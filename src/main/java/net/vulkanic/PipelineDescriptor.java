@@ -1020,6 +1020,7 @@ public final class PipelineDescriptor {
          */
         COMPARISON_SAMPLER,
         UNIFORM_BUFFER,
+        STORAGE_IMAGE,
         TEXEL_BUFFER;
 
         static ResourceType fromUniformType(UniformType uniformType) {

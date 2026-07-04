@@ -22,33 +22,39 @@ public final class PipelineResourceBindings {
 
     private final Map<String, SamplerBinding> samplerBindings;
     private final Map<String, VulkanicBufferSlice> uniformBufferBindings;
+    private final Map<String, StorageImageBinding> storageImageBindings;
     private final Map<String, TexelBufferBinding> texelBufferBindings;
 
     private PipelineResourceBindings(
         Map<String, SamplerBinding> samplerBindings,
         Map<String, VulkanicBufferSlice> uniformBufferBindings,
+        Map<String, StorageImageBinding> storageImageBindings,
         Map<String, TexelBufferBinding> texelBufferBindings
     ) {
         this.samplerBindings = Map.copyOf(samplerBindings);
         this.uniformBufferBindings = Map.copyOf(uniformBufferBindings);
+        this.storageImageBindings = Map.copyOf(storageImageBindings);
         this.texelBufferBindings = Map.copyOf(texelBufferBindings);
     }
 
     private PipelineResourceBindings(
         Map<String, SamplerBinding> samplerBindings,
         Map<String, VulkanicBufferSlice> uniformBufferBindings,
+        Map<String, StorageImageBinding> storageImageBindings,
         Map<String, TexelBufferBinding> texelBufferBindings,
         boolean adoptResolvedBindings
     ) {
         if (adoptResolvedBindings) {
             this.samplerBindings = Collections.unmodifiableMap(Objects.requireNonNull(samplerBindings, "samplerBindings must not be null"));
             this.uniformBufferBindings = Collections.unmodifiableMap(Objects.requireNonNull(uniformBufferBindings, "uniformBufferBindings must not be null"));
+            this.storageImageBindings = Collections.unmodifiableMap(Objects.requireNonNull(storageImageBindings, "storageImageBindings must not be null"));
             this.texelBufferBindings = Collections.unmodifiableMap(Objects.requireNonNull(texelBufferBindings, "texelBufferBindings must not be null"));
             return;
         }
 
         this.samplerBindings = Map.copyOf(samplerBindings);
         this.uniformBufferBindings = Map.copyOf(uniformBufferBindings);
+        this.storageImageBindings = Map.copyOf(storageImageBindings);
         this.texelBufferBindings = Map.copyOf(texelBufferBindings);
     }
 
@@ -65,9 +71,10 @@ public final class PipelineResourceBindings {
     public static PipelineResourceBindings ofResolvedBindings(
         Map<String, SamplerBinding> samplerBindings,
         Map<String, VulkanicBufferSlice> uniformBufferBindings,
+        Map<String, StorageImageBinding> storageImageBindings,
         Map<String, TexelBufferBinding> texelBufferBindings
     ) {
-        return new PipelineResourceBindings(samplerBindings, uniformBufferBindings, texelBufferBindings, true);
+        return new PipelineResourceBindings(samplerBindings, uniformBufferBindings, storageImageBindings, texelBufferBindings, true);
     }
 
     public Optional<SamplerBinding> getSamplerBinding(String name) {
@@ -103,6 +110,17 @@ public final class PipelineResourceBindings {
         return texelBufferBindings.get(name);
     }
 
+    public Optional<StorageImageBinding> getStorageImageBinding(String name) {
+        Objects.requireNonNull(name, "name must not be null");
+        return Optional.ofNullable(storageImageBindings.get(name));
+    }
+
+    @Nullable
+    public StorageImageBinding getStorageImageBindingOrNull(String name) {
+        Objects.requireNonNull(name, "name must not be null");
+        return storageImageBindings.get(name);
+    }
+
     /**
      * Validates these bindings against a descriptor resource layout.
      *
@@ -128,6 +146,11 @@ public final class PipelineResourceBindings {
                         missing.add(name + "(UNIFORM_BUFFER)");
                     }
                 }
+                case STORAGE_IMAGE -> {
+                    if (!storageImageBindings.containsKey(name)) {
+                        missing.add(name + "(STORAGE_IMAGE)");
+                    }
+                }
                 case TEXEL_BUFFER -> {
                     if (!texelBufferBindings.containsKey(name)) {
                         missing.add(name + "(TEXEL_BUFFER)");
@@ -139,6 +162,7 @@ public final class PipelineResourceBindings {
         List<String> unknown = new ArrayList<>();
         addUnknown(samplerBindings.keySet(), expectedNames, unknown, "SAMPLER");
         addUnknown(uniformBufferBindings.keySet(), expectedNames, unknown, "UNIFORM_BUFFER");
+        addUnknown(storageImageBindings.keySet(), expectedNames, unknown, "STORAGE_IMAGE");
         addUnknown(texelBufferBindings.keySet(), expectedNames, unknown, "TEXEL_BUFFER");
 
         if (!missing.isEmpty() || !unknown.isEmpty()) {
@@ -176,12 +200,13 @@ public final class PipelineResourceBindings {
         }
         return samplerBindings.equals(other.samplerBindings)
             && uniformBufferBindings.equals(other.uniformBufferBindings)
+            && storageImageBindings.equals(other.storageImageBindings)
             && texelBufferBindings.equals(other.texelBufferBindings);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(samplerBindings, uniformBufferBindings, texelBufferBindings);
+        return Objects.hash(samplerBindings, uniformBufferBindings, storageImageBindings, texelBufferBindings);
     }
 
     public record SamplerBinding(int textureUnit, @Nullable Integer samplerObject, @Nullable VulkanicTextureView textureView) {
@@ -215,9 +240,35 @@ public final class PipelineResourceBindings {
         }
     }
 
+    public record StorageImageBinding(
+        int imageUnit,
+        int texture,
+        int level,
+        boolean layered,
+        int layer,
+        int access,
+        int format
+    ) {
+        public StorageImageBinding {
+            if (imageUnit < 0) {
+                throw new IllegalArgumentException("imageUnit must be >= 0");
+            }
+            if (texture < 0) {
+                throw new IllegalArgumentException("texture must be >= 0");
+            }
+            if (level < 0) {
+                throw new IllegalArgumentException("level must be >= 0");
+            }
+            if (layer < 0) {
+                throw new IllegalArgumentException("layer must be >= 0");
+            }
+        }
+    }
+
     public static final class Builder {
         private final Map<String, SamplerBinding> samplerBindings = new HashMap<>();
         private final Map<String, VulkanicBufferSlice> uniformBufferBindings = new HashMap<>();
+        private final Map<String, StorageImageBinding> storageImageBindings = new HashMap<>();
         private final Map<String, TexelBufferBinding> texelBufferBindings = new HashMap<>();
 
         public Builder bindSampler(String name, int textureUnit) {
@@ -274,8 +325,18 @@ public final class PipelineResourceBindings {
             return this;
         }
 
+        public Builder bindStorageImage(String name, StorageImageBinding binding) {
+            String normalizedName = normalizeName(name);
+            ensureNameUnused(normalizedName);
+            storageImageBindings.put(
+                normalizedName,
+                Objects.requireNonNull(binding, "binding must not be null")
+            );
+            return this;
+        }
+
         public PipelineResourceBindings build() {
-            return new PipelineResourceBindings(samplerBindings, uniformBufferBindings, texelBufferBindings);
+            return new PipelineResourceBindings(samplerBindings, uniformBufferBindings, storageImageBindings, texelBufferBindings);
         }
 
         private String normalizeName(String name) {
@@ -289,6 +350,7 @@ public final class PipelineResourceBindings {
         private void ensureNameUnused(String name) {
             if (samplerBindings.containsKey(name)
                 || uniformBufferBindings.containsKey(name)
+                || storageImageBindings.containsKey(name)
                 || texelBufferBindings.containsKey(name)) {
                 throw new IllegalArgumentException(
                     "Resource name '" + name + "' is already bound. " +

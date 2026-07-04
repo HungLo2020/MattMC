@@ -1018,7 +1018,9 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             if (this.indexBuffer == null) {
                 throw new IllegalStateException("Can't draw indexed without an index buffer");
             }
-            this.bindPipelineAndResources();
+            if (!this.bindPipelineAndResources()) {
+                return;
+            }
             this.logDrawState(true, 0, baseVertex, firstIndex, indexCount, 0, instanceCount, this.indexType);
             this.pass.drawIndexed(firstIndex, indexCount, baseVertex, instanceCount);
         }
@@ -1051,7 +1053,9 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         @Override
         public void draw(int firstVertex, int vertexCount) {
             this.checkOpen();
-            this.bindPipelineAndResources();
+            if (!this.bindPipelineAndResources()) {
+                return;
+            }
             this.logDrawState(false, firstVertex, 0, 0, 0, vertexCount, 1, null);
             this.pass.draw(firstVertex, vertexCount);
         }
@@ -1083,10 +1087,9 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             }
         }
 
-        private void bindPipelineAndResources() {
+        private boolean bindPipelineAndResources() {
             if (this.customPass != null) {
-                this.bindCustomPassPipelineAndResources(this.customPass);
-                return;
+                return this.bindCustomPassPipelineAndResources(this.customPass);
             }
 
             RenderPipeline pipeline = this.requirePipeline();
@@ -1115,15 +1118,16 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
             if (this.isCachedResourceSubmission(handle, submission, false)) {
                 this.rememberSubmittedResources(handle, submission);
-                return;
+                return true;
             }
 
             this.pass.setPipeline(handle);
             VulkanNativeCommandEncoder.this.backend.bindPipelineResources(this.ctx, handle, submission.descriptor(), submission.bindings());
             this.cacheSubmittedResources(handle, submission, false);
+            return true;
         }
 
-        private void bindCustomPassPipelineAndResources(CustomPass pass) {
+        private boolean bindCustomPassPipelineAndResources(CustomPass pass) {
             RenderPipeline pipeline = this.requirePipeline();
             pass.bindRenderPassResources(this);
             pass.setupState();
@@ -1156,19 +1160,16 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                 );
             }
             if (!submission.completeCoverage()) {
-                String key = pipeline.getLocation() + "#" + this.framebuffer + "#"
-                    + (this.renderTargetDescriptor != null ? this.renderTargetDescriptor.label().get() : "no-descriptor");
-                if (WARNED_INCOMPLETE_CUSTOM_PASS_KEYS.add(key)) {
-                    LOGGER.warn(
-                        "Skipping Vulkan native custom pass {} because only {} of {} reflected resources were available; missingResources={}",
-                        pipeline.getLocation(),
-                        submission.boundResourceCount(),
-                        customDescriptor.getResourceLayout().bindings().size(),
-                        this.collectMissingCustomPassResources(customDescriptor, pass.program())
-                    );
-                }
                 throw new IllegalStateException(
-                    "Incomplete Vulkan native custom-pass resource coverage for " + pipeline.getLocation());
+                    "Incomplete Vulkan native custom-pass resource coverage for "
+                        + pipeline.getLocation()
+                        + ": only "
+                        + submission.boundResourceCount()
+                        + " of "
+                        + customDescriptor.getResourceLayout().bindings().size()
+                        + " reflected resources were available; missingResources="
+                        + this.collectMissingCustomPassResources(customDescriptor, pass.program())
+                );
             }
 
             PipelineHandle handle = pass.pipelineHandle(submission.descriptor());
@@ -1192,7 +1193,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
             if (this.isCachedResourceSubmission(handle, submission, true)) {
                 this.rememberSubmittedResources(handle, submission);
-                return;
+                return true;
             }
 
             this.pass.setPipeline(handle);
@@ -1203,6 +1204,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                 submission.bindings()
             );
             this.cacheSubmittedResources(handle, submission, true);
+            return true;
         }
 
         private boolean isCachedResourceSubmission(
@@ -1356,7 +1358,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                     activeProgram,
                     binding -> switch (binding.type()) {
                         case SAMPLER, COMPARISON_SAMPLER -> bindableSamplers.contains(binding.name());
-                        case UNIFORM_BUFFER, TEXEL_BUFFER -> true;
+                        case UNIFORM_BUFFER, STORAGE_IMAGE, TEXEL_BUFFER -> true;
                     }
                 );
                 if (liveDescriptor != null && liveDescriptor.hasSpirvModules()) {
@@ -1478,8 +1480,9 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                 @Override
                 @Nullable
                 public VulkanicTextureView samplerView(PipelineDescriptor.ResourceBinding binding) {
-                    return renderPassSamplerUnits.containsKey(binding.name())
-                        ? NativeRenderPass.this.getSamplerView(binding.name())
+                    Integer samplerUnit = renderPassSamplerUnits.get(binding.name());
+                    return samplerUnit != null
+                        ? NativeRenderPass.this.getSamplerView(binding.name(), samplerUnit)
                         : null;
                 }
 
@@ -1517,17 +1520,22 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
         @Nullable
         private VulkanicTextureView getSamplerView(String name) {
+            return this.getSamplerView(name, null);
+        }
+
+        @Nullable
+        private VulkanicTextureView getSamplerView(String name, @Nullable Integer textureUnit) {
             VulkanicTextureView view = this.samplers.get(name);
             if (view != null) {
                 return view;
             }
 
-            GpuTextureView recovered = this.recoverSamplerView(name);
+            GpuTextureView recovered = this.recoverSamplerView(name, textureUnit);
             if (recovered == null) {
                 return null;
             }
 
-            this.bindSampler(name, recovered);
+            this.bindSampler(name, recovered, textureUnit != null ? textureUnit : -1);
             return this.samplers.get(name);
         }
 
@@ -1542,23 +1550,21 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         }
 
         @Nullable
-        private GpuTextureView recoverSamplerView(String name) {
-            Integer samplerIndex = parseSamplerIndex(name);
-            if (samplerIndex == null) {
-                return null;
+        private GpuTextureView recoverSamplerView(String name, @Nullable Integer textureUnit) {
+            Integer samplerIndex = textureUnit != null ? textureUnit : parseSamplerIndex(name);
+            if (samplerIndex != null) {
+                GpuTextureView shaderTexture = TextureTracker.INSTANCE.getShaderTexture(samplerIndex);
+                if (shaderTexture != null) {
+                    return shaderTexture;
+                }
+
+                int textureId = IrisRenderSystem.getTextureBinding(samplerIndex);
+                if (textureId != 0) {
+                    return TextureTracker.INSTANCE.getTextureView(textureId);
+                }
             }
 
-            GpuTextureView shaderTexture = TextureTracker.INSTANCE.getShaderTexture(samplerIndex);
-            if (shaderTexture != null) {
-                return shaderTexture;
-            }
-
-            int textureId = IrisRenderSystem.getTextureBinding(samplerIndex);
-            if (textureId == 0) {
-                return null;
-            }
-
-            return TextureTracker.INSTANCE.getTextureView(textureId);
+            return null;
         }
 
         private RenderPipeline requirePipeline() {

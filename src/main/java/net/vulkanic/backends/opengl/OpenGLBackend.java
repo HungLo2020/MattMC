@@ -3337,6 +3337,7 @@ public class OpenGLBackend implements GraphicsBackend {
             case BGRA8  -> new int[]{org.lwjgl.opengl.GL11.GL_RGBA8};
             case RED8   -> new int[]{org.lwjgl.opengl.GL30.GL_R8};
             case RED8I  -> new int[]{org.lwjgl.opengl.GL30.GL_R8I};
+            case RED8UI -> new int[]{org.lwjgl.opengl.GL30.GL_R8UI};
             case DEPTH32 -> new int[]{org.lwjgl.opengl.GL14.GL_DEPTH_COMPONENT32};
             case DEPTH24_STENCIL8 -> new int[]{net.vulkanic.VulkanicAPI.GL_DEPTH24_STENCIL8};
             case DEPTH32F_STENCIL8 -> new int[]{net.vulkanic.VulkanicAPI.GL_DEPTH32F_STENCIL8};
@@ -3348,7 +3349,8 @@ public class OpenGLBackend implements GraphicsBackend {
             case RGBA8, RGBA16F, RGBA8_SNORM -> org.lwjgl.opengl.GL11.GL_RGBA;
             case R11F_G11F_B10F -> org.lwjgl.opengl.GL11.GL_RGB;
             case BGRA8  -> net.vulkanic.VulkanicAPI.GL_BGRA;
-            case RED8, RED8I, RED16F, RED32F -> org.lwjgl.opengl.GL30.GL_RED;
+            case RED8, RED16F, RED32F -> org.lwjgl.opengl.GL30.GL_RED;
+            case RED8I, RED8UI -> net.vulkanic.VulkanicAPI.GL_RED_INTEGER;
             case DEPTH32 -> org.lwjgl.opengl.GL11.GL_DEPTH_COMPONENT;
             case DEPTH24_STENCIL8, DEPTH32F_STENCIL8 -> net.vulkanic.VulkanicAPI.GL_DEPTH_STENCIL;
         };
@@ -3356,7 +3358,7 @@ public class OpenGLBackend implements GraphicsBackend {
 
     private static int toGlType(net.vulkanic.VulkanicTextureFormat format) {
         return switch (format) {
-            case RGBA8, BGRA8, RED8  -> org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
+            case RGBA8, BGRA8, RED8, RED8UI -> org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
             case RGBA16F      -> net.vulkanic.VulkanicAPI.GL_HALF_FLOAT;
             case RGBA8_SNORM  -> org.lwjgl.opengl.GL11.GL_BYTE;
             case R11F_G11F_B10F -> net.vulkanic.VulkanicAPI.GL_UNSIGNED_INT_10F_11F_11F_REV;
@@ -3592,6 +3594,27 @@ public class OpenGLBackend implements GraphicsBackend {
                         glBuffer.getGlHandle(),
                         slice.offset(),
                         slice.length());
+                }
+                case STORAGE_IMAGE -> {
+                    net.vulkanic.PipelineResourceBindings.StorageImageBinding imageBinding =
+                        bindings.getStorageImageBinding(resource.name())
+                            .orElseThrow(() -> new IllegalStateException(
+                                "Missing storage-image binding for '" + resource.name() + "' after validation"));
+
+                    int location = getUniformLocation(ctx, program, resource.name());
+                    if (location >= 0) {
+                        setUniform1i(ctx, location, imageBinding.imageUnit());
+                    }
+                    bindImageTexture(
+                        ctx,
+                        imageBinding.imageUnit(),
+                        imageBinding.texture(),
+                        imageBinding.level(),
+                        imageBinding.layered(),
+                        imageBinding.layer(),
+                        imageBinding.access(),
+                        imageBinding.format()
+                    );
                 }
                 case TEXEL_BUFFER -> {
                     net.vulkanic.PipelineResourceBindings.TexelBufferBinding texelBufferBinding =

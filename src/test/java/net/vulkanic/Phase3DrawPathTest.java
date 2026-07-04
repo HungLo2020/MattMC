@@ -475,8 +475,9 @@ public class Phase3DrawPathTest {
 	                && nativeCommandEncoderSource.contains("buildCustomPassResourceBindings("),
 	            "VulkanNativeCommandEncoder should own descriptor-backed custom-pass resource binding and pipeline resolution");
 	        assertTrue(nativeCommandEncoderSource.contains("if (!submission.completeCoverage())")
-	                && nativeCommandEncoderSource.contains("Incomplete Vulkan native custom-pass resource coverage"),
-	            "VulkanNativeCommandEncoder should fail closed instead of submitting underbound native custom passes");
+	                && nativeCommandEncoderSource.contains("Incomplete Vulkan native custom-pass resource coverage")
+	                && nativeCommandEncoderSource.contains("recoverSamplerView(String name, @Nullable Integer textureUnit)"),
+	            "VulkanNativeCommandEncoder should recover named shaderpack samplers from their render-pass texture units and fail fast if coverage is still incomplete");
 	    }
 
     @Test

@@ -1132,6 +1132,94 @@ public class VulkanBackendSpirvPathTest {
     }
 
     @Test
+    public void testVulkanComputeCapabilityIsReportedWhenBackendImplementsDispatchPath() {
+        VulkanBackend backend = new VulkanBackend((stage, source, sourceName, entryPoint) ->
+            new VulkanicSpirvModule(stage, entryPoint, new byte[]{0x61, 0x62}, sourceName, "stub")
+        );
+
+        assertTrue(backend.checkFunctionAvailable("glDispatchCompute"));
+        assertTrue(backend.checkFunctionAvailable("glDispatchComputeIndirect"));
+        assertTrue(backend.checkFunctionAvailable("glBindImageTexture"));
+        assertTrue(backend.checkFunctionAvailable("glMemoryBarrier"));
+        assertFalse(backend.checkFunctionAvailable("glNamedStringARB"));
+    }
+
+    @Test
+    public void testComputeImageUniformsBecomeStorageImageResourceBindings() {
+        List<String> capturedSources = new ArrayList<>();
+        VulkanBackend backend = new VulkanBackend((stage, source, sourceName, entryPoint) -> {
+            capturedSources.add(source.toString());
+            return new VulkanicSpirvModule(stage, entryPoint, new byte[]{0x63, 0x64}, sourceName, "stub");
+        });
+
+        int shader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_COMPUTE_SHADER);
+        uploadSource(
+            backend,
+            shader,
+            "#version 430\n"
+                + "layout(local_size_x = 8, local_size_y = 4, local_size_z = 2) in;\n"
+                + "writeonly uniform image3D floodfill_img;\n"
+                + "readonly uniform image2D source_img;\n"
+                + "void main(){ imageStore(floodfill_img, ivec3(gl_GlobalInvocationID.xyz), vec4(1.0)); }"
+        );
+        backend.compileShader(TEST_CONTEXT, shader);
+
+        int program = backend.createShaderProgram(TEST_CONTEXT);
+        backend.attachShader(TEST_CONTEXT, program, shader);
+        backend.linkProgram(TEST_CONTEXT, program);
+
+        VulkanCommandContext introspectionContext = new VulkanCommandContext(1L, "compute-image-layout-test");
+        PipelineDescriptor.ResourceLayout layout = backend.getLinkedProgramResourceLayout(
+            introspectionContext,
+            program,
+            Set.of(VulkanicShaderStage.COMPUTE)
+        );
+
+        PipelineDescriptor.ResourceBinding floodfill = layout.findByName("floodfill_img").orElseThrow();
+        PipelineDescriptor.ResourceBinding source = layout.findByName("source_img").orElseThrow();
+        assertEquals(PipelineDescriptor.ResourceType.STORAGE_IMAGE, floodfill.type());
+        assertEquals(PipelineDescriptor.ResourceType.STORAGE_IMAGE, source.type());
+        assertEquals(Set.of(VulkanicShaderStage.COMPUTE), floodfill.stages());
+        assertEquals(0, floodfill.binding());
+        assertEquals(1, source.binding());
+        assertTrue(capturedSources.stream().anyMatch(text ->
+            text.contains("layout(set = 0, binding = 0) writeonly uniform image3D floodfill_img;")));
+        assertTrue(capturedSources.stream().anyMatch(text ->
+            text.contains("layout(set = 0, binding = 1) readonly uniform image2D source_img;")));
+    }
+
+    @Test
+    public void testComputeWorkGroupSizeIsReflectedForIrisComputePrograms() {
+        VulkanBackend backend = new VulkanBackend((stage, source, sourceName, entryPoint) ->
+            new VulkanicSpirvModule(stage, entryPoint, new byte[]{0x65, 0x66}, sourceName, "stub")
+        );
+
+        int shader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_COMPUTE_SHADER);
+        uploadSource(
+            backend,
+            shader,
+            "#version 430\n"
+                + "layout(local_size_x = 8, local_size_y = 16) in;\n"
+                + "void main(){}"
+        );
+        backend.compileShader(TEST_CONTEXT, shader);
+
+        int program = backend.createShaderProgram(TEST_CONTEXT);
+        backend.attachShader(TEST_CONTEXT, program, shader);
+        backend.linkProgram(TEST_CONTEXT, program);
+
+        int[] localSize = new int[3];
+        backend.getProgramiv(
+            new VulkanCommandContext(1L, "compute-local-size-test"),
+            program,
+            VulkanicAPI.GL_COMPUTE_WORK_GROUP_SIZE,
+            localSize
+        );
+
+        assertArrayEquals(new int[]{8, 16, 1}, localSize);
+    }
+
+    @Test
     public void testSourceWiresNativeVulkanShaderModuleLifecycle() throws Exception {
         String source = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));

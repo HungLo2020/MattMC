@@ -25,6 +25,8 @@ public enum VulkanicTextureFormat {
     RED8(1),
     /** 1-component red, 8 bits (signed integer). */
     RED8I(1),
+    /** 1-component red, 8 bits (unsigned integer). */
+    RED8UI(1),
     /** 32-bit depth. */
     DEPTH32(4),
     /** 24-bit depth plus 8-bit stencil. */
@@ -53,7 +55,8 @@ public enum VulkanicTextureFormat {
             || this == RED32F
             || this == BGRA8
             || this == RED8
-            || this == RED8I;
+            || this == RED8I
+            || this == RED8UI;
     }
 
     /** Returns true if this format has a depth component. */

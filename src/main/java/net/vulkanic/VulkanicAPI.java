@@ -5585,6 +5585,9 @@ public class VulkanicAPI {
                 ? PipelineDescriptor.ResourceType.COMPARISON_SAMPLER
                 : PipelineDescriptor.ResourceType.SAMPLER);
         }
+        if (reflectionType.isPresent() && reflectionType.get().isImage()) {
+            return java.util.Optional.of(PipelineDescriptor.ResourceType.STORAGE_IMAGE);
+        }
         return java.util.Optional.empty();
     }
 

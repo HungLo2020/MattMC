@@ -624,6 +624,7 @@ public class VulkanicTypedApiRoutingTest {
             java.util.List.of("Globals"),
             java.util.List.of(
                 new RecordingInvocationHandler.ReflectedUniform("Sampler0[0]", 1, VulkanicAPI.GL_SAMPLER_2D),
+                new RecordingInvocationHandler.ReflectedUniform("floodfill_img", 1, VulkanicAPI.GL_IMAGE_3D),
                 new RecordingInvocationHandler.ReflectedUniform("IgnoredScalar", 1, VulkanicAPI.GL_FLOAT)
             )
         );
@@ -635,13 +636,16 @@ public class VulkanicTypedApiRoutingTest {
             java.util.Set.of(VulkanicShaderStage.FRAGMENT)
         );
 
-        assertEquals(2, layout.bindings().size());
+        assertEquals(3, layout.bindings().size());
         assertEquals("Globals", layout.bindings().get(0).name());
         assertEquals(PipelineDescriptor.ResourceType.UNIFORM_BUFFER, layout.bindings().get(0).type());
         assertEquals(java.util.Set.of(VulkanicShaderStage.FRAGMENT), layout.bindings().get(0).stages());
         assertEquals("Sampler0", layout.bindings().get(1).name());
         assertEquals(PipelineDescriptor.ResourceType.SAMPLER, layout.bindings().get(1).type());
         assertEquals(java.util.Set.of(VulkanicShaderStage.FRAGMENT), layout.bindings().get(1).stages());
+        assertEquals("floodfill_img", layout.bindings().get(2).name());
+        assertEquals(PipelineDescriptor.ResourceType.STORAGE_IMAGE, layout.bindings().get(2).type());
+        assertEquals(java.util.Set.of(VulkanicShaderStage.FRAGMENT), layout.bindings().get(2).stages());
 
         RecordedInvocation invocation = invocationHandler.lastInvocation;
         assertNotNull(invocation);

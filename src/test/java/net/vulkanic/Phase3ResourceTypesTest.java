@@ -816,6 +816,7 @@ public class Phase3ResourceTypesTest {
                 case SAMPLER, COMPARISON_SAMPLER -> PipelineResourcePlanner.ResolvedResource.sampler(
                     new PipelineResourceBindings.SamplerBinding(5, 44, textureView));
                 case UNIFORM_BUFFER -> PipelineResourcePlanner.ResolvedResource.uniformBuffer(uniformSlice);
+                case STORAGE_IMAGE -> null;
                 case TEXEL_BUFFER -> null;
             },
             PipelineResourcePlanner.options()

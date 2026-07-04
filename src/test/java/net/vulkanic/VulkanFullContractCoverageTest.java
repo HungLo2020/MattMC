@@ -126,7 +126,9 @@ public class VulkanFullContractCoverageTest {
         assertFalse(vulkanBackend.checkOpenGL32Support());
         assertFalse(vulkanBackend.checkOpenGL33Support());
         assertFalse(vulkanBackend.checkARBInstancedArraysSupport());
-        assertFalse(vulkanBackend.checkFunctionAvailable("glDispatchCompute"));
+        assertTrue(vulkanBackend.checkFunctionAvailable("glDispatchCompute"));
+        assertTrue(vulkanBackend.checkFunctionAvailable("glBindImageTexture"));
+        assertFalse(vulkanBackend.checkFunctionAvailable("glNamedStringARB"));
     }
 
     @Test
@@ -150,12 +152,31 @@ public class VulkanFullContractCoverageTest {
         assertTrue(copyException.getMessage().contains("copyImageSubData"),
             "Implemented native-backed copy paths should fail fast with operation context when Vulkan is not ready");
 
-        assertDoesNotThrow(() -> vulkanBackend.dispatchCompute(stubCtx, 1, 1, 1));
-        assertDoesNotThrow(() -> vulkanBackend.dispatchComputeIndirect(stubCtx, 0L));
+        IllegalStateException dispatchException = assertThrows(IllegalStateException.class,
+            () -> vulkanBackend.dispatchCompute(stubCtx, 1, 1, 1));
+        assertTrue(dispatchException.getMessage().contains("dispatchCompute"));
+
+        IllegalStateException indirectDispatchException = assertThrows(IllegalStateException.class,
+            () -> vulkanBackend.dispatchComputeIndirect(stubCtx, 0L));
+        assertTrue(indirectDispatchException.getMessage().contains("dispatchComputeIndirect"));
         assertDoesNotThrow(() -> vulkanBackend.memoryBarrier(stubCtx, 0));
         assertDoesNotThrow(() -> vulkanBackend.texBuffer(stubCtx, VulkanicAPI.GL_TEXTURE_BUFFER, 0, 0));
         assertDoesNotThrow(() -> vulkanBackend.uploadTexture1D(stubCtx, VulkanicAPI.GL_TEXTURE_1D, 0, 0, 16, 0, 0, 0, (ByteBuffer) null));
-        assertDoesNotThrow(() -> vulkanBackend.uploadTexture3D(stubCtx, VulkanicAPI.GL_TEXTURE_3D, 0, 0, 4, 4, 4, 0, 0, 0, (ByteBuffer) null));
+        IllegalStateException texture3DException = assertThrows(IllegalStateException.class,
+            () -> vulkanBackend.uploadTexture3D(
+                stubCtx,
+                VulkanicAPI.GL_TEXTURE_3D,
+                0,
+                VulkanicAPI.GL_RGBA16F,
+                4,
+                4,
+                4,
+                0,
+                VulkanicAPI.GL_RGBA,
+                VulkanicAPI.GL_HALF_FLOAT,
+                (ByteBuffer) null
+            ));
+        assertTrue(texture3DException.getMessage().contains("uploadTexture3D"));
         assertDoesNotThrow(() -> vulkanBackend.readPixels(stubCtx, 0, 0, 1, 1, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_FLOAT, new float[4]));
     }
 

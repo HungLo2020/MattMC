@@ -64,6 +64,12 @@ public final class VulkanicPipelineResourceResolver {
                         missing.add(binding.name() + "(UNIFORM_BUFFER)");
                     }
                 }
+                case STORAGE_IMAGE -> {
+                    PipelineResourceBindings.StorageImageBinding imageBinding = lookup.storageImageBinding(binding);
+                    if (imageBinding == null) {
+                        missing.add(binding.name() + "(STORAGE_IMAGE)");
+                    }
+                }
                 case TEXEL_BUFFER -> {
                     Integer textureUnit = lookup.texelBufferUnit(binding);
                     if (textureUnit == null) {
@@ -99,6 +105,10 @@ public final class VulkanicPipelineResourceResolver {
             case UNIFORM_BUFFER -> {
                 VulkanicBufferSlice slice = resolveUniformSlice(ctx, binding, lookup);
                 yield slice != null ? PipelineResourcePlanner.ResolvedResource.uniformBuffer(slice) : null;
+            }
+            case STORAGE_IMAGE -> {
+                PipelineResourceBindings.StorageImageBinding imageBinding = lookup.storageImageBinding(binding);
+                yield imageBinding != null ? PipelineResourcePlanner.ResolvedResource.storageImage(imageBinding) : null;
             }
             case TEXEL_BUFFER -> {
                 Integer textureUnit = lookup.texelBufferUnit(binding);
@@ -140,6 +150,11 @@ public final class VulkanicPipelineResourceResolver {
 
         @Nullable
         Integer texelBufferUnit(PipelineDescriptor.ResourceBinding binding);
+
+        @Nullable
+        default PipelineResourceBindings.StorageImageBinding storageImageBinding(PipelineDescriptor.ResourceBinding binding) {
+            return null;
+        }
 
         @Nullable
         Integer standaloneProgramId(PipelineDescriptor.ResourceBinding binding);

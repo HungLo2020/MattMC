@@ -34,6 +34,7 @@ public final class PipelineResourcePlanner {
         int layoutBindingCount = layoutBindings.size();
         Map<String, PipelineResourceBindings.SamplerBinding> samplerBindings = new HashMap<>(layoutBindingCount);
         Map<String, VulkanicBufferSlice> uniformBufferBindings = new HashMap<>(layoutBindingCount);
+        Map<String, PipelineResourceBindings.StorageImageBinding> storageImageBindings = new HashMap<>(layoutBindingCount);
         Map<String, PipelineResourceBindings.TexelBufferBinding> texelBufferBindings = new HashMap<>(layoutBindingCount);
         List<PipelineDescriptor.ResourceBinding> boundResources = new ArrayList<>(layoutBindingCount);
         List<String> missingResources = options.collectMissingResources() ? new ArrayList<>() : List.of();
@@ -66,6 +67,15 @@ public final class PipelineResourcePlanner {
                         missingResources.add(options.missingResourceDescriber().describe(binding));
                     }
                 }
+                case STORAGE_IMAGE -> {
+                    PipelineResourceBindings.StorageImageBinding storageImageBinding = resolvedResource.storageImageBinding();
+                    if (storageImageBinding != null) {
+                        storageImageBindings.put(binding.name(), storageImageBinding);
+                        boundResources.add(binding);
+                    } else if (options.collectMissingResources()) {
+                        missingResources.add(options.missingResourceDescriber().describe(binding));
+                    }
+                }
                 case TEXEL_BUFFER -> {
                     PipelineResourceBindings.TexelBufferBinding texelBufferBinding = resolvedResource.texelBufferBinding();
                     if (texelBufferBinding != null) {
@@ -89,7 +99,12 @@ public final class PipelineResourcePlanner {
 
         return new Plan(
             submissionDescriptor,
-            PipelineResourceBindings.ofResolvedBindings(samplerBindings, uniformBufferBindings, texelBufferBindings),
+            PipelineResourceBindings.ofResolvedBindings(
+                samplerBindings,
+                uniformBufferBindings,
+                storageImageBindings,
+                texelBufferBindings
+            ),
             completeCoverage,
             boundResources.size(),
             missingResources
@@ -143,18 +158,28 @@ public final class PipelineResourcePlanner {
     public record ResolvedResource(
         @Nullable PipelineResourceBindings.SamplerBinding samplerBinding,
         @Nullable VulkanicBufferSlice uniformBufferSlice,
+        @Nullable PipelineResourceBindings.StorageImageBinding storageImageBinding,
         @Nullable PipelineResourceBindings.TexelBufferBinding texelBufferBinding
     ) {
         public static ResolvedResource sampler(PipelineResourceBindings.SamplerBinding samplerBinding) {
-            return new ResolvedResource(Objects.requireNonNull(samplerBinding, "samplerBinding must not be null"), null, null);
+            return new ResolvedResource(Objects.requireNonNull(samplerBinding, "samplerBinding must not be null"), null, null, null);
         }
 
         public static ResolvedResource uniformBuffer(VulkanicBufferSlice slice) {
-            return new ResolvedResource(null, Objects.requireNonNull(slice, "slice must not be null"), null);
+            return new ResolvedResource(null, Objects.requireNonNull(slice, "slice must not be null"), null, null);
+        }
+
+        public static ResolvedResource storageImage(PipelineResourceBindings.StorageImageBinding storageImageBinding) {
+            return new ResolvedResource(
+                null,
+                null,
+                Objects.requireNonNull(storageImageBinding, "storageImageBinding must not be null"),
+                null
+            );
         }
 
         public static ResolvedResource texelBuffer(PipelineResourceBindings.TexelBufferBinding texelBufferBinding) {
-            return new ResolvedResource(null, null, Objects.requireNonNull(texelBufferBinding, "texelBufferBinding must not be null"));
+            return new ResolvedResource(null, null, null, Objects.requireNonNull(texelBufferBinding, "texelBufferBinding must not be null"));
         }
     }
 

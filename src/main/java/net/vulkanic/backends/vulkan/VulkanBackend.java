@@ -83,6 +83,7 @@ import org.lwjgl.vulkan.VkCommandBuffer;
 import org.lwjgl.vulkan.VkCommandBufferAllocateInfo;
 import org.lwjgl.vulkan.VkCommandBufferBeginInfo;
 import org.lwjgl.vulkan.VkCommandPoolCreateInfo;
+import org.lwjgl.vulkan.VkComputePipelineCreateInfo;
 import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkDeviceCreateInfo;
 import org.lwjgl.vulkan.VkDeviceQueueCreateInfo;
@@ -197,11 +198,15 @@ public class VulkanBackend {
     );
     private static final Pattern GLSL_LAYOUT_LOCATION_PATTERN = Pattern.compile("\\blocation\\s*=\\s*(\\d+)");
     private static final Pattern GLSL_UNIFORM_BLOCK_PATTERN = Pattern.compile("(?m)(?:layout\\s*\\(([^)]*)\\)\\s*)?uniform\\s+(\\w+)\\s*\\{");
+    private static final String GLSL_UNIFORM_QUALIFIER_PATTERN =
+        "(?:(?:lowp|mediump|highp|readonly|writeonly|coherent|volatile|restrict)\\s+)*";
     private static final Pattern GLSL_STANDALONE_UNIFORM_PATTERN = Pattern.compile(
-        "(?m)^\\s*(?:layout\\s*\\(([^)]*)\\)\\s*)?(?:lowp\\s+|mediump\\s+|highp\\s+)?uniform\\s+(\\w+)\\s+(\\w+)(?:\\s*\\[\\s*(\\d+)\\s*\\])?(?:\\s*=\\s*[^;]+)?\\s*;"
+        "(?m)^\\s*(?:layout\\s*\\(([^)]*)\\)\\s*)?" + GLSL_UNIFORM_QUALIFIER_PATTERN
+            + "uniform\\s+(\\w+)\\s+(\\w+)(?:\\s*\\[\\s*(\\d+)\\s*\\])?(?:\\s*=\\s*[^;]+)?\\s*;"
     );
     private static final Pattern GLSL_LAYOUT_SET_PATTERN = Pattern.compile("\\bset\\s*=\\s*(\\d+)\\b");
     private static final Pattern GLSL_LAYOUT_BINDING_PATTERN = Pattern.compile("\\bbinding\\s*=\\s*(\\d+)\\b");
+    private static final Pattern GLSL_LOCAL_SIZE_PATTERN = Pattern.compile("\\blocal_size_([xyz])\\s*=\\s*(\\d+)\\b");
     private static final Pattern GLSL_STANDALONE_UNIFORM_MEMBER_PATTERN = Pattern.compile(
         "^\\s*(\\w+)\\s+(\\w+)(?:\\s*\\[\\s*(\\d+)\\s*\\])?\\s*;\\s*$"
     );
@@ -311,6 +316,7 @@ public class VulkanBackend {
     private final ConcurrentHashMap<DescriptorPipelineKey, PipelineHandle> descriptorPipelineCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<RenderTargetPipelineKey, PipelineHandle> renderTargetPipelineCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<LegacyProgramPipelineKey, PipelineHandle> legacyProgramPipelineCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<LegacyComputePipelineKey, PipelineHandle> legacyComputePipelineCache = new ConcurrentHashMap<>();
 
     // Virtual query/sync tracking for GL-compat control flow on the Vulkan path
     private final AtomicInteger nextVirtualQueryId = new AtomicInteger(1);
@@ -461,6 +467,17 @@ public class VulkanBackend {
             Objects.requireNonNull(pipelineCompilationKey, "pipelineCompilationKey must not be null");
             Objects.requireNonNull(resourceLayoutKey, "resourceLayoutKey must not be null");
             Objects.requireNonNull(renderPassCompatibilityKey, "renderPassCompatibilityKey must not be null");
+        }
+    }
+
+    private record LegacyComputePipelineKey(
+        int programId,
+        String pipelineCompilationKey,
+        String resourceLayoutKey
+    ) {
+        private LegacyComputePipelineKey {
+            Objects.requireNonNull(pipelineCompilationKey, "pipelineCompilationKey must not be null");
+            Objects.requireNonNull(resourceLayoutKey, "resourceLayoutKey must not be null");
         }
     }
 
@@ -713,6 +730,12 @@ void main() {
             }
         }
         legacyProgramPipelineCache.clear();
+        for (PipelineHandle pipelineHandle : new ArrayList<>(legacyComputePipelineCache.values())) {
+            if (pipelineHandle != null) {
+                pipelineHandle.close();
+            }
+        }
+        legacyComputePipelineCache.clear();
     }
 
     private PrecompiledPipelineState compilePrecompiledPipeline(
@@ -1194,7 +1217,8 @@ void main() {
 
     private static String injectExplicitNamedUniformBinding(String shaderSource, String uniformName, int bindingIndex) {
         java.util.regex.Pattern layoutPattern = java.util.regex.Pattern.compile(
-            "(?m)(^\\s*)layout\\s*\\(([^)]*)\\)\\s*uniform\\s+([A-Za-z0-9_]+)\\s+"
+            "(?m)(^\\s*)layout\\s*\\(([^)]*)\\)\\s*(" + GLSL_UNIFORM_QUALIFIER_PATTERN
+                + ")uniform\\s+([A-Za-z0-9_]+)\\s+"
                 + java.util.regex.Pattern.quote(uniformName)
                 + "\\s*;"
         );
@@ -1208,8 +1232,10 @@ void main() {
             return layoutMatcher.replaceFirst(
                 java.util.regex.Matcher.quoteReplacement(
                     layoutMatcher.group(1)
-                        + "layout(" + layoutBody + ", set = 0, binding = " + bindingIndex + ") uniform "
+                        + "layout(" + layoutBody + ", set = 0, binding = " + bindingIndex + ") "
                         + layoutMatcher.group(3)
+                        + "uniform "
+                        + layoutMatcher.group(4)
                         + " "
                         + uniformName
                         + ";"
@@ -1218,7 +1244,9 @@ void main() {
         }
 
         java.util.regex.Pattern plainPattern = java.util.regex.Pattern.compile(
-            "(?m)(^\\s*)uniform\\s+([A-Za-z0-9_]+)\\s+" + java.util.regex.Pattern.quote(uniformName) + "\\s*;"
+            "(?m)(^\\s*)(" + GLSL_UNIFORM_QUALIFIER_PATTERN + ")uniform\\s+([A-Za-z0-9_]+)\\s+"
+                + java.util.regex.Pattern.quote(uniformName)
+                + "\\s*;"
         );
         java.util.regex.Matcher plainMatcher = plainPattern.matcher(shaderSource);
         if (!plainMatcher.find()) {
@@ -1228,8 +1256,10 @@ void main() {
         return plainMatcher.replaceFirst(
             java.util.regex.Matcher.quoteReplacement(
                 plainMatcher.group(1)
-                    + "layout(set = 0, binding = " + bindingIndex + ") uniform "
+                    + "layout(set = 0, binding = " + bindingIndex + ") "
                     + plainMatcher.group(2)
+                    + "uniform "
+                    + plainMatcher.group(3)
                     + " "
                     + uniformName
                     + ";"
@@ -2339,7 +2369,8 @@ void main() {
                     resourceBinding.binding()
                 );
             } else if (resourceBinding.type() == PipelineDescriptor.ResourceType.SAMPLER
-                || resourceBinding.type() == PipelineDescriptor.ResourceType.COMPARISON_SAMPLER) {
+                || resourceBinding.type() == PipelineDescriptor.ResourceType.COMPARISON_SAMPLER
+                || resourceBinding.type() == PipelineDescriptor.ResourceType.STORAGE_IMAGE) {
                 reboundSource = injectExplicitNamedUniformBinding(
                     reboundSource,
                     resourceBinding.name(),
@@ -2489,7 +2520,7 @@ void main() {
         for (ReflectedUniform uniform : activeUniforms) {
             Optional<net.vulkanic.VulkanicUniformReflectionType> reflectionType =
                 net.vulkanic.VulkanicUniformReflectionType.fromLegacyGlConstant(uniform.legacyType());
-            if (reflectionType.isEmpty() || !reflectionType.get().isSampler()) {
+            if (reflectionType.isEmpty() || (!reflectionType.get().isSampler() && !reflectionType.get().isImage())) {
                 continue;
             }
             String uniformName = uniform.name();
@@ -2504,7 +2535,9 @@ void main() {
                 || reflectionType.get() == net.vulkanic.VulkanicUniformReflectionType.SAMPLER_CUBE_SHADOW;
             requests.add(new ReflectedResourceRequest(
                 uniformName,
-                comparisonSampler
+                reflectionType.get().isImage()
+                    ? PipelineDescriptor.ResourceType.STORAGE_IMAGE
+                    : comparisonSampler
                     ? PipelineDescriptor.ResourceType.COMPARISON_SAMPLER
                     : PipelineDescriptor.ResourceType.SAMPLER
             ));
@@ -2576,6 +2609,7 @@ void main() {
         Set<String> activeUniformBlocks = new java.util.LinkedHashSet<>();
         Map<String, ExplicitDescriptorBinding> explicitBindings = new java.util.LinkedHashMap<>();
         List<String> standaloneUniformDeclarations = collectStandaloneUniformDeclarations(virtualProgram);
+        int[] computeWorkGroupSize = new int[]{1, 1, 1};
 
         for (int shaderId : sortedAttachedShaderIds(virtualProgram)) {
             VirtualShader virtualShader = virtualShaders.get(shaderId);
@@ -2587,6 +2621,9 @@ void main() {
             String normalizedSource = GLSL_LINE_COMMENT_PATTERN.matcher(
                 GLSL_BLOCK_COMMENT_PATTERN.matcher(reflectedSource).replaceAll("")
             ).replaceAll("");
+            if (virtualShader.stage == VulkanicShaderStage.COMPUTE) {
+                computeWorkGroupSize = parseComputeWorkGroupSize(normalizedSource);
+            }
             Matcher blockMatcher = GLSL_UNIFORM_BLOCK_PATTERN.matcher(normalizedSource);
             while (blockMatcher.find()) {
                 String blockName = normalizeIrisUniformBlockName(blockMatcher.group(2));
@@ -2630,10 +2667,27 @@ void main() {
             virtualProgram.activeUniforms,
             explicitBindings
         );
+        virtualProgram.computeWorkGroupSize = computeWorkGroupSize;
         virtualProgram.standaloneUniformDeclarations = standaloneUniformDeclarations;
         logStandaloneSliceTraceInternal(programId, "reflection", null, virtualProgram, null, false, null);
         initializeStandaloneUniformState(programId, virtualProgram, activeUniforms);
 
+    }
+
+    private static int[] parseComputeWorkGroupSize(String shaderSource) {
+        int[] localSize = new int[]{1, 1, 1};
+        Matcher matcher = GLSL_LOCAL_SIZE_PATTERN.matcher(shaderSource);
+        while (matcher.find()) {
+            int value = Math.max(1, Integer.parseInt(matcher.group(2)));
+            switch (matcher.group(1)) {
+                case "x" -> localSize[0] = value;
+                case "y" -> localSize[1] = value;
+                case "z" -> localSize[2] = value;
+                default -> {
+                }
+            }
+        }
+        return localSize;
     }
 
     private void initializeStandaloneUniformState(
@@ -3407,7 +3461,9 @@ void main() {
         int mipLevels = Math.max(1, legacyTexture.mipLevels);
         int width = Math.max(1, legacyTexture.width);
         int height = Math.max(1, legacyTexture.height);
-        int depthOrLayers = NativeSpine.legacyTextureLayerCount(legacyTexture);
+        int depthOrLayers = NativeSpine.isLegacy3DTexture(legacyTexture.target)
+            ? Math.max(1, legacyTexture.depth)
+            : NativeSpine.legacyTextureLayerCount(legacyTexture);
         VulkanicTextureFormat format;
         try {
             format = NativeSpine.wrappedTextureFormatForVkFormat(legacyTexture.vkFormat);
@@ -3999,6 +4055,11 @@ void main() {
                     1,
                     VK10.VK_IMAGE_ASPECT_COLOR_BIT
                 );
+                case VulkanicAPI.GL_R8UI -> new LegacyTextureFormatInfo(
+                    VK10.VK_FORMAT_R8_UINT,
+                    1,
+                    VK10.VK_IMAGE_ASPECT_COLOR_BIT
+                );
                 case VulkanicAPI.GL_RGBA8 -> new LegacyTextureFormatInfo(
                     VK10.VK_FORMAT_R8G8B8A8_UNORM,
                     4,
@@ -4361,6 +4422,55 @@ void main() {
     }
 
     @Nullable
+    private PipelineDescriptor createLegacyComputePipelineDescriptor(int programId) {
+        VirtualProgram virtualProgram = virtualPrograms.get(programId);
+        if (virtualProgram == null || !virtualProgram.linkStatus || virtualProgram.linkedSpirvModules.isEmpty()) {
+            return null;
+        }
+
+        List<VulkanicSpirvModule> computeModules = virtualProgram.linkedSpirvModules.stream()
+            .filter(module -> module.stage() == VulkanicShaderStage.COMPUTE)
+            .toList();
+        if (computeModules.size() != 1) {
+            return null;
+        }
+
+        PipelineDescriptor.ResourceLayout resourceLayout = getLinkedProgramResourceLayout(
+            getCurrentCommandContext(),
+            programId,
+            Set.of(VulkanicShaderStage.COMPUTE)
+        );
+        if (resourceLayout == null) {
+            resourceLayout = new PipelineDescriptor.ResourceLayout(List.of());
+        }
+
+        PipelineDescriptor.PortableState portableState = new PipelineDescriptor.PortableState(
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("vulkanic", "legacy_compute_program/" + programId),
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("vulkanic", "legacy_compute_program/" + programId + "/compute"),
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("vulkanic", "legacy_compute_program/" + programId + "/compute"),
+            Map.of(),
+            Set.of(),
+            List.of(),
+            List.of(),
+            java.util.Optional.empty(),
+            net.blaze3d.platform.DepthTestFunction.NO_DEPTH_TEST,
+            net.blaze3d.platform.PolygonMode.FILL,
+            false,
+            false,
+            false,
+            false,
+            net.blaze3d.platform.LogicOp.NONE,
+            net.blaze3d.vertex.DefaultVertexFormat.EMPTY,
+            VertexFormat.Mode.QUADS,
+            0.0F,
+            0.0F
+        );
+
+        return PipelineDescriptor.fromPortableStateAndSpirvModules(portableState, computeModules)
+            .withResourceLayout(resourceLayout);
+    }
+
+    @Nullable
     private PipelineDescriptor.VertexInputState createLegacyVertexInputState(VirtualProgram virtualProgram) {
         VirtualVaoState vaoState = currentVirtualVaoState();
         List<LegacyVertexAttribute> attributes = vaoState.enabledAttributes.stream()
@@ -4481,6 +4591,31 @@ void main() {
 
                 @Override
                 @Nullable
+                public PipelineResourceBindings.StorageImageBinding storageImageBinding(PipelineDescriptor.ResourceBinding binding) {
+                    int uniformIndex = virtualProgram.activeUniformNames.indexOf(binding.name());
+                    int imageUnit = uniformIndex < 0
+                        ? binding.binding()
+                        : virtualProgram.samplerUniformValuesByIndex.getOrDefault(uniformIndex, binding.binding());
+                    NativeSpine spine = nativeSpine;
+                    if (spine == null) {
+                        return null;
+                    }
+                    LegacyImageBinding imageBinding = spine.legacyImageBindingsByUnit.get(imageUnit);
+                    return imageBinding == null
+                        ? null
+                        : new PipelineResourceBindings.StorageImageBinding(
+                            imageBinding.imageUnit(),
+                            imageBinding.texture(),
+                            imageBinding.level(),
+                            imageBinding.layered(),
+                            imageBinding.layer(),
+                            imageBinding.access(),
+                            imageBinding.format()
+                        );
+                }
+
+                @Override
+                @Nullable
                 public Integer standaloneProgramId(PipelineDescriptor.ResourceBinding binding) {
                     return programId;
                 }
@@ -4564,6 +4699,73 @@ void main() {
             spine.bindPipeline(commandBufferHandle, vulkanPipeline.getVkPipelineHandle());
         }
         bindPipelineResources(ctx, pipelineHandle, submissionDescriptor, resourcePlan.bindings());
+    }
+
+    @Nullable
+    private VulkanPipelineHandle bindLegacyComputePipelineForDispatch(long commandBufferHandle) {
+        int programId = boundVirtualProgram;
+        if (programId <= 0) {
+            return null;
+        }
+        PipelineDescriptor descriptor = createLegacyComputePipelineDescriptor(programId);
+        if (descriptor == null) {
+            return null;
+        }
+
+        CommandContext ctx = getCurrentCommandContext();
+        PipelineResourcePlanner.Plan resourcePlan = buildLegacyProgramResourcePlan(ctx, descriptor, programId);
+        if (resourcePlan == null) {
+            return null;
+        }
+
+        ensureNativeReady("bindLegacyComputePipelineForDispatch");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        PipelineDescriptor submissionDescriptor = resourcePlan.descriptor();
+        LegacyComputePipelineKey key = new LegacyComputePipelineKey(
+            programId,
+            submissionDescriptor.getPipelineCompilationKey(),
+            submissionDescriptor.getResourceLayoutCacheKey()
+        );
+        PipelineHandle pipelineHandle = legacyComputePipelineCache.get(key);
+        if (pipelineHandle != null && !pipelineHandle.isValid()) {
+            legacyComputePipelineCache.remove(key, pipelineHandle);
+            pipelineHandle = null;
+        }
+        if (pipelineHandle == null) {
+            VulkanicSpirvModule computeModule = submissionDescriptor.getSpirvModules().stream()
+                .filter(module -> module.stage() == VulkanicShaderStage.COMPUTE)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Compute descriptor has no COMPUTE SPIR-V module."));
+            long computeModuleHandle = spine.createShaderModule(computeModule);
+            try {
+                PipelineHandle created = spine.createVulkanComputePipeline(submissionDescriptor, computeModuleHandle);
+                PipelineHandle raced = legacyComputePipelineCache.putIfAbsent(key, created);
+                if (raced != null) {
+                    created.close();
+                    pipelineHandle = raced;
+                } else {
+                    pipelineHandle = created;
+                }
+            } finally {
+                spine.destroyShaderModule(computeModuleHandle);
+            }
+        }
+        if (!(pipelineHandle instanceof VulkanPipelineHandle vulkanPipeline) || !vulkanPipeline.isValid()) {
+            return null;
+        }
+
+        spine.bindComputePipeline(commandBufferHandle, vulkanPipeline.getVkPipelineHandle());
+        spine.updateAndBindComputeDescriptorSet(
+            commandBufferHandle,
+            vulkanPipeline,
+            submissionDescriptor,
+            resourcePlan.bindings()
+        );
+        return vulkanPipeline;
     }
 
     private static final class BoundPipelineResources {
@@ -5303,6 +5505,9 @@ void main() {
                                 + "] is outside buffer size " + vulkanBuffer.size());
                     }
                 }
+                case STORAGE_IMAGE -> bindings.getStorageImageBinding(resourceBinding.name())
+                    .orElseThrow(() -> new IllegalStateException(
+                        "Missing storage-image binding for '" + resourceBinding.name() + "' after validation"));
                 case TEXEL_BUFFER -> bindings.getTexelBufferBinding(resourceBinding.name())
                     .orElseThrow(() -> new IllegalStateException(
                         "Missing texel-buffer binding for '" + resourceBinding.name() + "' after validation"));
@@ -8199,7 +8404,13 @@ void main() {
     }
 
     public boolean checkFunctionAvailable(String functionName) {
-        return false;
+        return switch (String.valueOf(functionName)) {
+            case "glDispatchCompute",
+                 "glDispatchComputeIndirect",
+                 "glBindImageTexture",
+                 "glMemoryBarrier" -> true;
+            default -> false;
+        };
     }
 
     public boolean checkOpenGL32Support() {
@@ -8502,11 +8713,48 @@ void main() {
     }
 
     public void dispatchCompute(CommandContext ctx, int workX, int workY, int workZ) {
-        requireVulkanCommandBufferHandle("dispatchCompute", ctx);
+        long commandBufferHandle = requireVulkanCommandBufferHandle("dispatchCompute", ctx);
+        if (workX <= 0 || workY <= 0 || workZ <= 0) {
+            return;
+        }
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable for dispatchCompute.");
+        }
+        if (spine.renderPassRecording) {
+            throw new IllegalStateException("Cannot dispatch Vulkan compute while a render pass is active.");
+        }
+        VulkanPipelineHandle pipeline = bindLegacyComputePipelineForDispatch(commandBufferHandle);
+        if (pipeline == null) {
+            throw new IllegalStateException("No valid Vulkan compute pipeline is bound for dispatchCompute.");
+        }
+        VkCommandBuffer activeCommandBuffer = spine.requireRecordingCommandBuffer(commandBufferHandle, "dispatchCompute");
+        VK10.vkCmdDispatch(activeCommandBuffer, workX, workY, workZ);
     }
 
     public void dispatchComputeIndirect(CommandContext ctx, long offset) {
-        requireVulkanCommandBufferHandle("dispatchComputeIndirect", ctx);
+        long commandBufferHandle = requireVulkanCommandBufferHandle("dispatchComputeIndirect", ctx);
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable for dispatchComputeIndirect.");
+        }
+        if (spine.renderPassRecording) {
+            throw new IllegalStateException("Cannot dispatch Vulkan compute while a render pass is active.");
+        }
+        VulkanPipelineHandle pipeline = bindLegacyComputePipelineForDispatch(commandBufferHandle);
+        if (pipeline == null) {
+            throw new IllegalStateException("No valid Vulkan compute pipeline is bound for dispatchComputeIndirect.");
+        }
+        Integer bufferId = spine.legacyBufferBindings.get(VulkanicAPI.GL_DISPATCH_INDIRECT_BUFFER);
+        if (bufferId == null || bufferId == 0) {
+            throw new IllegalStateException("dispatchComputeIndirect requires a GL_DISPATCH_INDIRECT_BUFFER binding.");
+        }
+        NativeSpine.LegacyBufferObject bufferObject = spine.legacyBuffers.get(bufferId);
+        if (bufferObject == null || bufferObject.buffer == null || bufferObject.buffer.isClosed()) {
+            throw new IllegalStateException("dispatchComputeIndirect buffer " + bufferId + " has no Vulkan buffer storage.");
+        }
+        VkCommandBuffer activeCommandBuffer = spine.requireRecordingCommandBuffer(commandBufferHandle, "dispatchComputeIndirect");
+        VK10.vkCmdDispatchIndirect(activeCommandBuffer, bufferObject.buffer.getVkBufferHandle(), offset);
     }
 
     public void disposeQueryObject(CommandContext ctx, int id) {
@@ -8749,6 +8997,14 @@ void main() {
     public void getProgramiv(CommandContext ctx, int program, int pname, int[] params) {
         requireVulkanCommandBufferHandle("getProgramiv", ctx);
         if (params != null && params.length > 0) {
+            if (pname == VulkanicAPI.GL_COMPUTE_WORK_GROUP_SIZE) {
+                VirtualProgram virtualProgram = virtualPrograms.get(program);
+                int[] localSize = virtualProgram == null ? new int[]{1, 1, 1} : virtualProgram.computeWorkGroupSize;
+                for (int i = 0; i < params.length; i++) {
+                    params[i] = i < localSize.length ? localSize[i] : 0;
+                }
+                return;
+            }
             params[0] = getProgramParameter(ctx, program, pname);
             for (int i = 1; i < params.length; i++) {
                 params[i] = 0;
@@ -9334,7 +9590,44 @@ void main() {
     public void uploadTexture3D(CommandContext ctx, int target, int level, int internalformat,
                                 int width, int height, int depth, int border,
                                 int format, int type, java.nio.ByteBuffer pixels) {
-        requireVulkanCommandBufferHandle("uploadTexture3D", ctx);
+        long commandBufferHandle = requireVulkanCommandBufferHandle("uploadTexture3D", ctx);
+        if (target != VulkanicAPI.GL_TEXTURE_3D) {
+            throw new IllegalArgumentException("uploadTexture3D requires GL_TEXTURE_3D, got: " + target);
+        }
+        if (level < 0) {
+            throw new IllegalArgumentException("level must be >= 0, got: " + level);
+        }
+        if (width <= 0 || height <= 0 || depth <= 0) {
+            throw new IllegalArgumentException(
+                "uploadTexture3D requires width/height/depth > 0, got " + width + "x" + height + "x" + depth);
+        }
+        if (border != 0) {
+            throw new IllegalArgumentException("uploadTexture3D requires border == 0, got: " + border);
+        }
+
+        if (pixels == null) {
+            LegacyTextureFormatInfo.resolveStorage(internalformat, format, type);
+        } else {
+            LegacyTextureFormatInfo.resolve(internalformat, format, type);
+        }
+
+        ensureNativeReady("uploadTexture3D");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.uploadLegacyTexture3D(
+            commandBufferHandle,
+            target,
+            level,
+            internalformat,
+            width,
+            height,
+            depth,
+            format,
+            type,
+            pixels == null ? null : pixels.duplicate()
+        );
     }
 
     public int waitForSync(CommandContext ctx, long sync, int flags, long timeout) {
@@ -9435,11 +9728,28 @@ void main() {
     // =====================================================================
 
     /**
-     * No-op. Storage images in Vulkan are bound via descriptor sets.
+     * Records image-unit state so storage image uniforms can be materialized
+     * into Vulkan descriptors when the active program is dispatched.
      */
     public void bindImageTexture(CommandContext ctx, int unit, int texture, int level,
                                  boolean layered, int layer, int access, int format) {
         requireVulkanCommandBufferHandle("bindImageTexture", ctx);
+        if (unit < 0) {
+            throw new IllegalArgumentException("Image unit must be >= 0");
+        }
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            return;
+        }
+        if (texture <= 0) {
+            spine.legacyImageBindingsByUnit.remove(unit);
+            return;
+        }
+        spine.legacyTextures.computeIfAbsent(texture, id -> new NativeSpine.LegacyTextureObject(id, VulkanicAPI.GL_TEXTURE_2D));
+        spine.legacyImageBindingsByUnit.put(
+            unit,
+            new LegacyImageBinding(unit, texture, Math.max(0, level), layered, Math.max(0, layer), access, format)
+        );
     }
 
     // =====================================================================
@@ -10021,6 +10331,7 @@ void main() {
         private volatile List<String> standaloneUniformDeclarations = List.of();
         private volatile List<VulkanicSpirvModule> linkedSpirvModules = List.of();
         private volatile List<ReflectedVertexInput> vertexInputs = List.of();
+        private volatile int[] computeWorkGroupSize = new int[]{1, 1, 1};
         private volatile Map<Integer, StandaloneUniformField> standaloneFieldsByLocation = Map.of();
         private volatile int standaloneBackingSize;
         @Nullable
@@ -10170,7 +10481,18 @@ void main() {
     private record ReflectedResourceRequest(String name, PipelineDescriptor.ResourceType type) {
     }
 
-    private record ReflectedResourceBinding(String name, PipelineDescriptor.ResourceType type, int set, int binding) {
+        private record ReflectedResourceBinding(String name, PipelineDescriptor.ResourceType type, int set, int binding) {
+    }
+
+    private record LegacyImageBinding(
+        int imageUnit,
+        int texture,
+        int level,
+        boolean layered,
+        int layer,
+        int access,
+        int format
+    ) {
     }
 
     private record ExplicitDescriptorBinding(int set, int binding) {
@@ -10205,7 +10527,8 @@ void main() {
         }
 
         private sealed interface ResolvedDescriptorBinding permits ResolvedSamplerDescriptorBinding,
-            ResolvedUniformBufferDescriptorBinding, ResolvedTexelBufferDescriptorBinding {
+            ResolvedUniformBufferDescriptorBinding, ResolvedStorageImageDescriptorBinding,
+            ResolvedTexelBufferDescriptorBinding {
 
             int bindingIndex();
 
@@ -10258,6 +10581,36 @@ void main() {
             ResolvedUniformBufferDescriptorBinding binding,
             boolean cacheable
         ) {
+        }
+
+        private record ResolvedStorageImageDescriptorBinding(
+            int bindingIndex,
+            int descriptorType,
+            long imageViewHandle,
+            int imageLayout
+        ) implements ResolvedDescriptorBinding {
+
+            @Override
+            public DescriptorBindingCacheKey cacheKey() {
+                return new DescriptorBindingCacheKey(
+                    bindingIndex,
+                    descriptorType,
+                    imageViewHandle,
+                    imageLayout,
+                    0L,
+                    0L
+                );
+            }
+
+            @Override
+            public void populateWrite(VkWriteDescriptorSet write, MemoryStack stack) {
+                VkDescriptorImageInfo.Buffer imageInfo = VkDescriptorImageInfo.calloc(1, stack);
+                imageInfo.get(0)
+                    .sampler(VK10.VK_NULL_HANDLE)
+                    .imageView(imageViewHandle)
+                    .imageLayout(imageLayout);
+                write.pImageInfo(imageInfo);
+            }
         }
 
         private record ResolvedSamplerDescriptorBinding(
@@ -10346,7 +10699,7 @@ void main() {
             }
         }
 
-        private record BoundDescriptorSetState(long pipelineHandle, long descriptorSetHandle) {
+        private record BoundDescriptorSetState(long pipelineHandle, long descriptorSetHandle, int bindPoint) {
         }
 
         private static final int MAX_FRAMES_IN_FLIGHT = 2;
@@ -10391,11 +10744,13 @@ void main() {
         private final Map<Integer, LegacyTextureObject> legacyTextures = new ConcurrentHashMap<>();
         private final VulkanImageStateTracker imageStateTracker = new VulkanImageStateTracker();
         private final Map<Integer, Integer> legacyTexture2DBindingsByUnit = new ConcurrentHashMap<>();
+        private final Map<Integer, LegacyImageBinding> legacyImageBindingsByUnit = new ConcurrentHashMap<>();
         private final Map<Integer, LegacyTexelBufferBinding> legacyTexelBufferBindingsByTextureId = new ConcurrentHashMap<>();
         private final Map<Integer, TextureLevelInfo> proxyTexture2DLevels = new ConcurrentHashMap<>();
         private final Map<DescriptorSamplerKey, Long> descriptorSamplerCache = new ConcurrentHashMap<>();
         private final Map<DescriptorSetCacheKey, Long> descriptorSetCache = new HashMap<>();
         private final Map<Long, Long> lastBoundGraphicsPipelineByCommandBuffer = new HashMap<>();
+        private final Map<Long, Long> lastBoundComputePipelineByCommandBuffer = new HashMap<>();
         private final Map<Long, BoundDescriptorSetState> lastBoundDescriptorSetByCommandBuffer = new HashMap<>();
         private final Map<Long, BoundIndexBufferState> boundIndexBuffersByCommandBuffer = new ConcurrentHashMap<>();
         @Nullable
@@ -10577,11 +10932,17 @@ void main() {
         private static final class TextureLevelInfo {
             private final int width;
             private final int height;
+            private final int depth;
             private final int internalFormat;
 
             private TextureLevelInfo(int width, int height, int internalFormat) {
+                this(width, height, 1, internalFormat);
+            }
+
+            private TextureLevelInfo(int width, int height, int depth, int internalFormat) {
                 this.width = width;
                 this.height = height;
+                this.depth = depth;
                 this.internalFormat = internalFormat;
             }
         }
@@ -10622,6 +10983,7 @@ void main() {
             private volatile int mipLevels = 1;
             private volatile int width;
             private volatile int height;
+            private volatile int depth = 1;
             private volatile int sourceFormat;
             private volatile int sourceType;
 
@@ -11052,7 +11414,7 @@ void main() {
 
         private void createSharedDescriptorResources() {
             try (MemoryStack stack = stackPush()) {
-                VkDescriptorPoolSize.Buffer poolSizes = VkDescriptorPoolSize.calloc(3, stack);
+                VkDescriptorPoolSize.Buffer poolSizes = VkDescriptorPoolSize.calloc(4, stack);
                 poolSizes.get(0)
                     .type(VK10.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
                     .descriptorCount(2048);
@@ -11061,6 +11423,9 @@ void main() {
                     .descriptorCount(2048);
                 poolSizes.get(2)
                     .type(VK10.VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER)
+                    .descriptorCount(1024);
+                poolSizes.get(3)
+                    .type(VK10.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
                     .descriptorCount(1024);
 
                 VkDescriptorPoolCreateInfo poolInfo = VkDescriptorPoolCreateInfo.calloc(stack)
@@ -11140,12 +11505,14 @@ void main() {
             }
             descriptorSetCache.clear();
             lastBoundGraphicsPipelineByCommandBuffer.clear();
+            lastBoundComputePipelineByCommandBuffer.clear();
             lastBoundDescriptorSetByCommandBuffer.clear();
             boundIndexBuffersByCommandBuffer.clear();
         }
 
         private void clearTrackedCommandBufferState(long commandBufferHandle) {
             lastBoundGraphicsPipelineByCommandBuffer.remove(commandBufferHandle);
+            lastBoundComputePipelineByCommandBuffer.remove(commandBufferHandle);
             lastBoundDescriptorSetByCommandBuffer.remove(commandBufferHandle);
             boundIndexBuffersByCommandBuffer.remove(commandBufferHandle);
         }
@@ -11156,27 +11523,44 @@ void main() {
             VulkanPipelineHandle pipeline,
             long descriptorSetHandle
         ) {
+            bindDescriptorSetIfNeeded(
+                commandBufferHandle,
+                activeCommandBuffer,
+                pipeline,
+                descriptorSetHandle,
+                VK10.VK_PIPELINE_BIND_POINT_GRAPHICS
+            );
+        }
+
+        private void bindDescriptorSetIfNeeded(
+            long commandBufferHandle,
+            VkCommandBuffer activeCommandBuffer,
+            VulkanPipelineHandle pipeline,
+            long descriptorSetHandle,
+            int bindPoint
+        ) {
             BoundDescriptorSetState currentState = lastBoundDescriptorSetByCommandBuffer.get(commandBufferHandle);
             if (currentState != null
                 && currentState.pipelineHandle() == pipeline.getVkPipelineHandle()
-                && currentState.descriptorSetHandle() == descriptorSetHandle) {
+                && currentState.descriptorSetHandle() == descriptorSetHandle
+                && currentState.bindPoint() == bindPoint) {
                 skippedRedundantDescriptorSetBindCount++;
                 return;
             }
 
             try (MemoryStack stack = stackPush()) {
                 VK10.vkCmdBindDescriptorSets(
-                    activeCommandBuffer,
-                    VK10.VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    pipeline.getVkPipelineLayoutHandle(),
-                    0,
-                    stack.longs(descriptorSetHandle),
+                activeCommandBuffer,
+                    bindPoint,
+                pipeline.getVkPipelineLayoutHandle(),
+                0,
+                stack.longs(descriptorSetHandle),
                     null
                 );
             }
             lastBoundDescriptorSetByCommandBuffer.put(
                 commandBufferHandle,
-                new BoundDescriptorSetState(pipeline.getVkPipelineHandle(), descriptorSetHandle)
+                new BoundDescriptorSetState(pipeline.getVkPipelineHandle(), descriptorSetHandle, bindPoint)
             );
         }
 
@@ -11221,6 +11605,7 @@ void main() {
                         }
                         yield resolvedPlan.binding();
                     }
+                    case STORAGE_IMAGE -> resolveStorageImageDescriptorBinding(effectiveBinding, bindings);
                     case TEXEL_BUFFER -> resolveTexelBufferDescriptorBinding(effectiveBinding, bindings);
                 };
 
@@ -11547,6 +11932,59 @@ void main() {
             );
         }
 
+        private ResolvedStorageImageDescriptorBinding resolveStorageImageDescriptorBinding(
+            PipelineDescriptor.ResourceBinding binding,
+            PipelineResourceBindings bindings
+        ) {
+            PipelineResourceBindings.StorageImageBinding imageBinding = bindings.getStorageImageBindingOrNull(binding.name());
+            if (imageBinding == null) {
+                throw new DescriptorValidationException("Missing storage-image binding for '" + binding.name() + "'");
+            }
+
+            LegacyTextureObject texture = legacyTextures.get(imageBinding.texture());
+            if (texture == null
+                || texture.imageHandle == VK10.VK_NULL_HANDLE
+                || texture.defaultViewHandle == VK10.VK_NULL_HANDLE) {
+                throw new IllegalStateException(
+                    "Storage-image binding '" + binding.name() + "' on image unit "
+                        + imageBinding.imageUnit()
+                        + " references texture "
+                        + imageBinding.texture()
+                        + " before Vulkan image storage is available"
+                );
+            }
+
+            if (texture.aspectMask != VK10.VK_IMAGE_ASPECT_COLOR_BIT) {
+                throw new IllegalStateException(
+                    "Storage-image binding '" + binding.name() + "' references non-color texture "
+                        + imageBinding.texture()
+                        + " aspectMask=0x"
+                        + Integer.toHexString(texture.aspectMask)
+                );
+            }
+
+            int mipLevel = Math.max(0, imageBinding.level());
+            if (mipLevel >= Math.max(1, texture.mipLevels)) {
+                throw new IllegalStateException(
+                    "Storage-image binding '" + binding.name() + "' requested mip level "
+                        + mipLevel
+                        + " but texture "
+                        + imageBinding.texture()
+                        + " only has "
+                        + texture.mipLevels
+                        + " levels"
+                );
+            }
+
+            transitionLegacyTextureToStorageImageLayout(texture, mipLevel, 1);
+            return new ResolvedStorageImageDescriptorBinding(
+                binding.binding(),
+                toVkDescriptorType(binding.type()),
+                texture.defaultViewHandle,
+                VK10.VK_IMAGE_LAYOUT_GENERAL
+            );
+        }
+
         private ResolvedTexelBufferDescriptorBinding resolveTexelBufferDescriptorBinding(
             PipelineDescriptor.ResourceBinding binding,
             PipelineResourceBindings bindings
@@ -11584,6 +12022,36 @@ void main() {
                                                 VulkanPipelineHandle pipeline,
                                                 PipelineDescriptor descriptor,
                                                 PipelineResourceBindings bindings) {
+            updateAndBindDescriptorSet(
+                commandBufferHandle,
+                pipeline,
+                descriptor,
+                bindings,
+                VK10.VK_PIPELINE_BIND_POINT_GRAPHICS,
+                true
+            );
+        }
+
+        private void updateAndBindComputeDescriptorSet(long commandBufferHandle,
+                                                       VulkanPipelineHandle pipeline,
+                                                       PipelineDescriptor descriptor,
+                                                       PipelineResourceBindings bindings) {
+            updateAndBindDescriptorSet(
+                commandBufferHandle,
+                pipeline,
+                descriptor,
+                bindings,
+                VK10.VK_PIPELINE_BIND_POINT_COMPUTE,
+                false
+            );
+        }
+
+        private void updateAndBindDescriptorSet(long commandBufferHandle,
+                                                VulkanPipelineHandle pipeline,
+                                                PipelineDescriptor descriptor,
+                                                PipelineResourceBindings bindings,
+                                                int bindPoint,
+                                                boolean bindGraphicsPipeline) {
             long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
             VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "bindPipelineResources");
 
@@ -11605,20 +12073,26 @@ void main() {
             // If the pipeline has no descriptors at all, nothing more to do.
             if (pipeline.getResourceBindingCount() == 0) {
                 // Even with no descriptors, bind the pipeline
-                bindPipeline(commandBufferHandle, pipeline.getVkPipelineHandle());
+                if (bindGraphicsPipeline) {
+                    bindPipeline(commandBufferHandle, pipeline.getVkPipelineHandle());
+                }
                 return;
             }
 
             if (layoutBindings.isEmpty()) {
                 // Even with empty descriptors, bind the pipeline
-                bindPipeline(commandBufferHandle, pipeline.getVkPipelineHandle());
+                if (bindGraphicsPipeline) {
+                    bindPipeline(commandBufferHandle, pipeline.getVkPipelineHandle());
+                }
                 return;
             }
 
             // Always bind the pipeline first so the GPU knows which shader/layout to use
             // for subsequent draw calls. vkCmdBindPipeline is valid both inside and
             // outside a render pass (Vulkan spec §19.3).
-            bindPipeline(commandBufferHandle, pipeline.getVkPipelineHandle());
+            if (bindGraphicsPipeline) {
+                bindPipeline(commandBufferHandle, pipeline.getVkPipelineHandle());
+            }
 
             try (MemoryStack stack = stackPush()) {
                 DescriptorWritePlan writePlan = buildDescriptorWritePlan(
@@ -11639,7 +12113,8 @@ void main() {
                             commandBufferHandle,
                             activeCommandBuffer,
                             pipeline,
-                            cachedDescriptorSetHandle
+                            cachedDescriptorSetHandle,
+                            bindPoint
                         );
                         return;
                     }
@@ -11673,7 +12148,7 @@ void main() {
                     descriptorSetCache.put(writePlan.cacheKey(), descriptorSetHandle);
                     descriptorSetCacheStoreCount++;
                 }
-                bindDescriptorSetIfNeeded(commandBufferHandle, activeCommandBuffer, pipeline, descriptorSetHandle);
+                bindDescriptorSetIfNeeded(commandBufferHandle, activeCommandBuffer, pipeline, descriptorSetHandle, bindPoint);
             } finally {
                 if (auditStartNanos != 0L) {
                     VulkanPerfAudit.recordDescriptorBind(System.nanoTime() - auditStartNanos);
@@ -11790,6 +12265,45 @@ void main() {
 
                 transitionImageLayout(texture, trackedLayout, targetLayout, level, 1);
                 trackLayoutForLevel(texture, level, targetLayout);
+            }
+        }
+
+        private void transitionLegacyTextureToStorageImageLayout(@Nullable LegacyTextureObject texture,
+                                                                 int baseMip,
+                                                                 int mipCount) {
+            if (texture == null || texture.imageHandle == VK10.VK_NULL_HANDLE) {
+                return;
+            }
+
+            int safeBaseMip = Math.max(0, baseMip);
+            int safeMipCount = Math.max(1, mipCount);
+            int maxMipLevels = Math.max(1, texture.mipLevels);
+            if (safeBaseMip >= maxMipLevels) {
+                return;
+            }
+            int endMipExclusive = Math.min(maxMipLevels, safeBaseMip + safeMipCount);
+            List<VulkanImageStateTracker.VulkanImageTransition> transitions =
+                imageStateTracker.planTransitions(
+                    texture.id,
+                    safeBaseMip,
+                    endMipExclusive - safeBaseMip,
+                    VK10.VK_IMAGE_LAYOUT_GENERAL
+                );
+            for (VulkanImageStateTracker.VulkanImageTransition transition : transitions) {
+                int level = transition.mipLevel();
+                int trackedLayout = transition.oldLayout();
+                if (renderPassRecording) {
+                    LOGGER.warn(
+                        "Illegal storage-image layout transition inside render pass: texId={} trackedLayout=0x{} level={}",
+                        texture.id,
+                        Integer.toHexString(trackedLayout),
+                        level
+                    );
+                    trackLayoutForLevel(texture, level, VK10.VK_IMAGE_LAYOUT_GENERAL);
+                    continue;
+                }
+                transitionImageLayout(texture, trackedLayout, VK10.VK_IMAGE_LAYOUT_GENERAL, level, 1);
+                trackLayoutForLevel(texture, level, VK10.VK_IMAGE_LAYOUT_GENERAL);
             }
         }
 
@@ -12393,6 +12907,33 @@ void main() {
             return packed;
         }
 
+        private java.nio.ByteBuffer normalizePixelData3D(java.nio.ByteBuffer pixels,
+                                                         LegacyTextureFormatInfo formatInfo,
+                                                         int width,
+                                                         int height,
+                                                         int depth) {
+            if (pixels == null) {
+                throw new IllegalArgumentException("pixels must not be null");
+            }
+            if (width <= 0 || height <= 0 || depth <= 0) {
+                throw new IllegalArgumentException("width/height/depth must be > 0");
+            }
+
+            long requiredLong = (long) width * height * depth * formatInfo.unpackPixelBytes;
+            if (requiredLong > Integer.MAX_VALUE) {
+                throw new IllegalArgumentException("3D pixel upload source size exceeds int range: " + requiredLong);
+            }
+            int required = (int) requiredLong;
+            if (pixels.remaining() < required) {
+                throw new IllegalArgumentException(
+                    "3D pixel upload buffer too small. Required=" + required + ", remaining=" + pixels.remaining());
+            }
+
+            java.nio.ByteBuffer source = pixels.duplicate();
+            source.limit(source.position() + required);
+            return source.slice();
+        }
+
         private void uploadLegacyTexture2D(long commandBufferHandle,
                                            int target,
                                            int level,
@@ -12444,7 +12985,7 @@ void main() {
             }
 
             if (needsRecreate) {
-                recreateLegacyTextureStorage(texture, formatInfo, inferredBaseWidth, inferredBaseHeight, requiredMipLevels);
+                recreateLegacyTextureStorage(texture, formatInfo, inferredBaseWidth, inferredBaseHeight, 1, requiredMipLevels);
                 if (preservedLevels != null && !preservedLevels.isEmpty()) {
                     texture.levels.putAll(preservedLevels);
                 }
@@ -12575,6 +13116,75 @@ void main() {
             return texture;
         }
 
+        private void uploadLegacyTexture3D(long commandBufferHandle,
+                                           int target,
+                                           int level,
+                                           int internalFormat,
+                                           int width,
+                                           int height,
+                                           int depth,
+                                           int format,
+                                           int type,
+                                           java.nio.ByteBuffer pixels) {
+            ensureRecordingCommandBuffer(commandBufferHandle, "uploadTexture3D");
+            if (renderPassRecording) {
+                throw new IllegalStateException("uploadTexture3D requires command recording outside an active render pass");
+            }
+            if (target != VulkanicAPI.GL_TEXTURE_3D) {
+                throw new IllegalArgumentException("uploadTexture3D requires GL_TEXTURE_3D, got: " + target);
+            }
+
+            LegacyTextureFormatInfo formatInfo = pixels == null
+                ? LegacyTextureFormatInfo.resolveStorage(internalFormat, format, type)
+                : LegacyTextureFormatInfo.resolve(internalFormat, format, type);
+            LegacyTextureObject texture = requireBoundLegacyTexture2D(target, "uploadTexture3D");
+            boolean was3DTexture = isLegacy3DTexture(texture.target);
+
+            int inferredBaseWidth = level == 0 ? width : Math.max(1, width << level);
+            int inferredBaseHeight = level == 0 ? height : Math.max(1, height << level);
+            int inferredBaseDepth = level == 0 ? depth : Math.max(1, depth << level);
+            int maxConfiguredLevel = Math.max(0, texture.integerParameters.getOrDefault(VulkanicAPI.GL_TEXTURE_MAX_LEVEL, level));
+            int configuredMipLevels = Math.max(1, maxConfiguredLevel + 1);
+            int maxPossibleMipLevels = maxMipLevelsForExtent(Math.max(inferredBaseWidth, inferredBaseDepth), inferredBaseHeight);
+            int requiredMipLevels = Math.max(1, Math.max(level + 1, Math.min(configuredMipLevels, maxPossibleMipLevels)));
+
+            boolean needsRecreate = texture.imageHandle == VK10.VK_NULL_HANDLE
+                || texture.vkFormat != formatInfo.vkFormat
+                || texture.width != inferredBaseWidth
+                || texture.height != inferredBaseHeight
+                || texture.depth != inferredBaseDepth
+                || texture.mipLevels < requiredMipLevels
+                || !was3DTexture;
+
+            texture.target = VulkanicAPI.GL_TEXTURE_3D;
+
+            if (needsRecreate) {
+                recreateLegacyTextureStorage(
+                    texture,
+                    formatInfo,
+                    inferredBaseWidth,
+                    inferredBaseHeight,
+                    inferredBaseDepth,
+                    requiredMipLevels
+                );
+            }
+
+            texture.sourceFormat = format;
+            texture.sourceType = type;
+            texture.levels.put(level, new TextureLevelInfo(width, height, depth, internalFormat));
+
+            if (pixels == null) {
+                int finalLayout = preferredIdleLayout(texture);
+                int oldLayout = trackedLayoutForLevel(texture, level);
+                transitionImageLayout(texture, oldLayout, finalLayout, level, 1);
+                trackLayoutForLevel(texture, level, finalLayout);
+                return;
+            }
+
+            java.nio.ByteBuffer packedPixels = normalizePixelData3D(pixels, formatInfo, width, height, depth);
+            uploadToLegacyTextureRegion3D(commandBufferHandle, "uploadTexture3D", texture, level, width, height, depth, packedPixels);
+        }
+
         private static final class StagingBuffer {
             private final long bufferHandle;
             private final long memoryHandle;
@@ -12599,6 +13209,7 @@ void main() {
                                                   LegacyTextureFormatInfo formatInfo,
                                                   int width,
                                                   int height,
+                                                  int depth,
                                                   int mipLevels) {
             destroyLegacyTextureStorage(texture);
 
@@ -12609,18 +13220,24 @@ void main() {
             try (MemoryStack stack = stackPush()) {
                 int arrayLayers = legacyTextureLayerCount(texture);
                 boolean cubemapTexture = isLegacyCubemapTarget(texture.target);
+                boolean texture3D = isLegacy3DTexture(texture.target);
                 boolean isColorTexture = formatInfo.aspectMask == VK10.VK_IMAGE_ASPECT_COLOR_BIT;
                 int legacyImageUsage = VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT
                     | VK10.VK_IMAGE_USAGE_TRANSFER_SRC_BIT
                     | VK10.VK_IMAGE_USAGE_SAMPLED_BIT
-                    | (isColorTexture ? VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT : VK10.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
-                if (attachmentFeedbackLoopLayoutEnabled) {
+                    | (isColorTexture ? VK10.VK_IMAGE_USAGE_STORAGE_BIT : 0);
+                if (!texture3D) {
+                    legacyImageUsage |= isColorTexture
+                        ? VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
+                        : VK10.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+                }
+                if (!texture3D && attachmentFeedbackLoopLayoutEnabled) {
                     legacyImageUsage |= EXTAttachmentFeedbackLoopLayout.VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
                 }
                 VkImageCreateInfo imageCreateInfo = VkImageCreateInfo.calloc(stack)
                     .sType$Default()
                     .flags(cubemapTexture ? VK10.VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0)
-                    .imageType(VK10.VK_IMAGE_TYPE_2D)
+                    .imageType(texture3D ? VK10.VK_IMAGE_TYPE_3D : VK10.VK_IMAGE_TYPE_2D)
                     .format(formatInfo.vkFormat)
                     .mipLevels(mipLevels)
                     .arrayLayers(arrayLayers)
@@ -12632,7 +13249,7 @@ void main() {
                 imageCreateInfo.extent()
                     .width(width)
                     .height(height)
-                    .depth(1);
+                    .depth(texture3D ? depth : 1);
 
                 java.nio.LongBuffer pImage = stack.mallocLong(1);
                 checkVk("vkCreateImage(legacy texture)", VK10.vkCreateImage(logicalDevice, imageCreateInfo, null, pImage));
@@ -12706,7 +13323,8 @@ void main() {
                     0,
                     mipLevels,
                     arrayLayers,
-                    cubemapTexture
+                    cubemapTexture,
+                    isLegacy3DTexture(texture.target)
                 );
 
                 texture.imageHandle = imageHandle;
@@ -12720,6 +13338,7 @@ void main() {
                 texture.mipLevels = mipLevels;
                 texture.width = width;
                 texture.height = height;
+                texture.depth = texture3D ? Math.max(1, depth) : 1;
                 texture.levels.clear();
                 texture.levelLayouts.clear();
                 imageStateTracker.registerTexture(
@@ -12784,6 +13403,10 @@ void main() {
             texture.memoryHandle = VK10.VK_NULL_HANDLE;
             texture.defaultViewHandle = VK10.VK_NULL_HANDLE;
             texture.currentLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
+            texture.width = 0;
+            texture.height = 0;
+            texture.depth = 1;
+            texture.mipLevels = 1;
             texture.levels.clear();
             texture.levelLayouts.clear();
             imageStateTracker.clearTextureStorage(texture.id);
@@ -12927,6 +13550,10 @@ void main() {
 
         private static int legacyTextureLayerCount(LegacyTextureObject texture) {
             return isLegacyCubemapTarget(texture.target) ? 6 : 1;
+        }
+
+        private static boolean isLegacy3DTexture(int target) {
+            return target == VulkanicAPI.GL_TEXTURE_3D;
         }
 
         private static int cubemapLayerIndexForTarget(int target) {
@@ -13253,6 +13880,69 @@ void main() {
                     level,
                     1,
                     legacyTextureLayerCount(texture)
+                );
+                trackLayoutForLevel(texture, level, finalLayout);
+            } finally {
+                deferStagingBufferDestroy(stagingBuffer);
+            }
+        }
+
+        private void uploadToLegacyTextureRegion3D(long commandBufferHandle,
+                                                   String operation,
+                                                   LegacyTextureObject texture,
+                                                   int level,
+                                                   int width,
+                                                   int height,
+                                                   int depth,
+                                                   java.nio.ByteBuffer pixels) {
+            VkCommandBuffer commandBuffer = requireRecordingCommandBuffer(commandBufferHandle, operation);
+            StagingBuffer stagingBuffer = createStagingBuffer(pixels);
+            try {
+                int oldLayout = trackedLayoutForLevel(texture, level);
+                transitionImageLayout(
+                    commandBuffer,
+                    texture.imageHandle,
+                    texture.aspectMask,
+                    oldLayout,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    level,
+                    1,
+                    1
+                );
+
+                try (MemoryStack stack = stackPush()) {
+                    VkBufferImageCopy.Buffer regions = VkBufferImageCopy.calloc(1, stack);
+                    regions.get(0)
+                        .bufferOffset(0L)
+                        .bufferRowLength(0)
+                        .bufferImageHeight(0);
+                    regions.get(0).imageSubresource()
+                        .aspectMask(texture.aspectMask)
+                        .mipLevel(level)
+                        .baseArrayLayer(0)
+                        .layerCount(1);
+                    regions.get(0).imageOffset().set(0, 0, 0);
+                    regions.get(0).imageExtent().set(width, height, depth);
+
+                    VK10.vkCmdCopyBufferToImage(
+                        commandBuffer,
+                        stagingBuffer.bufferHandle,
+                        texture.imageHandle,
+                        VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        regions
+                    );
+                }
+
+                int finalLayout = preferredIdleLayout(texture);
+                transitionImageLayout(
+                    commandBuffer,
+                    texture.imageHandle,
+                    texture.aspectMask,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    finalLayout,
+                    level,
+                    1,
+                    1
                 );
                 trackLayoutForLevel(texture, level, finalLayout);
             } finally {
@@ -14702,7 +15392,7 @@ void main() {
 
                 int aspectMask = toVkImageAspectMask(format);
                 defaultViewHandle = createVkImageView(stack, imageHandle, vkFormat,
-                    aspectMask, 0, mipLevels, depthOrLayers, cubemapCompatible);
+                    aspectMask, 0, mipLevels, depthOrLayers, cubemapCompatible, false);
 
                 managedImageAllocations.put(imageHandle, memoryHandle);
                 managedImageDefaultViews.put(imageHandle, defaultViewHandle);
@@ -14748,7 +15438,7 @@ void main() {
                 int aspectMask = toVkImageAspectMask(texture.getVulkanicFormat());
                 boolean cubemapCompatible = isCubemapCompatibleUsage(texture.usage());
                 long viewHandle = createVkImageView(stack, texture.getVkImageHandle(), vkFormat,
-                    aspectMask, baseMipLevel, mipLevelCount, texture.getDepthOrLayers(), cubemapCompatible);
+                    aspectMask, baseMipLevel, mipLevelCount, texture.getDepthOrLayers(), cubemapCompatible, false);
 
                 managedExtraImageViews.add(viewHandle);
                 long finalViewHandle = viewHandle;
@@ -14801,7 +15491,8 @@ void main() {
                     baseMipLevel,
                     mipLevelCount,
                     layerCount,
-                    cubemapTexture
+                    cubemapTexture,
+                    isLegacy3DTexture(legacyTexture.target)
                 );
 
                 managedExtraImageViews.add(viewHandle);
@@ -14820,11 +15511,11 @@ void main() {
 
         private long createVkImageView(MemoryStack stack, long imageHandle, int vkFormat,
                                        int aspectMask, int baseMipLevel, int mipLevelCount,
-                                       int layerCount, boolean cubemapCompatible) {
+                                       int layerCount, boolean cubemapCompatible, boolean texture3D) {
             VkImageViewCreateInfo viewCreateInfo = VkImageViewCreateInfo.calloc(stack)
                 .sType$Default()
                 .image(imageHandle)
-                .viewType(determineVkImageViewType(layerCount, cubemapCompatible))
+                .viewType(determineVkImageViewType(layerCount, cubemapCompatible, texture3D))
                 .format(vkFormat);
             viewCreateInfo.components()
                 .r(VK10.VK_COMPONENT_SWIZZLE_IDENTITY)
@@ -14843,7 +15534,10 @@ void main() {
             return pView.get(0);
         }
 
-        private static int determineVkImageViewType(int layerCount, boolean cubemapCompatible) {
+        private static int determineVkImageViewType(int layerCount, boolean cubemapCompatible, boolean texture3D) {
+            if (texture3D) {
+                return VK10.VK_IMAGE_VIEW_TYPE_3D;
+            }
             if (cubemapCompatible) {
                 return layerCount > 6 ? VK10.VK_IMAGE_VIEW_TYPE_CUBE_ARRAY : VK10.VK_IMAGE_VIEW_TYPE_CUBE;
             }
@@ -14861,6 +15555,7 @@ void main() {
                 case BGRA8   -> VK10.VK_FORMAT_B8G8R8A8_UNORM;
                 case RED8           -> VK10.VK_FORMAT_R8_UNORM;
                 case RED8I          -> VK10.VK_FORMAT_R8_SINT;
+                case RED8UI         -> VK10.VK_FORMAT_R8_UINT;
                 case DEPTH32        -> VK10.VK_FORMAT_D32_SFLOAT;
                 case DEPTH24_STENCIL8 -> VK10.VK_FORMAT_D24_UNORM_S8_UINT;
                 case DEPTH32F_STENCIL8 -> VK10.VK_FORMAT_D32_SFLOAT_S8_UINT;
@@ -16559,6 +17254,7 @@ void main() {
                         mipLevel,
                         1,
                         1,
+                        false,
                         false
                     );
                 }
@@ -16604,6 +17300,7 @@ void main() {
                 case VK10.VK_FORMAT_B8G8R8A8_UNORM, VK10.VK_FORMAT_B8G8R8A8_SRGB -> VulkanicTextureFormat.BGRA8;
                 case VK10.VK_FORMAT_R8_UNORM -> VulkanicTextureFormat.RED8;
                 case VK10.VK_FORMAT_R8_SINT -> VulkanicTextureFormat.RED8I;
+                case VK10.VK_FORMAT_R8_UINT -> VulkanicTextureFormat.RED8UI;
                 case VK10.VK_FORMAT_D32_SFLOAT -> VulkanicTextureFormat.DEPTH32;
                 case VK10.VK_FORMAT_D24_UNORM_S8_UINT -> VulkanicTextureFormat.DEPTH24_STENCIL8;
                 case VK10.VK_FORMAT_D32_SFLOAT_S8_UINT -> VulkanicTextureFormat.DEPTH32F_STENCIL8;
@@ -18730,6 +19427,91 @@ void main() {
             }
         }
 
+        private VulkanPipelineHandle createVulkanComputePipeline(
+            PipelineDescriptor descriptor,
+            long computeShaderModuleHandle
+        ) {
+            Objects.requireNonNull(descriptor, "descriptor must not be null");
+            if (logicalDevice == null) {
+                throw new IllegalStateException("Cannot create compute pipeline: Vulkan logical device is unavailable.");
+            }
+
+            try (MemoryStack stack = stackPush()) {
+                java.util.List<PipelineDescriptor.ResourceBinding> bindings =
+                    normalizeDescriptorLayoutBindings(descriptor.getResourceLayout().bindings());
+
+                long descriptorSetLayoutHandle;
+                if (bindings.isEmpty()) {
+                    VkDescriptorSetLayoutCreateInfo emptyDslInfo = VkDescriptorSetLayoutCreateInfo.calloc(stack)
+                        .sType$Default()
+                        .pBindings(null);
+                    java.nio.LongBuffer pDsl0 = stack.mallocLong(1);
+                    checkVk("vkCreateDescriptorSetLayout(compute empty)",
+                        VK10.vkCreateDescriptorSetLayout(logicalDevice, emptyDslInfo, null, pDsl0));
+                    descriptorSetLayoutHandle = pDsl0.get(0);
+                } else {
+                    VkDescriptorSetLayoutBinding.Buffer dslBindings =
+                        VkDescriptorSetLayoutBinding.calloc(bindings.size(), stack);
+                    for (int i = 0; i < bindings.size(); i++) {
+                        PipelineDescriptor.ResourceBinding b = bindings.get(i);
+                        PipelineDescriptor.ResourceBinding effectiveBinding = withEffectiveBindingType(b, null);
+                        dslBindings.get(i)
+                            .binding(b.binding())
+                            .descriptorType(toVkDescriptorType(effectiveBinding.type()))
+                            .descriptorCount(1)
+                            .stageFlags(toVkShaderStageFlags(b.stages()));
+                    }
+                    VkDescriptorSetLayoutCreateInfo dslInfo = VkDescriptorSetLayoutCreateInfo.calloc(stack)
+                        .sType$Default()
+                        .pBindings(dslBindings);
+                    java.nio.LongBuffer pDsl = stack.mallocLong(1);
+                    checkVk("vkCreateDescriptorSetLayout(compute)",
+                        VK10.vkCreateDescriptorSetLayout(logicalDevice, dslInfo, null, pDsl));
+                    descriptorSetLayoutHandle = pDsl.get(0);
+                }
+                managedVkDescriptorSetLayoutHandles.add(descriptorSetLayoutHandle);
+
+                VkPipelineLayoutCreateInfo pipelineLayoutInfo = VkPipelineLayoutCreateInfo.calloc(stack)
+                    .sType$Default()
+                    .pSetLayouts(stack.longs(descriptorSetLayoutHandle));
+                java.nio.LongBuffer pPipelineLayout = stack.mallocLong(1);
+                checkVk("vkCreatePipelineLayout(compute)",
+                    VK10.vkCreatePipelineLayout(logicalDevice, pipelineLayoutInfo, null, pPipelineLayout));
+                long pipelineLayoutHandle = pPipelineLayout.get(0);
+                managedVkPipelineLayoutHandles.add(pipelineLayoutHandle);
+
+                VkPipelineShaderStageCreateInfo stage = VkPipelineShaderStageCreateInfo.calloc(stack)
+                    .sType$Default()
+                    .stage(VK10.VK_SHADER_STAGE_COMPUTE_BIT)
+                    .module(computeShaderModuleHandle)
+                    .pName(stack.UTF8("main"));
+
+                VkComputePipelineCreateInfo.Buffer pipelineInfo = VkComputePipelineCreateInfo.calloc(1, stack);
+                pipelineInfo.get(0)
+                    .sType$Default()
+                    .stage(stage)
+                    .layout(pipelineLayoutHandle)
+                    .basePipelineHandle(VK10.VK_NULL_HANDLE)
+                    .basePipelineIndex(-1);
+
+                java.nio.LongBuffer pPipeline = stack.mallocLong(1);
+                checkVk("vkCreateComputePipelines",
+                    VK10.vkCreateComputePipelines(
+                        logicalDevice, VK10.VK_NULL_HANDLE, pipelineInfo, null, pPipeline));
+                long pipelineHandle = pPipeline.get(0);
+                managedVkPipelineHandles.add(pipelineHandle);
+
+                return new VulkanPipelineHandle(
+                    pipelineHandle,
+                    pipelineLayoutHandle,
+                    descriptorSetLayoutHandle,
+                    defaultRenderPassCompatibilityKey(),
+                    bindings.size(),
+                    this
+                );
+            }
+        }
+
         /**
          * Destroys a {@code VkPipeline}, its {@code VkPipelineLayout}, and its
          * {@code VkDescriptorSetLayout} when a {@link VulkanPipelineHandle} is closed.
@@ -18769,6 +19551,21 @@ void main() {
                 VK10.VK_PIPELINE_BIND_POINT_GRAPHICS,
                 pipelineHandle);
             lastBoundGraphicsPipelineByCommandBuffer.put(commandBufferHandle, pipelineHandle);
+            lastBoundDescriptorSetByCommandBuffer.remove(commandBufferHandle);
+        }
+
+        private void bindComputePipeline(long commandBufferHandle, long pipelineHandle) {
+            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "bindComputePipeline");
+            Long currentlyBoundPipeline = lastBoundComputePipelineByCommandBuffer.get(commandBufferHandle);
+            if (currentlyBoundPipeline != null && currentlyBoundPipeline == pipelineHandle) {
+                skippedRedundantPipelineBindCount++;
+                return;
+            }
+            VK10.vkCmdBindPipeline(
+                activeCommandBuffer,
+                VK10.VK_PIPELINE_BIND_POINT_COMPUTE,
+                pipelineHandle);
+            lastBoundComputePipelineByCommandBuffer.put(commandBufferHandle, pipelineHandle);
             lastBoundDescriptorSetByCommandBuffer.remove(commandBufferHandle);
         }
 
@@ -19089,6 +19886,7 @@ void main() {
             return switch (type) {
                 case SAMPLER, COMPARISON_SAMPLER -> VK10.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
                 case UNIFORM_BUFFER -> VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                case STORAGE_IMAGE -> VK10.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
                 case TEXEL_BUFFER -> VK10.VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
             };
         }
