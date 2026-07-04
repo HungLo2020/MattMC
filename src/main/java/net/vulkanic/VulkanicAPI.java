@@ -74,6 +74,8 @@ public class VulkanicAPI {
     private static GpuBufferSlice projectionMatrixBuffer;
     @Nullable
     private static GpuBufferSlice savedProjectionMatrixBuffer;
+    private static final java.util.Map<GpuBufferSlice, String> projectionMatrixLabels =
+        java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
     private static final Matrix4fStack modelViewStack = new Matrix4fStack(16);
     private static Matrix4f textureMatrix = new Matrix4f();
     private static float shaderLineWidth = 1.0F;
@@ -3938,6 +3940,14 @@ public class VulkanicAPI {
         VulkanicAPI.projectionType = projectionType;
     }
 
+    public static void labelProjectionMatrix(GpuBufferSlice gpuBufferSlice, String label) {
+        if (gpuBufferSlice == null || label == null || label.isBlank()) {
+            return;
+        }
+
+        projectionMatrixLabels.put(gpuBufferSlice, label);
+    }
+
     public static void backupProjectionMatrix() {
         assertOnRenderThread();
         savedProjectionMatrixBuffer = projectionMatrixBuffer;
@@ -6861,34 +6871,146 @@ public class VulkanicAPI {
             + ",length=" + slice.length()
             + ",payloadHash=" + payloadHash
             + ",rangeHash=" + rangeHash
+            + shaderInputParityProjectionLabel(resourceBinding.name(), slice)
             + shaderInputParitySemanticDetails(resourceBinding.name(), slice)
             + "}}";
     }
 
-    private static String shaderInputParitySemanticDetails(String name, VulkanicBufferSlice slice) {
-        if (!"Fog".equals(name)) {
+    private static String shaderInputParityProjectionLabel(String name, VulkanicBufferSlice slice) {
+        if (!"Projection".equals(name)) {
             return "";
         }
 
-        java.nio.ByteBuffer data = shaderInputParityRead(slice, Math.min(40, slice.length()));
-        if (data == null || data.capacity() < 40) {
+        String targetBufferKey = shaderInputParityBufferKey(slice.buffer());
+        synchronized (projectionMatrixLabels) {
+            for (java.util.Map.Entry<GpuBufferSlice, String> entry : projectionMatrixLabels.entrySet()) {
+                GpuBufferSlice gpuSlice = entry.getKey();
+                if (gpuSlice == null) {
+                    continue;
+                }
+
+                VulkanicBuffer labeledBuffer;
+                try {
+                    labeledBuffer = resolveVulkanicBuffer(gpuSlice.buffer());
+                } catch (RuntimeException ex) {
+                    continue;
+                }
+
+                if (!targetBufferKey.equals(shaderInputParityBufferKey(labeledBuffer))) {
+                    continue;
+                }
+
+                if (gpuSlice.offset() == slice.offset() && gpuSlice.length() == slice.length()) {
+                    return ",projectionLabel=" + shaderInputParitySanitizeLabel(entry.getValue());
+                }
+            }
+        }
+
+        return ",projectionLabel=unlabeled";
+    }
+
+    private static String shaderInputParityBufferKey(VulkanicBuffer buffer) {
+        if (buffer instanceof net.vulkanic.backends.opengl.OpenGLBuffer openGLBuffer) {
+            return "opengl:" + openGLBuffer.getGlHandle();
+        }
+
+        return "managed:" + System.identityHashCode(buffer);
+    }
+
+    private static String shaderInputParitySanitizeLabel(String value) {
+        return value
+            .replace(',', ';')
+            .replace('{', '(')
+            .replace('}', ')')
+            .replace('[', '(')
+            .replace(']', ')')
+            .replace(' ', '_');
+    }
+
+    private static String shaderInputParitySemanticDetails(String name, VulkanicBufferSlice slice) {
+        int semanticLength = switch (name) {
+            case "Projection" -> 64;
+            case "DynamicTransforms" -> 164;
+            case "Fog" -> 40;
+            default -> 0;
+        };
+
+        if (semanticLength == 0) {
+            return "";
+        }
+
+        java.nio.ByteBuffer data = shaderInputParityRead(slice, Math.min(semanticLength, slice.length()));
+        if (data == null || data.capacity() < semanticLength) {
             return ",semantic=unavailable";
         }
 
         data.order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        return switch (name) {
+            case "Projection" -> ",semantic={ProjMat=" + shaderInputParityMat4(data, 0) + "}";
+            case "DynamicTransforms" -> ",semantic={ModelViewMat=" + shaderInputParityMat4(data, 0)
+                + ",ColorModulator=" + shaderInputParityVec4(data, 64)
+                + ",ModelOffset=" + shaderInputParityVec3(data, 80)
+                + ",TextureMat=" + shaderInputParityMat4(data, 96)
+                + String.format(java.util.Locale.ROOT, ",LineWidth=%.8f}", data.getFloat(160));
+            case "Fog" -> String.format(
+                java.util.Locale.ROOT,
+                ",semantic={FogColor=(%.8f,%.8f,%.8f,%.8f),FogEnvironmentalStart=%.8f,FogEnvironmentalEnd=%.8f,FogRenderDistanceStart=%.8f,FogRenderDistanceEnd=%.8f,FogSkyEnd=%.8f,FogCloudsEnd=%.8f}",
+                data.getFloat(0),
+                data.getFloat(4),
+                data.getFloat(8),
+                data.getFloat(12),
+                data.getFloat(16),
+                data.getFloat(20),
+                data.getFloat(24),
+                data.getFloat(28),
+                data.getFloat(32),
+                data.getFloat(36)
+            );
+            default -> "";
+        };
+    }
+
+    private static String shaderInputParityMat4(java.nio.ByteBuffer data, int offset) {
         return String.format(
             java.util.Locale.ROOT,
-            ",semantic={FogColor=(%.8f,%.8f,%.8f,%.8f),FogEnvironmentalStart=%.8f,FogEnvironmentalEnd=%.8f,FogRenderDistanceStart=%.8f,FogRenderDistanceEnd=%.8f,FogSkyEnd=%.8f,FogCloudsEnd=%.8f}",
-            data.getFloat(0),
-            data.getFloat(4),
-            data.getFloat(8),
-            data.getFloat(12),
-            data.getFloat(16),
-            data.getFloat(20),
-            data.getFloat(24),
-            data.getFloat(28),
-            data.getFloat(32),
-            data.getFloat(36)
+            "[(%.8f,%.8f,%.8f,%.8f),(%.8f,%.8f,%.8f,%.8f),(%.8f,%.8f,%.8f,%.8f),(%.8f,%.8f,%.8f,%.8f)]",
+            data.getFloat(offset),
+            data.getFloat(offset + 4),
+            data.getFloat(offset + 8),
+            data.getFloat(offset + 12),
+            data.getFloat(offset + 16),
+            data.getFloat(offset + 20),
+            data.getFloat(offset + 24),
+            data.getFloat(offset + 28),
+            data.getFloat(offset + 32),
+            data.getFloat(offset + 36),
+            data.getFloat(offset + 40),
+            data.getFloat(offset + 44),
+            data.getFloat(offset + 48),
+            data.getFloat(offset + 52),
+            data.getFloat(offset + 56),
+            data.getFloat(offset + 60)
+        );
+    }
+
+    private static String shaderInputParityVec4(java.nio.ByteBuffer data, int offset) {
+        return String.format(
+            java.util.Locale.ROOT,
+            "(%.8f,%.8f,%.8f,%.8f)",
+            data.getFloat(offset),
+            data.getFloat(offset + 4),
+            data.getFloat(offset + 8),
+            data.getFloat(offset + 12)
+        );
+    }
+
+    private static String shaderInputParityVec3(java.nio.ByteBuffer data, int offset) {
+        return String.format(
+            java.util.Locale.ROOT,
+            "(%.8f,%.8f,%.8f)",
+            data.getFloat(offset),
+            data.getFloat(offset + 4),
+            data.getFloat(offset + 8)
         );
     }
 

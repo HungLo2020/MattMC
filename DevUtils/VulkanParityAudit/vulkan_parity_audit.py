@@ -91,10 +91,15 @@ class ResourceRecord:
     texture_height: str = ""
     texture_mips: str = ""
     texture_usage: str = ""
+    projection_label: str = ""
+    projection_context: str = ""
 
     @property
     def semantic_key(self) -> tuple[str, str, str]:
-        return (self.stable_key, self.name, self.resource_type)
+        name = self.name
+        if self.name == "Projection" and self.projection_label:
+            name = f"{self.name}@{self.projection_label}"
+        return (self.stable_key, name, self.resource_type)
 
     @property
     def ubo_payload_signature(self) -> str:
@@ -307,6 +312,7 @@ def parse_resource(raw: str, backend: str, source: str, pipeline_key: str, stabl
         texture_height=fields.get("height", ""),
         texture_mips=fields.get("mips", ""),
         texture_usage=fields.get("usage", ""),
+        projection_label=fields.get("projectionLabel", ""),
     )
 
     stages_match = re.search(r"stages=\[([^]]+)\]", body)
@@ -343,10 +349,15 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
         pipeline_key = fields.get("pipelineKey", "")
         stable_key = fields.get("stableKey", "")
         resources_text = extract_balanced_after("resources=", payload)
+        records: list[ResourceRecord] = []
         for raw_resource in split_top_level_resources(resources_text):
             record = parse_resource(raw_resource, backend, source, pipeline_key, stable_key)
             if record:
-                events.resources[record.semantic_key].append(record)
+                records.append(record)
+        projection_context = next((record.projection_label for record in records if record.name == "Projection" and record.projection_label), "")
+        for record in records:
+            record.projection_context = projection_context
+            events.resources[record.semantic_key].append(record)
 
     elif payload.startswith("UniformBuffer "):
         events.counters["UniformBuffer"] += 1
@@ -433,11 +444,16 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
 
         if not gl_records or not vk_records:
             only = "OpenGL" if gl_records else "Vulkan"
+            is_labeled_projection = key[1].startswith("Projection@")
             differences.append(Difference(
-                severity=60,
-                category="backend-only-resource",
+                severity=25 if is_labeled_projection else 60,
+                category="backend-only-projection-context" if is_labeled_projection else "backend-only-resource",
                 key=key_text,
-                reason=f"resource semantic key only observed on {only}",
+                reason=(
+                    f"labeled projection context only observed on {only}; separate captures can legitimately visit different GUI/minimap contexts"
+                    if is_labeled_projection
+                    else f"resource semantic key only observed on {only}"
+                ),
                 opengl_count=len(gl_records),
                 vulkan_count=len(vk_records),
                 opengl_values=values_for_resources(gl_records)[:4],
@@ -477,6 +493,20 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
                         vulkan_count=len(vk_records),
                         opengl_values=[f"shared={','.join(overlap[:3])}", *gl_payloads[:4]],
                         vulkan_values=[f"shared={','.join(overlap[:3])}", *vk_payloads[:4]],
+                    ))
+                    continue
+                gl_contexts = sorted({record.projection_context for record in gl_records if record.projection_context})
+                vk_contexts = sorted({record.projection_context for record in vk_records if record.projection_context})
+                if key[1] == "DynamicTransforms" and set(gl_contexts) == set(vk_contexts) and any("cubemap" in context for context in gl_contexts):
+                    differences.append(Difference(
+                        severity=40,
+                        category="timing-sensitive-dynamic-transform-mismatch",
+                        key=key_text,
+                        reason="DynamicTransforms are from the animated cubemap/panorama context; separate captures are not frame-synchronized",
+                        opengl_count=len(gl_records),
+                        vulkan_count=len(vk_records),
+                        opengl_values=[f"context={','.join(gl_contexts)}", *gl_payloads[:4]],
+                        vulkan_values=[f"context={','.join(vk_contexts)}", *vk_payloads[:4]],
                     ))
                     continue
                 differences.append(Difference(

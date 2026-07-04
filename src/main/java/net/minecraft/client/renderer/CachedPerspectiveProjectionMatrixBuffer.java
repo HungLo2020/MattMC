@@ -14,6 +14,7 @@ import org.lwjgl.system.MemoryStack;
 public class CachedPerspectiveProjectionMatrixBuffer implements AutoCloseable {
 	private final GpuBuffer buffer;
 	private final GpuBufferSlice bufferSlice;
+	private final String label;
 	private final float zNear;
 	private final float zFar;
 	private int width;
@@ -21,10 +22,12 @@ public class CachedPerspectiveProjectionMatrixBuffer implements AutoCloseable {
 	private float fov;
 
 	public CachedPerspectiveProjectionMatrixBuffer(String string, float f, float g) {
+		this.label = "cached-perspective:" + string;
 		this.zNear = f;
 		this.zFar = g;
 		this.buffer = net.vulkanic.VulkanicAPI.createBuffer(() -> "Projection matrix UBO " + string, 136, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
 		this.bufferSlice = this.buffer.slice(0, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
+		net.vulkanic.VulkanicAPI.labelProjectionMatrix(this.bufferSlice, this.label);
 	}
 
 	public GpuBufferSlice getBuffer(int i, int j, float f) {
@@ -41,6 +44,7 @@ public class CachedPerspectiveProjectionMatrixBuffer implements AutoCloseable {
 			this.fov = f;
 		}
 
+		net.vulkanic.VulkanicAPI.labelProjectionMatrix(this.bufferSlice, this.label);
 		return this.bufferSlice;
 	}
 

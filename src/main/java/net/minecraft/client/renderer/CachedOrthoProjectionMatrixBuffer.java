@@ -14,6 +14,7 @@ import org.lwjgl.system.MemoryStack;
 public class CachedOrthoProjectionMatrixBuffer implements AutoCloseable {
 	private final GpuBuffer buffer;
 	private final GpuBufferSlice bufferSlice;
+	private final String label;
 	private final float zNear;
 	private final float zFar;
 	private final boolean invertY;
@@ -26,12 +27,14 @@ public class CachedOrthoProjectionMatrixBuffer implements AutoCloseable {
 	}
 
 	public CachedOrthoProjectionMatrixBuffer(String string, float f, float g, boolean bl, boolean bl2) {
+		this.label = "cached-ortho:" + string;
 		this.zNear = f;
 		this.zFar = g;
 		this.invertY = bl;
 		this.useZeroToOneDepthWhenVulkan = bl2;
 		this.buffer = net.vulkanic.VulkanicAPI.createBuffer(() -> "Projection matrix UBO " + string, 136, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
 		this.bufferSlice = this.buffer.slice(0, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
+		net.vulkanic.VulkanicAPI.labelProjectionMatrix(this.bufferSlice, this.label);
 	}
 
 	public GpuBufferSlice getBuffer(float f, float g) {
@@ -47,6 +50,7 @@ public class CachedOrthoProjectionMatrixBuffer implements AutoCloseable {
 			this.height = g;
 		}
 
+		net.vulkanic.VulkanicAPI.labelProjectionMatrix(this.bufferSlice, this.label);
 		return this.bufferSlice;
 	}
 

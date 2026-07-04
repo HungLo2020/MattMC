@@ -14,10 +14,13 @@ import org.lwjgl.system.MemoryStack;
 public class PerspectiveProjectionMatrixBuffer implements AutoCloseable {
 	private final GpuBuffer buffer;
 	private final GpuBufferSlice bufferSlice;
+	private final String label;
 
 	public PerspectiveProjectionMatrixBuffer(String string) {
+		this.label = "perspective:" + string;
 		this.buffer = net.vulkanic.VulkanicAPI.createBuffer(() -> "Projection matrix UBO " + string, 136, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
 		this.bufferSlice = this.buffer.slice(0, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
+		net.vulkanic.VulkanicAPI.labelProjectionMatrix(this.bufferSlice, this.label);
 	}
 
 	public GpuBufferSlice getBuffer(Matrix4f matrix4f) {
@@ -26,6 +29,7 @@ public class PerspectiveProjectionMatrixBuffer implements AutoCloseable {
 			net.vulkanic.VulkanicAPI.createCommandEncoder().writeToBuffer(this.buffer.slice(), byteBuffer);
 		}
 
+		net.vulkanic.VulkanicAPI.labelProjectionMatrix(this.bufferSlice, this.label);
 		return this.bufferSlice;
 	}
 
