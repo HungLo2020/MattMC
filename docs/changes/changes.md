@@ -13,6 +13,7 @@ This Document is a list of all changes in MattMC over base Minecraft Java 1.21.1
 - Iris + Complementary Shaders
 - AlexsCaves Primordial Caves Mobs & Blocks
 - AlexsMobs Mobs & Items
+- [Elevator Block](../gameplay/items/Elevator.md)
 
 ## Removals
 - Microsoft Telemetry
@@ -26,3 +27,5 @@ This Document is a list of all changes in MattMC over base Minecraft Java 1.21.1
 - Replaced Microsoft Accounts with Offline Accounts
 - Game servers host Player Skins instead of Microsoft Servers
 - Reverted to old mob spawn egg textures
+- Swapped Sneak and Sprint keys. Sneak is now LCTRL and Sprint is LSHIFT.
+- Made the GUI Dark Mode
