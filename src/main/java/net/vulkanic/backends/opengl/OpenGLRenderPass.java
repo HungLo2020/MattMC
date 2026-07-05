@@ -1,12 +1,12 @@
 package net.vulkanic.backends.opengl;
 
+import net.blaze3d.opengl.GlConst;
 import net.vulkanic.CommandContext;
 import net.vulkanic.PipelineHandle;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicBuffer;
 import net.vulkanic.VulkanicBufferTarget;
 import net.vulkanic.VulkanicIndexType;
-import net.vulkanic.VulkanicPrimitiveMode;
 import net.vulkanic.VulkanicRenderPass;
 
 /**
@@ -25,6 +25,7 @@ public class OpenGLRenderPass implements VulkanicRenderPass {
     private final int fbo;
     private final CommandContext ctx;
     private VulkanicIndexType currentIndexType = VulkanicIndexType.INT;
+    private int currentPrimitiveMode = VulkanicAPI.GL_TRIANGLES;
     private boolean closed;
 
     /**
@@ -69,6 +70,7 @@ public class OpenGLRenderPass implements VulkanicRenderPass {
         }
         int programId = glHandle.getGlRenderPipeline().program().getProgramId();
         VulkanicAPI.bindShaderProgram(ctx, programId);
+        this.currentPrimitiveMode = GlConst.toGl(glHandle.getGlRenderPipeline().info().getVertexFormatMode());
     }
 
     @Override
@@ -100,9 +102,9 @@ public class OpenGLRenderPass implements VulkanicRenderPass {
         // Offset in bytes = firstIndex * bytesPerIndex
         long offset = (long) firstIndex * currentIndexType.bytesPerIndex();
         if (instanceCount == 1 && baseVertex == 0) {
-            VulkanicAPI.drawElements(ctx, VulkanicPrimitiveMode.TRIANGLES, indexCount, currentIndexType, offset);
+            VulkanicAPI.drawElements(ctx, currentPrimitiveMode, indexCount, currentIndexType, offset);
         } else {
-            VulkanicAPI.drawIndexedInstancedBaseVertex(ctx, VulkanicPrimitiveMode.TRIANGLES,
+            VulkanicAPI.drawIndexedInstancedBaseVertex(ctx, currentPrimitiveMode,
                 indexCount, currentIndexType, offset, instanceCount, baseVertex);
         }
     }
@@ -110,7 +112,7 @@ public class OpenGLRenderPass implements VulkanicRenderPass {
     @Override
     public void draw(int firstVertex, int vertexCount) {
         checkNotClosed();
-        VulkanicAPI.drawArrays(ctx, VulkanicPrimitiveMode.TRIANGLES, firstVertex, vertexCount);
+        VulkanicAPI.drawArrays(ctx, currentPrimitiveMode, firstVertex, vertexCount);
     }
 
     @Override

@@ -83,6 +83,7 @@ import net.minecraft.world.entity.monster.Spider;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TaczMvpGunItem;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -114,6 +115,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	public static final float PROJECTION_Z_NEAR = 0.05F;
 	public static final float PROJECTION_3D_HUD_Z_FAR = 100.0F;
+	private static final float HAND_DEPTH_SCALE = 0.125F;
 	private static final float PORTAL_SPINNING_SPEED = 20.0F;
 	private static final float NAUSEA_SPINNING_SPEED = 7.0F;
 	private final Minecraft minecraft;
@@ -154,6 +156,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	private final Lighting lighting = new Lighting();
 	private final GlobalSettingsUniform globalSettingsUniform = new GlobalSettingsUniform();
 	private final PerspectiveProjectionMatrixBuffer levelProjectionMatrixBuffer = new PerspectiveProjectionMatrixBuffer("level");
+	private final PerspectiveProjectionMatrixBuffer handProjectionMatrixBuffer = new PerspectiveProjectionMatrixBuffer("hand");
 	private final CachedPerspectiveProjectionMatrixBuffer hud3dProjectionMatrixBuffer = new CachedPerspectiveProjectionMatrixBuffer("3d hud", 0.05F, 100.0F);
 	// Screen shake support for ShakesScreen entities
 	private static final double SCREEN_SHAKE_SEARCH_RADIUS = 64.0;
@@ -242,6 +245,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		this.resourcePool.close();
 		this.guiRenderer.close();
 		this.levelProjectionMatrixBuffer.close();
+		this.handProjectionMatrixBuffer.close();
 		this.hud3dProjectionMatrixBuffer.close();
 		this.lighting.close();
 		this.cubeMap.close();
@@ -584,14 +588,25 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		if (!this.panoramicMode) {
 			this.featureRenderDispatcher.renderAllFeatures();
 			this.renderBuffers.bufferSource().endBatch();
-			PoseStack poseStack = new PoseStack();
-			poseStack.pushPose();
-			poseStack.mulPose(matrix4f.invert(new Matrix4f()));
 			Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
-			matrix4fStack.pushMatrix().mul(matrix4f);
-			this.bobHurt(poseStack, f);
-			if (this.minecraft.options.bobView().get()) {
-				this.bobView(poseStack, f);
+			PoseStack poseStack = new PoseStack();
+			boolean taczHandPath = this.useTaczHandModelViewPath();
+			poseStack.pushPose();
+			matrix4fStack.pushMatrix();
+			if (taczHandPath) {
+				PoseStack modelViewPoseStack = new PoseStack();
+				this.bobHurt(modelViewPoseStack, f);
+				if (this.minecraft.options.bobView().get()) {
+					this.bobView(modelViewPoseStack, f);
+				}
+				matrix4fStack.set(modelViewPoseStack.last().pose());
+			} else {
+				poseStack.mulPose(matrix4f.invert(new Matrix4f()));
+				matrix4fStack.mul(matrix4f);
+				this.bobHurt(poseStack, f);
+				if (this.minecraft.options.bobView().get()) {
+					this.bobView(poseStack, f);
+				}
 			}
 
 			if (this.minecraft.options.getCameraType().isFirstPerson()
@@ -616,6 +631,12 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			matrix4fStack.popMatrix();
 			poseStack.popPose();
 		}
+	}
+
+	private boolean useTaczHandModelViewPath() {
+		return !net.irisshaders.iris.Iris.isPackInUseQuick()
+			&& this.minecraft.player != null
+			&& this.minecraft.player.getMainHandItem().getItem() instanceof TaczMvpGunItem;
 	}
 
 	public Matrix4f getProjectionMatrix(float f) {
@@ -969,13 +990,19 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			);
 		profilerFiller.popPush("hand");
 		boolean bl3 = this.minecraft.getCameraEntity() instanceof LivingEntity && ((LivingEntity)this.minecraft.getCameraEntity()).isSleeping();
+		float itemFov = this.getFov(this.mainCamera, f, false);
+		Matrix4f handProjection = new Matrix4f().scale(1.0F, 1.0F, HAND_DEPTH_SCALE);
+		handProjection.mul(this.getProjectionMatrix(itemFov));
 		VulkanicAPI.setProjectionMatrix(
-			this.hud3dProjectionMatrixBuffer
-				.getBuffer(this.minecraft.getWindow().getWidth(), this.minecraft.getWindow().getHeight(), this.getFov(this.mainCamera, f, false)),
+			this.handProjectionMatrixBuffer.getBuffer(handProjection),
 			ProjectionType.PERSPECTIVE
 		);
 		VulkanicAPI.createCommandEncoder().clearDepthTexture(this.minecraft.getMainRenderTarget().getDepthTexture(), 1.0);
 		this.renderItemInHand(f, bl3, matrix4f2);
+		VulkanicAPI.setProjectionMatrix(
+			this.hud3dProjectionMatrixBuffer.getBuffer(this.minecraft.getWindow().getWidth(), this.minecraft.getWindow().getHeight(), itemFov),
+			ProjectionType.PERSPECTIVE
+		);
 		profilerFiller.popPush("screenEffects");
 		MultiBufferSource.BufferSource bufferSource = this.renderBuffers.bufferSource();
 		this.screenEffectRenderer.renderScreenEffect(bl3, f, this.submitNodeStorage);

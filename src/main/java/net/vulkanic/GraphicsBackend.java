@@ -1339,6 +1339,17 @@ public interface GraphicsBackend {
      * @param depth The depth clear value (0.0 to 1.0)
      */
     void setClearDepth(CommandContext ctx, double depth);
+
+    /**
+     * Sets the stencil clear value used by subsequent stencil clear operations.
+     *
+     * In OpenGL: Maps to glClearStencil()
+     * In Vulkan: Part of depth/stencil clear values
+     *
+     * @param ctx Command context for recording this command
+     * @param stencil The stencil clear value
+     */
+    void setClearStencil(CommandContext ctx, int stencil);
     
     /**
      * Sets the viewport transformation.

@@ -843,6 +843,14 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         GL11.glClearDepth(depth);
     }
+
+    @Override
+    public void setClearStencil(CommandContext ctx, int stencil) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glClearStencil(stencil);
+    }
     
     @Override
     public void setViewport(CommandContext ctx, int x, int y, int width, int height) {

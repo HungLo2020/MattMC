@@ -4511,6 +4511,15 @@ public class VulkanicAPI {
     public static void setClearDepth(CommandContext ctx, double depth) {
         getBackend().setClearDepth(ctx, depth);
     }
+
+    /**
+     * Sets the stencil clear value for subsequent stencil clear operations.
+     * @param ctx Command context
+     * @param stencil The stencil value
+     */
+    public static void setClearStencil(CommandContext ctx, int stencil) {
+        getBackend().setClearStencil(ctx, stencil);
+    }
     
     /**
      * Specifies the color buffer to draw into.

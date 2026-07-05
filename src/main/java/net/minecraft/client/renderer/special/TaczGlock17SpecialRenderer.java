@@ -80,6 +80,12 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	private static final Set<String> FUNCTIONAL_MARKER_NODES = Set.of("lefthand_pos", "righthand_pos", "muzzle_flash", "shell");
 	private static final Pattern TACZ_NUMBERED_NODE = Pattern.compile("^(.*?)(?:_(\\d+))?$");
 	private static final Map<String, AttachmentRenderData> ATTACHMENT_CACHE = new ConcurrentHashMap<>();
+	private static final Map<String, Long> SCOPE_DEBUG_LAST_LOG_NANOS = new ConcurrentHashMap<>();
+	private static final long SCOPE_DEBUG_INTERVAL_NANOS = 500_000_000L;
+	private static final int GL_STENCIL_BITS = 0x0D57;
+	private static final int GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE = 0x8CD0;
+	private static final int GL_FRAMEBUFFER_ATTACHMENT_DEPTH_SIZE = 0x8216;
+	private static final int GL_FRAMEBUFFER_ATTACHMENT_STENCIL_SIZE = 0x8217;
 	private static final RenderPipeline TACZ_ENTITY_CUTOUT_STENCIL_PIPELINE = RenderPipeline.builder(RenderPipelines.ENTITY_SNIPPET)
 		.withLocation(ResourceLocation.withDefaultNamespace("pipeline/tacz_entity_cutout_stencil"))
 		.withShaderDefine("ALPHA_CUTOUT", 0.1F)
@@ -129,7 +135,7 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			.withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
 			.withDepthWrite(false)
 			.withColorWrite(false)
-			.withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.TRIANGLE_FAN)
+			.withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.TRIANGLES)
 			.build(),
 		RenderType.CompositeState.builder().createCompositeState(false)
 	);
@@ -758,8 +764,89 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	private static void clearStencilForRenderType(RenderType renderType) {
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		bindRenderTarget(renderType);
+		VulkanicAPI.setClearStencil(ctx, 0);
 		VulkanicAPI.setStencilWriteMask(ctx, 0xFF);
 		VulkanicAPI.clearBuffers(ctx, VulkanicClearBuffer.STENCIL);
+	}
+
+	private static void logScopeDebug(String phase, RenderType renderTargetRenderType, String details) {
+		long now = System.nanoTime();
+		Long previous = SCOPE_DEBUG_LAST_LOG_NANOS.get(phase);
+		if (previous != null && now - previous < SCOPE_DEBUG_INTERVAL_NANOS) {
+			return;
+		}
+		SCOPE_DEBUG_LAST_LOG_NANOS.put(phase, now);
+
+		try {
+			CommandContext ctx = VulkanicAPI.getCommandContext();
+			RenderTargetBinding binding = renderTargetBinding(renderTargetRenderType);
+			int boundFbo = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_FRAMEBUFFER_BINDING);
+			int status = VulkanicAPI.checkFramebufferStatus(ctx);
+			int stencilBits = VulkanicAPI.getInteger(ctx, GL_STENCIL_BITS);
+			boolean stencilTest = VulkanicAPI.isEnabled(ctx, VulkanicCapability.STENCIL_TEST);
+			int stencilFunc = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_FUNC);
+			int stencilRef = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_REF);
+			int stencilValueMask = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_VALUE_MASK);
+			int stencilWriteMask = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_WRITEMASK);
+			int stencilFail = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_FAIL);
+			int stencilDepthFail = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_PASS_DEPTH_FAIL);
+			int stencilDepthPass = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_PASS_DEPTH_PASS);
+			boolean depthTest = VulkanicAPI.isEnabled(ctx, VulkanicCapability.DEPTH_TEST);
+			boolean blend = VulkanicAPI.isEnabled(ctx, VulkanicCapability.BLEND);
+			boolean cull = VulkanicAPI.isEnabled(ctx, VulkanicCapability.CULL_FACE);
+			int depthFunc = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_DEPTH_FUNC);
+			int depthWriteMask = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_DEPTH_WRITEMASK);
+			int depthAttachment = VulkanicAPI.getFramebufferAttachmentObjectName(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_ATTACHMENT);
+			int depthStencilAttachment = VulkanicAPI.getFramebufferAttachmentObjectName(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_STENCIL_ATTACHMENT);
+			int depthAttachmentType = VulkanicAPI.getFramebufferAttachmentParameteri(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE);
+			int depthStencilAttachmentType = VulkanicAPI.getFramebufferAttachmentParameteri(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_STENCIL_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE);
+			int depthAttachmentDepthSize = VulkanicAPI.getFramebufferAttachmentParameteri(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_DEPTH_SIZE);
+			int depthAttachmentStencilSize = VulkanicAPI.getFramebufferAttachmentParameteri(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_STENCIL_SIZE);
+			int depthStencilAttachmentDepthSize = VulkanicAPI.getFramebufferAttachmentParameteri(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_STENCIL_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_DEPTH_SIZE);
+			int depthStencilAttachmentStencilSize = VulkanicAPI.getFramebufferAttachmentParameteri(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_STENCIL_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_STENCIL_SIZE);
+			LOGGER.info(
+				"TACZ_SCOPE_DEBUG phase={} shaderPack={} targetRenderType={} pipeline={} pipelineDefines={} pipelineBlend={} pipelineDepthTest={} pipelineDepthWrite={} targetFbo={} boundFbo={} framebufferStatus=0x{} hasDepth={} stencilBits={} stencilTest={} stencilFunc=0x{} stencilRef={} stencilValueMask=0x{} stencilWriteMask=0x{} stencilOp=[0x{},0x{},0x{}] depthTest={} depthFunc=0x{} depthWriteMask={} blend={} cull={} depthAttachment={} depthAttachmentType=0x{} depthAttachmentDepthSize={} depthAttachmentStencilSize={} depthStencilAttachment={} depthStencilAttachmentType=0x{} depthStencilAttachmentDepthSize={} depthStencilAttachmentStencilSize={} outputColorOverride={} outputDepthOverride={} details={}",
+				phase,
+				net.irisshaders.iris.Iris.isPackInUseQuick(),
+				renderTargetRenderType.getName(),
+				renderTargetRenderType.pipeline().getLocation(),
+				renderTargetRenderType.pipeline().getShaderDefines(),
+				renderTargetRenderType.pipeline().getBlendFunction().isPresent(),
+				renderTargetRenderType.pipeline().getDepthTestFunction(),
+				renderTargetRenderType.pipeline().isWriteDepth(),
+				binding.framebuffer(),
+				boundFbo,
+				Integer.toHexString(status),
+				binding.hasDepth(),
+				stencilBits,
+				stencilTest,
+				Integer.toHexString(stencilFunc),
+				stencilRef,
+				Integer.toHexString(stencilValueMask),
+				Integer.toHexString(stencilWriteMask),
+				Integer.toHexString(stencilFail),
+				Integer.toHexString(stencilDepthFail),
+				Integer.toHexString(stencilDepthPass),
+				depthTest,
+				Integer.toHexString(depthFunc),
+				depthWriteMask,
+				blend,
+				cull,
+				depthAttachment,
+				Integer.toHexString(depthAttachmentType),
+				depthAttachmentDepthSize,
+				depthAttachmentStencilSize,
+				depthStencilAttachment,
+				Integer.toHexString(depthStencilAttachmentType),
+				depthStencilAttachmentDepthSize,
+				depthStencilAttachmentStencilSize,
+				VulkanicAPI.getOutputColorTextureOverride() != null,
+				VulkanicAPI.getOutputDepthTextureOverride() != null,
+				details
+			);
+		} catch (Exception exception) {
+			LOGGER.warn("TACZ_SCOPE_DEBUG phase={} failed to collect render state details={}", phase, details, exception);
+		}
 	}
 
 	private static void drawMeshImmediate(RenderType renderType, MeshData meshData, Runnable beforeDraw) {
@@ -776,11 +863,16 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 					new Vector3f(),
 					VulkanicAPI.getTextureMatrix(),
 					VulkanicAPI.getShaderLineWidth()
-				);
+			);
 			GpuBuffer vertexBuffer = renderType.pipeline().getVertexFormat().uploadImmediateVertexBuffer(meshData.vertexBuffer());
 			GpuBuffer indexBuffer;
 			VertexFormat.IndexType indexType;
-			if (meshData.indexBuffer() == null) {
+			boolean drawIndexed = true;
+			if (meshData.indexBuffer() == null && meshData.drawState().mode() == VertexFormat.Mode.TRIANGLE_FAN) {
+				indexBuffer = null;
+				indexType = null;
+				drawIndexed = false;
+			} else if (meshData.indexBuffer() == null) {
 				VulkanicAPI.AutoStorageIndexBuffer sequentialBuffer = VulkanicAPI.getSequentialBuffer(meshData.drawState().mode());
 				indexBuffer = sequentialBuffer.getBuffer(meshData.drawState().indexCount());
 				indexType = sequentialBuffer.type();
@@ -823,9 +915,15 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 						renderPass.bindSampler("Sampler" + sampler, textureView);
 					}
 				}
-				renderPass.setIndexBuffer(indexBuffer, indexType);
+				if (drawIndexed) {
+					renderPass.setIndexBuffer(indexBuffer, indexType);
+				}
 				beforeDraw.run();
-				renderPass.drawIndexed(0, 0, meshData.drawState().indexCount(), 1);
+				if (drawIndexed) {
+					renderPass.drawIndexed(0, 0, meshData.drawState().indexCount(), 1);
+				} else {
+					renderPass.draw(0, meshData.drawState().vertexCount());
+				}
 			}
 		} finally {
 			renderType.clearRenderState();
@@ -1052,10 +1150,16 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 				if (scopeOcular != ocularNode.scope()) {
 					continue;
 				}
+				int ocularIndex = index;
 				int stencilValue = index + 1;
 				this.renderNodeIfPresent(ocularNode.name(), poseStack, this.stencilRenderType(), renderTargetRenderType, bufferSource, null, () -> {
 					this.configureHiddenStencilWrite();
 					VulkanicAPI.setStencilFunc(ctx, VulkanicAPI.GL_GREATER, stencilValue, 0xFF);
+					logScopeDebug(
+						"hidden-ocular-stencil",
+						renderTargetRenderType,
+						"ocular=" + ocularNode.name() + " index=" + ocularIndex + " scopeOcular=" + ocularNode.scope() + " stencilValue=" + stencilValue
+					);
 				});
 			}
 			VulkanicAPI.setStencilOp(ctx, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP);
@@ -1122,6 +1226,7 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			RenderType divisionRenderType = this.noDepthRenderType();
 			for (int index = 0; index < ocularNodes.size() && index < divisionNodeGroups.size(); index++) {
 				OcularNode ocularNode = ocularNodes.get(index);
+				int divisionIndex = index;
 				int stencilValue = Math.min(index + 1, 0xFF);
 				CommandContext ctx = VulkanicAPI.getCommandContext();
 				if (selective && !ocularNode.scope()) {
@@ -1132,15 +1237,33 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 							VulkanicAPI.setStencilWriteMask(ctx, 0x00);
 							VulkanicAPI.setStencilOp(ctx, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP);
 							VulkanicAPI.setStencilFunc(ctx, VulkanicAPI.GL_EQUAL, stencilValue, 0xFF);
+							logScopeDebug(
+								"division-mask",
+								renderTargetRenderType,
+									"division=" + divisionNode
+									+ " ocular=" + ocularNode.name()
+									+ " index=" + divisionIndex
+									+ " selective=true"
+									+ " stencilValue=" + stencilValue
+									+ " drawRenderType=" + divisionRenderType.getName()
+									+ " drawPipeline=" + divisionRenderType.pipeline().getLocation()
+									+ " drawDefines=" + divisionRenderType.pipeline().getShaderDefines()
+							);
 						});
 					}
 				} else {
+					int ocularIndex = index;
 					this.renderNodeIfPresent(ocularNode.name(), poseStack, renderType, renderTargetRenderType, bufferSource, null, () -> {
 						VulkanicAPI.setColorMask(ctx, true, true, true, true);
 						VulkanicAPI.setDepthWriteMask(ctx, true);
 						VulkanicAPI.setStencilWriteMask(ctx, 0x00);
 						VulkanicAPI.setStencilOp(ctx, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP);
 						VulkanicAPI.setStencilFunc(ctx, VulkanicAPI.GL_EQUAL, stencilValue, 0xFF);
+						logScopeDebug(
+							"visible-ocular-mask",
+							renderTargetRenderType,
+							"ocular=" + ocularNode.name() + " index=" + ocularIndex + " scopeOcular=" + ocularNode.scope() + " stencilValue=" + stencilValue
+						);
 					});
 					int invertedStencilValue = ~stencilValue & 0xFF;
 					for (String divisionNode : divisionNodeGroups.get(index)) {
@@ -1150,6 +1273,19 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 							VulkanicAPI.setStencilWriteMask(ctx, 0x00);
 							VulkanicAPI.setStencilOp(ctx, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP);
 							VulkanicAPI.setStencilFunc(ctx, VulkanicAPI.GL_EQUAL, invertedStencilValue, 0xFF);
+							logScopeDebug(
+								"division-mask",
+								renderTargetRenderType,
+									"division=" + divisionNode
+									+ " ocular=" + ocularNode.name()
+									+ " index=" + divisionIndex
+									+ " selective=" + selective
+									+ " baseStencilValue=" + stencilValue
+									+ " invertedStencilValue=" + invertedStencilValue
+									+ " drawRenderType=" + divisionRenderType.getName()
+									+ " drawPipeline=" + divisionRenderType.pipeline().getLocation()
+									+ " drawDefines=" + divisionRenderType.pipeline().getShaderDefines()
+							);
 						});
 					}
 				}
@@ -1178,7 +1314,6 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			}
 
 			CommandContext ctx = VulkanicAPI.getCommandContext();
-			VulkanicAPI.setCapabilityEnabled(ctx, VulkanicCapability.DEPTH_TEST, true);
 			VulkanicAPI.setDepthWriteMask(ctx, true);
 			VulkanicAPI.setColorMask(ctx, true, true, true, true);
 			VulkanicAPI.setStencilOp(ctx, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP);
@@ -1197,12 +1332,14 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			float centerY = ocularCenter.y() * 16.0F * 90.0F;
 			float aimProgress = effectiveAimProgress(this.animationPose);
 			float radius = 80.0F * aimProgress;
-			try (ByteBufferBuilder byteBufferBuilder = ByteBufferBuilder.exactlySized(DefaultVertexFormat.POSITION_COLOR.getVertexSize() * 92)) {
-				BufferBuilder builder = new BufferBuilder(byteBufferBuilder, VertexFormat.Mode.TRIANGLE_FAN, DefaultVertexFormat.POSITION_COLOR);
-				builder.addVertex(centerX, centerY, -90.0F).setColor(255, 255, 255, 255);
-				for (int segment = 0; segment <= 90; segment++) {
+			try (ByteBufferBuilder byteBufferBuilder = ByteBufferBuilder.exactlySized(DefaultVertexFormat.POSITION_COLOR.getVertexSize() * 90 * 3)) {
+				BufferBuilder builder = new BufferBuilder(byteBufferBuilder, VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_COLOR);
+				for (int segment = 0; segment < 90; segment++) {
 					float angle = segment * ((float)Math.PI * 2.0F) / 90.0F;
+					float nextAngle = (segment + 1) * ((float)Math.PI * 2.0F) / 90.0F;
+					builder.addVertex(centerX, centerY, -90.0F).setColor(255, 255, 255, 255);
 					builder.addVertex(centerX + Mth.cos(angle) * radius, centerY + Mth.sin(angle) * radius, -90.0F).setColor(255, 255, 255, 255);
+					builder.addVertex(centerX + Mth.cos(nextAngle) * radius, centerY + Mth.sin(nextAngle) * radius, -90.0F).setColor(255, 255, 255, 255);
 				}
 				MeshData meshData = builder.buildOrThrow();
 				try {
@@ -1212,8 +1349,18 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 						VulkanicAPI.setStencilOp(ctx, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_INVERT);
 						VulkanicAPI.setColorMask(ctx, false, false, false, false);
 						VulkanicAPI.setDepthWriteMask(ctx, false);
-						VulkanicAPI.setCapabilityEnabled(ctx, VulkanicCapability.DEPTH_TEST, false);
 						VulkanicAPI.setStencilFunc(ctx, VulkanicAPI.GL_EQUAL, stencilValue, 0xFF);
+						logScopeDebug(
+							"aperture-invert",
+							renderTargetRenderType,
+							"ocular=" + ocularNode.name()
+								+ " stencilValue=" + stencilValue
+								+ " center=(" + centerX + "," + centerY + ")"
+								+ " radius=" + radius
+								+ " aimProgress=" + aimProgress
+								+ " vertices=" + meshData.drawState().vertexCount()
+								+ " mode=" + meshData.drawState().mode()
+						);
 					}, renderTargetRenderType);
 				} finally {
 					meshData.close();
@@ -1295,6 +1442,7 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			CommandContext ctx = VulkanicAPI.getCommandContext();
 			VulkanicAPI.setCapabilityEnabled(ctx, VulkanicCapability.STENCIL_TEST, true);
 			clearStencilForRenderType(renderType);
+			logScopeDebug("stencil-clear", renderType, "attachmentTexture=" + this.attachmentData.texture());
 			VulkanicAPI.setStencilFunc(ctx, VulkanicAPI.GL_ALWAYS, 0, 0xFF);
 			VulkanicAPI.setStencilOp(ctx, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP);
 		}
