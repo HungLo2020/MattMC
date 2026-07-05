@@ -47,17 +47,11 @@ float total_fog_value(float sphericalVertexDistance, float cylindricalVertexDist
 }
 
 vec4 apply_fog(vec4 inColor, float sphericalVertexDistance, float cylindricalVertexDistance, float environmentalStart, float environmantalEnd, float renderDistanceStart, float renderDistanceEnd, vec4 fogColor) {
-#ifdef MATTMC_VULKAN_DISABLE_ENTITY_FOG
-    return inColor;
-#endif
     float fogValue = total_fog_value(sphericalVertexDistance, cylindricalVertexDistance, environmentalStart, environmantalEnd, renderDistanceStart, renderDistanceEnd);
     return vec4(mix(inColor.rgb, fogColor.rgb, clamp(fogValue * fogColor.a, 0.0, 1.0)), inColor.a);
 }
 
 vec4 apply_entity_fog(vec4 inColor, float sphericalVertexDistance, float environmentalStart, float environmantalEnd, vec4 fogColor) {
-#ifdef MATTMC_VULKAN_DISABLE_ENTITY_FOG
-    return inColor;
-#endif
     float fogValue = linear_fog_value(sphericalVertexDistance, environmentalStart, environmantalEnd);
     return vec4(mix(inColor.rgb, fogColor.rgb, clamp(fogValue * fogColor.a, 0.0, 1.0)), inColor.a);
 }

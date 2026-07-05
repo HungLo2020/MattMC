@@ -674,19 +674,6 @@ void main() {
             || "minecraft:pipeline/translucent_particle".equals(pipelineLocation);
     }
 
-    private static boolean shouldDisableFogForEntityPipeline(RenderPipeline renderPipeline) {
-        net.minecraft.resources.ResourceLocation fragmentShader = renderPipeline.getFragmentShader();
-        if (fragmentShader == null) {
-            return false;
-        }
-
-        String shaderPath = fragmentShader.toString();
-        return "minecraft:core/entity".equals(shaderPath)
-            || "minecraft:core/rendertype_entity_shadow".equals(shaderPath)
-            || "minecraft:core/rendertype_item_entity_translucent_cull".equals(shaderPath)
-            || "minecraft:core/rendertype_entity_decal".equals(shaderPath);
-    }
-
     public CompiledRenderPipeline precompileRenderPipeline(
         RenderPipeline renderPipeline,
         @Nullable BiFunction<net.minecraft.resources.ResourceLocation, ShaderType, String> sourceProvider
@@ -781,13 +768,6 @@ void main() {
                     LOGGER.info("Vulkan particle alpha-mask debug override enabled for {}", renderPipeline.getLocation());
                     fragmentWithDefines = DEBUG_VULKAN_PARTICLE_ALPHA_MASK_SOURCE;
                 }
-            }
-
-            if (shouldDisableFogForEntityPipeline(renderPipeline)) {
-                fragmentWithDefines = GlslPreprocessor.injectDefines(
-                    fragmentWithDefines,
-                    net.minecraft.client.renderer.ShaderDefines.builder().define("MATTMC_VULKAN_DISABLE_ENTITY_FOG").build()
-                );
             }
 
             List<String> standaloneUniformDeclarations = collectStandaloneUniformDeclarations(
