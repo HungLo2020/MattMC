@@ -26,6 +26,7 @@ import net.irisshaders.iris.pipeline.transform.TransformPatcher;
 import net.irisshaders.iris.samplers.IrisSamplers;
 import net.irisshaders.iris.shaderpack.programs.ProgramSource;
 import net.irisshaders.iris.uniforms.CommonUniforms;
+import net.irisshaders.iris.uniforms.MatrixSafety;
 import net.irisshaders.iris.uniforms.builtin.BuiltinReplacementUniforms;
 import net.irisshaders.iris.uniforms.custom.CustomUniforms;
 import net.minecraft.client.Minecraft;
@@ -251,14 +252,14 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 		}
 
 		setUniform(modelViewUniform, toJOML(renderParam.dhModelViewMatrix));
-		setUniform(modelViewInverseUniform, toJOML(renderParam.dhModelViewMatrix).invert());
+		setUniform(modelViewInverseUniform, MatrixSafety.invertOrIdentity(toJOML(renderParam.dhModelViewMatrix), new Matrix4f()));
 		setUniform(projectionUniform, toJOML(renderParam.dhProjectionMatrix));
-		setUniform(projectionInverseUniform, toJOML(renderParam.dhProjectionMatrix).invert());
-		setUniform(normalMatrix3fUniform, toJOML(renderParam.dhModelViewMatrix).invert().transpose3x3(new Matrix3f()));
+		setUniform(projectionInverseUniform, MatrixSafety.invertOrIdentity(toJOML(renderParam.dhProjectionMatrix), new Matrix4f()));
+		setUniform(normalMatrix3fUniform, MatrixSafety.invertOrIdentity(toJOML(renderParam.dhModelViewMatrix), new Matrix4f()).transpose3x3(new Matrix3f()));
 		
 		// Set DH-specific projection uniforms (these are the same as the iris ones)
 		setUniform(dhProjectionUniform, toJOML(renderParam.dhProjectionMatrix));
-		setUniform(dhProjectionInverseUniform, toJOML(renderParam.dhProjectionMatrix).invert());
+		setUniform(dhProjectionInverseUniform, MatrixSafety.invertOrIdentity(toJOML(renderParam.dhProjectionMatrix), new Matrix4f()));
 		
 		Minecraft.getInstance().gameRenderer.lightTexture().turnOnLightLayer();
 		int lightmapTextureId = IrisRenderSystem.getTextureBinding(2);

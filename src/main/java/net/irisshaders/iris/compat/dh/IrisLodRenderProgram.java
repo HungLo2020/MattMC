@@ -19,6 +19,7 @@ import net.irisshaders.iris.pipeline.transform.TransformPatcher;
 import net.irisshaders.iris.samplers.IrisSamplers;
 import net.irisshaders.iris.shaderpack.programs.ProgramSource;
 import net.irisshaders.iris.uniforms.CommonUniforms;
+import net.irisshaders.iris.uniforms.MatrixSafety;
 import net.irisshaders.iris.uniforms.builtin.BuiltinReplacementUniforms;
 import net.irisshaders.iris.uniforms.custom.CustomUniforms;
 import net.minecraft.client.Minecraft;
@@ -242,14 +243,14 @@ public class IrisLodRenderProgram {
 		int lightmapTextureId = IrisRenderSystem.getTextureBinding(2);
 		IrisRenderSystem.bindTextureToUnit(IrisSamplers.LIGHTMAP_TEXTURE_UNIT, lightmapTextureId);
 		setUniform(modelViewUniform, modelView);
-		setUniform(modelViewInverseUniform, modelView.invert(new Matrix4f()));
+		setUniform(modelViewInverseUniform, MatrixSafety.invertOrIdentity(modelView, new Matrix4f()));
 		setUniform(projectionUniform, projection);
-		setUniform(projectionInverseUniform, projection.invert(new Matrix4f()));
-		setUniform(normalMatrix3fUniform, new Matrix4f(modelView).invert().transpose3x3(new Matrix3f()));
+		setUniform(projectionInverseUniform, MatrixSafety.invertOrIdentity(projection, new Matrix4f()));
+		setUniform(normalMatrix3fUniform, MatrixSafety.invertOrIdentity(modelView, new Matrix4f()).transpose3x3(new Matrix3f()));
 
 		// Set DH-specific projection uniforms (these are the same as the iris ones)
 		setUniform(dhProjectionUniform, projection);
-		setUniform(dhProjectionInverseUniform, projection.invert(new Matrix4f()));
+		setUniform(dhProjectionInverseUniform, MatrixSafety.invertOrIdentity(projection, new Matrix4f()));
 
 		setUniform(mircoOffsetUniform, 0.01f); // 0.01 block offset
 

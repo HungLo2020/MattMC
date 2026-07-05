@@ -29,6 +29,7 @@ import net.irisshaders.iris.samplers.IrisSamplers;
 import net.irisshaders.iris.shadows.ShadowRenderer;
 import net.irisshaders.iris.shadows.ShadowRenderingState;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
+import net.irisshaders.iris.uniforms.MatrixSafety;
 import net.irisshaders.iris.uniforms.custom.CustomUniforms;
 import net.irisshaders.iris.vertices.ImmediateState;
 import org.jetbrains.annotations.Nullable;
@@ -190,7 +191,7 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 
 		if (projectionInverse > -1) {
 			// TODO: This is wrong. (1.21.6)
-			IrisRenderSystem.uniformMatrix4fv(projectionInverse, false, (ShadowRenderingState.areShadowsCurrentlyBeingRendered() ? ShadowRenderer.PROJECTION : CapturedRenderingState.INSTANCE.getGbufferProjection()).invert(tempMatrix4f).get(tempFloats));
+			IrisRenderSystem.uniformMatrix4fv(projectionInverse, false, MatrixSafety.invertOrIdentity(ShadowRenderingState.areShadowsCurrentlyBeingRendered() ? ShadowRenderer.PROJECTION : CapturedRenderingState.INSTANCE.getGbufferProjection(), tempMatrix4f).get(tempFloats));
 		}
 
 		if (intensitySwizzle) {

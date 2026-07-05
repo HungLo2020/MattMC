@@ -1,6 +1,7 @@
 package net.irisshaders.iris.gl.uniform;
 
 import net.irisshaders.iris.gl.state.ValueUpdateNotifier;
+import net.irisshaders.iris.uniforms.MatrixSafety;
 import net.vulkanic.VulkanicAPI;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
@@ -39,6 +40,10 @@ public class MatrixUniform extends Uniform {
 
 	public void updateValue() {
 		Matrix4fc newValue = value.get();
+
+		if (!MatrixSafety.isFinite(newValue)) {
+			return;
+		}
 
 		if (!cachedValue.equals(newValue)) {
 			cachedValue.set(newValue);

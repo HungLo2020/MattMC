@@ -55,11 +55,7 @@ public final class MatrixUniforms {
 		@Override
 		public Matrix4fc get() {
 			// PERF: Don't copy + allocate this matrix every time?
-			Matrix4f copy = new Matrix4f(parent.get());
-
-			copy.invert();
-
-			return copy;
+			return MatrixSafety.invertOrIdentity(parent.get(), new Matrix4f());
 		}
 	}
 
