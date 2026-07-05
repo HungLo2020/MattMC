@@ -124,6 +124,14 @@ public class VulkanFramePresentationLifecycleTest {
                 && vulkanBackendSource.contains("enabledFeatures.fragmentStoresAndAtomics(true)")
                 && vulkanBackendSource.contains("fragmentStoresAndAtomicsEnabled"),
             "Vulkan backend should enable and track fragment-stage storage image writes when the selected device supports them");
+        assertTrue(vulkanBackendSource.contains("features.shaderStorageImageReadWithoutFormat()")
+                && vulkanBackendSource.contains("enabledFeatures.shaderStorageImageReadWithoutFormat(true)")
+                && vulkanBackendSource.contains("shaderStorageImageReadWithoutFormatEnabled"),
+            "Vulkan backend should enable and track unformatted storage-image reads required by shaderpack image uniforms");
+        assertTrue(vulkanBackendSource.contains("features.shaderStorageImageWriteWithoutFormat()")
+                && vulkanBackendSource.contains("enabledFeatures.shaderStorageImageWriteWithoutFormat(true)")
+                && vulkanBackendSource.contains("shaderStorageImageWriteWithoutFormatEnabled"),
+            "Vulkan backend should enable and track unformatted storage-image writes required by shaderpack imageStore SPIR-V");
         assertTrue(vulkanBackendSource.contains(".pEnabledFeatures(enabledFeatures)"),
             "Vulkan backend should pass requested core features to vkCreateDevice");
         assertTrue(vulkanBackendSource.contains("mode -> toVkPolygonMode(mode, portableState.location().toString())"),

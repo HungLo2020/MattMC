@@ -10962,6 +10962,10 @@ void main() {
         private boolean vertexPipelineStoresAndAtomicsEnabled;
         private boolean fragmentStoresAndAtomicsSupported;
         private boolean fragmentStoresAndAtomicsEnabled;
+        private boolean shaderStorageImageReadWithoutFormatSupported;
+        private boolean shaderStorageImageReadWithoutFormatEnabled;
+        private boolean shaderStorageImageWriteWithoutFormatSupported;
+        private boolean shaderStorageImageWriteWithoutFormatEnabled;
         private boolean warnedWireframeFallback;
         private boolean instanceProperties2ExtensionEnabled;
         private boolean presentIdExtensionEnabled;
@@ -11372,6 +11376,8 @@ void main() {
                 fillModeNonSolidSupported = features.fillModeNonSolid();
                 vertexPipelineStoresAndAtomicsSupported = features.vertexPipelineStoresAndAtomics();
                 fragmentStoresAndAtomicsSupported = features.fragmentStoresAndAtomics();
+                shaderStorageImageReadWithoutFormatSupported = features.shaderStorageImageReadWithoutFormat();
+                shaderStorageImageWriteWithoutFormatSupported = features.shaderStorageImageWriteWithoutFormat();
                 minUniformBufferOffsetAlignment = Math.max(1L, properties.limits().minUniformBufferOffsetAlignment());
                 maxImageDimension2D = Math.max(1024, properties.limits().maxImageDimension2D());
                 int maxPerStageSamplers = properties.limits().maxPerStageDescriptorSamplers();
@@ -11499,6 +11505,12 @@ void main() {
                 if (fragmentStoresAndAtomicsSupported) {
                     enabledFeatures.fragmentStoresAndAtomics(true);
                 }
+                if (shaderStorageImageReadWithoutFormatSupported) {
+                    enabledFeatures.shaderStorageImageReadWithoutFormat(true);
+                }
+                if (shaderStorageImageWriteWithoutFormatSupported) {
+                    enabledFeatures.shaderStorageImageWriteWithoutFormat(true);
+                }
 
                 VkDeviceCreateInfo createInfo = VkDeviceCreateInfo.calloc(stack)
                     .sType$Default()
@@ -11515,6 +11527,8 @@ void main() {
                 fillModeNonSolidEnabled = fillModeNonSolidSupported;
                 vertexPipelineStoresAndAtomicsEnabled = vertexPipelineStoresAndAtomicsSupported;
                 fragmentStoresAndAtomicsEnabled = fragmentStoresAndAtomicsSupported;
+                shaderStorageImageReadWithoutFormatEnabled = shaderStorageImageReadWithoutFormatSupported;
+                shaderStorageImageWriteWithoutFormatEnabled = shaderStorageImageWriteWithoutFormatSupported;
                 presentIdExtensionEnabled = presentCompletionSupport.presentId;
                 presentWaitExtensionEnabled = presentCompletionSupport.presentWait;
                 attachmentFeedbackLoopLayoutEnabled = hasFeedbackLoopLayout;
@@ -20900,6 +20914,10 @@ void main() {
                 vertexPipelineStoresAndAtomicsEnabled = false;
                 fragmentStoresAndAtomicsSupported = false;
                 fragmentStoresAndAtomicsEnabled = false;
+                shaderStorageImageReadWithoutFormatSupported = false;
+                shaderStorageImageReadWithoutFormatEnabled = false;
+                shaderStorageImageWriteWithoutFormatSupported = false;
+                shaderStorageImageWriteWithoutFormatEnabled = false;
                 warnedWireframeFallback = false;
             }
         }
