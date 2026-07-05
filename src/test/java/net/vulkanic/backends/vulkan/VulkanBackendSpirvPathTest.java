@@ -19,6 +19,7 @@ import net.blaze3d.vertex.VertexFormatElement;
 import net.minecraft.client.renderer.ShaderDefines;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Test;
+import org.lwjgl.vulkan.EXTAttachmentFeedbackLoopLayout;
 import org.lwjgl.vulkan.VK10;
 
 import java.lang.reflect.Method;
@@ -209,6 +210,37 @@ public class VulkanBackendSpirvPathTest {
             "Vulkan lightmap compilation should own the offscreen row-orientation compensation");
         assertFalse(generic.contains("1.0 - texCoord.y"),
             "The lightmap row-orientation rewrite must not affect unrelated fragment shaders");
+    }
+
+    @Test
+    public void testFeedbackLoopCapabilityRequiresActualImageUsageSupport() throws Exception {
+        Method capability = Class.forName("net.vulkanic.backends.vulkan.VulkanBackend$NativeSpine")
+            .getDeclaredMethod("isFeedbackLoopCapableImageUsage", int.class);
+        capability.setAccessible(true);
+
+        int sampledStorageOnly = VK10.VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+            | VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT
+            | VK10.VK_IMAGE_USAGE_SAMPLED_BIT
+            | VK10.VK_IMAGE_USAGE_STORAGE_BIT;
+        int feedbackOnlyWithoutAttachment = sampledStorageOnly
+            | EXTAttachmentFeedbackLoopLayout.VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
+        int colorAttachmentFeedback = sampledStorageOnly
+            | VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
+            | EXTAttachmentFeedbackLoopLayout.VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
+        int depthAttachmentFeedback = VK10.VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+            | VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT
+            | VK10.VK_IMAGE_USAGE_SAMPLED_BIT
+            | VK10.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
+            | EXTAttachmentFeedbackLoopLayout.VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
+
+        assertFalse((Boolean) capability.invoke(null, sampledStorageOnly),
+            "Sampled/storage-only images, including legacy 3D textures, cannot use attachment feedback-loop layouts");
+        assertFalse((Boolean) capability.invoke(null, feedbackOnlyWithoutAttachment),
+            "The feedback-loop usage bit is not sufficient without color/depth attachment usage");
+        assertTrue((Boolean) capability.invoke(null, colorAttachmentFeedback),
+            "Color attachments created as sampled feedback-loop images may use feedback-loop layouts");
+        assertTrue((Boolean) capability.invoke(null, depthAttachmentFeedback),
+            "Depth attachments created as sampled feedback-loop images may use feedback-loop layouts");
     }
 
     @Test

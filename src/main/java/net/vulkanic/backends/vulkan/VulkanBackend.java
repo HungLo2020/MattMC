@@ -10958,6 +10958,7 @@ void main() {
             private volatile long defaultViewHandle;
             private volatile int vkFormat = VK10.VK_FORMAT_UNDEFINED;
             private volatile int aspectMask = VK10.VK_IMAGE_ASPECT_COLOR_BIT;
+            private volatile int imageUsageFlags;
             private volatile boolean feedbackLoopCapable;
             private volatile int pixelBytes;
             private volatile int currentLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
@@ -13212,7 +13213,7 @@ void main() {
                         ? VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
                         : VK10.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
                 }
-                if (!texture3D && attachmentFeedbackLoopLayoutEnabled) {
+                if (attachmentFeedbackLoopLayoutEnabled && imageUsageCanSupportFeedbackLoop(legacyImageUsage)) {
                     legacyImageUsage |= EXTAttachmentFeedbackLoopLayout.VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
                 }
                 VkImageCreateInfo imageCreateInfo = VkImageCreateInfo.calloc(stack)
@@ -13313,7 +13314,8 @@ void main() {
                 texture.defaultViewHandle = defaultViewHandle;
                 texture.vkFormat = formatInfo.vkFormat;
                 texture.aspectMask = formatInfo.aspectMask;
-                texture.feedbackLoopCapable = attachmentFeedbackLoopLayoutEnabled;
+                texture.imageUsageFlags = legacyImageUsage;
+                texture.feedbackLoopCapable = isFeedbackLoopCapableImageUsage(legacyImageUsage);
                 texture.pixelBytes = formatInfo.pixelBytes;
                 texture.currentLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
                 texture.mipLevels = mipLevels;
@@ -13384,6 +13386,8 @@ void main() {
             texture.memoryHandle = VK10.VK_NULL_HANDLE;
             texture.defaultViewHandle = VK10.VK_NULL_HANDLE;
             texture.currentLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
+            texture.imageUsageFlags = 0;
+            texture.feedbackLoopCapable = false;
             texture.width = 0;
             texture.height = 0;
             texture.depth = 1;
@@ -13781,6 +13785,19 @@ void main() {
                 case ATTACHMENT_FEEDBACK_LOOP -> EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
                 case INFERRED -> inferredLayout;
             };
+        }
+
+        private static boolean imageUsageCanSupportFeedbackLoop(int imageUsageFlags) {
+            boolean attachment = (imageUsageFlags
+                & (VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK10.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)) != 0;
+            boolean shaderReadable = (imageUsageFlags
+                & (VK10.VK_IMAGE_USAGE_SAMPLED_BIT | VK10.VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)) != 0;
+            return attachment && shaderReadable;
+        }
+
+        private static boolean isFeedbackLoopCapableImageUsage(int imageUsageFlags) {
+            return imageUsageCanSupportFeedbackLoop(imageUsageFlags)
+                && (imageUsageFlags & EXTAttachmentFeedbackLoopLayout.VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT) != 0;
         }
 
         private void ensureTextureLayoutBeforeRenderPass(
@@ -15314,11 +15331,7 @@ void main() {
             try (MemoryStack stack = stackPush()) {
                 int vkFormat = toVkFormat(format);
                 int imageUsageFlags = toVkImageUsageFlags(usage, format);
-                boolean colorWithSampling = (imageUsageFlags & VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) != 0
-                    && (imageUsageFlags & VK10.VK_IMAGE_USAGE_SAMPLED_BIT) != 0;
-                boolean depthWithSampling = (imageUsageFlags & VK10.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0
-                    && (imageUsageFlags & VK10.VK_IMAGE_USAGE_SAMPLED_BIT) != 0;
-                if (attachmentFeedbackLoopLayoutEnabled && (colorWithSampling || depthWithSampling)) {
+                if (attachmentFeedbackLoopLayoutEnabled && NativeSpine.imageUsageCanSupportFeedbackLoop(imageUsageFlags)) {
                     imageUsageFlags |= EXTAttachmentFeedbackLoopLayout.VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
                 }
                 boolean cubemapCompatible = isCubemapCompatibleUsage(usage);
