@@ -33,8 +33,11 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         "(?m)^\\s*#\\s*define\\s+VULKANIC_BACKEND\\b"
     );
     private static final java.util.regex.Pattern VIEW_HEIGHT_DECLARATION_PATTERN = java.util.regex.Pattern.compile("\\bfloat\\s+viewHeight\\s*;");
+    private static final String GLSL_UNIFORM_QUALIFIER_PATTERN =
+        "(?:(?:lowp|mediump|highp|readonly|writeonly|coherent|volatile|restrict)\\s+)*";
     private static final java.util.regex.Pattern STANDALONE_UNIFORM_DECLARATION_PATTERN = java.util.regex.Pattern.compile(
-        "(?m)^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?(?:lowp\\s+|mediump\\s+|highp\\s+)?uniform\\s+([^;{}=]+?)(?:\\s*=\\s*[^;]+)?\\s*;\\s*(?://.*)?$"
+        "(?m)^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?" + GLSL_UNIFORM_QUALIFIER_PATTERN
+            + "uniform\\s+([^;{}=]+?)(?:\\s*=\\s*[^;]+)?\\s*;\\s*(?://.*)?$"
     );
     private static final java.util.regex.Pattern STANDALONE_UNIFORM_MEMBER_PATTERN = java.util.regex.Pattern.compile(
         "^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s*\\[\\s*(\\d+)\\s*\\])?\\s*;\\s*$"
@@ -766,11 +769,20 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
     }
 
     static java.util.Set<String> collectActiveStandaloneUniformNames(String shaderSource) {
+        return collectActiveStandaloneUniformNames(shaderSource, false);
+    }
+
+    static java.util.Set<String> collectActiveStandaloneUniformNamesIncludingOpaque(String shaderSource) {
+        return collectActiveStandaloneUniformNames(shaderSource, true);
+    }
+
+    private static java.util.Set<String> collectActiveStandaloneUniformNames(String shaderSource, boolean includeOpaqueUniforms) {
         if (shaderSource == null || shaderSource.isBlank()) {
             return java.util.Set.of();
         }
 
-        StandaloneUniformRewriteInput rewriteInput = stripStandaloneUniformDeclarations(stripGlslComments(shaderSource));
+        StandaloneUniformRewriteInput rewriteInput =
+            stripStandaloneUniformDeclarations(stripGlslComments(shaderSource), includeOpaqueUniforms);
         if (!rewriteInput.strippedAny()) {
             return java.util.Set.of();
         }
@@ -790,6 +802,13 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
     }
 
     private static StandaloneUniformRewriteInput stripStandaloneUniformDeclarations(String shaderSource) {
+        return stripStandaloneUniformDeclarations(shaderSource, false);
+    }
+
+    private static StandaloneUniformRewriteInput stripStandaloneUniformDeclarations(
+        String shaderSource,
+        boolean includeOpaqueUniforms
+    ) {
         java.util.regex.Matcher matcher = STANDALONE_UNIFORM_DECLARATION_PATTERN.matcher(shaderSource);
         StringBuffer strippedSource = new StringBuffer();
         List<StandaloneUniformCandidate> candidates = new ArrayList<>();
@@ -803,7 +822,7 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
             }
 
             String typeToken = declaration.split("\\s+", 2)[0];
-            if (isOpaqueUniformType(typeToken)) {
+            if (isOpaqueUniformType(typeToken) && !includeOpaqueUniforms) {
                 matcher.appendReplacement(strippedSource, java.util.regex.Matcher.quoteReplacement(matcher.group()));
                 continue;
             }

@@ -2420,6 +2420,10 @@ void main() {
             || uniformTypeName.equals("atomic_uint");
     }
 
+    private static boolean isSamplerStandaloneUniformType(String uniformTypeName) {
+        return uniformTypeName.contains("sampler");
+    }
+
     private static int standaloneUniformBlockBindingIndex(RenderPipeline renderPipeline) {
         return renderPipeline.getSamplers().size() + renderPipeline.getUniforms().size();
     }
@@ -2598,6 +2602,8 @@ void main() {
             // them into VulkanicStandaloneUniforms; mirror that here so reflection stays aligned.
             Set<String> activeStandaloneUniformNames =
                 GlslangSpirvCompiler.collectActiveStandaloneUniformNames(normalizedSource);
+            Set<String> activeStandaloneUniformNamesIncludingOpaque =
+                GlslangSpirvCompiler.collectActiveStandaloneUniformNamesIncludingOpaque(normalizedSource);
             if (!activeStandaloneUniformNames.isEmpty()) {
                 activeUniformBlocks.add(GlslangSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME);
             }
@@ -2608,6 +2614,10 @@ void main() {
                 String uniformName = uniformMatcher.group(3);
                 int arraySize = uniformMatcher.group(4) == null ? 1 : Integer.parseInt(uniformMatcher.group(4));
                 boolean opaqueUniform = isOpaqueStandaloneUniformType(uniformTypeName);
+                if (isSamplerStandaloneUniformType(uniformTypeName)
+                    && !activeStandaloneUniformNamesIncludingOpaque.contains(uniformName)) {
+                    continue;
+                }
                 if (!opaqueUniform && !activeStandaloneUniformNames.contains(uniformName)) {
                     continue;
                 }

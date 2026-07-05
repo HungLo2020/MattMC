@@ -1077,6 +1077,51 @@ public class VulkanBackendSpirvPathTest {
     }
 
     @Test
+    public void testProgramLinkDoesNotExposeInactiveOpaqueSamplerUniformLocations() {
+        VulkanBackend backend = new VulkanBackend((stage, source, sourceName, entryPoint) ->
+            new VulkanicSpirvModule(stage, entryPoint, new byte[]{0x3E, 0x3F}, sourceName, "stub")
+        );
+
+        int vertexShader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_VERTEX_SHADER);
+        int fragmentShader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_FRAGMENT_SHADER);
+
+        uploadSource(
+            backend,
+            vertexShader,
+            "#version 450\n"
+                + "void main(){ gl_Position = vec4(0.0); }"
+        );
+        uploadSource(
+            backend,
+            fragmentShader,
+            "#version 450\n"
+                + "uniform sampler2D UsedTexture;\n"
+                + "uniform sampler2D UnusedTexture;\n"
+                + "layout(location = 0) out vec4 fragColor;\n"
+                + "void main(){ fragColor = texture(UsedTexture, vec2(0.5)); }"
+        );
+
+        backend.compileShader(TEST_CONTEXT, vertexShader);
+        backend.compileShader(TEST_CONTEXT, fragmentShader);
+
+        int program = backend.createShaderProgram(TEST_CONTEXT);
+        backend.attachShader(TEST_CONTEXT, program, vertexShader);
+        backend.attachShader(TEST_CONTEXT, program, fragmentShader);
+        backend.linkProgram(TEST_CONTEXT, program);
+
+        VulkanCommandContext introspectionContext = new VulkanCommandContext(2L, "inactive-opaque-introspection-test");
+
+        assertEquals(VulkanicAPI.GL_TRUE,
+            backend.getProgramParameter(TEST_CONTEXT, program, VulkanicAPI.GL_LINK_STATUS));
+        assertTrue(backend.getUniformLocation(introspectionContext, program, "UsedTexture") >= 0);
+        assertEquals(-1, backend.getUniformLocation(introspectionContext, program, "UnusedTexture"));
+        assertEquals(1,
+            backend.getProgramParameter(TEST_CONTEXT, program, VulkanicAPI.GL_ACTIVE_UNIFORMS));
+        assertEquals("UsedTexture",
+            backend.getActiveUniform(introspectionContext, program, 0, 256, null, null));
+    }
+
+    @Test
     public void testLinkedProgramResourceLayoutNormalizesIrisWrappedUniformBlockNames() {
         VulkanBackend backend = new VulkanBackend((stage, source, sourceName, entryPoint) ->
             new VulkanicSpirvModule(stage, entryPoint, new byte[]{0x3A, 0x3B}, sourceName, "stub")
