@@ -179,6 +179,39 @@ public class VulkanBackendSpirvPathTest {
     }
 
     @Test
+    public void testNormalizeForVulkanOwnsLightmapSkyCoordinateOrientation() {
+        String source = "#version 330\n"
+            + "layout(std140) uniform LightmapInfo {\n"
+            + "    float AmbientLightFactor;\n"
+            + "    float SkyFactor;\n"
+            + "    float BlockFactor;\n"
+            + "} lightmapInfo;\n"
+            + "in vec2 texCoord;\n"
+            + "out vec4 fragColor;\n"
+            + "float get_brightness(float level) { return level; }\n"
+            + "void main(){\n"
+            + "    float sky_brightness = get_brightness(floor(texCoord.y * 16) / 15) * lightmapInfo.SkyFactor;\n"
+            + "    fragColor = vec4(vec3(sky_brightness), 1.0);\n"
+            + "}";
+
+        String lightmap = GlslangSpirvCompiler.normalizeForVulkan(
+            VulkanicShaderStage.FRAGMENT,
+            source,
+            "minecraft:core/lightmap"
+        );
+        String generic = GlslangSpirvCompiler.normalizeForVulkan(
+            VulkanicShaderStage.FRAGMENT,
+            source,
+            "minecraft:core/generic"
+        );
+
+        assertTrue(lightmap.contains("floor((1.0 - texCoord.y) * 16) / 15"),
+            "Vulkan lightmap compilation should own the offscreen row-orientation compensation");
+        assertFalse(generic.contains("1.0 - texCoord.y"),
+            "The lightmap row-orientation rewrite must not affect unrelated fragment shaders");
+    }
+
+    @Test
     public void testNormalizeForVulkanRewritesFragmentCoordScreenMathToLowerLeft() {
         String source = "#version 330\n"
             + "uniform float viewHeight;\n"

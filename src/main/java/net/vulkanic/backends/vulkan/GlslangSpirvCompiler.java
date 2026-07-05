@@ -175,9 +175,23 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         return normalizeForVulkan(stage, shaderSource, null, -1);
     }
 
+    static String normalizeForVulkan(VulkanicShaderStage stage, String shaderSource, String sourceName) {
+        return normalizeForVulkan(stage, shaderSource, sourceName, null, -1);
+    }
+
     static String normalizeForVulkan(
         VulkanicShaderStage stage,
         String shaderSource,
+        List<String> standaloneUniformDeclarations,
+        int standaloneUniformBindingIndex
+    ) {
+        return normalizeForVulkan(stage, shaderSource, null, standaloneUniformDeclarations, standaloneUniformBindingIndex);
+    }
+
+    static String normalizeForVulkan(
+        VulkanicShaderStage stage,
+        String shaderSource,
+        String sourceName,
         List<String> standaloneUniformDeclarations,
         int standaloneUniformBindingIndex
     ) {
@@ -186,6 +200,7 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         }
 
         String normalized = injectVulkanicBackendDefine(promoteVersionForVulkan(shaderSource));
+        normalized = rewriteLightmapSkyCoordinateForVulkan(stage, sourceName, normalized);
         normalized = injectDistantHorizonsTerrainVaryingLocationsForVulkan(stage, normalized);
         if (stage == VulkanicShaderStage.FRAGMENT) {
             normalized = LEGACY_FRAG_COORD_INPUT_DECLARATION_PATTERN.matcher(normalized).replaceAll("");
@@ -210,6 +225,37 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         normalized = LEGACY_VERTEX_ID_PATTERN.matcher(normalized).replaceAll("gl_VertexIndex");
         normalized = LEGACY_INSTANCE_ID_PATTERN.matcher(normalized).replaceAll("gl_InstanceIndex");
         return rewriteVertexClipDepthForVulkan(normalized);
+    }
+
+    private static String rewriteLightmapSkyCoordinateForVulkan(
+        VulkanicShaderStage stage,
+        String sourceName,
+        String shaderSource
+    ) {
+        if (stage != VulkanicShaderStage.FRAGMENT || !isMinecraftLightmapShader(sourceName, shaderSource)) {
+            return shaderSource;
+        }
+
+        String skyCoordinateExpression = "floor(texCoord.y * 16) / 15";
+        if (!shaderSource.contains(skyCoordinateExpression)) {
+            return shaderSource;
+        }
+
+        return shaderSource.replace(
+            skyCoordinateExpression,
+            "floor((1.0 - texCoord.y) * 16) / 15"
+        );
+    }
+
+    private static boolean isMinecraftLightmapShader(String sourceName, String shaderSource) {
+        if (sourceName == null || !sourceName.endsWith(":core/lightmap")) {
+            return false;
+        }
+
+        return shaderSource.contains("uniform LightmapInfo")
+            && shaderSource.contains("SkyFactor")
+            && shaderSource.contains("BlockFactor")
+            && shaderSource.contains("texCoord.y");
     }
 
     private static String injectVulkanicBackendDefine(String shaderSource) {

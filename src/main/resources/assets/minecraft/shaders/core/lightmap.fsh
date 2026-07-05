@@ -32,13 +32,8 @@ vec3 notGamma(vec3 color) {
 }
 
 void main() {
-    float skyCoord = texCoord.y;
-#ifdef VULKANIC_BACKEND
-    skyCoord = 1.0 - skyCoord;
-#endif
-
     float block_brightness = get_brightness(floor(texCoord.x * 16) / 15) * lightmapInfo.BlockFactor;
-    float sky_brightness = get_brightness(floor(skyCoord * 16) / 15) * lightmapInfo.SkyFactor;
+    float sky_brightness = get_brightness(floor(texCoord.y * 16) / 15) * lightmapInfo.SkyFactor;
     vec3 color = vec3(
         block_brightness,
         block_brightness * ((block_brightness * 0.6 + 0.4) * 0.6 + 0.4),

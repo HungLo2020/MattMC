@@ -2073,6 +2073,7 @@ void main() {
         String normalizedSource = GlslangSpirvCompiler.normalizeForVulkan(
             shaderStage,
             preprocessedSource,
+            sourceName,
             standaloneUniformDeclarations,
             standaloneUniformBindingIndex
         );

@@ -19,9 +19,22 @@ public class ApiNeutralityCallsiteTest {
 
     private static final Path PROJECT_ROOT = Paths.get(System.getProperty("user.dir"));
     private static final Path SRC_MAIN_JAVA = PROJECT_ROOT.resolve("src/main/java");
+    private static final Path SRC_MAIN_RESOURCES = PROJECT_ROOT.resolve("src/main/resources");
 
     private static String readSource(Path path) throws IOException {
         return Files.readString(path).replace("\r\n", "\n").replace('\r', '\n');
+    }
+
+    @Test
+    public void testLightmapShaderKeepsBackendNeutralSkyCoordinate() throws IOException {
+        String lightmapSource = readSource(SRC_MAIN_RESOURCES.resolve("assets/minecraft/shaders/core/lightmap.fsh"));
+
+        assertFalse(lightmapSource.contains("VULKANIC_BACKEND"),
+            "The shared lightmap shader should not branch on the backend for sky-light coordinates");
+        assertFalse(lightmapSource.contains("1.0 - texCoord.y"),
+            "Vulkan should handle render-target orientation in the backend, not by flipping lightmap sky coordinates");
+        assertTrue(lightmapSource.contains("floor(texCoord.y * 16) / 15"),
+            "The lightmap sky coordinate should use the same texture coordinate path on OpenGL and Vulkan");
     }
 
     @Test
