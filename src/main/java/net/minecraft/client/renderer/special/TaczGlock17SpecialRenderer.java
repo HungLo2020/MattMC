@@ -9,6 +9,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -87,12 +88,13 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	private void submitAnimated(ItemDisplayContext itemDisplayContext, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, ItemStack itemStack) {
 		poseStack.pushPose();
 		AnimationPose animationPose = this.animations.sample(TaczGlock17AnimationController.snapshot(itemStack));
+		GunRenderContext gunRenderContext = GunRenderContext.from(itemStack);
 		this.applyTaczTransform(itemDisplayContext, poseStack, animationPose, itemStack);
 		submitNodeCollector.submitCustomGeometry(poseStack, RenderType.entityCutoutNoCull(this.texture), (pose, vertexConsumer) -> {
 			PoseStack modelPoseStack = new PoseStack();
 			modelPoseStack.last().set(pose);
 			for (BedrockNode root : this.geometry.roots()) {
-				root.render(modelPoseStack, itemDisplayContext, vertexConsumer, i, j, animationPose);
+				root.render(modelPoseStack, itemDisplayContext, vertexConsumer, i, j, animationPose, null, gunRenderContext);
 			}
 		});
 		this.submitAttachments(itemStack, itemDisplayContext, poseStack, submitNodeCollector, i, j, animationPose);
@@ -761,6 +763,94 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		}
 	}
 
+	private record GunRenderContext(
+		Map<TaczAttachmentType, AttachmentState> attachments,
+		int extendedMagLevel,
+		boolean scopeInstalled,
+		boolean renderMount,
+		Set<String> adapterNodes
+	) {
+		private static final GunRenderContext EMPTY = new GunRenderContext(Map.of(), 0, false, true, Set.of());
+
+		private static GunRenderContext from(ItemStack gunStack) {
+			if (gunStack.isEmpty()) {
+				return EMPTY;
+			}
+
+			Map<TaczAttachmentType, AttachmentState> attachments = new EnumMap<>(TaczAttachmentType.class);
+			Set<String> adapterNodes = ConcurrentHashMap.newKeySet();
+			int extendedMagLevel = 0;
+			boolean scopeInstalled = false;
+			boolean renderMount = true;
+
+			for (TaczAttachmentType type : TaczAttachmentType.values()) {
+				if (type == TaczAttachmentType.NONE || type == TaczAttachmentType.AMMO_MOD) {
+					continue;
+				}
+
+				ItemStack attachmentStack = TaczRefitGun.getStoredAttachment(gunStack, type);
+				if (!(attachmentStack.getItem() instanceof TaczAttachmentItem attachment)) {
+					continue;
+				}
+
+				TaczScopeData.AttachmentDisplay display = TaczScopeData.display(attachment.getAttachmentId());
+				attachments.put(type, new AttachmentState(display, attachment.getAttachmentLevel()));
+				if (type == TaczAttachmentType.EXTENDED_MAG) {
+					extendedMagLevel = attachment.getAttachmentLevel();
+				}
+				if (type == TaczAttachmentType.SCOPE) {
+					scopeInstalled = true;
+					renderMount = display == null || display.showMount();
+				}
+				if (display != null && !display.adapter().isEmpty()) {
+					adapterNodes.add(display.adapter());
+				}
+			}
+
+			return new GunRenderContext(Map.copyOf(attachments), extendedMagLevel, scopeInstalled, renderMount, Set.copyOf(adapterNodes));
+		}
+
+		private boolean visible(BedrockNode node) {
+			if (node.name == null) {
+				return true;
+			}
+			if (node.parent != null && "attachment_adapter".equals(node.parent.name)) {
+				return this.adapterNodes.contains(node.name);
+			}
+			return switch (node.name) {
+				case "carry", "sight" -> !this.scopeInstalled;
+				case "sight_folded" -> this.scopeInstalled;
+				case "mount" -> this.scopeInstalled && this.renderMount;
+				case "mag_standard" -> this.extendedMagLevel == 0;
+				case "mag_extended_1" -> this.extendedMagLevel == 1;
+				case "mag_extended_2" -> this.extendedMagLevel == 2;
+				case "mag_extended_3" -> this.extendedMagLevel == 3;
+				case "handguard_default" -> !this.has(TaczAttachmentType.LASER) && !this.has(TaczAttachmentType.GRIP);
+				case "handguard_tactical" -> this.has(TaczAttachmentType.LASER) || this.has(TaczAttachmentType.GRIP);
+				case "muzzle_default" -> this.defaultAttachmentVisible(TaczAttachmentType.MUZZLE, true);
+				case "stock_default" -> this.defaultAttachmentVisible(TaczAttachmentType.STOCK, false);
+				case "grip_default" -> this.defaultAttachmentVisible(TaczAttachmentType.GRIP, false);
+				case "laser_default" -> this.defaultAttachmentVisible(TaczAttachmentType.LASER, false);
+				default -> true;
+			};
+		}
+
+		private boolean has(TaczAttachmentType type) {
+			return this.attachments.containsKey(type);
+		}
+
+		private boolean defaultAttachmentVisible(TaczAttachmentType type, boolean canForceVisible) {
+			AttachmentState attachment = this.attachments.get(type);
+			if (attachment == null) {
+				return true;
+			}
+			return canForceVisible && attachment.display() != null && attachment.display().showMuzzle();
+		}
+	}
+
+	private record AttachmentState(TaczScopeData.AttachmentDisplay display, int level) {
+	}
+
 	private static final class BedrockNode {
 		private final String name;
 		private final List<BedrockCube> cubes = new ArrayList<>();
@@ -786,7 +876,7 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			int overlay,
 			AnimationPose animationPose
 		) {
-			this.render(poseStack, itemDisplayContext, consumer, light, overlay, animationPose, null);
+			this.render(poseStack, itemDisplayContext, consumer, light, overlay, animationPose, null, GunRenderContext.EMPTY);
 		}
 
 		private void render(
@@ -798,13 +888,26 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			AnimationPose animationPose,
 			AttachmentRenderData attachmentRenderData
 		) {
+			this.render(poseStack, itemDisplayContext, consumer, light, overlay, animationPose, attachmentRenderData, GunRenderContext.EMPTY);
+		}
+
+		private void render(
+			PoseStack poseStack,
+			ItemDisplayContext itemDisplayContext,
+			VertexConsumer consumer,
+			int light,
+			int overlay,
+			AnimationPose animationPose,
+			AttachmentRenderData attachmentRenderData,
+			GunRenderContext gunRenderContext
+		) {
 			if (this.cubes.isEmpty() && this.children.isEmpty()) {
 				return;
 			}
 
 			poseStack.pushPose();
 			this.translateAndRotate(poseStack, animationPose.node(this.name));
-			if (this.hiddenByScopedFirstPerson(itemDisplayContext, attachmentRenderData, animationPose.aimProgress)) {
+			if (this.hiddenByScopedFirstPerson(itemDisplayContext, attachmentRenderData, animationPose.aimProgress) || !gunRenderContext.visible(this)) {
 				poseStack.popPose();
 				return;
 			}
@@ -818,7 +921,7 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			}
 
 			for (BedrockNode child : this.children) {
-				child.render(poseStack, itemDisplayContext, consumer, cubeLight, overlay, animationPose, attachmentRenderData);
+				child.render(poseStack, itemDisplayContext, consumer, cubeLight, overlay, animationPose, attachmentRenderData, gunRenderContext);
 			}
 			poseStack.popPose();
 		}

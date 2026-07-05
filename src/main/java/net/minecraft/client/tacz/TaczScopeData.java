@@ -71,9 +71,12 @@ public final class TaczScopeData {
 			ResourceLocation textureLocation = ResourceLocation.fromNamespaceAndPath(texture.getNamespace(), "textures/" + texture.getPath() + ".png");
 			boolean scope = GsonHelper.getAsBoolean(display, "scope", false);
 			boolean sight = GsonHelper.getAsBoolean(display, "sight", false);
+			boolean showMount = GsonHelper.getAsBoolean(display, "show_mount", true);
+			boolean showMuzzle = GsonHelper.getAsBoolean(display, "show_muzzle", false);
+			String adapter = GsonHelper.getAsString(display, "adapter", "");
 			float zoom = firstFloat(display, "zoom", 1.0F);
 			float modelFov = firstFloat(display, "views_fov", GsonHelper.getAsFloat(display, "fov", 70.0F));
-			return new AttachmentDisplay(attachmentId, geometryLocation, textureLocation, scope, sight, zoom, modelFov);
+			return new AttachmentDisplay(attachmentId, geometryLocation, textureLocation, scope, sight, showMount, showMuzzle, adapter, zoom, modelFov);
 		} catch (Exception exception) {
 			return null;
 		}
@@ -107,6 +110,9 @@ public final class TaczScopeData {
 		ResourceLocation textureLocation,
 		boolean scope,
 		boolean sight,
+		boolean showMount,
+		boolean showMuzzle,
+		String adapter,
 		float zoom,
 		float modelFov
 	) {
