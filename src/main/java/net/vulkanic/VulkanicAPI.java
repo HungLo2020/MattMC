@@ -5366,8 +5366,8 @@ public class VulkanicAPI {
                 baseBinding.set(),
                 baseBinding.binding(),
                 baseBinding.name(),
-                baseBinding.type(),
-                baseBinding.textureFormat(),
+                reflectedBinding != null ? reflectedBinding.type() : baseBinding.type(),
+                reflectedBinding != null ? reflectedBinding.textureFormat() : baseBinding.textureFormat(),
                 java.util.Set.copyOf(mergedStages)
             ));
             seenNames.add(baseBinding.name());

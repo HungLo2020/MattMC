@@ -656,7 +656,7 @@ public class VulkanicTypedApiRoutingTest {
     public void testMergedReflectedResourceLayoutPreservesPortableBindingContract() {
         invocationHandler.configureProgramReflection(
             java.util.List.of("Globals", "ReflectedOnly"),
-            java.util.List.of(new RecordingInvocationHandler.ReflectedUniform("Sampler0[0]", 1, VulkanicAPI.GL_SAMPLER_2D))
+            java.util.List.of(new RecordingInvocationHandler.ReflectedUniform("Sampler0[0]", 1, VulkanicAPI.GL_SAMPLER_2D_SHADOW))
         );
 
         RenderPipeline pipeline = RenderPipeline.builder()
@@ -683,7 +683,7 @@ public class VulkanicTypedApiRoutingTest {
 
         assertEquals(0, sampler.set());
         assertEquals(0, sampler.binding());
-        assertEquals(PipelineDescriptor.ResourceType.SAMPLER, sampler.type());
+        assertEquals(PipelineDescriptor.ResourceType.COMPARISON_SAMPLER, sampler.type());
         assertEquals(java.util.Set.of(VulkanicShaderStage.VERTEX, VulkanicShaderStage.FRAGMENT), sampler.stages());
 
         assertEquals(0, globals.set());
@@ -702,7 +702,7 @@ public class VulkanicTypedApiRoutingTest {
         invocationHandler.configureProgramReflection(
             java.util.List.of("DynamicTransforms"),
             java.util.List.of(
-                new RecordingInvocationHandler.ReflectedUniform("shadowtex0", 1, VulkanicAPI.GL_SAMPLER_2D),
+                new RecordingInvocationHandler.ReflectedUniform("shadowtex0", 1, VulkanicAPI.GL_SAMPLER_2D_SHADOW),
                 new RecordingInvocationHandler.ReflectedUniform("voxel_img", 1, VulkanicAPI.GL_UNSIGNED_INT_IMAGE_3D)
             )
         );
@@ -742,7 +742,7 @@ public class VulkanicTypedApiRoutingTest {
 
         assertEquals(0, shadowtex0.set());
         assertEquals(1, shadowtex0.binding());
-        assertEquals(PipelineDescriptor.ResourceType.SAMPLER, shadowtex0.type());
+        assertEquals(PipelineDescriptor.ResourceType.COMPARISON_SAMPLER, shadowtex0.type());
 
         assertEquals(0, voxelImg.set());
         assertEquals(2, voxelImg.binding());
