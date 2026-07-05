@@ -27,6 +27,7 @@ Environment overrides:
     VALIDATION_MODE             off|standard (default: off)
     SHADER_INPUT_PARITY         off|standard|full (default: off)
     SHADER_INPUT_PARITY_MAX_LOGS (default: 120000)
+    LIGHTMAP_INFO_PARITY_MAX_LOGS (default: 512)
     CLIENT_ARGS
 EOF
 }
@@ -40,6 +41,7 @@ SCREENSHOT_START_DELAY_SECS="${SCREENSHOT_START_DELAY_SECS:-0}"
 VALIDATION_MODE="${VALIDATION_MODE:-off}"
 SHADER_INPUT_PARITY="${SHADER_INPUT_PARITY:-off}"
 SHADER_INPUT_PARITY_MAX_LOGS="${SHADER_INPUT_PARITY_MAX_LOGS:-120000}"
+LIGHTMAP_INFO_PARITY_MAX_LOGS="${LIGHTMAP_INFO_PARITY_MAX_LOGS:-512}"
 CLIENT_ARGS="${CLIENT_ARGS:-}"
 
 while [[ $# -gt 0 ]]; do
@@ -110,6 +112,11 @@ if ! [[ "$SHADER_INPUT_PARITY_MAX_LOGS" =~ ^-?[0-9]+$ ]]; then
     exit 1
 fi
 
+if ! [[ "$LIGHTMAP_INFO_PARITY_MAX_LOGS" =~ ^-?[0-9]+$ ]]; then
+    echo "LIGHTMAP_INFO_PARITY_MAX_LOGS must be an integer" >&2
+    exit 1
+fi
+
 # Find project root (where gradlew exists).
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 PROJECT_ROOT="$SCRIPT_DIR"
@@ -167,9 +174,9 @@ IRIS_PROPERTY_COLOR_SPACE=""
 EFFECTIVE_SHADER_PACK=""
 EFFECTIVE_ENABLE_SHADERS=""
 PROJECT_SPIRV_COMPILER="$PROJECT_ROOT/libraries/deps/glslangValidator"
-SHADER_EVENT_PATTERN='Using shaderpack:|Loaded Shaderpack:|shaderPack=|enableShaders=|Profile:|Reloading pipeline on dimension change|Creating pipeline for dimension|Skipping compute shader|Missing program .*sodium:pipeline|Sodium Vulkan chunk pipelines|raw GLSL imports|ShaderInputParity|Type is (VERTEX|FRAGMENT|GEOMETRY|COMPUTE)|bindVertexBuffer requires an active render pass|No active Vulkan render pass to end|shader compose into swapchain|Unexpected error|DistantHorizons|\[DH-|DH Ready|DH Iris events|Validation Error|Validation Warning|VUID-|UNASSIGNED-|VK_LAYER_KHRONOS_validation|GL_INVALID|OpenGL debug'
+SHADER_EVENT_PATTERN='Using shaderpack:|Loaded Shaderpack:|shaderPack=|enableShaders=|Profile:|Reloading pipeline on dimension change|Creating pipeline for dimension|Skipping compute shader|Missing program .*sodium:pipeline|Sodium Vulkan chunk pipelines|raw GLSL imports|ShaderInputParity|LightmapInfoParity|Type is (VERTEX|FRAGMENT|GEOMETRY|COMPUTE)|bindVertexBuffer requires an active render pass|No active Vulkan render pass to end|shader compose into swapchain|Unexpected error|DistantHorizons|\[DH-|DH Ready|DH Iris events|Validation Error|Validation Warning|VUID-|UNASSIGNED-|VK_LAYER_KHRONOS_validation|GL_INVALID|OpenGL debug'
 VALIDATION_EVENT_PATTERN='VK_LAYER_KHRONOS_validation|Validation Error|Validation Warning|VUID-|UNASSIGNED-'
-KEY_SUMMARY_PATTERN='Using shaderpack:|Loaded Shaderpack:|Profile:|Reloading pipeline on dimension change|Creating pipeline for dimension|Skipping compute shader|Missing program .*sodium:pipeline|Sodium Vulkan chunk pipelines|raw GLSL imports|ShaderInputParity|bindVertexBuffer requires an active render pass|No active Vulkan render pass to end|Unexpected error|DistantHorizons|\[DH-|DH Ready|DH Iris events|Validation Error|Validation Warning|VUID-|UNASSIGNED-'
+KEY_SUMMARY_PATTERN='Using shaderpack:|Loaded Shaderpack:|Profile:|Reloading pipeline on dimension change|Creating pipeline for dimension|Skipping compute shader|Missing program .*sodium:pipeline|Sodium Vulkan chunk pipelines|raw GLSL imports|ShaderInputParity|LightmapInfoParity|bindVertexBuffer requires an active render pass|No active Vulkan render pass to end|Unexpected error|DistantHorizons|\[DH-|DH Ready|DH Iris events|Validation Error|Validation Warning|VUID-|UNASSIGNED-'
 
 {
     echo "run_id=$RUN_ID"
@@ -180,6 +187,7 @@ KEY_SUMMARY_PATTERN='Using shaderpack:|Loaded Shaderpack:|Profile:|Reloading pip
     echo "validation_mode=$VALIDATION_MODE"
     echo "shader_input_parity=$SHADER_INPUT_PARITY"
     echo "shader_input_parity_max_logs=$SHADER_INPUT_PARITY_MAX_LOGS"
+    echo "lightmap_info_parity_max_logs=$LIGHTMAP_INFO_PARITY_MAX_LOGS"
     echo "client_args=$CLIENT_ARGS"
 } > "$META_LOG"
 
@@ -665,6 +673,9 @@ if [[ "$SHADER_INPUT_PARITY" != "off" ]]; then
     SHADER_INPUT_PARITY_JAVA_OPTIONS=(
         "-Dmattmc.vulkan.traceShaderInputParity=true"
         "-Dmattmc.vulkan.traceShaderInputParity.maxLogs=$SHADER_INPUT_PARITY_MAX_LOGS"
+        "-Dmattmc.vulkan.deterministicLightmapParity=true"
+        "-Dmattmc.vulkan.traceLightmapInfoParity=true"
+        "-Dmattmc.vulkan.traceLightmapInfoParity.maxLogs=$LIGHTMAP_INFO_PARITY_MAX_LOGS"
     )
     if [[ "$SHADER_INPUT_PARITY" == "full" ]]; then
         SHADER_INPUT_PARITY_JAVA_OPTIONS+=("-Dmattmc.vulkan.traceStandaloneUniformBlockMembers=true")
@@ -679,6 +690,7 @@ if [[ "$SHADER_INPUT_PARITY" != "off" ]]; then
     {
         echo "shader_input_parity_java_options=${SHADER_INPUT_PARITY_JAVA_OPTIONS[*]}"
         echo "java_tool_options=$JAVA_TOOL_OPTIONS"
+        echo "deterministic_lightmap_parity=true"
     } >> "$META_LOG"
 fi
 
@@ -827,6 +839,7 @@ done < "$CRASH_REPORT_LIST"
     echo "validation_layer_manifest=${VALIDATION_LAYER_MANIFEST:-unavailable}"
     echo "shader_input_parity=$SHADER_INPUT_PARITY"
     echo "shader_input_parity_max_logs=$SHADER_INPUT_PARITY_MAX_LOGS"
+    echo "lightmap_info_parity_max_logs=$LIGHTMAP_INFO_PARITY_MAX_LOGS"
     echo "effective_enable_shaders=${EFFECTIVE_ENABLE_SHADERS:-unset}"
     echo "effective_shader_pack=${EFFECTIVE_SHADER_PACK:-unset}"
     echo "run_log=$RUN_LOG"

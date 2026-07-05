@@ -35,6 +35,10 @@ import org.slf4j.Logger;
 public class LightTexture implements AutoCloseable {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final boolean PROBE_VULKAN_SHADER_LIGHTMAP = Boolean.getBoolean("mattmc.vulkan.probeShaderLightmap");
+	private static final boolean DETERMINISTIC_LIGHTMAP_PARITY = Boolean.getBoolean("mattmc.vulkan.deterministicLightmapParity");
+	private static final boolean TRACE_LIGHTMAP_INFO_PARITY = Boolean.getBoolean("mattmc.vulkan.traceLightmapInfoParity");
+	private static final int MAX_LIGHTMAP_INFO_PARITY_LOGS = Integer.getInteger("mattmc.vulkan.traceLightmapInfoParity.maxLogs", 512);
+	private static final java.util.concurrent.atomic.AtomicInteger LIGHTMAP_INFO_PARITY_LOG_COUNT = new java.util.concurrent.atomic.AtomicInteger();
 	public static final int FULL_BRIGHT = 15728880;
 	public static final int FULL_SKY = 15728640;
 	public static final int FULL_BLOCK = 240;
@@ -120,8 +124,12 @@ public class LightTexture implements AutoCloseable {
 	}
 
 	public void tick() {
-		this.blockLightRedFlicker = this.blockLightRedFlicker + (float)((Math.random() - Math.random()) * Math.random() * Math.random() * 0.1);
-		this.blockLightRedFlicker *= 0.9F;
+		if (DETERMINISTIC_LIGHTMAP_PARITY) {
+			this.blockLightRedFlicker = 0.0F;
+		} else {
+			this.blockLightRedFlicker = this.blockLightRedFlicker + (float)((Math.random() - Math.random()) * Math.random() * Math.random() * 0.1);
+			this.blockLightRedFlicker *= 0.9F;
+		}
 		this.updateLightTexture = true;
 	}
 
@@ -201,9 +209,14 @@ public class LightTexture implements AutoCloseable {
 					vector3f2 = new Vector3f(g, g, 1.0F).lerp(new Vector3f(1.0F, 1.0F, 1.0F), 0.35F);
 				}
 
+				if (DETERMINISTIC_LIGHTMAP_PARITY) {
+					this.blockLightRedFlicker = 0.0F;
+				}
 				float n = this.blockLightRedFlicker + 1.5F;
 				float o = clientLevel.dimensionType().ambientLight();
 				float p = this.minecraft.options.gamma().get().floatValue();
+				float q = this.renderer.getDarkenWorldAmount(f);
+				float r = Math.max(0.0F, p - h);
 				CommandEncoder commandEncoder = VulkanicAPI.createCommandEncoder();
 
 				try (GpuBuffer.MappedView mappedView = commandEncoder.mapBuffer(this.ubo.currentBuffer(), false, true)) {
@@ -213,11 +226,12 @@ public class LightTexture implements AutoCloseable {
 						.putFloat(n)
 						.putFloat(m)
 						.putFloat(k)
-						.putFloat(this.renderer.getDarkenWorldAmount(f))
-						.putFloat(Math.max(0.0F, p - h))
+						.putFloat(q)
+						.putFloat(r)
 						.putVec3(vector3f2)
 						.putVec3(vector3f);
 				}
+				this.traceLightmapInfoParity(f, o, i, n, m, k, q, r, vector3f2, vector3f);
 
 				this.renderLightTextureShader(commandEncoder, this.textureView, "Update light");
 
@@ -245,6 +259,48 @@ public class LightTexture implements AutoCloseable {
 			renderPass.setUniform("LightmapInfo", this.ubo.currentBuffer());
 			renderPass.draw(0, 3);
 		}
+	}
+
+	private void traceLightmapInfoParity(
+		float partialTicks,
+		float ambientLight,
+		float skyFactor,
+		float blockLightFactor,
+		float nightVisionScale,
+		float darknessScale,
+		float darkenWorldAmount,
+		float gammaMinusDarkness,
+		Vector3f skyLightColor,
+		Vector3f lightColor
+	) {
+		if (!TRACE_LIGHTMAP_INFO_PARITY) {
+			return;
+		}
+		int logIndex = LIGHTMAP_INFO_PARITY_LOG_COUNT.incrementAndGet();
+		if (MAX_LIGHTMAP_INFO_PARITY_LOGS >= 0 && logIndex > MAX_LIGHTMAP_INFO_PARITY_LOGS) {
+			return;
+		}
+
+		LOGGER.info(
+			"LightmapInfoParity backend={} deterministic={} partialTicks={} ambientLight={} skyFactor={} blockLightRedFlicker={} blockLightFactor={} nightVisionScale={} darknessScale={} darkenWorldAmount={} gammaMinusDarkness={} skyLightColor=({},{},{}) lightColor=({},{},{})",
+			VulkanicAPI.getActiveBackendType().name().toLowerCase(java.util.Locale.ROOT),
+			DETERMINISTIC_LIGHTMAP_PARITY,
+			partialTicks,
+			ambientLight,
+			skyFactor,
+			this.blockLightRedFlicker,
+			blockLightFactor,
+			nightVisionScale,
+			darknessScale,
+			darkenWorldAmount,
+			gammaMinusDarkness,
+			skyLightColor.x(),
+			skyLightColor.y(),
+			skyLightColor.z(),
+			lightColor.x(),
+			lightColor.y(),
+			lightColor.z()
+		);
 	}
 
 	private void updateVulkanShaderLightmapProbe(CommandEncoder commandEncoder) {

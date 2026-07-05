@@ -7251,6 +7251,7 @@ public class VulkanicAPI {
             case "Projection" -> 64;
             case "DynamicTransforms" -> 164;
             case "Fog" -> 40;
+            case "LightmapInfo" -> 64;
             default -> 0;
         };
 
@@ -7284,6 +7285,23 @@ public class VulkanicAPI {
                 data.getFloat(28),
                 data.getFloat(32),
                 data.getFloat(36)
+            );
+            case "LightmapInfo" -> String.format(
+                java.util.Locale.ROOT,
+                ",semantic={AmbientLight=%.8f,SkyFactor=%.8f,BlockLightFactor=%.8f,NightVisionScale=%.8f,DarknessScale=%.8f,DarkenWorldAmount=%.8f,GammaMinusDarkness=%.8f,SkyLightColor=(%.8f,%.8f,%.8f),LightColor=(%.8f,%.8f,%.8f)}",
+                data.getFloat(0),
+                data.getFloat(4),
+                data.getFloat(8),
+                data.getFloat(12),
+                data.getFloat(16),
+                data.getFloat(20),
+                data.getFloat(24),
+                data.getFloat(32),
+                data.getFloat(36),
+                data.getFloat(40),
+                data.getFloat(48),
+                data.getFloat(52),
+                data.getFloat(56)
             );
             default -> "";
         };
@@ -7349,6 +7367,11 @@ public class VulkanicAPI {
             case "Projection" -> shaderInputParityHash(slice, Math.min(64, slice.length()));
             case "Fog" -> shaderInputParityHash(slice, Math.min(40, slice.length()));
             case "Globals" -> shaderInputParityHash(slice, Math.min(20, slice.length()));
+            case "LightmapInfo" -> shaderInputParityHash(slice, new int[][] {
+                {0, 28},   // seven scalar floats
+                {32, 12},  // vec3 SkyLightColor, excluding std140 padding
+                {48, 12}   // vec3 LightColor, excluding std140 padding
+            }, 52);
             default -> shaderInputParityHash(slice, slice.length());
         };
     }
