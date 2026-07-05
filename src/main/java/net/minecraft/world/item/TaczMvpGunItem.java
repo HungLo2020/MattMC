@@ -95,11 +95,24 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 		if (getFireMode(itemStack) == TaczFireMode.BURST) {
 			return TaczGunBurstData.burst(this.definition.id()).minIntervalTicks();
 		}
-		return Math.max(1, Math.round(1200.0F / Math.max(1, this.definition.rpm())));
+		return Math.max(1, Math.round(this.shootIntervalMillis(itemStack) / 50.0F));
 	}
 
-	private int roundsPerTrigger(ItemStack itemStack, int ammo) {
+	public int roundsPerTrigger(ItemStack itemStack, int ammo) {
 		return getFireMode(itemStack) == TaczFireMode.BURST ? Math.min(TaczGunBurstData.burst(this.definition.id()).count(), ammo) : 1;
+	}
+
+	public long shootIntervalMillis(ItemStack itemStack) {
+		int rpm = TaczGunFireModeAdjustments.rpm(this.definition.id(), getFireMode(itemStack), this.definition.rpm());
+		return 60000L / Math.max(1, rpm);
+	}
+
+	public long triggerCooldownMillis(ItemStack itemStack) {
+		return getFireMode(itemStack) == TaczFireMode.BURST ? TaczGunBurstData.burst(this.definition.id()).minIntervalMillis() : this.shootIntervalMillis(itemStack);
+	}
+
+	public long burstIntervalMillis(ItemStack itemStack) {
+		return getFireMode(itemStack) == TaczFireMode.BURST ? TaczGunBurstData.burst(this.definition.id()).intervalMillis() : 1L;
 	}
 
 	private void scheduleTriggerPull(ServerLevel serverLevel, Player player, ItemStack itemStack, int ammo) {
@@ -146,7 +159,7 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 
 		setAmmo(itemStack, getAmmo(itemStack) - 1);
 		player.awardStat(Stats.ITEM_USED.get(this));
-		serverLevel.playSound(null, player.getX(), player.getY(), player.getZ(), this.sound("shoot"), SoundSource.PLAYERS, 1.25F, 0.96F + serverLevel.random.nextFloat() * 0.08F);
+		serverLevel.playSound(player, player.getX(), player.getY(), player.getZ(), this.sound("shoot"), SoundSource.PLAYERS, 1.25F, 0.96F + serverLevel.random.nextFloat() * 0.08F);
 	}
 
 	public InteractionResult tryStartReload(Level level, Player player, InteractionHand interactionHand, ItemStack itemStack) {

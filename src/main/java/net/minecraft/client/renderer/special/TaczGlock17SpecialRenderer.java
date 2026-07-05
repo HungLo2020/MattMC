@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import net.blaze3d.vertex.PoseStack;
 import net.blaze3d.vertex.VertexConsumer;
 import net.math.Axis;
@@ -22,6 +24,7 @@ import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.LightTexture;
+import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
@@ -45,11 +48,16 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.slf4j.Logger;
+import net.vulkanic.CommandContext;
+import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicCapability;
+import net.vulkanic.VulkanicClearBuffer;
 
 @Environment(EnvType.CLIENT)
 public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final Set<String> FUNCTIONAL_MARKER_NODES = Set.of("lefthand_pos", "righthand_pos", "muzzle_flash", "shell");
+	private static final Pattern TACZ_NUMBERED_NODE = Pattern.compile("^(.*?)(?:_(\\d+))?$");
 	private static final Map<String, AttachmentRenderData> ATTACHMENT_CACHE = new ConcurrentHashMap<>();
 	private final String gunId;
 	private final ResourceLocation texture;
@@ -125,7 +133,17 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 				continue;
 			}
 
-			submitNodeCollector.submitCustomGeometry(poseStack, RenderType.entityCutoutNoCull(attachmentData.texture()), (pose, vertexConsumer) -> {
+			RenderType renderType = RenderType.entityCutoutNoCull(attachmentData.texture());
+			if (itemDisplayContext.firstPerson() && (attachmentData.scope() || attachmentData.sight())) {
+				submitNodeCollector.submitCustomGeometry(
+					poseStack,
+					renderType,
+					new TaczScopedAttachmentRenderer(this.geometry, marker, itemDisplayContext, light, overlay, animationPose, attachmentData)
+				);
+				continue;
+			}
+
+			submitNodeCollector.submitCustomGeometry(poseStack, renderType, (pose, vertexConsumer) -> {
 				PoseStack attachmentPoseStack = new PoseStack();
 				attachmentPoseStack.last().set(pose);
 				if (this.geometry.applyAnimatedNodePath(marker, attachmentPoseStack, animationPose)) {
@@ -491,6 +509,48 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			return true;
 		}
 
+		boolean renderNodePath(
+			String name,
+			PoseStack poseStack,
+			ItemDisplayContext itemDisplayContext,
+			VertexConsumer consumer,
+			int light,
+			int overlay,
+			AnimationPose animationPose,
+			AttachmentRenderData attachmentRenderData
+		) {
+			List<BedrockNode> nodePath = this.pathTo(name);
+			if (nodePath == null) {
+				return false;
+			}
+
+			poseStack.pushPose();
+			for (int index = 0; index < nodePath.size() - 1; index++) {
+				BedrockNode node = nodePath.get(index);
+				node.translateAndRotate(poseStack, animationPose.node(node.name));
+			}
+
+			nodePath.get(nodePath.size() - 1).render(poseStack, itemDisplayContext, consumer, light, overlay, animationPose, attachmentRenderData);
+			poseStack.popPose();
+			return true;
+		}
+
+		List<String> nodesMatching(String baseName) {
+			return this.nodes.keySet()
+				.stream()
+				.filter(name -> isTaczNumberedNode(name, baseName))
+				.sorted(Comparator.comparingInt(TaczGlock17SpecialRenderer::taczNodeSortIndex))
+				.toList();
+		}
+
+		List<String> nodesContaining(String firstFragment, String secondFragment) {
+			return this.nodes.keySet()
+				.stream()
+				.filter(name -> name.contains(firstFragment) && name.contains(secondFragment))
+				.sorted()
+				.toList();
+		}
+
 		boolean hasNode(String name) {
 			return this.nodes.containsKey(name);
 		}
@@ -507,6 +567,197 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 				node = node.parent;
 			}
 			return path;
+		}
+	}
+
+	private static boolean isTaczNumberedNode(String name, String baseName) {
+		if (name.equals(baseName)) {
+			return true;
+		}
+		return name.startsWith(baseName + "_") && taczNodeSortIndex(name) > 1;
+	}
+
+	private static int taczNodeSortIndex(String name) {
+		Matcher matcher = TACZ_NUMBERED_NODE.matcher(name);
+		if (!matcher.matches() || matcher.group(2) == null) {
+			return 1;
+		}
+		return Integer.parseInt(matcher.group(2));
+	}
+
+	private record TaczScopedAttachmentRenderer(
+		BedrockGunGeometry gunGeometry,
+		String marker,
+		ItemDisplayContext itemDisplayContext,
+		int light,
+		int overlay,
+		AnimationPose animationPose,
+		AttachmentRenderData attachmentData
+	) implements SubmitNodeCollector.ImmediateCustomGeometryRenderer {
+		@Override
+		public void render(PoseStack.Pose pose, RenderType renderType, MultiBufferSource.BufferSource bufferSource) {
+			PoseStack attachmentPoseStack = new PoseStack();
+			attachmentPoseStack.last().set(pose);
+			if (!this.gunGeometry.applyAnimatedNodePath(this.marker, attachmentPoseStack, this.animationPose)) {
+				return;
+			}
+
+			attachmentPoseStack.translate(0.0F, -1.5F, 0.0F);
+			this.renderTaczScopePasses(attachmentPoseStack, renderType, bufferSource);
+		}
+
+		private void renderTaczScopePasses(PoseStack poseStack, RenderType renderType, MultiBufferSource.BufferSource bufferSource) {
+			if (!this.isAiming()) {
+				this.renderNormalAttachment(poseStack, renderType, bufferSource);
+				return;
+			}
+
+			try {
+				this.enableStencil();
+				if (this.attachmentData.scope()) {
+					this.renderNodeIfPresent(
+						"ocular_ring",
+						poseStack,
+						renderType,
+						bufferSource,
+						null,
+						this::configureVisibleStencilWrite
+					);
+				}
+				this.renderOcularStencil(poseStack, renderType, bufferSource);
+				if (this.attachmentData.scope()) {
+					this.renderScopeBody(poseStack, renderType, bufferSource);
+				}
+				this.renderDivisionReticle(poseStack, renderType, bufferSource);
+			} finally {
+				this.disableStencil();
+			}
+
+			this.renderNormalAttachment(poseStack, renderType, bufferSource);
+		}
+
+		private boolean isAiming() {
+			return this.animationPose.aimProgress > 0.05F;
+		}
+
+		private void renderNormalAttachment(PoseStack poseStack, RenderType renderType, MultiBufferSource.BufferSource bufferSource) {
+			VertexConsumer consumer = bufferSource.getBuffer(renderType);
+			for (BedrockNode root : this.attachmentData.geometry().roots()) {
+				root.render(poseStack, this.itemDisplayContext, consumer, this.light, this.overlay, this.animationPose, this.attachmentData);
+			}
+			bufferSource.endBatch(renderType);
+		}
+
+		private void renderOcularStencil(PoseStack poseStack, RenderType renderType, MultiBufferSource.BufferSource bufferSource) {
+			List<String> ocularNodes = new ArrayList<>();
+			ocularNodes.addAll(this.attachmentData.geometry().nodesMatching("ocular"));
+			ocularNodes.addAll(this.attachmentData.geometry().nodesMatching("ocular_sight"));
+			ocularNodes.addAll(this.attachmentData.geometry().nodesMatching("ocular_scope"));
+			if (ocularNodes.isEmpty()) {
+				return;
+			}
+
+			CommandContext ctx = VulkanicAPI.getCommandContext();
+			VulkanicAPI.setColorMask(ctx, false, false, false, false);
+			VulkanicAPI.setDepthWriteMask(ctx, false);
+			VulkanicAPI.setStencilWriteMask(ctx, 0xFF);
+			VulkanicAPI.setStencilOp(ctx, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_REPLACE);
+			for (int index = 0; index < ocularNodes.size(); index++) {
+				int stencilValue = index + 1;
+				this.renderNodeIfPresent(ocularNodes.get(index), poseStack, renderType, bufferSource, null, () -> {
+					this.configureHiddenStencilWrite();
+					VulkanicAPI.setStencilFunc(ctx, VulkanicAPI.GL_GREATER, stencilValue, 0xFF);
+				});
+			}
+			VulkanicAPI.setStencilOp(ctx, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP);
+			VulkanicAPI.setDepthWriteMask(ctx, true);
+			VulkanicAPI.setColorMask(ctx, true, true, true, true);
+		}
+
+		private void renderScopeBody(PoseStack poseStack, RenderType renderType, MultiBufferSource.BufferSource bufferSource) {
+			this.renderNodeIfPresent("scope_body", poseStack, renderType, bufferSource, null, () -> {
+				CommandContext ctx = VulkanicAPI.getCommandContext();
+				VulkanicAPI.setColorMask(ctx, true, true, true, true);
+				VulkanicAPI.setDepthWriteMask(ctx, true);
+				VulkanicAPI.setStencilWriteMask(ctx, 0x00);
+				VulkanicAPI.setStencilOp(ctx, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP);
+				VulkanicAPI.setStencilFunc(ctx, VulkanicAPI.GL_EQUAL, 0, 0xFF);
+			});
+		}
+
+		private void renderDivisionReticle(PoseStack poseStack, RenderType renderType, MultiBufferSource.BufferSource bufferSource) {
+			List<String> reticleNodes = this.attachmentData.geometry().nodesContaining("division", "illuminated");
+			if (reticleNodes.isEmpty()) {
+				return;
+			}
+
+			CommandContext ctx = VulkanicAPI.getCommandContext();
+			VulkanicAPI.setCapabilityEnabled(ctx, VulkanicCapability.DEPTH_TEST, false);
+			for (int index = 0; index < reticleNodes.size(); index++) {
+				int stencilValue = Math.min(index + 1, 0xFF);
+				this.renderNodeIfPresent(reticleNodes.get(index), poseStack, renderType, bufferSource, null, () -> {
+					VulkanicAPI.setColorMask(ctx, true, true, true, true);
+					VulkanicAPI.setDepthWriteMask(ctx, true);
+					VulkanicAPI.setStencilWriteMask(ctx, 0x00);
+					VulkanicAPI.setStencilOp(ctx, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP);
+					VulkanicAPI.setStencilFunc(ctx, VulkanicAPI.GL_LEQUAL, stencilValue, 0xFF);
+					VulkanicAPI.setCapabilityEnabled(ctx, VulkanicCapability.DEPTH_TEST, false);
+				});
+			}
+			VulkanicAPI.setCapabilityEnabled(ctx, VulkanicCapability.DEPTH_TEST, true);
+		}
+
+		private void renderNodeIfPresent(
+			String nodeName,
+			PoseStack poseStack,
+			RenderType renderType,
+			MultiBufferSource.BufferSource bufferSource,
+			AttachmentRenderData attachmentRenderData,
+			Runnable beforeFlush
+		) {
+			VertexConsumer consumer = bufferSource.getBuffer(renderType);
+			if (this.attachmentData.geometry()
+				.renderNodePath(nodeName, poseStack, this.itemDisplayContext, consumer, this.light, this.overlay, this.animationPose, attachmentRenderData)) {
+				beforeFlush.run();
+				bufferSource.endBatch(renderType);
+			}
+		}
+
+		private void configureHiddenStencilWrite() {
+			CommandContext ctx = VulkanicAPI.getCommandContext();
+			VulkanicAPI.setColorMask(ctx, false, false, false, false);
+			VulkanicAPI.setDepthWriteMask(ctx, false);
+			VulkanicAPI.setStencilWriteMask(ctx, 0xFF);
+			VulkanicAPI.setStencilOp(ctx, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_REPLACE);
+		}
+
+		private void configureVisibleStencilWrite() {
+			CommandContext ctx = VulkanicAPI.getCommandContext();
+			VulkanicAPI.setColorMask(ctx, true, true, true, true);
+			VulkanicAPI.setDepthWriteMask(ctx, true);
+			VulkanicAPI.setStencilWriteMask(ctx, 0x00);
+			VulkanicAPI.setStencilOp(ctx, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP);
+			VulkanicAPI.setStencilFunc(ctx, VulkanicAPI.GL_ALWAYS, 0, 0xFF);
+		}
+
+		private void enableStencil() {
+			CommandContext ctx = VulkanicAPI.getCommandContext();
+			VulkanicAPI.setCapabilityEnabled(ctx, VulkanicCapability.STENCIL_TEST, true);
+			VulkanicAPI.clearBuffers(ctx, VulkanicClearBuffer.STENCIL);
+			VulkanicAPI.setStencilWriteMask(ctx, 0xFF);
+			VulkanicAPI.setStencilFunc(ctx, VulkanicAPI.GL_ALWAYS, 0, 0xFF);
+			VulkanicAPI.setStencilOp(ctx, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP);
+		}
+
+		private void disableStencil() {
+			CommandContext ctx = VulkanicAPI.getCommandContext();
+			VulkanicAPI.setStencilFunc(ctx, VulkanicAPI.GL_ALWAYS, 0, 0xFF);
+			VulkanicAPI.setStencilOp(ctx, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_KEEP);
+			VulkanicAPI.setStencilWriteMask(ctx, 0xFF);
+			VulkanicAPI.setColorMask(ctx, true, true, true, true);
+			VulkanicAPI.setDepthWriteMask(ctx, true);
+			VulkanicAPI.setCapabilityEnabled(ctx, VulkanicCapability.DEPTH_TEST, true);
+			VulkanicAPI.setCapabilityEnabled(ctx, VulkanicCapability.STENCIL_TEST, false);
 		}
 	}
 
@@ -553,9 +804,14 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 
 			poseStack.pushPose();
 			this.translateAndRotate(poseStack, animationPose.node(this.name));
+			if (this.hiddenByScopedFirstPerson(itemDisplayContext, attachmentRenderData, animationPose.aimProgress)) {
+				poseStack.popPose();
+				return;
+			}
+
 			int cubeLight = this.name != null && this.name.endsWith("_illuminated") ? LightTexture.pack(15, 15) : light;
 			NodePose nodePose = animationPose.node(this.name);
-			if (!this.hiddenMarker && nodePose.visible() && !this.hiddenByScopedFirstPerson(itemDisplayContext, attachmentRenderData)) {
+			if (!this.hiddenMarker && nodePose.visible()) {
 				for (BedrockCube cube : this.cubes) {
 					cube.compile(poseStack.last(), consumer, cubeLight, overlay);
 				}
@@ -567,10 +823,10 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			poseStack.popPose();
 		}
 
-		private boolean hiddenByScopedFirstPerson(ItemDisplayContext itemDisplayContext, AttachmentRenderData attachmentRenderData) {
+		private boolean hiddenByScopedFirstPerson(ItemDisplayContext itemDisplayContext, AttachmentRenderData attachmentRenderData, float aimProgress) {
 			return attachmentRenderData != null
 				&& itemDisplayContext.firstPerson()
-				&& attachmentRenderData.hidesFirstPersonNode(this.name);
+				&& attachmentRenderData.hidesFirstPersonNode(this.name, aimProgress);
 		}
 
 		private void translateAndRotate(PoseStack poseStack, NodePose nodePose) {
@@ -1131,14 +1387,17 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	}
 
 	private record AttachmentRenderData(BedrockGunGeometry geometry, ResourceLocation texture, boolean scope, boolean sight) {
-		private boolean hidesFirstPersonNode(String nodeName) {
+		private boolean hidesFirstPersonNode(String nodeName, float aimProgress) {
 			if ((!this.scope && !this.sight) || nodeName == null) {
 				return false;
 			}
 
+			boolean aiming = aimProgress > 0.05F;
 			return nodeName.equals("ocular")
+				|| this.scope && aiming && nodeName.equals("scope_body")
 				|| nodeName.startsWith("ocular_scope")
-				|| nodeName.startsWith("ocular_sight");
+				|| nodeName.startsWith("ocular_sight")
+				|| nodeName.contains("division");
 		}
 	}
 

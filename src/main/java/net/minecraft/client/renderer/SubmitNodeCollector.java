@@ -20,6 +20,15 @@ public interface SubmitNodeCollector extends OrderedSubmitNodeCollector {
 	}
 
 	@Environment(EnvType.CLIENT)
+	public interface ImmediateCustomGeometryRenderer extends CustomGeometryRenderer {
+		void render(PoseStack.Pose pose, RenderType renderType, MultiBufferSource.BufferSource bufferSource);
+
+		@Override
+		default void render(PoseStack.Pose pose, VertexConsumer vertexConsumer) {
+		}
+	}
+
+	@Environment(EnvType.CLIENT)
 	public interface ParticleGroupRenderer {
 		@Nullable
 		QuadParticleRenderState.PreparedBuffers prepare(ParticleFeatureRenderer.ParticleBufferCache particleBufferCache);

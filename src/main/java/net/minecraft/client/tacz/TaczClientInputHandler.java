@@ -113,27 +113,36 @@ public final class TaczClientInputHandler {
 	}
 
 	private static void scheduleClientShotFeedback(Minecraft minecraft, ItemStack itemStack, TaczMvpGunItem gunItem, int ammoBeforeShot) {
-		int shots = TaczMvpGunItem.getFireMode(itemStack) == TaczFireMode.BURST ? Math.min(TaczGunBurstData.burst(gunItem.gunId()).count(), ammoBeforeShot) : 1;
-		long intervalMillis = TaczMvpGunItem.getFireMode(itemStack) == TaczFireMode.BURST ? TaczGunBurstData.burst(gunItem.gunId()).intervalMillis() : 1L;
+		int shots = gunItem.roundsPerTrigger(itemStack, ammoBeforeShot);
+		long intervalMillis = gunItem.burstIntervalMillis(itemStack);
 		for (int shot = 0; shot < shots; shot++) {
 			int scheduledShot = shot;
+			if (scheduledShot == 0) {
+				playClientShotFeedback(minecraft, itemStack, gunItem);
+				continue;
+			}
 			BURST_FEEDBACK_EXECUTOR.schedule(() -> minecraft.execute(() -> {
-				if (minecraft.player == null || minecraft.level == null || minecraft.player.getMainHandItem() != itemStack) {
-					return;
-				}
-				TaczGlock17AnimationController.triggerShoot();
-				minecraft.level
-					.playSound(
-						minecraft.player,
-						minecraft.player.getX(),
-						minecraft.player.getY(),
-						minecraft.player.getZ(),
-						gunItem.shootSound(),
-						SoundSource.PLAYERS,
-						1.25F,
-						0.96F + minecraft.level.random.nextFloat() * 0.08F
-					);
+				playClientShotFeedback(minecraft, itemStack, gunItem);
 			}), scheduledShot * intervalMillis, TimeUnit.MILLISECONDS);
 		}
+	}
+
+	private static void playClientShotFeedback(Minecraft minecraft, ItemStack itemStack, TaczMvpGunItem gunItem) {
+		if (minecraft.player == null || minecraft.level == null || !ItemStack.isSameItem(minecraft.player.getMainHandItem(), itemStack)) {
+			return;
+		}
+
+		TaczGlock17AnimationController.triggerShoot();
+		minecraft.level
+			.playSound(
+				minecraft.player,
+				minecraft.player.getX(),
+				minecraft.player.getY(),
+				minecraft.player.getZ(),
+				gunItem.shootSound(),
+				SoundSource.PLAYERS,
+				1.25F,
+				0.96F + minecraft.level.random.nextFloat() * 0.08F
+			);
 	}
 }
