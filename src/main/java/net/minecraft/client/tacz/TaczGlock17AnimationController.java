@@ -19,6 +19,7 @@ public final class TaczGlock17AnimationController {
 	private static boolean wasHolding;
 	private static long lastUpdateNanos = System.nanoTime();
 	private static float aimProgress;
+	private static float previousAimProgress;
 	private static ActiveAnimation mainAnimation;
 	private static ActiveAnimation shootAnimation;
 
@@ -39,10 +40,15 @@ public final class TaczGlock17AnimationController {
 		wasHolding = holding;
 		float targetAim = holding && TaczKeyMappings.AIM.isDown() ? 1.0F : 0.0F;
 		float step = deltaSeconds / AIM_SECONDS;
+		previousAimProgress = aimProgress;
 		aimProgress = Mth.clamp(aimProgress + Math.signum(targetAim - aimProgress) * step, 0.0F, 1.0F);
 		if (Math.abs(targetAim - aimProgress) <= step) {
 			aimProgress = targetAim;
 		}
+	}
+
+	public static float aimProgress(float partialTick) {
+		return Mth.lerp(partialTick, previousAimProgress, aimProgress);
 	}
 
 	public static void triggerShoot() {

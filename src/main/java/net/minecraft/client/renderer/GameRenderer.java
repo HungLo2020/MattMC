@@ -60,6 +60,7 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.resources.model.AtlasManager;
 import net.vulkanic.VulkanicAPI;
 import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.client.tacz.TaczScopeData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Registry;
@@ -484,6 +485,13 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			if (fogType == FogType.LAVA || fogType == FogType.WATER) {
 				float h = this.minecraft.options.fovEffectScale().get().floatValue();
 				g *= Mth.lerp(h, 1.0F, 0.85714287F);
+			}
+
+			if (this.minecraft.options.getCameraType().isFirstPerson()
+				&& camera.getEntity() == this.minecraft.player
+				&& this.minecraft.player != null) {
+				ItemStack itemStack = this.minecraft.player.getMainHandItem();
+				g = bl ? TaczScopeData.applyWorldFov(itemStack, g, f) : TaczScopeData.applyItemFov(itemStack, g, f);
 			}
 
 			return g;

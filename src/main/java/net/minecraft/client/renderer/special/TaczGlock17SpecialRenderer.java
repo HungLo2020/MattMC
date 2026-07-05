@@ -6,9 +6,7 @@ import com.google.gson.JsonObject;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import java.io.IOException;
 import java.io.Reader;
-import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -29,6 +27,7 @@ import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.tacz.TaczGlock17AnimationController;
 import net.minecraft.client.tacz.TaczRefitTransform;
+import net.minecraft.client.tacz.TaczScopeData;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.GsonHelper;
@@ -80,7 +79,7 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	private void submitAnimated(ItemDisplayContext itemDisplayContext, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, ItemStack itemStack) {
 		poseStack.pushPose();
 		AnimationPose animationPose = this.animations.sample(TaczGlock17AnimationController.snapshot(itemStack));
-		this.applyTaczTransform(itemDisplayContext, poseStack, animationPose);
+		this.applyTaczTransform(itemDisplayContext, poseStack, animationPose, itemStack);
 		submitNodeCollector.submitCustomGeometry(poseStack, RenderType.entityCutoutNoCull(this.texture), (pose, vertexConsumer) -> {
 			PoseStack modelPoseStack = new PoseStack();
 			modelPoseStack.last().set(pose);
@@ -132,7 +131,7 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 				if (this.geometry.applyAnimatedNodePath(marker, attachmentPoseStack, animationPose)) {
 					attachmentPoseStack.translate(0.0F, -1.5F, 0.0F);
 					for (BedrockNode root : attachmentData.geometry().roots()) {
-						root.render(attachmentPoseStack, itemDisplayContext, vertexConsumer, light, overlay, animationPose);
+						root.render(attachmentPoseStack, itemDisplayContext, vertexConsumer, light, overlay, animationPose, attachmentData);
 					}
 				}
 			});
@@ -159,33 +158,22 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	}
 
 	private static AttachmentRenderData loadAttachmentData(String attachmentId) {
-		ResourceLocation displayLocation = ResourceLocation.withDefaultNamespace("display/attachments/" + attachmentId + "_display.json");
-		try (Reader reader = Minecraft.getInstance().getResourceManager().openAsReader(displayLocation)) {
-			String json = stripLineComments(readAll(reader));
-			JsonObject display = GsonHelper.parse(new StringReader(json));
-			ResourceLocation model = ResourceLocation.parse(GsonHelper.getAsString(display, "model"));
-			ResourceLocation texture = ResourceLocation.parse(GsonHelper.getAsString(display, "texture"));
-			ResourceLocation geometryLocation = ResourceLocation.fromNamespaceAndPath(model.getNamespace(), "geo_models/" + model.getPath() + ".json");
-			ResourceLocation textureLocation = ResourceLocation.fromNamespaceAndPath(texture.getNamespace(), "textures/" + texture.getPath() + ".png");
-			return new AttachmentRenderData(BedrockGunGeometry.load(geometryLocation), textureLocation);
-		} catch (Exception exception) {
-			LOGGER.warn("Failed to load TACZ attachment display {}", displayLocation, exception);
+		TaczScopeData.AttachmentDisplay display = TaczScopeData.display(attachmentId);
+		if (display == null) {
 			return null;
 		}
-	}
 
-	private static String readAll(Reader reader) throws IOException {
-		StringBuilder builder = new StringBuilder();
-		char[] buffer = new char[2048];
-		int read;
-		while ((read = reader.read(buffer)) >= 0) {
-			builder.append(buffer, 0, read);
+		try {
+			return new AttachmentRenderData(
+				BedrockGunGeometry.load(display.geometryLocation()),
+				display.textureLocation(),
+				display.scope(),
+				display.sight()
+			);
+		} catch (Exception exception) {
+			LOGGER.warn("Failed to load TACZ attachment display {}", attachmentId, exception);
+			return null;
 		}
-		return builder.toString();
-	}
-
-	private static String stripLineComments(String text) {
-		return text.replaceAll("(?m)//.*$", "");
 	}
 
 	private void submitFirstPersonArms(
@@ -256,7 +244,7 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		set.add(new Vector3f(1.0F, 1.0F, 1.0F));
 	}
 
-	private void applyTaczTransform(ItemDisplayContext itemDisplayContext, PoseStack poseStack, AnimationPose animationPose) {
+	private void applyTaczTransform(ItemDisplayContext itemDisplayContext, PoseStack poseStack, AnimationPose animationPose, ItemStack itemStack) {
 		if (itemDisplayContext.firstPerson()) {
 			this.applyCameraAnimation(poseStack, animationPose);
 			poseStack.translate(0.0F, 1.5F, 0.0F);
@@ -264,6 +252,7 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			this.geometry.applyFirstPersonPositioning(
 				poseStack,
 				animationPose.aimProgress,
+				this.scopeViewMatrix(itemStack),
 				TaczRefitTransform.openingProgress(),
 				TaczRefitTransform.previousType(),
 				TaczRefitTransform.currentType(),
@@ -293,6 +282,20 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			}
 			default -> poseStack.scale(0.6F, 0.6F, 0.6F);
 		}
+	}
+
+	private Matrix4f scopeViewMatrix(ItemStack itemStack) {
+		TaczScopeData.AttachmentDisplay scope = TaczScopeData.scope(itemStack);
+		if (scope == null || !this.geometry.hasNode("scope_pos")) {
+			return null;
+		}
+
+		AttachmentRenderData attachmentData = attachmentData(scope.id());
+		if (attachmentData == null || !attachmentData.geometry().hasNode("scope_view")) {
+			return null;
+		}
+
+		return new Matrix4f(this.geometry.positioningMatrix("scope_pos")).mul(attachmentData.geometry().positioningMatrix("scope_view"));
 	}
 
 	private void applyCameraAnimation(PoseStack poseStack, AnimationPose animationPose) {
@@ -400,13 +403,14 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		void applyFirstPersonPositioning(
 			PoseStack poseStack,
 			float aimProgress,
+			Matrix4f scopedAim,
 			float refitProgress,
 			TaczAttachmentType previousRefitType,
 			TaczAttachmentType currentRefitType,
 			float refitViewProgress
 		) {
 			Matrix4f idle = this.positioningMatrix("idle_view");
-			Matrix4f aim = this.positioningMatrix("iron_view");
+			Matrix4f aim = scopedAim == null ? this.positioningMatrix("iron_view") : scopedAim;
 			Matrix4f matrix = idle;
 			if (aim != null && aimProgress > 0.0F) {
 				matrix = interpolateMatrix(idle, aim, aimProgress * (1.0F - refitProgress));
@@ -531,6 +535,18 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			int overlay,
 			AnimationPose animationPose
 		) {
+			this.render(poseStack, itemDisplayContext, consumer, light, overlay, animationPose, null);
+		}
+
+		private void render(
+			PoseStack poseStack,
+			ItemDisplayContext itemDisplayContext,
+			VertexConsumer consumer,
+			int light,
+			int overlay,
+			AnimationPose animationPose,
+			AttachmentRenderData attachmentRenderData
+		) {
 			if (this.cubes.isEmpty() && this.children.isEmpty()) {
 				return;
 			}
@@ -539,16 +555,22 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			this.translateAndRotate(poseStack, animationPose.node(this.name));
 			int cubeLight = this.name != null && this.name.endsWith("_illuminated") ? LightTexture.pack(15, 15) : light;
 			NodePose nodePose = animationPose.node(this.name);
-			if (!this.hiddenMarker && nodePose.visible()) {
+			if (!this.hiddenMarker && nodePose.visible() && !this.hiddenByScopedFirstPerson(itemDisplayContext, attachmentRenderData)) {
 				for (BedrockCube cube : this.cubes) {
 					cube.compile(poseStack.last(), consumer, cubeLight, overlay);
 				}
 			}
 
 			for (BedrockNode child : this.children) {
-				child.render(poseStack, itemDisplayContext, consumer, cubeLight, overlay, animationPose);
+				child.render(poseStack, itemDisplayContext, consumer, cubeLight, overlay, animationPose, attachmentRenderData);
 			}
 			poseStack.popPose();
+		}
+
+		private boolean hiddenByScopedFirstPerson(ItemDisplayContext itemDisplayContext, AttachmentRenderData attachmentRenderData) {
+			return attachmentRenderData != null
+				&& itemDisplayContext.firstPerson()
+				&& attachmentRenderData.hidesFirstPersonNode(this.name);
 		}
 
 		private void translateAndRotate(PoseStack poseStack, NodePose nodePose) {
@@ -1108,7 +1130,16 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		);
 	}
 
-	private record AttachmentRenderData(BedrockGunGeometry geometry, ResourceLocation texture) {
+	private record AttachmentRenderData(BedrockGunGeometry geometry, ResourceLocation texture, boolean scope, boolean sight) {
+		private boolean hidesFirstPersonNode(String nodeName) {
+			if ((!this.scope && !this.sight) || nodeName == null) {
+				return false;
+			}
+
+			return nodeName.equals("ocular")
+				|| nodeName.startsWith("ocular_scope")
+				|| nodeName.startsWith("ocular_sight");
+		}
 	}
 
 	@Environment(EnvType.CLIENT)
