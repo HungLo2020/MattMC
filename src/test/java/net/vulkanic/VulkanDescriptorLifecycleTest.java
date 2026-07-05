@@ -240,6 +240,51 @@ public class VulkanDescriptorLifecycleTest {
             "Native Vulkan render pass should refresh its descriptor submission cache after binding resources");
     }
 
+    @Test
+    public void testSharedStorageImageSamplerDescriptorsUseGeneralLayout() throws Exception {
+        String source = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+
+        assertTrue(source.contains("collectStorageImageTextureIds"),
+            "Vulkan descriptor planning should detect textures that are also bound as storage images");
+        assertTrue(source.contains("storageImageCompatibleSample"),
+            "Sampler descriptor resolution should classify sampled textures that also have storage-image bindings");
+        assertTrue(source.contains("isStorageImageLayoutCompatibleSampler"),
+            "Sampler descriptor resolution should preserve GENERAL layout for storage-capable sampled textures already in GENERAL");
+        assertTrue(source.contains("trackedLayoutForLevel(texture, level) != VK10.VK_IMAGE_LAYOUT_GENERAL"),
+            "Storage-compatible sampler detection should be based on the tracked per-mip image layout");
+        assertTrue(source.contains("descriptorImageLayoutFor(sampledLegacyTexture, storageImageCompatibleSample)"),
+            "Sampler descriptor writes should choose their image layout with storage-image compatibility in mind");
+        assertTrue(source.contains("if (storageImageCompatible) {\n                return VK10.VK_IMAGE_LAYOUT_GENERAL;\n            }"),
+            "A sampled texture that is also bound as a storage image must be described with GENERAL layout");
+        assertTrue(source.contains("transitionLegacyTextureToStorageImageLayout(\n                    sampledLegacyTexture,"),
+            "Shared storage/sampled textures should be transitioned to the storage-compatible layout instead of shader-read-only");
+        assertTrue(source.contains("} else if (!storageImageCompatibleSample) {\n                transitionLegacyTextureToSampleLayout("),
+            "Storage/general-compatible sampled textures should not be forced back to shader-read-only during descriptor writes");
+    }
+
+    @Test
+    public void testIllegalRenderPassLayoutTransitionsDoNotAdvanceTrackerWithoutBarrier() throws Exception {
+        String source = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+
+        int samplerWarning = source.indexOf("Illegal sampler layout transition inside render pass");
+        int samplerContinue = source.indexOf("continue;", samplerWarning);
+        int samplerTrack = source.indexOf("trackLayoutForLevel(texture, level, targetLayout)", samplerWarning);
+        assertTrue(samplerWarning >= 0 && samplerContinue > samplerWarning,
+            "Sampler transition guard should keep rejecting render-pass-time barriers");
+        assertTrue(samplerTrack < 0 || samplerTrack > samplerContinue,
+            "Sampler layout tracking must not advance when no vkCmdPipelineBarrier was emitted");
+
+        int storageWarning = source.indexOf("Illegal storage-image layout transition inside render pass");
+        int storageContinue = source.indexOf("continue;", storageWarning);
+        int storageTrack = source.indexOf("trackLayoutForLevel(texture, level, VK10.VK_IMAGE_LAYOUT_GENERAL)", storageWarning);
+        assertTrue(storageWarning >= 0 && storageContinue > storageWarning,
+            "Storage-image transition guard should keep rejecting render-pass-time barriers");
+        assertTrue(storageTrack < 0 || storageTrack > storageContinue,
+            "Storage-image layout tracking must not advance when no vkCmdPipelineBarrier was emitted");
+    }
+
     private static RenderPipeline buildTestPipeline() {
         return RenderPipeline.builder()
             .withLocation(ResourceLocation.withDefaultNamespace("vulkanic/test_pipeline_vulkan_desc"))

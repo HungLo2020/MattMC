@@ -5668,6 +5668,85 @@ void main() {
         return new BarrierMasks(srcStageMask, dstStageMask, srcAccessMask, dstAccessMask);
     }
 
+    private static BarrierMasks toVkRenderPassBarrierMasks(VulkanicResourceBarriers barriers) {
+        int srcStageMask = 0;
+        int dstStageMask = 0;
+        int srcAccessMask = 0;
+        int dstAccessMask = 0;
+
+        int framebufferStages = VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+            | VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+            | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+
+        for (VulkanicResourceBarriers.Barrier barrier : barriers.barriers()) {
+            switch (barrier) {
+                case SHADER_IMAGE_ACCESS -> {
+                    srcStageMask |= framebufferStages;
+                    dstStageMask |= framebufferStages;
+                    srcAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                        | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                    dstAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT
+                        | VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                        | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
+                        | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                }
+                case TEXTURE_FETCH -> {
+                    srcStageMask |= framebufferStages;
+                    dstStageMask |= framebufferStages;
+                    srcAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                        | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                    dstAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT
+                        | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+                }
+                case SHADER_STORAGE -> {
+                    srcStageMask |= framebufferStages;
+                    dstStageMask |= framebufferStages;
+                    srcAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                        | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                    dstAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT
+                        | VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                        | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
+                        | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                }
+                default -> throw new IllegalArgumentException("Unhandled VulkanicResourceBarriers.Barrier: " + barrier);
+            }
+        }
+
+        if (srcStageMask == 0) {
+            srcStageMask = framebufferStages;
+        }
+        if (dstStageMask == 0) {
+            dstStageMask = framebufferStages;
+        }
+        if (srcAccessMask == 0) {
+            srcAccessMask = VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        }
+        if (dstAccessMask == 0) {
+            dstAccessMask = VK10.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT
+                | VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
+                | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        }
+
+        return new BarrierMasks(srcStageMask, dstStageMask, srcAccessMask, dstAccessMask);
+    }
+
+    private static BarrierMasks toVkRenderPassConservativeBarrierMasks() {
+        int sourceStages = VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+            | VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+            | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        int destinationStages = sourceStages;
+        int sourceAccess = VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+            | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        int destinationAccess = VK10.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT
+            | VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+            | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
+            | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+        return new BarrierMasks(sourceStages, destinationStages, sourceAccess, destinationAccess);
+    }
+
     private static final class BarrierMasks {
         private final int srcStageMask;
         private final int dstStageMask;
@@ -9801,7 +9880,13 @@ void main() {
             spine.legacyImageBindingsByUnit.remove(unit);
             return;
         }
-        spine.legacyTextures.computeIfAbsent(texture, id -> new NativeSpine.LegacyTextureObject(id, VulkanicAPI.GL_TEXTURE_2D));
+        NativeSpine.LegacyTextureObject legacyTexture = spine.legacyTextures.computeIfAbsent(
+            texture,
+            id -> new NativeSpine.LegacyTextureObject(id, VulkanicAPI.GL_TEXTURE_2D)
+        );
+        if (!spine.renderPassRecording) {
+            spine.transitionLegacyTextureToStorageImageLayout(legacyTexture, level, 1);
+        }
         spine.legacyImageBindingsByUnit.put(
             unit,
             new LegacyImageBinding(unit, texture, Math.max(0, level), layered, Math.max(0, layer), access, format)
@@ -11638,14 +11723,61 @@ void main() {
             );
         }
 
-        private int descriptorImageLayoutFor(@Nullable LegacyTextureObject texture) {
+        private int descriptorImageLayoutFor(@Nullable LegacyTextureObject texture, boolean storageImageCompatible) {
             if (texture == null) return VulkanImageUse.SAMPLED_COLOR.vkLayout();
+            if (storageImageCompatible) {
+                return VK10.VK_IMAGE_LAYOUT_GENERAL;
+            }
             if (texture.feedbackLoopCapable) {
                 return VulkanImageUse.FEEDBACK_LOOP.vkLayout();
             }
             if (texture.aspectMask == VK10.VK_IMAGE_ASPECT_DEPTH_BIT)
                 return VulkanImageUse.SAMPLED_DEPTH.vkLayout();
             return VulkanImageUse.SAMPLED_COLOR.vkLayout();
+        }
+
+        private boolean isStorageImageLayoutCompatibleSampler(@Nullable LegacyTextureObject texture,
+                                                              int baseMip,
+                                                              int mipCount) {
+            if (texture == null
+                || texture.feedbackLoopCapable
+                || texture.aspectMask != VK10.VK_IMAGE_ASPECT_COLOR_BIT
+                || (texture.imageUsageFlags & VK10.VK_IMAGE_USAGE_STORAGE_BIT) == 0) {
+                return false;
+            }
+
+            int safeBaseMip = Math.max(0, baseMip);
+            int safeMipCount = Math.max(1, mipCount);
+            int maxMipLevels = Math.max(1, texture.mipLevels);
+            if (safeBaseMip >= maxMipLevels) {
+                return false;
+            }
+            int endMipExclusive = Math.min(maxMipLevels, safeBaseMip + safeMipCount);
+            for (int level = safeBaseMip; level < endMipExclusive; level++) {
+                if (trackedLayoutForLevel(texture, level) != VK10.VK_IMAGE_LAYOUT_GENERAL) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private Set<Integer> collectStorageImageTextureIds(
+            List<PipelineDescriptor.ResourceBinding> layoutBindings,
+            PipelineResourceBindings bindings
+        ) {
+            Set<Integer> storageImageTextureIds = new HashSet<>();
+            for (PipelineDescriptor.ResourceBinding binding : layoutBindings) {
+                PipelineDescriptor.ResourceBinding effectiveBinding = withEffectiveBindingType(binding, bindings);
+                if (effectiveBinding.type() != PipelineDescriptor.ResourceType.STORAGE_IMAGE) {
+                    continue;
+                }
+                PipelineResourceBindings.StorageImageBinding imageBinding =
+                    bindings.getStorageImageBindingOrNull(effectiveBinding.name());
+                if (imageBinding != null && imageBinding.texture() > 0) {
+                    storageImageTextureIds.add(imageBinding.texture());
+                }
+            }
+            return storageImageTextureIds;
         }
 
         private DescriptorWritePlan buildDescriptorWritePlan(
@@ -11659,6 +11791,7 @@ void main() {
         ) {
             List<ResolvedDescriptorBinding> resolvedBindings = new ArrayList<>(layoutBindings.size());
             List<DescriptorBindingCacheKey> cacheKeys = new ArrayList<>(layoutBindings.size());
+            Set<Integer> storageImageTextureIds = collectStorageImageTextureIds(layoutBindings, bindings);
             boolean cacheable = true;
 
             for (PipelineDescriptor.ResourceBinding binding : layoutBindings) {
@@ -11670,7 +11803,8 @@ void main() {
                         sodiumChunkDescriptor,
                         particleDescriptor,
                         pipelineLocation,
-                        pipelineHandle
+                        pipelineHandle,
+                        storageImageTextureIds
                     );
                     case UNIFORM_BUFFER -> {
                         ResolvedUniformBufferDescriptorPlan resolvedPlan = resolveUniformBufferDescriptorBinding(effectiveBinding, bindings);
@@ -11731,7 +11865,8 @@ void main() {
             boolean sodiumChunkDescriptor,
             boolean particleDescriptor,
             String pipelineLocation,
-            long pipelineHandle
+            long pipelineHandle,
+            Set<Integer> storageImageTextureIds
         ) {
             PipelineResourceBindings.SamplerBinding samplerBinding = bindings.getSamplerBindingOrNull(binding.name());
             if (samplerBinding == null) {
@@ -11804,11 +11939,27 @@ void main() {
                 descriptorMipLevelCount = Math.max(1, sampledLegacyTexture.mipLevels);
             }
 
-            transitionLegacyTextureToSampleLayout(
-                sampledLegacyTexture,
-                descriptorBaseMipLevel,
-                descriptorMipLevelCount
-            );
+            boolean explicitlyStorageImageBound = sampledLegacyTexture != null
+                && storageImageTextureIds.contains(sampledLegacyTexture.id);
+            boolean storageImageCompatibleSample = explicitlyStorageImageBound
+                || isStorageImageLayoutCompatibleSampler(
+                    sampledLegacyTexture,
+                    descriptorBaseMipLevel,
+                    descriptorMipLevelCount
+                );
+            if (explicitlyStorageImageBound) {
+                transitionLegacyTextureToStorageImageLayout(
+                    sampledLegacyTexture,
+                    descriptorBaseMipLevel,
+                    descriptorMipLevelCount
+                );
+            } else if (!storageImageCompatibleSample) {
+                transitionLegacyTextureToSampleLayout(
+                    sampledLegacyTexture,
+                    descriptorBaseMipLevel,
+                    descriptorMipLevelCount
+                );
+            }
 
             String sampledTextureLabel = resolvedTextureView.texture().getLabel();
             int sampledUsage = resolvedTextureView.texture().usage();
@@ -11857,7 +12008,7 @@ void main() {
                     : null
             );
             long samplerHandle = resolveDescriptorSamplerHandle(samplerKey);
-            int descriptorImageLayout = descriptorImageLayoutFor(sampledLegacyTexture);
+            int descriptorImageLayout = descriptorImageLayoutFor(sampledLegacyTexture, storageImageCompatibleSample);
             if (sodiumChunkDescriptor
                 && shouldLogSodiumDescriptorBinding(binding.name())
                 && debugSodiumChunkDescriptorSamplerLogCount < 160) {
@@ -12332,8 +12483,6 @@ void main() {
                         Integer.toHexString(targetLayout),
                         level
                     );
-                    // Update tracking anyway so we log once, not every frame.
-                    trackLayoutForLevel(texture, level, targetLayout);
                     continue;
                 }
 
@@ -12373,7 +12522,6 @@ void main() {
                         Integer.toHexString(trackedLayout),
                         level
                     );
-                    trackLayoutForLevel(texture, level, VK10.VK_IMAGE_LAYOUT_GENERAL);
                     continue;
                 }
                 transitionImageLayout(texture, trackedLayout, VK10.VK_IMAGE_LAYOUT_GENERAL, level, 1);
@@ -17871,10 +18019,12 @@ void main() {
             }
         }
 
-	        private void applyResourceBarriers(long commandBufferHandle, VulkanicResourceBarriers barriers) {
-	            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "applyResourceBarriers");
+        private void applyResourceBarriers(long commandBufferHandle, VulkanicResourceBarriers barriers) {
+            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "applyResourceBarriers");
 
-            BarrierMasks masks = toVkBarrierMasks(barriers);
+            BarrierMasks masks = renderPassRecording
+                ? toVkRenderPassBarrierMasks(barriers)
+                : toVkBarrierMasks(barriers);
             try (MemoryStack stack = stackPush()) {
                 VkMemoryBarrier.Buffer memoryBarriers = VkMemoryBarrier.calloc(1, stack);
                 memoryBarriers.get(0)
@@ -17886,33 +18036,44 @@ void main() {
                     activeCommandBuffer,
                     masks.srcStageMask(),
                     masks.dstStageMask(),
-                    0,
+                    renderPassRecording ? VK10.VK_DEPENDENCY_BY_REGION_BIT : 0,
                     memoryBarriers,
                     null,
                     null
-	                );
-	            }
-	        }
+                );
+            }
+        }
 
-	        private void applyConservativeMemoryBarrier(long commandBufferHandle) {
-	            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "memoryBarrier");
-	            try (MemoryStack stack = stackPush()) {
-	                VkMemoryBarrier.Buffer memoryBarriers = VkMemoryBarrier.calloc(1, stack);
-	                memoryBarriers.get(0)
-	                    .sType$Default()
-	                    .srcAccessMask(VK10.VK_ACCESS_MEMORY_WRITE_BIT)
-	                    .dstAccessMask(VK10.VK_ACCESS_MEMORY_READ_BIT | VK10.VK_ACCESS_MEMORY_WRITE_BIT);
+        private void applyConservativeMemoryBarrier(long commandBufferHandle) {
+            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "memoryBarrier");
+            BarrierMasks renderPassMasks = renderPassRecording
+                ? toVkRenderPassConservativeBarrierMasks()
+                : null;
+            try (MemoryStack stack = stackPush()) {
+                VkMemoryBarrier.Buffer memoryBarriers = VkMemoryBarrier.calloc(1, stack);
+                memoryBarriers.get(0)
+                    .sType$Default()
+                    .srcAccessMask(renderPassMasks != null
+                        ? renderPassMasks.srcAccessMask()
+                        : VK10.VK_ACCESS_MEMORY_WRITE_BIT)
+                    .dstAccessMask(renderPassMasks != null
+                        ? renderPassMasks.dstAccessMask()
+                        : VK10.VK_ACCESS_MEMORY_READ_BIT | VK10.VK_ACCESS_MEMORY_WRITE_BIT);
 
-	                VK10.vkCmdPipelineBarrier(
-	                    activeCommandBuffer,
-	                    VK10.VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-	                    VK10.VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-	                    0,
-	                    memoryBarriers,
-	                    null,
-	                    null
-	                );
-	            }
+                VK10.vkCmdPipelineBarrier(
+                    activeCommandBuffer,
+                    renderPassMasks != null
+                        ? renderPassMasks.srcStageMask()
+                        : VK10.VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                    renderPassMasks != null
+                        ? renderPassMasks.dstStageMask()
+                        : VK10.VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                    renderPassMasks != null ? VK10.VK_DEPENDENCY_BY_REGION_BIT : 0,
+                    memoryBarriers,
+                    null,
+                    null
+                );
+            }
 	        }
 
 	        private VkCommandBuffer requireRecordingCommandBuffer(long commandBufferHandle, String operation) {
@@ -19785,7 +19946,7 @@ void main() {
             VulkanRenderPassCompatibilityKey compatibilityKey
         ) {
             VkSubpassDependency.Buffer dependencies = VkSubpassDependency.calloc(
-                compatibilityKey.feedbackLoop() ? 3 : 2,
+                compatibilityKey.feedbackLoop() ? 4 : 3,
                 stack
             );
             int entryStageMask = VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
@@ -19822,8 +19983,10 @@ void main() {
                 .srcAccessMask(exitSrcAccessMask)
                 .dstAccessMask(VK10.VK_ACCESS_SHADER_READ_BIT);
 
+            writeGraphicsBarrierSelfDependency(dependencies.get(2));
+
             if (compatibilityKey.feedbackLoop()) {
-                dependencies.get(2)
+                dependencies.get(3)
                     .srcSubpass(0)
                     .dstSubpass(0)
                     .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
@@ -19841,7 +20004,7 @@ void main() {
             VulkanRenderPassCompatibilityKey compatibilityKey
         ) {
             VkSubpassDependency.Buffer dependencies = VkSubpassDependency.calloc(
-                compatibilityKey.feedbackLoop() ? 3 : 2,
+                compatibilityKey.feedbackLoop() ? 4 : 3,
                 stack
             );
             int entryStageMask = VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
@@ -19882,6 +20045,8 @@ void main() {
                 .srcAccessMask(exitSrcAccessMask)
                 .dstAccessMask(VK10.VK_ACCESS_SHADER_READ_BIT);
 
+            writeGraphicsBarrierSelfDependency(dependencies.get(2));
+
             if (compatibilityKey.feedbackLoop()) {
                 int feedbackSrcStageMask = 0;
                 int feedbackSrcAccessMask = 0;
@@ -19894,7 +20059,7 @@ void main() {
                         | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
                     feedbackSrcAccessMask |= VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
                 }
-                dependencies.get(2)
+                dependencies.get(3)
                     .srcSubpass(0)
                     .dstSubpass(0)
                     .srcStageMask(feedbackSrcStageMask)
@@ -19905,6 +20070,25 @@ void main() {
                         | VK10.VK_DEPENDENCY_BY_REGION_BIT);
             }
             return dependencies;
+        }
+
+        private static void writeGraphicsBarrierSelfDependency(VkSubpassDependency dependency) {
+            int attachmentStages = VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+                | VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+                | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+            int attachmentAccess = VK10.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT
+                | VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
+                | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+            dependency
+                .srcSubpass(0)
+                .dstSubpass(0)
+                .srcStageMask(attachmentStages)
+                .dstStageMask(attachmentStages)
+                .srcAccessMask(attachmentAccess)
+                .dstAccessMask(attachmentAccess)
+                .dependencyFlags(VK10.VK_DEPENDENCY_BY_REGION_BIT);
         }
 
         /**

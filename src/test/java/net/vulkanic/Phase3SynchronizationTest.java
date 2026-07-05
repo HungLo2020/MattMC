@@ -139,6 +139,50 @@ public class Phase3SynchronizationTest {
     }
 
     @Test
+    public void testVulkanRenderPassBarrierMaskMappingRemovesIllegalNonGraphicsStages() throws Exception {
+        Method mappingMethod = VulkanBackend.class.getDeclaredMethod(
+            "toVkRenderPassBarrierMasks",
+            VulkanicResourceBarriers.class
+        );
+        mappingMethod.setAccessible(true);
+
+        Object masks = mappingMethod.invoke(
+            null,
+            VulkanicResourceBarriers.computeWritesVisibleToTextureSampling()
+        );
+
+        int srcStageMask = invokeIntAccessor(masks, "srcStageMask");
+        int dstStageMask = invokeIntAccessor(masks, "dstStageMask");
+        int srcAccessMask = invokeIntAccessor(masks, "srcAccessMask");
+        int dstAccessMask = invokeIntAccessor(masks, "dstAccessMask");
+
+        assertEquals(0, srcStageMask & VK10.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            "Render-pass barriers must not include compute source stages");
+        assertEquals(0, dstStageMask & VK10.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            "Render-pass barriers must not include compute destination stages");
+        assertEquals(0, srcStageMask & VK10.VK_PIPELINE_STAGE_TRANSFER_BIT,
+            "Render-pass barriers must not include transfer source stages");
+        assertEquals(0, srcAccessMask & VK10.VK_ACCESS_TRANSFER_WRITE_BIT,
+            "Render-pass barriers must not include transfer writes");
+        assertEquals(0, srcStageMask & VK10.VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+            "Render-pass barriers must not include non-framebuffer vertex stages");
+        assertEquals(0, dstStageMask & VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            "Render-pass barriers must not include non-framebuffer fragment stages");
+        assertEquals(0, srcAccessMask & VK10.VK_ACCESS_SHADER_WRITE_BIT,
+            "Render-pass barriers must not include shader writes");
+        assertEquals(0, dstAccessMask & VK10.VK_ACCESS_SHADER_READ_BIT,
+            "Render-pass barriers must not include shader reads");
+        assertTrue((srcStageMask & VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT) != 0,
+            "Render-pass barrier source stages should include framebuffer-space attachment stages");
+        assertTrue((dstStageMask & VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT) != 0,
+            "Render-pass barrier destination stages should include framebuffer-space attachment stages");
+        assertTrue((srcAccessMask & VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT) != 0,
+            "Render-pass barrier source access should include attachment writes");
+        assertTrue((dstAccessMask & VK10.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT) != 0,
+            "Render-pass barrier destination access should include attachment reads");
+    }
+
+    @Test
     public void testVulkanApplyResourceBarriersValidatesContextAndBarriersBeforeNativeChecks() {
         VulkanBackend backend = new VulkanBackend();
         VulkanicResourceBarriers barriers = VulkanicResourceBarriers.of(VulkanicResourceBarriers.Barrier.TEXTURE_FETCH);
@@ -168,6 +212,12 @@ public class Phase3SynchronizationTest {
             "Vulkan raw memoryBarrier calls with unsupported bits should still emit a conservative native barrier");
         assertTrue(source.contains("VK10.vkCmdPipelineBarrier("),
             "Vulkan native barrier path should use vkCmdPipelineBarrier");
+        assertTrue(source.contains("toVkRenderPassBarrierMasks(barriers)"),
+            "In-render-pass barriers should use render-pass-compatible masks");
+        assertTrue(source.contains("renderPassRecording ? VK10.VK_DEPENDENCY_BY_REGION_BIT : 0"),
+            "In-render-pass barriers should opt into BY_REGION self-dependency synchronization");
+        assertTrue(source.contains("toVkRenderPassConservativeBarrierMasks()"),
+            "Conservative memory barriers should also be legal inside an active render pass");
         assertFalse(source.contains("Vulkan-native resource barrier mapping is not implemented yet."),
             "Vulkan barrier mapping should no longer be marked unsupported");
     }
