@@ -2326,7 +2326,7 @@ void main() {
         }
         reboundSource = injectExplicitReflectedResourceBindings(reboundSource, virtualProgram);
 
-        boolean usesGeneratedStandaloneBlock = shaderHasStandaloneUniformBlockMembers(virtualShader.source);
+        boolean usesGeneratedStandaloneBlock = shaderHasStandaloneUniformBlockMembers(reboundSource);
         if (reboundSource.equals(virtualShader.source)
             && (!usesGeneratedStandaloneBlock || virtualProgram.standaloneUniformDeclarations.isEmpty())) {
             return virtualShader.compiledModule;
@@ -2398,27 +2398,7 @@ void main() {
     }
 
     private static List<String> collectStandaloneUniformDeclarations(List<String> shaderSources) {
-        java.util.LinkedHashMap<String, String> declarationsByName = new java.util.LinkedHashMap<>();
-        for (String shaderSource : shaderSources) {
-            if (shaderSource == null || shaderSource.isBlank()) {
-                continue;
-            }
-
-            String normalizedSource = stripGlslComments(shaderSource);
-            Matcher uniformMatcher = GLSL_STANDALONE_UNIFORM_PATTERN.matcher(normalizedSource);
-            while (uniformMatcher.find()) {
-                String uniformTypeName = uniformMatcher.group(2);
-                if (isOpaqueStandaloneUniformType(uniformTypeName)) {
-                    continue;
-                }
-
-                String uniformName = uniformMatcher.group(3);
-                int arraySize = uniformMatcher.group(4) == null ? 1 : Integer.parseInt(uniformMatcher.group(4));
-                String declaration = uniformTypeName + " " + uniformName + (arraySize > 1 ? "[" + arraySize + "]" : "") + ";";
-                declarationsByName.putIfAbsent(uniformName, declaration);
-            }
-        }
-        return List.copyOf(declarationsByName.values());
+        return GlslangSpirvCompiler.collectActiveStandaloneUniformDeclarations(shaderSources);
     }
 
     private static String stripGlslComments(String shaderSource) {
@@ -2431,7 +2411,7 @@ void main() {
         if (shaderSource == null || shaderSource.isBlank()) {
             return false;
         }
-        return GlslangSpirvCompiler.hasStandaloneUniformBlockMembers(stripGlslComments(shaderSource));
+        return GlslangSpirvCompiler.hasActiveStandaloneUniformBlockMembers(stripGlslComments(shaderSource));
     }
 
     private static boolean isOpaqueStandaloneUniformType(String uniformTypeName) {
@@ -2616,7 +2596,9 @@ void main() {
             }
             // If this shader has standalone non-opaque uniforms, the Vulkan normalizer rewrites
             // them into VulkanicStandaloneUniforms; mirror that here so reflection stays aligned.
-            if (GlslangSpirvCompiler.hasStandaloneUniformBlockMembers(normalizedSource)) {
+            Set<String> activeStandaloneUniformNames =
+                GlslangSpirvCompiler.collectActiveStandaloneUniformNames(normalizedSource);
+            if (!activeStandaloneUniformNames.isEmpty()) {
                 activeUniformBlocks.add(GlslangSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME);
             }
 
@@ -2625,6 +2607,10 @@ void main() {
                 String uniformTypeName = uniformMatcher.group(2);
                 String uniformName = uniformMatcher.group(3);
                 int arraySize = uniformMatcher.group(4) == null ? 1 : Integer.parseInt(uniformMatcher.group(4));
+                boolean opaqueUniform = isOpaqueStandaloneUniformType(uniformTypeName);
+                if (!opaqueUniform && !activeStandaloneUniformNames.contains(uniformName)) {
+                    continue;
+                }
 
                 activeUniformNames.add(uniformName);
                 parseExplicitDescriptorBinding(uniformMatcher.group(1))

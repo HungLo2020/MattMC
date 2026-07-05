@@ -473,7 +473,7 @@ public class VulkanBackendSpirvPathTest {
             + "uniform vec3 u_RegionOffset;\n"
             + "uniform vec2 u_TexCoordShrink;\n"
             + "uniform sampler2D u_LightTex;\n"
-            + "void main(){}";
+            + "void main(){ vec3 value = u_RegionOffset + vec3(u_TexCoordShrink, 0.0); gl_Position = vec4(value, 1.0); }";
 
         String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, source);
 
@@ -484,6 +484,23 @@ public class VulkanBackendSpirvPathTest {
         assertTrue(normalized.contains("uniform sampler2D u_LightTex;"));
         assertFalse(normalized.contains("uniform vec3 u_RegionOffset;"));
         assertFalse(normalized.contains("uniform vec2 u_TexCoordShrink;"));
+    }
+
+    @Test
+    public void testNormalizeForVulkanDoesNotMaterializeInactiveStandaloneUniforms() {
+        String source = "#version 330\n"
+            + "uniform vec4 UsedColor;\n"
+            + "uniform vec4 UnusedColor;\n"
+            + "layout(location = 0) out vec4 fragColor;\n"
+            + "void main(){ fragColor = UsedColor; }";
+
+        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
+
+        assertTrue(normalized.contains("uniform VulkanicStandaloneUniforms {"));
+        assertTrue(normalized.contains("vec4 UsedColor;"));
+        assertFalse(normalized.contains("vec4 UnusedColor;"));
+        assertFalse(normalized.contains("uniform vec4 UsedColor;"));
+        assertFalse(normalized.contains("uniform vec4 UnusedColor;"));
     }
 
     @Test
@@ -500,7 +517,9 @@ public class VulkanBackendSpirvPathTest {
             + "uniform float uNoiseIntensity;\n"
             + "uniform int uNoiseDropoff;\n"
             + "uniform bool uDitherDhRendering;\n"
-            + "void main(){ fragColor = vertexColor; if (uDitherDhRendering) { fragColor.a = gl_FragCoord.x; } }";
+            + "void main(){ fragColor = vertexColor; if (uDitherDhRendering) { fragColor.a = gl_FragCoord.x; }"
+            + " fragColor.rgb += vec3(uClipDistance + float(uNoiseEnabled ? 1 : 0) + float(uNoiseSteps)"
+            + " + uNoiseIntensity + float(uNoiseDropoff)) * 0.0; }";
 
         String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
 
@@ -648,7 +667,8 @@ public class VulkanBackendSpirvPathTest {
                 + "uniform vec4 u_FogColor;\n"
                 + "uniform vec2 u_EnvironmentFog;\n"
                 + "uniform vec2 u_RenderFog;\n"
-                + "void main(){}"
+                + "layout(location = 0) out vec4 fragColor;\n"
+                + "void main(){ fragColor = u_FogColor + vec4(u_EnvironmentFog + u_RenderFog, 0.0, 0.0); }"
         );
         backend.compileShader(TEST_CONTEXT, shader);
 
@@ -1007,6 +1027,53 @@ public class VulkanBackendSpirvPathTest {
         assertEquals(VulkanicAPI.GL_FLOAT_VEC4, fogColorType.get(0));
         assertEquals(VulkanicUniformReflectionType.FLOAT_VEC4,
             VulkanicUniformReflectionType.fromLegacyGlConstant(fogColorType.get(0)).orElseThrow());
+    }
+
+    @Test
+    public void testProgramLinkDoesNotExposeInactiveStandaloneUniformLocations() {
+        VulkanBackend backend = new VulkanBackend((stage, source, sourceName, entryPoint) ->
+            new VulkanicSpirvModule(stage, entryPoint, new byte[]{0x0E, 0x0F}, sourceName, "stub")
+        );
+
+        int vertexShader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_VERTEX_SHADER);
+        int fragmentShader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_FRAGMENT_SHADER);
+
+        uploadSource(
+            backend,
+            vertexShader,
+            "#version 450\n"
+                + "void main(){ gl_Position = vec4(0.0); }"
+        );
+        uploadSource(
+            backend,
+            fragmentShader,
+            "#version 450\n"
+                + "uniform vec4 UsedColor;\n"
+                + "uniform vec4 UnusedColor;\n"
+                + "layout(location = 0) out vec4 fragColor;\n"
+                + "void main(){ fragColor = UsedColor; }"
+        );
+
+        backend.compileShader(TEST_CONTEXT, vertexShader);
+        backend.compileShader(TEST_CONTEXT, fragmentShader);
+
+        int program = backend.createShaderProgram(TEST_CONTEXT);
+        backend.attachShader(TEST_CONTEXT, program, vertexShader);
+        backend.attachShader(TEST_CONTEXT, program, fragmentShader);
+        backend.linkProgram(TEST_CONTEXT, program);
+
+        VulkanCommandContext introspectionContext = new VulkanCommandContext(2L, "inactive-standalone-introspection-test");
+
+        assertEquals(VulkanicAPI.GL_TRUE,
+            backend.getProgramParameter(TEST_CONTEXT, program, VulkanicAPI.GL_LINK_STATUS));
+        assertTrue(backend.getUniformLocation(introspectionContext, program, "UsedColor") >= 0);
+        assertEquals(-1, backend.getUniformLocation(introspectionContext, program, "UnusedColor"));
+        assertEquals(1,
+            backend.getProgramParameter(TEST_CONTEXT, program, VulkanicAPI.GL_ACTIVE_UNIFORMS));
+        assertEquals(1,
+            backend.getProgramParameter(TEST_CONTEXT, program, VulkanicAPI.GL_ACTIVE_UNIFORM_BLOCKS));
+        assertEquals("VulkanicStandaloneUniforms",
+            backend.retrieveActiveUniformBlockName(introspectionContext, program, 0));
     }
 
     @Test

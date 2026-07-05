@@ -36,6 +36,11 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
     private static final java.util.regex.Pattern STANDALONE_UNIFORM_DECLARATION_PATTERN = java.util.regex.Pattern.compile(
         "(?m)^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?(?:lowp\\s+|mediump\\s+|highp\\s+)?uniform\\s+([^;{}=]+?)(?:\\s*=\\s*[^;]+)?\\s*;\\s*(?://.*)?$"
     );
+    private static final java.util.regex.Pattern STANDALONE_UNIFORM_MEMBER_PATTERN = java.util.regex.Pattern.compile(
+        "^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s*\\[\\s*(\\d+)\\s*\\])?\\s*;\\s*$"
+    );
+    private static final java.util.regex.Pattern GLSL_BLOCK_COMMENT_PATTERN = java.util.regex.Pattern.compile("/\\*.*?\\*/", java.util.regex.Pattern.DOTALL);
+    private static final java.util.regex.Pattern GLSL_LINE_COMMENT_PATTERN = java.util.regex.Pattern.compile("(?m)//.*$");
     private static final java.util.regex.Pattern EXPLICIT_BINDING_PATTERN = java.util.regex.Pattern.compile(
         "layout\\s*\\(([^)]*\\bbinding\\s*=\\s*(\\d+)[^)]*)\\)"
     );
@@ -691,36 +696,23 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         List<String> canonicalBlockMembers,
         int standaloneUniformBindingIndex
     ) {
-        java.util.regex.Matcher matcher = STANDALONE_UNIFORM_DECLARATION_PATTERN.matcher(shaderSource);
-        StringBuffer strippedSource = new StringBuffer();
-        List<String> localBlockMembers = new ArrayList<>();
-
-        while (matcher.find()) {
-            String declaration = matcher.group(1).trim();
-            if (declaration.isEmpty()) {
-                matcher.appendReplacement(strippedSource, java.util.regex.Matcher.quoteReplacement(matcher.group()));
-                continue;
-            }
-
-            String typeToken = declaration.split("\\s+", 2)[0];
-            if (isOpaqueUniformType(typeToken)) {
-                matcher.appendReplacement(strippedSource, java.util.regex.Matcher.quoteReplacement(matcher.group()));
-                continue;
-            }
-
-            localBlockMembers.add(declaration + ";");
-            matcher.appendReplacement(strippedSource, "");
-        }
-
-        matcher.appendTail(strippedSource);
-
-        if (localBlockMembers.isEmpty()) {
+        StandaloneUniformRewriteInput rewriteInput = stripStandaloneUniformDeclarations(shaderSource);
+        if (!rewriteInput.strippedAny()) {
             return shaderSource;
         }
 
+        String strippedSource = rewriteInput.strippedSource();
+        String searchableSource = stripGlslComments(strippedSource);
+        List<String> localBlockMembers = rewriteInput.candidates().stream()
+            .filter(candidate -> isIdentifierReferenced(searchableSource, candidate.name()))
+            .map(StandaloneUniformCandidate::declaration)
+            .toList();
         List<String> blockMembers = canonicalBlockMembers == null || canonicalBlockMembers.isEmpty()
             ? localBlockMembers
             : canonicalBlockMembers;
+        if (blockMembers.isEmpty()) {
+            return strippedSource;
+        }
         int insertOffset = findUniformBlockInsertionOffset(strippedSource.toString());
         StringBuilder block = new StringBuilder();
         // Use the HIGHER of: (max explicit binding + 1) OR (count of non-explicitly-bound opaque
@@ -749,6 +741,118 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         return strippedSource.substring(0, insertOffset)
             + block
             + strippedSource.substring(insertOffset);
+    }
+
+    static List<String> collectActiveStandaloneUniformDeclarations(List<String> shaderSources) {
+        java.util.LinkedHashMap<String, String> declarationsByName = new java.util.LinkedHashMap<>();
+        for (String shaderSource : shaderSources) {
+            if (shaderSource == null || shaderSource.isBlank()) {
+                continue;
+            }
+
+            StandaloneUniformRewriteInput rewriteInput = stripStandaloneUniformDeclarations(stripGlslComments(shaderSource));
+            if (!rewriteInput.strippedAny()) {
+                continue;
+            }
+
+            String searchableSource = rewriteInput.strippedSource();
+            for (StandaloneUniformCandidate candidate : rewriteInput.candidates()) {
+                if (isIdentifierReferenced(searchableSource, candidate.name())) {
+                    declarationsByName.putIfAbsent(candidate.name(), candidate.declaration());
+                }
+            }
+        }
+        return List.copyOf(declarationsByName.values());
+    }
+
+    static java.util.Set<String> collectActiveStandaloneUniformNames(String shaderSource) {
+        if (shaderSource == null || shaderSource.isBlank()) {
+            return java.util.Set.of();
+        }
+
+        StandaloneUniformRewriteInput rewriteInput = stripStandaloneUniformDeclarations(stripGlslComments(shaderSource));
+        if (!rewriteInput.strippedAny()) {
+            return java.util.Set.of();
+        }
+
+        java.util.LinkedHashSet<String> activeNames = new java.util.LinkedHashSet<>();
+        String searchableSource = rewriteInput.strippedSource();
+        for (StandaloneUniformCandidate candidate : rewriteInput.candidates()) {
+            if (isIdentifierReferenced(searchableSource, candidate.name())) {
+                activeNames.add(candidate.name());
+            }
+        }
+        return java.util.Set.copyOf(activeNames);
+    }
+
+    static boolean hasActiveStandaloneUniformBlockMembers(String shaderSource) {
+        return !collectActiveStandaloneUniformNames(shaderSource).isEmpty();
+    }
+
+    private static StandaloneUniformRewriteInput stripStandaloneUniformDeclarations(String shaderSource) {
+        java.util.regex.Matcher matcher = STANDALONE_UNIFORM_DECLARATION_PATTERN.matcher(shaderSource);
+        StringBuffer strippedSource = new StringBuffer();
+        List<StandaloneUniformCandidate> candidates = new ArrayList<>();
+        boolean strippedAny = false;
+
+        while (matcher.find()) {
+            String declaration = matcher.group(1).trim();
+            if (declaration.isEmpty()) {
+                matcher.appendReplacement(strippedSource, java.util.regex.Matcher.quoteReplacement(matcher.group()));
+                continue;
+            }
+
+            String typeToken = declaration.split("\\s+", 2)[0];
+            if (isOpaqueUniformType(typeToken)) {
+                matcher.appendReplacement(strippedSource, java.util.regex.Matcher.quoteReplacement(matcher.group()));
+                continue;
+            }
+
+            strippedAny = true;
+            parseStandaloneUniformCandidate(declaration).ifPresent(candidates::add);
+            matcher.appendReplacement(strippedSource, "");
+        }
+
+        matcher.appendTail(strippedSource);
+        return new StandaloneUniformRewriteInput(strippedSource.toString(), candidates, strippedAny);
+    }
+
+    private static java.util.Optional<StandaloneUniformCandidate> parseStandaloneUniformCandidate(String declaration) {
+        java.util.regex.Matcher matcher = STANDALONE_UNIFORM_MEMBER_PATTERN.matcher(declaration + ";");
+        if (!matcher.matches()) {
+            return java.util.Optional.empty();
+        }
+
+        String uniformTypeName = matcher.group(1);
+        String uniformName = matcher.group(2);
+        String arraySize = matcher.group(3);
+        return java.util.Optional.of(new StandaloneUniformCandidate(
+            uniformTypeName + " " + uniformName + (arraySize == null ? "" : "[" + arraySize + "]") + ";",
+            uniformName
+        ));
+    }
+
+    private static boolean isIdentifierReferenced(String shaderSource, String identifier) {
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+            "(?<![A-Za-z0-9_])" + java.util.regex.Pattern.quote(identifier) + "(?![A-Za-z0-9_])"
+        );
+        return pattern.matcher(shaderSource).find();
+    }
+
+    private static String stripGlslComments(String shaderSource) {
+        return GLSL_LINE_COMMENT_PATTERN.matcher(
+            GLSL_BLOCK_COMMENT_PATTERN.matcher(shaderSource).replaceAll("")
+        ).replaceAll("");
+    }
+
+    private record StandaloneUniformCandidate(String declaration, String name) {
+    }
+
+    private record StandaloneUniformRewriteInput(
+        String strippedSource,
+        List<StandaloneUniformCandidate> candidates,
+        boolean strippedAny
+    ) {
     }
 
     private static boolean isOpaqueUniformType(String typeToken) {
@@ -805,19 +909,7 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
     }
 
     static boolean hasStandaloneUniformBlockMembers(String shaderSource) {
-        java.util.regex.Matcher matcher = STANDALONE_UNIFORM_DECLARATION_PATTERN.matcher(shaderSource);
-        while (matcher.find()) {
-            String declaration = matcher.group(1).trim();
-            if (declaration.isEmpty()) {
-                continue;
-            }
-
-            String typeToken = declaration.split("\\s+", 2)[0];
-            if (!isOpaqueUniformType(typeToken)) {
-                return true;
-            }
-        }
-        return false;
+        return hasActiveStandaloneUniformBlockMembers(shaderSource);
     }
 
     private static int findNextExplicitBindingIndex(String shaderSource) {
