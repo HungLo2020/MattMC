@@ -10,17 +10,14 @@ import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
-import net.logging.LogUtils;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicTextureParameterName;
 import net.vulkanic.VulkanicTextureParameterValue;
 import net.vulkanic.VulkanicTextureTarget;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
 public class GlTexture extends GpuTexture {
-	private static final Logger LOGGER = LogUtils.getLogger();
 	protected final int id;
 	private final Int2IntMap fboCache = new Int2IntOpenHashMap();
 	protected boolean closed;
@@ -76,16 +73,6 @@ public class GlTexture extends GpuTexture {
 		return this.fboCache.computeIfAbsent(cacheKey, (Int2IntFunction)(j -> {
 			int k = directStateAccess.createFrameBufferObject();
 			directStateAccess.bindFrameBufferTextures(k, this.id, i, 0, 0, depthStencil);
-			LOGGER.info(
-				"TACZ_SCOPE_DEBUG phase=gl-texture-fbo-create colorTexture={} colorFormat={} depthTexture={} depthFormat={} depthStencil={} fbo={} cacheKey={}",
-				this.id,
-				this.getFormat(),
-				i,
-				gpuTexture == null ? "none" : gpuTexture.getFormat(),
-				depthStencil,
-				k,
-				cacheKey
-			);
 			return k;
 		}));
 	}

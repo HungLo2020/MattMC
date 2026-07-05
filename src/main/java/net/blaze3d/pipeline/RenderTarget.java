@@ -8,17 +8,14 @@ import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.textures.TextureFormat;
 import java.util.OptionalInt;
-import net.logging.LogUtils;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
 public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze3dRenderTargetExt, net.irisshaders.iris.mixinterface.RenderTargetInterface {
-	private static final Logger LOGGER = LogUtils.getLogger();
 	private static int UNNAMED_RENDER_TARGETS = 0;
 	public int width;
 	public int height;
@@ -97,14 +94,6 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 				this.depthTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.depthTexture);
 				this.depthTexture.setTextureFilter(FilterMode.NEAREST, false);
 				this.depthTexture.setAddressMode(AddressMode.CLAMP_TO_EDGE);
-				LOGGER.info(
-					"TACZ_SCOPE_DEBUG phase=render-target-depth-alloc label={} size={}x{} format={} texture={}",
-					this.label,
-					i,
-					j,
-					this.depthTexture.getFormat(),
-					VulkanicAPI.getTextureHandle(this.depthTexture)
-				);
 			}
 
 			this.colorTexture = net.vulkanic.VulkanicAPI.createTexture(() -> this.label + " / Color", 15, TextureFormat.RGBA8, i, j, 1, 1);
