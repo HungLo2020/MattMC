@@ -14084,11 +14084,7 @@ void main() {
                 return inferredLayout;
             }
 
-            if (feedbackLoopCapable
-                && (usage == VulkanicResourceUsage.COLOR_ATTACHMENT_WRITE
-                    || usage == VulkanicResourceUsage.DEPTH_ATTACHMENT_WRITE
-                    || usage == VulkanicResourceUsage.SAMPLED_READ
-                    || usage == VulkanicResourceUsage.ATTACHMENT_FEEDBACK_LOOP)) {
+            if (feedbackLoopCapable && usage == VulkanicResourceUsage.ATTACHMENT_FEEDBACK_LOOP) {
                 return EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
             }
 
@@ -14269,9 +14265,9 @@ void main() {
         }
 
         private int preferredIdleLayout(LegacyTextureObject texture) {
-            if (texture.feedbackLoopCapable) {
-                return VulkanImageUse.FEEDBACK_LOOP.vkLayout();
-            }
+            // Feedback-loop layout is a render-pass usage, not an idle layout.
+            // Keeping ordinary sampled textures in sampled-read layouts prevents
+            // descriptor binding from needing illegal in-render-pass transitions.
             return texture.aspectMask == VK10.VK_IMAGE_ASPECT_COLOR_BIT
                 ? VulkanImageUse.SAMPLED_COLOR.vkLayout()
                 : VulkanImageUse.SAMPLED_DEPTH.vkLayout();
@@ -18277,9 +18273,7 @@ void main() {
                         descriptor.colorAttachment().finalUsage(),
                         false,
                         legacyColorTexture != null && legacyColorTexture.feedbackLoopCapable,
-                        legacyColorTexture != null && legacyColorTexture.feedbackLoopCapable
-                            ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-                            : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                        VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
                     );
 
                 attachments.get(0)
@@ -18334,9 +18328,7 @@ void main() {
                             depthAttachment.initialUsage()
                         );
                     }
-	                    depthFinalLayout = depthFeedback
-	                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-	                        : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+	                    depthFinalLayout = VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
                     depthFinalLayout = imageLayoutForUsage(
                         depthAttachment.finalUsage(),
                         true,
@@ -18473,10 +18465,7 @@ void main() {
                 cachedScissorHeight = height;
 
                 if (legacyColorTexture != null) {
-                    int colorActiveLayout = legacyColorTexture.feedbackLoopCapable
-                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-                        : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-                    trackLayoutForLevel(legacyColorTexture, 0, colorActiveLayout);
+                    trackLayoutForLevel(legacyColorTexture, 0, colorSubpassLayoutSingle);
                     activeRenderPassColorTextures.clear();
                     activeRenderPassColorTextures.add(legacyColorTexture);
                     activeRenderPassColorFinalLayouts.clear();
@@ -18496,6 +18485,12 @@ void main() {
                     int depthActiveLayout = legacyDepthTexture.feedbackLoopCapable
                         ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
                         : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+                    depthActiveLayout = imageLayoutForUsage(
+                        depthAttachment.passUsage(),
+                        true,
+                        legacyDepthTexture.feedbackLoopCapable,
+                        depthActiveLayout
+                    );
                     trackLayoutForLevel(legacyDepthTexture, 0, depthActiveLayout);
                     activeRenderPassDepthTexture = legacyDepthTexture;
                     activeRenderPassDepthFinalLayout = depthFinalLayout;
@@ -18548,9 +18543,7 @@ void main() {
 	                        colorFeedback,
 	                        colorSubpassLayout
 	                    );
-	                    int colorFinalLayout = colorFeedback
-	                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-	                        : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	                    int colorFinalLayout = VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	                    colorFinalLayout = imageLayoutForUsage(
 	                        targets.colorFinalUsage(colorIndex),
 	                        false,
@@ -18637,9 +18630,7 @@ void main() {
 	                        depthInitialLayout2,
 	                        targets.depthInitialUsage()
 	                    );
-	                    int depthFinalLayout2 = depthFeedback2
-	                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-	                        : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+	                    int depthFinalLayout2 = VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 	                    depthFinalLayout2 = imageLayoutForUsage(
 	                        targets.depthFinalUsage(),
 	                        true,
@@ -18841,9 +18832,7 @@ void main() {
 	                activeRenderPassColorFinalLayouts.clear();
 	                for (int colorIndex = 0; colorIndex < targets.colorTextures.size(); colorIndex++) {
 	                    LegacyTextureObject colorTexture = targets.colorTextures.get(colorIndex);
-	                    int postLayout = colorTexture.feedbackLoopCapable
-	                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-	                        : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	                    int postLayout = VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	                    activeRenderPassColorFinalLayouts.add(imageLayoutForUsage(
 	                        targets.colorFinalUsage(colorIndex),
 	                        false,
@@ -18865,9 +18854,7 @@ void main() {
 	                    );
 	                    trackLayoutForLevel(targets.depthTexture, 0, depthActiveLayout2);
 	                    activeRenderPassDepthTexture = targets.depthTexture;
-	                    int depthPostLayout = targets.depthTexture.feedbackLoopCapable
-	                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-	                        : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+	                    int depthPostLayout = VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 	                    activeRenderPassDepthFinalLayout = imageLayoutForUsage(
 	                        targets.depthFinalUsage(),
 	                        true,
@@ -18923,9 +18910,7 @@ void main() {
 	                LegacyTextureObject colorTexture = activeRenderPassColorTextures.get(colorIndex);
 	                int postLayout = colorIndex >= 0 && colorIndex < activeRenderPassColorFinalLayouts.size()
 	                    ? activeRenderPassColorFinalLayouts.get(colorIndex)
-	                    : (colorTexture.feedbackLoopCapable
-	                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-	                        : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	                    : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	                trackLayoutForLevel(colorTexture, 0, postLayout);
 	            }
 	            activeRenderPassColorTextures.clear();
@@ -18933,9 +18918,7 @@ void main() {
 	            if (activeRenderPassDepthTexture != null) {
 	                int depthPostLayout = activeRenderPassDepthFinalLayout != VK10.VK_IMAGE_LAYOUT_UNDEFINED
 	                    ? activeRenderPassDepthFinalLayout
-	                    : (activeRenderPassDepthTexture.feedbackLoopCapable
-	                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-	                        : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
+	                    : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 	                trackLayoutForLevel(activeRenderPassDepthTexture, 0, depthPostLayout);
 	                activeRenderPassDepthTexture = null;
 	            }

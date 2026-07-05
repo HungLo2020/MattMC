@@ -272,8 +272,11 @@ public class VulkanDescriptorLifecycleTest {
             source.indexOf("private boolean isStorageImageLayoutCompatibleSampler"));
         String sampleTransition = source.substring(source.indexOf("private void transitionLegacyTextureToSampleLayout(@Nullable LegacyTextureObject texture,"),
             source.indexOf("private void transitionLegacyTextureToStorageImageLayout"));
+        String preferredIdleLayout = source.substring(source.indexOf("private int preferredIdleLayout"),
+            source.indexOf("private void clearLegacyColorTexture"));
         String normalizedDescriptorSelection = descriptorSelection.replaceAll("\\s+", " ");
         String normalizedSampleTransition = sampleTransition.replaceAll("\\s+", " ");
+        String normalizedPreferredIdleLayout = preferredIdleLayout.replaceAll("\\s+", " ");
 
         assertTrue(normalized.contains("private boolean shouldUseFeedbackLoopLayoutForSampling(@Nullable LegacyTextureObject texture)"),
             "Feedback-loop-capable images should not be described as feedback-loop layout for ordinary sampled reads");
@@ -283,10 +286,20 @@ public class VulkanDescriptorLifecycleTest {
             "Descriptor image layout selection should route feedback-loop layout through the active-attachment predicate");
         assertTrue(normalized.contains("int targetLayout = shouldUseFeedbackLoopLayoutForSampling(texture) ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT"),
             "Sampler transitions should route feedback-loop layout through the active-attachment predicate");
+        assertTrue(normalized.contains("if (feedbackLoopCapable && usage == VulkanicResourceUsage.ATTACHMENT_FEEDBACK_LOOP)"),
+            "Resource usage mapping should select feedback-loop layout only for explicit attachment feedback");
+        assertFalse(normalized.contains("|| usage == VulkanicResourceUsage.SAMPLED_READ"),
+            "SAMPLED_READ must resolve to shader/depth read-only layouts even for feedback-loop-capable images");
         assertFalse(normalizedDescriptorSelection.contains("if (texture.feedbackLoopCapable) { return VulkanImageUse.FEEDBACK_LOOP.vkLayout(); }"),
             "Descriptor image layout selection should not permanently force every feedback-capable texture into feedback-loop layout");
         assertFalse(normalizedSampleTransition.contains("int targetLayout = texture.feedbackLoopCapable ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT"),
             "Sampler transitions should use feedback-loop layout only for active attachment feedback, not all feedback-capable textures");
+        assertTrue(normalizedPreferredIdleLayout.contains("Feedback-loop layout is a render-pass usage, not an idle layout"),
+            "Idle layout policy should document why feedback-loop-capable textures still idle as sampled reads");
+        assertFalse(normalizedPreferredIdleLayout.contains("if (texture.feedbackLoopCapable) { return VulkanImageUse.FEEDBACK_LOOP.vkLayout(); }"),
+            "Feedback-loop-capable textures should not permanently idle in feedback-loop layout");
+        assertTrue(normalizedPreferredIdleLayout.contains("? VulkanImageUse.SAMPLED_COLOR.vkLayout() : VulkanImageUse.SAMPLED_DEPTH.vkLayout()"),
+            "Idle layout should match ordinary descriptor sampled-read layouts");
     }
 
     @Test
