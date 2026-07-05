@@ -74,20 +74,37 @@ public final class TaczScopeData {
 			boolean showMount = GsonHelper.getAsBoolean(display, "show_mount", true);
 			boolean showMuzzle = GsonHelper.getAsBoolean(display, "show_muzzle", false);
 			String adapter = GsonHelper.getAsString(display, "adapter", "");
-			float zoom = firstFloat(display, "zoom", 1.0F);
-			float modelFov = firstFloat(display, "views_fov", GsonHelper.getAsFloat(display, "fov", 70.0F));
-			return new AttachmentDisplay(attachmentId, geometryLocation, textureLocation, scope, sight, showMount, showMuzzle, adapter, zoom, modelFov);
+			float[] zoom = floatArray(display, "zoom", new float[]{1.0F});
+			int[] views = intArray(display, "views", new int[]{1});
+			float[] modelFov = floatArray(display, "views_fov", new float[]{GsonHelper.getAsFloat(display, "fov", 70.0F)});
+			return new AttachmentDisplay(attachmentId, geometryLocation, textureLocation, scope, sight, showMount, showMuzzle, adapter, zoom, views, modelFov);
 		} catch (Exception exception) {
 			return null;
 		}
 	}
 
-	private static float firstFloat(JsonObject object, String key, float fallback) {
+	private static float[] floatArray(JsonObject object, String key, float[] fallback) {
 		JsonArray values = GsonHelper.getAsJsonArray(object, key, null);
 		if (values == null || values.isEmpty()) {
 			return fallback;
 		}
-		return GsonHelper.convertToFloat(values.get(0), key + "[0]");
+		float[] result = new float[values.size()];
+		for (int index = 0; index < values.size(); index++) {
+			result[index] = GsonHelper.convertToFloat(values.get(index), key + "[" + index + "]");
+		}
+		return result;
+	}
+
+	private static int[] intArray(JsonObject object, String key, int[] fallback) {
+		JsonArray values = GsonHelper.getAsJsonArray(object, key, null);
+		if (values == null || values.isEmpty()) {
+			return fallback;
+		}
+		int[] result = new int[values.size()];
+		for (int index = 0; index < values.size(); index++) {
+			result[index] = GsonHelper.convertToInt(values.get(index), key + "[" + index + "]");
+		}
+		return result;
 	}
 
 	private static String readAll(Reader reader) throws IOException {
@@ -113,8 +130,25 @@ public final class TaczScopeData {
 		boolean showMount,
 		boolean showMuzzle,
 		String adapter,
-		float zoom,
-		float modelFov
+		float[] zoomValues,
+		int[] viewValues,
+		float[] modelFovValues
 	) {
+		public float zoom() {
+			return this.zoomValues.length == 0 ? 1.0F : this.zoomValues[0];
+		}
+
+		public float modelFov() {
+			return this.modelFovValues.length == 0 ? 70.0F : this.modelFovValues[0];
+		}
+
+		public int view() {
+			return this.viewValues.length == 0 ? 1 : Math.max(1, this.viewValues[0]);
+		}
+
+		public String scopeViewNodeName() {
+			int view = this.view();
+			return view <= 1 ? "scope_view" : "scope_view_" + view;
+		}
 	}
 }
