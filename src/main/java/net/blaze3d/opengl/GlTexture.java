@@ -68,9 +68,11 @@ public class GlTexture extends GpuTexture {
 
 	public int getFbo(DirectStateAccess directStateAccess, @Nullable GpuTexture gpuTexture) {
 		int i = gpuTexture == null ? 0 : ((GlTexture)gpuTexture).id;
-		return this.fboCache.computeIfAbsent(i, (Int2IntFunction)(j -> {
+		boolean depthStencil = gpuTexture != null && gpuTexture.getFormat().hasStencilAspect();
+		int cacheKey = depthStencil ? i | Integer.MIN_VALUE : i;
+		return this.fboCache.computeIfAbsent(cacheKey, (Int2IntFunction)(j -> {
 			int k = directStateAccess.createFrameBufferObject();
-			directStateAccess.bindFrameBufferTextures(k, this.id, i, 0, 0);
+			directStateAccess.bindFrameBufferTextures(k, this.id, i, 0, 0, depthStencil);
 			return k;
 		}));
 	}

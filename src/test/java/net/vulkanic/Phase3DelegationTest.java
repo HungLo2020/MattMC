@@ -352,4 +352,18 @@ public class Phase3DelegationTest {
         assertTrue(source.contains(".glHandle()"),
             "OpenGLBackend.beginRenderPass must call glHandle() to get the GL texture handle");
     }
+
+    @Test
+    public void testOpenGLRenderPassAttachesDepthStencilTexturesAsDepthStencil() throws java.io.IOException {
+        java.nio.file.Path file = java.nio.file.Paths.get(System.getProperty("user.dir"))
+            .resolve("src/main/java/net/vulkanic/backends/opengl/OpenGLBackend.java");
+        String source = java.nio.file.Files.readString(file);
+
+        assertTrue(source.contains("depthView.texture().getVulkanicFormat().hasStencilAspect()"),
+            "OpenGLBackend.beginRenderPass must inspect the depth texture format before attaching it");
+        assertTrue(source.contains("VulkanicAPI.GL_DEPTH_STENCIL_ATTACHMENT"),
+            "OpenGLBackend.beginRenderPass must attach depth-stencil textures through GL_DEPTH_STENCIL_ATTACHMENT");
+        assertTrue(source.contains("VulkanicAPI.GL_DEPTH_ATTACHMENT"),
+            "OpenGLBackend.beginRenderPass must keep depth-only textures on GL_DEPTH_ATTACHMENT");
+    }
 }

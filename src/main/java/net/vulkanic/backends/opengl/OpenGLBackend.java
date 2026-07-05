@@ -3615,9 +3615,12 @@ public class OpenGLBackend implements GraphicsBackend {
             OpenGLTextureView depthView = (OpenGLTextureView) depthTarget;
             int depthHandle = depthView.glHandle();
             int depthMip = depthView.getBaseMipLevel();
+            int depthAttachment = depthView.texture().getVulkanicFormat().hasStencilAspect()
+                ? net.vulkanic.VulkanicAPI.GL_DEPTH_STENCIL_ATTACHMENT
+                : net.vulkanic.VulkanicAPI.GL_DEPTH_ATTACHMENT;
             net.vulkanic.VulkanicAPI.framebufferTexture(ctx,
                 net.vulkanic.VulkanicAPI.GL_FRAMEBUFFER,
-                net.vulkanic.VulkanicAPI.GL_DEPTH_ATTACHMENT,
+                depthAttachment,
                 net.vulkanic.VulkanicAPI.GL_TEXTURE_2D,
                 depthHandle, depthMip);
         }
