@@ -11728,12 +11728,19 @@ void main() {
             if (storageImageCompatible) {
                 return VK10.VK_IMAGE_LAYOUT_GENERAL;
             }
-            if (texture.feedbackLoopCapable) {
+            if (shouldUseFeedbackLoopLayoutForSampling(texture)) {
                 return VulkanImageUse.FEEDBACK_LOOP.vkLayout();
             }
             if (texture.aspectMask == VK10.VK_IMAGE_ASPECT_DEPTH_BIT)
                 return VulkanImageUse.SAMPLED_DEPTH.vkLayout();
             return VulkanImageUse.SAMPLED_COLOR.vkLayout();
+        }
+
+        private boolean shouldUseFeedbackLoopLayoutForSampling(@Nullable LegacyTextureObject texture) {
+            return texture != null
+                && texture.feedbackLoopCapable
+                && renderPassRecording
+                && (activeRenderPassColorTextures.contains(texture) || texture == activeRenderPassDepthTexture);
         }
 
         private boolean isStorageImageLayoutCompatibleSampler(@Nullable LegacyTextureObject texture,
@@ -12456,10 +12463,7 @@ void main() {
             }
             int endMipExclusive = Math.min(maxMipLevels, safeBaseMip + safeMipCount);
 
-            // Feedback-loop-capable textures live permanently in ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-            // so they can be sampled without transition from any stage (including inside a render pass
-            // where the same image may simultaneously be a color attachment).
-            int targetLayout = texture.feedbackLoopCapable
+            int targetLayout = shouldUseFeedbackLoopLayoutForSampling(texture)
                 ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
                 : (texture.aspectMask == VK10.VK_IMAGE_ASPECT_DEPTH_BIT
                     ? VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL

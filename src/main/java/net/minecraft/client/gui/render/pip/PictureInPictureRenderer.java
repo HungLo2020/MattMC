@@ -54,18 +54,27 @@ public abstract class PictureInPictureRenderer<T extends PictureInPictureRenderS
 		if (!bl && this.textureIsReadyToBlit(pictureInPictureRenderState)) {
 			this.blitTexture(pictureInPictureRenderState, guiRenderState);
 		} else {
-			this.prepareTexturesAndProjection(bl, j, k);
-			net.vulkanic.VulkanicAPI.setOutputColorTextureOverride(this.textureView);
-			net.vulkanic.VulkanicAPI.setOutputDepthTextureOverride(this.depthTextureView);
-			PoseStack poseStack = new PoseStack();
-			poseStack.translate(j / 2.0F, this.getTranslateY(pictureInPictureRenderState, k, i), 0.0F);
-			float f = i * pictureInPictureRenderState.scale();
-			poseStack.scale(f, f, -f);
-			this.renderToTexture(pictureInPictureRenderState, poseStack);
-			this.bufferSource.endBatch();
-			this.afterRenderToTexture(pictureInPictureRenderState, guiRenderState, i);
-			net.vulkanic.VulkanicAPI.setOutputColorTextureOverride(null);
-			net.vulkanic.VulkanicAPI.setOutputDepthTextureOverride(null);
+			GpuBufferSlice previousProjectionMatrix = VulkanicAPI.getProjectionMatrixBuffer();
+			ProjectionType previousProjectionType = VulkanicAPI.getProjectionType();
+			GpuTextureView previousColorTextureOverride = VulkanicAPI.getOutputColorTextureOverride();
+			GpuTextureView previousDepthTextureOverride = VulkanicAPI.getOutputDepthTextureOverride();
+			try {
+				this.prepareTexturesAndProjection(bl, j, k);
+				net.vulkanic.VulkanicAPI.setOutputColorTextureOverride(this.textureView);
+				net.vulkanic.VulkanicAPI.setOutputDepthTextureOverride(this.depthTextureView);
+				PoseStack poseStack = new PoseStack();
+				poseStack.translate(j / 2.0F, this.getTranslateY(pictureInPictureRenderState, k, i), 0.0F);
+				float f = i * pictureInPictureRenderState.scale();
+				poseStack.scale(f, f, -f);
+				this.renderToTexture(pictureInPictureRenderState, poseStack);
+				this.bufferSource.endBatch();
+				this.afterRenderToTexture(pictureInPictureRenderState, guiRenderState, i);
+			} finally {
+				net.vulkanic.VulkanicAPI.setOutputColorTextureOverride(previousColorTextureOverride);
+				net.vulkanic.VulkanicAPI.setOutputDepthTextureOverride(previousDepthTextureOverride);
+				net.vulkanic.VulkanicAPI.setProjectionMatrix(previousProjectionMatrix, previousProjectionType);
+			}
+
 			VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), OFFSCREEN_COLOR_WRITES_VISIBLE_TO_TEXTURE_FETCH);
 			String string = this.getDebugDumpName(pictureInPictureRenderState, guiRenderState, i);
 			if (string != null) {

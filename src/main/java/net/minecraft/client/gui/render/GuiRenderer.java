@@ -359,64 +359,77 @@ public class GuiRenderer implements AutoCloseable {
 				this.createAtlasTextures(k);
 			}
 
-			net.vulkanic.VulkanicAPI.setOutputColorTextureOverride(this.itemsAtlasView);
-			net.vulkanic.VulkanicAPI.setOutputDepthTextureOverride(this.itemsAtlasDepthView);
-			net.vulkanic.VulkanicAPI.setProjectionMatrix(this.itemsProjectionMatrixBuffer.getBuffer(k, k), ProjectionType.ORTHOGRAPHIC);
-			Minecraft.getInstance().gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_3D);
-			PoseStack poseStack = new PoseStack();
+			GpuBufferSlice previousProjectionMatrix = VulkanicAPI.getProjectionMatrixBuffer();
+			ProjectionType previousProjectionType = VulkanicAPI.getProjectionType();
+			GpuTextureView previousColorTextureOverride = VulkanicAPI.getOutputColorTextureOverride();
+			GpuTextureView previousDepthTextureOverride = VulkanicAPI.getOutputDepthTextureOverride();
 			MutableBoolean mutableBoolean = new MutableBoolean(false);
 			MutableBoolean mutableBoolean2 = new MutableBoolean(false);
-			this.renderState
-				.forEachItem(
-					guiItemRenderState -> {
-						if (guiItemRenderState.oversizedItemBounds() != null) {
-							mutableBoolean2.setTrue();
-						} else {
-							TrackingItemStackRenderState trackingItemStackRenderState = guiItemRenderState.itemStackRenderState();
-							GuiRenderer.AtlasPosition atlasPosition = (GuiRenderer.AtlasPosition)this.atlasPositions.get(trackingItemStackRenderState.getModelIdentity());
-							if (atlasPosition == null || trackingItemStackRenderState.isAnimated() && atlasPosition.lastAnimatedOnFrame != this.frameNumber) {
-								if (this.itemAtlasX + j > k) {
-									this.itemAtlasX = 0;
-									this.itemAtlasY += j;
-								}
+			boolean atlasWritten = false;
+			try {
+				net.vulkanic.VulkanicAPI.setOutputColorTextureOverride(this.itemsAtlasView);
+				net.vulkanic.VulkanicAPI.setOutputDepthTextureOverride(this.itemsAtlasDepthView);
+				net.vulkanic.VulkanicAPI.setProjectionMatrix(this.itemsProjectionMatrixBuffer.getBuffer(k, k), ProjectionType.ORTHOGRAPHIC);
+				Minecraft.getInstance().gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_3D);
+				PoseStack poseStack = new PoseStack();
+				this.renderState
+					.forEachItem(
+						guiItemRenderState -> {
+							if (guiItemRenderState.oversizedItemBounds() != null) {
+								mutableBoolean2.setTrue();
+							} else {
+								TrackingItemStackRenderState trackingItemStackRenderState = guiItemRenderState.itemStackRenderState();
+								GuiRenderer.AtlasPosition atlasPosition = (GuiRenderer.AtlasPosition)this.atlasPositions.get(trackingItemStackRenderState.getModelIdentity());
+								if (atlasPosition == null || trackingItemStackRenderState.isAnimated() && atlasPosition.lastAnimatedOnFrame != this.frameNumber) {
+									if (this.itemAtlasX + j > k) {
+										this.itemAtlasX = 0;
+										this.itemAtlasY += j;
+									}
 
-								boolean bl = trackingItemStackRenderState.isAnimated() && atlasPosition != null;
-								if (!bl && this.itemAtlasY + j > k) {
-									if (mutableBoolean.isFalse()) {
-										LOGGER.warn("Trying to render too many items in GUI at the same time. Skipping some of them.");
-										mutableBoolean.setTrue();
+									boolean bl = trackingItemStackRenderState.isAnimated() && atlasPosition != null;
+									if (!bl && this.itemAtlasY + j > k) {
+										if (mutableBoolean.isFalse()) {
+											LOGGER.warn("Trying to render too many items in GUI at the same time. Skipping some of them.");
+											mutableBoolean.setTrue();
+										}
+									} else {
+										int kx = bl ? atlasPosition.x : this.itemAtlasX;
+										int l = bl ? atlasPosition.y : this.itemAtlasY;
+										if (bl) {
+											VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(this.itemsAtlas, 0, this.itemsAtlasDepth, 1.0, kx, k - l - j, j, j);
+										}
+
+										this.renderItemToAtlas(trackingItemStackRenderState, poseStack, kx, l, j);
+										float f = (float)kx / k;
+										float g = (float)(k - l) / k;
+										this.submitBlitFromItemAtlas(guiItemRenderState, f, g, j, k);
+										if (bl) {
+											atlasPosition.lastAnimatedOnFrame = this.frameNumber;
+										} else {
+											this.atlasPositions
+												.put(
+													guiItemRenderState.itemStackRenderState().getModelIdentity(),
+													new GuiRenderer.AtlasPosition(this.itemAtlasX, this.itemAtlasY, f, g, this.frameNumber)
+												);
+											this.itemAtlasX += j;
+										}
 									}
 								} else {
-									int kx = bl ? atlasPosition.x : this.itemAtlasX;
-									int l = bl ? atlasPosition.y : this.itemAtlasY;
-									if (bl) {
-										VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(this.itemsAtlas, 0, this.itemsAtlasDepth, 1.0, kx, k - l - j, j, j);
-									}
-
-									this.renderItemToAtlas(trackingItemStackRenderState, poseStack, kx, l, j);
-									float f = (float)kx / k;
-									float g = (float)(k - l) / k;
-									this.submitBlitFromItemAtlas(guiItemRenderState, f, g, j, k);
-									if (bl) {
-										atlasPosition.lastAnimatedOnFrame = this.frameNumber;
-									} else {
-										this.atlasPositions
-											.put(
-												guiItemRenderState.itemStackRenderState().getModelIdentity(),
-												new GuiRenderer.AtlasPosition(this.itemAtlasX, this.itemAtlasY, f, g, this.frameNumber)
-											);
-										this.itemAtlasX += j;
-									}
+									this.submitBlitFromItemAtlas(guiItemRenderState, atlasPosition.u, atlasPosition.v, j, k);
 								}
-							} else {
-								this.submitBlitFromItemAtlas(guiItemRenderState, atlasPosition.u, atlasPosition.v, j, k);
 							}
 						}
-					}
-				);
-			net.vulkanic.VulkanicAPI.setOutputColorTextureOverride(null);
-			net.vulkanic.VulkanicAPI.setOutputDepthTextureOverride(null);
-			VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), OFFSCREEN_COLOR_WRITES_VISIBLE_TO_TEXTURE_FETCH);
+					);
+				atlasWritten = true;
+			} finally {
+				net.vulkanic.VulkanicAPI.setOutputColorTextureOverride(previousColorTextureOverride);
+				net.vulkanic.VulkanicAPI.setOutputDepthTextureOverride(previousDepthTextureOverride);
+				net.vulkanic.VulkanicAPI.setProjectionMatrix(previousProjectionMatrix, previousProjectionType);
+				if (atlasWritten) {
+					VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), OFFSCREEN_COLOR_WRITES_VISIBLE_TO_TEXTURE_FETCH);
+				}
+			}
+
 			if (mutableBoolean2.getValue()) {
 				this.renderState
 					.forEachItem(

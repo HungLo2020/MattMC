@@ -493,6 +493,14 @@ public class ApiNeutralityCallsiteTest {
             "GuiRenderer should route Vulkan GUI items through the picture-in-picture path");
         assertTrue(guiRendererSource.contains("boolean bl2 = !VulkanicAPI.isVulkanBackendSelected();"),
             "GuiRenderer should bypass the atlas-only render-type scissor when Vulkan backend routing is active");
+        assertTrue(guiRendererSource.contains("GpuBufferSlice previousProjectionMatrix = VulkanicAPI.getProjectionMatrixBuffer();"),
+            "GuiRenderer should scope item-atlas projection changes instead of leaking global projection state");
+        assertTrue(guiRendererSource.contains("VulkanicAPI.setProjectionMatrix(previousProjectionMatrix, previousProjectionType);"),
+            "GuiRenderer should restore the previous projection after rendering into the item atlas");
+        assertTrue(pictureInPictureRendererSource.contains("GpuBufferSlice previousProjectionMatrix = VulkanicAPI.getProjectionMatrixBuffer();"),
+            "PictureInPictureRenderer should scope offscreen projection changes instead of leaking global projection state");
+        assertTrue(pictureInPictureRendererSource.contains("VulkanicAPI.setProjectionMatrix(previousProjectionMatrix, previousProjectionType);"),
+            "PictureInPictureRenderer should restore the previous projection after offscreen rendering");
         assertTrue(pictureInPictureRendererSource.contains("RenderPipelines.GUI_TEXTURED,"),
             "PictureInPictureRenderer should composite UI render-to-texture results with the straight-alpha GUI pipeline");
         assertTrue(pictureInPictureRendererSource.contains("protected int getRenderTextureWidth(T pictureInPictureRenderState, int i)"),

@@ -264,6 +264,32 @@ public class VulkanDescriptorLifecycleTest {
     }
 
     @Test
+    public void testFeedbackLoopSamplerLayoutIsOnlyUsedForActiveAttachments() throws Exception {
+        String source = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String normalized = source.replaceAll("\\s+", " ");
+        String descriptorSelection = source.substring(source.indexOf("private int descriptorImageLayoutFor"),
+            source.indexOf("private boolean isStorageImageLayoutCompatibleSampler"));
+        String sampleTransition = source.substring(source.indexOf("private void transitionLegacyTextureToSampleLayout(@Nullable LegacyTextureObject texture,"),
+            source.indexOf("private void transitionLegacyTextureToStorageImageLayout"));
+        String normalizedDescriptorSelection = descriptorSelection.replaceAll("\\s+", " ");
+        String normalizedSampleTransition = sampleTransition.replaceAll("\\s+", " ");
+
+        assertTrue(normalized.contains("private boolean shouldUseFeedbackLoopLayoutForSampling(@Nullable LegacyTextureObject texture)"),
+            "Feedback-loop-capable images should not be described as feedback-loop layout for ordinary sampled reads");
+        assertTrue(normalized.contains("texture.feedbackLoopCapable && renderPassRecording && (activeRenderPassColorTextures.contains(texture) || texture == activeRenderPassDepthTexture)"),
+            "Feedback-loop layout should be limited to textures that are actively bound as attachments in the current render pass");
+        assertTrue(normalized.contains("if (shouldUseFeedbackLoopLayoutForSampling(texture)) { return VulkanImageUse.FEEDBACK_LOOP.vkLayout(); }"),
+            "Descriptor image layout selection should route feedback-loop layout through the active-attachment predicate");
+        assertTrue(normalized.contains("int targetLayout = shouldUseFeedbackLoopLayoutForSampling(texture) ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT"),
+            "Sampler transitions should route feedback-loop layout through the active-attachment predicate");
+        assertFalse(normalizedDescriptorSelection.contains("if (texture.feedbackLoopCapable) { return VulkanImageUse.FEEDBACK_LOOP.vkLayout(); }"),
+            "Descriptor image layout selection should not permanently force every feedback-capable texture into feedback-loop layout");
+        assertFalse(normalizedSampleTransition.contains("int targetLayout = texture.feedbackLoopCapable ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT"),
+            "Sampler transitions should use feedback-loop layout only for active attachment feedback, not all feedback-capable textures");
+    }
+
+    @Test
     public void testIllegalRenderPassLayoutTransitionsDoNotAdvanceTrackerWithoutBarrier() throws Exception {
         String source = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
