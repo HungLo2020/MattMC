@@ -116,6 +116,14 @@ public class VulkanFramePresentationLifecycleTest {
             "Vulkan backend should query core physical-device feature support before device creation");
         assertTrue(vulkanBackendSource.contains("enabledFeatures.fillModeNonSolid(true)"),
             "Vulkan backend should enable fillModeNonSolid when the selected device supports it");
+        assertTrue(vulkanBackendSource.contains("features.vertexPipelineStoresAndAtomics()")
+                && vulkanBackendSource.contains("enabledFeatures.vertexPipelineStoresAndAtomics(true)")
+                && vulkanBackendSource.contains("vertexPipelineStoresAndAtomicsEnabled"),
+            "Vulkan backend should enable and track vertex-stage storage image writes when the selected device supports them");
+        assertTrue(vulkanBackendSource.contains("features.fragmentStoresAndAtomics()")
+                && vulkanBackendSource.contains("enabledFeatures.fragmentStoresAndAtomics(true)")
+                && vulkanBackendSource.contains("fragmentStoresAndAtomicsEnabled"),
+            "Vulkan backend should enable and track fragment-stage storage image writes when the selected device supports them");
         assertTrue(vulkanBackendSource.contains(".pEnabledFeatures(enabledFeatures)"),
             "Vulkan backend should pass requested core features to vkCreateDevice");
         assertTrue(vulkanBackendSource.contains("mode -> toVkPolygonMode(mode, portableState.location().toString())"),

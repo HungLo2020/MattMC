@@ -29,6 +29,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
@@ -1251,6 +1252,120 @@ public class VulkanBackendSpirvPathTest {
             text.contains("layout(set = 0, binding = 0) writeonly uniform image3D floodfill_img;")));
         assertTrue(capturedSources.stream().anyMatch(text ->
             text.contains("layout(set = 0, binding = 1) readonly uniform image2D source_img;")));
+    }
+
+    @Test
+    public void testVertexImageUniformsBecomeStorageImageResourceBindings() {
+        List<String> capturedSources = new ArrayList<>();
+        VulkanBackend backend = new VulkanBackend((stage, source, sourceName, entryPoint) -> {
+            capturedSources.add(source.toString());
+            return new VulkanicSpirvModule(stage, entryPoint, new byte[]{0x65, 0x66}, sourceName, "stub");
+        });
+
+        int vertexShader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_VERTEX_SHADER);
+        int fragmentShader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_FRAGMENT_SHADER);
+        uploadSource(
+            backend,
+            vertexShader,
+            "#version 430\n"
+                + "layout(location = 0) in vec3 Position;\n"
+                + "writeonly uniform uimage3D voxel_img;\n"
+                + "void main(){ imageStore(voxel_img, ivec3(0), uvec4(1u)); gl_Position = vec4(Position, 1.0); }"
+        );
+        uploadSource(
+            backend,
+            fragmentShader,
+            "#version 430\n"
+                + "layout(location = 0) out vec4 fragColor;\n"
+                + "void main(){ fragColor = vec4(1.0); }"
+        );
+        backend.compileShader(TEST_CONTEXT, vertexShader);
+        backend.compileShader(TEST_CONTEXT, fragmentShader);
+
+        int program = backend.createShaderProgram(TEST_CONTEXT);
+        backend.attachShader(TEST_CONTEXT, program, vertexShader);
+        backend.attachShader(TEST_CONTEXT, program, fragmentShader);
+        backend.linkProgram(TEST_CONTEXT, program);
+
+        VulkanCommandContext introspectionContext = new VulkanCommandContext(1L, "vertex-image-layout-test");
+        PipelineDescriptor.ResourceLayout layout = backend.getLinkedProgramResourceLayout(
+            introspectionContext,
+            program,
+            Set.of(VulkanicShaderStage.VERTEX, VulkanicShaderStage.FRAGMENT)
+        );
+
+        PipelineDescriptor.ResourceBinding voxel = layout.findByName("voxel_img").orElseThrow();
+        assertEquals(PipelineDescriptor.ResourceType.STORAGE_IMAGE, voxel.type());
+        assertTrue(voxel.stages().contains(VulkanicShaderStage.VERTEX));
+        assertEquals(0, voxel.binding());
+        assertTrue(capturedSources.stream().anyMatch(text ->
+            text.contains("layout(set = 0, binding = 0) writeonly uniform uimage3D voxel_img;")));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void testImageUniformIntegerUploadsAreCapturedAsOpaqueResourceUnits() throws Exception {
+        VulkanBackend backend = new VulkanBackend((stage, source, sourceName, entryPoint) ->
+            new VulkanicSpirvModule(stage, entryPoint, new byte[]{0x63, 0x65}, sourceName, "stub")
+        );
+
+        int shader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_COMPUTE_SHADER);
+        uploadSource(
+            backend,
+            shader,
+            "#version 430\n"
+                + "layout(local_size_x = 1) in;\n"
+                + "writeonly uniform image3D floodfill_img;\n"
+                + "void main(){ imageStore(floodfill_img, ivec3(0), vec4(1.0)); }"
+        );
+        backend.compileShader(TEST_CONTEXT, shader);
+
+        int program = backend.createShaderProgram(TEST_CONTEXT);
+        backend.attachShader(TEST_CONTEXT, program, shader);
+        backend.linkProgram(TEST_CONTEXT, program);
+
+        VulkanCommandContext context = new VulkanCommandContext(1L, "image-uniform-unit-test");
+        int location = backend.getUniformLocation(context, program, "floodfill_img");
+        assertTrue(location >= 0, "Image uniforms should expose a stable legacy uniform location");
+
+        backend.setUniform1i(context, location, 7);
+
+        java.lang.reflect.Field programsField = VulkanBackend.class.getDeclaredField("virtualPrograms");
+        programsField.setAccessible(true);
+        Map<Integer, ?> programs = (Map<Integer, ?>) programsField.get(backend);
+        Object programRecord = programs.get(program);
+
+        java.lang.reflect.Field activeUniformNamesField = programRecord.getClass().getDeclaredField("activeUniformNames");
+        activeUniformNamesField.setAccessible(true);
+        List<String> activeUniformNames = (List<String>) activeUniformNamesField.get(programRecord);
+        int uniformIndex = activeUniformNames.indexOf("floodfill_img");
+        assertTrue(uniformIndex >= 0, "Linked image uniform should be reflected as an active uniform");
+
+        java.lang.reflect.Field unitValuesField = programRecord.getClass().getDeclaredField("opaqueResourceUniformValuesByIndex");
+        unitValuesField.setAccessible(true);
+        Map<Integer, Integer> unitValues = (Map<Integer, Integer>) unitValuesField.get(programRecord);
+        assertEquals(7, unitValues.get(uniformIndex),
+            "Image uniform integer uploads must drive Vulkan storage-image unit lookup");
+    }
+
+    @Test
+    public void testLegacyVulkanResourcePlannerPreservesFullShaderLayout() throws Exception {
+        String source = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+
+        assertTrue(source.contains("PipelineResourcePlanner.options()\n                .requireAtLeastOneBinding(false)\n                .filterIncompleteLayout(false)"),
+            "Legacy Vulkan shader submissions must preserve full reflected resource layouts instead of compiling filtered layouts");
+    }
+
+    @Test
+    public void testLegacyVulkanSamplerPlannerUsesFallbackTextureForUnboundSamplerSlots() throws Exception {
+        String source = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+
+        assertTrue(source.contains("createLegacyFallbackSamplerView(commandBufferHandle, binding, unit)"),
+            "Legacy Vulkan sampler resolution should bind a backend fallback texture instead of dropping reflected sampler bindings");
+        assertTrue(source.contains("createLegacyFallbackSamplerTexture"),
+            "The backend fallback sampler texture should be a real Vulkan resource owned by the native spine");
     }
 
     @Test

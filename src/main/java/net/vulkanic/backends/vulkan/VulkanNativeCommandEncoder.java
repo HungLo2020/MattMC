@@ -1454,6 +1454,19 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
                 @Override
                 @Nullable
+                public PipelineResourceBindings.StorageImageBinding storageImageBinding(PipelineDescriptor.ResourceBinding binding) {
+                    if (VulkanNativeCommandEncoder.this.resourceMode != ResourceMode.TERRAIN
+                        || NativeRenderPass.this.renderPipeline == null) {
+                        return null;
+                    }
+                    int programId = SharedChunkProgramOverrides.activeProgramHandle(NativeRenderPass.this.renderPipeline);
+                    return programId > 0
+                        ? VulkanNativeCommandEncoder.this.backend.resolveLegacyStorageImageBindingForProgram(programId, binding)
+                        : null;
+                }
+
+                @Override
+                @Nullable
                 public Integer standaloneProgramId(PipelineDescriptor.ResourceBinding binding) {
                     if (VulkanNativeCommandEncoder.this.resourceMode != ResourceMode.TERRAIN
                         || !VulkanicAPI.generatedStandaloneUniformBlockName().equals(binding.name())) {
@@ -1502,6 +1515,14 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                 @Nullable
                 public Integer texelBufferUnit(PipelineDescriptor.ResourceBinding binding) {
                     return renderPassSamplerUnits.get(binding.name());
+                }
+
+                @Override
+                @Nullable
+                public PipelineResourceBindings.StorageImageBinding storageImageBinding(PipelineDescriptor.ResourceBinding binding) {
+                    return program != null
+                        ? VulkanNativeCommandEncoder.this.backend.resolveLegacyStorageImageBindingForProgram(program.getProgramId(), binding)
+                        : null;
                 }
 
                 @Override
@@ -1608,6 +1629,8 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         PipelineResourcePlanner.Options options = PipelineResourcePlanner.options();
         if (this.resourceMode == ResourceMode.GENERAL) {
             options = options.requireAtLeastOneBinding(false);
+        } else if (this.resourceMode == ResourceMode.TERRAIN) {
+            options = options.filterIncompleteLayout(false);
         }
         return options;
     }

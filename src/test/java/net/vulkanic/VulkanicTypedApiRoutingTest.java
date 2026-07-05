@@ -701,7 +701,10 @@ public class VulkanicTypedApiRoutingTest {
     public void testLiveProgramDescriptorWithLinkedSpirvPreservesNativeReflectedBindings() {
         invocationHandler.configureProgramReflection(
             java.util.List.of("DynamicTransforms"),
-            java.util.List.of(new RecordingInvocationHandler.ReflectedUniform("shadowtex0", 1, VulkanicAPI.GL_SAMPLER_2D))
+            java.util.List.of(
+                new RecordingInvocationHandler.ReflectedUniform("shadowtex0", 1, VulkanicAPI.GL_SAMPLER_2D),
+                new RecordingInvocationHandler.ReflectedUniform("voxel_img", 1, VulkanicAPI.GL_UNSIGNED_INT_IMAGE_3D)
+            )
         );
         invocationHandler.configureLinkedProgramSpirvModules(java.util.List.of(
             new VulkanicSpirvModule(
@@ -731,6 +734,7 @@ public class VulkanicTypedApiRoutingTest {
         PipelineDescriptor.ResourceLayout layout = descriptor.getResourceLayout();
         PipelineDescriptor.ResourceBinding dynamicTransforms = layout.findByName("DynamicTransforms").orElseThrow();
         PipelineDescriptor.ResourceBinding shadowtex0 = layout.findByName("shadowtex0").orElseThrow();
+        PipelineDescriptor.ResourceBinding voxelImg = layout.findByName("voxel_img").orElseThrow();
 
         assertEquals(0, dynamicTransforms.set());
         assertEquals(0, dynamicTransforms.binding());
@@ -739,6 +743,10 @@ public class VulkanicTypedApiRoutingTest {
         assertEquals(0, shadowtex0.set());
         assertEquals(1, shadowtex0.binding());
         assertEquals(PipelineDescriptor.ResourceType.SAMPLER, shadowtex0.type());
+
+        assertEquals(0, voxelImg.set());
+        assertEquals(2, voxelImg.binding());
+        assertEquals(PipelineDescriptor.ResourceType.STORAGE_IMAGE, voxelImg.type());
     }
 
     @Test
