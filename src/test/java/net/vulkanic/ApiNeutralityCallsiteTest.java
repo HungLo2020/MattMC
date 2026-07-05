@@ -825,6 +825,23 @@ public class ApiNeutralityCallsiteTest {
     }
 
     @Test
+    public void testExtendedShaderResolvesCanonicalIrisUniformBlockAliases() throws IOException {
+        String relative = "net/irisshaders/iris/pipeline/programs/ExtendedShader.java";
+        String source = readSource(SRC_MAIN_JAVA.resolve(relative));
+
+        int prefixedLookup = source.indexOf("VulkanicAPI.getUniformBlockIndex(ctx, program, \"iris_\" + uniformBlockName)");
+        int successfulPrefixedReturn = source.indexOf("return prefixedBlockIndex;", prefixedLookup);
+        int canonicalFallback = source.indexOf("VulkanicAPI.getUniformBlockIndex(ctx, program, uniformBlockName.toString())", successfulPrefixedReturn);
+
+        assertTrue(prefixedLookup >= 0,
+            "ExtendedShader should preserve Iris-prefixed uniform-block lookup for OpenGL/Iris shader programs: " + relative);
+        assertTrue(successfulPrefixedReturn > prefixedLookup,
+            "ExtendedShader should keep the Iris-prefixed block when it exists: " + relative);
+        assertTrue(canonicalFallback > successfulPrefixedReturn,
+            "ExtendedShader should fall back to canonical block names for Vulkan-reflected Iris-wrapped UBOs: " + relative);
+    }
+
+    @Test
     public void testIrisComputeSynchronizationAvoidsRawMemoryBarrierBitmasks() throws IOException {
         Pattern rawIrisBarrierPattern = Pattern.compile("IrisRenderSystem\\.memoryBarrier\\s*\\([^\\n]*VulkanicAPI\\.GL_");
 
