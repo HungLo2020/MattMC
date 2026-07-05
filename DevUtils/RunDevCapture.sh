@@ -4,7 +4,7 @@ set -euo pipefail
 
 usage() {
     cat <<'EOF'
-Usage: ./DevUtils/RunDevCapture.sh [--backend vulkan|opengl] [--max-secs N] [--dump-secs N] [--validation off|standard] [--client-args "..."]
+Usage: ./DevUtils/RunDevCapture.sh [--backend vulkan|opengl] [--max-secs N] [--dump-secs N] [--validation off|standard] [--shader-input-parity off|standard|full] [--client-args "..."]
 
 Runs ./gradlew runClient in a bounded session, captures diagnostics, and
 self-terminates so no manual kill is required.
@@ -25,6 +25,8 @@ Environment overrides:
     SCREENSHOT_MAX_COUNT        (default: 6)
     SCREENSHOT_START_DELAY_SECS (default: 0)
     VALIDATION_MODE             off|standard (default: off)
+    SHADER_INPUT_PARITY         off|standard|full (default: off)
+    SHADER_INPUT_PARITY_MAX_LOGS (default: 120000)
     CLIENT_ARGS
 EOF
 }
@@ -36,6 +38,8 @@ SCREENSHOT_INTERVAL_SECS="${SCREENSHOT_INTERVAL_SECS:-5}"
 SCREENSHOT_MAX_COUNT="${SCREENSHOT_MAX_COUNT:-6}"
 SCREENSHOT_START_DELAY_SECS="${SCREENSHOT_START_DELAY_SECS:-0}"
 VALIDATION_MODE="${VALIDATION_MODE:-off}"
+SHADER_INPUT_PARITY="${SHADER_INPUT_PARITY:-off}"
+SHADER_INPUT_PARITY_MAX_LOGS="${SHADER_INPUT_PARITY_MAX_LOGS:-120000}"
 CLIENT_ARGS="${CLIENT_ARGS:-}"
 
 while [[ $# -gt 0 ]]; do
@@ -54,6 +58,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --validation)
             VALIDATION_MODE="${2:-}"
+            shift 2
+            ;;
+        --shader-input-parity)
+            SHADER_INPUT_PARITY="${2:-}"
             shift 2
             ;;
         --client-args)
@@ -89,6 +97,16 @@ fi
 
 if [[ "$VALIDATION_MODE" != "off" && "$VALIDATION_MODE" != "standard" ]]; then
     echo "--validation must be 'off' or 'standard'" >&2
+    exit 1
+fi
+
+if [[ "$SHADER_INPUT_PARITY" != "off" && "$SHADER_INPUT_PARITY" != "standard" && "$SHADER_INPUT_PARITY" != "full" ]]; then
+    echo "--shader-input-parity must be 'off', 'standard', or 'full'" >&2
+    exit 1
+fi
+
+if ! [[ "$SHADER_INPUT_PARITY_MAX_LOGS" =~ ^-?[0-9]+$ ]]; then
+    echo "SHADER_INPUT_PARITY_MAX_LOGS must be an integer" >&2
     exit 1
 fi
 
@@ -149,9 +167,9 @@ IRIS_PROPERTY_COLOR_SPACE=""
 EFFECTIVE_SHADER_PACK=""
 EFFECTIVE_ENABLE_SHADERS=""
 PROJECT_SPIRV_COMPILER="$PROJECT_ROOT/libraries/deps/glslangValidator"
-SHADER_EVENT_PATTERN='Using shaderpack:|Loaded Shaderpack:|shaderPack=|enableShaders=|Profile:|Reloading pipeline on dimension change|Creating pipeline for dimension|Skipping compute shader|Missing program .*sodium:pipeline|Sodium Vulkan chunk pipelines|raw GLSL imports|Type is (VERTEX|FRAGMENT|GEOMETRY|COMPUTE)|bindVertexBuffer requires an active render pass|No active Vulkan render pass to end|shader compose into swapchain|Unexpected error|DistantHorizons|\[DH-|DH Ready|DH Iris events|Validation Error|Validation Warning|VUID-|UNASSIGNED-|VK_LAYER_KHRONOS_validation|GL_INVALID|OpenGL debug'
+SHADER_EVENT_PATTERN='Using shaderpack:|Loaded Shaderpack:|shaderPack=|enableShaders=|Profile:|Reloading pipeline on dimension change|Creating pipeline for dimension|Skipping compute shader|Missing program .*sodium:pipeline|Sodium Vulkan chunk pipelines|raw GLSL imports|ShaderInputParity|Type is (VERTEX|FRAGMENT|GEOMETRY|COMPUTE)|bindVertexBuffer requires an active render pass|No active Vulkan render pass to end|shader compose into swapchain|Unexpected error|DistantHorizons|\[DH-|DH Ready|DH Iris events|Validation Error|Validation Warning|VUID-|UNASSIGNED-|VK_LAYER_KHRONOS_validation|GL_INVALID|OpenGL debug'
 VALIDATION_EVENT_PATTERN='VK_LAYER_KHRONOS_validation|Validation Error|Validation Warning|VUID-|UNASSIGNED-'
-KEY_SUMMARY_PATTERN='Using shaderpack:|Loaded Shaderpack:|Profile:|Reloading pipeline on dimension change|Creating pipeline for dimension|Skipping compute shader|Missing program .*sodium:pipeline|Sodium Vulkan chunk pipelines|raw GLSL imports|bindVertexBuffer requires an active render pass|No active Vulkan render pass to end|Unexpected error|DistantHorizons|\[DH-|DH Ready|DH Iris events|Validation Error|Validation Warning|VUID-|UNASSIGNED-'
+KEY_SUMMARY_PATTERN='Using shaderpack:|Loaded Shaderpack:|Profile:|Reloading pipeline on dimension change|Creating pipeline for dimension|Skipping compute shader|Missing program .*sodium:pipeline|Sodium Vulkan chunk pipelines|raw GLSL imports|ShaderInputParity|bindVertexBuffer requires an active render pass|No active Vulkan render pass to end|Unexpected error|DistantHorizons|\[DH-|DH Ready|DH Iris events|Validation Error|Validation Warning|VUID-|UNASSIGNED-'
 
 {
     echo "run_id=$RUN_ID"
@@ -160,6 +178,8 @@ KEY_SUMMARY_PATTERN='Using shaderpack:|Loaded Shaderpack:|Profile:|Reloading pip
     echo "max_secs=$MAX_SECS"
     echo "dump_secs=$DUMP_SECS"
     echo "validation_mode=$VALIDATION_MODE"
+    echo "shader_input_parity=$SHADER_INPUT_PARITY"
+    echo "shader_input_parity_max_logs=$SHADER_INPUT_PARITY_MAX_LOGS"
     echo "client_args=$CLIENT_ARGS"
 } > "$META_LOG"
 
@@ -364,6 +384,8 @@ collect_system_snapshot() {
         echo "validation_enabled=$VALIDATION_ENABLED"
         echo "validation_layer_available=$VALIDATION_LAYER_AVAILABLE"
         echo "validation_layer_manifest=${VALIDATION_LAYER_MANIFEST:-unavailable}"
+        echo "shader_input_parity=$SHADER_INPUT_PARITY"
+        echo "shader_input_parity_max_logs=$SHADER_INPUT_PARITY_MAX_LOGS"
         echo "display=${DISPLAY:-unset}"
         echo "wayland_display=${WAYLAND_DISPLAY:-unset}"
         echo "xdg_session_type=${XDG_SESSION_TYPE:-unset}"
@@ -639,6 +661,27 @@ if [[ "$VALIDATION_ENABLED" == "true" ]]; then
     } >> "$META_LOG"
 fi
 
+if [[ "$SHADER_INPUT_PARITY" != "off" ]]; then
+    SHADER_INPUT_PARITY_JAVA_OPTIONS=(
+        "-Dmattmc.vulkan.traceShaderInputParity=true"
+        "-Dmattmc.vulkan.traceShaderInputParity.maxLogs=$SHADER_INPUT_PARITY_MAX_LOGS"
+    )
+    if [[ "$SHADER_INPUT_PARITY" == "full" ]]; then
+        SHADER_INPUT_PARITY_JAVA_OPTIONS+=("-Dmattmc.vulkan.traceStandaloneUniformBlockMembers=true")
+    fi
+
+    if [[ -n "${JAVA_TOOL_OPTIONS:-}" ]]; then
+        export JAVA_TOOL_OPTIONS="$JAVA_TOOL_OPTIONS ${SHADER_INPUT_PARITY_JAVA_OPTIONS[*]}"
+    else
+        export JAVA_TOOL_OPTIONS="${SHADER_INPUT_PARITY_JAVA_OPTIONS[*]}"
+    fi
+
+    {
+        echo "shader_input_parity_java_options=${SHADER_INPUT_PARITY_JAVA_OPTIONS[*]}"
+        echo "java_tool_options=$JAVA_TOOL_OPTIONS"
+    } >> "$META_LOG"
+fi
+
 setsid "${GRADLE_CMD[@]}" > "$RUN_LOG" 2>&1 &
 GRADLE_PID=$!
 echo "gradle_pid=$GRADLE_PID" >> "$META_LOG"
@@ -782,6 +825,8 @@ done < "$CRASH_REPORT_LIST"
     echo "validation_enabled=$VALIDATION_ENABLED"
     echo "validation_layer_available=$VALIDATION_LAYER_AVAILABLE"
     echo "validation_layer_manifest=${VALIDATION_LAYER_MANIFEST:-unavailable}"
+    echo "shader_input_parity=$SHADER_INPUT_PARITY"
+    echo "shader_input_parity_max_logs=$SHADER_INPUT_PARITY_MAX_LOGS"
     echo "effective_enable_shaders=${EFFECTIVE_ENABLE_SHADERS:-unset}"
     echo "effective_shader_pack=${EFFECTIVE_SHADER_PACK:-unset}"
     echo "run_log=$RUN_LOG"
