@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.gun.trs_bull.name",
+  "display": "minecraft:trs_bull_display",
+  "data": "minecraft:trs_bull_data",
+  "tooltip": "minecraft.gun.trs_bull.desc",
+  "type": "pistol"
+}

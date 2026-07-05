@@ -1,0 +1,5 @@
+{
+  "name": "minecraft.ammo.rifles_ammo.name",
+  "display": "minecraft:rifles_ammo_display",
+  "stack_size": 64
+}

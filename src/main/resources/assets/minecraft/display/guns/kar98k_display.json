@@ -1,0 +1,45 @@
+{
+  "model": "minecraft:gun/kar98k_geo",
+  "texture": "minecraft:gun/uv/kar98k",
+  "hud": "minecraft:gun/hud/kar98k",
+  "slot": "minecraft:gun/slot/kar98k",
+  "animation": "minecraft:kar98k",
+  "use_default_animation": "rifle",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "minecraft:flash/common_muzzle_flash",
+    "scale": 1
+  },
+  "sounds": {
+    "shoot": "minecraft:bolt_action_rifles/kar98k/kar98k_fire",
+    "shoot_3p": "minecraft:bolt_action_rifles/kar98k/kar98k_fire_3p",
+    "reload_empty": "minecraft:bolt_action_rifles/kar98k/kar98k_empty_reload",
+    "reload_tactical": "minecraft:bolt_action_rifles/kar98k/kar98k_normal_reload",
+    "inspect": "minecraft:bolt_action_rifles/kar98k/kar98k_inspect",
+    "inspect_empty": "minecraft:bolt_action_rifles/kar98k/kar98k_inspect_empty",
+    "draw": "minecraft:bolt_action_rifles/kar98k/kar98k_draw",
+    "bolt": "minecraft:bolt_action_rifles/kar98k/kar98k_bolt_rechamber",
+    "put_away": "minecraft:bolt_action_rifles/kar98k/kar98k_put_away",
+    "silence": "minecraft:bolt_action_rifles/kar98k/kar98k_suppressed",
+    "silence_3p": "minecraft:bolt_action_rifles/kar98k/kar98k_suppressed_3p",
+    "dry_fire": "minecraft:platform_sound_sfx/bolt_action_sfx/bolt_action_rifle_platform_dryfire"
+  },
+  "offhand_show": {
+    "pos": [-2, 20, 4],
+    "rotate": [0, 0, 45],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-4, 26, 3],
+      "rotate": [-90, -5, -90],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

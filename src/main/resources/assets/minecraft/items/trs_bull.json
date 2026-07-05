@@ -1,0 +1,10 @@
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "minecraft:item/trs_bull_base",
+    "model": {
+      "type": "minecraft:tacz_gun",
+      "gun": "trs_bull"
+    }
+  }
+}

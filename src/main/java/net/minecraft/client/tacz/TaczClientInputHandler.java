@@ -132,7 +132,7 @@ public final class TaczClientInputHandler {
 			return;
 		}
 
-		TaczGlock17AnimationController.triggerShoot();
+		TaczGlock17AnimationController.triggerShoot(itemStack);
 		minecraft.level
 			.playSound(
 				minecraft.player,

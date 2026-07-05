@@ -1,0 +1,9 @@
+{
+  "name": "minecraft.gun.g43.name",
+  "display": "minecraft:g43_display",
+  "data": "minecraft:g43_data",
+  "tooltip": "minecraft.gun.g43.desc",
+  "type": "rifle",
+  "item_type": "modern_kinetic",
+  "sort": 1
+}

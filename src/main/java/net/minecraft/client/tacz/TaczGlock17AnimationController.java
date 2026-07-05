@@ -20,8 +20,9 @@ public final class TaczGlock17AnimationController {
 	private static long lastUpdateNanos = System.nanoTime();
 	private static float aimProgress;
 	private static float previousAimProgress;
-	private static ActiveAnimation mainAnimation;
+	private static ActiveSequence mainAnimation;
 	private static ActiveAnimation shootAnimation;
+	private static String heldGunId = "glock_17";
 
 	private TaczGlock17AnimationController() {
 	}
@@ -31,10 +32,11 @@ public final class TaczGlock17AnimationController {
 		float deltaSeconds = Math.min((now - lastUpdateNanos) / 1.0E9F, 0.1F);
 		lastUpdateNanos = now;
 		boolean holding = itemStack.getItem() instanceof TaczMvpGunItem;
+		heldGunId = itemStack.getItem() instanceof TaczMvpGunItem gunItem ? gunItem.gunId() : "glock_17";
 		if (holding && !wasHolding) {
-			triggerMain("draw");
+			triggerMain(itemStack, "draw");
 		} else if (!holding && wasHolding) {
-			triggerMain("put_away");
+			triggerMain(itemStack, "put_away");
 		}
 
 		wasHolding = holding;
@@ -55,12 +57,16 @@ public final class TaczGlock17AnimationController {
 		shootAnimation = new ActiveAnimation("shoot", System.nanoTime(), true);
 	}
 
+	public static void triggerShoot(ItemStack itemStack) {
+		shootAnimation = new ActiveAnimation(TaczGunAnimationTimings.shootAnimation(itemStack), System.nanoTime(), true);
+	}
+
 	public static void triggerReload(ItemStack itemStack) {
-		triggerMain(TaczMvpGunItem.getAmmo(itemStack) <= 0 ? "reload_empty" : "reload_tactical");
+		triggerMain(itemStack, TaczGunAnimationTimings.reloadSequence(itemStack));
 	}
 
 	public static void triggerInspect(ItemStack itemStack) {
-		triggerMain(TaczMvpGunItem.getAmmo(itemStack) <= 0 ? "inspect_empty" : "inspect");
+		triggerMain(itemStack, TaczMvpGunItem.getAmmo(itemStack) <= 0 ? "inspect_empty" : "inspect");
 	}
 
 	public static Snapshot snapshot(ItemStack itemStack) {
@@ -71,7 +77,7 @@ public final class TaczGlock17AnimationController {
 			animations.add(new ActiveAnimation("static_bolt_caught", 0L, false));
 		}
 		if (mainAnimation != null) {
-			animations.add(mainAnimation);
+			animations.add(mainAnimation.currentAnimation());
 		}
 		if (shootAnimation != null) {
 			animations.add(shootAnimation);
@@ -79,33 +85,25 @@ public final class TaczGlock17AnimationController {
 		return new Snapshot(List.copyOf(animations), aimProgress);
 	}
 
-	private static void triggerMain(String name) {
-		mainAnimation = new ActiveAnimation(name, System.nanoTime(), false);
+	private static void triggerMain(ItemStack itemStack, String name) {
+		triggerMain(itemStack, List.of(name));
+	}
+
+	private static void triggerMain(ItemStack itemStack, List<String> names) {
+		mainAnimation = new ActiveSequence(itemStack.getItem() instanceof TaczMvpGunItem gunItem ? gunItem.gunId() : "glock_17", List.copyOf(names), System.nanoTime());
 	}
 
 	private static void clearExpiredAnimations() {
-		if (mainAnimation != null && mainAnimation.ageSeconds() > duration(mainAnimation.name())) {
+		if (mainAnimation != null && mainAnimation.ageSeconds() > mainAnimation.totalDurationSeconds()) {
 			mainAnimation = null;
 		}
-		if (shootAnimation != null && shootAnimation.ageSeconds() > SHOOT_SECONDS) {
+		if (shootAnimation != null && shootAnimation.ageSeconds() > TaczGunAnimationTimings.duration(heldGunId, shootAnimation.name())) {
 			shootAnimation = null;
 		}
 	}
 
 	private static boolean isReloading() {
-		return mainAnimation != null && mainAnimation.name().startsWith("reload_") && mainAnimation.ageSeconds() <= duration(mainAnimation.name());
-	}
-
-	private static float duration(String name) {
-		return switch (name) {
-			case "draw" -> DRAW_SECONDS;
-			case "put_away" -> PUT_AWAY_SECONDS;
-			case "reload_tactical" -> RELOAD_TACTICAL_SECONDS;
-			case "reload_empty" -> RELOAD_EMPTY_SECONDS;
-			case "inspect" -> INSPECT_SECONDS;
-			case "inspect_empty" -> INSPECT_EMPTY_SECONDS;
-			default -> 0.0F;
-		};
+		return mainAnimation != null && mainAnimation.currentAnimation().name().startsWith("reload_") && mainAnimation.ageSeconds() <= mainAnimation.totalDurationSeconds();
 	}
 
 	public record Snapshot(List<ActiveAnimation> animations, float aimProgress) {
@@ -114,6 +112,34 @@ public final class TaczGlock17AnimationController {
 	public record ActiveAnimation(String name, long startNanos, boolean additive) {
 		public float ageSeconds() {
 			return this.startNanos == 0L ? 0.0F : (System.nanoTime() - this.startNanos) / 1.0E9F;
+		}
+	}
+
+	private record ActiveSequence(String gunId, List<String> names, long startNanos) {
+		private ActiveAnimation currentAnimation() {
+			float age = this.ageSeconds();
+			float elapsed = 0.0F;
+			for (String name : this.names) {
+				float duration = TaczGunAnimationTimings.duration(this.gunId, name);
+				if (age <= elapsed + duration || name.equals(this.names.get(this.names.size() - 1))) {
+					long segmentStart = this.startNanos + (long)(elapsed * 1.0E9F);
+					return new ActiveAnimation(name, segmentStart, false);
+				}
+				elapsed += duration;
+			}
+			return new ActiveAnimation(this.names.get(this.names.size() - 1), this.startNanos, false);
+		}
+
+		private float ageSeconds() {
+			return (System.nanoTime() - this.startNanos) / 1.0E9F;
+		}
+
+		private float totalDurationSeconds() {
+			float total = 0.0F;
+			for (String name : this.names) {
+				total += TaczGunAnimationTimings.duration(this.gunId, name);
+			}
+			return total;
 		}
 	}
 }

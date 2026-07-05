@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.gun.m1_garand.name",
+  "display": "minecraft:m1_garand_display",
+  "data": "minecraft:m1_garand_data",
+  "tooltip": "minecraft.gun.m1_garand.desc",
+  "type": "sniper"
+}

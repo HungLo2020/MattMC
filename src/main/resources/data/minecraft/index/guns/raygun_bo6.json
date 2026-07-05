@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.gun.raygun_bo6.name",
+  "display": "minecraft:raygun_bo6_display",
+  "data": "minecraft:raygun_bo6_data",
+  "tooltip": "minecraft.gun.raygun_bo6.desc",
+  "type": "pistol"
+}

@@ -195,7 +195,7 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 
 	@Override
 	public int getUseDuration(ItemStack itemStack, LivingEntity livingEntity) {
-		return this.definition.reloadTicks();
+		return TaczGunReloadTimings.reloadTicks(itemStack, this.definition.reloadTicks());
 	}
 
 	@Override

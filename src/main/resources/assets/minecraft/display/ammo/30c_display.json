@@ -1,0 +1,9 @@
+{
+  "slot": "minecraft:ammo/slot/30c",
+  "shell": {
+    "model": "minecraft:shell/30c_shell",
+    "texture": "minecraft:shell/30c_shell"
+  },
+  "tracer_color": "#ffe09e"
+}
+    

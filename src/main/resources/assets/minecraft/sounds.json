@@ -25686,5 +25686,293 @@
                          "sounds":  [
                                         "minecraft:tacz_sounds/flesh_hit"
                                     ]
-                     }
+                     },
+    "mp40.shoot":  {
+                       "subtitle":  "subtitles.minecraft.mp40.shoot",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/hk_mp5a5/hk_mp5a5_shoot"
+                                  ]
+                   },
+    "mp40.reload_start":  {
+                              "subtitle":  "subtitles.minecraft.mp40.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/hk_mp5a5/hk_mp5a5_reload_magout"
+                                         ]
+                          },
+    "mp40.reload_end":  {
+                            "subtitle":  "subtitles.minecraft.mp40.reload",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/hk_mp5a5/hk_mp5a5_reload_magin"
+                                       ]
+                        },
+    "mp40.empty":  {
+                       "subtitle":  "subtitles.minecraft.gun.empty",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/dry_fire"
+                                  ]
+                   },
+    "m1a1.shoot":  {
+                       "subtitle":  "subtitles.minecraft.m1a1.shoot",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/ump45/ump45_shoot"
+                                  ]
+                   },
+    "m1a1.reload_start":  {
+                              "subtitle":  "subtitles.minecraft.m1a1.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/ump45/ump45_reload_tactical"
+                                         ]
+                          },
+    "m1a1.reload_end":  {
+                            "subtitle":  "subtitles.minecraft.m1a1.reload",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/ump45/ump45_reload_empty"
+                                       ]
+                        },
+    "m1a1.empty":  {
+                       "subtitle":  "subtitles.minecraft.gun.empty",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/dry_fire"
+                                  ]
+                   },
+    "m1897.shoot":  {
+                        "subtitle":  "subtitles.minecraft.m1897.shoot",
+                        "sounds":  [
+                                       "minecraft:tacz_sounds/m870/m870_shoot"
+                                   ]
+                    },
+    "m1897.reload_start":  {
+                               "subtitle":  "subtitles.minecraft.m1897.reload",
+                               "sounds":  [
+                                              "minecraft:tacz_sounds/m870/m870_reload_empty_start_close"
+                                          ]
+                           },
+    "m1897.reload_end":  {
+                             "subtitle":  "subtitles.minecraft.m1897.reload",
+                             "sounds":  [
+                                            "minecraft:tacz_sounds/m870/m870_reload_end_turnover"
+                                        ]
+                         },
+    "m1897.empty":  {
+                        "subtitle":  "subtitles.minecraft.gun.empty",
+                        "sounds":  [
+                                       "minecraft:tacz_sounds/dry_fire"
+                                   ]
+                    },
+    "g43.shoot":  {
+                      "subtitle":  "subtitles.minecraft.g43.shoot",
+                      "sounds":  [
+                                     "minecraft:tacz_sounds/ak47/ak47_shoot"
+                                 ]
+                  },
+    "g43.reload_start":  {
+                             "subtitle":  "subtitles.minecraft.g43.reload",
+                             "sounds":  [
+                                            "minecraft:tacz_sounds/ak47/ak47_reload_empty_magout"
+                                        ]
+                         },
+    "g43.reload_end":  {
+                           "subtitle":  "subtitles.minecraft.g43.reload",
+                           "sounds":  [
+                                          "minecraft:tacz_sounds/ak47/ak47_reload_empty_magin"
+                                      ]
+                       },
+    "g43.empty":  {
+                      "subtitle":  "subtitles.minecraft.gun.empty",
+                      "sounds":  [
+                                     "minecraft:tacz_sounds/dry_fire"
+                                 ]
+                  },
+    "m1.shoot":  {
+                     "subtitle":  "subtitles.minecraft.m1.shoot",
+                     "sounds":  [
+                                    "minecraft:tacz_sounds/m1/m1_shoot"
+                                ]
+                 },
+    "m1.reload_start":  {
+                            "subtitle":  "subtitles.minecraft.m1.reload",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/ak47/ak47_reload_empty_magout"
+                                       ]
+                        },
+    "m1.reload_end":  {
+                          "subtitle":  "subtitles.minecraft.m1.reload",
+                          "sounds":  [
+                                         "minecraft:tacz_sounds/ak47/ak47_reload_empty_magin"
+                                     ]
+                      },
+    "m1.empty":  {
+                     "subtitle":  "subtitles.minecraft.gun.empty",
+                     "sounds":  [
+                                    "minecraft:tacz_sounds/dry_fire"
+                                ]
+                 },
+    "stg44.shoot":  {
+                        "subtitle":  "subtitles.minecraft.stg44.shoot",
+                        "sounds":  [
+                                       "minecraft:tacz_sounds/ak47/ak47_shoot"
+                                   ]
+                    },
+    "stg44.reload_start":  {
+                               "subtitle":  "subtitles.minecraft.stg44.reload",
+                               "sounds":  [
+                                              "minecraft:tacz_sounds/ak47/ak47_reload_empty_magout"
+                                          ]
+                           },
+    "stg44.reload_end":  {
+                             "subtitle":  "subtitles.minecraft.stg44.reload",
+                             "sounds":  [
+                                            "minecraft:tacz_sounds/ak47/ak47_reload_empty_magin"
+                                        ]
+                         },
+    "stg44.empty":  {
+                        "subtitle":  "subtitles.minecraft.gun.empty",
+                        "sounds":  [
+                                       "minecraft:tacz_sounds/dry_fire"
+                                   ]
+                    },
+    "m1_garand.shoot":  {
+                            "subtitle":  "subtitles.minecraft.m1_garand.shoot",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/rifles/m1_garand/m1_garand_fire"
+                                       ]
+                        },
+    "m1_garand.reload_start":  {
+                                   "subtitle":  "subtitles.minecraft.m1_garand.reload",
+                                   "sounds":  [
+                                                  "minecraft:tacz_sounds/rifles/m1_garand/m1_garand_reload_normal"
+                                              ]
+                               },
+    "m1_garand.reload_end":  {
+                                 "subtitle":  "subtitles.minecraft.m1_garand.reload",
+                                 "sounds":  [
+                                                "minecraft:tacz_sounds/rifles/m1_garand/m1_garand_reload_empty"
+                                            ]
+                             },
+    "m1_garand.empty":  {
+                            "subtitle":  "subtitles.minecraft.gun.empty",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/platform_sound_sfx/bolt_action_sfx/bolt_action_rifle_platform_dryfire"
+                                       ]
+                        },
+    "kar98k.shoot":  {
+                         "subtitle":  "subtitles.minecraft.kar98k.shoot",
+                         "sounds":  [
+                                        "minecraft:tacz_sounds/bolt_action_rifles/kar98k/kar98k_fire"
+                                    ]
+                     },
+    "kar98k.reload_start":  {
+                                "subtitle":  "subtitles.minecraft.kar98k.reload",
+                                "sounds":  [
+                                               "minecraft:tacz_sounds/bolt_action_rifles/kar98k/kar98k_normal_reload"
+                                           ]
+                            },
+    "kar98k.reload_end":  {
+                              "subtitle":  "subtitles.minecraft.kar98k.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/bolt_action_rifles/kar98k/kar98k_empty_reload"
+                                         ]
+                          },
+    "kar98k.empty":  {
+                         "subtitle":  "subtitles.minecraft.gun.empty",
+                         "sounds":  [
+                                        "minecraft:tacz_sounds/platform_sound_sfx/bolt_action_sfx/bolt_action_rifle_platform_dryfire"
+                                    ]
+                     },
+    "trs_bull.shoot":  {
+                           "subtitle":  "subtitles.minecraft.trs_bull.shoot",
+                           "sounds":  [
+                                          "minecraft:tacz_sounds/pistols/trs_bull/trs_bull_fire"
+                                      ]
+                       },
+    "trs_bull.reload_start":  {
+                                  "subtitle":  "subtitles.minecraft.trs_bull.reload",
+                                  "sounds":  [
+                                                 "minecraft:tacz_sounds/pistols/trs_bull/trs_bull_reload_empty"
+                                             ]
+                              },
+    "trs_bull.reload_end":  {
+                                "subtitle":  "subtitles.minecraft.trs_bull.reload",
+                                "sounds":  [
+                                               "minecraft:tacz_sounds/pistols/trs_bull/trs_bull_reload_4"
+                                           ]
+                            },
+    "trs_bull.empty":  {
+                           "subtitle":  "subtitles.minecraft.gun.empty",
+                           "sounds":  [
+                                          "minecraft:tacz_sounds/platform_sound_sfx/pistols_sfx/regular_pistol_dry_fire"
+                                      ]
+                       },
+    "raygun_bo6.shoot":  {
+                             "subtitle":  "subtitles.minecraft.raygun_bo6.shoot",
+                             "sounds":  [
+                                            "minecraft:tacz_sounds/wonder_weapons/raygun_bo6/raygun_fire"
+                                        ]
+                         },
+    "raygun_bo6.reload_start":  {
+                                    "subtitle":  "subtitles.minecraft.raygun_bo6.reload",
+                                    "sounds":  [
+                                                   "minecraft:tacz_sounds/wonder_weapons/raygun_bo6/raygun_reload"
+                                               ]
+                                },
+    "raygun_bo6.reload_end":  {
+                                  "subtitle":  "subtitles.minecraft.raygun_bo6.reload",
+                                  "sounds":  [
+                                                 "minecraft:tacz_sounds/wonder_weapons/raygun_bo6/raygun_reload"
+                                             ]
+                              },
+    "raygun_bo6.empty":  {
+                             "subtitle":  "subtitles.minecraft.gun.empty",
+                             "sounds":  [
+                                            "minecraft:tacz_sounds/dry_fire"
+                                        ]
+                         },
+    "pistols/trs_bull/trs_bull_reload_1":  {
+                                               "subtitle":  "subtitles.minecraft.pistols.trs_bull.trs_bull_reload_1",
+                                               "sounds":  [
+                                                              "minecraft:tacz_sounds/pistols/trs_bull/trs_bull_reload_1"
+                                                          ]
+                                           },
+    "pistols/trs_bull/trs_bull_reload_2":  {
+                                               "subtitle":  "subtitles.minecraft.pistols.trs_bull.trs_bull_reload_2",
+                                               "sounds":  [
+                                                              "minecraft:tacz_sounds/pistols/trs_bull/trs_bull_reload_2"
+                                                          ]
+                                           },
+    "pistols/trs_bull/trs_bull_reload_3":  {
+                                               "subtitle":  "subtitles.minecraft.pistols.trs_bull.trs_bull_reload_3",
+                                               "sounds":  [
+                                                              "minecraft:tacz_sounds/pistols/trs_bull/trs_bull_reload_3"
+                                                          ]
+                                           },
+    "pistols/trs_bull/trs_bull_reload_4":  {
+                                               "subtitle":  "subtitles.minecraft.pistols.trs_bull.trs_bull_reload_4",
+                                               "sounds":  [
+                                                              "minecraft:tacz_sounds/pistols/trs_bull/trs_bull_reload_4"
+                                                          ]
+                                           },
+    "pistols/trs_bull/trs_bull_reload_empty":  {
+                                                   "subtitle":  "subtitles.minecraft.pistols.trs_bull.trs_bull_reload_empty",
+                                                   "sounds":  [
+                                                                  "minecraft:tacz_sounds/pistols/trs_bull/trs_bull_reload_empty"
+                                                              ]
+                                               },
+    "rifles/m1_garand/m1_garand_fire":  {
+                                            "subtitle":  "subtitles.minecraft.rifles.m1_garand.m1_garand_fire",
+                                            "sounds":  [
+                                                           "minecraft:tacz_sounds/rifles/m1_garand/m1_garand_fire"
+                                                       ]
+                                        },
+    "bolt_action_rifles/kar98k/kar98k_bolt_rechamber":  {
+                                                            "subtitle":  "subtitles.minecraft.bolt_action_rifles.kar98k.kar98k_bolt_rechamber",
+                                                            "sounds":  [
+                                                                           "minecraft:tacz_sounds/bolt_action_rifles/kar98k/kar98k_bolt_rechamber"
+                                                                       ]
+                                                        },
+    "wonder_weapons/raygun_bo6/raygun_fire":  {
+                                                  "subtitle":  "subtitles.minecraft.wonder_weapons.raygun_bo6.raygun_fire",
+                                                  "sounds":  [
+                                                                 "minecraft:tacz_sounds/wonder_weapons/raygun_bo6/raygun_fire"
+                                                             ]
+                                              }
 }

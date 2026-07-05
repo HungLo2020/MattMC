@@ -9,6 +9,7 @@ public final class TaczGunFireModeAdjustments {
 		"hk_mk23", Map.of(TaczFireMode.BURST, 250),
 		"mk14", Map.of(TaczFireMode.AUTO, 380),
 		"spr15hb", Map.of(TaczFireMode.SEMI, -400),
+		"stg44", Map.of(TaczFireMode.SEMI, -400),
 		"type_81", Map.of(TaczFireMode.SEMI, -330)
 	);
 

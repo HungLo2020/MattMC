@@ -1,0 +1,9 @@
+{
+  "name": "minecraft.gun.stg44.name",
+  "display": "minecraft:stg44_display",
+  "data": "minecraft:stg44_data",
+  "tooltip": "minecraft.gun.stg44.desc",
+  "type": "rifle",
+  "item_type": "modern_kinetic",
+  "sort": 1
+}
