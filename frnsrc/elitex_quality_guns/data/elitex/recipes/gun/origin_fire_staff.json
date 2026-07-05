@@ -1,0 +1,33 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "forge:ingots/gold"
+      },
+      "count": 15
+    },
+    {
+      "item": {
+        "item": "minecraft:blaze_powder"
+      },
+      "count": 5
+    },
+    {
+      "item": {
+        "item": "minecraft:netherrack"
+      },
+      "count": 10
+    },
+    {
+      "item": {
+        "item": "minecraft:ghast_tear"
+      },
+      "count": 1
+    }
+  ],
+  "result": {
+    "type": "gun",
+    "id": "elitex:origin_fire_staff"
+  },
+  "type": "tacz:gun_smith_table_crafting"
+}

@@ -1,0 +1,33 @@
+{
+  "slot": "elitex:ammo/slot/origin_wind_staff_ammo",
+  "transform": {
+    "scale": {
+      "thirdperson": [
+        0.2,
+        0.2,
+        0.2
+      ],
+      "ground": [
+        0.2,
+        0.2,
+        0.2
+      ],
+      "fixed": [
+        1,
+        1,
+        1
+      ]
+    }
+  },
+  "particle": {
+    "name": "cloud",
+    "delta": [
+      0,
+      0,
+      0
+    ],
+    "speed": 0.2,
+    "life_time": 65,
+    "count": 31
+  }
+}

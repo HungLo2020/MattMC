@@ -1,0 +1,45 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "forge:ingots/gold"
+      },
+      "count": 143
+    },
+    {
+      "item": {
+        "tag": "forge:ingots/iron"
+      },
+      "count": 240
+    },
+    {
+      "item": {
+        "item": "minecraft:glass"
+      },
+      "count": 4
+    },
+    {
+      "item": {
+        "tag": "minecraft:planks"
+      },
+      "count": 4
+    },
+    {
+      "item": {
+        "item": "minecraft:redstone"
+      },
+      "count": 18
+    },
+    {
+      "item": {
+        "item": "minecraft:end_rod"
+      },
+      "count": 2
+    }
+  ],
+  "result": {
+    "type": "gun",
+    "id": "elitex:wonder_waffle"
+  },
+  "type": "tacz:gun_smith_table_crafting"
+}

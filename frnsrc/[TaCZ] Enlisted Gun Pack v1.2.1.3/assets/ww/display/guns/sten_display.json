@@ -1,0 +1,50 @@
+{
+    "model": "ww:gun/sten.geo",
+    "texture": "ww:gun/uv/sten",
+    "hud": "ww:gun/hud/sten",
+    
+    "slot": "ww:gun/slot/sten",
+    "animation": "ww:sten",
+    "use_default_animation": "rifle",
+    "third_person_animation": "default",
+    "transform": {
+      "scale": {
+        "thirdperson": [0.6, 0.6, 0.6],
+        "ground": [0.6, 0.6, 0.6],
+        "fixed": [1.2, 1.2, 1.2]
+      }
+    },
+    "muzzle_flash": {
+      "texture": "tacz:flash/common_muzzle_flash",
+      "scale": 0.6
+    },
+    "shell": {
+      "initial_velocity": [5, 2, 1],
+      "random_velocity": [1, 1, 0.25],
+      "acceleration": [0.0, -10, 0.0],
+      "angular_velocity": [360, -1200, 90],
+      "living_time": 1.0
+    },
+    "sounds": {
+    "shoot": "tacz:hk_mp5a5/hk_mp5a5_shoot",
+    "shoot_3p": "tacz:hk_mp5a5/hk_mp5a5_shoot_3p",
+    "reload_empty": "ww:sten/sten9_empty_reload",
+    "reload_tactical": "ww:sten/sten9_normal_reload",
+    "inspect": "ww:sten/sten9_inspect",
+    "inspect_empty": "ww:sten/sten9_inspect_empty",
+    "draw": "ww:sten/sten9_draw",
+    "put_away": "ww:sten/sten9_put_away"
+    },
+    "offhand_show": {
+      "pos": [1, 20, 4],
+      "rotate": [0, 0, 45],
+      "scale": [0.5, 0.5, 0.5]
+    },
+    "hotbar_show": {
+      "0": {
+        "pos": [1, 16, -2],
+      "rotate": [0, 0, 20],
+      "scale": [0.5, 0.5, 0.5]
+      }
+    }
+  }

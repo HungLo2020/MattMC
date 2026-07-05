@@ -1,0 +1,7 @@
+{
+  "name": "elitex.gun.sp_m1903.name",
+  "display": "elitex:sp_m1903_display",
+  "data": "elitex:sp_m1903_data",
+  "tooltip": "elitex.gun.sp_m1903.desc",
+  "type": "sniper"
+}

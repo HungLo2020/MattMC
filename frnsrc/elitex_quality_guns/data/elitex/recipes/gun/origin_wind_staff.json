@@ -1,0 +1,33 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "forge:ingots/gold"
+      },
+      "count": 10
+    },
+    {
+      "item": {
+        "item": "minecraft:feather"
+      },
+      "count": 5
+    },
+    {
+      "item": {
+        "item": "minecraft:phantom_membrane"
+      },
+      "count": 2
+    },
+    {
+      "item": {
+        "item": "minecraft:sugar"
+      },
+      "count": 10
+    }
+  ],
+  "result": {
+    "type": "gun",
+    "id": "elitex:origin_wind_staff"
+  },
+  "type": "tacz:gun_smith_table_crafting"
+}

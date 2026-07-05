@@ -1,0 +1,28 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "forge:ingots/iron"
+      },
+      "count": 88
+    },
+    {
+      "item": {
+        "item": "minecraft:glass"
+      },
+      "count": 2
+    },
+    {
+      "item": {
+        "tag": "forge:dusts/redstone"
+      },
+      "count": 4
+    }
+
+  ],
+  "result": {
+    "type": "gun",
+    "id": "elitex:sassy_dmr"
+  },
+  "type": "tacz:gun_smith_table_crafting"
+}

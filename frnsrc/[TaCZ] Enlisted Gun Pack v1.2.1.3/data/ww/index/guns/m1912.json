@@ -1,0 +1,9 @@
+{
+    "name": "Winchester Model 1912",
+    "display": "ww:m1912_display",
+    "data": "ww:m1912_data",
+    "type": "shotgun",
+    "item_type": "modern_kinetic",
+    "sort": 1,
+    "tooltip":"So good that the Germans tried to make it a war crime"
+}

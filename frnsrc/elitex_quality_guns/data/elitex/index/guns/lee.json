@@ -1,0 +1,7 @@
+{
+  "name": "elitex.gun.lee.name",
+  "display": "elitex:lee_display",
+  "data": "elitex:lee_data",
+  "tooltip": "elitex.gun.lee.desc",
+  "type": "sniper"
+}

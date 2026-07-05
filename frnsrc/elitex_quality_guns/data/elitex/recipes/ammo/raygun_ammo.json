@@ -1,0 +1,28 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "forge:ingots/copper"
+      },
+      "count": 15
+    },
+    {
+      "item": {
+        "tag": "forge:ingots/gold"
+      },
+      "count": 3
+    },
+    {
+      "item": {
+        "item": "minecraft:glass"
+      },
+      "count": 1
+    }
+  ],
+  "result": {
+    "type": "ammo",
+    "id": "elitex:raygun_ammo",
+    "count": 64
+  },
+  "type": "tacz:gun_smith_table_crafting"
+}

@@ -1,0 +1,54 @@
+{
+  "model": "elitex:gun/m1_garand_geo",
+  "texture": "elitex:gun/uv/m1_garand",
+  "hud": "elitex:gun/hud/m1_garand",
+  "slot": "elitex:gun/slot/m1_garand",
+  "animation": "elitex:m1_garand",
+  "use_default_animation": "rifle",
+  "state_machine": "elitex:m1_garand_state_machine",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "tacz:flash/common_muzzle_flash",
+    "scale": 1
+  },
+  "iron_zoom": 1.3,
+  "shell": {
+    "initial_velocity": [5, 2, 1],
+    "random_velocity": [1, 1, 0.25],
+    "acceleration": [0.0, -10, 0.0],
+    "angular_velocity": [360, -1200, 90],
+    "living_time": 1.7
+  },
+
+  "sounds": {
+    "shoot": "elitex:rifles/m1_garand/m1_garand_fire",
+    "shoot_3p": "elitex:rifles/m1_garand/m1_garand_fire_3p",
+    "reload_empty": "elitex:rifles/m1_garand/m1_garand_reload_empty",
+    "reload_tactical": "elitex:rifles/m1_garand/m1_garand_reload_normal",
+    "inspect": "elitex:rifles/m1_garand/m1_garand_inspect",
+    "inspect_empty": "elitex:rifles/m1_garand/m1_garand_inspect_empty",
+    "draw": "elitex:rifles/m1_garand/m1_garand_draw",
+    "put_away": "elitex:rifles/m1_garand/m1_garand_put_away",
+    "silence": "elitex:rifles/m1_garand/m1_garand_suppressed",
+    "silence_3p": "elitex:rifles/m1_garand/m1_garand_suppressed_3p",
+    "dry_fire": "elitex:platform_sound_sfx/bolt_action_sfx/bolt_action_rifle_platform_dryfire"
+  },
+  "offhand_show": {
+    "pos": [-2, 20, 4],
+    "rotate": [0, 0, 45],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-4, 26, 3],
+      "rotate": [-90, -5, -90],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

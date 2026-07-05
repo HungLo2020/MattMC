@@ -1,0 +1,53 @@
+{
+  "model": "elitex:gun/m4a1_classic_geo",
+  "texture": "elitex:gun/uv/m4a1_classic",
+  "hud": "elitex:gun/hud/m4a1_classic",
+  "slot": "elitex:gun/slot/m4a1_classic",
+  "animation": "elitex:m4a1_classic",
+  "use_default_animation": "rifle",
+  "third_person_animation": "default",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.8, 0.8, 0.8],
+      "ground": [0.7, 0.7, 0.7],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "tacz:flash/common_muzzle_flash",
+    "scale": 1.1
+  },
+  "shell": {
+    "initial_velocity": [6, 2, 1],
+    "random_velocity": [1, 1, 0.25],
+    "acceleration": [0.0, -10, 0.0],
+    "angular_velocity": [360, -1200, 90],
+    "living_time": 2.8
+  },
+  "sounds": {
+    "shoot": "elitex:assault_rifles/m4a1_classic/m4a1_classic_fire",
+    "shoot_3p": "elitex:assault_rifles/m4a1_classic/m4a1_classic_fire_3p",
+    "reload_empty": "elitex:assault_rifles/m4a1_classic/m4a1_classic_reload_empty",
+    "reload_tactical": "elitex:assault_rifles/m4a1_classic/m4a1_classic_reload",
+    "inspect": "elitex:assault_rifles/m4a1_classic/m4a1_classic_inspect",
+    "inspect_empty": "elitex:assault_rifles/m4a1_classic/m4a1_classic_inspect",
+    "draw": "elitex:assault_rifles/m4a1_classic/m4a1_classic_draw",
+    "put_away": "elitex:assault_rifles/m4a1_classic/m4a1_classic_put_away",
+    "silence": "elitex:assault_rifles/m4a1_classic/m4a1_classic_suppressed",
+    "silence_3p": "elitex:assault_rifles/m4a1_classic/m4a1_classic_suppressed_3p",
+    "dry_fire":  "elitex:platform_sound_sfx/m4_platform_sfx/m4_platform_dry_fire",
+    "fire_select": "elitex:platform_sound_sfx/m4_platform_sfx/m4_platform_fire_select"
+  },
+  "offhand_show": {
+    "pos": [1, 19, 4],
+    "rotate": [0, 0, 50],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-1, 19, 3],
+      "rotate": [-180, 0, 130],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

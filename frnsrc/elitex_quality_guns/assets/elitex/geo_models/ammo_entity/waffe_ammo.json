@@ -1,0 +1,41 @@
+{
+	"format_version": "1.12.0",
+	"minecraft:geometry": [
+		{
+			"description": {
+				"identifier": "geometry.unknown",
+				"texture_width": 16,
+				"texture_height": 16,
+				"visible_bounds_width": 2,
+				"visible_bounds_height": 2.5,
+				"visible_bounds_offset": [0, 0.75, 0]
+			},
+			"bones": [
+				{
+					"name": "root",
+					"pivot": [0, 8.5, -8]
+				},
+				{
+					"name": "projectile_illuminated",
+					"parent": "root",
+					"pivot": [0, 8.5, -8],
+					"rotation": [54.73561, 30, -9.73561],
+					"cubes": [
+						{
+							"origin": [-0.35, 8.15, -8.35],
+							"size": [0.7, 0.7, 0.7],
+							"uv": {
+								"north": {"uv": [0, 0], "uv_size": [1, 1]},
+								"east": {"uv": [0, 1], "uv_size": [1, 1]},
+								"south": {"uv": [1, 0], "uv_size": [1, 1]},
+								"west": {"uv": [1, 1], "uv_size": [1, 1]},
+								"up": {"uv": [0, 2], "uv_size": [1, 1]},
+								"down": {"uv": [2, 1], "uv_size": [1, -1]}
+							}
+						}
+					]
+				}
+			]
+		}
+	]
+}

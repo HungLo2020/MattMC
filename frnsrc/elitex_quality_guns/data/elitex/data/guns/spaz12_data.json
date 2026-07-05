@@ -1,0 +1,103 @@
+{
+  "ammo": "tacz:12g",
+  "ammo_amount": 8,
+  "rpm": 340,
+  "bolt": "manual_action",
+  "bullet": {
+    "life": 2.9,
+    "bullet_amount": 16,
+    "damage": 46,
+    "tracer_count_interval": 0,
+    "extra_damage": {
+      "armor_ignore": 0.7,
+      "head_shot_multiplier": 1.73,
+      "damage_adjust": [
+        {"distance": 5, "damage": 45},
+        {"distance": 15, "damage": 30},
+        {"distance": 30, "damage": 27},
+        {"distance": "infinite", "damage": 20}
+      ]
+    },
+    "speed": 140,
+    "gravity": 0.098,
+    "knockback": 0.15,
+    "friction": 0.05,
+    "ignite": false,
+    "pierce": 1
+  },
+  "reload": {
+    "type": "magazine",
+    "feed": {
+      "empty": 2.13,
+      "tactical": 0.67
+    },
+    "cooldown": {
+      "empty": 0.62,
+      "tactical": 0.78
+    }
+  },
+  "script": "elitex:spaz12_logic",
+  "script_param": {
+    "bolt_time": 0.63,
+    "bolt_feed_time": 0.3,
+    "intro_empty": 1.8,
+    "intro": 0.4,
+    "loop": 0.75,
+    "ending": 0.7,
+    "intro_empty_feed": 1.37,
+    "loop_feed": 0.48
+  },
+
+  "draw_time": 0.87,
+  "put_away_time": 0.7,
+  "aim_time": 0.1,
+  "sprint_time": 0.21,
+  "fire_mode": [
+    "burst",
+    "semi"
+  ],
+  "burst_data": {
+    "continuous_shoot": false,
+    "count": 1,
+    "bpm": 1100,
+    "min_interval": 0.3
+  },
+  "allow_attachment_types": [
+    "muzzle"
+  ],
+
+
+  "recoil": {
+    "pitch": [
+      {"time": 0, "value": [0.25, 0.25]},
+      {"time": 0.125, "value": [0.25, 0.25]},
+      {"time": 0.4, "value": [-0.25, -0.25]},
+      {"time": 0.55, "value": [0, 0]}
+    ],
+    "yaw": [
+      {"time": 0, "value": [-0.5, 0.5]},
+      {"time": 0.1, "value": [-0.5, 0.5]},
+      {"time": 0.2, "value": [0.15, 0.15]},
+      {"time": 0.4, "value": [0, 0]}
+    ]
+  },
+  "inaccuracy": {
+    "stand": 4.5,
+    "move": 4.75,
+    "sneak": 4,
+    "lie": 4,
+    "aim": 2
+  },
+  "melee": {
+    "distance": 1,
+    "cooldown": 0.7,
+    "default": {
+      "animation_type": "melee_stock",
+      "distance": 0,
+      "range_angle": 30,
+      "damage": 23,
+      "knockback": 0.6,
+      "prep": 0.1
+    }
+  }
+}

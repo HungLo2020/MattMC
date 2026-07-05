@@ -1,0 +1,9 @@
+{
+    "name": "Browning M1919A6",
+    "display": "ww:m1919_display",
+    "data": "ww:m1919_data",
+    "type": "mg",
+    "item_type": "modern_kinetic",
+    "sort": 10,
+    "tooltip":"Best MG in the game? F*ck no, top tier Germany is way better."
+}

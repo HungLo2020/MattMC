@@ -1,0 +1,21 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "forge:ingots/iron"
+      },
+      "count":23
+    },
+    {
+      "item": {
+        "item": "minecraft:light_gray_dye"
+      },
+      "count": 3
+    }
+  ],
+  "result": {
+    "type": "gun",
+    "id": "elitex:famas_f1"
+  },
+  "type": "tacz:gun_smith_table_crafting"
+}

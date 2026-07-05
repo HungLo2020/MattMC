@@ -1,0 +1,46 @@
+{
+  "model": "elitex:gun/ray_gun_mk2_geo",
+  "texture": "elitex:gun/uv/ray_gun_mk2",
+  "hud": "elitex:gun/hud/ray_gun_mk2_hud",
+  "slot": "elitex:gun/slot/ray_gun_mk2_slot",
+  "animation": "elitex:ray_gun_mk2",
+  "lod": {
+    "model": "elitex:gun/lod/ray_gun_mk2",
+    "texture": "elitex:gun/lod/ray_gun_mk2"
+  },
+  "use_default_animation": "pistol",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.4, 0.4, 0.4],
+      "ground": [0.4, 0.4, 0.4],
+      "fixed": [1, 1, 1]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "elitex:flash/ray_gun_mk2_flash",
+    "scale": 1.2
+  },
+  "sounds": {
+    "shoot": "elitex:wonder_weapons/ray_gun_mk2/ray_gun_mk2_fire",
+    "shoot_3p": "elitex:wonder_weapons/ray_gun_mk2/ray_gun_mk2_fire_3p",
+    "reload_empty": "elitex:wonder_weapons/ray_gun_mk2/ray_gun_mk2_empty_reload",
+    "reload_tactical": "elitex:wonder_weapons/ray_gun_mk2/ray_gun_mk2_normal_reload",
+    "inspect": "elitex:wonder_weapons/ray_gun_mk2/ray_gun_mk2_inspect",
+    "inspect_empty": "elitex:wonder_weapons/ray_gun_mk2/ray_gun_mk2_inspect_empty",
+    "draw": "elitex:wonder_weapons/ray_gun_mk2/ray_gun_mk2_draw",
+    "put_away": "elitex:wonder_weapons/ray_gun_mk2/ray_gun_mk2_put_away"
+
+  },
+  "offhand_show": {
+    "pos": [4, 13, -1],
+    "rotate": [-90, -35, 90],
+    "scale": [0.1, 0.1, 0.1]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-5, 13, -1],
+      "rotate": [-90, -35, 90],
+      "scale": [0.4, 0.4, 0.4]
+    }
+  }
+}

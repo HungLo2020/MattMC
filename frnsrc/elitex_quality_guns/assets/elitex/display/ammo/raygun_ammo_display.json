@@ -1,0 +1,37 @@
+{
+  "slot": "elitex:ammo/slot/raygun_ammo",
+  "transform": {
+    "scale": {
+      "thirdperson": [
+        0.2,
+        0.2,
+        0.2
+      ],
+      "ground": [
+        0.2,
+        0.2,
+        0.2
+      ],
+      "fixed": [
+        1,
+        1,
+        1
+      ]
+    }
+  },
+
+  "particle": {
+    "name": "glow_squid_ink",
+    "delta": [
+      0,
+      0,
+      0
+    ],
+    "speed": 0,
+    "life_time": 20,
+    "count": 5
+  }
+
+
+
+}

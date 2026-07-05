@@ -1,0 +1,7 @@
+{
+  "name": "elitex.gun.vector45acp.name",
+  "display": "elitex:vector45acp_display",
+  "data": "elitex:vector45acp_data",
+  "tooltip": "elitex.gun.vector45acp.desc",
+  "type": "smg"
+}

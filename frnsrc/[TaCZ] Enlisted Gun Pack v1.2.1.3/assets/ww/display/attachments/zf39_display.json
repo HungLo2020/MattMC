@@ -1,0 +1,18 @@
+{
+  "slot": "ww:attachment/slot/zf39",
+  "model": "ww:attachment/zf39_geo",
+  "texture": "ww:attachment/uv/zf39",
+  "lod": {
+    "model": "ww:attachment/zf39_geo",
+    "texture": "ww:attachment/uv/zf39"
+  },
+  "zoom": [
+    5
+  ],
+  "scope": true,
+  "fov": 70.0,
+  "sounds": {
+    "install": "tacz:attachments/scope_general_d",
+    "uninstall": "tacz:attachments/scope_general_d"
+  }
+}

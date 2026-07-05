@@ -1,0 +1,52 @@
+{
+  "model": "elitex:gun/wonder_waffle_geo",
+  "texture": "elitex:gun/uv/wonder_waffle",
+  "hud": "elitex:gun/hud/wonder_waffle",
+  "slot": "elitex:gun/slot/wonder_waffle",
+  "lod": {
+    "model": "elitex:gun/lod/wonder_waffe",
+    "texture": "elitex:gun/lod/wonder_waffe"
+  },
+  "animation": "elitex:wonder_waffle",
+  "use_default_animation": "rifle",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.3, 0.3, 0.3],
+      "ground": [0.4, 0.4, 0.4],
+      "fixed": [1.0, 1.0, 1.0]
+    }
+  },
+  "shell": {
+    "initial_velocity": [8.0, 5.0, -0.5],
+    "random_velocity": [2.5, 1.5, 0.25],
+    "acceleration": [0.0, -20, 0.0],
+    "angular_velocity": [-720, -720, 90],
+    "living_time": 1.5
+  },
+  "muzzle_flash": {
+    "texture": "elitex:flash/waffe_muzzle_flash",
+    "scale": 2.5
+  },
+  "sounds": {
+    "shoot": "elitex:wonder_weapons/wonder_waffle/wonder_waffle_fire",
+    "shoot_3p": "elitex:wonder_weapons/wonder_waffle/wonder_waffle_fire_3p",
+    "reload_empty": "elitex:wonder_weapons/wonder_waffle/wonder_waffle_reload_empty",
+    "reload_tactical": "elitex:wonder_weapons/wonder_waffle/wonder_waffle_reload_normal",
+    "inspect": "elitex:wonder_weapons/wonder_waffle/wonder_waffle_inspect",
+    "inspect_empty": "elitex:wonder_weapons/wonder_waffle/wonder_waffle_inspect_empty",
+    "draw": "elitex:wonder_weapons/wonder_waffle/wonder_waffle_draw",
+    "put_away": "elitex:wonder_weapons/wonder_waffle/wonder_waffle_put_away"
+  },
+  "offhand_show": {
+    "pos": [4, 13, -1],
+    "rotate": [-90, -35, 90],
+    "scale": [0.2, 0.2, 0.2]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-5, 13, -1],
+      "rotate": [-90, -35, 90],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

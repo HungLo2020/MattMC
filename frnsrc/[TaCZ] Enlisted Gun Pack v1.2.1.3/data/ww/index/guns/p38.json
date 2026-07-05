@@ -1,0 +1,8 @@
+{
+  "name": "Walther P38",
+  "display": "ww:p38_display",
+  "data": "ww:p38_data",
+  "tooltip": "Standard issue of the Wehrmacht.",
+  "sort": 1,
+  "type": "pistol"
+}

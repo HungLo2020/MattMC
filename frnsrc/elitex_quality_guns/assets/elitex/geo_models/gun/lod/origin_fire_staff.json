@@ -1,0 +1,134 @@
+{
+	"format_version": "1.12.0",
+	"minecraft:geometry": [
+		{
+			"description": {
+				"identifier": "geometry.unknown",
+				"texture_width": 32,
+				"texture_height": 32,
+				"visible_bounds_width": 3,
+				"visible_bounds_height": 1.5,
+				"visible_bounds_offset": [0, 0.25, 0]
+			},
+			"bones": [
+				{
+					"name": "root",
+					"pivot": [0.0312, 5.9688, 0.28125]
+				},
+				{
+					"name": "FIre_Staff",
+					"parent": "root",
+					"pivot": [0, 5.90865, 3.40625],
+					"rotation": [91.75, 0, 180],
+					"cubes": [
+						{"origin": [-0.70711, -7.14461, 2.40625], "size": [0, 2, 2], "pivot": [0, -5.4375, 3.40625], "rotation": [90, 45, 90], "uv": [17, 6]},
+						{"origin": [-1.5, 14.5625, 1.90625], "size": [3, 1, 3], "uv": [12, 0]},
+						{"origin": [-1.5, 18.5625, 1.90625], "size": [3, 1, 3], "uv": [8, 8]},
+						{"origin": [-1, 15.5625, 2.40625], "size": [2, 2, 2], "uv": [12, 4]},
+						{"origin": [0, 17.5625, 2.40625], "size": [0, 1, 2], "uv": [9, 0]},
+						{"origin": [0, 17.5625, 2.40625], "size": [0, 1, 2], "pivot": [0, 18.0625, 3.40625], "rotation": [0, -90, 0], "uv": [7, 6]},
+						{"origin": [-1, -6.4375, 2.40625], "size": [0, 2, 2], "pivot": [-1, -5.4375, 3.40625], "rotation": [0, 0, 45], "uv": [8, 18]},
+						{"origin": [-0.5, -4.4375, 2.90625], "size": [1, 14, 1], "inflate": 0.2, "uv": [0, 8]},
+						{"origin": [1, -6.4375, 2.40625], "size": [0, 2, 2], "pivot": [1, -5.4375, 3.40625], "rotation": [0, 0, -45], "uv": [18, 2]},
+						{"origin": [0.70711, -7.14461, 2.40625], "size": [0, 2, 2], "pivot": [0, -5.4375, 3.40625], "rotation": [-90, 45, -90], "uv": [14, 10]},
+						{"origin": [-1, -6.4375, 2.40625], "size": [2, 2, 2], "uv": [8, 12]},
+						{"origin": [-0.5, -4.4375, 2.90625], "size": [1, 14, 1], "uv": [4, 8]},
+						{"origin": [-0.5, 9.5625, 2.90625], "size": [1, 5, 1], "uv": [15, 15]}
+					]
+				},
+				{
+					"name": "left_stick",
+					"parent": "FIre_Staff",
+					"pivot": [1.06021, 15.02596, 3.40625],
+					"cubes": [
+						{"origin": [0.5, 14.5625, 2.90625], "size": [1, 3, 1], "inflate": 0.1, "pivot": [1.06021, 15.02596, 3.40625], "rotation": [0, 0, 57.5], "uv": [8, 16]}
+					]
+				},
+				{
+					"name": "bone5",
+					"parent": "left_stick",
+					"pivot": [3.06646, 16.62596, 3.40625],
+					"cubes": [
+						{"origin": [2.6, 16.1625, 2.90625], "size": [1, 3, 1], "pivot": [3.16021, 16.62596, 3.40625], "rotation": [0, 0, 10], "uv": [8, 16]},
+						{"origin": [3.6, 16.1625, 2.90625], "size": [0, 3, 1], "pivot": [3.16021, 16.62596, 3.40625], "rotation": [0, 0, 32.5], "uv": [9, 16]}
+					]
+				},
+				{
+					"name": "bone4",
+					"parent": "bone5",
+					"pivot": [3.42271, 19.00721, 3.40625],
+					"cubes": [
+						{"origin": [2.8, 18.7625, 2.90625], "size": [1, 3, 1], "inflate": -0.1, "pivot": [3.36021, 19.22596, 3.40625], "rotation": [0, 0, -17.5], "uv": [8, 16]},
+						{"origin": [1.8, 17.7625, 3.25625], "size": [1.4, 4, 0.2], "inflate": -0.1, "pivot": [2.36021, 19.22596, 3.40625], "rotation": [0, 0, -17.5], "uv": [12, 16]}
+					]
+				},
+				{
+					"name": "right_stick",
+					"parent": "FIre_Staff",
+					"pivot": [-1.06021, 15.02596, 3.40625],
+					"cubes": [
+						{"origin": [-1.5, 14.5625, 2.90625], "size": [1, 3, 1], "inflate": 0.1, "pivot": [-1.06021, 15.02596, 3.40625], "rotation": [0, 0, -57.5], "uv": [8, 16], "mirror": true}
+					]
+				},
+				{
+					"name": "bone7",
+					"parent": "right_stick",
+					"pivot": [-3.16021, 16.62596, 3.40625],
+					"cubes": [
+						{"origin": [-3.6, 16.1625, 2.90625], "size": [1, 3, 1], "pivot": [-3.16021, 16.62596, 3.40625], "rotation": [0, 0, -10], "uv": [8, 16], "mirror": true},
+						{"origin": [-3.6, 16.1625, 2.90625], "size": [0, 3, 1], "pivot": [-3.16021, 16.62596, 3.40625], "rotation": [0, 0, -32.5], "uv": [9, 16], "mirror": true}
+					]
+				},
+				{
+					"name": "bone8",
+					"parent": "bone7",
+					"pivot": [-3.36021, 19.22596, 3.40625],
+					"cubes": [
+						{"origin": [-3.2, 17.7625, 3.25625], "size": [1.4, 4, 0.2], "inflate": -0.1, "pivot": [-2.36021, 19.22596, 3.40625], "rotation": [0, 0, 17.5], "uv": [12, 16], "mirror": true},
+						{"origin": [-3.8, 18.7625, 2.90625], "size": [1, 3, 1], "inflate": -0.1, "pivot": [-3.36021, 19.22596, 3.40625], "rotation": [0, 0, 17.5], "uv": [8, 16], "mirror": true}
+					]
+				},
+				{
+					"name": "Rotator",
+					"parent": "FIre_Staff",
+					"pivot": [0, 12.0625, 3.40625],
+					"cubes": [
+						{"origin": [-1.5, 9.5625, 1.90625], "size": [3, 5, 3], "uv": [0, 0]},
+						{"origin": [-1.5, 9.5625, 1.90625], "size": [3, 5, 3], "inflate": -0.2, "uv": [20, 24]}
+					]
+				},
+				{
+					"name": "attachments_positons",
+					"parent": "root",
+					"pivot": [0, 0, -5.84375]
+				},
+				{
+					"name": "muzzle_flash",
+					"parent": "attachments_positons",
+					"pivot": [0.07855, 6.46045, -11.92703]
+				},
+				{
+					"name": "positioning",
+					"pivot": [0, 0, 0]
+				},
+				{
+					"name": "fixed",
+					"parent": "positioning",
+					"pivot": [-0.61875, 7.61875, 10.66875],
+					"rotation": [90, 42.5, 90]
+				},
+				{
+					"name": "ground",
+					"parent": "positioning",
+					"pivot": [0, 0.25, 2]
+				},
+				{
+					"name": "thirdperson_hand",
+					"parent": "positioning",
+					"pivot": [-1.59375, 7.66875, 10.7375],
+					"rotation": [90, 0, 0]
+				}
+			]
+		}
+	]
+}

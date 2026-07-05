@@ -1,0 +1,52 @@
+{
+  "model": "elitex:gun/op1911_geo",
+  "texture": "elitex:gun/uv/op1911",
+  "hud": "elitex:gun/hud/op1911",
+  "slot": "elitex:gun/slot/op1911",
+  "animation": "elitex:op1911",
+  "use_default_animation": "pistol",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "shell": {
+    "initial_velocity": [5.0, 3.0, 1],
+    "random_velocity": [2.5, 2, 0.25],
+    "acceleration": [0.0, -20, 0.0],
+    "angular_velocity": [360, -960, 90],
+    "living_time": 1.0
+  },
+  "muzzle_flash": {
+    "texture": "tacz:flash/common_muzzle_flash",
+    "scale": 0.7
+  },
+  "iron_zoom": 1.1,
+  "sounds": {
+    "draw": "elitex:pistols/op1911/op1911_draw",
+    "put_away": "elitex:pistols/op1911/op1911_put_away",
+    "shoot": "elitex:pistols/op1911/op1911_fire",
+    "shoot_3p": "elitex:pistols/op1911/op1911_fire_3p",
+    "silence": "elitex:pistols/op1911/op1911_suppressed",
+    "silence_3p": "elitex:pistols/op1911/op1911_suppressed_3p",
+    "reload_empty": "elitex:pistols/op1911/op1911_empty_reload",
+    "reload_tactical": "elitex:pistols/op1911/op1911_normal_reload",
+    "inspect": "elitex:pistols/op1911/op1911_inspect",
+    "inspect_empty": "elitex:pistols/op1911/op1911_inspect_empty",
+    "dry_fire" : "elitex:pistols/op1911/op1911_dry_fire"
+  },
+  "offhand_show": {
+    "pos": [4, 13, -1],
+    "rotate": [-90, -35, 90],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-5, 13, -1],
+      "rotate": [-90, -35, 90],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "slot": "elitex:ammo/slot/origin_ice_staff_ammo",
+  "transform": {
+    "scale": {
+      "thirdperson": [
+        0.2,
+        0.2,
+        0.2
+      ],
+      "ground": [
+        0.2,
+        0.2,
+        0.2
+      ],
+      "fixed": [
+        1,
+        1,
+        1
+      ]
+    }
+  },
+  "particle": {
+    "name": "white_ash",
+    "delta": [
+      0,
+      0,
+      0
+    ],
+    "speed": 0.5,
+    "life_time": 55,
+    "count": 34
+  }
+}

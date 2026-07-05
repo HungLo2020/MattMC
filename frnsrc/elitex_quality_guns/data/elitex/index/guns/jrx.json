@@ -1,0 +1,7 @@
+{
+  "name": "elitex.gun.jrx.name",
+  "display": "elitex:jrx_display",
+  "data": "elitex:jrx_data",
+  "type": "pistol",
+  "tooltip": "elitex.gun.jrx.desc"
+}

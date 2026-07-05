@@ -1,0 +1,10 @@
+{
+  "slot": "ww:attachment/slot/bayonet_m1930",
+  "model": "ww:attachment/bayonet_m1930_geo",
+  "texture": "ww:attachment/uv/bayonet_m1930",
+  "show_muzzle": true,
+  "sounds": {
+    "install": "tacz:attachments/bayonet_install",
+    "uninstall": "tacz:attachments/bayonet_uninstall"
+  }
+}

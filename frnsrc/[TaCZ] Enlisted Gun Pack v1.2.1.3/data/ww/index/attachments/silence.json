@@ -1,0 +1,6 @@
+{
+  "name": "World War Two era silencer",
+  "display": "ww:silence_display",
+  "data": "ww:silence_data",
+  "type": "muzzle"
+}

@@ -1,0 +1,12 @@
+{
+    "name": "Type 100/40",
+
+    "display": "ww:t100_display",
+    
+    "data": "ww:t100_data",
+    "tooltip": "A relatively rare SMG used by Japan",
+    "type": "smg",
+    "sort": 1,
+    
+    "item_type": "modern_kinetic"  
+}

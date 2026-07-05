@@ -1,0 +1,9 @@
+{
+    "name": "Winchester Model 1897 'Trenchgun'",
+    "display": "ww:m1897_display",
+    "data": "ww:m1897_data",
+    "type": "shotgun",
+    "item_type": "modern_kinetic",
+    "sort": 1,
+    "tooltip":"Slam fire? Thats a war crime! Ignore the gas that we used on the french..."
+}

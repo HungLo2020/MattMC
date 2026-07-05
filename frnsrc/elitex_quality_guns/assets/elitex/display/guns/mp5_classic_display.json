@@ -1,0 +1,56 @@
+{
+  "model": "elitex:gun/mp5_classic_geo",
+  "texture": "elitex:gun/uv/mp5_classic",
+  "lod": {
+    "model": "elitex:gun/lod/mp5_classic",
+    "texture": "elitex:gun/lod/mp5_classic"
+  },
+  "hud": "elitex:gun/hud/mp5_classic",
+  "slot": "elitex:gun/slot/mp5_classic",
+  "animation": "elitex:mp5_classic",
+  "state_machine": "elitex:mp5_classic_state_machine",
+  "use_default_animation": "rifle",
+  "third_person_animation": "default",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "tacz:flash/common_muzzle_flash",
+    "scale": 0.7
+  },
+  "shell": {
+    "initial_velocity": [5, 2, 1],
+    "random_velocity": [1, 1, 0.25],
+    "acceleration": [0.0, -10, 0.0],
+    "angular_velocity": [360, -1200, 90],
+    "living_time": 1.0
+  },
+  "sounds": {
+    "shoot": "elitex:smgs/mp5_classic/mp5_classic_fire",
+    "shoot_3p": "elitex:smgs/mp5_classic/mp5_classic_fire_3p",
+    "inspect": "elitex:smgs/mp5_classic/mp5_classic_inspect",
+    "inspect_empty": "elitex:smgs/mp5_classic/mp5_classic_inspect_empty",
+    "draw": "elitex:smgs/mp5_classic/mp5_classic_draw",
+    "put_away": "elitex:smgs/mp5_classic/mp5_classic_put_away",
+    "silence": "elitex:smgs/mp5_classic/mp5_classic_suppressed",
+    "silence_3p": "elitex:smgs/mp5_classic/mp5_classic_suppressed_3p",
+    "dry_fire":  "elitex:platform_sound_sfx/smgs_platform_sfx/smgs_dry_fire",
+    "fire_select": "elitex:platform_sound_sfx/smgs_platform_sfx/smgs_fire_mode_switch"
+  },
+  "offhand_show": {
+    "pos": [1, 20, 4],
+    "rotate": [0, 0, 45],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [1, 16, -2],
+    "rotate": [0, 0, 20],
+    "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

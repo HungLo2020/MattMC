@@ -1,0 +1,46 @@
+{
+  "model": "elitex:gun/lee_geo",
+  "texture": "elitex:gun/uv/lee",
+  "hud": "elitex:gun/hud/lee",
+  "slot": "elitex:gun/slot/lee",
+  "animation": "elitex:lee",
+  "use_default_animation": "rifle",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.7, 0.7, 0.7],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "state_machine": "elitex:lee_state_machine",
+  "iron_zoom": 2.1,
+  "zoom_model_fov": 60,
+  "muzzle_flash": {
+    "texture": "tacz:flash/common_muzzle_flash",
+    "scale": 1.2
+  },
+  "sounds": {
+    "shoot": "elitex:bolt_action_rifles/lee/lee_fire",
+    "shoot_3p": "elitex:bolt_action_rifles/lee/lee_fire_3p",
+    "inspect": "elitex:bolt_action_rifles/lee/lee_inspect",
+    "inspect_empty": "elitex:bolt_action_rifles/lee/lee_inspect_empty",
+    "draw": "elitex:bolt_action_rifles/lee/lee_draw",
+    "bolt": "elitex:bolt_action_rifles/lee/lee_bolt_action",
+    "put_away": "elitex:bolt_action_rifles/lee/lee_put_away",
+    "silence": "elitex:bolt_action_rifles/lee/lee_suppressed",
+    "silence_3p": "elitex:bolt_action_rifles/lee/lee_suppressed_3p",
+    "dry_fire": "elitex:platform_sound_sfx/bolt_action_sfx/bolt_action_rifle_platform_dryfire"
+  },
+  "offhand_show": {
+    "pos": [-2, 20, 4],
+    "rotate": [0, 0, 45],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-4, 26, 3],
+      "rotate": [-90, -5, -90],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

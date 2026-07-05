@@ -1,0 +1,11 @@
+{
+    "name": "Sten MkII",
+
+    "display": "ww:sten_display",
+    
+    "data": "ww:sten_data",
+    "tooltip": "Created by Britain in time of need. What could be more patriotic than this toob? Also, Alex Kim sybau. The sten is WAYY better than the M3. It's just facts :/",
+    "type": "smg",
+    "sort": 1,
+    "item_type": "modern_kinetic"  
+}

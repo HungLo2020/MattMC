@@ -1,0 +1,9 @@
+{
+  "slot": "ww:ammo/slot/765",
+  "shell": {
+    "model": "ww:shell/762x25_shell",
+    "texture": "ww:shell/762x25_shell"
+  },
+  "tracer_color": "#ffe09e"
+}
+    

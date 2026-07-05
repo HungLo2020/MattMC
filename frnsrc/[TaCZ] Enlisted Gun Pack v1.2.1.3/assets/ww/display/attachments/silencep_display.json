@@ -1,0 +1,9 @@
+{
+  "slot": "ww:attachment/slot/silencep",
+  "model": "ww:attachment/silencep_geo",
+  "texture": "ww:attachment/uv/silencep",
+  "sounds": {
+    "install": "tacz:attachments/muzzle_general",
+    "uninstall": "tacz:attachments/muzzle_general"
+  }
+}

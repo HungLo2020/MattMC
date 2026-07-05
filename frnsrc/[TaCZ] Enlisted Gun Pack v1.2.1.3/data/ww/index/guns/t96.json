@@ -1,0 +1,12 @@
+{
+    "name": "Type 96 LMG",
+
+    "display": "ww:t96_display",
+    
+    "data": "ww:t96_data",
+    "tooltip": "Reliable yet underpowered.",
+    "type": "mg",
+    "sort": 1,
+    
+    "item_type": "modern_kinetic"  
+}

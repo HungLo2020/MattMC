@@ -1,0 +1,12 @@
+{
+    "name": "Type 38 Rifle",
+
+    "display": "ww:type38_display",
+    
+    "data": "ww:type38_data",
+    "tooltip": "Although accurate, it was underpowered.",
+    "type": "sniper",
+    "sort": 1,
+    
+    "item_type": "modern_kinetic"  
+}

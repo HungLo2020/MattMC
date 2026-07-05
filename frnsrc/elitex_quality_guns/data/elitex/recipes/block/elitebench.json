@@ -1,0 +1,22 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "RRR",
+    "P P",
+    "P P"
+  ],
+  "key": {
+    "R": {
+      "item": "minecraft:iron_ingot"
+    },
+    "P": {
+      "item": "minecraft:iron_block"
+    }
+  },
+  "result": {
+    "item": "tacz:workbench_b",
+    "nbt": {
+      "BlockId": "elitex:elitebench"
+    }
+  }
+}

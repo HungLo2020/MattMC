@@ -1,0 +1,21 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "forge:ingots/iron"
+      },
+      "count": 11
+    },
+    {
+      "item": {
+        "item": "minecraft:black_dye"
+      },
+      "count": 1
+    }
+  ],
+  "result": {
+    "type": "gun",
+    "id":  "elitex:op1911"
+  },
+  "type": "tacz:gun_smith_table_crafting"
+}

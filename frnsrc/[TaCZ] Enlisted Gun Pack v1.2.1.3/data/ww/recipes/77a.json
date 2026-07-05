@@ -1,0 +1,22 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "forge:ingots/copper"
+      },
+      "count": 30
+    },
+    {
+      "item": {
+        "tag": "forge:gunpowder"
+      },
+      "count": 10
+    }
+  ],
+  "result": {
+    "type": "ammo",
+    "id": "ww:77a",
+    "count": 48
+  },
+  "type": "tacz:gun_smith_table_crafting"
+}

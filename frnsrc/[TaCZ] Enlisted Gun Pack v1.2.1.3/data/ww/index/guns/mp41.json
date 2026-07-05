@@ -1,0 +1,12 @@
+{
+    "name": "Schmeisser MP41",
+
+    "display": "ww:mp41_display",
+    
+    "data": "ww:mp41_data",
+    "tooltip": "If an MP40 and MP28 had a baby.",
+    "type": "smg",
+    "sort": 1,
+    
+    "item_type": "modern_kinetic"  
+}

@@ -1,0 +1,28 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "forge:ingots/iron"
+      },
+      "count": 6
+    },
+    {
+      "item": {
+        "item": "minecraft:glowstone_dust"
+      },
+      "count": 3
+    },
+    {
+      "item": {
+        "item": "minecraft:redstone"
+      },
+      "count": 1
+    }
+  ],
+  "result": {
+    "type": "ammo",
+    "id": "elitex:origin_electric_staff_ammo",
+    "count": 64
+  },
+  "type": "tacz:gun_smith_table_crafting"
+}

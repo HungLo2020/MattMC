@@ -1,0 +1,21 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "minecraft:logs"
+      },
+      "count": 1
+    },
+    {
+      "item": {
+        "tag": "forge:ingots/iron"
+      },
+      "count": 43
+    }
+  ],
+  "result": {
+    "type": "gun",
+    "id": "elitex:mustang_and_sally"
+  },
+  "type": "tacz:gun_smith_table_crafting"
+}

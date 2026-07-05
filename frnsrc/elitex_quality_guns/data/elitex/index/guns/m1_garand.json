@@ -1,0 +1,7 @@
+{
+  "name": "elitex.gun.m1_garand.name",
+  "display": "elitex:m1_garand_display",
+  "data": "elitex:m1_garand_data",
+  "tooltip": "elitex.gun.m1_garand.desc",
+  "type": "sniper"
+}

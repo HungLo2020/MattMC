@@ -1,0 +1,12 @@
+{
+    "name": "MP34",
+
+    "display": "ww:mp34_display",
+    
+    "data": "ww:mp34_data",
+    "tooltip": "The Rolls-Royce of Submachine guns.",
+    "type": "smg",
+    "sort": 1,
+    
+    "item_type": "modern_kinetic"  
+}

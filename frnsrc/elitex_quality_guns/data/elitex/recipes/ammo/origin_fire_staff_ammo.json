@@ -1,0 +1,28 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "forge:ingots/iron"
+      },
+      "count": 8
+    },
+    {
+      "item": {
+        "item": "minecraft:blaze_powder"
+      },
+      "count": 4
+    },
+    {
+      "item": {
+        "item": "minecraft:magma_block"
+      },
+      "count": 1
+    }
+  ],
+  "result": {
+    "type": "ammo",
+    "id": "elitex:origin_fire_staff_ammo",
+    "count": 64
+  },
+  "type": "tacz:gun_smith_table_crafting"
+}

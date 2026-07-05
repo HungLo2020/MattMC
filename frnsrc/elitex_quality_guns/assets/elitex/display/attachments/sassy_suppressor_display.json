@@ -1,0 +1,9 @@
+{
+  "slot": "elitex:attachments/slot/sassy_suppressor",
+  "model": "elitex:attachments/sassy_suppressor_geo",
+  "texture": "elitex:attachments/uv/sassy_suppressor",
+  "sounds": {
+    "install": "tacz:attachments/muzzle_general",
+    "uninstall": "tacz:attachments/muzzle_general"
+  }
+}

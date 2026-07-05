@@ -1,0 +1,12 @@
+{
+    "name": "MG42",
+
+    "display": "ww:mg42_display",
+    
+    "data": "ww:mg42_data",
+    "tooltip": "Hitler's Buzzsaw",
+    "type": "mg",
+    "sort": 1,
+    
+    "item_type": "modern_kinetic"  
+}

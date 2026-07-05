@@ -1,0 +1,12 @@
+{
+    "name": "M1903 Rifle",
+
+    "display": "ww:m1903_display",
+    
+    "data": "ww:m1903_data",
+    "tooltip": "Haha I copy Gewehr 98",
+    "type": "sniper",
+    "sort": 1,
+    
+    "item_type": "modern_kinetic"  
+}

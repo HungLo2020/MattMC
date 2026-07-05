@@ -1,0 +1,51 @@
+{
+  "model": "elitex:gun/srz_2011_geo",
+  "texture": "elitex:gun/uv/srz_2011",
+  "hud": "elitex:gun/hud/srz_2011",
+  "slot": "elitex:gun/slot/srz_2011",
+  "animation": "elitex:srz_2011",
+  "use_default_animation": "pistol",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.5, 0.5, 0.5],
+      "ground": [0.4, 0.4, 0.4],
+      "fixed": [1.0, 1.0, 1.0]
+    }
+  },
+  "shell": {
+    "initial_velocity": [8.0, 5.0, -0.5],
+    "random_velocity": [2.5, 1.5, 0.25],
+    "acceleration": [0.0, -20, 0.0],
+    "angular_velocity": [-720, -720, 90],
+    "living_time": 1.9
+  },
+  "muzzle_flash": {
+    "texture": "tacz:flash/common_muzzle_flash",
+    "scale": 1
+  },
+  "sounds": {
+    "reload_empty": "elitex:pistols/srz_2011/srz_2011_empty_reload",
+    "reload_tactical": "elitex:pistols/srz_2011/srz_2011_normal_reload",
+    "inspect": "elitex:pistols/srz_2011/srz_2011_inspect",
+    "inspect_empty": "elitex:pistols/srz_2011/srz_2011_inspect_empty",
+    "draw": "elitex:pistols/srz_2011/srz_2011_draw",
+    "shoot": "elitex:pistols/srz_2011/srz_2011_fire",
+    "shoot_3p": "elitex:pistols/srz_2011/srz_2011_shoot_3p",
+    "silence": "elitex:pistols/srz_2011/srz_2011_suppressed",
+    "silence_3p": "elitex:pistols/srz_2011/srz_2011_suppressed_3p",
+    "put_away": "elitex:pistols/srz_2011/srz_2011_put_away",
+    "dry_fire":  "elitex:platform_sound_sfx/pistols_sfx/regular_pistol_dry_fire"
+  },
+  "offhand_show": {
+    "pos": [4, 13, -1],
+    "rotate": [-90, -35, 90],
+    "scale": [0.2, 0.2, 0.2]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-5, 13, -1],
+      "rotate": [-90, -35, 90],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

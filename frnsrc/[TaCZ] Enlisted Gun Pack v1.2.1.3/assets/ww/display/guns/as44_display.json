@@ -1,0 +1,62 @@
+{
+  "model": "ww:gun/as44_geo",
+  "texture": "ww:gun/uv/as44",
+  "lod": {
+    "model": "ww:gun/as44_geo",
+    "texture": "ww:gun/uv/as44"
+  },
+  "hud": "ww:gun/hud/as44",
+  "slot": "ww:gun/slot/as44",
+  "animation": "ww:as44",
+  "state_machine": "tacz:ak47_state_machine",
+  "use_default_animation": "rifle",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "tacz:flash/common_muzzle_flash",
+    "scale": 1
+  },
+  // 机瞄的放大倍数，默认 1.2
+  "iron_zoom": 1.5,
+  // 机瞄模型缩放fov，默认70
+  "zoom_model_fov": 60,
+  "sounds": {
+    "shoot": "tacz:ak47/ak47_shoot",
+    "shoot_3p": "tacz:ak47/ak47_shoot_3p",
+    "reload_empty": "tacz:ak47/ak47_reload_empty",
+    "reload_tactical": "tacz:ak47/ak47_reload_tactical",
+    "inspect": "tacz:ak47/ak47_inspect",
+    "inspect_empty": "tacz:ak47/ak47_inspect_empty",
+    "draw": "tacz:ak47/ak47_draw",
+    "put_away": "tacz:ak47/ak47_put_away",
+    "silence": "tacz:ak47/ak47_silence",
+    "silence_3p": "tacz:ak47/ak47_silence_3p",
+    // 下面四个音效可以不写，模组会自动添加默认音效
+    "dry_fire": "tacz:dry_fire",
+    "fire_select": "tacz:fire_select",
+    "head_hit": "tacz:head_hit",
+    "flesh_hit": "tacz:flesh_hit",
+    "kill": "tacz:kill",
+    // 近战音效，默认就会添加
+    "melee_bayonet": "tacz:melee_bayonet/melee_bayonet_01",
+    "melee_push": "tacz:melee_stock/melee_stock_01",
+    "melee_stock": "tacz:melee_stock/melee_stock_02"
+  },
+  "offhand_show": {
+    "pos": [-2, 20, 4],
+    "rotate": [0, 0, 45],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-4, 26, 3],
+      "rotate": [-90, -5, -90],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}
