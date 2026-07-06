@@ -243,7 +243,9 @@ public class VulkanDescriptorLifecycleTest {
     @Test
     public void testSharedStorageImageSamplerDescriptorsUseGeneralLayout() throws Exception {
         String source = Files.readString(PROJECT_ROOT
-            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"))
+            .replace("\r\n", "\n")
+            .replace('\r', '\n');
 
         assertTrue(source.contains("collectStorageImageTextureIds"),
             "Vulkan descriptor planning should detect textures that are also bound as storage images");

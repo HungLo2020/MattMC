@@ -1503,7 +1503,9 @@ public class VulkanBackendSpirvPathTest {
     @Test
     public void testLegacyVulkanResourcePlannerPreservesFullShaderLayout() throws Exception {
         String source = Files.readString(PROJECT_ROOT
-            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"))
+            .replace("\r\n", "\n")
+            .replace('\r', '\n');
 
         assertTrue(source.contains("PipelineResourcePlanner.options()\n                .requireAtLeastOneBinding(false)\n                .filterIncompleteLayout(false)"),
             "Legacy Vulkan shader submissions must preserve full reflected resource layouts instead of compiling filtered layouts");
