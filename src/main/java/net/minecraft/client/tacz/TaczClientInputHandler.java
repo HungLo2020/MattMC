@@ -5,6 +5,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.special.TaczGlock17SpecialRenderer;
 import net.minecraft.network.protocol.common.custom.TaczGunInputC2SPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
@@ -16,6 +17,7 @@ import net.minecraft.world.item.TaczFireMode;
 import net.minecraft.world.item.TaczGunBurstData;
 import net.minecraft.world.item.TaczMvpGunItem;
 import net.minecraft.world.item.TaczRefitGun;
+import net.minecraft.world.entity.projectile.TaczBulletEffectHooks;
 
 public final class TaczClientInputHandler {
 	private static final ScheduledExecutorService BURST_FEEDBACK_EXECUTOR = Executors.newSingleThreadScheduledExecutor(runnable -> {
@@ -23,6 +25,10 @@ public final class TaczClientInputHandler {
 		thread.setDaemon(true);
 		return thread;
 	});
+
+	static {
+		TaczBulletEffectHooks.setAmmoParticleSpawner(TaczAmmoParticleSpawner::addParticle);
+	}
 
 	private TaczClientInputHandler() {
 	}
@@ -139,6 +145,7 @@ public final class TaczClientInputHandler {
 		}
 
 		TaczGlock17AnimationController.triggerShoot(itemStack);
+		TaczGlock17SpecialRenderer.triggerMuzzleFlash();
 		minecraft.level
 			.playSound(
 				minecraft.player,

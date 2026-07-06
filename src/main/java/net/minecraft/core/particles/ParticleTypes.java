@@ -16,6 +16,9 @@ public class ParticleTypes {
 	public static final ParticleType<BlockParticleOption> BLOCK_MARKER = register(
 		"block_marker", true, BlockParticleOption::codec, BlockParticleOption::streamCodec
 	);
+	public static final ParticleType<TaczBulletHoleParticleOptions> BULLET_HOLE = register(
+		"bullet_hole", false, particleType -> TaczBulletHoleParticleOptions.CODEC, particleType -> TaczBulletHoleParticleOptions.STREAM_CODEC
+	);
 	public static final SimpleParticleType BUBBLE = register("bubble", false);
 	public static final SimpleParticleType CLOUD = register("cloud", false);
 	public static final SimpleParticleType COPPER_FIRE_FLAME = register("copper_fire_flame", false);

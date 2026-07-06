@@ -157,6 +157,7 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 		List<TaczGunBallistics.DamagePoint> damageCurve = TaczGunBallistics.damageCurve(this.definition.id(), fireMode, bulletCount, this.definition.damage());
 		for (int shot = 0; shot < bulletCount; shot++) {
 			TaczBullet bullet = new TaczBullet(serverLevel, player, itemStack, damage, Math.max(1, this.definition.pierce()));
+			bullet.setTaczIds(this.definition.id(), this.definition.ammoId());
 			bullet.setDamageCurve(damageCurve);
 			bullet.setBulletProperties(
 				this.definition.gravity(),

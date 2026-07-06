@@ -50,6 +50,7 @@ import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.tacz.TaczGlock17AnimationController;
 import net.minecraft.client.tacz.TaczGunRefitScreen;
 import net.minecraft.client.tacz.TaczKeyMappings;
+import net.minecraft.client.tacz.TaczMuzzleFlashData;
 import net.minecraft.client.tacz.TaczRefitTransform;
 import net.minecraft.client.tacz.TaczScopeData;
 import net.minecraft.core.Direction;
@@ -80,9 +81,12 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final Set<String> FUNCTIONAL_MARKER_NODES = Set.of("lefthand_pos", "righthand_pos", "muzzle_flash", "shell");
 	private static final Pattern TACZ_NUMBERED_NODE = Pattern.compile("^(.*?)(?:_(\\d+))?$");
+	private static final long MUZZLE_FLASH_TIME_RANGE_MILLIS = 50L;
 	private static final Map<String, AttachmentRenderData> ATTACHMENT_CACHE = new ConcurrentHashMap<>();
 	private static final Map<String, Long> RETICLE_DEBUG_LAST_LOG_NANOS = new ConcurrentHashMap<>();
 	private static final long RETICLE_DEBUG_INTERVAL_NANOS = 500_000_000L;
+	private static long muzzleFlashShootTimeMillis = -1L;
+	private static float muzzleFlashRandomRotate;
 	public static final RenderPipeline TACZ_ENTITY_CUTOUT_STENCIL_PIPELINE = RenderPipeline.builder(RenderPipelines.ENTITY_SNIPPET)
 		.withLocation(ResourceLocation.withDefaultNamespace("pipeline/tacz_entity_cutout_stencil"))
 		.withShaderDefine("ALPHA_CUTOUT", 0.1F)
@@ -154,6 +158,11 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		this.animations = BedrockAnimationSet.load(ResourceLocation.withDefaultNamespace("animations/" + gunId + ".animation.json"));
 	}
 
+	public static void triggerMuzzleFlash() {
+		muzzleFlashShootTimeMillis = System.currentTimeMillis();
+		muzzleFlashRandomRotate = (float)(Math.random() * 360.0);
+	}
+
 	@Override
 	public void submit(ItemDisplayContext itemDisplayContext, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, boolean bl, int k) {
 		this.submitAnimated(itemDisplayContext, poseStack, submitNodeCollector, i, j, ItemStack.EMPTY);
@@ -190,7 +199,63 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		if (this.shouldRenderFirstPersonArms(itemDisplayContext)) {
 			this.submitFirstPersonArms(itemDisplayContext, poseStack, submitNodeCollector, i, animationPose);
 		}
+		this.submitMuzzleFlash(itemStack, itemDisplayContext, poseStack, submitNodeCollector, i, j, animationPose);
 		poseStack.popPose();
+	}
+
+	private void submitMuzzleFlash(
+		ItemStack gunStack,
+		ItemDisplayContext itemDisplayContext,
+		PoseStack poseStack,
+		SubmitNodeCollector submitNodeCollector,
+		int light,
+		int overlay,
+		AnimationPose animationPose
+	) {
+		if (gunStack.isEmpty() || !itemDisplayContext.firstPerson() || !this.geometry.hasNode("muzzle_flash") || this.isSilenced(gunStack)) {
+			return;
+		}
+		long ageMillis = System.currentTimeMillis() - muzzleFlashShootTimeMillis;
+		if (ageMillis < 0L || ageMillis > MUZZLE_FLASH_TIME_RANGE_MILLIS) {
+			return;
+		}
+		TaczMuzzleFlashData muzzleFlash = TaczMuzzleFlashData.get(this.gunId);
+		if (muzzleFlash == null) {
+			return;
+		}
+
+		float scale = 0.5F * muzzleFlash.scale();
+		float scaleTime = MUZZLE_FLASH_TIME_RANGE_MILLIS / 2.0F;
+		if (ageMillis < scaleTime) {
+			scale *= ageMillis / scaleTime;
+		}
+		float alpha = 1.0F - Mth.clamp(ageMillis / (float)MUZZLE_FLASH_TIME_RANGE_MILLIS, 0.0F, 1.0F);
+		float renderScale = scale;
+		float renderAlpha = alpha;
+		RenderType renderType = RenderType.entityTranslucent(muzzleFlash.texture());
+		submitNodeCollector.submitCustomGeometry(poseStack, renderType, (pose, vertexConsumer) -> {
+			PoseStack flashPoseStack = new PoseStack();
+			flashPoseStack.last().set(pose);
+			if (!this.geometry.applyAnimatedNodePath("muzzle_flash", flashPoseStack, animationPose)) {
+				return;
+			}
+			flashPoseStack.mulPose(Axis.ZP.rotationDegrees(muzzleFlashRandomRotate));
+			renderMuzzleFlashQuad(flashPoseStack.last(), vertexConsumer, renderScale, renderAlpha, overlay);
+		});
+	}
+
+	private boolean isSilenced(ItemStack gunStack) {
+		ItemStack muzzleStack = TaczRefitGun.getStoredAttachment(gunStack, TaczAttachmentType.MUZZLE);
+		return muzzleStack.getItem() instanceof TaczAttachmentItem attachment && attachment.getAttachmentId().contains("silencer");
+	}
+
+	private static void renderMuzzleFlashQuad(PoseStack.Pose pose, VertexConsumer vertexConsumer, float scale, float alpha, int overlay) {
+		float half = 0.4F * scale;
+		int color = (Mth.clamp((int)(alpha * 255.0F), 0, 255) << 24) | 0xFFFFFF;
+		vertexConsumer.addVertex(pose, -half, -half, 0.0F).setColor(color).setUv(0.0F, 1.0F).setOverlay(overlay).setLight(LightTexture.FULL_BRIGHT).setNormal(pose, 0.0F, 0.0F, 1.0F);
+		vertexConsumer.addVertex(pose, half, -half, 0.0F).setColor(color).setUv(1.0F, 1.0F).setOverlay(overlay).setLight(LightTexture.FULL_BRIGHT).setNormal(pose, 0.0F, 0.0F, 1.0F);
+		vertexConsumer.addVertex(pose, half, half, 0.0F).setColor(color).setUv(1.0F, 0.0F).setOverlay(overlay).setLight(LightTexture.FULL_BRIGHT).setNormal(pose, 0.0F, 0.0F, 1.0F);
+		vertexConsumer.addVertex(pose, -half, half, 0.0F).setColor(color).setUv(0.0F, 0.0F).setOverlay(overlay).setLight(LightTexture.FULL_BRIGHT).setNormal(pose, 0.0F, 0.0F, 1.0F);
 	}
 
 	private boolean shouldRenderFirstPersonArms(ItemDisplayContext itemDisplayContext) {

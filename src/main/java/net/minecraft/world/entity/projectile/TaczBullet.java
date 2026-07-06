@@ -1,10 +1,13 @@
 package net.minecraft.world.entity.projectile;
 
 import java.util.List;
+import net.minecraft.core.particles.TaczBulletHoleParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
 import net.minecraft.network.protocol.common.custom.TaczKillHudS2CPayload;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -30,6 +33,8 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
 public class TaczBullet extends Projectile {
+	private static final EntityDataAccessor<String> DATA_GUN_ID = SynchedEntityData.defineId(TaczBullet.class, EntityDataSerializers.STRING);
+	private static final EntityDataAccessor<String> DATA_AMMO_ID = SynchedEntityData.defineId(TaczBullet.class, EntityDataSerializers.STRING);
 	private static final int DEFAULT_LIFE = 40;
 	private static final float DEFAULT_GRAVITY = 0.005F;
 	private static final float DEFAULT_FRICTION = 0.01F;
@@ -73,6 +78,11 @@ public class TaczBullet extends Projectile {
 		this.damageCurve = List.copyOf(damageCurve);
 	}
 
+	public void setTaczIds(String gunId, String ammoId) {
+		this.entityData.set(DATA_GUN_ID, gunId);
+		this.entityData.set(DATA_AMMO_ID, ammoId);
+	}
+
 	public void shootFromRotation(Entity shooter, float pitch, float yaw, float roll, float velocity, TaczGunBallistics.SpreadOffset spreadOffset) {
 		TaczGunBallistics.Vec3Like vector = TaczGunBallistics.directionFromScriptedSpread(pitch, yaw, velocity, spreadOffset);
 		this.setDeltaMovement(vector.x(), vector.y(), vector.z());
@@ -83,6 +93,8 @@ public class TaczBullet extends Projectile {
 
 	@Override
 	protected void defineSynchedData(SynchedEntityData.Builder builder) {
+		builder.define(DATA_GUN_ID, "");
+		builder.define(DATA_AMMO_ID, "");
 	}
 
 	@Override
@@ -94,7 +106,9 @@ public class TaczBullet extends Projectile {
 			return;
 		}
 
-		if (!this.level().isClientSide()) {
+		if (this.level().isClientSide()) {
+			TaczBulletEffectHooks.addAmmoParticle(this);
+		} else {
 			this.traceServerHits();
 		}
 
@@ -191,6 +205,26 @@ public class TaczBullet extends Projectile {
 
 	private void onBulletHitBlock(BlockHitResult blockHitResult) {
 		this.setPos(blockHitResult.getLocation());
+		if (this.level() instanceof ServerLevel serverLevel) {
+			Vec3 hit = blockHitResult.getLocation();
+			serverLevel.sendParticles(
+				new TaczBulletHoleParticleOptions(
+					blockHitResult.getDirection(),
+					blockHitResult.getBlockPos(),
+					this.getAmmoId(),
+					this.getGunId(),
+					this.getGunDisplayId()
+				),
+				hit.x,
+				hit.y,
+				hit.z,
+				1,
+				0.0,
+				0.0,
+				0.0,
+				0.0
+			);
+		}
 		this.onHitBlock(blockHitResult);
 		this.level().gameEvent(GameEvent.PROJECTILE_LAND, blockHitResult.getBlockPos(), GameEvent.Context.of(this, this.level().getBlockState(blockHitResult.getBlockPos())));
 		this.discard();
@@ -248,6 +282,8 @@ public class TaczBullet extends Projectile {
 		valueOutput.putInt("pierce", this.pierce);
 		valueOutput.putFloat("headshot_multiplier", this.headshotMultiplier);
 		valueOutput.putFloat("knockback", this.knockback);
+		valueOutput.putString("gun_id", this.getGunId());
+		valueOutput.putString("ammo_id", this.getAmmoId());
 	}
 
 	@Override
@@ -260,6 +296,7 @@ public class TaczBullet extends Projectile {
 		this.pierce = valueInput.getIntOr("pierce", DEFAULT_PIERCE);
 		this.headshotMultiplier = valueInput.getFloatOr("headshot_multiplier", DEFAULT_HEADSHOT_MULTIPLIER);
 		this.knockback = valueInput.getFloatOr("knockback", DEFAULT_KNOCKBACK);
+		this.setTaczIds(valueInput.getStringOr("gun_id", ""), valueInput.getStringOr("ammo_id", ""));
 		this.startPos = this.position();
 	}
 
@@ -280,5 +317,18 @@ public class TaczBullet extends Projectile {
 
 	public ItemStack getWeapon() {
 		return this.weapon;
+	}
+
+	public String getGunId() {
+		return this.entityData.get(DATA_GUN_ID);
+	}
+
+	public String getAmmoId() {
+		return this.entityData.get(DATA_AMMO_ID);
+	}
+
+	public String getGunDisplayId() {
+		String gunId = this.getGunId();
+		return gunId.isEmpty() ? "" : "minecraft:" + gunId + "_display";
 	}
 }

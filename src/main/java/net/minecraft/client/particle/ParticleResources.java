@@ -62,6 +62,7 @@ public class ParticleResources implements PreparableReloadListener {
 		this.register(ParticleTypes.ANGRY_VILLAGER, HeartParticle.AngryVillagerProvider::new);
 		this.register(ParticleTypes.BLOCK_MARKER, new BlockMarker.Provider());
 		this.register(ParticleTypes.BLOCK, new TerrainParticle.Provider());
+		this.register(ParticleTypes.BULLET_HOLE, new TaczBulletHoleParticle.Provider());
 		this.register(ParticleTypes.BUBBLE, BubbleParticle.Provider::new);
 		this.register(ParticleTypes.BUBBLE_COLUMN_UP, BubbleColumnUpParticle.Provider::new);
 		this.register(ParticleTypes.BUBBLE_POP, BubblePopParticle.Provider::new);
