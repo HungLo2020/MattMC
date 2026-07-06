@@ -50,7 +50,6 @@ public final class TaczGunAnimationTimings {
 			Map.entry("inspect", 7.6333F),
 			Map.entry("inspect_empty", 5.9333F)
 		)),
-		entry("kar98k", Map.of("draw", 0.6667F, "put_away", 0.5833F, "shoot", 0.65F, "reload_tactical", 3.6333F, "reload_empty", 3.35F, "inspect", 6.5F, "inspect_empty", 4.3833F)),
 		entry("trs_bull", Map.ofEntries(
 			Map.entry("draw", 1.06F),
 			Map.entry("put_away", 0.48F),

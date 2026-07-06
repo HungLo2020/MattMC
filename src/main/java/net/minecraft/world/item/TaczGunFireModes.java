@@ -24,7 +24,6 @@ public final class TaczGunFireModes {
         Map.entry("hk_mp5a5", List.of(TaczFireMode.AUTO, TaczFireMode.BURST, TaczFireMode.SEMI)),
         Map.entry("hk416d", List.of(TaczFireMode.AUTO, TaczFireMode.SEMI)),
         Map.entry("kar98", List.of(TaczFireMode.SEMI)),
-        Map.entry("kar98k", List.of(TaczFireMode.SEMI)),
         Map.entry("lonetrail", List.of(TaczFireMode.SEMI)),
         Map.entry("m1", List.of(TaczFireMode.SEMI)),
         Map.entry("m1_garand", List.of(TaczFireMode.SEMI)),
