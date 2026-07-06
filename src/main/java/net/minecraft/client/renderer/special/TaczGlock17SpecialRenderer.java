@@ -48,6 +48,7 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.tacz.TaczGlock17AnimationController;
+import net.minecraft.client.tacz.TaczGunRefitScreen;
 import net.minecraft.client.tacz.TaczKeyMappings;
 import net.minecraft.client.tacz.TaczRefitTransform;
 import net.minecraft.client.tacz.TaczScopeData;
@@ -186,8 +187,18 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			});
 			this.submitAttachments(itemStack, itemDisplayContext, poseStack, submitNodeCollector, i, j, animationPose, false);
 		}
-		this.submitFirstPersonArms(itemDisplayContext, poseStack, submitNodeCollector, i, animationPose);
+		if (this.shouldRenderFirstPersonArms(itemDisplayContext)) {
+			this.submitFirstPersonArms(itemDisplayContext, poseStack, submitNodeCollector, i, animationPose);
+		}
 		poseStack.popPose();
+	}
+
+	private boolean shouldRenderFirstPersonArms(ItemDisplayContext itemDisplayContext) {
+		if (!itemDisplayContext.firstPerson()) {
+			return false;
+		}
+		Minecraft minecraft = Minecraft.getInstance();
+		return !(minecraft.screen instanceof TaczGunRefitScreen) && TaczRefitTransform.openingProgress() <= 0.0F;
 	}
 
 	private ScopedAttachment scopedAttachment(ItemStack gunStack, ItemDisplayContext itemDisplayContext, AnimationPose animationPose) {

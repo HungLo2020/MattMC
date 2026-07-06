@@ -149,6 +149,15 @@ public class TaczGunRefitScreen extends Screen {
 	}
 
 	@Override
+	public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+	}
+
+	@Override
+	public boolean isInGameUi() {
+		return true;
+	}
+
+	@Override
 	public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
 		this.renderPanel(guiGraphics);
 		super.render(guiGraphics, mouseX, mouseY, partialTick);
