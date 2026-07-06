@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.uzi.name",
+  "display": "minecraft:uzi_display",
+  "data": "minecraft:uzi_data",
+  "tooltip": "minecraft.gun.uzi.desc",
+  "type": "smg",
+  "sort": 2
+}

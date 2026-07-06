@@ -1,0 +1,10 @@
+{
+  "model": "minecraft:ammo/68x51fury",
+  "texture": "minecraft:ammo/uv/68x51fury",
+  "slot": "minecraft:ammo/slot/68x51fury",
+  "shell": {
+    "model": "minecraft:shell/308_shell",
+    "texture": "minecraft:shell/308_shell"
+  }
+}
+    

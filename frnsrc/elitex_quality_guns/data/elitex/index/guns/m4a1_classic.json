@@ -1,0 +1,8 @@
+{
+    "name": "elitex.gun.m4a1_classic.name",
+    "display": "elitex:m4a1_classic_display",
+    "data": "elitex:m4a1_classic_data",
+    "type": "rifle",
+    "sort": 1,
+    "tooltip": "elitex.gun.m4a1_classic.desc"
+}

@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
@@ -149,7 +150,12 @@ public class KeyMapping implements Comparable<KeyMapping> {
 	}
 
 	public boolean same(KeyMapping keyMapping) {
-		return this.key.equals(keyMapping.key);
+		return this.key.equals(keyMapping.key) && Objects.equals(this.getKeyModifier(), keyMapping.getKeyModifier());
+	}
+
+	@Nullable
+	protected InputConstants.Key getKeyModifier() {
+		return null;
 	}
 
 	public boolean isUnbound() {

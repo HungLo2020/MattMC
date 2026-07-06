@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.scar_h.name",
+  "display": "minecraft:scar_h_display",
+  "data": "minecraft:scar_h_data",
+  "tooltip": "minecraft.gun.scar_h.desc",
+  "type": "rifle",
+  "sort": 5
+}

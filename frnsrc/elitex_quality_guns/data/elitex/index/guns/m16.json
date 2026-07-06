@@ -1,0 +1,8 @@
+{
+    "name": "elitex.gun.m16.name",
+    "display": "elitex:m16_display",
+    "data": "elitex:m16_data",
+    "type": "rifle",
+    "sort": 1,
+    "tooltip": "elitex.gun.m16.desc"
+}

@@ -253,6 +253,9 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.HitResult.Type;
+import net.minecraft.client.tacz.TaczClientInputHandler;
+import net.minecraft.client.tacz.TaczGunHudOverlay;
+import net.minecraft.client.tacz.TaczKeyMappings;
 import net.voxelmap.VoxelConstants;
 import net.voxelmap.VoxelMapInitializer;
 import org.apache.commons.io.FileUtils;
@@ -715,6 +718,10 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		} catch (Exception e) {
 			LOGGER.error("Failed to initialize VoxelMap", e);
 		}
+
+		// TACZ MVP: Register client controls using MattMC's direct key mapping list.
+		TaczKeyMappings.register(this);
+		TaczGunHudOverlay.register();
 	}
 
 	public boolean hasShiftDown() {
@@ -2045,6 +2052,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		}
 
 		boolean bl3 = false;
+		if (TaczClientInputHandler.handleKeybinds(this)) {
+			this.continueAttack(false);
+			return;
+		}
+
 		if (this.player.isUsingItem()) {
 			if (!this.options.keyUse.isDown()) {
 				this.gameMode.releaseUsingItem(this.player);

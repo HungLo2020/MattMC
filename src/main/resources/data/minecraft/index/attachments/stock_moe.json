@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.stock_moe.name",
+  "display": "minecraft:stock_moe_display",
+  "data": "minecraft:stock_moe_data",
+  "type": "stock",
+  "sort": 10
+}

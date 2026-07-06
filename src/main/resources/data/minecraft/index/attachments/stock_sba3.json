@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.stock_sba3.name",
+  "display": "minecraft:stock_sba3_display",
+  "data": "minecraft:stock_sba3_data",
+  "type": "stock",
+  "sort": 10
+}

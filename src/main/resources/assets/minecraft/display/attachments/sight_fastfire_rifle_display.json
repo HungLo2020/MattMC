@@ -1,0 +1,19 @@
+{
+  "slot": "minecraft:attachment/slot/sight_fastfire_rifle",
+  "model": "minecraft:attachment/sight_fastfire_rifle_geo",
+  "texture": "minecraft:attachment/uv/sight_fastfire_rifle",
+  "lod": {
+    "model": "minecraft:attachment/lod/sight_fastfire_rifle",
+    "texture": "minecraft:attachment/lod/sight_fastfire_rifle"
+  },
+  "zoom": [
+    1.5
+  ],
+  "scope": false,
+  "sight": true,
+  "fov": 45.0,
+  "sounds": {
+    "install": "minecraft:attachments/scope_general_c",
+    "uninstall": "minecraft:attachments/scope_general_c"
+  }
+}

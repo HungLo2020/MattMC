@@ -1,0 +1,33 @@
+{
+  "model": "minecraft:ammo/50ae",
+  "texture": "minecraft:ammo/uv/50ae",
+  "slot": "minecraft:ammo/slot/50ae",
+  "shell": {
+    "model": "minecraft:shell/50ae_shell",
+    "texture": "minecraft:shell/50ae_shell"
+  },
+  "tracer_color": "#FF9999",
+  "transform": {
+    "scale": {
+      // Ã§Â¬Â¬Ã¤Â¸â€°Ã¤ÂºÂºÃ§Â§Â°Ã¦â€°â€¹Ã©Æ’Â¨
+      "thirdperson": [
+        0.75,
+        0.75,
+        0.75
+      ],
+      // Ã¥Å“Â°Ã©ÂÂ¢Ã¥Â®Å¾Ã¤Â½â€œ
+      "ground": [
+        0.75,
+        0.75,
+        0.75
+      ],
+      // Ã¥Â±â€¢Ã§Â¤ÂºÃ¦Â¡â€ 
+      "fixed": [
+        1.5,
+        1.5,
+        1.5
+      ]
+    }
+  }
+}
+    

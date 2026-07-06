@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.laser_nightstick",
+  "display": "minecraft:laser_nightstick_display",
+  "data": "minecraft:laser_nightstick_data",
+  "type": "laser",
+  "sort": 10
+}

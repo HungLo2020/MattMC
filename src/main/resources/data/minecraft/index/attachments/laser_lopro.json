@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.laser_lopro",
+  "display": "minecraft:laser_lopro_display",
+  "data": "minecraft:laser_lopro_data",
+  "type": "laser",
+  "sort": 10
+}

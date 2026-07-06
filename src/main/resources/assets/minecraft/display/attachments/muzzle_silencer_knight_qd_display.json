@@ -1,0 +1,9 @@
+{
+  "slot": "minecraft:attachment/slot/muzzle_silencer_knight_qd",
+  "model": "minecraft:attachment/muzzle_silencer_knight_qd_geo",
+  "texture": "minecraft:attachment/uv/muzzle_silencer_knight_qd",
+  "sounds": {
+    "install": "minecraft:attachments/muzzle_general",
+    "uninstall": "minecraft:attachments/muzzle_general"
+  }
+}

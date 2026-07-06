@@ -1,0 +1,18 @@
+{
+  "slot": "ww:attachment/slot/no32",
+  "model": "ww:attachment/no32_geo",
+  "texture": "ww:attachment/uv/no32",
+  "lod": {
+    "model": "ww:attachment/no32_geo",
+    "texture": "ww:attachment/uv/no32"
+  },
+  "zoom": [
+    4
+  ],
+  "scope": true,
+  "fov": 70.0,
+  "sounds": {
+    "install": "tacz:attachments/scope_general_d",
+    "uninstall": "tacz:attachments/scope_general_d"
+  }
+}

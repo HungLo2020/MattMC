@@ -1,0 +1,9 @@
+{
+    "name": "Ithaca M37",
+    "display": "ww:i37_display",
+    "data": "ww:i37_data",
+    "type": "shotgun",
+    "item_type": "modern_kinetic",
+    "sort": 10,
+    "tooltip":"Hey this things not so bad - Oh, I'm out of ammo."
+}

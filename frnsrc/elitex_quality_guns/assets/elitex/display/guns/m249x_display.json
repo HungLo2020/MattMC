@@ -1,0 +1,58 @@
+{
+  "model": "elitex:gun/m249x_geo",
+  "texture": "elitex:gun/uv/m249x",
+  "hud": "elitex:gun/hud/m249x",
+  "slot": "elitex:gun/slot/m249x",
+  "animation": "elitex:m249x",
+  "use_default_animation": "rifle",
+  "third_person_animation": "default",
+  "state_machine": "elitex:m249x_state_machine",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.5, 0.5, 0.5],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1, 1, 1]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "tacz:flash/common_muzzle_flash",
+    "scale": 0.75
+  },
+  "iron_zoom": 1.33,
+  "zoom_model_fov": 57,
+  "shell": {
+    "initial_velocity": [3, -0.5, 0.25],
+    "random_velocity": [3, 0.5, 0.25],
+    "acceleration": [0.0, -10, 0.0],
+    "angular_velocity": [360, -3000, 90],
+    "living_time": 3.0
+  },
+
+
+  "sounds": {
+    "shoot": "elitex:lmgs/m249x/m249x_fire",
+    "shoot_3p": "elitex:lmgs/m249x/m249x_fire_3p",
+    "reload_empty": "elitex:lmgs/m249x/m249x_reload_empty",
+    "reload_tactical": "elitex:lmgs/m249x/m249x_reload",
+    "inspect": "elitex:lmgs/m249x/m249x_inspect",
+    "inspect_empty": "elitex:lmgs/m249x/m249x_inspect_empty",
+    "draw": "elitex:lmgs/m249x/m249x_draw",
+    "put_away": "elitex:lmgs/m249x/m249x_put_away",
+    "silence": "elitex:lmgs/m249x/m249x_suppressed",
+    "silence_3p": "elitex:lmgs/m249x/m249x_suppressed_3p",
+    "dry_fire":  "elitex:platform_sound_sfx/m4_platform_sfx/m4_platform_dry_fire",
+    "fire_select": "elitex:platform_sound_sfx/m4_platform_sfx/m4_platform_fire_select"
+  },
+  "offhand_show": {
+    "pos": [1, 19, 4],
+    "rotate": [0, 0, 50],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-1, 19, 3],
+      "rotate": [-180, 0, 130],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

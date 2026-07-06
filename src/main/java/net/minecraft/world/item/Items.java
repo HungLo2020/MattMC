@@ -1,6 +1,9 @@
 package net.minecraft.world.item;
 
 import java.util.List;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -2661,6 +2664,14 @@ public class Items {
 	public static final Item TROWEL = registerItem("trowel", TrowelItem::new, new Item.Properties().stacksTo(1));
 	// Building Wand: extends contiguous planes of matching blocks
 	public static final Item BUILDING_WAND = registerItem("building_wand", BuildingWandItem::new, new Item.Properties().stacksTo(1));
+	public static final Map<String, Item> TACZ_GUNS_BY_ID = registerTaczGuns();
+	public static final Map<String, Item> TACZ_AMMO_BY_ID = registerTaczAmmo();
+	public static final Map<String, Item> TACZ_ATTACHMENTS_BY_ID = registerTaczAttachments();
+	public static final Item TACZ_GLOCK_17 = TACZ_GUNS_BY_ID.get("glock_17");
+	public static final Item TACZ_NINE_MM_AMMO = TACZ_AMMO_BY_ID.get("9mm");
+	public static final Item TACZ_GLOCK_EXTENDED_MAG_I = TACZ_ATTACHMENTS_BY_ID.get("light_extended_mag_1");
+	public static final Item TACZ_GLOCK_EXTENDED_MAG_II = TACZ_ATTACHMENTS_BY_ID.get("light_extended_mag_2");
+	public static final Item TACZ_GLOCK_EXTENDED_MAG_III = TACZ_ATTACHMENTS_BY_ID.get("light_extended_mag_3");
 	
 	public static final Item OMINOUS_BOTTLE = registerItem(
 		"ominous_bottle",
@@ -2672,6 +2683,37 @@ public class Items {
 
 	private static Function<Item.Properties, Item> createBlockItemWithCustomItemName(Block block) {
 		return properties -> new BlockItem(block, properties.useItemDescriptionPrefix());
+	}
+
+	private static Map<String, Item> registerTaczGuns() {
+		Map<String, Item> items = new LinkedHashMap<>();
+		for (TaczGunDefinitions.Gun gun : TaczGunDefinitions.GUNS) {
+			items.put(gun.id(), registerItem(vanillaItemId(gun.id()), properties -> new TaczMvpGunItem(gun.id(), properties), new Item.Properties().stacksTo(1)));
+		}
+		return Collections.unmodifiableMap(items);
+	}
+
+	private static Map<String, Item> registerTaczAmmo() {
+		Map<String, Item> items = new LinkedHashMap<>();
+		for (TaczGunDefinitions.Ammo ammo : TaczGunDefinitions.AMMO) {
+			items.put(ammo.id(), registerItem(vanillaItemId(ammo.id()), Item::new, new Item.Properties().stacksTo(ammo.stackSize())));
+		}
+		return Collections.unmodifiableMap(items);
+	}
+
+	private static Map<String, Item> registerTaczAttachments() {
+		Map<String, Item> items = new LinkedHashMap<>();
+		for (TaczGunDefinitions.Attachment attachment : TaczGunDefinitions.ATTACHMENTS) {
+			items.put(
+				attachment.id(),
+				registerItem(
+					vanillaItemId(attachment.id()),
+					properties -> new TaczAttachmentItem(attachment.id(), attachment.type(), attachment.level(), properties),
+					new Item.Properties().stacksTo(1)
+				)
+			);
+		}
+		return Collections.unmodifiableMap(items);
 	}
 
 	private static ResourceKey<Item> vanillaItemId(String string) {

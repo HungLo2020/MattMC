@@ -1,0 +1,49 @@
+{
+  "model": "minecraft:gun/cz75_geo",
+  "texture": "minecraft:gun/uv/cz75",
+  "lod": {
+    "model": "minecraft:gun/lod/cz75",
+    "texture": "minecraft:gun/lod/cz75"
+  },
+  "hud": "minecraft:gun/hud/cz75",
+  "slot": "minecraft:gun/slot/cz75",
+  "animation": "minecraft:cz75",
+  "use_default_animation": "pistol",
+  "player_animator_3rd": "minecraft:pistol_default.player_animation",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "shell": {
+    "initial_velocity": [6.0, 5.0, 0.5],
+    "random_velocity": [2, 1.5, 0.25],
+    "acceleration": [0.0, -20, 0.0],
+    "angular_velocity": [360, -720, 90],
+    "living_time": 1.0
+  },
+  "muzzle_flash": {
+    "texture": "minecraft:flash/common_muzzle_flash",
+    "scale": 0.55
+  },
+  "sounds": {
+    "shoot": "minecraft:cz75/cz75_shoot",
+    "shoot_3p": "minecraft:cz75/cz75_shoot_3p",
+    "silence": "minecraft:cz75/cz75_silence",
+    "silence_3p": "minecraft:cz75/cz75_silence_3p"
+  },
+  "offhand_show": {
+    "pos": [4, 13, -1],
+    "rotate": [-90, -35, 90],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-5, 13, -1],
+      "rotate": [-90, -35, 90],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.attachment.ammo_mod_hp.name",
+  "display": "minecraft:ammo_mod_hp_display",
+  "data": "minecraft:ammo_mod_hp_data",
+  "tooltip": "minecraft.attachment.ammo_mod_hp.desc",
+  "type": "extended_mag",
+  "sort": 1000
+}

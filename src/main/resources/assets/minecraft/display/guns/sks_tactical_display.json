@@ -1,0 +1,59 @@
+{
+  "model": "minecraft:gun/sks_tactical_geo",
+  "texture": "minecraft:gun/uv/sks_tactical",
+  "lod": {
+    "model": "minecraft:gun/lod/sks_tactical",
+    "texture": "minecraft:gun/lod/sks_tactical"
+  },
+  "hud": "minecraft:gun/hud/sks_tactical",
+  "slot": "minecraft:gun/slot/sks_tactical",
+  "animation": "minecraft:sks_tactical",
+  "use_default_animation": "rifle",
+  "third_person_animation": "default",
+  "state_machine": "minecraft:sks_tactical_state_machine",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "minecraft:flash/common_muzzle_flash",
+    "scale": 1.0
+  },
+  "iron_zoom": 1.5,
+  "zoom_model_fov": 45,
+  "shell": {
+    "initial_velocity": [5, 2, 1],
+    "random_velocity": [1, 1, 0.25],
+    "acceleration": [0.0, -10, 0.0],
+    "angular_velocity": [360, -1200, 90],
+    "living_time": 1.0
+  },
+  "sounds": {
+    "shoot": "minecraft:sks/sks_shoot",
+    "shoot_3p": "minecraft:sks/sks_shoot_3p",
+    "silence": "minecraft:sks/sks_silence",
+    "silence_3p": "minecraft:sks/sks_silence_3p",
+    "dry_fire": "minecraft:dry_fire",
+    "fire_select": "minecraft:fire_select",
+    "head_hit": "minecraft:head_hit",
+    "flesh_hit": "minecraft:flesh_hit",
+    "kill": "minecraft:kill",
+    "melee_push": "minecraft:melee_stock/melee_stock_01",
+    "melee_stock": "minecraft:melee_stock/melee_stock_03"
+  },
+  "offhand_show": {
+    "pos": [0, 19, 4],
+    "rotate": [0, 0, 60],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [0, 19, 3],
+      "rotate": [-180, 0, 120],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

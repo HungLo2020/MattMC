@@ -46,6 +46,7 @@ public interface DamageTypes {
 	ResourceKey<DamageType> UNATTRIBUTED_FIREBALL = ResourceKey.create(Registries.DAMAGE_TYPE, ResourceLocation.withDefaultNamespace("unattributed_fireball"));
 	ResourceKey<DamageType> WITHER_SKULL = ResourceKey.create(Registries.DAMAGE_TYPE, ResourceLocation.withDefaultNamespace("wither_skull"));
 	ResourceKey<DamageType> THROWN = ResourceKey.create(Registries.DAMAGE_TYPE, ResourceLocation.withDefaultNamespace("thrown"));
+	ResourceKey<DamageType> BULLET = ResourceKey.create(Registries.DAMAGE_TYPE, ResourceLocation.withDefaultNamespace("bullet"));
 	ResourceKey<DamageType> INDIRECT_MAGIC = ResourceKey.create(Registries.DAMAGE_TYPE, ResourceLocation.withDefaultNamespace("indirect_magic"));
 	ResourceKey<DamageType> THORNS = ResourceKey.create(Registries.DAMAGE_TYPE, ResourceLocation.withDefaultNamespace("thorns"));
 	ResourceKey<DamageType> EXPLOSION = ResourceKey.create(Registries.DAMAGE_TYPE, ResourceLocation.withDefaultNamespace("explosion"));
@@ -100,6 +101,7 @@ public interface DamageTypes {
 		bootstrapContext.register(FIREBALL, new DamageType("fireball", 0.1F, DamageEffects.BURNING));
 		bootstrapContext.register(WITHER_SKULL, new DamageType("witherSkull", 0.1F));
 		bootstrapContext.register(THROWN, new DamageType("thrown", 0.1F));
+		bootstrapContext.register(BULLET, new DamageType("bullet", 0.1F));
 		bootstrapContext.register(INDIRECT_MAGIC, new DamageType("indirectMagic", 0.0F));
 		bootstrapContext.register(THORNS, new DamageType("thorns", 0.1F, DamageEffects.THORNS));
 		bootstrapContext.register(EXPLOSION, new DamageType("explosion", DamageScaling.ALWAYS, 0.1F));

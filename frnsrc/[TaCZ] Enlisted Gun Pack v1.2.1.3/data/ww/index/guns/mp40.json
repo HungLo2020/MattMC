@@ -1,0 +1,11 @@
+{
+    "name": "MP40",
+
+    "display": "ww:mp40_display",
+    
+    "data": "ww:mp40_data",
+    "tooltip": "Blah blah inspirational movie quote",
+    "type": "smg",
+    
+    "item_type": "modern_kinetic"  
+}

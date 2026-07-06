@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.oem_stock_light.name",
+  "display": "minecraft:oem_stock_light_display",
+  "data": "minecraft:oem_stock_light_data",
+  "type": "stock",
+  "sort": 1
+}

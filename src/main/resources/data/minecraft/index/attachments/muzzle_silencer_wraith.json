@@ -1,0 +1,6 @@
+{
+  "name": "minecraft.attachment.muzzle_silencer_wraith.name",
+  "display": "minecraft:muzzle_silencer_wraith_display",
+  "data": "minecraft:muzzle_silencer_wraith_data",
+  "type": "muzzle"
+}

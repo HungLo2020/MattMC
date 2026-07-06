@@ -1,0 +1,12 @@
+{
+    "name": "Type 100/44",
+
+    "display": "ww:t100l_display",
+    
+    "data": "ww:t100l_data",
+    "tooltip": "Death Before Dishonour.",
+    "type": "smg",
+    "sort": 1,
+    
+    "item_type": "modern_kinetic"  
+}

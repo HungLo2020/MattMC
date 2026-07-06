@@ -1,0 +1,27 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "forge:ingots/iron"
+      },
+      "count": 40
+    },
+    {
+      "item": {
+        "tag": "forge:ingots/gold"
+      },
+      "count": 7
+    },
+    {
+      "item": {
+        "tag": "minecraft:logs"
+      },
+      "count": 15
+    }
+  ],
+  "result": {
+    "type": "gun",
+    "id": "tacz:as44"
+  },
+  "type": "tacz:gun_smith_table_crafting"
+}

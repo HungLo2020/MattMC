@@ -1,0 +1,106 @@
+{
+  "ammo": "ww:65a",
+  "ammo_amount": 30,
+  "extended_mag_ammo_amount": [
+    30,
+    30,
+    40
+  ],
+  "bolt": "open_bolt",
+  "rpm": 500,
+  "bullet": {
+    "life": 1,
+    "bullet_amount": 1,
+    "damage": 13,
+    "tracer_count_interval": 0,
+    "extra_damage": {
+      "armor_ignore": 0.6,
+      "head_shot_multiplier": 1.75,
+      "damage_adjust": [
+        {"distance": 50, "damage": 17},
+        {"distance": 100, "damage": 16},
+        {"distance": "infinite", "damage": 15}
+      ]
+    },
+    "speed": 340,
+    "gravity": 0.15,
+    "knockback": 0,
+    "friction": 0.02,
+    "ignite": false,
+    "pierce": 2,
+    "explosion": {
+      "explode": false,
+      "damage": 35,
+      "radius": 1.2,
+      "knockback": false,
+      "delay": 1
+    }
+  },
+  "reload": {
+    "type": "magazine",
+    "feed": {
+      "empty": 3.7,
+      "tactical": 2.5
+    },
+    "cooldown": {
+      "empty": 4.7,
+      "tactical": 3.7
+    }
+  },
+  "draw_time": 1.1,
+  "put_away_time": 0.6,
+  "aim_time": 0.25,
+  "sprint_time": 0.35,
+  "weight": 9.65, 
+  "movement_speed": {
+    "base": 0.0,
+    "aim": -0.4,
+    "reload": -0.2
+  },
+  "crawl_recoil_multiplier": 0.25,
+  "fire_mode": [
+    "semi",
+    "auto"
+  ],
+  "burst_data": {
+    "continuous_shoot": false,
+    "count": 3,
+    "bpm": 700,
+    "min_interval": 0.3
+  },
+  "recoil": {
+    "pitch": [
+      {"time": 0, "value": [1.0, 1.2]},
+      {"time": 0.3, "value": [1.0, 1.2]},
+      {"time": 0.5, "value": [-0.25, -0.25]},
+      {"time": 0.65, "value": [0, 0]}
+    ],
+    "yaw": [
+      {"time": 0, "value": [-0.65, 0.2]},
+      {"time": 0.3, "value": [-0.65, 0.2]},
+      {"time": 0.5, "value": [0, 0]}
+    ]
+  },
+  "inaccuracy": {
+    "stand": 4,
+    "move": 5,
+    "sneak": 3.5,
+    "lie": 3,
+    "aim": 0.08
+  },
+  "melee": {
+    "distance": 1,
+    "cooldown": 0.44,
+    "default": {
+      "animation_type": "melee_stock",
+      "distance": 1,
+      "range_angle": 30,
+      "damage": 5,
+      "knockback": 0.5,
+      "prep": 0.1
+    }
+  },
+  "allow_attachment_types": [
+     "grip"
+  ]
+}

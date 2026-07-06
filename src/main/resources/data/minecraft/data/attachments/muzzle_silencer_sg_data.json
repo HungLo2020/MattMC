@@ -1,0 +1,30 @@
+{
+  "weight": 0.4,
+  "ads": {
+    // åŠ æ•°ï¼ˆå¤šä¸ªé…ä»¶çš„æ•°å€¼ç›¸åŠ ï¼Œä½œä¸ºç¬¬ä¸€ä¸ªä¹˜åŒºï¼‰
+    "addend": 0.1
+  },
+  "inaccuracy": {
+    "multiplier": 0.95
+  },
+  "aim_inaccuracy": {
+    "multiplier": 0.9
+  },
+  "effective_range": {
+    "multiplier": 1.5
+  },
+  "rpm": {
+    "multiplier":0.95
+  },
+  "recoil": {
+    "pitch": {
+      "multiplier": 0.9
+    }
+  },
+  "silence": {
+    // å£°éŸ³ä¼ æ’­çš„èŒƒå›´ï¼Œå¦‚æžœé»˜è®¤æ˜¯ 50 æ ¼ï¼Œè¿™é‡Œå¡«å…¥ -10ï¼Œé‚£ä¹ˆæ¶ˆéŸ³åŽä¼ æ’­è·ç¦»ä¸º 40 æ ¼
+    "distance_addend": -20,
+    // æ˜¯å¦ä½¿ç”¨ä¸“é—¨çš„æ¶ˆéŸ³åŽçš„éŸ³æº
+    "use_silence_sound": true
+  }
+}

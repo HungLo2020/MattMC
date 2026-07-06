@@ -1,0 +1,7 @@
+{
+    "name": "elitex.gun.mcs_spear.name",
+    "display": "elitex:mcs_spear_display",
+    "data": "elitex:mcs_spear_data",
+    "type": "rifle",
+    "tooltip": "elitex.gun.mcs_spear.desc"
+}

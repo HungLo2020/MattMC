@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/tacz/guns/db_short",
+    "particle": "minecraft:item/tacz/guns/db_short"
+  }
+}

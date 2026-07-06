@@ -290,6 +290,7 @@ public class VulkanBackend {
     private volatile float pendingClearB = 0.0f;
     private volatile float pendingClearA = 0.0f;
     private volatile double pendingClearDepth = 1.0;
+    private volatile int pendingClearStencil = 0;
 
     private volatile int pendingLogicOp = 0x1503 /* GL_COPY */;
     private volatile int pendingReadBuffer  = 0x0405 /* GL_BACK */;
@@ -7274,12 +7275,15 @@ void main() {
 
         final int GL_COLOR_BUFFER_BIT = 0x00004000;
         final int GL_DEPTH_BUFFER_BIT = 0x00000100;
+        final int GL_STENCIL_BUFFER_BIT = 0x00000400;
         boolean clearColor = (mask & GL_COLOR_BUFFER_BIT) != 0;
         boolean clearDepth = (mask & GL_DEPTH_BUFFER_BIT) != 0;
+        boolean clearStencil = (mask & GL_STENCIL_BUFFER_BIT) != 0;
 
         spine.cmdClearAttachments(commandBufferHandle,
             clearColor, pendingClearR, pendingClearG, pendingClearB, pendingClearA,
-            clearDepth, (float) pendingClearDepth);
+            clearDepth, (float) pendingClearDepth,
+            clearStencil, pendingClearStencil);
     }
 
     // =====================================================================
@@ -7528,6 +7532,12 @@ void main() {
     public void setClearDepth(CommandContext ctx, double depth) {
         requireVulkanCommandBufferHandle("setClearDepth", ctx);
         this.pendingClearDepth = depth;
+    }
+
+    /** Caches clear stencil value (used by stencil clear operations). */
+    public void setClearStencil(CommandContext ctx, int stencil) {
+        requireVulkanCommandBufferHandle("setClearStencil", ctx);
+        this.pendingClearStencil = stencil;
     }
 
     // =====================================================================
@@ -20635,15 +20645,16 @@ void main() {
         private void cmdClearAttachments(long commandBufferHandle,
                                          boolean clearColor,
                                          float cr, float cg, float cb, float ca,
-                                         boolean clearDepth, float depth) {
+                                         boolean clearDepth, float depth,
+                                         boolean clearStencil, int stencil) {
             VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "cmdClearAttachments");
             if (!renderPassRecording) {
                 // Cannot issue ClearAttachments outside a render pass; silently defer.
                 return;
             }
             int colorAttachmentCount = clearColor ? activeRenderPassColorAttachmentCount() : 0;
-            boolean clearActiveDepth = clearDepth && activeRenderPassDepthTexture != null;
-            int attachmentCount = colorAttachmentCount + (clearActiveDepth ? 1 : 0);
+            boolean clearActiveDepthStencil = (clearDepth || clearStencil) && activeRenderPassDepthTexture != null;
+            int attachmentCount = colorAttachmentCount + (clearActiveDepthStencil ? 1 : 0);
             if (attachmentCount == 0) return;
 
             try (MemoryStack stack = stackPush()) {
@@ -20661,10 +20672,17 @@ void main() {
                         .float32(0, cr).float32(1, cg).float32(2, cb).float32(3, ca);
                     idx++;
                 }
-                if (clearActiveDepth) {
+                if (clearActiveDepthStencil) {
+                    int aspectMask = 0;
+                    if (clearDepth) {
+                        aspectMask |= VK10.VK_IMAGE_ASPECT_DEPTH_BIT;
+                    }
+                    if (clearStencil) {
+                        aspectMask |= VK10.VK_IMAGE_ASPECT_STENCIL_BIT;
+                    }
                     attachments.get(idx)
-                        .aspectMask(VK10.VK_IMAGE_ASPECT_DEPTH_BIT);
-                    attachments.get(idx).clearValue().depthStencil().depth(depth).stencil(0);
+                        .aspectMask(aspectMask);
+                    attachments.get(idx).clearValue().depthStencil().depth(depth).stencil(stencil);
                 }
 
                 int w = Math.max(1, activeRenderPassWidth > 0 ? activeRenderPassWidth : swapchainWidth);

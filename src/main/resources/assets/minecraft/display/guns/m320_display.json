@@ -1,0 +1,43 @@
+{
+  "model": "minecraft:gun/m320_geo",
+  "texture": "minecraft:gun/uv/m320",
+  "hud": "minecraft:gun/hud/m320",
+  "slot": "minecraft:gun/slot/m320",
+  "animation": "minecraft:m320",
+  "use_default_animation": "rifle",
+  "player_animator_3rd": "minecraft:rifle_default.player_animation",
+  "lod": {
+    "model": "minecraft:gun/lod/m320",
+    "texture": "minecraft:gun/lod/m320"
+  },
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "sounds": {
+    "reload_empty": "minecraft:m320/m320_reload_empty",
+    "inspect": "minecraft:m320/m320_inspect",
+    "inspect_empty": "minecraft:m320/m320_inspect",
+    "draw": "minecraft:m320/m320_draw",
+    "put_away":"minecraft:m320/m320_put_away",
+    "shoot": "minecraft:m320/m320_shoot",
+    "shoot_3p": "minecraft:m320/m320_shoot",
+    "melee_push": "minecraft:melee_stock/melee_stock_02",
+    "melee_stock": "minecraft:melee_stock/melee_stock_03"
+  },
+  "offhand_show": {
+    "pos": [1, 20, 4],
+    "rotate": [0, 0, 45],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [1, 16, -2],
+    "rotate": [0, 0, 20],
+    "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

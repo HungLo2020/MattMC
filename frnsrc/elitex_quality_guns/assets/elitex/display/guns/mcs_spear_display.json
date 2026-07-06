@@ -1,0 +1,49 @@
+{
+  "model": "elitex:gun/mcs_spear_geo",
+  "texture": "elitex:gun/uv/mcs_spear",
+  "hud": "elitex:gun/hud/mcs_spear",
+  "slot": "elitex:gun/slot/mcs_spear",
+  "animation": "elitex:mcs_spear",
+  "use_default_animation": "rifle",
+  "third_person_animation": "default",
+  "state_machine": "elitex:mcs_spear_state_machine",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.5, 0.5, 0.5],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "tacz:flash/common_muzzle_flash",
+    "scale": 1.1
+  },
+  "shell": {
+    "initial_velocity": [5, 2, 1],
+    "random_velocity": [1, 1, 0.25],
+    "acceleration": [0.0, -10, 0.0],
+    "angular_velocity": [360, -1200, 90],
+    "living_time": 3.5
+  },
+  "sounds": {
+    "shoot": "elitex:assault_rifles/mcs_spear/mcx_spear_fire2",
+    "shoot_3p": "elitex:assault_rifles/mcs_spear/mcx_spear_fire",
+    "inspect_empty": "elitex:assault_rifles/mcs_spear/mcx_spear_inspect_empty",
+    "silence": "elitex:assault_rifles/mcs_spear/mcx_spear_suppressed2",
+    "silence_3p": "elitex:assault_rifles/mcs_spear/mcx_spear_suppressed",
+    "dry_fire":  "elitex:platform_sound_sfx/m4_platform_sfx/m4_platform_dry_fire",
+    "fire_select": "elitex:platform_sound_sfx/m4_platform_sfx/m4_platform_fire_select"
+  },
+  "offhand_show": {
+    "pos": [1, 19, 4],
+    "rotate": [0, 0, 50],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-1, 19, 3],
+      "rotate": [-180, 0, 130],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

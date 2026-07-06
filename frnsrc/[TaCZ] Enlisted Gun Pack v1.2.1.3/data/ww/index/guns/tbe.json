@@ -1,0 +1,12 @@
+{
+    "name": "Type Be",
+
+    "display": "ww:tbe_display",
+    
+    "data": "ww:tbe_data",
+    "tooltip": "The SIG Bergmann 1920",
+    "type": "smg",
+    "sort": 1,
+    
+    "item_type": "modern_kinetic"  
+}

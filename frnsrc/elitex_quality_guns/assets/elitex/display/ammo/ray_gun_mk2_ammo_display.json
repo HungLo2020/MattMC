@@ -1,0 +1,34 @@
+{
+  "slot": "elitex:ammo/slot/ray_gun_mk2_ammo",
+  "transform": {
+    "scale": {
+      "thirdperson": [
+        0.2,
+        0.2,
+        0.2
+      ],
+      "ground": [
+        0.2,
+        0.2,
+        0.2
+      ],
+      "fixed": [
+        1,
+        1,
+        1
+      ]
+    }
+  },
+  "particle": {
+    "name": "glow_squid_ink",
+    "delta": [
+      0,
+      0,
+      0
+    ],
+    "tracer_color": "#FF0033",
+    "speed": 0.3,
+    "life_time": 15,
+    "count": 6
+  }
+}

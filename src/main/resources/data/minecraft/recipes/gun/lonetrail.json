@@ -1,0 +1,30 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "forge:gems/lapis"
+      },
+      "count": 20
+    },
+    {
+      "item": {
+        "tag": "forge:ingots/gold"
+      },
+      "count": 4
+    },
+    {
+      "item": {
+        "tag": "forge:ingots/iron"
+      },
+      "count": 40
+    }
+  ],
+  "result": {
+    "type": "gun",
+    "id": "minecraft:lonetrail",
+    "attachments": {
+      "scope": "minecraft:scope_contender"
+    }
+  },
+  "type": "minecraft:gun_smith_table_crafting"
+}

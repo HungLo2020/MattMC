@@ -1,0 +1,8 @@
+{
+  "name": "T20 Garand",
+  "display": "ww:t20_display",
+  "data": "ww:t20_data",
+  "tooltip": "A rifle that combined aspects of both the BAR and the M1 Garand.",
+  "type": "rifle",
+    "sort": 1
+}

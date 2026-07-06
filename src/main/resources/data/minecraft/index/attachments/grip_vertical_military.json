@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.grip_vertical_military.name",
+  "display": "minecraft:grip_vertical_military_display",
+  "data": "minecraft:grip_vertical_military_data",
+  "type": "grip",
+  "sort": 10
+}

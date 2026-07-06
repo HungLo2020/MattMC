@@ -1,0 +1,12 @@
+{
+    "name": "Nambu Type 14",
+
+    "display": "ww:t14_display",
+    
+    "data": "ww:t14_data",
+    "tooltip": "Standard issue pistol of the Japanese empire",
+    "type": "pistol",
+    "sort": 1,
+    
+    "item_type": "modern_kinetic"  
+}

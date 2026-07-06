@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.aa12.name",
+  "display": "minecraft:aa12_display",
+  "data": "minecraft:aa12_data",
+  "tooltip": "minecraft.gun.aa12.desc",
+  "type": "shotgun",
+  "sort": 2
+}

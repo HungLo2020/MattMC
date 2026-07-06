@@ -1,0 +1,9 @@
+{
+  "slot": "minecraft:ammo/slot/22wmr",
+  "shell": {
+    "model": "minecraft:shell/22wmr_shell",
+    "texture": "minecraft:shell/22wmr_shell"
+  },
+  "tracer_color": "#ffe09e"
+}
+    

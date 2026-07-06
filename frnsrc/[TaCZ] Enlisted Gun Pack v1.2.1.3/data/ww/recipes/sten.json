@@ -1,0 +1,15 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "forge:ingots/iron"
+      },
+      "count": 22
+    }
+  ],
+  "result": {
+    "type": "gun",
+    "id": "ww:sten"
+  },
+  "type": "tacz:gun_smith_table_crafting"
+}

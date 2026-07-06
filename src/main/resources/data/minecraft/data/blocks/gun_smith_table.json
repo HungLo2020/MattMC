@@ -1,0 +1,90 @@
+{
+  // é…æ–¹è¿‡æ»¤å™¨ï¼Œå…·ä½“å†…å®¹ä½äºŽ data/<å‘½åç©ºé—´>/recipe_filters ä¸‹
+  // å¦‚æžœæ²¡æœ‰æŒ‡å®šï¼Œå°†ä½¿ç”¨é»˜è®¤è¿‡æ»¤å™¨ minecraft:default
+  "filter": "minecraft:default",
+  // guiå†…åŒ…å«çš„tab
+  // å¦‚æžœæ²¡æœ‰å¡«å†™æ­¤å­—æ®µæˆ–è€…tabsä¸ºç©ºï¼Œå°†ä½¿ç”¨å†…ç½®çš„é»˜è®¤tabåˆ—è¡¨
+  // ä½ å¯ä»¥ä½¿ç”¨è‡ªå®šä¹‰çš„tab idæ¥å®žçŽ°å¦å¤–ä¸€ç§é…æ–¹é™åˆ¶
+  "tabs": [
+    {
+      // tabçš„idï¼Œåœ¨é…æ–¹çš„resultä¸­æŒ‡å®š
+      "id": "minecraft:pistol",
+      // tabçš„åç§°ï¼Œå°†ä¼šæ˜¾ç¤ºåœ¨guiä¸­
+      "name": "minecraft.type.pistol.name",
+      // tabçš„å›¾æ ‡ï¼Œå¯ä»¥æŒ‡å®šä»»æ„ä¸€ä¸ªç‰©å“ä½œä¸ºå›¾æ ‡
+      "icon": {
+        "item": "minecraft:modern_kinetic_gun",
+        "nbt": {
+          "GunId": "minecraft:glock_17"
+        }
+      }
+    },
+    {
+      "id": "minecraft:sniper",
+      "name": "minecraft.type.sniper.name",
+      "icon": {
+        "item": "minecraft:modern_kinetic_gun",
+        "nbt": {
+          "GunId": "minecraft:ai_awp"
+        }
+      }
+    },
+    {
+      "id": "minecraft:rifle",
+      "name": "minecraft.type.rifle.name",
+      "icon": {
+        "item": "minecraft:modern_kinetic_gun",
+        "nbt": {
+          "GunId": "minecraft:ak47"
+        }
+      }
+    },
+    {
+      "id": "minecraft:shotgun",
+      "name": "minecraft.type.shotgun.name",
+      "icon": {
+        "item": "minecraft:modern_kinetic_gun",
+        "nbt": {
+          "GunId": "minecraft:db_short"
+        }
+      }
+    },
+    {
+      "id": "minecraft:smg",
+      "name": "minecraft.type.smg.name",
+      "icon": {
+        "item": "minecraft:modern_kinetic_gun",
+        "nbt": {
+          "GunId": "minecraft:hk_mp5a5"
+        }
+      }
+    },
+    {
+      "id": "minecraft:rpg",
+      "name": "minecraft.type.rpg.name",
+      "icon": {
+        "item": "minecraft:modern_kinetic_gun",
+        "nbt": {
+          "GunId": "minecraft:rpg7"
+        }
+      }
+    },
+    {
+      "id": "minecraft:mg",
+      "name": "minecraft.type.mg.name",
+      "icon": {
+        "item": "minecraft:modern_kinetic_gun",
+        "nbt": {
+          "GunId": "minecraft:m249"
+        }
+      }
+    },
+    {
+      "id": "minecraft:misc",
+      "name": "minecraft.type.misc.name",
+      "icon": {
+        "item": "minecraft:gun_smith_table"
+      }
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "model": "minecraft:gun/p90_geo",
+  "texture": "minecraft:gun/uv/p90",
+  "lod": {
+    "model": "minecraft:gun/lod/p90",
+    "texture": "minecraft:gun/lod/p90"
+  },
+  "hud": "minecraft:gun/hud/p90",
+  "slot": "minecraft:gun/slot/p90",
+  "animation": "minecraft:p90",
+  "use_default_animation": "rifle",
+  "third_person_animation": "default",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "minecraft:flash/common_muzzle_flash",
+    "scale": 0.75
+  },
+  "shell": {
+    "initial_velocity": [0, -5, 0],
+    "random_velocity": [1, 1, 0.25],
+    "acceleration": [0.0, -10, 0.0],
+    "angular_velocity": [360, -1200, 90],
+    "living_time": 1.0
+  },
+  "sounds": {
+    "reload_empty": "minecraft:p90/p90_reload_empty",
+    "reload_tactical": "minecraft:p90/p90_reload_tactical",
+    "inspect": "minecraft:p90/p90_inspect",
+    "inspect_empty": "minecraft:p90/p90_inspect_empty",
+    "draw": "minecraft:p90/p90_draw",
+    "put_away": "minecraft:p90/p90_put_away",
+    "shoot": "minecraft:p90/p90_shoot",
+    "shoot_3p": "minecraft:p90/p90_shoot_3p",
+    "silence": "minecraft:p90/p90_silence",
+    "silence_3p": "minecraft:p90/p90_silence_3p",
+    "melee_push": "minecraft:melee_stock/melee_stock_03",
+    "melee_stock": "minecraft:melee_stock/melee_stock_01"
+  },
+  "offhand_show": {
+    "pos": [1, 19, 4],
+    "rotate": [0, 0, 30],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [1, 16, -2],
+    "rotate": [0, 0, 20],
+    "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

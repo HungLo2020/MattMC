@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.deagle_golden.name",
+  "display": "minecraft:deagle_golden_display",
+  "data": "minecraft:deagle_golden_data",
+  "tooltip": "minecraft.gun.deagle_golden.desc",
+  "type": "pistol",
+  "sort": 4
+}

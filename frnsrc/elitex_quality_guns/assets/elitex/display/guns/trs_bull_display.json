@@ -1,0 +1,48 @@
+{
+  "model": "elitex:gun/trs_bull_geo",
+  "texture": "elitex:gun/uv/trs_bull",
+  "hud": "elitex:gun/hud/trs_bull",
+  "slot": "elitex:gun/slot/trs_bull",
+  "animation": "elitex:trs_bull",
+  "lod": {
+    "model": "elitex:gun/lod/trs_bull",
+    "texture": "elitex:gun/lod/trs_bull"
+  },
+
+  "use_default_animation": "pistol",
+  "state_machine": "elitex:trs_bull_state_machine",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.8, 0.8, 0.8],
+      "ground": [0.7, 0.7, 0.7],
+      "fixed": [1.1, 1.1, 1.1]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "tacz:flash/common_muzzle_flash",
+    "scale": 1.2
+  },
+
+  "sounds": {
+    "inspect": "elitex:pistols/trs_bull/trs_bull_inspect",
+    "inspect_empty": "elitex:pistols/trs_bull/trs_bull_inspect_empty",
+    "draw": "elitex:pistols/trs_bull/trs_bull_draw",
+    "shoot": "elitex:pistols/trs_bull/trs_bull_fire",
+    "shoot_3p": "elitex:pistols/trs_bull/trs_bull_fire_3p",
+    "put_away": "elitex:pistols/trs_bull/trs_bull_put_away",
+    "dry_fire":  "elitex:platform_sound_sfx/pistols_sfx/regular_pistol_dry_fire"
+
+  },
+  "offhand_show": {
+    "pos": [4, 13, -1],
+    "rotate": [-90, -35, 90],
+    "scale": [0.2, 0.2, 0.2]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-5, 13, -1],
+      "rotate": [-90, -35, 90],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

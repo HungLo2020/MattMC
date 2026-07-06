@@ -1,0 +1,7 @@
+{
+  "name": "elitex.gun.origin_fire_staff.name",
+  "display": "elitex:origin_fire_staff_display",
+  "data": "elitex:origin_fire_staff_data",
+  "type": "rifle",
+  "tooltip": "elitex.gun.origin_fire_staff.desc"
+}

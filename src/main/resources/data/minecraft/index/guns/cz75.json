@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.cz75.name",
+  "display": "minecraft:cz75_display",
+  "data": "minecraft:cz75_data",
+  "tooltip": "minecraft.gun.cz75.desc",
+  "type": "pistol",
+  "sort": 3
+}

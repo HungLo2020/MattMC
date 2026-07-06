@@ -1,0 +1,7 @@
+{
+  "name": "elitex.gun.mp7r.name",
+  "display": "elitex:mp7r_display",
+  "data": "elitex:mp7r_data",
+  "tooltip": "elitex.gun.mp7r.desc",
+  "type": "smg"
+}

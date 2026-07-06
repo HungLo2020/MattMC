@@ -1,0 +1,8 @@
+{
+    "name": "elitex.gun.famas_f1.name",
+    "display": "elitex:famas_f1_display",
+    "data": "elitex:famas_f1_data",
+    "type": "rifle",
+    "sort": 1,
+    "tooltip": "elitex.gun.famas_f1.desc"
+}

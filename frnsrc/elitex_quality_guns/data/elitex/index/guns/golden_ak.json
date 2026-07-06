@@ -1,0 +1,7 @@
+{
+  "name": "elitex.gun.golden_ak.name",
+  "display": "elitex:golden_ak_display",
+  "data": "elitex:golden_ak_data",
+  "type": "rifle",
+  "tooltip": "elitex.gun.golden_ak.desc"
+}

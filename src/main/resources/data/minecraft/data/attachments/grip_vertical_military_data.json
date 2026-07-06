@@ -1,0 +1,18 @@
+{
+  "weight": 0.25,
+  "ads": {
+    // åŠ æ•°ï¼ˆå¤šä¸ªé…ä»¶çš„æ•°å€¼ç›¸åŠ ï¼Œä½œä¸ºç¬¬ä¸€ä¸ªä¹˜åŒºï¼‰
+    "multiplier": 1.02
+  },
+  "aim_inaccuracy": {
+    "multiplier": 0.85
+  },
+  "recoil": {
+    "pitch": {
+      "multiplier": 0.8
+    },
+    "yaw": {
+      "multiplier": 0.8
+    }
+  }
+}

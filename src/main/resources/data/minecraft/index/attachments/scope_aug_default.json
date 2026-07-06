@@ -1,0 +1,7 @@
+{
+  "hidden": true,
+  "name": "minecraft.attachment.scope_aug_default.name",
+  "display": "minecraft:scope_aug_default_display",
+  "data": "minecraft:scope_aug_default_data",
+  "type": "scope"
+}

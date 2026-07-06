@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.b93r.name",
+  "display": "minecraft:b93r_display",
+  "data": "minecraft:b93r_data",
+  "tooltip": "minecraft.gun.b93r.desc",
+  "type": "pistol",
+  "sort": 7
+}

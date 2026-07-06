@@ -1,0 +1,58 @@
+{
+  "model": "elitex:gun/famas_f1_geo",
+  "texture": "elitex:gun/uv/famas_f1",
+  "hud": "elitex:gun/hud/famas_f1",
+  "slot": "elitex:gun/slot/famas_f1",
+  "lod": {
+    "model": "elitex:gun/lod/famas_f1",
+    "texture": "elitex:gun/lod/famas_f1"
+  },
+
+  "animation": "elitex:famas_f1",
+  "use_default_animation": "rifle",
+  "third_person_animation": "default",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "tacz:flash/common_muzzle_flash",
+    "scale": 0.75
+  },
+  "shell": {
+    "initial_velocity": [5, 2, 1],
+    "random_velocity": [1, 1, 0.25],
+    "acceleration": [0.0, -10, 0.0],
+    "angular_velocity": [360, -1200, 90],
+    "living_time": 1.0
+  },
+  "sounds": {
+    "shoot": "elitex:assault_rifles/famas_f1/famas_f1_shoot",
+    "shoot_3p": "elitex:assault_rifles/famas_f1/famas_f1_shoot_3p",
+    "reload_empty": "elitex:assault_rifles/famas_f1/famas_f1_empty_reload",
+    "reload_tactical": "elitex:assault_rifles/famas_f1/famas_f1_normal_reload",
+    "inspect": "elitex:assault_rifles/famas_f1/famas_f1_inspect",
+    "inspect_empty": "elitex:assault_rifles/famas_f1/famas_f1_inspect_empty",
+    "draw": "elitex:assault_rifles/famas_f1/famas_f1_draw",
+    "put_away": "elitex:assault_rifles/famas_f1/famas_f1_put_away",
+    "silence": "elitex:assault_rifles/famas_f1/famas_f1_silence",
+    "silence_3p": "elitex:assault_rifles/famas_f1/famas_f1_silence_3p",
+    "dry_fire":  "elitex:platform_sound_sfx/bullpup_platform_sfx/bullpup_platform_dry_fire_1",
+    "fire_select": "elitex:platform_sound_sfx/bullpup_platform_sfx/bullpup_platform_fire_select"
+  },
+  "offhand_show": {
+    "pos": [1, 19, 4],
+    "rotate": [0, 0, 50],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-1, 19, 3],
+      "rotate": [-180, 0, 130],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

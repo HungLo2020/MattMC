@@ -1,0 +1,7 @@
+{
+  "name": "elitex.attachment.sassy_dmr_scope.name",
+  "display": "elitex:sassy_dmr_scope_display",
+  "data": "elitex:sassy_dmr_scope_data",
+  "type": "scope",
+  "hidden": true
+}

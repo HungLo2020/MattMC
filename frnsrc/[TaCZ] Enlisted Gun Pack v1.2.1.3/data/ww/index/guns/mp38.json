@@ -1,0 +1,11 @@
+{
+    "name": "MP38",
+
+    "display": "ww:mp38_display",
+    
+    "data": "ww:mp38_data",
+    "tooltip": "Heavier and slower",
+    "type": "smg",
+    "sort": 1,    
+    "item_type": "modern_kinetic"  
+}

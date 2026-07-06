@@ -1,0 +1,7 @@
+{
+  "name": "elitex.gun.m249x.name",
+  "display": "elitex:m249x_display",
+  "data": "elitex:m249x_data",
+  "tooltip": "elitex.gun.m249x.desc",
+  "type": "mg"
+}

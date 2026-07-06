@@ -1,0 +1,7 @@
+{
+  "name": "elitex.gun.raygun_bo6.name",
+  "display": "elitex:raygun_bo6_display",
+  "data": "elitex:raygun_bo6_data",
+  "type": "pistol",
+  "tooltip": "elitex.gun.raygun_bo6.desc"
+}

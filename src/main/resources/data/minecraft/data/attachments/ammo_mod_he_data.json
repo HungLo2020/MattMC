@@ -1,0 +1,27 @@
+{
+  "weight": 0.6,
+  "explosion": {
+    "explode": true
+  },
+  "armor_ignore": {
+    "multiplier": 0.5
+  },
+  "head_shot":{
+    "function": "y = 1"
+  },
+  "pierce": {
+    "function": "y = 1"
+  },
+  "rpm": {
+    "multiplier":0.85
+  },
+  "extended_mag_level": 1,
+  // ç²¾åº¦æ˜¯åŠ ç»™éœ°å¼¹æžªçš„ï¼Œ
+  // éƒ½çŽ©é«˜çˆ†äº†ï¼Œè¿™ç‚¹ç²¾åº¦å¯¹æ™®é€šæ­¦å™¨æ¥è¯´ç”¨å¤„å·²ç»ä¸æ˜¯å¾ˆå¤§äº†
+  "inaccuracy": {
+    "multiplier": 1
+  },
+  "aim_inaccuracy": {
+    "multiplier": 0.25
+  }
+}

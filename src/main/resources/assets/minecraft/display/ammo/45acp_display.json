@@ -1,0 +1,30 @@
+{
+  "model": "minecraft:ammo/45acp",
+  "texture": "minecraft:ammo/uv/45acp",
+  "slot": "minecraft:ammo/slot/45acp",
+  "tracer_color": "#ffb373",
+  "shell": {
+    "model": "minecraft:shell/45acp_shell",
+    "texture": "minecraft:shell/45acp_shell"
+  },
+  "transform": {
+    "scale": {
+      "thirdperson": [
+        0.6,
+        0.6,
+        0.6
+      ],
+      "ground": [
+        0.6,
+        0.6,
+        0.6
+      ],
+      "fixed": [
+        1.2,
+        1.2,
+        1.2
+      ]
+    }
+  }
+}
+    

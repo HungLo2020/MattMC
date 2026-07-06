@@ -1,0 +1,53 @@
+{
+  "model": "elitex:gun/vector45acp_geo",
+  "texture": "elitex:gun/uv/vector45acp",
+  "hud": "elitex:gun/hud/vector45acp",
+  "slot": "elitex:gun/slot/vector45acp",
+  "animation": "elitex:vector45acp",
+  "use_default_animation": "rifle",
+  "third_person_animation": "default",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.5, 0.5, 0.5],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1, 1, 1]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "tacz:flash/common_muzzle_flash",
+    "scale": 1
+  },
+  "shell": {
+    "initial_velocity": [6, 2.1, 1],
+    "random_velocity": [1, 1, 0.25],
+    "acceleration": [0.0, -10, 0.0],
+    "angular_velocity": [360, -1200, 90],
+    "living_time": 1.3
+  },
+  "sounds": {
+    "shoot": "elitex:smgs/vector/vector_fire",
+    "shoot_3p": "elitex:smgs/vector/vector_fire_3p",
+    "reload_empty": "elitex:smgs/vector/vector_reload_empty",
+    "reload_tactical": "elitex:smgs/vector/vector_reload",
+    "inspect": "elitex:smgs/vector/vector_inspect",
+    "inspect_empty": "elitex:smgs/vector/vector_inspect_empty",
+    "draw": "elitex:smgs/vector/vector_draw",
+    "put_away": "elitex:smgs/vector/vector_put_away",
+    "silence": "elitex:smgs/vector/vector_suppressed",
+    "silence_3p": "elitex:smgs/vector/vector_suppressed_3p"
+  },
+  "offhand_show": {
+    "pos": [1, 19, 4],
+    "rotate": [0, 0, 50],
+    "scale": [0.5, 0.5, 0.5]
+  },
+
+
+  "hotbar_show": {
+    "0": {
+      "pos": [-1, 19, 3],
+      "rotate": [-180, 0, 130],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

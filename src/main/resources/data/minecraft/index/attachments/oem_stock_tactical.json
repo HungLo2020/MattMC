@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.oem_stock_tactical.name",
+  "display": "minecraft:oem_stock_tactical_display",
+  "data": "minecraft:oem_stock_tactical_data",
+  "type": "stock",
+  "sort": 1
+}

@@ -1,0 +1,19 @@
+{
+  "slot": "minecraft:attachment/slot/sight_deltapoint_rifle",
+  "model": "minecraft:attachment/sight_deltapoint_rifle_geo",
+  "texture": "minecraft:attachment/uv/sight_deltapoint_rifle",
+  "lod": {
+    "model": "minecraft:attachment/lod/sight_deltapoint_rifle",
+    "texture": "minecraft:attachment/lod/sight_deltapoint_rifle"
+  },
+  "zoom": [
+    1.5
+  ],
+  "scope": false,
+  "sight": true,
+  "fov": 40.0,
+  "sounds": {
+    "install": "minecraft:attachments/scope_general_c",
+    "uninstall": "minecraft:attachments/scope_general_c"
+  }
+}

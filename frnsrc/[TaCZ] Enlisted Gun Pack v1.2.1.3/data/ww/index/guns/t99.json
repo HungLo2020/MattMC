@@ -1,0 +1,12 @@
+{
+    "name": "Type 99 LMG",
+
+    "display": "ww:t99_display",
+    
+    "data": "ww:t99_data",
+    "tooltip": "Copy Paste and switch ammo",
+    "type": "mg",
+    "sort": 1,
+    
+    "item_type": "modern_kinetic"  
+}

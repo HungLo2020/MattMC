@@ -1,0 +1,9 @@
+{
+  "slot": "ww:attachment/slot/silence",
+  "model": "ww:attachment/silence_geo",
+  "texture": "ww:attachment/uv/silence",
+  "sounds": {
+    "install": "tacz:attachments/muzzle_general",
+    "uninstall": "tacz:attachments/muzzle_general"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.attachment.ammo_mod_fmj.name",
+  "display": "minecraft:ammo_mod_fmj_display",
+  "data": "minecraft:ammo_mod_fmj_data",
+  "tooltip": "minecraft.attachment.ammo_mod_fmj.desc",
+  "type": "extended_mag",
+  "sort": 1000
+}

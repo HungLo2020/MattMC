@@ -1,0 +1,21 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "forge:ingots/iron"
+      },
+      "count": 35
+    },
+    {
+      "item": {
+        "tag": "minecraft:planks"
+      },
+      "count": 3
+    }
+  ],
+  "result": {
+    "type": "gun",
+    "id": "elitex:ak47"
+  },
+  "type": "tacz:gun_smith_table_crafting"
+}

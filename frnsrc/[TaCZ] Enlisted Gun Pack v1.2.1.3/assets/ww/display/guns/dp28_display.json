@@ -1,0 +1,55 @@
+{
+  "model": "ww:gun/dp28_geo",
+  "texture": "ww:gun/uv/dp28",
+  "lod": {
+    "model": "ww:gun/dp28_geo",
+    "texture": "ww:gun/uv/dp28"
+  },
+  "hud": "ww:gun/hud/dp28",
+  "slot": "ww:gun/slot/dp28",
+  "animation": "ww:dp28",
+  "use_default_animation": "rifle",
+  "third_person_animation": "default",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "tacz:flash/common_muzzle_flash",
+    "scale": 0.8
+  },
+  "shell": {
+    "initial_velocity": [5, 2, 1],
+    "random_velocity": [1, 1, 0.25],
+    "acceleration": [0.0, -10, 0.0],
+    "angular_velocity": [360, -1200, 90],
+    "living_time": 1.0
+  },
+  "sounds": {
+    "shoot": "ww:mosin/mosin_shoot",
+    "shoot_3p": "ww:mosin/mosin_shoot",
+    "silence": "ww:mosin/mosin_silence",
+    "silence_3p": "ww:mosin/mosin_silence",
+    "inspect": "ww:dp28/dp28_inspect",
+    "inspect_empty": "ww:dp28/dp28_inspect",
+    "reload_empty": "ww:dp28/dp28_reload_empty",
+    "reload_tactical": "ww:dp28/dp28_reload_tactical",
+    "draw": "ww:dp28/dp28_draw",
+    "put_away": "tacz:rpk/rpk_put_away"
+  },
+  "offhand_show": {
+    "pos": [1, 19, 4],
+    "rotate": [0, 0, 50],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-1, 19, 3],
+      "rotate": [-180, 0, 130],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

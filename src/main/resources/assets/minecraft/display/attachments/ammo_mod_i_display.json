@@ -1,0 +1,7 @@
+{
+  "slot": "minecraft:attachment/slot/ammo_mod_i",
+  "sounds": {
+    "install": "minecraft:attachments/attachment_general_a",
+    "uninstall": "minecraft:attachments/attachment_general_uninstall"
+  }
+}

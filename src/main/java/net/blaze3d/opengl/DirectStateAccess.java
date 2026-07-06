@@ -43,7 +43,11 @@ public abstract class DirectStateAccess {
 
 	abstract int createFrameBufferObject();
 
-	abstract void bindFrameBufferTextures(int i, int j, int k, int l, int m);
+	void bindFrameBufferTextures(int i, int j, int k, int l, int m) {
+		this.bindFrameBufferTextures(i, j, k, l, m, false);
+	}
+
+	abstract void bindFrameBufferTextures(int i, int j, int k, int l, int m, boolean bl);
 
 	abstract void blitFrameBuffers(int i, int j, int k, int l, int m, int n, int o, int p, int q, int r, int s, int t);
 
@@ -114,10 +118,14 @@ public abstract class DirectStateAccess {
 		}
 
 		@Override
-		public void bindFrameBufferTextures(int i, int j, int k, int l, int m) {
+		public void bindFrameBufferTextures(int i, int j, int k, int l, int m, boolean bl) {
 			CommandContext ctx = commandContext();
 			VulkanicAPI.namedFramebufferColorAttachment0DSA(ctx, i, j, l);
-			VulkanicAPI.namedFramebufferDepthAttachmentDSA(ctx, i, k, l);
+			if (bl) {
+				VulkanicAPI.namedFramebufferTextureDSA(ctx, i, VulkanicAPI.GL_DEPTH_STENCIL_ATTACHMENT, k, l);
+			} else {
+				VulkanicAPI.namedFramebufferDepthAttachmentDSA(ctx, i, k, l);
+			}
 			if (m != 0) {
 				VulkanicAPI.bindFramebuffer(ctx, m, i);
 			}
@@ -252,13 +260,13 @@ public abstract class DirectStateAccess {
 		}
 
 		@Override
-		public void bindFrameBufferTextures(int i, int j, int k, int l, int m) {
+		public void bindFrameBufferTextures(int i, int j, int k, int l, int m, boolean bl) {
 			int n = m == 0 ? VulkanicAPI.GL_FRAMEBUFFER : m;
 			CommandContext ctx = commandContext();
 			int o = VulkanicAPI.getFramebufferBinding(n);
 			VulkanicAPI.bindFramebuffer(ctx, n, i);
 			VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, n, j, l);
-			VulkanicAPI.framebufferDepthAttachmentTexture2D(ctx, n, k, l);
+			VulkanicAPI.framebufferTexture2D(ctx, n, bl ? VulkanicAPI.GL_DEPTH_STENCIL_ATTACHMENT : VulkanicAPI.GL_DEPTH_ATTACHMENT, k, l);
 			if (m == 0) {
 				VulkanicAPI.bindFramebuffer(ctx, n, o);
 			}

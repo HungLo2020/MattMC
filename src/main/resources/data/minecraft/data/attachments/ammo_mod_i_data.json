@@ -1,0 +1,21 @@
+{
+  "weight": 0.6,
+  "ads": {
+    // åŠ æ•°ï¼ˆå¤šä¸ªé…ä»¶çš„æ•°å€¼ç›¸åŠ ï¼Œä½œä¸ºç¬¬ä¸€ä¸ªä¹˜åŒºï¼‰
+    "addend": 0.02
+  },
+  "ignite": {
+    "entity": true
+  },
+  "armor_ignore": {
+    "multiplier": 0.8
+  },
+  "damage": {
+    "multiplier": 1.1
+  },
+  "ammo_speed": {
+    "multiplier": 1.0
+  },
+  // æ‰©å®¹å¼¹å¤¹ï¼ˆåŒ£ï¼‰ç­‰çº§
+  "extended_mag_level": 3
+}

@@ -1,0 +1,8 @@
+{
+    "name": "elitex.gun.m4_sopmod.name",
+    "display": "elitex:m4_sopmod_display",
+    "data": "elitex:m4_sopmod_data",
+    "type": "rifle",
+    "sort": 1,
+    "tooltip": "elitex.gun.m4_sopmod.desc"
+}

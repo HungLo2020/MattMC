@@ -1,0 +1,100 @@
+{
+  "ammo": "tacz:9mm",
+  "rpm": 1220,
+  "bullet": {
+    "life": 3.8,
+    "bullet_amount": 1,
+    "damage": 7,
+    "tracer_count_interval": 0,
+    "extra_damage": {
+      "armor_ignore": 0.2,
+      "head_shot_multiplier": 1.25,
+      "damage_adjust": [
+        {"distance": 15, "damage": 7},
+        {"distance": 36, "damage": 5.5},
+        {"distance": 50, "damage": 4.5},
+        {"distance": "infinite", "damage": 3.5}
+      ]
+    },
+    "speed": 180,
+    "gravity": 0.15,
+    "knockback": 0,
+    "friction": 0.02,
+    "ignite": false,
+    "pierce": 1
+  },
+  "ammo_amount": 35,
+  "bolt": "closed_bolt",
+  "reload": {
+    "type": "magazine",
+    "feed": {
+      "empty": 2.27,
+      "tactical": 1.58
+    },
+    "cooldown": {
+      "empty": 2.42,
+      "tactical": 2.2
+    }
+  },
+  "draw_time": 1.02,
+  "put_away_time": 0.74,
+  "sprint_time": 0.1,
+  "aim_time": 0.08,
+  "weight": 1.0,
+  "movement_speed": {
+    "base": 0.0,
+    "aim": -0.1,
+    "reload": 0
+  },
+  "crawl_recoil_multiplier": 0.75,
+  "fire_mode": [
+    "auto",
+    "burst",
+    "semi"
+  ],
+  "burst_data": {
+    "continuous_shoot": false,
+    "count": 2,
+    "bpm": 900,
+    "min_interval": 0.3
+  },
+  "allow_attachment_types": [
+    "scope",
+    "grip",
+    "muzzle",
+    "laser"
+  ],
+  "recoil": {
+    "pitch": [
+      {"time": 0, "value": [0.2, 0.2]},
+      {"time": 0.1, "value": [0.2, 0.2]},
+      {"time": 0.3, "value": [-0.2, -0.2]},
+      {"time": 0.45, "value": [0, 0]}
+    ],
+    "yaw": [
+      {"time": 0, "value": [-0.65, 0.5]},
+      {"time": 0.12, "value": [-0.65, 0.5]},
+      {"time": 0.3, "value": [0, 0]}
+    ]
+  },
+  "inaccuracy": {
+    "stand": 3.5,
+    "move": 4.5,
+    "sneak": 2,
+    "lie": 1,
+    "aim": 0.175
+  },
+  "melee": {
+    "distance": 1,
+    "cooldown": 0.6,
+    "default": {
+      "animation_type": "melee_push",
+      "distance": 1,
+      "range_angle": 40,
+      "cooldown": 0.2,
+      "damage": 1,
+      "knockback": 0.4,
+      "prep": 0.1
+    }
+  }
+}

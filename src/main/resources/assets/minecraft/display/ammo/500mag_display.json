@@ -1,0 +1,9 @@
+{
+  "slot": "minecraft:ammo/slot/500mag",
+  "shell": {
+    "model": "minecraft:shell/500mag_shell",
+    "texture": "minecraft:shell/500mag_shell"
+  },
+  "tracer_color": "#FF9999"
+}
+    

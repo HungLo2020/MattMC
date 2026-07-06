@@ -1,0 +1,45 @@
+{
+  "model": "elitex:gun/inter_m200_geo",
+  "texture": "elitex:gun/uv/inter_m200",
+  "hud": "elitex:gun/hud/inter_m200",
+  "slot": "elitex:gun/slot/inter_m200",
+  "animation": "elitex:inter_m200",
+  "use_default_animation": "rifle",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "tacz:flash/common_muzzle_flash",
+    "scale": 1.2
+  },
+  "sounds": {
+    "shoot": "elitex:snipers/inter_m200/inter_m200_fire",
+    "shoot_3p": "elitex:snipers/inter_m200/inter_m200_fire_3p",
+    "inspect": "elitex:snipers/inter_m200/inter_m200_inspect",
+    "inspect_empty": "elitex:snipers/inter_m200/inter_m200_inspect_empty",
+    "reload_empty": "elitex:snipers/inter_m200/inter_m200_reload_normal",
+    "reload_tactical": "elitex:snipers/inter_m200/inter_m200_reload_empty",
+    "draw": "elitex:snipers/inter_m200/inter_m200_draw",
+    "bolt": "elitex:snipers/inter_m200/inter_m200_bolt_action",
+    "put_away": "elitex:snipers/inter_m200/inter_m200_put_away",
+    "silence": "elitex:snipers/inter_m200/inter_m200_suppressed",
+    "silence_3p": "elitex:snipers/inter_m200/inter_m200_suppressed_3p",
+    "dry_fire": "elitex:platform_sound_sfx/bolt_action_sfx/bolt_action_rifle_platform_dryfire"
+  },
+  "offhand_show": {
+    "pos": [-2, 20, 4],
+    "rotate": [0, 0, 45],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-4, 26, 3],
+      "rotate": [-90, -5, -90],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

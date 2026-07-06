@@ -1,0 +1,21 @@
+{
+  "weight": 0.6,
+  "ads": {
+    // åŠ æ•°ï¼ˆå¤šä¸ªé…ä»¶çš„æ•°å€¼ç›¸åŠ ï¼Œä½œä¸ºç¬¬ä¸€ä¸ªä¹˜åŒºï¼‰
+    "addend": 0.02
+  },
+  "pierce": {
+    "function": "if (x > 2) then y = x + 2 else y = x end"
+  },
+  "armor_ignore": {
+    "function": "if (x > 0.5) then y = x*1.5 else y = x*1.75 end"
+  },
+  "damage": {
+    "multiplier": 0.9
+  },
+  "ammo_speed": {
+    "multiplier": 1.1
+  },
+  // æ‰©å®¹å¼¹å¤¹ï¼ˆåŒ£ï¼‰ç­‰çº§
+  "extended_mag_level": 3
+}

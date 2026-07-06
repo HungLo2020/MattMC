@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.grip_vertical_talon.name",
+  "display": "minecraft:grip_vertical_talon_display",
+  "data": "minecraft:grip_vertical_talon_data",
+  "type": "grip",
+  "sort": 10
+}

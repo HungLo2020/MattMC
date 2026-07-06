@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.fn_evolys.name",
+  "display": "minecraft:fn_evolys_display",
+  "data": "minecraft:fn_evolys_data",
+  "tooltip": "minecraft.gun.fn_evolys.desc",
+  "type": "mg",
+  "sort": 4
+}

@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.m107.name",
+  "display": "minecraft:m107_display",
+  "data": "minecraft:m107_data",
+  "tooltip": "minecraft.gun.m107.desc",
+  "type": "sniper",
+  "sort": 4
+}

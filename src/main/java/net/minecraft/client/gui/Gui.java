@@ -65,6 +65,7 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.food.FoodData;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TaczMvpGunItem;
 import net.minecraft.world.item.equipment.Equippable;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
@@ -467,6 +468,10 @@ public class Gui {
 
 	private void renderCrosshair(GuiGraphics guiGraphics, DeltaTracker deltaTracker) {
 		Options options = this.minecraft.options;
+		if (this.isHoldingTaczGun()) {
+			return;
+		}
+
 		if (options.getCameraType().isFirstPerson()) {
 			if (this.minecraft.gameMode.getPlayerMode() != GameType.SPECTATOR || this.canRenderCrosshairForSpectator(this.minecraft.hitResult)) {
 				if (!this.minecraft.debugEntries.isCurrentlyEnabled(DebugScreenEntries.THREE_DIMENSIONAL_CROSSHAIR)) {
@@ -494,6 +499,12 @@ public class Gui {
 				}
 			}
 		}
+	}
+
+	private boolean isHoldingTaczGun() {
+		LocalPlayer player = this.minecraft.player;
+		return player != null
+			&& (player.getMainHandItem().getItem() instanceof TaczMvpGunItem || player.getOffhandItem().getItem() instanceof TaczMvpGunItem);
 	}
 
 	private boolean canRenderCrosshairForSpectator(@Nullable HitResult hitResult) {

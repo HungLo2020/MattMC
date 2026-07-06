@@ -1,0 +1,12 @@
+{
+    "name": "Schnellfeuer M712",
+
+    "display": "ww:c96_display",
+    
+    "data": "ww:m712_data",
+    "tooltip": "One of the first fully automatic mass-produced Machine pistols.",
+    "type": "pistol",
+    "sort": 1,
+    
+    "item_type": "modern_kinetic"  
+}

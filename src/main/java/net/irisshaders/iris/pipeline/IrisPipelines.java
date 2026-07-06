@@ -9,6 +9,7 @@ import net.irisshaders.iris.pathways.HorizonRenderer;
 import net.irisshaders.iris.pipeline.programs.ShaderKey;
 import net.irisshaders.iris.shadows.ShadowRenderingState;
 import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.renderer.special.TaczGlock17SpecialRenderer;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
@@ -31,6 +32,9 @@ public class IrisPipelines {
 		assignToMain(RenderPipelines.ENTITY_CUTOUT, p -> getCutout(p));
 		assignToMain(RenderPipelines.ENTITY_CUTOUT_NO_CULL, p -> getCutout(p));
 		assignToMain(RenderPipelines.ENTITY_CUTOUT_NO_CULL_Z_OFFSET, p -> getCutout(p));
+		assignToMain(TaczGlock17SpecialRenderer.TACZ_ENTITY_CUTOUT_STENCIL_PIPELINE, p -> getCutout(p));
+		assignToMain(TaczGlock17SpecialRenderer.TACZ_ENTITY_CUTOUT_NO_DEPTH_PIPELINE, p -> getCutout(p));
+		assignToMain(TaczGlock17SpecialRenderer.TACZ_DEBUG_TRIANGLE_FAN_STENCIL_PIPELINE, p -> ShaderKey.BASIC_COLOR);
 		assignToMain(RenderPipelines.ENTITY_SMOOTH_CUTOUT, p -> getCutout(p));
 		assignToMain(RenderPipelines.ITEM_ENTITY_TRANSLUCENT_CULL, p -> getTranslucent(p));
 		assignToMain(RenderPipelines.ENTITY_TRANSLUCENT, p -> getTranslucent(p));
@@ -89,6 +93,9 @@ public class IrisPipelines {
 		assignToShadow(RenderPipelines.TRANSLUCENT_MOVING_BLOCK, p -> ShaderKey.SHADOW_TRANSLUCENT);
 		assignToShadow(RenderPipelines.TRIPWIRE, p -> ShaderKey.SHADOW_TRANSLUCENT);
 		assignToShadow(RenderPipelines.ENTITY_CUTOUT, p -> ShaderKey.SHADOW_ENTITIES_CUTOUT);
+		assignToShadow(TaczGlock17SpecialRenderer.TACZ_ENTITY_CUTOUT_STENCIL_PIPELINE, p -> ShaderKey.SHADOW_ENTITIES_CUTOUT);
+		assignToShadow(TaczGlock17SpecialRenderer.TACZ_ENTITY_CUTOUT_NO_DEPTH_PIPELINE, p -> ShaderKey.SHADOW_ENTITIES_CUTOUT);
+		assignToShadow(TaczGlock17SpecialRenderer.TACZ_DEBUG_TRIANGLE_FAN_STENCIL_PIPELINE, p -> ShaderKey.SHADOW_BASIC_COLOR);
 		assignToShadow(RenderPipelines.ARMOR_CUTOUT_NO_CULL, p -> ShaderKey.SHADOW_ENTITIES_CUTOUT);
 		assignToShadow(RenderPipelines.ITEM_ENTITY_TRANSLUCENT_CULL, p -> ShaderKey.SHADOW_ENTITIES_CUTOUT);
 		assignToShadow(RenderPipelines.ARMOR_DECAL_CUTOUT_NO_CULL, p -> ShaderKey.SHADOW_ENTITIES_CUTOUT);

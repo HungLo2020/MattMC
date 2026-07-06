@@ -1,0 +1,7 @@
+{
+    "name": "elitex.gun.benelli_super.name",
+    "display": "elitex:benelli_super_display",
+    "data": "elitex:benelli_super_data",
+    "type": "shotgun",
+    "tooltip": "elitex.gun.benelli_super.desc"
+}

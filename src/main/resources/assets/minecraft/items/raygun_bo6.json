@@ -1,0 +1,10 @@
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "minecraft:item/raygun_bo6_base",
+    "model": {
+      "type": "minecraft:tacz_gun",
+      "gun": "raygun_bo6"
+    }
+  }
+}

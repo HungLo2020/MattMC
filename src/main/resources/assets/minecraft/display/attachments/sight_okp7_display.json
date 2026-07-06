@@ -1,0 +1,19 @@
+{
+  "slot": "minecraft:attachment/slot/sight_okp7",
+  "model": "minecraft:attachment/sight_okp7_geo",
+  "texture": "minecraft:attachment/uv/sight_okp7",
+  "lod": {
+    "model": "minecraft:attachment/lod/sight_okp7",
+    "texture": "minecraft:attachment/lod/sight_okp7"
+  },
+  "zoom": [
+    1.5
+  ],
+  "scope": false,
+  "sight": true,
+  "fov": 45.0,
+  "sounds": {
+    "install": "minecraft:attachments/scope_general_c",
+    "uninstall": "minecraft:attachments/scope_general_c"
+  }
+}

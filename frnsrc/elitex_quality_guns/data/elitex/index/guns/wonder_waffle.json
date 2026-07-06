@@ -1,0 +1,7 @@
+{
+  "name": "elitex.gun.wonder_waffle.name",
+  "display": "elitex:wonder_waffle_display",
+  "data": "elitex:wonder_waffle_data",
+  "type": "rifle",
+  "tooltip": "elitex.gun.wonder_waffle.desc"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.light_extended_mag_2.name",
+  "display": "minecraft:light_extended_mag_2_display",
+  "data": "minecraft:light_extended_mag_2_data",
+  "type": "extended_mag",
+  "sort": 5
+}

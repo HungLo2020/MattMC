@@ -1,0 +1,55 @@
+{
+  "model": "elitex:gun/mustang_and_sally_geo",
+  "texture": "elitex:gun/uv/mustang_and_sally",
+  "hud": "elitex:gun/hud/mustang_and_sally_hud",
+  "slot": "elitex:gun/slot/mustang_and_sally_slot",
+  "animation": "elitex:mustang_and_sally",
+  "lod": {
+    "model": "elitex:gun/lod/mustang_and_sally",
+    "texture": "elitex:gun/lod/mustang_and_sally"
+  },
+  "use_default_animation": "pistol",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.4, 0.4, 0.4],
+      "ground": [0.4, 0.4, 0.4],
+      "fixed": [1.0, 1.0, 1.0]
+    }
+  },
+  "shell": {
+    "initial_velocity": [8.0, 5.0, -0.5],
+    "random_velocity": [2.5, 1.5, 0.25],
+    "acceleration": [0.0, -20, 0.0],
+    "angular_velocity": [-720, -720, 90],
+    "living_time": 1.5
+  },
+  "muzzle_flash": {
+    "texture": "tacz:flash/common_muzzle_flash",
+    "scale": 0.7
+  },
+  "sounds": {
+    "shoot": "elitex:wonder_weapons/mustang_and_sally/mustang_and_sally_fire",
+    "shoot_3p": "elitex:wonder_weapons/mustang_and_sally/mustang_and_sally_fire_3p",
+    "reload_empty": "elitex:wonder_weapons/mustang_and_sally/mustang_and_sally_empty_reload",
+    "reload_tactical": "elitex:wonder_weapons/mustang_and_sally/mustang_and_sally_normal_reload",
+    "inspect": "elitex:wonder_weapons/mustang_and_sally/mustang_and_sally_inspect",
+    "inspect_empty": "elitex:wonder_weapons/mustang_and_sally/mustang_and_sally_inspect_empty",
+    "draw": "elitex:wonder_weapons/mustang_and_sally/mustang_and_sally_draw",
+    "put_away": "elitex:wonder_weapons/mustang_and_sally/mustang_and_sally_put_away",
+    "dry_fire":  "elitex:platform_sound_sfx/pistols_sfx/regular_pistol_dry_fire"
+
+
+  },
+  "offhand_show": {
+    "pos": [4, 13, -1],
+    "rotate": [-90, -35, 90],
+    "scale": [0.2, 0.2, 0.2]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-5, 13, -1],
+      "rotate": [-90, -35, 90],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

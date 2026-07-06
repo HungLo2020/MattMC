@@ -1,0 +1,6 @@
+{
+  "name": "minecraft.ammo.500mag.name",
+  "display": "minecraft:500mag_display",
+  "stack_size": 42,
+  "sort": 17
+}

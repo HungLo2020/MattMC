@@ -1,0 +1,31 @@
+{
+  "model": "elitex:ammo/sig_fury_ammo",
+  "texture": "elitex:ammo/uv/sig_fury_ammo",
+  "slot": "elitex:ammo/slot/sig_fury_ammo",
+  "shell": {
+    "model": "elitex:shell/sig_fury_ammo_shell",
+    "texture": "elitex:shell/sig_fury_ammo_shell"
+  },
+
+
+  "tracer_color": "#FF8888",
+  "transform": {
+    "scale": {
+      "thirdperson": [
+        0.2,
+        0.2,
+        0.2
+      ],
+      "ground": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "fixed": [
+        1,
+        1,
+        1
+      ]
+    }
+  }
+}

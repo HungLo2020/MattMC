@@ -1,0 +1,7 @@
+{
+  "name": "elitex.gun.kar98k.name",
+  "display": "elitex:kar98k_display",
+  "data": "elitex:kar98k_data",
+  "tooltip": "elitex.gun.kar98k.desc",
+  "type": "sniper"
+}

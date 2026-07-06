@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.rhino357.name",
+  "display": "minecraft:rhino357_display",
+  "data": "minecraft:rhino357_data",
+  "tooltip": "minecraft.gun.rhino357.desc",
+  "type": "pistol",
+  "sort": 10
+}

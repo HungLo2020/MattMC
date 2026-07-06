@@ -1,0 +1,95 @@
+{
+  "ammo": "elitex:sp_ammo",
+  "ammo_amount": 7,
+  "bolt": "manual_action",
+  "rpm": 135,
+  "bullet": {
+    "life": 7.8,
+    "damage": 48,
+    "tracer_count_interval": 2,
+    "extra_damage": {
+      "armor_ignore": 0.60,
+      "head_shot_multiplier": 3.2,
+      "damage_adjust": [
+        {"distance": 55, "damage": 60},
+        {"distance": 160, "damage": 55},
+        {"distance": "infinite", "damage": 48}
+      ]
+    },
+    "speed": 670,
+    "gravity": 0.098,
+    "knockback": 0,
+    "friction": 0.015,
+    "ignite": false,
+    "pierce": 6
+  },
+  "reload": {
+    "type": "magazine",
+    "feed": {
+      "empty": 4.54,
+      "tactical": 3.04
+    },
+    "cooldown": {
+      "empty": 5.34,
+      "tactical": 4.44
+    }
+  },
+  "draw_time": 1.04,
+  "put_away_time": 0.9,
+  "aim_time": 0.15,
+  "sprint_time": 0.35,
+  "bolt_action_time": 1.64,
+  "fire_mode": [
+    "semi"
+  ],
+  "recoil": {
+    "pitch": [
+      {"time": 0, "value": [2.2, 2.2]},
+      {"time": 0.32, "value": [2.2, 2.2]},
+      {"time": 0.57, "value": [-0.5, -0.5]},
+      {"time": 0.82, "value": [0.25, 0.25]},
+      {"time": 1.17, "value": [0, 0]},
+      {"time": 1.47, "value": [0, 0]}
+    ],
+    "yaw": [
+      {"time": 0, "value": [-0.6, -0.5]},
+      {"time": 0.32, "value": [-0.6, -0.5]},
+      {"time": 0.57, "value": [0, 0]}
+    ]
+  },
+  "inaccuracy": {
+    "stand": 8.5,
+    "move": 11,
+    "sneak": 6.5,
+    "lie": 4.5,
+    "aim": 0.05
+  },
+  "weight": 6.5,
+  "movement_speed": {
+    "base": 0.0,
+    "aim": -0.4,
+    "reload": -0.2
+  },
+
+
+  "melee": {
+    "distance": 1,
+    "cooldown": 1.0,
+    "default": {
+      "animation_type": "melee_stock",
+      "distance": 3,
+      "range_angle": 30,
+      "damage": 43,
+      "knockback": 1.75,
+      "prep": 0.1
+    }
+  },
+
+  "builtin_attachments": {
+    "scope": "elitex:inter_m200_scope"
+  },
+  "allow_attachment_types": [
+    "scope",
+    "muzzle"
+  ]
+}

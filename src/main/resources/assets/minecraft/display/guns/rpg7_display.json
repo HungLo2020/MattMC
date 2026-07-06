@@ -1,0 +1,42 @@
+{
+  "model": "minecraft:gun/rpg7_geo",
+  "texture": "minecraft:gun/uv/rpg7",
+  "hud": "minecraft:gun/hud/rpg7",
+  "slot": "minecraft:gun/slot/rpg7",
+  "animation": "minecraft:rpg7",
+  "use_default_animation": "rifle",
+  "lod": {
+    "model": "minecraft:gun/lod/rpg7",
+    "texture": "minecraft:gun/lod/rpg7"
+  },
+  "transform": {
+    "scale": {
+      "thirdperson": [1, 1, 1],
+      "ground": [1, 1, 1],
+      "fixed": [1.5, 1.5, 1.5]
+    }
+  },
+  "sounds": {
+    "reload_empty": "minecraft:rpg7/rpg7_reload",
+    "inspect": "minecraft:rpg7/rpg7_inspect",
+    "inspect_empty": "minecraft:rpg7/rpg7_inspect_empty",
+    "draw": "minecraft:rpg7/rpg7_draw",
+    "put_away": "minecraft:rpg7/rpg7_put_away",
+    "shoot": "minecraft:rpg7/rpg7_shoot",
+    "shoot_3p": "minecraft:rpg7/rpg7_shoot",
+    "melee_push": "minecraft:melee_stock/melee_stock_02",
+    "melee_stock": "minecraft:melee_stock/melee_stock_03"
+  },
+  "offhand_show": {
+    "pos": [0, 20, 5],
+    "rotate": [-20, 0, 30],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-4, 24, 4],
+      "rotate": [-90, -5, -90],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

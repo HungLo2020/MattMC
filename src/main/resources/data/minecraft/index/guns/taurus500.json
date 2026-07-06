@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.taurus500.name",
+  "display": "minecraft:taurus500_display",
+  "data": "minecraft:taurus500_data",
+  "tooltip": "minecraft.gun.taurus500.desc",
+  "type": "pistol",
+  "sort": 13
+}

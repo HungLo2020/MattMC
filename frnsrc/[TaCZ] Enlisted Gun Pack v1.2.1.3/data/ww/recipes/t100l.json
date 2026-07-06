@@ -1,0 +1,22 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "forge:ingots/iron"
+      },
+      "count": 25
+    },
+    {
+      "item": {
+        "tag": "forge:ingots/gold"
+      },
+      "count": 5
+    }
+
+  ],
+  "result": {
+    "type": "gun",
+    "id": "ww:t100l"
+  },
+  "type": "tacz:gun_smith_table_crafting"
+}

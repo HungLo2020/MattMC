@@ -1,0 +1,53 @@
+{
+  "model": "elitex:gun/m4_sopmod_geo",
+  "texture": "elitex:gun/uv/m4_sopmod",
+  "hud": "elitex:gun/hud/m4_sopmod",
+  "slot": "elitex:gun/slot/m4_sopmod",
+  "animation": "elitex:m4_sopmod",
+  "lod": {
+    "model": "elitex:gun/lod/m4_sopmod",
+    "texture": "elitex:gun/lod/m4_sopmod"
+  },
+  "use_default_animation": "rifle",
+  "state_machine": "elitex:m4a1_sopmod_state_machine",
+  "third_person_animation": "default",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "tacz:flash/common_muzzle_flash",
+    "scale": 0.75
+  },
+  "shell": {
+    "initial_velocity": [5, 2, 1],
+    "random_velocity": [1, 1, 0.25],
+    "acceleration": [0.0, -10, 0.0],
+    "angular_velocity": [360, -1200, 90],
+    "living_time": 4.0
+  },
+  "sounds": {
+    "shoot": "elitex:assault_rifles/m4_sopmod/m4a1_sopmod_fire",
+    "shoot_3p": "elitex:assault_rifles/m4_sopmod/m4a1_sopmod_fire_3p",
+    "silence": "elitex:assault_rifles/m4_sopmod/m4a1_sopmod_suppressed",
+    "silence_3p": "elitex:assault_rifles/m4_sopmod/m4_sopmod_suppressed_3p",
+    "dry_fire":  "elitex:platform_sound_sfx/m4_platform_sfx/m4_platform_dry_fire",
+    "fire_select": "elitex:platform_sound_sfx/m4_platform_sfx/m4_platform_fire_select",
+    "put_away": "elitex:assault_rifles/m4_sopmod/m4a1_sopmod_put_away"
+  },
+  "offhand_show": {
+    "pos": [1, 19, 4],
+    "rotate": [0, 0, 50],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-1, 19, 3],
+      "rotate": [-180, 0, 130],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "minecraft:item/m107_base",
+    "model": {
+      "type": "minecraft:tacz_gun",
+      "gun": "m107"
+    }
+  }
+}

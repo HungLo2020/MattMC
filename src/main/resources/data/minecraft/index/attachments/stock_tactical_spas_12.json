@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.stock_tactical_spas_12.name",
+  "display": "minecraft:stock_tactical_spas_12_display",
+  "data": "minecraft:stock_tactical_spas_12_data",
+  "type": "stock",
+  "sort": 12
+}

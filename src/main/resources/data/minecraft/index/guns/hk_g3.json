@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.hk_g3.name",
+  "display": "minecraft:hk_g3_display",
+  "data": "minecraft:hk_g3_data",
+  "tooltip": "minecraft.gun.hk_g3.desc",
+  "type": "rifle",
+  "sort": 3
+}

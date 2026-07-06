@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.oem_stock_heavy.name",
+  "display": "minecraft:oem_stock_heavy_display",
+  "data": "minecraft:oem_stock_heavy_data",
+  "type": "stock",
+  "sort": 1
+}

@@ -1,0 +1,12 @@
+{
+    "name": "Steyr-Solothurn S1-100",
+
+    "display": "ww:mp34_display",
+    
+    "data": "ww:s1100_data",
+    "tooltip": "'Your Japanese is terrible. It dishonours my ears.'",
+    "type": "smg",
+    "sort": 1,
+    
+    "item_type": "modern_kinetic"  
+}

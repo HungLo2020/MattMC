@@ -1,0 +1,10 @@
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "minecraft:item/deagle_golden_base",
+    "model": {
+      "type": "minecraft:tacz_gun",
+      "gun": "deagle_golden"
+    }
+  }
+}
