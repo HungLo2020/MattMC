@@ -1069,6 +1069,9 @@ public class CreativeModeTabs {
 						output.accept(Items.CARTOGRAPHY_TABLE);
 						output.accept(Items.FLETCHING_TABLE);
 						output.accept(Items.SMITHING_TABLE);
+						output.accept(Items.GUN_SMITH_TABLE);
+						output.accept(Items.AMMO_WORKBENCH);
+						output.accept(Items.ATTACHMENT_WORKBENCH);
 						output.accept(Items.GRINDSTONE);
 						output.accept(Items.LOOM);
 						output.accept(Items.FURNACE);
@@ -1644,6 +1647,9 @@ public class CreativeModeTabs {
 						output.accept(Items.WIND_CHARGE);
 						output.accept(Items.BOW);
 						output.accept(Items.CROSSBOW);
+						output.accept(Items.GUN_SMITH_TABLE);
+						output.accept(Items.AMMO_WORKBENCH);
+						output.accept(Items.ATTACHMENT_WORKBENCH);
 						Items.TACZ_GUNS_BY_ID.values().forEach(output::accept);
 						Items.TACZ_ATTACHMENTS_BY_ID.values().forEach(output::accept);
 						generateFireworksAllDurations(output, CreativeModeTab.TabVisibility.PARENT_AND_SEARCH_TABS);

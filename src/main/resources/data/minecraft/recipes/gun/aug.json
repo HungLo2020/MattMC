@@ -2,13 +2,13 @@
   "materials": [
     {
       "item": {
-        "tag": "forge:ingots/iron"
+        "item": "minecraft:iron_ingot"
       },
       "count": 39
     },
     {
       "item": {
-        "tag": "forge:gems/lapis"
+        "item": "minecraft:lapis_lazuli"
       },
       "count": 8
     },
@@ -20,7 +20,7 @@
     },
     {
       "item": {
-        "tag": "forge:gems/amethyst"
+        "item": "minecraft:amethyst_shard"
       },
       "count": 1
     }

@@ -1,0 +1,21 @@
+{
+  "materials": [
+    {
+      "item": {
+        "item": "minecraft:iron_ingot"
+      },
+      "count": 12
+    },
+    {
+      "item": {
+        "item": "minecraft:leather"
+      },
+      "count": 6
+    }
+  ],
+  "result": {
+    "type": "attachment",
+    "id": "minecraft:grip_cqr"
+  },
+  "type": "minecraft:gun_smith_table_crafting"
+}

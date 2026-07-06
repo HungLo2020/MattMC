@@ -2,31 +2,31 @@
   "materials": [
     {
       "item": {
-        "tag": "forge:ingots/iron"
+        "item": "minecraft:iron_ingot"
       },
       "count": 78
     },
     {
       "item": {
-        "tag": "forge:gems/diamond"
+        "item": "minecraft:diamond"
       },
       "count": 40
     },
     {
       "item": {
-        "tag": "forge:dusts/redstone"
+        "item": "minecraft:redstone"
       },
       "count": 32
     },
     {
       "item": {
-        "tag": "forge:nether_stars"
+        "item": "minecraft:nether_star"
       },
       "count": 1
     },
     {
       "item": {
-        "tag": "forge:ingots/gold"
+        "item": "minecraft:gold_ingot"
       },
       "count": 60
     }

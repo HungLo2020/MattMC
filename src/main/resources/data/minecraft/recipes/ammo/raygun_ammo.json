@@ -2,13 +2,13 @@
   "materials": [
     {
       "item": {
-        "tag": "forge:ingots/copper"
+        "item": "minecraft:copper_ingot"
       },
       "count": 15
     },
     {
       "item": {
-        "tag": "forge:ingots/gold"
+        "item": "minecraft:gold_ingot"
       },
       "count": 3
     },

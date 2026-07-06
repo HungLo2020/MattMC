@@ -34,6 +34,9 @@ public class MenuType<T extends AbstractContainerMenu> implements FeatureElement
 	public static final MenuType<SmokerMenu> SMOKER = register("smoker", SmokerMenu::new);
 	public static final MenuType<CartographyTableMenu> CARTOGRAPHY_TABLE = register("cartography_table", CartographyTableMenu::new);
 	public static final MenuType<StonecutterMenu> STONECUTTER = register("stonecutter", StonecutterMenu::new);
+	public static final MenuType<TaczWorkbenchMenu> TACZ_GUN_SMITH_TABLE = register("tacz_gun_smith_table", TaczWorkbenchMenu::gunSmithTable);
+	public static final MenuType<TaczWorkbenchMenu> TACZ_AMMO_WORKBENCH = register("tacz_ammo_workbench", TaczWorkbenchMenu::ammoWorkbench);
+	public static final MenuType<TaczWorkbenchMenu> TACZ_ATTACHMENT_WORKBENCH = register("tacz_attachment_workbench", TaczWorkbenchMenu::attachmentWorkbench);
 	private final FeatureFlagSet requiredFeatures;
 	private final MenuType.MenuSupplier<T> constructor;
 

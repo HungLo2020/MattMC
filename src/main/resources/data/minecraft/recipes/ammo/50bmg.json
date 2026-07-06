@@ -2,25 +2,25 @@
   "materials": [
     {
       "item": {
-        "tag": "forge:ingots/copper"
+        "item": "minecraft:copper_ingot"
       },
       "count": 110
     },
     {
       "item": {
-        "tag": "forge:gunpowder"
+        "item": "minecraft:gunpowder"
       },
       "count": 20
     },
     {
       "item": {
-        "tag": "forge:gems/lapis"
+        "item": "minecraft:lapis_lazuli"
       },
       "count": 12
     },
     {
       "item": {
-        "tag": "forge:rods/blaze"
+        "item": "minecraft:blaze_rod"
       }
     }
   ],

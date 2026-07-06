@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "CCC",
+    "RGR",
+    "P P"
+  ],
+  "key": {
+    "C": "minecraft:copper_ingot",
+    "R": "minecraft:redstone",
+    "G": "minecraft:gunpowder",
+    "P": "#minecraft:planks"
+  },
+  "result": {
+    "id": "minecraft:ammo_workbench",
+    "count": 1
+  }
+}

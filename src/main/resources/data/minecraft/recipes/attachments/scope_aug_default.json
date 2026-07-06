@@ -1,0 +1,27 @@
+{
+  "materials": [
+    {
+      "item": {
+        "item": "minecraft:iron_ingot"
+      },
+      "count": 12
+    },
+    {
+      "item": {
+        "item": "minecraft:amethyst_shard"
+      },
+      "count": 3
+    },
+    {
+      "item": {
+        "item": "minecraft:redstone"
+      },
+      "count": 6
+    }
+  ],
+  "result": {
+    "type": "attachment",
+    "id": "minecraft:scope_aug_default"
+  },
+  "type": "minecraft:gun_smith_table_crafting"
+}

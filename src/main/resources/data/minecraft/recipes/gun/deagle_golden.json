@@ -2,25 +2,25 @@
   "materials": [
     {
       "item": {
-        "tag": "forge:gems/diamond"
+        "item": "minecraft:diamond"
       },
       "count": 1
     },
     {
       "item": {
-        "tag": "forge:ingots/gold"
+        "item": "minecraft:gold_ingot"
       },
       "count": 32
     },
     {
       "item": {
-        "tag": "forge:ingots/iron"
+        "item": "minecraft:iron_ingot"
       },
       "count": 16
     },
     {
       "item": {
-        "tag": "forge:rods/blaze"
+        "item": "minecraft:blaze_rod"
       }
     }
   ],

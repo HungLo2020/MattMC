@@ -9038,5 +9038,13 @@
   "item.minecraft.trs_bull_ammo": "Raging Bull .454 Casull",
   "minecraft.ammo.trs_bull_ammo.name": "Raging Bull .454 Casull",
   "item.minecraft.raygun_ammo": "Ray Gun Ammo",
-  "minecraft.ammo.raygun_ammo.name": "Ray Gun Ammo"
+  "minecraft.ammo.raygun_ammo.name": "Ray Gun Ammo",
+  "block.minecraft.gun_smith_table": "TaCZ Gun Smith Table",
+  "block.minecraft.ammo_workbench": "TaCZ Ammo Assembly Table",
+  "block.minecraft.attachment_workbench": "TaCZ Attachment Table",
+  "container.tacz.gun_smith_table": "Gun Smith Table",
+  "container.tacz.ammo_workbench": "Ammo Assembly Table",
+  "container.tacz.attachment_workbench": "Attachment Table",
+  "gui.tacz.workbench.materials": "Materials",
+  "gui.tacz.workbench.missing": "Missing materials"
 }

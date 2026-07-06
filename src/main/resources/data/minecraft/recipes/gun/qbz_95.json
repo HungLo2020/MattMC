@@ -2,19 +2,19 @@
   "materials": [
     {
       "item": {
-        "tag": "forge:ingots/iron"
+        "item": "minecraft:iron_ingot"
       },
       "count": 40
     },
     {
       "item": {
-        "tag": "forge:ingots/gold"
+        "item": "minecraft:gold_ingot"
       },
       "count": 3
     },
     {
       "item": {
-        "tag": "forge:gems/lapis"
+        "item": "minecraft:lapis_lazuli"
       },
       "count": 8
     },

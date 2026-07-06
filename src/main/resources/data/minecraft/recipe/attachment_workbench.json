@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "IGI",
+    "CRC",
+    "P P"
+  ],
+  "key": {
+    "I": "minecraft:iron_ingot",
+    "G": "minecraft:glass",
+    "C": "minecraft:copper_ingot",
+    "R": "minecraft:redstone",
+    "P": "#minecraft:planks"
+  },
+  "result": {
+    "id": "minecraft:attachment_workbench",
+    "count": 1
+  }
+}

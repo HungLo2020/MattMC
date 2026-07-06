@@ -13,7 +13,7 @@
     },
     {
       "item": {
-        "tag": "forge:rods/blaze"
+        "item": "minecraft:blaze_rod"
       },
       "count": 4
     }

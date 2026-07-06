@@ -1652,6 +1652,9 @@
 - [Sweet Berries](SweetBerries.md)
 #### T
 - [T-Rex Heavy Brake](TRexHeavyBrake.md)
+- [TaCZ Ammo Assembly Table](TaCZAmmoAssemblyTable.md)
+- [TaCZ Attachment Table](TaCZAttachmentTable.md)
+- [TaCZ Gun Smith Table](TaCZGunSmithTable.md)
 - [T1 red dot](T1reddot.md)
 - [T2 red dot](T2reddot.md)
 - [TA31 2x ACOG](TA312xACOG.md)

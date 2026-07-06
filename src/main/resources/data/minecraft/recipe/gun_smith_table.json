@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "III",
+    "CRC",
+    "P P"
+  ],
+  "key": {
+    "I": "minecraft:iron_ingot",
+    "C": "minecraft:copper_ingot",
+    "R": "minecraft:redstone",
+    "P": "#minecraft:planks"
+  },
+  "result": {
+    "id": "minecraft:gun_smith_table",
+    "count": 1
+  }
+}

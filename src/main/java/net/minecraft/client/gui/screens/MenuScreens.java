@@ -27,6 +27,7 @@ import net.minecraft.client.gui.screens.inventory.ShulkerBoxScreen;
 import net.minecraft.client.gui.screens.inventory.SmithingScreen;
 import net.minecraft.client.gui.screens.inventory.SmokerScreen;
 import net.minecraft.client.gui.screens.inventory.StonecutterScreen;
+import net.minecraft.client.gui.screens.inventory.TaczWorkbenchScreen;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
@@ -102,6 +103,9 @@ public class MenuScreens {
 		register(MenuType.SMOKER, SmokerScreen::new);
 		register(MenuType.CARTOGRAPHY_TABLE, CartographyTableScreen::new);
 		register(MenuType.STONECUTTER, StonecutterScreen::new);
+		register(MenuType.TACZ_GUN_SMITH_TABLE, TaczWorkbenchScreen::new);
+		register(MenuType.TACZ_AMMO_WORKBENCH, TaczWorkbenchScreen::new);
+		register(MenuType.TACZ_ATTACHMENT_WORKBENCH, TaczWorkbenchScreen::new);
 	}
 
 	@Environment(EnvType.CLIENT)

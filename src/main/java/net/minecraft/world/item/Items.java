@@ -2658,6 +2658,9 @@ public class Items {
 	public static final Item TRIAL_KEY = registerItem("trial_key");
 	public static final Item OMINOUS_TRIAL_KEY = registerItem("ominous_trial_key");
 	public static final Item VAULT = registerBlock(Blocks.VAULT);
+	public static final Item GUN_SMITH_TABLE = registerBlock(Blocks.GUN_SMITH_TABLE);
+	public static final Item AMMO_WORKBENCH = registerBlock(Blocks.AMMO_WORKBENCH);
+	public static final Item ATTACHMENT_WORKBENCH = registerBlock(Blocks.ATTACHMENT_WORKBENCH);
 	// WorldEdit wand item
 	public static final Item WAND = registerItem("wand", WandItem::new, new Item.Properties().stacksTo(1));
 	// Trowel: randomly places a block from the player's hotbar on right-click

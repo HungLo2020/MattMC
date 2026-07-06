@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=east": { "model": "minecraft:block/gun_smith_table", "y": 90 },
+    "facing=north": { "model": "minecraft:block/gun_smith_table" },
+    "facing=south": { "model": "minecraft:block/gun_smith_table", "y": 180 },
+    "facing=west": { "model": "minecraft:block/gun_smith_table", "y": 270 }
+  }
+}
