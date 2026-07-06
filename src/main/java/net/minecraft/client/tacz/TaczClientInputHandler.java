@@ -102,15 +102,20 @@ public final class TaczClientInputHandler {
 			return;
 		}
 
+		boolean precisionAiming = isPrecisionAiming();
 		int ammoBeforeShot = TaczMvpGunItem.getAmmo(itemStack);
-		InteractionResult interactionResult = gunItem.tryFire(minecraft.level, minecraft.player, InteractionHand.MAIN_HAND, itemStack);
+		InteractionResult interactionResult = gunItem.tryFire(minecraft.level, minecraft.player, InteractionHand.MAIN_HAND, itemStack, precisionAiming);
 		if (interactionResult.consumesAction()) {
 			minecraft.gameRenderer.itemInHandRenderer.itemUsed(InteractionHand.MAIN_HAND);
 			if (ammoBeforeShot > 0) {
 				scheduleClientShotFeedback(minecraft, itemStack, gunItem, ammoBeforeShot);
 			}
-			ClientPlayNetworking.send(new TaczGunInputC2SPayload(TaczGunInputC2SPayload.Action.SHOOT));
+			ClientPlayNetworking.send(new TaczGunInputC2SPayload(TaczGunInputC2SPayload.Action.SHOOT, precisionAiming));
 		}
+	}
+
+	private static boolean isPrecisionAiming() {
+		return TaczKeyMappings.AIM.isDown() && TaczGlock17AnimationController.aimProgress(1.0F) >= 1.0F;
 	}
 
 	private static void scheduleClientShotFeedback(Minecraft minecraft, ItemStack itemStack, TaczMvpGunItem gunItem, int ammoBeforeShot) {

@@ -1,6 +1,8 @@
 package net.minecraft.world.item;
 
 import java.util.Set;
+import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
@@ -74,6 +76,10 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 	}
 
 	public InteractionResult tryFire(Level level, Player player, InteractionHand interactionHand, ItemStack itemStack) {
+		return this.tryFire(level, player, interactionHand, itemStack, false);
+	}
+
+	public InteractionResult tryFire(Level level, Player player, InteractionHand interactionHand, ItemStack itemStack, boolean precisionAiming) {
 		int ammo = getAmmo(itemStack);
 		if (ammo <= 0 || this.definition.magazineSize() <= 0) {
 			level.playSound(null, player.getX(), player.getY(), player.getZ(), this.sound("empty"), SoundSource.PLAYERS, 0.7F, 1.0F);
@@ -84,7 +90,7 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 		}
 
 		if (level instanceof ServerLevel serverLevel) {
-			this.scheduleTriggerPull(serverLevel, player, itemStack, ammo);
+			this.scheduleTriggerPull(serverLevel, player, itemStack, ammo, precisionAiming);
 		}
 
 		player.getCooldowns().addCooldown(itemStack, this.triggerCooldownTicks(itemStack));
@@ -115,10 +121,10 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 		return getFireMode(itemStack) == TaczFireMode.BURST ? TaczGunBurstData.burst(this.definition.id()).intervalMillis() : 1L;
 	}
 
-	private void scheduleTriggerPull(ServerLevel serverLevel, Player player, ItemStack itemStack, int ammo) {
+	private void scheduleTriggerPull(ServerLevel serverLevel, Player player, ItemStack itemStack, int ammo, boolean precisionAiming) {
 		int rounds = this.roundsPerTrigger(itemStack, ammo);
 		if (rounds <= 1) {
-			this.fireRound(serverLevel, player, itemStack);
+			this.fireRound(serverLevel, player, itemStack, precisionAiming);
 			return;
 		}
 
@@ -131,29 +137,40 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 				if (!player.isAlive() || player.getMainHandItem() != itemStack || getAmmo(itemStack) <= 0) {
 					return;
 				}
-				this.fireRound(serverLevel, player, itemStack);
+				this.fireRound(serverLevel, player, itemStack, precisionAiming);
 			}));
 		}
 	}
 
-	private void fireRound(ServerLevel serverLevel, Player player, ItemStack itemStack) {
+	private void fireRound(ServerLevel serverLevel, Player player, ItemStack itemStack, boolean precisionAiming) {
 		if (getAmmo(itemStack) <= 0) {
 			return;
 		}
 
+		TaczFireMode fireMode = getFireMode(itemStack);
 		int bulletCount = Math.max(1, this.definition.bulletCount());
 		float damage = this.definition.damage() / bulletCount;
-		float inaccuracy = Math.max(0.0F, this.definition.inaccuracy());
+		float inaccuracy = TaczGunBallistics.inaccuracy(this.definition.id(), fireMode, player, precisionAiming, this.definition.inaccuracy());
+		float bulletSpeed = TaczGunBallistics.bulletSpeed(this.definition.id(), fireMode, this.definition.bulletSpeed());
+		float headshotMultiplier = TaczGunBallistics.headshotMultiplier(this.definition.id(), fireMode, this.definition.headshotMultiplier());
+		float knockback = TaczGunBallistics.knockback(this.definition.id(), fireMode, this.definition.knockback());
+		List<TaczGunBallistics.DamagePoint> damageCurve = TaczGunBallistics.damageCurve(this.definition.id(), fireMode, bulletCount, this.definition.damage());
 		for (int shot = 0; shot < bulletCount; shot++) {
 			TaczBullet bullet = new TaczBullet(serverLevel, player, itemStack, damage, Math.max(1, this.definition.pierce()));
+			bullet.setDamageCurve(damageCurve);
 			bullet.setBulletProperties(
 				this.definition.gravity(),
 				this.definition.friction(),
 				this.definition.lifeTicks(),
-				this.definition.headshotMultiplier(),
-				this.definition.knockback()
+				headshotMultiplier,
+				knockback
 			);
-			bullet.shootFromRotation(player, player.getXRot(), player.getYRot(), 0.0F, this.definition.bulletSpeed(), inaccuracy);
+			Optional<TaczGunBallistics.SpreadOffset> spreadOffset = TaczGunBallistics.scriptedSpreadOffset(this.definition.id(), shot, inaccuracy);
+			if (spreadOffset.isPresent()) {
+				bullet.shootFromRotation(player, player.getXRot(), player.getYRot(), 0.0F, bulletSpeed, spreadOffset.get());
+			} else {
+				bullet.shootFromRotation(player, player.getXRot(), player.getYRot(), 0.0F, bulletSpeed, inaccuracy);
+			}
 			serverLevel.addFreshEntity(bullet);
 		}
 

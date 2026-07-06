@@ -2215,7 +2215,7 @@ public class ServerGamePacketListenerImpl
 		this.player.resetLastActionTime();
 		if (payload.action() == TaczGunInputC2SPayload.Action.SHOOT) {
 			if (!this.player.getCooldowns().isOnCooldown(itemStack)) {
-				gunItem.tryFire(this.player.level(), this.player, InteractionHand.MAIN_HAND, itemStack);
+				gunItem.tryFire(this.player.level(), this.player, InteractionHand.MAIN_HAND, itemStack, payload.precisionAiming());
 			}
 		} else if (payload.action() == TaczGunInputC2SPayload.Action.RELOAD) {
 			gunItem.tryStartReload(this.player.level(), this.player, InteractionHand.MAIN_HAND, itemStack);

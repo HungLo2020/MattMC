@@ -4,7 +4,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceLocation;
 
-public record TaczGunInputC2SPayload(TaczGunInputC2SPayload.Action action) implements CustomPacketPayload {
+public record TaczGunInputC2SPayload(TaczGunInputC2SPayload.Action action, boolean precisionAiming) implements CustomPacketPayload {
 	public static final CustomPacketPayload.Type<TaczGunInputC2SPayload> TYPE = new CustomPacketPayload.Type<>(
 		ResourceLocation.withDefaultNamespace("gun_input")
 	);
@@ -14,11 +14,16 @@ public record TaczGunInputC2SPayload(TaczGunInputC2SPayload.Action action) imple
 	);
 
 	private TaczGunInputC2SPayload(FriendlyByteBuf friendlyByteBuf) {
-		this(Action.byId(friendlyByteBuf.readUnsignedByte()));
+		this(Action.byId(friendlyByteBuf.readUnsignedByte()), friendlyByteBuf.readableBytes() > 0 && friendlyByteBuf.readBoolean());
+	}
+
+	public TaczGunInputC2SPayload(TaczGunInputC2SPayload.Action action) {
+		this(action, false);
 	}
 
 	private void write(FriendlyByteBuf friendlyByteBuf) {
 		friendlyByteBuf.writeByte(this.action.ordinal());
+		friendlyByteBuf.writeBoolean(this.precisionAiming);
 	}
 
 	@Override

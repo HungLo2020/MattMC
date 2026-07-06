@@ -1,5 +1,6 @@
 package net.minecraft.world.entity.projectile;
 
+import java.util.List;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
 import net.minecraft.network.protocol.common.custom.TaczKillHudS2CPayload;
@@ -16,6 +17,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TaczGunBallistics;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.gameevent.GameEvent;
@@ -43,6 +45,7 @@ public class TaczBullet extends Projectile {
 	private float knockback = DEFAULT_KNOCKBACK;
 	private Vec3 startPos = Vec3.ZERO;
 	private ItemStack weapon = ItemStack.EMPTY;
+	private List<TaczGunBallistics.DamagePoint> damageCurve = List.of();
 
 	public TaczBullet(EntityType<? extends TaczBullet> entityType, Level level) {
 		super(entityType, level);
@@ -64,6 +67,18 @@ public class TaczBullet extends Projectile {
 		this.life = Math.max(1, life);
 		this.headshotMultiplier = Math.max(1.0F, headshotMultiplier);
 		this.knockback = Math.max(0.0F, knockback);
+	}
+
+	public void setDamageCurve(List<TaczGunBallistics.DamagePoint> damageCurve) {
+		this.damageCurve = List.copyOf(damageCurve);
+	}
+
+	public void shootFromRotation(Entity shooter, float pitch, float yaw, float roll, float velocity, TaczGunBallistics.SpreadOffset spreadOffset) {
+		TaczGunBallistics.Vec3Like vector = TaczGunBallistics.directionFromScriptedSpread(pitch, yaw, velocity, spreadOffset);
+		this.setDeltaMovement(vector.x(), vector.y(), vector.z());
+		Vec3 shooterMovement = shooter.getKnownMovement();
+		this.setDeltaMovement(this.getDeltaMovement().add(shooterMovement.x, shooter.onGround() ? 0.0 : shooterMovement.y, shooterMovement.z));
+		this.updateBulletRotation(this.getDeltaMovement());
 	}
 
 	@Override
@@ -212,13 +227,15 @@ public class TaczBullet extends Projectile {
 
 	public float getDamage(Vec3 hitLocation) {
 		double distance = this.startPos.distanceTo(hitLocation);
-		if (distance <= 24.0) {
+		if (this.damageCurve.isEmpty()) {
 			return this.damage;
 		}
-		if (distance >= 48.0) {
-			return this.damage * 0.65F;
+		for (TaczGunBallistics.DamagePoint point : this.damageCurve) {
+			if (distance < point.distance()) {
+				return point.damage();
+			}
 		}
-		return Mth.lerp((float)((distance - 24.0) / 24.0), this.damage, this.damage * 0.65F);
+		return 0.0F;
 	}
 
 	@Override
