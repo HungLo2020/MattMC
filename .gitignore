@@ -26,6 +26,17 @@ Thumbs.db
 *.log
 ERROR-LOG.txt
 *.tmp
+*.bak
+*.backup
+*.inline_backup
+*.orig
+*.rej
+*~
+
+# Python generated files
+__pycache__/
+*.py[cod]
+*$py.class
 
 # JDK (too large to commit)
 /libraries/jdk/
@@ -41,11 +52,26 @@ build/reports/tests/
 # JMH generated files
 jmh-result.json
 jmh-result.txt
+jmh-result.*
+
+# Local profiler/performance reports
+*.jfr
+*.hprof
+*.prof
+*.profraw
+*.profdata
+*.trace
+/logs/auto-capture/*_report_*.txt
+/logs/auto-capture/vulkan_parity_source_audit_*.txt
+/logs/auto-capture/vulkan_shader_input_parity_*.txt
+/logs/vulkan-perf-audit/
+
+# DevUtils generated files
+/DevUtils/EggBuilder/spawn_egg.png
 
 # Test coverage
 .jacoco/
 /Task
-*.inline_backup
 /mattmc_performance_history.html
 
 # Wiki build/local environment
