@@ -3,6 +3,7 @@
 This Document is a list of all changes in MattMC over base Minecraft Java 1.21.10 which this is based on.
 
 ## Additions
+- [Added TACZ style firearms, Attachments, and Ammo](../changelog/changelog/7.2026.md)
 - [Trowel Item](../gameplay/items/Trowel.md)
 - [Redstone Randomizer](../gameplay/items/RedstoneRandomizer.md)
 - [Building Wand](../gameplay/items/BuildingWand.md)
