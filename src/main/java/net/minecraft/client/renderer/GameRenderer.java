@@ -60,6 +60,7 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.resources.model.AtlasManager;
 import net.vulkanic.VulkanicAPI;
 import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.client.tacz.TaczCameraRecoil;
 import net.minecraft.client.tacz.TaczScopeData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -898,6 +899,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		profilerFiller.popPush("camera");
 		Entity entity = (Entity)(this.minecraft.getCameraEntity() == null ? localPlayer : this.minecraft.getCameraEntity());
 		float g = this.minecraft.level.tickRateManager().isEntityFrozen(entity) ? 1.0F : f;
+		TaczCameraRecoil.apply(this.minecraft);
 		this.mainCamera
 			.setup(this.minecraft.level, entity, !this.minecraft.options.getCameraType().isFirstPerson(), this.minecraft.options.getCameraType().isMirrored(), g);
 		this.extractCamera(f);

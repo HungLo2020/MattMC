@@ -41,6 +41,16 @@ public final class TaczScopeData {
 		return CACHE.computeIfAbsent(attachmentId, TaczScopeData::loadDisplay);
 	}
 
+	public static float zoom(ItemStack itemStack) {
+		AttachmentDisplay scope = scope(itemStack);
+		if (scope != null && scope.zoom() > 1.0F) {
+			return scope.zoom();
+		}
+
+		GunDisplay display = gunDisplay(itemStack);
+		return display != null ? Math.max(display.ironZoom(), 1.0F) : 1.0F;
+	}
+
 	public static float applyWorldFov(ItemStack itemStack, float baseFov, float partialTick) {
 		AttachmentDisplay scope = scope(itemStack);
 		if (scope == null || scope.zoom() <= 1.0F) {

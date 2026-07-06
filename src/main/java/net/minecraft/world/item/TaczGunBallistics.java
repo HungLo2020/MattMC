@@ -10,6 +10,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +23,7 @@ import net.minecraft.world.entity.Pose;
 
 public final class TaczGunBallistics {
 	private static final Map<String, GunBallistics> CACHE = new ConcurrentHashMap<>();
+	private static final Map<String, AttachmentRecoilModifiers> ATTACHMENT_CACHE = new ConcurrentHashMap<>();
 	private static final Map<InaccuracyType, Float> DEFAULT_INACCURACY = Map.of(
 		InaccuracyType.STAND, 5.0F,
 		InaccuracyType.MOVE, 5.75F,
@@ -29,6 +32,7 @@ public final class TaczGunBallistics {
 		InaccuracyType.AIM, 0.15F
 	);
 	private static final float SCRIPT_SPREAD_TARGET_DISTANCE = 8.0F;
+	private static final float DEFAULT_CRAWL_RECOIL_MULTIPLIER = 0.5F;
 
 	private TaczGunBallistics() {
 	}
@@ -103,6 +107,46 @@ public final class TaczGunBallistics {
 		return new Vec3Like(rotatedX * scale, rotatedY * scale, finalZ * scale);
 	}
 
+	public static RecoilInstance recoilInstance(String gunId, ItemStack gunStack, float aimingProgress, boolean crawling, float zoom) {
+		GunBallistics data = data(gunId);
+		if (data.recoil().isEmpty()) {
+			return RecoilInstance.EMPTY;
+		}
+
+		float aimingModifier = 1.0F - aimingProgress + aimingProgress / (float)Math.min(Math.sqrt(zoom), 1.5);
+		if (crawling) {
+			aimingModifier *= data.crawlRecoilMultiplier();
+		}
+
+		AttachmentRecoilModifiers attachments = installedAttachmentRecoilModifiers(gunStack);
+		float pitchModifier = attachments.pitch().eval(aimingModifier);
+		float yawModifier = attachments.yaw().eval(aimingModifier);
+		return new RecoilInstance(data.recoil().pitch().sample(pitchModifier), data.recoil().yaw().sample(yawModifier));
+	}
+
+	public static AttachmentRecoilModifiers installedAttachmentRecoilModifiers(ItemStack gunStack) {
+		if (!(gunStack.getItem() instanceof TaczRefitGun gun)) {
+			return AttachmentRecoilModifiers.EMPTY;
+		}
+
+		List<Modifier> pitch = new ArrayList<>();
+		List<Modifier> yaw = new ArrayList<>();
+		for (TaczAttachmentType type : TaczAttachmentType.values()) {
+			ItemStack attachmentStack = gun.getAttachment(gunStack, type);
+			if (!(attachmentStack.getItem() instanceof TaczAttachmentItem attachment)) {
+				continue;
+			}
+			AttachmentRecoilModifiers modifiers = attachmentRecoilModifiers(attachment.getAttachmentId());
+			pitch.addAll(modifiers.pitch().modifiers());
+			yaw.addAll(modifiers.yaw().modifiers());
+		}
+		return new AttachmentRecoilModifiers(new ParameterizedModifiers(List.copyOf(pitch)), new ParameterizedModifiers(List.copyOf(yaw)));
+	}
+
+	public static AttachmentRecoilModifiers attachmentRecoilModifiers(String attachmentId) {
+		return ATTACHMENT_CACHE.computeIfAbsent(attachmentId, TaczGunBallistics::loadAttachmentRecoilModifiers);
+	}
+
 	static GunBallistics dataForTest(String gunId) {
 		return data(gunId);
 	}
@@ -150,7 +194,9 @@ public final class TaczGunBallistics {
 
 		List<DamagePoint> damageCurve = parseDamageCurve(root);
 		String script = root.has("script") ? root.get("script").getAsString() : "";
-		return new GunBallistics(Map.copyOf(inaccuracy), Map.copyOf(fireModeAdjustments), damageCurve, script);
+		float crawlRecoilMultiplier = root.has("crawl_recoil_multiplier") ? root.get("crawl_recoil_multiplier").getAsFloat() : DEFAULT_CRAWL_RECOIL_MULTIPLIER;
+		GunRecoil recoil = parseRecoil(root);
+		return new GunBallistics(Map.copyOf(inaccuracy), Map.copyOf(fireModeAdjustments), damageCurve, script, crawlRecoilMultiplier, recoil);
 	}
 
 	private static List<DamagePoint> parseDamageCurve(JsonObject root) {
@@ -191,6 +237,102 @@ public final class TaczGunBallistics {
 		return InaccuracyType.STAND;
 	}
 
+	private static GunRecoil parseRecoil(JsonObject root) {
+		if (!root.has("recoil") || !root.get("recoil").isJsonObject()) {
+			return GunRecoil.EMPTY;
+		}
+
+		JsonObject recoil = root.getAsJsonObject("recoil");
+		return new GunRecoil(parseRecoilCurve(recoil, "pitch"), parseRecoilCurve(recoil, "yaw"));
+	}
+
+	private static RecoilCurve parseRecoilCurve(JsonObject recoil, String key) {
+		if (!recoil.has(key) || !recoil.get(key).isJsonArray()) {
+			return RecoilCurve.EMPTY;
+		}
+
+		List<RecoilKeyFrame> keyFrames = recoil.getAsJsonArray(key)
+			.asList()
+			.stream()
+			.filter(JsonElement::isJsonObject)
+			.map(JsonElement::getAsJsonObject)
+			.map(TaczGunBallistics::parseRecoilKeyFrame)
+			.flatMap(Optional::stream)
+			.sorted(Comparator.comparingDouble(RecoilKeyFrame::time))
+			.toList();
+		return new RecoilCurve(keyFrames);
+	}
+
+	private static Optional<RecoilKeyFrame> parseRecoilKeyFrame(JsonObject frame) {
+		if (!frame.has("time") || !frame.has("value") || !frame.get("value").isJsonArray()) {
+			return Optional.empty();
+		}
+
+		JsonArray value = frame.getAsJsonArray("value");
+		if (value.size() != 2) {
+			return Optional.empty();
+		}
+
+		float time = frame.get("time").getAsFloat();
+		float min = value.get(0).getAsFloat();
+		float max = value.get(1).getAsFloat();
+		if (time < 0.0F || min > max) {
+			return Optional.empty();
+		}
+		return Optional.of(new RecoilKeyFrame(time, min, max));
+	}
+
+	private static AttachmentRecoilModifiers loadAttachmentRecoilModifiers(String attachmentId) {
+		String path = "data/minecraft/data/attachments/" + attachmentId + "_data.json";
+		try (InputStream stream = TaczGunBallistics.class.getClassLoader().getResourceAsStream(path)) {
+			if (stream == null) {
+				return AttachmentRecoilModifiers.EMPTY;
+			}
+			JsonReader reader = new JsonReader(new InputStreamReader(stream, StandardCharsets.UTF_8));
+			reader.setStrictness(Strictness.LENIENT);
+			JsonObject root = JsonParser.parseReader(reader).getAsJsonObject();
+			return parseAttachmentRecoilModifiers(root);
+		} catch (IOException | RuntimeException exception) {
+			return AttachmentRecoilModifiers.EMPTY;
+		}
+	}
+
+	private static AttachmentRecoilModifiers parseAttachmentRecoilModifiers(JsonObject root) {
+		if (!root.has("recoil") || !root.get("recoil").isJsonObject()) {
+			if (!root.has("recoil_modifier") || !root.get("recoil_modifier").isJsonObject()) {
+				return AttachmentRecoilModifiers.EMPTY;
+			}
+			JsonObject legacy = root.getAsJsonObject("recoil_modifier");
+			Modifier pitch = legacy.has("pitch") ? Modifier.percent(legacy.get("pitch").getAsDouble()) : Modifier.IDENTITY;
+			Modifier yaw = legacy.has("yaw") ? Modifier.percent(legacy.get("yaw").getAsDouble()) : Modifier.IDENTITY;
+			return new AttachmentRecoilModifiers(new ParameterizedModifiers(List.of(pitch)), new ParameterizedModifiers(List.of(yaw)));
+		}
+
+		JsonObject recoil = root.getAsJsonObject("recoil");
+		return new AttachmentRecoilModifiers(
+			new ParameterizedModifiers(parseModifiers(recoil, "pitch")),
+			new ParameterizedModifiers(parseModifiers(recoil, "yaw"))
+		);
+	}
+
+	private static List<Modifier> parseModifiers(JsonObject root, String key) {
+		if (!root.has(key) || !root.get(key).isJsonObject()) {
+			return List.of();
+		}
+
+		JsonObject value = root.getAsJsonObject(key);
+		return List.of(new Modifier(
+			getDouble(value, "addend", 0.0),
+			getDouble(value, "percent", 0.0),
+			Math.max(getDouble(value, "multiplier", 1.0), 0.0),
+			value.has("function") ? value.get("function").getAsString() : ""
+		));
+	}
+
+	private static double getDouble(JsonObject root, String key, double fallback) {
+		return root.has(key) ? root.get(key).getAsDouble() : fallback;
+	}
+
 	enum InaccuracyType {
 		STAND("stand"),
 		MOVE("move"),
@@ -213,9 +355,11 @@ public final class TaczGunBallistics {
 		Map<InaccuracyType, Float> inaccuracy,
 		Map<TaczFireMode, FireModeAdjustment> fireModeAdjustments,
 		List<DamagePoint> damageCurve,
-		String script
+		String script,
+		float crawlRecoilMultiplier,
+		GunRecoil recoil
 	) {
-		static final GunBallistics EMPTY = new GunBallistics(DEFAULT_INACCURACY, Map.of(), List.of(), "");
+		static final GunBallistics EMPTY = new GunBallistics(DEFAULT_INACCURACY, Map.of(), List.of(), "", DEFAULT_CRAWL_RECOIL_MULTIPLIER, GunRecoil.EMPTY);
 	}
 
 	private record FireModeAdjustment(float damage, float speed, float knockback, float headshotMultiplier, float aimInaccuracy, float otherInaccuracy) {
@@ -248,5 +392,331 @@ public final class TaczGunBallistics {
 	}
 
 	public record Vec3Like(double x, double y, double z) {
+	}
+
+	public record GunRecoil(RecoilCurve pitch, RecoilCurve yaw) {
+		static final GunRecoil EMPTY = new GunRecoil(RecoilCurve.EMPTY, RecoilCurve.EMPTY);
+
+		boolean isEmpty() {
+			return this.pitch.isEmpty() && this.yaw.isEmpty();
+		}
+	}
+
+	public record RecoilCurve(List<RecoilKeyFrame> keyFrames) {
+		static final RecoilCurve EMPTY = new RecoilCurve(List.of());
+
+		public boolean isEmpty() {
+			return this.keyFrames.isEmpty();
+		}
+
+		RecoilSpline sample(float modifier) {
+			if (this.keyFrames.isEmpty()) {
+				return RecoilSpline.EMPTY;
+			}
+
+			double[] times = new double[this.keyFrames.size() + 1];
+			double[] values = new double[this.keyFrames.size() + 1];
+			times[0] = 0.0;
+			values[0] = 0.0;
+			for (int i = 0; i < this.keyFrames.size(); i++) {
+				RecoilKeyFrame frame = this.keyFrames.get(i);
+				times[i + 1] = frame.time() * 1000.0 + 30.0;
+				values[i + 1] = frame.sample() * modifier;
+			}
+			return RecoilSpline.interpolate(times, values);
+		}
+	}
+
+	public record RecoilKeyFrame(float time, float minValue, float maxValue) {
+		double sample() {
+			return this.minValue + Math.random() * (this.maxValue - this.minValue);
+		}
+	}
+
+	public record RecoilInstance(RecoilSpline pitch, RecoilSpline yaw) {
+		static final RecoilInstance EMPTY = new RecoilInstance(RecoilSpline.EMPTY, RecoilSpline.EMPTY);
+	}
+
+	public static final class RecoilSpline {
+		public static final RecoilSpline EMPTY = new RecoilSpline(new double[0], new Polynomial[0]);
+		private final double[] knots;
+		private final Polynomial[] polynomials;
+
+		private RecoilSpline(double[] knots, Polynomial[] polynomials) {
+			this.knots = knots;
+			this.polynomials = polynomials;
+		}
+
+		static RecoilSpline interpolate(double[] x, double[] y) {
+			if (x.length < 2 || x.length != y.length) {
+				return EMPTY;
+			}
+			for (int i = 1; i < x.length; i++) {
+				if (x[i] <= x[i - 1]) {
+					return EMPTY;
+				}
+			}
+
+			int n = x.length - 1;
+			double[] h = new double[n];
+			for (int i = 0; i < n; i++) {
+				h[i] = x[i + 1] - x[i];
+			}
+
+			double[] mu = new double[n];
+			double[] z = new double[n + 1];
+			for (int i = 1; i < n; i++) {
+				double g = 2.0 * (x[i + 1] - x[i - 1]) - h[i - 1] * mu[i - 1];
+				mu[i] = h[i] / g;
+				z[i] = (3.0 * (y[i + 1] * h[i - 1] - y[i] * (x[i + 1] - x[i - 1]) + y[i - 1] * h[i]) / (h[i - 1] * h[i]) - h[i - 1] * z[i - 1]) / g;
+			}
+
+			double[] c = new double[n + 1];
+			double[] b = new double[n];
+			double[] d = new double[n];
+			for (int j = n - 1; j >= 0; j--) {
+				c[j] = z[j] - mu[j] * c[j + 1];
+				b[j] = (y[j + 1] - y[j]) / h[j] - h[j] * (c[j + 1] + 2.0 * c[j]) / 3.0;
+				d[j] = (c[j + 1] - c[j]) / (3.0 * h[j]);
+			}
+
+			Polynomial[] polynomials = new Polynomial[n];
+			for (int i = 0; i < n; i++) {
+				polynomials[i] = new Polynomial(y[i], b[i], c[i], d[i]);
+			}
+			return new RecoilSpline(x.clone(), polynomials);
+		}
+
+		public boolean isValidPoint(double x) {
+			return this.knots.length >= 2 && x >= this.knots[0] && x <= this.knots[this.knots.length - 1];
+		}
+
+		public double value(double x) {
+			if (!this.isValidPoint(x)) {
+				return 0.0;
+			}
+			int segment = this.polynomials.length - 1;
+			for (int i = 0; i < this.polynomials.length; i++) {
+				if (x <= this.knots[i + 1]) {
+					segment = i;
+					break;
+				}
+			}
+			return this.polynomials[segment].value(x - this.knots[segment]);
+		}
+
+		private record Polynomial(double a, double b, double c, double d) {
+			double value(double x) {
+				return this.a + x * (this.b + x * (this.c + x * this.d));
+			}
+		}
+	}
+
+	public record AttachmentRecoilModifiers(ParameterizedModifiers pitch, ParameterizedModifiers yaw) {
+		static final AttachmentRecoilModifiers EMPTY = new AttachmentRecoilModifiers(ParameterizedModifiers.EMPTY, ParameterizedModifiers.EMPTY);
+	}
+
+	public record ParameterizedModifiers(List<Modifier> modifiers) {
+		static final ParameterizedModifiers EMPTY = new ParameterizedModifiers(List.of());
+
+		float eval(double input) {
+			double addend = 0.0;
+			double percent = 1.0;
+			double multiplier = 1.0;
+			for (Modifier modifier : this.modifiers) {
+				addend += modifier.addend();
+				percent += modifier.percent();
+				multiplier *= Math.max(modifier.multiplier(), 0.0);
+			}
+			double value = (input + addend) * Math.max(percent, 0.0) * multiplier;
+			for (Modifier modifier : this.modifiers) {
+				if (!modifier.function().isBlank()) {
+					value = FunctionModifierEvaluator.eval(value, input, modifier.function());
+				}
+			}
+			return (float)value;
+		}
+	}
+
+	public record Modifier(double addend, double percent, double multiplier, String function) {
+		static final Modifier IDENTITY = new Modifier(0.0, 0.0, 1.0, "");
+
+		static Modifier percent(double percent) {
+			return new Modifier(0.0, percent, 1.0, "");
+		}
+	}
+
+	private static final class FunctionModifierEvaluator {
+		private FunctionModifierEvaluator() {
+		}
+
+		static double eval(double value, double input, String function) {
+			try {
+				return evalUnchecked(value, input, function);
+			} catch (RuntimeException exception) {
+				return value;
+			}
+		}
+
+		private static double evalUnchecked(double value, double input, String function) {
+			String script = function.trim().toLowerCase(java.util.Locale.ENGLISH);
+			if (script.startsWith("if")) {
+				int thenIndex = script.indexOf("then");
+				int elseIndex = script.indexOf("else", thenIndex + 4);
+				int endIndex = script.lastIndexOf("end");
+				if (thenIndex < 0 || elseIndex < 0 || endIndex < 0) {
+					return value;
+				}
+				String condition = script.substring(2, thenIndex).trim();
+				if (condition.startsWith("(") && condition.endsWith(")")) {
+					condition = condition.substring(1, condition.length() - 1);
+				}
+				String branch = evalCondition(condition, value, input)
+					? script.substring(thenIndex + 4, elseIndex)
+					: script.substring(elseIndex + 4, endIndex);
+				return evalAssignment(branch, value, input);
+			}
+			return evalAssignment(script, value, input);
+		}
+
+		private static boolean evalCondition(String condition, double value, double input) {
+			for (String operator : new String[]{">=", "<=", "==", "~=", ">", "<"}) {
+				int index = condition.indexOf(operator);
+				if (index < 0) {
+					continue;
+				}
+				double left = new ExpressionParser(condition.substring(0, index), value, input).parse();
+				double right = new ExpressionParser(condition.substring(index + operator.length()), value, input).parse();
+				return switch (operator) {
+					case ">=" -> left >= right;
+					case "<=" -> left <= right;
+					case "==" -> left == right;
+					case "~=" -> left != right;
+					case ">" -> left > right;
+					case "<" -> left < right;
+					default -> false;
+				};
+			}
+			return new ExpressionParser(condition, value, input).parse() != 0.0;
+		}
+
+		private static double evalAssignment(String assignment, double value, double input) {
+			String trimmed = assignment.trim();
+			int equals = trimmed.indexOf('=');
+			if (equals >= 0) {
+				String target = trimmed.substring(0, equals).trim();
+				if (!target.equals("y")) {
+					return value;
+				}
+				trimmed = trimmed.substring(equals + 1);
+			}
+			return new ExpressionParser(trimmed, value, input).parse();
+		}
+
+		private static final class ExpressionParser {
+			private final String expression;
+			private final double x;
+			private final double r;
+			private int cursor;
+
+			ExpressionParser(String expression, double x, double r) {
+				this.expression = expression;
+				this.x = x;
+				this.r = r;
+			}
+
+			double parse() {
+				double result = this.parseAddSubtract();
+				this.skipWhitespace();
+				if (this.cursor != this.expression.length()) {
+					throw new IllegalArgumentException("Unexpected expression tail");
+				}
+				return result;
+			}
+
+			private double parseAddSubtract() {
+				double value = this.parseMultiplyDivide();
+				while (true) {
+					this.skipWhitespace();
+					if (this.consume('+')) {
+						value += this.parseMultiplyDivide();
+					} else if (this.consume('-')) {
+						value -= this.parseMultiplyDivide();
+					} else {
+						return value;
+					}
+				}
+			}
+
+			private double parseMultiplyDivide() {
+				double value = this.parseUnary();
+				while (true) {
+					this.skipWhitespace();
+					if (this.consume('*')) {
+						value *= this.parseUnary();
+					} else if (this.consume('/')) {
+						value /= this.parseUnary();
+					} else {
+						return value;
+					}
+				}
+			}
+
+			private double parseUnary() {
+				this.skipWhitespace();
+				if (this.consume('+')) {
+					return this.parseUnary();
+				}
+				if (this.consume('-')) {
+					return -this.parseUnary();
+				}
+				return this.parsePrimary();
+			}
+
+			private double parsePrimary() {
+				this.skipWhitespace();
+				if (this.consume('(')) {
+					double value = this.parseAddSubtract();
+					if (!this.consume(')')) {
+						throw new IllegalArgumentException("Unclosed parenthesis");
+					}
+					return value;
+				}
+				if (this.consume('x')) {
+					return this.x;
+				}
+				if (this.consume('r')) {
+					return this.r;
+				}
+				int start = this.cursor;
+				while (this.cursor < this.expression.length()) {
+					char c = this.expression.charAt(this.cursor);
+					if ((c >= '0' && c <= '9') || c == '.') {
+						this.cursor++;
+					} else {
+						break;
+					}
+				}
+				if (start == this.cursor) {
+					throw new IllegalArgumentException("Expected expression value");
+				}
+				return Double.parseDouble(this.expression.substring(start, this.cursor));
+			}
+
+			private boolean consume(char expected) {
+				this.skipWhitespace();
+				if (this.cursor < this.expression.length() && this.expression.charAt(this.cursor) == expected) {
+					this.cursor++;
+					return true;
+				}
+				return false;
+			}
+
+			private void skipWhitespace() {
+				while (this.cursor < this.expression.length() && Character.isWhitespace(this.expression.charAt(this.cursor))) {
+					this.cursor++;
+				}
+			}
+		}
 	}
 }

@@ -145,6 +145,7 @@ public final class TaczClientInputHandler {
 		}
 
 		TaczGlock17AnimationController.triggerShoot(itemStack);
+		TaczCameraRecoil.trigger(itemStack);
 		TaczGlock17SpecialRenderer.triggerMuzzleFlash();
 		minecraft.level
 			.playSound(
