@@ -997,6 +997,7 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	}
 
 	private static void drawMeshImmediate(RenderType renderType, MeshData meshData, Runnable beforeDraw, RenderType renderTargetRenderType) {
+		ensureImmediatePipelineReady(renderType.pipeline());
 		renderType.setupRenderState();
 		try {
 			GpuBufferSlice dynamicTransforms = VulkanicAPI.getDynamicUniforms()
@@ -1070,6 +1071,12 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			}
 		} finally {
 			renderType.clearRenderState();
+		}
+	}
+
+	private static void ensureImmediatePipelineReady(RenderPipeline pipeline) {
+		if (VulkanicAPI.isVulkanBackendSelected()) {
+			VulkanicAPI.precompileRenderPipeline(pipeline, Minecraft.getInstance().getShaderManager()::getShader);
 		}
 	}
 
