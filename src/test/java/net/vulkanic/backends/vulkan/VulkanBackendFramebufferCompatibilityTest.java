@@ -26,6 +26,75 @@ public class VulkanBackendFramebufferCompatibilityTest {
 	private static final Path PROJECT_ROOT = Paths.get(System.getProperty("user.dir"));
 
 	@Test
+	public void testDepthReadOnlyLayoutBarrierStageSupportsShaderReadAccess() throws Exception {
+		Class<?> nativeSpine = Class.forName("net.vulkanic.backends.vulkan.VulkanBackend$NativeSpine");
+		Method accessMaskForLayout = nativeSpine.getDeclaredMethod("accessMaskForLayout", int.class);
+		Method stageMaskForLayout = nativeSpine.getDeclaredMethod("stageMaskForLayout", int.class);
+		accessMaskForLayout.setAccessible(true);
+		stageMaskForLayout.setAccessible(true);
+
+		int accessMask = (Integer) accessMaskForLayout.invoke(null, VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
+		int stageMask = (Integer) stageMaskForLayout.invoke(null, VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
+
+		assertTrue((accessMask & VK10.VK_ACCESS_SHADER_READ_BIT) != 0,
+			"Depth read-only layout is used for sampled depth descriptors and must include shader-read access");
+		assertTrue((stageMask & VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT) != 0,
+			"Shader-read access is invalid with only depth-test stages; fragment shader stage must be included");
+		assertTrue((stageMask & VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT) != 0);
+		assertTrue((stageMask & VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT) != 0);
+	}
+
+	@Test
+	public void testInferredFeedbackLoopInitialLayoutStillPreTransitionsBeforeRenderPass() throws Exception {
+		String source = Files.readString(PROJECT_ROOT
+			.resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"))
+			.replace("\r\n", "\n")
+			.replace('\r', '\n');
+
+		String helper = source.substring(
+			source.indexOf("private void ensureTextureLayoutBeforeRenderPass"),
+			source.indexOf("private void uploadToLegacyTextureRegion")
+		);
+		String normalizedHelper = helper.replaceAll("\\s+", " ");
+
+		assertFalse(helper.contains("usage == VulkanicResourceUsage.INFERRED"),
+			"A framebuffer pass may infer an explicit feedback-loop initial layout; INFERRED must not skip that pre-barrier");
+		assertTrue(normalizedHelper.contains("Objects.requireNonNull(usage, \"usage must not be null\");"),
+			"The usage parameter should remain validated even though explicit target layout drives the transition decision");
+		assertTrue(normalizedHelper.contains("transitionImageLayout(texture, trackedLayout, targetLayout, 0, 1);"),
+			"The helper must still emit an actual pre-render-pass layout barrier");
+	}
+
+	@Test
+	public void testDepthStencilSampledDescriptorsUseDepthOnlyViewAndLayout() throws Exception {
+		String source = Files.readString(PROJECT_ROOT
+			.resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"))
+			.replace("\r\n", "\n")
+			.replace('\r', '\n');
+
+		String descriptorLayoutHelper = source.substring(
+			source.indexOf("private int descriptorImageLayoutFor"),
+			source.indexOf("private boolean shouldUseFeedbackLoopLayoutForSampling")
+		);
+		assertTrue(descriptorLayoutHelper.contains("hasDepthAspect(texture)"),
+			"Depth/stencil textures sampled by shaders must use the depth-read descriptor layout");
+		assertFalse(descriptorLayoutHelper.contains("texture.aspectMask == VK10.VK_IMAGE_ASPECT_DEPTH_BIT"),
+			"A combined depth/stencil image still has a depth aspect; equality would misclassify it as color");
+
+		String descriptorViewHelper = source.substring(
+			source.indexOf("private long descriptorImageViewHandleForSampler"),
+			source.indexOf("private boolean shouldUseFeedbackLoopLayoutForSampling")
+		);
+		String normalizedDescriptorViewHelper = descriptorViewHelper.replaceAll("\\s+", " ");
+		assertTrue(normalizedDescriptorViewHelper.contains("!hasDepthAspect(texture) || !hasStencilAspect(texture)"),
+			"Only combined depth/stencil textures need a sampler-specific view remap");
+		assertTrue(descriptorViewHelper.contains("VK10.VK_IMAGE_ASPECT_DEPTH_BIT"),
+			"Sampled descriptors for combined depth/stencil images must bind a depth-only image view");
+		assertTrue(descriptorViewHelper.contains("texture.sampledDepthViewHandles.put(key, viewHandle);"),
+			"Sampler-specific depth views should be cached instead of recreated for every descriptor write");
+	}
+
+	@Test
 	public void testNamedFramebufferTextureTracksColorAndDepthAttachments() {
 		VulkanBackend backend = new VulkanBackend();
 		int framebuffer = backend.createFramebuffer(TEST_CONTEXT);

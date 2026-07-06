@@ -10849,6 +10849,9 @@ void main() {
         private record BoundDescriptorSetState(long pipelineHandle, long descriptorSetHandle, int bindPoint) {
         }
 
+        private record LegacySampledDepthViewKey(int baseMipLevel, int mipLevelCount) {
+        }
+
         private static final int MAX_FRAMES_IN_FLIGHT = 2;
         private static final int IMMEDIATE_SUBMIT_SLOTS = 3;
 
@@ -11127,6 +11130,7 @@ void main() {
             private final Map<Integer, TextureLevelInfo> levels = new ConcurrentHashMap<>();
             private final Map<Integer, Integer> levelLayouts = new ConcurrentHashMap<>();
             private final Set<Long> managedViewHandles = ConcurrentHashMap.newKeySet();
+            private final Map<LegacySampledDepthViewKey, Long> sampledDepthViewHandles = new ConcurrentHashMap<>();
 
             private volatile long imageHandle;
             private volatile long memoryHandle;
@@ -11751,9 +11755,64 @@ void main() {
             if (shouldUseFeedbackLoopLayoutForSampling(texture)) {
                 return VulkanImageUse.FEEDBACK_LOOP.vkLayout();
             }
-            if (texture.aspectMask == VK10.VK_IMAGE_ASPECT_DEPTH_BIT)
+            if (hasDepthAspect(texture))
                 return VulkanImageUse.SAMPLED_DEPTH.vkLayout();
             return VulkanImageUse.SAMPLED_COLOR.vkLayout();
+        }
+
+        private static boolean hasDepthAspect(@Nullable LegacyTextureObject texture) {
+            return texture != null && (texture.aspectMask & VK10.VK_IMAGE_ASPECT_DEPTH_BIT) != 0;
+        }
+
+        private static boolean hasStencilAspect(@Nullable LegacyTextureObject texture) {
+            return texture != null && (texture.aspectMask & VK10.VK_IMAGE_ASPECT_STENCIL_BIT) != 0;
+        }
+
+        private long descriptorImageViewHandleForSampler(
+            LegacyTextureObject texture,
+            long requestedImageViewHandle,
+            int baseMipLevel,
+            int mipLevelCount
+        ) {
+            if (!hasDepthAspect(texture) || !hasStencilAspect(texture)) {
+                return requestedImageViewHandle;
+            }
+
+            int safeBaseMipLevel = Math.max(0, baseMipLevel);
+            int safeMipLevelCount = Math.max(1, mipLevelCount);
+            LegacySampledDepthViewKey key = new LegacySampledDepthViewKey(safeBaseMipLevel, safeMipLevelCount);
+            Long cachedViewHandle = texture.sampledDepthViewHandles.get(key);
+            if (cachedViewHandle != null && cachedViewHandle != VK10.VK_NULL_HANDLE) {
+                return cachedViewHandle;
+            }
+
+            synchronized (texture) {
+                cachedViewHandle = texture.sampledDepthViewHandles.get(key);
+                if (cachedViewHandle != null && cachedViewHandle != VK10.VK_NULL_HANDLE) {
+                    return cachedViewHandle;
+                }
+                if (texture.imageHandle == VK10.VK_NULL_HANDLE) {
+                    throw new IllegalStateException("Cannot create sampled depth view for legacy texture without image storage");
+                }
+
+                try (MemoryStack stack = stackPush()) {
+                    long viewHandle = createVkImageView(
+                        stack,
+                        texture.imageHandle,
+                        texture.vkFormat,
+                        VK10.VK_IMAGE_ASPECT_DEPTH_BIT,
+                        safeBaseMipLevel,
+                        safeMipLevelCount,
+                        legacyTextureLayerCount(texture),
+                        isLegacyCubemapTarget(texture.target),
+                        isLegacy3DTexture(texture.target)
+                    );
+                    managedExtraImageViews.add(viewHandle);
+                    texture.managedViewHandles.add(viewHandle);
+                    texture.sampledDepthViewHandles.put(key, viewHandle);
+                    return viewHandle;
+                }
+            }
         }
 
         private boolean shouldUseFeedbackLoopLayoutForSampling(@Nullable LegacyTextureObject texture) {
@@ -11909,8 +11968,7 @@ void main() {
             LegacyTextureObject sampledLegacyTexture = tryResolveLegacyTexture(resolvedTextureView);
 
             boolean wantsComparisonSampler = binding.type() == PipelineDescriptor.ResourceType.COMPARISON_SAMPLER;
-            boolean canUseComparisonSampler = sampledLegacyTexture != null
-                && sampledLegacyTexture.aspectMask == VK10.VK_IMAGE_ASPECT_DEPTH_BIT;
+            boolean canUseComparisonSampler = hasDepthAspect(sampledLegacyTexture);
             if (wantsComparisonSampler && !canUseComparisonSampler) {
                 String[] depthFallbackBindings;
                 if ("shadowtex0".equals(binding.name())) {
@@ -11930,7 +11988,7 @@ void main() {
                     }
                     VulkanTextureView fallbackView = (VulkanTextureView) fallbackSamplerBinding.textureView();
                     LegacyTextureObject fallbackTexture = tryResolveLegacyTexture(fallbackView);
-                    if (fallbackTexture == null || fallbackTexture.aspectMask != VK10.VK_IMAGE_ASPECT_DEPTH_BIT) {
+                    if (!hasDepthAspect(fallbackTexture)) {
                         continue;
                     }
                     resolvedTextureView = fallbackView;
@@ -11964,6 +12022,14 @@ void main() {
                 descriptorImageViewHandle = sampledDefaultViewHandle;
                 descriptorBaseMipLevel = 0;
                 descriptorMipLevelCount = Math.max(1, sampledLegacyTexture.mipLevels);
+            }
+            if (sampledLegacyTexture != null) {
+                descriptorImageViewHandle = descriptorImageViewHandleForSampler(
+                    sampledLegacyTexture,
+                    descriptorImageViewHandle,
+                    descriptorBaseMipLevel,
+                    descriptorMipLevelCount
+                );
             }
 
             boolean explicitlyStorageImageBound = sampledLegacyTexture != null
@@ -13691,11 +13757,13 @@ void main() {
 
         private void destroyLegacyManagedImageViews(LegacyTextureObject texture) {
             if (texture.managedViewHandles.isEmpty()) {
+                texture.sampledDepthViewHandles.clear();
                 return;
             }
 
             java.util.List<Long> managedViews = new ArrayList<>(texture.managedViewHandles);
             texture.managedViewHandles.clear();
+            texture.sampledDepthViewHandles.clear();
             LOGGER.info(
                 "Invalidating {} legacy managed image view(s) for texId={} before storage teardown.",
                 managedViews.size(),
@@ -14075,9 +14143,12 @@ void main() {
                 case VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                     VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL -> VK10.VK_PIPELINE_STAGE_TRANSFER_BIT;
                 case VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL -> VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-                case VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                    VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL ->
+                case VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL ->
                     VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+                case VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL ->
+                    VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+                        | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT
+                        | VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
                 case VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL ->
                     VK10.VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK10.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
                 case KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR -> VK10.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
@@ -14141,8 +14212,8 @@ void main() {
             int targetLayout,
             VulkanicResourceUsage usage
         ) {
-            if (usage == VulkanicResourceUsage.INFERRED
-                || texture == null
+            Objects.requireNonNull(usage, "usage must not be null");
+            if (texture == null
                 || targetLayout == VK10.VK_IMAGE_LAYOUT_UNDEFINED) {
                 return;
             }
