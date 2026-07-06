@@ -545,6 +545,13 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
         key_text = format_key(key)
 
         if not gl_records or not vk_records:
+            if (
+                key[1] == "VulkanicStandaloneUniforms"
+                and vk_records
+                and not gl_records
+                and vulkan.standalone_uniform_block_members
+            ):
+                continue
             only = "OpenGL" if gl_records else "Vulkan"
             is_labeled_projection = key[1].startswith("Projection@")
             differences.append(Difference(
@@ -734,6 +741,8 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
         gl_events = opengl.standalone_uniforms.get(name, [])
         vk_events = vulkan.standalone_uniforms.get(name, [])
         if not gl_events or not vk_events:
+            if gl_events and not vk_events and name in vulkan.standalone_uniform_block_members:
+                continue
             differences.append(Difference(
                 severity=35,
                 category="backend-only-standalone-uniform",
@@ -1089,6 +1098,52 @@ def run_self_test() -> None:
     assert len(members) == 1
     assert members[0].signature == "crc32:bbbb/bytes:64"
     assert members[0].offset == "64"
+
+    gl_events = CaptureEvents(path=Path("gl-self-test.log"), backend="opengl")
+    vk_events = CaptureEvents(path=Path("vk-self-test.log"), backend="vulkan")
+    gl_events.standalone_uniforms["gbufferProjection"].append(StandaloneUniformEvent(
+        backend="opengl",
+        source="opengl-setUniform",
+        name="gbufferProjection",
+        value_kind="mat4",
+        component_count="16",
+        raw="",
+        payload_hash="crc32:aaaa/bytes:64",
+    ))
+    vk_events.standalone_uniform_block_members["gbufferProjection"].append(StandaloneUniformBlockMemberEvent(
+        backend="vulkan",
+        source="vulkan-standalone-ubo",
+        name="gbufferProjection",
+        value_kind="mat4",
+        component_count="16",
+        raw="",
+        payload_hash="crc32:bbbb/bytes:64",
+    ))
+    diffs = compare_capture_events(gl_events, vk_events)
+    assert not any(
+        diff.category == "backend-only-standalone-uniform" and diff.key == "name=gbufferProjection"
+        for diff in diffs
+    ), diffs
+    assert any(
+        diff.category == "strict-standalone-ubo-member-payload-mismatch" and diff.key == "name=gbufferProjection"
+        for diff in diffs
+    ), diffs
+
+    vk_events.resources[("generated", "VulkanicStandaloneUniforms", "UNIFORM_BUFFER")].append(ResourceRecord(
+        backend="vulkan",
+        source="vulkan-bindPipelineResources",
+        pipeline_key="pipeline",
+        stable_key="generated",
+        name="VulkanicStandaloneUniforms",
+        resource_type="UNIFORM_BUFFER",
+        raw="",
+        payload_hash="crc32:cccc/bytes:64",
+    ))
+    diffs = compare_capture_events(gl_events, vk_events)
+    assert not any(
+        diff.category == "backend-only-resource" and "name=VulkanicStandaloneUniforms" in diff.key
+        for diff in diffs
+    ), diffs
     print("self-test passed")
 
 

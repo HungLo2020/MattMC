@@ -22,8 +22,8 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
     private static final java.util.regex.Pattern LEGACY_FRAG_COORD_XY_NOISE_PATTERN = java.util.regex.Pattern.compile(
         "\\bgl_FragCoord\\s*\\.\\s*xy\\s*/\\s*128\\.0f?"
     );
-    private static final java.util.regex.Pattern LEGACY_BAYER_FRAG_COORD_XY_PATTERN = java.util.regex.Pattern.compile(
-        "\\b(Bayer(?:2|4|8|16|32|64|128)?)\\s*\\(\\s*gl_FragCoord\\s*\\.\\s*xy\\s*\\)"
+    private static final java.util.regex.Pattern LEGACY_SCREEN_SPACE_DITHER_FRAG_COORD_XY_PATTERN = java.util.regex.Pattern.compile(
+        "\\b(Bayer(?:2|4|8|16|32|64|128)?|bayerMatrix\\d+x\\d+|InterleavedGradientNoise)\\s*\\(\\s*gl_FragCoord\\s*\\.\\s*xy\\s*\\)"
     );
     private static final java.util.regex.Pattern LEGACY_FRAG_COORD_INPUT_DECLARATION_PATTERN = java.util.regex.Pattern.compile(
         "(?m)^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?(?:(?:flat|smooth|noperspective)\\s+)?in\\s+\\w+\\s+gl_FragCoord\\s*;\\s*(?://.*)?(?:\\R|$)"
@@ -66,6 +66,7 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         "vertexYPos", 3
     );
     static final String GENERATED_UNIFORM_BLOCK_NAME = "VulkanicStandaloneUniforms";
+    private static final String VIEW_HEIGHT_UNIFORM_DECLARATION = "float viewHeight;";
 
     @Override
     public VulkanicSpirvModule compile(VulkanicShaderStage stage, CharSequence source, String sourceName, String entryPoint) {
@@ -348,6 +349,8 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
     }
 
     static String prepareSourceForVulkanResourceReflection(VulkanicShaderStage stage, String shaderSource) {
+        shaderSource = injectSyntheticViewHeightUniformForFragmentCoordRewrite(stage, shaderSource);
+
         if (stage != VulkanicShaderStage.VERTEX || !isSodiumTerrainRegionOffsetSource(shaderSource)) {
             return shaderSource;
         }
@@ -373,6 +376,31 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         return SODIUM_REGION_OFFSET_REFERENCE_PATTERN.matcher(rewritten).replaceAll("ModelOffset");
     }
 
+    private static String injectSyntheticViewHeightUniformForFragmentCoordRewrite(VulkanicShaderStage stage, String shaderSource) {
+        if (stage != VulkanicShaderStage.FRAGMENT || !requiresSyntheticViewHeightForFragmentCoordRewrite(shaderSource)) {
+            return shaderSource;
+        }
+
+        int insertOffset = findUniformBlockInsertionOffset(shaderSource);
+        return shaderSource.substring(0, insertOffset)
+            + "uniform "
+            + VIEW_HEIGHT_UNIFORM_DECLARATION
+            + "\n"
+            + shaderSource.substring(insertOffset);
+    }
+
+    private static boolean requiresSyntheticViewHeightForFragmentCoordRewrite(String shaderSource) {
+        return shaderSource.contains("gl_FragCoord")
+            && !VIEW_HEIGHT_DECLARATION_PATTERN.matcher(shaderSource).find()
+            && LEGACY_SCREEN_SPACE_DITHER_FRAG_COORD_XY_PATTERN.matcher(shaderSource).find();
+    }
+
+    private static boolean isStandaloneUniformActiveForVulkan(String searchableSource, String uniformName) {
+        return isIdentifierReferenced(searchableSource, uniformName)
+            || ("viewHeight".equals(uniformName)
+                && requiresSyntheticViewHeightForFragmentCoordRewrite(searchableSource));
+    }
+
     private static boolean isSodiumTerrainRegionOffsetSource(String shaderSource) {
         return shaderSource.contains("u_RegionOffset")
             && shaderSource.contains("_vert_position")
@@ -393,7 +421,7 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
             .replaceAll(java.util.regex.Matcher.quoteReplacement("(" + lowerLeftXy + " / vec2(viewWidth, viewHeight))"));
         rewritten = LEGACY_FRAG_COORD_XY_NOISE_PATTERN.matcher(rewritten)
             .replaceAll(java.util.regex.Matcher.quoteReplacement("(" + lowerLeftXy + " / 128.0f)"));
-        return LEGACY_BAYER_FRAG_COORD_XY_PATTERN.matcher(rewritten)
+        return LEGACY_SCREEN_SPACE_DITHER_FRAG_COORD_XY_PATTERN.matcher(rewritten)
             .replaceAll("$1" + java.util.regex.Matcher.quoteReplacement("(" + lowerLeftXy + ")"));
     }
 
@@ -707,7 +735,7 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         String strippedSource = rewriteInput.strippedSource();
         String searchableSource = stripGlslComments(strippedSource);
         List<String> localBlockMembers = rewriteInput.candidates().stream()
-            .filter(candidate -> isIdentifierReferenced(searchableSource, candidate.name()))
+            .filter(candidate -> isStandaloneUniformActiveForVulkan(searchableSource, candidate.name()))
             .map(StandaloneUniformCandidate::declaration)
             .toList();
         List<String> blockMembers = canonicalBlockMembers == null || canonicalBlockMembers.isEmpty()
@@ -753,14 +781,18 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
                 continue;
             }
 
-            StandaloneUniformRewriteInput rewriteInput = stripStandaloneUniformDeclarations(stripGlslComments(shaderSource));
+            String sourceForCollection = injectSyntheticViewHeightUniformForFragmentCoordRewrite(
+                VulkanicShaderStage.FRAGMENT,
+                stripGlslComments(shaderSource)
+            );
+            StandaloneUniformRewriteInput rewriteInput = stripStandaloneUniformDeclarations(sourceForCollection);
             if (!rewriteInput.strippedAny()) {
                 continue;
             }
 
             String searchableSource = rewriteInput.strippedSource();
             for (StandaloneUniformCandidate candidate : rewriteInput.candidates()) {
-                if (isIdentifierReferenced(searchableSource, candidate.name())) {
+                if (isStandaloneUniformActiveForVulkan(searchableSource, candidate.name())) {
                     declarationsByName.putIfAbsent(candidate.name(), candidate.declaration());
                 }
             }
@@ -781,6 +813,10 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
             return java.util.Set.of();
         }
 
+        shaderSource = injectSyntheticViewHeightUniformForFragmentCoordRewrite(
+            VulkanicShaderStage.FRAGMENT,
+            shaderSource
+        );
         StandaloneUniformRewriteInput rewriteInput =
             stripStandaloneUniformDeclarations(stripGlslComments(shaderSource), includeOpaqueUniforms);
         if (!rewriteInput.strippedAny()) {
@@ -790,7 +826,7 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         java.util.LinkedHashSet<String> activeNames = new java.util.LinkedHashSet<>();
         String searchableSource = rewriteInput.strippedSource();
         for (StandaloneUniformCandidate candidate : rewriteInput.candidates()) {
-            if (isIdentifierReferenced(searchableSource, candidate.name())) {
+            if (isStandaloneUniformActiveForVulkan(searchableSource, candidate.name())) {
                 activeNames.add(candidate.name());
             }
         }

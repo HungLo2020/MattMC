@@ -251,11 +251,15 @@ public class VulkanBackendSpirvPathTest {
             + "uniform float viewWidth;\n"
             + "out vec4 fragColor;\n"
             + "float Bayer64(vec2 c) { return c.y; }"
+            + "float bayerMatrix4x4(vec2 c) { return c.x + c.y; }"
+            + "float InterleavedGradientNoise(vec2 c) { return c.x - c.y; }"
             + "void main(){"
             + "vec3 screenPos = vec3(gl_FragCoord.xy / vec2(viewWidth, viewHeight), gl_FragCoord.z);"
             + "float dither = Bayer64(gl_FragCoord.xy);"
+            + "float dhDither = bayerMatrix4x4(gl_FragCoord.xy);"
+            + "float ssaoDither = InterleavedGradientNoise(gl_FragCoord.xy);"
             + "float scalarY = gl_FragCoord.y;"
-            + "fragColor = vec4(screenPos.xy, dither + scalarY, gl_FragCoord.w);"
+            + "fragColor = vec4(screenPos.xy, dither + dhDither + ssaoDither + scalarY, gl_FragCoord.w);"
             + "}";
 
         String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
@@ -265,6 +269,8 @@ public class VulkanBackendSpirvPathTest {
             "vec3 screenPos = vec3((vec2(gl_FragCoord.x, viewHeight - gl_FragCoord.y) / vec2(viewWidth, viewHeight)), gl_FragCoord.z);"
         ));
         assertTrue(normalized.contains("float dither = Bayer64(vec2(gl_FragCoord.x, viewHeight - gl_FragCoord.y));"));
+        assertTrue(normalized.contains("float dhDither = bayerMatrix4x4(vec2(gl_FragCoord.x, viewHeight - gl_FragCoord.y));"));
+        assertTrue(normalized.contains("float ssaoDither = InterleavedGradientNoise(vec2(gl_FragCoord.x, viewHeight - gl_FragCoord.y));"));
         assertTrue(normalized.contains("float scalarY = (viewHeight - gl_FragCoord.y);"));
     }
 
@@ -537,6 +543,40 @@ public class VulkanBackendSpirvPathTest {
         assertFalse(normalized.contains("in vec4 gl_FragCoord;"));
         assertFalse(normalized.contains("uniform float uClipDistance = 0.0;"));
         assertTrue(normalized.contains("fragColor.a = gl_FragCoord.x;"));
+    }
+
+    @Test
+    public void testNormalizeForVulkanSynthesizesViewHeightForDistantHorizonsDitherCoord() {
+        String source = "#version 150\n"
+            + "in vec4 vertexColor;\n"
+            + "in vec3 vertexWorldPos;\n"
+            + "in vec4 vPos;\n"
+            + "out vec4 fragColor;\n"
+            + "uniform float uClipDistance;\n"
+            + "uniform bool uDitherDhRendering;\n"
+            + "float bayerMatrix4x4(vec2 st) { return mod(st.y, 4.0); }\n"
+            + "void main(){"
+            + "fragColor = vertexColor;"
+            + "float viewDist = length(vertexWorldPos);"
+            + "if (uDitherDhRendering) {"
+            + "float worldNoise = bayerMatrix4x4(gl_FragCoord.xy);"
+            + "if (smoothstep(uClipDistance, uClipDistance * 1.5, viewDist) <= worldNoise) discard;"
+            + "}"
+            + "}\n";
+
+        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
+        List<String> declarations = GlslangSpirvCompiler.collectActiveStandaloneUniformDeclarations(List.of(source));
+
+        assertTrue(normalized.contains("uniform VulkanicStandaloneUniforms {"));
+        assertTrue(normalized.contains("float viewHeight;"));
+        assertTrue(normalized.contains("float uClipDistance;"));
+        assertTrue(normalized.contains("bool uDitherDhRendering;"));
+        assertFalse(normalized.contains("uniform float viewHeight;"));
+        assertFalse(normalized.contains("bayerMatrix4x4(gl_FragCoord.xy)"));
+        assertTrue(normalized.contains(
+            "float worldNoise = bayerMatrix4x4(vec2(gl_FragCoord.x, viewHeight - gl_FragCoord.y));"
+        ));
+        assertTrue(declarations.contains("float viewHeight;"));
     }
 
     @Test
