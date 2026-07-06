@@ -379,18 +379,21 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 
 	private void applyTaczTransform(ItemDisplayContext itemDisplayContext, PoseStack poseStack, AnimationPose animationPose, ItemStack itemStack) {
 		if (itemDisplayContext.firstPerson()) {
+			float aimProgress = effectiveAimProgress(animationPose);
+			float refitProgress = TaczRefitTransform.openingProgress();
 			this.applyCameraAnimation(poseStack, animationPose);
 			poseStack.translate(0.0F, 1.5F, 0.0F);
 			poseStack.mulPose(Axis.ZP.rotationDegrees(180.0F));
 			this.geometry.applyFirstPersonPositioning(
 				poseStack,
-				effectiveAimProgress(animationPose),
+				aimProgress,
 				this.scopeViewMatrix(itemStack),
-				TaczRefitTransform.openingProgress(),
+				refitProgress,
 				TaczRefitTransform.previousType(),
 				TaczRefitTransform.currentType(),
 				TaczRefitTransform.viewProgress()
 			);
+			this.geometry.applyAnimationConstraintTransform(poseStack, animationPose, aimProgress * (1.0F - refitProgress));
 			return;
 		}
 
@@ -559,6 +562,95 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			poseStack.translate(0.0F, 1.5F, 0.0F);
 			poseStack.mulPose(matrix);
 			poseStack.translate(0.0F, -1.5F, 0.0F);
+		}
+
+		void applyAnimationConstraintTransform(PoseStack poseStack, AnimationPose animationPose, float weight) {
+			if (weight <= 0.0F) {
+				return;
+			}
+
+			List<BedrockNode> nodePath = this.pathTo("constraint");
+			if (nodePath == null || nodePath.isEmpty()) {
+				return;
+			}
+
+			ConstraintTransform constraintTransform = this.constraintTransform(nodePath, animationPose);
+			NodePose constraintPose = animationPose.node("constraint");
+			Vector3f translationConstraint = new Vector3f(constraintPose.position).mul(16.0F);
+			Vector3f rotationConstraint = new Vector3f(
+				positiveDegrees(constraintPose.rotation.x()),
+				positiveDegrees(constraintPose.rotation.y()),
+				positiveDegrees(constraintPose.rotation.z())
+			);
+
+			Vector3f inverseTranslation = new Vector3f(constraintTransform.originTranslation);
+			inverseTranslation.sub(constraintTransform.animatedTranslation);
+			inverseTranslation.mulDirection(poseStack.last().pose());
+			inverseTranslation.mul(
+				translationConstraint.x() - 1.0F,
+				translationConstraint.y() - 1.0F,
+				1.0F - translationConstraint.z()
+			);
+
+			Vector3f inverseRotation = new Vector3f(constraintTransform.rotation);
+			inverseRotation.mul(
+				rotationConstraint.x() - 1.0F,
+				rotationConstraint.y() - 1.0F,
+				rotationConstraint.z() - 1.0F
+			);
+
+			Vector3f animatedTranslation = constraintTransform.animatedTranslation;
+			poseStack.translate(animatedTranslation.x(), animatedTranslation.y() + 1.5F, animatedTranslation.z());
+			poseStack.mulPose(Axis.XP.rotation(inverseRotation.x() * weight));
+			poseStack.mulPose(Axis.YP.rotation(inverseRotation.y() * weight));
+			poseStack.mulPose(Axis.ZP.rotation(inverseRotation.z() * weight));
+			poseStack.translate(-animatedTranslation.x(), -animatedTranslation.y() - 1.5F, -animatedTranslation.z());
+
+			Matrix4f poseMatrix = poseStack.last().pose();
+			poseMatrix.m30(poseMatrix.m30() - inverseTranslation.x() * weight);
+			poseMatrix.m31(poseMatrix.m31() - inverseTranslation.y() * weight);
+			poseMatrix.m32(poseMatrix.m32() + inverseTranslation.z() * weight);
+		}
+
+		private ConstraintTransform constraintTransform(List<BedrockNode> nodePath, AnimationPose animationPose) {
+			Matrix4f animatedMatrix = new Matrix4f().identity();
+			Matrix4f originMatrix = new Matrix4f().identity();
+			BedrockNode constraintNode = nodePath.get(nodePath.size() - 1);
+
+			for (BedrockNode part : nodePath) {
+				NodePose nodePose = animationPose.node(part.name);
+				if (part != constraintNode) {
+					animatedMatrix.translate(nodePose.position.x(), -nodePose.position.y(), nodePose.position.z());
+				}
+
+				if (part.parent != null) {
+					animatedMatrix.translate(part.x / 16.0F, part.y / 16.0F, part.z / 16.0F);
+					originMatrix.translate(part.x / 16.0F, part.y / 16.0F, part.z / 16.0F);
+				} else {
+					animatedMatrix.translate(part.x / 16.0F, part.y / 16.0F - 1.5F, part.z / 16.0F);
+					originMatrix.translate(part.x / 16.0F, part.y / 16.0F - 1.5F, part.z / 16.0F);
+				}
+
+				if (part != constraintNode) {
+					animatedMatrix.rotate(Axis.ZP.rotation(nodePose.rotation.z()));
+					animatedMatrix.rotate(Axis.YP.rotation(nodePose.rotation.y()));
+					animatedMatrix.rotate(Axis.XP.rotation(nodePose.rotation.x()));
+				}
+
+				animatedMatrix.rotate(Axis.ZP.rotation(part.zRot));
+				animatedMatrix.rotate(Axis.YP.rotation(part.yRot));
+				animatedMatrix.rotate(Axis.XP.rotation(part.xRot));
+				originMatrix.rotate(Axis.ZP.rotation(part.zRot));
+				originMatrix.rotate(Axis.YP.rotation(part.yRot));
+				originMatrix.rotate(Axis.XP.rotation(part.xRot));
+			}
+
+			Vector3f animatedTranslation = animatedMatrix.getTranslation(new Vector3f());
+			Vector3f originTranslation = originMatrix.getTranslation(new Vector3f());
+			Vector3f animatedRotation = animatedMatrix.getEulerAnglesZYX(new Vector3f());
+			Vector3f originRotation = originMatrix.getEulerAnglesZYX(new Vector3f());
+			animatedRotation.sub(originRotation);
+			return new ConstraintTransform(originTranslation, animatedTranslation, animatedRotation);
 		}
 
 		private Matrix4f refitMatrix(TaczAttachmentType type) {
@@ -2129,6 +2221,14 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		Vector3f translation = fromTranslation.lerp(toTranslation, alpha);
 		Quaternionf rotation = from.getNormalizedRotation(new Quaternionf()).slerp(to.getNormalizedRotation(new Quaternionf()), alpha);
 		return new Matrix4f().translationRotate(translation, rotation);
+	}
+
+	private static float positiveDegrees(float radians) {
+		float degrees = radians * 180.0F / (float)Math.PI;
+		return degrees < 0.0F ? degrees + 360.0F : degrees;
+	}
+
+	private record ConstraintTransform(Vector3f originTranslation, Vector3f animatedTranslation, Vector3f rotation) {
 	}
 
 	private record OcularNode(String name, int index, boolean scope) {
