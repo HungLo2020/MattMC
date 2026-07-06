@@ -14,10 +14,12 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TaczAttachmentItem;
 import net.minecraft.world.item.TaczAttachmentType;
+import net.minecraft.world.item.TaczMvpGunItem;
 import net.minecraft.world.item.TaczRefitGun;
 
 public final class TaczScopeData {
 	private static final Map<String, AttachmentDisplay> CACHE = new ConcurrentHashMap<>();
+	private static final Map<String, GunDisplay> GUN_CACHE = new ConcurrentHashMap<>();
 
 	private TaczScopeData() {
 	}
@@ -42,7 +44,15 @@ public final class TaczScopeData {
 	public static float applyWorldFov(ItemStack itemStack, float baseFov, float partialTick) {
 		AttachmentDisplay scope = scope(itemStack);
 		if (scope == null || scope.zoom() <= 1.0F) {
-			return baseFov;
+			GunDisplay display = gunDisplay(itemStack);
+			if (display == null || display.ironZoom() <= 1.0F) {
+				return baseFov;
+			}
+
+			float aim = TaczGlock17AnimationController.aimProgress(partialTick);
+			float magnification = 1.0F + (display.ironZoom() - 1.0F) * aim;
+			double halfRadians = Math.atan(Math.tan(Math.toRadians(baseFov) / 2.0) / magnification);
+			return (float)Math.toDegrees(halfRadians * 2.0);
 		}
 
 		float aim = TaczGlock17AnimationController.aimProgress(partialTick);
@@ -54,10 +64,32 @@ public final class TaczScopeData {
 	public static float applyItemFov(ItemStack itemStack, float baseFov, float partialTick) {
 		AttachmentDisplay scope = scope(itemStack);
 		if (scope == null) {
-			return baseFov;
+			GunDisplay display = gunDisplay(itemStack);
+			if (display == null || display.zoomModelFov() <= 0.0F) {
+				return baseFov;
+			}
+			return Mth.lerp(TaczGlock17AnimationController.aimProgress(partialTick), baseFov, display.zoomModelFov());
 		}
 
 		return Mth.lerp(TaczGlock17AnimationController.aimProgress(partialTick), baseFov, scope.modelFov());
+	}
+
+	private static GunDisplay gunDisplay(ItemStack itemStack) {
+		if (!(itemStack.getItem() instanceof TaczMvpGunItem gunItem)) {
+			return null;
+		}
+		return GUN_CACHE.computeIfAbsent(gunItem.gunId(), TaczScopeData::loadGunDisplay);
+	}
+
+	private static GunDisplay loadGunDisplay(String gunId) {
+		ResourceLocation displayLocation = ResourceLocation.withDefaultNamespace("display/guns/" + gunId + "_display.json");
+		try (Reader reader = Minecraft.getInstance().getResourceManager().openAsReader(displayLocation)) {
+			String json = stripLineComments(readAll(reader));
+			JsonObject display = GsonHelper.parse(new StringReader(json));
+			return new GunDisplay(GsonHelper.getAsFloat(display, "iron_zoom", 1.0F), GsonHelper.getAsFloat(display, "zoom_model_fov", -1.0F));
+		} catch (Exception exception) {
+			return null;
+		}
 	}
 
 	private static AttachmentDisplay loadDisplay(String attachmentId) {
@@ -150,5 +182,8 @@ public final class TaczScopeData {
 			int view = this.view();
 			return view <= 1 ? "scope_view" : "scope_view_" + view;
 		}
+	}
+
+	private record GunDisplay(float ironZoom, float zoomModelFov) {
 	}
 }

@@ -2,6 +2,9 @@ package net.minecraft.client.tacz;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
@@ -23,6 +26,11 @@ public final class TaczGlock17AnimationController {
 	private static ActiveSequence mainAnimation;
 	private static ActiveAnimation shootAnimation;
 	private static String heldGunId = "glock_17";
+	private static final ScheduledExecutorService FOLLOW_UP_EXECUTOR = Executors.newSingleThreadScheduledExecutor(runnable -> {
+		Thread thread = new Thread(runnable, "TACZ Animation Follow-up");
+		thread.setDaemon(true);
+		return thread;
+	});
 
 	private TaczGlock17AnimationController() {
 	}
@@ -34,9 +42,9 @@ public final class TaczGlock17AnimationController {
 		boolean holding = itemStack.getItem() instanceof TaczMvpGunItem;
 		heldGunId = itemStack.getItem() instanceof TaczMvpGunItem gunItem ? gunItem.gunId() : "glock_17";
 		if (holding && !wasHolding) {
-			triggerMain(itemStack, "draw");
+			triggerMain(itemStack, TaczGunAnimationTimings.drawAnimation(itemStack));
 		} else if (!holding && wasHolding) {
-			triggerMain(itemStack, "put_away");
+			triggerMain(itemStack, TaczGunAnimationTimings.putAwayAnimation(itemStack));
 		}
 
 		wasHolding = holding;
@@ -55,10 +63,14 @@ public final class TaczGlock17AnimationController {
 
 	public static void triggerShoot() {
 		shootAnimation = new ActiveAnimation("shoot", System.nanoTime(), true);
+		TaczAnimationSoundEffects.schedule(ItemStack.EMPTY, "shoot");
 	}
 
 	public static void triggerShoot(ItemStack itemStack) {
-		shootAnimation = new ActiveAnimation(TaczGunAnimationTimings.shootAnimation(itemStack), System.nanoTime(), true);
+		String animationName = TaczGunAnimationTimings.shootAnimation(itemStack);
+		shootAnimation = new ActiveAnimation(animationName, System.nanoTime(), true);
+		TaczAnimationSoundEffects.schedule(itemStack, animationName);
+		scheduleFollowUpShootAnimations(itemStack);
 	}
 
 	public static void triggerReload(ItemStack itemStack) {
@@ -66,15 +78,27 @@ public final class TaczGlock17AnimationController {
 	}
 
 	public static void triggerInspect(ItemStack itemStack) {
-		triggerMain(itemStack, TaczMvpGunItem.getAmmo(itemStack) <= 0 ? "inspect_empty" : "inspect");
+		triggerMain(itemStack, TaczGunAnimationTimings.inspectAnimation(itemStack));
+	}
+
+	public static void triggerFireSelect(ItemStack itemStack) {
+		String animationName = TaczGunAnimationTimings.fireSelectAnimation(itemStack);
+		if (animationName != null) {
+			triggerMain(itemStack, animationName);
+		}
 	}
 
 	public static Snapshot snapshot(ItemStack itemStack) {
 		List<ActiveAnimation> animations = new ArrayList<>();
 		clearExpiredAnimations();
-		animations.add(new ActiveAnimation("static_idle", 0L, false));
-		if (itemStack.getItem() instanceof TaczMvpGunItem && TaczMvpGunItem.getAmmo(itemStack) <= 0 && !isReloading()) {
-			animations.add(new ActiveAnimation("static_bolt_caught", 0L, false));
+		boolean reloading = isReloading();
+		if (itemStack.getItem() instanceof TaczMvpGunItem) {
+			for (String idleAnimation : TaczGunAnimationTimings.idleAnimations(itemStack)) {
+				if (reloading && idleAnimation.contains("caught")) {
+					continue;
+				}
+				animations.add(new ActiveAnimation(idleAnimation, 0L, false));
+			}
 		}
 		if (mainAnimation != null) {
 			animations.add(mainAnimation.currentAnimation());
@@ -86,11 +110,36 @@ public final class TaczGlock17AnimationController {
 	}
 
 	private static void triggerMain(ItemStack itemStack, String name) {
+		if (name == null || name.isEmpty()) {
+			return;
+		}
 		triggerMain(itemStack, List.of(name));
 	}
 
 	private static void triggerMain(ItemStack itemStack, List<String> names) {
-		mainAnimation = new ActiveSequence(itemStack.getItem() instanceof TaczMvpGunItem gunItem ? gunItem.gunId() : "glock_17", List.copyOf(names), System.nanoTime());
+		List<String> filteredNames = names.stream().filter(name -> name != null && !name.isEmpty()).toList();
+		if (filteredNames.isEmpty()) {
+			return;
+		}
+		mainAnimation = new ActiveSequence(itemStack.getItem() instanceof TaczMvpGunItem gunItem ? gunItem.gunId() : "glock_17", List.copyOf(filteredNames), System.nanoTime());
+		TaczAnimationSoundEffects.scheduleSequence(itemStack, filteredNames);
+	}
+
+	private static void scheduleFollowUpShootAnimations(ItemStack itemStack) {
+		List<String> names = TaczGunAnimationTimings.followUpShootAnimations(itemStack);
+		if (names.isEmpty()) {
+			return;
+		}
+
+		String gunId = itemStack.getItem() instanceof TaczMvpGunItem gunItem ? gunItem.gunId() : "glock_17";
+		long delayMillis = Math.max(0L, Math.round(TaczGunAnimationTimings.followUpShootDelaySeconds(itemStack) * 1000.0F));
+		FOLLOW_UP_EXECUTOR.schedule(() -> Minecraft.getInstance().execute(() -> {
+			Minecraft minecraft = Minecraft.getInstance();
+			if (minecraft.player == null || !(minecraft.player.getMainHandItem().getItem() instanceof TaczMvpGunItem heldGun) || !gunId.equals(heldGun.gunId())) {
+				return;
+			}
+			triggerMain(minecraft.player.getMainHandItem(), names);
+		}), delayMillis, TimeUnit.MILLISECONDS);
 	}
 
 	private static void clearExpiredAnimations() {

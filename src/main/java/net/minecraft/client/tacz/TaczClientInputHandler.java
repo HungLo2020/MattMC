@@ -72,6 +72,7 @@ public final class TaczClientInputHandler {
 		while (TaczKeyMappings.FIRE_SELECT.consumeClick()) {
 			if (!minecraft.player.isUsingItem()) {
 				gunItem.cycleFireMode(itemStack);
+				TaczGlock17AnimationController.triggerFireSelect(itemStack);
 				minecraft.level
 					.playSound(
 						null,
