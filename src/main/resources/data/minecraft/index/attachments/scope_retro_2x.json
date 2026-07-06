@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.scope_retro_2x.name",
+  "display": "minecraft:scope_retro_2x_display",
+  "data": "minecraft:scope_retro_2x_data",
+  "type": "scope",
+  "sort": 100
+}

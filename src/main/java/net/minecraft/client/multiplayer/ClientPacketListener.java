@@ -36,6 +36,7 @@ import net.minecraft.advancements.AdvancementHolder;
 import net.minecraft.client.DebugQueryHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
+import net.minecraft.client.tacz.TaczKillAmountOverlay;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.screens.ChatScreen;
@@ -100,6 +101,7 @@ import net.minecraft.network.protocol.PacketUtils;
 import net.minecraft.network.protocol.common.ClientboundUpdateTagsPacket;
 import net.minecraft.network.protocol.common.ServerboundClientInformationPacket;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.network.protocol.common.custom.TaczKillHudS2CPayload;
 import net.minecraft.network.protocol.configuration.ConfigurationProtocols;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
@@ -2177,6 +2179,11 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 
 	@Override
 	public void handleCustomPayload(CustomPacketPayload customPacketPayload) {
+		if (customPacketPayload instanceof TaczKillHudS2CPayload killHudPayload) {
+			TaczKillAmountOverlay.mark(killHudPayload.amount());
+			return;
+		}
+
 		this.handleUnknownCustomPayload(customPacketPayload);
 	}
 

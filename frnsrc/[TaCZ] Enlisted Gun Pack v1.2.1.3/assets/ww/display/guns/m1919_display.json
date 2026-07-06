@@ -1,0 +1,34 @@
+{
+    "model": "ww:gun/m1919_geo",
+    "texture": "ww:gun/uv/m1919",
+    "slot": "ww:gun/slot/m1919",
+    "third_person_animation": "default",
+    "animation":"ww:m1919",
+    "use_default_animation": "rifle",
+    "hud":"ww:gun/hud/m1919",
+    "state_machine": "ww:m1919_state_machine",
+    "sounds": {
+        "draw": "ww:reapr/draw",
+        "dry_fire": "ww:reapr/dry_fire",
+        "reload_empty": "ww:reapr/reload_empty",
+        "reload_tactical": "ww:reapr/reload_tactical",
+        "inspect": "ww:reapr/inspect",
+        "inspect_empty": "ww:reapr/inspect_empty",
+        "put_away": "ww:reapr/put_away",
+        "shoot": "ww:m1918a2/m1918a2_shoot",
+        "shoot_3p": "ww:m1918a2/m1918a2_shoot_3p",
+        "silence":"ww:reapr/silence",
+        "silence_3p":"ww:reapr/silence_3p"
+    },
+    "muzzle_flash":{
+        "texture":"tacz:flash/common_muzzle_flash",
+        "scale":1
+    },
+    "shell": {
+        "initial_velocity": [0, -2, 1],
+        "random_velocity": [0.5, 1, 0.2],
+        "acceleration": [0.0, -10, 0.0],
+        "angular_velocity": [60, 0, 0],
+        "living_time": 3.0
+    }
+}

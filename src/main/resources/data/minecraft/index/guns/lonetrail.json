@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.lonetrail.name",
+  "display": "minecraft:lonetrail_display",
+  "data": "minecraft:lonetrail_data",
+  "tooltip": "minecraft.gun.lonetrail.desc",
+  "type": "pistol",
+  "sort": 11
+}

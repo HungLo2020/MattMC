@@ -1,0 +1,9 @@
+{
+  "slot": "elitex:attachments/slot/elite_smg_suppressor",
+  "model": "elitex:attachments/elite_smg_suppressor_geo",
+  "texture": "elitex:attachments/uv/elite_smg_suppressor",
+  "sounds": {
+    "install": "tacz:attachments/muzzle_general",
+    "uninstall": "tacz:attachments/muzzle_general"
+  }
+}

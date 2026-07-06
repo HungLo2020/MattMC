@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.sniper_extended_mag_1.name",
+  "display": "minecraft:sniper_extended_mag_1_display",
+  "data": "minecraft:sniper_extended_mag_1_data",
+  "type": "extended_mag",
+  "sort": 100
+}

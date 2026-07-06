@@ -1,0 +1,7 @@
+{
+  "name": "elitex.gun.ak47.name",
+  "display": "elitex:ak47_display",
+  "data": "elitex:ak47_data",
+  "type": "rifle",
+  "tooltip": "elitex.gun.ak47x.desc"
+}

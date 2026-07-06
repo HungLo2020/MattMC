@@ -1,0 +1,7 @@
+{
+  "slot": "minecraft:ammo/slot/545x39",
+  "shell": {
+    "model": "minecraft:shell/545x39_shell",
+    "texture": "minecraft:shell/545x39_shell"
+  }
+}

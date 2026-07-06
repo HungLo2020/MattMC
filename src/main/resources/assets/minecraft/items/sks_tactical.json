@@ -1,0 +1,10 @@
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "minecraft:item/sks_tactical_base",
+    "model": {
+      "type": "minecraft:tacz_gun",
+      "gun": "sks_tactical"
+    }
+  }
+}

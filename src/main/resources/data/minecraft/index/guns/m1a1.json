@@ -1,0 +1,9 @@
+{
+  "name": "minecraft.gun.m1a1.name",
+  "display": "minecraft:m1a1_display",
+  "data": "minecraft:m1a1_data",
+  "tooltip": "minecraft.gun.m1a1.desc",
+  "type": "smg",
+  "item_type": "modern_kinetic",
+  "sort": 1
+}

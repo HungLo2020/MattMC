@@ -1,0 +1,62 @@
+{
+  "model": "minecraft:gun/springfield1873_geo",
+  "texture": "minecraft:gun/uv/springfield1873",
+  "lod": {
+    "model": "minecraft:gun/lod/springfield1873",
+    "texture": "minecraft:gun/lod/springfield1873"
+  },
+  "hud": "minecraft:gun/hud/springfield1873_hud",
+  "slot": "minecraft:gun/slot/springfield1873_slot",
+  "animation": "minecraft:springfield1873",
+  "use_default_animation": "rifle",
+  "third_person_animation": "default",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "minecraft:flash/common_muzzle_flash",
+    "scale": 1
+  },
+  "ammo":{
+    "particle": {
+    // Ã¥ÂÂÃ§Â§Â°Ã¯Â¼Å’Ã¥â€¦Â·Ã¤Â½â€œÃ¥ÂÂ¯Ã©â‚¬â€°Ã§Â²â€™Ã¥Â­ÂÃ¥ÂÂ¯Ã¥Ââ€šÃ¨â‚¬Æ’ wikiÃ¯Â¼Å¡https://minecraft.fandom.com/zh/wiki/%E7%B2%92%E5%AD%90
+    "name": "mycelium",
+    // Ã§â€Å¸Ã¦Ë†ÂÃ§Å¡â€žÃ¥Å’ÂºÃ¥Å¸Å¸Ã¯Â¼Å’Ã©Â»ËœÃ¨Â®Â¤Ã¤Â¸Âº 0 0 0
+    "delta": [
+      0,
+      0,
+      0
+    ],
+    // Ã©â‚¬Å¸Ã¥ÂºÂ¦Ã¯Â¼Å’Ã©Â»ËœÃ¨Â®Â¤Ã¤Â¸Âº0Ã¯Â¼Å’Ã¥Â¿â€¦Ã©Â¡Â»Ã¨â€¡Â³Ã¥Â°â€˜Ã¤Â¸Âº 0
+    "speed": 0.0,
+    // Ã§Â²â€™Ã¥Â­ÂÃ¥Â­ËœÃ¥Å“Â¨Ã¦â€”Â¶Ã©â€”Â´Ã¯Â¼Å’Ã¥Ââ€¢Ã¤Â½Â tickÃ¯Â¼Å’Ã©Â»ËœÃ¨Â®Â¤Ã¤Â¸Âº 20 tick
+    "life_time": 25,
+    // Ã§Â²â€™Ã¥Â­ÂÃ¦â€¢Â°Ã©â€¡ÂÃ¯Â¼Å’Ã¥Â½â€œÃ¥Â­ÂÃ¥Â¼Â¹Ã©â‚¬Å¸Ã¥ÂºÂ¦Ã¨Â¿â€¡Ã¥Â¿Â«Ã¦â€”Â¶Ã¯Â¼Å’Ã¥ÂÂ¯Ã¤Â»Â¥Ã¥Â¢Å¾Ã¥Â¤Â§Ã¦Â­Â¤Ã¦â€¢Â°Ã©â€¡ÂÃ¯Â¼Å’Ã¨Æ’Â½Ã¥Â¤Å¸Ã¥Â¡Â«Ã¦Â»Â¡Ã¥Â­ÂÃ¥Â¼Â¹Ã¨Â·Â¯Ã¥Â¾â€žÃ§Å¡â€žÃ§Â©ÂºÃ©Å¡â„¢
+    "count": 75
+    }
+  },
+  "iron_zoom": 2,
+  "zoom_model_fov": 25,
+  "sounds": {
+    "draw": "minecraft:springfield1873/springfield1873_draw",
+    "put_away": "minecraft:springfield1873/springfield1873_put_away",
+    "shoot": "minecraft:springfield1873/springfield1873_shoot",
+    "shoot_3p": "minecraft:springfield1873/springfield1873_shoot_3p"
+  },
+  "offhand_show": {
+    "pos": [0, 20, 4],
+    "rotate": [0, 0, 60],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [0, 20, 3],
+      "rotate": [-180, 0, 120],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

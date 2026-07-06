@@ -1,0 +1,15 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "forge:ingots/iron"
+      },
+      "count": 38
+    }
+  ],
+  "result": {
+    "type": "gun",
+    "id": "minecraft:trs_bull"
+  },
+  "type": "minecraft:gun_smith_table_crafting"
+}

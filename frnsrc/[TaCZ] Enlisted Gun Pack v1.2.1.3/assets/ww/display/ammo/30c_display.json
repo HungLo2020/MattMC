@@ -1,0 +1,9 @@
+{
+  "slot": "ww:ammo/slot/30c",
+  "shell": {
+    "model": "ww:shell/30c_shell",
+    "texture": "ww:shell/30c_shell"
+  },
+  "tracer_color": "#ffe09e"
+}
+    

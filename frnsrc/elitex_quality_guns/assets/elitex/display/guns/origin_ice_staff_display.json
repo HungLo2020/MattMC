@@ -1,0 +1,45 @@
+{
+  "model": "elitex:gun/origin_ice_staff_geo",
+  "texture": "elitex:gun/uv/origin_ice_staff",
+  "hud": "elitex:gun/hud/origin_ice_staff",
+  "slot": "elitex:gun/slot/origin_ice_staff",
+  "animation": "elitex:origin_ice_staff",
+  "use_default_animation": "rifle",
+  "lod": {
+    "model": "elitex:gun/lod/origin_ice_staff",
+    "texture": "elitex:gun/lod/origin_ice_staff"
+  },
+  "transform": {
+    "scale": {
+      "thirdperson": [0.9, 0.9, 0.9],
+      "ground": [0.5, 0.5, 0.5],
+      "fixed": [1.0, 1.0, 1.0]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "elitex:flash/ice_staff_flash",
+    "scale": 2.7
+  },
+  "sounds": {
+    "shoot": "elitex:wonder_weapons/origin_staffs/origin_ice_staff/origin_ice_staff_fire",
+    "shoot_3p": "elitex:wonder_weapons/origin_staffs/origin_ice_staff/origin_ice_staff_fire_3p",
+    "reload_empty": "elitex:wonder_weapons/origin_staffs/origin_ice_staff/origin_ice_staff_empty_reload",
+    "reload_tactical": "elitex:wonder_weapons/origin_staffs/origin_ice_staff/origin_ice_staff_normal_reload",
+    "inspect": "elitex:wonder_weapons/origin_staffs/origin_ice_staff/origin_ice_staff_inspect",
+    "inspect_empty": "elitex:wonder_weapons/origin_staffs/origin_ice_staff/origin_ice_staff_inspect_empty",
+    "draw": "elitex:wonder_weapons/origin_staffs/origin_ice_staff/origin_ice_staff_draw",
+    "put_away": "elitex:wonder_weapons/origin_staffs/origin_ice_staff/origin_ice_staff_put_away"
+  },
+  "offhand_show": {
+    "pos": [4, 13, -1],
+    "rotate": [-90, -35, 90],
+    "scale": [0.2, 0.2, 0.2]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-5, 13, -1],
+      "rotate": [-90, -35, 90],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "model": "minecraft:gun/spas_12_geo",
+  "texture": "minecraft:gun/uv/spas_12",
+  "lod": {
+    "model": "minecraft:gun/lod/spas_12",
+    "texture": "minecraft:gun/lod/spas_12"
+  },
+  "hud": "minecraft:gun/hud/spas_12",
+  "slot": "minecraft:gun/slot/spas_12",
+  // Ã¥Â¼Â¹Ã¨ÂÂ¯Ã¨Â®Â¡Ã©â€¡ÂÃ¦Â Â·Ã¥Â¼ÂÃ¯Â¼Å’Ã¥ÂÂ¯Ã©â‚¬â€°Ã¥â‚¬Â¼Ã¯Â¼Å¡Ã¢â‚¬ÂnormalÃ¢â‚¬Å“(Ã¦ËœÂ¾Ã§Â¤ÂºÃ¥Â®Å¾Ã©â„¢â€¦Ã¥â‚¬Â¼)Ã£â‚¬ÂÃ¢â‚¬ÂpercentÃ¢â‚¬Å“(Ã¦ËœÂ¾Ã§Â¤ÂºÃ§â„¢Â¾Ã¥Ë†â€ Ã¦Â¯â€)Ã¯Â¼Å’Ã©Â»ËœÃ¨Â®Â¤Ã¤Â¸ÂºÃ¢â‚¬ÂnormalÃ¢â‚¬Å“
+  "ammo_count_style": "normal",
+  // tooltipÃ§Å¡â€žÃ¤Â¼Â¤Ã¥Â®Â³Ã¦ËœÂ¾Ã§Â¤ÂºÃ¦Â Â·Ã¥Â¼ÂÃ¯Â¼Å’Ã¥ÂÂ¯Ã©â‚¬â€°Ã¥â‚¬Â¼Ã¯Â¼Å¡Ã¢â‚¬ÂtotalÃ¢â‚¬Å“(Ã¦â‚¬Â»Ã¤Â¼Â¤Ã¥Â®Â³)Ã£â‚¬ÂÃ¢â‚¬Âper_projectileÃ¢â‚¬Å“(Ã¥Ââ€¢Ã¥Ââ€˜Ã¥Â¼Â¹Ã¤Â¸Â¸Ã¤Â¼Â¤Ã¥Â®Â³xÃ¥Â¼Â¹Ã¤Â¸Â¸Ã¦â€¢Â°Ã©â€¡Â)Ã¯Â¼Å’Ã©Â»ËœÃ¨Â®Â¤Ã¤Â¸ÂºÃ¢â‚¬Âper_projectileÃ¢â‚¬Å“
+  "damage_style": "per_projectile",
+  "animation": "minecraft:spas_12",
+  "state_machine": "minecraft:spas_12_state_machine",
+  "state_machine_param": {
+    "bolt_shell_ejecting_time": 0.13,
+    "intro_shell_ejecting_time": 0.15
+  },
+  "use_default_animation": "rifle",
+  "third_person_animation": "default",
+  "player_animator_3rd": "minecraft:rifle_default.player_animation",
+  "show_crosshair": true,
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "minecraft:flash/common_muzzle_flash",
+    "scale": 1.2
+  },
+  "iron_zoom": 1.5,
+  "shell": {
+    "initial_velocity": [5, 0.5, 1],
+    "random_velocity": [1, 0.5, 0.25],
+    "acceleration": [0.0, -10, 0.0],
+    "angular_velocity": [360, -960, 90],
+    "living_time": 1.0
+  },
+  "sounds": {
+    "draw": "minecraft:m870/m870_draw",
+    "bolt": "minecraft:spas_12/spas12_bolt",
+    "fire_select": "",
+    "shoot": "minecraft:spas_12/spas12_shoot",
+    "shoot_3p": "minecraft:m870/m870_shoot_3p",
+    "silence": "minecraft:spas_12/spas12_silence",
+    "silence_3p": "spas_12/spas12_silence_3p",
+    "put_away": "minecraft:m870/m870_put_away",
+    "melee_push": "minecraft:melee_stock/melee_stock_02",
+    "melee_stock": "minecraft:melee_stock/melee_stock_03"
+    
+  },
+  // Ã¥â€°Â¯Ã¦â€°â€¹Ã¦Å¾ÂªÃ¦Â¢Â°Ã¦ËœÂ¾Ã§Â¤Âº
+  "offhand_show": {
+    "pos": [1, 20, 3.5],
+    "rotate": [0, 0, 60],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-1, 20, 3],
+      "rotate": [-180, 0, 120],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  },
+  "controllable": {
+    "semi": {
+      "low_frequency": 0.25,
+      "high_frequency": 0.5,
+      "time": 100
+    }
+  }
+}

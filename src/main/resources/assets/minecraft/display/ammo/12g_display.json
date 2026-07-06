@@ -1,0 +1,29 @@
+{
+  "model": "minecraft:ammo/12g",
+  "texture": "minecraft:ammo/uv/12g",
+  "slot": "minecraft:ammo/slot/12g",
+  "shell": {
+    "model": "minecraft:shell/12g_shell",
+    "texture": "minecraft:shell/12g_shell"
+  },
+  "tracer_color": "#FF3030",
+  "transform": {
+    "scale": {
+      "thirdperson": [
+        0.6,
+        0.6,
+        0.6
+      ],
+      "ground": [
+        0.6,
+        0.6,
+        0.6
+      ],
+      "fixed": [
+        1.2,
+        1.2,
+        1.2
+      ]
+    }
+  }
+}

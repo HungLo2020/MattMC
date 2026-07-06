@@ -1,0 +1,12 @@
+{
+    "name": "Mauser C96",
+
+    "display": "ww:c96_display",
+    
+    "data": "ww:c96_data",
+    "tooltip": "Careful! It's expensive.",
+    "type": "pistol",
+    "sort": 1,
+    
+    "item_type": "modern_kinetic"  
+}

@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.grip_se_5",
+  "display": "minecraft:grip_se_5_display",
+  "data": "minecraft:grip_se_5_data",
+  "type": "grip",
+  "sort": 10
+}

@@ -1,0 +1,27 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "forge:ingots/iron"
+      },
+      "count": 55
+    },
+    {
+      "item": {
+        "tag": "forge:ingots/gold"
+      },
+      "count": 17
+    },
+    {
+      "item": {
+        "tag": "minecraft:planks"
+      },
+      "count": 5
+    }
+  ],
+  "result": {
+    "type": "gun",
+    "id": "elitex:golden_ak"
+  },
+  "type": "tacz:gun_smith_table_crafting"
+}

@@ -1,0 +1,11 @@
+{
+  "slot": "minecraft:attachment/slot/grip_vertical_talon",
+  // Ã©â€¦ÂÃ¤Â»Â¶Ã§Å¡â€žÃ©Â»ËœÃ¨Â®Â¤Ã¦Â¨Â¡Ã¥Å¾â€¹Ã¯Â¼Å’Ã¤Â¸ÂÃ¥ÂÂ¯Ã¤Â¸ÂºÃ§Â©Âº
+  "model": "minecraft:attachment/grip_vertical_talon_geo",
+  // Ã©â€¦ÂÃ¤Â»Â¶Ã©Â»ËœÃ¨Â®Â¤Ã¦Â¨Â¡Ã¥Å¾â€¹Ã¤Â½Â¿Ã§â€Â¨Ã§Å¡â€žÃ¦ÂÂÃ¨Â´Â¨Ã¯Â¼Å’Ã¤Â¸ÂÃ¥ÂÂ¯Ã¤Â¸ÂºÃ§Â©Âº
+  "texture": "minecraft:attachment/uv/grip_vertical_talon",
+  "sounds": {
+    "install": "minecraft:attachments/attachment_general_b",
+    "uninstall": "minecraft:attachments/attachment_general_uninstall"
+  }
+}

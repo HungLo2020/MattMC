@@ -1,0 +1,7 @@
+{
+  "name": "elitex.gun.colt_m1911x1.name",
+  "display": "elitex:colt_m1911x1_display",
+  "data": "elitex:colt_m1911x1_data",
+  "type": "pistol",
+  "tooltip": "elitex.gun.colt_m1911x1.desc"
+}

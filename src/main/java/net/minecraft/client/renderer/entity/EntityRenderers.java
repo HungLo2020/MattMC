@@ -83,6 +83,7 @@ public class EntityRenderers {
 		register(EntityType.ARMADILLO, ArmadilloRenderer::new);
 		register(EntityType.ARMOR_STAND, ArmorStandRenderer::new);
 		register(EntityType.ARROW, TippableArrowRenderer::new);
+		register(EntityType.TACZ_BULLET, NoopRenderer::new);
 		register(EntityType.AXOLOTL, AxolotlRenderer::new);
 		register(EntityType.BAMBOO_CHEST_RAFT, context -> new RaftRenderer(context, ModelLayers.BAMBOO_CHEST_RAFT));
 		register(EntityType.BAMBOO_RAFT, context -> new RaftRenderer(context, ModelLayers.BAMBOO_RAFT));

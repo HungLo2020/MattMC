@@ -1,0 +1,39 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "forge:ingots/iron"
+      },
+      "count": 78
+    },
+    {
+      "item": {
+        "tag": "forge:gems/diamond"
+      },
+      "count": 40
+    },
+    {
+      "item": {
+        "tag": "forge:dusts/redstone"
+      },
+      "count": 32
+    },
+    {
+      "item": {
+        "tag": "forge:nether_stars"
+      },
+      "count": 1
+    },
+    {
+      "item": {
+        "tag": "forge:ingots/gold"
+      },
+      "count": 60
+    }
+  ],
+  "result": {
+    "type": "gun",
+    "id": "elitex:raygun_bo6"
+  },
+  "type": "tacz:gun_smith_table_crafting"
+}

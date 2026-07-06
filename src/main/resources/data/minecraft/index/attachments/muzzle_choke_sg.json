@@ -1,0 +1,6 @@
+{
+  "name": "minecraft.attachment.muzzle_choke_sg.name",
+  "display": "minecraft:muzzle_choke_sg_display",
+  "data": "minecraft:muzzle_choke_sg_data",
+  "type": "muzzle"
+}

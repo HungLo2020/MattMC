@@ -1,0 +1,10 @@
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "minecraft:item/timeless50_base",
+    "model": {
+      "type": "minecraft:tacz_gun",
+      "gun": "timeless50"
+    }
+  }
+}

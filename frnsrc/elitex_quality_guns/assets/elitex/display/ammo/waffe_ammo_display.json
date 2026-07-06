@@ -1,0 +1,39 @@
+{
+  "model": "elitex:ammo_entity/waffe_ammo",
+  "texture": "elitex:ammo_entity/waffe_ammo",
+  "slot": "elitex:ammo/slot/waffe_ammo",
+  "entity": {
+    "model": "elitex:ammo_entity/waffe_ammo",
+    "texture": "elitex:ammo_entity/waffe_ammo"
+  },
+  "transform": {
+    "scale": {
+      "thirdperson": [
+        0.2,
+        0.2,
+        0.2
+      ],
+      "ground": [
+        0.2,
+        0.2,
+        0.2
+      ],
+      "fixed": [
+        1,
+        1,
+        1
+      ]
+    }
+  },
+  "particle": {
+    "name": "end_rod",
+    "delta": [
+      0,
+      0,
+      0
+    ],
+    "speed": 0.4,
+    "life_time": 50,
+    "count": 17
+  }
+}

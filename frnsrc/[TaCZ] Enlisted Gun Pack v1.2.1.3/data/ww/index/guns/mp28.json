@@ -1,0 +1,12 @@
+{
+    "name": "MP28",
+
+    "display": "ww:mp28_display",
+    
+    "data": "ww:mp28_data",
+    "tooltip": "BA- BA- BA-LLIN",
+    "type": "smg",
+    "sort": 1,
+    
+    "item_type": "modern_kinetic"  
+}

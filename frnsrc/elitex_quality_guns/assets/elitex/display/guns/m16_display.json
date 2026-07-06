@@ -1,0 +1,52 @@
+{
+  "model": "elitex:gun/m16_geo",
+  "texture": "elitex:gun/uv/m16",
+  "hud": "elitex:gun/hud/m16",
+  "slot": "elitex:gun/slot/m16",
+  "animation": "elitex:m16",
+  "use_default_animation": "rifle",
+  "third_person_animation": "default",
+  "state_machine": "elitex:m16_state_machine",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.8, 0.8, 0.8],
+      "ground": [0.7, 0.7, 0.7],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "tacz:flash/common_muzzle_flash",
+    "scale": 1
+  },
+  "shell": {
+    "initial_velocity": [5, 2, 1],
+    "random_velocity": [1, 1, 0.25],
+    "acceleration": [0.0, -10, 0.0],
+    "angular_velocity": [360, -1200, 90],
+    "living_time": 1.8
+  },
+  "sounds": {
+    "shoot": "elitex:assault_rifles/m16/m16_fire",
+    "shoot_3p": "elitex:assault_rifles/m16/m16_fire_3p",
+    "inspect": "elitex:assault_rifles/m16/m16_inspect",
+    "inspect_empty": "elitex:assault_rifles/m16/m16_inspect_empty",
+    "draw": "elitex:assault_rifles/m16/m16_draw",
+    "put_away": "elitex:assault_rifles/m16/m16_put_away",
+    "silence": "elitex:assault_rifles/m16/m16_suppressed",
+    "silence_3p": "elitex:assault_rifles/m16/m16_suppressed_3p",
+    "dry_fire":  "elitex:platform_sound_sfx/m4_platform_sfx/m4_platform_dry_fire",
+    "fire_select": "elitex:platform_sound_sfx/m4_platform_sfx/m4_platform_fire_select"
+  },
+  "offhand_show": {
+    "pos": [1, 19, 4],
+    "rotate": [0, 0, 50],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-1, 19, 3],
+      "rotate": [-180, 0, 130],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

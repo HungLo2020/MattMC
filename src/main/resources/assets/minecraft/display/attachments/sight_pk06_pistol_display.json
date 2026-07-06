@@ -1,0 +1,19 @@
+{
+  "slot": "minecraft:attachment/slot/sight_pk06_pistol",
+  "model": "minecraft:attachment/sight_pk06_pistol_geo",
+  "texture": "minecraft:attachment/uv/sight_pk06_pistol",
+  "lod": {
+    "model": "minecraft:attachment/lod/sight_pk06_pistol",
+    "texture": "minecraft:attachment/lod/sight_pk06_pistol"
+  },
+  "zoom": [
+    2
+  ],
+  "scope": false,
+  "sight": true,
+  "fov": 40.0,
+  "sounds": {
+    "install": "minecraft:attachments/scope_general_c",
+    "uninstall": "minecraft:attachments/scope_general_c"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "pack.ww.name": "Enlisted Gunpack",
+  "pack.ww.desc": "Guns that were used in World war two from prototypes to standard issue.",
+
+  "ww.gun.p38.name":"Walther P38",
+  "ww.gun.p38.desc":"Standard issue of the Wehrmacht."
+
+  "ww.gun.t20.name":"T20 Garand",
+  "ww.gun.t20.desc":"A rifle that combined aspects of both the BAR and the M1 Garand."
+}

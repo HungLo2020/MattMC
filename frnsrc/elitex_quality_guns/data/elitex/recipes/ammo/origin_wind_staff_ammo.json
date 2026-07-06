@@ -1,0 +1,28 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "forge:ingots/iron"
+      },
+      "count": 6
+    },
+    {
+      "item": {
+        "item": "minecraft:feather"
+      },
+      "count": 2
+    },
+    {
+      "item": {
+        "item": "minecraft:glass"
+      },
+      "count": 1
+    }
+  ],
+  "result": {
+    "type": "ammo",
+    "id": "elitex:origin_wind_staff_ammo",
+    "count": 64
+  },
+  "type": "tacz:gun_smith_table_crafting"
+}

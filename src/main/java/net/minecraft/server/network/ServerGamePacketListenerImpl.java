@@ -63,6 +63,8 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketUtils;
 import net.minecraft.network.protocol.common.ServerboundClientInformationPacket;
 import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket;
+import net.minecraft.network.protocol.common.custom.TaczGunInputC2SPayload;
+import net.minecraft.network.protocol.common.custom.TaczRefitC2SPayload;
 import net.minecraft.network.protocol.configuration.ConfigurationProtocols;
 import net.minecraft.network.protocol.game.ClientboundBlockChangedAckPacket;
 import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
@@ -177,6 +179,9 @@ import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.TaczAttachmentItem;
+import net.minecraft.world.item.TaczRefitGun;
+import net.minecraft.world.item.TaczMvpGunItem;
 import net.minecraft.world.item.component.WritableBookContent;
 import net.minecraft.world.item.component.WrittenBookContent;
 import net.minecraft.world.item.crafting.RecipeHolder;
@@ -2188,6 +2193,77 @@ public class ServerGamePacketListenerImpl
 
 	@Override
 	public void handleCustomPayload(ServerboundCustomPayloadPacket serverboundCustomPayloadPacket) {
+		if (serverboundCustomPayloadPacket.payload() instanceof TaczGunInputC2SPayload payload) {
+			PacketUtils.ensureRunningOnSameThread(serverboundCustomPayloadPacket, this, this.player.level());
+			this.handleTaczGunInput(payload);
+		} else if (serverboundCustomPayloadPacket.payload() instanceof TaczRefitC2SPayload payload) {
+			PacketUtils.ensureRunningOnSameThread(serverboundCustomPayloadPacket, this, this.player.level());
+			this.handleTaczRefit(payload);
+		}
+	}
+
+	private void handleTaczGunInput(TaczGunInputC2SPayload payload) {
+		if (!this.player.hasClientLoaded()) {
+			return;
+		}
+
+		ItemStack itemStack = this.player.getMainHandItem();
+		if (!(itemStack.getItem() instanceof TaczMvpGunItem gunItem) || !itemStack.isItemEnabled(this.player.level().enabledFeatures())) {
+			return;
+		}
+
+		this.player.resetLastActionTime();
+		if (payload.action() == TaczGunInputC2SPayload.Action.SHOOT) {
+			if (!this.player.getCooldowns().isOnCooldown(itemStack)) {
+				gunItem.tryFire(this.player.level(), this.player, InteractionHand.MAIN_HAND, itemStack);
+			}
+		} else if (payload.action() == TaczGunInputC2SPayload.Action.RELOAD) {
+			gunItem.tryStartReload(this.player.level(), this.player, InteractionHand.MAIN_HAND, itemStack);
+		} else if (payload.action() == TaczGunInputC2SPayload.Action.FIRE_SELECT) {
+			gunItem.cycleFireMode(itemStack);
+		}
+	}
+
+	private void handleTaczRefit(TaczRefitC2SPayload payload) {
+		if (!this.player.hasClientLoaded()) {
+			return;
+		}
+
+		ItemStack gunStack = this.player.getMainHandItem();
+		if (!(gunStack.getItem() instanceof TaczRefitGun gun) || !gunStack.isItemEnabled(this.player.level().enabledFeatures())) {
+			return;
+		}
+
+		this.player.resetLastActionTime();
+		if (payload.action() == TaczRefitC2SPayload.Action.INSTALL) {
+			int slot = payload.attachmentSlot();
+			if (slot < 0 || slot >= this.player.getInventory().getContainerSize()) {
+				return;
+			}
+
+			ItemStack attachmentStack = this.player.getInventory().getItem(slot);
+			if (!(attachmentStack.getItem() instanceof TaczAttachmentItem attachment) || attachment.getAttachmentType() != payload.attachmentType()) {
+				return;
+			}
+
+			ItemStack previous = gun.getAttachment(gunStack, payload.attachmentType());
+			ItemStack installed = attachmentStack.copyWithCount(1);
+			if (gun.installAttachment(gunStack, installed)) {
+				attachmentStack.shrink(1);
+				if (!previous.isEmpty() && !this.player.getInventory().add(previous)) {
+					this.player.drop(previous, false);
+				}
+				this.player.getInventory().setChanged();
+			}
+		} else if (payload.action() == TaczRefitC2SPayload.Action.UNINSTALL) {
+			ItemStack removed = gun.removeAttachment(gunStack, payload.attachmentType());
+			if (!removed.isEmpty()) {
+				if (!this.player.getInventory().add(removed)) {
+					gun.installAttachment(gunStack, removed);
+				}
+				this.player.getInventory().setChanged();
+			}
+		}
 	}
 
 	@Override

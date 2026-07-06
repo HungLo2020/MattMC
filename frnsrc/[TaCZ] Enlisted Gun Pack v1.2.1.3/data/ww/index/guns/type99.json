@@ -1,0 +1,12 @@
+{
+    "name": "Type 99 Rifle",
+
+    "display": "ww:type99_display",
+    
+    "data": "ww:type99_data",
+    "tooltip": "An updated version of the Type 38 firing the new round.",
+    "type": "sniper",
+    "sort": 1,
+    
+    "item_type": "modern_kinetic"  
+}

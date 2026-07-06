@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.stock_ripstock.name",
+  "display": "minecraft:stock_ripstock_display",
+  "data": "minecraft:stock_ripstock_data",
+  "type": "stock",
+  "sort": 10
+}

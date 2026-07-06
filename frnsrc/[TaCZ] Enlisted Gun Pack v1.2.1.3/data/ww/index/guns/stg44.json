@@ -1,0 +1,12 @@
+{
+    "name": "Sturmgewehr 44",
+
+    "display": "ww:stg44_display",
+    
+    "data": "ww:stg44_data",
+    "tooltip": "The first assault rifle.",
+    "type": "rifle",
+    "sort": 1,
+    
+    "item_type": "modern_kinetic"  
+}

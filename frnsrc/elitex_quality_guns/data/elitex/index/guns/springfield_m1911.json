@@ -1,0 +1,7 @@
+{
+  "name": "elitex.gun.springfield_m1911.name",
+  "display": "elitex:springfield_m1911_display",
+  "data": "elitex:springfield_m1911_data",
+  "type": "pistol",
+  "tooltip": "elitex.gun.springfield_m1911.desc"
+}

@@ -1,0 +1,9 @@
+{
+  "slot": "minecraft:attachment/slot/muzzle_silencer_phantom_s1",
+  "model": "minecraft:attachment/muzzle_silencer_phantom_s1_geo",
+  "texture": "minecraft:attachment/uv/muzzle_silencer_phantom_s1",
+  "sounds": {
+    "install": "minecraft:attachments/muzzle_general",
+    "uninstall": "minecraft:attachments/muzzle_general"
+  }
+}

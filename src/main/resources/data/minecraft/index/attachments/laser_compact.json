@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.laser_compact",
+  "display": "minecraft:laser_compact_display",
+  "data": "minecraft:laser_compact_data",
+  "type": "laser",
+  "sort": 10
+}

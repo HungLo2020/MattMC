@@ -1,0 +1,52 @@
+{
+  "model": "elitex:gun/bo1_1911_geo",
+  "texture": "elitex:gun/uv/bo1_1911",
+  "hud": "elitex:gun/hud/bo1_1911",
+  "slot": "elitex:gun/slot/bo1_1911",
+  "animation": "elitex:bo1_1911",
+  "use_default_animation": "pistol",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "shell": {
+    "initial_velocity": [5.0, 3.0, 1],
+    "random_velocity": [2.5, 2, 0.25],
+    "acceleration": [0.0, -20, 0.0],
+    "angular_velocity": [360, -960, 90],
+    "living_time": 1.0
+  },
+  "muzzle_flash": {
+    "texture": "tacz:flash/common_muzzle_flash",
+    "scale": 0.7
+  },
+  "iron_zoom": 1.1,
+  "sounds": {
+    "draw": "elitex:pistols/bo1_1911/bo1_1911_draw",
+    "put_away": "elitex:pistols/bo1_1911/bo1_1911_put_away",
+    "shoot": "elitex:pistols/bo1_1911/bo1_1911_fire",
+    "shoot_3p": "elitex:pistols/bo1_1911/bo1_1911_fire_3p",
+    "silence": "elitex:pistols/bo1_1911/bo1_1911_suppressed",
+    "silence_3p": "elitex:pistols/bo1_1911/bo1_1911_suppressed_3p",
+    "reload_empty": "elitex:pistols/bo1_1911/bo1_1911_reload_empty",
+    "reload_tactical": "elitex:pistols/bo1_1911/bo1_1911_reload",
+    "inspect": "elitex:pistols/bo1_1911/bo1_1911_inspect",
+    "inspect_empty": "elitex:pistols/bo1_1911/bo1_1911_inspect_empty",
+    "dry_fire":  "elitex:platform_sound_sfx/pistols_sfx/regular_pistol_dry_fire"
+  },
+  "offhand_show": {
+    "pos": [4, 13, -1],
+    "rotate": [-90, -35, 90],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-5, 13, -1],
+      "rotate": [-90, -35, 90],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

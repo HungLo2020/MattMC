@@ -448,6 +448,7 @@ public abstract class AbstractArrow extends Projectile {
 					} else if (!entity.isAlive()) {
 						CriteriaTriggers.KILLED_BY_ARROW.trigger(serverPlayer, List.of(entity), this.firedFromWeapon);
 					}
+
 				}
 			}
 

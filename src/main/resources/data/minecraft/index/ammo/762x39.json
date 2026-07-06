@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.ammo.762x39.name",
+  "display": "minecraft:762x39_display",
+  // å †å æ•°é‡
+  "stack_size": 60,
+  "sort": 10
+}

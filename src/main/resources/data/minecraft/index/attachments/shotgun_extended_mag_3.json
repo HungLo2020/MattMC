@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.shotgun_extended_mag_3.name",
+  "display": "minecraft:shotgun_extended_mag_3_display",
+  "data": "minecraft:shotgun_extended_mag_3_data",
+  "type": "extended_mag",
+  "sort": 10
+}

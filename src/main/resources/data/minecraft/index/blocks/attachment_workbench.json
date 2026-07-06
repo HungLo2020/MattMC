@@ -1,0 +1,17 @@
+{
+  // æ–¹å—çš„æ˜¾ç¤ºåç§°ï¼Œæ”¯æŒæœ¬åœ°åŒ–
+  "name": "minecraft.block.attachment_workbench.name",
+  // æ–¹å—æ•ˆæžœæ–‡ä»¶
+  "display": "minecraft:attachment_workbench",
+  // æ–¹å—å‚æ•°æ–‡ä»¶
+  "data": "minecraft:attachment_workbench",
+  // æ–¹å—æ–‡æœ¬æç¤º
+  "tooltip": "minecraft.block.attachment_workbench.desc",
+  // æ–¹å—idï¼Œå¯é€‰å€¼ï¼šminecraft:workbench_a, minecraft:workbench_b, minecraft:workbench_c
+  // å¯¹åº”ï¼ˆé•¿xé«˜xå®½ï¼‰1x1x1ï¼Œ2x1x1ï¼Œ1x2x1
+  // æ›´æ”¹è¯¥å­—æ®µæ— æ³•å½±å“å·²ç»æ”¾ç½®çš„æ–¹å—/ç‰©å“ï¼Œè¯·è°¨æ…Žä¿®æ”¹
+  "id": "minecraft:workbench_c",
+  // æŽ’åºæ•°ï¼Œå†³å®šäº†åœ¨åˆ›é€ æ¨¡å¼æ ‡ç­¾é¡µä¸­çš„é¡ºåº
+  // æ•°å­—è¶Šå°ï¼Œä¼˜å…ˆçº§è¶Šé«˜
+  "sort": 2
+}

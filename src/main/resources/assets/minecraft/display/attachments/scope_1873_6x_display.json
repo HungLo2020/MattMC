@@ -1,0 +1,18 @@
+{
+  "slot": "minecraft:attachment/slot/scope_1873_6x_slot",
+  "model": "minecraft:attachment/scope_1873_6x_geo",
+  "texture": "minecraft:attachment/uv/scope_1873_6x",
+  "lod": {
+    "model": "minecraft:attachment/lod/scope_1873_6x",
+    "texture": "minecraft:attachment/lod/scope_1873_6x"
+  },
+  "zoom": [
+    6
+  ],
+  "scope": true,
+  "fov": 33.0,
+  "sounds": {
+    "install": "minecraft:attachments/scope_general_b",
+    "uninstall": "minecraft:attachments/scope_general_b"
+  }
+}

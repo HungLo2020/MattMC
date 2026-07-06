@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.scar_l.name",
+  "display": "minecraft:scar_l_display",
+  "data": "minecraft:scar_l_data",
+  "tooltip": "minecraft.gun.scar_l.desc",
+  "type": "rifle",
+  "sort": 6
+}

@@ -90,7 +90,7 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 			this.width = i;
 			this.height = j;
 			if (this.useDepth) {
-				this.depthTexture = net.vulkanic.VulkanicAPI.createTexture(() -> this.label + " / Depth", 15, TextureFormat.DEPTH32, i, j, 1, 1);
+				this.depthTexture = net.vulkanic.VulkanicAPI.createTexture(() -> this.label + " / Depth", 15, TextureFormat.DEPTH24_STENCIL8, i, j, 1, 1);
 				this.depthTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.depthTexture);
 				this.depthTexture.setTextureFilter(FilterMode.NEAREST, false);
 				this.depthTexture.setAddressMode(AddressMode.CLAMP_TO_EDGE);

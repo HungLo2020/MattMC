@@ -1,0 +1,10 @@
+{
+  "model": "minecraft:ammo/762x25",
+  "texture": "minecraft:ammo/uv/762x25",
+  "slot": "minecraft:ammo/slot/762x25",
+  "shell": {
+    "model": "minecraft:shell/762x25_shell",
+    "texture": "minecraft:shell/762x25_shell"
+  }
+}
+    

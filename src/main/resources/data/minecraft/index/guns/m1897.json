@@ -1,0 +1,9 @@
+{
+  "name": "minecraft.gun.m1897.name",
+  "display": "minecraft:m1897_display",
+  "data": "minecraft:m1897_data",
+  "tooltip": "minecraft.gun.m1897.desc",
+  "type": "shotgun",
+  "item_type": "modern_kinetic",
+  "sort": 1
+}

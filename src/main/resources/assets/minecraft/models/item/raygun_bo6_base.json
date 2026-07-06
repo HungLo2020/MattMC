@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/tacz/guns/raygun_bo6",
+    "particle": "minecraft:item/tacz/guns/raygun_bo6"
+  }
+}

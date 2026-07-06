@@ -1,0 +1,8 @@
+{
+  "name": "elitex.gun.akx105.name",
+  "display": "elitex:akx105_display",
+  "data": "elitex:akx105_data",
+  "type": "rifle",
+  "tooltip": "elitex.gun.akx105.desc",
+  "item_type": "modern_kinetic"
+}

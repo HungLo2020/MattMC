@@ -1,0 +1,10 @@
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "minecraft:item/rpg7_base",
+    "model": {
+      "type": "minecraft:tacz_gun",
+      "gun": "rpg7"
+    }
+  }
+}

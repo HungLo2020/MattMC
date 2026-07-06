@@ -1,0 +1,73 @@
+{
+  "model": "elitex:gun/spaz12_geo",
+  "texture": "elitex:gun/uv/spaz12",
+  "hud": "elitex:gun/hud/spaz12",
+  "slot": "elitex:gun/slot/spaz12",
+  "animation": "elitex:spaz12",
+  "use_default_animation": "rifle",
+  "third_person_animation": "default",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "tacz:flash/common_muzzle_flash",
+    "scale": 0.75
+  },
+
+  "ammo_count_style": "normal",
+  "damage_style": "per_projectile",
+  "state_machine": "elitex:spaz12_state_machine",
+  "state_machine_param": {
+    "bolt_shell_ejecting_time": 0.13,
+    "intro_shell_ejecting_time": 1.08
+  },
+  "iron_zoom": 1.2,
+
+  "sounds": {
+    "shoot": "elitex:shotguns/spaz12/spaz12_fire",
+    "shoot_3p": "elitex:shotguns/spaz12/spaz12_fire_3p",
+    "silence": "elitex:shotguns/spaz12/spaz12_suppressed",
+    "silence_3p": "elitex:shotguns/spaz12/spaz12_suppressed_3p",
+    "inspect": "elitex:shotguns/spaz12/spaz12_inspect",
+    "inspect_empty": "elitex:shotguns/spaz12/spaz12_inspect_empty",
+    "draw": "elitex:shotguns/spaz12/spaz12_draw",
+    "put_away": "elitex:shotguns/spaz12/spaz12_put_away",
+    "melee_push": "tacz:melee_stock/melee_stock_01",
+    "melee_stock": "tacz:melee_stock/melee_stock_02",
+    "dry_fire":  "elitex:platform_sound_sfx/shotgun_platform_sfx/shotgun_platform_dry_fire1",
+    "reload_loop": "elitex:shotguns/spaz12/spaz12_reload_loop"
+  },
+  "offhand_show": {
+    "pos": [1, 19, 4],
+    "rotate": [0, 0, 50],
+    "scale": [0.3, 0.3, 0.3]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-1, 19, 3],
+      "rotate": [-180, 0, 130],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  },
+
+  "shell": {
+    "initial_velocity": [5, 0.5, 1],
+    "random_velocity": [1, 0.5, 0.25],
+    "acceleration": [0.0, -10, 0.0],
+    "angular_velocity": [360, -960, 90],
+    "living_time": 1.0
+  },
+
+  "controllable": {
+    "semi": {
+      "low_frequency": 0.25,
+      "high_frequency": 0.5,
+      "time": 100
+    }
+  }
+
+}

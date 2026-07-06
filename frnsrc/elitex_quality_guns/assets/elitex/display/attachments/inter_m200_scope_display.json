@@ -1,0 +1,21 @@
+{
+  "model": "elitex:attachments/inter_m200_scope_geo",
+  "texture": "elitex:attachments/uv/inter_m200_scope",
+  "zoom": [
+    4.0,
+    15.0
+  ],
+  "views": [
+    1,
+    2
+  ],
+  "views_fov": [
+    22.0,
+    25.0
+  ],
+  "scope": true,
+  "sounds": {
+    "install": "tacz:attachments/scope_general_a",
+    "uninstall": "tacz:attachments/scope_general_a"
+  }
+}

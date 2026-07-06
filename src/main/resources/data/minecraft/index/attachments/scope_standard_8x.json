@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.scope_standard_8x.name",
+  "display": "minecraft:scope_scout_display",
+  "data": "minecraft:scope_scout_data",
+  "type": "scope",
+  "sort": 100
+}

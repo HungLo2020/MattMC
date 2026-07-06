@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.sks_tactical.name",
+  "display": "minecraft:sks_tactical_display",
+  "data": "minecraft:sks_tactical_data",
+  "tooltip": "minecraft.gun.sks_tactical.desc",
+  "type": "rifle",
+  "sort": 4
+}

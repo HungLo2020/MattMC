@@ -1,0 +1,9 @@
+{
+  "slot": "minecraft:attachment/slot/grip_rk6",
+  "model": "minecraft:attachment/grip_rk6",
+  "texture": "minecraft:attachment/uv/grip_rk6",
+  "sounds": {
+    "install": "minecraft:attachments/attachment_general_b",
+    "uninstall": "minecraft:attachments/attachment_general_uninstall"
+  }
+}

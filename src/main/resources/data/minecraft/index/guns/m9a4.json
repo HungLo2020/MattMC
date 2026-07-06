@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.m9a4.name",
+  "display": "minecraft:m9a4_display",
+  "data": "minecraft:m9a4_data",
+  "tooltip": "minecraft.gun.m9a4.desc",
+  "type": "pistol",
+  "sort": 14
+}

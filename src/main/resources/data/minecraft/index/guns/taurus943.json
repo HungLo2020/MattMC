@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.taurus943.name",
+  "display": "minecraft:taurus943_display",
+  "data": "minecraft:taurus943_data",
+  "tooltip": "minecraft.gun.taurus943.desc",
+  "type": "pistol",
+  "sort": 9
+}

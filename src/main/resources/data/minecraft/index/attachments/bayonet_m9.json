@@ -1,0 +1,6 @@
+{
+  "name": "minecraft.attachment.bayonet_m9.name",
+  "display": "minecraft:bayonet_m9_display",
+  "data": "minecraft:bayonet_m9_data",
+  "type": "muzzle"
+}

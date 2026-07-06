@@ -1,0 +1,5 @@
+{
+  "name": "minecraft.ammo.raygun_ammo.name",
+  "display": "minecraft:raygun_ammo_display",
+  "stack_size": 64
+}

@@ -1,0 +1,61 @@
+{
+  "model": "minecraft:gun/g36k_geo",
+  "texture": "minecraft:gun/uv/g36k",
+  "lod": {
+    "model": "minecraft:gun/lod/g36k",
+    "texture": "minecraft:gun/lod/g36k"
+  },
+  "hud": "minecraft:gun/hud/g36k",
+  "slot": "minecraft:gun/slot/g36k",
+  "animation": "minecraft:g36k",
+  "use_default_animation": "rifle",
+  "third_person_animation": "default",
+  "state_machine": "minecraft:g36k_state_machine",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "minecraft:flash/common_muzzle_flash",
+    "scale": 0.75
+  },
+  "iron_zoom": 1.33,
+  "zoom_model_fov": 60,
+  "shell": {
+    "initial_velocity": [5, 2, 1],
+    "random_velocity": [1, 1, 0.25],
+    "acceleration": [0.0, -10, 0.0],
+    "angular_velocity": [360, -1200, 90],
+    "living_time": 1.0
+  },
+  "sounds": {
+    "shoot": "minecraft:g36k/g36k_shoot",
+    "shoot_3p": "minecraft:g36k/g36k_shoot_3p",
+    "silence": "minecraft:g36k/g36k_silence",
+    "silence_3p": "minecraft:g36k/g36k_silence_3p",
+    "draw": "minecraft:g36k/g36k_draw",
+    "put_away": "minecraft:g36k/g36k_put_away",
+    "dry_fire": "minecraft:dry_fire",
+    "fire_select": "minecraft:fire_select",
+    "head_hit": "minecraft:head_hit",
+    "flesh_hit": "minecraft:flesh_hit",
+    "kill": "minecraft:kill",
+    "melee_push": "minecraft:melee_stock/melee_stock_01",
+    "melee_stock": "minecraft:melee_stock/melee_stock_03"
+  },
+  "offhand_show": {
+    "pos": [1, 19, 4],
+    "rotate": [0, 0, 50],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-1, 19, 3],
+      "rotate": [-180, 0, 130],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

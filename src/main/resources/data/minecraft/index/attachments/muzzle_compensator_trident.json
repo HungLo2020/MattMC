@@ -1,0 +1,6 @@
+{
+  "name": "minecraft.attachment.muzzle_compensator_trident.name",
+  "display": "minecraft:muzzle_compensator_trident_display",
+  "data": "minecraft:muzzle_compensator_trident_data",
+  "type": "muzzle"
+}

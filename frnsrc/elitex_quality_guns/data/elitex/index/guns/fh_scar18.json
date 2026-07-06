@@ -1,0 +1,8 @@
+{
+  "name": "elitex.gun.fh_scar18.name",
+  "display": "elitex:fh_scar18_display",
+  "data": "elitex:fh_scar18_data",
+  "type": "rifle",
+  "tooltip": "elitex.gun.fh_scar18.desc",
+  "item_type": "modern_kinetic"
+}

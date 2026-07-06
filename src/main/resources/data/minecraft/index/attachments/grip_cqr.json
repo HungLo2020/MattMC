@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.grip_cqr",
+  "display": "minecraft:grip_cqr_display",
+  "data": "minecraft:grip_cqr_data",
+  "type": "grip",
+  "hidden": true
+}

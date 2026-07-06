@@ -1,0 +1,12 @@
+{
+    "name": "Colt Pocket Hammerless",
+
+    "display": "ww:cph_display",
+    
+    "data": "ww:cph_data",
+    "tooltip": "A forgettable Gun seen in service by many countries",
+    "type": "pistol",
+    "sort": 1,
+    
+    "item_type": "modern_kinetic"  
+}

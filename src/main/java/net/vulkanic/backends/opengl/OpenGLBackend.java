@@ -845,6 +845,14 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         GL11.glClearDepth(depth);
     }
+
+    @Override
+    public void setClearStencil(CommandContext ctx, int stencil) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glClearStencil(stencil);
+    }
     
     @Override
     public void setViewport(CommandContext ctx, int x, int y, int width, int height) {
@@ -3705,9 +3713,12 @@ public class OpenGLBackend implements GraphicsBackend {
             OpenGLTextureView depthView = (OpenGLTextureView) depthTarget;
             int depthHandle = depthView.glHandle();
             int depthMip = depthView.getBaseMipLevel();
+            int depthAttachment = depthView.texture().getVulkanicFormat().hasStencilAspect()
+                ? net.vulkanic.VulkanicAPI.GL_DEPTH_STENCIL_ATTACHMENT
+                : net.vulkanic.VulkanicAPI.GL_DEPTH_ATTACHMENT;
             net.vulkanic.VulkanicAPI.framebufferTexture(ctx,
                 net.vulkanic.VulkanicAPI.GL_FRAMEBUFFER,
-                net.vulkanic.VulkanicAPI.GL_DEPTH_ATTACHMENT,
+                depthAttachment,
                 net.vulkanic.VulkanicAPI.GL_TEXTURE_2D,
                 depthHandle, depthMip);
         }

@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.scope_contender.name",
+  "display": "minecraft:scope_contender_display",
+  "data": "minecraft:scope_contender_data",
+  "type": "scope",
+  "sort": 1000
+}

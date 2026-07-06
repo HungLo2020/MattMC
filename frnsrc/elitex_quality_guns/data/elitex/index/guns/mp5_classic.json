@@ -1,0 +1,7 @@
+{
+  "name": "elitex.gun.mp5_classic.name",
+  "display": "elitex:mp5_classic_display",
+  "data": "elitex:mp5_classic_data",
+  "tooltip": "elitex.gun.mp5_classic.desc",
+  "type": "smg"
+}

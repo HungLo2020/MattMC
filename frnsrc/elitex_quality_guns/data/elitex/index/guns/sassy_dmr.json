@@ -1,0 +1,8 @@
+{
+    "name": "elitex.gun.sassy_dmr.name",
+    "display": "elitex:sassy_dmr_display",
+    "data": "elitex:sassy_dmr_data",
+    "type": "rifle",
+    "sort": 2,
+    "tooltip": "elitex.gun.sassy_dmr.desc"
+}

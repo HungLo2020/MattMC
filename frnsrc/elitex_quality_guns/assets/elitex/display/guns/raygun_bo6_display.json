@@ -1,0 +1,46 @@
+{
+  "model": "elitex:gun/raygun_bo6_geo",
+  "texture": "elitex:gun/uv/raygun_bo6",
+  "hud": "elitex:gun/hud/raygun_bo6",
+  "slot": "elitex:gun/slot/raygun_bo6",
+  "animation": "elitex:raygun_bo6",
+  "lod": {
+    "model": "elitex:gun/lod/raygun_bo6",
+    "texture": "elitex:gun/lod/raygun_bo6"
+  },
+  "use_default_animation": "pistol",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.4, 0.4, 0.4],
+      "ground": [0.4, 0.4, 0.4],
+      "fixed": [1, 1, 1]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "elitex:flash/ray_gun_mk2_flash",
+    "scale": 1.2
+  },
+  "sounds": {
+    "shoot": "elitex:wonder_weapons/raygun_bo6/raygun_fire",
+    "shoot_3p": "elitex:wonder_weapons/raygun_bo6/raygun_fire_3p",
+    "reload_empty": "elitex:wonder_weapons/raygun_bo6/raygun_reload",
+    "reload_tactical": "elitex:wonder_weapons/raygun_bo6/raygun_reload",
+    "inspect": "elitex:wonder_weapons/raygun_bo6/raygun_inspect",
+    "inspect_empty": "elitex:wonder_weapons/raygun_bo6/raygun_inspect",
+    "draw": "elitex:wonder_weapons/raygun_bo6/raygun_draw",
+    "put_away": "elitex:wonder_weapons/raygun_bo6/raygun_put_away"
+
+  },
+  "offhand_show": {
+    "pos": [4, 13, -1],
+    "rotate": [-90, -35, 90],
+    "scale": [0.1, 0.1, 0.1]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-5, 13, -1],
+      "rotate": [-90, -35, 90],
+      "scale": [0.4, 0.4, 0.4]
+    }
+  }
+}

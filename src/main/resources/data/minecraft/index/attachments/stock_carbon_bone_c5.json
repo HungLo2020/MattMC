@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.stock_carbon_bone_c5.name",
+  "display": "minecraft:stock_carbon_bone_c5_display",
+  "data": "minecraft:stock_carbon_bone_c5_data",
+  "type": "stock",
+  "sort": 10
+}

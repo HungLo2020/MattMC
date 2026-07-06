@@ -1,0 +1,12 @@
+{
+  // é…ä»¶çš„çš„æ˜¾ç¤ºåç§°å’Œå·¥å…·æç¤ºï¼Œæ”¯æŒæœ¬åœ°åŒ–
+  "name": "minecraft.attachment.sight_t2.name",
+  // é…ä»¶çš„å®¢æˆ·ç«¯æ•°æ®
+  "display": "minecraft:sight_t2_display",
+  // é…ä»¶çš„å±žæ€§
+  "data": "minecraft:sight_t2_data",
+  // é…ä»¶çš„ç±»åž‹ã€‚scopeã€gripã€muzzleã€stockã€laserã€extended_mag
+  // æžªæ¢°é…ä»¶æ§½ä½èƒ½ä»Žä¸­é€‰æ‹©å¯ä»¥å®‰è£…çš„ç±»åž‹
+  "type": "scope",
+  "sort": 10
+}

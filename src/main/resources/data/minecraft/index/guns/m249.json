@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.m249.name",
+  "display": "minecraft:m249_display",
+  "data": "minecraft:m249_data",
+  "tooltip": "minecraft.gun.m249.desc",
+  "type": "mg",
+  "sort": 1
+}

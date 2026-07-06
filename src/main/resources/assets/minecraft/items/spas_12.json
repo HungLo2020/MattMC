@@ -1,0 +1,10 @@
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "minecraft:item/spas_12_base",
+    "model": {
+      "type": "minecraft:tacz_gun",
+      "gun": "spas_12"
+    }
+  }
+}

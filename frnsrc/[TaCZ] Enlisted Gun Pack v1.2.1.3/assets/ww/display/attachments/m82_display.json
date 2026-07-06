@@ -1,0 +1,18 @@
+{
+  "slot": "ww:attachment/slot/m82",
+  "model": "ww:attachment/m82_geo",
+  "texture": "ww:attachment/uv/m82",
+  "lod": {
+    "model": "ww:attachment/m82_geo",
+    "texture": "ww:attachment/uv/m82"
+  },
+  "zoom": [
+    2.5
+  ],
+  "scope": true,
+  "fov": 70.0,
+  "sounds": {
+    "install": "tacz:attachments/scope_general_d",
+    "uninstall": "tacz:attachments/scope_general_d"
+  }
+}

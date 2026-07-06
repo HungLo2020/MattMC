@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.p320.name",
+  "display": "minecraft:p320_display",
+  "data": "minecraft:p320_data",
+  "tooltip": "minecraft.gun.p320.desc",
+  "type": "pistol",
+  "sort": 5
+}

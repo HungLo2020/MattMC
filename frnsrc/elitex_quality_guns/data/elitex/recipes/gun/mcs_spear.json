@@ -1,0 +1,15 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "forge:ingots/iron"
+      },
+      "count": 78
+    }
+  ],
+  "result": {
+    "type": "gun",
+    "id": "elitex:mcs_spear"
+  },
+  "type": "tacz:gun_smith_table_crafting"
+}

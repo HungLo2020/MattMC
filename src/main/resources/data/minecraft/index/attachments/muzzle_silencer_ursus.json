@@ -1,0 +1,6 @@
+{
+  "name": "minecraft.attachment.muzzle_silencer_ursus.name",
+  "display": "minecraft:muzzle_silencer_ursus_display",
+  "data": "minecraft:muzzle_silencer_ursus_data",
+  "type": "muzzle"
+}

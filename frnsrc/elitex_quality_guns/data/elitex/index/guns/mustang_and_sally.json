@@ -1,0 +1,7 @@
+{
+  "name": "elitex.gun.mustang_and_sally.name",
+  "display": "elitex:mustang_and_sally_display",
+  "data": "elitex:mustang_and_sally_data",
+  "type": "pistol",
+  "tooltip": "elitex.gun.mustang_and_sally.desc"
+}

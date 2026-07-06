@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.hk_mk23.name",
+  "display": "minecraft:hk_mk23_display",
+  "data": "minecraft:hk_mk23_data",
+  "tooltip": "minecraft.gun.hk_mk23.desc",
+  "type": "pistol",
+  "sort": 12
+}

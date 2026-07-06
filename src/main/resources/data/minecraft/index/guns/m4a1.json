@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.m4a1.name",
+  "display": "minecraft:m4a1_display",
+  "data": "minecraft:m4a1_data",
+  "type": "rifle",
+  "tooltip": "minecraft.gun.m4a1.desc",
+  "sort": 2
+}

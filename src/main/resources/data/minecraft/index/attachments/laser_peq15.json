@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.attachment.laser_peq15",
+  "display": "minecraft:laser_peq15_display",
+  "data": "minecraft:laser_peq15_data",
+  "type": "laser",
+  "sort": 10,
+  "hidden": true
+}

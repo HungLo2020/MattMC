@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.m16a1.name",
+  "display": "minecraft:m16a1_display",
+  "data": "minecraft:m16a1_data",
+  "type": "rifle",
+  "tooltip": "minecraft.gun.m16a1.desc",
+  "sort": 7
+}

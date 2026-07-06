@@ -1,0 +1,68 @@
+{
+  "model": "elitex:gun/ak47_geo",
+  "texture": "elitex:gun/uv/ak47",
+  "hud": "elitex:gun/hud/ak47",
+  "slot": "elitex:gun/slot/ak47",
+  "animation": "elitex:ak47",
+  "use_default_animation": "rifle",
+  "third_person_animation": "default",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "tacz:flash/common_muzzle_flash",
+    "scale": 1.7
+  },
+  "iron_zoom": 1.1,
+  "zoom_model_fov": 55,
+  "shell": {
+    "initial_velocity": [5, 2, 1],
+    "random_velocity": [1, 1, 0.25],
+    "acceleration": [0.0, -10, 0.0],
+    "angular_velocity": [360, -1200, 90],
+    "living_time": 2.1
+  },
+  "sounds": {
+    "shoot": "elitex:assault_rifles/ak47/ak47_fire",
+    "shoot_3p": "elitex:assault_rifles/ak47/ak47_fire_3p",
+    "reload_empty": "elitex:assault_rifles/ak47/ak47_reload_empty",
+    "reload_tactical": "elitex:assault_rifles/ak47/ak47_reload",
+    "inspect": "elitex:assault_rifles/ak47/ak47_inspect",
+    "inspect_empty": "elitex:assault_rifles/ak47/ak47_inspect_empty",
+    "draw": "elitex:assault_rifles/ak47/ak47_draw",
+    "put_away": "elitex:assault_rifles/ak47/ak47_put_away",
+    "silence": "elitex:assault_rifles/ak47/ak47_suppressed",
+    "silence_3p": "elitex:assault_rifles/ak47/ak47_suppressed_3p",
+    "dry_fire": "elitex:assault_rifles/ak47/ak47_dry_fire",
+    "fire_select": "elitex:assault_rifles/ak47/ak47_fire_select",
+    "head_hit": "tacz:head_hit",
+    "flesh_hit": "tacz:flesh_hit",
+    "kill": "tacz:kill"
+  },
+  "offhand_show": {
+    "pos": [1, 20, 3.5],
+    "rotate": [0, 0, 60],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-1, 20, 3],
+      "rotate": [-180, 0, 120],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  },
+  "text_show": {
+    "ammo_count_text_show_pos": {
+      "scale": 1,
+      "align": "center",
+      "shadow": false,
+      "color": "#FFFFFF",
+      "light": 15,
+      "text": "text_show.elitex.ak47.ammo_count"
+    }
+  }
+}

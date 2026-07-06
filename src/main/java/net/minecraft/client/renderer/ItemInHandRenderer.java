@@ -2,6 +2,8 @@ package net.minecraft.client.renderer;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
+import java.util.HashMap;
+import java.util.Map;
 import net.blaze3d.vertex.PoseStack;
 import net.math.Axis;
 import net.minecraft.api.EnvType;
@@ -14,6 +16,7 @@ import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.renderer.item.ItemModelResolver;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
+import net.minecraft.client.renderer.special.TaczGlock17SpecialRenderer;
 import net.minecraft.client.renderer.state.MapRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.component.DataComponents;
@@ -30,6 +33,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.MapItem;
 import net.minecraft.world.item.ShieldItem;
+import net.minecraft.world.item.TaczMvpGunItem;
 import net.minecraft.world.level.saveddata.maps.MapId;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 
@@ -120,6 +124,7 @@ public class ItemInHandRenderer {
 	private final EntityRenderDispatcher entityRenderDispatcher;
 	private final ItemRenderer itemRenderer;
 	private final ItemModelResolver itemModelResolver;
+	private final Map<String, TaczGlock17SpecialRenderer> taczGunRenderers = new HashMap<>();
 
 	public ItemInHandRenderer(Minecraft minecraft, EntityRenderDispatcher entityRenderDispatcher, ItemRenderer itemRenderer, ItemModelResolver itemModelResolver) {
 		this.minecraft = minecraft;
@@ -405,7 +410,11 @@ public class ItemInHandRenderer {
 			boolean bl = interactionHand == InteractionHand.MAIN_HAND;
 			HumanoidArm humanoidArm = bl ? abstractClientPlayer.getMainArm() : abstractClientPlayer.getMainArm().getOpposite();
 			poseStack.pushPose();
-			if (itemStack.isEmpty()) {
+			if (itemStack.getItem() instanceof TaczMvpGunItem) {
+				if (bl) {
+					this.renderTaczGlockFirstPerson(abstractClientPlayer, f, h, itemStack, i, poseStack, submitNodeCollector, j, humanoidArm);
+				}
+			} else if (itemStack.isEmpty()) {
 				if (bl && !abstractClientPlayer.isInvisible()) {
 					this.renderPlayerArm(poseStack, submitNodeCollector, j, i, h, humanoidArm);
 				}
@@ -556,6 +565,36 @@ public class ItemInHandRenderer {
 
 			poseStack.popPose();
 		}
+	}
+
+	private void renderTaczGlockFirstPerson(
+		AbstractClientPlayer abstractClientPlayer,
+		float f,
+		float g,
+		ItemStack itemStack,
+		float h,
+		PoseStack poseStack,
+		SubmitNodeCollector submitNodeCollector,
+		int i,
+		HumanoidArm humanoidArm
+	) {
+		LocalPlayer localPlayer = this.minecraft.player;
+		float xRotOffset = localPlayer != null ? Mth.lerp(f, localPlayer.xBobO, localPlayer.xBob) : 0.0F;
+		float yRotOffset = localPlayer != null ? Mth.lerp(f, localPlayer.yBobO, localPlayer.yBob) : 0.0F;
+		float xRot = abstractClientPlayer.getViewXRot(f) - xRotOffset;
+		float yRot = abstractClientPlayer.getViewYRot(f) - yRotOffset;
+		poseStack.mulPose(Axis.XP.rotationDegrees(xRot * -0.1F));
+		poseStack.mulPose(Axis.YP.rotationDegrees(yRot * -0.1F));
+		TaczMvpGunItem gunItem = (TaczMvpGunItem)itemStack.getItem();
+		TaczGlock17SpecialRenderer renderer = this.taczGunRenderers.computeIfAbsent(gunItem.gunId(), TaczGlock17SpecialRenderer::new);
+
+		renderer.submitFirstPerson(
+			itemStack,
+			poseStack,
+			submitNodeCollector,
+			i,
+			OverlayTexture.NO_OVERLAY
+		);
 	}
 
 	private void swingArm(float f, float g, PoseStack poseStack, int i, HumanoidArm humanoidArm) {

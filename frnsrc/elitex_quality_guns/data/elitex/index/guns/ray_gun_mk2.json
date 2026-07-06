@@ -1,0 +1,7 @@
+{
+  "name": "elitex.gun.ray_gun_mk2.name",
+  "display": "elitex:ray_gun_mk2_display",
+  "data": "elitex:ray_gun_mk2_data",
+  "type": "pistol",
+  "tooltip": "elitex.gun.ray_gun_mk2.desc"
+}

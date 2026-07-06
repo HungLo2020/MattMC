@@ -1,0 +1,7 @@
+{
+  "name": "elitex.attachment.inter_m200_scope.name",
+  "display": "elitex:inter_m200_scope_display",
+  "data": "elitex:inter_m200_scope_data",
+  "type": "scope",
+  "hidden": true
+}

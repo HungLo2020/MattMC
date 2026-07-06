@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.p90.name",
+  "display": "minecraft:p90_display",
+  "data": "minecraft:p90_data",
+  "tooltip": "minecraft.gun.p90.desc",
+  "type": "smg",
+  "sort": 5
+}

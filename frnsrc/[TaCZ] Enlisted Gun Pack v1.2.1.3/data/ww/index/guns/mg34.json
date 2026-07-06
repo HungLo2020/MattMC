@@ -1,0 +1,12 @@
+{
+    "name": "MG34",
+
+    "display": "ww:mg34_display",
+    
+    "data": "ww:mg34_data",
+    "tooltip": "Little Hitler's Buzzsaw... Kanye's Buzzsaw?",
+    "type": "mg",
+    "sort": 1,
+    
+    "item_type": "modern_kinetic"  
+}

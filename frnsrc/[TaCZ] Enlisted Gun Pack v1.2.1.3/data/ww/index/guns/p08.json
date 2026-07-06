@@ -1,0 +1,8 @@
+{
+  "name": "Luger P08",
+  "display": "ww:p08_display",
+  "data": "ww:p08_data",
+  "tooltip": "A valuable trophy.",
+  "sort": 1,
+  "type": "pistol"
+}

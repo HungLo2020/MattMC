@@ -1,0 +1,75 @@
+{
+  // é…æ–¹è¿‡æ»¤å™¨ï¼Œå…·ä½“å†…å®¹ä½äºŽ data/<å‘½åç©ºé—´>/recipe_filters ä¸‹
+  // å¦‚æžœæ²¡æœ‰æŒ‡å®šï¼Œå°†ä½¿ç”¨é»˜è®¤è¿‡æ»¤å™¨ minecraft:default
+  "filter": "minecraft:default",
+    // guiå†…åŒ…å«çš„tab
+  "tabs": [
+    {
+      "id": "minecraft:ammo",
+      "name": "minecraft.type.ammo.name",
+      "icon": {
+        "item": "minecraft:ammo",
+        "nbt": {
+          "AmmoId": "minecraft:762x39"
+        }
+      }
+    },
+    {
+      "id": "minecraft:pd_cartridges",
+      "name": "minecraft.type.pd_cartridges.name",
+      "icon": {
+        "item": "minecraft:ammo",
+        "nbt": {
+          "AmmoId": "minecraft:9mm"
+        }
+      }
+    },
+    {
+      "id": "minecraft:ifp_rifle_cartridges",
+      "name": "minecraft.type.ifp_rifle_cartridges.name",
+      "icon": {
+        "item": "minecraft:ammo",
+        "nbt": {
+          "AmmoId": "minecraft:556x45"
+        }
+      }
+    },
+    {
+      "id": "minecraft:lc_specialized",
+      "name": "minecraft.type.lc_specialized.name",
+      "icon": {
+        "item": "minecraft:ammo",
+        "nbt": {
+          "AmmoId": "minecraft:50bmg"
+        }
+      }
+    },
+    {
+      "id": "minecraft:explosives",
+      "name": "minecraft.type.explosives.name",
+      "icon": {
+        "item": "minecraft:ammo",
+        "nbt": {
+          "AmmoId": "minecraft:rpg_rocket"
+        }
+      }
+    },
+    {
+      "id": "minecraft:shotgun_shells",
+      "name": "minecraft.type.shotgun_shells.name",
+      "icon": {
+        "item": "minecraft:ammo",
+        "nbt": {
+          "AmmoId": "minecraft:12g"
+        }
+      }
+    },
+    {
+      "id": "minecraft:alternative_proj",
+      "name": "minecraft.type.alternative_proj.name",
+      "icon": {
+        "item": "minecraft:arrow"
+      }
+    }
+  ]
+}

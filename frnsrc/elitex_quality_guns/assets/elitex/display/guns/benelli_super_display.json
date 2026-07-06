@@ -1,0 +1,75 @@
+{
+  "model": "elitex:gun/benelli_super_geo",
+  "texture": "elitex:gun/uv/benelli_super",
+  "hud": "elitex:gun/hud/benelli_super",
+  "slot": "elitex:gun/slot/benelli_super",
+  "animation": "elitex:benelli_super",
+  "use_default_animation": "rifle",
+  "third_person_animation": "default",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "tacz:flash/common_muzzle_flash",
+    "scale": 0.75
+  },
+
+  "ammo_count_style": "normal",
+  "damage_style": "per_projectile",
+  "state_machine": "elitex:pump_action_state_machine",
+  "state_machine_param": {
+    "bolt_shell_ejecting_time": 0.12,
+    "intro_shell_ejecting_time": 0.96
+  },
+  "iron_zoom": 1.2,
+
+  "sounds": {
+    "shoot": "elitex:shotguns/benelli_super/super_nova_fire",
+    "shoot_3p": "elitex:shotguns/benelli_super/super_nova_fire_3p",
+    "silence": "elitex:shotguns/benelli_super/super_nova_suppressed",
+    "silence_3p": "elitex:shotguns/benelli_super/super_nova_suppressed_3p",
+    "inspect": "elitex:shotguns/benelli_super/super_nova_inspect",
+    "inspect_empty": "elitex:shotguns/benelli_super/super_nova_inspect_empty",
+    "draw": "elitex:shotguns/benelli_super/super_nova_draw",
+    "put_away": "elitex:shotguns/benelli_super/super_nova_put_away",
+    "melee_push": "tacz:melee_stock/melee_stock_01",
+    "melee_stock": "tacz:melee_stock/melee_stock_02",
+    "dry_fire":  "elitex:platform_sound_sfx/shotgun_platform_sfx/shotgun_platform_dry_fire1",
+    "reload_loop": "elitex:shotguns/benelli_super/super_nova_reload_loop"
+  },
+  "offhand_show": {
+    "pos": [1, 19, 4],
+    "rotate": [0, 0, 50],
+    "scale": [0.3, 0.3, 0.3]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-1, 19, 3],
+      "rotate": [-180, 0, 130],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  },
+
+  "shell": {
+    "initial_velocity": [5, 0.5, 1],
+    "random_velocity": [1, 0.5, 0.25],
+    "acceleration": [0.0, -10, 0.0],
+    "angular_velocity": [360, -960, 90],
+    "living_time": 1.0
+  },
+
+
+
+  "controllable": {
+    "semi": {
+      "low_frequency": 0.25,
+      "high_frequency": 0.5,
+      "time": 100
+    }
+  }
+
+}

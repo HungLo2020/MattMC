@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.glock_17.name",
+  "display": "minecraft:glock_17_display",
+  "data": "minecraft:glock_17_data",
+  "tooltip": "minecraft.gun.glock_17.desc",
+  "type": "pistol",
+  "sort": 1
+}

@@ -1,0 +1,9 @@
+{
+  "name": "minecraft.gun.m1.name",
+  "display": "minecraft:m1_display",
+  "data": "minecraft:m1_data",
+  "tooltip": "minecraft.gun.m1.desc",
+  "type": "rifle",
+  "item_type": "modern_kinetic",
+  "sort": 1
+}

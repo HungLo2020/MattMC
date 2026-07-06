@@ -1,0 +1,6 @@
+{
+  "name": "elitex.attachment.elite_smg_suppressor.name",
+  "display": "elitex:elite_smg_suppressor_display",
+  "data": "elitex:elite_smg_suppressor_data",
+  "type": "muzzle"
+}

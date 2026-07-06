@@ -1,0 +1,7 @@
+{
+  "name": "elitex.gun.trs_bull.name",
+  "display": "elitex:trs_bull_display",
+  "data": "elitex:trs_bull_data",
+  "type": "pistol",
+  "tooltip": "elitex.gun.trs_bull.desc"
+}

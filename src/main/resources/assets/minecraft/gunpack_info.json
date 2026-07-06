@@ -1,0 +1,18 @@
+{
+  // ç‰ˆæœ¬
+  "version": "1.1.8",
+  // åç§°ï¼Œæ”¯æŒæœ¬åœ°åŒ–
+  "name": "pack.tacz.tacz_default_gun.name",
+  // æè¿°æ–‡æœ¬ï¼Œæ”¯æŒæœ¬åœ°åŒ–
+  "desc": "pack.tacz.tacz_default_gun.desc",
+  // è®¸å¯è¯
+  "license": "CC BY-NC-ND 4.0",
+  // ä½œè€…
+  "authors": [
+    "TACZ Dev Team"
+  ],
+  // æ—¥æœŸï¼šISO 8601 æ ‡å‡†ï¼Œå³ YYYY-MM-DD
+  "date": "2024-06-01",
+  // URL é“¾æŽ¥ï¼Œå¯ä»¥åœ¨æžªæ¢°åˆæˆå°çœ‹åˆ°ï¼Œç‚¹å‡»æŒ‰é’®å¯ä»¥è®¿é—®ç½‘ç»œé“¾æŽ¥
+  "url": "https://tacwiki.mcma.club/zh/"
+}

@@ -1,0 +1,55 @@
+{
+	"format_version": "1.12.0",
+	"minecraft:geometry": [
+		{
+			"description": {
+				"identifier": "geometry.unknown",
+				"texture_width": 32,
+				"texture_height": 32,
+				"visible_bounds_width": 4,
+				"visible_bounds_height": 2.5,
+				"visible_bounds_offset": [0, 0.75, 0]
+			},
+			"bones": [
+				{
+					"name": "root",
+					"pivot": [0, 8.5, -8]
+				},
+				{
+					"name": "projectile_illuminated",
+					"parent": "root",
+					"pivot": [0, 8.5, -8],
+					"cubes": [
+						{
+							"origin": [-0.69874, 7.80126, -8.72499],
+							"size": [1.39748, 1.39748, 1.66873],
+							"pivot": [0, 8.5, -7.89062],
+							"rotation": [0, 0, 45],
+							"uv": {
+								"north": {"uv": [5, 2], "uv_size": [1, 1]},
+								"east": {"uv": [2, 2], "uv_size": [2, 1]},
+								"south": {"uv": [3, 5], "uv_size": [1, 1]},
+								"west": {"uv": [2, 3], "uv_size": [2, 1]},
+								"up": {"uv": [2, 4], "uv_size": [1, 2]},
+								"down": {"uv": [4, 4], "uv_size": [1, -2]}
+							}
+						},
+						{
+							"origin": [-0.34373, 8.15627, -7.37498],
+							"size": [0.68747, 0.68747, 27.99997],
+							"pivot": [0, 8.5, -7.03125],
+							"rotation": [0, 0, 45],
+							"uv": {
+								"east": {"uv": [0, 0], "uv_size": [28, 1]},
+								"south": {"uv": [4, 4], "uv_size": [1, 1]},
+								"west": {"uv": [0, 1], "uv_size": [28, 1]},
+								"up": {"uv": [0, 2], "uv_size": [1, 28]},
+								"down": {"uv": [1, 30], "uv_size": [1, -28]}
+							}
+						}
+					]
+				}
+			]
+		}
+	]
+}

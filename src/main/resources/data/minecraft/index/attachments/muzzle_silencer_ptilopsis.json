@@ -1,0 +1,6 @@
+{
+  "name": "minecraft.attachment.muzzle_silencer_ptilopsis.name",
+  "display": "minecraft:muzzle_silencer_ptilopsis_display",
+  "data": "minecraft:muzzle_silencer_ptilopsis_data",
+  "type": "muzzle"
+}

@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.mp40.name",
+  "display": "minecraft:mp40_display",
+  "data": "minecraft:mp40_data",
+  "tooltip": "minecraft.gun.mp40.desc",
+  "type": "smg",
+  "item_type": "modern_kinetic"
+}

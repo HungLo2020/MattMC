@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.m95.name",
+  "display": "minecraft:m95_display",
+  "data": "minecraft:m95_data",
+  "tooltip": "minecraft.gun.m95.desc",
+  "type": "sniper",
+  "sort": 2
+}

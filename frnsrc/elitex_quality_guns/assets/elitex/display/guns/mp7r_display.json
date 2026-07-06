@@ -1,0 +1,53 @@
+{
+  "model": "elitex:gun/mp7r_geo",
+  "texture": "elitex:gun/uv/mp7r",
+  "hud": "elitex:gun/hud/mp7r",
+  "slot": "elitex:gun/slot/mp7r",
+  "animation": "elitex:mp7r",
+  "use_default_animation": "rifle",
+  "third_person_animation": "default",
+  "state_machine": "elitex:mp7_state_machine",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "tacz:flash/common_muzzle_flash",
+    "scale": 1.7
+  },
+  "iron_zoom": 1.5,
+  "zoom_model_fov": 55,
+  "shell": {
+    "initial_velocity": [5, 2, 1],
+    "random_velocity": [1, 1, 0.25],
+    "acceleration": [0.0, -10, 0.0],
+    "angular_velocity": [360, -1200, 90],
+    "living_time": 2.1
+  },
+  "sounds": {
+    "shoot": "elitex:smgs/mp7r/mp7_fire",
+    "shoot_3p": "elitex:smgs/mp7r/mp7_fire_3p",
+    "draw": "elitex:smgs/mp7r/mp7_draw",
+    "put_away": "elitex:smgs/mp7r/mp7_put_away",
+    "silence": "elitex:smgs/mp7r/mp7_suppressed",
+    "silence_3p": "elitex:smgs/mp7r/mp7_suppressed_3p",
+    "head_hit": "tacz:head_hit",
+    "flesh_hit": "tacz:flesh_hit",
+    "kill": "tacz:kill"
+  },
+  "offhand_show": {
+    "pos": [1, 20, 3.5],
+    "rotate": [0, 0, 60],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-1, 20, 3],
+      "rotate": [-180, 0, 120],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

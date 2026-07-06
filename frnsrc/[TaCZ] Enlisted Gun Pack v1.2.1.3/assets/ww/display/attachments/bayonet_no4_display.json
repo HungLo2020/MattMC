@@ -1,0 +1,10 @@
+{
+  "slot": "ww:attachment/slot/bayonet_no4",
+  "model": "ww:attachment/bayonet_no4_geo",
+  "texture": "ww:attachment/uv/bayonet_no4",
+  "show_muzzle": true,
+  "sounds": {
+    "install": "tacz:attachments/bayonet_install",
+    "uninstall": "tacz:attachments/bayonet_uninstall"
+  }
+}

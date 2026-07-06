@@ -1,0 +1,45 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "forge:gems/diamond"
+      },
+      "count": 30
+    },
+    {
+      "item": {
+        "tag": "forge:ingots/gold"
+      },
+      "count": 20
+    },
+    {
+      "item": {
+        "item": "minecraft:packed_ice"
+      },
+      "count": 40
+    },
+    {
+      "item": {
+        "item": "minecraft:blaze_powder"
+      },
+      "count": 10
+    },
+    {
+      "item": {
+        "item": "minecraft:ender_pearl"
+      },
+      "count": 3
+    },
+    {
+      "item": {
+        "item": "minecraft:ghast_tear"
+      },
+      "count": 2
+    }
+  ],
+  "result": {
+    "type": "gun",
+    "id": "elitex:origin_ice_staff"
+  },
+  "type": "tacz:gun_smith_table_crafting"
+}

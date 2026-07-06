@@ -1,0 +1,18 @@
+{
+  "slot": "minecraft:attachment/slot/scope_acog_ta31",
+  "model": "minecraft:attachment/scope_acog_ta31_geo",
+  "texture": "minecraft:attachment/uv/scope_acog_ta31",
+  "lod": {
+    "model": "minecraft:attachment/lod/scope_acog_ta31",
+    "texture": "minecraft:attachment/lod/scope_acog_ta31"
+  },
+  "zoom": [
+    2.5
+  ],
+  "scope": true,
+  "fov":45.0,
+  "sounds": {
+    "install": "minecraft:attachments/scope_general_b",
+    "uninstall": "minecraft:attachments/scope_general_b"
+  }
+}

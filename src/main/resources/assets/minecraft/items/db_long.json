@@ -1,0 +1,10 @@
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "minecraft:item/db_long_base",
+    "model": {
+      "type": "minecraft:tacz_gun",
+      "gun": "db_long"
+    }
+  }
+}

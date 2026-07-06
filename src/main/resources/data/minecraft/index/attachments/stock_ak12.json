@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.stock_ak12.name",
+  "display": "minecraft:stock_ak12_display",
+  "data": "minecraft:stock_ak12_data",
+  "type": "stock",
+  "sort": 10
+}

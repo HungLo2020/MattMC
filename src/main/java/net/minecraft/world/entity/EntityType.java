@@ -154,6 +154,7 @@ import net.minecraft.world.entity.projectile.ShulkerBullet;
 import net.minecraft.world.entity.projectile.SmallFireball;
 import net.minecraft.world.entity.projectile.Snowball;
 import net.minecraft.world.entity.projectile.SpectralArrow;
+import net.minecraft.world.entity.projectile.TaczBullet;
 import net.minecraft.world.entity.projectile.ThrownEgg;
 import net.minecraft.world.entity.projectile.ThrownEnderpearl;
 import net.minecraft.world.entity.projectile.ThrownExperienceBottle;
@@ -269,6 +270,16 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Arrow> ARROW = register(
 		"arrow",
 		EntityType.Builder.<Arrow>of(Arrow::new, MobCategory.MISC).noLootTable().sized(0.5F, 0.5F).eyeHeight(0.13F).clientTrackingRange(4).updateInterval(20)
+	);
+	public static final EntityType<TaczBullet> TACZ_BULLET = register(
+		"bullet",
+		EntityType.Builder.<TaczBullet>of(TaczBullet::new, MobCategory.MISC)
+			.noLootTable()
+			.noSave()
+			.fireImmune()
+			.sized(0.0625F, 0.0625F)
+			.clientTrackingRange(5)
+			.updateInterval(5)
 	);
 	public static final EntityType<Axolotl> AXOLOTL = register(
 		"axolotl", EntityType.Builder.of(Axolotl::new, MobCategory.AXOLOTLS).sized(0.75F, 0.42F).eyeHeight(0.2751F).clientTrackingRange(10)

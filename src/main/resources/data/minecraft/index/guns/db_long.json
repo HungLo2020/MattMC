@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.gun.db_long.name",
+  "display": "minecraft:db_long_display",
+  "data": "minecraft:db_long_data",
+  "tooltip": "minecraft.gun.db_long.desc",
+  "type": "shotgun"
+}

@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.aug.name",
+  "display": "minecraft:aug_display",
+  "data": "minecraft:aug_data",
+  "type": "rifle",
+  "tooltip": "minecraft.gun.aug.desc",
+  "sort": 10
+}

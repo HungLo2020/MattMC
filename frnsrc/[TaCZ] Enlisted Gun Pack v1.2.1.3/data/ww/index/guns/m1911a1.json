@@ -1,0 +1,9 @@
+{
+    "name": "M1911A1",
+    "display": "ww:m1911a1_display",
+    "data": "ww:m1911a1_data",
+    "type": "pistol",
+    "item_type": "modern_kinetic",
+    "sort": 1,
+    "tooltip":"The M1911 saw little change over the years, but the M1911A1 was cheaper to produce."
+}

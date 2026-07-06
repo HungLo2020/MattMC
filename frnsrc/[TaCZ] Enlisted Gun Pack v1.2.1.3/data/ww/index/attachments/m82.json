@@ -1,0 +1,6 @@
+{
+  "name": "M82 Scope",
+  "display": "ww:m82_display",
+  "data": "ww:m82_data",
+  "type": "scope"
+}
