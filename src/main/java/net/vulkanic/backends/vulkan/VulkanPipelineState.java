@@ -127,25 +127,32 @@ record VulkanPipelineState(
     ) {
         private static RasterizationPolicy from(PipelineDescriptor.PortableState portableState) {
             Objects.requireNonNull(portableState, "portableState must not be null");
+            int cullMode = portableState.cull()
+                ? toVkCullMode(portableState.cullFaceMode())
+                : VK10.VK_CULL_MODE_NONE;
             return new RasterizationPolicy(
                 portableState.cull(),
                 portableState.cull()
-                    ? CullDecision.DEFERRED_UNSAFE_WINDING_PARITY
+                    ? CullDecision.PORTABLE_STATE_ENABLED
                     : CullDecision.PORTABLE_STATE_DISABLED,
-                // The current Vulkan backend still inherits Minecraft's OpenGL-era
-                // clip/winding conventions. Static Vulkan face culling therefore
-                // is not a safe translation of RenderPipeline#isCull yet; enabling
-                // it globally culls valid fullscreen/world/UI passes. Preserve the
-                // historical Vulkan behavior until winding parity is solved per pass.
-                VK10.VK_CULL_MODE_NONE,
-                VK10.VK_FRONT_FACE_CLOCKWISE
+                cullMode,
+                VK10.VK_FRONT_FACE_COUNTER_CLOCKWISE
             );
         }
     }
 
     enum CullDecision {
         PORTABLE_STATE_DISABLED,
-        DEFERRED_UNSAFE_WINDING_PARITY
+        PORTABLE_STATE_ENABLED
+    }
+
+    private static int toVkCullMode(int cullFaceMode) {
+        return switch (cullFaceMode) {
+            case VulkanicAPI.GL_FRONT -> VK10.VK_CULL_MODE_FRONT_BIT;
+            case VulkanicAPI.GL_BACK -> VK10.VK_CULL_MODE_BACK_BIT;
+            case VulkanicAPI.GL_FRONT_AND_BACK -> VK10.VK_CULL_MODE_FRONT_AND_BACK;
+            default -> throw new IllegalArgumentException("Unsupported cull face mode: " + cullFaceMode);
+        };
     }
 
     private static int colorWriteMask(PipelineDescriptor.PortableState portableState) {

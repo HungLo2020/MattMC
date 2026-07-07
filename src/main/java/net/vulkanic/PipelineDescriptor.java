@@ -625,6 +625,7 @@ public final class PipelineDescriptor {
         DepthTestFunction depthTestFunction,
         PolygonMode polygonMode,
         boolean cull,
+        int cullFaceMode,
         boolean writeColor,
         boolean writeAlpha,
         boolean writeDepth,
@@ -645,6 +646,11 @@ public final class PipelineDescriptor {
             blendState = Objects.requireNonNull(blendState, "blendState must not be null");
             depthTestFunction = Objects.requireNonNull(depthTestFunction, "depthTestFunction must not be null");
             polygonMode = Objects.requireNonNull(polygonMode, "polygonMode must not be null");
+            if (cullFaceMode != VulkanicAPI.GL_FRONT
+                && cullFaceMode != VulkanicAPI.GL_BACK
+                && cullFaceMode != VulkanicAPI.GL_FRONT_AND_BACK) {
+                throw new IllegalArgumentException("cullFaceMode must be GL_FRONT, GL_BACK, or GL_FRONT_AND_BACK");
+            }
             colorLogic = Objects.requireNonNull(colorLogic, "colorLogic must not be null");
             vertexFormat = Objects.requireNonNull(vertexFormat, "vertexFormat must not be null");
             vertexFormatMode = Objects.requireNonNull(vertexFormatMode, "vertexFormatMode must not be null");
@@ -676,6 +682,7 @@ public final class PipelineDescriptor {
                 pipeline.getDepthTestFunction(),
                 pipeline.getPolygonMode(),
                 pipeline.isCull(),
+                VulkanicAPI.GL_BACK,
                 pipeline.isWriteColor(),
                 pipeline.isWriteAlpha(),
                 pipeline.isWriteDepth(),
@@ -792,6 +799,7 @@ public final class PipelineDescriptor {
             appendField(builder, "depthTestFunction", depthTestFunction.name());
             appendField(builder, "polygonMode", polygonMode.name());
             appendField(builder, "cull", cull);
+            appendField(builder, "cullFaceMode", cullFaceMode);
             appendField(builder, "writeColor", writeColor);
             appendField(builder, "writeAlpha", writeAlpha);
             appendField(builder, "writeDepth", writeDepth);

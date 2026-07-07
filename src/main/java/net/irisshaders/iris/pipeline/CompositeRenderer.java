@@ -739,6 +739,7 @@ public class CompositeRenderer {
 				portableState.depthTestFunction(),
 				portableState.polygonMode(),
 				portableState.cull(),
+				portableState.cullFaceMode(),
 				portableState.writeColor(),
 				portableState.writeAlpha(),
 				portableState.writeDepth(),

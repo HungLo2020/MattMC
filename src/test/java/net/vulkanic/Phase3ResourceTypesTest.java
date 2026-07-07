@@ -508,6 +508,7 @@ public class Phase3ResourceTypesTest {
             base.depthTestFunction(),
             base.polygonMode(),
             base.cull(),
+            base.cullFaceMode(),
             base.writeColor(),
             base.writeAlpha(),
             base.writeDepth(),

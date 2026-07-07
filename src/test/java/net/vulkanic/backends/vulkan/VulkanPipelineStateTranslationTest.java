@@ -25,22 +25,34 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class VulkanPipelineStateTranslationTest {
 
     @Test
-    public void testCullStatePreservesCurrentVulkanNoCullBehaviorUntilWindingParityExists() {
+    public void testCullStateTranslatesPortableBackFaceCullRequest() {
         VulkanPipelineState enabled = translate(state(builder().withCull(true).build()), 1);
         VulkanPipelineState disabled = translate(state(builder().withCull(false).build()), 1);
 
         assertTrue(enabled.requestedCull());
-        assertEquals(VulkanPipelineState.CullDecision.DEFERRED_UNSAFE_WINDING_PARITY, enabled.cullDecision());
-        assertEquals(VK10.VK_CULL_MODE_NONE, enabled.cullMode());
+        assertEquals(VulkanPipelineState.CullDecision.PORTABLE_STATE_ENABLED, enabled.cullDecision());
+        assertEquals(VK10.VK_CULL_MODE_BACK_BIT, enabled.cullMode());
         assertEquals(VK10.VK_CULL_MODE_NONE, disabled.cullMode());
-        assertEquals(VK10.VK_FRONT_FACE_CLOCKWISE, enabled.frontFace());
+        assertEquals(VK10.VK_FRONT_FACE_COUNTER_CLOCKWISE, enabled.frontFace());
         assertFalse(disabled.requestedCull());
         assertEquals(VulkanPipelineState.CullDecision.PORTABLE_STATE_DISABLED, disabled.cullDecision());
-        assertEquals(VK10.VK_FRONT_FACE_CLOCKWISE, disabled.frontFace());
+        assertEquals(VK10.VK_FRONT_FACE_COUNTER_CLOCKWISE, disabled.frontFace());
     }
 
     @Test
-    public void testCullRequestsRemainDeferredForGuiLikeScreenPipelines() {
+    public void testCullFaceModeTranslatesIntoVulkanCullMode() {
+        PipelineDescriptor.PortableState base = state(builder().withCull(true).build());
+
+        assertEquals(VK10.VK_CULL_MODE_FRONT_BIT, translate(withCullFaceMode(base, VulkanicAPI.GL_FRONT), 1).cullMode());
+        assertEquals(VK10.VK_CULL_MODE_BACK_BIT, translate(withCullFaceMode(base, VulkanicAPI.GL_BACK), 1).cullMode());
+        assertEquals(
+            VK10.VK_CULL_MODE_FRONT_AND_BACK,
+            translate(withCullFaceMode(base, VulkanicAPI.GL_FRONT_AND_BACK), 1).cullMode()
+        );
+    }
+
+    @Test
+    public void testGuiLikeScreenPipelinesHonorPortableCullRequest() {
         RenderPipeline guiLikePipeline = builder()
             .withLocation(ResourceLocation.withDefaultNamespace("pipeline/gui_text_like"))
             .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
@@ -52,9 +64,9 @@ public class VulkanPipelineStateTranslationTest {
         VulkanPipelineState state = translate(state(guiLikePipeline), 1);
 
         assertTrue(state.requestedCull());
-        assertEquals(VulkanPipelineState.CullDecision.DEFERRED_UNSAFE_WINDING_PARITY, state.cullDecision());
-        assertEquals(VK10.VK_CULL_MODE_NONE, state.cullMode());
-        assertEquals(VK10.VK_FRONT_FACE_CLOCKWISE, state.frontFace());
+        assertEquals(VulkanPipelineState.CullDecision.PORTABLE_STATE_ENABLED, state.cullDecision());
+        assertEquals(VK10.VK_CULL_MODE_BACK_BIT, state.cullMode());
+        assertEquals(VK10.VK_FRONT_FACE_COUNTER_CLOCKWISE, state.frontFace());
     }
 
     @Test
@@ -215,6 +227,31 @@ public class VulkanPipelineStateTranslationTest {
 
     private static PipelineDescriptor.PortableState state(RenderPipeline pipeline) {
         return PipelineDescriptor.fromRenderPipeline(pipeline).getPortableState();
+    }
+
+    private static PipelineDescriptor.PortableState withCullFaceMode(PipelineDescriptor.PortableState state, int cullFaceMode) {
+        return new PipelineDescriptor.PortableState(
+            state.location(),
+            state.vertexShader(),
+            state.fragmentShader(),
+            state.shaderDefineValues(),
+            state.shaderDefineFlags(),
+            state.samplers(),
+            state.uniforms(),
+            state.blendState(),
+            state.depthTestFunction(),
+            state.polygonMode(),
+            state.cull(),
+            cullFaceMode,
+            state.writeColor(),
+            state.writeAlpha(),
+            state.writeDepth(),
+            state.colorLogic(),
+            state.vertexFormat(),
+            state.vertexFormatMode(),
+            state.depthBiasScaleFactor(),
+            state.depthBiasConstant()
+        );
     }
 
     private static VulkanPipelineState.StencilState stencilState(boolean enabled) {
