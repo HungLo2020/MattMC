@@ -1596,6 +1596,13 @@ public class CreativeModeTabs {
 						output.accept(Items.GOLDEN_AXE);
 						output.accept(Items.DIAMOND_AXE);
 						output.accept(Items.NETHERITE_AXE);
+						output.accept(Items.WOODEN_SPEAR);
+						output.accept(Items.STONE_SPEAR);
+						output.accept(Items.COPPER_SPEAR);
+						output.accept(Items.IRON_SPEAR);
+						output.accept(Items.GOLDEN_SPEAR);
+						output.accept(Items.DIAMOND_SPEAR);
+						output.accept(Items.NETHERITE_SPEAR);
 						output.accept(Items.TRIDENT);
 						output.accept(Items.MACE);
 						output.accept(Items.SHIELD);
@@ -1635,6 +1642,12 @@ public class CreativeModeTabs {
 						output.accept(Items.IRON_HORSE_ARMOR);
 						output.accept(Items.GOLDEN_HORSE_ARMOR);
 						output.accept(Items.DIAMOND_HORSE_ARMOR);
+						output.accept(Items.NETHERITE_HORSE_ARMOR);
+						output.accept(Items.COPPER_NAUTILUS_ARMOR);
+						output.accept(Items.IRON_NAUTILUS_ARMOR);
+						output.accept(Items.GOLDEN_NAUTILUS_ARMOR);
+						output.accept(Items.DIAMOND_NAUTILUS_ARMOR);
+						output.accept(Items.NETHERITE_NAUTILUS_ARMOR);
 						output.accept(Items.WOLF_ARMOR);
 						output.accept(Items.TOTEM_OF_UNDYING);
 						output.accept(Items.TNT);
@@ -2036,6 +2049,7 @@ public class CreativeModeTabs {
 					output.accept(Items.MUDSKIPPER_SPAWN_EGG);
 					output.accept(Items.MULE_SPAWN_EGG);
 					output.accept(Items.MUNGUS_SPAWN_EGG);
+					output.accept(Items.NAUTILUS_SPAWN_EGG);
 					output.accept(Items.OCELOT_SPAWN_EGG);
 					output.accept(Items.ORCA_SPAWN_EGG);
 					output.accept(Items.PANDA_SPAWN_EGG);
@@ -2106,6 +2120,7 @@ public class CreativeModeTabs {
 					output.accept(Items.ZOGLIN_SPAWN_EGG);
 					output.accept(Items.ZOMBIE_SPAWN_EGG);
 					output.accept(Items.ZOMBIE_HORSE_SPAWN_EGG);
+					output.accept(Items.ZOMBIE_NAUTILUS_SPAWN_EGG);
 					output.accept(Items.ZOMBIE_VILLAGER_SPAWN_EGG);
 					output.accept(Items.ZOMBIFIED_PIGLIN_SPAWN_EGG);
 				})

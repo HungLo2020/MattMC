@@ -65,6 +65,7 @@ public class V4550 extends NamespacedSchema {
 		schema.registerSimple(map, "minecraft:mud_ball");
 		schema.registerSimple(map, "minecraft:mudskipper");
 		schema.registerSimple(map, "minecraft:mungus");
+		schema.registerSimple(map, "minecraft:nautilus");
 		schema.registerSimple(map, "minecraft:orca");
 		schema.registerSimple(map, "minecraft:pewen_boat");
 		schema.registerSimple(map, "minecraft:pewen_chest_boat");
@@ -91,6 +92,7 @@ public class V4550 extends NamespacedSchema {
 		schema.registerSimple(map, "minecraft:toucan");
 		schema.registerSimple(map, "minecraft:underminer");
 		schema.registerSimple(map, "minecraft:warped_toad");
+		schema.registerSimple(map, "minecraft:zombie_nautilus");
 		
 		// Register Alex's Caves entities
 		schema.registerSimple(map, "minecraft:atlatitan");

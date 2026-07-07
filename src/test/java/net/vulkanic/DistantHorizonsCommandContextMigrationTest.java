@@ -954,10 +954,10 @@ public class DistantHorizonsCommandContextMigrationTest {
                 && glProxySource.contains("this.vertexAttribDivisorSupported = true")
                 && glProxySource.contains("this.instancedArraysSupported = true"),
             "DH GLProxy should expose Vulkan instancing support so Iris generic DH rendering stays on the indirect path");
-        assertTrue(dhCompatSource.contains("DepthCopyStrategy strategy = DepthCopyStrategy.fastestDepthSnapshot(false)"),
-            "Iris DH translucent depth snapshots should use the depth-copy strategy instead of copyTexImage2D");
-        assertTrue(dhCompatSource.contains("depthTexNoTranslucentFramebuffer.addDepthAttachmentBypass(depthTexNoTranslucent.getTextureId())"),
-            "Iris DH translucent depth snapshots should have a depth-only destination framebuffer for Vulkan blits");
+        assertTrue(dhCompatSource.contains("DepthCopyStrategy strategy = DepthCopyStrategy.fastestDepthSnapshot(dhDepthFormat.isCombinedStencil())"),
+            "Iris DH translucent depth snapshots should use the depth-copy strategy with the active DH depth/stencil contract");
+        assertTrue(dhCompatSource.contains("depthTexNoTranslucentFramebuffer.addDepthAttachmentBypass(depthTexNoTranslucent.getTextureId(), dhDepthFormat.isCombinedStencil())"),
+            "Iris DH translucent depth snapshots should have a destination framebuffer that preserves combined depth-stencil attachment intent");
         assertFalse(dhCompatFacadeSource.contains("getMainDepthTextureIdForVulkanCompositeFallback"),
             "Iris DH shaderpack samplers must expose DH depth textures instead of substituting the main scene depth on Vulkan");
         assertFalse(dhCompatFacadeSource.contains("Minecraft.getInstance().getMainRenderTarget().getDepthTexture()"),

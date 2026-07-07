@@ -69,6 +69,7 @@ public class BiomeTags {
 	public static final TagKey<Biome> SPAWNS_WARM_VARIANT_FROGS = create("spawns_warm_variant_frogs");
 	public static final TagKey<Biome> SPAWNS_COLD_VARIANT_FARM_ANIMALS = create("spawns_cold_variant_farm_animals");
 	public static final TagKey<Biome> SPAWNS_WARM_VARIANT_FARM_ANIMALS = create("spawns_warm_variant_farm_animals");
+	public static final TagKey<Biome> SPAWNS_CORAL_VARIANT_ZOMBIE_NAUTILUS = create("spawns_coral_variant_zombie_nautilus");
 	public static final TagKey<Biome> SPAWNS_GOLD_RABBITS = create("spawns_gold_rabbits");
 	public static final TagKey<Biome> SPAWNS_WHITE_RABBITS = create("spawns_white_rabbits");
 	public static final TagKey<Biome> REDUCED_WATER_AMBIENT_SPAWNS = create("reduce_water_ambient_spawns");

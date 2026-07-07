@@ -26,7 +26,7 @@ public class DhFrameBufferWrapper implements IDhApiFramebuffer {
 
 	@Override
 	public void addDepthAttachment(int i, boolean b) {
-		// ignore
+		this.framebuffer.addDepthAttachmentBypass(i, b);
 	}
 
 	@Override

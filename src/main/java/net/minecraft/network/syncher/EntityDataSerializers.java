@@ -28,6 +28,7 @@ import net.minecraft.world.entity.animal.PigVariant;
 import net.minecraft.world.entity.animal.armadillo.Armadillo;
 import net.minecraft.world.entity.animal.coppergolem.CopperGolemState;
 import net.minecraft.world.entity.animal.frog.FrogVariant;
+import net.minecraft.world.entity.animal.nautilus.ZombieNautilusVariant;
 import net.minecraft.world.entity.animal.sniffer.Sniffer;
 import net.minecraft.world.entity.animal.wolf.WolfSoundVariant;
 import net.minecraft.world.entity.animal.wolf.WolfVariant;
@@ -118,6 +119,9 @@ public class EntityDataSerializers {
 	public static final EntityDataSerializer<Holder<FrogVariant>> FROG_VARIANT = EntityDataSerializer.forValueType(FrogVariant.STREAM_CODEC);
 	public static final EntityDataSerializer<Holder<PigVariant>> PIG_VARIANT = EntityDataSerializer.forValueType(PigVariant.STREAM_CODEC);
 	public static final EntityDataSerializer<Holder<PaintingVariant>> PAINTING_VARIANT = EntityDataSerializer.forValueType(PaintingVariant.STREAM_CODEC);
+	public static final EntityDataSerializer<Holder<ZombieNautilusVariant>> ZOMBIE_NAUTILUS_VARIANT = EntityDataSerializer.forValueType(
+		ZombieNautilusVariant.STREAM_CODEC
+	);
 	public static final EntityDataSerializer<Armadillo.ArmadilloState> ARMADILLO_STATE = EntityDataSerializer.forValueType(Armadillo.ArmadilloState.STREAM_CODEC);
 	public static final EntityDataSerializer<Sniffer.State> SNIFFER_STATE = EntityDataSerializer.forValueType(Sniffer.State.STREAM_CODEC);
 	public static final EntityDataSerializer<WeatheringCopper.WeatherState> WEATHERING_COPPER_STATE = EntityDataSerializer.forValueType(
@@ -175,6 +179,7 @@ public class EntityDataSerializers {
 		registerSerializer(CHICKEN_VARIANT);
 		registerSerializer(OPTIONAL_GLOBAL_POS);
 		registerSerializer(PAINTING_VARIANT);
+		registerSerializer(ZOMBIE_NAUTILUS_VARIANT);
 		registerSerializer(SNIFFER_STATE);
 		registerSerializer(ARMADILLO_STATE);
 		registerSerializer(COPPER_GOLEM_STATE);

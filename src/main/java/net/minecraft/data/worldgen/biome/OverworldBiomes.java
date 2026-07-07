@@ -432,10 +432,12 @@ public class OverworldBiomes {
 	public static Biome frozenOcean(HolderGetter<PlacedFeature> holderGetter, HolderGetter<ConfiguredWorldCarver<?>> holderGetter2, boolean bl) {
 		MobSpawnSettings.Builder builder = new MobSpawnSettings.Builder()
 			.addSpawn(MobCategory.WATER_CREATURE, 1, new MobSpawnSettings.SpawnerData(EntityType.SQUID, 1, 4))
+			.addSpawn(MobCategory.WATER_CREATURE, 4, new MobSpawnSettings.SpawnerData(EntityType.NAUTILUS, 1, 2))
 			.addSpawn(MobCategory.WATER_AMBIENT, 15, new MobSpawnSettings.SpawnerData(EntityType.SALMON, 1, 5))
 			.addSpawn(MobCategory.CREATURE, 1, new MobSpawnSettings.SpawnerData(EntityType.POLAR_BEAR, 1, 2));
 		BiomeDefaultFeatures.commonSpawns(builder);
 		builder.addSpawn(MobCategory.MONSTER, 5, new MobSpawnSettings.SpawnerData(EntityType.DROWNED, 1, 1));
+		builder.addSpawn(MobCategory.MONSTER, 2, new MobSpawnSettings.SpawnerData(EntityType.ZOMBIE_NAUTILUS, 1, 1));
 		float f = bl ? 0.5F : 0.0F;
 		BiomeGenerationSettings.Builder builder2 = new BiomeGenerationSettings.Builder(holderGetter, holderGetter2);
 		BiomeDefaultFeatures.addIcebergs(builder2);

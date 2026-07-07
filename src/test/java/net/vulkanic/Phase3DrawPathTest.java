@@ -3387,8 +3387,9 @@ public class Phase3DrawPathTest {
             "GlFramebuffer should not pass explicit GL_TEXTURE_2D for color attachment");
         assertFalse(glFramebufferSource.contains("IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_ATTACHMENT, texture, 0)"),
             "GlFramebuffer should not hard-code GL_FRAMEBUFFER target for bypass depth attachment");
-        assertTrue(glFramebufferSource.contains("IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_DEPTH_ATTACHMENT, texture, 0)"),
-            "GlFramebuffer should use IrisRenderSystem default-target framebufferTexture2D helper for bypass depth attachment");
+        assertTrue(glFramebufferSource.contains("IrisRenderSystem.framebufferTexture2D(")
+                && glFramebufferSource.contains("combinedStencil ? VulkanicAPI.GL_DEPTH_STENCIL_ATTACHMENT : VulkanicAPI.GL_DEPTH_ATTACHMENT"),
+            "GlFramebuffer should use IrisRenderSystem default-target framebufferTexture2D helper and preserve combined depth-stencil attachment intent");
         assertFalse(glFramebufferSource.contains("IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0 + index, texture, 0)"),
             "GlFramebuffer should not compute color-attachment enums inline for color attachment");
         assertFalse(glFramebufferSource.contains("IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.colorAttachment(index), texture, 0)"),
@@ -4021,10 +4022,10 @@ public class Phase3DrawPathTest {
             "DHCompatInternal should not pass explicit GL_TEXTURE_2D in copyTexImage2D calls");
         assertFalse(dhCompatInternalSource.contains("IrisRenderSystem.copyTexImage2D("),
             "DHCompatInternal should avoid color-oriented copyTexImage2D for translucent depth snapshots");
-        assertTrue(dhCompatInternalSource.contains("DepthCopyStrategy strategy = DepthCopyStrategy.fastestDepthSnapshot(false)"),
-            "DHCompatInternal should use the Vulkan-safe depth snapshot strategy for translucent depth copies");
-        assertTrue(dhCompatInternalSource.contains("depthTexNoTranslucentFramebuffer.addDepthAttachmentBypass(depthTexNoTranslucent.getTextureId())"),
-            "DHCompatInternal should provide a depth-only destination framebuffer for Vulkan depth snapshot blits");
+        assertTrue(dhCompatInternalSource.contains("DepthCopyStrategy strategy = DepthCopyStrategy.fastestDepthSnapshot(dhDepthFormat.isCombinedStencil())"),
+            "DHCompatInternal should use the Vulkan-safe depth snapshot strategy with the active depth/stencil contract");
+        assertTrue(dhCompatInternalSource.contains("depthTexNoTranslucentFramebuffer.addDepthAttachmentBypass(depthTexNoTranslucent.getTextureId(), dhDepthFormat.isCombinedStencil())"),
+            "DHCompatInternal should provide a destination framebuffer that preserves combined depth-stencil attachment intent");
 
         Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
         String dhWrapperSource = readSourceIfExists(dhWrapperFile);

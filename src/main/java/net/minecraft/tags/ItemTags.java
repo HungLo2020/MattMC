@@ -158,6 +158,7 @@ public final class ItemTags {
 	public static final TagKey<Item> DECORATED_POT_SHERDS = bind("decorated_pot_sherds");
 	public static final TagKey<Item> DECORATED_POT_INGREDIENTS = bind("decorated_pot_ingredients");
 	public static final TagKey<Item> SWORDS = bind("swords");
+	public static final TagKey<Item> SPEARS = bind("spears");
 	public static final TagKey<Item> AXES = bind("axes");
 	public static final TagKey<Item> HOES = bind("hoes");
 	public static final TagKey<Item> PICKAXES = bind("pickaxes");
@@ -194,6 +195,10 @@ public final class ItemTags {
 	public static final TagKey<Item> CROSSBOW_ENCHANTABLE = bind("enchantable/crossbow");
 	public static final TagKey<Item> VANISHING_ENCHANTABLE = bind("enchantable/vanishing");
 	public static final TagKey<Item> MACE_ENCHANTABLE = bind("enchantable/mace");
+	public static final TagKey<Item> LUNGE_ENCHANTABLE = bind("enchantable/lunge");
+	public static final TagKey<Item> NAUTILUS_BUCKET_FOOD = bind("nautilus_bucket_food");
+	public static final TagKey<Item> NAUTILUS_FOOD = bind("nautilus_food");
+	public static final TagKey<Item> NAUTILUS_TAMING_ITEMS = bind("nautilus_taming_items");
 	public static final TagKey<Item> MAP_INVISIBILITY_EQUIPMENT = bind("map_invisibility_equipment");
 	public static final TagKey<Item> GAZE_DISGUISE_EQUIPMENT = bind("gaze_disguise_equipment");
 

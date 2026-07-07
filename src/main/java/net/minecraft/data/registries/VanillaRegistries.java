@@ -31,6 +31,7 @@ import net.minecraft.world.entity.animal.ChickenVariants;
 import net.minecraft.world.entity.animal.CowVariants;
 import net.minecraft.world.entity.animal.PigVariants;
 import net.minecraft.world.entity.animal.frog.FrogVariants;
+import net.minecraft.world.entity.animal.nautilus.ZombieNautilusVariants;
 import net.minecraft.world.entity.animal.wolf.WolfSoundVariants;
 import net.minecraft.world.entity.animal.wolf.WolfVariants;
 import net.minecraft.world.entity.decoration.PaintingVariants;
@@ -88,6 +89,7 @@ public class VanillaRegistries {
 		.add(Registries.TEST_INSTANCE, GameTestInstances::bootstrap)
 		.add(Registries.FROG_VARIANT, FrogVariants::bootstrap)
 		.add(Registries.CAT_VARIANT, CatVariants::bootstrap)
+		.add(Registries.ZOMBIE_NAUTILUS_VARIANT, ZombieNautilusVariants::bootstrap)
 		.add(Registries.DIALOG, Dialogs::bootstrap);
 
 	private static void validateThatAllBiomeFeaturesHaveBiomeFilter(HolderLookup.Provider provider) {

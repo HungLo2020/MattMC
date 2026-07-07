@@ -33,6 +33,7 @@ import com.seibel.distanthorizons.coreapi.DependencyInjection.ApiEventInjector;
 import com.seibel.distanthorizons.coreapi.DependencyInjection.OverrideInjector;
 import com.seibel.distanthorizons.core.util.math.Vec3f;
 import net.blaze3d.systems.RenderPass;
+import net.blaze3d.textures.GpuTexture;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicBlendEquation;
 import net.vulkanic.VulkanicBlendFactor;
@@ -76,6 +77,7 @@ public class LodRenderer
 	private IDhApiFramebuffer activeFramebuffer;
 	private int textureWidth;
 	private int textureHeight;
+	private EDhDepthBufferFormat depthTextureFormat = EDhDepthBufferFormat.DEPTH32F;
 	
 	
 	private IDhApiShaderProgram lodRenderProgram = null;
@@ -441,12 +443,14 @@ public class LodRenderer
 		//===============//
 		
 		// resize the textures if needed
+		EDhDepthBufferFormat targetDepthTextureFormat = this.getTargetDepthTextureFormat();
 		if (MC_RENDER.getTargetFramebufferViewportWidth() != this.textureWidth
-				|| MC_RENDER.getTargetFramebufferViewportHeight() != this.textureHeight)
+				|| MC_RENDER.getTargetFramebufferViewportHeight() != this.textureHeight
+				|| targetDepthTextureFormat != this.depthTextureFormat)
 		{
 			// just resizing the textures doesn't work when Optifine is present,
 			// so recreate the textures with the new size instead
-			this.createAndBindTextures();
+			this.createAndBindTextures(targetDepthTextureFormat);
 		}
 		
 		
@@ -478,7 +482,7 @@ public class LodRenderer
 			{
 				// Due to using MC/Optifine's framebuffer we need to re-bind the depth texture,
 				// otherwise we'll be writing to MC/Optifine's depth texture which causes rendering issues
-				framebuffer.addDepthAttachment(this.depthTexture.getTextureId(), EDhDepthBufferFormat.DEPTH32F.isCombinedStencil());
+				framebuffer.addDepthAttachment(this.depthTexture.getTextureId(), this.depthTextureFormat.isCombinedStencil());
 				
 				
 				// don't clear the color texture, that removes the sky
@@ -537,10 +541,17 @@ public class LodRenderer
 	@SuppressWarnings( "deprecation" )
 	private void createAndBindTextures()
 	{
+		this.createAndBindTextures(this.getTargetDepthTextureFormat());
+	}
+
+	@SuppressWarnings( "deprecation" )
+	private void createAndBindTextures(EDhDepthBufferFormat depthTextureFormat)
+	{
 		int oldWidth = this.textureWidth;
 		int oldHeight = this.textureHeight;
 		this.textureWidth = MC_RENDER.getTargetFramebufferViewportWidth();
 		this.textureHeight = MC_RENDER.getTargetFramebufferViewportHeight();
+		this.depthTextureFormat = depthTextureFormat;
 		
 		DhApiTextureCreatedParam textureCreatedParam = new DhApiTextureCreatedParam(
 				oldWidth, oldHeight,
@@ -557,11 +568,11 @@ public class LodRenderer
 		IDhApiFramebuffer framebufferOverride = OverrideInjector.INSTANCE.get(IDhApiFramebuffer.class);
 		
 		
-		this.depthTexture = new DHDepthTexture(this.textureWidth, this.textureHeight, EDhDepthBufferFormat.DEPTH32F);
-		this.framebuffer.addDepthAttachment(this.depthTexture.getTextureId(), EDhDepthBufferFormat.DEPTH32F.isCombinedStencil());
+		this.depthTexture = new DHDepthTexture(this.textureWidth, this.textureHeight, this.depthTextureFormat);
+		this.framebuffer.addDepthAttachment(this.depthTexture.getTextureId(), this.depthTextureFormat.isCombinedStencil());
 		if (framebufferOverride != null)
 		{
-			framebufferOverride.addDepthAttachment(this.depthTexture.getTextureId(), EDhDepthBufferFormat.DEPTH32F.isCombinedStencil());
+			framebufferOverride.addDepthAttachment(this.depthTexture.getTextureId(), this.depthTextureFormat.isCombinedStencil());
 		}
 		
 		// if we are using MC's frame buffer, a color texture is already present and shouldn't need to be bound
@@ -586,6 +597,29 @@ public class LodRenderer
 		
 		
 		ApiEventInjector.INSTANCE.fireAllEvents(DhApiAfterColorDepthTextureCreatedEvent.class, textureCreatedParam);
+	}
+
+	private EDhDepthBufferFormat getTargetDepthTextureFormat()
+	{
+		net.blaze3d.pipeline.RenderTarget mainRenderTarget = net.minecraft.client.Minecraft.getInstance().getMainRenderTarget();
+		if (mainRenderTarget == null)
+		{
+			return EDhDepthBufferFormat.DEPTH32F;
+		}
+
+		GpuTexture depthTexture = mainRenderTarget.getDepthTexture();
+		if (depthTexture == null)
+		{
+			return EDhDepthBufferFormat.DEPTH32F;
+		}
+
+		return switch (depthTexture.getFormat())
+		{
+			case DEPTH32 -> EDhDepthBufferFormat.DEPTH32;
+			case DEPTH24_STENCIL8 -> EDhDepthBufferFormat.DEPTH24_STENCIL8;
+			case DEPTH32F_STENCIL8 -> EDhDepthBufferFormat.DEPTH32F_STENCIL8;
+			default -> EDhDepthBufferFormat.DEPTH32F;
+		};
 	}
 	
 	
@@ -618,7 +652,7 @@ public class LodRenderer
 		//===========//
 		
 		ApiEventInjector.INSTANCE.fireAllEvents(DhApiBeforeRenderPassEvent.class, renderEventParam);
-		
+
 		if (IRIS_ACCESSOR != null)
 		{
 			// done to fix a bug with Iris where face culling isn't properly set or reverted in the MC state manager
@@ -626,6 +660,17 @@ public class LodRenderer
 			// https://github.com/IrisShaders/Iris/issues/2582
 			// https://github.com/IrisShaders/Iris/blob/1.21.9/common/src/main/java/net/irisshaders/iris/compat/dh/LodRendererEvents.java#L346
 			VulkanicAPI.setCullFaceEnabled(ctx, true);
+		}
+
+		if (!this.isCurrentDrawFramebufferComplete(ctx, opaquePass))
+		{
+			renderPlan.cleanupState().applyIfPresent(ctx);
+			if (renderWireframe)
+			{
+				VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.FILL);
+				VulkanicAPI.setCullFaceEnabled(ctx, true);
+			}
+			return;
 		}
 		
 		
@@ -663,6 +708,22 @@ public class LodRenderer
 			VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.FILL);
 			VulkanicAPI.setCullFaceEnabled(ctx, true);
 		}
+	}
+
+	private boolean isCurrentDrawFramebufferComplete(CommandContext ctx, boolean opaquePass)
+	{
+		int framebufferStatus = VulkanicAPI.checkFramebufferStatus(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER);
+		if (VulkanicAPI.isFramebufferComplete(framebufferStatus))
+		{
+			return true;
+		}
+
+		RATE_LIMITED_LOGGER.warn(
+				"Skipping Distant Horizons {} LOD pass because draw framebuffer [{}] is incomplete after render-pass setup. Status [0x{}].",
+				opaquePass ? "opaque" : "transparent",
+				VulkanicAPI.getDrawFramebufferBinding(),
+				Integer.toHexString(framebufferStatus));
+		return false;
 	}
 
 	private DhLodRenderPlan createLodRenderPlan(boolean opaquePass)

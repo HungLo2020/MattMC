@@ -73,6 +73,8 @@ import net.minecraft.world.entity.animal.horse.Mule;
 import net.minecraft.world.entity.animal.horse.SkeletonHorse;
 import net.minecraft.world.entity.animal.horse.TraderLlama;
 import net.minecraft.world.entity.animal.horse.ZombieHorse;
+import net.minecraft.world.entity.animal.nautilus.Nautilus;
+import net.minecraft.world.entity.animal.nautilus.ZombieNautilus;
 import net.minecraft.world.entity.animal.sheep.Sheep;
 import net.minecraft.world.entity.animal.sniffer.Sniffer;
 import net.minecraft.world.entity.animal.wolf.Wolf;
@@ -941,6 +943,14 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.eyeHeight(0.3F)
 			.clientTrackingRange(8)
 	);
+	public static final EntityType<Nautilus> NAUTILUS = register(
+		"nautilus",
+		EntityType.Builder.of(Nautilus::new, MobCategory.WATER_CREATURE)
+			.sized(1.4F, 0.9F)
+			.eyeHeight(0.45F)
+			.passengerAttachments(0.9F)
+			.clientTrackingRange(10)
+	);
 	public static final EntityType<Boat> OAK_BOAT = register(
 		"oak_boat",
 		EntityType.Builder.of(boatFactory(() -> Items.OAK_BOAT), MobCategory.MISC).noLootTable().sized(1.375F, 0.5625F).eyeHeight(0.5625F).clientTrackingRange(10)
@@ -1552,6 +1562,15 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<ZombieHorse> ZOMBIE_HORSE = register(
 		"zombie_horse",
 		EntityType.Builder.of(ZombieHorse::new, MobCategory.CREATURE).sized(1.3964844F, 1.6F).eyeHeight(1.52F).passengerAttachments(1.31875F).clientTrackingRange(10)
+	);
+	public static final EntityType<ZombieNautilus> ZOMBIE_NAUTILUS = register(
+		"zombie_nautilus",
+		EntityType.Builder.of(ZombieNautilus::new, MobCategory.MONSTER)
+			.sized(1.4F, 0.9F)
+			.eyeHeight(0.45F)
+			.passengerAttachments(0.9F)
+			.clientTrackingRange(10)
+			.notInPeaceful()
 	);
 	public static final EntityType<ZombieVillager> ZOMBIE_VILLAGER = register(
 		"zombie_villager",

@@ -114,6 +114,7 @@ public class Enchantments {
 	public static final ResourceKey<Enchantment> MULTISHOT = key("multishot");
 	public static final ResourceKey<Enchantment> QUICK_CHARGE = key("quick_charge");
 	public static final ResourceKey<Enchantment> PIERCING = key("piercing");
+	public static final ResourceKey<Enchantment> LUNGE = key("lunge");
 	public static final ResourceKey<Enchantment> DENSITY = key("density");
 	public static final ResourceKey<Enchantment> BREACH = key("breach");
 	public static final ResourceKey<Enchantment> WIND_BURST = key("wind_burst");
@@ -1022,6 +1023,15 @@ public class Enchantments {
 				)
 				.exclusiveWith(holderGetter2.getOrThrow(EnchantmentTags.CROSSBOW_EXCLUSIVE))
 				.withEffect(EnchantmentEffectComponents.PROJECTILE_PIERCING, new AddValue(LevelBasedValue.perLevel(1.0F)))
+		);
+		register(
+			bootstrapContext,
+			LUNGE,
+			Enchantment.enchantment(
+				Enchantment.definition(
+					holderGetter3.getOrThrow(ItemTags.LUNGE_ENCHANTABLE), 5, 3, Enchantment.dynamicCost(5, 8), Enchantment.dynamicCost(25, 8), 2, EquipmentSlotGroup.MAINHAND
+				)
+			)
 		);
 		register(
 			bootstrapContext,

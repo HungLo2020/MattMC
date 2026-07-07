@@ -3,6 +3,7 @@
     "#minecraft:skeletons",
     "#minecraft:zombies",
     "minecraft:wither",
-    "minecraft:phantom"
+    "minecraft:phantom",
+    "minecraft:zombie_nautilus"
   ]
 }

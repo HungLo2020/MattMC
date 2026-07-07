@@ -43,6 +43,8 @@ public interface EntityTypeTags {
 	TagKey<EntityType<?>> CAN_EQUIP_SADDLE = create("can_equip_saddle");
 	TagKey<EntityType<?>> CAN_EQUIP_HARNESS = create("can_equip_harness");
 	TagKey<EntityType<?>> CAN_WEAR_HORSE_ARMOR = create("can_wear_horse_armor");
+	TagKey<EntityType<?>> CAN_WEAR_NAUTILUS_ARMOR = create("can_wear_nautilus_armor");
+	TagKey<EntityType<?>> NAUTILUS_HOSTILES = create("nautilus_hostiles");
 	TagKey<EntityType<?>> FOLLOWABLE_FRIENDLY_MOBS = create("followable_friendly_mobs");
 	TagKey<EntityType<?>> CANNOT_BE_PUSHED_ONTO_BOATS = create("cannot_be_pushed_onto_boats");
 	TagKey<EntityType<?>> ACCEPTS_IRON_GOLEM_GIFT = create("accepts_iron_golem_gift");

@@ -32796,5 +32796,221 @@
                               "sounds":  [
                                              "minecraft:tacz_sounds/m4a1/m4a1_put_away"
                                          ]
-                          }
+                          },
+    "entity.baby_nautilus.ambient": {
+        "sounds": [
+            {
+                "name": "mob/turtle/idle1",
+                "pitch": 1.3,
+                "volume": 0.55
+            },
+            {
+                "name": "mob/turtle/idle2",
+                "pitch": 1.4,
+                "volume": 0.55
+            }
+        ],
+        "subtitle": "subtitles.entity.baby_nautilus.ambient"
+    },
+    "entity.baby_nautilus.death": {
+        "sounds": [
+            {
+                "name": "mob/turtle/baby/death1",
+                "pitch": 1.15
+            },
+            {
+                "name": "mob/turtle/baby/death2",
+                "pitch": 1.15
+            }
+        ],
+        "subtitle": "subtitles.entity.baby_nautilus.death"
+    },
+    "entity.baby_nautilus.hurt": {
+        "sounds": [
+            {
+                "name": "mob/turtle/baby/hurt1",
+                "pitch": 1.15
+            },
+            {
+                "name": "mob/turtle/baby/hurt2",
+                "pitch": 1.15
+            }
+        ],
+        "subtitle": "subtitles.entity.baby_nautilus.hurt"
+    },
+    "entity.nautilus.ambient": {
+        "sounds": [
+            {
+                "name": "mob/turtle/idle1",
+                "volume": 0.75
+            },
+            {
+                "name": "mob/turtle/idle2",
+                "volume": 0.7
+            },
+            {
+                "name": "mob/turtle/idle3",
+                "volume": 0.75
+            }
+        ],
+        "subtitle": "subtitles.entity.nautilus.ambient"
+    },
+    "entity.nautilus.death": {
+        "sounds": [
+            "mob/turtle/death1",
+            "mob/turtle/death2",
+            "mob/turtle/death3"
+        ],
+        "subtitle": "subtitles.entity.nautilus.death"
+    },
+    "entity.nautilus.hurt": {
+        "sounds": [
+            "mob/turtle/hurt1",
+            "mob/turtle/hurt2",
+            "mob/turtle/hurt3",
+            "mob/turtle/hurt4",
+            "mob/turtle/hurt5"
+        ],
+        "subtitle": "subtitles.entity.nautilus.hurt"
+    },
+    "entity.nautilus.swim": {
+        "sounds": [
+            {
+                "name": "mob/turtle/swim/swim1",
+                "volume": 0.6
+            },
+            {
+                "name": "mob/turtle/swim/swim2",
+                "volume": 0.35
+            },
+            {
+                "name": "mob/turtle/swim/swim3",
+                "volume": 0.3
+            }
+        ],
+        "subtitle": "subtitles.entity.nautilus.swim"
+    },
+    "entity.zombie_nautilus.ambient": {
+        "sounds": [
+            {
+                "name": "mob/drowned/water/idle1",
+                "volume": 0.85
+            },
+            {
+                "name": "mob/drowned/water/idle2",
+                "volume": 0.85
+            },
+            {
+                "name": "mob/drowned/water/idle3",
+                "volume": 0.85
+            }
+        ],
+        "subtitle": "subtitles.entity.zombie_nautilus.ambient"
+    },
+    "entity.zombie_nautilus.death": {
+        "sounds": [
+            {
+                "name": "mob/drowned/water/death1",
+                "volume": 0.85
+            },
+            {
+                "name": "mob/drowned/water/death2",
+                "volume": 0.85
+            }
+        ],
+        "subtitle": "subtitles.entity.zombie_nautilus.death"
+    },
+    "entity.zombie_nautilus.hurt": {
+        "sounds": [
+            {
+                "name": "mob/drowned/water/hurt1",
+                "volume": 0.85
+            },
+            {
+                "name": "mob/drowned/water/hurt2",
+                "volume": 0.85
+            },
+            {
+                "name": "mob/drowned/water/hurt3",
+                "volume": 0.85
+            }
+        ],
+        "subtitle": "subtitles.entity.zombie_nautilus.hurt"
+    },
+    "item.armor.equip_nautilus": {
+        "sounds": [
+            "mob/turtle/armor",
+            {
+                "name": "mob/turtle/armor",
+                "pitch": 0.85
+            },
+            {
+                "name": "mob/turtle/armor",
+                "pitch": 1.1
+            }
+        ],
+        "subtitle": "subtitles.item.armor.equip_nautilus"
+    },
+    "item.armor.unequip_nautilus": {
+        "sounds": [
+            "item/armor/unequip_wolf1",
+            "item/armor/unequip_wolf2"
+        ],
+        "subtitle": "subtitles.item.armor.unequip_nautilus"
+    },
+    "item.nautilus_saddle.equip": {
+        "sounds": [
+            "mob/horse/leather"
+        ],
+        "subtitle": "subtitles.item.nautilus_saddle.equip"
+    },
+    "item.spear.hit": {
+        "sounds": [
+            "item/trident/pierce1",
+            "item/trident/pierce2",
+            "item/trident/pierce3"
+        ],
+        "subtitle": "subtitles.item.spear.hit"
+    },
+    "item.spear.lunge": {
+        "sounds": [
+            "item/trident/riptide1",
+            "item/trident/riptide2",
+            "item/trident/riptide3"
+        ],
+        "subtitle": "subtitles.item.spear.lunge"
+    },
+    "item.spear.use": {
+        "sounds": [
+            "item/trident/throw1",
+            "item/trident/throw2"
+        ],
+        "subtitle": "subtitles.item.spear.use"
+    },
+    "item.spear_wood.hit": {
+        "sounds": [
+            {
+                "name": "item/trident/pierce1",
+                "pitch": 1.25
+            },
+            {
+                "name": "item/trident/pierce2",
+                "pitch": 1.25
+            }
+        ],
+        "subtitle": "subtitles.item.spear_wood.hit"
+    },
+    "item.spear_wood.use": {
+        "sounds": [
+            {
+                "name": "item/trident/throw1",
+                "pitch": 1.2
+            },
+            {
+                "name": "item/trident/throw2",
+                "pitch": 1.2
+            }
+        ],
+        "subtitle": "subtitles.item.spear_wood.use"
+    }
 }

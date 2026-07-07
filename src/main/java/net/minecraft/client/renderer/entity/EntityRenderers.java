@@ -85,6 +85,7 @@ public class EntityRenderers {
 		register(EntityType.ARROW, TippableArrowRenderer::new);
 		register(EntityType.TACZ_BULLET, NoopRenderer::new);
 		register(EntityType.AXOLOTL, AxolotlRenderer::new);
+		register(EntityType.NAUTILUS, NautilusRenderer::new);
 		register(EntityType.BAMBOO_CHEST_RAFT, context -> new RaftRenderer(context, ModelLayers.BAMBOO_CHEST_RAFT));
 		register(EntityType.BAMBOO_RAFT, context -> new RaftRenderer(context, ModelLayers.BAMBOO_RAFT));
 		register(EntityType.BALD_EAGLE, RenderBaldEagle::new);
@@ -316,6 +317,7 @@ public class EntityRenderers {
 		register(EntityType.ZOGLIN, ZoglinRenderer::new);
 		register(EntityType.ZOMBIE, ZombieRenderer::new);
 		register(EntityType.ZOMBIE_HORSE, context -> new UndeadHorseRenderer(context, UndeadHorseRenderer.Type.ZOMBIE));
+		register(EntityType.ZOMBIE_NAUTILUS, ZombieNautilusRenderer::new);
 		register(EntityType.ZOMBIE_VILLAGER, ZombieVillagerRenderer::new);
 		register(
 			EntityType.ZOMBIFIED_PIGLIN,

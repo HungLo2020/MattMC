@@ -446,16 +446,20 @@ public class BiomeDefaultFeatures {
 
 	public static void oceanSpawns(MobSpawnSettings.Builder builder, int i, int j, int k) {
 		builder.addSpawn(MobCategory.WATER_CREATURE, i, new MobSpawnSettings.SpawnerData(EntityType.SQUID, 1, j));
+		builder.addSpawn(MobCategory.WATER_CREATURE, 4, new MobSpawnSettings.SpawnerData(EntityType.NAUTILUS, 1, 2));
 		builder.addSpawn(MobCategory.WATER_AMBIENT, k, new MobSpawnSettings.SpawnerData(EntityType.COD, 3, 6));
 		commonSpawns(builder);
 		builder.addSpawn(MobCategory.MONSTER, 5, new MobSpawnSettings.SpawnerData(EntityType.DROWNED, 1, 1));
+		builder.addSpawn(MobCategory.MONSTER, 2, new MobSpawnSettings.SpawnerData(EntityType.ZOMBIE_NAUTILUS, 1, 1));
 	}
 
 	public static void warmOceanSpawns(MobSpawnSettings.Builder builder, int i, int j) {
 		builder.addSpawn(MobCategory.WATER_CREATURE, i, new MobSpawnSettings.SpawnerData(EntityType.SQUID, j, 4));
+		builder.addSpawn(MobCategory.WATER_CREATURE, 4, new MobSpawnSettings.SpawnerData(EntityType.NAUTILUS, 1, 2));
 		builder.addSpawn(MobCategory.WATER_AMBIENT, 25, new MobSpawnSettings.SpawnerData(EntityType.TROPICAL_FISH, 8, 8));
 		builder.addSpawn(MobCategory.WATER_CREATURE, 2, new MobSpawnSettings.SpawnerData(EntityType.DOLPHIN, 1, 2));
 		builder.addSpawn(MobCategory.MONSTER, 5, new MobSpawnSettings.SpawnerData(EntityType.DROWNED, 1, 1));
+		builder.addSpawn(MobCategory.MONSTER, 2, new MobSpawnSettings.SpawnerData(EntityType.ZOMBIE_NAUTILUS, 1, 1));
 		commonSpawns(builder);
 	}
 

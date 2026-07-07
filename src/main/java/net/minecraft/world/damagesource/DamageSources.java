@@ -204,6 +204,10 @@ public class DamageSources {
 		return this.source(DamageTypes.PLAYER_ATTACK, player);
 	}
 
+	public DamageSource spear(LivingEntity livingEntity) {
+		return this.source(DamageTypes.SPEAR, livingEntity);
+	}
+
 	public DamageSource arrow(AbstractArrow abstractArrow, @Nullable Entity entity) {
 		return this.source(DamageTypes.ARROW, abstractArrow, entity);
 	}

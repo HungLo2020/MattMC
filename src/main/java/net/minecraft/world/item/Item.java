@@ -501,6 +501,23 @@ public class Item implements FeatureElement, ItemLike, net.iris.api.v0.item.Iris
 				.stacksTo(1);
 		}
 
+		public Item.Properties nautilusArmor(ArmorMaterial armorMaterial) {
+			HolderGetter<EntityType<?>> holderGetter = BuiltInRegistries.acquireBootstrapRegistrationLookup(BuiltInRegistries.ENTITY_TYPE);
+			return this.attributes(armorMaterial.createAttributes(ArmorType.BODY))
+				.component(
+					DataComponents.EQUIPPABLE,
+					Equippable.builder(EquipmentSlot.BODY)
+						.setEquipSound(SoundEvents.ARMOR_EQUIP_NAUTILUS)
+						.setAsset(armorMaterial.assetId())
+						.setAllowedEntities(holderGetter.getOrThrow(EntityTypeTags.CAN_WEAR_NAUTILUS_ARMOR))
+						.setDamageOnHurt(false)
+						.setCanBeSheared(true)
+						.setShearingSound(SoundEvents.ARMOR_UNEQUIP_NAUTILUS)
+						.build()
+				)
+				.stacksTo(1);
+		}
+
 		public Item.Properties trimMaterial(ResourceKey<TrimMaterial> resourceKey) {
 			return this.component(DataComponents.PROVIDES_TRIM_MATERIAL, new ProvidesTrimMaterial(resourceKey));
 		}

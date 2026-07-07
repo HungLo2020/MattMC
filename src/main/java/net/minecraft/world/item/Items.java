@@ -1916,6 +1916,7 @@ public class Items {
 	public static final Item MULE_SPAWN_EGG = registerItem("mule_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MULE));
 	public static final Item MUNGUS_SPAWN_EGG = registerItem("mungus_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MUNGUS));
 	public static final Item MUDSKIPPER_SPAWN_EGG = registerItem("mudskipper_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MUDSKIPPER));
+	public static final Item NAUTILUS_SPAWN_EGG = registerItem("nautilus_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.NAUTILUS));
 	public static final Item OCELOT_SPAWN_EGG = registerItem("ocelot_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.OCELOT));
 	public static final Item ORCA_SPAWN_EGG = registerItem("orca_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ORCA));
 	public static final Item PANDA_SPAWN_EGG = registerItem("panda_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.PANDA));
@@ -2009,6 +2010,9 @@ public class Items {
 	public static final Item ZOMBIE_HORSE_SPAWN_EGG = registerItem(
 		"zombie_horse_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ZOMBIE_HORSE)
 	);
+	public static final Item ZOMBIE_NAUTILUS_SPAWN_EGG = registerItem(
+		"zombie_nautilus_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ZOMBIE_NAUTILUS)
+	);
 	public static final Item ZOMBIE_VILLAGER_SPAWN_EGG = registerItem(
 		"zombie_villager_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ZOMBIE_VILLAGER)
 	);
@@ -2039,6 +2043,13 @@ public class Items {
 			.enchantable(15)
 			.component(DataComponents.WEAPON, new Weapon(1))
 	);
+	public static final Item WOODEN_SPEAR = registerSpear("wooden_spear", ToolMaterial.WOOD, 5.0F, true, false);
+	public static final Item STONE_SPEAR = registerSpear("stone_spear", ToolMaterial.STONE, 6.0F, false, false);
+	public static final Item COPPER_SPEAR = registerSpear("copper_spear", ToolMaterial.COPPER, 6.0F, false, false);
+	public static final Item IRON_SPEAR = registerSpear("iron_spear", ToolMaterial.IRON, 7.0F, false, false);
+	public static final Item GOLDEN_SPEAR = registerSpear("golden_spear", ToolMaterial.GOLD, 5.0F, false, false);
+	public static final Item DIAMOND_SPEAR = registerSpear("diamond_spear", ToolMaterial.DIAMOND, 8.0F, false, false);
+	public static final Item NETHERITE_SPEAR = registerSpear("netherite_spear", ToolMaterial.NETHERITE, 9.0F, false, true);
 	public static final Item ITEM_FRAME = registerItem("item_frame", properties -> new ItemFrameItem(EntityType.ITEM_FRAME, properties));
 	public static final Item GLOW_ITEM_FRAME = registerItem("glow_item_frame", properties -> new ItemFrameItem(EntityType.GLOW_ITEM_FRAME, properties));
 	public static final Item FLOWER_POT = registerBlock(Blocks.FLOWER_POT);
@@ -2119,7 +2130,13 @@ public class Items {
 	public static final Item IRON_HORSE_ARMOR = registerItem("iron_horse_armor", new Item.Properties().horseArmor(ArmorMaterials.IRON));
 	public static final Item GOLDEN_HORSE_ARMOR = registerItem("golden_horse_armor", new Item.Properties().horseArmor(ArmorMaterials.GOLD));
 	public static final Item DIAMOND_HORSE_ARMOR = registerItem("diamond_horse_armor", new Item.Properties().horseArmor(ArmorMaterials.DIAMOND));
+	public static final Item NETHERITE_HORSE_ARMOR = registerItem("netherite_horse_armor", new Item.Properties().horseArmor(ArmorMaterials.NETHERITE).fireResistant());
 	public static final Item LEATHER_HORSE_ARMOR = registerItem("leather_horse_armor", new Item.Properties().horseArmor(ArmorMaterials.LEATHER));
+	public static final Item COPPER_NAUTILUS_ARMOR = registerItem("copper_nautilus_armor", new Item.Properties().nautilusArmor(ArmorMaterials.COPPER));
+	public static final Item IRON_NAUTILUS_ARMOR = registerItem("iron_nautilus_armor", new Item.Properties().nautilusArmor(ArmorMaterials.IRON));
+	public static final Item GOLDEN_NAUTILUS_ARMOR = registerItem("golden_nautilus_armor", new Item.Properties().nautilusArmor(ArmorMaterials.GOLD));
+	public static final Item DIAMOND_NAUTILUS_ARMOR = registerItem("diamond_nautilus_armor", new Item.Properties().nautilusArmor(ArmorMaterials.DIAMOND));
+	public static final Item NETHERITE_NAUTILUS_ARMOR = registerItem("netherite_nautilus_armor", new Item.Properties().nautilusArmor(ArmorMaterials.NETHERITE).fireResistant());
 	public static final Item LEAD = registerItem("lead", LeadItem::new);
 	public static final Item NAME_TAG = registerItem("name_tag", NameTagItem::new);
 	public static final Item COMMAND_BLOCK_MINECART = registerItem(
@@ -2778,6 +2795,21 @@ public class Items {
 
 	public static Item registerItem(String string) {
 		return registerItem(vanillaItemId(string), Item::new, new Item.Properties());
+	}
+
+	private static Item registerSpear(String string, ToolMaterial toolMaterial, float thrustDamage, boolean woodenSounds, boolean fireResistant) {
+		Item.Properties properties = new Item.Properties()
+			.durability(toolMaterial.durability())
+			.repairable(toolMaterial.repairItems())
+			.enchantable(toolMaterial.enchantmentValue())
+			.attributes(SpearItem.createAttributes(toolMaterial, 4.0F, -2.8F))
+			.component(DataComponents.TOOL, SpearItem.createToolProperties())
+			.component(DataComponents.WEAPON, new Weapon(1));
+		if (fireResistant) {
+			properties.fireResistant();
+		}
+
+		return registerItem(string, props -> new SpearItem(props, thrustDamage, woodenSounds), properties);
 	}
 
 	public static Item registerItem(ResourceKey<Item> resourceKey, Function<Item.Properties, Item> function) {

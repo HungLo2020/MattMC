@@ -34,6 +34,7 @@ import net.minecraft.world.entity.animal.axolotl.Axolotl;
 import net.minecraft.world.entity.animal.frog.FrogVariant;
 import net.minecraft.world.entity.animal.horse.Llama;
 import net.minecraft.world.entity.animal.horse.Variant;
+import net.minecraft.world.entity.animal.nautilus.ZombieNautilusVariant;
 import net.minecraft.world.entity.animal.wolf.WolfSoundVariant;
 import net.minecraft.world.entity.animal.wolf.WolfVariant;
 import net.minecraft.world.entity.decoration.PaintingVariant;
@@ -366,6 +367,9 @@ public class DataComponents {
 	);
 	public static final DataComponentType<Holder<CatVariant>> CAT_VARIANT = register(
 		"cat/variant", builder -> builder.persistent(CatVariant.CODEC).networkSynchronized(CatVariant.STREAM_CODEC)
+	);
+	public static final DataComponentType<Holder<ZombieNautilusVariant>> ZOMBIE_NAUTILUS_VARIANT = register(
+		"zombie_nautilus/variant", builder -> builder.persistent(ZombieNautilusVariant.CODEC).networkSynchronized(ZombieNautilusVariant.STREAM_CODEC)
 	);
 	public static final DataComponentType<DyeColor> CAT_COLLAR = register(
 		"cat/collar", builder -> builder.persistent(DyeColor.CODEC).networkSynchronized(DyeColor.STREAM_CODEC)

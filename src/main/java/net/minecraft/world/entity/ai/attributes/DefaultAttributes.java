@@ -45,6 +45,8 @@ import net.minecraft.world.entity.animal.horse.AbstractHorse;
 import net.minecraft.world.entity.animal.horse.Llama;
 import net.minecraft.world.entity.animal.horse.SkeletonHorse;
 import net.minecraft.world.entity.animal.horse.ZombieHorse;
+import net.minecraft.world.entity.animal.nautilus.AbstractNautilus;
+import net.minecraft.world.entity.animal.nautilus.ZombieNautilus;
 import net.minecraft.world.entity.animal.sheep.Sheep;
 import net.minecraft.world.entity.animal.sniffer.Sniffer;
 import net.minecraft.world.entity.animal.wolf.Wolf;
@@ -114,6 +116,7 @@ public class DefaultAttributes {
 		.put(EntityType.ARMADILLO, Armadillo.createAttributes().build())
 		.put(EntityType.ARMOR_STAND, ArmorStand.createAttributes().build())
 		.put(EntityType.AXOLOTL, Axolotl.createAttributes().build())
+		.put(EntityType.NAUTILUS, AbstractNautilus.createAttributes().build())
 		.put(EntityType.BALD_EAGLE, EntityBaldEagle.bakeAttributes().build())
 		.put(EntityType.BAT, Bat.createAttributes().build())
 		.put(EntityType.BEE, Bee.createAttributes().build())
@@ -149,6 +152,7 @@ public class DefaultAttributes {
 		.put(EntityType.DOLPHIN, Dolphin.createAttributes().build())
 		.put(EntityType.DONKEY, AbstractChestedHorse.createBaseChestedHorseAttributes().build())
 		.put(EntityType.DROWNED, Drowned.createAttributes().build())
+		.put(EntityType.ZOMBIE_NAUTILUS, ZombieNautilus.createAttributes().build())
 		.put(EntityType.ELEPHANT, EntityElephant.bakeAttributes().build())
 		.put(EntityType.EMU, EntityEmu.createAttributes().build())
 		.put(EntityType.ELDER_GUARDIAN, ElderGuardian.createAttributes().build())

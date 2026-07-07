@@ -214,6 +214,10 @@ public class LodRendererEvents {
 						event.cancelEvent();
 					} else if (getInstance().shouldOverride) {
 						CommandContext ctx = VulkanicAPI.getCommandContext();
+						if (!VulkanicAPI.isFramebufferComplete(VulkanicAPI.checkFramebufferStatus(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER))) {
+							event.cancelEvent();
+							return;
+						}
 						VulkanicAPI.clearDepthBufferWithMacosWorkaround(ctx);
 						event.cancelEvent();
 					}

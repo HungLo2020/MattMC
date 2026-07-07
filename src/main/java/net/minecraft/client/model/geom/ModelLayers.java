@@ -26,6 +26,10 @@ public class ModelLayers {
 	public static final ModelLayerLocation ARROW = register("arrow");
 	public static final ModelLayerLocation AXOLOTL = register("axolotl");
 	public static final ModelLayerLocation AXOLOTL_BABY = register("axolotl_baby");
+	public static final ModelLayerLocation NAUTILUS = register("nautilus");
+	public static final ModelLayerLocation NAUTILUS_ARMOR = register("nautilus", "armor");
+	public static final ModelLayerLocation NAUTILUS_BABY = register("nautilus_baby");
+	public static final ModelLayerLocation NAUTILUS_SADDLE = register("nautilus", "saddle");
 	public static final ModelLayerLocation BAMBOO_CHEST_RAFT = register("chest_boat/bamboo");
 	public static final ModelLayerLocation BAMBOO_RAFT = register("boat/bamboo");
 	public static final ModelLayerLocation STANDING_BANNER = register("standing_banner");
@@ -292,6 +296,8 @@ public class ModelLayers {
 	public static final ModelLayerLocation ZOMBIE_HORSE_BABY = register("zombie_horse_baby");
 	public static final ModelLayerLocation ZOMBIE_HORSE_SADDLE = register("zombie_horse", "saddle");
 	public static final ModelLayerLocation ZOMBIE_HORSE_BABY_SADDLE = register("zombie_horse_baby", "saddle");
+	public static final ModelLayerLocation ZOMBIE_NAUTILUS = register("zombie_nautilus");
+	public static final ModelLayerLocation ZOMBIE_NAUTILUS_CORAL = register("zombie_nautilus", "coral");
 	public static final ArmorModelSet<ModelLayerLocation> ZOMBIE_ARMOR = registerArmorSet("zombie");
 	public static final ModelLayerLocation ZOMBIE_VILLAGER = register("zombie_villager");
 	public static final ModelLayerLocation ZOMBIE_VILLAGER_NO_HAT = register("zombie_villager_no_hat");

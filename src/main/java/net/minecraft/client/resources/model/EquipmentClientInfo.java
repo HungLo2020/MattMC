@@ -123,6 +123,8 @@ public record EquipmentClientInfo(Map<EquipmentClientInfo.LayerType, List<Equipm
 		MULE_SADDLE("mule_saddle"),
 		ZOMBIE_HORSE_SADDLE("zombie_horse_saddle"),
 		SKELETON_HORSE_SADDLE("skeleton_horse_saddle"),
+		NAUTILUS_BODY("nautilus_body"),
+		NAUTILUS_SADDLE("nautilus_saddle"),
 		HAPPY_GHAST_BODY("happy_ghast_body");
 
 		public static final Codec<EquipmentClientInfo.LayerType> CODEC = StringRepresentable.fromEnum(EquipmentClientInfo.LayerType::values);

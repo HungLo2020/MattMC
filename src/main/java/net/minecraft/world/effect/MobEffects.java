@@ -124,6 +124,7 @@ public class MobEffects {
 	public static final Holder<MobEffect> INFESTED = register(
 		"infested", new InfestedMobEffect(MobEffectCategory.HARMFUL, 9214860, 0.1F, randomSource -> Mth.randomBetweenInclusive(randomSource, 1, 2))
 	);
+	public static final Holder<MobEffect> BREATH_OF_THE_NAUTILUS = register("breath_of_the_nautilus", new MobEffect(MobEffectCategory.BENEFICIAL, 65518));
 	
 	// AlexsMobs custom effects
 	public static final Holder<MobEffect> ORCAS_MIGHT = register(

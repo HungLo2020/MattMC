@@ -9,6 +9,16 @@
       {
         "texture": "minecraft:netherite"
       }
+    ],
+    "nautilus_body": [
+      {
+        "texture": "minecraft:netherite"
+      }
+    ],
+    "horse_body": [
+      {
+        "texture": "minecraft:netherite"
+      }
     ]
   }
 }

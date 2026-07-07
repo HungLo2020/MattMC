@@ -37,6 +37,7 @@ public class DHCompatInternal {
 	private GlFramebuffer dhShadowFramebuffer;
 	private DhFrameBufferWrapper dhShadowFramebufferWrapper;
 	private DepthTexture depthTexNoTranslucent;
+	private DepthBufferFormat dhDepthFormat = DepthBufferFormat.DEPTH32F;
 	private GlFramebuffer depthTexNoTranslucentFramebuffer;
 	private boolean translucentDepthDirty;
 	private int storedDepthTex = -1;
@@ -179,12 +180,13 @@ public class DHCompatInternal {
 		}
 		if (storedDepthTex != depthTex && dhTerrainFramebuffer != null) {
 			storedDepthTex = depthTex;
-			dhTerrainFramebuffer.addDepthAttachmentBypass(depthTex);
+			boolean combinedStencil = isMainDepthTextureCombinedStencil();
+			dhTerrainFramebuffer.addDepthAttachmentBypass(depthTex, combinedStencil);
 			if (dhWaterFramebuffer != null) {
-				dhWaterFramebuffer.addDepthAttachmentBypass(depthTex);
+				dhWaterFramebuffer.addDepthAttachmentBypass(depthTex, combinedStencil);
 			}
 			if (dhGenericFramebuffer != null) {
-				dhGenericFramebuffer.addDepthAttachmentBypass(depthTex);
+				dhGenericFramebuffer.addDepthAttachmentBypass(depthTex, combinedStencil);
 			}
 		}
 	}
@@ -201,10 +203,29 @@ public class DHCompatInternal {
 
 		translucentDepthDirty = true;
 
-		depthTexNoTranslucent = new DepthTexture("DH depth tex", width, height, DepthBufferFormat.DEPTH32F);
+		dhDepthFormat = getMainDepthTextureFormat();
+		depthTexNoTranslucent = new DepthTexture("DH depth tex", width, height, dhDepthFormat);
 		depthTexNoTranslucentFramebuffer = new GlFramebuffer();
-		depthTexNoTranslucentFramebuffer.addDepthAttachmentBypass(depthTexNoTranslucent.getTextureId());
+		depthTexNoTranslucentFramebuffer.addDepthAttachmentBypass(depthTexNoTranslucent.getTextureId(), dhDepthFormat.isCombinedStencil());
 		depthTexNoTranslucentFramebuffer.noDrawBuffers();
+	}
+
+	private static DepthBufferFormat getMainDepthTextureFormat() {
+		net.blaze3d.pipeline.RenderTarget mainRenderTarget = Minecraft.getInstance().getMainRenderTarget();
+		if (mainRenderTarget == null || mainRenderTarget.getDepthTexture() == null) {
+			return DepthBufferFormat.DEPTH32F;
+		}
+
+		return switch (mainRenderTarget.getDepthTexture().getFormat()) {
+			case DEPTH32 -> DepthBufferFormat.DEPTH32;
+			case DEPTH24_STENCIL8 -> DepthBufferFormat.DEPTH24_STENCIL8;
+			case DEPTH32F_STENCIL8 -> DepthBufferFormat.DEPTH32F_STENCIL8;
+			default -> DepthBufferFormat.DEPTH32F;
+		};
+	}
+
+	private static boolean isMainDepthTextureCombinedStencil() {
+		return getMainDepthTextureFormat().isCombinedStencil();
 	}
 
 	public void clear() {
@@ -287,7 +308,7 @@ public class DHCompatInternal {
 			}
 		}
 
-		DepthCopyStrategy strategy = DepthCopyStrategy.fastestDepthSnapshot(false);
+		DepthCopyStrategy strategy = DepthCopyStrategy.fastestDepthSnapshot(dhDepthFormat.isCombinedStencil());
 		GlFramebuffer destFramebuffer = strategy.needsDestFramebuffer() ? depthTexNoTranslucentFramebuffer : null;
 		strategy.copy(dhTerrainFramebuffer, storedDepthTex, destFramebuffer, depthTexNoTranslucent.getTextureId(), width, height);
 	}

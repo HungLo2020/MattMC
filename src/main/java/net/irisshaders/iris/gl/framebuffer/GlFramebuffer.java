@@ -51,9 +51,18 @@ public class GlFramebuffer extends GlResource {
 	}
 
 	public void addDepthAttachmentBypass(int texture) {
+		addDepthAttachmentBypass(texture, false);
+	}
+
+	public void addDepthAttachmentBypass(int texture, boolean combinedStencil) {
 		int fb = getGlId();
 
-		IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_DEPTH_ATTACHMENT, texture, 0);
+		IrisRenderSystem.framebufferTexture2D(
+			fb,
+			combinedStencil ? VulkanicAPI.GL_DEPTH_STENCIL_ATTACHMENT : VulkanicAPI.GL_DEPTH_ATTACHMENT,
+			texture,
+			0
+		);
 
 		this.hasDepthAttachment = true;
 		this.depthAttachmentTexture = texture;
