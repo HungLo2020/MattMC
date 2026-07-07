@@ -81,6 +81,15 @@ public class VulkanBackendFramebufferCompatibilityTest {
 		assertFalse(descriptorLayoutHelper.contains("texture.aspectMask == VK10.VK_IMAGE_ASPECT_DEPTH_BIT"),
 			"A combined depth/stencil image still has a depth aspect; equality would misclassify it as color");
 
+		String sampleTransitionHelper = source.substring(
+			source.indexOf("private void transitionLegacyTextureToSampleLayout(@Nullable LegacyTextureObject texture,"),
+			source.indexOf("private void transitionLegacyTextureToStorageImageLayout")
+		);
+		assertTrue(sampleTransitionHelper.contains("hasDepthAspect(texture)"),
+			"Sampler layout transitions must classify combined depth/stencil images the same way descriptor writes do");
+		assertFalse(sampleTransitionHelper.contains("texture.aspectMask == VK10.VK_IMAGE_ASPECT_DEPTH_BIT"),
+			"A depth/stencil texture must not be transitioned toward color shader-read layout before sampling");
+
 		String descriptorViewHelper = source.substring(
 			source.indexOf("private long descriptorImageViewHandleForSampler"),
 			source.indexOf("private boolean shouldUseFeedbackLoopLayoutForSampling")

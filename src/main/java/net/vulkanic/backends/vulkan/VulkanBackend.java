@@ -12551,7 +12551,7 @@ void main() {
 
             int targetLayout = shouldUseFeedbackLoopLayoutForSampling(texture)
                 ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-                : (texture.aspectMask == VK10.VK_IMAGE_ASPECT_DEPTH_BIT
+                : (hasDepthAspect(texture)
                     ? VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
                     : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
