@@ -154,10 +154,10 @@ public class SpearItem extends Item {
 
 		this.postPiercingAttack(serverLevel, itemStack, livingEntity);
 		if (hitSomething) {
-			serverLevel.playSound(null, livingEntity, this.hitSound(), livingEntity.getSoundSource(), 1.0F, 1.0F);
+			serverLevel.playSound(null, livingEntity.getX(), livingEntity.getY(), livingEntity.getZ(), this.hitSound(), livingEntity.getSoundSource(), 1.0F, 1.0F);
 		}
 
-		serverLevel.playSound(null, livingEntity, this.useSound(), livingEntity.getSoundSource(), 1.0F, 1.0F);
+		serverLevel.playSound(null, livingEntity.getX(), livingEntity.getY(), livingEntity.getZ(), this.useSound(), livingEntity.getSoundSource(), 1.0F, 1.0F);
 		livingEntity.swing(livingEntity.getUsedItemHand());
 		return true;
 	}
@@ -285,7 +285,7 @@ public class SpearItem extends Item {
 			}
 
 			itemStack.hurtAndBreak(1, livingEntity, livingEntity.getUsedItemHand());
-			serverLevel.playSound(null, livingEntity, SoundEvents.SPEAR_LUNGE, SoundSource.PLAYERS, 1.0F, 1.0F);
+			serverLevel.playSound(null, livingEntity.getX(), livingEntity.getY(), livingEntity.getZ(), this.lungeSound(level), SoundSource.PLAYERS, 1.0F, 1.0F);
 		}
 	}
 
@@ -334,11 +334,19 @@ public class SpearItem extends Item {
 		return distance >= minReach - HITBOX_MARGIN && distance <= maxReach + HITBOX_MARGIN;
 	}
 
-	private SoundEvent useSound() {
+	private Holder<SoundEvent> lungeSound(int level) {
+		return switch (Math.min(level, 3)) {
+			case 1 -> SoundEvents.LUNGE_1;
+			case 2 -> SoundEvents.LUNGE_2;
+			default -> SoundEvents.LUNGE_3;
+		};
+	}
+
+	private Holder<SoundEvent> useSound() {
 		return this.woodenSounds ? SoundEvents.SPEAR_WOOD_USE : SoundEvents.SPEAR_USE;
 	}
 
-	private SoundEvent hitSound() {
+	private Holder<SoundEvent> hitSound() {
 		return this.woodenSounds ? SoundEvents.SPEAR_WOOD_HIT : SoundEvents.SPEAR_HIT;
 	}
 

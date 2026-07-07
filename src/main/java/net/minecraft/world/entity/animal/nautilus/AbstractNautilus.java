@@ -120,6 +120,7 @@ public abstract class AbstractNautilus extends TamableAnimal {
 				itemStack.shrink(1);
 			}
 
+			this.playEatingSound();
 			if (!this.level().isClientSide()) {
 				if (this.random.nextInt(3) == 0) {
 					this.tame(player);
@@ -138,6 +139,7 @@ public abstract class AbstractNautilus extends TamableAnimal {
 			}
 
 			this.heal(4.0F);
+			this.playEatingSound();
 			return InteractionResult.SUCCESS;
 		}
 
@@ -179,7 +181,11 @@ public abstract class AbstractNautilus extends TamableAnimal {
 
 	@Override
 	public Holder<SoundEvent> getEquipSound(EquipmentSlot equipmentSlot, ItemStack itemStack, Equippable equippable) {
-		return equipmentSlot == EquipmentSlot.SADDLE ? SoundEvents.NAUTILUS_SADDLE : super.getEquipSound(equipmentSlot, itemStack, equippable);
+		if (equipmentSlot == EquipmentSlot.SADDLE) {
+			return this.isUnderWater() ? SoundEvents.NAUTILUS_SADDLE_UNDERWATER_EQUIP : SoundEvents.NAUTILUS_SADDLE_EQUIP;
+		}
+
+		return super.getEquipSound(equipmentSlot, itemStack, equippable);
 	}
 
 	@Nullable
@@ -284,6 +290,14 @@ public abstract class AbstractNautilus extends TamableAnimal {
 	@Override
 	protected SoundEvent getSwimSound() {
 		return SoundEvents.NAUTILUS_SWIM;
+	}
+
+	protected SoundEvent getDashSound() {
+		return null;
+	}
+
+	protected SoundEvent getDashReadySound() {
+		return null;
 	}
 
 	protected SoundEvent getFlopSound() {

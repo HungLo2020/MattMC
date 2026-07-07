@@ -178,16 +178,36 @@ public class ZombieNautilus extends AbstractNautilus {
 
 	@Override
 	protected SoundEvent getAmbientSound() {
-		return SoundEvents.ZOMBIE_NAUTILUS_AMBIENT;
+		return this.isUnderWater() ? SoundEvents.ZOMBIE_NAUTILUS_AMBIENT : SoundEvents.ZOMBIE_NAUTILUS_AMBIENT_ON_LAND;
 	}
 
 	@Override
 	protected SoundEvent getHurtSound(net.minecraft.world.damagesource.DamageSource damageSource) {
-		return SoundEvents.ZOMBIE_NAUTILUS_HURT;
+		return this.isUnderWater() ? SoundEvents.ZOMBIE_NAUTILUS_HURT : SoundEvents.ZOMBIE_NAUTILUS_HURT_ON_LAND;
 	}
 
 	@Override
 	protected SoundEvent getDeathSound() {
-		return SoundEvents.ZOMBIE_NAUTILUS_DEATH;
+		return this.isUnderWater() ? SoundEvents.ZOMBIE_NAUTILUS_DEATH : SoundEvents.ZOMBIE_NAUTILUS_DEATH_ON_LAND;
+	}
+
+	@Override
+	protected SoundEvent getDashSound() {
+		return this.isUnderWater() ? SoundEvents.ZOMBIE_NAUTILUS_DASH : SoundEvents.ZOMBIE_NAUTILUS_DASH_ON_LAND;
+	}
+
+	@Override
+	protected SoundEvent getDashReadySound() {
+		return this.isUnderWater() ? SoundEvents.ZOMBIE_NAUTILUS_DASH_READY : SoundEvents.ZOMBIE_NAUTILUS_DASH_READY_ON_LAND;
+	}
+
+	@Override
+	protected void playEatingSound() {
+		this.makeSound(SoundEvents.ZOMBIE_NAUTILUS_EAT);
+	}
+
+	@Override
+	protected SoundEvent getSwimSound() {
+		return SoundEvents.ZOMBIE_NAUTILUS_SWIM;
 	}
 }
