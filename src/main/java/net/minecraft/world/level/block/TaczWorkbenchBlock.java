@@ -20,6 +20,7 @@ import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.level.pathfinder.PathComputationType;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 
@@ -66,7 +67,12 @@ public abstract class TaczWorkbenchBlock extends Block {
 
 	@Override
 	protected boolean useShapeForLightOcclusion(BlockState state) {
-		return true;
+		return false;
+	}
+
+	@Override
+	protected VoxelShape getOcclusionShape(BlockState state) {
+		return Shapes.empty();
 	}
 
 	@Override

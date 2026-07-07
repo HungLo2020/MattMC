@@ -13,6 +13,9 @@ import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.TaczGunDefinitions;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.shapes.Shapes;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -95,6 +98,16 @@ class TaczWorkbenchRecipeCoverageTest {
 		}
 		assertResourceExists("assets/minecraft/textures/gui/gun_smith_table.png");
 		assertResourceExists("assets/minecraft/textures/gui/gun_smith_table_side.png");
+	}
+
+	@Test
+	void workbenchBlocksDoNotOccludeNeighborFaces() {
+		for (Block block : Set.of(Blocks.GUN_SMITH_TABLE, Blocks.AMMO_WORKBENCH, Blocks.ATTACHMENT_WORKBENCH)) {
+			var state = block.defaultBlockState();
+			assertFalse(state.canOcclude(), block + " should not cull neighboring block faces");
+			assertFalse(state.useShapeForLightOcclusion(), block + " should not use its collision shape for occlusion");
+			assertEquals(Shapes.empty(), state.getOcclusionShape(), block + " should expose no occlusion shape");
+		}
 	}
 
 	private static void assertRecipeCoverage(TaczWorkbenchRecipe.Category category, int expectedCount) {

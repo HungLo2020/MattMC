@@ -6810,17 +6810,17 @@ public class Blocks {
 	public static final Block GUN_SMITH_TABLE = register(
 		"gun_smith_table",
 		TaczWorkbenchBlock.GunSmithTable::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASEDRUM).strength(2.5F, 6.0F).sound(SoundType.WOOD)
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASEDRUM).strength(2.5F, 6.0F).sound(SoundType.WOOD).noOcclusion()
 	);
 	public static final Block AMMO_WORKBENCH = register(
 		"ammo_workbench",
 		TaczWorkbenchBlock.AmmoWorkbench::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASEDRUM).strength(2.5F, 6.0F).sound(SoundType.WOOD)
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASEDRUM).strength(2.5F, 6.0F).sound(SoundType.WOOD).noOcclusion()
 	);
 	public static final Block ATTACHMENT_WORKBENCH = register(
 		"attachment_workbench",
 		TaczWorkbenchBlock.AttachmentWorkbench::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASEDRUM).strength(2.5F, 6.0F).sound(SoundType.WOOD)
+		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASEDRUM).strength(2.5F, 6.0F).sound(SoundType.WOOD).noOcclusion()
 	);
 	public static final Block PALE_MOSS_BLOCK = register(
 		"pale_moss_block",
