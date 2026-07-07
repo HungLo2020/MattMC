@@ -17,6 +17,7 @@ public enum VulkanicTextureParameterName {
     BASE_LEVEL,
     MAX_LEVEL,
     COMPARE_MODE,
+    DEPTH_STENCIL_TEXTURE_MODE,
     SWIZZLE_RGBA;
 
     /**
@@ -35,6 +36,7 @@ public enum VulkanicTextureParameterName {
             case BASE_LEVEL -> VulkanicAPI.GL_TEXTURE_BASE_LEVEL;
             case MAX_LEVEL -> VulkanicAPI.GL_TEXTURE_MAX_LEVEL;
             case COMPARE_MODE -> VulkanicAPI.GL_TEXTURE_COMPARE_MODE;
+            case DEPTH_STENCIL_TEXTURE_MODE -> VulkanicAPI.GL_DEPTH_STENCIL_TEXTURE_MODE;
             case SWIZZLE_RGBA -> VulkanicAPI.GL_TEXTURE_SWIZZLE_RGBA;
         };
     }
@@ -55,6 +57,7 @@ public enum VulkanicTextureParameterName {
             case VulkanicAPI.GL_TEXTURE_BASE_LEVEL -> Optional.of(BASE_LEVEL);
             case VulkanicAPI.GL_TEXTURE_MAX_LEVEL -> Optional.of(MAX_LEVEL);
             case VulkanicAPI.GL_TEXTURE_COMPARE_MODE -> Optional.of(COMPARE_MODE);
+            case VulkanicAPI.GL_DEPTH_STENCIL_TEXTURE_MODE -> Optional.of(DEPTH_STENCIL_TEXTURE_MODE);
             case VulkanicAPI.GL_TEXTURE_SWIZZLE_RGBA -> Optional.of(SWIZZLE_RGBA);
             default -> Optional.empty();
         };

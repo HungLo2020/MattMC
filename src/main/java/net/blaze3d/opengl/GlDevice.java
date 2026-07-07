@@ -73,6 +73,11 @@ public class GlDevice implements GpuDevice {
 		return VulkanicAPI.getCommandContext();
 	}
 
+	private static boolean supportsDepthStencilTextureMode() {
+		org.lwjgl.opengl.GLCapabilities capabilities = org.lwjgl.opengl.GL.getCapabilities();
+		return capabilities.OpenGL43 || capabilities.GL_ARB_stencil_texturing;
+	}
+
 	public GlDevice(long l, int i, boolean bl, BiFunction<ResourceLocation, ShaderType, String> biFunction, boolean bl2) {
 		GLFW.glfwMakeContextCurrent(l);
 		net.vulkanic.GraphicsCapabilities gLCapabilities = net.vulkanic.VulkanicAPI.initializeGraphicsCapabilities();
@@ -157,6 +162,9 @@ public class GlDevice implements GpuDevice {
 			net.vulkanic.VulkanicAPI.setTextureMaxLod(ctx, textureTarget, m - 1);
 			if (textureFormat.hasDepthAspect()) {
 				net.vulkanic.VulkanicAPI.disableTextureCompareMode(ctx, textureTarget);
+			}
+			if (textureFormat.hasStencilAspect() && supportsDepthStencilTextureMode()) {
+				net.vulkanic.VulkanicAPI.useDepthAspectForDepthStencilTexture(ctx, textureTarget);
 			}
 
 			if (bl) {

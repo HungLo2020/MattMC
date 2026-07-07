@@ -8,7 +8,6 @@ import net.blaze3d.textures.TextureFormat;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
 import net.irisshaders.iris.gl.texture.DepthBufferFormat;
 import net.irisshaders.iris.gl.texture.DepthCopyStrategy;
-import net.irisshaders.iris.platform.IrisPlatformHelpers;
 import net.irisshaders.iris.shaderpack.properties.PackDirectives;
 import net.irisshaders.iris.shaderpack.properties.PackRenderTargetDirectives;
 import net.vulkanic.VulkanicAPI;
@@ -50,7 +49,7 @@ public class RenderTargets {
 
 		this.currentDepthTexture = depthTexture;
 		this.currentDepthFormat = depthFormat;
-		this.copyStrategy = DepthCopyStrategy.fastestDepthSnapshot(currentDepthFormat.isCombinedStencil());
+		this.copyStrategy = DepthCopyStrategy.fastestDepthSnapshot(false);
 
 		this.cachedWidth = width;
 		this.cachedHeight = height;
@@ -64,10 +63,10 @@ public class RenderTargets {
 
 		this.depthSourceFb = createFramebufferWritingToMain(new int[]{0});
 
-		TextureFormat mojangDepthFormat = IrisPlatformHelpers.getInstance().mojangDepthFormat(depthFormat);
+		TextureFormat snapshotDepthFormat = TextureFormat.DEPTH32;
 
-		this.noTranslucents = VulkanicAPI.createTexture("Depth / Opaque", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, mojangDepthFormat, width, height, 1, 1);
-		this.noHand = VulkanicAPI.createTexture("Depth / Before Hand", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, mojangDepthFormat, width, height, 1, 1);
+		this.noTranslucents = VulkanicAPI.createTexture("Depth / Opaque", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, snapshotDepthFormat, width, height, 1, 1);
+		this.noHand = VulkanicAPI.createTexture("Depth / Before Hand", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, snapshotDepthFormat, width, height, 1, 1);
 
 		this.noTranslucents.setTextureFilter(FilterMode.NEAREST, false);
 		this.noHand.setTextureFilter(FilterMode.NEAREST, false);
@@ -166,8 +165,7 @@ public class RenderTargets {
 
 		if (depthFormatChanged) {
 			currentDepthFormat = newDepthFormat;
-			// Might need a new copy strategy
-			copyStrategy = DepthCopyStrategy.fastestDepthSnapshot(currentDepthFormat.isCombinedStencil());
+			copyStrategy = DepthCopyStrategy.fastestDepthSnapshot(false);
 		}
 
 		if (depthFormatChanged || sizeChanged) {
@@ -175,8 +173,8 @@ public class RenderTargets {
 			noTranslucents.close();
 			noHand.close();
 
-			this.noTranslucents = VulkanicAPI.createTexture("Depth / Opaque", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, newDepthTextureId.getFormat(), newWidth, newHeight, 1, 1);
-			this.noHand = VulkanicAPI.createTexture("Depth / Before Hand", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, newDepthTextureId.getFormat(), newWidth, newHeight, 1, 1);
+			this.noTranslucents = VulkanicAPI.createTexture("Depth / Opaque", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, TextureFormat.DEPTH32, newWidth, newHeight, 1, 1);
+			this.noHand = VulkanicAPI.createTexture("Depth / Before Hand", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, TextureFormat.DEPTH32, newWidth, newHeight, 1, 1);
 			this.noTranslucents.setTextureFilter(FilterMode.NEAREST, false);
 			this.noHand.setTextureFilter(FilterMode.NEAREST, false);
 			this.noTranslucents.setAddressMode(AddressMode.CLAMP_TO_EDGE);

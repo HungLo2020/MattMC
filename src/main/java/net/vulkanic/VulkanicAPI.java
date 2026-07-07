@@ -649,6 +649,7 @@ public class VulkanicAPI {
     public static final int GL_DEPTH_STENCIL = 0x84F9;
     public static final int GL_DEPTH24_STENCIL8 = 0x88F0;
     public static final int GL_DEPTH32F_STENCIL8 = 0x8CAD;
+    public static final int GL_DEPTH_STENCIL_TEXTURE_MODE = 0x90EA;
     
     // OpenGL Constants - Pixel Types (Additional)
     public static final int GL_UNSIGNED_BYTE_3_3_2 = 0x8032;
@@ -1985,6 +1986,10 @@ public class VulkanicAPI {
      */
     public static void disableTextureCompareMode(CommandContext ctx, VulkanicTextureTarget target) {
         setTextureParameter(ctx, target, VulkanicTextureParameterName.COMPARE_MODE, GL_NONE);
+    }
+
+    public static void useDepthAspectForDepthStencilTexture(CommandContext ctx, VulkanicTextureTarget target) {
+        setTextureParameter(ctx, target, VulkanicTextureParameterName.DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
     }
     
     /**

@@ -64,6 +64,11 @@ public class OpenGLBackend implements GraphicsBackend {
     private volatile String backendRendererName = "unknown";
     private volatile String backendVersionName = "unknown";
 
+    private static boolean supportsDepthStencilTextureMode() {
+        org.lwjgl.opengl.GLCapabilities capabilities = org.lwjgl.opengl.GL.getCapabilities();
+        return capabilities.OpenGL43 || capabilities.GL_ARB_stencil_texturing;
+    }
+
     /**
      * Registers the GlDevice with this backend.
      * Called from GlDevice's constructor after the device is fully initialized.
@@ -2251,6 +2256,7 @@ public class OpenGLBackend implements GraphicsBackend {
             case BASE_LEVEL -> VulkanicAPI.GL_TEXTURE_BASE_LEVEL;
             case MAX_LEVEL -> VulkanicAPI.GL_TEXTURE_MAX_LEVEL;
             case COMPARE_MODE -> VulkanicAPI.GL_TEXTURE_COMPARE_MODE;
+            case DEPTH_STENCIL_TEXTURE_MODE -> VulkanicAPI.GL_DEPTH_STENCIL_TEXTURE_MODE;
             case SWIZZLE_RGBA -> VulkanicAPI.GL_TEXTURE_SWIZZLE_RGBA;
         };
     }
@@ -3297,6 +3303,9 @@ public class OpenGLBackend implements GraphicsBackend {
         int[] internalFmt = toGlInternalFormat(format);
         int externalFmt = toGlExternalFormat(format);
         int glType = toGlType(format);
+        if (format.hasStencilAspect() && supportsDepthStencilTextureMode()) {
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, VulkanicAPI.GL_DEPTH_STENCIL_TEXTURE_MODE, VulkanicAPI.GL_DEPTH_COMPONENT);
+        }
         for (int mip = 0; mip < mipLevels; mip++) {
             GL11.glTexImage2D(GL11.GL_TEXTURE_2D, mip, internalFmt[0], Math.max(1, width >> mip),
                 Math.max(1, height >> mip), 0, externalFmt, glType, (java.nio.ByteBuffer) null);

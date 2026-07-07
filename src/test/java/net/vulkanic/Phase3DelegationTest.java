@@ -366,4 +366,57 @@ public class Phase3DelegationTest {
         assertTrue(source.contains("VulkanicAPI.GL_DEPTH_ATTACHMENT"),
             "OpenGLBackend.beginRenderPass must keep depth-only textures on GL_DEPTH_ATTACHMENT");
     }
+
+    @Test
+    public void testOpenGLDepthStencilTexturesSampleDepthAspect() throws java.io.IOException {
+        java.nio.file.Path glDevice = java.nio.file.Paths.get(System.getProperty("user.dir"))
+            .resolve("src/main/java/net/blaze3d/opengl/GlDevice.java");
+        java.nio.file.Path vulkanicApi = java.nio.file.Paths.get(System.getProperty("user.dir"))
+            .resolve("src/main/java/net/vulkanic/VulkanicAPI.java");
+        java.nio.file.Path parameterName = java.nio.file.Paths.get(System.getProperty("user.dir"))
+            .resolve("src/main/java/net/vulkanic/VulkanicTextureParameterName.java");
+        String glDeviceSource = java.nio.file.Files.readString(glDevice);
+        String vulkanicApiSource = java.nio.file.Files.readString(vulkanicApi);
+        String parameterNameSource = java.nio.file.Files.readString(parameterName);
+
+        assertTrue(vulkanicApiSource.contains("GL_DEPTH_STENCIL_TEXTURE_MODE = 0x90EA"),
+            "VulkanicAPI must expose GL_DEPTH_STENCIL_TEXTURE_MODE for combined depth-stencil textures");
+        assertTrue(parameterNameSource.contains("DEPTH_STENCIL_TEXTURE_MODE"),
+            "Depth-stencil texture mode must be represented by the typed texture-parameter API");
+        assertTrue(glDeviceSource.contains("textureFormat.hasStencilAspect()"),
+            "GlDevice texture creation must detect combined depth-stencil formats");
+        assertTrue(glDeviceSource.contains("supportsDepthStencilTextureMode()"),
+            "Depth-stencil texture mode must be guarded by the OpenGL capability/extension that defines it");
+        assertTrue(glDeviceSource.contains("useDepthAspectForDepthStencilTexture(ctx, textureTarget)"),
+            "OpenGL depth-stencil textures must be configured to sample their depth aspect");
+    }
+
+    @Test
+    public void testMainTargetKeepsStencilForTaczScopes() throws java.io.IOException {
+        java.nio.file.Path mainTarget = java.nio.file.Paths.get(System.getProperty("user.dir"))
+            .resolve("src/main/java/net/blaze3d/pipeline/MainTarget.java");
+        String source = java.nio.file.Files.readString(mainTarget);
+
+        assertTrue(source.contains("TextureFormat.DEPTH24_STENCIL8"),
+            "MainTarget must keep a stencil-capable depth attachment for TACZ scope masking");
+    }
+
+    @Test
+    public void testIrisWorldDepthSnapshotsStayDepthOnlyWhenMainTargetHasStencil() throws java.io.IOException {
+        java.nio.file.Path renderTargets = java.nio.file.Paths.get(System.getProperty("user.dir"))
+            .resolve("src/main/java/net/irisshaders/iris/targets/RenderTargets.java");
+        java.nio.file.Path depthCopyStrategy = java.nio.file.Paths.get(System.getProperty("user.dir"))
+            .resolve("src/main/java/net/irisshaders/iris/gl/texture/DepthCopyStrategy.java");
+        String renderTargetsSource = java.nio.file.Files.readString(renderTargets);
+        String depthCopyStrategySource = java.nio.file.Files.readString(depthCopyStrategy);
+
+        assertTrue(renderTargetsSource.contains("TextureFormat.DEPTH32"),
+            "Iris depthtex1/depthtex2 snapshots must be depth-only textures even when depthtex0 has stencil");
+        assertTrue(renderTargetsSource.contains("DepthCopyStrategy.fastestDepthSnapshot(false)"),
+            "Iris world depth snapshots must copy only depth, not stencil, for shaderpack depth samplers");
+        assertFalse(renderTargetsSource.contains("newDepthTextureId.getFormat(), newWidth, newHeight"),
+            "Resized Iris depth snapshots must not inherit the main target's combined depth-stencil format");
+        assertFalse(depthCopyStrategySource.contains("return new Gl30BlitFbCombinedDepthStencil();\n\t\t}\n\n\t\tif (VulkanicAPI.isVulkanBackendSelected())"),
+            "World depth snapshots must not choose the combined depth-stencil blit path before Vulkan/depth-only handling");
+    }
 }

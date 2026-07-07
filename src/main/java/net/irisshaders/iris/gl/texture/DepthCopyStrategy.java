@@ -24,10 +24,6 @@ public interface DepthCopyStrategy {
 	}
 
 	static DepthCopyStrategy fastestDepthSnapshot(boolean combinedStencilRequired) {
-		if (combinedStencilRequired) {
-			return new Gl30BlitFbCombinedDepthStencil();
-		}
-
 		if (VulkanicAPI.isVulkanBackendSelected()) {
 			return new Gl30BlitFbDepth();
 		}
