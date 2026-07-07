@@ -44,6 +44,10 @@ __pycache__/
 # Data generation output
 generated/
 
+# Local frnsrc scratch area; keep the directory, ignore its contents
+/frnsrc/frnsrc-no-git/*
+!/frnsrc/frnsrc-no-git/.gitkeep
+
 # Test outputs and reports
 build/test-results/
 build/reports/tests/
