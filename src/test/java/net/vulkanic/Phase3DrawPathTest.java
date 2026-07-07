@@ -3997,10 +3997,14 @@ public class Phase3DrawPathTest {
             "RenderTargets depth snapshots should avoid legacy copyTexImage2D now that depth targets are preallocated");
         assertTrue(renderTargetsSource.contains("DepthCopyStrategy.fastestDepthSnapshot(false)"),
             "RenderTargets world depth snapshots should copy depth only, even when the main target is stencil-capable");
-        assertTrue(renderTargetsSource.contains("TextureFormat.DEPTH32"),
-            "RenderTargets world depth snapshots should remain depth-only shaderpack sampler inputs");
+        assertTrue(renderTargetsSource.contains("private static TextureFormat snapshotDepthFormat(DepthBufferFormat sourceDepthFormat)"),
+            "RenderTargets world depth snapshots should choose a backend-legal texture format explicitly");
+        assertTrue(renderTargetsSource.contains("if (!VulkanicAPI.isVulkanBackendSelected())"),
+            "OpenGL RenderTargets world depth snapshots should remain depth-only shaderpack sampler inputs");
+        assertTrue(renderTargetsSource.contains("case DEPTH_STENCIL, DEPTH24_STENCIL8 -> TextureFormat.DEPTH24_STENCIL8"),
+            "Vulkan depth snapshots must match a combined source format for legal depth blits");
         assertFalse(renderTargetsSource.contains("newDepthTextureId.getFormat(), newWidth, newHeight"),
-            "RenderTargets resized depth snapshots should not inherit the main target's combined depth-stencil format");
+            "Resized Iris depth snapshots should not blindly inherit the main target format");
         assertTrue(renderTargetsSource.contains("copyStrategy.copy(depthSourceFb, VulkanicCoreAPI.textureId(getDepthTexture()), noHandDestFb, VulkanicCoreAPI.textureId(noHand),"),
             "RenderTargets pre-hand depth path should route through the shared depth copy strategy");
         assertTrue(renderTargetsSource.contains("copyStrategy.copy(depthSourceFb, VulkanicCoreAPI.textureId(getDepthTexture()), noTranslucentsDestFb, VulkanicCoreAPI.textureId(noTranslucents),"),

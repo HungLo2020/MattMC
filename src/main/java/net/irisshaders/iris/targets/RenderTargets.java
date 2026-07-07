@@ -63,7 +63,7 @@ public class RenderTargets {
 
 		this.depthSourceFb = createFramebufferWritingToMain(new int[]{0});
 
-		TextureFormat snapshotDepthFormat = TextureFormat.DEPTH32;
+		TextureFormat snapshotDepthFormat = snapshotDepthFormat(depthFormat);
 
 		this.noTranslucents = VulkanicAPI.createTexture("Depth / Opaque", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, snapshotDepthFormat, width, height, 1, 1);
 		this.noHand = VulkanicAPI.createTexture("Depth / Before Hand", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, snapshotDepthFormat, width, height, 1, 1);
@@ -173,8 +173,9 @@ public class RenderTargets {
 			noTranslucents.close();
 			noHand.close();
 
-			this.noTranslucents = VulkanicAPI.createTexture("Depth / Opaque", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, TextureFormat.DEPTH32, newWidth, newHeight, 1, 1);
-			this.noHand = VulkanicAPI.createTexture("Depth / Before Hand", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, TextureFormat.DEPTH32, newWidth, newHeight, 1, 1);
+			TextureFormat snapshotDepthFormat = snapshotDepthFormat(newDepthFormat);
+			this.noTranslucents = VulkanicAPI.createTexture("Depth / Opaque", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, snapshotDepthFormat, newWidth, newHeight, 1, 1);
+			this.noHand = VulkanicAPI.createTexture("Depth / Before Hand", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, snapshotDepthFormat, newWidth, newHeight, 1, 1);
 			this.noTranslucents.setTextureFilter(FilterMode.NEAREST, false);
 			this.noHand.setTextureFilter(FilterMode.NEAREST, false);
 			this.noTranslucents.setAddressMode(AddressMode.CLAMP_TO_EDGE);
@@ -217,6 +218,18 @@ public class RenderTargets {
 		}
 
 		return sizeChanged;
+	}
+
+	private static TextureFormat snapshotDepthFormat(DepthBufferFormat sourceDepthFormat) {
+		if (!VulkanicAPI.isVulkanBackendSelected()) {
+			return TextureFormat.DEPTH32;
+		}
+
+		return switch (sourceDepthFormat) {
+			case DEPTH_STENCIL, DEPTH24_STENCIL8 -> TextureFormat.DEPTH24_STENCIL8;
+			case DEPTH32F_STENCIL8 -> TextureFormat.DEPTH32F_STENCIL8;
+			default -> TextureFormat.DEPTH32;
+		};
 	}
 
 	public void copyPreTranslucentDepth() {

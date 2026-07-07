@@ -104,6 +104,84 @@ public class VulkanBackendFramebufferCompatibilityTest {
 	}
 
 	@Test
+	public void testDepthOnlyBlitsCanCopyFromCombinedDepthStencilIntoDepthOnlyTarget() throws Exception {
+		Class<?> nativeSpine = Class.forName("net.vulkanic.backends.vulkan.VulkanBackend$NativeSpine");
+		Method helper = nativeSpine.getDeclaredMethod(
+			"blitOperationAspectMask",
+			int.class,
+			int.class,
+			int.class,
+			String.class
+		);
+		helper.setAccessible(true);
+
+		int depthOnly = (Integer) helper.invoke(
+			null,
+			VulkanicAPI.GL_DEPTH_BUFFER_BIT,
+			VK10.VK_IMAGE_ASPECT_DEPTH_BIT | VK10.VK_IMAGE_ASPECT_STENCIL_BIT,
+			VK10.VK_IMAGE_ASPECT_DEPTH_BIT,
+			"test"
+		);
+
+		assertEquals(VK10.VK_IMAGE_ASPECT_DEPTH_BIT, depthOnly,
+			"A GL depth-only blit must select the depth aspect even when the source image also has stencil");
+	}
+
+	@Test
+	public void testCombinedDepthStencilBlitBarriersTransitionBothAspects() throws Exception {
+		Class<?> nativeSpine = Class.forName("net.vulkanic.backends.vulkan.VulkanBackend$NativeSpine");
+		Method helper = nativeSpine.getDeclaredMethod("blitTransitionAspectMask", int.class, int.class);
+		helper.setAccessible(true);
+
+		int combinedTransition = (Integer) helper.invoke(
+			null,
+			VK10.VK_IMAGE_ASPECT_DEPTH_BIT,
+			VK10.VK_IMAGE_ASPECT_DEPTH_BIT | VK10.VK_IMAGE_ASPECT_STENCIL_BIT
+		);
+		int depthOnlyTransition = (Integer) helper.invoke(
+			null,
+			VK10.VK_IMAGE_ASPECT_DEPTH_BIT,
+			VK10.VK_IMAGE_ASPECT_DEPTH_BIT
+		);
+
+		assertEquals(VK10.VK_IMAGE_ASPECT_DEPTH_BIT | VK10.VK_IMAGE_ASPECT_STENCIL_BIT, combinedTransition,
+			"Combined depth/stencil images need full depth-stencil layout barriers unless separate layouts are enabled");
+		assertEquals(VK10.VK_IMAGE_ASPECT_DEPTH_BIT, depthOnlyTransition,
+			"Depth-only images should keep depth-only layout barriers");
+	}
+
+	@Test
+	public void testLegacyBlitUsesOperationAspectInsteadOfWholeTextureAspect() throws Exception {
+		String source = Files.readString(PROJECT_ROOT
+			.resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"))
+			.replace("\r\n", "\n")
+			.replace('\r', '\n');
+
+		String helper = source.substring(
+			source.indexOf("private void blitLegacyTextureRegion"),
+			source.indexOf("private static int toVulkanImageY")
+		);
+		String normalizedHelper = helper.replaceAll("\\s+", " ");
+
+		assertFalse(helper.contains("sourceTexture.aspectMask != destTexture.aspectMask"),
+			"Depth-only blits from DEPTH24_STENCIL8 into DEPTH32 must not require whole texture aspect equality");
+		assertTrue(normalizedHelper.contains("int operationAspectMask = blitOperationAspectMask( mask, sourceTexture.aspectMask, destTexture.aspectMask, operation );"),
+			"The Vulkan blit path should derive the active aspect from the GL blit mask");
+		assertTrue(normalizedHelper.contains(".aspectMask(operationAspectMask) .mipLevel(sourceLevel)"),
+			"VkImageBlit source subresource must use the requested operation aspect");
+		assertTrue(normalizedHelper.contains(".aspectMask(operationAspectMask) .mipLevel(destLevel)"),
+			"VkImageBlit destination subresource must use the requested operation aspect");
+		assertTrue(normalizedHelper.contains("int sourceTransitionAspectMask = blitTransitionAspectMask(operationAspectMask, sourceTexture.aspectMask);"),
+			"Source layout barriers should account for combined depth/stencil texture restrictions");
+		assertTrue(normalizedHelper.contains("int destTransitionAspectMask = blitTransitionAspectMask(operationAspectMask, destTexture.aspectMask);"),
+			"Destination layout barriers should account for combined depth/stencil texture restrictions");
+		assertTrue(normalizedHelper.contains("sourceTexture.imageHandle, sourceTransitionAspectMask, sourceOriginalLayout"),
+			"Source layout transitions for blits must use the Vulkan-legal transition aspect");
+		assertTrue(normalizedHelper.contains("destTexture.imageHandle, destTransitionAspectMask, destOriginalLayout"),
+			"Destination layout transitions for blits must use the Vulkan-legal transition aspect");
+	}
+
+	@Test
 	public void testNamedFramebufferTextureTracksColorAndDepthAttachments() {
 		VulkanBackend backend = new VulkanBackend();
 		int framebuffer = backend.createFramebuffer(TEST_CONTEXT);

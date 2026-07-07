@@ -14818,9 +14818,17 @@ void main() {
             if (sourceTexture.imageHandle == VK10.VK_NULL_HANDLE || destTexture.imageHandle == VK10.VK_NULL_HANDLE) {
                 return;
             }
-            if (sourceTexture.aspectMask != destTexture.aspectMask) {
-                throw new IllegalArgumentException(operation + " requires matching source and destination texture aspects");
+            int operationAspectMask = blitOperationAspectMask(
+                mask,
+                sourceTexture.aspectMask,
+                destTexture.aspectMask,
+                operation
+            );
+            if (operationAspectMask == 0) {
+                return;
             }
+            int sourceTransitionAspectMask = blitTransitionAspectMask(operationAspectMask, sourceTexture.aspectMask);
+            int destTransitionAspectMask = blitTransitionAspectMask(operationAspectMask, destTexture.aspectMask);
 
             VkCommandBuffer commandBuffer = requireRecordingCommandBuffer(commandBufferHandle, operation);
             int layerCount = Math.min(legacyTextureLayerCount(sourceTexture), legacyTextureLayerCount(destTexture));
@@ -14833,7 +14841,7 @@ void main() {
                 transitionImageLayout(
                     commandBuffer,
                     sourceTexture.imageHandle,
-                    sourceTexture.aspectMask,
+                    sourceTransitionAspectMask,
                     sourceOriginalLayout,
                     VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                     sourceLevel,
@@ -14850,7 +14858,7 @@ void main() {
                 transitionImageLayout(
                     commandBuffer,
                     destTexture.imageHandle,
-                    destTexture.aspectMask,
+                    destTransitionAspectMask,
                     destOriginalLayout,
                     VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                     destLevel,
@@ -14862,14 +14870,14 @@ void main() {
             try (MemoryStack stack = stackPush()) {
                 VkImageBlit.Buffer blit = VkImageBlit.calloc(1, stack);
                 blit.get(0).srcSubresource()
-                    .aspectMask(sourceTexture.aspectMask)
+                    .aspectMask(operationAspectMask)
                     .mipLevel(sourceLevel)
                     .baseArrayLayer(0)
                     .layerCount(layerCount);
                 blit.get(0).srcOffsets(0).set(srcX0, toVulkanImageY(sourceTexture, sourceLevel, srcY0), 0);
                 blit.get(0).srcOffsets(1).set(srcX1, toVulkanImageY(sourceTexture, sourceLevel, srcY1), 1);
                 blit.get(0).dstSubresource()
-                    .aspectMask(destTexture.aspectMask)
+                    .aspectMask(operationAspectMask)
                     .mipLevel(destLevel)
                     .baseArrayLayer(0)
                     .layerCount(layerCount);
@@ -14891,7 +14899,7 @@ void main() {
                 transitionImageLayout(
                     commandBuffer,
                     sourceTexture.imageHandle,
-                    sourceTexture.aspectMask,
+                    sourceTransitionAspectMask,
                     VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                     sourceOriginalLayout,
                     sourceLevel,
@@ -14903,7 +14911,7 @@ void main() {
                 transitionImageLayout(
                     commandBuffer,
                     destTexture.imageHandle,
-                    destTexture.aspectMask,
+                    destTransitionAspectMask,
                     VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                     destOriginalLayout,
                     destLevel,
@@ -14914,6 +14922,45 @@ void main() {
 
             trackLayoutForLevel(sourceTexture, sourceLevel, sourceOriginalLayout);
             trackLayoutForLevel(destTexture, destLevel, destOriginalLayout);
+        }
+
+        private static int blitOperationAspectMask(int mask, int sourceAspectMask, int destAspectMask, String operation) {
+            int requestedAspectMask = 0;
+            if ((mask & GL_COLOR_BUFFER_BIT) != 0) {
+                requestedAspectMask |= VK10.VK_IMAGE_ASPECT_COLOR_BIT;
+            }
+            if ((mask & GL_DEPTH_BUFFER_BIT) != 0) {
+                requestedAspectMask |= VK10.VK_IMAGE_ASPECT_DEPTH_BIT;
+            }
+            if ((mask & GL_STENCIL_BUFFER_BIT) != 0) {
+                requestedAspectMask |= VK10.VK_IMAGE_ASPECT_STENCIL_BIT;
+            }
+            if (requestedAspectMask == 0) {
+                return 0;
+            }
+            if ((requestedAspectMask & VK10.VK_IMAGE_ASPECT_COLOR_BIT) != 0
+                && requestedAspectMask != VK10.VK_IMAGE_ASPECT_COLOR_BIT) {
+                throw new IllegalArgumentException(
+                    operation + " cannot blit color and depth/stencil aspects through a single legacy texture operation"
+                );
+            }
+
+            int supportedAspectMask = sourceAspectMask & destAspectMask & requestedAspectMask;
+            if (supportedAspectMask != requestedAspectMask) {
+                throw new IllegalArgumentException(
+                    operation + " requires source and destination textures to support requested blit aspects"
+                );
+            }
+            return requestedAspectMask;
+        }
+
+        private static int blitTransitionAspectMask(int operationAspectMask, int textureAspectMask) {
+            int depthStencilMask = VK10.VK_IMAGE_ASPECT_DEPTH_BIT | VK10.VK_IMAGE_ASPECT_STENCIL_BIT;
+            if ((operationAspectMask & depthStencilMask) != 0
+                && (textureAspectMask & depthStencilMask) == depthStencilMask) {
+                return depthStencilMask;
+            }
+            return operationAspectMask;
         }
 
         private static int toVulkanImageY(LegacyTextureObject texture, int level, int glY) {
