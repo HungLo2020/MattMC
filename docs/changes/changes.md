@@ -16,6 +16,8 @@ This Document is a list of all changes in MattMC over base Minecraft Java 1.21.1
 - AlexsMobs Mobs & Items
 - [Elevator Block](../gameplay/items/Elevator.md)
 - Backported features from [Mounts of Mayhem (1.21.11)](../changelog/changelog/7.2026.md) including Nautilus, and Spear
+- Offline Skin System
+- Region Editor accessible via main menu
 
 ## Removals
 - Microsoft Telemetry
@@ -31,3 +33,4 @@ This Document is a list of all changes in MattMC over base Minecraft Java 1.21.1
 - Reverted to old mob spawn egg textures
 - Swapped Sneak and Sprint keys. Sneak is now LCTRL and Sprint is LSHIFT.
 - Made the GUI Dark Mode
+- Updated wheat crop texture to be the same as the Stay True Resource pack
