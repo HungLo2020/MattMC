@@ -64,6 +64,10 @@ public class CrossbowItem extends ProjectileWeaponItem {
 	@Override
 	public InteractionResult use(Level level, Player player, InteractionHand interactionHand) {
 		ItemStack itemStack = player.getItemInHand(interactionHand);
+		if (itemStack.isBroken()) {
+			return InteractionResult.PASS;
+		}
+
 		ChargedProjectiles chargedProjectiles = itemStack.get(DataComponents.CHARGED_PROJECTILES);
 		if (chargedProjectiles != null && !chargedProjectiles.isEmpty()) {
 			this.performShooting(level, player, interactionHand, itemStack, getShootingPower(chargedProjectiles), 1.0F, null);
@@ -84,6 +88,10 @@ public class CrossbowItem extends ProjectileWeaponItem {
 
 	@Override
 	public boolean releaseUsing(ItemStack itemStack, Level level, LivingEntity livingEntity, int i) {
+		if (itemStack.isBroken()) {
+			return false;
+		}
+
 		int j = this.getUseDuration(itemStack, livingEntity) - i;
 		return getPowerForTime(j, itemStack, livingEntity) >= 1.0F && isCharged(itemStack);
 	}
@@ -159,6 +167,10 @@ public class CrossbowItem extends ProjectileWeaponItem {
 	public void performShooting(
 		Level level, LivingEntity livingEntity, InteractionHand interactionHand, ItemStack itemStack, float f, float g, @Nullable LivingEntity livingEntity2
 	) {
+		if (itemStack.isBroken()) {
+			return;
+		}
+
 		if (level instanceof ServerLevel serverLevel) {
 			ChargedProjectiles chargedProjectiles = itemStack.set(DataComponents.CHARGED_PROJECTILES, ChargedProjectiles.EMPTY);
 			if (chargedProjectiles != null && !chargedProjectiles.isEmpty()) {

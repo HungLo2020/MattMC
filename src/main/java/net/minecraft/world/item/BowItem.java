@@ -24,7 +24,9 @@ public class BowItem extends ProjectileWeaponItem {
 
 	@Override
 	public boolean releaseUsing(ItemStack itemStack, Level level, LivingEntity livingEntity, int i) {
-		if (!(livingEntity instanceof Player player)) {
+		if (itemStack.isBroken()) {
+			return false;
+		} else if (!(livingEntity instanceof Player player)) {
 			return false;
 		} else {
 			ItemStack itemStack2 = player.getProjectile(itemStack);

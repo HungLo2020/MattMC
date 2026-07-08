@@ -68,14 +68,14 @@ public class TridentItem extends Item implements ProjectileItem {
 				float f = EnchantmentHelper.getTridentSpinAttackStrength(itemStack, player);
 				if (f > 0.0F && !player.isInWaterOrRain()) {
 					return false;
-				} else if (itemStack.nextDamageWillBreak()) {
+				} else if (itemStack.isBroken()) {
 					return false;
 				} else {
 					Holder<SoundEvent> holder = (Holder<SoundEvent>)EnchantmentHelper.pickHighestLevel(itemStack, EnchantmentEffectComponents.TRIDENT_SOUND)
 						.orElse(SoundEvents.TRIDENT_THROW);
 					player.awardStat(Stats.ITEM_USED.get(this));
 					if (level instanceof ServerLevel serverLevel) {
-						itemStack.hurtWithoutBreaking(1, player);
+						itemStack.hurtAndBreak(1, player, player.getUsedItemHand());
 						if (f == 0.0F) {
 							ItemStack itemStack2 = itemStack.consumeAndReturn(1, player);
 							ThrownTrident thrownTrident = Projectile.spawnProjectileFromRotation(ThrownTrident::new, serverLevel, itemStack2, player, 0.0F, 2.5F, 1.0F);
@@ -120,7 +120,7 @@ public class TridentItem extends Item implements ProjectileItem {
 	@Override
 	public InteractionResult use(Level level, Player player, InteractionHand interactionHand) {
 		ItemStack itemStack = player.getItemInHand(interactionHand);
-		if (itemStack.nextDamageWillBreak()) {
+		if (itemStack.isBroken()) {
 			return InteractionResult.FAIL;
 		} else if (EnchantmentHelper.getTridentSpinAttackStrength(itemStack, player) > 0.0F && !player.isInWaterOrRain()) {
 			return InteractionResult.FAIL;

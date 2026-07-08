@@ -209,7 +209,7 @@ public class Creeper extends Monster {
 	@Override
 	protected InteractionResult mobInteract(Player player, InteractionHand interactionHand) {
 		ItemStack itemStack = player.getItemInHand(interactionHand);
-		if (itemStack.is(ItemTags.CREEPER_IGNITERS)) {
+		if (itemStack.is(ItemTags.CREEPER_IGNITERS) && !itemStack.isBroken()) {
 			SoundEvent soundEvent = itemStack.is(Items.FIRE_CHARGE) ? SoundEvents.FIRECHARGE_USE : SoundEvents.FLINTANDSTEEL_USE;
 			this.level().playSound(player, this.getX(), this.getY(), this.getZ(), soundEvent, this.getSoundSource(), 1.0F, this.random.nextFloat() * 0.4F + 0.8F);
 			if (!this.level().isClientSide()) {

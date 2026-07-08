@@ -962,7 +962,9 @@ public abstract class Player extends Avatar implements ContainerUser {
 			if (!entity.skipAttackInteraction(this)) {
 				float f = this.isAutoSpinAttack() ? this.autoSpinAttackDmg : (float)this.getAttributeValue(Attributes.ATTACK_DAMAGE);
 				ItemStack itemStack = this.getWeaponItem();
-				DamageSource damageSource = (DamageSource)Optional.ofNullable(itemStack.getItem().getDamageSource(this)).orElse(this.damageSources().playerAttack(this));
+				DamageSource damageSource = itemStack.isBroken()
+					? this.damageSources().playerAttack(this)
+					: (DamageSource)Optional.ofNullable(itemStack.getItem().getDamageSource(this)).orElse(this.damageSources().playerAttack(this));
 				float g = this.getEnchantedDamage(entity, f, damageSource) - f;
 				float h = this.getAttackStrengthScale(0.5F);
 				f *= 0.2F + h * h * 0.8F;
@@ -983,7 +985,9 @@ public abstract class Player extends Avatar implements ContainerUser {
 							bl2 = false;
 						}
 
-						f += itemStack.getItem().getAttackDamageBonus(entity, f, damageSource);
+						if (!itemStack.isBroken()) {
+							f += itemStack.getItem().getAttackDamageBonus(entity, f, damageSource);
+						}
 						boolean bl3 = bl
 							&& this.fallDistance > 0.0
 							&& !this.onGround()
@@ -1002,7 +1006,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 						if (bl && !bl3 && !bl2 && this.onGround()) {
 							double d = this.getKnownMovement().horizontalDistanceSqr();
 							double e = this.getSpeed() * 2.5;
-							if (d < Mth.square(e) && this.getItemInHand(InteractionHand.MAIN_HAND).is(ItemTags.SWORDS)) {
+							if (d < Mth.square(e) && !itemStack.isBroken() && this.getItemInHand(InteractionHand.MAIN_HAND).is(ItemTags.SWORDS)) {
 								bl4 = true;
 							}
 						}

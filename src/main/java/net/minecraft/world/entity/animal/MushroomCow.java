@@ -116,7 +116,7 @@ public class MushroomCow extends AbstractCow implements Shearable {
 
 			this.playSound(soundEvent, 1.0F, 1.0F);
 			return InteractionResult.SUCCESS;
-		} else if (itemStack.is(Items.SHEARS) && this.readyForShearing()) {
+		} else if (itemStack.is(Items.SHEARS) && !itemStack.isBroken() && this.readyForShearing()) {
 			if (this.level() instanceof ServerLevel serverLevel) {
 				this.shear(serverLevel, SoundSource.PLAYERS, itemStack);
 				this.gameEvent(GameEvent.SHEAR, player);

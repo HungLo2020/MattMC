@@ -93,7 +93,7 @@ public class SpearItem extends Item {
 	@Override
 	public InteractionResult use(Level level, Player player, InteractionHand interactionHand) {
 		ItemStack itemStack = player.getItemInHand(interactionHand);
-		if (itemStack.nextDamageWillBreak()) {
+		if (itemStack.isBroken()) {
 			return InteractionResult.FAIL;
 		} else {
 			player.startUsingItem(interactionHand);
@@ -103,7 +103,7 @@ public class SpearItem extends Item {
 
 	@Override
 	public void onUseTick(Level level, LivingEntity livingEntity, ItemStack itemStack, int remainingUseTicks) {
-		if (!(level instanceof ServerLevel serverLevel) || itemStack.nextDamageWillBreak()) {
+		if (!(level instanceof ServerLevel serverLevel) || itemStack.isBroken()) {
 			return;
 		}
 
@@ -139,7 +139,7 @@ public class SpearItem extends Item {
 	@Override
 	public boolean releaseUsing(ItemStack itemStack, Level level, LivingEntity livingEntity, int remainingUseTicks) {
 		int i = this.getUseDuration(itemStack, livingEntity) - remainingUseTicks;
-		if (i < THRUST_THRESHOLD_TIME || itemStack.nextDamageWillBreak()) {
+		if (i < THRUST_THRESHOLD_TIME || itemStack.isBroken()) {
 			return false;
 		}
 

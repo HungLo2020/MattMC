@@ -51,6 +51,10 @@ public abstract class ProjectileWeaponItem extends Item {
 		boolean bl,
 		@Nullable LivingEntity livingEntity2
 	) {
+		if (itemStack.isBroken()) {
+			return;
+		}
+
 		float h = EnchantmentHelper.processProjectileSpread(serverLevel, itemStack, livingEntity, 0.0F);
 		float i = list.size() == 1 ? 0.0F : 2.0F * h / (list.size() - 1);
 		float j = (list.size() - 1) % 2 * i / 2.0F;

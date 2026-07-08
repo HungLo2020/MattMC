@@ -178,6 +178,10 @@ public class EnchantmentHelper {
 	}
 
 	public static float modifyDamage(ServerLevel serverLevel, ItemStack itemStack, Entity entity, DamageSource damageSource, float f) {
+		if (itemStack.isBroken()) {
+			return f;
+		}
+
 		MutableFloat mutableFloat = new MutableFloat(f);
 		runIterationOnItem(itemStack, (holder, i) -> holder.value().modifyDamage(serverLevel, i, itemStack, entity, damageSource, mutableFloat));
 		return mutableFloat.floatValue();
@@ -196,6 +200,10 @@ public class EnchantmentHelper {
 	}
 
 	public static float modifyKnockback(ServerLevel serverLevel, ItemStack itemStack, Entity entity, DamageSource damageSource, float f) {
+		if (itemStack.isBroken()) {
+			return f;
+		}
+
 		MutableFloat mutableFloat = new MutableFloat(f);
 		runIterationOnItem(itemStack, (holder, i) -> holder.value().modifyKnockback(serverLevel, i, itemStack, entity, damageSource, mutableFloat));
 		return mutableFloat.floatValue();
@@ -223,7 +231,7 @@ public class EnchantmentHelper {
 			);
 		}
 
-		if (itemStack != null) {
+		if (itemStack != null && !itemStack.isBroken()) {
 			if (damageSource.getEntity() instanceof LivingEntity livingEntity) {
 				runIterationOnItem(
 					itemStack,
@@ -317,6 +325,10 @@ public class EnchantmentHelper {
 		BlockState blockState,
 		Consumer<Item> consumer
 	) {
+		if (itemStack.isBroken()) {
+			return;
+		}
+
 		EnchantedItemInUse enchantedItemInUse = new EnchantedItemInUse(itemStack, equipmentSlot, livingEntity, consumer);
 		runIterationOnItem(itemStack, (holder, i) -> holder.value().onHitBlock(serverLevel, i, enchantedItemInUse, entity, vec3, blockState));
 	}

@@ -72,7 +72,8 @@ public class LeashFenceKnotEntity extends BlockAttachedEntity {
 		if (this.level().isClientSide()) {
 			return InteractionResult.SUCCESS;
 		} else {
-			if (player.getItemInHand(interactionHand).is(Items.SHEARS)) {
+			ItemStack itemStack = player.getItemInHand(interactionHand);
+			if (itemStack.is(Items.SHEARS) && !itemStack.isBroken()) {
 				InteractionResult interactionResult = super.interact(player, interactionHand);
 				if (interactionResult instanceof InteractionResult.Success success && success.wasItemInteraction()) {
 					return interactionResult;

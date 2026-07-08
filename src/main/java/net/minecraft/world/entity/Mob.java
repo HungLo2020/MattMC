@@ -562,6 +562,10 @@ public abstract class Mob extends LivingEntity implements EquipmentUser, Leashab
 
 	private double getApproximateAttributeWith(ItemStack itemStack, Holder<Attribute> holder, EquipmentSlot equipmentSlot) {
 		double d = this.getAttributes().hasAttribute(holder) ? this.getAttributeBaseValue(holder) : 0.0;
+		if (itemStack.isBroken()) {
+			return d;
+		}
+
 		ItemAttributeModifiers itemAttributeModifiers = itemStack.getOrDefault(DataComponents.ATTRIBUTE_MODIFIERS, ItemAttributeModifiers.EMPTY);
 		return itemAttributeModifiers.compute(d, equipmentSlot);
 	}
@@ -1289,9 +1293,13 @@ public abstract class Mob extends LivingEntity implements EquipmentUser, Leashab
 	public boolean doHurtTarget(ServerLevel serverLevel, Entity entity) {
 		float f = (float)this.getAttributeValue(Attributes.ATTACK_DAMAGE);
 		ItemStack itemStack = this.getWeaponItem();
-		DamageSource damageSource = (DamageSource)Optional.ofNullable(itemStack.getItem().getDamageSource(this)).orElse(this.damageSources().mobAttack(this));
+		DamageSource damageSource = itemStack.isBroken()
+			? this.damageSources().mobAttack(this)
+			: (DamageSource)Optional.ofNullable(itemStack.getItem().getDamageSource(this)).orElse(this.damageSources().mobAttack(this));
 		f = EnchantmentHelper.modifyDamage(serverLevel, itemStack, entity, damageSource, f);
-		f += itemStack.getItem().getAttackDamageBonus(entity, f, damageSource);
+		if (!itemStack.isBroken()) {
+			f += itemStack.getItem().getAttackDamageBonus(entity, f, damageSource);
+		}
 		boolean bl = entity.hurtServer(serverLevel, damageSource, f);
 		if (bl) {
 			float g = this.getKnockback(entity, damageSource);

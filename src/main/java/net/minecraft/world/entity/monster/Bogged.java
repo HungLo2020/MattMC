@@ -72,7 +72,7 @@ public class Bogged extends AbstractSkeleton implements Shearable {
 	@Override
 	protected InteractionResult mobInteract(Player player, InteractionHand interactionHand) {
 		ItemStack itemStack = player.getItemInHand(interactionHand);
-		if (itemStack.is(Items.SHEARS) && this.readyForShearing()) {
+		if (itemStack.is(Items.SHEARS) && !itemStack.isBroken() && this.readyForShearing()) {
 			if (this.level() instanceof ServerLevel serverLevel) {
 				this.shear(serverLevel, SoundSource.PLAYERS, itemStack);
 				this.gameEvent(GameEvent.SHEAR, player);

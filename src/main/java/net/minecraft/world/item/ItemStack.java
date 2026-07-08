@@ -352,6 +352,10 @@ public final class ItemStack implements DataComponentHolder {
 	}
 
 	public InteractionResult useOn(UseOnContext useOnContext) {
+		if (this.isBroken()) {
+			return InteractionResult.PASS;
+		}
+
 		Player player = useOnContext.getPlayer();
 		BlockPos blockPos = useOnContext.getClickedPos();
 		if (player != null && !player.getAbilities().mayBuild && !this.canPlaceOnBlockInAdventureMode(new BlockInWorld(useOnContext.getLevel(), blockPos, false))) {
@@ -368,10 +372,18 @@ public final class ItemStack implements DataComponentHolder {
 	}
 
 	public float getDestroySpeed(BlockState blockState) {
+		if (this.isBroken()) {
+			return 1.0F;
+		}
+
 		return this.getItem().getDestroySpeed(this, blockState);
 	}
 
 	public InteractionResult use(Level level, Player player, InteractionHand interactionHand) {
+		if (this.isBroken()) {
+			return InteractionResult.PASS;
+		}
+
 		ItemStack itemStack = this.copy();
 		boolean bl = this.getUseDuration(player) <= 0;
 		InteractionResult interactionResult = this.getItem().use(level, player, interactionHand);
@@ -452,6 +464,8 @@ public final class ItemStack implements DataComponentHolder {
 	private int processDurabilityChange(int i, ServerLevel serverLevel, @Nullable ServerPlayer serverPlayer) {
 		if (!this.isDamageableItem()) {
 			return 0;
+		} else if (this.isBroken()) {
+			return 0;
 		} else if (serverPlayer != null && serverPlayer.hasInfiniteMaterials()) {
 			return 0;
 		} else {
@@ -460,15 +474,14 @@ public final class ItemStack implements DataComponentHolder {
 	}
 
 	private void applyDamage(int i, @Nullable ServerPlayer serverPlayer, Consumer<Item> consumer) {
+		boolean bl = this.isBroken();
 		if (serverPlayer != null) {
 			CriteriaTriggers.ITEM_DURABILITY_CHANGED.trigger(serverPlayer, this, i);
 		}
 
 		this.setDamageValue(i);
-		if (this.isBroken()) {
-			Item item = this.getItem();
-			this.shrink(1);
-			consumer.accept(item);
+		if (!bl && this.isBroken()) {
+			consumer.accept(this.getItem());
 		}
 	}
 
@@ -531,6 +544,10 @@ public final class ItemStack implements DataComponentHolder {
 	}
 
 	public boolean hurtEnemy(LivingEntity livingEntity, LivingEntity livingEntity2) {
+		if (this.isBroken()) {
+			return false;
+		}
+
 		Item item = this.getItem();
 		item.hurtEnemy(this, livingEntity, livingEntity2);
 		if (this.has(DataComponents.WEAPON)) {
@@ -545,6 +562,10 @@ public final class ItemStack implements DataComponentHolder {
 	}
 
 	public void postHurtEnemy(LivingEntity livingEntity, LivingEntity livingEntity2) {
+		if (this.isBroken()) {
+			return;
+		}
+
 		this.getItem().postHurtEnemy(this, livingEntity, livingEntity2);
 		Weapon weapon = this.get(DataComponents.WEAPON);
 		if (weapon != null) {
@@ -553,6 +574,10 @@ public final class ItemStack implements DataComponentHolder {
 	}
 
 	public void mineBlock(Level level, BlockState blockState, BlockPos blockPos, Player player) {
+		if (this.isBroken()) {
+			return;
+		}
+
 		Item item = this.getItem();
 		if (item.mineBlock(this, level, blockState, blockPos, player)) {
 			player.awardStat(Stats.ITEM_USED.get(item));
@@ -560,10 +585,14 @@ public final class ItemStack implements DataComponentHolder {
 	}
 
 	public boolean isCorrectToolForDrops(BlockState blockState) {
-		return this.getItem().isCorrectToolForDrops(this, blockState);
+		return !this.isBroken() && this.getItem().isCorrectToolForDrops(this, blockState);
 	}
 
 	public InteractionResult interactLivingEntity(Player player, LivingEntity livingEntity, InteractionHand interactionHand) {
+		if (this.isBroken()) {
+			return InteractionResult.PASS;
+		}
+
 		Equippable equippable = this.get(DataComponents.EQUIPPABLE);
 		if (equippable != null && equippable.equipOnInteract()) {
 			InteractionResult interactionResult = equippable.equipOnTarget(player, livingEntity, this);
@@ -1080,6 +1109,10 @@ public final class ItemStack implements DataComponentHolder {
 	}
 
 	public boolean canDestroyBlock(BlockState blockState, Level level, BlockPos blockPos, Player player) {
+		if (this.isBroken()) {
+			return true;
+		}
+
 		return this.getItem().canDestroyBlock(this, blockState, level, blockPos, player);
 	}
 }

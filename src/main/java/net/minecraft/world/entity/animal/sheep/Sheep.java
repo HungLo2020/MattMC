@@ -137,7 +137,7 @@ public class Sheep extends Animal implements Shearable {
 	@Override
 	public InteractionResult mobInteract(Player player, InteractionHand interactionHand) {
 		ItemStack itemStack = player.getItemInHand(interactionHand);
-		if (itemStack.is(Items.SHEARS)) {
+		if (itemStack.is(Items.SHEARS) && !itemStack.isBroken()) {
 			if (this.level() instanceof ServerLevel serverLevel && this.readyForShearing()) {
 				this.shear(serverLevel, SoundSource.PLAYERS, itemStack);
 				this.gameEvent(GameEvent.SHEAR, player);

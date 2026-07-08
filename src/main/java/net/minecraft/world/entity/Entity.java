@@ -2132,11 +2132,12 @@ public abstract class Entity
 		}
 
 		ItemStack itemStack = player.getItemInHand(interactionHand);
-		if (itemStack.is(Items.SHEARS) && this.shearOffAllLeashConnections(player)) {
+		if (itemStack.is(Items.SHEARS) && !itemStack.isBroken() && this.shearOffAllLeashConnections(player)) {
 			itemStack.hurtAndBreak(1, player, interactionHand);
 			return InteractionResult.SUCCESS;
 		} else if (this instanceof Mob mob
 			&& itemStack.is(Items.SHEARS)
+			&& !itemStack.isBroken()
 			&& mob.canShearEquipment(player)
 			&& !player.isSecondaryUseActive()
 			&& this.attemptToShearEquipment(player, interactionHand, itemStack, mob)) {

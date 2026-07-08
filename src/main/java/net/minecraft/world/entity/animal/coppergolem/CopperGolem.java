@@ -220,7 +220,7 @@ public class CopperGolem extends AbstractGolem implements ContainerUser, Shearab
 		}
 
 		Level level = this.level();
-		if (itemStack.is(Items.SHEARS) && this.readyForShearing()) {
+		if (itemStack.is(Items.SHEARS) && !itemStack.isBroken() && this.readyForShearing()) {
 			if (level instanceof ServerLevel serverLevel) {
 				this.shear(serverLevel, SoundSource.PLAYERS, itemStack);
 				this.gameEvent(GameEvent.SHEAR, player);
@@ -235,14 +235,14 @@ public class CopperGolem extends AbstractGolem implements ContainerUser, Shearab
 			this.nextWeatheringTick = -2L;
 			this.usePlayerItem(player, interactionHand, itemStack);
 			return InteractionResult.SUCCESS_SERVER;
-		} else if (itemStack.is(ItemTags.AXES) && this.nextWeatheringTick == -2L) {
+		} else if (itemStack.is(ItemTags.AXES) && !itemStack.isBroken() && this.nextWeatheringTick == -2L) {
 			level.playSound(null, this, SoundEvents.AXE_SCRAPE, this.getSoundSource(), 1.0F, 1.0F);
 			level.levelEvent(this, 3004, this.blockPosition(), 0);
 			this.nextWeatheringTick = -1L;
 			itemStack.hurtAndBreak(1, player, interactionHand.asEquipmentSlot());
 			return InteractionResult.SUCCESS_SERVER;
 		} else {
-			if (itemStack.is(ItemTags.AXES)) {
+			if (itemStack.is(ItemTags.AXES) && !itemStack.isBroken()) {
 				WeatheringCopper.WeatherState weatherState = this.getWeatherState();
 				if (weatherState != WeatheringCopper.WeatherState.UNAFFECTED) {
 					level.playSound(null, this, SoundEvents.AXE_SCRAPE, this.getSoundSource(), 1.0F, 1.0F);
