@@ -1,0 +1,7 @@
+{
+    "parent": "minecraft:block/leaves_cross1",
+    "textures": {
+        "all": "minecraft:block/azalea_leaves",
+	"bushy": "minecraft:block/azalea_leaves_bushy1"
+    }
+}

@@ -1,0 +1,7 @@
+{
+    "parent": "minecraft:block/leaves_cross1",
+    "textures": {
+        "all": "minecraft:block/mangrove_leaves",
+	"bushy": "minecraft:block/mangrove_leaves_bushy1"
+    }
+}

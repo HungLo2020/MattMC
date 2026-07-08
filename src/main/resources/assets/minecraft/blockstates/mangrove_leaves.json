@@ -1,7 +1,32 @@
 {
-  "variants": {
-    "": {
-      "model": "minecraft:block/mangrove_leaves"
+    "variants": {
+        "distance=1": [
+			{ "model": "minecraft:block/mangrove_leaves" },
+			{ "model": "minecraft:block/mangrove_leaves1" }
+				],
+        "distance=2": [
+			{ "model": "minecraft:block/mangrove_leaves" },
+			{ "model": "minecraft:block/mangrove_leaves1" }
+				],
+        "distance=3": [
+			{ "model": "minecraft:block/mangrove_leaves" },
+			{ "model": "minecraft:block/mangrove_leaves1" }
+				],
+        "distance=4": [
+			{ "model": "minecraft:block/mangrove_leaves" },
+			{ "model": "minecraft:block/mangrove_leaves1" }
+				],
+        "distance=5": [
+			{ "model": "minecraft:block/mangrove_leaves" },
+			{ "model": "minecraft:block/mangrove_leaves1" }
+				],
+        "distance=6": [
+			{ "model": "minecraft:block/mangrove_leaves" },
+			{ "model": "minecraft:block/mangrove_leaves1" }
+				],
+        "distance=7": [
+			{ "model": "minecraft:block/mangrove_leaves" },
+			{ "model": "minecraft:block/mangrove_leaves1" }
+				]
     }
-  }
 }

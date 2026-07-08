@@ -1,0 +1,1 @@
+{    "parent": "minecraft:block/leaves_cross_spruce",    "textures": {        "all": "minecraft:block/leaves_spruce2",        "top": "minecraft:block/leaves_spruce_top2",        "bottom": "minecraft:block/leaves_spruce_bottom2",	"bushy": "minecraft:block/leaves_spruce_bl2"    }}
