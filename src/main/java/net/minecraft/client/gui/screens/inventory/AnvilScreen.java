@@ -24,7 +24,6 @@ public class AnvilScreen extends ItemCombinerScreen<AnvilMenu> {
 	private static final ResourceLocation TEXT_FIELD_DISABLED_SPRITE = ResourceLocation.withDefaultNamespace("container/anvil/text_field_disabled");
 	private static final ResourceLocation ERROR_SPRITE = ResourceLocation.withDefaultNamespace("container/anvil/error");
 	private static final ResourceLocation ANVIL_LOCATION = ResourceLocation.withDefaultNamespace("textures/gui/container/anvil.png");
-	private static final Component TOO_EXPENSIVE_TEXT = Component.translatable("container.repair.expensive");
 	private EditBox name;
 	private final Player player;
 
@@ -99,10 +98,7 @@ public class AnvilScreen extends ItemCombinerScreen<AnvilMenu> {
 		if (k > 0) {
 			int l = -8323296;
 			Component component;
-			if (k >= 40 && !this.minecraft.player.hasInfiniteMaterials()) {
-				component = TOO_EXPENSIVE_TEXT;
-				l = -40864;
-			} else if (!this.menu.getSlot(2).hasItem()) {
+			if (!this.menu.getSlot(2).hasItem()) {
 				component = null;
 			} else {
 				component = Component.translatable("container.repair.cost", new Object[]{k});

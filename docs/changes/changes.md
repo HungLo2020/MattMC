@@ -25,6 +25,7 @@ This Document is a list of all changes in MattMC over base Minecraft Java 1.21.1
 - Microsoft Realms
 - Sodium "Buy us a Coffee" Button
 - Chat Reporting
+- Removed Anvil "Too Expensive" and capped cost at 40 levels.
 
 ## Tweaks
 - Removed Creative Mode Menu & Replaced with JEI Style Menu

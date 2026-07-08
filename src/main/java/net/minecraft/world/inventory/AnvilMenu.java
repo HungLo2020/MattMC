@@ -28,6 +28,7 @@ public class AnvilMenu extends ItemCombinerMenu {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final boolean DEBUG_COST = false;
 	public static final int MAX_NAME_LENGTH = 50;
+	public static final int MAXIMUM_COST = 40;
 	private int repairItemCountCost;
 	@Nullable
 	private String itemName;
@@ -234,22 +235,14 @@ public class AnvilMenu extends ItemCombinerMenu {
 				itemStack2.remove(DataComponents.CUSTOM_NAME);
 			}
 
-			int t = i <= 0 ? 0 : (int)Mth.clamp(l + i, 0L, 2147483647L);
+			int t = i <= 0 ? 0 : clampRepairCost(l + i);
 			this.cost.set(t);
 			if (i <= 0) {
 				itemStack2 = ItemStack.EMPTY;
 			}
 
 			if (j == i && j > 0) {
-				if (this.cost.get() >= 40) {
-					this.cost.set(39);
-				}
-
 				this.onlyRenaming = true;
-			}
-
-			if (this.cost.get() >= 40 && !this.player.hasInfiniteMaterials()) {
-				itemStack2 = ItemStack.EMPTY;
 			}
 
 			if (!itemStack2.isEmpty()) {
@@ -276,6 +269,10 @@ public class AnvilMenu extends ItemCombinerMenu {
 
 	public static int calculateIncreasedRepairCost(int i) {
 		return (int)Math.min(i * 2L + 1L, 2147483647L);
+	}
+
+	static int clampRepairCost(long l) {
+		return (int)Mth.clamp(l, 0L, (long)MAXIMUM_COST);
 	}
 
 	public boolean setItemName(String string) {

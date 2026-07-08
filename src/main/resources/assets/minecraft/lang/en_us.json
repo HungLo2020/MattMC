@@ -3182,7 +3182,6 @@
   "container.loom": "Loom",
   "container.repair": "Repair & Name",
   "container.repair.cost": "Enchantment Cost: %1$s",
-  "container.repair.expensive": "Too Expensive!",
   "container.shulkerBox": "Shulker Box",
   "container.shulkerBox.itemCount": "%s x%s",
   "container.shulkerBox.more": "and %s more...",
