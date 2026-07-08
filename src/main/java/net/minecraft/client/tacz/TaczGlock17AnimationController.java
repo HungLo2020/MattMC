@@ -69,12 +69,16 @@ public final class TaczGlock17AnimationController {
 	public static void triggerShoot(ItemStack itemStack) {
 		String animationName = TaczGunAnimationTimings.shootAnimation(itemStack);
 		shootAnimation = new ActiveAnimation(animationName, System.nanoTime(), true);
-		TaczAnimationSoundEffects.schedule(itemStack, animationName);
+		TaczAnimationSoundEffects.scheduleShoot(itemStack, animationName);
 		scheduleFollowUpShootAnimations(itemStack);
 	}
 
 	public static void triggerReload(ItemStack itemStack) {
-		triggerMain(itemStack, TaczGunAnimationTimings.reloadSequence(itemStack));
+		if (isReloading(itemStack)) {
+			return;
+		}
+		boolean playedDisplayReload = TaczAnimationSoundEffects.playReload(itemStack, TaczMvpGunItem.getAmmo(itemStack) <= 0);
+		triggerMain(itemStack, TaczGunAnimationTimings.reloadSequence(itemStack), !playedDisplayReload);
 	}
 
 	public static void triggerInspect(ItemStack itemStack) {
@@ -117,12 +121,18 @@ public final class TaczGlock17AnimationController {
 	}
 
 	private static void triggerMain(ItemStack itemStack, List<String> names) {
+		triggerMain(itemStack, names, true);
+	}
+
+	private static void triggerMain(ItemStack itemStack, List<String> names, boolean scheduleSounds) {
 		List<String> filteredNames = names.stream().filter(name -> name != null && !name.isEmpty()).toList();
 		if (filteredNames.isEmpty()) {
 			return;
 		}
 		mainAnimation = new ActiveSequence(itemStack.getItem() instanceof TaczMvpGunItem gunItem ? gunItem.gunId() : "glock_17", List.copyOf(filteredNames), System.nanoTime());
-		TaczAnimationSoundEffects.scheduleSequence(itemStack, filteredNames);
+		if (scheduleSounds) {
+			TaczAnimationSoundEffects.scheduleSequence(itemStack, filteredNames);
+		}
 	}
 
 	private static void scheduleFollowUpShootAnimations(ItemStack itemStack) {
@@ -153,6 +163,14 @@ public final class TaczGlock17AnimationController {
 
 	private static boolean isReloading() {
 		return mainAnimation != null && mainAnimation.currentAnimation().name().startsWith("reload_") && mainAnimation.ageSeconds() <= mainAnimation.totalDurationSeconds();
+	}
+
+	private static boolean isReloading(ItemStack itemStack) {
+		String gunId = itemStack.getItem() instanceof TaczMvpGunItem gunItem ? gunItem.gunId() : "glock_17";
+		return mainAnimation != null
+			&& gunId.equals(mainAnimation.gunId())
+			&& mainAnimation.currentAnimation().name().startsWith("reload_")
+			&& mainAnimation.ageSeconds() <= mainAnimation.totalDurationSeconds();
 	}
 
 	public record Snapshot(List<ActiveAnimation> animations, float aimProgress) {

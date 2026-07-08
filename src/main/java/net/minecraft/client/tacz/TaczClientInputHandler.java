@@ -155,7 +155,7 @@ public final class TaczClientInputHandler {
 				minecraft.player.getZ(),
 				gunItem.shootSound(),
 				SoundSource.PLAYERS,
-				1.25F,
+				0.8F,
 				0.96F + minecraft.level.random.nextFloat() * 0.08F
 			);
 	}

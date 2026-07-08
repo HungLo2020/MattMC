@@ -27,6 +27,7 @@ import net.minecraft.world.level.Level;
 public class TaczMvpGunItem extends Item implements TaczRefitGun {
 	private static final String AMMO_KEY = "TaczMvpAmmo";
 	private static final String FIRE_MODE_KEY = "TaczFireMode";
+	private static final float SHOOT_SOUND_VOLUME = 0.8F;
 	private final TaczGunDefinitions.Gun definition;
 
 	public TaczMvpGunItem(Item.Properties properties) {
@@ -177,10 +178,14 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 
 		setAmmo(itemStack, getAmmo(itemStack) - 1);
 		player.awardStat(Stats.ITEM_USED.get(this));
-		serverLevel.playSound(player, player.getX(), player.getY(), player.getZ(), this.sound("shoot"), SoundSource.PLAYERS, 1.25F, 0.96F + serverLevel.random.nextFloat() * 0.08F);
+		serverLevel.playSound(player, player.getX(), player.getY(), player.getZ(), this.sound("shoot"), SoundSource.PLAYERS, SHOOT_SOUND_VOLUME, 0.96F + serverLevel.random.nextFloat() * 0.08F);
 	}
 
 	public InteractionResult tryStartReload(Level level, Player player, InteractionHand interactionHand, ItemStack itemStack) {
+		if (player.isUsingItem()) {
+			return InteractionResult.FAIL;
+		}
+
 		if (getAmmo(itemStack) >= getMagazineSize(itemStack) || this.definition.magazineSize() <= 0) {
 			return InteractionResult.FAIL;
 		}

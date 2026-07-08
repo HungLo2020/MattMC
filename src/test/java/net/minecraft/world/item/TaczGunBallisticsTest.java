@@ -157,13 +157,116 @@ class TaczGunBallisticsTest {
 	}
 
 	@Test
-	void reloadAudioComesFromTaczAnimationKeyframesOnly() throws IOException {
+	void reloadAudioComesFromDisplaySoundsLikeUpstream() throws IOException {
 		String item = readSource("src/main/java/net/minecraft/world/item/TaczMvpGunItem.java");
 		String animationSounds = readSource("src/main/java/net/minecraft/client/tacz/TaczAnimationSoundEffects.java");
+		String controller = readSource("src/main/java/net/minecraft/client/tacz/TaczGlock17AnimationController.java");
 
-		assertTrue(animationSounds.contains("sound_effects"), "TACZ reload audio should be scheduled from animation sound_effects keyframes");
+		assertTrue(controller.contains("boolean playedDisplayReload = TaczAnimationSoundEffects.playReload(itemStack, TaczMvpGunItem.getAmmo(itemStack) <= 0)"),
+			"Reload should play one display-level reload sound at reload start like upstream SoundPlayManager.playReloadSound");
+		assertTrue(controller.contains("triggerMain(itemStack, TaczGunAnimationTimings.reloadSequence(itemStack), !playedDisplayReload)"),
+			"Reload animation keyframe sounds should be suppressed only when a display reload sound was actually found");
+		assertTrue(animationSounds.contains("\"display/guns/\" + gunId + \"_display.json\""),
+			"Reload sounds should come from the imported gun display sounds table");
+		assertTrue(animationSounds.contains("reload_empty") && animationSounds.contains("reload_tactical"),
+			"Reload sound selection must preserve upstream empty versus tactical variants");
+		assertTrue(animationSounds.contains("importedSoundEventForDisplayTarget"),
+			"Display sound events imported under legacy names must be resolved through their actual sound targets");
 		assertFalse(item.contains("this.sound(\"reload_start\")"), "Item-level reload_start audio duplicates animation keyframe audio");
 		assertFalse(item.contains("this.sound(\"reload_end\")"), "Item-level reload_end audio duplicates animation keyframe audio");
+	}
+
+	@Test
+	void mk14AndM1GarandReloadAudioUseDisplayEntriesForDifferentReasons() throws IOException {
+		JsonObject mk14Display = JsonParser.parseString(readSource("src/main/resources/assets/minecraft/display/guns/mk14_display.json")).getAsJsonObject();
+		JsonObject mk14Reload = JsonParser.parseString(readSource("src/main/resources/assets/minecraft/animations/mk14.animation.json"))
+			.getAsJsonObject()
+			.getAsJsonObject("animations")
+			.getAsJsonObject("reload_tactical");
+		JsonObject garandDisplay = JsonParser.parseString(readSource("src/main/resources/assets/minecraft/display/guns/m1_garand_display.json")).getAsJsonObject();
+		JsonObject garandReload = JsonParser.parseString(readSource("src/main/resources/assets/minecraft/animations/m1_garand.animation.json"))
+			.getAsJsonObject()
+			.getAsJsonObject("animations")
+			.getAsJsonObject("reload_tactical");
+		JsonObject sounds = JsonParser.parseString(readSource("src/main/resources/assets/minecraft/sounds.json")).getAsJsonObject();
+
+		assertEquals("minecraft:mk14/mk14_reload_empty", mk14Display.getAsJsonObject("sounds").get("reload_empty").getAsString());
+		assertEquals("minecraft:mk14/mk14_reload_tactical", mk14Display.getAsJsonObject("sounds").get("reload_tactical").getAsString());
+		assertTrue(mk14Reload.getAsJsonObject("sound_effects").size() > 1,
+			"MK14 has multiple reload animation sound keyframes, so reload audio must not also schedule that sequence");
+
+		assertEquals("minecraft:rifles/m1_garand/m1_garand_reload_empty", garandDisplay.getAsJsonObject("sounds").get("reload_empty").getAsString());
+		assertEquals("minecraft:rifles/m1_garand/m1_garand_reload_normal", garandDisplay.getAsJsonObject("sounds").get("reload_tactical").getAsString());
+		assertFalse(garandReload.has("sound_effects"),
+			"M1 Garand has no reload animation sound keyframes, so display reload audio is required");
+
+		assertEquals("minecraft:tacz_sounds/mk14/mk14_reload_empty",
+			sounds.getAsJsonObject("mk14.reload_start").getAsJsonArray("sounds").get(0).getAsString());
+		assertEquals("minecraft:tacz_sounds/rifles/m1_garand/m1_garand_reload_empty",
+			sounds.getAsJsonObject("m1_garand.reload_end").getAsJsonArray("sounds").get(0).getAsString());
+	}
+
+	@Test
+	void vectorReloadFallsBackToAnimationKeyframesBecauseUpstreamDisplayHasNoReloadSounds() throws IOException {
+		JsonObject vectorDisplay = JsonParser.parseString(readSource("src/main/resources/assets/minecraft/display/guns/vector45_display.json")).getAsJsonObject();
+		JsonObject vectorReload = JsonParser.parseString(readSource("src/main/resources/assets/minecraft/animations/vector45.animation.json"))
+			.getAsJsonObject()
+			.getAsJsonObject("animations")
+			.getAsJsonObject("reload_tactical");
+		JsonObject sounds = JsonParser.parseString(readSource("src/main/resources/assets/minecraft/sounds.json")).getAsJsonObject();
+
+		assertFalse(vectorDisplay.getAsJsonObject("sounds").has("reload_empty"),
+			"Vector's upstream display does not define display-level reload sounds");
+		assertFalse(vectorDisplay.getAsJsonObject("sounds").has("reload_tactical"),
+			"Vector's upstream display does not define display-level reload sounds");
+		assertTrue(vectorReload.getAsJsonObject("sound_effects").size() > 1,
+			"Vector reload audio is carried by animation keyframes and must remain scheduled");
+		assertEquals("minecraft:tacz_sounds/victor45/victor_reload_raise",
+			sounds.getAsJsonObject("victor45/victor_reload_raise").getAsJsonArray("sounds").get(0).getAsString());
+	}
+
+	@Test
+	void reloadInputDoesNotRescheduleTheSameAnimationSoundSequence() throws IOException {
+		String item = readSource("src/main/java/net/minecraft/world/item/TaczMvpGunItem.java");
+		String controller = readSource("src/main/java/net/minecraft/client/tacz/TaczGlock17AnimationController.java");
+
+		assertTrue(item.contains("if (player.isUsingItem())"),
+			"Server reload handling must not restart use duration or reload sounds while a reload is already active");
+		assertTrue(controller.contains("if (isReloading(itemStack))"),
+			"Client reload animation scheduling must ignore repeated reload input while the same gun is already reloading");
+	}
+
+	@Test
+	void shootAnimationAudioDoesNotDuplicateTheGunReportSound() throws IOException {
+		String clientInput = readSource("src/main/java/net/minecraft/client/tacz/TaczClientInputHandler.java");
+		String item = readSource("src/main/java/net/minecraft/world/item/TaczMvpGunItem.java");
+		String controller = readSource("src/main/java/net/minecraft/client/tacz/TaczGlock17AnimationController.java");
+		String animationSounds = readSource("src/main/java/net/minecraft/client/tacz/TaczAnimationSoundEffects.java");
+		JsonObject sounds = JsonParser.parseString(readSource("src/main/resources/assets/minecraft/sounds.json")).getAsJsonObject();
+		JsonObject m1Animation = JsonParser.parseString(readSource("src/main/resources/assets/minecraft/animations/m1.animation.json")).getAsJsonObject();
+
+		assertTrue(controller.contains("TaczAnimationSoundEffects.scheduleShoot(itemStack, animationName)"),
+			"Shoot animations need duplicate-aware sound scheduling");
+		assertTrue(animationSounds.contains("duplicatesGunShootSound") && animationSounds.contains("ResourceLocation.withDefaultNamespace(gunId + \".shoot\")"),
+			"Animation sound scheduling must compare shoot keyframes against the runtime gunId.shoot event");
+		assertTrue(animationSounds.contains("soundEventTargets"),
+			"Duplicate detection must resolve sounds.json aliases instead of relying only on event-name equality");
+		assertTrue(clientInput.contains("SoundSource.PLAYERS,\n\t\t\t\t0.8F,"),
+			"Local gun report volume should match upstream TACZ's 0.8 first-person shoot volume");
+		assertTrue(item.contains("SHOOT_SOUND_VOLUME = 0.8F"),
+			"Server gun report volume should match the local TACZ shoot volume");
+
+		String m1ShootEffect = m1Animation.getAsJsonObject("animations")
+			.getAsJsonObject("shoot")
+			.getAsJsonObject("sound_effects")
+			.getAsJsonObject("0.0")
+			.get("effect")
+			.getAsString();
+		String m1ShootTarget = sounds.getAsJsonObject("m1.shoot").getAsJsonArray("sounds").get(0).getAsString();
+		String m1AnimationTarget = sounds.getAsJsonObject(m1ShootEffect.substring("minecraft:".length())).getAsJsonArray("sounds").get(0).getAsString();
+
+		assertEquals(m1ShootTarget, m1AnimationTarget,
+			"The M1 Carbine shoot animation keyframe resolves to the same sound as the item gun report and must be suppressed");
 	}
 
 	private static void assertDamagePoint(DamagePoint actual, float distance, float damage) {
