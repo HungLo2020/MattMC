@@ -19,7 +19,7 @@
 		"**/build/**": true,
 		"**/out/**": true,
 		"**/run/**": true,
-    "**/logs/**": true,
+    	"**/logs/**": true,
 		"**/.git/objects/**": true
 	},
 	"java.import.exclusions": [
@@ -27,8 +27,9 @@
 		"**/.gradle/**",
 		"**/build/**",
 		"**/out/**",
-    "**/logs/**",
-		"**/run/**"
+    	"**/logs/**",
+		"**/run/**",
+		"**/frnsrc/**",
 	],
 	"java.configuration.updateBuildConfiguration": "automatic"
 }
