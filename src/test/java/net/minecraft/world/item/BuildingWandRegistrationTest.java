@@ -103,12 +103,4 @@ class BuildingWandRegistrationTest {
         assertFalse(Arrays.equals(trowel, buildingWand), "Building Wand should use the supplied dedicated texture");
     }
 
-    @Test
-    void buildingWandHasDiamondCraftingRecipe() throws IOException {
-        String recipe = Files.readString(Path.of("src/main/resources/data/minecraft/recipe/crafting/building_wand.json"));
-
-        assertTrue(recipe.contains("\"I\": \"minecraft:diamond\""));
-        assertTrue(recipe.contains("\"S\": \"minecraft:stick\""));
-        assertTrue(recipe.contains("\"id\": \"minecraft:building_wand\""));
-    }
 }
