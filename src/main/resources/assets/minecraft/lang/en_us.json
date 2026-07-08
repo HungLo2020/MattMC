@@ -7970,7 +7970,7 @@
   "test_instance_block.starting": "Starting test %s",
   "test_instance_block.test_id": "Test Instance ID",
   "title.32bit.deprecation": "32-bit system detected: this may prevent you from playing in the future as a 64-bit system will be required!",
-  "title.credits": "Copyright Mojang AB. Do not distribute!",
+  "title.credits": "MattMC; Minecraft Java 1.21.10 Fork",
   "title.multiplayer.disabled": "Multiplayer is disabled. Please check your Microsoft account settings.",
   "title.multiplayer.disabled.banned.name": "You must change your name before you can play online",
   "title.multiplayer.disabled.banned.permanent": "Your account is permanently suspended from online play",
