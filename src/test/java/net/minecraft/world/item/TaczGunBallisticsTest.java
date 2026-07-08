@@ -1,13 +1,17 @@
 package net.minecraft.world.item;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Map;
 import net.minecraft.world.item.TaczGunBallistics.DamagePoint;
 import net.minecraft.world.item.TaczGunBallistics.SpreadOffset;
 import net.minecraft.world.item.TaczGunBallistics.Vec3Like;
@@ -133,6 +137,33 @@ class TaczGunBallisticsTest {
 			"Bullet damage must be selected from the gunpack curve");
 		assertTrue(!bullet.contains("distance <= 24.0") && !bullet.contains("distance >= 48.0"),
 			"The old hard-coded 24-48 block falloff must not return");
+	}
+
+	@Test
+	void displayShootAliasesTargetImportedTaczSounds() throws IOException {
+		JsonObject sounds = JsonParser.parseString(readSource("src/main/resources/assets/minecraft/sounds.json")).getAsJsonObject();
+		Map<String, String> aliases = Map.of(
+			"deagle_golden.shoot", "minecraft:tacz_sounds/deagle/deagle_shoot",
+			"hk_mk23.shoot", "minecraft:tacz_sounds/mk23/mk23_shoot",
+			"sks_tactical.shoot", "minecraft:tacz_sounds/sks/sks_shoot",
+			"vector45.shoot", "minecraft:tacz_sounds/victor45/vector_shoot"
+		);
+
+		for (Map.Entry<String, String> alias : aliases.entrySet()) {
+			JsonObject sound = sounds.getAsJsonObject(alias.getKey());
+			assertTrue(sound != null, alias.getKey() + " must exist because item shooting resolves gunId.shoot");
+			assertEquals(alias.getValue(), sound.getAsJsonArray("sounds").get(0).getAsString());
+		}
+	}
+
+	@Test
+	void reloadAudioComesFromTaczAnimationKeyframesOnly() throws IOException {
+		String item = readSource("src/main/java/net/minecraft/world/item/TaczMvpGunItem.java");
+		String animationSounds = readSource("src/main/java/net/minecraft/client/tacz/TaczAnimationSoundEffects.java");
+
+		assertTrue(animationSounds.contains("sound_effects"), "TACZ reload audio should be scheduled from animation sound_effects keyframes");
+		assertFalse(item.contains("this.sound(\"reload_start\")"), "Item-level reload_start audio duplicates animation keyframe audio");
+		assertFalse(item.contains("this.sound(\"reload_end\")"), "Item-level reload_end audio duplicates animation keyframe audio");
 	}
 
 	private static void assertDamagePoint(DamagePoint actual, float distance, float damage) {

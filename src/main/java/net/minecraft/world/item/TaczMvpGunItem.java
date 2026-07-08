@@ -194,7 +194,6 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 		}
 
 		player.startUsingItem(interactionHand);
-		level.playSound(null, player.getX(), player.getY(), player.getZ(), this.sound("reload_start"), SoundSource.PLAYERS, 0.9F, 1.0F);
 		return InteractionResult.CONSUME;
 	}
 
@@ -204,8 +203,6 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 			if (!level.isClientSide()) {
 				this.reload(itemStack, player);
 			}
-
-			level.playSound(null, livingEntity.getX(), livingEntity.getY(), livingEntity.getZ(), this.sound("reload_end"), SoundSource.PLAYERS, 0.9F, 1.0F);
 		}
 
 		return itemStack;

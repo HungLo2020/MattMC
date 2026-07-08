@@ -24772,6 +24772,12 @@
                                         "minecraft:tacz_sounds/deagle/deagle_shoot"
                                     ]
                      },
+    "deagle_golden.shoot":  {
+                                "subtitle":  "subtitles.minecraft.deagle_golden.shoot",
+                                "sounds":  [
+                                               "minecraft:tacz_sounds/deagle/deagle_shoot"
+                                           ]
+                            },
     "deagle.reload_start":  {
                                 "subtitle":  "subtitles.minecraft.deagle.reload",
                                 "sounds":  [
@@ -24892,6 +24898,12 @@
                                        "minecraft:tacz_sounds/hk_g3/hk_g3_reload_empty_carrierback"
                                    ]
                     },
+    "hk_mk23.shoot":  {
+                          "subtitle":  "subtitles.minecraft.hk_mk23.shoot",
+                          "sounds":  [
+                                         "minecraft:tacz_sounds/mk23/mk23_shoot"
+                                     ]
+                      },
     "hk_mp5a5.shoot":  {
                            "subtitle":  "subtitles.minecraft.hk_mp5a5.shoot",
                            "sounds":  [
@@ -25462,6 +25474,12 @@
                                         "minecraft:tacz_sounds/scar_l/scar_l_shoot"
                                     ]
                      },
+    "sks_tactical.shoot":  {
+                               "subtitle":  "subtitles.minecraft.sks_tactical.shoot",
+                               "sounds":  [
+                                              "minecraft:tacz_sounds/sks/sks_shoot"
+                                          ]
+                           },
     "scar_l.reload_start":  {
                                 "subtitle":  "subtitles.minecraft.scar_l.reload",
                                 "sounds":  [
@@ -31405,6 +31423,12 @@
                                              "minecraft:tacz_sounds/ump45/ump45_shoot"
                                          ]
                           },
+    "vector45.shoot":  {
+                           "subtitle":  "subtitles.minecraft.vector45.shoot",
+                           "sounds":  [
+                                          "minecraft:tacz_sounds/victor45/vector_shoot"
+                                      ]
+                       },
     "victor45/victor_draw":  {
                                  "subtitle":  "subtitles.minecraft.victor45.victor_draw",
                                  "sounds":  [
