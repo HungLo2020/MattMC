@@ -371,27 +371,41 @@ public class VulkanBackendSpirvPathTest {
     }
 
     @Test
-    public void testNormalizeForVulkanKeepsShadowTextureSamplingCoordsNative() {
+    public void testNormalizeForVulkanFlipsShadowTextureSamplingCoords() {
         String source = "#version 330\n"
             + "uniform sampler2DShadow shadowtex0;\n"
             + "uniform sampler2DShadow shadowtex1;\n"
+            + "uniform sampler2DShadow shadow;\n"
+            + "uniform sampler2D shadowcolor0;\n"
+            + "uniform sampler2D shadowcolor1;\n"
             + "uniform sampler2D noisetex;\n"
             + "out vec4 fragColor;\n"
             + "void main(){"
             + "vec3 shadowPosition = vec3(0.25, 0.75, 0.5);"
+            + "ivec2 shadowPixel = ivec2(12, 34);"
             + "float shadow0 = texture(shadowtex0, shadowPosition).x;"
             + "float shadow1 = texture2D(shadowtex1, vec3(shadowPosition.st, shadowPosition.z)).x;"
+            + "float shadow2 = textureLod(shadow, shadowPosition, 0).x;"
+            + "float shadow3 = texelFetch(shadowtex0, shadowPixel, 0).x;"
+            + "float shadowColor = texture(shadowcolor0, shadowPosition.xy).r;"
+            + "float shadowColorTexel = texelFetch(shadowcolor1, shadowPixel, 0).r;"
             + "float noise = texture(noisetex, shadowPosition.xy).r;"
-            + "fragColor = vec4(shadow0 + shadow1 + noise);"
+            + "fragColor = vec4(shadow0 + shadow1 + shadow2 + shadow3 + shadowColor + shadowColorTexel + noise);"
             + "}";
 
         String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
 
-        assertTrue(normalized.contains("texture(shadowtex0, shadowPosition).x"));
-        assertTrue(normalized.contains("texture2D(shadowtex1, vec3(shadowPosition.st, shadowPosition.z)).x"));
+        assertTrue(normalized.contains("texture(shadowtex0, vec3((shadowPosition).x, 1.0f - (shadowPosition).y, (shadowPosition).z)).x"));
+        assertTrue(normalized.contains("texture2D(shadowtex1, vec3((vec3(shadowPosition.st, shadowPosition.z)).x, 1.0f - (vec3(shadowPosition.st, shadowPosition.z)).y, (vec3(shadowPosition.st, shadowPosition.z)).z)).x"));
+        assertTrue(normalized.contains("textureLod(shadow, vec3((shadowPosition).x, 1.0f - (shadowPosition).y, (shadowPosition).z), 0).x"));
+        assertTrue(normalized.contains("texelFetch(shadowtex0, ivec2((shadowPixel).x, textureSize(shadowtex0, 0).y - 1 - (shadowPixel).y), 0).x"));
+        assertTrue(normalized.contains("texture(shadowcolor0, vec2((shadowPosition.xy).x, 1.0f - (shadowPosition.xy).y)).r"));
+        assertTrue(normalized.contains("texelFetch(shadowcolor1, ivec2((shadowPixel).x, textureSize(shadowcolor1, 0).y - 1 - (shadowPixel).y), 0).r"));
         assertTrue(normalized.contains("texture(noisetex, shadowPosition.xy).r"));
-        assertFalse(normalized.contains("texture(shadowtex0, vec3((shadowPosition).x, 1.0f - (shadowPosition).y"));
-        assertFalse(normalized.contains("texture2D(shadowtex1, vec3((vec3(shadowPosition.st, shadowPosition.z)).x, 1.0f - (vec3(shadowPosition.st, shadowPosition.z)).y"));
+        assertFalse(normalized.contains("texture(shadowtex0, shadowPosition).x"));
+        assertFalse(normalized.contains("texture2D(shadowtex1, vec3(shadowPosition.st, shadowPosition.z)).x"));
+        assertFalse(normalized.contains("texelFetch(shadowtex0, shadowPixel, 0).x"));
+        assertFalse(normalized.contains("texelFetch(shadowcolor1, shadowPixel, 0).r"));
     }
 
     @Test

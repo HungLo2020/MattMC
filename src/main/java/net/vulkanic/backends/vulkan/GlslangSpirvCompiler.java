@@ -1,7 +1,9 @@
 package net.vulkanic.backends.vulkan;
 
+import net.logging.LogUtils;
 import net.vulkanic.VulkanicShaderStage;
 import net.vulkanic.VulkanicSpirvModule;
+import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -10,9 +12,16 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 
 final class GlslangSpirvCompiler implements SpirvCompiler {
 
+    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final boolean TRACE_SHADOW_FOG_SHADER_NORMALIZATION =
+        Boolean.getBoolean("mattmc.vulkan.traceShadowFogShaderNormalization");
+    private static final int MAX_SHADOW_FOG_SHADER_NORMALIZATION_LOGS =
+        Integer.getInteger("mattmc.vulkan.traceShadowFogShaderNormalization.maxLogs", 200);
+    private static final AtomicInteger shadowFogShaderNormalizationLogCount = new AtomicInteger();
     private static final java.util.regex.Pattern LEGACY_VERTEX_ID_PATTERN = java.util.regex.Pattern.compile("\\bgl_VertexID\\b");
     private static final java.util.regex.Pattern LEGACY_INSTANCE_ID_PATTERN = java.util.regex.Pattern.compile("\\bgl_InstanceID\\b");
     private static final java.util.regex.Pattern LEGACY_FRAG_COORD_Y_PATTERN = java.util.regex.Pattern.compile("\\bgl_FragCoord\\s*\\.\\s*y\\b");
@@ -224,6 +233,7 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         if (stage == VulkanicShaderStage.FRAGMENT) {
             normalized = rewriteFragmentCoordForVulkan(normalized);
             normalized = rewriteFramebufferTextureSamplingForVulkan(normalized);
+            traceShadowFogTextureNormalization(stage, sourceName, normalized);
         }
 
         if (stage != VulkanicShaderStage.VERTEX) {
@@ -430,7 +440,7 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
     }
 
     private static String rewriteFramebufferTextureSamplingForVulkan(String shaderSource) {
-        if (!shaderSource.contains("texture")) {
+        if (!shaderSource.contains("texture") && !shaderSource.contains("texelFetch")) {
             return shaderSource;
         }
 
@@ -453,7 +463,7 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
 
             String functionName = shaderSource.substring(callStart, openParen);
             String arguments = shaderSource.substring(openParen + 1, closeParen);
-            String replacementArguments = rewriteFramebufferTextureArguments(arguments);
+            String replacementArguments = rewriteFramebufferTextureArguments(functionName, arguments);
             rewritten.append(functionName)
                 .append('(')
                 .append(replacementArguments)
@@ -467,35 +477,60 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
     private static int nextTextureCall(String shaderSource, int start) {
         int texture = indexOfFunctionCall(shaderSource, "texture", start);
         int texture2D = indexOfFunctionCall(shaderSource, "texture2D", start);
-        if (texture < 0) {
-            return texture2D;
+        int textureLod = indexOfFunctionCall(shaderSource, "textureLod", start);
+        int texelFetch = indexOfFunctionCall(shaderSource, "texelFetch", start);
+        int next = -1;
+        if (texture >= 0) {
+            next = texture;
         }
-        if (texture2D < 0) {
-            return texture;
+        if (texture2D >= 0 && (next < 0 || texture2D < next)) {
+            next = texture2D;
         }
-        return Math.min(texture, texture2D);
+        if (textureLod >= 0 && (next < 0 || textureLod < next)) {
+            next = textureLod;
+        }
+        if (texelFetch >= 0 && (next < 0 || texelFetch < next)) {
+            next = texelFetch;
+        }
+        return next;
     }
 
-    private static String rewriteFramebufferTextureArguments(String arguments) {
+    private static String rewriteFramebufferTextureArguments(String functionName, String arguments) {
         List<int[]> argumentRanges = topLevelArgumentRanges(arguments);
         if (argumentRanges.size() < 2) {
             return arguments;
         }
 
         String sampler = slice(arguments, argumentRanges.get(0)).trim();
-        if (!isFramebufferSamplerName(sampler)) {
+        int[] coordRange = argumentRanges.get(1);
+        String coord = slice(arguments, coordRange).trim();
+        if (coord.isEmpty()
+            || coord.contains("vulkanicFramebufferTexCoord")
+            || coord.contains("vulkanicShadowTextureCoord")
+            || coord.contains("vulkanicShadowTexelFetchCoord")) {
             return arguments;
         }
 
-        int[] coordRange = argumentRanges.get(1);
-        String coord = slice(arguments, coordRange).trim();
-        if (coord.isEmpty() || coord.contains("vulkanicFramebufferTexCoord")) {
+        String replacementCoord;
+        if (isFramebufferSamplerName(sampler) && functionName.equals("texelFetch")) {
+            return arguments;
+        } else if (isFramebufferSamplerName(sampler)) {
+            replacementCoord = framebufferTextureCoordExpression(coord);
+        } else if (isShadowDepthSamplerName(sampler) && functionName.equals("texelFetch")) {
+            replacementCoord = shadowTexelFetchCoordExpression(sampler, coord);
+        } else if (isShadowDepthSamplerName(sampler)) {
+            replacementCoord = shadowTextureCoordExpression(coord);
+        } else if (isShadowColorSamplerName(sampler) && functionName.equals("texelFetch")) {
+            replacementCoord = shadowTexelFetchCoordExpression(sampler, coord);
+        } else if (isShadowColorSamplerName(sampler)) {
+            replacementCoord = framebufferTextureCoordExpression(coord);
+        } else {
             return arguments;
         }
 
         StringBuilder rewritten = new StringBuilder(arguments.length() + coord.length() + 64);
         rewritten.append(arguments, 0, coordRange[0]);
-        rewritten.append(framebufferTextureCoordExpression(coord));
+        rewritten.append(replacementCoord);
         rewritten.append(arguments, coordRange[1], arguments.length());
         return rewritten.toString();
     }
@@ -542,8 +577,150 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
             || sampler.matches("dhDepthTex\\d*");
     }
 
+    private static boolean isShadowSamplerName(String sampler) {
+        return isShadowDepthSamplerName(sampler) || isShadowColorSamplerName(sampler);
+    }
+
+    private static boolean isShadowDepthSamplerName(String sampler) {
+        return sampler.matches("shadowtex\\d*(?:HW|DH)?")
+            || sampler.equals("shadow")
+            || sampler.equals("watershadow");
+    }
+
+    private static boolean isShadowColorSamplerName(String sampler) {
+        return sampler.matches("shadowcolor\\d*");
+    }
+
+    private static void traceShadowFogTextureNormalization(
+        VulkanicShaderStage stage,
+        String sourceName,
+        String shaderSource
+    ) {
+        if (!TRACE_SHADOW_FOG_SHADER_NORMALIZATION) {
+            return;
+        }
+
+        TextureCallStats stats = textureCallStats(shaderSource);
+        if (!stats.hasInterestingCalls()) {
+            return;
+        }
+
+        int logIndex = shadowFogShaderNormalizationLogCount.incrementAndGet();
+        if (logIndex > MAX_SHADOW_FOG_SHADER_NORMALIZATION_LOGS) {
+            return;
+        }
+
+        LOGGER.info(
+            "ShadowFogShaderNormalizationTrace#{} stage={} source={} framebufferTextureCalls={} shadowTextureCalls={} shadowTextureCallsNative={} shadowTexelFetchCalls={} shadowTexelFetchNative={}",
+            logIndex,
+            stage,
+            sourceName == null ? "unknown" : sourceName,
+            stats.framebufferTextureCalls(),
+            stats.shadowTextureCalls(),
+            stats.shadowTextureCallsNative(),
+            stats.shadowTexelFetchCalls(),
+            stats.shadowTexelFetchNative()
+        );
+    }
+
+    private static TextureCallStats textureCallStats(String shaderSource) {
+        TextureCallStats stats = new TextureCallStats();
+        countTextureFunctionCalls(shaderSource, "texture", false, stats);
+        countTextureFunctionCalls(shaderSource, "texture2D", false, stats);
+        countTextureFunctionCalls(shaderSource, "textureLod", false, stats);
+        countTextureFunctionCalls(shaderSource, "texelFetch", true, stats);
+        return stats;
+    }
+
+    private static void countTextureFunctionCalls(
+        String shaderSource,
+        String functionName,
+        boolean texelFetch,
+        TextureCallStats stats
+    ) {
+        int cursor = 0;
+        while (cursor < shaderSource.length()) {
+            int callStart = indexOfFunctionCall(shaderSource, functionName, cursor);
+            if (callStart < 0) {
+                return;
+            }
+
+            int openParen = shaderSource.indexOf('(', callStart);
+            int closeParen = findMatchingParen(shaderSource, openParen);
+            if (openParen < 0 || closeParen < 0) {
+                return;
+            }
+
+            String arguments = shaderSource.substring(openParen + 1, closeParen);
+            List<int[]> argumentRanges = topLevelArgumentRanges(arguments);
+            if (argumentRanges.size() >= 2) {
+                String sampler = slice(arguments, argumentRanges.get(0)).trim();
+                String coord = slice(arguments, argumentRanges.get(1)).trim();
+                if (isFramebufferSamplerName(sampler)) {
+                    stats.framebufferTextureCalls++;
+                } else if (isShadowSamplerName(sampler)) {
+                    if (texelFetch) {
+                        stats.shadowTexelFetchCalls++;
+                        if (!coord.contains("1.0f -") && !coord.contains("textureSize(")) {
+                            stats.shadowTexelFetchNative++;
+                        }
+                    } else {
+                        stats.shadowTextureCalls++;
+                        if (!coord.contains("1.0f -")) {
+                            stats.shadowTextureCallsNative++;
+                        }
+                    }
+                }
+            }
+
+            cursor = closeParen + 1;
+        }
+    }
+
     private static String framebufferTextureCoordExpression(String coord) {
         return "vec2((" + coord + ").x, 1.0f - (" + coord + ").y)";
+    }
+
+    private static String shadowTextureCoordExpression(String coord) {
+        return "vec3((" + coord + ").x, 1.0f - (" + coord + ").y, (" + coord + ").z)";
+    }
+
+    private static String shadowTexelFetchCoordExpression(String sampler, String coord) {
+        return "ivec2((" + coord + ").x, textureSize(" + sampler + ", 0).y - 1 - (" + coord + ").y)";
+    }
+
+    private static final class TextureCallStats {
+        private int framebufferTextureCalls;
+        private int shadowTextureCalls;
+        private int shadowTextureCallsNative;
+        private int shadowTexelFetchCalls;
+        private int shadowTexelFetchNative;
+
+        boolean hasInterestingCalls() {
+            return framebufferTextureCalls > 0
+                || shadowTextureCalls > 0
+                || shadowTexelFetchCalls > 0;
+        }
+
+        int framebufferTextureCalls() {
+            return framebufferTextureCalls;
+        }
+
+        int shadowTextureCalls() {
+            return shadowTextureCalls;
+        }
+
+        int shadowTextureCallsNative() {
+            return shadowTextureCallsNative;
+        }
+
+        int shadowTexelFetchCalls() {
+            return shadowTexelFetchCalls;
+        }
+
+        int shadowTexelFetchNative() {
+            return shadowTexelFetchNative;
+        }
     }
 
     private static String rewriteMinecraftLightingNormalsForVulkan(String shaderSource) {
