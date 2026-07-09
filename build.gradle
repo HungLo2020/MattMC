@@ -316,6 +316,12 @@ def rustManifest = file('src/main/rust/Cargo.toml')
 def rustTargetDir = layout.buildDirectory.dir('rust/target')
 def rustBuiltNativesDir = layout.buildDirectory.dir('rust/native')
 def rustCargoLibraryName = System.mapLibraryName('mattmc_rust')
+def rustCargoProfile = (findProperty('mattmcRustProfile') ?: 'dev').toString()
+def rustCargoProfileDir = rustCargoProfile == 'dev' ? 'debug' : rustCargoProfile
+def rustCargoBuildCommand = ['cargo', 'build', '--manifest-path', rustManifest.absolutePath, '--locked']
+if (rustCargoProfile != 'dev') {
+    rustCargoBuildCommand += ['--profile', rustCargoProfile]
+}
 def resolveRustNativePlatformKey = {
     def osName = System.getProperty('os.name').toLowerCase()
     def osPart
@@ -362,13 +368,14 @@ tasks.register('buildRustNative', Exec) {
     description = 'Builds the mandatory Rust native library used by Java code.'
 
     inputs.files(rustSourceFiles)
+    inputs.property('mattmcRustProfile', rustCargoProfile)
     outputs.file(rustBuiltNativesDir.map { it.file(rustNativeFileName) })
 
     environment 'CARGO_TARGET_DIR', rustTargetDir.get().asFile.absolutePath
-    commandLine 'cargo', 'build', '--manifest-path', rustManifest.absolutePath, '--locked'
+    commandLine rustCargoBuildCommand
 
     doLast {
-        def cargoLibrary = rustTargetDir.get().file("debug/${rustCargoLibraryName}").asFile
+        def cargoLibrary = rustTargetDir.get().file("${rustCargoProfileDir}/${rustCargoLibraryName}").asFile
         if (!cargoLibrary.isFile()) {
             throw new GradleException("Cargo did not produce expected Rust native library: ${cargoLibrary}")
         }

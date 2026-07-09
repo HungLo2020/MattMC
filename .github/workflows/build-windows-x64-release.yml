@@ -44,7 +44,7 @@ jobs:
 
       - name: Build client distribution zip
         shell: pwsh
-        run: .\gradlew.bat clean clientDistZip --no-daemon
+        run: .\gradlew.bat clean clientDistZip -PmattmcRustProfile=release --no-daemon
 
       - name: Locate and label Windows x64 zip
         id: metadata

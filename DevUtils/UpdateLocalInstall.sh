@@ -38,8 +38,8 @@ echo "  MattMC Local Install Update"
 echo "========================================="
 echo ""
 
-echo "[1/6] Building fresh jar and Rust native..."
-./gradlew clean buildRustNative jar --rerun-tasks --no-daemon
+echo "[1/6] Building fresh jar and optimized Rust native..."
+./gradlew clean buildRustNative jar -PmattmcRustProfile=release --rerun-tasks --no-daemon
 
 echo "[2/6] Locating built jar..."
 JAR_FILE="$(find "$PROJECT_ROOT/build/libs" -maxdepth 1 -type f -name "MattMC*.jar" ! -name "*-sources.jar" ! -name "*-javadoc.jar" -printf "%T@ %p\n" 2>/dev/null | sort -nr | head -n 1 | cut -d' ' -f2-)"

@@ -46,7 +46,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build client distribution zip
-        run: ./gradlew clean clientDistZip --no-daemon
+        run: ./gradlew clean clientDistZip -PmattmcRustProfile=release --no-daemon
 
       - name: Locate and label Linux x64 zip
         id: metadata
