@@ -1,6 +1,5 @@
 package net.sodium.client.render.chunk.translucent_sorting.bsp_tree;
 
-import java.nio.IntBuffer;
 import java.lang.Math;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
@@ -16,14 +15,17 @@ import net.sodium.client.util.NativeBuffer;
 class BSPSortState {
     static final int NO_FIXED_OFFSET = Integer.MIN_VALUE;
 
-    private IntBuffer indexBuffer;
+    private final NativeBuffer nativeBuffer;
+    private final int[] quadIndexes;
+    private int quadIndexCount;
 
     private int indexModificationsRemaining;
     private int[] indexMap;
     private int fixedIndexOffset = NO_FIXED_OFFSET;
 
     BSPSortState(NativeBuffer nativeBuffer) {
-        this.indexBuffer = nativeBuffer.getDirectBuffer().asIntBuffer();
+        this.nativeBuffer = nativeBuffer;
+        this.quadIndexes = new int[nativeBuffer.getLength() / TranslucentData.BYTES_PER_QUAD];
     }
 
     void startNode(InnerPartitionBSPNode node) {
@@ -54,14 +56,26 @@ class BSPSortState {
 
     void writeIndex(int index) {
         if (this.indexMap != null) {
-            TranslucentData.writeQuadVertexIndexes(this.indexBuffer, this.indexMap[index]);
+            this.addIndex(this.indexMap[index]);
             checkModificationCounter(1);
         } else if (this.fixedIndexOffset != NO_FIXED_OFFSET) {
-            TranslucentData.writeQuadVertexIndexes(this.indexBuffer, this.fixedIndexOffset + index);
+            this.addIndex(this.fixedIndexOffset + index);
             checkModificationCounter(1);
         } else {
-            TranslucentData.writeQuadVertexIndexes(this.indexBuffer, index);
+            this.addIndex(index);
         }
+    }
+
+    void flush() {
+        TranslucentData.writeQuadVertexIndexes(this.nativeBuffer.getDirectBuffer().asIntBuffer(), this.quadIndexes, this.quadIndexCount);
+    }
+
+    private void addIndex(int index) {
+        if (this.quadIndexCount >= this.quadIndexes.length) {
+            throw new IllegalStateException("BSP sort wrote more quad indexes than the index buffer can hold");
+        }
+
+        this.quadIndexes[this.quadIndexCount++] = index;
     }
 
     /**
@@ -278,11 +292,9 @@ class BSPSortState {
         return indexes[0] < 0;
     }
 
-    private IntConsumer indexConsumer = (int index) -> TranslucentData.writeQuadVertexIndexes(
-            this.indexBuffer, index);
+    private IntConsumer indexConsumer = this::addIndex;
 
-    private IntConsumer indexMapConsumer = (int index) -> TranslucentData.writeQuadVertexIndexes(
-            this.indexBuffer, this.indexMap[index]);
+    private IntConsumer indexMapConsumer = (int index) -> this.addIndex(this.indexMap[index]);
 
     void writeIndexes(int[] indexes) {
         boolean useIndexMap = this.indexMap != null;
@@ -299,14 +311,16 @@ class BSPSortState {
             // uncompressed indexes
             if (useIndexMap) {
                 for (int i = 0; i < indexes.length; i++) {
-                    TranslucentData.writeQuadVertexIndexes(this.indexBuffer, this.indexMap[indexes[i]]);
+                    this.addIndex(this.indexMap[indexes[i]]);
                 }
             } else if (useFixedIndexOffset) {
                 for (int i = 0; i < indexes.length; i++) {
-                    TranslucentData.writeQuadVertexIndexes(this.indexBuffer, this.fixedIndexOffset + indexes[i]);
+                    this.addIndex(this.fixedIndexOffset + indexes[i]);
                 }
             } else {
-                TranslucentData.writeQuadVertexIndexes(this.indexBuffer, indexes);
+                for (int i = 0; i < indexes.length; i++) {
+                    this.addIndex(indexes[i]);
+                }
             }
             valueCount = indexes.length;
         }

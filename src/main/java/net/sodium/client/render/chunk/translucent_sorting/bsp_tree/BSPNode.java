@@ -29,7 +29,9 @@ public abstract class BSPNode {
     abstract void collectSortedQuads(BSPSortState sortState, Vector3fc cameraPos);
 
     public void collectSortedQuads(NativeBuffer nativeBuffer, Vector3fc cameraPos) {
-        this.collectSortedQuads(new BSPSortState(nativeBuffer), cameraPos);
+        var sortState = new BSPSortState(nativeBuffer);
+        this.collectSortedQuads(sortState, cameraPos);
+        sortState.flush();
     }
 
     public static BSPResult buildBSP(TQuad[] quads, SectionPos sectionPos, BSPNode oldRoot,

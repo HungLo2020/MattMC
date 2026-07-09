@@ -3,7 +3,6 @@ package net.sodium.client.render.chunk.translucent_sorting.data;
 import net.sodium.client.render.chunk.translucent_sorting.SortType;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.sodium.api.util.MathUtil;
-import net.sodium.client.util.sorting.RadixSort;
 import net.minecraft.core.SectionPos;
 
 /**
@@ -43,21 +42,15 @@ public class StaticNormalRelativeData extends PresentTranslucentData {
 
         if (quads.length <= 1) {
             // Avoid allocations when there is nothing to sort.
-            TranslucentData.writeQuadVertexIndexes(indexBuffer, 0);
+            TranslucentData.writeFirstQuadVertexIndexes(indexBuffer);
         } else {
             final var keys = new int[quads.length];
-            final var perm = new int[quads.length];
 
             for (int q = 0; q < quads.length; q++) {
                 keys[q] = MathUtil.floatToComparableInt(quads[q].getAccurateDotProduct());
-                perm[q] = q;
             }
 
-            RadixSort.sortIndirect(perm, keys, false);
-
-            for (int i = 0; i < quads.length; i++) {
-                TranslucentData.writeQuadVertexIndexes(indexBuffer, perm[i]);
-            }
+            TranslucentData.writeQuadVertexIndexesSortedByKey(indexBuffer, keys);
         }
 
         return snrData;
@@ -91,22 +84,16 @@ public class StaticNormalRelativeData extends PresentTranslucentData {
             }
 
             if (quadCount == 1) {
-                TranslucentData.writeQuadVertexIndexes(indexBuffer, 0);
+                TranslucentData.writeFirstQuadVertexIndexes(indexBuffer);
                 quadIndex++;
             } else {
                 final var keys = new int[quadCount];
-                final var perm = new int[quadCount];
 
                 for (int idx = 0; idx < quadCount; idx++) {
                     keys[idx] = MathUtil.floatToComparableInt(quads[quadIndex++].getAccurateDotProduct());
-                    perm[idx] = idx;
                 }
 
-                RadixSort.sortIndirect(perm, keys, false);
-
-                for (int idx = 0; idx < quadCount; idx++) {
-                    TranslucentData.writeQuadVertexIndexes(indexBuffer, perm[idx]);
-                }
+                TranslucentData.writeQuadVertexIndexesSortedByKey(indexBuffer, keys);
             }
         }
 

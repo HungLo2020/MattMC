@@ -1,5 +1,7 @@
 use std::slice;
 
+use super::index;
+
 const OK: i32 = 0;
 const ERR_NULL_POINTER: i32 = -1;
 const ERR_INVALID_ARGUMENT: i32 = -2;
@@ -11,6 +13,10 @@ const POSITION_MAX_VALUE: f32 = (1 << 20) as f32;
 const TEXTURE_MAX_VALUE: f32 = (1 << 15) as f32;
 const MODEL_ORIGIN: f32 = 8.0;
 const MODEL_RANGE: f32 = 32.0;
+const INDEX_MODE_NONE: i32 = 0;
+const INDEX_MODE_SHARED: i32 = 1;
+const INDEX_MODE_SORTED_QUADS: i32 = 2;
+const INDEX_MODE_KEY_SORTED: i32 = 3;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -291,6 +297,115 @@ unsafe fn assemble(
     }
 
     OK
+}
+
+unsafe fn assemble_output(
+    input_addresses: *const u64,
+    input_vertex_counts: *const i32,
+    input_count: i32,
+    output_address: u64,
+    output_capacity: i32,
+    vertex_segments: *mut i32,
+    vertex_segments_len: i32,
+    format: NativeFormat,
+    visible_slices: i32,
+    force_unassigned: i32,
+    slice_reordering: i32,
+    index_output_address: u64,
+    index_output_capacity: i32,
+    index_mode: i32,
+    index_stride: i32,
+    index_values: *const i32,
+    index_value_count: i32,
+) -> i32 {
+    let status = assemble(
+        input_addresses,
+        input_vertex_counts,
+        input_count,
+        output_address,
+        output_capacity,
+        vertex_segments,
+        vertex_segments_len,
+        format,
+        visible_slices,
+        force_unassigned,
+        slice_reordering,
+    );
+    if status != OK || index_mode == INDEX_MODE_NONE {
+        return status;
+    }
+    if index_output_capacity < 0 || index_output_address == 0 {
+        return if index_output_capacity < 0 {
+            ERR_INVALID_ARGUMENT
+        } else {
+            ERR_NULL_POINTER
+        };
+    }
+
+    match index_mode {
+        INDEX_MODE_SHARED => {
+            let total_vertices = match total_vertex_count(input_vertex_counts, input_count) {
+                Ok(value) => value,
+                Err(status) => return status,
+            };
+            if total_vertices % 4 != 0 {
+                return ERR_INVALID_ARGUMENT;
+            }
+
+            let output = slice::from_raw_parts_mut(
+                index_output_address as *mut u8,
+                index_output_capacity as usize,
+            );
+            index::write_shared_quad_index_buffer(output, index_stride, (total_vertices / 4) as i32)
+        }
+        INDEX_MODE_SORTED_QUADS | INDEX_MODE_KEY_SORTED => {
+            if index_value_count < 0 {
+                return ERR_INVALID_ARGUMENT;
+            }
+            if index_value_count == 0 {
+                return OK;
+            }
+            if index_values.is_null() {
+                return ERR_NULL_POINTER;
+            }
+
+            let index_capacity = (index_output_capacity as usize) / std::mem::size_of::<i32>();
+            let output =
+                slice::from_raw_parts_mut(index_output_address as *mut i32, index_capacity);
+            let values = slice::from_raw_parts(index_values, index_value_count as usize);
+
+            if index_mode == INDEX_MODE_SORTED_QUADS {
+                index::write_sorted_quad_index_buffer(output, values)
+            } else {
+                index::write_key_sorted_quad_index_buffer(output, values)
+            }
+        }
+        _ => ERR_INVALID_ARGUMENT,
+    }
+}
+
+unsafe fn total_vertex_count(
+    input_vertex_counts: *const i32,
+    input_count: i32,
+) -> Result<usize, i32> {
+    if input_vertex_counts.is_null() {
+        return Err(ERR_NULL_POINTER);
+    }
+    if input_count != MODEL_QUAD_FACING_COUNT as i32 {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    let input_vertex_counts = slice::from_raw_parts(input_vertex_counts, MODEL_QUAD_FACING_COUNT);
+    input_vertex_counts
+        .iter()
+        .try_fold(0usize, |acc, count| {
+            let count = usize::try_from(*count).ok()?;
+            if count % 4 != 0 {
+                return None;
+            }
+            acc.checked_add(count)
+        })
+        .ok_or(ERR_INVALID_ARGUMENT)
 }
 
 fn append_segment(
@@ -710,7 +825,7 @@ pub unsafe extern "C" fn mattmc_sodium_chunk_mesh_encode(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_sodium_chunk_mesh_assemble(
+pub unsafe extern "C" fn mattmc_sodium_chunk_mesh_output_assemble(
     input_addresses: *const u64,
     input_vertex_counts: *const i32,
     input_count: i32,
@@ -730,6 +845,12 @@ pub unsafe extern "C" fn mattmc_sodium_chunk_mesh_assemble(
     force_unassigned: i32,
     slice_reordering: i32,
     separate_ao: i32,
+    index_output_address: u64,
+    index_output_capacity: i32,
+    index_mode: i32,
+    index_stride: i32,
+    index_values: *const i32,
+    index_value_count: i32,
 ) -> i32 {
     let format = match NativeFormat::from_abi(
         quad_stride,
@@ -746,7 +867,7 @@ pub unsafe extern "C" fn mattmc_sodium_chunk_mesh_assemble(
         Err(status) => return status,
     };
 
-    match assemble(
+    assemble_output(
         input_addresses,
         input_vertex_counts,
         input_count,
@@ -758,10 +879,13 @@ pub unsafe extern "C" fn mattmc_sodium_chunk_mesh_assemble(
         visible_slices,
         force_unassigned,
         slice_reordering,
-    ) {
-        OK => OK,
-        status => status,
-    }
+        index_output_address,
+        index_output_capacity,
+        index_mode,
+        index_stride,
+        index_values,
+        index_value_count,
+    )
 }
 
 #[cfg(test)]

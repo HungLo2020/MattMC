@@ -8,17 +8,14 @@ import net.sodium.client.gl.buffer.GlBufferUsage;
 import net.sodium.client.gl.buffer.GlMutableBuffer;
 import net.sodium.client.gl.device.CommandList;
 import net.sodium.client.gl.util.EnumBitField;
+import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.sodium.client.util.NativeBuffer;
 import net.vulkanic.VulkanicIndexType;
 
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.IntBuffer;
-import java.nio.ShortBuffer;
 
 public class SharedQuadIndexBuffer {
     private static final int ELEMENTS_PER_PRIMITIVE = 6;
-    private static final int VERTICES_PER_PRIMITIVE = 4;
 
     private final boolean nativeGpuBuffer;
     private final GlMutableBuffer buffer;
@@ -113,41 +110,13 @@ public class SharedQuadIndexBuffer {
         SHORT(VulkanicIndexType.SHORT, 64 * 1024) {
             @Override
             public void createIndexBuffer(ByteBuffer byteBuffer, int primitiveCount) {
-                byteBuffer.order(ByteOrder.nativeOrder());
-                ShortBuffer shortBuffer = byteBuffer.asShortBuffer();
-
-                for (int primitiveIndex = 0; primitiveIndex < primitiveCount; primitiveIndex++) {
-                    int indexOffset = primitiveIndex * ELEMENTS_PER_PRIMITIVE;
-                    int vertexOffset = primitiveIndex * VERTICES_PER_PRIMITIVE;
-
-                    shortBuffer.put(indexOffset + 0, (short) (vertexOffset + 0));
-                    shortBuffer.put(indexOffset + 1, (short) (vertexOffset + 1));
-                    shortBuffer.put(indexOffset + 2, (short) (vertexOffset + 2));
-
-                    shortBuffer.put(indexOffset + 3, (short) (vertexOffset + 2));
-                    shortBuffer.put(indexOffset + 4, (short) (vertexOffset + 3));
-                    shortBuffer.put(indexOffset + 5, (short) (vertexOffset + 0));
-                }
+                NativeChunkMeshEncoder.writeSharedQuadIndexBuffer(byteBuffer, this.getBytesPerElement(), primitiveCount);
             }
         },
         INTEGER(VulkanicIndexType.INT, Integer.MAX_VALUE) {
             @Override
             public void createIndexBuffer(ByteBuffer byteBuffer, int primitiveCount) {
-                byteBuffer.order(ByteOrder.nativeOrder());
-                IntBuffer intBuffer = byteBuffer.asIntBuffer();
-
-                for (int primitiveIndex = 0; primitiveIndex < primitiveCount; primitiveIndex++) {
-                    int indexOffset = primitiveIndex * ELEMENTS_PER_PRIMITIVE;
-                    int vertexOffset = primitiveIndex * VERTICES_PER_PRIMITIVE;
-
-                    intBuffer.put(indexOffset + 0, vertexOffset + 0);
-                    intBuffer.put(indexOffset + 1, vertexOffset + 1);
-                    intBuffer.put(indexOffset + 2, vertexOffset + 2);
-
-                    intBuffer.put(indexOffset + 3, vertexOffset + 2);
-                    intBuffer.put(indexOffset + 4, vertexOffset + 3);
-                    intBuffer.put(indexOffset + 5, vertexOffset + 0);
-                }
+                NativeChunkMeshEncoder.writeSharedQuadIndexBuffer(byteBuffer, this.getBytesPerElement(), primitiveCount);
             }
         };
 

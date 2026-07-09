@@ -60,6 +60,37 @@ class NativeChunkMeshEncoderTest {
     }
 
     @Test
+    void assemblesMeshAndSharedIndexBufferInOneNativeCall() {
+        ChunkMeshBufferBuilder[] builders = makeBuilders(ChunkMeshFormats.COMPACT, 16, 4);
+        ByteBuffer output = null;
+        ByteBuffer indexOutput = null;
+
+        try {
+            pushQuad(builders[ModelQuadFacing.UNASSIGNED.ordinal()], 0.0F, 3);
+            pushQuad(builders[ModelQuadFacing.POS_X.ordinal()], 2.0F, 5);
+
+            long[] addresses = logicalAddresses(builders);
+            int[] counts = vertexCounts(builders);
+            int[] segments = new int[ModelQuadFacing.COUNT << 1];
+            output = nativeOrder(MemoryUtil.memCalloc(8 * ChunkMeshFormats.COMPACT.getNativeFormat().stride()));
+            indexOutput = nativeOrder(MemoryUtil.memCalloc(2 * 6 * Integer.BYTES));
+
+            NativeChunkMeshEncoder.assembleWithSharedIndex(addresses, counts, output, segments,
+                    ChunkMeshFormats.COMPACT.getNativeFormat(), 4, 1 << ModelQuadFacing.POS_X.ordinal(),
+                    false, true, false, indexOutput, Integer.BYTES);
+
+            assertCompactVertex(output, 0, 0.0F, 3, 4);
+            assertCompactVertex(output, 4, 2.0F, 5, 4);
+            assertArrayEquals(new int[] {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4}, readInts(indexOutput, 12));
+        } finally {
+            free(output);
+            free(indexOutput);
+            destroy(builders);
+        }
+    }
+
+
+    @Test
     void writesXhfpExtendedAttributesNatively() {
         ChunkVertexType vertexType = FormatAnalyzer.createFormat(true, true, true, true);
         NativeChunkVertexFormat format = vertexType.getNativeFormat();
@@ -199,6 +230,16 @@ class NativeChunkMeshEncoderTest {
 
     private static ByteBuffer nativeOrder(ByteBuffer buffer) {
         return buffer.order(ByteOrder.nativeOrder());
+    }
+
+    private static int[] readInts(ByteBuffer buffer, int count) {
+        int[] values = new int[count];
+
+        for (int index = 0; index < count; index++) {
+            values[index] = buffer.getInt(index * Integer.BYTES);
+        }
+
+        return values;
     }
 
     private static void destroy(ChunkMeshBufferBuilder[] builders) {

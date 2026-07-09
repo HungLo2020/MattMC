@@ -3,7 +3,6 @@ package net.sodium.client.render.chunk.translucent_sorting.data;
 import it.unimi.dsi.fastutil.objects.Object2ReferenceMap;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.sodium.client.render.chunk.translucent_sorting.trigger.GeometryPlanes;
-import net.sodium.client.util.sorting.RadixSort;
 import net.minecraft.core.SectionPos;
 import org.joml.Vector3dc;
 import org.joml.Vector3fc;
@@ -134,7 +133,8 @@ public class DynamicTopoData extends DynamicData {
         private boolean GFNITrigger;
         private int consecutiveTopoSortFailuresNew;
 
-        private IntBuffer intBuffer;
+        private int[] topoQuadOrder;
+        private int topoQuadOrderLength;
 
         private DynamicTopoSorter(int quadCount, DynamicTopoData parent, boolean isDirectTrigger, int consecutiveTopoSortFailures, boolean GFNITrigger, boolean directTrigger) {
             super(quadCount);
@@ -160,7 +160,7 @@ public class DynamicTopoData extends DynamicData {
 
         @Override
         public void accept(int value) {
-            TranslucentData.writeQuadVertexIndexes(this.intBuffer, value);
+            this.topoQuadOrder[this.topoQuadOrderLength++] = value;
         }
 
         @Override
@@ -169,10 +169,10 @@ public class DynamicTopoData extends DynamicData {
             IntBuffer indexBuffer = this.getIntBuffer();
 
             if (this.GFNITrigger && !this.isDirectTrigger) {
-                this.intBuffer = indexBuffer;
+                this.topoQuadOrder = new int[this.getQuadCount()];
+                this.topoQuadOrderLength = 0;
                 var sortStart = initial ? 0 : System.nanoTime();
                 var result = TopoGraphSorting.topoGraphSort(this, DynamicTopoData.this.quads, DynamicTopoData.this.distancesByNormal, cameraPos.getRelativeCameraPos(), false);
-                this.intBuffer = null;
 
                 var sortTime = initial ? 0 : System.nanoTime() - sortStart;
 
@@ -187,6 +187,8 @@ public class DynamicTopoData extends DynamicData {
                     this.GFNITrigger = false;
                 } else if (result) {
                     // disable distance sorting because topo sort seems to be possible.
+                    indexBuffer.rewind();
+                    TranslucentData.writeQuadVertexIndexes(indexBuffer, this.topoQuadOrder, this.topoQuadOrderLength);
                     this.directTrigger = false;
                     this.consecutiveTopoSortFailuresNew = 0;
                 } else {
@@ -201,6 +203,7 @@ public class DynamicTopoData extends DynamicData {
                         this.GFNITrigger = false;
                     }
                 }
+                this.topoQuadOrder = null;
             }
 
             if (this.directTrigger) {
@@ -221,22 +224,16 @@ public class DynamicTopoData extends DynamicData {
     static void distanceSortDirect(IntBuffer indexBuffer, TQuad[] quads, Vector3fc cameraPos) {
         if (quads.length <= 1) {
             // Avoid allocations when there is nothing to sort.
-            TranslucentData.writeQuadVertexIndexes(indexBuffer, 0);
+            TranslucentData.writeFirstQuadVertexIndexes(indexBuffer);
         } else {
             final var keys = new int[quads.length];
-            final var perm = new int[quads.length];
 
             for (int idx = 0; idx < quads.length; idx++) {
                 var centroid = quads[idx].getCenter();
                 keys[idx] = ~Float.floatToRawIntBits(centroid.distanceSquared(cameraPos));
-                perm[idx] = idx;
             }
 
-            RadixSort.sortIndirect(perm, keys, false);
-
-            for (int idx = 0; idx < quads.length; idx++) {
-                TranslucentData.writeQuadVertexIndexes(indexBuffer, perm[idx]);
-            }
+            TranslucentData.writeQuadVertexIndexesSortedByKey(indexBuffer, keys);
         }
     }
 

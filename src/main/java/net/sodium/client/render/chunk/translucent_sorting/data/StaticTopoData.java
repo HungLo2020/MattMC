@@ -4,7 +4,6 @@ import net.sodium.client.render.chunk.translucent_sorting.SortType;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.minecraft.core.SectionPos;
 
-import java.nio.IntBuffer;
 import java.util.function.IntConsumer;
 
 /**
@@ -34,21 +33,33 @@ public class StaticTopoData extends PresentTranslucentData {
         return sorter;
     }
 
-    private record QuadIndexConsumerIntoBuffer(IntBuffer buffer) implements IntConsumer {
+    private static final class QuadIndexCollector implements IntConsumer {
+        private final int[] quadIndexes;
+        private int count;
+
+        private QuadIndexCollector(int quadCount) {
+            this.quadIndexes = new int[quadCount];
+        }
+
         @Override
         public void accept(int value) {
-            TranslucentData.writeQuadVertexIndexes(this.buffer, value);
+            if (this.count >= this.quadIndexes.length) {
+                throw new IllegalStateException("Static topo sort wrote more quad indexes than expected");
+            }
+
+            this.quadIndexes[this.count++] = value;
         }
     }
 
     public static StaticTopoData fromMesh(TQuad[] quads, SectionPos sectionPos, boolean failOnIntersection) {
-        var sorter = new StaticSorter(quads.length);
-        var indexWriter = new QuadIndexConsumerIntoBuffer(sorter.getIntBuffer());
+        var indexWriter = new QuadIndexCollector(quads.length);
 
         if (!TopoGraphSorting.topoGraphSort(indexWriter, quads, null, null, failOnIntersection)) {
-            sorter.getIndexBuffer().free();
             return null;
         }
+
+        var sorter = new StaticSorter(quads.length);
+        TranslucentData.writeQuadVertexIndexes(sorter.getIntBuffer(), indexWriter.quadIndexes, indexWriter.count);
 
         var staticTopoData = new StaticTopoData(sectionPos, quads.length);
         staticTopoData.sorterOnce = sorter;

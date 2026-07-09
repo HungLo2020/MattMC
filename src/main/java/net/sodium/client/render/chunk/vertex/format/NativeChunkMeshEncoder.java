@@ -10,11 +10,16 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
 
 public final class NativeChunkMeshEncoder {
     public static final int NATIVE_QUAD_STRIDE = 152;
 
     private static final int OK = 0;
+    private static final int INDEX_MODE_NONE = 0;
+    private static final int INDEX_MODE_SHARED = 1;
+    private static final int INDEX_MODE_SORTED_QUADS = 2;
+    private static final int INDEX_MODE_KEY_SORTED = 3;
     private static final MethodHandle VERIFY = NativeLibraryLoader.downcallHandle("mattmc_rust",
             "mattmc_sodium_chunk_mesh_verify",
             FunctionDescriptor.of(ValueLayout.JAVA_INT));
@@ -34,8 +39,8 @@ public final class NativeChunkMeshEncoder {
                     ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_INT));
-    private static final MethodHandle ASSEMBLE = NativeLibraryLoader.downcallHandle("mattmc_rust",
-            "mattmc_sodium_chunk_mesh_assemble",
+    private static final MethodHandle ASSEMBLE_OUTPUT = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_chunk_mesh_output_assemble",
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
                     ValueLayout.ADDRESS,
                     ValueLayout.ADDRESS,
@@ -55,8 +60,34 @@ public final class NativeChunkMeshEncoder {
                     ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS,
                     ValueLayout.JAVA_INT));
-
+    private static final MethodHandle WRITE_SHARED = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_chunk_shared_quad_index_buffer_write",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT));
+    private static final MethodHandle WRITE_SORTED = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_chunk_sorted_quad_index_buffer_write",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_INT));
+    private static final MethodHandle WRITE_KEY_SORTED = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_chunk_key_sorted_quad_index_buffer_write",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_INT));
     private NativeChunkMeshEncoder() {
     }
 
@@ -109,6 +140,46 @@ public final class NativeChunkMeshEncoder {
             boolean sliceReordering,
             boolean separateAo
     ) {
+        assembleOutput(inputAddresses, inputVertexCounts, output, vertexSegments, format, sectionIndex,
+                visibleSlices, forceUnassigned, sliceReordering, separateAo, null, INDEX_MODE_NONE, 0, null, 0);
+    }
+
+    public static void assembleWithSharedIndex(
+            long[] inputAddresses,
+            int[] inputVertexCounts,
+            ByteBuffer output,
+            int[] vertexSegments,
+            NativeChunkVertexFormat format,
+            int sectionIndex,
+            int visibleSlices,
+            boolean forceUnassigned,
+            boolean sliceReordering,
+            boolean separateAo,
+            ByteBuffer indexOutput,
+            int indexStride
+    ) {
+        assembleOutput(inputAddresses, inputVertexCounts, output, vertexSegments, format, sectionIndex,
+                visibleSlices, forceUnassigned, sliceReordering, separateAo,
+                indexOutput, INDEX_MODE_SHARED, indexStride, null, 0);
+    }
+
+    private static void assembleOutput(
+            long[] inputAddresses,
+            int[] inputVertexCounts,
+            ByteBuffer output,
+            int[] vertexSegments,
+            NativeChunkVertexFormat format,
+            int sectionIndex,
+            int visibleSlices,
+            boolean forceUnassigned,
+            boolean sliceReordering,
+            boolean separateAo,
+            ByteBuffer indexOutput,
+            int indexMode,
+            int indexStride,
+            int[] indexValues,
+            int indexValueCount
+    ) {
         if (inputAddresses.length != ModelQuadFacing.COUNT || inputVertexCounts.length != ModelQuadFacing.COUNT) {
             throw new IllegalArgumentException("Expected one input buffer per chunk quad facing");
         }
@@ -116,18 +187,32 @@ public final class NativeChunkMeshEncoder {
         if (vertexSegments.length != ModelQuadFacing.COUNT << 1) {
             throw new IllegalArgumentException("Unexpected vertex segment array length: " + vertexSegments.length);
         }
+        if (indexValueCount < 0 || (indexValues != null && indexValueCount > indexValues.length)) {
+            throw new IllegalArgumentException("Invalid index value count: " + indexValueCount);
+        }
+        if (indexMode != INDEX_MODE_NONE && indexOutput == null) {
+            throw new IllegalArgumentException("Index output buffer is required for index mode " + indexMode);
+        }
 
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment inputAddressesSegment = arena.allocate(ValueLayout.JAVA_LONG, inputAddresses.length);
             MemorySegment inputVertexCountsSegment = arena.allocate(ValueLayout.JAVA_INT, inputVertexCounts.length);
             MemorySegment vertexSegmentsSegment = arena.allocate(ValueLayout.JAVA_INT, vertexSegments.length);
+            MemorySegment indexValuesSegment = MemorySegment.NULL;
 
             for (int index = 0; index < inputAddresses.length; index++) {
                 inputAddressesSegment.setAtIndex(ValueLayout.JAVA_LONG, index, inputAddresses[index]);
                 inputVertexCountsSegment.setAtIndex(ValueLayout.JAVA_INT, index, inputVertexCounts[index]);
             }
+            if (indexValues != null && indexValueCount > 0) {
+                indexValuesSegment = arena.allocate(ValueLayout.JAVA_INT, indexValueCount);
 
-            check(invokeAssemble(
+                for (int index = 0; index < indexValueCount; index++) {
+                    indexValuesSegment.setAtIndex(ValueLayout.JAVA_INT, index, indexValues[index]);
+                }
+            }
+
+            check(invokeAssembleOutput(
                     inputAddressesSegment,
                     inputVertexCountsSegment,
                     ModelQuadFacing.COUNT,
@@ -146,12 +231,70 @@ public final class NativeChunkMeshEncoder {
                     visibleSlices,
                     forceUnassigned ? 1 : 0,
                     sliceReordering ? 1 : 0,
-                    separateAo ? 1 : 0
-            ), "native chunk mesh assembly");
+                    separateAo ? 1 : 0,
+                    indexOutput == null ? 0L : MemoryUtil.memAddress(indexOutput),
+                    indexOutput == null ? 0 : indexOutput.remaining(),
+                    indexMode,
+                    indexStride,
+                    indexValuesSegment,
+                    indexValueCount
+            ), "native chunk mesh output assembly");
 
             for (int index = 0; index < vertexSegments.length; index++) {
                 vertexSegments[index] = vertexSegmentsSegment.getAtIndex(ValueLayout.JAVA_INT, index);
             }
+        }
+    }
+
+    public static void writeSharedQuadIndexBuffer(ByteBuffer output, int indexStride, int primitiveCount) {
+        if (primitiveCount == 0) {
+            return;
+        }
+
+        check(invokeWriteShared(MemoryUtil.memAddress(output), output.remaining(), indexStride, primitiveCount),
+                "native shared quad index buffer writing");
+    }
+
+    public static void writeQuadVertexIndexes(IntBuffer output, int[] quadIndexes) {
+        writeQuadVertexIndexes(output, quadIndexes, quadIndexes.length);
+    }
+
+    public static void writeQuadVertexIndexes(IntBuffer output, int[] quadIndexes, int quadIndexCount) {
+        if (quadIndexCount < 0 || quadIndexCount > quadIndexes.length) {
+            throw new IllegalArgumentException("Invalid quad index count: " + quadIndexCount);
+        }
+        if (quadIndexCount == 0) {
+            return;
+        }
+
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment quadIndexSegment = arena.allocate(ValueLayout.JAVA_INT, quadIndexCount);
+
+            for (int index = 0; index < quadIndexCount; index++) {
+                quadIndexSegment.setAtIndex(ValueLayout.JAVA_INT, index, quadIndexes[index]);
+            }
+
+            check(invokeWriteSorted(MemoryUtil.memAddress(output), output.remaining(), quadIndexSegment, quadIndexCount),
+                    "native sorted quad index buffer writing");
+            output.position(output.position() + quadIndexCount * 6);
+        }
+    }
+
+    public static void writeQuadVertexIndexesSortedByKey(IntBuffer output, int[] keys) {
+        if (keys.length == 0) {
+            return;
+        }
+
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment keysSegment = arena.allocate(ValueLayout.JAVA_INT, keys.length);
+
+            for (int index = 0; index < keys.length; index++) {
+                keysSegment.setAtIndex(ValueLayout.JAVA_INT, index, keys[index]);
+            }
+
+            check(invokeWriteKeySorted(MemoryUtil.memAddress(output), output.remaining(), keysSegment, keys.length),
+                    "native key-sorted quad index buffer writing");
+            output.position(output.position() + keys.length * 6);
         }
     }
 
@@ -192,7 +335,7 @@ public final class NativeChunkMeshEncoder {
         }
     }
 
-    private static int invokeAssemble(
+    private static int invokeAssembleOutput(
             MemorySegment inputAddresses,
             MemorySegment inputVertexCounts,
             int inputCount,
@@ -211,14 +354,46 @@ public final class NativeChunkMeshEncoder {
             int visibleSlices,
             int forceUnassigned,
             int sliceReordering,
-            int separateAo
+            int separateAo,
+            long indexOutputAddress,
+            int indexOutputCapacity,
+            int indexMode,
+            int indexStride,
+            MemorySegment indexValues,
+            int indexValueCount
     ) {
         try {
-            return (int) ASSEMBLE.invokeExact(inputAddresses, inputVertexCounts, inputCount, outputAddress, outputCapacity,
-                    vertexSegments, vertexSegmentsLength, quadStride, vertexStride, blockIdOffset, normalOffset, tangentOffset,
-                    midUvOffset, midBlockOffset, sectionIndex, visibleSlices, forceUnassigned, sliceReordering, separateAo);
+            return (int) ASSEMBLE_OUTPUT.invokeExact(inputAddresses, inputVertexCounts, inputCount, outputAddress,
+                    outputCapacity, vertexSegments, vertexSegmentsLength, quadStride, vertexStride, blockIdOffset,
+                    normalOffset, tangentOffset, midUvOffset, midBlockOffset, sectionIndex, visibleSlices,
+                    forceUnassigned, sliceReordering, separateAo, indexOutputAddress, indexOutputCapacity, indexMode,
+                    indexStride, indexValues, indexValueCount);
         } catch (Throwable throwable) {
-            throw new IllegalStateException("Rust chunk mesh assembly downcall failed", throwable);
+            throw new IllegalStateException("Rust chunk mesh output assembly downcall failed", throwable);
+        }
+    }
+
+    private static int invokeWriteShared(long outputAddress, int outputCapacity, int indexStride, int primitiveCount) {
+        try {
+            return (int) WRITE_SHARED.invokeExact(outputAddress, outputCapacity, indexStride, primitiveCount);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust shared quad index buffer downcall failed", throwable);
+        }
+    }
+
+    private static int invokeWriteSorted(long outputAddress, int outputCapacity, MemorySegment quadIndexes, int quadIndexCount) {
+        try {
+            return (int) WRITE_SORTED.invokeExact(outputAddress, outputCapacity, quadIndexes, quadIndexCount);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust sorted quad index buffer downcall failed", throwable);
+        }
+    }
+
+    private static int invokeWriteKeySorted(long outputAddress, int outputCapacity, MemorySegment keys, int keyCount) {
+        try {
+            return (int) WRITE_KEY_SORTED.invokeExact(outputAddress, outputCapacity, keys, keyCount);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust key-sorted quad index buffer downcall failed", throwable);
         }
     }
 }

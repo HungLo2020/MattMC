@@ -6,6 +6,7 @@ import net.sodium.client.render.chunk.translucent_sorting.SortType;
 import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.UpdatedQuadsList;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
+import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.minecraft.core.SectionPos;
 
 /**
@@ -17,6 +18,7 @@ public abstract class TranslucentData {
     public static final int VERTICES_PER_QUAD = 4;
     public static final int BYTES_PER_INDEX = 4;
     public static final int BYTES_PER_QUAD = INDICES_PER_QUAD * BYTES_PER_INDEX;
+    private static final int[] FIRST_QUAD_INDEX = {0};
 
     public final SectionPos sectionPos;
 
@@ -58,21 +60,19 @@ public abstract class TranslucentData {
         return quadCount * VERTICES_PER_QUAD;
     }
 
-    public static void writeQuadVertexIndexes(IntBuffer intBuffer, int quadIndex) {
-        int vertexOffset = quadIndex * VERTICES_PER_QUAD;
-
-        intBuffer.put(vertexOffset + 0);
-        intBuffer.put(vertexOffset + 1);
-        intBuffer.put(vertexOffset + 2);
-
-        intBuffer.put(vertexOffset + 2);
-        intBuffer.put(vertexOffset + 3);
-        intBuffer.put(vertexOffset + 0);
+    public static void writeFirstQuadVertexIndexes(IntBuffer intBuffer) {
+        NativeChunkMeshEncoder.writeQuadVertexIndexes(intBuffer, FIRST_QUAD_INDEX);
     }
 
     public static void writeQuadVertexIndexes(IntBuffer intBuffer, int[] quadIndexes) {
-        for (int quadIndexPos = 0; quadIndexPos < quadIndexes.length; quadIndexPos++) {
-            writeQuadVertexIndexes(intBuffer, quadIndexes[quadIndexPos]);
-        }
+        NativeChunkMeshEncoder.writeQuadVertexIndexes(intBuffer, quadIndexes);
+    }
+
+    public static void writeQuadVertexIndexes(IntBuffer intBuffer, int[] quadIndexes, int quadIndexCount) {
+        NativeChunkMeshEncoder.writeQuadVertexIndexes(intBuffer, quadIndexes, quadIndexCount);
+    }
+
+    public static void writeQuadVertexIndexesSortedByKey(IntBuffer intBuffer, int[] keys) {
+        NativeChunkMeshEncoder.writeQuadVertexIndexesSortedByKey(intBuffer, keys);
     }
 }
