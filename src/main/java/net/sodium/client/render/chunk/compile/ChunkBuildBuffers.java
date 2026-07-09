@@ -10,13 +10,11 @@ import net.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.render.chunk.terrain.material.Material;
 import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.UpdatedQuadsList;
-import net.sodium.client.render.chunk.translucent_sorting.data.TranslucentData;
 import net.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkVertexFormat;
 import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
-import net.sodium.client.util.NativeBuffer;
 
 /**
  * A collection of temporary buffers for each worker thread which will be used to build chunk meshes for given render
@@ -24,8 +22,6 @@ import net.sodium.client.util.NativeBuffer;
  * shrink a buffer.
  */
 public class ChunkBuildBuffers {
-    private static final int UNASSIGNED_SEGMENT_INDEX = ModelQuadFacing.UNASSIGNED.ordinal() << 1;
-
     private final Reference2ReferenceOpenHashMap<TerrainRenderPass, BakedChunkModelBuilder> builders = new Reference2ReferenceOpenHashMap<>();
 
     private final ChunkVertexType vertexType;
@@ -62,10 +58,6 @@ public class ChunkBuildBuffers {
         return this.builders.get(pass);
     }
 
-    public static int[] makeVertexSegments() {
-        return new int[ModelQuadFacing.COUNT << 1];
-    }
-
     /**
      * Creates immutable baked chunk meshes from all non-empty scratch buffers. This is used after all blocks
      * have been rendered to pass the finished meshes over to the graphics card. This function can be called multiple
@@ -73,41 +65,14 @@ public class ChunkBuildBuffers {
      */
     public BuiltSectionMeshParts createMesh(TerrainRenderPass pass, int visibleSlices, boolean forceUnassigned, boolean sliceReordering) {
         var builder = this.builders.get(pass);
-        int[] vertexSegments = makeVertexSegments();
-        NativeSectionMeshBuilder sectionBuilder = builder.getSectionBuilder();
-        int vertexTotal = sectionBuilder.totalVertexCount();
-
-        if (vertexTotal == 0) {
-            return null;
-        }
-
-        var mergedBuffer = new NativeBuffer(vertexTotal * this.nativeFormat.stride());
-        sectionBuilder.assemble(mergedBuffer.getDirectBuffer(), vertexSegments, this.nativeFormat, visibleSlices,
+        return builder.getSectionBuilder().finishMesh(this.nativeFormat, visibleSlices,
                 forceUnassigned, sliceReordering, usesSeparateAo());
-
-        return new BuiltSectionMeshParts(mergedBuffer, vertexSegments);
     }
 
     public BuiltSectionMeshParts createModifiedTranslucentMesh(UpdatedQuadsList updatedQuads) {
-        // mesh modification assumes non-empty mesh with predetermined size
-
         var builder = this.builders.get(DefaultTerrainRenderPasses.TRANSLUCENT);
-
-        var vertexTotal = TranslucentData.quadCountToVertexCount(updatedQuads.getMeshQuadCount());
-        var mergedBuffer = new NativeBuffer(vertexTotal * this.nativeFormat.stride());
-        var mergedBufferBuilder = mergedBuffer.getDirectBuffer();
-
-        int[] ignoredSegments = makeVertexSegments();
-        builder.getSectionBuilder().assemble(mergedBufferBuilder, ignoredSegments, this.nativeFormat, 0,
-                true, false, usesSeparateAo());
-
-        updatedQuads.applyBufferUpdates(builder.getVertexBuffer(ModelQuadFacing.UNASSIGNED), mergedBufferBuilder);
-
-        int[] vertexSegments = makeVertexSegments();
-        vertexSegments[UNASSIGNED_SEGMENT_INDEX] = vertexTotal;
-        vertexSegments[UNASSIGNED_SEGMENT_INDEX + 1] = ModelQuadFacing.UNASSIGNED.ordinal();
-
-        return new BuiltSectionMeshParts(mergedBuffer, vertexSegments);
+        return builder.getSectionBuilder().finishModifiedTranslucentMesh(updatedQuads, this.nativeFormat,
+                usesSeparateAo());
     }
 
     public void destroy() {

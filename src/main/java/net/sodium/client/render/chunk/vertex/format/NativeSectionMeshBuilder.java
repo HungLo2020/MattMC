@@ -1,6 +1,10 @@
 package net.sodium.client.render.chunk.vertex.format;
 
 import net.minecraft.util.NativeLibraryLoader;
+import net.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.sodium.client.render.chunk.data.BuiltSectionMeshParts;
+import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.UpdatedQuadsList;
+import net.sodium.client.util.NativeBuffer;
 import org.lwjgl.system.MemoryUtil;
 
 import java.lang.foreign.Arena;
@@ -56,6 +60,27 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                     ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_LONG,
                     ValueLayout.ADDRESS));
+    private static final MethodHandle APPEND_TRANSLUCENT_BATCH = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_mesh_builder_append_translucent_batch",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_INT));
+    private static final MethodHandle STAGING_ADDRESSES = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_mesh_builder_staging_addresses",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.ADDRESS));
     private static final MethodHandle FACING_ADDRESS = NativeLibraryLoader.downcallHandle("mattmc_rust",
             "mattmc_sodium_section_mesh_builder_facing_address",
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
@@ -83,6 +108,23 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                     ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT));
+    private static final MethodHandle ENCODE_SCATTERED_UNASSIGNED = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_mesh_builder_encode_scattered_unassigned",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
                     ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_INT,
@@ -165,6 +207,42 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
         }
     }
 
+    public TranslucentBatchResult appendTranslucentBatch(int facing, long batchAddress, int quadCount,
+            long analyzerHandle, int translucentFacing, long packedNormalsAddress) {
+        if (quadCount < 0) {
+            throw new IllegalArgumentException("Invalid quad count: " + quadCount);
+        }
+        if (quadCount == 0) {
+            return new TranslucentBatchResult(0, 0);
+        }
+
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment countsSegment = arena.allocate(ValueLayout.JAVA_INT, 2);
+            check(invokeAppendTranslucentBatch(this.state.getHandle(), facing, batchAddress, quadCount,
+                    analyzerHandle, translucentFacing, packedNormalsAddress, countsSegment, 2),
+                    "native section mesh builder translucent batch append");
+            return new TranslucentBatchResult(countsSegment.getAtIndex(ValueLayout.JAVA_INT, 0),
+                    countsSegment.getAtIndex(ValueLayout.JAVA_INT, 1));
+        }
+    }
+
+    public StagingBuffers stagingBuffers(int facing) {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment quadAddressSegment = arena.allocate(ValueLayout.JAVA_LONG);
+            MemorySegment packedNormalsAddressSegment = arena.allocate(ValueLayout.JAVA_LONG);
+            MemorySegment validityAddressSegment = arena.allocate(ValueLayout.JAVA_LONG);
+            MemorySegment capacitySegment = arena.allocate(ValueLayout.JAVA_INT);
+            check(invokeStagingAddresses(this.state.getHandle(), facing, quadAddressSegment,
+                    packedNormalsAddressSegment, validityAddressSegment, capacitySegment),
+                    "native section mesh builder staging address query");
+            return new StagingBuffers(
+                    quadAddressSegment.get(ValueLayout.JAVA_LONG, 0),
+                    packedNormalsAddressSegment.get(ValueLayout.JAVA_LONG, 0),
+                    validityAddressSegment.get(ValueLayout.JAVA_LONG, 0),
+                    capacitySegment.get(ValueLayout.JAVA_INT, 0));
+        }
+    }
+
     public long facingAddress(int facing) {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment addressSegment = arena.allocate(ValueLayout.JAVA_LONG);
@@ -213,8 +291,66 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
         }
     }
 
+    public BuiltSectionMeshParts finishMesh(NativeChunkVertexFormat format, int visibleSlices,
+            boolean forceUnassigned, boolean sliceReordering, boolean separateAo) {
+        int vertexTotal = this.totalVertexCount();
+        if (vertexTotal == 0) {
+            return null;
+        }
+
+        int[] vertexSegments = createVertexSegments();
+        NativeBuffer mergedBuffer = new NativeBuffer(vertexTotal * format.stride());
+        this.assemble(mergedBuffer.getDirectBuffer(), vertexSegments, format, visibleSlices, forceUnassigned,
+                sliceReordering, separateAo);
+        return new BuiltSectionMeshParts(mergedBuffer, vertexSegments);
+    }
+
+    public BuiltSectionMeshParts finishModifiedTranslucentMesh(UpdatedQuadsList updatedQuads,
+            NativeChunkVertexFormat format, boolean separateAo) {
+        int vertexTotal = updatedQuads.getMeshQuadCount() * 4;
+        NativeBuffer mergedBuffer = new NativeBuffer(vertexTotal * format.stride());
+        ByteBuffer mergedBufferBuilder = mergedBuffer.getDirectBuffer();
+
+        this.assemble(mergedBufferBuilder, createVertexSegments(), format, 0, true, false, separateAo);
+        updatedQuads.applyBufferUpdates(format, this.sectionIndex, mergedBufferBuilder);
+
+        int[] vertexSegments = createVertexSegments();
+        int unassignedSegmentIndex = ModelQuadFacing.UNASSIGNED.ordinal() << 1;
+        vertexSegments[unassignedSegmentIndex] = vertexTotal;
+        vertexSegments[unassignedSegmentIndex + 1] = ModelQuadFacing.UNASSIGNED.ordinal();
+
+        return new BuiltSectionMeshParts(mergedBuffer, vertexSegments);
+    }
+
+    public void encodeScatteredUnassigned(int[] outputVertexOffsets, int updateCount, ByteBuffer output,
+            NativeChunkVertexFormat format, boolean separateAo) {
+        if (updateCount < 0 || updateCount > outputVertexOffsets.length) {
+            throw new IllegalArgumentException("Invalid scattered encode update count: " + updateCount);
+        }
+        if (updateCount == 0) {
+            return;
+        }
+
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment outputVertexOffsetsSegment = arena.allocate(ValueLayout.JAVA_INT, updateCount);
+            for (int index = 0; index < updateCount; index++) {
+                outputVertexOffsetsSegment.setAtIndex(ValueLayout.JAVA_INT, index, outputVertexOffsets[index]);
+            }
+
+            check(invokeEncodeScatteredUnassigned(this.state.getHandle(), outputVertexOffsetsSegment, updateCount,
+                    MemoryUtil.memAddress(output), output.remaining(), NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE,
+                    format.stride(), format.blockIdOffset(), format.normalOffset(), format.tangentOffset(),
+                    format.midUvOffset(), format.midBlockOffset(), this.sectionIndex, separateAo ? 1 : 0),
+                    "native section mesh builder scattered update encoding");
+        }
+    }
+
     public int sectionIndex() {
         return this.sectionIndex;
+    }
+
+    private static int[] createVertexSegments() {
+        return new int[ModelQuadFacing.COUNT << 1];
     }
 
     @Override
@@ -288,6 +424,28 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
         }
     }
 
+    private static int invokeAppendTranslucentBatch(long handle, int facing, long batchAddress, int quadCount,
+            long analyzerHandle, int translucentFacing, long packedNormalsAddress, MemorySegment outputCounts,
+            int outputCountsLength) {
+        try {
+            return (int) APPEND_TRANSLUCENT_BATCH.invokeExact(handle, facing, batchAddress, quadCount,
+                    analyzerHandle, translucentFacing, packedNormalsAddress, outputCounts, outputCountsLength);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust section mesh builder translucent batch downcall failed", throwable);
+        }
+    }
+
+    private static int invokeStagingAddresses(long handle, int facing, MemorySegment quadAddressOutput,
+            MemorySegment packedNormalsAddressOutput, MemorySegment validityAddressOutput,
+            MemorySegment capacityOutput) {
+        try {
+            return (int) STAGING_ADDRESSES.invokeExact(handle, facing, quadAddressOutput,
+                    packedNormalsAddressOutput, validityAddressOutput, capacityOutput);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust section mesh builder staging address downcall failed", throwable);
+        }
+    }
+
     private static int invokeFacingAddress(long handle, int facing, MemorySegment addressOutput) {
         try {
             return (int) FACING_ADDRESS.invokeExact(handle, facing, addressOutput);
@@ -324,6 +482,25 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust section mesh builder assembly downcall failed", throwable);
         }
+    }
+
+    private static int invokeEncodeScatteredUnassigned(long handle, MemorySegment outputVertexOffsets,
+            int updateCount, long outputAddress, int outputCapacity, int quadStride, int vertexStride,
+            int blockIdOffset, int normalOffset, int tangentOffset, int midUvOffset, int midBlockOffset,
+            int sectionIndex, int separateAo) {
+        try {
+            return (int) ENCODE_SCATTERED_UNASSIGNED.invokeExact(handle, outputVertexOffsets, updateCount,
+                    outputAddress, outputCapacity, quadStride, vertexStride, blockIdOffset, normalOffset,
+                    tangentOffset, midUvOffset, midBlockOffset, sectionIndex, separateAo);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust section mesh builder scattered update downcall failed", throwable);
+        }
+    }
+
+    public record StagingBuffers(long quadAddress, long packedNormalsAddress, long validityAddress, int capacity) {
+    }
+
+    public record TranslucentBatchResult(int validCount, int committedCount) {
     }
 
     private static final class State implements Runnable {

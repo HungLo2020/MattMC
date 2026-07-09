@@ -213,6 +213,10 @@ final class NativeTranslucentGeometryAnalyzer {
         }
     }
 
+    long handle() {
+        return this.getHandle();
+    }
+
     TQuad[] buildRegularQuadsByFacing() {
         int recordCount = this.getRecordCount();
         TQuad[] quads = new TQuad[recordCount];

@@ -134,25 +134,49 @@ unsafe fn sort_regions(
     };
     let region_coordinates = slice::from_raw_parts(region_coordinates, coordinate_count);
     let output_indices = slice::from_raw_parts_mut(output_indices, output_indices_len);
-    let mut items: Vec<(i32, i32)> = Vec::with_capacity(region_count);
 
     for index in 0..region_count {
-        let base = index * 3;
-        let x = (region_coordinates[base] - camera_region_x).abs();
-        let y = (region_coordinates[base + 1] - camera_region_y).abs();
-        let z = (region_coordinates[base + 2] - camera_region_z).abs();
-        let distance = x + y + z;
-
-        items.push((distance, index as i32));
+        output_indices[index] = index as i32;
     }
 
-    items.sort_unstable_by_key(|&(distance, index)| (distance, index));
+    output_indices[..region_count].sort_unstable_by(|left, right| {
+        let left = *left as usize;
+        let right = *right as usize;
+        let left_distance = region_distance(
+            region_coordinates,
+            left,
+            camera_region_x,
+            camera_region_y,
+            camera_region_z,
+        );
+        let right_distance = region_distance(
+            region_coordinates,
+            right,
+            camera_region_x,
+            camera_region_y,
+            camera_region_z,
+        );
 
-    for (output_index, &(_, region_index)) in items.iter().enumerate() {
-        output_indices[output_index] = region_index;
-    }
+        left_distance
+            .cmp(&right_distance)
+            .then_with(|| left.cmp(&right))
+    });
 
     OK
+}
+
+fn region_distance(
+    region_coordinates: &[i32],
+    index: usize,
+    camera_region_x: i32,
+    camera_region_y: i32,
+    camera_region_z: i32,
+) -> i32 {
+    let base = index * 3;
+    let x = (region_coordinates[base] - camera_region_x).abs();
+    let y = (region_coordinates[base + 1] - camera_region_y).abs();
+    let z = (region_coordinates[base + 2] - camera_region_z).abs();
+    x + y + z
 }
 
 unsafe fn prepare_frame(

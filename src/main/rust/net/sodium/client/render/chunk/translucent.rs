@@ -1487,6 +1487,26 @@ pub unsafe extern "C" fn mattmc_sodium_translucent_analyzer_append_native_quad_b
     validity_output_address: u64,
     output_valid_count: *mut i32,
 ) -> i32 {
+    append_native_quad_batch_to_analyzer(
+        handle,
+        native_quad_address,
+        quad_count,
+        facing,
+        packed_normals,
+        validity_output_address,
+        output_valid_count,
+    )
+}
+
+pub unsafe fn append_native_quad_batch_to_analyzer(
+    handle: u64,
+    native_quad_address: u64,
+    quad_count: i32,
+    facing: i32,
+    packed_normals: *const i32,
+    validity_output_address: u64,
+    output_valid_count: *mut i32,
+) -> i32 {
     if handle == 0 || output_valid_count.is_null() {
         return ERR_NULL_POINTER;
     }

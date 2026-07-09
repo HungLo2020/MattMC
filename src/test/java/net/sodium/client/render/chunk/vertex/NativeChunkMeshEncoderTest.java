@@ -1,7 +1,10 @@
 package net.sodium.client.render.chunk.vertex;
 
 import net.irisshaders.iris.vertices.sodium.terrain.FormatAnalyzer;
+import net.sodium.client.SodiumClientMod;
+import net.sodium.client.gui.SodiumGameOptions;
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.sodium.client.render.chunk.data.BuiltSectionMeshParts;
 import net.sodium.client.render.chunk.terrain.material.DefaultMaterials;
 import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.UpdatedQuadsList;
 import net.sodium.client.render.chunk.translucent_sorting.quad.FullTQuad;
@@ -12,17 +15,34 @@ import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkVertexFormat;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.lwjgl.system.MemoryUtil;
 
+import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class NativeChunkMeshEncoderTest {
+    @BeforeAll
+    static void installDefaultSodiumOptionsForNativeBufferAllocation() throws Exception {
+        try {
+            SodiumClientMod.options();
+            return;
+        } catch (IllegalStateException ignored) {
+            // Unit tests do not run Sodium's full client initializer.
+        }
+
+        Field configField = SodiumClientMod.class.getDeclaredField("CONFIG");
+        configField.setAccessible(true);
+        configField.set(null, SodiumGameOptions.defaults());
+    }
+
     @Test
     void assemblesCompactQuadsInSliceOrder() {
         ChunkMeshBufferBuilder[] builders = makeBuilders(ChunkMeshFormats.COMPACT, 16, 9);
@@ -135,6 +155,98 @@ class NativeChunkMeshEncoderTest {
     }
 
     @Test
+    void nativeSectionBuilderFinishesMeshParts() {
+        NativeSectionMeshBuilder sectionBuilder = NativeSectionMeshBuilder.create(1);
+        ChunkMeshBufferBuilder posX = new ChunkMeshBufferBuilder(ChunkMeshFormats.COMPACT.getNativeFormat(),
+                sectionBuilder, ModelQuadFacing.POS_X.ordinal());
+        ChunkMeshBufferBuilder unassigned = new ChunkMeshBufferBuilder(ChunkMeshFormats.COMPACT.getNativeFormat(),
+                sectionBuilder, ModelQuadFacing.UNASSIGNED.ordinal());
+
+        try {
+            sectionBuilder.start(5);
+            posX.start(5);
+            unassigned.start(5);
+            posX.push(quad(2.0F, 5), 5);
+            unassigned.push(quad(0.0F, 3), 3);
+            posX.flushPending();
+            unassigned.flushPending();
+
+            BuiltSectionMeshParts mesh = sectionBuilder.finishMesh(ChunkMeshFormats.COMPACT.getNativeFormat(),
+                    1 << ModelQuadFacing.POS_X.ordinal(), false, true, false);
+            assertNotNull(mesh);
+
+            try {
+                assertArrayEquals(new int[] {
+                        4, ModelQuadFacing.UNASSIGNED.ordinal(),
+                        4, ModelQuadFacing.POS_X.ordinal(),
+                        0, ModelQuadFacing.POS_Y.ordinal(),
+                        0, ModelQuadFacing.POS_Z.ordinal(),
+                        0, ModelQuadFacing.NEG_X.ordinal(),
+                        0, ModelQuadFacing.NEG_Y.ordinal(),
+                        0, ModelQuadFacing.NEG_Z.ordinal(),
+                }, mesh.getVertexSegments());
+                ByteBuffer output = mesh.getVertexData().getDirectBuffer().order(ByteOrder.nativeOrder());
+                assertCompactVertex(output, 0, 0.0F, 3, 5);
+                assertCompactVertex(output, 4, 2.0F, 5, 5);
+            } finally {
+                mesh.getVertexData().free();
+            }
+        } finally {
+            sectionBuilder.close();
+        }
+    }
+
+    @Test
+    void nativeSectionBuilderFinishesModifiedTranslucentMeshParts() {
+        NativeSectionMeshBuilder sectionBuilder = NativeSectionMeshBuilder.create(1);
+        ChunkMeshBufferBuilder unassigned = new ChunkMeshBufferBuilder(ChunkMeshFormats.COMPACT.getNativeFormat(),
+                sectionBuilder, ModelQuadFacing.UNASSIGNED.ordinal());
+
+        try {
+            sectionBuilder.start(12);
+            unassigned.start(12);
+            for (int index = 0; index < 4; index++) {
+                unassigned.push(quad(index * 2.0F, 99), DefaultMaterials.TRANSLUCENT);
+            }
+            unassigned.flushPending();
+
+            UpdatedQuadsList updates = new UpdatedQuadsList();
+            FullTQuad skipped = FullTQuad.fromVertices(quad(1.0F, 99), ModelQuadFacing.UNASSIGNED, 0);
+            FullTQuad first = FullTQuad.fromVertices(quad(3.0F, 13), ModelQuadFacing.UNASSIGNED, 0);
+            FullTQuad second = FullTQuad.fromVertices(quad(5.0F, 17), ModelQuadFacing.UNASSIGNED, 0);
+            skipped.setNoWrite();
+            first.setWriteToIndex(1);
+            second.setWriteToIndex(3);
+            updates.add(skipped);
+            updates.add(first);
+            updates.add(second);
+            updates.setQuadCounts(4, 4);
+
+            BuiltSectionMeshParts mesh = sectionBuilder.finishModifiedTranslucentMesh(updates,
+                    ChunkMeshFormats.COMPACT.getNativeFormat(), false);
+
+            try {
+                assertArrayEquals(new int[] {
+                        0, 0,
+                        0, 0,
+                        0, 0,
+                        0, 0,
+                        0, 0,
+                        0, 0,
+                        16, ModelQuadFacing.UNASSIGNED.ordinal(),
+                }, mesh.getVertexSegments());
+                ByteBuffer output = mesh.getVertexData().getDirectBuffer().order(ByteOrder.nativeOrder());
+                assertCompactVertex(output, 4, 3.0F, DefaultMaterials.TRANSLUCENT.bits(), 12);
+                assertCompactVertex(output, 12, 5.0F, DefaultMaterials.TRANSLUCENT.bits(), 12);
+            } finally {
+                mesh.getVertexData().free();
+            }
+        } finally {
+            sectionBuilder.close();
+        }
+    }
+
+    @Test
     void nativeSectionBuilderAppendsFilteredQuadBatches() {
         NativeSectionMeshBuilder sectionBuilder = NativeSectionMeshBuilder.create(1);
         ByteBuffer batch = null;
@@ -160,6 +272,60 @@ class NativeChunkMeshEncoderTest {
             free(validity);
             sectionBuilder.close();
         }
+    }
+
+    @Test
+    void nativeSectionBuilderOwnsReusableStagingBuffers() {
+        NativeSectionMeshBuilder sectionBuilder = NativeSectionMeshBuilder.create(1);
+
+        try {
+            sectionBuilder.start(5);
+            NativeSectionMeshBuilder.StagingBuffers staging =
+                    sectionBuilder.stagingBuffers(ModelQuadFacing.POS_X.ordinal());
+
+            assertEquals(256, staging.capacity());
+            assertNotEquals(0, staging.quadAddress());
+            assertNotEquals(0, staging.packedNormalsAddress());
+            assertNotEquals(0, staging.validityAddress());
+
+            NativeChunkMeshEncoder.writeNativeQuad(staging.quadAddress(), quad(2.0F, 5), 5);
+
+            assertEquals(1, sectionBuilder.appendBatch(ModelQuadFacing.POS_X.ordinal(),
+                    staging.quadAddress(), 1));
+            assertEquals(4, sectionBuilder.totalVertexCount());
+            assertEquals(4, sectionBuilder.facingVertexCount(ModelQuadFacing.POS_X.ordinal()));
+        } finally {
+            sectionBuilder.close();
+        }
+    }
+
+    @Test
+    void chunkMeshHotPathUsesRustOwnedStagingAndBuilderFinalizers() throws Exception {
+        String chunkMeshBufferBuilder = java.nio.file.Files.readString(java.nio.file.Path.of(
+                "src/main/java/net/sodium/client/render/chunk/vertex/builder/ChunkMeshBufferBuilder.java"));
+        String updatedQuadsList = java.nio.file.Files.readString(java.nio.file.Path.of(
+                "src/main/java/net/sodium/client/render/chunk/translucent_sorting/bsp_tree/UpdatedQuadsList.java"));
+        String chunkBuildBuffers = java.nio.file.Files.readString(java.nio.file.Path.of(
+                "src/main/java/net/sodium/client/render/chunk/compile/ChunkBuildBuffers.java"));
+
+        assertArrayEquals(new String[] {
+                "sectionBuilder.stagingBuffers(",
+                "appendTranslucentBatch(",
+        }, new String[] {
+                contains(chunkMeshBufferBuilder, "sectionBuilder.stagingBuffers("),
+                contains(chunkMeshBufferBuilder, "appendTranslucentBatch("),
+        });
+        assertEquals("encodeScatteredUnassigned(",
+                contains(updatedQuadsList, "encodeScatteredUnassigned("));
+        org.junit.jupiter.api.Assertions.assertFalse(chunkMeshBufferBuilder.contains("memAlloc("));
+        org.junit.jupiter.api.Assertions.assertFalse(chunkMeshBufferBuilder.contains("memFree("));
+        org.junit.jupiter.api.Assertions.assertFalse(updatedQuadsList.contains("NativeChunkMeshEncoder.encodeScattered("));
+        assertEquals("finishMesh(", contains(chunkBuildBuffers, "finishMesh("));
+        assertEquals("finishModifiedTranslucentMesh(",
+                contains(chunkBuildBuffers, "finishModifiedTranslucentMesh("));
+        org.junit.jupiter.api.Assertions.assertFalse(chunkBuildBuffers.contains("new NativeBuffer"));
+        org.junit.jupiter.api.Assertions.assertFalse(chunkBuildBuffers.contains("totalVertexCount("));
+        org.junit.jupiter.api.Assertions.assertFalse(chunkBuildBuffers.contains(".assemble("));
     }
 
 
@@ -242,6 +408,11 @@ class NativeChunkMeshEncoderTest {
 
     private static void pushQuad(ChunkMeshBufferBuilder builder, float baseX, int materialBits) {
         builder.push(quad(baseX, materialBits), materialBits);
+    }
+
+    private static String contains(String text, String expected) {
+        org.junit.jupiter.api.Assertions.assertTrue(text.contains(expected));
+        return expected;
     }
 
     private static ChunkVertexEncoder.Vertex[] quad(float baseX, int seed) {

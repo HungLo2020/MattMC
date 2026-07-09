@@ -1,6 +1,6 @@
 use std::slice;
 
-use super::index;
+use super::{index, translucent};
 
 const OK: i32 = 0;
 const ERR_NULL_POINTER: i32 = -1;
@@ -17,6 +17,7 @@ const INDEX_MODE_NONE: i32 = 0;
 const INDEX_MODE_SHARED: i32 = 1;
 const INDEX_MODE_SORTED_QUADS: i32 = 2;
 const INDEX_MODE_KEY_SORTED: i32 = 3;
+const PENDING_BATCH_QUAD_CAPACITY: usize = 256;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
@@ -50,8 +51,15 @@ struct NativeQuadBuffer {
     quads: Vec<NativeQuad>,
 }
 
+struct NativePendingQuadBuffer {
+    quads: Vec<NativeQuad>,
+    packed_normals: Vec<i32>,
+    validity: Vec<u8>,
+}
+
 struct NativeSectionMeshBuilder {
     buffers: [NativeQuadBuffer; MODEL_QUAD_FACING_COUNT],
+    pending: [NativePendingQuadBuffer; MODEL_QUAD_FACING_COUNT],
     counts: [usize; MODEL_QUAD_FACING_COUNT],
 }
 
@@ -641,6 +649,52 @@ unsafe fn section_builder_append_batch(
     Ok(valid_count as i32)
 }
 
+fn section_builder_staging_addresses(
+    builder: &mut NativeSectionMeshBuilder,
+    facing: usize,
+) -> Result<(u64, u64, u64, i32), i32> {
+    if facing >= MODEL_QUAD_FACING_COUNT {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    let pending = &mut builder.pending[facing];
+    Ok((
+        pending.quads.as_mut_ptr() as u64,
+        pending.packed_normals.as_mut_ptr() as u64,
+        pending.validity.as_mut_ptr() as u64,
+        pending.quads.len() as i32,
+    ))
+}
+
+unsafe fn section_builder_encode_scattered_unassigned(
+    builder: &NativeSectionMeshBuilder,
+    output_vertex_offsets: *const i32,
+    update_count: i32,
+    output_address: u64,
+    output_capacity: i32,
+    format: NativeFormat,
+) -> i32 {
+    if update_count < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if update_count == 0 {
+        return OK;
+    }
+    if output_vertex_offsets.is_null() || output_address == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let input_address = builder.buffers[MODEL_QUAD_FACING_UNASSIGNED].quads.as_ptr() as u64;
+    encode_scattered(
+        input_address,
+        output_vertex_offsets,
+        update_count,
+        output_address,
+        output_capacity,
+        format,
+    )
+}
+
 fn encode_quad(quad: &NativeQuad, output: &mut [u8], format: NativeFormat) {
     let vertices = &quad.vertices;
     let tex_centroid_u = vertices.iter().map(|vertex| vertex.u).sum::<f32>() * 0.25;
@@ -1118,6 +1172,11 @@ pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_create(
         buffers: std::array::from_fn(|_| NativeQuadBuffer {
             quads: vec![NativeQuad::default(); capacity],
         }),
+        pending: std::array::from_fn(|_| NativePendingQuadBuffer {
+            quads: vec![NativeQuad::default(); PENDING_BATCH_QUAD_CAPACITY],
+            packed_normals: vec![0; PENDING_BATCH_QUAD_CAPACITY],
+            validity: vec![0; PENDING_BATCH_QUAD_CAPACITY],
+        }),
         counts: [0; MODEL_QUAD_FACING_COUNT],
     };
 
@@ -1263,6 +1322,107 @@ pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_append_batch_filtere
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_append_translucent_batch(
+    handle: u64,
+    facing: i32,
+    batch_address: u64,
+    quad_count: i32,
+    analyzer_handle: u64,
+    translucent_facing: i32,
+    packed_normals_address: u64,
+    output_counts: *mut i32,
+    output_counts_len: i32,
+) -> i32 {
+    if handle == 0 || output_counts.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    if facing < 0 || quad_count < 0 || output_counts_len < 2 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if quad_count == 0 {
+        *output_counts = 0;
+        *output_counts.add(1) = 0;
+        return OK;
+    }
+    if analyzer_handle == 0 || packed_normals_address == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let builder = &mut *(handle as *mut NativeSectionMeshBuilder);
+    let facing = facing as usize;
+    if facing >= MODEL_QUAD_FACING_COUNT || quad_count as usize > PENDING_BATCH_QUAD_CAPACITY {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let validity_address = builder.pending[facing].validity.as_mut_ptr() as u64;
+    let mut valid_count = 0i32;
+    let status = translucent::append_native_quad_batch_to_analyzer(
+        analyzer_handle,
+        batch_address,
+        quad_count,
+        translucent_facing,
+        packed_normals_address as *const i32,
+        validity_address,
+        &mut valid_count,
+    );
+    if status != OK {
+        return status;
+    }
+
+    match section_builder_append_batch(
+        builder,
+        facing,
+        batch_address,
+        quad_count as usize,
+        Some(slice::from_raw_parts(
+            validity_address as *const u8,
+            quad_count as usize,
+        )),
+    ) {
+        Ok(committed_count) => {
+            *output_counts = valid_count;
+            *output_counts.add(1) = committed_count;
+            OK
+        }
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_staging_addresses(
+    handle: u64,
+    facing: i32,
+    output_quad_address: *mut u64,
+    output_packed_normals_address: *mut u64,
+    output_validity_address: *mut u64,
+    output_capacity: *mut i32,
+) -> i32 {
+    if handle == 0
+        || output_quad_address.is_null()
+        || output_packed_normals_address.is_null()
+        || output_validity_address.is_null()
+        || output_capacity.is_null()
+    {
+        return ERR_NULL_POINTER;
+    }
+    if facing < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let builder = &mut *(handle as *mut NativeSectionMeshBuilder);
+    match section_builder_staging_addresses(builder, facing as usize) {
+        Ok((quad_address, packed_normals_address, validity_address, capacity)) => {
+            *output_quad_address = quad_address;
+            *output_packed_normals_address = packed_normals_address;
+            *output_validity_address = validity_address;
+            *output_capacity = capacity;
+            OK
+        }
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_facing_address(
     handle: u64,
     facing: i32,
@@ -1378,6 +1538,51 @@ pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_assemble(
         visible_slices,
         force_unassigned,
         slice_reordering,
+    )
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_encode_scattered_unassigned(
+    handle: u64,
+    output_vertex_offsets: *const i32,
+    update_count: i32,
+    output_address: u64,
+    output_capacity: i32,
+    quad_stride: i32,
+    vertex_stride: i32,
+    block_id_offset: i32,
+    normal_offset: i32,
+    tangent_offset: i32,
+    mid_uv_offset: i32,
+    mid_block_offset: i32,
+    section_index: i32,
+    separate_ao: i32,
+) -> i32 {
+    if handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+    let format = match NativeFormat::from_abi(
+        quad_stride,
+        vertex_stride,
+        block_id_offset,
+        normal_offset,
+        tangent_offset,
+        mid_uv_offset,
+        mid_block_offset,
+        section_index,
+        separate_ao,
+    ) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+
+    section_builder_encode_scattered_unassigned(
+        &*(handle as *const NativeSectionMeshBuilder),
+        output_vertex_offsets,
+        update_count,
+        output_address,
+        output_capacity,
+        format,
     )
 }
 

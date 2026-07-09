@@ -212,6 +212,14 @@ public class TranslucentGeometryCollector {
                 validityAddress);
     }
 
+    public long nativeAnalyzerHandle() {
+        if (this.nativeAnalyzer == null) {
+            throw new IllegalStateException("Native translucent batching is unavailable when quad splitting is enabled");
+        }
+
+        return this.nativeAnalyzer.handle();
+    }
+
     public static boolean isInvalidQuad(ChunkVertexEncoder.Vertex[] vertices) {
         ChunkVertexEncoder.Vertex last = vertices[3];
         int sameVertexMap = 0;
