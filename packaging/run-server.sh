@@ -94,6 +94,8 @@ fi
 
 $JAVA_CMD $JVM_ARGS \
     $SPIRV_JVM_ARG \
+    --enable-native-access=ALL-UNNAMED \
+    -Dmattmc.rust.natives.dir="$SCRIPT_DIR/../natives" \
     -cp "$CLASSPATH" \
     net.minecraft.server.Main \
     --nogui

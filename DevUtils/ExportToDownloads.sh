@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# RunExport.sh - Build and export MattMC client distribution
+# ExportToDownloads.sh - Build and export MattMC client distribution
 # Builds the project, creates a runnable distribution, zips it,
 # copies to Downloads folder, and extracts it
 
@@ -24,7 +24,7 @@ fi
 cd "$PROJECT_ROOT"
 
 # Downloads directory - defaults to matt's home on Kubuntu
-# Override with: DOWNLOADS_DIR=/path/to/dir ./RunExport.sh
+# Override with: DOWNLOADS_DIR=/path/to/dir ./ExportToDownloads.sh
 DOWNLOADS_DIR="${DOWNLOADS_DIR:-/home/matt/Downloads}"
 PROJECT_NAME="MattMC"
 

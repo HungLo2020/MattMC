@@ -62,6 +62,8 @@ REM Remove --nogui to run with GUI
 "%JAVA_CMD%" -Xmx2G -Xms1G ^
     -XX:+UseZGC ^
     -XX:+UseCompactObjectHeaders ^
+    --enable-native-access=ALL-UNNAMED ^
+    -Dmattmc.rust.natives.dir="%SCRIPT_DIR%\..\natives" ^
     -cp "!CLASSPATH!" ^
     net.minecraft.server.Main ^
     --nogui

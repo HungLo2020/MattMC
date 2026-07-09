@@ -96,6 +96,8 @@ fi
 
 $JAVA_CMD $JVM_ARGS \
     $SPIRV_JVM_ARG \
+    --enable-native-access=ALL-UNNAMED \
+    -Dmattmc.rust.natives.dir="$SCRIPT_DIR/natives" \
     -Dfabric.development=true \
     -cp "$CLASSPATH" \
     net.fabricmc.loader.impl.launch.knot.KnotClient \

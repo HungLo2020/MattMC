@@ -21,4 +21,4 @@ Source Code: https://github.com/HungLo2020/MattMC
 ## Quick Start
 - download or clone the repository, ```git clone https://github.com/HungLo2020/MattMC.git```
 - run ```./libraries/download_jdk.sh``` to download the bundled JDK.
-- run ```./gradlew runClient``` to launch the client or ```./gradlew runServer``` to launch the server. Or optioinally use the built in scripts, ```./DevUtils/RunDev.sh``` to launch the game in the dev environment. ```./DevUtils/RunExport.sh``` to export the build.
+- run ```./gradlew runClient``` to launch the client or ```./gradlew runServer``` to launch the server. Or optioinally use the built in scripts, ```./DevUtils/RunDev.sh``` to launch the game in the dev environment. ```./DevUtils/ExportToDownloads.sh``` to export the build.
