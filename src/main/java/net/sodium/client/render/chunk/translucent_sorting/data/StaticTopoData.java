@@ -65,4 +65,13 @@ public class StaticTopoData extends PresentTranslucentData {
         staticTopoData.sorterOnce = sorter;
         return staticTopoData;
     }
+
+    public static StaticTopoData fromNativeOrder(int quadCount, int[] quadIndexes, SectionPos sectionPos) {
+        var sorter = new StaticSorter(quadCount);
+        TranslucentData.writeQuadVertexIndexes(sorter.getIntBuffer(), quadIndexes, quadIndexes.length);
+
+        var staticTopoData = new StaticTopoData(sectionPos, quadCount);
+        staticTopoData.sorterOnce = sorter;
+        return staticTopoData;
+    }
 }

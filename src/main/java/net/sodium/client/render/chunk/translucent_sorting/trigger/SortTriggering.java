@@ -158,6 +158,12 @@ public class SortTriggering {
         }
     }
 
+    private void releaseTranslucentData(TranslucentData oldData) {
+        if (oldData != null) {
+            oldData.close();
+        }
+    }
+
     private void incrementSortTypeCounter(TranslucentData newData) {
         this.sortTypeCounters[newData.getSortType().ordinal()]++;
     }
@@ -176,6 +182,7 @@ public class SortTriggering {
         this.gfni.removeSection(sectionPos, oldData);
         this.direct.removeSection(sectionPos, oldData);
         this.decrementSortTypeCounter(oldData);
+        this.releaseTranslucentData(oldData);
     }
 
     /**
@@ -196,6 +203,7 @@ public class SortTriggering {
         if (newData instanceof DynamicData dynamicData) {
             this.direct.removeSection(pos.asLong(), oldData);
             this.decrementSortTypeCounter(oldData);
+            this.releaseTranslucentData(oldData);
             this.triggerSectionCallback = triggerSectionCallback;
             this.catchupData = dynamicData;
             var movement = new CameraMovement(dynamicData.getInitialCameraPos(), cameraPos);

@@ -22,7 +22,8 @@ public abstract class PresentTranslucentData extends TranslucentData {
     @Override
     public boolean oldDataMatches(TranslucentGeometryCollector collector, SortType sortType, TQuad[] quads) {
         // for the sort types other than NONE (and the old data being AnyOrderData) the geometry needs to be the same (checked with length and hash)
-        return this.getInputQuadCount() == quads.length && this.hashMatches(collector);
+        return this.getSortType() == sortType && this.getInputQuadCount() == collector.getQuadCount()
+                && this.hashMatches(collector);
     }
 
     protected boolean hashMatches(TranslucentGeometryCollector collector) {

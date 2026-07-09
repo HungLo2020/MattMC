@@ -38,6 +38,10 @@ public abstract class TranslucentData {
         return this.getUpdatedQuads() != null;
     }
 
+    public void close() {
+        // no-op for translucent data without native or GPU-side ownership
+    }
+
     /**
      * Prepares the translucent data for triggering of the given type. This is run
      * on the main thread before a sort task is scheduled.
@@ -74,5 +78,9 @@ public abstract class TranslucentData {
 
     public static void writeQuadVertexIndexesSortedByKey(IntBuffer intBuffer, int[] keys) {
         NativeChunkMeshEncoder.writeQuadVertexIndexesSortedByKey(intBuffer, keys);
+    }
+
+    public static void writeQuadVertexIndexesSortedByKey(IntBuffer intBuffer, int[] keys, int offset, int count) {
+        NativeChunkMeshEncoder.writeQuadVertexIndexesSortedByKey(intBuffer, keys, offset, count);
     }
 }

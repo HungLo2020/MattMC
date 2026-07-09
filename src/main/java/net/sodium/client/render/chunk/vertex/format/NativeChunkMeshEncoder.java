@@ -281,20 +281,27 @@ public final class NativeChunkMeshEncoder {
     }
 
     public static void writeQuadVertexIndexesSortedByKey(IntBuffer output, int[] keys) {
-        if (keys.length == 0) {
+        writeQuadVertexIndexesSortedByKey(output, keys, 0, keys.length);
+    }
+
+    public static void writeQuadVertexIndexesSortedByKey(IntBuffer output, int[] keys, int offset, int count) {
+        if (offset < 0 || count < 0 || offset + count > keys.length) {
+            throw new IllegalArgumentException("Invalid key range: offset=" + offset + ", count=" + count);
+        }
+        if (count == 0) {
             return;
         }
 
         try (Arena arena = Arena.ofConfined()) {
-            MemorySegment keysSegment = arena.allocate(ValueLayout.JAVA_INT, keys.length);
+            MemorySegment keysSegment = arena.allocate(ValueLayout.JAVA_INT, count);
 
-            for (int index = 0; index < keys.length; index++) {
-                keysSegment.setAtIndex(ValueLayout.JAVA_INT, index, keys[index]);
+            for (int index = 0; index < count; index++) {
+                keysSegment.setAtIndex(ValueLayout.JAVA_INT, index, keys[offset + index]);
             }
 
-            check(invokeWriteKeySorted(MemoryUtil.memAddress(output), output.remaining(), keysSegment, keys.length),
+            check(invokeWriteKeySorted(MemoryUtil.memAddress(output), output.remaining(), keysSegment, count),
                     "native key-sorted quad index buffer writing");
-            output.position(output.position() + keys.length * 6);
+            output.position(output.position() + count * 6);
         }
     }
 

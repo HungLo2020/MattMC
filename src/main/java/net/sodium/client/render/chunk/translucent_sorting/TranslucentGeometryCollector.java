@@ -8,7 +8,6 @@ import net.sodium.client.render.chunk.compile.ChunkBuildOutput;
 import net.sodium.client.render.chunk.data.BuiltSectionMeshParts;
 import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.BSPBuildFailureException;
 import net.sodium.client.render.chunk.translucent_sorting.data.*;
-import net.sodium.client.render.chunk.translucent_sorting.data.*;
 import net.sodium.client.render.chunk.translucent_sorting.quad.FullTQuad;
 import net.sodium.client.render.chunk.translucent_sorting.quad.RegularTQuad;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
@@ -86,6 +85,8 @@ public class TranslucentGeometryCollector {
     private ReferenceArrayList<TQuad>[] quadLists = new ReferenceArrayList[ModelQuadFacing.COUNT];
     private final int[] meshFacingCounts = new int[ModelQuadFacing.COUNT];
     private TQuad[] quads;
+    private final NativeTranslucentGeometryAnalyzer nativeAnalyzer;
+    private NativeTranslucentGeometryAnalyzer.Analysis nativeAnalysis;
 
     private SortType sortType;
 
@@ -95,6 +96,7 @@ public class TranslucentGeometryCollector {
     public TranslucentGeometryCollector(SectionPos sectionPos, SortBehavior sortBehavior) {
         this.sectionPos = sectionPos;
         this.sortBehavior = sortBehavior;
+        this.nativeAnalyzer = this.isSplittingQuads() ? null : new NativeTranslucentGeometryAnalyzer();
     }
 
     /**
@@ -106,6 +108,10 @@ public class TranslucentGeometryCollector {
      * @return true if the quad is invalid and should be discarded from the model entirely, false otherwise.
      */
     public boolean appendQuad(ChunkVertexEncoder.Vertex[] vertices, ModelQuadFacing facing, int packedNormal) {
+        if (this.nativeAnalyzer != null) {
+            return this.nativeAnalyzer.appendQuad(vertices, facing, packedNormal);
+        }
+
         TQuad quad;
         if (this.isSplittingQuads()) {
             quad = FullTQuad.fromVertices(vertices, facing, packedNormal);
@@ -367,6 +373,22 @@ public class TranslucentGeometryCollector {
     }
 
     public SortType finishRendering() {
+        if (this.nativeAnalyzer != null) {
+            this.nativeAnalysis = this.nativeAnalyzer.analyze(this.sortBehavior.getSortMode());
+            System.arraycopy(this.nativeAnalysis.meshFacingCounts(), 0,
+                    this.meshFacingCounts, 0, this.meshFacingCounts.length);
+            this.alignedFacingBitmap = this.nativeAnalysis.alignedFacingBitmap();
+            this.quadHash = this.nativeAnalysis.quadHash();
+            this.quadHashPresent = true;
+            this.sortType = this.nativeAnalysis.sortType();
+
+            if (this.sortType == SortType.DYNAMIC) {
+                this.quads = this.nativeAnalyzer.buildRegularQuadsByFacing();
+            }
+
+            return this.sortType;
+        }
+
         // combine the quads into one array
         int totalQuadCount = 0;
         for (var quadList : this.quadLists) {
@@ -398,10 +420,17 @@ public class TranslucentGeometryCollector {
     private TranslucentData makeNewTranslucentData(CombinedCameraPos cameraPos,
                                                    TranslucentData oldData) {
         if (this.sortType == SortType.NONE) {
+            if (this.nativeAnalysis != null) {
+                return AnyOrderData.fromQuadCount(this.nativeAnalysis.quadCount(), this.sectionPos);
+            }
             return AnyOrderData.fromMesh(this.quads, this.sectionPos);
         }
 
         if (this.sortType == SortType.STATIC_NORMAL_RELATIVE) {
+            if (this.nativeAnalysis != null) {
+                return StaticNormalRelativeData.fromNative(this.meshFacingCounts, this.nativeAnalysis.staticKeys(),
+                        this.sectionPos, this.nativeAnalysis.quadCount(), this.nativeAnalysis.doubleUnaligned());
+            }
             var isDoubleUnaligned = this.alignedFacingBitmap == 0;
             return StaticNormalRelativeData.fromMesh(this.meshFacingCounts, this.quads, this.sectionPos, isDoubleUnaligned);
         }
@@ -409,18 +438,34 @@ public class TranslucentGeometryCollector {
         // from this point on we know the estimated sort type requires direction mixing
         // (no backface culling) and all vertices are in the UNASSIGNED direction.
         if (this.sortType == SortType.STATIC_TOPO) {
-            var result = StaticTopoData.fromMesh(this.quads, this.sectionPos, this.isSplittingQuads());
-            if (result != null) {
-                return result;
+            if (this.nativeAnalysis != null) {
+                int[] quadIndexes = this.nativeAnalyzer.staticTopoSort(false);
+                if (quadIndexes != null) {
+                    return StaticTopoData.fromNativeOrder(this.nativeAnalysis.quadCount(), quadIndexes, this.sectionPos);
+                }
+
+                this.sortType = SortType.DYNAMIC;
+            } else {
+                var result = StaticTopoData.fromMesh(this.quads, this.sectionPos, this.isSplittingQuads());
+                if (result != null) {
+                    return result;
+                }
+                this.sortType = SortType.DYNAMIC;
             }
-            this.sortType = SortType.DYNAMIC;
         }
 
         // filter the sort type with the user setting and re-evaluate
         this.sortType = filterSortType(this.sortType, this.sortBehavior);
 
         if (this.sortType == SortType.NONE) {
+            if (this.nativeAnalysis != null) {
+                return AnyOrderData.fromQuadCount(this.nativeAnalysis.quadCount(), this.sectionPos);
+            }
             return AnyOrderData.fromMesh(this.quads, this.sectionPos);
+        }
+
+        if (this.sortType == SortType.DYNAMIC && this.quads == null) {
+            this.quads = this.nativeAnalyzer.buildRegularQuadsByFacing();
         }
 
         if (this.sortType == SortType.DYNAMIC) {
@@ -428,9 +473,12 @@ public class TranslucentGeometryCollector {
                 return DynamicBSPData.fromMesh(cameraPos, this.quads, this.sectionPos, oldData, this.quadSplittingMode);
             } catch (BSPBuildFailureException e) {
                 var geometryPlanes = GeometryPlanes.fromQuadLists(this.sectionPos, this.quads);
+                NativeTranslucentSectionGeometry nativeGeometry = this.nativeAnalyzer == null
+                        ? NativeTranslucentSectionGeometry.create(this.quads)
+                        : this.nativeAnalyzer.createSectionGeometry();
                 return DynamicTopoData.fromMesh(
                         cameraPos, this.quads, this.sectionPos,
-                        geometryPlanes);
+                        geometryPlanes, nativeGeometry);
             }
         }
 
@@ -438,6 +486,10 @@ public class TranslucentGeometryCollector {
     }
 
     public int getQuadHash() {
+        if (this.nativeAnalysis != null) {
+            return this.nativeAnalysis.quadHash();
+        }
+
         if (this.quadHashPresent) {
             return this.quadHash;
         }
@@ -451,26 +503,40 @@ public class TranslucentGeometryCollector {
         return this.quadHash;
     }
 
+    public int getQuadCount() {
+        if (this.nativeAnalysis != null) {
+            return this.nativeAnalysis.quadCount();
+        }
+
+        return this.quads == null ? 0 : this.quads.length;
+    }
+
     public TranslucentData getTranslucentData(
             TranslucentData oldData, CombinedCameraPos cameraPos) {
-        if (this.quads.length == 0) {
-            return NoData.forNoTranslucent(this.sectionPos);
-        }
+        try {
+            if (this.getQuadCount() == 0) {
+                return NoData.forNoTranslucent(this.sectionPos);
+            }
 
-        // re-use the original translucent data if it's the same. This reduces the
-        // amount of generated and uploaded index data when sections are rebuilt without
-        // relevant changes to translucent geometry. Rebuilds happen when any part of
-        // the section changes, including the here irrelevant cases of changes to opaque
-        // geometry or non-geometric changes to translucent geometry.
-        // (except when quad splitting, where data is never reused)
-        if (oldData != null && oldData.oldDataMatches(this, this.sortType, this.quads)) {
-            return oldData;
-        }
+            // re-use the original translucent data if it's the same. This reduces the
+            // amount of generated and uploaded index data when sections are rebuilt without
+            // relevant changes to translucent geometry. Rebuilds happen when any part of
+            // the section changes, including the here irrelevant cases of changes to opaque
+            // geometry or non-geometric changes to translucent geometry.
+            // (except when quad splitting, where data is never reused)
+            if (oldData != null && oldData.oldDataMatches(this, this.sortType, this.quads)) {
+                return oldData;
+            }
 
-        var newData = this.makeNewTranslucentData(cameraPos, oldData);
-        if (newData instanceof PresentTranslucentData presentData) {
-            presentData.setQuadHash(this.getQuadHash());
+            var newData = this.makeNewTranslucentData(cameraPos, oldData);
+            if (newData instanceof PresentTranslucentData presentData) {
+                presentData.setQuadHash(this.getQuadHash());
+            }
+            return newData;
+        } finally {
+            if (this.nativeAnalyzer != null) {
+                this.nativeAnalyzer.destroy();
+            }
         }
-        return newData;
     }
 }

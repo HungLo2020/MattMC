@@ -1,0 +1,1111 @@
+use std::slice;
+
+use super::index;
+
+const OK: i32 = 0;
+const SORT_FAILED: i32 = 1;
+const ERR_NULL_POINTER: i32 = -1;
+const ERR_INVALID_ARGUMENT: i32 = -2;
+const ERR_CAPACITY: i32 = -3;
+
+const FACING_COUNT: usize = 7;
+const FACING_DIRECTIONS: usize = 6;
+const FACING_POS_X: i32 = 0;
+const FACING_POS_Y: i32 = 1;
+const FACING_POS_Z: i32 = 2;
+const FACING_NEG_X: i32 = 3;
+const FACING_NEG_Y: i32 = 4;
+const FACING_NEG_Z: i32 = 5;
+const FACING_UNASSIGNED: i32 = 6;
+
+const SORT_MODE_NONE: i32 = 0;
+const SORT_MODE_STATIC: i32 = 1;
+
+const SORT_TYPE_NONE: i32 = 2;
+const SORT_TYPE_STATIC_NORMAL_RELATIVE: i32 = 3;
+const SORT_TYPE_STATIC_TOPO: i32 = 4;
+const SORT_TYPE_DYNAMIC: i32 = 5;
+
+const VERTEX_EPSILON: f32 = 0.00001;
+const QUANTIZE_EPSILON: f32 = 1.0 / 256.0;
+const HALF_SPACE_EPSILON: f32 = 0.001;
+const NORMAL_COMPONENT_RANGE: f32 = 127.0;
+
+const ALIGNED_NORMALS: [(i8, i8, i8); FACING_DIRECTIONS] = [
+    (127, 0, 0),
+    (0, 127, 0),
+    (0, 0, 127),
+    (-127, 0, 0),
+    (0, -127, 0),
+    (0, 0, -127),
+];
+const STATIC_TOPO_SORT_ATTEMPT_LIMITS: [i32; 6] = [-1, -1, 250, 100, 50, 30];
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct TranslucentQuadRecord {
+    positions: [f32; 12],
+    facing: i32,
+    packed_normal: i32,
+}
+
+#[derive(Clone)]
+struct QuadInfo {
+    positions: [f32; 12],
+    center: (f32, f32, f32),
+    facing: i32,
+    packed_normal: i32,
+    extents: [f32; 6],
+    accurate_dot_product: f32,
+    quantized_dot_product: f32,
+}
+
+#[derive(Clone)]
+struct Analyzer {
+    mesh_facing_counts: [i32; FACING_COUNT],
+    sort_type: i32,
+    quad_hash: i32,
+    aligned_facing_bitmap: i32,
+    is_double_unaligned: bool,
+    static_keys: Vec<i32>,
+}
+
+struct NativeTranslucentSectionGeometry {
+    quads: Vec<QuadInfo>,
+}
+
+pub fn verify() -> i32 {
+    if std::mem::size_of::<TranslucentQuadRecord>() == 56 {
+        OK
+    } else {
+        ERR_INVALID_ARGUMENT
+    }
+}
+
+fn analyze(records: &[TranslucentQuadRecord], sort_mode: i32) -> Result<Analyzer, i32> {
+    if sort_mode < SORT_MODE_NONE || sort_mode > 2 {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    let mut quads_by_facing: [Vec<QuadInfo>; FACING_COUNT] = std::array::from_fn(|_| Vec::new());
+    let mut has_unaligned = false;
+    let mut untracked_unaligned_normal_count = 0;
+    let mut aligned_facing_bitmap = 0i32;
+    let mut extents = [
+        f32::NEG_INFINITY,
+        f32::NEG_INFINITY,
+        f32::NEG_INFINITY,
+        f32::INFINITY,
+        f32::INFINITY,
+        f32::INFINITY,
+    ];
+    let mut aligned_extents_multiple = false;
+    let mut aligned_extremes = [
+        f32::NEG_INFINITY,
+        f32::NEG_INFINITY,
+        f32::NEG_INFINITY,
+        f32::INFINITY,
+        f32::INFINITY,
+        f32::INFINITY,
+    ];
+    let mut unaligned_a_normal = -1;
+    let mut unaligned_a_distance1 = f32::NAN;
+    let mut unaligned_a_distance2 = f32::NAN;
+    let mut unaligned_b_normal = -1;
+    let mut unaligned_b_distance1 = f32::NAN;
+    let mut unaligned_b_distance2 = f32::NAN;
+
+    for record in records {
+        if record.facing < 0 || record.facing >= FACING_COUNT as i32 {
+            return Err(ERR_INVALID_ARGUMENT);
+        }
+
+        let quad = build_quad_info(record);
+        let facing_index = quad.facing as usize;
+
+        if is_aligned(quad.facing) {
+            if !has_unaligned {
+                for axis in 0..3 {
+                    extents[axis] = extents[axis].max(quad.extents[axis]);
+                }
+                for axis in 3..6 {
+                    extents[axis] = extents[axis].min(quad.extents[axis]);
+                }
+            }
+
+            let distance = quad.accurate_dot_product;
+            let existing_extreme = aligned_extremes[facing_index];
+            if !aligned_extents_multiple
+                && !existing_extreme.is_infinite()
+                && existing_extreme != distance
+            {
+                aligned_extents_multiple = true;
+            }
+
+            if facing_sign(quad.facing) > 0 {
+                aligned_extremes[facing_index] = aligned_extremes[facing_index].max(distance);
+            } else {
+                aligned_extremes[facing_index] = aligned_extremes[facing_index].min(distance);
+            }
+        } else {
+            has_unaligned = true;
+            let distance = quad.accurate_dot_product;
+
+            if quad.packed_normal == unaligned_a_normal {
+                if unaligned_a_distance1.is_nan() {
+                    unaligned_a_distance1 = distance;
+                } else {
+                    unaligned_a_distance2 = distance;
+                }
+            } else if quad.packed_normal == unaligned_b_normal {
+                if unaligned_b_distance1.is_nan() {
+                    unaligned_b_distance1 = distance;
+                } else {
+                    unaligned_b_distance2 = distance;
+                }
+            } else if unaligned_a_normal == -1 {
+                unaligned_a_normal = quad.packed_normal;
+                unaligned_a_distance1 = distance;
+            } else if unaligned_b_normal == -1 {
+                unaligned_b_normal = quad.packed_normal;
+                unaligned_b_distance1 = distance;
+            } else {
+                untracked_unaligned_normal_count += 1;
+            }
+        }
+
+        quads_by_facing[facing_index].push(quad);
+        if facing_index < FACING_DIRECTIONS {
+            aligned_facing_bitmap |= 1 << facing_index;
+        }
+    }
+
+    let mut mesh_facing_counts = [0i32; FACING_COUNT];
+    for facing in 0..FACING_COUNT {
+        mesh_facing_counts[facing] = quads_by_facing[facing].len() as i32;
+    }
+
+    let sorted_quads = flatten_by_facing(&quads_by_facing);
+    let sort_type = filter_sort_type(
+        sort_type_heuristic(
+            &sorted_quads,
+            sort_mode,
+            has_unaligned,
+            untracked_unaligned_normal_count,
+            aligned_facing_bitmap,
+            extents,
+            aligned_extents_multiple,
+            aligned_extremes,
+            unaligned_a_normal,
+            unaligned_a_distance1,
+            unaligned_a_distance2,
+            unaligned_b_normal,
+            unaligned_b_distance1,
+            unaligned_b_distance2,
+        ),
+        sort_mode,
+    );
+    let quad_hash = compute_quad_hash(&sorted_quads);
+    let static_keys = if sort_type == SORT_TYPE_STATIC_NORMAL_RELATIVE {
+        sorted_quads
+            .iter()
+            .map(|quad| float_to_comparable_int(quad.accurate_dot_product))
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    Ok(Analyzer {
+        mesh_facing_counts,
+        sort_type,
+        quad_hash,
+        aligned_facing_bitmap,
+        is_double_unaligned: aligned_facing_bitmap == 0,
+        static_keys,
+    })
+}
+
+fn build_quad_info(record: &TranslucentQuadRecord) -> QuadInfo {
+    let facing = record.facing;
+    let packed_normal = if is_aligned(facing) {
+        packed_aligned_normal(facing)
+    } else {
+        record.packed_normal
+    };
+    let (mut extents, explicit_center) = compute_extents_and_center(record, facing);
+    shrink_extents(&mut extents, facing);
+    let center = explicit_center.unwrap_or_else(|| compute_extent_center(&extents));
+
+    let accurate_dot_product = if is_aligned(facing) {
+        extents[facing as usize] * facing_sign(facing) as f32
+    } else {
+        let normal = unpack_normal(packed_normal);
+        center.0 * normal.0 + center.1 * normal.1 + center.2 * normal.2
+    };
+
+    QuadInfo {
+        positions: record.positions,
+        center,
+        facing,
+        packed_normal,
+        extents,
+        accurate_dot_product,
+        quantized_dot_product: accurate_dot_product,
+    }
+}
+
+fn compute_extents_and_center(
+    record: &TranslucentQuadRecord,
+    facing: i32,
+) -> ([f32; 6], Option<(f32, f32, f32)>) {
+    let mut x_sum = 0.0;
+    let mut y_sum = 0.0;
+    let mut z_sum = 0.0;
+    let mut last_x = record.positions[9];
+    let mut last_y = record.positions[10];
+    let mut last_z = record.positions[11];
+    let mut same_vertex_map = 0i32;
+    let mut extents = [
+        f32::NEG_INFINITY,
+        f32::NEG_INFINITY,
+        f32::NEG_INFINITY,
+        f32::INFINITY,
+        f32::INFINITY,
+        f32::INFINITY,
+    ];
+
+    for vertex in 0..4 {
+        let base = vertex * 3;
+        let x = record.positions[base];
+        let y = record.positions[base + 1];
+        let z = record.positions[base + 2];
+
+        extents[0] = extents[0].max(x);
+        extents[1] = extents[1].max(y);
+        extents[2] = extents[2].max(z);
+        extents[3] = extents[3].min(x);
+        extents[4] = extents[4].min(y);
+        extents[5] = extents[5].min(z);
+
+        if (x - last_x).abs() >= VERTEX_EPSILON
+            || (y - last_y).abs() >= VERTEX_EPSILON
+            || (z - last_z).abs() >= VERTEX_EPSILON
+        {
+            x_sum += x;
+            y_sum += y;
+            z_sum += z;
+        } else {
+            same_vertex_map |= 1 << vertex;
+        }
+
+        if vertex != 3 {
+            last_x = x;
+            last_y = y;
+            last_z = z;
+        }
+    }
+
+    let unique_vertices = 4 - same_vertex_map.count_ones() as i32;
+    let center = if (!is_aligned(facing) || unique_vertices != 4) && unique_vertices >= 3 {
+        let inv = 1.0 / unique_vertices as f32;
+        Some((x_sum * inv, y_sum * inv, z_sum * inv))
+    } else {
+        None
+    };
+
+    (extents, center)
+}
+
+fn compute_extent_center(extents: &[f32; 6]) -> (f32, f32, f32) {
+    (
+        (extents[0] + extents[3]) * 0.5,
+        (extents[1] + extents[4]) * 0.5,
+        (extents[2] + extents[5]) * 0.5,
+    )
+}
+
+fn shrink_extents(extents: &mut [f32; 6], facing: i32) {
+    if facing != FACING_POS_X && facing != FACING_NEG_X {
+        extents[0] -= QUANTIZE_EPSILON;
+        extents[3] += QUANTIZE_EPSILON;
+        if extents[3] > extents[0] {
+            extents[3] = extents[0];
+        }
+    }
+    if facing != FACING_POS_Y && facing != FACING_NEG_Y {
+        extents[1] -= QUANTIZE_EPSILON;
+        extents[4] += QUANTIZE_EPSILON;
+        if extents[4] > extents[1] {
+            extents[4] = extents[1];
+        }
+    }
+    if facing != FACING_POS_Z && facing != FACING_NEG_Z {
+        extents[2] -= QUANTIZE_EPSILON;
+        extents[5] += QUANTIZE_EPSILON;
+        if extents[5] > extents[2] {
+            extents[5] = extents[2];
+        }
+    }
+}
+
+fn flatten_by_facing(quads_by_facing: &[Vec<QuadInfo>; FACING_COUNT]) -> Vec<QuadInfo> {
+    let total = quads_by_facing.iter().map(Vec::len).sum();
+    let mut quads = Vec::with_capacity(total);
+    for quads_for_facing in quads_by_facing {
+        quads.extend(quads_for_facing.iter().cloned());
+    }
+    quads
+}
+
+#[allow(clippy::too_many_arguments)]
+fn sort_type_heuristic(
+    quads: &[QuadInfo],
+    sort_mode: i32,
+    has_unaligned: bool,
+    untracked_unaligned_normal_count: i32,
+    aligned_facing_bitmap: i32,
+    extents: [f32; 6],
+    aligned_extents_multiple: bool,
+    aligned_extremes: [f32; 6],
+    unaligned_a_normal: i32,
+    unaligned_a_distance1: f32,
+    unaligned_a_distance2: f32,
+    unaligned_b_normal: i32,
+    unaligned_b_distance1: f32,
+    unaligned_b_distance2: f32,
+) -> i32 {
+    if quads.len() <= 1 || sort_mode == SORT_MODE_NONE {
+        return SORT_TYPE_NONE;
+    }
+
+    let aligned_normal_count = aligned_facing_bitmap.count_ones() as i32;
+    let plane_count = get_plane_count(
+        aligned_normal_count,
+        aligned_extents_multiple,
+        unaligned_a_distance1,
+        unaligned_a_distance2,
+        unaligned_b_distance1,
+        unaligned_b_distance2,
+    );
+    let mut unaligned_normal_count = untracked_unaligned_normal_count;
+    if unaligned_a_normal != -1 {
+        unaligned_normal_count += 1;
+    }
+    if unaligned_b_normal != -1 {
+        unaligned_normal_count += 1;
+    }
+    let normal_count = aligned_normal_count + unaligned_normal_count;
+
+    if plane_count <= 1 {
+        return SORT_TYPE_NONE;
+    }
+
+    if !has_unaligned {
+        let opposing_aligned_normals = bitmap_is_opposing_aligned(aligned_facing_bitmap);
+        if plane_count == 2 && opposing_aligned_normals {
+            return SORT_TYPE_NONE;
+        }
+
+        if !aligned_extents_multiple {
+            let mut passes_bounding_box_test = true;
+            for direction in 0..FACING_DIRECTIONS {
+                let extreme = aligned_extremes[direction];
+                if extreme.is_infinite() {
+                    continue;
+                }
+
+                let sign = if direction < 3 { 1.0 } else { -1.0 };
+                if sign * extreme != extents[direction] {
+                    passes_bounding_box_test = false;
+                    break;
+                }
+            }
+            if passes_bounding_box_test {
+                return SORT_TYPE_NONE;
+            }
+        }
+
+        if opposing_aligned_normals || aligned_normal_count == 1 {
+            return SORT_TYPE_STATIC_NORMAL_RELATIVE;
+        }
+    } else if aligned_normal_count == 0 {
+        if unaligned_normal_count == 1
+            || (unaligned_normal_count == 2
+                && normals_are_opposite(unaligned_a_normal, unaligned_b_normal))
+        {
+            return SORT_TYPE_STATIC_NORMAL_RELATIVE;
+        }
+    } else if plane_count == 2 {
+        let aligned_direction = aligned_facing_bitmap.trailing_zeros() as i32;
+        if normals_are_opposite(unaligned_a_normal, packed_aligned_normal(aligned_direction)) {
+            return SORT_TYPE_STATIC_NORMAL_RELATIVE;
+        }
+    }
+
+    let attempt_limit_index =
+        normal_count.clamp(2, STATIC_TOPO_SORT_ATTEMPT_LIMITS.len() as i32 - 1);
+    if quads.len() as i32 <= STATIC_TOPO_SORT_ATTEMPT_LIMITS[attempt_limit_index as usize] {
+        SORT_TYPE_STATIC_TOPO
+    } else {
+        SORT_TYPE_DYNAMIC
+    }
+}
+
+fn filter_sort_type(sort_type: i32, sort_mode: i32) -> i32 {
+    if sort_mode == SORT_MODE_NONE {
+        SORT_TYPE_NONE
+    } else if sort_mode == SORT_MODE_STATIC
+        && sort_type != SORT_TYPE_STATIC_NORMAL_RELATIVE
+        && sort_type != SORT_TYPE_STATIC_TOPO
+    {
+        SORT_TYPE_NONE
+    } else {
+        sort_type
+    }
+}
+
+fn get_plane_count(
+    aligned_normal_count: i32,
+    aligned_extents_multiple: bool,
+    unaligned_a_distance1: f32,
+    unaligned_a_distance2: f32,
+    unaligned_b_distance1: f32,
+    unaligned_b_distance2: f32,
+) -> i32 {
+    let aligned_plane_count = if aligned_extents_multiple {
+        100
+    } else {
+        aligned_normal_count
+    };
+
+    aligned_plane_count
+        + (!unaligned_a_distance1.is_nan()) as i32
+        + (!unaligned_a_distance2.is_nan()) as i32
+        + (!unaligned_b_distance1.is_nan()) as i32
+        + (!unaligned_b_distance2.is_nan()) as i32
+}
+
+fn compute_quad_hash(quads: &[QuadInfo]) -> i32 {
+    let mut quad_hash = 0i32;
+    for (index, quad) in quads.iter().enumerate() {
+        quad_hash = java_i32_add(
+            java_i32_mul(quad_hash, 31),
+            java_i32_add(compute_single_quad_hash(quad), (index as i32) * 3),
+        );
+    }
+    quad_hash
+}
+
+fn compute_single_quad_hash(quad: &QuadInfo) -> i32 {
+    let mut result = 1i32;
+    result = java_i32_add(
+        java_i32_mul(31, result),
+        java_float_array_hash(&quad.extents),
+    );
+    let normal_or_facing = if is_aligned(quad.facing) {
+        packed_aligned_normal(quad.facing)
+    } else {
+        quad.packed_normal
+    };
+    result = java_i32_add(java_i32_mul(31, result), normal_or_facing);
+    result = java_i32_add(
+        java_i32_mul(31, result),
+        quad.quantized_dot_product.to_bits() as i32,
+    );
+    result
+}
+
+fn java_float_array_hash(values: &[f32; 6]) -> i32 {
+    let mut result = 1i32;
+    for value in values {
+        result = java_i32_add(java_i32_mul(31, result), value.to_bits() as i32);
+    }
+    result
+}
+
+fn java_i32_add(a: i32, b: i32) -> i32 {
+    a.wrapping_add(b)
+}
+
+fn java_i32_mul(a: i32, b: i32) -> i32 {
+    a.wrapping_mul(b)
+}
+
+fn float_to_comparable_int(value: f32) -> i32 {
+    let bits = value.to_bits() as i32;
+    bits ^ ((bits >> 31) & 0x7fff_ffff)
+}
+
+fn bitmap_is_opposing_aligned(bitmap: i32) -> bool {
+    bitmap == ((1 << FACING_POS_X) | (1 << FACING_NEG_X))
+        || bitmap == ((1 << FACING_POS_Y) | (1 << FACING_NEG_Y))
+        || bitmap == ((1 << FACING_POS_Z) | (1 << FACING_NEG_Z))
+}
+
+fn is_aligned(facing: i32) -> bool {
+    facing != FACING_UNASSIGNED
+}
+
+fn facing_sign(facing: i32) -> i32 {
+    match facing {
+        FACING_POS_X | FACING_POS_Y | FACING_POS_Z => 1,
+        FACING_NEG_X | FACING_NEG_Y | FACING_NEG_Z => -1,
+        _ => 0,
+    }
+}
+
+fn packed_aligned_normal(facing: i32) -> i32 {
+    let normal = ALIGNED_NORMALS[facing as usize];
+    pack_normal(normal.0, normal.1, normal.2)
+}
+
+fn pack_normal(x: i8, y: i8, z: i8) -> i32 {
+    ((z as u8 as i32) << 16) | ((y as u8 as i32) << 8) | (x as u8 as i32)
+}
+
+fn unpack_normal(normal: i32) -> (f32, f32, f32) {
+    (
+        ((normal & 0xff) as u8 as i8) as f32 / NORMAL_COMPONENT_RANGE,
+        (((normal >> 8) & 0xff) as u8 as i8) as f32 / NORMAL_COMPONENT_RANGE,
+        (((normal >> 16) & 0xff) as u8 as i8) as f32 / NORMAL_COMPONENT_RANGE,
+    )
+}
+
+fn normals_are_opposite(a: i32, b: i32) -> bool {
+    ((a & 0xff) as u8 as i8) == -((b & 0xff) as u8 as i8)
+        && (((a >> 8) & 0xff) as u8 as i8) == -(((b >> 8) & 0xff) as u8 as i8)
+        && (((a >> 16) & 0xff) as u8 as i8) == -(((b >> 16) & 0xff) as u8 as i8)
+}
+
+fn sorted_quads_by_facing(records: &[TranslucentQuadRecord]) -> Result<Vec<QuadInfo>, i32> {
+    let mut quads_by_facing: [Vec<QuadInfo>; FACING_COUNT] = std::array::from_fn(|_| Vec::new());
+
+    for record in records {
+        if record.facing < 0 || record.facing >= FACING_COUNT as i32 {
+            return Err(ERR_INVALID_ARGUMENT);
+        }
+
+        let quad = build_quad_info(record);
+        quads_by_facing[quad.facing as usize].push(quad);
+    }
+
+    Ok(flatten_by_facing(&quads_by_facing))
+}
+
+fn static_topo_sort(
+    records: &[TranslucentQuadRecord],
+    fail_on_intersection: bool,
+) -> Result<Option<Vec<i32>>, i32> {
+    let quads = sorted_quads_by_facing(records)?;
+    Ok(topo_graph_sort(&quads, fail_on_intersection))
+}
+
+fn create_section_geometry(
+    records: &[TranslucentQuadRecord],
+) -> Result<NativeTranslucentSectionGeometry, i32> {
+    Ok(NativeTranslucentSectionGeometry {
+        quads: sorted_quads_by_facing(records)?,
+    })
+}
+
+fn write_distance_sorted_index_buffer(
+    geometry: &NativeTranslucentSectionGeometry,
+    output: &mut [i32],
+    camera_x: f32,
+    camera_y: f32,
+    camera_z: f32,
+) -> i32 {
+    let keys: Vec<i32> = geometry
+        .quads
+        .iter()
+        .map(|quad| {
+            let dx = quad.center.0 - camera_x;
+            let dy = quad.center.1 - camera_y;
+            let dz = quad.center.2 - camera_z;
+            let distance_squared = dx.mul_add(dx, dy.mul_add(dy, dz * dz));
+            !(distance_squared.to_bits() as i32)
+        })
+        .collect();
+
+    index::write_key_sorted_quad_index_buffer(output, &keys)
+}
+
+fn topo_graph_sort(quads: &[QuadInfo], fail_on_intersection: bool) -> Option<Vec<i32>> {
+    let quad_count = quads.len();
+    let mut output = Vec::with_capacity(quad_count);
+
+    if quad_count == 0 {
+        return Some(output);
+    }
+    if quad_count == 1 {
+        output.push(0);
+        return Some(output);
+    }
+    if quad_count == 2 {
+        let mut a = 0usize;
+        let mut b = 1usize;
+        if quad_visible_through(&quads[a], &quads[b], fail_on_intersection) {
+            if fail_on_intersection
+                && quad_visible_through_intersections_visible(&quads[b], &quads[a])
+            {
+                return None;
+            }
+
+            a = 1;
+            b = 0;
+        }
+        output.push(a as i32);
+        output.push(b as i32);
+        return Some(output);
+    }
+
+    let mut unvisited = vec![true; quad_count];
+    let mut visited_count = 0usize;
+    let mut on_stack = vec![false; quad_count];
+    let mut stack = vec![0usize; quad_count];
+    let mut next_edge = vec![0usize; quad_count];
+
+    while visited_count < quad_count {
+        let mut stack_pos = 0usize;
+        let root = next_set_bit(&unvisited, 0)?;
+        stack[stack_pos] = root;
+        on_stack[root] = true;
+        next_edge[stack_pos] = 0;
+
+        loop {
+            let current_quad_index = stack[stack_pos];
+            let mut next_edge_test = next_set_bit(&unvisited, next_edge[stack_pos]);
+            if let Some(mut next_index) = next_edge_test {
+                if current_quad_index != next_index
+                    && quad_visible_through(
+                        &quads[current_quad_index],
+                        &quads[next_index],
+                        fail_on_intersection,
+                    )
+                {
+                    if on_stack[next_index] {
+                        return None;
+                    }
+
+                    next_edge[stack_pos] = next_index + 1;
+                    stack_pos += 1;
+                    stack[stack_pos] = next_index;
+                    on_stack[next_index] = true;
+                    next_edge[stack_pos] = 0;
+                    continue;
+                }
+
+                next_index += 1;
+                if next_index < quad_count {
+                    next_edge[stack_pos] = next_index;
+                    continue;
+                }
+                next_edge_test = None;
+            }
+
+            if next_edge_test.is_none() {
+                on_stack[current_quad_index] = false;
+                visited_count += 1;
+                unvisited[current_quad_index] = false;
+                output.push(current_quad_index as i32);
+
+                if stack_pos == 0 {
+                    break;
+                }
+                stack_pos -= 1;
+            }
+        }
+    }
+
+    Some(output)
+}
+
+fn next_set_bit(bits: &[bool], start: usize) -> Option<usize> {
+    bits.iter()
+        .enumerate()
+        .skip(start)
+        .find_map(|(index, value)| (*value).then_some(index))
+}
+
+fn quad_visible_through(quad: &QuadInfo, other: &QuadInfo, intersections_visible: bool) -> bool {
+    if std::ptr::eq(quad, other) {
+        return false;
+    }
+
+    if is_aligned(quad.facing) && is_aligned(other.facing) {
+        if opposite_facing(quad.facing) == other.facing {
+            return false;
+        }
+
+        if quad.facing == other.facing {
+            let sign = facing_sign(quad.facing) as f32;
+            let direction = quad.facing as usize;
+            return sign * quad.extents[direction] > sign * other.extents[direction];
+        }
+
+        return orthogonal_quad_visible_through(quad, other, intersections_visible);
+    }
+
+    let quad_normal = accurate_normal(quad);
+    let mut other_inside_quad = false;
+    for vertex in 0..4 {
+        let base = vertex * 3;
+        if point_inside_half_space_epsilon(
+            quad.accurate_dot_product,
+            quad_normal,
+            other.positions[base],
+            other.positions[base + 1],
+            other.positions[base + 2],
+        ) {
+            other_inside_quad = true;
+            break;
+        }
+    }
+
+    if !other_inside_quad {
+        return false;
+    }
+
+    let other_normal = accurate_normal(other);
+    for vertex in 0..4 {
+        let base = vertex * 3;
+        if point_outside_half_space_epsilon(
+            other.accurate_dot_product,
+            other_normal,
+            quad.positions[base],
+            quad.positions[base + 1],
+            quad.positions[base + 2],
+        ) {
+            return true;
+        }
+    }
+
+    false
+}
+
+fn quad_visible_through_intersections_visible(quad: &QuadInfo, other: &QuadInfo) -> bool {
+    quad_visible_through(quad, other, true)
+}
+
+fn orthogonal_quad_visible_through(
+    quad: &QuadInfo,
+    other: &QuadInfo,
+    intersections_visible: bool,
+) -> bool {
+    let a_direction = quad.facing as usize;
+    let a_opposite = opposite_facing(quad.facing) as usize;
+    let b_direction = other.facing as usize;
+    let a_sign = facing_sign(quad.facing) as f32;
+    let b_sign = facing_sign(other.facing) as f32;
+
+    let b_into_a_descent = a_sign * quad.extents[a_direction] - a_sign * other.extents[a_opposite];
+    let a_outside_b_ascent =
+        b_sign * quad.extents[b_direction] - b_sign * other.extents[b_direction];
+    let visible = b_into_a_descent > 0.0 && a_outside_b_ascent > 0.0;
+
+    if visible && extents_intersect(&quad.extents, &other.extents) {
+        if intersections_visible {
+            return true;
+        }
+        return b_into_a_descent + a_outside_b_ascent > 1.0;
+    }
+
+    visible
+}
+
+fn accurate_normal(quad: &QuadInfo) -> (f32, f32, f32) {
+    if is_aligned(quad.facing) {
+        let normal = ALIGNED_NORMALS[quad.facing as usize];
+        (
+            normal.0 as f32 / NORMAL_COMPONENT_RANGE,
+            normal.1 as f32 / NORMAL_COMPONENT_RANGE,
+            normal.2 as f32 / NORMAL_COMPONENT_RANGE,
+        )
+    } else {
+        unpack_normal(quad.packed_normal)
+    }
+}
+
+fn point_inside_half_space_epsilon(
+    plane_distance: f32,
+    plane_normal: (f32, f32, f32),
+    x: f32,
+    y: f32,
+    z: f32,
+) -> bool {
+    dot(plane_normal, x, y, z) + HALF_SPACE_EPSILON < plane_distance
+}
+
+fn point_outside_half_space_epsilon(
+    plane_distance: f32,
+    plane_normal: (f32, f32, f32),
+    x: f32,
+    y: f32,
+    z: f32,
+) -> bool {
+    dot(plane_normal, x, y, z) - HALF_SPACE_EPSILON > plane_distance
+}
+
+fn dot(normal: (f32, f32, f32), x: f32, y: f32, z: f32) -> f32 {
+    normal.0 * x + normal.1 * y + normal.2 * z
+}
+
+fn extents_intersect(a: &[f32; 6], b: &[f32; 6]) -> bool {
+    for axis in 0..3 {
+        let opposite = axis + 3;
+        if a[axis] <= b[opposite] || b[axis] <= a[opposite] {
+            return false;
+        }
+    }
+
+    true
+}
+
+fn opposite_facing(facing: i32) -> i32 {
+    match facing {
+        FACING_POS_X => FACING_NEG_X,
+        FACING_POS_Y => FACING_NEG_Y,
+        FACING_POS_Z => FACING_NEG_Z,
+        FACING_NEG_X => FACING_POS_X,
+        FACING_NEG_Y => FACING_POS_Y,
+        FACING_NEG_Z => FACING_POS_Z,
+        _ => FACING_UNASSIGNED,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn mattmc_sodium_translucent_analyzer_verify() -> i32 {
+    verify()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_analyzer_analyze(
+    records: *const TranslucentQuadRecord,
+    record_count: i32,
+    sort_mode: i32,
+    metrics: *mut i32,
+    metrics_len: i32,
+    mesh_facing_counts: *mut i32,
+    mesh_facing_counts_len: i32,
+    static_keys: *mut i32,
+    static_keys_len: i32,
+) -> i32 {
+    if record_count < 0
+        || metrics_len < 5
+        || mesh_facing_counts_len != FACING_COUNT as i32
+        || static_keys_len < 0
+    {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if metrics.is_null() || mesh_facing_counts.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    if record_count > 0 && records.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let records = if record_count == 0 {
+        &[]
+    } else {
+        slice::from_raw_parts(records, record_count as usize)
+    };
+    let analyzer = match analyze(records, sort_mode) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    if analyzer.static_keys.len() > static_keys_len as usize {
+        return ERR_CAPACITY;
+    }
+    if !analyzer.static_keys.is_empty() && static_keys.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let metrics = slice::from_raw_parts_mut(metrics, metrics_len as usize);
+    metrics[0] = analyzer.sort_type;
+    metrics[1] = analyzer.quad_hash;
+    metrics[2] = analyzer.aligned_facing_bitmap;
+    metrics[3] = if analyzer.is_double_unaligned { 1 } else { 0 };
+    metrics[4] = analyzer.static_keys.len() as i32;
+
+    let mesh_facing_counts =
+        slice::from_raw_parts_mut(mesh_facing_counts, mesh_facing_counts_len as usize);
+    mesh_facing_counts.copy_from_slice(&analyzer.mesh_facing_counts);
+
+    if !analyzer.static_keys.is_empty() {
+        let static_keys = slice::from_raw_parts_mut(static_keys, static_keys_len as usize);
+        static_keys[..analyzer.static_keys.len()].copy_from_slice(&analyzer.static_keys);
+    }
+
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_static_topo_sort(
+    records: *const TranslucentQuadRecord,
+    record_count: i32,
+    fail_on_intersection: i32,
+    output_indices: *mut i32,
+    output_indices_len: i32,
+) -> i32 {
+    if record_count < 0 || output_indices_len < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if record_count > 0 && (records.is_null() || output_indices.is_null()) {
+        return ERR_NULL_POINTER;
+    }
+    if output_indices_len < record_count {
+        return ERR_CAPACITY;
+    }
+
+    let records = if record_count == 0 {
+        &[]
+    } else {
+        slice::from_raw_parts(records, record_count as usize)
+    };
+    let order = match static_topo_sort(records, fail_on_intersection != 0) {
+        Ok(Some(value)) => value,
+        Ok(None) => return SORT_FAILED,
+        Err(status) => return status,
+    };
+
+    if !order.is_empty() {
+        let output_indices = slice::from_raw_parts_mut(output_indices, output_indices_len as usize);
+        output_indices[..order.len()].copy_from_slice(&order);
+    }
+
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_section_geometry_create(
+    records: *const TranslucentQuadRecord,
+    record_count: i32,
+    output_handle: *mut u64,
+) -> i32 {
+    if record_count < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if output_handle.is_null() || (record_count > 0 && records.is_null()) {
+        return ERR_NULL_POINTER;
+    }
+
+    let records = if record_count == 0 {
+        &[]
+    } else {
+        slice::from_raw_parts(records, record_count as usize)
+    };
+    let geometry = match create_section_geometry(records) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+
+    *output_handle = Box::into_raw(Box::new(geometry)) as u64;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_section_geometry_destroy(handle: u64) -> i32 {
+    if handle == 0 {
+        return OK;
+    }
+
+    drop(Box::from_raw(
+        handle as *mut NativeTranslucentSectionGeometry,
+    ));
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_section_geometry_distance_sort_write(
+    handle: u64,
+    output_address: u64,
+    output_capacity: i32,
+    camera_x: f32,
+    camera_y: f32,
+    camera_z: f32,
+) -> i32 {
+    if output_capacity < 0 || output_capacity % std::mem::size_of::<i32>() as i32 != 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if handle == 0 || output_address == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let geometry = &*(handle as *const NativeTranslucentSectionGeometry);
+    let output = slice::from_raw_parts_mut(
+        output_address as *mut i32,
+        output_capacity as usize / std::mem::size_of::<i32>(),
+    );
+    write_distance_sorted_index_buffer(geometry, output, camera_x, camera_y, camera_z)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn vertex_record(facing: i32, z: f32) -> TranslucentQuadRecord {
+        TranslucentQuadRecord {
+            positions: [0.0, 0.0, z, 1.0, 0.0, z, 1.0, 1.0, z, 0.0, 1.0, z],
+            facing,
+            packed_normal: packed_aligned_normal(facing),
+        }
+    }
+
+    #[test]
+    fn record_layout_matches_java_stride() {
+        assert_eq!(56, std::mem::size_of::<TranslucentQuadRecord>());
+    }
+
+    #[test]
+    fn opposing_faces_need_no_sort() {
+        let records = [
+            vertex_record(FACING_POS_Z, 1.0),
+            vertex_record(FACING_NEG_Z, 0.0),
+        ];
+        let analysis = analyze(&records, 2).unwrap();
+
+        assert_eq!(SORT_TYPE_NONE, analysis.sort_type);
+        assert_eq!(1, analysis.mesh_facing_counts[FACING_POS_Z as usize]);
+        assert_eq!(1, analysis.mesh_facing_counts[FACING_NEG_Z as usize]);
+    }
+
+    #[test]
+    fn same_direction_planes_use_static_normal_relative_keys() {
+        let records = [
+            vertex_record(FACING_POS_Z, 0.0),
+            vertex_record(FACING_POS_Z, 1.0),
+        ];
+        let analysis = analyze(&records, 2).unwrap();
+
+        assert_eq!(SORT_TYPE_STATIC_NORMAL_RELATIVE, analysis.sort_type);
+        assert_eq!(2, analysis.static_keys.len());
+        assert!(analysis.static_keys[0] < analysis.static_keys[1]);
+    }
+
+    #[test]
+    fn static_topo_sort_orders_visible_parallel_planes_back_to_front() {
+        let records = [
+            vertex_record(FACING_POS_Z, 1.0),
+            vertex_record(FACING_POS_Z, 0.0),
+        ];
+        let order = static_topo_sort(&records, false).unwrap().unwrap();
+
+        assert_eq!(vec![1, 0], order);
+    }
+
+    #[test]
+    fn distance_sort_orders_far_quads_before_near_quads() {
+        let records = [
+            vertex_record(FACING_POS_Z, 1.0),
+            vertex_record(FACING_POS_Z, 4.0),
+        ];
+        let geometry = create_section_geometry(&records).unwrap();
+        let mut output = vec![0; 12];
+
+        assert_eq!(
+            OK,
+            write_distance_sorted_index_buffer(&geometry, &mut output, 0.0, 0.0, 0.0)
+        );
+        assert_eq!(vec![4, 5, 6, 6, 7, 4, 0, 1, 2, 2, 3, 0], output);
+    }
+}

@@ -44,15 +44,19 @@ public class AnyOrderData extends PresentTranslucentData {
     @Override
     public boolean oldDataMatches(TranslucentGeometryCollector collector, SortType sortType, TQuad[] quads) {
         // for the NONE sort type the ranges need to be the same, the actual geometry doesn't matter
-        return sortType == SortType.NONE && this.getInputQuadCount() == quads.length;
+        return sortType == SortType.NONE && this.getInputQuadCount() == collector.getQuadCount();
     }
 
     /**
      * Important: The vertex indexes must start at zero for each facing.
      */
     public static AnyOrderData fromMesh(TQuad[] quads, SectionPos sectionPos) {
-        var anyOrderData = new AnyOrderData(sectionPos, quads.length);
-        anyOrderData.sorterOnce = new SharedIndexSorter(quads.length);
+        return fromQuadCount(quads.length, sectionPos);
+    }
+
+    public static AnyOrderData fromQuadCount(int quadCount, SectionPos sectionPos) {
+        var anyOrderData = new AnyOrderData(sectionPos, quadCount);
+        anyOrderData.sorterOnce = new SharedIndexSorter(quadCount);
         return anyOrderData;
     }
 }

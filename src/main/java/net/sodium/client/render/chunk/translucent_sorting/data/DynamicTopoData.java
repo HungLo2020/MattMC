@@ -1,6 +1,7 @@
 package net.sodium.client.render.chunk.translucent_sorting.data;
 
 import it.unimi.dsi.fastutil.objects.Object2ReferenceMap;
+import net.sodium.client.render.chunk.translucent_sorting.NativeTranslucentSectionGeometry;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.sodium.client.render.chunk.translucent_sorting.trigger.GeometryPlanes;
 import net.minecraft.core.SectionPos;
@@ -8,6 +9,7 @@ import org.joml.Vector3dc;
 import org.joml.Vector3fc;
 
 import java.nio.IntBuffer;
+import java.util.Objects;
 import java.util.function.IntConsumer;
 
 /**
@@ -41,13 +43,16 @@ public class DynamicTopoData extends DynamicData {
     private boolean pendingTriggerIsDirect;
 
     private final TQuad[] quads;
+    private final NativeTranslucentSectionGeometry nativeGeometry;
     private final Object2ReferenceMap<Vector3fc, float[]> distancesByNormal;
 
     private DynamicTopoData(SectionPos sectionPos, TQuad[] quads,
                             GeometryPlanes geometryPlanes, Vector3dc initialCameraPos,
-                            Object2ReferenceMap<Vector3fc, float[]> distancesByNormal) {
+                            Object2ReferenceMap<Vector3fc, float[]> distancesByNormal,
+                            NativeTranslucentSectionGeometry nativeGeometry) {
         super(sectionPos, quads.length, geometryPlanes, initialCameraPos);
         this.quads = quads;
+        this.nativeGeometry = Objects.requireNonNull(nativeGeometry, "nativeGeometry");
         this.distancesByNormal = distancesByNormal;
 
         if (this.getInputQuadCount() > MAX_TOPO_SORT_QUADS) {
@@ -59,6 +64,13 @@ public class DynamicTopoData extends DynamicData {
     @Override
     public DynamicSorter getSorter() {
         return new DynamicTopoSorter(this.getInputQuadCount(), this, this.pendingTriggerIsDirect, this.consecutiveTopoSortFailures, this.GFNITrigger, this.directTrigger);
+    }
+
+    @Override
+    public void close() {
+        if (this.nativeGeometry != null) {
+            this.nativeGeometry.close();
+        }
     }
 
     public boolean GFNITriggerEnabled() {
@@ -208,7 +220,8 @@ public class DynamicTopoData extends DynamicData {
 
             if (this.directTrigger) {
                 indexBuffer.rewind();
-                distanceSortDirect(indexBuffer, DynamicTopoData.this.quads, cameraPos.getRelativeCameraPos());
+                DynamicTopoData.this.nativeGeometry.writeDistanceSortedIndexBuffer(this.getIndexBuffer(),
+                        cameraPos.getRelativeCameraPos());
             }
 
             if (initial) {
@@ -217,29 +230,18 @@ public class DynamicTopoData extends DynamicData {
         }
     }
 
-    /**
-     * Sorts the given quads by descending center distance to the camera and writes
-     * the resulting order to the given index buffer.
-     */
-    static void distanceSortDirect(IntBuffer indexBuffer, TQuad[] quads, Vector3fc cameraPos) {
-        if (quads.length <= 1) {
-            // Avoid allocations when there is nothing to sort.
-            TranslucentData.writeFirstQuadVertexIndexes(indexBuffer);
-        } else {
-            final var keys = new int[quads.length];
-
-            for (int idx = 0; idx < quads.length; idx++) {
-                var centroid = quads[idx].getCenter();
-                keys[idx] = ~Float.floatToRawIntBits(centroid.distanceSquared(cameraPos));
-            }
-
-            TranslucentData.writeQuadVertexIndexesSortedByKey(indexBuffer, keys);
-        }
-    }
-
-    public static DynamicTopoData fromMesh(CombinedCameraPos cameraPos, TQuad[] quads, SectionPos sectionPos, GeometryPlanes geometryPlanes) {
+    public static DynamicTopoData fromMesh(CombinedCameraPos cameraPos, TQuad[] quads, SectionPos sectionPos,
+            GeometryPlanes geometryPlanes, NativeTranslucentSectionGeometry nativeGeometry) {
         var distancesByNormal = geometryPlanes.prepareAndGetDistances();
 
-        return new DynamicTopoData(sectionPos, quads, geometryPlanes, cameraPos.getAbsoluteCameraPos(), distancesByNormal);
+        try {
+            return new DynamicTopoData(sectionPos, quads, geometryPlanes, cameraPos.getAbsoluteCameraPos(),
+                    distancesByNormal, nativeGeometry);
+        } catch (RuntimeException exception) {
+            if (nativeGeometry != null) {
+                nativeGeometry.close();
+            }
+            throw exception;
+        }
     }
 }

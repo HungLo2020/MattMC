@@ -108,4 +108,38 @@ public class StaticNormalRelativeData extends PresentTranslucentData {
             return fromMixed(meshFacingCounts, quads, sectionPos);
         }
     }
+
+    public static StaticNormalRelativeData fromNative(int[] meshFacingCounts, int[] sortKeys, SectionPos sectionPos,
+            int quadCount, boolean isDoubleUnaligned) {
+        var snrData = new StaticNormalRelativeData(sectionPos, quadCount);
+        var sorter = new StaticSorter(quadCount);
+        snrData.sorterOnce = sorter;
+        var indexBuffer = sorter.getIntBuffer();
+
+        if (quadCount <= 1) {
+            TranslucentData.writeFirstQuadVertexIndexes(indexBuffer);
+            return snrData;
+        }
+
+        if (isDoubleUnaligned) {
+            TranslucentData.writeQuadVertexIndexesSortedByKey(indexBuffer, sortKeys);
+            return snrData;
+        }
+
+        int keyOffset = 0;
+        for (int quadCountForFacing : meshFacingCounts) {
+            if (quadCountForFacing <= 0) {
+                continue;
+            }
+
+            if (quadCountForFacing == 1) {
+                TranslucentData.writeFirstQuadVertexIndexes(indexBuffer);
+            } else {
+                TranslucentData.writeQuadVertexIndexesSortedByKey(indexBuffer, sortKeys, keyOffset, quadCountForFacing);
+            }
+            keyOffset += quadCountForFacing;
+        }
+
+        return snrData;
+    }
 }
