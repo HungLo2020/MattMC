@@ -10,7 +10,7 @@ public abstract class PresentSorter implements Sorter {
         return this.indexBuffer;
     }
 
-    void initBufferWithQuadLength(int quadCount) {
+    protected void initBufferWithQuadLength(int quadCount) {
         this.indexBuffer = new NativeBuffer(TranslucentData.quadCountToIndexBytes(quadCount));
     }
 

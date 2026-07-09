@@ -1,6 +1,7 @@
 package net.sodium.client.render.chunk.translucent_sorting.data;
 
 import net.sodium.client.render.chunk.translucent_sorting.SortType;
+import net.sodium.client.render.chunk.translucent_sorting.NativeTranslucentSortData;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.sodium.api.util.MathUtil;
 import net.minecraft.core.SectionPos;
@@ -112,34 +113,9 @@ public class StaticNormalRelativeData extends PresentTranslucentData {
     public static StaticNormalRelativeData fromNative(int[] meshFacingCounts, int[] sortKeys, SectionPos sectionPos,
             int quadCount, boolean isDoubleUnaligned) {
         var snrData = new StaticNormalRelativeData(sectionPos, quadCount);
-        var sorter = new StaticSorter(quadCount);
-        snrData.sorterOnce = sorter;
-        var indexBuffer = sorter.getIntBuffer();
-
-        if (quadCount <= 1) {
-            TranslucentData.writeFirstQuadVertexIndexes(indexBuffer);
-            return snrData;
-        }
-
-        if (isDoubleUnaligned) {
-            TranslucentData.writeQuadVertexIndexesSortedByKey(indexBuffer, sortKeys);
-            return snrData;
-        }
-
-        int keyOffset = 0;
-        for (int quadCountForFacing : meshFacingCounts) {
-            if (quadCountForFacing <= 0) {
-                continue;
-            }
-
-            if (quadCountForFacing == 1) {
-                TranslucentData.writeFirstQuadVertexIndexes(indexBuffer);
-            } else {
-                TranslucentData.writeQuadVertexIndexesSortedByKey(indexBuffer, sortKeys, keyOffset, quadCountForFacing);
-            }
-            keyOffset += quadCountForFacing;
-        }
-
+        NativeTranslucentSortData sortData = NativeTranslucentSortData.createStaticNormalRelative(meshFacingCounts,
+                sortKeys, quadCount, isDoubleUnaligned);
+        snrData.sorterOnce = sortData.createStaticSorter();
         return snrData;
     }
 }

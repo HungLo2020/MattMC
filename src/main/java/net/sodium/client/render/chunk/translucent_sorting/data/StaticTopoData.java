@@ -1,6 +1,7 @@
 package net.sodium.client.render.chunk.translucent_sorting.data;
 
 import net.sodium.client.render.chunk.translucent_sorting.SortType;
+import net.sodium.client.render.chunk.translucent_sorting.NativeTranslucentSortData;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.minecraft.core.SectionPos;
 
@@ -72,6 +73,13 @@ public class StaticTopoData extends PresentTranslucentData {
 
         var staticTopoData = new StaticTopoData(sectionPos, quadCount);
         staticTopoData.sorterOnce = sorter;
+        return staticTopoData;
+    }
+
+    public static StaticTopoData fromNativeSortData(int quadCount, NativeTranslucentSortData sortData,
+            SectionPos sectionPos) {
+        var staticTopoData = new StaticTopoData(sectionPos, quadCount);
+        staticTopoData.sorterOnce = sortData.createStaticSorter();
         return staticTopoData;
     }
 }

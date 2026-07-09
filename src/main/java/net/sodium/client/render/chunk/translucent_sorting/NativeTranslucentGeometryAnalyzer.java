@@ -213,6 +213,15 @@ final class NativeTranslucentGeometryAnalyzer {
         }
     }
 
+    NativeTranslucentSortData createStaticTopoSortData(boolean failOnIntersection) {
+        return NativeTranslucentSortData.createStaticTopoFromAnalyzer(this.getHandle(), this.getRecordCount(),
+                failOnIntersection);
+    }
+
+    NativeTranslucentSortData createDynamicTopoSortData() {
+        return NativeTranslucentSortData.createDynamicTopoFromAnalyzer(this.getHandle(), this.getRecordCount());
+    }
+
     long handle() {
         return this.getHandle();
     }

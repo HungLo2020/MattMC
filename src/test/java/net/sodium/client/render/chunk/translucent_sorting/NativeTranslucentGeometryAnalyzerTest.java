@@ -1,18 +1,25 @@
 package net.sodium.client.render.chunk.translucent_sorting;
 
+import net.sodium.client.SodiumClientMod;
+import net.sodium.client.gui.SodiumGameOptions;
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.sodium.client.render.chunk.terrain.material.DefaultMaterials;
+import net.sodium.client.render.chunk.translucent_sorting.data.Sorter;
 import net.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
 import net.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import org.joml.Vector3f;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.lwjgl.system.MemoryUtil;
 
+import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -20,6 +27,20 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NativeTranslucentGeometryAnalyzerTest {
+    @BeforeAll
+    static void installDefaultSodiumOptionsForNativeBufferAllocation() throws Exception {
+        try {
+            SodiumClientMod.options();
+            return;
+        } catch (IllegalStateException ignored) {
+            // Unit tests do not run Sodium's full client initializer.
+        }
+
+        Field configField = SodiumClientMod.class.getDeclaredField("CONFIG");
+        configField.setAccessible(true);
+        configField.set(null, SodiumGameOptions.defaults());
+    }
+
     @Test
     void opposingAlignedFacesNeedNoSorting() {
         NativeTranslucentGeometryAnalyzer analyzer = new NativeTranslucentGeometryAnalyzer();
@@ -156,6 +177,31 @@ class NativeTranslucentGeometryAnalyzerTest {
     }
 
     @Test
+    void nativeSortDataStaticTopoWritesPreparedIndexData() {
+        NativeTranslucentGeometryAnalyzer analyzer = new NativeTranslucentGeometryAnalyzer();
+        Sorter sorter = null;
+
+        try {
+            assertFalse(analyzer.appendQuad(zQuad(1.0F), ModelQuadFacing.POS_Z,
+                    ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
+            assertFalse(analyzer.appendQuad(zQuad(0.0F), ModelQuadFacing.POS_Z,
+                    ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
+
+            NativeTranslucentSortData sortData = analyzer.createStaticTopoSortData(false);
+            sorter = sortData.createStaticSorter();
+            sorter.writeIndexBuffer(null, true);
+
+            assertArrayEquals(new int[] {4, 5, 6, 6, 7, 4, 0, 1, 2, 2, 3, 0},
+                    readInts(sorter.getIndexBuffer().getDirectBuffer(), 12));
+        } finally {
+            if (sorter != null) {
+                sorter.destroy();
+            }
+            analyzer.destroy();
+        }
+    }
+
+    @Test
     void sectionGeometryDistanceSortWritesFarQuadsBeforeNearQuads() {
         NativeTranslucentGeometryAnalyzer analyzer = new NativeTranslucentGeometryAnalyzer();
         ByteBuffer indexBuffer = MemoryUtil.memAlloc(2 * 6 * Integer.BYTES);
@@ -242,6 +288,50 @@ class NativeTranslucentGeometryAnalyzerTest {
             analyzer.destroy();
             MemoryUtil.memFree(indexBuffer);
         }
+    }
+
+    @Test
+    void nativeSortDataDynamicTopoWritesThroughOpaqueHandle() {
+        NativeTranslucentGeometryAnalyzer analyzer = new NativeTranslucentGeometryAnalyzer();
+        ByteBuffer indexBuffer = MemoryUtil.memAlloc(2 * 6 * Integer.BYTES);
+        NativeTranslucentSortData sortData = null;
+
+        try {
+            assertFalse(analyzer.appendQuad(zQuad(1.0F), ModelQuadFacing.POS_Z,
+                    ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
+            assertFalse(analyzer.appendQuad(zQuad(4.0F), ModelQuadFacing.POS_Z,
+                    ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
+
+            sortData = analyzer.createDynamicTopoSortData();
+            NativeTranslucentSortData.DynamicSortResult result = sortData.writeDynamicSortedIndexBuffer(
+                    MemoryUtil.memAddress(indexBuffer), indexBuffer.capacity(), new Vector3f(0.0F, 0.0F, 8.0F),
+                    true, false, true, false, 2);
+
+            assertTrue(result.gfniTrigger());
+            assertFalse(result.directTrigger());
+            assertEquals(0, result.consecutiveTopoSortFailures());
+            assertArrayEquals(new int[] {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4},
+                    readInts(indexBuffer, 12));
+        } finally {
+            if (sortData != null) {
+                sortData.close();
+            }
+            analyzer.destroy();
+            MemoryUtil.memFree(indexBuffer);
+        }
+    }
+
+    @Test
+    void translucentNativePathsUseOpaqueSortDataHandles() throws Exception {
+        String collector = Files.readString(Path.of(
+                "src/main/java/net/sodium/client/render/chunk/translucent_sorting/TranslucentGeometryCollector.java"));
+        String dynamicTopoData = Files.readString(Path.of(
+                "src/main/java/net/sodium/client/render/chunk/translucent_sorting/data/DynamicTopoData.java"));
+
+        assertTrue(collector.contains("createStaticTopoSortData("));
+        assertTrue(collector.contains("NativeTranslucentSortData.createDynamicTopo("));
+        assertTrue(dynamicTopoData.contains("NativeTranslucentSortData nativeSortData"));
+        assertFalse(dynamicTopoData.contains("NativeTranslucentSectionGeometry nativeGeometry"));
     }
 
     private static ChunkVertexEncoder.Vertex[] zQuad(float z) {

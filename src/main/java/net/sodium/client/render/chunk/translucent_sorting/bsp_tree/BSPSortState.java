@@ -12,12 +12,11 @@ import net.sodium.client.util.NativeBuffer;
  * contains the index buffer being written to alongside additional state for
  * remapping indexes when traversing the subtree of a reused node.
  */
-class BSPSortState {
+class BSPSortState implements AutoCloseable {
     static final int NO_FIXED_OFFSET = Integer.MIN_VALUE;
 
     private final NativeBuffer nativeBuffer;
-    private final int[] quadIndexes;
-    private int quadIndexCount;
+    private final NativeBspSortState nativeSortState;
 
     private int indexModificationsRemaining;
     private int[] indexMap;
@@ -25,7 +24,7 @@ class BSPSortState {
 
     BSPSortState(NativeBuffer nativeBuffer) {
         this.nativeBuffer = nativeBuffer;
-        this.quadIndexes = new int[nativeBuffer.getLength() / TranslucentData.BYTES_PER_QUAD];
+        this.nativeSortState = NativeBspSortState.create(nativeBuffer.getLength() / TranslucentData.BYTES_PER_QUAD);
     }
 
     void startNode(InnerPartitionBSPNode node) {
@@ -67,15 +66,16 @@ class BSPSortState {
     }
 
     void flush() {
-        TranslucentData.writeQuadVertexIndexes(this.nativeBuffer.getDirectBuffer().asIntBuffer(), this.quadIndexes, this.quadIndexCount);
+        this.nativeSortState.writeIndexBuffer(this.nativeBuffer);
+    }
+
+    @Override
+    public void close() {
+        this.nativeSortState.close();
     }
 
     private void addIndex(int index) {
-        if (this.quadIndexCount >= this.quadIndexes.length) {
-            throw new IllegalStateException("BSP sort wrote more quad indexes than the index buffer can hold");
-        }
-
-        this.quadIndexes[this.quadIndexCount++] = index;
+        this.nativeSortState.append(index);
     }
 
     /**
@@ -296,6 +296,10 @@ class BSPSortState {
 
     private IntConsumer indexMapConsumer = (int index) -> this.addIndex(this.indexMap[index]);
 
+    private void addIndexes(int[] indexes) {
+        this.nativeSortState.appendBatch(indexes, indexes.length);
+    }
+
     void writeIndexes(int[] indexes) {
         boolean useIndexMap = this.indexMap != null;
         boolean useFixedIndexOffset = this.fixedIndexOffset != NO_FIXED_OFFSET;
@@ -318,9 +322,7 @@ class BSPSortState {
                     this.addIndex(this.fixedIndexOffset + indexes[i]);
                 }
             } else {
-                for (int i = 0; i < indexes.length; i++) {
-                    this.addIndex(indexes[i]);
-                }
+                this.addIndexes(indexes);
             }
             valueCount = indexes.length;
         }

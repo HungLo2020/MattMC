@@ -489,9 +489,10 @@ public class TranslucentGeometryCollector {
         // (no backface culling) and all vertices are in the UNASSIGNED direction.
         if (this.sortType == SortType.STATIC_TOPO) {
             if (this.nativeAnalysis != null) {
-                int[] quadIndexes = this.nativeAnalyzer.staticTopoSort(false);
-                if (quadIndexes != null) {
-                    return StaticTopoData.fromNativeOrder(this.nativeAnalysis.quadCount(), quadIndexes, this.sectionPos);
+                NativeTranslucentSortData sortData = this.nativeAnalyzer.createStaticTopoSortData(false);
+                if (sortData != null) {
+                    return StaticTopoData.fromNativeSortData(this.nativeAnalysis.quadCount(), sortData,
+                            this.sectionPos);
                 }
 
                 this.sortType = SortType.DYNAMIC;
@@ -523,12 +524,12 @@ public class TranslucentGeometryCollector {
                 return DynamicBSPData.fromMesh(cameraPos, this.quads, this.sectionPos, oldData, this.quadSplittingMode);
             } catch (BSPBuildFailureException e) {
                 var geometryPlanes = GeometryPlanes.fromQuadLists(this.sectionPos, this.quads);
-                NativeTranslucentSectionGeometry nativeGeometry = this.nativeAnalyzer == null
-                        ? NativeTranslucentSectionGeometry.create(this.quads)
-                        : this.nativeAnalyzer.createSectionGeometry();
+                NativeTranslucentSortData nativeSortData = this.nativeAnalyzer == null
+                        ? NativeTranslucentSortData.createDynamicTopo(this.quads)
+                        : this.nativeAnalyzer.createDynamicTopoSortData();
                 return DynamicTopoData.fromMesh(
                         cameraPos, this.quads, this.sectionPos,
-                        geometryPlanes, nativeGeometry);
+                        geometryPlanes, nativeSortData);
             }
         }
 

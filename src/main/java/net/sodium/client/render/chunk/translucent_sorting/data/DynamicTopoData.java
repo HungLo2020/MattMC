@@ -1,6 +1,6 @@
 package net.sodium.client.render.chunk.translucent_sorting.data;
 
-import net.sodium.client.render.chunk.translucent_sorting.NativeTranslucentSectionGeometry;
+import net.sodium.client.render.chunk.translucent_sorting.NativeTranslucentSortData;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.sodium.client.render.chunk.translucent_sorting.trigger.GeometryPlanes;
 import net.minecraft.core.SectionPos;
@@ -33,13 +33,13 @@ public class DynamicTopoData extends DynamicData {
     private double directTriggerKey = -1;
     private boolean pendingTriggerIsDirect;
 
-    private final NativeTranslucentSectionGeometry nativeGeometry;
+    private final NativeTranslucentSortData nativeSortData;
 
     private DynamicTopoData(SectionPos sectionPos, int quadCount,
                             GeometryPlanes geometryPlanes, Vector3dc initialCameraPos,
-                            NativeTranslucentSectionGeometry nativeGeometry) {
+                            NativeTranslucentSortData nativeSortData) {
         super(sectionPos, quadCount, geometryPlanes, initialCameraPos);
-        this.nativeGeometry = Objects.requireNonNull(nativeGeometry, "nativeGeometry");
+        this.nativeSortData = Objects.requireNonNull(nativeSortData, "nativeSortData");
 
         if (this.getInputQuadCount() > MAX_TOPO_SORT_QUADS) {
             this.directTrigger = true;
@@ -54,8 +54,8 @@ public class DynamicTopoData extends DynamicData {
 
     @Override
     public void close() {
-        if (this.nativeGeometry != null) {
-            this.nativeGeometry.close();
+        if (this.nativeSortData != null) {
+            this.nativeSortData.close();
         }
     }
 
@@ -151,7 +151,7 @@ public class DynamicTopoData extends DynamicData {
 
         @Override
         void writeSort(CombinedCameraPos cameraPos, boolean initial) {
-            var result = DynamicTopoData.this.nativeGeometry.writeDynamicSortedIndexBuffer(this.getIndexBuffer(),
+            var result = DynamicTopoData.this.nativeSortData.writeDynamicSortedIndexBuffer(this.getIndexBuffer(),
                     cameraPos.getRelativeCameraPos(), initial, this.isDirectTrigger, this.GFNITrigger,
                     this.directTrigger, this.consecutiveTopoSortFailuresNew);
             this.GFNITrigger = result.gfniTrigger();
@@ -165,15 +165,15 @@ public class DynamicTopoData extends DynamicData {
     }
 
     public static DynamicTopoData fromMesh(CombinedCameraPos cameraPos, TQuad[] quads, SectionPos sectionPos,
-            GeometryPlanes geometryPlanes, NativeTranslucentSectionGeometry nativeGeometry) {
+            GeometryPlanes geometryPlanes, NativeTranslucentSortData nativeSortData) {
         geometryPlanes.prepareIntegration();
 
         try {
             return new DynamicTopoData(sectionPos, quads.length, geometryPlanes, cameraPos.getAbsoluteCameraPos(),
-                    nativeGeometry);
+                    nativeSortData);
         } catch (RuntimeException exception) {
-            if (nativeGeometry != null) {
-                nativeGeometry.close();
+            if (nativeSortData != null) {
+                nativeSortData.close();
             }
             throw exception;
         }

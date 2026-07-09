@@ -77,6 +77,20 @@ struct NativeTranslucentSectionGeometry {
     aligned_separator_distances: [Vec<f32>; FACING_DIRECTIONS],
 }
 
+enum NativeTranslucentSortDataKind {
+    StaticIndexData(Vec<i32>),
+    DynamicTopo(NativeTranslucentSectionGeometry),
+}
+
+struct NativeTranslucentSortData {
+    quad_count: usize,
+    kind: NativeTranslucentSortDataKind,
+}
+
+struct NativeBspSortState {
+    quad_indexes: Vec<i32>,
+}
+
 struct NativeTranslucentAnalyzer {
     records: Vec<TranslucentQuadRecord>,
 }
@@ -729,6 +743,212 @@ fn create_section_geometry(
         quads,
         aligned_separator_distances,
     })
+}
+
+fn sorted_index_data_from_order(quad_count: usize, quad_indexes: &[i32]) -> Result<Vec<i32>, i32> {
+    if quad_indexes.len() > quad_count {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    let output_len = quad_count.checked_mul(6).ok_or(ERR_INVALID_ARGUMENT)?;
+    let mut output = vec![0i32; output_len];
+    let status = index::write_sorted_quad_index_buffer(&mut output, quad_indexes);
+    if status != OK {
+        return Err(status);
+    }
+
+    Ok(output)
+}
+
+fn static_normal_relative_index_data(
+    mesh_facing_counts: &[i32],
+    sort_keys: &[i32],
+    quad_count: usize,
+    is_double_unaligned: bool,
+) -> Result<Vec<i32>, i32> {
+    if mesh_facing_counts.len() != FACING_COUNT {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+    if sort_keys.len() < quad_count {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    let output_len = quad_count.checked_mul(6).ok_or(ERR_INVALID_ARGUMENT)?;
+    let mut output = vec![0i32; output_len];
+
+    if quad_count == 0 {
+        return Ok(output);
+    }
+    if quad_count == 1 {
+        let status = index::write_sorted_quad_index_buffer(&mut output, &[0]);
+        return if status == OK {
+            Ok(output)
+        } else {
+            Err(status)
+        };
+    }
+
+    if is_double_unaligned {
+        let status =
+            index::write_key_sorted_quad_index_buffer(&mut output, &sort_keys[..quad_count]);
+        return if status == OK {
+            Ok(output)
+        } else {
+            Err(status)
+        };
+    }
+
+    let mut key_offset = 0usize;
+    let mut output_offset = 0usize;
+    for &quad_count_for_facing in mesh_facing_counts {
+        if quad_count_for_facing < 0 {
+            continue;
+        }
+
+        let count = usize::try_from(quad_count_for_facing).map_err(|_| ERR_INVALID_ARGUMENT)?;
+        if count == 0 {
+            continue;
+        }
+        if key_offset
+            .checked_add(count)
+            .filter(|end| *end <= sort_keys.len())
+            .is_none()
+        {
+            return Err(ERR_INVALID_ARGUMENT);
+        }
+
+        let index_offset = output_offset.checked_mul(6).ok_or(ERR_INVALID_ARGUMENT)?;
+        let output_slice = &mut output[index_offset..];
+        let status = if count == 1 {
+            index::write_sorted_quad_index_buffer(output_slice, &[0])
+        } else {
+            index::write_key_sorted_quad_index_buffer(
+                output_slice,
+                &sort_keys[key_offset..key_offset + count],
+            )
+        };
+        if status != OK {
+            return Err(status);
+        }
+
+        key_offset += count;
+        output_offset += count;
+    }
+
+    if output_offset != quad_count {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    Ok(output)
+}
+
+fn create_static_topo_sort_data(
+    records: &[TranslucentQuadRecord],
+    fail_on_intersection: bool,
+) -> Result<Option<NativeTranslucentSortData>, i32> {
+    let Some(quad_indexes) = static_topo_sort(records, fail_on_intersection)? else {
+        return Ok(None);
+    };
+    let quad_count = records.len();
+    let index_data = sorted_index_data_from_order(quad_count, &quad_indexes)?;
+    Ok(Some(NativeTranslucentSortData {
+        quad_count,
+        kind: NativeTranslucentSortDataKind::StaticIndexData(index_data),
+    }))
+}
+
+fn create_static_normal_relative_sort_data(
+    mesh_facing_counts: &[i32],
+    sort_keys: &[i32],
+    quad_count: usize,
+    is_double_unaligned: bool,
+) -> Result<NativeTranslucentSortData, i32> {
+    let index_data = static_normal_relative_index_data(
+        mesh_facing_counts,
+        sort_keys,
+        quad_count,
+        is_double_unaligned,
+    )?;
+    Ok(NativeTranslucentSortData {
+        quad_count,
+        kind: NativeTranslucentSortDataKind::StaticIndexData(index_data),
+    })
+}
+
+fn create_dynamic_topo_sort_data(
+    records: &[TranslucentQuadRecord],
+) -> Result<NativeTranslucentSortData, i32> {
+    let geometry = create_section_geometry(records)?;
+    Ok(NativeTranslucentSortData {
+        quad_count: records.len(),
+        kind: NativeTranslucentSortDataKind::DynamicTopo(geometry),
+    })
+}
+
+fn write_static_sort_data(sort_data: &NativeTranslucentSortData, output: &mut [i32]) -> i32 {
+    let NativeTranslucentSortDataKind::StaticIndexData(index_data) = &sort_data.kind else {
+        return ERR_INVALID_ARGUMENT;
+    };
+    let expected_index_count = match sort_data.quad_count.checked_mul(6) {
+        Some(value) => value,
+        None => return ERR_INVALID_ARGUMENT,
+    };
+    if index_data.len() != expected_index_count {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if output.len() < index_data.len() {
+        return ERR_CAPACITY;
+    }
+
+    output[..index_data.len()].copy_from_slice(index_data);
+    OK
+}
+
+fn write_dynamic_sort_data(
+    sort_data: &NativeTranslucentSortData,
+    output: &mut [i32],
+    camera_x: f32,
+    camera_y: f32,
+    camera_z: f32,
+    initial: bool,
+    is_direct_trigger: bool,
+    state: DynamicSortState,
+) -> Result<DynamicSortState, i32> {
+    let NativeTranslucentSortDataKind::DynamicTopo(geometry) = &sort_data.kind else {
+        return Err(ERR_INVALID_ARGUMENT);
+    };
+    write_dynamic_sort_index_buffer(
+        geometry,
+        output,
+        camera_x,
+        camera_y,
+        camera_z,
+        initial,
+        is_direct_trigger,
+        state,
+    )
+}
+
+fn create_bsp_sort_state(quad_capacity: usize) -> NativeBspSortState {
+    NativeBspSortState {
+        quad_indexes: vec![0; quad_capacity],
+    }
+}
+
+fn bsp_sort_state_write_index_buffer(
+    state: &NativeBspSortState,
+    quad_index_count: usize,
+    output: &mut [i32],
+) -> i32 {
+    if quad_index_count > state.quad_indexes.len() {
+        return ERR_CAPACITY;
+    }
+    let quad_indexes = &state.quad_indexes[..quad_index_count];
+    if quad_indexes.iter().any(|index| *index < 0) {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    index::write_sorted_quad_index_buffer(output, quad_indexes)
 }
 
 fn write_distance_sorted_index_buffer(
@@ -1799,6 +2019,298 @@ pub unsafe extern "C" fn mattmc_sodium_translucent_section_geometry_destroy(hand
         handle as *mut NativeTranslucentSectionGeometry,
     ));
     OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_sort_data_static_topo_create(
+    records: *const TranslucentQuadRecord,
+    record_count: i32,
+    fail_on_intersection: i32,
+    output_handle: *mut u64,
+) -> i32 {
+    if record_count < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if output_handle.is_null() || (record_count > 0 && records.is_null()) {
+        return ERR_NULL_POINTER;
+    }
+
+    let records = if record_count == 0 {
+        &[]
+    } else {
+        slice::from_raw_parts(records, record_count as usize)
+    };
+    let sort_data = match create_static_topo_sort_data(records, fail_on_intersection != 0) {
+        Ok(Some(value)) => value,
+        Ok(None) => {
+            *output_handle = 0;
+            return SORT_FAILED;
+        }
+        Err(status) => return status,
+    };
+
+    *output_handle = Box::into_raw(Box::new(sort_data)) as u64;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_sort_data_static_topo_create_from_analyzer(
+    analyzer_handle: u64,
+    fail_on_intersection: i32,
+    output_handle: *mut u64,
+) -> i32 {
+    if analyzer_handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let analyzer = &*(analyzer_handle as *const NativeTranslucentAnalyzer);
+    mattmc_sodium_translucent_sort_data_static_topo_create(
+        analyzer.records.as_ptr(),
+        analyzer.records.len() as i32,
+        fail_on_intersection,
+        output_handle,
+    )
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_sort_data_static_snr_create(
+    mesh_facing_counts: *const i32,
+    mesh_facing_count_len: i32,
+    sort_keys: *const i32,
+    sort_key_len: i32,
+    quad_count: i32,
+    is_double_unaligned: i32,
+    output_handle: *mut u64,
+) -> i32 {
+    if mesh_facing_count_len < 0 || sort_key_len < 0 || quad_count < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if output_handle.is_null()
+        || mesh_facing_counts.is_null()
+        || (sort_key_len > 0 && sort_keys.is_null())
+    {
+        return ERR_NULL_POINTER;
+    }
+
+    let mesh_facing_counts =
+        slice::from_raw_parts(mesh_facing_counts, mesh_facing_count_len as usize);
+    let sort_keys = if sort_key_len == 0 {
+        &[]
+    } else {
+        slice::from_raw_parts(sort_keys, sort_key_len as usize)
+    };
+    let sort_data = match create_static_normal_relative_sort_data(
+        mesh_facing_counts,
+        sort_keys,
+        quad_count as usize,
+        is_double_unaligned != 0,
+    ) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+
+    *output_handle = Box::into_raw(Box::new(sort_data)) as u64;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_sort_data_dynamic_topo_create(
+    records: *const TranslucentQuadRecord,
+    record_count: i32,
+    output_handle: *mut u64,
+) -> i32 {
+    if record_count < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if output_handle.is_null() || (record_count > 0 && records.is_null()) {
+        return ERR_NULL_POINTER;
+    }
+
+    let records = if record_count == 0 {
+        &[]
+    } else {
+        slice::from_raw_parts(records, record_count as usize)
+    };
+    let sort_data = match create_dynamic_topo_sort_data(records) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+
+    *output_handle = Box::into_raw(Box::new(sort_data)) as u64;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_sort_data_dynamic_topo_create_from_analyzer(
+    analyzer_handle: u64,
+    output_handle: *mut u64,
+) -> i32 {
+    if analyzer_handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let analyzer = &*(analyzer_handle as *const NativeTranslucentAnalyzer);
+    mattmc_sodium_translucent_sort_data_dynamic_topo_create(
+        analyzer.records.as_ptr(),
+        analyzer.records.len() as i32,
+        output_handle,
+    )
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_sort_data_destroy(handle: u64) -> i32 {
+    if handle == 0 {
+        return OK;
+    }
+
+    drop(Box::from_raw(handle as *mut NativeTranslucentSortData));
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_sort_data_static_write(
+    handle: u64,
+    output_address: u64,
+    output_capacity: i32,
+) -> i32 {
+    if output_capacity < 0 || output_capacity % std::mem::size_of::<i32>() as i32 != 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if handle == 0 || output_address == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let sort_data = &*(handle as *const NativeTranslucentSortData);
+    let output = slice::from_raw_parts_mut(
+        output_address as *mut i32,
+        output_capacity as usize / std::mem::size_of::<i32>(),
+    );
+    write_static_sort_data(sort_data, output)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_sort_data_dynamic_write(
+    handle: u64,
+    output_address: u64,
+    output_capacity: i32,
+    camera_x: f32,
+    camera_y: f32,
+    camera_z: f32,
+    initial: i32,
+    is_direct_trigger: i32,
+    gfni_trigger: i32,
+    direct_trigger: i32,
+    consecutive_topo_sort_failures: i32,
+    output_state: *mut i32,
+    output_state_len: i32,
+) -> i32 {
+    if output_capacity < 0 || output_capacity % std::mem::size_of::<i32>() as i32 != 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if output_state_len < 3 || consecutive_topo_sort_failures < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if handle == 0 || output_address == 0 || output_state.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let sort_data = &*(handle as *const NativeTranslucentSortData);
+    let output = slice::from_raw_parts_mut(
+        output_address as *mut i32,
+        output_capacity as usize / std::mem::size_of::<i32>(),
+    );
+    let state = DynamicSortState {
+        gfni_trigger: gfni_trigger != 0,
+        direct_trigger: direct_trigger != 0,
+        consecutive_topo_sort_failures,
+    };
+    let state = match write_dynamic_sort_data(
+        sort_data,
+        output,
+        camera_x,
+        camera_y,
+        camera_z,
+        initial != 0,
+        is_direct_trigger != 0,
+        state,
+    ) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+
+    let output_state = slice::from_raw_parts_mut(output_state, output_state_len as usize);
+    output_state[0] = if state.gfni_trigger { 1 } else { 0 };
+    output_state[1] = if state.direct_trigger { 1 } else { 0 };
+    output_state[2] = state.consecutive_topo_sort_failures;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_sort_state_create(
+    quad_capacity: i32,
+    output_handle: *mut u64,
+) -> i32 {
+    if quad_capacity < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if output_handle.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let state = create_bsp_sort_state(quad_capacity as usize);
+    *output_handle = Box::into_raw(Box::new(state)) as u64;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_sort_state_destroy(handle: u64) -> i32 {
+    if handle == 0 {
+        return OK;
+    }
+
+    drop(Box::from_raw(handle as *mut NativeBspSortState));
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_sort_state_address(
+    handle: u64,
+    output_address: *mut u64,
+    output_capacity: *mut i32,
+) -> i32 {
+    if handle == 0 || output_address.is_null() || output_capacity.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let state = &mut *(handle as *mut NativeBspSortState);
+    *output_address = state.quad_indexes.as_mut_ptr() as u64;
+    *output_capacity = state.quad_indexes.len() as i32;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_sort_state_write_index_buffer(
+    handle: u64,
+    quad_index_count: i32,
+    output_address: u64,
+    output_capacity: i32,
+) -> i32 {
+    if quad_index_count < 0
+        || output_capacity < 0
+        || output_capacity % std::mem::size_of::<i32>() as i32 != 0
+    {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if handle == 0 || output_address == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let state = &*(handle as *const NativeBspSortState);
+    let output = slice::from_raw_parts_mut(
+        output_address as *mut i32,
+        output_capacity as usize / std::mem::size_of::<i32>(),
+    );
+    bsp_sort_state_write_index_buffer(state, quad_index_count as usize, output)
 }
 
 #[no_mangle]
