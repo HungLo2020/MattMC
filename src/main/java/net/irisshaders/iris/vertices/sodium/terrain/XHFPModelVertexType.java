@@ -1,8 +1,8 @@
 package net.irisshaders.iris.vertices.sodium.terrain;
 
 import net.sodium.client.gl.attribute.GlVertexFormat;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
+import net.sodium.client.render.chunk.vertex.format.NativeChunkVertexFormat;
 
 /**
  * Like HFPModelVertexType, but extended to support Iris. The extensions aren't particularly efficient right now.
@@ -42,7 +42,7 @@ public class XHFPModelVertexType implements ChunkVertexType {
 	}
 
 	@Override
-	public ChunkVertexEncoder getEncoder() {
-		return new XHFPTerrainVertex(blockIdOffset, normalOffset, tangentOffset, midUvOffset, midBlockOffset, format.getStride());
+	public NativeChunkVertexFormat getNativeFormat() {
+		return new NativeChunkVertexFormat(format.getStride(), blockIdOffset, normalOffset, tangentOffset, midUvOffset, midBlockOffset);
 	}
 }

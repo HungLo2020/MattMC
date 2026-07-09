@@ -1,23 +1,46 @@
 package net.minecraft.util;
 
-import com.sun.jna.Library;
-import com.sun.jna.Native;
+import java.lang.foreign.Arena;
+import java.lang.foreign.FunctionDescriptor;
+import java.lang.foreign.Linker;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.SymbolLookup;
+import java.lang.invoke.MethodHandle;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 public final class NativeLibraryLoader {
 	private static final String NATIVES_DIR_PROPERTY = "mattmc.rust.natives.dir";
+	private static final Linker LINKER = Linker.nativeLinker();
+	private static final Arena LIBRARY_ARENA = Arena.global();
+	private static final ConcurrentMap<String, SymbolLookup> RUST_LIBRARIES = new ConcurrentHashMap<>();
 
 	private NativeLibraryLoader() {
 	}
 
-	public static <T extends Library> T loadRustLibrary(String libraryName, Class<T> interfaceClass) {
+	public static MethodHandle downcallHandle(String libraryName, String symbolName, FunctionDescriptor descriptor) {
+		return LINKER.downcallHandle(loadRustSymbol(libraryName, symbolName), descriptor);
+	}
+
+	private static MemorySegment loadRustSymbol(String libraryName, String symbolName) {
+		return rustLibraryLookup(libraryName)
+				.find(symbolName)
+				.orElseThrow(() -> new UnsatisfiedLinkError("Required Rust native symbol is missing: " + symbolName));
+	}
+
+	private static SymbolLookup rustLibraryLookup(String libraryName) {
+		return RUST_LIBRARIES.computeIfAbsent(libraryName, NativeLibraryLoader::loadRustLibraryLookup);
+	}
+
+	private static SymbolLookup loadRustLibraryLookup(String libraryName) {
 		Path libraryPath = resolveNativesDirectory().resolve(platformLibraryFileName(libraryName)).toAbsolutePath().normalize();
 		if (!Files.isRegularFile(libraryPath)) {
 			throw new UnsatisfiedLinkError("Required Rust native library is missing: " + libraryPath);
 		}
 
-		return Native.load(libraryPath.toString(), interfaceClass);
+		return SymbolLookup.libraryLookup(libraryPath, LIBRARY_ARENA);
 	}
 
 	public static String platformLibraryFileName(String libraryName) {

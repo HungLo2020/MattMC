@@ -1,9 +1,10 @@
 package net.sodium.client.render.chunk.vertex.format;
 
-public interface ChunkVertexEncoder {
-    long write(long ptr, int materialBits, Vertex[] vertices, int sectionIndex);
+public final class ChunkVertexEncoder {
+    private ChunkVertexEncoder() {
+    }
 
-    class Vertex implements net.irisshaders.iris.vertices.sodium.terrain.ChunkVertexExtension {
+    public static class Vertex implements net.irisshaders.iris.vertices.sodium.terrain.ChunkVertexExtension {
         public float x;
         public float y;
         public float z;

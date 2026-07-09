@@ -5,5 +5,5 @@ import net.sodium.client.gl.attribute.GlVertexFormat;
 public interface ChunkVertexType {
     GlVertexFormat getVertexFormat();
 
-    ChunkVertexEncoder getEncoder();
+    NativeChunkVertexFormat getNativeFormat();
 }

@@ -13,6 +13,8 @@ import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.UpdatedQuadsL
 import net.sodium.client.render.chunk.translucent_sorting.data.TranslucentData;
 import net.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
+import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
+import net.sodium.client.render.chunk.vertex.format.NativeChunkVertexFormat;
 import net.sodium.client.util.NativeBuffer;
 
 /**
@@ -26,9 +28,12 @@ public class ChunkBuildBuffers {
     private final Reference2ReferenceOpenHashMap<TerrainRenderPass, BakedChunkModelBuilder> builders = new Reference2ReferenceOpenHashMap<>();
 
     private final ChunkVertexType vertexType;
+    private final NativeChunkVertexFormat nativeFormat;
 
     public ChunkBuildBuffers(ChunkVertexType vertexType) {
+        NativeChunkMeshEncoder.verifyAvailable();
         this.vertexType = vertexType;
+        this.nativeFormat = vertexType.getNativeFormat();
 
         for (TerrainRenderPass pass : DefaultTerrainRenderPasses.ALL) {
             var vertexBuffers = new ChunkMeshBufferBuilder[ModelQuadFacing.COUNT];
@@ -67,73 +72,18 @@ public class ChunkBuildBuffers {
     public BuiltSectionMeshParts createMesh(TerrainRenderPass pass, int visibleSlices, boolean forceUnassigned, boolean sliceReordering) {
         var builder = this.builders.get(pass);
         int[] vertexSegments = makeVertexSegments();
-        int vertexTotal = 0;
-
-        // get the total vertex count to initialize the buffer
-        for (ModelQuadFacing facing : ModelQuadFacing.VALUES) {
-            vertexTotal += builder.getVertexBuffer(facing).count();
-        }
+        long[] logicalAddresses = new long[ModelQuadFacing.COUNT];
+        int[] vertexCounts = new int[ModelQuadFacing.COUNT];
+        int vertexTotal = collectLogicalInputs(builder, logicalAddresses, vertexCounts);
 
         if (vertexTotal == 0) {
             return null;
         }
 
-        var mergedBuffer = new NativeBuffer(vertexTotal * this.vertexType.getVertexFormat().getStride());
-        var mergedBufferBuilder = mergedBuffer.getDirectBuffer();
-
-        if (sliceReordering) {
-            // sliceReordering implies !forceUnassigned
-
-            // write all currently visible slices first, and then the rest.
-            // start with unassigned as it will never become invisible
-            var unassignedBuffer = builder.getVertexBuffer(ModelQuadFacing.UNASSIGNED);
-            int vertexSegmentCount = 0;
-            vertexSegments[vertexSegmentCount++] = unassignedBuffer.count();
-            vertexSegments[vertexSegmentCount++] = ModelQuadFacing.UNASSIGNED.ordinal();
-            if (!unassignedBuffer.isEmpty()) {
-                mergedBufferBuilder.put(unassignedBuffer.slice());
-            }
-
-            // write all visible and then invisible slices
-            for (var step = 0; step < 2; step++) {
-                for (ModelQuadFacing facing : ModelQuadFacing.VALUES) {
-                    var facingIndex = facing.ordinal();
-                    if (facing == ModelQuadFacing.UNASSIGNED || ((visibleSlices >> facingIndex) & 1) == step) {
-                        continue;
-                    }
-
-                    var buffer = builder.getVertexBuffer(facing);
-
-                    // generate empty ranges to prevent SectionRenderData storage from making up indexes for null ranges
-                    vertexSegments[vertexSegmentCount++] = buffer.count();
-                    vertexSegments[vertexSegmentCount++] = facingIndex;
-
-                    if (!buffer.isEmpty()) {
-                        mergedBufferBuilder.put(buffer.slice());
-                    }
-                }
-            }
-        } else {
-            // forceUnassigned implies !sliceReordering
-
-            if (forceUnassigned) {
-                vertexSegments[UNASSIGNED_SEGMENT_INDEX] = vertexTotal;
-                vertexSegments[UNASSIGNED_SEGMENT_INDEX + 1] = ModelQuadFacing.UNASSIGNED.ordinal();
-            }
-
-            for (ModelQuadFacing facing : ModelQuadFacing.VALUES) {
-                var buffer = builder.getVertexBuffer(facing);
-                if (!buffer.isEmpty()) {
-                    if (!forceUnassigned) {
-                        var facingIndex = facing.ordinal();
-                        var segmentIndex = facingIndex << 1;
-                        vertexSegments[segmentIndex] = buffer.count();
-                        vertexSegments[segmentIndex + 1] = facingIndex;
-                    }
-                    mergedBufferBuilder.put(buffer.slice());
-                }
-            }
-        }
+        var mergedBuffer = new NativeBuffer(vertexTotal * this.nativeFormat.stride());
+        NativeChunkMeshEncoder.assemble(logicalAddresses, vertexCounts, mergedBuffer.getDirectBuffer(), vertexSegments,
+                this.nativeFormat, builder.getVertexBuffer(ModelQuadFacing.UNASSIGNED).sectionIndex(), visibleSlices,
+                forceUnassigned, sliceReordering, usesSeparateAo());
 
         return new BuiltSectionMeshParts(mergedBuffer, vertexSegments);
     }
@@ -143,17 +93,17 @@ public class ChunkBuildBuffers {
 
         var builder = this.builders.get(DefaultTerrainRenderPasses.TRANSLUCENT);
 
-        var stride = this.vertexType.getVertexFormat().getStride();
         var vertexTotal = TranslucentData.quadCountToVertexCount(updatedQuads.getMeshQuadCount());
-        var mergedBuffer = new NativeBuffer(vertexTotal * stride);
+        var mergedBuffer = new NativeBuffer(vertexTotal * this.nativeFormat.stride());
         var mergedBufferBuilder = mergedBuffer.getDirectBuffer();
+        long[] logicalAddresses = new long[ModelQuadFacing.COUNT];
+        int[] vertexCounts = new int[ModelQuadFacing.COUNT];
+        collectLogicalInputs(builder, logicalAddresses, vertexCounts);
 
-        for (ModelQuadFacing facing : ModelQuadFacing.VALUES) {
-            var buffer = builder.getVertexBuffer(facing);
-            if (!buffer.isEmpty()) {
-                mergedBufferBuilder.put(buffer.slice());
-            }
-        }
+        int[] ignoredSegments = makeVertexSegments();
+        NativeChunkMeshEncoder.assemble(logicalAddresses, vertexCounts, mergedBufferBuilder, ignoredSegments,
+                this.nativeFormat, builder.getVertexBuffer(ModelQuadFacing.UNASSIGNED).sectionIndex(), 0,
+                true, false, usesSeparateAo());
 
         updatedQuads.applyBufferUpdates(builder.getVertexBuffer(ModelQuadFacing.UNASSIGNED), mergedBufferBuilder);
 
@@ -168,5 +118,23 @@ public class ChunkBuildBuffers {
         for (var builder : this.builders.values()) {
             builder.destroy();
         }
+    }
+
+    private static int collectLogicalInputs(BakedChunkModelBuilder builder, long[] logicalAddresses, int[] vertexCounts) {
+        int vertexTotal = 0;
+
+        for (ModelQuadFacing facing : ModelQuadFacing.VALUES) {
+            var buffer = builder.getVertexBuffer(facing);
+            int facingIndex = facing.ordinal();
+            logicalAddresses[facingIndex] = buffer.logicalAddress();
+            vertexCounts[facingIndex] = buffer.count();
+            vertexTotal += buffer.count();
+        }
+
+        return vertexTotal;
+    }
+
+    private static boolean usesSeparateAo() {
+        return net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldUseSeparateAo();
     }
 }
