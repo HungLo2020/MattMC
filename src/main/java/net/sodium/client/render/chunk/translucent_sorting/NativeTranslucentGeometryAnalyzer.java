@@ -45,6 +45,16 @@ final class NativeTranslucentGeometryAnalyzer {
                     ValueLayout.JAVA_LONG,
                     ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_INT));
+    private static final MethodHandle APPEND_NATIVE_QUAD_BATCH = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_translucent_analyzer_append_native_quad_batch",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.ADDRESS));
     private static final MethodHandle RECORD_COUNT = NativeLibraryLoader.downcallHandle("mattmc_rust",
             "mattmc_sodium_translucent_analyzer_record_count",
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
@@ -110,6 +120,24 @@ final class NativeTranslucentGeometryAnalyzer {
         }
         check(status, "native translucent analyzer native quad append");
         return false;
+    }
+
+    int appendNativeQuadBatch(long nativeQuadAddress, int quadCount, ModelQuadFacing facing, long packedNormalsAddress,
+            long validityAddress) {
+        if (quadCount < 0) {
+            throw new IllegalArgumentException("Invalid native translucent quad count: " + quadCount);
+        }
+        if (quadCount == 0) {
+            return 0;
+        }
+
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment validCountSegment = arena.allocate(ValueLayout.JAVA_INT);
+            check(invokeAppendNativeQuadBatch(this.getHandle(), nativeQuadAddress, quadCount, facing.ordinal(),
+                    MemorySegment.ofAddress(packedNormalsAddress), validityAddress, validCountSegment),
+                    "native translucent analyzer batch append");
+            return validCountSegment.get(ValueLayout.JAVA_INT, 0);
+        }
     }
 
     Analysis analyze(SortBehavior.SortMode sortMode) {
@@ -292,6 +320,17 @@ final class NativeTranslucentGeometryAnalyzer {
             return (int) APPEND_NATIVE_QUAD.invokeExact(handle, nativeQuadAddress, facing, packedNormal);
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust translucent analyzer native append downcall failed", throwable);
+        }
+    }
+
+    private static int invokeAppendNativeQuadBatch(long handle, long nativeQuadAddress, int quadCount, int facing,
+            MemorySegment packedNormals, long validityAddress, MemorySegment validCountOutput) {
+        try {
+            return (int) APPEND_NATIVE_QUAD_BATCH.invokeExact(handle, nativeQuadAddress, quadCount, facing,
+                    packedNormals, validityAddress, validCountOutput);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust translucent analyzer native batch append downcall failed",
+                    throwable);
         }
     }
 

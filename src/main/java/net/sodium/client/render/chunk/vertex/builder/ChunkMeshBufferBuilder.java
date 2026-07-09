@@ -13,6 +13,8 @@ import org.lwjgl.system.MemoryUtil;
 import java.nio.ByteBuffer;
 
 public class ChunkMeshBufferBuilder {
+    private static final int BATCH_QUAD_CAPACITY = 256;
+
     private final NativeChunkVertexFormat nativeFormat;
     private final int nativeQuadStride = NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE;
 
@@ -21,6 +23,15 @@ public class ChunkMeshBufferBuilder {
     private final boolean ownsSectionBuilder;
 
     private int sectionIndex;
+    private ByteBuffer pendingQuads;
+    private ByteBuffer pendingPackedNormals;
+    private ByteBuffer pendingValidity;
+    private long pendingQuadsAddress;
+    private long pendingPackedNormalsAddress;
+    private long pendingValidityAddress;
+    private int pendingQuadCount;
+    private TranslucentGeometryCollector pendingCollector;
+    private ModelQuadFacing pendingCollectorFacing;
 
     public ChunkMeshBufferBuilder(ChunkVertexType vertexType, int initialCapacity) {
         this(vertexType.getNativeFormat(),
@@ -50,9 +61,7 @@ public class ChunkMeshBufferBuilder {
             throw new IllegalArgumentException("Only quad primitives (with 4 vertices) can be pushed");
         }
 
-        long address = this.prepareQuadAddress();
-        NativeChunkMeshEncoder.writeNativeQuad(address, vertices, materialBits);
-        this.commitPreparedQuad();
+        this.queueQuad(vertices, materialBits, null, null, 0);
     }
 
     public boolean pushTranslucent(ChunkVertexEncoder.Vertex[] vertices, int materialBits,
@@ -61,17 +70,25 @@ public class ChunkMeshBufferBuilder {
             throw new IllegalArgumentException("Only quad primitives (with 4 vertices) can be pushed");
         }
 
-        long address = this.prepareQuadAddress();
-        NativeChunkMeshEncoder.writeNativeQuad(address, vertices, materialBits);
-        if (collector.appendNativeQuad(address, vertices, facing, packedNormal)) {
+        if (TranslucentGeometryCollector.isInvalidQuad(vertices)) {
             return true;
         }
 
-        this.commitPreparedQuad();
+        if (!collector.supportsNativeBatching()) {
+            if (collector.appendQuad(vertices, facing, packedNormal)) {
+                return true;
+            }
+
+            this.queueQuad(vertices, materialBits, null, null, 0);
+            return false;
+        }
+
+        this.queueQuad(vertices, materialBits, collector, facing, packedNormal);
         return false;
     }
 
     public long prepareQuadAddress() {
+        this.flushPending();
         return this.sectionBuilder.prepareQuadAddress(this.facing);
     }
 
@@ -81,6 +98,7 @@ public class ChunkMeshBufferBuilder {
 
     public void start(int sectionIndex) {
         this.sectionIndex = sectionIndex;
+        this.clearPending();
 
         if (this.ownsSectionBuilder) {
             this.sectionBuilder.start(sectionIndex);
@@ -88,6 +106,8 @@ public class ChunkMeshBufferBuilder {
     }
 
     public void destroy() {
+        this.freePendingBuffers();
+
         if (this.ownsSectionBuilder) {
             this.sectionBuilder.close();
         }
@@ -98,6 +118,8 @@ public class ChunkMeshBufferBuilder {
     }
 
     public ByteBuffer slice() {
+        this.flushPending();
+
         if (this.isEmpty()) {
             throw new IllegalStateException("No vertex data in buffer");
         }
@@ -106,10 +128,12 @@ public class ChunkMeshBufferBuilder {
     }
 
     public int count() {
+        this.flushPending();
         return this.sectionBuilder.facingVertexCount(this.facing);
     }
 
     public long logicalAddress() {
+        this.flushPending();
         return this.sectionBuilder.facingAddress(this.facing);
     }
 
@@ -122,6 +146,111 @@ public class ChunkMeshBufferBuilder {
     }
 
     public NativeSectionMeshBuilder sectionBuilder() {
+        this.flushPending();
         return this.sectionBuilder;
+    }
+
+    public void flushPending() {
+        if (this.pendingQuadCount == 0) {
+            return;
+        }
+
+        int quadCount = this.pendingQuadCount;
+        TranslucentGeometryCollector collector = this.pendingCollector;
+
+        if (collector == null) {
+            int committedCount = this.sectionBuilder.appendBatch(this.facing, this.pendingQuadsAddress, quadCount);
+            if (committedCount != quadCount) {
+                throw new IllegalStateException("Native batch committed " + committedCount
+                        + " quads from an unfiltered batch of " + quadCount + " quads");
+            }
+        } else {
+            int validCount = collector.appendNativeQuadBatch(this.pendingQuadsAddress, quadCount,
+                    this.pendingCollectorFacing, this.pendingPackedNormalsAddress, this.pendingValidityAddress);
+            int committedCount = this.sectionBuilder.appendBatchFiltered(this.facing, this.pendingQuadsAddress,
+                    quadCount, this.pendingValidityAddress);
+
+            if (validCount != committedCount) {
+                throw new IllegalStateException("Native translucent batch accepted " + validCount
+                        + " quads but committed " + committedCount + " quads");
+            }
+        }
+
+        this.clearPending();
+    }
+
+    private void queueQuad(ChunkVertexEncoder.Vertex[] vertices, int materialBits,
+            TranslucentGeometryCollector collector, ModelQuadFacing collectorFacing, int packedNormal) {
+        if (!this.matchesPendingMode(collector, collectorFacing)) {
+            this.flushPending();
+        }
+
+        this.ensurePendingBuffers(collector != null);
+
+        if (this.pendingQuadCount == BATCH_QUAD_CAPACITY) {
+            this.flushPending();
+        }
+
+        this.pendingCollector = collector;
+        this.pendingCollectorFacing = collectorFacing;
+
+        int quadIndex = this.pendingQuadCount;
+        long quadAddress = this.pendingQuadsAddress + (long) quadIndex * this.nativeQuadStride;
+        NativeChunkMeshEncoder.writeNativeQuad(quadAddress, vertices, materialBits);
+
+        if (collector != null) {
+            MemoryUtil.memPutInt(this.pendingPackedNormalsAddress + (long) quadIndex * Integer.BYTES, packedNormal);
+        }
+
+        this.pendingQuadCount++;
+    }
+
+    private boolean matchesPendingMode(TranslucentGeometryCollector collector, ModelQuadFacing collectorFacing) {
+        if (this.pendingQuadCount == 0) {
+            return true;
+        }
+        if (this.pendingCollector != collector) {
+            return false;
+        }
+
+        return collector == null || this.pendingCollectorFacing == collectorFacing;
+    }
+
+    private void ensurePendingBuffers(boolean translucent) {
+        if (this.pendingQuads == null) {
+            this.pendingQuads = MemoryUtil.memAlloc(BATCH_QUAD_CAPACITY * this.nativeQuadStride);
+            this.pendingQuadsAddress = MemoryUtil.memAddress(this.pendingQuads);
+        }
+
+        if (translucent && this.pendingPackedNormals == null) {
+            this.pendingPackedNormals = MemoryUtil.memAlloc(BATCH_QUAD_CAPACITY * Integer.BYTES);
+            this.pendingValidity = MemoryUtil.memAlloc(BATCH_QUAD_CAPACITY);
+            this.pendingPackedNormalsAddress = MemoryUtil.memAddress(this.pendingPackedNormals);
+            this.pendingValidityAddress = MemoryUtil.memAddress(this.pendingValidity);
+        }
+    }
+
+    private void clearPending() {
+        this.pendingQuadCount = 0;
+        this.pendingCollector = null;
+        this.pendingCollectorFacing = null;
+    }
+
+    private void freePendingBuffers() {
+        if (this.pendingQuads != null) {
+            MemoryUtil.memFree(this.pendingQuads);
+            this.pendingQuads = null;
+            this.pendingQuadsAddress = 0;
+        }
+        if (this.pendingPackedNormals != null) {
+            MemoryUtil.memFree(this.pendingPackedNormals);
+            this.pendingPackedNormals = null;
+            this.pendingPackedNormalsAddress = 0;
+        }
+        if (this.pendingValidity != null) {
+            MemoryUtil.memFree(this.pendingValidity);
+            this.pendingValidity = null;
+            this.pendingValidityAddress = 0;
+        }
     }
 }

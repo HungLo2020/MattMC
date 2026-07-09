@@ -30,6 +30,7 @@ const VERTEX_EPSILON: f32 = 0.00001;
 const QUANTIZE_EPSILON: f32 = 1.0 / 256.0;
 const HALF_SPACE_EPSILON: f32 = 0.001;
 const NORMAL_COMPONENT_RANGE: f32 = 127.0;
+const NATIVE_QUAD_STRIDE: u64 = 152;
 
 const ALIGNED_NORMALS: [(i8, i8, i8); FACING_DIRECTIONS] = [
     (127, 0, 0),
@@ -1473,6 +1474,54 @@ pub unsafe extern "C" fn mattmc_sodium_translucent_analyzer_append_native_quad(
     }
 
     analyzer.records.push(record);
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_analyzer_append_native_quad_batch(
+    handle: u64,
+    native_quad_address: u64,
+    quad_count: i32,
+    facing: i32,
+    packed_normals: *const i32,
+    validity_output_address: u64,
+    output_valid_count: *mut i32,
+) -> i32 {
+    if handle == 0 || output_valid_count.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    if quad_count < 0 || !(0..FACING_COUNT as i32).contains(&facing) {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if quad_count == 0 {
+        *output_valid_count = 0;
+        return OK;
+    }
+    if native_quad_address == 0 || packed_normals.is_null() || validity_output_address == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let quad_count = quad_count as usize;
+    let analyzer = &mut *(handle as *mut NativeTranslucentAnalyzer);
+    let packed_normals = slice::from_raw_parts(packed_normals, quad_count);
+    let validity_output = slice::from_raw_parts_mut(validity_output_address as *mut u8, quad_count);
+    let mut valid_count = 0i32;
+
+    for index in 0..quad_count {
+        let quad_address = native_quad_address + (index as u64 * NATIVE_QUAD_STRIDE);
+        let record = record_from_native_quad(quad_address, facing, packed_normals[index]);
+
+        if record_is_invalid(&record) {
+            validity_output[index] = 0;
+            continue;
+        }
+
+        validity_output[index] = 1;
+        analyzer.records.push(record);
+        valid_count += 1;
+    }
+
+    *output_valid_count = valid_count;
     OK
 }
 

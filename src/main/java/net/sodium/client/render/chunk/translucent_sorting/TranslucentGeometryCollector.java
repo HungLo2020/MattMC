@@ -198,6 +198,39 @@ public class TranslucentGeometryCollector {
         return this.appendQuad(vertices, facing, packedNormal);
     }
 
+    public boolean supportsNativeBatching() {
+        return this.nativeAnalyzer != null;
+    }
+
+    public int appendNativeQuadBatch(long nativeQuadAddress, int quadCount, ModelQuadFacing facing,
+            long packedNormalsAddress, long validityAddress) {
+        if (this.nativeAnalyzer == null) {
+            throw new IllegalStateException("Native translucent batching is unavailable when quad splitting is enabled");
+        }
+
+        return this.nativeAnalyzer.appendNativeQuadBatch(nativeQuadAddress, quadCount, facing, packedNormalsAddress,
+                validityAddress);
+    }
+
+    public static boolean isInvalidQuad(ChunkVertexEncoder.Vertex[] vertices) {
+        ChunkVertexEncoder.Vertex last = vertices[3];
+        int sameVertexMap = 0;
+
+        for (int index = 0; index < 4; index++) {
+            ChunkVertexEncoder.Vertex current = vertices[index];
+
+            if (Math.abs(current.x - last.x) < 0.00001F
+                    && Math.abs(current.y - last.y) < 0.00001F
+                    && Math.abs(current.z - last.z) < 0.00001F) {
+                sameVertexMap |= 1 << index;
+            }
+
+            last = current;
+        }
+
+        return Integer.bitCount(sameVertexMap) > 1;
+    }
+
     public boolean isSplittingQuads() {
         return this.quadSplittingMode.allowsSplitting();
     }

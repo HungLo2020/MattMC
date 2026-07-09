@@ -43,12 +43,12 @@ public class BakedChunkModelBuilder implements ChunkModelBuilder {
     }
 
     public void destroy() {
+        for (ChunkMeshBufferBuilder builder : this.vertexBuffers) {
+            builder.destroy();
+        }
+
         if (this.sectionBuilder != null) {
             this.sectionBuilder.close();
-        } else {
-            for (ChunkMeshBufferBuilder builder : this.vertexBuffers) {
-                builder.destroy();
-            }
         }
     }
 
@@ -63,7 +63,15 @@ public class BakedChunkModelBuilder implements ChunkModelBuilder {
         }
     }
 
+    public void flushPending() {
+        for (var vertexBuffer : this.vertexBuffers) {
+            vertexBuffer.flushPending();
+        }
+    }
+
     public NativeSectionMeshBuilder getSectionBuilder() {
+        this.flushPending();
+
         if (this.sectionBuilder != null) {
             return this.sectionBuilder;
         }

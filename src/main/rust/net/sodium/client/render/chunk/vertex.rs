@@ -582,6 +582,65 @@ fn section_builder_prepare_quad(
     Ok(unsafe { builder.buffers[facing].quads.as_mut_ptr().add(index) as u64 })
 }
 
+unsafe fn section_builder_append_batch(
+    builder: &mut NativeSectionMeshBuilder,
+    facing: usize,
+    batch_address: u64,
+    quad_count: usize,
+    validity: Option<&[u8]>,
+) -> Result<i32, i32> {
+    if facing >= MODEL_QUAD_FACING_COUNT {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+    if quad_count == 0 {
+        return Ok(0);
+    }
+    if batch_address == 0 {
+        return Err(ERR_NULL_POINTER);
+    }
+    if let Some(validity) = validity {
+        if validity.len() < quad_count {
+            return Err(ERR_INVALID_ARGUMENT);
+        }
+    }
+
+    let input = slice::from_raw_parts(batch_address as *const NativeQuad, quad_count);
+    let valid_count = validity
+        .map(|mask| {
+            mask.iter()
+                .take(quad_count)
+                .filter(|&&value| value != 0)
+                .count()
+        })
+        .unwrap_or(quad_count);
+    let start = builder.counts[facing];
+    let required_len = start.checked_add(valid_count).ok_or(ERR_CAPACITY)?;
+
+    if builder.buffers[facing].quads.len() < required_len {
+        builder.buffers[facing]
+            .quads
+            .resize(required_len, NativeQuad::default());
+    }
+
+    let output = &mut builder.buffers[facing].quads[start..required_len];
+    let mut output_index = 0usize;
+
+    for index in 0..quad_count {
+        let is_valid = match validity {
+            Some(mask) => mask[index] != 0,
+            None => true,
+        };
+
+        if is_valid {
+            output[output_index] = input[index];
+            output_index += 1;
+        }
+    }
+
+    builder.counts[facing] = required_len;
+    Ok(valid_count as i32)
+}
+
 fn encode_quad(quad: &NativeQuad, output: &mut [u8], format: NativeFormat) {
     let vertices = &quad.vertices;
     let tex_centroid_u = vertices.iter().map(|vertex| vertex.u).sum::<f32>() * 0.25;
@@ -1129,6 +1188,78 @@ pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_commit_quad(
     }
     builder.counts[facing] += 1;
     OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_append_batch(
+    handle: u64,
+    facing: i32,
+    batch_address: u64,
+    quad_count: i32,
+    output_committed_count: *mut i32,
+) -> i32 {
+    if handle == 0 || output_committed_count.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    if facing < 0 || quad_count < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let builder = &mut *(handle as *mut NativeSectionMeshBuilder);
+    match section_builder_append_batch(
+        builder,
+        facing as usize,
+        batch_address,
+        quad_count as usize,
+        None,
+    ) {
+        Ok(committed_count) => {
+            *output_committed_count = committed_count;
+            OK
+        }
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_append_batch_filtered(
+    handle: u64,
+    facing: i32,
+    batch_address: u64,
+    quad_count: i32,
+    validity_address: u64,
+    output_committed_count: *mut i32,
+) -> i32 {
+    if handle == 0 || output_committed_count.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    if facing < 0 || quad_count < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if quad_count > 0 && validity_address == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let validity = if quad_count == 0 {
+        &[][..]
+    } else {
+        slice::from_raw_parts(validity_address as *const u8, quad_count as usize)
+    };
+
+    let builder = &mut *(handle as *mut NativeSectionMeshBuilder);
+    match section_builder_append_batch(
+        builder,
+        facing as usize,
+        batch_address,
+        quad_count as usize,
+        Some(validity),
+    ) {
+        Ok(committed_count) => {
+            *output_committed_count = committed_count;
+            OK
+        }
+        Err(status) => status,
+    }
 }
 
 #[no_mangle]

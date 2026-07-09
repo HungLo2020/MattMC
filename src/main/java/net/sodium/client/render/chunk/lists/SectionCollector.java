@@ -19,8 +19,6 @@ public abstract class SectionCollector implements RenderListProvider, RenderSect
     private final EnumMap<TaskQueueType, ArrayDeque<RenderSection>> sortedTaskLists;
     private boolean needsRevisitForPendingUpdates = false;
 
-    private static int[] sortItems = new int[RenderRegion.REGION_SIZE];
-
     public SectionCollector(int frame, TaskQueueType importantRebuildQueueType, TaskQueueType importantSortQueueType) {
         this.frame = frame;
         this.importantRebuildQueueType = importantRebuildQueueType;
@@ -84,15 +82,5 @@ public abstract class SectionCollector implements RenderListProvider, RenderSect
     @Override
     public boolean needsRevisitForPendingUpdates() {
         return this.needsRevisitForPendingUpdates;
-    }
-
-    @Override
-    public void setCachedSortItems(int[] sortItems) {
-        SectionCollector.sortItems = sortItems;
-    }
-
-    @Override
-    public int[] getCachedSortItems() {
-        return SectionCollector.sortItems;
     }
 }

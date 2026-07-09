@@ -101,6 +101,49 @@ class NativeTranslucentGeometryAnalyzerTest {
     }
 
     @Test
+    void analyzerAppendsNativeQuadBatchesAndMarksInvalidRecords() {
+        NativeTranslucentGeometryAnalyzer analyzer = new NativeTranslucentGeometryAnalyzer();
+        ByteBuffer batch = null;
+        ByteBuffer packedNormals = null;
+        ByteBuffer validity = null;
+
+        try {
+            batch = nativeOrder(MemoryUtil.memAlloc(2 * NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE));
+            packedNormals = nativeOrder(MemoryUtil.memAlloc(2 * Integer.BYTES));
+            validity = MemoryUtil.memAlloc(2);
+
+            ChunkVertexEncoder.Vertex[] invalid = zQuad(4.0F);
+            invalid[1].x = invalid[0].x;
+            invalid[1].y = invalid[0].y;
+            invalid[1].z = invalid[0].z;
+            invalid[3].x = invalid[2].x;
+            invalid[3].y = invalid[2].y;
+            invalid[3].z = invalid[2].z;
+
+            NativeChunkMeshEncoder.writeNativeQuad(MemoryUtil.memAddress(batch), zQuad(2.0F),
+                    DefaultMaterials.TRANSLUCENT.bits());
+            NativeChunkMeshEncoder.writeNativeQuad(MemoryUtil.memAddress(batch) + NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE,
+                    invalid, DefaultMaterials.TRANSLUCENT.bits());
+            packedNormals.putInt(0, ModelQuadFacing.POS_Z.getPackedAlignedNormal());
+            packedNormals.putInt(Integer.BYTES, ModelQuadFacing.POS_Z.getPackedAlignedNormal());
+
+            assertEquals(1, analyzer.appendNativeQuadBatch(MemoryUtil.memAddress(batch), 2, ModelQuadFacing.POS_Z,
+                    MemoryUtil.memAddress(packedNormals), MemoryUtil.memAddress(validity)));
+            assertEquals(1, validity.get(0));
+            assertEquals(0, validity.get(1));
+
+            NativeTranslucentGeometryAnalyzer.Analysis analysis = analyzer.analyze(SortBehavior.SortMode.DYNAMIC);
+            assertEquals(1, analysis.quadCount());
+            assertEquals(1, analysis.meshFacingCounts()[ModelQuadFacing.POS_Z.ordinal()]);
+        } finally {
+            analyzer.destroy();
+            free(batch);
+            free(packedNormals);
+            free(validity);
+        }
+    }
+
+    @Test
     void staticTopoSortOrdersVisibleParallelPlanesBackToFront() {
         NativeTranslucentGeometryAnalyzer analyzer = new NativeTranslucentGeometryAnalyzer();
 
@@ -221,5 +264,15 @@ class NativeTranslucentGeometryAnalyzerTest {
             values[index] = nativeOrderBuffer.getInt(index * Integer.BYTES);
         }
         return values;
+    }
+
+    private static ByteBuffer nativeOrder(ByteBuffer buffer) {
+        return buffer.order(ByteOrder.nativeOrder());
+    }
+
+    private static void free(ByteBuffer buffer) {
+        if (buffer != null) {
+            MemoryUtil.memFree(buffer);
+        }
     }
 }

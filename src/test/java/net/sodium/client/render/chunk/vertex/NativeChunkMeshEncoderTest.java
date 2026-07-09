@@ -108,9 +108,9 @@ class NativeChunkMeshEncoderTest {
             posX.push(quad(2.0F, 5), 5);
             unassigned.push(quad(0.0F, 3), 3);
 
-            assertEquals(8, sectionBuilder.totalVertexCount());
             assertEquals(4, posX.count());
             assertEquals(4, unassigned.count());
+            assertEquals(8, sectionBuilder.totalVertexCount());
 
             int[] segments = new int[ModelQuadFacing.COUNT << 1];
             output = nativeOrder(MemoryUtil.memCalloc(8 * ChunkMeshFormats.COMPACT.getNativeFormat().stride()));
@@ -130,6 +130,34 @@ class NativeChunkMeshEncoderTest {
             assertCompactVertex(output, 4, 2.0F, 5, 5);
         } finally {
             free(output);
+            sectionBuilder.close();
+        }
+    }
+
+    @Test
+    void nativeSectionBuilderAppendsFilteredQuadBatches() {
+        NativeSectionMeshBuilder sectionBuilder = NativeSectionMeshBuilder.create(1);
+        ByteBuffer batch = null;
+        ByteBuffer validity = null;
+
+        try {
+            sectionBuilder.start(5);
+            batch = nativeOrder(MemoryUtil.memAlloc(2 * NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE));
+            validity = MemoryUtil.memAlloc(2);
+
+            NativeChunkMeshEncoder.writeNativeQuad(MemoryUtil.memAddress(batch), quad(2.0F, 5), 5);
+            NativeChunkMeshEncoder.writeNativeQuad(MemoryUtil.memAddress(batch) + NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE,
+                    quad(4.0F, 7), 7);
+            validity.put(0, (byte) 1);
+            validity.put(1, (byte) 0);
+
+            assertEquals(1, sectionBuilder.appendBatchFiltered(ModelQuadFacing.POS_X.ordinal(),
+                    MemoryUtil.memAddress(batch), 2, MemoryUtil.memAddress(validity)));
+            assertEquals(4, sectionBuilder.totalVertexCount());
+            assertEquals(4, sectionBuilder.facingVertexCount(ModelQuadFacing.POS_X.ordinal()));
+        } finally {
+            free(batch);
+            free(validity);
             sectionBuilder.close();
         }
     }

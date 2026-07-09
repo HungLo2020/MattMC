@@ -1,6 +1,5 @@
 package net.sodium.client.render.chunk.lists;
 
-import net.sodium.client.render.chunk.LocalSectionIndex;
 import net.sodium.client.render.chunk.RenderSection;
 import net.sodium.client.render.chunk.RenderSectionFlags;
 import net.sodium.client.render.chunk.region.RenderRegion;
@@ -11,6 +10,7 @@ import net.minecraft.core.SectionPos;
 import net.minecraft.util.Mth;
 import org.jetbrains.annotations.Nullable;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 public class ChunkRenderList {
@@ -53,77 +53,76 @@ public class ChunkRenderList {
         this.addedSectionsAreSorted = addedSectionsAreSorted;
     }
 
-    // clamping the relative camera position to the region bounds means there can only be very few different distances
-    private static final int SORTING_HISTOGRAM_SIZE = RenderRegion.REGION_WIDTH + RenderRegion.REGION_HEIGHT + RenderRegion.REGION_LENGTH - 2;
-
-    public void prepareForRender(SectionPos cameraPos, SortItemsProvider sortItemsProvider) {
-        // The relative coordinates are clamped to one section larger than the region bounds to also capture cache invalidation that happens
-        // when the camera moves from outside the region to inside the region (when seen on all axes independently).
-        // This type of cache invalidation stems from different facings of sections being rendered if the camera is aligned with them on an axis.
-        // For sorting only the position clamped to inside the region is used.
-        int relativeCameraSectionX = Mth.clamp(cameraPos.getX() - this.region.getChunkX(), -1, RenderRegion.REGION_WIDTH);
-        int relativeCameraSectionY = Mth.clamp(cameraPos.getY() - this.region.getChunkY(), -1, RenderRegion.REGION_HEIGHT);
-        int relativeCameraSectionZ = Mth.clamp(cameraPos.getZ() - this.region.getChunkZ(), -1, RenderRegion.REGION_LENGTH);
+    public void prepareForRender(SectionPos cameraPos) {
+        int relativeCameraSectionX = this.getRelativeCameraSectionX(cameraPos);
+        int relativeCameraSectionY = this.getRelativeCameraSectionY(cameraPos);
+        int relativeCameraSectionZ = this.getRelativeCameraSectionZ(cameraPos);
 
         // invalidate batch cache if the render list changed
-        if (this.prevSectionsWithGeometryCount != this.sectionsWithGeometryCount ||
-                relativeCameraSectionX != this.lastRelativeCameraSectionX ||
-                relativeCameraSectionY != this.lastRelativeCameraSectionY ||
-                relativeCameraSectionZ != this.lastRelativeCameraSectionZ ||
-                !Arrays.equals(this.sectionsWithGeometryMap, this.prevSectionsWithGeometryMap)) {
-            // reset cache invalidation, the newly built batches will remain valid until the next change
-            this.region.clearAllCachedBatches();
+        if (this.needsRenderPreparation(relativeCameraSectionX, relativeCameraSectionY, relativeCameraSectionZ)) {
+            this.commitRenderPreparation(relativeCameraSectionX, relativeCameraSectionY, relativeCameraSectionZ);
 
-            this.prevSectionsWithGeometryCount = this.sectionsWithGeometryCount;
-            System.arraycopy(this.sectionsWithGeometryMap, 0, this.prevSectionsWithGeometryMap, 0, this.sectionsWithGeometryMap.length);
-            this.lastRelativeCameraSectionX = relativeCameraSectionX;
-            this.lastRelativeCameraSectionY = relativeCameraSectionY;
-            this.lastRelativeCameraSectionZ = relativeCameraSectionZ;
-
-            // only sort sections if necessary, read directly from bitmap instead of no sorting is required
             if (!this.addedSectionsAreSorted) {
-                this.sortSections(relativeCameraSectionX, relativeCameraSectionY, relativeCameraSectionZ, sortItemsProvider);
+                this.sortSections(relativeCameraSectionX, relativeCameraSectionY, relativeCameraSectionZ);
             }
         }
     }
 
-    private void sortSections(int relativeCameraSectionX, int relativeCameraSectionY, int relativeCameraSectionZ, SortItemsProvider sortItemsProvider) {
-        relativeCameraSectionX = Mth.clamp(relativeCameraSectionX, 0, RenderRegion.REGION_WIDTH - 1);
-        relativeCameraSectionY = Mth.clamp(relativeCameraSectionY, 0, RenderRegion.REGION_HEIGHT - 1);
-        relativeCameraSectionZ = Mth.clamp(relativeCameraSectionZ, 0, RenderRegion.REGION_LENGTH - 1);
+    private void sortSections(int relativeCameraSectionX, int relativeCameraSectionY, int relativeCameraSectionZ) {
+        this.sectionsWithGeometryCount = NativeRenderListSorter.sortSections(this.sectionsWithGeometryMap,
+                this.sectionsWithGeometry, relativeCameraSectionX, relativeCameraSectionY, relativeCameraSectionZ);
+    }
 
-        int[] histogram = new int[SORTING_HISTOGRAM_SIZE];
-        var sortItems = sortItemsProvider.ensureSortItemsOfLength(this.sectionsWithGeometryCount);
+    int getRelativeCameraSectionX(SectionPos cameraPos) {
+        // The relative coordinates are clamped to one section larger than the region bounds to also capture cache invalidation that happens
+        // when the camera moves from outside the region to inside the region (when seen on all axes independently).
+        // This type of cache invalidation stems from different facings of sections being rendered if the camera is aligned with them on an axis.
+        // For sorting only the position clamped to inside the region is used.
+        return Mth.clamp(cameraPos.getX() - this.region.getChunkX(), -1, RenderRegion.REGION_WIDTH);
+    }
 
-        this.sectionsWithGeometryCount = 0;
-        for (int mapIndex = 0; mapIndex < this.sectionsWithGeometryMap.length; mapIndex++) {
-            var map = this.sectionsWithGeometryMap[mapIndex];
-            var mapOffset = mapIndex << 6;
+    int getRelativeCameraSectionY(SectionPos cameraPos) {
+        return Mth.clamp(cameraPos.getY() - this.region.getChunkY(), -1, RenderRegion.REGION_HEIGHT);
+    }
 
-            while (map != 0) {
-                var index = Long.numberOfTrailingZeros(map) + mapOffset;
-                map &= map - 1;
+    int getRelativeCameraSectionZ(SectionPos cameraPos) {
+        return Mth.clamp(cameraPos.getZ() - this.region.getChunkZ(), -1, RenderRegion.REGION_LENGTH);
+    }
 
-                var x = Math.abs(LocalSectionIndex.unpackX(index) - relativeCameraSectionX);
-                var y = Math.abs(LocalSectionIndex.unpackY(index) - relativeCameraSectionY);
-                var z = Math.abs(LocalSectionIndex.unpackZ(index) - relativeCameraSectionZ);
+    boolean needsRenderPreparation(int relativeCameraSectionX, int relativeCameraSectionY,
+            int relativeCameraSectionZ) {
+        return this.prevSectionsWithGeometryCount != this.sectionsWithGeometryCount ||
+                relativeCameraSectionX != this.lastRelativeCameraSectionX ||
+                relativeCameraSectionY != this.lastRelativeCameraSectionY ||
+                relativeCameraSectionZ != this.lastRelativeCameraSectionZ ||
+                !Arrays.equals(this.sectionsWithGeometryMap, this.prevSectionsWithGeometryMap);
+    }
 
-                var distance = x + y + z;
-                histogram[distance]++;
-                sortItems[this.sectionsWithGeometryCount++] = distance << 8 | index;
-            }
+    boolean needsNativeSectionSort() {
+        return !this.addedSectionsAreSorted;
+    }
+
+    long[] getSectionsWithGeometryMap() {
+        return this.sectionsWithGeometryMap;
+    }
+
+    void commitRenderPreparation(int relativeCameraSectionX, int relativeCameraSectionY,
+            int relativeCameraSectionZ) {
+        this.region.clearAllCachedBatches();
+        this.prevSectionsWithGeometryCount = this.sectionsWithGeometryCount;
+        System.arraycopy(this.sectionsWithGeometryMap, 0, this.prevSectionsWithGeometryMap, 0,
+                this.sectionsWithGeometryMap.length);
+        this.lastRelativeCameraSectionX = relativeCameraSectionX;
+        this.lastRelativeCameraSectionY = relativeCameraSectionY;
+        this.lastRelativeCameraSectionZ = relativeCameraSectionZ;
+    }
+
+    void applyNativeSortedSections(ByteBuffer sortedSections, int offset, int count) {
+        for (int index = 0; index < count; index++) {
+            this.sectionsWithGeometry[index] = sortedSections.get(offset + index);
         }
 
-        // prefix sum to calculate indexes
-        for (int i = 1; i < SORTING_HISTOGRAM_SIZE; i++) {
-            histogram[i] += histogram[i - 1];
-        }
-
-        for (int i = 0; i < this.sectionsWithGeometryCount; i++) {
-            var item = sortItems[i];
-            var distance = item >>> 8;
-            this.sectionsWithGeometry[--histogram[distance]] = (byte) item;
-        }
+        this.sectionsWithGeometryCount = count;
     }
 
     public void add(RenderSection render) {

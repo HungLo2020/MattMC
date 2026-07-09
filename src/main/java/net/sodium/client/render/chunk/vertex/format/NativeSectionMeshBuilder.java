@@ -39,6 +39,23 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_LONG,
                     ValueLayout.JAVA_INT));
+    private static final MethodHandle APPEND_BATCH = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_mesh_builder_append_batch",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS));
+    private static final MethodHandle APPEND_BATCH_FILTERED = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_mesh_builder_append_batch_filtered",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.ADDRESS));
     private static final MethodHandle FACING_ADDRESS = NativeLibraryLoader.downcallHandle("mattmc_rust",
             "mattmc_sodium_section_mesh_builder_facing_address",
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
@@ -114,6 +131,38 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
 
     public void commitQuad(int facing) {
         check(invokeCommitQuad(this.state.getHandle(), facing), "native section mesh builder quad commit");
+    }
+
+    public int appendBatch(int facing, long batchAddress, int quadCount) {
+        if (quadCount < 0) {
+            throw new IllegalArgumentException("Invalid quad count: " + quadCount);
+        }
+        if (quadCount == 0) {
+            return 0;
+        }
+
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment committedCountSegment = arena.allocate(ValueLayout.JAVA_INT);
+            check(invokeAppendBatch(this.state.getHandle(), facing, batchAddress, quadCount, committedCountSegment),
+                    "native section mesh builder batch append");
+            return committedCountSegment.get(ValueLayout.JAVA_INT, 0);
+        }
+    }
+
+    public int appendBatchFiltered(int facing, long batchAddress, int quadCount, long validityAddress) {
+        if (quadCount < 0) {
+            throw new IllegalArgumentException("Invalid quad count: " + quadCount);
+        }
+        if (quadCount == 0) {
+            return 0;
+        }
+
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment committedCountSegment = arena.allocate(ValueLayout.JAVA_INT);
+            check(invokeAppendBatchFiltered(this.state.getHandle(), facing, batchAddress, quadCount,
+                    validityAddress, committedCountSegment), "native section mesh builder filtered batch append");
+            return committedCountSegment.get(ValueLayout.JAVA_INT, 0);
+        }
     }
 
     public long facingAddress(int facing) {
@@ -216,6 +265,26 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
             return (int) COMMIT_QUAD.invokeExact(handle, facing);
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust section mesh builder commit downcall failed", throwable);
+        }
+    }
+
+    private static int invokeAppendBatch(long handle, int facing, long batchAddress, int quadCount,
+            MemorySegment committedCountOutput) {
+        try {
+            return (int) APPEND_BATCH.invokeExact(handle, facing, batchAddress, quadCount, committedCountOutput);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust section mesh builder batch append downcall failed", throwable);
+        }
+    }
+
+    private static int invokeAppendBatchFiltered(long handle, int facing, long batchAddress, int quadCount,
+            long validityAddress, MemorySegment committedCountOutput) {
+        try {
+            return (int) APPEND_BATCH_FILTERED.invokeExact(handle, facing, batchAddress, quadCount,
+                    validityAddress, committedCountOutput);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust section mesh builder filtered batch append downcall failed",
+                    throwable);
         }
     }
 
