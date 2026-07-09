@@ -86,6 +86,12 @@ class NativeBspTreeTest {
                 "src/main/java/net/sodium/client/render/chunk/translucent_sorting/bsp_tree/BSPSortState.java")));
         assertFalse(Files.exists(Path.of(
                 "src/main/java/net/sodium/client/render/chunk/translucent_sorting/bsp_tree/NativeBspSortState.java")));
+        assertFalse(Files.exists(Path.of(
+                "src/main/java/net/sodium/client/render/chunk/translucent_sorting/bsp_tree/LeafSingleBSPNode.java")));
+        assertFalse(Files.exists(Path.of(
+                "src/main/java/net/sodium/client/render/chunk/translucent_sorting/bsp_tree/LeafDoubleBSPNode.java")));
+        assertFalse(Files.exists(Path.of(
+                "src/main/java/net/sodium/client/render/chunk/translucent_sorting/bsp_tree/LeafMultiBSPNode.java")));
         assertTrue(Files.exists(Path.of(
                 "src/main/java/net/sodium/client/render/chunk/translucent_sorting/bsp_tree/NativeBspTree.java")));
     }

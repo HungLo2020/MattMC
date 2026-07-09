@@ -949,7 +949,7 @@ abstract class InnerPartitionBSPNode extends BSPNode {
                 // cancel primary intersector search if they all intersect with each other
                 if (primaryIntersectorIndexes != null && primaryIntersectorIndexes.size() == indexes.size()) {
                     // return multi leaf node as this is impossible to sort
-                    return new LeafMultiBSPNode(BSPNode.copyIndexes(indexes));
+                    return BSPNode.nativeLeafMulti(BSPNode.copyIndexes(indexes));
                 }
             }
         }
@@ -1010,7 +1010,7 @@ abstract class InnerPartitionBSPNode extends BSPNode {
         // no need to add the geometry to the workspace's trigger registry
         // since it's being sorted statically and the sort order won't change based on the camera position
 
-        return new LeafMultiBSPNode(BSPNode.copyIndexes(indexWriter.indexes, false));
+        return BSPNode.nativeLeafMulti(BSPNode.copyIndexes(indexWriter.indexes, false));
     }
 
     static private BSPNode buildSNRLeafNodeFromQuads(BSPWorkspace workspace, IntArrayList indexes) {
@@ -1032,7 +1032,7 @@ abstract class InnerPartitionBSPNode extends BSPNode {
             perm[i] = indexBuffer[perm[i]];
         }
 
-        return new LeafMultiBSPNode(BSPNode.copyIndexes(IntArrayList.wrap(perm), false));
+        return BSPNode.nativeLeafMulti(BSPNode.copyIndexes(IntArrayList.wrap(perm), false));
     }
 
     static private BSPNode buildSNRLeafNodeFromPoints(BSPWorkspace workspace, LongArrayList points) {
@@ -1055,6 +1055,6 @@ abstract class InnerPartitionBSPNode extends BSPNode {
             }
         }
 
-        return new LeafMultiBSPNode(BSPNode.copyIndexes(IntArrayList.wrap(quadIndexes), false));
+        return BSPNode.nativeLeafMulti(BSPNode.copyIndexes(IntArrayList.wrap(quadIndexes), false));
     }
 }

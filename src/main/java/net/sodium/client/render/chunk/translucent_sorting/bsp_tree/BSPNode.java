@@ -25,9 +25,55 @@ import java.util.Arrays;
  * number of triggering planes (which would have a performance and memory usage
  * benefit).
  */
-public abstract class BSPNode {
+public class BSPNode {
+    private static final int NO_QUAD = -1;
 
-    abstract int addTo(NativeBspTree.Builder builder);
+    private enum NativeLeafKind {
+        NONE,
+        SINGLE,
+        DOUBLE,
+        MULTI
+    }
+
+    private final NativeLeafKind nativeLeafKind;
+    private final int quadA;
+    private final int quadB;
+    private final int[] quads;
+
+    BSPNode() {
+        this.nativeLeafKind = NativeLeafKind.NONE;
+        this.quadA = NO_QUAD;
+        this.quadB = NO_QUAD;
+        this.quads = null;
+    }
+
+    private BSPNode(NativeLeafKind nativeLeafKind, int quadA, int quadB, int[] quads) {
+        this.nativeLeafKind = nativeLeafKind;
+        this.quadA = quadA;
+        this.quadB = quadB;
+        this.quads = quads;
+    }
+
+    static BSPNode nativeLeafSingle(int quad) {
+        return new BSPNode(NativeLeafKind.SINGLE, quad, NO_QUAD, null);
+    }
+
+    static BSPNode nativeLeafDouble(int quadA, int quadB) {
+        return new BSPNode(NativeLeafKind.DOUBLE, quadA, quadB, null);
+    }
+
+    static BSPNode nativeLeafMulti(int[] quads) {
+        return new BSPNode(NativeLeafKind.MULTI, NO_QUAD, NO_QUAD, quads);
+    }
+
+    int addTo(NativeBspTree.Builder builder) {
+        return switch (this.nativeLeafKind) {
+            case SINGLE -> builder.addLeafSingle(this.quadA);
+            case DOUBLE -> builder.addLeafDouble(this.quadA, this.quadB);
+            case MULTI -> builder.addLeafMulti(this.quads);
+            case NONE -> throw new IllegalStateException("BSP node does not implement native export");
+        };
+    }
 
     public static BSPResult buildBSP(TQuad[] quads, SectionPos sectionPos, BSPNode oldRoot,
             boolean prepareNodeReuse, QuadSplittingMode quadSplittingMode) {
@@ -95,7 +141,7 @@ public abstract class BSPNode {
         if (indexes.isEmpty()) {
             return null;
         } else if (indexes.size() == 1) {
-            return new LeafSingleBSPNode(indexes.getInt(0));
+            return nativeLeafSingle(indexes.getInt(0));
         } else if (indexes.size() == 2) {
             var quadIndexA = indexes.getInt(0);
             var quadIndexB = indexes.getInt(1);
@@ -103,7 +149,7 @@ public abstract class BSPNode {
             var quadB = workspace.get(quadIndexB);
 
             if (doubleLeafPossible(quadA, quadB, workspace.canSplitQuads())) {
-                return new LeafDoubleBSPNode(quadIndexA, quadIndexB);
+                return nativeLeafDouble(quadIndexA, quadIndexB);
             }
         }
 
