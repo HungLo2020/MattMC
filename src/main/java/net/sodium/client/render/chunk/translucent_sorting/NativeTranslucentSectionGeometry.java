@@ -41,6 +41,22 @@ public final class NativeTranslucentSectionGeometry implements AutoCloseable {
                     ValueLayout.JAVA_FLOAT,
                     ValueLayout.JAVA_FLOAT,
                     ValueLayout.JAVA_FLOAT));
+    private static final MethodHandle WRITE_DYNAMIC_SORT = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_translucent_section_geometry_dynamic_sort_write",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_FLOAT,
+                    ValueLayout.JAVA_FLOAT,
+                    ValueLayout.JAVA_FLOAT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_INT));
 
     private final State state;
     private final Cleaner.Cleanable cleanable;
@@ -86,6 +102,32 @@ public final class NativeTranslucentSectionGeometry implements AutoCloseable {
         check(invokeWriteDistanceSort(handle, outputAddress, outputCapacity, cameraPos.x(), cameraPos.y(),
                 cameraPos.z()),
                 "native translucent distance sort writing");
+    }
+
+    public DynamicSortResult writeDynamicSortedIndexBuffer(NativeBuffer indexBuffer, Vector3fc cameraPos,
+            boolean initial, boolean directTriggerSort, boolean gfniTrigger, boolean directTrigger,
+            int consecutiveTopoSortFailures) {
+        return this.writeDynamicSortedIndexBuffer(MemoryUtil.memAddress(indexBuffer.getDirectBuffer()),
+                indexBuffer.getLength(), cameraPos, initial, directTriggerSort, gfniTrigger, directTrigger,
+                consecutiveTopoSortFailures);
+    }
+
+    DynamicSortResult writeDynamicSortedIndexBuffer(long outputAddress, int outputCapacity, Vector3fc cameraPos,
+            boolean initial, boolean directTriggerSort, boolean gfniTrigger, boolean directTrigger,
+            int consecutiveTopoSortFailures) {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment stateSegment = arena.allocate(ValueLayout.JAVA_INT, 3);
+            long handle = this.state.getHandle();
+            check(invokeWriteDynamicSort(handle, outputAddress, outputCapacity, cameraPos.x(), cameraPos.y(),
+                    cameraPos.z(), initial ? 1 : 0, directTriggerSort ? 1 : 0,
+                    gfniTrigger ? 1 : 0, directTrigger ? 1 : 0, consecutiveTopoSortFailures, stateSegment, 3),
+                    "native translucent dynamic sort writing");
+
+            return new DynamicSortResult(
+                    stateSegment.getAtIndex(ValueLayout.JAVA_INT, 0) != 0,
+                    stateSegment.getAtIndex(ValueLayout.JAVA_INT, 1) != 0,
+                    stateSegment.getAtIndex(ValueLayout.JAVA_INT, 2));
+        }
     }
 
     public int getQuadCount() {
@@ -152,6 +194,21 @@ public final class NativeTranslucentSectionGeometry implements AutoCloseable {
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust translucent distance sort downcall failed", throwable);
         }
+    }
+
+    private static int invokeWriteDynamicSort(long handle, long outputAddress, int outputCapacity, float cameraX,
+            float cameraY, float cameraZ, int initial, int directTriggerSort, int gfniTrigger, int directTrigger,
+            int consecutiveTopoSortFailures, MemorySegment outputState, int outputStateLength) {
+        try {
+            return (int) WRITE_DYNAMIC_SORT.invokeExact(handle, outputAddress, outputCapacity, cameraX, cameraY,
+                    cameraZ, initial, directTriggerSort, gfniTrigger, directTrigger, consecutiveTopoSortFailures,
+                    outputState, outputStateLength);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust translucent dynamic sort downcall failed", throwable);
+        }
+    }
+
+    public record DynamicSortResult(boolean gfniTrigger, boolean directTrigger, int consecutiveTopoSortFailures) {
     }
 
     private static final class State implements Runnable {

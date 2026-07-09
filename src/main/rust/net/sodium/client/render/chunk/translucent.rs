@@ -54,6 +54,7 @@ struct QuadInfo {
     positions: [f32; 12],
     center: (f32, f32, f32),
     facing: i32,
+    topo_facing: i32,
     packed_normal: i32,
     extents: [f32; 6],
     accurate_dot_product: f32,
@@ -72,6 +73,7 @@ struct Analyzer {
 
 struct NativeTranslucentSectionGeometry {
     quads: Vec<QuadInfo>,
+    aligned_separator_distances: [Vec<f32>; FACING_DIRECTIONS],
 }
 
 pub fn verify() -> i32 {
@@ -242,15 +244,18 @@ fn build_quad_info(record: &TranslucentQuadRecord) -> QuadInfo {
         let normal = unpack_normal(packed_normal);
         center.0 * normal.0 + center.1 * normal.1 + center.2 * normal.2
     };
+    let (topo_facing, quantized_dot_product) =
+        compute_topo_facing_and_quantized_dot(facing, packed_normal, center, &extents);
 
     QuadInfo {
         positions: record.positions,
         center,
         facing,
+        topo_facing,
         packed_normal,
         extents,
         accurate_dot_product,
-        quantized_dot_product: accurate_dot_product,
+        quantized_dot_product,
     }
 }
 
@@ -322,6 +327,66 @@ fn compute_extent_center(extents: &[f32; 6]) -> (f32, f32, f32) {
         (extents[1] + extents[4]) * 0.5,
         (extents[2] + extents[5]) * 0.5,
     )
+}
+
+fn compute_topo_facing_and_quantized_dot(
+    facing: i32,
+    packed_normal: i32,
+    center: (f32, f32, f32),
+    extents: &[f32; 6],
+) -> (i32, f32) {
+    if is_aligned(facing) {
+        return (
+            facing,
+            extents[facing as usize] * facing_sign(facing) as f32,
+        );
+    }
+
+    let quantized_normal = quantize_normal(unpack_normal(packed_normal));
+    let topo_facing = aligned_facing_from_normal(quantized_normal).unwrap_or(FACING_UNASSIGNED);
+    let quantized_dot_product = if is_aligned(topo_facing) {
+        extents[topo_facing as usize] * facing_sign(topo_facing) as f32
+    } else {
+        dot(quantized_normal, center.0, center.1, center.2)
+    };
+
+    (topo_facing, quantized_dot_product)
+}
+
+fn quantize_normal(normal: (f32, f32, f32)) -> (f32, f32, f32) {
+    let inf_norm = normal.0.abs().max(normal.1.abs()).max(normal.2.abs());
+    let mut x = normal.0;
+    let mut y = normal.1;
+    let mut z = normal.2;
+    if inf_norm != 0.0 && inf_norm != 1.0 {
+        x /= inf_norm;
+        y /= inf_norm;
+        z /= inf_norm;
+    }
+
+    normalize3(
+        (x * 4.0) as i32 as f32,
+        (y * 4.0) as i32 as f32,
+        (z * 4.0) as i32 as f32,
+    )
+}
+
+fn aligned_facing_from_normal(normal: (f32, f32, f32)) -> Option<i32> {
+    for facing in 0..FACING_DIRECTIONS {
+        let aligned = accurate_aligned_normal(facing as i32);
+        if float_equal(normal.0, aligned.0)
+            && float_equal(normal.1, aligned.1)
+            && float_equal(normal.2, aligned.2)
+        {
+            return Some(facing as i32);
+        }
+    }
+
+    None
+}
+
+fn float_equal(a: f32, b: f32) -> bool {
+    (a - b).abs() < VERTEX_EPSILON
 }
 
 fn shrink_extents(extents: &mut [f32; 6], facing: i32) {
@@ -603,8 +668,11 @@ fn static_topo_sort(
 fn create_section_geometry(
     records: &[TranslucentQuadRecord],
 ) -> Result<NativeTranslucentSectionGeometry, i32> {
+    let quads = sorted_quads_by_facing(records)?;
+    let aligned_separator_distances = build_aligned_separator_distances(&quads);
     Ok(NativeTranslucentSectionGeometry {
-        quads: sorted_quads_by_facing(records)?,
+        quads,
+        aligned_separator_distances,
     })
 }
 
@@ -628,6 +696,385 @@ fn write_distance_sorted_index_buffer(
         .collect();
 
     index::write_key_sorted_quad_index_buffer(output, &keys)
+}
+
+fn build_aligned_separator_distances(quads: &[QuadInfo]) -> [Vec<f32>; FACING_DIRECTIONS] {
+    let mut distances: [Vec<f32>; FACING_DIRECTIONS] = std::array::from_fn(|_| Vec::new());
+
+    for quad in quads {
+        if is_aligned(quad.topo_facing) {
+            distances[quad.topo_facing as usize].push(quad.quantized_dot_product);
+        }
+    }
+
+    for distances_for_normal in &mut distances {
+        distances_for_normal.sort_by(f32::total_cmp);
+        distances_for_normal.dedup_by(|a, b| a.to_bits() == b.to_bits());
+    }
+
+    distances
+}
+
+struct DynamicSortState {
+    gfni_trigger: bool,
+    direct_trigger: bool,
+    consecutive_topo_sort_failures: i32,
+}
+
+fn write_dynamic_sort_index_buffer(
+    geometry: &NativeTranslucentSectionGeometry,
+    output: &mut [i32],
+    camera_x: f32,
+    camera_y: f32,
+    camera_z: f32,
+    initial: bool,
+    is_direct_trigger: bool,
+    mut state: DynamicSortState,
+) -> Result<DynamicSortState, i32> {
+    if state.gfni_trigger && !is_direct_trigger {
+        let topo_start = if initial {
+            None
+        } else {
+            Some(std::time::Instant::now())
+        };
+        let topo_result = dynamic_topo_graph_sort(geometry, (camera_x, camera_y, camera_z), false);
+        let sort_time_ns = topo_start
+            .map(|start| start.elapsed().as_nanos().min(i32::MAX as u128) as i32)
+            .unwrap_or(0);
+
+        match topo_result {
+            Some(order)
+                if !topo_sort_timed_out(
+                    initial,
+                    sort_time_ns,
+                    state.consecutive_topo_sort_failures,
+                ) =>
+            {
+                let status = index::write_sorted_quad_index_buffer(output, &order);
+                if status != OK {
+                    return Err(status);
+                }
+                state.direct_trigger = false;
+                state.consecutive_topo_sort_failures = 0;
+            }
+            Some(_) => {
+                state.direct_trigger = true;
+                state.gfni_trigger = false;
+            }
+            None => {
+                state.consecutive_topo_sort_failures += 1;
+                state.direct_trigger = true;
+                if state.consecutive_topo_sort_failures >= topo_attempts_for_time(sort_time_ns) {
+                    state.gfni_trigger = false;
+                }
+            }
+        }
+    }
+
+    if state.direct_trigger {
+        let status =
+            write_distance_sorted_index_buffer(geometry, output, camera_x, camera_y, camera_z);
+        if status != OK {
+            return Err(status);
+        }
+    }
+
+    Ok(state)
+}
+
+fn topo_sort_timed_out(initial: bool, sort_time_ns: i32, consecutive_failures: i32) -> bool {
+    if initial {
+        return false;
+    }
+
+    let limit = if consecutive_failures > 0 {
+        750_000
+    } else {
+        1_000_000
+    };
+    sort_time_ns > limit
+}
+
+fn topo_attempts_for_time(ns: i32) -> i32 {
+    if ns <= 250_000 {
+        5
+    } else {
+        2
+    }
+}
+
+fn dynamic_topo_graph_sort(
+    geometry: &NativeTranslucentSectionGeometry,
+    camera: (f32, f32, f32),
+    fail_on_intersection: bool,
+) -> Option<Vec<i32>> {
+    let mut order = Vec::with_capacity(geometry.quads.len());
+    let mut active_to_real_index = Vec::with_capacity(geometry.quads.len());
+    let mut active_quads = Vec::with_capacity(geometry.quads.len());
+
+    for (index, quad) in geometry.quads.iter().enumerate() {
+        if point_outside_half_space(
+            quad.accurate_dot_product,
+            dynamic_accurate_normal(quad),
+            camera.0,
+            camera.1,
+            camera.2,
+        ) {
+            active_to_real_index.push(index as i32);
+            active_quads.push(quad);
+        } else {
+            order.push(index as i32);
+        }
+    }
+
+    dynamic_topo_graph_sort_active(
+        &mut order,
+        &active_quads,
+        Some(&active_to_real_index),
+        Some(geometry),
+        Some(camera),
+        fail_on_intersection,
+    )
+}
+
+fn dynamic_topo_graph_sort_active(
+    output: &mut Vec<i32>,
+    quads: &[&QuadInfo],
+    active_to_real_index: Option<&[i32]>,
+    geometry: Option<&NativeTranslucentSectionGeometry>,
+    camera: Option<(f32, f32, f32)>,
+    fail_on_intersection: bool,
+) -> Option<Vec<i32>> {
+    let quad_count = quads.len();
+
+    if quad_count == 0 {
+        return Some(std::mem::take(output));
+    }
+    if quad_count == 1 {
+        output.push(active_to_real_index.map_or(0, |indexes| indexes[0]));
+        return Some(std::mem::take(output));
+    }
+    if quad_count == 2 {
+        let mut a = 0usize;
+        let mut b = 1usize;
+        if dynamic_quad_visible_through(quads[a], quads[b], None, None, fail_on_intersection) {
+            if fail_on_intersection
+                && dynamic_quad_visible_through(quads[b], quads[a], None, None, true)
+            {
+                return None;
+            }
+
+            a = 1;
+            b = 0;
+        }
+        output.push(active_to_real_index.map_or(a as i32, |indexes| indexes[a]));
+        output.push(active_to_real_index.map_or(b as i32, |indexes| indexes[b]));
+        return Some(std::mem::take(output));
+    }
+
+    let mut unvisited = vec![true; quad_count];
+    let mut visited_count = 0usize;
+    let mut on_stack = vec![false; quad_count];
+    let mut stack = vec![0usize; quad_count];
+    let mut next_edge = vec![0usize; quad_count];
+
+    while visited_count < quad_count {
+        let mut stack_pos = 0usize;
+        let root = next_set_bit(&unvisited, 0)?;
+        stack[stack_pos] = root;
+        on_stack[root] = true;
+        next_edge[stack_pos] = 0;
+
+        loop {
+            let current_quad_index = stack[stack_pos];
+            let mut next_edge_test = next_set_bit(&unvisited, next_edge[stack_pos]);
+            if let Some(mut next_index) = next_edge_test {
+                if current_quad_index != next_index
+                    && dynamic_quad_visible_through(
+                        quads[current_quad_index],
+                        quads[next_index],
+                        geometry,
+                        camera,
+                        fail_on_intersection,
+                    )
+                {
+                    if on_stack[next_index] {
+                        return None;
+                    }
+
+                    next_edge[stack_pos] = next_index + 1;
+                    stack_pos += 1;
+                    stack[stack_pos] = next_index;
+                    on_stack[next_index] = true;
+                    next_edge[stack_pos] = 0;
+                    continue;
+                }
+
+                next_index += 1;
+                if next_index < quad_count {
+                    next_edge[stack_pos] = next_index;
+                    continue;
+                }
+                next_edge_test = None;
+            }
+
+            if next_edge_test.is_none() {
+                on_stack[current_quad_index] = false;
+                visited_count += 1;
+                unvisited[current_quad_index] = false;
+                output.push(
+                    active_to_real_index.map_or(current_quad_index as i32, |indexes| {
+                        indexes[current_quad_index]
+                    }),
+                );
+
+                if stack_pos == 0 {
+                    break;
+                }
+                stack_pos -= 1;
+            }
+        }
+    }
+
+    Some(std::mem::take(output))
+}
+
+fn dynamic_quad_visible_through(
+    quad: &QuadInfo,
+    other: &QuadInfo,
+    geometry: Option<&NativeTranslucentSectionGeometry>,
+    camera: Option<(f32, f32, f32)>,
+    intersections_visible: bool,
+) -> bool {
+    let result = if is_aligned(quad.topo_facing) && is_aligned(other.topo_facing) {
+        if opposite_facing(quad.topo_facing) == other.topo_facing {
+            false
+        } else if quad.topo_facing == other.topo_facing {
+            let sign = facing_sign(quad.topo_facing) as f32;
+            let direction = quad.topo_facing as usize;
+            sign * quad.extents[direction] > sign * other.extents[direction]
+        } else {
+            dynamic_orthogonal_quad_visible_through(quad, other, intersections_visible)
+        }
+    } else {
+        let quad_normal = dynamic_accurate_normal(quad);
+        let mut other_inside_quad = false;
+        for vertex in 0..4 {
+            let base = vertex * 3;
+            if point_inside_half_space_epsilon(
+                quad.accurate_dot_product,
+                quad_normal,
+                other.positions[base],
+                other.positions[base + 1],
+                other.positions[base + 2],
+            ) {
+                other_inside_quad = true;
+                break;
+            }
+        }
+
+        if !other_inside_quad {
+            false
+        } else {
+            let other_normal = dynamic_accurate_normal(other);
+            let mut quad_not_fully_inside_other = false;
+            for vertex in 0..4 {
+                let base = vertex * 3;
+                if point_outside_half_space_epsilon(
+                    other.accurate_dot_product,
+                    other_normal,
+                    quad.positions[base],
+                    quad.positions[base + 1],
+                    quad.positions[base + 2],
+                ) {
+                    quad_not_fully_inside_other = true;
+                    break;
+                }
+            }
+            quad_not_fully_inside_other
+        }
+    };
+
+    if result {
+        if let (Some(geometry), Some(camera)) = (geometry, camera) {
+            return dynamic_visibility_with_separator(quad, other, geometry, camera);
+        }
+    }
+
+    result
+}
+
+fn dynamic_orthogonal_quad_visible_through(
+    quad: &QuadInfo,
+    other: &QuadInfo,
+    intersections_visible: bool,
+) -> bool {
+    let a_direction = quad.topo_facing as usize;
+    let a_opposite = opposite_facing(quad.topo_facing) as usize;
+    let b_direction = other.topo_facing as usize;
+    let a_sign = facing_sign(quad.topo_facing) as f32;
+    let b_sign = facing_sign(other.topo_facing) as f32;
+
+    let b_into_a_descent = a_sign * quad.extents[a_direction] - a_sign * other.extents[a_opposite];
+    let a_outside_b_ascent =
+        b_sign * quad.extents[b_direction] - b_sign * other.extents[b_direction];
+    let visible = b_into_a_descent > 0.0 && a_outside_b_ascent > 0.0;
+
+    if visible && extents_intersect(&quad.extents, &other.extents) {
+        if intersections_visible {
+            return true;
+        }
+        return b_into_a_descent + a_outside_b_ascent > 1.0;
+    }
+
+    visible
+}
+
+fn dynamic_visibility_with_separator(
+    quad: &QuadInfo,
+    other: &QuadInfo,
+    geometry: &NativeTranslucentSectionGeometry,
+    camera: (f32, f32, f32),
+) -> bool {
+    for direction in 0..FACING_DIRECTIONS {
+        let opposite_direction = opposite_facing(direction as i32) as usize;
+        let sign = facing_sign(direction as i32) as f32;
+        let mut separator_range_start = sign * other.extents[direction];
+        let separator_range_end = sign * quad.extents[opposite_direction];
+        if separator_range_start > separator_range_end {
+            continue;
+        }
+
+        let normal = accurate_aligned_normal(direction as i32);
+        let camera_distance = dot(normal, camera.0, camera.1, camera.2);
+        if camera_distance > separator_range_end {
+            continue;
+        }
+
+        separator_range_start = camera_distance;
+        if query_range(
+            &geometry.aligned_separator_distances[direction],
+            separator_range_start,
+            separator_range_end,
+        ) {
+            return false;
+        }
+    }
+
+    true
+}
+
+fn query_range(sorted_distances: &[f32], start: f32, end: f32) -> bool {
+    if sorted_distances.is_empty() {
+        return false;
+    }
+
+    match sorted_distances.binary_search_by(|distance| distance.total_cmp(&start)) {
+        Ok(_) => true,
+        Err(insertion_point) => {
+            insertion_point < sorted_distances.len() && sorted_distances[insertion_point] <= end
+        }
+    }
 }
 
 fn topo_graph_sort(quads: &[QuadInfo], fail_on_intersection: bool) -> Option<Vec<i32>> {
@@ -815,15 +1262,37 @@ fn orthogonal_quad_visible_through(
 
 fn accurate_normal(quad: &QuadInfo) -> (f32, f32, f32) {
     if is_aligned(quad.facing) {
-        let normal = ALIGNED_NORMALS[quad.facing as usize];
-        (
-            normal.0 as f32 / NORMAL_COMPONENT_RANGE,
-            normal.1 as f32 / NORMAL_COMPONENT_RANGE,
-            normal.2 as f32 / NORMAL_COMPONENT_RANGE,
-        )
+        accurate_aligned_normal(quad.facing)
     } else {
         unpack_normal(quad.packed_normal)
     }
+}
+
+fn dynamic_accurate_normal(quad: &QuadInfo) -> (f32, f32, f32) {
+    if is_aligned(quad.topo_facing) {
+        accurate_aligned_normal(quad.topo_facing)
+    } else {
+        unpack_normal(quad.packed_normal)
+    }
+}
+
+fn accurate_aligned_normal(facing: i32) -> (f32, f32, f32) {
+    let normal = ALIGNED_NORMALS[facing as usize];
+    (
+        normal.0 as f32 / NORMAL_COMPONENT_RANGE,
+        normal.1 as f32 / NORMAL_COMPONENT_RANGE,
+        normal.2 as f32 / NORMAL_COMPONENT_RANGE,
+    )
+}
+
+fn point_outside_half_space(
+    plane_distance: f32,
+    plane_normal: (f32, f32, f32),
+    x: f32,
+    y: f32,
+    z: f32,
+) -> bool {
+    dot(plane_normal, x, y, z) > plane_distance
 }
 
 fn point_inside_half_space_epsilon(
@@ -848,6 +1317,16 @@ fn point_outside_half_space_epsilon(
 
 fn dot(normal: (f32, f32, f32), x: f32, y: f32, z: f32) -> f32 {
     normal.0 * x + normal.1 * y + normal.2 * z
+}
+
+fn normalize3(x: f32, y: f32, z: f32) -> (f32, f32, f32) {
+    let value = x * x + y * y + z * z;
+    let coefficient = if value == 0.0 {
+        1.0
+    } else {
+        1.0 / value.sqrt()
+    };
+    (x * coefficient, y * coefficient, z * coefficient)
 }
 
 fn extents_intersect(a: &[f32; 6], b: &[f32; 6]) -> bool {
@@ -1037,6 +1516,63 @@ pub unsafe extern "C" fn mattmc_sodium_translucent_section_geometry_distance_sor
         output_capacity as usize / std::mem::size_of::<i32>(),
     );
     write_distance_sorted_index_buffer(geometry, output, camera_x, camera_y, camera_z)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_section_geometry_dynamic_sort_write(
+    handle: u64,
+    output_address: u64,
+    output_capacity: i32,
+    camera_x: f32,
+    camera_y: f32,
+    camera_z: f32,
+    initial: i32,
+    is_direct_trigger: i32,
+    gfni_trigger: i32,
+    direct_trigger: i32,
+    consecutive_topo_sort_failures: i32,
+    output_state: *mut i32,
+    output_state_len: i32,
+) -> i32 {
+    if output_capacity < 0 || output_capacity % std::mem::size_of::<i32>() as i32 != 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if output_state_len < 3 || consecutive_topo_sort_failures < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if handle == 0 || output_address == 0 || output_state.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let geometry = &*(handle as *const NativeTranslucentSectionGeometry);
+    let output = slice::from_raw_parts_mut(
+        output_address as *mut i32,
+        output_capacity as usize / std::mem::size_of::<i32>(),
+    );
+    let state = DynamicSortState {
+        gfni_trigger: gfni_trigger != 0,
+        direct_trigger: direct_trigger != 0,
+        consecutive_topo_sort_failures,
+    };
+    let state = match write_dynamic_sort_index_buffer(
+        geometry,
+        output,
+        camera_x,
+        camera_y,
+        camera_z,
+        initial != 0,
+        is_direct_trigger != 0,
+        state,
+    ) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+
+    let output_state = slice::from_raw_parts_mut(output_state, output_state_len as usize);
+    output_state[0] = if state.gfni_trigger { 1 } else { 0 };
+    output_state[1] = if state.direct_trigger { 1 } else { 0 };
+    output_state[2] = state.consecutive_topo_sort_failures;
+    OK
 }
 
 #[cfg(test)]

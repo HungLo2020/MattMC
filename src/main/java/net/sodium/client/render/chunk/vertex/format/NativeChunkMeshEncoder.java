@@ -14,6 +14,23 @@ import java.nio.IntBuffer;
 
 public final class NativeChunkMeshEncoder {
     public static final int NATIVE_QUAD_STRIDE = 152;
+    private static final int LOGICAL_VERTEX_STRIDE = 32;
+    private static final int OFFSET_X = 0;
+    private static final int OFFSET_Y = 4;
+    private static final int OFFSET_Z = 8;
+    private static final int OFFSET_COLOR = 12;
+    private static final int OFFSET_AO = 16;
+    private static final int OFFSET_U = 20;
+    private static final int OFFSET_V = 24;
+    private static final int OFFSET_LIGHT = 28;
+    private static final int OFFSET_BLOCK_EMISSION = LOGICAL_VERTEX_STRIDE * 4;
+    private static final int OFFSET_RENDER_TYPE = OFFSET_BLOCK_EMISSION + 1;
+    private static final int OFFSET_IGNORE_MID_BLOCK = OFFSET_BLOCK_EMISSION + 2;
+    private static final int OFFSET_BLOCK_ID = OFFSET_BLOCK_EMISSION + 4;
+    private static final int OFFSET_LOCAL_X = OFFSET_BLOCK_ID + 4;
+    private static final int OFFSET_LOCAL_Y = OFFSET_LOCAL_X + 4;
+    private static final int OFFSET_LOCAL_Z = OFFSET_LOCAL_Y + 4;
+    private static final int OFFSET_MATERIAL_BITS = OFFSET_LOCAL_Z + 4;
 
     private static final int OK = 0;
     private static final int INDEX_MODE_NONE = 0;
@@ -27,6 +44,23 @@ public final class NativeChunkMeshEncoder {
             "mattmc_sodium_chunk_mesh_encode",
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT));
+    private static final MethodHandle SCATTERED_ENCODE = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_chunk_mesh_scattered_encode",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.ADDRESS,
                     ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_LONG,
                     ValueLayout.JAVA_INT,
@@ -126,6 +160,80 @@ public final class NativeChunkMeshEncoder {
                 sectionIndex,
                 separateAo ? 1 : 0
         ), "native chunk vertex encoding");
+    }
+
+    public static void encodeScattered(
+            long inputAddress,
+            int[] outputVertexOffsets,
+            int updateCount,
+            ByteBuffer output,
+            NativeChunkVertexFormat format,
+            int sectionIndex,
+            boolean separateAo
+    ) {
+        if (updateCount < 0 || updateCount > outputVertexOffsets.length) {
+            throw new IllegalArgumentException("Invalid scattered encode update count: " + updateCount);
+        }
+        if (updateCount == 0) {
+            return;
+        }
+
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment outputVertexOffsetsSegment = arena.allocate(ValueLayout.JAVA_INT, updateCount);
+
+            for (int index = 0; index < updateCount; index++) {
+                outputVertexOffsetsSegment.setAtIndex(ValueLayout.JAVA_INT, index, outputVertexOffsets[index]);
+            }
+
+            check(invokeScatteredEncode(
+                    inputAddress,
+                    outputVertexOffsetsSegment,
+                    updateCount,
+                    MemoryUtil.memAddress(output),
+                    output.remaining(),
+                    NATIVE_QUAD_STRIDE,
+                    format.stride(),
+                    format.blockIdOffset(),
+                    format.normalOffset(),
+                    format.tangentOffset(),
+                    format.midUvOffset(),
+                    format.midBlockOffset(),
+                    sectionIndex,
+                    separateAo ? 1 : 0
+            ), "native scattered chunk vertex encoding");
+        }
+    }
+
+    public static void writeNativeQuad(long ptr, ChunkVertexEncoder.Vertex[] vertices, int materialBits) {
+        long vertexPtr = ptr;
+
+        for (ChunkVertexEncoder.Vertex vertex : vertices) {
+            writeNativeQuadVertex(vertexPtr, vertex);
+            vertexPtr += LOGICAL_VERTEX_STRIDE;
+        }
+
+        var extension = (net.irisshaders.iris.vertices.sodium.terrain.ChunkVertexExtension) vertices[0];
+
+        MemoryUtil.memPutByte(ptr + OFFSET_BLOCK_EMISSION, extension.getBlockEmission());
+        MemoryUtil.memPutByte(ptr + OFFSET_RENDER_TYPE, extension.getRenderType());
+        MemoryUtil.memPutByte(ptr + OFFSET_IGNORE_MID_BLOCK, (byte) (extension.ignoreMidBlock() ? 1 : 0));
+        MemoryUtil.memPutByte(ptr + OFFSET_BLOCK_EMISSION + 3, (byte) 0);
+        MemoryUtil.memPutInt(ptr + OFFSET_BLOCK_ID, extension.getBlockId());
+        MemoryUtil.memPutInt(ptr + OFFSET_LOCAL_X, extension.getLocalPosX());
+        MemoryUtil.memPutInt(ptr + OFFSET_LOCAL_Y, extension.getLocalPosY());
+        MemoryUtil.memPutInt(ptr + OFFSET_LOCAL_Z, extension.getLocalPosZ());
+        MemoryUtil.memPutInt(ptr + OFFSET_MATERIAL_BITS, materialBits);
+    }
+
+    private static void writeNativeQuadVertex(long ptr, ChunkVertexEncoder.Vertex vertex) {
+        MemoryUtil.memPutFloat(ptr + OFFSET_X, vertex.x);
+        MemoryUtil.memPutFloat(ptr + OFFSET_Y, vertex.y);
+        MemoryUtil.memPutFloat(ptr + OFFSET_Z, vertex.z);
+        MemoryUtil.memPutInt(ptr + OFFSET_COLOR, vertex.color);
+        MemoryUtil.memPutFloat(ptr + OFFSET_AO, vertex.ao);
+        MemoryUtil.memPutFloat(ptr + OFFSET_U, vertex.u);
+        MemoryUtil.memPutFloat(ptr + OFFSET_V, vertex.v);
+        MemoryUtil.memPutInt(ptr + OFFSET_LIGHT, vertex.light);
     }
 
     public static void assemble(
@@ -339,6 +447,31 @@ public final class NativeChunkMeshEncoder {
                     blockIdOffset, normalOffset, tangentOffset, midUvOffset, midBlockOffset, sectionIndex, separateAo);
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust chunk vertex encoding downcall failed", throwable);
+        }
+    }
+
+    private static int invokeScatteredEncode(
+            long inputAddress,
+            MemorySegment outputVertexOffsets,
+            int updateCount,
+            long outputAddress,
+            int outputCapacity,
+            int quadStride,
+            int vertexStride,
+            int blockIdOffset,
+            int normalOffset,
+            int tangentOffset,
+            int midUvOffset,
+            int midBlockOffset,
+            int sectionIndex,
+            int separateAo
+    ) {
+        try {
+            return (int) SCATTERED_ENCODE.invokeExact(inputAddress, outputVertexOffsets, updateCount, outputAddress,
+                    outputCapacity, quadStride, vertexStride, blockIdOffset, normalOffset, tangentOffset, midUvOffset,
+                    midBlockOffset, sectionIndex, separateAo);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust scattered chunk vertex encoding downcall failed", throwable);
         }
     }
 

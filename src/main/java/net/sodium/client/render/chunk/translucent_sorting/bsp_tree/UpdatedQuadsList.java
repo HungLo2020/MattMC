@@ -1,8 +1,12 @@
 package net.sodium.client.render.chunk.translucent_sorting.bsp_tree;
 
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
+import net.sodium.client.render.chunk.terrain.material.DefaultMaterials;
+import net.sodium.client.render.chunk.translucent_sorting.data.TranslucentData;
 import net.sodium.client.render.chunk.translucent_sorting.quad.FullTQuad;
 import net.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
+import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
+import net.sodium.client.render.chunk.vertex.format.NativeChunkQuadBuffer;
 
 import java.nio.ByteBuffer;
 
@@ -24,8 +28,32 @@ public class UpdatedQuadsList extends ReferenceArrayList<FullTQuad> {
     }
 
     public void applyBufferUpdates(ChunkMeshBufferBuilder builder, ByteBuffer buffer) {
-        for (var quad : this) {
-            quad.writeToBuffer(builder, buffer);
+        if (this.isEmpty()) {
+            return;
         }
+
+        try (NativeChunkQuadBuffer updateBuffer = NativeChunkQuadBuffer.create(this.size())) {
+            int[] outputVertexOffsets = new int[this.size()];
+            int updateCount = 0;
+
+            for (var quad : this) {
+                int writeToIndex = quad.getWriteToIndex();
+                if (writeToIndex < 0) {
+                    continue;
+                }
+
+                NativeChunkMeshEncoder.writeNativeQuad(updateBuffer.addressAt(updateCount), quad.getVertices(),
+                        DefaultMaterials.TRANSLUCENT.bits());
+                outputVertexOffsets[updateCount] = TranslucentData.quadCountToVertexCount(writeToIndex);
+                updateCount++;
+            }
+
+            NativeChunkMeshEncoder.encodeScattered(updateBuffer.address(), outputVertexOffsets, updateCount, buffer,
+                    builder.nativeFormat(), builder.sectionIndex(), usesSeparateAo());
+        }
+    }
+
+    private static boolean usesSeparateAo() {
+        return net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldUseSeparateAo();
     }
 }

@@ -108,6 +108,68 @@ class NativeTranslucentGeometryAnalyzerTest {
         }
     }
 
+    @Test
+    void dynamicDirectTriggerWritesDistanceSortNatively() {
+        NativeTranslucentGeometryAnalyzer analyzer = new NativeTranslucentGeometryAnalyzer();
+        ByteBuffer indexBuffer = MemoryUtil.memAlloc(2 * 6 * Integer.BYTES);
+        NativeTranslucentSectionGeometry geometry = null;
+
+        try {
+            assertFalse(analyzer.appendQuad(zQuad(1.0F), ModelQuadFacing.POS_Z,
+                    ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
+            assertFalse(analyzer.appendQuad(zQuad(4.0F), ModelQuadFacing.POS_Z,
+                    ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
+
+            geometry = analyzer.createSectionGeometry();
+            NativeTranslucentSectionGeometry.DynamicSortResult result = geometry.writeDynamicSortedIndexBuffer(
+                    MemoryUtil.memAddress(indexBuffer), indexBuffer.capacity(), new Vector3f(0.0F, 0.0F, 0.0F),
+                    false, true, false, true, 1);
+
+            assertFalse(result.gfniTrigger());
+            assertTrue(result.directTrigger());
+            assertEquals(1, result.consecutiveTopoSortFailures());
+            assertArrayEquals(new int[] {4, 5, 6, 6, 7, 4, 0, 1, 2, 2, 3, 0},
+                    readInts(indexBuffer, 12));
+        } finally {
+            if (geometry != null) {
+                geometry.close();
+            }
+            analyzer.destroy();
+            MemoryUtil.memFree(indexBuffer);
+        }
+    }
+
+    @Test
+    void dynamicTopoSuccessKeepsGfniTriggeringNatively() {
+        NativeTranslucentGeometryAnalyzer analyzer = new NativeTranslucentGeometryAnalyzer();
+        ByteBuffer indexBuffer = MemoryUtil.memAlloc(2 * 6 * Integer.BYTES);
+        NativeTranslucentSectionGeometry geometry = null;
+
+        try {
+            assertFalse(analyzer.appendQuad(zQuad(1.0F), ModelQuadFacing.POS_Z,
+                    ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
+            assertFalse(analyzer.appendQuad(zQuad(4.0F), ModelQuadFacing.POS_Z,
+                    ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
+
+            geometry = analyzer.createSectionGeometry();
+            NativeTranslucentSectionGeometry.DynamicSortResult result = geometry.writeDynamicSortedIndexBuffer(
+                    MemoryUtil.memAddress(indexBuffer), indexBuffer.capacity(), new Vector3f(0.0F, 0.0F, 8.0F),
+                    true, false, true, false, 2);
+
+            assertTrue(result.gfniTrigger());
+            assertFalse(result.directTrigger());
+            assertEquals(0, result.consecutiveTopoSortFailures());
+            assertArrayEquals(new int[] {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4},
+                    readInts(indexBuffer, 12));
+        } finally {
+            if (geometry != null) {
+                geometry.close();
+            }
+            analyzer.destroy();
+            MemoryUtil.memFree(indexBuffer);
+        }
+    }
+
     private static ChunkVertexEncoder.Vertex[] zQuad(float z) {
         ChunkVertexEncoder.Vertex[] vertices = ChunkVertexEncoder.Vertex.uninitializedQuad();
         writeVertex(vertices[0], 0.0F, 0.0F, z);

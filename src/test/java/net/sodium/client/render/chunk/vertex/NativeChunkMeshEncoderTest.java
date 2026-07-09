@@ -3,6 +3,8 @@ package net.sodium.client.render.chunk.vertex;
 import net.irisshaders.iris.vertices.sodium.terrain.FormatAnalyzer;
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.sodium.client.render.chunk.terrain.material.DefaultMaterials;
+import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.UpdatedQuadsList;
+import net.sodium.client.render.chunk.translucent_sorting.quad.FullTQuad;
 import net.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
 import net.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
@@ -124,18 +126,32 @@ class NativeChunkMeshEncoderTest {
     }
 
     @Test
-    void writeExternalUsesNativeEncoderAtRequestedVertexOffset() {
+    void modifiedTranslucentUpdatesUseBatchedScatteredNativeEncoding() {
         ChunkMeshBufferBuilder builder = new ChunkMeshBufferBuilder(ChunkMeshFormats.COMPACT, 16);
         ByteBuffer output = null;
 
         try {
             builder.start(12);
-            output = nativeOrder(MemoryUtil.memCalloc(8 * ChunkMeshFormats.COMPACT.getNativeFormat().stride()));
+            output = nativeOrder(MemoryUtil.memCalloc(16 * ChunkMeshFormats.COMPACT.getNativeFormat().stride()));
 
-            builder.writeExternal(output, 4, quad(3.0F, 13), DefaultMaterials.SOLID);
+            UpdatedQuadsList updates = new UpdatedQuadsList();
+            FullTQuad skipped = FullTQuad.fromVertices(quad(1.0F, 99), ModelQuadFacing.UNASSIGNED, 0);
+            FullTQuad first = FullTQuad.fromVertices(quad(3.0F, 13), ModelQuadFacing.UNASSIGNED, 0);
+            FullTQuad second = FullTQuad.fromVertices(quad(5.0F, 17), ModelQuadFacing.UNASSIGNED, 0);
+
+            skipped.setNoWrite();
+            first.setWriteToIndex(1);
+            second.setWriteToIndex(3);
+
+            updates.add(skipped);
+            updates.add(first);
+            updates.add(second);
+            updates.applyBufferUpdates(builder, output);
 
             assertEquals(0, output.getInt(0));
-            assertCompactVertex(output, 4, 3.0F, DefaultMaterials.SOLID.bits(), 12);
+            assertCompactVertex(output, 4, 3.0F, DefaultMaterials.TRANSLUCENT.bits(), 12);
+            assertEquals(0, output.getInt(8 * ChunkMeshFormats.COMPACT.getNativeFormat().stride()));
+            assertCompactVertex(output, 12, 5.0F, DefaultMaterials.TRANSLUCENT.bits(), 12);
         } finally {
             free(output);
             builder.destroy();

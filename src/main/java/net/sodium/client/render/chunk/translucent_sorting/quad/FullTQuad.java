@@ -1,14 +1,9 @@
 package net.sodium.client.render.chunk.translucent_sorting.quad;
 
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
-import net.sodium.client.render.chunk.terrain.material.DefaultMaterials;
-import net.sodium.client.render.chunk.translucent_sorting.data.TranslucentData;
-import net.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
-
-import java.nio.ByteBuffer;
 
 public class FullTQuad extends RegularTQuad {
     private final ChunkVertexEncoder.Vertex[] vertices = ChunkVertexEncoder.Vertex.uninitializedQuad();
@@ -102,10 +97,8 @@ public class FullTQuad extends RegularTQuad {
         this.writeToIndex = NO_WRITE;
     }
 
-    public void writeToBuffer(ChunkMeshBufferBuilder bufferBuilder, ByteBuffer buffer) {
-        if (this.writeToIndex != NO_WRITE) {
-            bufferBuilder.writeExternal(buffer, TranslucentData.quadCountToVertexCount(this.writeToIndex), this.vertices, DefaultMaterials.TRANSLUCENT);
-        }
+    public int getWriteToIndex() {
+        return this.writeToIndex;
     }
 
     @Override

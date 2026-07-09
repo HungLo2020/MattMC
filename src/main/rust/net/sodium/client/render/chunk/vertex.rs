@@ -19,7 +19,7 @@ const INDEX_MODE_SORTED_QUADS: i32 = 2;
 const INDEX_MODE_KEY_SORTED: i32 = 3;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 struct QuadVertex {
     x: f32,
     y: f32,
@@ -32,7 +32,7 @@ struct QuadVertex {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 struct NativeQuad {
     vertices: [QuadVertex; 4],
     block_emission: u8,
@@ -44,6 +44,10 @@ struct NativeQuad {
     local_y: i32,
     local_z: i32,
     material_bits: i32,
+}
+
+struct NativeQuadBuffer {
+    quads: Vec<NativeQuad>,
 }
 
 #[derive(Clone, Copy)]
@@ -160,6 +164,67 @@ unsafe fn encode(
         let start = quad_index * 4 * format.vertex_stride;
         let end = start + 4 * format.vertex_stride;
         encode_quad(quad, &mut output[start..end], format);
+    }
+
+    OK
+}
+
+unsafe fn encode_scattered(
+    input_address: u64,
+    output_vertex_offsets: *const i32,
+    update_count: i32,
+    output_address: u64,
+    output_capacity: i32,
+    format: NativeFormat,
+) -> i32 {
+    if update_count < 0 || output_capacity < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if update_count == 0 {
+        return OK;
+    }
+    if input_address == 0 || output_vertex_offsets.is_null() || output_address == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let update_count = match usize::try_from(update_count) {
+        Ok(value) => value,
+        Err(_) => return ERR_INVALID_ARGUMENT,
+    };
+    let output_capacity = match usize::try_from(output_capacity) {
+        Ok(value) => value,
+        Err(_) => return ERR_INVALID_ARGUMENT,
+    };
+    let output = slice::from_raw_parts_mut(output_address as *mut u8, output_capacity);
+    let input = slice::from_raw_parts(input_address as *const NativeQuad, update_count);
+    let output_vertex_offsets = slice::from_raw_parts(output_vertex_offsets, update_count);
+    let quad_byte_len = match 4usize.checked_mul(format.vertex_stride) {
+        Some(value) => value,
+        None => return ERR_INVALID_ARGUMENT,
+    };
+
+    for (quad, vertex_offset) in input.iter().zip(output_vertex_offsets.iter()) {
+        let vertex_offset = match usize::try_from(*vertex_offset) {
+            Ok(value) => value,
+            Err(_) => return ERR_INVALID_ARGUMENT,
+        };
+        if vertex_offset % 4 != 0 {
+            return ERR_INVALID_ARGUMENT;
+        }
+
+        let byte_offset = match vertex_offset.checked_mul(format.vertex_stride) {
+            Some(value) => value,
+            None => return ERR_INVALID_ARGUMENT,
+        };
+        let byte_end = match byte_offset.checked_add(quad_byte_len) {
+            Some(value) => value,
+            None => return ERR_INVALID_ARGUMENT,
+        };
+        let Some(output_slice) = output.get_mut(byte_offset..byte_end) else {
+            return ERR_CAPACITY;
+        };
+
+        encode_quad(quad, output_slice, format);
     }
 
     OK
@@ -825,6 +890,48 @@ pub unsafe extern "C" fn mattmc_sodium_chunk_mesh_encode(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_chunk_mesh_scattered_encode(
+    input_address: u64,
+    output_vertex_offsets: *const i32,
+    update_count: i32,
+    output_address: u64,
+    output_capacity: i32,
+    quad_stride: i32,
+    vertex_stride: i32,
+    block_id_offset: i32,
+    normal_offset: i32,
+    tangent_offset: i32,
+    mid_uv_offset: i32,
+    mid_block_offset: i32,
+    section_index: i32,
+    separate_ao: i32,
+) -> i32 {
+    let format = match NativeFormat::from_abi(
+        quad_stride,
+        vertex_stride,
+        block_id_offset,
+        normal_offset,
+        tangent_offset,
+        mid_uv_offset,
+        mid_block_offset,
+        section_index,
+        separate_ao,
+    ) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+
+    encode_scattered(
+        input_address,
+        output_vertex_offsets,
+        update_count,
+        output_address,
+        output_capacity,
+        format,
+    )
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn mattmc_sodium_chunk_mesh_output_assemble(
     input_addresses: *const u64,
     input_vertex_counts: *const i32,
@@ -886,6 +993,76 @@ pub unsafe extern "C" fn mattmc_sodium_chunk_mesh_output_assemble(
         index_values,
         index_value_count,
     )
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_chunk_quad_buffer_create(
+    capacity: i32,
+    output_handle: *mut u64,
+    output_address: *mut u64,
+) -> i32 {
+    if capacity < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if output_handle.is_null() || output_address.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let capacity = match usize::try_from(capacity) {
+        Ok(value) => value,
+        Err(_) => return ERR_INVALID_ARGUMENT,
+    };
+    let mut buffer = Box::new(NativeQuadBuffer {
+        quads: vec![NativeQuad::default(); capacity],
+    });
+
+    *output_address = if buffer.quads.is_empty() {
+        0
+    } else {
+        buffer.quads.as_mut_ptr() as u64
+    };
+    *output_handle = Box::into_raw(buffer) as u64;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_chunk_quad_buffer_ensure_capacity(
+    handle: u64,
+    capacity: i32,
+    output_address: *mut u64,
+) -> i32 {
+    if capacity < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if handle == 0 || output_address.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let capacity = match usize::try_from(capacity) {
+        Ok(value) => value,
+        Err(_) => return ERR_INVALID_ARGUMENT,
+    };
+    let buffer = &mut *(handle as *mut NativeQuadBuffer);
+    if buffer.quads.len() < capacity {
+        buffer.quads.resize(capacity, NativeQuad::default());
+    }
+
+    *output_address = if buffer.quads.is_empty() {
+        0
+    } else {
+        buffer.quads.as_mut_ptr() as u64
+    };
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_chunk_quad_buffer_destroy(handle: u64) -> i32 {
+    if handle == 0 {
+        return OK;
+    }
+
+    drop(Box::from_raw(handle as *mut NativeQuadBuffer));
+    OK
 }
 
 #[cfg(test)]
@@ -964,5 +1141,76 @@ mod tests {
             pack_light_and_data(0xf0f0, 5, 3).to_ne_bytes(),
             output[16..20]
         );
+    }
+
+    #[test]
+    fn scattered_encoder_writes_requested_quad_slots_only() {
+        let mut first = quad();
+        first.material_bits = 5;
+        let mut second = quad();
+        second.material_bits = 9;
+        second.vertices[0].x = 4.0;
+        let input = [first, second];
+        let offsets = [8, 0];
+        let mut output = vec![0u8; 4 * 3 * 20];
+        let format = NativeFormat {
+            vertex_stride: 20,
+            block_id_offset: 0,
+            normal_offset: 0,
+            tangent_offset: 0,
+            mid_uv_offset: 0,
+            mid_block_offset: 0,
+            section_index: 7,
+            separate_ao: false,
+        };
+
+        unsafe {
+            assert_eq!(
+                OK,
+                encode_scattered(
+                    input.as_ptr() as u64,
+                    offsets.as_ptr(),
+                    input.len() as i32,
+                    output.as_mut_ptr() as u64,
+                    output.len() as i32,
+                    format,
+                )
+            );
+        }
+
+        assert_eq!(
+            pack_light_and_data(0xf0f0, 9, 7).to_ne_bytes(),
+            output[16..20]
+        );
+        assert_eq!([0u8; 20], output[4 * 20..5 * 20]);
+        assert_eq!(
+            pack_light_and_data(0xf0f0, 5, 7).to_ne_bytes(),
+            output[(8 * 20 + 16)..(8 * 20 + 20)]
+        );
+    }
+
+    #[test]
+    fn native_quad_buffer_create_and_grow_returns_writable_memory() {
+        unsafe {
+            let mut handle = 0u64;
+            let mut address = 0u64;
+            assert_eq!(
+                OK,
+                mattmc_sodium_chunk_quad_buffer_create(1, &mut handle, &mut address)
+            );
+            assert_ne!(0, handle);
+            assert_ne!(0, address);
+
+            *(address as *mut NativeQuad) = quad();
+
+            assert_eq!(
+                OK,
+                mattmc_sodium_chunk_quad_buffer_ensure_capacity(handle, 4, &mut address)
+            );
+            assert_ne!(0, address);
+            *(address as *mut NativeQuad).add(3) = quad();
+
+            assert_eq!(OK, mattmc_sodium_chunk_quad_buffer_destroy(handle));
+        }
     }
 }

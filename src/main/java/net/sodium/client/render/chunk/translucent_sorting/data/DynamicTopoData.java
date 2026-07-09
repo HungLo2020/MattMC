@@ -1,16 +1,12 @@
 package net.sodium.client.render.chunk.translucent_sorting.data;
 
-import it.unimi.dsi.fastutil.objects.Object2ReferenceMap;
 import net.sodium.client.render.chunk.translucent_sorting.NativeTranslucentSectionGeometry;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.sodium.client.render.chunk.translucent_sorting.trigger.GeometryPlanes;
 import net.minecraft.core.SectionPos;
 import org.joml.Vector3dc;
-import org.joml.Vector3fc;
 
-import java.nio.IntBuffer;
 import java.util.Objects;
-import java.util.function.IntConsumer;
 
 /**
  * Performs dynamic topo sorting and falls back to distance sorting as
@@ -29,11 +25,6 @@ import java.util.function.IntConsumer;
  */
 public class DynamicTopoData extends DynamicData {
     private static final int MAX_TOPO_SORT_QUADS = 1000;
-    private static final int MAX_TOPO_SORT_TIME_NS = 1_000_000;
-    private static final int MAX_FAILING_TOPO_SORT_TIME_NS = 750_000;
-    private static final int MAX_TOPO_SORT_PATIENT_TIME_NS = 250_000;
-    private static final int PATIENT_TOPO_ATTEMPTS = 5;
-    private static final int REGULAR_TOPO_ATTEMPTS = 2;
 
     private boolean GFNITrigger = true;
     private boolean directTrigger = false;
@@ -42,18 +33,13 @@ public class DynamicTopoData extends DynamicData {
     private double directTriggerKey = -1;
     private boolean pendingTriggerIsDirect;
 
-    private final TQuad[] quads;
     private final NativeTranslucentSectionGeometry nativeGeometry;
-    private final Object2ReferenceMap<Vector3fc, float[]> distancesByNormal;
 
-    private DynamicTopoData(SectionPos sectionPos, TQuad[] quads,
+    private DynamicTopoData(SectionPos sectionPos, int quadCount,
                             GeometryPlanes geometryPlanes, Vector3dc initialCameraPos,
-                            Object2ReferenceMap<Vector3fc, float[]> distancesByNormal,
                             NativeTranslucentSectionGeometry nativeGeometry) {
-        super(sectionPos, quads.length, geometryPlanes, initialCameraPos);
-        this.quads = quads;
+        super(sectionPos, quadCount, geometryPlanes, initialCameraPos);
         this.nativeGeometry = Objects.requireNonNull(nativeGeometry, "nativeGeometry");
-        this.distancesByNormal = distancesByNormal;
 
         if (this.getInputQuadCount() > MAX_TOPO_SORT_QUADS) {
             this.directTrigger = true;
@@ -136,7 +122,7 @@ public class DynamicTopoData extends DynamicData {
         this.pendingTriggerIsDirect = isDirectTrigger;
     }
 
-    public class DynamicTopoSorter extends DynamicSorter implements IntConsumer {
+    public class DynamicTopoSorter extends DynamicSorter {
         private final DynamicTopoData parent;
         private final boolean isDirectTrigger;
         private final int consecutiveTopoSortFailures;
@@ -144,9 +130,6 @@ public class DynamicTopoData extends DynamicData {
         private boolean directTrigger;
         private boolean GFNITrigger;
         private int consecutiveTopoSortFailuresNew;
-
-        private int[] topoQuadOrder;
-        private int topoQuadOrderLength;
 
         private DynamicTopoSorter(int quadCount, DynamicTopoData parent, boolean isDirectTrigger, int consecutiveTopoSortFailures, boolean GFNITrigger, boolean directTrigger) {
             super(quadCount);
@@ -158,10 +141,6 @@ public class DynamicTopoData extends DynamicData {
             this.directTrigger = directTrigger;
         }
 
-        private static int getAttemptsForTime(long ns) {
-            return ns <= MAX_TOPO_SORT_PATIENT_TIME_NS ? PATIENT_TOPO_ATTEMPTS : REGULAR_TOPO_ATTEMPTS;
-        }
-
         private boolean hasSortFailureReset() {
             return this.consecutiveTopoSortFailuresNew < this.consecutiveTopoSortFailures;
         }
@@ -171,58 +150,13 @@ public class DynamicTopoData extends DynamicData {
         }
 
         @Override
-        public void accept(int value) {
-            this.topoQuadOrder[this.topoQuadOrderLength++] = value;
-        }
-
-        @Override
         void writeSort(CombinedCameraPos cameraPos, boolean initial) {
-            // uses a topo sort or a distance sort depending on what is enabled
-            IntBuffer indexBuffer = this.getIntBuffer();
-
-            if (this.GFNITrigger && !this.isDirectTrigger) {
-                this.topoQuadOrder = new int[this.getQuadCount()];
-                this.topoQuadOrderLength = 0;
-                var sortStart = initial ? 0 : System.nanoTime();
-                var result = TopoGraphSorting.topoGraphSort(this, DynamicTopoData.this.quads, DynamicTopoData.this.distancesByNormal, cameraPos.getRelativeCameraPos(), false);
-
-                var sortTime = initial ? 0 : System.nanoTime() - sortStart;
-
-                // if we've already failed, there's reduced patience for sorting since the
-                // probability of failure and wasted compute time is higher. Initial sorting is
-                // often very slow when the cpu is loaded and the JIT isn't ready yet, so it's
-                // ignored here.
-                if (!initial && sortTime > (this.consecutiveTopoSortFailuresNew > 0
-                        ? MAX_FAILING_TOPO_SORT_TIME_NS
-                        : MAX_TOPO_SORT_TIME_NS)) {
-                    this.directTrigger = true;
-                    this.GFNITrigger = false;
-                } else if (result) {
-                    // disable distance sorting because topo sort seems to be possible.
-                    indexBuffer.rewind();
-                    TranslucentData.writeQuadVertexIndexes(indexBuffer, this.topoQuadOrder, this.topoQuadOrderLength);
-                    this.directTrigger = false;
-                    this.consecutiveTopoSortFailuresNew = 0;
-                } else {
-                    // topo sort failure, the topo sort algorithm doesn't work on all cases
-
-                    // gives up after a certain number of failures. it keeps GFNI triggering with
-                    // topo sort on while the angle triggering is also active to maybe get a topo
-                    // sort success from a different angle.
-                    this.consecutiveTopoSortFailuresNew++;
-                    this.directTrigger = true;
-                    if (this.consecutiveTopoSortFailuresNew >= getAttemptsForTime(sortTime)) {
-                        this.GFNITrigger = false;
-                    }
-                }
-                this.topoQuadOrder = null;
-            }
-
-            if (this.directTrigger) {
-                indexBuffer.rewind();
-                DynamicTopoData.this.nativeGeometry.writeDistanceSortedIndexBuffer(this.getIndexBuffer(),
-                        cameraPos.getRelativeCameraPos());
-            }
+            var result = DynamicTopoData.this.nativeGeometry.writeDynamicSortedIndexBuffer(this.getIndexBuffer(),
+                    cameraPos.getRelativeCameraPos(), initial, this.isDirectTrigger, this.GFNITrigger,
+                    this.directTrigger, this.consecutiveTopoSortFailuresNew);
+            this.GFNITrigger = result.gfniTrigger();
+            this.directTrigger = result.directTrigger();
+            this.consecutiveTopoSortFailuresNew = result.consecutiveTopoSortFailures();
 
             if (initial) {
                 DynamicTopoData.this.copyStateFrom(this);
@@ -232,11 +166,11 @@ public class DynamicTopoData extends DynamicData {
 
     public static DynamicTopoData fromMesh(CombinedCameraPos cameraPos, TQuad[] quads, SectionPos sectionPos,
             GeometryPlanes geometryPlanes, NativeTranslucentSectionGeometry nativeGeometry) {
-        var distancesByNormal = geometryPlanes.prepareAndGetDistances();
+        geometryPlanes.prepareIntegration();
 
         try {
-            return new DynamicTopoData(sectionPos, quads, geometryPlanes, cameraPos.getAbsoluteCameraPos(),
-                    distancesByNormal, nativeGeometry);
+            return new DynamicTopoData(sectionPos, quads.length, geometryPlanes, cameraPos.getAbsoluteCameraPos(),
+                    nativeGeometry);
         } catch (RuntimeException exception) {
             if (nativeGeometry != null) {
                 nativeGeometry.close();
