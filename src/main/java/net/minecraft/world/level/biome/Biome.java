@@ -18,7 +18,7 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.util.Mth;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.util.random.WeightedList;
-import net.minecraft.world.level.DryFoliageColor;
+import net.minecraft.world.level.ColorMapColorUtil;
 import net.minecraft.world.level.FoliageColor;
 import net.minecraft.world.level.GrassColor;
 import net.minecraft.world.level.LevelReader;
@@ -277,7 +277,7 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 	private int getDryFoliageColorFromTexture() {
 		double d = Mth.clamp(this.climateSettings.temperature, 0.0F, 1.0F);
 		double e = Mth.clamp(this.climateSettings.downfall, 0.0F, 1.0F);
-		return DryFoliageColor.get(d, e);
+		return ColorMapColorUtil.getDryFoliage(d, e);
 	}
 
 	public float getBaseTemperature() {

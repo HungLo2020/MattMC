@@ -7,7 +7,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.SimplePreparableReloadListener;
 import net.minecraft.util.profiling.ProfilerFiller;
-import net.minecraft.world.level.DryFoliageColor;
+import net.minecraft.world.level.ColorMapColorUtil;
 
 @Environment(EnvType.CLIENT)
 public class DryFoliageColorReloadListener extends SimplePreparableReloadListener<int[]> {
@@ -22,6 +22,6 @@ public class DryFoliageColorReloadListener extends SimplePreparableReloadListene
 	}
 
 	protected void apply(int[] is, ResourceManager resourceManager, ProfilerFiller profilerFiller) {
-		DryFoliageColor.init(is);
+		ColorMapColorUtil.initDryFoliage(is);
 	}
 }

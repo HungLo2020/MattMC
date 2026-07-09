@@ -28,6 +28,20 @@ class ColorMapColorUtilRustTest {
 	}
 
 	@Test
+	void dryFoliageColorStateLivesInRust() {
+		int[] pixels = new int[65536];
+		int index = 223 << 8 | 191;
+		pixels[index] = 0x23456789;
+
+		try {
+			ColorMapColorUtil.initDryFoliage(pixels);
+			assertEquals(0x23456789, ColorMapColorUtil.getDryFoliage(0.25, 0.5));
+		} finally {
+			ColorMapColorUtil.initDryFoliage(new int[65536]);
+		}
+	}
+
+	@Test
 	void nativeLibraryNameIncludesPlatformDetails() {
 		String fileName = NativeLibraryLoader.platformLibraryFileName("mattmc_rust");
 
