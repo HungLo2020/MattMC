@@ -76,6 +76,12 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
     );
     static final String GENERATED_UNIFORM_BLOCK_NAME = "VulkanicStandaloneUniforms";
     private static final String VIEW_HEIGHT_UNIFORM_DECLARATION = "float viewHeight;";
+    private static final String LEGACY_SHADOW_DEPTH_TEXEL_FETCH_HELPER_NAME =
+        "vulkanicOpenGlShadowDepthTexelFetch";
+    private static final String LEGACY_SHADOW_DEPTH_TEXEL_FETCH_HELPER =
+        "vec4 " + LEGACY_SHADOW_DEPTH_TEXEL_FETCH_HELPER_NAME + "(vec4 depthSample) {\n"
+            + "    return vec4(depthSample.xyz * 2.0f - 1.0f, depthSample.w);\n"
+            + "}\n\n";
 
     @Override
     public VulkanicSpirvModule compile(VulkanicShaderStage stage, CharSequence source, String sourceName, String entryPoint) {
@@ -463,15 +469,36 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
 
             String functionName = shaderSource.substring(callStart, openParen);
             String arguments = shaderSource.substring(openParen + 1, closeParen);
+            boolean shadowDepthTexelFetch = isShadowDepthTexelFetchCall(functionName, arguments);
             String replacementArguments = rewriteFramebufferTextureArguments(functionName, arguments);
-            rewritten.append(functionName)
-                .append('(')
-                .append(replacementArguments)
-                .append(')');
+            String call = functionName + "(" + replacementArguments + ")";
+            if (shadowDepthTexelFetch) {
+                call = LEGACY_SHADOW_DEPTH_TEXEL_FETCH_HELPER_NAME + "(" + call + ")";
+            }
+            rewritten.append(call);
             cursor = closeParen + 1;
         }
 
-        return rewritten.toString();
+        String result = rewritten.toString();
+        if (result.contains(LEGACY_SHADOW_DEPTH_TEXEL_FETCH_HELPER_NAME + "(")
+            && !result.contains("vec4 " + LEGACY_SHADOW_DEPTH_TEXEL_FETCH_HELPER_NAME + "(")) {
+            int helperOffset = findUniformBlockInsertionOffset(result);
+            result = result.substring(0, helperOffset)
+                + LEGACY_SHADOW_DEPTH_TEXEL_FETCH_HELPER
+                + result.substring(helperOffset);
+        }
+        return result;
+    }
+
+    private static boolean isShadowDepthTexelFetchCall(String functionName, String arguments) {
+        if (!functionName.equals("texelFetch")) {
+            return false;
+        }
+        List<int[]> argumentRanges = topLevelArgumentRanges(arguments);
+        if (argumentRanges.size() < 2) {
+            return false;
+        }
+        return isShadowDepthSamplerName(slice(arguments, argumentRanges.get(0)).trim());
     }
 
     private static int nextTextureCall(String shaderSource, int start) {

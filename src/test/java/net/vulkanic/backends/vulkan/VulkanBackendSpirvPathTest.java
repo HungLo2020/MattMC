@@ -398,7 +398,8 @@ public class VulkanBackendSpirvPathTest {
         assertTrue(normalized.contains("texture(shadowtex0, vec3((shadowPosition).x, 1.0f - (shadowPosition).y, (shadowPosition).z)).x"));
         assertTrue(normalized.contains("texture2D(shadowtex1, vec3((vec3(shadowPosition.st, shadowPosition.z)).x, 1.0f - (vec3(shadowPosition.st, shadowPosition.z)).y, (vec3(shadowPosition.st, shadowPosition.z)).z)).x"));
         assertTrue(normalized.contains("textureLod(shadow, vec3((shadowPosition).x, 1.0f - (shadowPosition).y, (shadowPosition).z), 0).x"));
-        assertTrue(normalized.contains("texelFetch(shadowtex0, ivec2((shadowPixel).x, textureSize(shadowtex0, 0).y - 1 - (shadowPixel).y), 0).x"));
+        assertTrue(normalized.contains("vec4 vulkanicOpenGlShadowDepthTexelFetch(vec4 depthSample)"));
+        assertTrue(normalized.contains("vulkanicOpenGlShadowDepthTexelFetch(texelFetch(shadowtex0, ivec2((shadowPixel).x, textureSize(shadowtex0, 0).y - 1 - (shadowPixel).y), 0)).x"));
         assertTrue(normalized.contains("texture(shadowcolor0, vec2((shadowPosition.xy).x, 1.0f - (shadowPosition.xy).y)).r"));
         assertTrue(normalized.contains("texelFetch(shadowcolor1, ivec2((shadowPixel).x, textureSize(shadowcolor1, 0).y - 1 - (shadowPixel).y), 0).r"));
         assertTrue(normalized.contains("texture(noisetex, shadowPosition.xy).r"));
