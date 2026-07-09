@@ -29,6 +29,19 @@ jobs:
           java-version: "21"
           cache: gradle
 
+      - name: Set up Rust stable
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          if (-not (Get-Command rustup -ErrorAction SilentlyContinue)) {
+            throw 'rustup is required to install the Rust toolchain.'
+          }
+
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          cargo --version
+
       - name: Build client distribution zip
         shell: pwsh
         run: .\gradlew.bat clean clientDistZip --no-daemon
@@ -50,6 +63,27 @@ jobs:
           $version = [regex]::Match($zipFile.Name, '^MattMC-Client-(.+)\.zip$').Groups[1].Value
           if ([string]::IsNullOrWhiteSpace($version)) {
             throw "Could not parse version from zip name: $($zipFile.Name)"
+          }
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($zipFile.FullName)
+          try {
+            $entries = $zip.Entries | ForEach-Object { $_.FullName -replace '\\', '/' }
+
+            if (-not ($entries | Where-Object { $_ -match '(^|/)run-mattmc\.sh$|(^|/)run-mattmc\.bat$' })) {
+              throw 'Selected archive does not look like the exported client distribution'
+            }
+
+            if ($entries | Where-Object { $_ -match '(^|/)src/main/java/|(^|/)build\.gradle$|(^|/)settings\.gradle$|(^|/)gradlew$' }) {
+              throw 'Selected archive appears to be a source/project archive'
+            }
+
+            if (-not ($entries | Where-Object { $_ -match '(^|/)natives/mattmc_rust-win-x64\.dll$' })) {
+              throw 'Selected archive is missing Windows x64 Rust native: natives/mattmc_rust-win-x64.dll'
+            }
+          }
+          finally {
+            $zip.Dispose()
           }
 
           $windowsZipFile = Join-Path 'build/distributions' "MattMC-Client-$version-windows-x64.zip"

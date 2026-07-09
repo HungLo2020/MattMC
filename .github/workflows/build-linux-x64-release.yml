@@ -29,6 +29,19 @@ jobs:
           java-version: "21"
           cache: gradle
 
+      - name: Set up Rust stable
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v rustup >/dev/null 2>&1; then
+            echo "ERROR: rustup is required to install the Rust toolchain."
+            exit 1
+          fi
+
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          cargo --version
+
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
@@ -58,6 +71,12 @@ jobs:
 
           if grep -qE '(^|/)src/main/java/|(^|/)build\.gradle$|(^|/)settings\.gradle$|(^|/)gradlew$' "$ZIP_LIST_FILE"; then
             echo "ERROR: Selected archive appears to be a source/project archive"
+            rm -f "$ZIP_LIST_FILE"
+            exit 1
+          fi
+
+          if ! grep -qE '(^|/)natives/mattmc_rust-linux-x64\.so$' "$ZIP_LIST_FILE"; then
+            echo "ERROR: Selected archive is missing Linux x64 Rust native: natives/mattmc_rust-linux-x64.so"
             rm -f "$ZIP_LIST_FILE"
             exit 1
           fi

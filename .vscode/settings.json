@@ -5,8 +5,7 @@
 
   	"files.exclude": {
 		"**/*.class": true,
-		"**/.gradle": true,
-		"**/build": true
+		"**/.gradle": true
 	},
 	"search.exclude": {
 		"**/*.class": true,

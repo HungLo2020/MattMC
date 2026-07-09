@@ -1,5 +1,6 @@
 # Rust
 target/
+/src/main/rust/target/
 
 # Gradle
 .gradle/

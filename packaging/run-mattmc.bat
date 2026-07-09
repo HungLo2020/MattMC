@@ -62,6 +62,8 @@ REM Note: Assets are loaded directly from JAR classpath - no --assetsDir needed
 "%JAVA_CMD%" -Xmx8G -Xms4G ^
     -XX:+UseZGC ^
     -XX:+UseCompactObjectHeaders ^
+    --enable-native-access=ALL-UNNAMED ^
+    -Dmattmc.rust.natives.dir="%SCRIPT_DIR%\natives" ^
     -Dfabric.development=true ^
     -cp "!CLASSPATH!" ^
     net.fabricmc.loader.impl.launch.knot.KnotClient ^
