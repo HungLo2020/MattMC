@@ -9,8 +9,8 @@ import net.minecraft.core.SectionPos;
 import org.joml.Vector3fc;
 
 /**
- * The BSP workspace holds the state during the BSP building process. (see also
- * BSPSortState) It brings a number of fixed parameters and receives partition
+ * The BSP workspace holds the state during the BSP building process. It brings
+ * a number of fixed parameters and receives partition
  * planes to return as part of the final result.
  * 
  * Implementation note: Storing the multi partition node's interval points in a

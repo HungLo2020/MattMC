@@ -1,7 +1,5 @@
 package net.sodium.client.render.chunk.translucent_sorting.bsp_tree;
 
-import org.joml.Vector3fc;
-
 /**
  * A leaf node of a BSP tree that contains a set of quads.
  */
@@ -13,7 +11,7 @@ class LeafMultiBSPNode extends BSPNode {
     }
 
     @Override
-    void collectSortedQuads(BSPSortState sortState, Vector3fc cameraPos) {
-        sortState.writeIndexes(this.quads);
+    int addTo(NativeBspTree.Builder builder) {
+        return builder.addLeafMulti(this.quads);
     }
 }

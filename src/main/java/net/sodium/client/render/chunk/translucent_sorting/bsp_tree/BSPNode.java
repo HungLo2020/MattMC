@@ -6,9 +6,10 @@ import org.joml.Vector3fc;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.sodium.client.render.chunk.translucent_sorting.data.TopoGraphSorting;
-import net.sodium.client.util.NativeBuffer;
 import net.sodium.api.util.NormI8;
 import net.minecraft.core.SectionPos;
+
+import java.util.Arrays;
 
 /**
  * A node in the BSP tree. The BSP tree is made up of nodes that split quads
@@ -26,14 +27,7 @@ import net.minecraft.core.SectionPos;
  */
 public abstract class BSPNode {
 
-    abstract void collectSortedQuads(BSPSortState sortState, Vector3fc cameraPos);
-
-    public void collectSortedQuads(NativeBuffer nativeBuffer, Vector3fc cameraPos) {
-        try (var sortState = new BSPSortState(nativeBuffer)) {
-            this.collectSortedQuads(sortState, cameraPos);
-            sortState.flush();
-        }
-    }
+    abstract int addTo(NativeBspTree.Builder builder);
 
     public static BSPResult buildBSP(TQuad[] quads, SectionPos sectionPos, BSPNode oldRoot,
             boolean prepareNodeReuse, QuadSplittingMode quadSplittingMode) {
@@ -114,5 +108,25 @@ public abstract class BSPNode {
         }
 
         return InnerPartitionBSPNode.build(workspace, indexes, depth, oldNode);
+    }
+
+    static int[] copyIndexes(IntArrayList indexes) {
+        return copyIndexes(indexes, true);
+    }
+
+    static int[] copyIndexes(IntArrayList indexes, boolean doSort) {
+        int[] output = indexes.toIntArray();
+        if (doSort) {
+            Arrays.sort(output);
+        }
+        return output;
+    }
+
+    static int[] copyIndexes(int[] indexes, boolean doSort) {
+        int[] output = Arrays.copyOf(indexes, indexes.length);
+        if (doSort) {
+            Arrays.sort(output);
+        }
+        return output;
     }
 }

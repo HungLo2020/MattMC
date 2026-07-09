@@ -1,7 +1,6 @@
 package net.sodium.client.render.chunk.translucent_sorting.bsp_tree;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
-import org.joml.Vector3fc;
 
 public class InnerFixedDoubleBSPNode extends InnerPartitionBSPNode {
     private final BSPNode first;
@@ -14,11 +13,8 @@ public class InnerFixedDoubleBSPNode extends InnerPartitionBSPNode {
     }
 
     @Override
-    void collectSortedQuads(BSPSortState sortState, Vector3fc cameraPos) {
-        sortState.startNode(this);
-
-        this.first.collectSortedQuads(sortState, cameraPos);
-        this.second.collectSortedQuads(sortState, cameraPos);
+    int addTo(NativeBspTree.Builder builder) {
+        return builder.addFixedDouble(this.nativeRemap(), this.first.addTo(builder), this.second.addTo(builder));
     }
 
     @Override

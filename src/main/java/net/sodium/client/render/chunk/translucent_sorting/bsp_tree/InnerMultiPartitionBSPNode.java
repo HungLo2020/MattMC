@@ -42,55 +42,17 @@ class InnerMultiPartitionBSPNode extends InnerPartitionBSPNode {
         }
     }
 
-    private void collectPlaneQuads(BSPSortState sortState, int planeIndex) {
-        if (this.onPlaneQuads[planeIndex] != null) {
-            sortState.writeIndexes(this.onPlaneQuads[planeIndex]);
-        }
-    }
-
-    private void collectPartitionQuads(BSPSortState sortState, int partitionIndex, Vector3fc cameraPos) {
-        if (this.partitions[partitionIndex] != null) {
-            this.partitions[partitionIndex].collectSortedQuads(sortState, cameraPos);
-        }
-    }
-
     @Override
-    void collectSortedQuads(BSPSortState sortState, Vector3fc cameraPos) {
-        sortState.startNode(this);
-
-        // calculate the camera's distance. Then render the partitions in order of
-        // distance to the partition the camera is in.
-        var cameraDistance = this.planeNormal.dot(cameraPos);
-
-        // forward sweep: collect quads until the camera is in the partition
-        for (int i = 0; i < this.planeDistances.length; i++) {
-            if (cameraDistance <= this.planeDistances[i]) {
-                // collect the plane the camera is in
-                var isOnPlane = cameraDistance == this.planeDistances[i];
-                if (isOnPlane) {
-                    this.collectPartitionQuads(sortState, i, cameraPos);
-                }
-
-                // backwards sweep: collect all partitions backwards until the camera is reached
-                for (int j = this.planeDistances.length; j > i; j--) {
-                    this.collectPartitionQuads(sortState, j, cameraPos);
-                    this.collectPlaneQuads(sortState, j - 1);
-                }
-
-                if (!isOnPlane) {
-                    this.collectPartitionQuads(sortState, i, cameraPos);
-                }
-
-                return;
-            }
-
-            // collect the quads in the partition and on the plane
-            this.collectPartitionQuads(sortState, i, cameraPos);
-            this.collectPlaneQuads(sortState, i);
+    int addTo(NativeBspTree.Builder builder) {
+        int[] partitionIndexes = new int[this.partitions.length];
+        for (int index = 0; index < this.partitions.length; index++) {
+            partitionIndexes[index] = this.partitions[index] == null
+                    ? NativeBspTree.NULL_NODE
+                    : this.partitions[index].addTo(builder);
         }
 
-        // collect the last partition
-        this.collectPartitionQuads(sortState, this.planeDistances.length, cameraPos);
+        return builder.addMultiPartition(this.nativeRemap(), this.planeNormal,
+                this.planeDistances, partitionIndexes, this.onPlaneQuads);
     }
 
     static BSPNode buildFromPartitions(BSPWorkspace workspace, IntArrayList indexes, int depth, BSPNode oldNode,
@@ -150,7 +112,7 @@ class InnerMultiPartitionBSPNode extends InnerPartitionBSPNode {
                 partitionNodes[i] = BSPNode.build(workspace, partition.quadsBefore(), depth, oldChild);
             }
             if (partition.quadsOn() != null) {
-                onPlaneQuads[i] = BSPSortState.compressIndexes(partition.quadsOn());
+                onPlaneQuads[i] = BSPNode.copyIndexes(partition.quadsOn());
             }
         }
 

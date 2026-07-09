@@ -7,6 +7,7 @@ import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
 import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.BSPNode;
 import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.BSPResult;
+import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.NativeBspTree;
 import net.minecraft.core.SectionPos;
 import org.joml.Vector3dc;
 
@@ -21,6 +22,7 @@ public class DynamicBSPData extends DynamicData {
 
     private final int indexQuadCount;
     private final BSPNode rootNode;
+    private final NativeBspTree nativeTree;
     private final int generation;
     private final UpdatedQuadsList updatedQuadsList; // TODO: delete reference after mesh task is done since this won't be needed anymore after that
 
@@ -35,6 +37,8 @@ public class DynamicBSPData extends DynamicData {
         } else {
             this.indexQuadCount = inputQuadCount;
         }
+
+        this.nativeTree = NativeBspTree.fromRoot(this.rootNode, this.indexQuadCount);
     }
 
     private class DynamicBSPSorter extends DynamicSorter {
@@ -44,8 +48,13 @@ public class DynamicBSPData extends DynamicData {
 
         @Override
         void writeSort(CombinedCameraPos cameraPos, boolean initial) {
-            DynamicBSPData.this.rootNode.collectSortedQuads(this.getIndexBuffer(), cameraPos.getRelativeCameraPos());
+            DynamicBSPData.this.nativeTree.writeIndexBuffer(this.getIndexBuffer(), cameraPos.getRelativeCameraPos());
         }
+    }
+
+    @Override
+    public void close() {
+        this.nativeTree.close();
     }
 
     @Override

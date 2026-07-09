@@ -87,12 +87,83 @@ struct NativeTranslucentSortData {
     kind: NativeTranslucentSortDataKind,
 }
 
-struct NativeBspSortState {
-    quad_indexes: Vec<i32>,
-}
-
 struct NativeTranslucentAnalyzer {
     records: Vec<TranslucentQuadRecord>,
+}
+
+#[derive(Clone)]
+enum BspRemapKind {
+    None,
+    FixedOffset(i32),
+    IndexMap(Vec<i32>),
+}
+
+#[derive(Clone)]
+struct BspRemap {
+    index_count: usize,
+    kind: BspRemapKind,
+}
+
+impl BspRemap {
+    fn none() -> Self {
+        Self {
+            index_count: 0,
+            kind: BspRemapKind::None,
+        }
+    }
+
+    fn is_active(&self) -> bool {
+        !matches!(self.kind, BspRemapKind::None)
+    }
+}
+
+enum BspNode {
+    LeafSingle {
+        quad: i32,
+    },
+    LeafDouble {
+        quad_a: i32,
+        quad_b: i32,
+    },
+    LeafMulti {
+        quads: Vec<i32>,
+    },
+    FixedDouble {
+        remap: BspRemap,
+        first: i32,
+        second: i32,
+    },
+    Binary {
+        remap: BspRemap,
+        normal: [f32; 3],
+        distance: f32,
+        inside: i32,
+        outside: i32,
+        on_plane: Vec<i32>,
+    },
+    MultiPartition {
+        remap: BspRemap,
+        normal: [f32; 3],
+        plane_distances: Vec<f32>,
+        partitions: Vec<i32>,
+        on_plane_quads: Vec<Vec<i32>>,
+    },
+}
+
+struct NativeBspTree {
+    nodes: Vec<BspNode>,
+    root: i32,
+    index_quad_count: usize,
+}
+
+struct BspActiveRemap {
+    node_index: usize,
+    remaining: usize,
+}
+
+struct BspTraversalState {
+    quad_indexes: Vec<i32>,
+    active_remap: Option<BspActiveRemap>,
 }
 
 pub fn verify() -> i32 {
@@ -929,26 +1000,311 @@ fn write_dynamic_sort_data(
     )
 }
 
-fn create_bsp_sort_state(quad_capacity: usize) -> NativeBspSortState {
-    NativeBspSortState {
-        quad_indexes: vec![0; quad_capacity],
+fn create_bsp_tree() -> NativeBspTree {
+    NativeBspTree {
+        nodes: Vec::new(),
+        root: -1,
+        index_quad_count: 0,
     }
 }
 
-fn bsp_sort_state_write_index_buffer(
-    state: &NativeBspSortState,
-    quad_index_count: usize,
-    output: &mut [i32],
-) -> i32 {
-    if quad_index_count > state.quad_indexes.len() {
-        return ERR_CAPACITY;
+fn add_bsp_node(tree: &mut NativeBspTree, node: BspNode) -> Result<i32, i32> {
+    let index = i32::try_from(tree.nodes.len()).map_err(|_| ERR_CAPACITY)?;
+    tree.nodes.push(node);
+    Ok(index)
+}
+
+fn validate_bsp_node_index(tree: &NativeBspTree, node_index: i32) -> Result<Option<usize>, i32> {
+    if node_index < 0 {
+        return Ok(None);
     }
-    let quad_indexes = &state.quad_indexes[..quad_index_count];
-    if quad_indexes.iter().any(|index| *index < 0) {
+
+    let index = node_index as usize;
+    if index >= tree.nodes.len() {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+    Ok(Some(index))
+}
+
+fn create_bsp_remap(
+    kind: i32,
+    index_count: i32,
+    fixed_offset: i32,
+    index_map: &[i32],
+) -> Result<BspRemap, i32> {
+    if index_count < 0 {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    match kind {
+        0 => {
+            if index_count != 0 || !index_map.is_empty() {
+                return Err(ERR_INVALID_ARGUMENT);
+            }
+            Ok(BspRemap::none())
+        }
+        1 => {
+            if index_count == 0 || !index_map.is_empty() {
+                return Err(ERR_INVALID_ARGUMENT);
+            }
+            Ok(BspRemap {
+                index_count: index_count as usize,
+                kind: BspRemapKind::FixedOffset(fixed_offset),
+            })
+        }
+        2 => {
+            if index_count == 0 || index_map.is_empty() {
+                return Err(ERR_INVALID_ARGUMENT);
+            }
+            Ok(BspRemap {
+                index_count: index_count as usize,
+                kind: BspRemapKind::IndexMap(index_map.to_vec()),
+            })
+        }
+        _ => Err(ERR_INVALID_ARGUMENT),
+    }
+}
+
+fn write_bsp_tree_index_buffer(
+    tree: &NativeBspTree,
+    output: &mut [i32],
+    camera_x: f32,
+    camera_y: f32,
+    camera_z: f32,
+) -> i32 {
+    let Some(root_index) = (match validate_bsp_node_index(tree, tree.root) {
+        Ok(value) => value,
+        Err(status) => return status,
+    }) else {
+        return ERR_INVALID_ARGUMENT;
+    };
+
+    let mut state = BspTraversalState {
+        quad_indexes: Vec::with_capacity(tree.index_quad_count),
+        active_remap: None,
+    };
+
+    if let Err(status) =
+        collect_bsp_node(tree, root_index, [camera_x, camera_y, camera_z], &mut state)
+    {
+        return status;
+    }
+    if state.active_remap.is_some() || state.quad_indexes.len() != tree.index_quad_count {
         return ERR_INVALID_ARGUMENT;
     }
 
-    index::write_sorted_quad_index_buffer(output, quad_indexes)
+    index::write_sorted_quad_index_buffer(output, &state.quad_indexes)
+}
+
+fn collect_optional_bsp_node(
+    tree: &NativeBspTree,
+    node_index: i32,
+    camera: [f32; 3],
+    state: &mut BspTraversalState,
+) -> Result<(), i32> {
+    if let Some(index) = validate_bsp_node_index(tree, node_index)? {
+        collect_bsp_node(tree, index, camera, state)?;
+    }
+    Ok(())
+}
+
+fn collect_bsp_node(
+    tree: &NativeBspTree,
+    node_index: usize,
+    camera: [f32; 3],
+    state: &mut BspTraversalState,
+) -> Result<(), i32> {
+    let node = tree.nodes.get(node_index).ok_or(ERR_INVALID_ARGUMENT)?;
+    match node {
+        BspNode::LeafSingle { quad } => write_bsp_index(tree, state, *quad),
+        BspNode::LeafDouble { quad_a, quad_b } => {
+            write_bsp_index(tree, state, *quad_a)?;
+            write_bsp_index(tree, state, *quad_b)
+        }
+        BspNode::LeafMulti { quads } => write_bsp_indexes(tree, state, quads),
+        BspNode::FixedDouble {
+            remap,
+            first,
+            second,
+        } => {
+            start_bsp_remap(state, node_index, remap)?;
+            collect_optional_bsp_node(tree, *first, camera, state)?;
+            collect_optional_bsp_node(tree, *second, camera, state)
+        }
+        BspNode::Binary {
+            remap,
+            normal,
+            distance,
+            inside,
+            outside,
+            on_plane,
+        } => {
+            start_bsp_remap(state, node_index, remap)?;
+            let camera_inside = dot3(*normal, camera) < *distance;
+            if camera_inside {
+                collect_optional_bsp_node(tree, *outside, camera, state)?;
+            } else {
+                collect_optional_bsp_node(tree, *inside, camera, state)?;
+            }
+            write_bsp_indexes(tree, state, on_plane)?;
+            if camera_inside {
+                collect_optional_bsp_node(tree, *inside, camera, state)
+            } else {
+                collect_optional_bsp_node(tree, *outside, camera, state)
+            }
+        }
+        BspNode::MultiPartition {
+            remap,
+            normal,
+            plane_distances,
+            partitions,
+            on_plane_quads,
+        } => {
+            start_bsp_remap(state, node_index, remap)?;
+            let camera_distance = dot3(*normal, camera);
+
+            for i in 0..plane_distances.len() {
+                if camera_distance <= plane_distances[i] {
+                    let is_on_plane = camera_distance == plane_distances[i];
+                    if is_on_plane {
+                        collect_optional_bsp_node(tree, partitions[i], camera, state)?;
+                    }
+
+                    for j in ((i + 1)..=plane_distances.len()).rev() {
+                        collect_optional_bsp_node(tree, partitions[j], camera, state)?;
+                        write_bsp_indexes(tree, state, &on_plane_quads[j - 1])?;
+                    }
+
+                    if !is_on_plane {
+                        collect_optional_bsp_node(tree, partitions[i], camera, state)?;
+                    }
+                    return Ok(());
+                }
+
+                collect_optional_bsp_node(tree, partitions[i], camera, state)?;
+                write_bsp_indexes(tree, state, &on_plane_quads[i])?;
+            }
+
+            collect_optional_bsp_node(tree, partitions[plane_distances.len()], camera, state)
+        }
+    }
+}
+
+fn start_bsp_remap(
+    state: &mut BspTraversalState,
+    node_index: usize,
+    remap: &BspRemap,
+) -> Result<(), i32> {
+    if !remap.is_active() {
+        return Ok(());
+    }
+    if state.active_remap.is_some() {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    state.active_remap = Some(BspActiveRemap {
+        node_index,
+        remaining: remap.index_count,
+    });
+    Ok(())
+}
+
+fn write_bsp_indexes(
+    tree: &NativeBspTree,
+    state: &mut BspTraversalState,
+    indexes: &[i32],
+) -> Result<(), i32> {
+    for index in indexes {
+        write_bsp_index(tree, state, *index)?;
+    }
+    Ok(())
+}
+
+fn write_bsp_index(
+    tree: &NativeBspTree,
+    state: &mut BspTraversalState,
+    index: i32,
+) -> Result<(), i32> {
+    if index < 0 {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    let output_index = if let Some(active) = &mut state.active_remap {
+        let remap_node = tree
+            .nodes
+            .get(active.node_index)
+            .ok_or(ERR_INVALID_ARGUMENT)?;
+        let remapped = match node_remap(remap_node) {
+            Some(BspRemap {
+                kind: BspRemapKind::FixedOffset(offset),
+                ..
+            }) => index.checked_add(*offset).ok_or(ERR_INVALID_ARGUMENT)?,
+            Some(BspRemap {
+                kind: BspRemapKind::IndexMap(map),
+                ..
+            }) => {
+                let map_index = usize::try_from(index).map_err(|_| ERR_INVALID_ARGUMENT)?;
+                *map.get(map_index).ok_or(ERR_INVALID_ARGUMENT)?
+            }
+            _ => return Err(ERR_INVALID_ARGUMENT),
+        };
+
+        if remapped < 0 {
+            return Err(ERR_INVALID_ARGUMENT);
+        }
+        if active.remaining == 0 {
+            return Err(ERR_INVALID_ARGUMENT);
+        }
+        active.remaining -= 1;
+        if active.remaining == 0 {
+            state.active_remap = None;
+        }
+        remapped
+    } else {
+        index
+    };
+
+    state.quad_indexes.push(output_index);
+    Ok(())
+}
+
+fn node_remap(node: &BspNode) -> Option<&BspRemap> {
+    match node {
+        BspNode::FixedDouble { remap, .. }
+        | BspNode::Binary { remap, .. }
+        | BspNode::MultiPartition { remap, .. } => Some(remap),
+        _ => None,
+    }
+}
+
+fn dot3(a: [f32; 3], b: [f32; 3]) -> f32 {
+    a[0].mul_add(b[0], a[1].mul_add(b[1], a[2] * b[2]))
+}
+
+unsafe fn ffi_i32_slice<'a>(ptr: *const i32, len: i32) -> Result<&'a [i32], i32> {
+    if len < 0 {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+    if len == 0 {
+        return Ok(&[]);
+    }
+    if ptr.is_null() {
+        return Err(ERR_NULL_POINTER);
+    }
+    Ok(slice::from_raw_parts(ptr, len as usize))
+}
+
+unsafe fn ffi_f32_slice<'a>(ptr: *const f32, len: i32) -> Result<&'a [f32], i32> {
+    if len < 0 {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+    if len == 0 {
+        return Ok(&[]);
+    }
+    if ptr.is_null() {
+        return Err(ERR_NULL_POINTER);
+    }
+    Ok(slice::from_raw_parts(ptr, len as usize))
 }
 
 fn write_distance_sorted_index_buffer(
@@ -2246,71 +2602,384 @@ pub unsafe extern "C" fn mattmc_sodium_translucent_sort_data_dynamic_write(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_sort_state_create(
-    quad_capacity: i32,
-    output_handle: *mut u64,
-) -> i32 {
-    if quad_capacity < 0 {
-        return ERR_INVALID_ARGUMENT;
-    }
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_tree_create(output_handle: *mut u64) -> i32 {
     if output_handle.is_null() {
         return ERR_NULL_POINTER;
     }
 
-    let state = create_bsp_sort_state(quad_capacity as usize);
-    *output_handle = Box::into_raw(Box::new(state)) as u64;
+    *output_handle = Box::into_raw(Box::new(create_bsp_tree())) as u64;
     OK
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_sort_state_destroy(handle: u64) -> i32 {
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_tree_destroy(handle: u64) -> i32 {
     if handle == 0 {
         return OK;
     }
 
-    drop(Box::from_raw(handle as *mut NativeBspSortState));
+    drop(Box::from_raw(handle as *mut NativeBspTree));
     OK
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_sort_state_address(
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_tree_set_root(
     handle: u64,
-    output_address: *mut u64,
-    output_capacity: *mut i32,
+    root_node: i32,
+    index_quad_count: i32,
 ) -> i32 {
-    if handle == 0 || output_address.is_null() || output_capacity.is_null() {
+    if index_quad_count < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if handle == 0 {
         return ERR_NULL_POINTER;
     }
 
-    let state = &mut *(handle as *mut NativeBspSortState);
-    *output_address = state.quad_indexes.as_mut_ptr() as u64;
-    *output_capacity = state.quad_indexes.len() as i32;
+    let tree = &mut *(handle as *mut NativeBspTree);
+    if let Err(status) = validate_bsp_node_index(tree, root_node) {
+        return status;
+    }
+    tree.root = root_node;
+    tree.index_quad_count = index_quad_count as usize;
     OK
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_sort_state_write_index_buffer(
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_tree_add_leaf_single(
     handle: u64,
-    quad_index_count: i32,
+    quad: i32,
+    output_node: *mut i32,
+) -> i32 {
+    if quad < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if handle == 0 || output_node.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let tree = &mut *(handle as *mut NativeBspTree);
+    match add_bsp_node(tree, BspNode::LeafSingle { quad }) {
+        Ok(index) => {
+            *output_node = index;
+            OK
+        }
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_tree_add_leaf_double(
+    handle: u64,
+    quad_a: i32,
+    quad_b: i32,
+    output_node: *mut i32,
+) -> i32 {
+    if quad_a < 0 || quad_b < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if handle == 0 || output_node.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let tree = &mut *(handle as *mut NativeBspTree);
+    match add_bsp_node(tree, BspNode::LeafDouble { quad_a, quad_b }) {
+        Ok(index) => {
+            *output_node = index;
+            OK
+        }
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_tree_add_leaf_multi(
+    handle: u64,
+    indexes: *const i32,
+    index_count: i32,
+    output_node: *mut i32,
+) -> i32 {
+    if index_count < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if handle == 0 || output_node.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let quads = match ffi_i32_slice(indexes, index_count) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    if quads.iter().any(|index| *index < 0) {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let tree = &mut *(handle as *mut NativeBspTree);
+    match add_bsp_node(
+        tree,
+        BspNode::LeafMulti {
+            quads: quads.to_vec(),
+        },
+    ) {
+        Ok(index) => {
+            *output_node = index;
+            OK
+        }
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_tree_add_fixed_double(
+    handle: u64,
+    remap_kind: i32,
+    remap_index_count: i32,
+    fixed_offset: i32,
+    index_map: *const i32,
+    index_map_len: i32,
+    first: i32,
+    second: i32,
+    output_node: *mut i32,
+) -> i32 {
+    if index_map_len < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if handle == 0 || output_node.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let tree = &mut *(handle as *mut NativeBspTree);
+    if let Err(status) = validate_bsp_node_index(tree, first) {
+        return status;
+    }
+    if let Err(status) = validate_bsp_node_index(tree, second) {
+        return status;
+    }
+
+    let index_map = match ffi_i32_slice(index_map, index_map_len) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    let remap = match create_bsp_remap(remap_kind, remap_index_count, fixed_offset, index_map) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    match add_bsp_node(
+        tree,
+        BspNode::FixedDouble {
+            remap,
+            first,
+            second,
+        },
+    ) {
+        Ok(index) => {
+            *output_node = index;
+            OK
+        }
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_tree_add_binary(
+    handle: u64,
+    remap_kind: i32,
+    remap_index_count: i32,
+    fixed_offset: i32,
+    index_map: *const i32,
+    index_map_len: i32,
+    normal_x: f32,
+    normal_y: f32,
+    normal_z: f32,
+    distance: f32,
+    inside: i32,
+    outside: i32,
+    on_plane: *const i32,
+    on_plane_len: i32,
+    output_node: *mut i32,
+) -> i32 {
+    if index_map_len < 0 || on_plane_len < 0 || !distance.is_finite() {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if handle == 0 || output_node.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let tree = &mut *(handle as *mut NativeBspTree);
+    if let Err(status) = validate_bsp_node_index(tree, inside) {
+        return status;
+    }
+    if let Err(status) = validate_bsp_node_index(tree, outside) {
+        return status;
+    }
+
+    let index_map = match ffi_i32_slice(index_map, index_map_len) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    let remap = match create_bsp_remap(remap_kind, remap_index_count, fixed_offset, index_map) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    let on_plane = match ffi_i32_slice(on_plane, on_plane_len) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    if on_plane.iter().any(|index| *index < 0) {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    match add_bsp_node(
+        tree,
+        BspNode::Binary {
+            remap,
+            normal: [normal_x, normal_y, normal_z],
+            distance,
+            inside,
+            outside,
+            on_plane: on_plane.to_vec(),
+        },
+    ) {
+        Ok(index) => {
+            *output_node = index;
+            OK
+        }
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_tree_add_multi_partition(
+    handle: u64,
+    remap_kind: i32,
+    remap_index_count: i32,
+    fixed_offset: i32,
+    index_map: *const i32,
+    index_map_len: i32,
+    normal_x: f32,
+    normal_y: f32,
+    normal_z: f32,
+    plane_distances: *const f32,
+    plane_distance_count: i32,
+    partitions: *const i32,
+    partition_count: i32,
+    on_plane_indexes: *const i32,
+    on_plane_index_count: i32,
+    on_plane_counts: *const i32,
+    on_plane_count_count: i32,
+    output_node: *mut i32,
+) -> i32 {
+    if index_map_len < 0
+        || plane_distance_count < 0
+        || partition_count < 0
+        || on_plane_index_count < 0
+        || on_plane_count_count < 0
+    {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if handle == 0 || output_node.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    if partition_count != plane_distance_count + 1 || on_plane_count_count != plane_distance_count {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let tree = &mut *(handle as *mut NativeBspTree);
+    let partition_indexes = match ffi_i32_slice(partitions, partition_count) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    for partition in partition_indexes {
+        if let Err(status) = validate_bsp_node_index(tree, *partition) {
+            return status;
+        }
+    }
+
+    let index_map = match ffi_i32_slice(index_map, index_map_len) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    let remap = match create_bsp_remap(remap_kind, remap_index_count, fixed_offset, index_map) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    let distances = match ffi_f32_slice(plane_distances, plane_distance_count) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    if distances.iter().any(|distance| !distance.is_finite()) {
+        return ERR_INVALID_ARGUMENT;
+    }
+    let on_plane_flat = match ffi_i32_slice(on_plane_indexes, on_plane_index_count) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    if on_plane_flat.iter().any(|index| *index < 0) {
+        return ERR_INVALID_ARGUMENT;
+    }
+    let counts = match ffi_i32_slice(on_plane_counts, on_plane_count_count) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+
+    let mut on_plane_quads = Vec::with_capacity(counts.len());
+    let mut offset = 0usize;
+    for count in counts {
+        if *count < 0 {
+            return ERR_INVALID_ARGUMENT;
+        }
+        let next_offset = match offset.checked_add(*count as usize) {
+            Some(value) => value,
+            None => return ERR_INVALID_ARGUMENT,
+        };
+        if next_offset > on_plane_flat.len() {
+            return ERR_INVALID_ARGUMENT;
+        }
+        on_plane_quads.push(on_plane_flat[offset..next_offset].to_vec());
+        offset = next_offset;
+    }
+    if offset != on_plane_flat.len() {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    match add_bsp_node(
+        tree,
+        BspNode::MultiPartition {
+            remap,
+            normal: [normal_x, normal_y, normal_z],
+            plane_distances: distances.to_vec(),
+            partitions: partition_indexes.to_vec(),
+            on_plane_quads,
+        },
+    ) {
+        Ok(index) => {
+            *output_node = index;
+            OK
+        }
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_tree_write_index_buffer(
+    handle: u64,
     output_address: u64,
     output_capacity: i32,
+    camera_x: f32,
+    camera_y: f32,
+    camera_z: f32,
 ) -> i32 {
-    if quad_index_count < 0
-        || output_capacity < 0
-        || output_capacity % std::mem::size_of::<i32>() as i32 != 0
-    {
+    if output_capacity < 0 || output_capacity % std::mem::size_of::<i32>() as i32 != 0 {
         return ERR_INVALID_ARGUMENT;
     }
     if handle == 0 || output_address == 0 {
         return ERR_NULL_POINTER;
     }
 
-    let state = &*(handle as *const NativeBspSortState);
+    let tree = &*(handle as *const NativeBspTree);
     let output = slice::from_raw_parts_mut(
         output_address as *mut i32,
         output_capacity as usize / std::mem::size_of::<i32>(),
     );
-    bsp_sort_state_write_index_buffer(state, quad_index_count as usize, output)
+    write_bsp_tree_index_buffer(tree, output, camera_x, camera_y, camera_z)
 }
 
 #[no_mangle]
@@ -2462,5 +3131,76 @@ mod tests {
             write_distance_sorted_index_buffer(&geometry, &mut output, 0.0, 0.0, 0.0)
         );
         assert_eq!(vec![4, 5, 6, 6, 7, 4, 0, 1, 2, 2, 3, 0], output);
+    }
+
+    #[test]
+    fn bsp_tree_traverses_binary_partition_by_camera_side() {
+        let mut tree = create_bsp_tree();
+        let inside = add_bsp_node(&mut tree, BspNode::LeafSingle { quad: 0 }).unwrap();
+        let outside = add_bsp_node(&mut tree, BspNode::LeafSingle { quad: 1 }).unwrap();
+        let root = add_bsp_node(
+            &mut tree,
+            BspNode::Binary {
+                remap: BspRemap::none(),
+                normal: [1.0, 0.0, 0.0],
+                distance: 0.5,
+                inside,
+                outside,
+                on_plane: vec![2],
+            },
+        )
+        .unwrap();
+        tree.root = root;
+        tree.index_quad_count = 3;
+
+        let mut output = vec![0; 18];
+        assert_eq!(
+            OK,
+            write_bsp_tree_index_buffer(&tree, &mut output, 0.0, 0.0, 0.0)
+        );
+        assert_eq!(
+            vec![4, 5, 6, 6, 7, 4, 8, 9, 10, 10, 11, 8, 0, 1, 2, 2, 3, 0],
+            output
+        );
+
+        assert_eq!(
+            OK,
+            write_bsp_tree_index_buffer(&tree, &mut output, 1.0, 0.0, 0.0)
+        );
+        assert_eq!(
+            vec![0, 1, 2, 2, 3, 0, 8, 9, 10, 10, 11, 8, 4, 5, 6, 6, 7, 4],
+            output
+        );
+    }
+
+    #[test]
+    fn bsp_tree_applies_fixed_offset_remap_for_reused_subtree() {
+        let mut tree = create_bsp_tree();
+        let first = add_bsp_node(&mut tree, BspNode::LeafMulti { quads: vec![0, 1] }).unwrap();
+        let second = add_bsp_node(&mut tree, BspNode::LeafSingle { quad: 2 }).unwrap();
+        let root = add_bsp_node(
+            &mut tree,
+            BspNode::FixedDouble {
+                remap: BspRemap {
+                    index_count: 3,
+                    kind: BspRemapKind::FixedOffset(3),
+                },
+                first,
+                second,
+            },
+        )
+        .unwrap();
+        tree.root = root;
+        tree.index_quad_count = 3;
+
+        let mut output = vec![0; 18];
+        assert_eq!(
+            OK,
+            write_bsp_tree_index_buffer(&tree, &mut output, 0.0, 0.0, 0.0)
+        );
+        assert_eq!(
+            vec![12, 13, 14, 14, 15, 12, 16, 17, 18, 18, 19, 16, 20, 21, 22, 22, 23, 20],
+            output
+        );
     }
 }

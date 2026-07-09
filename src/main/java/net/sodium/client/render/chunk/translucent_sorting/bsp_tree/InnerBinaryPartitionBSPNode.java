@@ -51,36 +51,12 @@ class InnerBinaryPartitionBSPNode extends InnerPartitionBSPNode {
         }
     }
 
-    private void collectInside(BSPSortState sortState, Vector3fc cameraPos) {
-        if (this.inside != null) {
-            this.inside.collectSortedQuads(sortState, cameraPos);
-        }
-    }
-
-    private void collectOutside(BSPSortState sortState, Vector3fc cameraPos) {
-        if (this.outside != null) {
-            this.outside.collectSortedQuads(sortState, cameraPos);
-        }
-    }
-
     @Override
-    void collectSortedQuads(BSPSortState sortState, Vector3fc cameraPos) {
-        sortState.startNode(this);
-
-        var cameraInside = this.planeNormal.dot(cameraPos) < this.planeDistance;
-        if (cameraInside) {
-            this.collectOutside(sortState, cameraPos);
-        } else {
-            this.collectInside(sortState, cameraPos);
-        }
-        if (this.onPlaneQuads != null) {
-            sortState.writeIndexes(this.onPlaneQuads);
-        }
-        if (cameraInside) {
-            this.collectInside(sortState, cameraPos);
-        } else {
-            this.collectOutside(sortState, cameraPos);
-        }
+    int addTo(NativeBspTree.Builder builder) {
+        int insideIndex = this.inside == null ? NativeBspTree.NULL_NODE : this.inside.addTo(builder);
+        int outsideIndex = this.outside == null ? NativeBspTree.NULL_NODE : this.outside.addTo(builder);
+        return builder.addBinary(this.nativeRemap(), this.planeNormal, this.planeDistance,
+                insideIndex, outsideIndex, this.onPlaneQuads);
     }
 
     static BSPNode buildFromPartitions(BSPWorkspace workspace, IntArrayList indexes, int depth, BSPNode oldNode,
@@ -105,7 +81,7 @@ class InnerBinaryPartitionBSPNode extends InnerPartitionBSPNode {
         if (outside != null) {
             outsideNode = BSPNode.build(workspace, outside.quadsBefore(), depth, oldOutsideNode);
         }
-        var onPlane = inside.quadsOn() == null ? null : BSPSortState.compressIndexes(inside.quadsOn());
+        var onPlane = inside.quadsOn() == null ? null : BSPNode.copyIndexes(inside.quadsOn());
 
         return new InnerBinaryPartitionBSPNode(
                 prepareNodeReuse(workspace, indexes, depth),
@@ -139,7 +115,7 @@ class InnerBinaryPartitionBSPNode extends InnerPartitionBSPNode {
         if (outside != null) {
             outsideNode = BSPNode.build(workspace, outside, depth, oldOutsideNode);
         }
-        var onPlaneArr = BSPSortState.compressIndexes(onPlane);
+        var onPlaneArr = BSPNode.copyIndexes(onPlane);
 
         // always use the correct plane normal here because just specifying the axis causes the constructor to use a wrong and unsigned normal
         return new InnerBinaryPartitionBSPNode(

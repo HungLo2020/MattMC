@@ -58,13 +58,14 @@ import static net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder.Ve
 abstract class InnerPartitionBSPNode extends BSPNode {
     private static final int NODE_REUSE_THRESHOLD = 30;
     private static final int MAX_INTERSECTION_ATTEMPTS = 500;
+    static final int NO_FIXED_OFFSET = Integer.MIN_VALUE;
     protected static final int UNALIGNED_AXIS = -1;
 
     final Vector3fc planeNormal;
     final int axis;
 
     int[] indexMap;
-    int fixedIndexOffset = BSPSortState.NO_FIXED_OFFSET;
+    int fixedIndexOffset = NO_FIXED_OFFSET;
     final NodeReuseData reuseData; // nullable
 
     /**
@@ -114,7 +115,7 @@ abstract class InnerPartitionBSPNode extends BSPNode {
             // for the extents comparison loop to work
             return new NodeReuseData(
                     quadExtents,
-                    BSPSortState.compressIndexes(indexes, false),
+                    BSPNode.copyIndexes(indexes, false),
                     indexes.size(),
                     maxIndex);
         }
@@ -158,7 +159,7 @@ abstract class InnerPartitionBSPNode extends BSPNode {
         }
 
         oldNode.indexMap = null;
-        oldNode.fixedIndexOffset = BSPSortState.NO_FIXED_OFFSET;
+        oldNode.fixedIndexOffset = NO_FIXED_OFFSET;
 
         var reuseData = oldNode.reuseData;
         if (reuseData == null) {
@@ -179,7 +180,9 @@ abstract class InnerPartitionBSPNode extends BSPNode {
         // reuse old node and either apply a fixed offset or calculate an index map to
         // map from old to new indices
         var remapper = new IndexRemapper(reuseData.maxIndex + 1, newIndexes);
-        BSPSortState.decompressOrRead(reuseData.indexes, remapper);
+        for (int index : reuseData.indexes) {
+            remapper.accept(index);
+        }
 
         // use a fixed offset if possible (if all old indices differ from the new ones
         // by the same amount)
@@ -194,6 +197,16 @@ abstract class InnerPartitionBSPNode extends BSPNode {
         oldNode.addPartitionPlanes(workspace);
 
         return oldNode;
+    }
+
+    NativeBspTree.Remap nativeRemap() {
+        if (this.indexMap != null) {
+            return new NativeBspTree.Remap(2, this.reuseData.indexCount(), 0, this.indexMap);
+        }
+        if (this.fixedIndexOffset != NO_FIXED_OFFSET) {
+            return new NativeBspTree.Remap(1, this.reuseData.indexCount(), this.fixedIndexOffset, null);
+        }
+        return NativeBspTree.Remap.NONE;
     }
 
     /**
@@ -936,7 +949,7 @@ abstract class InnerPartitionBSPNode extends BSPNode {
                 // cancel primary intersector search if they all intersect with each other
                 if (primaryIntersectorIndexes != null && primaryIntersectorIndexes.size() == indexes.size()) {
                     // return multi leaf node as this is impossible to sort
-                    return new LeafMultiBSPNode(BSPSortState.compressIndexes(indexes));
+                    return new LeafMultiBSPNode(BSPNode.copyIndexes(indexes));
                 }
             }
         }
@@ -997,7 +1010,7 @@ abstract class InnerPartitionBSPNode extends BSPNode {
         // no need to add the geometry to the workspace's trigger registry
         // since it's being sorted statically and the sort order won't change based on the camera position
 
-        return new LeafMultiBSPNode(BSPSortState.compressIndexesInPlace(indexWriter.indexes, false));
+        return new LeafMultiBSPNode(BSPNode.copyIndexes(indexWriter.indexes, false));
     }
 
     static private BSPNode buildSNRLeafNodeFromQuads(BSPWorkspace workspace, IntArrayList indexes) {
@@ -1019,7 +1032,7 @@ abstract class InnerPartitionBSPNode extends BSPNode {
             perm[i] = indexBuffer[perm[i]];
         }
 
-        return new LeafMultiBSPNode(BSPSortState.compressIndexes(IntArrayList.wrap(perm), false));
+        return new LeafMultiBSPNode(BSPNode.copyIndexes(IntArrayList.wrap(perm), false));
     }
 
     static private BSPNode buildSNRLeafNodeFromPoints(BSPWorkspace workspace, LongArrayList points) {
@@ -1042,6 +1055,6 @@ abstract class InnerPartitionBSPNode extends BSPNode {
             }
         }
 
-        return new LeafMultiBSPNode(BSPSortState.compressIndexes(IntArrayList.wrap(quadIndexes), false));
+        return new LeafMultiBSPNode(BSPNode.copyIndexes(IntArrayList.wrap(quadIndexes), false));
     }
 }
