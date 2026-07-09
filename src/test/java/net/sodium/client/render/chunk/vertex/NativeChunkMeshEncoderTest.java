@@ -10,6 +10,7 @@ import net.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
+import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkVertexFormat;
 import org.junit.jupiter.api.Test;
 import org.lwjgl.system.MemoryUtil;
@@ -88,6 +89,48 @@ class NativeChunkMeshEncoderTest {
             free(output);
             free(indexOutput);
             destroy(builders);
+        }
+    }
+
+    @Test
+    void nativeSectionBuilderOwnsPerFacingStagingAndAssembly() {
+        NativeSectionMeshBuilder sectionBuilder = NativeSectionMeshBuilder.create(1);
+        ChunkMeshBufferBuilder posX = new ChunkMeshBufferBuilder(ChunkMeshFormats.COMPACT.getNativeFormat(),
+                sectionBuilder, ModelQuadFacing.POS_X.ordinal());
+        ChunkMeshBufferBuilder unassigned = new ChunkMeshBufferBuilder(ChunkMeshFormats.COMPACT.getNativeFormat(),
+                sectionBuilder, ModelQuadFacing.UNASSIGNED.ordinal());
+        ByteBuffer output = null;
+
+        try {
+            sectionBuilder.start(5);
+            posX.start(5);
+            unassigned.start(5);
+            posX.push(quad(2.0F, 5), 5);
+            unassigned.push(quad(0.0F, 3), 3);
+
+            assertEquals(8, sectionBuilder.totalVertexCount());
+            assertEquals(4, posX.count());
+            assertEquals(4, unassigned.count());
+
+            int[] segments = new int[ModelQuadFacing.COUNT << 1];
+            output = nativeOrder(MemoryUtil.memCalloc(8 * ChunkMeshFormats.COMPACT.getNativeFormat().stride()));
+            sectionBuilder.assemble(output, segments, ChunkMeshFormats.COMPACT.getNativeFormat(),
+                    1 << ModelQuadFacing.POS_X.ordinal(), false, true, false);
+
+            assertArrayEquals(new int[] {
+                    4, ModelQuadFacing.UNASSIGNED.ordinal(),
+                    4, ModelQuadFacing.POS_X.ordinal(),
+                    0, ModelQuadFacing.POS_Y.ordinal(),
+                    0, ModelQuadFacing.POS_Z.ordinal(),
+                    0, ModelQuadFacing.NEG_X.ordinal(),
+                    0, ModelQuadFacing.NEG_Y.ordinal(),
+                    0, ModelQuadFacing.NEG_Z.ordinal(),
+            }, segments);
+            assertCompactVertex(output, 0, 0.0F, 3, 5);
+            assertCompactVertex(output, 4, 2.0F, 5, 5);
+        } finally {
+            free(output);
+            sectionBuilder.close();
         }
     }
 

@@ -11,7 +11,6 @@ import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
-import java.util.Arrays;
 
 final class NativeTranslucentGeometryAnalyzer {
     private static final int RECORD_STRIDE = 56;
@@ -26,11 +25,41 @@ final class NativeTranslucentGeometryAnalyzer {
     private static final MethodHandle VERIFY = NativeLibraryLoader.downcallHandle("mattmc_rust",
             "mattmc_sodium_translucent_analyzer_verify",
             FunctionDescriptor.of(ValueLayout.JAVA_INT));
-    private static final MethodHandle ANALYZE = NativeLibraryLoader.downcallHandle("mattmc_rust",
-            "mattmc_sodium_translucent_analyzer_analyze",
+    private static final MethodHandle CREATE = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_translucent_analyzer_create",
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
-                    ValueLayout.ADDRESS,
+                    ValueLayout.ADDRESS));
+    private static final MethodHandle DESTROY = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_translucent_analyzer_destroy",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG));
+    private static final MethodHandle APPEND_RECORD = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_translucent_analyzer_append_record",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.ADDRESS));
+    private static final MethodHandle APPEND_NATIVE_QUAD = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_translucent_analyzer_append_native_quad",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_LONG,
                     ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT));
+    private static final MethodHandle RECORD_COUNT = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_translucent_analyzer_record_count",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.ADDRESS));
+    private static final MethodHandle WRITE_RECORDS_BY_FACING = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_translucent_analyzer_write_records_by_facing",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_INT));
+    private static final MethodHandle ANALYZE = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_translucent_analyzer_analyze_handle",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
                     ValueLayout.JAVA_INT,
                     ValueLayout.ADDRESS,
                     ValueLayout.JAVA_INT,
@@ -39,61 +68,63 @@ final class NativeTranslucentGeometryAnalyzer {
                     ValueLayout.ADDRESS,
                     ValueLayout.JAVA_INT));
     private static final MethodHandle STATIC_TOPO_SORT = NativeLibraryLoader.downcallHandle("mattmc_rust",
-            "mattmc_sodium_translucent_static_topo_sort",
+            "mattmc_sodium_translucent_static_topo_sort_handle",
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
-                    ValueLayout.ADDRESS,
-                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
                     ValueLayout.JAVA_INT,
                     ValueLayout.ADDRESS,
                     ValueLayout.JAVA_INT));
     private static final int VERIFY_STATUS = invokeVerify();
 
-    private float[] positions;
-    private int[] facings;
-    private int[] packedNormals;
-    private int recordCount;
-    private int capacity;
+    private long handle;
 
     NativeTranslucentGeometryAnalyzer() {
         check(VERIFY_STATUS, "native translucent analyzer verification");
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment handleSegment = arena.allocate(ValueLayout.JAVA_LONG);
+            check(invokeCreate(handleSegment), "native translucent analyzer creation");
+            this.handle = handleSegment.get(ValueLayout.JAVA_LONG, 0);
+            if (this.handle == 0) {
+                throw new IllegalStateException("Native translucent analyzer creation returned a null handle");
+            }
+        }
     }
 
     boolean appendQuad(ChunkVertexEncoder.Vertex[] vertices, ModelQuadFacing facing, int packedNormal) {
-        if (isInvalid(vertices)) {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment recordSegment = arena.allocate(RECORD_STRIDE, Integer.BYTES);
+            writeRecord(recordSegment, vertices, facing.ordinal(), packedNormal);
+            int status = invokeAppendRecord(this.getHandle(), recordSegment);
+            if (status == SORT_FAILED) {
+                return true;
+            }
+            check(status, "native translucent analyzer record append");
+            return false;
+        }
+    }
+
+    boolean appendNativeQuad(long nativeQuadAddress, ModelQuadFacing facing, int packedNormal) {
+        int status = invokeAppendNativeQuad(this.getHandle(), nativeQuadAddress, facing.ordinal(), packedNormal);
+        if (status == SORT_FAILED) {
             return true;
         }
-
-        this.ensureCapacity(this.recordCount + 1);
-        int positionOffset = this.recordCount * POSITION_FLOATS;
-
-        for (int vertexIndex = 0; vertexIndex < 4; vertexIndex++) {
-            ChunkVertexEncoder.Vertex vertex = vertices[vertexIndex];
-            int vertexOffset = positionOffset + vertexIndex * 3;
-            this.positions[vertexOffset] = vertex.x;
-            this.positions[vertexOffset + 1] = vertex.y;
-            this.positions[vertexOffset + 2] = vertex.z;
-        }
-
-        this.facings[this.recordCount] = facing.ordinal();
-        this.packedNormals[this.recordCount] = packedNormal;
-        this.recordCount++;
+        check(status, "native translucent analyzer native quad append");
         return false;
     }
 
     Analysis analyze(SortBehavior.SortMode sortMode) {
         int[] metrics = new int[METRIC_COUNT];
         int[] meshFacingCounts = new int[ModelQuadFacing.COUNT];
-        int[] staticKeys = new int[this.recordCount];
+        int recordCount = this.getRecordCount();
+        int[] staticKeys = new int[recordCount];
 
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment metricsSegment = arena.allocate(ValueLayout.JAVA_INT, metrics.length);
             MemorySegment meshFacingCountsSegment = arena.allocate(ValueLayout.JAVA_INT, meshFacingCounts.length);
             MemorySegment staticKeysSegment = arena.allocate(ValueLayout.JAVA_INT, staticKeys.length);
-            MemorySegment recordsSegment = this.copyRecords(arena);
 
             check(invokeAnalyze(
-                    recordsSegment,
-                    this.recordCount,
+                    this.getHandle(),
                     sortMode.ordinal(),
                     metricsSegment,
                     metrics.length,
@@ -120,18 +151,17 @@ final class NativeTranslucentGeometryAnalyzer {
                 metrics[2],
                 metrics[3] != 0,
                 meshFacingCounts,
-                Arrays.copyOf(staticKeys, metrics[4]),
-                this.recordCount
+                java.util.Arrays.copyOf(staticKeys, metrics[4]),
+                recordCount
         );
     }
 
     int[] staticTopoSort(boolean failOnIntersection) {
-        int[] quadIndexes = new int[this.recordCount];
+        int[] quadIndexes = new int[this.getRecordCount()];
 
         try (Arena arena = Arena.ofConfined()) {
-            MemorySegment recordsSegment = this.copyRecords(arena);
             MemorySegment quadIndexesSegment = arena.allocate(ValueLayout.JAVA_INT, quadIndexes.length);
-            int status = invokeStaticTopoSort(recordsSegment, this.recordCount, failOnIntersection ? 1 : 0,
+            int status = invokeStaticTopoSort(this.getHandle(), failOnIntersection ? 1 : 0,
                     quadIndexesSegment, quadIndexes.length);
 
             if (status == SORT_FAILED) {
@@ -149,130 +179,74 @@ final class NativeTranslucentGeometryAnalyzer {
 
     NativeTranslucentSectionGeometry createSectionGeometry() {
         try (Arena arena = Arena.ofConfined()) {
-            MemorySegment recordsSegment = this.copyRecords(arena);
             MemorySegment handleSegment = arena.allocate(ValueLayout.JAVA_LONG);
-            return NativeTranslucentSectionGeometry.create(recordsSegment, this.recordCount, handleSegment);
+            return NativeTranslucentSectionGeometry.createFromAnalyzer(this.getHandle(), this.getRecordCount(),
+                    handleSegment);
         }
     }
 
     TQuad[] buildRegularQuadsByFacing() {
-        TQuad[] quads = new TQuad[this.recordCount];
-        int outputIndex = 0;
+        int recordCount = this.getRecordCount();
+        TQuad[] quads = new TQuad[recordCount];
 
-        for (ModelQuadFacing facing : ModelQuadFacing.VALUES) {
-            for (int recordIndex = 0; recordIndex < this.recordCount; recordIndex++) {
-                if (this.readFacing(recordIndex) != facing.ordinal()) {
-                    continue;
-                }
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment recordsSegment = recordCount == 0
+                    ? MemorySegment.NULL
+                    : arena.allocate((long) recordCount * RECORD_STRIDE, Integer.BYTES);
+            check(invokeWriteRecordsByFacing(this.getHandle(), recordsSegment, recordCount),
+                    "native translucent analyzer record copy");
 
-                TQuad quad = this.buildRegularQuad(recordIndex, facing);
-                if (quad != null) {
-                    quads[outputIndex++] = quad;
+            for (int recordIndex = 0; recordIndex < recordCount; recordIndex++) {
+                TQuad quad = buildRegularQuad(recordsSegment, recordIndex);
+                if (quad == null) {
+                    throw new IllegalStateException("Native translucent records produced an unexpected invalid quad");
                 }
+                quads[recordIndex] = quad;
             }
         }
 
-        if (outputIndex != quads.length) {
-            throw new IllegalStateException("Native translucent records produced an unexpected valid quad count");
-        }
         return quads;
     }
 
     void destroy() {
-        this.positions = null;
-        this.facings = null;
-        this.packedNormals = null;
-        this.recordCount = 0;
-        this.capacity = 0;
+        long handle = this.handle;
+        if (handle != 0) {
+            check(invokeDestroy(handle), "native translucent analyzer destroy");
+            this.handle = 0;
+        }
     }
 
     int getRecordCount() {
-        return this.recordCount;
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment countSegment = arena.allocate(ValueLayout.JAVA_INT);
+            check(invokeRecordCount(this.getHandle(), countSegment), "native translucent analyzer count query");
+            return countSegment.get(ValueLayout.JAVA_INT, 0);
+        }
     }
 
-    private TQuad buildRegularQuad(int recordIndex, ModelQuadFacing facing) {
+    private static TQuad buildRegularQuad(MemorySegment recordsSegment, int recordIndex) {
         ChunkVertexEncoder.Vertex[] vertices = ChunkVertexEncoder.Vertex.uninitializedQuad();
-        int positionOffset = recordIndex * POSITION_FLOATS;
+        long recordOffset = (long) recordIndex * RECORD_STRIDE;
 
         for (int vertexIndex = 0; vertexIndex < 4; vertexIndex++) {
-            int vertexOffset = positionOffset + vertexIndex * 3;
             ChunkVertexEncoder.Vertex vertex = vertices[vertexIndex];
-            vertex.x = this.positions[vertexOffset];
-            vertex.y = this.positions[vertexOffset + 1];
-            vertex.z = this.positions[vertexOffset + 2];
+            long positionOffset = recordOffset + OFFSET_POSITIONS + (long) vertexIndex * 3 * Float.BYTES;
+            vertex.x = recordsSegment.get(ValueLayout.JAVA_FLOAT, positionOffset);
+            vertex.y = recordsSegment.get(ValueLayout.JAVA_FLOAT, positionOffset + Float.BYTES);
+            vertex.z = recordsSegment.get(ValueLayout.JAVA_FLOAT, positionOffset + 2L * Float.BYTES);
         }
 
-        return RegularTQuad.fromVertices(vertices, facing, this.readPackedNormal(recordIndex));
+        ModelQuadFacing facing = ModelQuadFacing.VALUES[recordsSegment.get(ValueLayout.JAVA_INT,
+                recordOffset + OFFSET_FACING)];
+        int packedNormal = recordsSegment.get(ValueLayout.JAVA_INT, recordOffset + OFFSET_PACKED_NORMAL);
+        return RegularTQuad.fromVertices(vertices, facing, packedNormal);
     }
 
-    private int readFacing(int recordIndex) {
-        return this.facings[recordIndex];
-    }
-
-    private int readPackedNormal(int recordIndex) {
-        return this.packedNormals[recordIndex];
-    }
-
-    private void ensureCapacity(int requiredCapacity) {
-        if (requiredCapacity <= this.capacity) {
-            return;
+    private long getHandle() {
+        if (this.handle == 0) {
+            throw new IllegalStateException("Native translucent analyzer has been destroyed");
         }
-
-        int newCapacity = Math.max(requiredCapacity, Math.max(16, this.capacity * 2));
-        this.positions = Arrays.copyOf(this.positions == null ? new float[0] : this.positions,
-                newCapacity * POSITION_FLOATS);
-        this.facings = Arrays.copyOf(this.facings == null ? new int[0] : this.facings, newCapacity);
-        this.packedNormals = Arrays.copyOf(this.packedNormals == null ? new int[0] : this.packedNormals,
-                newCapacity);
-        this.capacity = newCapacity;
-    }
-
-    private MemorySegment copyRecords(Arena arena) {
-        if (this.recordCount == 0) {
-            return MemorySegment.NULL;
-        }
-
-        MemorySegment recordsSegment = arena.allocate((long) this.recordCount * RECORD_STRIDE, Integer.BYTES);
-        for (int recordIndex = 0; recordIndex < this.recordCount; recordIndex++) {
-            long recordOffset = (long) recordIndex * RECORD_STRIDE;
-            int positionOffset = recordIndex * POSITION_FLOATS;
-
-            for (int positionIndex = 0; positionIndex < POSITION_FLOATS; positionIndex++) {
-                recordsSegment.set(ValueLayout.JAVA_FLOAT,
-                        recordOffset + OFFSET_POSITIONS + (long) positionIndex * Float.BYTES,
-                        this.positions[positionOffset + positionIndex]);
-            }
-
-            recordsSegment.set(ValueLayout.JAVA_INT, recordOffset + OFFSET_FACING, this.facings[recordIndex]);
-            recordsSegment.set(ValueLayout.JAVA_INT, recordOffset + OFFSET_PACKED_NORMAL,
-                    this.packedNormals[recordIndex]);
-        }
-
-        return recordsSegment;
-    }
-
-    private static boolean isInvalid(ChunkVertexEncoder.Vertex[] vertices) {
-        float lastX = vertices[3].x;
-        float lastY = vertices[3].y;
-        float lastZ = vertices[3].z;
-        int sameVertexMap = 0;
-
-        for (int index = 0; index < 4; index++) {
-            ChunkVertexEncoder.Vertex vertex = vertices[index];
-            if (Math.abs(vertex.x - lastX) < TQuad.VERTEX_EPSILON
-                    && Math.abs(vertex.y - lastY) < TQuad.VERTEX_EPSILON
-                    && Math.abs(vertex.z - lastZ) < TQuad.VERTEX_EPSILON) {
-                sameVertexMap |= 1 << index;
-            }
-
-            if (index != 3) {
-                lastX = vertex.x;
-                lastY = vertex.y;
-                lastZ = vertex.z;
-            }
-        }
-
-        return Integer.bitCount(sameVertexMap) > 1;
+        return this.handle;
     }
 
     private static void check(int status, String operation) {
@@ -289,38 +263,86 @@ final class NativeTranslucentGeometryAnalyzer {
         }
     }
 
-    private static int invokeAnalyze(
-            MemorySegment records,
-            int recordCount,
-            int sortMode,
-            MemorySegment metrics,
-            int metricsLength,
-            MemorySegment meshFacingCounts,
-            int meshFacingCountsLength,
-            MemorySegment staticKeys,
-            int staticKeysLength
-    ) {
+    private static int invokeCreate(MemorySegment handleOutput) {
         try {
-            return (int) ANALYZE.invokeExact(records, recordCount, sortMode, metrics, metricsLength,
+            return (int) CREATE.invokeExact(handleOutput);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust translucent analyzer creation downcall failed", throwable);
+        }
+    }
+
+    private static int invokeDestroy(long handle) {
+        try {
+            return (int) DESTROY.invokeExact(handle);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust translucent analyzer destroy downcall failed", throwable);
+        }
+    }
+
+    private static int invokeAppendRecord(long handle, MemorySegment record) {
+        try {
+            return (int) APPEND_RECORD.invokeExact(handle, record);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust translucent analyzer append downcall failed", throwable);
+        }
+    }
+
+    private static int invokeAppendNativeQuad(long handle, long nativeQuadAddress, int facing, int packedNormal) {
+        try {
+            return (int) APPEND_NATIVE_QUAD.invokeExact(handle, nativeQuadAddress, facing, packedNormal);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust translucent analyzer native append downcall failed", throwable);
+        }
+    }
+
+    private static int invokeRecordCount(long handle, MemorySegment countOutput) {
+        try {
+            return (int) RECORD_COUNT.invokeExact(handle, countOutput);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust translucent analyzer count downcall failed", throwable);
+        }
+    }
+
+    private static int invokeWriteRecordsByFacing(long handle, MemorySegment records, int recordCount) {
+        try {
+            return (int) WRITE_RECORDS_BY_FACING.invokeExact(handle, records, recordCount);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust translucent analyzer record copy downcall failed", throwable);
+        }
+    }
+
+    private static int invokeAnalyze(long handle, int sortMode, MemorySegment metrics, int metricsLength,
+            MemorySegment meshFacingCounts, int meshFacingCountsLength, MemorySegment staticKeys,
+            int staticKeysLength) {
+        try {
+            return (int) ANALYZE.invokeExact(handle, sortMode, metrics, metricsLength,
                     meshFacingCounts, meshFacingCountsLength, staticKeys, staticKeysLength);
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust translucent analyzer downcall failed", throwable);
         }
     }
 
-    private static int invokeStaticTopoSort(
-            MemorySegment records,
-            int recordCount,
-            int failOnIntersection,
-            MemorySegment quadIndexes,
-            int quadIndexesLength
-    ) {
+    private static int invokeStaticTopoSort(long handle, int failOnIntersection, MemorySegment quadIndexes,
+            int quadIndexesLength) {
         try {
-            return (int) STATIC_TOPO_SORT.invokeExact(records, recordCount, failOnIntersection, quadIndexes,
-                    quadIndexesLength);
+            return (int) STATIC_TOPO_SORT.invokeExact(handle, failOnIntersection, quadIndexes, quadIndexesLength);
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust static translucent topo sort downcall failed", throwable);
         }
+    }
+
+    private static void writeRecord(MemorySegment recordSegment, ChunkVertexEncoder.Vertex[] vertices,
+            int facingOrdinal, int packedNormal) {
+        for (int vertexIndex = 0; vertexIndex < 4; vertexIndex++) {
+            ChunkVertexEncoder.Vertex vertex = vertices[vertexIndex];
+            long positionOffset = OFFSET_POSITIONS + (long) vertexIndex * 3 * Float.BYTES;
+            recordSegment.set(ValueLayout.JAVA_FLOAT, positionOffset, vertex.x);
+            recordSegment.set(ValueLayout.JAVA_FLOAT, positionOffset + Float.BYTES, vertex.y);
+            recordSegment.set(ValueLayout.JAVA_FLOAT, positionOffset + 2L * Float.BYTES, vertex.z);
+        }
+
+        recordSegment.set(ValueLayout.JAVA_INT, OFFSET_FACING, facingOrdinal);
+        recordSegment.set(ValueLayout.JAVA_INT, OFFSET_PACKED_NORMAL, packedNormal);
     }
 
     record Analysis(

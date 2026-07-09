@@ -75,6 +75,7 @@ public class ChunkBuilder {
         }
 
         this.shutdownThreads();
+        this.localContext.destroy();
     }
 
     private void shutdownThreads() {
@@ -169,34 +170,39 @@ public class ChunkBuilder {
 
         @Override
         public void run() {
-            // Run until the chunk builder shuts down
-            while (ChunkBuilder.this.queue.isRunning()) {
-                ChunkJob job;
+            try {
+                // Run until the chunk builder shuts down
+                while (ChunkBuilder.this.queue.isRunning()) {
+                    ChunkJob job;
 
-                try {
-                    job = ChunkBuilder.this.queue.waitForNextJob();
-                } catch (InterruptedException ignored) {
-                    continue;
+                    try {
+                        job = ChunkBuilder.this.queue.waitForNextJob();
+                    } catch (InterruptedException ignored) {
+                        continue;
+                    }
+
+                    if (job == null) {
+                        // might mean we are not running anymore... go around and check isRunning
+                        continue;
+                    }
+
+                    ChunkBuilder.this.busyThreadCount.getAndIncrement();
+
+                    Zone zone = TracyClient.beginZone(name, SharedConstants.IS_RUNNING_IN_IDE);
+
+                    try {
+                        job.execute(this.context);
+                    } finally {
+                        try {
+                            this.context.cleanup();
+                        } finally {
+                            ChunkBuilder.this.busyThreadCount.decrementAndGet();
+                            zone.close();
+                        }
+                    }
                 }
-
-                if (job == null) {
-                    // might mean we are not running anymore... go around and check isRunning
-                    continue;
-                }
-
-                ChunkBuilder.this.busyThreadCount.getAndIncrement();
-
-                Zone zone = TracyClient.beginZone(name, SharedConstants.IS_RUNNING_IN_IDE);
-
-                try {
-                    job.execute(this.context);
-                } finally {
-                    this.context.cleanup();
-
-                    ChunkBuilder.this.busyThreadCount.decrementAndGet();
-                }
-
-                zone.close();
+            } finally {
+                this.context.destroy();
             }
         }
     }

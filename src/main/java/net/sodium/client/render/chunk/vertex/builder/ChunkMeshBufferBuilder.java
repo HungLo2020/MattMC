@@ -1,10 +1,12 @@
 package net.sodium.client.render.chunk.vertex.builder;
 
 import net.sodium.client.render.chunk.terrain.material.Material;
+import net.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
-import net.sodium.client.render.chunk.vertex.format.NativeChunkQuadBuffer;
+import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkVertexFormat;
 import org.lwjgl.system.MemoryUtil;
 
@@ -14,21 +16,29 @@ public class ChunkMeshBufferBuilder {
     private final NativeChunkVertexFormat nativeFormat;
     private final int nativeQuadStride = NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE;
 
-    private final int initialQuadCapacity;
-
-    private NativeChunkQuadBuffer buffer;
-    private int quadCount;
-    private int quadCapacity;
+    private final NativeSectionMeshBuilder sectionBuilder;
+    private final int facing;
+    private final boolean ownsSectionBuilder;
 
     private int sectionIndex;
 
     public ChunkMeshBufferBuilder(ChunkVertexType vertexType, int initialCapacity) {
-        this.nativeFormat = vertexType.getNativeFormat();
+        this(vertexType.getNativeFormat(),
+                NativeSectionMeshBuilder.create(Math.max(1, (initialCapacity + 3) >> 2)),
+                net.sodium.client.model.quad.properties.ModelQuadFacing.UNASSIGNED.ordinal(), true);
+    }
 
-        this.buffer = null;
+    public ChunkMeshBufferBuilder(NativeChunkVertexFormat nativeFormat, NativeSectionMeshBuilder sectionBuilder,
+            int facing) {
+        this(nativeFormat, sectionBuilder, facing, false);
+    }
 
-        this.quadCapacity = Math.max(1, (initialCapacity + 3) >> 2);
-        this.initialQuadCapacity = this.quadCapacity;
+    private ChunkMeshBufferBuilder(NativeChunkVertexFormat nativeFormat, NativeSectionMeshBuilder sectionBuilder,
+            int facing, boolean ownsSectionBuilder) {
+        this.nativeFormat = nativeFormat;
+        this.sectionBuilder = sectionBuilder;
+        this.facing = facing;
+        this.ownsSectionBuilder = ownsSectionBuilder;
     }
 
     public void push(ChunkVertexEncoder.Vertex[] vertices, Material material) {
@@ -40,52 +50,51 @@ public class ChunkMeshBufferBuilder {
             throw new IllegalArgumentException("Only quad primitives (with 4 vertices) can be pushed");
         }
 
-        this.ensureCapacity(1);
-
-        NativeChunkMeshEncoder.writeNativeQuad(this.buffer.addressAt(this.quadCount), vertices, materialBits);
-
-        this.quadCount++;
+        long address = this.prepareQuadAddress();
+        NativeChunkMeshEncoder.writeNativeQuad(address, vertices, materialBits);
+        this.commitPreparedQuad();
     }
 
-    private void ensureCapacity(int quadCount) {
-        if (this.quadCount + quadCount >= this.quadCapacity) {
-            this.grow(quadCount);
+    public boolean pushTranslucent(ChunkVertexEncoder.Vertex[] vertices, int materialBits,
+            TranslucentGeometryCollector collector, ModelQuadFacing facing, int packedNormal) {
+        if (vertices.length != 4) {
+            throw new IllegalArgumentException("Only quad primitives (with 4 vertices) can be pushed");
         }
-    }
 
-    private void grow(int quadCount) {
-        this.reallocate(
-                // The new capacity will at least twice as large
-                Math.max(this.quadCapacity * 2, this.quadCapacity + quadCount)
-        );
-    }
-
-    private void reallocate(int quadCount) {
-        if (this.buffer == null) {
-            this.buffer = NativeChunkQuadBuffer.create(quadCount);
-        } else {
-            this.buffer.ensureCapacity(quadCount);
+        long address = this.prepareQuadAddress();
+        NativeChunkMeshEncoder.writeNativeQuad(address, vertices, materialBits);
+        if (collector.appendNativeQuad(address, vertices, facing, packedNormal)) {
+            return true;
         }
-        this.quadCapacity = this.buffer.capacity();
+
+        this.commitPreparedQuad();
+        return false;
+    }
+
+    public long prepareQuadAddress() {
+        return this.sectionBuilder.prepareQuadAddress(this.facing);
+    }
+
+    public void commitPreparedQuad() {
+        this.sectionBuilder.commitQuad(this.facing);
     }
 
     public void start(int sectionIndex) {
-        this.quadCount = 0;
         this.sectionIndex = sectionIndex;
 
-        this.reallocate(this.initialQuadCapacity);
+        if (this.ownsSectionBuilder) {
+            this.sectionBuilder.start(sectionIndex);
+        }
     }
 
     public void destroy() {
-        if (this.buffer != null) {
-            this.buffer.close();
+        if (this.ownsSectionBuilder) {
+            this.sectionBuilder.close();
         }
-
-        this.buffer = null;
     }
 
     public boolean isEmpty() {
-        return this.quadCount == 0;
+        return this.count() == 0;
     }
 
     public ByteBuffer slice() {
@@ -93,15 +102,15 @@ public class ChunkMeshBufferBuilder {
             throw new IllegalStateException("No vertex data in buffer");
         }
 
-        return MemoryUtil.memByteBuffer(this.buffer.address(), this.nativeQuadStride * this.quadCount);
+        return MemoryUtil.memByteBuffer(this.logicalAddress(), this.nativeQuadStride * (this.count() >> 2));
     }
 
     public int count() {
-        return this.quadCount << 2;
+        return this.sectionBuilder.facingVertexCount(this.facing);
     }
 
     public long logicalAddress() {
-        return this.isEmpty() ? 0L : this.buffer.address();
+        return this.sectionBuilder.facingAddress(this.facing);
     }
 
     public NativeChunkVertexFormat nativeFormat() {
@@ -110,5 +119,9 @@ public class ChunkMeshBufferBuilder {
 
     public int sectionIndex() {
         return this.sectionIndex;
+    }
+
+    public NativeSectionMeshBuilder sectionBuilder() {
+        return this.sectionBuilder;
     }
 }

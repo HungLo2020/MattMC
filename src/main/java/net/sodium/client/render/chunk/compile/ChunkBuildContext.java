@@ -15,6 +15,10 @@ public class ChunkBuildContext {
     }
 
     public void cleanup() {
+        this.cache.cleanup();
+    }
+
+    public void destroy() {
         this.buffers.destroy();
         this.cache.cleanup();
     }

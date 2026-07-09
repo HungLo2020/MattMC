@@ -194,13 +194,6 @@ public class BlockRenderer extends AbstractBlockRenderContext implements net.iri
             pass = downgradedPass;
         }
 
-        // collect all translucent quads into the translucency sorting system if enabled,
-        // and discard the quad if it's invalid (i.e. not visible)
-        if (pass.isTranslucent() && this.collector != null &&
-                this.collector.appendQuad(vertices, normalFace, quad.getFaceNormal())) {
-            return;
-        }
-
         // if there was a downgrade from translucent to cutout, the material bits' alpha cutoff needs to be updated
         if (downgradedPass != null && material == DefaultMaterials.TRANSLUCENT && pass == DefaultTerrainRenderPasses.CUTOUT) {
             // ONE_TENTH and HALF are functionally the same so it doesn't matter which one we take here
@@ -209,7 +202,13 @@ public class BlockRenderer extends AbstractBlockRenderContext implements net.iri
 
         ChunkModelBuilder builder = this.buffers.get(pass);
         ChunkMeshBufferBuilder vertexBuffer = builder.getVertexBuffer(normalFace);
-        vertexBuffer.push(vertices, materialBits);
+        if (pass.isTranslucent() && this.collector != null) {
+            if (vertexBuffer.pushTranslucent(vertices, materialBits, this.collector, normalFace, quad.getFaceNormal())) {
+                return;
+            }
+        } else {
+            vertexBuffer.push(vertices, materialBits);
+        }
 
         if (atlasSprite != null) {
             builder.addSprite(atlasSprite);

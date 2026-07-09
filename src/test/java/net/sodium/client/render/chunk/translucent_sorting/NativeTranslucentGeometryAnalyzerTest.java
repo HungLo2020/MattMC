@@ -1,7 +1,12 @@
 package net.sodium.client.render.chunk.translucent_sorting;
 
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.sodium.client.render.chunk.terrain.material.DefaultMaterials;
+import net.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
+import net.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
+import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
+import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
 import org.lwjgl.system.MemoryUtil;
@@ -67,6 +72,32 @@ class NativeTranslucentGeometryAnalyzerTest {
 
         assertEquals(0, analysis.quadCount());
         assertEquals(SortType.NONE, analysis.sortType());
+    }
+
+    @Test
+    void analyzerAppendsFromNativeStagedQuadWithoutJavaRecordStorage() {
+        NativeTranslucentGeometryAnalyzer analyzer = new NativeTranslucentGeometryAnalyzer();
+        NativeSectionMeshBuilder sectionBuilder = NativeSectionMeshBuilder.create(1);
+        ChunkMeshBufferBuilder quadBuffer = new ChunkMeshBufferBuilder(ChunkMeshFormats.COMPACT.getNativeFormat(),
+                sectionBuilder, ModelQuadFacing.POS_Z.ordinal());
+
+        try {
+            sectionBuilder.start(3);
+            quadBuffer.start(3);
+            long address = quadBuffer.prepareQuadAddress();
+            NativeChunkMeshEncoder.writeNativeQuad(address, zQuad(2.0F), DefaultMaterials.TRANSLUCENT.bits());
+
+            assertFalse(analyzer.appendNativeQuad(address, ModelQuadFacing.POS_Z,
+                    ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
+            quadBuffer.commitPreparedQuad();
+
+            NativeTranslucentGeometryAnalyzer.Analysis analysis = analyzer.analyze(SortBehavior.SortMode.DYNAMIC);
+            assertEquals(1, analysis.quadCount());
+            assertEquals(4, quadBuffer.count());
+        } finally {
+            analyzer.destroy();
+            sectionBuilder.close();
+        }
     }
 
     @Test

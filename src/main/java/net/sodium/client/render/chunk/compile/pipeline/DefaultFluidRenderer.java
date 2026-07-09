@@ -422,6 +422,7 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
             builder.addSprite(sprite);
         }
 
+        var vertexBuffer = builder.getVertexBuffer(facing);
         if (material.isTranslucent() && collector != null) {
             int normal;
 
@@ -436,14 +437,12 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
                 normal = NormI8.flipPacked(normal);
             }
 
-            // discard the quad if it's invalid (i.e. not visible)
-            if (collector.appendQuad(vertices, facing, normal)) {
+            if (vertexBuffer.pushTranslucent(vertices, material.bits(), collector, facing, normal)) {
                 return;
             }
+        } else {
+            vertexBuffer.push(vertices, material);
         }
-
-        var vertexBuffer = builder.getVertexBuffer(facing);
-        vertexBuffer.push(vertices, material);
     }
 
     private static void setVertex(ModelQuadViewMutable quad, int i, float x, float y, float z, float u, float v) {

@@ -76,6 +76,10 @@ struct NativeTranslucentSectionGeometry {
     aligned_separator_distances: [Vec<f32>; FACING_DIRECTIONS],
 }
 
+struct NativeTranslucentAnalyzer {
+    records: Vec<TranslucentQuadRecord>,
+}
+
 pub fn verify() -> i32 {
     if std::mem::size_of::<TranslucentQuadRecord>() == 56 {
         OK
@@ -257,6 +261,56 @@ fn build_quad_info(record: &TranslucentQuadRecord) -> QuadInfo {
         accurate_dot_product,
         quantized_dot_product,
     }
+}
+
+unsafe fn record_from_native_quad(
+    native_quad_address: u64,
+    facing: i32,
+    packed_normal: i32,
+) -> TranslucentQuadRecord {
+    let mut positions = [0.0; 12];
+    for vertex in 0..4usize {
+        let base = native_quad_address + (vertex * 32) as u64;
+        let output = vertex * 3;
+        positions[output] = *(base as *const f32);
+        positions[output + 1] = *((base + 4) as *const f32);
+        positions[output + 2] = *((base + 8) as *const f32);
+    }
+
+    TranslucentQuadRecord {
+        positions,
+        facing,
+        packed_normal,
+    }
+}
+
+fn record_is_invalid(record: &TranslucentQuadRecord) -> bool {
+    let mut last = (
+        record.positions[9],
+        record.positions[10],
+        record.positions[11],
+    );
+    let mut same_vertex_map = 0i32;
+
+    for index in 0..4usize {
+        let base = index * 3;
+        let current = (
+            record.positions[base],
+            record.positions[base + 1],
+            record.positions[base + 2],
+        );
+
+        if (current.0 - last.0).abs() < VERTEX_EPSILON
+            && (current.1 - last.1).abs() < VERTEX_EPSILON
+            && (current.2 - last.2).abs() < VERTEX_EPSILON
+        {
+            same_vertex_map |= 1 << index;
+        }
+
+        last = current;
+    }
+
+    same_vertex_map.count_ones() > 1
 }
 
 fn compute_extents_and_center(
@@ -1358,6 +1412,123 @@ pub extern "C" fn mattmc_sodium_translucent_analyzer_verify() -> i32 {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_analyzer_create(output_handle: *mut u64) -> i32 {
+    if output_handle.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    *output_handle = Box::into_raw(Box::new(NativeTranslucentAnalyzer {
+        records: Vec::new(),
+    })) as u64;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_analyzer_destroy(handle: u64) -> i32 {
+    if handle == 0 {
+        return OK;
+    }
+
+    drop(Box::from_raw(handle as *mut NativeTranslucentAnalyzer));
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_analyzer_append_record(
+    handle: u64,
+    record: *const TranslucentQuadRecord,
+) -> i32 {
+    if handle == 0 || record.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let analyzer = &mut *(handle as *mut NativeTranslucentAnalyzer);
+    let record = *record;
+    if record_is_invalid(&record) {
+        return SORT_FAILED;
+    }
+
+    analyzer.records.push(record);
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_analyzer_append_native_quad(
+    handle: u64,
+    native_quad_address: u64,
+    facing: i32,
+    packed_normal: i32,
+) -> i32 {
+    if handle == 0 || native_quad_address == 0 {
+        return ERR_NULL_POINTER;
+    }
+    if !(0..FACING_COUNT as i32).contains(&facing) {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let analyzer = &mut *(handle as *mut NativeTranslucentAnalyzer);
+    let record = record_from_native_quad(native_quad_address, facing, packed_normal);
+    if record_is_invalid(&record) {
+        return SORT_FAILED;
+    }
+
+    analyzer.records.push(record);
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_analyzer_record_count(
+    handle: u64,
+    output_count: *mut i32,
+) -> i32 {
+    if handle == 0 || output_count.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let analyzer = &*(handle as *const NativeTranslucentAnalyzer);
+    *output_count = analyzer.records.len() as i32;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_analyzer_write_records_by_facing(
+    handle: u64,
+    output_records: *mut TranslucentQuadRecord,
+    output_records_len: i32,
+) -> i32 {
+    if handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+    if output_records_len < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let analyzer = &*(handle as *const NativeTranslucentAnalyzer);
+    if output_records_len as usize != analyzer.records.len() {
+        return ERR_CAPACITY;
+    }
+    if analyzer.records.is_empty() {
+        return OK;
+    }
+    if !analyzer.records.is_empty() && output_records.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let output_records = slice::from_raw_parts_mut(output_records, output_records_len as usize);
+    let mut output_index = 0usize;
+    for facing in 0..FACING_COUNT as i32 {
+        for record in &analyzer.records {
+            if record.facing == facing {
+                output_records[output_index] = *record;
+                output_index += 1;
+            }
+        }
+    }
+
+    OK
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn mattmc_sodium_translucent_analyzer_analyze(
     records: *const TranslucentQuadRecord,
     record_count: i32,
@@ -1419,6 +1590,35 @@ pub unsafe extern "C" fn mattmc_sodium_translucent_analyzer_analyze(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_analyzer_analyze_handle(
+    handle: u64,
+    sort_mode: i32,
+    metrics: *mut i32,
+    metrics_len: i32,
+    mesh_facing_counts: *mut i32,
+    mesh_facing_counts_len: i32,
+    static_keys: *mut i32,
+    static_keys_len: i32,
+) -> i32 {
+    if handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let analyzer = &*(handle as *const NativeTranslucentAnalyzer);
+    mattmc_sodium_translucent_analyzer_analyze(
+        analyzer.records.as_ptr(),
+        analyzer.records.len() as i32,
+        sort_mode,
+        metrics,
+        metrics_len,
+        mesh_facing_counts,
+        mesh_facing_counts_len,
+        static_keys,
+        static_keys_len,
+    )
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn mattmc_sodium_translucent_static_topo_sort(
     records: *const TranslucentQuadRecord,
     record_count: i32,
@@ -1456,6 +1656,27 @@ pub unsafe extern "C" fn mattmc_sodium_translucent_static_topo_sort(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_static_topo_sort_handle(
+    handle: u64,
+    fail_on_intersection: i32,
+    output_indices: *mut i32,
+    output_indices_len: i32,
+) -> i32 {
+    if handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let analyzer = &*(handle as *const NativeTranslucentAnalyzer);
+    mattmc_sodium_translucent_static_topo_sort(
+        analyzer.records.as_ptr(),
+        analyzer.records.len() as i32,
+        fail_on_intersection,
+        output_indices,
+        output_indices_len,
+    )
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn mattmc_sodium_translucent_section_geometry_create(
     records: *const TranslucentQuadRecord,
     record_count: i32,
@@ -1480,6 +1701,23 @@ pub unsafe extern "C" fn mattmc_sodium_translucent_section_geometry_create(
 
     *output_handle = Box::into_raw(Box::new(geometry)) as u64;
     OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_section_geometry_create_from_analyzer(
+    analyzer_handle: u64,
+    output_handle: *mut u64,
+) -> i32 {
+    if analyzer_handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let analyzer = &*(analyzer_handle as *const NativeTranslucentAnalyzer);
+    mattmc_sodium_translucent_section_geometry_create(
+        analyzer.records.as_ptr(),
+        analyzer.records.len() as i32,
+        output_handle,
+    )
 }
 
 #[no_mangle]

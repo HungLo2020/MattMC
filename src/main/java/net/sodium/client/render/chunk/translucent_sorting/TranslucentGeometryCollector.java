@@ -189,6 +189,15 @@ public class TranslucentGeometryCollector {
         return false;
     }
 
+    public boolean appendNativeQuad(long nativeQuadAddress, ChunkVertexEncoder.Vertex[] vertices,
+            ModelQuadFacing facing, int packedNormal) {
+        if (this.nativeAnalyzer != null) {
+            return this.nativeAnalyzer.appendNativeQuad(nativeQuadAddress, facing, packedNormal);
+        }
+
+        return this.appendQuad(vertices, facing, packedNormal);
+    }
+
     public boolean isSplittingQuads() {
         return this.quadSplittingMode.allowsSplitting();
     }

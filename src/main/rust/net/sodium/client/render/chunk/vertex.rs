@@ -50,6 +50,11 @@ struct NativeQuadBuffer {
     quads: Vec<NativeQuad>,
 }
 
+struct NativeSectionMeshBuilder {
+    buffers: [NativeQuadBuffer; MODEL_QUAD_FACING_COUNT],
+    counts: [usize; MODEL_QUAD_FACING_COUNT],
+}
+
 #[derive(Clone, Copy)]
 struct NativeFormat {
     vertex_stride: usize,
@@ -538,6 +543,45 @@ fn encode_segment(
     Ok(())
 }
 
+fn section_builder_addresses_and_counts(
+    builder: &NativeSectionMeshBuilder,
+) -> (
+    [u64; MODEL_QUAD_FACING_COUNT],
+    [i32; MODEL_QUAD_FACING_COUNT],
+) {
+    let mut addresses = [0u64; MODEL_QUAD_FACING_COUNT];
+    let mut vertex_counts = [0i32; MODEL_QUAD_FACING_COUNT];
+
+    for facing in 0..MODEL_QUAD_FACING_COUNT {
+        let count = builder.counts[facing];
+        if count != 0 {
+            addresses[facing] = builder.buffers[facing].quads.as_ptr() as u64;
+            vertex_counts[facing] = (count * 4) as i32;
+        }
+    }
+
+    (addresses, vertex_counts)
+}
+
+fn section_builder_prepare_quad(
+    builder: &mut NativeSectionMeshBuilder,
+    facing: usize,
+) -> Result<u64, i32> {
+    if facing >= MODEL_QUAD_FACING_COUNT {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    let index = builder.counts[facing];
+    if builder.buffers[facing].quads.len() <= index {
+        let next_capacity = (builder.buffers[facing].quads.len().max(1) * 2).max(index + 1);
+        builder.buffers[facing]
+            .quads
+            .resize(next_capacity, NativeQuad::default());
+    }
+
+    Ok(unsafe { builder.buffers[facing].quads.as_mut_ptr().add(index) as u64 })
+}
+
 fn encode_quad(quad: &NativeQuad, output: &mut [u8], format: NativeFormat) {
     let vertices = &quad.vertices;
     let tex_centroid_u = vertices.iter().map(|vertex| vertex.u).sum::<f32>() * 0.25;
@@ -992,6 +1036,217 @@ pub unsafe extern "C" fn mattmc_sodium_chunk_mesh_output_assemble(
         index_stride,
         index_values,
         index_value_count,
+    )
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_create(
+    initial_quad_capacity: i32,
+    output_handle: *mut u64,
+) -> i32 {
+    if initial_quad_capacity < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if output_handle.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let capacity = match usize::try_from(initial_quad_capacity) {
+        Ok(value) => value,
+        Err(_) => return ERR_INVALID_ARGUMENT,
+    };
+    let builder = NativeSectionMeshBuilder {
+        buffers: std::array::from_fn(|_| NativeQuadBuffer {
+            quads: vec![NativeQuad::default(); capacity],
+        }),
+        counts: [0; MODEL_QUAD_FACING_COUNT],
+    };
+
+    *output_handle = Box::into_raw(Box::new(builder)) as u64;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_destroy(handle: u64) -> i32 {
+    if handle == 0 {
+        return OK;
+    }
+
+    drop(Box::from_raw(handle as *mut NativeSectionMeshBuilder));
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_start(handle: u64) -> i32 {
+    if handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let builder = &mut *(handle as *mut NativeSectionMeshBuilder);
+    builder.counts.fill(0);
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_prepare_quad(
+    handle: u64,
+    facing: i32,
+    output_address: *mut u64,
+) -> i32 {
+    if handle == 0 || output_address.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    if facing < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let builder = &mut *(handle as *mut NativeSectionMeshBuilder);
+    match section_builder_prepare_quad(builder, facing as usize) {
+        Ok(address) => {
+            *output_address = address;
+            OK
+        }
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_commit_quad(
+    handle: u64,
+    facing: i32,
+) -> i32 {
+    if handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+    if facing < 0 || facing as usize >= MODEL_QUAD_FACING_COUNT {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let builder = &mut *(handle as *mut NativeSectionMeshBuilder);
+    let facing = facing as usize;
+    if builder.counts[facing] >= builder.buffers[facing].quads.len() {
+        return ERR_INVALID_ARGUMENT;
+    }
+    builder.counts[facing] += 1;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_facing_address(
+    handle: u64,
+    facing: i32,
+    output_address: *mut u64,
+) -> i32 {
+    if handle == 0 || output_address.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    if facing < 0 || facing as usize >= MODEL_QUAD_FACING_COUNT {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let builder = &*(handle as *const NativeSectionMeshBuilder);
+    let facing = facing as usize;
+    *output_address = if builder.counts[facing] == 0 {
+        0
+    } else {
+        builder.buffers[facing].quads.as_ptr() as u64
+    };
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_facing_vertex_count(
+    handle: u64,
+    facing: i32,
+    output_count: *mut i32,
+) -> i32 {
+    if handle == 0 || output_count.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    if facing < 0 || facing as usize >= MODEL_QUAD_FACING_COUNT {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let builder = &*(handle as *const NativeSectionMeshBuilder);
+    *output_count = (builder.counts[facing as usize] * 4) as i32;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_total_vertex_count(
+    handle: u64,
+    output_count: *mut i32,
+) -> i32 {
+    if handle == 0 || output_count.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let builder = &*(handle as *const NativeSectionMeshBuilder);
+    let Some(total_count) = builder
+        .counts
+        .iter()
+        .try_fold(0usize, |acc, count| acc.checked_add(count * 4))
+        .and_then(|value| i32::try_from(value).ok())
+    else {
+        return ERR_CAPACITY;
+    };
+
+    *output_count = total_count;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_assemble(
+    handle: u64,
+    output_address: u64,
+    output_capacity: i32,
+    vertex_segments: *mut i32,
+    vertex_segments_len: i32,
+    quad_stride: i32,
+    vertex_stride: i32,
+    block_id_offset: i32,
+    normal_offset: i32,
+    tangent_offset: i32,
+    mid_uv_offset: i32,
+    mid_block_offset: i32,
+    section_index: i32,
+    visible_slices: i32,
+    force_unassigned: i32,
+    slice_reordering: i32,
+    separate_ao: i32,
+) -> i32 {
+    if handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+    let format = match NativeFormat::from_abi(
+        quad_stride,
+        vertex_stride,
+        block_id_offset,
+        normal_offset,
+        tangent_offset,
+        mid_uv_offset,
+        mid_block_offset,
+        section_index,
+        separate_ao,
+    ) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+
+    let builder = &*(handle as *const NativeSectionMeshBuilder);
+    let (addresses, vertex_counts) = section_builder_addresses_and_counts(builder);
+    assemble(
+        addresses.as_ptr(),
+        vertex_counts.as_ptr(),
+        MODEL_QUAD_FACING_COUNT as i32,
+        output_address,
+        output_capacity,
+        vertex_segments,
+        vertex_segments_len,
+        format,
+        visible_slices,
+        force_unassigned,
+        slice_reordering,
     )
 }
 

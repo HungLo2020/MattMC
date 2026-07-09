@@ -28,6 +28,11 @@ public final class NativeTranslucentSectionGeometry implements AutoCloseable {
                     ValueLayout.ADDRESS,
                     ValueLayout.JAVA_INT,
                     ValueLayout.ADDRESS));
+    private static final MethodHandle CREATE_FROM_ANALYZER = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_translucent_section_geometry_create_from_analyzer",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.ADDRESS));
     private static final MethodHandle DESTROY = NativeLibraryLoader.downcallHandle("mattmc_rust",
             "mattmc_sodium_translucent_section_geometry_destroy",
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
@@ -75,6 +80,17 @@ public final class NativeTranslucentSectionGeometry implements AutoCloseable {
             throw new IllegalStateException("Native translucent section geometry creation returned a null handle");
         }
         return new NativeTranslucentSectionGeometry(handle, recordCount);
+    }
+
+    static NativeTranslucentSectionGeometry createFromAnalyzer(long analyzerHandle, int quadCount,
+            MemorySegment handleOutput) {
+        check(invokeCreateFromAnalyzer(analyzerHandle, handleOutput),
+                "native translucent section geometry creation from analyzer");
+        long handle = handleOutput.get(ValueLayout.JAVA_LONG, 0);
+        if (handle == 0) {
+            throw new IllegalStateException("Native translucent section geometry creation returned a null handle");
+        }
+        return new NativeTranslucentSectionGeometry(handle, quadCount);
     }
 
     static NativeTranslucentSectionGeometry create(TQuad[] quads) {
@@ -173,6 +189,14 @@ public final class NativeTranslucentSectionGeometry implements AutoCloseable {
     private static int invokeCreate(MemorySegment records, int recordCount, MemorySegment handleOutput) {
         try {
             return (int) CREATE.invokeExact(records, recordCount, handleOutput);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust translucent section geometry creation downcall failed", throwable);
+        }
+    }
+
+    private static int invokeCreateFromAnalyzer(long analyzerHandle, MemorySegment handleOutput) {
+        try {
+            return (int) CREATE_FROM_ANALYZER.invokeExact(analyzerHandle, handleOutput);
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust translucent section geometry creation downcall failed", throwable);
         }

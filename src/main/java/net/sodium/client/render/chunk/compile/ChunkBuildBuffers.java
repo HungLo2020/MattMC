@@ -15,6 +15,7 @@ import net.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkVertexFormat;
+import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import net.sodium.client.util.NativeBuffer;
 
 /**
@@ -36,13 +37,14 @@ public class ChunkBuildBuffers {
         this.nativeFormat = vertexType.getNativeFormat();
 
         for (TerrainRenderPass pass : DefaultTerrainRenderPasses.ALL) {
+            NativeSectionMeshBuilder sectionBuilder = NativeSectionMeshBuilder.create(128 * 1024 / 4);
             var vertexBuffers = new ChunkMeshBufferBuilder[ModelQuadFacing.COUNT];
 
             for (int facing = 0; facing < ModelQuadFacing.COUNT; facing++) {
-                vertexBuffers[facing] = new ChunkMeshBufferBuilder(this.vertexType, 128 * 1024);
+                vertexBuffers[facing] = new ChunkMeshBufferBuilder(this.nativeFormat, sectionBuilder, facing);
             }
 
-            this.builders.put(pass, new BakedChunkModelBuilder(vertexBuffers));
+            this.builders.put(pass, new BakedChunkModelBuilder(vertexBuffers, sectionBuilder));
         }
     }
 
@@ -72,17 +74,15 @@ public class ChunkBuildBuffers {
     public BuiltSectionMeshParts createMesh(TerrainRenderPass pass, int visibleSlices, boolean forceUnassigned, boolean sliceReordering) {
         var builder = this.builders.get(pass);
         int[] vertexSegments = makeVertexSegments();
-        long[] logicalAddresses = new long[ModelQuadFacing.COUNT];
-        int[] vertexCounts = new int[ModelQuadFacing.COUNT];
-        int vertexTotal = collectLogicalInputs(builder, logicalAddresses, vertexCounts);
+        NativeSectionMeshBuilder sectionBuilder = builder.getSectionBuilder();
+        int vertexTotal = sectionBuilder.totalVertexCount();
 
         if (vertexTotal == 0) {
             return null;
         }
 
         var mergedBuffer = new NativeBuffer(vertexTotal * this.nativeFormat.stride());
-        NativeChunkMeshEncoder.assemble(logicalAddresses, vertexCounts, mergedBuffer.getDirectBuffer(), vertexSegments,
-                this.nativeFormat, builder.getVertexBuffer(ModelQuadFacing.UNASSIGNED).sectionIndex(), visibleSlices,
+        sectionBuilder.assemble(mergedBuffer.getDirectBuffer(), vertexSegments, this.nativeFormat, visibleSlices,
                 forceUnassigned, sliceReordering, usesSeparateAo());
 
         return new BuiltSectionMeshParts(mergedBuffer, vertexSegments);
@@ -96,13 +96,9 @@ public class ChunkBuildBuffers {
         var vertexTotal = TranslucentData.quadCountToVertexCount(updatedQuads.getMeshQuadCount());
         var mergedBuffer = new NativeBuffer(vertexTotal * this.nativeFormat.stride());
         var mergedBufferBuilder = mergedBuffer.getDirectBuffer();
-        long[] logicalAddresses = new long[ModelQuadFacing.COUNT];
-        int[] vertexCounts = new int[ModelQuadFacing.COUNT];
-        collectLogicalInputs(builder, logicalAddresses, vertexCounts);
 
         int[] ignoredSegments = makeVertexSegments();
-        NativeChunkMeshEncoder.assemble(logicalAddresses, vertexCounts, mergedBufferBuilder, ignoredSegments,
-                this.nativeFormat, builder.getVertexBuffer(ModelQuadFacing.UNASSIGNED).sectionIndex(), 0,
+        builder.getSectionBuilder().assemble(mergedBufferBuilder, ignoredSegments, this.nativeFormat, 0,
                 true, false, usesSeparateAo());
 
         updatedQuads.applyBufferUpdates(builder.getVertexBuffer(ModelQuadFacing.UNASSIGNED), mergedBufferBuilder);
@@ -118,20 +114,6 @@ public class ChunkBuildBuffers {
         for (var builder : this.builders.values()) {
             builder.destroy();
         }
-    }
-
-    private static int collectLogicalInputs(BakedChunkModelBuilder builder, long[] logicalAddresses, int[] vertexCounts) {
-        int vertexTotal = 0;
-
-        for (ModelQuadFacing facing : ModelQuadFacing.VALUES) {
-            var buffer = builder.getVertexBuffer(facing);
-            int facingIndex = facing.ordinal();
-            logicalAddresses[facingIndex] = buffer.logicalAddress();
-            vertexCounts[facingIndex] = buffer.count();
-            vertexTotal += buffer.count();
-        }
-
-        return vertexTotal;
     }
 
     private static boolean usesSeparateAo() {

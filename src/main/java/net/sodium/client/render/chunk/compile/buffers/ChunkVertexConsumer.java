@@ -128,13 +128,14 @@ public class ChunkVertexConsumer implements VertexConsumer, net.irisshaders.iris
 
             ModelQuadFacing cullFace = ModelQuadFacing.fromPackedNormal(normal);
 
-            // let the collector intercept the quad but discard it if it's deemed invalid (i.e. not visible)
-            if (this.material.isTranslucent() && this.collector != null &&
-                    this.collector.appendQuad(this.vertices, cullFace, normal)) {
-               return this;
+            var vertexBuffer = this.modelBuilder.getVertexBuffer(cullFace);
+            if (this.material.isTranslucent() && this.collector != null) {
+                if (vertexBuffer.pushTranslucent(this.vertices, this.material.bits(), this.collector, cullFace, normal)) {
+                    return this;
+                }
+            } else {
+                vertexBuffer.push(this.vertices, this.material);
             }
-
-            this.modelBuilder.getVertexBuffer(cullFace).push(this.vertices, this.material);
 
             float u = 0;
             float v = 0;
