@@ -326,6 +326,25 @@ public class VulkanBackendSpirvPathTest {
     }
 
     @Test
+    public void testNormalizeForVulkanFlipsVertexFramebufferTexelFetchCoords() {
+        String source = "#version 330\n"
+            + "uniform float viewWidth;\n"
+            + "uniform float viewHeight;\n"
+            + "uniform sampler2D colortex4;\n"
+            + "flat out float vlFactor;\n"
+            + "void main(){"
+            + "vlFactor = texelFetch(colortex4, ivec2(viewWidth - 1, viewHeight - 1), 0).r;"
+            + "gl_Position = vec4(1.0);"
+            + "}";
+
+        String normalized = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, source);
+
+        assertTrue(normalized.contains(
+            "texelFetch(colortex4, ivec2((ivec2(viewWidth - 1, viewHeight - 1)).x, textureSize(colortex4, 0).y - 1 - (ivec2(viewWidth - 1, viewHeight - 1)).y), 0).r"
+        ));
+    }
+
+    @Test
     public void testNormalizeForVulkanKeepsCompositeScreenSpaceTexCoordNative() {
         String source = "#version 330\n"
             + "uniform sampler2D depthtex0;\n"

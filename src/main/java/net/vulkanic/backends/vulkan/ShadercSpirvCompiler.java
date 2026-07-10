@@ -148,7 +148,13 @@ final class ShadercSpirvCompiler implements SpirvCompiler {
 
         if (stage == VulkanicShaderStage.FRAGMENT) {
             normalized = rewriteFragmentCoordForVulkan(normalized);
-            normalized = rewriteFramebufferTextureSamplingForVulkan(normalized);
+        }
+
+        if (stage == VulkanicShaderStage.VERTEX || stage == VulkanicShaderStage.FRAGMENT) {
+            normalized = rewriteFramebufferTextureSamplingForVulkan(stage, normalized);
+        }
+
+        if (stage == VulkanicShaderStage.FRAGMENT) {
             traceShadowFogTextureNormalization(stage, sourceName, normalized);
         }
 
@@ -355,7 +361,7 @@ final class ShadercSpirvCompiler implements SpirvCompiler {
         return "vec2(gl_FragCoord.x, viewHeight - gl_FragCoord.y)";
     }
 
-    private static String rewriteFramebufferTextureSamplingForVulkan(String shaderSource) {
+    private static String rewriteFramebufferTextureSamplingForVulkan(VulkanicShaderStage stage, String shaderSource) {
         if (!shaderSource.contains("texture") && !shaderSource.contains("texelFetch")) {
             return shaderSource;
         }
@@ -380,7 +386,7 @@ final class ShadercSpirvCompiler implements SpirvCompiler {
             String functionName = shaderSource.substring(callStart, openParen);
             String arguments = shaderSource.substring(openParen + 1, closeParen);
             boolean shadowDepthTexelFetch = isShadowDepthTexelFetchCall(functionName, arguments);
-            String replacementArguments = rewriteFramebufferTextureArguments(functionName, arguments);
+            String replacementArguments = rewriteFramebufferTextureArguments(stage, functionName, arguments);
             String call = functionName + "(" + replacementArguments + ")";
             if (shadowDepthTexelFetch) {
                 call = LEGACY_SHADOW_DEPTH_TEXEL_FETCH_HELPER_NAME + "(" + call + ")";
@@ -436,7 +442,7 @@ final class ShadercSpirvCompiler implements SpirvCompiler {
         return next;
     }
 
-    private static String rewriteFramebufferTextureArguments(String functionName, String arguments) {
+    private static String rewriteFramebufferTextureArguments(VulkanicShaderStage stage, String functionName, String arguments) {
         List<int[]> argumentRanges = topLevelArgumentRanges(arguments);
         if (argumentRanges.size() < 2) {
             return arguments;
@@ -453,7 +459,9 @@ final class ShadercSpirvCompiler implements SpirvCompiler {
         }
 
         String replacementCoord;
-        if (isFramebufferSamplerName(sampler) && functionName.equals("texelFetch")) {
+        if (isFramebufferSamplerName(sampler) && functionName.equals("texelFetch") && stage == VulkanicShaderStage.VERTEX) {
+            replacementCoord = framebufferTexelFetchCoordExpression(sampler, coord);
+        } else if (isFramebufferSamplerName(sampler) && functionName.equals("texelFetch")) {
             return arguments;
         } else if (isFramebufferSamplerName(sampler)) {
             replacementCoord = framebufferTextureCoordExpression(coord);
@@ -621,6 +629,10 @@ final class ShadercSpirvCompiler implements SpirvCompiler {
 
     private static String framebufferTextureCoordExpression(String coord) {
         return "vec2((" + coord + ").x, 1.0f - (" + coord + ").y)";
+    }
+
+    private static String framebufferTexelFetchCoordExpression(String sampler, String coord) {
+        return "ivec2((" + coord + ").x, textureSize(" + sampler + ", 0).y - 1 - (" + coord + ").y)";
     }
 
     private static String shadowTextureCoordExpression(String coord) {
