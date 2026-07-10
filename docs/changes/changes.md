@@ -36,3 +36,4 @@ This Document is a list of all changes in MattMC over base Minecraft Java 1.21.1
 - Made the GUI Dark Mode
 - Updated whea and potato crop texture to be the same as the Stay True Resource pack. also bushy leaves. Orange Birch leaves.
 - Tools no longer disapear when breaking.
+- Right click crop harvest.

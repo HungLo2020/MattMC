@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # RunDev.sh - Development script to run the Minecraft client
-# Clears ERROR-LOG.txt and writes all output from Gradle to it
 
 # Find the project root (where gradlew is located)
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
@@ -20,7 +19,6 @@ fi
 # Change to project root
 cd "$PROJECT_ROOT"
 
-LOG_FILE="ERROR-LOG.txt"
 SPIRV_COMPILER="$PROJECT_ROOT/libraries/deps/glslangValidator"
 
 if [ ! -x "$SPIRV_COMPILER" ] && [ -x "$PROJECT_ROOT/Install.sh" ]; then
@@ -33,8 +31,4 @@ if [ -x "$SPIRV_COMPILER" ]; then
     echo "Using bundled SPIR-V compiler: $VULKANIC_SPIRV_COMPILER"
 fi
 
-# Truncate the log file (create it if it doesn't exist)
-: > "$LOG_FILE"
-
-# Run Gradle and pipe all output (stdout + stderr) into the log file
-./gradlew clean runClient 2>&1 | tee "$LOG_FILE"
+./gradlew clean runClient
