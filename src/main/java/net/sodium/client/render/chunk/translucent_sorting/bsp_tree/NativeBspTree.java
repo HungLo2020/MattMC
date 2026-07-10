@@ -122,18 +122,11 @@ public final class NativeBspTree implements AutoCloseable {
         this.cleanable = CLEANER.register(this, this.state);
     }
 
-    public static NativeBspTree fromRoot(BSPNode rootNode, int indexQuadCount) {
-        if (rootNode == null) {
-            throw new IllegalArgumentException("BSP root node must not be null");
+    static NativeBspTree fromHandle(long handle) {
+        if (handle == 0) {
+            throw new IllegalArgumentException("Native BSP tree handle must not be null");
         }
-        if (indexQuadCount < 0) {
-            throw new IllegalArgumentException("Invalid BSP index quad count: " + indexQuadCount);
-        }
-
-        try (Builder builder = Builder.create()) {
-            int rootIndex = rootNode.addTo(builder);
-            return builder.finish(rootIndex, indexQuadCount);
-        }
+        return new NativeBspTree(handle);
     }
 
     public void writeIndexBuffer(NativeBuffer indexBuffer, Vector3fc cameraPos) {
@@ -263,11 +256,15 @@ public final class NativeBspTree implements AutoCloseable {
         }
 
         NativeBspTree finish(int rootIndex, int indexQuadCount) {
+            return NativeBspTree.fromHandle(this.finishHandle(rootIndex, indexQuadCount));
+        }
+
+        long finishHandle(int rootIndex, int indexQuadCount) {
             long handle = this.requireHandle();
             check(invokeSetRoot(handle, rootIndex, indexQuadCount), "native BSP tree root assignment");
             this.finished = true;
             this.handle = 0;
-            return new NativeBspTree(handle);
+            return handle;
         }
 
         @Override
@@ -334,6 +331,10 @@ public final class NativeBspTree implements AutoCloseable {
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust BSP tree destroy downcall failed", throwable);
         }
+    }
+
+    static void destroyHandle(long handle) {
+        check(invokeDestroy(handle), "native BSP tree destroy");
     }
 
     private static int invokeSetRoot(long handle, int rootIndex, int indexQuadCount) {

@@ -77,13 +77,15 @@ abstract class InnerPartitionBSPNode extends BSPNode {
     record NodeReuseData(float[][] quadExtents, int[] indexes, int indexCount, int maxIndex) {
     }
 
-    InnerPartitionBSPNode(NodeReuseData reuseData, int axis) {
+    InnerPartitionBSPNode(NodeReuseData reuseData, int axis, int nativeNodeIndex) {
+        super(nativeNodeIndex);
         this.planeNormal = ModelQuadFacing.ALIGNED_NORMALS[axis];
         this.axis = axis;
         this.reuseData = reuseData;
     }
 
-    InnerPartitionBSPNode(NodeReuseData reuseData, Vector3fc planeNormal) {
+    InnerPartitionBSPNode(NodeReuseData reuseData, Vector3fc planeNormal, int nativeNodeIndex) {
+        super(nativeNodeIndex);
         this.planeNormal = planeNormal;
         this.axis = UNALIGNED_AXIS;
         this.reuseData = reuseData;
@@ -156,7 +158,22 @@ abstract class InnerPartitionBSPNode extends BSPNode {
         oldNode.indexMap = null;
         oldNode.fixedIndexOffset = NO_FIXED_OFFSET;
 
-        var reuseData = oldNode.reuseData;
+        NativeBspTree.Remap remap = prepareNativeNodeReuse(workspace, newIndexes, oldNode.reuseData);
+        if (remap == null) {
+            return null;
+        }
+        oldNode.applyNativeRemap(remap);
+
+        // import the triggering data from the old node to ensure it still triggers at
+        // the right time
+        oldNode.addPartitionPlanes(workspace);
+        oldNode.rebuildNativeNode(workspace);
+
+        return oldNode;
+    }
+
+    static NativeBspTree.Remap prepareNativeNodeReuse(BSPWorkspace workspace, IntArrayList newIndexes,
+            NodeReuseData reuseData) {
         if (reuseData == null) {
             return null;
         }
@@ -182,24 +199,28 @@ abstract class InnerPartitionBSPNode extends BSPNode {
         // use a fixed offset if possible (if all old indices differ from the new ones
         // by the same amount)
         if (remapper.hasFixedOffset()) {
-            oldNode.fixedIndexOffset = remapper.firstOffset;
-        } else {
-            oldNode.indexMap = remapper.indexMap;
+            return new NativeBspTree.Remap(1, reuseData.indexCount(), remapper.firstOffset, null);
         }
+        return new NativeBspTree.Remap(2, reuseData.indexCount(), 0, remapper.indexMap);
+    }
 
-        // import the triggering data from the old node to ensure it still triggers at
-        // the right time
-        oldNode.addPartitionPlanes(workspace);
-
-        return oldNode;
+    private void applyNativeRemap(NativeBspTree.Remap remap) {
+        this.indexMap = remap.indexMap();
+        this.fixedIndexOffset = remap.kind() == 1
+                ? remap.fixedIndexOffset()
+                : NO_FIXED_OFFSET;
     }
 
     NativeBspTree.Remap nativeRemap() {
-        if (this.indexMap != null) {
-            return new NativeBspTree.Remap(2, this.reuseData.indexCount(), 0, this.indexMap);
+        return nativeRemap(this.reuseData, this.indexMap, this.fixedIndexOffset);
+    }
+
+    static NativeBspTree.Remap nativeRemap(NodeReuseData reuseData, int[] indexMap, int fixedIndexOffset) {
+        if (indexMap != null) {
+            return new NativeBspTree.Remap(2, reuseData.indexCount(), 0, indexMap);
         }
-        if (this.fixedIndexOffset != NO_FIXED_OFFSET) {
-            return new NativeBspTree.Remap(1, this.reuseData.indexCount(), this.fixedIndexOffset, null);
+        if (fixedIndexOffset != NO_FIXED_OFFSET) {
+            return new NativeBspTree.Remap(1, reuseData.indexCount(), fixedIndexOffset, null);
         }
         return NativeBspTree.Remap.NONE;
     }
@@ -249,6 +270,21 @@ abstract class InnerPartitionBSPNode extends BSPNode {
         // attempt reuse of the old node if possible
         if (oldNode instanceof InnerPartitionBSPNode oldInnerNode) {
             var reusedNode = InnerPartitionBSPNode.attemptNodeReuse(workspace, indexes, oldInnerNode);
+            if (reusedNode != null) {
+                return reusedNode;
+            }
+        } else {
+            var reusedNode = BSPNode.attemptNativeMultiPartitionReuse(workspace, indexes, oldNode);
+            if (reusedNode != null) {
+                return reusedNode;
+            }
+
+            reusedNode = BSPNode.attemptNativeBinaryReuse(workspace, indexes, oldNode);
+            if (reusedNode != null) {
+                return reusedNode;
+            }
+
+            reusedNode = BSPNode.attemptNativeFixedDoubleReuse(workspace, indexes, oldNode);
             if (reusedNode != null) {
                 return reusedNode;
             }
@@ -433,13 +469,13 @@ abstract class InnerPartitionBSPNode extends BSPNode {
                 var inside = partitions.get(0);
                 var outside = partitions.size() == 2 ? partitions.get(1) : null;
                 if (outside == null || !endsWithPlane) {
-                    return InnerBinaryPartitionBSPNode.buildFromPartitions(workspace, indexes, depth, oldNode,
+                    return BSPNode.nativeBinaryFromPartitions(workspace, indexes, depth, oldNode,
                             inside, outside, axis);
                 }
             }
 
             // create a multi-partition node
-            return InnerMultiPartitionBSPNode.buildFromPartitions(workspace, indexes, depth, oldNode,
+            return BSPNode.nativeMultiPartitionFromPartitions(workspace, indexes, depth, oldNode,
                     partitions, axis, endsWithPlane);
         }
 
@@ -543,7 +579,7 @@ abstract class InnerPartitionBSPNode extends BSPNode {
             axis = facing.getAxis();
         }
 
-        return InnerBinaryPartitionBSPNode.buildFromParts(
+        return BSPNode.nativeBinaryFromParts(
                 workspace, indexes, depth, oldNode, inside, outside, splittingGroup, axis,
                 normal, dotProduct);
     }
@@ -780,7 +816,7 @@ abstract class InnerPartitionBSPNode extends BSPNode {
                 // cancel primary intersector search if they all intersect with each other
                 if (primaryIntersectorIndexes != null && primaryIntersectorIndexes.size() == indexes.size()) {
                     // return multi leaf node as this is impossible to sort
-                    return BSPNode.nativeLeafMulti(BSPNode.copyIndexes(indexes));
+                    return BSPNode.nativeLeafMulti(workspace, BSPNode.copyIndexes(indexes));
                 }
             }
         }
@@ -796,7 +832,7 @@ abstract class InnerPartitionBSPNode extends BSPNode {
                     nonPrimaryIntersectors.add(indexes.getInt(k));
                 }
             }
-            return InnerFixedDoubleBSPNode.buildFromParts(workspace, indexes, depth, oldNode,
+            return BSPNode.nativeFixedDoubleFromParts(workspace, indexes, depth, oldNode,
                     nonPrimaryIntersectors, primaryIntersectorQuadIndexes);
         }
 
@@ -828,7 +864,7 @@ abstract class InnerPartitionBSPNode extends BSPNode {
         // no need to add the geometry to the workspace's trigger registry
         // since it's being sorted statically and the sort order won't change based on the camera position
 
-        return BSPNode.nativeLeafMulti(BSPNode.copyIndexes(sortedIndexes, false));
+        return BSPNode.nativeLeafMulti(workspace, BSPNode.copyIndexes(sortedIndexes, false));
     }
 
     static private BSPNode buildSNRLeafNodeFromQuads(BSPWorkspace workspace, IntArrayList indexes) {
@@ -850,7 +886,7 @@ abstract class InnerPartitionBSPNode extends BSPNode {
             perm[i] = indexBuffer[perm[i]];
         }
 
-        return BSPNode.nativeLeafMulti(BSPNode.copyIndexes(IntArrayList.wrap(perm), false));
+        return BSPNode.nativeLeafMulti(workspace, BSPNode.copyIndexes(IntArrayList.wrap(perm), false));
     }
 
     static private BSPNode buildSNRLeafNodeFromPoints(BSPWorkspace workspace, LongArrayList points) {
@@ -873,6 +909,6 @@ abstract class InnerPartitionBSPNode extends BSPNode {
             }
         }
 
-        return BSPNode.nativeLeafMulti(BSPNode.copyIndexes(IntArrayList.wrap(quadIndexes), false));
+        return BSPNode.nativeLeafMulti(workspace, BSPNode.copyIndexes(IntArrayList.wrap(quadIndexes), false));
     }
 }

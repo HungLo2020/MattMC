@@ -94,7 +94,11 @@ impl NativeGeometryPlanes {
         Ok(())
     }
 
-    fn add_double_sided_aligned_plane(&mut self, axis: i32, distance: f32) -> Result<(), i32> {
+    pub(crate) fn add_double_sided_aligned_plane(
+        &mut self,
+        axis: i32,
+        distance: f32,
+    ) -> Result<(), i32> {
         if !(0..3).contains(&axis) || !distance.is_finite() {
             return Err(ERR_INVALID_ARGUMENT);
         }
@@ -119,7 +123,7 @@ impl NativeGeometryPlanes {
         Ok(())
     }
 
-    fn add_double_sided_unaligned_plane(
+    pub(crate) fn add_double_sided_unaligned_plane(
         &mut self,
         normal: [f32; 3],
         distance: f32,

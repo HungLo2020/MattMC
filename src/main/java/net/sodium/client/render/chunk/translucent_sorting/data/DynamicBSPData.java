@@ -2,12 +2,11 @@ package net.sodium.client.render.chunk.translucent_sorting.data;
 
 import net.sodium.client.render.chunk.translucent_sorting.QuadSplittingMode;
 import net.sodium.client.render.chunk.translucent_sorting.SortType;
+import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.NativeBspBuildResult;
 import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.NativeUpdatedQuads;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
 import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.BSPNode;
-import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.BSPResult;
-import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.NativeBspTree;
 import net.minecraft.core.SectionPos;
 import org.joml.Vector3dc;
 
@@ -22,23 +21,16 @@ public class DynamicBSPData extends DynamicData {
 
     private final int indexQuadCount;
     private final BSPNode rootNode;
-    private final NativeBspTree nativeTree;
+    private final NativeBspBuildResult buildResult;
     private final int generation;
-    private final NativeUpdatedQuads updatedQuadsList; // TODO: delete reference after mesh task is done since this won't be needed anymore after that
 
-    private DynamicBSPData(SectionPos sectionPos, int inputQuadCount, BSPResult result, Vector3dc initialCameraPos, int generation) {
-        super(sectionPos, inputQuadCount, result.takeGeometryPlanesHandle(), initialCameraPos);
-        this.rootNode = result.getRootNode();
+    private DynamicBSPData(SectionPos sectionPos, int inputQuadCount, NativeBspBuildResult result,
+            Vector3dc initialCameraPos, int generation, long geometryPlanesHandle) {
+        super(sectionPos, inputQuadCount, geometryPlanesHandle, initialCameraPos);
+        this.rootNode = result.rootNode();
         this.generation = generation;
-        this.updatedQuadsList = result.getNativeUpdatedQuads();
-
-        if (this.updatedQuadsList != null) {
-            this.indexQuadCount = this.updatedQuadsList.getIndexQuadCount();
-        } else {
-            this.indexQuadCount = inputQuadCount;
-        }
-
-        this.nativeTree = NativeBspTree.fromRoot(this.rootNode, this.indexQuadCount);
+        this.buildResult = result;
+        this.indexQuadCount = result.indexQuadCount();
     }
 
     private class DynamicBSPSorter extends DynamicSorter {
@@ -48,17 +40,14 @@ public class DynamicBSPData extends DynamicData {
 
         @Override
         void writeSort(CombinedCameraPos cameraPos, boolean initial) {
-            DynamicBSPData.this.nativeTree.writeIndexBuffer(this.getIndexBuffer(), cameraPos.getRelativeCameraPos());
+            DynamicBSPData.this.buildResult.writeIndexBuffer(this.getIndexBuffer(), cameraPos.getRelativeCameraPos());
         }
     }
 
     @Override
     public void close() {
         super.close();
-        this.nativeTree.close();
-        if (this.updatedQuadsList != null) {
-            this.updatedQuadsList.close();
-        }
+        this.buildResult.close();
     }
 
     @Override
@@ -79,7 +68,7 @@ public class DynamicBSPData extends DynamicData {
 
     @Override
     public NativeUpdatedQuads getUpdatedQuads() {
-        return this.updatedQuadsList;
+        return this.buildResult.updatedQuads();
     }
 
     public static DynamicBSPData fromMesh(CombinedCameraPos cameraPos, TQuad[] quads, SectionPos sectionPos,
@@ -95,10 +84,15 @@ public class DynamicBSPData extends DynamicData {
             // (times the section has been built)
             prepareNodeReuse = generation >= NODE_REUSE_MIN_GENERATION;
         }
-        var result = BSPNode.buildBSP(quads, sectionPos, oldRoot, prepareNodeReuse, quadSplittingMode);
-
-        var dynamicData = new DynamicBSPData(sectionPos, quads.length, result, cameraPos.getAbsoluteCameraPos(), generation);
-
-        return dynamicData;
+        NativeBspBuildResult result = BSPNode.buildBSP(quads, sectionPos, oldRoot, prepareNodeReuse,
+                quadSplittingMode);
+        try {
+            long geometryPlanesHandle = result.takeGeometryPlanesHandle();
+            return new DynamicBSPData(sectionPos, quads.length, result, cameraPos.getAbsoluteCameraPos(),
+                    generation, geometryPlanesHandle);
+        } catch (RuntimeException exception) {
+            result.close();
+            throw exception;
+        }
     }
 }

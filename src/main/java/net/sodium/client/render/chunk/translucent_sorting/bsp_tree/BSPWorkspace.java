@@ -19,9 +19,11 @@ import org.joml.Vector3fc;
  * have any performance benefit.
  */
 class BSPWorkspace extends ObjectArrayList<TQuad> implements AutoCloseable {
-    final BSPResult result = new BSPResult();
+    final NativeBspBuildResult result = new NativeBspBuildResult();
+    private NativeBspTree.Builder nativeTreeBuilder = NativeBspTree.Builder.create();
     private final NativeTranslucentGeometryAnalyzer.TopoQuadStore topoQuadStore;
     private boolean resultReleased;
+    private boolean nativeTreeReleased;
 
     private final SectionPos sectionPos;
     final boolean prepareNodeReuse;
@@ -55,6 +57,62 @@ class BSPWorkspace extends ObjectArrayList<TQuad> implements AutoCloseable {
         return this.topoQuadStore.bspDoubleLeafPossible(quadIndexA, quadIndexB, failOnIntersection);
     }
 
+    NativeBspTree.Builder nativeTreeBuilder() {
+        if (this.nativeTreeBuilder == null) {
+            throw new IllegalStateException("Native BSP tree builder has been released");
+        }
+        return this.nativeTreeBuilder;
+    }
+
+    int addNativeLeafSingle(int quad) {
+        return this.nativeTreeBuilder().addLeafSingle(quad);
+    }
+
+    int addNativeLeafDouble(int quadA, int quadB) {
+        return this.nativeTreeBuilder().addLeafDouble(quadA, quadB);
+    }
+
+    int addNativeLeafMulti(int[] quads) {
+        return this.nativeTreeBuilder().addLeafMulti(quads);
+    }
+
+    int addNativeFixedDouble(NativeBspTree.Remap remap, BSPNode first, BSPNode second) {
+        return this.nativeTreeBuilder().addFixedDouble(remap, first.nativeNodeIndex(), second.nativeNodeIndex());
+    }
+
+    int addNativeBinary(NativeBspTree.Remap remap, Vector3fc normal, float distance,
+            BSPNode inside, BSPNode outside, int[] onPlane) {
+        int insideIndex = inside == null ? NativeBspTree.NULL_NODE : inside.nativeNodeIndex();
+        int outsideIndex = outside == null ? NativeBspTree.NULL_NODE : outside.nativeNodeIndex();
+        return this.nativeTreeBuilder().addBinary(remap, normal, distance, insideIndex, outsideIndex, onPlane);
+    }
+
+    int addNativeMultiPartition(NativeBspTree.Remap remap, Vector3fc normal, float[] distances,
+            BSPNode[] partitions, int[][] onPlaneQuads) {
+        int[] partitionIndexes = new int[partitions.length];
+        for (int index = 0; index < partitions.length; index++) {
+            partitionIndexes[index] = partitions[index] == null
+                    ? NativeBspTree.NULL_NODE
+                    : partitions[index].nativeNodeIndex();
+        }
+
+        return this.nativeTreeBuilder().addMultiPartition(remap, normal, distances, partitionIndexes, onPlaneQuads);
+    }
+
+    long finishNativeTree(BSPNode rootNode, int indexQuadCount) {
+        if (rootNode == null) {
+            throw new IllegalArgumentException("BSP root node must not be null");
+        }
+        if (indexQuadCount < 0) {
+            throw new IllegalArgumentException("Invalid BSP index quad count: " + indexQuadCount);
+        }
+
+        long treeHandle = this.nativeTreeBuilder().finishHandle(rootNode.nativeNodeIndex(), indexQuadCount);
+        this.nativeTreeReleased = true;
+        this.nativeTreeBuilder = null;
+        return treeHandle;
+    }
+
     // TODO: better bidirectional triggering: integrate bidirectionality in GFNI if
     // top-level topo sorting isn't used anymore (and only use half as much memory
     // by not storing trigger planes twice)
@@ -82,7 +140,7 @@ class BSPWorkspace extends ObjectArrayList<TQuad> implements AutoCloseable {
         return this.updatedQuads;
     }
 
-    BSPResult releaseResult() {
+    NativeBspBuildResult releaseResult() {
         this.resultReleased = true;
         return this.result;
     }
@@ -149,6 +207,10 @@ class BSPWorkspace extends ObjectArrayList<TQuad> implements AutoCloseable {
     @Override
     public void close() {
         this.topoQuadStore.close();
+        if (!this.nativeTreeReleased && this.nativeTreeBuilder != null) {
+            this.nativeTreeBuilder.close();
+            this.nativeTreeBuilder = null;
+        }
         if (!this.resultReleased) {
             this.result.close();
         }

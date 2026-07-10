@@ -227,6 +227,11 @@ struct NativeBspTree {
     index_quad_count: usize,
 }
 
+struct NativeBspBuildResult {
+    geometry_planes: Option<Box<NativeGeometryPlanes>>,
+    tree: Option<Box<NativeBspTree>>,
+}
+
 struct BspActiveRemap {
     node_index: usize,
     remaining: usize,
@@ -1636,6 +1641,13 @@ fn create_bsp_tree() -> NativeBspTree {
         nodes: Vec::new(),
         root: -1,
         index_quad_count: 0,
+    }
+}
+
+fn create_bsp_build_result() -> NativeBspBuildResult {
+    NativeBspBuildResult {
+        geometry_planes: Some(Box::new(NativeGeometryPlanes::new())),
+        tree: None,
     }
 }
 
@@ -3740,6 +3752,136 @@ pub unsafe extern "C" fn mattmc_sodium_translucent_sort_data_dynamic_write(
     output_state[1] = if state.direct_trigger { 1 } else { 0 };
     output_state[2] = state.consecutive_topo_sort_failures;
     OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_build_result_create(
+    output_handle: *mut u64,
+) -> i32 {
+    if output_handle.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    *output_handle = Box::into_raw(Box::new(create_bsp_build_result())) as u64;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_build_result_destroy(handle: u64) -> i32 {
+    if handle == 0 {
+        return OK;
+    }
+
+    drop(Box::from_raw(handle as *mut NativeBspBuildResult));
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_build_result_add_aligned_plane(
+    handle: u64,
+    axis: i32,
+    distance: f32,
+) -> i32 {
+    if handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let result = &mut *(handle as *mut NativeBspBuildResult);
+    let Some(geometry_planes) = result.geometry_planes.as_mut() else {
+        return ERR_INVALID_ARGUMENT;
+    };
+
+    match geometry_planes.add_double_sided_aligned_plane(axis, distance) {
+        Ok(()) => OK,
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_build_result_add_unaligned_plane(
+    handle: u64,
+    normal_x: f32,
+    normal_y: f32,
+    normal_z: f32,
+    distance: f32,
+) -> i32 {
+    if handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let result = &mut *(handle as *mut NativeBspBuildResult);
+    let Some(geometry_planes) = result.geometry_planes.as_mut() else {
+        return ERR_INVALID_ARGUMENT;
+    };
+
+    match geometry_planes.add_double_sided_unaligned_plane([normal_x, normal_y, normal_z], distance)
+    {
+        Ok(()) => OK,
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_build_result_take_geometry_planes(
+    handle: u64,
+    output_geometry_planes_handle: *mut u64,
+) -> i32 {
+    if handle == 0 || output_geometry_planes_handle.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let result = &mut *(handle as *mut NativeBspBuildResult);
+    let Some(geometry_planes) = result.geometry_planes.take() else {
+        return ERR_INVALID_ARGUMENT;
+    };
+
+    *output_geometry_planes_handle = Box::into_raw(geometry_planes) as u64;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_build_result_set_tree(
+    handle: u64,
+    tree_handle: u64,
+) -> i32 {
+    if handle == 0 || tree_handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let result = &mut *(handle as *mut NativeBspBuildResult);
+    if result.tree.is_some() {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    result.tree = Some(Box::from_raw(tree_handle as *mut NativeBspTree));
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_build_result_write_index_buffer(
+    handle: u64,
+    output_address: u64,
+    output_capacity: i32,
+    camera_x: f32,
+    camera_y: f32,
+    camera_z: f32,
+) -> i32 {
+    if output_capacity < 0 || output_capacity % std::mem::size_of::<i32>() as i32 != 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if handle == 0 || output_address == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let result = &*(handle as *const NativeBspBuildResult);
+    let Some(tree) = result.tree.as_ref() else {
+        return ERR_INVALID_ARGUMENT;
+    };
+    let output = slice::from_raw_parts_mut(
+        output_address as *mut i32,
+        output_capacity as usize / std::mem::size_of::<i32>(),
+    );
+    write_bsp_tree_index_buffer(tree, output, camera_x, camera_y, camera_z)
 }
 
 #[no_mangle]
