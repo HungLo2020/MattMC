@@ -1235,8 +1235,9 @@ public class Phase3DrawPathTest {
             "Native Vulkan terrain should never drop depth just because the selected terrain color target lacks its own depth view");
         assertTrue(rendererSource.contains("final boolean useIndexedTessellation = terrainPass.isTranslucent() && indexedRenderingEnabled;"),
             "Vulkan shader terrain should keep Sodium's sorted translucent local-index path enabled");
-        assertTrue(rendererSource.contains("if (useIndexedTessellation && SectionRenderDataUnsafe.isLocalIndex(pMeshData))"),
-            "Local sorted translucent sections should use their region-local sorted index data instead of an unsorted shared fallback");
+        assertTrue(rendererSource.contains("renderDataStorage.fillDrawCommandBuffer(batch, renderRegion, renderList, camera, pass.isTranslucent(),")
+                && rendererSource.contains("useBlockFaceCulling, useIndexedTessellation);"),
+            "Local sorted translucent section draw assembly should stay on the Rust native render-data path");
         assertTrue(rendererSource.contains("super.end(terrainPass);"),
             "The Vulkan chunk renderer should close the shared chunk program path after terrain submission");
     }

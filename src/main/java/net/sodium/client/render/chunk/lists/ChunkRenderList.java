@@ -178,6 +178,16 @@ public class ChunkRenderList {
         return this.sectionsWithGeometryCount;
     }
 
+    public void copySectionsWithGeometry(ByteBuffer output) {
+        if (output.capacity() < this.sectionsWithGeometryCount) {
+            throw new IllegalArgumentException("Output buffer is too small for section render list");
+        }
+
+        for (int index = 0; index < this.sectionsWithGeometryCount; index++) {
+            output.put(index, this.sectionsWithGeometry[index]);
+        }
+    }
+
     public int getSectionsWithSpritesCount() {
         return this.sectionsWithSpritesCount;
     }

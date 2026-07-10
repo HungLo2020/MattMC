@@ -1,6 +1,12 @@
 package net.sodium.client.render.chunk.occlusion;
 
 import it.unimi.dsi.fastutil.longs.Long2ReferenceMap;
+import net.minecraft.client.renderer.chunk.VisibilitySet;
+import net.minecraft.core.Direction;
+import net.minecraft.core.SectionPos;
+import net.minecraft.util.Mth;
+import net.minecraft.util.NativeLibraryLoader;
+import net.minecraft.world.level.Level;
 import net.sodium.client.render.chunk.RenderSection;
 import net.sodium.client.render.chunk.lists.RenderSectionVisitor;
 import net.sodium.client.render.viewport.CameraTransform;
@@ -8,12 +14,51 @@ import net.sodium.client.render.viewport.Viewport;
 import net.sodium.client.util.collections.DoubleBufferedQueue;
 import net.sodium.client.util.collections.ReadQueue;
 import net.sodium.client.util.collections.WriteQueue;
-import net.minecraft.core.SectionPos;
-import net.minecraft.util.Mth;
-import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
+import org.lwjgl.system.MemoryUtil;
+
+import java.lang.foreign.Arena;
+import java.lang.foreign.FunctionDescriptor;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
+import java.lang.invoke.MethodHandle;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 public class OcclusionCuller {
+    public static final long NULL_VISIBILITY = 0L;
+
+    private static final int OK = 0;
+    private static final int VISIBILITY_MATRIX_LENGTH = GraphDirection.COUNT * GraphDirection.COUNT;
+    private static final ThreadLocal<NativeScratch> NATIVE_SCRATCH = ThreadLocal.withInitial(NativeScratch::new);
+
+    private static final MethodHandle VERIFY = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_occlusion_verify",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT));
+    private static final MethodHandle ENCODE_VISIBILITY = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_occlusion_encode_visibility",
+            FunctionDescriptor.of(ValueLayout.JAVA_LONG,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_INT));
+    private static final MethodHandle CONNECTIONS = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_occlusion_connections",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT));
+    private static final MethodHandle CONNECTIONS_BATCH = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_occlusion_connections_batch",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_INT));
+    private static final int VERIFY_STATUS = invokeVerify();
+
     private final Long2ReferenceMap<RenderSection> sections;
     private final Level level;
 
@@ -51,64 +96,41 @@ public class OcclusionCuller {
                                      WriteQueue<RenderSection> writeQueue)
     {
         RenderSection section;
+        NativeScratch scratch = useOcclusionCulling ? NATIVE_SCRATCH.get() : null;
+        if (scratch != null) {
+            scratch.clear();
+        }
 
         while ((section = readQueue.dequeue()) != null) {
             if (!isSectionVisible(section, viewport, searchDistance)) {
                 continue;
             }
 
+            if (useOcclusionCulling) {
+                scratch.add(section, viewport);
+            } else {
+                visitor.visit(section);
+                visitNeighbors(writeQueue, section,
+                        GraphDirectionSet.ALL & getOutwardDirections(viewport.getChunkCoord(), section), frame);
+            }
+        }
+
+        if (!useOcclusionCulling || scratch.count == 0) {
+            return;
+        }
+
+        computeOcclusionConnectionsBatch(scratch);
+        for (int index = 0; index < scratch.count; index++) {
+            section = scratch.sections[index];
             visitor.visit(section);
 
-            int connections;
-
-            {
-                if (useOcclusionCulling) {
-                    var sectionVisibilityData = section.getVisibilityData();
-
-                    // occlude paths through the section if it's being viewed at an angle where
-                    // the other side can't possibly be seen
-                    sectionVisibilityData &= getAngleVisibilityMask(viewport, section);
-
-                    // When using occlusion culling, we can only traverse into neighbors for which there is a path of
-                    // visibility through this chunk. This is determined by taking all the incoming paths to this chunk and
-                    // creating a union of the outgoing paths from those.
-                    connections = VisibilityEncoding.getConnections(sectionVisibilityData, section.getIncomingDirections());
-                } else {
-                    // Not using any occlusion culling, so traversing in any direction is legal.
-                    connections = GraphDirectionSet.ALL;
-                }
-
-                // We can only traverse *outwards* from the center of the graph search, so mask off any invalid
-                // directions.
-                connections &= getOutwardDirections(viewport.getChunkCoord(), section);
-            }
+            // When using occlusion culling, Rust calculates all outgoing paths for this BFS wave in one native call.
+            int connections = scratch.connections.getInt(index * Integer.BYTES);
+            connections &= getOutwardDirections(viewport.getChunkCoord(), section);
 
             visitNeighbors(writeQueue, section, connections, frame);
+            scratch.sections[index] = null;
         }
-    }
-
-    private static final long UP_DOWN_OCCLUDED = (1L << VisibilityEncoding.bit(GraphDirection.DOWN, GraphDirection.UP)) | (1L << VisibilityEncoding.bit(GraphDirection.UP, GraphDirection.DOWN));
-    private static final long NORTH_SOUTH_OCCLUDED = (1L << VisibilityEncoding.bit(GraphDirection.NORTH, GraphDirection.SOUTH)) | (1L << VisibilityEncoding.bit(GraphDirection.SOUTH, GraphDirection.NORTH));
-    private static final long WEST_EAST_OCCLUDED = (1L << VisibilityEncoding.bit(GraphDirection.WEST, GraphDirection.EAST)) | (1L << VisibilityEncoding.bit(GraphDirection.EAST, GraphDirection.WEST));
-
-    private static long getAngleVisibilityMask(Viewport viewport, RenderSection section) {
-        var transform = viewport.getTransform();
-        var dx = Math.abs(transform.x - section.getCenterX());
-        var dy = Math.abs(transform.y - section.getCenterY());
-        var dz = Math.abs(transform.z - section.getCenterZ());
-
-        var angleOcclusionMask = 0L;
-        if (dx > dy || dz > dy) {
-            angleOcclusionMask |= UP_DOWN_OCCLUDED;
-        }
-        if (dx > dz || dy > dz) {
-            angleOcclusionMask |= NORTH_SOUTH_OCCLUDED;
-        }
-        if (dy > dx || dz > dx) {
-            angleOcclusionMask |= WEST_EAST_OCCLUDED;
-        }
-
-        return ~angleOcclusionMask;
     }
 
     private static boolean isSectionVisible(RenderSection section, Viewport viewport, float maxDistance) {
@@ -301,7 +323,7 @@ public class OcclusionCuller {
         if (useOcclusionCulling) {
             // Since the camera is located inside this chunk, there are no "incoming" directions. So we need to instead
             // find any possible paths out of this chunk and enqueue those neighbors.
-            outgoing = VisibilityEncoding.getConnections(section.getVisibilityData());
+            outgoing = getVisibilityConnections(section.getVisibilityData(), GraphDirectionSet.NONE, false);
         } else {
             // Occlusion culling is disabled, so we can traverse into any neighbor.
             outgoing = GraphDirectionSet.ALL;
@@ -377,6 +399,150 @@ public class OcclusionCuller {
 
     private RenderSection getRenderSection(int x, int y, int z) {
         return this.sections.get(SectionPos.asLong(x, y, z));
+    }
+
+    public static long encodeVisibility(VisibilitySet occlusionData) {
+        check(VERIFY_STATUS, "native occlusion verification");
+
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment matrix = arena.allocate(ValueLayout.JAVA_BYTE, VISIBILITY_MATRIX_LENGTH);
+
+            for (int from = 0; from < GraphDirection.COUNT; from++) {
+                Direction fromDirection = GraphDirection.toEnum(from);
+                for (int to = 0; to < GraphDirection.COUNT; to++) {
+                    matrix.setAtIndex(ValueLayout.JAVA_BYTE, (from * GraphDirection.COUNT) + to,
+                            (byte)(occlusionData.visibilityBetween(fromDirection, GraphDirection.toEnum(to)) ? 1 : 0));
+                }
+            }
+
+            return invokeEncodeVisibility(matrix, VISIBILITY_MATRIX_LENGTH);
+        }
+    }
+
+    static int getVisibilityConnections(long visibilityData, int incoming, boolean useIncoming) {
+        check(VERIFY_STATUS, "native occlusion verification");
+        int connections = invokeConnections(visibilityData, incoming, useIncoming ? 1 : 0);
+        if (connections < 0) {
+            check(connections, "native occlusion connection calculation");
+        }
+        return connections;
+    }
+
+    private static void computeOcclusionConnectionsBatch(NativeScratch scratch) {
+        check(VERIFY_STATUS, "native occlusion verification");
+        check(invokeConnectionsBatch(
+                MemoryUtil.memAddress(scratch.visibilityData),
+                scratch.count,
+                MemoryUtil.memAddress(scratch.incomingDirections),
+                scratch.count,
+                MemoryUtil.memAddress(scratch.cameraDeltas),
+                scratch.count * 3,
+                MemoryUtil.memAddress(scratch.connections),
+                scratch.count), "native batched occlusion connection calculation");
+    }
+
+    private static int invokeVerify() {
+        try {
+            return (int)VERIFY.invokeExact();
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust occlusion verification downcall failed", throwable);
+        }
+    }
+
+    private static long invokeEncodeVisibility(MemorySegment matrix, int matrixLength) {
+        try {
+            return (long)ENCODE_VISIBILITY.invokeExact(matrix, matrixLength);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust visibility encoding downcall failed", throwable);
+        }
+    }
+
+    private static int invokeConnections(long visibilityData, int incoming, int useIncoming) {
+        try {
+            return (int)CONNECTIONS.invokeExact(visibilityData, incoming, useIncoming);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust occlusion connection downcall failed", throwable);
+        }
+    }
+
+    private static int invokeConnectionsBatch(long visibilityDataAddress, int visibilityDataCount,
+            long incomingAddress, int incomingCount, long cameraDeltaAddress, int cameraDeltaCount,
+            long outputAddress, int outputCount) {
+        try {
+            return (int)CONNECTIONS_BATCH.invokeExact(
+                    MemorySegment.ofAddress(visibilityDataAddress),
+                    visibilityDataCount,
+                    MemorySegment.ofAddress(incomingAddress),
+                    incomingCount,
+                    MemorySegment.ofAddress(cameraDeltaAddress),
+                    cameraDeltaCount,
+                    MemorySegment.ofAddress(outputAddress),
+                    outputCount);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust batched occlusion connection downcall failed", throwable);
+        }
+    }
+
+    private static void check(int status, String operation) {
+        if (status != OK) {
+            throw new IllegalStateException(operation + " failed with native status " + status);
+        }
+    }
+
+    private static final class NativeScratch {
+        private RenderSection[] sections = new RenderSection[256];
+        private ByteBuffer visibilityData = allocate(Long.BYTES * this.sections.length);
+        private ByteBuffer incomingDirections = allocate(Integer.BYTES * this.sections.length);
+        private ByteBuffer cameraDeltas = allocate(Double.BYTES * 3 * this.sections.length);
+        private ByteBuffer connections = allocate(Integer.BYTES * this.sections.length);
+        private int count;
+
+        void clear() {
+            this.count = 0;
+        }
+
+        void add(RenderSection section, Viewport viewport) {
+            this.ensureCapacity(this.count + 1);
+
+            int index = this.count++;
+            this.sections[index] = section;
+            this.visibilityData.putLong(index * Long.BYTES, section.getVisibilityData());
+            this.incomingDirections.putInt(index * Integer.BYTES, section.getIncomingDirections());
+
+            CameraTransform transform = viewport.getTransform();
+            int deltaOffset = index * 3 * Double.BYTES;
+            this.cameraDeltas.putDouble(deltaOffset, transform.x - section.getCenterX());
+            this.cameraDeltas.putDouble(deltaOffset + Double.BYTES, transform.y - section.getCenterY());
+            this.cameraDeltas.putDouble(deltaOffset + 2 * Double.BYTES, transform.z - section.getCenterZ());
+        }
+
+        private void ensureCapacity(int capacity) {
+            if (capacity <= this.sections.length) {
+                return;
+            }
+
+            int newCapacity = Math.max(capacity, this.sections.length << 1);
+            RenderSection[] newSections = new RenderSection[newCapacity];
+            System.arraycopy(this.sections, 0, newSections, 0, this.count);
+
+            this.sections = newSections;
+            this.visibilityData = grow(this.visibilityData, Long.BYTES, newCapacity, this.count);
+            this.incomingDirections = grow(this.incomingDirections, Integer.BYTES, newCapacity, this.count);
+            this.cameraDeltas = grow(this.cameraDeltas, Double.BYTES * 3, newCapacity, this.count);
+            this.connections = allocate(Integer.BYTES * newCapacity);
+        }
+
+        private static ByteBuffer allocate(int bytes) {
+            return ByteBuffer.allocateDirect(bytes).order(ByteOrder.nativeOrder());
+        }
+
+        private static ByteBuffer grow(ByteBuffer oldBuffer, int stride, int newCapacity, int count) {
+            ByteBuffer newBuffer = allocate(stride * newCapacity);
+            for (int offset = 0, limit = stride * count; offset < limit; offset++) {
+                newBuffer.put(offset, oldBuffer.get(offset));
+            }
+            return newBuffer;
+        }
     }
 
 }

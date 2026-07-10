@@ -5,7 +5,7 @@ import net.sodium.client.render.chunk.compile.executor.ChunkJob;
 import net.sodium.client.render.chunk.data.BuiltSectionInfo;
 import net.sodium.client.render.chunk.occlusion.GraphDirection;
 import net.sodium.client.render.chunk.occlusion.GraphDirectionSet;
-import net.sodium.client.render.chunk.occlusion.VisibilityEncoding;
+import net.sodium.client.render.chunk.occlusion.OcclusionCuller;
 import net.sodium.client.render.chunk.region.RenderRegion;
 import net.sodium.client.render.chunk.translucent_sorting.data.TranslucentData;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -28,7 +28,7 @@ public class RenderSection {
     private final int chunkX, chunkY, chunkZ;
 
     // Occlusion Culling State
-    private long visibilityData = VisibilityEncoding.NULL;
+    private long visibilityData = OcclusionCuller.NULL_VISIBILITY;
 
     private int incomingDirections;
     private int lastVisibleFrame = -1;
@@ -174,7 +174,7 @@ public class RenderSection {
 
         this.built = false;
         this.flags = RenderSectionFlags.NONE;
-        this.visibilityData = VisibilityEncoding.NULL;
+        this.visibilityData = OcclusionCuller.NULL_VISIBILITY;
         this.globalBlockEntities = null;
         this.culledBlockEntities = null;
         this.animatedSprites = null;

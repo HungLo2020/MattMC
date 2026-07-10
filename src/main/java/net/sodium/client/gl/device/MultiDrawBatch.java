@@ -13,11 +13,13 @@ public final class MultiDrawBatch {
     public final long pElementPointer;
     public final long pElementCount;
     public final long pBaseVertex;
+    public final int capacity;
 
     public int size;
     public boolean isFilled;
 
     public MultiDrawBatch(int capacity) {
+        this.capacity = capacity;
         this.pElementPointer = MemoryUtil.nmemAlignedAlloc(32, (long) capacity * Pointer.POINTER_SIZE);
         MemoryUtil.memSet(this.pElementPointer, 0x0, (long) capacity * Pointer.POINTER_SIZE);
 

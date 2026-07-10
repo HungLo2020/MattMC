@@ -2,15 +2,24 @@ package net.sodium.client.render.chunk.data;
 
 import net.sodium.client.gl.arena.PendingUpload;
 import net.sodium.client.gl.device.CommandList;
-import net.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.sodium.client.gl.device.MultiDrawBatch;
+import net.sodium.client.render.chunk.lists.ChunkRenderList;
 import net.sodium.client.render.chunk.buffer.ChunkBufferAllocation;
 import net.sodium.client.render.chunk.buffer.ChunkBufferArena;
 import net.sodium.client.render.chunk.SharedQuadIndexBuffer;
 import net.sodium.client.render.chunk.region.RenderRegion;
-import net.sodium.client.util.UInt32;
+import net.sodium.client.render.viewport.CameraTransform;
+import net.minecraft.util.NativeLibraryLoader;
+import org.lwjgl.system.MemoryUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.foreign.FunctionDescriptor;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
+import java.lang.invoke.MethodHandle;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.stream.Stream;
 
@@ -20,8 +29,7 @@ import java.util.stream.Stream;
  * about vertex and optionally index buffer data. The array of buffer allocations is
  * indexed by the region-local section index. The data about the contents of
  * buffer segments is stored in a natively allocated piece of memory referenced
- * by {@code pMeshDataArray} and accessed through
- * {@link SectionRenderDataUnsafe}.
+ * by {@code pMeshDataArray}. Rust owns the packed record layout and the hot draw-command assembly path.
  * <p>
  * When the backing buffer (from the chunk buffer arena) is resized, the storage
  * object is notified, and then it updates the changed offsets of the buffer
@@ -34,6 +42,95 @@ import java.util.stream.Stream;
  * updated independently of each other (in both directions).
  */
 public class SectionRenderDataStorage {
+    private static final int OK = 0;
+    private static final int REGION_SIZE = RenderRegion.REGION_SIZE;
+    private static final int VERTEX_SEGMENT_VALUES = 14;
+    private static final ThreadLocal<NativeScratch> NATIVE_SCRATCH = ThreadLocal.withInitial(NativeScratch::new);
+
+    private static final MethodHandle VERIFY = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_render_data_verify",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT));
+    private static final MethodHandle ALLOCATE = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_render_data_allocate",
+            FunctionDescriptor.of(ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT));
+    private static final MethodHandle FREE = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_render_data_free",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT));
+    private static final MethodHandle SET_VERTEX_DATA = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_render_data_set_vertex_data",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_INT));
+    private static final MethodHandle SET_LOCAL_BASE_ELEMENT = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_render_data_set_local_base_element",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG));
+    private static final MethodHandle SET_SHARED_BASE_ELEMENT = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_render_data_set_shared_base_element",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG));
+    private static final MethodHandle SET_BASE_VERTEX = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_render_data_set_base_vertex",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG));
+    private static final MethodHandle CLEAR_FULL = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_render_data_clear_full",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT));
+    private static final MethodHandle CLEAR_VERTEX_DATA = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_render_data_clear_vertex_data",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT));
+    private static final MethodHandle CLEAR_INDEX_DATA = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_render_data_clear_index_data",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT));
+    private static final MethodHandle FILL_DRAW_COMMANDS = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_render_data_fill_draw_commands",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS));
+    private static final MethodHandle VISIBLE_FACES = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_render_data_visible_faces",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT));
+    private static final int VERIFY_STATUS = invokeVerify();
+
     private final @Nullable ChunkBufferAllocation[] vertexAllocations;
     private final @Nullable ChunkBufferAllocation @Nullable [] elementAllocations;
     private @Nullable ChunkBufferAllocation sharedIndexAllocation;
@@ -52,7 +149,10 @@ public class SectionRenderDataStorage {
             this.elementAllocations = null;
         }
 
-        this.pMeshDataArray = SectionRenderDataUnsafe.allocateHeap(RenderRegion.REGION_SIZE);
+        this.pMeshDataArray = invokeAllocate(REGION_SIZE);
+        if (this.pMeshDataArray == 0) {
+            throw new IllegalStateException("Rust section render data allocation failed");
+        }
     }
 
     public void setVertexData(int localSectionIndex, ChunkBufferAllocation allocation, int[] vertexSegments) {
@@ -64,28 +164,11 @@ public class SectionRenderDataStorage {
 
         this.vertexAllocations[localSectionIndex] = allocation;
 
-        var pMeshData = this.getDataPointer(localSectionIndex);
-
-        int sliceMask = 0;
-        long facingList = 0;
-
-        for (int i = 0; i < ModelQuadFacing.COUNT; i++) {
-            var segmentIndex = i << 1;
-
-            int facing = vertexSegments[segmentIndex + 1];
-            facingList |= (long) facing << (i * 8);
-
-            long vertexCount = UInt32.upcast(vertexSegments[segmentIndex]);
-            SectionRenderDataUnsafe.setVertexCount(pMeshData, i, vertexCount);
-
-            if (vertexCount > 0) {
-                sliceMask |= 1 << facing;
-            }
-        }
-
-        SectionRenderDataUnsafe.setBaseVertex(pMeshData, allocation.getOffset());
-        SectionRenderDataUnsafe.setSliceMask(pMeshData, sliceMask);
-        SectionRenderDataUnsafe.setFacingList(pMeshData, facingList);
+        NativeScratch scratch = NATIVE_SCRATCH.get();
+        scratch.writeVertexSegments(vertexSegments);
+        check(invokeSetVertexData(this.pMeshDataArray, localSectionIndex, allocation.getOffset(),
+                MemoryUtil.memAddress(scratch.vertexSegments), VERTEX_SEGMENT_VALUES),
+                "native section render vertex data update");
     }
 
     public void setIndexData(int localSectionIndex, ChunkBufferAllocation allocation) {
@@ -101,9 +184,8 @@ public class SectionRenderDataStorage {
 
         this.elementAllocations[localSectionIndex] = allocation;
 
-        var pMeshData = this.getDataPointer(localSectionIndex);
-
-        SectionRenderDataUnsafe.setLocalBaseElement(pMeshData, allocation.getOffset());
+        check(invokeSetLocalBaseElement(this.pMeshDataArray, localSectionIndex, allocation.getOffset()),
+                "native section render local index update");
     }
 
     public boolean setSharedIndexUsage(int localSectionIndex, int newUsage) {
@@ -122,8 +204,8 @@ public class SectionRenderDataStorage {
         } else {
             // just set the base element since no update is happening
             var sharedBaseElement = this.sharedIndexAllocation.getOffset();
-            var pMeshData = this.getDataPointer(localSectionIndex);
-            SectionRenderDataUnsafe.setSharedBaseElement(pMeshData, sharedBaseElement);
+            check(invokeSetSharedBaseElement(this.pMeshDataArray, localSectionIndex, sharedBaseElement),
+                    "native section render shared index update");
 
             if (previousUsage == 0 && newUsage > 0) {
                 newlyUsingSharedIndexBuffer = true;
@@ -186,7 +268,8 @@ public class SectionRenderDataStorage {
             var sharedBaseElement = this.sharedIndexAllocation.getOffset();
             for (int i = 0; i < RenderRegion.REGION_SIZE; i++) {
                 if (this.sharedIndexUsage[i] > 0) {
-                    SectionRenderDataUnsafe.setSharedBaseElement(this.getDataPointer(i), sharedBaseElement);
+                    check(invokeSetSharedBaseElement(this.pMeshDataArray, i, sharedBaseElement),
+                            "native section render shared index update");
                 }
             }
         }
@@ -232,14 +315,12 @@ public class SectionRenderDataStorage {
             this.setSharedIndexUsage(localSectionIndex, 0);
         }
 
-        var pMeshData = this.getDataPointer(localSectionIndex);
-
         if ((removeIndexData || !this.storesIndexData()) && removeVertexData) {
-            SectionRenderDataUnsafe.clearFull(pMeshData);
+            check(invokeClearFull(this.pMeshDataArray, localSectionIndex), "native section render data clear");
         } else if (removeVertexData) {
-            SectionRenderDataUnsafe.clearVertexData(pMeshData);
+            check(invokeClearVertexData(this.pMeshDataArray, localSectionIndex), "native section render vertex data clear");
         } else if (removeIndexData) {
-            SectionRenderDataUnsafe.clearIndexData(pMeshData);
+            check(invokeClearIndexData(this.pMeshDataArray, localSectionIndex), "native section render index data clear");
         }
     }
 
@@ -256,9 +337,9 @@ public class SectionRenderDataStorage {
             return;
         }
 
-        var data = this.getDataPointer(sectionIndex);
         long offset = allocation.getOffset();
-        SectionRenderDataUnsafe.setBaseVertex(data, offset);
+        check(invokeSetBaseVertex(this.pMeshDataArray, sectionIndex, offset),
+                "native section render base vertex update");
     }
 
     public void onIndexBufferResized() {
@@ -270,19 +351,62 @@ public class SectionRenderDataStorage {
         for (int i = 0; i < RenderRegion.REGION_SIZE; i++) {
             if (this.sharedIndexUsage[i] > 0) {
                 // update index sharing sections to use the new shared index buffer's offset
-                SectionRenderDataUnsafe.setSharedBaseElement(this.getDataPointer(i), sharedBaseElement);
+                check(invokeSetSharedBaseElement(this.pMeshDataArray, i, sharedBaseElement),
+                        "native section render shared index update");
             } else if (this.elementAllocations != null) {
                 var allocation = this.elementAllocations[i];
 
                 if (allocation != null) {
-                    SectionRenderDataUnsafe.setLocalBaseElement(this.getDataPointer(i), allocation.getOffset());
+                    check(invokeSetLocalBaseElement(this.pMeshDataArray, i, allocation.getOffset()),
+                            "native section render local index update");
                 }
             }
         }
     }
 
-    public long getDataPointer(int sectionIndex) {
-        return SectionRenderDataUnsafe.heapPointer(this.pMeshDataArray, sectionIndex);
+    public void fillDrawCommandBuffer(MultiDrawBatch batch, RenderRegion region, ChunkRenderList renderList,
+            CameraTransform camera, boolean reverseSections, boolean useBlockFaceCulling,
+            boolean useIndexedTessellation) {
+        batch.isFilled = true;
+
+        int sectionCount = renderList.getSectionsWithGeometryCount();
+        if (sectionCount == 0) {
+            batch.size = 0;
+            return;
+        }
+
+        NativeScratch scratch = NATIVE_SCRATCH.get();
+        scratch.ensureSectionCapacity(sectionCount);
+        renderList.copySectionsWithGeometry(scratch.sectionIndices);
+
+        check(invokeFillDrawCommands(
+                this.pMeshDataArray,
+                MemoryUtil.memAddress(scratch.sectionIndices),
+                sectionCount,
+                reverseSections ? 1 : 0,
+                region.getChunkX(),
+                region.getChunkY(),
+                region.getChunkZ(),
+                camera.intX,
+                camera.intY,
+                camera.intZ,
+                useBlockFaceCulling ? 1 : 0,
+                useIndexedTessellation ? 1 : 0,
+                batch.pElementPointer,
+                batch.pElementCount,
+                batch.pBaseVertex,
+                batch.capacity,
+                MemoryUtil.memAddress(scratch.outputSize)), "native section render draw-command assembly");
+        batch.size = scratch.outputSize.getInt(0);
+    }
+
+    public static int getVisibleFaces(int originX, int originY, int originZ, int chunkX, int chunkY, int chunkZ) {
+        check(VERIFY_STATUS, "native section render data verification");
+        try {
+            return (int) VISIBLE_FACES.invokeExact(originX, originY, originZ, chunkX, chunkY, chunkZ);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust section render visible-face calculation downcall failed", throwable);
+        }
     }
 
     public void delete() {
@@ -296,7 +420,7 @@ public class SectionRenderDataStorage {
             this.sharedIndexAllocation.delete();
         }
 
-        SectionRenderDataUnsafe.freeHeap(this.pMeshDataArray);
+        check(invokeFree(this.pMeshDataArray, REGION_SIZE), "native section render data free");
     }
 
     private static void deleteAllocations(ChunkBufferAllocation @NotNull [] allocations) {
@@ -307,5 +431,152 @@ public class SectionRenderDataStorage {
         }
 
         Arrays.fill(allocations, null);
+    }
+
+    private static int invokeVerify() {
+        try {
+            return (int) VERIFY.invokeExact();
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust section render data verification downcall failed", throwable);
+        }
+    }
+
+    private static long invokeAllocate(int count) {
+        check(VERIFY_STATUS, "native section render data verification");
+        try {
+            return (long) ALLOCATE.invokeExact(count);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust section render data allocation downcall failed", throwable);
+        }
+    }
+
+    private static int invokeFree(long pointer, int count) {
+        try {
+            return (int) FREE.invokeExact(pointer, count);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust section render data free downcall failed", throwable);
+        }
+    }
+
+    private static int invokeSetVertexData(long baseAddress, int sectionIndex, long baseVertex,
+            long vertexSegmentsAddress, int vertexSegmentsLength) {
+        try {
+            return (int) SET_VERTEX_DATA.invokeExact(baseAddress, sectionIndex, baseVertex,
+                    MemorySegment.ofAddress(vertexSegmentsAddress), vertexSegmentsLength);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust section render vertex data downcall failed", throwable);
+        }
+    }
+
+    private static int invokeSetLocalBaseElement(long baseAddress, int sectionIndex, long value) {
+        try {
+            return (int) SET_LOCAL_BASE_ELEMENT.invokeExact(baseAddress, sectionIndex, value);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust section render local index downcall failed", throwable);
+        }
+    }
+
+    private static int invokeSetSharedBaseElement(long baseAddress, int sectionIndex, long value) {
+        try {
+            return (int) SET_SHARED_BASE_ELEMENT.invokeExact(baseAddress, sectionIndex, value);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust section render shared index downcall failed", throwable);
+        }
+    }
+
+    private static int invokeSetBaseVertex(long baseAddress, int sectionIndex, long value) {
+        try {
+            return (int) SET_BASE_VERTEX.invokeExact(baseAddress, sectionIndex, value);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust section render base vertex downcall failed", throwable);
+        }
+    }
+
+    private static int invokeClearFull(long baseAddress, int sectionIndex) {
+        try {
+            return (int) CLEAR_FULL.invokeExact(baseAddress, sectionIndex);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust section render full clear downcall failed", throwable);
+        }
+    }
+
+    private static int invokeClearVertexData(long baseAddress, int sectionIndex) {
+        try {
+            return (int) CLEAR_VERTEX_DATA.invokeExact(baseAddress, sectionIndex);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust section render vertex clear downcall failed", throwable);
+        }
+    }
+
+    private static int invokeClearIndexData(long baseAddress, int sectionIndex) {
+        try {
+            return (int) CLEAR_INDEX_DATA.invokeExact(baseAddress, sectionIndex);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust section render index clear downcall failed", throwable);
+        }
+    }
+
+    private static int invokeFillDrawCommands(long baseAddress, long sectionIndicesAddress, int sectionCount,
+            int reverseSections, int regionChunkX, int regionChunkY, int regionChunkZ, int cameraX,
+            int cameraY, int cameraZ, int useBlockFaceCulling, int useIndexedTessellation,
+            long elementPointerAddress, long elementCountAddress, long baseVertexAddress, int drawCapacity,
+            long outputSizeAddress) {
+        try {
+            return (int) FILL_DRAW_COMMANDS.invokeExact(
+                    baseAddress,
+                    MemorySegment.ofAddress(sectionIndicesAddress),
+                    sectionCount,
+                    reverseSections,
+                    regionChunkX,
+                    regionChunkY,
+                    regionChunkZ,
+                    cameraX,
+                    cameraY,
+                    cameraZ,
+                    useBlockFaceCulling,
+                    useIndexedTessellation,
+                    elementPointerAddress,
+                    elementCountAddress,
+                    baseVertexAddress,
+                    drawCapacity,
+                    MemorySegment.ofAddress(outputSizeAddress));
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust section render draw-command assembly downcall failed", throwable);
+        }
+    }
+
+    private static void check(int status, String operation) {
+        if (status != OK) {
+            throw new IllegalStateException(operation + " failed with native status " + status);
+        }
+    }
+
+    private static final class NativeScratch {
+        private ByteBuffer vertexSegments = allocate(VERTEX_SEGMENT_VALUES * Integer.BYTES);
+        private ByteBuffer sectionIndices = allocate(REGION_SIZE);
+        private ByteBuffer outputSize = allocate(Integer.BYTES);
+
+        void writeVertexSegments(int[] segments) {
+            if (segments.length != VERTEX_SEGMENT_VALUES) {
+                throw new IllegalArgumentException("Expected " + VERTEX_SEGMENT_VALUES
+                        + " native section vertex segment values, got " + segments.length);
+            }
+
+            for (int index = 0; index < VERTEX_SEGMENT_VALUES; index++) {
+                this.vertexSegments.putInt(index * Integer.BYTES, segments[index]);
+            }
+        }
+
+        void ensureSectionCapacity(int sectionCount) {
+            if (this.sectionIndices.capacity() >= sectionCount) {
+                return;
+            }
+
+            this.sectionIndices = allocate(sectionCount);
+        }
+
+        private static ByteBuffer allocate(int bytes) {
+            return ByteBuffer.allocateDirect(bytes).order(ByteOrder.nativeOrder());
+        }
     }
 }

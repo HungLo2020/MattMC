@@ -3,7 +3,7 @@ package net.sodium.client.render.chunk.data;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.sodium.api.texture.SpriteUtil;
 import net.sodium.client.render.chunk.RenderSectionFlags;
-import net.sodium.client.render.chunk.occlusion.VisibilityEncoding;
+import net.sodium.client.render.chunk.occlusion.OcclusionCuller;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.minecraft.client.renderer.chunk.VisibilitySet;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -54,7 +54,7 @@ public class BuiltSectionInfo {
 
         this.flags = flags;
 
-        this.visibilityData = VisibilityEncoding.encode(occlusionData);
+        this.visibilityData = OcclusionCuller.encodeVisibility(occlusionData);
     }
 
     public static class Builder {

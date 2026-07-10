@@ -1,7 +1,6 @@
 package net.sodium.client.render.chunk.compile.tasks;
 
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
-import net.sodium.client.render.chunk.DefaultChunkRenderer;
 import net.sodium.client.render.chunk.ExtendedBlockEntityType;
 import net.sodium.client.render.chunk.RenderSection;
 import net.sodium.client.render.chunk.compile.ChunkBuildBuffers;
@@ -14,6 +13,7 @@ import net.sodium.client.render.chunk.compile.pipeline.BlockRenderCache;
 import net.sodium.client.render.chunk.compile.pipeline.BlockRenderer;
 import net.sodium.client.render.chunk.data.BuiltSectionInfo;
 import net.sodium.client.render.chunk.data.BuiltSectionMeshParts;
+import net.sodium.client.render.chunk.data.SectionRenderDataStorage;
 import net.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.render.chunk.terrain.material.DefaultMaterials;
@@ -232,7 +232,7 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
         profiler.popPush("meshing");
 
         Map<TerrainRenderPass, BuiltSectionMeshParts> meshes = new Reference2ReferenceOpenHashMap<>();
-        var visibleSlices = DefaultChunkRenderer.getVisibleFaces(
+        var visibleSlices = SectionRenderDataStorage.getVisibleFaces(
                 (int) this.absoluteCameraPos.x(), (int) this.absoluteCameraPos.y(), (int) this.absoluteCameraPos.z(),
                 this.render.getChunkX(), this.render.getChunkY(), this.render.getChunkZ());
 
