@@ -10,6 +10,7 @@ import net.sodium.client.render.chunk.translucent_sorting.data.StaticTopoData;
 import net.sodium.client.render.chunk.translucent_sorting.data.Sorter;
 import net.sodium.client.render.chunk.translucent_sorting.quad.RegularTQuad;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
+import net.sodium.client.render.chunk.translucent_sorting.trigger.NativeGfniTriggers;
 import net.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
 import net.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
@@ -407,6 +408,38 @@ class NativeTranslucentGeometryAnalyzerTest {
             }
             analyzer.destroy();
             MemoryUtil.memFree(indexBuffer);
+        }
+    }
+
+    @Test
+    void nativeAnalyzerCreatesGeometryPlanesInRust() {
+        NativeTranslucentGeometryAnalyzer analyzer = new NativeTranslucentGeometryAnalyzer();
+        long geometryPlanes = 0;
+
+        try {
+            assertFalse(analyzer.appendQuad(zQuad(1.0F), ModelQuadFacing.POS_Z,
+                    ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
+            assertFalse(analyzer.appendQuad(zQuad(4.0F), ModelQuadFacing.POS_Z,
+                    ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
+
+            geometryPlanes = analyzer.createGeometryPlanesHandle();
+            assertEquals(2, NativeGfniTriggers.getGeometryPlaneCount(geometryPlanes));
+        } finally {
+            NativeGfniTriggers.destroyGeometryPlanes(geometryPlanes);
+            analyzer.destroy();
+        }
+    }
+
+    @Test
+    void quadRecordFallbackCreatesGeometryPlanesInRust() {
+        TQuad quad = RegularTQuad.fromVertices(zQuad(2.0F), ModelQuadFacing.POS_Z,
+                ModelQuadFacing.POS_Z.getPackedAlignedNormal());
+        long geometryPlanes = NativeTranslucentGeometryAnalyzer.createGeometryPlanes(new TQuad[] {quad});
+
+        try {
+            assertEquals(1, NativeGfniTriggers.getGeometryPlaneCount(geometryPlanes));
+        } finally {
+            NativeGfniTriggers.destroyGeometryPlanes(geometryPlanes);
         }
     }
 

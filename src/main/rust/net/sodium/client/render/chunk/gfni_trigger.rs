@@ -65,6 +65,70 @@ struct NativeGfniTriggers {
     group_count: usize,
 }
 
+#[derive(Clone, Copy)]
+struct RawPlane {
+    normal: [f32; 3],
+    distance: f32,
+}
+
+pub(crate) struct NativeGeometryPlanes {
+    planes: Vec<RawPlane>,
+}
+
+impl NativeGeometryPlanes {
+    pub(crate) fn new() -> Self {
+        Self { planes: Vec::new() }
+    }
+
+    fn plane_count(&self) -> usize {
+        self.planes.len()
+    }
+
+    pub(crate) fn add_aligned_plane(&mut self, direction: i32, distance: f32) -> Result<(), i32> {
+        if !distance.is_finite() {
+            return Err(ERR_INVALID_ARGUMENT);
+        }
+
+        let normal = aligned_normal(direction)?;
+        self.planes.push(RawPlane { normal, distance });
+        Ok(())
+    }
+
+    fn add_double_sided_aligned_plane(&mut self, axis: i32, distance: f32) -> Result<(), i32> {
+        if !(0..3).contains(&axis) || !distance.is_finite() {
+            return Err(ERR_INVALID_ARGUMENT);
+        }
+
+        self.add_aligned_plane(axis, distance)?;
+        self.add_aligned_plane(axis + 3, -distance)
+    }
+
+    pub(crate) fn add_unaligned_plane(
+        &mut self,
+        normal: [f32; 3],
+        distance: f32,
+    ) -> Result<(), i32> {
+        if normal.iter().any(|value| !value.is_finite()) || !distance.is_finite() {
+            return Err(ERR_INVALID_ARGUMENT);
+        }
+
+        self.planes.push(RawPlane {
+            normal: clean_normal(normal),
+            distance,
+        });
+        Ok(())
+    }
+
+    fn add_double_sided_unaligned_plane(
+        &mut self,
+        normal: [f32; 3],
+        distance: f32,
+    ) -> Result<(), i32> {
+        self.add_unaligned_plane(normal, distance)?;
+        self.add_unaligned_plane([-normal[0], -normal[1], -normal[2]], -distance)
+    }
+}
+
 impl NativeGfniTriggers {
     fn new() -> Self {
         Self {
@@ -294,6 +358,34 @@ struct PendingGfniGroup {
     relative_distances: Vec<f32>,
 }
 
+struct PendingGroupAccumulator {
+    normal: [f32; 3],
+    distances: Vec<f32>,
+}
+
+impl PendingGroupAccumulator {
+    fn into_group(mut self, section_min: [f64; 3]) -> PendingGfniGroup {
+        self.distances
+            .sort_unstable_by(|left, right| left.total_cmp(right));
+        self.distances
+            .dedup_by(|left, right| left.to_bits() == right.to_bits());
+
+        let base_distance = float_double_dot(self.normal, section_min);
+        let range_start = self.distances[0] as f64 + base_distance;
+        let range_end = self.distances[self.distances.len() - 1] as f64 + base_distance;
+        let rel_distance_hash = relative_distance_hash(&self.distances);
+
+        PendingGfniGroup {
+            normal: self.normal,
+            base_distance,
+            range_start,
+            range_end,
+            rel_distance_hash,
+            relative_distances: self.distances,
+        }
+    }
+}
+
 impl PendingGfniGroup {
     fn into_group(self, section_pos: i64) -> GfniGroup {
         GfniGroup {
@@ -353,11 +445,40 @@ fn canonical_float_bits(value: f32) -> u32 {
     }
 }
 
+fn clean_normal(normal: [f32; 3]) -> [f32; 3] {
+    [
+        if normal[0] == 0.0 { 0.0 } else { normal[0] },
+        if normal[1] == 0.0 { 0.0 } else { normal[1] },
+        if normal[2] == 0.0 { 0.0 } else { normal[2] },
+    ]
+}
+
+fn aligned_normal(direction: i32) -> Result<[f32; 3], i32> {
+    match direction {
+        0 => Ok([1.0, 0.0, 0.0]),
+        1 => Ok([0.0, 1.0, 0.0]),
+        2 => Ok([0.0, 0.0, 1.0]),
+        3 => Ok([-1.0, 0.0, 0.0]),
+        4 => Ok([0.0, -1.0, 0.0]),
+        5 => Ok([0.0, 0.0, -1.0]),
+        _ => Err(ERR_INVALID_ARGUMENT),
+    }
+}
+
 fn float_double_dot(normal: [f32; 3], value: [f64; 3]) -> f64 {
     (normal[0] as f64).mul_add(
         value[0],
         (normal[1] as f64).mul_add(value[1], normal[2] as f64 * value[2]),
     )
+}
+
+fn relative_distance_hash(distances: &[f32]) -> i64 {
+    let mut hash = 0i64;
+    for &distance in distances {
+        let distance_bits = (distance as f64).to_bits() as i64;
+        hash ^= hash.wrapping_mul(31).wrapping_add(distance_bits);
+    }
+    hash
 }
 
 fn validate_movement(values: [f64; 6]) -> Result<([f64; 3], [f64; 3]), i32> {
@@ -371,83 +492,35 @@ fn validate_movement(values: [f64; 6]) -> Result<([f64; 3], [f64; 3]), i32> {
     ))
 }
 
-fn read_pending_groups(
-    normal_components: *const f32,
-    base_distances: *const f64,
-    ranges: *const f64,
-    hashes: *const i64,
-    distance_offsets: *const i32,
-    distance_counts: *const i32,
-    distances: *const f32,
-    group_count: i32,
-    distance_count: i32,
+fn build_pending_groups(
+    collector: &NativeGeometryPlanes,
+    section_min: [f64; 3],
 ) -> Result<Vec<PendingGfniGroup>, i32> {
-    if group_count < 0 || distance_count < 0 {
-        return Err(ERR_INVALID_ARGUMENT);
-    }
-    if group_count == 0 {
+    if collector.planes.is_empty() {
         return Ok(Vec::new());
     }
-    if normal_components.is_null()
-        || base_distances.is_null()
-        || ranges.is_null()
-        || hashes.is_null()
-        || distance_offsets.is_null()
-        || distance_counts.is_null()
-        || distances.is_null()
-    {
-        return Err(ERR_NULL_POINTER);
+
+    let mut accumulators: HashMap<NormalKey, PendingGroupAccumulator> = HashMap::new();
+
+    for plane in &collector.planes {
+        if plane.normal.iter().any(|value| !value.is_finite()) || !plane.distance.is_finite() {
+            return Err(ERR_INVALID_ARGUMENT);
+        }
+
+        let key = NormalKey::new(plane.normal[0], plane.normal[1], plane.normal[2]);
+        accumulators
+            .entry(key)
+            .or_insert_with(|| PendingGroupAccumulator {
+                normal: plane.normal,
+                distances: Vec::new(),
+            })
+            .distances
+            .push(plane.distance);
     }
 
-    let group_count = group_count as usize;
-    let distance_count = distance_count as usize;
-    let normal_components = unsafe { slice::from_raw_parts(normal_components, group_count * 3) };
-    let base_distances = unsafe { slice::from_raw_parts(base_distances, group_count) };
-    let ranges = unsafe { slice::from_raw_parts(ranges, group_count * 2) };
-    let hashes = unsafe { slice::from_raw_parts(hashes, group_count) };
-    let distance_offsets = unsafe { slice::from_raw_parts(distance_offsets, group_count) };
-    let distance_counts = unsafe { slice::from_raw_parts(distance_counts, group_count) };
-    let distances = unsafe { slice::from_raw_parts(distances, distance_count) };
-
-    let mut groups = Vec::with_capacity(group_count);
-    for index in 0..group_count {
-        let offset = distance_offsets[index];
-        let count = distance_counts[index];
-        if offset < 0 || count <= 0 {
-            return Err(ERR_INVALID_ARGUMENT);
-        }
-
-        let offset = offset as usize;
-        let count = count as usize;
-        let end = offset.checked_add(count).ok_or(ERR_INVALID_ARGUMENT)?;
-        if end > distances.len() {
-            return Err(ERR_INVALID_ARGUMENT);
-        }
-
-        let normal = [
-            normal_components[index * 3],
-            normal_components[index * 3 + 1],
-            normal_components[index * 3 + 2],
-        ];
-        if normal.iter().any(|value| !value.is_finite())
-            || !base_distances[index].is_finite()
-            || !ranges[index * 2].is_finite()
-            || !ranges[index * 2 + 1].is_finite()
-            || distances[offset..end]
-                .iter()
-                .any(|value| !value.is_finite())
-        {
-            return Err(ERR_INVALID_ARGUMENT);
-        }
-
-        groups.push(PendingGfniGroup {
-            normal,
-            base_distance: base_distances[index],
-            range_start: ranges[index * 2],
-            range_end: ranges[index * 2 + 1],
-            rel_distance_hash: hashes[index],
-            relative_distances: distances[offset..end].to_vec(),
-        });
+    let mut groups = Vec::with_capacity(accumulators.len());
+    for accumulator in accumulators.into_values() {
+        groups.push(accumulator.into_group(section_min));
     }
 
     Ok(groups)
@@ -459,6 +532,22 @@ fn handle_mut<'a>(handle: u64) -> Result<&'a mut NativeGfniTriggers, i32> {
     }
 
     Ok(unsafe { &mut *(handle as *mut NativeGfniTriggers) })
+}
+
+fn geometry_planes_ref<'a>(handle: u64) -> Result<&'a NativeGeometryPlanes, i32> {
+    if handle == 0 {
+        return Err(ERR_NULL_POINTER);
+    }
+
+    Ok(unsafe { &*(handle as *const NativeGeometryPlanes) })
+}
+
+fn geometry_planes_mut<'a>(handle: u64) -> Result<&'a mut NativeGeometryPlanes, i32> {
+    if handle == 0 {
+        return Err(ERR_NULL_POINTER);
+    }
+
+    Ok(unsafe { &mut *(handle as *mut NativeGeometryPlanes) })
 }
 
 fn write_trigger_output(
@@ -521,6 +610,120 @@ fn write_count_output(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_geometry_planes_create(output_handle: *mut u64) -> i32 {
+    if output_handle.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    *output_handle = Box::into_raw(Box::new(NativeGeometryPlanes::new())) as u64;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_geometry_planes_destroy(handle: u64) -> i32 {
+    if handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    drop(Box::from_raw(handle as *mut NativeGeometryPlanes));
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_geometry_planes_count(
+    handle: u64,
+    output_count: *mut i32,
+) -> i32 {
+    if output_count.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    let collector = match geometry_planes_ref(handle) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    if collector.plane_count() > i32::MAX as usize {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    *output_count = collector.plane_count() as i32;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_geometry_planes_add_aligned(
+    handle: u64,
+    direction: i32,
+    distance: f32,
+) -> i32 {
+    let collector = match geometry_planes_mut(handle) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+
+    match collector.add_aligned_plane(direction, distance) {
+        Ok(()) => OK,
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_geometry_planes_add_double_sided_aligned(
+    handle: u64,
+    axis: i32,
+    distance: f32,
+) -> i32 {
+    let collector = match geometry_planes_mut(handle) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+
+    match collector.add_double_sided_aligned_plane(axis, distance) {
+        Ok(()) => OK,
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn mattmc_sodium_geometry_planes_add_unaligned(
+    handle: u64,
+    normal_x: f32,
+    normal_y: f32,
+    normal_z: f32,
+    distance: f32,
+) -> i32 {
+    let collector = match geometry_planes_mut(handle) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+
+    match collector.add_unaligned_plane([normal_x, normal_y, normal_z], distance) {
+        Ok(()) => OK,
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn mattmc_sodium_geometry_planes_add_double_sided_unaligned(
+    handle: u64,
+    normal_x: f32,
+    normal_y: f32,
+    normal_z: f32,
+    distance: f32,
+) -> i32 {
+    let collector = match geometry_planes_mut(handle) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+
+    match collector.add_double_sided_unaligned_plane([normal_x, normal_y, normal_z], distance) {
+        Ok(()) => OK,
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn mattmc_sodium_gfni_triggers_create(output_handle: *mut u64) -> i32 {
     if output_handle.is_null() {
         return ERR_NULL_POINTER;
@@ -568,30 +771,26 @@ pub unsafe extern "C" fn mattmc_sodium_gfni_triggers_remove(handle: u64, section
 pub unsafe extern "C" fn mattmc_sodium_gfni_triggers_integrate(
     handle: u64,
     section_pos: i64,
-    normal_components: *const f32,
-    base_distances: *const f64,
-    ranges: *const f64,
-    hashes: *const i64,
-    distance_offsets: *const i32,
-    distance_counts: *const i32,
-    distances: *const f32,
-    group_count: i32,
-    distance_count: i32,
+    section_min_x: i32,
+    section_min_y: i32,
+    section_min_z: i32,
+    geometry_planes_handle: u64,
 ) -> i32 {
     let triggers = match handle_mut(handle) {
         Ok(value) => value,
         Err(status) => return status,
     };
-    let groups = match read_pending_groups(
-        normal_components,
-        base_distances,
-        ranges,
-        hashes,
-        distance_offsets,
-        distance_counts,
-        distances,
-        group_count,
-        distance_count,
+    let collector = match geometry_planes_ref(geometry_planes_handle) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    let groups = match build_pending_groups(
+        collector,
+        [
+            section_min_x as f64,
+            section_min_y as f64,
+            section_min_z as f64,
+        ],
     ) {
         Ok(value) => value,
         Err(status) => return status,
@@ -776,5 +975,59 @@ mod tests {
             triggers.process_catchup(42, [0.0, 0.0, 0.0], [5.0, 0.0, 0.0]),
             vec![42]
         );
+    }
+
+    #[test]
+    fn raw_plane_records_are_grouped_and_prepared_like_normal_planes() {
+        let mut collector = NativeGeometryPlanes::new();
+        collector.add_aligned_plane(0, 4.0).unwrap();
+        collector.add_aligned_plane(0, 2.0).unwrap();
+        collector.add_aligned_plane(0, 4.0).unwrap();
+        collector.add_aligned_plane(1, 3.0).unwrap();
+
+        let groups = build_pending_groups(&collector, [16.0, 32.0, 48.0]).unwrap();
+
+        assert_eq!(groups.len(), 2);
+        let x_group = groups
+            .iter()
+            .find(|group| group.normal == [1.0, 0.0, 0.0])
+            .unwrap();
+        assert_eq!(x_group.base_distance, 16.0);
+        assert_eq!(x_group.range_start, 18.0);
+        assert_eq!(x_group.range_end, 20.0);
+        assert_eq!(x_group.relative_distances, vec![2.0, 4.0]);
+
+        let y_group = groups
+            .iter()
+            .find(|group| group.normal == [0.0, 1.0, 0.0])
+            .unwrap();
+        assert_eq!(y_group.base_distance, 32.0);
+        assert_eq!(y_group.range_start, 35.0);
+        assert_eq!(y_group.range_end, 35.0);
+        assert_eq!(y_group.relative_distances, vec![3.0]);
+    }
+
+    #[test]
+    fn raw_plane_reader_rejects_invalid_records() {
+        let mut collector = NativeGeometryPlanes::new();
+
+        assert!(matches!(
+            collector.add_unaligned_plane([1.0, 0.0, f32::NAN], 4.0),
+            Err(ERR_INVALID_ARGUMENT)
+        ));
+    }
+
+    #[test]
+    fn geometry_plane_collector_cleans_zeroes_and_adds_double_sided_planes() {
+        let mut collector = NativeGeometryPlanes::new();
+        collector
+            .add_double_sided_unaligned_plane([-0.0, 1.0, 0.0], 7.0)
+            .unwrap();
+
+        assert_eq!(collector.plane_count(), 2);
+        assert_eq!(collector.planes[0].normal, [0.0, 1.0, 0.0]);
+        assert_eq!(collector.planes[0].distance, 7.0);
+        assert_eq!(collector.planes[1].normal, [0.0, -1.0, 0.0]);
+        assert_eq!(collector.planes[1].distance, -7.0);
     }
 }

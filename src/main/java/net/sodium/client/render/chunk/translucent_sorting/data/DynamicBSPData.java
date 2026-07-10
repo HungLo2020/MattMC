@@ -27,7 +27,7 @@ public class DynamicBSPData extends DynamicData {
     private final UpdatedQuadsList updatedQuadsList; // TODO: delete reference after mesh task is done since this won't be needed anymore after that
 
     private DynamicBSPData(SectionPos sectionPos, int inputQuadCount, BSPResult result, Vector3dc initialCameraPos, int generation) {
-        super(sectionPos, inputQuadCount, result, initialCameraPos);
+        super(sectionPos, inputQuadCount, result.takeGeometryPlanesHandle(), initialCameraPos);
         this.rootNode = result.getRootNode();
         this.generation = generation;
         this.updatedQuadsList = result.getUpdatedQuadsList();
@@ -54,6 +54,7 @@ public class DynamicBSPData extends DynamicData {
 
     @Override
     public void close() {
+        super.close();
         this.nativeTree.close();
     }
 
@@ -94,9 +95,6 @@ public class DynamicBSPData extends DynamicData {
         var result = BSPNode.buildBSP(quads, sectionPos, oldRoot, prepareNodeReuse, quadSplittingMode);
 
         var dynamicData = new DynamicBSPData(sectionPos, quads.length, result, cameraPos.getAbsoluteCameraPos(), generation);
-
-        // prepare geometry planes for integration into GFNI triggering
-        result.prepareIntegration();
 
         return dynamicData;
     }

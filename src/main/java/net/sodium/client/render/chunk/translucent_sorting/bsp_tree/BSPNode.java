@@ -89,7 +89,7 @@ public class BSPNode {
             var allIndexes = new IntArrayList(initialIndexes);
 
             var rootNode = BSPNode.build(workspace, allIndexes, -1, oldRoot);
-            var result = workspace.result;
+            var result = workspace.releaseResult();
             result.setRootNode(rootNode);
             result.setUpdatedQuadIndexes(workspace.getFinalizedUpdatedQuads());
             return result;

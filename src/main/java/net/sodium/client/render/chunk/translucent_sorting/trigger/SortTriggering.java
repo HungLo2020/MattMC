@@ -201,7 +201,7 @@ public class SortTriggering implements AutoCloseable {
 
             if (dynamicData instanceof DynamicTopoData topoSortData) {
                 if (topoSortData.GFNITriggerEnabled()) {
-                    this.integrateGfniSection(pos, dynamicData.getGeometryPlanes(), movement);
+                    this.integrateGfniSection(pos, dynamicData.getGeometryPlanesHandle(), movement);
                     topoSortData.discardGeometryPlanes();
                 } else {
                     // remove the trigger data since this section is never going to get gfni
@@ -213,7 +213,7 @@ public class SortTriggering implements AutoCloseable {
                     this.integrateDirectSection(pos, movement);
                 }
             } else {
-                this.integrateGfniSection(pos, dynamicData.getGeometryPlanes(), movement);
+                this.integrateGfniSection(pos, dynamicData.getGeometryPlanesHandle(), movement);
                 dynamicData.discardGeometryPlanes();
             }
 
@@ -247,8 +247,8 @@ public class SortTriggering implements AutoCloseable {
         }
     }
 
-    private void integrateGfniSection(SectionPos sectionPos, GeometryPlanes geometryPlanes, CameraMovement movement) {
-        this.gfni.integrateSection(sectionPos, geometryPlanes);
+    private void integrateGfniSection(SectionPos sectionPos, long geometryPlanesHandle, CameraMovement movement) {
+        this.gfni.integrateSection(sectionPos, geometryPlanesHandle);
         if (movement.hasChanged()) {
             this.gfni.processCatchup(sectionPos.asLong(), movement, this::triggerSectionGFNI);
         }

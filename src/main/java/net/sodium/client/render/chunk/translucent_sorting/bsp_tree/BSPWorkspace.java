@@ -21,6 +21,7 @@ import org.joml.Vector3fc;
 class BSPWorkspace extends ObjectArrayList<TQuad> implements AutoCloseable {
     final BSPResult result = new BSPResult();
     private final NativeTranslucentGeometryAnalyzer.TopoQuadStore topoQuadStore;
+    private boolean resultReleased;
 
     private final SectionPos sectionPos;
     final boolean prepareNodeReuse;
@@ -58,11 +59,11 @@ class BSPWorkspace extends ObjectArrayList<TQuad> implements AutoCloseable {
     // top-level topo sorting isn't used anymore (and only use half as much memory
     // by not storing trigger planes twice)
     void addAlignedPartitionPlane(int axis, float distance) {
-        this.result.addDoubleSidedAlignedPlane(this.sectionPos, axis, distance);
+        this.result.addDoubleSidedAlignedPlane(axis, distance);
     }
 
     void addUnalignedPartitionPlane(Vector3fc planeNormal, float distance) {
-        this.result.addDoubleSidedUnalignedPlane(this.sectionPos, planeNormal, distance);
+        this.result.addDoubleSidedUnalignedPlane(planeNormal, distance);
     }
 
     private void registerQuadUpdate(FullTQuad quad) {
@@ -79,6 +80,11 @@ class BSPWorkspace extends ObjectArrayList<TQuad> implements AutoCloseable {
             this.updatedQuads.setQuadCounts(this.size(), this.quadCount);
         }
         return this.updatedQuads;
+    }
+
+    BSPResult releaseResult() {
+        this.resultReleased = true;
+        return this.result;
     }
 
     int pushQuad(FullTQuad quad) {
@@ -143,5 +149,8 @@ class BSPWorkspace extends ObjectArrayList<TQuad> implements AutoCloseable {
     @Override
     public void close() {
         this.topoQuadStore.close();
+        if (!this.resultReleased) {
+            this.result.close();
+        }
     }
 }

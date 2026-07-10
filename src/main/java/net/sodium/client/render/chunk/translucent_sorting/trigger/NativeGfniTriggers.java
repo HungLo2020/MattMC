@@ -12,11 +12,9 @@ import java.lang.invoke.MethodHandle;
 import java.lang.ref.Cleaner;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.function.LongConsumer;
 
-final class NativeGfniTriggers implements AutoCloseable {
+public final class NativeGfniTriggers implements AutoCloseable {
     private static final int OK = 0;
     private static final int ERR_CAPACITY = -3;
     private static final int OUTPUT_STATE_VALUES = 2;
@@ -47,15 +45,10 @@ final class NativeGfniTriggers implements AutoCloseable {
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_LONG,
                     ValueLayout.JAVA_LONG,
-                    ValueLayout.ADDRESS,
-                    ValueLayout.ADDRESS,
-                    ValueLayout.ADDRESS,
-                    ValueLayout.ADDRESS,
-                    ValueLayout.ADDRESS,
-                    ValueLayout.ADDRESS,
-                    ValueLayout.ADDRESS,
                     ValueLayout.JAVA_INT,
-                    ValueLayout.JAVA_INT));
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG));
     private static final MethodHandle PROCESS = NativeLibraryLoader.downcallHandle("mattmc_rust",
             "mattmc_sodium_gfni_triggers_process",
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
@@ -85,6 +78,47 @@ final class NativeGfniTriggers implements AutoCloseable {
                     ValueLayout.JAVA_INT,
                     ValueLayout.ADDRESS,
                     ValueLayout.JAVA_INT));
+    private static final MethodHandle GEOMETRY_PLANES_CREATE = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_geometry_planes_create",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS));
+    private static final MethodHandle GEOMETRY_PLANES_DESTROY = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_geometry_planes_destroy",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG));
+    private static final MethodHandle GEOMETRY_PLANES_COUNT = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_geometry_planes_count",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.ADDRESS));
+    private static final MethodHandle GEOMETRY_PLANES_ADD_ALIGNED = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_geometry_planes_add_aligned",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_FLOAT));
+    private static final MethodHandle GEOMETRY_PLANES_ADD_DOUBLE_SIDED_ALIGNED = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_geometry_planes_add_double_sided_aligned",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_FLOAT));
+    private static final MethodHandle GEOMETRY_PLANES_ADD_UNALIGNED = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_geometry_planes_add_unaligned",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_FLOAT,
+                    ValueLayout.JAVA_FLOAT,
+                    ValueLayout.JAVA_FLOAT,
+                    ValueLayout.JAVA_FLOAT));
+    private static final MethodHandle GEOMETRY_PLANES_ADD_DOUBLE_SIDED_UNALIGNED = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_geometry_planes_add_double_sided_unaligned",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_FLOAT,
+                    ValueLayout.JAVA_FLOAT,
+                    ValueLayout.JAVA_FLOAT,
+                    ValueLayout.JAVA_FLOAT));
 
     private final State state;
     private final Cleaner.Cleanable cleanable;
@@ -115,57 +149,10 @@ final class NativeGfniTriggers implements AutoCloseable {
         this.processWithRetry(true, sectionPos, movement, triggeredSectionConsumer);
     }
 
-    void integrateSection(SectionPos sectionPos, GeometryPlanes geometryPlanes) {
-        ArrayList<NormalPlanes> normalPlanes = collectNormalPlanes(geometryPlanes);
-
-        if (normalPlanes.isEmpty()) {
-            check(invokeIntegrate(this.state.getHandle(), sectionPos.asLong(), MemorySegment.NULL,
-                    MemorySegment.NULL, MemorySegment.NULL, MemorySegment.NULL, MemorySegment.NULL,
-                    MemorySegment.NULL, MemorySegment.NULL, 0, 0), "native GFNI trigger integration");
-            return;
-        }
-
-        int totalDistanceCount = 0;
-        for (NormalPlanes planes : normalPlanes) {
-            ensurePrepared(planes);
-            totalDistanceCount += planes.relativeDistances.length;
-        }
-
-        try (Arena arena = Arena.ofConfined()) {
-            MemorySegment normals = arena.allocate(ValueLayout.JAVA_FLOAT, normalPlanes.size() * 3L);
-            MemorySegment baseDistances = arena.allocate(ValueLayout.JAVA_DOUBLE, normalPlanes.size());
-            MemorySegment ranges = arena.allocate(ValueLayout.JAVA_DOUBLE, normalPlanes.size() * 2L);
-            MemorySegment hashes = arena.allocate(ValueLayout.JAVA_LONG, normalPlanes.size());
-            MemorySegment distanceOffsets = arena.allocate(ValueLayout.JAVA_INT, normalPlanes.size());
-            MemorySegment distanceCounts = arena.allocate(ValueLayout.JAVA_INT, normalPlanes.size());
-            MemorySegment distances = arena.allocate(ValueLayout.JAVA_FLOAT, totalDistanceCount);
-
-            int distanceOffset = 0;
-            for (int index = 0; index < normalPlanes.size(); index++) {
-                NormalPlanes planes = normalPlanes.get(index);
-
-                normals.setAtIndex(ValueLayout.JAVA_FLOAT, index * 3L, planes.normal.x());
-                normals.setAtIndex(ValueLayout.JAVA_FLOAT, index * 3L + 1, planes.normal.y());
-                normals.setAtIndex(ValueLayout.JAVA_FLOAT, index * 3L + 2, planes.normal.z());
-                baseDistances.setAtIndex(ValueLayout.JAVA_DOUBLE, index, planes.baseDistance);
-                ranges.setAtIndex(ValueLayout.JAVA_DOUBLE, index * 2L, planes.relativeDistances[0] + planes.baseDistance);
-                ranges.setAtIndex(ValueLayout.JAVA_DOUBLE, index * 2L + 1,
-                        planes.relativeDistances[planes.relativeDistances.length - 1] + planes.baseDistance);
-                hashes.setAtIndex(ValueLayout.JAVA_LONG, index, planes.relDistanceHash);
-                distanceOffsets.setAtIndex(ValueLayout.JAVA_INT, index, distanceOffset);
-                distanceCounts.setAtIndex(ValueLayout.JAVA_INT, index, planes.relativeDistances.length);
-
-                for (int distanceIndex = 0; distanceIndex < planes.relativeDistances.length; distanceIndex++) {
-                    distances.setAtIndex(ValueLayout.JAVA_FLOAT, distanceOffset + distanceIndex,
-                            planes.relativeDistances[distanceIndex]);
-                }
-                distanceOffset += planes.relativeDistances.length;
-            }
-
-            check(invokeIntegrate(this.state.getHandle(), sectionPos.asLong(), normals, baseDistances, ranges,
-                    hashes, distanceOffsets, distanceCounts, distances, normalPlanes.size(), totalDistanceCount),
-                    "native GFNI trigger integration");
-        }
+    void integrateSection(SectionPos sectionPos, long geometryPlanesHandle) {
+        check(invokeIntegrate(this.state.getHandle(), sectionPos.asLong(), sectionPos.minBlockX(),
+                sectionPos.minBlockY(), sectionPos.minBlockZ(), geometryPlanesHandle),
+                "native GFNI trigger integration");
     }
 
     void removeSection(long sectionPos) {
@@ -179,6 +166,54 @@ final class NativeGfniTriggers implements AutoCloseable {
                     "native GFNI trigger count query");
             return counts.getAtIndex(ValueLayout.JAVA_INT, 0);
         }
+    }
+
+    public static long createGeometryPlanes() {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment handleSegment = arena.allocate(ValueLayout.JAVA_LONG);
+            check(invokeGeometryPlanesCreate(handleSegment), "native geometry plane collector creation");
+            long handle = handleSegment.get(ValueLayout.JAVA_LONG, 0);
+            if (handle == 0) {
+                throw new IllegalStateException("Native geometry plane collector creation returned a null handle");
+            }
+            return handle;
+        }
+    }
+
+    public static void destroyGeometryPlanes(long handle) {
+        if (handle != 0) {
+            check(invokeGeometryPlanesDestroy(handle), "native geometry plane collector destruction");
+        }
+    }
+
+    public static int getGeometryPlaneCount(long handle) {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment countSegment = arena.allocate(ValueLayout.JAVA_INT);
+            check(invokeGeometryPlanesCount(handle, countSegment), "native geometry plane count query");
+            return countSegment.get(ValueLayout.JAVA_INT, 0);
+        }
+    }
+
+    public static void addAlignedGeometryPlane(long handle, int direction, float distance) {
+        check(invokeGeometryPlanesAddAligned(handle, direction, distance),
+                "native aligned geometry plane insertion");
+    }
+
+    public static void addDoubleSidedAlignedGeometryPlane(long handle, int axis, float distance) {
+        check(invokeGeometryPlanesAddDoubleSidedAligned(handle, axis, distance),
+                "native double-sided aligned geometry plane insertion");
+    }
+
+    public static void addUnalignedGeometryPlane(long handle, float normalX, float normalY, float normalZ,
+            float distance) {
+        check(invokeGeometryPlanesAddUnaligned(handle, normalX, normalY, normalZ, distance),
+                "native unaligned geometry plane insertion");
+    }
+
+    public static void addDoubleSidedUnalignedGeometryPlane(long handle, float normalX, float normalY, float normalZ,
+            float distance) {
+        check(invokeGeometryPlanesAddDoubleSidedUnaligned(handle, normalX, normalY, normalZ, distance),
+                "native double-sided unaligned geometry plane insertion");
     }
 
     @Override
@@ -222,32 +257,6 @@ final class NativeGfniTriggers implements AutoCloseable {
         }
     }
 
-    private static ArrayList<NormalPlanes> collectNormalPlanes(GeometryPlanes geometryPlanes) {
-        ArrayList<NormalPlanes> normalPlanes = new ArrayList<>();
-
-        NormalPlanes[] aligned = geometryPlanes.getAligned();
-        if (aligned != null) {
-            for (NormalPlanes planes : aligned) {
-                if (planes != null) {
-                    normalPlanes.add(planes);
-                }
-            }
-        }
-
-        Collection<NormalPlanes> unaligned = geometryPlanes.getUnaligned();
-        if (unaligned != null) {
-            normalPlanes.addAll(unaligned);
-        }
-
-        return normalPlanes;
-    }
-
-    private static void ensurePrepared(NormalPlanes planes) {
-        if (planes.relativeDistances == null) {
-            planes.prepareIntegration();
-        }
-    }
-
     private static void check(int status, String operation) {
         if (status != OK) {
             throw new IllegalStateException(operation + " failed with native status " + status);
@@ -286,12 +295,11 @@ final class NativeGfniTriggers implements AutoCloseable {
         }
     }
 
-    private static int invokeIntegrate(long handle, long sectionPos, MemorySegment normals,
-            MemorySegment baseDistances, MemorySegment ranges, MemorySegment hashes, MemorySegment distanceOffsets,
-            MemorySegment distanceCounts, MemorySegment distances, int groupCount, int distanceCount) {
+    private static int invokeIntegrate(long handle, long sectionPos, int sectionMinX, int sectionMinY,
+            int sectionMinZ, long geometryPlanesHandle) {
         try {
-            return (int) INTEGRATE.invokeExact(handle, sectionPos, normals, baseDistances, ranges, hashes,
-                    distanceOffsets, distanceCounts, distances, groupCount, distanceCount);
+            return (int) INTEGRATE.invokeExact(handle, sectionPos, sectionMinX, sectionMinY, sectionMinZ,
+                    geometryPlanesHandle);
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust GFNI trigger integration downcall failed", throwable);
         }
@@ -305,6 +313,67 @@ final class NativeGfniTriggers implements AutoCloseable {
                     outputCapacity, outputState, outputStateLen);
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust GFNI trigger processing downcall failed", throwable);
+        }
+    }
+
+    private static int invokeGeometryPlanesCreate(MemorySegment outputHandle) {
+        try {
+            return (int) GEOMETRY_PLANES_CREATE.invokeExact(outputHandle);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust geometry plane collector creation downcall failed", throwable);
+        }
+    }
+
+    private static int invokeGeometryPlanesDestroy(long handle) {
+        try {
+            return (int) GEOMETRY_PLANES_DESTROY.invokeExact(handle);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust geometry plane collector destroy downcall failed", throwable);
+        }
+    }
+
+    private static int invokeGeometryPlanesCount(long handle, MemorySegment outputCount) {
+        try {
+            return (int) GEOMETRY_PLANES_COUNT.invokeExact(handle, outputCount);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust geometry plane count downcall failed", throwable);
+        }
+    }
+
+    private static int invokeGeometryPlanesAddAligned(long handle, int direction, float distance) {
+        try {
+            return (int) GEOMETRY_PLANES_ADD_ALIGNED.invokeExact(handle, direction, distance);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust aligned geometry plane insertion downcall failed", throwable);
+        }
+    }
+
+    private static int invokeGeometryPlanesAddDoubleSidedAligned(long handle, int axis, float distance) {
+        try {
+            return (int) GEOMETRY_PLANES_ADD_DOUBLE_SIDED_ALIGNED.invokeExact(handle, axis, distance);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust double-sided aligned geometry plane insertion downcall failed",
+                    throwable);
+        }
+    }
+
+    private static int invokeGeometryPlanesAddUnaligned(long handle, float normalX, float normalY, float normalZ,
+            float distance) {
+        try {
+            return (int) GEOMETRY_PLANES_ADD_UNALIGNED.invokeExact(handle, normalX, normalY, normalZ, distance);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust unaligned geometry plane insertion downcall failed", throwable);
+        }
+    }
+
+    private static int invokeGeometryPlanesAddDoubleSidedUnaligned(long handle, float normalX, float normalY,
+            float normalZ, float distance) {
+        try {
+            return (int) GEOMETRY_PLANES_ADD_DOUBLE_SIDED_UNALIGNED.invokeExact(handle, normalX, normalY, normalZ,
+                    distance);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust double-sided unaligned geometry plane insertion downcall failed",
+                    throwable);
         }
     }
 

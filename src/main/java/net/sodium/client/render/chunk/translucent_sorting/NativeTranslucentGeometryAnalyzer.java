@@ -73,6 +73,17 @@ public final class NativeTranslucentGeometryAnalyzer {
                     ValueLayout.JAVA_LONG,
                     ValueLayout.ADDRESS,
                     ValueLayout.JAVA_INT));
+    private static final MethodHandle GEOMETRY_PLANES_CREATE_FROM_RECORDS = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_geometry_planes_create_from_records",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS));
+    private static final MethodHandle GEOMETRY_PLANES_CREATE_FROM_ANALYZER = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_geometry_planes_create_from_analyzer",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.ADDRESS));
     private static final MethodHandle ANALYZE = NativeLibraryLoader.downcallHandle("mattmc_rust",
             "mattmc_sodium_translucent_analyzer_analyze_handle",
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
@@ -339,6 +350,39 @@ public final class NativeTranslucentGeometryAnalyzer {
         return NativeTranslucentSortData.createDynamicTopoFromAnalyzer(this.getHandle(), this.getRecordCount());
     }
 
+    long createGeometryPlanesHandle() {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment handleSegment = arena.allocate(ValueLayout.JAVA_LONG);
+            check(invokeCreateGeometryPlanesFromAnalyzer(this.getHandle(), handleSegment),
+                    "native translucent geometry plane creation from analyzer");
+            long handle = handleSegment.get(ValueLayout.JAVA_LONG, 0);
+            if (handle == 0) {
+                throw new IllegalStateException("Native translucent geometry plane creation returned a null handle");
+            }
+            return handle;
+        }
+    }
+
+    public static long createGeometryPlanes(TQuad[] quads) {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment recordsSegment = quads.length == 0
+                    ? MemorySegment.NULL
+                    : arena.allocate((long) quads.length * RECORD_STRIDE, Integer.BYTES);
+            for (int quadIndex = 0; quadIndex < quads.length; quadIndex++) {
+                writeQuadRecord(recordsSegment.asSlice((long) quadIndex * RECORD_STRIDE), quads[quadIndex]);
+            }
+
+            MemorySegment handleSegment = arena.allocate(ValueLayout.JAVA_LONG);
+            check(invokeCreateGeometryPlanesFromRecords(recordsSegment, quads.length, handleSegment),
+                    "native translucent geometry plane creation from quad records");
+            long handle = handleSegment.get(ValueLayout.JAVA_LONG, 0);
+            if (handle == 0) {
+                throw new IllegalStateException("Native translucent geometry plane creation returned a null handle");
+            }
+            return handle;
+        }
+    }
+
     long handle() {
         return this.getHandle();
     }
@@ -480,6 +524,23 @@ public final class NativeTranslucentGeometryAnalyzer {
         }
     }
 
+    private static int invokeCreateGeometryPlanesFromRecords(MemorySegment records, int recordCount,
+            MemorySegment handleOutput) {
+        try {
+            return (int) GEOMETRY_PLANES_CREATE_FROM_RECORDS.invokeExact(records, recordCount, handleOutput);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust translucent geometry plane record downcall failed", throwable);
+        }
+    }
+
+    private static int invokeCreateGeometryPlanesFromAnalyzer(long handle, MemorySegment handleOutput) {
+        try {
+            return (int) GEOMETRY_PLANES_CREATE_FROM_ANALYZER.invokeExact(handle, handleOutput);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust translucent analyzer geometry plane downcall failed", throwable);
+        }
+    }
+
     private static int invokeAnalyze(long handle, int sortMode, MemorySegment metrics, int metricsLength,
             MemorySegment meshFacingCounts, int meshFacingCountsLength, MemorySegment staticKeys,
             int staticKeysLength) {
@@ -566,6 +627,17 @@ public final class NativeTranslucentGeometryAnalyzer {
 
         recordSegment.set(ValueLayout.JAVA_INT, OFFSET_FACING, facingOrdinal);
         recordSegment.set(ValueLayout.JAVA_INT, OFFSET_PACKED_NORMAL, packedNormal);
+    }
+
+    private static void writeQuadRecord(MemorySegment recordSegment, TQuad quad) {
+        float[] vertexPositions = quad.getVertexPositions();
+        for (int positionIndex = 0; positionIndex < POSITION_FLOATS; positionIndex++) {
+            recordSegment.set(ValueLayout.JAVA_FLOAT, OFFSET_POSITIONS + (long) positionIndex * Float.BYTES,
+                    vertexPositions[positionIndex]);
+        }
+
+        recordSegment.set(ValueLayout.JAVA_INT, OFFSET_FACING, quad.getFacing().ordinal());
+        recordSegment.set(ValueLayout.JAVA_INT, OFFSET_PACKED_NORMAL, quad.getPackedNormal());
     }
 
     private static void writeTopoRecord(MemorySegment recordSegment, TQuad quad) {

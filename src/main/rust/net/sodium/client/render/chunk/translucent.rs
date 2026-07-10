@@ -1,5 +1,6 @@
 use std::slice;
 
+use super::gfni_trigger::NativeGeometryPlanes;
 use super::index;
 
 const OK: i32 = 0;
@@ -1120,6 +1121,29 @@ fn create_dynamic_topo_sort_data(
         quad_count: records.len(),
         kind: NativeTranslucentSortDataKind::DynamicTopo(geometry),
     })
+}
+
+fn create_geometry_planes_from_records(
+    records: &[TranslucentQuadRecord],
+) -> Result<NativeGeometryPlanes, i32> {
+    let mut collector = NativeGeometryPlanes::new();
+
+    for record in records {
+        if record.facing < 0 || record.facing >= FACING_COUNT as i32 {
+            return Err(ERR_INVALID_ARGUMENT);
+        }
+
+        let quad = build_quad_info(record);
+        if is_aligned(quad.topo_facing) {
+            collector.add_aligned_plane(quad.topo_facing, quad.quantized_dot_product)?;
+        } else {
+            let normal = quantize_normal(unpack_normal(quad.packed_normal));
+            collector
+                .add_unaligned_plane([normal.0, normal.1, normal.2], quad.quantized_dot_product)?;
+        }
+    }
+
+    Ok(collector)
 }
 
 fn write_static_sort_data(sort_data: &NativeTranslucentSortData, output: &mut [i32]) -> i32 {
@@ -2690,6 +2714,50 @@ pub unsafe extern "C" fn mattmc_sodium_translucent_section_geometry_destroy(hand
         handle as *mut NativeTranslucentSectionGeometry,
     ));
     OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_geometry_planes_create_from_records(
+    records: *const TranslucentQuadRecord,
+    record_count: i32,
+    output_handle: *mut u64,
+) -> i32 {
+    if record_count < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if output_handle.is_null() || (record_count > 0 && records.is_null()) {
+        return ERR_NULL_POINTER;
+    }
+
+    let records = if record_count == 0 {
+        &[]
+    } else {
+        slice::from_raw_parts(records, record_count as usize)
+    };
+    let collector = match create_geometry_planes_from_records(records) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+
+    *output_handle = Box::into_raw(Box::new(collector)) as u64;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_geometry_planes_create_from_analyzer(
+    analyzer_handle: u64,
+    output_handle: *mut u64,
+) -> i32 {
+    if analyzer_handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let analyzer = &*(analyzer_handle as *const NativeTranslucentAnalyzer);
+    mattmc_sodium_geometry_planes_create_from_records(
+        analyzer.records.as_ptr(),
+        analyzer.records.len() as i32,
+        output_handle,
+    )
 }
 
 #[no_mangle]

@@ -2,7 +2,7 @@ package net.sodium.client.render.chunk.translucent_sorting.data;
 
 import net.sodium.client.render.chunk.translucent_sorting.NativeTranslucentSortData;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
-import net.sodium.client.render.chunk.translucent_sorting.trigger.GeometryPlanes;
+import net.sodium.client.render.chunk.translucent_sorting.trigger.NativeGfniTriggers;
 import net.minecraft.core.SectionPos;
 import org.joml.Vector3dc;
 
@@ -35,9 +35,9 @@ public class DynamicTopoData extends DynamicData {
     private final NativeTranslucentSortData nativeSortData;
 
     private DynamicTopoData(SectionPos sectionPos, int quadCount,
-                            GeometryPlanes geometryPlanes, Vector3dc initialCameraPos,
+                            long geometryPlanesHandle, Vector3dc initialCameraPos,
                             NativeTranslucentSortData nativeSortData) {
-        super(sectionPos, quadCount, geometryPlanes, initialCameraPos);
+        super(sectionPos, quadCount, geometryPlanesHandle, initialCameraPos);
         this.nativeSortData = Objects.requireNonNull(nativeSortData, "nativeSortData");
 
         if (this.getInputQuadCount() > MAX_TOPO_SORT_QUADS) {
@@ -53,6 +53,7 @@ public class DynamicTopoData extends DynamicData {
 
     @Override
     public void close() {
+        super.close();
         if (this.nativeSortData != null) {
             this.nativeSortData.close();
         }
@@ -156,13 +157,12 @@ public class DynamicTopoData extends DynamicData {
     }
 
     public static DynamicTopoData fromMesh(CombinedCameraPos cameraPos, TQuad[] quads, SectionPos sectionPos,
-            GeometryPlanes geometryPlanes, NativeTranslucentSortData nativeSortData) {
-        geometryPlanes.prepareIntegration();
-
+            long geometryPlanesHandle, NativeTranslucentSortData nativeSortData) {
         try {
-            return new DynamicTopoData(sectionPos, quads.length, geometryPlanes, cameraPos.getAbsoluteCameraPos(),
+            return new DynamicTopoData(sectionPos, quads.length, geometryPlanesHandle, cameraPos.getAbsoluteCameraPos(),
                     nativeSortData);
         } catch (RuntimeException exception) {
+            NativeGfniTriggers.destroyGeometryPlanes(geometryPlanesHandle);
             if (nativeSortData != null) {
                 nativeSortData.close();
             }

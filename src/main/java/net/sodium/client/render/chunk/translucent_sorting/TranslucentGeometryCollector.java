@@ -11,7 +11,7 @@ import net.sodium.client.render.chunk.translucent_sorting.data.*;
 import net.sodium.client.render.chunk.translucent_sorting.quad.FullTQuad;
 import net.sodium.client.render.chunk.translucent_sorting.quad.RegularTQuad;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
-import net.sodium.client.render.chunk.translucent_sorting.trigger.GeometryPlanes;
+import net.sodium.client.render.chunk.translucent_sorting.trigger.NativeGfniTriggers;
 import net.sodium.client.render.chunk.translucent_sorting.trigger.SortTriggering;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import net.minecraft.core.SectionPos;
@@ -523,13 +523,23 @@ public class TranslucentGeometryCollector {
             try {
                 return DynamicBSPData.fromMesh(cameraPos, this.quads, this.sectionPos, oldData, this.quadSplittingMode);
             } catch (BSPBuildFailureException e) {
-                var geometryPlanes = GeometryPlanes.fromQuadLists(this.sectionPos, this.quads);
-                NativeTranslucentSortData nativeSortData = this.nativeAnalyzer == null
-                        ? NativeTranslucentSortData.createDynamicTopo(this.quads)
-                        : this.nativeAnalyzer.createDynamicTopoSortData();
-                return DynamicTopoData.fromMesh(
-                        cameraPos, this.quads, this.sectionPos,
-                        geometryPlanes, nativeSortData);
+                long geometryPlanesHandle = this.nativeAnalyzer == null
+                        ? NativeTranslucentGeometryAnalyzer.createGeometryPlanes(this.quads)
+                        : this.nativeAnalyzer.createGeometryPlanesHandle();
+                NativeTranslucentSortData nativeSortData = null;
+                try {
+                    nativeSortData = this.nativeAnalyzer == null
+                            ? NativeTranslucentSortData.createDynamicTopo(this.quads)
+                            : this.nativeAnalyzer.createDynamicTopoSortData();
+                    return DynamicTopoData.fromMesh(
+                            cameraPos, this.quads, this.sectionPos,
+                            geometryPlanesHandle, nativeSortData);
+                } catch (RuntimeException exception) {
+                    if (nativeSortData == null) {
+                        NativeGfniTriggers.destroyGeometryPlanes(geometryPlanesHandle);
+                    }
+                    throw exception;
+                }
             }
         }
 
