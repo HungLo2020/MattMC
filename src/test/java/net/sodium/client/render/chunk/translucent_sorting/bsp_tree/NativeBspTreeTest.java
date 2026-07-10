@@ -42,111 +42,6 @@ class NativeBspTreeTest {
     }
 
     @Test
-    void nativeBspTreeWritesMultiLeafOrder() {
-        NativeBuffer output = new NativeBuffer(2 * TranslucentData.BYTES_PER_QUAD);
-
-        try (NativeBspTree.Builder builder = NativeBspTree.Builder.create()) {
-            int leaf = builder.addLeafMulti(new int[] {1, 0});
-            try (NativeBspTree tree = builder.finish(leaf, 2)) {
-                tree.writeIndexBuffer(output, new Vector3f());
-
-                assertArrayEquals(new int[] {4, 5, 6, 6, 7, 4, 0, 1, 2, 2, 3, 0},
-                        readInts(output.getDirectBuffer(), 12));
-            }
-        } finally {
-            output.free();
-        }
-    }
-
-    @Test
-    void nativeBspTreeTraversesBinaryPartitionByCameraSide() {
-        NativeBuffer output = new NativeBuffer(3 * TranslucentData.BYTES_PER_QUAD);
-
-        try (NativeBspTree.Builder builder = NativeBspTree.Builder.create()) {
-            int inside = builder.addLeafSingle(0);
-            int outside = builder.addLeafSingle(1);
-            int root = builder.addBinary(NativeBspTree.Remap.NONE, new Vector3f(1.0f, 0.0f, 0.0f),
-                    0.5f, inside, outside, new int[] {2});
-
-            try (NativeBspTree tree = builder.finish(root, 3)) {
-                tree.writeIndexBuffer(output, new Vector3f(0.0f, 0.0f, 0.0f));
-                assertArrayEquals(new int[] {
-                        4, 5, 6, 6, 7, 4,
-                        8, 9, 10, 10, 11, 8,
-                        0, 1, 2, 2, 3, 0
-                }, readInts(output.getDirectBuffer(), 18));
-
-                tree.writeIndexBuffer(output, new Vector3f(1.0f, 0.0f, 0.0f));
-                assertArrayEquals(new int[] {
-                        0, 1, 2, 2, 3, 0,
-                        8, 9, 10, 10, 11, 8,
-                        4, 5, 6, 6, 7, 4
-                }, readInts(output.getDirectBuffer(), 18));
-            }
-        } finally {
-            output.free();
-        }
-    }
-
-    @Test
-    void nativeBspTreeTraversesFixedDoubleInNativeOrder() {
-        NativeBuffer output = new NativeBuffer(3 * TranslucentData.BYTES_PER_QUAD);
-
-        try (NativeBspTree.Builder builder = NativeBspTree.Builder.create()) {
-            int first = builder.addLeafDouble(0, 1);
-            int second = builder.addLeafSingle(2);
-            int root = builder.addFixedDouble(NativeBspTree.Remap.NONE, first, second);
-
-            try (NativeBspTree tree = builder.finish(root, 3)) {
-                tree.writeIndexBuffer(output, new Vector3f());
-
-                assertArrayEquals(new int[] {
-                        0, 1, 2, 2, 3, 0,
-                        4, 5, 6, 6, 7, 4,
-                        8, 9, 10, 10, 11, 8
-                }, readInts(output.getDirectBuffer(), 18));
-            }
-        } finally {
-            output.free();
-        }
-    }
-
-    @Test
-    void nativeBspTreeTraversesMultiPartitionByCameraInterval() {
-        NativeBuffer output = new NativeBuffer(5 * TranslucentData.BYTES_PER_QUAD);
-
-        try (NativeBspTree.Builder builder = NativeBspTree.Builder.create()) {
-            int first = builder.addLeafSingle(0);
-            int middle = builder.addLeafSingle(1);
-            int last = builder.addLeafSingle(2);
-            int root = builder.addMultiPartition(NativeBspTree.Remap.NONE, new Vector3f(1.0f, 0.0f, 0.0f),
-                    new float[] {0.5f, 1.5f}, new int[] {first, middle, last}, new int[][] {{3}, {4}});
-
-            try (NativeBspTree tree = builder.finish(root, 5)) {
-                tree.writeIndexBuffer(output, new Vector3f(0.0f, 0.0f, 0.0f));
-                assertArrayEquals(new int[] {
-                        8, 9, 10, 10, 11, 8,
-                        16, 17, 18, 18, 19, 16,
-                        4, 5, 6, 6, 7, 4,
-                        12, 13, 14, 14, 15, 12,
-                        0, 1, 2, 2, 3, 0
-                }, readInts(output.getDirectBuffer(), 30));
-
-                tree.writeIndexBuffer(output, new Vector3f(2.0f, 0.0f, 0.0f));
-                assertArrayEquals(new int[] {
-                        0, 1, 2, 2, 3, 0,
-                        12, 13, 14, 14, 15, 12,
-                        4, 5, 6, 6, 7, 4,
-                        16, 17, 18, 18, 19, 16,
-                        8, 9, 10, 10, 11, 8
-                }, readInts(output.getDirectBuffer(), 30));
-            }
-        } finally {
-            output.free();
-        }
-    }
-
-    @Test
     void nativeBspBuilderConstructsStaticNormalRelativeLeafInRust() {
         TQuad[] quads = new TQuad[] {
                 RegularTQuad.fromVertices(zQuad(0.0F), ModelQuadFacing.POS_Z,
@@ -213,7 +108,7 @@ class NativeBspTreeTest {
                 "src/main/java/net/sodium/client/render/chunk/translucent_sorting/bsp_tree/Partition.java")));
         assertFalse(Files.exists(Path.of(
                 "src/main/java/net/sodium/client/render/chunk/translucent_sorting/bsp_tree/BSPWorkspace.java")));
-        assertTrue(Files.exists(Path.of(
+        assertFalse(Files.exists(Path.of(
                 "src/main/java/net/sodium/client/render/chunk/translucent_sorting/bsp_tree/NativeBspTree.java")));
         assertTrue(Files.exists(Path.of(
                 "src/main/java/net/sodium/client/render/chunk/translucent_sorting/bsp_tree/NativeBspBuildResult.java")));
@@ -233,6 +128,7 @@ class NativeBspTreeTest {
                 "src/main/java/net/sodium/client/render/chunk/translucent_sorting/bsp_tree/NativeBspBuilder.java"));
 
         assertFalse(dynamicBspData.contains("NativeBspTree.fromRoot("));
+        assertFalse(nativeBuildResult.contains("NativeBspTree"));
         assertFalse(nativeBuildResult.contains("rootNode.addTo("));
         assertFalse(nativeBuildResult.contains("Builder.create()"));
         assertTrue(dynamicBspData.contains("NativeBspBuildResult"));

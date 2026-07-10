@@ -13,9 +13,9 @@ import java.lang.invoke.MethodHandle;
 import java.lang.ref.Cleaner;
 
 /**
- * Native-owned result of dynamic BSP construction. The Java root node is retained
- * only so the existing Java partition builder can reuse old nodes on later
- * builds; geometry planes and the finished BSP traversal tree live in Rust.
+ * Native-owned result of dynamic BSP construction. The Java root node is only a
+ * lifecycle wrapper for Rust-owned reusable BSP metadata; geometry planes and
+ * the finished BSP traversal tree live in Rust.
  */
 public final class NativeBspBuildResult implements AutoCloseable {
     private static final int OK = 0;
@@ -52,6 +52,10 @@ public final class NativeBspBuildResult implements AutoCloseable {
             "mattmc_sodium_translucent_bsp_build_result_set_tree",
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_LONG));
+    private static final MethodHandle DESTROY_TREE = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_translucent_bsp_tree_destroy",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_LONG));
     private static final MethodHandle WRITE_INDEX_BUFFER = NativeLibraryLoader.downcallHandle("mattmc_rust",
             "mattmc_sodium_translucent_bsp_build_result_write_index_buffer",
@@ -113,7 +117,7 @@ public final class NativeBspBuildResult implements AutoCloseable {
             transferredTreeHandle = 0;
         } finally {
             if (transferredTreeHandle != 0) {
-                NativeBspTree.destroyHandle(transferredTreeHandle);
+                destroyTreeHandle(transferredTreeHandle);
             }
         }
 
@@ -226,6 +230,18 @@ public final class NativeBspBuildResult implements AutoCloseable {
             return (int) SET_TREE.invokeExact(handle, treeHandle);
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust BSP build result tree downcall failed", throwable);
+        }
+    }
+
+    private static void destroyTreeHandle(long handle) {
+        check(invokeDestroyTree(handle), "native BSP tree destroy");
+    }
+
+    private static int invokeDestroyTree(long handle) {
+        try {
+            return (int) DESTROY_TREE.invokeExact(handle);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust BSP tree destroy downcall failed", throwable);
         }
     }
 
