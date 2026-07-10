@@ -1,1 +1,4 @@
-pub mod backends;
+#[cfg(test)]
+mod architecture_boundary;
+
+mod backends;
