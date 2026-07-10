@@ -4,7 +4,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.sodium.client.render.chunk.translucent_sorting.QuadSplittingMode;
 import net.sodium.client.render.chunk.translucent_sorting.NativeTranslucentGeometryAnalyzer;
-import net.sodium.client.render.chunk.translucent_sorting.quad.FullTQuad;
+import net.sodium.client.render.chunk.translucent_sorting.quad.NativeFullTQuad;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.minecraft.core.SectionPos;
 import org.joml.Vector3fc;
@@ -30,7 +30,7 @@ class BSPWorkspace extends ObjectArrayList<TQuad> implements AutoCloseable {
     private int quadCount;
     private final int maxQuadCount;
     private IntArrayList availableQuadIndexes;
-    private UpdatedQuadsList updatedQuads;
+    private NativeUpdatedQuads updatedQuads;
 
     BSPWorkspace(TQuad[] quads, SectionPos sectionPos, boolean prepareNodeReuse, QuadSplittingMode quadSplittingMode) {
         super(quads);
@@ -66,16 +66,16 @@ class BSPWorkspace extends ObjectArrayList<TQuad> implements AutoCloseable {
         this.result.addDoubleSidedUnalignedPlane(planeNormal, distance);
     }
 
-    private void registerQuadUpdate(FullTQuad quad) {
+    private void registerQuadUpdate(NativeFullTQuad quad) {
         if (quad.triggerAndSetUpdatedVertices()) {
             if (this.updatedQuads == null) {
-                this.updatedQuads = new UpdatedQuadsList();
+                this.updatedQuads = new NativeUpdatedQuads();
             }
             this.updatedQuads.add(quad);
         }
     }
 
-    public UpdatedQuadsList getFinalizedUpdatedQuads() {
+    public NativeUpdatedQuads getFinalizedUpdatedQuads() {
         if (this.updatedQuads != null) {
             this.updatedQuads.setQuadCounts(this.size(), this.quadCount);
         }
@@ -87,7 +87,7 @@ class BSPWorkspace extends ObjectArrayList<TQuad> implements AutoCloseable {
         return this.result;
     }
 
-    int pushQuad(FullTQuad quad) {
+    int pushQuad(NativeFullTQuad quad) {
         // null or invalid quads simply don't get added
         if (quad == null || quad.isInvalid()) {
             return -1;
@@ -112,7 +112,7 @@ class BSPWorkspace extends ObjectArrayList<TQuad> implements AutoCloseable {
         return index;
     }
 
-    int updateQuad(FullTQuad quad, int quadIndex) {
+    int updateQuad(NativeFullTQuad quad, int quadIndex) {
         if (quad == null) {
             return -1;
         }

@@ -3,7 +3,7 @@ package net.sodium.client.render.chunk.translucent_sorting.data;
 import java.nio.IntBuffer;
 
 import net.sodium.client.render.chunk.translucent_sorting.SortType;
-import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.UpdatedQuadsList;
+import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.NativeUpdatedQuads;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
@@ -30,7 +30,7 @@ public abstract class TranslucentData {
 
     public abstract boolean oldDataMatches(TranslucentGeometryCollector collector, SortType sortType, TQuad[] quads);
 
-    public UpdatedQuadsList getUpdatedQuads() {
+    public NativeUpdatedQuads getUpdatedQuads() {
         return null;
     }
 

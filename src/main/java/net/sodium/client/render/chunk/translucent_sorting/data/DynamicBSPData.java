@@ -2,7 +2,7 @@ package net.sodium.client.render.chunk.translucent_sorting.data;
 
 import net.sodium.client.render.chunk.translucent_sorting.QuadSplittingMode;
 import net.sodium.client.render.chunk.translucent_sorting.SortType;
-import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.UpdatedQuadsList;
+import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.NativeUpdatedQuads;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
 import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.BSPNode;
@@ -24,13 +24,13 @@ public class DynamicBSPData extends DynamicData {
     private final BSPNode rootNode;
     private final NativeBspTree nativeTree;
     private final int generation;
-    private final UpdatedQuadsList updatedQuadsList; // TODO: delete reference after mesh task is done since this won't be needed anymore after that
+    private final NativeUpdatedQuads updatedQuadsList; // TODO: delete reference after mesh task is done since this won't be needed anymore after that
 
     private DynamicBSPData(SectionPos sectionPos, int inputQuadCount, BSPResult result, Vector3dc initialCameraPos, int generation) {
         super(sectionPos, inputQuadCount, result.takeGeometryPlanesHandle(), initialCameraPos);
         this.rootNode = result.getRootNode();
         this.generation = generation;
-        this.updatedQuadsList = result.getUpdatedQuadsList();
+        this.updatedQuadsList = result.getNativeUpdatedQuads();
 
         if (this.updatedQuadsList != null) {
             this.indexQuadCount = this.updatedQuadsList.getIndexQuadCount();
@@ -56,6 +56,9 @@ public class DynamicBSPData extends DynamicData {
     public void close() {
         super.close();
         this.nativeTree.close();
+        if (this.updatedQuadsList != null) {
+            this.updatedQuadsList.close();
+        }
     }
 
     @Override
@@ -75,7 +78,7 @@ public class DynamicBSPData extends DynamicData {
     }
 
     @Override
-    public UpdatedQuadsList getUpdatedQuads() {
+    public NativeUpdatedQuads getUpdatedQuads() {
         return this.updatedQuadsList;
     }
 

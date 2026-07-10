@@ -61,6 +61,51 @@ pub struct TranslucentTopoQuadRecord {
     packed_normal: i32,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct NativeFullQuadVertex {
+    x: f32,
+    y: f32,
+    z: f32,
+    color: i32,
+    ao: f32,
+    u: f32,
+    v: f32,
+    light: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct NativeFullQuadBuffer {
+    vertices: [NativeFullQuadVertex; 4],
+    block_emission: u8,
+    render_type: u8,
+    ignore_mid_block: u8,
+    _padding: u8,
+    block_id: i32,
+    local_x: i32,
+    local_y: i32,
+    local_z: i32,
+    material_bits: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct NativeFullQuadState {
+    positions: [f32; 12],
+    extents: [f32; 6],
+    center: [f32; 3],
+    accurate_normal: [f32; 3],
+    accurate_dot_product: f32,
+    quantized_dot_product: f32,
+    facing: i32,
+    packed_normal: i32,
+    same_vertex_map: i32,
+    normal_is_very_accurate: i32,
+    has_updated_vertices: i32,
+    write_to_index: i32,
+}
+
 #[derive(Clone)]
 struct QuadInfo {
     positions: [f32; 12],
@@ -104,6 +149,17 @@ struct NativeTranslucentAnalyzer {
 
 struct NativeTopoQuadStore {
     quads: Vec<Option<QuadInfo>>,
+}
+
+#[derive(Clone)]
+struct NativeFullTQuad {
+    quad: NativeFullQuadBuffer,
+    info: QuadInfo,
+    same_vertex_map: i32,
+    normal_is_very_accurate: bool,
+    accurate_normal: [f32; 3],
+    has_updated_vertices: bool,
+    write_to_index: i32,
 }
 
 #[derive(Clone)]
@@ -182,7 +238,11 @@ struct BspTraversalState {
 }
 
 pub fn verify() -> i32 {
-    if std::mem::size_of::<TranslucentQuadRecord>() == 56 {
+    if std::mem::size_of::<TranslucentQuadRecord>() == 56
+        && std::mem::size_of::<NativeFullQuadVertex>() == 32
+        && std::mem::size_of::<NativeFullQuadBuffer>() == 152
+        && std::mem::size_of::<NativeFullQuadState>() == 128
+    {
         OK
     } else {
         ERR_INVALID_ARGUMENT
@@ -418,20 +478,16 @@ unsafe fn record_from_native_quad(
 }
 
 fn record_is_invalid(record: &TranslucentQuadRecord) -> bool {
-    let mut last = (
-        record.positions[9],
-        record.positions[10],
-        record.positions[11],
-    );
+    compute_same_vertex_map(&record.positions).count_ones() > 1
+}
+
+fn compute_same_vertex_map(positions: &[f32; 12]) -> i32 {
+    let mut last = (positions[9], positions[10], positions[11]);
     let mut same_vertex_map = 0i32;
 
     for index in 0..4usize {
         let base = index * 3;
-        let current = (
-            record.positions[base],
-            record.positions[base + 1],
-            record.positions[base + 2],
-        );
+        let current = (positions[base], positions[base + 1], positions[base + 2]);
 
         if (current.0 - last.0).abs() < VERTEX_EPSILON
             && (current.1 - last.1).abs() < VERTEX_EPSILON
@@ -443,7 +499,7 @@ fn record_is_invalid(record: &TranslucentQuadRecord) -> bool {
         last = current;
     }
 
-    same_vertex_map.count_ones() > 1
+    same_vertex_map
 }
 
 fn compute_extents_and_center(
@@ -514,6 +570,391 @@ fn compute_extent_center(extents: &[f32; 6]) -> (f32, f32, f32) {
         (extents[1] + extents[4]) * 0.5,
         (extents[2] + extents[5]) * 0.5,
     )
+}
+
+fn full_quad_record(
+    quad: &NativeFullQuadBuffer,
+    facing: i32,
+    packed_normal: i32,
+) -> TranslucentQuadRecord {
+    let mut positions = [0.0; 12];
+    for vertex in 0..4usize {
+        let output = vertex * 3;
+        positions[output] = quad.vertices[vertex].x;
+        positions[output + 1] = quad.vertices[vertex].y;
+        positions[output + 2] = quad.vertices[vertex].z;
+    }
+
+    TranslucentQuadRecord {
+        positions,
+        facing,
+        packed_normal,
+    }
+}
+
+fn create_full_quad(
+    source: &NativeFullQuadBuffer,
+    facing: i32,
+    packed_normal: i32,
+) -> Result<NativeFullTQuad, i32> {
+    if !(0..FACING_COUNT as i32).contains(&facing) {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    let record = full_quad_record(source, facing, packed_normal);
+    if record_is_invalid(&record) {
+        return Err(SORT_FAILED);
+    }
+
+    let info = build_quad_info(&record);
+    Ok(NativeFullTQuad {
+        quad: *source,
+        info,
+        same_vertex_map: compute_same_vertex_map(&record.positions),
+        normal_is_very_accurate: false,
+        accurate_normal: [0.0; 3],
+        has_updated_vertices: false,
+        write_to_index: -1,
+    })
+}
+
+fn write_full_quad_state(quad: &NativeFullTQuad, output: *mut NativeFullQuadState) -> i32 {
+    if output.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    unsafe {
+        *output = NativeFullQuadState {
+            positions: quad.info.positions,
+            extents: quad.info.extents,
+            center: [quad.info.center.0, quad.info.center.1, quad.info.center.2],
+            accurate_normal: quad.accurate_normal,
+            accurate_dot_product: quad.info.accurate_dot_product,
+            quantized_dot_product: quad.info.quantized_dot_product,
+            facing: quad.info.facing,
+            packed_normal: quad.info.packed_normal,
+            same_vertex_map: quad.same_vertex_map,
+            normal_is_very_accurate: i32::from(quad.normal_is_very_accurate),
+            has_updated_vertices: i32::from(quad.has_updated_vertices),
+            write_to_index: quad.write_to_index,
+        };
+    }
+
+    OK
+}
+
+fn full_quad_refresh_after_vertex_modification(quad: &mut NativeFullTQuad) {
+    let old_accurate_dot = quad.info.accurate_dot_product;
+    let old_quantized_dot = quad.info.quantized_dot_product;
+    let record = full_quad_record(&quad.quad, quad.info.facing, quad.info.packed_normal);
+    let mut info = build_quad_info(&record);
+
+    // Splitting preserves the original plane. Java only refreshed extents,
+    // center, and cached vertex positions after a split vertex mutation.
+    info.accurate_dot_product = old_accurate_dot;
+    info.quantized_dot_product = old_quantized_dot;
+
+    quad.same_vertex_map = compute_same_vertex_map(&record.positions);
+    quad.info = info;
+}
+
+fn full_quad_very_accurate_normal(quad: &mut NativeFullTQuad) -> [f32; 3] {
+    if is_aligned(quad.info.facing) {
+        let normal = accurate_aligned_normal(quad.info.facing);
+        return [normal.0, normal.1, normal.2];
+    }
+
+    if !quad.normal_is_very_accurate {
+        let v = &quad.quad.vertices;
+        let dx0 = v[2].x - v[0].x;
+        let dy0 = v[2].y - v[0].y;
+        let dz0 = v[2].z - v[0].z;
+        let dx1 = v[3].x - v[1].x;
+        let dy1 = v[3].y - v[1].y;
+        let dz1 = v[3].z - v[1].z;
+
+        let (x, y, z) = normalize3(
+            dy0 * dz1 - dz0 * dy1,
+            dz0 * dx1 - dx0 * dz1,
+            dx0 * dy1 - dy0 * dx1,
+        );
+        quad.accurate_normal = [x, y, z];
+        quad.info.accurate_dot_product = dot(
+            (x, y, z),
+            quad.info.center.0,
+            quad.info.center.1,
+            quad.info.center.2,
+        );
+        quad.normal_is_very_accurate = true;
+    }
+
+    quad.accurate_normal
+}
+
+fn full_quad_classify(quad: &NativeFullTQuad, plane: (f32, f32, f32), distance: f32) -> (i32, i32) {
+    let mut inside_map = 0;
+    let mut on_plane_map = 0;
+
+    for index in 0..4usize {
+        let vertex = quad.quad.vertices[index];
+        let delta = dot(plane, vertex.x, vertex.y, vertex.z) - distance;
+        if delta.abs() < VERTEX_EPSILON {
+            on_plane_map |= 1 << index;
+        } else if delta < 0.0 {
+            inside_map |= 1 << index;
+        }
+    }
+
+    (inside_map, on_plane_map)
+}
+
+fn copy_full_quad_vertex(from: NativeFullQuadVertex, target: &mut NativeFullQuadVertex) {
+    *target = from;
+}
+
+fn copy_full_quad_vertex_to_indexes(
+    quad: &mut NativeFullQuadBuffer,
+    from: usize,
+    targets: &[usize],
+) {
+    let value = quad.vertices[from];
+    for target in targets {
+        copy_full_quad_vertex(value, &mut quad.vertices[*target]);
+    }
+}
+
+fn mix_color(start: i32, end: i32, weight: f32) -> i32 {
+    let weight = ((weight * 255.0) as i32 & 0xff) as i64;
+    let inverse = 255 - weight;
+    let start = start as u32 as u64;
+    let end = end as u32 as u64;
+
+    let hi = ((start & 0x00ff00ff) * weight as u64) + ((end & 0x00ff00ff) * inverse as u64);
+    let lo = ((start & 0xff00ff00) * weight as u64) + ((end & 0xff00ff00) * inverse as u64);
+    ((((hi + 0x00ff00ff) >> 8) & 0x00ff00ff) | (((lo + 0xff00ff00) >> 8) & 0xff00ff00)) as u32
+        as i32
+}
+
+fn lerp(weight: f32, start: f32, end: f32) -> f32 {
+    start + weight * (end - start)
+}
+
+fn interpolate_full_quad_attributes(
+    split_distance: f32,
+    split_plane: (f32, f32, f32),
+    inside: NativeFullQuadVertex,
+    outside: NativeFullQuadVertex,
+) -> Result<NativeFullQuadVertex, i32> {
+    let inside_to_outside_x = outside.x - inside.x;
+    let inside_to_outside_y = outside.y - inside.y;
+    let inside_to_outside_z = outside.z - inside.z;
+
+    if inside_to_outside_x.abs() < VERTEX_EPSILON
+        && inside_to_outside_y.abs() < VERTEX_EPSILON
+        && inside_to_outside_z.abs() < VERTEX_EPSILON
+    {
+        return Ok(inside);
+    }
+
+    let split_plane_edge_dot = dot(
+        split_plane,
+        inside_to_outside_x,
+        inside_to_outside_y,
+        inside_to_outside_z,
+    );
+    if split_plane_edge_dot == 0.0 {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    let outside_amount =
+        (split_distance - dot(split_plane, inside.x, inside.y, inside.z)) / split_plane_edge_dot;
+    if outside_amount >= 1.0 {
+        return Ok(outside);
+    }
+    if outside_amount <= 0.0 {
+        return Ok(inside);
+    }
+
+    let block_light = lerp(
+        outside_amount,
+        (inside.light & 0xff) as f32,
+        (outside.light & 0xff) as f32,
+    ) as i32;
+    let sky_light = lerp(
+        outside_amount,
+        (inside.light >> 16) as f32,
+        (outside.light >> 16) as f32,
+    ) as i32;
+
+    Ok(NativeFullQuadVertex {
+        x: inside.x + inside_to_outside_x * outside_amount,
+        y: inside.y + inside_to_outside_y * outside_amount,
+        z: inside.z + inside_to_outside_z * outside_amount,
+        color: mix_color(inside.color, outside.color, outside_amount),
+        ao: lerp(outside_amount, inside.ao, outside.ao),
+        u: lerp(outside_amount, inside.u, outside.u),
+        v: lerp(outside_amount, inside.v, outside.v),
+        light: ((sky_light & 0xff) << 16) | (block_light & 0xff),
+    })
+}
+
+fn full_quad_split_even(
+    vertex_inside_map: i32,
+    inside_quad: &mut NativeFullTQuad,
+    outside_quad: &mut NativeFullTQuad,
+    split_plane: (f32, f32, f32),
+    split_distance: f32,
+) -> Result<(), i32> {
+    for index_a in 0..4usize {
+        let index_b = (index_a + 1) & 0b11;
+        let inside_a = (vertex_inside_map & (1 << index_a)) != 0;
+        let inside_b = (vertex_inside_map & (1 << index_b)) != 0;
+        if inside_a == inside_b {
+            continue;
+        }
+
+        let (inside_index, outside_index) = if inside_a {
+            (index_a, index_b)
+        } else {
+            (index_b, index_a)
+        };
+        let interpolated = interpolate_full_quad_attributes(
+            split_distance,
+            split_plane,
+            inside_quad.quad.vertices[inside_index],
+            outside_quad.quad.vertices[outside_index],
+        )?;
+        inside_quad.quad.vertices[outside_index] = interpolated;
+        outside_quad.quad.vertices[inside_index] = interpolated;
+    }
+
+    full_quad_refresh_after_vertex_modification(inside_quad);
+    full_quad_refresh_after_vertex_modification(outside_quad);
+    Ok(())
+}
+
+fn full_quad_split_odd(
+    corner_index: usize,
+    corner_quad: &mut NativeFullTQuad,
+    cut_quad: &mut NativeFullTQuad,
+    bulk_quad: &mut NativeFullTQuad,
+    split_plane: (f32, f32, f32),
+    split_distance: f32,
+) -> Result<(), i32> {
+    if corner_index >= 4 {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    let prev_index = (corner_index + 3) & 0b11;
+    let next_index = (corner_index + 1) & 0b11;
+    let opposite_index = (corner_index + 2) & 0b11;
+    let corner_vertex = corner_quad.quad.vertices[corner_index];
+
+    let next = interpolate_full_quad_attributes(
+        split_distance,
+        split_plane,
+        corner_vertex,
+        bulk_quad.quad.vertices[next_index],
+    )?;
+    corner_quad.quad.vertices[next_index] = next;
+    cut_quad.quad.vertices[next_index] = next;
+    bulk_quad.quad.vertices[corner_index] = next;
+
+    let prev = interpolate_full_quad_attributes(
+        split_distance,
+        split_plane,
+        corner_vertex,
+        bulk_quad.quad.vertices[prev_index],
+    )?;
+    corner_quad.quad.vertices[prev_index] = prev;
+    corner_quad.quad.vertices[opposite_index] = prev;
+    cut_quad.quad.vertices[corner_index] = prev;
+
+    copy_full_quad_vertex_to_indexes(&mut cut_quad.quad, prev_index, &[opposite_index]);
+
+    full_quad_refresh_after_vertex_modification(corner_quad);
+    full_quad_refresh_after_vertex_modification(cut_quad);
+    full_quad_refresh_after_vertex_modification(bulk_quad);
+    Ok(())
+}
+
+fn full_quad_split_triangle_corner(
+    corner_index: usize,
+    corner_quad: &mut NativeFullTQuad,
+    bulk_quad: &mut NativeFullTQuad,
+    split_plane: (f32, f32, f32),
+    split_distance: f32,
+) -> Result<(), i32> {
+    if corner_index >= 4 {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    let prev_index = (corner_index + 3) & 0b11;
+    let next_index = (corner_index + 1) & 0b11;
+    let opposite_index = (corner_index + 2) & 0b11;
+    let corner_vertex = corner_quad.quad.vertices[corner_index];
+
+    let next = interpolate_full_quad_attributes(
+        split_distance,
+        split_plane,
+        corner_vertex,
+        bulk_quad.quad.vertices[next_index],
+    )?;
+    corner_quad.quad.vertices[next_index] = next;
+    corner_quad.quad.vertices[opposite_index] = next;
+    bulk_quad.quad.vertices[corner_index] = next;
+
+    copy_full_quad_vertex_to_indexes(&mut bulk_quad.quad, prev_index, &[opposite_index]);
+
+    let prev = interpolate_full_quad_attributes(
+        split_distance,
+        split_plane,
+        corner_vertex,
+        bulk_quad.quad.vertices[prev_index],
+    )?;
+    corner_quad.quad.vertices[prev_index] = prev;
+    bulk_quad.quad.vertices[prev_index] = prev;
+
+    full_quad_refresh_after_vertex_modification(corner_quad);
+    full_quad_refresh_after_vertex_modification(bulk_quad);
+    Ok(())
+}
+
+fn full_quad_split_triangle_vertex(
+    inside_index: usize,
+    outside_index: usize,
+    duplicate_index: i32,
+    duplicate_is_inside: bool,
+    inside_quad: &mut NativeFullTQuad,
+    outside_quad: &mut NativeFullTQuad,
+    split_plane: (f32, f32, f32),
+    split_distance: f32,
+) -> Result<(), i32> {
+    if inside_index >= 4 || outside_index >= 4 || duplicate_index >= 4 {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    let interpolated = interpolate_full_quad_attributes(
+        split_distance,
+        split_plane,
+        inside_quad.quad.vertices[inside_index],
+        outside_quad.quad.vertices[outside_index],
+    )?;
+    inside_quad.quad.vertices[outside_index] = interpolated;
+    outside_quad.quad.vertices[inside_index] = interpolated;
+
+    if duplicate_index >= 0 {
+        let duplicate_index = duplicate_index as usize;
+        if duplicate_is_inside {
+            outside_quad.quad.vertices[duplicate_index] = interpolated;
+        } else {
+            inside_quad.quad.vertices[duplicate_index] = interpolated;
+        }
+    }
+
+    full_quad_refresh_after_vertex_modification(inside_quad);
+    full_quad_refresh_after_vertex_modification(outside_quad);
+    Ok(())
 }
 
 fn compute_topo_facing_and_quantized_dot(
@@ -2661,59 +3102,345 @@ pub unsafe extern "C" fn mattmc_sodium_translucent_topo_quad_store_bsp_double_le
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_sodium_translucent_section_geometry_create(
-    records: *const TranslucentQuadRecord,
-    record_count: i32,
+pub unsafe extern "C" fn mattmc_sodium_translucent_full_quad_create(
+    native_quad_address: u64,
+    facing: i32,
+    packed_normal: i32,
     output_handle: *mut u64,
+    output_state: *mut NativeFullQuadState,
 ) -> i32 {
-    if record_count < 0 {
-        return ERR_INVALID_ARGUMENT;
-    }
-    if output_handle.is_null() || (record_count > 0 && records.is_null()) {
+    if native_quad_address == 0 || output_handle.is_null() || output_state.is_null() {
         return ERR_NULL_POINTER;
     }
 
-    let records = if record_count == 0 {
-        &[]
-    } else {
-        slice::from_raw_parts(records, record_count as usize)
-    };
-    let geometry = match create_section_geometry(records) {
+    let source = &*(native_quad_address as *const NativeFullQuadBuffer);
+    let quad = match create_full_quad(source, facing, packed_normal) {
         Ok(value) => value,
         Err(status) => return status,
     };
+    let boxed = Box::new(quad);
+    let handle = Box::into_raw(boxed) as u64;
+    let status = write_full_quad_state(&*(handle as *const NativeFullTQuad), output_state);
+    if status != OK {
+        drop(Box::from_raw(handle as *mut NativeFullTQuad));
+        return status;
+    }
 
-    *output_handle = Box::into_raw(Box::new(geometry)) as u64;
+    *output_handle = handle;
     OK
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_sodium_translucent_section_geometry_create_from_analyzer(
-    analyzer_handle: u64,
-    output_handle: *mut u64,
-) -> i32 {
-    if analyzer_handle == 0 {
+pub unsafe extern "C" fn mattmc_sodium_translucent_full_quad_destroy(handle: u64) -> i32 {
+    if handle == 0 {
         return ERR_NULL_POINTER;
     }
 
-    let analyzer = &*(analyzer_handle as *const NativeTranslucentAnalyzer);
-    mattmc_sodium_translucent_section_geometry_create(
-        analyzer.records.as_ptr(),
-        analyzer.records.len() as i32,
-        output_handle,
-    )
+    drop(Box::from_raw(handle as *mut NativeFullTQuad));
+    OK
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_sodium_translucent_section_geometry_destroy(handle: u64) -> i32 {
-    if handle == 0 {
-        return OK;
+pub unsafe extern "C" fn mattmc_sodium_translucent_full_quad_copy(
+    handle: u64,
+    output_handle: *mut u64,
+    output_state: *mut NativeFullQuadState,
+) -> i32 {
+    if handle == 0 || output_handle.is_null() || output_state.is_null() {
+        return ERR_NULL_POINTER;
     }
 
-    drop(Box::from_raw(
-        handle as *mut NativeTranslucentSectionGeometry,
-    ));
+    let source = &*(handle as *const NativeFullTQuad);
+    let copied = Box::new(source.clone());
+    let new_handle = Box::into_raw(copied) as u64;
+    let status = write_full_quad_state(&*(new_handle as *const NativeFullTQuad), output_state);
+    if status != OK {
+        drop(Box::from_raw(new_handle as *mut NativeFullTQuad));
+        return status;
+    }
+
+    *output_handle = new_handle;
     OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_full_quad_write_state(
+    handle: u64,
+    output_state: *mut NativeFullQuadState,
+) -> i32 {
+    if handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    write_full_quad_state(&*(handle as *const NativeFullTQuad), output_state)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_full_quad_get_very_accurate_normal(
+    handle: u64,
+    output_state: *mut NativeFullQuadState,
+) -> i32 {
+    if handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let quad = &mut *(handle as *mut NativeFullTQuad);
+    full_quad_very_accurate_normal(quad);
+    write_full_quad_state(quad, output_state)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_full_quad_classify(
+    handle: u64,
+    normal_x: f32,
+    normal_y: f32,
+    normal_z: f32,
+    distance: f32,
+    output_maps: *mut i32,
+) -> i32 {
+    if handle == 0 || output_maps.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let quad = &*(handle as *const NativeFullTQuad);
+    let (inside_map, on_plane_map) =
+        full_quad_classify(quad, (normal_x, normal_y, normal_z), distance);
+    *output_maps.add(0) = inside_map;
+    *output_maps.add(1) = on_plane_map;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_full_quad_trigger_update(handle: u64) -> i32 {
+    if handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let quad = &mut *(handle as *mut NativeFullTQuad);
+    if quad.has_updated_vertices {
+        0
+    } else {
+        quad.has_updated_vertices = true;
+        1
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_full_quad_set_write_to_index(
+    handle: u64,
+    write_to_index: i32,
+) -> i32 {
+    if handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let quad = &mut *(handle as *mut NativeFullTQuad);
+    quad.write_to_index = write_to_index;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_full_quad_write_to_native_buffer(
+    handle: u64,
+    output_native_quad_address: u64,
+    material_bits: i32,
+) -> i32 {
+    native_full_quad_write_to_native_buffer(handle, output_native_quad_address, material_bits)
+}
+
+pub(crate) unsafe fn native_full_quad_write_to_index(
+    handle: u64,
+    output_write_to_index: *mut i32,
+) -> i32 {
+    if handle == 0 || output_write_to_index.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let quad = &*(handle as *const NativeFullTQuad);
+    *output_write_to_index = quad.write_to_index;
+    OK
+}
+
+pub(crate) unsafe fn native_full_quad_write_to_native_buffer(
+    handle: u64,
+    output_native_quad_address: u64,
+    material_bits: i32,
+) -> i32 {
+    if handle == 0 || output_native_quad_address == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let quad = &*(handle as *const NativeFullTQuad);
+    let output = &mut *(output_native_quad_address as *mut NativeFullQuadBuffer);
+    *output = quad.quad;
+    output.material_bits = material_bits;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_full_quad_split_even(
+    vertex_inside_map: i32,
+    inside_handle: u64,
+    outside_handle: u64,
+    normal_x: f32,
+    normal_y: f32,
+    normal_z: f32,
+    distance: f32,
+    inside_state: *mut NativeFullQuadState,
+    outside_state: *mut NativeFullQuadState,
+) -> i32 {
+    if inside_handle == 0 || outside_handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+    if inside_handle == outside_handle {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let inside = &mut *(inside_handle as *mut NativeFullTQuad);
+    let outside = &mut *(outside_handle as *mut NativeFullTQuad);
+    if let Err(status) = full_quad_split_even(
+        vertex_inside_map,
+        inside,
+        outside,
+        (normal_x, normal_y, normal_z),
+        distance,
+    ) {
+        return status;
+    }
+
+    let status = write_full_quad_state(inside, inside_state);
+    if status != OK {
+        return status;
+    }
+    write_full_quad_state(outside, outside_state)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_full_quad_split_odd(
+    corner_index: i32,
+    corner_handle: u64,
+    cut_handle: u64,
+    bulk_handle: u64,
+    normal_x: f32,
+    normal_y: f32,
+    normal_z: f32,
+    distance: f32,
+    corner_state: *mut NativeFullQuadState,
+    cut_state: *mut NativeFullQuadState,
+    bulk_state: *mut NativeFullQuadState,
+) -> i32 {
+    if corner_handle == 0 || cut_handle == 0 || bulk_handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+    if corner_handle == cut_handle || corner_handle == bulk_handle || cut_handle == bulk_handle {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let corner = &mut *(corner_handle as *mut NativeFullTQuad);
+    let cut = &mut *(cut_handle as *mut NativeFullTQuad);
+    let bulk = &mut *(bulk_handle as *mut NativeFullTQuad);
+    if let Err(status) = full_quad_split_odd(
+        corner_index as usize,
+        corner,
+        cut,
+        bulk,
+        (normal_x, normal_y, normal_z),
+        distance,
+    ) {
+        return status;
+    }
+
+    let status = write_full_quad_state(corner, corner_state);
+    if status != OK {
+        return status;
+    }
+    let status = write_full_quad_state(cut, cut_state);
+    if status != OK {
+        return status;
+    }
+    write_full_quad_state(bulk, bulk_state)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_full_quad_split_triangle_corner(
+    corner_index: i32,
+    corner_handle: u64,
+    bulk_handle: u64,
+    normal_x: f32,
+    normal_y: f32,
+    normal_z: f32,
+    distance: f32,
+    corner_state: *mut NativeFullQuadState,
+    bulk_state: *mut NativeFullQuadState,
+) -> i32 {
+    if corner_handle == 0 || bulk_handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+    if corner_handle == bulk_handle {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let corner = &mut *(corner_handle as *mut NativeFullTQuad);
+    let bulk = &mut *(bulk_handle as *mut NativeFullTQuad);
+    if let Err(status) = full_quad_split_triangle_corner(
+        corner_index as usize,
+        corner,
+        bulk,
+        (normal_x, normal_y, normal_z),
+        distance,
+    ) {
+        return status;
+    }
+
+    let status = write_full_quad_state(corner, corner_state);
+    if status != OK {
+        return status;
+    }
+    write_full_quad_state(bulk, bulk_state)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_full_quad_split_triangle_vertex(
+    inside_index: i32,
+    outside_index: i32,
+    duplicate_index: i32,
+    duplicate_is_inside: i32,
+    inside_handle: u64,
+    outside_handle: u64,
+    normal_x: f32,
+    normal_y: f32,
+    normal_z: f32,
+    distance: f32,
+    inside_state: *mut NativeFullQuadState,
+    outside_state: *mut NativeFullQuadState,
+) -> i32 {
+    if inside_handle == 0 || outside_handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+    if inside_handle == outside_handle {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let inside = &mut *(inside_handle as *mut NativeFullTQuad);
+    let outside = &mut *(outside_handle as *mut NativeFullTQuad);
+    if let Err(status) = full_quad_split_triangle_vertex(
+        inside_index as usize,
+        outside_index as usize,
+        duplicate_index,
+        duplicate_is_inside != 0,
+        inside,
+        outside,
+        (normal_x, normal_y, normal_z),
+        distance,
+    ) {
+        return status;
+    }
+
+    let status = write_full_quad_state(inside, inside_state);
+    if status != OK {
+        return status;
+    }
+    write_full_quad_state(outside, outside_state)
 }
 
 #[no_mangle]
@@ -3394,87 +4121,6 @@ pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_tree_write_index_buffer(
         output_capacity as usize / std::mem::size_of::<i32>(),
     );
     write_bsp_tree_index_buffer(tree, output, camera_x, camera_y, camera_z)
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn mattmc_sodium_translucent_section_geometry_distance_sort_write(
-    handle: u64,
-    output_address: u64,
-    output_capacity: i32,
-    camera_x: f32,
-    camera_y: f32,
-    camera_z: f32,
-) -> i32 {
-    if output_capacity < 0 || output_capacity % std::mem::size_of::<i32>() as i32 != 0 {
-        return ERR_INVALID_ARGUMENT;
-    }
-    if handle == 0 || output_address == 0 {
-        return ERR_NULL_POINTER;
-    }
-
-    let geometry = &*(handle as *const NativeTranslucentSectionGeometry);
-    let output = slice::from_raw_parts_mut(
-        output_address as *mut i32,
-        output_capacity as usize / std::mem::size_of::<i32>(),
-    );
-    write_distance_sorted_index_buffer(geometry, output, camera_x, camera_y, camera_z)
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn mattmc_sodium_translucent_section_geometry_dynamic_sort_write(
-    handle: u64,
-    output_address: u64,
-    output_capacity: i32,
-    camera_x: f32,
-    camera_y: f32,
-    camera_z: f32,
-    initial: i32,
-    is_direct_trigger: i32,
-    gfni_trigger: i32,
-    direct_trigger: i32,
-    consecutive_topo_sort_failures: i32,
-    output_state: *mut i32,
-    output_state_len: i32,
-) -> i32 {
-    if output_capacity < 0 || output_capacity % std::mem::size_of::<i32>() as i32 != 0 {
-        return ERR_INVALID_ARGUMENT;
-    }
-    if output_state_len < 3 || consecutive_topo_sort_failures < 0 {
-        return ERR_INVALID_ARGUMENT;
-    }
-    if handle == 0 || output_address == 0 || output_state.is_null() {
-        return ERR_NULL_POINTER;
-    }
-
-    let geometry = &*(handle as *const NativeTranslucentSectionGeometry);
-    let output = slice::from_raw_parts_mut(
-        output_address as *mut i32,
-        output_capacity as usize / std::mem::size_of::<i32>(),
-    );
-    let state = DynamicSortState {
-        gfni_trigger: gfni_trigger != 0,
-        direct_trigger: direct_trigger != 0,
-        consecutive_topo_sort_failures,
-    };
-    let state = match write_dynamic_sort_index_buffer(
-        geometry,
-        output,
-        camera_x,
-        camera_y,
-        camera_z,
-        initial != 0,
-        is_direct_trigger != 0,
-        state,
-    ) {
-        Ok(value) => value,
-        Err(status) => return status,
-    };
-
-    let output_state = slice::from_raw_parts_mut(output_state, output_state_len as usize);
-    output_state[0] = if state.gfni_trigger { 1 } else { 0 };
-    output_state[1] = if state.direct_trigger { 1 } else { 0 };
-    output_state[2] = state.consecutive_topo_sort_failures;
-    OK
 }
 
 #[cfg(test)]

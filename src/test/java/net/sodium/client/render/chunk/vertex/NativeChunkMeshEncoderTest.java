@@ -6,8 +6,8 @@ import net.sodium.client.gui.SodiumGameOptions;
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.sodium.client.render.chunk.data.BuiltSectionMeshParts;
 import net.sodium.client.render.chunk.terrain.material.DefaultMaterials;
-import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.UpdatedQuadsList;
-import net.sodium.client.render.chunk.translucent_sorting.quad.FullTQuad;
+import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.NativeUpdatedQuads;
+import net.sodium.client.render.chunk.translucent_sorting.quad.NativeFullTQuad;
 import net.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
 import net.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
@@ -210,10 +210,10 @@ class NativeChunkMeshEncoderTest {
             }
             unassigned.flushPending();
 
-            UpdatedQuadsList updates = new UpdatedQuadsList();
-            FullTQuad skipped = FullTQuad.fromVertices(quad(1.0F, 99), ModelQuadFacing.UNASSIGNED, 0);
-            FullTQuad first = FullTQuad.fromVertices(quad(3.0F, 13), ModelQuadFacing.UNASSIGNED, 0);
-            FullTQuad second = FullTQuad.fromVertices(quad(5.0F, 17), ModelQuadFacing.UNASSIGNED, 0);
+            NativeUpdatedQuads updates = new NativeUpdatedQuads();
+            NativeFullTQuad skipped = NativeFullTQuad.fromVertices(quad(1.0F, 99), ModelQuadFacing.UNASSIGNED, 0);
+            NativeFullTQuad first = NativeFullTQuad.fromVertices(quad(3.0F, 13), ModelQuadFacing.UNASSIGNED, 0);
+            NativeFullTQuad second = NativeFullTQuad.fromVertices(quad(5.0F, 17), ModelQuadFacing.UNASSIGNED, 0);
             skipped.setNoWrite();
             first.setWriteToIndex(1);
             second.setWriteToIndex(3);
@@ -304,7 +304,7 @@ class NativeChunkMeshEncoderTest {
         String chunkMeshBufferBuilder = java.nio.file.Files.readString(java.nio.file.Path.of(
                 "src/main/java/net/sodium/client/render/chunk/vertex/builder/ChunkMeshBufferBuilder.java"));
         String updatedQuadsList = java.nio.file.Files.readString(java.nio.file.Path.of(
-                "src/main/java/net/sodium/client/render/chunk/translucent_sorting/bsp_tree/UpdatedQuadsList.java"));
+                "src/main/java/net/sodium/client/render/chunk/translucent_sorting/bsp_tree/NativeUpdatedQuads.java"));
         String chunkBuildBuffers = java.nio.file.Files.readString(java.nio.file.Path.of(
                 "src/main/java/net/sodium/client/render/chunk/compile/ChunkBuildBuffers.java"));
 
@@ -315,8 +315,8 @@ class NativeChunkMeshEncoderTest {
                 contains(chunkMeshBufferBuilder, "sectionBuilder.stagingBuffers("),
                 contains(chunkMeshBufferBuilder, "appendTranslucentBatch("),
         });
-        assertEquals("encodeScatteredUnassigned(",
-                contains(updatedQuadsList, "encodeScatteredUnassigned("));
+        assertEquals("mattmc_sodium_updated_quads_apply",
+                contains(updatedQuadsList, "mattmc_sodium_updated_quads_apply"));
         org.junit.jupiter.api.Assertions.assertFalse(chunkMeshBufferBuilder.contains("memAlloc("));
         org.junit.jupiter.api.Assertions.assertFalse(chunkMeshBufferBuilder.contains("memFree("));
         org.junit.jupiter.api.Assertions.assertFalse(updatedQuadsList.contains("NativeChunkMeshEncoder.encodeScattered("));
@@ -371,10 +371,10 @@ class NativeChunkMeshEncoderTest {
             builder.start(12);
             output = nativeOrder(MemoryUtil.memCalloc(16 * ChunkMeshFormats.COMPACT.getNativeFormat().stride()));
 
-            UpdatedQuadsList updates = new UpdatedQuadsList();
-            FullTQuad skipped = FullTQuad.fromVertices(quad(1.0F, 99), ModelQuadFacing.UNASSIGNED, 0);
-            FullTQuad first = FullTQuad.fromVertices(quad(3.0F, 13), ModelQuadFacing.UNASSIGNED, 0);
-            FullTQuad second = FullTQuad.fromVertices(quad(5.0F, 17), ModelQuadFacing.UNASSIGNED, 0);
+            NativeUpdatedQuads updates = new NativeUpdatedQuads();
+            NativeFullTQuad skipped = NativeFullTQuad.fromVertices(quad(1.0F, 99), ModelQuadFacing.UNASSIGNED, 0);
+            NativeFullTQuad first = NativeFullTQuad.fromVertices(quad(3.0F, 13), ModelQuadFacing.UNASSIGNED, 0);
+            NativeFullTQuad second = NativeFullTQuad.fromVertices(quad(5.0F, 17), ModelQuadFacing.UNASSIGNED, 0);
 
             skipped.setNoWrite();
             first.setWriteToIndex(1);

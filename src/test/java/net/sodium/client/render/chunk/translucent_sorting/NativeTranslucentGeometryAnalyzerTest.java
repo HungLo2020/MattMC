@@ -216,6 +216,26 @@ class NativeTranslucentGeometryAnalyzerTest {
     }
 
     @Test
+    void fullSplitQuadClassWasMigratedToRust() throws Exception {
+        assertFalse(Files.exists(Path.of(
+                "src/main/java/net/sodium/client/render/chunk/translucent_sorting/quad/FullTQuad.java")));
+
+        String nativeFullQuad = Files.readString(Path.of(
+                "src/main/java/net/sodium/client/render/chunk/translucent_sorting/quad/NativeFullTQuad.java"));
+        String bspPartition = Files.readString(Path.of(
+                "src/main/java/net/sodium/client/render/chunk/translucent_sorting/bsp_tree/InnerPartitionBSPNode.java"));
+        String rustTranslucent = Files.readString(Path.of(
+                "src/main/rust/net/sodium/client/render/chunk/translucent.rs"));
+
+        assertTrue(nativeFullQuad.contains("mattmc_sodium_translucent_full_quad_split_even"));
+        assertTrue(nativeFullQuad.contains("mattmc_sodium_translucent_full_quad_split_triangle_vertex"));
+        assertFalse(bspPartition.contains("interpolateAttributes("));
+        assertFalse(bspPartition.contains("ColorMixer.mix("));
+        assertTrue(rustTranslucent.contains("fn full_quad_split_even("));
+        assertTrue(rustTranslucent.contains("fn interpolate_full_quad_attributes("));
+    }
+
+    @Test
     void nativeSortDataStaticTopoWritesPreparedIndexData() {
         NativeTranslucentGeometryAnalyzer analyzer = new NativeTranslucentGeometryAnalyzer();
         Sorter sorter = null;
@@ -292,10 +312,10 @@ class NativeTranslucentGeometryAnalyzerTest {
     }
 
     @Test
-    void sectionGeometryDistanceSortWritesFarQuadsBeforeNearQuads() {
+    void nativeSortDataDirectDistanceSortWritesFarQuadsBeforeNearQuads() {
         NativeTranslucentGeometryAnalyzer analyzer = new NativeTranslucentGeometryAnalyzer();
         ByteBuffer indexBuffer = MemoryUtil.memAlloc(2 * 6 * Integer.BYTES);
-        NativeTranslucentSectionGeometry geometry = null;
+        NativeTranslucentSortData sortData = null;
 
         try {
             assertFalse(analyzer.appendQuad(zQuad(1.0F), ModelQuadFacing.POS_Z,
@@ -303,15 +323,19 @@ class NativeTranslucentGeometryAnalyzerTest {
             assertFalse(analyzer.appendQuad(zQuad(4.0F), ModelQuadFacing.POS_Z,
                     ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
 
-            geometry = analyzer.createSectionGeometry();
-            geometry.writeDistanceSortedIndexBuffer(MemoryUtil.memAddress(indexBuffer), indexBuffer.capacity(),
-                    new Vector3f(0.0F, 0.0F, 0.0F));
+            sortData = analyzer.createDynamicTopoSortData();
+            NativeTranslucentSortData.DynamicSortResult result = sortData.writeDynamicSortedIndexBuffer(
+                    MemoryUtil.memAddress(indexBuffer), indexBuffer.capacity(), new Vector3f(0.0F, 0.0F, 0.0F),
+                    false, true, false, true, 1);
 
+            assertFalse(result.gfniTrigger());
+            assertTrue(result.directTrigger());
+            assertEquals(1, result.consecutiveTopoSortFailures());
             assertArrayEquals(new int[] {4, 5, 6, 6, 7, 4, 0, 1, 2, 2, 3, 0},
                     readInts(indexBuffer, 12));
         } finally {
-            if (geometry != null) {
-                geometry.close();
+            if (sortData != null) {
+                sortData.close();
             }
             analyzer.destroy();
             MemoryUtil.memFree(indexBuffer);
@@ -322,7 +346,7 @@ class NativeTranslucentGeometryAnalyzerTest {
     void dynamicDirectTriggerWritesDistanceSortNatively() {
         NativeTranslucentGeometryAnalyzer analyzer = new NativeTranslucentGeometryAnalyzer();
         ByteBuffer indexBuffer = MemoryUtil.memAlloc(2 * 6 * Integer.BYTES);
-        NativeTranslucentSectionGeometry geometry = null;
+        NativeTranslucentSortData sortData = null;
 
         try {
             assertFalse(analyzer.appendQuad(zQuad(1.0F), ModelQuadFacing.POS_Z,
@@ -330,8 +354,8 @@ class NativeTranslucentGeometryAnalyzerTest {
             assertFalse(analyzer.appendQuad(zQuad(4.0F), ModelQuadFacing.POS_Z,
                     ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
 
-            geometry = analyzer.createSectionGeometry();
-            NativeTranslucentSectionGeometry.DynamicSortResult result = geometry.writeDynamicSortedIndexBuffer(
+            sortData = analyzer.createDynamicTopoSortData();
+            NativeTranslucentSortData.DynamicSortResult result = sortData.writeDynamicSortedIndexBuffer(
                     MemoryUtil.memAddress(indexBuffer), indexBuffer.capacity(), new Vector3f(0.0F, 0.0F, 0.0F),
                     false, true, false, true, 1);
 
@@ -341,8 +365,8 @@ class NativeTranslucentGeometryAnalyzerTest {
             assertArrayEquals(new int[] {4, 5, 6, 6, 7, 4, 0, 1, 2, 2, 3, 0},
                     readInts(indexBuffer, 12));
         } finally {
-            if (geometry != null) {
-                geometry.close();
+            if (sortData != null) {
+                sortData.close();
             }
             analyzer.destroy();
             MemoryUtil.memFree(indexBuffer);
@@ -353,7 +377,7 @@ class NativeTranslucentGeometryAnalyzerTest {
     void dynamicTopoSuccessKeepsGfniTriggeringNatively() {
         NativeTranslucentGeometryAnalyzer analyzer = new NativeTranslucentGeometryAnalyzer();
         ByteBuffer indexBuffer = MemoryUtil.memAlloc(2 * 6 * Integer.BYTES);
-        NativeTranslucentSectionGeometry geometry = null;
+        NativeTranslucentSortData sortData = null;
 
         try {
             assertFalse(analyzer.appendQuad(zQuad(1.0F), ModelQuadFacing.POS_Z,
@@ -361,8 +385,8 @@ class NativeTranslucentGeometryAnalyzerTest {
             assertFalse(analyzer.appendQuad(zQuad(4.0F), ModelQuadFacing.POS_Z,
                     ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
 
-            geometry = analyzer.createSectionGeometry();
-            NativeTranslucentSectionGeometry.DynamicSortResult result = geometry.writeDynamicSortedIndexBuffer(
+            sortData = analyzer.createDynamicTopoSortData();
+            NativeTranslucentSortData.DynamicSortResult result = sortData.writeDynamicSortedIndexBuffer(
                     MemoryUtil.memAddress(indexBuffer), indexBuffer.capacity(), new Vector3f(0.0F, 0.0F, 8.0F),
                     true, false, true, false, 2);
 
@@ -372,8 +396,8 @@ class NativeTranslucentGeometryAnalyzerTest {
             assertArrayEquals(new int[] {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4},
                     readInts(indexBuffer, 12));
         } finally {
-            if (geometry != null) {
-                geometry.close();
+            if (sortData != null) {
+                sortData.close();
             }
             analyzer.destroy();
             MemoryUtil.memFree(indexBuffer);
@@ -453,11 +477,16 @@ class NativeTranslucentGeometryAnalyzerTest {
                 "src/main/java/net/sodium/client/render/chunk/translucent_sorting/data/StaticTopoData.java"));
         String staticNormalRelativeData = Files.readString(Path.of(
                 "src/main/java/net/sodium/client/render/chunk/translucent_sorting/data/StaticNormalRelativeData.java"));
+        String analyzer = Files.readString(Path.of(
+                "src/main/java/net/sodium/client/render/chunk/translucent_sorting/NativeTranslucentGeometryAnalyzer.java"));
 
         assertTrue(collector.contains("createStaticTopoSortData("));
         assertTrue(collector.contains("NativeTranslucentSortData.createDynamicTopo("));
         assertTrue(dynamicTopoData.contains("NativeTranslucentSortData nativeSortData"));
         assertFalse(dynamicTopoData.contains("NativeTranslucentSectionGeometry nativeGeometry"));
+        assertFalse(analyzer.contains("createSectionGeometry("));
+        assertFalse(Files.exists(Path.of(
+                "src/main/java/net/sodium/client/render/chunk/translucent_sorting/NativeTranslucentSectionGeometry.java")));
         assertFalse(Files.exists(Path.of(
                 "src/main/java/net/sodium/client/render/chunk/translucent_sorting/data/StaticSorter.java")));
         assertFalse(staticTopoData.contains("new StaticSorter"));

@@ -8,7 +8,7 @@ import net.sodium.client.render.chunk.compile.ChunkBuildOutput;
 import net.sodium.client.render.chunk.data.BuiltSectionMeshParts;
 import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.BSPBuildFailureException;
 import net.sodium.client.render.chunk.translucent_sorting.data.*;
-import net.sodium.client.render.chunk.translucent_sorting.quad.FullTQuad;
+import net.sodium.client.render.chunk.translucent_sorting.quad.NativeFullTQuad;
 import net.sodium.client.render.chunk.translucent_sorting.quad.RegularTQuad;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.sodium.client.render.chunk.translucent_sorting.trigger.NativeGfniTriggers;
@@ -114,7 +114,7 @@ public class TranslucentGeometryCollector {
 
         TQuad quad;
         if (this.isSplittingQuads()) {
-            quad = FullTQuad.fromVertices(vertices, facing, packedNormal);
+            quad = NativeFullTQuad.fromVertices(vertices, facing, packedNormal);
         } else {
             quad = RegularTQuad.fromVertices(vertices, facing, packedNormal);
         }

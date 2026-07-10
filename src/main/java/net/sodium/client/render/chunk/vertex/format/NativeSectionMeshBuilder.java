@@ -3,7 +3,7 @@ package net.sodium.client.render.chunk.vertex.format;
 import net.minecraft.util.NativeLibraryLoader;
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.sodium.client.render.chunk.data.BuiltSectionMeshParts;
-import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.UpdatedQuadsList;
+import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.NativeUpdatedQuads;
 import net.sodium.client.util.NativeBuffer;
 import org.lwjgl.system.MemoryUtil;
 
@@ -305,7 +305,7 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
         return new BuiltSectionMeshParts(mergedBuffer, vertexSegments);
     }
 
-    public BuiltSectionMeshParts finishModifiedTranslucentMesh(UpdatedQuadsList updatedQuads,
+    public BuiltSectionMeshParts finishModifiedTranslucentMesh(NativeUpdatedQuads updatedQuads,
             NativeChunkVertexFormat format, boolean separateAo) {
         int vertexTotal = updatedQuads.getMeshQuadCount() * 4;
         NativeBuffer mergedBuffer = new NativeBuffer(vertexTotal * format.stride());

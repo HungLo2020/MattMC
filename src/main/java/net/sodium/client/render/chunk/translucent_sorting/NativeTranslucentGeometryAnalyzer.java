@@ -333,14 +333,6 @@ public final class NativeTranslucentGeometryAnalyzer {
         return quadIndexes;
     }
 
-    NativeTranslucentSectionGeometry createSectionGeometry() {
-        try (Arena arena = Arena.ofConfined()) {
-            MemorySegment handleSegment = arena.allocate(ValueLayout.JAVA_LONG);
-            return NativeTranslucentSectionGeometry.createFromAnalyzer(this.getHandle(), this.getRecordCount(),
-                    handleSegment);
-        }
-    }
-
     NativeTranslucentSortData createStaticTopoSortData(boolean failOnIntersection) {
         return NativeTranslucentSortData.createStaticTopoFromAnalyzer(this.getHandle(), this.getRecordCount(),
                 failOnIntersection);

@@ -9,7 +9,7 @@ import net.sodium.client.render.chunk.data.BuiltSectionMeshParts;
 import net.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.render.chunk.terrain.material.Material;
-import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.UpdatedQuadsList;
+import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.NativeUpdatedQuads;
 import net.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
@@ -69,7 +69,7 @@ public class ChunkBuildBuffers {
                 forceUnassigned, sliceReordering, usesSeparateAo());
     }
 
-    public BuiltSectionMeshParts createModifiedTranslucentMesh(UpdatedQuadsList updatedQuads) {
+    public BuiltSectionMeshParts createModifiedTranslucentMesh(NativeUpdatedQuads updatedQuads) {
         var builder = this.builders.get(DefaultTerrainRenderPasses.TRANSLUCENT);
         return builder.getSectionBuilder().finishModifiedTranslucentMesh(updatedQuads, this.nativeFormat,
                 usesSeparateAo());

@@ -63,6 +63,12 @@ struct NativeSectionMeshBuilder {
     counts: [usize; MODEL_QUAD_FACING_COUNT],
 }
 
+struct NativeUpdatedQuads {
+    quads: Vec<u64>,
+    mesh_quad_count: i32,
+    index_quad_count: i32,
+}
+
 #[derive(Clone, Copy)]
 struct NativeFormat {
     vertex_stride: usize,
@@ -571,6 +577,20 @@ fn section_builder_addresses_and_counts(
     (addresses, vertex_counts)
 }
 
+fn create_section_mesh_builder(capacity: usize) -> NativeSectionMeshBuilder {
+    NativeSectionMeshBuilder {
+        buffers: std::array::from_fn(|_| NativeQuadBuffer {
+            quads: vec![NativeQuad::default(); capacity],
+        }),
+        pending: std::array::from_fn(|_| NativePendingQuadBuffer {
+            quads: vec![NativeQuad::default(); PENDING_BATCH_QUAD_CAPACITY],
+            packed_normals: vec![0; PENDING_BATCH_QUAD_CAPACITY],
+            validity: vec![0; PENDING_BATCH_QUAD_CAPACITY],
+        }),
+        counts: [0; MODEL_QUAD_FACING_COUNT],
+    }
+}
+
 fn section_builder_prepare_quad(
     builder: &mut NativeSectionMeshBuilder,
     facing: usize,
@@ -689,6 +709,67 @@ unsafe fn section_builder_encode_scattered_unassigned(
         input_address,
         output_vertex_offsets,
         update_count,
+        output_address,
+        output_capacity,
+        format,
+    )
+}
+
+unsafe fn updated_quads_apply(
+    updated_quads: &NativeUpdatedQuads,
+    output_address: u64,
+    output_capacity: i32,
+    format: NativeFormat,
+    material_bits: i32,
+) -> i32 {
+    if output_capacity < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if updated_quads.quads.is_empty() {
+        return OK;
+    }
+    if output_address == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let mut update_builder = create_section_mesh_builder(updated_quads.quads.len());
+    let mut output_vertex_offsets = Vec::with_capacity(updated_quads.quads.len());
+
+    for &quad_handle in &updated_quads.quads {
+        let mut write_to_index = -1;
+        let status = translucent::native_full_quad_write_to_index(quad_handle, &mut write_to_index);
+        if status != OK {
+            return status;
+        }
+        if write_to_index < 0 {
+            continue;
+        }
+
+        let quad_address =
+            match section_builder_prepare_quad(&mut update_builder, MODEL_QUAD_FACING_UNASSIGNED) {
+                Ok(value) => value,
+                Err(status) => return status,
+            };
+        let status = translucent::native_full_quad_write_to_native_buffer(
+            quad_handle,
+            quad_address,
+            material_bits,
+        );
+        if status != OK {
+            return status;
+        }
+        update_builder.counts[MODEL_QUAD_FACING_UNASSIGNED] += 1;
+
+        let Some(vertex_offset) = write_to_index.checked_mul(4) else {
+            return ERR_INVALID_ARGUMENT;
+        };
+        output_vertex_offsets.push(vertex_offset);
+    }
+
+    section_builder_encode_scattered_unassigned(
+        &update_builder,
+        output_vertex_offsets.as_ptr(),
+        output_vertex_offsets.len() as i32,
         output_address,
         output_capacity,
         format,
@@ -1168,17 +1249,7 @@ pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_create(
         Ok(value) => value,
         Err(_) => return ERR_INVALID_ARGUMENT,
     };
-    let builder = NativeSectionMeshBuilder {
-        buffers: std::array::from_fn(|_| NativeQuadBuffer {
-            quads: vec![NativeQuad::default(); capacity],
-        }),
-        pending: std::array::from_fn(|_| NativePendingQuadBuffer {
-            quads: vec![NativeQuad::default(); PENDING_BATCH_QUAD_CAPACITY],
-            packed_normals: vec![0; PENDING_BATCH_QUAD_CAPACITY],
-            validity: vec![0; PENDING_BATCH_QUAD_CAPACITY],
-        }),
-        counts: [0; MODEL_QUAD_FACING_COUNT],
-    };
+    let builder = create_section_mesh_builder(capacity);
 
     *output_handle = Box::into_raw(Box::new(builder)) as u64;
     OK
@@ -1583,6 +1654,123 @@ pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_encode_scattered_una
         output_address,
         output_capacity,
         format,
+    )
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_updated_quads_create(output_handle: *mut u64) -> i32 {
+    if output_handle.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    *output_handle = Box::into_raw(Box::new(NativeUpdatedQuads {
+        quads: Vec::new(),
+        mesh_quad_count: 0,
+        index_quad_count: 0,
+    })) as u64;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_updated_quads_destroy(handle: u64) -> i32 {
+    if handle == 0 {
+        return OK;
+    }
+
+    drop(Box::from_raw(handle as *mut NativeUpdatedQuads));
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_updated_quads_add(handle: u64, quad_handle: u64) -> i32 {
+    if handle == 0 || quad_handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let updated_quads = &mut *(handle as *mut NativeUpdatedQuads);
+    updated_quads.quads.push(quad_handle);
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_updated_quads_set_counts(
+    handle: u64,
+    mesh_quad_count: i32,
+    index_quad_count: i32,
+) -> i32 {
+    if handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+    if mesh_quad_count < 0 || index_quad_count < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let updated_quads = &mut *(handle as *mut NativeUpdatedQuads);
+    updated_quads.mesh_quad_count = mesh_quad_count;
+    updated_quads.index_quad_count = index_quad_count;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_updated_quads_counts(
+    handle: u64,
+    output_counts: *mut i32,
+    output_counts_len: i32,
+) -> i32 {
+    if handle == 0 || output_counts.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    if output_counts_len < 2 {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let updated_quads = &*(handle as *const NativeUpdatedQuads);
+    *output_counts = updated_quads.mesh_quad_count;
+    *output_counts.add(1) = updated_quads.index_quad_count;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_updated_quads_apply(
+    handle: u64,
+    output_address: u64,
+    output_capacity: i32,
+    quad_stride: i32,
+    vertex_stride: i32,
+    block_id_offset: i32,
+    normal_offset: i32,
+    tangent_offset: i32,
+    mid_uv_offset: i32,
+    mid_block_offset: i32,
+    section_index: i32,
+    separate_ao: i32,
+    material_bits: i32,
+) -> i32 {
+    if handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+    let format = match NativeFormat::from_abi(
+        quad_stride,
+        vertex_stride,
+        block_id_offset,
+        normal_offset,
+        tangent_offset,
+        mid_uv_offset,
+        mid_block_offset,
+        section_index,
+        separate_ao,
+    ) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+
+    let updated_quads = &*(handle as *const NativeUpdatedQuads);
+    updated_quads_apply(
+        updated_quads,
+        output_address,
+        output_capacity,
+        format,
+        material_bits,
     )
 }
 

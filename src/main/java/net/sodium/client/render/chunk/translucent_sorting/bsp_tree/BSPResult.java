@@ -10,7 +10,7 @@ import org.joml.Vector3fc;
 public class BSPResult implements AutoCloseable {
     private long geometryPlanesHandle = NativeGfniTriggers.createGeometryPlanes();
     private BSPNode rootNode;
-    private UpdatedQuadsList updatedQuadsList;
+    private NativeUpdatedQuads updatedQuadsList;
 
     public BSPNode getRootNode() {
         return this.rootNode;
@@ -38,11 +38,11 @@ public class BSPResult implements AutoCloseable {
                 normal.x(), normal.y(), normal.z(), distance);
     }
 
-    public UpdatedQuadsList getUpdatedQuadsList() {
+    public NativeUpdatedQuads getNativeUpdatedQuads() {
         return this.updatedQuadsList;
     }
 
-    public void setUpdatedQuadIndexes(UpdatedQuadsList updatedQuadsList) {
+    public void setUpdatedQuadIndexes(NativeUpdatedQuads updatedQuadsList) {
         this.updatedQuadsList = updatedQuadsList;
     }
 
