@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.lang.management.BufferPoolMXBean;
+import java.lang.management.ManagementFactory;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
@@ -95,9 +97,13 @@ class ChunkMeshingHotPathBenchmarkTest {
     }
 
     private static BenchmarkResult measure(String name, BenchmarkAction action) throws Exception {
+        settleMemory();
+        MemorySnapshot before = MemorySnapshot.capture();
+        MemorySnapshot peak = before;
         long checksum = 0L;
         for (int iteration = 0; iteration < WARMUP_ITERATIONS; iteration++) {
             checksum ^= action.run();
+            peak = peak.max(MemorySnapshot.capture());
         }
 
         long[] samples = new long[MEASURE_ITERATIONS];
@@ -105,7 +111,10 @@ class ChunkMeshingHotPathBenchmarkTest {
             long start = System.nanoTime();
             checksum ^= action.run();
             samples[iteration] = System.nanoTime() - start;
+            peak = peak.max(MemorySnapshot.capture());
         }
+        MemorySnapshot after = MemorySnapshot.capture();
+        peak = peak.max(after);
 
         long[] sorted = samples.clone();
         Arrays.sort(sorted);
@@ -121,7 +130,10 @@ class ChunkMeshingHotPathBenchmarkTest {
                 sorted[sorted.length / 2],
                 sorted[0],
                 sorted[sorted.length - 1],
-                checksum);
+                checksum,
+                before,
+                after,
+                peak);
     }
 
     private static int[] shuffledQuadIndexes() {
@@ -223,7 +235,8 @@ class ChunkMeshingHotPathBenchmarkTest {
             builder.append(String.format(Locale.ROOT, "      \"max_ms\": %.6f,%n", result.maxMillis()));
             builder.append(String.format(Locale.ROOT, "      \"mega_quads_per_second\": %.6f,%n",
                     result.megaQuadsPerSecond()));
-            builder.append("      \"checksum\": ").append(result.checksum).append("\n");
+            builder.append("      \"checksum\": ").append(result.checksum).append(",\n");
+            appendMemoryJson(builder, result);
             builder.append("    }");
             if (index + 1 < results.size()) {
                 builder.append(',');
@@ -247,6 +260,72 @@ class ChunkMeshingHotPathBenchmarkTest {
     private static boolean shouldRunPerfBenchmarks() {
         return Boolean.getBoolean("mattmc.runPerfBenchmarks")
                 || Boolean.parseBoolean(System.getenv("MATTMC_RUN_PERF_BENCHMARKS"));
+    }
+
+    private static void appendMemoryJson(StringBuilder builder, BenchmarkResult result) {
+        builder.append("      \"memory\": {\n");
+        appendSnapshotJson(builder, "before", result.memoryBefore, true);
+        appendSnapshotJson(builder, "after", result.memoryAfter, true);
+        appendSnapshotJson(builder, "peak", result.memoryPeak, true);
+        appendMemoryDeltaJson(builder, "heap_used_delta_bytes", result.memoryBefore.heapUsedBytes,
+                result.memoryAfter.heapUsedBytes, true);
+        appendMemoryDeltaJson(builder, "direct_used_delta_bytes", result.memoryBefore.directUsedBytes,
+                result.memoryAfter.directUsedBytes, true);
+        appendMemoryDeltaJson(builder, "rss_delta_bytes", result.memoryBefore.rssBytes,
+                result.memoryAfter.rssBytes, true);
+        appendMemoryDeltaJson(builder, "rss_peak_delta_bytes", result.memoryBefore.rssBytes,
+                result.memoryPeak.rssBytes, true);
+        appendMemoryDeltaJson(builder, "rss_high_water_delta_bytes", result.memoryBefore.rssHighWaterBytes,
+                result.memoryPeak.rssHighWaterBytes, false);
+        builder.append("      }\n");
+    }
+
+    private static void appendSnapshotJson(StringBuilder builder, String name, MemorySnapshot snapshot,
+            boolean trailingComma) {
+        builder.append("        \"").append(name).append("\": {\n");
+        appendMemoryValueJson(builder, "heap_used_bytes", snapshot.heapUsedBytes, true);
+        appendMemoryValueJson(builder, "non_heap_used_bytes", snapshot.nonHeapUsedBytes, true);
+        appendMemoryValueJson(builder, "direct_used_bytes", snapshot.directUsedBytes, true);
+        appendMemoryValueJson(builder, "mapped_used_bytes", snapshot.mappedUsedBytes, true);
+        appendMemoryValueJson(builder, "rss_bytes", snapshot.rssBytes, true);
+        appendMemoryValueJson(builder, "rss_high_water_bytes", snapshot.rssHighWaterBytes, false);
+        builder.append("        }");
+        if (trailingComma) {
+            builder.append(',');
+        }
+        builder.append('\n');
+    }
+
+    private static void appendMemoryDeltaJson(StringBuilder builder, String name, long before, long after,
+            boolean trailingComma) {
+        builder.append("        \"").append(name).append("\": ");
+        if (before < 0 || after < 0) {
+            builder.append("null");
+        } else {
+            builder.append(after - before);
+        }
+        if (trailingComma) {
+            builder.append(',');
+        }
+        builder.append('\n');
+    }
+
+    private static void appendMemoryValueJson(StringBuilder builder, String name, long value, boolean trailingComma) {
+        builder.append("          \"").append(name).append("\": ");
+        if (value < 0) {
+            builder.append("null");
+        } else {
+            builder.append(value);
+        }
+        if (trailingComma) {
+            builder.append(',');
+        }
+        builder.append('\n');
+    }
+
+    private static void settleMemory() throws InterruptedException {
+        System.gc();
+        Thread.sleep(50L);
     }
 
     private static MeshFinisher createMeshFinisher() {
@@ -295,8 +374,59 @@ class ChunkMeshingHotPathBenchmarkTest {
         long run() throws Exception;
     }
 
+    private record MemorySnapshot(long heapUsedBytes, long nonHeapUsedBytes, long directUsedBytes,
+            long mappedUsedBytes, long rssBytes, long rssHighWaterBytes) {
+        static MemorySnapshot capture() {
+            Runtime runtime = Runtime.getRuntime();
+            long heapUsed = runtime.totalMemory() - runtime.freeMemory();
+            long nonHeapUsed = ManagementFactory.getMemoryMXBean().getNonHeapMemoryUsage().getUsed();
+            long directUsed = bufferPoolMemoryUsed("direct");
+            long mappedUsed = bufferPoolMemoryUsed("mapped");
+            long rss = procStatusKilobytes("VmRSS");
+            long rssHighWater = procStatusKilobytes("VmHWM");
+            return new MemorySnapshot(heapUsed, nonHeapUsed, directUsed, mappedUsed, rss, rssHighWater);
+        }
+
+        MemorySnapshot max(MemorySnapshot other) {
+            return new MemorySnapshot(
+                    Math.max(this.heapUsedBytes, other.heapUsedBytes),
+                    Math.max(this.nonHeapUsedBytes, other.nonHeapUsedBytes),
+                    Math.max(this.directUsedBytes, other.directUsedBytes),
+                    Math.max(this.mappedUsedBytes, other.mappedUsedBytes),
+                    Math.max(this.rssBytes, other.rssBytes),
+                    Math.max(this.rssHighWaterBytes, other.rssHighWaterBytes));
+        }
+
+        private static long bufferPoolMemoryUsed(String poolName) {
+            for (BufferPoolMXBean pool : ManagementFactory.getPlatformMXBeans(BufferPoolMXBean.class)) {
+                if (poolName.equals(pool.getName())) {
+                    return pool.getMemoryUsed();
+                }
+            }
+            return -1L;
+        }
+
+        private static long procStatusKilobytes(String key) {
+            try {
+                for (String line : Files.readAllLines(Path.of("/proc/self/status"))) {
+                    if (!line.startsWith(key + ":")) {
+                        continue;
+                    }
+
+                    String[] parts = line.trim().split("\\s+");
+                    if (parts.length >= 2) {
+                        return Long.parseLong(parts[1]) * 1024L;
+                    }
+                }
+            } catch (IOException | NumberFormatException ignored) {
+                // /proc is Linux-specific. Missing values are emitted as null in JSON.
+            }
+            return -1L;
+        }
+    }
+
     private record BenchmarkResult(String name, double meanNanos, long medianNanos, long minNanos, long maxNanos,
-            long checksum) {
+            long checksum, MemorySnapshot memoryBefore, MemorySnapshot memoryAfter, MemorySnapshot memoryPeak) {
         double meanMillis() {
             return this.meanNanos / 1_000_000.0;
         }

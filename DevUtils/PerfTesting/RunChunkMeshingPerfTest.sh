@@ -194,6 +194,24 @@ def fmt_rate(value):
 def fmt_ratio(value):
     return f"{value:8.2f}x"
 
+def fmt_bytes(value):
+    if value is None:
+        return "     n/a"
+    sign = "-" if value < 0 else ""
+    value = abs(value)
+    units = [
+        ("GiB", 1024 ** 3),
+        ("MiB", 1024 ** 2),
+        ("KiB", 1024),
+    ]
+    for suffix, factor in units:
+        if value >= factor:
+            return f"{sign}{value / factor:7.2f} {suffix}"
+    return f"{sign}{value:7.0f} B"
+
+def memory_value(result, key):
+    return result.get("memory", {}).get(key)
+
 comparisons = []
 for name in names:
     old_result = old_results[name]
@@ -223,6 +241,11 @@ for name, old_result, current_result, time_ratio, throughput_ratio in comparison
     print(f"Median time: Java {fmt_ms(old_result['median_ms'])} | Rust {fmt_ms(current_result['median_ms'])}")
     print(f"Best time:   Java {fmt_ms(old_result['min_ms'])} | Rust {fmt_ms(current_result['min_ms'])}")
     print(f"Throughput:  Java {fmt_rate(old_result['mega_quads_per_second'])} | Rust {fmt_rate(current_result['mega_quads_per_second'])} | Rust/Java {fmt_ratio(throughput_ratio)}")
+    print(f"Heap delta:  Java {fmt_bytes(memory_value(old_result, 'heap_used_delta_bytes'))} | Rust {fmt_bytes(memory_value(current_result, 'heap_used_delta_bytes'))}")
+    print(f"Direct delta:Java {fmt_bytes(memory_value(old_result, 'direct_used_delta_bytes'))} | Rust {fmt_bytes(memory_value(current_result, 'direct_used_delta_bytes'))}")
+    print(f"RSS delta:   Java {fmt_bytes(memory_value(old_result, 'rss_delta_bytes'))} | Rust {fmt_bytes(memory_value(current_result, 'rss_delta_bytes'))}")
+    print(f"RSS peak:    Java {fmt_bytes(memory_value(old_result, 'rss_peak_delta_bytes'))} | Rust {fmt_bytes(memory_value(current_result, 'rss_peak_delta_bytes'))}")
+    print(f"HWM growth:  Java {fmt_bytes(memory_value(old_result, 'rss_high_water_delta_bytes'))} | Rust {fmt_bytes(memory_value(current_result, 'rss_high_water_delta_bytes'))}")
 
 print("")
 print(f"Frozen Java JSON: {old_path}")
