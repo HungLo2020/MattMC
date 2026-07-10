@@ -5,6 +5,8 @@ import net.sodium.client.gui.SodiumGameOptions;
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.sodium.client.render.chunk.terrain.material.DefaultMaterials;
 import net.sodium.client.render.chunk.translucent_sorting.data.Sorter;
+import net.sodium.client.render.chunk.translucent_sorting.quad.RegularTQuad;
+import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
 import net.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
@@ -174,6 +176,38 @@ class NativeTranslucentGeometryAnalyzerTest {
                 ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
 
         assertArrayEquals(new int[] {1, 0}, analyzer.staticTopoSort(false));
+    }
+
+    @Test
+    void topoGraphSortFromJavaQuadsRunsNativelyAndAppliesActiveRemap() {
+        TQuad[] quads = new TQuad[] {
+                RegularTQuad.fromVertices(zQuad(1.0F), ModelQuadFacing.POS_Z,
+                        ModelQuadFacing.POS_Z.getPackedAlignedNormal()),
+                RegularTQuad.fromVertices(zQuad(0.0F), ModelQuadFacing.POS_Z,
+                        ModelQuadFacing.POS_Z.getPackedAlignedNormal())
+        };
+
+        assertArrayEquals(new int[] {7, 42},
+                NativeTranslucentGeometryAnalyzer.topoGraphSort(quads, quads.length, new int[] {42, 7}, false));
+    }
+
+    @Test
+    void bspDoubleLeafDecisionUsesRustOwnedTopoQuadStore() {
+        TQuad quadA = RegularTQuad.fromVertices(zQuad(1.0F), ModelQuadFacing.POS_Z,
+                ModelQuadFacing.POS_Z.getPackedAlignedNormal());
+        TQuad quadB = RegularTQuad.fromVertices(zQuad(0.0F), ModelQuadFacing.NEG_Z,
+                ModelQuadFacing.NEG_Z.getPackedAlignedNormal());
+
+        try (NativeTranslucentGeometryAnalyzer.TopoQuadStore store =
+                     NativeTranslucentGeometryAnalyzer.createTopoQuadStore(new TQuad[] {quadA, quadB})) {
+            assertTrue(store.bspDoubleLeafPossible(0, 1, false));
+        }
+    }
+
+    @Test
+    void topoGraphSortingClassWasRemovedFromJava() {
+        assertFalse(Files.exists(Path.of(
+                "src/main/java/net/sodium/client/render/chunk/translucent_sorting/data/TopoGraphSorting.java")));
     }
 
     @Test

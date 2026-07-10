@@ -2,10 +2,9 @@ package net.sodium.client.render.chunk.translucent_sorting.data;
 
 import net.sodium.client.render.chunk.translucent_sorting.SortType;
 import net.sodium.client.render.chunk.translucent_sorting.NativeTranslucentSortData;
+import net.sodium.client.render.chunk.translucent_sorting.NativeTranslucentGeometryAnalyzer;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.minecraft.core.SectionPos;
-
-import java.util.function.IntConsumer;
 
 /**
  * Static topo acyclic sorting uses the topo sorting algorithm but only if it's
@@ -34,33 +33,15 @@ public class StaticTopoData extends PresentTranslucentData {
         return sorter;
     }
 
-    private static final class QuadIndexCollector implements IntConsumer {
-        private final int[] quadIndexes;
-        private int count;
-
-        private QuadIndexCollector(int quadCount) {
-            this.quadIndexes = new int[quadCount];
-        }
-
-        @Override
-        public void accept(int value) {
-            if (this.count >= this.quadIndexes.length) {
-                throw new IllegalStateException("Static topo sort wrote more quad indexes than expected");
-            }
-
-            this.quadIndexes[this.count++] = value;
-        }
-    }
-
     public static StaticTopoData fromMesh(TQuad[] quads, SectionPos sectionPos, boolean failOnIntersection) {
-        var indexWriter = new QuadIndexCollector(quads.length);
+        int[] quadIndexes = NativeTranslucentGeometryAnalyzer.topoGraphSort(quads, failOnIntersection);
 
-        if (!TopoGraphSorting.topoGraphSort(indexWriter, quads, null, null, failOnIntersection)) {
+        if (quadIndexes == null) {
             return null;
         }
 
         var sorter = new StaticSorter(quads.length);
-        TranslucentData.writeQuadVertexIndexes(sorter.getIntBuffer(), indexWriter.quadIndexes, indexWriter.count);
+        TranslucentData.writeQuadVertexIndexes(sorter.getIntBuffer(), quadIndexes, quadIndexes.length);
 
         var staticTopoData = new StaticTopoData(sectionPos, quads.length);
         staticTopoData.sorterOnce = sorter;

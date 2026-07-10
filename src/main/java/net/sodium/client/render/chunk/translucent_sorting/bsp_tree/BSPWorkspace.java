@@ -3,6 +3,7 @@ package net.sodium.client.render.chunk.translucent_sorting.bsp_tree;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.sodium.client.render.chunk.translucent_sorting.QuadSplittingMode;
+import net.sodium.client.render.chunk.translucent_sorting.NativeTranslucentGeometryAnalyzer;
 import net.sodium.client.render.chunk.translucent_sorting.quad.FullTQuad;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.minecraft.core.SectionPos;
@@ -17,8 +18,9 @@ import org.joml.Vector3fc;
  * global array instead of making a new one at each tree level doesn't appear to
  * have any performance benefit.
  */
-class BSPWorkspace extends ObjectArrayList<TQuad> {
+class BSPWorkspace extends ObjectArrayList<TQuad> implements AutoCloseable {
     final BSPResult result = new BSPResult();
+    private final NativeTranslucentGeometryAnalyzer.TopoQuadStore topoQuadStore;
 
     private final SectionPos sectionPos;
     final boolean prepareNodeReuse;
@@ -31,6 +33,7 @@ class BSPWorkspace extends ObjectArrayList<TQuad> {
 
     BSPWorkspace(TQuad[] quads, SectionPos sectionPos, boolean prepareNodeReuse, QuadSplittingMode quadSplittingMode) {
         super(quads);
+        this.topoQuadStore = NativeTranslucentGeometryAnalyzer.createTopoQuadStore(quads);
         this.sectionPos = sectionPos;
         this.prepareNodeReuse = prepareNodeReuse;
         this.quantizeTriggerNormals = quadSplittingMode.quantizeTriggerNormals();
@@ -45,6 +48,10 @@ class BSPWorkspace extends ObjectArrayList<TQuad> {
 
     boolean canSplitQuads() {
         return this.quadCount < this.maxQuadCount;
+    }
+
+    boolean doubleLeafPossible(int quadIndexA, int quadIndexB, boolean failOnIntersection) {
+        return this.topoQuadStore.bspDoubleLeafPossible(quadIndexA, quadIndexB, failOnIntersection);
     }
 
     // TODO: better bidirectional triggering: integrate bidirectionality in GFNI if
@@ -91,6 +98,7 @@ class BSPWorkspace extends ObjectArrayList<TQuad> {
         }
 
         quad.setWriteToIndex(index);
+        this.topoQuadStore.set(index, quad);
         this.quadCount++;
 
         this.registerQuadUpdate(quad);
@@ -117,6 +125,7 @@ class BSPWorkspace extends ObjectArrayList<TQuad> {
             }
 
             quad.setNoWrite();
+            this.topoQuadStore.remove(quadIndex);
             this.registerQuadUpdate(quad);
 
             this.quadCount--;
@@ -125,8 +134,14 @@ class BSPWorkspace extends ObjectArrayList<TQuad> {
         }
 
         quad.setWriteToIndex(quadIndex);
+        this.topoQuadStore.set(quadIndex, quad);
         this.registerQuadUpdate(quad);
 
         return quadIndex;
+    }
+
+    @Override
+    public void close() {
+        this.topoQuadStore.close();
     }
 }

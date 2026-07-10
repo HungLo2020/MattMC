@@ -5,8 +5,6 @@ import org.joml.Vector3fc;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
-import net.sodium.client.render.chunk.translucent_sorting.data.TopoGraphSorting;
-import net.sodium.api.util.NormI8;
 import net.minecraft.core.SectionPos;
 
 import java.util.Arrays;
@@ -82,56 +80,20 @@ public class BSPNode {
 
         // create a workspace and then the nodes figure out the recursive building.
         // throws if the BSP can't be built, null if none is necessary
-        var workspace = new BSPWorkspace(quads, sectionPos, prepareNodeReuse, quadSplittingMode);
-
-        // initialize the indexes to all quads
-        int[] initialIndexes = new int[quads.length];
-        for (int i = 0; i < quads.length; i++) {
-            initialIndexes[i] = i;
-        }
-        var allIndexes = new IntArrayList(initialIndexes);
-
-        var rootNode = BSPNode.build(workspace, allIndexes, -1, oldRoot);
-        var result = workspace.result;
-        result.setRootNode(rootNode);
-        result.setUpdatedQuadIndexes(workspace.getFinalizedUpdatedQuads());
-        return result;
-    }
-
-    private static boolean doubleLeafPossible(TQuad quadA, TQuad quadB, boolean failOnIntersection) {
-        // check for coplanar or mutually invisible quads
-        var facingA = quadA.getFacing();
-        var facingB = quadB.getFacing();
-
-        // coplanar not aligned
-        if (!facingA.isAligned() || !facingB.isAligned()) {
-            var packedNormalA = quadA.getPackedNormal();
-            var packedNormalB = quadB.getPackedNormal();
-            // opposite normal (distance irrelevant)
-            if (NormI8.isOpposite(packedNormalA, packedNormalB)
-                    // same normal and same distance
-                    || packedNormalA == packedNormalB && quadA.getAccurateDotProduct() == quadB.getAccurateDotProduct()) {
-                return true;
+        try (var workspace = new BSPWorkspace(quads, sectionPos, prepareNodeReuse, quadSplittingMode)) {
+            // initialize the indexes to all quads
+            int[] initialIndexes = new int[quads.length];
+            for (int i = 0; i < quads.length; i++) {
+                initialIndexes[i] = i;
             }
-        }
+            var allIndexes = new IntArrayList(initialIndexes);
 
-        // coplanar aligned
-        else if (quadA.getExtents()[facingA.ordinal()] == quadB.getExtents()[facingB.ordinal()]) {
-            return true;
+            var rootNode = BSPNode.build(workspace, allIndexes, -1, oldRoot);
+            var result = workspace.result;
+            result.setRootNode(rootNode);
+            result.setUpdatedQuadIndexes(workspace.getFinalizedUpdatedQuads());
+            return result;
         }
-
-        // aligned facing away from each other
-        else if (facingA == facingB.getOpposite()) {
-            return true;
-        }
-
-        // aligned otherwise mutually invisible
-        else {
-            return !TopoGraphSorting.orthogonalQuadVisibleThrough(quadA, quadB, failOnIntersection)
-                    && !TopoGraphSorting.orthogonalQuadVisibleThrough(quadB, quadA, failOnIntersection);
-        }
-
-        return false;
     }
 
     static BSPNode build(BSPWorkspace workspace, IntArrayList indexes, int depth, BSPNode oldNode) {
@@ -145,10 +107,7 @@ public class BSPNode {
         } else if (indexes.size() == 2) {
             var quadIndexA = indexes.getInt(0);
             var quadIndexB = indexes.getInt(1);
-            var quadA = workspace.get(quadIndexA);
-            var quadB = workspace.get(quadIndexB);
-
-            if (doubleLeafPossible(quadA, quadB, workspace.canSplitQuads())) {
+            if (workspace.doubleLeafPossible(quadIndexA, quadIndexB, workspace.canSplitQuads())) {
                 return nativeLeafDouble(quadIndexA, quadIndexB);
             }
         }

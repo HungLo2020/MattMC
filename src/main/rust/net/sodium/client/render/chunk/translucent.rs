@@ -50,6 +50,16 @@ pub struct TranslucentQuadRecord {
     packed_normal: i32,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct TranslucentTopoQuadRecord {
+    positions: [f32; 12],
+    extents: [f32; 6],
+    accurate_dot_product: f32,
+    facing: i32,
+    packed_normal: i32,
+}
+
 #[derive(Clone)]
 struct QuadInfo {
     positions: [f32; 12],
@@ -89,6 +99,10 @@ struct NativeTranslucentSortData {
 
 struct NativeTranslucentAnalyzer {
     records: Vec<TranslucentQuadRecord>,
+}
+
+struct NativeTopoQuadStore {
+    quads: Vec<Option<QuadInfo>>,
 }
 
 #[derive(Clone)]
@@ -347,6 +361,38 @@ fn build_quad_info(record: &TranslucentQuadRecord) -> QuadInfo {
         accurate_dot_product,
         quantized_dot_product,
     }
+}
+
+fn build_topo_quad_info(record: &TranslucentTopoQuadRecord) -> Result<QuadInfo, i32> {
+    let facing = record.facing;
+    if !(0..FACING_COUNT as i32).contains(&facing) {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    let packed_normal = if is_aligned(facing) {
+        packed_aligned_normal(facing)
+    } else {
+        record.packed_normal
+    };
+    let extents = record.extents;
+    let center = compute_extent_center(&extents);
+    let (topo_facing, quantized_dot_product) =
+        compute_topo_facing_and_quantized_dot(facing, packed_normal, center, &extents);
+
+    Ok(QuadInfo {
+        positions: record.positions,
+        center,
+        facing,
+        topo_facing,
+        packed_normal,
+        extents,
+        accurate_dot_product: record.accurate_dot_product,
+        quantized_dot_product,
+    })
+}
+
+fn build_topo_quad_infos(records: &[TranslucentTopoQuadRecord]) -> Result<Vec<QuadInfo>, i32> {
+    records.iter().map(build_topo_quad_info).collect()
 }
 
 unsafe fn record_from_native_quad(
@@ -803,6 +849,115 @@ fn static_topo_sort(
 ) -> Result<Option<Vec<i32>>, i32> {
     let quads = sorted_quads_by_facing(records)?;
     Ok(topo_graph_sort(&quads, fail_on_intersection))
+}
+
+fn topo_graph_sort_topo_records(
+    records: &[TranslucentTopoQuadRecord],
+    active_to_real_index: Option<&[i32]>,
+    fail_on_intersection: bool,
+) -> Result<Option<Vec<i32>>, i32> {
+    if let Some(indexes) = active_to_real_index {
+        if indexes.len() < records.len() {
+            return Err(ERR_INVALID_ARGUMENT);
+        }
+    }
+
+    let quads = build_topo_quad_infos(records)?;
+    let Some(order) = topo_graph_sort(&quads, fail_on_intersection) else {
+        return Ok(None);
+    };
+
+    if let Some(indexes) = active_to_real_index {
+        let mut remapped = Vec::with_capacity(order.len());
+        for index in order {
+            if index < 0 {
+                return Err(ERR_INVALID_ARGUMENT);
+            }
+            let index = index as usize;
+            if index >= indexes.len() {
+                return Err(ERR_INVALID_ARGUMENT);
+            }
+            remapped.push(indexes[index]);
+        }
+        Ok(Some(remapped))
+    } else {
+        Ok(Some(order))
+    }
+}
+
+fn bsp_double_leaf_possible(
+    quad_a: &QuadInfo,
+    quad_b: &QuadInfo,
+    fail_on_intersection: bool,
+) -> bool {
+    let facing_a = quad_a.facing;
+    let facing_b = quad_b.facing;
+
+    if !is_aligned(facing_a) || !is_aligned(facing_b) {
+        return normals_are_opposite(quad_a.packed_normal, quad_b.packed_normal)
+            || quad_a.packed_normal == quad_b.packed_normal
+                && quad_a.accurate_dot_product == quad_b.accurate_dot_product;
+    }
+
+    if quad_a.extents[facing_a as usize] == quad_b.extents[facing_b as usize] {
+        return true;
+    }
+
+    if facing_a == opposite_facing(facing_b) {
+        return true;
+    }
+
+    !orthogonal_quad_visible_through(quad_a, quad_b, fail_on_intersection)
+        && !orthogonal_quad_visible_through(quad_b, quad_a, fail_on_intersection)
+}
+
+fn create_topo_quad_store(
+    records: &[TranslucentTopoQuadRecord],
+) -> Result<NativeTopoQuadStore, i32> {
+    let mut quads = Vec::with_capacity(records.len());
+    for record in records {
+        quads.push(Some(build_topo_quad_info(record)?));
+    }
+    Ok(NativeTopoQuadStore { quads })
+}
+
+fn topo_quad_store_set(
+    store: &mut NativeTopoQuadStore,
+    index: i32,
+    record: &TranslucentTopoQuadRecord,
+) -> i32 {
+    if index < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let quad = match build_topo_quad_info(record) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    let index = index as usize;
+    if index == store.quads.len() {
+        store.quads.push(Some(quad));
+    } else if index < store.quads.len() {
+        store.quads[index] = Some(quad);
+    } else {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    OK
+}
+
+fn topo_quad_store_remove(store: &mut NativeTopoQuadStore, index: i32) -> i32 {
+    if index < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let index = index as usize;
+    if index >= store.quads.len() {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    store.quads[index] = None;
+    OK
 }
 
 fn create_section_geometry(
@@ -2322,6 +2477,155 @@ pub unsafe extern "C" fn mattmc_sodium_translucent_static_topo_sort_handle(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_topo_graph_sort_records(
+    records: *const TranslucentTopoQuadRecord,
+    record_count: i32,
+    active_to_real_index: *const i32,
+    active_to_real_index_len: i32,
+    fail_on_intersection: i32,
+    output_indices: *mut i32,
+    output_indices_len: i32,
+) -> i32 {
+    if record_count < 0 || active_to_real_index_len < 0 || output_indices_len < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if record_count > 0 && (records.is_null() || output_indices.is_null()) {
+        return ERR_NULL_POINTER;
+    }
+    if output_indices_len < record_count {
+        return ERR_CAPACITY;
+    }
+
+    let records = if record_count == 0 {
+        &[]
+    } else {
+        slice::from_raw_parts(records, record_count as usize)
+    };
+    let active_to_real_index = if active_to_real_index.is_null() {
+        None
+    } else {
+        if active_to_real_index_len < record_count {
+            return ERR_CAPACITY;
+        }
+        Some(slice::from_raw_parts(
+            active_to_real_index,
+            active_to_real_index_len as usize,
+        ))
+    };
+    let order = match topo_graph_sort_topo_records(
+        records,
+        active_to_real_index,
+        fail_on_intersection != 0,
+    ) {
+        Ok(Some(value)) => value,
+        Ok(None) => return SORT_FAILED,
+        Err(status) => return status,
+    };
+
+    if !order.is_empty() {
+        let output_indices = slice::from_raw_parts_mut(output_indices, output_indices_len as usize);
+        output_indices[..order.len()].copy_from_slice(&order);
+    }
+
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_topo_quad_store_create(
+    records: *const TranslucentTopoQuadRecord,
+    record_count: i32,
+    output_handle: *mut u64,
+) -> i32 {
+    if record_count < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if output_handle.is_null() || (record_count > 0 && records.is_null()) {
+        return ERR_NULL_POINTER;
+    }
+
+    let records = if record_count == 0 {
+        &[]
+    } else {
+        slice::from_raw_parts(records, record_count as usize)
+    };
+    let store = match create_topo_quad_store(records) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+
+    *output_handle = Box::into_raw(Box::new(store)) as u64;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_topo_quad_store_destroy(handle: u64) -> i32 {
+    if handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    drop(Box::from_raw(handle as *mut NativeTopoQuadStore));
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_topo_quad_store_set(
+    handle: u64,
+    index: i32,
+    record: *const TranslucentTopoQuadRecord,
+) -> i32 {
+    if handle == 0 || record.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let store = &mut *(handle as *mut NativeTopoQuadStore);
+    topo_quad_store_set(store, index, &*record)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_topo_quad_store_remove(
+    handle: u64,
+    index: i32,
+) -> i32 {
+    if handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+
+    let store = &mut *(handle as *mut NativeTopoQuadStore);
+    topo_quad_store_remove(store, index)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_topo_quad_store_bsp_double_leaf_possible(
+    handle: u64,
+    quad_a_index: i32,
+    quad_b_index: i32,
+    fail_on_intersection: i32,
+    output_result: *mut i32,
+) -> i32 {
+    if handle == 0 || output_result.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    if quad_a_index < 0 || quad_b_index < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let store = &*(handle as *const NativeTopoQuadStore);
+    let Some(Some(quad_a)) = store.quads.get(quad_a_index as usize) else {
+        return ERR_INVALID_ARGUMENT;
+    };
+    let Some(Some(quad_b)) = store.quads.get(quad_b_index as usize) else {
+        return ERR_INVALID_ARGUMENT;
+    };
+
+    *output_result = if bsp_double_leaf_possible(quad_a, quad_b, fail_on_intersection != 0) {
+        1
+    } else {
+        0
+    };
+    OK
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn mattmc_sodium_translucent_section_geometry_create(
     records: *const TranslucentQuadRecord,
     record_count: i32,
@@ -3081,6 +3385,11 @@ mod tests {
     }
 
     #[test]
+    fn topo_record_layout_matches_java_stride() {
+        assert_eq!(84, std::mem::size_of::<TranslucentTopoQuadRecord>());
+    }
+
+    #[test]
     fn opposing_faces_need_no_sort() {
         let records = [
             vertex_record(FACING_POS_Z, 1.0),
@@ -3118,6 +3427,56 @@ mod tests {
     }
 
     #[test]
+    fn topo_graph_sort_topo_records_applies_active_remap() {
+        let records = [
+            topo_record(FACING_POS_Z, 1.0),
+            topo_record(FACING_POS_Z, 0.0),
+        ];
+        let active_to_real_index = [42, 7];
+        let order = topo_graph_sort_topo_records(&records, Some(&active_to_real_index), false)
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(vec![7, 42], order);
+    }
+
+    #[test]
+    fn bsp_double_leaf_possible_accepts_opposite_aligned_faces() {
+        let quad_a = build_topo_quad_info(&topo_record(FACING_POS_Z, 1.0)).unwrap();
+        let quad_b = build_topo_quad_info(&topo_record(FACING_NEG_Z, 0.0)).unwrap();
+
+        assert!(bsp_double_leaf_possible(&quad_a, &quad_b, false));
+    }
+
+    #[test]
+    fn topo_quad_store_updates_and_queries_by_index() {
+        let records = [
+            topo_record(FACING_POS_Z, 1.0),
+            topo_record(FACING_POS_Z, 0.0),
+        ];
+        let mut store = create_topo_quad_store(&records).unwrap();
+
+        assert!(!bsp_double_leaf_possible(
+            store.quads[0].as_ref().unwrap(),
+            store.quads[1].as_ref().unwrap(),
+            false
+        ));
+
+        assert_eq!(
+            OK,
+            topo_quad_store_set(&mut store, 1, &topo_record(FACING_NEG_Z, 0.0))
+        );
+        assert!(bsp_double_leaf_possible(
+            store.quads[0].as_ref().unwrap(),
+            store.quads[1].as_ref().unwrap(),
+            false
+        ));
+
+        assert_eq!(OK, topo_quad_store_remove(&mut store, 1));
+        assert!(store.quads[1].is_none());
+    }
+
+    #[test]
     fn distance_sort_orders_far_quads_before_near_quads() {
         let records = [
             vertex_record(FACING_POS_Z, 1.0),
@@ -3131,6 +3490,18 @@ mod tests {
             write_distance_sorted_index_buffer(&geometry, &mut output, 0.0, 0.0, 0.0)
         );
         assert_eq!(vec![4, 5, 6, 6, 7, 4, 0, 1, 2, 2, 3, 0], output);
+    }
+
+    fn topo_record(facing: i32, z: f32) -> TranslucentTopoQuadRecord {
+        let record = vertex_record(facing, z);
+        let quad = build_quad_info(&record);
+        TranslucentTopoQuadRecord {
+            positions: quad.positions,
+            extents: quad.extents,
+            accurate_dot_product: quad.accurate_dot_product,
+            facing: quad.facing,
+            packed_normal: quad.packed_normal,
+        }
     }
 
     #[test]

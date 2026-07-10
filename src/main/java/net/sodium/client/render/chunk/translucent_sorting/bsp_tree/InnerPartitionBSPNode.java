@@ -8,8 +8,8 @@ import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import net.sodium.api.util.ColorMixer;
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.sodium.client.render.chunk.translucent_sorting.NativeTranslucentGeometryAnalyzer;
 import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
-import net.sodium.client.render.chunk.translucent_sorting.data.TopoGraphSorting;
 import net.sodium.client.render.chunk.translucent_sorting.quad.FullTQuad;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
@@ -973,20 +973,6 @@ abstract class InnerPartitionBSPNode extends BSPNode {
         return null;
     }
 
-    private static class QuadIndexConsumerIntoArray implements IntConsumer {
-        final int[] indexes;
-        private int index = 0;
-
-        QuadIndexConsumerIntoArray(int size) {
-            this.indexes = new int[size];
-        }
-
-        @Override
-        public void accept(int value) {
-            this.indexes[this.index++] = value;
-        }
-    }
-
     static private BSPNode buildTopoMultiLeafNode(BSPWorkspace workspace, IntArrayList indexes, boolean failOnIntersection) {
         var quadCount = indexes.size();
 
@@ -1002,15 +988,16 @@ abstract class InnerPartitionBSPNode extends BSPNode {
             activeToRealIndex[i] = quadIndex;
         }
 
-        var indexWriter = new QuadIndexConsumerIntoArray(quadCount);
-        if (!TopoGraphSorting.topoGraphSort(indexWriter, quads, quads.length, activeToRealIndex, null, null, failOnIntersection)) {
+        var sortedIndexes = NativeTranslucentGeometryAnalyzer.topoGraphSort(quads, quads.length, activeToRealIndex,
+                failOnIntersection);
+        if (sortedIndexes == null) {
             return null;
         }
 
         // no need to add the geometry to the workspace's trigger registry
         // since it's being sorted statically and the sort order won't change based on the camera position
 
-        return BSPNode.nativeLeafMulti(BSPNode.copyIndexes(indexWriter.indexes, false));
+        return BSPNode.nativeLeafMulti(BSPNode.copyIndexes(sortedIndexes, false));
     }
 
     static private BSPNode buildSNRLeafNodeFromQuads(BSPWorkspace workspace, IntArrayList indexes) {

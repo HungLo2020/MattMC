@@ -12,12 +12,19 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 
-final class NativeTranslucentGeometryAnalyzer {
+public final class NativeTranslucentGeometryAnalyzer {
     private static final int RECORD_STRIDE = 56;
     private static final int POSITION_FLOATS = 12;
     private static final int OFFSET_POSITIONS = 0;
     private static final int OFFSET_FACING = OFFSET_POSITIONS + POSITION_FLOATS * Float.BYTES;
     private static final int OFFSET_PACKED_NORMAL = OFFSET_FACING + Integer.BYTES;
+    private static final int TOPO_RECORD_STRIDE = 84;
+    private static final int TOPO_EXTENT_FLOATS = 6;
+    private static final int OFFSET_TOPO_POSITIONS = 0;
+    private static final int OFFSET_TOPO_EXTENTS = OFFSET_TOPO_POSITIONS + POSITION_FLOATS * Float.BYTES;
+    private static final int OFFSET_TOPO_ACCURATE_DOT_PRODUCT = OFFSET_TOPO_EXTENTS + TOPO_EXTENT_FLOATS * Float.BYTES;
+    private static final int OFFSET_TOPO_FACING = OFFSET_TOPO_ACCURATE_DOT_PRODUCT + Float.BYTES;
+    private static final int OFFSET_TOPO_PACKED_NORMAL = OFFSET_TOPO_FACING + Integer.BYTES;
     private static final int METRIC_COUNT = 5;
     private static final int OK = 0;
     private static final int SORT_FAILED = 1;
@@ -84,6 +91,45 @@ final class NativeTranslucentGeometryAnalyzer {
                     ValueLayout.JAVA_INT,
                     ValueLayout.ADDRESS,
                     ValueLayout.JAVA_INT));
+    private static final MethodHandle TOPO_GRAPH_SORT = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_translucent_topo_graph_sort_records",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_INT));
+    private static final MethodHandle TOPO_QUAD_STORE_CREATE = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_translucent_topo_quad_store_create",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS));
+    private static final MethodHandle TOPO_QUAD_STORE_DESTROY = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_translucent_topo_quad_store_destroy",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG));
+    private static final MethodHandle TOPO_QUAD_STORE_SET = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_translucent_topo_quad_store_set",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS));
+    private static final MethodHandle TOPO_QUAD_STORE_REMOVE = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_translucent_topo_quad_store_remove",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT));
+    private static final MethodHandle TOPO_QUAD_STORE_BSP_DOUBLE_LEAF_POSSIBLE = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_translucent_topo_quad_store_bsp_double_leaf_possible",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS));
     private static final int VERIFY_STATUS = invokeVerify();
 
     private long handle;
@@ -97,6 +143,77 @@ final class NativeTranslucentGeometryAnalyzer {
             if (this.handle == 0) {
                 throw new IllegalStateException("Native translucent analyzer creation returned a null handle");
             }
+        }
+    }
+
+    public static int[] topoGraphSort(TQuad[] quads, boolean failOnIntersection) {
+        return topoGraphSort(quads, quads.length, null, failOnIntersection);
+    }
+
+    public static int[] topoGraphSort(TQuad[] quads, int quadCount, int[] activeToRealIndex,
+            boolean failOnIntersection) {
+        if (quadCount < 0 || quadCount > quads.length) {
+            throw new IllegalArgumentException("Invalid translucent topo quad count: " + quadCount);
+        }
+        if (activeToRealIndex != null && activeToRealIndex.length < quadCount) {
+            throw new IllegalArgumentException("Active translucent topo index map is shorter than the quad count");
+        }
+
+        int[] quadIndexes = new int[quadCount];
+
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment recordsSegment = quadCount == 0
+                    ? MemorySegment.NULL
+                    : arena.allocate((long) quadCount * TOPO_RECORD_STRIDE, Integer.BYTES);
+            for (int quadIndex = 0; quadIndex < quadCount; quadIndex++) {
+                writeTopoRecord(recordsSegment.asSlice((long) quadIndex * TOPO_RECORD_STRIDE), quads[quadIndex]);
+            }
+
+            MemorySegment activeToRealIndexSegment = MemorySegment.NULL;
+            int activeToRealIndexLength = 0;
+            if (activeToRealIndex != null) {
+                activeToRealIndexSegment = arena.allocate(ValueLayout.JAVA_INT, activeToRealIndex.length);
+                activeToRealIndexLength = activeToRealIndex.length;
+                for (int index = 0; index < activeToRealIndex.length; index++) {
+                    activeToRealIndexSegment.setAtIndex(ValueLayout.JAVA_INT, index, activeToRealIndex[index]);
+                }
+            }
+
+            MemorySegment quadIndexesSegment = quadCount == 0
+                    ? MemorySegment.NULL
+                    : arena.allocate(ValueLayout.JAVA_INT, quadCount);
+            int status = invokeTopoGraphSort(recordsSegment, quadCount, activeToRealIndexSegment,
+                    activeToRealIndexLength, failOnIntersection ? 1 : 0, quadIndexesSegment, quadIndexes.length);
+            if (status == SORT_FAILED) {
+                return null;
+            }
+            check(status, "native translucent topo graph sort");
+
+            for (int index = 0; index < quadIndexes.length; index++) {
+                quadIndexes[index] = quadIndexesSegment.getAtIndex(ValueLayout.JAVA_INT, index);
+            }
+        }
+
+        return quadIndexes;
+    }
+
+    public static TopoQuadStore createTopoQuadStore(TQuad[] quads) {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment recordsSegment = quads.length == 0
+                    ? MemorySegment.NULL
+                    : arena.allocate((long) quads.length * TOPO_RECORD_STRIDE, Integer.BYTES);
+            for (int quadIndex = 0; quadIndex < quads.length; quadIndex++) {
+                writeTopoRecord(recordsSegment.asSlice((long) quadIndex * TOPO_RECORD_STRIDE), quads[quadIndex]);
+            }
+
+            MemorySegment handleSegment = arena.allocate(ValueLayout.JAVA_LONG);
+            check(invokeTopoQuadStoreCreate(recordsSegment, quads.length, handleSegment),
+                    "native translucent topo quad store creation");
+            long handle = handleSegment.get(ValueLayout.JAVA_LONG, 0);
+            if (handle == 0) {
+                throw new IllegalStateException("Native translucent topo quad store creation returned a null handle");
+            }
+            return new TopoQuadStore(handle);
         }
     }
 
@@ -383,6 +500,60 @@ final class NativeTranslucentGeometryAnalyzer {
         }
     }
 
+    private static int invokeTopoGraphSort(MemorySegment records, int recordCount,
+            MemorySegment activeToRealIndex, int activeToRealIndexLength, int failOnIntersection,
+            MemorySegment quadIndexes, int quadIndexesLength) {
+        try {
+            return (int)TOPO_GRAPH_SORT.invokeExact(records, recordCount, activeToRealIndex,
+                    activeToRealIndexLength, failOnIntersection, quadIndexes, quadIndexesLength);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust translucent topo graph sort downcall failed", throwable);
+        }
+    }
+
+    private static int invokeTopoQuadStoreCreate(MemorySegment records, int recordCount, MemorySegment outputHandle) {
+        try {
+            return (int)TOPO_QUAD_STORE_CREATE.invokeExact(records, recordCount, outputHandle);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust translucent topo quad store creation downcall failed", throwable);
+        }
+    }
+
+    private static int invokeTopoQuadStoreDestroy(long handle) {
+        try {
+            return (int)TOPO_QUAD_STORE_DESTROY.invokeExact(handle);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust translucent topo quad store destroy downcall failed", throwable);
+        }
+    }
+
+    private static int invokeTopoQuadStoreSet(long handle, int index, MemorySegment record) {
+        try {
+            return (int)TOPO_QUAD_STORE_SET.invokeExact(handle, index, record);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust translucent topo quad store set downcall failed", throwable);
+        }
+    }
+
+    private static int invokeTopoQuadStoreRemove(long handle, int index) {
+        try {
+            return (int)TOPO_QUAD_STORE_REMOVE.invokeExact(handle, index);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust translucent topo quad store remove downcall failed", throwable);
+        }
+    }
+
+    private static int invokeTopoQuadStoreBspDoubleLeafPossible(long handle, int quadAIndex, int quadBIndex,
+            int failOnIntersection, MemorySegment result) {
+        try {
+            return (int)TOPO_QUAD_STORE_BSP_DOUBLE_LEAF_POSSIBLE.invokeExact(handle, quadAIndex, quadBIndex,
+                    failOnIntersection, result);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust translucent topo quad store BSP double leaf downcall failed",
+                    throwable);
+        }
+    }
+
     private static void writeRecord(MemorySegment recordSegment, ChunkVertexEncoder.Vertex[] vertices,
             int facingOrdinal, int packedNormal) {
         for (int vertexIndex = 0; vertexIndex < 4; vertexIndex++) {
@@ -397,6 +568,24 @@ final class NativeTranslucentGeometryAnalyzer {
         recordSegment.set(ValueLayout.JAVA_INT, OFFSET_PACKED_NORMAL, packedNormal);
     }
 
+    private static void writeTopoRecord(MemorySegment recordSegment, TQuad quad) {
+        float[] vertexPositions = quad.getVertexPositions();
+        for (int positionIndex = 0; positionIndex < POSITION_FLOATS; positionIndex++) {
+            recordSegment.set(ValueLayout.JAVA_FLOAT, OFFSET_TOPO_POSITIONS + (long) positionIndex * Float.BYTES,
+                    vertexPositions[positionIndex]);
+        }
+
+        float[] extents = quad.getExtents();
+        for (int extentIndex = 0; extentIndex < TOPO_EXTENT_FLOATS; extentIndex++) {
+            recordSegment.set(ValueLayout.JAVA_FLOAT, OFFSET_TOPO_EXTENTS + (long) extentIndex * Float.BYTES,
+                    extents[extentIndex]);
+        }
+
+        recordSegment.set(ValueLayout.JAVA_FLOAT, OFFSET_TOPO_ACCURATE_DOT_PRODUCT, quad.getAccurateDotProduct());
+        recordSegment.set(ValueLayout.JAVA_INT, OFFSET_TOPO_FACING, quad.getFacing().ordinal());
+        recordSegment.set(ValueLayout.JAVA_INT, OFFSET_TOPO_PACKED_NORMAL, quad.getPackedNormal());
+    }
+
     record Analysis(
             SortType sortType,
             int quadHash,
@@ -406,5 +595,53 @@ final class NativeTranslucentGeometryAnalyzer {
             int[] staticKeys,
             int quadCount
     ) {
+    }
+
+    public static final class TopoQuadStore implements AutoCloseable {
+        private long handle;
+
+        private TopoQuadStore(long handle) {
+            this.handle = handle;
+        }
+
+        public void set(int index, TQuad quad) {
+            try (Arena arena = Arena.ofConfined()) {
+                MemorySegment recordSegment = arena.allocate(TOPO_RECORD_STRIDE, Integer.BYTES);
+                writeTopoRecord(recordSegment, quad);
+                check(invokeTopoQuadStoreSet(this.getHandle(), index, recordSegment),
+                        "native translucent topo quad store update");
+            }
+        }
+
+        public void remove(int index) {
+            check(invokeTopoQuadStoreRemove(this.getHandle(), index),
+                    "native translucent topo quad store removal");
+        }
+
+        public boolean bspDoubleLeafPossible(int quadAIndex, int quadBIndex, boolean failOnIntersection) {
+            try (Arena arena = Arena.ofConfined()) {
+                MemorySegment resultSegment = arena.allocate(ValueLayout.JAVA_INT);
+                check(invokeTopoQuadStoreBspDoubleLeafPossible(this.getHandle(), quadAIndex, quadBIndex,
+                        failOnIntersection ? 1 : 0, resultSegment),
+                        "native translucent topo quad store BSP double leaf test");
+                return resultSegment.get(ValueLayout.JAVA_INT, 0) != 0;
+            }
+        }
+
+        @Override
+        public void close() {
+            long handle = this.handle;
+            if (handle != 0) {
+                check(invokeTopoQuadStoreDestroy(handle), "native translucent topo quad store destroy");
+                this.handle = 0;
+            }
+        }
+
+        private long getHandle() {
+            if (this.handle == 0) {
+                throw new IllegalStateException("Native translucent topo quad store has been closed");
+            }
+            return this.handle;
+        }
     }
 }
