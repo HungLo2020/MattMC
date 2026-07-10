@@ -122,6 +122,14 @@ public final class NativeBspBuildResult implements AutoCloseable {
         this.updatedQuads = updatedQuads;
     }
 
+    void finishNative(BSPNode rootNode, int indexQuadCount, long treeHandle) {
+        this.finishNative(rootNode, indexQuadCount, null, treeHandle);
+    }
+
+    void finishNative(BSPNode rootNode, int indexQuadCount, NativeUpdatedQuads updatedQuads, long treeHandle) {
+        this.finish(rootNode, indexQuadCount, updatedQuads, treeHandle);
+    }
+
     public int indexQuadCount() {
         return this.indexQuadCount;
     }
@@ -149,9 +157,17 @@ public final class NativeBspBuildResult implements AutoCloseable {
                 "native BSP build result index buffer writing");
     }
 
+    long nativeHandle() {
+        return this.state.getHandle();
+    }
+
     @Override
     public void close() {
         this.cleanable.clean();
+        if (this.rootNode != null) {
+            this.rootNode.close();
+            this.rootNode = null;
+        }
         if (this.updatedQuads != null) {
             this.updatedQuads.close();
             this.updatedQuads = null;

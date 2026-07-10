@@ -13,7 +13,9 @@ fn shader_kind(stage: i32) -> Result<shaderc::ShaderKind, String> {
         3 => Ok(shaderc::ShaderKind::Compute),
         4 => Ok(shaderc::ShaderKind::TessControl),
         5 => Ok(shaderc::ShaderKind::TessEvaluation),
-        _ => Err(format!("unsupported Vulkanic shader stage ordinal: {stage}")),
+        _ => Err(format!(
+            "unsupported Vulkanic shader stage ordinal: {stage}"
+        )),
     }
 }
 
@@ -63,7 +65,10 @@ unsafe fn compile_inner(
     let mut options = shaderc::CompileOptions::new()
         .map_err(|error| format!("failed to create Shaderc compile options: {error}"))?;
     options.set_source_language(shaderc::SourceLanguage::GLSL);
-    options.set_target_env(shaderc::TargetEnv::Vulkan, shaderc::EnvVersion::Vulkan1_0 as u32);
+    options.set_target_env(
+        shaderc::TargetEnv::Vulkan,
+        shaderc::EnvVersion::Vulkan1_0 as u32,
+    );
     options.set_auto_bind_uniforms(true);
     options.set_auto_map_locations(true);
 

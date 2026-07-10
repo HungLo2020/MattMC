@@ -71,6 +71,7 @@ struct RawPlane {
     distance: f32,
 }
 
+#[derive(Clone)]
 pub(crate) struct NativeGeometryPlanes {
     planes: Vec<RawPlane>,
 }

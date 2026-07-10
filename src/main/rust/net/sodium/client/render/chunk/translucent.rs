@@ -1,7 +1,7 @@
 use std::slice;
 
 use super::gfni_trigger::NativeGeometryPlanes;
-use super::index;
+use super::{index, vertex};
 
 const OK: i32 = 0;
 const SORT_FAILED: i32 = 1;
@@ -32,6 +32,7 @@ const QUANTIZE_EPSILON: f32 = 1.0 / 256.0;
 const HALF_SPACE_EPSILON: f32 = 0.001;
 const NORMAL_COMPONENT_RANGE: f32 = 127.0;
 const NATIVE_QUAD_STRIDE: u64 = 152;
+const BSP_NODE_REUSE_THRESHOLD: usize = 30;
 
 const ALIGNED_NORMALS: [(i8, i8, i8); FACING_DIRECTIONS] = [
     (127, 0, 0),
@@ -188,6 +189,7 @@ impl BspRemap {
     }
 }
 
+#[derive(Clone)]
 enum BspNode {
     LeafSingle {
         quad: i32,
@@ -221,15 +223,70 @@ enum BspNode {
     },
 }
 
+#[derive(Clone)]
 struct NativeBspTree {
     nodes: Vec<BspNode>,
     root: i32,
     index_quad_count: usize,
 }
 
+struct NativeBspReusableRoot {
+    tree: NativeBspTree,
+    geometry_planes: NativeGeometryPlanes,
+    reuse_data: BspNodeReuseData,
+}
+
 struct NativeBspBuildResult {
     geometry_planes: Option<Box<NativeGeometryPlanes>>,
     tree: Option<Box<NativeBspTree>>,
+    owned_split_quads: Vec<Box<NativeFullTQuad>>,
+}
+
+struct BspBuildOutput {
+    tree: NativeBspTree,
+    reusable_root: Option<Box<NativeBspReusableRoot>>,
+}
+
+struct BspNodeReuseData {
+    quad_extents: Vec<[f32; 6]>,
+    indexes: Vec<i32>,
+    index_count: usize,
+    max_index: i32,
+}
+
+struct BspBuildPartition {
+    distance: f32,
+    before: Vec<i32>,
+    on: Vec<i32>,
+}
+
+struct BspBuildIntervalPoint {
+    distance_key: i32,
+    distance: f32,
+    quad_index: i32,
+    point_type: i32,
+}
+
+struct BspFullQuadBuildOutput {
+    tree: NativeBspTree,
+    reusable_root: Option<Box<NativeBspReusableRoot>>,
+    owned_split_quads: Vec<Box<NativeFullTQuad>>,
+    updated_quad_handles: Vec<u64>,
+    mesh_quad_count: usize,
+    index_quad_count: usize,
+}
+
+struct BspFullQuadWorkspace<'a> {
+    tree: NativeBspTree,
+    geometry_planes: &'a mut NativeGeometryPlanes,
+    quads: Vec<QuadInfo>,
+    handles: Vec<u64>,
+    owned_split_quads: Vec<Box<NativeFullTQuad>>,
+    updated_quad_handles: Vec<u64>,
+    mesh_quad_count: usize,
+    index_quad_count: usize,
+    max_quad_count: usize,
+    quantize_trigger_normals: bool,
 }
 
 struct BspActiveRemap {
@@ -1644,11 +1701,1526 @@ fn create_bsp_tree() -> NativeBspTree {
     }
 }
 
+fn prepare_bsp_reuse_data(quads: &[QuadInfo], indexes: &[i32]) -> Option<BspNodeReuseData> {
+    if indexes.len() <= BSP_NODE_REUSE_THRESHOLD {
+        return None;
+    }
+
+    let mut quad_extents = Vec::with_capacity(indexes.len());
+    let mut max_index = -1;
+    for &index in indexes {
+        let quad = quad_at(quads, index).ok()?;
+        quad_extents.push(quad.extents);
+        max_index = max_index.max(index);
+    }
+
+    Some(BspNodeReuseData {
+        quad_extents,
+        indexes: indexes.to_vec(),
+        index_count: indexes.len(),
+        max_index,
+    })
+}
+
+fn prepare_bsp_reuse_remap(
+    quads: &[QuadInfo],
+    indexes: &[i32],
+    reuse_data: &BspNodeReuseData,
+) -> Option<BspRemap> {
+    if reuse_data.quad_extents.len() != indexes.len() {
+        return None;
+    }
+
+    for (position, &index) in indexes.iter().enumerate() {
+        if quad_at(quads, index).ok()?.extents != reuse_data.quad_extents[position] {
+            return None;
+        }
+    }
+
+    let map_len = usize::try_from(reuse_data.max_index.checked_add(1)?).ok()?;
+    let mut index_map = vec![0; map_len];
+    let mut first_offset = 0;
+    let mut fixed_offset = true;
+
+    for (position, &old_index) in reuse_data.indexes.iter().enumerate() {
+        let old_index_usize = usize::try_from(old_index).ok()?;
+        let new_index = *indexes.get(position)?;
+        *index_map.get_mut(old_index_usize)? = new_index;
+        let offset = new_index.checked_sub(old_index)?;
+        if position == 0 {
+            first_offset = offset;
+        } else if first_offset != offset {
+            fixed_offset = false;
+        }
+    }
+
+    if fixed_offset {
+        Some(BspRemap {
+            index_count: reuse_data.index_count,
+            kind: BspRemapKind::FixedOffset(first_offset),
+        })
+    } else {
+        Some(BspRemap {
+            index_count: reuse_data.index_count,
+            kind: BspRemapKind::IndexMap(index_map),
+        })
+    }
+}
+
+fn set_bsp_root_remap(tree: &mut NativeBspTree, remap: BspRemap) -> Result<(), i32> {
+    let root = validate_bsp_node_index(tree, tree.root)?.ok_or(ERR_INVALID_ARGUMENT)?;
+    match tree.nodes.get_mut(root).ok_or(ERR_INVALID_ARGUMENT)? {
+        BspNode::FixedDouble {
+            remap: node_remap, ..
+        }
+        | BspNode::Binary {
+            remap: node_remap, ..
+        }
+        | BspNode::MultiPartition {
+            remap: node_remap, ..
+        } => {
+            *node_remap = remap;
+            Ok(())
+        }
+        _ => {
+            if remap.is_active() {
+                Err(ERR_INVALID_ARGUMENT)
+            } else {
+                Ok(())
+            }
+        }
+    }
+}
+
+fn try_reuse_bsp_root(
+    quads: &[QuadInfo],
+    indexes: &[i32],
+    old_root_handle: u64,
+    geometry_planes: &mut NativeGeometryPlanes,
+) -> Result<Option<BspBuildOutput>, i32> {
+    if old_root_handle == 0 {
+        return Ok(None);
+    }
+
+    let old_root = unsafe { &*(old_root_handle as *const NativeBspReusableRoot) };
+    let Some(remap) = prepare_bsp_reuse_remap(quads, indexes, &old_root.reuse_data) else {
+        return Ok(None);
+    };
+
+    let mut tree = old_root.tree.clone();
+    set_bsp_root_remap(&mut tree, remap)?;
+    *geometry_planes = old_root.geometry_planes.clone();
+    let reusable_root = Box::new(NativeBspReusableRoot {
+        tree: tree.clone(),
+        geometry_planes: geometry_planes.clone(),
+        reuse_data: BspNodeReuseData {
+            quad_extents: old_root.reuse_data.quad_extents.clone(),
+            indexes: old_root.reuse_data.indexes.clone(),
+            index_count: old_root.reuse_data.index_count,
+            max_index: old_root.reuse_data.max_index,
+        },
+    });
+
+    Ok(Some(BspBuildOutput {
+        tree,
+        reusable_root: Some(reusable_root),
+    }))
+}
+
+fn create_bsp_reusable_root(
+    tree: &NativeBspTree,
+    geometry_planes: &NativeGeometryPlanes,
+    quads: &[QuadInfo],
+    indexes: &[i32],
+    prepare_node_reuse: bool,
+) -> Option<Box<NativeBspReusableRoot>> {
+    if !prepare_node_reuse {
+        return None;
+    }
+
+    let reuse_data = prepare_bsp_reuse_data(quads, indexes)?;
+    Some(Box::new(NativeBspReusableRoot {
+        tree: tree.clone(),
+        geometry_planes: geometry_planes.clone(),
+        reuse_data,
+    }))
+}
+
 fn create_bsp_build_result() -> NativeBspBuildResult {
     NativeBspBuildResult {
         geometry_planes: Some(Box::new(NativeGeometryPlanes::new())),
         tree: None,
+        owned_split_quads: Vec::new(),
     }
+}
+
+fn build_bsp_tree_from_topo_records_with_reuse(
+    records: &[TranslucentTopoQuadRecord],
+    geometry_planes: &mut NativeGeometryPlanes,
+    old_root_handle: u64,
+    prepare_node_reuse: bool,
+) -> Result<BspBuildOutput, i32> {
+    let quads = build_topo_quad_infos(records)?;
+    let indexes = (0..quads.len())
+        .map(|index| i32::try_from(index).map_err(|_| ERR_CAPACITY))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    if let Some(output) = try_reuse_bsp_root(&quads, &indexes, old_root_handle, geometry_planes)? {
+        return Ok(output);
+    }
+
+    let mut tree = create_bsp_tree();
+    let root = build_bsp_node(&mut tree, geometry_planes, &quads, &indexes, -1)?;
+    tree.root = root;
+    tree.index_quad_count = quads.len();
+    let reusable_root =
+        create_bsp_reusable_root(&tree, geometry_planes, &quads, &indexes, prepare_node_reuse);
+
+    Ok(BspBuildOutput {
+        tree,
+        reusable_root,
+    })
+}
+
+fn build_bsp_node(
+    tree: &mut NativeBspTree,
+    geometry_planes: &mut NativeGeometryPlanes,
+    quads: &[QuadInfo],
+    indexes: &[i32],
+    depth: i32,
+) -> Result<i32, i32> {
+    if indexes.is_empty() {
+        return Ok(-1);
+    }
+    if indexes.len() == 1 {
+        return add_bsp_node(tree, BspNode::LeafSingle { quad: indexes[0] });
+    }
+    if indexes.len() == 2 {
+        let quad_a = quad_at(quads, indexes[0])?;
+        let quad_b = quad_at(quads, indexes[1])?;
+        if bsp_double_leaf_possible(quad_a, quad_b, false) {
+            return add_bsp_node(
+                tree,
+                BspNode::LeafDouble {
+                    quad_a: indexes[0],
+                    quad_b: indexes[1],
+                },
+            );
+        }
+    }
+
+    build_partitioned_bsp_node(tree, geometry_planes, quads, indexes, depth + 1)
+}
+
+fn build_partitioned_bsp_node(
+    tree: &mut NativeBspTree,
+    geometry_planes: &mut NativeGeometryPlanes,
+    quads: &[QuadInfo],
+    indexes: &[i32],
+    depth: i32,
+) -> Result<i32, i32> {
+    for axis_count in 0..3 {
+        let axis = ((axis_count + depth + 1) % 3) as usize;
+        let opposite_direction = axis + 3;
+        let mut aligned_facing_bitmap = 0i32;
+        let mut only_interval_side = true;
+        let mut points = Vec::with_capacity(indexes.len() * 2);
+
+        for &quad_index in indexes {
+            let quad = quad_at(quads, quad_index)?;
+            let pos_extent = quad.extents[axis];
+            let neg_extent = quad.extents[opposite_direction];
+            if pos_extent == neg_extent {
+                points.push(bsp_interval_point(pos_extent, quad_index, 1));
+            } else {
+                points.push(bsp_interval_point(pos_extent, quad_index, 0));
+                points.push(bsp_interval_point(neg_extent, quad_index, 2));
+                only_interval_side = false;
+            }
+            aligned_facing_bitmap |= 1 << quad.facing;
+        }
+
+        if aligned_facing_bitmap & (1 << FACING_UNASSIGNED) == 0 {
+            let normal_count = aligned_facing_bitmap.count_ones();
+            if normal_count == 1
+                || (normal_count == 2 && bitmap_is_opposing_aligned(aligned_facing_bitmap))
+            {
+                return if only_interval_side {
+                    build_bsp_snr_leaf_from_points(tree, quads, &mut points)
+                } else {
+                    build_bsp_snr_leaf_from_quads(tree, quads, indexes)
+                };
+            }
+        }
+
+        points.sort_by(|a, b| {
+            a.distance_key
+                .cmp(&b.distance_key)
+                .then_with(|| a.point_type.cmp(&b.point_type))
+                .then_with(|| a.quad_index.cmp(&b.quad_index))
+        });
+
+        let mut distance = f32::NAN;
+        let mut before: Vec<i32> = Vec::new();
+        let mut on: Vec<i32> = Vec::new();
+        let mut has_before = false;
+        let mut has_on = false;
+        let mut thickness = 0i32;
+        let mut partitions = Vec::new();
+
+        for point in &points {
+            match point.point_type {
+                2 => {
+                    if thickness == 0 && (has_before || has_on) {
+                        partitions.push(BspBuildPartition {
+                            distance,
+                            before: take_if_present(&mut before, &mut has_before),
+                            on: take_if_present(&mut on, &mut has_on),
+                        });
+                        distance = f32::NAN;
+                    }
+
+                    thickness += 1;
+                    if has_on {
+                        if distance.is_nan() {
+                            return Err(ERR_INVALID_ARGUMENT);
+                        }
+                        partitions.push(BspBuildPartition {
+                            distance,
+                            before: take_if_present(&mut before, &mut has_before),
+                            on: take_if_present(&mut on, &mut has_on),
+                        });
+                        distance = f32::NAN;
+                    }
+                    before.push(point.quad_index);
+                    has_before = true;
+                }
+                0 => {
+                    thickness -= 1;
+                    if !has_on {
+                        distance = point.distance;
+                    }
+                }
+                1 => {
+                    if thickness == 0 {
+                        if !has_on {
+                            on.clear();
+                            has_on = true;
+                            distance = point.distance;
+                        } else if distance != point.distance {
+                            partitions.push(BspBuildPartition {
+                                distance,
+                                before: take_if_present(&mut before, &mut has_before),
+                                on: take_if_present(&mut on, &mut has_on),
+                            });
+                            distance = point.distance;
+                            on.clear();
+                            has_on = true;
+                        }
+                        on.push(point.quad_index);
+                    } else {
+                        before.push(point.quad_index);
+                        has_before = true;
+                    }
+                }
+                _ => return Err(ERR_INVALID_ARGUMENT),
+            }
+        }
+
+        if has_before && before.len() == indexes.len() {
+            continue;
+        }
+
+        let ends_with_plane = has_on;
+        if has_before || has_on {
+            partitions.push(BspBuildPartition {
+                distance: if ends_with_plane { distance } else { f32::NAN },
+                before: take_if_present(&mut before, &mut has_before),
+                on: take_if_present(&mut on, &mut has_on),
+            });
+        }
+
+        if partitions.len() <= 2 {
+            let outside = if partitions.len() == 2 {
+                Some(&partitions[1])
+            } else {
+                None
+            };
+            if outside.is_none() || !ends_with_plane {
+                return build_bsp_binary_from_partitions(
+                    tree,
+                    geometry_planes,
+                    quads,
+                    depth,
+                    &partitions[0],
+                    outside,
+                    axis as i32,
+                );
+            }
+        }
+
+        return build_bsp_multi_partition(
+            tree,
+            geometry_planes,
+            quads,
+            depth,
+            &partitions,
+            axis as i32,
+            ends_with_plane,
+        );
+    }
+
+    if let Some(node) =
+        build_bsp_intersection_fallback(tree, geometry_planes, quads, indexes, depth)?
+    {
+        return Ok(node);
+    }
+    build_bsp_topo_multi_leaf(tree, quads, indexes, false)?.ok_or(SORT_FAILED)
+}
+
+fn bsp_interval_point(distance: f32, quad_index: i32, point_type: i32) -> BspBuildIntervalPoint {
+    BspBuildIntervalPoint {
+        distance_key: float_to_comparable_int(distance),
+        distance,
+        quad_index,
+        point_type,
+    }
+}
+
+fn take_if_present(values: &mut Vec<i32>, present: &mut bool) -> Vec<i32> {
+    if *present {
+        *present = false;
+        std::mem::take(values)
+    } else {
+        Vec::new()
+    }
+}
+
+fn build_bsp_binary_from_partitions(
+    tree: &mut NativeBspTree,
+    geometry_planes: &mut NativeGeometryPlanes,
+    quads: &[QuadInfo],
+    depth: i32,
+    inside: &BspBuildPartition,
+    outside: Option<&BspBuildPartition>,
+    axis: i32,
+) -> Result<i32, i32> {
+    geometry_planes.add_double_sided_aligned_plane(axis, inside.distance)?;
+
+    let inside_node = if inside.before.is_empty() {
+        -1
+    } else {
+        build_bsp_node(tree, geometry_planes, quads, &inside.before, depth)?
+    };
+    let outside_node = if let Some(outside) = outside {
+        build_bsp_node(tree, geometry_planes, quads, &outside.before, depth)?
+    } else {
+        -1
+    };
+    let mut on_plane = inside.on.clone();
+    on_plane.sort_unstable();
+
+    let normal = accurate_aligned_normal(axis);
+    add_bsp_node(
+        tree,
+        BspNode::Binary {
+            remap: BspRemap::none(),
+            normal: [normal.0, normal.1, normal.2],
+            distance: inside.distance,
+            inside: inside_node,
+            outside: outside_node,
+            on_plane,
+        },
+    )
+}
+
+fn build_bsp_multi_partition(
+    tree: &mut NativeBspTree,
+    geometry_planes: &mut NativeGeometryPlanes,
+    quads: &[QuadInfo],
+    depth: i32,
+    partitions: &[BspBuildPartition],
+    axis: i32,
+    ends_with_plane: bool,
+) -> Result<i32, i32> {
+    let plane_count = if ends_with_plane {
+        partitions.len()
+    } else {
+        partitions.len().saturating_sub(1)
+    };
+    let mut plane_distances = Vec::with_capacity(plane_count);
+    let mut partition_nodes = vec![-1; plane_count + 1];
+    let mut on_plane_quads = Vec::with_capacity(plane_count);
+
+    for (index, partition) in partitions.iter().enumerate() {
+        if index < plane_count {
+            if partition.distance.is_nan() {
+                return Err(ERR_INVALID_ARGUMENT);
+            }
+            geometry_planes.add_double_sided_aligned_plane(axis, partition.distance)?;
+            plane_distances.push(partition.distance);
+            let mut on_plane = partition.on.clone();
+            on_plane.sort_unstable();
+            on_plane_quads.push(on_plane);
+        }
+
+        if !partition.before.is_empty() && index < partition_nodes.len() {
+            partition_nodes[index] =
+                build_bsp_node(tree, geometry_planes, quads, &partition.before, depth)?;
+        }
+    }
+
+    let normal = accurate_aligned_normal(axis);
+    add_bsp_node(
+        tree,
+        BspNode::MultiPartition {
+            remap: BspRemap::none(),
+            normal: [normal.0, normal.1, normal.2],
+            plane_distances,
+            partitions: partition_nodes,
+            on_plane_quads,
+        },
+    )
+}
+
+fn build_bsp_snr_leaf_from_quads(
+    tree: &mut NativeBspTree,
+    quads: &[QuadInfo],
+    indexes: &[i32],
+) -> Result<i32, i32> {
+    let mut sorted = indexes.to_vec();
+    sorted.sort_by_key(|index| {
+        quad_at(quads, *index)
+            .map(|quad| float_to_comparable_int(quad.accurate_dot_product))
+            .unwrap_or(i32::MAX)
+    });
+    add_bsp_node(tree, BspNode::LeafMulti { quads: sorted })
+}
+
+fn build_bsp_snr_leaf_from_points(
+    tree: &mut NativeBspTree,
+    quads: &[QuadInfo],
+    points: &mut [BspBuildIntervalPoint],
+) -> Result<i32, i32> {
+    points.sort_by(|a, b| {
+        a.distance_key
+            .cmp(&b.distance_key)
+            .then_with(|| a.point_type.cmp(&b.point_type))
+            .then_with(|| a.quad_index.cmp(&b.quad_index))
+    });
+
+    let mut sorted = vec![0; points.len()];
+    let mut forwards = 0usize;
+    let mut backwards = sorted.len();
+    for point in points {
+        let quad = quad_at(quads, point.quad_index)?;
+        if facing_sign(quad.facing) == 1 {
+            sorted[forwards] = point.quad_index;
+            forwards += 1;
+        } else {
+            backwards -= 1;
+            sorted[backwards] = point.quad_index;
+        }
+    }
+    add_bsp_node(tree, BspNode::LeafMulti { quads: sorted })
+}
+
+fn build_bsp_topo_multi_leaf(
+    tree: &mut NativeBspTree,
+    quads: &[QuadInfo],
+    indexes: &[i32],
+    fail_on_intersection: bool,
+) -> Result<Option<i32>, i32> {
+    if indexes.len()
+        > STATIC_TOPO_SORT_ATTEMPT_LIMITS[STATIC_TOPO_SORT_ATTEMPT_LIMITS.len() - 1] as usize
+    {
+        return Ok(None);
+    }
+
+    let active = indexes
+        .iter()
+        .map(|index| quad_at(quads, *index).cloned())
+        .collect::<Result<Vec<_>, _>>()?;
+    let Some(sorted_local) = topo_graph_sort(&active, fail_on_intersection) else {
+        return Ok(None);
+    };
+    let mut sorted = Vec::with_capacity(sorted_local.len());
+    for local in sorted_local {
+        let local = usize::try_from(local).map_err(|_| ERR_INVALID_ARGUMENT)?;
+        sorted.push(*indexes.get(local).ok_or(ERR_INVALID_ARGUMENT)?);
+    }
+    add_bsp_node(tree, BspNode::LeafMulti { quads: sorted }).map(Some)
+}
+
+fn build_bsp_intersection_fallback(
+    tree: &mut NativeBspTree,
+    geometry_planes: &mut NativeGeometryPlanes,
+    quads: &[QuadInfo],
+    indexes: &[i32],
+    depth: i32,
+) -> Result<Option<i32>, i32> {
+    let primary_threshold = (indexes.len() / 2).clamp(2, 4);
+    let mut counts = vec![0usize; indexes.len()];
+    let mut primary = vec![false; indexes.len()];
+
+    for a in 0..indexes.len() {
+        for b in (a + 1)..indexes.len() {
+            if extents_intersect(
+                &quad_at(quads, indexes[a])?.extents,
+                &quad_at(quads, indexes[b])?.extents,
+            ) {
+                counts[a] += 1;
+                counts[b] += 1;
+                if counts[a] >= primary_threshold {
+                    primary[a] = true;
+                }
+                if counts[b] >= primary_threshold {
+                    primary[b] = true;
+                }
+            }
+        }
+    }
+
+    let primary_count = primary.iter().filter(|value| **value).count();
+    if primary_count == 0 {
+        return Ok(None);
+    }
+    if primary_count == indexes.len() {
+        let mut sorted = indexes.to_vec();
+        sorted.sort_unstable();
+        return add_bsp_node(tree, BspNode::LeafMulti { quads: sorted }).map(Some);
+    }
+
+    let mut non_primary = Vec::with_capacity(indexes.len() - primary_count);
+    let mut primary_indexes = Vec::with_capacity(primary_count);
+    for (local, &index) in indexes.iter().enumerate() {
+        if primary[local] {
+            primary_indexes.push(index);
+        } else {
+            non_primary.push(index);
+        }
+    }
+    let first = build_bsp_node(tree, geometry_planes, quads, &non_primary, depth)?;
+    let second = build_bsp_node(tree, geometry_planes, quads, &primary_indexes, depth)?;
+    add_bsp_node(
+        tree,
+        BspNode::FixedDouble {
+            remap: BspRemap::none(),
+            first,
+            second,
+        },
+    )
+    .map(Some)
+}
+
+fn quad_at(quads: &[QuadInfo], index: i32) -> Result<&QuadInfo, i32> {
+    if index < 0 {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+    quads.get(index as usize).ok_or(ERR_INVALID_ARGUMENT)
+}
+
+unsafe fn build_bsp_tree_from_full_quad_handles_with_reuse(
+    handles: &[u64],
+    geometry_planes: &mut NativeGeometryPlanes,
+    max_quad_count: usize,
+    quantize_trigger_normals: bool,
+    old_root_handle: u64,
+    prepare_node_reuse: bool,
+) -> Result<BspFullQuadBuildOutput, i32> {
+    let mut quads = Vec::with_capacity(handles.len());
+    for &handle in handles {
+        if handle == 0 {
+            return Err(ERR_NULL_POINTER);
+        }
+        quads.push((&*(handle as *const NativeFullTQuad)).info.clone());
+    }
+
+    let indexes = (0..handles.len())
+        .map(|index| i32::try_from(index).map_err(|_| ERR_CAPACITY))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    if let Some(output) = try_reuse_bsp_root(&quads, &indexes, old_root_handle, geometry_planes)? {
+        return Ok(BspFullQuadBuildOutput {
+            tree: output.tree,
+            reusable_root: output.reusable_root,
+            owned_split_quads: Vec::new(),
+            updated_quad_handles: Vec::new(),
+            mesh_quad_count: handles.len(),
+            index_quad_count: handles.len(),
+        });
+    }
+
+    let mut workspace = BspFullQuadWorkspace {
+        tree: create_bsp_tree(),
+        geometry_planes,
+        quads,
+        handles: handles.to_vec(),
+        owned_split_quads: Vec::new(),
+        updated_quad_handles: Vec::new(),
+        mesh_quad_count: handles.len(),
+        index_quad_count: handles.len(),
+        max_quad_count: max_quad_count.max(handles.len()),
+        quantize_trigger_normals,
+    };
+
+    let root = build_full_bsp_node(&mut workspace, &indexes, -1)?;
+    workspace.tree.root = root;
+    workspace.tree.index_quad_count = workspace.index_quad_count;
+    let reusable_root = create_bsp_reusable_root(
+        &workspace.tree,
+        workspace.geometry_planes,
+        &workspace.quads,
+        &indexes,
+        prepare_node_reuse,
+    );
+
+    Ok(BspFullQuadBuildOutput {
+        tree: workspace.tree,
+        reusable_root,
+        owned_split_quads: workspace.owned_split_quads,
+        updated_quad_handles: workspace.updated_quad_handles,
+        mesh_quad_count: workspace.mesh_quad_count,
+        index_quad_count: workspace.index_quad_count,
+    })
+}
+
+fn build_full_bsp_node(
+    workspace: &mut BspFullQuadWorkspace<'_>,
+    indexes: &[i32],
+    depth: i32,
+) -> Result<i32, i32> {
+    if indexes.is_empty() {
+        return Ok(-1);
+    }
+    if indexes.len() == 1 {
+        return add_bsp_node(
+            &mut workspace.tree,
+            BspNode::LeafSingle { quad: indexes[0] },
+        );
+    }
+    if indexes.len() == 2 {
+        let quad_a = workspace.quad(indexes[0])?;
+        let quad_b = workspace.quad(indexes[1])?;
+        if bsp_double_leaf_possible(quad_a, quad_b, workspace.can_split_quads()) {
+            return add_bsp_node(
+                &mut workspace.tree,
+                BspNode::LeafDouble {
+                    quad_a: indexes[0],
+                    quad_b: indexes[1],
+                },
+            );
+        }
+    }
+
+    build_full_partitioned_bsp_node(workspace, indexes, depth + 1)
+}
+
+fn build_full_partitioned_bsp_node(
+    workspace: &mut BspFullQuadWorkspace<'_>,
+    indexes: &[i32],
+    depth: i32,
+) -> Result<i32, i32> {
+    let mut best_splitting_group = Vec::new();
+
+    for axis_count in 0..3 {
+        let axis = ((axis_count + depth + 1) % 3) as usize;
+        let opposite_direction = axis + 3;
+        let mut aligned_facing_bitmap = 0i32;
+        let mut only_interval_side = true;
+        let mut points = Vec::with_capacity(indexes.len() * 2);
+
+        for &quad_index in indexes {
+            let quad = workspace.quad(quad_index)?;
+            let pos_extent = quad.extents[axis];
+            let neg_extent = quad.extents[opposite_direction];
+            if pos_extent == neg_extent {
+                points.push(bsp_interval_point(pos_extent, quad_index, 1));
+            } else {
+                points.push(bsp_interval_point(pos_extent, quad_index, 0));
+                points.push(bsp_interval_point(neg_extent, quad_index, 2));
+                only_interval_side = false;
+            }
+            aligned_facing_bitmap |= 1 << quad.facing;
+        }
+
+        if aligned_facing_bitmap & (1 << FACING_UNASSIGNED) == 0 {
+            let normal_count = aligned_facing_bitmap.count_ones();
+            if normal_count == 1
+                || (normal_count == 2 && bitmap_is_opposing_aligned(aligned_facing_bitmap))
+            {
+                return if only_interval_side {
+                    build_full_bsp_snr_leaf_from_points(workspace, &mut points)
+                } else {
+                    build_full_bsp_snr_leaf_from_quads(workspace, indexes)
+                };
+            }
+        }
+
+        points.sort_by(|a, b| {
+            a.distance_key
+                .cmp(&b.distance_key)
+                .then_with(|| a.point_type.cmp(&b.point_type))
+                .then_with(|| a.quad_index.cmp(&b.quad_index))
+        });
+
+        let mut distance = f32::NAN;
+        let mut before = Vec::new();
+        let mut on = Vec::new();
+        let mut has_before = false;
+        let mut has_on = false;
+        let mut thickness = 0i32;
+        let mut partitions = Vec::new();
+        let mut splitting_group = Vec::new();
+        let mut split_distance = f32::NAN;
+
+        for point in &points {
+            match point.point_type {
+                2 => {
+                    if thickness == 0 && (has_before || has_on) {
+                        partitions.push(BspBuildPartition {
+                            distance,
+                            before: take_if_present(&mut before, &mut has_before),
+                            on: take_if_present(&mut on, &mut has_on),
+                        });
+                        distance = f32::NAN;
+                    }
+                    thickness += 1;
+                    if has_on {
+                        if distance.is_nan() {
+                            return Err(ERR_INVALID_ARGUMENT);
+                        }
+                        partitions.push(BspBuildPartition {
+                            distance,
+                            before: take_if_present(&mut before, &mut has_before),
+                            on: take_if_present(&mut on, &mut has_on),
+                        });
+                        distance = f32::NAN;
+                    }
+                    before.push(point.quad_index);
+                    has_before = true;
+                }
+                0 => {
+                    thickness -= 1;
+                    if !has_on {
+                        distance = point.distance;
+                    }
+                }
+                1 => {
+                    if thickness == 0 {
+                        if !has_on {
+                            on.clear();
+                            has_on = true;
+                            distance = point.distance;
+                        } else if distance != point.distance {
+                            partitions.push(BspBuildPartition {
+                                distance,
+                                before: take_if_present(&mut before, &mut has_before),
+                                on: take_if_present(&mut on, &mut has_on),
+                            });
+                            distance = point.distance;
+                            on.clear();
+                            has_on = true;
+                        }
+                        on.push(point.quad_index);
+                    } else {
+                        before.push(point.quad_index);
+                        has_before = true;
+                        if workspace.can_split_quads() {
+                            if point.distance == split_distance || split_distance.is_nan() {
+                                splitting_group.push(point.quad_index);
+                            } else {
+                                flush_best_splitting_group(
+                                    &mut splitting_group,
+                                    &mut best_splitting_group,
+                                    axis,
+                                );
+                            }
+                            split_distance = point.distance;
+                        }
+                    }
+                }
+                _ => return Err(ERR_INVALID_ARGUMENT),
+            }
+        }
+
+        if workspace.can_split_quads() {
+            flush_best_splitting_group(&mut splitting_group, &mut best_splitting_group, axis);
+        }
+
+        if has_before && before.len() == indexes.len() {
+            continue;
+        }
+
+        let ends_with_plane = has_on;
+        if has_before || has_on {
+            partitions.push(BspBuildPartition {
+                distance: if ends_with_plane { distance } else { f32::NAN },
+                before: take_if_present(&mut before, &mut has_before),
+                on: take_if_present(&mut on, &mut has_on),
+            });
+        }
+
+        if partitions.len() <= 2 {
+            let outside = if partitions.len() == 2 {
+                Some(&partitions[1])
+            } else {
+                None
+            };
+            if outside.is_none() || !ends_with_plane {
+                return build_full_bsp_binary_from_partitions(
+                    workspace,
+                    depth,
+                    &partitions[0],
+                    outside,
+                    axis as i32,
+                );
+            }
+        }
+
+        return build_full_bsp_multi_partition(
+            workspace,
+            depth,
+            &partitions,
+            axis as i32,
+            ends_with_plane,
+        );
+    }
+
+    if workspace.can_split_quads() {
+        if let Some(node) = build_full_bsp_topo_multi_leaf(workspace, indexes, true)? {
+            return Ok(node);
+        }
+        return handle_full_unsortable_by_splitting(
+            workspace,
+            indexes,
+            depth,
+            best_splitting_group,
+        );
+    }
+
+    if let Some(node) = build_full_bsp_intersection_fallback(workspace, indexes, depth)? {
+        return Ok(node);
+    }
+    build_full_bsp_topo_multi_leaf(workspace, indexes, false)?.ok_or(SORT_FAILED)
+}
+
+fn flush_best_splitting_group(current: &mut Vec<i32>, best: &mut Vec<i32>, axis: usize) {
+    if current.len() > best.len() || (current.len() == best.len() && axis == 1) {
+        best.clear();
+        best.extend_from_slice(current);
+    }
+    current.clear();
+}
+
+fn build_full_bsp_binary_from_partitions(
+    workspace: &mut BspFullQuadWorkspace<'_>,
+    depth: i32,
+    inside: &BspBuildPartition,
+    outside: Option<&BspBuildPartition>,
+    axis: i32,
+) -> Result<i32, i32> {
+    workspace
+        .geometry_planes
+        .add_double_sided_aligned_plane(axis, inside.distance)?;
+    let inside_node = if inside.before.is_empty() {
+        -1
+    } else {
+        build_full_bsp_node(workspace, &inside.before, depth)?
+    };
+    let outside_node = if let Some(outside) = outside {
+        build_full_bsp_node(workspace, &outside.before, depth)?
+    } else {
+        -1
+    };
+    let mut on_plane = inside.on.clone();
+    on_plane.sort_unstable();
+    let normal = accurate_aligned_normal(axis);
+    add_bsp_node(
+        &mut workspace.tree,
+        BspNode::Binary {
+            remap: BspRemap::none(),
+            normal: [normal.0, normal.1, normal.2],
+            distance: inside.distance,
+            inside: inside_node,
+            outside: outside_node,
+            on_plane,
+        },
+    )
+}
+
+fn build_full_bsp_binary_from_parts(
+    workspace: &mut BspFullQuadWorkspace<'_>,
+    depth: i32,
+    inside: &[i32],
+    outside: &[i32],
+    on_plane: &[i32],
+    axis: i32,
+    normal: [f32; 3],
+    distance: f32,
+) -> Result<i32, i32> {
+    if axis < 0 {
+        workspace
+            .geometry_planes
+            .add_double_sided_unaligned_plane(normal, distance)?;
+    } else {
+        workspace
+            .geometry_planes
+            .add_double_sided_aligned_plane(axis, distance.abs())?;
+    }
+
+    let inside_node = if inside.is_empty() {
+        -1
+    } else {
+        build_full_bsp_node(workspace, inside, depth)?
+    };
+    let outside_node = if outside.is_empty() {
+        -1
+    } else {
+        build_full_bsp_node(workspace, outside, depth)?
+    };
+    let mut on_plane = on_plane.to_vec();
+    on_plane.sort_unstable();
+
+    add_bsp_node(
+        &mut workspace.tree,
+        BspNode::Binary {
+            remap: BspRemap::none(),
+            normal,
+            distance,
+            inside: inside_node,
+            outside: outside_node,
+            on_plane,
+        },
+    )
+}
+
+fn build_full_bsp_multi_partition(
+    workspace: &mut BspFullQuadWorkspace<'_>,
+    depth: i32,
+    partitions: &[BspBuildPartition],
+    axis: i32,
+    ends_with_plane: bool,
+) -> Result<i32, i32> {
+    let plane_count = if ends_with_plane {
+        partitions.len()
+    } else {
+        partitions.len().saturating_sub(1)
+    };
+    let mut plane_distances = Vec::with_capacity(plane_count);
+    let mut partition_nodes = vec![-1; plane_count + 1];
+    let mut on_plane_quads = Vec::with_capacity(plane_count);
+
+    for (index, partition) in partitions.iter().enumerate() {
+        if index < plane_count {
+            if partition.distance.is_nan() {
+                return Err(ERR_INVALID_ARGUMENT);
+            }
+            workspace
+                .geometry_planes
+                .add_double_sided_aligned_plane(axis, partition.distance)?;
+            plane_distances.push(partition.distance);
+            let mut on_plane = partition.on.clone();
+            on_plane.sort_unstable();
+            on_plane_quads.push(on_plane);
+        }
+        if !partition.before.is_empty() && index < partition_nodes.len() {
+            partition_nodes[index] = build_full_bsp_node(workspace, &partition.before, depth)?;
+        }
+    }
+
+    let normal = accurate_aligned_normal(axis);
+    add_bsp_node(
+        &mut workspace.tree,
+        BspNode::MultiPartition {
+            remap: BspRemap::none(),
+            normal: [normal.0, normal.1, normal.2],
+            plane_distances,
+            partitions: partition_nodes,
+            on_plane_quads,
+        },
+    )
+}
+
+fn build_full_bsp_snr_leaf_from_quads(
+    workspace: &mut BspFullQuadWorkspace<'_>,
+    indexes: &[i32],
+) -> Result<i32, i32> {
+    let mut sorted = indexes.to_vec();
+    sorted.sort_by_key(|index| {
+        workspace
+            .quad(*index)
+            .map(|quad| float_to_comparable_int(quad.accurate_dot_product))
+            .unwrap_or(i32::MAX)
+    });
+    add_bsp_node(&mut workspace.tree, BspNode::LeafMulti { quads: sorted })
+}
+
+fn build_full_bsp_snr_leaf_from_points(
+    workspace: &mut BspFullQuadWorkspace<'_>,
+    points: &mut [BspBuildIntervalPoint],
+) -> Result<i32, i32> {
+    points.sort_by(|a, b| {
+        a.distance_key
+            .cmp(&b.distance_key)
+            .then_with(|| a.point_type.cmp(&b.point_type))
+            .then_with(|| a.quad_index.cmp(&b.quad_index))
+    });
+
+    let mut sorted = vec![0; points.len()];
+    let mut forwards = 0usize;
+    let mut backwards = sorted.len();
+    for point in points {
+        let quad = workspace.quad(point.quad_index)?;
+        if facing_sign(quad.facing) == 1 {
+            sorted[forwards] = point.quad_index;
+            forwards += 1;
+        } else {
+            backwards -= 1;
+            sorted[backwards] = point.quad_index;
+        }
+    }
+    add_bsp_node(&mut workspace.tree, BspNode::LeafMulti { quads: sorted })
+}
+
+fn build_full_bsp_topo_multi_leaf(
+    workspace: &mut BspFullQuadWorkspace<'_>,
+    indexes: &[i32],
+    fail_on_intersection: bool,
+) -> Result<Option<i32>, i32> {
+    if indexes.len()
+        > STATIC_TOPO_SORT_ATTEMPT_LIMITS[STATIC_TOPO_SORT_ATTEMPT_LIMITS.len() - 1] as usize
+    {
+        return Ok(None);
+    }
+    let active = indexes
+        .iter()
+        .map(|index| workspace.quad(*index).cloned())
+        .collect::<Result<Vec<_>, _>>()?;
+    let Some(sorted_local) = topo_graph_sort(&active, fail_on_intersection) else {
+        return Ok(None);
+    };
+    let mut sorted = Vec::with_capacity(sorted_local.len());
+    for local in sorted_local {
+        let local = usize::try_from(local).map_err(|_| ERR_INVALID_ARGUMENT)?;
+        sorted.push(*indexes.get(local).ok_or(ERR_INVALID_ARGUMENT)?);
+    }
+    add_bsp_node(&mut workspace.tree, BspNode::LeafMulti { quads: sorted }).map(Some)
+}
+
+fn build_full_bsp_intersection_fallback(
+    workspace: &mut BspFullQuadWorkspace<'_>,
+    indexes: &[i32],
+    depth: i32,
+) -> Result<Option<i32>, i32> {
+    let primary_threshold = (indexes.len() / 2).clamp(2, 4);
+    let mut counts = vec![0usize; indexes.len()];
+    let mut primary = vec![false; indexes.len()];
+
+    for a in 0..indexes.len() {
+        for b in (a + 1)..indexes.len() {
+            if extents_intersect(
+                &workspace.quad(indexes[a])?.extents,
+                &workspace.quad(indexes[b])?.extents,
+            ) {
+                counts[a] += 1;
+                counts[b] += 1;
+                if counts[a] >= primary_threshold {
+                    primary[a] = true;
+                }
+                if counts[b] >= primary_threshold {
+                    primary[b] = true;
+                }
+            }
+        }
+    }
+
+    let primary_count = primary.iter().filter(|value| **value).count();
+    if primary_count == 0 {
+        return Ok(None);
+    }
+    if primary_count == indexes.len() {
+        let mut sorted = indexes.to_vec();
+        sorted.sort_unstable();
+        return add_bsp_node(&mut workspace.tree, BspNode::LeafMulti { quads: sorted }).map(Some);
+    }
+
+    let mut non_primary = Vec::with_capacity(indexes.len() - primary_count);
+    let mut primary_indexes = Vec::with_capacity(primary_count);
+    for (local, &index) in indexes.iter().enumerate() {
+        if primary[local] {
+            primary_indexes.push(index);
+        } else {
+            non_primary.push(index);
+        }
+    }
+    let first = build_full_bsp_node(workspace, &non_primary, depth)?;
+    let second = build_full_bsp_node(workspace, &primary_indexes, depth)?;
+    add_bsp_node(
+        &mut workspace.tree,
+        BspNode::FixedDouble {
+            remap: BspRemap::none(),
+            first,
+            second,
+        },
+    )
+    .map(Some)
+}
+
+fn handle_full_unsortable_by_splitting(
+    workspace: &mut BspFullQuadWorkspace<'_>,
+    indexes: &[i32],
+    depth: i32,
+    mut splitting_group: Vec<i32>,
+) -> Result<i32, i32> {
+    if splitting_group.is_empty() {
+        let representative = *indexes.first().ok_or(ERR_INVALID_ARGUMENT)?;
+        splitting_group.push(representative);
+    }
+    let representative_index = splitting_group[0];
+    let representative = unsafe { workspace.full_quad_mut(representative_index)? };
+    let representative_facing = representative.info.facing;
+    let split_plane = full_quad_very_accurate_normal(representative);
+    let split_distance = representative.info.accurate_dot_product;
+    let initial_splitting_group_size = splitting_group.len();
+
+    let mut inside = Vec::new();
+    let mut outside = Vec::new();
+
+    for &candidate_index in indexes {
+        if splitting_group[..initial_splitting_group_size].contains(&candidate_index) {
+            continue;
+        }
+
+        let candidate = unsafe { workspace.full_quad_mut(candidate_index)? };
+        let candidate_facing = candidate.info.facing;
+        let same_split_plane = candidate_facing == representative_facing
+            && candidate.info.accurate_dot_product == split_distance
+            && (representative_facing != FACING_UNASSIGNED
+                || full_quad_very_accurate_normal(candidate) == split_plane);
+        if same_split_plane {
+            splitting_group.push(candidate_index);
+            continue;
+        }
+
+        split_full_candidate(
+            workspace,
+            &mut splitting_group,
+            candidate_index,
+            split_plane,
+            split_distance,
+            &mut outside,
+            &mut inside,
+        )?;
+    }
+
+    let (facing, normal, distance) = if workspace.quantize_trigger_normals {
+        let representative = unsafe { workspace.full_quad_mut(representative_index)? };
+        quantized_full_quad_plane(representative)
+    } else {
+        (representative_facing, split_plane, split_distance)
+    };
+    let axis = if is_aligned(facing) { facing % 3 } else { -1 };
+
+    build_full_bsp_binary_from_parts(
+        workspace,
+        depth,
+        &inside,
+        &outside,
+        &splitting_group,
+        axis,
+        normal,
+        distance,
+    )
+}
+
+fn split_full_candidate(
+    workspace: &mut BspFullQuadWorkspace<'_>,
+    splitting_group: &mut Vec<i32>,
+    candidate_index: i32,
+    split_plane: [f32; 3],
+    split_distance: f32,
+    outside: &mut Vec<i32>,
+    inside: &mut Vec<i32>,
+) -> Result<(), i32> {
+    let handle = workspace.handle(candidate_index)?;
+    let source = unsafe { &*(handle as *const NativeFullTQuad) };
+    let unique_vertex_map = (!source.same_vertex_map) & 0b1111;
+    let unique_vertices = unique_vertex_map.count_ones();
+    if unique_vertices < 3 {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    let (inside_map_unmasked, on_plane_map_unmasked) =
+        full_quad_classify(source, tuple3(split_plane), split_distance);
+    let mut inside_map = inside_map_unmasked & unique_vertex_map;
+    let on_plane_map = on_plane_map_unmasked & unique_vertex_map;
+
+    if on_plane_map == unique_vertex_map {
+        splitting_group.push(candidate_index);
+        return Ok(());
+    }
+    if inside_map == 0 {
+        outside.push(candidate_index);
+        return Ok(());
+    }
+    if (inside_map | on_plane_map) == unique_vertex_map {
+        inside.push(candidate_index);
+        return Ok(());
+    }
+
+    let on_plane_count = on_plane_map.count_ones();
+    let mut inside_count = inside_map.count_ones();
+    if !workspace.can_split_quads() {
+        let outside_count = 4 - inside_count - on_plane_count;
+        if on_plane_count >= inside_count && on_plane_count >= outside_count {
+            splitting_group.push(candidate_index);
+        } else if inside_count >= outside_count {
+            inside.push(candidate_index);
+        } else {
+            outside.push(candidate_index);
+        }
+        return Ok(());
+    }
+
+    let mut outside_quad = Box::new(source.clone());
+    let mut second_outside_quad: Option<Box<NativeFullTQuad>> = None;
+    let mut second_inside_quad: Option<Box<NativeFullTQuad>> = None;
+
+    if unique_vertices == 3 {
+        let same_vertex_map = source.same_vertex_map;
+        if on_plane_count == 1 {
+            let mut duplicate_index = -1;
+            let mut duplicate_is_inside = false;
+            if (on_plane_map_unmasked & same_vertex_map) == 0 {
+                duplicate_is_inside = (same_vertex_map & inside_map_unmasked) != 0;
+                duplicate_index = same_vertex_map.trailing_zeros() as i32;
+            }
+
+            let inside_index = inside_map.trailing_zeros() as usize;
+            let outside_index =
+                (!(inside_map | on_plane_map) & unique_vertex_map).trailing_zeros() as usize;
+            let inside_quad = unsafe { &mut *(handle as *mut NativeFullTQuad) };
+            full_quad_split_triangle_vertex(
+                inside_index,
+                outside_index,
+                duplicate_index,
+                duplicate_is_inside,
+                inside_quad,
+                &mut outside_quad,
+                tuple3(split_plane),
+                split_distance,
+            )?;
+        } else if inside_map_unmasked.count_ones() == 2 {
+            let inside_quad = unsafe { &mut *(handle as *mut NativeFullTQuad) };
+            full_quad_split_even(
+                inside_map_unmasked,
+                inside_quad,
+                &mut outside_quad,
+                tuple3(split_plane),
+                split_distance,
+            )?;
+        } else if inside_count == 1 {
+            let corner_index = inside_map.trailing_zeros() as usize;
+            let inside_quad = unsafe { &mut *(handle as *mut NativeFullTQuad) };
+            full_quad_split_triangle_corner(
+                corner_index,
+                inside_quad,
+                &mut outside_quad,
+                tuple3(split_plane),
+                split_distance,
+            )?;
+        } else {
+            let corner_index = (!inside_map_unmasked).trailing_zeros() as usize;
+            let inside_quad = unsafe { &mut *(handle as *mut NativeFullTQuad) };
+            full_quad_split_triangle_corner(
+                corner_index,
+                &mut outside_quad,
+                inside_quad,
+                tuple3(split_plane),
+                split_distance,
+            )?;
+        }
+    } else {
+        if on_plane_count == 2 {
+            if on_plane_map == 0b0101 {
+                inside_map |= 0b0001;
+            } else {
+                inside_map |= 0b0010;
+            }
+            inside_count = 2;
+        } else if on_plane_count == 1 && inside_count == 1 {
+            inside_map |= on_plane_map;
+            inside_count = 2;
+        }
+
+        if inside_count == 2 {
+            let inside_quad = unsafe { &mut *(handle as *mut NativeFullTQuad) };
+            full_quad_split_even(
+                inside_map,
+                inside_quad,
+                &mut outside_quad,
+                tuple3(split_plane),
+                split_distance,
+            )?;
+        } else if inside_count == 3 {
+            let corner_index = (!inside_map & 0b1111).trailing_zeros() as usize;
+            let mut extra_inside = Box::new(source.clone());
+            let inside_quad = unsafe { &mut *(handle as *mut NativeFullTQuad) };
+            full_quad_split_odd(
+                corner_index,
+                &mut outside_quad,
+                &mut extra_inside,
+                inside_quad,
+                tuple3(split_plane),
+                split_distance,
+            )?;
+            second_inside_quad = Some(extra_inside);
+        } else {
+            let corner_index = inside_map.trailing_zeros() as usize;
+            let mut extra_outside = Box::new(source.clone());
+            let inside_quad = unsafe { &mut *(handle as *mut NativeFullTQuad) };
+            full_quad_split_odd(
+                corner_index,
+                inside_quad,
+                &mut extra_outside,
+                &mut outside_quad,
+                tuple3(split_plane),
+                split_distance,
+            )?;
+            second_outside_quad = Some(extra_outside);
+        }
+    }
+
+    if let Some(index) = workspace.update_full_quad(candidate_index)? {
+        inside.push(index);
+    }
+    if let Some(index) = workspace.push_full_quad(outside_quad)? {
+        outside.push(index);
+    }
+    if let Some(quad) = second_inside_quad {
+        if let Some(index) = workspace.push_full_quad(quad)? {
+            inside.push(index);
+        }
+    }
+    if let Some(quad) = second_outside_quad {
+        if let Some(index) = workspace.push_full_quad(quad)? {
+            outside.push(index);
+        }
+    }
+
+    Ok(())
+}
+
+fn quantized_full_quad_plane(quad: &NativeFullTQuad) -> (i32, [f32; 3], f32) {
+    if is_aligned(quad.info.facing) {
+        let normal = accurate_aligned_normal(quad.info.facing);
+        return (
+            quad.info.facing,
+            [normal.0, normal.1, normal.2],
+            quad.info.accurate_dot_product,
+        );
+    }
+
+    let normal_tuple = quantize_normal(unpack_normal(quad.info.packed_normal));
+    let facing = aligned_facing_from_normal(normal_tuple).unwrap_or(FACING_UNASSIGNED);
+    let distance = if is_aligned(facing) {
+        quad.info.extents[facing as usize] * facing_sign(facing) as f32
+    } else {
+        dot(
+            normal_tuple,
+            quad.info.center.0,
+            quad.info.center.1,
+            quad.info.center.2,
+        )
+    };
+    (
+        facing,
+        [normal_tuple.0, normal_tuple.1, normal_tuple.2],
+        distance,
+    )
+}
+
+fn tuple3(value: [f32; 3]) -> (f32, f32, f32) {
+    (value[0], value[1], value[2])
+}
+
+impl BspFullQuadWorkspace<'_> {
+    fn can_split_quads(&self) -> bool {
+        self.index_quad_count < self.max_quad_count
+    }
+
+    fn quad(&self, index: i32) -> Result<&QuadInfo, i32> {
+        quad_at(&self.quads, index)
+    }
+
+    fn handle(&self, index: i32) -> Result<u64, i32> {
+        if index < 0 {
+            return Err(ERR_INVALID_ARGUMENT);
+        }
+        self.handles
+            .get(index as usize)
+            .copied()
+            .ok_or(ERR_INVALID_ARGUMENT)
+    }
+
+    unsafe fn full_quad_mut(&self, index: i32) -> Result<&mut NativeFullTQuad, i32> {
+        let handle = self.handle(index)?;
+        if handle == 0 {
+            return Err(ERR_NULL_POINTER);
+        }
+        Ok(&mut *(handle as *mut NativeFullTQuad))
+    }
+
+    fn mark_updated(&mut self, handle: u64) -> Result<(), i32> {
+        if handle == 0 {
+            return Err(ERR_NULL_POINTER);
+        }
+        let quad = unsafe { &mut *(handle as *mut NativeFullTQuad) };
+        if !quad.has_updated_vertices {
+            quad.has_updated_vertices = true;
+            self.updated_quad_handles.push(handle);
+        }
+        Ok(())
+    }
+
+    fn update_full_quad(&mut self, index: i32) -> Result<Option<i32>, i32> {
+        let handle = self.handle(index)?;
+        let quad = unsafe { &mut *(handle as *mut NativeFullTQuad) };
+        if full_quad_is_invalid(quad) {
+            quad.write_to_index = -1;
+            self.mark_updated(handle)?;
+            self.index_quad_count = self.index_quad_count.saturating_sub(1);
+            return Ok(None);
+        }
+
+        quad.write_to_index = index;
+        let index_usize = index as usize;
+        self.quads[index_usize] = quad.info.clone();
+        self.mark_updated(handle)?;
+        Ok(Some(index))
+    }
+
+    fn push_full_quad(&mut self, mut quad: Box<NativeFullTQuad>) -> Result<Option<i32>, i32> {
+        if full_quad_is_invalid(&quad) {
+            return Ok(None);
+        }
+
+        let index = i32::try_from(self.handles.len()).map_err(|_| ERR_CAPACITY)?;
+        quad.write_to_index = index;
+        let handle = (&mut *quad) as *mut NativeFullTQuad as u64;
+        self.quads.push(quad.info.clone());
+        self.handles.push(handle);
+        self.owned_split_quads.push(quad);
+        self.mesh_quad_count += 1;
+        self.index_quad_count += 1;
+        self.mark_updated(handle)?;
+        Ok(Some(index))
+    }
+}
+
+fn full_quad_is_invalid(quad: &NativeFullTQuad) -> bool {
+    quad.same_vertex_map.count_ones() > 1
 }
 
 fn add_bsp_node(tree: &mut NativeBspTree, node: BspNode) -> Result<i32, i32> {
@@ -3885,6 +5457,148 @@ pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_build_result_write_index_
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_build_records(
+    records: *const TranslucentTopoQuadRecord,
+    record_count: i32,
+    result_handle: u64,
+    old_root_handle: u64,
+    prepare_node_reuse: i32,
+    output_tree_handle: *mut u64,
+    output_index_quad_count: *mut i32,
+    output_reusable_root_handle: *mut u64,
+) -> i32 {
+    if record_count < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if result_handle == 0
+        || output_tree_handle.is_null()
+        || output_index_quad_count.is_null()
+        || output_reusable_root_handle.is_null()
+    {
+        return ERR_NULL_POINTER;
+    }
+    if record_count > 0 && records.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let records = if record_count == 0 {
+        &[]
+    } else {
+        slice::from_raw_parts(records, record_count as usize)
+    };
+    let result = &mut *(result_handle as *mut NativeBspBuildResult);
+    let Some(geometry_planes) = result.geometry_planes.as_mut() else {
+        return ERR_INVALID_ARGUMENT;
+    };
+
+    let output = match build_bsp_tree_from_topo_records_with_reuse(
+        records,
+        geometry_planes,
+        old_root_handle,
+        prepare_node_reuse != 0,
+    ) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+
+    *output_index_quad_count = output.tree.index_quad_count as i32;
+    *output_reusable_root_handle = output
+        .reusable_root
+        .map(|root| Box::into_raw(root) as u64)
+        .unwrap_or(0);
+    *output_tree_handle = Box::into_raw(Box::new(output.tree)) as u64;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_build_full_quads(
+    quad_handles: *const u64,
+    quad_count: i32,
+    result_handle: u64,
+    max_quad_count: i32,
+    quantize_trigger_normals: i32,
+    old_root_handle: u64,
+    prepare_node_reuse: i32,
+    output_tree_handle: *mut u64,
+    output_index_quad_count: *mut i32,
+    output_updated_quads_handle: *mut u64,
+    output_reusable_root_handle: *mut u64,
+) -> i32 {
+    if quad_count < 0 || max_quad_count < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if result_handle == 0
+        || output_tree_handle.is_null()
+        || output_index_quad_count.is_null()
+        || output_updated_quads_handle.is_null()
+        || output_reusable_root_handle.is_null()
+    {
+        return ERR_NULL_POINTER;
+    }
+    if quad_count > 0 && quad_handles.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let handles = if quad_count == 0 {
+        &[]
+    } else {
+        slice::from_raw_parts(quad_handles, quad_count as usize)
+    };
+    let result = &mut *(result_handle as *mut NativeBspBuildResult);
+    let Some(geometry_planes) = result.geometry_planes.as_mut() else {
+        return ERR_INVALID_ARGUMENT;
+    };
+
+    let output = match build_bsp_tree_from_full_quad_handles_with_reuse(
+        handles,
+        geometry_planes,
+        max_quad_count as usize,
+        quantize_trigger_normals != 0,
+        old_root_handle,
+        prepare_node_reuse != 0,
+    ) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+
+    let updated_quads_handle = if output.updated_quad_handles.is_empty() {
+        0
+    } else {
+        vertex::updated_quads_create_from_handles(
+            output.updated_quad_handles,
+            match i32::try_from(output.mesh_quad_count) {
+                Ok(value) => value,
+                Err(_) => return ERR_CAPACITY,
+            },
+            match i32::try_from(output.index_quad_count) {
+                Ok(value) => value,
+                Err(_) => return ERR_CAPACITY,
+            },
+        )
+    };
+
+    result.owned_split_quads.extend(output.owned_split_quads);
+    *output_index_quad_count = output.tree.index_quad_count as i32;
+    *output_updated_quads_handle = updated_quads_handle;
+    *output_reusable_root_handle = output
+        .reusable_root
+        .map(|root| Box::into_raw(root) as u64)
+        .unwrap_or(0);
+    *output_tree_handle = Box::into_raw(Box::new(output.tree)) as u64;
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_reusable_root_destroy(handle: u64) -> i32 {
+    if handle == 0 {
+        return OK;
+    }
+
+    drop(Box::from_raw(handle as *mut NativeBspReusableRoot));
+    OK
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_tree_create(output_handle: *mut u64) -> i32 {
     if output_handle.is_null() {
         return ERR_NULL_POINTER;
@@ -4277,6 +5991,48 @@ mod tests {
         }
     }
 
+    fn full_quad_xy() -> NativeFullQuadBuffer {
+        let mut buffer = NativeFullQuadBuffer::default();
+        buffer.vertices[0] = NativeFullQuadVertex {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            color: -1,
+            ao: 1.0,
+            light: 0x00f000f0,
+            ..NativeFullQuadVertex::default()
+        };
+        buffer.vertices[1] = NativeFullQuadVertex {
+            x: 1.0,
+            y: 0.0,
+            z: 0.0,
+            color: -1,
+            ao: 1.0,
+            light: 0x00f000f0,
+            ..NativeFullQuadVertex::default()
+        };
+        buffer.vertices[2] = NativeFullQuadVertex {
+            x: 1.0,
+            y: 1.0,
+            z: 0.0,
+            color: -1,
+            ao: 1.0,
+            light: 0x00f000f0,
+            ..NativeFullQuadVertex::default()
+        };
+        buffer.vertices[3] = NativeFullQuadVertex {
+            x: 0.0,
+            y: 1.0,
+            z: 0.0,
+            color: -1,
+            ao: 1.0,
+            light: 0x00f000f0,
+            ..NativeFullQuadVertex::default()
+        };
+        buffer.material_bits = 1;
+        buffer
+    }
+
     #[test]
     fn record_layout_matches_java_stride() {
         assert_eq!(56, std::mem::size_of::<TranslucentQuadRecord>());
@@ -4344,6 +6100,58 @@ mod tests {
         let quad_b = build_topo_quad_info(&topo_record(FACING_NEG_Z, 0.0)).unwrap();
 
         assert!(bsp_double_leaf_possible(&quad_a, &quad_b, false));
+    }
+
+    #[test]
+    fn full_quad_bsp_split_tracks_generated_quad_ownership_and_updates() {
+        let mut source = Box::new(
+            create_full_quad(
+                &full_quad_xy(),
+                FACING_POS_Z,
+                packed_aligned_normal(FACING_POS_Z),
+            )
+            .unwrap(),
+        );
+        let source_handle = (&mut *source) as *mut NativeFullTQuad as u64;
+        let mut planes = NativeGeometryPlanes::new();
+        let mut workspace = BspFullQuadWorkspace {
+            tree: create_bsp_tree(),
+            geometry_planes: &mut planes,
+            quads: vec![source.info.clone()],
+            handles: vec![source_handle],
+            owned_split_quads: Vec::new(),
+            updated_quad_handles: Vec::new(),
+            mesh_quad_count: 1,
+            index_quad_count: 1,
+            max_quad_count: 4,
+            quantize_trigger_normals: false,
+        };
+        let mut splitting_group = Vec::new();
+        let mut outside = Vec::new();
+        let mut inside = Vec::new();
+
+        split_full_candidate(
+            &mut workspace,
+            &mut splitting_group,
+            0,
+            [1.0, 0.0, 0.0],
+            0.5,
+            &mut outside,
+            &mut inside,
+        )
+        .unwrap();
+
+        assert!(splitting_group.is_empty());
+        assert_eq!(vec![0], inside);
+        assert_eq!(vec![1], outside);
+        assert_eq!(2, workspace.mesh_quad_count);
+        assert_eq!(2, workspace.index_quad_count);
+        assert_eq!(1, workspace.owned_split_quads.len());
+        assert_eq!(2, workspace.updated_quad_handles.len());
+        assert_eq!(0, source.write_to_index);
+        assert!(source.has_updated_vertices);
+        assert_eq!(1, workspace.owned_split_quads[0].write_to_index);
+        assert!(workspace.owned_split_quads[0].has_updated_vertices);
     }
 
     #[test]
@@ -4471,5 +6279,72 @@ mod tests {
             vec![12, 13, 14, 14, 15, 12, 16, 17, 18, 18, 19, 16, 20, 21, 22, 22, 23, 20],
             output
         );
+    }
+
+    #[test]
+    fn reusable_bsp_root_applies_fixed_offset_remap_natively() {
+        let base_records = (0..32)
+            .map(|index| vertex_record(FACING_POS_Z, index as f32))
+            .collect::<Vec<_>>();
+        let base_quads = base_records.iter().map(build_quad_info).collect::<Vec<_>>();
+        let mut shifted_quads = Vec::with_capacity(base_quads.len() + 1);
+        shifted_quads.push(base_quads[0].clone());
+        shifted_quads.extend(base_quads.iter().cloned());
+        let indexes = (1..=32).collect::<Vec<_>>();
+
+        let mut old_tree = create_bsp_tree();
+        let first = add_bsp_node(
+            &mut old_tree,
+            BspNode::LeafMulti {
+                quads: (0..16).collect(),
+            },
+        )
+        .unwrap();
+        let second = add_bsp_node(
+            &mut old_tree,
+            BspNode::LeafMulti {
+                quads: (16..32).collect(),
+            },
+        )
+        .unwrap();
+        let root = add_bsp_node(
+            &mut old_tree,
+            BspNode::FixedDouble {
+                remap: BspRemap::none(),
+                first,
+                second,
+            },
+        )
+        .unwrap();
+        old_tree.root = root;
+        old_tree.index_quad_count = 32;
+        let old_root = Box::new(NativeBspReusableRoot {
+            tree: old_tree,
+            geometry_planes: NativeGeometryPlanes::new(),
+            reuse_data: prepare_bsp_reuse_data(&base_quads, &(0..32).collect::<Vec<_>>()).unwrap(),
+        });
+        let old_root_handle = Box::into_raw(old_root) as u64;
+        let mut geometry_planes = NativeGeometryPlanes::new();
+
+        let output = try_reuse_bsp_root(
+            &shifted_quads,
+            &indexes,
+            old_root_handle,
+            &mut geometry_planes,
+        )
+        .unwrap()
+        .unwrap();
+        let mut index_buffer = vec![0; 32 * 6];
+
+        assert_eq!(
+            OK,
+            write_bsp_tree_index_buffer(&output.tree, &mut index_buffer, 0.0, 0.0, 0.0)
+        );
+        assert_eq!(&[4, 5, 6, 6, 7, 4], &index_buffer[0..6]);
+        assert_eq!(&[128, 129, 130, 130, 131, 128], &index_buffer[186..192]);
+
+        unsafe {
+            drop(Box::from_raw(old_root_handle as *mut NativeBspReusableRoot));
+        }
     }
 }

@@ -68,6 +68,24 @@ public final class NativeUpdatedQuads implements AutoCloseable {
     private final ArrayList<NativeFullTQuad> keepAlive = new ArrayList<>();
 
     public NativeUpdatedQuads() {
+        this(createNativeHandle());
+    }
+
+    private NativeUpdatedQuads(long handle) {
+        if (handle == 0) {
+            throw new IllegalArgumentException("Native updated quad handle must not be null");
+        }
+        this.state = new State(handle);
+        this.cleanable = CLEANER.register(this, this.state);
+    }
+
+    static NativeUpdatedQuads fromHandle(long handle, NativeFullTQuad[] keepAlive) {
+        NativeUpdatedQuads updatedQuads = new NativeUpdatedQuads(handle);
+        updatedQuads.keepAlive.addAll(java.util.Arrays.asList(keepAlive));
+        return updatedQuads;
+    }
+
+    private static long createNativeHandle() {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment handleSegment = arena.allocate(ValueLayout.JAVA_LONG);
             check(invokeCreate(handleSegment), "native updated quad list creation");
@@ -75,8 +93,7 @@ public final class NativeUpdatedQuads implements AutoCloseable {
             if (handle == 0) {
                 throw new IllegalStateException("Native updated quad list creation returned a null handle");
             }
-            this.state = new State(handle);
-            this.cleanable = CLEANER.register(this, this.state);
+            return handle;
         }
     }
 

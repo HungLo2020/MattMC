@@ -69,6 +69,18 @@ struct NativeUpdatedQuads {
     index_quad_count: i32,
 }
 
+pub(crate) fn updated_quads_create_from_handles(
+    quads: Vec<u64>,
+    mesh_quad_count: i32,
+    index_quad_count: i32,
+) -> u64 {
+    Box::into_raw(Box::new(NativeUpdatedQuads {
+        quads,
+        mesh_quad_count,
+        index_quad_count,
+    })) as u64
+}
+
 #[derive(Clone, Copy)]
 struct NativeFormat {
     vertex_stride: usize,

@@ -222,17 +222,14 @@ class NativeTranslucentGeometryAnalyzerTest {
 
         String nativeFullQuad = Files.readString(Path.of(
                 "src/main/java/net/sodium/client/render/chunk/translucent_sorting/quad/NativeFullTQuad.java"));
-        String bspPartition = Files.readString(Path.of(
-                "src/main/java/net/sodium/client/render/chunk/translucent_sorting/bsp_tree/InnerPartitionBSPNode.java"));
         String rustTranslucent = Files.readString(Path.of(
                 "src/main/rust/net/sodium/client/render/chunk/translucent.rs"));
 
         assertTrue(nativeFullQuad.contains("mattmc_sodium_translucent_full_quad_split_even"));
         assertTrue(nativeFullQuad.contains("mattmc_sodium_translucent_full_quad_split_triangle_vertex"));
-        assertFalse(bspPartition.contains("interpolateAttributes("));
-        assertFalse(bspPartition.contains("ColorMixer.mix("));
         assertTrue(rustTranslucent.contains("fn full_quad_split_even("));
         assertTrue(rustTranslucent.contains("fn interpolate_full_quad_attributes("));
+        assertTrue(rustTranslucent.contains("fn mix_color("));
     }
 
     @Test
