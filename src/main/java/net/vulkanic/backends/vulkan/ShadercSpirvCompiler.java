@@ -416,6 +416,7 @@ final class ShadercSpirvCompiler implements SpirvCompiler {
         int texture2D = indexOfFunctionCall(shaderSource, "texture2D", start);
         int textureLod = indexOfFunctionCall(shaderSource, "textureLod", start);
         int texelFetch = indexOfFunctionCall(shaderSource, "texelFetch", start);
+        int shadow2D = indexOfFunctionCall(shaderSource, "shadow2D", start);
         int next = -1;
         if (texture >= 0) {
             next = texture;
@@ -428,6 +429,9 @@ final class ShadercSpirvCompiler implements SpirvCompiler {
         }
         if (texelFetch >= 0 && (next < 0 || texelFetch < next)) {
             next = texelFetch;
+        }
+        if (shadow2D >= 0 && (next < 0 || shadow2D < next)) {
+            next = shadow2D;
         }
         return next;
     }
@@ -565,6 +569,7 @@ final class ShadercSpirvCompiler implements SpirvCompiler {
         countTextureFunctionCalls(shaderSource, "texture", false, stats);
         countTextureFunctionCalls(shaderSource, "texture2D", false, stats);
         countTextureFunctionCalls(shaderSource, "textureLod", false, stats);
+        countTextureFunctionCalls(shaderSource, "shadow2D", false, stats);
         countTextureFunctionCalls(shaderSource, "texelFetch", true, stats);
         return stats;
     }

@@ -404,11 +404,12 @@ public class VulkanBackendSpirvPathTest {
             + "float shadow0 = texture(shadowtex0, shadowPosition).x;"
             + "float shadow1 = texture2D(shadowtex1, vec3(shadowPosition.st, shadowPosition.z)).x;"
             + "float shadow2 = textureLod(shadow, shadowPosition, 0).x;"
+            + "float shadowLegacy = shadow2D(shadowtex1, shadowPosition).z;"
             + "float shadow3 = texelFetch(shadowtex0, shadowPixel, 0).x;"
             + "float shadowColor = texture(shadowcolor0, shadowPosition.xy).r;"
             + "float shadowColorTexel = texelFetch(shadowcolor1, shadowPixel, 0).r;"
             + "float noise = texture(noisetex, shadowPosition.xy).r;"
-            + "fragColor = vec4(shadow0 + shadow1 + shadow2 + shadow3 + shadowColor + shadowColorTexel + noise);"
+            + "fragColor = vec4(shadow0 + shadow1 + shadow2 + shadowLegacy + shadow3 + shadowColor + shadowColorTexel + noise);"
             + "}";
 
         String normalized = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
@@ -416,6 +417,7 @@ public class VulkanBackendSpirvPathTest {
         assertTrue(normalized.contains("texture(shadowtex0, vec3((shadowPosition).x, 1.0f - (shadowPosition).y, (shadowPosition).z)).x"));
         assertTrue(normalized.contains("texture2D(shadowtex1, vec3((vec3(shadowPosition.st, shadowPosition.z)).x, 1.0f - (vec3(shadowPosition.st, shadowPosition.z)).y, (vec3(shadowPosition.st, shadowPosition.z)).z)).x"));
         assertTrue(normalized.contains("textureLod(shadow, vec3((shadowPosition).x, 1.0f - (shadowPosition).y, (shadowPosition).z), 0).x"));
+        assertTrue(normalized.contains("shadow2D(shadowtex1, vec3((shadowPosition).x, 1.0f - (shadowPosition).y, (shadowPosition).z)).z"));
         assertTrue(normalized.contains("vec4 vulkanicOpenGlShadowDepthTexelFetch(vec4 depthSample)"));
         assertTrue(normalized.contains("vulkanicOpenGlShadowDepthTexelFetch(texelFetch(shadowtex0, ivec2((shadowPixel).x, textureSize(shadowtex0, 0).y - 1 - (shadowPixel).y), 0)).x"));
         assertTrue(normalized.contains("texture(shadowcolor0, vec2((shadowPosition.xy).x, 1.0f - (shadowPosition.xy).y)).r"));
@@ -423,6 +425,7 @@ public class VulkanBackendSpirvPathTest {
         assertTrue(normalized.contains("texture(noisetex, shadowPosition.xy).r"));
         assertFalse(normalized.contains("texture(shadowtex0, shadowPosition).x"));
         assertFalse(normalized.contains("texture2D(shadowtex1, vec3(shadowPosition.st, shadowPosition.z)).x"));
+        assertFalse(normalized.contains("shadow2D(shadowtex1, shadowPosition).z"));
         assertFalse(normalized.contains("texelFetch(shadowtex0, shadowPixel, 0).x"));
         assertFalse(normalized.contains("texelFetch(shadowcolor1, shadowPixel, 0).r"));
     }
