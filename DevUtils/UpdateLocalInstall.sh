@@ -4,6 +4,7 @@
 # Builds a fresh jar and Rust native library, then copies them into:
 #   /home/matt/Games/MattMC/lib/
 #   /home/matt/Games/MattMC/natives/
+# Only the native library produced for the current platform is overwritten.
 # It also refreshes launcher/helper scripts from packaging/.
 
 set -e
@@ -33,6 +34,51 @@ SERVER_DIR="$INSTALL_ROOT/server"
 PACKAGING_DIR="$PROJECT_ROOT/packaging"
 BUILT_NATIVES_DIR="$PROJECT_ROOT/build/rust/native"
 
+resolve_rust_native_file_name() {
+	local os_name
+	local arch_name
+	local os_part
+	local arch_part
+	local extension
+
+	os_name="$(uname -s | tr '[:upper:]' '[:lower:]')"
+	arch_name="$(uname -m | tr '[:upper:]' '[:lower:]')"
+
+	case "$os_name" in
+		linux*)
+			os_part="linux"
+			extension="so"
+			;;
+		darwin*)
+			os_part="mac"
+			extension="dylib"
+			;;
+		mingw*|msys*|cygwin*)
+			os_part="win"
+			extension="dll"
+			;;
+		*)
+			echo "ERROR: Unsupported OS for Rust native library: $(uname -s)" >&2
+			exit 1
+			;;
+	esac
+
+	case "$arch_name" in
+		x86_64|amd64)
+			arch_part="x64"
+			;;
+		aarch64|arm64)
+			arch_part="aarch64"
+			;;
+		*)
+			echo "ERROR: Unsupported architecture for Rust native library: $(uname -m)" >&2
+			exit 1
+			;;
+	esac
+
+	printf 'mattmc_rust-%s-%s.%s\n' "$os_part" "$arch_part" "$extension"
+}
+
 echo "========================================="
 echo "  MattMC Local Install Update"
 echo "========================================="
@@ -59,22 +105,21 @@ echo "[4/6] Copying jar to $LIB_DIR..."
 cp -f "$JAR_FILE" "$LIB_DIR/"
 
 echo "[5/6] Refreshing Rust natives in $NATIVES_DIR..."
-find "$NATIVES_DIR" -maxdepth 1 -type f \( -name '*.so' -o -name '*.dll' -o -name '*.dylib' \) -delete
 if [ ! -d "$BUILT_NATIVES_DIR" ]; then
 	echo "ERROR: Rust native output directory does not exist: $BUILT_NATIVES_DIR"
 	exit 1
 fi
 
-NATIVE_COUNT=0
-while IFS= read -r native_file; do
-	cp -f "$native_file" "$NATIVES_DIR/"
-	NATIVE_COUNT=$((NATIVE_COUNT + 1))
-done < <(find "$BUILT_NATIVES_DIR" -maxdepth 1 -type f \( -name '*.so' -o -name '*.dll' -o -name '*.dylib' \) | sort)
+RUST_NATIVE_FILE_NAME="$(resolve_rust_native_file_name)"
+BUILT_NATIVE_FILE="$BUILT_NATIVES_DIR/$RUST_NATIVE_FILE_NAME"
 
-if [ "$NATIVE_COUNT" -eq 0 ]; then
-	echo "ERROR: No Rust native libraries found in $BUILT_NATIVES_DIR"
+if [ ! -f "$BUILT_NATIVE_FILE" ]; then
+	echo "ERROR: Expected Rust native library was not produced: $BUILT_NATIVE_FILE"
 	exit 1
 fi
+
+cp -f "$BUILT_NATIVE_FILE" "$NATIVES_DIR/$RUST_NATIVE_FILE_NAME"
+echo "    Updated: $NATIVES_DIR/$RUST_NATIVE_FILE_NAME"
 
 VERSION="$(./gradlew properties -q --no-daemon | awk '/^version:/ {print $2; exit}')"
 if [ -z "$VERSION" ]; then
