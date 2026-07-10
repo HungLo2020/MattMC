@@ -2,6 +2,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 const RUST_ROOT: &str = env!("CARGO_MANIFEST_DIR");
+const ASH_TOKEN: &str = "ash";
+const GLOW_TOKEN: &str = "glow";
 const SHADERC_TOKEN: &str = "shaderc";
 
 #[test]
@@ -73,16 +75,26 @@ fn non_vulkanic_rust_code_does_not_reference_backend_modules() {
 fn backend_specific_crates_stay_inside_their_backend_modules() {
     let rust_root = Path::new(RUST_ROOT);
     let vulkan_backend = rust_root.join("net/vulkanic/backends/vulkan");
+    let opengl_backend = rust_root.join("net/vulkanic/backends/opengl");
     let mut violations = Vec::new();
 
     for file in rust_files(rust_root) {
-        if is_inside(&file, &vulkan_backend) {
-            continue;
-        }
-
         let source = read_source(&file);
         for (line_index, line) in source.lines().enumerate() {
-            if line.contains(&format!("{SHADERC_TOKEN}::")) {
+            if !is_inside(&file, &vulkan_backend) {
+                if line.contains(&format!("{ASH_TOKEN}::"))
+                    || line.contains(&format!("{SHADERC_TOKEN}::"))
+                {
+                    violations.push(format!(
+                        "{}:{}: {}",
+                        relative(&file),
+                        line_index + 1,
+                        line.trim()
+                    ));
+                }
+            }
+
+            if !is_inside(&file, &opengl_backend) && line.contains(&format!("{GLOW_TOKEN}::")) {
                 violations.push(format!(
                     "{}:{}: {}",
                     relative(&file),
@@ -95,7 +107,7 @@ fn backend_specific_crates_stay_inside_their_backend_modules() {
 
     assert!(
         violations.is_empty(),
-        "Vulkan-specific Rust dependencies must stay inside net/vulkanic/backends/vulkan:\n{}",
+        "Backend-specific Rust graphics dependencies must stay inside their backend modules:\n{}",
         violations.join("\n")
     );
 }
