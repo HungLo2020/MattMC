@@ -39,6 +39,13 @@ public final class NativeTranslucentSortData implements AutoCloseable {
                     ValueLayout.JAVA_LONG,
                     ValueLayout.JAVA_INT,
                     ValueLayout.ADDRESS));
+    private static final MethodHandle CREATE_STATIC_ORDER = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_translucent_sort_data_static_order_create",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS));
     private static final MethodHandle CREATE_STATIC_SNR = NativeLibraryLoader.downcallHandle("mattmc_rust",
             "mattmc_sodium_translucent_sort_data_static_snr_create",
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
@@ -158,6 +165,27 @@ public final class NativeTranslucentSortData implements AutoCloseable {
             check(status, "native translucent analyzer static topo sort data creation");
             return fromHandleSegment(handleSegment, quadCount,
                     "Native translucent analyzer static topo sort data creation");
+        }
+    }
+
+    public static NativeTranslucentSortData createStaticOrder(int quadCount, int[] quadIndexes) {
+        if (quadCount < 0 || quadIndexes.length > quadCount) {
+            throw new IllegalArgumentException("Invalid translucent static order size");
+        }
+
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment quadIndexesSegment = quadIndexes.length == 0
+                    ? MemorySegment.NULL
+                    : arena.allocate(ValueLayout.JAVA_INT, quadIndexes.length);
+            for (int index = 0; index < quadIndexes.length; index++) {
+                quadIndexesSegment.setAtIndex(ValueLayout.JAVA_INT, index, quadIndexes[index]);
+            }
+
+            MemorySegment handleSegment = arena.allocate(ValueLayout.JAVA_LONG);
+            check(invokeCreateStaticOrder(quadCount, quadIndexesSegment, quadIndexes.length, handleSegment),
+                    "native translucent explicit static order sort data creation");
+            return fromHandleSegment(handleSegment, quadCount,
+                    "Native translucent explicit static order sort data creation");
         }
     }
 
@@ -291,6 +319,16 @@ public final class NativeTranslucentSortData implements AutoCloseable {
                     handleOutput);
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust translucent analyzer static topo sort data creation downcall failed",
+                    throwable);
+        }
+    }
+
+    private static int invokeCreateStaticOrder(int quadCount, MemorySegment quadIndexes, int quadIndexCount,
+            MemorySegment handleOutput) {
+        try {
+            return (int) CREATE_STATIC_ORDER.invokeExact(quadCount, quadIndexes, quadIndexCount, handleOutput);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust translucent explicit static order sort data creation downcall failed",
                     throwable);
         }
     }

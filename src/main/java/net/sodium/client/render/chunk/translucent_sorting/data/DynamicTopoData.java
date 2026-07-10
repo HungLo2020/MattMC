@@ -30,7 +30,6 @@ public class DynamicTopoData extends DynamicData {
     private boolean directTrigger = false;
     private int consecutiveTopoSortFailures = 0;
 
-    private double directTriggerKey = -1;
     private boolean pendingTriggerIsDirect;
 
     private final NativeTranslucentSortData nativeSortData;
@@ -65,14 +64,6 @@ public class DynamicTopoData extends DynamicData {
 
     public boolean directTriggerEnabled() {
         return this.directTrigger;
-    }
-
-    public double getDirectTriggerKey() {
-        return this.directTriggerKey;
-    }
-
-    public void setDirectTriggerKey(double key) {
-        this.directTriggerKey = key;
     }
 
     public boolean isMatchingSorter(DynamicTopoSorter sorter) {

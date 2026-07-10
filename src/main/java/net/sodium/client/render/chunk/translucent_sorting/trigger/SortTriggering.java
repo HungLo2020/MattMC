@@ -1,6 +1,5 @@
 package net.sodium.client.render.chunk.translucent_sorting.trigger;
 
-import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.sodium.client.SodiumClientMod;
 import net.sodium.client.render.chunk.translucent_sorting.SortBehavior;
 import net.sodium.client.render.chunk.translucent_sorting.SortType;
@@ -9,7 +8,6 @@ import net.sodium.client.render.chunk.translucent_sorting.data.DynamicTopoData;
 import net.sodium.client.render.chunk.translucent_sorting.data.TranslucentData;
 import net.minecraft.core.SectionPos;
 import org.joml.Vector3dc;
-import org.joml.Vector3fc;
 
 import java.util.List;
 import java.util.function.BiConsumer;
@@ -24,7 +22,7 @@ import java.util.function.BiConsumer;
  * 
  * @author douira (the translucent_sorting package)
  */
-public class SortTriggering {
+public class SortTriggering implements AutoCloseable {
     /**
      * To avoid generating a collection of the triggered sections, this callback is
      * used to process the triggered sections directly as they are queried from the
@@ -43,12 +41,11 @@ public class SortTriggering {
     private DynamicData catchupData = null;
 
     /**
-     * The number of triggered sections and normals. The normals are kept in a
-     * hashmap to count them, triggered sections are not deduplicated.
+     * The number of triggered sections and normals. Triggered sections are not
+     * deduplicated.
      */
     private int gfniTriggerCount = 0;
     private int directTriggerCount = 0;
-    private final ObjectOpenHashSet<Vector3fc> triggeredNormals = new ObjectOpenHashSet<>();
     private int triggeredNormalCount = 0;
 
     /**
@@ -56,16 +53,8 @@ public class SortTriggering {
      */
     private final int[] sortTypeCounters = new int[SortType.values().length];
 
-    private final GFNITriggers gfni = new GFNITriggers();
-    private final DirectTriggers direct = new DirectTriggers();
-
-    interface SectionTriggers<T extends DynamicData> {
-        void processTriggers(SortTriggering ts, CameraMovement movement);
-
-        void removeSection(long sectionPos, TranslucentData data);
-
-        void integrateSection(SortTriggering ts, SectionPos sectionPos, T data, CameraMovement movement);
-    }
+    private final NativeGfniTriggers gfni = NativeGfniTriggers.create();
+    private final NativeDirectTriggers direct = NativeDirectTriggers.create();
 
     /**
      * Triggers the sections that the given camera movement crosses face planes of.
@@ -74,18 +63,17 @@ public class SortTriggering {
      * @param movement               the camera movement to trigger for
      */
     public void triggerSections(BiConsumer<Long, Boolean> triggerSectionCallback, CameraMovement movement) {
-        this.triggeredNormals.clear();
         this.triggerSectionCallback = triggerSectionCallback;
         var oldGfniTriggerCount = this.gfniTriggerCount;
         var oldDirectTriggerCount = this.directTriggerCount;
         this.gfniTriggerCount = 0;
         this.directTriggerCount = 0;
 
-        this.gfni.processTriggers(this, movement);
-        this.direct.processTriggers(this, movement);
+        int triggeredNormalCount = this.gfni.processTriggers(movement, this::triggerSectionGFNI);
+        this.direct.processTriggers(movement, this::triggerSectionDirect);
 
         if (this.gfniTriggerCount > 0 || this.directTriggerCount > 0) {
-            this.triggeredNormalCount = this.triggeredNormals.size();
+            this.triggeredNormalCount = triggeredNormalCount;
         } else {
             this.gfniTriggerCount = oldGfniTriggerCount;
             this.directTriggerCount = oldDirectTriggerCount;
@@ -98,24 +86,23 @@ public class SortTriggering {
         return this.catchupData != null;
     }
 
-    void triggerSectionGFNI(long sectionPos, Vector3fc normal) {
+    private void triggerSectionGFNI(long sectionPos) {
         if (this.isCatchingUp()) {
             this.triggerSectionCatchup(sectionPos, false);
             return;
         }
 
-        this.triggeredNormals.add(normal);
         this.triggerSectionCallback.accept(sectionPos, false);
         this.gfniTriggerCount++;
     }
 
-    void triggerSectionDirect(SectionPos sectionPos) {
+    private void triggerSectionDirect(long sectionPos) {
         if (this.isCatchingUp()) {
-            this.triggerSectionCatchup(sectionPos.asLong(), true);
+            this.triggerSectionCatchup(sectionPos, true);
             return;
         }
 
-        this.triggerSectionCallback.accept(sectionPos.asLong(), true);
+        this.triggerSectionCallback.accept(sectionPos, true);
         this.directTriggerCount++;
     }
 
@@ -137,16 +124,16 @@ public class SortTriggering {
         }
 
         if (data.checkAndApplyGFNITriggerOff(topoSorter)) {
-            this.gfni.removeSection(pos.asLong(), data);
+            this.gfni.removeSection(pos.asLong());
         }
         if (data.checkAndApplyDirectTriggerOn(topoSorter)) {
             // use dummy camera movement since there's no risk of the camera moving between
             // the section being scheduled and integrated (there's no building going on
             // here)
-            this.direct.integrateSection(this, pos, data, new CameraMovement(cameraPos, cameraPos));
+            this.integrateDirectSection(pos, new CameraMovement(cameraPos, cameraPos));
         }
         if (data.checkAndApplyDirectTriggerOff(topoSorter)) {
-            this.direct.removeSection(pos.asLong(), data);
+            this.direct.removeSection(pos.asLong());
         }
 
         data.applyTopoSortFailureCounterChange(topoSorter);
@@ -179,8 +166,10 @@ public class SortTriggering {
         if (oldData == null) {
             return;
         }
-        this.gfni.removeSection(sectionPos, oldData);
-        this.direct.removeSection(sectionPos, oldData);
+        this.gfni.removeSection(sectionPos);
+        if (oldData instanceof DynamicTopoData) {
+            this.direct.removeSection(sectionPos);
+        }
         this.decrementSortTypeCounter(oldData);
         this.releaseTranslucentData(oldData);
     }
@@ -201,7 +190,9 @@ public class SortTriggering {
         this.incrementSortTypeCounter(newData);
 
         if (newData instanceof DynamicData dynamicData) {
-            this.direct.removeSection(pos.asLong(), oldData);
+            if (oldData instanceof DynamicTopoData) {
+                this.direct.removeSection(pos.asLong());
+            }
             this.decrementSortTypeCounter(oldData);
             this.releaseTranslucentData(oldData);
             this.triggerSectionCallback = triggerSectionCallback;
@@ -210,17 +201,20 @@ public class SortTriggering {
 
             if (dynamicData instanceof DynamicTopoData topoSortData) {
                 if (topoSortData.GFNITriggerEnabled()) {
-                    this.gfni.integrateSection(this, pos, topoSortData, movement);
+                    this.integrateGfniSection(pos, dynamicData.getGeometryPlanes(), movement);
+                    topoSortData.discardGeometryPlanes();
                 } else {
                     // remove the trigger data since this section is never going to get gfni
                     // triggering (there's no option to add sections to GFNI later currently)
+                    this.gfni.removeSection(pos.asLong());
                     topoSortData.discardGeometryPlanes();
                 }
                 if (topoSortData.directTriggerEnabled()) {
-                    this.direct.integrateSection(this, pos, topoSortData, movement);
+                    this.integrateDirectSection(pos, movement);
                 }
             } else {
-                this.gfni.integrateSection(this, pos, dynamicData, movement);
+                this.integrateGfniSection(pos, dynamicData.getGeometryPlanes(), movement);
+                dynamicData.discardGeometryPlanes();
             }
 
             this.triggerSectionCallback = null;
@@ -245,5 +239,24 @@ public class SortTriggering {
                 this.sortTypeCounters[SortType.STATIC_TOPO.ordinal()],
                 this.sortTypeCounters[SortType.DYNAMIC.ordinal()],
                 this.direct.getDirectTriggerCount()));
+    }
+
+    private void integrateDirectSection(SectionPos sectionPos, CameraMovement movement) {
+        if (this.direct.integrateSection(sectionPos, movement)) {
+            this.triggerSectionDirect(sectionPos.asLong());
+        }
+    }
+
+    private void integrateGfniSection(SectionPos sectionPos, GeometryPlanes geometryPlanes, CameraMovement movement) {
+        this.gfni.integrateSection(sectionPos, geometryPlanes);
+        if (movement.hasChanged()) {
+            this.gfni.processCatchup(sectionPos.asLong(), movement, this::triggerSectionGFNI);
+        }
+    }
+
+    @Override
+    public void close() {
+        this.gfni.close();
+        this.direct.close();
     }
 }

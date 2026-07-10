@@ -45,21 +45,6 @@ public class GeometryPlanes {
         return this.unalignedPlanes;
     }
 
-    NormalPlanes getPlanesForNormal(NormalList normalList) {
-        var normal = normalList.getNormal();
-        if (normalList.isAligned()) {
-            if (this.alignedPlanes == null) {
-                return null;
-            }
-            return this.alignedPlanes[normalList.getAlignedDirection()];
-        } else {
-            if (this.unalignedPlanes == null) {
-                return null;
-            }
-            return this.unalignedPlanes.get(normal);
-        }
-    }
-
     public void addAlignedPlane(SectionPos sectionPos, int direction, float distance) {
         var alignedDistances = this.getAlignedOrCreate();
         var normalPlanes = alignedDistances[direction];

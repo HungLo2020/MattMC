@@ -1081,6 +1081,10 @@ public class RenderSectionManager {
             section.delete();
         }
 
+        if (this.sortTriggering != null) {
+            this.sortTriggering.close();
+        }
+
         this.sectionsWithGlobalEntities.clear();
         this.resetRenderLists();
 

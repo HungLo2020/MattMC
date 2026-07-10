@@ -2,7 +2,6 @@ package net.sodium.client.render.chunk.translucent_sorting.data;
 
 import net.sodium.client.render.chunk.translucent_sorting.SortType;
 import net.sodium.client.render.chunk.translucent_sorting.NativeTranslucentSortData;
-import net.sodium.client.render.chunk.translucent_sorting.NativeTranslucentGeometryAnalyzer;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.minecraft.core.SectionPos;
 
@@ -34,27 +33,17 @@ public class StaticTopoData extends PresentTranslucentData {
     }
 
     public static StaticTopoData fromMesh(TQuad[] quads, SectionPos sectionPos, boolean failOnIntersection) {
-        int[] quadIndexes = NativeTranslucentGeometryAnalyzer.topoGraphSort(quads, failOnIntersection);
-
-        if (quadIndexes == null) {
+        NativeTranslucentSortData sortData = NativeTranslucentSortData.createStaticTopo(quads, failOnIntersection);
+        if (sortData == null) {
             return null;
         }
 
-        var sorter = new StaticSorter(quads.length);
-        TranslucentData.writeQuadVertexIndexes(sorter.getIntBuffer(), quadIndexes, quadIndexes.length);
-
-        var staticTopoData = new StaticTopoData(sectionPos, quads.length);
-        staticTopoData.sorterOnce = sorter;
-        return staticTopoData;
+        return fromNativeSortData(quads.length, sortData, sectionPos);
     }
 
     public static StaticTopoData fromNativeOrder(int quadCount, int[] quadIndexes, SectionPos sectionPos) {
-        var sorter = new StaticSorter(quadCount);
-        TranslucentData.writeQuadVertexIndexes(sorter.getIntBuffer(), quadIndexes, quadIndexes.length);
-
-        var staticTopoData = new StaticTopoData(sectionPos, quadCount);
-        staticTopoData.sorterOnce = sorter;
-        return staticTopoData;
+        return fromNativeSortData(quadCount, NativeTranslucentSortData.createStaticOrder(quadCount, quadIndexes),
+                sectionPos);
     }
 
     public static StaticTopoData fromNativeSortData(int quadCount, NativeTranslucentSortData sortData,

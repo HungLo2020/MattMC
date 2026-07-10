@@ -1,9 +1,12 @@
 package net.sodium.client.render.chunk.translucent_sorting;
 
+import net.minecraft.core.SectionPos;
 import net.sodium.client.SodiumClientMod;
 import net.sodium.client.gui.SodiumGameOptions;
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.sodium.client.render.chunk.terrain.material.DefaultMaterials;
+import net.sodium.client.render.chunk.translucent_sorting.data.StaticNormalRelativeData;
+import net.sodium.client.render.chunk.translucent_sorting.data.StaticTopoData;
 import net.sodium.client.render.chunk.translucent_sorting.data.Sorter;
 import net.sodium.client.render.chunk.translucent_sorting.quad.RegularTQuad;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
@@ -26,6 +29,7 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NativeTranslucentGeometryAnalyzerTest {
@@ -236,6 +240,57 @@ class NativeTranslucentGeometryAnalyzerTest {
     }
 
     @Test
+    void staticTopoFromNativeOrderWritesThroughRustOwnedSortData() {
+        Sorter sorter = null;
+
+        try {
+            StaticTopoData data = StaticTopoData.fromNativeOrder(3, new int[] {2, 0, 1}, SectionPos.of(0, 0, 0));
+            assertNotNull(data);
+            sorter = data.getSorter();
+            sorter.writeIndexBuffer(null, true);
+
+            assertArrayEquals(new int[] {
+                    8, 9, 10, 10, 11, 8,
+                    0, 1, 2, 2, 3, 0,
+                    4, 5, 6, 6, 7, 4
+            }, readInts(sorter.getIndexBuffer().getDirectBuffer(), 18));
+        } finally {
+            if (sorter != null) {
+                sorter.destroy();
+            }
+        }
+    }
+
+    @Test
+    void staticNormalRelativeFromMeshWritesThroughRustOwnedSortData() {
+        Sorter sorter = null;
+
+        try {
+            TQuad[] quads = new TQuad[] {
+                    RegularTQuad.fromVertices(zQuad(1.0F), ModelQuadFacing.POS_Z,
+                            ModelQuadFacing.POS_Z.getPackedAlignedNormal()),
+                    RegularTQuad.fromVertices(zQuad(0.0F), ModelQuadFacing.POS_Z,
+                            ModelQuadFacing.POS_Z.getPackedAlignedNormal())
+            };
+
+            StaticNormalRelativeData data = StaticNormalRelativeData.fromMesh(
+                    new int[] {0, 0, 2, 0, 0, 0, 0}, quads, SectionPos.of(0, 0, 0), false);
+            assertNotNull(data);
+            sorter = data.getSorter();
+            sorter.writeIndexBuffer(null, true);
+
+            assertArrayEquals(new int[] {
+                    4, 5, 6, 6, 7, 4,
+                    0, 1, 2, 2, 3, 0
+            }, readInts(sorter.getIndexBuffer().getDirectBuffer(), 12));
+        } finally {
+            if (sorter != null) {
+                sorter.destroy();
+            }
+        }
+    }
+
+    @Test
     void sectionGeometryDistanceSortWritesFarQuadsBeforeNearQuads() {
         NativeTranslucentGeometryAnalyzer analyzer = new NativeTranslucentGeometryAnalyzer();
         ByteBuffer indexBuffer = MemoryUtil.memAlloc(2 * 6 * Integer.BYTES);
@@ -361,11 +416,19 @@ class NativeTranslucentGeometryAnalyzerTest {
                 "src/main/java/net/sodium/client/render/chunk/translucent_sorting/TranslucentGeometryCollector.java"));
         String dynamicTopoData = Files.readString(Path.of(
                 "src/main/java/net/sodium/client/render/chunk/translucent_sorting/data/DynamicTopoData.java"));
+        String staticTopoData = Files.readString(Path.of(
+                "src/main/java/net/sodium/client/render/chunk/translucent_sorting/data/StaticTopoData.java"));
+        String staticNormalRelativeData = Files.readString(Path.of(
+                "src/main/java/net/sodium/client/render/chunk/translucent_sorting/data/StaticNormalRelativeData.java"));
 
         assertTrue(collector.contains("createStaticTopoSortData("));
         assertTrue(collector.contains("NativeTranslucentSortData.createDynamicTopo("));
         assertTrue(dynamicTopoData.contains("NativeTranslucentSortData nativeSortData"));
         assertFalse(dynamicTopoData.contains("NativeTranslucentSectionGeometry nativeGeometry"));
+        assertFalse(Files.exists(Path.of(
+                "src/main/java/net/sodium/client/render/chunk/translucent_sorting/data/StaticSorter.java")));
+        assertFalse(staticTopoData.contains("new StaticSorter"));
+        assertFalse(staticNormalRelativeData.contains("new StaticSorter"));
     }
 
     private static ChunkVertexEncoder.Vertex[] zQuad(float z) {

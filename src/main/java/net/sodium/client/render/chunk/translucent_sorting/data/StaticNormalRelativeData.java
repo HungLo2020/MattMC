@@ -36,25 +36,12 @@ public class StaticNormalRelativeData extends PresentTranslucentData {
     }
 
     private static StaticNormalRelativeData fromDoubleUnaligned(TQuad[] quads, SectionPos sectionPos) {
-        var snrData = new StaticNormalRelativeData(sectionPos, quads.length);
-        var sorter = new StaticSorter(quads.length);
-        snrData.sorterOnce = sorter;
-        var indexBuffer = sorter.getIntBuffer();
-
-        if (quads.length <= 1) {
-            // Avoid allocations when there is nothing to sort.
-            TranslucentData.writeFirstQuadVertexIndexes(indexBuffer);
-        } else {
-            final var keys = new int[quads.length];
-
-            for (int q = 0; q < quads.length; q++) {
-                keys[q] = MathUtil.floatToComparableInt(quads[q].getAccurateDotProduct());
-            }
-
-            TranslucentData.writeQuadVertexIndexesSortedByKey(indexBuffer, keys);
+        final var keys = new int[quads.length];
+        for (int q = 0; q < quads.length; q++) {
+            keys[q] = MathUtil.floatToComparableInt(quads[q].getAccurateDotProduct());
         }
 
-        return snrData;
+        return fromNative(emptyFacingCounts(), keys, sectionPos, quads.length, true);
     }
 
     /**
@@ -62,43 +49,20 @@ public class StaticNormalRelativeData extends PresentTranslucentData {
      */
     private static StaticNormalRelativeData fromMixed(int[] meshFacingCounts,
                                                       TQuad[] quads, SectionPos sectionPos) {
-        var snrData = new StaticNormalRelativeData(sectionPos, quads.length);
-        var sorter = new StaticSorter(quads.length);
-        snrData.sorterOnce = sorter;
-        var indexBuffer = sorter.getIntBuffer();
-
-        var maxQuadCount = 0;
-
-        for (var quadCount : meshFacingCounts) {
-            if (quadCount != -1) {
-                maxQuadCount = Math.max(maxQuadCount, quadCount);
-            }
-        }
-
-        // The quad index is used to keep track of the position in the quad array.
-        // This is necessary because the emitted quad indexes in each facing start at zero,
-        // but the quads are stored in a single continuously indexed array.
+        final var keys = new int[quads.length];
         int quadIndex = 0;
         for (var quadCount : meshFacingCounts) {
             if (quadCount == -1 || quadCount == 0) {
                 continue;
             }
 
-            if (quadCount == 1) {
-                TranslucentData.writeFirstQuadVertexIndexes(indexBuffer);
+            for (int idx = 0; idx < quadCount; idx++) {
+                keys[quadIndex] = MathUtil.floatToComparableInt(quads[quadIndex].getAccurateDotProduct());
                 quadIndex++;
-            } else {
-                final var keys = new int[quadCount];
-
-                for (int idx = 0; idx < quadCount; idx++) {
-                    keys[idx] = MathUtil.floatToComparableInt(quads[quadIndex++].getAccurateDotProduct());
-                }
-
-                TranslucentData.writeQuadVertexIndexesSortedByKey(indexBuffer, keys);
             }
         }
 
-        return snrData;
+        return fromNative(meshFacingCounts, keys, sectionPos, quads.length, false);
     }
 
     public static StaticNormalRelativeData fromMesh(int[] meshFacingCounts,
@@ -117,5 +81,9 @@ public class StaticNormalRelativeData extends PresentTranslucentData {
                 sortKeys, quadCount, isDoubleUnaligned);
         snrData.sorterOnce = sortData.createStaticSorter();
         return snrData;
+    }
+
+    private static int[] emptyFacingCounts() {
+        return new int[] {0, 0, 0, 0, 0, 0, 0};
     }
 }

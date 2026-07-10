@@ -1083,6 +1083,17 @@ fn create_static_topo_sort_data(
     }))
 }
 
+fn create_static_order_sort_data(
+    quad_count: usize,
+    quad_indexes: &[i32],
+) -> Result<NativeTranslucentSortData, i32> {
+    let index_data = sorted_index_data_from_order(quad_count, quad_indexes)?;
+    Ok(NativeTranslucentSortData {
+        quad_count,
+        kind: NativeTranslucentSortDataKind::StaticIndexData(index_data),
+    })
+}
+
 fn create_static_normal_relative_sort_data(
     mesh_facing_counts: &[i32],
     sort_keys: &[i32],
@@ -2730,6 +2741,37 @@ pub unsafe extern "C" fn mattmc_sodium_translucent_sort_data_static_topo_create_
         fail_on_intersection,
         output_handle,
     )
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_translucent_sort_data_static_order_create(
+    quad_count: i32,
+    quad_indexes: *const i32,
+    quad_index_count: i32,
+    output_handle: *mut u64,
+) -> i32 {
+    if quad_count < 0 || quad_index_count < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if output_handle.is_null() || (quad_index_count > 0 && quad_indexes.is_null()) {
+        return ERR_NULL_POINTER;
+    }
+    if quad_index_count > quad_count {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let quad_indexes = if quad_index_count == 0 {
+        &[]
+    } else {
+        slice::from_raw_parts(quad_indexes, quad_index_count as usize)
+    };
+    let sort_data = match create_static_order_sort_data(quad_count as usize, quad_indexes) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+
+    *output_handle = Box::into_raw(Box::new(sort_data)) as u64;
+    OK
 }
 
 #[no_mangle]
