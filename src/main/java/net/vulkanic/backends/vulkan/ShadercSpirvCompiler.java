@@ -5,16 +5,12 @@ import net.vulkanic.VulkanicShaderStage;
 import net.vulkanic.VulkanicSpirvModule;
 import org.slf4j.Logger;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
-final class GlslangSpirvCompiler implements SpirvCompiler {
+final class ShadercSpirvCompiler implements SpirvCompiler {
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final boolean TRACE_SHADOW_FOG_SHADER_NORMALIZATION =
@@ -90,109 +86,23 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         Objects.requireNonNull(sourceName, "sourceName must not be null");
         Objects.requireNonNull(entryPoint, "entryPoint must not be null");
 
-        String compilerExecutable = resolveCompilerExecutable();
         String shaderSource = source.toString();
         if (shaderSource.isBlank()) {
             throw new IllegalStateException("Cannot compile blank shader source to SPIR-V: " + sourceName);
         }
 
-        Path tempDirectory = null;
-        try {
-            tempDirectory = Files.createTempDirectory("vulkanic-spirv-");
-            String stageSuffix = stageToken(stage);
-
-            Path sourcePath = tempDirectory.resolve("shader." + stageSuffix + ".glsl");
-            Path outputPath = tempDirectory.resolve("shader." + stageSuffix + ".spv");
-
-            Files.writeString(sourcePath, shaderSource, StandardCharsets.UTF_8);
-
-            List<String> command = new ArrayList<>();
-            command.add(compilerExecutable);
-            command.add("-V");
-            command.add("-S");
-            command.add(stageSuffix);
-            command.add("--auto-map-bindings");
-            command.add("--auto-map-locations");
-            command.add("-e");
-            command.add(entryPoint);
-            command.add("-o");
-            command.add(outputPath.toAbsolutePath().toString());
-            command.add(sourcePath.toAbsolutePath().toString());
-
-            Process process = new ProcessBuilder(command)
-                .redirectErrorStream(true)
-                .start();
-
-            byte[] output = process.getInputStream().readAllBytes();
-            int exitCode = process.waitFor();
-            String outputText = new String(output, StandardCharsets.UTF_8).trim();
-
-            if (exitCode != 0) {
-                throw new IllegalStateException(
-                    "SPIR-V compilation failed for '" + sourceName + "' (stage=" + stage + ", entryPoint=" + entryPoint + ")"
-                        + " using compiler '" + compilerExecutable + "' with exit code " + exitCode
-                        + (outputText.isEmpty() ? "" : ": " + outputText)
-                );
-            }
-
-            byte[] spirvBytes = Files.readAllBytes(outputPath);
-            if (spirvBytes.length == 0) {
-                throw new IllegalStateException(
-                    "SPIR-V compiler produced empty output for '" + sourceName + "' using compiler '"
-                        + compilerExecutable + "'."
-                );
-            }
-
-            return new VulkanicSpirvModule(
-                stage,
-                entryPoint,
-                spirvBytes,
-                sourceName,
-                compilerExecutable,
-                shaderSource.contains("iris_FragData0"),
-                "sodium:core/vulkan_chunk".equals(sourceName)
-                    || shaderSource.contains("sodium_core_vulkan_chunk")
-                    || shaderSource.contains("sodium:core/vulkan_chunk")
-            );
-        } catch (IOException exception) {
-            throw new IllegalStateException(
-                "Failed to invoke SPIR-V compiler for '" + sourceName + "'. Ensure glslangValidator is installed"
-                    + " or set -Dvulkanic.spirv.compiler=/path/to/glslangValidator. Cause: " + exception.getMessage(),
-                exception
-            );
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("Interrupted while compiling shader to SPIR-V: " + sourceName, exception);
-        } finally {
-            if (tempDirectory != null) {
-                deleteTempDirectoryQuietly(tempDirectory);
-            }
-        }
-    }
-
-    private static String resolveCompilerExecutable() {
-        String propertyValue = System.getProperty("vulkanic.spirv.compiler");
-        if (propertyValue != null && !propertyValue.isBlank()) {
-            return propertyValue.trim();
-        }
-
-        String environmentValue = System.getenv("VULKANIC_SPIRV_COMPILER");
-        if (environmentValue != null && !environmentValue.isBlank()) {
-            return environmentValue.trim();
-        }
-
-        return "glslangValidator";
-    }
-
-    private static String stageToken(VulkanicShaderStage stage) {
-        return switch (stage) {
-            case VERTEX -> "vert";
-            case FRAGMENT -> "frag";
-            case GEOMETRY -> "geom";
-            case COMPUTE -> "comp";
-            case TESSELLATION_CONTROL -> "tesc";
-            case TESSELLATION_EVALUATION -> "tese";
-        };
+        byte[] spirvBytes = NativeShadercCompiler.compile(stage, shaderSource, sourceName, entryPoint);
+        return new VulkanicSpirvModule(
+            stage,
+            entryPoint,
+            spirvBytes,
+            sourceName,
+            "mattmc_rust:shaderc",
+            shaderSource.contains("iris_FragData0"),
+            "sodium:core/vulkan_chunk".equals(sourceName)
+                || shaderSource.contains("sodium_core_vulkan_chunk")
+                || shaderSource.contains("sodium:core/vulkan_chunk")
+        );
     }
 
     static String normalizeForVulkan(VulkanicShaderStage stage, String shaderSource) {
@@ -952,7 +862,7 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         StringBuilder block = new StringBuilder();
         // Use the HIGHER of: (max explicit binding + 1) OR (count of non-explicitly-bound opaque
         // uniforms). The latter ensures the UBO is placed after all auto-mapped samplers, which
-        // glslang assigns starting from binding 0 independently per resource type. Without this,
+        // Shaderc assigns starting from binding 0 independently per resource type. Without this,
         // VulkanicStandaloneUniforms would get explicit binding 0 and collide with the first
         // auto-mapped sampler (e.g. colortex0 from Iris shaders that have no explicit bindings).
         int standaloneBindingIndex = standaloneUniformBindingIndex >= 0
@@ -1186,16 +1096,4 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         return maxBinding + 1;
     }
 
-    private static void deleteTempDirectoryQuietly(Path directory) {
-        try (var paths = Files.walk(directory)) {
-            paths.sorted((left, right) -> right.getNameCount() - left.getNameCount())
-                .forEach(path -> {
-                    try {
-                        Files.deleteIfExists(path);
-                    } catch (IOException ignored) {
-                    }
-                });
-        } catch (IOException ignored) {
-        }
-    }
 }

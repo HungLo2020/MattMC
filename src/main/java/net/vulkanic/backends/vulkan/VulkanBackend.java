@@ -352,7 +352,7 @@ public class VulkanBackend {
     private volatile int    pendingBackStencilWriteMask  = 0xFF;
 
     public VulkanBackend() {
-        this(new GlslangSpirvCompiler());
+        this(new ShadercSpirvCompiler());
     }
 
     VulkanBackend(SpirvCompiler spirvCompiler) {
@@ -2073,7 +2073,7 @@ void main() {
         int standaloneUniformBindingIndex
     ) {
         String preprocessedSource = preprocessMojImportsForVulkan(sourceName, glslSource.toString());
-        String normalizedSource = GlslangSpirvCompiler.normalizeForVulkan(
+        String normalizedSource = ShadercSpirvCompiler.normalizeForVulkan(
             shaderStage,
             preprocessedSource,
             sourceName,
@@ -2384,7 +2384,7 @@ void main() {
         if (source == null || source.isBlank()) {
             return source;
         }
-        return GlslangSpirvCompiler.prepareSourceForVulkanResourceReflection(virtualShader.stage, source);
+        return ShadercSpirvCompiler.prepareSourceForVulkanResourceReflection(virtualShader.stage, source);
     }
 
     private List<String> collectStandaloneUniformDeclarations(VirtualProgram virtualProgram) {
@@ -2399,7 +2399,7 @@ void main() {
     }
 
     private static List<String> collectStandaloneUniformDeclarations(List<String> shaderSources) {
-        return GlslangSpirvCompiler.collectActiveStandaloneUniformDeclarations(shaderSources);
+        return ShadercSpirvCompiler.collectActiveStandaloneUniformDeclarations(shaderSources);
     }
 
     private static String stripGlslComments(String shaderSource) {
@@ -2412,7 +2412,7 @@ void main() {
         if (shaderSource == null || shaderSource.isBlank()) {
             return false;
         }
-        return GlslangSpirvCompiler.hasActiveStandaloneUniformBlockMembers(stripGlslComments(shaderSource));
+        return ShadercSpirvCompiler.hasActiveStandaloneUniformBlockMembers(stripGlslComments(shaderSource));
     }
 
     private static boolean isOpaqueStandaloneUniformType(String uniformTypeName) {
@@ -2431,7 +2431,7 @@ void main() {
 
     private static int standaloneUniformBlockBindingIndex(VirtualProgram virtualProgram) {
         for (ReflectedResourceBinding resourceBinding : virtualProgram.activeResourceBindings) {
-            if (GlslangSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME.equals(resourceBinding.name())) {
+            if (ShadercSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME.equals(resourceBinding.name())) {
                 return resourceBinding.binding();
             }
         }
@@ -2478,7 +2478,7 @@ void main() {
             if (!seenNames.add(blockName)) {
                 continue;
             }
-            if (GlslangSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME.equals(blockName)) {
+            if (ShadercSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME.equals(blockName)) {
                 hasGeneratedStandaloneUniformBlock = true;
                 continue;
             }
@@ -2513,7 +2513,7 @@ void main() {
 
         if (hasGeneratedStandaloneUniformBlock) {
             requests.add(new ReflectedResourceRequest(
-                GlslangSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME,
+                ShadercSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME,
                 PipelineDescriptor.ResourceType.UNIFORM_BUFFER
             ));
         }
@@ -2602,11 +2602,11 @@ void main() {
             // If this shader has standalone non-opaque uniforms, the Vulkan normalizer rewrites
             // them into VulkanicStandaloneUniforms; mirror that here so reflection stays aligned.
             Set<String> activeStandaloneUniformNames =
-                GlslangSpirvCompiler.collectActiveStandaloneUniformNames(normalizedSource);
+                ShadercSpirvCompiler.collectActiveStandaloneUniformNames(normalizedSource);
             Set<String> activeStandaloneUniformNamesIncludingOpaque =
-                GlslangSpirvCompiler.collectActiveStandaloneUniformNamesIncludingOpaque(normalizedSource);
+                ShadercSpirvCompiler.collectActiveStandaloneUniformNamesIncludingOpaque(normalizedSource);
             if (!activeStandaloneUniformNames.isEmpty()) {
-                activeUniformBlocks.add(GlslangSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME);
+                activeUniformBlocks.add(ShadercSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME);
             }
 
             Matcher uniformMatcher = GLSL_STANDALONE_UNIFORM_PATTERN.matcher(normalizedSource);
@@ -2849,7 +2849,7 @@ void main() {
 
         boolean programRecordPresent = virtualProgram != null;
         boolean reflectedStandaloneBlockPresent = programRecordPresent
-            && virtualProgram.activeUniformBlocks.contains(GlslangSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME);
+            && virtualProgram.activeUniformBlocks.contains(ShadercSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME);
         boolean backingAllocated = programRecordPresent
             && virtualProgram.standaloneBackingSize > 0
             && virtualProgram.standaloneBackingData != null;

@@ -28,6 +28,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -106,6 +107,23 @@ public class VulkanBackendSpirvPathTest {
     };
 
     @Test
+    public void testNativeShadercCompilerProducesSpirvThroughPanama() {
+        ShadercSpirvCompiler compiler = new ShadercSpirvCompiler();
+
+        VulkanicSpirvModule module = compiler.compile(
+            VulkanicShaderStage.VERTEX,
+            "#version 450\nvoid main(){gl_Position=vec4(0.0);}",
+            "test:native_shaderc_vertex",
+            "main"
+        );
+
+        byte[] spirv = module.spirvBytes();
+        assertTrue(spirv.length > 4);
+        assertArrayEquals(new byte[]{0x03, 0x02, 0x23, 0x07}, Arrays.copyOfRange(spirv, 0, 4));
+        assertEquals("mattmc_rust:shaderc", module.compilerName());
+    }
+
+    @Test
     public void testCompileShaderBuildsSpirvModuleUsingInjectedCompiler() {
         AtomicReference<String> capturedSource = new AtomicReference<>();
 
@@ -157,7 +175,7 @@ public class VulkanBackendSpirvPathTest {
 
         assertEquals(
             "#version 450\n#define VULKANIC_BACKEND 1\nvoid main(){int a = gl_VertexID; int b = gl_InstanceID;}",
-            GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source)
+            ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source)
         );
     }
 
@@ -176,7 +194,7 @@ public class VulkanBackendSpirvPathTest {
                 + "vec2 uv = vec2(1.0);\n"
                 + "#endif\n"
                 + "void main(){}",
-            GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source)
+            ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source)
         );
     }
 
@@ -196,12 +214,12 @@ public class VulkanBackendSpirvPathTest {
             + "    fragColor = vec4(vec3(sky_brightness), 1.0);\n"
             + "}";
 
-        String lightmap = GlslangSpirvCompiler.normalizeForVulkan(
+        String lightmap = ShadercSpirvCompiler.normalizeForVulkan(
             VulkanicShaderStage.FRAGMENT,
             source,
             "minecraft:core/lightmap"
         );
-        String generic = GlslangSpirvCompiler.normalizeForVulkan(
+        String generic = ShadercSpirvCompiler.normalizeForVulkan(
             VulkanicShaderStage.FRAGMENT,
             source,
             "minecraft:core/generic"
@@ -262,7 +280,7 @@ public class VulkanBackendSpirvPathTest {
             + "fragColor = vec4(screenPos.xy, dither + dhDither + ssaoDither + scalarY, gl_FragCoord.w);"
             + "}";
 
-        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
+        String normalized = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
 
         assertTrue(normalized.contains("float viewHeight;"));
         assertTrue(normalized.contains(
@@ -294,7 +312,7 @@ public class VulkanBackendSpirvPathTest {
             + "vec3 screenPos = vec3(gl_FragCoord.xy / vec2(viewWidth, viewHeight), gl_FragCoord.z);"
             + "fragColor = vec4(color, depth + depthNeighbour + noise + screenPos.y);}";
 
-        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
+        String normalized = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
 
         assertTrue(normalized.contains("ivec2 texelCoord = ivec2(gl_FragCoord.xy);"));
         assertTrue(normalized.contains("texelFetch(colortex0, texelCoord, 0).rgb"));
@@ -328,7 +346,7 @@ public class VulkanBackendSpirvPathTest {
             + "fragColor = vec4(viewPos.xy + viewPosDH.xy + screenPos1.xy + screenPos1DH.xy, 0.0, 1.0);"
             + "}";
 
-        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
+        String normalized = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
 
         assertTrue(normalized.contains("vec4 screenPos = vec4(texCoord, z0, 1.0);"));
         assertTrue(normalized.contains("vec4 screenPosDH = vec4(texCoord, z0DH, 1.0);"));
@@ -361,7 +379,7 @@ public class VulkanBackendSpirvPathTest {
             + "fragColor = vec4(color + history + noise + atlas, depth);"
             + "}";
 
-        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
+        String normalized = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
 
         assertTrue(normalized.contains("texture(colortex0, vec2((texCoord).x, 1.0f - (texCoord).y)).rgb"));
         assertTrue(normalized.contains("texture2D(depthtex0, vec2((coord1).x, 1.0f - (coord1).y)).r"));
@@ -393,7 +411,7 @@ public class VulkanBackendSpirvPathTest {
             + "fragColor = vec4(shadow0 + shadow1 + shadow2 + shadow3 + shadowColor + shadowColorTexel + noise);"
             + "}";
 
-        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
+        String normalized = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
 
         assertTrue(normalized.contains("texture(shadowtex0, vec3((shadowPosition).x, 1.0f - (shadowPosition).y, (shadowPosition).z)).x"));
         assertTrue(normalized.contains("texture2D(shadowtex1, vec3((vec3(shadowPosition.st, shadowPosition.z)).x, 1.0f - (vec3(shadowPosition.st, shadowPosition.z)).y, (vec3(shadowPosition.st, shadowPosition.z)).z)).x"));
@@ -425,7 +443,7 @@ public class VulkanBackendSpirvPathTest {
             + "DoTAA(color, temp, z1);"
             + "fragColor = vec4(color + temp, 1.0);}";
 
-        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
+        String normalized = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
 
         assertTrue(normalized.contains("DoTAA(color, temp, z1);"));
         assertTrue(normalized.contains("texture(colortex2, vec2((prvCoord).x, 1.0f - (prvCoord).y)).rgb"));
@@ -441,7 +459,7 @@ public class VulkanBackendSpirvPathTest {
             + "float ssao = DoAmbientOcclusion(z0, linearZ0, dither);"
             + "fragColor = vec4(vec3(ssao), 1.0);}";
 
-        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
+        String normalized = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
 
         assertTrue(normalized.contains("float ssao = DoAmbientOcclusion(z0, linearZ0, dither);"));
         assertFalse(normalized.contains("float ssao = 1.0f;"));
@@ -453,7 +471,7 @@ public class VulkanBackendSpirvPathTest {
 
         assertEquals(
             "#version 450\n#define VULKANIC_BACKEND 1\nvoid main(){}",
-            GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source)
+            ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source)
         );
     }
 
@@ -463,7 +481,7 @@ public class VulkanBackendSpirvPathTest {
             + "uniform mat4 iris_ProjectionMatrix;\n"
             + "void main(){ gl_Position = iris_ProjectionMatrix * vec4(1.0); }";
 
-        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, source);
+        String normalized = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, source);
 
         assertTrue(normalized.contains("float vulkanicOpenGlClipDepthToVulkan(float z, float w)"));
         assertTrue(normalized.contains("gl_Position.z = vulkanicOpenGlClipDepthToVulkan(gl_Position.z, gl_Position.w);"));
@@ -481,7 +499,7 @@ public class VulkanBackendSpirvPathTest {
             + "}\n"
             + "void main(){gl_Position = vec4(1.0);}";
 
-        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, source);
+        String normalized = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, source);
 
         assertTrue(normalized.contains("vec3 vulkanicMinecraftLightingNormal(vec3 normal)"));
         assertTrue(normalized.contains("normal = vulkanicMinecraftLightingNormal(normal);"));
@@ -496,7 +514,7 @@ public class VulkanBackendSpirvPathTest {
             + "uniform sampler2D u_LightTex;\n"
             + "void main(){ vec3 value = u_RegionOffset + vec3(u_TexCoordShrink, 0.0); gl_Position = vec4(value, 1.0); }";
 
-        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, source);
+        String normalized = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, source);
 
         assertTrue(normalized.contains("uniform VulkanicStandaloneUniforms {"));
         assertTrue(normalized.contains("layout(std140, set = 0, binding = 1)"));
@@ -515,7 +533,7 @@ public class VulkanBackendSpirvPathTest {
             + "layout(location = 0) out vec4 fragColor;\n"
             + "void main(){ fragColor = UsedColor; }";
 
-        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
+        String normalized = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
 
         assertTrue(normalized.contains("uniform VulkanicStandaloneUniforms {"));
         assertTrue(normalized.contains("vec4 UsedColor;"));
@@ -542,7 +560,7 @@ public class VulkanBackendSpirvPathTest {
             + " fragColor.rgb += vec3(uClipDistance + float(uNoiseEnabled ? 1 : 0) + float(uNoiseSteps)"
             + " + uNoiseIntensity + float(uNoiseDropoff)) * 0.0; }";
 
-        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
+        String normalized = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
 
         assertTrue(normalized.startsWith("#version 450"));
         assertTrue(normalized.contains("layout(location = 1) in vec4 vertexColor;"));
@@ -579,8 +597,8 @@ public class VulkanBackendSpirvPathTest {
             + "}"
             + "}\n";
 
-        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
-        List<String> declarations = GlslangSpirvCompiler.collectActiveStandaloneUniformDeclarations(List.of(source));
+        String normalized = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
+        List<String> declarations = ShadercSpirvCompiler.collectActiveStandaloneUniformDeclarations(List.of(source));
 
         assertTrue(normalized.contains("uniform VulkanicStandaloneUniforms {"));
         assertTrue(normalized.contains("float viewHeight;"));
@@ -614,8 +632,8 @@ public class VulkanBackendSpirvPathTest {
             + "out vec4 fragColor;\n"
             + "void main(){ fragColor = vertexColor + vec4(vertexWorldPos, 0.0) + vPos; if (uDitherDhRendering) { discard; } }\n";
 
-        String normalizedVertex = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, vertexSource);
-        String normalizedFragment = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, fragmentSource);
+        String normalizedVertex = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, vertexSource);
+        String normalizedFragment = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, fragmentSource);
 
         assertTrue(normalizedVertex.contains("layout(location = 0) out vec4 vPos;"));
         assertTrue(normalizedVertex.contains("layout(location = 1) out vec4 vertexColor;"));
@@ -633,7 +651,7 @@ public class VulkanBackendSpirvPathTest {
             + "out vec4 vertexColor;\n"
             + "void main(){ vertexColor = vec4(1.0); }\n";
 
-        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, source);
+        String normalized = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, source);
 
         assertTrue(normalized.contains("out vec4 vertexColor;"));
         assertFalse(normalized.contains("layout(location = 1) out vec4 vertexColor;"));
@@ -649,7 +667,7 @@ public class VulkanBackendSpirvPathTest {
             + "vec4 getVertexPosition() { return vec4(_vert_position + u_RegionOffset + _get_draw_translation(_draw_id), 1.0); }\n"
             + "void main(){ gl_Position = getVertexPosition(); }";
 
-        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, source);
+        String normalized = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, source);
 
         assertTrue(normalized.contains("uniform DynamicTransforms {"));
         assertTrue(normalized.contains("vec3 ModelOffset;"));

@@ -71,14 +71,6 @@ if [[ -z "$CLASSPATH" ]]; then
     exit 1
 fi
 
-# Prefer bundled SPIR-V compiler when present
-SPIRV_COMPILER="${SCRIPT_DIR}/../libraries/deps/glslangValidator"
-SPIRV_JVM_ARG=""
-if [[ -x "$SPIRV_COMPILER" ]]; then
-    SPIRV_JVM_ARG="-Dvulkanic.spirv.compiler=$SPIRV_COMPILER"
-    echo "Using bundled SPIR-V compiler"
-fi
-
 # Launch the dedicated server
 # Note: Server runs in headless mode by default (--nogui)
 # Remove --nogui to run with GUI
@@ -93,7 +85,6 @@ else
 fi
 
 $JAVA_CMD $JVM_ARGS \
-    $SPIRV_JVM_ARG \
     --enable-native-access=ALL-UNNAMED \
     -Dmattmc.rust.natives.dir="$SCRIPT_DIR/../natives" \
     -cp "$CLASSPATH" \

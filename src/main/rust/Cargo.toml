@@ -6,3 +6,6 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib"]
 path = "lib.rs"
+
+[dependencies]
+shaderc = { version = "0.10.1", features = ["build-from-source"] }

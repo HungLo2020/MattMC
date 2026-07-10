@@ -173,7 +173,6 @@ IRIS_PROPERTY_ENABLE_SHADERS=""
 IRIS_PROPERTY_COLOR_SPACE=""
 EFFECTIVE_SHADER_PACK=""
 EFFECTIVE_ENABLE_SHADERS=""
-PROJECT_SPIRV_COMPILER="$PROJECT_ROOT/libraries/deps/glslangValidator"
 SHADER_EVENT_PATTERN='Using shaderpack:|Loaded Shaderpack:|shaderPack=|enableShaders=|Profile:|Reloading pipeline on dimension change|Creating pipeline for dimension|Skipping compute shader|Missing program .*sodium:pipeline|Sodium Vulkan chunk pipelines|raw GLSL imports|ShaderInputParity|LightmapInfoParity|Type is (VERTEX|FRAGMENT|GEOMETRY|COMPUTE)|bindVertexBuffer requires an active render pass|No active Vulkan render pass to end|shader compose into swapchain|Unexpected error|DistantHorizons|\[DH-|DH Ready|DH Iris events|Validation Error|Validation Warning|VUID-|UNASSIGNED-|VK_LAYER_KHRONOS_validation|GL_INVALID|OpenGL debug'
 VALIDATION_EVENT_PATTERN='VK_LAYER_KHRONOS_validation|Validation Error|Validation Warning|VUID-|UNASSIGNED-'
 KEY_SUMMARY_PATTERN='Using shaderpack:|Loaded Shaderpack:|Profile:|Reloading pipeline on dimension change|Creating pipeline for dimension|Skipping compute shader|Missing program .*sodium:pipeline|Sodium Vulkan chunk pipelines|raw GLSL imports|ShaderInputParity|LightmapInfoParity|bindVertexBuffer requires an active render pass|No active Vulkan render pass to end|Unexpected error|DistantHorizons|\[DH-|DH Ready|DH Iris events|Validation Error|Validation Warning|VUID-|UNASSIGNED-'
@@ -397,22 +396,12 @@ collect_system_snapshot() {
         echo "display=${DISPLAY:-unset}"
         echo "wayland_display=${WAYLAND_DISPLAY:-unset}"
         echo "xdg_session_type=${XDG_SESSION_TYPE:-unset}"
-        echo "project_spirv_compiler=${PROJECT_SPIRV_COMPILER:-unavailable}"
         echo
         echo "===== uname -a ====="
         uname -a
         echo
         echo "===== java -version ====="
         java -version 2>&1 || true
-        if [[ -x "$PROJECT_SPIRV_COMPILER" ]]; then
-            echo
-            echo "===== project glslangValidator --version ====="
-            "$PROJECT_SPIRV_COMPILER" --version 2>&1 || true
-        elif command -v glslangValidator >/dev/null 2>&1; then
-            echo
-            echo "===== glslangValidator --version ====="
-            glslangValidator --version 2>&1 || true
-        fi
         if command -v vulkaninfo >/dev/null 2>&1; then
             echo
             echo "===== vulkaninfo --summary ====="

@@ -29,6 +29,25 @@ jobs:
           java-version: "21"
           cache: gradle
 
+      - name: Verify native shader compiler build tools
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
+            throw 'CMake is required to build Shaderc into mattmc_rust.'
+          }
+          if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
+            throw 'Python is required to build Shaderc into mattmc_rust.'
+          }
+          if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) {
+            choco install ninja -y --no-progress
+          }
+
+          cmake --version
+          python --version
+          ninja --version
+
       - name: Set up Rust stable
         shell: pwsh
         run: |

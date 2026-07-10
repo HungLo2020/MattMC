@@ -29,6 +29,13 @@ jobs:
           java-version: "21"
           cache: gradle
 
+      - name: Install native shader compiler build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build python3
+
       - name: Set up Rust stable
         shell: bash
         run: |

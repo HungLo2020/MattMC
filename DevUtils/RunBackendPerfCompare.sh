@@ -228,11 +228,6 @@ fi
 
 ensure_quick_play_target
 
-SPIRV_COMPILER="$PROJECT_ROOT/libraries/deps/glslangValidator"
-if [[ -x "$SPIRV_COMPILER" ]]; then
-    export VULKANIC_SPIRV_COMPILER="$SPIRV_COMPILER"
-fi
-
 ORIGINAL_BACKEND=""
 if [[ -f "$OPTIONS_FILE" ]]; then
     ORIGINAL_BACKEND="$(awk -F= '/^graphics_backend=/{print $2; exit}' "$OPTIONS_FILE" || true)"
