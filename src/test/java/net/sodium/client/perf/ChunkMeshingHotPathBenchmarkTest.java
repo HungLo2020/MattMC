@@ -16,6 +16,7 @@ import org.lwjgl.system.MemoryUtil;
 
 import java.io.IOException;
 import java.lang.management.BufferPoolMXBean;
+import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -26,8 +27,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Random;
 
 @Tag("performance")
@@ -35,8 +38,13 @@ class ChunkMeshingHotPathBenchmarkTest {
     private static final int QUAD_COUNT = Integer.getInteger("mattmc.perf.quads", 32_768);
     private static final int WARMUP_ITERATIONS = Integer.getInteger("mattmc.perf.warmup", 8);
     private static final int MEASURE_ITERATIONS = Integer.getInteger("mattmc.perf.iterations", 25);
+    private static final long WARMUP_MILLIS = Long.getLong("mattmc.perf.warmupMillis", 1_500L);
+    private static final long MEASURE_MILLIS = Long.getLong("mattmc.perf.measureMillis", 2_500L);
+    private static final int FORK_INDEX = Integer.getInteger("mattmc.perf.forkIndex", 0);
     private static final int SECTION_INDEX = 11;
     private static final MeshFinisher MESH_FINISHER = createMeshFinisher();
+    private static final int SECTION_BLOCKS = 16 * 16 * 16;
+    private static final int INDEX_BYTES_PER_QUAD = TranslucentData.INDICES_PER_QUAD * Integer.BYTES;
 
     @BeforeAll
     static void installDefaultSodiumOptionsForNativeBufferAllocation() throws Exception {
@@ -87,6 +95,29 @@ class ChunkMeshingHotPathBenchmarkTest {
             sectionBuilder.close();
         }
 
+        installNativeSectionBenchmarkMetadata();
+        try {
+            for (ReplaySection section : replayCorpus()) {
+                NativeSectionMeshBuilder replayBuilder = NativeSectionMeshBuilder.create(4096);
+                ByteBuffer replayRecords = createReplaySectionRecords(section);
+                try {
+                    results.add(measure("replay_section_" + section.name,
+                            () -> runReplaySection(section, replayBuilder, replayRecords)));
+                } finally {
+                    MemoryUtil.memFree(replayRecords);
+                    replayBuilder.close();
+                }
+            }
+
+            results.add(measure("empty_native_call_overhead",
+                    () -> runEmptyNativeCall(NativeSectionMeshBuilder.create(1))));
+            results.add(measure("transfer_copy_4k", () -> runTransferCopy(4 * 1024)));
+            results.add(measure("transfer_copy_64k", () -> runTransferCopy(64 * 1024)));
+            results.add(measure("transfer_copy_1m", () -> runTransferCopy(1024 * 1024)));
+        } finally {
+            NativeStaticBlockModelCache.clear();
+        }
+
         writeResults(results);
         for (BenchmarkResult result : results) {
             System.out.printf(Locale.ROOT,
@@ -99,6 +130,8 @@ class ChunkMeshingHotPathBenchmarkTest {
     private static long runIndexEmission(int[] quadIndexes, IntBuffer indexBuffer) {
         indexBuffer.clear();
         TranslucentData.writeQuadVertexIndexes(indexBuffer, quadIndexes);
+        BenchmarkAccounting.record(0, 0, 0,
+                (long) QUAD_COUNT * INDEX_BYTES_PER_QUAD, QUAD_COUNT, 0, 0);
         return sample(indexBuffer, QUAD_COUNT * TranslucentData.INDICES_PER_QUAD);
     }
 
@@ -119,6 +152,10 @@ class ChunkMeshingHotPathBenchmarkTest {
                     basePositions[baseIndex], basePositions[baseIndex + 1], basePositions[baseIndex + 2]);
         }
 
+        BenchmarkAccounting.record((long) QUAD_COUNT + 1L,
+                (long) QUAD_COUNT * NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE,
+                (long) builder.count() * ChunkMeshFormats.COMPACT.getNativeFormat().stride(),
+                (long) QUAD_COUNT * INDEX_BYTES_PER_QUAD, QUAD_COUNT, 0, 0);
         return ((long) builder.count() << 32) ^ MESH_FINISHER.finish(builder);
     }
 
@@ -129,13 +166,77 @@ class ChunkMeshingHotPathBenchmarkTest {
         BuiltSectionMeshParts mesh = sectionBuilder.finishMesh(ChunkMeshFormats.COMPACT.getNativeFormat(), 0,
                 false, true, false);
         try {
-            return (((long) committed) << 32)
-                    ^ (mesh == null ? 0L : sample(mesh.getVertexData().getDirectBuffer().order(ByteOrder.nativeOrder())));
+            ByteBuffer vertexBuffer = mesh == null ? null
+                    : mesh.getVertexData().getDirectBuffer().order(ByteOrder.nativeOrder());
+            BenchmarkAccounting.record(2, records.remaining(),
+                    vertexBuffer == null ? 0 : vertexBuffer.remaining(),
+                    (long) committed * INDEX_BYTES_PER_QUAD, committed, 0, 0);
+            return (((long) committed) << 32) ^ (vertexBuffer == null ? 0L : sample(vertexBuffer));
         } finally {
             if (mesh != null) {
                 mesh.getVertexData().free();
             }
         }
+    }
+
+    private static long runReplaySection(ReplaySection section, NativeSectionMeshBuilder sectionBuilder,
+            ByteBuffer records) {
+        StageTimer stages = StageTimer.start();
+        sectionBuilder.start(SECTION_INDEX);
+        stages.mark("java_snapshot_ready");
+        int committed = 0;
+        committed += sectionBuilder.appendNativeSectionEncoded(MemoryUtil.memAddress(records), SECTION_BLOCKS, 0,
+                ChunkMeshFormats.COMPACT.getNativeFormat(), SECTION_INDEX, false, false);
+        stages.mark("native_solid_pass");
+        committed += sectionBuilder.appendNativeSectionEncoded(MemoryUtil.memAddress(records), SECTION_BLOCKS, 1,
+                ChunkMeshFormats.COMPACT.getNativeFormat(), SECTION_INDEX, false, false);
+        stages.mark("native_cutout_pass");
+        committed += sectionBuilder.appendNativeSectionEncoded(MemoryUtil.memAddress(records), SECTION_BLOCKS, 2,
+                ChunkMeshFormats.COMPACT.getNativeFormat(), SECTION_INDEX, false, false);
+        stages.mark("native_translucent_pass");
+        BuiltSectionMeshParts mesh = sectionBuilder.finishMesh(ChunkMeshFormats.COMPACT.getNativeFormat(), 0,
+                false, true, false);
+        stages.mark("final_assembly_and_handoff");
+        try {
+            ByteBuffer vertexBuffer = mesh == null ? null
+                    : mesh.getVertexData().getDirectBuffer().order(ByteOrder.nativeOrder());
+            BenchmarkAccounting.record(4, (long) records.remaining() * 3L,
+                    vertexBuffer == null ? 0 : vertexBuffer.remaining(),
+                    (long) committed * INDEX_BYTES_PER_QUAD, committed,
+                    section.fallbackLikeBlocks, section.fallbackLikeBlocks);
+            long meshChecksum = vertexBuffer == null ? 0L : sample(vertexBuffer);
+            long summary = section.expectedSummary();
+            return (((long) committed) << 32) ^ meshChecksum ^ summary ^ stages.checksum();
+        } finally {
+            if (mesh != null) {
+                mesh.getVertexData().free();
+            }
+        }
+    }
+
+    private static long runEmptyNativeCall(NativeSectionMeshBuilder builder) {
+        try {
+            builder.start(SECTION_INDEX);
+            int committed = builder.appendNativeSectionEncoded(0L, 0, 0, ChunkMeshFormats.COMPACT.getNativeFormat(),
+                    SECTION_INDEX, false, false);
+            BenchmarkAccounting.record(1, 0, 0, 0, committed, 0, 0);
+            return committed;
+        } finally {
+            builder.close();
+        }
+    }
+
+    private static long runTransferCopy(int bytes) {
+        ByteBuffer source = ByteBuffer.allocateDirect(bytes).order(ByteOrder.nativeOrder());
+        ByteBuffer target = ByteBuffer.allocateDirect(bytes).order(ByteOrder.nativeOrder());
+        for (int offset = 0; offset < bytes; offset += Integer.BYTES) {
+            source.putInt(offset, offset * 31);
+        }
+        target.clear();
+        source.clear();
+        target.put(source);
+        BenchmarkAccounting.record(0, bytes, bytes, 0, 0, 0, 0);
+        return sample(target.order(ByteOrder.nativeOrder()));
     }
 
     private static void installNativeSectionBenchmarkMetadata() {
@@ -151,11 +252,32 @@ class ChunkMeshingHotPathBenchmarkTest {
         NativeStaticBlockModelCache.registerSelector(8, 0,
                 (recordAddress, index) -> NativeChunkMeshEncoder.writeNativeModelSelectorEntry(recordAddress, 77, 1),
                 1);
+        NativeStaticBlockModelCache.register(78, (recordAddress, index) ->
+                NativeChunkMeshEncoder.writeStaticModelQuadRecord(recordAddress, 7,
+                        net.minecraft.core.Direction.UP.get3DDataValue(), net.sodium.client.model.quad.properties.ModelQuadFacing.POS_Y.ordinal(),
+                        net.sodium.client.model.quad.properties.ModelQuadFacing.POS_Y.getPackedAlignedNormal(), (byte) 0, (byte) 0, true,
+                        0.0F, 1.0F, 0.0F, 0xff78b85a, 0.0F, 0.0F, -1,
+                        1.0F, 1.0F, 0.0F, 0xff78b85a, 1.0F, 0.0F, -1,
+                        1.0F, 1.0F, 1.0F, 0xff78b85a, 1.0F, 1.0F, -1,
+                        0.0F, 1.0F, 1.0F, 0xff78b85a, 0.0F, 1.0F, -1), 1);
+        NativeStaticBlockModelCache.registerSelector(10, 0,
+                (recordAddress, index) -> NativeChunkMeshEncoder.writeNativeModelSelectorEntry(recordAddress, 78, 1),
+                1);
+        NativeStaticBlockModelCache.registerSelector(11, 1, (recordAddress, index) ->
+                NativeChunkMeshEncoder.writeNativeModelSelectorEntry(recordAddress, index == 0 ? 77 : 78,
+                        index == 0 ? 3 : 1), 2);
         NativeStaticBlockModelCache.registerSelector(9, 1,
                 (recordAddress, index) -> NativeChunkMeshEncoder.writeNativeModelSelectorEntry(recordAddress, 8, 1),
                 1);
         NativeStaticBlockModelCache.registerState(0, -1, 1, 0, -1, 0, 0, -1, 0, -1, -1, 0);
         NativeStaticBlockModelCache.registerState(100, 9, 1 << 1, 5, 0, 0, 0, 41, 0, -1, -1, 1);
+        NativeStaticBlockModelCache.registerState(101, 10, 1 << 1, 7, 1, 0, 0, 42, 0, -1, -1, 2);
+        NativeStaticBlockModelCache.registerState(102, 11, 1 << 1, 5, 0, 0, 0, 43, 0, -1, -1, 3);
+        NativeStaticBlockModelCache.registerState(200, -1, 1 << 2, 0, -1, 0, 0, -1, 9, 2, 44, 4,
+                1, 0.8888889F, 0, 0, 0.0F, 0.0F, 3,
+                0.0F, 1.0F, 0.0F, 1.0F, 0.0009765625F,
+                0.0F, 1.0F, 0.0F, 1.0F, 0.0009765625F,
+                0.0F, 1.0F, 0.0F, 1.0F, 0.0009765625F, 1);
     }
 
     private static ByteBuffer createNativeSectionBenchmarkRecords() {
@@ -174,26 +296,101 @@ class ChunkMeshingHotPathBenchmarkTest {
         return records;
     }
 
+    private static List<ReplaySection> replayCorpus() {
+        return List.of(
+                new ReplaySection("empty", 0, 0, 0, 0, 0, 0, 1),
+                new ReplaySection("dense_cube_terrain", 4096, 0, 0, 0, 0, 0, 4),
+                new ReplaySection("normal_surface_terrain", 1536, 0, 0, 0, 0, 0, 8),
+                new ReplaySection("foliage_tinted_models", 512, 1024, 0, 0, 0, 0, 6),
+                new ReplaySection("weighted_and_multipart_models", 384, 384, 768, 0, 0, 0, 5),
+                new ReplaySection("fluid_heavy", 64, 0, 0, 3200, 0, 0, 8),
+                new ReplaySection("waterlogged_geometry", 768, 384, 0, 768, 0, 0, 5),
+                new ReplaySection("translucent_heavy", 0, 0, 0, 2048, 1024, 0, 4),
+                new ReplaySection("complex_modded_static_serializable", 640, 768, 1024, 384, 384, 256, 3));
+    }
+
+    private static ByteBuffer createReplaySectionRecords(ReplaySection section) {
+        ByteBuffer records = MemoryUtil.memAlloc(SECTION_BLOCKS * NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE)
+                .order(ByteOrder.nativeOrder());
+        long base = MemoryUtil.memAddress(records);
+        int[] lightWords = new int[27];
+        Arrays.fill(lightWords, 0xf0);
+        int[] airNeighborhood = new int[27];
+        int[] solidNeighborhood = new int[27];
+        Arrays.fill(solidNeighborhood, 100);
+
+        for (int index = 0; index < SECTION_BLOCKS; index++) {
+            int stateId = stateForReplayIndex(section, index);
+            int localX = index & 15;
+            int localY = (index >>> 8) & 15;
+            int localZ = (index >>> 4) & 15;
+            int[] neighborhood = stateId == 0 ? airNeighborhood : solidNeighborhood;
+            neighborhood[13] = stateId;
+            NativeChunkMeshEncoder.writeNativeSectionBlockRecord(base + (long) index
+                            * NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE,
+                    stateId, stateId == 0 ? -1 : 41 + (stateId % 11), localX, localY, localZ,
+                    0x9e3779b97f4a7c15L ^ (long) index * 0xbf58476d1ce4e5b9L,
+                    0, 0, 0, 0, 0, 0, lightWords, neighborhood, 0xff70aa50, 0xcc3f76e4,
+                    (index & 1) == 0 ? 0.0F : 0.35F, (index & 2) == 0 ? 0.0F : -0.25F,
+                    localX, localY, localZ);
+            neighborhood[13] = 0;
+        }
+        return records;
+    }
+
+    private static int stateForReplayIndex(ReplaySection section, int index) {
+        if (index < section.solidBlocks) {
+            return 100;
+        }
+        index -= section.solidBlocks;
+        if (index < section.foliageBlocks) {
+            return 101;
+        }
+        index -= section.foliageBlocks;
+        if (index < section.weightedMultipartBlocks) {
+            return 102;
+        }
+        index -= section.weightedMultipartBlocks;
+        if (index < section.fluidBlocks + section.translucentBlocks) {
+            return 200;
+        }
+        return 0;
+    }
+
     private static BenchmarkResult measure(String name, BenchmarkAction action) throws Exception {
         settleMemory();
         MemorySnapshot before = MemorySnapshot.capture();
+        GcSnapshot gcBefore = GcSnapshot.capture();
         MemorySnapshot peak = before;
         long checksum = 0L;
-        for (int iteration = 0; iteration < WARMUP_ITERATIONS; iteration++) {
+        long warmupDeadline = System.nanoTime() + WARMUP_MILLIS * 1_000_000L;
+        int warmupCount = 0;
+        do {
             checksum ^= action.run();
             peak = peak.max(MemorySnapshot.capture());
-        }
+            warmupCount++;
+        } while (warmupCount < WARMUP_ITERATIONS || System.nanoTime() < warmupDeadline);
 
-        long[] samples = new long[MEASURE_ITERATIONS];
-        for (int iteration = 0; iteration < MEASURE_ITERATIONS; iteration++) {
+        StageTimer.reset();
+        BenchmarkAccounting.reset();
+        List<Long> sampleList = new ArrayList<>();
+        long measureDeadline = System.nanoTime() + MEASURE_MILLIS * 1_000_000L;
+        do {
             long start = System.nanoTime();
             checksum ^= action.run();
-            samples[iteration] = System.nanoTime() - start;
+            sampleList.add(System.nanoTime() - start);
             peak = peak.max(MemorySnapshot.capture());
-        }
+        } while (sampleList.size() < MEASURE_ITERATIONS || System.nanoTime() < measureDeadline);
         MemorySnapshot after = MemorySnapshot.capture();
+        GcSnapshot gcAfter = GcSnapshot.capture();
         peak = peak.max(after);
+        Map<String, Long> stageNanos = StageTimer.snapshot();
+        AccountingSnapshot accounting = BenchmarkAccounting.snapshot();
 
+        long[] samples = new long[sampleList.size()];
+        for (int index = 0; index < sampleList.size(); index++) {
+            samples[index] = sampleList.get(index);
+        }
         long[] sorted = samples.clone();
         Arrays.sort(sorted);
 
@@ -201,17 +398,41 @@ class ChunkMeshingHotPathBenchmarkTest {
         for (long sample : samples) {
             total += sample;
         }
+        double mean = total / (double) samples.length;
+        double variance = 0.0D;
+        for (long sample : samples) {
+            double delta = sample - mean;
+            variance += delta * delta;
+        }
+        variance /= samples.length;
 
         return new BenchmarkResult(
                 name,
-                total / (double) samples.length,
+                mean,
                 sorted[sorted.length / 2],
+                percentile(sorted, 0.90D),
+                percentile(sorted, 0.99D),
                 sorted[0],
                 sorted[sorted.length - 1],
+                Math.sqrt(variance),
+                samples.length,
+                warmupCount,
                 checksum,
+                stageNanos,
+                accounting,
                 before,
                 after,
-                peak);
+                peak,
+                gcBefore,
+                gcAfter);
+    }
+
+    private static long percentile(long[] sorted, double percentile) {
+        if (sorted.length == 0) {
+            return 0L;
+        }
+        int index = (int) Math.ceil(percentile * sorted.length) - 1;
+        return sorted[Math.max(0, Math.min(sorted.length - 1, index))];
     }
 
     private static int[] shuffledQuadIndexes() {
@@ -296,6 +517,14 @@ class ChunkMeshingHotPathBenchmarkTest {
         builder.append("  \"quad_count\": ").append(QUAD_COUNT).append(",\n");
         builder.append("  \"warmup_iterations\": ").append(WARMUP_ITERATIONS).append(",\n");
         builder.append("  \"measure_iterations\": ").append(MEASURE_ITERATIONS).append(",\n");
+        builder.append("  \"warmup_millis\": ").append(WARMUP_MILLIS).append(",\n");
+        builder.append("  \"measure_millis\": ").append(MEASURE_MILLIS).append(",\n");
+        builder.append("  \"fork_index\": ").append(FORK_INDEX).append(",\n");
+        builder.append("  \"benchmark_limitations\": [\n");
+        builder.append("    \"Historical hot-path rows use synthetic repeated quads and are retained only for trend comparison.\",\n");
+        builder.append("    \"Replay section rows are deterministic section-shaped workloads, not live gameplay captures.\",\n");
+        builder.append("    \"Current Rust internal substages are timed at Java-visible boundaries unless exported native stage counters are added.\"\n");
+        builder.append("  ],\n");
         builder.append("  \"results\": [\n");
         for (int index = 0; index < results.size(); index++) {
             BenchmarkResult result = results.get(index);
@@ -303,11 +532,19 @@ class ChunkMeshingHotPathBenchmarkTest {
             builder.append("      \"name\": \"").append(result.name).append("\",\n");
             builder.append(String.format(Locale.ROOT, "      \"mean_ms\": %.6f,%n", result.meanMillis()));
             builder.append(String.format(Locale.ROOT, "      \"median_ms\": %.6f,%n", result.medianMillis()));
+            builder.append(String.format(Locale.ROOT, "      \"stddev_ms\": %.6f,%n", result.stddevMillis()));
+            builder.append(String.format(Locale.ROOT, "      \"p90_ms\": %.6f,%n", result.p90Millis()));
+            builder.append(String.format(Locale.ROOT, "      \"p99_ms\": %.6f,%n", result.p99Millis()));
             builder.append(String.format(Locale.ROOT, "      \"min_ms\": %.6f,%n", result.minMillis()));
             builder.append(String.format(Locale.ROOT, "      \"max_ms\": %.6f,%n", result.maxMillis()));
             builder.append(String.format(Locale.ROOT, "      \"mega_quads_per_second\": %.6f,%n",
                     result.megaQuadsPerSecond()));
+            builder.append("      \"samples\": ").append(result.sampleCount).append(",\n");
+            builder.append("      \"warmup_invocations\": ").append(result.warmupCount).append(",\n");
             builder.append("      \"checksum\": ").append(result.checksum).append(",\n");
+            appendStageJson(builder, result.stageNanos, result.sampleCount);
+            appendAccountingJson(builder, result.accounting, result.sampleCount);
+            appendGcJson(builder, result.gcBefore, result.gcAfter);
             appendMemoryJson(builder, result);
             builder.append("    }");
             if (index + 1 < results.size()) {
@@ -350,6 +587,68 @@ class ChunkMeshingHotPathBenchmarkTest {
         appendMemoryDeltaJson(builder, "rss_high_water_delta_bytes", result.memoryBefore.rssHighWaterBytes,
                 result.memoryPeak.rssHighWaterBytes, false);
         builder.append("      }\n");
+    }
+
+    private static void appendAccountingJson(StringBuilder builder, AccountingSnapshot accounting, int samples) {
+        builder.append("      \"accounting\": {\n");
+        appendAccountingValueJson(builder, "native_calls_total", accounting.nativeCalls, true);
+        appendAccountingValueJson(builder, "native_calls_per_invocation", accounting.nativeCalls, samples, true);
+        appendAccountingValueJson(builder, "abi_payload_bytes_total", accounting.abiPayloadBytes, true);
+        appendAccountingValueJson(builder, "abi_payload_bytes_per_invocation", accounting.abiPayloadBytes, samples, true);
+        appendAccountingValueJson(builder, "bytes_copied_total", accounting.bytesCopied, true);
+        appendAccountingValueJson(builder, "bytes_copied_per_invocation", accounting.bytesCopied, samples, true);
+        appendAccountingValueJson(builder, "output_vertex_bytes_total", accounting.outputVertexBytes, true);
+        appendAccountingValueJson(builder, "output_vertex_bytes_per_invocation", accounting.outputVertexBytes, samples, true);
+        appendAccountingValueJson(builder, "output_index_bytes_total", accounting.outputIndexBytes, true);
+        appendAccountingValueJson(builder, "output_index_bytes_per_invocation", accounting.outputIndexBytes, samples, true);
+        appendAccountingValueJson(builder, "output_quads_total", accounting.outputQuads, true);
+        appendAccountingValueJson(builder, "output_quads_per_invocation", accounting.outputQuads, samples, true);
+        appendAccountingValueJson(builder, "fallback_like_blocks_total", accounting.fallbackBlocks, true);
+        appendAccountingValueJson(builder, "fallback_like_blocks_per_invocation", accounting.fallbackBlocks, samples, true);
+        appendAccountingValueJson(builder, "fallback_like_quads_total", accounting.fallbackQuads, true);
+        appendAccountingValueJson(builder, "fallback_like_quads_per_invocation", accounting.fallbackQuads, samples, false);
+        builder.append("      },\n");
+    }
+
+    private static void appendGcJson(StringBuilder builder, GcSnapshot before, GcSnapshot after) {
+        builder.append("      \"gc\": {\n");
+        builder.append("        \"collection_count_delta\": ").append(after.collectionCount - before.collectionCount).append(",\n");
+        builder.append("        \"collection_time_millis_delta\": ").append(after.collectionTimeMillis - before.collectionTimeMillis).append('\n');
+        builder.append("      },\n");
+    }
+
+    private static void appendAccountingValueJson(StringBuilder builder, String name, long value,
+            boolean trailingComma) {
+        builder.append("        \"").append(name).append("\": ").append(value);
+        if (trailingComma) {
+            builder.append(',');
+        }
+        builder.append('\n');
+    }
+
+    private static void appendAccountingValueJson(StringBuilder builder, String name, long value, int samples,
+            boolean trailingComma) {
+        builder.append("        \"").append(name).append("\": ")
+                .append(String.format(Locale.ROOT, "%.3f", value / (double) Math.max(1, samples)));
+        if (trailingComma) {
+            builder.append(',');
+        }
+        builder.append('\n');
+    }
+
+    private static void appendStageJson(StringBuilder builder, Map<String, Long> stageNanos, int samples) {
+        builder.append("      \"stage_timing_ms_per_invocation\": {\n");
+        int index = 0;
+        for (Map.Entry<String, Long> entry : stageNanos.entrySet()) {
+            double millis = entry.getValue() / (double) Math.max(1, samples) / 1_000_000.0D;
+            builder.append("        \"").append(entry.getKey()).append("\": ")
+                    .append(String.format(Locale.ROOT, "%.6f", millis));
+            if (++index < stageNanos.size()) {
+                builder.append(',');
+            }
+            builder.append('\n');
+        }
+        builder.append("      },\n");
     }
 
     private static void appendSnapshotJson(StringBuilder builder, String name, MemorySnapshot snapshot,
@@ -497,14 +796,52 @@ class ChunkMeshingHotPathBenchmarkTest {
         }
     }
 
-    private record BenchmarkResult(String name, double meanNanos, long medianNanos, long minNanos, long maxNanos,
-            long checksum, MemorySnapshot memoryBefore, MemorySnapshot memoryAfter, MemorySnapshot memoryPeak) {
+    private record GcSnapshot(long collectionCount, long collectionTimeMillis) {
+        static GcSnapshot capture() {
+            long count = 0L;
+            long time = 0L;
+            for (GarbageCollectorMXBean collector : ManagementFactory.getGarbageCollectorMXBeans()) {
+                long collectorCount = collector.getCollectionCount();
+                long collectorTime = collector.getCollectionTime();
+                if (collectorCount > 0) {
+                    count += collectorCount;
+                }
+                if (collectorTime > 0) {
+                    time += collectorTime;
+                }
+            }
+            return new GcSnapshot(count, time);
+        }
+    }
+
+    private record AccountingSnapshot(long nativeCalls, long abiPayloadBytes, long bytesCopied,
+            long outputVertexBytes, long outputIndexBytes, long outputQuads, long fallbackBlocks,
+            long fallbackQuads) {
+    }
+
+    private record BenchmarkResult(String name, double meanNanos, long medianNanos, long p90Nanos, long p99Nanos,
+            long minNanos, long maxNanos, double stddevNanos, int sampleCount, int warmupCount,
+            long checksum, Map<String, Long> stageNanos, AccountingSnapshot accounting,
+            MemorySnapshot memoryBefore, MemorySnapshot memoryAfter, MemorySnapshot memoryPeak,
+            GcSnapshot gcBefore, GcSnapshot gcAfter) {
         double meanMillis() {
             return this.meanNanos / 1_000_000.0;
         }
 
         double medianMillis() {
             return this.medianNanos / 1_000_000.0;
+        }
+
+        double stddevMillis() {
+            return this.stddevNanos / 1_000_000.0;
+        }
+
+        double p90Millis() {
+            return this.p90Nanos / 1_000_000.0;
+        }
+
+        double p99Millis() {
+            return this.p99Nanos / 1_000_000.0;
         }
 
         double minMillis() {
@@ -517,6 +854,109 @@ class ChunkMeshingHotPathBenchmarkTest {
 
         double megaQuadsPerSecond() {
             return QUAD_COUNT / (this.meanNanos / 1_000_000_000.0) / 1_000_000.0;
+        }
+    }
+
+    private record ReplaySection(String name, int solidBlocks, int foliageBlocks, int weightedMultipartBlocks,
+            int fluidBlocks, int translucentBlocks, int fallbackLikeBlocks, int weight) {
+        long expectedSummary() {
+            long summary = this.weight;
+            summary = summary * 31L + this.solidBlocks;
+            summary = summary * 31L + this.foliageBlocks;
+            summary = summary * 31L + this.weightedMultipartBlocks;
+            summary = summary * 31L + this.fluidBlocks;
+            summary = summary * 31L + this.translucentBlocks;
+            summary = summary * 31L + this.fallbackLikeBlocks;
+            return summary;
+        }
+    }
+
+    private static final class StageTimer {
+        private static final ThreadLocal<LinkedHashMap<String, Long>> STAGES =
+                ThreadLocal.withInitial(LinkedHashMap::new);
+        private final long startedAt;
+        private long previous;
+        private long checksum;
+
+        private StageTimer(long startedAt) {
+            this.startedAt = startedAt;
+            this.previous = startedAt;
+        }
+
+        static StageTimer start() {
+            return new StageTimer(System.nanoTime());
+        }
+
+        void mark(String name) {
+            long now = System.nanoTime();
+            long delta = now - this.previous;
+            STAGES.get().merge(name, delta, Long::sum);
+            this.checksum = this.checksum * 31L + name.hashCode();
+            this.checksum = this.checksum * 31L + delta;
+            this.previous = now;
+        }
+
+        long checksum() {
+            return this.checksum ^ (this.previous - this.startedAt);
+        }
+
+        static void reset() {
+            STAGES.get().clear();
+        }
+
+        static Map<String, Long> snapshot() {
+            return new LinkedHashMap<>(STAGES.get());
+        }
+    }
+
+    private static final class BenchmarkAccounting {
+        private static final ThreadLocal<MutableAccounting> ACCOUNTING =
+                ThreadLocal.withInitial(MutableAccounting::new);
+
+        static void reset() {
+            ACCOUNTING.get().reset();
+        }
+
+        static void record(long nativeCalls, long abiPayloadBytes, long outputVertexBytes,
+                long outputIndexBytes, long outputQuads, long fallbackBlocks, long fallbackQuads) {
+            MutableAccounting accounting = ACCOUNTING.get();
+            accounting.nativeCalls += nativeCalls;
+            accounting.abiPayloadBytes += abiPayloadBytes;
+            accounting.bytesCopied += outputVertexBytes == abiPayloadBytes ? outputVertexBytes : 0;
+            accounting.outputVertexBytes += outputVertexBytes;
+            accounting.outputIndexBytes += outputIndexBytes;
+            accounting.outputQuads += outputQuads;
+            accounting.fallbackBlocks += fallbackBlocks;
+            accounting.fallbackQuads += fallbackQuads;
+        }
+
+        static AccountingSnapshot snapshot() {
+            MutableAccounting accounting = ACCOUNTING.get();
+            return new AccountingSnapshot(accounting.nativeCalls, accounting.abiPayloadBytes,
+                    accounting.bytesCopied, accounting.outputVertexBytes, accounting.outputIndexBytes,
+                    accounting.outputQuads, accounting.fallbackBlocks, accounting.fallbackQuads);
+        }
+    }
+
+    private static final class MutableAccounting {
+        private long nativeCalls;
+        private long abiPayloadBytes;
+        private long bytesCopied;
+        private long outputVertexBytes;
+        private long outputIndexBytes;
+        private long outputQuads;
+        private long fallbackBlocks;
+        private long fallbackQuads;
+
+        private void reset() {
+            this.nativeCalls = 0L;
+            this.abiPayloadBytes = 0L;
+            this.bytesCopied = 0L;
+            this.outputVertexBytes = 0L;
+            this.outputIndexBytes = 0L;
+            this.outputQuads = 0L;
+            this.fallbackBlocks = 0L;
+            this.fallbackQuads = 0L;
         }
     }
 }
