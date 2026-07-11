@@ -14,25 +14,23 @@ import java.nio.IntBuffer;
 
 public final class NativeChunkMeshEncoder {
     public static final int NATIVE_QUAD_STRIDE = 152;
-    private static final int LOGICAL_VERTEX_STRIDE = 32;
-    private static final int OFFSET_X = 0;
-    private static final int OFFSET_Y = 4;
-    private static final int OFFSET_Z = 8;
-    private static final int OFFSET_COLOR = 12;
-    private static final int OFFSET_AO = 16;
-    private static final int OFFSET_U = 20;
-    private static final int OFFSET_V = 24;
-    private static final int OFFSET_LIGHT = 28;
-    private static final int OFFSET_BLOCK_EMISSION = LOGICAL_VERTEX_STRIDE * 4;
-    private static final int OFFSET_RENDER_TYPE = OFFSET_BLOCK_EMISSION + 1;
-    private static final int OFFSET_IGNORE_MID_BLOCK = OFFSET_BLOCK_EMISSION + 2;
-    private static final int OFFSET_BLOCK_ID = OFFSET_BLOCK_EMISSION + 4;
-    private static final int OFFSET_LOCAL_X = OFFSET_BLOCK_ID + 4;
-    private static final int OFFSET_LOCAL_Y = OFFSET_LOCAL_X + 4;
-    private static final int OFFSET_LOCAL_Z = OFFSET_LOCAL_Y + 4;
-    private static final int OFFSET_MATERIAL_BITS = OFFSET_LOCAL_Z + 4;
 
     private static final int OK = 0;
+    public static final int COMPACT_VALUE_STRIDE = 0;
+    public static final int COMPACT_VALUE_POSITION_OFFSET = 1;
+    public static final int COMPACT_VALUE_COLOR_OFFSET = 2;
+    public static final int COMPACT_VALUE_TEXTURE_OFFSET = 3;
+    public static final int COMPACT_VALUE_LIGHT_MATERIAL_INDEX_OFFSET = 4;
+    public static final int COMPACT_VALUE_BLOCK_ID_OFFSET = 5;
+    public static final int COMPACT_VALUE_NORMAL_OFFSET = 6;
+    public static final int COMPACT_VALUE_TANGENT_OFFSET = 7;
+    public static final int COMPACT_VALUE_MID_UV_OFFSET = 8;
+    public static final int COMPACT_VALUE_MID_BLOCK_OFFSET = 9;
+    public static final int COMPACT_VALUE_POSITION_MAX_VALUE = 10;
+    public static final int COMPACT_VALUE_TEXTURE_MAX_VALUE = 11;
+    private static final int POSITION_COMPONENT_X = 0;
+    private static final int POSITION_COMPONENT_Y = 1;
+    private static final int POSITION_COMPONENT_Z = 2;
     private static final int INDEX_MODE_NONE = 0;
     private static final int INDEX_MODE_SHARED = 1;
     private static final int INDEX_MODE_SORTED_QUADS = 2;
@@ -40,6 +38,55 @@ public final class NativeChunkMeshEncoder {
     private static final MethodHandle VERIFY = NativeLibraryLoader.downcallHandle("mattmc_rust",
             "mattmc_sodium_chunk_mesh_verify",
             FunctionDescriptor.of(ValueLayout.JAVA_INT));
+    private static final MethodHandle COMPACT_FORMAT_VALUE = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_chunk_compact_format_value",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT));
+    private static final MethodHandle WRITE_NATIVE_QUAD_METADATA = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_chunk_native_quad_write_metadata",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT));
+    private static final MethodHandle WRITE_NATIVE_QUAD = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_chunk_native_quad_write",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_INT));
+    private static final MethodHandle WRITE_NATIVE_QUAD_VERTEX = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_chunk_native_quad_write_vertex",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_FLOAT,
+                    ValueLayout.JAVA_FLOAT,
+                    ValueLayout.JAVA_FLOAT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_FLOAT,
+                    ValueLayout.JAVA_FLOAT,
+                    ValueLayout.JAVA_FLOAT,
+                    ValueLayout.JAVA_INT));
+    private static final MethodHandle NATIVE_QUAD_POSITION = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_chunk_native_quad_position",
+            FunctionDescriptor.of(ValueLayout.JAVA_FLOAT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT));
     private static final MethodHandle ENCODE = NativeLibraryLoader.downcallHandle("mattmc_rust",
             "mattmc_sodium_chunk_mesh_encode",
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
@@ -129,6 +176,24 @@ public final class NativeChunkMeshEncoder {
         check(invokeVerify(), "native chunk mesh encoder verification");
     }
 
+    public static int compactFormatValue(int value) {
+        int result = invokeCompactFormatValue(value);
+        if (result < 0) {
+            throw new IllegalArgumentException("Unknown compact chunk vertex format value: " + value);
+        }
+        return result;
+    }
+
+    public static NativeChunkVertexFormat compactNativeFormat() {
+        return new NativeChunkVertexFormat(
+                compactFormatValue(COMPACT_VALUE_STRIDE),
+                compactFormatValue(COMPACT_VALUE_BLOCK_ID_OFFSET),
+                compactFormatValue(COMPACT_VALUE_NORMAL_OFFSET),
+                compactFormatValue(COMPACT_VALUE_TANGENT_OFFSET),
+                compactFormatValue(COMPACT_VALUE_MID_UV_OFFSET),
+                compactFormatValue(COMPACT_VALUE_MID_BLOCK_OFFSET));
+    }
+
     public static void encode(
             ByteBuffer logicalVertices,
             int vertexCount,
@@ -204,36 +269,63 @@ public final class NativeChunkMeshEncoder {
         }
     }
 
-    public static void writeNativeQuad(long ptr, ChunkVertexEncoder.Vertex[] vertices, int materialBits) {
-        long vertexPtr = ptr;
-
-        for (ChunkVertexEncoder.Vertex vertex : vertices) {
-            writeNativeQuadVertex(vertexPtr, vertex);
-            vertexPtr += LOGICAL_VERTEX_STRIDE;
-        }
-
-        var extension = (net.irisshaders.iris.vertices.sodium.terrain.ChunkVertexExtension) vertices[0];
-
-        MemoryUtil.memPutByte(ptr + OFFSET_BLOCK_EMISSION, extension.getBlockEmission());
-        MemoryUtil.memPutByte(ptr + OFFSET_RENDER_TYPE, extension.getRenderType());
-        MemoryUtil.memPutByte(ptr + OFFSET_IGNORE_MID_BLOCK, (byte) (extension.ignoreMidBlock() ? 1 : 0));
-        MemoryUtil.memPutByte(ptr + OFFSET_BLOCK_EMISSION + 3, (byte) 0);
-        MemoryUtil.memPutInt(ptr + OFFSET_BLOCK_ID, extension.getBlockId());
-        MemoryUtil.memPutInt(ptr + OFFSET_LOCAL_X, extension.getLocalPosX());
-        MemoryUtil.memPutInt(ptr + OFFSET_LOCAL_Y, extension.getLocalPosY());
-        MemoryUtil.memPutInt(ptr + OFFSET_LOCAL_Z, extension.getLocalPosZ());
-        MemoryUtil.memPutInt(ptr + OFFSET_MATERIAL_BITS, materialBits);
+    public static void writeNativeQuadMetadata(long ptr, byte blockEmission, byte renderType, boolean ignoreMidBlock,
+            int blockId, int localX, int localY, int localZ, int materialBits) {
+        check(invokeWriteNativeQuadMetadata(ptr, blockEmission, renderType, ignoreMidBlock ? 1 : 0, blockId, localX,
+                localY, localZ, materialBits), "native quad metadata writing");
     }
 
-    private static void writeNativeQuadVertex(long ptr, ChunkVertexEncoder.Vertex vertex) {
-        MemoryUtil.memPutFloat(ptr + OFFSET_X, vertex.x);
-        MemoryUtil.memPutFloat(ptr + OFFSET_Y, vertex.y);
-        MemoryUtil.memPutFloat(ptr + OFFSET_Z, vertex.z);
-        MemoryUtil.memPutInt(ptr + OFFSET_COLOR, vertex.color);
-        MemoryUtil.memPutFloat(ptr + OFFSET_AO, vertex.ao);
-        MemoryUtil.memPutFloat(ptr + OFFSET_U, vertex.u);
-        MemoryUtil.memPutFloat(ptr + OFFSET_V, vertex.v);
-        MemoryUtil.memPutInt(ptr + OFFSET_LIGHT, vertex.light);
+    public static void writeNativeQuadVertex(long ptr, int vertexIndex, float x, float y, float z, int color,
+            float ao, float u, float v, int light) {
+        if (vertexIndex < 0 || vertexIndex >= 4) {
+            throw new IllegalArgumentException("Invalid quad vertex index: " + vertexIndex);
+        }
+
+        check(invokeWriteNativeQuadVertex(ptr, vertexIndex, x, y, z, color, ao, u, v, light),
+                "native quad vertex writing");
+    }
+
+    public static void writeNativeQuad(
+            long ptr,
+            byte blockEmission,
+            byte renderType,
+            boolean ignoreMidBlock,
+            int blockId,
+            int localX,
+            int localY,
+            int localZ,
+            int materialBits,
+            float x0, float y0, float z0, int color0, float ao0, float u0, float v0, int light0,
+            float x1, float y1, float z1, int color1, float ao1, float u1, float v1, int light1,
+            float x2, float y2, float z2, int color2, float ao2, float u2, float v2, int light2,
+            float x3, float y3, float z3, int color3, float ao3, float u3, float v3, int light3
+    ) {
+        check(invokeWriteNativeQuad(ptr, blockEmission, renderType, ignoreMidBlock ? 1 : 0, blockId, localX, localY,
+                localZ, materialBits,
+                x0, y0, z0, color0, ao0, u0, v0, light0,
+                x1, y1, z1, color1, ao1, u1, v1, light1,
+                x2, y2, z2, color2, ao2, u2, v2, light2,
+                x3, y3, z3, color3, ao3, u3, v3, light3), "native quad writing");
+    }
+
+    public static float nativeQuadX(long ptr, int vertexIndex) {
+        return nativeQuadPosition(ptr, vertexIndex, POSITION_COMPONENT_X);
+    }
+
+    public static float nativeQuadY(long ptr, int vertexIndex) {
+        return nativeQuadPosition(ptr, vertexIndex, POSITION_COMPONENT_Y);
+    }
+
+    public static float nativeQuadZ(long ptr, int vertexIndex) {
+        return nativeQuadPosition(ptr, vertexIndex, POSITION_COMPONENT_Z);
+    }
+
+    private static float nativeQuadPosition(long ptr, int vertexIndex, int component) {
+        if (vertexIndex < 0 || vertexIndex >= 4) {
+            throw new IllegalArgumentException("Invalid quad vertex index: " + vertexIndex);
+        }
+
+        return invokeNativeQuadPosition(ptr, vertexIndex, component);
     }
 
     public static void assemble(
@@ -424,6 +516,87 @@ public final class NativeChunkMeshEncoder {
             return (int) VERIFY.invokeExact();
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust chunk mesh verification downcall failed", throwable);
+        }
+    }
+
+    private static int invokeCompactFormatValue(int value) {
+        try {
+            return (int) COMPACT_FORMAT_VALUE.invokeExact(value);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust compact chunk vertex format downcall failed", throwable);
+        }
+    }
+
+    private static int invokeWriteNativeQuadMetadata(
+            long ptr,
+            int blockEmission,
+            int renderType,
+            int ignoreMidBlock,
+            int blockId,
+            int localX,
+            int localY,
+            int localZ,
+            int materialBits
+    ) {
+        try {
+            return (int) WRITE_NATIVE_QUAD_METADATA.invokeExact(ptr, blockEmission, renderType, ignoreMidBlock,
+                    blockId, localX, localY, localZ, materialBits);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust native quad metadata downcall failed", throwable);
+        }
+    }
+
+    private static int invokeWriteNativeQuadVertex(
+            long ptr,
+            int vertexIndex,
+            float x,
+            float y,
+            float z,
+            int color,
+            float ao,
+            float u,
+            float v,
+            int light
+    ) {
+        try {
+            return (int) WRITE_NATIVE_QUAD_VERTEX.invokeExact(ptr, vertexIndex, x, y, z, color, ao, u, v, light);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust native quad vertex downcall failed", throwable);
+        }
+    }
+
+    private static int invokeWriteNativeQuad(
+            long ptr,
+            int blockEmission,
+            int renderType,
+            int ignoreMidBlock,
+            int blockId,
+            int localX,
+            int localY,
+            int localZ,
+            int materialBits,
+            float x0, float y0, float z0, int color0, float ao0, float u0, float v0, int light0,
+            float x1, float y1, float z1, int color1, float ao1, float u1, float v1, int light1,
+            float x2, float y2, float z2, int color2, float ao2, float u2, float v2, int light2,
+            float x3, float y3, float z3, int color3, float ao3, float u3, float v3, int light3
+    ) {
+        try {
+            return (int) WRITE_NATIVE_QUAD.invokeExact(ptr, blockEmission, renderType, ignoreMidBlock, blockId,
+                    localX, localY, localZ, materialBits,
+                    x0, y0, z0, color0, ao0, u0, v0, light0,
+                    x1, y1, z1, color1, ao1, u1, v1, light1,
+                    x2, y2, z2, color2, ao2, u2, v2, light2,
+                    x3, y3, z3, color3, ao3, u3, v3, light3);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust native quad downcall failed", throwable);
+        }
+    }
+
+    private static float invokeNativeQuadPosition(long ptr, int vertexIndex, int component) {
+        try {
+            return (float) NATIVE_QUAD_POSITION.invokeExact(ptr, vertexIndex, component);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust native quad position downcall failed", throwable);
         }
     }
 

@@ -12,7 +12,6 @@ import net.sodium.client.render.chunk.translucent_sorting.quad.RegularTQuad;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.sodium.client.render.chunk.translucent_sorting.trigger.NativeGfniTriggers;
 import net.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import org.joml.Vector3f;
@@ -51,9 +50,9 @@ class NativeTranslucentGeometryAnalyzerTest {
     void opposingAlignedFacesNeedNoSorting() {
         NativeTranslucentGeometryAnalyzer analyzer = new NativeTranslucentGeometryAnalyzer();
 
-        assertFalse(analyzer.appendQuad(zQuad(1.0F), ModelQuadFacing.POS_Z,
+        assertFalse(appendZQuad(analyzer, 1.0F, ModelQuadFacing.POS_Z,
                 ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
-        assertFalse(analyzer.appendQuad(zQuad(0.0F), ModelQuadFacing.NEG_Z,
+        assertFalse(appendZQuad(analyzer, 0.0F, ModelQuadFacing.NEG_Z,
                 ModelQuadFacing.NEG_Z.getPackedAlignedNormal()));
 
         NativeTranslucentGeometryAnalyzer.Analysis analysis = analyzer.analyze(SortBehavior.SortMode.DYNAMIC);
@@ -69,9 +68,9 @@ class NativeTranslucentGeometryAnalyzerTest {
     void sameAlignedFacingProducesStaticNormalRelativeKeys() {
         NativeTranslucentGeometryAnalyzer analyzer = new NativeTranslucentGeometryAnalyzer();
 
-        assertFalse(analyzer.appendQuad(zQuad(0.0F), ModelQuadFacing.POS_Z,
+        assertFalse(appendZQuad(analyzer, 0.0F, ModelQuadFacing.POS_Z,
                 ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
-        assertFalse(analyzer.appendQuad(zQuad(1.0F), ModelQuadFacing.POS_Z,
+        assertFalse(appendZQuad(analyzer, 1.0F, ModelQuadFacing.POS_Z,
                 ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
 
         NativeTranslucentGeometryAnalyzer.Analysis analysis = analyzer.analyze(SortBehavior.SortMode.DYNAMIC);
@@ -84,16 +83,15 @@ class NativeTranslucentGeometryAnalyzerTest {
     @Test
     void invalidDuplicateVertexQuadIsDiscardedBeforeNativeAnalysis() {
         NativeTranslucentGeometryAnalyzer analyzer = new NativeTranslucentGeometryAnalyzer();
-        ChunkVertexEncoder.Vertex[] vertices = zQuad(0.0F);
-        vertices[1].x = vertices[0].x;
-        vertices[1].y = vertices[0].y;
-        vertices[1].z = vertices[0].z;
-        vertices[3].x = vertices[2].x;
-        vertices[3].y = vertices[2].y;
-        vertices[3].z = vertices[2].z;
+        ByteBuffer quad = nativeOrder(MemoryUtil.memAlloc(NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE));
 
-        assertTrue(analyzer.appendQuad(vertices, ModelQuadFacing.POS_Z,
-                ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
+        try {
+            writeInvalidZQuad(MemoryUtil.memAddress(quad), 0.0F);
+            assertTrue(analyzer.appendNativeQuad(MemoryUtil.memAddress(quad), ModelQuadFacing.POS_Z,
+                    ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
+        } finally {
+            free(quad);
+        }
 
         NativeTranslucentGeometryAnalyzer.Analysis analysis = analyzer.analyze(SortBehavior.SortMode.DYNAMIC);
 
@@ -112,7 +110,7 @@ class NativeTranslucentGeometryAnalyzerTest {
             sectionBuilder.start(3);
             quadBuffer.start(3);
             long address = quadBuffer.prepareQuadAddress();
-            NativeChunkMeshEncoder.writeNativeQuad(address, zQuad(2.0F), DefaultMaterials.TRANSLUCENT.bits());
+            writeZQuad(address, 2.0F);
 
             assertFalse(analyzer.appendNativeQuad(address, ModelQuadFacing.POS_Z,
                     ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
@@ -139,18 +137,8 @@ class NativeTranslucentGeometryAnalyzerTest {
             packedNormals = nativeOrder(MemoryUtil.memAlloc(2 * Integer.BYTES));
             validity = MemoryUtil.memAlloc(2);
 
-            ChunkVertexEncoder.Vertex[] invalid = zQuad(4.0F);
-            invalid[1].x = invalid[0].x;
-            invalid[1].y = invalid[0].y;
-            invalid[1].z = invalid[0].z;
-            invalid[3].x = invalid[2].x;
-            invalid[3].y = invalid[2].y;
-            invalid[3].z = invalid[2].z;
-
-            NativeChunkMeshEncoder.writeNativeQuad(MemoryUtil.memAddress(batch), zQuad(2.0F),
-                    DefaultMaterials.TRANSLUCENT.bits());
-            NativeChunkMeshEncoder.writeNativeQuad(MemoryUtil.memAddress(batch) + NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE,
-                    invalid, DefaultMaterials.TRANSLUCENT.bits());
+            writeZQuad(MemoryUtil.memAddress(batch), 2.0F);
+            writeInvalidZQuad(MemoryUtil.memAddress(batch) + NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE, 4.0F);
             packedNormals.putInt(0, ModelQuadFacing.POS_Z.getPackedAlignedNormal());
             packedNormals.putInt(Integer.BYTES, ModelQuadFacing.POS_Z.getPackedAlignedNormal());
 
@@ -174,9 +162,9 @@ class NativeTranslucentGeometryAnalyzerTest {
     void staticTopoSortOrdersVisibleParallelPlanesBackToFront() {
         NativeTranslucentGeometryAnalyzer analyzer = new NativeTranslucentGeometryAnalyzer();
 
-        assertFalse(analyzer.appendQuad(zQuad(1.0F), ModelQuadFacing.POS_Z,
+        assertFalse(appendZQuad(analyzer, 1.0F, ModelQuadFacing.POS_Z,
                 ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
-        assertFalse(analyzer.appendQuad(zQuad(0.0F), ModelQuadFacing.POS_Z,
+        assertFalse(appendZQuad(analyzer, 0.0F, ModelQuadFacing.POS_Z,
                 ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
 
         assertArrayEquals(new int[] {1, 0}, analyzer.staticTopoSort(false));
@@ -185,9 +173,9 @@ class NativeTranslucentGeometryAnalyzerTest {
     @Test
     void topoGraphSortFromJavaQuadsRunsNativelyAndAppliesActiveRemap() {
         TQuad[] quads = new TQuad[] {
-                RegularTQuad.fromVertices(zQuad(1.0F), ModelQuadFacing.POS_Z,
+                zRegularQuad(1.0F, ModelQuadFacing.POS_Z,
                         ModelQuadFacing.POS_Z.getPackedAlignedNormal()),
-                RegularTQuad.fromVertices(zQuad(0.0F), ModelQuadFacing.POS_Z,
+                zRegularQuad(0.0F, ModelQuadFacing.POS_Z,
                         ModelQuadFacing.POS_Z.getPackedAlignedNormal())
         };
 
@@ -197,9 +185,9 @@ class NativeTranslucentGeometryAnalyzerTest {
 
     @Test
     void bspDoubleLeafDecisionUsesRustOwnedTopoQuadStore() {
-        TQuad quadA = RegularTQuad.fromVertices(zQuad(1.0F), ModelQuadFacing.POS_Z,
+        TQuad quadA = zRegularQuad(1.0F, ModelQuadFacing.POS_Z,
                 ModelQuadFacing.POS_Z.getPackedAlignedNormal());
-        TQuad quadB = RegularTQuad.fromVertices(zQuad(0.0F), ModelQuadFacing.NEG_Z,
+        TQuad quadB = zRegularQuad(0.0F, ModelQuadFacing.NEG_Z,
                 ModelQuadFacing.NEG_Z.getPackedAlignedNormal());
 
         try (NativeTranslucentGeometryAnalyzer.TopoQuadStore store =
@@ -237,9 +225,9 @@ class NativeTranslucentGeometryAnalyzerTest {
         Sorter sorter = null;
 
         try {
-            assertFalse(analyzer.appendQuad(zQuad(1.0F), ModelQuadFacing.POS_Z,
+            assertFalse(appendZQuad(analyzer, 1.0F, ModelQuadFacing.POS_Z,
                     ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
-            assertFalse(analyzer.appendQuad(zQuad(0.0F), ModelQuadFacing.POS_Z,
+            assertFalse(appendZQuad(analyzer, 0.0F, ModelQuadFacing.POS_Z,
                     ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
 
             NativeTranslucentSortData sortData = analyzer.createStaticTopoSortData(false);
@@ -284,9 +272,9 @@ class NativeTranslucentGeometryAnalyzerTest {
 
         try {
             TQuad[] quads = new TQuad[] {
-                    RegularTQuad.fromVertices(zQuad(1.0F), ModelQuadFacing.POS_Z,
+                    zRegularQuad(1.0F, ModelQuadFacing.POS_Z,
                             ModelQuadFacing.POS_Z.getPackedAlignedNormal()),
-                    RegularTQuad.fromVertices(zQuad(0.0F), ModelQuadFacing.POS_Z,
+                    zRegularQuad(0.0F, ModelQuadFacing.POS_Z,
                             ModelQuadFacing.POS_Z.getPackedAlignedNormal())
             };
 
@@ -314,9 +302,9 @@ class NativeTranslucentGeometryAnalyzerTest {
         NativeTranslucentSortData sortData = null;
 
         try {
-            assertFalse(analyzer.appendQuad(zQuad(1.0F), ModelQuadFacing.POS_Z,
+            assertFalse(appendZQuad(analyzer, 1.0F, ModelQuadFacing.POS_Z,
                     ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
-            assertFalse(analyzer.appendQuad(zQuad(4.0F), ModelQuadFacing.POS_Z,
+            assertFalse(appendZQuad(analyzer, 4.0F, ModelQuadFacing.POS_Z,
                     ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
 
             sortData = analyzer.createDynamicTopoSortData();
@@ -345,9 +333,9 @@ class NativeTranslucentGeometryAnalyzerTest {
         NativeTranslucentSortData sortData = null;
 
         try {
-            assertFalse(analyzer.appendQuad(zQuad(1.0F), ModelQuadFacing.POS_Z,
+            assertFalse(appendZQuad(analyzer, 1.0F, ModelQuadFacing.POS_Z,
                     ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
-            assertFalse(analyzer.appendQuad(zQuad(4.0F), ModelQuadFacing.POS_Z,
+            assertFalse(appendZQuad(analyzer, 4.0F, ModelQuadFacing.POS_Z,
                     ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
 
             sortData = analyzer.createDynamicTopoSortData();
@@ -376,9 +364,9 @@ class NativeTranslucentGeometryAnalyzerTest {
         NativeTranslucentSortData sortData = null;
 
         try {
-            assertFalse(analyzer.appendQuad(zQuad(1.0F), ModelQuadFacing.POS_Z,
+            assertFalse(appendZQuad(analyzer, 1.0F, ModelQuadFacing.POS_Z,
                     ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
-            assertFalse(analyzer.appendQuad(zQuad(4.0F), ModelQuadFacing.POS_Z,
+            assertFalse(appendZQuad(analyzer, 4.0F, ModelQuadFacing.POS_Z,
                     ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
 
             sortData = analyzer.createDynamicTopoSortData();
@@ -407,9 +395,9 @@ class NativeTranslucentGeometryAnalyzerTest {
         NativeTranslucentSortData sortData = null;
 
         try {
-            assertFalse(analyzer.appendQuad(zQuad(1.0F), ModelQuadFacing.POS_Z,
+            assertFalse(appendZQuad(analyzer, 1.0F, ModelQuadFacing.POS_Z,
                     ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
-            assertFalse(analyzer.appendQuad(zQuad(4.0F), ModelQuadFacing.POS_Z,
+            assertFalse(appendZQuad(analyzer, 4.0F, ModelQuadFacing.POS_Z,
                     ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
 
             sortData = analyzer.createDynamicTopoSortData();
@@ -437,9 +425,9 @@ class NativeTranslucentGeometryAnalyzerTest {
         long geometryPlanes = 0;
 
         try {
-            assertFalse(analyzer.appendQuad(zQuad(1.0F), ModelQuadFacing.POS_Z,
+            assertFalse(appendZQuad(analyzer, 1.0F, ModelQuadFacing.POS_Z,
                     ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
-            assertFalse(analyzer.appendQuad(zQuad(4.0F), ModelQuadFacing.POS_Z,
+            assertFalse(appendZQuad(analyzer, 4.0F, ModelQuadFacing.POS_Z,
                     ModelQuadFacing.POS_Z.getPackedAlignedNormal()));
 
             geometryPlanes = analyzer.createGeometryPlanesHandle();
@@ -452,7 +440,7 @@ class NativeTranslucentGeometryAnalyzerTest {
 
     @Test
     void quadRecordFallbackCreatesGeometryPlanesInRust() {
-        TQuad quad = RegularTQuad.fromVertices(zQuad(2.0F), ModelQuadFacing.POS_Z,
+        TQuad quad = zRegularQuad(2.0F, ModelQuadFacing.POS_Z,
                 ModelQuadFacing.POS_Z.getPackedAlignedNormal());
         long geometryPlanes = NativeTranslucentGeometryAnalyzer.createGeometryPlanes(new TQuad[] {quad});
 
@@ -489,17 +477,54 @@ class NativeTranslucentGeometryAnalyzerTest {
         assertFalse(staticNormalRelativeData.contains("new StaticSorter"));
     }
 
-    private static ChunkVertexEncoder.Vertex[] zQuad(float z) {
-        ChunkVertexEncoder.Vertex[] vertices = ChunkVertexEncoder.Vertex.uninitializedQuad();
-        writeVertex(vertices[0], 0.0F, 0.0F, z);
-        writeVertex(vertices[1], 1.0F, 0.0F, z);
-        writeVertex(vertices[2], 1.0F, 1.0F, z);
-        writeVertex(vertices[3], 0.0F, 1.0F, z);
-        return vertices;
+    private static boolean appendZQuad(NativeTranslucentGeometryAnalyzer analyzer, float z,
+            ModelQuadFacing facing, int packedNormal) {
+        ByteBuffer quad = nativeOrder(MemoryUtil.memAlloc(NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE));
+        try {
+            writeZQuad(MemoryUtil.memAddress(quad), z);
+            return analyzer.appendNativeQuad(MemoryUtil.memAddress(quad), facing, packedNormal);
+        } finally {
+            free(quad);
+        }
     }
 
-    private static void writeVertex(ChunkVertexEncoder.Vertex vertex, float x, float y, float z) {
-        ChunkVertexEncoder.Vertex.writeVertex(vertex, x, y, z, 0xffffffff, 1.0F, 0.0F, 0.0F, 0);
+    private static TQuad zRegularQuad(float z, ModelQuadFacing facing, int packedNormal) {
+        return RegularTQuad.fromPositions(zPositions(z), facing, packedNormal);
+    }
+
+    private static float[] zPositions(float z) {
+        return new float[] {
+                0.0F, 0.0F, z,
+                1.0F, 0.0F, z,
+                1.0F, 1.0F, z,
+                0.0F, 1.0F, z
+        };
+    }
+
+    private static void writeZQuad(long quadAddress, float z) {
+        NativeChunkMeshEncoder.writeNativeQuadMetadata(quadAddress, (byte) 0, (byte) 0, false,
+                0, 0, 0, 0, DefaultMaterials.TRANSLUCENT.bits());
+        NativeChunkMeshEncoder.writeNativeQuadVertex(quadAddress, 0, 0.0F, 0.0F, z,
+                0xffffffff, 1.0F, 0.0F, 0.0F, 0);
+        NativeChunkMeshEncoder.writeNativeQuadVertex(quadAddress, 1, 1.0F, 0.0F, z,
+                0xffffffff, 1.0F, 0.0F, 0.0F, 0);
+        NativeChunkMeshEncoder.writeNativeQuadVertex(quadAddress, 2, 1.0F, 1.0F, z,
+                0xffffffff, 1.0F, 0.0F, 0.0F, 0);
+        NativeChunkMeshEncoder.writeNativeQuadVertex(quadAddress, 3, 0.0F, 1.0F, z,
+                0xffffffff, 1.0F, 0.0F, 0.0F, 0);
+    }
+
+    private static void writeInvalidZQuad(long quadAddress, float z) {
+        NativeChunkMeshEncoder.writeNativeQuadMetadata(quadAddress, (byte) 0, (byte) 0, false,
+                0, 0, 0, 0, DefaultMaterials.TRANSLUCENT.bits());
+        NativeChunkMeshEncoder.writeNativeQuadVertex(quadAddress, 0, 0.0F, 0.0F, z,
+                0xffffffff, 1.0F, 0.0F, 0.0F, 0);
+        NativeChunkMeshEncoder.writeNativeQuadVertex(quadAddress, 1, 0.0F, 0.0F, z,
+                0xffffffff, 1.0F, 0.0F, 0.0F, 0);
+        NativeChunkMeshEncoder.writeNativeQuadVertex(quadAddress, 2, 1.0F, 1.0F, z,
+                0xffffffff, 1.0F, 0.0F, 0.0F, 0);
+        NativeChunkMeshEncoder.writeNativeQuadVertex(quadAddress, 3, 1.0F, 1.0F, z,
+                0xffffffff, 1.0F, 0.0F, 0.0F, 0);
     }
 
     private static int[] readInts(ByteBuffer buffer, int count) {

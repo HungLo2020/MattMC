@@ -15,6 +15,6 @@ public record NativeChunkVertexFormat(
     }
 
     public static NativeChunkVertexFormat compact() {
-        return new NativeChunkVertexFormat(20, 0, 0, 0, 0, 0);
+        return NativeChunkMeshEncoder.compactNativeFormat();
     }
 }

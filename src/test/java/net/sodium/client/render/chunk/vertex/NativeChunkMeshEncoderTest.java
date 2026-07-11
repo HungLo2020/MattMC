@@ -9,7 +9,6 @@ import net.sodium.client.render.chunk.terrain.material.DefaultMaterials;
 import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.NativeUpdatedQuads;
 import net.sodium.client.render.chunk.translucent_sorting.quad.NativeFullTQuad;
 import net.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
@@ -26,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class NativeChunkMeshEncoderTest {
     @BeforeAll
@@ -40,6 +40,27 @@ class NativeChunkMeshEncoderTest {
         Field configField = SodiumClientMod.class.getDeclaredField("CONFIG");
         configField.setAccessible(true);
         configField.set(null, SodiumGameOptions.defaults());
+    }
+
+    @Test
+    void compactChunkVertexClassWasMigratedToRust() {
+        assertThrows(ClassNotFoundException.class, () ->
+                Class.forName("net.sodium.client.render.chunk.vertex.format.impl.CompactChunkVertex"));
+    }
+
+    @Test
+    void compactChunkVertexFormatMetadataComesFromRust() {
+        NativeChunkVertexFormat format = ChunkMeshFormats.COMPACT.getNativeFormat();
+
+        assertEquals(20, format.stride());
+        assertEquals(0, format.blockIdOffset());
+        assertEquals(0, format.normalOffset());
+        assertEquals(0, format.tangentOffset());
+        assertEquals(0, format.midUvOffset());
+        assertEquals(0, format.midBlockOffset());
+        assertEquals(1 << 15, ChunkMeshFormats.COMPACT_TEXTURE_MAX_VALUE);
+        assertEquals(1 << 20, ChunkMeshFormats.COMPACT_POSITION_MAX_VALUE);
+        assertEquals(20, ChunkMeshFormats.COMPACT.getVertexFormat().getStride());
     }
 
     @Test
@@ -124,8 +145,8 @@ class NativeChunkMeshEncoderTest {
             sectionBuilder.start(5);
             posX.start(5);
             unassigned.start(5);
-            posX.push(quad(2.0F, 5), 5);
-            unassigned.push(quad(0.0F, 3), 3);
+            pushQuad(posX, 2.0F, 5);
+            pushQuad(unassigned, 0.0F, 3);
 
             assertEquals(4, posX.count());
             assertEquals(4, unassigned.count());
@@ -165,8 +186,8 @@ class NativeChunkMeshEncoderTest {
             sectionBuilder.start(5);
             posX.start(5);
             unassigned.start(5);
-            posX.push(quad(2.0F, 5), 5);
-            unassigned.push(quad(0.0F, 3), 3);
+            pushQuad(posX, 2.0F, 5);
+            pushQuad(unassigned, 0.0F, 3);
             posX.flushPending();
             unassigned.flushPending();
 
@@ -205,14 +226,14 @@ class NativeChunkMeshEncoderTest {
             sectionBuilder.start(12);
             unassigned.start(12);
             for (int index = 0; index < 4; index++) {
-                unassigned.push(quad(index * 2.0F, 99), DefaultMaterials.TRANSLUCENT);
+                pushQuad(unassigned, index * 2.0F, DefaultMaterials.TRANSLUCENT.bits());
             }
             unassigned.flushPending();
 
             NativeUpdatedQuads updates = new NativeUpdatedQuads();
-            NativeFullTQuad skipped = NativeFullTQuad.fromVertices(quad(1.0F, 99), ModelQuadFacing.UNASSIGNED, 0);
-            NativeFullTQuad first = NativeFullTQuad.fromVertices(quad(3.0F, 13), ModelQuadFacing.UNASSIGNED, 0);
-            NativeFullTQuad second = NativeFullTQuad.fromVertices(quad(5.0F, 17), ModelQuadFacing.UNASSIGNED, 0);
+            NativeFullTQuad skipped = nativeFullQuad(1.0F, 99);
+            NativeFullTQuad first = nativeFullQuad(3.0F, 13);
+            NativeFullTQuad second = nativeFullQuad(5.0F, 17);
             skipped.setNoWrite();
             first.setWriteToIndex(1);
             second.setWriteToIndex(3);
@@ -256,9 +277,8 @@ class NativeChunkMeshEncoderTest {
             batch = nativeOrder(MemoryUtil.memAlloc(2 * NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE));
             validity = MemoryUtil.memAlloc(2);
 
-            NativeChunkMeshEncoder.writeNativeQuad(MemoryUtil.memAddress(batch), quad(2.0F, 5), 5);
-            NativeChunkMeshEncoder.writeNativeQuad(MemoryUtil.memAddress(batch) + NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE,
-                    quad(4.0F, 7), 7);
+            writeQuad(MemoryUtil.memAddress(batch), 2.0F, 5, 5);
+            writeQuad(MemoryUtil.memAddress(batch) + NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE, 4.0F, 7, 7);
             validity.put(0, (byte) 1);
             validity.put(1, (byte) 0);
 
@@ -287,7 +307,7 @@ class NativeChunkMeshEncoderTest {
             assertNotEquals(0, staging.packedNormalsAddress());
             assertNotEquals(0, staging.validityAddress());
 
-            NativeChunkMeshEncoder.writeNativeQuad(staging.quadAddress(), quad(2.0F, 5), 5);
+            writeQuad(staging.quadAddress(), 2.0F, 5, 5);
 
             assertEquals(1, sectionBuilder.appendBatch(ModelQuadFacing.POS_X.ordinal(),
                     staging.quadAddress(), 1));
@@ -339,7 +359,7 @@ class NativeChunkMeshEncoderTest {
 
         try {
             builder.start(6);
-            builder.push(quad(0.25F, 11), DefaultMaterials.SOLID);
+            pushQuad(builder, 0.25F, DefaultMaterials.SOLID.bits());
 
             output = nativeOrder(MemoryUtil.memCalloc(4 * format.stride()));
             int[] segments = new int[ModelQuadFacing.COUNT << 1];
@@ -374,9 +394,9 @@ class NativeChunkMeshEncoderTest {
             output = nativeOrder(MemoryUtil.memCalloc(16 * ChunkMeshFormats.COMPACT.getNativeFormat().stride()));
 
             NativeUpdatedQuads updates = new NativeUpdatedQuads();
-            NativeFullTQuad skipped = NativeFullTQuad.fromVertices(quad(1.0F, 99), ModelQuadFacing.UNASSIGNED, 0);
-            NativeFullTQuad first = NativeFullTQuad.fromVertices(quad(3.0F, 13), ModelQuadFacing.UNASSIGNED, 0);
-            NativeFullTQuad second = NativeFullTQuad.fromVertices(quad(5.0F, 17), ModelQuadFacing.UNASSIGNED, 0);
+            NativeFullTQuad skipped = nativeFullQuad(1.0F, 99);
+            NativeFullTQuad first = nativeFullQuad(3.0F, 13);
+            NativeFullTQuad second = nativeFullQuad(5.0F, 17);
 
             skipped.setNoWrite();
             first.setWriteToIndex(1);
@@ -411,7 +431,9 @@ class NativeChunkMeshEncoderTest {
     }
 
     private static void pushQuad(NativeSectionMeshBuilder.FacingBuffer builder, float baseX, int materialBits) {
-        builder.push(quad(baseX, materialBits), materialBits);
+        long quadAddress = builder.prepareStagedQuad(materialBits, (byte) 7, (byte) 1, false, 41, 4, 5, 6);
+        writeQuad(quadAddress, baseX, 7, materialBits);
+        builder.commitStagedQuad();
     }
 
     private static String contains(String text, String expected) {
@@ -419,18 +441,22 @@ class NativeChunkMeshEncoderTest {
         return expected;
     }
 
-    private static ChunkVertexEncoder.Vertex[] quad(float baseX, int seed) {
-        ChunkVertexEncoder.Vertex[] vertices = ChunkVertexEncoder.Vertex.uninitializedQuad();
-        writeVertex(vertices[0], baseX, 0.25F, 0.25F, 0.0F, 0.0F, seed);
-        writeVertex(vertices[1], baseX + 1.0F, 0.25F, 0.25F, 1.0F, 0.0F, seed);
-        writeVertex(vertices[2], baseX + 1.0F, 1.25F, 0.25F, 1.0F, 1.0F, seed);
-        writeVertex(vertices[3], baseX, 1.25F, 0.25F, 0.0F, 1.0F, seed);
-        return vertices;
+    private static NativeFullTQuad nativeFullQuad(float baseX, int seed) {
+        ByteBuffer buffer = nativeOrder(MemoryUtil.memAlloc(NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE));
+        try {
+            writeQuad(MemoryUtil.memAddress(buffer), baseX, seed, DefaultMaterials.TRANSLUCENT.bits());
+            return NativeFullTQuad.fromNativeQuad(MemoryUtil.memAddress(buffer), ModelQuadFacing.UNASSIGNED, 0);
+        } finally {
+            free(buffer);
+        }
     }
 
-    private static void writeVertex(ChunkVertexEncoder.Vertex vertex, float x, float y, float z, float u, float v, int seed) {
-        ChunkVertexEncoder.Vertex.writeVertex(vertex, x, y, z, 0xff806040, 0.5F, u, v, 0x00f000f0);
-        vertex.iris$setData((byte) 7, (byte) 1, 41, 4, 5, 6);
+    private static void writeQuad(long quadAddress, float baseX, int seed, int materialBits) {
+        NativeChunkMeshEncoder.writeNativeQuad(quadAddress, (byte) 7, (byte) 1, false, 41, 4, 5, 6, materialBits,
+                baseX, 0.25F, 0.25F, 0xff806040, 0.5F, 0.0F, 0.0F, 0x00f000f0,
+                baseX + 1.0F, 0.25F, 0.25F, 0xff806040, 0.5F, 1.0F, 0.0F, 0x00f000f0,
+                baseX + 1.0F, 1.25F, 0.25F, 0xff806040, 0.5F, 1.0F, 1.0F, 0x00f000f0,
+                baseX, 1.25F, 0.25F, 0xff806040, 0.5F, 0.0F, 1.0F, 0x00f000f0);
     }
 
     private static long[] logicalAddresses(NativeSectionMeshBuilder.FacingBuffer[] builders) {

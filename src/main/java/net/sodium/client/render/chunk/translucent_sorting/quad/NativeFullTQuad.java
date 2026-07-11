@@ -3,8 +3,6 @@ package net.sodium.client.render.chunk.translucent_sorting.quad;
 import net.minecraft.util.NativeLibraryLoader;
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.sodium.client.render.chunk.terrain.material.DefaultMaterials;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
-import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
@@ -19,7 +17,6 @@ public final class NativeFullTQuad extends RegularTQuad {
     private static final int OK = 0;
     private static final int SORT_FAILED = 1;
     private static final int NO_WRITE = -1;
-    private static final int NATIVE_QUAD_STRIDE = 152;
     private static final int STATE_STRIDE = 128;
     private static final int STATE_POSITION_FLOATS = 12;
     private static final int STATE_EXTENT_FLOATS = 6;
@@ -153,14 +150,12 @@ public final class NativeFullTQuad extends RegularTQuad {
         this.applyState(stateSegment);
     }
 
-    public static NativeFullTQuad fromVertices(ChunkVertexEncoder.Vertex[] vertices, ModelQuadFacing facing, int packedNormal) {
+    public static NativeFullTQuad fromNativeQuad(long nativeQuadAddress, ModelQuadFacing facing, int packedNormal) {
         try (Arena arena = Arena.ofConfined()) {
-            MemorySegment nativeQuad = arena.allocate(NATIVE_QUAD_STRIDE, Integer.BYTES);
             MemorySegment handleSegment = arena.allocate(ValueLayout.JAVA_LONG);
             MemorySegment stateSegment = arena.allocate(STATE_STRIDE, Integer.BYTES);
-            NativeChunkMeshEncoder.writeNativeQuad(nativeQuad.address(), vertices, DefaultMaterials.TRANSLUCENT.bits());
 
-            int status = invokeCreate(nativeQuad.address(), facing.ordinal(), packedNormal, handleSegment, stateSegment);
+            int status = invokeCreate(nativeQuadAddress, facing.ordinal(), packedNormal, handleSegment, stateSegment);
             if (status == SORT_FAILED) {
                 return null;
             }

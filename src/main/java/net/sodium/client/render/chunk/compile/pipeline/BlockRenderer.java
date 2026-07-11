@@ -1,6 +1,5 @@
 package net.sodium.client.render.chunk.compile.pipeline;
 
-import net.sodium.api.util.ColorABGR;
 import net.sodium.api.util.ColorARGB;
 import net.sodium.api.util.ColorMixer;
 import net.sodium.client.compatibility.workarounds.Workarounds;
@@ -19,8 +18,8 @@ import net.sodium.client.render.chunk.terrain.material.Material;
 import net.sodium.client.render.chunk.terrain.material.parameters.AlphaCutoffParameter;
 import net.sodium.client.render.chunk.terrain.material.parameters.MaterialParameters;
 import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
+import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import net.sodium.client.render.frapi.mesh.MutableQuadViewImpl;
 import net.sodium.client.render.frapi.render.AbstractBlockRenderContext;
 import net.sodium.client.render.texture.SpriteFinderCache;
@@ -42,7 +41,6 @@ import org.joml.Vector3f;
 public class BlockRenderer extends AbstractBlockRenderContext implements net.irisshaders.iris.vertices.sodium.terrain.VertexEncoderInterface {
     private final ColorProviderRegistry colorProviderRegistry;
     private final int[] vertexColors = new int[4];
-    private final ChunkVertexEncoder.Vertex[] vertices = ChunkVertexEncoder.Vertex.uninitializedQuad();
 
     public ChunkBuildBuffers buffers; // Made public for Iris Sodium integration (though currently unused)
 
@@ -158,28 +156,7 @@ public class BlockRenderer extends AbstractBlockRenderContext implements net.iri
     private void bufferQuad(MutableQuadViewImpl quad, float[] brightnesses, Material material) {
         // TODO: Find a way to reimplement quad reorientation
         ModelQuadOrientation orientation = ModelQuadOrientation.NORMAL;
-        ChunkVertexEncoder.Vertex[] vertices = this.vertices;
         Vector3f offset = this.posOffset;
-
-        for (int dstIndex = 0; dstIndex < 4; dstIndex++) {
-            int srcIndex = orientation.getVertexIndex(dstIndex);
-
-            ChunkVertexEncoder.Vertex out = vertices[dstIndex];
-            out.x = quad.x(srcIndex) + offset.x;
-            // Iris: From MixinBlockRenderer - set vertex data after x is set
-            ((net.irisshaders.iris.vertices.sodium.terrain.ChunkVertexExtension) out).iris$setData(iris$lightEmission, iris$isFluid, iris$blockId, iris$localX, iris$localY, iris$localZ);
-            out.y = quad.y(srcIndex) + offset.y;
-            out.z = quad.z(srcIndex) + offset.z;
-
-            // FRAPI uses ARGB color format; convert to ABGR.
-            out.color = ColorARGB.toABGR(quad.color(srcIndex));
-            out.ao = brightnesses[srcIndex];
-
-            out.u = quad.u(srcIndex);
-            out.v = quad.v(srcIndex);
-
-            out.light = quad.lightmap(srcIndex);
-        }
 
         var atlasSprite = quad.sprite(SpriteFinderCache.forBlockAtlas());
         var materialBits = material.bits();
@@ -189,7 +166,7 @@ public class BlockRenderer extends AbstractBlockRenderContext implements net.iri
         var pass = material.pass;
 
         // Iris: From MixinBlockRenderer - skip pass downgrade when hasOverride
-        var downgradedPass = iris$hasOverride ? null : attemptPassDowngrade(atlasSprite, pass);
+        var downgradedPass = iris$hasOverride ? null : attemptPassDowngrade(atlasSprite, pass, quad);
         if (downgradedPass != null) {
             pass = downgradedPass;
         }
@@ -202,12 +179,21 @@ public class BlockRenderer extends AbstractBlockRenderContext implements net.iri
 
         ChunkModelBuilder builder = this.buffers.get(pass);
         NativeSectionMeshBuilder.FacingBuffer vertexBuffer = builder.getVertexBuffer(normalFace);
+        long quadAddress;
         if (pass.isTranslucent() && this.collector != null) {
-            if (vertexBuffer.pushTranslucent(vertices, materialBits, this.collector, normalFace, quad.getFaceNormal())) {
+            quadAddress = vertexBuffer.prepareStagedTranslucentQuad(materialBits, this.collector, normalFace,
+                    iris$lightEmission, iris$isFluid, false, iris$blockId, iris$localX, iris$localY, iris$localZ);
+            this.writeQuad(quadAddress, materialBits, quad, brightnesses, orientation, offset);
+
+            if (vertexBuffer.commitStagedTranslucentQuad(quadAddress, this.collector, normalFace,
+                    quad.getFaceNormal())) {
                 return;
             }
         } else {
-            vertexBuffer.push(vertices, materialBits);
+            quadAddress = vertexBuffer.prepareStagedQuad(materialBits, iris$lightEmission, iris$isFluid, false,
+                    iris$blockId, iris$localX, iris$localY, iris$localZ);
+            this.writeQuad(quadAddress, materialBits, quad, brightnesses, orientation, offset);
+            vertexBuffer.commitStagedQuad();
         }
 
         if (atlasSprite != null) {
@@ -215,7 +201,30 @@ public class BlockRenderer extends AbstractBlockRenderContext implements net.iri
         }
     }
 
-    private boolean validateQuadUVs(TextureAtlasSprite atlasSprite) {
+    private void writeQuad(long quadAddress, int materialBits, MutableQuadViewImpl quad, float[] brightnesses,
+            ModelQuadOrientation orientation, Vector3f offset) {
+        int src0 = orientation.getVertexIndex(0);
+        int src1 = orientation.getVertexIndex(1);
+        int src2 = orientation.getVertexIndex(2);
+        int src3 = orientation.getVertexIndex(3);
+
+        NativeChunkMeshEncoder.writeNativeQuad(quadAddress, iris$lightEmission, iris$isFluid, false, iris$blockId,
+                iris$localX, iris$localY, iris$localZ, materialBits,
+                quad.x(src0) + offset.x, quad.y(src0) + offset.y, quad.z(src0) + offset.z,
+                ColorARGB.toABGR(quad.color(src0)), brightnesses[src0], quad.u(src0), quad.v(src0),
+                quad.lightmap(src0),
+                quad.x(src1) + offset.x, quad.y(src1) + offset.y, quad.z(src1) + offset.z,
+                ColorARGB.toABGR(quad.color(src1)), brightnesses[src1], quad.u(src1), quad.v(src1),
+                quad.lightmap(src1),
+                quad.x(src2) + offset.x, quad.y(src2) + offset.y, quad.z(src2) + offset.z,
+                ColorARGB.toABGR(quad.color(src2)), brightnesses[src2], quad.u(src2), quad.v(src2),
+                quad.lightmap(src2),
+                quad.x(src3) + offset.x, quad.y(src3) + offset.y, quad.z(src3) + offset.z,
+                ColorARGB.toABGR(quad.color(src3)), brightnesses[src3], quad.u(src3), quad.v(src3),
+                quad.lightmap(src3));
+    }
+
+    private static boolean validateQuadUVs(TextureAtlasSprite atlasSprite, MutableQuadViewImpl quad) {
         // sanity check that the quad's UVs are within the sprite's bounds
         var spriteUMin = atlasSprite.getU0();
         var spriteUMax = atlasSprite.getU1();
@@ -223,8 +232,8 @@ public class BlockRenderer extends AbstractBlockRenderContext implements net.iri
         var spriteVMax = atlasSprite.getV1();
 
         for (int i = 0; i < 4; i++) {
-            var u = this.vertices[i].u;
-            var v = this.vertices[i].v;
+            var u = quad.u(i);
+            var v = quad.v(i);
             if (u < spriteUMin || u > spriteUMax || v < spriteVMin || v > spriteVMax) {
                 return false;
             }
@@ -233,7 +242,8 @@ public class BlockRenderer extends AbstractBlockRenderContext implements net.iri
         return true;
     }
 
-    private @Nullable TerrainRenderPass attemptPassDowngrade(TextureAtlasSprite sprite, TerrainRenderPass pass) {
+    private @Nullable TerrainRenderPass attemptPassDowngrade(TextureAtlasSprite sprite, TerrainRenderPass pass,
+            MutableQuadViewImpl quad) {
         if (!allowDowngrade || Workarounds.isWorkaroundEnabled(Workarounds.Reference.INTEL_DEPTH_BUFFER_COMPARISON_UNRELIABLE)) {
             return null;
         }
@@ -242,7 +252,7 @@ public class BlockRenderer extends AbstractBlockRenderContext implements net.iri
         boolean hasNonOpaqueVertex = false;
 
         for (int i = 0; i < 4; i++) {
-            hasNonOpaqueVertex |= ColorABGR.unpackAlpha(this.vertices[i].color) != 0xFF;
+            hasNonOpaqueVertex |= ColorARGB.unpackAlpha(quad.color(i)) != 0xFF;
         }
 
         // don't do downgrade if some vertex is not fully opaque
@@ -251,7 +261,7 @@ public class BlockRenderer extends AbstractBlockRenderContext implements net.iri
         }
 
         if (attemptDowngrade) {
-            attemptDowngrade = validateQuadUVs(sprite);
+            attemptDowngrade = validateQuadUVs(sprite, quad);
         }
 
         if (attemptDowngrade) {

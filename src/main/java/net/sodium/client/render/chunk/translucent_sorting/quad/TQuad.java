@@ -3,7 +3,6 @@ package net.sodium.client.render.chunk.translucent_sorting.quad;
 import java.util.Arrays;
 
 import net.sodium.client.render.chunk.compile.pipeline.DefaultFluidRenderer;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
@@ -67,16 +66,16 @@ public abstract class TQuad {
         return Integer.bitCount(sameVertexMap) > 1;
     }
 
-    int initExtentsAndCenter(ChunkVertexEncoder.Vertex[] vertices) {
+    int initExtentsAndCenter(float[] positions) {
         float xSum = 0;
         float ySum = 0;
         float zSum = 0;
 
         // keep track of distinct vertices to compute the center accurately for
         // degenerate quads
-        float lastX = vertices[3].x;
-        float lastY = vertices[3].y;
-        float lastZ = vertices[3].z;
+        float lastX = positions[9];
+        float lastY = positions[10];
+        float lastZ = positions[11];
         int sameVertexMap = 0;
 
         float posXExtent = Float.NEGATIVE_INFINITY;
@@ -87,9 +86,10 @@ public abstract class TQuad {
         float negZExtent = Float.POSITIVE_INFINITY;
 
         for (int i = 0; i < 4; i++) {
-            float x = vertices[i].x;
-            float y = vertices[i].y;
-            float z = vertices[i].z;
+            int positionIndex = i * 3;
+            float x = positions[positionIndex];
+            float y = positions[positionIndex + 1];
+            float z = positions[positionIndex + 2];
 
             posXExtent = Math.max(posXExtent, x);
             posYExtent = Math.max(posYExtent, y);

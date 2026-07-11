@@ -9,11 +9,12 @@ import net.sodium.client.render.chunk.translucent_sorting.quad.NativeFullTQuad;
 import net.sodium.client.render.chunk.translucent_sorting.quad.RegularTQuad;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.sodium.client.util.NativeBuffer;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
+import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.minecraft.core.SectionPos;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.joml.Vector3f;
+import org.lwjgl.system.MemoryUtil;
 
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
@@ -44,11 +45,11 @@ class NativeBspTreeTest {
     @Test
     void nativeBspBuilderConstructsStaticNormalRelativeLeafInRust() {
         TQuad[] quads = new TQuad[] {
-                RegularTQuad.fromVertices(zQuad(0.0F), ModelQuadFacing.POS_Z,
+                zRegularQuad(0.0F, ModelQuadFacing.POS_Z,
                         ModelQuadFacing.POS_Z.getPackedAlignedNormal()),
-                RegularTQuad.fromVertices(zQuad(1.0F), ModelQuadFacing.POS_Z,
+                zRegularQuad(1.0F, ModelQuadFacing.POS_Z,
                         ModelQuadFacing.POS_Z.getPackedAlignedNormal()),
-                RegularTQuad.fromVertices(zQuad(2.0F), ModelQuadFacing.POS_Z,
+                zRegularQuad(2.0F, ModelQuadFacing.POS_Z,
                         ModelQuadFacing.POS_Z.getPackedAlignedNormal())
         };
         NativeBuffer output = new NativeBuffer(3 * TranslucentData.BYTES_PER_QUAD);
@@ -68,8 +69,7 @@ class NativeBspTreeTest {
     @Test
     void nativeBspBuilderAcceptsSplitModeNativeFullQuads() {
         TQuad[] quads = new TQuad[] {
-                NativeFullTQuad.fromVertices(zQuad(0.0F), ModelQuadFacing.POS_Z,
-                        ModelQuadFacing.POS_Z.getPackedAlignedNormal())
+                zNativeFullQuad(0.0F, ModelQuadFacing.POS_Z, ModelQuadFacing.POS_Z.getPackedAlignedNormal())
         };
         NativeBuffer output = new NativeBuffer(TranslucentData.BYTES_PER_QUAD);
 
@@ -155,16 +155,39 @@ class NativeBspTreeTest {
         return readInts(output.getDirectBuffer(), count);
     }
 
-    private static ChunkVertexEncoder.Vertex[] zQuad(float z) {
-        ChunkVertexEncoder.Vertex[] vertices = ChunkVertexEncoder.Vertex.uninitializedQuad();
-        writeVertex(vertices[0], 0.0F, 0.0F, z);
-        writeVertex(vertices[1], 1.0F, 0.0F, z);
-        writeVertex(vertices[2], 1.0F, 1.0F, z);
-        writeVertex(vertices[3], 0.0F, 1.0F, z);
-        return vertices;
+    private static RegularTQuad zRegularQuad(float z, ModelQuadFacing facing, int packedNormal) {
+        return RegularTQuad.fromPositions(zPositions(z), facing, packedNormal);
     }
 
-    private static void writeVertex(ChunkVertexEncoder.Vertex vertex, float x, float y, float z) {
-        ChunkVertexEncoder.Vertex.writeVertex(vertex, x, y, z, 0xffffffff, 1.0F, 0.0F, 0.0F, 0);
+    private static NativeFullTQuad zNativeFullQuad(float z, ModelQuadFacing facing, int packedNormal) {
+        ByteBuffer quad = MemoryUtil.memAlloc(NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE).order(ByteOrder.nativeOrder());
+        try {
+            writeZQuad(MemoryUtil.memAddress(quad), z);
+            return NativeFullTQuad.fromNativeQuad(MemoryUtil.memAddress(quad), facing, packedNormal);
+        } finally {
+            MemoryUtil.memFree(quad);
+        }
+    }
+
+    private static float[] zPositions(float z) {
+        return new float[] {
+                0.0F, 0.0F, z,
+                1.0F, 0.0F, z,
+                1.0F, 1.0F, z,
+                0.0F, 1.0F, z
+        };
+    }
+
+    private static void writeZQuad(long quadAddress, float z) {
+        NativeChunkMeshEncoder.writeNativeQuadMetadata(quadAddress, (byte) 0, (byte) 0, false,
+                0, 0, 0, 0, 0);
+        NativeChunkMeshEncoder.writeNativeQuadVertex(quadAddress, 0, 0.0F, 0.0F, z,
+                0xffffffff, 1.0F, 0.0F, 0.0F, 0);
+        NativeChunkMeshEncoder.writeNativeQuadVertex(quadAddress, 1, 1.0F, 0.0F, z,
+                0xffffffff, 1.0F, 0.0F, 0.0F, 0);
+        NativeChunkMeshEncoder.writeNativeQuadVertex(quadAddress, 2, 1.0F, 1.0F, z,
+                0xffffffff, 1.0F, 0.0F, 0.0F, 0);
+        NativeChunkMeshEncoder.writeNativeQuadVertex(quadAddress, 3, 0.0F, 1.0F, z,
+                0xffffffff, 1.0F, 0.0F, 0.0F, 0);
     }
 }

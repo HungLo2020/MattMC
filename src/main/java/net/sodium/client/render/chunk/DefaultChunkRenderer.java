@@ -28,6 +28,7 @@ import net.sodium.client.render.chunk.shader.SharedChunkProgramOverrides;
 import net.sodium.client.render.chunk.shader.SodiumChunkRenderPipelines;
 import net.sodium.client.render.chunk.shader.TerrainPipelineContract;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
+import net.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import net.sodium.client.render.viewport.CameraTransform;
 import net.sodium.client.util.FogParameters;
@@ -406,7 +407,7 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                 .getTexture(net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_BLOCKS);
 
             double subTexelPrecision = (1 << RenderDevice.instance().getSubTexelPrecisionBits());
-            double subTexelOffset = 1.0f / net.sodium.client.render.chunk.vertex.format.impl.CompactChunkVertex.TEXTURE_MAX_VALUE;
+            double subTexelOffset = 1.0f / ChunkMeshFormats.COMPACT_TEXTURE_MAX_VALUE;
             float shrinkX = (float) (subTexelOffset - (((1.0D / textureAtlas.width) / subTexelPrecision)));
             float shrinkY = (float) (subTexelOffset - (((1.0D / textureAtlas.height) / subTexelPrecision)));
 

@@ -663,41 +663,6 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
             this.stagingBuffers = sectionBuilder.stagingBuffers(facing);
         }
 
-        public void push(ChunkVertexEncoder.Vertex[] vertices, Material material) {
-            this.push(vertices, material.bits());
-        }
-
-        public void push(ChunkVertexEncoder.Vertex[] vertices, int materialBits) {
-            if (vertices.length != 4) {
-                throw new IllegalArgumentException("Only quad primitives (with 4 vertices) can be pushed");
-            }
-
-            this.queueQuad(vertices, materialBits, null, null, 0);
-        }
-
-        public boolean pushTranslucent(ChunkVertexEncoder.Vertex[] vertices, int materialBits,
-                TranslucentGeometryCollector collector, ModelQuadFacing facing, int packedNormal) {
-            if (vertices.length != 4) {
-                throw new IllegalArgumentException("Only quad primitives (with 4 vertices) can be pushed");
-            }
-
-            if (TranslucentGeometryCollector.isInvalidQuad(vertices)) {
-                return true;
-            }
-
-            if (!collector.supportsNativeBatching()) {
-                if (collector.appendQuad(vertices, facing, packedNormal)) {
-                    return true;
-                }
-
-                this.queueQuad(vertices, materialBits, null, null, 0);
-                return false;
-            }
-
-            this.queueQuad(vertices, materialBits, collector, facing, packedNormal);
-            return false;
-        }
-
         public long prepareQuadAddress() {
             this.flushPending();
             return this.sectionBuilder.prepareQuadAddress(this.facing);
@@ -705,6 +670,63 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
 
         public void commitPreparedQuad() {
             this.sectionBuilder.commitQuad(this.facing);
+        }
+
+        public long prepareStagedQuad(int materialBits, byte blockEmission, byte renderType, boolean ignoreMidBlock,
+                int blockId, int localX, int localY, int localZ) {
+            if (!this.matchesPendingMode(null, null)) {
+                this.flushPending();
+            }
+
+            if (this.pendingQuadCount == this.stagingBuffers.capacity()) {
+                this.flushPending();
+            }
+
+            this.pendingCollector = null;
+            this.pendingCollectorFacing = null;
+            return this.pendingQuadAddress();
+        }
+
+        public void commitStagedQuad() {
+            this.pendingQuadCount++;
+        }
+
+        public long prepareStagedTranslucentQuad(int materialBits, TranslucentGeometryCollector collector,
+                ModelQuadFacing collectorFacing, byte blockEmission, byte renderType, boolean ignoreMidBlock,
+                int blockId, int localX, int localY, int localZ) {
+            if (!collector.supportsNativeBatching()) {
+                return this.prepareStagedQuad(materialBits, blockEmission, renderType, ignoreMidBlock,
+                        blockId, localX, localY, localZ);
+            }
+
+            if (!this.matchesPendingMode(collector, collectorFacing)) {
+                this.flushPending();
+            }
+
+            if (this.pendingQuadCount == this.stagingBuffers.capacity()) {
+                this.flushPending();
+            }
+
+            this.pendingCollector = collector;
+            this.pendingCollectorFacing = collectorFacing;
+            return this.pendingQuadAddress();
+        }
+
+        public boolean commitStagedTranslucentQuad(long quadAddress, TranslucentGeometryCollector collector,
+                ModelQuadFacing collectorFacing, int packedNormal) {
+            if (!collector.supportsNativeBatching()) {
+                if (collector.appendNativeQuad(quadAddress, collectorFacing, packedNormal)) {
+                    return true;
+                }
+
+                this.commitStagedQuad();
+                return false;
+            }
+
+            MemoryUtil.memPutInt(this.stagingBuffers.packedNormalsAddress()
+                    + (long) this.pendingQuadCount * Integer.BYTES, packedNormal);
+            this.pendingQuadCount++;
+            return false;
         }
 
         public void start(int sectionIndex) {
@@ -792,29 +814,8 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
             this.clearPending();
         }
 
-        private void queueQuad(ChunkVertexEncoder.Vertex[] vertices, int materialBits,
-                TranslucentGeometryCollector collector, ModelQuadFacing collectorFacing, int packedNormal) {
-            if (!this.matchesPendingMode(collector, collectorFacing)) {
-                this.flushPending();
-            }
-
-            if (this.pendingQuadCount == this.stagingBuffers.capacity()) {
-                this.flushPending();
-            }
-
-            this.pendingCollector = collector;
-            this.pendingCollectorFacing = collectorFacing;
-
-            int quadIndex = this.pendingQuadCount;
-            long quadAddress = this.stagingBuffers.quadAddress() + (long) quadIndex * this.nativeQuadStride;
-            NativeChunkMeshEncoder.writeNativeQuad(quadAddress, vertices, materialBits);
-
-            if (collector != null) {
-                MemoryUtil.memPutInt(this.stagingBuffers.packedNormalsAddress() + (long) quadIndex * Integer.BYTES,
-                        packedNormal);
-            }
-
-            this.pendingQuadCount++;
+        private long pendingQuadAddress() {
+            return this.stagingBuffers.quadAddress() + (long) this.pendingQuadCount * this.nativeQuadStride;
         }
 
         private boolean matchesPendingMode(TranslucentGeometryCollector collector, ModelQuadFacing collectorFacing) {

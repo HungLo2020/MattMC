@@ -23,6 +23,8 @@ import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCol
 import net.sodium.client.render.chunk.translucent_sorting.data.DynamicData;
 import net.sodium.client.render.chunk.translucent_sorting.data.PresentTranslucentData;
 import net.sodium.client.render.chunk.translucent_sorting.data.TranslucentData;
+import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
+import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import net.sodium.client.services.PlatformLevelRenderHooks;
 import net.sodium.client.util.task.CancellationToken;
 import net.sodium.client.world.LevelSlice;
@@ -42,7 +44,6 @@ import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import org.joml.Vector3dc;
 
 import java.util.Map;
@@ -126,22 +127,23 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                                 && blockState.getBlock() instanceof net.minecraft.world.level.block.LightBlock) {
                                 ChunkModelBuilder buildBuffers = buffers.get(DefaultMaterials.CUTOUT);
                                 int id = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds().getInt(blockState);
-                                ChunkVertexEncoder.Vertex[] vertices = ChunkVertexEncoder.Vertex.uninitializedQuad();
-                                for (int i = 0; i < 4; i++) {
-                                    ((net.irisshaders.iris.vertices.sodium.terrain.ChunkVertexExtension) vertices[i]).iris$ignoresMidBlock(true);
-                                    ((net.irisshaders.iris.vertices.sodium.terrain.ChunkVertexExtension) vertices[i]).iris$setData(
-                                        (byte) blockState.getLightEmission(), (byte) 0, id,
+                                NativeSectionMeshBuilder.FacingBuffer vertexBuffer =
+                                        buildBuffers.getVertexBuffer(ModelQuadFacing.UNASSIGNED);
+                                long quadAddress = vertexBuffer.prepareStagedQuad(DefaultMaterials.CUTOUT.bits(),
+                                        (byte) blockState.getLightEmission(), (byte) 0, true, id,
                                         (blockPos.getX() & 15), (blockPos.getY() & 15), (blockPos.getZ() & 15));
-                                    vertices[i].x = (float) ((blockPos.getX() & 15)) + 0.25f;
-                                    vertices[i].y = (float) ((blockPos.getY() & 15)) + 0.25f;
-                                    vertices[i].z = (float) ((blockPos.getZ() & 15)) + 0.25f;
-                                    vertices[i].u = 0;
-                                    vertices[i].v = 0;
-                                    vertices[i].color = 0;
-                                    vertices[i].light = blockState.getLightEmission() << 4 | blockState.getLightEmission() << 20;
-                                }
-                                buildBuffers.getVertexBuffer(ModelQuadFacing.UNASSIGNED)
-                                    .push(vertices, DefaultMaterials.CUTOUT);
+                                float lightX = (float) ((blockPos.getX() & 15)) + 0.25f;
+                                float lightY = (float) ((blockPos.getY() & 15)) + 0.25f;
+                                float lightZ = (float) ((blockPos.getZ() & 15)) + 0.25f;
+                                int light = blockState.getLightEmission() << 4 | blockState.getLightEmission() << 20;
+                                NativeChunkMeshEncoder.writeNativeQuad(quadAddress, (byte) blockState.getLightEmission(),
+                                        (byte) 0, true, id, (blockPos.getX() & 15), (blockPos.getY() & 15),
+                                        (blockPos.getZ() & 15), DefaultMaterials.CUTOUT.bits(),
+                                        lightX, lightY, lightZ, 0, 1.0F, 0, 0, light,
+                                        lightX, lightY, lightZ, 0, 1.0F, 0, 0, light,
+                                        lightX, lightY, lightZ, 0, 1.0F, 0, 0, light,
+                                        lightX, lightY, lightZ, 0, 1.0F, 0, 0, light);
+                                vertexBuffer.commitStagedQuad();
                             }
                         }
 

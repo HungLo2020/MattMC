@@ -7,7 +7,8 @@ import net.sodium.api.util.NormI8;
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.sodium.client.render.chunk.terrain.material.Material;
 import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
+import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
+import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import net.sodium.client.render.texture.SpriteFinderCache;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import org.jetbrains.annotations.NotNull;
@@ -21,12 +22,27 @@ public class ChunkVertexConsumer implements VertexConsumer, net.irisshaders.iris
     private static final int REQUIRED_ATTRIBUTES = (1 << 5) - 1;
 
     private final ChunkModelBuilder modelBuilder;
-    private final ChunkVertexEncoder.Vertex[] vertices = ChunkVertexEncoder.Vertex.uninitializedQuad();
+    private final float[] x = new float[4];
+    private final float[] y = new float[4];
+    private final float[] z = new float[4];
+    private final int[] color = new int[4];
+    private final float[] ao = new float[4];
+    private final float[] u = new float[4];
+    private final float[] v = new float[4];
+    private final int[] light = new int[4];
 
     private Material material;
     private int vertexIndex;
     private int writtenAttributes;
     private TranslucentGeometryCollector collector;
+    private int blockId;
+    private int previousBlockId;
+    private byte renderType;
+    private byte blockEmission;
+    private int localPosX;
+    private int localPosY;
+    private int localPosZ;
+    private boolean ignoreMidBlock;
 
     public ChunkVertexConsumer(ChunkModelBuilder modelBuilder) {
         this.modelBuilder = modelBuilder;
@@ -39,11 +55,10 @@ public class ChunkVertexConsumer implements VertexConsumer, net.irisshaders.iris
 
     @Override
     public @NotNull VertexConsumer addVertex(float x, float y, float z) {
-        ChunkVertexEncoder.Vertex vertex = this.vertices[this.vertexIndex];
-        vertex.x = x;
-        vertex.y = y;
-        vertex.z = z;
-        vertex.ao = 1.0f;
+        this.x[this.vertexIndex] = x;
+        this.y[this.vertexIndex] = y;
+        this.z[this.vertexIndex] = z;
+        this.ao[this.vertexIndex] = 1.0f;
         this.writtenAttributes |= ATTRIBUTE_POSITION_BIT;
         return potentiallyEndVertex();
     }
@@ -51,33 +66,29 @@ public class ChunkVertexConsumer implements VertexConsumer, net.irisshaders.iris
     // Writing color ignores alpha since alpha is used as a color multiplier by Sodium.
     @Override
     public @NotNull VertexConsumer setColor(int red, int green, int blue, int alpha) {
-        ChunkVertexEncoder.Vertex vertex = this.vertices[this.vertexIndex];
-        vertex.color = ColorABGR.pack(red, green, blue, alpha);
+        this.color[this.vertexIndex] = ColorABGR.pack(red, green, blue, alpha);
         this.writtenAttributes |= ATTRIBUTE_COLOR_BIT;
         return potentiallyEndVertex();
     }
 
     @Override
     public @NotNull VertexConsumer setColor(float red, float green, float blue, float alpha) {
-        ChunkVertexEncoder.Vertex vertex = this.vertices[this.vertexIndex];
-        vertex.color = ColorABGR.pack(red, green, blue, alpha);
+        this.color[this.vertexIndex] = ColorABGR.pack(red, green, blue, alpha);
         this.writtenAttributes |= ATTRIBUTE_COLOR_BIT;
         return potentiallyEndVertex();
     }
 
     @Override
     public @NotNull VertexConsumer setColor(int argb) {
-        ChunkVertexEncoder.Vertex vertex = this.vertices[this.vertexIndex];
-        vertex.color = ColorARGB.toABGR(argb);
+        this.color[this.vertexIndex] = ColorARGB.toABGR(argb);
         this.writtenAttributes |= ATTRIBUTE_COLOR_BIT;
         return potentiallyEndVertex();
     }
 
     @Override
     public @NotNull VertexConsumer setUv(float u, float v) {
-        ChunkVertexEncoder.Vertex vertex = this.vertices[this.vertexIndex];
-        vertex.u = u;
-        vertex.v = v;
+        this.u[this.vertexIndex] = u;
+        this.v[this.vertexIndex] = v;
         this.writtenAttributes |= ATTRIBUTE_TEXTURE_BIT;
         return potentiallyEndVertex();
     }
@@ -95,16 +106,14 @@ public class ChunkVertexConsumer implements VertexConsumer, net.irisshaders.iris
 
     @Override
     public @NotNull VertexConsumer setUv2(int u, int v) {
-        ChunkVertexEncoder.Vertex vertex = this.vertices[this.vertexIndex];
-        vertex.light = ((v & 0xFFFF) << 16) | (u & 0xFFFF);
+        this.light[this.vertexIndex] = ((v & 0xFFFF) << 16) | (u & 0xFFFF);
         this.writtenAttributes |= ATTRIBUTE_LIGHT_BIT;
         return potentiallyEndVertex();
     }
 
     @Override
     public @NotNull VertexConsumer setLight(int uv) {
-        ChunkVertexEncoder.Vertex vertex = this.vertices[this.vertexIndex];
-        vertex.light = uv;
+        this.light[this.vertexIndex] = uv;
         this.writtenAttributes |= ATTRIBUTE_LIGHT_BIT;
         return potentiallyEndVertex();
     }
@@ -128,21 +137,31 @@ public class ChunkVertexConsumer implements VertexConsumer, net.irisshaders.iris
 
             ModelQuadFacing cullFace = ModelQuadFacing.fromPackedNormal(normal);
 
-            var vertexBuffer = this.modelBuilder.getVertexBuffer(cullFace);
+            NativeSectionMeshBuilder.FacingBuffer vertexBuffer = this.modelBuilder.getVertexBuffer(cullFace);
+            long quadAddress;
             if (this.material.isTranslucent() && this.collector != null) {
-                if (vertexBuffer.pushTranslucent(this.vertices, this.material.bits(), this.collector, cullFace, normal)) {
+                quadAddress = vertexBuffer.prepareStagedTranslucentQuad(this.material.bits(), this.collector,
+                        cullFace, this.blockEmission, this.renderType, this.ignoreMidBlock, this.blockId,
+                        this.localPosX, this.localPosY, this.localPosZ);
+                this.writeNativeQuad(quadAddress);
+
+                if (vertexBuffer.commitStagedTranslucentQuad(quadAddress, this.collector, cullFace, normal)) {
                     return this;
                 }
             } else {
-                vertexBuffer.push(this.vertices, this.material);
+                quadAddress = vertexBuffer.prepareStagedQuad(this.material.bits(), this.blockEmission,
+                        this.renderType, this.ignoreMidBlock, this.blockId, this.localPosX, this.localPosY,
+                        this.localPosZ);
+                this.writeNativeQuad(quadAddress);
+                vertexBuffer.commitStagedQuad();
             }
 
             float u = 0;
             float v = 0;
 
-            for (ChunkVertexEncoder.Vertex vertex : this.vertices) {
-                u += vertex.u;
-                v += vertex.v;
+            for (int index = 0; index < 4; index++) {
+                u += this.u[index];
+                v += this.v[index];
             }
 
             TextureAtlasSprite sprite = SpriteFinderCache.forBlockAtlas().find(u * 0.25f, v * 0.25f);
@@ -158,21 +177,21 @@ public class ChunkVertexConsumer implements VertexConsumer, net.irisshaders.iris
     }
 
     private int calculateNormal() {
-        final float x0 = this.vertices[0].x;
-        final float y0 = this.vertices[0].y;
-        final float z0 = this.vertices[0].z;
+        final float x0 = this.x[0];
+        final float y0 = this.y[0];
+        final float z0 = this.z[0];
 
-        final float x1 = this.vertices[1].x;
-        final float y1 = this.vertices[1].y;
-        final float z1 = this.vertices[1].z;
+        final float x1 = this.x[1];
+        final float y1 = this.y[1];
+        final float z1 = this.z[1];
 
-        final float x2 = this.vertices[2].x;
-        final float y2 = this.vertices[2].y;
-        final float z2 = this.vertices[2].z;
+        final float x2 = this.x[2];
+        final float y2 = this.y[2];
+        final float z2 = this.z[2];
 
-        final float x3 = this.vertices[3].x;
-        final float y3 = this.vertices[3].y;
-        final float z3 = this.vertices[3].z;
+        final float x3 = this.x[3];
+        final float y3 = this.y[3];
+        final float z3 = this.z[3];
 
         final float dx0 = x2 - x0;
         final float dy0 = y2 - y0;
@@ -195,20 +214,38 @@ public class ChunkVertexConsumer implements VertexConsumer, net.irisshaders.iris
 
         return NormI8.pack(normX, normY, normZ);
     }
+
+    private void writeNativeQuad(long quadAddress) {
+        NativeChunkMeshEncoder.writeNativeQuad(quadAddress, this.blockEmission, this.renderType, this.ignoreMidBlock,
+                this.blockId, this.localPosX, this.localPosY, this.localPosZ, this.material.bits(),
+                this.x[0], this.y[0], this.z[0], this.color[0], this.ao[0], this.u[0], this.v[0], this.light[0],
+                this.x[1], this.y[1], this.z[1], this.color[1], this.ao[1], this.u[1], this.v[1], this.light[1],
+                this.x[2], this.y[2], this.z[2], this.color[2], this.ao[2], this.u[2], this.v[2], this.light[2],
+                this.x[3], this.y[3], this.z[3], this.color[3], this.ao[3], this.u[3], this.v[3], this.light[3]);
+    }
     
     // Iris: BlockSensitiveBufferBuilder interface implementation
     @Override
     public void beginBlock(int block, byte renderType, byte blockEmission, int localPosX, int localPosY, int localPosZ) {
+        this.blockId = block;
+        this.renderType = renderType;
+        this.blockEmission = blockEmission;
+        this.localPosX = localPosX;
+        this.localPosY = localPosY;
+        this.localPosZ = localPosZ;
         ((net.irisshaders.iris.vertices.BlockSensitiveBufferBuilder) modelBuilder).beginBlock(block, renderType, blockEmission, localPosX, localPosY, localPosZ);
     }
 
     @Override
     public void overrideBlock(int block) {
+        this.previousBlockId = this.blockId;
+        this.blockId = block;
         ((net.irisshaders.iris.vertices.BlockSensitiveBufferBuilder) modelBuilder).overrideBlock(block);
     }
 
     @Override
     public void restoreBlock() {
+        this.blockId = this.previousBlockId;
         ((net.irisshaders.iris.vertices.BlockSensitiveBufferBuilder) modelBuilder).restoreBlock();
     }
 
@@ -219,6 +256,7 @@ public class ChunkVertexConsumer implements VertexConsumer, net.irisshaders.iris
 
     @Override
     public void ignoreMidBlock(boolean b) {
+        this.ignoreMidBlock = b;
         ((net.irisshaders.iris.vertices.BlockSensitiveBufferBuilder) modelBuilder).ignoreMidBlock(b);
     }
 }

@@ -4,7 +4,6 @@ import net.minecraft.util.NativeLibraryLoader;
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.sodium.client.render.chunk.translucent_sorting.quad.RegularTQuad;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
@@ -40,11 +39,6 @@ public final class NativeTranslucentGeometryAnalyzer {
             "mattmc_sodium_translucent_analyzer_destroy",
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_LONG));
-    private static final MethodHandle APPEND_RECORD = NativeLibraryLoader.downcallHandle("mattmc_rust",
-            "mattmc_sodium_translucent_analyzer_append_record",
-            FunctionDescriptor.of(ValueLayout.JAVA_INT,
-                    ValueLayout.JAVA_LONG,
-                    ValueLayout.ADDRESS));
     private static final MethodHandle APPEND_NATIVE_QUAD = NativeLibraryLoader.downcallHandle("mattmc_rust",
             "mattmc_sodium_translucent_analyzer_append_native_quad",
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
@@ -228,19 +222,6 @@ public final class NativeTranslucentGeometryAnalyzer {
         }
     }
 
-    boolean appendQuad(ChunkVertexEncoder.Vertex[] vertices, ModelQuadFacing facing, int packedNormal) {
-        try (Arena arena = Arena.ofConfined()) {
-            MemorySegment recordSegment = arena.allocate(RECORD_STRIDE, Integer.BYTES);
-            writeRecord(recordSegment, vertices, facing.ordinal(), packedNormal);
-            int status = invokeAppendRecord(this.getHandle(), recordSegment);
-            if (status == SORT_FAILED) {
-                return true;
-            }
-            check(status, "native translucent analyzer record append");
-            return false;
-        }
-    }
-
     boolean appendNativeQuad(long nativeQuadAddress, ModelQuadFacing facing, int packedNormal) {
         int status = invokeAppendNativeQuad(this.getHandle(), nativeQuadAddress, facing.ordinal(), packedNormal);
         if (status == SORT_FAILED) {
@@ -419,21 +400,21 @@ public final class NativeTranslucentGeometryAnalyzer {
     }
 
     private static TQuad buildRegularQuad(MemorySegment recordsSegment, int recordIndex) {
-        ChunkVertexEncoder.Vertex[] vertices = ChunkVertexEncoder.Vertex.uninitializedQuad();
+        float[] positions = new float[POSITION_FLOATS];
         long recordOffset = (long) recordIndex * RECORD_STRIDE;
 
         for (int vertexIndex = 0; vertexIndex < 4; vertexIndex++) {
-            ChunkVertexEncoder.Vertex vertex = vertices[vertexIndex];
             long positionOffset = recordOffset + OFFSET_POSITIONS + (long) vertexIndex * 3 * Float.BYTES;
-            vertex.x = recordsSegment.get(ValueLayout.JAVA_FLOAT, positionOffset);
-            vertex.y = recordsSegment.get(ValueLayout.JAVA_FLOAT, positionOffset + Float.BYTES);
-            vertex.z = recordsSegment.get(ValueLayout.JAVA_FLOAT, positionOffset + 2L * Float.BYTES);
+            int outputIndex = vertexIndex * 3;
+            positions[outputIndex] = recordsSegment.get(ValueLayout.JAVA_FLOAT, positionOffset);
+            positions[outputIndex + 1] = recordsSegment.get(ValueLayout.JAVA_FLOAT, positionOffset + Float.BYTES);
+            positions[outputIndex + 2] = recordsSegment.get(ValueLayout.JAVA_FLOAT, positionOffset + 2L * Float.BYTES);
         }
 
         ModelQuadFacing facing = ModelQuadFacing.VALUES[recordsSegment.get(ValueLayout.JAVA_INT,
                 recordOffset + OFFSET_FACING)];
         int packedNormal = recordsSegment.get(ValueLayout.JAVA_INT, recordOffset + OFFSET_PACKED_NORMAL);
-        return RegularTQuad.fromVertices(vertices, facing, packedNormal);
+        return RegularTQuad.fromPositions(positions, facing, packedNormal);
     }
 
     private long getHandle() {
@@ -470,14 +451,6 @@ public final class NativeTranslucentGeometryAnalyzer {
             return (int) DESTROY.invokeExact(handle);
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust translucent analyzer destroy downcall failed", throwable);
-        }
-    }
-
-    private static int invokeAppendRecord(long handle, MemorySegment record) {
-        try {
-            return (int) APPEND_RECORD.invokeExact(handle, record);
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Rust translucent analyzer append downcall failed", throwable);
         }
     }
 
@@ -605,20 +578,6 @@ public final class NativeTranslucentGeometryAnalyzer {
             throw new IllegalStateException("Rust translucent topo quad store BSP double leaf downcall failed",
                     throwable);
         }
-    }
-
-    private static void writeRecord(MemorySegment recordSegment, ChunkVertexEncoder.Vertex[] vertices,
-            int facingOrdinal, int packedNormal) {
-        for (int vertexIndex = 0; vertexIndex < 4; vertexIndex++) {
-            ChunkVertexEncoder.Vertex vertex = vertices[vertexIndex];
-            long positionOffset = OFFSET_POSITIONS + (long) vertexIndex * 3 * Float.BYTES;
-            recordSegment.set(ValueLayout.JAVA_FLOAT, positionOffset, vertex.x);
-            recordSegment.set(ValueLayout.JAVA_FLOAT, positionOffset + Float.BYTES, vertex.y);
-            recordSegment.set(ValueLayout.JAVA_FLOAT, positionOffset + 2L * Float.BYTES, vertex.z);
-        }
-
-        recordSegment.set(ValueLayout.JAVA_INT, OFFSET_FACING, facingOrdinal);
-        recordSegment.set(ValueLayout.JAVA_INT, OFFSET_PACKED_NORMAL, packedNormal);
     }
 
     private static void writeQuadRecord(MemorySegment recordSegment, TQuad quad) {

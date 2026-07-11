@@ -1,7 +1,7 @@
 package net.sodium.client.render.chunk.translucent_sorting.quad;
 
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
+import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 
 public class RegularTQuad extends TQuad {
     float[] vertexPositions;
@@ -10,21 +10,36 @@ public class RegularTQuad extends TQuad {
         super(facing, packedNormal);
     }
 
-    public static RegularTQuad fromVertices(ChunkVertexEncoder.Vertex[] vertices, ModelQuadFacing facing, int packedNormal) {
+    public static RegularTQuad fromNativeQuad(long nativeQuadAddress, ModelQuadFacing facing, int packedNormal) {
+        float[] positions = new float[12];
+        for (int vertexIndex = 0; vertexIndex < 4; vertexIndex++) {
+            int positionIndex = vertexIndex * 3;
+            positions[positionIndex] = NativeChunkMeshEncoder.nativeQuadX(nativeQuadAddress, vertexIndex);
+            positions[positionIndex + 1] = NativeChunkMeshEncoder.nativeQuadY(nativeQuadAddress, vertexIndex);
+            positions[positionIndex + 2] = NativeChunkMeshEncoder.nativeQuadZ(nativeQuadAddress, vertexIndex);
+        }
+        return fromPositions(positions, facing, packedNormal);
+    }
+
+    public static RegularTQuad fromPositions(float[] positions, ModelQuadFacing facing, int packedNormal) {
+        if (positions.length != 12) {
+            throw new IllegalArgumentException("Expected 12 position floats, got " + positions.length);
+        }
+
         var quad = new RegularTQuad(facing, packedNormal);
 
-        var sameVertexMap = quad.initExtentsAndCenter(vertices);
+        var sameVertexMap = quad.initExtentsAndCenter(positions);
         if (isInvalid(sameVertexMap)) {
             return null;
         }
 
-        quad.initVertexPositions(vertices, sameVertexMap);
+        quad.initVertexPositions(positions, sameVertexMap);
         quad.initDotProduct();
 
         return quad;
     }
 
-    void initVertexPositions(ChunkVertexEncoder.Vertex[] vertices, int sameVertexMap) {
+    void initVertexPositions(float[] positions, int sameVertexMap) {
         // check if we need to store vertex positions for this quad, only necessary if it's unaligned or rotated (yet aligned)
         var needsVertexPositions = (sameVertexMap != 0 || !this.facing.isAligned());
         if (!needsVertexPositions) {
@@ -36,10 +51,13 @@ public class RegularTQuad extends TQuad {
             float negZExtent = this.extents[5];
 
             for (int i = 0; i < 4; i++) {
-                var vertex = vertices[i];
-                if (vertex.x != posYExtent && vertex.x != negYExtent ||
-                        vertex.y != posZExtent && vertex.y != negZExtent ||
-                        vertex.z != posXExtent && vertex.z != negXExtent) {
+                int positionIndex = i * 3;
+                float x = positions[positionIndex];
+                float y = positions[positionIndex + 1];
+                float z = positions[positionIndex + 2];
+                if (x != posYExtent && x != negYExtent ||
+                        y != posZExtent && y != negZExtent ||
+                        z != posXExtent && z != negXExtent) {
                     needsVertexPositions = true;
                     break;
                 }
@@ -49,12 +67,7 @@ public class RegularTQuad extends TQuad {
         if (needsVertexPositions) {
             var vertexPositions = new float[12];
             this.vertexPositions = vertexPositions;
-            for (int i = 0, itemIndex = 0; i < 4; i++) {
-                var vertex = vertices[i];
-                vertexPositions[itemIndex++] = vertex.x;
-                vertexPositions[itemIndex++] = vertex.y;
-                vertexPositions[itemIndex++] = vertex.z;
-            }
+            System.arraycopy(positions, 0, vertexPositions, 0, vertexPositions.length);
         }
     }
 

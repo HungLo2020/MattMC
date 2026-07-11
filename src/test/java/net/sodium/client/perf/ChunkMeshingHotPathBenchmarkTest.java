@@ -4,7 +4,7 @@ import net.sodium.client.SodiumClientMod;
 import net.sodium.client.gui.SodiumGameOptions;
 import net.sodium.client.render.chunk.translucent_sorting.data.TranslucentData;
 import net.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
+import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
@@ -59,7 +59,7 @@ class ChunkMeshingHotPathBenchmarkTest {
                 .allocateDirect(QUAD_COUNT * TranslucentData.INDICES_PER_QUAD * Integer.BYTES)
                 .order(ByteOrder.nativeOrder())
                 .asIntBuffer();
-        ChunkVertexEncoder.Vertex[][] quads = syntheticQuads();
+        float[] basePositions = syntheticQuadBasePositions();
 
         List<BenchmarkResult> results = new ArrayList<>();
         results.add(measure("translucent_quad_index_emission", () -> runIndexEmission(quadIndexes, indexBuffer)));
@@ -67,7 +67,7 @@ class ChunkMeshingHotPathBenchmarkTest {
         NativeSectionMeshBuilder.FacingBuffer builder =
                 NativeSectionMeshBuilder.createEncodedFacingBuffer(ChunkMeshFormats.COMPACT, QUAD_COUNT * 4);
         try {
-            results.add(measure("compact_chunk_mesh_buffer_build", () -> runMeshBufferBuild(builder, quads)));
+            results.add(measure("compact_chunk_mesh_buffer_build", () -> runMeshBufferBuild(builder, basePositions)));
         } finally {
             builder.destroy();
         }
@@ -88,11 +88,23 @@ class ChunkMeshingHotPathBenchmarkTest {
     }
 
     private static long runMeshBufferBuild(NativeSectionMeshBuilder.FacingBuffer builder,
-            ChunkVertexEncoder.Vertex[][] quads)
+            float[] basePositions)
             throws Exception {
         builder.start(SECTION_INDEX);
         for (int index = 0; index < QUAD_COUNT; index++) {
-            builder.push(quads[index], materialBits(index));
+            int baseIndex = index * 3;
+            int materialBits = materialBits(index);
+            byte blockEmission = (byte) (index & 15);
+            byte renderType = (byte) (index & 3);
+            int blockId = index & 0xffff;
+            int localX = index & 15;
+            int localY = (index >>> 4) & 15;
+            int localZ = (index >>> 8) & 15;
+            long quadAddress = builder.prepareStagedQuad(materialBits, blockEmission, renderType, false, blockId,
+                    localX, localY, localZ);
+            writeQuad(quadAddress, blockEmission, renderType, blockId, localX, localY, localZ, materialBits,
+                    basePositions[baseIndex], basePositions[baseIndex + 1], basePositions[baseIndex + 2]);
+            builder.commitStagedQuad();
         }
 
         return ((long) builder.count() << 32) ^ MESH_FINISHER.finish(builder);
@@ -155,32 +167,26 @@ class ChunkMeshingHotPathBenchmarkTest {
         return quadIndexes;
     }
 
-    private static ChunkVertexEncoder.Vertex[][] syntheticQuads() {
-        ChunkVertexEncoder.Vertex[][] quads = new ChunkVertexEncoder.Vertex[QUAD_COUNT][];
-        for (int index = 0; index < quads.length; index++) {
-            float baseX = (index & 15) + ((index >>> 4) & 3) * 0.03125F;
-            float baseY = ((index >>> 6) & 15) + 0.125F;
-            float baseZ = ((index >>> 10) & 15) + 0.25F;
-            quads[index] = quad(baseX, baseY, baseZ, index);
+    private static float[] syntheticQuadBasePositions() {
+        float[] positions = new float[QUAD_COUNT * 3];
+        for (int index = 0; index < QUAD_COUNT; index++) {
+            int baseIndex = index * 3;
+            positions[baseIndex] = (index & 15) + ((index >>> 4) & 3) * 0.03125F;
+            positions[baseIndex + 1] = ((index >>> 6) & 15) + 0.125F;
+            positions[baseIndex + 2] = ((index >>> 10) & 15) + 0.25F;
         }
 
-        return quads;
+        return positions;
     }
 
-    private static ChunkVertexEncoder.Vertex[] quad(float baseX, float baseY, float baseZ, int seed) {
-        ChunkVertexEncoder.Vertex[] vertices = ChunkVertexEncoder.Vertex.uninitializedQuad();
-        writeVertex(vertices[0], baseX, baseY, baseZ, 0.0F, 0.0F, seed);
-        writeVertex(vertices[1], baseX + 1.0F, baseY, baseZ, 1.0F, 0.0F, seed);
-        writeVertex(vertices[2], baseX + 1.0F, baseY + 1.0F, baseZ, 1.0F, 1.0F, seed);
-        writeVertex(vertices[3], baseX, baseY + 1.0F, baseZ, 0.0F, 1.0F, seed);
-        return vertices;
-    }
-
-    private static void writeVertex(ChunkVertexEncoder.Vertex vertex, float x, float y, float z,
-            float u, float v, int seed) {
-        ChunkVertexEncoder.Vertex.writeVertex(vertex, x, y, z, 0xff806040, 0.5F, u, v, 0x00f000f0);
-        vertex.iris$setData((byte) (seed & 15), (byte) (seed & 3), seed & 0xffff,
-                seed & 15, (seed >>> 4) & 15, (seed >>> 8) & 15);
+    private static void writeQuad(long quadAddress, byte blockEmission, byte renderType, int blockId,
+            int localX, int localY, int localZ, int materialBits, float baseX, float baseY, float baseZ) {
+        NativeChunkMeshEncoder.writeNativeQuad(quadAddress, blockEmission, renderType, false, blockId, localX, localY,
+                localZ, materialBits,
+                baseX, baseY, baseZ, 0xff806040, 0.5F, 0.0F, 0.0F, 0x00f000f0,
+                baseX + 1.0F, baseY, baseZ, 0xff806040, 0.5F, 1.0F, 0.0F, 0x00f000f0,
+                baseX + 1.0F, baseY + 1.0F, baseZ, 0xff806040, 0.5F, 1.0F, 1.0F, 0x00f000f0,
+                baseX, baseY + 1.0F, baseZ, 0xff806040, 0.5F, 0.0F, 1.0F, 0x00f000f0);
     }
 
     private static int materialBits(int index) {

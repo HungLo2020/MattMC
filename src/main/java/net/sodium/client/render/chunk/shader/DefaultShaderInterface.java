@@ -8,7 +8,7 @@ import net.sodium.client.gl.shader.uniform.GlUniformFloat3v;
 import net.sodium.client.gl.shader.uniform.GlUniformInt;
 import net.sodium.client.gl.shader.uniform.GlUniformMatrix4f;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
-import net.sodium.client.render.chunk.vertex.format.impl.CompactChunkVertex;
+import net.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
 import net.sodium.client.util.FogParameters;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
@@ -67,7 +67,7 @@ public class DefaultShaderInterface implements RenderPassChunkShaderInterface {
         // area must be "shrunk" by at least one sub-texel to avoid bleed between textures in the atlas. And since we
         // offset texture coordinates in the vertex format by one texel, we also need to undo that here.
         double subTexelPrecision = (1 << RenderDevice.instance().getSubTexelPrecisionBits());
-        double subTexelOffset = 1.0f / CompactChunkVertex.TEXTURE_MAX_VALUE;
+        double subTexelOffset = 1.0f / ChunkMeshFormats.COMPACT_TEXTURE_MAX_VALUE;
 
         this.uniformTexCoordShrink.set(
                 (float) (subTexelOffset - (((1.0D / textureAtlas.width) / subTexelPrecision))),

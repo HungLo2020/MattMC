@@ -13,7 +13,6 @@ import net.sodium.client.render.chunk.translucent_sorting.quad.RegularTQuad;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.sodium.client.render.chunk.translucent_sorting.trigger.NativeGfniTriggers;
 import net.sodium.client.render.chunk.translucent_sorting.trigger.SortTriggering;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import net.minecraft.core.SectionPos;
 import net.minecraft.util.Mth;
 
@@ -107,16 +106,16 @@ public class TranslucentGeometryCollector {
      * @param packedNormal the packed normal of the quad
      * @return true if the quad is invalid and should be discarded from the model entirely, false otherwise.
      */
-    public boolean appendQuad(ChunkVertexEncoder.Vertex[] vertices, ModelQuadFacing facing, int packedNormal) {
+    public boolean appendNativeQuad(long nativeQuadAddress, ModelQuadFacing facing, int packedNormal) {
         if (this.nativeAnalyzer != null) {
-            return this.nativeAnalyzer.appendQuad(vertices, facing, packedNormal);
+            return this.nativeAnalyzer.appendNativeQuad(nativeQuadAddress, facing, packedNormal);
         }
 
         TQuad quad;
         if (this.isSplittingQuads()) {
-            quad = NativeFullTQuad.fromVertices(vertices, facing, packedNormal);
+            quad = NativeFullTQuad.fromNativeQuad(nativeQuadAddress, facing, packedNormal);
         } else {
-            quad = RegularTQuad.fromVertices(vertices, facing, packedNormal);
+            quad = RegularTQuad.fromNativeQuad(nativeQuadAddress, facing, packedNormal);
         }
         if (quad == null) {
             return true;
@@ -189,15 +188,6 @@ public class TranslucentGeometryCollector {
         return false;
     }
 
-    public boolean appendNativeQuad(long nativeQuadAddress, ChunkVertexEncoder.Vertex[] vertices,
-            ModelQuadFacing facing, int packedNormal) {
-        if (this.nativeAnalyzer != null) {
-            return this.nativeAnalyzer.appendNativeQuad(nativeQuadAddress, facing, packedNormal);
-        }
-
-        return this.appendQuad(vertices, facing, packedNormal);
-    }
-
     public boolean supportsNativeBatching() {
         return this.nativeAnalyzer != null;
     }
@@ -220,20 +210,26 @@ public class TranslucentGeometryCollector {
         return this.nativeAnalyzer.handle();
     }
 
-    public static boolean isInvalidQuad(ChunkVertexEncoder.Vertex[] vertices) {
-        ChunkVertexEncoder.Vertex last = vertices[3];
+    public static boolean isInvalidNativeQuad(long nativeQuadAddress) {
+        float lastX = net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder.nativeQuadX(nativeQuadAddress, 3);
+        float lastY = net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder.nativeQuadY(nativeQuadAddress, 3);
+        float lastZ = net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder.nativeQuadZ(nativeQuadAddress, 3);
         int sameVertexMap = 0;
 
         for (int index = 0; index < 4; index++) {
-            ChunkVertexEncoder.Vertex current = vertices[index];
+            float currentX = net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder.nativeQuadX(nativeQuadAddress, index);
+            float currentY = net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder.nativeQuadY(nativeQuadAddress, index);
+            float currentZ = net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder.nativeQuadZ(nativeQuadAddress, index);
 
-            if (Math.abs(current.x - last.x) < 0.00001F
-                    && Math.abs(current.y - last.y) < 0.00001F
-                    && Math.abs(current.z - last.z) < 0.00001F) {
+            if (Math.abs(currentX - lastX) < 0.00001F
+                    && Math.abs(currentY - lastY) < 0.00001F
+                    && Math.abs(currentZ - lastZ) < 0.00001F) {
                 sameVertexMap |= 1 << index;
             }
 
-            last = current;
+            lastX = currentX;
+            lastY = currentY;
+            lastZ = currentZ;
         }
 
         return Integer.bitCount(sameVertexMap) > 1;

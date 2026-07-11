@@ -19,6 +19,30 @@ const INDEX_MODE_SORTED_QUADS: i32 = 2;
 const INDEX_MODE_KEY_SORTED: i32 = 3;
 const PENDING_BATCH_QUAD_CAPACITY: usize = 256;
 
+const COMPACT_VALUE_STRIDE: i32 = 0;
+const COMPACT_VALUE_POSITION_OFFSET: i32 = 1;
+const COMPACT_VALUE_COLOR_OFFSET: i32 = 2;
+const COMPACT_VALUE_TEXTURE_OFFSET: i32 = 3;
+const COMPACT_VALUE_LIGHT_MATERIAL_INDEX_OFFSET: i32 = 4;
+const COMPACT_VALUE_BLOCK_ID_OFFSET: i32 = 5;
+const COMPACT_VALUE_NORMAL_OFFSET: i32 = 6;
+const COMPACT_VALUE_TANGENT_OFFSET: i32 = 7;
+const COMPACT_VALUE_MID_UV_OFFSET: i32 = 8;
+const COMPACT_VALUE_MID_BLOCK_OFFSET: i32 = 9;
+const COMPACT_VALUE_POSITION_MAX_VALUE: i32 = 10;
+const COMPACT_VALUE_TEXTURE_MAX_VALUE: i32 = 11;
+
+const COMPACT_VERTEX_STRIDE: i32 = 20;
+const COMPACT_POSITION_OFFSET: i32 = 0;
+const COMPACT_COLOR_OFFSET: i32 = 8;
+const COMPACT_TEXTURE_OFFSET: i32 = 12;
+const COMPACT_LIGHT_MATERIAL_INDEX_OFFSET: i32 = 16;
+const COMPACT_NATIVE_BLOCK_ID_OFFSET: i32 = 0;
+const COMPACT_NATIVE_NORMAL_OFFSET: i32 = 0;
+const COMPACT_NATIVE_TANGENT_OFFSET: i32 = 0;
+const COMPACT_NATIVE_MID_UV_OFFSET: i32 = 0;
+const COMPACT_NATIVE_MID_BLOCK_OFFSET: i32 = 0;
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 struct QuadVertex {
@@ -150,6 +174,227 @@ pub fn verify() -> i32 {
         OK
     } else {
         ERR_INVALID_ARGUMENT
+    }
+}
+
+fn compact_format_value(value: i32) -> i32 {
+    match value {
+        COMPACT_VALUE_STRIDE => COMPACT_VERTEX_STRIDE,
+        COMPACT_VALUE_POSITION_OFFSET => COMPACT_POSITION_OFFSET,
+        COMPACT_VALUE_COLOR_OFFSET => COMPACT_COLOR_OFFSET,
+        COMPACT_VALUE_TEXTURE_OFFSET => COMPACT_TEXTURE_OFFSET,
+        COMPACT_VALUE_LIGHT_MATERIAL_INDEX_OFFSET => COMPACT_LIGHT_MATERIAL_INDEX_OFFSET,
+        COMPACT_VALUE_BLOCK_ID_OFFSET => COMPACT_NATIVE_BLOCK_ID_OFFSET,
+        COMPACT_VALUE_NORMAL_OFFSET => COMPACT_NATIVE_NORMAL_OFFSET,
+        COMPACT_VALUE_TANGENT_OFFSET => COMPACT_NATIVE_TANGENT_OFFSET,
+        COMPACT_VALUE_MID_UV_OFFSET => COMPACT_NATIVE_MID_UV_OFFSET,
+        COMPACT_VALUE_MID_BLOCK_OFFSET => COMPACT_NATIVE_MID_BLOCK_OFFSET,
+        COMPACT_VALUE_POSITION_MAX_VALUE => POSITION_MAX_VALUE as i32,
+        COMPACT_VALUE_TEXTURE_MAX_VALUE => TEXTURE_MAX_VALUE as i32,
+        _ => ERR_INVALID_ARGUMENT,
+    }
+}
+
+unsafe fn native_quad_mut(address: u64) -> Result<&'static mut NativeQuad, i32> {
+    if address == 0 {
+        return Err(ERR_NULL_POINTER);
+    }
+
+    Ok(&mut *(address as *mut NativeQuad))
+}
+
+unsafe fn native_quad(address: u64) -> Result<&'static NativeQuad, i32> {
+    if address == 0 {
+        return Err(ERR_NULL_POINTER);
+    }
+
+    Ok(&*(address as *const NativeQuad))
+}
+
+unsafe fn write_native_quad_metadata(
+    quad_address: u64,
+    block_emission: i32,
+    render_type: i32,
+    ignore_mid_block: i32,
+    block_id: i32,
+    local_x: i32,
+    local_y: i32,
+    local_z: i32,
+    material_bits: i32,
+) -> i32 {
+    let quad = match native_quad_mut(quad_address) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+
+    quad.block_emission = block_emission as u8;
+    quad.render_type = render_type as u8;
+    quad.ignore_mid_block = if ignore_mid_block != 0 { 1 } else { 0 };
+    quad._padding = 0;
+    quad.block_id = block_id;
+    quad.local_x = local_x;
+    quad.local_y = local_y;
+    quad.local_z = local_z;
+    quad.material_bits = material_bits;
+    OK
+}
+
+unsafe fn write_native_quad_vertex(
+    quad_address: u64,
+    vertex_index: i32,
+    x: f32,
+    y: f32,
+    z: f32,
+    color: i32,
+    ao: f32,
+    u: f32,
+    v: f32,
+    light: i32,
+) -> i32 {
+    let vertex_index = match usize::try_from(vertex_index) {
+        Ok(value) if value < 4 => value,
+        _ => return ERR_INVALID_ARGUMENT,
+    };
+    let quad = match native_quad_mut(quad_address) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+
+    quad.vertices[vertex_index] = QuadVertex {
+        x,
+        y,
+        z,
+        color,
+        ao,
+        u,
+        v,
+        light,
+    };
+    OK
+}
+
+unsafe fn write_native_quad(
+    quad_address: u64,
+    block_emission: i32,
+    render_type: i32,
+    ignore_mid_block: i32,
+    block_id: i32,
+    local_x: i32,
+    local_y: i32,
+    local_z: i32,
+    material_bits: i32,
+    x0: f32,
+    y0: f32,
+    z0: f32,
+    color0: i32,
+    ao0: f32,
+    u0: f32,
+    v0: f32,
+    light0: i32,
+    x1: f32,
+    y1: f32,
+    z1: f32,
+    color1: i32,
+    ao1: f32,
+    u1: f32,
+    v1: f32,
+    light1: i32,
+    x2: f32,
+    y2: f32,
+    z2: f32,
+    color2: i32,
+    ao2: f32,
+    u2: f32,
+    v2: f32,
+    light2: i32,
+    x3: f32,
+    y3: f32,
+    z3: f32,
+    color3: i32,
+    ao3: f32,
+    u3: f32,
+    v3: f32,
+    light3: i32,
+) -> i32 {
+    let quad = match native_quad_mut(quad_address) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+
+    *quad = NativeQuad {
+        vertices: [
+            QuadVertex {
+                x: x0,
+                y: y0,
+                z: z0,
+                color: color0,
+                ao: ao0,
+                u: u0,
+                v: v0,
+                light: light0,
+            },
+            QuadVertex {
+                x: x1,
+                y: y1,
+                z: z1,
+                color: color1,
+                ao: ao1,
+                u: u1,
+                v: v1,
+                light: light1,
+            },
+            QuadVertex {
+                x: x2,
+                y: y2,
+                z: z2,
+                color: color2,
+                ao: ao2,
+                u: u2,
+                v: v2,
+                light: light2,
+            },
+            QuadVertex {
+                x: x3,
+                y: y3,
+                z: z3,
+                color: color3,
+                ao: ao3,
+                u: u3,
+                v: v3,
+                light: light3,
+            },
+        ],
+        block_emission: block_emission as u8,
+        render_type: render_type as u8,
+        ignore_mid_block: if ignore_mid_block != 0 { 1 } else { 0 },
+        _padding: 0,
+        block_id,
+        local_x,
+        local_y,
+        local_z,
+        material_bits,
+    };
+    OK
+}
+
+unsafe fn native_quad_position(quad_address: u64, vertex_index: i32, component: i32) -> f32 {
+    let Ok(vertex_index) = usize::try_from(vertex_index) else {
+        return 0.0;
+    };
+    if vertex_index >= 4 {
+        return 0.0;
+    }
+
+    let Ok(quad) = native_quad(quad_address) else {
+        return 0.0;
+    };
+    let vertex = quad.vertices[vertex_index];
+
+    match component {
+        0 => vertex.x,
+        1 => vertex.y,
+        2 => vertex.z,
+        _ => 0.0,
     }
 }
 
@@ -507,9 +752,11 @@ unsafe fn assemble_section_builder(
     let vertex_segments = slice::from_raw_parts_mut(vertex_segments, MODEL_QUAD_FACING_COUNT * 2);
     vertex_segments.fill(0);
 
-    let total_vertices = match builder.counts.iter().try_fold(0usize, |acc, count| {
-        acc.checked_add(count.checked_mul(4)?)
-    }) {
+    let total_vertices = match builder
+        .counts
+        .iter()
+        .try_fold(0usize, |acc, count| acc.checked_add(count.checked_mul(4)?))
+    {
         Some(value) => value,
         None => return ERR_INVALID_ARGUMENT,
     };
@@ -933,7 +1180,11 @@ unsafe fn section_builder_append_batch_encoded(
             }
             let encoded_start = (start + output_index) * encoded_quad_len;
             let encoded_end = encoded_start + encoded_quad_len;
-            encode_quad(&quad, &mut buffer.encoded[encoded_start..encoded_end], format);
+            encode_quad(
+                &quad,
+                &mut buffer.encoded[encoded_start..encoded_end],
+                format,
+            );
             output_index += 1;
         }
     }
@@ -1358,6 +1609,150 @@ fn pack_norm_i8(x: f32, y: f32, z: f32, w: f32) -> i32 {
 #[no_mangle]
 pub extern "C" fn mattmc_sodium_chunk_mesh_verify() -> i32 {
     verify()
+}
+
+#[no_mangle]
+pub extern "C" fn mattmc_sodium_chunk_compact_format_value(value: i32) -> i32 {
+    compact_format_value(value)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_chunk_native_quad_write_metadata(
+    quad_address: u64,
+    block_emission: i32,
+    render_type: i32,
+    ignore_mid_block: i32,
+    block_id: i32,
+    local_x: i32,
+    local_y: i32,
+    local_z: i32,
+    material_bits: i32,
+) -> i32 {
+    write_native_quad_metadata(
+        quad_address,
+        block_emission,
+        render_type,
+        ignore_mid_block,
+        block_id,
+        local_x,
+        local_y,
+        local_z,
+        material_bits,
+    )
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_chunk_native_quad_write_vertex(
+    quad_address: u64,
+    vertex_index: i32,
+    x: f32,
+    y: f32,
+    z: f32,
+    color: i32,
+    ao: f32,
+    u: f32,
+    v: f32,
+    light: i32,
+) -> i32 {
+    write_native_quad_vertex(quad_address, vertex_index, x, y, z, color, ao, u, v, light)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_chunk_native_quad_write(
+    quad_address: u64,
+    block_emission: i32,
+    render_type: i32,
+    ignore_mid_block: i32,
+    block_id: i32,
+    local_x: i32,
+    local_y: i32,
+    local_z: i32,
+    material_bits: i32,
+    x0: f32,
+    y0: f32,
+    z0: f32,
+    color0: i32,
+    ao0: f32,
+    u0: f32,
+    v0: f32,
+    light0: i32,
+    x1: f32,
+    y1: f32,
+    z1: f32,
+    color1: i32,
+    ao1: f32,
+    u1: f32,
+    v1: f32,
+    light1: i32,
+    x2: f32,
+    y2: f32,
+    z2: f32,
+    color2: i32,
+    ao2: f32,
+    u2: f32,
+    v2: f32,
+    light2: i32,
+    x3: f32,
+    y3: f32,
+    z3: f32,
+    color3: i32,
+    ao3: f32,
+    u3: f32,
+    v3: f32,
+    light3: i32,
+) -> i32 {
+    write_native_quad(
+        quad_address,
+        block_emission,
+        render_type,
+        ignore_mid_block,
+        block_id,
+        local_x,
+        local_y,
+        local_z,
+        material_bits,
+        x0,
+        y0,
+        z0,
+        color0,
+        ao0,
+        u0,
+        v0,
+        light0,
+        x1,
+        y1,
+        z1,
+        color1,
+        ao1,
+        u1,
+        v1,
+        light1,
+        x2,
+        y2,
+        z2,
+        color2,
+        ao2,
+        u2,
+        v2,
+        light2,
+        x3,
+        y3,
+        z3,
+        color3,
+        ao3,
+        u3,
+        v3,
+        light3,
+    )
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_chunk_native_quad_position(
+    quad_address: u64,
+    vertex_index: i32,
+    component: i32,
+) -> f32 {
+    native_quad_position(quad_address, vertex_index, component)
 }
 
 #[no_mangle]
@@ -2311,6 +2706,83 @@ mod tests {
     fn native_quad_layout_matches_java_stride() {
         assert_eq!(32, std::mem::size_of::<QuadVertex>());
         assert_eq!(152, std::mem::size_of::<NativeQuad>());
+    }
+
+    #[test]
+    fn compact_format_metadata_is_rust_owned() {
+        assert_eq!(
+            20,
+            mattmc_sodium_chunk_compact_format_value(COMPACT_VALUE_STRIDE)
+        );
+        assert_eq!(
+            0,
+            mattmc_sodium_chunk_compact_format_value(COMPACT_VALUE_POSITION_OFFSET)
+        );
+        assert_eq!(
+            8,
+            mattmc_sodium_chunk_compact_format_value(COMPACT_VALUE_COLOR_OFFSET)
+        );
+        assert_eq!(
+            12,
+            mattmc_sodium_chunk_compact_format_value(COMPACT_VALUE_TEXTURE_OFFSET)
+        );
+        assert_eq!(
+            16,
+            mattmc_sodium_chunk_compact_format_value(COMPACT_VALUE_LIGHT_MATERIAL_INDEX_OFFSET)
+        );
+        assert_eq!(
+            0,
+            mattmc_sodium_chunk_compact_format_value(COMPACT_VALUE_BLOCK_ID_OFFSET)
+        );
+        assert_eq!(
+            1 << 20,
+            mattmc_sodium_chunk_compact_format_value(COMPACT_VALUE_POSITION_MAX_VALUE)
+        );
+        assert_eq!(
+            1 << 15,
+            mattmc_sodium_chunk_compact_format_value(COMPACT_VALUE_TEXTURE_MAX_VALUE)
+        );
+    }
+
+    #[test]
+    fn native_quad_write_helpers_populate_rust_owned_layout() {
+        let mut quad = NativeQuad::default();
+        let address = &mut quad as *mut NativeQuad as u64;
+
+        unsafe {
+            assert_eq!(
+                OK,
+                mattmc_sodium_chunk_native_quad_write_metadata(address, 13, 2, 1, 99, 4, 5, 6, 7)
+            );
+            assert_eq!(
+                OK,
+                mattmc_sodium_chunk_native_quad_write_vertex(
+                    address, 2, 1.25, 2.5, 3.75, 0x11223344, 0.875, 0.125, 0.625, 0x00f000f0,
+                )
+            );
+        }
+
+        assert_eq!(13, quad.block_emission);
+        assert_eq!(2, quad.render_type);
+        assert_eq!(1, quad.ignore_mid_block);
+        assert_eq!(0, quad._padding);
+        assert_eq!(99, quad.block_id);
+        assert_eq!(4, quad.local_x);
+        assert_eq!(5, quad.local_y);
+        assert_eq!(6, quad.local_z);
+        assert_eq!(7, quad.material_bits);
+        assert_eq!(1.25, quad.vertices[2].x);
+        assert_eq!(2.5, unsafe {
+            mattmc_sodium_chunk_native_quad_position(address, 2, 1)
+        });
+        assert_eq!(3.75, unsafe {
+            mattmc_sodium_chunk_native_quad_position(address, 2, 2)
+        });
+        assert_eq!(0x11223344, quad.vertices[2].color);
+        assert_eq!(0.875, quad.vertices[2].ao);
+        assert_eq!(0.125, quad.vertices[2].u);
+        assert_eq!(0.625, quad.vertices[2].v);
+        assert_eq!(0x00f000f0, quad.vertices[2].light);
     }
 
     #[test]
