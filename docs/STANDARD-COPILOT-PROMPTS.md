@@ -15,4 +15,4 @@ so whats our next step here to continue the rust migration? my expectations are 
 
 alright dont make any changes dont run any scripts yet. just based on the implementations we have here... do think this rust implementation is better than the java? worse? or about equal? give me numbers.
 
-good work. i want you to completely and throughly cleanly and efficiently implement these next recomended steps. do not take shortcuts. ensure the meshing test is up to date in both the current project and the old frozen java repo. before you are finished i expect you to run the test and report back.
+good work. i want you to first run the meshing test for a baseline. then i want you to completely and throughly cleanly and efficiently implement these next recomended steps. do not take shortcuts. ensure the meshing test is up to date in both the current project and the old frozen java repo. before you are finished i expect you to run the test and report back with the results and the delta.

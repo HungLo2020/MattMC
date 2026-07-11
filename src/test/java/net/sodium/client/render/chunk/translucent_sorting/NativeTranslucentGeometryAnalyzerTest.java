@@ -11,7 +11,6 @@ import net.sodium.client.render.chunk.translucent_sorting.data.Sorter;
 import net.sodium.client.render.chunk.translucent_sorting.quad.RegularTQuad;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.sodium.client.render.chunk.translucent_sorting.trigger.NativeGfniTriggers;
-import net.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
 import net.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
@@ -106,8 +105,8 @@ class NativeTranslucentGeometryAnalyzerTest {
     void analyzerAppendsFromNativeStagedQuadWithoutJavaRecordStorage() {
         NativeTranslucentGeometryAnalyzer analyzer = new NativeTranslucentGeometryAnalyzer();
         NativeSectionMeshBuilder sectionBuilder = NativeSectionMeshBuilder.create(1);
-        ChunkMeshBufferBuilder quadBuffer = new ChunkMeshBufferBuilder(ChunkMeshFormats.COMPACT.getNativeFormat(),
-                sectionBuilder, ModelQuadFacing.POS_Z.ordinal());
+        NativeSectionMeshBuilder.FacingBuffer quadBuffer = new NativeSectionMeshBuilder.FacingBuffer(
+                ChunkMeshFormats.COMPACT.getNativeFormat(), sectionBuilder, ModelQuadFacing.POS_Z.ordinal());
 
         try {
             sectionBuilder.start(3);

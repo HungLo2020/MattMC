@@ -3,9 +3,9 @@ package net.sodium.client.perf;
 import net.sodium.client.SodiumClientMod;
 import net.sodium.client.gui.SodiumGameOptions;
 import net.sodium.client.render.chunk.translucent_sorting.data.TranslucentData;
-import net.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
 import net.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
+import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -64,7 +64,8 @@ class ChunkMeshingHotPathBenchmarkTest {
         List<BenchmarkResult> results = new ArrayList<>();
         results.add(measure("translucent_quad_index_emission", () -> runIndexEmission(quadIndexes, indexBuffer)));
 
-        ChunkMeshBufferBuilder builder = new ChunkMeshBufferBuilder(ChunkMeshFormats.COMPACT, QUAD_COUNT * 4);
+        NativeSectionMeshBuilder.FacingBuffer builder =
+                NativeSectionMeshBuilder.createEncodedFacingBuffer(ChunkMeshFormats.COMPACT, QUAD_COUNT * 4);
         try {
             results.add(measure("compact_chunk_mesh_buffer_build", () -> runMeshBufferBuild(builder, quads)));
         } finally {
@@ -86,7 +87,8 @@ class ChunkMeshingHotPathBenchmarkTest {
         return sample(indexBuffer, QUAD_COUNT * TranslucentData.INDICES_PER_QUAD);
     }
 
-    private static long runMeshBufferBuild(ChunkMeshBufferBuilder builder, ChunkVertexEncoder.Vertex[][] quads)
+    private static long runMeshBufferBuild(NativeSectionMeshBuilder.FacingBuffer builder,
+            ChunkVertexEncoder.Vertex[][] quads)
             throws Exception {
         builder.start(SECTION_INDEX);
         for (int index = 0; index < QUAD_COUNT; index++) {
@@ -330,8 +332,8 @@ class ChunkMeshingHotPathBenchmarkTest {
 
     private static MeshFinisher createMeshFinisher() {
         try {
-            Method sectionBuilderMethod = ChunkMeshBufferBuilder.class.getMethod("sectionBuilder");
-            Method nativeFormatMethod = ChunkMeshBufferBuilder.class.getMethod("nativeFormat");
+            Method sectionBuilderMethod = NativeSectionMeshBuilder.FacingBuffer.class.getMethod("sectionBuilder");
+            Method nativeFormatMethod = NativeSectionMeshBuilder.FacingBuffer.class.getMethod("nativeFormat");
             Class<?> nativeSectionMeshBuilderClass =
                     Class.forName("net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder");
             Class<?> nativeChunkVertexFormatClass =
@@ -366,7 +368,7 @@ class ChunkMeshingHotPathBenchmarkTest {
 
     @FunctionalInterface
     private interface MeshFinisher {
-        long finish(ChunkMeshBufferBuilder builder) throws Exception;
+        long finish(NativeSectionMeshBuilder.FacingBuffer builder) throws Exception;
     }
 
     @FunctionalInterface

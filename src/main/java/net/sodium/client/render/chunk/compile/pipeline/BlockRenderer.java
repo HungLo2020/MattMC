@@ -19,7 +19,7 @@ import net.sodium.client.render.chunk.terrain.material.Material;
 import net.sodium.client.render.chunk.terrain.material.parameters.AlphaCutoffParameter;
 import net.sodium.client.render.chunk.terrain.material.parameters.MaterialParameters;
 import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
-import net.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
+import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import net.sodium.client.render.frapi.mesh.MutableQuadViewImpl;
 import net.sodium.client.render.frapi.render.AbstractBlockRenderContext;
@@ -201,7 +201,7 @@ public class BlockRenderer extends AbstractBlockRenderContext implements net.iri
         }
 
         ChunkModelBuilder builder = this.buffers.get(pass);
-        ChunkMeshBufferBuilder vertexBuffer = builder.getVertexBuffer(normalFace);
+        NativeSectionMeshBuilder.FacingBuffer vertexBuffer = builder.getVertexBuffer(normalFace);
         if (pass.isTranslucent() && this.collector != null) {
             if (vertexBuffer.pushTranslucent(vertices, materialBits, this.collector, normalFace, quad.getFaceNormal())) {
                 return;

@@ -10,7 +10,6 @@ import net.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.render.chunk.terrain.material.Material;
 import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.NativeUpdatedQuads;
-import net.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkVertexFormat;
@@ -34,10 +33,11 @@ public class ChunkBuildBuffers {
 
         for (TerrainRenderPass pass : DefaultTerrainRenderPasses.ALL) {
             NativeSectionMeshBuilder sectionBuilder = NativeSectionMeshBuilder.create(128 * 1024 / 4);
-            var vertexBuffers = new ChunkMeshBufferBuilder[ModelQuadFacing.COUNT];
+            var vertexBuffers = new NativeSectionMeshBuilder.FacingBuffer[ModelQuadFacing.COUNT];
 
             for (int facing = 0; facing < ModelQuadFacing.COUNT; facing++) {
-                vertexBuffers[facing] = new ChunkMeshBufferBuilder(this.nativeFormat, sectionBuilder, facing);
+                vertexBuffers[facing] = new NativeSectionMeshBuilder.FacingBuffer(this.nativeFormat, sectionBuilder,
+                        facing, false);
             }
 
             this.builders.put(pass, new BakedChunkModelBuilder(vertexBuffers, sectionBuilder));

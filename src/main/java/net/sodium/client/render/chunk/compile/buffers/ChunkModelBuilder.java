@@ -4,12 +4,12 @@ import net.blaze3d.vertex.VertexConsumer;
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.sodium.client.render.chunk.terrain.material.Material;
 import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
-import net.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
+import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import org.jetbrains.annotations.NotNull;
 
 public interface ChunkModelBuilder {
-    ChunkMeshBufferBuilder getVertexBuffer(ModelQuadFacing facing);
+    NativeSectionMeshBuilder.FacingBuffer getVertexBuffer(ModelQuadFacing facing);
 
     void addSprite(@NotNull TextureAtlasSprite sprite);
 

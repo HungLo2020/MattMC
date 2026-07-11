@@ -5,29 +5,29 @@ import net.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.sodium.client.render.chunk.data.BuiltSectionInfo;
 import net.sodium.client.render.chunk.terrain.material.Material;
 import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
-import net.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
 import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import org.jetbrains.annotations.NotNull;
 
 public class BakedChunkModelBuilder implements ChunkModelBuilder {
-    private final ChunkMeshBufferBuilder[] vertexBuffers;
+    private final NativeSectionMeshBuilder.FacingBuffer[] vertexBuffers;
     private final NativeSectionMeshBuilder sectionBuilder;
     private final ChunkVertexConsumer fallbackVertexConsumer = new ChunkVertexConsumer(this);
 
     private BuiltSectionInfo.Builder renderData;
 
-    public BakedChunkModelBuilder(ChunkMeshBufferBuilder[] vertexBuffers) {
+    public BakedChunkModelBuilder(NativeSectionMeshBuilder.FacingBuffer[] vertexBuffers) {
         this(vertexBuffers, null);
     }
 
-    public BakedChunkModelBuilder(ChunkMeshBufferBuilder[] vertexBuffers, NativeSectionMeshBuilder sectionBuilder) {
+    public BakedChunkModelBuilder(NativeSectionMeshBuilder.FacingBuffer[] vertexBuffers,
+            NativeSectionMeshBuilder sectionBuilder) {
         this.vertexBuffers = vertexBuffers;
         this.sectionBuilder = sectionBuilder;
     }
 
     @Override
-    public ChunkMeshBufferBuilder getVertexBuffer(ModelQuadFacing facing) {
+    public NativeSectionMeshBuilder.FacingBuffer getVertexBuffer(ModelQuadFacing facing) {
         return this.vertexBuffers[facing.ordinal()];
     }
 
@@ -43,7 +43,7 @@ public class BakedChunkModelBuilder implements ChunkModelBuilder {
     }
 
     public void destroy() {
-        for (ChunkMeshBufferBuilder builder : this.vertexBuffers) {
+        for (NativeSectionMeshBuilder.FacingBuffer builder : this.vertexBuffers) {
             builder.destroy();
         }
 

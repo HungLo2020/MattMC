@@ -3,9 +3,9 @@ package net.sodium.client.render.chunk.translucent_sorting.bsp_tree;
 import net.minecraft.util.NativeLibraryLoader;
 import net.sodium.client.render.chunk.terrain.material.DefaultMaterials;
 import net.sodium.client.render.chunk.translucent_sorting.quad.NativeFullTQuad;
-import net.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkVertexFormat;
+import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import org.lwjgl.system.MemoryUtil;
 
 import java.lang.foreign.Arena;
@@ -123,7 +123,7 @@ public final class NativeUpdatedQuads implements AutoCloseable {
                 "native updated quad buffer application");
     }
 
-    public void applyBufferUpdates(ChunkMeshBufferBuilder builder, ByteBuffer buffer) {
+    public void applyBufferUpdates(NativeSectionMeshBuilder.FacingBuffer builder, ByteBuffer buffer) {
         this.applyBufferUpdates(builder.nativeFormat(), builder.sectionIndex(), buffer);
     }
 

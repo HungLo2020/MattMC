@@ -3,6 +3,8 @@ package net.sodium.client.render.chunk.vertex.format;
 import net.minecraft.util.NativeLibraryLoader;
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.sodium.client.render.chunk.data.BuiltSectionMeshParts;
+import net.sodium.client.render.chunk.terrain.material.Material;
+import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
 import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.NativeUpdatedQuads;
 import net.sodium.client.util.NativeBuffer;
 import org.lwjgl.system.MemoryUtil;
@@ -60,6 +62,24 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                     ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_LONG,
                     ValueLayout.ADDRESS));
+    private static final MethodHandle APPEND_BATCH_ENCODED = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_mesh_builder_append_batch_encoded",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.ADDRESS));
     private static final MethodHandle APPEND_TRANSLUCENT_BATCH = NativeLibraryLoader.downcallHandle("mattmc_rust",
             "mattmc_sodium_section_mesh_builder_append_translucent_batch",
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
@@ -70,6 +90,28 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                     ValueLayout.JAVA_LONG,
                     ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_LONG,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_INT));
+    private static final MethodHandle APPEND_TRANSLUCENT_BATCH_ENCODED = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_mesh_builder_append_translucent_batch_encoded",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
                     ValueLayout.ADDRESS,
                     ValueLayout.JAVA_INT));
     private static final MethodHandle STAGING_ADDRESSES = NativeLibraryLoader.downcallHandle("mattmc_rust",
@@ -157,6 +199,18 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
         }
     }
 
+    public static FacingBuffer createFacingBuffer(ChunkVertexType vertexType, int initialCapacity) {
+        return new FacingBuffer(vertexType.getNativeFormat(),
+                NativeSectionMeshBuilder.create(Math.max(1, (initialCapacity + 3) >> 2)),
+                ModelQuadFacing.UNASSIGNED.ordinal(), true, true);
+    }
+
+    public static FacingBuffer createEncodedFacingBuffer(ChunkVertexType vertexType, int initialCapacity) {
+        return new FacingBuffer(vertexType.getNativeFormat(),
+                NativeSectionMeshBuilder.create(Math.max(1, (initialCapacity + 3) >> 2)),
+                ModelQuadFacing.UNASSIGNED.ordinal(), true, false);
+    }
+
     public void start(int sectionIndex) {
         check(invokeStart(this.state.getHandle()), "native section mesh builder start");
         this.sectionIndex = sectionIndex;
@@ -191,6 +245,26 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
         }
     }
 
+    public int appendBatchEncoded(int facing, long batchAddress, int quadCount, NativeChunkVertexFormat format,
+            int sectionIndex, boolean separateAo, boolean storeRawQuads) {
+        if (quadCount < 0) {
+            throw new IllegalArgumentException("Invalid quad count: " + quadCount);
+        }
+        if (quadCount == 0) {
+            return 0;
+        }
+
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment committedCountSegment = arena.allocate(ValueLayout.JAVA_INT);
+            check(invokeAppendBatchEncoded(this.state.getHandle(), facing, batchAddress, quadCount,
+                    NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE, format.stride(), format.blockIdOffset(),
+                    format.normalOffset(), format.tangentOffset(), format.midUvOffset(), format.midBlockOffset(),
+                    sectionIndex, separateAo ? 1 : 0, storeRawQuads ? 1 : 0, committedCountSegment),
+                    "native section mesh builder encoded batch append");
+            return committedCountSegment.get(ValueLayout.JAVA_INT, 0);
+        }
+    }
+
     public int appendBatchFiltered(int facing, long batchAddress, int quadCount, long validityAddress) {
         if (quadCount < 0) {
             throw new IllegalArgumentException("Invalid quad count: " + quadCount);
@@ -221,6 +295,29 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
             check(invokeAppendTranslucentBatch(this.state.getHandle(), facing, batchAddress, quadCount,
                     analyzerHandle, translucentFacing, packedNormalsAddress, countsSegment, 2),
                     "native section mesh builder translucent batch append");
+            return new TranslucentBatchResult(countsSegment.getAtIndex(ValueLayout.JAVA_INT, 0),
+                    countsSegment.getAtIndex(ValueLayout.JAVA_INT, 1));
+        }
+    }
+
+    public TranslucentBatchResult appendTranslucentBatchEncoded(int facing, long batchAddress, int quadCount,
+            long analyzerHandle, int translucentFacing, long packedNormalsAddress, NativeChunkVertexFormat format,
+            int sectionIndex, boolean separateAo, boolean storeRawQuads) {
+        if (quadCount < 0) {
+            throw new IllegalArgumentException("Invalid quad count: " + quadCount);
+        }
+        if (quadCount == 0) {
+            return new TranslucentBatchResult(0, 0);
+        }
+
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment countsSegment = arena.allocate(ValueLayout.JAVA_INT, 2);
+            check(invokeAppendTranslucentBatchEncoded(this.state.getHandle(), facing, batchAddress, quadCount,
+                    analyzerHandle, translucentFacing, packedNormalsAddress,
+                    NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE, format.stride(), format.blockIdOffset(),
+                    format.normalOffset(), format.tangentOffset(), format.midUvOffset(), format.midBlockOffset(),
+                    sectionIndex, separateAo ? 1 : 0, storeRawQuads ? 1 : 0, countsSegment, 2),
+                    "native section mesh builder encoded translucent batch append");
             return new TranslucentBatchResult(countsSegment.getAtIndex(ValueLayout.JAVA_INT, 0),
                     countsSegment.getAtIndex(ValueLayout.JAVA_INT, 1));
         }
@@ -424,6 +521,20 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
         }
     }
 
+    private static int invokeAppendBatchEncoded(long handle, int facing, long batchAddress, int quadCount,
+            int quadStride, int vertexStride, int blockIdOffset, int normalOffset, int tangentOffset, int midUvOffset,
+            int midBlockOffset, int sectionIndex, int separateAo, int storeRawQuads,
+            MemorySegment committedCountOutput) {
+        try {
+            return (int) APPEND_BATCH_ENCODED.invokeExact(handle, facing, batchAddress, quadCount, quadStride,
+                    vertexStride, blockIdOffset, normalOffset, tangentOffset, midUvOffset, midBlockOffset,
+                    sectionIndex, separateAo, storeRawQuads, committedCountOutput);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust section mesh builder encoded batch append downcall failed",
+                    throwable);
+        }
+    }
+
     private static int invokeAppendTranslucentBatch(long handle, int facing, long batchAddress, int quadCount,
             long analyzerHandle, int translucentFacing, long packedNormalsAddress, MemorySegment outputCounts,
             int outputCountsLength) {
@@ -432,6 +543,21 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                     analyzerHandle, translucentFacing, packedNormalsAddress, outputCounts, outputCountsLength);
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust section mesh builder translucent batch downcall failed", throwable);
+        }
+    }
+
+    private static int invokeAppendTranslucentBatchEncoded(long handle, int facing, long batchAddress, int quadCount,
+            long analyzerHandle, int translucentFacing, long packedNormalsAddress, int quadStride, int vertexStride,
+            int blockIdOffset, int normalOffset, int tangentOffset, int midUvOffset, int midBlockOffset,
+            int sectionIndex, int separateAo, int storeRawQuads, MemorySegment outputCounts, int outputCountsLength) {
+        try {
+            return (int) APPEND_TRANSLUCENT_BATCH_ENCODED.invokeExact(handle, facing, batchAddress, quadCount,
+                    analyzerHandle, translucentFacing, packedNormalsAddress, quadStride, vertexStride, blockIdOffset,
+                    normalOffset, tangentOffset, midUvOffset, midBlockOffset, sectionIndex, separateAo, storeRawQuads,
+                    outputCounts, outputCountsLength);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust section mesh builder encoded translucent batch downcall failed",
+                    throwable);
         }
     }
 
@@ -501,6 +627,212 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
     }
 
     public record TranslucentBatchResult(int validCount, int committedCount) {
+    }
+
+    public static final class FacingBuffer {
+        private final NativeChunkVertexFormat nativeFormat;
+        private final int nativeQuadStride = NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE;
+        private final NativeSectionMeshBuilder sectionBuilder;
+        private final int facing;
+        private final boolean ownsSectionBuilder;
+        private final boolean storeRawQuads;
+        private final StagingBuffers stagingBuffers;
+
+        private int sectionIndex;
+        private int pendingQuadCount;
+        private TranslucentGeometryCollector pendingCollector;
+        private ModelQuadFacing pendingCollectorFacing;
+
+        public FacingBuffer(NativeChunkVertexFormat nativeFormat, NativeSectionMeshBuilder sectionBuilder,
+                int facing) {
+            this(nativeFormat, sectionBuilder, facing, false, true);
+        }
+
+        public FacingBuffer(NativeChunkVertexFormat nativeFormat, NativeSectionMeshBuilder sectionBuilder,
+                int facing, boolean storeRawQuads) {
+            this(nativeFormat, sectionBuilder, facing, false, storeRawQuads);
+        }
+
+        private FacingBuffer(NativeChunkVertexFormat nativeFormat, NativeSectionMeshBuilder sectionBuilder,
+                int facing, boolean ownsSectionBuilder, boolean storeRawQuads) {
+            this.nativeFormat = nativeFormat;
+            this.sectionBuilder = sectionBuilder;
+            this.facing = facing;
+            this.ownsSectionBuilder = ownsSectionBuilder;
+            this.storeRawQuads = storeRawQuads;
+            this.stagingBuffers = sectionBuilder.stagingBuffers(facing);
+        }
+
+        public void push(ChunkVertexEncoder.Vertex[] vertices, Material material) {
+            this.push(vertices, material.bits());
+        }
+
+        public void push(ChunkVertexEncoder.Vertex[] vertices, int materialBits) {
+            if (vertices.length != 4) {
+                throw new IllegalArgumentException("Only quad primitives (with 4 vertices) can be pushed");
+            }
+
+            this.queueQuad(vertices, materialBits, null, null, 0);
+        }
+
+        public boolean pushTranslucent(ChunkVertexEncoder.Vertex[] vertices, int materialBits,
+                TranslucentGeometryCollector collector, ModelQuadFacing facing, int packedNormal) {
+            if (vertices.length != 4) {
+                throw new IllegalArgumentException("Only quad primitives (with 4 vertices) can be pushed");
+            }
+
+            if (TranslucentGeometryCollector.isInvalidQuad(vertices)) {
+                return true;
+            }
+
+            if (!collector.supportsNativeBatching()) {
+                if (collector.appendQuad(vertices, facing, packedNormal)) {
+                    return true;
+                }
+
+                this.queueQuad(vertices, materialBits, null, null, 0);
+                return false;
+            }
+
+            this.queueQuad(vertices, materialBits, collector, facing, packedNormal);
+            return false;
+        }
+
+        public long prepareQuadAddress() {
+            this.flushPending();
+            return this.sectionBuilder.prepareQuadAddress(this.facing);
+        }
+
+        public void commitPreparedQuad() {
+            this.sectionBuilder.commitQuad(this.facing);
+        }
+
+        public void start(int sectionIndex) {
+            this.sectionIndex = sectionIndex;
+            this.clearPending();
+
+            if (this.ownsSectionBuilder) {
+                this.sectionBuilder.start(sectionIndex);
+            }
+        }
+
+        public void destroy() {
+            if (this.ownsSectionBuilder) {
+                this.sectionBuilder.close();
+            }
+        }
+
+        public boolean isEmpty() {
+            return this.count() == 0;
+        }
+
+        public ByteBuffer slice() {
+            this.flushPending();
+
+            if (this.isEmpty()) {
+                throw new IllegalStateException("No vertex data in buffer");
+            }
+
+            return MemoryUtil.memByteBuffer(this.logicalAddress(), this.nativeQuadStride * (this.count() >> 2));
+        }
+
+        public int count() {
+            this.flushPending();
+            return this.sectionBuilder.facingVertexCount(this.facing);
+        }
+
+        public long logicalAddress() {
+            this.flushPending();
+            return this.sectionBuilder.facingAddress(this.facing);
+        }
+
+        public NativeChunkVertexFormat nativeFormat() {
+            return this.nativeFormat;
+        }
+
+        public int sectionIndex() {
+            return this.sectionIndex;
+        }
+
+        public NativeSectionMeshBuilder sectionBuilder() {
+            this.flushPending();
+            return this.sectionBuilder;
+        }
+
+        public void flushPending() {
+            if (this.pendingQuadCount == 0) {
+                return;
+            }
+
+            int quadCount = this.pendingQuadCount;
+            TranslucentGeometryCollector collector = this.pendingCollector;
+            boolean separateAo = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE
+                    .shouldUseSeparateAo();
+
+            if (collector == null) {
+                int committedCount = this.sectionBuilder.appendBatchEncoded(this.facing,
+                        this.stagingBuffers.quadAddress(), quadCount, this.nativeFormat, this.sectionIndex,
+                        separateAo, this.storeRawQuads);
+                if (committedCount != quadCount) {
+                    throw new IllegalStateException("Native batch committed " + committedCount
+                            + " quads from an unfiltered batch of " + quadCount + " quads");
+                }
+            } else {
+                TranslucentBatchResult result = this.sectionBuilder.appendTranslucentBatchEncoded(
+                        this.facing, this.stagingBuffers.quadAddress(), quadCount, collector.nativeAnalyzerHandle(),
+                        this.pendingCollectorFacing.ordinal(), this.stagingBuffers.packedNormalsAddress(),
+                        this.nativeFormat, this.sectionIndex, separateAo, this.storeRawQuads);
+
+                if (result.validCount() != result.committedCount()) {
+                    throw new IllegalStateException("Native translucent batch accepted " + result.validCount()
+                            + " quads but committed " + result.committedCount() + " quads");
+                }
+            }
+
+            this.clearPending();
+        }
+
+        private void queueQuad(ChunkVertexEncoder.Vertex[] vertices, int materialBits,
+                TranslucentGeometryCollector collector, ModelQuadFacing collectorFacing, int packedNormal) {
+            if (!this.matchesPendingMode(collector, collectorFacing)) {
+                this.flushPending();
+            }
+
+            if (this.pendingQuadCount == this.stagingBuffers.capacity()) {
+                this.flushPending();
+            }
+
+            this.pendingCollector = collector;
+            this.pendingCollectorFacing = collectorFacing;
+
+            int quadIndex = this.pendingQuadCount;
+            long quadAddress = this.stagingBuffers.quadAddress() + (long) quadIndex * this.nativeQuadStride;
+            NativeChunkMeshEncoder.writeNativeQuad(quadAddress, vertices, materialBits);
+
+            if (collector != null) {
+                MemoryUtil.memPutInt(this.stagingBuffers.packedNormalsAddress() + (long) quadIndex * Integer.BYTES,
+                        packedNormal);
+            }
+
+            this.pendingQuadCount++;
+        }
+
+        private boolean matchesPendingMode(TranslucentGeometryCollector collector, ModelQuadFacing collectorFacing) {
+            if (this.pendingQuadCount == 0) {
+                return true;
+            }
+            if (this.pendingCollector != collector) {
+                return false;
+            }
+
+            return collector == null || this.pendingCollectorFacing == collectorFacing;
+        }
+
+        private void clearPending() {
+            this.pendingQuadCount = 0;
+            this.pendingCollector = null;
+            this.pendingCollectorFacing = null;
+        }
     }
 
     private static final class State implements Runnable {
