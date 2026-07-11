@@ -81,6 +81,17 @@ class NativeTranslucentGeometryAnalyzerTest {
     }
 
     @Test
+    void collectorKeepsNativeBatchingAvailableInSafeQuadSplittingMode() {
+        SodiumClientMod.options().performance.quadSplittingMode = QuadSplittingMode.SAFE;
+
+        TranslucentGeometryCollector collector = new TranslucentGeometryCollector(
+                SectionPos.of(0, 0, 0), SortBehavior.DYNAMIC_DEFER_NEARBY_ONE_FRAME);
+
+        assertTrue(collector.isSplittingQuads());
+        assertTrue(collector.supportsNativeBatching());
+    }
+
+    @Test
     void invalidDuplicateVertexQuadIsDiscardedBeforeNativeAnalysis() {
         NativeTranslucentGeometryAnalyzer analyzer = new NativeTranslucentGeometryAnalyzer();
         ByteBuffer quad = nativeOrder(MemoryUtil.memAlloc(NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE));

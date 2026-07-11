@@ -1,9 +1,13 @@
 use std::collections::HashMap;
 use std::slice;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 use super::{index, translucent};
+
+mod fluid;
+#[cfg(test)]
+use fluid::{fluid_face_record_to_quad, fluid_semantic_face};
+use fluid::{native_section_fluid_faces, section_builder_append_fluid_face_records_encoded};
 
 const OK: i32 = 0;
 const ERR_NULL_POINTER: i32 = -1;
@@ -24,8 +28,6 @@ const FLUID_FACE_TOP_NW_SE: i32 = 1;
 const FLUID_FACE_BOTTOM: i32 = 2;
 const FLUID_FACE_SIDE: i32 = 3;
 const NATIVE_SECTION_BLOCK_FLAG_SUPPRESS_FLUID: i32 = 1;
-static FLUID_DIAG_COUNT: AtomicUsize = AtomicUsize::new(0);
-static FLUID_FLUSH_DIAG_COUNT: AtomicUsize = AtomicUsize::new(0);
 const POSITION_MAX_VALUE: f32 = (1 << 20) as f32;
 const TEXTURE_MAX_VALUE: f32 = (1 << 15) as f32;
 const MODEL_ORIGIN: f32 = 8.0;
@@ -330,7 +332,8 @@ struct NativeUpdatedQuads {
     index_quad_count: i32,
 }
 
-static STATIC_MODEL_CACHE: OnceLock<Mutex<HashMap<i32, Vec<StaticModelQuadRecord>>>> = OnceLock::new();
+static STATIC_MODEL_CACHE: OnceLock<Mutex<HashMap<i32, Vec<StaticModelQuadRecord>>>> =
+    OnceLock::new();
 static NATIVE_MODEL_SELECTORS: OnceLock<Mutex<HashMap<i32, NativeModelSelector>>> = OnceLock::new();
 static NATIVE_MESHING_STATES: OnceLock<Mutex<HashMap<i32, NativeMeshingState>>> = OnceLock::new();
 
@@ -1283,7 +1286,10 @@ fn create_section_mesh_builder(capacity: usize) -> NativeSectionMeshBuilder {
             flat_quad_records: vec![FlatQuadRecord::default(); PENDING_BATCH_QUAD_CAPACITY],
             light_block_records: vec![LightBlockRecord::default(); PENDING_BATCH_QUAD_CAPACITY],
             fluid_face_records: vec![FluidFaceRecord::default(); PENDING_BATCH_QUAD_CAPACITY],
-            static_model_block_records: vec![StaticModelBlockRecord::default(); PENDING_BATCH_QUAD_CAPACITY],
+            static_model_block_records: vec![
+                StaticModelBlockRecord::default();
+                PENDING_BATCH_QUAD_CAPACITY
+            ],
             packed_normals: vec![0; PENDING_BATCH_QUAD_CAPACITY],
             validity: vec![0; PENDING_BATCH_QUAD_CAPACITY],
         }),
@@ -1512,7 +1518,10 @@ unsafe fn section_builder_append_flat_quad_records_encoded(
             if status != OK {
                 return Err(status);
             }
-            Some(slice::from_raw_parts(validity_address as *const u8, chunk_count))
+            Some(slice::from_raw_parts(
+                validity_address as *const u8,
+                chunk_count,
+            ))
         } else {
             None
         };
@@ -1535,44 +1544,6 @@ unsafe fn section_builder_append_flat_quad_records_encoded(
     }
 
     Ok((total_valid, total_committed))
-}
-
-fn native_fluid_flush_diag(
-    facing: usize,
-    has_analyzer: bool,
-    chunk_count: usize,
-    valid_count: i32,
-    committed_count: i32,
-    records: &[FluidFaceRecord],
-) {
-    if std::env::var_os("MATTMC_NATIVE_FLUID_DIAG").is_none() {
-        return;
-    }
-    let Some(record) = records
-        .iter()
-        .find(|record| record.render_type == 1 && record.face_kind == FLUID_FACE_TOP_NE_SW)
-    else {
-        return;
-    };
-    let index = FLUID_FLUSH_DIAG_COUNT.fetch_add(1, Ordering::Relaxed);
-    if index >= 80 {
-        return;
-    }
-    eprintln!(
-        "MATTMC_NATIVE_FLUID_DIAG #{index} flush facing={} analyzer={} quads={} valid={} committed={} first_pos={},{},{} first_face={} first_flip={} first_light=0x{:08x} first_color=0x{:08x}",
-        facing,
-        has_analyzer,
-        chunk_count,
-        valid_count,
-        committed_count,
-        record.local_x,
-        record.local_y,
-        record.local_z,
-        record.face_kind,
-        record.flip,
-        record.lights[0],
-        record.colors[0] as u32,
-    );
 }
 
 unsafe fn section_builder_append_light_block_records_encoded(
@@ -1629,94 +1600,6 @@ unsafe fn section_builder_append_light_block_records_encoded(
     Ok(total_committed)
 }
 
-unsafe fn section_builder_append_fluid_face_records_encoded(
-    builder: &mut NativeSectionMeshBuilder,
-    facing: usize,
-    record_address: u64,
-    record_count: usize,
-    record_stride: usize,
-    analyzer: Option<(u64, i32)>,
-    format: NativeFormat,
-    store_raw_quads: bool,
-) -> Result<(i32, i32), i32> {
-    if facing >= MODEL_QUAD_FACING_COUNT {
-        return Err(ERR_INVALID_ARGUMENT);
-    }
-    if record_count == 0 {
-        return Ok((0, 0));
-    }
-    if record_address == 0 {
-        return Err(ERR_NULL_POINTER);
-    }
-    if record_stride != std::mem::size_of::<FluidFaceRecord>() {
-        return Err(ERR_INVALID_ARGUMENT);
-    }
-
-    let records = slice::from_raw_parts(record_address as *const FluidFaceRecord, record_count);
-    let mut processed = 0usize;
-    let mut total_valid = 0i32;
-    let mut total_committed = 0i32;
-
-    while processed < record_count {
-        let chunk_count = (record_count - processed).min(PENDING_BATCH_QUAD_CAPACITY);
-        {
-            let pending = &mut builder.pending[facing];
-            for index in 0..chunk_count {
-                let record = records[processed + index];
-                pending.quads[index] = fluid_face_record_to_quad(record)?;
-                pending.packed_normals[index] = record.packed_normal;
-            }
-        }
-
-        let validity_address = builder.pending[facing].validity.as_mut_ptr() as u64;
-        let mut chunk_valid = chunk_count as i32;
-        let validity = if let Some((analyzer_handle, translucent_facing)) = analyzer {
-            let status = translucent::append_native_quad_batch_to_analyzer(
-                analyzer_handle,
-                builder.pending[facing].quads.as_ptr() as u64,
-                chunk_count as i32,
-                translucent_facing,
-                builder.pending[facing].packed_normals.as_ptr(),
-                validity_address,
-                &mut chunk_valid,
-            );
-            if status != OK {
-                return Err(status);
-            }
-            Some(slice::from_raw_parts(validity_address as *const u8, chunk_count))
-        } else {
-            None
-        };
-
-        let chunk_committed = section_builder_append_batch_encoded(
-            builder,
-            facing,
-            builder.pending[facing].quads.as_ptr() as u64,
-            chunk_count,
-            validity,
-            format,
-            store_raw_quads,
-        )?;
-
-        native_fluid_flush_diag(
-            facing,
-            analyzer.is_some(),
-            chunk_count,
-            chunk_valid,
-            chunk_committed,
-            &records[processed..processed + chunk_count],
-        );
-
-        total_valid = total_valid.checked_add(chunk_valid).ok_or(ERR_CAPACITY)?;
-        total_committed = total_committed
-            .checked_add(chunk_committed)
-            .ok_or(ERR_CAPACITY)?;
-        processed += chunk_count;
-    }
-
-    Ok((total_valid, total_committed))
-}
-
 unsafe fn section_builder_append_static_model_records_encoded(
     builder: &mut NativeSectionMeshBuilder,
     record_address: u64,
@@ -1735,7 +1618,10 @@ unsafe fn section_builder_append_static_model_records_encoded(
         return Err(ERR_INVALID_ARGUMENT);
     }
 
-    let records = slice::from_raw_parts(record_address as *const StaticModelBlockRecord, record_count);
+    let records = slice::from_raw_parts(
+        record_address as *const StaticModelBlockRecord,
+        record_count,
+    );
     let cache_guard = static_model_cache()
         .lock()
         .map_err(|_| ERR_INVALID_ARGUMENT)?;
@@ -1781,7 +1667,8 @@ unsafe fn section_builder_append_static_model_records_encoded(
         };
 
         for quad_record in model {
-            if quad_record.cull_face >= 0 && ((record.cull_mask >> quad_record.cull_face) & 1) != 0 {
+            if quad_record.cull_face >= 0 && ((record.cull_mask >> quad_record.cull_face) & 1) != 0
+            {
                 continue;
             }
 
@@ -1974,7 +1861,10 @@ unsafe fn section_builder_append_native_section_records_encoded(
         return Err(ERR_INVALID_ARGUMENT);
     }
 
-    let records = slice::from_raw_parts(record_address as *const NativeSectionBlockRecord, record_count);
+    let records = slice::from_raw_parts(
+        record_address as *const NativeSectionBlockRecord,
+        record_count,
+    );
     let states_guard = native_meshing_states()
         .lock()
         .map_err(|_| ERR_INVALID_ARGUMENT)?;
@@ -2279,10 +2169,7 @@ fn legacy_set_seed(seed: u64) -> u64 {
 }
 
 fn legacy_next(state: &mut u64, bits: u32) -> u32 {
-    *state = state
-        .wrapping_mul(25_214_903_917)
-        .wrapping_add(11)
-        & 281_474_976_710_655;
+    *state = state.wrapping_mul(25_214_903_917).wrapping_add(11) & 281_474_976_710_655;
     (*state >> (48 - bits)) as u32
 }
 
@@ -2305,10 +2192,12 @@ fn native_section_culls_quad(
     };
 
     (neighbor.flags & (STATE_FLAG_FULL_OCCLUSION | STATE_FLAG_SOLID_RENDER)) != 0
-        || (neighbor.skip_group != 0 && neighbor.skip_group == states
-            .get(&record.state_id)
-            .map(|state| state.skip_group)
-            .unwrap_or(0)
+        || (neighbor.skip_group != 0
+            && neighbor.skip_group
+                == states
+                    .get(&record.state_id)
+                    .map(|state| state.skip_group)
+                    .unwrap_or(0)
             && (neighbor.flags & STATE_FLAG_FULL_OCCLUSION) != 0)
 }
 
@@ -2344,7 +2233,11 @@ fn static_model_quad_to_native_section(
             ao: light.ao[index],
             u: source.u,
             v: source.v,
-            light: if source.light > 0 { source.light } else { light.lm[index] },
+            light: if source.light > 0 {
+                source.light
+            } else {
+                light.lm[index]
+            },
         };
     }
 
@@ -2419,7 +2312,10 @@ fn flat_lighting(
     } else if sample_dir >= 0 {
         let origin = block.light_words[13];
         let adj = word;
-        pack_light(std::cmp::max(unpack_bl(adj), unpack_lu(origin)), unpack_sl(adj))
+        pack_light(
+            std::cmp::max(unpack_bl(adj), unpack_lu(origin)),
+            unpack_sl(adj),
+        )
     } else {
         get_emissive_lightmap(word)
     };
@@ -2456,7 +2352,12 @@ fn smooth_lighting(
     };
     for i in 0..4 {
         let source = quad.vertices[i];
-        let weights = corner_weights(light_face, source.x.clamp(0.0, 1.0), source.y.clamp(0.0, 1.0), source.z.clamp(0.0, 1.0));
+        let weights = corner_weights(
+            light_face,
+            source.x.clamp(0.0, 1.0),
+            source.y.clamp(0.0, 1.0),
+            source.z.clamp(0.0, 1.0),
+        );
         let depth = face_depth(light_face, source.x, source.y, source.z);
 
         let (ao, lm) = if aligned {
@@ -2487,11 +2388,23 @@ struct AoFace {
 }
 
 fn ao_face_data(block: &NativeSectionBlockRecord, direction: i32, offset: bool) -> AoFace {
-    let (dx, dy, dz) = if offset { dir_step(direction) } else { (0, 0, 0) };
+    let (dx, dy, dz) = if offset {
+        dir_step(direction)
+    } else {
+        (0, 0, 0)
+    };
     let adj = light_word(block, (dx, dy, dz));
     let origin = block.light_words[13];
-    let calm = if offset && unpack_fo(adj) { get_lightmap(origin) } else { get_lightmap(adj) };
-    let caem = if offset && unpack_fo(adj) { unpack_em(origin) } else { unpack_em(adj) };
+    let calm = if offset && unpack_fo(adj) {
+        get_lightmap(origin)
+    } else {
+        get_lightmap(adj)
+    };
+    let caem = if offset && unpack_fo(adj) {
+        unpack_em(origin)
+    } else {
+        unpack_em(adj)
+    };
     let caao = unpack_ao(adj);
     let faces = ao_neighbor_faces(direction);
 
@@ -2505,10 +2418,38 @@ fn ao_face_data(block: &NativeSectionBlockRecord, direction: i32, offset: bool) 
     let eop = e.map(unpack_op);
     let eem = e.map(unpack_em);
 
-    let c0 = corner_word(block, (dx, dy, dz), faces[0], faces[2], eop[2] && eop[0], e[0]);
-    let c1 = corner_word(block, (dx, dy, dz), faces[0], faces[3], eop[3] && eop[0], e[0]);
-    let c2 = corner_word(block, (dx, dy, dz), faces[1], faces[2], eop[2] && eop[1], e[1]);
-    let c3 = corner_word(block, (dx, dy, dz), faces[1], faces[3], eop[3] && eop[1], e[1]);
+    let c0 = corner_word(
+        block,
+        (dx, dy, dz),
+        faces[0],
+        faces[2],
+        eop[2] && eop[0],
+        e[0],
+    );
+    let c1 = corner_word(
+        block,
+        (dx, dy, dz),
+        faces[0],
+        faces[3],
+        eop[3] && eop[0],
+        e[0],
+    );
+    let c2 = corner_word(
+        block,
+        (dx, dy, dz),
+        faces[1],
+        faces[2],
+        eop[2] && eop[1],
+        e[1],
+    );
+    let c3 = corner_word(
+        block,
+        (dx, dy, dz),
+        faces[1],
+        faces[3],
+        eop[3] && eop[1],
+        e[1],
+    );
     let c = [c1, c0, c2, c3];
 
     AoFace {
@@ -2519,417 +2460,48 @@ fn ao_face_data(block: &NativeSectionBlockRecord, direction: i32, offset: bool) 
             (eao[3] + eao[1] + unpack_ao(c[3]) + caao) * 0.25,
         ],
         lm: [
-            calculate_corner_brightness(elm[3], elm[0], get_lightmap(c[0]), calm, eem[3], eem[0], unpack_em(c[0]), caem),
-            calculate_corner_brightness(elm[2], elm[0], get_lightmap(c[1]), calm, eem[2], eem[0], unpack_em(c[1]), caem),
-            calculate_corner_brightness(elm[2], elm[1], get_lightmap(c[2]), calm, eem[2], eem[1], unpack_em(c[2]), caem),
-            calculate_corner_brightness(elm[3], elm[1], get_lightmap(c[3]), calm, eem[3], eem[1], unpack_em(c[3]), caem),
+            calculate_corner_brightness(
+                elm[3],
+                elm[0],
+                get_lightmap(c[0]),
+                calm,
+                eem[3],
+                eem[0],
+                unpack_em(c[0]),
+                caem,
+            ),
+            calculate_corner_brightness(
+                elm[2],
+                elm[0],
+                get_lightmap(c[1]),
+                calm,
+                eem[2],
+                eem[0],
+                unpack_em(c[1]),
+                caem,
+            ),
+            calculate_corner_brightness(
+                elm[2],
+                elm[1],
+                get_lightmap(c[2]),
+                calm,
+                eem[2],
+                eem[1],
+                unpack_em(c[2]),
+                caem,
+            ),
+            calculate_corner_brightness(
+                elm[3],
+                elm[1],
+                get_lightmap(c[3]),
+                calm,
+                eem[3],
+                eem[1],
+                unpack_em(c[3]),
+                caem,
+            ),
         ],
     }
-}
-
-fn native_section_fluid_faces(
-    block: &NativeSectionBlockRecord,
-    state: NativeMeshingState,
-    states: &HashMap<i32, NativeMeshingState>,
-) -> Vec<(FluidFaceRecord, usize)> {
-    if state.fluid_type != FLUID_WATER && state.fluid_type != FLUID_LAVA {
-        return Vec::new();
-    }
-    let mut out = Vec::with_capacity(8);
-    let h = fluid_height(block, states, 0, 0, 0, 1);
-    let heights = if h >= 1.0 {
-        [1.0; 4]
-    } else {
-        let hn = fluid_height(block, states, 0, 0, -1, 2);
-        let hs = fluid_height(block, states, 0, 0, 1, 3);
-        let hw = fluid_height(block, states, -1, 0, 0, 4);
-        let he = fluid_height(block, states, 1, 0, 0, 5);
-        [
-            fluid_corner_height(block, states, h, hn, hw, -1, 0, -1),
-            fluid_corner_height(block, states, h, hs, hw, -1, 0, 1),
-            fluid_corner_height(block, states, h, hs, he, 1, 0, 1),
-            fluid_corner_height(block, states, h, hn, he, 1, 0, -1),
-        ]
-    };
-    let cull_up = fluid_side_occluded(block, state, states, 1);
-    let cull_down = fluid_side_occluded(block, state, states, 0) || !fluid_side_exposed(block, states, 0, 0, -1, 0.8888889);
-    let color = argb_to_abgr(native_tint_color(block, state, true));
-    let light = get_emissive_lightmap(block.light_words[13]);
-    let y_offset = if cull_down { 0.0 } else { 0.001 };
-    let top_exposed = fluid_side_exposed(block, states, 0, 1, 0, heights.iter().copied().fold(1.0, f32::min));
-    fluid_diag(block, state, "top-check", cull_up, top_exposed, heights, color, light, None);
-
-    let mut render_heights = heights;
-    if !cull_up && top_exposed {
-        for height in &mut render_heights {
-            *height -= 0.001;
-        }
-        let top = if block.fluid_flow_x == 0.0 && block.fluid_flow_z == 0.0 && state.fluid_falling == 0 {
-            let sprite = state.fluid_still;
-            [
-                (sprite_u(sprite, 0.0), sprite_v(sprite, 0.0)),
-                (sprite_u(sprite, 0.0), sprite_v(sprite, 1.0)),
-                (sprite_u(sprite, 1.0), sprite_v(sprite, 1.0)),
-                (sprite_u(sprite, 1.0), sprite_v(sprite, 0.0)),
-            ]
-        } else {
-            let sprite = state.fluid_flow;
-            let dir = block.fluid_flow_z.atan2(block.fluid_flow_x) - std::f32::consts::FRAC_PI_2;
-            let sin = dir.sin() * 0.25;
-            let cos = dir.cos() * 0.25;
-            [
-                (sprite_u(sprite, 0.5 + (-cos - sin)), sprite_v(sprite, 0.5 + -cos + sin)),
-                (sprite_u(sprite, 0.5 + -cos + sin), sprite_v(sprite, 0.5 + cos + sin)),
-                (sprite_u(sprite, 0.5 + cos + sin), sprite_v(sprite, 0.5 + (cos - sin))),
-                (sprite_u(sprite, 0.5 + (cos - sin)), sprite_v(sprite, 0.5 + (-cos - sin))),
-            ]
-        };
-        let top = shrink_fluid_uvs(top, state.fluid_still.shrink);
-        let top_facing = if fluid_top_aligned(render_heights) {
-            MODEL_QUAD_FACING_POS_Y
-        } else {
-            MODEL_QUAD_FACING_UNASSIGNED
-        };
-        let top_face_kind = if fluid_top_crease_ne_sw(render_heights) {
-            FLUID_FACE_TOP_NE_SW
-        } else {
-            FLUID_FACE_TOP_NW_SE
-        };
-        let top_record_uvs = if top_face_kind == FLUID_FACE_TOP_NE_SW {
-            [top[3], top[0], top[1], top[2]]
-        } else {
-            top
-        };
-        let top_face = fluid_semantic_face(
-            state,
-            block,
-            top_facing,
-            false,
-            top_face_kind,
-            0.0,
-            render_heights,
-            [0.0; 4],
-            top_record_uvs,
-            color,
-            1.0,
-            light,
-        );
-        fluid_record_diag(block, "top-record", &top_face.0, top_face.1);
-        out.push(top_face);
-        fluid_diag(block, state, "top-emitted", cull_up, top_exposed, render_heights, color, light, Some(top_facing));
-        if fluid_backward_up_face(block, state, states) {
-            let backward_facing = if top_facing == MODEL_QUAD_FACING_POS_Y {
-                MODEL_QUAD_FACING_NEG_Y
-            } else {
-                MODEL_QUAD_FACING_UNASSIGNED
-            };
-            let backward_face = fluid_semantic_face(
-                state,
-                block,
-                backward_facing,
-                true,
-                top_face_kind,
-                0.0,
-                render_heights,
-                [0.0; 4],
-                top_record_uvs,
-                color,
-                1.0,
-                light,
-            );
-            fluid_record_diag(block, "top-back-record", &backward_face.0, backward_face.1);
-            out.push(backward_face);
-        }
-    }
-
-    if !cull_down {
-        let sprite = state.fluid_still;
-        out.push(fluid_semantic_face(
-            state,
-            block,
-            MODEL_QUAD_FACING_NEG_Y,
-            false,
-            FLUID_FACE_BOTTOM,
-            y_offset,
-            [0.0; 4],
-            [0.0; 4],
-            [
-                (sprite.u0, sprite.v1),
-                (sprite.u0, sprite.v0),
-                (sprite.u1, sprite.v0),
-                (sprite.u1, sprite.v1),
-            ],
-            color,
-            1.0,
-            light,
-        ));
-    }
-
-    let sides = [
-        (2, MODEL_QUAD_FACING_NEG_Z, MODEL_QUAD_FACING_POS_Z, 0.8, render_heights[0], render_heights[3], 0.0, 0.001, 1.0, 0.001),
-        (3, MODEL_QUAD_FACING_POS_Z, MODEL_QUAD_FACING_NEG_Z, 0.8, render_heights[2], render_heights[1], 1.0, 0.999, 0.0, 0.999),
-        (4, MODEL_QUAD_FACING_NEG_X, MODEL_QUAD_FACING_POS_X, 0.6, render_heights[1], render_heights[0], 0.001, 1.0, 0.001, 0.0),
-        (5, MODEL_QUAD_FACING_POS_X, MODEL_QUAD_FACING_NEG_X, 0.6, render_heights[3], render_heights[2], 0.999, 0.0, 0.999, 1.0),
-    ];
-    for (dir, facing, opposite_facing, shade, h1, h2, x1, z1, x2, z2) in sides {
-        if !fluid_side_occluded(block, state, states, dir) && fluid_side_exposed(block, states, dir_step(dir).0, dir_step(dir).1, dir_step(dir).2, h1.max(h2)) {
-            let is_overlay = fluid_side_uses_overlay(block, state, states, dir);
-            let sprite = if is_overlay {
-                state.fluid_overlay
-            } else {
-                state.fluid_flow
-            };
-            let u1 = sprite_u(sprite, 0.0);
-            let u2 = sprite_u(sprite, 0.5);
-            let v1 = sprite_v(sprite, (1.0 - h1) * 0.5);
-            let v2 = sprite_v(sprite, (1.0 - h2) * 0.5);
-            let v3 = sprite_v(sprite, 0.5);
-            out.push(fluid_semantic_face(
-                state,
-                block,
-                facing,
-                false,
-                FLUID_FACE_SIDE,
-                y_offset,
-                [h1, h2, 0.0, 0.0],
-                [x1, z1, x2, z2],
-                [(u2, v2), (u2, v3), (u1, v3), (u1, v1)],
-                color,
-                shade,
-                light,
-            ));
-            if !is_overlay {
-                out.push(fluid_semantic_face(
-                    state,
-                    block,
-                    opposite_facing,
-                    true,
-                    FLUID_FACE_SIDE,
-                    y_offset,
-                    [h1, h2, 0.0, 0.0],
-                    [x1, z1, x2, z2],
-                    [(u2, v2), (u2, v3), (u1, v3), (u1, v1)],
-                    color,
-                    shade,
-                    light,
-                ));
-            }
-        }
-    }
-    out
-}
-
-fn fluid_diag(
-    block: &NativeSectionBlockRecord,
-    state: NativeMeshingState,
-    phase: &str,
-    cull_up: bool,
-    top_exposed: bool,
-    heights: [f32; 4],
-    color: i32,
-    light: i32,
-    facing: Option<usize>,
-) {
-    if std::env::var_os("MATTMC_NATIVE_FLUID_DIAG").is_none() {
-        return;
-    }
-    if state.fluid_type != FLUID_WATER {
-        return;
-    }
-    if !(0..=160).contains(&block.absolute_x)
-        || !(60..=72).contains(&block.absolute_y)
-        || !(360..=660).contains(&block.absolute_z)
-    {
-        return;
-    }
-    if phase == "top-check" && cull_up {
-        return;
-    }
-    let index = FLUID_DIAG_COUNT.fetch_add(1, Ordering::Relaxed);
-    if index >= 240 {
-        return;
-    }
-    let color_u = color as u32;
-    eprintln!(
-        "MATTMC_NATIVE_FLUID_DIAG #{index} {phase} pos={},{},{} state={} fluid_block_id={} state_fluid_block_id={} pass={} material={} cull_up={} top_exposed={} heights={:.4},{:.4},{:.4},{:.4} color=0x{color_u:08x} alpha={} light=0x{:08x} facing={:?} sprite_still=({:.5},{:.5},{:.5},{:.5}) flow=({:.4},{:.4})",
-        block.absolute_x,
-        block.absolute_y,
-        block.absolute_z,
-        block.state_id,
-        block.fluid_block_id,
-        state.fluid_block_id,
-        state.fluid_pass_id,
-        state.fluid_material_bits,
-        cull_up,
-        top_exposed,
-        heights[0],
-        heights[1],
-        heights[2],
-        heights[3],
-        (color_u >> 24) & 0xff,
-        light,
-        facing,
-        state.fluid_still.u0,
-        state.fluid_still.u1,
-        state.fluid_still.v0,
-        state.fluid_still.v1,
-        block.fluid_flow_x,
-        block.fluid_flow_z,
-    );
-}
-
-fn fluid_record_diag(block: &NativeSectionBlockRecord, phase: &str, record: &FluidFaceRecord, facing: usize) {
-    if std::env::var_os("MATTMC_NATIVE_FLUID_DIAG").is_none() {
-        return;
-    }
-    if !(0..=160).contains(&block.absolute_x)
-        || !(60..=72).contains(&block.absolute_y)
-        || !(360..=660).contains(&block.absolute_z)
-    {
-        return;
-    }
-    let index = FLUID_DIAG_COUNT.fetch_add(1, Ordering::Relaxed);
-    if index >= 240 {
-        return;
-    }
-    let color = record.colors[0] as u32;
-    eprintln!(
-        "MATTMC_NATIVE_FLUID_DIAG #{index} {phase} pos={},{},{} facing={} flip={} face={} origin={:.1},{:.1},{:.1} heights={:.4},{:.4},{:.4},{:.4} uv0={:.5},{:.5} uv1={:.5},{:.5} uv2={:.5},{:.5} uv3={:.5},{:.5} color0=0x{color:08x} ao0={:.4} light0=0x{:08x} normal=0x{:08x} material={} pass={}",
-        block.absolute_x,
-        block.absolute_y,
-        block.absolute_z,
-        facing,
-        record.flip,
-        record.face_kind,
-        record.origin_x,
-        record.origin_y,
-        record.origin_z,
-        record.heights[0],
-        record.heights[1],
-        record.heights[2],
-        record.heights[3],
-        record.uvs[0],
-        record.uvs[1],
-        record.uvs[2],
-        record.uvs[3],
-        record.uvs[4],
-        record.uvs[5],
-        record.uvs[6],
-        record.uvs[7],
-        record.aos[0],
-        record.lights[0],
-        record.packed_normal,
-        record.material_bits,
-        record.render_type,
-    );
-}
-
-fn fluid_top_aligned(heights: [f32; 4]) -> bool {
-    fluid_aligned_equals(heights[3], heights[0])
-        && fluid_aligned_equals(heights[0], heights[2])
-        && fluid_aligned_equals(heights[2], heights[1])
-        && fluid_aligned_equals(heights[1], heights[3])
-}
-
-fn fluid_aligned_equals(a: f32, b: f32) -> bool {
-    (a - b).abs() <= FLUID_ALIGNED_EQUALS_EPSILON
-}
-
-fn fluid_top_crease_ne_sw(heights: [f32; 4]) -> bool {
-    fluid_top_aligned(heights)
-        || heights[3] > heights[0] && heights[3] > heights[2]
-        || heights[3] < heights[0] && heights[3] < heights[2]
-        || heights[1] > heights[0] && heights[1] > heights[2]
-        || heights[1] < heights[0] && heights[1] < heights[2]
-}
-
-fn fluid_semantic_face(
-    state: NativeMeshingState,
-    block: &NativeSectionBlockRecord,
-    mut facing: usize,
-    flip: bool,
-    face_kind: i32,
-    y_offset: f32,
-    heights: [f32; 4],
-    side_coords: [f32; 4],
-    uvs: [(f32, f32); 4],
-    color: i32,
-    ao: f32,
-    light: i32,
-) -> (FluidFaceRecord, usize) {
-    if std::env::var_os("MATTMC_NATIVE_FLUID_FORCE_UNASSIGNED").is_some() {
-        facing = MODEL_QUAD_FACING_UNASSIGNED;
-    }
-
-    let mut record = FluidFaceRecord {
-        packed_normal: 0,
-        material_bits: state.fluid_material_bits,
-        block_emission: state.block_emission,
-        render_type: 1,
-        ignore_mid_block: 0,
-        block_id: choose_block_id(block.fluid_block_id, state.fluid_block_id),
-        local_x: block.absolute_x,
-        local_y: block.absolute_y,
-        local_z: block.absolute_z,
-        face_kind,
-        flip: if flip { 1 } else { 0 },
-        origin_x: block.local_x as f32,
-        origin_y: block.local_y as f32,
-        origin_z: block.local_z as f32,
-        y_offset,
-        heights,
-        side_coords,
-        uvs: [
-            uvs[0].0, uvs[0].1, uvs[1].0, uvs[1].1, uvs[2].0, uvs[2].1, uvs[3].0, uvs[3].1,
-        ],
-        colors: [color; 4],
-        aos: [ao; 4],
-        lights: [light; 4],
-    };
-    if let Ok(quad) = fluid_face_record_to_quad(record) {
-        record.packed_normal = norm_i8_pack_from_quad(&quad);
-    }
-    (record, facing)
-}
-
-fn fluid_side_uses_overlay(
-    block: &NativeSectionBlockRecord,
-    state: NativeMeshingState,
-    states: &HashMap<i32, NativeMeshingState>,
-    direction: i32,
-) -> bool {
-    if state.fluid_type != FLUID_WATER || state.fluid_overlay_valid == 0 {
-        return false;
-    }
-    let (dx, dy, dz) = dir_step(direction);
-    let Some(neighbor_id) = neighborhood_state_id(block, dx, dy, dz) else {
-        return false;
-    };
-    let Some(neighbor) = states.get(&neighbor_id) else {
-        return false;
-    };
-    (neighbor.flags & STATE_FLAG_AIR) == 0 && (neighbor.flags & STATE_FLAG_CAN_OCCLUDE) == 0
-}
-
-fn sprite_u(sprite: FluidSprite, value: f32) -> f32 {
-    sprite.u0 + (sprite.u1 - sprite.u0) * value
-}
-
-fn sprite_v(sprite: FluidSprite, value: f32) -> f32 {
-    sprite.v0 + (sprite.v1 - sprite.v0) * value
-}
-
-fn shrink_fluid_uvs(mut uvs: [(f32, f32); 4], shrink: f32) -> [(f32, f32); 4] {
-    if shrink == 0.0 {
-        return uvs;
-    }
-    let avg_u = (uvs[0].0 + uvs[1].0 + uvs[2].0 + uvs[3].0) * 0.25;
-    let avg_v = (uvs[0].1 + uvs[1].1 + uvs[2].1 + uvs[3].1) * 0.25;
-    for uv in &mut uvs {
-        uv.0 += (avg_u - uv.0) * shrink;
-        uv.1 += (avg_v - uv.1) * shrink;
-    }
-    uvs
 }
 
 fn choose_block_id(record_block_id: i32, state_block_id: i32) -> i32 {
@@ -2940,9 +2512,17 @@ fn choose_block_id(record_block_id: i32, state_block_id: i32) -> i32 {
     }
 }
 
-fn native_model_offset(block: NativeSectionBlockRecord, state: NativeMeshingState) -> (f32, f32, f32) {
-    if block.legacy_offset_x != 0.0 || block.legacy_offset_y != 0.0 || block.legacy_offset_z != 0.0 {
-        return (block.legacy_offset_x, block.legacy_offset_y, block.legacy_offset_z);
+fn native_model_offset(
+    block: NativeSectionBlockRecord,
+    state: NativeMeshingState,
+) -> (f32, f32, f32) {
+    if block.legacy_offset_x != 0.0 || block.legacy_offset_y != 0.0 || block.legacy_offset_z != 0.0
+    {
+        return (
+            block.legacy_offset_x,
+            block.legacy_offset_y,
+            block.legacy_offset_z,
+        );
     }
     if state.offset_type == OFFSET_NONE {
         return (0.0, 0.0, 0.0);
@@ -2962,10 +2542,8 @@ fn native_model_offset(block: NativeSectionBlockRecord, state: NativeMeshingStat
 }
 
 fn mth_seed(x: i32, y: i32, z: i32) -> i64 {
-    let mut value = (x as i64)
-        .wrapping_mul(3_129_871)
-        ^ (z as i64).wrapping_mul(116_129_781)
-        ^ (y as i64);
+    let mut value =
+        (x as i64).wrapping_mul(3_129_871) ^ (z as i64).wrapping_mul(116_129_781) ^ (y as i64);
     value = value
         .wrapping_mul(value)
         .wrapping_mul(42_317_861)
@@ -2973,7 +2551,11 @@ fn mth_seed(x: i32, y: i32, z: i32) -> i64 {
     value >> 16
 }
 
-fn native_tint_color(block: &NativeSectionBlockRecord, state: NativeMeshingState, fluid: bool) -> i32 {
+fn native_tint_color(
+    block: &NativeSectionBlockRecord,
+    state: NativeMeshingState,
+    fluid: bool,
+) -> i32 {
     if fluid {
         if state.fluid_type == FLUID_WATER && block.fluid_tint != -1 {
             return block.fluid_tint;
@@ -3011,127 +2593,12 @@ fn multiply_argb(color: i32, tint: i32) -> i32 {
     ((ca << 24) | ((cr * tr / 255) << 16) | ((cg * tg / 255) << 8) | (cb * tb / 255)) as i32
 }
 
-fn fluid_height(
+fn neighborhood_state_id(
     block: &NativeSectionBlockRecord,
-    states: &HashMap<i32, NativeMeshingState>,
     dx: i32,
     dy: i32,
     dz: i32,
-    fallback_neighbor_index: usize,
-) -> f32 {
-    let state_id = neighborhood_state_id(block, dx, dy, dz)
-        .unwrap_or_else(|| block.neighbor_state_ids[fallback_neighbor_index]);
-    let Some(sample) = states.get(&state_id).copied() else {
-        return 0.0;
-    };
-    let Some(center) = states.get(&block.state_id).copied() else {
-        return 0.0;
-    };
-    if sample.fluid_type == center.fluid_type && sample.fluid_type != 0 {
-        if neighborhood_state_id(block, dx, dy + 1, dz)
-            .and_then(|above_id| states.get(&above_id))
-            .map(|above| above.fluid_type == center.fluid_type)
-            .unwrap_or(false)
-        {
-            1.0
-        } else {
-            sample.fluid_own_height
-        }
-    } else if (sample.flags & STATE_FLAG_BLOCKS_MOTION) == 0 {
-        0.0
-    } else {
-        -1.0
-    }
-}
-
-fn fluid_corner_height(
-    block: &NativeSectionBlockRecord,
-    states: &HashMap<i32, NativeMeshingState>,
-    center: f32,
-    hx: f32,
-    hz: f32,
-    dx: i32,
-    dy: i32,
-    dz: i32,
-) -> f32 {
-    if hx >= 1.0 || hz >= 1.0 {
-        return 1.0;
-    }
-    let mut total = 0.0;
-    let mut samples = 0.0;
-    if hx > 0.0 || hz > 0.0 {
-        let diagonal = fluid_height(block, states, dx, dy, dz, 0);
-        if diagonal >= 1.0 {
-            return 1.0;
-        }
-        modify_fluid_height(&mut total, &mut samples, diagonal);
-    }
-    modify_fluid_height(&mut total, &mut samples, center);
-    modify_fluid_height(&mut total, &mut samples, hx);
-    modify_fluid_height(&mut total, &mut samples, hz);
-    if samples == 0.0 { 0.0 } else { total / samples }
-}
-
-fn modify_fluid_height(total: &mut f32, samples: &mut f32, height: f32) {
-    if height >= 0.8 {
-        *total += height * 10.0;
-        *samples += 10.0;
-    } else if height >= 0.0 {
-        *total += height;
-        *samples += 1.0;
-    }
-}
-
-fn fluid_side_occluded(
-    block: &NativeSectionBlockRecord,
-    state: NativeMeshingState,
-    states: &HashMap<i32, NativeMeshingState>,
-    dir: i32,
-) -> bool {
-    let neighbor_id = block.neighbor_state_ids[dir as usize];
-    let Some(neighbor) = states.get(&neighbor_id) else {
-        return false;
-    };
-    neighbor.fluid_type == state.fluid_type
-        || ((neighbor.flags & STATE_FLAG_FULL_OCCLUSION) != 0 && dir != 1)
-}
-
-fn fluid_side_exposed(
-    block: &NativeSectionBlockRecord,
-    states: &HashMap<i32, NativeMeshingState>,
-    dx: i32,
-    dy: i32,
-    dz: i32,
-    _height: f32,
-) -> bool {
-    neighborhood_state_id(block, dx, dy, dz)
-        .and_then(|id| states.get(&id))
-        .map(|state| (state.flags & STATE_FLAG_CAN_OCCLUDE) == 0 || (state.flags & STATE_FLAG_FULL_OCCLUSION) == 0)
-        .unwrap_or(true)
-}
-
-fn fluid_backward_up_face(
-    block: &NativeSectionBlockRecord,
-    state: NativeMeshingState,
-    states: &HashMap<i32, NativeMeshingState>,
-) -> bool {
-    for dz in -1..=1 {
-        for dx in -1..=1 {
-            let Some(id) = neighborhood_state_id(block, dx, 1, dz) else {
-                return true;
-            };
-            let Some(sample) = states.get(&id) else {
-                return true;
-            };
-            if sample.fluid_type != state.fluid_type && (sample.flags & STATE_FLAG_SOLID_RENDER) == 0 {
-                return true;
-            }
-        }
-    }
-    false
-}
-
-fn neighborhood_state_id(block: &NativeSectionBlockRecord, dx: i32, dy: i32, dz: i32) -> Option<i32> {
+) -> Option<i32> {
     if !(-1..=1).contains(&dx) || !(-1..=1).contains(&dy) || !(-1..=1).contains(&dz) {
         return None;
     }
@@ -3143,7 +2610,8 @@ fn neighborhood_index(dx: i32, dy: i32, dz: i32) -> usize {
 }
 
 fn light_word(block: &NativeSectionBlockRecord, delta: (i32, i32, i32)) -> i32 {
-    if !(-1..=1).contains(&delta.0) || !(-1..=1).contains(&delta.1) || !(-1..=1).contains(&delta.2) {
+    if !(-1..=1).contains(&delta.0) || !(-1..=1).contains(&delta.1) || !(-1..=1).contains(&delta.2)
+    {
         block.light_words[13]
     } else {
         block.light_words[neighborhood_index(delta.0, delta.1, delta.2)]
@@ -3195,9 +2663,18 @@ fn ao_neighbor_faces(dir: i32) -> [i32; 4] {
 
 fn map_ao_corners(dir: i32, lm0: [i32; 4], ao0: [f32; 4]) -> ([i32; 4], [f32; 4]) {
     match dir {
-        1 => ([lm0[2], lm0[3], lm0[0], lm0[1]], [ao0[2], ao0[3], ao0[0], ao0[1]]),
-        2 | 4 => ([lm0[1], lm0[2], lm0[3], lm0[0]], [ao0[1], ao0[2], ao0[3], ao0[0]]),
-        5 => ([lm0[3], lm0[0], lm0[1], lm0[2]], [ao0[3], ao0[0], ao0[1], ao0[2]]),
+        1 => (
+            [lm0[2], lm0[3], lm0[0], lm0[1]],
+            [ao0[2], ao0[3], ao0[0], ao0[1]],
+        ),
+        2 | 4 => (
+            [lm0[1], lm0[2], lm0[3], lm0[0]],
+            [ao0[1], ao0[2], ao0[3], ao0[0]],
+        ),
+        5 => (
+            [lm0[3], lm0[0], lm0[1], lm0[2]],
+            [ao0[3], ao0[0], ao0[1], ao0[2]],
+        ),
         _ => (lm0, ao0),
     }
 }
@@ -3285,7 +2762,10 @@ fn ambient_shade(dir: i32, shade: bool) -> f32 {
 }
 
 fn get_lightmap(word: i32) -> i32 {
-    pack_light(std::cmp::max(unpack_bl(word), unpack_lu(word)), unpack_sl(word))
+    pack_light(
+        std::cmp::max(unpack_bl(word), unpack_lu(word)),
+        unpack_sl(word),
+    )
 }
 
 fn get_emissive_lightmap(word: i32) -> i32 {
@@ -3308,13 +2788,27 @@ fn unpack_sky_light(light: i32) -> i32 {
     (light >> 16) & 0xff
 }
 
-fn unpack_bl(word: i32) -> i32 { word & 0xF }
-fn unpack_sl(word: i32) -> i32 { (word >> 4) & 0xF }
-fn unpack_lu(word: i32) -> i32 { (word >> 8) & 0xF }
-fn unpack_ao(word: i32) -> f32 { (((word >> 12) & 0xFFFF) as f32) * (1.0 / 4096.0) }
-fn unpack_em(word: i32) -> bool { ((word >> 28) & 1) != 0 }
-fn unpack_op(word: i32) -> bool { ((word >> 29) & 1) != 0 }
-fn unpack_fo(word: i32) -> bool { ((word >> 30) & 1) != 0 }
+fn unpack_bl(word: i32) -> i32 {
+    word & 0xF
+}
+fn unpack_sl(word: i32) -> i32 {
+    (word >> 4) & 0xF
+}
+fn unpack_lu(word: i32) -> i32 {
+    (word >> 8) & 0xF
+}
+fn unpack_ao(word: i32) -> f32 {
+    (((word >> 12) & 0xFFFF) as f32) * (1.0 / 4096.0)
+}
+fn unpack_em(word: i32) -> bool {
+    ((word >> 28) & 1) != 0
+}
+fn unpack_op(word: i32) -> bool {
+    ((word >> 29) & 1) != 0
+}
+fn unpack_fo(word: i32) -> bool {
+    ((word >> 30) & 1) != 0
+}
 
 fn calculate_corner_brightness(
     mut a: i32,
@@ -3333,15 +2827,29 @@ fn calculate_corner_brightness(
         c = c.max(min);
         d = d.max(min);
     }
-    if aem { a = LIGHT_FULL_BRIGHT; }
-    if bem { b = LIGHT_FULL_BRIGHT; }
-    if cem { c = LIGHT_FULL_BRIGHT; }
-    if dem { d = LIGHT_FULL_BRIGHT; }
+    if aem {
+        a = LIGHT_FULL_BRIGHT;
+    }
+    if bem {
+        b = LIGHT_FULL_BRIGHT;
+    }
+    if cem {
+        c = LIGHT_FULL_BRIGHT;
+    }
+    if dem {
+        d = LIGHT_FULL_BRIGHT;
+    }
     ((a + b + c + d) >> 2) & 0x00ff_00ff
 }
 
 fn min_non_zero(a: i32, b: i32) -> i32 {
-    if a == 0 { b } else if b == 0 { a } else { a.min(b) }
+    if a == 0 {
+        b
+    } else if b == 0 {
+        a
+    } else {
+        a.min(b)
+    }
 }
 
 fn argb_to_abgr(color: i32) -> i32 {
@@ -3350,94 +2858,6 @@ fn argb_to_abgr(color: i32) -> i32 {
     let red = (color & 0x00ff_0000) >> 16;
     let blue = (color & 0x0000_00ff) << 16;
     (alpha_green | red | blue) as i32
-}
-
-fn fluid_face_record_to_quad(record: FluidFaceRecord) -> Result<NativeQuad, i32> {
-    let mut vertices = match record.face_kind {
-        // Top face, diagonal from north-east to south-west.
-        0 => [
-            fluid_vertex(record.origin_x + 1.0, record.origin_y + record.heights[3], record.origin_z, 0, record),
-            fluid_vertex(record.origin_x, record.origin_y + record.heights[0], record.origin_z, 1, record),
-            fluid_vertex(record.origin_x, record.origin_y + record.heights[1], record.origin_z + 1.0, 2, record),
-            fluid_vertex(record.origin_x + 1.0, record.origin_y + record.heights[2], record.origin_z + 1.0, 3, record),
-        ],
-        // Top face, diagonal from north-west to south-east.
-        1 => [
-            fluid_vertex(record.origin_x, record.origin_y + record.heights[0], record.origin_z, 0, record),
-            fluid_vertex(record.origin_x, record.origin_y + record.heights[1], record.origin_z + 1.0, 1, record),
-            fluid_vertex(record.origin_x + 1.0, record.origin_y + record.heights[2], record.origin_z + 1.0, 2, record),
-            fluid_vertex(record.origin_x + 1.0, record.origin_y + record.heights[3], record.origin_z, 3, record),
-        ],
-        // Bottom face.
-        2 => [
-            fluid_vertex(record.origin_x, record.origin_y + record.y_offset, record.origin_z + 1.0, 0, record),
-            fluid_vertex(record.origin_x, record.origin_y + record.y_offset, record.origin_z, 1, record),
-            fluid_vertex(record.origin_x + 1.0, record.origin_y + record.y_offset, record.origin_z, 2, record),
-            fluid_vertex(record.origin_x + 1.0, record.origin_y + record.y_offset, record.origin_z + 1.0, 3, record),
-        ],
-        // Horizontal side face. side_coords = x1,z1,x2,z2 and heights = c1,c2,...
-        3 => [
-            fluid_vertex(
-                record.origin_x + record.side_coords[2],
-                record.origin_y + record.heights[1],
-                record.origin_z + record.side_coords[3],
-                0,
-                record,
-            ),
-            fluid_vertex(
-                record.origin_x + record.side_coords[2],
-                record.origin_y + record.y_offset,
-                record.origin_z + record.side_coords[3],
-                1,
-                record,
-            ),
-            fluid_vertex(
-                record.origin_x + record.side_coords[0],
-                record.origin_y + record.y_offset,
-                record.origin_z + record.side_coords[1],
-                2,
-                record,
-            ),
-            fluid_vertex(
-                record.origin_x + record.side_coords[0],
-                record.origin_y + record.heights[0],
-                record.origin_z + record.side_coords[1],
-                3,
-                record,
-            ),
-        ],
-        _ => return Err(ERR_INVALID_ARGUMENT),
-    };
-
-    if record.flip != 0 {
-        vertices = [vertices[0], vertices[3], vertices[2], vertices[1]];
-    }
-
-    Ok(NativeQuad {
-        vertices,
-        block_emission: record.block_emission.clamp(0, 255) as u8,
-        render_type: record.render_type.clamp(0, 255) as u8,
-        ignore_mid_block: if record.ignore_mid_block != 0 { 1 } else { 0 },
-        _padding: 0,
-        block_id: record.block_id,
-        local_x: record.local_x,
-        local_y: record.local_y,
-        local_z: record.local_z,
-        material_bits: record.material_bits,
-    })
-}
-
-fn fluid_vertex(x: f32, y: f32, z: f32, vertex: usize, record: FluidFaceRecord) -> QuadVertex {
-    QuadVertex {
-        x,
-        y,
-        z,
-        color: record.colors[vertex],
-        ao: record.aos[vertex],
-        u: record.uvs[vertex * 2],
-        v: record.uvs[vertex * 2 + 1],
-        light: record.lights[vertex],
-    }
 }
 
 fn section_builder_staging_addresses(
@@ -3742,10 +3162,7 @@ fn pack_mid_block(x: f32, y: f32, z: f32) -> i32 {
 }
 
 fn pack_block_id(quad: &NativeQuad) -> i32 {
-    quad.block_id
-        .wrapping_add(1)
-        .wrapping_shl(1)
-        | ((quad.render_type as i32) & 1)
+    quad.block_id.wrapping_add(1).wrapping_shl(1) | ((quad.render_type as i32) & 1)
 }
 
 fn compute_face_normal(vertices: &[QuadVertex; 4]) -> (f32, f32, f32) {
@@ -4627,8 +4044,11 @@ pub unsafe extern "C" fn mattmc_sodium_static_model_cache_register(
     let quads = if quad_count == 0 {
         Vec::new()
     } else {
-        slice::from_raw_parts(quad_address as *const StaticModelQuadRecord, quad_count as usize)
-            .to_vec()
+        slice::from_raw_parts(
+            quad_address as *const StaticModelQuadRecord,
+            quad_count as usize,
+        )
+        .to_vec()
     };
 
     let Ok(mut cache) = static_model_cache().lock() else {
@@ -4663,8 +4083,11 @@ pub unsafe extern "C" fn mattmc_sodium_native_model_selector_register(
     let entries = if entry_count == 0 {
         Vec::new()
     } else {
-        slice::from_raw_parts(entry_address as *const NativeModelSelectorEntry, entry_count as usize)
-            .to_vec()
+        slice::from_raw_parts(
+            entry_address as *const NativeModelSelectorEntry,
+            entry_count as usize,
+        )
+        .to_vec()
     };
     let total_weight = entries
         .iter()
@@ -4675,11 +4098,14 @@ pub unsafe extern "C" fn mattmc_sodium_native_model_selector_register(
     let Ok(mut selectors) = native_model_selectors().lock() else {
         return ERR_INVALID_ARGUMENT;
     };
-    selectors.insert(selector_id, NativeModelSelector {
-        kind,
-        entries,
-        total_weight,
-    });
+    selectors.insert(
+        selector_id,
+        NativeModelSelector {
+            kind,
+            entries,
+            total_weight,
+        },
+    );
     OK
 }
 
@@ -4728,48 +4154,51 @@ pub unsafe extern "C" fn mattmc_sodium_native_meshing_state_register(
     let Ok(mut states) = native_meshing_states().lock() else {
         return ERR_INVALID_ARGUMENT;
     };
-    states.insert(state_id, NativeMeshingState {
-        selector_id,
-        flags,
-        material_bits,
-        pass_id,
-        block_emission,
-        render_type,
-        block_id,
-        fluid_material_bits,
-        fluid_pass_id,
-        fluid_block_id,
-        skip_group,
-        fluid_type,
-        fluid_own_height,
-        fluid_falling,
-        offset_type,
-        max_horizontal_offset,
-        max_vertical_offset,
-        tint_type,
-        fluid_still: FluidSprite {
-            u0: fluid_still_u0,
-            u1: fluid_still_u1,
-            v0: fluid_still_v0,
-            v1: fluid_still_v1,
-            shrink: fluid_still_shrink,
+    states.insert(
+        state_id,
+        NativeMeshingState {
+            selector_id,
+            flags,
+            material_bits,
+            pass_id,
+            block_emission,
+            render_type,
+            block_id,
+            fluid_material_bits,
+            fluid_pass_id,
+            fluid_block_id,
+            skip_group,
+            fluid_type,
+            fluid_own_height,
+            fluid_falling,
+            offset_type,
+            max_horizontal_offset,
+            max_vertical_offset,
+            tint_type,
+            fluid_still: FluidSprite {
+                u0: fluid_still_u0,
+                u1: fluid_still_u1,
+                v0: fluid_still_v0,
+                v1: fluid_still_v1,
+                shrink: fluid_still_shrink,
+            },
+            fluid_flow: FluidSprite {
+                u0: fluid_flow_u0,
+                u1: fluid_flow_u1,
+                v0: fluid_flow_v0,
+                v1: fluid_flow_v1,
+                shrink: fluid_flow_shrink,
+            },
+            fluid_overlay: FluidSprite {
+                u0: fluid_overlay_u0,
+                u1: fluid_overlay_u1,
+                v0: fluid_overlay_v0,
+                v1: fluid_overlay_v1,
+                shrink: fluid_overlay_shrink,
+            },
+            fluid_overlay_valid,
         },
-        fluid_flow: FluidSprite {
-            u0: fluid_flow_u0,
-            u1: fluid_flow_u1,
-            v0: fluid_flow_v0,
-            v1: fluid_flow_v1,
-            shrink: fluid_flow_shrink,
-        },
-        fluid_overlay: FluidSprite {
-            u0: fluid_overlay_u0,
-            u1: fluid_overlay_u1,
-            v0: fluid_overlay_v0,
-            v1: fluid_overlay_v1,
-            shrink: fluid_overlay_shrink,
-        },
-        fluid_overlay_valid,
-    });
+    );
     OK
 }
 
@@ -4885,7 +4314,11 @@ pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_append_native_sectio
         record_count as usize,
         record_stride,
         pass_id,
-        if analyzer_handle == 0 { None } else { Some(analyzer_handle) },
+        if analyzer_handle == 0 {
+            None
+        } else {
+            Some(analyzer_handle)
+        },
         format,
         store_raw_quads != 0,
     ) {
@@ -5266,8 +4699,13 @@ pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_record_staging_addre
 
     let builder = &mut *(handle as *mut NativeSectionMeshBuilder);
     match section_builder_record_staging_addresses(builder, facing as usize) {
-        Ok((flat_quad_record_address, light_block_record_address, fluid_face_record_address,
-            static_model_block_record_address, capacity)) => {
+        Ok((
+            flat_quad_record_address,
+            light_block_record_address,
+            fluid_face_record_address,
+            static_model_block_record_address,
+            capacity,
+        )) => {
             *output_flat_quad_record_address = flat_quad_record_address;
             *output_light_block_record_address = light_block_record_address;
             *output_fluid_face_record_address = fluid_face_record_address;
@@ -5916,7 +5354,13 @@ mod tests {
     #[test]
     fn smooth_lighting_uses_java_aligned_partial_offset_face() {
         let block = lighting_block_record();
-        let quad = lighting_quad(MODEL_QUAD_FLAG_ALIGNED | MODEL_QUAD_FLAG_PARTIAL, 1, 0.25, 0.5, 0.75);
+        let quad = lighting_quad(
+            MODEL_QUAD_FLAG_ALIGNED | MODEL_QUAD_FLAG_PARTIAL,
+            1,
+            0.25,
+            0.5,
+            0.75,
+        );
         let light = smooth_lighting(&block, &quad, lighting_state_record(0), 1, true);
         let weights = corner_weights(1, 0.25, 0.5, 0.75);
         let expected = blend_ao_face(ao_face_data(&block, 1, true), weights);
@@ -5930,7 +5374,13 @@ mod tests {
     #[test]
     fn smooth_lighting_uses_java_parallel_inset_depth_weights() {
         let block = lighting_block_record();
-        let quad = lighting_quad(MODEL_QUAD_FLAG_PARALLEL | MODEL_QUAD_FLAG_PARTIAL, 1, 0.4, 0.25, 0.6);
+        let quad = lighting_quad(
+            MODEL_QUAD_FLAG_PARALLEL | MODEL_QUAD_FLAG_PARTIAL,
+            1,
+            0.4,
+            0.25,
+            0.6,
+        );
         let light = smooth_lighting(&block, &quad, lighting_state_record(0), 1, true);
         let weights = corner_weights(1, 0.4, 0.25, 0.6);
         let depth = face_depth(1, 0.4, 0.25, 0.6);
@@ -5946,7 +5396,8 @@ mod tests {
         let top_vertex = lighting_quad(0, 1, 0.5, 1.0, 0.5);
         let bottom_vertex = lighting_quad(0, 1, 0.5, 0.0, 0.5);
         let top_light = smooth_lighting(&block, &top_vertex, lighting_state_record(0), 1, true);
-        let bottom_light = smooth_lighting(&block, &bottom_vertex, lighting_state_record(0), 1, true);
+        let bottom_light =
+            smooth_lighting(&block, &bottom_vertex, lighting_state_record(0), 1, true);
         let weights_top = corner_weights(1, 0.5, 1.0, 0.5);
         let weights_bottom = corner_weights(1, 0.5, 0.0, 0.5);
         let expected_top = blend_ao_face(ao_face_data(&block, 1, true), weights_top);
@@ -5961,7 +5412,13 @@ mod tests {
     fn smooth_lighting_treats_parallel_full_cube_as_java_aligned_full_face() {
         let block = lighting_block_record();
         let quad = lighting_quad(MODEL_QUAD_FLAG_PARALLEL, 1, 0.4, 0.25, 0.6);
-        let light = smooth_lighting(&block, &quad, lighting_state_record(STATE_FLAG_FULL_OCCLUSION), 1, true);
+        let light = smooth_lighting(
+            &block,
+            &quad,
+            lighting_state_record(STATE_FLAG_FULL_OCCLUSION),
+            1,
+            true,
+        );
         let face = ao_face_data(&block, 1, true);
         let (expected_lm, mut expected_ao) = map_ao_corners(1, face.lm, face.ao);
         for value in &mut expected_ao {
@@ -6002,7 +5459,11 @@ mod tests {
         for vertex in &mut quad.vertices {
             vertex.light = 0;
         }
-        let expected = native_quad_lighting(&block, &quad, lighting_state_record(STATE_FLAG_FULL_OCCLUSION));
+        let expected = native_quad_lighting(
+            &block,
+            &quad,
+            lighting_state_record(STATE_FLAG_FULL_OCCLUSION),
+        );
 
         let native = static_model_quad_to_native_section(
             block,
@@ -6104,7 +5565,8 @@ mod tests {
                     let block = ((index as i32 * 3) + 1) & 0xf;
                     let sky = ((index as i32 * 5) + 2) & 0xf;
                     let luminance = ((index as i32 * 7) + 3) & 0xf;
-                    record.light_words[index] = pack_light_word(block, sky, luminance, ao, false, false, false, false);
+                    record.light_words[index] =
+                        pack_light_word(block, sky, luminance, ao, false, false, false, false);
                 }
             }
         }
@@ -6117,7 +5579,16 @@ mod tests {
         state
     }
 
-    fn pack_light_word(block: i32, sky: i32, luminance: i32, ao: i32, em: bool, op: bool, fo: bool, fc: bool) -> i32 {
+    fn pack_light_word(
+        block: i32,
+        sky: i32,
+        luminance: i32,
+        ao: i32,
+        em: bool,
+        op: bool,
+        fo: bool,
+        fc: bool,
+    ) -> i32 {
         (block & 0xf)
             | ((sky & 0xf) << 4)
             | ((luminance & 0xf) << 8)
@@ -6129,7 +5600,10 @@ mod tests {
     }
 
     fn assert_close(expected: f32, actual: f32) {
-        assert!((expected - actual).abs() < 0.00001, "expected {expected}, got {actual}");
+        assert!(
+            (expected - actual).abs() < 0.00001,
+            "expected {expected}, got {actual}"
+        );
     }
 
     #[test]

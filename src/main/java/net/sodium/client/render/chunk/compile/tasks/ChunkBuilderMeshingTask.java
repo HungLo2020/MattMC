@@ -149,13 +149,8 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                         FluidState fluidState = blockState.getFluidState();
                         boolean nativeFluidSupported = !fluidState.isEmpty()
                                 && NativeSectionSnapshot.isNativeFluidSupported(fluidState);
-                        boolean collectorNeedsJavaFluid = !fluidState.isEmpty()
-                                && nativeFluidSupported
-                                && collector != null
-                                && DefaultMaterials.forFluidState(fluidState).pass.isTranslucent()
-                                && !collector.supportsNativeBatching();
                         boolean useJavaFluid = !fluidState.isEmpty()
-                                && (forceJavaFluids || !nativeFluidSupported || collectorNeedsJavaFluid);
+                                && (forceJavaFluids || !nativeFluidSupported);
 
                         if (!forceJavaProducers) {
                             nativeSectionSnapshot.appendBlock(localBlockIndex, slice, blockState, blockPos, localX,
@@ -201,7 +196,7 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                             for (var sprite : NativeStaticBlockModelRegistry.getFluidSprites(fluidState)) {
                                 buffers.get(DefaultMaterials.forFluidState(fluidState).pass).addSprite(sprite);
                             }
-                            fallbackStats.recordNativeFluidBlock();
+                            fallbackStats.recordNativeFluidBlock(fluidState);
                         }
 
                         if (blockState.hasBlockEntity()) {

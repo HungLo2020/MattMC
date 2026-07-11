@@ -95,7 +95,7 @@ public class TranslucentGeometryCollector {
     public TranslucentGeometryCollector(SectionPos sectionPos, SortBehavior sortBehavior) {
         this.sectionPos = sectionPos;
         this.sortBehavior = sortBehavior;
-        this.nativeAnalyzer = this.isSplittingQuads() ? null : new NativeTranslucentGeometryAnalyzer();
+        this.nativeAnalyzer = new NativeTranslucentGeometryAnalyzer();
     }
 
     /**
@@ -428,7 +428,7 @@ public class TranslucentGeometryCollector {
             this.quadHashPresent = true;
             this.sortType = this.nativeAnalysis.sortType();
 
-            if (this.sortType == SortType.DYNAMIC) {
+            if (this.sortType == SortType.DYNAMIC && !this.isSplittingQuads()) {
                 this.quads = this.nativeAnalyzer.buildRegularQuadsByFacing();
             }
 
@@ -509,6 +509,22 @@ public class TranslucentGeometryCollector {
                 return AnyOrderData.fromQuadCount(this.nativeAnalysis.quadCount(), this.sectionPos);
             }
             return AnyOrderData.fromMesh(this.quads, this.sectionPos);
+        }
+
+        if (this.sortType == SortType.DYNAMIC && this.nativeAnalysis != null && this.isSplittingQuads()) {
+            long geometryPlanesHandle = this.nativeAnalyzer.createGeometryPlanesHandle();
+            NativeTranslucentSortData nativeSortData = null;
+            try {
+                nativeSortData = this.nativeAnalyzer.createDynamicTopoSortData();
+                return DynamicTopoData.fromNative(
+                        cameraPos, this.nativeAnalysis.quadCount(), this.sectionPos,
+                        geometryPlanesHandle, nativeSortData);
+            } catch (RuntimeException exception) {
+                if (nativeSortData == null) {
+                    NativeGfniTriggers.destroyGeometryPlanes(geometryPlanesHandle);
+                }
+                throw exception;
+            }
         }
 
         if (this.sortType == SortType.DYNAMIC && this.quads == null) {

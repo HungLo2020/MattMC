@@ -158,8 +158,13 @@ public class DynamicTopoData extends DynamicData {
 
     public static DynamicTopoData fromMesh(CombinedCameraPos cameraPos, TQuad[] quads, SectionPos sectionPos,
             long geometryPlanesHandle, NativeTranslucentSortData nativeSortData) {
+        return fromNative(cameraPos, quads.length, sectionPos, geometryPlanesHandle, nativeSortData);
+    }
+
+    public static DynamicTopoData fromNative(CombinedCameraPos cameraPos, int quadCount, SectionPos sectionPos,
+            long geometryPlanesHandle, NativeTranslucentSortData nativeSortData) {
         try {
-            return new DynamicTopoData(sectionPos, quads.length, geometryPlanesHandle, cameraPos.getAbsoluteCameraPos(),
+            return new DynamicTopoData(sectionPos, quadCount, geometryPlanesHandle, cameraPos.getAbsoluteCameraPos(),
                     nativeSortData);
         } catch (RuntimeException exception) {
             NativeGfniTriggers.destroyGeometryPlanes(geometryPlanesHandle);

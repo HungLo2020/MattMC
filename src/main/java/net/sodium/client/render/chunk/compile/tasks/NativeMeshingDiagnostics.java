@@ -4,6 +4,7 @@ import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.material.Fluids;
 import org.lwjgl.system.MemoryUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -150,9 +151,11 @@ final class NativeMeshingDiagnostics {
         private final boolean enabled;
         private int nativeModelBlocks;
         private int nativeFluidBlocks;
+        private int nativeWaterBlocks;
         private int modelFallbackBlocks;
         private int modelFallbackQuads;
         private int fluidFallbackBlocks;
+        private int waterFallbackBlocks;
         private int fluidFallbackQuads;
         private int appenderFallbackQuads;
         private int nativeSolidQuads;
@@ -179,9 +182,12 @@ final class NativeMeshingDiagnostics {
             }
         }
 
-        void recordNativeFluidBlock() {
+        void recordNativeFluidBlock(FluidState fluidState) {
             if (this.enabled) {
                 this.nativeFluidBlocks++;
+                if (fluidState.is(Fluids.WATER)) {
+                    this.nativeWaterBlocks++;
+                }
             }
         }
 
@@ -199,6 +205,9 @@ final class NativeMeshingDiagnostics {
                 return;
             }
             this.fluidFallbackBlocks++;
+            if (fluidState.is(Fluids.WATER)) {
+                this.waterFallbackBlocks++;
+            }
             this.fluidFallbackQuads += Math.max(quadCount, 0);
             incrementBounded(this.fluidFallbackStates, blockState + " fluid=" + fluidState);
         }
@@ -232,12 +241,14 @@ final class NativeMeshingDiagnostics {
             LOGGER.info("Native meshing fallback report section={} origin={},{},{} "
                             + "nativeModelBlocks={} modelFallbackBlocks={} modelFallbackQuads={} modelFallbackRate={} "
                             + "nativeFluidBlocks={} fluidFallbackBlocks={} fluidFallbackQuads={} fluidFallbackRate={} "
+                            + "nativeWaterBlocks={} waterFallbackBlocks={} "
                             + "appenderFallbackQuads={} nativeQuads={} nativeSolidQuads={} nativeCutoutQuads={} nativeTranslucentQuads={}",
                     sectionIndex, origin.getX(), origin.getY(), origin.getZ(),
                     this.nativeModelBlocks, this.modelFallbackBlocks, this.modelFallbackQuads,
                     String.format("%.4f", modelFallbackRate),
                     this.nativeFluidBlocks, this.fluidFallbackBlocks, this.fluidFallbackQuads,
                     String.format("%.4f", fluidFallbackRate),
+                    this.nativeWaterBlocks, this.waterFallbackBlocks,
                     this.appenderFallbackQuads, nativeQuads, this.nativeSolidQuads, this.nativeCutoutQuads,
                     this.nativeTranslucentQuads);
 
