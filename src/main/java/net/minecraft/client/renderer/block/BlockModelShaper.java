@@ -7,6 +7,7 @@ import net.minecraft.client.renderer.block.model.BlockStateModel;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.ModelManager;
 import net.minecraft.world.level.block.state.BlockState;
+import net.sodium.client.render.chunk.compile.pipeline.NativeStaticBlockModelRegistry;
 
 @Environment(EnvType.CLIENT)
 public class BlockModelShaper {
@@ -36,5 +37,6 @@ public class BlockModelShaper {
 
 	public void replaceCache(Map<BlockState, BlockStateModel> map) {
 		this.modelByStateCache = map;
+		NativeStaticBlockModelRegistry.reload(map);
 	}
 }

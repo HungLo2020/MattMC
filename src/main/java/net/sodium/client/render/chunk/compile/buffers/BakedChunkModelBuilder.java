@@ -42,6 +42,14 @@ public class BakedChunkModelBuilder implements ChunkModelBuilder {
         return fallbackVertexConsumer;
     }
 
+    public int getFallbackConsumerEmittedQuadCount() {
+        return this.fallbackVertexConsumer.getEmittedQuadCount();
+    }
+
+    public void resetFallbackConsumerEmittedQuadCount() {
+        this.fallbackVertexConsumer.resetEmittedQuadCount();
+    }
+
     public void destroy() {
         for (NativeSectionMeshBuilder.FacingBuffer builder : this.vertexBuffers) {
             builder.destroy();

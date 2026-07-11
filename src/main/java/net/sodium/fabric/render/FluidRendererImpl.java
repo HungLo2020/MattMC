@@ -80,6 +80,16 @@ public class FluidRendererImpl extends FluidRenderer implements net.irisshaders.
         }
     }
 
+    @Override
+    public int getEmittedQuadCount() {
+        return this.defaultRenderer.getEmittedQuadCount();
+    }
+
+    @Override
+    public void resetEmittedQuadCount() {
+        this.defaultRenderer.resetEmittedQuadCount();
+    }
+
     private static class DefaultRenderContext implements FluidRendering.DefaultRenderer {
         private DefaultFluidRenderer renderer;
         private LevelSlice level;

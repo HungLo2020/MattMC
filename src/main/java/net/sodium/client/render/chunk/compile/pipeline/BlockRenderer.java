@@ -18,7 +18,6 @@ import net.sodium.client.render.chunk.terrain.material.Material;
 import net.sodium.client.render.chunk.terrain.material.parameters.AlphaCutoffParameter;
 import net.sodium.client.render.chunk.terrain.material.parameters.MaterialParameters;
 import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
-import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import net.sodium.client.render.frapi.mesh.MutableQuadViewImpl;
 import net.sodium.client.render.frapi.render.AbstractBlockRenderContext;
@@ -49,6 +48,7 @@ public class BlockRenderer extends AbstractBlockRenderContext implements net.iri
     @Nullable
     private ColorProvider<BlockState> colorProvider;
     private TranslucentGeometryCollector collector;
+    private int emittedQuadCount;
     
     // Iris: From MixinBlockRenderer - vertex encoder fields
     private boolean iris$hasOverride;
@@ -69,6 +69,7 @@ public class BlockRenderer extends AbstractBlockRenderContext implements net.iri
         this.level = level;
         this.collector = collector;
         this.slice = level;
+        this.emittedQuadCount = 0;
     }
 
     public void release() {
@@ -76,6 +77,10 @@ public class BlockRenderer extends AbstractBlockRenderContext implements net.iri
         this.level = null;
         this.collector = null;
         this.slice = null;
+    }
+
+    public int getEmittedQuadCount() {
+        return this.emittedQuadCount;
     }
 
     public void renderModel(BlockStateModel model, BlockState state, BlockPos pos, BlockPos origin) {
@@ -118,6 +123,7 @@ public class BlockRenderer extends AbstractBlockRenderContext implements net.iri
      */
     @Override
     protected void processQuad(MutableQuadViewImpl quad) {
+        this.emittedQuadCount++;
         final TriState aoMode = quad.ambientOcclusion();
         final ShadeMode shadeMode = quad.shadeMode();
         final LightMode lightMode;
@@ -179,21 +185,13 @@ public class BlockRenderer extends AbstractBlockRenderContext implements net.iri
 
         ChunkModelBuilder builder = this.buffers.get(pass);
         NativeSectionMeshBuilder.FacingBuffer vertexBuffer = builder.getVertexBuffer(normalFace);
-        long quadAddress;
         if (pass.isTranslucent() && this.collector != null) {
-            quadAddress = vertexBuffer.prepareStagedTranslucentQuad(materialBits, this.collector, normalFace,
-                    iris$lightEmission, iris$isFluid, false, iris$blockId, iris$localX, iris$localY, iris$localZ);
-            this.writeQuad(quadAddress, materialBits, quad, brightnesses, orientation, offset);
-
-            if (vertexBuffer.commitStagedTranslucentQuad(quadAddress, this.collector, normalFace,
-                    quad.getFaceNormal())) {
+            if (this.appendQuad(vertexBuffer, materialBits, quad, brightnesses, orientation, offset,
+                    this.collector, normalFace, quad.getFaceNormal())) {
                 return;
             }
         } else {
-            quadAddress = vertexBuffer.prepareStagedQuad(materialBits, iris$lightEmission, iris$isFluid, false,
-                    iris$blockId, iris$localX, iris$localY, iris$localZ);
-            this.writeQuad(quadAddress, materialBits, quad, brightnesses, orientation, offset);
-            vertexBuffer.commitStagedQuad();
+            this.appendQuad(vertexBuffer, materialBits, quad, brightnesses, orientation, offset, null, null, 0);
         }
 
         if (atlasSprite != null) {
@@ -201,15 +199,33 @@ public class BlockRenderer extends AbstractBlockRenderContext implements net.iri
         }
     }
 
-    private void writeQuad(long quadAddress, int materialBits, MutableQuadViewImpl quad, float[] brightnesses,
-            ModelQuadOrientation orientation, Vector3f offset) {
+    private boolean appendQuad(NativeSectionMeshBuilder.FacingBuffer vertexBuffer, int materialBits,
+            MutableQuadViewImpl quad, float[] brightnesses, ModelQuadOrientation orientation, Vector3f offset,
+            TranslucentGeometryCollector collector, ModelQuadFacing collectorFacing, int packedNormal) {
         int src0 = orientation.getVertexIndex(0);
         int src1 = orientation.getVertexIndex(1);
         int src2 = orientation.getVertexIndex(2);
         int src3 = orientation.getVertexIndex(3);
 
-        NativeChunkMeshEncoder.writeNativeQuad(quadAddress, iris$lightEmission, iris$isFluid, false, iris$blockId,
-                iris$localX, iris$localY, iris$localZ, materialBits,
+        if (collector != null) {
+            return vertexBuffer.appendFlatTranslucentQuad(materialBits, collector, collectorFacing, packedNormal,
+                    iris$lightEmission, iris$isFluid, false, iris$blockId, iris$localX, iris$localY, iris$localZ,
+                    quad.x(src0) + offset.x, quad.y(src0) + offset.y, quad.z(src0) + offset.z,
+                    ColorARGB.toABGR(quad.color(src0)), brightnesses[src0], quad.u(src0), quad.v(src0),
+                    quad.lightmap(src0),
+                    quad.x(src1) + offset.x, quad.y(src1) + offset.y, quad.z(src1) + offset.z,
+                    ColorARGB.toABGR(quad.color(src1)), brightnesses[src1], quad.u(src1), quad.v(src1),
+                    quad.lightmap(src1),
+                    quad.x(src2) + offset.x, quad.y(src2) + offset.y, quad.z(src2) + offset.z,
+                    ColorARGB.toABGR(quad.color(src2)), brightnesses[src2], quad.u(src2), quad.v(src2),
+                    quad.lightmap(src2),
+                    quad.x(src3) + offset.x, quad.y(src3) + offset.y, quad.z(src3) + offset.z,
+                    ColorARGB.toABGR(quad.color(src3)), brightnesses[src3], quad.u(src3), quad.v(src3),
+                    quad.lightmap(src3));
+        }
+
+        vertexBuffer.appendFlatQuad(materialBits, iris$lightEmission, iris$isFluid, false, iris$blockId,
+                iris$localX, iris$localY, iris$localZ,
                 quad.x(src0) + offset.x, quad.y(src0) + offset.y, quad.z(src0) + offset.z,
                 ColorARGB.toABGR(quad.color(src0)), brightnesses[src0], quad.u(src0), quad.v(src0),
                 quad.lightmap(src0),
@@ -222,6 +238,7 @@ public class BlockRenderer extends AbstractBlockRenderContext implements net.iri
                 quad.x(src3) + offset.x, quad.y(src3) + offset.y, quad.z(src3) + offset.z,
                 ColorARGB.toABGR(quad.color(src3)), brightnesses[src3], quad.u(src3), quad.v(src3),
                 quad.lightmap(src3));
+        return false;
     }
 
     private static boolean validateQuadUVs(TextureAtlasSprite atlasSprite, MutableQuadViewImpl quad) {

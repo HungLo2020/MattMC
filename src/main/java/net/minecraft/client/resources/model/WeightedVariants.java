@@ -31,6 +31,10 @@ public class WeightedVariants implements BlockStateModel {
 		((BlockStateModel)this.list.getRandomOrThrow(randomSource)).collectParts(randomSource, list);
 	}
 
+	public WeightedList<BlockStateModel> sodium$getWeightedModels() {
+		return this.list;
+	}
+
 	@Environment(EnvType.CLIENT)
 	public record Unbaked(WeightedList<BlockStateModel.Unbaked> entries) implements BlockStateModel.Unbaked {
 		@Override

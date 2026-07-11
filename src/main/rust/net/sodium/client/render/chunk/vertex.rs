@@ -1,4 +1,7 @@
+use std::collections::HashMap;
 use std::slice;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Mutex, OnceLock};
 
 use super::{index, translucent};
 
@@ -8,7 +11,21 @@ const ERR_INVALID_ARGUMENT: i32 = -2;
 const ERR_CAPACITY: i32 = -3;
 
 const MODEL_QUAD_FACING_COUNT: usize = 7;
+const MODEL_QUAD_FACING_POS_X: usize = 0;
+const MODEL_QUAD_FACING_POS_Y: usize = 1;
+const MODEL_QUAD_FACING_POS_Z: usize = 2;
+const MODEL_QUAD_FACING_NEG_X: usize = 3;
+const MODEL_QUAD_FACING_NEG_Y: usize = 4;
+const MODEL_QUAD_FACING_NEG_Z: usize = 5;
 const MODEL_QUAD_FACING_UNASSIGNED: usize = 6;
+const FLUID_ALIGNED_EQUALS_EPSILON: f32 = 0.011;
+const FLUID_FACE_TOP_NE_SW: i32 = 0;
+const FLUID_FACE_TOP_NW_SE: i32 = 1;
+const FLUID_FACE_BOTTOM: i32 = 2;
+const FLUID_FACE_SIDE: i32 = 3;
+const NATIVE_SECTION_BLOCK_FLAG_SUPPRESS_FLUID: i32 = 1;
+static FLUID_DIAG_COUNT: AtomicUsize = AtomicUsize::new(0);
+static FLUID_FLUSH_DIAG_COUNT: AtomicUsize = AtomicUsize::new(0);
 const POSITION_MAX_VALUE: f32 = (1 << 20) as f32;
 const TEXTURE_MAX_VALUE: f32 = (1 << 15) as f32;
 const MODEL_ORIGIN: f32 = 8.0;
@@ -18,6 +35,39 @@ const INDEX_MODE_SHARED: i32 = 1;
 const INDEX_MODE_SORTED_QUADS: i32 = 2;
 const INDEX_MODE_KEY_SORTED: i32 = 3;
 const PENDING_BATCH_QUAD_CAPACITY: usize = 256;
+const STATIC_MODEL_EMPTY_RECORD_ID: i32 = -1;
+const STATIC_MODEL_LIGHT_BLOCK_RECORD_ID: i32 = -2;
+const STATE_FLAG_AIR: i32 = 1;
+const STATE_FLAG_MODEL: i32 = 1 << 1;
+const STATE_FLAG_FLUID: i32 = 1 << 2;
+const STATE_FLAG_SOLID_RENDER: i32 = 1 << 3;
+const STATE_FLAG_FULL_OCCLUSION: i32 = 1 << 4;
+const STATE_FLAG_LIGHT_BLOCK: i32 = 1 << 5;
+const STATE_FLAG_CAN_OCCLUDE: i32 = 1 << 7;
+const STATE_FLAG_BLOCKS_MOTION: i32 = 1 << 8;
+const MODEL_QUAD_FLAG_PARTIAL: i32 = 1;
+const MODEL_QUAD_FLAG_PARALLEL: i32 = 1 << 1;
+const MODEL_QUAD_FLAG_ALIGNED: i32 = 1 << 2;
+const TINT_NONE: i32 = 0;
+const TINT_GRASS: i32 = 1;
+const TINT_FOLIAGE: i32 = 2;
+const TINT_WATER: i32 = 3;
+const TINT_REDSTONE: i32 = 4;
+const TINT_CONSTANT: i32 = 5;
+const TINT_STEM: i32 = 6;
+const TINT_DOUBLE_PLANT_GRASS: i32 = 7;
+const TINT_SPRUCE: i32 = 8;
+const TINT_BIRCH: i32 = 9;
+const TINT_FORCE_GRASS: i32 = 10;
+const FLUID_WATER: i32 = 1;
+const FLUID_LAVA: i32 = 2;
+const OFFSET_NONE: i32 = 0;
+const OFFSET_XZ: i32 = 1;
+const OFFSET_XYZ: i32 = 2;
+const LIGHT_FULL_BRIGHT: i32 = 0x00f0_00f0;
+const SELECTOR_DIRECT: i32 = 0;
+const SELECTOR_WEIGHTED: i32 = 1;
+const SELECTOR_GROUP: i32 = 2;
 
 const COMPACT_VALUE_STRIDE: i32 = 0;
 const COMPACT_VALUE_POSITION_OFFSET: i32 = 1;
@@ -71,6 +121,187 @@ struct NativeQuad {
     material_bits: i32,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct FlatQuadRecord {
+    quad: NativeQuad,
+    packed_normal: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct LightBlockRecord {
+    material_bits: i32,
+    block_emission: i32,
+    block_id: i32,
+    local_x: i32,
+    local_y: i32,
+    local_z: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct FluidFaceRecord {
+    packed_normal: i32,
+    material_bits: i32,
+    block_emission: i32,
+    render_type: i32,
+    ignore_mid_block: i32,
+    block_id: i32,
+    local_x: i32,
+    local_y: i32,
+    local_z: i32,
+    face_kind: i32,
+    flip: i32,
+    origin_x: f32,
+    origin_y: f32,
+    origin_z: f32,
+    y_offset: f32,
+    heights: [f32; 4],
+    side_coords: [f32; 4],
+    uvs: [f32; 8],
+    colors: [i32; 4],
+    aos: [f32; 4],
+    lights: [i32; 4],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct StaticModelVertexRecord {
+    x: f32,
+    y: f32,
+    z: f32,
+    color: i32,
+    u: f32,
+    v: f32,
+    light: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct StaticModelQuadRecord {
+    vertices: [StaticModelVertexRecord; 4],
+    material_bits: i32,
+    cull_face: i32,
+    normal_face: i32,
+    packed_normal: i32,
+    block_emission: i32,
+    render_type: i32,
+    shade: i32,
+    flags: i32,
+    light_face: i32,
+    tint_index: i32,
+    has_ao: i32,
+    _padding: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct StaticModelBlockRecord {
+    model_id: i32,
+    material_bits: i32,
+    block_emission: i32,
+    render_type: i32,
+    block_id: i32,
+    local_x: i32,
+    local_y: i32,
+    local_z: i32,
+    cull_mask: i32,
+    _padding: i32,
+    offset_x: f32,
+    offset_y: f32,
+    offset_z: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct NativeSectionBlockRecord {
+    state_id: i32,
+    block_id: i32,
+    local_x: i32,
+    local_y: i32,
+    local_z: i32,
+    seed_lo: i32,
+    seed_hi: i32,
+    neighbor_state_ids: [i32; 6],
+    light_words: [i32; 27],
+    neighborhood_state_ids: [i32; 27],
+    tint: i32,
+    fluid_tint: i32,
+    fluid_flow_x: f32,
+    fluid_flow_z: f32,
+    absolute_x: i32,
+    absolute_y: i32,
+    absolute_z: i32,
+    legacy_offset_x: f32,
+    legacy_offset_y: f32,
+    legacy_offset_z: f32,
+    fluid_block_id: i32,
+    flags: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct NativeModelSelectorEntry {
+    target_id: i32,
+    weight: i32,
+}
+
+#[derive(Clone, Debug, Default)]
+struct NativeModelSelector {
+    kind: i32,
+    entries: Vec<NativeModelSelectorEntry>,
+    total_weight: i32,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct FluidSprite {
+    u0: f32,
+    u1: f32,
+    v0: f32,
+    v1: f32,
+    shrink: f32,
+}
+
+impl Default for FluidSprite {
+    fn default() -> Self {
+        Self {
+            u0: 0.0,
+            u1: 1.0,
+            v0: 0.0,
+            v1: 1.0,
+            shrink: 0.0,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct NativeMeshingState {
+    selector_id: i32,
+    flags: i32,
+    material_bits: i32,
+    pass_id: i32,
+    block_emission: i32,
+    #[allow(dead_code)]
+    render_type: i32,
+    block_id: i32,
+    fluid_material_bits: i32,
+    fluid_pass_id: i32,
+    fluid_block_id: i32,
+    skip_group: i32,
+    fluid_type: i32,
+    fluid_own_height: f32,
+    fluid_falling: i32,
+    offset_type: i32,
+    max_horizontal_offset: f32,
+    max_vertical_offset: f32,
+    tint_type: i32,
+    fluid_still: FluidSprite,
+    fluid_flow: FluidSprite,
+    fluid_overlay: FluidSprite,
+    fluid_overlay_valid: i32,
+}
+
 struct NativeQuadBuffer {
     quads: Vec<NativeQuad>,
     encoded: Vec<u8>,
@@ -79,6 +310,10 @@ struct NativeQuadBuffer {
 
 struct NativePendingQuadBuffer {
     quads: Vec<NativeQuad>,
+    flat_quad_records: Vec<FlatQuadRecord>,
+    light_block_records: Vec<LightBlockRecord>,
+    fluid_face_records: Vec<FluidFaceRecord>,
+    static_model_block_records: Vec<StaticModelBlockRecord>,
     packed_normals: Vec<i32>,
     validity: Vec<u8>,
 }
@@ -93,6 +328,22 @@ struct NativeUpdatedQuads {
     quads: Vec<u64>,
     mesh_quad_count: i32,
     index_quad_count: i32,
+}
+
+static STATIC_MODEL_CACHE: OnceLock<Mutex<HashMap<i32, Vec<StaticModelQuadRecord>>>> = OnceLock::new();
+static NATIVE_MODEL_SELECTORS: OnceLock<Mutex<HashMap<i32, NativeModelSelector>>> = OnceLock::new();
+static NATIVE_MESHING_STATES: OnceLock<Mutex<HashMap<i32, NativeMeshingState>>> = OnceLock::new();
+
+fn static_model_cache() -> &'static Mutex<HashMap<i32, Vec<StaticModelQuadRecord>>> {
+    STATIC_MODEL_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn native_model_selectors() -> &'static Mutex<HashMap<i32, NativeModelSelector>> {
+    NATIVE_MODEL_SELECTORS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn native_meshing_states() -> &'static Mutex<HashMap<i32, NativeMeshingState>> {
+    NATIVE_MESHING_STATES.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 pub(crate) fn updated_quads_create_from_handles(
@@ -170,7 +421,17 @@ impl NativeFormat {
 }
 
 pub fn verify() -> i32 {
-    if std::mem::size_of::<QuadVertex>() == 32 && std::mem::size_of::<NativeQuad>() == 152 {
+    if std::mem::size_of::<QuadVertex>() == 32
+        && std::mem::size_of::<NativeQuad>() == 152
+        && std::mem::size_of::<FlatQuadRecord>() == 156
+        && std::mem::size_of::<LightBlockRecord>() == 24
+        && std::mem::size_of::<FluidFaceRecord>() == 172
+        && std::mem::size_of::<StaticModelVertexRecord>() == 28
+        && std::mem::size_of::<StaticModelQuadRecord>() == 160
+        && std::mem::size_of::<StaticModelBlockRecord>() == 52
+        && std::mem::size_of::<NativeSectionBlockRecord>() == 316
+        && std::mem::size_of::<NativeModelSelectorEntry>() == 8
+    {
         OK
     } else {
         ERR_INVALID_ARGUMENT
@@ -1019,6 +1280,10 @@ fn create_section_mesh_builder(capacity: usize) -> NativeSectionMeshBuilder {
         }),
         pending: std::array::from_fn(|_| NativePendingQuadBuffer {
             quads: vec![NativeQuad::default(); PENDING_BATCH_QUAD_CAPACITY],
+            flat_quad_records: vec![FlatQuadRecord::default(); PENDING_BATCH_QUAD_CAPACITY],
+            light_block_records: vec![LightBlockRecord::default(); PENDING_BATCH_QUAD_CAPACITY],
+            fluid_face_records: vec![FluidFaceRecord::default(); PENDING_BATCH_QUAD_CAPACITY],
+            static_model_block_records: vec![StaticModelBlockRecord::default(); PENDING_BATCH_QUAD_CAPACITY],
             packed_normals: vec![0; PENDING_BATCH_QUAD_CAPACITY],
             validity: vec![0; PENDING_BATCH_QUAD_CAPACITY],
         }),
@@ -1193,6 +1458,1988 @@ unsafe fn section_builder_append_batch_encoded(
     Ok(valid_count as i32)
 }
 
+unsafe fn section_builder_append_flat_quad_records_encoded(
+    builder: &mut NativeSectionMeshBuilder,
+    facing: usize,
+    record_address: u64,
+    record_count: usize,
+    record_stride: usize,
+    analyzer: Option<(u64, i32)>,
+    format: NativeFormat,
+    store_raw_quads: bool,
+) -> Result<(i32, i32), i32> {
+    if facing >= MODEL_QUAD_FACING_COUNT {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+    if record_count == 0 {
+        return Ok((0, 0));
+    }
+    if record_address == 0 {
+        return Err(ERR_NULL_POINTER);
+    }
+    if record_stride != std::mem::size_of::<FlatQuadRecord>() {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    let records = slice::from_raw_parts(record_address as *const FlatQuadRecord, record_count);
+    let mut processed = 0usize;
+    let mut total_valid = 0i32;
+    let mut total_committed = 0i32;
+
+    while processed < record_count {
+        let chunk_count = (record_count - processed).min(PENDING_BATCH_QUAD_CAPACITY);
+        {
+            let pending = &mut builder.pending[facing];
+            for index in 0..chunk_count {
+                let record = records[processed + index];
+                pending.quads[index] = record.quad;
+                pending.packed_normals[index] = record.packed_normal;
+            }
+        }
+
+        let validity_address = builder.pending[facing].validity.as_mut_ptr() as u64;
+        let mut chunk_valid = chunk_count as i32;
+        let validity = if let Some((analyzer_handle, translucent_facing)) = analyzer {
+            let status = translucent::append_native_quad_batch_to_analyzer(
+                analyzer_handle,
+                builder.pending[facing].quads.as_ptr() as u64,
+                chunk_count as i32,
+                translucent_facing,
+                builder.pending[facing].packed_normals.as_ptr(),
+                validity_address,
+                &mut chunk_valid,
+            );
+            if status != OK {
+                return Err(status);
+            }
+            Some(slice::from_raw_parts(validity_address as *const u8, chunk_count))
+        } else {
+            None
+        };
+
+        let chunk_committed = section_builder_append_batch_encoded(
+            builder,
+            facing,
+            builder.pending[facing].quads.as_ptr() as u64,
+            chunk_count,
+            validity,
+            format,
+            store_raw_quads,
+        )?;
+
+        total_valid = total_valid.checked_add(chunk_valid).ok_or(ERR_CAPACITY)?;
+        total_committed = total_committed
+            .checked_add(chunk_committed)
+            .ok_or(ERR_CAPACITY)?;
+        processed += chunk_count;
+    }
+
+    Ok((total_valid, total_committed))
+}
+
+fn native_fluid_flush_diag(
+    facing: usize,
+    has_analyzer: bool,
+    chunk_count: usize,
+    valid_count: i32,
+    committed_count: i32,
+    records: &[FluidFaceRecord],
+) {
+    if std::env::var_os("MATTMC_NATIVE_FLUID_DIAG").is_none() {
+        return;
+    }
+    let Some(record) = records
+        .iter()
+        .find(|record| record.render_type == 1 && record.face_kind == FLUID_FACE_TOP_NE_SW)
+    else {
+        return;
+    };
+    let index = FLUID_FLUSH_DIAG_COUNT.fetch_add(1, Ordering::Relaxed);
+    if index >= 80 {
+        return;
+    }
+    eprintln!(
+        "MATTMC_NATIVE_FLUID_DIAG #{index} flush facing={} analyzer={} quads={} valid={} committed={} first_pos={},{},{} first_face={} first_flip={} first_light=0x{:08x} first_color=0x{:08x}",
+        facing,
+        has_analyzer,
+        chunk_count,
+        valid_count,
+        committed_count,
+        record.local_x,
+        record.local_y,
+        record.local_z,
+        record.face_kind,
+        record.flip,
+        record.lights[0],
+        record.colors[0] as u32,
+    );
+}
+
+unsafe fn section_builder_append_light_block_records_encoded(
+    builder: &mut NativeSectionMeshBuilder,
+    facing: usize,
+    record_address: u64,
+    record_count: usize,
+    record_stride: usize,
+    format: NativeFormat,
+    store_raw_quads: bool,
+) -> Result<i32, i32> {
+    if facing >= MODEL_QUAD_FACING_COUNT {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+    if record_count == 0 {
+        return Ok(0);
+    }
+    if record_address == 0 {
+        return Err(ERR_NULL_POINTER);
+    }
+    if record_stride != std::mem::size_of::<LightBlockRecord>() {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    let records = slice::from_raw_parts(record_address as *const LightBlockRecord, record_count);
+    let mut processed = 0usize;
+    let mut total_committed = 0i32;
+
+    while processed < record_count {
+        let chunk_count = (record_count - processed).min(PENDING_BATCH_QUAD_CAPACITY);
+        {
+            let pending = &mut builder.pending[facing];
+            for index in 0..chunk_count {
+                pending.quads[index] = light_block_record_to_quad(records[processed + index]);
+            }
+        }
+
+        let chunk_committed = section_builder_append_batch_encoded(
+            builder,
+            facing,
+            builder.pending[facing].quads.as_ptr() as u64,
+            chunk_count,
+            None,
+            format,
+            store_raw_quads,
+        )?;
+
+        total_committed = total_committed
+            .checked_add(chunk_committed)
+            .ok_or(ERR_CAPACITY)?;
+        processed += chunk_count;
+    }
+
+    Ok(total_committed)
+}
+
+unsafe fn section_builder_append_fluid_face_records_encoded(
+    builder: &mut NativeSectionMeshBuilder,
+    facing: usize,
+    record_address: u64,
+    record_count: usize,
+    record_stride: usize,
+    analyzer: Option<(u64, i32)>,
+    format: NativeFormat,
+    store_raw_quads: bool,
+) -> Result<(i32, i32), i32> {
+    if facing >= MODEL_QUAD_FACING_COUNT {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+    if record_count == 0 {
+        return Ok((0, 0));
+    }
+    if record_address == 0 {
+        return Err(ERR_NULL_POINTER);
+    }
+    if record_stride != std::mem::size_of::<FluidFaceRecord>() {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    let records = slice::from_raw_parts(record_address as *const FluidFaceRecord, record_count);
+    let mut processed = 0usize;
+    let mut total_valid = 0i32;
+    let mut total_committed = 0i32;
+
+    while processed < record_count {
+        let chunk_count = (record_count - processed).min(PENDING_BATCH_QUAD_CAPACITY);
+        {
+            let pending = &mut builder.pending[facing];
+            for index in 0..chunk_count {
+                let record = records[processed + index];
+                pending.quads[index] = fluid_face_record_to_quad(record)?;
+                pending.packed_normals[index] = record.packed_normal;
+            }
+        }
+
+        let validity_address = builder.pending[facing].validity.as_mut_ptr() as u64;
+        let mut chunk_valid = chunk_count as i32;
+        let validity = if let Some((analyzer_handle, translucent_facing)) = analyzer {
+            let status = translucent::append_native_quad_batch_to_analyzer(
+                analyzer_handle,
+                builder.pending[facing].quads.as_ptr() as u64,
+                chunk_count as i32,
+                translucent_facing,
+                builder.pending[facing].packed_normals.as_ptr(),
+                validity_address,
+                &mut chunk_valid,
+            );
+            if status != OK {
+                return Err(status);
+            }
+            Some(slice::from_raw_parts(validity_address as *const u8, chunk_count))
+        } else {
+            None
+        };
+
+        let chunk_committed = section_builder_append_batch_encoded(
+            builder,
+            facing,
+            builder.pending[facing].quads.as_ptr() as u64,
+            chunk_count,
+            validity,
+            format,
+            store_raw_quads,
+        )?;
+
+        native_fluid_flush_diag(
+            facing,
+            analyzer.is_some(),
+            chunk_count,
+            chunk_valid,
+            chunk_committed,
+            &records[processed..processed + chunk_count],
+        );
+
+        total_valid = total_valid.checked_add(chunk_valid).ok_or(ERR_CAPACITY)?;
+        total_committed = total_committed
+            .checked_add(chunk_committed)
+            .ok_or(ERR_CAPACITY)?;
+        processed += chunk_count;
+    }
+
+    Ok((total_valid, total_committed))
+}
+
+unsafe fn section_builder_append_static_model_records_encoded(
+    builder: &mut NativeSectionMeshBuilder,
+    record_address: u64,
+    record_count: usize,
+    record_stride: usize,
+    format: NativeFormat,
+    store_raw_quads: bool,
+) -> Result<i32, i32> {
+    if record_count == 0 {
+        return Ok(0);
+    }
+    if record_address == 0 {
+        return Err(ERR_NULL_POINTER);
+    }
+    if record_stride != std::mem::size_of::<StaticModelBlockRecord>() {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    let records = slice::from_raw_parts(record_address as *const StaticModelBlockRecord, record_count);
+    let cache_guard = static_model_cache()
+        .lock()
+        .map_err(|_| ERR_INVALID_ARGUMENT)?;
+    let mut total_committed = 0i32;
+    let mut pending_counts = [0usize; MODEL_QUAD_FACING_COUNT];
+
+    for record in records {
+        if record.model_id == STATIC_MODEL_EMPTY_RECORD_ID {
+            continue;
+        }
+        if record.model_id == STATIC_MODEL_LIGHT_BLOCK_RECORD_ID {
+            let facing = MODEL_QUAD_FACING_UNASSIGNED;
+            let slot = pending_counts[facing];
+            {
+                let pending = &mut builder.pending[facing];
+                pending.quads[slot] = light_block_record_to_quad(LightBlockRecord {
+                    material_bits: record.material_bits,
+                    block_emission: record.block_emission,
+                    block_id: record.block_id,
+                    local_x: record.local_x,
+                    local_y: record.local_y,
+                    local_z: record.local_z,
+                });
+            }
+            pending_counts[facing] += 1;
+
+            if pending_counts[facing] == PENDING_BATCH_QUAD_CAPACITY {
+                flush_static_model_pending_face(
+                    builder,
+                    facing,
+                    &mut pending_counts,
+                    None,
+                    format,
+                    store_raw_quads,
+                    &mut total_committed,
+                )?;
+            }
+            continue;
+        }
+
+        let Some(model) = cache_guard.get(&record.model_id) else {
+            continue;
+        };
+
+        for quad_record in model {
+            if quad_record.cull_face >= 0 && ((record.cull_mask >> quad_record.cull_face) & 1) != 0 {
+                continue;
+            }
+
+            let facing = match usize::try_from(quad_record.normal_face) {
+                Ok(value) if value < MODEL_QUAD_FACING_COUNT => value,
+                _ => MODEL_QUAD_FACING_UNASSIGNED,
+            };
+            let quad = static_model_quad_to_native(*record, *quad_record);
+            let slot = pending_counts[facing];
+            {
+                let pending = &mut builder.pending[facing];
+                pending.quads[slot] = quad;
+            }
+            pending_counts[facing] += 1;
+
+            if pending_counts[facing] == PENDING_BATCH_QUAD_CAPACITY {
+                flush_static_model_pending_face(
+                    builder,
+                    facing,
+                    &mut pending_counts,
+                    None,
+                    format,
+                    store_raw_quads,
+                    &mut total_committed,
+                )?;
+            }
+        }
+    }
+
+    for facing in 0..MODEL_QUAD_FACING_COUNT {
+        flush_static_model_pending_face(
+            builder,
+            facing,
+            &mut pending_counts,
+            None,
+            format,
+            store_raw_quads,
+            &mut total_committed,
+        )?;
+    }
+
+    Ok(total_committed)
+}
+
+unsafe fn flush_static_model_pending_face(
+    builder: &mut NativeSectionMeshBuilder,
+    facing: usize,
+    pending_counts: &mut [usize; MODEL_QUAD_FACING_COUNT],
+    analyzer: Option<u64>,
+    format: NativeFormat,
+    store_raw_quads: bool,
+    total_committed: &mut i32,
+) -> Result<(), i32> {
+    let count = pending_counts[facing];
+    if count == 0 {
+        return Ok(());
+    }
+
+    let pending_address = builder.pending[facing].quads.as_ptr() as u64;
+    let validity_address = builder.pending[facing].validity.as_mut_ptr() as u64;
+    let mut valid_count = count as i32;
+    let validity = if let Some(analyzer_handle) = analyzer {
+        let status = translucent::append_native_quad_batch_to_analyzer(
+            analyzer_handle,
+            pending_address,
+            count as i32,
+            facing as i32,
+            builder.pending[facing].packed_normals.as_ptr(),
+            validity_address,
+            &mut valid_count,
+        );
+        if status != OK {
+            return Err(status);
+        }
+        Some(slice::from_raw_parts(validity_address as *const u8, count))
+    } else {
+        None
+    };
+    let committed = section_builder_append_batch_encoded(
+        builder,
+        facing,
+        pending_address,
+        count,
+        validity,
+        format,
+        store_raw_quads,
+    )?;
+    *total_committed = total_committed.checked_add(committed).ok_or(ERR_CAPACITY)?;
+    pending_counts[facing] = 0;
+    Ok(())
+}
+
+fn light_block_record_to_quad(record: LightBlockRecord) -> NativeQuad {
+    let emission = record.block_emission.clamp(0, 255);
+    let x = record.local_x as f32 + 0.25;
+    let y = record.local_y as f32 + 0.25;
+    let z = record.local_z as f32 + 0.25;
+    let light = (emission << 4) | (emission << 20);
+    let vertex = QuadVertex {
+        x,
+        y,
+        z,
+        color: 0,
+        ao: 1.0,
+        u: 0.0,
+        v: 0.0,
+        light,
+    };
+
+    NativeQuad {
+        vertices: [vertex; 4],
+        block_emission: emission as u8,
+        render_type: 0,
+        ignore_mid_block: 1,
+        _padding: 0,
+        block_id: record.block_id,
+        local_x: record.local_x,
+        local_y: record.local_y,
+        local_z: record.local_z,
+        material_bits: record.material_bits,
+    }
+}
+
+fn static_model_quad_to_native(
+    block: StaticModelBlockRecord,
+    quad_record: StaticModelQuadRecord,
+) -> NativeQuad {
+    let material_bits = if block.material_bits != 0 {
+        block.material_bits
+    } else {
+        quad_record.material_bits
+    };
+    let block_emission = if block.block_emission != 0 {
+        block.block_emission
+    } else {
+        quad_record.block_emission
+    };
+    let render_type = if block.render_type != 0 {
+        block.render_type
+    } else {
+        quad_record.render_type
+    };
+    let mut vertices = [QuadVertex::default(); 4];
+
+    for (index, vertex) in vertices.iter_mut().enumerate() {
+        let source = quad_record.vertices[index];
+        *vertex = QuadVertex {
+            x: block.local_x as f32 + block.offset_x + source.x,
+            y: block.local_y as f32 + block.offset_y + source.y,
+            z: block.local_z as f32 + block.offset_z + source.z,
+            color: argb_to_abgr(source.color),
+            ao: if quad_record.shade != 0 { 1.0 } else { 1.0 },
+            u: source.u,
+            v: source.v,
+            light: source.light,
+        };
+    }
+
+    NativeQuad {
+        vertices,
+        block_emission: block_emission.clamp(0, 255) as u8,
+        render_type: render_type.clamp(0, 255) as u8,
+        ignore_mid_block: 0,
+        _padding: 0,
+        block_id: block.block_id,
+        local_x: block.local_x,
+        local_y: block.local_y,
+        local_z: block.local_z,
+        material_bits,
+    }
+}
+
+unsafe fn section_builder_append_native_section_records_encoded(
+    builder: &mut NativeSectionMeshBuilder,
+    record_address: u64,
+    record_count: usize,
+    record_stride: usize,
+    pass_id: i32,
+    analyzer: Option<u64>,
+    format: NativeFormat,
+    store_raw_quads: bool,
+) -> Result<i32, i32> {
+    if record_count == 0 {
+        return Ok(0);
+    }
+    if record_address == 0 {
+        return Err(ERR_NULL_POINTER);
+    }
+    if record_stride != std::mem::size_of::<NativeSectionBlockRecord>() {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    let records = slice::from_raw_parts(record_address as *const NativeSectionBlockRecord, record_count);
+    let states_guard = native_meshing_states()
+        .lock()
+        .map_err(|_| ERR_INVALID_ARGUMENT)?;
+    let selectors_guard = native_model_selectors()
+        .lock()
+        .map_err(|_| ERR_INVALID_ARGUMENT)?;
+    let models_guard = static_model_cache()
+        .lock()
+        .map_err(|_| ERR_INVALID_ARGUMENT)?;
+    let mut total_committed = 0i32;
+    let mut pending_counts = [0usize; MODEL_QUAD_FACING_COUNT];
+    let mut fluid_pending_counts = [0usize; MODEL_QUAD_FACING_COUNT];
+    let mut model_ids = Vec::with_capacity(8);
+
+    for record in records {
+        let Some(state) = states_guard.get(&record.state_id).copied() else {
+            continue;
+        };
+        if (state.flags & STATE_FLAG_AIR) != 0 {
+            continue;
+        }
+
+        if (state.flags & STATE_FLAG_LIGHT_BLOCK) != 0 && pass_id == 1 {
+            push_native_section_quad(
+                builder,
+                light_block_record_to_quad(LightBlockRecord {
+                    material_bits: state.material_bits,
+                    block_emission: state.block_emission,
+                    block_id: choose_block_id(record.block_id, state.block_id),
+                    local_x: record.local_x,
+                    local_y: record.local_y,
+                    local_z: record.local_z,
+                }),
+                0,
+                MODEL_QUAD_FACING_UNASSIGNED,
+                &mut pending_counts,
+                analyzer,
+                format,
+                store_raw_quads,
+                &mut total_committed,
+            )?;
+        }
+
+        if (state.flags & STATE_FLAG_MODEL) != 0 && state.pass_id == pass_id {
+            model_ids.clear();
+            resolve_selector_model_ids(
+                state.selector_id,
+                record_seed(*record),
+                &selectors_guard,
+                &mut model_ids,
+            )?;
+
+            for model_id in &model_ids {
+                let Some(model) = models_guard.get(model_id) else {
+                    continue;
+                };
+
+                for quad_record in model {
+                    if native_section_culls_quad(record, *quad_record, &states_guard) {
+                        continue;
+                    }
+
+                    let facing = match usize::try_from(quad_record.normal_face) {
+                        Ok(value) if value < MODEL_QUAD_FACING_COUNT => value,
+                        _ => MODEL_QUAD_FACING_UNASSIGNED,
+                    };
+                    let quad = static_model_quad_to_native_section(*record, state, *quad_record);
+                    push_native_section_quad(
+                        builder,
+                        quad,
+                        quad_record.packed_normal,
+                        facing,
+                        &mut pending_counts,
+                        analyzer,
+                        format,
+                        store_raw_quads,
+                        &mut total_committed,
+                    )?;
+                }
+            }
+        }
+
+        if (state.flags & STATE_FLAG_FLUID) != 0
+            && (record.flags & NATIVE_SECTION_BLOCK_FLAG_SUPPRESS_FLUID) == 0
+            && state.fluid_pass_id == pass_id
+        {
+            for (fluid_record, facing) in native_section_fluid_faces(record, state, &states_guard) {
+                push_native_section_fluid_face(
+                    builder,
+                    fluid_record,
+                    facing,
+                    &mut pending_counts,
+                    &mut fluid_pending_counts,
+                    analyzer,
+                    format,
+                    store_raw_quads,
+                    &mut total_committed,
+                )?;
+            }
+        }
+    }
+
+    for facing in 0..MODEL_QUAD_FACING_COUNT {
+        flush_static_model_pending_face(
+            builder,
+            facing,
+            &mut pending_counts,
+            analyzer,
+            format,
+            store_raw_quads,
+            &mut total_committed,
+        )?;
+        flush_native_section_pending_fluid_face(
+            builder,
+            facing,
+            &mut fluid_pending_counts,
+            analyzer,
+            format,
+            store_raw_quads,
+            &mut total_committed,
+        )?;
+    }
+
+    Ok(total_committed)
+}
+
+unsafe fn push_native_section_quad(
+    builder: &mut NativeSectionMeshBuilder,
+    quad: NativeQuad,
+    packed_normal: i32,
+    facing: usize,
+    pending_counts: &mut [usize; MODEL_QUAD_FACING_COUNT],
+    analyzer: Option<u64>,
+    format: NativeFormat,
+    store_raw_quads: bool,
+    total_committed: &mut i32,
+) -> Result<(), i32> {
+    let slot = pending_counts[facing];
+    builder.pending[facing].quads[slot] = quad;
+    builder.pending[facing].packed_normals[slot] = packed_normal;
+    pending_counts[facing] += 1;
+
+    if pending_counts[facing] == PENDING_BATCH_QUAD_CAPACITY {
+        flush_static_model_pending_face(
+            builder,
+            facing,
+            pending_counts,
+            analyzer,
+            format,
+            store_raw_quads,
+            total_committed,
+        )?;
+    }
+
+    Ok(())
+}
+
+unsafe fn push_native_section_fluid_face(
+    builder: &mut NativeSectionMeshBuilder,
+    record: FluidFaceRecord,
+    facing: usize,
+    static_pending_counts: &mut [usize; MODEL_QUAD_FACING_COUNT],
+    fluid_pending_counts: &mut [usize; MODEL_QUAD_FACING_COUNT],
+    analyzer: Option<u64>,
+    format: NativeFormat,
+    store_raw_quads: bool,
+    total_committed: &mut i32,
+) -> Result<(), i32> {
+    if static_pending_counts[facing] != 0 {
+        flush_static_model_pending_face(
+            builder,
+            facing,
+            static_pending_counts,
+            analyzer,
+            format,
+            store_raw_quads,
+            total_committed,
+        )?;
+    }
+
+    let slot = fluid_pending_counts[facing];
+    builder.pending[facing].fluid_face_records[slot] = record;
+    fluid_pending_counts[facing] += 1;
+
+    if fluid_pending_counts[facing] == PENDING_BATCH_QUAD_CAPACITY {
+        flush_native_section_pending_fluid_face(
+            builder,
+            facing,
+            fluid_pending_counts,
+            analyzer,
+            format,
+            store_raw_quads,
+            total_committed,
+        )?;
+    }
+
+    Ok(())
+}
+
+unsafe fn flush_native_section_pending_fluid_face(
+    builder: &mut NativeSectionMeshBuilder,
+    facing: usize,
+    fluid_pending_counts: &mut [usize; MODEL_QUAD_FACING_COUNT],
+    analyzer: Option<u64>,
+    format: NativeFormat,
+    store_raw_quads: bool,
+    total_committed: &mut i32,
+) -> Result<(), i32> {
+    let count = fluid_pending_counts[facing];
+    if count == 0 {
+        return Ok(());
+    }
+
+    let analyzer = analyzer.map(|handle| (handle, facing as i32));
+    let (valid, committed) = section_builder_append_fluid_face_records_encoded(
+        builder,
+        facing,
+        builder.pending[facing].fluid_face_records.as_ptr() as u64,
+        count,
+        std::mem::size_of::<FluidFaceRecord>(),
+        analyzer,
+        format,
+        store_raw_quads,
+    )?;
+    if valid != committed {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+    *total_committed = total_committed.checked_add(committed).ok_or(ERR_CAPACITY)?;
+    fluid_pending_counts[facing] = 0;
+    Ok(())
+}
+
+fn resolve_selector_model_ids(
+    selector_id: i32,
+    seed: u64,
+    selectors: &HashMap<i32, NativeModelSelector>,
+    output: &mut Vec<i32>,
+) -> Result<(), i32> {
+    let Some(selector) = selectors.get(&selector_id) else {
+        return Ok(());
+    };
+
+    match selector.kind {
+        SELECTOR_DIRECT => {
+            if let Some(entry) = selector.entries.first() {
+                output.push(entry.target_id);
+            }
+        }
+        SELECTOR_WEIGHTED => {
+            if selector.total_weight <= 0 {
+                return Ok(());
+            }
+            let mut choice = legacy_next_int(seed, selector.total_weight);
+            for entry in &selector.entries {
+                choice -= entry.weight;
+                if choice < 0 {
+                    resolve_selector_model_ids(entry.target_id, seed, selectors, output)?;
+                    break;
+                }
+            }
+        }
+        SELECTOR_GROUP => {
+            let child_seed = legacy_next_long(seed);
+            for entry in &selector.entries {
+                resolve_selector_model_ids(entry.target_id, child_seed, selectors, output)?;
+            }
+        }
+        _ => return Err(ERR_INVALID_ARGUMENT),
+    }
+
+    Ok(())
+}
+
+fn legacy_next_int(seed: u64, bound: i32) -> i32 {
+    if bound <= 0 {
+        return 0;
+    }
+
+    let mut state = legacy_set_seed(seed);
+    if (bound & (bound - 1)) == 0 {
+        return (((bound as i64) * (legacy_next(&mut state, 31) as i64)) >> 31) as i32;
+    }
+
+    loop {
+        let value = legacy_next(&mut state, 31) as i32;
+        let result = value % bound;
+        if value - result + (bound - 1) >= 0 {
+            return result;
+        }
+    }
+}
+
+fn legacy_next_long(seed: u64) -> u64 {
+    let mut state = legacy_set_seed(seed);
+    let high = legacy_next(&mut state, 32) as u64;
+    let low = legacy_next(&mut state, 32) as u64;
+    (high << 32).wrapping_add(low)
+}
+
+fn legacy_set_seed(seed: u64) -> u64 {
+    (seed ^ 25_214_903_917) & 281_474_976_710_655
+}
+
+fn legacy_next(state: &mut u64, bits: u32) -> u32 {
+    *state = state
+        .wrapping_mul(25_214_903_917)
+        .wrapping_add(11)
+        & 281_474_976_710_655;
+    (*state >> (48 - bits)) as u32
+}
+
+fn record_seed(record: NativeSectionBlockRecord) -> u64 {
+    ((record.seed_hi as u32 as u64) << 32) | (record.seed_lo as u32 as u64)
+}
+
+fn native_section_culls_quad(
+    record: &NativeSectionBlockRecord,
+    quad_record: StaticModelQuadRecord,
+    states: &HashMap<i32, NativeMeshingState>,
+) -> bool {
+    if quad_record.cull_face < 0 || quad_record.cull_face >= 6 {
+        return false;
+    }
+
+    let neighbor_id = record.neighbor_state_ids[quad_record.cull_face as usize];
+    let Some(neighbor) = states.get(&neighbor_id) else {
+        return false;
+    };
+
+    (neighbor.flags & (STATE_FLAG_FULL_OCCLUSION | STATE_FLAG_SOLID_RENDER)) != 0
+        || (neighbor.skip_group != 0 && neighbor.skip_group == states
+            .get(&record.state_id)
+            .map(|state| state.skip_group)
+            .unwrap_or(0)
+            && (neighbor.flags & STATE_FLAG_FULL_OCCLUSION) != 0)
+}
+
+fn static_model_quad_to_native_section(
+    block: NativeSectionBlockRecord,
+    state: NativeMeshingState,
+    quad_record: StaticModelQuadRecord,
+) -> NativeQuad {
+    let mut vertices = [QuadVertex::default(); 4];
+    let offset = native_model_offset(block, state);
+    let light = native_quad_lighting(&block, &quad_record, state);
+    let tint = native_tint_color(&block, state, false);
+
+    for (index, vertex) in vertices.iter_mut().enumerate() {
+        let source = quad_record.vertices[index];
+        let mut color = source.color;
+        if quad_record.tint_index != -1
+            || state.tint_type == TINT_GRASS
+            || state.tint_type == TINT_FOLIAGE
+            || state.tint_type == TINT_FORCE_GRASS
+            || state.tint_type == TINT_DOUBLE_PLANT_GRASS
+            || state.tint_type == TINT_CONSTANT
+            || state.tint_type == TINT_SPRUCE
+            || state.tint_type == TINT_BIRCH
+        {
+            color = multiply_argb(color, tint);
+        }
+        *vertex = QuadVertex {
+            x: block.local_x as f32 + offset.0 + source.x,
+            y: block.local_y as f32 + offset.1 + source.y,
+            z: block.local_z as f32 + offset.2 + source.z,
+            color: argb_to_abgr(color),
+            ao: light.ao[index],
+            u: source.u,
+            v: source.v,
+            light: if source.light > 0 { source.light } else { light.lm[index] },
+        };
+    }
+
+    NativeQuad {
+        vertices,
+        block_emission: state.block_emission.clamp(0, 255) as u8,
+        render_type: 0,
+        ignore_mid_block: 0,
+        _padding: 0,
+        block_id: choose_block_id(block.block_id, state.block_id),
+        local_x: block.absolute_x,
+        local_y: block.absolute_y,
+        local_z: block.absolute_z,
+        material_bits: if state.material_bits != 0 {
+            state.material_bits
+        } else {
+            quad_record.material_bits
+        },
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct NativeQuadLight {
+    ao: [f32; 4],
+    lm: [i32; 4],
+}
+
+fn native_quad_lighting(
+    block: &NativeSectionBlockRecord,
+    quad: &StaticModelQuadRecord,
+    state: NativeMeshingState,
+) -> NativeQuadLight {
+    let light_face = if (0..6).contains(&quad.light_face) {
+        quad.light_face
+    } else if (0..6).contains(&quad.cull_face) {
+        quad.cull_face
+    } else {
+        1
+    };
+    let use_smooth = quad.has_ao != 0;
+    if use_smooth {
+        smooth_lighting(block, quad, state, light_face, quad.shade != 0)
+    } else {
+        flat_lighting(block, quad, state, light_face, quad.shade != 0)
+    }
+}
+
+fn flat_lighting(
+    block: &NativeSectionBlockRecord,
+    quad: &StaticModelQuadRecord,
+    state: NativeMeshingState,
+    light_face: i32,
+    shade: bool,
+) -> NativeQuadLight {
+    let sample_dir = if (0..6).contains(&quad.cull_face) {
+        quad.cull_face
+    } else if (quad.flags & MODEL_QUAD_FLAG_ALIGNED) != 0
+        || ((quad.flags & MODEL_QUAD_FLAG_PARALLEL) != 0
+            && (state.flags & STATE_FLAG_FULL_OCCLUSION) != 0)
+    {
+        light_face
+    } else {
+        -1
+    };
+    let word = if sample_dir >= 0 {
+        light_word(block, dir_step(sample_dir))
+    } else {
+        block.light_words[13]
+    };
+    let lm = if unpack_em(block.light_words[13]) && sample_dir >= 0 {
+        LIGHT_FULL_BRIGHT
+    } else if sample_dir >= 0 {
+        let origin = block.light_words[13];
+        let adj = word;
+        pack_light(std::cmp::max(unpack_bl(adj), unpack_lu(origin)), unpack_sl(adj))
+    } else {
+        get_emissive_lightmap(word)
+    };
+    NativeQuadLight {
+        ao: [ambient_shade(light_face, shade); 4],
+        lm: [lm; 4],
+    }
+}
+
+fn smooth_lighting(
+    block: &NativeSectionBlockRecord,
+    quad: &StaticModelQuadRecord,
+    state: NativeMeshingState,
+    light_face: i32,
+    shade: bool,
+) -> NativeQuadLight {
+    let parallel = (quad.flags & MODEL_QUAD_FLAG_PARALLEL) != 0;
+    let aligned = (quad.flags & MODEL_QUAD_FLAG_ALIGNED) != 0
+        || (parallel && (state.flags & STATE_FLAG_FULL_OCCLUSION) != 0);
+    let partial = (quad.flags & MODEL_QUAD_FLAG_PARTIAL) != 0;
+
+    if aligned && !partial {
+        let face = ao_face_data(block, light_face, true);
+        let (lm, mut ao) = map_ao_corners(light_face, face.lm, face.ao);
+        for value in &mut ao {
+            *value *= ambient_shade(light_face, shade);
+        }
+        return NativeQuadLight { ao, lm };
+    }
+
+    let mut out = NativeQuadLight {
+        ao: [1.0; 4],
+        lm: [get_emissive_lightmap(block.light_words[13]); 4],
+    };
+    for i in 0..4 {
+        let source = quad.vertices[i];
+        let weights = corner_weights(light_face, source.x.clamp(0.0, 1.0), source.y.clamp(0.0, 1.0), source.z.clamp(0.0, 1.0));
+        let depth = face_depth(light_face, source.x, source.y, source.z);
+
+        let (ao, lm) = if aligned {
+            blend_ao_face(ao_face_data(block, light_face, true), weights)
+        } else if parallel {
+            if java_float_equal(depth, 1.0) {
+                blend_ao_face(ao_face_data(block, light_face, false), weights)
+            } else {
+                blend_inset_ao_face(block, light_face, depth, 1.0 - depth, weights)
+            }
+        } else if java_float_equal(depth, 0.0) {
+            blend_ao_face(ao_face_data(block, light_face, true), weights)
+        } else if java_float_equal(depth, 1.0) {
+            blend_ao_face(ao_face_data(block, light_face, false), weights)
+        } else {
+            blend_inset_ao_face(block, light_face, depth, 1.0 - depth, weights)
+        };
+        out.ao[i] = ao * ambient_shade(light_face, shade);
+        out.lm[i] = lm;
+    }
+    out
+}
+
+#[derive(Clone, Copy)]
+struct AoFace {
+    lm: [i32; 4],
+    ao: [f32; 4],
+}
+
+fn ao_face_data(block: &NativeSectionBlockRecord, direction: i32, offset: bool) -> AoFace {
+    let (dx, dy, dz) = if offset { dir_step(direction) } else { (0, 0, 0) };
+    let adj = light_word(block, (dx, dy, dz));
+    let origin = block.light_words[13];
+    let calm = if offset && unpack_fo(adj) { get_lightmap(origin) } else { get_lightmap(adj) };
+    let caem = if offset && unpack_fo(adj) { unpack_em(origin) } else { unpack_em(adj) };
+    let caao = unpack_ao(adj);
+    let faces = ao_neighbor_faces(direction);
+
+    let e0 = light_word(block, add_dir((dx, dy, dz), dir_step(faces[0])));
+    let e1 = light_word(block, add_dir((dx, dy, dz), dir_step(faces[1])));
+    let e2 = light_word(block, add_dir((dx, dy, dz), dir_step(faces[2])));
+    let e3 = light_word(block, add_dir((dx, dy, dz), dir_step(faces[3])));
+    let e = [e0, e1, e2, e3];
+    let elm = e.map(get_lightmap);
+    let eao = e.map(unpack_ao);
+    let eop = e.map(unpack_op);
+    let eem = e.map(unpack_em);
+
+    let c0 = corner_word(block, (dx, dy, dz), faces[0], faces[2], eop[2] && eop[0], e[0]);
+    let c1 = corner_word(block, (dx, dy, dz), faces[0], faces[3], eop[3] && eop[0], e[0]);
+    let c2 = corner_word(block, (dx, dy, dz), faces[1], faces[2], eop[2] && eop[1], e[1]);
+    let c3 = corner_word(block, (dx, dy, dz), faces[1], faces[3], eop[3] && eop[1], e[1]);
+    let c = [c1, c0, c2, c3];
+
+    AoFace {
+        ao: [
+            (eao[3] + eao[0] + unpack_ao(c[0]) + caao) * 0.25,
+            (eao[2] + eao[0] + unpack_ao(c[1]) + caao) * 0.25,
+            (eao[2] + eao[1] + unpack_ao(c[2]) + caao) * 0.25,
+            (eao[3] + eao[1] + unpack_ao(c[3]) + caao) * 0.25,
+        ],
+        lm: [
+            calculate_corner_brightness(elm[3], elm[0], get_lightmap(c[0]), calm, eem[3], eem[0], unpack_em(c[0]), caem),
+            calculate_corner_brightness(elm[2], elm[0], get_lightmap(c[1]), calm, eem[2], eem[0], unpack_em(c[1]), caem),
+            calculate_corner_brightness(elm[2], elm[1], get_lightmap(c[2]), calm, eem[2], eem[1], unpack_em(c[2]), caem),
+            calculate_corner_brightness(elm[3], elm[1], get_lightmap(c[3]), calm, eem[3], eem[1], unpack_em(c[3]), caem),
+        ],
+    }
+}
+
+fn native_section_fluid_faces(
+    block: &NativeSectionBlockRecord,
+    state: NativeMeshingState,
+    states: &HashMap<i32, NativeMeshingState>,
+) -> Vec<(FluidFaceRecord, usize)> {
+    if state.fluid_type != FLUID_WATER && state.fluid_type != FLUID_LAVA {
+        return Vec::new();
+    }
+    let mut out = Vec::with_capacity(8);
+    let h = fluid_height(block, states, 0, 0, 0, 1);
+    let heights = if h >= 1.0 {
+        [1.0; 4]
+    } else {
+        let hn = fluid_height(block, states, 0, 0, -1, 2);
+        let hs = fluid_height(block, states, 0, 0, 1, 3);
+        let hw = fluid_height(block, states, -1, 0, 0, 4);
+        let he = fluid_height(block, states, 1, 0, 0, 5);
+        [
+            fluid_corner_height(block, states, h, hn, hw, -1, 0, -1),
+            fluid_corner_height(block, states, h, hs, hw, -1, 0, 1),
+            fluid_corner_height(block, states, h, hs, he, 1, 0, 1),
+            fluid_corner_height(block, states, h, hn, he, 1, 0, -1),
+        ]
+    };
+    let cull_up = fluid_side_occluded(block, state, states, 1);
+    let cull_down = fluid_side_occluded(block, state, states, 0) || !fluid_side_exposed(block, states, 0, 0, -1, 0.8888889);
+    let color = argb_to_abgr(native_tint_color(block, state, true));
+    let light = get_emissive_lightmap(block.light_words[13]);
+    let y_offset = if cull_down { 0.0 } else { 0.001 };
+    let top_exposed = fluid_side_exposed(block, states, 0, 1, 0, heights.iter().copied().fold(1.0, f32::min));
+    fluid_diag(block, state, "top-check", cull_up, top_exposed, heights, color, light, None);
+
+    let mut render_heights = heights;
+    if !cull_up && top_exposed {
+        for height in &mut render_heights {
+            *height -= 0.001;
+        }
+        let top = if block.fluid_flow_x == 0.0 && block.fluid_flow_z == 0.0 && state.fluid_falling == 0 {
+            let sprite = state.fluid_still;
+            [
+                (sprite_u(sprite, 0.0), sprite_v(sprite, 0.0)),
+                (sprite_u(sprite, 0.0), sprite_v(sprite, 1.0)),
+                (sprite_u(sprite, 1.0), sprite_v(sprite, 1.0)),
+                (sprite_u(sprite, 1.0), sprite_v(sprite, 0.0)),
+            ]
+        } else {
+            let sprite = state.fluid_flow;
+            let dir = block.fluid_flow_z.atan2(block.fluid_flow_x) - std::f32::consts::FRAC_PI_2;
+            let sin = dir.sin() * 0.25;
+            let cos = dir.cos() * 0.25;
+            [
+                (sprite_u(sprite, 0.5 + (-cos - sin)), sprite_v(sprite, 0.5 + -cos + sin)),
+                (sprite_u(sprite, 0.5 + -cos + sin), sprite_v(sprite, 0.5 + cos + sin)),
+                (sprite_u(sprite, 0.5 + cos + sin), sprite_v(sprite, 0.5 + (cos - sin))),
+                (sprite_u(sprite, 0.5 + (cos - sin)), sprite_v(sprite, 0.5 + (-cos - sin))),
+            ]
+        };
+        let top = shrink_fluid_uvs(top, state.fluid_still.shrink);
+        let top_facing = if fluid_top_aligned(render_heights) {
+            MODEL_QUAD_FACING_POS_Y
+        } else {
+            MODEL_QUAD_FACING_UNASSIGNED
+        };
+        let top_face_kind = if fluid_top_crease_ne_sw(render_heights) {
+            FLUID_FACE_TOP_NE_SW
+        } else {
+            FLUID_FACE_TOP_NW_SE
+        };
+        let top_record_uvs = if top_face_kind == FLUID_FACE_TOP_NE_SW {
+            [top[3], top[0], top[1], top[2]]
+        } else {
+            top
+        };
+        let top_face = fluid_semantic_face(
+            state,
+            block,
+            top_facing,
+            false,
+            top_face_kind,
+            0.0,
+            render_heights,
+            [0.0; 4],
+            top_record_uvs,
+            color,
+            1.0,
+            light,
+        );
+        fluid_record_diag(block, "top-record", &top_face.0, top_face.1);
+        out.push(top_face);
+        fluid_diag(block, state, "top-emitted", cull_up, top_exposed, render_heights, color, light, Some(top_facing));
+        if fluid_backward_up_face(block, state, states) {
+            let backward_facing = if top_facing == MODEL_QUAD_FACING_POS_Y {
+                MODEL_QUAD_FACING_NEG_Y
+            } else {
+                MODEL_QUAD_FACING_UNASSIGNED
+            };
+            let backward_face = fluid_semantic_face(
+                state,
+                block,
+                backward_facing,
+                true,
+                top_face_kind,
+                0.0,
+                render_heights,
+                [0.0; 4],
+                top_record_uvs,
+                color,
+                1.0,
+                light,
+            );
+            fluid_record_diag(block, "top-back-record", &backward_face.0, backward_face.1);
+            out.push(backward_face);
+        }
+    }
+
+    if !cull_down {
+        let sprite = state.fluid_still;
+        out.push(fluid_semantic_face(
+            state,
+            block,
+            MODEL_QUAD_FACING_NEG_Y,
+            false,
+            FLUID_FACE_BOTTOM,
+            y_offset,
+            [0.0; 4],
+            [0.0; 4],
+            [
+                (sprite.u0, sprite.v1),
+                (sprite.u0, sprite.v0),
+                (sprite.u1, sprite.v0),
+                (sprite.u1, sprite.v1),
+            ],
+            color,
+            1.0,
+            light,
+        ));
+    }
+
+    let sides = [
+        (2, MODEL_QUAD_FACING_NEG_Z, MODEL_QUAD_FACING_POS_Z, 0.8, render_heights[0], render_heights[3], 0.0, 0.001, 1.0, 0.001),
+        (3, MODEL_QUAD_FACING_POS_Z, MODEL_QUAD_FACING_NEG_Z, 0.8, render_heights[2], render_heights[1], 1.0, 0.999, 0.0, 0.999),
+        (4, MODEL_QUAD_FACING_NEG_X, MODEL_QUAD_FACING_POS_X, 0.6, render_heights[1], render_heights[0], 0.001, 1.0, 0.001, 0.0),
+        (5, MODEL_QUAD_FACING_POS_X, MODEL_QUAD_FACING_NEG_X, 0.6, render_heights[3], render_heights[2], 0.999, 0.0, 0.999, 1.0),
+    ];
+    for (dir, facing, opposite_facing, shade, h1, h2, x1, z1, x2, z2) in sides {
+        if !fluid_side_occluded(block, state, states, dir) && fluid_side_exposed(block, states, dir_step(dir).0, dir_step(dir).1, dir_step(dir).2, h1.max(h2)) {
+            let is_overlay = fluid_side_uses_overlay(block, state, states, dir);
+            let sprite = if is_overlay {
+                state.fluid_overlay
+            } else {
+                state.fluid_flow
+            };
+            let u1 = sprite_u(sprite, 0.0);
+            let u2 = sprite_u(sprite, 0.5);
+            let v1 = sprite_v(sprite, (1.0 - h1) * 0.5);
+            let v2 = sprite_v(sprite, (1.0 - h2) * 0.5);
+            let v3 = sprite_v(sprite, 0.5);
+            out.push(fluid_semantic_face(
+                state,
+                block,
+                facing,
+                false,
+                FLUID_FACE_SIDE,
+                y_offset,
+                [h1, h2, 0.0, 0.0],
+                [x1, z1, x2, z2],
+                [(u2, v2), (u2, v3), (u1, v3), (u1, v1)],
+                color,
+                shade,
+                light,
+            ));
+            if !is_overlay {
+                out.push(fluid_semantic_face(
+                    state,
+                    block,
+                    opposite_facing,
+                    true,
+                    FLUID_FACE_SIDE,
+                    y_offset,
+                    [h1, h2, 0.0, 0.0],
+                    [x1, z1, x2, z2],
+                    [(u2, v2), (u2, v3), (u1, v3), (u1, v1)],
+                    color,
+                    shade,
+                    light,
+                ));
+            }
+        }
+    }
+    out
+}
+
+fn fluid_diag(
+    block: &NativeSectionBlockRecord,
+    state: NativeMeshingState,
+    phase: &str,
+    cull_up: bool,
+    top_exposed: bool,
+    heights: [f32; 4],
+    color: i32,
+    light: i32,
+    facing: Option<usize>,
+) {
+    if std::env::var_os("MATTMC_NATIVE_FLUID_DIAG").is_none() {
+        return;
+    }
+    if state.fluid_type != FLUID_WATER {
+        return;
+    }
+    if !(0..=160).contains(&block.absolute_x)
+        || !(60..=72).contains(&block.absolute_y)
+        || !(360..=660).contains(&block.absolute_z)
+    {
+        return;
+    }
+    if phase == "top-check" && cull_up {
+        return;
+    }
+    let index = FLUID_DIAG_COUNT.fetch_add(1, Ordering::Relaxed);
+    if index >= 240 {
+        return;
+    }
+    let color_u = color as u32;
+    eprintln!(
+        "MATTMC_NATIVE_FLUID_DIAG #{index} {phase} pos={},{},{} state={} fluid_block_id={} state_fluid_block_id={} pass={} material={} cull_up={} top_exposed={} heights={:.4},{:.4},{:.4},{:.4} color=0x{color_u:08x} alpha={} light=0x{:08x} facing={:?} sprite_still=({:.5},{:.5},{:.5},{:.5}) flow=({:.4},{:.4})",
+        block.absolute_x,
+        block.absolute_y,
+        block.absolute_z,
+        block.state_id,
+        block.fluid_block_id,
+        state.fluid_block_id,
+        state.fluid_pass_id,
+        state.fluid_material_bits,
+        cull_up,
+        top_exposed,
+        heights[0],
+        heights[1],
+        heights[2],
+        heights[3],
+        (color_u >> 24) & 0xff,
+        light,
+        facing,
+        state.fluid_still.u0,
+        state.fluid_still.u1,
+        state.fluid_still.v0,
+        state.fluid_still.v1,
+        block.fluid_flow_x,
+        block.fluid_flow_z,
+    );
+}
+
+fn fluid_record_diag(block: &NativeSectionBlockRecord, phase: &str, record: &FluidFaceRecord, facing: usize) {
+    if std::env::var_os("MATTMC_NATIVE_FLUID_DIAG").is_none() {
+        return;
+    }
+    if !(0..=160).contains(&block.absolute_x)
+        || !(60..=72).contains(&block.absolute_y)
+        || !(360..=660).contains(&block.absolute_z)
+    {
+        return;
+    }
+    let index = FLUID_DIAG_COUNT.fetch_add(1, Ordering::Relaxed);
+    if index >= 240 {
+        return;
+    }
+    let color = record.colors[0] as u32;
+    eprintln!(
+        "MATTMC_NATIVE_FLUID_DIAG #{index} {phase} pos={},{},{} facing={} flip={} face={} origin={:.1},{:.1},{:.1} heights={:.4},{:.4},{:.4},{:.4} uv0={:.5},{:.5} uv1={:.5},{:.5} uv2={:.5},{:.5} uv3={:.5},{:.5} color0=0x{color:08x} ao0={:.4} light0=0x{:08x} normal=0x{:08x} material={} pass={}",
+        block.absolute_x,
+        block.absolute_y,
+        block.absolute_z,
+        facing,
+        record.flip,
+        record.face_kind,
+        record.origin_x,
+        record.origin_y,
+        record.origin_z,
+        record.heights[0],
+        record.heights[1],
+        record.heights[2],
+        record.heights[3],
+        record.uvs[0],
+        record.uvs[1],
+        record.uvs[2],
+        record.uvs[3],
+        record.uvs[4],
+        record.uvs[5],
+        record.uvs[6],
+        record.uvs[7],
+        record.aos[0],
+        record.lights[0],
+        record.packed_normal,
+        record.material_bits,
+        record.render_type,
+    );
+}
+
+fn fluid_top_aligned(heights: [f32; 4]) -> bool {
+    fluid_aligned_equals(heights[3], heights[0])
+        && fluid_aligned_equals(heights[0], heights[2])
+        && fluid_aligned_equals(heights[2], heights[1])
+        && fluid_aligned_equals(heights[1], heights[3])
+}
+
+fn fluid_aligned_equals(a: f32, b: f32) -> bool {
+    (a - b).abs() <= FLUID_ALIGNED_EQUALS_EPSILON
+}
+
+fn fluid_top_crease_ne_sw(heights: [f32; 4]) -> bool {
+    fluid_top_aligned(heights)
+        || heights[3] > heights[0] && heights[3] > heights[2]
+        || heights[3] < heights[0] && heights[3] < heights[2]
+        || heights[1] > heights[0] && heights[1] > heights[2]
+        || heights[1] < heights[0] && heights[1] < heights[2]
+}
+
+fn fluid_semantic_face(
+    state: NativeMeshingState,
+    block: &NativeSectionBlockRecord,
+    mut facing: usize,
+    flip: bool,
+    face_kind: i32,
+    y_offset: f32,
+    heights: [f32; 4],
+    side_coords: [f32; 4],
+    uvs: [(f32, f32); 4],
+    color: i32,
+    ao: f32,
+    light: i32,
+) -> (FluidFaceRecord, usize) {
+    if std::env::var_os("MATTMC_NATIVE_FLUID_FORCE_UNASSIGNED").is_some() {
+        facing = MODEL_QUAD_FACING_UNASSIGNED;
+    }
+
+    let mut record = FluidFaceRecord {
+        packed_normal: 0,
+        material_bits: state.fluid_material_bits,
+        block_emission: state.block_emission,
+        render_type: 1,
+        ignore_mid_block: 0,
+        block_id: choose_block_id(block.fluid_block_id, state.fluid_block_id),
+        local_x: block.absolute_x,
+        local_y: block.absolute_y,
+        local_z: block.absolute_z,
+        face_kind,
+        flip: if flip { 1 } else { 0 },
+        origin_x: block.local_x as f32,
+        origin_y: block.local_y as f32,
+        origin_z: block.local_z as f32,
+        y_offset,
+        heights,
+        side_coords,
+        uvs: [
+            uvs[0].0, uvs[0].1, uvs[1].0, uvs[1].1, uvs[2].0, uvs[2].1, uvs[3].0, uvs[3].1,
+        ],
+        colors: [color; 4],
+        aos: [ao; 4],
+        lights: [light; 4],
+    };
+    if let Ok(quad) = fluid_face_record_to_quad(record) {
+        record.packed_normal = norm_i8_pack_from_quad(&quad);
+    }
+    (record, facing)
+}
+
+fn fluid_side_uses_overlay(
+    block: &NativeSectionBlockRecord,
+    state: NativeMeshingState,
+    states: &HashMap<i32, NativeMeshingState>,
+    direction: i32,
+) -> bool {
+    if state.fluid_type != FLUID_WATER || state.fluid_overlay_valid == 0 {
+        return false;
+    }
+    let (dx, dy, dz) = dir_step(direction);
+    let Some(neighbor_id) = neighborhood_state_id(block, dx, dy, dz) else {
+        return false;
+    };
+    let Some(neighbor) = states.get(&neighbor_id) else {
+        return false;
+    };
+    (neighbor.flags & STATE_FLAG_AIR) == 0 && (neighbor.flags & STATE_FLAG_CAN_OCCLUDE) == 0
+}
+
+fn sprite_u(sprite: FluidSprite, value: f32) -> f32 {
+    sprite.u0 + (sprite.u1 - sprite.u0) * value
+}
+
+fn sprite_v(sprite: FluidSprite, value: f32) -> f32 {
+    sprite.v0 + (sprite.v1 - sprite.v0) * value
+}
+
+fn shrink_fluid_uvs(mut uvs: [(f32, f32); 4], shrink: f32) -> [(f32, f32); 4] {
+    if shrink == 0.0 {
+        return uvs;
+    }
+    let avg_u = (uvs[0].0 + uvs[1].0 + uvs[2].0 + uvs[3].0) * 0.25;
+    let avg_v = (uvs[0].1 + uvs[1].1 + uvs[2].1 + uvs[3].1) * 0.25;
+    for uv in &mut uvs {
+        uv.0 += (avg_u - uv.0) * shrink;
+        uv.1 += (avg_v - uv.1) * shrink;
+    }
+    uvs
+}
+
+fn choose_block_id(record_block_id: i32, state_block_id: i32) -> i32 {
+    if record_block_id >= 0 {
+        record_block_id
+    } else {
+        state_block_id
+    }
+}
+
+fn native_model_offset(block: NativeSectionBlockRecord, state: NativeMeshingState) -> (f32, f32, f32) {
+    if block.legacy_offset_x != 0.0 || block.legacy_offset_y != 0.0 || block.legacy_offset_z != 0.0 {
+        return (block.legacy_offset_x, block.legacy_offset_y, block.legacy_offset_z);
+    }
+    if state.offset_type == OFFSET_NONE {
+        return (0.0, 0.0, 0.0);
+    }
+    let seed = mth_seed(block.absolute_x, 0, block.absolute_z);
+    let max_h = state.max_horizontal_offset;
+    let x = ((((seed & 15) as f32) / 15.0 - 0.5) * 0.5).clamp(-max_h, max_h);
+    let z = ((((seed >> 8 & 15) as f32) / 15.0 - 0.5) * 0.5).clamp(-max_h, max_h);
+    if state.offset_type == OFFSET_XYZ {
+        let y = (((seed >> 4 & 15) as f32) / 15.0 - 1.0) * state.max_vertical_offset;
+        (x, y, z)
+    } else if state.offset_type == OFFSET_XZ {
+        (x, 0.0, z)
+    } else {
+        (0.0, 0.0, 0.0)
+    }
+}
+
+fn mth_seed(x: i32, y: i32, z: i32) -> i64 {
+    let mut value = (x as i64)
+        .wrapping_mul(3_129_871)
+        ^ (z as i64).wrapping_mul(116_129_781)
+        ^ (y as i64);
+    value = value
+        .wrapping_mul(value)
+        .wrapping_mul(42_317_861)
+        .wrapping_add(value.wrapping_mul(11));
+    value >> 16
+}
+
+fn native_tint_color(block: &NativeSectionBlockRecord, state: NativeMeshingState, fluid: bool) -> i32 {
+    if fluid {
+        if state.fluid_type == FLUID_WATER && block.fluid_tint != -1 {
+            return block.fluid_tint;
+        }
+        return -1;
+    }
+    match state.tint_type {
+        TINT_SPRUCE => return 0xff619961u32 as i32,
+        TINT_BIRCH => return 0xff80a755u32 as i32,
+        _ => {}
+    }
+
+    if block.tint != -1 {
+        return block.tint;
+    }
+    match state.tint_type {
+        TINT_NONE => -1,
+        TINT_REDSTONE | TINT_CONSTANT | TINT_STEM => block.tint,
+        TINT_WATER => block.tint,
+        _ => block.tint,
+    }
+}
+
+fn multiply_argb(color: i32, tint: i32) -> i32 {
+    if tint == -1 {
+        return color;
+    }
+    let ca = (color as u32 >> 24) & 0xff;
+    let cr = (color as u32 >> 16) & 0xff;
+    let cg = (color as u32 >> 8) & 0xff;
+    let cb = color as u32 & 0xff;
+    let tr = (tint as u32 >> 16) & 0xff;
+    let tg = (tint as u32 >> 8) & 0xff;
+    let tb = tint as u32 & 0xff;
+    ((ca << 24) | ((cr * tr / 255) << 16) | ((cg * tg / 255) << 8) | (cb * tb / 255)) as i32
+}
+
+fn fluid_height(
+    block: &NativeSectionBlockRecord,
+    states: &HashMap<i32, NativeMeshingState>,
+    dx: i32,
+    dy: i32,
+    dz: i32,
+    fallback_neighbor_index: usize,
+) -> f32 {
+    let state_id = neighborhood_state_id(block, dx, dy, dz)
+        .unwrap_or_else(|| block.neighbor_state_ids[fallback_neighbor_index]);
+    let Some(sample) = states.get(&state_id).copied() else {
+        return 0.0;
+    };
+    let Some(center) = states.get(&block.state_id).copied() else {
+        return 0.0;
+    };
+    if sample.fluid_type == center.fluid_type && sample.fluid_type != 0 {
+        if neighborhood_state_id(block, dx, dy + 1, dz)
+            .and_then(|above_id| states.get(&above_id))
+            .map(|above| above.fluid_type == center.fluid_type)
+            .unwrap_or(false)
+        {
+            1.0
+        } else {
+            sample.fluid_own_height
+        }
+    } else if (sample.flags & STATE_FLAG_BLOCKS_MOTION) == 0 {
+        0.0
+    } else {
+        -1.0
+    }
+}
+
+fn fluid_corner_height(
+    block: &NativeSectionBlockRecord,
+    states: &HashMap<i32, NativeMeshingState>,
+    center: f32,
+    hx: f32,
+    hz: f32,
+    dx: i32,
+    dy: i32,
+    dz: i32,
+) -> f32 {
+    if hx >= 1.0 || hz >= 1.0 {
+        return 1.0;
+    }
+    let mut total = 0.0;
+    let mut samples = 0.0;
+    if hx > 0.0 || hz > 0.0 {
+        let diagonal = fluid_height(block, states, dx, dy, dz, 0);
+        if diagonal >= 1.0 {
+            return 1.0;
+        }
+        modify_fluid_height(&mut total, &mut samples, diagonal);
+    }
+    modify_fluid_height(&mut total, &mut samples, center);
+    modify_fluid_height(&mut total, &mut samples, hx);
+    modify_fluid_height(&mut total, &mut samples, hz);
+    if samples == 0.0 { 0.0 } else { total / samples }
+}
+
+fn modify_fluid_height(total: &mut f32, samples: &mut f32, height: f32) {
+    if height >= 0.8 {
+        *total += height * 10.0;
+        *samples += 10.0;
+    } else if height >= 0.0 {
+        *total += height;
+        *samples += 1.0;
+    }
+}
+
+fn fluid_side_occluded(
+    block: &NativeSectionBlockRecord,
+    state: NativeMeshingState,
+    states: &HashMap<i32, NativeMeshingState>,
+    dir: i32,
+) -> bool {
+    let neighbor_id = block.neighbor_state_ids[dir as usize];
+    let Some(neighbor) = states.get(&neighbor_id) else {
+        return false;
+    };
+    neighbor.fluid_type == state.fluid_type
+        || ((neighbor.flags & STATE_FLAG_FULL_OCCLUSION) != 0 && dir != 1)
+}
+
+fn fluid_side_exposed(
+    block: &NativeSectionBlockRecord,
+    states: &HashMap<i32, NativeMeshingState>,
+    dx: i32,
+    dy: i32,
+    dz: i32,
+    _height: f32,
+) -> bool {
+    neighborhood_state_id(block, dx, dy, dz)
+        .and_then(|id| states.get(&id))
+        .map(|state| (state.flags & STATE_FLAG_CAN_OCCLUDE) == 0 || (state.flags & STATE_FLAG_FULL_OCCLUSION) == 0)
+        .unwrap_or(true)
+}
+
+fn fluid_backward_up_face(
+    block: &NativeSectionBlockRecord,
+    state: NativeMeshingState,
+    states: &HashMap<i32, NativeMeshingState>,
+) -> bool {
+    for dz in -1..=1 {
+        for dx in -1..=1 {
+            let Some(id) = neighborhood_state_id(block, dx, 1, dz) else {
+                return true;
+            };
+            let Some(sample) = states.get(&id) else {
+                return true;
+            };
+            if sample.fluid_type != state.fluid_type && (sample.flags & STATE_FLAG_SOLID_RENDER) == 0 {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn neighborhood_state_id(block: &NativeSectionBlockRecord, dx: i32, dy: i32, dz: i32) -> Option<i32> {
+    if !(-1..=1).contains(&dx) || !(-1..=1).contains(&dy) || !(-1..=1).contains(&dz) {
+        return None;
+    }
+    Some(block.neighborhood_state_ids[neighborhood_index(dx, dy, dz)])
+}
+
+fn neighborhood_index(dx: i32, dy: i32, dz: i32) -> usize {
+    ((dy + 1) as usize * 9) + ((dz + 1) as usize * 3) + (dx + 1) as usize
+}
+
+fn light_word(block: &NativeSectionBlockRecord, delta: (i32, i32, i32)) -> i32 {
+    if !(-1..=1).contains(&delta.0) || !(-1..=1).contains(&delta.1) || !(-1..=1).contains(&delta.2) {
+        block.light_words[13]
+    } else {
+        block.light_words[neighborhood_index(delta.0, delta.1, delta.2)]
+    }
+}
+
+fn corner_word(
+    block: &NativeSectionBlockRecord,
+    base: (i32, i32, i32),
+    a: i32,
+    b: i32,
+    edge_occluded: bool,
+    fallback: i32,
+) -> i32 {
+    if edge_occluded {
+        fallback
+    } else {
+        light_word(block, add_dir(add_dir(base, dir_step(a)), dir_step(b)))
+    }
+}
+
+fn add_dir(a: (i32, i32, i32), b: (i32, i32, i32)) -> (i32, i32, i32) {
+    (a.0 + b.0, a.1 + b.1, a.2 + b.2)
+}
+
+fn dir_step(dir: i32) -> (i32, i32, i32) {
+    match dir {
+        0 => (0, -1, 0),
+        1 => (0, 1, 0),
+        2 => (0, 0, -1),
+        3 => (0, 0, 1),
+        4 => (-1, 0, 0),
+        5 => (1, 0, 0),
+        _ => (0, 0, 0),
+    }
+}
+
+fn ao_neighbor_faces(dir: i32) -> [i32; 4] {
+    match dir {
+        0 => [4, 5, 2, 3],
+        1 => [5, 4, 2, 3],
+        2 => [1, 0, 5, 4],
+        3 => [4, 5, 0, 1],
+        4 => [1, 0, 2, 3],
+        5 => [0, 1, 2, 3],
+        _ => [5, 4, 2, 3],
+    }
+}
+
+fn map_ao_corners(dir: i32, lm0: [i32; 4], ao0: [f32; 4]) -> ([i32; 4], [f32; 4]) {
+    match dir {
+        1 => ([lm0[2], lm0[3], lm0[0], lm0[1]], [ao0[2], ao0[3], ao0[0], ao0[1]]),
+        2 | 4 => ([lm0[1], lm0[2], lm0[3], lm0[0]], [ao0[1], ao0[2], ao0[3], ao0[0]]),
+        5 => ([lm0[3], lm0[0], lm0[1], lm0[2]], [ao0[3], ao0[0], ao0[1], ao0[2]]),
+        _ => (lm0, ao0),
+    }
+}
+
+fn corner_weights(dir: i32, x: f32, y: f32, z: f32) -> [f32; 4] {
+    let (u, v) = match dir {
+        0 => (z.clamp(0.0, 1.0), (1.0 - x).clamp(0.0, 1.0)),
+        1 => (z.clamp(0.0, 1.0), x.clamp(0.0, 1.0)),
+        2 => ((1.0 - x).clamp(0.0, 1.0), y.clamp(0.0, 1.0)),
+        3 => (y.clamp(0.0, 1.0), (1.0 - x).clamp(0.0, 1.0)),
+        4 => (z.clamp(0.0, 1.0), y.clamp(0.0, 1.0)),
+        5 => (z.clamp(0.0, 1.0), (1.0 - y).clamp(0.0, 1.0)),
+        _ => (0.5, 0.5),
+    };
+    [v * u, v * (1.0 - u), (1.0 - v) * (1.0 - u), (1.0 - v) * u]
+}
+
+fn face_depth(dir: i32, x: f32, y: f32, z: f32) -> f32 {
+    match dir {
+        0 => y.clamp(0.0, 1.0),
+        1 => 1.0 - y.clamp(0.0, 1.0),
+        2 => z.clamp(0.0, 1.0),
+        3 => 1.0 - z.clamp(0.0, 1.0),
+        4 => x.clamp(0.0, 1.0),
+        5 => 1.0 - x.clamp(0.0, 1.0),
+        _ => 0.0,
+    }
+}
+
+fn blend_ao_face(face: AoFace, weights: [f32; 4]) -> (f32, i32) {
+    let ao = face.ao[0] * weights[0]
+        + face.ao[1] * weights[1]
+        + face.ao[2] * weights[2]
+        + face.ao[3] * weights[3];
+    let sky = unpack_sky_light(face.lm[0]) as f32 * weights[0]
+        + unpack_sky_light(face.lm[1]) as f32 * weights[1]
+        + unpack_sky_light(face.lm[2]) as f32 * weights[2]
+        + unpack_sky_light(face.lm[3]) as f32 * weights[3];
+    let block = unpack_block_light(face.lm[0]) as f32 * weights[0]
+        + unpack_block_light(face.lm[1]) as f32 * weights[1]
+        + unpack_block_light(face.lm[2]) as f32 * weights[2]
+        + unpack_block_light(face.lm[3]) as f32 * weights[3];
+    (ao, (((sky as i32) & 0xff) << 16) | ((block as i32) & 0xff))
+}
+
+fn blend_inset_ao_face(
+    block: &NativeSectionBlockRecord,
+    light_face: i32,
+    n1d: f32,
+    n2d: f32,
+    weights: [f32; 4],
+) -> (f32, i32) {
+    let n1 = ao_face_data(block, light_face, false);
+    let n2 = ao_face_data(block, light_face, true);
+    let ao = weighted_sum(n1.ao, weights) * n1d + weighted_sum(n2.ao, weights) * n2d;
+    let sl = weighted_sum(n1.lm.map(|lm| unpack_sky_light(lm) as f32), weights) * n1d
+        + weighted_sum(n2.lm.map(|lm| unpack_sky_light(lm) as f32), weights) * n2d;
+    let bl = weighted_sum(n1.lm.map(|lm| unpack_block_light(lm) as f32), weights) * n1d
+        + weighted_sum(n2.lm.map(|lm| unpack_block_light(lm) as f32), weights) * n2d;
+    (ao, (((sl as i32) & 0xff) << 16) | ((bl as i32) & 0xff))
+}
+
+fn weighted_sum(values: [f32; 4], weights: [f32; 4]) -> f32 {
+    values[0] * weights[0]
+        + values[1] * weights[1]
+        + values[2] * weights[2]
+        + values[3] * weights[3]
+}
+
+fn java_float_equal(a: f32, b: f32) -> bool {
+    (a - b).abs() < 1.0e-5
+}
+
+fn ambient_shade(dir: i32, shade: bool) -> f32 {
+    if !shade {
+        return 1.0;
+    }
+    match dir {
+        0 => 0.5,
+        1 => 1.0,
+        2 | 3 => 0.8,
+        4 | 5 => 0.6,
+        _ => 1.0,
+    }
+}
+
+fn get_lightmap(word: i32) -> i32 {
+    pack_light(std::cmp::max(unpack_bl(word), unpack_lu(word)), unpack_sl(word))
+}
+
+fn get_emissive_lightmap(word: i32) -> i32 {
+    if unpack_em(word) {
+        LIGHT_FULL_BRIGHT
+    } else {
+        get_lightmap(word)
+    }
+}
+
+fn pack_light(block: i32, sky: i32) -> i32 {
+    ((sky & 0xF) << 20) | ((block & 0xF) << 4)
+}
+
+fn unpack_block_light(light: i32) -> i32 {
+    light & 0xff
+}
+
+fn unpack_sky_light(light: i32) -> i32 {
+    (light >> 16) & 0xff
+}
+
+fn unpack_bl(word: i32) -> i32 { word & 0xF }
+fn unpack_sl(word: i32) -> i32 { (word >> 4) & 0xF }
+fn unpack_lu(word: i32) -> i32 { (word >> 8) & 0xF }
+fn unpack_ao(word: i32) -> f32 { (((word >> 12) & 0xFFFF) as f32) * (1.0 / 4096.0) }
+fn unpack_em(word: i32) -> bool { ((word >> 28) & 1) != 0 }
+fn unpack_op(word: i32) -> bool { ((word >> 29) & 1) != 0 }
+fn unpack_fo(word: i32) -> bool { ((word >> 30) & 1) != 0 }
+
+fn calculate_corner_brightness(
+    mut a: i32,
+    mut b: i32,
+    mut c: i32,
+    mut d: i32,
+    aem: bool,
+    bem: bool,
+    cem: bool,
+    dem: bool,
+) -> i32 {
+    if a == 0 || b == 0 || c == 0 || d == 0 {
+        let min = min_non_zero(min_non_zero(a, b), min_non_zero(c, d));
+        a = a.max(min);
+        b = b.max(min);
+        c = c.max(min);
+        d = d.max(min);
+    }
+    if aem { a = LIGHT_FULL_BRIGHT; }
+    if bem { b = LIGHT_FULL_BRIGHT; }
+    if cem { c = LIGHT_FULL_BRIGHT; }
+    if dem { d = LIGHT_FULL_BRIGHT; }
+    ((a + b + c + d) >> 2) & 0x00ff_00ff
+}
+
+fn min_non_zero(a: i32, b: i32) -> i32 {
+    if a == 0 { b } else if b == 0 { a } else { a.min(b) }
+}
+
+fn argb_to_abgr(color: i32) -> i32 {
+    let color = color as u32;
+    let alpha_green = color & 0xff00_ff00;
+    let red = (color & 0x00ff_0000) >> 16;
+    let blue = (color & 0x0000_00ff) << 16;
+    (alpha_green | red | blue) as i32
+}
+
+fn fluid_face_record_to_quad(record: FluidFaceRecord) -> Result<NativeQuad, i32> {
+    let mut vertices = match record.face_kind {
+        // Top face, diagonal from north-east to south-west.
+        0 => [
+            fluid_vertex(record.origin_x + 1.0, record.origin_y + record.heights[3], record.origin_z, 0, record),
+            fluid_vertex(record.origin_x, record.origin_y + record.heights[0], record.origin_z, 1, record),
+            fluid_vertex(record.origin_x, record.origin_y + record.heights[1], record.origin_z + 1.0, 2, record),
+            fluid_vertex(record.origin_x + 1.0, record.origin_y + record.heights[2], record.origin_z + 1.0, 3, record),
+        ],
+        // Top face, diagonal from north-west to south-east.
+        1 => [
+            fluid_vertex(record.origin_x, record.origin_y + record.heights[0], record.origin_z, 0, record),
+            fluid_vertex(record.origin_x, record.origin_y + record.heights[1], record.origin_z + 1.0, 1, record),
+            fluid_vertex(record.origin_x + 1.0, record.origin_y + record.heights[2], record.origin_z + 1.0, 2, record),
+            fluid_vertex(record.origin_x + 1.0, record.origin_y + record.heights[3], record.origin_z, 3, record),
+        ],
+        // Bottom face.
+        2 => [
+            fluid_vertex(record.origin_x, record.origin_y + record.y_offset, record.origin_z + 1.0, 0, record),
+            fluid_vertex(record.origin_x, record.origin_y + record.y_offset, record.origin_z, 1, record),
+            fluid_vertex(record.origin_x + 1.0, record.origin_y + record.y_offset, record.origin_z, 2, record),
+            fluid_vertex(record.origin_x + 1.0, record.origin_y + record.y_offset, record.origin_z + 1.0, 3, record),
+        ],
+        // Horizontal side face. side_coords = x1,z1,x2,z2 and heights = c1,c2,...
+        3 => [
+            fluid_vertex(
+                record.origin_x + record.side_coords[2],
+                record.origin_y + record.heights[1],
+                record.origin_z + record.side_coords[3],
+                0,
+                record,
+            ),
+            fluid_vertex(
+                record.origin_x + record.side_coords[2],
+                record.origin_y + record.y_offset,
+                record.origin_z + record.side_coords[3],
+                1,
+                record,
+            ),
+            fluid_vertex(
+                record.origin_x + record.side_coords[0],
+                record.origin_y + record.y_offset,
+                record.origin_z + record.side_coords[1],
+                2,
+                record,
+            ),
+            fluid_vertex(
+                record.origin_x + record.side_coords[0],
+                record.origin_y + record.heights[0],
+                record.origin_z + record.side_coords[1],
+                3,
+                record,
+            ),
+        ],
+        _ => return Err(ERR_INVALID_ARGUMENT),
+    };
+
+    if record.flip != 0 {
+        vertices = [vertices[0], vertices[3], vertices[2], vertices[1]];
+    }
+
+    Ok(NativeQuad {
+        vertices,
+        block_emission: record.block_emission.clamp(0, 255) as u8,
+        render_type: record.render_type.clamp(0, 255) as u8,
+        ignore_mid_block: if record.ignore_mid_block != 0 { 1 } else { 0 },
+        _padding: 0,
+        block_id: record.block_id,
+        local_x: record.local_x,
+        local_y: record.local_y,
+        local_z: record.local_z,
+        material_bits: record.material_bits,
+    })
+}
+
+fn fluid_vertex(x: f32, y: f32, z: f32, vertex: usize, record: FluidFaceRecord) -> QuadVertex {
+    QuadVertex {
+        x,
+        y,
+        z,
+        color: record.colors[vertex],
+        ao: record.aos[vertex],
+        u: record.uvs[vertex * 2],
+        v: record.uvs[vertex * 2 + 1],
+        light: record.lights[vertex],
+    }
+}
+
 fn section_builder_staging_addresses(
     builder: &mut NativeSectionMeshBuilder,
     facing: usize,
@@ -1207,6 +3454,24 @@ fn section_builder_staging_addresses(
         pending.packed_normals.as_mut_ptr() as u64,
         pending.validity.as_mut_ptr() as u64,
         pending.quads.len() as i32,
+    ))
+}
+
+fn section_builder_record_staging_addresses(
+    builder: &mut NativeSectionMeshBuilder,
+    facing: usize,
+) -> Result<(u64, u64, u64, u64, i32), i32> {
+    if facing >= MODEL_QUAD_FACING_COUNT {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    let pending = &mut builder.pending[facing];
+    Ok((
+        pending.flat_quad_records.as_mut_ptr() as u64,
+        pending.light_block_records.as_mut_ptr() as u64,
+        pending.fluid_face_records.as_mut_ptr() as u64,
+        pending.static_model_block_records.as_mut_ptr() as u64,
+        pending.flat_quad_records.len() as i32,
     ))
 }
 
@@ -1477,7 +3742,10 @@ fn pack_mid_block(x: f32, y: f32, z: f32) -> i32 {
 }
 
 fn pack_block_id(quad: &NativeQuad) -> i32 {
-    ((quad.block_id + 1) << 1) | ((quad.render_type as i32) & 1)
+    quad.block_id
+        .wrapping_add(1)
+        .wrapping_shl(1)
+        | ((quad.render_type as i32) & 1)
 }
 
 fn compute_face_normal(vertices: &[QuadVertex; 4]) -> (f32, f32, f32) {
@@ -1492,6 +3760,13 @@ fn compute_face_normal(vertices: &[QuadVertex; 4]) -> (f32, f32, f32) {
         dz0 * dx1 - dx0 * dz1,
         dx0 * dy1 - dy0 * dx1,
     )
+}
+
+fn norm_i8_pack_from_quad(quad: &NativeQuad) -> i32 {
+    let normal = compute_face_normal(&quad.vertices);
+    (((normal.0.clamp(-1.0, 1.0) * 127.0) as i32) & 0xff)
+        | ((((normal.1.clamp(-1.0, 1.0) * 127.0) as i32) & 0xff) << 8)
+        | ((((normal.2.clamp(-1.0, 1.0) * 127.0) as i32) & 0xff) << 16)
 }
 
 fn compute_tangent_for_quad(
@@ -2122,6 +4397,507 @@ pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_append_batch_encoded
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_append_flat_quad_batch_encoded(
+    handle: u64,
+    facing: i32,
+    record_address: u64,
+    record_count: i32,
+    record_stride: i32,
+    quad_stride: i32,
+    vertex_stride: i32,
+    block_id_offset: i32,
+    normal_offset: i32,
+    tangent_offset: i32,
+    mid_uv_offset: i32,
+    mid_block_offset: i32,
+    section_index: i32,
+    separate_ao: i32,
+    store_raw_quads: i32,
+    output_committed_count: *mut i32,
+) -> i32 {
+    if handle == 0 || output_committed_count.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    if facing < 0 || record_count < 0 || record_stride < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    let format = match NativeFormat::from_abi(
+        quad_stride,
+        vertex_stride,
+        block_id_offset,
+        normal_offset,
+        tangent_offset,
+        mid_uv_offset,
+        mid_block_offset,
+        section_index,
+        separate_ao,
+    ) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    let record_stride = match usize::try_from(record_stride) {
+        Ok(value) => value,
+        Err(_) => return ERR_INVALID_ARGUMENT,
+    };
+
+    let builder = &mut *(handle as *mut NativeSectionMeshBuilder);
+    match section_builder_append_flat_quad_records_encoded(
+        builder,
+        facing as usize,
+        record_address,
+        record_count as usize,
+        record_stride,
+        None,
+        format,
+        store_raw_quads != 0,
+    ) {
+        Ok((_, committed_count)) => {
+            *output_committed_count = committed_count;
+            OK
+        }
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_append_light_block_batch_encoded(
+    handle: u64,
+    facing: i32,
+    record_address: u64,
+    record_count: i32,
+    record_stride: i32,
+    quad_stride: i32,
+    vertex_stride: i32,
+    block_id_offset: i32,
+    normal_offset: i32,
+    tangent_offset: i32,
+    mid_uv_offset: i32,
+    mid_block_offset: i32,
+    section_index: i32,
+    separate_ao: i32,
+    store_raw_quads: i32,
+    output_committed_count: *mut i32,
+) -> i32 {
+    if handle == 0 || output_committed_count.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    if facing < 0 || record_count < 0 || record_stride < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    let format = match NativeFormat::from_abi(
+        quad_stride,
+        vertex_stride,
+        block_id_offset,
+        normal_offset,
+        tangent_offset,
+        mid_uv_offset,
+        mid_block_offset,
+        section_index,
+        separate_ao,
+    ) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    let record_stride = match usize::try_from(record_stride) {
+        Ok(value) => value,
+        Err(_) => return ERR_INVALID_ARGUMENT,
+    };
+
+    let builder = &mut *(handle as *mut NativeSectionMeshBuilder);
+    match section_builder_append_light_block_records_encoded(
+        builder,
+        facing as usize,
+        record_address,
+        record_count as usize,
+        record_stride,
+        format,
+        store_raw_quads != 0,
+    ) {
+        Ok(committed_count) => {
+            *output_committed_count = committed_count;
+            OK
+        }
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_append_fluid_face_batch_encoded(
+    handle: u64,
+    facing: i32,
+    record_address: u64,
+    record_count: i32,
+    record_stride: i32,
+    quad_stride: i32,
+    vertex_stride: i32,
+    block_id_offset: i32,
+    normal_offset: i32,
+    tangent_offset: i32,
+    mid_uv_offset: i32,
+    mid_block_offset: i32,
+    section_index: i32,
+    separate_ao: i32,
+    store_raw_quads: i32,
+    output_committed_count: *mut i32,
+) -> i32 {
+    if handle == 0 || output_committed_count.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    if facing < 0 || record_count < 0 || record_stride < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    let format = match NativeFormat::from_abi(
+        quad_stride,
+        vertex_stride,
+        block_id_offset,
+        normal_offset,
+        tangent_offset,
+        mid_uv_offset,
+        mid_block_offset,
+        section_index,
+        separate_ao,
+    ) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    let record_stride = match usize::try_from(record_stride) {
+        Ok(value) => value,
+        Err(_) => return ERR_INVALID_ARGUMENT,
+    };
+
+    let builder = &mut *(handle as *mut NativeSectionMeshBuilder);
+    match section_builder_append_fluid_face_records_encoded(
+        builder,
+        facing as usize,
+        record_address,
+        record_count as usize,
+        record_stride,
+        None,
+        format,
+        store_raw_quads != 0,
+    ) {
+        Ok((_, committed_count)) => {
+            *output_committed_count = committed_count;
+            OK
+        }
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_static_model_cache_clear() -> i32 {
+    let Ok(mut cache) = static_model_cache().lock() else {
+        return ERR_INVALID_ARGUMENT;
+    };
+    cache.clear();
+    drop(cache);
+    let Ok(mut selectors) = native_model_selectors().lock() else {
+        return ERR_INVALID_ARGUMENT;
+    };
+    selectors.clear();
+    drop(selectors);
+    let Ok(mut states) = native_meshing_states().lock() else {
+        return ERR_INVALID_ARGUMENT;
+    };
+    states.clear();
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_static_model_cache_register(
+    model_id: i32,
+    quad_address: u64,
+    quad_count: i32,
+    quad_stride: i32,
+) -> i32 {
+    if model_id < 0 || quad_count < 0 || quad_stride < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if quad_count > 0 && quad_address == 0 {
+        return ERR_NULL_POINTER;
+    }
+    let quad_stride = match usize::try_from(quad_stride) {
+        Ok(value) => value,
+        Err(_) => return ERR_INVALID_ARGUMENT,
+    };
+    if quad_stride != std::mem::size_of::<StaticModelQuadRecord>() {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let quads = if quad_count == 0 {
+        Vec::new()
+    } else {
+        slice::from_raw_parts(quad_address as *const StaticModelQuadRecord, quad_count as usize)
+            .to_vec()
+    };
+
+    let Ok(mut cache) = static_model_cache().lock() else {
+        return ERR_INVALID_ARGUMENT;
+    };
+    cache.insert(model_id, quads);
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_native_model_selector_register(
+    selector_id: i32,
+    kind: i32,
+    entry_address: u64,
+    entry_count: i32,
+    entry_stride: i32,
+) -> i32 {
+    if selector_id < 0 || entry_count < 0 || entry_stride < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if entry_count > 0 && entry_address == 0 {
+        return ERR_NULL_POINTER;
+    }
+    let entry_stride = match usize::try_from(entry_stride) {
+        Ok(value) => value,
+        Err(_) => return ERR_INVALID_ARGUMENT,
+    };
+    if entry_stride != std::mem::size_of::<NativeModelSelectorEntry>() {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let entries = if entry_count == 0 {
+        Vec::new()
+    } else {
+        slice::from_raw_parts(entry_address as *const NativeModelSelectorEntry, entry_count as usize)
+            .to_vec()
+    };
+    let total_weight = entries
+        .iter()
+        .filter(|entry| entry.weight > 0)
+        .map(|entry| entry.weight)
+        .sum();
+
+    let Ok(mut selectors) = native_model_selectors().lock() else {
+        return ERR_INVALID_ARGUMENT;
+    };
+    selectors.insert(selector_id, NativeModelSelector {
+        kind,
+        entries,
+        total_weight,
+    });
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_native_meshing_state_register(
+    state_id: i32,
+    selector_id: i32,
+    flags: i32,
+    material_bits: i32,
+    pass_id: i32,
+    block_emission: i32,
+    render_type: i32,
+    block_id: i32,
+    fluid_material_bits: i32,
+    fluid_pass_id: i32,
+    fluid_block_id: i32,
+    skip_group: i32,
+    fluid_type: i32,
+    fluid_own_height: f32,
+    fluid_falling: i32,
+    offset_type: i32,
+    max_horizontal_offset: f32,
+    max_vertical_offset: f32,
+    tint_type: i32,
+    fluid_still_u0: f32,
+    fluid_still_u1: f32,
+    fluid_still_v0: f32,
+    fluid_still_v1: f32,
+    fluid_still_shrink: f32,
+    fluid_flow_u0: f32,
+    fluid_flow_u1: f32,
+    fluid_flow_v0: f32,
+    fluid_flow_v1: f32,
+    fluid_flow_shrink: f32,
+    fluid_overlay_u0: f32,
+    fluid_overlay_u1: f32,
+    fluid_overlay_v0: f32,
+    fluid_overlay_v1: f32,
+    fluid_overlay_shrink: f32,
+    fluid_overlay_valid: i32,
+) -> i32 {
+    if state_id < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let Ok(mut states) = native_meshing_states().lock() else {
+        return ERR_INVALID_ARGUMENT;
+    };
+    states.insert(state_id, NativeMeshingState {
+        selector_id,
+        flags,
+        material_bits,
+        pass_id,
+        block_emission,
+        render_type,
+        block_id,
+        fluid_material_bits,
+        fluid_pass_id,
+        fluid_block_id,
+        skip_group,
+        fluid_type,
+        fluid_own_height,
+        fluid_falling,
+        offset_type,
+        max_horizontal_offset,
+        max_vertical_offset,
+        tint_type,
+        fluid_still: FluidSprite {
+            u0: fluid_still_u0,
+            u1: fluid_still_u1,
+            v0: fluid_still_v0,
+            v1: fluid_still_v1,
+            shrink: fluid_still_shrink,
+        },
+        fluid_flow: FluidSprite {
+            u0: fluid_flow_u0,
+            u1: fluid_flow_u1,
+            v0: fluid_flow_v0,
+            v1: fluid_flow_v1,
+            shrink: fluid_flow_shrink,
+        },
+        fluid_overlay: FluidSprite {
+            u0: fluid_overlay_u0,
+            u1: fluid_overlay_u1,
+            v0: fluid_overlay_v0,
+            v1: fluid_overlay_v1,
+            shrink: fluid_overlay_shrink,
+        },
+        fluid_overlay_valid,
+    });
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_append_static_model_batch_encoded(
+    handle: u64,
+    record_address: u64,
+    record_count: i32,
+    record_stride: i32,
+    quad_stride: i32,
+    vertex_stride: i32,
+    block_id_offset: i32,
+    normal_offset: i32,
+    tangent_offset: i32,
+    mid_uv_offset: i32,
+    mid_block_offset: i32,
+    section_index: i32,
+    separate_ao: i32,
+    store_raw_quads: i32,
+    output_committed_count: *mut i32,
+) -> i32 {
+    if handle == 0 || output_committed_count.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    if record_count < 0 || record_stride < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    let format = match NativeFormat::from_abi(
+        quad_stride,
+        vertex_stride,
+        block_id_offset,
+        normal_offset,
+        tangent_offset,
+        mid_uv_offset,
+        mid_block_offset,
+        section_index,
+        separate_ao,
+    ) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    let record_stride = match usize::try_from(record_stride) {
+        Ok(value) => value,
+        Err(_) => return ERR_INVALID_ARGUMENT,
+    };
+
+    let builder = &mut *(handle as *mut NativeSectionMeshBuilder);
+    match section_builder_append_static_model_records_encoded(
+        builder,
+        record_address,
+        record_count as usize,
+        record_stride,
+        format,
+        store_raw_quads != 0,
+    ) {
+        Ok(committed_count) => {
+            *output_committed_count = committed_count;
+            OK
+        }
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_append_native_section_encoded(
+    handle: u64,
+    record_address: u64,
+    record_count: i32,
+    record_stride: i32,
+    pass_id: i32,
+    quad_stride: i32,
+    vertex_stride: i32,
+    block_id_offset: i32,
+    normal_offset: i32,
+    tangent_offset: i32,
+    mid_uv_offset: i32,
+    mid_block_offset: i32,
+    section_index: i32,
+    separate_ao: i32,
+    store_raw_quads: i32,
+    analyzer_handle: u64,
+    output_committed_count: *mut i32,
+) -> i32 {
+    if handle == 0 || output_committed_count.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    if record_count < 0 || record_stride < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    let format = match NativeFormat::from_abi(
+        quad_stride,
+        vertex_stride,
+        block_id_offset,
+        normal_offset,
+        tangent_offset,
+        mid_uv_offset,
+        mid_block_offset,
+        section_index,
+        separate_ao,
+    ) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    let record_stride = match usize::try_from(record_stride) {
+        Ok(value) => value,
+        Err(_) => return ERR_INVALID_ARGUMENT,
+    };
+
+    let builder = &mut *(handle as *mut NativeSectionMeshBuilder);
+    match section_builder_append_native_section_records_encoded(
+        builder,
+        record_address,
+        record_count as usize,
+        record_stride,
+        pass_id,
+        if analyzer_handle == 0 { None } else { Some(analyzer_handle) },
+        format,
+        store_raw_quads != 0,
+    ) {
+        Ok(committed_count) => {
+            *output_committed_count = committed_count;
+            OK
+        }
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_append_translucent_batch_encoded(
     handle: u64,
     facing: i32,
@@ -2206,6 +4982,156 @@ pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_append_translucent_b
         store_raw_quads != 0,
     ) {
         Ok(committed_count) => {
+            *output_counts = valid_count;
+            *output_counts.add(1) = committed_count;
+            OK
+        }
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_append_translucent_flat_quad_batch_encoded(
+    handle: u64,
+    facing: i32,
+    record_address: u64,
+    record_count: i32,
+    analyzer_handle: u64,
+    translucent_facing: i32,
+    record_stride: i32,
+    quad_stride: i32,
+    vertex_stride: i32,
+    block_id_offset: i32,
+    normal_offset: i32,
+    tangent_offset: i32,
+    mid_uv_offset: i32,
+    mid_block_offset: i32,
+    section_index: i32,
+    separate_ao: i32,
+    store_raw_quads: i32,
+    output_counts: *mut i32,
+    output_counts_len: i32,
+) -> i32 {
+    if handle == 0 || output_counts.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    if facing < 0 || record_count < 0 || record_stride < 0 || output_counts_len < 2 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if record_count == 0 {
+        *output_counts = 0;
+        *output_counts.add(1) = 0;
+        return OK;
+    }
+    if analyzer_handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+    let format = match NativeFormat::from_abi(
+        quad_stride,
+        vertex_stride,
+        block_id_offset,
+        normal_offset,
+        tangent_offset,
+        mid_uv_offset,
+        mid_block_offset,
+        section_index,
+        separate_ao,
+    ) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    let record_stride = match usize::try_from(record_stride) {
+        Ok(value) => value,
+        Err(_) => return ERR_INVALID_ARGUMENT,
+    };
+
+    let builder = &mut *(handle as *mut NativeSectionMeshBuilder);
+    match section_builder_append_flat_quad_records_encoded(
+        builder,
+        facing as usize,
+        record_address,
+        record_count as usize,
+        record_stride,
+        Some((analyzer_handle, translucent_facing)),
+        format,
+        store_raw_quads != 0,
+    ) {
+        Ok((valid_count, committed_count)) => {
+            *output_counts = valid_count;
+            *output_counts.add(1) = committed_count;
+            OK
+        }
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_append_translucent_fluid_face_batch_encoded(
+    handle: u64,
+    facing: i32,
+    record_address: u64,
+    record_count: i32,
+    analyzer_handle: u64,
+    translucent_facing: i32,
+    record_stride: i32,
+    quad_stride: i32,
+    vertex_stride: i32,
+    block_id_offset: i32,
+    normal_offset: i32,
+    tangent_offset: i32,
+    mid_uv_offset: i32,
+    mid_block_offset: i32,
+    section_index: i32,
+    separate_ao: i32,
+    store_raw_quads: i32,
+    output_counts: *mut i32,
+    output_counts_len: i32,
+) -> i32 {
+    if handle == 0 || output_counts.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    if facing < 0 || record_count < 0 || record_stride < 0 || output_counts_len < 2 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if record_count == 0 {
+        *output_counts = 0;
+        *output_counts.add(1) = 0;
+        return OK;
+    }
+    if analyzer_handle == 0 {
+        return ERR_NULL_POINTER;
+    }
+    let format = match NativeFormat::from_abi(
+        quad_stride,
+        vertex_stride,
+        block_id_offset,
+        normal_offset,
+        tangent_offset,
+        mid_uv_offset,
+        mid_block_offset,
+        section_index,
+        separate_ao,
+    ) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    let record_stride = match usize::try_from(record_stride) {
+        Ok(value) => value,
+        Err(_) => return ERR_INVALID_ARGUMENT,
+    };
+
+    let builder = &mut *(handle as *mut NativeSectionMeshBuilder);
+    match section_builder_append_fluid_face_records_encoded(
+        builder,
+        facing as usize,
+        record_address,
+        record_count as usize,
+        record_stride,
+        Some((analyzer_handle, translucent_facing)),
+        format,
+        store_raw_quads != 0,
+    ) {
+        Ok((valid_count, committed_count)) => {
             *output_counts = valid_count;
             *output_counts.add(1) = committed_count;
             OK
@@ -2308,6 +5234,44 @@ pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_staging_addresses(
             *output_quad_address = quad_address;
             *output_packed_normals_address = packed_normals_address;
             *output_validity_address = validity_address;
+            *output_capacity = capacity;
+            OK
+        }
+        Err(status) => status,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_record_staging_addresses(
+    handle: u64,
+    facing: i32,
+    output_flat_quad_record_address: *mut u64,
+    output_light_block_record_address: *mut u64,
+    output_fluid_face_record_address: *mut u64,
+    output_static_model_block_record_address: *mut u64,
+    output_capacity: *mut i32,
+) -> i32 {
+    if handle == 0
+        || output_flat_quad_record_address.is_null()
+        || output_light_block_record_address.is_null()
+        || output_fluid_face_record_address.is_null()
+        || output_static_model_block_record_address.is_null()
+        || output_capacity.is_null()
+    {
+        return ERR_NULL_POINTER;
+    }
+    if facing < 0 {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let builder = &mut *(handle as *mut NativeSectionMeshBuilder);
+    match section_builder_record_staging_addresses(builder, facing as usize) {
+        Ok((flat_quad_record_address, light_block_record_address, fluid_face_record_address,
+            static_model_block_record_address, capacity)) => {
+            *output_flat_quad_record_address = flat_quad_record_address;
+            *output_light_block_record_address = light_block_record_address;
+            *output_fluid_face_record_address = fluid_face_record_address;
+            *output_static_model_block_record_address = static_model_block_record_address;
             *output_capacity = capacity;
             OK
         }
@@ -2706,6 +5670,76 @@ mod tests {
     fn native_quad_layout_matches_java_stride() {
         assert_eq!(32, std::mem::size_of::<QuadVertex>());
         assert_eq!(152, std::mem::size_of::<NativeQuad>());
+        assert_eq!(156, std::mem::size_of::<FlatQuadRecord>());
+        assert_eq!(24, std::mem::size_of::<LightBlockRecord>());
+        assert_eq!(172, std::mem::size_of::<FluidFaceRecord>());
+    }
+
+    #[test]
+    fn argb_to_abgr_preserves_alpha_and_swaps_red_blue() {
+        assert_eq!(0xff0000ffu32 as i32, argb_to_abgr(0xffff0000u32 as i32));
+        assert_eq!(0xff00ff00u32 as i32, argb_to_abgr(0xff00ff00u32 as i32));
+        assert_eq!(0xffff0000u32 as i32, argb_to_abgr(0xff0000ffu32 as i32));
+        assert_eq!(0xffffffffu32 as i32, argb_to_abgr(0xffffffffu32 as i32));
+        assert_eq!(0x80332211u32 as i32, argb_to_abgr(0x80112233u32 as i32));
+        assert_eq!(0xff6f9935u32 as i32, argb_to_abgr(0xff35996fu32 as i32));
+        assert_eq!(0xffe4763fu32 as i32, argb_to_abgr(0xff3f76e4u32 as i32));
+    }
+
+    #[test]
+    fn compact_color_encoding_keeps_material_alpha_when_ao_is_not_separate() {
+        assert_eq!(
+            0x80112233u32 as i32,
+            encode_color(0x80112233u32 as i32, 1.0, false)
+        );
+        assert_eq!(
+            0x7f112233u32 as i32,
+            encode_color(0x80112233u32 as i32, 0.5, true)
+        );
+    }
+
+    #[test]
+    fn fluid_face_record_expands_semantic_side_face_to_quad() {
+        let mut record = FluidFaceRecord {
+            packed_normal: 0,
+            material_bits: 5,
+            block_emission: 7,
+            render_type: 1,
+            ignore_mid_block: 0,
+            block_id: 41,
+            local_x: 4,
+            local_y: 5,
+            local_z: 6,
+            face_kind: 3,
+            flip: 0,
+            origin_x: 10.0,
+            origin_y: 20.0,
+            origin_z: 30.0,
+            y_offset: 0.001,
+            heights: [0.75, 0.5, 0.0, 0.0],
+            side_coords: [0.0, 1.0, 1.0, 1.0],
+            uvs: [0.0, 0.2, 0.5, 0.6, 1.0, 0.6, 1.0, 0.1],
+            colors: [1, 2, 3, 4],
+            aos: [0.1, 0.2, 0.3, 0.4],
+            lights: [11, 12, 13, 14],
+        };
+
+        let quad = fluid_face_record_to_quad(record).unwrap();
+        assert_eq!(11.0, quad.vertices[0].x);
+        assert_eq!(20.5, quad.vertices[0].y);
+        assert_eq!(31.0, quad.vertices[0].z);
+        assert_eq!(10.0, quad.vertices[3].x);
+        assert_eq!(20.75, quad.vertices[3].y);
+        assert_eq!(31.0, quad.vertices[3].z);
+        assert_eq!(5, quad.material_bits);
+        assert_eq!(41, quad.block_id);
+
+        record.flip = 1;
+        let flipped = fluid_face_record_to_quad(record).unwrap();
+        assert_eq!(quad.vertices[0].x, flipped.vertices[0].x);
+        assert_eq!(quad.vertices[3].x, flipped.vertices[1].x);
+        assert_eq!(quad.vertices[2].x, flipped.vertices[2].x);
+        assert_eq!(quad.vertices[1].x, flipped.vertices[3].x);
     }
 
     #[test]
@@ -2821,6 +5855,19 @@ mod tests {
     }
 
     #[test]
+    fn block_id_pack_matches_java_wrapping_int_arithmetic() {
+        let mut input = quad();
+        input.block_id = i32::MAX;
+        input.render_type = 1;
+
+        assert_eq!(1, pack_block_id(&input));
+
+        input.block_id = -1;
+        input.render_type = 0;
+        assert_eq!(0, pack_block_id(&input));
+    }
+
+    #[test]
     fn scattered_encoder_writes_requested_quad_slots_only() {
         let mut first = quad();
         first.material_bits = 5;
@@ -2864,6 +5911,225 @@ mod tests {
             pack_light_and_data(0xf0f0, 5, 7).to_ne_bytes(),
             output[(8 * 20 + 16)..(8 * 20 + 20)]
         );
+    }
+
+    #[test]
+    fn smooth_lighting_uses_java_aligned_partial_offset_face() {
+        let block = lighting_block_record();
+        let quad = lighting_quad(MODEL_QUAD_FLAG_ALIGNED | MODEL_QUAD_FLAG_PARTIAL, 1, 0.25, 0.5, 0.75);
+        let light = smooth_lighting(&block, &quad, lighting_state_record(0), 1, true);
+        let weights = corner_weights(1, 0.25, 0.5, 0.75);
+        let expected = blend_ao_face(ao_face_data(&block, 1, true), weights);
+        let wrong_direct = blend_ao_face(ao_face_data(&block, 1, false), weights);
+
+        assert_close(expected.0 * ambient_shade(1, true), light.ao[0]);
+        assert_eq!(expected.1, light.lm[0]);
+        assert_ne!(wrong_direct.1, light.lm[0]);
+    }
+
+    #[test]
+    fn smooth_lighting_uses_java_parallel_inset_depth_weights() {
+        let block = lighting_block_record();
+        let quad = lighting_quad(MODEL_QUAD_FLAG_PARALLEL | MODEL_QUAD_FLAG_PARTIAL, 1, 0.4, 0.25, 0.6);
+        let light = smooth_lighting(&block, &quad, lighting_state_record(0), 1, true);
+        let weights = corner_weights(1, 0.4, 0.25, 0.6);
+        let depth = face_depth(1, 0.4, 0.25, 0.6);
+        let expected = blend_inset_ao_face(&block, 1, depth, 1.0 - depth, weights);
+
+        assert_close(expected.0 * ambient_shade(1, true), light.ao[0]);
+        assert_eq!(expected.1, light.lm[0]);
+    }
+
+    #[test]
+    fn smooth_lighting_snaps_non_parallel_endpoints_like_java() {
+        let block = lighting_block_record();
+        let top_vertex = lighting_quad(0, 1, 0.5, 1.0, 0.5);
+        let bottom_vertex = lighting_quad(0, 1, 0.5, 0.0, 0.5);
+        let top_light = smooth_lighting(&block, &top_vertex, lighting_state_record(0), 1, true);
+        let bottom_light = smooth_lighting(&block, &bottom_vertex, lighting_state_record(0), 1, true);
+        let weights_top = corner_weights(1, 0.5, 1.0, 0.5);
+        let weights_bottom = corner_weights(1, 0.5, 0.0, 0.5);
+        let expected_top = blend_ao_face(ao_face_data(&block, 1, true), weights_top);
+        let expected_bottom = blend_ao_face(ao_face_data(&block, 1, false), weights_bottom);
+
+        assert_eq!(expected_top.1, top_light.lm[0]);
+        assert_eq!(expected_bottom.1, bottom_light.lm[0]);
+        assert_ne!(top_light.lm[0], bottom_light.lm[0]);
+    }
+
+    #[test]
+    fn smooth_lighting_treats_parallel_full_cube_as_java_aligned_full_face() {
+        let block = lighting_block_record();
+        let quad = lighting_quad(MODEL_QUAD_FLAG_PARALLEL, 1, 0.4, 0.25, 0.6);
+        let light = smooth_lighting(&block, &quad, lighting_state_record(STATE_FLAG_FULL_OCCLUSION), 1, true);
+        let face = ao_face_data(&block, 1, true);
+        let (expected_lm, mut expected_ao) = map_ao_corners(1, face.lm, face.ao);
+        for value in &mut expected_ao {
+            *value *= ambient_shade(1, true);
+        }
+
+        assert_eq!(expected_lm, light.lm);
+        for i in 0..4 {
+            assert_close(expected_ao[i], light.ao[i]);
+        }
+    }
+
+    #[test]
+    fn static_model_native_quads_use_block_iris_render_type() {
+        let mut block = lighting_block_record();
+        block.local_x = 1;
+        block.local_y = 2;
+        block.local_z = 3;
+        block.absolute_x = 145;
+        block.absolute_y = 66;
+        block.absolute_z = 531;
+        let mut state = lighting_state_record(0);
+        state.render_type = 2;
+        let quad = lighting_quad(MODEL_QUAD_FLAG_ALIGNED, 1, 0.0, 1.0, 0.0);
+
+        let native = static_model_quad_to_native_section(block, state, quad);
+
+        assert_eq!(0, native.render_type);
+        assert_eq!(145, native.local_x);
+        assert_eq!(66, native.local_y);
+        assert_eq!(531, native.local_z);
+    }
+
+    #[test]
+    fn static_model_zero_source_light_uses_computed_lighting() {
+        let block = lighting_block_record();
+        let mut quad = lighting_quad(MODEL_QUAD_FLAG_ALIGNED, 1, 0.0, 1.0, 0.0);
+        for vertex in &mut quad.vertices {
+            vertex.light = 0;
+        }
+        let expected = native_quad_lighting(&block, &quad, lighting_state_record(STATE_FLAG_FULL_OCCLUSION));
+
+        let native = static_model_quad_to_native_section(
+            block,
+            lighting_state_record(STATE_FLAG_FULL_OCCLUSION),
+            quad,
+        );
+
+        assert_eq!(expected.lm[0], native.vertices[0].light);
+        assert_ne!(0, native.vertices[0].light);
+    }
+
+    #[test]
+    fn static_model_force_grass_tint_applies_without_quad_tint_index() {
+        let mut block = lighting_block_record();
+        block.tint = 0xff35_996fu32 as i32;
+        let mut state = lighting_state_record(0);
+        state.tint_type = TINT_FORCE_GRASS;
+        let mut quad = lighting_quad(MODEL_QUAD_FLAG_ALIGNED, 1, 0.0, 1.0, 0.0);
+        quad.tint_index = -1;
+        quad.vertices[0].color = 0xffff_ffffu32 as i32;
+
+        let native = static_model_quad_to_native_section(block, state, quad);
+
+        assert_eq!(0xff6f_9935u32 as i32, native.vertices[0].color);
+    }
+
+    #[test]
+    fn native_fluid_uses_fluid_shader_block_id_not_container_block_id() {
+        let mut block = lighting_block_record();
+        block.block_id = 1234;
+        block.fluid_block_id = 5678;
+        block.fluid_tint = 0xff3f_76e4u32 as i32;
+        let mut state = lighting_state_record(0);
+        state.fluid_type = FLUID_WATER;
+        state.fluid_block_id = 9012;
+        state.fluid_material_bits = 9;
+        state.fluid_still = FluidSprite {
+            u0: 0.0,
+            u1: 1.0,
+            v0: 0.0,
+            v1: 1.0,
+            shrink: 0.0,
+        };
+
+        let (record, _) = fluid_semantic_face(
+            state,
+            &block,
+            MODEL_QUAD_FACING_POS_Y,
+            false,
+            FLUID_FACE_TOP_NW_SE,
+            0.0,
+            [1.0; 4],
+            [0.0; 4],
+            [(0.0, 0.0), (0.0, 1.0), (1.0, 1.0), (1.0, 0.0)],
+            argb_to_abgr(block.fluid_tint),
+            1.0,
+            LIGHT_FULL_BRIGHT,
+        );
+        let quad = fluid_face_record_to_quad(record).unwrap();
+
+        assert_eq!(5678, quad.block_id);
+        assert_eq!(1, quad.render_type);
+    }
+
+    fn lighting_quad(flags: i32, light_face: i32, x: f32, y: f32, z: f32) -> StaticModelQuadRecord {
+        StaticModelQuadRecord {
+            vertices: [StaticModelVertexRecord {
+                x,
+                y,
+                z,
+                color: -1,
+                u: 0.0,
+                v: 0.0,
+                light: -1,
+            }; 4],
+            material_bits: 5,
+            cull_face: -1,
+            normal_face: MODEL_QUAD_FACING_UNASSIGNED as i32,
+            packed_normal: 0,
+            block_emission: 0,
+            render_type: 0,
+            shade: 1,
+            flags,
+            light_face,
+            tint_index: -1,
+            has_ao: 1,
+            _padding: 0,
+        }
+    }
+
+    fn lighting_block_record() -> NativeSectionBlockRecord {
+        let mut record = NativeSectionBlockRecord::default();
+        record.fluid_block_id = -1;
+        for dz in -1..=1 {
+            for dy in -1..=1 {
+                for dx in -1..=1 {
+                    let index = neighborhood_index(dx, dy, dz);
+                    let ao = 2048 + (index as i32 * 53);
+                    let block = ((index as i32 * 3) + 1) & 0xf;
+                    let sky = ((index as i32 * 5) + 2) & 0xf;
+                    let luminance = ((index as i32 * 7) + 3) & 0xf;
+                    record.light_words[index] = pack_light_word(block, sky, luminance, ao, false, false, false, false);
+                }
+            }
+        }
+        record
+    }
+
+    fn lighting_state_record(flags: i32) -> NativeMeshingState {
+        let mut state = NativeMeshingState::default();
+        state.flags = flags;
+        state
+    }
+
+    fn pack_light_word(block: i32, sky: i32, luminance: i32, ao: i32, em: bool, op: bool, fo: bool, fc: bool) -> i32 {
+        (block & 0xf)
+            | ((sky & 0xf) << 4)
+            | ((luminance & 0xf) << 8)
+            | ((ao & 0xffff) << 12)
+            | ((em as i32) << 28)
+            | ((op as i32) << 29)
+            | ((fo as i32) << 30)
+            | ((fc as i32) << 31)
+    }
+
+    fn assert_close(expected: f32, actual: f32) {
+        assert!((expected - actual).abs() < 0.00001, "expected {expected}, got {actual}");
     }
 
     #[test]

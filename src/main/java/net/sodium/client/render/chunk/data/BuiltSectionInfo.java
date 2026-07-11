@@ -28,15 +28,21 @@ public class BuiltSectionInfo {
     public final BlockEntity @Nullable[] globalBlockEntities;
     public final BlockEntity @Nullable[] culledBlockEntities;
     public final TextureAtlasSprite @Nullable[] animatedSprites;
+    public final int nativeMeshingFallbackBlocks;
+    public final int nativeMeshingFallbackQuads;
 
     private BuiltSectionInfo(@NotNull Collection<TerrainRenderPass> blockRenderPasses,
                              @NotNull Collection<BlockEntity> globalBlockEntities,
                              @NotNull Collection<BlockEntity> culledBlockEntities,
                              @NotNull Collection<TextureAtlasSprite> animatedSprites,
-                             @NotNull VisibilitySet occlusionData) {
+                             @NotNull VisibilitySet occlusionData,
+                             int nativeMeshingFallbackBlocks,
+                             int nativeMeshingFallbackQuads) {
         this.globalBlockEntities = toArray(globalBlockEntities, BlockEntity[]::new);
         this.culledBlockEntities = toArray(culledBlockEntities, BlockEntity[]::new);
         this.animatedSprites = toArray(animatedSprites, TextureAtlasSprite[]::new);
+        this.nativeMeshingFallbackBlocks = nativeMeshingFallbackBlocks;
+        this.nativeMeshingFallbackQuads = nativeMeshingFallbackQuads;
 
         int flags = 0;
 
@@ -64,6 +70,8 @@ public class BuiltSectionInfo {
         private final Set<TextureAtlasSprite> animatedSprites = new ObjectOpenHashSet<>();
 
         private VisibilitySet occlusionData;
+        private int nativeMeshingFallbackBlocks;
+        private int nativeMeshingFallbackQuads;
 
         public void addRenderPass(TerrainRenderPass pass) {
             this.blockRenderPasses.add(pass);
@@ -93,8 +101,15 @@ public class BuiltSectionInfo {
             (cull ? this.culledBlockEntities : this.globalBlockEntities).add(entity);
         }
 
+        public void setNativeMeshingFallbackCounts(int blocks, int quads) {
+            this.nativeMeshingFallbackBlocks = blocks;
+            this.nativeMeshingFallbackQuads = quads;
+        }
+
         public BuiltSectionInfo build() {
-            return new BuiltSectionInfo(this.blockRenderPasses, this.globalBlockEntities, this.culledBlockEntities, this.animatedSprites, this.occlusionData);
+            return new BuiltSectionInfo(this.blockRenderPasses, this.globalBlockEntities, this.culledBlockEntities,
+                    this.animatedSprites, this.occlusionData, this.nativeMeshingFallbackBlocks,
+                    this.nativeMeshingFallbackQuads);
         }
     }
 

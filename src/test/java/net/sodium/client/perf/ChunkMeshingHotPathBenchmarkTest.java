@@ -2,14 +2,17 @@ package net.sodium.client.perf;
 
 import net.sodium.client.SodiumClientMod;
 import net.sodium.client.gui.SodiumGameOptions;
+import net.sodium.client.render.chunk.data.BuiltSectionMeshParts;
 import net.sodium.client.render.chunk.translucent_sorting.data.TranslucentData;
 import net.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
+import net.sodium.client.render.chunk.vertex.format.NativeStaticBlockModelCache;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.lwjgl.system.MemoryUtil;
 
 import java.io.IOException;
 import java.lang.management.BufferPoolMXBean;
@@ -72,6 +75,18 @@ class ChunkMeshingHotPathBenchmarkTest {
             builder.destroy();
         }
 
+        NativeSectionMeshBuilder sectionBuilder = NativeSectionMeshBuilder.create(4096);
+        ByteBuffer sectionRecords = createNativeSectionBenchmarkRecords();
+        try {
+            installNativeSectionBenchmarkMetadata();
+            results.add(measure("native_section_scan_and_build",
+                    () -> runNativeSectionScan(sectionBuilder, sectionRecords)));
+        } finally {
+            NativeStaticBlockModelCache.clear();
+            MemoryUtil.memFree(sectionRecords);
+            sectionBuilder.close();
+        }
+
         writeResults(results);
         for (BenchmarkResult result : results) {
             System.out.printf(Locale.ROOT,
@@ -100,14 +115,63 @@ class ChunkMeshingHotPathBenchmarkTest {
             int localX = index & 15;
             int localY = (index >>> 4) & 15;
             int localZ = (index >>> 8) & 15;
-            long quadAddress = builder.prepareStagedQuad(materialBits, blockEmission, renderType, false, blockId,
-                    localX, localY, localZ);
-            writeQuad(quadAddress, blockEmission, renderType, blockId, localX, localY, localZ, materialBits,
+            appendQuad(builder, blockEmission, renderType, blockId, localX, localY, localZ, materialBits,
                     basePositions[baseIndex], basePositions[baseIndex + 1], basePositions[baseIndex + 2]);
-            builder.commitStagedQuad();
         }
 
         return ((long) builder.count() << 32) ^ MESH_FINISHER.finish(builder);
+    }
+
+    private static long runNativeSectionScan(NativeSectionMeshBuilder sectionBuilder, ByteBuffer records) {
+        sectionBuilder.start(SECTION_INDEX);
+        int committed = sectionBuilder.appendNativeSectionEncoded(MemoryUtil.memAddress(records), 4096, 0,
+                ChunkMeshFormats.COMPACT.getNativeFormat(), SECTION_INDEX, false, false);
+        BuiltSectionMeshParts mesh = sectionBuilder.finishMesh(ChunkMeshFormats.COMPACT.getNativeFormat(), 0,
+                false, true, false);
+        try {
+            return (((long) committed) << 32)
+                    ^ (mesh == null ? 0L : sample(mesh.getVertexData().getDirectBuffer().order(ByteOrder.nativeOrder())));
+        } finally {
+            if (mesh != null) {
+                mesh.getVertexData().free();
+            }
+        }
+    }
+
+    private static void installNativeSectionBenchmarkMetadata() {
+        NativeStaticBlockModelCache.clear();
+        NativeStaticBlockModelCache.register(77, (recordAddress, index) ->
+                NativeChunkMeshEncoder.writeStaticModelQuadRecord(recordAddress, 5,
+                        net.minecraft.core.Direction.NORTH.get3DDataValue(), net.sodium.client.model.quad.properties.ModelQuadFacing.NEG_Z.ordinal(),
+                        net.sodium.client.model.quad.properties.ModelQuadFacing.NEG_Z.getPackedAlignedNormal(), (byte) 0, (byte) 0, true,
+                        0.0F, 0.0F, 0.0F, 0xffffffff, 0.0F, 0.0F, -1,
+                        1.0F, 0.0F, 0.0F, 0xffffffff, 1.0F, 0.0F, -1,
+                        1.0F, 1.0F, 0.0F, 0xffffffff, 1.0F, 1.0F, -1,
+                        0.0F, 1.0F, 0.0F, 0xffffffff, 0.0F, 1.0F, -1), 1);
+        NativeStaticBlockModelCache.registerSelector(8, 0,
+                (recordAddress, index) -> NativeChunkMeshEncoder.writeNativeModelSelectorEntry(recordAddress, 77, 1),
+                1);
+        NativeStaticBlockModelCache.registerSelector(9, 1,
+                (recordAddress, index) -> NativeChunkMeshEncoder.writeNativeModelSelectorEntry(recordAddress, 8, 1),
+                1);
+        NativeStaticBlockModelCache.registerState(0, -1, 1, 0, -1, 0, 0, -1, 0, -1, -1, 0);
+        NativeStaticBlockModelCache.registerState(100, 9, 1 << 1, 5, 0, 0, 0, 41, 0, -1, -1, 1);
+    }
+
+    private static ByteBuffer createNativeSectionBenchmarkRecords() {
+        ByteBuffer records = MemoryUtil.memAlloc(4096 * NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE)
+                .order(ByteOrder.nativeOrder());
+        long base = MemoryUtil.memAddress(records);
+        for (int index = 0; index < 4096; index++) {
+            int localX = index & 15;
+            int localY = (index >>> 8) & 15;
+            int localZ = (index >>> 4) & 15;
+            NativeChunkMeshEncoder.writeNativeSectionBlockRecord(base + (long) index
+                            * NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE,
+                    100, 41, localX, localY, localZ, index * 31L,
+                    0, 0, 0, 0, 0, 0, 0x00f000f0, 0.0F, 0.0F, 0.0F);
+        }
+        return records;
     }
 
     private static BenchmarkResult measure(String name, BenchmarkAction action) throws Exception {
@@ -179,10 +243,10 @@ class ChunkMeshingHotPathBenchmarkTest {
         return positions;
     }
 
-    private static void writeQuad(long quadAddress, byte blockEmission, byte renderType, int blockId,
+    private static void appendQuad(NativeSectionMeshBuilder.FacingBuffer builder, byte blockEmission,
+            byte renderType, int blockId,
             int localX, int localY, int localZ, int materialBits, float baseX, float baseY, float baseZ) {
-        NativeChunkMeshEncoder.writeNativeQuad(quadAddress, blockEmission, renderType, false, blockId, localX, localY,
-                localZ, materialBits,
+        builder.appendFlatQuad(materialBits, blockEmission, renderType, false, blockId, localX, localY, localZ,
                 baseX, baseY, baseZ, 0xff806040, 0.5F, 0.0F, 0.0F, 0x00f000f0,
                 baseX + 1.0F, baseY, baseZ, 0xff806040, 0.5F, 1.0F, 0.0F, 0x00f000f0,
                 baseX + 1.0F, baseY + 1.0F, baseZ, 0xff806040, 0.5F, 1.0F, 1.0F, 0x00f000f0,

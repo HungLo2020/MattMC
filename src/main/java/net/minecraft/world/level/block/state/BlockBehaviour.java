@@ -440,6 +440,7 @@ public abstract class BlockBehaviour implements FeatureElement {
 		private final BlockBehaviour.StatePredicate emissiveRendering;
 		@Nullable
 		private final BlockBehaviour.OffsetFunction offsetFunction;
+		private final BlockBehaviour.OffsetType offsetType;
 		private final boolean spawnTerrainParticles;
 		private final NoteBlockInstrument instrument;
 		private final boolean replaceable;
@@ -472,6 +473,7 @@ public abstract class BlockBehaviour implements FeatureElement {
 			this.hasPostProcess = properties.hasPostProcess;
 			this.emissiveRendering = properties.emissiveRendering;
 			this.offsetFunction = properties.offsetFunction;
+			this.offsetType = properties.offsetType;
 			this.spawnTerrainParticles = properties.spawnTerrainParticles;
 			this.instrument = properties.instrument;
 			this.replaceable = properties.replaceable;
@@ -707,6 +709,18 @@ public abstract class BlockBehaviour implements FeatureElement {
 
 		public boolean hasOffsetFunction() {
 			return this.offsetFunction != null;
+		}
+
+		public BlockBehaviour.OffsetType sodium$getOffsetType() {
+			return this.offsetType;
+		}
+
+		public float sodium$getMaxHorizontalOffset() {
+			return this.getBlock().getMaxHorizontalOffset();
+		}
+
+		public float sodium$getMaxVerticalOffset() {
+			return this.getBlock().getMaxVerticalOffset();
 		}
 
 		public boolean triggerEvent(Level level, BlockPos blockPos, int i, int j) {
@@ -1020,6 +1034,7 @@ public abstract class BlockBehaviour implements FeatureElement {
 		FeatureFlagSet requiredFeatures = FeatureFlags.VANILLA_SET;
 		@Nullable
 		BlockBehaviour.OffsetFunction offsetFunction;
+		BlockBehaviour.OffsetType offsetType = BlockBehaviour.OffsetType.NONE;
 
 		private Properties() {
 		}
@@ -1065,6 +1080,7 @@ public abstract class BlockBehaviour implements FeatureElement {
 			properties.pushReaction = properties2.pushReaction;
 			properties.requiresCorrectToolForDrops = properties2.requiresCorrectToolForDrops;
 			properties.offsetFunction = properties2.offsetFunction;
+			properties.offsetType = properties2.offsetType;
 			properties.spawnTerrainParticles = properties2.spawnTerrainParticles;
 			properties.requiredFeatures = properties2.requiredFeatures;
 			properties.emissiveRendering = properties2.emissiveRendering;
@@ -1238,6 +1254,7 @@ public abstract class BlockBehaviour implements FeatureElement {
 		}
 
 		public BlockBehaviour.Properties offsetType(BlockBehaviour.OffsetType offsetType) {
+			this.offsetType = offsetType;
 			this.offsetFunction = switch (offsetType) {
 				case NONE -> null;
 				case XZ -> (blockState, blockPos) -> {

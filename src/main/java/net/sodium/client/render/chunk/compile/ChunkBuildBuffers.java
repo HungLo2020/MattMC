@@ -10,6 +10,7 @@ import net.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.render.chunk.terrain.material.Material;
 import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.NativeUpdatedQuads;
+import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkVertexFormat;
@@ -58,6 +59,20 @@ public class ChunkBuildBuffers {
         return this.builders.get(pass);
     }
 
+    public int getFallbackConsumerEmittedQuadCount() {
+        int count = 0;
+        for (var builder : this.builders.values()) {
+            count += builder.getFallbackConsumerEmittedQuadCount();
+        }
+        return count;
+    }
+
+    public void resetFallbackConsumerEmittedQuadCount() {
+        for (var builder : this.builders.values()) {
+            builder.resetFallbackConsumerEmittedQuadCount();
+        }
+    }
+
     /**
      * Creates immutable baked chunk meshes from all non-empty scratch buffers. This is used after all blocks
      * have been rendered to pass the finished meshes over to the graphics card. This function can be called multiple
@@ -73,6 +88,31 @@ public class ChunkBuildBuffers {
         var builder = this.builders.get(DefaultTerrainRenderPasses.TRANSLUCENT);
         return builder.getSectionBuilder().finishModifiedTranslucentMesh(updatedQuads, this.nativeFormat,
                 usesSeparateAo());
+    }
+
+    public int appendStaticModelSnapshot(TerrainRenderPass pass, long recordAddress, int recordCount,
+            int sectionIndex, boolean storeRawQuads) {
+        if (recordCount == 0) {
+            return 0;
+        }
+
+        var builder = this.builders.get(pass);
+        return builder.getSectionBuilder().appendStaticModelBatchEncoded(recordAddress, recordCount,
+                this.nativeFormat, sectionIndex, usesSeparateAo(), storeRawQuads);
+    }
+
+    public int appendNativeSectionSnapshot(TerrainRenderPass pass, long recordAddress, int recordCount,
+            int passId, int sectionIndex, boolean storeRawQuads, TranslucentGeometryCollector collector) {
+        if (recordCount == 0) {
+            return 0;
+        }
+
+        var builder = this.builders.get(pass);
+        long analyzerHandle = pass.isTranslucent() && collector != null && collector.supportsNativeBatching()
+                ? collector.nativeAnalyzerHandle()
+                : 0L;
+        return builder.getSectionBuilder().appendNativeSectionEncoded(recordAddress, recordCount, passId,
+                this.nativeFormat, sectionIndex, usesSeparateAo(), storeRawQuads, analyzerHandle);
     }
 
     public void destroy() {

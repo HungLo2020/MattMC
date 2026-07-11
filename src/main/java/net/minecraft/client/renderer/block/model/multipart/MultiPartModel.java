@@ -51,6 +51,14 @@ public class MultiPartModel implements BlockStateModel {
 		}
 	}
 
+	public List<BlockStateModel> sodium$getSelectedModels() {
+		if (this.models == null) {
+			this.models = this.shared.selectModels(this.blockState);
+		}
+
+		return this.models;
+	}
+
 	@Environment(EnvType.CLIENT)
 	public record Selector<T>(Predicate<BlockState> condition, T model) {
 

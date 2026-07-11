@@ -13,6 +13,7 @@ import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkVertexFormat;
+import net.sodium.client.render.chunk.vertex.format.NativeStaticBlockModelCache;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.lwjgl.system.MemoryUtil;
@@ -169,6 +170,333 @@ class NativeChunkMeshEncoderTest {
             assertCompactVertex(output, 0, 0.0F, 3, 5);
             assertCompactVertex(output, 4, 2.0F, 5, 5);
         } finally {
+            free(output);
+            sectionBuilder.close();
+        }
+    }
+
+    @Test
+    void nativeSectionBuilderAppendsFlatAndLightBlockBatches() {
+        NativeSectionMeshBuilder sectionBuilder = NativeSectionMeshBuilder.create(1);
+        NativeSectionMeshBuilder.FacingBuffer unassigned = new NativeSectionMeshBuilder.FacingBuffer(
+                ChunkMeshFormats.COMPACT.getNativeFormat(), sectionBuilder, ModelQuadFacing.UNASSIGNED.ordinal());
+        ByteBuffer output = null;
+
+        try {
+            sectionBuilder.start(6);
+            unassigned.start(6);
+            unassigned.appendFlatQuad(5, (byte) 7, (byte) 1, false, 41, 4, 5, 6,
+                    2.0F, 0.25F, 0.25F, 0xff806040, 0.5F, 0.0F, 0.0F, 0x00f000f0,
+                    3.0F, 0.25F, 0.25F, 0xff806040, 0.5F, 1.0F, 0.0F, 0x00f000f0,
+                    3.0F, 1.25F, 0.25F, 0xff806040, 0.5F, 1.0F, 1.0F, 0x00f000f0,
+                    2.0F, 1.25F, 0.25F, 0xff806040, 0.5F, 0.0F, 1.0F, 0x00f000f0);
+            unassigned.appendLightBlockQuad(7, (byte) 12, 99, 4, 0, 0);
+            unassigned.flushPending();
+
+            int[] segments = new int[ModelQuadFacing.COUNT << 1];
+            output = nativeOrder(MemoryUtil.memCalloc(8 * ChunkMeshFormats.COMPACT.getNativeFormat().stride()));
+            sectionBuilder.assemble(output, segments, ChunkMeshFormats.COMPACT.getNativeFormat(),
+                    0, false, true, false);
+
+            assertEquals(8, sectionBuilder.totalVertexCount());
+            assertCompactVertex(output, 0, 2.0F, 5, 6);
+            assertCompactVertex(output, 4, 4.25F, 0.25F, 0.25F, 0xc0c0, 7, 6);
+        } finally {
+            free(output);
+            sectionBuilder.close();
+        }
+    }
+
+    @Test
+    void nativeSectionBuilderAppendsSemanticFluidFaceBatches() {
+        NativeSectionMeshBuilder sectionBuilder = NativeSectionMeshBuilder.create(1);
+        NativeSectionMeshBuilder.FacingBuffer posZ = new NativeSectionMeshBuilder.FacingBuffer(
+                ChunkMeshFormats.COMPACT.getNativeFormat(), sectionBuilder, ModelQuadFacing.POS_Z.ordinal());
+        ByteBuffer output = null;
+
+        try {
+            sectionBuilder.start(8);
+            posZ.start(8);
+            posZ.appendFluidFace(5, (byte) 7, (byte) 1, false, 41, 4, 5, 6,
+                    3, false, 0, 2, 3, 4, 0.001F,
+                    0.75F, 0.5F, 0.0F, 0.0F, 0.0F, 1.0F, 1.0F, 1.0F,
+                    0.0F, 0.2F, 0.5F, 0.6F, 1.0F, 0.6F, 1.0F, 0.1F,
+                    0xff806040, 0xff806040, 0xff806040, 0xff806040,
+                    0.5F, 0.5F, 0.5F, 0.5F,
+                    0x00f000f0, 0x00f000f0, 0x00f000f0, 0x00f000f0);
+            posZ.flushPending();
+
+            int[] segments = new int[ModelQuadFacing.COUNT << 1];
+            output = nativeOrder(MemoryUtil.memCalloc(4 * ChunkMeshFormats.COMPACT.getNativeFormat().stride()));
+            sectionBuilder.assemble(output, segments, ChunkMeshFormats.COMPACT.getNativeFormat(),
+                    1 << ModelQuadFacing.POS_Z.ordinal(), false, true, false);
+
+            assertEquals(4, sectionBuilder.totalVertexCount());
+            assertCompactVertex(output, 0, 3.0F, 3.5F, 5.0F, 0xf0f0, 5, 8);
+            assertCompactVertex(output, 3, 2.0F, 3.75F, 5.0F, 0xf0f0, 5, 8);
+        } finally {
+            free(output);
+            sectionBuilder.close();
+        }
+    }
+
+    @Test
+    void nativeSectionBuilderBuildsCachedStaticModelBlocks() {
+        NativeSectionMeshBuilder sectionBuilder = NativeSectionMeshBuilder.create(1);
+        NativeSectionMeshBuilder.FacingBuffer staging = new NativeSectionMeshBuilder.FacingBuffer(
+                ChunkMeshFormats.COMPACT.getNativeFormat(), sectionBuilder, ModelQuadFacing.UNASSIGNED.ordinal());
+        ByteBuffer output = null;
+
+        try {
+            NativeStaticBlockModelCache.clear();
+            NativeStaticBlockModelCache.register(77, (recordAddress, index) ->
+                    NativeChunkMeshEncoder.writeStaticModelQuadRecord(recordAddress, 5,
+                            net.minecraft.core.Direction.NORTH.get3DDataValue(), ModelQuadFacing.NEG_Z.ordinal(),
+                            ModelQuadFacing.NEG_Z.getPackedAlignedNormal(), (byte) 7, (byte) 1, true,
+                            0.0F, 0.0F, 0.0F, 0xff806040, 0.0F, 0.0F, 0x00f000f0,
+                            1.0F, 0.0F, 0.0F, 0xff806040, 1.0F, 0.0F, 0x00f000f0,
+                            1.0F, 1.0F, 0.0F, 0xff806040, 1.0F, 1.0F, 0x00f000f0,
+                            0.0F, 1.0F, 0.0F, 0xff806040, 0.0F, 1.0F, 0x00f000f0), 1);
+
+            sectionBuilder.start(3);
+            staging.start(3);
+            staging.appendStaticModelBlock(77, 0, (byte) 0, (byte) 0, 41, 4, 5, 6, 0,
+                    0.25F, 0.0F, 0.5F);
+            staging.flushPending();
+
+            output = nativeOrder(MemoryUtil.memCalloc(4 * ChunkMeshFormats.COMPACT.getNativeFormat().stride()));
+            int[] segments = new int[ModelQuadFacing.COUNT << 1];
+            sectionBuilder.assemble(output, segments, ChunkMeshFormats.COMPACT.getNativeFormat(),
+                    1 << ModelQuadFacing.NEG_Z.ordinal(), false, true, false);
+
+            assertEquals(4, sectionBuilder.totalVertexCount());
+            assertCompactVertex(output, 0, 4.25F, 5.0F, 6.5F, 0xf0f0, 5, 3);
+            assertSegmentPresent(segments, 4, ModelQuadFacing.NEG_Z.ordinal());
+
+            sectionBuilder.start(3);
+            staging.start(3);
+            staging.appendStaticModelBlock(77, 0, (byte) 0, (byte) 0, 41, 4, 5, 6,
+                    1 << net.minecraft.core.Direction.NORTH.get3DDataValue(), 0.0F, 0.0F, 0.0F);
+            staging.flushPending();
+            assertEquals(0, sectionBuilder.totalVertexCount());
+        } finally {
+            NativeStaticBlockModelCache.clear();
+            free(output);
+            sectionBuilder.close();
+        }
+    }
+
+    @Test
+    void nativeSectionBuilderScansStaticSectionSnapshotRecords() {
+        NativeSectionMeshBuilder sectionBuilder = NativeSectionMeshBuilder.create(1);
+        ByteBuffer records = null;
+
+        try {
+            NativeStaticBlockModelCache.clear();
+            NativeStaticBlockModelCache.register(77, (recordAddress, index) ->
+                    NativeChunkMeshEncoder.writeStaticModelQuadRecord(recordAddress, 5,
+                            net.minecraft.core.Direction.NORTH.get3DDataValue(), ModelQuadFacing.NEG_Z.ordinal(),
+                            ModelQuadFacing.NEG_Z.getPackedAlignedNormal(), (byte) 0, (byte) 0, true,
+                            0.0F, 0.0F, 0.0F, 0xffffffff, 0.0F, 0.0F, 0x00f000f0,
+                            1.0F, 0.0F, 0.0F, 0xffffffff, 1.0F, 0.0F, 0x00f000f0,
+                            1.0F, 1.0F, 0.0F, 0xffffffff, 1.0F, 1.0F, 0x00f000f0,
+                            0.0F, 1.0F, 0.0F, 0xffffffff, 0.0F, 1.0F, 0x00f000f0), 1);
+
+            records = MemoryUtil.memAlloc(3 * NativeChunkMeshEncoder.STATIC_MODEL_BLOCK_RECORD_STRIDE);
+            long base = MemoryUtil.memAddress(records);
+            NativeChunkMeshEncoder.writeStaticModelBlockRecord(base, -1, 0, (byte) 0, (byte) 0,
+                    -1, 0, 0, 0, 0, 0.0F, 0.0F, 0.0F);
+            NativeChunkMeshEncoder.writeStaticModelBlockRecord(base + NativeChunkMeshEncoder.STATIC_MODEL_BLOCK_RECORD_STRIDE,
+                    -2, 5, (byte) 15, (byte) 0, 99, 1, 2, 3, 0, 0.0F, 0.0F, 0.0F);
+            NativeChunkMeshEncoder.writeStaticModelBlockRecord(base + 2L * NativeChunkMeshEncoder.STATIC_MODEL_BLOCK_RECORD_STRIDE,
+                    77, 5, (byte) 0, (byte) 0, 41, 4, 5, 6, 0, 0.0F, 0.0F, 0.0F);
+
+            sectionBuilder.start(3);
+            int committed = sectionBuilder.appendStaticModelBatchEncoded(base, 3, ChunkMeshFormats.COMPACT.getNativeFormat(),
+                    3, false, false);
+
+            assertEquals(2, committed);
+            assertEquals(8, sectionBuilder.totalVertexCount());
+        } finally {
+            NativeStaticBlockModelCache.clear();
+            free(records);
+            sectionBuilder.close();
+        }
+    }
+
+    @Test
+    void nativeSectionBuilderScansSerializableSectionPath() {
+        NativeSectionMeshBuilder sectionBuilder = NativeSectionMeshBuilder.create(1);
+        ByteBuffer records = null;
+        ByteBuffer output = null;
+
+        try {
+            NativeStaticBlockModelCache.clear();
+            NativeStaticBlockModelCache.register(77, (recordAddress, index) ->
+                    NativeChunkMeshEncoder.writeStaticModelQuadRecord(recordAddress, 5,
+                            net.minecraft.core.Direction.NORTH.get3DDataValue(), ModelQuadFacing.NEG_Z.ordinal(),
+                            ModelQuadFacing.NEG_Z.getPackedAlignedNormal(), (byte) 0, (byte) 0, true,
+                            0.0F, 0.0F, 0.0F, 0xffffffff, 0.0F, 0.0F, -1,
+                            1.0F, 0.0F, 0.0F, 0xffffffff, 1.0F, 0.0F, -1,
+                            1.0F, 1.0F, 0.0F, 0xffffffff, 1.0F, 1.0F, -1,
+                            0.0F, 1.0F, 0.0F, 0xffffffff, 0.0F, 1.0F, -1), 1);
+            NativeStaticBlockModelCache.registerSelector(8, 0,
+                    (recordAddress, index) -> NativeChunkMeshEncoder.writeNativeModelSelectorEntry(recordAddress, 77, 1),
+                    1);
+            NativeStaticBlockModelCache.registerSelector(9, 1,
+                    (recordAddress, index) -> NativeChunkMeshEncoder.writeNativeModelSelectorEntry(recordAddress, 8, 1),
+                    1);
+            NativeStaticBlockModelCache.registerState(0, -1, 1, 0, -1, 0, 0, -1, 0, -1, -1, 0);
+            NativeStaticBlockModelCache.registerState(100, 9, 1 << 1, 5, 0, 0, 0, 41, 0, -1, -1, 1);
+
+            records = MemoryUtil.memAlloc(NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE);
+            long base = MemoryUtil.memAddress(records);
+            NativeChunkMeshEncoder.writeNativeSectionBlockRecord(base, 100, 41, 4, 5, 6, 1234L,
+                    0, 0, 0, 0, 0, 0, 0x00f000f0, 0.25F, 0.0F, 0.5F);
+
+            sectionBuilder.start(3);
+            int committed = sectionBuilder.appendNativeSectionEncoded(base, 1, 0,
+                    ChunkMeshFormats.COMPACT.getNativeFormat(), 3, false, false);
+
+            assertEquals(1, committed);
+            assertEquals(4, sectionBuilder.totalVertexCount());
+
+            int[] segments = new int[ModelQuadFacing.COUNT << 1];
+            output = nativeOrder(MemoryUtil.memCalloc(4 * ChunkMeshFormats.COMPACT.getNativeFormat().stride()));
+            sectionBuilder.assemble(output, segments, ChunkMeshFormats.COMPACT.getNativeFormat(),
+                    1 << ModelQuadFacing.NEG_Z.ordinal(), false, true, false);
+            assertCompactVertex(output, 0, 4.25F, 5.0F, 6.5F, 0xf0f0, 5, 3);
+            assertSegmentPresent(segments, 4, ModelQuadFacing.NEG_Z.ordinal());
+        } finally {
+            NativeStaticBlockModelCache.clear();
+            free(records);
+            free(output);
+            sectionBuilder.close();
+        }
+    }
+
+    @Test
+    void nativeSectionBuilderIgnoresZeroedAirSectionSnapshot() {
+        NativeSectionMeshBuilder sectionBuilder = NativeSectionMeshBuilder.create(1);
+        ByteBuffer records = null;
+
+        try {
+            NativeStaticBlockModelCache.clear();
+            NativeStaticBlockModelCache.registerState(0, -1, 1, 0, -1, 0, 0, -1, 0, -1, -1, 0);
+
+            records = MemoryUtil.memCalloc(4096 * NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE);
+            long base = MemoryUtil.memAddress(records);
+
+            for (int pass = 0; pass < 3; pass++) {
+                sectionBuilder.start(3);
+                assertEquals(0, sectionBuilder.appendNativeSectionEncoded(base, 4096, pass,
+                        ChunkMeshFormats.COMPACT.getNativeFormat(), 3, false, false));
+                assertEquals(0, sectionBuilder.totalVertexCount());
+            }
+        } finally {
+            NativeStaticBlockModelCache.clear();
+            free(records);
+            sectionBuilder.close();
+        }
+    }
+
+    @Test
+    void nativeSectionBuilderAppliesNativeTintAndRustOffset() {
+        NativeSectionMeshBuilder sectionBuilder = NativeSectionMeshBuilder.create(1);
+        ByteBuffer records = null;
+        ByteBuffer output = null;
+
+        try {
+            NativeStaticBlockModelCache.clear();
+            NativeStaticBlockModelCache.register(88, (recordAddress, index) ->
+                    NativeChunkMeshEncoder.writeStaticModelQuadRecord(recordAddress, 5,
+                            -1, ModelQuadFacing.UNASSIGNED.ordinal(), ModelQuadFacing.POS_Y.getPackedAlignedNormal(),
+                            (byte) 0, (byte) 0, true, 0, net.minecraft.core.Direction.UP.get3DDataValue(), 0, false,
+                            0.0F, 0.0F, 0.0F, 0xffffffff, 0.0F, 0.0F, -1,
+                            1.0F, 0.0F, 0.0F, 0xffffffff, 1.0F, 0.0F, -1,
+                            1.0F, 1.0F, 0.0F, 0xffffffff, 1.0F, 1.0F, -1,
+                            0.0F, 1.0F, 0.0F, 0xffffffff, 0.0F, 1.0F, -1), 1);
+            NativeStaticBlockModelCache.registerSelector(18, 0,
+                    (recordAddress, index) -> NativeChunkMeshEncoder.writeNativeModelSelectorEntry(recordAddress, 88, 1),
+                    1);
+            NativeStaticBlockModelCache.registerState(0, -1, 1, 0, -1, 0, 0, -1, 0, -1, -1, 0);
+            NativeStaticBlockModelCache.registerState(120, 18, 1 << 1, 5, 0, 0, 0, 41,
+                    0, -1, -1, 1, 0, 0.0F, 0, 1, 0.25F, 0.2F, 5);
+
+            records = MemoryUtil.memAlloc(NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE);
+            int[] lightWords = fullBrightLightWords();
+            int[] states = neighborhoodStates(0);
+            states[13] = 120;
+            long base = MemoryUtil.memAddress(records);
+            NativeChunkMeshEncoder.writeNativeSectionBlockRecord(base, 120, 41, 4, 5, 6, 1234L,
+                    0, 0, 0, 0, 0, 0, lightWords, states, 0xff204080, -1,
+                    0.0F, 0.0F, 20, 64, 30);
+
+            sectionBuilder.start(3);
+            assertEquals(1, sectionBuilder.appendNativeSectionEncoded(base, 1, 0,
+                    ChunkMeshFormats.COMPACT.getNativeFormat(), 3, false, false));
+
+            output = nativeOrder(MemoryUtil.memCalloc(4 * ChunkMeshFormats.COMPACT.getNativeFormat().stride()));
+            int[] segments = new int[ModelQuadFacing.COUNT << 1];
+            sectionBuilder.assemble(output, segments, ChunkMeshFormats.COMPACT.getNativeFormat(),
+                    1 << ModelQuadFacing.UNASSIGNED.ordinal(), false, true, false);
+
+            int unoffsetX = quantizePosition(4.0F);
+            int unoffsetY = quantizePosition(5.0F);
+            int unoffsetZ = quantizePosition(6.0F);
+            assertNotEquals(packPositionHi(unoffsetX, unoffsetY, unoffsetZ), output.getInt(0));
+            assertEquals(packLightAndData(0xf0f0, 5, 3), output.getInt(16));
+            assertEquals(0xff804020, output.getInt(8));
+        } finally {
+            NativeStaticBlockModelCache.clear();
+            free(records);
+            free(output);
+            sectionBuilder.close();
+        }
+    }
+
+    @Test
+    void nativeSectionBuilderProducesFullBuiltInFluidGeometry() {
+        NativeSectionMeshBuilder sectionBuilder = NativeSectionMeshBuilder.create(1);
+        ByteBuffer records = null;
+        ByteBuffer output = null;
+
+        try {
+            NativeStaticBlockModelCache.clear();
+            NativeStaticBlockModelCache.registerState(0, -1, 1, 0, -1, 0, 0, -1, 0, -1, -1, 0);
+            NativeStaticBlockModelCache.registerState(200, -1, 1 << 2, 5, -1, 0, 0, 77,
+                    5, 2, 77, 1, 1, 0.875F, 0, 0, 0.25F, 0.2F, 3,
+                    0.125F, 0.625F, 0.25F, 0.75F, 0.0F,
+                    0.25F, 0.75F, 0.125F, 0.625F, 0.0F,
+                    0.5F, 1.0F, 0.5F, 1.0F, 0.0F, 1);
+
+            records = MemoryUtil.memAlloc(NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE);
+            int[] lightWords = fullBrightLightWords();
+            int[] states = neighborhoodStates(0);
+            states[13] = 200;
+            NativeChunkMeshEncoder.writeNativeSectionBlockRecord(MemoryUtil.memAddress(records), 200, 77,
+                    8, 8, 8, 99L, 0, 0, 0, 0, 0, 0, lightWords, states,
+                    -1, 0xff3f76e4, 0.0F, 0.0F, 8, 64, 8);
+
+            sectionBuilder.start(3);
+            int committed = sectionBuilder.appendNativeSectionEncoded(MemoryUtil.memAddress(records), 1, 2,
+                    ChunkMeshFormats.COMPACT.getNativeFormat(), 3, false, false);
+
+            assertEquals(11, committed);
+            assertEquals(44, sectionBuilder.totalVertexCount());
+
+            output = nativeOrder(MemoryUtil.memCalloc(44 * ChunkMeshFormats.COMPACT.getNativeFormat().stride()));
+            int[] segments = new int[ModelQuadFacing.COUNT << 1];
+            sectionBuilder.assemble(output, segments, ChunkMeshFormats.COMPACT.getNativeFormat(),
+                    1 << ModelQuadFacing.POS_Y.ordinal(), false, true, false);
+            assertEquals(packTextureForQuad(0.625F, 0.25F,
+                    0.625F, 0.25F,
+                    0.125F, 0.25F,
+                    0.125F, 0.75F,
+                    0.625F, 0.75F), output.getInt(12));
+        } finally {
+            NativeStaticBlockModelCache.clear();
+            free(records);
             free(output);
             sectionBuilder.close();
         }
@@ -480,18 +808,39 @@ class NativeChunkMeshEncoderTest {
     }
 
     private static void assertCompactVertex(ByteBuffer buffer, int vertexIndex, float x, int materialBits, int sectionIndex) {
+        assertCompactVertex(buffer, vertexIndex, x, 0.25F, 0.25F, 0xf0f0, materialBits, sectionIndex);
+    }
+
+    private static void assertCompactVertex(ByteBuffer buffer, int vertexIndex, float x, float y, float z,
+            int light, int materialBits, int sectionIndex) {
         int offset = vertexIndex * ChunkMeshFormats.COMPACT.getNativeFormat().stride();
         int packedX = quantizePosition(x);
-        int packedY = quantizePosition(0.25F);
-        int packedZ = quantizePosition(0.25F);
+        int packedY = quantizePosition(y);
+        int packedZ = quantizePosition(z);
 
         assertEquals(packPositionHi(packedX, packedY, packedZ), buffer.getInt(offset));
         assertEquals(packPositionLo(packedX, packedY, packedZ), buffer.getInt(offset + 4));
-        assertEquals(packLightAndData(0xf0f0, materialBits, sectionIndex), buffer.getInt(offset + 16));
+        assertEquals(packLightAndData(light, materialBits, sectionIndex), buffer.getInt(offset + 16));
     }
 
     private static int quantizePosition(float position) {
         return ((int) (((8.0F + position) / 32.0F) * (1 << 20))) & 0xFFFFF;
+    }
+
+    private static int[] fullBrightLightWords() {
+        int[] words = new int[27];
+        for (int i = 0; i < words.length; i++) {
+            words[i] = 0x010000FF;
+        }
+        return words;
+    }
+
+    private static int[] neighborhoodStates(int stateId) {
+        int[] states = new int[27];
+        for (int i = 0; i < states.length; i++) {
+            states[i] = stateId;
+        }
+        return states;
     }
 
     private static int packPositionHi(int x, int y, int z) {
@@ -504,6 +853,32 @@ class NativeChunkMeshEncoderTest {
 
     private static int packLightAndData(int light, int material, int section) {
         return ((light & 0xFFFF) << 0) | ((material & 0xFF) << 16) | ((section & 0xFF) << 24);
+    }
+
+    private static int packTextureForQuad(float vertexU, float vertexV,
+            float u0, float v0, float u1, float v1, float u2, float v2, float u3, float v3) {
+        float centerU = (u0 + u1 + u2 + u3) * 0.25F;
+        float centerV = (v0 + v1 + v2 + v3) * 0.25F;
+        int u = encodeTexture(centerU, vertexU);
+        int v = encodeTexture(centerV, vertexV);
+        return (u & 0xFFFF) | ((v & 0xFFFF) << 16);
+    }
+
+    private static int encodeTexture(float center, float value) {
+        int bias = value < center ? 1 : -1;
+        int quantized = Math.round(value * (1 << 15)) + bias;
+        return (quantized & 0x7fff) | ((bias >>> 31) << 15);
+    }
+
+    private static void assertSegmentPresent(int[] segments, int vertexCount, int facing) {
+        for (int index = 0; index < segments.length; index += 2) {
+            if (segments[index] == vertexCount && segments[index + 1] == facing) {
+                return;
+            }
+        }
+
+        org.junit.jupiter.api.Assertions.fail("Missing segment " + vertexCount + "/" + facing
+                + " in " + java.util.Arrays.toString(segments));
     }
 
     private static int encodeOld(float u, float v) {

@@ -27,6 +27,10 @@ public class SingleVariant implements BlockStateModel {
 		return this.model.particleIcon();
 	}
 
+	public BlockModelPart sodium$getModelPart() {
+		return this.model;
+	}
+
 	@Environment(EnvType.CLIENT)
 	public record Unbaked(Variant variant) implements BlockStateModel.Unbaked {
 		public static final Codec<SingleVariant.Unbaked> CODEC = Variant.CODEC.xmap(SingleVariant.Unbaked::new, SingleVariant.Unbaked::variant);

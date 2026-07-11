@@ -16,7 +16,6 @@ import net.sodium.client.model.quad.properties.ModelQuadFlags;
 import net.sodium.client.render.chunk.compile.buffers.ChunkModelBuilder;
 import net.sodium.client.render.chunk.terrain.material.Material;
 import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
-import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import net.sodium.client.services.PlatformBlockAccess;
 import net.sodium.api.util.DirectionUtil;
@@ -42,6 +41,12 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
     // TODO: move fluid rendering to a separate render pass and control glPolygonOffset and glDepthFunc to fix this properly
     public static final float EPSILON = 0.001f;
     private static final float ALIGNED_EQUALS_EPSILON = 0.011f;
+    private static final int FLUID_FACE_TOP_NE_SW = 0;
+    private static final int FLUID_FACE_TOP_NW_SE = 1;
+    private static final int FLUID_FACE_BOTTOM = 2;
+    private static final int FLUID_FACE_SIDE = 3;
+    private static final boolean JAVA_FLUID_DIAG = System.getenv("MATTMC_JAVA_FLUID_DIAG") != null;
+    private static int javaFluidDiagCount;
 
     private final BlockPos.MutableBlockPos scratchPos = new BlockPos.MutableBlockPos();
     private final MutableFloat scratchHeight = new MutableFloat(0);
@@ -62,11 +67,20 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
     private byte iris$isFluid;
     private byte iris$lightEmission;
     private int iris$localX, iris$localY, iris$localZ;
+    private int emittedQuadCount;
 
     public DefaultFluidRenderer(LightPipelineProvider lighters) {
         this.quad.setLightFace(Direction.UP);
 
         this.lighters = lighters;
+    }
+
+    public int getEmittedQuadCount() {
+        return this.emittedQuadCount;
+    }
+
+    public void resetEmittedQuadCount() {
+        this.emittedQuadCount = 0;
     }
 
     private boolean isFullBlockFluidOccluded(BlockAndTintGetter world, BlockPos pos, Direction dir, BlockState blockState, FluidState fluid) {
@@ -229,11 +243,17 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
             }
 
             this.updateQuad(quad, level, blockPos, lighter, Direction.UP, ModelQuadFacing.POS_Y, 1.0F, colorProvider, fluidState);
-            this.writeQuad(meshBuilder, collector, material, offset, quad, aligned ? ModelQuadFacing.POS_Y : ModelQuadFacing.UNASSIGNED, false);
+            int faceKind = creaseNorthEastSouthWest ? FLUID_FACE_TOP_NE_SW : FLUID_FACE_TOP_NW_SE;
+            this.writeFluidFace(meshBuilder, collector, material, offset, quad,
+                    aligned ? ModelQuadFacing.POS_Y : ModelQuadFacing.UNASSIGNED, false, faceKind, 0.0F,
+                    northWestHeight, southWestHeight, southEastHeight, northEastHeight,
+                    0.0F, 0.0F, 0.0F, 0.0F);
 
             if (fluidState.shouldRenderBackwardUpFace(level, this.scratchPos.set(posX, posY + 1, posZ))) {
-                this.writeQuad(meshBuilder, collector, material, offset, quad,
-                        aligned ? ModelQuadFacing.NEG_Y : ModelQuadFacing.UNASSIGNED, true);
+                this.writeFluidFace(meshBuilder, collector, material, offset, quad,
+                        aligned ? ModelQuadFacing.NEG_Y : ModelQuadFacing.UNASSIGNED, true, faceKind, 0.0F,
+                        northWestHeight, southWestHeight, southEastHeight, northEastHeight,
+                        0.0F, 0.0F, 0.0F, 0.0F);
             }
         }
 
@@ -252,7 +272,9 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
             setVertex(quad, 3, 1.0F, yOffset, 1.0F, maxU, maxV);
 
             this.updateQuad(quad, level, blockPos, lighter, Direction.DOWN, ModelQuadFacing.NEG_Y, 1.0F, colorProvider, fluidState);
-            this.writeQuad(meshBuilder, collector, material, offset, quad, ModelQuadFacing.NEG_Y, false);
+            this.writeFluidFace(meshBuilder, collector, material, offset, quad, ModelQuadFacing.NEG_Y, false,
+                    FLUID_FACE_BOTTOM, yOffset, 0.0F, 0.0F, 0.0F, 0.0F,
+                    0.0F, 0.0F, 0.0F, 0.0F);
         }
 
         quad.setFlags(ModelQuadFlags.IS_PARALLEL | ModelQuadFlags.IS_ALIGNED);
@@ -356,10 +378,12 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
                 ModelQuadFacing facing = ModelQuadFacing.fromDirection(dir);
 
                 this.updateQuad(quad, level, blockPos, lighter, dir, facing, br, colorProvider, fluidState);
-                this.writeQuad(meshBuilder, collector, material, offset, quad, facing, false);
+                this.writeFluidFace(meshBuilder, collector, material, offset, quad, facing, false,
+                        FLUID_FACE_SIDE, yOffset, c1, c2, 0.0F, 0.0F, x1, z1, x2, z2);
 
                 if (!isOverlay) {
-                    this.writeQuad(meshBuilder, collector, material, offset, quad, facing.getOpposite(), true);
+                    this.writeFluidFace(meshBuilder, collector, material, offset, quad, facing.getOpposite(), true,
+                            FLUID_FACE_SIDE, yOffset, c1, c2, 0.0F, 0.0F, x1, z1, x2, z2);
                 }
 
             }
@@ -419,29 +443,109 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
                 normal = NormI8.flipPacked(normal);
             }
 
-            long quadAddress = vertexBuffer.prepareStagedTranslucentQuad(material.bits(), collector, facing,
-                    iris$lightEmission, iris$isFluid, false, iris$blockId, iris$localX, iris$localY, iris$localZ);
-            this.writeNativeQuad(quadAddress, material.bits(), offset, quad, flip);
-
-            if (vertexBuffer.commitStagedTranslucentQuad(quadAddress, collector, facing, normal)) {
+            if (this.appendNativeQuad(vertexBuffer, material.bits(), offset, quad, flip, collector, facing, normal)) {
                 return;
             }
         } else {
-            long quadAddress = vertexBuffer.prepareStagedQuad(material.bits(), iris$lightEmission, iris$isFluid,
-                    false, iris$blockId, iris$localX, iris$localY, iris$localZ);
-            this.writeNativeQuad(quadAddress, material.bits(), offset, quad, flip);
-            vertexBuffer.commitStagedQuad();
+            this.appendNativeQuad(vertexBuffer, material.bits(), offset, quad, flip, null, null, 0);
         }
     }
 
-    private void writeNativeQuad(long quadAddress, int materialBits, BlockPos offset, ModelQuadView quad, boolean flip) {
+    private void writeFluidFace(ChunkModelBuilder builder, TranslucentGeometryCollector collector, Material material,
+            BlockPos offset, ModelQuadView quad, ModelQuadFacing facing, boolean flip, int faceKind, float yOffset,
+            float height0, float height1, float height2, float height3,
+            float sideX1, float sideZ1, float sideX2, float sideZ2) {
+        this.emittedQuadCount++;
+        if (JAVA_FLUID_DIAG && javaFluidDiagCount < 80 && faceKind == FLUID_FACE_TOP_NE_SW
+                && this.iris$localX >= 0 && this.iris$localX <= 160
+                && this.iris$localY >= 60 && this.iris$localY <= 72
+                && this.iris$localZ >= 360 && this.iris$localZ <= 660) {
+            int index = javaFluidDiagCount++;
+            System.out.printf("MATTMC_JAVA_FLUID_DIAG #%d pos=%d,%d,%d blockId=%d renderType=%d material=%d facing=%s flip=%s face=%d origin=%d,%d,%d yOffset=%.4f heights=%.4f,%.4f,%.4f,%.4f uv0=%.5f,%.5f uv1=%.5f,%.5f uv2=%.5f,%.5f uv3=%.5f,%.5f color0=0x%08x ao0=%.4f light0=0x%08x collector=%s%n",
+                    index, this.iris$localX, this.iris$localY, this.iris$localZ, this.iris$blockId,
+                    this.iris$isFluid, material.bits(), facing, flip, faceKind, offset.getX(), offset.getY(),
+                    offset.getZ(), yOffset, height0, height1, height2, height3,
+                    quad.getTexU(0), quad.getTexV(0), quad.getTexU(1), quad.getTexV(1),
+                    quad.getTexU(2), quad.getTexV(2), quad.getTexU(3), quad.getTexV(3),
+                    this.quadColors[0], this.brightness[0], this.quadLightData.lm[0], collector != null);
+        }
+        TextureAtlasSprite sprite = quad.getSprite();
+
+        if (sprite != null) {
+            builder.addSprite(sprite);
+        }
+
+        NativeSectionMeshBuilder.FacingBuffer vertexBuffer = builder.getVertexBuffer(facing);
+        if (material.isTranslucent() && collector != null) {
+            if (!collector.supportsNativeBatching()) {
+                this.writeQuad(builder, collector, material, offset, quad, facing, flip);
+                return;
+            }
+
+            int normal;
+
+            if (facing.isAligned()) {
+                normal = facing.getPackedAlignedNormal();
+            } else {
+                normal = quad.getFaceNormal();
+            }
+
+            if (flip) {
+                normal = NormI8.flipPacked(normal);
+            }
+
+            vertexBuffer.appendTranslucentFluidFace(material.bits(), collector, facing, normal, iris$lightEmission,
+                    iris$isFluid, false, iris$blockId, iris$localX, iris$localY, iris$localZ, faceKind, flip,
+                    offset.getX(), offset.getY(), offset.getZ(), yOffset,
+                    height0, height1, height2, height3, sideX1, sideZ1, sideX2, sideZ2,
+                    quad.getTexU(0), quad.getTexV(0), quad.getTexU(1), quad.getTexV(1),
+                    quad.getTexU(2), quad.getTexV(2), quad.getTexU(3), quad.getTexV(3),
+                    this.quadColors[0], this.quadColors[1], this.quadColors[2], this.quadColors[3],
+                    this.brightness[0], this.brightness[1], this.brightness[2], this.brightness[3],
+                    this.quadLightData.lm[0], this.quadLightData.lm[1], this.quadLightData.lm[2],
+                    this.quadLightData.lm[3]);
+            return;
+        }
+
+        vertexBuffer.appendFluidFace(material.bits(), iris$lightEmission, iris$isFluid, false, iris$blockId,
+                iris$localX, iris$localY, iris$localZ, faceKind, flip, 0,
+                offset.getX(), offset.getY(), offset.getZ(), yOffset,
+                height0, height1, height2, height3, sideX1, sideZ1, sideX2, sideZ2,
+                quad.getTexU(0), quad.getTexV(0), quad.getTexU(1), quad.getTexV(1),
+                quad.getTexU(2), quad.getTexV(2), quad.getTexU(3), quad.getTexV(3),
+                this.quadColors[0], this.quadColors[1], this.quadColors[2], this.quadColors[3],
+                this.brightness[0], this.brightness[1], this.brightness[2], this.brightness[3],
+                this.quadLightData.lm[0], this.quadLightData.lm[1], this.quadLightData.lm[2],
+                this.quadLightData.lm[3]);
+    }
+
+    private boolean appendNativeQuad(NativeSectionMeshBuilder.FacingBuffer vertexBuffer, int materialBits,
+            BlockPos offset, ModelQuadView quad, boolean flip, TranslucentGeometryCollector collector,
+            ModelQuadFacing collectorFacing, int packedNormal) {
         int src0 = 0;
         int src1 = flip ? 3 : 1;
         int src2 = 2;
         int src3 = flip ? 1 : 3;
 
-        NativeChunkMeshEncoder.writeNativeQuad(quadAddress, iris$lightEmission, iris$isFluid, false, iris$blockId,
-                iris$localX, iris$localY, iris$localZ, materialBits,
+        if (collector != null) {
+            return vertexBuffer.appendFlatTranslucentQuad(materialBits, collector, collectorFacing, packedNormal,
+                    iris$lightEmission, iris$isFluid, false, iris$blockId, iris$localX, iris$localY, iris$localZ,
+                    offset.getX() + quad.getX(src0), offset.getY() + quad.getY(src0), offset.getZ() + quad.getZ(src0),
+                    this.quadColors[src0], this.brightness[src0], quad.getTexU(src0), quad.getTexV(src0),
+                    this.quadLightData.lm[src0],
+                    offset.getX() + quad.getX(src1), offset.getY() + quad.getY(src1), offset.getZ() + quad.getZ(src1),
+                    this.quadColors[src1], this.brightness[src1], quad.getTexU(src1), quad.getTexV(src1),
+                    this.quadLightData.lm[src1],
+                    offset.getX() + quad.getX(src2), offset.getY() + quad.getY(src2), offset.getZ() + quad.getZ(src2),
+                    this.quadColors[src2], this.brightness[src2], quad.getTexU(src2), quad.getTexV(src2),
+                    this.quadLightData.lm[src2],
+                    offset.getX() + quad.getX(src3), offset.getY() + quad.getY(src3), offset.getZ() + quad.getZ(src3),
+                    this.quadColors[src3], this.brightness[src3], quad.getTexU(src3), quad.getTexV(src3),
+                    this.quadLightData.lm[src3]);
+        }
+
+        vertexBuffer.appendFlatQuad(materialBits, iris$lightEmission, iris$isFluid, false, iris$blockId,
+                iris$localX, iris$localY, iris$localZ,
                 offset.getX() + quad.getX(src0), offset.getY() + quad.getY(src0), offset.getZ() + quad.getZ(src0),
                 this.quadColors[src0], this.brightness[src0], quad.getTexU(src0), quad.getTexV(src0),
                 this.quadLightData.lm[src0],
@@ -454,6 +558,7 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
                 offset.getX() + quad.getX(src3), offset.getY() + quad.getY(src3), offset.getZ() + quad.getZ(src3),
                 this.quadColors[src3], this.brightness[src3], quad.getTexU(src3), quad.getTexV(src3),
                 this.quadLightData.lm[src3]);
+        return false;
     }
 
     private static void setVertex(ModelQuadViewMutable quad, int i, float x, float y, float z, float u, float v) {

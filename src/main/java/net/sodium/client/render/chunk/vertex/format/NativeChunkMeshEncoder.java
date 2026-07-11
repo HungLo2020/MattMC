@@ -14,8 +14,111 @@ import java.nio.IntBuffer;
 
 public final class NativeChunkMeshEncoder {
     public static final int NATIVE_QUAD_STRIDE = 152;
+    public static final int FLAT_QUAD_RECORD_STRIDE = 156;
+    public static final int LIGHT_BLOCK_RECORD_STRIDE = 24;
+    public static final int FLUID_FACE_RECORD_STRIDE = 172;
+    public static final int STATIC_MODEL_VERTEX_RECORD_STRIDE = 28;
+    public static final int STATIC_MODEL_QUAD_RECORD_STRIDE = 160;
+    public static final int STATIC_MODEL_BLOCK_RECORD_STRIDE = 52;
+    public static final int NATIVE_SECTION_BLOCK_RECORD_STRIDE = 316;
+    public static final int NATIVE_MODEL_SELECTOR_ENTRY_STRIDE = 8;
+    public static final int NATIVE_SECTION_BLOCK_FLAG_SUPPRESS_FLUID = 1;
 
     private static final int OK = 0;
+    private static final int VERTEX_STRIDE = 32;
+    private static final int VERTEX_X_OFFSET = 0;
+    private static final int VERTEX_Y_OFFSET = 4;
+    private static final int VERTEX_Z_OFFSET = 8;
+    private static final int VERTEX_COLOR_OFFSET = 12;
+    private static final int VERTEX_AO_OFFSET = 16;
+    private static final int VERTEX_U_OFFSET = 20;
+    private static final int VERTEX_V_OFFSET = 24;
+    private static final int VERTEX_LIGHT_OFFSET = 28;
+    private static final int QUAD_BLOCK_EMISSION_OFFSET = 128;
+    private static final int QUAD_RENDER_TYPE_OFFSET = 129;
+    private static final int QUAD_IGNORE_MID_BLOCK_OFFSET = 130;
+    private static final int QUAD_PADDING_OFFSET = 131;
+    private static final int QUAD_BLOCK_ID_OFFSET = 132;
+    private static final int QUAD_LOCAL_X_OFFSET = 136;
+    private static final int QUAD_LOCAL_Y_OFFSET = 140;
+    private static final int QUAD_LOCAL_Z_OFFSET = 144;
+    private static final int QUAD_MATERIAL_BITS_OFFSET = 148;
+    private static final int FLAT_QUAD_PACKED_NORMAL_OFFSET = 152;
+    private static final int LIGHT_BLOCK_MATERIAL_BITS_OFFSET = 0;
+    private static final int LIGHT_BLOCK_EMISSION_OFFSET = 4;
+    private static final int LIGHT_BLOCK_ID_OFFSET = 8;
+    private static final int LIGHT_BLOCK_LOCAL_X_OFFSET = 12;
+    private static final int LIGHT_BLOCK_LOCAL_Y_OFFSET = 16;
+    private static final int LIGHT_BLOCK_LOCAL_Z_OFFSET = 20;
+    private static final int FLUID_FACE_PACKED_NORMAL_OFFSET = 0;
+    private static final int FLUID_FACE_MATERIAL_BITS_OFFSET = 4;
+    private static final int FLUID_FACE_BLOCK_EMISSION_OFFSET = 8;
+    private static final int FLUID_FACE_RENDER_TYPE_OFFSET = 12;
+    private static final int FLUID_FACE_IGNORE_MID_BLOCK_OFFSET = 16;
+    private static final int FLUID_FACE_BLOCK_ID_OFFSET = 20;
+    private static final int FLUID_FACE_LOCAL_X_OFFSET = 24;
+    private static final int FLUID_FACE_LOCAL_Y_OFFSET = 28;
+    private static final int FLUID_FACE_LOCAL_Z_OFFSET = 32;
+    private static final int FLUID_FACE_KIND_OFFSET = 36;
+    private static final int FLUID_FACE_FLIP_OFFSET = 40;
+    private static final int FLUID_FACE_ORIGIN_X_OFFSET = 44;
+    private static final int FLUID_FACE_ORIGIN_Y_OFFSET = 48;
+    private static final int FLUID_FACE_ORIGIN_Z_OFFSET = 52;
+    private static final int FLUID_FACE_Y_OFFSET_OFFSET = 56;
+    private static final int FLUID_FACE_HEIGHTS_OFFSET = 60;
+    private static final int FLUID_FACE_SIDE_COORDS_OFFSET = 76;
+    private static final int FLUID_FACE_UVS_OFFSET = 92;
+    private static final int FLUID_FACE_COLORS_OFFSET = 124;
+    private static final int FLUID_FACE_AO_OFFSET = 140;
+    private static final int FLUID_FACE_LIGHTS_OFFSET = 156;
+    private static final int STATIC_MODEL_QUAD_VERTICES_OFFSET = 0;
+    private static final int STATIC_MODEL_QUAD_MATERIAL_BITS_OFFSET = 112;
+    private static final int STATIC_MODEL_QUAD_CULL_FACE_OFFSET = 116;
+    private static final int STATIC_MODEL_QUAD_NORMAL_FACE_OFFSET = 120;
+    private static final int STATIC_MODEL_QUAD_PACKED_NORMAL_OFFSET = 124;
+    private static final int STATIC_MODEL_QUAD_BLOCK_EMISSION_OFFSET = 128;
+    private static final int STATIC_MODEL_QUAD_RENDER_TYPE_OFFSET = 132;
+    private static final int STATIC_MODEL_QUAD_SHADE_OFFSET = 136;
+    private static final int STATIC_MODEL_QUAD_FLAGS_OFFSET = 140;
+    private static final int STATIC_MODEL_QUAD_LIGHT_FACE_OFFSET = 144;
+    private static final int STATIC_MODEL_QUAD_TINT_INDEX_OFFSET = 148;
+    private static final int STATIC_MODEL_QUAD_HAS_AO_OFFSET = 152;
+    private static final int STATIC_MODEL_BLOCK_MODEL_ID_OFFSET = 0;
+    private static final int STATIC_MODEL_BLOCK_MATERIAL_BITS_OFFSET = 4;
+    private static final int STATIC_MODEL_BLOCK_EMISSION_OFFSET = 8;
+    private static final int STATIC_MODEL_BLOCK_RENDER_TYPE_OFFSET = 12;
+    private static final int STATIC_MODEL_BLOCK_ID_OFFSET = 16;
+    private static final int STATIC_MODEL_BLOCK_LOCAL_X_OFFSET = 20;
+    private static final int STATIC_MODEL_BLOCK_LOCAL_Y_OFFSET = 24;
+    private static final int STATIC_MODEL_BLOCK_LOCAL_Z_OFFSET = 28;
+    private static final int STATIC_MODEL_BLOCK_CULL_MASK_OFFSET = 32;
+    private static final int STATIC_MODEL_BLOCK_OFFSET_X_OFFSET = 40;
+    private static final int STATIC_MODEL_BLOCK_OFFSET_Y_OFFSET = 44;
+    private static final int STATIC_MODEL_BLOCK_OFFSET_Z_OFFSET = 48;
+    private static final int NATIVE_SECTION_BLOCK_STATE_ID_OFFSET = 0;
+    private static final int NATIVE_SECTION_BLOCK_BLOCK_ID_OFFSET = 4;
+    private static final int NATIVE_SECTION_BLOCK_LOCAL_X_OFFSET = 8;
+    private static final int NATIVE_SECTION_BLOCK_LOCAL_Y_OFFSET = 12;
+    private static final int NATIVE_SECTION_BLOCK_LOCAL_Z_OFFSET = 16;
+    private static final int NATIVE_SECTION_BLOCK_SEED_LO_OFFSET = 20;
+    private static final int NATIVE_SECTION_BLOCK_SEED_HI_OFFSET = 24;
+    private static final int NATIVE_SECTION_BLOCK_NEIGHBOR_IDS_OFFSET = 28;
+    private static final int NATIVE_SECTION_BLOCK_LIGHT_WORDS_OFFSET = 52;
+    private static final int NATIVE_SECTION_BLOCK_NEIGHBORHOOD_STATE_IDS_OFFSET = 160;
+    private static final int NATIVE_SECTION_BLOCK_TINT_OFFSET = 268;
+    private static final int NATIVE_SECTION_BLOCK_FLUID_TINT_OFFSET = 272;
+    private static final int NATIVE_SECTION_BLOCK_FLUID_FLOW_X_OFFSET = 276;
+    private static final int NATIVE_SECTION_BLOCK_FLUID_FLOW_Z_OFFSET = 280;
+    private static final int NATIVE_SECTION_BLOCK_ABSOLUTE_X_OFFSET = 284;
+    private static final int NATIVE_SECTION_BLOCK_ABSOLUTE_Y_OFFSET = 288;
+    private static final int NATIVE_SECTION_BLOCK_ABSOLUTE_Z_OFFSET = 292;
+    private static final int NATIVE_SECTION_BLOCK_LEGACY_OFFSET_X_OFFSET = 296;
+    private static final int NATIVE_SECTION_BLOCK_LEGACY_OFFSET_Y_OFFSET = 300;
+    private static final int NATIVE_SECTION_BLOCK_LEGACY_OFFSET_Z_OFFSET = 304;
+    private static final int NATIVE_SECTION_BLOCK_RESERVED_OFFSET = 308;
+    private static final int NATIVE_SECTION_BLOCK_FLAGS_OFFSET = 312;
+    private static final int NATIVE_MODEL_SELECTOR_ENTRY_TARGET_OFFSET = 0;
+    private static final int NATIVE_MODEL_SELECTOR_ENTRY_WEIGHT_OFFSET = 4;
     public static final int COMPACT_VALUE_STRIDE = 0;
     public static final int COMPACT_VALUE_POSITION_OFFSET = 1;
     public static final int COMPACT_VALUE_COLOR_OFFSET = 2;
@@ -306,6 +409,314 @@ public final class NativeChunkMeshEncoder {
                 x1, y1, z1, color1, ao1, u1, v1, light1,
                 x2, y2, z2, color2, ao2, u2, v2, light2,
                 x3, y3, z3, color3, ao3, u3, v3, light3), "native quad writing");
+    }
+
+    public static void writeNativeQuadMemory(
+            long ptr,
+            byte blockEmission,
+            byte renderType,
+            boolean ignoreMidBlock,
+            int blockId,
+            int localX,
+            int localY,
+            int localZ,
+            int materialBits,
+            float x0, float y0, float z0, int color0, float ao0, float u0, float v0, int light0,
+            float x1, float y1, float z1, int color1, float ao1, float u1, float v1, int light1,
+            float x2, float y2, float z2, int color2, float ao2, float u2, float v2, int light2,
+            float x3, float y3, float z3, int color3, float ao3, float u3, float v3, int light3
+    ) {
+        writeNativeQuadMemoryUnchecked(ptr, blockEmission, renderType, ignoreMidBlock, blockId, localX, localY,
+                localZ, materialBits,
+                x0, y0, z0, color0, ao0, u0, v0, light0,
+                x1, y1, z1, color1, ao1, u1, v1, light1,
+                x2, y2, z2, color2, ao2, u2, v2, light2,
+                x3, y3, z3, color3, ao3, u3, v3, light3);
+    }
+
+    public static void writeFlatQuadRecord(
+            long ptr,
+            int packedNormal,
+            byte blockEmission,
+            byte renderType,
+            boolean ignoreMidBlock,
+            int blockId,
+            int localX,
+            int localY,
+            int localZ,
+            int materialBits,
+            float x0, float y0, float z0, int color0, float ao0, float u0, float v0, int light0,
+            float x1, float y1, float z1, int color1, float ao1, float u1, float v1, int light1,
+            float x2, float y2, float z2, int color2, float ao2, float u2, float v2, int light2,
+            float x3, float y3, float z3, int color3, float ao3, float u3, float v3, int light3
+    ) {
+        writeNativeQuadMemoryUnchecked(ptr, blockEmission, renderType, ignoreMidBlock, blockId, localX, localY,
+                localZ, materialBits,
+                x0, y0, z0, color0, ao0, u0, v0, light0,
+                x1, y1, z1, color1, ao1, u1, v1, light1,
+                x2, y2, z2, color2, ao2, u2, v2, light2,
+                x3, y3, z3, color3, ao3, u3, v3, light3);
+        MemoryUtil.memPutInt(ptr + FLAT_QUAD_PACKED_NORMAL_OFFSET, packedNormal);
+    }
+
+    public static void writeLightBlockRecord(long ptr, int materialBits, byte blockEmission, int blockId,
+            int localX, int localY, int localZ) {
+        MemoryUtil.memPutInt(ptr + LIGHT_BLOCK_MATERIAL_BITS_OFFSET, materialBits);
+        MemoryUtil.memPutInt(ptr + LIGHT_BLOCK_EMISSION_OFFSET, blockEmission & 0xff);
+        MemoryUtil.memPutInt(ptr + LIGHT_BLOCK_ID_OFFSET, blockId);
+        MemoryUtil.memPutInt(ptr + LIGHT_BLOCK_LOCAL_X_OFFSET, localX);
+        MemoryUtil.memPutInt(ptr + LIGHT_BLOCK_LOCAL_Y_OFFSET, localY);
+        MemoryUtil.memPutInt(ptr + LIGHT_BLOCK_LOCAL_Z_OFFSET, localZ);
+    }
+
+    public static void writeFluidFaceRecord(long ptr, int packedNormal, int materialBits, byte blockEmission,
+            byte renderType, boolean ignoreMidBlock, int blockId, int localX, int localY, int localZ,
+            int faceKind, boolean flip, int originX, int originY, int originZ, float yOffset,
+            float height0, float height1, float height2, float height3,
+            float sideX1, float sideZ1, float sideX2, float sideZ2,
+            float u0, float v0, float u1, float v1, float u2, float v2, float u3, float v3,
+            int color0, int color1, int color2, int color3,
+            float ao0, float ao1, float ao2, float ao3,
+            int light0, int light1, int light2, int light3) {
+        MemoryUtil.memPutInt(ptr + FLUID_FACE_PACKED_NORMAL_OFFSET, packedNormal);
+        MemoryUtil.memPutInt(ptr + FLUID_FACE_MATERIAL_BITS_OFFSET, materialBits);
+        MemoryUtil.memPutInt(ptr + FLUID_FACE_BLOCK_EMISSION_OFFSET, blockEmission & 0xff);
+        MemoryUtil.memPutInt(ptr + FLUID_FACE_RENDER_TYPE_OFFSET, renderType & 0xff);
+        MemoryUtil.memPutInt(ptr + FLUID_FACE_IGNORE_MID_BLOCK_OFFSET, ignoreMidBlock ? 1 : 0);
+        MemoryUtil.memPutInt(ptr + FLUID_FACE_BLOCK_ID_OFFSET, blockId);
+        MemoryUtil.memPutInt(ptr + FLUID_FACE_LOCAL_X_OFFSET, localX);
+        MemoryUtil.memPutInt(ptr + FLUID_FACE_LOCAL_Y_OFFSET, localY);
+        MemoryUtil.memPutInt(ptr + FLUID_FACE_LOCAL_Z_OFFSET, localZ);
+        MemoryUtil.memPutInt(ptr + FLUID_FACE_KIND_OFFSET, faceKind);
+        MemoryUtil.memPutInt(ptr + FLUID_FACE_FLIP_OFFSET, flip ? 1 : 0);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_ORIGIN_X_OFFSET, originX);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_ORIGIN_Y_OFFSET, originY);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_ORIGIN_Z_OFFSET, originZ);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_Y_OFFSET_OFFSET, yOffset);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_HEIGHTS_OFFSET, height0);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_HEIGHTS_OFFSET + 4, height1);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_HEIGHTS_OFFSET + 8, height2);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_HEIGHTS_OFFSET + 12, height3);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_SIDE_COORDS_OFFSET, sideX1);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_SIDE_COORDS_OFFSET + 4, sideZ1);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_SIDE_COORDS_OFFSET + 8, sideX2);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_SIDE_COORDS_OFFSET + 12, sideZ2);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_UVS_OFFSET, u0);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_UVS_OFFSET + 4, v0);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_UVS_OFFSET + 8, u1);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_UVS_OFFSET + 12, v1);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_UVS_OFFSET + 16, u2);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_UVS_OFFSET + 20, v2);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_UVS_OFFSET + 24, u3);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_UVS_OFFSET + 28, v3);
+        MemoryUtil.memPutInt(ptr + FLUID_FACE_COLORS_OFFSET, color0);
+        MemoryUtil.memPutInt(ptr + FLUID_FACE_COLORS_OFFSET + 4, color1);
+        MemoryUtil.memPutInt(ptr + FLUID_FACE_COLORS_OFFSET + 8, color2);
+        MemoryUtil.memPutInt(ptr + FLUID_FACE_COLORS_OFFSET + 12, color3);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_AO_OFFSET, ao0);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_AO_OFFSET + 4, ao1);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_AO_OFFSET + 8, ao2);
+        MemoryUtil.memPutFloat(ptr + FLUID_FACE_AO_OFFSET + 12, ao3);
+        MemoryUtil.memPutInt(ptr + FLUID_FACE_LIGHTS_OFFSET, light0);
+        MemoryUtil.memPutInt(ptr + FLUID_FACE_LIGHTS_OFFSET + 4, light1);
+        MemoryUtil.memPutInt(ptr + FLUID_FACE_LIGHTS_OFFSET + 8, light2);
+        MemoryUtil.memPutInt(ptr + FLUID_FACE_LIGHTS_OFFSET + 12, light3);
+    }
+
+    public static void writeStaticModelQuadRecord(long ptr, int materialBits, int cullFace, int normalFace,
+            int packedNormal, byte blockEmission, byte renderType, boolean shade, int flags, int lightFace,
+            int tintIndex, boolean hasAo,
+            float x0, float y0, float z0, int color0, float u0, float v0, int light0,
+            float x1, float y1, float z1, int color1, float u1, float v1, int light1,
+            float x2, float y2, float z2, int color2, float u2, float v2, int light2,
+            float x3, float y3, float z3, int color3, float u3, float v3, int light3) {
+        writeStaticModelVertexRecord(ptr + STATIC_MODEL_QUAD_VERTICES_OFFSET,
+                x0, y0, z0, color0, u0, v0, light0);
+        writeStaticModelVertexRecord(ptr + STATIC_MODEL_QUAD_VERTICES_OFFSET + STATIC_MODEL_VERTEX_RECORD_STRIDE,
+                x1, y1, z1, color1, u1, v1, light1);
+        writeStaticModelVertexRecord(ptr + STATIC_MODEL_QUAD_VERTICES_OFFSET + 2L * STATIC_MODEL_VERTEX_RECORD_STRIDE,
+                x2, y2, z2, color2, u2, v2, light2);
+        writeStaticModelVertexRecord(ptr + STATIC_MODEL_QUAD_VERTICES_OFFSET + 3L * STATIC_MODEL_VERTEX_RECORD_STRIDE,
+                x3, y3, z3, color3, u3, v3, light3);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_MATERIAL_BITS_OFFSET, materialBits);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_CULL_FACE_OFFSET, cullFace);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_NORMAL_FACE_OFFSET, normalFace);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_PACKED_NORMAL_OFFSET, packedNormal);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_BLOCK_EMISSION_OFFSET, blockEmission & 0xff);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_RENDER_TYPE_OFFSET, renderType & 0xff);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_SHADE_OFFSET, shade ? 1 : 0);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_FLAGS_OFFSET, flags);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_LIGHT_FACE_OFFSET, lightFace);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_TINT_INDEX_OFFSET, tintIndex);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_HAS_AO_OFFSET, hasAo ? 1 : 0);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_HAS_AO_OFFSET + 4, 0);
+    }
+
+    public static void writeStaticModelQuadRecord(long ptr, int materialBits, int cullFace, int normalFace,
+            int packedNormal, byte blockEmission, byte renderType, boolean shade,
+            float x0, float y0, float z0, int color0, float u0, float v0, int light0,
+            float x1, float y1, float z1, int color1, float u1, float v1, int light1,
+            float x2, float y2, float z2, int color2, float u2, float v2, int light2,
+            float x3, float y3, float z3, int color3, float u3, float v3, int light3) {
+        writeStaticModelQuadRecord(ptr, materialBits, cullFace, normalFace, packedNormal, blockEmission, renderType,
+                shade, 0, cullFace >= 0 ? cullFace : 1, -1, true,
+                x0, y0, z0, color0, u0, v0, light0,
+                x1, y1, z1, color1, u1, v1, light1,
+                x2, y2, z2, color2, u2, v2, light2,
+                x3, y3, z3, color3, u3, v3, light3);
+    }
+
+    public static void writeStaticModelBlockRecord(long ptr, int modelId, int materialBits, byte blockEmission,
+            byte renderType, int blockId, int localX, int localY, int localZ, int cullMask,
+            float offsetX, float offsetY, float offsetZ) {
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_MODEL_ID_OFFSET, modelId);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_MATERIAL_BITS_OFFSET, materialBits);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_EMISSION_OFFSET, blockEmission & 0xff);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_RENDER_TYPE_OFFSET, renderType & 0xff);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_ID_OFFSET, blockId);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_LOCAL_X_OFFSET, localX);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_LOCAL_Y_OFFSET, localY);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_LOCAL_Z_OFFSET, localZ);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_CULL_MASK_OFFSET, cullMask);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_CULL_MASK_OFFSET + 4, 0);
+        MemoryUtil.memPutFloat(ptr + STATIC_MODEL_BLOCK_OFFSET_X_OFFSET, offsetX);
+        MemoryUtil.memPutFloat(ptr + STATIC_MODEL_BLOCK_OFFSET_Y_OFFSET, offsetY);
+        MemoryUtil.memPutFloat(ptr + STATIC_MODEL_BLOCK_OFFSET_Z_OFFSET, offsetZ);
+    }
+
+    public static void writeNativeSectionBlockRecord(long ptr, int stateId, int blockId, int localX, int localY,
+            int localZ, long seed, int neighborDown, int neighborUp, int neighborNorth, int neighborSouth,
+            int neighborWest, int neighborEast, int[] lightWords, int[] neighborhoodStateIds, int tint,
+            int fluidTint, float fluidFlowX, float fluidFlowZ, int absoluteX, int absoluteY, int absoluteZ) {
+        MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_STATE_ID_OFFSET, stateId);
+        MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_BLOCK_ID_OFFSET, blockId);
+        MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_LOCAL_X_OFFSET, localX);
+        MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_LOCAL_Y_OFFSET, localY);
+        MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_LOCAL_Z_OFFSET, localZ);
+        MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_SEED_LO_OFFSET, (int) seed);
+        MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_SEED_HI_OFFSET, (int) (seed >>> 32));
+        MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_NEIGHBOR_IDS_OFFSET, neighborDown);
+        MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_NEIGHBOR_IDS_OFFSET + 4, neighborUp);
+        MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_NEIGHBOR_IDS_OFFSET + 8, neighborNorth);
+        MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_NEIGHBOR_IDS_OFFSET + 12, neighborSouth);
+        MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_NEIGHBOR_IDS_OFFSET + 16, neighborWest);
+        MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_NEIGHBOR_IDS_OFFSET + 20, neighborEast);
+        for (int i = 0; i < 27; i++) {
+            MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_LIGHT_WORDS_OFFSET + (long) i * 4, lightWords[i]);
+            MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_NEIGHBORHOOD_STATE_IDS_OFFSET + (long) i * 4, neighborhoodStateIds[i]);
+        }
+        MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_TINT_OFFSET, tint);
+        MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_FLUID_TINT_OFFSET, fluidTint);
+        MemoryUtil.memPutFloat(ptr + NATIVE_SECTION_BLOCK_FLUID_FLOW_X_OFFSET, fluidFlowX);
+        MemoryUtil.memPutFloat(ptr + NATIVE_SECTION_BLOCK_FLUID_FLOW_Z_OFFSET, fluidFlowZ);
+        MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_ABSOLUTE_X_OFFSET, absoluteX);
+        MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_ABSOLUTE_Y_OFFSET, absoluteY);
+        MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_ABSOLUTE_Z_OFFSET, absoluteZ);
+        MemoryUtil.memPutFloat(ptr + NATIVE_SECTION_BLOCK_LEGACY_OFFSET_X_OFFSET, 0.0F);
+        MemoryUtil.memPutFloat(ptr + NATIVE_SECTION_BLOCK_LEGACY_OFFSET_Y_OFFSET, 0.0F);
+        MemoryUtil.memPutFloat(ptr + NATIVE_SECTION_BLOCK_LEGACY_OFFSET_Z_OFFSET, 0.0F);
+        MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_RESERVED_OFFSET, -1);
+        for (int offset = 0; offset < 8; offset += 4) {
+            if (offset != 0) {
+                MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_RESERVED_OFFSET + offset, 0);
+            }
+        }
+    }
+
+    public static void writeNativeSectionBlockFluidBlockId(long ptr, int fluidBlockId) {
+        MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_RESERVED_OFFSET, fluidBlockId);
+    }
+
+    public static void writeNativeSectionBlockFlags(long ptr, int flags) {
+        MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_FLAGS_OFFSET, flags);
+    }
+
+    public static void writeNativeSectionBlockRecord(long ptr, int stateId, int blockId, int localX, int localY,
+            int localZ, long seed, int neighborDown, int neighborUp, int neighborNorth, int neighborSouth,
+            int neighborWest, int neighborEast, int lightmap, float offsetX, float offsetY, float offsetZ) {
+        int[] lightWords = new int[27];
+        int packedWord = ((LightTextureBlock(lightmap) & 0xF) | ((LightTextureSky(lightmap) & 0xF) << 4));
+        for (int i = 0; i < lightWords.length; i++) {
+            lightWords[i] = packedWord;
+        }
+        int[] neighborhoodStateIds = new int[27];
+        for (int i = 0; i < neighborhoodStateIds.length; i++) {
+            neighborhoodStateIds[i] = 0;
+        }
+        neighborhoodStateIds[13] = stateId;
+        writeNativeSectionBlockRecord(ptr, stateId, blockId, localX, localY, localZ, seed, neighborDown, neighborUp,
+                neighborNorth, neighborSouth, neighborWest, neighborEast, lightWords, neighborhoodStateIds, -1, -1,
+                0.0F, 0.0F, localX, localY, localZ);
+        MemoryUtil.memPutFloat(ptr + NATIVE_SECTION_BLOCK_LEGACY_OFFSET_X_OFFSET, offsetX);
+        MemoryUtil.memPutFloat(ptr + NATIVE_SECTION_BLOCK_LEGACY_OFFSET_Y_OFFSET, offsetY);
+        MemoryUtil.memPutFloat(ptr + NATIVE_SECTION_BLOCK_LEGACY_OFFSET_Z_OFFSET, offsetZ);
+    }
+
+    private static int LightTextureBlock(int lightmap) {
+        return (lightmap >> 4) & 0xF;
+    }
+
+    private static int LightTextureSky(int lightmap) {
+        return (lightmap >> 20) & 0xF;
+    }
+
+    public static void writeNativeModelSelectorEntry(long ptr, int targetId, int weight) {
+        MemoryUtil.memPutInt(ptr + NATIVE_MODEL_SELECTOR_ENTRY_TARGET_OFFSET, targetId);
+        MemoryUtil.memPutInt(ptr + NATIVE_MODEL_SELECTOR_ENTRY_WEIGHT_OFFSET, weight);
+    }
+
+    private static void writeStaticModelVertexRecord(long ptr, float x, float y, float z, int color,
+            float u, float v, int light) {
+        MemoryUtil.memPutFloat(ptr, x);
+        MemoryUtil.memPutFloat(ptr + 4, y);
+        MemoryUtil.memPutFloat(ptr + 8, z);
+        MemoryUtil.memPutInt(ptr + 12, color);
+        MemoryUtil.memPutFloat(ptr + 16, u);
+        MemoryUtil.memPutFloat(ptr + 20, v);
+        MemoryUtil.memPutInt(ptr + 24, light);
+    }
+
+    private static void writeNativeQuadMemoryUnchecked(
+            long ptr,
+            byte blockEmission,
+            byte renderType,
+            boolean ignoreMidBlock,
+            int blockId,
+            int localX,
+            int localY,
+            int localZ,
+            int materialBits,
+            float x0, float y0, float z0, int color0, float ao0, float u0, float v0, int light0,
+            float x1, float y1, float z1, int color1, float ao1, float u1, float v1, int light1,
+            float x2, float y2, float z2, int color2, float ao2, float u2, float v2, int light2,
+            float x3, float y3, float z3, int color3, float ao3, float u3, float v3, int light3
+    ) {
+        writeNativeQuadVertexMemory(ptr, 0, x0, y0, z0, color0, ao0, u0, v0, light0);
+        writeNativeQuadVertexMemory(ptr, 1, x1, y1, z1, color1, ao1, u1, v1, light1);
+        writeNativeQuadVertexMemory(ptr, 2, x2, y2, z2, color2, ao2, u2, v2, light2);
+        writeNativeQuadVertexMemory(ptr, 3, x3, y3, z3, color3, ao3, u3, v3, light3);
+        MemoryUtil.memPutByte(ptr + QUAD_BLOCK_EMISSION_OFFSET, blockEmission);
+        MemoryUtil.memPutByte(ptr + QUAD_RENDER_TYPE_OFFSET, renderType);
+        MemoryUtil.memPutByte(ptr + QUAD_IGNORE_MID_BLOCK_OFFSET, (byte) (ignoreMidBlock ? 1 : 0));
+        MemoryUtil.memPutByte(ptr + QUAD_PADDING_OFFSET, (byte) 0);
+        MemoryUtil.memPutInt(ptr + QUAD_BLOCK_ID_OFFSET, blockId);
+        MemoryUtil.memPutInt(ptr + QUAD_LOCAL_X_OFFSET, localX);
+        MemoryUtil.memPutInt(ptr + QUAD_LOCAL_Y_OFFSET, localY);
+        MemoryUtil.memPutInt(ptr + QUAD_LOCAL_Z_OFFSET, localZ);
+        MemoryUtil.memPutInt(ptr + QUAD_MATERIAL_BITS_OFFSET, materialBits);
+    }
+
+    private static void writeNativeQuadVertexMemory(long ptr, int vertexIndex, float x, float y, float z,
+            int color, float ao, float u, float v, int light) {
+        long vertexPtr = ptr + (long) vertexIndex * VERTEX_STRIDE;
+        MemoryUtil.memPutFloat(vertexPtr + VERTEX_X_OFFSET, x);
+        MemoryUtil.memPutFloat(vertexPtr + VERTEX_Y_OFFSET, y);
+        MemoryUtil.memPutFloat(vertexPtr + VERTEX_Z_OFFSET, z);
+        MemoryUtil.memPutInt(vertexPtr + VERTEX_COLOR_OFFSET, color);
+        MemoryUtil.memPutFloat(vertexPtr + VERTEX_AO_OFFSET, ao);
+        MemoryUtil.memPutFloat(vertexPtr + VERTEX_U_OFFSET, u);
+        MemoryUtil.memPutFloat(vertexPtr + VERTEX_V_OFFSET, v);
+        MemoryUtil.memPutInt(vertexPtr + VERTEX_LIGHT_OFFSET, light);
     }
 
     public static float nativeQuadX(long ptr, int vertexIndex) {

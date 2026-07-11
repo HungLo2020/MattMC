@@ -7,7 +7,6 @@ import net.sodium.api.util.NormI8;
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.sodium.client.render.chunk.terrain.material.Material;
 import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
-import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import net.sodium.client.render.texture.SpriteFinderCache;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -43,6 +42,7 @@ public class ChunkVertexConsumer implements VertexConsumer, net.irisshaders.iris
     private int localPosY;
     private int localPosZ;
     private boolean ignoreMidBlock;
+    private int emittedQuadCount;
 
     public ChunkVertexConsumer(ChunkModelBuilder modelBuilder) {
         this.modelBuilder = modelBuilder;
@@ -51,6 +51,14 @@ public class ChunkVertexConsumer implements VertexConsumer, net.irisshaders.iris
     public void setData(Material material, TranslucentGeometryCollector collector) {
         this.material = material;
         this.collector = collector;
+    }
+
+    public int getEmittedQuadCount() {
+        return this.emittedQuadCount;
+    }
+
+    public void resetEmittedQuadCount() {
+        this.emittedQuadCount = 0;
     }
 
     @Override
@@ -133,27 +141,18 @@ public class ChunkVertexConsumer implements VertexConsumer, net.irisshaders.iris
         this.writtenAttributes = 0;
 
         if (this.vertexIndex == 4) {
+            this.emittedQuadCount++;
             int normal = calculateNormal();
 
             ModelQuadFacing cullFace = ModelQuadFacing.fromPackedNormal(normal);
 
             NativeSectionMeshBuilder.FacingBuffer vertexBuffer = this.modelBuilder.getVertexBuffer(cullFace);
-            long quadAddress;
             if (this.material.isTranslucent() && this.collector != null) {
-                quadAddress = vertexBuffer.prepareStagedTranslucentQuad(this.material.bits(), this.collector,
-                        cullFace, this.blockEmission, this.renderType, this.ignoreMidBlock, this.blockId,
-                        this.localPosX, this.localPosY, this.localPosZ);
-                this.writeNativeQuad(quadAddress);
-
-                if (vertexBuffer.commitStagedTranslucentQuad(quadAddress, this.collector, cullFace, normal)) {
+                if (this.appendNativeQuad(vertexBuffer, this.collector, cullFace, normal)) {
                     return this;
                 }
             } else {
-                quadAddress = vertexBuffer.prepareStagedQuad(this.material.bits(), this.blockEmission,
-                        this.renderType, this.ignoreMidBlock, this.blockId, this.localPosX, this.localPosY,
-                        this.localPosZ);
-                this.writeNativeQuad(quadAddress);
-                vertexBuffer.commitStagedQuad();
+                this.appendNativeQuad(vertexBuffer, null, null, 0);
             }
 
             float u = 0;
@@ -215,13 +214,25 @@ public class ChunkVertexConsumer implements VertexConsumer, net.irisshaders.iris
         return NormI8.pack(normX, normY, normZ);
     }
 
-    private void writeNativeQuad(long quadAddress) {
-        NativeChunkMeshEncoder.writeNativeQuad(quadAddress, this.blockEmission, this.renderType, this.ignoreMidBlock,
-                this.blockId, this.localPosX, this.localPosY, this.localPosZ, this.material.bits(),
+    private boolean appendNativeQuad(NativeSectionMeshBuilder.FacingBuffer vertexBuffer,
+            TranslucentGeometryCollector collector, ModelQuadFacing collectorFacing, int packedNormal) {
+        if (collector != null) {
+            return vertexBuffer.appendFlatTranslucentQuad(this.material.bits(), collector, collectorFacing,
+                    packedNormal, this.blockEmission, this.renderType, this.ignoreMidBlock, this.blockId,
+                    this.localPosX, this.localPosY, this.localPosZ,
+                    this.x[0], this.y[0], this.z[0], this.color[0], this.ao[0], this.u[0], this.v[0], this.light[0],
+                    this.x[1], this.y[1], this.z[1], this.color[1], this.ao[1], this.u[1], this.v[1], this.light[1],
+                    this.x[2], this.y[2], this.z[2], this.color[2], this.ao[2], this.u[2], this.v[2], this.light[2],
+                    this.x[3], this.y[3], this.z[3], this.color[3], this.ao[3], this.u[3], this.v[3], this.light[3]);
+        }
+
+        vertexBuffer.appendFlatQuad(this.material.bits(), this.blockEmission, this.renderType, this.ignoreMidBlock,
+                this.blockId, this.localPosX, this.localPosY, this.localPosZ,
                 this.x[0], this.y[0], this.z[0], this.color[0], this.ao[0], this.u[0], this.v[0], this.light[0],
                 this.x[1], this.y[1], this.z[1], this.color[1], this.ao[1], this.u[1], this.v[1], this.light[1],
                 this.x[2], this.y[2], this.z[2], this.color[2], this.ao[2], this.u[2], this.v[2], this.light[2],
                 this.x[3], this.y[3], this.z[3], this.color[3], this.ao[3], this.u[3], this.v[3], this.light[3]);
+        return false;
     }
     
     // Iris: BlockSensitiveBufferBuilder interface implementation

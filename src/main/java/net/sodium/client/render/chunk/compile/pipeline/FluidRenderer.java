@@ -9,4 +9,11 @@ import net.minecraft.world.level.material.FluidState;
 
 public abstract class FluidRenderer {
     public abstract void render(LevelSlice level, BlockState blockState, FluidState fluidState, BlockPos blockPos, BlockPos offset, TranslucentGeometryCollector collector, ChunkBuildBuffers buffers);
+
+    public int getEmittedQuadCount() {
+        return 0;
+    }
+
+    public void resetEmittedQuadCount() {
+    }
 }
