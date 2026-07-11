@@ -1,11 +1,19 @@
 use std::collections::HashMap;
 use std::slice;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Instant;
 
 use super::*;
 
 static FLUID_DIAG_COUNT: AtomicUsize = AtomicUsize::new(0);
 static FLUID_FLUSH_DIAG_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+#[derive(Clone, Copy)]
+pub(super) struct NativeFluidFace {
+    pub quad: NativeQuad,
+    pub packed_normal: i32,
+    pub facing: usize,
+}
 
 fn native_fluid_flush_diag(
     facing: usize,
@@ -76,17 +84,22 @@ pub(super) unsafe fn section_builder_append_fluid_face_records_encoded(
     while processed < record_count {
         let chunk_count = (record_count - processed).min(PENDING_BATCH_QUAD_CAPACITY);
         {
+            let geometry_started = Instant::now();
             let pending = &mut builder.pending[facing];
             for index in 0..chunk_count {
                 let record = records[processed + index];
                 pending.quads[index] = fluid_face_record_to_quad(record)?;
                 pending.packed_normals[index] = record.packed_normal;
             }
+            builder
+                .profile
+                .add_stage(PROFILE_FLUID_GEOM_UV, geometry_started);
         }
 
         let validity_address = builder.pending[facing].validity.as_mut_ptr() as u64;
         let mut chunk_valid = chunk_count as i32;
         let validity = if let Some((analyzer_handle, translucent_facing)) = analyzer {
+            let analyzer_started = Instant::now();
             let status = translucent::append_native_quad_batch_to_analyzer(
                 analyzer_handle,
                 builder.pending[facing].quads.as_ptr() as u64,
@@ -99,6 +112,12 @@ pub(super) unsafe fn section_builder_append_fluid_face_records_encoded(
             if status != OK {
                 return Err(status);
             }
+            builder
+                .profile
+                .add_stage(PROFILE_TRANSLUCENT_INGEST, analyzer_started);
+            builder
+                .profile
+                .add_count(PROFILE_COUNT_TRANSLUCENT_QUADS, chunk_valid.max(0) as usize);
             Some(slice::from_raw_parts(
                 validity_address as *const u8,
                 chunk_count,
@@ -107,6 +126,7 @@ pub(super) unsafe fn section_builder_append_fluid_face_records_encoded(
             None
         };
 
+        let staging_started = Instant::now();
         let chunk_committed = section_builder_append_batch_encoded(
             builder,
             facing,
@@ -116,6 +136,9 @@ pub(super) unsafe fn section_builder_append_fluid_face_records_encoded(
             format,
             store_raw_quads,
         )?;
+        builder
+            .profile
+            .add_stage(PROFILE_QUAD_STAGING, staging_started);
 
         native_fluid_flush_diag(
             facing,
@@ -140,11 +163,14 @@ pub(super) fn native_section_fluid_faces(
     block: &NativeSectionBlockRecord,
     state: NativeMeshingState,
     states: &HashMap<i32, NativeMeshingState>,
-) -> Vec<(FluidFaceRecord, usize)> {
+    out: &mut Vec<NativeFluidFace>,
+    profile: &mut NativeMeshingProfile,
+) {
+    let visibility_started = Instant::now();
     if state.fluid_type != FLUID_WATER && state.fluid_type != FLUID_LAVA {
-        return Vec::new();
+        profile.add_stage(PROFILE_FLUID_VIS_HEIGHT, visibility_started);
+        return;
     }
-    let mut out = Vec::with_capacity(8);
     let h = fluid_height(block, states, 0, 0, 0, 1);
     let heights = if h >= 1.0 {
         [1.0; 4]
@@ -174,6 +200,7 @@ pub(super) fn native_section_fluid_faces(
         0,
         heights.iter().copied().fold(1.0, f32::min),
     );
+    profile.add_stage(PROFILE_FLUID_VIS_HEIGHT, visibility_started);
     fluid_diag(
         block,
         state,
@@ -188,6 +215,7 @@ pub(super) fn native_section_fluid_faces(
 
     let mut render_heights = heights;
     if !cull_up && top_exposed {
+        let geometry_started = Instant::now();
         for height in &mut render_heights {
             *height -= 0.001;
         }
@@ -241,7 +269,7 @@ pub(super) fn native_section_fluid_faces(
         } else {
             top
         };
-        let top_face = fluid_semantic_face(
+        let top_face = fluid_semantic_native_face(
             state,
             block,
             top_facing,
@@ -255,7 +283,22 @@ pub(super) fn native_section_fluid_faces(
             1.0,
             light,
         );
-        fluid_record_diag(block, "top-record", &top_face.0, top_face.1);
+        fluid_semantic_record_diag(
+            block,
+            "top-record",
+            state,
+            top_face.facing,
+            false,
+            top_face_kind,
+            0.0,
+            render_heights,
+            [0.0; 4],
+            top_record_uvs,
+            color,
+            1.0,
+            light,
+            top_face.packed_normal,
+        );
         out.push(top_face);
         fluid_diag(
             block,
@@ -274,7 +317,7 @@ pub(super) fn native_section_fluid_faces(
             } else {
                 MODEL_QUAD_FACING_UNASSIGNED
             };
-            let backward_face = fluid_semantic_face(
+            let backward_face = fluid_semantic_native_face(
                 state,
                 block,
                 backward_facing,
@@ -288,14 +331,31 @@ pub(super) fn native_section_fluid_faces(
                 1.0,
                 light,
             );
-            fluid_record_diag(block, "top-back-record", &backward_face.0, backward_face.1);
+            fluid_semantic_record_diag(
+                block,
+                "top-back-record",
+                state,
+                backward_face.facing,
+                true,
+                top_face_kind,
+                0.0,
+                render_heights,
+                [0.0; 4],
+                top_record_uvs,
+                color,
+                1.0,
+                light,
+                backward_face.packed_normal,
+            );
             out.push(backward_face);
         }
+        profile.add_stage(PROFILE_FLUID_GEOM_UV, geometry_started);
     }
 
     if !cull_down {
+        let geometry_started = Instant::now();
         let sprite = state.fluid_still;
-        out.push(fluid_semantic_face(
+        out.push(fluid_semantic_native_face(
             state,
             block,
             MODEL_QUAD_FACING_NEG_Y,
@@ -314,6 +374,7 @@ pub(super) fn native_section_fluid_faces(
             1.0,
             light,
         ));
+        profile.add_stage(PROFILE_FLUID_GEOM_UV, geometry_started);
     }
 
     let sides = [
@@ -367,6 +428,7 @@ pub(super) fn native_section_fluid_faces(
         ),
     ];
     for (dir, facing, opposite_facing, shade, h1, h2, x1, z1, x2, z2) in sides {
+        let visibility_started = Instant::now();
         if !fluid_side_occluded(block, state, states, dir)
             && fluid_side_exposed(
                 block,
@@ -377,6 +439,8 @@ pub(super) fn native_section_fluid_faces(
                 h1.max(h2),
             )
         {
+            profile.add_stage(PROFILE_FLUID_VIS_HEIGHT, visibility_started);
+            let geometry_started = Instant::now();
             let is_overlay = fluid_side_uses_overlay(block, state, states, dir);
             let sprite = if is_overlay {
                 state.fluid_overlay
@@ -388,7 +452,7 @@ pub(super) fn native_section_fluid_faces(
             let v1 = sprite_v(sprite, (1.0 - h1) * 0.5);
             let v2 = sprite_v(sprite, (1.0 - h2) * 0.5);
             let v3 = sprite_v(sprite, 0.5);
-            out.push(fluid_semantic_face(
+            out.push(fluid_semantic_native_face(
                 state,
                 block,
                 facing,
@@ -403,7 +467,7 @@ pub(super) fn native_section_fluid_faces(
                 light,
             ));
             if !is_overlay {
-                out.push(fluid_semantic_face(
+                out.push(fluid_semantic_native_face(
                     state,
                     block,
                     opposite_facing,
@@ -418,9 +482,11 @@ pub(super) fn native_section_fluid_faces(
                     light,
                 ));
             }
+            profile.add_stage(PROFILE_FLUID_GEOM_UV, geometry_started);
+        } else {
+            profile.add_stage(PROFILE_FLUID_VIS_HEIGHT, visibility_started);
         }
     }
-    out
 }
 
 fn fluid_diag(
@@ -552,7 +618,46 @@ fn fluid_top_crease_ne_sw(heights: [f32; 4]) -> bool {
         || heights[1] < heights[0] && heights[1] < heights[2]
 }
 
+#[cfg(test)]
 pub(super) fn fluid_semantic_face(
+    state: NativeMeshingState,
+    block: &NativeSectionBlockRecord,
+    facing: usize,
+    flip: bool,
+    face_kind: i32,
+    y_offset: f32,
+    heights: [f32; 4],
+    side_coords: [f32; 4],
+    uvs: [(f32, f32); 4],
+    color: i32,
+    ao: f32,
+    light: i32,
+) -> (FluidFaceRecord, usize) {
+    let mut facing = facing;
+    if std::env::var_os("MATTMC_NATIVE_FLUID_FORCE_UNASSIGNED").is_some() {
+        facing = MODEL_QUAD_FACING_UNASSIGNED;
+    }
+    let mut record = fluid_semantic_record(
+        state,
+        block,
+        facing,
+        flip,
+        face_kind,
+        y_offset,
+        heights,
+        side_coords,
+        uvs,
+        color,
+        ao,
+        light,
+    );
+    let quad = fluid_face_record_to_quad(record)
+        .expect("native fluid semantic face generated an invalid fluid face record");
+    record.packed_normal = norm_i8_pack_from_quad(&quad);
+    (record, facing)
+}
+
+fn fluid_semantic_native_face(
     state: NativeMeshingState,
     block: &NativeSectionBlockRecord,
     mut facing: usize,
@@ -565,12 +670,85 @@ pub(super) fn fluid_semantic_face(
     color: i32,
     ao: f32,
     light: i32,
-) -> (FluidFaceRecord, usize) {
+) -> NativeFluidFace {
     if std::env::var_os("MATTMC_NATIVE_FLUID_FORCE_UNASSIGNED").is_some() {
         facing = MODEL_QUAD_FACING_UNASSIGNED;
     }
 
-    let mut record = FluidFaceRecord {
+    let quad = fluid_semantic_quad(
+        state,
+        block,
+        flip,
+        face_kind,
+        y_offset,
+        heights,
+        side_coords,
+        uvs,
+        color,
+        ao,
+        light,
+    );
+    let packed_normal = packed_fluid_normal(facing, &quad);
+    NativeFluidFace {
+        quad,
+        packed_normal,
+        facing,
+    }
+}
+
+fn fluid_semantic_record_diag(
+    block: &NativeSectionBlockRecord,
+    phase: &str,
+    state: NativeMeshingState,
+    facing: usize,
+    flip: bool,
+    face_kind: i32,
+    y_offset: f32,
+    heights: [f32; 4],
+    side_coords: [f32; 4],
+    uvs: [(f32, f32); 4],
+    color: i32,
+    ao: f32,
+    light: i32,
+    packed_normal: i32,
+) {
+    if std::env::var_os("MATTMC_NATIVE_FLUID_DIAG").is_none() {
+        return;
+    }
+    let mut record = fluid_semantic_record(
+        state,
+        block,
+        facing,
+        flip,
+        face_kind,
+        y_offset,
+        heights,
+        side_coords,
+        uvs,
+        color,
+        ao,
+        light,
+    );
+    record.packed_normal = packed_normal;
+    fluid_record_diag(block, phase, &record, facing);
+}
+
+fn fluid_semantic_record(
+    state: NativeMeshingState,
+    block: &NativeSectionBlockRecord,
+    facing: usize,
+    flip: bool,
+    face_kind: i32,
+    y_offset: f32,
+    heights: [f32; 4],
+    side_coords: [f32; 4],
+    uvs: [(f32, f32); 4],
+    color: i32,
+    ao: f32,
+    light: i32,
+) -> FluidFaceRecord {
+    let _ = facing;
+    FluidFaceRecord {
         packed_normal: 0,
         material_bits: state.fluid_material_bits,
         block_emission: state.block_emission,
@@ -594,11 +772,247 @@ pub(super) fn fluid_semantic_face(
         colors: [color; 4],
         aos: [ao; 4],
         lights: [light; 4],
-    };
-    if let Ok(quad) = fluid_face_record_to_quad(record) {
-        record.packed_normal = norm_i8_pack_from_quad(&quad);
     }
-    (record, facing)
+}
+
+fn fluid_semantic_quad(
+    state: NativeMeshingState,
+    block: &NativeSectionBlockRecord,
+    flip: bool,
+    face_kind: i32,
+    y_offset: f32,
+    heights: [f32; 4],
+    side_coords: [f32; 4],
+    uvs: [(f32, f32); 4],
+    color: i32,
+    ao: f32,
+    light: i32,
+) -> NativeQuad {
+    let origin_x = block.local_x as f32;
+    let origin_y = block.local_y as f32;
+    let origin_z = block.local_z as f32;
+    let mut vertices = match face_kind {
+        FLUID_FACE_TOP_NE_SW => [
+            fluid_native_vertex(
+                origin_x + 1.0,
+                origin_y + heights[3],
+                origin_z,
+                0,
+                uvs,
+                color,
+                ao,
+                light,
+            ),
+            fluid_native_vertex(
+                origin_x,
+                origin_y + heights[0],
+                origin_z,
+                1,
+                uvs,
+                color,
+                ao,
+                light,
+            ),
+            fluid_native_vertex(
+                origin_x,
+                origin_y + heights[1],
+                origin_z + 1.0,
+                2,
+                uvs,
+                color,
+                ao,
+                light,
+            ),
+            fluid_native_vertex(
+                origin_x + 1.0,
+                origin_y + heights[2],
+                origin_z + 1.0,
+                3,
+                uvs,
+                color,
+                ao,
+                light,
+            ),
+        ],
+        FLUID_FACE_TOP_NW_SE => [
+            fluid_native_vertex(
+                origin_x,
+                origin_y + heights[0],
+                origin_z,
+                0,
+                uvs,
+                color,
+                ao,
+                light,
+            ),
+            fluid_native_vertex(
+                origin_x,
+                origin_y + heights[1],
+                origin_z + 1.0,
+                1,
+                uvs,
+                color,
+                ao,
+                light,
+            ),
+            fluid_native_vertex(
+                origin_x + 1.0,
+                origin_y + heights[2],
+                origin_z + 1.0,
+                2,
+                uvs,
+                color,
+                ao,
+                light,
+            ),
+            fluid_native_vertex(
+                origin_x + 1.0,
+                origin_y + heights[3],
+                origin_z,
+                3,
+                uvs,
+                color,
+                ao,
+                light,
+            ),
+        ],
+        FLUID_FACE_BOTTOM => [
+            fluid_native_vertex(
+                origin_x,
+                origin_y + y_offset,
+                origin_z + 1.0,
+                0,
+                uvs,
+                color,
+                ao,
+                light,
+            ),
+            fluid_native_vertex(
+                origin_x,
+                origin_y + y_offset,
+                origin_z,
+                1,
+                uvs,
+                color,
+                ao,
+                light,
+            ),
+            fluid_native_vertex(
+                origin_x + 1.0,
+                origin_y + y_offset,
+                origin_z,
+                2,
+                uvs,
+                color,
+                ao,
+                light,
+            ),
+            fluid_native_vertex(
+                origin_x + 1.0,
+                origin_y + y_offset,
+                origin_z + 1.0,
+                3,
+                uvs,
+                color,
+                ao,
+                light,
+            ),
+        ],
+        FLUID_FACE_SIDE => [
+            fluid_native_vertex(
+                origin_x + side_coords[2],
+                origin_y + heights[1],
+                origin_z + side_coords[3],
+                0,
+                uvs,
+                color,
+                ao,
+                light,
+            ),
+            fluid_native_vertex(
+                origin_x + side_coords[2],
+                origin_y + y_offset,
+                origin_z + side_coords[3],
+                1,
+                uvs,
+                color,
+                ao,
+                light,
+            ),
+            fluid_native_vertex(
+                origin_x + side_coords[0],
+                origin_y + y_offset,
+                origin_z + side_coords[1],
+                2,
+                uvs,
+                color,
+                ao,
+                light,
+            ),
+            fluid_native_vertex(
+                origin_x + side_coords[0],
+                origin_y + heights[0],
+                origin_z + side_coords[1],
+                3,
+                uvs,
+                color,
+                ao,
+                light,
+            ),
+        ],
+        _ => [QuadVertex::default(); 4],
+    };
+
+    if flip {
+        vertices = [vertices[0], vertices[3], vertices[2], vertices[1]];
+    }
+
+    NativeQuad {
+        vertices,
+        block_emission: state.block_emission.clamp(0, 255) as u8,
+        render_type: 1,
+        ignore_mid_block: 0,
+        _padding: 0,
+        block_id: choose_block_id(block.fluid_block_id, state.fluid_block_id),
+        local_x: block.absolute_x,
+        local_y: block.absolute_y,
+        local_z: block.absolute_z,
+        material_bits: state.fluid_material_bits,
+    }
+}
+
+fn packed_fluid_normal(facing: usize, quad: &NativeQuad) -> i32 {
+    match facing {
+        MODEL_QUAD_FACING_POS_X => 0x0000007f,
+        MODEL_QUAD_FACING_POS_Y => 0x00007f00,
+        MODEL_QUAD_FACING_POS_Z => 0x007f0000,
+        MODEL_QUAD_FACING_NEG_X => 0x00000081,
+        MODEL_QUAD_FACING_NEG_Y => 0x00008100,
+        MODEL_QUAD_FACING_NEG_Z => 0x00810000,
+        _ => norm_i8_pack_from_quad(quad),
+    }
+}
+
+fn fluid_native_vertex(
+    x: f32,
+    y: f32,
+    z: f32,
+    vertex: usize,
+    uvs: [(f32, f32); 4],
+    color: i32,
+    ao: f32,
+    light: i32,
+) -> QuadVertex {
+    QuadVertex {
+        x,
+        y,
+        z,
+        color,
+        ao,
+        u: uvs[vertex].0,
+        v: uvs[vertex].1,
+        light,
+    }
 }
 
 fn fluid_side_uses_overlay(

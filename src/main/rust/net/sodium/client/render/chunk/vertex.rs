@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::slice;
 use std::sync::{Mutex, OnceLock};
+use std::time::Instant;
 
 use super::{index, translucent};
 
@@ -94,6 +95,36 @@ const COMPACT_NATIVE_NORMAL_OFFSET: i32 = 0;
 const COMPACT_NATIVE_TANGENT_OFFSET: i32 = 0;
 const COMPACT_NATIVE_MID_UV_OFFSET: i32 = 0;
 const COMPACT_NATIVE_MID_BLOCK_OFFSET: i32 = 0;
+
+const PROFILE_STAGE_COUNT: usize = 13;
+const PROFILE_COUNT_COUNT: usize = 8;
+const PROFILE_EXPORT_LONGS: usize = PROFILE_STAGE_COUNT + PROFILE_COUNT_COUNT;
+const PROFILE_SECTION_SCAN: usize = 0;
+const PROFILE_MODEL_LOOKUP_EMIT: usize = 1;
+const PROFILE_FLUID_VIS_HEIGHT: usize = 2;
+const PROFILE_FLUID_GEOM_UV: usize = 3;
+#[allow(dead_code)]
+const PROFILE_LIGHT_AO_TINT: usize = 4;
+const PROFILE_MATERIAL_PASS: usize = 5;
+const PROFILE_QUAD_STAGING: usize = 6;
+const PROFILE_TRANSLUCENT_INGEST: usize = 7;
+#[allow(dead_code)]
+const PROFILE_TRANSLUCENT_METADATA: usize = 8;
+#[allow(dead_code)]
+const PROFILE_SORTING: usize = 9;
+const PROFILE_VERTEX_PACKING: usize = 10;
+#[allow(dead_code)]
+const PROFILE_INDEX_EMISSION: usize = 11;
+const PROFILE_FINAL_ASSEMBLY: usize = 12;
+const PROFILE_COUNT_SCANNED_BLOCKS: usize = 0;
+const PROFILE_COUNT_NATIVE_MODEL_BLOCKS: usize = 1;
+const PROFILE_COUNT_NATIVE_MODEL_QUADS: usize = 2;
+const PROFILE_COUNT_FLUID_BLOCKS: usize = 3;
+const PROFILE_COUNT_FLUID_FACES: usize = 4;
+const PROFILE_COUNT_TRANSLUCENT_QUADS: usize = 5;
+#[allow(dead_code)]
+const PROFILE_COUNT_SORTED_QUADS: usize = 6;
+const PROFILE_COUNT_EMITTED_QUADS: usize = 7;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
@@ -324,6 +355,33 @@ struct NativeSectionMeshBuilder {
     buffers: [NativeQuadBuffer; MODEL_QUAD_FACING_COUNT],
     pending: [NativePendingQuadBuffer; MODEL_QUAD_FACING_COUNT],
     counts: [usize; MODEL_QUAD_FACING_COUNT],
+    profile: NativeMeshingProfile,
+    section_pass_cache_address: u64,
+    section_pass_cache_count: usize,
+    section_pass_cache_mask: u32,
+    section_pass_cache_valid: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct NativeMeshingProfile {
+    stage_nanos: [u64; PROFILE_STAGE_COUNT],
+    counts: [u64; PROFILE_COUNT_COUNT],
+}
+
+impl NativeMeshingProfile {
+    fn reset(&mut self) {
+        self.stage_nanos.fill(0);
+        self.counts.fill(0);
+    }
+
+    fn add_stage(&mut self, stage: usize, started_at: Instant) {
+        self.stage_nanos[stage] = self.stage_nanos[stage]
+            .saturating_add(started_at.elapsed().as_nanos().min(u128::from(u64::MAX)) as u64);
+    }
+
+    fn add_count(&mut self, counter: usize, value: usize) {
+        self.counts[counter] = self.counts[counter].saturating_add(value as u64);
+    }
 }
 
 struct NativeUpdatedQuads {
@@ -992,7 +1050,7 @@ unsafe fn assemble_output(
 }
 
 unsafe fn assemble_section_builder(
-    builder: &NativeSectionMeshBuilder,
+    builder: &mut NativeSectionMeshBuilder,
     output_address: u64,
     output_capacity: i32,
     vertex_segments: *mut i32,
@@ -1002,6 +1060,7 @@ unsafe fn assemble_section_builder(
     force_unassigned: i32,
     slice_reordering: i32,
 ) -> i32 {
+    let assembly_started = Instant::now();
     if vertex_segments.is_null() || output_capacity < 0 {
         return if vertex_segments.is_null() {
             ERR_NULL_POINTER
@@ -1111,6 +1170,9 @@ unsafe fn assemble_section_builder(
         }
     }
 
+    builder
+        .profile
+        .add_stage(PROFILE_FINAL_ASSEMBLY, assembly_started);
     OK
 }
 
@@ -1294,6 +1356,11 @@ fn create_section_mesh_builder(capacity: usize) -> NativeSectionMeshBuilder {
             validity: vec![0; PENDING_BATCH_QUAD_CAPACITY],
         }),
         counts: [0; MODEL_QUAD_FACING_COUNT],
+        profile: NativeMeshingProfile::default(),
+        section_pass_cache_address: 0,
+        section_pass_cache_count: 0,
+        section_pass_cache_mask: 0,
+        section_pass_cache_valid: false,
     }
 }
 
@@ -1384,6 +1451,7 @@ unsafe fn section_builder_append_batch_encoded(
     format: NativeFormat,
     store_raw_quads: bool,
 ) -> Result<i32, i32> {
+    let stage_started = Instant::now();
     if facing >= MODEL_QUAD_FACING_COUNT {
         return Err(ERR_INVALID_ARGUMENT);
     }
@@ -1461,6 +1529,12 @@ unsafe fn section_builder_append_batch_encoded(
     }
 
     builder.counts[facing] = required_len;
+    builder
+        .profile
+        .add_stage(PROFILE_VERTEX_PACKING, stage_started);
+    builder
+        .profile
+        .add_count(PROFILE_COUNT_EMITTED_QUADS, valid_count);
     Ok(valid_count as i32)
 }
 
@@ -1731,6 +1805,7 @@ unsafe fn flush_static_model_pending_face(
     let validity_address = builder.pending[facing].validity.as_mut_ptr() as u64;
     let mut valid_count = count as i32;
     let validity = if let Some(analyzer_handle) = analyzer {
+        let analyzer_started = Instant::now();
         let status = translucent::append_native_quad_batch_to_analyzer(
             analyzer_handle,
             pending_address,
@@ -1743,10 +1818,17 @@ unsafe fn flush_static_model_pending_face(
         if status != OK {
             return Err(status);
         }
+        builder
+            .profile
+            .add_stage(PROFILE_TRANSLUCENT_INGEST, analyzer_started);
+        builder
+            .profile
+            .add_count(PROFILE_COUNT_TRANSLUCENT_QUADS, valid_count.max(0) as usize);
         Some(slice::from_raw_parts(validity_address as *const u8, count))
     } else {
         None
     };
+    let staging_started = Instant::now();
     let committed = section_builder_append_batch_encoded(
         builder,
         facing,
@@ -1756,6 +1838,9 @@ unsafe fn flush_static_model_pending_face(
         format,
         store_raw_quads,
     )?;
+    builder
+        .profile
+        .add_stage(PROFILE_QUAD_STAGING, staging_started);
     *total_committed = total_committed.checked_add(committed).ok_or(ERR_CAPACITY)?;
     pending_counts[facing] = 0;
     Ok(())
@@ -1860,11 +1945,25 @@ unsafe fn section_builder_append_native_section_records_encoded(
     if record_stride != std::mem::size_of::<NativeSectionBlockRecord>() {
         return Err(ERR_INVALID_ARGUMENT);
     }
+    if pass_id >= 0
+        && pass_id < 32
+        && builder.section_pass_cache_valid
+        && builder.section_pass_cache_address == record_address
+        && builder.section_pass_cache_count == record_count
+        && (builder.section_pass_cache_mask & (1u32 << pass_id)) == 0
+    {
+        return Ok(0);
+    }
 
     let records = slice::from_raw_parts(
         record_address as *const NativeSectionBlockRecord,
         record_count,
     );
+    let emit_all_passes = pass_id < 0;
+    builder
+        .profile
+        .add_count(PROFILE_COUNT_SCANNED_BLOCKS, record_count);
+    let metadata_started = Instant::now();
     let states_guard = native_meshing_states()
         .lock()
         .map_err(|_| ERR_INVALID_ARGUMENT)?;
@@ -1874,20 +1973,52 @@ unsafe fn section_builder_append_native_section_records_encoded(
     let models_guard = static_model_cache()
         .lock()
         .map_err(|_| ERR_INVALID_ARGUMENT)?;
+    builder
+        .profile
+        .add_stage(PROFILE_MATERIAL_PASS, metadata_started);
     let mut total_committed = 0i32;
     let mut pending_counts = [0usize; MODEL_QUAD_FACING_COUNT];
-    let mut fluid_pending_counts = [0usize; MODEL_QUAD_FACING_COUNT];
     let mut model_ids = Vec::with_capacity(8);
+    let mut fluid_faces = Vec::with_capacity(8);
+    let mut last_state_id = i32::MIN;
+    let mut last_state = None;
+    let mut last_direct_selector_id = i32::MIN;
+    let mut last_direct_selector_model_id = None;
+    let mut last_model_id = i32::MIN;
+    let mut last_model = None;
+    let mut discovered_pass_mask = 0u32;
 
+    let scan_started = Instant::now();
     for record in records {
-        let Some(state) = states_guard.get(&record.state_id).copied() else {
+        let state = if record.state_id == last_state_id {
+            last_state
+        } else {
+            last_state_id = record.state_id;
+            last_state = states_guard.get(&record.state_id).copied();
+            last_state
+        };
+        let Some(state) = state else {
             continue;
         };
         if (state.flags & STATE_FLAG_AIR) != 0 {
             continue;
         }
+        if (state.flags & STATE_FLAG_LIGHT_BLOCK) != 0 {
+            discovered_pass_mask |= 1u32 << 1;
+        }
+        if (state.flags & STATE_FLAG_MODEL) != 0 && state.pass_id >= 0 && state.pass_id < 32 {
+            discovered_pass_mask |= 1u32 << state.pass_id;
+        }
+        if (state.flags & STATE_FLAG_FLUID) != 0
+            && (record.flags & NATIVE_SECTION_BLOCK_FLAG_SUPPRESS_FLUID) == 0
+            && state.fluid_pass_id >= 0
+            && state.fluid_pass_id < 32
+        {
+            discovered_pass_mask |= 1u32 << state.fluid_pass_id;
+        }
 
-        if (state.flags & STATE_FLAG_LIGHT_BLOCK) != 0 && pass_id == 1 {
+        if (state.flags & STATE_FLAG_LIGHT_BLOCK) != 0 && (emit_all_passes || pass_id == 1) {
+            let model_started = Instant::now();
             push_native_section_quad(
                 builder,
                 light_block_record_to_quad(LightBlockRecord {
@@ -1906,19 +2037,60 @@ unsafe fn section_builder_append_native_section_records_encoded(
                 store_raw_quads,
                 &mut total_committed,
             )?;
+            builder
+                .profile
+                .add_stage(PROFILE_MODEL_LOOKUP_EMIT, model_started);
+            builder
+                .profile
+                .add_count(PROFILE_COUNT_NATIVE_MODEL_QUADS, 1);
         }
 
-        if (state.flags & STATE_FLAG_MODEL) != 0 && state.pass_id == pass_id {
+        if (state.flags & STATE_FLAG_MODEL) != 0 && (emit_all_passes || state.pass_id == pass_id) {
+            let model_started = Instant::now();
+            builder
+                .profile
+                .add_count(PROFILE_COUNT_NATIVE_MODEL_BLOCKS, 1);
             model_ids.clear();
-            resolve_selector_model_ids(
-                state.selector_id,
-                record_seed(*record),
-                &selectors_guard,
-                &mut model_ids,
-            )?;
+            if state.selector_id == last_direct_selector_id {
+                if let Some(model_id) = last_direct_selector_model_id {
+                    model_ids.push(model_id);
+                }
+            } else {
+                let direct_model_id =
+                    selectors_guard
+                        .get(&state.selector_id)
+                        .and_then(|selector| {
+                            if selector.kind == SELECTOR_DIRECT {
+                                selector.entries.first().map(|entry| entry.target_id)
+                            } else {
+                                None
+                            }
+                        });
+                if let Some(model_id) = direct_model_id {
+                    last_direct_selector_id = state.selector_id;
+                    last_direct_selector_model_id = Some(model_id);
+                    model_ids.push(model_id);
+                } else {
+                    last_direct_selector_id = i32::MIN;
+                    last_direct_selector_model_id = None;
+                    resolve_selector_model_ids(
+                        state.selector_id,
+                        record_seed(*record),
+                        &selectors_guard,
+                        &mut model_ids,
+                    )?;
+                }
+            }
 
             for model_id in &model_ids {
-                let Some(model) = models_guard.get(model_id) else {
+                let model = if *model_id == last_model_id {
+                    last_model
+                } else {
+                    last_model_id = *model_id;
+                    last_model = models_guard.get(model_id);
+                    last_model
+                };
+                let Some(model) = model else {
                     continue;
                 };
 
@@ -1943,21 +2115,39 @@ unsafe fn section_builder_append_native_section_records_encoded(
                         store_raw_quads,
                         &mut total_committed,
                     )?;
+                    builder
+                        .profile
+                        .add_count(PROFILE_COUNT_NATIVE_MODEL_QUADS, 1);
                 }
             }
+            builder
+                .profile
+                .add_stage(PROFILE_MODEL_LOOKUP_EMIT, model_started);
         }
 
         if (state.flags & STATE_FLAG_FLUID) != 0
             && (record.flags & NATIVE_SECTION_BLOCK_FLAG_SUPPRESS_FLUID) == 0
-            && state.fluid_pass_id == pass_id
+            && (emit_all_passes || state.fluid_pass_id == pass_id)
         {
-            for (fluid_record, facing) in native_section_fluid_faces(record, state, &states_guard) {
-                push_native_section_fluid_face(
+            builder.profile.add_count(PROFILE_COUNT_FLUID_BLOCKS, 1);
+            fluid_faces.clear();
+            native_section_fluid_faces(
+                record,
+                state,
+                &states_guard,
+                &mut fluid_faces,
+                &mut builder.profile,
+            );
+            builder
+                .profile
+                .add_count(PROFILE_COUNT_FLUID_FACES, fluid_faces.len());
+            for fluid_face in &fluid_faces {
+                push_native_section_quad(
                     builder,
-                    fluid_record,
-                    facing,
+                    fluid_face.quad,
+                    fluid_face.packed_normal,
+                    fluid_face.facing,
                     &mut pending_counts,
-                    &mut fluid_pending_counts,
                     analyzer,
                     format,
                     store_raw_quads,
@@ -1966,21 +2156,21 @@ unsafe fn section_builder_append_native_section_records_encoded(
             }
         }
     }
+    builder
+        .profile
+        .add_stage(PROFILE_SECTION_SCAN, scan_started);
+    if pass_id >= 0 && pass_id < 32 {
+        builder.section_pass_cache_address = record_address;
+        builder.section_pass_cache_count = record_count;
+        builder.section_pass_cache_mask = discovered_pass_mask;
+        builder.section_pass_cache_valid = true;
+    }
 
     for facing in 0..MODEL_QUAD_FACING_COUNT {
         flush_static_model_pending_face(
             builder,
             facing,
             &mut pending_counts,
-            analyzer,
-            format,
-            store_raw_quads,
-            &mut total_committed,
-        )?;
-        flush_native_section_pending_fluid_face(
-            builder,
-            facing,
-            &mut fluid_pending_counts,
             analyzer,
             format,
             store_raw_quads,
@@ -2019,81 +2209,6 @@ unsafe fn push_native_section_quad(
         )?;
     }
 
-    Ok(())
-}
-
-unsafe fn push_native_section_fluid_face(
-    builder: &mut NativeSectionMeshBuilder,
-    record: FluidFaceRecord,
-    facing: usize,
-    static_pending_counts: &mut [usize; MODEL_QUAD_FACING_COUNT],
-    fluid_pending_counts: &mut [usize; MODEL_QUAD_FACING_COUNT],
-    analyzer: Option<u64>,
-    format: NativeFormat,
-    store_raw_quads: bool,
-    total_committed: &mut i32,
-) -> Result<(), i32> {
-    if static_pending_counts[facing] != 0 {
-        flush_static_model_pending_face(
-            builder,
-            facing,
-            static_pending_counts,
-            analyzer,
-            format,
-            store_raw_quads,
-            total_committed,
-        )?;
-    }
-
-    let slot = fluid_pending_counts[facing];
-    builder.pending[facing].fluid_face_records[slot] = record;
-    fluid_pending_counts[facing] += 1;
-
-    if fluid_pending_counts[facing] == PENDING_BATCH_QUAD_CAPACITY {
-        flush_native_section_pending_fluid_face(
-            builder,
-            facing,
-            fluid_pending_counts,
-            analyzer,
-            format,
-            store_raw_quads,
-            total_committed,
-        )?;
-    }
-
-    Ok(())
-}
-
-unsafe fn flush_native_section_pending_fluid_face(
-    builder: &mut NativeSectionMeshBuilder,
-    facing: usize,
-    fluid_pending_counts: &mut [usize; MODEL_QUAD_FACING_COUNT],
-    analyzer: Option<u64>,
-    format: NativeFormat,
-    store_raw_quads: bool,
-    total_committed: &mut i32,
-) -> Result<(), i32> {
-    let count = fluid_pending_counts[facing];
-    if count == 0 {
-        return Ok(());
-    }
-
-    let analyzer = analyzer.map(|handle| (handle, facing as i32));
-    let (valid, committed) = section_builder_append_fluid_face_records_encoded(
-        builder,
-        facing,
-        builder.pending[facing].fluid_face_records.as_ptr() as u64,
-        count,
-        std::mem::size_of::<FluidFaceRecord>(),
-        analyzer,
-        format,
-        store_raw_quads,
-    )?;
-    if valid != committed {
-        return Err(ERR_INVALID_ARGUMENT);
-    }
-    *total_committed = total_committed.checked_add(committed).ok_or(ERR_CAPACITY)?;
-    fluid_pending_counts[facing] = 0;
     Ok(())
 }
 
@@ -2207,22 +2322,27 @@ fn static_model_quad_to_native_section(
     quad_record: StaticModelQuadRecord,
 ) -> NativeQuad {
     let mut vertices = [QuadVertex::default(); 4];
-    let offset = native_model_offset(block, state);
+    let offset = if block.legacy_offset_x != 0.0
+        || block.legacy_offset_y != 0.0
+        || block.legacy_offset_z != 0.0
+        || state.offset_type != OFFSET_NONE
+    {
+        native_model_offset(block, state)
+    } else {
+        (0.0, 0.0, 0.0)
+    };
     let light = native_quad_lighting(&block, &quad_record, state);
-    let tint = native_tint_color(&block, state, false);
+    let applies_tint = static_quad_applies_tint(quad_record, state);
+    let tint = if applies_tint {
+        native_tint_color(&block, state, false)
+    } else {
+        -1
+    };
 
     for (index, vertex) in vertices.iter_mut().enumerate() {
         let source = quad_record.vertices[index];
         let mut color = source.color;
-        if quad_record.tint_index != -1
-            || state.tint_type == TINT_GRASS
-            || state.tint_type == TINT_FOLIAGE
-            || state.tint_type == TINT_FORCE_GRASS
-            || state.tint_type == TINT_DOUBLE_PLANT_GRASS
-            || state.tint_type == TINT_CONSTANT
-            || state.tint_type == TINT_SPRUCE
-            || state.tint_type == TINT_BIRCH
-        {
+        if applies_tint {
             color = multiply_argb(color, tint);
         }
         *vertex = QuadVertex {
@@ -2257,6 +2377,17 @@ fn static_model_quad_to_native_section(
             quad_record.material_bits
         },
     }
+}
+
+fn static_quad_applies_tint(quad_record: StaticModelQuadRecord, state: NativeMeshingState) -> bool {
+    quad_record.tint_index != -1
+        || state.tint_type == TINT_GRASS
+        || state.tint_type == TINT_FOLIAGE
+        || state.tint_type == TINT_FORCE_GRASS
+        || state.tint_type == TINT_DOUBLE_PLANT_GRASS
+        || state.tint_type == TINT_CONSTANT
+        || state.tint_type == TINT_SPRUCE
+        || state.tint_type == TINT_BIRCH
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -3633,6 +3764,11 @@ pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_start(handle: u64) -
 
     let builder = &mut *(handle as *mut NativeSectionMeshBuilder);
     builder.counts.fill(0);
+    builder.profile.reset();
+    builder.section_pass_cache_valid = false;
+    builder.section_pass_cache_address = 0;
+    builder.section_pass_cache_count = 0;
+    builder.section_pass_cache_mask = 0;
     for buffer in &mut builder.buffers {
         buffer.encoded.clear();
         buffer.encoded_format = None;
@@ -4782,6 +4918,30 @@ pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_total_vertex_count(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_copy_profile(
+    handle: u64,
+    output_values: *mut i64,
+    output_len: i32,
+) -> i32 {
+    if handle == 0 || output_values.is_null() {
+        return ERR_NULL_POINTER;
+    }
+    if output_len < PROFILE_EXPORT_LONGS as i32 {
+        return ERR_INVALID_ARGUMENT;
+    }
+
+    let builder = &*(handle as *const NativeSectionMeshBuilder);
+    let output = slice::from_raw_parts_mut(output_values, PROFILE_EXPORT_LONGS);
+    for (index, value) in builder.profile.stage_nanos.iter().enumerate() {
+        output[index] = *value as i64;
+    }
+    for (index, value) in builder.profile.counts.iter().enumerate() {
+        output[PROFILE_STAGE_COUNT + index] = *value as i64;
+    }
+    OK
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_assemble(
     handle: u64,
     output_address: u64,
@@ -4819,7 +4979,7 @@ pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_assemble(
         Err(status) => return status,
     };
 
-    let builder = &*(handle as *const NativeSectionMeshBuilder);
+    let builder = &mut *(handle as *mut NativeSectionMeshBuilder);
     assemble_section_builder(
         builder,
         output_address,

@@ -210,6 +210,12 @@ public class TranslucentGeometryCollector {
         return this.nativeAnalyzer.handle();
     }
 
+    public void discardNativeAnalyzerForBenchmark() {
+        if (this.nativeAnalyzer != null) {
+            this.nativeAnalyzer.destroy();
+        }
+    }
+
     public static boolean isInvalidNativeQuad(long nativeQuadAddress) {
         float lastX = net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder.nativeQuadX(nativeQuadAddress, 3);
         float lastY = net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder.nativeQuadY(nativeQuadAddress, 3);

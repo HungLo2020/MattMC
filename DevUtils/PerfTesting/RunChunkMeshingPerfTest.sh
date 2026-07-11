@@ -231,6 +231,7 @@ def by_name(runs):
 old_results = by_name(old_runs)
 current_results = by_name(current_runs)
 names = [name for name in sorted(old_results) if name in current_results]
+current_only_names = [name for name in sorted(current_results) if name not in old_results]
 
 def verdict_for(time_ratio):
     if time_ratio < 1.0:
@@ -273,6 +274,28 @@ def median_nested(forks, group, key, default=0.0):
     values = [fork.get(group, {}).get(key, default) for fork in forks]
     return statistics.median(values) if values else default
 
+def median_stage(forks, stage):
+    values = [
+        fork.get("native_profile", {}).get("stage_nanos_per_invocation", {}).get(stage, 0.0)
+        for fork in forks
+    ]
+    return statistics.median(values) if values else 0.0
+
+def median_count(forks, count):
+    values = [
+        fork.get("native_profile", {}).get("counts_per_invocation", {}).get(count, 0.0)
+        for fork in forks
+    ]
+    return statistics.median(values) if values else 0.0
+
+def current_summary(name, forks):
+    return {
+        "name": name,
+        "rust_median_mean_ms": statistics.median(r["mean_ms"] for r in forks),
+        "rust_median_throughput_mqps": statistics.median(r["mega_quads_per_second"] for r in forks),
+        "rust_forks": forks,
+    }
+
 comparisons = []
 for name in names:
     old_forks = old_results[name]
@@ -281,6 +304,12 @@ for name in names:
     current_mean = statistics.median(r["mean_ms"] for r in current_forks)
     old_throughput = statistics.median(r["mega_quads_per_second"] for r in old_forks)
     current_throughput = statistics.median(r["mega_quads_per_second"] for r in current_forks)
+    old_quads = median_nested(old_forks, "accounting", "output_quads_per_invocation")
+    current_quads = median_nested(current_forks, "accounting", "output_quads_per_invocation")
+    old_vertex_bytes = median_nested(old_forks, "accounting", "output_vertex_bytes_per_invocation")
+    current_vertex_bytes = median_nested(current_forks, "accounting", "output_vertex_bytes_per_invocation")
+    old_index_bytes = median_nested(old_forks, "accounting", "output_index_bytes_per_invocation")
+    current_index_bytes = median_nested(current_forks, "accounting", "output_index_bytes_per_invocation")
     time_ratio = current_mean / old_mean if old_mean else float("nan")
     throughput_ratio = current_throughput / old_throughput if old_throughput else float("nan")
     comparisons.append({
@@ -291,9 +320,20 @@ for name in names:
         "java_median_throughput_mqps": old_throughput,
         "rust_median_throughput_mqps": current_throughput,
         "rust_vs_java_throughput_ratio": throughput_ratio,
+        "output_equivalent": old_quads == current_quads
+            and old_vertex_bytes == current_vertex_bytes
+            and old_index_bytes == current_index_bytes,
+        "java_output_quads": old_quads,
+        "rust_output_quads": current_quads,
+        "java_output_vertex_bytes": old_vertex_bytes,
+        "rust_output_vertex_bytes": current_vertex_bytes,
+        "java_output_index_bytes": old_index_bytes,
+        "rust_output_index_bytes": current_index_bytes,
         "java_forks": old_forks,
         "rust_forks": current_forks,
     })
+
+current_only = [current_summary(name, current_results[name]) for name in current_only_names]
 
 summary = {
     "artifact_dir": str(artifact_dir),
@@ -307,6 +347,7 @@ summary = {
     "measure_millis": current_runs[0].get("measure_millis"),
     "limitations": current_runs[0].get("benchmark_limitations", []),
     "comparisons": comparisons,
+    "current_only_results": current_only,
     "old_json_paths": [run["_path"] for run in old_runs],
     "current_json_paths": [run["_path"] for run in current_runs],
 }
@@ -329,10 +370,27 @@ for item in comparisons:
     rf = item["rust_forks"]
     lines.append(f"{label(item['name'])[:42]:42} {item['java_median_mean_ms']:10.3f} {item['rust_median_mean_ms']:10.3f} {item['rust_vs_java_time_ratio']:10.2f} {int(statistics.median(r['samples'] for r in jf)):10d} {int(statistics.median(r['samples'] for r in rf)):10d}")
 lines.append("")
+lines.append("Output equivalence, median per invocation")
+lines.append("-----------------------------------------")
+lines.append(f"{'benchmark':42} {'status':>8} {'java quads':>11} {'rust quads':>11} {'java out':>13} {'rust out':>13} {'java idx':>13} {'rust idx':>13}")
+for item in comparisons:
+    status = "ok" if item["output_equivalent"] else "DIFF"
+    lines.append(f"{label(item['name'])[:42]:42} {status:>8} {item['java_output_quads']:11.1f} {item['rust_output_quads']:11.1f} {fmt_bytes(item['java_output_vertex_bytes']):>13} {fmt_bytes(item['rust_output_vertex_bytes']):>13} {fmt_bytes(item['java_output_index_bytes']):>13} {fmt_bytes(item['rust_output_index_bytes']):>13}")
+if current_only:
+    lines.append("")
+    lines.append("Current-only diagnostic rows")
+    lines.append("----------------------------")
+    lines.append(f"{'benchmark':58} {'rust ms':>10} {'samples':>10} {'quads':>10} {'native calls':>12}")
+    for item in current_only:
+        rf = item["rust_forks"]
+        quads = median_nested(rf, "accounting", "output_quads_per_invocation")
+        calls = median_nested(rf, "accounting", "native_calls_per_invocation")
+        lines.append(f"{label(item['name'])[:58]:58} {item['rust_median_mean_ms']:10.3f} {int(statistics.median(r['samples'] for r in rf)):10d} {quads:10.1f} {calls:12.1f}")
+lines.append("")
 lines.append("Current-path stage timing, median ms/invocation")
 lines.append("-----------------------------------------------")
-for item in comparisons:
-    if not item["name"].startswith("replay_section_"):
+for item in comparisons + current_only:
+    if not item["name"].startswith("replay_section_") and not item["name"].startswith("diagnostic_"):
         continue
     stage_names = sorted({name for fork in item["rust_forks"] for name in fork.get("stage_timing_ms_per_invocation", {})})
     if not stage_names:
@@ -342,6 +400,56 @@ for item in comparisons:
         values = [fork["stage_timing_ms_per_invocation"][stage] for fork in item["rust_forks"] if stage in fork.get("stage_timing_ms_per_invocation", {})]
         if values:
             lines.append(f"  {stage:32} {statistics.median(values):9.4f}")
+lines.append("")
+lines.append("Rust native internal profile, median ms/invocation")
+lines.append("--------------------------------------------------")
+for item in comparisons + current_only:
+    if not item["name"].startswith("replay_section_") and not item["name"].startswith("diagnostic_") and item["name"] != "native_section_scan_and_build":
+        continue
+    forks = item["rust_forks"]
+    stages = [
+        name
+        for name in current_runs[0]["results"][0].get("native_profile", {}).get("stage_nanos_per_invocation", {})
+    ]
+    # The first row may be an old historical microbenchmark with no profile values;
+    # collect names from this benchmark if necessary.
+    if not stages:
+        stages = sorted({
+            stage
+            for fork in forks
+            for stage in fork.get("native_profile", {}).get("stage_nanos_per_invocation", {})
+        })
+    values = [(stage, median_stage(forks, stage) / 1_000_000.0) for stage in stages]
+    values = [(stage, value) for stage, value in values if value > 0.000001]
+    if not values:
+        continue
+    lines.append(label(item["name"]))
+    for stage, value in values:
+        lines.append(f"  {stage:38} {value:9.4f}")
+lines.append("")
+lines.append("Rust normalized native costs, median")
+lines.append("------------------------------------")
+lines.append(f"{'benchmark':42} {'scan ns/block':>14} {'model ns/quad':>14} {'fluid ns/block':>15} {'fluid ns/face':>14} {'trans ns/quad':>14} {'pack ns/quad':>13} {'assembly ns/quad':>16}")
+for item in comparisons + current_only:
+    if not item["name"].startswith("replay_section_") and not item["name"].startswith("diagnostic_") and item["name"] != "native_section_scan_and_build":
+        continue
+    forks = item["rust_forks"]
+    scanned = median_count(forks, "scanned_blocks")
+    model_quads = median_count(forks, "native_model_quads")
+    fluid_blocks = median_count(forks, "fluid_blocks")
+    fluid_faces = median_count(forks, "fluid_faces")
+    translucent_quads = median_count(forks, "translucent_quads")
+    emitted_quads = median_count(forks, "emitted_quads")
+    def per(stage, count):
+        return median_stage(forks, stage) / count if count else 0.0
+    scan = per("section_scanning", scanned)
+    model = per("native_model_lookup_and_emission", model_quads)
+    fluid_block = per("fluid_visibility_and_height", fluid_blocks)
+    fluid_face = (median_stage(forks, "fluid_geometry_and_uv") / fluid_faces) if fluid_faces else 0.0
+    trans = per("translucent_analyzer_ingestion", translucent_quads)
+    pack = per("vertex_packing", emitted_quads)
+    assembly = per("final_mesh_assembly", emitted_quads)
+    lines.append(f"{label(item['name'])[:42]:42} {scan:14.1f} {model:14.1f} {fluid_block:15.1f} {fluid_face:14.1f} {trans:14.1f} {pack:13.1f} {assembly:16.1f}")
 lines.append("")
 lines.append("Boundary/accounting, median per invocation")
 lines.append("------------------------------------------")

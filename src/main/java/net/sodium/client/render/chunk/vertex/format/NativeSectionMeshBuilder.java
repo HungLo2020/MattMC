@@ -289,6 +289,12 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_LONG,
                     ValueLayout.ADDRESS));
+    private static final MethodHandle COPY_PROFILE = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_mesh_builder_copy_profile",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.ADDRESS,
+                    ValueLayout.JAVA_INT));
     private static final MethodHandle ASSEMBLE = NativeLibraryLoader.downcallHandle("mattmc_rust",
             "mattmc_sodium_section_mesh_builder_assemble",
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
@@ -695,6 +701,19 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
         }
     }
 
+    public long[] copyProfile() {
+        long[] values = new long[Profile.METRIC_COUNT];
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment valuesSegment = arena.allocate(ValueLayout.JAVA_LONG, values.length);
+            check(invokeCopyProfile(this.state.getHandle(), valuesSegment, values.length),
+                    "native section mesh builder profile copy");
+            for (int index = 0; index < values.length; index++) {
+                values[index] = valuesSegment.getAtIndex(ValueLayout.JAVA_LONG, index);
+            }
+        }
+        return values;
+    }
+
     public void assemble(ByteBuffer output, int[] vertexSegments, NativeChunkVertexFormat format,
             int visibleSlices, boolean forceUnassigned, boolean sliceReordering, boolean separateAo) {
         if (vertexSegments.length != 14) {
@@ -776,6 +795,40 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
 
     private static int[] createVertexSegments() {
         return new int[ModelQuadFacing.COUNT << 1];
+    }
+
+    public static final class Profile {
+        public static final String[] STAGE_NAMES = {
+                "section_scanning",
+                "native_model_lookup_and_emission",
+                "fluid_visibility_and_height",
+                "fluid_geometry_and_uv",
+                "lighting_ao_and_tint",
+                "material_and_pass_routing",
+                "quad_staging",
+                "translucent_analyzer_ingestion",
+                "translucent_metadata_key_generation",
+                "sorting",
+                "vertex_packing",
+                "index_emission",
+                "final_mesh_assembly"
+        };
+        public static final String[] COUNT_NAMES = {
+                "scanned_blocks",
+                "native_model_blocks",
+                "native_model_quads",
+                "fluid_blocks",
+                "fluid_faces",
+                "translucent_quads",
+                "sorted_quads",
+                "emitted_quads"
+        };
+        public static final int STAGE_COUNT = STAGE_NAMES.length;
+        public static final int COUNT_COUNT = COUNT_NAMES.length;
+        public static final int METRIC_COUNT = STAGE_COUNT + COUNT_COUNT;
+
+        private Profile() {
+        }
     }
 
     @Override
@@ -1038,6 +1091,14 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
             return (int) TOTAL_VERTEX_COUNT.invokeExact(handle, countOutput);
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust section mesh builder total count downcall failed", throwable);
+        }
+    }
+
+    private static int invokeCopyProfile(long handle, MemorySegment outputValues, int outputLength) {
+        try {
+            return (int) COPY_PROFILE.invokeExact(handle, outputValues, outputLength);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust section mesh builder profile downcall failed", throwable);
         }
     }
 

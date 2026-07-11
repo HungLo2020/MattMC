@@ -2,8 +2,14 @@ package net.sodium.client.perf;
 
 import net.sodium.client.SodiumClientMod;
 import net.sodium.client.gui.SodiumGameOptions;
+import net.minecraft.core.SectionPos;
 import net.sodium.client.render.chunk.data.BuiltSectionMeshParts;
+import net.sodium.client.render.chunk.translucent_sorting.SortBehavior;
+import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
+import net.sodium.client.render.chunk.translucent_sorting.SortType;
+import net.sodium.client.render.chunk.translucent_sorting.data.CombinedCameraPos;
 import net.sodium.client.render.chunk.translucent_sorting.data.TranslucentData;
+import net.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
@@ -12,6 +18,10 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.joml.Vector3d;
+import org.joml.Vector3dc;
+import org.joml.Vector3f;
+import org.joml.Vector3fc;
 import org.lwjgl.system.MemoryUtil;
 
 import java.io.IOException;
@@ -45,6 +55,28 @@ class ChunkMeshingHotPathBenchmarkTest {
     private static final MeshFinisher MESH_FINISHER = createMeshFinisher();
     private static final int SECTION_BLOCKS = 16 * 16 * 16;
     private static final int INDEX_BYTES_PER_QUAD = TranslucentData.INDICES_PER_QUAD * Integer.BYTES;
+    private static final int NATIVE_FLAG_AIR = 1;
+    private static final int NATIVE_FLAG_MODEL = 1 << 1;
+    private static final int NATIVE_FLAG_FLUID = 1 << 2;
+    private static final int NATIVE_FLAG_SOLID_RENDER = 1 << 3;
+    private static final int NATIVE_FLAG_FULL_OCCLUSION = 1 << 4;
+    private static final int NATIVE_FLAG_CAN_OCCLUDE = 1 << 7;
+    private static final int NATIVE_FLAG_BLOCKS_MOTION = 1 << 8;
+    private static final SectionPos BENCHMARK_SECTION_POS = SectionPos.of(0, SECTION_INDEX, 0);
+    private static final CombinedCameraPos ZERO_CAMERA_POS = new CombinedCameraPos() {
+        private final Vector3f relative = new Vector3f();
+        private final Vector3d absolute = new Vector3d();
+
+        @Override
+        public Vector3fc getRelativeCameraPos() {
+            return this.relative;
+        }
+
+        @Override
+        public Vector3dc getAbsoluteCameraPos() {
+            return this.absolute;
+        }
+    };
 
     @BeforeAll
     static void installDefaultSodiumOptionsForNativeBufferAllocation() throws Exception {
@@ -109,6 +141,20 @@ class ChunkMeshingHotPathBenchmarkTest {
                 }
             }
 
+            ReplaySection fluidHeavySection = replaySection("fluid_heavy");
+            for (FluidDiagnosticMode mode : FluidDiagnosticMode.values()) {
+                NativeSectionMeshBuilder diagnosticBuilder = NativeSectionMeshBuilder.create(4096);
+                ByteBuffer diagnosticRecords = createReplaySectionRecords(fluidHeavySection);
+                try {
+                    results.add(measure("diagnostic_fluid_heavy_" + mode.resultName,
+                            () -> runFluidHeavyDiagnostic(fluidHeavySection, diagnosticBuilder, diagnosticRecords,
+                                    mode)));
+                } finally {
+                    MemoryUtil.memFree(diagnosticRecords);
+                    diagnosticBuilder.close();
+                }
+            }
+
             results.add(measure("empty_native_call_overhead",
                     () -> runEmptyNativeCall(NativeSectionMeshBuilder.create(1))));
             results.add(measure("transfer_copy_4k", () -> runTransferCopy(4 * 1024)));
@@ -125,6 +171,15 @@ class ChunkMeshingHotPathBenchmarkTest {
                     result.name, result.meanMillis(), result.medianMillis(), result.minMillis(),
                     result.megaQuadsPerSecond(), result.checksum);
         }
+    }
+
+    private static ReplaySection replaySection(String name) {
+        for (ReplaySection section : replayCorpus()) {
+            if (section.name.equals(name)) {
+                return section;
+            }
+        }
+        throw new IllegalArgumentException("Unknown replay section " + name);
     }
 
     private static long runIndexEmission(int[] quadIndexes, IntBuffer indexBuffer) {
@@ -168,6 +223,7 @@ class ChunkMeshingHotPathBenchmarkTest {
         try {
             ByteBuffer vertexBuffer = mesh == null ? null
                     : mesh.getVertexData().getDirectBuffer().order(ByteOrder.nativeOrder());
+            BenchmarkAccounting.recordNativeProfile(sectionBuilder.copyProfile());
             BenchmarkAccounting.record(2, records.remaining(),
                     vertexBuffer == null ? 0 : vertexBuffer.remaining(),
                     (long) committed * INDEX_BYTES_PER_QUAD, committed, 0, 0);
@@ -185,22 +241,24 @@ class ChunkMeshingHotPathBenchmarkTest {
         sectionBuilder.start(SECTION_INDEX);
         stages.mark("java_snapshot_ready");
         int committed = 0;
-        committed += sectionBuilder.appendNativeSectionEncoded(MemoryUtil.memAddress(records), SECTION_BLOCKS, 0,
+        committed += sectionBuilder.appendNativeSectionEncoded(MemoryUtil.memAddress(records), SECTION_BLOCKS, -1,
                 ChunkMeshFormats.COMPACT.getNativeFormat(), SECTION_INDEX, false, false);
-        stages.mark("native_solid_pass");
-        committed += sectionBuilder.appendNativeSectionEncoded(MemoryUtil.memAddress(records), SECTION_BLOCKS, 1,
-                ChunkMeshFormats.COMPACT.getNativeFormat(), SECTION_INDEX, false, false);
-        stages.mark("native_cutout_pass");
-        committed += sectionBuilder.appendNativeSectionEncoded(MemoryUtil.memAddress(records), SECTION_BLOCKS, 2,
-                ChunkMeshFormats.COMPACT.getNativeFormat(), SECTION_INDEX, false, false);
-        stages.mark("native_translucent_pass");
+        stages.mark("native_all_passes");
+        if (section.fallbackLikeBlocks > 0) {
+            appendReplayFallbackQuads(sectionBuilder, section.fallbackLikeBlocks);
+            committed += section.fallbackLikeBlocks;
+            stages.mark("java_fallback_geometry");
+        }
         BuiltSectionMeshParts mesh = sectionBuilder.finishMesh(ChunkMeshFormats.COMPACT.getNativeFormat(), 0,
                 false, true, false);
         stages.mark("final_assembly_and_handoff");
         try {
             ByteBuffer vertexBuffer = mesh == null ? null
                     : mesh.getVertexData().getDirectBuffer().order(ByteOrder.nativeOrder());
-            BenchmarkAccounting.record(4, (long) records.remaining() * 3L,
+            BenchmarkAccounting.recordNativeProfile(sectionBuilder.copyProfile());
+            BenchmarkAccounting.record(2 + (section.fallbackLikeBlocks > 0 ? 1 : 0),
+                    records.remaining()
+                            + (long) section.fallbackLikeBlocks * NativeChunkMeshEncoder.FLAT_QUAD_RECORD_STRIDE,
                     vertexBuffer == null ? 0 : vertexBuffer.remaining(),
                     (long) committed * INDEX_BYTES_PER_QUAD, committed,
                     section.fallbackLikeBlocks, section.fallbackLikeBlocks);
@@ -214,11 +272,87 @@ class ChunkMeshingHotPathBenchmarkTest {
         }
     }
 
+    private static long runFluidHeavyDiagnostic(ReplaySection section, NativeSectionMeshBuilder sectionBuilder,
+            ByteBuffer records, FluidDiagnosticMode mode) {
+        StageTimer stages = StageTimer.start();
+        sectionBuilder.start(SECTION_INDEX);
+        stages.mark("java_snapshot_ready");
+
+        TranslucentGeometryCollector collector = null;
+        TranslucentData translucentData = null;
+        BuiltSectionMeshParts mesh = null;
+        int committed = 0;
+        int sortTypeOrdinal = -1;
+        try {
+            long analyzerHandle = 0L;
+            if (mode.usesAnalyzer) {
+                collector = new TranslucentGeometryCollector(BENCHMARK_SECTION_POS, SortBehavior.STATIC);
+                analyzerHandle = collector.nativeAnalyzerHandle();
+            }
+
+            committed = sectionBuilder.appendNativeSectionEncoded(MemoryUtil.memAddress(records), SECTION_BLOCKS, 2,
+                    ChunkMeshFormats.COMPACT.getNativeFormat(), SECTION_INDEX, false, false, analyzerHandle);
+            stages.mark("native_fluid_generation");
+
+            if (mode.finishCollector) {
+                SortType sortType = collector.finishRendering();
+                sortTypeOrdinal = sortType.ordinal();
+                stages.mark("translucent_analysis_and_sort_choice");
+            }
+
+            if (mode.createTranslucentData) {
+                translucentData = collector.getTranslucentData(null, ZERO_CAMERA_POS);
+                stages.mark("translucent_sort_data");
+            }
+
+            if (mode.finishMesh) {
+                mesh = sectionBuilder.finishMesh(ChunkMeshFormats.COMPACT.getNativeFormat(), 0,
+                        false, true, false);
+                stages.mark("final_assembly_and_handoff");
+            }
+
+            ByteBuffer vertexBuffer = mesh == null ? null
+                    : mesh.getVertexData().getDirectBuffer().order(ByteOrder.nativeOrder());
+            BenchmarkAccounting.recordNativeProfile(sectionBuilder.copyProfile());
+            BenchmarkAccounting.record(1, records.remaining(),
+                    vertexBuffer == null ? 0 : vertexBuffer.remaining(),
+                    (long) committed * INDEX_BYTES_PER_QUAD, committed,
+                    section.fallbackLikeBlocks, section.fallbackLikeBlocks);
+            long meshChecksum = vertexBuffer == null ? 0L : sample(vertexBuffer);
+            return (((long) committed) << 32) ^ meshChecksum ^ stages.checksum() ^ sortTypeOrdinal;
+        } finally {
+            if (mesh != null) {
+                mesh.getVertexData().free();
+            }
+            if (translucentData != null) {
+                translucentData.close();
+            } else if (collector != null) {
+                collector.discardNativeAnalyzerForBenchmark();
+            }
+        }
+    }
+
+    private static void appendReplayFallbackQuads(NativeSectionMeshBuilder sectionBuilder, int quadCount) {
+        NativeSectionMeshBuilder.FacingBuffer fallbackBuffer = new NativeSectionMeshBuilder.FacingBuffer(
+                ChunkMeshFormats.COMPACT.getNativeFormat(), sectionBuilder, ModelQuadFacing.UNASSIGNED.ordinal(),
+                false);
+        fallbackBuffer.start(SECTION_INDEX);
+        for (int index = 0; index < quadCount; index++) {
+            int localX = index & 15;
+            int localY = (index >>> 8) & 15;
+            int localZ = (index >>> 4) & 15;
+            appendQuad(fallbackBuffer, (byte) 0, (byte) 0, 61 + (index & 7), localX, localY, localZ,
+                    materialBits(index), localX, localY, localZ);
+        }
+        fallbackBuffer.count();
+    }
+
     private static long runEmptyNativeCall(NativeSectionMeshBuilder builder) {
         try {
             builder.start(SECTION_INDEX);
             int committed = builder.appendNativeSectionEncoded(0L, 0, 0, ChunkMeshFormats.COMPACT.getNativeFormat(),
                     SECTION_INDEX, false, false);
+            BenchmarkAccounting.recordNativeProfile(builder.copyProfile());
             BenchmarkAccounting.record(1, 0, 0, 0, committed, 0, 0);
             return committed;
         } finally {
@@ -264,16 +398,19 @@ class ChunkMeshingHotPathBenchmarkTest {
                 (recordAddress, index) -> NativeChunkMeshEncoder.writeNativeModelSelectorEntry(recordAddress, 78, 1),
                 1);
         NativeStaticBlockModelCache.registerSelector(11, 1, (recordAddress, index) ->
-                NativeChunkMeshEncoder.writeNativeModelSelectorEntry(recordAddress, index == 0 ? 77 : 78,
+                NativeChunkMeshEncoder.writeNativeModelSelectorEntry(recordAddress, index == 0 ? 8 : 10,
                         index == 0 ? 3 : 1), 2);
         NativeStaticBlockModelCache.registerSelector(9, 1,
                 (recordAddress, index) -> NativeChunkMeshEncoder.writeNativeModelSelectorEntry(recordAddress, 8, 1),
                 1);
-        NativeStaticBlockModelCache.registerState(0, -1, 1, 0, -1, 0, 0, -1, 0, -1, -1, 0);
-        NativeStaticBlockModelCache.registerState(100, 9, 1 << 1, 5, 0, 0, 0, 41, 0, -1, -1, 1);
-        NativeStaticBlockModelCache.registerState(101, 10, 1 << 1, 7, 1, 0, 0, 42, 0, -1, -1, 2);
-        NativeStaticBlockModelCache.registerState(102, 11, 1 << 1, 5, 0, 0, 0, 43, 0, -1, -1, 3);
-        NativeStaticBlockModelCache.registerState(200, -1, 1 << 2, 0, -1, 0, 0, -1, 9, 2, 44, 4,
+        NativeStaticBlockModelCache.registerState(0, -1, NATIVE_FLAG_AIR, 0, -1, 0, 0, -1, 0, -1, -1, 0);
+        NativeStaticBlockModelCache.registerState(100, 9,
+                NATIVE_FLAG_MODEL | NATIVE_FLAG_SOLID_RENDER | NATIVE_FLAG_FULL_OCCLUSION
+                        | NATIVE_FLAG_CAN_OCCLUDE | NATIVE_FLAG_BLOCKS_MOTION,
+                5, 0, 0, 0, 41, 0, -1, -1, 1);
+        NativeStaticBlockModelCache.registerState(101, 10, NATIVE_FLAG_MODEL, 7, 1, 0, 0, 42, 0, -1, -1, 2);
+        NativeStaticBlockModelCache.registerState(102, 11, NATIVE_FLAG_MODEL, 5, 0, 0, 0, 43, 0, -1, -1, 3);
+        NativeStaticBlockModelCache.registerState(200, -1, NATIVE_FLAG_FLUID, 0, -1, 0, 0, -1, 9, 2, 44, 4,
                 1, 0.8888889F, 0, 0, 0.0F, 0.0F, 3,
                 0.0F, 1.0F, 0.0F, 1.0F, 0.0009765625F,
                 0.0F, 1.0F, 0.0F, 1.0F, 0.0009765625F,
@@ -318,13 +455,16 @@ class ChunkMeshingHotPathBenchmarkTest {
         int[] airNeighborhood = new int[27];
         int[] solidNeighborhood = new int[27];
         Arrays.fill(solidNeighborhood, 100);
+        int[] fluidSurfaceNeighborhood = solidNeighborhood.clone();
+        fluidSurfaceNeighborhood[22] = 200;
 
         for (int index = 0; index < SECTION_BLOCKS; index++) {
             int stateId = stateForReplayIndex(section, index);
             int localX = index & 15;
             int localY = (index >>> 8) & 15;
             int localZ = (index >>> 4) & 15;
-            int[] neighborhood = stateId == 0 ? airNeighborhood : solidNeighborhood;
+            int[] neighborhood = stateId == 0 ? airNeighborhood
+                    : stateId == 200 ? fluidSurfaceNeighborhood : solidNeighborhood;
             neighborhood[13] = stateId;
             NativeChunkMeshEncoder.writeNativeSectionBlockRecord(base + (long) index
                             * NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE,
@@ -523,7 +663,7 @@ class ChunkMeshingHotPathBenchmarkTest {
         builder.append("  \"benchmark_limitations\": [\n");
         builder.append("    \"Historical hot-path rows use synthetic repeated quads and are retained only for trend comparison.\",\n");
         builder.append("    \"Replay section rows are deterministic section-shaped workloads, not live gameplay captures.\",\n");
-        builder.append("    \"Current Rust internal substages are timed at Java-visible boundaries unless exported native stage counters are added.\"\n");
+        builder.append("    \"Current Rust internal substages are exported once per benchmark operation; section_scanning is inclusive of native producers.\"\n");
         builder.append("  ],\n");
         builder.append("  \"results\": [\n");
         for (int index = 0; index < results.size(); index++) {
@@ -544,6 +684,7 @@ class ChunkMeshingHotPathBenchmarkTest {
             builder.append("      \"checksum\": ").append(result.checksum).append(",\n");
             appendStageJson(builder, result.stageNanos, result.sampleCount);
             appendAccountingJson(builder, result.accounting, result.sampleCount);
+            appendNativeProfileJson(builder, result.accounting.nativeProfile, result.sampleCount);
             appendGcJson(builder, result.gcBefore, result.gcAfter);
             appendMemoryJson(builder, result);
             builder.append("    }");
@@ -607,6 +748,53 @@ class ChunkMeshingHotPathBenchmarkTest {
         appendAccountingValueJson(builder, "fallback_like_blocks_per_invocation", accounting.fallbackBlocks, samples, true);
         appendAccountingValueJson(builder, "fallback_like_quads_total", accounting.fallbackQuads, true);
         appendAccountingValueJson(builder, "fallback_like_quads_per_invocation", accounting.fallbackQuads, samples, false);
+        builder.append("      },\n");
+    }
+
+    private static void appendNativeProfileJson(StringBuilder builder, long[] nativeProfile, int samples) {
+        builder.append("      \"native_profile\": {\n");
+        builder.append("        \"stage_nanos_total\": {\n");
+        for (int index = 0; index < NativeSectionMeshBuilder.Profile.STAGE_COUNT; index++) {
+            builder.append("          \"").append(NativeSectionMeshBuilder.Profile.STAGE_NAMES[index]).append("\": ")
+                    .append(nativeProfile[index]);
+            if (index + 1 < NativeSectionMeshBuilder.Profile.STAGE_COUNT) {
+                builder.append(',');
+            }
+            builder.append('\n');
+        }
+        builder.append("        },\n");
+        builder.append("        \"stage_nanos_per_invocation\": {\n");
+        for (int index = 0; index < NativeSectionMeshBuilder.Profile.STAGE_COUNT; index++) {
+            builder.append("          \"").append(NativeSectionMeshBuilder.Profile.STAGE_NAMES[index]).append("\": ")
+                    .append(String.format(Locale.ROOT, "%.3f", nativeProfile[index] / (double) Math.max(1, samples)));
+            if (index + 1 < NativeSectionMeshBuilder.Profile.STAGE_COUNT) {
+                builder.append(',');
+            }
+            builder.append('\n');
+        }
+        builder.append("        },\n");
+        builder.append("        \"counts_total\": {\n");
+        for (int index = 0; index < NativeSectionMeshBuilder.Profile.COUNT_COUNT; index++) {
+            int profileIndex = NativeSectionMeshBuilder.Profile.STAGE_COUNT + index;
+            builder.append("          \"").append(NativeSectionMeshBuilder.Profile.COUNT_NAMES[index]).append("\": ")
+                    .append(nativeProfile[profileIndex]);
+            if (index + 1 < NativeSectionMeshBuilder.Profile.COUNT_COUNT) {
+                builder.append(',');
+            }
+            builder.append('\n');
+        }
+        builder.append("        },\n");
+        builder.append("        \"counts_per_invocation\": {\n");
+        for (int index = 0; index < NativeSectionMeshBuilder.Profile.COUNT_COUNT; index++) {
+            int profileIndex = NativeSectionMeshBuilder.Profile.STAGE_COUNT + index;
+            builder.append("          \"").append(NativeSectionMeshBuilder.Profile.COUNT_NAMES[index]).append("\": ")
+                    .append(String.format(Locale.ROOT, "%.3f", nativeProfile[profileIndex] / (double) Math.max(1, samples)));
+            if (index + 1 < NativeSectionMeshBuilder.Profile.COUNT_COUNT) {
+                builder.append(',');
+            }
+            builder.append('\n');
+        }
+        builder.append("        }\n");
         builder.append("      },\n");
     }
 
@@ -816,7 +1004,7 @@ class ChunkMeshingHotPathBenchmarkTest {
 
     private record AccountingSnapshot(long nativeCalls, long abiPayloadBytes, long bytesCopied,
             long outputVertexBytes, long outputIndexBytes, long outputQuads, long fallbackBlocks,
-            long fallbackQuads) {
+            long fallbackQuads, long[] nativeProfile) {
     }
 
     private record BenchmarkResult(String name, double meanNanos, long medianNanos, long p90Nanos, long p99Nanos,
@@ -868,6 +1056,28 @@ class ChunkMeshingHotPathBenchmarkTest {
             summary = summary * 31L + this.translucentBlocks;
             summary = summary * 31L + this.fallbackLikeBlocks;
             return summary;
+        }
+    }
+
+    private enum FluidDiagnosticMode {
+        NO_ANALYZER_NO_ASSEMBLY("no_analyzer_no_assembly", false, false, false, false),
+        ANALYZER_INGEST_NO_SORT_NO_ASSEMBLY("analyzer_ingest_no_sort_no_assembly", true, false, false, false),
+        ANALYZER_SORT_NO_ASSEMBLY("analyzer_sort_no_assembly", true, true, false, false),
+        COMPLETE_NATIVE_FLUID_PATH("complete_native_path", true, true, true, true);
+
+        private final String resultName;
+        private final boolean usesAnalyzer;
+        private final boolean finishCollector;
+        private final boolean createTranslucentData;
+        private final boolean finishMesh;
+
+        FluidDiagnosticMode(String resultName, boolean usesAnalyzer, boolean finishCollector,
+                boolean createTranslucentData, boolean finishMesh) {
+            this.resultName = resultName;
+            this.usesAnalyzer = usesAnalyzer;
+            this.finishCollector = finishCollector;
+            this.createTranslucentData = createTranslucentData;
+            this.finishMesh = finishMesh;
         }
     }
 
@@ -930,11 +1140,20 @@ class ChunkMeshingHotPathBenchmarkTest {
             accounting.fallbackQuads += fallbackQuads;
         }
 
+        static void recordNativeProfile(long[] values) {
+            MutableAccounting accounting = ACCOUNTING.get();
+            int length = Math.min(values.length, accounting.nativeProfile.length);
+            for (int index = 0; index < length; index++) {
+                accounting.nativeProfile[index] += values[index];
+            }
+        }
+
         static AccountingSnapshot snapshot() {
             MutableAccounting accounting = ACCOUNTING.get();
             return new AccountingSnapshot(accounting.nativeCalls, accounting.abiPayloadBytes,
                     accounting.bytesCopied, accounting.outputVertexBytes, accounting.outputIndexBytes,
-                    accounting.outputQuads, accounting.fallbackBlocks, accounting.fallbackQuads);
+                    accounting.outputQuads, accounting.fallbackBlocks, accounting.fallbackQuads,
+                    accounting.nativeProfile.clone());
         }
     }
 
@@ -947,6 +1166,7 @@ class ChunkMeshingHotPathBenchmarkTest {
         private long outputQuads;
         private long fallbackBlocks;
         private long fallbackQuads;
+        private final long[] nativeProfile = new long[NativeSectionMeshBuilder.Profile.METRIC_COUNT];
 
         private void reset() {
             this.nativeCalls = 0L;
@@ -957,6 +1177,7 @@ class ChunkMeshingHotPathBenchmarkTest {
             this.outputQuads = 0L;
             this.fallbackBlocks = 0L;
             this.fallbackQuads = 0L;
+            Arrays.fill(this.nativeProfile, 0L);
         }
     }
 }
