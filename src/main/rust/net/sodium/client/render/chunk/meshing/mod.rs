@@ -1,0 +1,423 @@
+use std::collections::HashMap;
+use std::slice;
+use std::sync::{Mutex, OnceLock};
+use std::time::Instant;
+
+use super::{index, translucent};
+
+mod assembly;
+mod builder;
+mod cache;
+mod culling;
+mod ffi;
+mod fluid;
+mod format;
+mod lighting;
+mod model;
+mod packing;
+mod quad;
+mod scan;
+mod tint;
+mod updates;
+
+pub use ffi::*;
+pub(crate) use updates::updated_quads_create_from_handles;
+
+use assembly::*;
+use builder::*;
+use cache::*;
+use culling::*;
+#[cfg(test)]
+use fluid::{fluid_face_record_to_quad, fluid_semantic_face};
+use fluid::{native_section_fluid_faces, section_builder_append_fluid_face_records_encoded};
+use format::*;
+use lighting::*;
+use model::*;
+use packing::*;
+use quad::*;
+use scan::*;
+use tint::*;
+use updates::*;
+
+const OK: i32 = 0;
+const ERR_NULL_POINTER: i32 = -1;
+const ERR_INVALID_ARGUMENT: i32 = -2;
+const ERR_CAPACITY: i32 = -3;
+
+const MODEL_QUAD_FACING_COUNT: usize = 7;
+const MODEL_QUAD_FACING_POS_X: usize = 0;
+const MODEL_QUAD_FACING_POS_Y: usize = 1;
+const MODEL_QUAD_FACING_POS_Z: usize = 2;
+const MODEL_QUAD_FACING_NEG_X: usize = 3;
+const MODEL_QUAD_FACING_NEG_Y: usize = 4;
+const MODEL_QUAD_FACING_NEG_Z: usize = 5;
+const MODEL_QUAD_FACING_UNASSIGNED: usize = 6;
+const FLUID_ALIGNED_EQUALS_EPSILON: f32 = 0.011;
+const FLUID_FACE_TOP_NE_SW: i32 = 0;
+const FLUID_FACE_TOP_NW_SE: i32 = 1;
+const FLUID_FACE_BOTTOM: i32 = 2;
+const FLUID_FACE_SIDE: i32 = 3;
+const NATIVE_SECTION_BLOCK_FLAG_SUPPRESS_FLUID: i32 = 1;
+const POSITION_MAX_VALUE: f32 = (1 << 20) as f32;
+const TEXTURE_MAX_VALUE: f32 = (1 << 15) as f32;
+const MODEL_ORIGIN: f32 = 8.0;
+const MODEL_RANGE: f32 = 32.0;
+const INDEX_MODE_NONE: i32 = 0;
+const INDEX_MODE_SHARED: i32 = 1;
+const INDEX_MODE_SORTED_QUADS: i32 = 2;
+const INDEX_MODE_KEY_SORTED: i32 = 3;
+const PENDING_BATCH_QUAD_CAPACITY: usize = 256;
+const STATIC_MODEL_EMPTY_RECORD_ID: i32 = -1;
+const STATIC_MODEL_LIGHT_BLOCK_RECORD_ID: i32 = -2;
+const STATE_FLAG_AIR: i32 = 1;
+const STATE_FLAG_MODEL: i32 = 1 << 1;
+const STATE_FLAG_FLUID: i32 = 1 << 2;
+const STATE_FLAG_SOLID_RENDER: i32 = 1 << 3;
+const STATE_FLAG_FULL_OCCLUSION: i32 = 1 << 4;
+const STATE_FLAG_LIGHT_BLOCK: i32 = 1 << 5;
+const STATE_FLAG_CAN_OCCLUDE: i32 = 1 << 7;
+const STATE_FLAG_BLOCKS_MOTION: i32 = 1 << 8;
+const MODEL_QUAD_FLAG_PARTIAL: i32 = 1;
+const MODEL_QUAD_FLAG_PARALLEL: i32 = 1 << 1;
+const MODEL_QUAD_FLAG_ALIGNED: i32 = 1 << 2;
+const TINT_NONE: i32 = 0;
+const TINT_GRASS: i32 = 1;
+const TINT_FOLIAGE: i32 = 2;
+const TINT_WATER: i32 = 3;
+const TINT_REDSTONE: i32 = 4;
+const TINT_CONSTANT: i32 = 5;
+const TINT_STEM: i32 = 6;
+const TINT_DOUBLE_PLANT_GRASS: i32 = 7;
+const TINT_SPRUCE: i32 = 8;
+const TINT_BIRCH: i32 = 9;
+const TINT_FORCE_GRASS: i32 = 10;
+const FLUID_WATER: i32 = 1;
+const FLUID_LAVA: i32 = 2;
+const OFFSET_NONE: i32 = 0;
+const OFFSET_XZ: i32 = 1;
+const OFFSET_XYZ: i32 = 2;
+const LIGHT_FULL_BRIGHT: i32 = 0x00f0_00f0;
+const SELECTOR_DIRECT: i32 = 0;
+const SELECTOR_WEIGHTED: i32 = 1;
+const SELECTOR_GROUP: i32 = 2;
+
+const COMPACT_VALUE_STRIDE: i32 = 0;
+const COMPACT_VALUE_POSITION_OFFSET: i32 = 1;
+const COMPACT_VALUE_COLOR_OFFSET: i32 = 2;
+const COMPACT_VALUE_TEXTURE_OFFSET: i32 = 3;
+const COMPACT_VALUE_LIGHT_MATERIAL_INDEX_OFFSET: i32 = 4;
+const COMPACT_VALUE_BLOCK_ID_OFFSET: i32 = 5;
+const COMPACT_VALUE_NORMAL_OFFSET: i32 = 6;
+const COMPACT_VALUE_TANGENT_OFFSET: i32 = 7;
+const COMPACT_VALUE_MID_UV_OFFSET: i32 = 8;
+const COMPACT_VALUE_MID_BLOCK_OFFSET: i32 = 9;
+const COMPACT_VALUE_POSITION_MAX_VALUE: i32 = 10;
+const COMPACT_VALUE_TEXTURE_MAX_VALUE: i32 = 11;
+
+const COMPACT_VERTEX_STRIDE: i32 = 20;
+const COMPACT_POSITION_OFFSET: i32 = 0;
+const COMPACT_COLOR_OFFSET: i32 = 8;
+const COMPACT_TEXTURE_OFFSET: i32 = 12;
+const COMPACT_LIGHT_MATERIAL_INDEX_OFFSET: i32 = 16;
+const COMPACT_NATIVE_BLOCK_ID_OFFSET: i32 = 0;
+const COMPACT_NATIVE_NORMAL_OFFSET: i32 = 0;
+const COMPACT_NATIVE_TANGENT_OFFSET: i32 = 0;
+const COMPACT_NATIVE_MID_UV_OFFSET: i32 = 0;
+const COMPACT_NATIVE_MID_BLOCK_OFFSET: i32 = 0;
+
+const PROFILE_STAGE_COUNT: usize = 13;
+const PROFILE_COUNT_COUNT: usize = 8;
+const PROFILE_EXPORT_LONGS: usize = PROFILE_STAGE_COUNT + PROFILE_COUNT_COUNT;
+const PROFILE_SECTION_SCAN: usize = 0;
+const PROFILE_MODEL_LOOKUP_EMIT: usize = 1;
+const PROFILE_FLUID_VIS_HEIGHT: usize = 2;
+const PROFILE_FLUID_GEOM_UV: usize = 3;
+#[allow(dead_code)]
+const PROFILE_LIGHT_AO_TINT: usize = 4;
+const PROFILE_MATERIAL_PASS: usize = 5;
+const PROFILE_QUAD_STAGING: usize = 6;
+const PROFILE_TRANSLUCENT_INGEST: usize = 7;
+#[allow(dead_code)]
+const PROFILE_TRANSLUCENT_METADATA: usize = 8;
+#[allow(dead_code)]
+const PROFILE_SORTING: usize = 9;
+const PROFILE_VERTEX_PACKING: usize = 10;
+#[allow(dead_code)]
+const PROFILE_INDEX_EMISSION: usize = 11;
+const PROFILE_FINAL_ASSEMBLY: usize = 12;
+const PROFILE_COUNT_SCANNED_BLOCKS: usize = 0;
+const PROFILE_COUNT_NATIVE_MODEL_BLOCKS: usize = 1;
+const PROFILE_COUNT_NATIVE_MODEL_QUADS: usize = 2;
+const PROFILE_COUNT_FLUID_BLOCKS: usize = 3;
+const PROFILE_COUNT_FLUID_FACES: usize = 4;
+const PROFILE_COUNT_TRANSLUCENT_QUADS: usize = 5;
+#[allow(dead_code)]
+const PROFILE_COUNT_SORTED_QUADS: usize = 6;
+const PROFILE_COUNT_EMITTED_QUADS: usize = 7;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct QuadVertex {
+    x: f32,
+    y: f32,
+    z: f32,
+    color: i32,
+    ao: f32,
+    u: f32,
+    v: f32,
+    light: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct NativeQuad {
+    vertices: [QuadVertex; 4],
+    block_emission: u8,
+    render_type: u8,
+    ignore_mid_block: u8,
+    _padding: u8,
+    block_id: i32,
+    local_x: i32,
+    local_y: i32,
+    local_z: i32,
+    material_bits: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct FlatQuadRecord {
+    quad: NativeQuad,
+    packed_normal: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct LightBlockRecord {
+    material_bits: i32,
+    block_emission: i32,
+    block_id: i32,
+    local_x: i32,
+    local_y: i32,
+    local_z: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct FluidFaceRecord {
+    packed_normal: i32,
+    material_bits: i32,
+    block_emission: i32,
+    render_type: i32,
+    ignore_mid_block: i32,
+    block_id: i32,
+    local_x: i32,
+    local_y: i32,
+    local_z: i32,
+    face_kind: i32,
+    flip: i32,
+    origin_x: f32,
+    origin_y: f32,
+    origin_z: f32,
+    y_offset: f32,
+    heights: [f32; 4],
+    side_coords: [f32; 4],
+    uvs: [f32; 8],
+    colors: [i32; 4],
+    aos: [f32; 4],
+    lights: [i32; 4],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct StaticModelVertexRecord {
+    x: f32,
+    y: f32,
+    z: f32,
+    color: i32,
+    u: f32,
+    v: f32,
+    light: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct StaticModelQuadRecord {
+    vertices: [StaticModelVertexRecord; 4],
+    material_bits: i32,
+    cull_face: i32,
+    normal_face: i32,
+    packed_normal: i32,
+    block_emission: i32,
+    render_type: i32,
+    shade: i32,
+    flags: i32,
+    light_face: i32,
+    tint_index: i32,
+    has_ao: i32,
+    _padding: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct StaticModelBlockRecord {
+    model_id: i32,
+    material_bits: i32,
+    block_emission: i32,
+    render_type: i32,
+    block_id: i32,
+    local_x: i32,
+    local_y: i32,
+    local_z: i32,
+    cull_mask: i32,
+    _padding: i32,
+    offset_x: f32,
+    offset_y: f32,
+    offset_z: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct NativeSectionBlockRecord {
+    state_id: i32,
+    block_id: i32,
+    local_x: i32,
+    local_y: i32,
+    local_z: i32,
+    seed_lo: i32,
+    seed_hi: i32,
+    neighbor_state_ids: [i32; 6],
+    light_words: [i32; 27],
+    neighborhood_state_ids: [i32; 27],
+    tint: i32,
+    fluid_tint: i32,
+    fluid_flow_x: f32,
+    fluid_flow_z: f32,
+    absolute_x: i32,
+    absolute_y: i32,
+    absolute_z: i32,
+    legacy_offset_x: f32,
+    legacy_offset_y: f32,
+    legacy_offset_z: f32,
+    fluid_block_id: i32,
+    flags: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct NativeModelSelectorEntry {
+    target_id: i32,
+    weight: i32,
+}
+
+#[derive(Clone, Debug, Default)]
+struct NativeModelSelector {
+    kind: i32,
+    entries: Vec<NativeModelSelectorEntry>,
+    total_weight: i32,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct FluidSprite {
+    u0: f32,
+    u1: f32,
+    v0: f32,
+    v1: f32,
+    shrink: f32,
+}
+
+impl Default for FluidSprite {
+    fn default() -> Self {
+        Self {
+            u0: 0.0,
+            u1: 1.0,
+            v0: 0.0,
+            v1: 1.0,
+            shrink: 0.0,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct NativeMeshingState {
+    selector_id: i32,
+    flags: i32,
+    material_bits: i32,
+    pass_id: i32,
+    block_emission: i32,
+    #[allow(dead_code)]
+    render_type: i32,
+    block_id: i32,
+    fluid_material_bits: i32,
+    fluid_pass_id: i32,
+    fluid_block_id: i32,
+    skip_group: i32,
+    fluid_type: i32,
+    fluid_own_height: f32,
+    fluid_falling: i32,
+    offset_type: i32,
+    max_horizontal_offset: f32,
+    max_vertical_offset: f32,
+    tint_type: i32,
+    fluid_still: FluidSprite,
+    fluid_flow: FluidSprite,
+    fluid_overlay: FluidSprite,
+    fluid_overlay_valid: i32,
+}
+
+struct NativeQuadBuffer {
+    quads: Vec<NativeQuad>,
+    encoded: Vec<u8>,
+    encoded_format: Option<NativeFormat>,
+}
+
+struct NativePendingQuadBuffer {
+    quads: Vec<NativeQuad>,
+    flat_quad_records: Vec<FlatQuadRecord>,
+    light_block_records: Vec<LightBlockRecord>,
+    fluid_face_records: Vec<FluidFaceRecord>,
+    static_model_block_records: Vec<StaticModelBlockRecord>,
+    packed_normals: Vec<i32>,
+    validity: Vec<u8>,
+}
+
+struct NativeSectionMeshBuilder {
+    buffers: [NativeQuadBuffer; MODEL_QUAD_FACING_COUNT],
+    pending: [NativePendingQuadBuffer; MODEL_QUAD_FACING_COUNT],
+    counts: [usize; MODEL_QUAD_FACING_COUNT],
+    profile: NativeMeshingProfile,
+    section_pass_cache_address: u64,
+    section_pass_cache_count: usize,
+    section_pass_cache_mask: u32,
+    section_pass_cache_valid: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct NativeMeshingProfile {
+    stage_nanos: [u64; PROFILE_STAGE_COUNT],
+    counts: [u64; PROFILE_COUNT_COUNT],
+}
+
+impl NativeMeshingProfile {
+    fn reset(&mut self) {
+        self.stage_nanos.fill(0);
+        self.counts.fill(0);
+    }
+
+    fn add_stage(&mut self, stage: usize, started_at: Instant) {
+        self.stage_nanos[stage] = self.stage_nanos[stage]
+            .saturating_add(started_at.elapsed().as_nanos().min(u128::from(u64::MAX)) as u64);
+    }
+
+    fn add_count(&mut self, counter: usize, value: usize) {
+        self.counts[counter] = self.counts[counter].saturating_add(value as u64);
+    }
+}
+
+struct NativeUpdatedQuads {
+    quads: Vec<u64>,
+    mesh_quad_count: i32,
+    index_quad_count: i32,
+}
+
+#[cfg(test)]
+mod tests;
