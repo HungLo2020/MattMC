@@ -26,9 +26,9 @@ use assembly::*;
 use builder::*;
 use cache::*;
 use culling::*;
+use fluid::{emit_native_section_fluid_faces, section_builder_append_fluid_face_records_encoded};
 #[cfg(test)]
 use fluid::{fluid_face_record_to_quad, fluid_semantic_face};
-use fluid::{emit_native_section_fluid_faces, section_builder_append_fluid_face_records_encoded};
 use format::*;
 use lighting::*;
 use model::*;
@@ -124,8 +124,8 @@ const COMPACT_NATIVE_TANGENT_OFFSET: i32 = 0;
 const COMPACT_NATIVE_MID_UV_OFFSET: i32 = 0;
 const COMPACT_NATIVE_MID_BLOCK_OFFSET: i32 = 0;
 
-const PROFILE_STAGE_COUNT: usize = 51;
-const PROFILE_COUNT_COUNT: usize = 8;
+const PROFILE_STAGE_COUNT: usize = 56;
+const PROFILE_COUNT_COUNT: usize = 12;
 const PROFILE_EXPORT_LONGS: usize = PROFILE_STAGE_COUNT + PROFILE_COUNT_COUNT;
 const PROFILE_SECTION_SCAN: usize = 0;
 const PROFILE_MODEL_LOOKUP_EMIT: usize = 1;
@@ -185,6 +185,14 @@ const PROFILE_STAGING_VERTEX_ENCODING: usize = 48;
 const PROFILE_STAGING_INDEX_WRITE: usize = 49;
 #[allow(dead_code)]
 const PROFILE_STAGING_FINAL_BUFFER_ASSEMBLY: usize = 50;
+#[allow(dead_code)]
+const PROFILE_TEMPLATE_LOOKUP: usize = 51;
+const PROFILE_TEMPLATE_INSTANCE_PATCH: usize = 52;
+const PROFILE_TEMPLATE_DIRECT_VERTEX_ENCODING: usize = 53;
+#[allow(dead_code)]
+const PROFILE_TEMPLATE_RETAINED_TRANSLUCENT_METADATA: usize = 54;
+#[allow(dead_code)]
+const PROFILE_TEMPLATE_FINAL_ASSEMBLY_COPY: usize = 55;
 const PROFILE_COUNT_SCANNED_BLOCKS: usize = 0;
 const PROFILE_COUNT_NATIVE_MODEL_BLOCKS: usize = 1;
 const PROFILE_COUNT_NATIVE_MODEL_QUADS: usize = 2;
@@ -194,6 +202,10 @@ const PROFILE_COUNT_TRANSLUCENT_QUADS: usize = 5;
 #[allow(dead_code)]
 const PROFILE_COUNT_SORTED_QUADS: usize = 6;
 const PROFILE_COUNT_EMITTED_QUADS: usize = 7;
+const PROFILE_COUNT_DIRECT_TEMPLATE_QUADS: usize = 8;
+const PROFILE_COUNT_GENERIC_NATIVE_QUADS: usize = 9;
+const PROFILE_COUNT_DIRECT_TEMPLATE_BYTES_WRITTEN: usize = 10;
+const PROFILE_COUNT_GENERIC_NATIVE_BYTES_RETAINED: usize = 11;
 
 static STATIC_MODEL_SUBSTAGE_PROFILE_ENABLED: OnceLock<bool> = OnceLock::new();
 static FLUID_SUBSTAGE_PROFILE_ENABLED: OnceLock<bool> = OnceLock::new();
@@ -421,6 +433,9 @@ struct NativePendingQuadBuffer {
     light_block_records: Vec<LightBlockRecord>,
     fluid_face_records: Vec<FluidFaceRecord>,
     static_model_block_records: Vec<StaticModelBlockRecord>,
+    static_template_blocks: Vec<*const NativeSectionBlockRecord>,
+    static_template_states: Vec<NativeMeshingState>,
+    static_template_quads: Vec<*const StaticModelQuadRecord>,
     packed_normals: Vec<i32>,
     validity: Vec<u8>,
 }

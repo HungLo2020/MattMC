@@ -849,7 +849,12 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                 "staging_flush",
                 "staging_vertex_encoding",
                 "staging_index_write",
-                "staging_final_buffer_assembly"
+                "staging_final_buffer_assembly",
+                "template_lookup",
+                "template_instance_patching",
+                "template_direct_vertex_encoding",
+                "template_retained_translucent_metadata",
+                "template_final_assembly_copy"
         };
         public static final String[] COUNT_NAMES = {
                 "scanned_blocks",
@@ -859,7 +864,11 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                 "fluid_faces",
                 "translucent_quads",
                 "sorted_quads",
-                "emitted_quads"
+                "emitted_quads",
+                "direct_template_quads",
+                "generic_native_quads",
+                "direct_template_bytes_written",
+                "generic_native_bytes_retained"
         };
         public static final int STAGE_COUNT = STAGE_NAMES.length;
         public static final int COUNT_COUNT = COUNT_NAMES.length;

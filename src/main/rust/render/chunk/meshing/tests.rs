@@ -222,6 +222,78 @@ fn compact_encoder_writes_expected_base_words() {
 }
 
 #[test]
+fn direct_static_template_encoding_matches_generic_compact_quad() {
+    let mut block = lighting_block_record();
+    block.local_x = 3;
+    block.local_y = 4;
+    block.local_z = 5;
+    block.absolute_x = 99;
+    block.absolute_y = 66;
+    block.absolute_z = -14;
+    block.tint = 0xff35_996fu32 as i32;
+    let mut state = lighting_state_record(STATE_FLAG_FULL_OCCLUSION);
+    state.tint_type = TINT_FORCE_GRASS;
+    state.material_bits = 7;
+    let mut quad = lighting_quad(MODEL_QUAD_FLAG_ALIGNED, 1, 0.0, 1.0, 0.0);
+    quad.cull_face = -1;
+    quad.tint_index = -1;
+    quad.vertices[0].color = 0xffff_ffffu32 as i32;
+    quad.vertices[1].light = 0;
+
+    let format = NativeFormat {
+        vertex_stride: 20,
+        block_id_offset: 0,
+        normal_offset: 0,
+        tangent_offset: 0,
+        mid_uv_offset: 0,
+        mid_block_offset: 0,
+        section_index: 5,
+        separate_ao: false,
+    };
+    let mut profile = NativeMeshingProfile::default();
+    let generic_quad =
+        static_model_quad_to_native_section(block, state, quad, &mut profile, false, false);
+    let mut expected = vec![0u8; 4 * format.vertex_stride];
+    encode_quad(&generic_quad, &mut expected, format);
+
+    let mut builder = create_section_mesh_builder(0);
+    let mut pending_counts = [0usize; MODEL_QUAD_FACING_COUNT];
+    let direct = unsafe {
+        push_static_model_template_quad(
+            &mut builder,
+            &block as *const NativeSectionBlockRecord,
+            state,
+            &quad as *const StaticModelQuadRecord,
+            MODEL_QUAD_FACING_UNASSIGNED,
+            &mut pending_counts,
+            format,
+            false,
+            false,
+        )
+    }
+    .unwrap();
+    assert_eq!(0, direct);
+    let committed = unsafe {
+        flush_static_model_template_face(
+            &mut builder,
+            MODEL_QUAD_FACING_UNASSIGNED,
+            &mut pending_counts,
+            format,
+            false,
+            false,
+        )
+    }
+    .unwrap();
+
+    assert_eq!(1, committed);
+    assert_eq!(1, builder.counts[MODEL_QUAD_FACING_UNASSIGNED]);
+    assert_eq!(
+        expected,
+        builder.buffers[MODEL_QUAD_FACING_UNASSIGNED].encoded[..expected.len()]
+    );
+}
+
+#[test]
 fn block_id_pack_matches_java_wrapping_int_arithmetic() {
     let mut input = quad();
     input.block_id = i32::MAX;

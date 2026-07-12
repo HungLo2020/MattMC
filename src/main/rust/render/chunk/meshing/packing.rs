@@ -244,16 +244,48 @@ fn encode_compact_vertex(
     tex_centroid_v: f32,
     material_section: i32,
 ) {
-    let x = quantize_position(vertex.x);
-    let y = quantize_position(vertex.y);
-    let z = quantize_position(vertex.z);
-    let u = encode_texture(tex_centroid_u, vertex.u);
-    let v = encode_texture(tex_centroid_v, vertex.v);
-    let light = encode_light(vertex.light);
+    encode_compact_vertex_values(
+        vertex.x,
+        vertex.y,
+        vertex.z,
+        vertex.color,
+        vertex.ao,
+        vertex.u,
+        vertex.v,
+        vertex.light,
+        output,
+        tex_centroid_u,
+        tex_centroid_v,
+        material_section,
+    );
+}
+
+#[inline(always)]
+#[allow(clippy::too_many_arguments)]
+pub(super) fn encode_compact_vertex_values(
+    x: f32,
+    y: f32,
+    z: f32,
+    color: i32,
+    ao: f32,
+    u: f32,
+    v: f32,
+    light: i32,
+    output: &mut [u8],
+    tex_centroid_u: f32,
+    tex_centroid_v: f32,
+    material_section: i32,
+) {
+    let x = quantize_position(x);
+    let y = quantize_position(y);
+    let z = quantize_position(z);
+    let u = encode_texture(tex_centroid_u, u);
+    let v = encode_texture(tex_centroid_v, v);
+    let light = encode_light(light);
 
     put_i32(output, 0, pack_position_hi(x, y, z));
     put_i32(output, 4, pack_position_lo(x, y, z));
-    put_i32(output, 8, color_mul_rgb(vertex.color, vertex.ao));
+    put_i32(output, 8, color_mul_rgb(color, ao));
     put_i32(output, 12, pack_texture(u, v));
     put_i32(output, 16, (light & 0xffff) | material_section);
 }

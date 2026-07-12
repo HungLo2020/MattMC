@@ -16,6 +16,12 @@ pub(super) fn create_section_mesh_builder(capacity: usize) -> NativeSectionMeshB
                 StaticModelBlockRecord::default();
                 PENDING_BATCH_QUAD_CAPACITY
             ],
+            static_template_blocks: vec![std::ptr::null(); PENDING_BATCH_QUAD_CAPACITY],
+            static_template_states: vec![
+                NativeMeshingState::default();
+                PENDING_BATCH_QUAD_CAPACITY
+            ],
+            static_template_quads: vec![std::ptr::null(); PENDING_BATCH_QUAD_CAPACITY],
             packed_normals: vec![0; PENDING_BATCH_QUAD_CAPACITY],
             validity: vec![0; PENDING_BATCH_QUAD_CAPACITY],
         }),
@@ -29,7 +35,7 @@ pub(super) fn create_section_mesh_builder(capacity: usize) -> NativeSectionMeshB
 }
 
 #[inline(always)]
-fn ensure_encoded_len(encoded: &mut Vec<u8>, required_len: usize, format: NativeFormat) {
+pub(super) fn ensure_encoded_len(encoded: &mut Vec<u8>, required_len: usize, format: NativeFormat) {
     if encoded.len() >= required_len {
         return;
     }

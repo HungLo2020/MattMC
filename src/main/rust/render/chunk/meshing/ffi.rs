@@ -812,10 +812,10 @@ pub unsafe extern "C" fn mattmc_sodium_native_model_selector_register(
         return ERR_INVALID_ARGUMENT;
     };
     selectors[index] = Some(NativeModelSelector {
-            kind,
-            entries,
-            total_weight,
-        });
+        kind,
+        entries,
+        total_weight,
+    });
     OK
 }
 
@@ -868,47 +868,47 @@ pub unsafe extern "C" fn mattmc_sodium_native_meshing_state_register(
         return ERR_INVALID_ARGUMENT;
     };
     states[index] = Some(NativeMeshingState {
-            selector_id,
-            flags,
-            material_bits,
-            pass_id,
-            block_emission,
-            render_type,
-            block_id,
-            fluid_material_bits,
-            fluid_pass_id,
-            fluid_block_id,
-            skip_group,
-            fluid_type,
-            fluid_own_height,
-            fluid_falling,
-            offset_type,
-            max_horizontal_offset,
-            max_vertical_offset,
-            tint_type,
-            fluid_still: FluidSprite {
-                u0: fluid_still_u0,
-                u1: fluid_still_u1,
-                v0: fluid_still_v0,
-                v1: fluid_still_v1,
-                shrink: fluid_still_shrink,
-            },
-            fluid_flow: FluidSprite {
-                u0: fluid_flow_u0,
-                u1: fluid_flow_u1,
-                v0: fluid_flow_v0,
-                v1: fluid_flow_v1,
-                shrink: fluid_flow_shrink,
-            },
-            fluid_overlay: FluidSprite {
-                u0: fluid_overlay_u0,
-                u1: fluid_overlay_u1,
-                v0: fluid_overlay_v0,
-                v1: fluid_overlay_v1,
-                shrink: fluid_overlay_shrink,
-            },
-            fluid_overlay_valid,
-        });
+        selector_id,
+        flags,
+        material_bits,
+        pass_id,
+        block_emission,
+        render_type,
+        block_id,
+        fluid_material_bits,
+        fluid_pass_id,
+        fluid_block_id,
+        skip_group,
+        fluid_type,
+        fluid_own_height,
+        fluid_falling,
+        offset_type,
+        max_horizontal_offset,
+        max_vertical_offset,
+        tint_type,
+        fluid_still: FluidSprite {
+            u0: fluid_still_u0,
+            u1: fluid_still_u1,
+            v0: fluid_still_v0,
+            v1: fluid_still_v1,
+            shrink: fluid_still_shrink,
+        },
+        fluid_flow: FluidSprite {
+            u0: fluid_flow_u0,
+            u1: fluid_flow_u1,
+            v0: fluid_flow_v0,
+            v1: fluid_flow_v1,
+            shrink: fluid_flow_shrink,
+        },
+        fluid_overlay: FluidSprite {
+            u0: fluid_overlay_u0,
+            u1: fluid_overlay_u1,
+            v0: fluid_overlay_v0,
+            v1: fluid_overlay_v1,
+            shrink: fluid_overlay_shrink,
+        },
+        fluid_overlay_valid,
+    });
     OK
 }
 
