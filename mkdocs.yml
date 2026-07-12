@@ -40,6 +40,6 @@ nav:
   - Home: index.md
   - Gameplay: gameplay/Gameplay.md
   - Testing: testing/home.md
-  - Development: development/DEV-TIPS-TOOLS.md
+  - Development: development/home.md
   - Changelog: changelog/CHANGELOG.md
   - Changes: changes/changes.md
