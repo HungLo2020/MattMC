@@ -392,7 +392,8 @@ fn static_model_native_quads_use_block_iris_render_type() {
     let quad = lighting_quad(MODEL_QUAD_FLAG_ALIGNED, 1, 0.0, 1.0, 0.0);
     let mut profile = NativeMeshingProfile::default();
 
-    let native = static_model_quad_to_native_section(block, state, quad, &mut profile, false);
+    let native =
+        static_model_quad_to_native_section(block, state, quad, &mut profile, false, false);
 
     assert_eq!(0, native.render_type);
     assert_eq!(145, native.local_x);
@@ -420,6 +421,7 @@ fn static_model_zero_source_light_uses_computed_lighting() {
         quad,
         &mut profile,
         false,
+        false,
     );
 
     assert_eq!(expected.lm[0], native.vertices[0].light);
@@ -437,7 +439,8 @@ fn static_model_force_grass_tint_applies_without_quad_tint_index() {
     quad.vertices[0].color = 0xffff_ffffu32 as i32;
     let mut profile = NativeMeshingProfile::default();
 
-    let native = static_model_quad_to_native_section(block, state, quad, &mut profile, false);
+    let native =
+        static_model_quad_to_native_section(block, state, quad, &mut profile, false, false);
 
     assert_eq!(0xff6f_9935u32 as i32, native.vertices[0].color);
 }

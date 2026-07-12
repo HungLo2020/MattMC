@@ -832,7 +832,24 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                 "fluid_lighting_tint",
                 "fluid_normal_backface",
                 "fluid_material_sprite_routing",
-                "fluid_native_quad_append"
+                "fluid_native_quad_append",
+                "scan_active_record_iteration",
+                "scan_record_decoding",
+                "scan_state_model_fluid_dispatch",
+                "scan_cache_lookup",
+                "scan_culling",
+                "scan_lighting_ao",
+                "scan_tinting",
+                "scan_model_emission",
+                "scan_fluid_emission",
+                "scan_pass_material_routing",
+                "scan_quad_append",
+                "staging_quad_append",
+                "staging_pending_write",
+                "staging_flush",
+                "staging_vertex_encoding",
+                "staging_index_write",
+                "staging_final_buffer_assembly"
         };
         public static final String[] COUNT_NAMES = {
                 "scanned_blocks",

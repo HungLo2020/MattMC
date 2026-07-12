@@ -28,6 +28,24 @@ pub(super) fn create_section_mesh_builder(capacity: usize) -> NativeSectionMeshB
     }
 }
 
+#[inline(always)]
+fn ensure_encoded_len(encoded: &mut Vec<u8>, required_len: usize, format: NativeFormat) {
+    if encoded.len() >= required_len {
+        return;
+    }
+    if is_compact_fast_format(format) {
+        encoded.reserve(required_len - encoded.len());
+        // Compact encoding writes every byte in each appended vertex. Avoiding
+        // zero-fill here removes a staging-only write before the encoder
+        // immediately overwrites the same range.
+        unsafe {
+            encoded.set_len(required_len);
+        }
+    } else {
+        encoded.resize(required_len, 0);
+    }
+}
+
 pub(super) fn section_builder_prepare_quad(
     builder: &mut NativeSectionMeshBuilder,
     facing: usize,
@@ -133,6 +151,7 @@ pub(super) unsafe fn section_builder_append_batch_encoded(
 
     let input = slice::from_raw_parts(batch_address as *const NativeQuad, quad_count);
     if validity.is_none() && !store_raw_quads {
+        let profile_staging_substages = staging_substage_profile_enabled();
         let start = builder.counts[facing];
         let required_len = start.checked_add(quad_count).ok_or(ERR_CAPACITY)?;
         let buffer = &mut builder.buffers[facing];
@@ -151,18 +170,20 @@ pub(super) unsafe fn section_builder_append_batch_encoded(
         let required_encoded_len = required_len
             .checked_mul(encoded_quad_len)
             .ok_or(ERR_INVALID_ARGUMENT)?;
-        if buffer.encoded.len() < required_encoded_len {
-            buffer.encoded.resize(required_encoded_len, 0);
-        }
+        ensure_encoded_len(&mut buffer.encoded, required_encoded_len, format);
 
         for (index, quad) in input.iter().enumerate() {
             let encoded_start = (start + index) * encoded_quad_len;
             let encoded_end = encoded_start + encoded_quad_len;
+            let encode_started = profile_start(profile_staging_substages);
             encode_quad(
                 quad,
                 &mut buffer.encoded[encoded_start..encoded_end],
                 format,
             );
+            builder
+                .profile
+                .add_optional_stage(PROFILE_STAGING_VERTEX_ENCODING, encode_started);
         }
 
         builder.counts[facing] = required_len;
@@ -207,9 +228,7 @@ pub(super) unsafe fn section_builder_append_batch_encoded(
     let required_encoded_len = required_len
         .checked_mul(encoded_quad_len)
         .ok_or(ERR_INVALID_ARGUMENT)?;
-    if buffer.encoded.len() < required_encoded_len {
-        buffer.encoded.resize(required_encoded_len, 0);
-    }
+    ensure_encoded_len(&mut buffer.encoded, required_encoded_len, format);
 
     let mut output_index = 0usize;
 
@@ -503,6 +522,7 @@ pub(super) unsafe fn flush_static_model_pending_face(
     store_raw_quads: bool,
     total_committed: &mut i32,
 ) -> Result<(), i32> {
+    let flush_started = profile_start(staging_substage_profile_enabled());
     let count = pending_counts[facing];
     if count == 0 {
         return Ok(());
@@ -550,6 +570,9 @@ pub(super) unsafe fn flush_static_model_pending_face(
         .add_stage(PROFILE_QUAD_STAGING, staging_started);
     *total_committed = total_committed.checked_add(committed).ok_or(ERR_CAPACITY)?;
     pending_counts[facing] = 0;
+    builder
+        .profile
+        .add_optional_stage(PROFILE_STAGING_FLUSH, flush_started);
     Ok(())
 }
 

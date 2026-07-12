@@ -28,7 +28,7 @@ use cache::*;
 use culling::*;
 #[cfg(test)]
 use fluid::{fluid_face_record_to_quad, fluid_semantic_face};
-use fluid::{native_section_fluid_faces, section_builder_append_fluid_face_records_encoded};
+use fluid::{emit_native_section_fluid_faces, section_builder_append_fluid_face_records_encoded};
 use format::*;
 use lighting::*;
 use model::*;
@@ -124,7 +124,7 @@ const COMPACT_NATIVE_TANGENT_OFFSET: i32 = 0;
 const COMPACT_NATIVE_MID_UV_OFFSET: i32 = 0;
 const COMPACT_NATIVE_MID_BLOCK_OFFSET: i32 = 0;
 
-const PROFILE_STAGE_COUNT: usize = 34;
+const PROFILE_STAGE_COUNT: usize = 51;
 const PROFILE_COUNT_COUNT: usize = 8;
 const PROFILE_EXPORT_LONGS: usize = PROFILE_STAGE_COUNT + PROFILE_COUNT_COUNT;
 const PROFILE_SECTION_SCAN: usize = 0;
@@ -165,6 +165,26 @@ const PROFILE_FLUID_LIGHTING_TINT: usize = 30;
 const PROFILE_FLUID_NORMAL_BACKFACE: usize = 31;
 const PROFILE_FLUID_MATERIAL_SPRITE_ROUTING: usize = 32;
 const PROFILE_FLUID_NATIVE_QUAD_APPEND: usize = 33;
+const PROFILE_SCAN_ACTIVE_RECORD_ITERATION: usize = 34;
+const PROFILE_SCAN_RECORD_DECODING: usize = 35;
+const PROFILE_SCAN_DISPATCH: usize = 36;
+const PROFILE_SCAN_CACHE_LOOKUP: usize = 37;
+const PROFILE_SCAN_CULLING: usize = 38;
+const PROFILE_SCAN_LIGHTING_AO: usize = 39;
+const PROFILE_SCAN_TINTING: usize = 40;
+const PROFILE_SCAN_MODEL_EMISSION: usize = 41;
+const PROFILE_SCAN_FLUID_EMISSION: usize = 42;
+#[allow(dead_code)]
+const PROFILE_SCAN_PASS_MATERIAL_ROUTING: usize = 43;
+const PROFILE_SCAN_QUAD_APPEND: usize = 44;
+const PROFILE_STAGING_QUAD_APPEND: usize = 45;
+const PROFILE_STAGING_PENDING_WRITE: usize = 46;
+const PROFILE_STAGING_FLUSH: usize = 47;
+const PROFILE_STAGING_VERTEX_ENCODING: usize = 48;
+#[allow(dead_code)]
+const PROFILE_STAGING_INDEX_WRITE: usize = 49;
+#[allow(dead_code)]
+const PROFILE_STAGING_FINAL_BUFFER_ASSEMBLY: usize = 50;
 const PROFILE_COUNT_SCANNED_BLOCKS: usize = 0;
 const PROFILE_COUNT_NATIVE_MODEL_BLOCKS: usize = 1;
 const PROFILE_COUNT_NATIVE_MODEL_QUADS: usize = 2;
@@ -177,6 +197,8 @@ const PROFILE_COUNT_EMITTED_QUADS: usize = 7;
 
 static STATIC_MODEL_SUBSTAGE_PROFILE_ENABLED: OnceLock<bool> = OnceLock::new();
 static FLUID_SUBSTAGE_PROFILE_ENABLED: OnceLock<bool> = OnceLock::new();
+static SCAN_SUBSTAGE_PROFILE_ENABLED: OnceLock<bool> = OnceLock::new();
+static STAGING_SUBSTAGE_PROFILE_ENABLED: OnceLock<bool> = OnceLock::new();
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
@@ -430,27 +452,32 @@ impl Default for NativeMeshingProfile {
 }
 
 impl NativeMeshingProfile {
+    #[inline(always)]
     fn reset(&mut self) {
         self.stage_nanos.fill(0);
         self.counts.fill(0);
     }
 
+    #[inline(always)]
     fn add_stage(&mut self, stage: usize, started_at: Instant) {
         self.stage_nanos[stage] = self.stage_nanos[stage]
             .saturating_add(started_at.elapsed().as_nanos().min(u128::from(u64::MAX)) as u64);
     }
 
+    #[inline(always)]
     fn add_optional_stage(&mut self, stage: usize, started_at: Option<Instant>) {
         if let Some(started_at) = started_at {
             self.add_stage(stage, started_at);
         }
     }
 
+    #[inline(always)]
     fn add_count(&mut self, counter: usize, value: usize) {
         self.counts[counter] = self.counts[counter].saturating_add(value as u64);
     }
 }
 
+#[inline(always)]
 fn static_model_substage_profile_enabled() -> bool {
     *STATIC_MODEL_SUBSTAGE_PROFILE_ENABLED.get_or_init(|| {
         matches!(
@@ -462,10 +489,35 @@ fn static_model_substage_profile_enabled() -> bool {
     })
 }
 
+#[inline(always)]
 fn fluid_substage_profile_enabled() -> bool {
     *FLUID_SUBSTAGE_PROFILE_ENABLED.get_or_init(|| {
         matches!(
             std::env::var("MATTMC_PROFILE_FLUID_SUBSTAGES")
+                .as_deref()
+                .map(str::to_ascii_lowercase),
+            Ok(value) if value == "1" || value == "true" || value == "yes" || value == "on"
+        )
+    })
+}
+
+#[inline(always)]
+fn scan_substage_profile_enabled() -> bool {
+    *SCAN_SUBSTAGE_PROFILE_ENABLED.get_or_init(|| {
+        matches!(
+            std::env::var("MATTMC_PROFILE_SCAN_SUBSTAGES")
+                .as_deref()
+                .map(str::to_ascii_lowercase),
+            Ok(value) if value == "1" || value == "true" || value == "yes" || value == "on"
+        )
+    })
+}
+
+#[inline(always)]
+fn staging_substage_profile_enabled() -> bool {
+    *STAGING_SUBSTAGE_PROFILE_ENABLED.get_or_init(|| {
+        matches!(
+            std::env::var("MATTMC_PROFILE_STAGING_SUBSTAGES")
                 .as_deref()
                 .map(str::to_ascii_lowercase),
             Ok(value) if value == "1" || value == "true" || value == "yes" || value == "on"

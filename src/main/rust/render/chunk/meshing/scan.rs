@@ -37,7 +37,9 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
     builder
         .profile
         .add_count(PROFILE_COUNT_SCANNED_BLOCKS, record_count);
+    let profile_scan_substages = scan_substage_profile_enabled();
     let metadata_started = Instant::now();
+    let cache_lookup_started = profile_start(profile_scan_substages);
     let states_guard = native_meshing_states()
         .lock()
         .map_err(|_| ERR_INVALID_ARGUMENT)?;
@@ -50,10 +52,12 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
     builder
         .profile
         .add_stage(PROFILE_MATERIAL_PASS, metadata_started);
+    builder
+        .profile
+        .add_optional_stage(PROFILE_SCAN_CACHE_LOOKUP, cache_lookup_started);
     let mut total_committed = 0i32;
     let mut pending_counts = [0usize; MODEL_QUAD_FACING_COUNT];
     let mut model_ids = Vec::with_capacity(8);
-    let mut fluid_faces = Vec::with_capacity(8);
     let mut last_state_id = i32::MIN;
     let mut last_state = None;
     let mut last_direct_selector_id = i32::MIN;
@@ -62,9 +66,12 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
     let mut last_model = None;
     let mut discovered_pass_mask = 0u32;
     let profile_static_substages = static_model_substage_profile_enabled();
+    let profile_staging_substages = staging_substage_profile_enabled();
 
     let scan_started = Instant::now();
     for record in records {
+        let iteration_started = profile_start(profile_scan_substages);
+        let decoding_started = profile_start(profile_scan_substages);
         let state_lookup_started = profile_start(profile_static_substages);
         let state = if record.state_id == last_state_id {
             last_state
@@ -76,28 +83,43 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
         builder
             .profile
             .add_optional_stage(PROFILE_STATIC_STATE_SELECTOR_LOOKUP, state_lookup_started);
+        builder
+            .profile
+            .add_optional_stage(PROFILE_SCAN_RECORD_DECODING, decoding_started);
         let Some(state) = state else {
+            builder
+                .profile
+                .add_optional_stage(PROFILE_SCAN_ACTIVE_RECORD_ITERATION, iteration_started);
             continue;
         };
-        if (state.flags & STATE_FLAG_AIR) != 0 {
+        let flags = state.flags;
+        if (flags & STATE_FLAG_AIR) != 0 {
+            builder
+                .profile
+                .add_optional_stage(PROFILE_SCAN_ACTIVE_RECORD_ITERATION, iteration_started);
             continue;
         }
-        if (state.flags & STATE_FLAG_LIGHT_BLOCK) != 0 {
+        let dispatch_started = profile_start(profile_scan_substages);
+        let has_light_block = (flags & STATE_FLAG_LIGHT_BLOCK) != 0;
+        let has_model = (flags & STATE_FLAG_MODEL) != 0;
+        let has_fluid = (flags & STATE_FLAG_FLUID) != 0
+            && (record.flags & NATIVE_SECTION_BLOCK_FLAG_SUPPRESS_FLUID) == 0;
+        if has_light_block {
             discovered_pass_mask |= 1u32 << 1;
         }
-        if (state.flags & STATE_FLAG_MODEL) != 0 && state.pass_id >= 0 && state.pass_id < 32 {
+        if has_model && state.pass_id >= 0 && state.pass_id < 32 {
             discovered_pass_mask |= 1u32 << state.pass_id;
         }
-        if (state.flags & STATE_FLAG_FLUID) != 0
-            && (record.flags & NATIVE_SECTION_BLOCK_FLAG_SUPPRESS_FLUID) == 0
-            && state.fluid_pass_id >= 0
-            && state.fluid_pass_id < 32
-        {
+        if has_fluid && state.fluid_pass_id >= 0 && state.fluid_pass_id < 32 {
             discovered_pass_mask |= 1u32 << state.fluid_pass_id;
         }
+        builder
+            .profile
+            .add_optional_stage(PROFILE_SCAN_DISPATCH, dispatch_started);
 
-        if (state.flags & STATE_FLAG_LIGHT_BLOCK) != 0 && (emit_all_passes || pass_id == 1) {
+        if has_light_block && (emit_all_passes || pass_id == 1) {
             let model_started = Instant::now();
+            let append_started = profile_start(profile_scan_substages);
             push_native_section_quad(
                 builder,
                 light_block_record_to_quad(LightBlockRecord {
@@ -114,8 +136,12 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
                 analyzer,
                 format,
                 store_raw_quads,
+                profile_staging_substages,
                 &mut total_committed,
             )?;
+            builder
+                .profile
+                .add_optional_stage(PROFILE_SCAN_QUAD_APPEND, append_started);
             builder
                 .profile
                 .add_stage(PROFILE_MODEL_LOOKUP_EMIT, model_started);
@@ -124,8 +150,9 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
                 .add_count(PROFILE_COUNT_NATIVE_MODEL_QUADS, 1);
         }
 
-        if (state.flags & STATE_FLAG_MODEL) != 0 && (emit_all_passes || state.pass_id == pass_id) {
+        if has_model && (emit_all_passes || state.pass_id == pass_id) {
             let model_started = Instant::now();
+            let scan_model_started = profile_start(profile_scan_substages);
             builder
                 .profile
                 .add_count(PROFILE_COUNT_NATIVE_MODEL_BLOCKS, 1);
@@ -141,6 +168,7 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
                     model_id_slice = &[];
                 }
             } else {
+                let cache_lookup_started = profile_start(profile_scan_substages);
                 let direct_model_id =
                     selector_by_id(&selectors_guard, state.selector_id).and_then(|selector| {
                         if selector.kind == SELECTOR_DIRECT {
@@ -149,6 +177,9 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
                             None
                         }
                     });
+                builder
+                    .profile
+                    .add_optional_stage(PROFILE_SCAN_CACHE_LOOKUP, cache_lookup_started);
                 if let Some(model_id) = direct_model_id {
                     last_direct_selector_id = state.selector_id;
                     last_direct_selector_model_id = Some(model_id);
@@ -184,6 +215,7 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
 
             for model_id in model_id_slice {
                 let model_lookup_started = profile_start(profile_static_substages);
+                let scan_cache_lookup_started = profile_start(profile_scan_substages);
                 let model = if *model_id == last_model_id {
                     last_model
                 } else {
@@ -194,6 +226,9 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
                 builder
                     .profile
                     .add_optional_stage(PROFILE_STATIC_CACHED_MODEL_LOOKUP, model_lookup_started);
+                builder
+                    .profile
+                    .add_optional_stage(PROFILE_SCAN_CACHE_LOOKUP, scan_cache_lookup_started);
                 let Some(model) = model else {
                     continue;
                 };
@@ -205,15 +240,22 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
                         .profile
                         .add_optional_stage(PROFILE_STATIC_QUAD_ITERATION, quad_iteration_started);
                     let culling_started = profile_start(profile_static_substages);
+                    let scan_culling_started = profile_start(profile_scan_substages);
                     if native_section_culls_quad(record, state, quad_record, &states_guard) {
                         builder
                             .profile
                             .add_optional_stage(PROFILE_STATIC_CULLING, culling_started);
+                        builder
+                            .profile
+                            .add_optional_stage(PROFILE_SCAN_CULLING, scan_culling_started);
                         continue;
                     }
                     builder
                         .profile
                         .add_optional_stage(PROFILE_STATIC_CULLING, culling_started);
+                    builder
+                        .profile
+                        .add_optional_stage(PROFILE_SCAN_CULLING, scan_culling_started);
 
                     let quad_iteration_started = profile_start(profile_static_substages);
                     let facing = match usize::try_from(quad_record.normal_face) {
@@ -229,8 +271,10 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
                         quad_record,
                         &mut builder.profile,
                         profile_static_substages,
+                        profile_scan_substages,
                     );
                     let staging_started = profile_start(profile_static_substages);
+                    let append_started = profile_start(profile_scan_substages);
                     push_native_section_quad(
                         builder,
                         quad,
@@ -240,8 +284,12 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
                         analyzer,
                         format,
                         store_raw_quads,
+                        profile_staging_substages,
                         &mut total_committed,
                     )?;
+                    builder
+                        .profile
+                        .add_optional_stage(PROFILE_SCAN_QUAD_APPEND, append_started);
                     builder
                         .profile
                         .add_optional_stage(PROFILE_STATIC_STAGING, staging_started);
@@ -253,38 +301,37 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
             builder
                 .profile
                 .add_stage(PROFILE_MODEL_LOOKUP_EMIT, model_started);
+            builder
+                .profile
+                .add_optional_stage(PROFILE_SCAN_MODEL_EMISSION, scan_model_started);
         }
 
-        if (state.flags & STATE_FLAG_FLUID) != 0
-            && (record.flags & NATIVE_SECTION_BLOCK_FLAG_SUPPRESS_FLUID) == 0
-            && (emit_all_passes || state.fluid_pass_id == pass_id)
-        {
+        if has_fluid && (emit_all_passes || state.fluid_pass_id == pass_id) {
+            let scan_fluid_started = profile_start(profile_scan_substages);
             builder.profile.add_count(PROFILE_COUNT_FLUID_BLOCKS, 1);
-            fluid_faces.clear();
-            native_section_fluid_faces(
+            let fluid_face_count = emit_native_section_fluid_faces(
                 record,
                 state,
                 &states_guard,
-                &mut fluid_faces,
-                &mut builder.profile,
-            );
+                builder,
+                &mut pending_counts,
+                analyzer,
+                format,
+                store_raw_quads,
+                profile_scan_substages,
+                profile_staging_substages,
+                &mut total_committed,
+            )?;
             builder
                 .profile
-                .add_count(PROFILE_COUNT_FLUID_FACES, fluid_faces.len());
-            for fluid_face in &fluid_faces {
-                push_native_section_quad(
-                    builder,
-                    fluid_face.quad,
-                    fluid_face.packed_normal,
-                    fluid_face.facing,
-                    &mut pending_counts,
-                    analyzer,
-                    format,
-                    store_raw_quads,
-                    &mut total_committed,
-                )?;
-            }
+                .add_count(PROFILE_COUNT_FLUID_FACES, fluid_face_count);
+            builder
+                .profile
+                .add_optional_stage(PROFILE_SCAN_FLUID_EMISSION, scan_fluid_started);
         }
+        builder
+            .profile
+            .add_optional_stage(PROFILE_SCAN_ACTIVE_RECORD_ITERATION, iteration_started);
     }
     builder
         .profile

@@ -26,6 +26,53 @@ pub(super) struct NativeFluidFace {
     pub facing: usize,
 }
 
+trait NativeFluidFaceSink {
+    fn profile(&mut self) -> &mut NativeMeshingProfile;
+
+    fn emit(&mut self, face: NativeFluidFace) -> Result<(), i32>;
+}
+
+struct BuilderFluidFaceSink<'a, 'b> {
+    builder: &'a mut NativeSectionMeshBuilder,
+    pending_counts: &'b mut [usize; MODEL_QUAD_FACING_COUNT],
+    analyzer: Option<u64>,
+    format: NativeFormat,
+    store_raw_quads: bool,
+    profile_scan_substages: bool,
+    profile_staging_substages: bool,
+    total_committed: &'b mut i32,
+}
+
+impl NativeFluidFaceSink for BuilderFluidFaceSink<'_, '_> {
+    #[inline(always)]
+    fn profile(&mut self) -> &mut NativeMeshingProfile {
+        &mut self.builder.profile
+    }
+
+    #[inline(always)]
+    fn emit(&mut self, face: NativeFluidFace) -> Result<(), i32> {
+        let append_started = profile_start(self.profile_scan_substages);
+        unsafe {
+            push_native_section_quad(
+                self.builder,
+                face.quad,
+                face.packed_normal,
+                face.facing,
+                self.pending_counts,
+                self.analyzer,
+                self.format,
+                self.store_raw_quads,
+                self.profile_staging_substages,
+                self.total_committed,
+            )?;
+        }
+        self.builder
+            .profile
+            .add_optional_stage(PROFILE_SCAN_QUAD_APPEND, append_started);
+        Ok(())
+    }
+}
+
 fn native_fluid_flush_diag(
     facing: usize,
     has_analyzer: bool,
@@ -170,18 +217,45 @@ pub(super) unsafe fn section_builder_append_fluid_face_records_encoded(
     Ok((total_valid, total_committed))
 }
 
-pub(super) fn native_section_fluid_faces(
+pub(super) unsafe fn emit_native_section_fluid_faces(
     block: &NativeSectionBlockRecord,
     state: NativeMeshingState,
     states: &[Option<NativeMeshingState>],
-    out: &mut Vec<NativeFluidFace>,
-    profile: &mut NativeMeshingProfile,
-) {
+    builder: &mut NativeSectionMeshBuilder,
+    pending_counts: &mut [usize; MODEL_QUAD_FACING_COUNT],
+    analyzer: Option<u64>,
+    format: NativeFormat,
+    store_raw_quads: bool,
+    profile_scan_substages: bool,
+    profile_staging_substages: bool,
+    total_committed: &mut i32,
+) -> Result<usize, i32> {
+    let mut sink = BuilderFluidFaceSink {
+        builder,
+        pending_counts,
+        analyzer,
+        format,
+        store_raw_quads,
+        profile_scan_substages,
+        profile_staging_substages,
+        total_committed,
+    };
+    native_section_fluid_faces_to_sink(block, state, states, &mut sink)
+}
+
+fn native_section_fluid_faces_to_sink<S: NativeFluidFaceSink>(
+    block: &NativeSectionBlockRecord,
+    state: NativeMeshingState,
+    states: &[Option<NativeMeshingState>],
+    sink: &mut S,
+) -> Result<usize, i32> {
+    let mut emitted = 0usize;
     let profile_fluid_substages = fluid_substage_profile_enabled();
     let visibility_started = Instant::now();
     if state.fluid_type != FLUID_WATER && state.fluid_type != FLUID_LAVA {
-        profile.add_stage(PROFILE_FLUID_VIS_HEIGHT, visibility_started);
-        return;
+        sink.profile()
+            .add_stage(PROFILE_FLUID_VIS_HEIGHT, visibility_started);
+        return Ok(0);
     }
     let h = fluid_height(block, state, states, 0, 0, 0, 1);
     let heights = if h >= 1.0 {
@@ -198,7 +272,8 @@ pub(super) fn native_section_fluid_faces(
             fluid_corner_height(block, state, states, h, hs, he, 1, 0, 1),
             fluid_corner_height(block, state, states, h, hn, he, 1, 0, -1),
         ];
-        profile.add_optional_stage(PROFILE_FLUID_CORNER_HEIGHT_USE, corner_started);
+        sink.profile()
+            .add_optional_stage(PROFILE_FLUID_CORNER_HEIGHT_USE, corner_started);
         heights
     };
     let cull_up = fluid_side_occluded(block, state, states, 1);
@@ -207,7 +282,8 @@ pub(super) fn native_section_fluid_faces(
     let lighting_tint_started = profile_start(profile_fluid_substages);
     let color = argb_to_abgr(native_tint_color(block, state, true));
     let light = get_emissive_lightmap(block.light_words[13]);
-    profile.add_optional_stage(PROFILE_FLUID_LIGHTING_TINT, lighting_tint_started);
+    sink.profile()
+        .add_optional_stage(PROFILE_FLUID_LIGHTING_TINT, lighting_tint_started);
     let y_offset = if cull_down { 0.0 } else { 0.001 };
     let top_exposed = fluid_side_exposed(
         block,
@@ -283,10 +359,12 @@ pub(super) fn native_section_fluid_faces(
         if visible_sides[index] {
             let overlay_started = profile_start(profile_fluid_substages);
             overlay_sides[index] = fluid_side_uses_overlay(block, state, states, dir);
-            profile.add_optional_stage(PROFILE_FLUID_OVERLAY_SELECTION, overlay_started);
+            sink.profile()
+                .add_optional_stage(PROFILE_FLUID_OVERLAY_SELECTION, overlay_started);
         }
     }
-    profile.add_stage(PROFILE_FLUID_VIS_HEIGHT, visibility_started);
+    sink.profile()
+        .add_stage(PROFILE_FLUID_VIS_HEIGHT, visibility_started);
     fluid_diag(
         block,
         state,
@@ -333,7 +411,8 @@ pub(super) fn native_section_fluid_faces(
                     state.fluid_still.shrink,
                 )
             };
-        profile.add_optional_stage(PROFILE_FLUID_STILL_FLOWING_UV, uv_started);
+        sink.profile()
+            .add_optional_stage(PROFILE_FLUID_STILL_FLOWING_UV, uv_started);
         let top_started = profile_start(profile_fluid_substages);
         let top_aligned = fluid_top_aligned(render_heights);
         let top_facing = if top_aligned {
@@ -382,9 +461,12 @@ pub(super) fn native_section_fluid_faces(
             top_face.packed_normal,
         );
         let append_started = profile_start(profile_fluid_substages);
-        out.push(top_face);
-        profile.add_optional_stage(PROFILE_FLUID_NATIVE_QUAD_APPEND, append_started);
-        profile.add_optional_stage(PROFILE_FLUID_TOP_FACE_CONSTRUCTION, top_started);
+        sink.emit(top_face)?;
+        emitted += 1;
+        sink.profile()
+            .add_optional_stage(PROFILE_FLUID_NATIVE_QUAD_APPEND, append_started);
+        sink.profile()
+            .add_optional_stage(PROFILE_FLUID_TOP_FACE_CONSTRUCTION, top_started);
         fluid_diag(
             block,
             state,
@@ -434,10 +516,13 @@ pub(super) fn native_section_fluid_faces(
                 backward_face.packed_normal,
             );
             let append_started = profile_start(profile_fluid_substages);
-            out.push(backward_face);
-            profile.add_optional_stage(PROFILE_FLUID_NATIVE_QUAD_APPEND, append_started);
+            sink.emit(backward_face)?;
+            emitted += 1;
+            sink.profile()
+                .add_optional_stage(PROFILE_FLUID_NATIVE_QUAD_APPEND, append_started);
         }
-        profile.add_optional_stage(PROFILE_FLUID_NORMAL_BACKFACE, normal_backface_started);
+        sink.profile()
+            .add_optional_stage(PROFILE_FLUID_NORMAL_BACKFACE, normal_backface_started);
     }
 
     if !cull_down {
@@ -450,7 +535,8 @@ pub(super) fn native_section_fluid_faces(
             (sprite.u1, sprite.v0),
             (sprite.u1, sprite.v1),
         ];
-        profile.add_optional_stage(PROFILE_FLUID_MATERIAL_SPRITE_ROUTING, material_started);
+        sink.profile()
+            .add_optional_stage(PROFILE_FLUID_MATERIAL_SPRITE_ROUTING, material_started);
         let bottom_face = fluid_semantic_native_face(
             state,
             block,
@@ -466,9 +552,12 @@ pub(super) fn native_section_fluid_faces(
             light,
         );
         let append_started = profile_start(profile_fluid_substages);
-        out.push(bottom_face);
-        profile.add_optional_stage(PROFILE_FLUID_NATIVE_QUAD_APPEND, append_started);
-        profile.add_optional_stage(PROFILE_FLUID_BOTTOM_FACE_CONSTRUCTION, bottom_started);
+        sink.emit(bottom_face)?;
+        emitted += 1;
+        sink.profile()
+            .add_optional_stage(PROFILE_FLUID_NATIVE_QUAD_APPEND, append_started);
+        sink.profile()
+            .add_optional_stage(PROFILE_FLUID_BOTTOM_FACE_CONSTRUCTION, bottom_started);
     }
 
     let flow_sprite = state.fluid_flow;
@@ -492,12 +581,14 @@ pub(super) fn native_section_fluid_faces(
             } else {
                 (flow_sprite, flow_u1, flow_u2, flow_v3)
             };
-            profile.add_optional_stage(PROFILE_FLUID_MATERIAL_SPRITE_ROUTING, material_started);
+            sink.profile()
+                .add_optional_stage(PROFILE_FLUID_MATERIAL_SPRITE_ROUTING, material_started);
             let uv_started = profile_start(profile_fluid_substages);
             let v1 = sprite_v(sprite, (1.0 - h1) * 0.5);
             let v2 = sprite_v(sprite, (1.0 - h2) * 0.5);
             let uvs = [(u2, v2), (u2, v3), (u1, v3), (u1, v1)];
-            profile.add_optional_stage(PROFILE_FLUID_STILL_FLOWING_UV, uv_started);
+            sink.profile()
+                .add_optional_stage(PROFILE_FLUID_STILL_FLOWING_UV, uv_started);
             let side_face = fluid_semantic_native_face(
                 state,
                 block,
@@ -513,8 +604,10 @@ pub(super) fn native_section_fluid_faces(
                 light,
             );
             let append_started = profile_start(profile_fluid_substages);
-            out.push(side_face);
-            profile.add_optional_stage(PROFILE_FLUID_NATIVE_QUAD_APPEND, append_started);
+            sink.emit(side_face)?;
+            emitted += 1;
+            sink.profile()
+                .add_optional_stage(PROFILE_FLUID_NATIVE_QUAD_APPEND, append_started);
             if !is_overlay {
                 let normal_backface_started = profile_start(profile_fluid_substages);
                 let back_face = fluid_semantic_native_face(
@@ -532,14 +625,20 @@ pub(super) fn native_section_fluid_faces(
                     light,
                 );
                 let append_started = profile_start(profile_fluid_substages);
-                out.push(back_face);
-                profile.add_optional_stage(PROFILE_FLUID_NATIVE_QUAD_APPEND, append_started);
-                profile.add_optional_stage(PROFILE_FLUID_NORMAL_BACKFACE, normal_backface_started);
+                sink.emit(back_face)?;
+                emitted += 1;
+                sink.profile()
+                    .add_optional_stage(PROFILE_FLUID_NATIVE_QUAD_APPEND, append_started);
+                sink.profile()
+                    .add_optional_stage(PROFILE_FLUID_NORMAL_BACKFACE, normal_backface_started);
             }
-            profile.add_optional_stage(PROFILE_FLUID_SIDE_FACE_CONSTRUCTION, side_started);
+            sink.profile()
+                .add_optional_stage(PROFILE_FLUID_SIDE_FACE_CONSTRUCTION, side_started);
         }
     }
-    profile.add_stage(PROFILE_FLUID_GEOM_UV, geometry_started);
+    sink.profile()
+        .add_stage(PROFILE_FLUID_GEOM_UV, geometry_started);
+    Ok(emitted)
 }
 
 fn fluid_diag(

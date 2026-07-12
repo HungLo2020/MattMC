@@ -189,7 +189,7 @@ pub(super) fn encode_quad(quad: &NativeQuad, output: &mut [u8], format: NativeFo
 }
 
 #[inline(always)]
-fn is_compact_fast_format(format: NativeFormat) -> bool {
+pub(super) fn is_compact_fast_format(format: NativeFormat) -> bool {
     format.vertex_stride == COMPACT_VERTEX_STRIDE as usize
         && format.block_id_offset == 0
         && format.normal_offset == 0

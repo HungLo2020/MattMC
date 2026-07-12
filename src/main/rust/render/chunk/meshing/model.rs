@@ -89,12 +89,18 @@ pub(super) unsafe fn push_native_section_quad(
     analyzer: Option<u64>,
     format: NativeFormat,
     store_raw_quads: bool,
+    profile_staging_substages: bool,
     total_committed: &mut i32,
 ) -> Result<(), i32> {
+    let append_started = profile_start(profile_staging_substages);
+    let pending_started = profile_start(profile_staging_substages);
     let slot = pending_counts[facing];
     builder.pending[facing].quads[slot] = quad;
     builder.pending[facing].packed_normals[slot] = packed_normal;
     pending_counts[facing] += 1;
+    builder
+        .profile
+        .add_optional_stage(PROFILE_STAGING_PENDING_WRITE, pending_started);
 
     if pending_counts[facing] == PENDING_BATCH_QUAD_CAPACITY {
         flush_static_model_pending_face(
@@ -108,6 +114,9 @@ pub(super) unsafe fn push_native_section_quad(
         )?;
     }
 
+    builder
+        .profile
+        .add_optional_stage(PROFILE_STAGING_QUAD_APPEND, append_started);
     Ok(())
 }
 
@@ -197,6 +206,7 @@ pub(super) fn static_model_quad_to_native_section(
     quad_record: StaticModelQuadRecord,
     profile: &mut NativeMeshingProfile,
     profile_static_substages: bool,
+    profile_scan_substages: bool,
 ) -> NativeQuad {
     let offset_started = profile_start(profile_static_substages);
     let offset = if block.legacy_offset_x != 0.0
@@ -211,10 +221,13 @@ pub(super) fn static_model_quad_to_native_section(
     profile.add_optional_stage(PROFILE_STATIC_POSITION_OFFSET_TRANSFORM, offset_started);
 
     let lighting_started = profile_start(profile_static_substages);
+    let scan_lighting_started = profile_start(profile_scan_substages);
     let light = native_quad_lighting(&block, &quad_record, state);
     profile.add_optional_stage(PROFILE_STATIC_LIGHTING_AO, lighting_started);
+    profile.add_optional_stage(PROFILE_SCAN_LIGHTING_AO, scan_lighting_started);
 
     let tint_started = profile_start(profile_static_substages);
+    let scan_tint_started = profile_start(profile_scan_substages);
     let applies_tint = static_quad_applies_tint(quad_record, state);
     let tint = if applies_tint {
         native_tint_color(&block, state, false)
@@ -222,6 +235,7 @@ pub(super) fn static_model_quad_to_native_section(
         -1
     };
     profile.add_optional_stage(PROFILE_STATIC_TINT, tint_started);
+    profile.add_optional_stage(PROFILE_SCAN_TINTING, scan_tint_started);
 
     let material_started = profile_start(profile_static_substages);
     let block_id = choose_block_id(block.block_id, state.block_id);
