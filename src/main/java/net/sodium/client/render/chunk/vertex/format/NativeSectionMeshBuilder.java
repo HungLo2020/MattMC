@@ -811,7 +811,18 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                 "sorting",
                 "vertex_packing",
                 "index_emission",
-                "final_mesh_assembly"
+                "final_mesh_assembly",
+                "static_state_selector_lookup",
+                "static_weighted_multipart_resolution",
+                "static_cached_model_lookup",
+                "static_culling",
+                "static_quad_iteration",
+                "static_lighting_ao",
+                "static_tint",
+                "static_position_offset_transform",
+                "static_sprite_material_pass",
+                "static_native_quad_creation",
+                "static_staging"
         };
         public static final String[] COUNT_NAMES = {
                 "scanned_blocks",

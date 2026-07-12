@@ -20,6 +20,7 @@ pub(super) fn native_meshing_states() -> &'static Mutex<NativeMeshingStateTable>
     NATIVE_MESHING_STATES.get_or_init(|| Mutex::new(Vec::new()))
 }
 
+#[inline]
 pub(super) fn ensure_table_slot<T>(table: &mut Vec<Option<T>>, id: i32) -> Result<usize, i32> {
     let index = usize::try_from(id).map_err(|_| ERR_INVALID_ARGUMENT)?;
     if table.len() <= index {
@@ -28,29 +29,35 @@ pub(super) fn ensure_table_slot<T>(table: &mut Vec<Option<T>>, id: i32) -> Resul
     Ok(index)
 }
 
+#[inline(always)]
 pub(super) fn state_by_id(
     states: &[Option<NativeMeshingState>],
     state_id: i32,
 ) -> Option<NativeMeshingState> {
-    states
-        .get(usize::try_from(state_id).ok()?)?
-        .as_ref()
-        .copied()
+    if state_id < 0 {
+        return None;
+    }
+    states.get(state_id as usize)?.as_ref().copied()
 }
 
+#[inline(always)]
 pub(super) fn selector_by_id(
     selectors: &[Option<NativeModelSelector>],
     selector_id: i32,
 ) -> Option<&NativeModelSelector> {
-    selectors.get(usize::try_from(selector_id).ok()?)?.as_ref()
+    if selector_id < 0 {
+        return None;
+    }
+    selectors.get(selector_id as usize)?.as_ref()
 }
 
+#[inline(always)]
 pub(super) fn model_by_id(
     models: &[Option<Vec<StaticModelQuadRecord>>],
     model_id: i32,
 ) -> Option<&[StaticModelQuadRecord]> {
-    models
-        .get(usize::try_from(model_id).ok()?)?
-        .as_ref()
-        .map(Vec::as_slice)
+    if model_id < 0 {
+        return None;
+    }
+    models.get(model_id as usize)?.as_ref().map(Vec::as_slice)
 }

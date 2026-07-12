@@ -1,5 +1,6 @@
 use super::*;
 
+#[inline(always)]
 pub(super) fn native_section_culls_quad(
     record: &NativeSectionBlockRecord,
     state: NativeMeshingState,

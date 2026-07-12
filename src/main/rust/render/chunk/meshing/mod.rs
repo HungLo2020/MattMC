@@ -124,7 +124,7 @@ const COMPACT_NATIVE_TANGENT_OFFSET: i32 = 0;
 const COMPACT_NATIVE_MID_UV_OFFSET: i32 = 0;
 const COMPACT_NATIVE_MID_BLOCK_OFFSET: i32 = 0;
 
-const PROFILE_STAGE_COUNT: usize = 13;
+const PROFILE_STAGE_COUNT: usize = 24;
 const PROFILE_COUNT_COUNT: usize = 8;
 const PROFILE_EXPORT_LONGS: usize = PROFILE_STAGE_COUNT + PROFILE_COUNT_COUNT;
 const PROFILE_SECTION_SCAN: usize = 0;
@@ -144,6 +144,17 @@ const PROFILE_VERTEX_PACKING: usize = 10;
 #[allow(dead_code)]
 const PROFILE_INDEX_EMISSION: usize = 11;
 const PROFILE_FINAL_ASSEMBLY: usize = 12;
+const PROFILE_STATIC_STATE_SELECTOR_LOOKUP: usize = 13;
+const PROFILE_STATIC_WEIGHTED_MULTIPART_RESOLUTION: usize = 14;
+const PROFILE_STATIC_CACHED_MODEL_LOOKUP: usize = 15;
+const PROFILE_STATIC_CULLING: usize = 16;
+const PROFILE_STATIC_QUAD_ITERATION: usize = 17;
+const PROFILE_STATIC_LIGHTING_AO: usize = 18;
+const PROFILE_STATIC_TINT: usize = 19;
+const PROFILE_STATIC_POSITION_OFFSET_TRANSFORM: usize = 20;
+const PROFILE_STATIC_SPRITE_MATERIAL_PASS: usize = 21;
+const PROFILE_STATIC_NATIVE_QUAD_CREATION: usize = 22;
+const PROFILE_STATIC_STAGING: usize = 23;
 const PROFILE_COUNT_SCANNED_BLOCKS: usize = 0;
 const PROFILE_COUNT_NATIVE_MODEL_BLOCKS: usize = 1;
 const PROFILE_COUNT_NATIVE_MODEL_QUADS: usize = 2;
@@ -153,6 +164,8 @@ const PROFILE_COUNT_TRANSLUCENT_QUADS: usize = 5;
 #[allow(dead_code)]
 const PROFILE_COUNT_SORTED_QUADS: usize = 6;
 const PROFILE_COUNT_EMITTED_QUADS: usize = 7;
+
+static STATIC_MODEL_SUBSTAGE_PROFILE_ENABLED: OnceLock<bool> = OnceLock::new();
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
@@ -407,9 +420,31 @@ impl NativeMeshingProfile {
             .saturating_add(started_at.elapsed().as_nanos().min(u128::from(u64::MAX)) as u64);
     }
 
+    fn add_optional_stage(&mut self, stage: usize, started_at: Option<Instant>) {
+        if let Some(started_at) = started_at {
+            self.add_stage(stage, started_at);
+        }
+    }
+
     fn add_count(&mut self, counter: usize, value: usize) {
         self.counts[counter] = self.counts[counter].saturating_add(value as u64);
     }
+}
+
+fn static_model_substage_profile_enabled() -> bool {
+    *STATIC_MODEL_SUBSTAGE_PROFILE_ENABLED.get_or_init(|| {
+        matches!(
+            std::env::var("MATTMC_PROFILE_STATIC_MODEL_SUBSTAGES")
+                .as_deref()
+                .map(str::to_ascii_lowercase),
+            Ok(value) if value == "1" || value == "true" || value == "yes" || value == "on"
+        )
+    })
+}
+
+#[inline(always)]
+fn profile_start(enabled: bool) -> Option<Instant> {
+    enabled.then(Instant::now)
 }
 
 struct NativeUpdatedQuads {

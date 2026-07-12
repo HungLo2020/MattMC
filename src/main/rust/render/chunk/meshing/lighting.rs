@@ -73,6 +73,10 @@ pub(super) fn smooth_lighting(
     light_face: i32,
     shade: bool,
 ) -> NativeQuadLight {
+    if let Some(light) = uniform_smooth_lighting(block, light_face, shade) {
+        return light;
+    }
+
     let parallel = (quad.flags & MODEL_QUAD_FLAG_PARALLEL) != 0;
     let aligned = (quad.flags & MODEL_QUAD_FLAG_ALIGNED) != 0
         || (parallel && (state.flags & STATE_FLAG_FULL_OCCLUSION) != 0);
@@ -120,6 +124,29 @@ pub(super) fn smooth_lighting(
         out.lm[i] = lm;
     }
     out
+}
+
+#[inline]
+fn uniform_smooth_lighting(
+    block: &NativeSectionBlockRecord,
+    light_face: i32,
+    shade: bool,
+) -> Option<NativeQuadLight> {
+    let word = block.light_words[13];
+    if !block.light_words.iter().all(|sample| *sample == word) {
+        return None;
+    }
+
+    let lightmap = get_lightmap(word);
+    let emissive = unpack_em(word);
+    let lm = calculate_corner_brightness(
+        lightmap, lightmap, lightmap, lightmap, emissive, emissive, emissive, emissive,
+    );
+    let ao = unpack_ao(word) * ambient_shade(light_face, shade);
+    Some(NativeQuadLight {
+        ao: [ao; 4],
+        lm: [lm; 4],
+    })
 }
 
 #[derive(Clone, Copy)]

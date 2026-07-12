@@ -195,8 +195,10 @@ pub(super) fn static_model_quad_to_native_section(
     block: NativeSectionBlockRecord,
     state: NativeMeshingState,
     quad_record: StaticModelQuadRecord,
+    profile: &mut NativeMeshingProfile,
+    profile_static_substages: bool,
 ) -> NativeQuad {
-    let mut vertices = [QuadVertex::default(); 4];
+    let offset_started = profile_start(profile_static_substages);
     let offset = if block.legacy_offset_x != 0.0
         || block.legacy_offset_y != 0.0
         || block.legacy_offset_z != 0.0
@@ -206,14 +208,32 @@ pub(super) fn static_model_quad_to_native_section(
     } else {
         (0.0, 0.0, 0.0)
     };
+    profile.add_optional_stage(PROFILE_STATIC_POSITION_OFFSET_TRANSFORM, offset_started);
+
+    let lighting_started = profile_start(profile_static_substages);
     let light = native_quad_lighting(&block, &quad_record, state);
+    profile.add_optional_stage(PROFILE_STATIC_LIGHTING_AO, lighting_started);
+
+    let tint_started = profile_start(profile_static_substages);
     let applies_tint = static_quad_applies_tint(quad_record, state);
     let tint = if applies_tint {
         native_tint_color(&block, state, false)
     } else {
         -1
     };
+    profile.add_optional_stage(PROFILE_STATIC_TINT, tint_started);
 
+    let material_started = profile_start(profile_static_substages);
+    let block_id = choose_block_id(block.block_id, state.block_id);
+    let material_bits = if state.material_bits != 0 {
+        state.material_bits
+    } else {
+        quad_record.material_bits
+    };
+    profile.add_optional_stage(PROFILE_STATIC_SPRITE_MATERIAL_PASS, material_started);
+
+    let creation_started = profile_start(profile_static_substages);
+    let mut vertices = [QuadVertex::default(); 4];
     for (index, vertex) in vertices.iter_mut().enumerate() {
         let source = quad_record.vertices[index];
         let mut color = source.color;
@@ -236,38 +256,45 @@ pub(super) fn static_model_quad_to_native_section(
         };
     }
 
-    NativeQuad {
+    let quad = NativeQuad {
         vertices,
         block_emission: state.block_emission.clamp(0, 255) as u8,
         render_type: 0,
         ignore_mid_block: 0,
         _padding: 0,
-        block_id: choose_block_id(block.block_id, state.block_id),
+        block_id,
         local_x: block.absolute_x,
         local_y: block.absolute_y,
         local_z: block.absolute_z,
-        material_bits: if state.material_bits != 0 {
-            state.material_bits
-        } else {
-            quad_record.material_bits
-        },
-    }
+        material_bits,
+    };
+    profile.add_optional_stage(PROFILE_STATIC_NATIVE_QUAD_CREATION, creation_started);
+    quad
 }
 
+#[inline(always)]
+fn static_state_applies_tint(state: NativeMeshingState) -> bool {
+    matches!(
+        state.tint_type,
+        TINT_GRASS
+            | TINT_FOLIAGE
+            | TINT_FORCE_GRASS
+            | TINT_DOUBLE_PLANT_GRASS
+            | TINT_CONSTANT
+            | TINT_SPRUCE
+            | TINT_BIRCH
+    )
+}
+
+#[inline(always)]
 pub(super) fn static_quad_applies_tint(
     quad_record: StaticModelQuadRecord,
     state: NativeMeshingState,
 ) -> bool {
-    quad_record.tint_index != -1
-        || state.tint_type == TINT_GRASS
-        || state.tint_type == TINT_FOLIAGE
-        || state.tint_type == TINT_FORCE_GRASS
-        || state.tint_type == TINT_DOUBLE_PLANT_GRASS
-        || state.tint_type == TINT_CONSTANT
-        || state.tint_type == TINT_SPRUCE
-        || state.tint_type == TINT_BIRCH
+    quad_record.tint_index != -1 || static_state_applies_tint(state)
 }
 
+#[inline(always)]
 pub(super) fn choose_block_id(record_block_id: i32, state_block_id: i32) -> i32 {
     if record_block_id >= 0 {
         record_block_id

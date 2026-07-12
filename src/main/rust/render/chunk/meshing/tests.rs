@@ -360,6 +360,25 @@ fn smooth_lighting_treats_parallel_full_cube_as_java_aligned_full_face() {
 }
 
 #[test]
+fn smooth_lighting_collapses_uniform_neighborhood_without_changing_result() {
+    let mut block = lighting_block_record();
+    let word = pack_light_word(7, 11, 3, 2048, false, false, false, false);
+    block.light_words.fill(word);
+    let quad = lighting_quad(0, 1, 0.4, 0.25, 0.6);
+    let light = smooth_lighting(&block, &quad, lighting_state_record(0), 1, true);
+    let lightmap = get_lightmap(word);
+    let expected_lm = calculate_corner_brightness(
+        lightmap, lightmap, lightmap, lightmap, false, false, false, false,
+    );
+    let expected_ao = unpack_ao(word) * ambient_shade(1, true);
+
+    assert_eq!([expected_lm; 4], light.lm);
+    for value in light.ao {
+        assert_close(expected_ao, value);
+    }
+}
+
+#[test]
 fn static_model_native_quads_use_block_iris_render_type() {
     let mut block = lighting_block_record();
     block.local_x = 1;
@@ -371,8 +390,9 @@ fn static_model_native_quads_use_block_iris_render_type() {
     let mut state = lighting_state_record(0);
     state.render_type = 2;
     let quad = lighting_quad(MODEL_QUAD_FLAG_ALIGNED, 1, 0.0, 1.0, 0.0);
+    let mut profile = NativeMeshingProfile::default();
 
-    let native = static_model_quad_to_native_section(block, state, quad);
+    let native = static_model_quad_to_native_section(block, state, quad, &mut profile, false);
 
     assert_eq!(0, native.render_type);
     assert_eq!(145, native.local_x);
@@ -393,10 +413,13 @@ fn static_model_zero_source_light_uses_computed_lighting() {
         lighting_state_record(STATE_FLAG_FULL_OCCLUSION),
     );
 
+    let mut profile = NativeMeshingProfile::default();
     let native = static_model_quad_to_native_section(
         block,
         lighting_state_record(STATE_FLAG_FULL_OCCLUSION),
         quad,
+        &mut profile,
+        false,
     );
 
     assert_eq!(expected.lm[0], native.vertices[0].light);
@@ -412,8 +435,9 @@ fn static_model_force_grass_tint_applies_without_quad_tint_index() {
     let mut quad = lighting_quad(MODEL_QUAD_FLAG_ALIGNED, 1, 0.0, 1.0, 0.0);
     quad.tint_index = -1;
     quad.vertices[0].color = 0xffff_ffffu32 as i32;
+    let mut profile = NativeMeshingProfile::default();
 
-    let native = static_model_quad_to_native_section(block, state, quad);
+    let native = static_model_quad_to_native_section(block, state, quad, &mut profile, false);
 
     assert_eq!(0xff6f_9935u32 as i32, native.vertices[0].color);
 }

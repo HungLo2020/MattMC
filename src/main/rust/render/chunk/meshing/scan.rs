@@ -61,9 +61,11 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
     let mut last_model_id = i32::MIN;
     let mut last_model = None;
     let mut discovered_pass_mask = 0u32;
+    let profile_static_substages = static_model_substage_profile_enabled();
 
     let scan_started = Instant::now();
     for record in records {
+        let state_lookup_started = profile_start(profile_static_substages);
         let state = if record.state_id == last_state_id {
             last_state
         } else {
@@ -71,6 +73,9 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
             last_state = state_by_id(&states_guard, record.state_id);
             last_state
         };
+        builder
+            .profile
+            .add_optional_stage(PROFILE_STATIC_STATE_SELECTOR_LOOKUP, state_lookup_started);
         let Some(state) = state else {
             continue;
         };
@@ -124,10 +129,16 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
             builder
                 .profile
                 .add_count(PROFILE_COUNT_NATIVE_MODEL_BLOCKS, 1);
-            model_ids.clear();
+            let selector_started = profile_start(profile_static_substages);
+            let mut selector_lookup_recorded = false;
+            let direct_model_storage;
+            let model_id_slice: &[i32];
             if state.selector_id == last_direct_selector_id {
                 if let Some(model_id) = last_direct_selector_model_id {
-                    model_ids.push(model_id);
+                    direct_model_storage = [model_id];
+                    model_id_slice = &direct_model_storage;
+                } else {
+                    model_id_slice = &[];
                 }
             } else {
                 let direct_model_id =
@@ -141,20 +152,38 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
                 if let Some(model_id) = direct_model_id {
                     last_direct_selector_id = state.selector_id;
                     last_direct_selector_model_id = Some(model_id);
-                    model_ids.push(model_id);
+                    direct_model_storage = [model_id];
+                    model_id_slice = &direct_model_storage;
                 } else {
                     last_direct_selector_id = i32::MIN;
                     last_direct_selector_model_id = None;
+                    builder
+                        .profile
+                        .add_optional_stage(PROFILE_STATIC_STATE_SELECTOR_LOOKUP, selector_started);
+                    selector_lookup_recorded = true;
+                    model_ids.clear();
+                    let resolution_started = profile_start(profile_static_substages);
                     resolve_selector_model_ids(
                         state.selector_id,
                         record_seed(*record),
                         &selectors_guard,
                         &mut model_ids,
                     )?;
+                    builder.profile.add_optional_stage(
+                        PROFILE_STATIC_WEIGHTED_MULTIPART_RESOLUTION,
+                        resolution_started,
+                    );
+                    model_id_slice = &model_ids;
                 }
             }
+            if !selector_lookup_recorded {
+                builder
+                    .profile
+                    .add_optional_stage(PROFILE_STATIC_STATE_SELECTOR_LOOKUP, selector_started);
+            }
 
-            for model_id in &model_ids {
+            for model_id in model_id_slice {
+                let model_lookup_started = profile_start(profile_static_substages);
                 let model = if *model_id == last_model_id {
                     last_model
                 } else {
@@ -162,20 +191,46 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
                     last_model = model_by_id(&models_guard, *model_id);
                     last_model
                 };
+                builder
+                    .profile
+                    .add_optional_stage(PROFILE_STATIC_CACHED_MODEL_LOOKUP, model_lookup_started);
                 let Some(model) = model else {
                     continue;
                 };
 
                 for quad_record in model {
-                    if native_section_culls_quad(record, state, *quad_record, &states_guard) {
+                    let quad_iteration_started = profile_start(profile_static_substages);
+                    let quad_record = *quad_record;
+                    builder
+                        .profile
+                        .add_optional_stage(PROFILE_STATIC_QUAD_ITERATION, quad_iteration_started);
+                    let culling_started = profile_start(profile_static_substages);
+                    if native_section_culls_quad(record, state, quad_record, &states_guard) {
+                        builder
+                            .profile
+                            .add_optional_stage(PROFILE_STATIC_CULLING, culling_started);
                         continue;
                     }
+                    builder
+                        .profile
+                        .add_optional_stage(PROFILE_STATIC_CULLING, culling_started);
 
+                    let quad_iteration_started = profile_start(profile_static_substages);
                     let facing = match usize::try_from(quad_record.normal_face) {
                         Ok(value) if value < MODEL_QUAD_FACING_COUNT => value,
                         _ => MODEL_QUAD_FACING_UNASSIGNED,
                     };
-                    let quad = static_model_quad_to_native_section(*record, state, *quad_record);
+                    builder
+                        .profile
+                        .add_optional_stage(PROFILE_STATIC_QUAD_ITERATION, quad_iteration_started);
+                    let quad = static_model_quad_to_native_section(
+                        *record,
+                        state,
+                        quad_record,
+                        &mut builder.profile,
+                        profile_static_substages,
+                    );
+                    let staging_started = profile_start(profile_static_substages);
                     push_native_section_quad(
                         builder,
                         quad,
@@ -187,6 +242,9 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
                         store_raw_quads,
                         &mut total_committed,
                     )?;
+                    builder
+                        .profile
+                        .add_optional_stage(PROFILE_STATIC_STAGING, staging_started);
                     builder
                         .profile
                         .add_count(PROFILE_COUNT_NATIVE_MODEL_QUADS, 1);
