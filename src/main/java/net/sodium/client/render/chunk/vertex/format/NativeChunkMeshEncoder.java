@@ -83,6 +83,7 @@ public final class NativeChunkMeshEncoder {
     private static final int STATIC_MODEL_QUAD_LIGHT_FACE_OFFSET = 144;
     private static final int STATIC_MODEL_QUAD_TINT_INDEX_OFFSET = 148;
     private static final int STATIC_MODEL_QUAD_HAS_AO_OFFSET = 152;
+    private static final int STATIC_MODEL_QUAD_PASS_ID_OFFSET = 156;
     private static final int STATIC_MODEL_BLOCK_MODEL_ID_OFFSET = 0;
     private static final int STATIC_MODEL_BLOCK_MATERIAL_BITS_OFFSET = 4;
     private static final int STATIC_MODEL_BLOCK_EMISSION_OFFSET = 8;
@@ -530,6 +531,21 @@ public final class NativeChunkMeshEncoder {
             float x1, float y1, float z1, int color1, float u1, float v1, int light1,
             float x2, float y2, float z2, int color2, float u2, float v2, int light2,
             float x3, float y3, float z3, int color3, float u3, float v3, int light3) {
+        writeStaticModelQuadRecord(ptr, materialBits, -1, cullFace, normalFace, packedNormal, blockEmission,
+                renderType, shade, flags, lightFace, tintIndex, hasAo,
+                x0, y0, z0, color0, u0, v0, light0,
+                x1, y1, z1, color1, u1, v1, light1,
+                x2, y2, z2, color2, u2, v2, light2,
+                x3, y3, z3, color3, u3, v3, light3);
+    }
+
+    public static void writeStaticModelQuadRecord(long ptr, int materialBits, int passId, int cullFace, int normalFace,
+            int packedNormal, byte blockEmission, byte renderType, boolean shade, int flags, int lightFace,
+            int tintIndex, boolean hasAo,
+            float x0, float y0, float z0, int color0, float u0, float v0, int light0,
+            float x1, float y1, float z1, int color1, float u1, float v1, int light1,
+            float x2, float y2, float z2, int color2, float u2, float v2, int light2,
+            float x3, float y3, float z3, int color3, float u3, float v3, int light3) {
         writeStaticModelVertexRecord(ptr + STATIC_MODEL_QUAD_VERTICES_OFFSET,
                 x0, y0, z0, color0, u0, v0, light0);
         writeStaticModelVertexRecord(ptr + STATIC_MODEL_QUAD_VERTICES_OFFSET + STATIC_MODEL_VERTEX_RECORD_STRIDE,
@@ -549,7 +565,7 @@ public final class NativeChunkMeshEncoder {
         MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_LIGHT_FACE_OFFSET, lightFace);
         MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_TINT_INDEX_OFFSET, tintIndex);
         MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_HAS_AO_OFFSET, hasAo ? 1 : 0);
-        MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_HAS_AO_OFFSET + 4, 0);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_PASS_ID_OFFSET, passId);
     }
 
     public static void writeStaticModelQuadRecord(long ptr, int materialBits, int cullFace, int normalFace,
@@ -558,7 +574,7 @@ public final class NativeChunkMeshEncoder {
             float x1, float y1, float z1, int color1, float u1, float v1, int light1,
             float x2, float y2, float z2, int color2, float u2, float v2, int light2,
             float x3, float y3, float z3, int color3, float u3, float v3, int light3) {
-        writeStaticModelQuadRecord(ptr, materialBits, cullFace, normalFace, packedNormal, blockEmission, renderType,
+        writeStaticModelQuadRecord(ptr, materialBits, -1, cullFace, normalFace, packedNormal, blockEmission, renderType,
                 shade, 0, cullFace >= 0 ? cullFace : 1, -1, true,
                 x0, y0, z0, color0, u0, v0, light0,
                 x1, y1, z1, color1, u1, v1, light1,

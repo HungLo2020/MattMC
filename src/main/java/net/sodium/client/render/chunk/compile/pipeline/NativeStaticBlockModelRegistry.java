@@ -3,6 +3,8 @@ package net.sodium.client.render.chunk.compile.pipeline;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
+import net.sodium.api.util.ColorARGB;
+import net.sodium.client.compatibility.workarounds.Workarounds;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.block.model.BakedQuad;
@@ -86,7 +88,14 @@ public final class NativeStaticBlockModelRegistry {
     private static final IdentityHashMap<BlockStateModel, Integer> SELECTOR_IDS = new IdentityHashMap<>();
     private static final IdentityHashMap<BlockModelPart, Integer> PART_MODEL_IDS = new IdentityHashMap<>();
     private static final Object2IntOpenHashMap<Block> SKIP_GROUPS = new Object2IntOpenHashMap<>();
-    private static final Map<Integer, List<TextureAtlasSprite>> SPRITES = new java.util.HashMap<>();
+    private static final int FLUID_SPRITE_WATER_STILL = 1;
+    private static final int FLUID_SPRITE_WATER_FLOW = 1 << 1;
+    private static final int FLUID_SPRITE_WATER_OVERLAY = 1 << 2;
+    private static final int FLUID_SPRITE_LAVA_STILL = 1 << 8;
+    private static final int FLUID_SPRITE_LAVA_FLOW = 1 << 9;
+
+    private static final Map<Integer, List<TextureAtlasSprite>> MODEL_SPRITES = new java.util.HashMap<>();
+    private static final Map<Integer, List<TextureAtlasSprite>> SELECTOR_SPRITES = new java.util.HashMap<>();
 
     private static int nextSelectorId;
     private static int nextModelId;
@@ -107,7 +116,8 @@ public final class NativeStaticBlockModelRegistry {
         STATE_SELECTORS.clear();
         SELECTOR_IDS.clear();
         PART_MODEL_IDS.clear();
-        SPRITES.clear();
+        MODEL_SPRITES.clear();
+        SELECTOR_SPRITES.clear();
         SKIP_GROUPS.clear();
         NativeStaticBlockModelCache.clear();
         nextSelectorId = 0;
@@ -135,7 +145,7 @@ public final class NativeStaticBlockModelRegistry {
     }
 
     public static List<TextureAtlasSprite> getSprites(int selectorId) {
-        return SPRITES.get(selectorId);
+        return SELECTOR_SPRITES.get(selectorId);
     }
 
     public static List<TextureAtlasSprite> getSprites(BlockState state) {
@@ -144,46 +154,34 @@ public final class NativeStaticBlockModelRegistry {
             return List.of();
         }
 
-        List<TextureAtlasSprite> sprites = SPRITES.get(selectorId);
+        List<TextureAtlasSprite> sprites = SELECTOR_SPRITES.get(selectorId);
         return sprites == null ? List.of() : sprites;
     }
 
-    public static List<TextureAtlasSprite> getFluidSprites(FluidState fluidState) {
-        if (!isNativeFluidSupported(fluidState)) {
+    public static List<TextureAtlasSprite> getNativeFluidSprites(int emittedSpriteMask) {
+        if (emittedSpriteMask == 0) {
             return List.of();
         }
 
-        TextureAtlasSprite[] builtInSprites = builtInFluidSprites(fluidState);
-        if (builtInSprites.length != 0) {
-            ArrayList<TextureAtlasSprite> tracked = new ArrayList<>(builtInSprites.length);
-            for (TextureAtlasSprite sprite : builtInSprites) {
-                if (sprite != null && !tracked.contains(sprite)) {
-                    tracked.add(sprite);
-                }
-            }
-            return tracked;
-        }
-
-        FluidRenderHandler handler = FluidRenderHandlerRegistry.INSTANCE.get(fluidState.getType());
-        if (handler == null) {
-            handler = FluidRenderHandlerRegistry.INSTANCE.get(fluidState.is(Fluids.LAVA) ? Fluids.LAVA : Fluids.WATER);
-        }
-        if (handler == null) {
-            return List.of();
-        }
-
-        TextureAtlasSprite[] sprites = handler.getFluidSprites(null, null, fluidState);
-        if (sprites == null || sprites.length == 0) {
-            return List.of();
-        }
-
-        ArrayList<TextureAtlasSprite> tracked = new ArrayList<>(sprites.length);
-        for (TextureAtlasSprite sprite : sprites) {
-            if (sprite != null && !tracked.contains(sprite)) {
-                tracked.add(sprite);
-            }
-        }
+        ArrayList<TextureAtlasSprite> tracked = new ArrayList<>(3);
+        addFluidSprite(tracked, emittedSpriteMask, FLUID_SPRITE_WATER_STILL, "minecraft:block/water_still");
+        addFluidSprite(tracked, emittedSpriteMask, FLUID_SPRITE_WATER_FLOW, "minecraft:block/water_flow");
+        addFluidSprite(tracked, emittedSpriteMask, FLUID_SPRITE_WATER_OVERLAY, "minecraft:block/water_overlay");
+        addFluidSprite(tracked, emittedSpriteMask, FLUID_SPRITE_LAVA_STILL, "minecraft:block/lava_still");
+        addFluidSprite(tracked, emittedSpriteMask, FLUID_SPRITE_LAVA_FLOW, "minecraft:block/lava_flow");
         return tracked;
+    }
+
+    private static void addFluidSprite(List<TextureAtlasSprite> tracked, int emittedSpriteMask, int flag,
+            String spriteId) {
+        if ((emittedSpriteMask & flag) == 0) {
+            return;
+        }
+
+        TextureAtlasSprite sprite = blockSprite(spriteId);
+        if (sprite != null && !tracked.contains(sprite)) {
+            tracked.add(sprite);
+        }
     }
 
     private static int registerState(BlockState state, BlockStateModel model) {
@@ -206,6 +204,7 @@ public final class NativeStaticBlockModelRegistry {
         STATE_SELECTORS.put(state, selectorId);
 
         Material material = DefaultMaterials.forBlockState(state);
+        int modelPassId = selectorId >= 0 ? MISSING_ID : passId(material.pass);
         FluidState fluidState = state.getFluidState();
         int fluidMaterialBits = 0;
         int fluidPassId = MISSING_ID;
@@ -246,7 +245,7 @@ public final class NativeStaticBlockModelRegistry {
         int fluidType = FORCE_JAVA_FLUIDS ? FLUID_NONE : fluidType(fluidState);
         BlockBehaviour.OffsetType offsetType = state.sodium$getOffsetType();
         FluidSpriteMetadata fluidSprites = fluidSpriteMetadata(fluidState);
-        NativeStaticBlockModelCache.registerState(stateId, selectorId, flags, material.bits(), passId(material.pass),
+        NativeStaticBlockModelCache.registerState(stateId, selectorId, flags, material.bits(), modelPassId,
                 state.getLightEmission(), 0, irisBlockId(state), fluidMaterialBits, fluidPassId, fluidBlockId,
                 skipGroup(state), fluidType, fluidState.isEmpty() ? 0.0F : fluidState.getOwnHeight(),
                 fluidState.hasProperty(net.minecraft.world.level.material.FlowingFluid.FALLING) && fluidState.getValue(net.minecraft.world.level.material.FlowingFluid.FALLING) ? 1 : 0,
@@ -359,10 +358,10 @@ public final class NativeStaticBlockModelRegistry {
         PART_MODEL_IDS.put(part, modelId);
 
         CachedModel cached = buildCachedModel(state, part);
-        SPRITES.put(modelId, cached.sprites);
+        MODEL_SPRITES.put(modelId, cached.sprites);
         NativeStaticBlockModelCache.register(modelId, (recordAddress, index) -> {
             CachedQuad quad = cached.quads.get(index);
-            NativeChunkMeshEncoder.writeStaticModelQuadRecord(recordAddress, quad.materialBits,
+            NativeChunkMeshEncoder.writeStaticModelQuadRecord(recordAddress, quad.materialBits, quad.passId,
                     quad.cullFace, quad.normalFace, quad.packedNormal, (byte) 0, (byte) 0, quad.shade,
                     quad.flags, quad.lightFace, quad.tintIndex, quad.hasAo,
                     quad.x0, quad.y0, quad.z0, quad.color0, quad.u0, quad.v0, quad.light0,
@@ -375,14 +374,15 @@ public final class NativeStaticBlockModelRegistry {
 
     private static CachedModel buildCachedModel(BlockState state, BlockModelPart part) {
         ChunkSectionLayer layer = ItemBlockRenderTypes.getChunkRenderType(state);
-        int materialBits = DefaultMaterials.forChunkLayer(layer).bits();
+        Material material = DefaultMaterials.forChunkLayer(layer);
         List<CachedQuad> quads = new ArrayList<>();
         List<TextureAtlasSprite> sprites = new ArrayList<>();
 
         for (int faceIndex = -1; faceIndex < net.minecraft.core.Direction.values().length; faceIndex++) {
             net.minecraft.core.Direction cullFace = faceIndex < 0 ? null : net.minecraft.core.Direction.from3DDataValue(faceIndex);
             for (BakedQuad quad : part.getQuads(cullFace)) {
-                quads.add(CachedQuad.from(quad, cullFace, materialBits));
+                quads.add(CachedQuad.from(quad, cullFace, material, downgradedPassId(quad, material),
+                        part.useAmbientOcclusion() && state.getLightEmission() == 0));
                 if (quad.sprite() != null && !sprites.contains(quad.sprite())) {
                     sprites.add(quad.sprite());
                 }
@@ -395,7 +395,7 @@ public final class NativeStaticBlockModelRegistry {
     private static void copySprites(int selectorId, List<Integer> modelIds) {
         List<TextureAtlasSprite> sprites = new ArrayList<>();
         for (int modelId : modelIds) {
-            List<TextureAtlasSprite> modelSprites = SPRITES.get(modelId);
+        List<TextureAtlasSprite> modelSprites = MODEL_SPRITES.get(modelId);
             if (modelSprites != null) {
                 for (TextureAtlasSprite sprite : modelSprites) {
                     if (!sprites.contains(sprite)) {
@@ -404,13 +404,13 @@ public final class NativeStaticBlockModelRegistry {
                 }
             }
         }
-        SPRITES.put(selectorId, sprites);
+        SELECTOR_SPRITES.put(selectorId, sprites);
     }
 
     private static void copySelectorSprites(int selectorId, int[] childSelectors) {
         List<TextureAtlasSprite> sprites = new ArrayList<>();
         for (int childSelector : childSelectors) {
-            List<TextureAtlasSprite> childSprites = SPRITES.get(childSelector);
+            List<TextureAtlasSprite> childSprites = SELECTOR_SPRITES.get(childSelector);
             if (childSprites != null) {
                 for (TextureAtlasSprite sprite : childSprites) {
                     if (!sprites.contains(sprite)) {
@@ -419,7 +419,7 @@ public final class NativeStaticBlockModelRegistry {
                 }
             }
         }
-        SPRITES.put(selectorId, sprites);
+        SELECTOR_SPRITES.put(selectorId, sprites);
     }
 
     private static int passId(TerrainRenderPass pass) {
@@ -433,6 +433,54 @@ public final class NativeStaticBlockModelRegistry {
             return 2;
         }
         return MISSING_ID;
+    }
+
+    private static int downgradedPassId(BakedQuad quad, Material material) {
+        TerrainRenderPass pass = material.pass;
+        TextureAtlasSprite sprite = quad.sprite();
+        if (sprite == null || Workarounds.isWorkaroundEnabled(Workarounds.Reference.INTEL_DEPTH_BUFFER_COMPARISON_UNRELIABLE)) {
+            return passId(pass);
+        }
+
+        boolean hasNonOpaqueVertex = false;
+        for (int vertex = 0; vertex < 4; vertex++) {
+            hasNonOpaqueVertex |= ColorARGB.unpackAlpha(quad.getColor(vertex)) != 0xFF;
+        }
+        if (pass.isTranslucent() && hasNonOpaqueVertex) {
+            return passId(pass);
+        }
+        if (!validateQuadUVs(sprite, quad)) {
+            return passId(pass);
+        }
+        if (sprite instanceof TextureAtlasSpriteExtension spriteExt && spriteExt.sodium$hasUnknownImageContents()) {
+            return passId(pass);
+        }
+        if (sprite.contents() instanceof SpriteContentsExtension contentsExt) {
+            if (pass == DefaultTerrainRenderPasses.TRANSLUCENT && !contentsExt.sodium$hasTranslucentPixels()) {
+                pass = DefaultTerrainRenderPasses.CUTOUT;
+            }
+            if (pass == DefaultTerrainRenderPasses.CUTOUT && !contentsExt.sodium$hasTransparentPixels()) {
+                pass = DefaultTerrainRenderPasses.SOLID;
+            }
+        }
+        return passId(pass);
+    }
+
+    private static boolean validateQuadUVs(TextureAtlasSprite sprite, BakedQuad quad) {
+        float spriteUMin = sprite.getU0();
+        float spriteUMax = sprite.getU1();
+        float spriteVMin = sprite.getV0();
+        float spriteVMax = sprite.getV1();
+
+        for (int vertex = 0; vertex < 4; vertex++) {
+            float u = quad.getTexU(vertex);
+            float v = quad.getTexV(vertex);
+            if (u < spriteUMin || u > spriteUMax || v < spriteVMin || v > spriteVMax) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static int irisBlockId(BlockState state) {
@@ -594,16 +642,17 @@ public final class NativeStaticBlockModelRegistry {
                 || block == Blocks.BIRCH_LEAVES;
     }
 
-    private record CachedQuad(int materialBits, int cullFace, int normalFace, int packedNormal, boolean shade,
+    private record CachedQuad(int materialBits, int passId, int cullFace, int normalFace, int packedNormal, boolean shade,
             int flags, int lightFace, int tintIndex, boolean hasAo,
             float x0, float y0, float z0, int color0, float u0, float v0, int light0,
             float x1, float y1, float z1, int color1, float u1, float v1, int light1,
             float x2, float y2, float z2, int color2, float u2, float v2, int light2,
             float x3, float y3, float z3, int color3, float u3, float v3, int light3) {
-        static CachedQuad from(BakedQuad quad, net.minecraft.core.Direction cullFace, int materialBits) {
-            return new CachedQuad(materialBits, cullFace == null ? -1 : cullFace.get3DDataValue(),
+        static CachedQuad from(BakedQuad quad, net.minecraft.core.Direction cullFace, Material material, int passId,
+                boolean hasAo) {
+            return new CachedQuad(material.bits(), passId, cullFace == null ? -1 : cullFace.get3DDataValue(),
                     quad.getNormalFace().ordinal(), quad.getFaceNormal(), quad.hasShade(),
-                    quad.getFlags(), quad.getLightFace().get3DDataValue(), quad.getTintIndex(), quad.hasAO(),
+                    quad.getFlags(), quad.getLightFace().get3DDataValue(), quad.getTintIndex(), hasAo,
                     quad.getX(0), quad.getY(0), quad.getZ(0), quad.getColor(0), quad.getTexU(0), quad.getTexV(0), quad.getLight(0),
                     quad.getX(1), quad.getY(1), quad.getZ(1), quad.getColor(1), quad.getTexU(1), quad.getTexV(1), quad.getLight(1),
                     quad.getX(2), quad.getY(2), quad.getZ(2), quad.getColor(2), quad.getTexU(2), quad.getTexV(2), quad.getLight(2),

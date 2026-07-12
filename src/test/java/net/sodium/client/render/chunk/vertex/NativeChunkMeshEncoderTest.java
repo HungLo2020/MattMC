@@ -365,7 +365,7 @@ class NativeChunkMeshEncoderTest {
             output = nativeOrder(MemoryUtil.memCalloc(4 * ChunkMeshFormats.COMPACT.getNativeFormat().stride()));
             sectionBuilder.assemble(output, segments, ChunkMeshFormats.COMPACT.getNativeFormat(),
                     1 << ModelQuadFacing.NEG_Z.ordinal(), false, true, false);
-            assertCompactVertex(output, 0, 4.25F, 5.0F, 6.5F, 0xf0f0, 5, 3);
+            assertCompactVertex(output, 0, 4.25F, 5.0F, 6.5F, 0xf8f8, 5, 3);
             assertSegmentPresent(segments, 4, ModelQuadFacing.NEG_Z.ordinal());
         } finally {
             NativeStaticBlockModelCache.clear();
@@ -445,7 +445,7 @@ class NativeChunkMeshEncoderTest {
             int unoffsetY = quantizePosition(5.0F);
             int unoffsetZ = quantizePosition(6.0F);
             assertNotEquals(packPositionHi(unoffsetX, unoffsetY, unoffsetZ), output.getInt(0));
-            assertEquals(packLightAndData(0xf0f0, 5, 3), output.getInt(16));
+            assertEquals(packLightAndData(0xf8f8, 5, 3), output.getInt(16));
             assertEquals(0xff804020, output.getInt(8));
         } finally {
             NativeStaticBlockModelCache.clear();

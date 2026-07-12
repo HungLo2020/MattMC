@@ -110,6 +110,35 @@ fn fluid_face_record_expands_semantic_side_face_to_quad() {
 }
 
 #[test]
+fn flipped_fluid_faces_flip_packed_normals_like_java_writer() {
+    assert_eq!(0x00007f00, fluid::flip_packed_normal(0x00008100));
+    assert_eq!(0x00008100, fluid::flip_packed_normal(0x00007f00));
+    assert_eq!(0x0081007f, fluid::flip_packed_normal(0x007f0081));
+}
+
+#[test]
+fn fluid_bottom_lighting_uses_direction_down_not_model_facing_ordinal() {
+    let mut block = NativeSectionBlockRecord::default();
+    block.light_words[neighborhood_index(0, -1, 0)] =
+        pack_light_word(4, 15, 0, 4096, false, false, false, false);
+    block.light_words[neighborhood_index(0, 0, 0)] =
+        pack_light_word(10, 7, 0, 4096, false, false, false, false);
+    block.light_words[neighborhood_index(-1, 0, 0)] =
+        pack_light_word(1, 1, 0, 4096, false, false, false, false);
+
+    let quad = lighting_quad(0, 0, 0.0, 0.0, 1.0);
+    let down = native_quad_lighting(&block, &quad, lighting_state_record(0));
+    let wrong_facing_ordinal = native_quad_lighting(
+        &block,
+        &lighting_quad(0, MODEL_QUAD_FACING_NEG_Y as i32, 0.0, 0.0, 1.0),
+        lighting_state_record(0),
+    );
+
+    assert_eq!(pack_light(4, 15), down.lm[0]);
+    assert_ne!(down.lm[0], wrong_facing_ordinal.lm[0]);
+}
+
+#[test]
 fn compact_format_metadata_is_rust_owned() {
     assert_eq!(
         20,
@@ -410,15 +439,10 @@ fn smooth_lighting_snaps_non_parallel_endpoints_like_java() {
 
 #[test]
 fn smooth_lighting_treats_parallel_full_cube_as_java_aligned_full_face() {
-    let block = lighting_block_record();
+    let mut block = lighting_block_record();
+    block.light_words[13] = pack_light_word(8, 8, 0, 4096, false, false, false, true);
     let quad = lighting_quad(MODEL_QUAD_FLAG_PARALLEL, 1, 0.4, 0.25, 0.6);
-    let light = smooth_lighting(
-        &block,
-        &quad,
-        lighting_state_record(STATE_FLAG_FULL_OCCLUSION),
-        1,
-        true,
-    );
+    let light = smooth_lighting(&block, &quad, lighting_state_record(0), 1, true);
     let face = ao_face_data(&block, 1, true);
     let (expected_lm, mut expected_ao) = map_ao_corners(1, face.lm, face.ao);
     for value in &mut expected_ao {
@@ -501,13 +525,36 @@ fn static_model_zero_source_light_uses_computed_lighting() {
 }
 
 #[test]
-fn static_model_force_grass_tint_applies_without_quad_tint_index() {
+fn static_model_source_light_uses_java_component_max_brightness() {
+    assert_eq!(0x0010_0200, max_brightness(0x0010_0000, 0x0008_0200));
+    assert_eq!(0x0008_0200, max_brightness(0x0000_0200, 0x0008_0000));
+}
+
+#[test]
+fn static_model_state_tint_does_not_apply_without_quad_tint_index() {
     let mut block = lighting_block_record();
     block.tint = 0xff35_996fu32 as i32;
     let mut state = lighting_state_record(0);
     state.tint_type = TINT_FORCE_GRASS;
     let mut quad = lighting_quad(MODEL_QUAD_FLAG_ALIGNED, 1, 0.0, 1.0, 0.0);
     quad.tint_index = -1;
+    quad.vertices[0].color = 0xffff_ffffu32 as i32;
+    let mut profile = NativeMeshingProfile::default();
+
+    let native =
+        static_model_quad_to_native_section(block, state, quad, &mut profile, false, false);
+
+    assert_eq!(0xffff_ffffu32 as i32, native.vertices[0].color);
+}
+
+#[test]
+fn static_model_force_grass_tint_applies_with_quad_tint_index() {
+    let mut block = lighting_block_record();
+    block.tint = 0xff35_996fu32 as i32;
+    let mut state = lighting_state_record(0);
+    state.tint_type = TINT_FORCE_GRASS;
+    let mut quad = lighting_quad(MODEL_QUAD_FLAG_ALIGNED, 1, 0.0, 1.0, 0.0);
+    quad.tint_index = 0;
     quad.vertices[0].color = 0xffff_ffffu32 as i32;
     let mut profile = NativeMeshingProfile::default();
 
@@ -555,6 +602,16 @@ fn native_fluid_uses_fluid_shader_block_id_not_container_block_id() {
     assert_eq!(1, quad.render_type);
 }
 
+#[test]
+fn flowing_fluid_top_trig_initializes_without_native_stack_table() {
+    let (dir, sin, cos) = flowing_top_trig_for_test(0.70710677, 0.70710677);
+
+    assert!(dir.is_finite());
+    assert!(sin.is_finite());
+    assert!(cos.is_finite());
+    assert!((dir + std::f32::consts::FRAC_PI_4).abs() < 0.001);
+}
+
 fn lighting_quad(flags: i32, light_face: i32, x: f32, y: f32, z: f32) -> StaticModelQuadRecord {
     StaticModelQuadRecord {
         vertices: [StaticModelVertexRecord {
@@ -577,7 +634,7 @@ fn lighting_quad(flags: i32, light_face: i32, x: f32, y: f32, z: f32) -> StaticM
         light_face,
         tint_index: -1,
         has_ao: 1,
-        _padding: 0,
+        pass_id: -1,
     }
 }
 

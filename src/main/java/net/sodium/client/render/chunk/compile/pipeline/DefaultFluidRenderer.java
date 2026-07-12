@@ -457,9 +457,7 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
             float sideX1, float sideZ1, float sideX2, float sideZ2) {
         this.emittedQuadCount++;
         if (JAVA_FLUID_DIAG && javaFluidDiagCount < 80 && faceKind == FLUID_FACE_TOP_NE_SW
-                && this.iris$localX >= 0 && this.iris$localX <= 160
-                && this.iris$localY >= 60 && this.iris$localY <= 72
-                && this.iris$localZ >= 360 && this.iris$localZ <= 660) {
+                && shouldLogFluidDiag(this.iris$localX, this.iris$localY, this.iris$localZ)) {
             int index = javaFluidDiagCount++;
             System.out.printf("MATTMC_JAVA_FLUID_DIAG #%d pos=%d,%d,%d blockId=%d renderType=%d material=%d facing=%s flip=%s face=%d origin=%d,%d,%d yOffset=%.4f heights=%.4f,%.4f,%.4f,%.4f uv0=%.5f,%.5f uv1=%.5f,%.5f uv2=%.5f,%.5f uv3=%.5f,%.5f color0=0x%08x ao0=%.4f light0=0x%08x collector=%s%n",
                     index, this.iris$localX, this.iris$localY, this.iris$localZ, this.iris$blockId,
@@ -517,6 +515,14 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
                 this.brightness[0], this.brightness[1], this.brightness[2], this.brightness[3],
                 this.quadLightData.lm[0], this.quadLightData.lm[1], this.quadLightData.lm[2],
                 this.quadLightData.lm[3]);
+    }
+
+    private static boolean shouldLogFluidDiag(int x, int y, int z) {
+        if (System.getenv("MATTMC_FLUID_DIAG_REPLAY") != null) {
+            return x >= 0 && x <= 15 && y >= 64 && y <= 79 && z >= 0 && z <= 15;
+        }
+
+        return x >= 0 && x <= 160 && y >= 60 && y <= 72 && z >= 360 && z <= 660;
     }
 
     private boolean appendNativeQuad(NativeSectionMeshBuilder.FacingBuffer vertexBuffer, int materialBits,

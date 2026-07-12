@@ -3,16 +3,20 @@ package net.sodium.client.render.chunk.compile.tasks;
 import net.sodium.client.render.chunk.compile.ChunkBuildBuffers;
 import net.sodium.client.render.chunk.compile.pipeline.NativeStaticBlockModelRegistry;
 import net.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
+import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
 import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.sodium.client.services.PlatformBlockAccess;
 import net.sodium.client.world.LevelSlice;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BiomeColors;
+import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.RedStoneWireBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
@@ -94,11 +98,21 @@ final class NativeSectionSnapshot implements AutoCloseable {
                 this.address, this.activeRecordCount);
         int solid = this.buffers.appendNativeSectionSnapshot(DefaultTerrainRenderPasses.SOLID, this.address, this.activeRecordCount,
                 0, this.sectionIndex, false, null);
+        this.addNativeFluidSprites(DefaultTerrainRenderPasses.SOLID);
         int cutout = this.buffers.appendNativeSectionSnapshot(DefaultTerrainRenderPasses.CUTOUT, this.address, this.activeRecordCount,
                 1, this.sectionIndex, false, null);
+        this.addNativeFluidSprites(DefaultTerrainRenderPasses.CUTOUT);
         int translucent = this.buffers.appendNativeSectionSnapshot(DefaultTerrainRenderPasses.TRANSLUCENT, this.address,
                 this.activeRecordCount, 2, this.sectionIndex, false, collector);
+        this.addNativeFluidSprites(DefaultTerrainRenderPasses.TRANSLUCENT);
         return new int[] { solid, cutout, translucent };
+    }
+
+    private void addNativeFluidSprites(TerrainRenderPass pass) {
+        int emittedSpriteMask = this.buffers.nativeFluidSpriteMask(pass);
+        for (var sprite : NativeStaticBlockModelRegistry.getNativeFluidSprites(emittedSpriteMask)) {
+            this.buffers.get(pass).addSprite(sprite);
+        }
     }
 
     private long recordAddress(int localBlockIndex) {
@@ -134,8 +148,14 @@ final class NativeSectionSnapshot implements AutoCloseable {
             blockLight = 0;
             skyLight = 0;
         } else {
-            blockLight = slice.getBrightness(LightLayer.BLOCK, pos);
-            skyLight = slice.getBrightness(LightLayer.SKY, pos);
+            if (emissive) {
+                blockLight = slice.getBrightness(LightLayer.BLOCK, pos);
+                skyLight = slice.getBrightness(LightLayer.SKY, pos);
+            } else {
+                int light = LevelRenderer.getLightColor(LevelRenderer.BrightnessGetter.DEFAULT, slice, state, pos);
+                blockLight = LightTexture.block(light);
+                skyLight = LightTexture.sky(light);
+            }
         }
         float ao = luminance == 0 ? state.getShadeBrightness(slice, pos) : 1.0F;
         int aoi = (int) (ao * 4096.0F);
@@ -164,6 +184,9 @@ final class NativeSectionSnapshot implements AutoCloseable {
                 || block == Blocks.DARK_OAK_LEAVES || block == Blocks.VINE || block == Blocks.MANGROVE_LEAVES
                 || block == Blocks.LEAF_LITTER) {
             return BiomeColors.getAverageFoliageColor(slice, pos) | 0xFF000000;
+        }
+        if (block == Blocks.REDSTONE_WIRE) {
+            return RedStoneWireBlock.getColorForPower(state.getValue(RedStoneWireBlock.POWER)) | 0xFF000000;
         }
         int color = Minecraft.getInstance().getBlockColors().getColor(state, slice, pos, 0);
         return color < 0 ? -1 : color | 0xFF000000;

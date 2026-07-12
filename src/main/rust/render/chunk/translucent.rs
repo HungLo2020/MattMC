@@ -43,7 +43,6 @@ const ALIGNED_NORMALS: [(i8, i8, i8); FACING_DIRECTIONS] = [
     (0, 0, -127),
 ];
 const STATIC_TOPO_SORT_ATTEMPT_LIMITS: [i32; 6] = [-1, -1, 250, 100, 50, 30];
-
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct TranslucentQuadRecord {
@@ -669,8 +668,11 @@ fn create_full_quad(
     }
 
     let info = build_quad_info(&record);
+    let mut quad = *source;
+    clamp_full_quad_lights_for_split_interpolation(&mut quad);
+
     Ok(NativeFullTQuad {
-        quad: *source,
+        quad,
         info,
         same_vertex_map: compute_same_vertex_map(&record.positions),
         normal_is_very_accurate: false,
@@ -678,6 +680,18 @@ fn create_full_quad(
         has_updated_vertices: false,
         write_to_index: -1,
     })
+}
+
+fn clamp_full_quad_lights_for_split_interpolation(quad: &mut NativeFullQuadBuffer) {
+    for vertex in &mut quad.vertices {
+        vertex.light = clamp_split_light(vertex.light);
+    }
+}
+
+fn clamp_split_light(light: i32) -> i32 {
+    let block = (((light as u32) & 0xff) as i32).clamp(8, 248);
+    let sky = ((((light as u32) >> 16) & 0xff) as i32).clamp(8, 248);
+    (sky << 16) | block
 }
 
 fn write_full_quad_state(quad: &NativeFullTQuad, output: *mut NativeFullQuadState) -> i32 {
@@ -2955,7 +2969,6 @@ fn split_full_candidate(
         full_quad_classify(source, tuple3(split_plane), split_distance);
     let mut inside_map = inside_map_unmasked & unique_vertex_map;
     let on_plane_map = on_plane_map_unmasked & unique_vertex_map;
-
     if on_plane_map == unique_vertex_map {
         splitting_group.push(candidate_index);
         return Ok(());
@@ -4783,7 +4796,7 @@ pub(crate) unsafe fn native_full_quad_write_to_index(
 pub(crate) unsafe fn native_full_quad_write_to_native_buffer(
     handle: u64,
     output_native_quad_address: u64,
-    material_bits: i32,
+    _material_bits: i32,
 ) -> i32 {
     if handle == 0 || output_native_quad_address == 0 {
         return ERR_NULL_POINTER;
@@ -4792,7 +4805,6 @@ pub(crate) unsafe fn native_full_quad_write_to_native_buffer(
     let quad = &*(handle as *const NativeFullTQuad);
     let output = &mut *(output_native_quad_address as *mut NativeFullQuadBuffer);
     *output = quad.quad;
-    output.material_bits = material_bits;
     OK
 }
 
@@ -5716,6 +5728,28 @@ mod tests {
         assert!(source.has_updated_vertices);
         assert_eq!(1, workspace.owned_split_quads[0].write_to_index);
         assert!(workspace.owned_split_quads[0].has_updated_vertices);
+    }
+
+    #[test]
+    fn native_full_quad_clamps_light_before_split_interpolation() {
+        let mut source = full_quad_xy();
+        source.vertices[0].light = 0;
+        source.vertices[1].light = 0x0010_0010;
+        let quad = create_full_quad(&source, FACING_POS_Z, packed_aligned_normal(FACING_POS_Z))
+            .unwrap();
+
+        assert_eq!(0x0008_0008, quad.quad.vertices[0].light);
+        assert_eq!(0x0010_0010, quad.quad.vertices[1].light);
+
+        let interpolated = interpolate_full_quad_attributes(
+            0.5,
+            (1.0, 0.0, 0.0),
+            quad.quad.vertices[0],
+            quad.quad.vertices[1],
+        )
+        .unwrap();
+
+        assert_eq!(0x000c_000c, interpolated.light);
     }
 
     #[test]

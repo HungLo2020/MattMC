@@ -340,10 +340,25 @@ pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_start(handle: u64) -
     builder.section_pass_cache_address = 0;
     builder.section_pass_cache_count = 0;
     builder.section_pass_cache_mask = 0;
+    builder.fluid_sprite_mask = 0;
     for buffer in &mut builder.buffers {
         buffer.encoded.clear();
         buffer.encoded_format = None;
     }
+    OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sodium_section_mesh_builder_fluid_sprite_mask(
+    handle: u64,
+    output_mask: *mut i32,
+) -> i32 {
+    if handle == 0 || output_mask.is_null() {
+        return ERR_NULL_POINTER;
+    }
+
+    let builder = &*(handle as *const NativeSectionMeshBuilder);
+    *output_mask = builder.fluid_sprite_mask;
     OK
 }
 

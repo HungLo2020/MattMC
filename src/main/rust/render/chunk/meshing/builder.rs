@@ -31,6 +31,7 @@ pub(super) fn create_section_mesh_builder(capacity: usize) -> NativeSectionMeshB
         section_pass_cache_count: 0,
         section_pass_cache_mask: 0,
         section_pass_cache_valid: false,
+        fluid_sprite_mask: 0,
     }
 }
 

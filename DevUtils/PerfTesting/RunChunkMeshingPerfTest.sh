@@ -232,6 +232,7 @@ old_results = by_name(old_runs)
 current_results = by_name(current_runs)
 names = [name for name in sorted(old_results) if name in current_results]
 current_only_names = [name for name in sorted(current_results) if name not in old_results]
+old_only_names = [name for name in sorted(old_results) if name not in current_results]
 
 def verdict_for(time_ratio):
     if time_ratio < 1.0:
@@ -334,6 +335,15 @@ for name in names:
     })
 
 current_only = [current_summary(name, current_results[name]) for name in current_only_names]
+old_only = [
+    {
+        "name": name,
+        "java_median_mean_ms": statistics.median(r["mean_ms"] for r in old_results[name]),
+        "java_median_throughput_mqps": statistics.median(r["mega_quads_per_second"] for r in old_results[name]),
+        "java_forks": old_results[name],
+    }
+    for name in old_only_names
+]
 
 summary = {
     "artifact_dir": str(artifact_dir),
@@ -348,6 +358,7 @@ summary = {
     "limitations": current_runs[0].get("benchmark_limitations", []),
     "comparisons": comparisons,
     "current_only_results": current_only,
+    "old_only_results": old_only,
     "old_json_paths": [run["_path"] for run in old_runs],
     "current_json_paths": [run["_path"] for run in current_runs],
 }
@@ -362,13 +373,27 @@ lines.append(f"Forks:                  {summary['forks']}")
 lines.append(f"Warmup:                 {summary['warmup_millis']} ms + at least {summary['warmup_iterations_minimum']} invocations")
 lines.append(f"Measurement:            {summary['measure_millis']} ms + at least {summary['measurement_iterations_minimum']} samples")
 lines.append("")
-lines.append("Median of per-fork means")
-lines.append("------------------------")
-lines.append(f"{'benchmark':42} {'java ms':>10} {'rust ms':>10} {'ratio':>10} {'java samp':>10} {'rust samp':>10}")
-for item in comparisons:
-    jf = item["java_forks"]
-    rf = item["rust_forks"]
-    lines.append(f"{label(item['name'])[:42]:42} {item['java_median_mean_ms']:10.3f} {item['rust_median_mean_ms']:10.3f} {item['rust_vs_java_time_ratio']:10.2f} {int(statistics.median(r['samples'] for r in jf)):10d} {int(statistics.median(r['samples'] for r in rf)):10d}")
+def comparison_table(title, predicate):
+    rows = [item for item in comparisons if predicate(item["name"])]
+    if not rows:
+        return
+    lines.append(title)
+    lines.append("-" * len(title))
+    lines.append(f"{'benchmark':42} {'java ms':>10} {'rust ms':>10} {'ratio':>10} {'java samp':>10} {'rust samp':>10}")
+    for item in rows:
+        jf = item["java_forks"]
+        rf = item["rust_forks"]
+        lines.append(f"{label(item['name'])[:42]:42} {item['java_median_mean_ms']:10.3f} {item['rust_median_mean_ms']:10.3f} {item['rust_vs_java_time_ratio']:10.2f} {int(statistics.median(r['samples'] for r in jf)):10d} {int(statistics.median(r['samples'] for r in rf)):10d}")
+    lines.append("")
+
+comparison_table("Full end-to-end section replay", lambda name: name.startswith("full_section_replay_"))
+comparison_table("Isolated packing and algorithm microbenchmarks",
+        lambda name: not name.startswith("full_section_replay_")
+        and not name.startswith("snapshot_create_")
+        and not name.startswith("replay_section_")
+        and not name.startswith("diagnostic_"))
+comparison_table("Legacy native replay rows without snapshot creation",
+        lambda name: name.startswith("replay_section_"))
 lines.append("")
 lines.append("Output equivalence, median per invocation")
 lines.append("-----------------------------------------")
@@ -386,6 +411,15 @@ if current_only:
         quads = median_nested(rf, "accounting", "output_quads_per_invocation")
         calls = median_nested(rf, "accounting", "native_calls_per_invocation")
         lines.append(f"{label(item['name'])[:58]:58} {item['rust_median_mean_ms']:10.3f} {int(statistics.median(r['samples'] for r in rf)):10d} {quads:10.1f} {calls:12.1f}")
+if old_only:
+    lines.append("")
+    lines.append("Frozen-only historical/prebuilt rows")
+    lines.append("------------------------------------")
+    lines.append(f"{'benchmark':58} {'java ms':>10} {'samples':>10} {'quads':>10}")
+    for item in old_only:
+        jf = item["java_forks"]
+        quads = median_nested(jf, "accounting", "output_quads_per_invocation")
+        lines.append(f"{label(item['name'])[:58]:58} {item['java_median_mean_ms']:10.3f} {int(statistics.median(r['samples'] for r in jf)):10d} {quads:10.1f}")
 lines.append("")
 lines.append("Current-path stage timing, median ms/invocation")
 lines.append("-----------------------------------------------")

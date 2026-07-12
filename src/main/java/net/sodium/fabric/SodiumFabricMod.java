@@ -7,6 +7,7 @@ import net.sodium.client.hooks.SodiumClientLevelHook;
 import net.sodium.client.hooks.SodiumSpriteContentsHook;
 import net.sodium.client.hooks.SodiumVertexFormatHook;
 import net.sodium.client.hooks.SodiumWindowHook;
+import net.sodium.client.perf.real.RealChunkMeshingReplayRunner;
 import net.sodium.client.render.frapi.SodiumRenderer;
 import net.sodium.client.util.FlawlessFrames;
 import net.fabricmc.api.ClientModInitializer;
@@ -60,5 +61,6 @@ public class SodiumFabricMod implements ClientModInitializer {
         HookRegistry.registerBlockEntityTypeHook(SodiumBlockEntityTypeHook.getInstance());
         HookRegistry.registerSpriteContentsHook(SodiumSpriteContentsHook.getInstance());
         HookRegistry.registerWindowHook(SodiumWindowHook.getInstance());
+        RealChunkMeshingReplayRunner.installIfRequested();
     }
 }

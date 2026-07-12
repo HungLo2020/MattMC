@@ -26,9 +26,12 @@ use assembly::*;
 use builder::*;
 use cache::*;
 use culling::*;
-use fluid::{emit_native_section_fluid_faces, section_builder_append_fluid_face_records_encoded};
+use fluid::{
+    emit_native_section_fluid_faces, native_fluid_diag_enabled,
+    section_builder_append_fluid_face_records_encoded,
+};
 #[cfg(test)]
-use fluid::{fluid_face_record_to_quad, fluid_semantic_face};
+use fluid::{flowing_top_trig_for_test, fluid_face_record_to_quad, fluid_semantic_face};
 use format::*;
 use lighting::*;
 use model::*;
@@ -92,6 +95,11 @@ const TINT_BIRCH: i32 = 9;
 const TINT_FORCE_GRASS: i32 = 10;
 const FLUID_WATER: i32 = 1;
 const FLUID_LAVA: i32 = 2;
+const FLUID_SPRITE_WATER_STILL: i32 = 1;
+const FLUID_SPRITE_WATER_FLOW: i32 = 1 << 1;
+const FLUID_SPRITE_WATER_OVERLAY: i32 = 1 << 2;
+const FLUID_SPRITE_LAVA_STILL: i32 = 1 << 8;
+const FLUID_SPRITE_LAVA_FLOW: i32 = 1 << 9;
 const OFFSET_NONE: i32 = 0;
 const OFFSET_XZ: i32 = 1;
 const OFFSET_XYZ: i32 = 2;
@@ -211,6 +219,7 @@ static STATIC_MODEL_SUBSTAGE_PROFILE_ENABLED: OnceLock<bool> = OnceLock::new();
 static FLUID_SUBSTAGE_PROFILE_ENABLED: OnceLock<bool> = OnceLock::new();
 static SCAN_SUBSTAGE_PROFILE_ENABLED: OnceLock<bool> = OnceLock::new();
 static STAGING_SUBSTAGE_PROFILE_ENABLED: OnceLock<bool> = OnceLock::new();
+static ENABLE_DIRECT_STATIC_TEMPLATES: OnceLock<bool> = OnceLock::new();
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
@@ -311,7 +320,7 @@ struct StaticModelQuadRecord {
     light_face: i32,
     tint_index: i32,
     has_ao: i32,
-    _padding: i32,
+    pass_id: i32,
 }
 
 #[repr(C)]
@@ -449,6 +458,7 @@ struct NativeSectionMeshBuilder {
     section_pass_cache_count: usize,
     section_pass_cache_mask: u32,
     section_pass_cache_valid: bool,
+    fluid_sprite_mask: i32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -501,6 +511,18 @@ fn static_model_substage_profile_enabled() -> bool {
                 .map(str::to_ascii_lowercase),
             Ok(value) if value == "1" || value == "true" || value == "yes" || value == "on"
         )
+    })
+}
+
+fn direct_static_templates_enabled() -> bool {
+    *ENABLE_DIRECT_STATIC_TEMPLATES.get_or_init(|| {
+        std::env::var("MATTMC_NATIVE_MESHING_ENABLE_DIRECT_STATIC_TEMPLATES")
+            .map(|value| {
+                value.eq_ignore_ascii_case("true")
+                    || value.eq_ignore_ascii_case("yes")
+                    || value == "1"
+            })
+            .unwrap_or(false)
     })
 }
 

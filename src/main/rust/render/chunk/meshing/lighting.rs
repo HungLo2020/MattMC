@@ -29,15 +29,15 @@ pub(super) fn native_quad_lighting(
 pub(super) fn flat_lighting(
     block: &NativeSectionBlockRecord,
     quad: &StaticModelQuadRecord,
-    state: NativeMeshingState,
+    _state: NativeMeshingState,
     light_face: i32,
     shade: bool,
 ) -> NativeQuadLight {
+    let origin_full_cube = unpack_fc(block.light_words[13]);
     let sample_dir = if (0..6).contains(&quad.cull_face) {
         quad.cull_face
     } else if (quad.flags & MODEL_QUAD_FLAG_ALIGNED) != 0
-        || ((quad.flags & MODEL_QUAD_FLAG_PARALLEL) != 0
-            && (state.flags & STATE_FLAG_FULL_OCCLUSION) != 0)
+        || ((quad.flags & MODEL_QUAD_FLAG_PARALLEL) != 0 && origin_full_cube)
     {
         light_face
     } else {
@@ -69,7 +69,7 @@ pub(super) fn flat_lighting(
 pub(super) fn smooth_lighting(
     block: &NativeSectionBlockRecord,
     quad: &StaticModelQuadRecord,
-    state: NativeMeshingState,
+    _state: NativeMeshingState,
     light_face: i32,
     shade: bool,
 ) -> NativeQuadLight {
@@ -79,7 +79,7 @@ pub(super) fn smooth_lighting(
 
     let parallel = (quad.flags & MODEL_QUAD_FLAG_PARALLEL) != 0;
     let aligned = (quad.flags & MODEL_QUAD_FLAG_ALIGNED) != 0
-        || (parallel && (state.flags & STATE_FLAG_FULL_OCCLUSION) != 0);
+        || (parallel && unpack_fc(block.light_words[13]));
     let partial = (quad.flags & MODEL_QUAD_FLAG_PARTIAL) != 0;
 
     if aligned && !partial {
@@ -491,6 +491,9 @@ pub(super) fn unpack_op(word: i32) -> bool {
 }
 pub(super) fn unpack_fo(word: i32) -> bool {
     ((word >> 30) & 1) != 0
+}
+pub(super) fn unpack_fc(word: i32) -> bool {
+    ((word as u32 >> 31) & 1) != 0
 }
 
 pub(super) fn calculate_corner_brightness(

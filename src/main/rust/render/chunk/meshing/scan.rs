@@ -110,6 +110,8 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
         }
         if has_model && state.pass_id >= 0 && state.pass_id < 32 {
             discovered_pass_mask |= 1u32 << state.pass_id;
+        } else if has_model && state.pass_id < 0 {
+            discovered_pass_mask |= 0b111;
         }
         if has_fluid && state.fluid_pass_id >= 0 && state.fluid_pass_id < 32 {
             discovered_pass_mask |= 1u32 << state.fluid_pass_id;
@@ -151,7 +153,7 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
                 .add_count(PROFILE_COUNT_NATIVE_MODEL_QUADS, 1);
         }
 
-        if has_model && (emit_all_passes || state.pass_id == pass_id) {
+        if has_model && (emit_all_passes || state.pass_id < 0 || state.pass_id == pass_id) {
             let model_started = Instant::now();
             let scan_model_started = profile_start(profile_scan_substages);
             builder
@@ -241,6 +243,9 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
                     builder
                         .profile
                         .add_optional_stage(PROFILE_STATIC_QUAD_ITERATION, quad_iteration_started);
+                    if !emit_all_passes && quad_record.pass_id >= 0 && quad_record.pass_id != pass_id {
+                        continue;
+                    }
                     let culling_started = profile_start(profile_static_substages);
                     let scan_culling_started = profile_start(profile_scan_substages);
                     if native_section_culls_quad(record, state, quad_record, &states_guard) {
@@ -267,7 +272,11 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
                     builder
                         .profile
                         .add_optional_stage(PROFILE_STATIC_QUAD_ITERATION, quad_iteration_started);
-                    if analyzer.is_none() && !store_raw_quads && is_compact_fast_format(format) {
+                    if analyzer.is_none()
+                        && !store_raw_quads
+                        && is_compact_fast_format(format)
+                        && direct_static_templates_enabled()
+                    {
                         if pending_counts[facing] != 0 {
                             flush_static_model_pending_face(
                                 builder,
@@ -356,6 +365,22 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
 
         if has_fluid && (emit_all_passes || state.fluid_pass_id == pass_id) {
             let scan_fluid_started = profile_start(profile_scan_substages);
+            if native_fluid_diag_enabled() {
+                eprintln!(
+                    "MATTMC_NATIVE_FLUID_DIAG scan-fluid pass={} pos={},{},{} local={},{},{} state={} fluid_pass={} analyzer={} store_raw={}",
+                    pass_id,
+                    record.absolute_x,
+                    record.absolute_y,
+                    record.absolute_z,
+                    record.local_x,
+                    record.local_y,
+                    record.local_z,
+                    record.state_id,
+                    state.fluid_pass_id,
+                    analyzer.is_some(),
+                    store_raw_quads
+                );
+            }
             builder.profile.add_count(PROFILE_COUNT_FLUID_BLOCKS, 1);
             let fluid_face_count = emit_native_section_fluid_faces(
                 record,

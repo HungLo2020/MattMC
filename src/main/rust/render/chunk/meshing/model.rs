@@ -248,11 +248,7 @@ pub(super) unsafe fn flush_static_model_template_face(
             .add_optional_stage(PROFILE_SCAN_LIGHTING_AO, scan_lighting_started);
 
         let material_started = profile_start(profile_static_substages);
-        let material_bits = if state.material_bits != 0 {
-            state.material_bits
-        } else {
-            quad_record.material_bits
-        };
+        let material_bits = quad_record.material_bits;
         let material_section =
             ((material_bits & 0xff) << 16) | ((format.section_index & 0xff) << 24);
         builder
@@ -327,11 +323,7 @@ fn encode_static_template_quad_compact(
         } else {
             source.color
         };
-        let light = if source.light > 0 {
-            source.light
-        } else {
-            quad_light.lm[index]
-        };
+        let light = max_brightness(source.light, quad_light.lm[index]);
         let vertex_start = index * format.vertex_stride;
         let vertex_end = vertex_start + format.vertex_stride;
         encode_compact_vertex_values(
@@ -470,11 +462,7 @@ pub(super) fn static_model_quad_to_native_section(
 
     let material_started = profile_start(profile_static_substages);
     let block_id = choose_block_id(block.block_id, state.block_id);
-    let material_bits = if state.material_bits != 0 {
-        state.material_bits
-    } else {
-        quad_record.material_bits
-    };
+    let material_bits = quad_record.material_bits;
     profile.add_optional_stage(PROFILE_STATIC_SPRITE_MATERIAL_PASS, material_started);
 
     let creation_started = profile_start(profile_static_substages);
@@ -493,11 +481,7 @@ pub(super) fn static_model_quad_to_native_section(
             ao: light.ao[index],
             u: source.u,
             v: source.v,
-            light: if source.light > 0 {
-                source.light
-            } else {
-                light.lm[index]
-            },
+            light: max_brightness(source.light, light.lm[index]),
         };
     }
 
@@ -518,25 +502,19 @@ pub(super) fn static_model_quad_to_native_section(
 }
 
 #[inline(always)]
-fn static_state_applies_tint(state: NativeMeshingState) -> bool {
-    matches!(
-        state.tint_type,
-        TINT_GRASS
-            | TINT_FOLIAGE
-            | TINT_FORCE_GRASS
-            | TINT_DOUBLE_PLANT_GRASS
-            | TINT_CONSTANT
-            | TINT_SPRUCE
-            | TINT_BIRCH
-    )
+pub(super) fn static_quad_applies_tint(
+    quad_record: StaticModelQuadRecord,
+    _state: NativeMeshingState,
+) -> bool {
+    quad_record.tint_index != -1
 }
 
 #[inline(always)]
-pub(super) fn static_quad_applies_tint(
-    quad_record: StaticModelQuadRecord,
-    state: NativeMeshingState,
-) -> bool {
-    quad_record.tint_index != -1 || static_state_applies_tint(state)
+pub(super) fn max_brightness(a: i32, b: i32) -> i32 {
+    let a = a as u32;
+    let b = b as u32;
+    ((a & 0x0000_ffff).max(b & 0x0000_ffff)
+        | (a & 0xffff_0000).max(b & 0xffff_0000)) as i32
 }
 
 #[inline(always)]

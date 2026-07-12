@@ -158,9 +158,6 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                                     fluidState, blockPos, modelOffset, collector, fallbackStats);
                             fallbackBlockCount++;
                         } else if (!fluidState.isEmpty()) {
-                            for (var sprite : NativeStaticBlockModelRegistry.getFluidSprites(fluidState)) {
-                                buffers.get(DefaultMaterials.forFluidState(fluidState).pass).addSprite(sprite);
-                            }
                             fallbackStats.recordNativeFluidBlock(fluidState);
                         }
 

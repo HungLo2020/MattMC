@@ -135,6 +135,8 @@ class ChunkMeshingHotPathBenchmarkTest {
                 try {
                     results.add(measure("snapshot_create_" + section.name,
                             () -> runSnapshotCreate(section)));
+                    results.add(measure("full_section_replay_" + section.name,
+                            () -> runReplaySectionEndToEnd(section, replayBuilder)));
                     results.add(measure("replay_section_" + section.name,
                             () -> runReplaySection(section, replayBuilder, replayRecords)));
                 } finally {
@@ -274,6 +276,53 @@ class ChunkMeshingHotPathBenchmarkTest {
             if (mesh != null) {
                 mesh.getVertexData().free();
             }
+        }
+    }
+
+    private static long runReplaySectionEndToEnd(ReplaySection section, NativeSectionMeshBuilder sectionBuilder) {
+        StageTimer stages = StageTimer.start();
+        int recordCount = section.nativeRecordCount();
+        int bytes = Math.max(1, recordCount * NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE);
+        ByteBuffer records = MemoryUtil.memAlloc(bytes).order(ByteOrder.nativeOrder());
+        records.limit(recordCount * NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE);
+        stages.mark("java_snapshot_allocation");
+        try {
+            fillReplaySectionRecords(section, records);
+            stages.mark("java_snapshot_population");
+            sectionBuilder.start(SECTION_INDEX);
+            int committed = 0;
+            if (recordCount != 0) {
+                committed += sectionBuilder.appendNativeSectionEncoded(MemoryUtil.memAddress(records), recordCount, -1,
+                        ChunkMeshFormats.COMPACT.getNativeFormat(), SECTION_INDEX, false, false);
+            }
+            stages.mark("native_all_passes");
+            if (section.fallbackLikeBlocks > 0) {
+                appendReplayFallbackQuads(sectionBuilder, section.fallbackLikeBlocks);
+                committed += section.fallbackLikeBlocks;
+                stages.mark("java_fallback_geometry");
+            }
+            BuiltSectionMeshParts mesh = sectionBuilder.finishMesh(ChunkMeshFormats.COMPACT.getNativeFormat(), 0,
+                    false, true, false);
+            stages.mark("final_assembly_and_handoff");
+            try {
+                ByteBuffer vertexBuffer = mesh == null ? null
+                        : mesh.getVertexData().getDirectBuffer().order(ByteOrder.nativeOrder());
+                BenchmarkAccounting.recordNativeProfile(sectionBuilder.copyProfile());
+                BenchmarkAccounting.record((recordCount == 0 ? 0 : 2) + (section.fallbackLikeBlocks > 0 ? 1 : 0),
+                        records.remaining()
+                                + (long) section.fallbackLikeBlocks * NativeChunkMeshEncoder.FLAT_QUAD_RECORD_STRIDE,
+                        vertexBuffer == null ? 0 : vertexBuffer.remaining(),
+                        (long) committed * INDEX_BYTES_PER_QUAD, committed,
+                        section.fallbackLikeBlocks, section.fallbackLikeBlocks);
+                long meshChecksum = vertexBuffer == null ? 0L : sample(vertexBuffer);
+                return (((long) committed) << 32) ^ meshChecksum ^ section.expectedSummary() ^ stages.checksum();
+            } finally {
+                if (mesh != null) {
+                    mesh.getVertexData().free();
+                }
+            }
+        } finally {
+            MemoryUtil.memFree(records);
         }
     }
 
@@ -703,6 +752,8 @@ class ChunkMeshingHotPathBenchmarkTest {
         builder.append("  \"fork_index\": ").append(FORK_INDEX).append(",\n");
         builder.append("  \"benchmark_limitations\": [\n");
         builder.append("    \"Historical hot-path rows use synthetic repeated quads and are retained only for trend comparison.\",\n");
+        builder.append("    \"full_section_replay rows include Java snapshot allocation/population, native section calls, Rust section scan/producers, packing, fallback, and final mesh assembly.\",\n");
+        builder.append("    \"replay_section rows reuse a prebuilt native snapshot and are retained as boundary-free native replay diagnostics.\",\n");
         builder.append("    \"Replay section rows are deterministic section-shaped workloads, not live gameplay captures.\",\n");
         builder.append("    \"Current Rust internal substages are exported once per benchmark operation; section_scanning is inclusive of native producers.\"\n");
         builder.append("  ],\n");

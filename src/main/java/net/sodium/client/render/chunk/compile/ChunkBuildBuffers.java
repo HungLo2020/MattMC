@@ -115,6 +115,10 @@ public class ChunkBuildBuffers {
                 this.nativeFormat, sectionIndex, usesSeparateAo(), storeRawQuads, analyzerHandle);
     }
 
+    public int nativeFluidSpriteMask(TerrainRenderPass pass) {
+        return this.builders.get(pass).getSectionBuilder().fluidSpriteMask();
+    }
+
     public void destroy() {
         for (var builder : this.builders.values()) {
             builder.destroy();

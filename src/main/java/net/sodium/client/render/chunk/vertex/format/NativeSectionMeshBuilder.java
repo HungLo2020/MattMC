@@ -295,6 +295,11 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                     ValueLayout.JAVA_LONG,
                     ValueLayout.ADDRESS,
                     ValueLayout.JAVA_INT));
+    private static final MethodHandle FLUID_SPRITE_MASK = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_mesh_builder_fluid_sprite_mask",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.ADDRESS));
     private static final MethodHandle ASSEMBLE = NativeLibraryLoader.downcallHandle("mattmc_rust",
             "mattmc_sodium_section_mesh_builder_assemble",
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
@@ -712,6 +717,15 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
             }
         }
         return values;
+    }
+
+    public int fluidSpriteMask() {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment maskSegment = arena.allocate(ValueLayout.JAVA_INT);
+            check(invokeFluidSpriteMask(this.state.getHandle(), maskSegment),
+                    "native section mesh builder fluid sprite mask query");
+            return maskSegment.get(ValueLayout.JAVA_INT, 0);
+        }
     }
 
     public void assemble(ByteBuffer output, int[] vertexSegments, NativeChunkVertexFormat format,
@@ -1146,6 +1160,14 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
             return (int) COPY_PROFILE.invokeExact(handle, outputValues, outputLength);
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust section mesh builder profile downcall failed", throwable);
+        }
+    }
+
+    private static int invokeFluidSpriteMask(long handle, MemorySegment maskOutput) {
+        try {
+            return (int) FLUID_SPRITE_MASK.invokeExact(handle, maskOutput);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust section mesh builder fluid sprite mask downcall failed", throwable);
         }
     }
 
