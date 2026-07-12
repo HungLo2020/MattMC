@@ -124,7 +124,7 @@ const COMPACT_NATIVE_TANGENT_OFFSET: i32 = 0;
 const COMPACT_NATIVE_MID_UV_OFFSET: i32 = 0;
 const COMPACT_NATIVE_MID_BLOCK_OFFSET: i32 = 0;
 
-const PROFILE_STAGE_COUNT: usize = 24;
+const PROFILE_STAGE_COUNT: usize = 34;
 const PROFILE_COUNT_COUNT: usize = 8;
 const PROFILE_EXPORT_LONGS: usize = PROFILE_STAGE_COUNT + PROFILE_COUNT_COUNT;
 const PROFILE_SECTION_SCAN: usize = 0;
@@ -155,6 +155,16 @@ const PROFILE_STATIC_POSITION_OFFSET_TRANSFORM: usize = 20;
 const PROFILE_STATIC_SPRITE_MATERIAL_PASS: usize = 21;
 const PROFILE_STATIC_NATIVE_QUAD_CREATION: usize = 22;
 const PROFILE_STATIC_STAGING: usize = 23;
+const PROFILE_FLUID_TOP_FACE_CONSTRUCTION: usize = 24;
+const PROFILE_FLUID_SIDE_FACE_CONSTRUCTION: usize = 25;
+const PROFILE_FLUID_BOTTOM_FACE_CONSTRUCTION: usize = 26;
+const PROFILE_FLUID_CORNER_HEIGHT_USE: usize = 27;
+const PROFILE_FLUID_STILL_FLOWING_UV: usize = 28;
+const PROFILE_FLUID_OVERLAY_SELECTION: usize = 29;
+const PROFILE_FLUID_LIGHTING_TINT: usize = 30;
+const PROFILE_FLUID_NORMAL_BACKFACE: usize = 31;
+const PROFILE_FLUID_MATERIAL_SPRITE_ROUTING: usize = 32;
+const PROFILE_FLUID_NATIVE_QUAD_APPEND: usize = 33;
 const PROFILE_COUNT_SCANNED_BLOCKS: usize = 0;
 const PROFILE_COUNT_NATIVE_MODEL_BLOCKS: usize = 1;
 const PROFILE_COUNT_NATIVE_MODEL_QUADS: usize = 2;
@@ -166,6 +176,7 @@ const PROFILE_COUNT_SORTED_QUADS: usize = 6;
 const PROFILE_COUNT_EMITTED_QUADS: usize = 7;
 
 static STATIC_MODEL_SUBSTAGE_PROFILE_ENABLED: OnceLock<bool> = OnceLock::new();
+static FLUID_SUBSTAGE_PROFILE_ENABLED: OnceLock<bool> = OnceLock::new();
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
@@ -403,10 +414,19 @@ struct NativeSectionMeshBuilder {
     section_pass_cache_valid: bool,
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 struct NativeMeshingProfile {
     stage_nanos: [u64; PROFILE_STAGE_COUNT],
     counts: [u64; PROFILE_COUNT_COUNT],
+}
+
+impl Default for NativeMeshingProfile {
+    fn default() -> Self {
+        Self {
+            stage_nanos: [0; PROFILE_STAGE_COUNT],
+            counts: [0; PROFILE_COUNT_COUNT],
+        }
+    }
 }
 
 impl NativeMeshingProfile {
@@ -435,6 +455,17 @@ fn static_model_substage_profile_enabled() -> bool {
     *STATIC_MODEL_SUBSTAGE_PROFILE_ENABLED.get_or_init(|| {
         matches!(
             std::env::var("MATTMC_PROFILE_STATIC_MODEL_SUBSTAGES")
+                .as_deref()
+                .map(str::to_ascii_lowercase),
+            Ok(value) if value == "1" || value == "true" || value == "yes" || value == "on"
+        )
+    })
+}
+
+fn fluid_substage_profile_enabled() -> bool {
+    *FLUID_SUBSTAGE_PROFILE_ENABLED.get_or_init(|| {
+        matches!(
+            std::env::var("MATTMC_PROFILE_FLUID_SUBSTAGES")
                 .as_deref()
                 .map(str::to_ascii_lowercase),
             Ok(value) if value == "1" || value == "true" || value == "yes" || value == "on"

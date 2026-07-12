@@ -1,11 +1,23 @@
 use std::slice;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::OnceLock;
 use std::time::Instant;
 
 use super::*;
 
 static FLUID_DIAG_COUNT: AtomicUsize = AtomicUsize::new(0);
 static FLUID_FLUSH_DIAG_COUNT: AtomicUsize = AtomicUsize::new(0);
+static FLUID_DIAG_ENABLED: OnceLock<bool> = OnceLock::new();
+static FLUID_FORCE_UNASSIGNED: OnceLock<bool> = OnceLock::new();
+
+fn native_fluid_diag_enabled() -> bool {
+    *FLUID_DIAG_ENABLED.get_or_init(|| std::env::var_os("MATTMC_NATIVE_FLUID_DIAG").is_some())
+}
+
+fn native_fluid_force_unassigned() -> bool {
+    *FLUID_FORCE_UNASSIGNED
+        .get_or_init(|| std::env::var_os("MATTMC_NATIVE_FLUID_FORCE_UNASSIGNED").is_some())
+}
 
 #[derive(Clone, Copy)]
 pub(super) struct NativeFluidFace {
@@ -22,7 +34,7 @@ fn native_fluid_flush_diag(
     committed_count: i32,
     records: &[FluidFaceRecord],
 ) {
-    if std::env::var_os("MATTMC_NATIVE_FLUID_DIAG").is_none() {
+    if !native_fluid_diag_enabled() {
         return;
     }
     let Some(record) = records
@@ -165,31 +177,37 @@ pub(super) fn native_section_fluid_faces(
     out: &mut Vec<NativeFluidFace>,
     profile: &mut NativeMeshingProfile,
 ) {
+    let profile_fluid_substages = fluid_substage_profile_enabled();
     let visibility_started = Instant::now();
     if state.fluid_type != FLUID_WATER && state.fluid_type != FLUID_LAVA {
         profile.add_stage(PROFILE_FLUID_VIS_HEIGHT, visibility_started);
         return;
     }
-    let h = fluid_height(block, states, 0, 0, 0, 1);
+    let h = fluid_height(block, state, states, 0, 0, 0, 1);
     let heights = if h >= 1.0 {
         [1.0; 4]
     } else {
-        let hn = fluid_height(block, states, 0, 0, -1, 2);
-        let hs = fluid_height(block, states, 0, 0, 1, 3);
-        let hw = fluid_height(block, states, -1, 0, 0, 4);
-        let he = fluid_height(block, states, 1, 0, 0, 5);
-        [
-            fluid_corner_height(block, states, h, hn, hw, -1, 0, -1),
-            fluid_corner_height(block, states, h, hs, hw, -1, 0, 1),
-            fluid_corner_height(block, states, h, hs, he, 1, 0, 1),
-            fluid_corner_height(block, states, h, hn, he, 1, 0, -1),
-        ]
+        let corner_started = profile_start(profile_fluid_substages);
+        let hn = fluid_height(block, state, states, 0, 0, -1, 2);
+        let hs = fluid_height(block, state, states, 0, 0, 1, 3);
+        let hw = fluid_height(block, state, states, -1, 0, 0, 4);
+        let he = fluid_height(block, state, states, 1, 0, 0, 5);
+        let heights = [
+            fluid_corner_height(block, state, states, h, hn, hw, -1, 0, -1),
+            fluid_corner_height(block, state, states, h, hs, hw, -1, 0, 1),
+            fluid_corner_height(block, state, states, h, hs, he, 1, 0, 1),
+            fluid_corner_height(block, state, states, h, hn, he, 1, 0, -1),
+        ];
+        profile.add_optional_stage(PROFILE_FLUID_CORNER_HEIGHT_USE, corner_started);
+        heights
     };
     let cull_up = fluid_side_occluded(block, state, states, 1);
     let cull_down = fluid_side_occluded(block, state, states, 0)
         || !fluid_side_exposed(block, states, 0, 0, -1, 0.8888889);
+    let lighting_tint_started = profile_start(profile_fluid_substages);
     let color = argb_to_abgr(native_tint_color(block, state, true));
     let light = get_emissive_lightmap(block.light_words[13]);
+    profile.add_optional_stage(PROFILE_FLUID_LIGHTING_TINT, lighting_tint_started);
     let y_offset = if cull_down { 0.0 } else { 0.001 };
     let top_exposed = fluid_side_exposed(
         block,
@@ -263,7 +281,9 @@ pub(super) fn native_section_fluid_faces(
         visible_sides[index] = !fluid_side_occluded(block, state, states, dir)
             && fluid_side_exposed(block, states, step.0, step.1, step.2, h1.max(h2));
         if visible_sides[index] {
+            let overlay_started = profile_start(profile_fluid_substages);
             overlay_sides[index] = fluid_side_uses_overlay(block, state, states, dir);
+            profile.add_optional_stage(PROFILE_FLUID_OVERLAY_SELECTION, overlay_started);
         }
     }
     profile.add_stage(PROFILE_FLUID_VIS_HEIGHT, visibility_started);
@@ -281,47 +301,47 @@ pub(super) fn native_section_fluid_faces(
 
     let geometry_started = Instant::now();
     if emit_top {
+        let uv_started = profile_start(profile_fluid_substages);
         let top =
             if block.fluid_flow_x == 0.0 && block.fluid_flow_z == 0.0 && state.fluid_falling == 0 {
-                let sprite = state.fluid_still;
-                [
-                    (sprite_u(sprite, 0.0), sprite_v(sprite, 0.0)),
-                    (sprite_u(sprite, 0.0), sprite_v(sprite, 1.0)),
-                    (sprite_u(sprite, 1.0), sprite_v(sprite, 1.0)),
-                    (sprite_u(sprite, 1.0), sprite_v(sprite, 0.0)),
-                ]
+                still_fluid_top_uvs(state.fluid_still)
             } else {
                 let sprite = state.fluid_flow;
                 let dir =
                     block.fluid_flow_z.atan2(block.fluid_flow_x) - std::f32::consts::FRAC_PI_2;
                 let sin = dir.sin() * 0.25;
                 let cos = dir.cos() * 0.25;
-                [
-                    (
-                        sprite_u(sprite, 0.5 + (-cos - sin)),
-                        sprite_v(sprite, 0.5 + -cos + sin),
-                    ),
-                    (
-                        sprite_u(sprite, 0.5 + -cos + sin),
-                        sprite_v(sprite, 0.5 + cos + sin),
-                    ),
-                    (
-                        sprite_u(sprite, 0.5 + cos + sin),
-                        sprite_v(sprite, 0.5 + (cos - sin)),
-                    ),
-                    (
-                        sprite_u(sprite, 0.5 + (cos - sin)),
-                        sprite_v(sprite, 0.5 + (-cos - sin)),
-                    ),
-                ]
+                shrink_fluid_uvs(
+                    [
+                        (
+                            sprite_u(sprite, 0.5 + (-cos - sin)),
+                            sprite_v(sprite, 0.5 + -cos + sin),
+                        ),
+                        (
+                            sprite_u(sprite, 0.5 + -cos + sin),
+                            sprite_v(sprite, 0.5 + cos + sin),
+                        ),
+                        (
+                            sprite_u(sprite, 0.5 + cos + sin),
+                            sprite_v(sprite, 0.5 + (cos - sin)),
+                        ),
+                        (
+                            sprite_u(sprite, 0.5 + (cos - sin)),
+                            sprite_v(sprite, 0.5 + (-cos - sin)),
+                        ),
+                    ],
+                    state.fluid_still.shrink,
+                )
             };
-        let top = shrink_fluid_uvs(top, state.fluid_still.shrink);
-        let top_facing = if fluid_top_aligned(render_heights) {
+        profile.add_optional_stage(PROFILE_FLUID_STILL_FLOWING_UV, uv_started);
+        let top_started = profile_start(profile_fluid_substages);
+        let top_aligned = fluid_top_aligned(render_heights);
+        let top_facing = if top_aligned {
             MODEL_QUAD_FACING_POS_Y
         } else {
             MODEL_QUAD_FACING_UNASSIGNED
         };
-        let top_face_kind = if fluid_top_crease_ne_sw(render_heights) {
+        let top_face_kind = if fluid_top_crease_ne_sw(render_heights, top_aligned) {
             FLUID_FACE_TOP_NE_SW
         } else {
             FLUID_FACE_TOP_NW_SE
@@ -361,7 +381,10 @@ pub(super) fn native_section_fluid_faces(
             light,
             top_face.packed_normal,
         );
+        let append_started = profile_start(profile_fluid_substages);
         out.push(top_face);
+        profile.add_optional_stage(PROFILE_FLUID_NATIVE_QUAD_APPEND, append_started);
+        profile.add_optional_stage(PROFILE_FLUID_TOP_FACE_CONSTRUCTION, top_started);
         fluid_diag(
             block,
             state,
@@ -373,6 +396,7 @@ pub(super) fn native_section_fluid_faces(
             light,
             Some(top_facing),
         );
+        let normal_backface_started = profile_start(profile_fluid_substages);
         if fluid_backward_up_face(block, state, states) {
             let backward_facing = if top_facing == MODEL_QUAD_FACING_POS_Y {
                 MODEL_QUAD_FACING_NEG_Y
@@ -409,13 +433,25 @@ pub(super) fn native_section_fluid_faces(
                 light,
                 backward_face.packed_normal,
             );
+            let append_started = profile_start(profile_fluid_substages);
             out.push(backward_face);
+            profile.add_optional_stage(PROFILE_FLUID_NATIVE_QUAD_APPEND, append_started);
         }
+        profile.add_optional_stage(PROFILE_FLUID_NORMAL_BACKFACE, normal_backface_started);
     }
 
     if !cull_down {
+        let bottom_started = profile_start(profile_fluid_substages);
         let sprite = state.fluid_still;
-        out.push(fluid_semantic_native_face(
+        let material_started = profile_start(profile_fluid_substages);
+        let uvs = [
+            (sprite.u0, sprite.v1),
+            (sprite.u0, sprite.v0),
+            (sprite.u1, sprite.v0),
+            (sprite.u1, sprite.v1),
+        ];
+        profile.add_optional_stage(PROFILE_FLUID_MATERIAL_SPRITE_ROUTING, material_started);
+        let bottom_face = fluid_semantic_native_face(
             state,
             block,
             MODEL_QUAD_FACING_NEG_Y,
@@ -424,34 +460,45 @@ pub(super) fn native_section_fluid_faces(
             y_offset,
             [0.0; 4],
             [0.0; 4],
-            [
-                (sprite.u0, sprite.v1),
-                (sprite.u0, sprite.v0),
-                (sprite.u1, sprite.v0),
-                (sprite.u1, sprite.v1),
-            ],
+            uvs,
             color,
             1.0,
             light,
-        ));
+        );
+        let append_started = profile_start(profile_fluid_substages);
+        out.push(bottom_face);
+        profile.add_optional_stage(PROFILE_FLUID_NATIVE_QUAD_APPEND, append_started);
+        profile.add_optional_stage(PROFILE_FLUID_BOTTOM_FACE_CONSTRUCTION, bottom_started);
     }
+
+    let flow_sprite = state.fluid_flow;
+    let flow_u1 = flow_sprite.u0;
+    let flow_u2 = sprite_mid_u(flow_sprite);
+    let flow_v3 = sprite_mid_v(flow_sprite);
+    let overlay_sprite = state.fluid_overlay;
+    let overlay_u1 = overlay_sprite.u0;
+    let overlay_u2 = sprite_mid_u(overlay_sprite);
+    let overlay_v3 = sprite_mid_v(overlay_sprite);
 
     for (index, (_, facing, opposite_facing, shade, h1, h2, x1, z1, x2, z2)) in
         sides.iter().copied().enumerate()
     {
         if visible_sides[index] {
+            let side_started = profile_start(profile_fluid_substages);
+            let material_started = profile_start(profile_fluid_substages);
             let is_overlay = overlay_sides[index];
-            let sprite = if is_overlay {
-                state.fluid_overlay
+            let (sprite, u1, u2, v3) = if is_overlay {
+                (overlay_sprite, overlay_u1, overlay_u2, overlay_v3)
             } else {
-                state.fluid_flow
+                (flow_sprite, flow_u1, flow_u2, flow_v3)
             };
-            let u1 = sprite_u(sprite, 0.0);
-            let u2 = sprite_u(sprite, 0.5);
+            profile.add_optional_stage(PROFILE_FLUID_MATERIAL_SPRITE_ROUTING, material_started);
+            let uv_started = profile_start(profile_fluid_substages);
             let v1 = sprite_v(sprite, (1.0 - h1) * 0.5);
             let v2 = sprite_v(sprite, (1.0 - h2) * 0.5);
-            let v3 = sprite_v(sprite, 0.5);
-            out.push(fluid_semantic_native_face(
+            let uvs = [(u2, v2), (u2, v3), (u1, v3), (u1, v1)];
+            profile.add_optional_stage(PROFILE_FLUID_STILL_FLOWING_UV, uv_started);
+            let side_face = fluid_semantic_native_face(
                 state,
                 block,
                 facing,
@@ -460,13 +507,17 @@ pub(super) fn native_section_fluid_faces(
                 y_offset,
                 [h1, h2, 0.0, 0.0],
                 [x1, z1, x2, z2],
-                [(u2, v2), (u2, v3), (u1, v3), (u1, v1)],
+                uvs,
                 color,
                 shade,
                 light,
-            ));
+            );
+            let append_started = profile_start(profile_fluid_substages);
+            out.push(side_face);
+            profile.add_optional_stage(PROFILE_FLUID_NATIVE_QUAD_APPEND, append_started);
             if !is_overlay {
-                out.push(fluid_semantic_native_face(
+                let normal_backface_started = profile_start(profile_fluid_substages);
+                let back_face = fluid_semantic_native_face(
                     state,
                     block,
                     opposite_facing,
@@ -475,12 +526,17 @@ pub(super) fn native_section_fluid_faces(
                     y_offset,
                     [h1, h2, 0.0, 0.0],
                     [x1, z1, x2, z2],
-                    [(u2, v2), (u2, v3), (u1, v3), (u1, v1)],
+                    uvs,
                     color,
                     shade,
                     light,
-                ));
+                );
+                let append_started = profile_start(profile_fluid_substages);
+                out.push(back_face);
+                profile.add_optional_stage(PROFILE_FLUID_NATIVE_QUAD_APPEND, append_started);
+                profile.add_optional_stage(PROFILE_FLUID_NORMAL_BACKFACE, normal_backface_started);
             }
+            profile.add_optional_stage(PROFILE_FLUID_SIDE_FACE_CONSTRUCTION, side_started);
         }
     }
     profile.add_stage(PROFILE_FLUID_GEOM_UV, geometry_started);
@@ -497,7 +553,7 @@ fn fluid_diag(
     light: i32,
     facing: Option<usize>,
 ) {
-    if std::env::var_os("MATTMC_NATIVE_FLUID_DIAG").is_none() {
+    if !native_fluid_diag_enabled() {
         return;
     }
     if state.fluid_type != FLUID_WATER {
@@ -551,7 +607,7 @@ fn fluid_record_diag(
     record: &FluidFaceRecord,
     facing: usize,
 ) {
-    if std::env::var_os("MATTMC_NATIVE_FLUID_DIAG").is_none() {
+    if !native_fluid_diag_enabled() {
         return;
     }
     if !(0..=160).contains(&block.absolute_x)
@@ -607,8 +663,8 @@ fn fluid_aligned_equals(a: f32, b: f32) -> bool {
     (a - b).abs() <= FLUID_ALIGNED_EQUALS_EPSILON
 }
 
-fn fluid_top_crease_ne_sw(heights: [f32; 4]) -> bool {
-    fluid_top_aligned(heights)
+fn fluid_top_crease_ne_sw(heights: [f32; 4], aligned: bool) -> bool {
+    aligned
         || heights[3] > heights[0] && heights[3] > heights[2]
         || heights[3] < heights[0] && heights[3] < heights[2]
         || heights[1] > heights[0] && heights[1] > heights[2]
@@ -631,7 +687,7 @@ pub(super) fn fluid_semantic_face(
     light: i32,
 ) -> (FluidFaceRecord, usize) {
     let mut facing = facing;
-    if std::env::var_os("MATTMC_NATIVE_FLUID_FORCE_UNASSIGNED").is_some() {
+    if native_fluid_force_unassigned() {
         facing = MODEL_QUAD_FACING_UNASSIGNED;
     }
     let mut record = fluid_semantic_record(
@@ -668,7 +724,7 @@ fn fluid_semantic_native_face(
     ao: f32,
     light: i32,
 ) -> NativeFluidFace {
-    if std::env::var_os("MATTMC_NATIVE_FLUID_FORCE_UNASSIGNED").is_some() {
+    if native_fluid_force_unassigned() {
         facing = MODEL_QUAD_FACING_UNASSIGNED;
     }
 
@@ -709,7 +765,7 @@ fn fluid_semantic_record_diag(
     light: i32,
     packed_normal: i32,
 ) {
-    if std::env::var_os("MATTMC_NATIVE_FLUID_DIAG").is_none() {
+    if !native_fluid_diag_enabled() {
         return;
     }
     let mut record = fluid_semantic_record(
@@ -1039,6 +1095,34 @@ fn sprite_v(sprite: FluidSprite, value: f32) -> f32 {
     sprite.v0 + (sprite.v1 - sprite.v0) * value
 }
 
+#[inline(always)]
+fn sprite_mid_u(sprite: FluidSprite) -> f32 {
+    (sprite.u0 + sprite.u1) * 0.5
+}
+
+#[inline(always)]
+fn sprite_mid_v(sprite: FluidSprite) -> f32 {
+    (sprite.v0 + sprite.v1) * 0.5
+}
+
+fn still_fluid_top_uvs(sprite: FluidSprite) -> [(f32, f32); 4] {
+    if sprite.shrink == 0.0 {
+        return [
+            (sprite.u0, sprite.v0),
+            (sprite.u0, sprite.v1),
+            (sprite.u1, sprite.v1),
+            (sprite.u1, sprite.v0),
+        ];
+    }
+    let mid_u = sprite_mid_u(sprite);
+    let mid_v = sprite_mid_v(sprite);
+    let u0 = sprite.u0 + (mid_u - sprite.u0) * sprite.shrink;
+    let u1 = sprite.u1 + (mid_u - sprite.u1) * sprite.shrink;
+    let v0 = sprite.v0 + (mid_v - sprite.v0) * sprite.shrink;
+    let v1 = sprite.v1 + (mid_v - sprite.v1) * sprite.shrink;
+    [(u0, v0), (u0, v1), (u1, v1), (u1, v0)]
+}
+
 fn shrink_fluid_uvs(mut uvs: [(f32, f32); 4], shrink: f32) -> [(f32, f32); 4] {
     if shrink == 0.0 {
         return uvs;
@@ -1054,6 +1138,7 @@ fn shrink_fluid_uvs(mut uvs: [(f32, f32); 4], shrink: f32) -> [(f32, f32); 4] {
 
 fn fluid_height(
     block: &NativeSectionBlockRecord,
+    center: NativeMeshingState,
     states: &[Option<NativeMeshingState>],
     dx: i32,
     dy: i32,
@@ -1063,9 +1148,6 @@ fn fluid_height(
     let state_id = neighborhood_state_id(block, dx, dy, dz)
         .unwrap_or_else(|| block.neighbor_state_ids[fallback_neighbor_index]);
     let Some(sample) = state_by_id(states, state_id) else {
-        return 0.0;
-    };
-    let Some(center) = state_by_id(states, block.state_id) else {
         return 0.0;
     };
     if sample.fluid_type == center.fluid_type && sample.fluid_type != 0 {
@@ -1087,6 +1169,7 @@ fn fluid_height(
 
 fn fluid_corner_height(
     block: &NativeSectionBlockRecord,
+    center_state: NativeMeshingState,
     states: &[Option<NativeMeshingState>],
     center: f32,
     hx: f32,
@@ -1101,7 +1184,7 @@ fn fluid_corner_height(
     let mut total = 0.0;
     let mut samples = 0.0;
     if hx > 0.0 || hz > 0.0 {
-        let diagonal = fluid_height(block, states, dx, dy, dz, 0);
+        let diagonal = fluid_height(block, center_state, states, dx, dy, dz, 0);
         if diagonal >= 1.0 {
             return 1.0;
         }
