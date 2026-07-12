@@ -111,6 +111,11 @@ pub(super) unsafe fn encode_scattered(
 }
 
 pub(super) fn encode_quad(quad: &NativeQuad, output: &mut [u8], format: NativeFormat) {
+    if is_compact_fast_format(format) {
+        encode_quad_compact(quad, output, format.section_index);
+        return;
+    }
+
     let vertices = &quad.vertices;
     let tex_centroid_u = vertices.iter().map(|vertex| vertex.u).sum::<f32>() * 0.25;
     let tex_centroid_v = vertices.iter().map(|vertex| vertex.v).sum::<f32>() * 0.25;
@@ -183,8 +188,80 @@ pub(super) fn encode_quad(quad: &NativeQuad, output: &mut [u8], format: NativeFo
     }
 }
 
+#[inline(always)]
+fn is_compact_fast_format(format: NativeFormat) -> bool {
+    format.vertex_stride == COMPACT_VERTEX_STRIDE as usize
+        && format.block_id_offset == 0
+        && format.normal_offset == 0
+        && format.tangent_offset == 0
+        && format.mid_uv_offset == 0
+        && format.mid_block_offset == 0
+        && !format.separate_ao
+}
+
+#[inline(always)]
+fn encode_quad_compact(quad: &NativeQuad, output: &mut [u8], section_index: i32) {
+    let vertices = &quad.vertices;
+    let tex_centroid_u = (vertices[0].u + vertices[1].u + vertices[2].u + vertices[3].u) * 0.25;
+    let tex_centroid_v = (vertices[0].v + vertices[1].v + vertices[2].v + vertices[3].v) * 0.25;
+    let material_section = ((quad.material_bits & 0xff) << 16) | ((section_index & 0xff) << 24);
+
+    encode_compact_vertex(
+        vertices[0],
+        &mut output[0..COMPACT_VERTEX_STRIDE as usize],
+        tex_centroid_u,
+        tex_centroid_v,
+        material_section,
+    );
+    encode_compact_vertex(
+        vertices[1],
+        &mut output[COMPACT_VERTEX_STRIDE as usize..(COMPACT_VERTEX_STRIDE * 2) as usize],
+        tex_centroid_u,
+        tex_centroid_v,
+        material_section,
+    );
+    encode_compact_vertex(
+        vertices[2],
+        &mut output[(COMPACT_VERTEX_STRIDE * 2) as usize..(COMPACT_VERTEX_STRIDE * 3) as usize],
+        tex_centroid_u,
+        tex_centroid_v,
+        material_section,
+    );
+    encode_compact_vertex(
+        vertices[3],
+        &mut output[(COMPACT_VERTEX_STRIDE * 3) as usize..(COMPACT_VERTEX_STRIDE * 4) as usize],
+        tex_centroid_u,
+        tex_centroid_v,
+        material_section,
+    );
+}
+
+#[inline(always)]
+fn encode_compact_vertex(
+    vertex: QuadVertex,
+    output: &mut [u8],
+    tex_centroid_u: f32,
+    tex_centroid_v: f32,
+    material_section: i32,
+) {
+    let x = quantize_position(vertex.x);
+    let y = quantize_position(vertex.y);
+    let z = quantize_position(vertex.z);
+    let u = encode_texture(tex_centroid_u, vertex.u);
+    let v = encode_texture(tex_centroid_v, vertex.v);
+    let light = encode_light(vertex.light);
+
+    put_i32(output, 0, pack_position_hi(x, y, z));
+    put_i32(output, 4, pack_position_lo(x, y, z));
+    put_i32(output, 8, color_mul_rgb(vertex.color, vertex.ao));
+    put_i32(output, 12, pack_texture(u, v));
+    put_i32(output, 16, (light & 0xffff) | material_section);
+}
+
 pub(super) fn put_i32(output: &mut [u8], offset: usize, value: i32) {
-    output[offset..offset + 4].copy_from_slice(&value.to_ne_bytes());
+    unsafe {
+        std::ptr::write_unaligned(output.as_mut_ptr().add(offset).cast::<i32>(), value);
+    }
 }
 
 pub(super) fn pack_position_hi(x: i32, y: i32, z: i32) -> i32 {

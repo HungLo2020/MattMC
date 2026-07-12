@@ -132,6 +132,49 @@ pub(super) unsafe fn section_builder_append_batch_encoded(
     }
 
     let input = slice::from_raw_parts(batch_address as *const NativeQuad, quad_count);
+    if validity.is_none() && !store_raw_quads {
+        let start = builder.counts[facing];
+        let required_len = start.checked_add(quad_count).ok_or(ERR_CAPACITY)?;
+        let buffer = &mut builder.buffers[facing];
+        let encoded_quad_len = 4usize
+            .checked_mul(format.vertex_stride)
+            .ok_or(ERR_INVALID_ARGUMENT)?;
+
+        if !buffer.encoded.is_empty() && buffer.encoded_format != Some(format) {
+            buffer.encoded.clear();
+            buffer.encoded_format = None;
+        }
+        if buffer.encoded_format.is_none() {
+            buffer.encoded_format = Some(format);
+        }
+
+        let required_encoded_len = required_len
+            .checked_mul(encoded_quad_len)
+            .ok_or(ERR_INVALID_ARGUMENT)?;
+        if buffer.encoded.len() < required_encoded_len {
+            buffer.encoded.resize(required_encoded_len, 0);
+        }
+
+        for (index, quad) in input.iter().enumerate() {
+            let encoded_start = (start + index) * encoded_quad_len;
+            let encoded_end = encoded_start + encoded_quad_len;
+            encode_quad(
+                quad,
+                &mut buffer.encoded[encoded_start..encoded_end],
+                format,
+            );
+        }
+
+        builder.counts[facing] = required_len;
+        builder
+            .profile
+            .add_stage(PROFILE_VERTEX_PACKING, stage_started);
+        builder
+            .profile
+            .add_count(PROFILE_COUNT_EMITTED_QUADS, quad_count);
+        return Ok(quad_count as i32);
+    }
+
     let valid_count = validity
         .map(|mask| {
             mask.iter()

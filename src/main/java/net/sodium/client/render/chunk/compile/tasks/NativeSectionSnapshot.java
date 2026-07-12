@@ -27,6 +27,9 @@ final class NativeSectionSnapshot implements AutoCloseable {
     private final int minY;
     private final int minZ;
     private long address;
+    private int activeRecordCount;
+    private final int[] lightWords = new int[27];
+    private final int[] neighborhoodStateIds = new int[27];
 
     NativeSectionSnapshot(ChunkBuildBuffers buffers, int sectionIndex, int minX, int minY, int minZ) {
         this.buffers = buffers;
@@ -44,10 +47,8 @@ final class NativeSectionSnapshot implements AutoCloseable {
 
     void appendBlock(int localBlockIndex, LevelSlice slice, BlockState blockState, BlockPos blockPos,
             int localX, int localY, int localZ, boolean suppressNativeFluid) {
-        long recordAddress = this.recordAddress(localBlockIndex);
+        long recordAddress = this.recordAddress(this.activeRecordCount++);
         long seed = blockState.getSeed(blockPos);
-        int[] lightWords = new int[27];
-        int[] neighborhoodStateIds = new int[27];
         int neighborhoodIndex = 0;
         for (int dy = -1; dy <= 1; dy++) {
             for (int dz = -1; dz <= 1; dz++) {
@@ -56,8 +57,8 @@ final class NativeSectionSnapshot implements AutoCloseable {
                     int sampleY = blockPos.getY() + dy;
                     int sampleZ = blockPos.getZ() + dz;
                     BlockState sampleState = slice.getBlockState(sampleX, sampleY, sampleZ);
-                    neighborhoodStateIds[neighborhoodIndex] = NativeStaticBlockModelRegistry.getStateId(sampleState);
-                    lightWords[neighborhoodIndex] = computeLightWord(slice, sampleState, sampleX, sampleY, sampleZ);
+                    this.neighborhoodStateIds[neighborhoodIndex] = NativeStaticBlockModelRegistry.getStateId(sampleState);
+                    this.lightWords[neighborhoodIndex] = computeLightWord(slice, sampleState, sampleX, sampleY, sampleZ);
                     neighborhoodIndex++;
                 }
             }
@@ -76,7 +77,7 @@ final class NativeSectionSnapshot implements AutoCloseable {
                 NativeStaticBlockModelRegistry.getStateId(slice.getBlockState(blockPos.getX(), blockPos.getY(), blockPos.getZ() + 1)),
                 NativeStaticBlockModelRegistry.getStateId(slice.getBlockState(blockPos.getX() - 1, blockPos.getY(), blockPos.getZ())),
                 NativeStaticBlockModelRegistry.getStateId(slice.getBlockState(blockPos.getX() + 1, blockPos.getY(), blockPos.getZ())),
-                lightWords, neighborhoodStateIds, tint, fluidTint, (float) flow.x, (float) flow.z,
+                this.lightWords, this.neighborhoodStateIds, tint, fluidTint, (float) flow.x, (float) flow.z,
                 blockPos.getX(), blockPos.getY(), blockPos.getZ());
         if (!fluidState.isEmpty()) {
             NativeChunkMeshEncoder.writeNativeSectionBlockFluidBlockId(recordAddress,
@@ -90,13 +91,13 @@ final class NativeSectionSnapshot implements AutoCloseable {
 
     int[] flushAll(TranslucentGeometryCollector collector) {
         NativeMeshingDiagnostics.dumpSectionSnapshot(this.sectionIndex, this.minX, this.minY, this.minZ,
-                this.address, SECTION_BLOCK_COUNT);
-        int solid = this.buffers.appendNativeSectionSnapshot(DefaultTerrainRenderPasses.SOLID, this.address, SECTION_BLOCK_COUNT,
+                this.address, this.activeRecordCount);
+        int solid = this.buffers.appendNativeSectionSnapshot(DefaultTerrainRenderPasses.SOLID, this.address, this.activeRecordCount,
                 0, this.sectionIndex, false, null);
-        int cutout = this.buffers.appendNativeSectionSnapshot(DefaultTerrainRenderPasses.CUTOUT, this.address, SECTION_BLOCK_COUNT,
+        int cutout = this.buffers.appendNativeSectionSnapshot(DefaultTerrainRenderPasses.CUTOUT, this.address, this.activeRecordCount,
                 1, this.sectionIndex, false, null);
         int translucent = this.buffers.appendNativeSectionSnapshot(DefaultTerrainRenderPasses.TRANSLUCENT, this.address,
-                SECTION_BLOCK_COUNT, 2, this.sectionIndex, false, collector);
+                this.activeRecordCount, 2, this.sectionIndex, false, collector);
         return new int[] { solid, cutout, translucent };
     }
 
