@@ -1,7 +1,7 @@
 use std::slice;
 
 use super::gfni_trigger::NativeGeometryPlanes;
-use super::{index, vertex};
+use super::{index, meshing};
 
 const OK: i32 = 0;
 const SORT_FAILED: i32 = 1;
@@ -5499,7 +5499,7 @@ pub unsafe extern "C" fn mattmc_sodium_translucent_bsp_build_full_quads(
     let updated_quads_handle = if output.updated_quad_handles.is_empty() {
         0
     } else {
-        vertex::updated_quads_create_from_handles(
+        meshing::updated_quads_create_from_handles(
             output.updated_quad_handles,
             match i32::try_from(output.mesh_quad_count) {
                 Ok(value) => value,

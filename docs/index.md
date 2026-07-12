@@ -16,6 +16,6 @@ From its creation, Minecraft was developed almost exclusively by Swedish game de
 - [Changes](changes/changes.md)
 - [Changelog](changelog/CHANGELOG.md)
 - [Performance & Testing](testing/home.md)
-- [Development Tools](development/DEV-TIPS-TOOLS.md)
+- [Development Tools](development/home.md)
 - [Gameplay](gameplay/Gameplay.md)
 

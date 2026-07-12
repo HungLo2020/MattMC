@@ -9,14 +9,14 @@ const SHADERC_TOKEN: &str = "shaderc";
 #[test]
 fn backends_module_is_private_to_vulkanic() {
     let rust_root = Path::new(RUST_ROOT);
-    let vulkanic_mod = rust_root.join("net/vulkanic/mod.rs");
-    let backends_mod = rust_root.join("net/vulkanic/backends/mod.rs");
+    let vulkanic_mod = rust_root.join("render/vulkanic/mod.rs");
+    let backends_mod = rust_root.join("render/vulkanic/backends/mod.rs");
 
     let vulkanic_source = read_source(&vulkanic_mod);
     let backends_source = read_source(&backends_mod);
 
     // This guardrail is intentional: Rust backend implementations are private
-    // implementation details. Only net::vulkanic may route to them, and all
+    // implementation details. Only render::vulkanic may route to them, and all
     // other Rust code must go through Vulkanic frontend modules.
     assert!(
         contains_module_declaration(&vulkanic_source, "mod backends;"),
@@ -44,15 +44,15 @@ fn non_vulkanic_rust_code_does_not_reference_backend_modules() {
     let mut violations = Vec::new();
 
     for file in rust_files(rust_root) {
-        if is_inside(&file, &rust_root.join("net/vulkanic")) {
+        if is_inside(&file, &rust_root.join("render/vulkanic")) {
             continue;
         }
 
         let source = read_source(&file);
         for (line_index, line) in source.lines().enumerate() {
             let compact = compact_line(line);
-            if compact.contains("net::vulkanic::backends")
-                || compact.contains("crate::net::vulkanic::backends")
+            if compact.contains("render::vulkanic::backends")
+                || compact.contains("crate::render::vulkanic::backends")
             {
                 violations.push(format!(
                     "{}:{}: {}",
@@ -66,7 +66,7 @@ fn non_vulkanic_rust_code_does_not_reference_backend_modules() {
 
     assert!(
         violations.is_empty(),
-        "Rust code outside net::vulkanic must not reference backend implementation modules:\n{}",
+        "Rust code outside render::vulkanic must not reference backend implementation modules:\n{}",
         violations.join("\n")
     );
 }
@@ -74,8 +74,8 @@ fn non_vulkanic_rust_code_does_not_reference_backend_modules() {
 #[test]
 fn backend_specific_crates_stay_inside_their_backend_modules() {
     let rust_root = Path::new(RUST_ROOT);
-    let vulkan_backend = rust_root.join("net/vulkanic/backends/vulkan");
-    let opengl_backend = rust_root.join("net/vulkanic/backends/opengl");
+    let vulkan_backend = rust_root.join("render/vulkanic/backends/vulkan");
+    let opengl_backend = rust_root.join("render/vulkanic/backends/opengl");
     let mut violations = Vec::new();
 
     for file in rust_files(rust_root) {
@@ -115,8 +115,8 @@ fn backend_specific_crates_stay_inside_their_backend_modules() {
 #[test]
 fn backend_modules_do_not_reference_each_other() {
     let rust_root = Path::new(RUST_ROOT);
-    let vulkan_backend = rust_root.join("net/vulkanic/backends/vulkan");
-    let opengl_backend = rust_root.join("net/vulkanic/backends/opengl");
+    let vulkan_backend = rust_root.join("render/vulkanic/backends/vulkan");
+    let opengl_backend = rust_root.join("render/vulkanic/backends/opengl");
 
     let vulkan_violations = backend_reference_violations(&vulkan_backend, "opengl");
     assert!(
@@ -173,9 +173,9 @@ fn backend_reference_violations(backend_path: &Path, forbidden_backend: &str) ->
             let compact = compact_line(line);
             if compact.contains(&format!("backends::{forbidden_backend}"))
                 || compact.contains(&format!("super::{forbidden_backend}"))
-                || compact.contains(&format!("net::vulkanic::backends::{forbidden_backend}"))
+                || compact.contains(&format!("render::vulkanic::backends::{forbidden_backend}"))
                 || compact.contains(&format!(
-                    "crate::net::vulkanic::backends::{forbidden_backend}"
+                    "crate::render::vulkanic::backends::{forbidden_backend}"
                 ))
             {
                 violations.push(format!(
@@ -204,6 +204,10 @@ fn rust_files(root: &Path) -> Vec<PathBuf> {
 }
 
 fn collect_rust_files(path: &Path, files: &mut Vec<PathBuf>) {
+    if path.file_name().is_some_and(|name| name == "target") {
+        return;
+    }
+
     if path.is_file() {
         if path.extension().is_some_and(|extension| extension == "rs") {
             files.push(path.to_path_buf());
