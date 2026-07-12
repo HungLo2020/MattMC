@@ -114,10 +114,10 @@ pub(super) unsafe fn push_native_section_quad(
 pub(super) fn resolve_selector_model_ids(
     selector_id: i32,
     seed: u64,
-    selectors: &HashMap<i32, NativeModelSelector>,
+    selectors: &[Option<NativeModelSelector>],
     output: &mut Vec<i32>,
 ) -> Result<(), i32> {
-    let Some(selector) = selectors.get(&selector_id) else {
+    let Some(selector) = selector_by_id(selectors, selector_id) else {
         return Ok(());
     };
 

@@ -68,7 +68,7 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
             last_state
         } else {
             last_state_id = record.state_id;
-            last_state = states_guard.get(&record.state_id).copied();
+            last_state = state_by_id(&states_guard, record.state_id);
             last_state
         };
         let Some(state) = state else {
@@ -131,15 +131,13 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
                 }
             } else {
                 let direct_model_id =
-                    selectors_guard
-                        .get(&state.selector_id)
-                        .and_then(|selector| {
-                            if selector.kind == SELECTOR_DIRECT {
-                                selector.entries.first().map(|entry| entry.target_id)
-                            } else {
-                                None
-                            }
-                        });
+                    selector_by_id(&selectors_guard, state.selector_id).and_then(|selector| {
+                        if selector.kind == SELECTOR_DIRECT {
+                            selector.entries.first().map(|entry| entry.target_id)
+                        } else {
+                            None
+                        }
+                    });
                 if let Some(model_id) = direct_model_id {
                     last_direct_selector_id = state.selector_id;
                     last_direct_selector_model_id = Some(model_id);
@@ -161,7 +159,7 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
                     last_model
                 } else {
                     last_model_id = *model_id;
-                    last_model = models_guard.get(model_id);
+                    last_model = model_by_id(&models_guard, *model_id);
                     last_model
                 };
                 let Some(model) = model else {
@@ -169,7 +167,7 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
                 };
 
                 for quad_record in model {
-                    if native_section_culls_quad(record, *quad_record, &states_guard) {
+                    if native_section_culls_quad(record, state, *quad_record, &states_guard) {
                         continue;
                     }
 

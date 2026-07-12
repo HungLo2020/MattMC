@@ -400,7 +400,7 @@ pub(super) unsafe fn section_builder_append_static_model_records_encoded(
             continue;
         }
 
-        let Some(model) = cache_guard.get(&record.model_id) else {
+        let Some(model) = model_by_id(&cache_guard, record.model_id) else {
             continue;
         };
 

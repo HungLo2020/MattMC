@@ -761,7 +761,10 @@ pub unsafe extern "C" fn mattmc_sodium_static_model_cache_register(
     let Ok(mut cache) = static_model_cache().lock() else {
         return ERR_INVALID_ARGUMENT;
     };
-    cache.insert(model_id, quads);
+    let Ok(index) = ensure_table_slot(&mut cache, model_id) else {
+        return ERR_INVALID_ARGUMENT;
+    };
+    cache[index] = Some(quads);
     OK
 }
 
@@ -805,14 +808,14 @@ pub unsafe extern "C" fn mattmc_sodium_native_model_selector_register(
     let Ok(mut selectors) = native_model_selectors().lock() else {
         return ERR_INVALID_ARGUMENT;
     };
-    selectors.insert(
-        selector_id,
-        NativeModelSelector {
+    let Ok(index) = ensure_table_slot(&mut selectors, selector_id) else {
+        return ERR_INVALID_ARGUMENT;
+    };
+    selectors[index] = Some(NativeModelSelector {
             kind,
             entries,
             total_weight,
-        },
-    );
+        });
     OK
 }
 
@@ -861,9 +864,10 @@ pub unsafe extern "C" fn mattmc_sodium_native_meshing_state_register(
     let Ok(mut states) = native_meshing_states().lock() else {
         return ERR_INVALID_ARGUMENT;
     };
-    states.insert(
-        state_id,
-        NativeMeshingState {
+    let Ok(index) = ensure_table_slot(&mut states, state_id) else {
+        return ERR_INVALID_ARGUMENT;
+    };
+    states[index] = Some(NativeMeshingState {
             selector_id,
             flags,
             material_bits,
@@ -904,8 +908,7 @@ pub unsafe extern "C" fn mattmc_sodium_native_meshing_state_register(
                 shrink: fluid_overlay_shrink,
             },
             fluid_overlay_valid,
-        },
-    );
+        });
     OK
 }
 

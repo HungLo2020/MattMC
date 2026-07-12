@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::slice;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
@@ -162,7 +161,7 @@ pub(super) unsafe fn section_builder_append_fluid_face_records_encoded(
 pub(super) fn native_section_fluid_faces(
     block: &NativeSectionBlockRecord,
     state: NativeMeshingState,
-    states: &HashMap<i32, NativeMeshingState>,
+    states: &[Option<NativeMeshingState>],
     out: &mut Vec<NativeFluidFace>,
     profile: &mut NativeMeshingProfile,
 ) {
@@ -200,6 +199,73 @@ pub(super) fn native_section_fluid_faces(
         0,
         heights.iter().copied().fold(1.0, f32::min),
     );
+    let mut render_heights = heights;
+    let emit_top = !cull_up && top_exposed;
+    if emit_top {
+        for height in &mut render_heights {
+            *height -= 0.001;
+        }
+    }
+    let sides = [
+        (
+            2,
+            MODEL_QUAD_FACING_NEG_Z,
+            MODEL_QUAD_FACING_POS_Z,
+            0.8,
+            render_heights[0],
+            render_heights[3],
+            0.0,
+            0.001,
+            1.0,
+            0.001,
+        ),
+        (
+            3,
+            MODEL_QUAD_FACING_POS_Z,
+            MODEL_QUAD_FACING_NEG_Z,
+            0.8,
+            render_heights[2],
+            render_heights[1],
+            1.0,
+            0.999,
+            0.0,
+            0.999,
+        ),
+        (
+            4,
+            MODEL_QUAD_FACING_NEG_X,
+            MODEL_QUAD_FACING_POS_X,
+            0.6,
+            render_heights[1],
+            render_heights[0],
+            0.001,
+            1.0,
+            0.001,
+            0.0,
+        ),
+        (
+            5,
+            MODEL_QUAD_FACING_POS_X,
+            MODEL_QUAD_FACING_NEG_X,
+            0.6,
+            render_heights[3],
+            render_heights[2],
+            0.999,
+            0.0,
+            0.999,
+            1.0,
+        ),
+    ];
+    let mut visible_sides = [false; 4];
+    let mut overlay_sides = [false; 4];
+    for (index, (dir, _, _, _, h1, h2, _, _, _, _)) in sides.iter().copied().enumerate() {
+        let step = dir_step(dir);
+        visible_sides[index] = !fluid_side_occluded(block, state, states, dir)
+            && fluid_side_exposed(block, states, step.0, step.1, step.2, h1.max(h2));
+        if visible_sides[index] {
+            overlay_sides[index] = fluid_side_uses_overlay(block, state, states, dir);
+        }
+    }
     profile.add_stage(PROFILE_FLUID_VIS_HEIGHT, visibility_started);
     fluid_diag(
         block,
@@ -213,12 +279,8 @@ pub(super) fn native_section_fluid_faces(
         None,
     );
 
-    let mut render_heights = heights;
-    if !cull_up && top_exposed {
-        let geometry_started = Instant::now();
-        for height in &mut render_heights {
-            *height -= 0.001;
-        }
+    let geometry_started = Instant::now();
+    if emit_top {
         let top =
             if block.fluid_flow_x == 0.0 && block.fluid_flow_z == 0.0 && state.fluid_falling == 0 {
                 let sprite = state.fluid_still;
@@ -349,11 +411,9 @@ pub(super) fn native_section_fluid_faces(
             );
             out.push(backward_face);
         }
-        profile.add_stage(PROFILE_FLUID_GEOM_UV, geometry_started);
     }
 
     if !cull_down {
-        let geometry_started = Instant::now();
         let sprite = state.fluid_still;
         out.push(fluid_semantic_native_face(
             state,
@@ -374,74 +434,13 @@ pub(super) fn native_section_fluid_faces(
             1.0,
             light,
         ));
-        profile.add_stage(PROFILE_FLUID_GEOM_UV, geometry_started);
     }
 
-    let sides = [
-        (
-            2,
-            MODEL_QUAD_FACING_NEG_Z,
-            MODEL_QUAD_FACING_POS_Z,
-            0.8,
-            render_heights[0],
-            render_heights[3],
-            0.0,
-            0.001,
-            1.0,
-            0.001,
-        ),
-        (
-            3,
-            MODEL_QUAD_FACING_POS_Z,
-            MODEL_QUAD_FACING_NEG_Z,
-            0.8,
-            render_heights[2],
-            render_heights[1],
-            1.0,
-            0.999,
-            0.0,
-            0.999,
-        ),
-        (
-            4,
-            MODEL_QUAD_FACING_NEG_X,
-            MODEL_QUAD_FACING_POS_X,
-            0.6,
-            render_heights[1],
-            render_heights[0],
-            0.001,
-            1.0,
-            0.001,
-            0.0,
-        ),
-        (
-            5,
-            MODEL_QUAD_FACING_POS_X,
-            MODEL_QUAD_FACING_NEG_X,
-            0.6,
-            render_heights[3],
-            render_heights[2],
-            0.999,
-            0.0,
-            0.999,
-            1.0,
-        ),
-    ];
-    for (dir, facing, opposite_facing, shade, h1, h2, x1, z1, x2, z2) in sides {
-        let visibility_started = Instant::now();
-        if !fluid_side_occluded(block, state, states, dir)
-            && fluid_side_exposed(
-                block,
-                states,
-                dir_step(dir).0,
-                dir_step(dir).1,
-                dir_step(dir).2,
-                h1.max(h2),
-            )
-        {
-            profile.add_stage(PROFILE_FLUID_VIS_HEIGHT, visibility_started);
-            let geometry_started = Instant::now();
-            let is_overlay = fluid_side_uses_overlay(block, state, states, dir);
+    for (index, (_, facing, opposite_facing, shade, h1, h2, x1, z1, x2, z2)) in
+        sides.iter().copied().enumerate()
+    {
+        if visible_sides[index] {
+            let is_overlay = overlay_sides[index];
             let sprite = if is_overlay {
                 state.fluid_overlay
             } else {
@@ -482,11 +481,9 @@ pub(super) fn native_section_fluid_faces(
                     light,
                 ));
             }
-            profile.add_stage(PROFILE_FLUID_GEOM_UV, geometry_started);
-        } else {
-            profile.add_stage(PROFILE_FLUID_VIS_HEIGHT, visibility_started);
         }
     }
+    profile.add_stage(PROFILE_FLUID_GEOM_UV, geometry_started);
 }
 
 fn fluid_diag(
@@ -1018,7 +1015,7 @@ fn fluid_native_vertex(
 fn fluid_side_uses_overlay(
     block: &NativeSectionBlockRecord,
     state: NativeMeshingState,
-    states: &HashMap<i32, NativeMeshingState>,
+    states: &[Option<NativeMeshingState>],
     direction: i32,
 ) -> bool {
     if state.fluid_type != FLUID_WATER || state.fluid_overlay_valid == 0 {
@@ -1028,7 +1025,7 @@ fn fluid_side_uses_overlay(
     let Some(neighbor_id) = neighborhood_state_id(block, dx, dy, dz) else {
         return false;
     };
-    let Some(neighbor) = states.get(&neighbor_id) else {
+    let Some(neighbor) = state_by_id(states, neighbor_id) else {
         return false;
     };
     (neighbor.flags & STATE_FLAG_AIR) == 0 && (neighbor.flags & STATE_FLAG_CAN_OCCLUDE) == 0
@@ -1057,7 +1054,7 @@ fn shrink_fluid_uvs(mut uvs: [(f32, f32); 4], shrink: f32) -> [(f32, f32); 4] {
 
 fn fluid_height(
     block: &NativeSectionBlockRecord,
-    states: &HashMap<i32, NativeMeshingState>,
+    states: &[Option<NativeMeshingState>],
     dx: i32,
     dy: i32,
     dz: i32,
@@ -1065,15 +1062,15 @@ fn fluid_height(
 ) -> f32 {
     let state_id = neighborhood_state_id(block, dx, dy, dz)
         .unwrap_or_else(|| block.neighbor_state_ids[fallback_neighbor_index]);
-    let Some(sample) = states.get(&state_id).copied() else {
+    let Some(sample) = state_by_id(states, state_id) else {
         return 0.0;
     };
-    let Some(center) = states.get(&block.state_id).copied() else {
+    let Some(center) = state_by_id(states, block.state_id) else {
         return 0.0;
     };
     if sample.fluid_type == center.fluid_type && sample.fluid_type != 0 {
         if neighborhood_state_id(block, dx, dy + 1, dz)
-            .and_then(|above_id| states.get(&above_id))
+            .and_then(|above_id| state_by_id(states, above_id))
             .map(|above| above.fluid_type == center.fluid_type)
             .unwrap_or(false)
         {
@@ -1090,7 +1087,7 @@ fn fluid_height(
 
 fn fluid_corner_height(
     block: &NativeSectionBlockRecord,
-    states: &HashMap<i32, NativeMeshingState>,
+    states: &[Option<NativeMeshingState>],
     center: f32,
     hx: f32,
     hz: f32,
@@ -1133,11 +1130,11 @@ fn modify_fluid_height(total: &mut f32, samples: &mut f32, height: f32) {
 fn fluid_side_occluded(
     block: &NativeSectionBlockRecord,
     state: NativeMeshingState,
-    states: &HashMap<i32, NativeMeshingState>,
+    states: &[Option<NativeMeshingState>],
     dir: i32,
 ) -> bool {
     let neighbor_id = block.neighbor_state_ids[dir as usize];
-    let Some(neighbor) = states.get(&neighbor_id) else {
+    let Some(neighbor) = state_by_id(states, neighbor_id) else {
         return false;
     };
     neighbor.fluid_type == state.fluid_type
@@ -1146,14 +1143,14 @@ fn fluid_side_occluded(
 
 fn fluid_side_exposed(
     block: &NativeSectionBlockRecord,
-    states: &HashMap<i32, NativeMeshingState>,
+    states: &[Option<NativeMeshingState>],
     dx: i32,
     dy: i32,
     dz: i32,
     _height: f32,
 ) -> bool {
     neighborhood_state_id(block, dx, dy, dz)
-        .and_then(|id| states.get(&id))
+        .and_then(|id| state_by_id(states, id))
         .map(|state| {
             (state.flags & STATE_FLAG_CAN_OCCLUDE) == 0
                 || (state.flags & STATE_FLAG_FULL_OCCLUSION) == 0
@@ -1164,14 +1161,14 @@ fn fluid_side_exposed(
 fn fluid_backward_up_face(
     block: &NativeSectionBlockRecord,
     state: NativeMeshingState,
-    states: &HashMap<i32, NativeMeshingState>,
+    states: &[Option<NativeMeshingState>],
 ) -> bool {
     for dz in -1..=1 {
         for dx in -1..=1 {
             let Some(id) = neighborhood_state_id(block, dx, 1, dz) else {
                 return true;
             };
-            let Some(sample) = states.get(&id) else {
+            let Some(sample) = state_by_id(states, id) else {
                 return true;
             };
             if sample.fluid_type != state.fluid_type
