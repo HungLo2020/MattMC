@@ -60,6 +60,9 @@ const FLUID_FACE_TOP_NW_SE: i32 = 1;
 const FLUID_FACE_BOTTOM: i32 = 2;
 const FLUID_FACE_SIDE: i32 = 3;
 const NATIVE_SECTION_BLOCK_FLAG_SUPPRESS_FLUID: i32 = 1;
+const COMPACT_SECTION_SNAPSHOT_VERSION: i32 = 1;
+const COMPACT_SECTION_PADDED_LENGTH: usize = 18;
+const COMPACT_SECTION_BLOCK_COUNT: usize = 16 * 16 * 16;
 const POSITION_MAX_VALUE: f32 = (1 << 20) as f32;
 const TEXTURE_MAX_VALUE: f32 = (1 << 15) as f32;
 const MODEL_ORIGIN: f32 = 8.0;
@@ -378,6 +381,29 @@ struct NativeSectionBlockRecord {
     legacy_offset_z: f32,
     fluid_block_id: i32,
     flags: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct CompactSectionSnapshotHeader {
+    version: i32,
+    active_count: i32,
+    min_x: i32,
+    min_y: i32,
+    min_z: i32,
+    _padding: i32,
+    active_indices_address: u64,
+    padded_state_ids_address: u64,
+    padded_light_words_address: u64,
+    block_ids_address: u64,
+    seed_los_address: u64,
+    seed_his_address: u64,
+    tints_address: u64,
+    fluid_tints_address: u64,
+    fluid_flow_x_address: u64,
+    fluid_flow_z_address: u64,
+    fluid_block_ids_address: u64,
+    flags_address: u64,
 }
 
 #[repr(C)]

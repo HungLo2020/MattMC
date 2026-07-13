@@ -108,7 +108,7 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
 
         profiler.push("render blocks");
         try (NativeSectionSnapshot nativeSectionSnapshot =
-                     new NativeSectionSnapshot(buffers, this.render.getSectionIndex(), minX, minY, minZ)) {
+                     new NativeSectionSnapshot(buffers, this.render.getSectionIndex(), minX, minY, minZ, slice)) {
             for (int y = minY; y < maxY; y++) {
                 if (cancellationToken.isCancelled()) {
                     return null;

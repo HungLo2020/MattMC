@@ -148,6 +148,221 @@ fn native_pass_index(pass_id: i32) -> Option<usize> {
     }
 }
 
+trait NativeSectionRecordSource {
+    fn record_count(&self) -> usize;
+
+    unsafe fn record_at(&self, index: usize) -> Result<NativeSectionBlockRecord, i32>;
+
+    unsafe fn stable_record_ptr(&self, _index: usize) -> Option<*const NativeSectionBlockRecord> {
+        None
+    }
+}
+
+struct LegacySectionRecordSource<'a> {
+    records: &'a [NativeSectionBlockRecord],
+}
+
+impl NativeSectionRecordSource for LegacySectionRecordSource<'_> {
+    #[inline(always)]
+    fn record_count(&self) -> usize {
+        self.records.len()
+    }
+
+    #[inline(always)]
+    unsafe fn record_at(&self, index: usize) -> Result<NativeSectionBlockRecord, i32> {
+        Ok(*self.records.get_unchecked(index))
+    }
+
+    #[inline(always)]
+    unsafe fn stable_record_ptr(&self, index: usize) -> Option<*const NativeSectionBlockRecord> {
+        Some(self.records.as_ptr().add(index))
+    }
+}
+
+struct CompactSectionSnapshot<'a> {
+    header: &'a CompactSectionSnapshotHeader,
+    active_indices: &'a [u16],
+    padded_state_ids: &'a [i32],
+    padded_light_words: &'a [i32],
+    block_ids: &'a [i32],
+    seed_los: &'a [i32],
+    seed_his: &'a [i32],
+    tints: &'a [i32],
+    fluid_tints: &'a [i32],
+    fluid_flow_x: &'a [f32],
+    fluid_flow_z: &'a [f32],
+    fluid_block_ids: &'a [i32],
+    flags: &'a [i32],
+}
+
+impl<'a> CompactSectionSnapshot<'a> {
+    unsafe fn from_address(address: u64) -> Result<Self, i32> {
+        if address == 0 {
+            return Err(ERR_NULL_POINTER);
+        }
+        let header = &*(address as *const CompactSectionSnapshotHeader);
+        if header.version != COMPACT_SECTION_SNAPSHOT_VERSION
+            || header.active_count < 0
+            || header.active_count as usize > COMPACT_SECTION_BLOCK_COUNT
+        {
+            return Err(ERR_INVALID_ARGUMENT);
+        }
+        let active_count = header.active_count as usize;
+        if header.active_indices_address == 0
+            || header.padded_state_ids_address == 0
+            || header.padded_light_words_address == 0
+            || header.block_ids_address == 0
+            || header.seed_los_address == 0
+            || header.seed_his_address == 0
+            || header.tints_address == 0
+            || header.fluid_tints_address == 0
+            || header.fluid_flow_x_address == 0
+            || header.fluid_flow_z_address == 0
+            || header.fluid_block_ids_address == 0
+            || header.flags_address == 0
+        {
+            return Err(ERR_NULL_POINTER);
+        }
+        let padded_len = COMPACT_SECTION_PADDED_LENGTH
+            * COMPACT_SECTION_PADDED_LENGTH
+            * COMPACT_SECTION_PADDED_LENGTH;
+        Ok(Self {
+            header,
+            active_indices: slice::from_raw_parts(
+                header.active_indices_address as *const u16,
+                active_count,
+            ),
+            padded_state_ids: slice::from_raw_parts(
+                header.padded_state_ids_address as *const i32,
+                padded_len,
+            ),
+            padded_light_words: slice::from_raw_parts(
+                header.padded_light_words_address as *const i32,
+                padded_len,
+            ),
+            block_ids: slice::from_raw_parts(
+                header.block_ids_address as *const i32,
+                COMPACT_SECTION_BLOCK_COUNT,
+            ),
+            seed_los: slice::from_raw_parts(
+                header.seed_los_address as *const i32,
+                COMPACT_SECTION_BLOCK_COUNT,
+            ),
+            seed_his: slice::from_raw_parts(
+                header.seed_his_address as *const i32,
+                COMPACT_SECTION_BLOCK_COUNT,
+            ),
+            tints: slice::from_raw_parts(
+                header.tints_address as *const i32,
+                COMPACT_SECTION_BLOCK_COUNT,
+            ),
+            fluid_tints: slice::from_raw_parts(
+                header.fluid_tints_address as *const i32,
+                COMPACT_SECTION_BLOCK_COUNT,
+            ),
+            fluid_flow_x: slice::from_raw_parts(
+                header.fluid_flow_x_address as *const f32,
+                COMPACT_SECTION_BLOCK_COUNT,
+            ),
+            fluid_flow_z: slice::from_raw_parts(
+                header.fluid_flow_z_address as *const f32,
+                COMPACT_SECTION_BLOCK_COUNT,
+            ),
+            fluid_block_ids: slice::from_raw_parts(
+                header.fluid_block_ids_address as *const i32,
+                COMPACT_SECTION_BLOCK_COUNT,
+            ),
+            flags: slice::from_raw_parts(
+                header.flags_address as *const i32,
+                COMPACT_SECTION_BLOCK_COUNT,
+            ),
+        })
+    }
+
+    #[inline(always)]
+    fn padded_index(x: usize, y: usize, z: usize) -> usize {
+        (y * COMPACT_SECTION_PADDED_LENGTH + z) * COMPACT_SECTION_PADDED_LENGTH + x
+    }
+
+    #[inline(always)]
+    unsafe fn padded_state(&self, x: usize, y: usize, z: usize) -> i32 {
+        *self
+            .padded_state_ids
+            .get_unchecked(Self::padded_index(x, y, z))
+    }
+
+    #[inline(always)]
+    unsafe fn padded_light_word(&self, x: usize, y: usize, z: usize) -> i32 {
+        *self
+            .padded_light_words
+            .get_unchecked(Self::padded_index(x, y, z))
+    }
+}
+
+impl NativeSectionRecordSource for CompactSectionSnapshot<'_> {
+    #[inline(always)]
+    fn record_count(&self) -> usize {
+        self.active_indices.len()
+    }
+
+    unsafe fn record_at(&self, index: usize) -> Result<NativeSectionBlockRecord, i32> {
+        let local_index = *self.active_indices.get_unchecked(index) as usize;
+        if local_index >= COMPACT_SECTION_BLOCK_COUNT {
+            return Err(ERR_INVALID_ARGUMENT);
+        }
+        let local_x = local_index & 15;
+        let local_z = (local_index >> 4) & 15;
+        let local_y = (local_index >> 8) & 15;
+        let padded_x = local_x + 1;
+        let padded_y = local_y + 1;
+        let padded_z = local_z + 1;
+
+        let mut record = NativeSectionBlockRecord {
+            state_id: self.padded_state(padded_x, padded_y, padded_z),
+            block_id: *self.block_ids.get_unchecked(local_index),
+            local_x: local_x as i32,
+            local_y: local_y as i32,
+            local_z: local_z as i32,
+            seed_lo: *self.seed_los.get_unchecked(local_index),
+            seed_hi: *self.seed_his.get_unchecked(local_index),
+            tint: *self.tints.get_unchecked(local_index),
+            fluid_tint: *self.fluid_tints.get_unchecked(local_index),
+            fluid_flow_x: *self.fluid_flow_x.get_unchecked(local_index),
+            fluid_flow_z: *self.fluid_flow_z.get_unchecked(local_index),
+            absolute_x: self.header.min_x + local_x as i32,
+            absolute_y: self.header.min_y + local_y as i32,
+            absolute_z: self.header.min_z + local_z as i32,
+            fluid_block_id: *self.fluid_block_ids.get_unchecked(local_index),
+            flags: *self.flags.get_unchecked(local_index),
+            ..NativeSectionBlockRecord::default()
+        };
+
+        record.neighbor_state_ids[0] = self.padded_state(padded_x, padded_y - 1, padded_z);
+        record.neighbor_state_ids[1] = self.padded_state(padded_x, padded_y + 1, padded_z);
+        record.neighbor_state_ids[2] = self.padded_state(padded_x, padded_y, padded_z - 1);
+        record.neighbor_state_ids[3] = self.padded_state(padded_x, padded_y, padded_z + 1);
+        record.neighbor_state_ids[4] = self.padded_state(padded_x - 1, padded_y, padded_z);
+        record.neighbor_state_ids[5] = self.padded_state(padded_x + 1, padded_y, padded_z);
+
+        let mut neighborhood_index = 0;
+        for dy in 0..3 {
+            for dz in 0..3 {
+                for dx in 0..3 {
+                    let sx = padded_x + dx - 1;
+                    let sy = padded_y + dy - 1;
+                    let sz = padded_z + dz - 1;
+                    record.neighborhood_state_ids[neighborhood_index] =
+                        self.padded_state(sx, sy, sz);
+                    record.light_words[neighborhood_index] = self.padded_light_word(sx, sy, sz);
+                    neighborhood_index += 1;
+                }
+            }
+        }
+
+        Ok(record)
+    }
+}
+
 unsafe fn flush_all_pass_target(
     target: &mut AllPassEmitTarget,
     format: NativeFormat,
@@ -188,6 +403,48 @@ pub(super) unsafe fn section_builders_append_native_section_records_all_passes_e
         record_address as *const NativeSectionBlockRecord,
         record_count,
     );
+    let source = LegacySectionRecordSource { records };
+    section_builders_append_native_section_source_all_passes_encoded(
+        solid_builder,
+        cutout_builder,
+        translucent_builder,
+        &source,
+        translucent_analyzer,
+        format,
+    )
+}
+
+pub(super) unsafe fn section_builders_append_compact_native_section_all_passes_encoded(
+    solid_builder: &mut NativeSectionMeshBuilder,
+    cutout_builder: &mut NativeSectionMeshBuilder,
+    translucent_builder: &mut NativeSectionMeshBuilder,
+    snapshot_address: u64,
+    translucent_analyzer: Option<u64>,
+    format: NativeFormat,
+) -> Result<[i32; 3], i32> {
+    let source = CompactSectionSnapshot::from_address(snapshot_address)?;
+    section_builders_append_native_section_source_all_passes_encoded(
+        solid_builder,
+        cutout_builder,
+        translucent_builder,
+        &source,
+        translucent_analyzer,
+        format,
+    )
+}
+
+unsafe fn section_builders_append_native_section_source_all_passes_encoded<S: NativeSectionRecordSource>(
+    solid_builder: &mut NativeSectionMeshBuilder,
+    cutout_builder: &mut NativeSectionMeshBuilder,
+    translucent_builder: &mut NativeSectionMeshBuilder,
+    source: &S,
+    translucent_analyzer: Option<u64>,
+    format: NativeFormat,
+) -> Result<[i32; 3], i32> {
+    let record_count = source.record_count();
+    if record_count == 0 {
+        return Ok([0, 0, 0]);
+    }
     let mut targets = [
         AllPassEmitTarget {
             builder: solid_builder,
@@ -248,7 +505,9 @@ pub(super) unsafe fn section_builders_append_native_section_records_all_passes_e
     let mut last_model = None;
 
     let scan_started = Instant::now();
-    for record in records {
+    for record_index in 0..record_count {
+        let record = source.record_at(record_index)?;
+        let stable_record_ptr = source.stable_record_ptr(record_index);
         let iteration_started = profile_start(profile_scan_substages);
         let decoding_started = profile_start(profile_scan_substages);
         let state_lookup_started = profile_start(profile_static_substages);
@@ -384,7 +643,7 @@ pub(super) unsafe fn section_builders_append_native_section_records_all_passes_e
                     let resolution_started = profile_start(profile_static_substages);
                     resolve_selector_model_ids(
                         state.selector_id,
-                        record_seed(*record),
+                        record_seed(record),
                         &selectors_guard,
                         &mut model_ids,
                         &mut targets[0].builder().profile,
@@ -445,7 +704,7 @@ pub(super) unsafe fn section_builders_append_native_section_records_all_passes_e
 
                     let culling_started = profile_start(profile_static_substages);
                     let scan_culling_started = profile_start(profile_scan_substages);
-                    if native_section_culls_quad(record, state, quad_record, &states_guard) {
+                    if native_section_culls_quad(&record, state, quad_record, &states_guard) {
                         let builder = targets[0].builder();
                         builder
                             .profile
@@ -487,6 +746,7 @@ pub(super) unsafe fn section_builders_append_native_section_records_all_passes_e
                     if target.analyzer.is_none()
                         && is_compact_fast_format(format)
                         && direct_static_templates_enabled()
+                        && stable_record_ptr.is_some()
                     {
                         if target.pending_counts[facing] != 0 {
                             target.flush_pending_face(
@@ -497,7 +757,7 @@ pub(super) unsafe fn section_builders_append_native_section_records_all_passes_e
                         }
                         let append_started = profile_start(profile_scan_substages);
                         target.push_template_quad(
-                            record as *const NativeSectionBlockRecord,
+                            stable_record_ptr.unwrap(),
                             state,
                             quad_record_ptr,
                             facing,
@@ -520,7 +780,7 @@ pub(super) unsafe fn section_builders_append_native_section_records_all_passes_e
                         )?;
                     }
                     let quad = static_model_quad_to_native_section(
-                        *record,
+                        record,
                         state,
                         quad_record,
                         target.profile(),
@@ -568,7 +828,7 @@ pub(super) unsafe fn section_builders_append_native_section_records_all_passes_e
                 .profile()
                 .add_count(PROFILE_COUNT_FLUID_BLOCKS, 1);
             let fluid_face_count = target.emit_fluid_faces(
-                record,
+                &record,
                 state,
                 &states_guard,
                 format,

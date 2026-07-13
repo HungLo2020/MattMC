@@ -72,6 +72,7 @@ pub fn verify() -> i32 {
         && std::mem::size_of::<StaticModelQuadRecord>() == 160
         && std::mem::size_of::<StaticModelBlockRecord>() == 52
         && std::mem::size_of::<NativeSectionBlockRecord>() == 316
+        && std::mem::size_of::<CompactSectionSnapshotHeader>() == 120
         && std::mem::size_of::<NativeModelSelectorEntry>() == 8
     {
         OK

@@ -24,79 +24,132 @@ import org.lwjgl.system.MemoryUtil;
 
 final class NativeSectionSnapshot implements AutoCloseable {
     private static final int SECTION_BLOCK_COUNT = 16 * 16 * 16;
+    private static final int PADDED_LENGTH = NativeChunkMeshEncoder.COMPACT_SECTION_PADDED_LENGTH;
+    private static final int PADDED_BLOCK_COUNT = NativeChunkMeshEncoder.COMPACT_SECTION_PADDED_BLOCK_COUNT;
+    private static final int HEADER_VERSION_OFFSET = 0;
+    private static final int HEADER_ACTIVE_COUNT_OFFSET = 4;
+    private static final int HEADER_MIN_X_OFFSET = 8;
+    private static final int HEADER_MIN_Y_OFFSET = 12;
+    private static final int HEADER_MIN_Z_OFFSET = 16;
+    private static final int HEADER_PADDING_OFFSET = 20;
+    private static final int HEADER_ACTIVE_INDICES_ADDRESS_OFFSET = 24;
+    private static final int HEADER_PADDED_STATE_IDS_ADDRESS_OFFSET = 32;
+    private static final int HEADER_PADDED_LIGHT_WORDS_ADDRESS_OFFSET = 40;
+    private static final int HEADER_BLOCK_IDS_ADDRESS_OFFSET = 48;
+    private static final int HEADER_SEED_LOS_ADDRESS_OFFSET = 56;
+    private static final int HEADER_SEED_HIS_ADDRESS_OFFSET = 64;
+    private static final int HEADER_TINTS_ADDRESS_OFFSET = 72;
+    private static final int HEADER_FLUID_TINTS_ADDRESS_OFFSET = 80;
+    private static final int HEADER_FLUID_FLOW_X_ADDRESS_OFFSET = 88;
+    private static final int HEADER_FLUID_FLOW_Z_ADDRESS_OFFSET = 96;
+    private static final int HEADER_FLUID_BLOCK_IDS_ADDRESS_OFFSET = 104;
+    private static final int HEADER_FLAGS_ADDRESS_OFFSET = 112;
 
     private final ChunkBuildBuffers buffers;
     private final int sectionIndex;
     private final int minX;
     private final int minY;
     private final int minZ;
+    private final long totalBytes;
     private long address;
+    private long activeIndicesAddress;
+    private long paddedStateIdsAddress;
+    private long paddedLightWordsAddress;
+    private long blockIdsAddress;
+    private long seedLosAddress;
+    private long seedHisAddress;
+    private long tintsAddress;
+    private long fluidTintsAddress;
+    private long fluidFlowXAddress;
+    private long fluidFlowZAddress;
+    private long fluidBlockIdsAddress;
+    private long flagsAddress;
     private int activeRecordCount;
-    private final int[] lightWords = new int[27];
-    private final int[] neighborhoodStateIds = new int[27];
 
-    NativeSectionSnapshot(ChunkBuildBuffers buffers, int sectionIndex, int minX, int minY, int minZ) {
+    NativeSectionSnapshot(ChunkBuildBuffers buffers, int sectionIndex, int minX, int minY, int minZ,
+            LevelSlice slice) {
         this.buffers = buffers;
         this.sectionIndex = sectionIndex;
         this.minX = minX;
         this.minY = minY;
         this.minZ = minZ;
 
-        this.address = MemoryUtil.nmemCalloc(SECTION_BLOCK_COUNT,
-                NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE);
+        long offset = NativeChunkMeshEncoder.COMPACT_SECTION_SNAPSHOT_HEADER_STRIDE;
+        this.activeIndicesAddress = offset;
+        offset += (long) SECTION_BLOCK_COUNT * NativeChunkMeshEncoder.COMPACT_SECTION_ACTIVE_INDEX_STRIDE;
+        offset = align(offset, Integer.BYTES);
+        this.paddedStateIdsAddress = offset;
+        offset += (long) PADDED_BLOCK_COUNT * Integer.BYTES;
+        this.paddedLightWordsAddress = offset;
+        offset += (long) PADDED_BLOCK_COUNT * Integer.BYTES;
+        this.blockIdsAddress = offset;
+        offset += (long) SECTION_BLOCK_COUNT * Integer.BYTES;
+        this.seedLosAddress = offset;
+        offset += (long) SECTION_BLOCK_COUNT * Integer.BYTES;
+        this.seedHisAddress = offset;
+        offset += (long) SECTION_BLOCK_COUNT * Integer.BYTES;
+        this.tintsAddress = offset;
+        offset += (long) SECTION_BLOCK_COUNT * Integer.BYTES;
+        this.fluidTintsAddress = offset;
+        offset += (long) SECTION_BLOCK_COUNT * Integer.BYTES;
+        this.fluidFlowXAddress = offset;
+        offset += (long) SECTION_BLOCK_COUNT * Float.BYTES;
+        this.fluidFlowZAddress = offset;
+        offset += (long) SECTION_BLOCK_COUNT * Float.BYTES;
+        this.fluidBlockIdsAddress = offset;
+        offset += (long) SECTION_BLOCK_COUNT * Integer.BYTES;
+        this.flagsAddress = offset;
+        offset += (long) SECTION_BLOCK_COUNT * Integer.BYTES;
+        this.totalBytes = align(offset, Long.BYTES);
+
+        this.address = MemoryUtil.nmemCalloc(1L, this.totalBytes);
         if (this.address == 0L) {
             throw new OutOfMemoryError("Could not allocate native section snapshot");
         }
+        this.rebaseAddresses();
+        this.writeHeader();
+        this.populatePaddedGrids(slice);
     }
 
     void appendBlock(int localBlockIndex, LevelSlice slice, BlockState blockState, BlockPos blockPos,
             int localX, int localY, int localZ, boolean suppressNativeFluid) {
-        long recordAddress = this.recordAddress(this.activeRecordCount++);
         long seed = blockState.getSeed(blockPos);
-        int neighborhoodIndex = 0;
-        for (int dy = -1; dy <= 1; dy++) {
-            for (int dz = -1; dz <= 1; dz++) {
-                for (int dx = -1; dx <= 1; dx++) {
-                    int sampleX = blockPos.getX() + dx;
-                    int sampleY = blockPos.getY() + dy;
-                    int sampleZ = blockPos.getZ() + dz;
-                    BlockState sampleState = slice.getBlockState(sampleX, sampleY, sampleZ);
-                    this.neighborhoodStateIds[neighborhoodIndex] = NativeStaticBlockModelRegistry.getStateId(sampleState);
-                    this.lightWords[neighborhoodIndex] = computeLightWord(slice, sampleState, sampleX, sampleY, sampleZ);
-                    neighborhoodIndex++;
-                }
-            }
+        int activeIndex = this.activeRecordCount++;
+        if (activeIndex < 0 || activeIndex >= SECTION_BLOCK_COUNT) {
+            throw new IllegalArgumentException("Invalid active section block index: " + activeIndex);
+        }
+        if (localBlockIndex < 0 || localBlockIndex >= SECTION_BLOCK_COUNT) {
+            throw new IllegalArgumentException("Invalid section block index: " + localBlockIndex);
         }
 
         FluidState fluidState = blockState.getFluidState();
         var flow = fluidState.isEmpty() ? net.minecraft.world.phys.Vec3.ZERO : fluidState.getFlow(slice, blockPos);
         int tint = blockTint(slice, blockState, blockPos);
         int fluidTint = fluidTint(slice, fluidState, blockPos);
-        NativeChunkMeshEncoder.writeNativeSectionBlockRecord(recordAddress,
-                NativeStaticBlockModelRegistry.getStateId(blockState), irisBlockId(blockState), localX, localY,
-                localZ, seed,
-                NativeStaticBlockModelRegistry.getStateId(slice.getBlockState(blockPos.getX(), blockPos.getY() - 1, blockPos.getZ())),
-                NativeStaticBlockModelRegistry.getStateId(slice.getBlockState(blockPos.getX(), blockPos.getY() + 1, blockPos.getZ())),
-                NativeStaticBlockModelRegistry.getStateId(slice.getBlockState(blockPos.getX(), blockPos.getY(), blockPos.getZ() - 1)),
-                NativeStaticBlockModelRegistry.getStateId(slice.getBlockState(blockPos.getX(), blockPos.getY(), blockPos.getZ() + 1)),
-                NativeStaticBlockModelRegistry.getStateId(slice.getBlockState(blockPos.getX() - 1, blockPos.getY(), blockPos.getZ())),
-                NativeStaticBlockModelRegistry.getStateId(slice.getBlockState(blockPos.getX() + 1, blockPos.getY(), blockPos.getZ())),
-                this.lightWords, this.neighborhoodStateIds, tint, fluidTint, (float) flow.x, (float) flow.z,
-                blockPos.getX(), blockPos.getY(), blockPos.getZ());
+
+        MemoryUtil.memPutShort(this.activeIndicesAddress
+                + (long) activeIndex * NativeChunkMeshEncoder.COMPACT_SECTION_ACTIVE_INDEX_STRIDE,
+                (short) localBlockIndex);
+        MemoryUtil.memPutInt(this.blockIdsAddress + (long) localBlockIndex * Integer.BYTES, irisBlockId(blockState));
+        MemoryUtil.memPutInt(this.seedLosAddress + (long) localBlockIndex * Integer.BYTES, (int) seed);
+        MemoryUtil.memPutInt(this.seedHisAddress + (long) localBlockIndex * Integer.BYTES, (int) (seed >>> 32));
+        MemoryUtil.memPutInt(this.tintsAddress + (long) localBlockIndex * Integer.BYTES, tint);
+        MemoryUtil.memPutInt(this.fluidTintsAddress + (long) localBlockIndex * Integer.BYTES, fluidTint);
+        MemoryUtil.memPutFloat(this.fluidFlowXAddress + (long) localBlockIndex * Float.BYTES, (float) flow.x);
+        MemoryUtil.memPutFloat(this.fluidFlowZAddress + (long) localBlockIndex * Float.BYTES, (float) flow.z);
         if (!fluidState.isEmpty()) {
-            NativeChunkMeshEncoder.writeNativeSectionBlockFluidBlockId(recordAddress,
+            MemoryUtil.memPutInt(this.fluidBlockIdsAddress + (long) localBlockIndex * Integer.BYTES,
                     irisFluidBlockId(fluidState));
         }
         if (suppressNativeFluid) {
-            NativeChunkMeshEncoder.writeNativeSectionBlockFlags(recordAddress,
+            MemoryUtil.memPutInt(this.flagsAddress + (long) localBlockIndex * Integer.BYTES,
                     NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_FLAG_SUPPRESS_FLUID);
         }
     }
 
     int[] flushAll(TranslucentGeometryCollector collector) {
-        NativeMeshingDiagnostics.dumpSectionSnapshot(this.sectionIndex, this.minX, this.minY, this.minZ,
-                this.address, this.activeRecordCount);
-        int[] nativeQuads = this.buffers.appendNativeSectionSnapshotAllPasses(this.address, this.activeRecordCount,
+        MemoryUtil.memPutInt(this.address + HEADER_ACTIVE_COUNT_OFFSET, this.activeRecordCount);
+        int[] nativeQuads = this.buffers.appendCompactNativeSectionSnapshotAllPasses(this.address,
                 this.sectionIndex, collector);
         this.addNativeFluidSprites(DefaultTerrainRenderPasses.SOLID);
         this.addNativeFluidSprites(DefaultTerrainRenderPasses.CUTOUT);
@@ -111,12 +164,67 @@ final class NativeSectionSnapshot implements AutoCloseable {
         }
     }
 
-    private long recordAddress(int localBlockIndex) {
-        if (localBlockIndex < 0 || localBlockIndex >= SECTION_BLOCK_COUNT) {
-            throw new IllegalArgumentException("Invalid section block index: " + localBlockIndex);
-        }
+    private void rebaseAddresses() {
+        this.activeIndicesAddress += this.address;
+        this.paddedStateIdsAddress += this.address;
+        this.paddedLightWordsAddress += this.address;
+        this.blockIdsAddress += this.address;
+        this.seedLosAddress += this.address;
+        this.seedHisAddress += this.address;
+        this.tintsAddress += this.address;
+        this.fluidTintsAddress += this.address;
+        this.fluidFlowXAddress += this.address;
+        this.fluidFlowZAddress += this.address;
+        this.fluidBlockIdsAddress += this.address;
+        this.flagsAddress += this.address;
+    }
 
-        return this.address + (long) localBlockIndex * NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE;
+    private void writeHeader() {
+        MemoryUtil.memPutInt(this.address + HEADER_VERSION_OFFSET,
+                NativeChunkMeshEncoder.COMPACT_SECTION_SNAPSHOT_VERSION);
+        MemoryUtil.memPutInt(this.address + HEADER_ACTIVE_COUNT_OFFSET, 0);
+        MemoryUtil.memPutInt(this.address + HEADER_MIN_X_OFFSET, this.minX);
+        MemoryUtil.memPutInt(this.address + HEADER_MIN_Y_OFFSET, this.minY);
+        MemoryUtil.memPutInt(this.address + HEADER_MIN_Z_OFFSET, this.minZ);
+        MemoryUtil.memPutInt(this.address + HEADER_PADDING_OFFSET, 0);
+        MemoryUtil.memPutLong(this.address + HEADER_ACTIVE_INDICES_ADDRESS_OFFSET, this.activeIndicesAddress);
+        MemoryUtil.memPutLong(this.address + HEADER_PADDED_STATE_IDS_ADDRESS_OFFSET, this.paddedStateIdsAddress);
+        MemoryUtil.memPutLong(this.address + HEADER_PADDED_LIGHT_WORDS_ADDRESS_OFFSET, this.paddedLightWordsAddress);
+        MemoryUtil.memPutLong(this.address + HEADER_BLOCK_IDS_ADDRESS_OFFSET, this.blockIdsAddress);
+        MemoryUtil.memPutLong(this.address + HEADER_SEED_LOS_ADDRESS_OFFSET, this.seedLosAddress);
+        MemoryUtil.memPutLong(this.address + HEADER_SEED_HIS_ADDRESS_OFFSET, this.seedHisAddress);
+        MemoryUtil.memPutLong(this.address + HEADER_TINTS_ADDRESS_OFFSET, this.tintsAddress);
+        MemoryUtil.memPutLong(this.address + HEADER_FLUID_TINTS_ADDRESS_OFFSET, this.fluidTintsAddress);
+        MemoryUtil.memPutLong(this.address + HEADER_FLUID_FLOW_X_ADDRESS_OFFSET, this.fluidFlowXAddress);
+        MemoryUtil.memPutLong(this.address + HEADER_FLUID_FLOW_Z_ADDRESS_OFFSET, this.fluidFlowZAddress);
+        MemoryUtil.memPutLong(this.address + HEADER_FLUID_BLOCK_IDS_ADDRESS_OFFSET, this.fluidBlockIdsAddress);
+        MemoryUtil.memPutLong(this.address + HEADER_FLAGS_ADDRESS_OFFSET, this.flagsAddress);
+    }
+
+    private void populatePaddedGrids(LevelSlice slice) {
+        for (int py = 0; py < PADDED_LENGTH; py++) {
+            int y = this.minY + py - 1;
+            for (int pz = 0; pz < PADDED_LENGTH; pz++) {
+                int z = this.minZ + pz - 1;
+                for (int px = 0; px < PADDED_LENGTH; px++) {
+                    int x = this.minX + px - 1;
+                    int index = paddedIndex(px, py, pz);
+                    BlockState state = slice.getBlockState(x, y, z);
+                    MemoryUtil.memPutInt(this.paddedStateIdsAddress + (long) index * Integer.BYTES,
+                            NativeStaticBlockModelRegistry.getStateId(state));
+                    MemoryUtil.memPutInt(this.paddedLightWordsAddress + (long) index * Integer.BYTES,
+                            computeLightWord(slice, state, x, y, z));
+                }
+            }
+        }
+    }
+
+    private static int paddedIndex(int x, int y, int z) {
+        return (y * PADDED_LENGTH + z) * PADDED_LENGTH + x;
+    }
+
+    private static long align(long offset, int alignment) {
+        return (offset + alignment - 1L) & -alignment;
     }
 
     @Override

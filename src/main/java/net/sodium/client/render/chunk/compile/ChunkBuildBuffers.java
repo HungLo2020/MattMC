@@ -117,6 +117,22 @@ public class ChunkBuildBuffers {
                 recordAddress, recordCount, this.nativeFormat, sectionIndex, usesSeparateAo(), analyzerHandle);
     }
 
+    public int[] appendCompactNativeSectionSnapshotAllPasses(long snapshotAddress, int sectionIndex,
+            TranslucentGeometryCollector collector) {
+        if (snapshotAddress == 0L) {
+            return new int[] { 0, 0, 0 };
+        }
+
+        var solid = this.builders.get(DefaultTerrainRenderPasses.SOLID).getSectionBuilder();
+        var cutout = this.builders.get(DefaultTerrainRenderPasses.CUTOUT).getSectionBuilder();
+        var translucent = this.builders.get(DefaultTerrainRenderPasses.TRANSLUCENT).getSectionBuilder();
+        long analyzerHandle = collector != null && collector.supportsNativeBatching()
+                ? collector.nativeAnalyzerHandle()
+                : 0L;
+        return NativeSectionMeshBuilder.appendCompactNativeSectionAllPassesEncoded(solid, cutout, translucent,
+                snapshotAddress, this.nativeFormat, sectionIndex, usesSeparateAo(), analyzerHandle);
+    }
+
     public int nativeFluidSpriteMask(TerrainRenderPass pass) {
         return this.builders.get(pass).getSectionBuilder().fluidSpriteMask();
     }
