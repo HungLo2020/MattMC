@@ -1580,6 +1580,41 @@ public class GlCommandEncoder implements CommandEncoder {
 		}
 		int glPrimitiveMode = GlConst.toGl(glRenderPipeline.info().getVertexFormatMode());
 		java.util.Optional<VulkanicPrimitiveMode> typedPrimitiveMode = VulkanicPrimitiveMode.fromLegacyGlConstant(glPrimitiveMode);
+		net.irisshaders.iris.mixinterface.CustomPass customPass = glRenderPass.iris$getCustomPass();
+		if (VulkanicAPI.shouldTraceScopedComposite3ProducerDraw(
+			glRenderPass.getRenderTargetDescriptor(),
+			glRenderPass.getFramebuffer(),
+			glRenderPipeline.info(),
+			customPass
+		)) {
+			PipelineDescriptor diagnosticDescriptor = customPass != null && customPass.pipelineDescriptor() != null
+				? customPass.pipelineDescriptor()
+				: glRenderPipeline.descriptor();
+			PipelineResourcePlanner.Plan diagnosticSubmission = this.buildPipelineResourceBindings(glRenderPass, diagnosticDescriptor);
+			VulkanicAPI.traceScopedComposite3ProducerDraw(
+				glRenderPass.getRenderTargetDescriptor(),
+				glRenderPass.getFramebuffer(),
+				glRenderPipeline.info(),
+				customPass,
+				null,
+				diagnosticSubmission == null ? diagnosticDescriptor : diagnosticSubmission.descriptor(),
+				diagnosticSubmission == null ? null : diagnosticSubmission.bindings(),
+				"opengl-draw",
+				indexType != null,
+				indexType == null ? i : 0,
+				indexType != null ? i : 0,
+				indexType != null ? j : 0,
+				indexType != null ? k : 0,
+				indexType == null ? k : 0,
+				l,
+				indexType,
+				glRenderPass.isScissorEnabled(),
+				glRenderPass.getScissorX(),
+				glRenderPass.getScissorY(),
+				glRenderPass.getScissorWidth(),
+				glRenderPass.getScissorHeight()
+			);
+		}
 		this.logDrawState(glRenderPass, glRenderPipeline.info(), i, j, k, indexType, l);
 		if (indexType != null) {
 			// Route index buffer bind through VulkanicAPI rather than the GlStateManager wrapper.

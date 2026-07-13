@@ -1035,6 +1035,29 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             if (!this.bindPipelineAndResources()) {
                 return;
             }
+            VulkanicAPI.traceScopedComposite3ProducerDraw(
+                this.renderTargetDescriptor,
+                this.framebuffer,
+                this.renderPipeline,
+                this.customPass,
+                this.lastPipelineHandle,
+                this.lastSubmittedDescriptor,
+                this.lastSubmittedPlan == null ? null : this.lastSubmittedPlan.bindings(),
+                "vulkan-native-draw",
+                true,
+                0,
+                baseVertex,
+                firstIndex,
+                indexCount,
+                0,
+                instanceCount,
+                this.indexType,
+                this.scissorEnabled,
+                this.scissorX,
+                this.scissorY,
+                this.scissorWidth,
+                this.scissorHeight
+            );
             this.logDrawState(true, 0, baseVertex, firstIndex, indexCount, 0, instanceCount, this.indexType);
             this.pass.drawIndexed(firstIndex, indexCount, baseVertex, instanceCount);
         }

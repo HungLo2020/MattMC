@@ -147,6 +147,16 @@ public class ProgramSamplers {
 
 			if (textureView != null) {
 				String name = Objects.requireNonNull(binding.name(), "sampler name");
+				int diagnosticTextureId = textureId > 0
+					? textureId
+					: net.vulkanic.VulkanicCoreAPI.textureId(textureView);
+				VulkanicAPI.traceScopedComposite3SamplerBinding(
+					renderPass,
+					name,
+					binding.textureUnit(),
+					diagnosticTextureId,
+					"program-samplers-texture-view"
+				);
 				if (renderPass instanceof net.vulkanic.RenderPassResourceBinder resourceBinder) {
 					resourceBinder.bindSampler(
 						name,
@@ -161,6 +171,13 @@ public class ProgramSamplers {
 
 			if (textureId > 0 && VulkanicAPI.isVulkanBackendSelected()) {
 				String name = Objects.requireNonNull(binding.name(), "sampler name");
+				VulkanicAPI.traceScopedComposite3SamplerBinding(
+					renderPass,
+					name,
+					binding.textureUnit(),
+					textureId,
+					"program-samplers-vulkan-legacy"
+				);
 				if (renderPass instanceof GlRenderPass glRenderPass) {
 					glRenderPass.bindLegacySampler(name, textureId);
 				} else if (renderPass instanceof net.vulkanic.RenderPassResourceBinder resourceBinder) {
@@ -169,6 +186,13 @@ public class ProgramSamplers {
 			}
 			if (textureId > 0 && renderPass instanceof GlRenderPass glRenderPass) {
 				String name = Objects.requireNonNull(binding.name(), "sampler name");
+				VulkanicAPI.traceScopedComposite3SamplerBinding(
+					renderPass,
+					name,
+					binding.textureUnit(),
+					textureId,
+					"program-samplers-opengl-legacy"
+				);
 				VulkanicAPI.recordScopedCompositeColortex0RenderPassLegacyBinding(
 					glRenderPass.pipeline == null ? null : glRenderPass.pipeline.info(),
 					name,
