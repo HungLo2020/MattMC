@@ -16,6 +16,14 @@ pub(super) fn native_section_culls_quad(
         return false;
     };
 
+    state_culls_model_face(state, neighbor)
+}
+
+#[inline(always)]
+pub(super) fn state_culls_model_face(
+    state: NativeMeshingState,
+    neighbor: NativeMeshingState,
+) -> bool {
     (neighbor.flags & (STATE_FLAG_FULL_OCCLUSION | STATE_FLAG_SOLID_RENDER)) != 0
         || (neighbor.skip_group != 0
             && neighbor.skip_group == state.skip_group

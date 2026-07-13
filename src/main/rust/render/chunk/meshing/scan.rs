@@ -151,6 +151,23 @@ fn native_pass_index(pass_id: i32) -> Option<usize> {
 trait NativeSectionRecordSource {
     fn record_count(&self) -> usize;
 
+    unsafe fn state_id_at(&self, index: usize) -> Result<i32, i32> {
+        Ok(self.record_at(index)?.state_id)
+    }
+
+    unsafe fn flags_at(&self, index: usize) -> Result<i32, i32> {
+        Ok(self.record_at(index)?.flags)
+    }
+
+    unsafe fn model_fully_occluded_at(
+        &self,
+        _index: usize,
+        _state: NativeMeshingState,
+        _states: &[Option<NativeMeshingState>],
+    ) -> Result<bool, i32> {
+        Ok(false)
+    }
+
     unsafe fn record_at(&self, index: usize) -> Result<NativeSectionBlockRecord, i32>;
 }
 
@@ -272,6 +289,15 @@ impl<'a> CompactSectionSnapshot<'a> {
             .padded_light_words
             .get_unchecked(Self::padded_index(x, y, z))
     }
+
+    #[inline(always)]
+    unsafe fn active_local_index(&self, index: usize) -> Result<usize, i32> {
+        let local_index = *self.active_indices.get_unchecked(index) as usize;
+        if local_index >= COMPACT_SECTION_BLOCK_COUNT {
+            return Err(ERR_INVALID_ARGUMENT);
+        }
+        Ok(local_index)
+    }
 }
 
 impl NativeSectionRecordSource for CompactSectionSnapshot<'_> {
@@ -280,11 +306,58 @@ impl NativeSectionRecordSource for CompactSectionSnapshot<'_> {
         self.active_indices.len()
     }
 
-    unsafe fn record_at(&self, index: usize) -> Result<NativeSectionBlockRecord, i32> {
-        let local_index = *self.active_indices.get_unchecked(index) as usize;
-        if local_index >= COMPACT_SECTION_BLOCK_COUNT {
-            return Err(ERR_INVALID_ARGUMENT);
+    #[inline(always)]
+    unsafe fn state_id_at(&self, index: usize) -> Result<i32, i32> {
+        let local_index = self.active_local_index(index)?;
+        let local_x = local_index & 15;
+        let local_z = (local_index >> 4) & 15;
+        let local_y = (local_index >> 8) & 15;
+        Ok(self.padded_state(local_x + 1, local_y + 1, local_z + 1))
+    }
+
+    #[inline(always)]
+    unsafe fn flags_at(&self, index: usize) -> Result<i32, i32> {
+        let local_index = self.active_local_index(index)?;
+        Ok(*self.flags.get_unchecked(local_index))
+    }
+
+    #[inline(always)]
+    unsafe fn model_fully_occluded_at(
+        &self,
+        index: usize,
+        state: NativeMeshingState,
+        states: &[Option<NativeMeshingState>],
+    ) -> Result<bool, i32> {
+        let local_index = self.active_local_index(index)?;
+        let local_x = local_index & 15;
+        let local_z = (local_index >> 4) & 15;
+        let local_y = (local_index >> 8) & 15;
+        let padded_x = local_x + 1;
+        let padded_y = local_y + 1;
+        let padded_z = local_z + 1;
+        let neighbor_ids = [
+            self.padded_state(padded_x, padded_y - 1, padded_z),
+            self.padded_state(padded_x, padded_y + 1, padded_z),
+            self.padded_state(padded_x, padded_y, padded_z - 1),
+            self.padded_state(padded_x, padded_y, padded_z + 1),
+            self.padded_state(padded_x - 1, padded_y, padded_z),
+            self.padded_state(padded_x + 1, padded_y, padded_z),
+        ];
+
+        for neighbor_id in neighbor_ids {
+            let Some(neighbor) = state_by_id(states, neighbor_id) else {
+                return Ok(false);
+            };
+            if !state_culls_model_face(state, neighbor) {
+                return Ok(false);
+            }
         }
+
+        Ok(true)
+    }
+
+    unsafe fn record_at(&self, index: usize) -> Result<NativeSectionBlockRecord, i32> {
+        let local_index = self.active_local_index(index)?;
         let local_x = local_index & 15;
         let local_z = (local_index >> 4) & 15;
         let local_y = (local_index >> 8) & 15;
@@ -446,15 +519,16 @@ unsafe fn section_builders_append_native_section_source_all_passes_encoded<S: Na
 
     let scan_started = Instant::now();
     for record_index in 0..record_count {
-        let record = source.record_at(record_index)?;
         let iteration_started = profile_start(profile_scan_substages);
         let decoding_started = profile_start(profile_scan_substages);
+        let state_id = source.state_id_at(record_index)?;
+        let record_flags = source.flags_at(record_index)?;
         let state_lookup_started = profile_start(profile_static_substages);
-        let state = if record.state_id == last_state_id {
+        let state = if state_id == last_state_id {
             last_state
         } else {
-            last_state_id = record.state_id;
-            last_state = state_by_id(&states_guard, record.state_id);
+            last_state_id = state_id;
+            last_state = state_by_id(&states_guard, state_id);
             last_state
         };
         {
@@ -486,11 +560,26 @@ unsafe fn section_builders_append_native_section_source_all_passes_encoded<S: Na
         let has_light_block = (flags & STATE_FLAG_LIGHT_BLOCK) != 0;
         let has_model = (flags & STATE_FLAG_MODEL) != 0;
         let has_fluid = (flags & STATE_FLAG_FLUID) != 0
-            && (record.flags & NATIVE_SECTION_BLOCK_FLAG_SUPPRESS_FLUID) == 0;
+            && (record_flags & NATIVE_SECTION_BLOCK_FLAG_SUPPRESS_FLUID) == 0;
         targets[0]
             .builder()
             .profile
             .add_optional_stage(PROFILE_SCAN_DISPATCH, dispatch_started);
+
+        if has_model
+            && !has_fluid
+            && !has_light_block
+            && (flags & STATE_FLAG_MODEL_FACE_CULLABLE) != 0
+            && source.model_fully_occluded_at(record_index, state, &states_guard)?
+        {
+            targets[0]
+                .builder()
+                .profile
+                .add_optional_stage(PROFILE_SCAN_ACTIVE_RECORD_ITERATION, iteration_started);
+            continue;
+        }
+
+        let record = source.record_at(record_index)?;
 
         if has_light_block {
             let target = &mut targets[1];

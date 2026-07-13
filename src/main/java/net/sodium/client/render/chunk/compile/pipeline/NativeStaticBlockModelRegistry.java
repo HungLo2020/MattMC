@@ -52,6 +52,7 @@ public final class NativeStaticBlockModelRegistry {
     public static final int STATE_FLAG_BLOCK_ENTITY = 1 << 6;
     public static final int STATE_FLAG_CAN_OCCLUDE = 1 << 7;
     public static final int STATE_FLAG_BLOCKS_MOTION = 1 << 8;
+    public static final int STATE_FLAG_MODEL_FACE_CULLABLE = 1 << 9;
 
     private static final int TINT_NONE = 0;
     private static final int TINT_GRASS = 1;
@@ -223,6 +224,9 @@ public final class NativeStaticBlockModelRegistry {
         }
         if (selectorId >= 0) {
             flags |= STATE_FLAG_MODEL;
+            if (modelHasOnlyCullFaceQuads(model)) {
+                flags |= STATE_FLAG_MODEL_FACE_CULLABLE;
+            }
         }
         if (!FORCE_JAVA_FLUIDS && !fluidState.isEmpty()) {
             flags |= STATE_FLAG_FLUID;
@@ -350,6 +354,39 @@ public final class NativeStaticBlockModelRegistry {
             }
         }
         return false;
+    }
+
+    private static boolean modelHasOnlyCullFaceQuads(BlockStateModel model) {
+        if (model instanceof SingleVariant single) {
+            return partHasOnlyCullFaceQuads(single.sodium$getModelPart());
+        }
+
+        if (model instanceof WeightedVariants weighted) {
+            for (Weighted<BlockStateModel> entry : weighted.sodium$getWeightedModels().unwrap()) {
+                if (!modelHasOnlyCullFaceQuads(entry.value())) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        if (model instanceof MultiPartModel multipart) {
+            for (BlockStateModel child : multipart.sodium$getSelectedModels()) {
+                if (!modelHasOnlyCullFaceQuads(child)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    private static boolean partHasOnlyCullFaceQuads(BlockModelPart part) {
+        for (BakedQuad quad : part.getQuads(null)) {
+            return false;
+        }
+        return true;
     }
 
     private static int registerPartModel(BlockState state, int stateId, BlockModelPart part) {
