@@ -16,6 +16,7 @@ import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.textures.TextureFormat;
 import net.blaze3d.vertex.VertexFormat;
 import net.minecraft.Util;
+import net.minecraft.client.dev.DeterministicCameraCapture;
 import net.minecraft.client.renderer.DynamicUniforms;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
@@ -6943,16 +6944,23 @@ public class VulkanicAPI {
 
         java.util.List<String> resources = new java.util.ArrayList<>();
         for (PipelineDescriptor.ResourceBinding resourceBinding : descriptor.getResourceLayout().bindings()) {
-            if (resourceBinding.type() != PipelineDescriptor.ResourceType.UNIFORM_BUFFER) {
-                continue;
+            switch (resourceBinding.type()) {
+                case UNIFORM_BUFFER -> {
+                    VulkanicBufferSlice slice = bindings.getUniformBufferBindingOrNull(resourceBinding.name());
+                    if (slice != null) {
+                        resources.add(describeShaderInputParityUniform(resourceBinding, slice));
+                    }
+                }
+                case SAMPLER, COMPARISON_SAMPLER -> {
+                    PipelineResourceBindings.SamplerBinding samplerBinding = bindings.getSamplerBindingOrNull(resourceBinding.name());
+                    if (samplerBinding != null) {
+                        resources.add(describeShaderInputParitySampler(resourceBinding, samplerBinding));
+                    }
+                }
+                case STORAGE_IMAGE, TEXEL_BUFFER -> {
+                    // Not logged yet: current parity pass only normalizes shader-visible UBOs and samplers.
+                }
             }
-
-            VulkanicBufferSlice slice = bindings.getUniformBufferBindingOrNull(resourceBinding.name());
-            if (slice == null) {
-                continue;
-            }
-
-            resources.add(describeShaderInputParityUniform(resourceBinding, slice));
         }
 
         if (resources.isEmpty()) {
@@ -6960,12 +6968,16 @@ public class VulkanicAPI {
         }
 
         LOGGER.info(
-            "ShaderInputParityResources backend={} source={} pipelineHandle={} pipelineKey={} stableKey={} resources=[{}]",
+            "ShaderInputParityResources backend={} source={} pipelineLocation={} vertexShader={} fragmentShader={} pipelineHandle={} pipelineKey={} stableKey={} {} resources=[{}]",
             getActiveBackendType().name().toLowerCase(java.util.Locale.ROOT),
             source,
+            descriptor.getPortableState().location(),
+            descriptor.getPortableState().vertexShader(),
+            descriptor.getPortableState().fragmentShader(),
             pipeline == null ? "none" : pipeline.getClass().getSimpleName() + "@" + Integer.toHexString(System.identityHashCode(pipeline)),
             descriptor.getPipelineCompilationKey(),
             descriptor.getStableCacheKey(),
+            shaderInputParityDeterministicContextFields(),
             String.join(", ", resources)
         );
     }
@@ -6991,7 +7003,7 @@ public class VulkanicAPI {
         bytes.flip();
 
         LOGGER.info(
-            "ShaderInputParityStandaloneUniform backend={} source={} program={} location={} name={} valueKind={} componentCount={} transpose={} payloadHash={},sample={}",
+            "ShaderInputParityStandaloneUniform backend={} source={} program={} location={} name={} valueKind={} componentCount={} transpose={} {} payloadHash={},sample={}",
             getActiveBackendType().name().toLowerCase(Locale.ROOT),
             source,
             program,
@@ -7000,6 +7012,7 @@ public class VulkanicAPI {
             valueKind,
             normalized.length,
             transpose,
+            shaderInputParityDeterministicContextFields(),
             shaderInputParityHash(bytes, bytes.remaining()),
             shaderInputParityFloatSample(normalized)
         );
@@ -7024,7 +7037,7 @@ public class VulkanicAPI {
         bytes.flip();
 
         LOGGER.info(
-            "ShaderInputParityStandaloneUniform backend={} source={} program={} location={} name={} valueKind={} componentCount={} transpose=false payloadHash={},sample={}",
+            "ShaderInputParityStandaloneUniform backend={} source={} program={} location={} name={} valueKind={} componentCount={} transpose=false {} payloadHash={},sample={}",
             getActiveBackendType().name().toLowerCase(Locale.ROOT),
             source,
             program,
@@ -7032,6 +7045,7 @@ public class VulkanicAPI {
             sanitizeShaderInputParityUniformName(name),
             valueKind,
             values.length,
+            shaderInputParityDeterministicContextFields(),
             shaderInputParityHash(bytes, bytes.remaining()),
             shaderInputParityIntSample(values)
         );
@@ -7059,7 +7073,7 @@ public class VulkanicAPI {
         bytes.flip();
 
         LOGGER.info(
-            "ShaderInputParityStandaloneUniformBlockMember backend={} source={} program={} location={} name={} valueKind={} componentCount={} offset={} arraySize={} stride={} payloadHash={},sample={}",
+            "ShaderInputParityStandaloneUniformBlockMember backend={} source={} program={} location={} name={} valueKind={} componentCount={} offset={} arraySize={} stride={} {} payloadHash={},sample={}",
             getActiveBackendType().name().toLowerCase(Locale.ROOT),
             source,
             program,
@@ -7070,6 +7084,7 @@ public class VulkanicAPI {
             offset,
             arraySize,
             stride,
+            shaderInputParityDeterministicContextFields(),
             shaderInputParityHash(bytes, bytes.remaining()),
             shaderInputParityFloatSample(values)
         );
@@ -7097,7 +7112,7 @@ public class VulkanicAPI {
         bytes.flip();
 
         LOGGER.info(
-            "ShaderInputParityStandaloneUniformBlockMember backend={} source={} program={} location={} name={} valueKind={} componentCount={} offset={} arraySize={} stride={} payloadHash={},sample={}",
+            "ShaderInputParityStandaloneUniformBlockMember backend={} source={} program={} location={} name={} valueKind={} componentCount={} offset={} arraySize={} stride={} {} payloadHash={},sample={}",
             getActiveBackendType().name().toLowerCase(Locale.ROOT),
             source,
             program,
@@ -7108,9 +7123,14 @@ public class VulkanicAPI {
             offset,
             arraySize,
             stride,
+            shaderInputParityDeterministicContextFields(),
             shaderInputParityHash(bytes, bytes.remaining()),
             shaderInputParityIntSample(values)
         );
+    }
+
+    private static String shaderInputParityDeterministicContextFields() {
+        return DeterministicCameraCapture.shaderInputParityContextFields();
     }
 
     private static boolean shouldTraceShaderInputParityLog() {
@@ -7209,6 +7229,83 @@ public class VulkanicAPI {
             + "}}";
     }
 
+    private static String describeShaderInputParitySampler(
+            PipelineDescriptor.ResourceBinding resourceBinding,
+            PipelineResourceBindings.SamplerBinding samplerBinding) {
+        VulkanicTextureView textureView = samplerBinding.textureView();
+        StringBuilder builder = new StringBuilder();
+        java.util.List<String> stages = resourceBinding.stages().stream()
+            .map(Enum::name)
+            .sorted()
+            .toList();
+
+        builder.append(resourceBinding.name())
+            .append("{layout=set:").append(resourceBinding.set())
+            .append(",binding:").append(resourceBinding.binding())
+            .append(",type:").append(resourceBinding.type())
+            .append(",stages:[").append(String.join(", ", stages)).append("]")
+            .append(",sampler={unit=").append(samplerBinding.textureUnit())
+            .append(",samplerObject=").append(samplerBinding.samplerObject() == null ? "none" : samplerBinding.samplerObject());
+
+        if (textureView == null) {
+            return builder.append(",view=missing}}").toString();
+        }
+
+        VulkanicTexture texture = textureView.texture();
+        builder.append(",view={viewClass=").append(textureView.getClass().getSimpleName())
+            .append(",viewId=").append(Integer.toHexString(System.identityHashCode(textureView)))
+            .append(",baseMip=").append(textureView.getBaseMipLevel())
+            .append(",mips=").append(textureView.getMipLevelCount())
+            .append(",width=").append(safeTextureViewWidth(textureView))
+            .append(",height=").append(safeTextureViewHeight(textureView))
+            .append(",closed=").append(textureView.isClosed())
+            .append(",texture={class=").append(texture.getClass().getSimpleName())
+            .append(",id=").append(Integer.toHexString(System.identityHashCode(texture)))
+            .append(",label=\"").append(shaderInputParitySanitizeLabel(texture.getLabel())).append('"')
+            .append(",format=").append(texture.getVulkanicFormat())
+            .append(",width=").append(safeTextureWidth(texture, 0))
+            .append(",height=").append(safeTextureHeight(texture, 0))
+            .append(",layers=").append(texture.getDepthOrLayers())
+            .append(",mips=").append(texture.getMipLevels())
+            .append(",usage=").append(texture.usage())
+            .append(",closed=").append(texture.isClosed())
+            .append("}}}");
+
+        return builder.append('}').toString();
+    }
+
+    private static int safeTextureViewWidth(VulkanicTextureView textureView) {
+        try {
+            return textureView.getWidth(0);
+        } catch (RuntimeException exception) {
+            return -1;
+        }
+    }
+
+    private static int safeTextureViewHeight(VulkanicTextureView textureView) {
+        try {
+            return textureView.getHeight(0);
+        } catch (RuntimeException exception) {
+            return -1;
+        }
+    }
+
+    private static int safeTextureWidth(VulkanicTexture texture, int mipLevel) {
+        try {
+            return texture.getWidth(mipLevel);
+        } catch (RuntimeException exception) {
+            return -1;
+        }
+    }
+
+    private static int safeTextureHeight(VulkanicTexture texture, int mipLevel) {
+        try {
+            return texture.getHeight(mipLevel);
+        } catch (RuntimeException exception) {
+            return -1;
+        }
+    }
+
     private static String shaderInputParityProjectionLabel(String name, VulkanicBufferSlice slice) {
         if (!"Projection".equals(name)) {
             return "";
@@ -7257,6 +7354,7 @@ public class VulkanicAPI {
             .replace('}', ')')
             .replace('[', '(')
             .replace(']', ')')
+            .replace('"', '\'')
             .replace(' ', '_');
     }
 

@@ -84,6 +84,7 @@ public record VulkanicDrawStateSnapshot(
 
     public String toLogFields() {
         return "backend=" + backend
+            + " " + net.minecraft.client.dev.DeterministicCameraCapture.shaderInputParityContextFields()
             + " path=" + path
             + " pipeline=" + pipeline
             + " framebuffer=" + framebuffer

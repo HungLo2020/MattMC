@@ -73,6 +73,9 @@ class CaptureMeta:
 class ResourceRecord:
     backend: str
     source: str
+    pipeline_location: str
+    vertex_shader: str
+    fragment_shader: str
     pipeline_key: str
     stable_key: str
     name: str
@@ -95,11 +98,12 @@ class ResourceRecord:
     projection_context: str = ""
 
     @property
-    def semantic_key(self) -> tuple[str, str, str]:
+    def semantic_key(self) -> tuple[str, str, str, str]:
         name = self.name
         if self.name == "Projection" and self.projection_label:
             name = f"{self.name}@{self.projection_label}"
-        return (self.stable_key, name, self.resource_type)
+        pipeline_identity = self.pipeline_location or self.stable_key
+        return (pipeline_identity, self.stable_key, name, self.resource_type)
 
     @property
     def ubo_payload_signature(self) -> str:
@@ -212,7 +216,7 @@ class VertexInputEvent:
 class CaptureEvents:
     path: Path
     backend: str = "unknown"
-    resources: dict[tuple[str, str, str], list[ResourceRecord]] = field(default_factory=lambda: defaultdict(list))
+    resources: dict[tuple[str, str, str, str], list[ResourceRecord]] = field(default_factory=lambda: defaultdict(list))
     uniform_buffers: dict[str, list[UniformBufferEvent]] = field(default_factory=lambda: defaultdict(list))
     standalone_uniforms: dict[str, list[StandaloneUniformEvent]] = field(default_factory=lambda: defaultdict(list))
     standalone_uniform_block_members: dict[str, list[StandaloneUniformBlockMemberEvent]] = field(default_factory=lambda: defaultdict(list))
@@ -330,23 +334,32 @@ def split_top_level_resources(text: str) -> list[str]:
     return resources
 
 
-def parse_resource(raw: str, backend: str, source: str, pipeline_key: str, stable_key: str) -> ResourceRecord | None:
+def parse_resource(raw: str, backend: str, source: str, pipeline_key: str, stable_key: str, top_fields: dict[str, str] | None = None) -> ResourceRecord | None:
     match = re.match(r"([A-Za-z0-9_.$:-]+)\{(.*)\}$", raw.strip())
     if not match:
         return None
+    top_fields = top_fields or {}
     name = match.group(1)
     body = match.group(2)
     fields = parse_struct_fields(body)
     hashes = extract_hashes(body)
+    top_context = " ".join(
+        f"{field}={top_fields[field]}"
+        for field in ("detCapture", "detPose", "detPoseIndex", "detRenderedFrame", "detAwaitingScreenshot", "detComplete", "detFailed")
+        if field in top_fields
+    )
 
     record = ResourceRecord(
         backend=backend,
         source=source,
+        pipeline_location=top_fields.get("pipelineLocation", ""),
+        vertex_shader=top_fields.get("vertexShader", ""),
+        fragment_shader=top_fields.get("fragmentShader", ""),
         pipeline_key=pipeline_key,
         stable_key=stable_key,
         name=name,
         resource_type=fields.get("type", ""),
-        raw=raw.strip(),
+        raw=(top_context + " " + raw.strip()).strip(),
         binding=fields.get("binding", ""),
         payload_hash=hashes.get("payloadHash", ""),
         range_hash=hashes.get("rangeHash", ""),
@@ -398,7 +411,7 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
         resources_text = extract_balanced_after("resources=", payload)
         records: list[ResourceRecord] = []
         for raw_resource in split_top_level_resources(resources_text):
-            record = parse_resource(raw_resource, backend, source, pipeline_key, stable_key)
+            record = parse_resource(raw_resource, backend, source, pipeline_key, stable_key, fields)
             if record:
                 records.append(record)
         projection_context = next((record.projection_label for record in records if record.name == "Projection" and record.projection_label), "")
@@ -530,9 +543,9 @@ def values_for_pipeline_keys(records: list[ResourceRecord]) -> list[str]:
     return sorted({record.pipeline_key for record in records if record.pipeline_key})
 
 
-def format_key(key: tuple[str, str, str]) -> str:
-    stable_key, name, resource_type = key
-    return f"stableKey={stable_key} / name={name} / type={resource_type}"
+def format_key(key: tuple[str, str, str, str]) -> str:
+    pipeline_identity, stable_key, name, resource_type = key
+    return f"pipeline={pipeline_identity} / stableKey={stable_key} / name={name} / type={resource_type}"
 
 
 def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list[Difference]:
@@ -546,14 +559,14 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
 
         if not gl_records or not vk_records:
             if (
-                key[1] == "VulkanicStandaloneUniforms"
+                key[2] == "VulkanicStandaloneUniforms"
                 and vk_records
                 and not gl_records
                 and vulkan.standalone_uniform_block_members
             ):
                 continue
             only = "OpenGL" if gl_records else "Vulkan"
-            is_labeled_projection = key[1].startswith("Projection@")
+            is_labeled_projection = key[2].startswith("Projection@")
             differences.append(Difference(
                 severity=25 if is_labeled_projection else 60,
                 category="backend-only-projection-context" if is_labeled_projection else "backend-only-resource",
@@ -570,7 +583,7 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
             ))
             continue
 
-        resource_type = key[2]
+        resource_type = key[3]
         gl_values = values_for_resources(gl_records)
         vk_values = values_for_resources(vk_records)
         if resource_type == "UNIFORM_BUFFER":
@@ -606,7 +619,7 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
                     continue
                 gl_contexts = sorted({record.projection_context for record in gl_records if record.projection_context})
                 vk_contexts = sorted({record.projection_context for record in vk_records if record.projection_context})
-                if key[1] == "DynamicTransforms" and set(gl_contexts) == set(vk_contexts) and any("cubemap" in context for context in gl_contexts):
+                if key[2] == "DynamicTransforms" and set(gl_contexts) == set(vk_contexts) and any("cubemap" in context for context in gl_contexts):
                     differences.append(Difference(
                         severity=40,
                         category="timing-sensitive-dynamic-transform-mismatch",
@@ -1018,7 +1031,7 @@ def render_diff_report(opengl_log: Path, vulkan_log: Path, limit: int, parse_lim
     lines.append("")
     lines.append("Normalization rules:")
     lines.append("- Backend object identities, Java identity hashes, pipeline handles, texture ids, view ids, and buffer ids are ignored.")
-    lines.append("- Pipeline resources are matched by stableKey/name/type before comparing binding numbers.")
+    lines.append("- Pipeline resources are matched by pipeline identity/stableKey/name/type before comparing binding numbers.")
     lines.append("- UBOs compare payload hashes separately from range hashes and binding metadata.")
     lines.append("- Standalone uniforms compare by semantic uniform name and normalized setter payload hash.")
     lines.append("- Materialized Vulkan standalone UBO members compare by semantic uniform name against OpenGL standalone uniforms when member logs are present.")
@@ -1129,9 +1142,12 @@ def run_self_test() -> None:
         for diff in diffs
     ), diffs
 
-    vk_events.resources[("generated", "VulkanicStandaloneUniforms", "UNIFORM_BUFFER")].append(ResourceRecord(
+    vk_events.resources[("pipeline", "generated", "VulkanicStandaloneUniforms", "UNIFORM_BUFFER")].append(ResourceRecord(
         backend="vulkan",
         source="vulkan-bindPipelineResources",
+        pipeline_location="pipeline",
+        vertex_shader="",
+        fragment_shader="",
         pipeline_key="pipeline",
         stable_key="generated",
         name="VulkanicStandaloneUniforms",

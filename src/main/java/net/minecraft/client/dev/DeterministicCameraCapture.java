@@ -128,6 +128,32 @@ public final class DeterministicCameraCapture {
 		renderedFramesAtPose = 0;
 	}
 
+	public static String shaderInputParityContextFields() {
+		if (!ENABLED) {
+			return "detCapture=false detPose=none detPoseIndex=0 detRenderedFrame=0 detAwaitingScreenshot=false detComplete=false detFailed=false";
+		}
+
+		String poseName = "none";
+		int displayPoseIndex = 0;
+		if (initialized && poses != null) {
+			if (poseIndex >= 0 && poseIndex < poses.length) {
+				poseName = poses[poseIndex].name();
+				displayPoseIndex = poseIndex + 1;
+			} else if (complete) {
+				poseName = "complete";
+				displayPoseIndex = poses.length;
+			}
+		}
+
+		return "detCapture=true"
+			+ " detPose=" + poseName
+			+ " detPoseIndex=" + displayPoseIndex
+			+ " detRenderedFrame=" + renderedFrameIndex
+			+ " detAwaitingScreenshot=" + awaitingScreenshotAck
+			+ " detComplete=" + complete
+			+ " detFailed=" + failed;
+	}
+
 	private static boolean ensureInitialized(Minecraft minecraft) {
 		if (initialized) {
 			return true;
