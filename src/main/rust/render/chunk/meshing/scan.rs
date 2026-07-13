@@ -4,7 +4,6 @@ struct AllPassEmitTarget {
     builder: *mut NativeSectionMeshBuilder,
     analyzer: Option<u64>,
     pending_counts: [usize; MODEL_QUAD_FACING_COUNT],
-    template_pending_counts: [usize; MODEL_QUAD_FACING_COUNT],
     total_committed: i32,
 }
 
@@ -42,35 +41,6 @@ impl AllPassEmitTarget {
         )
     }
 
-    unsafe fn push_template_quad(
-        &mut self,
-        block: *const NativeSectionBlockRecord,
-        state: NativeMeshingState,
-        quad_record: *const StaticModelQuadRecord,
-        facing: usize,
-        format: NativeFormat,
-        profile_static_substages: bool,
-        profile_scan_substages: bool,
-    ) -> Result<i32, i32> {
-        let builder = &mut *self.builder;
-        let committed = push_static_model_template_quad(
-            builder,
-            block,
-            state,
-            quad_record,
-            facing,
-            &mut self.template_pending_counts,
-            format,
-            profile_static_substages,
-            profile_scan_substages,
-        )?;
-        self.total_committed = self
-            .total_committed
-            .checked_add(committed)
-            .ok_or(ERR_CAPACITY)?;
-        Ok(committed)
-    }
-
     unsafe fn flush_pending_face(
         &mut self,
         facing: usize,
@@ -89,29 +59,6 @@ impl AllPassEmitTarget {
         )?;
         let _ = profile_staging_substages;
         Ok(())
-    }
-
-    unsafe fn flush_template_face(
-        &mut self,
-        facing: usize,
-        format: NativeFormat,
-        profile_static_substages: bool,
-        profile_scan_substages: bool,
-    ) -> Result<i32, i32> {
-        let builder = &mut *self.builder;
-        let committed = flush_static_model_template_face(
-            builder,
-            facing,
-            &mut self.template_pending_counts,
-            format,
-            profile_static_substages,
-            profile_scan_substages,
-        )?;
-        self.total_committed = self
-            .total_committed
-            .checked_add(committed)
-            .ok_or(ERR_CAPACITY)?;
-        Ok(committed)
     }
 
     unsafe fn emit_fluid_faces(
@@ -414,12 +361,9 @@ impl NativeSectionRecordSource for CompactSectionSnapshot<'_> {
 unsafe fn flush_all_pass_target(
     target: &mut AllPassEmitTarget,
     format: NativeFormat,
-    profile_static_substages: bool,
+    _profile_static_substages: bool,
 ) -> Result<(), i32> {
     for facing in 0..MODEL_QUAD_FACING_COUNT {
-        if target.template_pending_counts[facing] != 0 {
-            target.flush_template_face(facing, format, profile_static_substages, false)?;
-        }
         if target.pending_counts[facing] != 0 {
             target.flush_pending_face(facing, format, false)?;
         }
@@ -463,21 +407,18 @@ unsafe fn section_builders_append_native_section_source_all_passes_encoded<S: Na
             builder: solid_builder,
             analyzer: None,
             pending_counts: [0; MODEL_QUAD_FACING_COUNT],
-            template_pending_counts: [0; MODEL_QUAD_FACING_COUNT],
             total_committed: 0,
         },
         AllPassEmitTarget {
             builder: cutout_builder,
             analyzer: None,
             pending_counts: [0; MODEL_QUAD_FACING_COUNT],
-            template_pending_counts: [0; MODEL_QUAD_FACING_COUNT],
             total_committed: 0,
         },
         AllPassEmitTarget {
             builder: translucent_builder,
             analyzer: translucent_analyzer,
             pending_counts: [0; MODEL_QUAD_FACING_COUNT],
-            template_pending_counts: [0; MODEL_QUAD_FACING_COUNT],
             total_committed: 0,
         },
     ];
@@ -770,14 +711,6 @@ unsafe fn section_builders_append_native_section_source_all_passes_encoded<S: Na
                     };
                     let target = &mut targets[routed_pass];
 
-                    if target.template_pending_counts[facing] != 0 {
-                        target.flush_template_face(
-                            facing,
-                            format,
-                            profile_static_substages,
-                            profile_scan_substages,
-                        )?;
-                    }
                     let quad = static_model_quad_to_native_section(
                         record,
                         state,
