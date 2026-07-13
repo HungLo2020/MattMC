@@ -1836,6 +1836,8 @@ public class OpenGLBackend implements GraphicsBackend {
             "opengl-setUniform",
             program,
             location,
+            null,
+            shaderStagesForProgram(program),
             uniformNameFor(program, location),
             valueKind,
             transpose,
@@ -1852,10 +1854,43 @@ public class OpenGLBackend implements GraphicsBackend {
             "opengl-setUniform",
             program,
             location,
+            null,
+            shaderStagesForProgram(program),
             uniformNameFor(program, location),
             valueKind,
             values
         );
+    }
+
+    private String shaderStagesForProgram(int program) {
+        if (program <= 0) {
+            return "unknown";
+        }
+        try {
+            int count = GL20.glGetProgrami(program, GL20.GL_ATTACHED_SHADERS);
+            if (count <= 0) {
+                return "unknown";
+            }
+            int[] shaders = new int[count];
+            int[] actualCount = new int[1];
+            GL20.glGetAttachedShaders(program, actualCount, shaders);
+            java.util.TreeSet<String> stages = new java.util.TreeSet<>();
+            for (int index = 0; index < Math.min(count, actualCount[0]); index++) {
+                int type = GL20.glGetShaderi(shaders[index], GL20.GL_SHADER_TYPE);
+                if (type == GL20.GL_VERTEX_SHADER) {
+                    stages.add("VERTEX");
+                } else if (type == GL32.GL_GEOMETRY_SHADER) {
+                    stages.add("GEOMETRY");
+                } else if (type == GL20.GL_FRAGMENT_SHADER) {
+                    stages.add("FRAGMENT");
+                } else {
+                    stages.add("UNKNOWN_" + Integer.toHexString(type));
+                }
+            }
+            return stages.isEmpty() ? "unknown" : String.join("|", stages);
+        } catch (RuntimeException exception) {
+            return "unknown";
+        }
     }
 
     @Nullable

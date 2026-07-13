@@ -3,6 +3,7 @@ package net.minecraft.client.dev;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
+import net.irisshaders.iris.uniforms.SystemTimeUniforms;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.phys.Vec3;
 import net.vulkanic.VulkanicAPI;
@@ -150,8 +151,17 @@ public final class DeterministicCameraCapture {
 			+ " detPoseIndex=" + displayPoseIndex
 			+ " detRenderedFrame=" + renderedFrameIndex
 			+ " detAwaitingScreenshot=" + awaitingScreenshotAck
-			+ " detComplete=" + complete
-			+ " detFailed=" + failed;
+				+ " detComplete=" + complete
+				+ " detFailed=" + failed;
+	}
+
+	public static int deterministicTemporalFrameIndex() {
+		if (!ENABLED || !initialized || poses == null || poses.length == 0) {
+			return 0;
+		}
+		int clampedPoseIndex = Math.max(0, Math.min(poseIndex, poses.length - 1));
+		int clampedFrameAtPose = Math.max(0, Math.min(renderedFramesAtPose, FRAMES_PER_POSE));
+		return clampedPoseIndex * FRAMES_PER_POSE + clampedFrameAtPose;
 	}
 
 	private static boolean ensureInitialized(Minecraft minecraft) {
@@ -378,8 +388,15 @@ public final class DeterministicCameraCapture {
 		json.append("  \"distantHorizonsActive\": ").append(isDistantHorizonsActive()).append(",\n");
 		json.append("  \"framesPerPose\": ").append(FRAMES_PER_POSE).append(",\n");
 		json.append("  \"ackTimeoutFrames\": ").append(ACK_TIMEOUT_FRAMES).append(",\n");
-		json.append("  \"yawDelta\": ").append(format(YAW_DELTA)).append(",\n");
-		json.append("  \"renderedFrameIndex\": ").append(renderedFrameIndex).append(",\n");
+			json.append("  \"yawDelta\": ").append(format(YAW_DELTA)).append(",\n");
+			json.append("  \"deterministicTemporalParity\": { \"enabled\": ").append(SystemTimeUniforms.isDeterministicTemporalParityEnabled())
+				.append(", \"frameIndex\": ").append(deterministicTemporalFrameIndex())
+				.append(", \"frameCounter\": ").append(SystemTimeUniforms.deterministicTemporalFrameCounter())
+				.append(", \"frameTime\": ").append(format(SystemTimeUniforms.deterministicTemporalFrameTime()))
+				.append(", \"frameTimeCounter\": ").append(format(SystemTimeUniforms.deterministicTemporalFrameTimeCounter()))
+				.append(", \"frameTimeSmooth\": ").append(format(SystemTimeUniforms.deterministicTemporalFrameTimeSmooth()))
+				.append(" },\n");
+			json.append("  \"renderedFrameIndex\": ").append(renderedFrameIndex).append(",\n");
 		json.append("  \"currentPoseIndex\": ").append(poseIndex).append(",\n");
 		json.append("  \"awaitingScreenshotAck\": ").append(awaitingScreenshotAck).append(",\n");
 		json.append("  \"captures\": [\n");
@@ -399,10 +416,17 @@ public final class DeterministicCameraCapture {
 			appendVec3(json, "position", capture.position(), 6).append(",\n");
 			json.append("      \"requestedYaw\": ").append(format(capture.requestedYaw())).append(",\n");
 			json.append("      \"requestedPitch\": ").append(format(capture.requestedPitch())).append(",\n");
-			json.append("      \"observedYaw\": ").append(format(capture.observedYaw())).append(",\n");
-			json.append("      \"observedPitch\": ").append(format(capture.observedPitch())).append(",\n");
-			json.append("      \"renderedFrameIndex\": ").append(capture.renderedFrameIndex()).append(",\n");
-			json.append("      \"gameTime\": ").append(capture.gameTime()).append("\n");
+				json.append("      \"observedYaw\": ").append(format(capture.observedYaw())).append(",\n");
+				json.append("      \"observedPitch\": ").append(format(capture.observedPitch())).append(",\n");
+				json.append("      \"renderedFrameIndex\": ").append(capture.renderedFrameIndex()).append(",\n");
+				json.append("      \"deterministicTemporal\": { \"enabled\": ").append(SystemTimeUniforms.isDeterministicTemporalParityEnabled())
+					.append(", \"frameIndex\": ").append(capture.index() * FRAMES_PER_POSE)
+					.append(", \"frameCounter\": ").append(capture.index() * FRAMES_PER_POSE)
+					.append(", \"frameTime\": ").append(format(SystemTimeUniforms.deterministicTemporalFrameTime()))
+					.append(", \"frameTimeCounter\": ").append(format((capture.index() * FRAMES_PER_POSE * SystemTimeUniforms.deterministicTemporalFrameTime()) % 3600.0F))
+					.append(", \"frameTimeSmooth\": ").append(format(SystemTimeUniforms.deterministicTemporalFrameTimeSmooth()))
+					.append(" },\n");
+				json.append("      \"gameTime\": ").append(capture.gameTime()).append("\n");
 			json.append("    }").append(i + 1 == CAPTURES.size() ? "\n" : ",\n");
 		}
 		json.append("  ]\n");

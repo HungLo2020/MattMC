@@ -209,10 +209,12 @@ public class ProgramUniforms {
 			return OptionalInt.of(id);
 		}
 
-		public ProgramUniforms buildUniforms() {
-			// Check for any unsupported uniforms and warn about them so that we can easily figure out what uniforms we
-			// need to add.
-			for (VulkanicAPI.ActiveUniformInfo activeUniformInfo : VulkanicAPI.getActiveUniforms(VulkanicAPI.getCommandContext(), program, 128)) {
+			public ProgramUniforms buildUniforms() {
+				VulkanicAPI.registerShaderInputParityProgramName(program, name);
+
+				// Check for any unsupported uniforms and warn about them so that we can easily figure out what uniforms we
+				// need to add.
+				for (VulkanicAPI.ActiveUniformInfo activeUniformInfo : VulkanicAPI.getActiveUniforms(VulkanicAPI.getCommandContext(), program, 128)) {
 				String name = activeUniformInfo.name();
 
 				if (name.isEmpty()) {

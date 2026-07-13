@@ -94,6 +94,8 @@ class ResourceRecord:
     texture_height: str = ""
     texture_mips: str = ""
     texture_usage: str = ""
+    content_hash: str = ""
+    content_hash_region: str = ""
     projection_label: str = ""
     projection_context: str = ""
 
@@ -156,10 +158,17 @@ class StandaloneUniformEvent:
     raw: str
     payload_hash: str = ""
     sample: str = ""
+    program_identity: str = ""
+    shader_stages: str = ""
+    location: str = ""
+    render_phase: str = ""
+    draw_key: str = ""
+    det_pose: str = ""
+    det_rendered_frame: str = ""
 
     @property
     def key(self) -> str:
-        return self.name
+        return standalone_uniform_key(self)
 
     @property
     def signature(self) -> str:
@@ -179,10 +188,17 @@ class StandaloneUniformBlockMemberEvent:
     offset: str = ""
     array_size: str = ""
     stride: str = ""
+    program_identity: str = ""
+    shader_stages: str = ""
+    location: str = ""
+    render_phase: str = ""
+    draw_key: str = ""
+    det_pose: str = ""
+    det_rendered_frame: str = ""
 
     @property
     def key(self) -> str:
-        return self.name
+        return standalone_uniform_key(self)
 
     @property
     def signature(self) -> str:
@@ -291,6 +307,17 @@ def extract_hashes(text: str) -> dict[str, str]:
     return {match.group(1): match.group(2) for match in HASH_RE.finditer(text)}
 
 
+def standalone_uniform_key(event: StandaloneUniformEvent | StandaloneUniformBlockMemberEvent) -> str:
+    return "|".join([
+        f"program={event.program_identity or 'unknown'}",
+        f"stages={event.shader_stages or 'unknown'}",
+        f"phase={event.render_phase or 'unknown'}",
+        f"draw={event.draw_key or 'unavailable'}",
+        f"name={event.name}",
+        f"type={event.value_kind}",
+    ])
+
+
 def extract_balanced_after(prefix: str, text: str) -> str:
     start = text.find(prefix)
     if start < 0:
@@ -343,6 +370,10 @@ def parse_resource(raw: str, backend: str, source: str, pipeline_key: str, stabl
     body = match.group(2)
     fields = parse_struct_fields(body)
     hashes = extract_hashes(body)
+    content_fields: dict[str, str] = {}
+    content_body = extract_balanced_after("contentHash=", body)
+    if content_body:
+        content_fields = parse_struct_fields(content_body)
     top_context = " ".join(
         f"{field}={top_fields[field]}"
         for field in ("detCapture", "detPose", "detPoseIndex", "detRenderedFrame", "detAwaitingScreenshot", "detComplete", "detFailed")
@@ -372,6 +403,8 @@ def parse_resource(raw: str, backend: str, source: str, pipeline_key: str, stabl
         texture_height=fields.get("height", ""),
         texture_mips=fields.get("mips", ""),
         texture_usage=fields.get("usage", ""),
+        content_hash=content_fields.get("hash", ""),
+        content_hash_region=content_fields.get("region", ""),
         projection_label=fields.get("projectionLabel", ""),
     )
 
@@ -465,6 +498,13 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             raw=payload.strip(),
             payload_hash=hashes.get("payloadHash", ""),
             sample=fields.get("sample", ""),
+            program_identity=fields.get("programIdentity", ""),
+            shader_stages=fields.get("shaderStages", ""),
+            location=fields.get("location", ""),
+            render_phase=fields.get("renderPhase", ""),
+            draw_key=fields.get("drawKey", ""),
+            det_pose=fields.get("detPose", ""),
+            det_rendered_frame=fields.get("detRenderedFrame", ""),
             offset=fields.get("offset", ""),
             array_size=fields.get("arraySize", ""),
             stride=fields.get("stride", ""),
@@ -492,6 +532,13 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             raw=payload.strip(),
             payload_hash=hashes.get("payloadHash", ""),
             sample=fields.get("sample", ""),
+            program_identity=fields.get("programIdentity", ""),
+            shader_stages=fields.get("shaderStages", ""),
+            location=fields.get("location", ""),
+            render_phase=fields.get("renderPhase", ""),
+            draw_key=fields.get("drawKey", ""),
+            det_pose=fields.get("detPose", ""),
+            det_rendered_frame=fields.get("detRenderedFrame", ""),
         )
         events.standalone_uniforms[event.key].append(event)
 
@@ -521,6 +568,10 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
 
 def values_for_resources(records: list[ResourceRecord]) -> list[str]:
     return sorted({record.short_signature for record in records})
+
+
+def values_for_content_hashes(records: list[ResourceRecord]) -> list[str]:
+    return sorted({record.content_hash for record in records if record.content_hash})
 
 
 def values_for_bindings(records: list[ResourceRecord]) -> list[str]:
@@ -567,25 +618,75 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
                 continue
             only = "OpenGL" if gl_records else "Vulkan"
             is_labeled_projection = key[2].startswith("Projection@")
+            gl_content_hashes = values_for_content_hashes(gl_records)
+            vk_content_hashes = values_for_content_hashes(vk_records)
+            has_content_hash = bool(gl_content_hashes or vk_content_hashes)
             differences.append(Difference(
-                severity=25 if is_labeled_projection else 60,
-                category="backend-only-projection-context" if is_labeled_projection else "backend-only-resource",
+                severity=25 if is_labeled_projection else 62 if has_content_hash else 60,
+                category=(
+                    "backend-only-projection-context"
+                    if is_labeled_projection
+                    else "render-target-content-hash-backend-only"
+                    if has_content_hash
+                    else "backend-only-resource"
+                ),
                 key=key_text,
                 reason=(
                     f"labeled projection context only observed on {only}; separate captures can legitimately visit different GUI/minimap contexts"
                     if is_labeled_projection
+                    else f"render-target content-hash resource only observed on {only}"
+                    if has_content_hash
                     else f"resource semantic key only observed on {only}"
                 ),
                 opengl_count=len(gl_records),
                 vulkan_count=len(vk_records),
-                opengl_values=values_for_resources(gl_records)[:4],
-                vulkan_values=values_for_resources(vk_records)[:4],
+                opengl_values=(gl_content_hashes or values_for_resources(gl_records))[:4],
+                vulkan_values=(vk_content_hashes or values_for_resources(vk_records))[:4],
             ))
             continue
 
         resource_type = key[3]
         gl_values = values_for_resources(gl_records)
         vk_values = values_for_resources(vk_records)
+        if "SAMPLER" in resource_type:
+            gl_content_hashes = values_for_content_hashes(gl_records)
+            vk_content_hashes = values_for_content_hashes(vk_records)
+            if gl_content_hashes or vk_content_hashes:
+                if not gl_content_hashes or not vk_content_hashes:
+                    differences.append(Difference(
+                        severity=62,
+                        category="render-target-content-hash-only-observed-on-one-backend",
+                        key=key_text,
+                        reason="render-target content hash diagnostics were only emitted for one backend/resource",
+                        opengl_count=len(gl_records),
+                        vulkan_count=len(vk_records),
+                        opengl_values=gl_content_hashes[:4],
+                        vulkan_values=vk_content_hashes[:4],
+                    ))
+                elif any(value.startswith("unavailable:") for value in gl_content_hashes + vk_content_hashes):
+                    if set(gl_content_hashes) != set(vk_content_hashes):
+                        differences.append(Difference(
+                            severity=35,
+                            category="render-target-content-hash-not-comparable",
+                            key=key_text,
+                            reason="at least one backend reported an explicit diagnostic readback limitation for this shader-visible texture",
+                            opengl_count=len(gl_records),
+                            vulkan_count=len(vk_records),
+                            opengl_values=gl_content_hashes[:4],
+                            vulkan_values=vk_content_hashes[:4],
+                        ))
+                elif set(gl_content_hashes) != set(vk_content_hashes):
+                    differences.append(Difference(
+                        severity=99,
+                        category="strict-render-target-content-hash-mismatch",
+                        key=key_text,
+                        reason="same shader-visible render-target resource produced different normalized content hashes",
+                        opengl_count=len(gl_records),
+                        vulkan_count=len(vk_records),
+                        opengl_values=gl_content_hashes[:4],
+                        vulkan_values=vk_content_hashes[:4],
+                    ))
+
         if resource_type == "UNIFORM_BUFFER":
             gl_payloads = values_for_payload_hashes(gl_records)
             vk_payloads = values_for_payload_hashes(vk_records)
@@ -776,8 +877,8 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
                 differences.append(Difference(
                     severity=55,
                     category="timing-sensitive-standalone-uniform-payload-set-difference",
-                    key=f"name={name}",
-                    reason="same standalone uniform has overlapping payload hashes plus backend-specific observations in separate captures",
+                    key=name,
+                    reason="same standalone uniform semantic key has overlapping payload hashes plus backend-specific observations in separate captures",
                     opengl_count=len(gl_events),
                     vulkan_count=len(vk_events),
                     opengl_values=[f"shared={','.join(overlap[:3])}", *gl_values[:6]],
@@ -799,8 +900,8 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
             differences.append(Difference(
                 severity=severity,
                 category="strict-standalone-uniform-payload-mismatch",
-                key=f"name={name}",
-                reason="same standalone uniform name has disjoint payload hash sets",
+                key=name,
+                reason="same standalone uniform semantic key has disjoint payload hash sets",
                 opengl_count=len(gl_events),
                 vulkan_count=len(vk_events),
                 opengl_values=gl_values[:6],
@@ -1033,8 +1134,8 @@ def render_diff_report(opengl_log: Path, vulkan_log: Path, limit: int, parse_lim
     lines.append("- Backend object identities, Java identity hashes, pipeline handles, texture ids, view ids, and buffer ids are ignored.")
     lines.append("- Pipeline resources are matched by pipeline identity/stableKey/name/type before comparing binding numbers.")
     lines.append("- UBOs compare payload hashes separately from range hashes and binding metadata.")
-    lines.append("- Standalone uniforms compare by semantic uniform name and normalized setter payload hash.")
-    lines.append("- Materialized Vulkan standalone UBO members compare by semantic uniform name against OpenGL standalone uniforms when member logs are present.")
+    lines.append("- Standalone uniforms compare by semantic program/stage/phase/draw/name/type key and normalized setter payload hash.")
+    lines.append("- Materialized Vulkan standalone UBO members compare by the same semantic key against OpenGL standalone uniforms when member logs are present.")
     lines.append("- Samplers compare semantic texture metadata; numeric GL object labels are normalized.")
     lines.append("- Separate captures are not frame-synchronized; backend-only observations are lower-confidence than strict same-key mismatches.")
     lines.append("")
@@ -1107,7 +1208,8 @@ def run_self_test() -> None:
     )
     events = CaptureEvents(path=Path("self-test.log"))
     parse_capture_line(member_line, events, ParseLimits())
-    members = events.standalone_uniform_block_members["gbufferProjection"]
+    assert "gbufferProjection" not in events.standalone_uniform_block_members
+    members = next(iter(events.standalone_uniform_block_members.values()))
     assert len(members) == 1
     assert members[0].signature == "crc32:bbbb/bytes:64"
     assert members[0].offset == "64"

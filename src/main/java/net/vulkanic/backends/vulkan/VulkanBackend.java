@@ -7769,6 +7769,8 @@ void main() {
             "vulkan-setUniform",
             programId,
             location,
+            null,
+            standaloneUniformShaderStages(virtualProgram),
             field.name(),
             standaloneUniformValueKind(field),
             false,
@@ -7788,10 +7790,35 @@ void main() {
             "vulkan-setUniform",
             programId,
             location,
+            null,
+            standaloneUniformShaderStages(virtualProgram),
             field.name(),
             standaloneUniformValueKind(field),
             values
         );
+    }
+
+    private static String standaloneUniformProgramIdentity(int programId, VirtualProgram virtualProgram) {
+        if (virtualProgram.linkedSpirvModules.isEmpty()) {
+            return "program:" + programId;
+        }
+        return virtualProgram.linkedSpirvModules.stream()
+            .sorted(java.util.Comparator
+                .comparing((VulkanicSpirvModule module) -> module.stage().name())
+                .thenComparing(VulkanicSpirvModule::sourceName))
+            .map(module -> module.stage().name() + ":" + module.sourceName())
+            .collect(java.util.stream.Collectors.joining("|"));
+    }
+
+    private static String standaloneUniformShaderStages(VirtualProgram virtualProgram) {
+        if (virtualProgram.linkedSpirvModules.isEmpty()) {
+            return "unknown";
+        }
+        return virtualProgram.linkedSpirvModules.stream()
+            .map(module -> module.stage().name())
+            .distinct()
+            .sorted()
+            .collect(java.util.stream.Collectors.joining("|"));
     }
 
     private static String standaloneUniformValueKind(StandaloneUniformField field) {
@@ -8254,6 +8281,8 @@ void main() {
                     "vulkan-standalone-ubo",
                     program,
                     entry.getKey(),
+                    null,
+                    standaloneUniformShaderStages(virtualProgram),
                     field.name(),
                     standaloneUniformValueKind(field),
                     offset,
@@ -8266,6 +8295,8 @@ void main() {
                     "vulkan-standalone-ubo",
                     program,
                     entry.getKey(),
+                    null,
+                    standaloneUniformShaderStages(virtualProgram),
                     field.name(),
                     standaloneUniformValueKind(field),
                     offset,

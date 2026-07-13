@@ -14,6 +14,13 @@ import java.util.function.IntSupplier;
 public final class SystemTimeUniforms {
 	public static final Timer TIMER = new Timer();
 	public static final FrameCounter COUNTER = new FrameCounter();
+	private static final boolean DETERMINISTIC_TEMPORAL_PARITY = Boolean.getBoolean("mattmc.vulkan.deterministicTemporalParity");
+	private static final int DETERMINISTIC_FRAME_COUNTER =
+		Integer.getInteger("mattmc.vulkan.deterministicTemporalParity.frameCounter", 0);
+	private static final float DETERMINISTIC_FRAME_TIME_SECONDS =
+		Float.parseFloat(System.getProperty("mattmc.vulkan.deterministicTemporalParity.frameTime", "0.016666668"));
+	private static final float DETERMINISTIC_FRAME_TIME_COUNTER_SECONDS =
+		Float.parseFloat(System.getProperty("mattmc.vulkan.deterministicTemporalParity.frameTimeCounter", "0.0"));
 
 	private SystemTimeUniforms() {
 	}
@@ -30,6 +37,29 @@ public final class SystemTimeUniforms {
 			.uniform1f(UniformUpdateFrequency.PER_FRAME, "frameTimeCounter", TIMER::getFrameTimeCounter);
 	}
 
+	public static boolean isDeterministicTemporalParityEnabled() {
+		return DETERMINISTIC_TEMPORAL_PARITY;
+	}
+
+	public static int deterministicTemporalFrameCounter() {
+		if (!DETERMINISTIC_TEMPORAL_PARITY) {
+			return COUNTER.count;
+		}
+		return Math.floorMod(DETERMINISTIC_FRAME_COUNTER, 720720);
+	}
+
+	public static float deterministicTemporalFrameTime() {
+		return DETERMINISTIC_FRAME_TIME_SECONDS;
+	}
+
+	public static float deterministicTemporalFrameTimeCounter() {
+		return DETERMINISTIC_FRAME_TIME_COUNTER_SECONDS;
+	}
+
+	public static float deterministicTemporalFrameTimeSmooth() {
+		return DETERMINISTIC_FRAME_TIME_SECONDS;
+	}
+
 	/**
 	 * A simple frame counter. On each frame, it is incremented by 1, and it wraps around every 720720 frames. It starts
 	 * at zero and goes from there.
@@ -43,10 +73,16 @@ public final class SystemTimeUniforms {
 
 		@Override
 		public int getAsInt() {
+			if (DETERMINISTIC_TEMPORAL_PARITY) {
+				return deterministicTemporalFrameCounter();
+			}
 			return count;
 		}
 
 		public void beginFrame() {
+			if (DETERMINISTIC_TEMPORAL_PARITY) {
+				return;
+			}
 			count = (count + 1) % 720720;
 		}
 
@@ -72,6 +108,13 @@ public final class SystemTimeUniforms {
 		}
 
 		public void beginFrame(long frameStartTime) {
+			if (DETERMINISTIC_TEMPORAL_PARITY) {
+				lastFrameTime = deterministicTemporalFrameTime();
+				frameTimeCounter = deterministicTemporalFrameTimeCounter();
+				lastStartTime = OptionalLong.of(frameStartTime);
+				return;
+			}
+
 			// Track how much time passed since the last time we began rendering a frame.
 			// If this is the first frame, then use a value of 0.
 			long diffNs = frameStartTime - lastStartTime.orElse(frameStartTime);
@@ -95,10 +138,16 @@ public final class SystemTimeUniforms {
 		}
 
 		public float getFrameTimeCounter() {
+			if (DETERMINISTIC_TEMPORAL_PARITY) {
+				return deterministicTemporalFrameTimeCounter();
+			}
 			return frameTimeCounter;
 		}
 
 		public float getLastFrameTime() {
+			if (DETERMINISTIC_TEMPORAL_PARITY) {
+				return deterministicTemporalFrameTime();
+			}
 			return lastFrameTime;
 		}
 

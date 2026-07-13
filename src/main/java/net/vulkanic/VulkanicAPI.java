@@ -57,8 +57,12 @@ public class VulkanicAPI {
     private static final boolean TRACE_SHADER_INPUT_PARITY = Boolean.getBoolean("mattmc.vulkan.traceShaderInputParity");
     private static final boolean TRACE_STANDALONE_UNIFORM_BLOCK_MEMBERS =
         Boolean.getBoolean("mattmc.vulkan.traceStandaloneUniformBlockMembers");
+    private static final boolean TRACE_RENDER_TARGET_CONTENT_HASHES =
+        Boolean.getBoolean("mattmc.vulkan.traceRenderTargetContentHashes");
     private static final int MAX_SHADER_INPUT_PARITY_LOGS = Integer.getInteger("mattmc.vulkan.traceShaderInputParity.maxLogs", 20000);
     private static final java.util.concurrent.atomic.AtomicInteger SHADER_INPUT_PARITY_LOG_COUNT = new java.util.concurrent.atomic.AtomicInteger();
+    private static final java.util.concurrent.ConcurrentMap<Integer, String> SHADER_INPUT_PARITY_PROGRAM_NAMES =
+        new java.util.concurrent.ConcurrentHashMap<>();
     private static final int VULKAN_LWJGL_STACK_SIZE_KB = 512;
     private static GraphicsBackend backend;
     @Nullable
@@ -3202,6 +3206,13 @@ public class VulkanicAPI {
 
     public static boolean isShaderInputParityTracingEnabled() {
         return TRACE_SHADER_INPUT_PARITY;
+    }
+
+    public static void registerShaderInputParityProgramName(int program, String name) {
+        if (program <= 0 || name == null || name.isBlank()) {
+            return;
+        }
+        SHADER_INPUT_PARITY_PROGRAM_NAMES.put(program, name);
     }
 
     public static boolean shouldTraceStandaloneUniformBlockMembers() {
@@ -6991,6 +7002,20 @@ public class VulkanicAPI {
         boolean transpose,
         float[] values
     ) {
+        traceShaderInputParityStandaloneUniformFloats(source, program, location, null, null, name, valueKind, transpose, values);
+    }
+
+    public static void traceShaderInputParityStandaloneUniformFloats(
+        String source,
+        int program,
+        int location,
+        @Nullable String programIdentity,
+        @Nullable String shaderStages,
+        @Nullable String name,
+        String valueKind,
+        boolean transpose,
+        float[] values
+    ) {
         if (values == null || values.length == 0 || !shouldTraceShaderInputParityLog()) {
             return;
         }
@@ -7003,11 +7028,15 @@ public class VulkanicAPI {
         bytes.flip();
 
         LOGGER.info(
-            "ShaderInputParityStandaloneUniform backend={} source={} program={} location={} name={} valueKind={} componentCount={} transpose={} {} payloadHash={},sample={}",
+            "ShaderInputParityStandaloneUniform backend={} source={} program={} programIdentity={} shaderStages={} location={} renderPhase={} drawKey={} name={} valueKind={} componentCount={} transpose={} {} payloadHash={},sample={}",
             getActiveBackendType().name().toLowerCase(Locale.ROOT),
             source,
             program,
+            shaderInputParityProgramIdentity(program, programIdentity),
+            shaderInputParityValueOrUnknown(shaderStages),
             location,
+            shaderInputParityRenderPhase(),
+            "unavailable",
             sanitizeShaderInputParityUniformName(name),
             valueKind,
             normalized.length,
@@ -7026,6 +7055,19 @@ public class VulkanicAPI {
         String valueKind,
         int[] values
     ) {
+        traceShaderInputParityStandaloneUniformInts(source, program, location, null, null, name, valueKind, values);
+    }
+
+    public static void traceShaderInputParityStandaloneUniformInts(
+        String source,
+        int program,
+        int location,
+        @Nullable String programIdentity,
+        @Nullable String shaderStages,
+        @Nullable String name,
+        String valueKind,
+        int[] values
+    ) {
         if (values == null || values.length == 0 || !shouldTraceShaderInputParityLog()) {
             return;
         }
@@ -7037,11 +7079,15 @@ public class VulkanicAPI {
         bytes.flip();
 
         LOGGER.info(
-            "ShaderInputParityStandaloneUniform backend={} source={} program={} location={} name={} valueKind={} componentCount={} transpose=false {} payloadHash={},sample={}",
+            "ShaderInputParityStandaloneUniform backend={} source={} program={} programIdentity={} shaderStages={} location={} renderPhase={} drawKey={} name={} valueKind={} componentCount={} transpose=false {} payloadHash={},sample={}",
             getActiveBackendType().name().toLowerCase(Locale.ROOT),
             source,
             program,
+            shaderInputParityProgramIdentity(program, programIdentity),
+            shaderInputParityValueOrUnknown(shaderStages),
             location,
+            shaderInputParityRenderPhase(),
+            "unavailable",
             sanitizeShaderInputParityUniformName(name),
             valueKind,
             values.length,
@@ -7062,6 +7108,22 @@ public class VulkanicAPI {
         int stride,
         float[] values
     ) {
+        traceShaderInputParityStandaloneUniformBlockMemberFloats(source, program, location, null, null, name, valueKind, offset, arraySize, stride, values);
+    }
+
+    public static void traceShaderInputParityStandaloneUniformBlockMemberFloats(
+        String source,
+        int program,
+        int location,
+        @Nullable String programIdentity,
+        @Nullable String shaderStages,
+        @Nullable String name,
+        String valueKind,
+        int offset,
+        int arraySize,
+        int stride,
+        float[] values
+    ) {
         if (values == null || values.length == 0 || !shouldTraceShaderInputParityLog()) {
             return;
         }
@@ -7073,11 +7135,15 @@ public class VulkanicAPI {
         bytes.flip();
 
         LOGGER.info(
-            "ShaderInputParityStandaloneUniformBlockMember backend={} source={} program={} location={} name={} valueKind={} componentCount={} offset={} arraySize={} stride={} {} payloadHash={},sample={}",
+            "ShaderInputParityStandaloneUniformBlockMember backend={} source={} program={} programIdentity={} shaderStages={} location={} renderPhase={} drawKey={} name={} valueKind={} componentCount={} offset={} arraySize={} stride={} {} payloadHash={},sample={}",
             getActiveBackendType().name().toLowerCase(Locale.ROOT),
             source,
             program,
+            shaderInputParityProgramIdentity(program, programIdentity),
+            shaderInputParityValueOrUnknown(shaderStages),
             location,
+            shaderInputParityRenderPhase(),
+            "unavailable",
             sanitizeShaderInputParityUniformName(name),
             valueKind,
             values.length,
@@ -7101,6 +7167,22 @@ public class VulkanicAPI {
         int stride,
         int[] values
     ) {
+        traceShaderInputParityStandaloneUniformBlockMemberInts(source, program, location, null, null, name, valueKind, offset, arraySize, stride, values);
+    }
+
+    public static void traceShaderInputParityStandaloneUniformBlockMemberInts(
+        String source,
+        int program,
+        int location,
+        @Nullable String programIdentity,
+        @Nullable String shaderStages,
+        @Nullable String name,
+        String valueKind,
+        int offset,
+        int arraySize,
+        int stride,
+        int[] values
+    ) {
         if (values == null || values.length == 0 || !shouldTraceShaderInputParityLog()) {
             return;
         }
@@ -7112,11 +7194,15 @@ public class VulkanicAPI {
         bytes.flip();
 
         LOGGER.info(
-            "ShaderInputParityStandaloneUniformBlockMember backend={} source={} program={} location={} name={} valueKind={} componentCount={} offset={} arraySize={} stride={} {} payloadHash={},sample={}",
+            "ShaderInputParityStandaloneUniformBlockMember backend={} source={} program={} programIdentity={} shaderStages={} location={} renderPhase={} drawKey={} name={} valueKind={} componentCount={} offset={} arraySize={} stride={} {} payloadHash={},sample={}",
             getActiveBackendType().name().toLowerCase(Locale.ROOT),
             source,
             program,
+            shaderInputParityProgramIdentity(program, programIdentity),
+            shaderInputParityValueOrUnknown(shaderStages),
             location,
+            shaderInputParityRenderPhase(),
+            "unavailable",
             sanitizeShaderInputParityUniformName(name),
             valueKind,
             values.length,
@@ -7131,6 +7217,32 @@ public class VulkanicAPI {
 
     private static String shaderInputParityDeterministicContextFields() {
         return DeterministicCameraCapture.shaderInputParityContextFields();
+    }
+
+    private static String shaderInputParityProgramIdentity(int program, @Nullable String explicitIdentity) {
+        if (explicitIdentity != null && !explicitIdentity.isBlank()) {
+            return shaderInputParitySanitizeLabel(explicitIdentity);
+        }
+        String registeredName = SHADER_INPUT_PARITY_PROGRAM_NAMES.get(program);
+        if (registeredName != null && !registeredName.isBlank()) {
+            return shaderInputParitySanitizeLabel(registeredName);
+        }
+        return "program:" + program;
+    }
+
+    private static String shaderInputParityValueOrUnknown(@Nullable String value) {
+        if (value == null || value.isBlank()) {
+            return "unknown";
+        }
+        return shaderInputParitySanitizeLabel(value);
+    }
+
+    private static String shaderInputParityRenderPhase() {
+        try {
+            return shaderInputParitySanitizeLabel(net.irisshaders.iris.layer.GbufferPrograms.getCurrentPhase().name());
+        } catch (Throwable ignored) {
+            return "unknown";
+        }
     }
 
     private static boolean shouldTraceShaderInputParityLog() {
@@ -7271,7 +7383,115 @@ public class VulkanicAPI {
             .append(",closed=").append(texture.isClosed())
             .append("}}}");
 
+        if (TRACE_RENDER_TARGET_CONTENT_HASHES && shouldTraceRenderTargetContentHash(resourceBinding.name(), texture.getLabel())) {
+            builder.append(",contentHash={")
+                .append("logicalResource=").append(shaderInputParitySanitizeLabel(resourceBinding.name()))
+                .append(",mip=").append(textureView.getBaseMipLevel())
+                .append(",layer=0")
+                .append(",region=0:0:").append(safeTextureViewWidth(textureView)).append(':').append(safeTextureViewHeight(textureView))
+                .append(",hash=").append(shaderInputParityTextureContentHash(textureView, resourceBinding.name()))
+                .append(",poseContext={").append(shaderInputParityDeterministicContextFields().replace(' ', ',')).append("}")
+                .append('}');
+        }
+
         return builder.append('}').toString();
+    }
+
+    private static boolean shouldTraceRenderTargetContentHash(String resourceName, @Nullable String label) {
+        String normalizedName = resourceName == null ? "" : resourceName.toLowerCase(Locale.ROOT);
+        String normalizedLabel = label == null ? "" : label.toLowerCase(Locale.ROOT);
+        return normalizedName.startsWith("colortex")
+            || normalizedName.startsWith("depthtex")
+            || normalizedName.contains("dhdepth")
+            || normalizedName.contains("shadow")
+            || normalizedName.contains("floodfill")
+            || normalizedName.contains("history")
+            || normalizedLabel.startsWith("colortex")
+            || normalizedLabel.startsWith("depthtex")
+            || normalizedLabel.contains("dhdepth")
+            || normalizedLabel.contains("shadow")
+            || normalizedLabel.contains("floodfill")
+            || normalizedLabel.contains("history");
+    }
+
+    private static String shaderInputParityTextureContentHash(VulkanicTextureView textureView, String resourceName) {
+        VulkanicTexture texture = textureView.texture();
+        VulkanicTextureFormat format = texture.getVulkanicFormat();
+        if (textureView.isClosed() || texture.isClosed()) {
+            return "unavailable:closed";
+        }
+        if (getActiveBackendType() != GraphicsBackendType.OPENGL) {
+            return "unavailable:vulkan-readback-not-yet-normalized";
+        }
+        if (!(textureView instanceof net.vulkanic.backends.opengl.OpenGLTextureView openGLTextureView)) {
+            return "unavailable:not-opengl-view";
+        }
+        int width = Math.min(Math.max(0, safeTextureViewWidth(textureView)), 128);
+        int height = Math.min(Math.max(0, safeTextureViewHeight(textureView)), 128);
+        if (width <= 0 || height <= 0) {
+            return "unavailable:empty";
+        }
+        int externalFormat;
+        int externalType;
+        int bytesPerPixel;
+        switch (format) {
+            case RGBA8, BGRA8, RGBA8_SNORM -> {
+                externalFormat = org.lwjgl.opengl.GL11.GL_RGBA;
+                externalType = org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
+                bytesPerPixel = 4;
+            }
+            case RED8, RED8I, RED8UI -> {
+                externalFormat = org.lwjgl.opengl.GL11.GL_RED;
+                externalType = org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
+                bytesPerPixel = 1;
+            }
+            case RGBA16F -> {
+                externalFormat = org.lwjgl.opengl.GL11.GL_RGBA;
+                externalType = org.lwjgl.opengl.GL11.GL_FLOAT;
+                bytesPerPixel = 16;
+            }
+            case R11F_G11F_B10F -> {
+                externalFormat = org.lwjgl.opengl.GL11.GL_RGB;
+                externalType = org.lwjgl.opengl.GL11.GL_FLOAT;
+                bytesPerPixel = 12;
+            }
+            case RED16F, RED32F, DEPTH32 -> {
+                externalFormat = format.hasDepthAspect() ? org.lwjgl.opengl.GL11.GL_DEPTH_COMPONENT : org.lwjgl.opengl.GL11.GL_RED;
+                externalType = org.lwjgl.opengl.GL11.GL_FLOAT;
+                bytesPerPixel = 4;
+            }
+            case DEPTH24_STENCIL8 -> {
+                externalFormat = org.lwjgl.opengl.GL30.GL_DEPTH_STENCIL;
+                externalType = org.lwjgl.opengl.GL30.GL_UNSIGNED_INT_24_8;
+                bytesPerPixel = 4;
+            }
+            case DEPTH32F_STENCIL8 -> {
+                return "unavailable:depth32f-stencil8-normalization";
+            }
+            default -> {
+                return "unavailable:format-" + format.name().toLowerCase(Locale.ROOT);
+            }
+        }
+        java.nio.ByteBuffer pixels = BufferUtils.createByteBuffer(width * height * bytesPerPixel);
+        try {
+            org.lwjgl.opengl.GL45.glGetTextureSubImage(
+                openGLTextureView.glHandle(),
+                textureView.getBaseMipLevel(),
+                0,
+                0,
+                0,
+                width,
+                height,
+                1,
+                externalFormat,
+                externalType,
+                pixels
+            );
+        } catch (Throwable exception) {
+            return "unavailable:readback-" + shaderInputParitySanitizeLabel(exception.getClass().getSimpleName());
+        }
+        pixels.flip();
+        return shaderInputParityHash(pixels, pixels.remaining()) + "/region:0x0x" + width + "x" + height + "/format:" + format.name();
     }
 
     private static int safeTextureViewWidth(VulkanicTextureView textureView) {
