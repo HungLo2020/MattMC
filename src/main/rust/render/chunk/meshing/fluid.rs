@@ -40,9 +40,35 @@ fn fluid_sprite_mask(fluid_type: i32, still: bool, overlay: bool) -> i32 {
 
 #[derive(Clone, Copy)]
 pub(super) struct NativeFluidFace {
-    pub quad: NativeQuad,
+    pub vertices: [QuadVertex; 4],
+    pub block_emission: u8,
+    pub render_type: u8,
+    pub ignore_mid_block: u8,
+    pub block_id: i32,
+    pub local_x: i32,
+    pub local_y: i32,
+    pub local_z: i32,
+    pub material_bits: i32,
     pub packed_normal: i32,
     pub facing: usize,
+}
+
+impl NativeFluidFace {
+    #[inline(always)]
+    fn to_native_quad(self) -> NativeQuad {
+        NativeQuad {
+            vertices: self.vertices,
+            block_emission: self.block_emission,
+            render_type: self.render_type,
+            ignore_mid_block: self.ignore_mid_block,
+            _padding: 0,
+            block_id: self.block_id,
+            local_x: self.local_x,
+            local_y: self.local_y,
+            local_z: self.local_z,
+            material_bits: self.material_bits,
+        }
+    }
 }
 
 trait NativeFluidFaceSink {
@@ -79,24 +105,128 @@ impl NativeFluidFaceSink for BuilderFluidFaceSink<'_, '_> {
     fn emit(&mut self, face: NativeFluidFace) -> Result<(), i32> {
         let append_started = profile_start(self.profile_scan_substages);
         unsafe {
-            push_native_section_quad(
-                self.builder,
-                face.quad,
-                face.packed_normal,
-                face.facing,
-                self.pending_counts,
-                self.analyzer,
-                self.format,
-                self.store_raw_quads,
-                self.profile_staging_substages,
-                self.total_committed,
-            )?;
+            if is_compact_fast_format(self.format) && !self.store_raw_quads {
+                append_direct_compact_fluid_face(
+                    self.builder,
+                    face,
+                    self.analyzer,
+                    self.format,
+                    self.profile_staging_substages,
+                    self.total_committed,
+                )?;
+            } else {
+                push_native_section_quad(
+                    self.builder,
+                    face.to_native_quad(),
+                    face.packed_normal,
+                    face.facing,
+                    self.pending_counts,
+                    self.analyzer,
+                    self.format,
+                    self.store_raw_quads,
+                    self.profile_staging_substages,
+                    self.total_committed,
+                )?;
+            }
         }
         self.builder
             .profile
             .add_optional_stage(PROFILE_SCAN_QUAD_APPEND, append_started);
         Ok(())
     }
+}
+
+unsafe fn append_direct_compact_fluid_face(
+    builder: &mut NativeSectionMeshBuilder,
+    face: NativeFluidFace,
+    analyzer: Option<u64>,
+    format: NativeFormat,
+    profile_staging_substages: bool,
+    total_committed: &mut i32,
+) -> Result<(), i32> {
+    if face.facing >= MODEL_QUAD_FACING_COUNT {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    if let Some(analyzer_handle) = analyzer {
+        let analyzer_started = profile_start(profile_staging_substages);
+        let accepted = translucent::append_quad_positions_to_analyzer(
+            analyzer_handle,
+            fluid_face_positions(&face),
+            face.facing as i32,
+            face.packed_normal,
+        )?;
+        builder
+            .profile
+            .add_optional_stage(PROFILE_TRANSLUCENT_INGEST, analyzer_started);
+        builder
+            .profile
+            .add_count(PROFILE_COUNT_TRANSLUCENT_ANALYZER_ENTRIES, 1);
+        builder
+            .profile
+            .add_count(PROFILE_COUNT_TRANSLUCENT_VALIDITY_BYTES, 1);
+        if !accepted {
+            return Ok(());
+        }
+        builder
+            .profile
+            .add_count(PROFILE_COUNT_TRANSLUCENT_QUADS, 1);
+    }
+
+    let pack_started = profile_start(profile_staging_substages);
+    let start = builder.counts[face.facing];
+    let required_len = start.checked_add(1).ok_or(ERR_CAPACITY)?;
+    let buffer = &mut builder.buffers[face.facing];
+    let encoded_quad_len = 4usize
+        .checked_mul(format.vertex_stride)
+        .ok_or(ERR_INVALID_ARGUMENT)?;
+
+    if !buffer.encoded.is_empty() && buffer.encoded_format != Some(format) {
+        buffer.encoded.clear();
+        buffer.encoded_format = None;
+    }
+    if buffer.encoded_format.is_none() {
+        buffer.encoded_format = Some(format);
+    }
+
+    let required_encoded_len = required_len
+        .checked_mul(encoded_quad_len)
+        .ok_or(ERR_INVALID_ARGUMENT)?;
+    ensure_encoded_len(&mut buffer.encoded, required_encoded_len, format);
+
+    let encoded_start = start * encoded_quad_len;
+    let encoded_end = encoded_start + encoded_quad_len;
+    encode_compact_quad_vertices(
+        &face.vertices,
+        face.material_bits,
+        format.section_index,
+        &mut buffer.encoded[encoded_start..encoded_end],
+    );
+    builder.counts[face.facing] = required_len;
+    *total_committed = total_committed.checked_add(1).ok_or(ERR_CAPACITY)?;
+    builder
+        .profile
+        .add_optional_stage(PROFILE_VERTEX_PACKING, pack_started);
+    builder.profile.add_count(PROFILE_COUNT_EMITTED_QUADS, 1);
+    Ok(())
+}
+
+fn fluid_face_positions(face: &NativeFluidFace) -> [f32; 12] {
+    let vertices = &face.vertices;
+    [
+        vertices[0].x,
+        vertices[0].y,
+        vertices[0].z,
+        vertices[1].x,
+        vertices[1].y,
+        vertices[1].z,
+        vertices[2].x,
+        vertices[2].y,
+        vertices[2].z,
+        vertices[3].x,
+        vertices[3].y,
+        vertices[3].z,
+    ]
 }
 
 fn native_fluid_flush_diag(
@@ -1075,7 +1205,7 @@ fn fluid_semantic_native_face(
         facing = MODEL_QUAD_FACING_UNASSIGNED;
     }
 
-    let mut quad = fluid_semantic_quad(
+    let mut vertices = fluid_semantic_vertices(
         state,
         block,
         false,
@@ -1088,26 +1218,29 @@ fn fluid_semantic_native_face(
         ao,
         light,
     );
-    apply_fluid_lighting(&mut quad, block, state, light_face, light_flags, ao);
-    let mut packed_normal = packed_fluid_normal(facing, &quad);
+    apply_fluid_lighting(&mut vertices, block, state, light_face, light_flags, ao);
+    let mut packed_normal = packed_fluid_normal(facing, &vertices);
     if flip {
-        quad.vertices = [
-            quad.vertices[0],
-            quad.vertices[3],
-            quad.vertices[2],
-            quad.vertices[1],
-        ];
+        vertices = [vertices[0], vertices[3], vertices[2], vertices[1]];
         packed_normal = flip_packed_normal(packed_normal);
     }
     NativeFluidFace {
-        quad,
+        vertices,
+        block_emission: state.block_emission.clamp(0, 255) as u8,
+        render_type: 1,
+        ignore_mid_block: 0,
+        block_id: choose_block_id(block.fluid_block_id, state.fluid_block_id),
+        local_x: block.absolute_x,
+        local_y: block.absolute_y,
+        local_z: block.absolute_z,
+        material_bits: state.fluid_material_bits,
         packed_normal,
         facing,
     }
 }
 
 fn apply_fluid_lighting(
-    quad: &mut NativeQuad,
+    vertices: &mut [QuadVertex; 4],
     block: &NativeSectionBlockRecord,
     state: NativeMeshingState,
     light_face: i32,
@@ -1124,7 +1257,7 @@ fn apply_fluid_lighting(
         ..StaticModelQuadRecord::default()
     };
 
-    for (index, vertex) in quad.vertices.iter().enumerate() {
+    for (index, vertex) in vertices.iter().enumerate() {
         light_quad.vertices[index] = StaticModelVertexRecord {
             x: vertex.x - block.local_x as f32,
             y: vertex.y - block.local_y as f32,
@@ -1137,7 +1270,7 @@ fn apply_fluid_lighting(
     }
 
     let light = native_quad_lighting(block, &light_quad, state);
-    for (index, vertex) in quad.vertices.iter_mut().enumerate() {
+    for (index, vertex) in vertices.iter_mut().enumerate() {
         vertex.ao = light.ao[index] * face_brightness;
         vertex.light = light.lm[index];
     }
@@ -1222,8 +1355,8 @@ fn fluid_semantic_record(
     }
 }
 
-fn fluid_semantic_quad(
-    state: NativeMeshingState,
+fn fluid_semantic_vertices(
+    _state: NativeMeshingState,
     block: &NativeSectionBlockRecord,
     flip: bool,
     face_kind: i32,
@@ -1234,7 +1367,7 @@ fn fluid_semantic_quad(
     color: i32,
     ao: f32,
     light: i32,
-) -> NativeQuad {
+) -> [QuadVertex; 4] {
     let origin_x = block.local_x as f32;
     let origin_y = block.local_y as f32;
     let origin_z = block.local_z as f32;
@@ -1414,21 +1547,10 @@ fn fluid_semantic_quad(
         vertices = [vertices[0], vertices[3], vertices[2], vertices[1]];
     }
 
-    NativeQuad {
-        vertices,
-        block_emission: state.block_emission.clamp(0, 255) as u8,
-        render_type: 1,
-        ignore_mid_block: 0,
-        _padding: 0,
-        block_id: choose_block_id(block.fluid_block_id, state.fluid_block_id),
-        local_x: block.absolute_x,
-        local_y: block.absolute_y,
-        local_z: block.absolute_z,
-        material_bits: state.fluid_material_bits,
-    }
+    vertices
 }
 
-fn packed_fluid_normal(facing: usize, quad: &NativeQuad) -> i32 {
+fn packed_fluid_normal(facing: usize, vertices: &[QuadVertex; 4]) -> i32 {
     match facing {
         MODEL_QUAD_FACING_POS_X => 0x0000007f,
         MODEL_QUAD_FACING_POS_Y => 0x00007f00,
@@ -1436,7 +1558,7 @@ fn packed_fluid_normal(facing: usize, quad: &NativeQuad) -> i32 {
         MODEL_QUAD_FACING_NEG_X => 0x00000081,
         MODEL_QUAD_FACING_NEG_Y => 0x00008100,
         MODEL_QUAD_FACING_NEG_Z => 0x00810000,
-        _ => norm_i8_pack_from_quad(quad),
+        _ => norm_i8_pack_from_vertices(vertices),
     }
 }
 
@@ -1444,23 +1566,21 @@ fn flipped_fluid_back_face(front: NativeFluidFace, mut facing: usize) -> NativeF
     if native_fluid_force_unassigned() {
         facing = MODEL_QUAD_FACING_UNASSIGNED;
     }
-    let mut quad = front.quad;
-    quad.vertices = [
-        quad.vertices[0],
-        quad.vertices[3],
-        quad.vertices[2],
-        quad.vertices[1],
+    let mut back = front;
+    back.vertices = [
+        front.vertices[0],
+        front.vertices[3],
+        front.vertices[2],
+        front.vertices[1],
     ];
     let packed_normal = if facing < MODEL_QUAD_FACING_COUNT - 1 {
-        flip_packed_normal(packed_fluid_normal(facing, &front.quad))
+        flip_packed_normal(packed_fluid_normal(facing, &front.vertices))
     } else {
         flip_packed_normal(front.packed_normal)
     };
-    NativeFluidFace {
-        quad,
-        packed_normal,
-        facing,
-    }
+    back.packed_normal = packed_normal;
+    back.facing = facing;
+    back
 }
 
 pub(super) fn flip_packed_normal(normal: i32) -> i32 {

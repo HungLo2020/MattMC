@@ -4284,6 +4284,33 @@ pub unsafe fn append_native_quad_batch_to_analyzer(
     OK
 }
 
+pub unsafe fn append_quad_positions_to_analyzer(
+    handle: u64,
+    positions: [f32; 12],
+    facing: i32,
+    packed_normal: i32,
+) -> Result<bool, i32> {
+    if handle == 0 {
+        return Err(ERR_NULL_POINTER);
+    }
+    if !(0..FACING_COUNT as i32).contains(&facing) {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    let record = TranslucentQuadRecord {
+        positions,
+        facing,
+        packed_normal,
+    };
+    if record_is_invalid(&record) {
+        return Ok(false);
+    }
+
+    let analyzer = &mut *(handle as *mut NativeTranslucentAnalyzer);
+    analyzer.records.push(record);
+    Ok(true)
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_sodium_translucent_analyzer_record_count(
     handle: u64,

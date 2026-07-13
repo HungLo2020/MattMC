@@ -201,10 +201,24 @@ pub(super) fn is_compact_fast_format(format: NativeFormat) -> bool {
 
 #[inline(always)]
 fn encode_quad_compact(quad: &NativeQuad, output: &mut [u8], section_index: i32) {
-    let vertices = &quad.vertices;
+    encode_compact_quad_vertices(
+        &quad.vertices,
+        quad.material_bits,
+        section_index,
+        output,
+    );
+}
+
+#[inline(always)]
+pub(super) fn encode_compact_quad_vertices(
+    vertices: &[QuadVertex; 4],
+    material_bits: i32,
+    section_index: i32,
+    output: &mut [u8],
+) {
     let tex_centroid_u = (vertices[0].u + vertices[1].u + vertices[2].u + vertices[3].u) * 0.25;
     let tex_centroid_v = (vertices[0].v + vertices[1].v + vertices[2].v + vertices[3].v) * 0.25;
-    let material_section = ((quad.material_bits & 0xff) << 16) | ((section_index & 0xff) << 24);
+    let material_section = ((material_bits & 0xff) << 16) | ((section_index & 0xff) << 24);
 
     encode_compact_vertex(
         vertices[0],
@@ -414,7 +428,11 @@ pub(super) fn compute_face_normal(vertices: &[QuadVertex; 4]) -> (f32, f32, f32)
 }
 
 pub(super) fn norm_i8_pack_from_quad(quad: &NativeQuad) -> i32 {
-    let normal = compute_face_normal(&quad.vertices);
+    norm_i8_pack_from_vertices(&quad.vertices)
+}
+
+pub(super) fn norm_i8_pack_from_vertices(vertices: &[QuadVertex; 4]) -> i32 {
+    let normal = compute_face_normal(vertices);
     (((normal.0.clamp(-1.0, 1.0) * 127.0) as i32) & 0xff)
         | ((((normal.1.clamp(-1.0, 1.0) * 127.0) as i32) & 0xff) << 8)
         | ((((normal.2.clamp(-1.0, 1.0) * 127.0) as i32) & 0xff) << 16)
