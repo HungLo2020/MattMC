@@ -301,6 +301,22 @@ fn native_section_fluid_faces_to_sink<S: NativeFluidFaceSink>(
         ));
         return Ok(0);
     }
+    let cull_up = fluid_side_occluded(block, state, states, 1);
+    let cull_down = fluid_side_occluded(block, state, states, 0);
+    let cull_north = fluid_side_occluded(block, state, states, 2);
+    let cull_south = fluid_side_occluded(block, state, states, 3);
+    let cull_west = fluid_side_occluded(block, state, states, 4);
+    let cull_east = fluid_side_occluded(block, state, states, 5);
+    if cull_up && cull_down && cull_north && cull_south && cull_west && cull_east {
+        sink.profile()
+            .add_stage(PROFILE_FLUID_VIS_HEIGHT, visibility_started);
+        native_fluid_diag_log(format_args!(
+            "skip-occluded pos={},{},{}",
+            block.absolute_x, block.absolute_y, block.absolute_z
+        ));
+        return Ok(0);
+    }
+
     let h = fluid_height(block, state, states, 0, 0, 0, 1);
     native_fluid_diag_log(format_args!(
         "own-height pos={},{},{} height={:.4}",
@@ -324,9 +340,7 @@ fn native_section_fluid_faces_to_sink<S: NativeFluidFaceSink>(
             .add_optional_stage(PROFILE_FLUID_CORNER_HEIGHT_USE, corner_started);
         heights
     };
-    let cull_up = fluid_side_occluded(block, state, states, 1);
-    let cull_down = fluid_side_occluded(block, state, states, 0)
-        || !fluid_side_exposed(block, states, 0, 0, -1, 0.8888889);
+    let cull_down = cull_down || !fluid_side_exposed(block, states, 0, 0, -1, 0.8888889);
     let lighting_tint_started = profile_start(profile_fluid_substages);
     let color = argb_to_abgr(native_tint_color(block, state, true));
     let light = get_emissive_lightmap(block.light_words[13]);
@@ -400,9 +414,10 @@ fn native_section_fluid_faces_to_sink<S: NativeFluidFaceSink>(
     ];
     let mut visible_sides = [false; 4];
     let mut overlay_sides = [false; 4];
+    let side_culls = [cull_north, cull_south, cull_west, cull_east];
     for (index, (dir, _, _, _, h1, h2, _, _, _, _)) in sides.iter().copied().enumerate() {
         let step = dir_step(dir);
-        visible_sides[index] = !fluid_side_occluded(block, state, states, dir)
+        visible_sides[index] = !side_culls[index]
             && fluid_side_exposed(block, states, step.0, step.1, step.2, h1.max(h2));
         if visible_sides[index] {
             let overlay_started = profile_start(profile_fluid_substages);
@@ -595,22 +610,7 @@ fn native_section_fluid_faces_to_sink<S: NativeFluidFaceSink>(
             } else {
                 MODEL_QUAD_FACING_UNASSIGNED
             };
-            let backward_face = fluid_semantic_native_face(
-                state,
-                block,
-                backward_facing,
-                true,
-                MODEL_QUAD_FACING_POS_Y as i32,
-                0,
-                top_face_kind,
-                0.0,
-                render_heights,
-                [0.0; 4],
-                top_record_uvs,
-                color,
-                1.0,
-                light,
-            );
+            let backward_face = flipped_fluid_back_face(top_face, backward_facing);
             fluid_semantic_record_diag(
                 block,
                 "top-back-record",
@@ -780,22 +780,7 @@ fn native_section_fluid_faces_to_sink<S: NativeFluidFaceSink>(
                 .add_optional_stage(PROFILE_FLUID_NATIVE_QUAD_APPEND, append_started);
             if !is_overlay {
                 let normal_backface_started = profile_start(profile_fluid_substages);
-                let back_face = fluid_semantic_native_face(
-                    state,
-                    block,
-                    opposite_facing,
-                    true,
-                    dir,
-                    MODEL_QUAD_FLAG_PARALLEL | MODEL_QUAD_FLAG_ALIGNED,
-                    FLUID_FACE_SIDE,
-                    y_offset,
-                    [h1, h2, 0.0, 0.0],
-                    [x1, z1, x2, z2],
-                    uvs,
-                    color,
-                    shade,
-                    light,
-                );
+                let back_face = flipped_fluid_back_face(side_face, opposite_facing);
                 fluid_semantic_record_diag(
                     block,
                     "side-back-record",
@@ -1452,6 +1437,29 @@ fn packed_fluid_normal(facing: usize, quad: &NativeQuad) -> i32 {
         MODEL_QUAD_FACING_NEG_Y => 0x00008100,
         MODEL_QUAD_FACING_NEG_Z => 0x00810000,
         _ => norm_i8_pack_from_quad(quad),
+    }
+}
+
+fn flipped_fluid_back_face(front: NativeFluidFace, mut facing: usize) -> NativeFluidFace {
+    if native_fluid_force_unassigned() {
+        facing = MODEL_QUAD_FACING_UNASSIGNED;
+    }
+    let mut quad = front.quad;
+    quad.vertices = [
+        quad.vertices[0],
+        quad.vertices[3],
+        quad.vertices[2],
+        quad.vertices[1],
+    ];
+    let packed_normal = if facing < MODEL_QUAD_FACING_COUNT - 1 {
+        flip_packed_normal(packed_fluid_normal(facing, &front.quad))
+    } else {
+        flip_packed_normal(front.packed_normal)
+    };
+    NativeFluidFace {
+        quad,
+        packed_normal,
+        facing,
     }
 }
 
