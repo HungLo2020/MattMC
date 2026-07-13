@@ -261,6 +261,7 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
         }
 
         renderData.setOcclusionData(occluder.resolve());
+        renderData.setNativeMeshingProfile(buffers.copyNativeMeshingProfile());
         var output = new ChunkBuildOutput(this.render, this.submitTime, translucentData, renderData.build(), meshes);
 
         if (sortEnabled) {

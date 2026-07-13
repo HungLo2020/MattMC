@@ -119,6 +119,17 @@ public class ChunkBuildBuffers {
         return this.builders.get(pass).getSectionBuilder().fluidSpriteMask();
     }
 
+    public long[] copyNativeMeshingProfile() {
+        long[] total = new long[NativeSectionMeshBuilder.Profile.METRIC_COUNT];
+        for (var builder : this.builders.values()) {
+            long[] profile = builder.getSectionBuilder().copyProfile();
+            for (int i = 0; i < total.length; i++) {
+                total[i] += profile[i];
+            }
+        }
+        return total;
+    }
+
     public void destroy() {
         for (var builder : this.builders.values()) {
             builder.destroy();

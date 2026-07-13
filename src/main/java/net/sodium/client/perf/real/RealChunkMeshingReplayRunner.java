@@ -1,9 +1,15 @@
 package net.sodium.client.perf.real;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.block.model.BakedQuad;
+import net.minecraft.client.renderer.block.model.BlockModelPart;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.SectionPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
@@ -19,12 +25,15 @@ import net.minecraft.world.level.block.TrapDoorBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Half;
+import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.block.state.properties.SlabType;
 import net.minecraft.world.level.block.state.properties.StairsShape;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.levelgen.WorldOptions;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import net.minecraft.hooks.GameHooks;
+import net.sodium.client.render.chunk.terrain.material.DefaultMaterials;
 import net.sodium.client.render.chunk.RenderSection;
 import net.sodium.client.render.chunk.compile.ChunkBuildContext;
 import net.sodium.client.render.chunk.compile.ChunkBuildOutput;
@@ -36,6 +45,7 @@ import net.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.render.chunk.translucent_sorting.SortBehavior;
 import net.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
+import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import net.sodium.client.util.task.CancellationToken;
 import net.sodium.client.world.LevelSlice;
 import net.sodium.client.world.cloned.ChunkRenderContext;
@@ -44,6 +54,8 @@ import org.joml.Vector3d;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.management.GarbageCollectorMXBean;
+import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
@@ -59,7 +71,12 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
     private static final String ENABLE_PROPERTY = "mattmc.realMeshingReplay";
     private static final String OUTPUT_PROPERTY = "mattmc.realMeshingReplay.output";
     private static final String WARMUP_PROPERTY = "mattmc.realMeshingReplay.warmup";
+    private static final String WARMUP_SECONDS_PROPERTY = "mattmc.realMeshingReplay.warmupSeconds";
     private static final String MEASURE_PROPERTY = "mattmc.realMeshingReplay.measure";
+    private static final String MEASURE_SECONDS_PROPERTY = "mattmc.realMeshingReplay.measureSeconds";
+    private static final String REBUILDS_PER_SAMPLE_PROPERTY = "mattmc.realMeshingReplay.rebuildsPerSample";
+    private static final String VALIDATE_EACH_SAMPLE_PROPERTY = "mattmc.realMeshingReplay.validateEachSample";
+    private static final String RUST_PROFILE_PROPERTY = "mattmc.realMeshingReplay.rustProfile";
     private static final String FIXTURE_PROPERTY = "mattmc.realMeshingReplay.fixture";
     private static final String WORLD_NAME = "MattMC Real Chunk Meshing Replay";
     private static final long WORLD_SEED = 0x4d6174744d435265L;
@@ -80,18 +97,26 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
     private final Path outputPath;
     private final int warmupIterations;
     private final int measurementIterations;
+    private final long warmupNanos;
+    private final long measurementNanos;
+    private final int rebuildsPerSample;
+    private final boolean validateEachSample;
     private final List<Fixture> fixtures;
     private Phase phase = Phase.WAITING_FOR_LEVEL;
     private int ticksInPhase;
-    private int centerSectionX;
-    private int centerSectionZ;
 
     private RealChunkMeshingReplayRunner(Path outputPath, int warmupIterations, int measurementIterations,
+            long warmupNanos, long measurementNanos, int rebuildsPerSample, boolean validateEachSample,
             String selectedFixture) {
         this.outputPath = outputPath;
         this.warmupIterations = warmupIterations;
         this.measurementIterations = measurementIterations;
+        this.warmupNanos = warmupNanos;
+        this.measurementNanos = measurementNanos;
+        this.rebuildsPerSample = Math.max(1, rebuildsPerSample);
+        this.validateEachSample = validateEachSample;
         List<Fixture> allFixtures = List.of(
+                new Fixture("empty"),
                 new Fixture("dense_cube"),
                 new Fixture("normal_surface"),
                 new Fixture("foliage_tinted"),
@@ -125,8 +150,36 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
 
         int warmup = Integer.getInteger(WARMUP_PROPERTY, 30);
         int measure = Integer.getInteger(MEASURE_PROPERTY, 80);
+        long warmupNanos = secondsPropertyToNanos(WARMUP_SECONDS_PROPERTY);
+        long measurementNanos = secondsPropertyToNanos(MEASURE_SECONDS_PROPERTY);
+        int rebuildsPerSample = Integer.getInteger(REBUILDS_PER_SAMPLE_PROPERTY, 1);
+        boolean validateEachSample = booleanProperty(VALIDATE_EACH_SAMPLE_PROPERTY, true);
         net.minecraft.hooks.HookRegistry.registerGameHook(new RealChunkMeshingReplayRunner(Path.of(output), warmup,
-                measure, System.getProperty(FIXTURE_PROPERTY)));
+                measure, warmupNanos, measurementNanos, rebuildsPerSample, validateEachSample,
+                System.getProperty(FIXTURE_PROPERTY)));
+    }
+
+    private static boolean booleanProperty(String property, boolean defaultValue) {
+        String value = System.getProperty(property);
+        if (value == null || value.isBlank()) {
+            return defaultValue;
+        }
+
+        return switch (value.trim().toLowerCase(Locale.ROOT)) {
+            case "1", "true", "yes", "on" -> true;
+            case "0", "false", "no", "off" -> false;
+            default -> throw new IllegalArgumentException("Invalid boolean value for " + property + ": " + value);
+        };
+    }
+
+    private static long secondsPropertyToNanos(String property) {
+        String value = System.getProperty(property, "0");
+        try {
+            double seconds = Double.parseDouble(value);
+            return seconds <= 0.0 ? 0L : (long) (seconds * 1_000_000_000.0);
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("Invalid seconds value for " + property + ": " + value, exception);
+        }
     }
 
     @Override
@@ -177,19 +230,20 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
                 return;
             }
 
-            this.centerSectionX = SECTION_X;
-            this.centerSectionZ = SECTION_Z;
             this.phase = Phase.POPULATING;
             this.ticksInPhase = 0;
             return;
         }
 
         if (this.phase == Phase.POPULATING) {
-            if (!this.fixtureChunksLoaded(minecraft, this.centerSectionX, this.centerSectionZ)) {
+            if (!this.fixtureChunksLoaded(minecraft)) {
                 return;
             }
 
-            clearFixtureVolume(minecraft, this.centerSectionX, this.centerSectionZ);
+            for (Fixture fixture : this.fixtures) {
+                FixtureSection section = sectionForFixture(fixture.name);
+                clearFixtureVolume(minecraft, section.sectionX, section.sectionZ);
+            }
             this.phase = Phase.WAITING_FOR_LIGHT;
             this.ticksInPhase = 0;
             return;
@@ -211,6 +265,16 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
             this.phase = Phase.DONE;
             minecraft.stop();
         }
+    }
+
+    private boolean fixtureChunksLoaded(Minecraft minecraft) {
+        for (Fixture fixture : this.fixtures) {
+            FixtureSection section = sectionForFixture(fixture.name);
+            if (!this.fixtureChunksLoaded(minecraft, section.sectionX, section.sectionZ)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private boolean fixtureChunksLoaded(Minecraft minecraft, int sectionX, int sectionZ) {
@@ -346,11 +410,17 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
 
         try (CloseableChunkBuildContext context = new CloseableChunkBuildContext(minecraft.level)) {
             for (Fixture fixture : this.fixtures) {
+                FixtureSection section = sectionForFixture(fixture.name);
                 System.out.println("[RealReplay] running fixture " + fixture.name);
-                clearFixtureVolume(minecraft, this.centerSectionX, this.centerSectionZ);
-                populateFixture(minecraft, fixture.name, this.centerSectionX, this.centerSectionZ);
+                if (!this.fixtureChunksLoaded(minecraft, section.sectionX, section.sectionZ)) {
+                    throw new IllegalStateException("Fixture chunks failed to load for " + fixture.name);
+                }
+                long setupStart = System.nanoTime();
+                clearFixtureVolume(minecraft, section.sectionX, section.sectionZ);
+                populateFixture(minecraft, fixture.name, section.sectionX, section.sectionZ);
                 minecraft.level.pollLightUpdates();
-                results.add(this.runFixture(minecraft, context, fixture));
+                long fixtureSetupNanos = System.nanoTime() - setupStart;
+                results.add(this.runFixture(minecraft, context, fixture, section, fixtureSetupNanos));
                 this.writeResults(new ResultDocument(results));
                 System.out.println("[RealReplay] finished fixture " + fixture.name);
             }
@@ -359,40 +429,97 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
         return new ResultDocument(results);
     }
 
-    private FixtureResult runFixture(Minecraft minecraft, ChunkBuildContext context, Fixture fixture) {
-        SectionPos sectionPos = SectionPos.of(this.centerSectionX, SECTION_Y, this.centerSectionZ);
+    private FixtureResult runFixture(Minecraft minecraft, ChunkBuildContext context, Fixture fixture,
+                                     FixtureSection section, long fixtureSetupNanos) {
+        SectionPos sectionPos = SectionPos.of(section.sectionX, SECTION_Y, section.sectionZ);
+        long contextStart = System.nanoTime();
         ClonedChunkSectionCache cache = new ClonedChunkSectionCache(minecraft.level);
         ChunkRenderContext renderContext = LevelSlice.prepare(minecraft.level, sectionPos, cache);
+        long renderContextNanos = System.nanoTime() - contextStart;
 
         if (renderContext == null) {
-            return FixtureResult.empty(fixture.name);
+            return FixtureResult.empty(fixture.name, FixtureFingerprint.forFixture(minecraft, fixture.name, section),
+                    new FixtureTiming(fixtureSetupNanos, renderContextNanos, 0L, 0L, 0L),
+                    GcDelta.empty(), GcDelta.empty());
         }
 
-        for (int i = 0; i < this.warmupIterations; i++) {
-            System.out.println("[RealReplay] warmup " + fixture.name + " " + (i + 1) + "/" + this.warmupIterations);
-            ChunkBuildOutput output = executeTask(sectionPos, renderContext, context);
-            if (output != null) {
-                output.destroy();
-            }
-        }
+        long fingerprintStart = System.nanoTime();
+        FixtureFingerprint fingerprint = FixtureFingerprint.forFixture(minecraft, fixture.name, section);
+        long fingerprintNanos = System.nanoTime() - fingerprintStart;
 
-        long[] times = new long[this.measurementIterations];
-        ChunkSummary lastSummary = null;
-        for (int i = 0; i < this.measurementIterations; i++) {
-            System.out.println("[RealReplay] measure execute " + fixture.name + " " + (i + 1) + "/" + this.measurementIterations);
+        List<Long> warmupTimes = new ArrayList<>();
+        long warmupStart = System.nanoTime();
+        GcSnapshot beforeWarmupGc = GcSnapshot.capture();
+        while (warmupTimes.size() < this.warmupIterations || System.nanoTime() - warmupStart < this.warmupNanos) {
+            int i = warmupTimes.size();
+            System.out.println("[RealReplay] warmup " + fixture.name + " " + (i + 1));
             long start = System.nanoTime();
             ChunkBuildOutput output = executeTask(sectionPos, renderContext, context);
-            long elapsed = System.nanoTime() - start;
-            times[i] = elapsed;
-            System.out.println("[RealReplay] measure summarize " + fixture.name + " " + (i + 1) + "/" + this.measurementIterations);
-            lastSummary = summarize(fixture.name, output);
+            warmupTimes.add(System.nanoTime() - start);
             if (output != null) {
-                System.out.println("[RealReplay] measure destroy " + fixture.name + " " + (i + 1) + "/" + this.measurementIterations);
                 output.destroy();
             }
         }
+        GcSnapshot afterWarmupGc = GcSnapshot.capture();
 
-        return new FixtureResult(fixture.name, false, times, lastSummary);
+        List<Long> rebuildTimes = new ArrayList<>();
+        List<Long> sampleBatchTimes = new ArrayList<>();
+        List<Long> canonicalHashList = new ArrayList<>();
+        ChunkSummary lastSummary = null;
+        long validationNanos = 0L;
+        GcSnapshot beforeMeasureGc = GcSnapshot.capture();
+        long measureStart = System.nanoTime();
+        while (sampleBatchTimes.size() < this.measurementIterations || System.nanoTime() - measureStart < this.measurementNanos) {
+            int i = sampleBatchTimes.size();
+            System.out.println("[RealReplay] measure execute " + fixture.name + " " + (i + 1));
+            ChunkBuildOutput[] outputs = new ChunkBuildOutput[this.rebuildsPerSample];
+            long start = System.nanoTime();
+            for (int rebuild = 0; rebuild < this.rebuildsPerSample; rebuild++) {
+                outputs[rebuild] = executeTask(sectionPos, renderContext, context);
+            }
+            long elapsed = System.nanoTime() - start;
+            sampleBatchTimes.add(elapsed);
+            rebuildTimes.add(elapsed / this.rebuildsPerSample);
+            if (this.validateEachSample) {
+                System.out.println("[RealReplay] measure summarize " + fixture.name + " " + (i + 1));
+                long validationStart = System.nanoTime();
+                lastSummary = summarize(fixture.name, outputs[outputs.length - 1]);
+                canonicalHashList.add(lastSummary.canonicalHash());
+                validationNanos += System.nanoTime() - validationStart;
+            }
+            for (ChunkBuildOutput output : outputs) {
+                if (output != null) {
+                    output.destroy();
+                }
+            }
+        }
+        GcSnapshot afterMeasureGc = GcSnapshot.capture();
+        if (!this.validateEachSample) {
+            long validationStart = System.nanoTime();
+            ChunkBuildOutput output = executeTask(sectionPos, renderContext, context);
+            lastSummary = summarize(fixture.name, output);
+            canonicalHashList.add(lastSummary.canonicalHash());
+            if (output != null) {
+                output.destroy();
+            }
+            validationNanos += System.nanoTime() - validationStart;
+        }
+        long[] canonicalHashes = toLongArray(canonicalHashList);
+        verifyStableCanonicalHashes(fixture.name, canonicalHashes);
+
+        return new FixtureResult(fixture.name, false, toLongArray(rebuildTimes), toLongArray(sampleBatchTimes),
+                toLongArray(warmupTimes), this.rebuildsPerSample, fingerprint, canonicalHashes,
+                new FixtureTiming(fixtureSetupNanos, renderContextNanos, fingerprintNanos, validationNanos,
+                        sampleBatchTimes.size() * (long) this.rebuildsPerSample),
+                afterWarmupGc.deltaSince(beforeWarmupGc), afterMeasureGc.deltaSince(beforeMeasureGc), lastSummary);
+    }
+
+    private static long[] toLongArray(List<Long> values) {
+        long[] array = new long[values.size()];
+        for (int i = 0; i < values.size(); i++) {
+            array[i] = values.get(i);
+        }
+        return array;
     }
 
     private static ChunkBuildOutput executeTask(SectionPos sectionPos, ChunkRenderContext renderContext,
@@ -414,6 +541,7 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
         int totalVertexBytes = 0;
         int totalVertices = 0;
         long checksum = 1469598103934665603L;
+        long canonicalHash = 1469598103934665603L;
         List<PassSummary> passes = new ArrayList<>();
 
         for (TerrainRenderPass pass : DefaultTerrainRenderPasses.ALL) {
@@ -433,13 +561,17 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
             totalVertexBytes += bytes;
             totalVertices += vertices;
             checksum = checksum(checksum, data.duplicate());
-            passes.add(PassSummary.fromMesh(fixture, passName(pass), mesh, data.duplicate(), vertices, bytes));
+            PassSummary passSummary = PassSummary.fromMesh(fixture, passName(pass), output.render.getSectionIndex(),
+                    mesh, data.duplicate(), vertices, bytes);
+            canonicalHash = checksum(canonicalHash, passSummary.canonicalKey());
+            passes.add(passSummary);
         }
 
         int blockEntities = count(output.info.globalBlockEntities) + count(output.info.culledBlockEntities);
         List<String> animatedSpriteNames = animatedSpriteNames(output.info.animatedSprites);
         return new ChunkSummary(passCount, totalVertices, totalVertexBytes, checksum, blockEntities,
-                animatedSpriteNames.size(), animatedSpriteNames, fallbackBlocks(output), fallbackQuads(output), passes);
+                animatedSpriteNames.size(), animatedSpriteNames, fallbackBlocks(output), fallbackQuads(output),
+                nativeProfile(output), canonicalHash, passes);
     }
 
     private static long checksum(long seed, ByteBuffer data) {
@@ -453,6 +585,24 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
 
     private static long checksum(ByteBuffer data) {
         return checksum(1469598103934665603L, data);
+    }
+
+    private static long checksum(long seed, String value) {
+        long hash = seed;
+        for (int i = 0; i < value.length(); i++) {
+            hash ^= value.charAt(i);
+            hash *= 1099511628211L;
+        }
+        return hash;
+    }
+
+    private static long checksum(long seed, long value) {
+        long hash = seed;
+        for (int i = 0; i < Long.BYTES; i++) {
+            hash ^= (value >>> (i * 8)) & 0xffL;
+            hash *= 1099511628211L;
+        }
+        return hash;
     }
 
     private static int count(Object[] array) {
@@ -480,6 +630,18 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
 
     private static int fallbackQuads(ChunkBuildOutput output) {
         return intField(output.info, "nativeMeshingFallbackQuads");
+    }
+
+    private static long[] nativeProfile(ChunkBuildOutput output) {
+        try {
+            Field field = output.info.getClass().getField("nativeMeshingProfile");
+            Object value = field.get(output.info);
+            if (value instanceof long[] profile) {
+                return profile.clone();
+            }
+        } catch (ReflectiveOperationException ignored) {
+        }
+        return new long[0];
     }
 
     private static int intField(Object target, String fieldName) {
@@ -512,7 +674,25 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
     }
 
     private static String uniqueWorldId() {
-        return "mattmc-real-meshing-replay-" + Long.toUnsignedString(System.nanoTime(), 36).toLowerCase(Locale.ROOT);
+        return "mattmc-real-meshing-replay";
+    }
+
+    private static FixtureSection sectionForFixture(String fixture) {
+        long seed = checksum(checksum(1469598103934665603L, WORLD_SEED), fixture);
+        return new FixtureSection(SECTION_X, SECTION_Y, SECTION_Z, seed);
+    }
+
+    private static void verifyStableCanonicalHashes(String fixture, long[] hashes) {
+        if (hashes.length < 2) {
+            return;
+        }
+        long expected = hashes[0];
+        for (int i = 1; i < hashes.length; i++) {
+            if (hashes[i] != expected) {
+                throw new IllegalStateException("Fixture " + fixture + " produced nondeterministic canonical mesh hash in one process: iteration 1="
+                        + Long.toUnsignedString(expected) + ", iteration " + (i + 1) + "=" + Long.toUnsignedString(hashes[i]));
+            }
+        }
     }
 
     private interface StateFactory {
@@ -546,6 +726,178 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
     private record Fixture(String name) {
     }
 
+    private record FixtureSection(int sectionX, int sectionY, int sectionZ, long fixtureSeed) {
+    }
+
+    private record FixtureFingerprint(long worldSeed, int sectionX, int sectionY, int sectionZ,
+                                      long fixtureSeed, long blockFluidStateHash, long modelRegistryHash,
+                                      long spriteMaterialMappingHash, long selectedWeightedMultipartChildHash,
+                                      long selectedModelGeometryHash, long lightHash) {
+        private static FixtureFingerprint forFixture(Minecraft minecraft, String fixture, FixtureSection section) {
+            long blockFluid = 1469598103934665603L;
+            long models = 1469598103934665603L;
+            long spriteMaterials = 1469598103934665603L;
+            long weightedSeeds = 1469598103934665603L;
+            long selectedModelGeometry = 1469598103934665603L;
+            long light = 1469598103934665603L;
+            int originX = SectionPos.sectionToBlockCoord(section.sectionX);
+            int originY = SectionPos.sectionToBlockCoord(section.sectionY);
+            int originZ = SectionPos.sectionToBlockCoord(section.sectionZ);
+            BlockPos.MutableBlockPos blockPos = new BlockPos.MutableBlockPos();
+
+            for (int y = 0; y < 16; y++) {
+                for (int z = 0; z < 16; z++) {
+                    for (int x = 0; x < 16; x++) {
+                        BlockState state = fixtureState(fixture, x, y, z);
+                        FluidState fluidState = state.getFluidState();
+                        String stateKey = stableStateKey(state);
+                        String fluidKey = stableFluidKey(fluidState);
+                        blockPos.set(originX + x, originY + y, originZ + z);
+
+                        blockFluid = checksum(checksum(checksum(blockFluid, x), y), z);
+                        blockFluid = checksum(blockFluid, stateKey);
+                        blockFluid = checksum(blockFluid, fluidKey);
+
+                        if (!state.isAir()) {
+                            try {
+                                var model = minecraft.getBlockRenderer().getBlockModel(state);
+                                models = checksum(models, model.getClass().getName());
+                                if (model.particleIcon() != null && model.particleIcon().contents() != null) {
+                                    models = checksum(models, model.particleIcon().contents().name().toString());
+                                }
+                            } catch (RuntimeException exception) {
+                                models = checksum(models, "model-error:" + exception.getClass().getName());
+                            }
+
+                            spriteMaterials = checksum(spriteMaterials, stateKey);
+                            spriteMaterials = checksum(spriteMaterials, DefaultMaterials.forBlockState(state).bits());
+                            spriteMaterials = checksum(spriteMaterials, passName(DefaultMaterials.forBlockState(state).pass));
+                        }
+
+                        if (!fluidState.isEmpty()) {
+                            spriteMaterials = checksum(spriteMaterials, fluidKey);
+                            spriteMaterials = checksum(spriteMaterials, DefaultMaterials.forFluidState(fluidState).bits());
+                            spriteMaterials = checksum(spriteMaterials, passName(DefaultMaterials.forFluidState(fluidState).pass));
+                        }
+
+                        long modelSeed = state.getSeed(blockPos);
+                        weightedSeeds = checksum(weightedSeeds, section.fixtureSeed);
+                        weightedSeeds = checksum(weightedSeeds, modelSeed);
+                        weightedSeeds = checksum(weightedSeeds, stateKey);
+
+                        light = checksum(light, LevelRenderer.getLightColor(minecraft.level, blockPos));
+                        selectedModelGeometry = checksumSelectedModelGeometry(selectedModelGeometry, minecraft, state, blockPos, modelSeed);
+                    }
+                }
+            }
+
+            return new FixtureFingerprint(WORLD_SEED, section.sectionX, section.sectionY, section.sectionZ,
+                    section.fixtureSeed, blockFluid, models, spriteMaterials, weightedSeeds, selectedModelGeometry, light);
+        }
+
+        private void appendJson(StringBuilder builder, String indent) {
+            builder.append("{\n");
+            builder.append(indent).append("  \"world_seed\": ").append(quote(Long.toUnsignedString(this.worldSeed))).append(",\n");
+            builder.append(indent).append("  \"section\": [").append(this.sectionX).append(", ")
+                    .append(this.sectionY).append(", ").append(this.sectionZ).append("],\n");
+            builder.append(indent).append("  \"fixture_seed\": ").append(quote(Long.toUnsignedString(this.fixtureSeed))).append(",\n");
+            builder.append(indent).append("  \"block_fluid_state_hash\": ").append(quote(Long.toUnsignedString(this.blockFluidStateHash))).append(",\n");
+            builder.append(indent).append("  \"model_selector_registry_hash\": ").append(quote(Long.toUnsignedString(this.modelRegistryHash))).append(",\n");
+            builder.append(indent).append("  \"sprite_material_mapping_hash\": ").append(quote(Long.toUnsignedString(this.spriteMaterialMappingHash))).append(",\n");
+            builder.append(indent).append("  \"selected_weighted_multipart_child_hash\": ")
+                    .append(quote(Long.toUnsignedString(this.selectedWeightedMultipartChildHash))).append(",\n");
+            builder.append(indent).append("  \"selected_model_geometry_hash\": ")
+                    .append(quote(Long.toUnsignedString(this.selectedModelGeometryHash))).append(",\n");
+            builder.append(indent).append("  \"light_hash\": ").append(quote(Long.toUnsignedString(this.lightHash))).append("\n");
+            builder.append(indent).append("}");
+        }
+    }
+
+    private static long checksumSelectedModelGeometry(long seed, Minecraft minecraft, BlockState state,
+                                                      BlockPos blockPos, long modelSeed) {
+        if (state.isAir() || state.getRenderShape() != net.minecraft.world.level.block.RenderShape.MODEL) {
+            return checksum(seed, "no-model");
+        }
+
+        long hash = checksum(seed, stableStateKey(state));
+        try {
+            List<BlockModelPart> parts = new ArrayList<>();
+            minecraft.getBlockRenderer().getBlockModel(state).collectParts(RandomSource.create(modelSeed), parts);
+            hash = checksum(hash, parts.size());
+            for (BlockModelPart part : parts) {
+                hash = checksum(hash, part.getClass().getName());
+                hash = checksum(hash, part.useAmbientOcclusion() ? 1L : 0L);
+                hash = checksum(hash, spriteName(part.particleIcon()));
+                for (int faceIndex = -1; faceIndex < Direction.values().length; faceIndex++) {
+                    Direction direction = faceIndex < 0 ? null : Direction.from3DDataValue(faceIndex);
+                    List<BakedQuad> quads = part.getQuads(direction);
+                    hash = checksum(hash, faceIndex);
+                    hash = checksum(hash, quads.size());
+                    for (BakedQuad quad : quads) {
+                        hash = checksum(hash, quad.direction().ordinal());
+                        hash = checksum(hash, quad.tintIndex());
+                        hash = checksum(hash, quad.shade() ? 1L : 0L);
+                        hash = checksum(hash, quad.lightEmission());
+                        hash = checksum(hash, spriteName(quad.sprite()));
+                        for (int word : quad.vertices()) {
+                            hash = checksum(hash, word);
+                        }
+                    }
+                }
+            }
+        } catch (RuntimeException exception) {
+            hash = checksum(hash, "model-geometry-error:" + exception.getClass().getName());
+        }
+        return hash;
+    }
+
+    private static String spriteName(net.minecraft.client.renderer.texture.TextureAtlasSprite sprite) {
+        if (sprite == null || sprite.contents() == null) {
+            return "";
+        }
+        return sprite.contents().name().toString();
+    }
+
+    private static String stableStateKey(BlockState state) {
+        StringBuilder builder = new StringBuilder();
+        builder.append(BuiltInRegistries.BLOCK.getKey(state.getBlock()));
+        appendSortedProperties(builder, state.getValues());
+        return builder.toString();
+    }
+
+    private static String stableFluidKey(FluidState state) {
+        if (state.isEmpty()) {
+            return "minecraft:empty";
+        }
+        StringBuilder builder = new StringBuilder();
+        builder.append(BuiltInRegistries.FLUID.getKey(state.getType()));
+        appendSortedProperties(builder, state.getValues());
+        return builder.toString();
+    }
+
+    private static <T extends Comparable<T>> void appendSortedProperties(StringBuilder builder,
+                                                                        Map<Property<?>, Comparable<?>> values) {
+        values.entrySet().stream()
+                .sorted(Comparator.comparing(entry -> entry.getKey().getName()))
+                .forEach(entry -> appendProperty(builder, entry.getKey(), entry.getValue()));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T extends Comparable<T>> void appendProperty(StringBuilder builder, Property<?> property,
+                                                                 Comparable<?> value) {
+        Property<T> typed = (Property<T>) property;
+        builder.append('[')
+                .append(property.getName())
+                .append('=')
+                .append(typed.getName((T) value))
+                .append(']');
+    }
+
+    private BenchmarkProtocol protocol() {
+        return BenchmarkProtocol.current(this.warmupIterations, this.warmupNanos, this.measurementIterations,
+                this.measurementNanos, this.rebuildsPerSample, this.validateEachSample);
+    }
+
     private record ResultDocument(List<FixtureResult> fixtures) {
         private String toJson() {
             StringBuilder builder = new StringBuilder(16384);
@@ -553,6 +905,9 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
             builder.append("  \"status\": \"ok\",\n");
             builder.append("  \"timestamp\": ").append(quote(Instant.now().toString())).append(",\n");
             builder.append("  \"runner\": \"real-production-chunk-meshing\",\n");
+            builder.append("  \"protocol\": ");
+            BenchmarkProtocol.currentFromSystem().appendJson(builder, "  ");
+            builder.append(",\n");
             builder.append("  \"fixtures\": [\n");
             for (int i = 0; i < this.fixtures.size(); i++) {
                 if (i > 0) builder.append(",\n");
@@ -564,10 +919,114 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
         }
     }
 
+    private record BenchmarkProtocol(int warmupIterations, long warmupNanos, int measurementIterations,
+                                     long measurementNanos, int rebuildsPerSample, boolean validateEachSample,
+                                     String rustProfile, String nativesDir, List<String> jvmArgs,
+                                     Map<String, String> profileEnvironment) {
+        private static BenchmarkProtocol current(int warmupIterations, long warmupNanos, int measurementIterations,
+                                                 long measurementNanos, int rebuildsPerSample,
+                                                 boolean validateEachSample) {
+            return new BenchmarkProtocol(warmupIterations, warmupNanos, measurementIterations, measurementNanos,
+                    rebuildsPerSample, validateEachSample, System.getProperty(RUST_PROFILE_PROPERTY, "unknown"),
+                    System.getProperty("mattmc.rust.natives.dir", ""),
+                    ManagementFactory.getRuntimeMXBean().getInputArguments(),
+                    Map.of(
+                            "MATTMC_PROFILE_STATIC_MODEL_SUBSTAGES", System.getenv().getOrDefault("MATTMC_PROFILE_STATIC_MODEL_SUBSTAGES", ""),
+                            "MATTMC_PROFILE_SCAN_SUBSTAGES", System.getenv().getOrDefault("MATTMC_PROFILE_SCAN_SUBSTAGES", ""),
+                            "MATTMC_PROFILE_STAGING_SUBSTAGES", System.getenv().getOrDefault("MATTMC_PROFILE_STAGING_SUBSTAGES", ""),
+                            "MATTMC_PROFILE_FLUID_SUBSTAGES", System.getenv().getOrDefault("MATTMC_PROFILE_FLUID_SUBSTAGES", "")
+                    ));
+        }
+
+        private static BenchmarkProtocol currentFromSystem() {
+            int warmup = Integer.getInteger(WARMUP_PROPERTY, 30);
+            int measure = Integer.getInteger(MEASURE_PROPERTY, 80);
+            return current(warmup, secondsPropertyToNanos(WARMUP_SECONDS_PROPERTY), measure,
+                    secondsPropertyToNanos(MEASURE_SECONDS_PROPERTY),
+                    Math.max(1, Integer.getInteger(REBUILDS_PER_SAMPLE_PROPERTY, 1)),
+                    booleanProperty(VALIDATE_EACH_SAMPLE_PROPERTY, true));
+        }
+
+        private void appendJson(StringBuilder builder, String indent) {
+            builder.append("{\n");
+            builder.append(indent).append("  \"warmup_iterations_min\": ").append(this.warmupIterations).append(",\n");
+            builder.append(indent).append("  \"warmup_seconds_min\": ").append(this.warmupNanos / 1_000_000_000.0).append(",\n");
+            builder.append(indent).append("  \"measurement_samples_min\": ").append(this.measurementIterations).append(",\n");
+            builder.append(indent).append("  \"measurement_seconds_min\": ").append(this.measurementNanos / 1_000_000_000.0).append(",\n");
+            builder.append(indent).append("  \"rebuilds_per_sample\": ").append(this.rebuildsPerSample).append(",\n");
+            builder.append(indent).append("  \"reported_sample_unit\": \"nanoseconds per section rebuild, normalized from the timed batch\",\n");
+            builder.append(indent).append("  \"timed_scope\": \"ChunkBuilderMeshingTask.execute only; fixture reset, LevelSlice.prepare, fingerprinting, canonicalization, JSON, logging, and output destroy are outside the timer\",\n");
+            builder.append(indent).append("  \"validate_each_sample\": ").append(this.validateEachSample).append(",\n");
+            builder.append(indent).append("  \"rust_profile\": ").append(quote(this.rustProfile)).append(",\n");
+            builder.append(indent).append("  \"native_library_dir\": ").append(quote(this.nativesDir)).append(",\n");
+            builder.append(indent).append("  \"jvm_args\": ");
+            appendStringList(builder, this.jvmArgs);
+            builder.append(",\n");
+            builder.append(indent).append("  \"profile_environment\": {");
+            int index = 0;
+            for (Map.Entry<String, String> entry : this.profileEnvironment.entrySet()) {
+                if (index++ > 0) builder.append(", ");
+                builder.append(quote(entry.getKey())).append(": ").append(quote(entry.getValue()));
+            }
+            builder.append("}\n");
+            builder.append(indent).append("}");
+        }
+    }
+
+    private record GcSnapshot(long collections, long collectionTimeMillis) {
+        private static GcSnapshot capture() {
+            long collections = 0L;
+            long time = 0L;
+            for (GarbageCollectorMXBean bean : ManagementFactory.getGarbageCollectorMXBeans()) {
+                long count = bean.getCollectionCount();
+                long millis = bean.getCollectionTime();
+                if (count > 0) collections += count;
+                if (millis > 0) time += millis;
+            }
+            return new GcSnapshot(collections, time);
+        }
+
+        private GcDelta deltaSince(GcSnapshot before) {
+            return new GcDelta(this.collections - before.collections,
+                    this.collectionTimeMillis - before.collectionTimeMillis);
+        }
+    }
+
+    private record GcDelta(long collections, long collectionTimeMillis) {
+        private static GcDelta empty() {
+            return new GcDelta(0L, 0L);
+        }
+
+        private void appendJson(StringBuilder builder) {
+            builder.append("{\"collections\": ").append(this.collections)
+                    .append(", \"collection_time_ms\": ").append(this.collectionTimeMillis)
+                    .append("}");
+        }
+    }
+
+    private record FixtureTiming(long fixtureResetAndPopulationNanos, long renderContextCreationNanos,
+                                 long fingerprintNanos, long validationNanos, long executeInvocations) {
+        private void appendJson(StringBuilder builder, String indent) {
+            builder.append("{\n");
+            builder.append(indent).append("  \"fixture_reset_and_population_ns\": ").append(this.fixtureResetAndPopulationNanos).append(",\n");
+            builder.append(indent).append("  \"render_context_creation_ns\": ").append(this.renderContextCreationNanos).append(",\n");
+            builder.append(indent).append("  \"fingerprinting_ns\": ").append(this.fingerprintNanos).append(",\n");
+            builder.append(indent).append("  \"canonicalization_and_validation_ns\": ").append(this.validationNanos).append(",\n");
+            builder.append(indent).append("  \"chunk_builder_execute_invocations\": ").append(this.executeInvocations).append(",\n");
+            builder.append(indent).append("  \"sections_meshed\": ").append(this.executeInvocations).append("\n");
+            builder.append(indent).append("}");
+        }
+    }
+
     private record FixtureResult(String name, boolean skippedByProductionEmptySection, long[] times,
+                                 long[] sampleBatchTimes, long[] warmupTimes, int rebuildsPerSample,
+                                 FixtureFingerprint fingerprint, long[] canonicalHashes,
+                                 FixtureTiming timing, GcDelta warmupGc, GcDelta measurementGc,
                                  ChunkSummary summary) {
-        private static FixtureResult empty(String name) {
-            return new FixtureResult(name, true, new long[0], ChunkSummary.empty());
+        private static FixtureResult empty(String name, FixtureFingerprint fingerprint, FixtureTiming timing,
+                                           GcDelta warmupGc, GcDelta measurementGc) {
+            return new FixtureResult(name, true, new long[0], new long[0], new long[0], 1,
+                    fingerprint, new long[0], timing, warmupGc, measurementGc, ChunkSummary.empty());
         }
 
         private void appendJson(StringBuilder builder, String indent) {
@@ -578,6 +1037,34 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
             builder.append(indent).append("  \"mean_ns\": ").append(mean(this.times)).append(",\n");
             builder.append(indent).append("  \"median_ns\": ").append(median(this.times)).append(",\n");
             builder.append(indent).append("  \"best_ns\": ").append(best(this.times)).append(",\n");
+            builder.append(indent).append("  \"rebuilds_per_sample\": ").append(this.rebuildsPerSample).append(",\n");
+            builder.append(indent).append("  \"raw_rebuild_times_ns\": ");
+            appendLongArray(builder, this.times);
+            builder.append(",\n");
+            builder.append(indent).append("  \"raw_sample_batch_times_ns\": ");
+            appendLongArray(builder, this.sampleBatchTimes);
+            builder.append(",\n");
+            builder.append(indent).append("  \"warmup_execute_times_ns\": ");
+            appendLongArray(builder, this.warmupTimes);
+            builder.append(",\n");
+            builder.append(indent).append("  \"timing\": ");
+            this.timing.appendJson(builder, indent + "  ");
+            builder.append(",\n");
+            builder.append(indent).append("  \"warmup_gc\": ");
+            this.warmupGc.appendJson(builder);
+            builder.append(",\n");
+            builder.append(indent).append("  \"measurement_gc\": ");
+            this.measurementGc.appendJson(builder);
+            builder.append(",\n");
+            builder.append(indent).append("  \"fingerprint\": ");
+            this.fingerprint.appendJson(builder, indent + "  ");
+            builder.append(",\n");
+            builder.append(indent).append("  \"iteration_canonical_hashes\": [");
+            for (int i = 0; i < this.canonicalHashes.length; i++) {
+                if (i > 0) builder.append(", ");
+                builder.append(quote(Long.toUnsignedString(this.canonicalHashes[i])));
+            }
+            builder.append("],\n");
             builder.append(indent).append("  \"summary\": ");
             this.summary.appendJson(builder, indent + "  ");
             builder.append("\n").append(indent).append("}");
@@ -608,9 +1095,12 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
     private record ChunkSummary(int passCount, int totalVertices, int totalVertexBytes, long checksum,
                                 int blockEntities, int animatedSprites, List<String> animatedSpriteNames,
                                 int fallbackBlocks, int fallbackQuads,
+                                long[] nativeProfile,
+                                long canonicalHash,
                                 List<PassSummary> passes) {
         private static ChunkSummary empty() {
-            return new ChunkSummary(0, 0, 0, 1469598103934665603L, 0, 0, List.of(), 0, 0, List.of());
+            return new ChunkSummary(0, 0, 0, 1469598103934665603L, 0, 0, List.of(), 0, 0,
+                    new long[0], 1469598103934665603L, List.of());
         }
 
         private void appendJson(StringBuilder builder, String indent) {
@@ -619,6 +1109,7 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
             builder.append(indent).append("  \"total_vertices\": ").append(this.totalVertices).append(",\n");
             builder.append(indent).append("  \"total_vertex_bytes\": ").append(this.totalVertexBytes).append(",\n");
             builder.append(indent).append("  \"checksum\": ").append(Long.toUnsignedString(this.checksum)).append(",\n");
+            builder.append(indent).append("  \"canonical_hash\": ").append(quote(Long.toUnsignedString(this.canonicalHash))).append(",\n");
             builder.append(indent).append("  \"block_entities\": ").append(this.blockEntities).append(",\n");
             builder.append(indent).append("  \"animated_sprites\": ").append(this.animatedSprites).append(",\n");
             builder.append(indent).append("  \"animated_sprite_names\": [");
@@ -629,6 +1120,7 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
             builder.append("],\n");
             builder.append(indent).append("  \"fallback_blocks\": ").append(this.fallbackBlocks).append(",\n");
             builder.append(indent).append("  \"fallback_quads\": ").append(this.fallbackQuads).append(",\n");
+            appendProfileJson(builder, indent, this.nativeProfile);
             builder.append(indent).append("  \"passes\": [");
             for (int i = 0; i < this.passes.size(); i++) {
                 if (i > 0) builder.append(", ");
@@ -639,12 +1131,37 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
         }
     }
 
+    private static void appendProfileJson(StringBuilder builder, String indent, long[] nativeProfile) {
+        builder.append(indent).append("  \"native_profile\": {");
+        if (nativeProfile.length == NativeSectionMeshBuilder.Profile.METRIC_COUNT) {
+            builder.append("\n");
+            builder.append(indent).append("    \"stages_nanos\": {");
+            for (int i = 0; i < NativeSectionMeshBuilder.Profile.STAGE_NAMES.length; i++) {
+                if (i > 0) builder.append(", ");
+                builder.append(quote(NativeSectionMeshBuilder.Profile.STAGE_NAMES[i]))
+                        .append(": ").append(nativeProfile[i]);
+            }
+            builder.append("},\n");
+            builder.append(indent).append("    \"counts\": {");
+            int countOffset = NativeSectionMeshBuilder.Profile.STAGE_COUNT;
+            for (int i = 0; i < NativeSectionMeshBuilder.Profile.COUNT_NAMES.length; i++) {
+                if (i > 0) builder.append(", ");
+                builder.append(quote(NativeSectionMeshBuilder.Profile.COUNT_NAMES[i]))
+                        .append(": ").append(nativeProfile[countOffset + i]);
+            }
+            builder.append("}\n");
+            builder.append(indent).append("  },\n");
+        } else {
+            builder.append("},\n");
+        }
+    }
+
     private record PassSummary(String name, int vertices, int bytes, long checksum, int[] vertexSegments,
                                List<CanonicalQuad> quads) {
-        private static PassSummary fromMesh(String fixture, String name, BuiltSectionMeshParts mesh, ByteBuffer data, int vertices,
-                                            int bytes) {
+        private static PassSummary fromMesh(String fixture, String name, int sectionIndex, BuiltSectionMeshParts mesh,
+                                            ByteBuffer data, int vertices, int bytes) {
             int[] segments = mesh.getVertexSegments().clone();
-            List<CanonicalQuad> quads = canonicalizeQuads(fixture, name, data, segments);
+            List<CanonicalQuad> quads = canonicalizeQuads(fixture, name, sectionIndex, data, segments);
             return new PassSummary(name, vertices, bytes, RealChunkMeshingReplayRunner.checksum(data.duplicate()), segments, quads);
         }
 
@@ -665,9 +1182,20 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
             }
             builder.append("]}");
         }
+
+        private String canonicalKey() {
+            StringBuilder builder = new StringBuilder(this.quads.size() * 96);
+            builder.append(this.name).append('|');
+            for (CanonicalQuad quad : this.quads) {
+                builder.append(quad.sortKey()).append('#').append(quad.rawKey()).append('\n');
+            }
+            return builder.toString();
+        }
     }
 
-    private static List<CanonicalQuad> canonicalizeQuads(String fixture, String pass, ByteBuffer data, int[] vertexSegments) {
+    private static List<CanonicalQuad> canonicalizeQuads(String fixture, String pass, int sectionIndex, ByteBuffer data,
+                                                         int[] vertexSegments) {
+        data.order(ByteOrder.nativeOrder());
         List<CanonicalQuad> quads = new ArrayList<>();
         int vertexCursor = 0;
         int stride = 20;
@@ -689,7 +1217,8 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
                     int color = data.getInt(offset + 8);
                     int texture = data.getInt(offset + 12);
                     int lightMaterialSection = data.getInt(offset + 16);
-                    vertices[vertex] = new CanonicalVertex(positionHi, positionLo, color, texture, lightMaterialSection);
+                    vertices[vertex] = new CanonicalVertex(positionHi, positionLo, color, texture,
+                            PackedVertexMetadata.decode(lightMaterialSection, sectionIndex));
                 }
                 quads.add(CanonicalQuad.from(fixture, pass, facing, facingIndex, vertices));
             }
@@ -856,7 +1385,39 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
         return Math.max(0, Math.min(15, value));
     }
 
-    private record CanonicalVertex(int positionHi, int positionLo, int color, int texture, int lightMaterialSection) {
+    private record PackedVertexMetadata(int rawWord, int blockLight, int skyLight, int materialBits,
+                                        boolean mipmapped, int alphaCutoffOrdinal, int unusedMaterialBits,
+                                        int sectionIndex, boolean sectionMatches) {
+        private static PackedVertexMetadata decode(int rawWord, int expectedSectionIndex) {
+            int blockLight = rawWord & 0xff;
+            int skyLight = (rawWord >>> 8) & 0xff;
+            int materialBits = (rawWord >>> 16) & 0xff;
+            int sectionIndex = (rawWord >>> 24) & 0xff;
+            return new PackedVertexMetadata(rawWord, blockLight, skyLight, materialBits,
+                    (materialBits & 1) != 0, (materialBits >>> 1) & 0x3, materialBits & ~0x7,
+                    sectionIndex, sectionIndex == (expectedSectionIndex & 0xff));
+        }
+
+        private String semanticKey() {
+            return this.blockLight + "," + this.skyLight + "," + this.materialBits + "," + this.sectionIndex;
+        }
+
+        private void appendJson(StringBuilder builder) {
+            builder.append("{\"block_light\": ").append(this.blockLight)
+                    .append(", \"sky_light\": ").append(this.skyLight)
+                    .append(", \"material_bits\": ").append(this.materialBits)
+                    .append(", \"mipmapped\": ").append(this.mipmapped)
+                    .append(", \"alpha_cutoff_ordinal\": ").append(this.alphaCutoffOrdinal)
+                    .append(", \"unused_material_bits\": ").append(this.unusedMaterialBits)
+                    .append(", \"section_index\": ").append(this.sectionIndex)
+                    .append(", \"section_matches_output\": ").append(this.sectionMatches)
+                    .append(", \"raw_word\": ").append(Integer.toUnsignedString(this.rawWord))
+                    .append("}");
+        }
+    }
+
+    private record CanonicalVertex(int positionHi, int positionLo, int color, int texture,
+                                   PackedVertexMetadata metadata) {
         private int x20() {
             return ((this.positionHi & 0x3ff) << 10) | (this.positionLo & 0x3ff);
         }
@@ -874,16 +1435,35 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
                     Integer.toUnsignedString(this.positionLo) + ',' +
                     Integer.toUnsignedString(this.color) + ',' +
                     Integer.toUnsignedString(this.texture) + ',' +
-                    Integer.toUnsignedString(this.lightMaterialSection);
+                    this.metadata.semanticKey();
         }
 
         private void appendJson(StringBuilder builder) {
             builder.append("{\"pos\": [").append(this.x20()).append(", ").append(this.y20()).append(", ").append(this.z20())
                     .append("], \"color\": ").append(Integer.toUnsignedString(this.color))
                     .append(", \"texture\": ").append(Integer.toUnsignedString(this.texture))
-                    .append(", \"light_material_section\": ").append(Integer.toUnsignedString(this.lightMaterialSection))
-                    .append("}");
+                    .append(", \"metadata\": ");
+            this.metadata.appendJson(builder);
+            builder.append("}");
         }
+    }
+
+    private static void appendLongArray(StringBuilder builder, long[] values) {
+        builder.append("[");
+        for (int i = 0; i < values.length; i++) {
+            if (i > 0) builder.append(", ");
+            builder.append(values[i]);
+        }
+        builder.append("]");
+    }
+
+    private static void appendStringList(StringBuilder builder, List<String> values) {
+        builder.append("[");
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0) builder.append(", ");
+            builder.append(quote(values.get(i)));
+        }
+        builder.append("]");
     }
 
     private static String quote(String value) {

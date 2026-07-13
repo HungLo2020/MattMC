@@ -95,6 +95,7 @@ pub(super) fn smooth_lighting(
         ao: [1.0; 4],
         lm: [get_emissive_lightmap(block.light_words[13]); 4],
     };
+    let mut face_cache = AoFaceCache::default();
     for i in 0..4 {
         let source = quad.vertices[i];
         let weights = corner_weights(
@@ -106,24 +107,48 @@ pub(super) fn smooth_lighting(
         let depth = face_depth(light_face, source.x, source.y, source.z);
 
         let (ao, lm) = if aligned {
-            blend_ao_face(ao_face_data(block, light_face, true), weights)
+            blend_ao_face(face_cache.get(block, light_face, true), weights)
         } else if parallel {
             if java_float_equal(depth, 1.0) {
-                blend_ao_face(ao_face_data(block, light_face, false), weights)
+                blend_ao_face(face_cache.get(block, light_face, false), weights)
             } else {
-                blend_inset_ao_face(block, light_face, depth, 1.0 - depth, weights)
+                blend_inset_ao_face_cached(&mut face_cache, block, light_face, depth, 1.0 - depth, weights)
             }
         } else if java_float_equal(depth, 0.0) {
-            blend_ao_face(ao_face_data(block, light_face, true), weights)
+            blend_ao_face(face_cache.get(block, light_face, true), weights)
         } else if java_float_equal(depth, 1.0) {
-            blend_ao_face(ao_face_data(block, light_face, false), weights)
+            blend_ao_face(face_cache.get(block, light_face, false), weights)
         } else {
-            blend_inset_ao_face(block, light_face, depth, 1.0 - depth, weights)
+            blend_inset_ao_face_cached(&mut face_cache, block, light_face, depth, 1.0 - depth, weights)
         };
         out.ao[i] = ao * ambient_shade(light_face, shade);
         out.lm[i] = lm;
     }
     out
+}
+
+#[derive(Default)]
+struct AoFaceCache {
+    faces: [Option<AoFace>; 12],
+}
+
+impl AoFaceCache {
+    #[inline(always)]
+    fn get(&mut self, block: &NativeSectionBlockRecord, direction: i32, offset: bool) -> AoFace {
+        let index = ao_face_cache_index(direction, offset);
+        if let Some(face) = self.faces[index] {
+            return face;
+        }
+        let face = ao_face_data(block, direction, offset);
+        self.faces[index] = Some(face);
+        face
+    }
+}
+
+#[inline(always)]
+fn ao_face_cache_index(direction: i32, offset: bool) -> usize {
+    let direction = direction.clamp(0, 5) as usize;
+    (direction << 1) | usize::from(offset)
 }
 
 #[inline]
@@ -412,6 +437,24 @@ pub(super) fn blend_inset_ao_face(
 ) -> (f32, i32) {
     let n1 = ao_face_data(block, light_face, false);
     let n2 = ao_face_data(block, light_face, true);
+    let ao = weighted_sum(n1.ao, weights) * n1d + weighted_sum(n2.ao, weights) * n2d;
+    let sl = weighted_sum(n1.lm.map(|lm| unpack_sky_light(lm) as f32), weights) * n1d
+        + weighted_sum(n2.lm.map(|lm| unpack_sky_light(lm) as f32), weights) * n2d;
+    let bl = weighted_sum(n1.lm.map(|lm| unpack_block_light(lm) as f32), weights) * n1d
+        + weighted_sum(n2.lm.map(|lm| unpack_block_light(lm) as f32), weights) * n2d;
+    (ao, (((sl as i32) & 0xff) << 16) | ((bl as i32) & 0xff))
+}
+
+fn blend_inset_ao_face_cached(
+    cache: &mut AoFaceCache,
+    block: &NativeSectionBlockRecord,
+    light_face: i32,
+    n1d: f32,
+    n2d: f32,
+    weights: [f32; 4],
+) -> (f32, i32) {
+    let n1 = cache.get(block, light_face, false);
+    let n2 = cache.get(block, light_face, true);
     let ao = weighted_sum(n1.ao, weights) * n1d + weighted_sum(n2.ao, weights) * n2d;
     let sl = weighted_sum(n1.lm.map(|lm| unpack_sky_light(lm) as f32), weights) * n1d
         + weighted_sum(n2.lm.map(|lm| unpack_sky_light(lm) as f32), weights) * n2d;

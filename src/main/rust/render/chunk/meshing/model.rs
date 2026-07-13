@@ -348,7 +348,9 @@ pub(super) fn resolve_selector_model_ids(
     seed: u64,
     selectors: &[Option<NativeModelSelector>],
     output: &mut Vec<i32>,
+    profile: &mut NativeMeshingProfile,
 ) -> Result<(), i32> {
+    profile.add_count(PROFILE_COUNT_SELECTOR_RESOLUTIONS, 1);
     let Some(selector) = selector_by_id(selectors, selector_id) else {
         return Ok(());
     };
@@ -365,17 +367,23 @@ pub(super) fn resolve_selector_model_ids(
             }
             let mut choice = legacy_next_int(seed, selector.total_weight);
             for entry in &selector.entries {
+                profile.add_count(PROFILE_COUNT_WEIGHTED_ENTRIES_VISITED, 1);
                 choice -= entry.weight;
                 if choice < 0 {
-                    resolve_selector_model_ids(entry.target_id, seed, selectors, output)?;
+                    resolve_selector_model_ids(entry.target_id, seed, selectors, output, profile)?;
                     break;
                 }
             }
         }
         SELECTOR_GROUP => {
             let child_seed = legacy_next_long(seed);
+            profile.add_count(PROFILE_COUNT_MULTIPART_CHILDREN_TESTED, selector.entries.len());
             for entry in &selector.entries {
-                resolve_selector_model_ids(entry.target_id, child_seed, selectors, output)?;
+                let before = output.len();
+                resolve_selector_model_ids(entry.target_id, child_seed, selectors, output, profile)?;
+                if output.len() != before {
+                    profile.add_count(PROFILE_COUNT_MULTIPART_CHILDREN_SELECTED, 1);
+                }
             }
         }
         _ => return Err(ERR_INVALID_ARGUMENT),

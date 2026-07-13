@@ -219,6 +219,12 @@ pub(super) unsafe fn section_builder_append_batch_encoded(
     if store_raw_quads && buffer.quads.len() < required_len {
         buffer.quads.resize(required_len, NativeQuad::default());
     }
+    if store_raw_quads {
+        builder.profile.add_count(
+            PROFILE_COUNT_TRANSLUCENT_RETAINED_BYTES,
+            valid_count.saturating_mul(std::mem::size_of::<NativeQuad>()),
+        );
+    }
 
     let encoded_quad_len = 4usize
         .checked_mul(format.vertex_stride)
@@ -558,6 +564,20 @@ pub(super) unsafe fn flush_static_model_pending_face(
         builder
             .profile
             .add_count(PROFILE_COUNT_TRANSLUCENT_QUADS, valid_count.max(0) as usize);
+        builder
+            .profile
+            .add_count(PROFILE_COUNT_TRANSLUCENT_ANALYZER_ENTRIES, count);
+        builder.profile.add_count(
+            PROFILE_COUNT_TRANSLUCENT_RETAINED_BYTES,
+            valid_count
+                .max(0)
+                .try_into()
+                .unwrap_or(0usize)
+                .saturating_mul(std::mem::size_of::<NativeQuad>()),
+        );
+        builder
+            .profile
+            .add_count(PROFILE_COUNT_TRANSLUCENT_VALIDITY_BYTES, count);
         Some(slice::from_raw_parts(validity_address as *const u8, count))
     } else {
         None

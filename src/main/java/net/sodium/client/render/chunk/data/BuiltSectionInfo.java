@@ -30,6 +30,7 @@ public class BuiltSectionInfo {
     public final TextureAtlasSprite @Nullable[] animatedSprites;
     public final int nativeMeshingFallbackBlocks;
     public final int nativeMeshingFallbackQuads;
+    public final long @Nullable[] nativeMeshingProfile;
 
     private BuiltSectionInfo(@NotNull Collection<TerrainRenderPass> blockRenderPasses,
                              @NotNull Collection<BlockEntity> globalBlockEntities,
@@ -37,12 +38,14 @@ public class BuiltSectionInfo {
                              @NotNull Collection<TextureAtlasSprite> animatedSprites,
                              @NotNull VisibilitySet occlusionData,
                              int nativeMeshingFallbackBlocks,
-                             int nativeMeshingFallbackQuads) {
+                             int nativeMeshingFallbackQuads,
+                             long @Nullable[] nativeMeshingProfile) {
         this.globalBlockEntities = toArray(globalBlockEntities, BlockEntity[]::new);
         this.culledBlockEntities = toArray(culledBlockEntities, BlockEntity[]::new);
         this.animatedSprites = toArray(animatedSprites, TextureAtlasSprite[]::new);
         this.nativeMeshingFallbackBlocks = nativeMeshingFallbackBlocks;
         this.nativeMeshingFallbackQuads = nativeMeshingFallbackQuads;
+        this.nativeMeshingProfile = nativeMeshingProfile == null ? null : nativeMeshingProfile.clone();
 
         int flags = 0;
 
@@ -72,6 +75,7 @@ public class BuiltSectionInfo {
         private VisibilitySet occlusionData;
         private int nativeMeshingFallbackBlocks;
         private int nativeMeshingFallbackQuads;
+        private long @Nullable[] nativeMeshingProfile;
 
         public void addRenderPass(TerrainRenderPass pass) {
             this.blockRenderPasses.add(pass);
@@ -106,10 +110,14 @@ public class BuiltSectionInfo {
             this.nativeMeshingFallbackQuads = quads;
         }
 
+        public void setNativeMeshingProfile(long[] profile) {
+            this.nativeMeshingProfile = profile == null ? null : profile.clone();
+        }
+
         public BuiltSectionInfo build() {
             return new BuiltSectionInfo(this.blockRenderPasses, this.globalBlockEntities, this.culledBlockEntities,
                     this.animatedSprites, this.occlusionData, this.nativeMeshingFallbackBlocks,
-                    this.nativeMeshingFallbackQuads);
+                    this.nativeMeshingFallbackQuads, this.nativeMeshingProfile);
         }
     }
 

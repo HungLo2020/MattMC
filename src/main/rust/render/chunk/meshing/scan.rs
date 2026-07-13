@@ -164,6 +164,9 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
             let direct_model_storage;
             let model_id_slice: &[i32];
             if state.selector_id == last_direct_selector_id {
+                builder
+                    .profile
+                    .add_count(PROFILE_COUNT_SELECTOR_CACHE_HITS, 1);
                 if let Some(model_id) = last_direct_selector_model_id {
                     direct_model_storage = [model_id];
                     model_id_slice = &direct_model_storage;
@@ -186,6 +189,9 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
                 if let Some(model_id) = direct_model_id {
                     last_direct_selector_id = state.selector_id;
                     last_direct_selector_model_id = Some(model_id);
+                    builder
+                        .profile
+                        .add_count(PROFILE_COUNT_SELECTOR_CACHE_HITS, 1);
                     direct_model_storage = [model_id];
                     model_id_slice = &direct_model_storage;
                 } else {
@@ -193,15 +199,22 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
                     last_direct_selector_model_id = None;
                     builder
                         .profile
+                        .add_count(PROFILE_COUNT_SELECTOR_CACHE_MISSES, 1);
+                    builder
+                        .profile
                         .add_optional_stage(PROFILE_STATIC_STATE_SELECTOR_LOOKUP, selector_started);
                     selector_lookup_recorded = true;
                     model_ids.clear();
+                    builder
+                        .profile
+                        .add_count(PROFILE_COUNT_TEMP_VECTOR_CLEARS, 1);
                     let resolution_started = profile_start(profile_static_substages);
                     resolve_selector_model_ids(
                         state.selector_id,
                         record_seed(*record),
                         &selectors_guard,
                         &mut model_ids,
+                        &mut builder.profile,
                     )?;
                     builder.profile.add_optional_stage(
                         PROFILE_STATIC_WEIGHTED_MULTIPART_RESOLUTION,
@@ -220,10 +233,12 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
                 let model_lookup_started = profile_start(profile_static_substages);
                 let scan_cache_lookup_started = profile_start(profile_scan_substages);
                 let model = if *model_id == last_model_id {
+                    builder.profile.add_count(PROFILE_COUNT_MODEL_CACHE_HITS, 1);
                     last_model
                 } else {
                     last_model_id = *model_id;
                     last_model = model_by_id(&models_guard, *model_id);
+                    builder.profile.add_count(PROFILE_COUNT_MODEL_CACHE_MISSES, 1);
                     last_model
                 };
                 builder

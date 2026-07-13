@@ -882,7 +882,19 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                 "direct_template_quads",
                 "generic_native_quads",
                 "direct_template_bytes_written",
-                "generic_native_bytes_retained"
+                "generic_native_bytes_retained",
+                "selector_resolutions",
+                "selector_cache_hits",
+                "selector_cache_misses",
+                "multipart_children_tested",
+                "multipart_children_selected",
+                "weighted_entries_visited",
+                "model_cache_hits",
+                "model_cache_misses",
+                "temporary_vector_clears",
+                "translucent_retained_bytes",
+                "translucent_analyzer_entries",
+                "translucent_validity_bytes"
         };
         public static final int STAGE_COUNT = STAGE_NAMES.length;
         public static final int COUNT_COUNT = COUNT_NAMES.length;
