@@ -175,6 +175,26 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                     ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_LONG,
                     ValueLayout.ADDRESS));
+    private static final MethodHandle APPEND_NATIVE_SECTION_ALL_PASSES_ENCODED = NativeLibraryLoader.downcallHandle("mattmc_rust",
+            "mattmc_sodium_section_mesh_builders_append_native_section_all_passes_encoded",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_LONG,
+                    ValueLayout.ADDRESS));
     private static final MethodHandle APPEND_TRANSLUCENT_BATCH = NativeLibraryLoader.downcallHandle("mattmc_rust",
             "mattmc_sodium_section_mesh_builder_append_translucent_batch",
             FunctionDescriptor.of(ValueLayout.JAVA_INT,
@@ -535,6 +555,33 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                     committedCountSegment),
                     "native section mesh builder native section encoded append");
             return committedCountSegment.get(ValueLayout.JAVA_INT, 0);
+        }
+    }
+
+    public static int[] appendNativeSectionAllPassesEncoded(NativeSectionMeshBuilder solid,
+            NativeSectionMeshBuilder cutout, NativeSectionMeshBuilder translucent, long recordAddress, int blockCount,
+            NativeChunkVertexFormat format, int sectionIndex, boolean separateAo, long translucentAnalyzerHandle) {
+        if (blockCount < 0) {
+            throw new IllegalArgumentException("Invalid native section block count: " + blockCount);
+        }
+        if (blockCount == 0) {
+            return new int[] { 0, 0, 0 };
+        }
+
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment countsSegment = arena.allocate(ValueLayout.JAVA_INT, 3);
+            check(invokeAppendNativeSectionAllPassesEncoded(solid.state.getHandle(), cutout.state.getHandle(),
+                    translucent.state.getHandle(), recordAddress, blockCount,
+                    NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE,
+                    NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE, format.stride(), format.blockIdOffset(),
+                    format.normalOffset(), format.tangentOffset(), format.midUvOffset(), format.midBlockOffset(),
+                    sectionIndex, separateAo ? 1 : 0, translucentAnalyzerHandle, countsSegment),
+                    "native section mesh builder all-pass native section encoded append");
+            return new int[] {
+                    countsSegment.getAtIndex(ValueLayout.JAVA_INT, 0),
+                    countsSegment.getAtIndex(ValueLayout.JAVA_INT, 1),
+                    countsSegment.getAtIndex(ValueLayout.JAVA_INT, 2)
+            };
         }
     }
 
@@ -1056,6 +1103,22 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                     committedCountOutput);
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust section mesh builder native section encoded downcall failed",
+                    throwable);
+        }
+    }
+
+    private static int invokeAppendNativeSectionAllPassesEncoded(long solidHandle, long cutoutHandle,
+            long translucentHandle, long recordAddress, int blockCount, int recordStride, int quadStride,
+            int vertexStride, int blockIdOffset, int normalOffset, int tangentOffset, int midUvOffset,
+            int midBlockOffset, int sectionIndex, int separateAo, long translucentAnalyzerHandle,
+            MemorySegment committedCountsOutput) {
+        try {
+            return (int) APPEND_NATIVE_SECTION_ALL_PASSES_ENCODED.invokeExact(solidHandle, cutoutHandle,
+                    translucentHandle, recordAddress, blockCount, recordStride, quadStride, vertexStride,
+                    blockIdOffset, normalOffset, tangentOffset, midUvOffset, midBlockOffset, sectionIndex,
+                    separateAo, translucentAnalyzerHandle, committedCountsOutput);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust section mesh builder all-pass native section downcall failed",
                     throwable);
         }
     }

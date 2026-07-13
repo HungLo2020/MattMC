@@ -101,18 +101,20 @@ public class ChunkBuildBuffers {
                 this.nativeFormat, sectionIndex, usesSeparateAo(), storeRawQuads);
     }
 
-    public int appendNativeSectionSnapshot(TerrainRenderPass pass, long recordAddress, int recordCount,
-            int passId, int sectionIndex, boolean storeRawQuads, TranslucentGeometryCollector collector) {
+    public int[] appendNativeSectionSnapshotAllPasses(long recordAddress, int recordCount, int sectionIndex,
+            TranslucentGeometryCollector collector) {
         if (recordCount == 0) {
-            return 0;
+            return new int[] { 0, 0, 0 };
         }
 
-        var builder = this.builders.get(pass);
-        long analyzerHandle = pass.isTranslucent() && collector != null && collector.supportsNativeBatching()
+        var solid = this.builders.get(DefaultTerrainRenderPasses.SOLID).getSectionBuilder();
+        var cutout = this.builders.get(DefaultTerrainRenderPasses.CUTOUT).getSectionBuilder();
+        var translucent = this.builders.get(DefaultTerrainRenderPasses.TRANSLUCENT).getSectionBuilder();
+        long analyzerHandle = collector != null && collector.supportsNativeBatching()
                 ? collector.nativeAnalyzerHandle()
                 : 0L;
-        return builder.getSectionBuilder().appendNativeSectionEncoded(recordAddress, recordCount, passId,
-                this.nativeFormat, sectionIndex, usesSeparateAo(), storeRawQuads, analyzerHandle);
+        return NativeSectionMeshBuilder.appendNativeSectionAllPassesEncoded(solid, cutout, translucent,
+                recordAddress, recordCount, this.nativeFormat, sectionIndex, usesSeparateAo(), analyzerHandle);
     }
 
     public int nativeFluidSpriteMask(TerrainRenderPass pass) {

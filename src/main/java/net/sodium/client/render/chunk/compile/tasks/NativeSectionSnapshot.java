@@ -96,16 +96,12 @@ final class NativeSectionSnapshot implements AutoCloseable {
     int[] flushAll(TranslucentGeometryCollector collector) {
         NativeMeshingDiagnostics.dumpSectionSnapshot(this.sectionIndex, this.minX, this.minY, this.minZ,
                 this.address, this.activeRecordCount);
-        int solid = this.buffers.appendNativeSectionSnapshot(DefaultTerrainRenderPasses.SOLID, this.address, this.activeRecordCount,
-                0, this.sectionIndex, false, null);
+        int[] nativeQuads = this.buffers.appendNativeSectionSnapshotAllPasses(this.address, this.activeRecordCount,
+                this.sectionIndex, collector);
         this.addNativeFluidSprites(DefaultTerrainRenderPasses.SOLID);
-        int cutout = this.buffers.appendNativeSectionSnapshot(DefaultTerrainRenderPasses.CUTOUT, this.address, this.activeRecordCount,
-                1, this.sectionIndex, false, null);
         this.addNativeFluidSprites(DefaultTerrainRenderPasses.CUTOUT);
-        int translucent = this.buffers.appendNativeSectionSnapshot(DefaultTerrainRenderPasses.TRANSLUCENT, this.address,
-                this.activeRecordCount, 2, this.sectionIndex, false, collector);
         this.addNativeFluidSprites(DefaultTerrainRenderPasses.TRANSLUCENT);
-        return new int[] { solid, cutout, translucent };
+        return nativeQuads;
     }
 
     private void addNativeFluidSprites(TerrainRenderPass pass) {
