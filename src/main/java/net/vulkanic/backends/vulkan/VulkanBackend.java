@@ -3513,6 +3513,54 @@ void main() {
         return spine.createManagedTextureViewForLegacyTexture(legacyTextureWrapper, legacyTextureHandle, 0, mipLevels);
     }
 
+    public VulkanicAPI.DiagnosticTextureContentHash diagnosticTextureContentHash(
+        CommandContext ctx,
+        VulkanicTextureView textureView,
+        String logicalResource
+    ) {
+        ensureNativeReady("diagnosticTextureContentHash");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        if (!(textureView instanceof VulkanTextureView vulkanTextureView)) {
+            return VulkanicAPI.DiagnosticTextureContentHash.unavailable(
+                logicalResource,
+                textureView == null ? null : textureView.texture(),
+                textureView,
+                "not-vulkan-view"
+            );
+        }
+        try {
+            return spine.diagnosticTextureContentHash(vulkanTextureView, logicalResource);
+        } catch (RuntimeException exception) {
+            return VulkanicAPI.DiagnosticTextureContentHash.unavailable(
+                logicalResource,
+                textureView.texture(),
+                textureView,
+                "readback-" + exception.getClass().getSimpleName()
+            );
+        }
+    }
+
+    public String diagnosticTextureLifecycleInfo(
+        CommandContext ctx,
+        VulkanicTextureView textureView,
+        String logicalResource
+    ) {
+        ensureNativeReady("diagnosticTextureLifecycleInfo");
+        NativeSpine spine = nativeSpine;
+        if (spine == null || !(textureView instanceof VulkanTextureView vulkanTextureView)) {
+            return "backend=vulkan,logicalResource=" + logicalResource + ",lifecycle=unavailable:not-vulkan-view";
+        }
+        try {
+            return spine.diagnosticTextureLifecycleInfo(vulkanTextureView, logicalResource);
+        } catch (RuntimeException exception) {
+            return "backend=vulkan,logicalResource=" + logicalResource
+                + ",lifecycle=unavailable:" + exception.getClass().getSimpleName();
+        }
+    }
+
     public void setActiveTextureUnit(CommandContext ctx, int unit) {
         requireVulkanCommandBufferHandle("setActiveTextureUnit", ctx);
         ensureNativeReady("setActiveTextureUnit");
@@ -14758,6 +14806,303 @@ void main() {
             }
 
             trackLayoutForLevel(sourceTexture, 0, sourceOriginalLayout);
+        }
+
+        private VulkanicAPI.DiagnosticTextureContentHash diagnosticTextureContentHash(
+            VulkanTextureView textureView,
+            String logicalResource
+        ) {
+            if (renderPassRecording) {
+                return VulkanicAPI.DiagnosticTextureContentHash.unavailable(
+                    logicalResource,
+                    textureView.texture(),
+                    textureView,
+                    "render-pass-active"
+                );
+            }
+            if (textureView.getBaseMipLevel() != 0) {
+                return VulkanicAPI.DiagnosticTextureContentHash.unavailable(
+                    logicalResource,
+                    textureView.texture(),
+                    textureView,
+                    "base-mip-" + textureView.getBaseMipLevel()
+                );
+            }
+
+            LegacyTextureObject sourceTexture = tryResolveLegacyTexture(textureView);
+            if (sourceTexture == null) {
+                return VulkanicAPI.DiagnosticTextureContentHash.unavailable(
+                    logicalResource,
+                    textureView.texture(),
+                    textureView,
+                    "not-legacy-backed"
+                );
+            }
+            if (sourceTexture.imageHandle == VK10.VK_NULL_HANDLE) {
+                return VulkanicAPI.DiagnosticTextureContentHash.unavailable(
+                    logicalResource,
+                    textureView.texture(),
+                    textureView,
+                    "missing-image"
+                );
+            }
+            if (sourceTexture.aspectMask != VK10.VK_IMAGE_ASPECT_COLOR_BIT) {
+                return VulkanicAPI.DiagnosticTextureContentHash.unavailable(
+                    logicalResource,
+                    textureView.texture(),
+                    textureView,
+                    "non-color-aspect"
+                );
+            }
+
+            int width = Math.max(0, textureView.getWidth(0));
+            int height = Math.max(0, textureView.getHeight(0));
+            int pixelBytes = Math.max(1, sourceTexture.pixelBytes);
+            if (width <= 0 || height <= 0) {
+                return VulkanicAPI.DiagnosticTextureContentHash.unavailable(
+                    logicalResource,
+                    textureView.texture(),
+                    textureView,
+                    "empty"
+                );
+            }
+            int byteCount = Math.multiplyExact(Math.multiplyExact(width, height), pixelBytes);
+            int previousPixelPackBuffer = legacyBufferBindings.getOrDefault(VulkanicAPI.GL_PIXEL_PACK_BUFFER, 0);
+            int readbackBuffer = createLegacyBuffer();
+            try {
+                bindLegacyBuffer(VulkanicAPI.GL_PIXEL_PACK_BUFFER, readbackBuffer);
+                namedBufferStorage(readbackBuffer, byteCount, 0);
+                if (commandBufferRecording) {
+                    submitPrimaryCommandBuffer(primaryCommandBuffer.address());
+                }
+                long commandBufferHandle = beginPrimaryCommandBuffer();
+                readLegacyTextureRegionToBoundPixelPackBuffer(
+                    commandBufferHandle,
+                    "diagnosticTextureContentHash",
+                    sourceTexture.id,
+                    0,
+                    0,
+                    width,
+                    height,
+                    0L
+                );
+                submitPrimaryCommandBuffer(commandBufferHandle);
+
+                java.nio.ByteBuffer raw = mapNamedBufferRange(readbackBuffer, 0, byteCount, GL_MAP_READ_BIT);
+                try {
+                    java.nio.ByteBuffer canonical = canonicalizeVulkanTextureToRgba32fTopLeft(
+                        raw,
+                        sourceTexture.vkFormat,
+                        width,
+                        height
+                    );
+                    if (canonical == null) {
+                        return VulkanicAPI.DiagnosticTextureContentHash.unavailable(
+                            logicalResource,
+                            textureView.texture(),
+                            textureView,
+                            "format-0x" + Integer.toHexString(sourceTexture.vkFormat)
+                        );
+                    }
+                    return VulkanicAPI.diagnosticContentHashFromCanonical(
+                        logicalResource,
+                        textureView.texture(),
+                        textureView,
+                        canonical,
+                        width,
+                        height
+                    );
+                } finally {
+                    unmapNamedBuffer(readbackBuffer);
+                }
+            } finally {
+                if (previousPixelPackBuffer > 0) {
+                    bindLegacyBuffer(VulkanicAPI.GL_PIXEL_PACK_BUFFER, previousPixelPackBuffer);
+                } else {
+                    legacyBufferBindings.remove(VulkanicAPI.GL_PIXEL_PACK_BUFFER);
+                }
+                deleteLegacyBuffer(readbackBuffer);
+            }
+        }
+
+        private String diagnosticTextureLifecycleInfo(
+            VulkanTextureView textureView,
+            String logicalResource
+        ) {
+            LegacyTextureObject texture = tryResolveLegacyTexture(textureView);
+            if (texture == null) {
+                return "backend=vulkan,logicalResource=" + logicalResource + ",lifecycle=unavailable:not-legacy-backed";
+            }
+            int trackedLayout = trackedLayoutForLevel(texture, textureView.getBaseMipLevel());
+            return "backend=vulkan"
+                + ",logicalResource=" + logicalResource
+                + ",legacyTextureId=" + texture.id
+                + ",image=0x" + Long.toHexString(texture.imageHandle)
+                + ",view=0x" + Long.toHexString(textureView.getVkImageViewHandle())
+                + ",defaultView=0x" + Long.toHexString(texture.defaultViewHandle)
+                + ",vkFormat=0x" + Integer.toHexString(texture.vkFormat)
+                + ",trackedLayout=" + vkImageLayoutName(trackedLayout) + "(0x" + Integer.toHexString(trackedLayout) + ")"
+                + ",stageMask=0x" + Integer.toHexString(stageMaskForLayout(trackedLayout))
+                + ",accessMask=0x" + Integer.toHexString(accessMaskForLayout(trackedLayout))
+                + ",producerAttachmentLayout=" + vkImageLayoutName(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+                + ",producerStage=COLOR_ATTACHMENT_OUTPUT"
+                + ",producerAccess=COLOR_ATTACHMENT_WRITE"
+                + ",consumerShaderReadLayout=" + vkImageLayoutName(VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+                + ",consumerStage=FRAGMENT_SHADER"
+                + ",consumerAccess=SHADER_READ"
+                + ",queueOwnership=ignored";
+        }
+
+        private static String vkImageLayoutName(int layout) {
+            return switch (layout) {
+                case VK10.VK_IMAGE_LAYOUT_UNDEFINED -> "UNDEFINED";
+                case VK10.VK_IMAGE_LAYOUT_GENERAL -> "GENERAL";
+                case VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL -> "COLOR_ATTACHMENT_OPTIMAL";
+                case VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL -> "DEPTH_STENCIL_ATTACHMENT_OPTIMAL";
+                case VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL -> "DEPTH_STENCIL_READ_ONLY_OPTIMAL";
+                case VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL -> "SHADER_READ_ONLY_OPTIMAL";
+                case VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL -> "TRANSFER_SRC_OPTIMAL";
+                case VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL -> "TRANSFER_DST_OPTIMAL";
+                case KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR -> "PRESENT_SRC_KHR";
+                default -> layout == EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+                    ? "ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT"
+                    : "layout-" + layout;
+            };
+        }
+
+        @Nullable
+        private java.nio.ByteBuffer canonicalizeVulkanTextureToRgba32fTopLeft(
+            java.nio.ByteBuffer raw,
+            int vkFormat,
+            int width,
+            int height
+        ) {
+            java.nio.ByteBuffer source = raw.duplicate().order(ByteOrder.LITTLE_ENDIAN);
+            source.position(0);
+            java.nio.ByteBuffer canonical = org.lwjgl.BufferUtils.createByteBuffer(width * height * 4 * Float.BYTES)
+                .order(ByteOrder.LITTLE_ENDIAN);
+            for (int pixel = 0; pixel < width * height; pixel++) {
+                float r;
+                float g;
+                float b;
+                float a;
+                switch (vkFormat) {
+                    case VK10.VK_FORMAT_R8G8B8A8_UNORM -> {
+                        r = unsignedByteToFloat(source.get());
+                        g = unsignedByteToFloat(source.get());
+                        b = unsignedByteToFloat(source.get());
+                        a = unsignedByteToFloat(source.get());
+                    }
+                    case VK10.VK_FORMAT_B8G8R8A8_UNORM, VK10.VK_FORMAT_B8G8R8A8_SRGB -> {
+                        b = unsignedByteToFloat(source.get());
+                        g = unsignedByteToFloat(source.get());
+                        r = unsignedByteToFloat(source.get());
+                        a = unsignedByteToFloat(source.get());
+                    }
+                    case VK10.VK_FORMAT_R8G8B8A8_SNORM -> {
+                        r = signedNormalizedByteToFloat(source.get());
+                        g = signedNormalizedByteToFloat(source.get());
+                        b = signedNormalizedByteToFloat(source.get());
+                        a = signedNormalizedByteToFloat(source.get());
+                    }
+                    case VK10.VK_FORMAT_R16G16B16A16_SFLOAT -> {
+                        r = halfToFloat(source.getShort());
+                        g = halfToFloat(source.getShort());
+                        b = halfToFloat(source.getShort());
+                        a = halfToFloat(source.getShort());
+                    }
+                    case VK10.VK_FORMAT_B10G11R11_UFLOAT_PACK32 -> {
+                        int packed = source.getInt();
+                        r = unsignedFloat11ToFloat(packed & 0x7FF);
+                        g = unsignedFloat11ToFloat((packed >>> 11) & 0x7FF);
+                        b = unsignedFloat10ToFloat((packed >>> 22) & 0x3FF);
+                        a = 1.0F;
+                    }
+                    case VK10.VK_FORMAT_R8_UNORM, VK10.VK_FORMAT_R8_UINT -> {
+                        r = unsignedByteToFloat(source.get());
+                        g = r;
+                        b = r;
+                        a = 1.0F;
+                    }
+                    case VK10.VK_FORMAT_R8_SINT -> {
+                        r = source.get();
+                        g = r;
+                        b = r;
+                        a = 1.0F;
+                    }
+                    case VK10.VK_FORMAT_R16_SFLOAT -> {
+                        r = halfToFloat(source.getShort());
+                        g = r;
+                        b = r;
+                        a = 1.0F;
+                    }
+                    case VK10.VK_FORMAT_R32_SFLOAT -> {
+                        r = source.getFloat();
+                        g = r;
+                        b = r;
+                        a = 1.0F;
+                    }
+                    default -> {
+                        return null;
+                    }
+                }
+                canonical.putFloat(r);
+                canonical.putFloat(g);
+                canonical.putFloat(b);
+                canonical.putFloat(a);
+            }
+            canonical.flip();
+            return canonical;
+        }
+
+        private static float unsignedByteToFloat(byte value) {
+            return (value & 0xFF) / 255.0F;
+        }
+
+        private static float signedNormalizedByteToFloat(byte value) {
+            return Math.max(-1.0F, value / 127.0F);
+        }
+
+        private static float halfToFloat(short value) {
+            int bits = value & 0xFFFF;
+            int sign = (bits >>> 15) & 0x1;
+            int exponent = (bits >>> 10) & 0x1F;
+            int mantissa = bits & 0x3FF;
+            if (exponent == 0) {
+                return (sign == 0 ? 1.0F : -1.0F) * mantissa * (float)Math.pow(2.0, -24.0);
+            }
+            if (exponent == 0x1F) {
+                return mantissa == 0
+                    ? (sign == 0 ? Float.POSITIVE_INFINITY : Float.NEGATIVE_INFINITY)
+                    : Float.NaN;
+            }
+            return (sign == 0 ? 1.0F : -1.0F)
+                * (1.0F + mantissa / 1024.0F)
+                * (float)Math.pow(2.0, exponent - 15);
+        }
+
+        private static float unsignedFloat11ToFloat(int value) {
+            int exponent = (value >>> 6) & 0x1F;
+            int mantissa = value & 0x3F;
+            if (exponent == 0) {
+                return mantissa * (float)Math.pow(2.0, -20.0);
+            }
+            if (exponent == 0x1F) {
+                return mantissa == 0 ? Float.POSITIVE_INFINITY : Float.NaN;
+            }
+            return (1.0F + mantissa / 64.0F) * (float)Math.pow(2.0, exponent - 15);
+        }
+
+        private static float unsignedFloat10ToFloat(int value) {
+            int exponent = (value >>> 5) & 0x1F;
+            int mantissa = value & 0x1F;
+            if (exponent == 0) {
+                return mantissa * (float)Math.pow(2.0, -19.0);
+            }
+            if (exponent == 0x1F) {
+                return mantissa == 0 ? Float.POSITIVE_INFINITY : Float.NaN;
+            }
+            return (1.0F + mantissa / 32.0F) * (float)Math.pow(2.0, exponent - 15);
         }
 
         private void copyToBoundLegacyTexture2D(long commandBufferHandle,

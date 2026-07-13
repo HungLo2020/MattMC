@@ -372,9 +372,18 @@ public class RenderTargets {
 
 			RenderTarget target = this.getOrCreate(drawBuffers[i]);
 
-			int textureId = stageWritesToMain.contains(drawBuffers[i]) ? target.getMainTexture() : target.getAltTexture();
+			boolean writesMain = stageWritesToMain.contains(drawBuffers[i]);
+			int textureId = writesMain ? target.getMainTexture() : target.getAltTexture();
 
 			framebuffer.addColorAttachment(i, textureId);
+			VulkanicAPI.recordDiagnosticIrisColorAttachment(
+				framebuffer.getId(),
+				i,
+				drawBuffers[i],
+				textureId,
+				writesMain,
+				"iris-render-targets-createColorFramebuffer"
+			);
 		}
 
 		framebuffer.drawBuffers(actualDrawBuffers);

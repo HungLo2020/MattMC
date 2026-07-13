@@ -930,6 +930,13 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                 this.samplerUnits.remove(name);
             }
             this.samplers.put(name, VulkanicAPI.createManagedTextureView(texture, view.baseMipLevel(), view.mipLevels()));
+            VulkanicAPI.recordScopedCompositeColortex0RenderPassBinding(
+                this.renderPipeline,
+                name,
+                view,
+                textureUnit,
+                "vulkan-renderpass-bindSampler"
+            );
         }
 
         @Override
@@ -954,6 +961,13 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                 this.samplerUnits.remove(name);
             }
             this.samplers.put(name, view);
+            VulkanicAPI.recordScopedCompositeColortex0RenderPassLegacyBinding(
+                this.renderPipeline,
+                name,
+                textureId,
+                textureUnit,
+                "vulkan-renderpass-bindLegacySampler"
+            );
             return true;
         }
 
@@ -1072,6 +1086,13 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             try {
                 this.pass.close();
                 VulkanNativeCommandEncoder.this.backend.submitCommandBuffer(this.ctx);
+                VulkanicAPI.recordScopedCompositeColortex0ProducerCompletion(
+                    this.renderTargetDescriptor,
+                    this.framebuffer,
+                    this.renderPipeline,
+                    this.customPass,
+                    "vulkan-native-renderpass-close"
+                );
             } finally {
                 VulkanNativeCommandEncoder.this.inRenderPass = false;
                 for (VulkanicTextureView view : this.samplers.values()) {

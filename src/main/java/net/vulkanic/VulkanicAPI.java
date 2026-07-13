@@ -67,6 +67,16 @@ public class VulkanicAPI {
     private static GraphicsBackend backend;
     @Nullable
     private static VulkanBackend rawVulkanBackend;
+    @Nullable
+    private static ScopedCompositeColortex0Binding scopedCompositeColortex0Binding;
+    private static final java.util.Set<String> SCOPED_COMPOSITE_COLORTEX0_EMITTED =
+        java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+    private static final java.util.concurrent.ConcurrentMap<Integer, java.util.List<DiagnosticIrisColorAttachment>> DIAGNOSTIC_IRIS_FRAMEBUFFER_ATTACHMENTS =
+        new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.concurrent.ConcurrentMap<Integer, DiagnosticIrisColorAttachment> DIAGNOSTIC_IRIS_TEXTURE_ATTACHMENTS =
+        new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.concurrent.ConcurrentMap<String, ScopedCompositeColortex0Producer> SCOPED_COMPOSITE_COLORTEX0_PRODUCERS =
+        new java.util.concurrent.ConcurrentHashMap<>();
 
     private static final boolean IS_MACOS = System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("mac");
     @Nullable
@@ -99,6 +109,103 @@ public class VulkanicAPI {
         intConsumer.accept(i + 3);
         intConsumer.accept(i);
     });
+
+    private record ScopedCompositeColortex0Binding(
+        PipelineHandle pipeline,
+        String pipelineLocation,
+        String vertexShader,
+        String fragmentShader,
+        String pipelineKey,
+        String stableKey,
+        String resourceName,
+        int resourceSet,
+        int resourceBinding,
+        String resourceType,
+        java.util.List<String> stages,
+        int samplerUnit,
+        @Nullable Object samplerObject,
+        @Nullable VulkanicTexture texture,
+        int baseMipLevel,
+        int mipLevelCount,
+        int legacyTextureId,
+        String source
+    ) {}
+
+    private record DiagnosticIrisColorAttachment(
+        int framebuffer,
+        int colorAttachment,
+        int logicalIndex,
+        int textureId,
+        String logicalName,
+        String pingPong,
+        String source
+    ) {}
+
+    private record ScopedCompositeColortex0Producer(
+        String backend,
+        String source,
+        String passLabel,
+        String customPassName,
+        String pipelineLocation,
+        String physicalKey,
+        int textureId,
+        String logicalAttachment,
+        int colorAttachment,
+        String pingPong,
+        String descriptorSignature,
+        String attachmentUsage,
+        String lifecycleInfo,
+        String poseName,
+        String deterministicFields,
+        DiagnosticTextureContentHash hash
+    ) {}
+
+    private record DiagnosticProducerAttachment(
+        int colorAttachment,
+        int textureId,
+        String logicalName,
+        String pingPong,
+        String usage
+    ) {}
+
+    public record DiagnosticTextureContentHash(
+        String logicalResource,
+        int width,
+        int height,
+        VulkanicTextureFormat storageFormat,
+        String canonicalFormat,
+        int mip,
+        int layer,
+        String originConvention,
+        String channelInterpretation,
+        String hash,
+        String tileHashes
+    ) {
+        public static DiagnosticTextureContentHash unavailable(
+            String logicalResource,
+            @Nullable VulkanicTexture texture,
+            @Nullable VulkanicTextureView textureView,
+            String reason
+        ) {
+            VulkanicTextureFormat format = texture == null ? null : texture.getVulkanicFormat();
+            int width = textureView == null ? -1 : safeTextureViewWidth(textureView);
+            int height = textureView == null ? -1 : safeTextureViewHeight(textureView);
+            int mip = textureView == null ? 0 : textureView.getBaseMipLevel();
+            return new DiagnosticTextureContentHash(
+                shaderInputParitySanitizeLabel(logicalResource),
+                width,
+                height,
+                format,
+                "unavailable",
+                mip,
+                0,
+                "unavailable",
+                "unavailable",
+                "unavailable:" + shaderInputParitySanitizeLabel(reason),
+                ""
+            );
+        }
+    }
     private static final VulkanicAPI.AutoStorageIndexBuffer sharedSequentialLines = new VulkanicAPI.AutoStorageIndexBuffer(4, 6, (intConsumer, i) -> {
         intConsumer.accept(i);
         intConsumer.accept(i + 1);
@@ -6965,6 +7072,7 @@ public class VulkanicAPI {
                 case SAMPLER, COMPARISON_SAMPLER -> {
                     PipelineResourceBindings.SamplerBinding samplerBinding = bindings.getSamplerBindingOrNull(resourceBinding.name());
                     if (samplerBinding != null) {
+                        recordScopedCompositeColortex0Binding(source, pipeline, descriptor, resourceBinding, samplerBinding);
                         resources.add(describeShaderInputParitySampler(resourceBinding, samplerBinding));
                     }
                 }
@@ -6991,6 +7099,599 @@ public class VulkanicAPI {
             shaderInputParityDeterministicContextFields(),
             String.join(", ", resources)
         );
+    }
+
+    private static void recordScopedCompositeColortex0Binding(
+        String source,
+        PipelineHandle pipeline,
+        PipelineDescriptor descriptor,
+        PipelineDescriptor.ResourceBinding resourceBinding,
+        PipelineResourceBindings.SamplerBinding samplerBinding
+    ) {
+        if (!TRACE_RENDER_TARGET_CONTENT_HASHES) {
+            return;
+        }
+        if (!DeterministicCameraCapture.isEnabledForDiagnostics()) {
+            return;
+        }
+        if (!"iris:composite".contentEquals(String.valueOf(descriptor.getPortableState().location()))) {
+            return;
+        }
+        if (!isLogicalColortex0(resourceBinding.name(), samplerBinding.textureView())) {
+            return;
+        }
+        VulkanicTextureView textureView = samplerBinding.textureView();
+        if (textureView == null) {
+            return;
+        }
+        java.util.List<String> stages = resourceBinding.stages().stream()
+            .map(Enum::name)
+            .sorted()
+            .toList();
+        scopedCompositeColortex0Binding = new ScopedCompositeColortex0Binding(
+            pipeline,
+            String.valueOf(descriptor.getPortableState().location()),
+            String.valueOf(descriptor.getPortableState().vertexShader()),
+            String.valueOf(descriptor.getPortableState().fragmentShader()),
+            String.valueOf(descriptor.getPipelineCompilationKey()),
+            String.valueOf(descriptor.getStableCacheKey()),
+            resourceBinding.name(),
+            resourceBinding.set(),
+            resourceBinding.binding(),
+            String.valueOf(resourceBinding.type()),
+            stages,
+            samplerBinding.textureUnit(),
+            samplerBinding.samplerObject(),
+            textureView.texture(),
+            textureView.getBaseMipLevel(),
+            textureView.getMipLevelCount(),
+            legacyTextureIdFromLabel(textureView.texture().getLabel()),
+            source
+        );
+    }
+
+    public static void recordScopedCompositeColortex0RenderPassBinding(
+        @Nullable RenderPipeline renderPipeline,
+        String resourceName,
+        @Nullable GpuTextureView textureView,
+        int textureUnit,
+        String source
+    ) {
+        if (!shouldRecordScopedCompositeColortex0RenderPassBinding(renderPipeline, resourceName)) {
+            return;
+        }
+        if (textureView == null || !(textureView.texture() instanceof VulkanicTexture texture)) {
+            return;
+        }
+        recordScopedCompositeColortex0RenderPassBinding(
+            renderPipeline,
+            resourceName,
+            textureUnit,
+            texture,
+            textureView.baseMipLevel(),
+            textureView.mipLevels(),
+            0,
+            source
+        );
+    }
+
+    public static void recordScopedCompositeColortex0RenderPassLegacyBinding(
+        @Nullable RenderPipeline renderPipeline,
+        String resourceName,
+        int textureId,
+        int textureUnit,
+        String source
+    ) {
+        if (!shouldRecordScopedCompositeColortex0RenderPassBinding(renderPipeline, resourceName) || textureId <= 0) {
+            return;
+        }
+        recordScopedCompositeColortex0RenderPassBinding(
+            renderPipeline,
+            resourceName,
+            textureUnit,
+            null,
+            0,
+            1,
+            textureId,
+            source
+        );
+    }
+
+    private static boolean shouldRecordScopedCompositeColortex0RenderPassBinding(
+        @Nullable RenderPipeline renderPipeline,
+        String resourceName
+    ) {
+        if (!TRACE_RENDER_TARGET_CONTENT_HASHES) {
+            return false;
+        }
+        if (!DeterministicCameraCapture.isEnabledForDiagnostics()) {
+            return false;
+        }
+        if (renderPipeline == null || !"iris:composite".contentEquals(String.valueOf(renderPipeline.getLocation()))) {
+            return false;
+        }
+        return isScopedCompositeColortex0ResourceName(resourceName);
+    }
+
+    private static void recordScopedCompositeColortex0RenderPassBinding(
+        RenderPipeline renderPipeline,
+        String resourceName,
+        int textureUnit,
+        @Nullable VulkanicTexture texture,
+        int baseMipLevel,
+        int mipLevelCount,
+        int legacyTextureId,
+        String source
+    ) {
+        PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(renderPipeline);
+        scopedCompositeColortex0Binding = new ScopedCompositeColortex0Binding(
+            null,
+            String.valueOf(renderPipeline.getLocation()),
+            String.valueOf(renderPipeline.getVertexShader()),
+            String.valueOf(renderPipeline.getFragmentShader()),
+            String.valueOf(descriptor.getPipelineCompilationKey()),
+            String.valueOf(descriptor.getStableCacheKey()),
+            resourceName,
+            0,
+            Math.max(0, textureUnit),
+            "SAMPLER",
+            java.util.List.of("FRAGMENT"),
+            textureUnit,
+            null,
+            texture,
+            baseMipLevel,
+            mipLevelCount,
+            legacyTextureId > 0 ? legacyTextureId : legacyTextureIdFromLabel(texture == null ? null : texture.getLabel()),
+            source
+        );
+    }
+
+    public static void recordDiagnosticIrisColorAttachment(
+        int framebuffer,
+        int colorAttachment,
+        int logicalIndex,
+        int textureId,
+        boolean writesMain,
+        String source
+    ) {
+        if (!TRACE_RENDER_TARGET_CONTENT_HASHES || textureId <= 0) {
+            return;
+        }
+        DiagnosticIrisColorAttachment attachment = new DiagnosticIrisColorAttachment(
+            framebuffer,
+            colorAttachment,
+            logicalIndex,
+            textureId,
+            "colortex" + logicalIndex,
+            writesMain ? "main" : "alt",
+            source
+        );
+        DIAGNOSTIC_IRIS_TEXTURE_ATTACHMENTS.put(textureId, attachment);
+        DIAGNOSTIC_IRIS_FRAMEBUFFER_ATTACHMENTS.compute(framebuffer, (ignored, existing) -> {
+            java.util.ArrayList<DiagnosticIrisColorAttachment> updated = existing == null
+                ? new java.util.ArrayList<>()
+                : new java.util.ArrayList<>(existing);
+            updated.removeIf(previous -> previous.colorAttachment() == colorAttachment);
+            updated.add(attachment);
+            updated.sort(java.util.Comparator.comparingInt(DiagnosticIrisColorAttachment::colorAttachment));
+            return java.util.List.copyOf(updated);
+        });
+    }
+
+    public static void recordScopedCompositeColortex0ProducerCompletion(
+        @Nullable VulkanicRenderTargetDescriptor descriptor,
+        int framebuffer,
+        @Nullable RenderPipeline renderPipeline,
+        @Nullable Object customPass,
+        String source
+    ) {
+        if (!TRACE_RENDER_TARGET_CONTENT_HASHES || !DeterministicCameraCapture.isEnabledForDiagnostics()) {
+            return;
+        }
+
+        java.util.List<DiagnosticProducerAttachment> attachments = diagnosticProducerAttachments(descriptor, framebuffer);
+        if (attachments.isEmpty()) {
+            return;
+        }
+
+        String backendName = getActiveBackendType().name().toLowerCase(java.util.Locale.ROOT);
+        String passLabel = descriptor == null ? "framebuffer:" + framebuffer : safeSupplierLabel(descriptor.label());
+        String customPassName = diagnosticCustomPassName(customPass);
+        String pipelineLocation = renderPipeline == null ? "unknown" : String.valueOf(renderPipeline.getLocation());
+        String descriptorSignature = descriptor == null ? "framebuffer:" + framebuffer : descriptor.debugSignature();
+        for (DiagnosticProducerAttachment attachment : attachments) {
+            if (!"colortex0".equals(attachment.logicalName())) {
+                continue;
+            }
+
+            VulkanicTextureView textureView = createManagedLegacyTextureView(attachment.textureId());
+            DiagnosticTextureContentHash contentHash;
+            try {
+                contentHash = diagnosticTextureContentHash(textureView, "colortex0");
+            } catch (RuntimeException exception) {
+                contentHash = DiagnosticTextureContentHash.unavailable(
+                    "colortex0",
+                    textureView == null ? null : textureView.texture(),
+                    textureView,
+                    "exception-" + exception.getClass().getSimpleName() + '-' + exception.getMessage()
+                );
+            }
+            String lifecycleInfo = textureView == null
+                ? "textureView=missing"
+                : diagnosticTextureLifecycleInfo(textureView, "colortex0");
+            String physicalKey = physicalResourceKey(attachment.textureId(), textureView == null ? null : textureView.texture());
+            if (textureView != null) {
+                textureView.close();
+            }
+
+            ScopedCompositeColortex0Producer producer = new ScopedCompositeColortex0Producer(
+                backendName,
+                source,
+                passLabel,
+                customPassName,
+                pipelineLocation,
+                physicalKey,
+                attachment.textureId(),
+                attachment.logicalName(),
+                attachment.colorAttachment(),
+                attachment.pingPong(),
+                descriptorSignature,
+                attachment.usage(),
+                lifecycleInfo,
+                DeterministicCameraCapture.currentPoseNameForDiagnostics(),
+                shaderInputParityDeterministicContextFields(),
+                contentHash
+            );
+            SCOPED_COMPOSITE_COLORTEX0_PRODUCERS.put(backendName + '|' + physicalKey, producer);
+            LOGGER.info(
+                "ShaderInputParityScopedColortex0Lifecycle backend={} event=producer-complete source={} logicalAttachment={} colorAttachment={} pingPong={} textureId={} physicalKey={} passLabel={} customPass={} pipelineLocation={} descriptorSignature=\"{}\" attachmentUsage=\"{}\" lifecycle=\"{}\" {} contentHash={{{}}}",
+                backendName,
+                source,
+                producer.logicalAttachment(),
+                producer.colorAttachment(),
+                producer.pingPong(),
+                producer.textureId(),
+                producer.physicalKey(),
+                shaderInputParitySanitizeLabel(producer.passLabel()),
+                shaderInputParitySanitizeLabel(producer.customPassName()),
+                shaderInputParitySanitizeLabel(producer.pipelineLocation()),
+                shaderInputParitySanitizeLabel(producer.descriptorSignature()),
+                shaderInputParitySanitizeLabel(producer.attachmentUsage()),
+                shaderInputParitySanitizeLabel(producer.lifecycleInfo()),
+                producer.deterministicFields(),
+                diagnosticContentHashFields(producer.hash())
+            );
+        }
+    }
+
+    private static java.util.List<DiagnosticProducerAttachment> diagnosticProducerAttachments(
+        @Nullable VulkanicRenderTargetDescriptor descriptor,
+        int framebuffer
+    ) {
+        java.util.ArrayList<DiagnosticProducerAttachment> attachments = new java.util.ArrayList<>();
+        if (descriptor != null) {
+            for (int colorIndex = 0; colorIndex < descriptor.colorAttachments().size(); colorIndex++) {
+                VulkanicRenderTargetDescriptor.ColorAttachment colorAttachment = descriptor.colorAttachments().get(colorIndex);
+                DiagnosticIrisColorAttachment irisAttachment = DIAGNOSTIC_IRIS_TEXTURE_ATTACHMENTS.get(colorAttachment.textureId());
+                String logicalName = irisAttachment == null ? "unknown" : irisAttachment.logicalName();
+                String pingPong = irisAttachment == null ? "unknown" : irisAttachment.pingPong();
+                String usage = "initial=" + colorAttachment.initialUsage()
+                    + ",pass=" + colorAttachment.passUsage()
+                    + ",final=" + colorAttachment.finalUsage()
+                    + ",load=" + colorAttachment.loadOp()
+                    + ",store=" + colorAttachment.storeOp();
+                attachments.add(new DiagnosticProducerAttachment(
+                    colorIndex,
+                    colorAttachment.textureId(),
+                    logicalName,
+                    pingPong,
+                    usage
+                ));
+            }
+            return attachments;
+        }
+
+        java.util.List<DiagnosticIrisColorAttachment> framebufferAttachments =
+            DIAGNOSTIC_IRIS_FRAMEBUFFER_ATTACHMENTS.getOrDefault(framebuffer, java.util.List.of());
+        for (DiagnosticIrisColorAttachment attachment : framebufferAttachments) {
+            attachments.add(new DiagnosticProducerAttachment(
+                attachment.colorAttachment(),
+                attachment.textureId(),
+                attachment.logicalName(),
+                attachment.pingPong(),
+                "irisFramebufferAttachment=true,source=" + attachment.source()
+            ));
+        }
+        return attachments;
+    }
+
+    private static String safeSupplierLabel(java.util.function.Supplier<String> supplier) {
+        try {
+            return supplier == null ? "unknown" : String.valueOf(supplier.get());
+        } catch (RuntimeException exception) {
+            return "unavailable:" + exception.getClass().getSimpleName();
+        }
+    }
+
+    private static String diagnosticCustomPassName(@Nullable Object customPass) {
+        if (customPass == null) {
+            return "none";
+        }
+        Class<?> type = customPass.getClass();
+        while (type != null) {
+            try {
+                java.lang.reflect.Field field = type.getDeclaredField("name");
+                field.setAccessible(true);
+                Object value = field.get(customPass);
+                if (value != null) {
+                    return String.valueOf(value);
+                }
+            } catch (NoSuchFieldException ignored) {
+                type = type.getSuperclass();
+                continue;
+            } catch (IllegalAccessException | RuntimeException exception) {
+                return "unavailable:" + exception.getClass().getSimpleName();
+            }
+        }
+        return customPass.getClass().getName();
+    }
+
+    private static String physicalResourceKey(int legacyTextureId, @Nullable VulkanicTexture texture) {
+        if (legacyTextureId > 0) {
+            return "legacy:" + legacyTextureId;
+        }
+        int labelId = texture == null ? 0 : legacyTextureIdFromLabel(texture.getLabel());
+        if (labelId > 0) {
+            return "legacy:" + labelId;
+        }
+        return texture == null
+            ? "missing"
+            : "texture-label:" + shaderInputParitySanitizeLabel(texture.getLabel());
+    }
+
+    private static int legacyTextureIdFromLabel(@Nullable String label) {
+        if (label == null) {
+            return 0;
+        }
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+            .compile("Legacy(?:_| )texture(?:_| )([0-9]+)", java.util.regex.Pattern.CASE_INSENSITIVE)
+            .matcher(label);
+        return matcher.find() ? Integer.parseInt(matcher.group(1)) : 0;
+    }
+
+    public static void traceScopedCompositeColortex0PoseBoundary() {
+        if (!TRACE_RENDER_TARGET_CONTENT_HASHES) {
+            return;
+        }
+        if (!DeterministicCameraCapture.isEnabledForDiagnostics()) {
+            return;
+        }
+        ScopedCompositeColortex0Binding binding = scopedCompositeColortex0Binding;
+        if (binding == null) {
+            LOGGER.info(
+                "ShaderInputParityResources backend={} source=scoped-composite-colortex0-content pipelineLocation=iris:composite vertexShader=unknown fragmentShader=unknown pipelineHandle=none pipelineKey=unavailable stableKey=unavailable {} resources=[colortex0{layout=set:0,binding:0,type:SAMPLER,stages:[FRAGMENT],sampler={unit=0,view=missing},contentHash={logicalResource=colortex0,mip=0,layer=0,region=0:0:-1:-1,canonicalFormat=unavailable,origin=unavailable,channels=unavailable,hash=unavailable:not-bound-at-pose-boundary,poseContext={}}}]",
+                getActiveBackendType().name().toLowerCase(java.util.Locale.ROOT),
+                shaderInputParityDeterministicContextFields(),
+                shaderInputParityDeterministicContextFields().replace(' ', ',')
+            );
+            return;
+        }
+
+        String poseName = DeterministicCameraCapture.currentPoseNameForDiagnostics();
+        String emitKey = getActiveBackendType() + "|" + poseName + "|"
+            + binding.stableKey() + "|"
+            + (binding.texture() == null ? "legacy:" + binding.legacyTextureId() : "texture:" + System.identityHashCode(binding.texture()))
+            + "|mip:" + binding.baseMipLevel() + ':' + binding.mipLevelCount();
+        if (!SCOPED_COMPOSITE_COLORTEX0_EMITTED.add(emitKey)) {
+            return;
+        }
+
+        VulkanicTextureView textureView = createScopedCompositeColortex0DiagnosticView(binding);
+        DiagnosticTextureContentHash contentHash;
+        try {
+            contentHash = diagnosticTextureContentHash(textureView, "colortex0");
+        } catch (RuntimeException exception) {
+            contentHash = DiagnosticTextureContentHash.unavailable(
+                "colortex0",
+                textureView == null ? binding.texture() : textureView.texture(),
+                textureView,
+                "exception-" + exception.getClass().getSimpleName() + '-' + exception.getMessage()
+            );
+        }
+        String resource = scopedCompositeColortex0ResourceString(binding, textureView, contentHash);
+        String physicalKey = physicalResourceKey(binding.legacyTextureId(), textureView == null ? binding.texture() : textureView.texture());
+        String backendName = getActiveBackendType().name().toLowerCase(java.util.Locale.ROOT);
+        ScopedCompositeColortex0Producer producer = SCOPED_COMPOSITE_COLORTEX0_PRODUCERS.get(backendName + '|' + physicalKey);
+        String lifecycleInfo = textureView == null
+            ? "textureView=missing"
+            : diagnosticTextureLifecycleInfo(textureView, "colortex0");
+        traceScopedCompositeColortex0Consumer(binding, physicalKey, lifecycleInfo, producer, contentHash);
+        if (textureView != null) {
+            textureView.close();
+        }
+
+        LOGGER.info(
+            "ShaderInputParityResources backend={} source=scoped-composite-colortex0-content pipelineLocation={} vertexShader={} fragmentShader={} pipelineHandle={} pipelineKey={} stableKey={} {} resources=[{}]",
+            getActiveBackendType().name().toLowerCase(java.util.Locale.ROOT),
+            binding.pipelineLocation(),
+            binding.vertexShader(),
+            binding.fragmentShader(),
+            binding.pipeline() == null ? "none" : binding.pipeline().getClass().getSimpleName() + "@" + Integer.toHexString(System.identityHashCode(binding.pipeline())),
+            binding.pipelineKey(),
+            binding.stableKey(),
+            shaderInputParityDeterministicContextFields(),
+            resource
+        );
+    }
+
+    private static void traceScopedCompositeColortex0Consumer(
+        ScopedCompositeColortex0Binding binding,
+        String physicalKey,
+        String lifecycleInfo,
+        @Nullable ScopedCompositeColortex0Producer producer,
+        DiagnosticTextureContentHash contentHash
+    ) {
+        String backendName = getActiveBackendType().name().toLowerCase(java.util.Locale.ROOT);
+        boolean physicalResourceMatches = producer != null && producer.physicalKey().equals(physicalKey);
+        boolean producerAvailable = producer != null && producer.hash() != null && !producer.hash().hash().startsWith("unavailable:");
+        boolean consumerAvailable = contentHash != null && !contentHash.hash().startsWith("unavailable:");
+        boolean contentsChanged = producerAvailable && consumerAvailable && !producer.hash().hash().equals(contentHash.hash());
+        LOGGER.info(
+            "ShaderInputParityScopedColortex0Lifecycle backend={} event=consumer-sample source=scoped-composite-colortex0-content logicalResource=colortex0 resourceName={} physicalKey={} legacyTextureId={} producerFound={} physicalResourceMatches={} contentsChangedBetweenProducerAndConsumer={} producerPassLabel={} producerCustomPass={} producerPipelineLocation={} producerPingPong={} producerAttachmentUsage=\"{}\" producerLifecycle=\"{}\" consumerPipelineLocation={} consumerStableKey={} consumerLifecycle=\"{}\" {} producerHash={} consumerHash={{{}}}",
+            backendName,
+            shaderInputParitySanitizeLabel(binding.resourceName()),
+            physicalKey,
+            binding.legacyTextureId(),
+            producer != null,
+            physicalResourceMatches,
+            contentsChanged,
+            producer == null ? "none" : shaderInputParitySanitizeLabel(producer.passLabel()),
+            producer == null ? "none" : shaderInputParitySanitizeLabel(producer.customPassName()),
+            producer == null ? "none" : shaderInputParitySanitizeLabel(producer.pipelineLocation()),
+            producer == null ? "none" : producer.pingPong(),
+            producer == null ? "none" : shaderInputParitySanitizeLabel(producer.attachmentUsage()),
+            producer == null ? "none" : shaderInputParitySanitizeLabel(producer.lifecycleInfo()),
+            shaderInputParitySanitizeLabel(binding.pipelineLocation()),
+            binding.stableKey(),
+            shaderInputParitySanitizeLabel(lifecycleInfo),
+            shaderInputParityDeterministicContextFields(),
+            producer == null ? "unavailable:no-producer" : producer.hash().hash(),
+            diagnosticContentHashFields(contentHash)
+        );
+    }
+
+    @Nullable
+    private static VulkanicTextureView createScopedCompositeColortex0DiagnosticView(ScopedCompositeColortex0Binding binding) {
+        try {
+            if (binding.texture() != null) {
+                return createManagedTextureView(
+                    binding.texture(),
+                    Math.max(0, binding.baseMipLevel()),
+                    Math.max(1, binding.mipLevelCount())
+                );
+            }
+            if (binding.legacyTextureId() > 0) {
+                return createManagedLegacyTextureView(binding.legacyTextureId());
+            }
+        } catch (RuntimeException exception) {
+            LOGGER.info(
+                "ShaderInputParityResourceReadback backend={} source=scoped-composite-colortex0-content logicalResource=colortex0 result=unavailable reason={} {}",
+                getActiveBackendType().name().toLowerCase(java.util.Locale.ROOT),
+                shaderInputParitySanitizeLabel(exception.getClass().getSimpleName() + ':' + exception.getMessage()),
+                shaderInputParityDeterministicContextFields()
+            );
+        }
+        return null;
+    }
+
+    private static String scopedCompositeColortex0ResourceString(
+        ScopedCompositeColortex0Binding binding,
+        @Nullable VulkanicTextureView textureView,
+        DiagnosticTextureContentHash contentHash
+    ) {
+        VulkanicTexture texture = textureView == null ? binding.texture() : textureView.texture();
+        String viewDescription = textureView == null
+            ? "missing"
+            : "{viewClass=" + textureView.getClass().getSimpleName()
+            + ",baseMip=" + textureView.getBaseMipLevel()
+            + ",mips=" + textureView.getMipLevelCount()
+            + ",width=" + safeTextureViewWidth(textureView)
+            + ",height=" + safeTextureViewHeight(textureView)
+            + ",closed=" + textureView.isClosed()
+            + ",texture=" + scopedCompositeColortex0TextureString(texture)
+            + "}";
+        return binding.resourceName()
+            + "{layout=set:" + binding.resourceSet()
+            + ",binding:" + binding.resourceBinding()
+            + ",type:" + binding.resourceType()
+            + ",stages:[" + String.join(", ", binding.stages()) + "]"
+            + ",sampler={unit=" + binding.samplerUnit()
+            + ",samplerObject=" + (binding.samplerObject() == null ? "none" : binding.samplerObject())
+            + ",legacyTextureId=" + binding.legacyTextureId()
+            + ",view=" + viewDescription
+            + "},contentHash={" + diagnosticContentHashFields(contentHash)
+            + ",poseContext={" + shaderInputParityDeterministicContextFields().replace(' ', ',') + "}}}";
+    }
+
+    private static String diagnosticContentHashFields(DiagnosticTextureContentHash contentHash) {
+        return "logicalResource=" + contentHash.logicalResource()
+            + ",mip=" + contentHash.mip()
+            + ",layer=" + contentHash.layer()
+            + ",region=0:0:" + contentHash.width() + ':' + contentHash.height()
+            + ",canonicalFormat=" + contentHash.canonicalFormat()
+            + ",storageFormat=" + contentHash.storageFormat()
+            + ",origin=" + contentHash.originConvention()
+            + ",channels=" + contentHash.channelInterpretation()
+            + ",hash=" + contentHash.hash()
+            + (contentHash.tileHashes().isBlank() ? "" : ",tileHashes=" + contentHash.tileHashes());
+    }
+
+    private static String scopedCompositeColortex0TextureString(@Nullable VulkanicTexture texture) {
+        if (texture == null) {
+            return "missing";
+        }
+        return "{label=\"" + shaderInputParitySanitizeLabel(texture.getLabel()) + '"'
+            + ",format=" + texture.getVulkanicFormat()
+            + ",width=" + safeTextureWidth(texture, 0)
+            + ",height=" + safeTextureHeight(texture, 0)
+            + ",layers=" + texture.getDepthOrLayers()
+            + ",mips=" + texture.getMipLevels()
+            + ",usage=" + texture.usage()
+            + ",closed=" + texture.isClosed()
+            + "}";
+    }
+
+    private static boolean isLogicalColortex0(String resourceName, @Nullable VulkanicTextureView textureView) {
+        String normalizedName = resourceName == null ? "" : resourceName.toLowerCase(Locale.ROOT);
+        if ("colortex0".equals(normalizedName)) {
+            return true;
+        }
+        if ("gcolor".equals(normalizedName) || "tex".equals(normalizedName)) {
+            if (textureView == null) {
+                return true;
+            }
+            String label = textureView.texture().getLabel();
+            return label != null && label.toLowerCase(Locale.ROOT).startsWith("colortex0");
+        }
+        return false;
+    }
+
+    private static boolean isScopedCompositeColortex0ResourceName(String resourceName) {
+        String normalizedName = resourceName == null ? "" : resourceName.toLowerCase(Locale.ROOT);
+        return "colortex0".equals(normalizedName) || "gcolor".equals(normalizedName);
+    }
+
+    private static DiagnosticTextureContentHash diagnosticTextureContentHash(VulkanicTextureView textureView, String logicalResource) {
+        if (textureView == null || textureView.texture() == null) {
+            return DiagnosticTextureContentHash.unavailable(logicalResource, null, textureView, "missing-view");
+        }
+        if (textureView.isClosed() || textureView.texture().isClosed()) {
+            return DiagnosticTextureContentHash.unavailable(logicalResource, textureView.texture(), textureView, "closed");
+        }
+        if (getActiveBackendType() == GraphicsBackendType.OPENGL) {
+            return diagnosticOpenGLTextureContentHash(textureView, logicalResource);
+        }
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.diagnosticTextureContentHash(getCommandContext(), textureView, logicalResource)
+            : getBackend().diagnosticTextureContentHash(getCommandContext(), textureView, logicalResource);
+    }
+
+    private static String diagnosticTextureLifecycleInfo(VulkanicTextureView textureView, String logicalResource) {
+        if (textureView == null || textureView.texture() == null) {
+            return "textureView=missing";
+        }
+        if (getActiveBackendType() == GraphicsBackendType.OPENGL) {
+            return "backend=opengl,logicalResource=" + logicalResource
+                + ",ordering=render-pass-close-before-sampler-read"
+                + ",producerWrite=framebuffer-color-attachment"
+                + ",consumerRead=texture-sampling"
+                + ",explicitBarrier=none";
+        }
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.diagnosticTextureLifecycleInfo(getCommandContext(), textureView, logicalResource)
+            : getBackend().diagnosticTextureLifecycleInfo(getCommandContext(), textureView, logicalResource);
     }
 
     public static void traceShaderInputParityStandaloneUniformFloats(
@@ -7490,8 +8191,212 @@ public class VulkanicAPI {
         } catch (Throwable exception) {
             return "unavailable:readback-" + shaderInputParitySanitizeLabel(exception.getClass().getSimpleName());
         }
-        pixels.flip();
+        pixels.position(0);
+        pixels.limit(pixels.capacity());
         return shaderInputParityHash(pixels, pixels.remaining()) + "/region:0x0x" + width + "x" + height + "/format:" + format.name();
+    }
+
+    private static DiagnosticTextureContentHash diagnosticOpenGLTextureContentHash(
+        VulkanicTextureView textureView,
+        String logicalResource
+    ) {
+        VulkanicTexture texture = textureView.texture();
+        VulkanicTextureFormat format = texture.getVulkanicFormat();
+        if (!(textureView instanceof net.vulkanic.backends.opengl.OpenGLTextureView openGLTextureView)) {
+            return DiagnosticTextureContentHash.unavailable(logicalResource, texture, textureView, "not-opengl-view");
+        }
+
+        int width = Math.max(0, safeTextureViewWidth(textureView));
+        int height = Math.max(0, safeTextureViewHeight(textureView));
+        if (width <= 0 || height <= 0) {
+            return DiagnosticTextureContentHash.unavailable(logicalResource, texture, textureView, "empty");
+        }
+
+        int externalFormat;
+        int externalType;
+        int componentCount;
+        switch (format) {
+            case RGBA8, BGRA8, RGBA8_SNORM, RGBA16F -> {
+                externalFormat = org.lwjgl.opengl.GL11.GL_RGBA;
+                externalType = org.lwjgl.opengl.GL11.GL_FLOAT;
+                componentCount = 4;
+            }
+            case R11F_G11F_B10F -> {
+                externalFormat = org.lwjgl.opengl.GL11.GL_RGB;
+                externalType = org.lwjgl.opengl.GL11.GL_FLOAT;
+                componentCount = 3;
+            }
+            case RED8, RED8I, RED8UI, RED16F, RED32F -> {
+                externalFormat = org.lwjgl.opengl.GL11.GL_RED;
+                externalType = org.lwjgl.opengl.GL11.GL_FLOAT;
+                componentCount = 1;
+            }
+            default -> {
+                return DiagnosticTextureContentHash.unavailable(
+                    logicalResource,
+                    texture,
+                    textureView,
+                    "format-" + format.name().toLowerCase(Locale.ROOT)
+                );
+            }
+        }
+
+        java.nio.ByteBuffer componentBytes = BufferUtils.createByteBuffer(width * height * componentCount * Float.BYTES);
+        try {
+            org.lwjgl.opengl.GL45.glGetTextureSubImage(
+                openGLTextureView.glHandle(),
+                textureView.getBaseMipLevel(),
+                0,
+                0,
+                0,
+                width,
+                height,
+                1,
+                externalFormat,
+                externalType,
+                componentBytes
+            );
+        } catch (Throwable exception) {
+            return DiagnosticTextureContentHash.unavailable(
+                logicalResource,
+                texture,
+                textureView,
+                "readback-" + exception.getClass().getSimpleName()
+            );
+        }
+        componentBytes.position(0);
+        componentBytes.limit(componentBytes.capacity());
+        java.nio.ByteBuffer canonical = canonicalizeFloatComponentsToRgba32fTopLeft(
+            componentBytes,
+            width,
+            height,
+            componentCount,
+            true
+        );
+        return diagnosticContentHashFromCanonical(logicalResource, texture, textureView, canonical, width, height);
+    }
+
+    public static DiagnosticTextureContentHash diagnosticContentHashFromCanonical(
+        String logicalResource,
+        VulkanicTexture texture,
+        VulkanicTextureView textureView,
+        java.nio.ByteBuffer canonicalRgba32fTopLeft,
+        int width,
+        int height
+    ) {
+        java.nio.ByteBuffer bytes = canonicalRgba32fTopLeft.duplicate();
+        bytes.position(0);
+        bytes.limit(bytes.capacity());
+        bytes.limit(width * height * 4 * Float.BYTES);
+        String hash = shaderInputParityHash(bytes, bytes.remaining());
+        String tileHashes;
+        try {
+            tileHashes = diagnosticTileHashes(bytes, width, height);
+        } catch (RuntimeException exception) {
+            tileHashes = "unavailable:" + shaderInputParitySanitizeLabel(
+                exception.getClass().getSimpleName() + '-' + exception.getMessage()
+            );
+        }
+        return new DiagnosticTextureContentHash(
+            shaderInputParitySanitizeLabel(logicalResource),
+            width,
+            height,
+            texture.getVulkanicFormat(),
+            "RGBA32F_LE",
+            textureView.getBaseMipLevel(),
+            0,
+            "top-left-row-major",
+            "raw-linear-shader-visible-components-alpha-one-when-source-lacks-alpha",
+            hash,
+            tileHashes
+        );
+    }
+
+    public static java.nio.ByteBuffer canonicalizeFloatComponentsToRgba32fTopLeft(
+        java.nio.ByteBuffer source,
+        int width,
+        int height,
+        int sourceComponents,
+        boolean sourceRowsAreBottomToTop
+    ) {
+        java.nio.ByteBuffer input = source.duplicate().order(java.nio.ByteOrder.nativeOrder());
+        input.position(0);
+        java.nio.FloatBuffer floats = input.asFloatBuffer();
+        java.nio.ByteBuffer canonical = BufferUtils.createByteBuffer(width * height * 4 * Float.BYTES)
+            .order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        for (int y = 0; y < height; y++) {
+            int sourceY = sourceRowsAreBottomToTop ? height - 1 - y : y;
+            for (int x = 0; x < width; x++) {
+                int sourceIndex = (sourceY * width + x) * sourceComponents;
+                float r = sourceComponents >= 1 ? floats.get(sourceIndex) : 0.0F;
+                float g = sourceComponents >= 2 ? floats.get(sourceIndex + 1) : r;
+                float b = sourceComponents >= 3 ? floats.get(sourceIndex + 2) : r;
+                float a = sourceComponents >= 4 ? floats.get(sourceIndex + 3) : 1.0F;
+                canonical.putFloat(r);
+                canonical.putFloat(g);
+                canonical.putFloat(b);
+                canonical.putFloat(a);
+            }
+        }
+        canonical.flip();
+        return canonical;
+    }
+
+    public static String diagnosticHash(java.nio.ByteBuffer data, int length) {
+        return shaderInputParityHash(data, length);
+    }
+
+    private static String diagnosticTileHashes(java.nio.ByteBuffer canonical, int width, int height) {
+        if (width <= 0 || height <= 0) {
+            return "";
+        }
+        int tilesX = 4;
+        int tilesY = 4;
+        int bytesPerPixel = 4 * Float.BYTES;
+        int expectedBytes = width * height * bytesPerPixel;
+        if (canonical.capacity() < expectedBytes) {
+            return "unavailable:canonical-size-mismatch:expected-" + expectedBytes + ":actual-" + canonical.capacity();
+        }
+        java.util.List<String> hashes = new java.util.ArrayList<>(tilesX * tilesY);
+        for (int tileY = 0; tileY < tilesY; tileY++) {
+            int y0 = tileY * height / tilesY;
+            int y1 = (tileY + 1) * height / tilesY;
+            for (int tileX = 0; tileX < tilesX; tileX++) {
+                int x0 = tileX * width / tilesX;
+                int x1 = (tileX + 1) * width / tilesX;
+                java.security.MessageDigest digest;
+                try {
+                    digest = java.security.MessageDigest.getInstance("SHA-256");
+                } catch (java.security.NoSuchAlgorithmException exception) {
+                    throw new IllegalStateException("SHA-256 digest unavailable", exception);
+                }
+                java.nio.ByteBuffer tileSource = canonical.duplicate();
+                tileSource.position(0);
+                tileSource.limit(tileSource.capacity());
+                for (int y = y0; y < y1; y++) {
+                    int rowOffset = (y * width + x0) * bytesPerPixel;
+                    int rowLength = (x1 - x0) * bytesPerPixel;
+                    if (rowOffset < 0 || rowLength < 0 || rowOffset + rowLength > tileSource.capacity()) {
+                        return "unavailable:tile-range-mismatch:offset-" + rowOffset + ":length-" + rowLength + ":capacity-" + tileSource.capacity();
+                    }
+                    tileSource.limit(tileSource.capacity());
+                    tileSource.position(rowOffset);
+                    tileSource.limit(rowOffset + rowLength);
+                    digest.update(tileSource.slice());
+                }
+                hashes.add(tileX + "x" + tileY + ":" + toHex(digest.digest()).substring(0, 16));
+            }
+        }
+        return String.join("|", hashes);
+    }
+
+    private static String toHex(byte[] bytes) {
+        StringBuilder builder = new StringBuilder(bytes.length * 2);
+        for (byte value : bytes) {
+            builder.append(Character.forDigit((value >>> 4) & 0xF, 16));
+            builder.append(Character.forDigit(value & 0xF, 16));
+        }
+        return builder.toString();
     }
 
     private static int safeTextureViewWidth(VulkanicTextureView textureView) {

@@ -167,6 +167,16 @@ public class ProgramSamplers {
 					resourceBinder.bindLegacySampler(name, textureId, binding.textureUnit());
 				}
 			}
+			if (textureId > 0 && renderPass instanceof GlRenderPass glRenderPass) {
+				String name = Objects.requireNonNull(binding.name(), "sampler name");
+				VulkanicAPI.recordScopedCompositeColortex0RenderPassLegacyBinding(
+					glRenderPass.pipeline == null ? null : glRenderPass.pipeline.info(),
+					name,
+					textureId,
+					binding.textureUnit(),
+					"iris-program-sampler-legacy"
+				);
+			}
 		}
 	}
 

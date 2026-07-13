@@ -3375,7 +3375,55 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     @Nullable
     public net.vulkanic.VulkanicTextureView createManagedLegacyTextureView(int legacyTextureHandle) {
-        return null;
+        if (legacyTextureHandle <= 0 || !GL11.glIsTexture(legacyTextureHandle)) {
+            return null;
+        }
+        int width = GL45.glGetTextureLevelParameteri(legacyTextureHandle, 0, GL11.GL_TEXTURE_WIDTH);
+        int height = GL45.glGetTextureLevelParameteri(legacyTextureHandle, 0, GL11.GL_TEXTURE_HEIGHT);
+        int depth = GL45.glGetTextureLevelParameteri(legacyTextureHandle, 0, GL12.GL_TEXTURE_DEPTH);
+        int internalFormat = GL45.glGetTextureLevelParameteri(legacyTextureHandle, 0, GL11.GL_TEXTURE_INTERNAL_FORMAT);
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
+        net.vulkanic.VulkanicTextureFormat format = legacyInternalFormatToVulkanic(internalFormat);
+        if (format == null) {
+            return null;
+        }
+        int mipLevels = 1;
+        try {
+            int immutableLevels = GL45.glGetTextureParameteri(legacyTextureHandle, GL43.GL_TEXTURE_IMMUTABLE_LEVELS);
+            if (immutableLevels > 0) {
+                mipLevels = immutableLevels;
+            }
+        } catch (RuntimeException ignored) {
+        }
+        OpenGLTexture texture = OpenGLTexture.nonOwning(
+            legacyTextureHandle,
+            net.vulkanic.VulkanicTexture.USAGE_TEXTURE_BINDING | net.vulkanic.VulkanicTexture.USAGE_RENDER_ATTACHMENT,
+            format,
+            width,
+            height,
+            Math.max(1, depth),
+            Math.max(1, mipLevels),
+            "Legacy_texture_" + legacyTextureHandle
+        );
+        return new OpenGLTextureView(texture, 0, 1);
+    }
+
+    @Nullable
+    private static net.vulkanic.VulkanicTextureFormat legacyInternalFormatToVulkanic(int internalFormat) {
+        return switch (internalFormat) {
+            case VulkanicAPI.GL_RGBA8, GL11.GL_RGBA -> net.vulkanic.VulkanicTextureFormat.RGBA8;
+            case VulkanicAPI.GL_RGBA8_SNORM -> net.vulkanic.VulkanicTextureFormat.RGBA8_SNORM;
+            case VulkanicAPI.GL_RGBA16F -> net.vulkanic.VulkanicTextureFormat.RGBA16F;
+            case VulkanicAPI.GL_R11F_G11F_B10F -> net.vulkanic.VulkanicTextureFormat.R11F_G11F_B10F;
+            case GL30.GL_R8 -> net.vulkanic.VulkanicTextureFormat.RED8;
+            case VulkanicAPI.GL_R8I -> net.vulkanic.VulkanicTextureFormat.RED8I;
+            case VulkanicAPI.GL_R8UI -> net.vulkanic.VulkanicTextureFormat.RED8UI;
+            case VulkanicAPI.GL_R16F -> net.vulkanic.VulkanicTextureFormat.RED16F;
+            case VulkanicAPI.GL_R32F -> net.vulkanic.VulkanicTextureFormat.RED32F;
+            default -> null;
+        };
     }
 
     private static int[] toGlInternalFormat(net.vulkanic.VulkanicTextureFormat format) {

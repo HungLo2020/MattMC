@@ -113,6 +113,13 @@ public class GlRenderPass implements RenderPass {
 			this.samplerResourceViews.put(string, this.encoder.createSamplerResourceView(gpuTextureView));
 		}
 
+		VulkanicAPI.recordScopedCompositeColortex0RenderPassBinding(
+			this.pipeline == null ? null : this.pipeline.info(),
+			string,
+			gpuTextureView,
+			-1,
+			"opengl-renderpass-bindSampler"
+		);
 		this.dirtyUniforms.add(string);
 	}
 
@@ -131,6 +138,13 @@ public class GlRenderPass implements RenderPass {
 		}
 
 		this.samplerResourceViews.put(string, resourceView);
+		VulkanicAPI.recordScopedCompositeColortex0RenderPassLegacyBinding(
+			this.pipeline == null ? null : this.pipeline.info(),
+			string,
+			textureId,
+			-1,
+			"opengl-renderpass-bindLegacySampler"
+		);
 		this.dirtyUniforms.add(string);
 		return true;
 	}
@@ -332,13 +346,20 @@ public class GlRenderPass implements RenderPass {
 				throw new IllegalStateException("Render pass had debug groups left open!");
 			}
 
-			this.closed = true;
-			try {
-				this.encoder.finishRenderPass();
-			} finally {
-				this.closeSamplerResourceViews();
+				this.closed = true;
+				try {
+					this.encoder.finishRenderPass();
+					VulkanicAPI.recordScopedCompositeColortex0ProducerCompletion(
+						this.renderTargetDescriptor,
+						this.framebuffer,
+						this.pipeline == null ? null : this.pipeline.info(),
+						this.irisCustomPass,
+						"opengl-renderpass-close"
+					);
+				} finally {
+					this.closeSamplerResourceViews();
+				}
 			}
-		}
 	}
 	
 	// Iris compatibility

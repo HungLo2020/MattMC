@@ -96,6 +96,10 @@ class ResourceRecord:
     texture_usage: str = ""
     content_hash: str = ""
     content_hash_region: str = ""
+    content_hash_format: str = ""
+    content_hash_storage_format: str = ""
+    content_hash_tiles: str = ""
+    det_pose: str = ""
     projection_label: str = ""
     projection_context: str = ""
 
@@ -104,6 +108,8 @@ class ResourceRecord:
         name = self.name
         if self.name == "Projection" and self.projection_label:
             name = f"{self.name}@{self.projection_label}"
+        if self.content_hash and self.det_pose:
+            name = f"{name}@pose:{self.det_pose}@source:{self.source or 'unknown'}"
         pipeline_identity = self.pipeline_location or self.stable_key
         return (pipeline_identity, self.stable_key, name, self.resource_type)
 
@@ -280,6 +286,8 @@ def normalize_texture_label(label: str) -> str:
         return "<numeric-label>"
     if label.startswith("Legacy texture "):
         return "Legacy texture <id>"
+    if label.startswith("Legacy_texture_"):
+        return "Legacy_texture_<id>"
     return label
 
 
@@ -405,6 +413,10 @@ def parse_resource(raw: str, backend: str, source: str, pipeline_key: str, stabl
         texture_usage=fields.get("usage", ""),
         content_hash=content_fields.get("hash", ""),
         content_hash_region=content_fields.get("region", ""),
+        content_hash_format=content_fields.get("canonicalFormat", ""),
+        content_hash_storage_format=content_fields.get("storageFormat", ""),
+        content_hash_tiles=content_fields.get("tileHashes", ""),
+        det_pose=top_fields.get("detPose", ""),
         projection_label=fields.get("projectionLabel", ""),
     )
 

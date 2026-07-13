@@ -125,8 +125,23 @@ public final class DeterministicCameraCapture {
 			return;
 		}
 
+		VulkanicAPI.traceScopedCompositeColortex0PoseBoundary();
 		requestCurrentPoseScreenshot(minecraft);
 		renderedFramesAtPose = 0;
+	}
+
+	public static boolean isEnabledForDiagnostics() {
+		return ENABLED && initialized && !failed;
+	}
+
+	public static String currentPoseNameForDiagnostics() {
+		if (!ENABLED || !initialized || poses == null) {
+			return "none";
+		}
+		if (poseIndex >= 0 && poseIndex < poses.length) {
+			return poses[poseIndex].name();
+		}
+		return complete ? "complete" : "none";
 	}
 
 	public static String shaderInputParityContextFields() {

@@ -3860,6 +3860,33 @@ public interface GraphicsBackend {
     @Nullable
     VulkanicTextureView createManagedLegacyTextureView(int legacyTextureHandle);
 
+    /**
+     * Diagnostic-only content hash readback for deterministic shader-input parity captures.
+     *
+     * <p>Backends should leave rendering behavior unchanged and return an explicit
+     * {@code unavailable:*} hash when the requested texture cannot be read safely.</p>
+     */
+    default VulkanicAPI.DiagnosticTextureContentHash diagnosticTextureContentHash(
+        CommandContext ctx,
+        VulkanicTextureView textureView,
+        String logicalResource
+    ) {
+        return VulkanicAPI.DiagnosticTextureContentHash.unavailable(
+            logicalResource,
+            textureView == null ? null : textureView.texture(),
+            textureView,
+            "backend-readback-not-implemented"
+        );
+    }
+
+    default String diagnosticTextureLifecycleInfo(
+        CommandContext ctx,
+        VulkanicTextureView textureView,
+        String logicalResource
+    ) {
+        return "backend=generic,logicalResource=" + logicalResource + ",lifecycle=unavailable";
+    }
+
     // =========================================================================
     // Phase 3c: Pipeline Objects
     // =========================================================================
