@@ -4,7 +4,7 @@ set -euo pipefail
 
 usage() {
     cat <<'EOF'
-Usage: ./DevUtils/RunDevCapture.sh [--backend vulkan|opengl] [--max-secs N] [--dump-secs N] [--validation off|standard] [--shader-input-parity off|standard|full] [--client-args "..."]
+Usage: ./DevUtils/RunDevCapture.sh [--backend vulkan|opengl] [--max-secs N] [--dump-secs N] [--validation off|standard] [--shader-input-parity off|standard|full] [--deterministic-camera-capture] [--client-args "..."]
 
 Runs ./gradlew runClient in a bounded session, captures diagnostics, and
 self-terminates so no manual kill is required.
@@ -29,6 +29,12 @@ Environment overrides:
     SHADER_INPUT_PARITY_MAX_LOGS (default: 120000)
     LIGHTMAP_INFO_PARITY_MAX_LOGS (default: 512)
     CLIENT_ARGS
+
+Deterministic capture mode:
+    --deterministic-camera-capture
+        Loads Origin, forces 1280x720, enables shaders with the configured
+        shader pack, and runs a development-only camera sweep hook that writes
+        per-pose screenshots plus metadata.
 EOF
 }
 
@@ -43,6 +49,8 @@ SHADER_INPUT_PARITY="${SHADER_INPUT_PARITY:-off}"
 SHADER_INPUT_PARITY_MAX_LOGS="${SHADER_INPUT_PARITY_MAX_LOGS:-120000}"
 LIGHTMAP_INFO_PARITY_MAX_LOGS="${LIGHTMAP_INFO_PARITY_MAX_LOGS:-512}"
 CLIENT_ARGS="${CLIENT_ARGS:-}"
+DETERMINISTIC_CAMERA_CAPTURE="false"
+DETERMINISTIC_POSE_TOLERANCE="${DETERMINISTIC_POSE_TOLERANCE:-0.001}"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -65,6 +73,10 @@ while [[ $# -gt 0 ]]; do
         --shader-input-parity)
             SHADER_INPUT_PARITY="${2:-}"
             shift 2
+            ;;
+        --deterministic-camera-capture)
+            DETERMINISTIC_CAMERA_CAPTURE="true"
+            shift
             ;;
         --client-args)
             CLIENT_ARGS="${2:-}"
@@ -117,6 +129,11 @@ if ! [[ "$LIGHTMAP_INFO_PARITY_MAX_LOGS" =~ ^-?[0-9]+$ ]]; then
     exit 1
 fi
 
+if ! [[ "$DETERMINISTIC_POSE_TOLERANCE" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+    echo "DETERMINISTIC_POSE_TOLERANCE must be a non-negative number" >&2
+    exit 1
+fi
+
 # Find project root (where gradlew exists).
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 PROJECT_ROOT="$SCRIPT_DIR"
@@ -135,9 +152,22 @@ RUN_DIR="$PROJECT_ROOT/run"
 OPTIONS_FILE="$RUN_DIR/options.txt"
 ARTIFACT_DIR="$PROJECT_ROOT/logs/auto-capture"
 mkdir -p "$ARTIFACT_DIR"
+LOCK_FILE="$ARTIFACT_DIR/.RunDevCapture.lock"
+if [[ ! -e "$LOCK_FILE" ]]; then
+    : > "$LOCK_FILE"
+fi
+exec 9<>"$LOCK_FILE"
+if ! flock -n 9; then
+    echo "Refusing to start RunDevCapture because another RunDevCapture.sh instance is already running." >&2
+    echo "Concurrent captures can lock Origin and corrupt capture results." >&2
+    exit 1
+fi
+: > "$LOCK_FILE"
+printf 'pid=%s\nstarted_epoch=%s\n' "$$" "$(date +%s)" >&9
 
 RUN_ID="$(date +%Y%m%d_%H%M%S)"
 START_EPOCH="$(date +%s)"
+GIT_COMMIT="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
 RUN_LOG="$ARTIFACT_DIR/runClient_${RUN_ID}.log"
 META_LOG="$ARTIFACT_DIR/meta_${RUN_ID}.txt"
 THREAD_DUMP="$ARTIFACT_DIR/thread_dump_${RUN_ID}.txt"
@@ -161,6 +191,8 @@ PATCHED_SHADERS_SNAPSHOT="$ARTIFACT_DIR/patched_shaders_${RUN_ID}"
 PATCHED_SHADERS_MANIFEST="$ARTIFACT_DIR/patched_shaders_manifest_${RUN_ID}.txt"
 WINDOW_TREE="$ARTIFACT_DIR/window_tree_${RUN_ID}.txt"
 WINDOW_TREE_DUMP="$ARTIFACT_DIR/window_tree_dump_${RUN_ID}.txt"
+DETERMINISTIC_METADATA="$ARTIFACT_DIR/deterministic_camera_capture_${RUN_ID}.json"
+DETERMINISTIC_SCREENSHOT_DIR="$ARTIFACT_DIR/deterministic_camera_capture_${RUN_ID}"
 
 VALIDATION_LAYER_MANIFEST=""
 VALIDATION_LAYER_DIR=""
@@ -187,8 +219,27 @@ KEY_SUMMARY_PATTERN='Using shaderpack:|Loaded Shaderpack:|Profile:|Reloading pip
     echo "shader_input_parity=$SHADER_INPUT_PARITY"
     echo "shader_input_parity_max_logs=$SHADER_INPUT_PARITY_MAX_LOGS"
     echo "lightmap_info_parity_max_logs=$LIGHTMAP_INFO_PARITY_MAX_LOGS"
-    echo "client_args=$CLIENT_ARGS"
+    echo "deterministic_camera_capture=$DETERMINISTIC_CAMERA_CAPTURE"
+    echo "deterministic_pose_tolerance=$DETERMINISTIC_POSE_TOLERANCE"
+    echo "client_args_initial=$CLIENT_ARGS"
 } > "$META_LOG"
+
+find_existing_mattmc_clients() {
+    jcmd -l 2>/dev/null \
+        | awk '/KnotClient|devlaunchinjector|MattMC-1\.21/ && $0 !~ /jcmd|GradleWrapperMain|GradleDaemon/ {print}'
+}
+
+EXISTING_CLIENTS="$(find_existing_mattmc_clients || true)"
+if [[ -n "$EXISTING_CLIENTS" ]]; then
+    {
+        echo "preflight_existing_clients=true"
+        printf '%s\n' "$EXISTING_CLIENTS" | sed 's/^/preflight_existing_client=/'
+    } >> "$META_LOG"
+    echo "Refusing to start RunDevCapture because a MattMC client is already running:" >&2
+    printf '%s\n' "$EXISTING_CLIENTS" >&2
+    echo "Stop the existing client first; concurrent runs can lock Origin and corrupt capture results." >&2
+    exit 1
+fi
 
 screenshot_count=0
 screenshot_enabled="false"
@@ -197,7 +248,7 @@ find_client_window_id() {
     local client_pid="$1"
     local client_list raw_ids id props pid
 
-    if [[ -z "$client_pid" ]] || ! command -v xprop >/dev/null 2>&1; then
+    if ! command -v xprop >/dev/null 2>&1; then
         return 1
     fi
 
@@ -209,9 +260,13 @@ find_client_window_id() {
 
     while IFS= read -r id; do
         [[ -z "$id" ]] && continue
-        props="$(xprop -id "$id" _NET_WM_PID WM_NAME 2>/dev/null || true)"
+        props="$(xprop -id "$id" _NET_WM_PID WM_NAME _NET_WM_NAME WM_CLASS 2>/dev/null || true)"
         pid="$(printf '%s\n' "$props" | awk -F' = ' '/_NET_WM_PID\(CARDINAL\)/ {print $2; exit}' | tr -d '[:space:]')"
-        if [[ "$pid" == "$client_pid" ]]; then
+        if [[ -n "$client_pid" && "$pid" == "$client_pid" ]]; then
+            printf '%s\n' "$id"
+            return 0
+        fi
+        if printf '%s\n' "$props" | grep -Eiq 'Minecraft|MattMC'; then
             printf '%s\n' "$id"
             return 0
         fi
@@ -248,6 +303,86 @@ capture_root_screenshot() {
         rm -f "$screenshot_file"
         echo "screenshot_${screenshot_count}=failed:$label:$elapsed_secs" >> "$META_LOG"
     fi
+}
+
+capture_window_screenshot_file() {
+    local screenshot_file="$1"
+    local client_pid="${2:-}"
+    local target_window
+
+    mkdir -p "$(dirname "$screenshot_file")"
+    if target_window="$(find_client_window_id "$client_pid" 2>/dev/null)"; then
+        :
+    else
+        return 1
+    fi
+
+    if import -window "$target_window" "$screenshot_file" >/dev/null 2>&1; then
+        printf '%s\n' "$target_window"
+        return 0
+    fi
+
+    rm -f "$screenshot_file"
+    return 1
+}
+
+capture_deterministic_requests() {
+    local client_pid="${1:-}"
+    local request ack screenshot target_window
+
+    if [[ "$DETERMINISTIC_CAMERA_CAPTURE" != "true" ]]; then
+        return 0
+    fi
+    if [[ ! -d "$DETERMINISTIC_SCREENSHOT_DIR" ]]; then
+        return 0
+    fi
+
+    shopt -s nullglob
+    for request in "$DETERMINISTIC_SCREENSHOT_DIR"/capture_request_*.json; do
+        [[ "$request" == *.ack.json ]] && continue
+        ack="${request%.json}.ack.json"
+        [[ -f "$ack" ]] && continue
+
+        screenshot="$(python3 - "$request" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    data = json.load(handle)
+print(data.get("screenshot", ""))
+PY
+)"
+        if [[ -z "$screenshot" ]]; then
+            echo "deterministic_capture_request_invalid=$request" >> "$META_LOG"
+            continue
+        fi
+
+        if target_window="$(capture_window_screenshot_file "$screenshot" "$client_pid")"; then
+            python3 - "$request" "$ack" "$screenshot" "$target_window" <<'PY'
+import json
+import time
+import sys
+
+request_path, ack_path, screenshot, target_window = sys.argv[1:5]
+with open(request_path, encoding="utf-8") as handle:
+    data = json.load(handle)
+data["status"] = "captured"
+data["screenshot"] = screenshot
+data["targetWindow"] = target_window
+data["capturedAtEpoch"] = int(time.time())
+with open(ack_path, "w", encoding="utf-8") as handle:
+    json.dump(data, handle, indent=2)
+    handle.write("\n")
+PY
+            echo "deterministic_capture_ack=$ack" >> "$META_LOG"
+            echo "deterministic_capture_screenshot=$screenshot" >> "$META_LOG"
+            echo "deterministic_capture_target=$target_window" >> "$META_LOG"
+        else
+            echo "deterministic_capture_failed=$request" >> "$META_LOG"
+        fi
+    done
+    shopt -u nullglob
+    return 0
 }
 
 find_validation_layer_manifest() {
@@ -316,6 +451,40 @@ extract_client_arg_assignment() {
         | grep -oE "(^|[[:space:]])${key}=[^[:space:]]+" \
         | head -n 1 \
         | sed -E "s/(^|[[:space:]])${key}=//"
+}
+
+append_client_arg() {
+    if [[ -n "$CLIENT_ARGS" ]]; then
+        CLIENT_ARGS="$CLIENT_ARGS $1"
+    else
+        CLIENT_ARGS="$1"
+    fi
+}
+
+client_args_contains_option() {
+    local option="$1"
+
+    [[ " $CLIENT_ARGS " == *" ${option}"* ]]
+}
+
+client_args_contains_assignment() {
+    local key="$1"
+
+    [[ " $CLIENT_ARGS " == *" ${key}="* ]]
+}
+
+append_java_tool_options() {
+    local options=("$@")
+
+    if [[ ${#options[@]} -eq 0 ]]; then
+        return
+    fi
+
+    if [[ -n "${JAVA_TOOL_OPTIONS:-}" ]]; then
+        export JAVA_TOOL_OPTIONS="$JAVA_TOOL_OPTIONS ${options[*]}"
+    else
+        export JAVA_TOOL_OPTIONS="${options[*]}"
+    fi
 }
 
 upsert_property() {
@@ -546,6 +715,19 @@ else
     } >> "$META_LOG"
 fi
 
+if [[ "$DETERMINISTIC_CAMERA_CAPTURE" == "true" && "$screenshot_enabled" != "true" ]]; then
+    echo "--deterministic-camera-capture requires ImageMagick import and DISPLAY for window screenshots" >&2
+    exit 1
+fi
+
+if [[ "$DETERMINISTIC_CAMERA_CAPTURE" == "true" ]]; then
+    SCREENSHOT_INTERVAL_SECS=0
+    {
+        echo "deterministic_wall_clock_screenshots=false"
+        echo "screenshot_interval_secs_effective=0"
+    } >> "$META_LOG"
+fi
+
 if [[ -f "$OPTIONS_FILE" ]]; then
     if grep -q '^graphics_backend=' "$OPTIONS_FILE"; then
         sed -i "s/^graphics_backend=.*/graphics_backend=$BACKEND/" "$OPTIONS_FILE"
@@ -561,6 +743,30 @@ fi
 
 if [[ "$BACKEND" == "vulkan" && "$VALIDATION_MODE" == "standard" && "$VALIDATION_LAYER_AVAILABLE" == "true" ]]; then
     VALIDATION_ENABLED="true"
+fi
+
+if [[ "$DETERMINISTIC_CAMERA_CAPTURE" == "true" ]]; then
+    CONFIGURED_SHADER_PACK="$(extract_property_value "$RUN_DIR/config/iris.properties" shaderPack || true)"
+
+    if ! client_args_contains_option "--quickPlaySingleplayer"; then
+        append_client_arg "--quickPlaySingleplayer=Origin"
+    fi
+    if ! client_args_contains_option "--width"; then
+        append_client_arg "--width 1280"
+    fi
+    if ! client_args_contains_option "--height"; then
+        append_client_arg "--height 720"
+    fi
+    if ! client_args_contains_assignment "enableShaders"; then
+        append_client_arg "enableShaders=true"
+    fi
+    if ! client_args_contains_assignment "shaderPack"; then
+        if [[ -z "$CONFIGURED_SHADER_PACK" ]]; then
+            echo "--deterministic-camera-capture requires a shaderPack in CLIENT_ARGS or run/config/iris.properties" >&2
+            exit 1
+        fi
+        append_client_arg "shaderPack=$CONFIGURED_SHADER_PACK"
+    fi
 fi
 
 copy_config_snapshot "$CONFIG_BEFORE_DIR"
@@ -588,21 +794,27 @@ write_shaderpack_info
     echo "shaderpack_info=$SHADERPACK_INFO"
     echo "effective_enable_shaders=${EFFECTIVE_ENABLE_SHADERS:-unset}"
     echo "effective_shader_pack=${EFFECTIVE_SHADER_PACK:-unset}"
+    echo "client_args_effective=$CLIENT_ARGS"
+    echo "deterministic_metadata=$DETERMINISTIC_METADATA"
+    echo "deterministic_screenshot_dir=$DETERMINISTIC_SCREENSHOT_DIR"
 } >> "$META_LOG"
 
 find_client_pid() {
     local pid
 
-    # Prefer Java processes in the same process group as this run, with Minecraft/Fabric markers.
-    pid="$(ps -eo pid=,pgid=,cmd= \
-        | awk -v pg="$GRADLE_PID" '$2 == pg && $0 ~ /java/ && $0 ~ /(devlaunchinjector|minecraft|fabric|MattMC-1\\.21)/ {print $1; exit}' 2>/dev/null || true)"
+    # Prefer the per-run JVM marker. Gradle may launch runClient from a daemon
+    # outside the wrapper process group, so process-group matching alone is not
+    # enough to identify the actual client reliably.
+    pid="$(ps -eo pid=,cmd= \
+        | awk -v marker="-Dmattmc.dev.runCaptureId=$RUN_ID" '$0 ~ /(KnotClient|devlaunchinjector|MattMC-1\\.21)/ && index($0, marker) {print $1; exit}' 2>/dev/null || true)"
     if [[ -n "${pid:-}" ]]; then
         echo "$pid"
         return
     fi
 
-    # Fallback to jcmd process inventory.
-    pid="$(jcmd -l 2>/dev/null | awk '/devlaunchinjector|minecraft|fabric|MattMC-1\.21/ {print $1; exit}' || true)"
+    # Prefer Java processes in the same process group as this run, with Minecraft/Fabric markers.
+    pid="$(ps -eo pid=,pgid=,cmd= \
+        | awk -v pg="$GRADLE_PID" '$2 == pg && $0 ~ /java/ && $0 ~ /(devlaunchinjector|minecraft|fabric|MattMC-1\\.21)/ {print $1; exit}' 2>/dev/null || true)"
     if [[ -n "${pid:-}" ]]; then
         echo "$pid"
         return
@@ -618,6 +830,63 @@ find_client_pid() {
 dump_taken="false"
 timed_out="false"
 exit_code=""
+deterministic_validation_status="not_requested"
+GRADLE_PID=""
+RUN_CLIENT_ACTIVE="false"
+
+terminate_run_processes() {
+    local reason="$1"
+    local client_pid=""
+
+    if [[ -z "${GRADLE_PID:-}" ]]; then
+        return 0
+    fi
+
+    echo "cleanup_reason=$reason" >> "$META_LOG"
+    client_pid="$(find_client_pid || true)"
+    if [[ -n "$client_pid" ]]; then
+        echo "cleanup_client_pid=$client_pid" >> "$META_LOG"
+        kill -TERM "$client_pid" 2>/dev/null || true
+    fi
+
+    kill -TERM -- "-$GRADLE_PID" 2>/dev/null || true
+    kill -TERM "$GRADLE_PID" 2>/dev/null || true
+    sleep 5
+
+    if [[ -n "$client_pid" ]] && kill -0 "$client_pid" 2>/dev/null; then
+        echo "cleanup_client_kill=true" >> "$META_LOG"
+        kill -KILL "$client_pid" 2>/dev/null || true
+    fi
+    if kill -0 "$GRADLE_PID" 2>/dev/null; then
+        echo "cleanup_gradle_kill=true" >> "$META_LOG"
+        kill -KILL -- "-$GRADLE_PID" 2>/dev/null || true
+        kill -KILL "$GRADLE_PID" 2>/dev/null || true
+    fi
+
+    RUN_CLIENT_ACTIVE="false"
+}
+
+cleanup_on_exit() {
+    local status=$?
+
+    if [[ "$RUN_CLIENT_ACTIVE" == "true" ]]; then
+        terminate_run_processes "script_exit_${status}"
+    fi
+}
+
+cleanup_on_signal() {
+    local signal="$1"
+
+    if [[ "$RUN_CLIENT_ACTIVE" == "true" ]]; then
+        terminate_run_processes "signal_${signal}"
+    fi
+    exit 128
+}
+
+trap cleanup_on_exit EXIT
+trap 'cleanup_on_signal INT' INT
+trap 'cleanup_on_signal TERM' TERM
+trap 'cleanup_on_signal HUP' HUP
 
 echo "Starting bounded runClient capture (run_id=$RUN_ID, backend=$BACKEND)"
 GRADLE_CMD=(./gradlew -x test runClient)
@@ -658,6 +927,13 @@ if [[ "$VALIDATION_ENABLED" == "true" ]]; then
     } >> "$META_LOG"
 fi
 
+RUN_CAPTURE_JAVA_OPTIONS=("-Dmattmc.dev.runCaptureId=$RUN_ID")
+append_java_tool_options "${RUN_CAPTURE_JAVA_OPTIONS[@]}"
+{
+    echo "run_capture_java_options=${RUN_CAPTURE_JAVA_OPTIONS[*]}"
+    echo "java_tool_options=$JAVA_TOOL_OPTIONS"
+} >> "$META_LOG"
+
 if [[ "$SHADER_INPUT_PARITY" != "off" ]]; then
     SHADER_INPUT_PARITY_JAVA_OPTIONS=(
         "-Dmattmc.vulkan.traceShaderInputParity=true"
@@ -670,11 +946,7 @@ if [[ "$SHADER_INPUT_PARITY" != "off" ]]; then
         SHADER_INPUT_PARITY_JAVA_OPTIONS+=("-Dmattmc.vulkan.traceStandaloneUniformBlockMembers=true")
     fi
 
-    if [[ -n "${JAVA_TOOL_OPTIONS:-}" ]]; then
-        export JAVA_TOOL_OPTIONS="$JAVA_TOOL_OPTIONS ${SHADER_INPUT_PARITY_JAVA_OPTIONS[*]}"
-    else
-        export JAVA_TOOL_OPTIONS="${SHADER_INPUT_PARITY_JAVA_OPTIONS[*]}"
-    fi
+    append_java_tool_options "${SHADER_INPUT_PARITY_JAVA_OPTIONS[@]}"
 
     {
         echo "shader_input_parity_java_options=${SHADER_INPUT_PARITY_JAVA_OPTIONS[*]}"
@@ -683,8 +955,26 @@ if [[ "$SHADER_INPUT_PARITY" != "off" ]]; then
     } >> "$META_LOG"
 fi
 
+if [[ "$DETERMINISTIC_CAMERA_CAPTURE" == "true" ]]; then
+    DETERMINISTIC_JAVA_OPTIONS=(
+        "-Dmattmc.dev.deterministicCameraCapture=true"
+        "-Dmattmc.dev.deterministicCameraCapture.metadata=$DETERMINISTIC_METADATA"
+        "-Dmattmc.dev.deterministicCameraCapture.screenshotDir=$DETERMINISTIC_SCREENSHOT_DIR"
+        "-Dmattmc.dev.deterministicCameraCapture.shaderEnabled=${EFFECTIVE_ENABLE_SHADERS:-unknown}"
+        "-Dmattmc.dev.deterministicCameraCapture.shaderPack=${EFFECTIVE_SHADER_PACK:-unknown}"
+        "-Dmattmc.dev.deterministicCameraCapture.gitCommit=$GIT_COMMIT"
+    )
+    append_java_tool_options "${DETERMINISTIC_JAVA_OPTIONS[@]}"
+
+    {
+        echo "deterministic_camera_capture_java_options=${DETERMINISTIC_JAVA_OPTIONS[*]}"
+        echo "java_tool_options=$JAVA_TOOL_OPTIONS"
+    } >> "$META_LOG"
+fi
+
 setsid "${GRADLE_CMD[@]}" > "$RUN_LOG" 2>&1 &
 GRADLE_PID=$!
+RUN_CLIENT_ACTIVE="true"
 echo "gradle_pid=$GRADLE_PID" >> "$META_LOG"
 
 elapsed=0
@@ -694,9 +984,11 @@ while kill -0 "$GRADLE_PID" 2>/dev/null; do
 
     CLIENT_PID="$(find_client_pid)"
 
-    if [[ "$screenshot_enabled" == "true" && "$SCREENSHOT_INTERVAL_SECS" -gt 0 && "$elapsed" -ge "$SCREENSHOT_START_DELAY_SECS" && $(((elapsed - SCREENSHOT_START_DELAY_SECS) % SCREENSHOT_INTERVAL_SECS)) -eq 0 ]]; then
+    if [[ "$DETERMINISTIC_CAMERA_CAPTURE" != "true" && "$screenshot_enabled" == "true" && "$SCREENSHOT_INTERVAL_SECS" -gt 0 && "$elapsed" -ge "$SCREENSHOT_START_DELAY_SECS" && $(((elapsed - SCREENSHOT_START_DELAY_SECS) % SCREENSHOT_INTERVAL_SECS)) -eq 0 ]]; then
         capture_root_screenshot "tick" "$elapsed" "$CLIENT_PID"
     fi
+
+    capture_deterministic_requests "$CLIENT_PID"
 
     if [[ "$dump_taken" == "false" && "$elapsed" -ge "$DUMP_SECS" ]]; then
         {
@@ -723,11 +1015,15 @@ while kill -0 "$GRADLE_PID" 2>/dev/null; do
                 echo "===== jcmd Thread.print (pid=$CLIENT_PID) ====="
                 jcmd "$CLIENT_PID" Thread.print
             } > "$THREAD_DUMP" 2>&1 || true
-            capture_root_screenshot "dump" "$elapsed"
+            if [[ "$DETERMINISTIC_CAMERA_CAPTURE" != "true" ]]; then
+                capture_root_screenshot "dump" "$elapsed"
+            fi
             dump_taken="true"
         else
             echo "No Minecraft Java PID found at dump point." > "$THREAD_DUMP"
-            capture_root_screenshot "dump" "$elapsed"
+            if [[ "$DETERMINISTIC_CAMERA_CAPTURE" != "true" ]]; then
+                capture_root_screenshot "dump" "$elapsed"
+            fi
             dump_taken="true"
         fi
     fi
@@ -740,7 +1036,9 @@ done
 
 if [[ "$timed_out" == "true" ]]; then
     echo "timeout=true" >> "$META_LOG"
-    capture_root_screenshot "timeout" "$elapsed"
+    if [[ "$DETERMINISTIC_CAMERA_CAPTURE" != "true" ]]; then
+        capture_root_screenshot "timeout" "$elapsed"
+    fi
     # Final best-effort dump before terminating, in case dump window was too early.
     CLIENT_PID="$(find_client_pid)"
     if [[ -n "$CLIENT_PID" ]]; then
@@ -751,12 +1049,7 @@ if [[ "$timed_out" == "true" ]]; then
         } >> "$THREAD_DUMP" 2>&1 || true
     fi
 
-    # Kill the whole process group started with setsid.
-    kill -TERM -- "-$GRADLE_PID" 2>/dev/null || true
-    sleep 8
-    if kill -0 "$GRADLE_PID" 2>/dev/null; then
-        kill -KILL -- "-$GRADLE_PID" 2>/dev/null || true
-    fi
+    terminate_run_processes "timeout"
 fi
 
 if wait "$GRADLE_PID"; then
@@ -764,6 +1057,7 @@ if wait "$GRADLE_PID"; then
 else
     exit_code=$?
 fi
+RUN_CLIENT_ACTIVE="false"
 
 echo "exit_code=$exit_code" >> "$META_LOG"
 echo "end_epoch=$(date +%s)" >> "$META_LOG"
@@ -845,6 +1139,110 @@ done < "$CRASH_REPORT_LIST"
     grep -nEi "$KEY_SUMMARY_PATTERN" "$RUN_LOG" | head -n 200 || true
 } > "$SHADER_SUMMARY"
 
+if [[ "$DETERMINISTIC_CAMERA_CAPTURE" == "true" ]]; then
+    if python3 - "$DETERMINISTIC_METADATA" "$DETERMINISTIC_SCREENSHOT_DIR" "$DETERMINISTIC_POSE_TOLERANCE" <<'PY'
+import json
+import math
+import pathlib
+import sys
+
+metadata_path = pathlib.Path(sys.argv[1])
+screenshot_dir = pathlib.Path(sys.argv[2])
+tolerance = float(sys.argv[3])
+
+if not metadata_path.is_file():
+    raise SystemExit(f"deterministic metadata was not written: {metadata_path}")
+
+data = json.loads(metadata_path.read_text(encoding="utf-8"))
+if data.get("status") != "complete":
+    raise SystemExit(f"deterministic capture did not complete: status={data.get('status')!r} reason={data.get('reason')!r}")
+
+backend = data.get("backend")
+shader_enabled = data.get("shaderEnabled")
+shader_pack = data.get("shaderPack")
+git_commit = data.get("gitCommit")
+dimension = data.get("dimension")
+yaw_delta = float(data.get("yawDelta", float("nan")))
+initial_pose = data.get("initialPose") or {}
+initial_yaw = float(initial_pose.get("yaw", float("nan")))
+initial_pitch = float(initial_pose.get("pitch", float("nan")))
+
+window = data.get("window") or {}
+if window.get("width") != 1280 or window.get("height") != 720:
+    raise SystemExit(f"deterministic capture window mismatch: {window}")
+
+captures = data.get("captures") or []
+expected_poses = ["initial", "right", "left", "return"]
+actual_poses = [capture.get("poseName") for capture in captures]
+if actual_poses != expected_poses:
+    raise SystemExit(f"deterministic pose sequence mismatch: {actual_poses}")
+
+expected_requested = {
+    "initial": (initial_yaw, initial_pitch),
+    "right": (initial_yaw + yaw_delta, initial_pitch),
+    "left": (initial_yaw - yaw_delta, initial_pitch),
+    "return": (initial_yaw, initial_pitch),
+}
+
+if not screenshot_dir.is_dir():
+    raise SystemExit(f"deterministic screenshot directory missing: {screenshot_dir}")
+
+initial_position = data.get("initialPosition") or {}
+previous_frame = -1
+for capture in captures:
+    screenshot = pathlib.Path(capture.get("screenshot", ""))
+    if not screenshot.is_file():
+        raise SystemExit(f"deterministic screenshot missing for {capture.get('poseName')}: {screenshot}")
+    if not screenshot.name.startswith(f"{capture.get('index'):02d}_{capture.get('poseName')}"):
+        raise SystemExit(f"deterministic screenshot name does not match pose: {screenshot}")
+    if capture.get("backend") != backend:
+        raise SystemExit(f"deterministic capture backend mismatch: {capture}")
+    if capture.get("shaderEnabled") != shader_enabled:
+        raise SystemExit(f"deterministic capture shaderEnabled mismatch: {capture}")
+    if capture.get("shaderPack") != shader_pack:
+        raise SystemExit(f"deterministic capture shaderPack mismatch: {capture}")
+    if capture.get("gitCommit") != git_commit:
+        raise SystemExit(f"deterministic capture gitCommit mismatch: {capture}")
+    if capture.get("window") != window:
+        raise SystemExit(f"deterministic capture window mismatch: {capture}")
+    if capture.get("dimension") != dimension:
+        raise SystemExit(f"deterministic capture dimension mismatch: {capture}")
+    position = capture.get("position") or {}
+    for axis in ("x", "y", "z"):
+        if not math.isclose(float(position.get(axis, float("nan"))), float(initial_position.get(axis, float("nan"))), rel_tol=0.0, abs_tol=0.0001):
+            raise SystemExit(f"deterministic player position changed on {capture.get('poseName')} axis {axis}: initial={initial_position} capture={position}")
+    pose_name = capture.get("poseName")
+    expected_yaw, expected_pitch = expected_requested[pose_name]
+    requested_yaw = float(capture.get("requestedYaw", float("nan")))
+    requested_pitch = float(capture.get("requestedPitch", float("nan")))
+    observed_yaw = float(capture.get("observedYaw", float("nan")))
+    observed_pitch = float(capture.get("observedPitch", float("nan")))
+    if not math.isclose(requested_yaw, expected_yaw, rel_tol=0.0, abs_tol=tolerance):
+        raise SystemExit(f"deterministic requested yaw mismatch for {pose_name}: expected={expected_yaw} actual={requested_yaw} tolerance={tolerance}")
+    if not math.isclose(requested_pitch, expected_pitch, rel_tol=0.0, abs_tol=tolerance):
+        raise SystemExit(f"deterministic requested pitch mismatch for {pose_name}: expected={expected_pitch} actual={requested_pitch} tolerance={tolerance}")
+    if not math.isclose(observed_yaw, requested_yaw, rel_tol=0.0, abs_tol=tolerance):
+        raise SystemExit(f"deterministic observed yaw mismatch for {pose_name}: requested={requested_yaw} observed={observed_yaw} tolerance={tolerance}")
+    if not math.isclose(observed_pitch, requested_pitch, rel_tol=0.0, abs_tol=tolerance):
+        raise SystemExit(f"deterministic observed pitch mismatch for {pose_name}: requested={requested_pitch} observed={observed_pitch} tolerance={tolerance}")
+    frame = int(capture.get("renderedFrameIndex", -1))
+    if frame <= previous_frame:
+        raise SystemExit(f"deterministic frame index did not increase at {pose_name}: previous={previous_frame} actual={frame}")
+    previous_frame = frame
+
+if captures[0]["requestedYaw"] != captures[3]["requestedYaw"] or captures[0]["requestedPitch"] != captures[3]["requestedPitch"]:
+    raise SystemExit("deterministic return pose does not exactly match initial requested pose")
+
+print(f"deterministic capture OK: {metadata_path} tolerance={tolerance}")
+PY
+    then
+        deterministic_validation_status="ok"
+    else
+        deterministic_validation_status="failed"
+    fi
+    echo "deterministic_validation=$deterministic_validation_status" >> "$META_LOG"
+fi
+
 echo "Capture complete."
 echo "- Meta:        $META_LOG"
 echo "- System:      $SYSTEM_SNAPSHOT"
@@ -869,6 +1267,11 @@ fi
 if [[ -f "$WINDOW_TREE" ]]; then
     echo "- Window tree: $WINDOW_TREE"
 fi
+if [[ "$DETERMINISTIC_CAMERA_CAPTURE" == "true" ]]; then
+    echo "- Deterministic metadata: $DETERMINISTIC_METADATA"
+    echo "- Deterministic screenshots: $DETERMINISTIC_SCREENSHOT_DIR"
+    echo "- Deterministic validation: $deterministic_validation_status"
+fi
 
 if [[ "$timed_out" == "true" ]]; then
     echo "Result: timed out after ${MAX_SECS}s and was terminated automatically."
@@ -876,4 +1279,8 @@ elif [[ "$exit_code" -ne 0 ]]; then
     echo "Result: exited with non-zero code $exit_code."
 else
     echo "Result: exited cleanly."
+fi
+
+if [[ "$DETERMINISTIC_CAMERA_CAPTURE" == "true" && "$deterministic_validation_status" != "ok" ]]; then
+    exit 2
 fi

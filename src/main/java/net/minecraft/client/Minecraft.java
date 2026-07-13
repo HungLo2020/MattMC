@@ -1278,7 +1278,8 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	private void runTick(boolean bl) {
 		long frameStart = Util.getNanos();
-		
+		net.minecraft.client.dev.DeterministicCameraCapture.beforeTick(this);
+
 		// HOOK: Call registered hooks at beginning of tick
 		for (GameHooks hook : HookRegistry.getGameHooks()) {
 			hook.beforeRunTick(this, bl);
@@ -1344,7 +1345,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		profilerFiller.push("gameRenderer");
 		startTime = Util.getNanos();
 		if (!this.noRender) {
+			net.minecraft.client.dev.DeterministicCameraCapture.beforeRender(this);
 			this.gameRenderer.render(this.deltaTracker, bl);
+			net.minecraft.client.dev.DeterministicCameraCapture.afterRender(this);
 		}
 		net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadOperation("frame.gameRenderer", Util.getNanos() - startTime);
 
