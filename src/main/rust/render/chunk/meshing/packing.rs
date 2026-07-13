@@ -427,6 +427,7 @@ pub(super) fn compute_face_normal(vertices: &[QuadVertex; 4]) -> (f32, f32, f32)
     )
 }
 
+#[cfg(test)]
 pub(super) fn norm_i8_pack_from_quad(quad: &NativeQuad) -> i32 {
     norm_i8_pack_from_vertices(&quad.vertices)
 }

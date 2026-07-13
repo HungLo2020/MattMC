@@ -428,6 +428,7 @@ pub(super) fn blend_ao_face(face: AoFace, weights: [f32; 4]) -> (f32, i32) {
     (ao, (((sky as i32) & 0xff) << 16) | ((block as i32) & 0xff))
 }
 
+#[cfg(test)]
 pub(super) fn blend_inset_ao_face(
     block: &NativeSectionBlockRecord,
     light_face: i32,
