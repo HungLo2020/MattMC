@@ -198,7 +198,7 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
                 uniqueWorldId(),
                 settings,
                 new WorldOptions(WORLD_SEED, false, false),
-                WorldPresets::createNormalWorldDimensions,
+                WorldPresets::createFlatWorldDimensions,
                 null
         );
     }
@@ -292,10 +292,10 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
 
     private static void clearFixtureVolume(Minecraft minecraft, int sectionX, int sectionZ) {
         int minX = SectionPos.sectionToBlockCoord(sectionX) - 16;
-        int minY = SectionPos.sectionToBlockCoord(SECTION_Y) - 1;
+        int minY = SectionPos.sectionToBlockCoord(SECTION_Y) - 2;
         int minZ = SectionPos.sectionToBlockCoord(sectionZ) - 16;
         int maxX = SectionPos.sectionToBlockCoord(sectionX) + 31;
-        int maxY = SectionPos.sectionToBlockCoord(SECTION_Y) + 16;
+        int maxY = minecraft.level.getMaxY();
         int maxZ = SectionPos.sectionToBlockCoord(sectionZ) + 31;
         BlockState air = Blocks.AIR.defaultBlockState();
 
@@ -418,7 +418,7 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
                 long setupStart = System.nanoTime();
                 clearFixtureVolume(minecraft, section.sectionX, section.sectionZ);
                 populateFixture(minecraft, fixture.name, section.sectionX, section.sectionZ);
-                minecraft.level.pollLightUpdates();
+                settleFixtureLighting(minecraft);
                 long fixtureSetupNanos = System.nanoTime() - setupStart;
                 results.add(this.runFixture(minecraft, context, fixture, section, fixtureSetupNanos));
                 this.writeResults(new ResultDocument(results));
@@ -427,6 +427,24 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
         }
 
         return new ResultDocument(results);
+    }
+
+    private static void settleFixtureLighting(Minecraft minecraft) {
+        for (int attempt = 0; attempt < 64; attempt++) {
+            minecraft.level.pollLightUpdates();
+            minecraft.level.getChunkSource().getLightEngine().runLightUpdates();
+
+            if (!minecraft.level.getChunkSource().getLightEngine().hasLightWork()) {
+                minecraft.level.pollLightUpdates();
+                minecraft.level.getChunkSource().getLightEngine().runLightUpdates();
+
+                if (!minecraft.level.getChunkSource().getLightEngine().hasLightWork()) {
+                    return;
+                }
+            }
+        }
+
+        throw new IllegalStateException("Real chunk meshing replay fixture lighting did not settle");
     }
 
     private FixtureResult runFixture(Minecraft minecraft, ChunkBuildContext context, Fixture fixture,
