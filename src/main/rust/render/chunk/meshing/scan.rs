@@ -851,7 +851,6 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
         .add_optional_stage(PROFILE_SCAN_CACHE_LOOKUP, cache_lookup_started);
     let mut total_committed = 0i32;
     let mut pending_counts = [0usize; MODEL_QUAD_FACING_COUNT];
-    let mut template_pending_counts = [0usize; MODEL_QUAD_FACING_COUNT];
     let mut model_ids = Vec::with_capacity(8);
     let mut last_state_id = i32::MIN;
     let mut last_state = None;
@@ -1047,7 +1046,6 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
 
                 for quad_record in model {
                     let quad_iteration_started = profile_start(profile_static_substages);
-                    let quad_record_ptr = quad_record as *const StaticModelQuadRecord;
                     let quad_record = *quad_record;
                     builder
                         .profile
@@ -1081,56 +1079,6 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
                     builder
                         .profile
                         .add_optional_stage(PROFILE_STATIC_QUAD_ITERATION, quad_iteration_started);
-                    if analyzer.is_none()
-                        && !store_raw_quads
-                        && is_compact_fast_format(format)
-                        && direct_static_templates_enabled()
-                    {
-                        if pending_counts[facing] != 0 {
-                            flush_static_model_pending_face(
-                                builder,
-                                facing,
-                                &mut pending_counts,
-                                analyzer,
-                                format,
-                                store_raw_quads,
-                                &mut total_committed,
-                            )?;
-                        }
-                        let append_started = profile_start(profile_scan_substages);
-                        let committed = push_static_model_template_quad(
-                            builder,
-                            record as *const NativeSectionBlockRecord,
-                            state,
-                            quad_record_ptr,
-                            facing,
-                            &mut template_pending_counts,
-                            format,
-                            profile_static_substages,
-                            profile_scan_substages,
-                        )?;
-                        total_committed =
-                            total_committed.checked_add(committed).ok_or(ERR_CAPACITY)?;
-                        builder
-                            .profile
-                            .add_optional_stage(PROFILE_SCAN_QUAD_APPEND, append_started);
-                        builder
-                            .profile
-                            .add_count(PROFILE_COUNT_NATIVE_MODEL_QUADS, 1);
-                        continue;
-                    }
-                    if template_pending_counts[facing] != 0 {
-                        let committed = flush_static_model_template_face(
-                            builder,
-                            facing,
-                            &mut template_pending_counts,
-                            format,
-                            profile_static_substages,
-                            profile_scan_substages,
-                        )?;
-                        total_committed =
-                            total_committed.checked_add(committed).ok_or(ERR_CAPACITY)?;
-                    }
                     let quad = static_model_quad_to_native_section(
                         *record,
                         state,
@@ -1235,15 +1183,6 @@ pub(super) unsafe fn section_builder_append_native_section_records_encoded(
             store_raw_quads,
             &mut total_committed,
         )?;
-        let committed = flush_static_model_template_face(
-            builder,
-            facing,
-            &mut template_pending_counts,
-            format,
-            profile_static_substages,
-            profile_scan_substages,
-        )?;
-        total_committed = total_committed.checked_add(committed).ok_or(ERR_CAPACITY)?;
     }
 
     Ok(total_committed)

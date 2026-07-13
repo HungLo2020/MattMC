@@ -8,16 +8,10 @@ use super::*;
 static FLUID_DIAG_COUNT: AtomicUsize = AtomicUsize::new(0);
 static FLUID_FLUSH_DIAG_COUNT: AtomicUsize = AtomicUsize::new(0);
 static FLUID_DIAG_ENABLED: OnceLock<bool> = OnceLock::new();
-static FLUID_FORCE_UNASSIGNED: OnceLock<bool> = OnceLock::new();
 const FLUID_DIAG_LIMIT: usize = 10_000;
 
 pub(super) fn native_fluid_diag_enabled() -> bool {
     *FLUID_DIAG_ENABLED.get_or_init(|| std::env::var_os("MATTMC_NATIVE_FLUID_DIAG").is_some())
-}
-
-fn native_fluid_force_unassigned() -> bool {
-    *FLUID_FORCE_UNASSIGNED
-        .get_or_init(|| std::env::var_os("MATTMC_NATIVE_FLUID_FORCE_UNASSIGNED").is_some())
 }
 
 fn native_fluid_diag_log(message: impl std::fmt::Display) {
@@ -1147,6 +1141,7 @@ fn fluid_top_crease_ne_sw(heights: [f32; 4], aligned: bool) -> bool {
 }
 
 #[cfg(test)]
+#[cfg(test)]
 pub(super) fn fluid_semantic_face(
     state: NativeMeshingState,
     block: &NativeSectionBlockRecord,
@@ -1161,10 +1156,6 @@ pub(super) fn fluid_semantic_face(
     ao: f32,
     light: i32,
 ) -> (FluidFaceRecord, usize) {
-    let mut facing = facing;
-    if native_fluid_force_unassigned() {
-        facing = MODEL_QUAD_FACING_UNASSIGNED;
-    }
     let mut record = fluid_semantic_record(
         state,
         block,
@@ -1188,7 +1179,7 @@ pub(super) fn fluid_semantic_face(
 fn fluid_semantic_native_face(
     state: NativeMeshingState,
     block: &NativeSectionBlockRecord,
-    mut facing: usize,
+    facing: usize,
     flip: bool,
     light_face: i32,
     light_flags: i32,
@@ -1201,10 +1192,6 @@ fn fluid_semantic_native_face(
     ao: f32,
     light: i32,
 ) -> NativeFluidFace {
-    if native_fluid_force_unassigned() {
-        facing = MODEL_QUAD_FACING_UNASSIGNED;
-    }
-
     let mut vertices = fluid_semantic_vertices(
         state,
         block,
@@ -1562,10 +1549,7 @@ fn packed_fluid_normal(facing: usize, vertices: &[QuadVertex; 4]) -> i32 {
     }
 }
 
-fn flipped_fluid_back_face(front: NativeFluidFace, mut facing: usize) -> NativeFluidFace {
-    if native_fluid_force_unassigned() {
-        facing = MODEL_QUAD_FACING_UNASSIGNED;
-    }
+fn flipped_fluid_back_face(front: NativeFluidFace, facing: usize) -> NativeFluidFace {
     let mut back = front;
     back.vertices = [
         front.vertices[0],

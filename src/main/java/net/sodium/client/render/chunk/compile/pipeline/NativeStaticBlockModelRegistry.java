@@ -100,6 +100,7 @@ public final class NativeStaticBlockModelRegistry {
     private static int nextSelectorId;
     private static int nextModelId;
     private static int nextSkipGroup = 1;
+    private static int reloadGeneration;
 
     static {
         STATE_IDS.defaultReturnValue(MISSING_ID);
@@ -111,6 +112,7 @@ public final class NativeStaticBlockModelRegistry {
     }
 
     public static synchronized void reload(Map<BlockState, BlockStateModel> models) {
+        reloadGeneration++;
         MODELS.clear();
         STATE_IDS.clear();
         STATE_SELECTORS.clear();
@@ -130,6 +132,10 @@ public final class NativeStaticBlockModelRegistry {
             MODELS.put(entry.getKey(), entry.getValue());
             registerState(entry.getKey(), entry.getValue());
         }
+    }
+
+    public static synchronized int reloadGeneration() {
+        return reloadGeneration;
     }
 
     public static synchronized int getStateId(BlockState state) {

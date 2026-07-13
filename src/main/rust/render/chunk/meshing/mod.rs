@@ -87,16 +87,12 @@ const MODEL_QUAD_FLAG_PARTIAL: i32 = 1;
 const MODEL_QUAD_FLAG_PARALLEL: i32 = 1 << 1;
 const MODEL_QUAD_FLAG_ALIGNED: i32 = 1 << 2;
 const TINT_NONE: i32 = 0;
-const TINT_GRASS: i32 = 1;
-const TINT_FOLIAGE: i32 = 2;
 const TINT_WATER: i32 = 3;
 const TINT_REDSTONE: i32 = 4;
 const TINT_CONSTANT: i32 = 5;
 const TINT_STEM: i32 = 6;
-const TINT_DOUBLE_PLANT_GRASS: i32 = 7;
 const TINT_SPRUCE: i32 = 8;
 const TINT_BIRCH: i32 = 9;
-const TINT_FORCE_GRASS: i32 = 10;
 const FLUID_WATER: i32 = 1;
 const FLUID_LAVA: i32 = 2;
 const FLUID_SPRITE_WATER_STILL: i32 = 1;
@@ -197,14 +193,6 @@ const PROFILE_STAGING_VERTEX_ENCODING: usize = 48;
 const PROFILE_STAGING_INDEX_WRITE: usize = 49;
 #[allow(dead_code)]
 const PROFILE_STAGING_FINAL_BUFFER_ASSEMBLY: usize = 50;
-#[allow(dead_code)]
-const PROFILE_TEMPLATE_LOOKUP: usize = 51;
-const PROFILE_TEMPLATE_INSTANCE_PATCH: usize = 52;
-const PROFILE_TEMPLATE_DIRECT_VERTEX_ENCODING: usize = 53;
-#[allow(dead_code)]
-const PROFILE_TEMPLATE_RETAINED_TRANSLUCENT_METADATA: usize = 54;
-#[allow(dead_code)]
-const PROFILE_TEMPLATE_FINAL_ASSEMBLY_COPY: usize = 55;
 const PROFILE_COUNT_SCANNED_BLOCKS: usize = 0;
 const PROFILE_COUNT_NATIVE_MODEL_BLOCKS: usize = 1;
 const PROFILE_COUNT_NATIVE_MODEL_QUADS: usize = 2;
@@ -214,9 +202,7 @@ const PROFILE_COUNT_TRANSLUCENT_QUADS: usize = 5;
 #[allow(dead_code)]
 const PROFILE_COUNT_SORTED_QUADS: usize = 6;
 const PROFILE_COUNT_EMITTED_QUADS: usize = 7;
-const PROFILE_COUNT_DIRECT_TEMPLATE_QUADS: usize = 8;
 const PROFILE_COUNT_GENERIC_NATIVE_QUADS: usize = 9;
-const PROFILE_COUNT_DIRECT_TEMPLATE_BYTES_WRITTEN: usize = 10;
 const PROFILE_COUNT_GENERIC_NATIVE_BYTES_RETAINED: usize = 11;
 const PROFILE_COUNT_SELECTOR_RESOLUTIONS: usize = 12;
 const PROFILE_COUNT_SELECTOR_CACHE_HITS: usize = 13;
@@ -235,7 +221,6 @@ static STATIC_MODEL_SUBSTAGE_PROFILE_ENABLED: OnceLock<bool> = OnceLock::new();
 static FLUID_SUBSTAGE_PROFILE_ENABLED: OnceLock<bool> = OnceLock::new();
 static SCAN_SUBSTAGE_PROFILE_ENABLED: OnceLock<bool> = OnceLock::new();
 static STAGING_SUBSTAGE_PROFILE_ENABLED: OnceLock<bool> = OnceLock::new();
-static ENABLE_DIRECT_STATIC_TEMPLATES: OnceLock<bool> = OnceLock::new();
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
@@ -481,9 +466,6 @@ struct NativePendingQuadBuffer {
     light_block_records: Vec<LightBlockRecord>,
     fluid_face_records: Vec<FluidFaceRecord>,
     static_model_block_records: Vec<StaticModelBlockRecord>,
-    static_template_blocks: Vec<*const NativeSectionBlockRecord>,
-    static_template_states: Vec<NativeMeshingState>,
-    static_template_quads: Vec<*const StaticModelQuadRecord>,
     packed_normals: Vec<i32>,
     validity: Vec<u8>,
 }
@@ -550,18 +532,6 @@ fn static_model_substage_profile_enabled() -> bool {
                 .map(str::to_ascii_lowercase),
             Ok(value) if value == "1" || value == "true" || value == "yes" || value == "on"
         )
-    })
-}
-
-fn direct_static_templates_enabled() -> bool {
-    *ENABLE_DIRECT_STATIC_TEMPLATES.get_or_init(|| {
-        std::env::var("MATTMC_NATIVE_MESHING_ENABLE_DIRECT_STATIC_TEMPLATES")
-            .map(|value| {
-                value.eq_ignore_ascii_case("true")
-                    || value.eq_ignore_ascii_case("yes")
-                    || value == "1"
-            })
-            .unwrap_or(false)
     })
 }
 

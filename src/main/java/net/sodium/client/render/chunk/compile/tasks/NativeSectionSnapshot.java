@@ -50,6 +50,7 @@ final class NativeSectionSnapshot implements AutoCloseable {
     private final int minX;
     private final int minY;
     private final int minZ;
+    private final int modelReloadGeneration;
     private final long totalBytes;
     private long address;
     private long activeIndicesAddress;
@@ -73,6 +74,7 @@ final class NativeSectionSnapshot implements AutoCloseable {
         this.minX = minX;
         this.minY = minY;
         this.minZ = minZ;
+        this.modelReloadGeneration = NativeStaticBlockModelRegistry.reloadGeneration();
 
         long offset = NativeChunkMeshEncoder.COMPACT_SECTION_SNAPSHOT_HEADER_STRIDE;
         this.activeIndicesAddress = offset;
@@ -148,6 +150,9 @@ final class NativeSectionSnapshot implements AutoCloseable {
     }
 
     int[] flushAll(TranslucentGeometryCollector collector) {
+        if (this.modelReloadGeneration != NativeStaticBlockModelRegistry.reloadGeneration()) {
+            throw new IllegalStateException("Native section snapshot was built against stale native model metadata");
+        }
         MemoryUtil.memPutInt(this.address + HEADER_ACTIVE_COUNT_OFFSET, this.activeRecordCount);
         int[] nativeQuads = this.buffers.appendCompactNativeSectionSnapshotAllPasses(this.address,
                 this.sectionIndex, collector);

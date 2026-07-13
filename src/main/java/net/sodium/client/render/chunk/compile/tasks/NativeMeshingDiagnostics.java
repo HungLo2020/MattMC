@@ -13,6 +13,8 @@ final class NativeMeshingDiagnostics {
     private static final Logger LOGGER = LoggerFactory.getLogger("MattMC-NativeMeshing");
 
     private static final boolean REPORT_FALLBACKS = Boolean.getBoolean("mattmc.nativeMeshing.reportFallbacks");
+    // Diagnostic A/B switches only. They intentionally route work to Java for comparison captures,
+    // but production coverage should keep ordinary vanilla/MattMC geometry on the native path.
     private static final boolean FORCE_JAVA_PRODUCERS = Boolean.getBoolean("mattmc.nativeMeshing.forceJavaProducers");
     private static final boolean FORCE_JAVA_MODELS = FORCE_JAVA_PRODUCERS
             || Boolean.getBoolean("mattmc.nativeMeshing.forceJavaModels");

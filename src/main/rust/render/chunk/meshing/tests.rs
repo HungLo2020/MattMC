@@ -1,5 +1,7 @@
 use super::*;
 
+const TEST_TINT_FORCE_GRASS: i32 = 10;
+
 fn vertex(x: f32, y: f32, z: f32, u: f32, v: f32) -> QuadVertex {
     QuadVertex {
         x,
@@ -40,6 +42,64 @@ fn native_quad_layout_matches_java_stride() {
     assert_eq!(156, std::mem::size_of::<FlatQuadRecord>());
     assert_eq!(24, std::mem::size_of::<LightBlockRecord>());
     assert_eq!(172, std::mem::size_of::<FluidFaceRecord>());
+}
+
+#[test]
+fn compact_section_snapshot_header_layout_matches_java() {
+    assert_eq!(120, std::mem::size_of::<CompactSectionSnapshotHeader>());
+    assert_eq!(0, std::mem::offset_of!(CompactSectionSnapshotHeader, version));
+    assert_eq!(4, std::mem::offset_of!(CompactSectionSnapshotHeader, active_count));
+    assert_eq!(8, std::mem::offset_of!(CompactSectionSnapshotHeader, min_x));
+    assert_eq!(12, std::mem::offset_of!(CompactSectionSnapshotHeader, min_y));
+    assert_eq!(16, std::mem::offset_of!(CompactSectionSnapshotHeader, min_z));
+    assert_eq!(
+        24,
+        std::mem::offset_of!(CompactSectionSnapshotHeader, active_indices_address)
+    );
+    assert_eq!(
+        32,
+        std::mem::offset_of!(CompactSectionSnapshotHeader, padded_state_ids_address)
+    );
+    assert_eq!(
+        40,
+        std::mem::offset_of!(CompactSectionSnapshotHeader, padded_light_words_address)
+    );
+    assert_eq!(
+        48,
+        std::mem::offset_of!(CompactSectionSnapshotHeader, block_ids_address)
+    );
+    assert_eq!(
+        56,
+        std::mem::offset_of!(CompactSectionSnapshotHeader, seed_los_address)
+    );
+    assert_eq!(
+        64,
+        std::mem::offset_of!(CompactSectionSnapshotHeader, seed_his_address)
+    );
+    assert_eq!(
+        72,
+        std::mem::offset_of!(CompactSectionSnapshotHeader, tints_address)
+    );
+    assert_eq!(
+        80,
+        std::mem::offset_of!(CompactSectionSnapshotHeader, fluid_tints_address)
+    );
+    assert_eq!(
+        88,
+        std::mem::offset_of!(CompactSectionSnapshotHeader, fluid_flow_x_address)
+    );
+    assert_eq!(
+        96,
+        std::mem::offset_of!(CompactSectionSnapshotHeader, fluid_flow_z_address)
+    );
+    assert_eq!(
+        104,
+        std::mem::offset_of!(CompactSectionSnapshotHeader, fluid_block_ids_address)
+    );
+    assert_eq!(
+        112,
+        std::mem::offset_of!(CompactSectionSnapshotHeader, flags_address)
+    );
 }
 
 #[test]
@@ -247,78 +307,6 @@ fn compact_encoder_writes_expected_base_words() {
     assert_eq!(
         pack_light_and_data(0xf0f0, 5, 3).to_ne_bytes(),
         output[16..20]
-    );
-}
-
-#[test]
-fn direct_static_template_encoding_matches_generic_compact_quad() {
-    let mut block = lighting_block_record();
-    block.local_x = 3;
-    block.local_y = 4;
-    block.local_z = 5;
-    block.absolute_x = 99;
-    block.absolute_y = 66;
-    block.absolute_z = -14;
-    block.tint = 0xff35_996fu32 as i32;
-    let mut state = lighting_state_record(STATE_FLAG_FULL_OCCLUSION);
-    state.tint_type = TINT_FORCE_GRASS;
-    state.material_bits = 7;
-    let mut quad = lighting_quad(MODEL_QUAD_FLAG_ALIGNED, 1, 0.0, 1.0, 0.0);
-    quad.cull_face = -1;
-    quad.tint_index = -1;
-    quad.vertices[0].color = 0xffff_ffffu32 as i32;
-    quad.vertices[1].light = 0;
-
-    let format = NativeFormat {
-        vertex_stride: 20,
-        block_id_offset: 0,
-        normal_offset: 0,
-        tangent_offset: 0,
-        mid_uv_offset: 0,
-        mid_block_offset: 0,
-        section_index: 5,
-        separate_ao: false,
-    };
-    let mut profile = NativeMeshingProfile::default();
-    let generic_quad =
-        static_model_quad_to_native_section(block, state, quad, &mut profile, false, false);
-    let mut expected = vec![0u8; 4 * format.vertex_stride];
-    encode_quad(&generic_quad, &mut expected, format);
-
-    let mut builder = create_section_mesh_builder(0);
-    let mut pending_counts = [0usize; MODEL_QUAD_FACING_COUNT];
-    let direct = unsafe {
-        push_static_model_template_quad(
-            &mut builder,
-            &block as *const NativeSectionBlockRecord,
-            state,
-            &quad as *const StaticModelQuadRecord,
-            MODEL_QUAD_FACING_UNASSIGNED,
-            &mut pending_counts,
-            format,
-            false,
-            false,
-        )
-    }
-    .unwrap();
-    assert_eq!(0, direct);
-    let committed = unsafe {
-        flush_static_model_template_face(
-            &mut builder,
-            MODEL_QUAD_FACING_UNASSIGNED,
-            &mut pending_counts,
-            format,
-            false,
-            false,
-        )
-    }
-    .unwrap();
-
-    assert_eq!(1, committed);
-    assert_eq!(1, builder.counts[MODEL_QUAD_FACING_UNASSIGNED]);
-    assert_eq!(
-        expected,
-        builder.buffers[MODEL_QUAD_FACING_UNASSIGNED].encoded[..expected.len()]
     );
 }
 
@@ -535,7 +523,7 @@ fn static_model_state_tint_does_not_apply_without_quad_tint_index() {
     let mut block = lighting_block_record();
     block.tint = 0xff35_996fu32 as i32;
     let mut state = lighting_state_record(0);
-    state.tint_type = TINT_FORCE_GRASS;
+    state.tint_type = TEST_TINT_FORCE_GRASS;
     let mut quad = lighting_quad(MODEL_QUAD_FLAG_ALIGNED, 1, 0.0, 1.0, 0.0);
     quad.tint_index = -1;
     quad.vertices[0].color = 0xffff_ffffu32 as i32;
@@ -552,7 +540,7 @@ fn static_model_force_grass_tint_applies_with_quad_tint_index() {
     let mut block = lighting_block_record();
     block.tint = 0xff35_996fu32 as i32;
     let mut state = lighting_state_record(0);
-    state.tint_type = TINT_FORCE_GRASS;
+    state.tint_type = TEST_TINT_FORCE_GRASS;
     let mut quad = lighting_quad(MODEL_QUAD_FLAG_ALIGNED, 1, 0.0, 1.0, 0.0);
     quad.tint_index = 0;
     quad.vertices[0].color = 0xffff_ffffu32 as i32;

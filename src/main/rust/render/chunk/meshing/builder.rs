@@ -16,12 +16,6 @@ pub(super) fn create_section_mesh_builder(capacity: usize) -> NativeSectionMeshB
                 StaticModelBlockRecord::default();
                 PENDING_BATCH_QUAD_CAPACITY
             ],
-            static_template_blocks: vec![std::ptr::null(); PENDING_BATCH_QUAD_CAPACITY],
-            static_template_states: vec![
-                NativeMeshingState::default();
-                PENDING_BATCH_QUAD_CAPACITY
-            ],
-            static_template_quads: vec![std::ptr::null(); PENDING_BATCH_QUAD_CAPACITY],
             packed_normals: vec![0; PENDING_BATCH_QUAD_CAPACITY],
             validity: vec![0; PENDING_BATCH_QUAD_CAPACITY],
         }),
