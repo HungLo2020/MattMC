@@ -349,13 +349,13 @@ class NativeChunkMeshEncoderTest {
             NativeStaticBlockModelCache.registerState(0, -1, 1, 0, -1, 0, 0, -1, 0, -1, -1, 0);
             NativeStaticBlockModelCache.registerState(100, 9, 1 << 1, 5, 0, 0, 0, 41, 0, -1, -1, 1);
 
-            records = MemoryUtil.memAlloc(NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE);
+            records = MemoryUtil.memAlloc(NativeChunkMeshEncoder.LEGACY_NATIVE_SECTION_BLOCK_RECORD_STRIDE);
             long base = MemoryUtil.memAddress(records);
-            NativeChunkMeshEncoder.writeNativeSectionBlockRecord(base, 100, 41, 4, 5, 6, 1234L,
+            NativeChunkMeshEncoder.writeLegacyNativeSectionBlockRecord(base, 100, 41, 4, 5, 6, 1234L,
                     0, 0, 0, 0, 0, 0, 0x00f000f0, 0.25F, 0.0F, 0.5F);
 
             sectionBuilder.start(3);
-            int committed = sectionBuilder.appendNativeSectionEncoded(base, 1, 0,
+            int committed = sectionBuilder.appendLegacyNativeSectionRecordsEncoded(base, 1, 0,
                     ChunkMeshFormats.COMPACT.getNativeFormat(), 3, false, false);
 
             assertEquals(1, committed);
@@ -384,12 +384,12 @@ class NativeChunkMeshEncoderTest {
             NativeStaticBlockModelCache.clear();
             NativeStaticBlockModelCache.registerState(0, -1, 1, 0, -1, 0, 0, -1, 0, -1, -1, 0);
 
-            records = MemoryUtil.memCalloc(4096 * NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE);
+            records = MemoryUtil.memCalloc(4096 * NativeChunkMeshEncoder.LEGACY_NATIVE_SECTION_BLOCK_RECORD_STRIDE);
             long base = MemoryUtil.memAddress(records);
 
             for (int pass = 0; pass < 3; pass++) {
                 sectionBuilder.start(3);
-                assertEquals(0, sectionBuilder.appendNativeSectionEncoded(base, 4096, pass,
+                assertEquals(0, sectionBuilder.appendLegacyNativeSectionRecordsEncoded(base, 4096, pass,
                         ChunkMeshFormats.COMPACT.getNativeFormat(), 3, false, false));
                 assertEquals(0, sectionBuilder.totalVertexCount());
             }
@@ -423,17 +423,17 @@ class NativeChunkMeshEncoderTest {
             NativeStaticBlockModelCache.registerState(120, 18, 1 << 1, 5, 0, 0, 0, 41,
                     0, -1, -1, 1, 0, 0.0F, 0, 1, 0.25F, 0.2F, 5);
 
-            records = MemoryUtil.memAlloc(NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE);
+            records = MemoryUtil.memAlloc(NativeChunkMeshEncoder.LEGACY_NATIVE_SECTION_BLOCK_RECORD_STRIDE);
             int[] lightWords = fullBrightLightWords();
             int[] states = neighborhoodStates(0);
             states[13] = 120;
             long base = MemoryUtil.memAddress(records);
-            NativeChunkMeshEncoder.writeNativeSectionBlockRecord(base, 120, 41, 4, 5, 6, 1234L,
+            NativeChunkMeshEncoder.writeLegacyNativeSectionBlockRecord(base, 120, 41, 4, 5, 6, 1234L,
                     0, 0, 0, 0, 0, 0, lightWords, states, 0xff204080, -1,
                     0.0F, 0.0F, 20, 64, 30);
 
             sectionBuilder.start(3);
-            assertEquals(1, sectionBuilder.appendNativeSectionEncoded(base, 1, 0,
+            assertEquals(1, sectionBuilder.appendLegacyNativeSectionRecordsEncoded(base, 1, 0,
                     ChunkMeshFormats.COMPACT.getNativeFormat(), 3, false, false));
 
             output = nativeOrder(MemoryUtil.memCalloc(4 * ChunkMeshFormats.COMPACT.getNativeFormat().stride()));
@@ -470,16 +470,16 @@ class NativeChunkMeshEncoderTest {
                     0.25F, 0.75F, 0.125F, 0.625F, 0.0F,
                     0.5F, 1.0F, 0.5F, 1.0F, 0.0F, 1);
 
-            records = MemoryUtil.memAlloc(NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE);
+            records = MemoryUtil.memAlloc(NativeChunkMeshEncoder.LEGACY_NATIVE_SECTION_BLOCK_RECORD_STRIDE);
             int[] lightWords = fullBrightLightWords();
             int[] states = neighborhoodStates(0);
             states[13] = 200;
-            NativeChunkMeshEncoder.writeNativeSectionBlockRecord(MemoryUtil.memAddress(records), 200, 77,
+            NativeChunkMeshEncoder.writeLegacyNativeSectionBlockRecord(MemoryUtil.memAddress(records), 200, 77,
                     8, 8, 8, 99L, 0, 0, 0, 0, 0, 0, lightWords, states,
                     -1, 0xff3f76e4, 0.0F, 0.0F, 8, 64, 8);
 
             sectionBuilder.start(3);
-            int committed = sectionBuilder.appendNativeSectionEncoded(MemoryUtil.memAddress(records), 1, 2,
+            int committed = sectionBuilder.appendLegacyNativeSectionRecordsEncoded(MemoryUtil.memAddress(records), 1, 2,
                     ChunkMeshFormats.COMPACT.getNativeFormat(), 3, false, false);
 
             assertEquals(11, committed);

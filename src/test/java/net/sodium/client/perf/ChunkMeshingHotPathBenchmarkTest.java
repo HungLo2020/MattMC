@@ -220,7 +220,7 @@ class ChunkMeshingHotPathBenchmarkTest {
 
     private static long runNativeSectionScan(NativeSectionMeshBuilder sectionBuilder, ByteBuffer records) {
         sectionBuilder.start(SECTION_INDEX);
-        int committed = sectionBuilder.appendNativeSectionEncoded(MemoryUtil.memAddress(records), 4096, 0,
+        int committed = sectionBuilder.appendLegacyNativeSectionRecordsEncoded(MemoryUtil.memAddress(records), 4096, 0,
                 ChunkMeshFormats.COMPACT.getNativeFormat(), SECTION_INDEX, false, false);
         BuiltSectionMeshParts mesh = sectionBuilder.finishMesh(ChunkMeshFormats.COMPACT.getNativeFormat(), 0,
                 false, true, false);
@@ -247,7 +247,7 @@ class ChunkMeshingHotPathBenchmarkTest {
         int recordCount = nativeSectionRecordCount(records);
         int committed = 0;
         if (recordCount != 0) {
-            committed += sectionBuilder.appendNativeSectionEncoded(MemoryUtil.memAddress(records), recordCount, -1,
+            committed += sectionBuilder.appendLegacyNativeSectionRecordsEncoded(MemoryUtil.memAddress(records), recordCount, -1,
                     ChunkMeshFormats.COMPACT.getNativeFormat(), SECTION_INDEX, false, false);
         }
         stages.mark("native_all_passes");
@@ -282,9 +282,9 @@ class ChunkMeshingHotPathBenchmarkTest {
     private static long runReplaySectionEndToEnd(ReplaySection section, NativeSectionMeshBuilder sectionBuilder) {
         StageTimer stages = StageTimer.start();
         int recordCount = section.nativeRecordCount();
-        int bytes = Math.max(1, recordCount * NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE);
+        int bytes = Math.max(1, recordCount * NativeChunkMeshEncoder.LEGACY_NATIVE_SECTION_BLOCK_RECORD_STRIDE);
         ByteBuffer records = MemoryUtil.memAlloc(bytes).order(ByteOrder.nativeOrder());
-        records.limit(recordCount * NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE);
+        records.limit(recordCount * NativeChunkMeshEncoder.LEGACY_NATIVE_SECTION_BLOCK_RECORD_STRIDE);
         stages.mark("java_snapshot_allocation");
         try {
             fillReplaySectionRecords(section, records);
@@ -292,7 +292,7 @@ class ChunkMeshingHotPathBenchmarkTest {
             sectionBuilder.start(SECTION_INDEX);
             int committed = 0;
             if (recordCount != 0) {
-                committed += sectionBuilder.appendNativeSectionEncoded(MemoryUtil.memAddress(records), recordCount, -1,
+                committed += sectionBuilder.appendLegacyNativeSectionRecordsEncoded(MemoryUtil.memAddress(records), recordCount, -1,
                         ChunkMeshFormats.COMPACT.getNativeFormat(), SECTION_INDEX, false, false);
             }
             stages.mark("native_all_passes");
@@ -346,7 +346,7 @@ class ChunkMeshingHotPathBenchmarkTest {
             }
 
             if (recordCount != 0) {
-                committed = sectionBuilder.appendNativeSectionEncoded(MemoryUtil.memAddress(records), recordCount, 2,
+                committed = sectionBuilder.appendLegacyNativeSectionRecordsEncoded(MemoryUtil.memAddress(records), recordCount, 2,
                         ChunkMeshFormats.COMPACT.getNativeFormat(), SECTION_INDEX, false, false, analyzerHandle);
             }
             stages.mark("native_fluid_generation");
@@ -407,7 +407,7 @@ class ChunkMeshingHotPathBenchmarkTest {
     private static long runEmptyNativeCall(NativeSectionMeshBuilder builder) {
         try {
             builder.start(SECTION_INDEX);
-            int committed = builder.appendNativeSectionEncoded(0L, 0, 0, ChunkMeshFormats.COMPACT.getNativeFormat(),
+            int committed = builder.appendLegacyNativeSectionRecordsEncoded(0L, 0, 0, ChunkMeshFormats.COMPACT.getNativeFormat(),
                     SECTION_INDEX, false, false);
             BenchmarkAccounting.recordNativeProfile(builder.copyProfile());
             BenchmarkAccounting.record(1, 0, 0, 0, committed, 0, 0);
@@ -420,9 +420,9 @@ class ChunkMeshingHotPathBenchmarkTest {
     private static long runSnapshotCreate(ReplaySection section) {
         StageTimer stages = StageTimer.start();
         int recordCount = section.nativeRecordCount();
-        int bytes = Math.max(1, recordCount * NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE);
+        int bytes = Math.max(1, recordCount * NativeChunkMeshEncoder.LEGACY_NATIVE_SECTION_BLOCK_RECORD_STRIDE);
         ByteBuffer records = MemoryUtil.memAlloc(bytes).order(ByteOrder.nativeOrder());
-        records.limit(recordCount * NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE);
+        records.limit(recordCount * NativeChunkMeshEncoder.LEGACY_NATIVE_SECTION_BLOCK_RECORD_STRIDE);
         stages.mark("java_snapshot_allocation");
         try {
             fillReplaySectionRecords(section, records);
@@ -493,15 +493,15 @@ class ChunkMeshingHotPathBenchmarkTest {
     }
 
     private static ByteBuffer createNativeSectionBenchmarkRecords() {
-        ByteBuffer records = MemoryUtil.memAlloc(4096 * NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE)
+        ByteBuffer records = MemoryUtil.memAlloc(4096 * NativeChunkMeshEncoder.LEGACY_NATIVE_SECTION_BLOCK_RECORD_STRIDE)
                 .order(ByteOrder.nativeOrder());
         long base = MemoryUtil.memAddress(records);
         for (int index = 0; index < 4096; index++) {
             int localX = index & 15;
             int localY = (index >>> 8) & 15;
             int localZ = (index >>> 4) & 15;
-            NativeChunkMeshEncoder.writeNativeSectionBlockRecord(base + (long) index
-                            * NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE,
+            NativeChunkMeshEncoder.writeLegacyNativeSectionBlockRecord(base + (long) index
+                            * NativeChunkMeshEncoder.LEGACY_NATIVE_SECTION_BLOCK_RECORD_STRIDE,
                     100, 41, localX, localY, localZ, index * 31L,
                     0, 0, 0, 0, 0, 0, 0x00f000f0, 0.0F, 0.0F, 0.0F);
         }
@@ -523,9 +523,9 @@ class ChunkMeshingHotPathBenchmarkTest {
 
     private static ByteBuffer createReplaySectionRecords(ReplaySection section) {
         int recordCount = section.nativeRecordCount();
-        int bytes = Math.max(1, recordCount * NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE);
+        int bytes = Math.max(1, recordCount * NativeChunkMeshEncoder.LEGACY_NATIVE_SECTION_BLOCK_RECORD_STRIDE);
         ByteBuffer records = MemoryUtil.memAlloc(bytes).order(ByteOrder.nativeOrder());
-        records.limit(recordCount * NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE);
+        records.limit(recordCount * NativeChunkMeshEncoder.LEGACY_NATIVE_SECTION_BLOCK_RECORD_STRIDE);
         fillReplaySectionRecords(section, records);
         return records;
     }
@@ -552,8 +552,8 @@ class ChunkMeshingHotPathBenchmarkTest {
             int[] neighborhood = stateId == 0 ? airNeighborhood
                     : stateId == 200 ? fluidSurfaceNeighborhood : solidNeighborhood;
             neighborhood[13] = stateId;
-            NativeChunkMeshEncoder.writeNativeSectionBlockRecord(base + (long) recordIndex
-                            * NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE,
+            NativeChunkMeshEncoder.writeLegacyNativeSectionBlockRecord(base + (long) recordIndex
+                            * NativeChunkMeshEncoder.LEGACY_NATIVE_SECTION_BLOCK_RECORD_STRIDE,
                     stateId, stateId == 0 ? -1 : 41 + (stateId % 11), localX, localY, localZ,
                     0x9e3779b97f4a7c15L ^ (long) index * 0xbf58476d1ce4e5b9L,
                     0, 0, 0, 0, 0, 0, lightWords, neighborhood, 0xff70aa50, 0xcc3f76e4,
@@ -565,7 +565,7 @@ class ChunkMeshingHotPathBenchmarkTest {
     }
 
     private static int nativeSectionRecordCount(ByteBuffer records) {
-        return records.remaining() / NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_RECORD_STRIDE;
+        return records.remaining() / NativeChunkMeshEncoder.LEGACY_NATIVE_SECTION_BLOCK_RECORD_STRIDE;
     }
 
     private static int stateForReplayIndex(ReplaySection section, int index) {

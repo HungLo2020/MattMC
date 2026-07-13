@@ -152,31 +152,6 @@ trait NativeSectionRecordSource {
     fn record_count(&self) -> usize;
 
     unsafe fn record_at(&self, index: usize) -> Result<NativeSectionBlockRecord, i32>;
-
-    unsafe fn stable_record_ptr(&self, _index: usize) -> Option<*const NativeSectionBlockRecord> {
-        None
-    }
-}
-
-struct LegacySectionRecordSource<'a> {
-    records: &'a [NativeSectionBlockRecord],
-}
-
-impl NativeSectionRecordSource for LegacySectionRecordSource<'_> {
-    #[inline(always)]
-    fn record_count(&self) -> usize {
-        self.records.len()
-    }
-
-    #[inline(always)]
-    unsafe fn record_at(&self, index: usize) -> Result<NativeSectionBlockRecord, i32> {
-        Ok(*self.records.get_unchecked(index))
-    }
-
-    #[inline(always)]
-    unsafe fn stable_record_ptr(&self, index: usize) -> Option<*const NativeSectionBlockRecord> {
-        Some(self.records.as_ptr().add(index))
-    }
 }
 
 struct CompactSectionSnapshot<'a> {
@@ -379,41 +354,6 @@ unsafe fn flush_all_pass_target(
     Ok(())
 }
 
-pub(super) unsafe fn section_builders_append_native_section_records_all_passes_encoded(
-    solid_builder: &mut NativeSectionMeshBuilder,
-    cutout_builder: &mut NativeSectionMeshBuilder,
-    translucent_builder: &mut NativeSectionMeshBuilder,
-    record_address: u64,
-    record_count: usize,
-    record_stride: usize,
-    translucent_analyzer: Option<u64>,
-    format: NativeFormat,
-) -> Result<[i32; 3], i32> {
-    if record_count == 0 {
-        return Ok([0, 0, 0]);
-    }
-    if record_address == 0 {
-        return Err(ERR_NULL_POINTER);
-    }
-    if record_stride != std::mem::size_of::<NativeSectionBlockRecord>() {
-        return Err(ERR_INVALID_ARGUMENT);
-    }
-
-    let records = slice::from_raw_parts(
-        record_address as *const NativeSectionBlockRecord,
-        record_count,
-    );
-    let source = LegacySectionRecordSource { records };
-    section_builders_append_native_section_source_all_passes_encoded(
-        solid_builder,
-        cutout_builder,
-        translucent_builder,
-        &source,
-        translucent_analyzer,
-        format,
-    )
-}
-
 pub(super) unsafe fn section_builders_append_compact_native_section_all_passes_encoded(
     solid_builder: &mut NativeSectionMeshBuilder,
     cutout_builder: &mut NativeSectionMeshBuilder,
@@ -507,7 +447,6 @@ unsafe fn section_builders_append_native_section_source_all_passes_encoded<S: Na
     let scan_started = Instant::now();
     for record_index in 0..record_count {
         let record = source.record_at(record_index)?;
-        let stable_record_ptr = source.stable_record_ptr(record_index);
         let iteration_started = profile_start(profile_scan_substages);
         let decoding_started = profile_start(profile_scan_substages);
         let state_lookup_started = profile_start(profile_static_substages);
@@ -695,7 +634,6 @@ unsafe fn section_builders_append_native_section_source_all_passes_encoded<S: Na
 
                 for quad_record in model {
                     let quad_iteration_started = profile_start(profile_static_substages);
-                    let quad_record_ptr = quad_record as *const StaticModelQuadRecord;
                     let quad_record = *quad_record;
                     targets[0]
                         .builder()
@@ -743,34 +681,6 @@ unsafe fn section_builders_append_native_section_source_all_passes_encoded<S: Na
                     };
                     let target = &mut targets[routed_pass];
 
-                    if target.analyzer.is_none()
-                        && is_compact_fast_format(format)
-                        && direct_static_templates_enabled()
-                        && stable_record_ptr.is_some()
-                    {
-                        if target.pending_counts[facing] != 0 {
-                            target.flush_pending_face(
-                                facing,
-                                format,
-                                profile_staging_substages,
-                            )?;
-                        }
-                        let append_started = profile_start(profile_scan_substages);
-                        target.push_template_quad(
-                            stable_record_ptr.unwrap(),
-                            state,
-                            quad_record_ptr,
-                            facing,
-                            format,
-                            profile_static_substages,
-                            profile_scan_substages,
-                        )?;
-                        let builder = target.profile();
-                        builder
-                            .add_optional_stage(PROFILE_SCAN_QUAD_APPEND, append_started);
-                        builder.add_count(PROFILE_COUNT_NATIVE_MODEL_QUADS, 1);
-                        continue;
-                    }
                     if target.template_pending_counts[facing] != 0 {
                         target.flush_template_face(
                             facing,

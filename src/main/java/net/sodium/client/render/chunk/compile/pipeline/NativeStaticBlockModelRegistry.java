@@ -39,7 +39,6 @@ import net.fabricmc.fabric.api.client.render.fluid.v1.FluidRenderHandler;
 import net.fabricmc.fabric.api.client.render.fluid.v1.FluidRenderHandlerRegistry;
 
 import java.util.ArrayList;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -85,8 +84,8 @@ public final class NativeStaticBlockModelRegistry {
     private static final Reference2ReferenceOpenHashMap<BlockState, BlockStateModel> MODELS = new Reference2ReferenceOpenHashMap<>();
     private static final Reference2IntOpenHashMap<BlockState> STATE_IDS = new Reference2IntOpenHashMap<>();
     private static final Reference2IntOpenHashMap<BlockState> STATE_SELECTORS = new Reference2IntOpenHashMap<>();
-    private static final IdentityHashMap<BlockStateModel, Integer> SELECTOR_IDS = new IdentityHashMap<>();
-    private static final IdentityHashMap<BlockModelPart, Integer> PART_MODEL_IDS = new IdentityHashMap<>();
+    private static final Map<SelectorKey, Integer> SELECTOR_IDS = new java.util.HashMap<>();
+    private static final Map<PartModelKey, Integer> PART_MODEL_IDS = new java.util.HashMap<>();
     private static final Object2IntOpenHashMap<Block> SKIP_GROUPS = new Object2IntOpenHashMap<>();
     private static final int FLUID_SPRITE_WATER_STILL = 1;
     private static final int FLUID_SPRITE_WATER_FLOW = 1 << 1;
@@ -123,6 +122,8 @@ public final class NativeStaticBlockModelRegistry {
         nextSelectorId = 0;
         nextModelId = 0;
         nextSkipGroup = 1;
+
+        ItemBlockRenderTypes.setFancy(Minecraft.useFancyGraphics());
 
         for (Map.Entry<BlockState, BlockStateModel> entry : models.entrySet()) {
             MODELS.put(entry.getKey(), entry.getValue());
@@ -195,8 +196,8 @@ public final class NativeStaticBlockModelRegistry {
 
         int tintType = tintType(state);
         int selectorId = MISSING_ID;
-        if (!FORCE_JAVA_MODELS && !requiresJavaTintFallback(state) && model != null && state.getRenderShape() == RenderShape.MODEL) {
-            selectorId = registerSelector(state, model);
+        if (!FORCE_JAVA_MODELS && model != null && state.getRenderShape() == RenderShape.MODEL) {
+            selectorId = registerSelector(state, model, stateId);
             if (selectorId != MISSING_ID && tintType == TINT_NONE && modelHasTintedQuads(model)) {
                 selectorId = MISSING_ID;
             }
@@ -260,17 +261,20 @@ public final class NativeStaticBlockModelRegistry {
         return stateId;
     }
 
-    private static int registerSelector(BlockState state, BlockStateModel model) {
-        Integer existing = SELECTOR_IDS.get(model);
+    private static int registerSelector(BlockState state, BlockStateModel model, int stateId) {
+        Material material = DefaultMaterials.forBlockState(state);
+        SelectorKey key = new SelectorKey(model, stateId, material.bits(), passId(material.pass),
+                state.getLightEmission() == 0);
+        Integer existing = SELECTOR_IDS.get(key);
         if (existing != null) {
             return existing;
         }
 
         int selectorId = nextSelectorId++;
-        SELECTOR_IDS.put(model, selectorId);
+        SELECTOR_IDS.put(key, selectorId);
 
         if (model instanceof SingleVariant single) {
-            int modelId = registerPartModel(state, single.sodium$getModelPart());
+            int modelId = registerPartModel(state, stateId, single.sodium$getModelPart());
             NativeStaticBlockModelCache.registerSelector(selectorId, SELECTOR_DIRECT,
                     (recordAddress, index) -> NativeChunkMeshEncoder.writeNativeModelSelectorEntry(recordAddress,
                             modelId, 1), 1);
@@ -284,7 +288,7 @@ public final class NativeStaticBlockModelRegistry {
             int[] weights = new int[entries.size()];
             for (int index = 0; index < entries.size(); index++) {
                 Weighted<BlockStateModel> entry = entries.get(index);
-                childSelectors[index] = registerSelector(state, entry.value());
+                childSelectors[index] = registerSelector(state, entry.value(), stateId);
                 weights[index] = entry.weight();
             }
             NativeStaticBlockModelCache.registerSelector(selectorId, SELECTOR_WEIGHTED,
@@ -298,7 +302,7 @@ public final class NativeStaticBlockModelRegistry {
             List<BlockStateModel> children = multipart.sodium$getSelectedModels();
             int[] childSelectors = new int[children.size()];
             for (int index = 0; index < children.size(); index++) {
-                childSelectors[index] = registerSelector(state, children.get(index));
+                childSelectors[index] = registerSelector(state, children.get(index), stateId);
             }
             NativeStaticBlockModelCache.registerSelector(selectorId, SELECTOR_GROUP,
                     (recordAddress, index) -> NativeChunkMeshEncoder.writeNativeModelSelectorEntry(recordAddress,
@@ -307,7 +311,7 @@ public final class NativeStaticBlockModelRegistry {
             return selectorId;
         }
 
-        SELECTOR_IDS.remove(model);
+        SELECTOR_IDS.remove(key);
         return MISSING_ID;
     }
 
@@ -348,16 +352,20 @@ public final class NativeStaticBlockModelRegistry {
         return false;
     }
 
-    private static int registerPartModel(BlockState state, BlockModelPart part) {
-        Integer existing = PART_MODEL_IDS.get(part);
+    private static int registerPartModel(BlockState state, int stateId, BlockModelPart part) {
+        Material material = DefaultMaterials.forBlockState(state);
+        boolean hasAo = part.useAmbientOcclusion() && state.getLightEmission() == 0;
+        ChunkSectionLayer defaultRenderType = ItemBlockRenderTypes.getChunkRenderType(state);
+        PartModelKey key = new PartModelKey(part, stateId, material.bits(), passId(material.pass), hasAo);
+        Integer existing = PART_MODEL_IDS.get(key);
         if (existing != null) {
             return existing;
         }
 
         int modelId = nextModelId++;
-        PART_MODEL_IDS.put(part, modelId);
+        PART_MODEL_IDS.put(key, modelId);
 
-        CachedModel cached = buildCachedModel(state, part);
+        CachedModel cached = buildCachedModel(part, defaultRenderType, hasAo);
         MODEL_SPRITES.put(modelId, cached.sprites);
         NativeStaticBlockModelCache.register(modelId, (recordAddress, index) -> {
             CachedQuad quad = cached.quads.get(index);
@@ -372,17 +380,16 @@ public final class NativeStaticBlockModelRegistry {
         return modelId;
     }
 
-    private static CachedModel buildCachedModel(BlockState state, BlockModelPart part) {
-        ChunkSectionLayer layer = ItemBlockRenderTypes.getChunkRenderType(state);
-        Material material = DefaultMaterials.forChunkLayer(layer);
+    private static CachedModel buildCachedModel(BlockModelPart part, ChunkSectionLayer defaultRenderType, boolean hasAo) {
         List<CachedQuad> quads = new ArrayList<>();
         List<TextureAtlasSprite> sprites = new ArrayList<>();
 
         for (int faceIndex = -1; faceIndex < net.minecraft.core.Direction.values().length; faceIndex++) {
             net.minecraft.core.Direction cullFace = faceIndex < 0 ? null : net.minecraft.core.Direction.from3DDataValue(faceIndex);
             for (BakedQuad quad : part.getQuads(cullFace)) {
+                Material material = DefaultMaterials.forChunkLayer(defaultRenderType);
                 quads.add(CachedQuad.from(quad, cullFace, material, downgradedPassId(quad, material),
-                        part.useAmbientOcclusion() && state.getLightEmission() == 0));
+                        hasAo));
                 if (quad.sprite() != null && !sprites.contains(quad.sprite())) {
                     sprites.add(quad.sprite());
                 }
@@ -395,7 +402,7 @@ public final class NativeStaticBlockModelRegistry {
     private static void copySprites(int selectorId, List<Integer> modelIds) {
         List<TextureAtlasSprite> sprites = new ArrayList<>();
         for (int modelId : modelIds) {
-        List<TextureAtlasSprite> modelSprites = MODEL_SPRITES.get(modelId);
+            List<TextureAtlasSprite> modelSprites = MODEL_SPRITES.get(modelId);
             if (modelSprites != null) {
                 for (TextureAtlasSprite sprite : modelSprites) {
                     if (!sprites.contains(sprite)) {
@@ -631,15 +638,86 @@ public final class NativeStaticBlockModelRegistry {
         return TINT_NONE;
     }
 
-    private static boolean requiresJavaTintFallback(BlockState state) {
-        Block block = state.getBlock();
-        return block == Blocks.OAK_LEAVES
-                || block == Blocks.JUNGLE_LEAVES
-                || block == Blocks.ACACIA_LEAVES
-                || block == Blocks.DARK_OAK_LEAVES
-                || block == Blocks.MANGROVE_LEAVES
-                || block == Blocks.SPRUCE_LEAVES
-                || block == Blocks.BIRCH_LEAVES;
+    private static final class PartModelKey {
+        private final BlockModelPart part;
+        private final int stateId;
+        private final int materialBits;
+        private final int passId;
+        private final boolean hasAo;
+
+        private PartModelKey(BlockModelPart part, int stateId, int materialBits, int passId, boolean hasAo) {
+            this.part = part;
+            this.stateId = stateId;
+            this.materialBits = materialBits;
+            this.passId = passId;
+            this.hasAo = hasAo;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (!(obj instanceof PartModelKey other)) {
+                return false;
+            }
+            return this.part == other.part
+                    && this.stateId == other.stateId
+                    && this.materialBits == other.materialBits
+                    && this.passId == other.passId
+                    && this.hasAo == other.hasAo;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = System.identityHashCode(this.part);
+            result = 31 * result + this.stateId;
+            result = 31 * result + this.materialBits;
+            result = 31 * result + this.passId;
+            result = 31 * result + (this.hasAo ? 1 : 0);
+            return result;
+        }
+    }
+
+    private static final class SelectorKey {
+        private final BlockStateModel model;
+        private final int stateId;
+        private final int materialBits;
+        private final int passId;
+        private final boolean canUseAo;
+
+        private SelectorKey(BlockStateModel model, int stateId, int materialBits, int passId, boolean canUseAo) {
+            this.model = model;
+            this.stateId = stateId;
+            this.materialBits = materialBits;
+            this.passId = passId;
+            this.canUseAo = canUseAo;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (!(obj instanceof SelectorKey other)) {
+                return false;
+            }
+            return this.model == other.model
+                    && this.stateId == other.stateId
+                    && this.materialBits == other.materialBits
+                    && this.passId == other.passId
+                    && this.canUseAo == other.canUseAo;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = System.identityHashCode(this.model);
+            result = 31 * result + this.stateId;
+            result = 31 * result + this.materialBits;
+            result = 31 * result + this.passId;
+            result = 31 * result + (this.canUseAo ? 1 : 0);
+            return result;
+        }
     }
 
     private record CachedQuad(int materialBits, int passId, int cullFace, int normalFace, int packedNormal, boolean shade,

@@ -20,7 +20,12 @@ public final class NativeChunkMeshEncoder {
     public static final int STATIC_MODEL_VERTEX_RECORD_STRIDE = 28;
     public static final int STATIC_MODEL_QUAD_RECORD_STRIDE = 160;
     public static final int STATIC_MODEL_BLOCK_RECORD_STRIDE = 52;
-    public static final int NATIVE_SECTION_BLOCK_RECORD_STRIDE = 316;
+    /**
+     * Retained only for historical microbenchmarks and low-level ABI regression tests.
+     * Production section meshing uses the compact all-pass section snapshot.
+     */
+    @Deprecated(forRemoval = false)
+    public static final int LEGACY_NATIVE_SECTION_BLOCK_RECORD_STRIDE = 316;
     public static final int COMPACT_SECTION_SNAPSHOT_HEADER_STRIDE = 120;
     public static final int COMPACT_SECTION_SNAPSHOT_VERSION = 1;
     public static final int COMPACT_SECTION_PADDED_LENGTH = 18;
@@ -606,7 +611,11 @@ public final class NativeChunkMeshEncoder {
         MemoryUtil.memPutFloat(ptr + STATIC_MODEL_BLOCK_OFFSET_Z_OFFSET, offsetZ);
     }
 
-    public static void writeNativeSectionBlockRecord(long ptr, int stateId, int blockId, int localX, int localY,
+    /**
+     * Writes the retired self-contained per-block section record used by legacy tests only.
+     */
+    @Deprecated(forRemoval = false)
+    public static void writeLegacyNativeSectionBlockRecord(long ptr, int stateId, int blockId, int localX, int localY,
             int localZ, long seed, int neighborDown, int neighborUp, int neighborNorth, int neighborSouth,
             int neighborWest, int neighborEast, int[] lightWords, int[] neighborhoodStateIds, int tint,
             int fluidTint, float fluidFlowX, float fluidFlowZ, int absoluteX, int absoluteY, int absoluteZ) {
@@ -645,15 +654,18 @@ public final class NativeChunkMeshEncoder {
         }
     }
 
-    public static void writeNativeSectionBlockFluidBlockId(long ptr, int fluidBlockId) {
+    @Deprecated(forRemoval = false)
+    public static void writeLegacyNativeSectionBlockFluidBlockId(long ptr, int fluidBlockId) {
         MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_RESERVED_OFFSET, fluidBlockId);
     }
 
-    public static void writeNativeSectionBlockFlags(long ptr, int flags) {
+    @Deprecated(forRemoval = false)
+    public static void writeLegacyNativeSectionBlockFlags(long ptr, int flags) {
         MemoryUtil.memPutInt(ptr + NATIVE_SECTION_BLOCK_FLAGS_OFFSET, flags);
     }
 
-    public static void writeNativeSectionBlockRecord(long ptr, int stateId, int blockId, int localX, int localY,
+    @Deprecated(forRemoval = false)
+    public static void writeLegacyNativeSectionBlockRecord(long ptr, int stateId, int blockId, int localX, int localY,
             int localZ, long seed, int neighborDown, int neighborUp, int neighborNorth, int neighborSouth,
             int neighborWest, int neighborEast, int lightmap, float offsetX, float offsetY, float offsetZ) {
         int[] lightWords = new int[27];
@@ -666,7 +678,7 @@ public final class NativeChunkMeshEncoder {
             neighborhoodStateIds[i] = 0;
         }
         neighborhoodStateIds[13] = stateId;
-        writeNativeSectionBlockRecord(ptr, stateId, blockId, localX, localY, localZ, seed, neighborDown, neighborUp,
+        writeLegacyNativeSectionBlockRecord(ptr, stateId, blockId, localX, localY, localZ, seed, neighborDown, neighborUp,
                 neighborNorth, neighborSouth, neighborWest, neighborEast, lightWords, neighborhoodStateIds, -1, -1,
                 0.0F, 0.0F, localX, localY, localZ);
         MemoryUtil.memPutFloat(ptr + NATIVE_SECTION_BLOCK_LEGACY_OFFSET_X_OFFSET, offsetX);
