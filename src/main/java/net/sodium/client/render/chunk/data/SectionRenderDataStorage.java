@@ -21,6 +21,8 @@ import java.lang.invoke.MethodHandle;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.Locale;
+import java.util.zip.CRC32;
 import java.util.stream.Stream;
 
 /**
@@ -400,6 +402,61 @@ public class SectionRenderDataStorage {
         batch.size = scratch.outputSize.getInt(0);
     }
 
+    public String diagnosticMeshReadinessSignature(ChunkRenderList renderList, boolean reverseSections,
+            boolean useIndexedTessellation) {
+        int sectionCount = renderList.getSectionsWithGeometryCount();
+        NativeScratch scratch = NATIVE_SCRATCH.get();
+        scratch.ensureSectionCapacity(sectionCount);
+        renderList.copySectionsWithGeometry(scratch.sectionIndices);
+
+        CRC32 crc = new CRC32();
+        int vertexReady = 0;
+        int indexReady = 0;
+        int missing = 0;
+        updateCrcInt(crc, sectionCount);
+        updateCrcBool(crc, reverseSections);
+        updateCrcBool(crc, useIndexedTessellation);
+
+        for (int ordinal = 0; ordinal < sectionCount; ordinal++) {
+            int sectionOrdinal = reverseSections ? sectionCount - 1 - ordinal : ordinal;
+            int sectionIndex = scratch.sectionIndices.get(sectionOrdinal) & 0xFF;
+            ChunkBufferAllocation vertexAllocation = this.vertexAllocations[sectionIndex];
+            ChunkBufferAllocation indexAllocation = this.elementAllocations == null ? null : this.elementAllocations[sectionIndex];
+            boolean hasVertex = vertexAllocation != null;
+            boolean hasIndex = useIndexedTessellation ? indexAllocation != null : this.sharedIndexUsage[sectionIndex] > 0;
+            if (hasVertex) {
+                vertexReady++;
+            }
+            if (hasIndex) {
+                indexReady++;
+            }
+            if (!hasVertex || !hasIndex) {
+                missing++;
+            }
+
+            updateCrcInt(crc, sectionIndex);
+            updateCrcBool(crc, hasVertex);
+            updateCrcBool(crc, hasIndex);
+            updateCrcLong(crc, vertexAllocation == null ? -1L : vertexAllocation.getOffset());
+            updateCrcLong(crc, vertexAllocation == null ? -1L : vertexAllocation.getLength());
+            updateCrcLong(crc, indexAllocation == null ? -1L : indexAllocation.getOffset());
+            updateCrcLong(crc, indexAllocation == null ? -1L : indexAllocation.getLength());
+            updateCrcInt(crc, this.sharedIndexUsage[sectionIndex]);
+        }
+
+        return String.format(
+            Locale.ROOT,
+            "mesh=%d;v=%d;i=%d;miss=%d;shared=%d;idx=%s;h=%s",
+            sectionCount,
+            vertexReady,
+            indexReady,
+            missing,
+            this.sharedIndexCapacity,
+            Boolean.toString(useIndexedTessellation),
+            Long.toHexString(crc.getValue())
+        );
+    }
+
     public static int getVisibleFaces(int originX, int originY, int originZ, int chunkX, int chunkY, int chunkZ) {
         check(VERIFY_STATUS, "native section render data verification");
         try {
@@ -549,6 +606,22 @@ public class SectionRenderDataStorage {
         if (status != OK) {
             throw new IllegalStateException(operation + " failed with native status " + status);
         }
+    }
+
+    private static void updateCrcBool(CRC32 crc, boolean value) {
+        updateCrcInt(crc, value ? 1 : 0);
+    }
+
+    private static void updateCrcInt(CRC32 crc, int value) {
+        crc.update(value & 0xFF);
+        crc.update((value >>> 8) & 0xFF);
+        crc.update((value >>> 16) & 0xFF);
+        crc.update((value >>> 24) & 0xFF);
+    }
+
+    private static void updateCrcLong(CRC32 crc, long value) {
+        updateCrcInt(crc, (int) value);
+        updateCrcInt(crc, (int) (value >>> 32));
     }
 
     private static final class NativeScratch {

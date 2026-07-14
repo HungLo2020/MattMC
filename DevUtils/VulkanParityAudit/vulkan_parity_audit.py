@@ -1834,10 +1834,10 @@ def semantic_texture_label(label: str) -> str:
 def geometry_missing_reason(signature: str, gl_events: list[GeometryEvent], vk_events: list[GeometryEvent]) -> str:
     if "subsystem=sodium-terrain|" in signature:
         if not gl_events and vk_events:
-            return "opengl-sodium-terrain-legacy-glbuffer-consumed-range-readback-missing"
+            return "sodium-terrain-ready-work-unmatched:opengl-missing"
         if gl_events and not vk_events:
-            return "vulkan-sodium-terrain-geometry-records-missing"
-        return "sodium-terrain-geometry-records-missing"
+            return "sodium-terrain-ready-work-unmatched:vulkan-missing"
+        return "sodium-terrain-ready-work-unmatched"
     missing = []
     if not gl_events:
         missing.append("opengl")
@@ -1864,7 +1864,7 @@ def geometry_not_comparable_override(signature: str, classification: str, first_
     first_vulkan = str(first_detail_difference.get("vulkan", ""))
     if "pipeline=minecraft:pipeline/gui_text|" in signature and ".UV0@" in first_opengl and ".UV0@" in first_vulkan:
         return "font-atlas-glyph-content-identity-not-logged"
-    if "pipeline=minecraft:pipeline/gui_textured|" in signature and "label=voxelmap-map-" in signature and ".UV0@" in first_opengl and ".UV0@" in first_vulkan:
+    if "pipeline=minecraft:pipeline/gui_textured|" in signature and "label=voxelmap-map-" in signature:
         return "voxelmap-minimap-source-offset-angle-state-not-logged"
     if "pipeline=minecraft:pipeline/entity_" in signature and ".POSITION0@" in first_opengl and ".POSITION0@" in first_vulkan:
         return "entity-animation-pose-state-not-logged"

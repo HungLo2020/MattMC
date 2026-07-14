@@ -12,6 +12,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Locale;
+import java.util.zip.CRC32;
 
 public class ChunkRenderList {
     private final RenderRegion region;
@@ -186,6 +188,56 @@ public class ChunkRenderList {
         for (int index = 0; index < this.sectionsWithGeometryCount; index++) {
             output.put(index, this.sectionsWithGeometry[index]);
         }
+    }
+
+    public String diagnosticGeometryStateSignature(boolean reverse) {
+        CRC32 orderCrc = new CRC32();
+        updateCrcInt(orderCrc, this.sectionsWithGeometryCount);
+        updateCrcBool(orderCrc, reverse);
+        if (reverse) {
+            for (int index = this.sectionsWithGeometryCount - 1; index >= 0; index--) {
+                updateCrcInt(orderCrc, this.sectionsWithGeometry[index] & 0xFF);
+            }
+        } else {
+            for (int index = 0; index < this.sectionsWithGeometryCount; index++) {
+                updateCrcInt(orderCrc, this.sectionsWithGeometry[index] & 0xFF);
+            }
+        }
+
+        CRC32 mapCrc = new CRC32();
+        for (long bits : this.sectionsWithGeometryMap) {
+            updateCrcLong(mapCrc, bits);
+        }
+
+        return String.format(
+            Locale.ROOT,
+            "sec=%d;ord=%s;map=%s;rev=%s;rel=%d,%d,%d;vf=%d;sorted=%s",
+            this.sectionsWithGeometryCount,
+            Long.toHexString(orderCrc.getValue()),
+            Long.toHexString(mapCrc.getValue()),
+            Boolean.toString(reverse),
+            this.lastRelativeCameraSectionX,
+            this.lastRelativeCameraSectionY,
+            this.lastRelativeCameraSectionZ,
+            this.lastVisibleFrame,
+            Boolean.toString(this.addedSectionsAreSorted)
+        );
+    }
+
+    private static void updateCrcBool(CRC32 crc, boolean value) {
+        updateCrcInt(crc, value ? 1 : 0);
+    }
+
+    private static void updateCrcInt(CRC32 crc, int value) {
+        crc.update(value & 0xFF);
+        crc.update((value >>> 8) & 0xFF);
+        crc.update((value >>> 16) & 0xFF);
+        crc.update((value >>> 24) & 0xFF);
+    }
+
+    private static void updateCrcLong(CRC32 crc, long value) {
+        updateCrcInt(crc, (int) value);
+        updateCrcInt(crc, (int) (value >>> 32));
     }
 
     public int getSectionsWithSpritesCount() {

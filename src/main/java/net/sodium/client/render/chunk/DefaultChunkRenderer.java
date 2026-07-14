@@ -153,7 +153,11 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                 "sodium-terrain-opengl-region-batch",
                 renderPass,
                 region,
-                batch
+                storage,
+                renderList,
+                camera,
+                batch,
+                useIndexedTessellation
             )) {
                 traceOpenGlSodiumTerrainGeometry(renderPass, shader, tessellation, batch);
                 executeDrawBatch(commandList, tessellation, batch);
@@ -271,7 +275,8 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                 vertexBuffer,
                 indexBuffer,
                 region,
-                this.writeDynamicTransforms(matrices.modelView(), modelOffsetX, modelOffsetY, modelOffsetZ)
+                this.writeDynamicTransforms(matrices.modelView(), modelOffsetX, modelOffsetY, modelOffsetZ),
+                sodiumTerrainStateSignature(terrainPass, region, storage, renderList, camera, batch, useIndexedTessellation)
             ));
         }
 
@@ -307,6 +312,7 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                     "sodium-terrain-vulkan-region-batch",
                     terrainPass,
                     preparedDraw.region(),
+                    preparedDraw.terrainState(),
                     preparedDraw.batch()
                 )) {
                     for (int drawIndex = 0; drawIndex < preparedDraw.batch().size; drawIndex++) {
@@ -499,7 +505,8 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         GpuBuffer vertexBuffer,
         GpuBuffer indexBuffer,
         RenderRegion region,
-        GpuBufferSlice transforms
+        GpuBufferSlice transforms,
+        String terrainState
     ) {
     }
 
@@ -507,12 +514,32 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         String source,
         TerrainRenderPass terrainPass,
         RenderRegion region,
+        SectionRenderDataStorage storage,
+        ChunkRenderList renderList,
+        CameraTransform camera,
+        MultiDrawBatch batch,
+        boolean useIndexedTessellation
+    ) {
+        return beginSodiumTerrainParityScope(
+            source,
+            terrainPass,
+            region,
+            sodiumTerrainStateSignature(terrainPass, region, storage, renderList, camera, batch, useIndexedTessellation),
+            batch
+        );
+    }
+
+    private static VulkanicAPI.ShaderInputParityScope beginSodiumTerrainParityScope(
+        String source,
+        TerrainRenderPass terrainPass,
+        RenderRegion region,
+        String terrainState,
         MultiDrawBatch batch
     ) {
         return VulkanicAPI.beginShaderInputParitySemanticDraw(
             source,
             "sodium-terrain",
-            sodiumTerrainPassLabel(terrainPass, region),
+            sodiumTerrainPassLabel(terrainPass, region, terrainState),
             terrainPass.getPipeline(),
             null,
             sodiumTerrainMaterial(terrainPass),
@@ -527,17 +554,73 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         );
     }
 
-    private static String sodiumTerrainPassLabel(TerrainRenderPass terrainPass, RenderRegion region) {
+    private static String sodiumTerrainPassLabel(TerrainRenderPass terrainPass, RenderRegion region, String terrainState) {
         return String.format(
-            "terrain:%s:region=%d,%d,%d:origin=%d,%d,%d",
+            "terrain:%s:region=%d,%d,%d:origin=%d,%d,%d:%s",
             sodiumTerrainKind(terrainPass),
             region.getX(),
             region.getY(),
             region.getZ(),
             region.getOriginX(),
             region.getOriginY(),
-            region.getOriginZ()
+            region.getOriginZ(),
+            terrainState
         );
+    }
+
+    private static String sodiumTerrainStateSignature(
+        TerrainRenderPass terrainPass,
+        RenderRegion region,
+        SectionRenderDataStorage storage,
+        ChunkRenderList renderList,
+        CameraTransform camera,
+        MultiDrawBatch batch,
+        boolean useIndexedTessellation
+    ) {
+        if (!VulkanicAPI.isShaderInputParityTracingEnabled()) {
+            return "state=disabled";
+        }
+
+        boolean reverseSections = terrainPass.isTranslucent();
+        return String.join(
+            ":",
+            renderList.diagnosticGeometryStateSignature(reverseSections),
+            storage.diagnosticMeshReadinessSignature(renderList, reverseSections, useIndexedTessellation),
+            "cam=" + camera.intX + "," + camera.intY + "," + camera.intZ,
+            sodiumTerrainSubmittedSubdrawSignature(batch)
+        );
+    }
+
+    private static String sodiumTerrainSubmittedSubdrawSignature(MultiDrawBatch batch) {
+        java.util.zip.CRC32 crc = new java.util.zip.CRC32();
+        long totalIndices = 0L;
+        int submittedDraws = 0;
+        updateCrcInt(crc, batch.size);
+        for (int drawIndex = 0; drawIndex < batch.size; drawIndex++) {
+            int indexCount = MemoryUtil.memGetInt(batch.pElementCount + ((long) drawIndex << 2));
+            long rawIndexOffsetBytes = MemoryUtil.memGetAddress(batch.pElementPointer + ((long) drawIndex << Pointer.POINTER_SHIFT));
+            int baseVertex = MemoryUtil.memGetInt(batch.pBaseVertex + ((long) drawIndex << 2));
+            if (indexCount > 0) {
+                submittedDraws++;
+                totalIndices += indexCount;
+            }
+            updateCrcInt(crc, indexCount);
+            updateCrcLong(crc, rawIndexOffsetBytes);
+            updateCrcInt(crc, baseVertex);
+        }
+        return "draws=" + submittedDraws + ";idx=" + totalIndices + ";dh=" + Long.toHexString(crc.getValue());
+    }
+
+    private static void updateCrcInt(java.util.zip.CRC32 crc, int value) {
+        crc.update(value & 0xFF);
+        crc.update((value >>> 8) & 0xFF);
+        crc.update((value >>> 16) & 0xFF);
+        crc.update((value >>> 24) & 0xFF);
+    }
+
+    private static void updateCrcLong(java.util.zip.CRC32 crc, long value) {
+        updateCrcInt(crc, (int) value);
+        updateCrcInt(crc, (int) (value >>> 32));
     }
 
     private static String sodiumTerrainMaterial(TerrainRenderPass terrainPass) {
