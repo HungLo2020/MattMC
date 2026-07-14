@@ -20,7 +20,7 @@ function Normalize-Version {
     return $Version.Trim().TrimStart('v', 'V')
 }
 
-function Get-ExpectedAssetName {
+function Get-WindowsPlatformSuffix {
     param(
         [string]$Architecture
     )
@@ -31,22 +31,65 @@ function Get-ExpectedAssetName {
         default { $Architecture.ToLowerInvariant() }
     }
 
-    return "MattMC-Client-win-$archToken.zip"
+    return "windows-$archToken"
+}
+
+function Get-WindowsArchitecture {
+    $architecture = $env:PROCESSOR_ARCHITEW6432
+    if ([string]::IsNullOrWhiteSpace($architecture)) {
+        $architecture = $env:PROCESSOR_ARCHITECTURE
+    }
+
+    switch ($architecture.ToLowerInvariant()) {
+        'amd64' { return 'x64' }
+        'x86_64' { return 'x64' }
+        'arm64' { return 'arm64' }
+        'aarch64' { return 'arm64' }
+        default { throw "Unsupported Windows architecture: $architecture" }
+    }
 }
 
 function Get-ExactReleaseAsset {
     param(
         [object[]]$Assets,
-        [string]$ExpectedName
+        [string]$PlatformSuffix,
+        [string]$ReleaseTag
     )
 
-    $matches = @($Assets | Where-Object { [string]$_.name -eq $ExpectedName })
+    $tagVersion = Normalize-Version $ReleaseTag
+    if ($tagVersion -and $tagVersion -ne 'latest') {
+        $expectedName = "MattMC-Client-$tagVersion-$PlatformSuffix.zip"
+        $matches = @($Assets | Where-Object { [string]$_.name -eq $expectedName })
 
-    if ($matches.Count -ne 1) {
-        throw "Expected exactly one GitHub release asset named '$ExpectedName', found $($matches.Count)."
+        if ($matches.Count -ne 1) {
+            throw "Expected exactly one GitHub release asset named '$expectedName', found $($matches.Count)."
+        }
+
+        return [pscustomobject]@{
+            Asset = $matches[0]
+            Version = $tagVersion
+            ExpectedName = $expectedName
+        }
     }
 
-    return $matches[0]
+    $pattern = "^MattMC-Client-(.+)-$([regex]::Escape($PlatformSuffix))\.zip$"
+    $matches = @(
+        $Assets | Where-Object {
+            [string]$_.name -match $pattern
+        }
+    )
+
+    if ($matches.Count -ne 1) {
+        throw "Expected exactly one GitHub release asset matching 'MattMC-Client-<version>-$PlatformSuffix.zip', found $($matches.Count)."
+    }
+
+    $version = [regex]::Match([string]$matches[0].name, $pattern).Groups[1].Value
+
+    return [pscustomobject]@{
+        Asset = $matches[0]
+        Version = $version
+        ExpectedName = [string]$matches[0].name
+    }
 }
 
 function Get-PayloadRoot {
@@ -96,19 +139,19 @@ $headers = @{
 }
 
 $release = Invoke-RestMethod -Uri $apiUrl -Headers $headers
-$latestVersion = [string]$release.tag_name
+$arch = Get-WindowsArchitecture
+$platformSuffix = Get-WindowsPlatformSuffix -Architecture $arch
+$assetInfo = Get-ExactReleaseAsset -Assets @($release.assets) -PlatformSuffix $platformSuffix -ReleaseTag ([string]$release.tag_name)
+$latestVersion = $assetInfo.Version
+$asset = $assetInfo.Asset
 
 if (-not $Force -and (Normalize-Version $latestVersion) -eq (Normalize-Version $CurrentVersion)) {
     Write-Host "Already up to date: $latestVersion"
     exit 0
 }
 
-$arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
-$expectedAssetName = Get-ExpectedAssetName -Architecture $arch
-$asset = Get-ExactReleaseAsset -Assets @($release.assets) -ExpectedName $expectedAssetName
-
 Write-Host "Latest version: $latestVersion"
-Write-Host "Expected asset: $expectedAssetName"
+Write-Host "Expected asset: $($assetInfo.ExpectedName)"
 Write-Host "Downloading: $($asset.name)"
 
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("mattmc-update-" + [System.Guid]::NewGuid().ToString('N'))

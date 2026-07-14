@@ -1278,7 +1278,8 @@ tasks.register('clientDistZip', Zip) {
         throw new GradleException("Unsupported platform for client distribution zip: ${System.getProperty('os.name')} ${System.getProperty('os.arch')}")
     }
 
-    archiveFileName = "MattMC-Client-${platformKey}.zip"
+    def releasePlatformKey = platformKey.startsWith('win-') ? platformKey.replaceFirst('win-', 'windows-') : platformKey
+    archiveFileName = "MattMC-Client-${version}-${releasePlatformKey}.zip"
     
     from "${buildDir}/client-dist"
     

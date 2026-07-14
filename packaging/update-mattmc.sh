@@ -68,28 +68,56 @@ detect_platform() {
 }
 
 expected_asset_name() {
-    local platform="$1"
-    printf 'MattMC-Client-%s.zip' "$platform"
+    local version="$1"
+    local platform="$2"
+    printf 'MattMC-Client-%s-%s.zip' "$version" "$platform"
 }
 
 json_get_latest_tag() {
     sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$1" | head -n 1
 }
 
-select_exact_asset_url() {
+select_exact_asset() {
     local json_file="$1"
-    local expected_name="$2"
+    local platform="$2"
+    local release_tag="$3"
     local line name="" url=""
+    local tag_version expected_name version
+
+    tag_version="$(normalize_version "$release_tag")"
+    if [[ -n "$tag_version" && "$tag_version" != "latest" ]]; then
+        expected_name="$(expected_asset_name "$tag_version" "$platform")"
+
+        while IFS= read -r line; do
+            if [[ "$line" == *'"name"'* ]]; then
+                name="$(printf '%s' "$line" | sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+            elif [[ "$line" == *'"browser_download_url"'* ]]; then
+                url="$(printf '%s' "$line" | sed -n 's/.*"browser_download_url"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+                if [[ "$name" == "$expected_name" ]]; then
+                    printf '%s\t%s\t%s' "$url" "$tag_version" "$expected_name"
+                    return 0
+                fi
+                name=""
+                url=""
+            fi
+        done < "$json_file"
+
+        return 1
+    fi
 
     while IFS= read -r line; do
         if [[ "$line" == *'"name"'* ]]; then
             name="$(printf '%s' "$line" | sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
         elif [[ "$line" == *'"browser_download_url"'* ]]; then
             url="$(printf '%s' "$line" | sed -n 's/.*"browser_download_url"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
-            if [[ "$name" == "$expected_name" ]]; then
-                printf '%s' "$url"
-                return 0
-            fi
+            case "$name" in
+                MattMC-Client-*-"$platform".zip)
+                    version="${name#MattMC-Client-}"
+                    version="${version%-"$platform".zip}"
+                    printf '%s\t%s\t%s' "$url" "$version" "$name"
+                    return 0
+                    ;;
+            esac
             name=""
             url=""
         fi
@@ -129,7 +157,6 @@ require_command curl
 require_command unzip
 
 PLATFORM="$(detect_platform)"
-EXPECTED_ASSET_NAME="$(expected_asset_name "$PLATFORM")"
 API_URL="https://api.github.com/repos/$REPO/releases/latest"
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/mattmc-update.XXXXXX")"
 
@@ -158,15 +185,19 @@ if [[ -z "$LATEST_VERSION" ]]; then
     exit 1
 fi
 
+ASSET_INFO="$(select_exact_asset "$JSON_PATH" "$PLATFORM" "$LATEST_VERSION" || true)"
+if [[ -z "$ASSET_INFO" ]]; then
+    echo "Error: expected exact GitHub release asset not found: MattMC-Client-<version>-$PLATFORM.zip" >&2
+    exit 1
+fi
+
+ASSET_URL="$(printf '%s' "$ASSET_INFO" | cut -f1)"
+LATEST_VERSION="$(printf '%s' "$ASSET_INFO" | cut -f2)"
+EXPECTED_ASSET_NAME="$(printf '%s' "$ASSET_INFO" | cut -f3)"
+
 if [[ "$FORCE" -eq 0 && "$(normalize_version "$LATEST_VERSION")" == "$(normalize_version "$CURRENT_VERSION")" ]]; then
     echo "Already up to date: $LATEST_VERSION"
     exit 0
-fi
-
-ASSET_URL="$(select_exact_asset_url "$JSON_PATH" "$EXPECTED_ASSET_NAME" || true)"
-if [[ -z "$ASSET_URL" ]]; then
-    echo "Error: expected exact GitHub release asset not found: $EXPECTED_ASSET_NAME" >&2
-    exit 1
 fi
 
 echo "Latest version: $LATEST_VERSION"
