@@ -363,6 +363,7 @@ class GeometryEvent:
     index_hash: str
     status: str
     reason: str
+    detail: str = ""
     det_pose: str = ""
     det_rendered_frame: str = ""
 
@@ -925,6 +926,7 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             index_hash=fields.get("indexHash", ""),
             status=fields.get("status", ""),
             reason=fields.get("reason", ""),
+            detail=fields.get("detail", ""),
             det_pose=fields.get("detPose", ""),
             det_rendered_frame=fields.get("detRenderedFrame", ""),
         ))
@@ -1732,6 +1734,7 @@ def geometry_coverage(opengl_events: CaptureEvents, vulkan_events: CaptureEvents
             divergent += 1
         else:
             equivalent += 1
+        first_detail_difference = first_geometry_detail_difference(gl_events, vk_events)
 
         group_results.append({
             "signature": signature,
@@ -1753,6 +1756,7 @@ def geometry_coverage(opengl_events: CaptureEvents, vulkan_events: CaptureEvents
             "vulkan_canonical_hash": vk_stream,
             "opengl_not_comparable_reasons": sorted(set(gl_not_comparable))[:8],
             "vulkan_not_comparable_reasons": sorted(set(vk_not_comparable))[:8],
+            "first_detail_difference": first_detail_difference,
         })
 
     return {
@@ -1780,6 +1784,37 @@ def geometry_stream_parts(events: list[GeometryEvent]) -> Iterable[str]:
             f"vertexHash={event.vertex_hash}",
             f"indexHash={event.index_hash}",
         ])
+
+
+def first_geometry_detail_difference(gl_events: list[GeometryEvent], vk_events: list[GeometryEvent]) -> dict[str, object]:
+    for draw_index, (gl_event, vk_event) in enumerate(zip(gl_events, vk_events)):
+        gl_detail = [] if not gl_event.detail or gl_event.detail == "none" else gl_event.detail.split(";")
+        vk_detail = [] if not vk_event.detail or vk_event.detail == "none" else vk_event.detail.split(";")
+        if not gl_detail and not vk_detail:
+            continue
+        if len(gl_detail) != len(vk_detail):
+            return {
+                "draw_index": draw_index,
+                "kind": "detail-count-differs",
+                "opengl_detail_tokens": len(gl_detail),
+                "vulkan_detail_tokens": len(vk_detail),
+            }
+        for token_index, (gl_token, vk_token) in enumerate(zip(gl_detail, vk_detail)):
+            if gl_token != vk_token:
+                return {
+                    "draw_index": draw_index,
+                    "token_index": token_index,
+                    "kind": "detail-token-differs",
+                    "opengl": gl_token,
+                    "vulkan": vk_token,
+                }
+    if len(gl_events) != len(vk_events):
+        return {
+            "kind": "geometry-event-count-differs",
+            "opengl_events": len(gl_events),
+            "vulkan_events": len(vk_events),
+        }
+    return {}
 
 
 def _empty_family_coverage() -> dict[str, object]:

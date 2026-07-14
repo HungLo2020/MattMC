@@ -90,6 +90,12 @@ public class VulkanicAPI {
         new java.util.concurrent.ConcurrentHashMap<>();
     private static final int SHADER_INPUT_PARITY_GEOMETRY_MAX_BYTES =
         diagnosticLimit("mattmc.vulkan.traceShaderInputParity.geometryMaxBytes", 2 * 1024 * 1024);
+    private static final boolean TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL =
+        Boolean.getBoolean("mattmc.vulkan.traceShaderInputParity.geometryDetail");
+    private static final String TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINE =
+        System.getProperty("mattmc.vulkan.traceShaderInputParity.geometryDetailPipeline", "minecraft:pipeline/vignette");
+    private static final int TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_MAX_VERTICES =
+        diagnosticLimit("mattmc.vulkan.traceShaderInputParity.geometryDetailMaxVertices", 12);
     private static final int VULKAN_LWJGL_STACK_SIZE_KB = 512;
     private static GraphicsBackend backend;
     @Nullable
@@ -7381,7 +7387,7 @@ public class VulkanicAPI {
             baseVertex
         );
         LOGGER.info(
-            "ShaderInputParityGeometry backend={} source={} {} mode={} indexed={} vertexFormat={} vertexStride={} layoutHash={} totalVertices={} totalIndices={} totalPrimitives={} instances={} vertexHash={} indexHash={} status={} reason={} {}",
+            "ShaderInputParityGeometry backend={} source={} {} mode={} indexed={} vertexFormat={} vertexStride={} layoutHash={} totalVertices={} totalIndices={} totalPrimitives={} instances={} vertexHash={} indexHash={} status={} reason={} detail={} {}",
             getActiveBackendType().name().toLowerCase(Locale.ROOT),
             source,
             shaderInputParitySemanticDrawContextFields(),
@@ -7398,6 +7404,7 @@ public class VulkanicAPI {
             result.indexHash(),
             result.status(),
             result.reason(),
+            result.detail(),
             shaderInputParityDeterministicContextFields()
         );
     }
@@ -9033,7 +9040,8 @@ public class VulkanicAPI {
         long totalVertices,
         long totalIndices,
         String vertexHash,
-        String indexHash
+        String indexHash,
+        String detail
     ) {
     }
 
@@ -9051,11 +9059,11 @@ public class VulkanicAPI {
         int baseVertex
     ) {
         if (vertexBuffer == null || vertexBuffer.isClosed()) {
-            return new GeometryParityResult("not-comparable", "vertex-buffer-missing-or-closed", 0, 0, "unavailable", "unavailable");
+            return new GeometryParityResult("not-comparable", "vertex-buffer-missing-or-closed", 0, 0, "unavailable", "unavailable", "none");
         }
         int stride = vertexFormat.getVertexSize();
         if (stride <= 0) {
-            return new GeometryParityResult("not-comparable", "vertex-stride-invalid", 0, 0, "unavailable", "unavailable");
+            return new GeometryParityResult("not-comparable", "vertex-stride-invalid", 0, 0, "unavailable", "unavailable", "none");
         }
         int safeInstances = Math.max(1, instanceCount);
         int safeVertexCount = Math.max(0, vertexCount);
@@ -9065,10 +9073,10 @@ public class VulkanicAPI {
         long logicalIndexBytes = 0L;
         if (indexed) {
             if (indexBuffer == null || indexBuffer.isClosed()) {
-                return new GeometryParityResult("not-comparable", "index-buffer-missing-or-closed", logicalVertices, safeIndexCount, "unavailable", "unavailable");
+                return new GeometryParityResult("not-comparable", "index-buffer-missing-or-closed", logicalVertices, safeIndexCount, "unavailable", "unavailable", "none");
             }
             if (indexType == null) {
-                return new GeometryParityResult("not-comparable", "index-type-missing", logicalVertices, safeIndexCount, "unavailable", "unavailable");
+                return new GeometryParityResult("not-comparable", "index-type-missing", logicalVertices, safeIndexCount, "unavailable", "unavailable", "none");
             }
             logicalIndexBytes = (long) safeIndexCount * indexType.bytes;
         }
@@ -9080,7 +9088,8 @@ public class VulkanicAPI {
                 logicalVertices,
                 indexed ? safeIndexCount * (long) safeInstances : 0L,
                 "unavailable",
-                "unavailable"
+                "unavailable",
+                "none"
             );
         }
 
@@ -9089,13 +9098,16 @@ public class VulkanicAPI {
             java.util.zip.CRC32 vertexCrc = new java.util.zip.CRC32();
             java.util.zip.CRC32 indexCrc = new java.util.zip.CRC32();
             long totalIndices = indexed ? safeIndexCount * (long) safeInstances : 0L;
+            boolean includeDetail = shaderInputParityGeometryDetailEnabled();
+            StringBuilder detail = includeDetail ? new StringBuilder() : null;
+            int detailVertexOrdinal = 0;
             if (indexed) {
                 VulkanicBuffer resolvedIndexBuffer = resolveVulkanicBuffer(indexBuffer);
                 int indexBytes = safeIndexCount * indexType.bytes;
                 int indexOffset = Math.multiplyExact(firstIndex, indexType.bytes);
                 java.nio.ByteBuffer indexData = shaderInputParityRead(new VulkanicBufferSlice(resolvedIndexBuffer, indexOffset, indexBytes), indexBytes);
                 if (indexData == null) {
-                    return new GeometryParityResult("not-comparable", "index-read-unavailable", logicalVertices, totalIndices, "unavailable", "unavailable");
+                    return new GeometryParityResult("not-comparable", "index-read-unavailable", logicalVertices, totalIndices, "unavailable", "unavailable", "none");
                 }
                 int minVertex = Integer.MAX_VALUE;
                 int maxVertex = Integer.MIN_VALUE;
@@ -9112,16 +9124,16 @@ public class VulkanicAPI {
                     maxVertex = -1;
                 }
                 if (minVertex < 0 || maxVertex < minVertex) {
-                    return new GeometryParityResult("not-comparable", "indexed-vertex-range-invalid", logicalVertices, totalIndices, "unavailable", "unavailable");
+                    return new GeometryParityResult("not-comparable", "indexed-vertex-range-invalid", logicalVertices, totalIndices, "unavailable", "unavailable", "none");
                 }
                 int vertexReadBytes = Math.multiplyExact(maxVertex - minVertex + 1, stride);
                 int vertexReadOffset = Math.multiplyExact(minVertex, stride);
                 if ((long) vertexReadOffset + vertexReadBytes > vertexBuffer.size()) {
-                    return new GeometryParityResult("not-comparable", "indexed-vertex-range-out-of-bounds", logicalVertices, totalIndices, "unavailable", "unavailable");
+                    return new GeometryParityResult("not-comparable", "indexed-vertex-range-out-of-bounds", logicalVertices, totalIndices, "unavailable", "unavailable", "none");
                 }
                 java.nio.ByteBuffer vertexData = shaderInputParityRead(new VulkanicBufferSlice(resolvedVertexBuffer, vertexReadOffset, vertexReadBytes), vertexReadBytes);
                 if (vertexData == null) {
-                    return new GeometryParityResult("not-comparable", "vertex-read-unavailable", logicalVertices, totalIndices, "unavailable", "unavailable");
+                    return new GeometryParityResult("not-comparable", "vertex-read-unavailable", logicalVertices, totalIndices, "unavailable", "unavailable", "none");
                 }
                 for (int instance = 0; instance < safeInstances; instance++) {
                     updateShaderInputParityInt(indexCrc, instance);
@@ -9130,25 +9142,33 @@ public class VulkanicAPI {
                         updateShaderInputParityInt(indexCrc, logicalIndex);
                         int localVertex = logicalIndex - minVertex;
                         updateShaderInputParityVertex(vertexCrc, vertexData, localVertex * stride, vertexFormat);
+                        if (includeDetail && detailVertexOrdinal < TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_MAX_VERTICES) {
+                            appendShaderInputParityVertexDetail(detail, detailVertexOrdinal, instance, logicalIndex, vertexData, localVertex * stride, vertexFormat);
+                        }
+                        detailVertexOrdinal++;
                     }
                 }
             } else {
                 if (safeVertexCount == 0) {
-                    return new GeometryParityResult("equivalent-candidate", "empty-non-indexed-draw", 0, 0, "crc32:0/vertices:0", "none");
+                    return new GeometryParityResult("equivalent-candidate", "empty-non-indexed-draw", 0, 0, "crc32:0/vertices:0", "none", "none");
                 }
                 int vertexReadBytes = Math.multiplyExact(safeVertexCount, stride);
                 int vertexReadOffset = Math.multiplyExact(firstVertex, stride);
                 if ((long) vertexReadOffset + vertexReadBytes > vertexBuffer.size()) {
-                    return new GeometryParityResult("not-comparable", "vertex-range-out-of-bounds", logicalVertices, 0, "unavailable", "none");
+                    return new GeometryParityResult("not-comparable", "vertex-range-out-of-bounds", logicalVertices, 0, "unavailable", "none", "none");
                 }
                 java.nio.ByteBuffer vertexData = shaderInputParityRead(new VulkanicBufferSlice(resolvedVertexBuffer, vertexReadOffset, vertexReadBytes), vertexReadBytes);
                 if (vertexData == null) {
-                    return new GeometryParityResult("not-comparable", "vertex-read-unavailable", logicalVertices, 0, "unavailable", "none");
+                    return new GeometryParityResult("not-comparable", "vertex-read-unavailable", logicalVertices, 0, "unavailable", "none", "none");
                 }
                 for (int instance = 0; instance < safeInstances; instance++) {
                     updateShaderInputParityInt(vertexCrc, instance);
                     for (int vertex = 0; vertex < safeVertexCount; vertex++) {
                         updateShaderInputParityVertex(vertexCrc, vertexData, vertex * stride, vertexFormat);
+                        if (includeDetail && detailVertexOrdinal < TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_MAX_VERTICES) {
+                            appendShaderInputParityVertexDetail(detail, detailVertexOrdinal, instance, firstVertex + vertex, vertexData, vertex * stride, vertexFormat);
+                        }
+                        detailVertexOrdinal++;
                     }
                 }
             }
@@ -9156,7 +9176,15 @@ public class VulkanicAPI {
             String indexHash = indexed
                 ? "crc32:" + Long.toHexString(indexCrc.getValue()) + "/indices:" + totalIndices
                 : "none";
-            return new GeometryParityResult("equivalent-candidate", "ok", logicalVertices, totalIndices, vertexHash, indexHash);
+            return new GeometryParityResult(
+                "equivalent-candidate",
+                "ok",
+                logicalVertices,
+                totalIndices,
+                vertexHash,
+                indexHash,
+                detail == null || detail.isEmpty() ? "none" : detail.toString()
+            );
         } catch (RuntimeException ex) {
             return new GeometryParityResult(
                 "not-comparable",
@@ -9164,7 +9192,8 @@ public class VulkanicAPI {
                 logicalVertices,
                 indexed ? safeIndexCount * (long) safeInstances : 0L,
                 "unavailable",
-                "unavailable"
+                "unavailable",
+                "none"
             );
         }
     }
@@ -9182,6 +9211,92 @@ public class VulkanicAPI {
                 crc.update(vertexData.get(baseOffset + elementOffset + index) & 0xFF);
             }
         }
+    }
+
+    private static boolean shaderInputParityGeometryDetailEnabled() {
+        if (!TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL) {
+            return false;
+        }
+        ShaderInputParitySemanticDrawIdentity identity = SHADER_INPUT_PARITY_SEMANTIC_DRAW.get();
+        if (identity == null) {
+            return TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINE.isBlank()
+                || "*".equals(TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINE);
+        }
+        return TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINE.isBlank()
+            || "*".equals(TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINE)
+            || TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINE.equals(identity.pipeline());
+    }
+
+    private static void appendShaderInputParityVertexDetail(
+        StringBuilder builder,
+        int consumedVertexOrdinal,
+        int instance,
+        int logicalVertexIndex,
+        java.nio.ByteBuffer vertexData,
+        int baseOffset,
+        VertexFormat vertexFormat
+    ) {
+        for (VertexFormatElement element : vertexFormat.getElements()) {
+            if (builder.length() > 0) {
+                builder.append(';');
+            }
+            int elementOffset = vertexFormat.getOffset(element);
+            int byteSize = element.byteSize();
+            builder
+                .append('v').append(consumedVertexOrdinal)
+                .append(".inst").append(instance)
+                .append(".idx").append(logicalVertexIndex)
+                .append('.').append(element.usage().name())
+                .append(element.index())
+                .append('@').append(elementOffset)
+                .append('.').append(element.type().name())
+                .append(element.count())
+                .append(".hash=").append(shaderInputParityElementHash(vertexData, baseOffset + elementOffset, byteSize))
+                .append(".value=").append(shaderInputParityDecodeElement(vertexData, baseOffset + elementOffset, element));
+        }
+    }
+
+    private static String shaderInputParityElementHash(java.nio.ByteBuffer vertexData, int offset, int byteSize) {
+        java.util.zip.CRC32 crc = new java.util.zip.CRC32();
+        for (int index = 0; index < byteSize; index++) {
+            crc.update(vertexData.get(offset + index) & 0xFF);
+        }
+        return "crc32:" + Long.toHexString(crc.getValue()) + "/bytes:" + byteSize;
+    }
+
+    private static String shaderInputParityDecodeElement(java.nio.ByteBuffer vertexData, int offset, VertexFormatElement element) {
+        StringBuilder builder = new StringBuilder("(");
+        for (int component = 0; component < element.count(); component++) {
+            if (component > 0) {
+                builder.append(',');
+            }
+            int componentOffset = offset + component * element.type().size();
+            builder.append(shaderInputParityDecodeComponent(vertexData, componentOffset, element.type(), element.usage()));
+        }
+        return builder.append(')').toString();
+    }
+
+    private static String shaderInputParityDecodeComponent(
+        java.nio.ByteBuffer vertexData,
+        int offset,
+        VertexFormatElement.Type type,
+        VertexFormatElement.Usage usage
+    ) {
+        return switch (type) {
+            case FLOAT -> Float.toHexString(vertexData.getFloat(offset));
+            case UBYTE -> {
+                int value = vertexData.get(offset) & 0xFF;
+                if (usage == VertexFormatElement.Usage.COLOR) {
+                    yield String.format(Locale.ROOT, "%.8f", value / 255.0F);
+                }
+                yield Integer.toUnsignedString(value);
+            }
+            case BYTE -> Integer.toString(vertexData.get(offset));
+            case USHORT -> Integer.toUnsignedString(vertexData.getShort(offset) & 0xFFFF);
+            case SHORT -> Short.toString(vertexData.getShort(offset));
+            case UINT -> Integer.toUnsignedString(vertexData.getInt(offset));
+            case INT -> Integer.toString(vertexData.getInt(offset));
+        };
     }
 
     private static int readShaderInputParityIndex(java.nio.ByteBuffer data, int offset, VertexFormat.IndexType indexType) {

@@ -33,6 +33,8 @@ public final class DeterministicCameraCapture {
 	private static final int ACK_TIMEOUT_FRAMES = Math.max(1, Integer.getInteger("mattmc.dev.deterministicCameraCapture.ackTimeoutFrames", 600));
 	private static final float YAW_DELTA = Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.yawDelta", "35.0"));
 	private static final boolean STOP_AFTER_COMPLETE = Boolean.parseBoolean(System.getProperty("mattmc.dev.deterministicCameraCapture.stopAfterComplete", "true"));
+	private static final float FIXED_VIGNETTE_BRIGHTNESS =
+		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.vignetteBrightness", "1.0"));
 	private static final Path METADATA_PATH = Path.of(System.getProperty("mattmc.dev.deterministicCameraCapture.metadata", "run/deterministic_camera_capture.json"));
 	private static final Path SCREENSHOT_DIR = Path.of(System.getProperty("mattmc.dev.deterministicCameraCapture.screenshotDir", "run/deterministic_camera_capture"));
 
@@ -88,10 +90,12 @@ public final class DeterministicCameraCapture {
 			return;
 		}
 		if (poseIndex >= poses.length) {
+			stabilizeGuiState(minecraft);
 			applyPose(minecraft.player, initialPose);
 			return;
 		}
 
+		stabilizeGuiState(minecraft);
 		applyPose(minecraft.player, poses[poseIndex]);
 	}
 
@@ -103,10 +107,12 @@ public final class DeterministicCameraCapture {
 			return;
 		}
 		if (poseIndex >= poses.length) {
+			stabilizeGuiState(minecraft);
 			applyPose(minecraft.player, initialPose);
 			return;
 		}
 
+		stabilizeGuiState(minecraft);
 		applyPose(minecraft.player, poses[poseIndex]);
 		renderedFrameIndex++;
 		if (awaitingScreenshotAck) {
@@ -207,6 +213,7 @@ public final class DeterministicCameraCapture {
 		initialPosition = player.position();
 		initialDimension = level.dimension().location().toString();
 		initialPose = new Pose("initial", player.getYRot(), player.getXRot());
+		stabilizeGuiState(minecraft);
 		poses = new Pose[] {
 			initialPose,
 			new Pose("right", initialPose.yaw() + YAW_DELTA, initialPose.pitch()),
@@ -231,6 +238,10 @@ public final class DeterministicCameraCapture {
 		);
 		writeMetadata(minecraft, "running");
 		return true;
+	}
+
+	private static void stabilizeGuiState(Minecraft minecraft) {
+		minecraft.gui.vignetteBrightness = FIXED_VIGNETTE_BRIGHTNESS;
 	}
 
 	private static void requestCurrentPoseScreenshot(Minecraft minecraft) {
