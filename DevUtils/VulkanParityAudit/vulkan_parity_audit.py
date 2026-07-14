@@ -103,6 +103,14 @@ class ResourceRecord:
     texture_height: str = ""
     texture_mips: str = ""
     texture_usage: str = ""
+    texture_min_filter: str = ""
+    texture_mag_filter: str = ""
+    texture_uses_mipmaps: str = ""
+    texture_wrap_u: str = ""
+    texture_wrap_v: str = ""
+    texture_compare: str = ""
+    texture_swizzle: str = ""
+    texture_srgb_interpretation: str = ""
     content_hash: str = ""
     content_hash_region: str = ""
     content_hash_format: str = ""
@@ -169,6 +177,14 @@ class ResourceRecord:
             f"size={self.texture_width}x{self.texture_height}",
             f"mips={self.texture_mips}",
             f"usage={self.texture_usage}",
+            f"minFilter={self.texture_min_filter or 'unknown'}",
+            f"magFilter={self.texture_mag_filter or 'unknown'}",
+            f"mipmaps={self.texture_uses_mipmaps or 'unknown'}",
+            f"wrapU={self.texture_wrap_u or 'unknown'}",
+            f"wrapV={self.texture_wrap_v or 'unknown'}",
+            f"compare={self.texture_compare or 'unknown'}",
+            f"swizzle={self.texture_swizzle or 'unknown'}",
+            f"srgb={self.texture_srgb_interpretation or 'unknown'}",
         ])
 
     @property
@@ -178,6 +194,14 @@ class ResourceRecord:
             f"format={self.texture_format}",
             f"size={self.texture_width}x{self.texture_height}",
             f"mips={self.texture_mips}",
+            f"minFilter={self.texture_min_filter or 'unknown'}",
+            f"magFilter={self.texture_mag_filter or 'unknown'}",
+            f"mipmaps={self.texture_uses_mipmaps or 'unknown'}",
+            f"wrapU={self.texture_wrap_u or 'unknown'}",
+            f"wrapV={self.texture_wrap_v or 'unknown'}",
+            f"compare={self.texture_compare or 'unknown'}",
+            f"swizzle={self.texture_swizzle or 'unknown'}",
+            f"srgb={self.texture_srgb_interpretation or 'unknown'}",
         ])
 
     @property
@@ -189,6 +213,14 @@ class ResourceRecord:
             f"format={self.texture_format}",
             f"size={self.texture_width}x{self.texture_height}",
             f"mips={self.texture_mips}",
+            f"minFilter={self.texture_min_filter or 'unknown'}",
+            f"magFilter={self.texture_mag_filter or 'unknown'}",
+            f"mipmaps={self.texture_uses_mipmaps or 'unknown'}",
+            f"wrapU={self.texture_wrap_u or 'unknown'}",
+            f"wrapV={self.texture_wrap_v or 'unknown'}",
+            f"compare={self.texture_compare or 'unknown'}",
+            f"swizzle={self.texture_swizzle or 'unknown'}",
+            f"srgb={self.texture_srgb_interpretation or 'unknown'}",
         ])
 
     @property
@@ -695,6 +727,14 @@ def parse_resource(raw: str, backend: str, source: str, pipeline_key: str, stabl
         texture_height=fields.get("height", ""),
         texture_mips=fields.get("mips", ""),
         texture_usage=fields.get("usage", ""),
+        texture_min_filter=fields.get("minFilter", ""),
+        texture_mag_filter=fields.get("magFilter", ""),
+        texture_uses_mipmaps=fields.get("mipmaps", ""),
+        texture_wrap_u=fields.get("wrapU", ""),
+        texture_wrap_v=fields.get("wrapV", ""),
+        texture_compare=fields.get("compare", ""),
+        texture_swizzle=fields.get("swizzle", ""),
+        texture_srgb_interpretation=fields.get("srgbInterpretation", ""),
         content_hash=content_fields.get("hash", ""),
         content_hash_region=content_fields.get("region", ""),
         content_hash_format=content_fields.get("canonicalFormat", ""),
@@ -1044,6 +1084,64 @@ def values_for_pipeline_keys(records: list[ResourceRecord]) -> list[str]:
     return sorted({record.pipeline_key for record in records if record.pipeline_key})
 
 
+def semantic_draw_parameter_signatures(events: CaptureEvents) -> dict[str, set[str]]:
+    signatures: dict[str, set[str]] = defaultdict(set)
+    for event in events.semantic_draws:
+        if not event.semantic_draw_key or event.semantic_draw_key == "unavailable":
+            continue
+        signatures[event.semantic_draw_key].add("|".join([
+            f"pipeline={event.semantic_pipeline or 'unknown'}",
+            f"pose={event.det_pose or 'none'}",
+            f"frame={event.det_rendered_frame or 'none'}",
+            f"indexed={event.indexed}",
+            f"firstVertex={event.first_vertex}",
+            f"vertexCount={event.vertex_count}",
+            f"firstIndex={event.first_index}",
+            f"indexCount={event.index_count}",
+            f"instances={event.instance_count}",
+            f"baseVertex={event.base_vertex}",
+        ]))
+    return signatures
+
+
+def semantic_draw_keys_for_records(records: list[ResourceRecord]) -> set[str]:
+    return {
+        record.semantic_draw_key
+        for record in records
+        if record.semantic_draw_key and record.semantic_draw_key != "unavailable"
+    }
+
+
+def sampler_records_have_different_draw_parameters(
+    gl_records: list[ResourceRecord],
+    vk_records: list[ResourceRecord],
+    gl_draw_parameters: dict[str, set[str]],
+    vk_draw_parameters: dict[str, set[str]],
+) -> bool:
+    for draw_key in semantic_draw_keys_for_records(gl_records) & semantic_draw_keys_for_records(vk_records):
+        if gl_draw_parameters.get(draw_key) != vk_draw_parameters.get(draw_key):
+            return True
+    return False
+
+
+def is_gui_item_pip_ordinal_matching_gap(gl_records: list[ResourceRecord], vk_records: list[ResourceRecord]) -> bool:
+    pipelines = {record.semantic_pipeline for record in gl_records + vk_records}
+    if pipelines != {"minecraft:pipeline/gui_textured"}:
+        return False
+    gl_labels = {semantic_texture_label(record.texture_label) for record in gl_records}
+    vk_labels = {semantic_texture_label(record.texture_label) for record in vk_records}
+    item_pip_labels = {"UI_standard_3d_item_texture", "UI_oversized_item_texture"}
+    if gl_labels == vk_labels:
+        return False
+    if gl_labels & item_pip_labels or vk_labels & item_pip_labels:
+        return True
+    # VoxelMap GUI quads are emitted in a different ordinal position once Vulkan inserts
+    # item PIP blits, so ordinal-only matching can pair minimap/frame/arrow draws with
+    # vanilla GUI atlas quads.
+    gui_aux_labels = {"voxelmap-map-256", "Minimap_Square_Map_Frame", "Minimap_Arrow"}
+    return bool((gl_labels | vk_labels) & gui_aux_labels)
+
+
 def format_key(key: tuple[str, str, str, str]) -> str:
     pipeline_identity, stable_key, name, resource_type = key
     return f"pipeline={pipeline_identity} / stableKey={stable_key} / name={name} / type={resource_type}"
@@ -1051,6 +1149,8 @@ def format_key(key: tuple[str, str, str, str]) -> str:
 
 def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list[Difference]:
     differences: list[Difference] = []
+    opengl_draw_parameters = semantic_draw_parameter_signatures(opengl)
+    vulkan_draw_parameters = semantic_draw_parameter_signatures(vulkan)
 
     all_resource_keys = sorted(set(opengl.resources) | set(vulkan.resources))
     for key in all_resource_keys:
@@ -1250,6 +1350,19 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
                     reason = "same semantic sampler has matching texture identity metadata except backend usage flags"
                     severity = 30
                     category = "sampler-usage-flag-difference"
+                elif sampler_records_have_different_draw_parameters(
+                    gl_records,
+                    vk_records,
+                    opengl_draw_parameters,
+                    vulkan_draw_parameters,
+                ):
+                    reason = "same semantic sampler key maps to different physical draw parameters; ordinal-only draw identity is insufficient for this resource comparison"
+                    severity = 42
+                    category = "sampler-semantic-draw-parameter-matching-gap"
+                elif is_gui_item_pip_ordinal_matching_gap(gl_records, vk_records):
+                    reason = "GUI textured sampler records are shifted by Vulkan item picture-in-picture blits; the same ordinal does not identify the same logical GUI resource"
+                    severity = 40
+                    category = "sampler-gui-pip-ordinal-matching-gap"
                 elif len(gl_shader_visible) > 1 or len(vk_shader_visible) > 1:
                     reason = "same pipeline/resource bucket contains multiple sampler states; missing draw identity prevents pairing individual sampler observations"
                     severity = 44

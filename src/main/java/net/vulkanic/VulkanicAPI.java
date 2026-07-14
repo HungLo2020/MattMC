@@ -9609,6 +9609,7 @@ public class VulkanicAPI {
             .append(",mips=").append(texture.getMipLevels())
             .append(",usage=").append(texture.usage())
             .append(",closed=").append(texture.isClosed())
+            .append(",samplerState={").append(shaderInputParitySamplerState(texture)).append('}')
             .append("}}}");
 
         if (TRACE_SHADER_INPUT_SAMPLER_CONTENT_HASHES && shouldTraceRenderTargetContentHash(resourceBinding.name(), texture.getLabel())) {
@@ -9623,6 +9624,28 @@ public class VulkanicAPI {
         }
 
         return builder.append('}').toString();
+    }
+
+    private static String shaderInputParitySamplerState(VulkanicTexture texture) {
+        if (texture instanceof GpuTexture gpuTexture) {
+            return "minFilter=" + gpuTexture.getMinFilter()
+                + ",magFilter=" + gpuTexture.getMagFilter()
+                + ",mipmaps=" + gpuTexture.usesMipmaps()
+                + ",wrapU=" + gpuTexture.getAddressModeU()
+                + ",wrapV=" + gpuTexture.getAddressModeV()
+                + ",compare=none"
+                + ",swizzle=identity"
+                + ",srgbInterpretation=" + shaderInputParitySrgbInterpretation(gpuTexture.getFormat());
+        }
+        return "minFilter=unknown,magFilter=unknown,mipmaps=unknown,wrapU=unknown,wrapV=unknown,compare=unknown,swizzle=unknown,srgbInterpretation=unknown";
+    }
+
+    private static String shaderInputParitySrgbInterpretation(TextureFormat format) {
+        return switch (format) {
+            case RGBA8, BGRA8 -> "linear-unorm";
+            case RED8, RED8I -> "linear-red";
+            case DEPTH32, DEPTH24_STENCIL8, DEPTH32F_STENCIL8 -> "depth";
+        };
     }
 
     private static boolean shouldTraceRenderTargetContentHash(String resourceName, @Nullable String label) {
