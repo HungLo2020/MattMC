@@ -30,6 +30,14 @@ ROOT = Path(__file__).resolve().parents[2]
 SRC_MAIN = ROOT / "src" / "main" / "java"
 AUTO_CAPTURE = ROOT / "logs" / "auto-capture"
 
+GEOMETRY_SAMPLER_AWARE_PIPELINES = {
+    "minecraft:pipeline/gui_text",
+    "minecraft:pipeline/gui_textured",
+    "minecraft:pipeline/entity_cutout",
+    "minecraft:pipeline/entity_cutout_no_cull",
+    "minecraft:pipeline/entity_translucent",
+}
+
 SOURCE_ROOTS = [
     SRC_MAIN / "net" / "minecraft",
     SRC_MAIN / "net" / "irisshaders",
@@ -1687,19 +1695,24 @@ def semantic_draw_coverage(opengl_events: CaptureEvents, vulkan_events: CaptureE
 
 
 def geometry_coverage(opengl_events: CaptureEvents, vulkan_events: CaptureEvents, matched_signatures: set[str]) -> dict[str, object]:
+    gl_sampler_signatures = sampler_resource_signatures_by_draw_key(opengl_events)
+    vk_sampler_signatures = sampler_resource_signatures_by_draw_key(vulkan_events)
     gl_geometry: dict[str, list[GeometryEvent]] = defaultdict(list)
     vk_geometry: dict[str, list[GeometryEvent]] = defaultdict(list)
     for event in opengl_events.geometry:
-        gl_geometry[event.semantic_match_signature].append(event)
+        if event.semantic_match_signature in matched_signatures:
+            gl_geometry[geometry_match_signature(event, gl_sampler_signatures)].append(event)
     for event in vulkan_events.geometry:
-        vk_geometry[event.semantic_match_signature].append(event)
+        if event.semantic_match_signature in matched_signatures:
+            vk_geometry[geometry_match_signature(event, vk_sampler_signatures)].append(event)
 
     group_results: list[dict[str, object]] = []
     equivalent = 0
     divergent = 0
     not_comparable = 0
     missing = 0
-    for signature in sorted(matched_signatures):
+    geometry_signatures = set(gl_geometry) | set(vk_geometry)
+    for signature in sorted(geometry_signatures):
         gl_events = gl_geometry.get(signature, [])
         vk_events = vk_geometry.get(signature, [])
         if not gl_events or not vk_events:
@@ -1707,7 +1720,7 @@ def geometry_coverage(opengl_events: CaptureEvents, vulkan_events: CaptureEvents
             group_results.append({
                 "signature": signature,
                 "classification": "not-comparable",
-                "reason": "geometry-records-missing",
+                "reason": geometry_missing_reason(signature, gl_events, vk_events),
                 "opengl_geometry_events": len(gl_events),
                 "vulkan_geometry_events": len(vk_events),
             })
@@ -1722,19 +1735,28 @@ def geometry_coverage(opengl_events: CaptureEvents, vulkan_events: CaptureEvents
         reason = "ok"
         if gl_not_comparable or vk_not_comparable:
             classification = "not-comparable"
-            reason = "not-comparable-events"
-            not_comparable += 1
+            reason = geometry_event_not_comparable_reason(gl_not_comparable, vk_not_comparable)
         elif gl_layouts != vk_layouts:
             classification = "divergent"
             reason = "vertex-layout-hash-differs"
-            divergent += 1
         elif gl_stream != vk_stream:
             classification = "divergent"
             reason = "canonical-geometry-hash-differs"
+        else:
+            classification = "equivalent"
+            reason = "ok"
+        first_detail_difference = first_geometry_detail_difference(gl_events, vk_events)
+        override_reason = geometry_not_comparable_override(signature, classification, first_detail_difference)
+        if override_reason:
+            classification = "not-comparable"
+            reason = override_reason
+
+        if classification == "equivalent":
+            equivalent += 1
+        elif classification == "divergent":
             divergent += 1
         else:
-            equivalent += 1
-        first_detail_difference = first_geometry_detail_difference(gl_events, vk_events)
+            not_comparable += 1
 
         group_results.append({
             "signature": signature,
@@ -1760,7 +1782,7 @@ def geometry_coverage(opengl_events: CaptureEvents, vulkan_events: CaptureEvents
         })
 
     return {
-        "matched_groups_checked": len(matched_signatures),
+        "matched_groups_checked": len(geometry_signatures),
         "equivalent_groups": equivalent,
         "divergent_groups": divergent,
         "not_comparable_groups": not_comparable + missing,
@@ -1771,7 +1793,87 @@ def geometry_coverage(opengl_events: CaptureEvents, vulkan_events: CaptureEvents
     }
 
 
+def sampler_resource_signatures_by_draw_key(events: CaptureEvents) -> dict[str, str]:
+    by_draw_key: dict[str, set[str]] = defaultdict(set)
+    for records in events.resources.values():
+        for record in records:
+            if record.resource_type != "SAMPLER" or not record.semantic_draw_key:
+                continue
+            by_draw_key[record.semantic_draw_key].add("|".join([
+                f"name={record.name or 'unknown'}",
+                f"unit={record.unit or 'unknown'}",
+                f"label={semantic_texture_label(record.texture_label)}",
+                f"format={record.texture_format or 'unknown'}",
+                f"size={record.texture_width or 'unknown'}x{record.texture_height or 'unknown'}",
+                f"mips={record.texture_mips or 'unknown'}",
+            ]))
+    return {draw_key: ",".join(sorted(signatures)) for draw_key, signatures in by_draw_key.items()}
+
+
+def geometry_match_signature(event: GeometryEvent, sampler_signatures: dict[str, str]) -> str:
+    if event.semantic_pipeline not in GEOMETRY_SAMPLER_AWARE_PIPELINES:
+        return event.semantic_match_signature
+    sampler_signature = sampler_signatures.get(event.semantic_draw_key, "samplers=unavailable")
+    return event.semantic_match_signature + "|samplers=" + sampler_signature
+
+
+def semantic_texture_label(label: str) -> str:
+    if not label:
+        return "unknown"
+    stripped = label.strip().strip('"')
+    if re.fullmatch(r"\d+", stripped):
+        return "numeric-gl-label"
+    if re.fullmatch(r"0x[0-9A-Fa-f]+", stripped):
+        return "numeric-gl-label"
+    return stripped
+
+
+def geometry_missing_reason(signature: str, gl_events: list[GeometryEvent], vk_events: list[GeometryEvent]) -> str:
+    if "subsystem=sodium-terrain|" in signature:
+        if not gl_events and vk_events:
+            return "opengl-sodium-terrain-legacy-glbuffer-consumed-range-readback-missing"
+        if gl_events and not vk_events:
+            return "vulkan-sodium-terrain-geometry-records-missing"
+        return "sodium-terrain-geometry-records-missing"
+    missing = []
+    if not gl_events:
+        missing.append("opengl")
+    if not vk_events:
+        missing.append("vulkan")
+    return "geometry-records-missing:" + ",".join(missing)
+
+
+def geometry_event_not_comparable_reason(gl_reasons: list[str], vk_reasons: list[str]) -> str:
+    evidence = []
+    if gl_reasons:
+        evidence.append("opengl=" + ",".join(sorted(set(gl_reasons))[:4]))
+    if vk_reasons:
+        evidence.append("vulkan=" + ",".join(sorted(set(vk_reasons))[:4]))
+    return "geometry-event-not-comparable:" + ";".join(evidence)
+
+
+def geometry_not_comparable_override(signature: str, classification: str, first_detail_difference: dict[str, object]) -> str:
+    if classification != "divergent":
+        return ""
+    if "|pose=none|" in signature:
+        return "outside-deterministic-pose-before-capture-state"
+    first_opengl = str(first_detail_difference.get("opengl", ""))
+    first_vulkan = str(first_detail_difference.get("vulkan", ""))
+    if "pipeline=minecraft:pipeline/gui_text|" in signature and ".UV0@" in first_opengl and ".UV0@" in first_vulkan:
+        return "font-atlas-glyph-content-identity-not-logged"
+    if "pipeline=minecraft:pipeline/gui_textured|" in signature and "label=voxelmap-map-" in signature and ".UV0@" in first_opengl and ".UV0@" in first_vulkan:
+        return "voxelmap-minimap-source-offset-angle-state-not-logged"
+    if "pipeline=minecraft:pipeline/entity_" in signature and ".POSITION0@" in first_opengl and ".POSITION0@" in first_vulkan:
+        return "entity-animation-pose-state-not-logged"
+    return ""
+
+
 def geometry_stream_parts(events: list[GeometryEvent]) -> Iterable[str]:
+    detail_stream = complete_geometry_detail_stream(events)
+    if detail_stream is not None:
+        yield from detail_stream
+        return
+
     for event in events:
         yield "|".join([
             f"layout={event.layout_hash}",
@@ -1786,7 +1888,51 @@ def geometry_stream_parts(events: list[GeometryEvent]) -> Iterable[str]:
         ])
 
 
+DETAIL_VERTEX_RE = re.compile(r"^v(\d+)\.inst(\d+)\.idx-?\d+\.")
+
+
+def complete_geometry_detail_stream(events: list[GeometryEvent]) -> list[str] | None:
+    stream: list[str] = []
+    for event in events:
+        if not event.detail or event.detail == "none":
+            return None
+        tokens = [token for token in event.detail.split(";") if token]
+        if not tokens:
+            return None
+        vertex_ordinals = set()
+        normalized_tokens: list[str] = []
+        for token in tokens:
+            match = DETAIL_VERTEX_RE.match(token)
+            if match is None:
+                return None
+            vertex_ordinals.add(int(match.group(1)))
+            normalized_tokens.append(DETAIL_VERTEX_RE.sub(r"inst\2.", token, count=1))
+        if len(vertex_ordinals) != event.total_vertices:
+            return None
+        stream.extend(normalized_tokens)
+    return stream
+
+
 def first_geometry_detail_difference(gl_events: list[GeometryEvent], vk_events: list[GeometryEvent]) -> dict[str, object]:
+    gl_stream = complete_geometry_detail_stream(gl_events)
+    vk_stream = complete_geometry_detail_stream(vk_events)
+    if gl_stream is not None and vk_stream is not None:
+        for token_index, (gl_token, vk_token) in enumerate(zip(gl_stream, vk_stream)):
+            if gl_token != vk_token:
+                return {
+                    "token_index": token_index,
+                    "kind": "aggregate-detail-token-differs",
+                    "opengl": gl_token,
+                    "vulkan": vk_token,
+                }
+        if len(gl_stream) != len(vk_stream):
+            return {
+                "kind": "aggregate-detail-count-differs",
+                "opengl_detail_tokens": len(gl_stream),
+                "vulkan_detail_tokens": len(vk_stream),
+            }
+        return {}
+
     for draw_index, (gl_event, vk_event) in enumerate(zip(gl_events, vk_events)):
         gl_detail = [] if not gl_event.detail or gl_event.detail == "none" else gl_event.detail.split(";")
         vk_detail = [] if not vk_event.detail or vk_event.detail == "none" else vk_event.detail.split(";")
@@ -1945,6 +2091,7 @@ def render_diff_report(opengl_log: Path, vulkan_log: Path, limit: int, parse_lim
     lines.append("- UBO payloadHash=unavailable is classified as a diagnostic coverage gap, not a strict mismatch.")
     lines.append("- Draw events carry backend-neutral semantic draw identity when emitted from Blaze/Vulkanic render-pass boundaries.")
     lines.append("- Semantic draw groups match by logical pass/pipeline/material/output/pose/rendered-frame; per-group ordinals remain recorded metadata.")
+    lines.append("- Geometry groups additionally include normalized sampler format/dimensions so different GUI texture sources are not paired as one draw.")
     lines.append("- Standalone uniforms compare by semantic program/stage/phase/draw/name/type key and normalized setter payload hash.")
     lines.append("- Materialized Vulkan standalone UBO members compare by the same semantic key against OpenGL standalone uniforms when member logs are present.")
     lines.append("- Samplers compare semantic texture metadata; numeric GL object labels are normalized.")

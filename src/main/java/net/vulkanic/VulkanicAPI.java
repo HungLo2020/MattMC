@@ -94,6 +94,11 @@ public class VulkanicAPI {
         Boolean.getBoolean("mattmc.vulkan.traceShaderInputParity.geometryDetail");
     private static final String TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINE =
         System.getProperty("mattmc.vulkan.traceShaderInputParity.geometryDetailPipeline", "minecraft:pipeline/vignette");
+    private static final java.util.Set<String> TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINES =
+        java.util.Arrays.stream(TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINE.split(","))
+            .map(String::trim)
+            .filter(entry -> !entry.isEmpty())
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
     private static final int TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_MAX_VERTICES =
         diagnosticLimit("mattmc.vulkan.traceShaderInputParity.geometryDetailMaxVertices", 12);
     private static final int VULKAN_LWJGL_STACK_SIZE_KB = 512;
@@ -3479,6 +3484,11 @@ public class VulkanicAPI {
         PipelineDescriptor.PortableState portableState = descriptor != null ? descriptor.getPortableState() : null;
         String phase = shaderInputParityRenderPhase();
         String normalizedSubsystem = shaderInputParityValueOrUnknown(subsystem);
+        if (previous != null
+            && "sodium-terrain".equals(previous.subsystem())
+            && "blaze3d-renderpass".equals(normalizedSubsystem)) {
+            return NO_SHADER_INPUT_PARITY_SCOPE;
+        }
         String normalizedPass = shaderInputParityValueOrUnknown(pass);
         String pipeline = shaderInputParityPipelineLocation(renderPipeline, portableState);
         String vertexShader = shaderInputParityVertexShader(renderPipeline, portableState);
@@ -9098,7 +9108,8 @@ public class VulkanicAPI {
             java.util.zip.CRC32 vertexCrc = new java.util.zip.CRC32();
             java.util.zip.CRC32 indexCrc = new java.util.zip.CRC32();
             long totalIndices = indexed ? safeIndexCount * (long) safeInstances : 0L;
-            boolean includeDetail = shaderInputParityGeometryDetailEnabled();
+            boolean includeDetail = shaderInputParityGeometryDetailEnabled()
+                && logicalVertices <= TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_MAX_VERTICES;
             StringBuilder detail = includeDetail ? new StringBuilder() : null;
             int detailVertexOrdinal = 0;
             if (indexed) {
@@ -9219,12 +9230,12 @@ public class VulkanicAPI {
         }
         ShaderInputParitySemanticDrawIdentity identity = SHADER_INPUT_PARITY_SEMANTIC_DRAW.get();
         if (identity == null) {
-            return TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINE.isBlank()
-                || "*".equals(TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINE);
+            return TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINES.isEmpty()
+                || TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINES.contains("*");
         }
-        return TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINE.isBlank()
-            || "*".equals(TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINE)
-            || TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINE.equals(identity.pipeline());
+        return TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINES.isEmpty()
+            || TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINES.contains("*")
+            || TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINES.contains(identity.pipeline());
     }
 
     private static void appendShaderInputParityVertexDetail(

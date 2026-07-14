@@ -146,7 +146,14 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
             }
 
             setModelMatrixUniforms(shader, region, camera);
-            executeDrawBatch(commandList, tessellation, batch);
+            try (VulkanicAPI.ShaderInputParityScope ignored = beginSodiumTerrainParityScope(
+                "sodium-terrain-opengl-region-batch",
+                renderPass,
+                region,
+                batch
+            )) {
+                executeDrawBatch(commandList, tessellation, batch);
+            }
         }
 
         super.end(renderPass);
@@ -292,19 +299,26 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                 renderPass.setIndexBuffer(preparedDraw.indexBuffer(), net.blaze3d.vertex.VertexFormat.IndexType.INT);
                 renderPass.setUniform("DynamicTransforms", preparedDraw.transforms());
 
-                for (int drawIndex = 0; drawIndex < preparedDraw.batch().size; drawIndex++) {
-                    int indexCount = MemoryUtil.memGetInt(preparedDraw.batch().pElementCount + ((long) drawIndex << 2));
-                    if (indexCount <= 0) {
-                        continue;
+                try (VulkanicAPI.ShaderInputParityScope ignored = beginSodiumTerrainParityScope(
+                    "sodium-terrain-vulkan-region-batch",
+                    terrainPass,
+                    preparedDraw.region(),
+                    preparedDraw.batch()
+                )) {
+                    for (int drawIndex = 0; drawIndex < preparedDraw.batch().size; drawIndex++) {
+                        int indexCount = MemoryUtil.memGetInt(preparedDraw.batch().pElementCount + ((long) drawIndex << 2));
+                        if (indexCount <= 0) {
+                            continue;
+                        }
+
+                        int baseVertex = MemoryUtil.memGetInt(preparedDraw.batch().pBaseVertex + ((long) drawIndex << 2));
+                        long rawIndexOffsetBytes = MemoryUtil.memGetAddress(preparedDraw.batch().pElementPointer + ((long) drawIndex << Pointer.POINTER_SHIFT));
+                        int firstIndex = Math.toIntExact(rawIndexOffsetBytes / Integer.BYTES);
+
+                        renderPass.drawIndexed(baseVertex, firstIndex, indexCount, 1);
+                        submittedDrawCommands++;
+                        submittedIndexCount += indexCount;
                     }
-
-                    int baseVertex = MemoryUtil.memGetInt(preparedDraw.batch().pBaseVertex + ((long) drawIndex << 2));
-                    long rawIndexOffsetBytes = MemoryUtil.memGetAddress(preparedDraw.batch().pElementPointer + ((long) drawIndex << Pointer.POINTER_SHIFT));
-                    int firstIndex = Math.toIntExact(rawIndexOffsetBytes / Integer.BYTES);
-
-                    renderPass.drawIndexed(baseVertex, firstIndex, indexCount, 1);
-                    submittedDrawCommands++;
-                    submittedIndexCount += indexCount;
                 }
             }
         }
@@ -483,6 +497,71 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         RenderRegion region,
         GpuBufferSlice transforms
     ) {
+    }
+
+    private static VulkanicAPI.ShaderInputParityScope beginSodiumTerrainParityScope(
+        String source,
+        TerrainRenderPass terrainPass,
+        RenderRegion region,
+        MultiDrawBatch batch
+    ) {
+        return VulkanicAPI.beginShaderInputParitySemanticDraw(
+            source,
+            "sodium-terrain",
+            sodiumTerrainPassLabel(terrainPass, region),
+            terrainPass.getPipeline(),
+            null,
+            sodiumTerrainMaterial(terrainPass),
+            sodiumTerrainOutput(terrainPass),
+            true,
+            0,
+            0,
+            0,
+            sodiumTerrainIndexCount(batch),
+            Math.max(1, batch.size),
+            0
+        );
+    }
+
+    private static String sodiumTerrainPassLabel(TerrainRenderPass terrainPass, RenderRegion region) {
+        return String.format(
+            "terrain:%s:region=%d,%d,%d:origin=%d,%d,%d",
+            sodiumTerrainKind(terrainPass),
+            region.getX(),
+            region.getY(),
+            region.getZ(),
+            region.getOriginX(),
+            region.getOriginY(),
+            region.getOriginZ()
+        );
+    }
+
+    private static String sodiumTerrainMaterial(TerrainRenderPass terrainPass) {
+        return "terrain:" + sodiumTerrainKind(terrainPass) + ":" + terrainPass.getPipeline().getLocation();
+    }
+
+    private static String sodiumTerrainOutput(TerrainRenderPass terrainPass) {
+        return terrainPass.isTranslucent() && net.minecraft.client.Minecraft.useShaderTransparency()
+            ? "terrain-translucent-target"
+            : "terrain-main-target";
+    }
+
+    private static String sodiumTerrainKind(TerrainRenderPass terrainPass) {
+        if (terrainPass.isTranslucent()) {
+            return "translucent";
+        }
+        return terrainPass.supportsFragmentDiscard() ? "cutout" : "solid";
+    }
+
+    private static int sodiumTerrainIndexCount(MultiDrawBatch batch) {
+        long total = 0L;
+        for (int drawIndex = 0; drawIndex < batch.size; drawIndex++) {
+            int indexCount = MemoryUtil.memGetInt(batch.pElementCount + ((long) drawIndex << 2));
+            if (indexCount > 0) {
+                total += indexCount;
+            }
+        }
+        return total > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) total;
     }
 
     private static void fillCommandBuffer(MultiDrawBatch batch,

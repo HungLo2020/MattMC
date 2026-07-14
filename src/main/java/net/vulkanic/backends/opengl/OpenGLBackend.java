@@ -1940,6 +1940,27 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
         if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        for (int drawIndex = 0; drawIndex < drawCount; drawIndex++) {
+            int count = org.lwjgl.system.MemoryUtil.memGetInt(pCount + ((long) drawIndex * Integer.BYTES));
+            if (count <= 0) {
+                continue;
+            }
+
+            long indices = org.lwjgl.system.MemoryUtil.memGetAddress(pIndices + ((long) drawIndex * org.lwjgl.system.Pointer.POINTER_SIZE));
+            int baseVertex = org.lwjgl.system.MemoryUtil.memGetInt(pBaseVertex + ((long) drawIndex * Integer.BYTES));
+            VulkanicAPI.traceShaderInputParityDraw(
+                "opengl-multiDrawElementsBaseVertex",
+                true,
+                mode,
+                0,
+                0,
+                indices,
+                count,
+                type,
+                1,
+                baseVertex
+            );
+        }
         org.lwjgl.opengl.GL32C.nglMultiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawCount, pBaseVertex);
     }
     
