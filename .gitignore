@@ -13,6 +13,7 @@ build/
 .idea/mavenHomeManager.xml
 *.iws
 out/
+/bin/
 
 # Runtime
 run/

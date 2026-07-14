@@ -41,17 +41,9 @@ if not defined JAVA_OK (
 
 echo Using bundled JDK: %JAVA_CMD%
 
-REM Build classpath dynamically from all jars in lib/ so mixed-platform native jars are safe.
-set "CLASSPATH="
-for %%F in ("%SCRIPT_DIR%\lib\*.jar") do (
-    if not defined CLASSPATH (
-        set "CLASSPATH=%%~fF"
-    ) else (
-        set "CLASSPATH=!CLASSPATH!;%%~fF"
-    )
-)
-
-if not defined CLASSPATH (
+REM Let Java expand the lib wildcard. Expanding every jar in batch can exceed
+REM cmd.exe's command-line limit on full distributions.
+if not exist "%SCRIPT_DIR%\lib\*.jar" (
     echo Error: no JAR files found in %SCRIPT_DIR%\lib
     exit /b 1
 )
@@ -65,7 +57,7 @@ REM Note: Assets are loaded directly from JAR classpath - no --assetsDir needed
     --enable-native-access=ALL-UNNAMED ^
     -Dmattmc.rust.natives.dir="%SCRIPT_DIR%\natives" ^
     -Dfabric.development=true ^
-    -cp "!CLASSPATH!" ^
+    -cp "%SCRIPT_DIR%\lib\*" ^
     net.fabricmc.loader.impl.launch.knot.KnotClient ^
     --version @VERSION@ ^
     --accessToken 0 ^
