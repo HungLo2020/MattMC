@@ -6,13 +6,17 @@ import net.vulkanic.backends.vulkan.VulkanCommandContext;
 import net.vulkanic.backends.vulkan.VulkanTexture;
 import net.vulkanic.backends.vulkan.VulkanTextureView;
 import org.junit.jupiter.api.Test;
+import org.lwjgl.vulkan.EXTAttachmentFeedbackLoopLayout;
+import org.lwjgl.vulkan.VK10;
 
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -137,6 +141,41 @@ public class VulkanRenderPassLifecycleTest {
     }
 
     @Test
+    public void testFeedbackLoopCapableAttachmentWritesUseFeedbackLoopLayout() throws Exception {
+        Method imageLayoutForUsage = Class
+            .forName("net.vulkanic.backends.vulkan.VulkanBackend$NativeSpine")
+            .getDeclaredMethod("imageLayoutForUsage", VulkanicResourceUsage.class, boolean.class, boolean.class, int.class);
+        imageLayoutForUsage.setAccessible(true);
+
+        int feedbackLoopLayout = EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+
+        assertEquals(feedbackLoopLayout, invokeImageLayoutForUsage(
+            imageLayoutForUsage,
+            VulkanicResourceUsage.COLOR_ATTACHMENT_WRITE,
+            false,
+            true
+        ), "Feedback-capable color attachments may be sampled while active and must use the feedback-loop layout");
+        assertEquals(feedbackLoopLayout, invokeImageLayoutForUsage(
+            imageLayoutForUsage,
+            VulkanicResourceUsage.DEPTH_ATTACHMENT_WRITE,
+            true,
+            true
+        ), "Feedback-capable depth attachments may be sampled while active and must use the feedback-loop layout");
+        assertEquals(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, invokeImageLayoutForUsage(
+            imageLayoutForUsage,
+            VulkanicResourceUsage.COLOR_ATTACHMENT_WRITE,
+            false,
+            false
+        ), "Non-feedback color attachments should keep the ordinary attachment layout");
+        assertEquals(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, invokeImageLayoutForUsage(
+            imageLayoutForUsage,
+            VulkanicResourceUsage.DEPTH_ATTACHMENT_WRITE,
+            true,
+            false
+        ), "Non-feedback depth attachments should keep the ordinary attachment layout");
+    }
+
+    @Test
     public void testVulkanBackendSourceUsesNativeRenderPassLifecycle() throws Exception {
         String source = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
@@ -174,5 +213,20 @@ public class VulkanRenderPassLifecycleTest {
             () -> {}
         );
         return new VulkanTextureView(texture, 4L, 0, 1, () -> {});
+    }
+
+    private static int invokeImageLayoutForUsage(
+        Method method,
+        VulkanicResourceUsage usage,
+        boolean depth,
+        boolean feedbackLoopCapable
+    ) throws Exception {
+        return (Integer) method.invoke(
+            null,
+            usage,
+            depth,
+            feedbackLoopCapable,
+            VK10.VK_IMAGE_LAYOUT_UNDEFINED
+        );
     }
 }

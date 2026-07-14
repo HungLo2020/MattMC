@@ -14261,8 +14261,12 @@ void main() {
             }
 
             return switch (usage) {
-                case COLOR_ATTACHMENT_WRITE -> VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-                case DEPTH_ATTACHMENT_WRITE -> VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+                case COLOR_ATTACHMENT_WRITE -> feedbackLoopCapable
+                    ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+                    : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                case DEPTH_ATTACHMENT_WRITE -> feedbackLoopCapable
+                    ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+                    : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
                 case SAMPLED_READ -> depth
                     ? VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
                     : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
