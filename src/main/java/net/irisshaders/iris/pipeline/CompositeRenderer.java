@@ -78,6 +78,7 @@ public class CompositeRenderer {
 	public static final RenderPipeline COMPOSITE_PIPELINE = RenderPipeline.builder()
 		.withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
 		.withDepthWrite(false)
+		.withCull(false)
 		.withColorWrite(true)
 		.withoutBlend()
 		.withLocation(ResourceLocation.fromNamespaceAndPath("iris", "composite")).withVertexShader("core/screenquad").withFragmentShader("core/blit_screen")

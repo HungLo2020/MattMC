@@ -435,6 +435,8 @@ public class Phase3DrawPathTest {
 	            "CompositeRenderer should migrate main Iris composite passes to descriptor-backed Vulkan render targets while preserving framebuffer-compatible fallback paths");
 	        assertTrue(compositeRendererSource.contains("VulkanicAPI.bindDefaultUniforms(renderPass);"),
 	            "CompositeRenderer should bind shared default uniforms before Vulkan custom-pass draws");
+	        assertTrue(compositeRendererSource.contains(".withCull(false)"),
+	            "CompositeRenderer full-screen custom passes must disable culling so screen-space triangles do not depend on backend winding/origin conventions");
 	        assertFalse(compositeRendererSource.contains("framebuffer.bind();"),
 	            "CompositeRenderer custom pass setup should not manually rebind the framebuffer after backend-owned render-pass creation");
 
