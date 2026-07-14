@@ -1,16 +1,14 @@
 param(
-    [switch]$Force,
     [string]$Repo = 'HungLo2020/MattMC'
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$CurrentVersion = '@VERSION@'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $installDir = (Resolve-Path -LiteralPath $scriptDir).Path
 
-function Normalize-Version {
+function Normalize-ReleaseTag {
     param([string]$Version)
 
     if ([string]::IsNullOrWhiteSpace($Version)) {
@@ -56,7 +54,7 @@ function Get-ExactReleaseAsset {
         [string]$ReleaseTag
     )
 
-    $tagVersion = Normalize-Version $ReleaseTag
+    $tagVersion = Normalize-ReleaseTag $ReleaseTag
     if ($tagVersion -and $tagVersion -ne 'latest') {
         $expectedName = "MattMC-Client-$tagVersion-$PlatformSuffix.zip"
         $matches = @($Assets | Where-Object { [string]$_.name -eq $expectedName })
@@ -128,9 +126,28 @@ function Copy-UpdatePayload {
     }
 }
 
+function Save-ReleaseAsset {
+    param(
+        [string]$Uri,
+        [hashtable]$Headers,
+        [string]$Destination
+    )
+
+    $client = New-Object System.Net.WebClient
+    try {
+        foreach ($key in $Headers.Keys) {
+            $client.Headers.Add($key, [string]$Headers[$key])
+        }
+
+        $client.DownloadFile($Uri, $Destination)
+    }
+    finally {
+        $client.Dispose()
+    }
+}
+
 Write-Host "MattMC updater"
 Write-Host "Install: $installDir"
-Write-Host "Current version: $CurrentVersion"
 
 $apiUrl = "https://api.github.com/repos/$Repo/releases/latest"
 $headers = @{
@@ -142,15 +159,9 @@ $release = Invoke-RestMethod -Uri $apiUrl -Headers $headers
 $arch = Get-WindowsArchitecture
 $platformSuffix = Get-WindowsPlatformSuffix -Architecture $arch
 $assetInfo = Get-ExactReleaseAsset -Assets @($release.assets) -PlatformSuffix $platformSuffix -ReleaseTag ([string]$release.tag_name)
-$latestVersion = $assetInfo.Version
 $asset = $assetInfo.Asset
 
-if (-not $Force -and (Normalize-Version $latestVersion) -eq (Normalize-Version $CurrentVersion)) {
-    Write-Host "Already up to date: $latestVersion"
-    exit 0
-}
-
-Write-Host "Latest version: $latestVersion"
+Write-Host "Release: $($release.name) ($($release.tag_name))"
 Write-Host "Expected asset: $($assetInfo.ExpectedName)"
 Write-Host "Downloading: $($asset.name)"
 
@@ -161,7 +172,7 @@ $extractDir = Join-Path $tempRoot 'extract'
 New-Item -ItemType Directory -Path $tempRoot, $extractDir -Force | Out-Null
 
 try {
-    Invoke-WebRequest -Uri $asset.browser_download_url -Headers $headers -OutFile $downloadPath
+    Save-ReleaseAsset -Uri $asset.browser_download_url -Headers $headers -Destination $downloadPath
     Expand-Archive -LiteralPath $downloadPath -DestinationPath $extractDir -Force
 
     $payloadRoot = Get-PayloadRoot -ExtractDir $extractDir
@@ -170,7 +181,7 @@ try {
     Copy-UpdatePayload -SourceRoot $payloadRoot -DestinationRoot $installDir
 
     Write-Host "Update complete."
-    Write-Host "Installed version: $latestVersion"
+    Write-Host "Installed release asset: $($asset.name)"
 }
 finally {
     if (Test-Path -LiteralPath $tempRoot) {

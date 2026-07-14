@@ -1,16 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CURRENT_VERSION="@VERSION@"
 REPO="${MATTMC_REPO:-HungLo2020/MattMC}"
-FORCE=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --force)
-            FORCE=1
-            shift
-            ;;
         --repo)
             REPO="${2:?Missing value for --repo}"
             shift 2
@@ -25,7 +19,7 @@ done
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 INSTALL_DIR="$SCRIPT_DIR"
 
-normalize_version() {
+normalize_release_tag() {
     local version="${1:-}"
     version="${version#"${version%%[![:space:]]*}"}"
     version="${version%"${version##*[![:space:]]}"}"
@@ -84,7 +78,7 @@ select_exact_asset() {
     local line name="" url=""
     local tag_version expected_name version
 
-    tag_version="$(normalize_version "$release_tag")"
+    tag_version="$(normalize_release_tag "$release_tag")"
     if [[ -n "$tag_version" && "$tag_version" != "latest" ]]; then
         expected_name="$(expected_asset_name "$tag_version" "$platform")"
 
@@ -171,7 +165,6 @@ EXTRACT_DIR="$TMP_ROOT/extract"
 
 echo "MattMC updater"
 echo "Install: $INSTALL_DIR"
-echo "Current version: $CURRENT_VERSION"
 
 curl -fsSL \
     -H "Accept: application/vnd.github+json" \
@@ -195,12 +188,7 @@ ASSET_URL="$(printf '%s' "$ASSET_INFO" | cut -f1)"
 LATEST_VERSION="$(printf '%s' "$ASSET_INFO" | cut -f2)"
 EXPECTED_ASSET_NAME="$(printf '%s' "$ASSET_INFO" | cut -f3)"
 
-if [[ "$FORCE" -eq 0 && "$(normalize_version "$LATEST_VERSION")" == "$(normalize_version "$CURRENT_VERSION")" ]]; then
-    echo "Already up to date: $LATEST_VERSION"
-    exit 0
-fi
-
-echo "Latest version: $LATEST_VERSION"
+echo "Release: $LATEST_VERSION"
 echo "Expected asset: $EXPECTED_ASSET_NAME"
 echo "Downloading: $(basename "$ASSET_URL")"
 
@@ -218,4 +206,4 @@ echo "Applying update from: $PAYLOAD_ROOT"
 cp -R "$PAYLOAD_ROOT"/. "$INSTALL_DIR"/
 
 echo "Update complete."
-echo "Installed version: $LATEST_VERSION"
+echo "Installed release asset: $EXPECTED_ASSET_NAME"
