@@ -7419,6 +7419,85 @@ public class VulkanicAPI {
         );
     }
 
+    public static void traceShaderInputParityOpenGLLegacyGeometry(
+            String source,
+            int vertexBufferHandle,
+            int indexBufferHandle,
+            VertexFormat vertexFormat,
+            VertexFormat.Mode mode,
+            boolean indexed,
+            int firstVertex,
+            int vertexCount,
+            int firstIndex,
+            int indexCount,
+            @Nullable VertexFormat.IndexType indexType,
+            int instanceCount,
+            int baseVertex) {
+        if (!shouldTraceShaderInputParityLog()) {
+            return;
+        }
+
+        GpuBuffer vertexBuffer = shaderInputParityOpenGLLegacyBuffer(
+            vertexBufferHandle,
+            GpuBuffer.USAGE_VERTEX
+        );
+        GpuBuffer indexBuffer = indexed
+            ? shaderInputParityOpenGLLegacyBuffer(indexBufferHandle, GpuBuffer.USAGE_INDEX)
+            : null;
+        GeometryParityResult result = buildShaderInputParityGeometry(
+            vertexBuffer,
+            indexBuffer,
+            vertexFormat,
+            indexed,
+            firstVertex,
+            vertexCount,
+            firstIndex,
+            indexCount,
+            indexType,
+            instanceCount,
+            baseVertex
+        );
+        LOGGER.info(
+            "ShaderInputParityGeometry backend={} source={} {} mode={} indexed={} vertexFormat={} vertexStride={} layoutHash={} totalVertices={} totalIndices={} totalPrimitives={} instances={} vertexHash={} indexHash={} status={} reason={} detail={} {}",
+            getActiveBackendType().name().toLowerCase(Locale.ROOT),
+            source,
+            shaderInputParitySemanticDrawContextFields(),
+            mode,
+            indexed,
+            shaderInputParitySanitizeLabel(vertexFormat.toString()),
+            vertexFormat.getVertexSize(),
+            shaderInputParityVertexFormatHash(vertexFormat),
+            result.totalVertices(),
+            result.totalIndices(),
+            shaderInputParityPrimitiveCount(mode, indexed ? indexCount : vertexCount, instanceCount),
+            instanceCount,
+            result.vertexHash(),
+            result.indexHash(),
+            result.status(),
+            result.reason(),
+            result.detail(),
+            shaderInputParityDeterministicContextFields()
+        );
+    }
+
+    private static @Nullable GpuBuffer shaderInputParityOpenGLLegacyBuffer(int handle, int usage) {
+        if (handle <= 0) {
+            return null;
+        }
+
+        int size;
+        try {
+            size = org.lwjgl.opengl.GL45.glGetNamedBufferParameteri(handle, org.lwjgl.opengl.GL15.GL_BUFFER_SIZE);
+        } catch (RuntimeException ex) {
+            return null;
+        }
+        if (size < 0) {
+            return null;
+        }
+
+        return new ShaderInputParityOpenGLLegacyGpuBuffer(handle, usage, size);
+    }
+
     private static void recordScopedCompositeColortex0Binding(
         String source,
         PipelineHandle pipeline,
@@ -9055,6 +9134,24 @@ public class VulkanicAPI {
     ) {
     }
 
+    private static final class ShaderInputParityOpenGLLegacyGpuBuffer extends GpuBuffer {
+        private final net.vulkanic.backends.opengl.OpenGLBuffer buffer;
+
+        private ShaderInputParityOpenGLLegacyGpuBuffer(int handle, int usage, int size) {
+            super(usage, size);
+            this.buffer = new net.vulkanic.backends.opengl.OpenGLBuffer(handle, usage, size);
+        }
+
+        @Override
+        public boolean isClosed() {
+            return false;
+        }
+
+        @Override
+        public void close() {
+        }
+    }
+
     private static GeometryParityResult buildShaderInputParityGeometry(
         @Nullable GpuBuffer vertexBuffer,
         @Nullable GpuBuffer indexBuffer,
@@ -10137,6 +10234,9 @@ public class VulkanicAPI {
      * @return the backend-native buffer representation
      */
     public static VulkanicBuffer resolveVulkanicBuffer(GpuBuffer gpuBuffer) {
+        if (gpuBuffer instanceof ShaderInputParityOpenGLLegacyGpuBuffer legacyBuffer) {
+            return legacyBuffer.buffer;
+        }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         return directVulkanBackend != null
             ? directVulkanBackend.resolveVulkanicBuffer(gpuBuffer)

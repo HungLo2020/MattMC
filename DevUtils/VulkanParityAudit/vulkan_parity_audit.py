@@ -377,7 +377,7 @@ class GeometryEvent:
 
     @property
     def semantic_match_signature(self) -> str:
-        return "|".join([
+        parts = [
             f"subsystem={self.semantic_subsystem or 'unknown'}",
             f"phase={self.semantic_phase or 'unknown'}",
             f"pass={self.semantic_pass or 'unknown'}",
@@ -388,7 +388,10 @@ class GeometryEvent:
             f"output={self.semantic_output or 'unknown'}",
             f"pose={self.det_pose or 'none'}",
             f"frame={self.det_rendered_frame or 'none'}",
-        ])
+        ]
+        if self.semantic_subsystem == "sodium-terrain":
+            parts.append(f"ordinal={self.semantic_ordinal or '0'}")
+        return "|".join(parts)
 
     @property
     def comparable(self) -> bool:
@@ -1884,7 +1887,6 @@ def geometry_stream_parts(events: list[GeometryEvent]) -> Iterable[str]:
             f"primitives={event.total_primitives}",
             f"instances={event.instances}",
             f"vertexHash={event.vertex_hash}",
-            f"indexHash={event.index_hash}",
         ])
 
 
@@ -2092,6 +2094,7 @@ def render_diff_report(opengl_log: Path, vulkan_log: Path, limit: int, parse_lim
     lines.append("- Draw events carry backend-neutral semantic draw identity when emitted from Blaze/Vulkanic render-pass boundaries.")
     lines.append("- Semantic draw groups match by logical pass/pipeline/material/output/pose/rendered-frame; per-group ordinals remain recorded metadata.")
     lines.append("- Geometry groups additionally include normalized sampler format/dimensions so different GUI texture sources are not paired as one draw.")
+    lines.append("- Geometry hashes compare consumed vertex attributes in draw order; backend-local index buffer values are representational and are not part of the canonical stream.")
     lines.append("- Standalone uniforms compare by semantic program/stage/phase/draw/name/type key and normalized setter payload hash.")
     lines.append("- Materialized Vulkan standalone UBO members compare by the same semantic key against OpenGL standalone uniforms when member logs are present.")
     lines.append("- Samplers compare semantic texture metadata; numeric GL object labels are normalized.")

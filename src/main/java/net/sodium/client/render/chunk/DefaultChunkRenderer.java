@@ -8,14 +8,17 @@ import net.blaze3d.pipeline.RenderTarget;
 import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.textures.GpuTextureView;
+import net.blaze3d.vertex.VertexFormat;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
 import net.sodium.client.SodiumClientMod;
+import net.sodium.client.gl.buffer.GlBuffer;
 import net.sodium.client.gl.device.CommandList;
 import net.sodium.client.gl.device.DrawCommandList;
 import net.sodium.client.gl.device.MultiDrawBatch;
 import net.sodium.client.gl.device.RenderDevice;
+import net.sodium.client.gl.tessellation.GlAbstractTessellation;
 import net.sodium.client.render.device.RenderTessellation;
 import net.sodium.client.render.device.RenderTessellationBinding;
 import net.sodium.client.render.chunk.data.SectionRenderDataStorage;
@@ -152,6 +155,7 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                 region,
                 batch
             )) {
+                traceOpenGlSodiumTerrainGeometry(renderPass, shader, tessellation, batch);
                 executeDrawBatch(commandList, tessellation, batch);
             }
         }
@@ -562,6 +566,54 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
             }
         }
         return total > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) total;
+    }
+
+    private static void traceOpenGlSodiumTerrainGeometry(
+        TerrainRenderPass terrainPass,
+        ChunkShaderInterface shader,
+        RenderTessellation tessellation,
+        MultiDrawBatch batch
+    ) {
+        if (!VulkanicAPI.isShaderInputParityTracingEnabled() || !(tessellation instanceof GlAbstractTessellation glTessellation)) {
+            return;
+        }
+
+        GlBuffer vertexBuffer = glTessellation.getDiagnosticVertexBuffer();
+        GlBuffer indexBuffer = glTessellation.getDiagnosticIndexBuffer();
+        if (vertexBuffer == null || indexBuffer == null) {
+            return;
+        }
+
+        RenderPassChunkShaderInterface renderPassShader = Iris.getIrisConfig().areShadersEnabled()
+            && shader instanceof RenderPassChunkShaderInterface sharedShader
+            ? sharedShader
+            : null;
+        VertexFormat parityVertexFormat = SodiumChunkRenderPipelines.createContract(terrainPass, renderPassShader).vertexFormat();
+        for (int drawIndex = 0; drawIndex < batch.size; drawIndex++) {
+            int indexCount = MemoryUtil.memGetInt(batch.pElementCount + ((long) drawIndex << 2));
+            if (indexCount <= 0) {
+                continue;
+            }
+
+            long rawIndexOffsetBytes = MemoryUtil.memGetAddress(batch.pElementPointer + ((long) drawIndex << Pointer.POINTER_SHIFT));
+            int firstIndex = Math.toIntExact(rawIndexOffsetBytes / Integer.BYTES);
+            int baseVertex = MemoryUtil.memGetInt(batch.pBaseVertex + ((long) drawIndex << 2));
+            VulkanicAPI.traceShaderInputParityOpenGLLegacyGeometry(
+                "opengl-sodium-terrain-legacy-glbuffer-geometry",
+                vertexBuffer.handle(),
+                indexBuffer.handle(),
+                parityVertexFormat,
+                VertexFormat.Mode.TRIANGLES,
+                true,
+                0,
+                0,
+                firstIndex,
+                indexCount,
+                VertexFormat.IndexType.INT,
+                1,
+                baseVertex
+            );
+        }
     }
 
     private static void fillCommandBuffer(MultiDrawBatch batch,
