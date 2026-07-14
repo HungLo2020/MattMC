@@ -1,7 +1,9 @@
 package net.vulkanic.backends.opengl;
 
 import net.blaze3d.opengl.GlConst;
+import net.blaze3d.pipeline.RenderPipeline;
 import net.vulkanic.CommandContext;
+import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.PipelineHandle;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicBuffer;
@@ -26,6 +28,8 @@ public class OpenGLRenderPass implements VulkanicRenderPass {
     private final CommandContext ctx;
     private VulkanicIndexType currentIndexType = VulkanicIndexType.INT;
     private int currentPrimitiveMode = VulkanicAPI.GL_TRIANGLES;
+    private RenderPipeline currentRenderPipeline;
+    private PipelineDescriptor currentPipelineDescriptor;
     private boolean closed;
 
     /**
@@ -71,6 +75,8 @@ public class OpenGLRenderPass implements VulkanicRenderPass {
         int programId = glHandle.getGlRenderPipeline().program().getProgramId();
         VulkanicAPI.bindShaderProgram(ctx, programId);
         this.currentPrimitiveMode = GlConst.toGl(glHandle.getGlRenderPipeline().info().getVertexFormatMode());
+        this.currentRenderPipeline = glHandle.getGlRenderPipeline().info();
+        this.currentPipelineDescriptor = glHandle.getGlRenderPipeline().descriptor();
     }
 
     @Override
@@ -101,18 +107,52 @@ public class OpenGLRenderPass implements VulkanicRenderPass {
         checkNotClosed();
         // Offset in bytes = firstIndex * bytesPerIndex
         long offset = (long) firstIndex * currentIndexType.bytesPerIndex();
+        try (VulkanicAPI.ShaderInputParityScope ignored = VulkanicAPI.beginShaderInputParitySemanticDraw(
+            "opengl-vulkanic-renderpass-drawIndexed",
+            "vulkanic-renderpass",
+            "vulkanic-renderpass",
+            currentRenderPipeline,
+            currentPipelineDescriptor,
+            currentRenderPipeline == null ? null : currentRenderPipeline.getLocation().toString(),
+            "vulkanic-render-target",
+            true,
+            0,
+            0,
+            firstIndex,
+            indexCount,
+            instanceCount,
+            baseVertex
+        )) {
         if (instanceCount == 1 && baseVertex == 0) {
             VulkanicAPI.drawElements(ctx, currentPrimitiveMode, indexCount, currentIndexType, offset);
         } else {
             VulkanicAPI.drawIndexedInstancedBaseVertex(ctx, currentPrimitiveMode,
                 indexCount, currentIndexType, offset, instanceCount, baseVertex);
         }
+        }
     }
 
     @Override
     public void draw(int firstVertex, int vertexCount) {
         checkNotClosed();
+        try (VulkanicAPI.ShaderInputParityScope ignored = VulkanicAPI.beginShaderInputParitySemanticDraw(
+            "opengl-vulkanic-renderpass-draw",
+            "vulkanic-renderpass",
+            "vulkanic-renderpass",
+            currentRenderPipeline,
+            currentPipelineDescriptor,
+            currentRenderPipeline == null ? null : currentRenderPipeline.getLocation().toString(),
+            "vulkanic-render-target",
+            false,
+            firstVertex,
+            vertexCount,
+            0,
+            0,
+            1,
+            0
+        )) {
         VulkanicAPI.drawArrays(ctx, currentPrimitiveMode, firstVertex, vertexCount);
+        }
     }
 
     @Override

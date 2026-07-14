@@ -6858,6 +6858,8 @@ void main() {
         private final NativeSpine spine;
         private final long commandBufferHandle;
         private final VulkanRenderPassCompatibilityKey compatibilityKey;
+        @Nullable
+        private PipelineDescriptor currentPipelineDescriptor;
         private volatile boolean closed;
 
         private VulkanBackedRenderPass(
@@ -6896,6 +6898,7 @@ void main() {
                 );
             }
             spine.bindPipeline(commandBufferHandle, vulkanPipeline.getVkPipelineHandle());
+            this.currentPipelineDescriptor = null;
         }
 
         @Override
@@ -6929,13 +6932,47 @@ void main() {
         @Override
         public void drawIndexed(int firstIndex, int indexCount, int baseVertex, int instanceCount) {
             ensureOpen("drawIndexed");
+            try (VulkanicAPI.ShaderInputParityScope ignored = VulkanicAPI.beginShaderInputParitySemanticDraw(
+                "vulkan-vulkanic-renderpass-drawIndexed",
+                "vulkanic-renderpass",
+                "vulkanic-renderpass",
+                null,
+                currentPipelineDescriptor,
+                "unknown",
+                "vulkanic-render-target",
+                true,
+                0,
+                0,
+                firstIndex,
+                indexCount,
+                instanceCount,
+                baseVertex
+            )) {
             spine.drawIndexed(commandBufferHandle, firstIndex, indexCount, baseVertex, instanceCount);
+            }
         }
 
         @Override
         public void draw(int firstVertex, int vertexCount) {
             ensureOpen("draw");
+            try (VulkanicAPI.ShaderInputParityScope ignored = VulkanicAPI.beginShaderInputParitySemanticDraw(
+                "vulkan-vulkanic-renderpass-draw",
+                "vulkanic-renderpass",
+                "vulkanic-renderpass",
+                null,
+                currentPipelineDescriptor,
+                "unknown",
+                "vulkanic-render-target",
+                false,
+                firstVertex,
+                vertexCount,
+                0,
+                0,
+                1,
+                0
+            )) {
             spine.draw(commandBufferHandle, firstVertex, vertexCount);
+            }
         }
 
         @Override
@@ -7091,6 +7128,7 @@ void main() {
             return;
         }
 
+        VulkanicAPI.traceShaderInputParityDraw("vulkan-drawArrays", false, mode, first, count, 0L, 0, 0, 1, 0);
         ensureNativeReady("drawArrays");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -7117,6 +7155,7 @@ void main() {
             return;
         }
 
+        VulkanicAPI.traceShaderInputParityDraw("vulkan-drawElements", true, mode, 0, 0, indices, count, type, 1, 0);
         ensureNativeReady("drawElements");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -7150,6 +7189,7 @@ void main() {
             return;
         }
 
+        VulkanicAPI.traceShaderInputParityDraw("vulkan-drawIndexedInstancedBaseVertex", true, mode, 0, 0, indices, count, type, instanceCount, baseVertex);
         ensureNativeReady("drawIndexedInstancedBaseVertex");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -7187,6 +7227,7 @@ void main() {
             return;
         }
 
+        VulkanicAPI.traceShaderInputParityDraw("vulkan-drawArraysInstanced", false, mode, first, count, 0L, 0, 0, instanceCount, 0);
         ensureNativeReady("drawArraysInstanced");
         NativeSpine spine = nativeSpine;
         if (spine == null) {

@@ -83,6 +83,10 @@ public class VulkanicAPI {
     private static final java.util.concurrent.atomic.AtomicInteger SHADER_INPUT_PARITY_LOG_COUNT = new java.util.concurrent.atomic.AtomicInteger();
     private static final java.util.concurrent.ConcurrentMap<Integer, String> SHADER_INPUT_PARITY_PROGRAM_NAMES =
         new java.util.concurrent.ConcurrentHashMap<>();
+    private static final ThreadLocal<ShaderInputParitySemanticDrawIdentity> SHADER_INPUT_PARITY_SEMANTIC_DRAW =
+        new ThreadLocal<>();
+    private static final java.util.concurrent.ConcurrentMap<String, java.util.concurrent.atomic.AtomicInteger> SHADER_INPUT_PARITY_SEMANTIC_DRAW_ORDINALS =
+        new java.util.concurrent.ConcurrentHashMap<>();
     private static final int VULKAN_LWJGL_STACK_SIZE_KB = 512;
     private static GraphicsBackend backend;
     @Nullable
@@ -3406,6 +3410,124 @@ public class VulkanicAPI {
 
     public static boolean shouldTraceStandaloneUniform(String name) {
         return GENERATED_STANDALONE_UNIFORM_BLOCK_NAME.equals(name) && shouldTraceStandaloneUniforms();
+    }
+
+    public interface ShaderInputParityScope extends AutoCloseable {
+        @Override
+        void close();
+    }
+
+    private static final ShaderInputParityScope NO_SHADER_INPUT_PARITY_SCOPE = () -> {
+    };
+
+    private record ShaderInputParitySemanticDrawIdentity(
+        String key,
+        String subsystem,
+        String phase,
+        String pass,
+        String pipeline,
+        String vertexShader,
+        String fragmentShader,
+        String material,
+        String output,
+        int ordinal
+    ) {
+        String fields() {
+            return "semanticDrawKey=" + key
+                + " semanticSubsystem=" + subsystem
+                + " semanticPhase=" + phase
+                + " semanticPass=" + pass
+                + " semanticPipeline=" + pipeline
+                + " semanticVertexShader=" + vertexShader
+                + " semanticFragmentShader=" + fragmentShader
+                + " semanticMaterial=" + material
+                + " semanticOutput=" + output
+                + " semanticOrdinal=" + ordinal;
+        }
+    }
+
+    public static ShaderInputParityScope beginShaderInputParitySemanticDraw(
+        String source,
+        String subsystem,
+        @Nullable String pass,
+        @Nullable RenderPipeline renderPipeline,
+        @Nullable PipelineDescriptor descriptor,
+        @Nullable String material,
+        @Nullable String output,
+        boolean indexed,
+        int firstVertex,
+        int vertexCount,
+        int firstIndex,
+        int indexCount,
+        int instanceCount,
+        int baseVertex
+    ) {
+        if (!TRACE_SHADER_INPUT_PARITY) {
+            return NO_SHADER_INPUT_PARITY_SCOPE;
+        }
+
+        ShaderInputParitySemanticDrawIdentity previous = SHADER_INPUT_PARITY_SEMANTIC_DRAW.get();
+        PipelineDescriptor.PortableState portableState = descriptor != null ? descriptor.getPortableState() : null;
+        String phase = shaderInputParityRenderPhase();
+        String normalizedSubsystem = shaderInputParityValueOrUnknown(subsystem);
+        String normalizedPass = shaderInputParityValueOrUnknown(pass);
+        String pipeline = shaderInputParityPipelineLocation(renderPipeline, portableState);
+        String vertexShader = shaderInputParityVertexShader(renderPipeline, portableState);
+        String fragmentShader = shaderInputParityFragmentShader(renderPipeline, portableState);
+        String normalizedMaterial = shaderInputParityValueOrUnknown(material != null ? material : pipeline);
+        String normalizedOutput = shaderInputParityValueOrUnknown(output);
+        String poseContext = shaderInputParityDeterministicContextFields().replace(' ', '|');
+        String ordinalKey = String.join("|",
+            normalizedSubsystem,
+            phase,
+            normalizedPass,
+            pipeline,
+            normalizedMaterial,
+            normalizedOutput,
+            poseContext
+        );
+        int ordinal = SHADER_INPUT_PARITY_SEMANTIC_DRAW_ORDINALS
+            .computeIfAbsent(ordinalKey, ignored -> new java.util.concurrent.atomic.AtomicInteger())
+            .incrementAndGet();
+        String semanticKey = shaderInputParityHashString(ordinalKey + "|ordinal=" + ordinal);
+        ShaderInputParitySemanticDrawIdentity identity = new ShaderInputParitySemanticDrawIdentity(
+            semanticKey,
+            normalizedSubsystem,
+            phase,
+            normalizedPass,
+            pipeline,
+            vertexShader,
+            fragmentShader,
+            normalizedMaterial,
+            normalizedOutput,
+            ordinal
+        );
+        SHADER_INPUT_PARITY_SEMANTIC_DRAW.set(identity);
+
+        if (shouldTraceShaderInputParityLog()) {
+            LOGGER.info(
+                "ShaderInputParitySemanticDraw backend={} source={} {} indexed={} firstVertex={} vertexCount={} firstIndex={} indexCount={} instanceCount={} baseVertex={} {}",
+                getActiveBackendType().name().toLowerCase(Locale.ROOT),
+                source,
+                identity.fields(),
+                indexed,
+                firstVertex,
+                vertexCount,
+                firstIndex,
+                indexCount,
+                instanceCount,
+                baseVertex,
+                shaderInputParityDeterministicContextFields()
+            );
+        }
+
+        return () -> {
+            if (previous == null) {
+                SHADER_INPUT_PARITY_SEMANTIC_DRAW.remove();
+            } else {
+                SHADER_INPUT_PARITY_SEMANTIC_DRAW.set(previous);
+            }
+        };
     }
 
     @Nullable
@@ -7157,7 +7279,7 @@ public class VulkanicAPI {
         }
 
         LOGGER.info(
-            "ShaderInputParityResources backend={} source={} pipelineLocation={} vertexShader={} fragmentShader={} pipelineHandle={} pipelineKey={} stableKey={} {} resources=[{}]",
+            "ShaderInputParityResources backend={} source={} pipelineLocation={} vertexShader={} fragmentShader={} pipelineHandle={} pipelineKey={} stableKey={} {} {} resources=[{}]",
             getActiveBackendType().name().toLowerCase(java.util.Locale.ROOT),
             source,
             descriptor.getPortableState().location(),
@@ -7166,8 +7288,61 @@ public class VulkanicAPI {
             pipeline == null ? "none" : pipeline.getClass().getSimpleName() + "@" + Integer.toHexString(System.identityHashCode(pipeline)),
             descriptor.getPipelineCompilationKey(),
             descriptor.getStableCacheKey(),
+            shaderInputParitySemanticDrawContextFields(),
             shaderInputParityDeterministicContextFields(),
             String.join(", ", resources)
+        );
+    }
+
+    public static void traceShaderInputParityDraw(
+            String source,
+            boolean indexed,
+            int mode,
+            int firstVertex,
+            int vertexCount,
+            long firstIndexOrByteOffset,
+            int indexCount,
+            int type,
+            int instanceCount,
+            int baseVertex) {
+        if (!shouldTraceShaderInputParityLog()) {
+            return;
+        }
+
+        String primitive = VulkanicPrimitiveMode.fromLegacyGlConstant(mode)
+            .map(Enum::name)
+            .orElse("legacy:0x" + Integer.toHexString(mode));
+        String indexType = indexed
+            ? VulkanicIndexType.fromLegacyGlConstant(type)
+                .map(Enum::name)
+                .orElse("legacy:0x" + Integer.toHexString(type))
+            : "none";
+        long firstIndex = firstIndexOrByteOffset;
+        if (indexed) {
+            java.util.Optional<VulkanicIndexType> typedIndex = VulkanicIndexType.fromLegacyGlConstant(type);
+            if (typedIndex.isPresent() && typedIndex.get().bytesPerIndex() > 0) {
+                firstIndex = firstIndexOrByteOffset / typedIndex.get().bytesPerIndex();
+            }
+        }
+
+        LOGGER.info(
+            "ShaderInputParityDraw backend={} source={} renderPhase={} indexed={} primitive={} mode={} firstVertex={} vertexCount={} firstIndex={} indexByteOffset={} indexCount={} indexType={} instanceCount={} baseVertex={} {} {}",
+            getActiveBackendType().name().toLowerCase(java.util.Locale.ROOT),
+            source,
+            shaderInputParityRenderPhase(),
+            indexed,
+            primitive,
+            mode,
+            firstVertex,
+            vertexCount,
+            firstIndex,
+            firstIndexOrByteOffset,
+            indexCount,
+            indexType,
+            instanceCount,
+            baseVertex,
+            shaderInputParitySemanticDrawContextFields(),
+            shaderInputParityDeterministicContextFields()
         );
     }
 
@@ -8545,7 +8720,7 @@ public class VulkanicAPI {
         bytes.flip();
 
         LOGGER.info(
-            "ShaderInputParityStandaloneUniform backend={} source={} program={} programIdentity={} shaderStages={} location={} renderPhase={} drawKey={} name={} valueKind={} componentCount={} transpose={} {} payloadHash={},sample={}",
+            "ShaderInputParityStandaloneUniform backend={} source={} program={} programIdentity={} shaderStages={} location={} renderPhase={} drawKey={} name={} valueKind={} componentCount={} transpose={} {} {} payloadHash={},sample={}",
             getActiveBackendType().name().toLowerCase(Locale.ROOT),
             source,
             program,
@@ -8553,11 +8728,12 @@ public class VulkanicAPI {
             shaderInputParityValueOrUnknown(shaderStages),
             location,
             shaderInputParityRenderPhase(),
-            "unavailable",
+            shaderInputParitySemanticDrawKeyOrUnavailable(),
             sanitizeShaderInputParityUniformName(name),
             valueKind,
             normalized.length,
             transpose,
+            shaderInputParitySemanticDrawContextFields(),
             shaderInputParityDeterministicContextFields(),
             shaderInputParityHash(bytes, bytes.remaining()),
             shaderInputParityFloatSample(normalized)
@@ -8596,7 +8772,7 @@ public class VulkanicAPI {
         bytes.flip();
 
         LOGGER.info(
-            "ShaderInputParityStandaloneUniform backend={} source={} program={} programIdentity={} shaderStages={} location={} renderPhase={} drawKey={} name={} valueKind={} componentCount={} transpose=false {} payloadHash={},sample={}",
+            "ShaderInputParityStandaloneUniform backend={} source={} program={} programIdentity={} shaderStages={} location={} renderPhase={} drawKey={} name={} valueKind={} componentCount={} transpose=false {} {} payloadHash={},sample={}",
             getActiveBackendType().name().toLowerCase(Locale.ROOT),
             source,
             program,
@@ -8604,10 +8780,11 @@ public class VulkanicAPI {
             shaderInputParityValueOrUnknown(shaderStages),
             location,
             shaderInputParityRenderPhase(),
-            "unavailable",
+            shaderInputParitySemanticDrawKeyOrUnavailable(),
             sanitizeShaderInputParityUniformName(name),
             valueKind,
             values.length,
+            shaderInputParitySemanticDrawContextFields(),
             shaderInputParityDeterministicContextFields(),
             shaderInputParityHash(bytes, bytes.remaining()),
             shaderInputParityIntSample(values)
@@ -8652,7 +8829,7 @@ public class VulkanicAPI {
         bytes.flip();
 
         LOGGER.info(
-            "ShaderInputParityStandaloneUniformBlockMember backend={} source={} program={} programIdentity={} shaderStages={} location={} renderPhase={} drawKey={} name={} valueKind={} componentCount={} offset={} arraySize={} stride={} {} payloadHash={},sample={}",
+            "ShaderInputParityStandaloneUniformBlockMember backend={} source={} program={} programIdentity={} shaderStages={} location={} renderPhase={} drawKey={} name={} valueKind={} componentCount={} offset={} arraySize={} stride={} {} {} payloadHash={},sample={}",
             getActiveBackendType().name().toLowerCase(Locale.ROOT),
             source,
             program,
@@ -8660,13 +8837,14 @@ public class VulkanicAPI {
             shaderInputParityValueOrUnknown(shaderStages),
             location,
             shaderInputParityRenderPhase(),
-            "unavailable",
+            shaderInputParitySemanticDrawKeyOrUnavailable(),
             sanitizeShaderInputParityUniformName(name),
             valueKind,
             values.length,
             offset,
             arraySize,
             stride,
+            shaderInputParitySemanticDrawContextFields(),
             shaderInputParityDeterministicContextFields(),
             shaderInputParityHash(bytes, bytes.remaining()),
             shaderInputParityFloatSample(values)
@@ -8711,7 +8889,7 @@ public class VulkanicAPI {
         bytes.flip();
 
         LOGGER.info(
-            "ShaderInputParityStandaloneUniformBlockMember backend={} source={} program={} programIdentity={} shaderStages={} location={} renderPhase={} drawKey={} name={} valueKind={} componentCount={} offset={} arraySize={} stride={} {} payloadHash={},sample={}",
+            "ShaderInputParityStandaloneUniformBlockMember backend={} source={} program={} programIdentity={} shaderStages={} location={} renderPhase={} drawKey={} name={} valueKind={} componentCount={} offset={} arraySize={} stride={} {} {} payloadHash={},sample={}",
             getActiveBackendType().name().toLowerCase(Locale.ROOT),
             source,
             program,
@@ -8719,13 +8897,14 @@ public class VulkanicAPI {
             shaderInputParityValueOrUnknown(shaderStages),
             location,
             shaderInputParityRenderPhase(),
-            "unavailable",
+            shaderInputParitySemanticDrawKeyOrUnavailable(),
             sanitizeShaderInputParityUniformName(name),
             valueKind,
             values.length,
             offset,
             arraySize,
             stride,
+            shaderInputParitySemanticDrawContextFields(),
             shaderInputParityDeterministicContextFields(),
             shaderInputParityHash(bytes, bytes.remaining()),
             shaderInputParityIntSample(values)
@@ -8734,6 +8913,62 @@ public class VulkanicAPI {
 
     private static String shaderInputParityDeterministicContextFields() {
         return DeterministicCameraCapture.shaderInputParityContextFields();
+    }
+
+    private static String shaderInputParitySemanticDrawContextFields() {
+        ShaderInputParitySemanticDrawIdentity identity = SHADER_INPUT_PARITY_SEMANTIC_DRAW.get();
+        return identity == null
+            ? "semanticDrawKey=unavailable semanticSubsystem=unknown semanticPhase=unknown semanticPass=unknown semanticPipeline=unknown semanticVertexShader=unknown semanticFragmentShader=unknown semanticMaterial=unknown semanticOutput=unknown semanticOrdinal=0"
+            : identity.fields();
+    }
+
+    private static String shaderInputParitySemanticDrawKeyOrUnavailable() {
+        ShaderInputParitySemanticDrawIdentity identity = SHADER_INPUT_PARITY_SEMANTIC_DRAW.get();
+        return identity == null ? "unavailable" : identity.key();
+    }
+
+    private static String shaderInputParityPipelineLocation(
+        @Nullable RenderPipeline renderPipeline,
+        @Nullable PipelineDescriptor.PortableState portableState
+    ) {
+        if (portableState != null) {
+            return shaderInputParitySanitizeLabel(portableState.location().toString());
+        }
+        if (renderPipeline != null) {
+            return shaderInputParitySanitizeLabel(renderPipeline.getLocation().toString());
+        }
+        return "unknown";
+    }
+
+    private static String shaderInputParityVertexShader(
+        @Nullable RenderPipeline renderPipeline,
+        @Nullable PipelineDescriptor.PortableState portableState
+    ) {
+        if (portableState != null) {
+            return shaderInputParitySanitizeLabel(portableState.vertexShader().toString());
+        }
+        if (renderPipeline != null) {
+            return shaderInputParitySanitizeLabel(renderPipeline.getVertexShader().toString());
+        }
+        return "unknown";
+    }
+
+    private static String shaderInputParityFragmentShader(
+        @Nullable RenderPipeline renderPipeline,
+        @Nullable PipelineDescriptor.PortableState portableState
+    ) {
+        if (portableState != null) {
+            return shaderInputParitySanitizeLabel(portableState.fragmentShader().toString());
+        }
+        if (renderPipeline != null) {
+            return shaderInputParitySanitizeLabel(renderPipeline.getFragmentShader().toString());
+        }
+        return "unknown";
+    }
+
+    private static String shaderInputParityHashString(String value) {
+        ByteBuffer bytes = ByteBuffer.wrap(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return shaderInputParityHash(bytes, bytes.remaining());
     }
 
     private static String shaderInputParityProgramIdentity(int program, @Nullable String explicitIdentity) {

@@ -1491,6 +1491,23 @@ public class GlCommandEncoder implements CommandEncoder {
 		Collection<String> collection2,
 		T object
 	) {
+		int aggregateIndexCount = collection.stream().mapToInt(RenderPass.Draw::indexCount).sum();
+		try (VulkanicAPI.ShaderInputParityScope ignored = VulkanicAPI.beginShaderInputParitySemanticDraw(
+			"opengl-renderpass-drawMultipleIndexed",
+			"blaze3d-renderpass",
+			this.semanticPassLabel(glRenderPass),
+			glRenderPass.pipeline == null ? null : glRenderPass.pipeline.info(),
+			glRenderPass.pipeline == null ? null : glRenderPass.pipeline.descriptor(),
+			this.semanticMaterial(glRenderPass),
+			this.semanticOutputTarget(glRenderPass),
+			true,
+			0,
+			0,
+			0,
+			aggregateIndexCount,
+			collection.size(),
+			0
+		)) {
 		if (this.trySetup(glRenderPass, collection2)) {
 			if (indexType == null) {
 				indexType = VertexFormat.IndexType.SHORT;
@@ -1530,9 +1547,26 @@ public class GlCommandEncoder implements CommandEncoder {
 				this.drawFromBuffers(glRenderPass, 0, draw.firstIndex(), draw.indexCount(), indexType2, glRenderPass.pipeline, 1);
 			}
 		}
+		}
 	}
 
 	protected void executeDraw(GlRenderPass glRenderPass, int i, int j, int k, @Nullable VertexFormat.IndexType indexType, int l) {
+		try (VulkanicAPI.ShaderInputParityScope ignored = VulkanicAPI.beginShaderInputParitySemanticDraw(
+			indexType != null ? "opengl-renderpass-drawIndexed" : "opengl-renderpass-draw",
+			"blaze3d-renderpass",
+			this.semanticPassLabel(glRenderPass),
+			glRenderPass.pipeline == null ? null : glRenderPass.pipeline.info(),
+			glRenderPass.pipeline == null ? null : glRenderPass.pipeline.descriptor(),
+			this.semanticMaterial(glRenderPass),
+			this.semanticOutputTarget(glRenderPass),
+			indexType != null,
+			indexType == null ? i : 0,
+			indexType == null ? k : 0,
+			indexType != null ? j : 0,
+			indexType != null ? k : 0,
+			l,
+			indexType != null ? i : 0
+		)) {
 		if (this.trySetup(glRenderPass, Collections.emptyList())) {
 			if (GlRenderPass.VALIDATION) {
 				if (indexType != null) {
@@ -1565,6 +1599,28 @@ public class GlCommandEncoder implements CommandEncoder {
 
 			this.drawFromBuffers(glRenderPass, i, j, k, indexType, glRenderPass.pipeline, l);
 		}
+		}
+	}
+
+	private String semanticPassLabel(GlRenderPass glRenderPass) {
+		net.irisshaders.iris.mixinterface.CustomPass customPass = glRenderPass.iris$getCustomPass();
+		if (customPass != null) {
+			return customPass.getClass().getName();
+		}
+		VulkanicRenderTargetDescriptor descriptor = glRenderPass.getRenderTargetDescriptor();
+		return descriptor != null ? descriptor.debugSignature() : "legacy-renderpass";
+	}
+
+	private String semanticMaterial(GlRenderPass glRenderPass) {
+		if (glRenderPass.pipeline != null) {
+			return glRenderPass.pipeline.info().getLocation().toString();
+		}
+		return "unknown";
+	}
+
+	private String semanticOutputTarget(GlRenderPass glRenderPass) {
+		VulkanicRenderTargetDescriptor descriptor = glRenderPass.getRenderTargetDescriptor();
+		return descriptor != null ? descriptor.debugSignature() : "legacy-framebuffer";
 	}
 
 	private void drawFromBuffers(

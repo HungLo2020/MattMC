@@ -707,6 +707,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        VulkanicAPI.traceShaderInputParityDraw("opengl-drawArrays", false, mode, first, count, 0L, 0, 0, 1, 0);
         GL11.glDrawArrays(mode, first, count);
     }
     
@@ -715,6 +716,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        VulkanicAPI.traceShaderInputParityDraw("opengl-drawElements", true, mode, 0, 0, indices, count, type, 1, 0);
         GL11.glDrawElements(mode, count, type, indices);
     }
     
@@ -1762,6 +1764,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        VulkanicAPI.traceShaderInputParityDraw("opengl-drawIndexedInstancedBaseVertex", true, mode, 0, 0, indices, count, type, instanceCount, baseVertex);
         org.lwjgl.opengl.GL32.glDrawElementsInstancedBaseVertex(mode, count, type, indices, instanceCount, baseVertex);
     }
     
@@ -1770,6 +1773,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        VulkanicAPI.traceShaderInputParityDraw("opengl-drawIndexedBaseVertex", true, mode, 0, 0, indices, count, type, 1, baseVertex);
         org.lwjgl.opengl.GL32.glDrawElementsBaseVertex(mode, count, type, indices, baseVertex);
     }
     
@@ -1778,6 +1782,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        VulkanicAPI.traceShaderInputParityDraw("opengl-drawIndexedInstanced", true, mode, 0, 0, indices, count, type, instanceCount, 0);
         org.lwjgl.opengl.GL31.glDrawElementsInstanced(mode, count, type, indices, instanceCount);
     }
     
@@ -1786,6 +1791,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        VulkanicAPI.traceShaderInputParityDraw("opengl-drawArraysInstanced", false, mode, first, count, 0L, 0, 0, instanceCount, 0);
         org.lwjgl.opengl.GL31.glDrawArraysInstanced(mode, first, count, instanceCount);
     }
     

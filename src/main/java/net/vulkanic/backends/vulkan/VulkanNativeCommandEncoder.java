@@ -1032,6 +1032,22 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             if (this.indexBuffer == null) {
                 throw new IllegalStateException("Can't draw indexed without an index buffer");
             }
+            try (VulkanicAPI.ShaderInputParityScope ignored = VulkanicAPI.beginShaderInputParitySemanticDraw(
+                "vulkan-native-renderpass-drawIndexed",
+                "blaze3d-renderpass",
+                this.semanticPassLabel(),
+                this.renderPipeline,
+                this.pipelineDescriptor,
+                this.semanticMaterial(),
+                this.semanticOutputTarget(),
+                true,
+                0,
+                0,
+                firstIndex,
+                indexCount,
+                instanceCount,
+                baseVertex
+            )) {
             if (!this.bindPipelineAndResources()) {
                 return;
             }
@@ -1059,7 +1075,21 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                 this.scissorHeight
             );
             this.logDrawState(true, 0, baseVertex, firstIndex, indexCount, 0, instanceCount, this.indexType);
+            int glPrimitiveMode = GlConst.toGl(this.requirePipeline().getVertexFormatMode());
+            VulkanicAPI.traceShaderInputParityDraw(
+                "vulkan-native-renderpass-encoded-drawIndexed",
+                true,
+                glPrimitiveMode,
+                0,
+                0,
+                (long) firstIndex * this.indexType.bytes,
+                indexCount,
+                GlConst.toGl(this.indexType),
+                instanceCount,
+                baseVertex
+            );
             this.pass.drawIndexed(firstIndex, indexCount, baseVertex, instanceCount);
+            }
         }
 
         @Override
@@ -1090,11 +1120,60 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         @Override
         public void draw(int firstVertex, int vertexCount) {
             this.checkOpen();
+            try (VulkanicAPI.ShaderInputParityScope ignored = VulkanicAPI.beginShaderInputParitySemanticDraw(
+                "vulkan-native-renderpass-draw",
+                "blaze3d-renderpass",
+                this.semanticPassLabel(),
+                this.renderPipeline,
+                this.pipelineDescriptor,
+                this.semanticMaterial(),
+                this.semanticOutputTarget(),
+                false,
+                firstVertex,
+                vertexCount,
+                0,
+                0,
+                1,
+                0
+            )) {
             if (!this.bindPipelineAndResources()) {
                 return;
             }
             this.logDrawState(false, firstVertex, 0, 0, 0, vertexCount, 1, null);
+            int glPrimitiveMode = GlConst.toGl(this.requirePipeline().getVertexFormatMode());
+            VulkanicAPI.traceShaderInputParityDraw(
+                "vulkan-native-renderpass-encoded-draw",
+                false,
+                glPrimitiveMode,
+                firstVertex,
+                vertexCount,
+                0L,
+                0,
+                0,
+                1,
+                0
+            );
             this.pass.draw(firstVertex, vertexCount);
+            }
+        }
+
+        private String semanticPassLabel() {
+            if (this.customPass != null) {
+                return this.customPass.getClass().getName();
+            }
+            return this.renderTargetDescriptor != null
+                ? this.renderTargetDescriptor.debugSignature()
+                : "legacy-renderpass";
+        }
+
+        private String semanticMaterial() {
+            return this.renderPipeline != null ? this.renderPipeline.getLocation().toString() : "unknown";
+        }
+
+        private String semanticOutputTarget() {
+            return this.renderTargetDescriptor != null
+                ? this.renderTargetDescriptor.debugSignature()
+                : "legacy-framebuffer";
         }
 
         @Override
