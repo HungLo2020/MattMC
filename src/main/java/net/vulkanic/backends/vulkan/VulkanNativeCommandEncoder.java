@@ -825,6 +825,8 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         private CustomPass customPass;
         @Nullable
         private GpuBuffer indexBuffer;
+        @Nullable
+        private GpuBuffer vertexBuffer;
         private VertexFormat.IndexType indexType = VertexFormat.IndexType.INT;
         @Nullable
         private PipelineDescriptor lastSubmittedDescriptor;
@@ -1012,6 +1014,9 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         @Override
         public void setVertexBuffer(int slot, GpuBuffer buffer) {
             this.checkOpen();
+            if (slot == 0) {
+                this.vertexBuffer = buffer;
+            }
             VulkanicBuffer vulkanBuffer = VulkanicAPI.resolveVulkanicBuffer(buffer);
             this.pass.setVertexBuffer(slot, vulkanBuffer);
         }
@@ -1075,6 +1080,22 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                 this.scissorHeight
             );
             this.logDrawState(true, 0, baseVertex, firstIndex, indexCount, 0, instanceCount, this.indexType);
+            RenderPipeline pipeline = this.requirePipeline();
+            VulkanicAPI.traceShaderInputParityGeometry(
+                "vulkan-native-renderpass-geometry",
+                this.vertexBuffer,
+                this.indexBuffer,
+                pipeline.getVertexFormat(),
+                pipeline.getVertexFormatMode(),
+                true,
+                0,
+                0,
+                firstIndex,
+                indexCount,
+                this.indexType,
+                instanceCount,
+                baseVertex
+            );
             int glPrimitiveMode = GlConst.toGl(this.requirePipeline().getVertexFormatMode());
             VulkanicAPI.traceShaderInputParityDraw(
                 "vulkan-native-renderpass-encoded-drawIndexed",
@@ -1140,6 +1161,22 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                 return;
             }
             this.logDrawState(false, firstVertex, 0, 0, 0, vertexCount, 1, null);
+            RenderPipeline pipeline = this.requirePipeline();
+            VulkanicAPI.traceShaderInputParityGeometry(
+                "vulkan-native-renderpass-geometry",
+                this.vertexBuffer,
+                null,
+                pipeline.getVertexFormat(),
+                pipeline.getVertexFormatMode(),
+                false,
+                firstVertex,
+                vertexCount,
+                0,
+                0,
+                null,
+                1,
+                0
+            );
             int glPrimitiveMode = GlConst.toGl(this.requirePipeline().getVertexFormatMode());
             VulkanicAPI.traceShaderInputParityDraw(
                 "vulkan-native-renderpass-encoded-draw",

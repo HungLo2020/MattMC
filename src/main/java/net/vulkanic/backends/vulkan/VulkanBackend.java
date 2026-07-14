@@ -174,6 +174,8 @@ import org.slf4j.Logger;
 public class VulkanBackend {
 
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static final boolean FORCE_MAPPABLE_GEOMETRY_PARITY_BUFFERS =
+        Boolean.getBoolean("mattmc.vulkan.traceShaderInputParity.forceMappableGeometryBuffers");
     private static final Set<String> STANDALONE_SLICE_TRACE_KEYS = ConcurrentHashMap.newKeySet();
     private static final AtomicLong STANDALONE_UNIFORM_CALL_COUNT = new AtomicLong();
     private static final AtomicLong STANDALONE_UNIFORM_TOKEN_HIT_COUNT = new AtomicLong();
@@ -16053,6 +16055,10 @@ void main() {
             long memoryHandle = VK10.VK_NULL_HANDLE;
 
             try (MemoryStack stack = stackPush()) {
+                if (FORCE_MAPPABLE_GEOMETRY_PARITY_BUFFERS
+                    && (usage & (VulkanicBuffer.USAGE_VERTEX | VulkanicBuffer.USAGE_INDEX)) != 0) {
+                    usage |= VulkanicBuffer.USAGE_MAP_READ;
+                }
                 int bufferUsageFlags = toVkBufferUsageFlags(usage);
                 boolean requiresHostVisibleMemory = requiresHostVisibleBufferMemory(usage);
                 if (!requiresHostVisibleMemory && initialData != null && renderPassRecording) {

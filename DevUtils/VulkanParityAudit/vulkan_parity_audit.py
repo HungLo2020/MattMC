@@ -337,6 +337,56 @@ class DrawEvent:
 
 
 @dataclass
+class GeometryEvent:
+    backend: str
+    source: str
+    semantic_draw_key: str
+    semantic_subsystem: str
+    semantic_phase: str
+    semantic_pass: str
+    semantic_pipeline: str
+    semantic_vertex_shader: str
+    semantic_fragment_shader: str
+    semantic_material: str
+    semantic_output: str
+    semantic_ordinal: str
+    mode: str
+    indexed: str
+    vertex_format: str
+    vertex_stride: str
+    layout_hash: str
+    total_vertices: int
+    total_indices: int
+    total_primitives: int
+    instances: int
+    vertex_hash: str
+    index_hash: str
+    status: str
+    reason: str
+    det_pose: str = ""
+    det_rendered_frame: str = ""
+
+    @property
+    def semantic_match_signature(self) -> str:
+        return "|".join([
+            f"subsystem={self.semantic_subsystem or 'unknown'}",
+            f"phase={self.semantic_phase or 'unknown'}",
+            f"pass={self.semantic_pass or 'unknown'}",
+            f"pipeline={self.semantic_pipeline or 'unknown'}",
+            f"vertex={self.semantic_vertex_shader or 'unknown'}",
+            f"fragment={self.semantic_fragment_shader or 'unknown'}",
+            f"material={self.semantic_material or 'unknown'}",
+            f"output={self.semantic_output or 'unknown'}",
+            f"pose={self.det_pose or 'none'}",
+            f"frame={self.det_rendered_frame or 'none'}",
+        ])
+
+    @property
+    def comparable(self) -> bool:
+        return self.status == "equivalent-candidate" and self.vertex_hash and self.vertex_hash != "unavailable"
+
+
+@dataclass
 class SemanticDrawEvent:
     backend: str
     source: str
@@ -377,6 +427,7 @@ class SemanticDrawEvent:
             f"output={self.semantic_output or 'unknown'}",
             f"ordinal={self.semantic_ordinal or '0'}",
             f"pose={self.det_pose or 'none'}",
+            f"frame={self.det_rendered_frame or 'none'}",
         ])
 
     @property
@@ -391,6 +442,7 @@ class SemanticDrawEvent:
             f"material={self.semantic_material or 'unknown'}",
             f"output={self.semantic_output or 'unknown'}",
             f"pose={self.det_pose or 'none'}",
+            f"frame={self.det_rendered_frame or 'none'}",
         ])
 
 
@@ -405,6 +457,7 @@ class CaptureEvents:
     vertex_inputs: dict[str, list[VertexInputEvent]] = field(default_factory=lambda: defaultdict(list))
     draws: list[DrawEvent] = field(default_factory=list)
     semantic_draws: list[SemanticDrawEvent] = field(default_factory=list)
+    geometry: list[GeometryEvent] = field(default_factory=list)
     counters: Counter = field(default_factory=Counter)
     skipped: Counter = field(default_factory=Counter)
 
@@ -462,6 +515,16 @@ def stable_digest(values: Iterable[str]) -> str:
     return digest.hexdigest()[:16]
 
 
+def ordered_digest(values: Iterable[str]) -> str:
+    digest = hashlib.sha256()
+    count = 0
+    for value in values:
+        digest.update(value.encode("utf-8", "replace"))
+        digest.update(b"\0")
+        count += 1
+    return f"{digest.hexdigest()[:16]}/events:{count}"
+
+
 def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="replace")
 
@@ -476,6 +539,13 @@ def parse_struct_fields(text: str) -> dict[str, str]:
 
 def extract_hashes(text: str) -> dict[str, str]:
     return {match.group(1): match.group(2) for match in HASH_RE.finditer(text)}
+
+
+def int_or_zero(value: str) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def standalone_uniform_key(event: StandaloneUniformEvent | StandaloneUniformBlockMemberEvent) -> str:
@@ -820,6 +890,41 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             index_count=fields.get("indexCount", ""),
             instance_count=fields.get("instanceCount", ""),
             base_vertex=fields.get("baseVertex", ""),
+            det_pose=fields.get("detPose", ""),
+            det_rendered_frame=fields.get("detRenderedFrame", ""),
+        ))
+
+    elif payload.startswith("Geometry "):
+        events.counters["Geometry"] += 1
+        fields = parse_top_fields(payload)
+        backend = fields.get("backend", "unknown")
+        events.backend = backend
+        events.geometry.append(GeometryEvent(
+            backend=backend,
+            source=fields.get("source", ""),
+            semantic_draw_key=fields.get("semanticDrawKey", ""),
+            semantic_subsystem=fields.get("semanticSubsystem", ""),
+            semantic_phase=fields.get("semanticPhase", ""),
+            semantic_pass=fields.get("semanticPass", ""),
+            semantic_pipeline=fields.get("semanticPipeline", ""),
+            semantic_vertex_shader=fields.get("semanticVertexShader", ""),
+            semantic_fragment_shader=fields.get("semanticFragmentShader", ""),
+            semantic_material=fields.get("semanticMaterial", ""),
+            semantic_output=fields.get("semanticOutput", ""),
+            semantic_ordinal=fields.get("semanticOrdinal", ""),
+            mode=fields.get("mode", ""),
+            indexed=fields.get("indexed", ""),
+            vertex_format=fields.get("vertexFormat", ""),
+            vertex_stride=fields.get("vertexStride", ""),
+            layout_hash=fields.get("layoutHash", ""),
+            total_vertices=int_or_zero(fields.get("totalVertices", "")),
+            total_indices=int_or_zero(fields.get("totalIndices", "")),
+            total_primitives=int_or_zero(fields.get("totalPrimitives", "")),
+            instances=int_or_zero(fields.get("instances", "")),
+            vertex_hash=fields.get("vertexHash", ""),
+            index_hash=fields.get("indexHash", ""),
+            status=fields.get("status", ""),
+            reason=fields.get("reason", ""),
             det_pose=fields.get("detPose", ""),
             det_rendered_frame=fields.get("detRenderedFrame", ""),
         ))
@@ -1554,6 +1659,7 @@ def semantic_draw_coverage(opengl_events: CaptureEvents, vulkan_events: CaptureE
         entry for entry in matched
         if entry["opengl_physical_draw_events"] != entry["vulkan_physical_draw_events"]
     ][:20]
+    geometry = geometry_coverage(opengl_events, vulkan_events, set(gl_by_signature) & set(vk_by_signature))
 
     return {
         "opengl_semantic_draw_events": len(opengl_events.semantic_draws),
@@ -1571,10 +1677,109 @@ def semantic_draw_coverage(opengl_events: CaptureEvents, vulkan_events: CaptureE
             if entry["opengl_physical_draw_events"] != entry["vulkan_physical_draw_events"]
         ]),
         "physical_draw_delta_examples": physical_draw_delta_examples,
+        "geometry": geometry,
         "unmatched_opengl_examples": unmatched_opengl[:20],
         "unmatched_vulkan_examples": unmatched_vulkan[:20],
         "ambiguous_examples": ambiguous[:20],
     }
+
+
+def geometry_coverage(opengl_events: CaptureEvents, vulkan_events: CaptureEvents, matched_signatures: set[str]) -> dict[str, object]:
+    gl_geometry: dict[str, list[GeometryEvent]] = defaultdict(list)
+    vk_geometry: dict[str, list[GeometryEvent]] = defaultdict(list)
+    for event in opengl_events.geometry:
+        gl_geometry[event.semantic_match_signature].append(event)
+    for event in vulkan_events.geometry:
+        vk_geometry[event.semantic_match_signature].append(event)
+
+    group_results: list[dict[str, object]] = []
+    equivalent = 0
+    divergent = 0
+    not_comparable = 0
+    missing = 0
+    for signature in sorted(matched_signatures):
+        gl_events = gl_geometry.get(signature, [])
+        vk_events = vk_geometry.get(signature, [])
+        if not gl_events or not vk_events:
+            missing += 1
+            group_results.append({
+                "signature": signature,
+                "classification": "not-comparable",
+                "reason": "geometry-records-missing",
+                "opengl_geometry_events": len(gl_events),
+                "vulkan_geometry_events": len(vk_events),
+            })
+            continue
+        gl_not_comparable = [event.reason for event in gl_events if not event.comparable]
+        vk_not_comparable = [event.reason for event in vk_events if not event.comparable]
+        gl_layouts = sorted({event.layout_hash for event in gl_events})
+        vk_layouts = sorted({event.layout_hash for event in vk_events})
+        gl_stream = ordered_digest(geometry_stream_parts(gl_events))
+        vk_stream = ordered_digest(geometry_stream_parts(vk_events))
+        classification = "equivalent"
+        reason = "ok"
+        if gl_not_comparable or vk_not_comparable:
+            classification = "not-comparable"
+            reason = "not-comparable-events"
+            not_comparable += 1
+        elif gl_layouts != vk_layouts:
+            classification = "divergent"
+            reason = "vertex-layout-hash-differs"
+            divergent += 1
+        elif gl_stream != vk_stream:
+            classification = "divergent"
+            reason = "canonical-geometry-hash-differs"
+            divergent += 1
+        else:
+            equivalent += 1
+
+        group_results.append({
+            "signature": signature,
+            "classification": classification,
+            "reason": reason,
+            "opengl_geometry_events": len(gl_events),
+            "vulkan_geometry_events": len(vk_events),
+            "opengl_total_vertices": sum(event.total_vertices for event in gl_events),
+            "vulkan_total_vertices": sum(event.total_vertices for event in vk_events),
+            "opengl_total_indices": sum(event.total_indices for event in gl_events),
+            "vulkan_total_indices": sum(event.total_indices for event in vk_events),
+            "opengl_total_primitives": sum(event.total_primitives for event in gl_events),
+            "vulkan_total_primitives": sum(event.total_primitives for event in vk_events),
+            "opengl_total_instances": sum(event.instances for event in gl_events),
+            "vulkan_total_instances": sum(event.instances for event in vk_events),
+            "opengl_layout_hashes": gl_layouts,
+            "vulkan_layout_hashes": vk_layouts,
+            "opengl_canonical_hash": gl_stream,
+            "vulkan_canonical_hash": vk_stream,
+            "opengl_not_comparable_reasons": sorted(set(gl_not_comparable))[:8],
+            "vulkan_not_comparable_reasons": sorted(set(vk_not_comparable))[:8],
+        })
+
+    return {
+        "matched_groups_checked": len(matched_signatures),
+        "equivalent_groups": equivalent,
+        "divergent_groups": divergent,
+        "not_comparable_groups": not_comparable + missing,
+        "missing_geometry_groups": missing,
+        "opengl_geometry_events": len(opengl_events.geometry),
+        "vulkan_geometry_events": len(vulkan_events.geometry),
+        "group_results": group_results,
+    }
+
+
+def geometry_stream_parts(events: list[GeometryEvent]) -> Iterable[str]:
+    for event in events:
+        yield "|".join([
+            f"layout={event.layout_hash}",
+            f"mode={event.mode}",
+            f"indexed={event.indexed}",
+            f"vertices={event.total_vertices}",
+            f"indices={event.total_indices}",
+            f"primitives={event.total_primitives}",
+            f"instances={event.instances}",
+            f"vertexHash={event.vertex_hash}",
+            f"indexHash={event.index_hash}",
+        ])
 
 
 def _empty_family_coverage() -> dict[str, object]:
@@ -1704,7 +1909,7 @@ def render_diff_report(opengl_log: Path, vulkan_log: Path, limit: int, parse_lim
     lines.append("- UBOs compare payload hashes separately from range hashes and binding metadata.")
     lines.append("- UBO payloadHash=unavailable is classified as a diagnostic coverage gap, not a strict mismatch.")
     lines.append("- Draw events carry backend-neutral semantic draw identity when emitted from Blaze/Vulkanic render-pass boundaries.")
-    lines.append("- Semantic draw groups match by logical pass/pipeline/material/output/pose; per-group ordinals remain recorded metadata.")
+    lines.append("- Semantic draw groups match by logical pass/pipeline/material/output/pose/rendered-frame; per-group ordinals remain recorded metadata.")
     lines.append("- Standalone uniforms compare by semantic program/stage/phase/draw/name/type key and normalized setter payload hash.")
     lines.append("- Materialized Vulkan standalone UBO members compare by the same semantic key against OpenGL standalone uniforms when member logs are present.")
     lines.append("- Samplers compare semantic texture metadata; numeric GL object labels are normalized.")
@@ -1736,6 +1941,19 @@ def render_diff_report(opengl_log: Path, vulkan_log: Path, limit: int, parse_lim
                 "  "
                 + f"OpenGL={entry['opengl_physical_draw_events']} Vulkan={entry['vulkan_physical_draw_events']} "
                 + str(entry["signature"])[:220]
+            )
+    geometry = semantic_coverage.get("geometry", {})
+    if geometry:
+        lines.append("- Geometry coverage:")
+        lines.append(f"  checked={geometry.get('matched_groups_checked', 0)} equivalent={geometry.get('equivalent_groups', 0)} divergent={geometry.get('divergent_groups', 0)} notComparable={geometry.get('not_comparable_groups', 0)}")
+        lines.append(f"  geometry events: OpenGL={geometry.get('opengl_geometry_events', 0)} Vulkan={geometry.get('vulkan_geometry_events', 0)}")
+        for entry in geometry.get("group_results", [])[:5]:
+            lines.append(
+                "  "
+                + f"[{entry.get('classification')}] "
+                + f"GL draws={entry.get('opengl_geometry_events')} VK draws={entry.get('vulkan_geometry_events')} "
+                + f"GL verts={entry.get('opengl_total_vertices')} VK verts={entry.get('vulkan_total_vertices')} "
+                + str(entry.get("signature", ""))[:160]
             )
     lines.append("")
     lines.append("Difference summary:")

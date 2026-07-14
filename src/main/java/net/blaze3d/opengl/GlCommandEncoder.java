@@ -1674,6 +1674,21 @@ public class GlCommandEncoder implements CommandEncoder {
 			);
 		}
 		this.logDrawState(glRenderPass, glRenderPipeline.info(), i, j, k, indexType, l);
+		VulkanicAPI.traceShaderInputParityGeometry(
+			"opengl-renderpass-geometry",
+			vertexBuffer,
+			glRenderPass.indexBuffer,
+			glRenderPipeline.info().getVertexFormat(),
+			glRenderPipeline.info().getVertexFormatMode(),
+			indexType != null,
+			indexType == null ? i : 0,
+			indexType == null ? k : 0,
+			indexType != null ? j : 0,
+			indexType != null ? k : 0,
+			indexType,
+			l,
+			indexType != null ? i : 0
+		);
 		if (indexType != null) {
 			// Route index buffer bind through VulkanicAPI rather than the GlStateManager wrapper.
 			VulkanicAPI.bindIndexBuffer(ctx, requireBufferHandle(glRenderPass.indexBuffer));
