@@ -5,6 +5,7 @@ import com.google.common.collect.ImmutableSet;
 import net.blaze3d.opengl.GlConst;
 import net.blaze3d.opengl.GlProgram;
 import net.blaze3d.pipeline.RenderTarget;
+import net.blaze3d.systems.RenderPass;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
@@ -116,6 +117,9 @@ import java.util.function.IntFunction;
 import java.util.function.Supplier;
 
 public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRenderingPipeline {
+	private static final boolean USE_IRIS_SKY_RENDER_TARGET_CONTRACT =
+		!Boolean.getBoolean("mattmc.vulkan.disableIrisSkyRenderTargetContract");
+
 	private final RenderTargets renderTargets;
 	private final ShaderMap shaderMap;
 	private final CustomUniforms customUniforms;
@@ -971,6 +975,8 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 			clearPass.execute(fogColor);
 		}
 
+		traceColortex0Phase("after-clear");
+
 		GLDebug.popGroup();
 
 		// Make sure to switch back to the main framebuffer. If we forget to do this then our alt buffers might be
@@ -998,6 +1004,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		}
 
 		beginRenderer.renderAll();
+		traceColortex0Phase("after-begin");
 
 		isBeforeTranslucent = true;
 	}
@@ -1009,6 +1016,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		}
 
 		prepareRenderer.renderAll();
+		traceColortex0Phase("after-prepare");
 	}
 
 	@Override
@@ -1048,7 +1056,9 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		// all non-translucent content, as required.
 		renderTargets.copyPreTranslucentDepth();
 
+		traceColortex0Phase("before-deferred");
 		deferredRenderer.renderAll();
+		traceColortex0Phase("after-deferred");
 
 		// note: we are careful not to touch the lightmap texture unit or overlay color texture unit here,
 		// so we don't need to do anything to restore them if needed.
@@ -1066,6 +1076,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 	public void finalizeLevelRendering() {
 		isRenderingWorld = false;
 		removePhaseIfNeeded();
+		traceColortex0Phase("before-composite");
 		compositeRenderer.renderAll();
 		finalPassRenderer.renderFinalPass();
 	}
@@ -1358,7 +1369,30 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		}
 	}
 
+	@Override
+	public RenderPass createSkyRenderPass(Supplier<String> label, boolean includeDepth) {
+		GlFramebuffer framebuffer = isBeforeTranslucent ? defaultFB : defaultFBAlt;
+		if (USE_IRIS_SKY_RENDER_TARGET_CONTRACT && VulkanicAPI.isVulkanBackendSelected() && !VulkanicAPI.getCommandContext().isImmediate()) {
+			return VulkanicAPI.createRenderPass(framebuffer.createRenderTargetDescriptor(label, renderTargets.getCurrentWidth(), renderTargets.getCurrentHeight(), includeDepth));
+		}
+		return VulkanicAPI.createRenderPass(label, framebuffer.getId(), includeDepth && framebuffer.hasDepthAttachment());
+	}
+
+	@Override
+	public void traceColortex0PhaseForDiagnostics(String phase) {
+		traceColortex0Phase(phase);
+	}
+
 	public void bindDefaultShadow() {
 		defaultFBShadow.bind();
+	}
+
+	private void traceColortex0Phase(String phase) {
+		net.irisshaders.iris.targets.RenderTarget target = renderTargets.get(0);
+		if (target == null) {
+			return;
+		}
+		VulkanicAPI.traceIrisColortex0PhaseHash(phase, "main", target.getMainTexture());
+		VulkanicAPI.traceIrisColortex0PhaseHash(phase, "alt", target.getAltTexture());
 	}
 }

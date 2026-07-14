@@ -1035,7 +1035,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             if (!this.bindPipelineAndResources()) {
                 return;
             }
-            VulkanicAPI.traceScopedComposite3ProducerDraw(
+            VulkanicAPI.traceScopedCompositeColortex0ProducerDraw(
                 this.renderTargetDescriptor,
                 this.framebuffer,
                 this.renderPipeline,
@@ -1109,6 +1109,9 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             try {
                 this.pass.close();
                 VulkanNativeCommandEncoder.this.backend.submitCommandBuffer(this.ctx);
+                VulkanicAPI.traceDeferredScopedCompositeColortex0SamplerReadbacks(
+                    "vulkan-native-renderpass-close"
+                );
                 VulkanicAPI.recordScopedCompositeColortex0ProducerCompletion(
                     this.renderTargetDescriptor,
                     this.framebuffer,

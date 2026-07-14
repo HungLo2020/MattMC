@@ -571,6 +571,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		irisSetupPass.executes(() -> {
 			GpuBufferSlice params = VulkanicAPI.getShaderFog();
 			this.pipeline.onBeginClear();
+			this.pipeline.traceColortex0PhaseForDiagnostics("after-iris-setup");
 			VulkanicAPI.setShaderFog(params);
 		});
 		
@@ -710,6 +711,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			profilerFiller.push("terrain");
 			ChunkSectionsToRender chunkSectionsToRender = this.prepareChunkRenders(matrix4f, d, e, f);
 			iris$renderTerrainGroup(chunkSectionsToRender, ChunkSectionLayerGroup.OPAQUE);
+			this.pipeline.traceColortex0PhaseForDiagnostics("after-opaque-terrain");
 			this.minecraft.gameRenderer
 				.getLighting()
 				.setupFor(Lighting.Entry.LEVEL);
@@ -771,6 +773,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			this.checkPoseStack(poseStack);
 			bufferSource.endBatch(RenderType.waterMask());
 			bufferSource.endBatch();
+			this.pipeline.traceColortex0PhaseForDiagnostics("after-main-opaque-work");
 			iris$beginTranslucents();
 			if (resourceHandle2 != null) {
 				resourceHandle2.get().copyDepthFrom(resourceHandle.get());
@@ -1203,10 +1206,11 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 								this.skyRenderer.renderDarkDisc();
 							}
 						}
-						// Iris: Reset phase after sky rendering
-						if (LevelRenderer.this.pipeline != null) {
-							LevelRenderer.this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE);
-						}
+							// Iris: Reset phase after sky rendering
+							if (LevelRenderer.this.pipeline != null) {
+								LevelRenderer.this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE);
+								LevelRenderer.this.pipeline.traceColortex0PhaseForDiagnostics("after-sky");
+							}
 					}
 				);
 			}

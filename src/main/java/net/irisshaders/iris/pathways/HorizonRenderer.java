@@ -11,8 +11,10 @@ import net.blaze3d.vertex.MeshData;
 import net.blaze3d.vertex.Tesselator;
 import net.blaze3d.vertex.VertexConsumer;
 import net.blaze3d.vertex.VertexFormat;
+import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.pbr.TextureTracker;
+import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.texture.AbstractTexture;
@@ -23,6 +25,7 @@ import org.joml.Vector3f;
 import org.joml.Vector4f;
 
 import java.util.OptionalInt;
+import java.util.function.Supplier;
 
 /**
  * Renders the sky horizon. Vanilla Minecraft simply uses the "clear color" for its horizon, and then draws a plane
@@ -189,7 +192,7 @@ public class HorizonRenderer {
 		VulkanicAPI.AutoStorageIndexBuffer indices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
 		GpuBuffer indexBuffer = indices.getBuffer(indexCount);
 		GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms().writeTransform(modelView, fogColor, new Vector3f(), VulkanicAPI.getTextureMatrix(), VulkanicAPI.getShaderLineWidth());
-		try (RenderPass pass = VulkanicAPI.createRenderPass(() -> "Sky", Minecraft.getInstance().getMainRenderTarget().getColorTextureView(), OptionalInt.empty())) {
+		try (RenderPass pass = createIrisAwareSkyRenderPass(() -> "Sky", false)) {
 			VulkanicAPI.bindDefaultUniforms(pass);
 			pass.setUniform("DynamicTransforms", gpuBufferSlice);
 
@@ -212,5 +215,14 @@ public class HorizonRenderer {
 
 	public void destroy() {
 		buffer.close();
+	}
+
+	private static RenderPass createIrisAwareSkyRenderPass(Supplier<String> label, boolean includeDepth) {
+		WorldRenderingPipeline pipeline = Iris.getPipelineManager().getPipelineNullable();
+		RenderPass irisPass = pipeline == null ? null : pipeline.createSkyRenderPass(label, includeDepth);
+		if (irisPass != null) {
+			return irisPass;
+		}
+		return VulkanicAPI.createRenderPass(label, Minecraft.getInstance().getMainRenderTarget().getColorTextureView(), OptionalInt.empty());
 	}
 }

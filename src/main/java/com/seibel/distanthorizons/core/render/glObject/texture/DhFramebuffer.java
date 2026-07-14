@@ -25,6 +25,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 	private boolean hasDepthAttachment;
 	private int depthAttachmentTextureId;
 	private int[] drawBuffers;
+	private boolean drawsToNoColorBuffers;
 	private int id;
 	
 	
@@ -44,6 +45,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 		this.hasDepthAttachment = false;
 		this.depthAttachmentTextureId = 0;
 		this.drawBuffers = new int[0];
+		this.drawsToNoColorBuffers = false;
 	}
 
 	/** For internal use by Iris, do not remove. */
@@ -58,6 +60,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 		this.hasDepthAttachment = false;
 		this.depthAttachmentTextureId = 0;
 		this.drawBuffers = new int[0];
+		this.drawsToNoColorBuffers = false;
 	}
 	
 	
@@ -111,7 +114,8 @@ public class DhFramebuffer implements IDhApiFramebuffer
 	{
 		this.bind(ctx); 
 		VulkanicAPI.drawBuffers(ctx, new int[]{VulkanicAPI.GL_NONE});
-		this.drawBuffers = new int[]{VulkanicAPI.GL_NONE};
+		this.drawBuffers = new int[0];
+		this.drawsToNoColorBuffers = true;
 	}
 	
 	public void drawBuffers(int[] buffers)
@@ -142,6 +146,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 		this.bind(ctx); 
 		VulkanicAPI.drawBuffers(ctx, glBuffers);
 		this.drawBuffers = Arrays.copyOf(buffers, buffers.length);
+		this.drawsToNoColorBuffers = false;
 	}
 	
 	public void readBuffer(int buffer)
@@ -161,10 +166,10 @@ public class DhFramebuffer implements IDhApiFramebuffer
 
 	public boolean canCreateRenderTargetDescriptor()
 	{
-		int[] activeDrawBuffers = this.drawBuffers.length > 0 ? this.drawBuffers : new int[]{0};
+		int[] activeDrawBuffers = this.drawsToNoColorBuffers ? new int[0] : (this.drawBuffers.length > 0 ? this.drawBuffers : new int[]{0});
 		for (int drawBuffer : activeDrawBuffers)
 		{
-			if (drawBuffer != VulkanicAPI.GL_NONE && this.attachments.get(drawBuffer) > 0)
+			if (this.attachments.get(drawBuffer) > 0)
 			{
 				return true;
 			}
@@ -180,15 +185,10 @@ public class DhFramebuffer implements IDhApiFramebuffer
 
 	public VulkanicRenderTargetDescriptor createRenderTargetDescriptor(Supplier<String> label, int width, int height)
 	{
-		int[] activeDrawBuffers = this.drawBuffers.length > 0 ? this.drawBuffers : new int[]{0};
+		int[] activeDrawBuffers = this.drawsToNoColorBuffers ? new int[0] : (this.drawBuffers.length > 0 ? this.drawBuffers : new int[]{0});
 		List<VulkanicRenderTargetDescriptor.ColorAttachment> colorAttachments = new ArrayList<>(activeDrawBuffers.length);
 		for (int drawBuffer : activeDrawBuffers)
 		{
-			if (drawBuffer == VulkanicAPI.GL_NONE)
-			{
-				continue;
-			}
-
 			int textureId = this.attachments.get(drawBuffer);
 			if (textureId <= 0)
 			{

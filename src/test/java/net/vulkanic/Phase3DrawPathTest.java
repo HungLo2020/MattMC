@@ -5665,8 +5665,11 @@ public class Phase3DrawPathTest {
                 && glFramebufferSource.contains("VulkanicResourceUsage.COLOR_ATTACHMENT_WRITE")
                 && glFramebufferSource.contains("VulkanicResourceUsage.DEPTH_ATTACHMENT_WRITE"),
             "Iris shader framebuffer descriptors should carry explicit sampled/read-write usage intent instead of backend-only inference");
-        assertTrue(glFramebufferSource.contains("this.drawBuffers = new int[]{VulkanicAPI.GL_NONE}"),
-            "GlFramebuffer descriptor snapshots should preserve explicit no-draw-buffer state");
+        assertTrue(glFramebufferSource.contains("private boolean drawsToNoColorBuffers;")
+                && glFramebufferSource.contains("this.drawBuffers = new int[0];")
+                && glFramebufferSource.contains("this.drawsToNoColorBuffers = true;")
+                && !glFramebufferSource.contains("drawBuffer == VulkanicAPI.GL_NONE"),
+            "GlFramebuffer descriptor snapshots should keep GL_NONE separate from logical attachment index 0");
         assertTrue(glCommandEncoderSource.contains("VulkanicAPI.beginRenderPass(renderPassCtx, descriptor)"),
             "GlCommandEncoder should begin Vulkan render passes from explicit render-target descriptors");
         assertTrue(glCommandEncoderSource.contains("glRenderPass.getRenderTargetDescriptor()"),

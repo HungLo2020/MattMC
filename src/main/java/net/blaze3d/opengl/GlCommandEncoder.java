@@ -1581,7 +1581,7 @@ public class GlCommandEncoder implements CommandEncoder {
 		int glPrimitiveMode = GlConst.toGl(glRenderPipeline.info().getVertexFormatMode());
 		java.util.Optional<VulkanicPrimitiveMode> typedPrimitiveMode = VulkanicPrimitiveMode.fromLegacyGlConstant(glPrimitiveMode);
 		net.irisshaders.iris.mixinterface.CustomPass customPass = glRenderPass.iris$getCustomPass();
-		if (VulkanicAPI.shouldTraceScopedComposite3ProducerDraw(
+		if (VulkanicAPI.shouldTraceScopedCompositeColortex0ProducerDraw(
 			glRenderPass.getRenderTargetDescriptor(),
 			glRenderPass.getFramebuffer(),
 			glRenderPipeline.info(),
@@ -1590,8 +1590,10 @@ public class GlCommandEncoder implements CommandEncoder {
 			PipelineDescriptor diagnosticDescriptor = customPass != null && customPass.pipelineDescriptor() != null
 				? customPass.pipelineDescriptor()
 				: glRenderPipeline.descriptor();
-			PipelineResourcePlanner.Plan diagnosticSubmission = this.buildPipelineResourceBindings(glRenderPass, diagnosticDescriptor);
-			VulkanicAPI.traceScopedComposite3ProducerDraw(
+			PipelineResourcePlanner.Plan diagnosticSubmission = customPass != null && customPass.pipelineDescriptor() != null
+				? this.buildCustomPassPipelineResourceBindings(glRenderPass, diagnosticDescriptor, customPass.program())
+				: this.buildPipelineResourceBindings(glRenderPass, diagnosticDescriptor);
+			VulkanicAPI.traceScopedCompositeColortex0ProducerDraw(
 				glRenderPass.getRenderTargetDescriptor(),
 				glRenderPass.getFramebuffer(),
 				glRenderPipeline.info(),

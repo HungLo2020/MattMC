@@ -1,5 +1,6 @@
 package net.irisshaders.iris.pipeline;
 
+import net.blaze3d.systems.RenderPass;
 import net.blaze3d.textures.GpuTextureView;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import net.irisshaders.iris.compat.dh.DHCompat;
@@ -17,6 +18,7 @@ import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.state.CameraRenderState;
 
 import java.util.OptionalInt;
+import java.util.function.Supplier;
 
 public interface WorldRenderingPipeline {
 	void beginLevelRendering();
@@ -98,4 +100,11 @@ public interface WorldRenderingPipeline {
     void onBeginClear();
 
     boolean supportsEndFlash();
+
+	default RenderPass createSkyRenderPass(Supplier<String> label, boolean includeDepth) {
+		return null;
+	}
+
+	default void traceColortex0PhaseForDiagnostics(String phase) {
+	}
 }

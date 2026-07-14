@@ -802,8 +802,10 @@ public class DistantHorizonsCommandContextMigrationTest {
             "DH framebuffers should track the depth texture needed by explicit render-target descriptors");
 	        assertTrue(framebufferSource.contains("private int[] drawBuffers;")
 	                && framebufferSource.contains("this.drawBuffers = Arrays.copyOf(buffers, buffers.length);")
-	                && framebufferSource.contains("this.drawBuffers = new int[]{VulkanicAPI.GL_NONE};"),
-	            "DH framebuffers should track active draw buffers, including no-draw-buffer state");
+	                && framebufferSource.contains("private boolean drawsToNoColorBuffers;")
+	                && framebufferSource.contains("this.drawBuffers = new int[0];")
+	                && framebufferSource.contains("this.drawsToNoColorBuffers = true;"),
+	            "DH framebuffers should track active draw buffers while keeping GL_NONE separate from logical attachment index 0");
 	        assertTrue(framebufferSource.contains("public boolean canCreateRenderTargetDescriptor()")
 	                && framebufferSource.contains("this.hasDepthAttachment && this.depthAttachmentTextureId > 0"),
 	            "DH framebuffers should report whether descriptor-backed render passes have real attachment state");

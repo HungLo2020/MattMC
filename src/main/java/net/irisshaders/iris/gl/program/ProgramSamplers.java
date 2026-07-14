@@ -150,7 +150,7 @@ public class ProgramSamplers {
 				int diagnosticTextureId = textureId > 0
 					? textureId
 					: net.vulkanic.VulkanicCoreAPI.textureId(textureView);
-				VulkanicAPI.traceScopedComposite3SamplerBinding(
+				VulkanicAPI.traceScopedCompositeColortex0SamplerBinding(
 					renderPass,
 					name,
 					binding.textureUnit(),
@@ -171,7 +171,7 @@ public class ProgramSamplers {
 
 			if (textureId > 0 && VulkanicAPI.isVulkanBackendSelected()) {
 				String name = Objects.requireNonNull(binding.name(), "sampler name");
-				VulkanicAPI.traceScopedComposite3SamplerBinding(
+				VulkanicAPI.traceScopedCompositeColortex0SamplerBinding(
 					renderPass,
 					name,
 					binding.textureUnit(),
@@ -186,7 +186,7 @@ public class ProgramSamplers {
 			}
 			if (textureId > 0 && renderPass instanceof GlRenderPass glRenderPass) {
 				String name = Objects.requireNonNull(binding.name(), "sampler name");
-				VulkanicAPI.traceScopedComposite3SamplerBinding(
+				VulkanicAPI.traceScopedCompositeColortex0SamplerBinding(
 					renderPass,
 					name,
 					binding.textureUnit(),
