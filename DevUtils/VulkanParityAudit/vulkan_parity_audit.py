@@ -256,6 +256,7 @@ class StandaloneUniformEvent:
     raw: str
     payload_hash: str = ""
     sample: str = ""
+    decoded: str = ""
     program_identity: str = ""
     shader_stages: str = ""
     location: str = ""
@@ -291,6 +292,7 @@ class StandaloneUniformBlockMemberEvent:
     raw: str
     payload_hash: str = ""
     sample: str = ""
+    decoded: str = ""
     offset: str = ""
     array_size: str = ""
     stride: str = ""
@@ -596,6 +598,43 @@ class SemanticDrawEvent:
 
 
 @dataclass
+class OrderingEvent:
+    backend: str
+    operation: str
+    source: str
+    order_ordinal: int
+    order_key: str
+    detail: str
+    det_pose: str = ""
+    det_rendered_frame: str = ""
+    semantic_draw_key: str = ""
+    semantic_subsystem: str = ""
+    semantic_phase: str = ""
+    semantic_pass: str = ""
+    semantic_pipeline: str = ""
+    semantic_material: str = ""
+    semantic_output: str = ""
+    semantic_ordinal: str = ""
+
+    @property
+    def pose_key(self) -> str:
+        return f"pose={self.det_pose or 'none'}|frame={self.det_rendered_frame or 'none'}"
+
+    @property
+    def semantic_signature(self) -> str:
+        return "|".join([
+            f"operation={self.operation or 'unknown'}",
+            f"subsystem={self.semantic_subsystem or 'unknown'}",
+            f"phase={self.semantic_phase or 'unknown'}",
+            f"pass={self.semantic_pass or 'unknown'}",
+            f"pipeline={self.semantic_pipeline or 'unknown'}",
+            f"material={self.semantic_material or 'unknown'}",
+            f"output={self.semantic_output or 'unknown'}",
+            self.pose_key,
+        ])
+
+
+@dataclass
 class CaptureEvents:
     path: Path
     backend: str = "unknown"
@@ -608,6 +647,7 @@ class CaptureEvents:
     semantic_draws: list[SemanticDrawEvent] = field(default_factory=list)
     geometry: list[GeometryEvent] = field(default_factory=list)
     draw_states: dict[str, list[DrawStateEvent]] = field(default_factory=lambda: defaultdict(list))
+    ordering: list[OrderingEvent] = field(default_factory=list)
     counters: Counter = field(default_factory=Counter)
     skipped: Counter = field(default_factory=Counter)
 
@@ -743,7 +783,8 @@ def normalize_color_write_mask(value: str) -> str:
 
 FLOAT_RE = re.compile(r"[-+]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?")
 SEMANTIC_BLOCK_RE = re.compile(r"semantic=\{([^}]*)\}")
-SEMANTIC_FLOAT_TOLERANCE = 1.0e-5
+SEMANTIC_FLOAT_ABS_TOLERANCE = 1.0e-4
+SEMANTIC_FLOAT_REL_TOLERANCE = 1.0e-4
 
 
 def extract_semantic_float_values(text: str) -> list[float]:
@@ -751,6 +792,72 @@ def extract_semantic_float_values(text: str) -> list[float]:
     if not match:
         return []
     return [float(value) for value in FLOAT_RE.findall(match.group(1))]
+
+
+def parse_decoded_float_values(text: str) -> list[float]:
+    if not text or text in {"unavailable", "unknown"}:
+        return []
+    return [float(value) for value in FLOAT_RE.findall(text)]
+
+
+def decoded_float_values(event: StandaloneUniformEvent | StandaloneUniformBlockMemberEvent) -> list[float]:
+    return parse_decoded_float_values(event.decoded)
+
+
+def semantic_float_tolerance_for(left: float, right: float) -> float:
+    return SEMANTIC_FLOAT_ABS_TOLERANCE + SEMANTIC_FLOAT_REL_TOLERANCE * max(abs(left), abs(right))
+
+
+def float_sequences_equivalent(left: list[float], right: list[float]) -> tuple[bool, float]:
+    if len(left) != len(right):
+        return False, float("inf")
+    max_delta = 0.0
+    for left_value, right_value in zip(left, right):
+        delta = abs(left_value - right_value)
+        max_delta = max(max_delta, delta)
+        if delta > semantic_float_tolerance_for(left_value, right_value):
+            return False, max_delta
+    return True, max_delta
+
+
+def decoded_float_sets_equivalent(
+    gl_events: list[StandaloneUniformEvent] | list[StandaloneUniformBlockMemberEvent],
+    vk_events: list[StandaloneUniformEvent] | list[StandaloneUniformBlockMemberEvent],
+) -> tuple[str, str]:
+    gl_values = unique_float_sequences(decoded_float_values(event) for event in gl_events)
+    vk_values = unique_float_sequences(decoded_float_values(event) for event in vk_events)
+    if not gl_values or not vk_values or not all(gl_values) or not all(vk_values):
+        return "unavailable", ""
+
+    unmatched_vk = list(range(len(vk_values)))
+    max_delta = 0.0
+    for gl_value in gl_values:
+        match_index = -1
+        match_delta = float("inf")
+        for candidate_index in unmatched_vk:
+            equivalent, delta = float_sequences_equivalent(gl_value, vk_values[candidate_index])
+            if equivalent and delta < match_delta:
+                match_index = candidate_index
+                match_delta = delta
+        if match_index < 0:
+            return "different", ""
+        unmatched_vk.remove(match_index)
+        max_delta = max(max_delta, match_delta)
+
+    if unmatched_vk:
+        return "different", ""
+    return "equivalent", f"maxDelta={max_delta:.9g};absTolerance={SEMANTIC_FLOAT_ABS_TOLERANCE:.1e};relTolerance={SEMANTIC_FLOAT_REL_TOLERANCE:.1e};decodedValues={len(gl_values)}"
+
+
+def unique_float_sequences(values: Iterable[list[float]]) -> list[list[float]]:
+    unique: list[list[float]] = []
+    for value in values:
+        if not value:
+            unique.append(value)
+            continue
+        if not any(float_sequences_equivalent(value, existing)[0] for existing in unique if existing):
+            unique.append(value)
+    return unique
 
 
 def semantic_float_values_equivalent(gl_records: list[ResourceRecord], vk_records: list[ResourceRecord]) -> tuple[bool, str]:
@@ -764,9 +871,9 @@ def semantic_float_values_equivalent(gl_records: list[ResourceRecord], vk_record
             return False, ""
         for gl_value, vk_value in zip(gl_record_values, vk_record_values):
             max_delta = max(max_delta, abs(gl_value - vk_value))
-            if max_delta > SEMANTIC_FLOAT_TOLERANCE:
+            if max_delta > semantic_float_tolerance_for(gl_value, vk_value):
                 return False, f"maxDelta={max_delta:.9g}"
-    return True, f"maxDelta={max_delta:.9g};tolerance={SEMANTIC_FLOAT_TOLERANCE:.1e}"
+    return True, f"maxDelta={max_delta:.9g};absTolerance={SEMANTIC_FLOAT_ABS_TOLERANCE:.1e};relTolerance={SEMANTIC_FLOAT_REL_TOLERANCE:.1e}"
 
 
 def without_signature_field(signature: str, field_name: str) -> str:
@@ -1015,7 +1122,38 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
         return
     payload = line.split("ShaderInputParity", 1)[1]
 
-    if payload.startswith("Resources "):
+    if payload.startswith("Ordering "):
+        events.counters["Ordering"] += 1
+        fields = parse_top_fields(payload)
+        if is_pre_pose_deterministic_record(fields):
+            events.skipped["OrderingPrePose"] += 1
+            return
+        backend = fields.get("backend", "unknown")
+        events.backend = backend
+        try:
+            order_ordinal = int(fields.get("orderOrdinal", "0"))
+        except ValueError:
+            order_ordinal = 0
+        events.ordering.append(OrderingEvent(
+            backend=backend,
+            operation=fields.get("operation", ""),
+            source=fields.get("source", ""),
+            order_ordinal=order_ordinal,
+            order_key=fields.get("orderKey", ""),
+            detail=fields.get("detail", ""),
+            det_pose=fields.get("detPose", ""),
+            det_rendered_frame=fields.get("detRenderedFrame", ""),
+            semantic_draw_key=fields.get("semanticDrawKey", ""),
+            semantic_subsystem=fields.get("semanticSubsystem", ""),
+            semantic_phase=fields.get("semanticPhase", ""),
+            semantic_pass=fields.get("semanticPass", ""),
+            semantic_pipeline=fields.get("semanticPipeline", ""),
+            semantic_material=fields.get("semanticMaterial", ""),
+            semantic_output=fields.get("semanticOutput", ""),
+            semantic_ordinal=fields.get("semanticOrdinal", ""),
+        ))
+
+    elif payload.startswith("Resources "):
         events.counters["Resources"] += 1
         if limits.reached(events.counters, "Resources", limits.max_resource_events):
             events.skipped["Resources"] += 1
@@ -1089,6 +1227,7 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             raw=payload.strip(),
             payload_hash=hashes.get("payloadHash", ""),
             sample=fields.get("sample", ""),
+            decoded=fields.get("decoded", ""),
             program_identity=fields.get("programIdentity", ""),
             shader_stages=fields.get("shaderStages", ""),
             location=fields.get("location", ""),
@@ -1134,6 +1273,7 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             raw=payload.strip(),
             payload_hash=hashes.get("payloadHash", ""),
             sample=fields.get("sample", ""),
+            decoded=fields.get("decoded", ""),
             program_identity=fields.get("programIdentity", ""),
             shader_stages=fields.get("shaderStages", ""),
             location=fields.get("location", ""),
@@ -1730,6 +1870,32 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
         gl_values = sorted({event.signature for event in gl_events})
         vk_values = sorted({event.signature for event in vk_events})
         if set(gl_values) != set(vk_values):
+            decoded_status, decoded_reason = decoded_float_sets_equivalent(gl_events, vk_events)
+            if decoded_status == "equivalent":
+                differences.append(Difference(
+                    severity=18,
+                    category="standalone-uniform-byte-different-semantic-float-equivalent",
+                    key=name,
+                    reason="same standalone uniform semantic key has disjoint payload hashes, but decoded float values match within tolerance; raw byte/hash difference is representational",
+                    opengl_count=len(gl_events),
+                    vulkan_count=len(vk_events),
+                    opengl_values=[decoded_reason, *gl_values[:5]],
+                    vulkan_values=[decoded_reason, *vk_values[:5]],
+                ))
+                continue
+            if decoded_status == "different":
+                differences.append(Difference(
+                    severity=96,
+                    category="strict-standalone-uniform-decoded-float-mismatch",
+                    key=name,
+                    reason="same standalone uniform semantic key has decoded float values that differ beyond tolerance",
+                    opengl_count=len(gl_events),
+                    vulkan_count=len(vk_events),
+                    opengl_values=[event.decoded for event in gl_events[:4]],
+                    vulkan_values=[event.decoded for event in vk_events[:4]],
+                ))
+                continue
+
             overlap = sorted(set(gl_values) & set(vk_values))
             if overlap:
                 differences.append(Difference(
@@ -1777,6 +1943,32 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
         gl_values = sorted({event.signature for event in gl_events})
         vk_values = sorted({event.signature for event in vk_events})
         if set(gl_values) != set(vk_values):
+            decoded_status, decoded_reason = decoded_float_sets_equivalent(gl_events, vk_events)
+            if decoded_status == "equivalent":
+                differences.append(Difference(
+                    severity=18,
+                    category="standalone-ubo-member-byte-different-semantic-float-equivalent",
+                    key=f"name={name}",
+                    reason="OpenGL standalone uniform and Vulkan materialized UBO member have disjoint payload hashes, but decoded float values match within tolerance; raw byte/hash difference is representational",
+                    opengl_count=len(gl_events),
+                    vulkan_count=len(vk_events),
+                    opengl_values=[decoded_reason, *gl_values[:5]],
+                    vulkan_values=[decoded_reason, *vk_values[:5]],
+                ))
+                continue
+            if decoded_status == "different":
+                differences.append(Difference(
+                    severity=98,
+                    category="strict-standalone-ubo-member-decoded-float-mismatch",
+                    key=f"name={name}",
+                    reason="OpenGL standalone uniform and Vulkan materialized UBO member decoded float values differ beyond tolerance",
+                    opengl_count=len(gl_events),
+                    vulkan_count=len(vk_events),
+                    opengl_values=[event.decoded for event in gl_events[:4]],
+                    vulkan_values=[event.decoded for event in vk_events[:4]],
+                ))
+                continue
+
             overlap = sorted(set(gl_values) & set(vk_values))
             if overlap:
                 differences.append(Difference(
@@ -2472,9 +2664,74 @@ def _empty_family_coverage() -> dict[str, object]:
     }
 
 
+def ordering_visibility_coverage(opengl_events: CaptureEvents, vulkan_events: CaptureEvents) -> dict[str, object]:
+    def operation_counts(events: list[OrderingEvent]) -> dict[str, int]:
+        return dict(Counter(event.operation or "unknown" for event in events))
+
+    def pose_operation_counts(events: list[OrderingEvent]) -> dict[str, dict[str, int]]:
+        grouped: dict[str, Counter] = defaultdict(Counter)
+        for event in events:
+            grouped[event.pose_key][event.operation or "unknown"] += 1
+        return {pose: dict(counter) for pose, counter in sorted(grouped.items())}
+
+    def sequence_digest(events: list[OrderingEvent]) -> str:
+        ordered = sorted(events, key=lambda event: event.order_ordinal)
+        return ordered_digest(
+            f"{event.pose_key}|{event.operation}|{event.semantic_signature}|{event.detail}"
+            for event in ordered
+        )
+
+    gl_operation_counts = operation_counts(opengl_events.ordering)
+    vk_operation_counts = operation_counts(vulkan_events.ordering)
+    all_operations = sorted(set(gl_operation_counts) | set(vk_operation_counts))
+    operation_deltas = {
+        operation: {
+            "opengl": gl_operation_counts.get(operation, 0),
+            "vulkan": vk_operation_counts.get(operation, 0),
+        }
+        for operation in all_operations
+        if gl_operation_counts.get(operation, 0) != vk_operation_counts.get(operation, 0)
+    }
+
+    gl_semantic_counts = Counter(event.semantic_signature for event in opengl_events.ordering)
+    vk_semantic_counts = Counter(event.semantic_signature for event in vulkan_events.ordering)
+    matched_semantic_order_keys = sum(
+        min(count, vk_semantic_counts.get(signature, 0))
+        for signature, count in gl_semantic_counts.items()
+    )
+    unmatched_opengl = [
+        signature for signature, count in gl_semantic_counts.items()
+        if vk_semantic_counts.get(signature, 0) != count
+    ]
+    unmatched_vulkan = [
+        signature for signature, count in vk_semantic_counts.items()
+        if gl_semantic_counts.get(signature, 0) != count
+    ]
+
+    return {
+        "opengl_ordering_events": len(opengl_events.ordering),
+        "vulkan_ordering_events": len(vulkan_events.ordering),
+        "opengl_operation_counts": gl_operation_counts,
+        "vulkan_operation_counts": vk_operation_counts,
+        "operation_count_deltas": operation_deltas,
+        "pose_operation_counts": {
+            "opengl": pose_operation_counts(opengl_events.ordering),
+            "vulkan": pose_operation_counts(vulkan_events.ordering),
+        },
+        "matched_semantic_order_events": matched_semantic_order_keys,
+        "unmatched_opengl_semantic_order_signatures": len(unmatched_opengl),
+        "unmatched_vulkan_semantic_order_signatures": len(unmatched_vulkan),
+        "unmatched_opengl_examples": sorted(unmatched_opengl)[:20],
+        "unmatched_vulkan_examples": sorted(unmatched_vulkan)[:20],
+        "opengl_sequence_digest": sequence_digest(opengl_events.ordering),
+        "vulkan_sequence_digest": sequence_digest(vulkan_events.ordering),
+    }
+
+
 def build_coverage_report(opengl_events: CaptureEvents, vulkan_events: CaptureEvents, differences: list[Difference]) -> dict[str, object]:
     families: dict[str, dict[str, object]] = {family: _empty_family_coverage() for family in PASS_FAMILIES}
     semantic_coverage = semantic_draw_coverage(opengl_events, vulkan_events)
+    ordering_coverage = ordering_visibility_coverage(opengl_events, vulkan_events)
     opengl_draw_signature_counts = Counter(event.signature for event in opengl_events.draws)
     vulkan_draw_signature_counts = Counter(event.signature for event in vulkan_events.draws)
 
@@ -2549,10 +2806,11 @@ def build_coverage_report(opengl_events: CaptureEvents, vulkan_events: CaptureEv
             ),
             "semantic_coverage": semantic_coverage,
         },
+        "ordering_visibility": ordering_coverage,
         "global_blockers": {
             "draw_structure": "semantic draw identity is present, but some legacy/raw backend draw records may still lack a semantic key",
             "geometry_input_bytes": "missing consumed vertex/index range hashes",
-            "render_target_state": "missing normalized attachment/load/store/clear events",
+            "render_target_state": "normalized semantic ordering events are present for pass begin/end and clears; attachment load/store parity still depends on descriptor coverage",
             "fixed_function_state": "missing normalized pipeline-state events",
             "shader_construction": "not emitted by this capture log format",
         },
@@ -2627,6 +2885,19 @@ def render_diff_report(opengl_log: Path, vulkan_log: Path, limit: int, parse_lim
                 + f"GL verts={entry.get('opengl_total_vertices')} VK verts={entry.get('vulkan_total_vertices')} "
                 + str(entry.get("signature", ""))[:160]
             )
+    ordering = ordering_visibility_coverage(opengl_events, vulkan_events)
+    lines.append("- Semantic ordering / resource visibility:")
+    lines.append(f"  ordering events: OpenGL={ordering.get('opengl_ordering_events', 0)} Vulkan={ordering.get('vulkan_ordering_events', 0)}")
+    lines.append(f"  operation counts OpenGL={ordering.get('opengl_operation_counts', {})}")
+    lines.append(f"  operation counts Vulkan={ordering.get('vulkan_operation_counts', {})}")
+    lines.append(f"  operation count deltas={ordering.get('operation_count_deltas', {})}")
+    lines.append(f"  matched semantic order events={ordering.get('matched_semantic_order_events', 0)}")
+    lines.append(
+        "  unmatched semantic order signatures: "
+        + f"OpenGL={ordering.get('unmatched_opengl_semantic_order_signatures', 0)} "
+        + f"Vulkan={ordering.get('unmatched_vulkan_semantic_order_signatures', 0)}"
+    )
+    lines.append(f"  sequence digests: OpenGL={ordering.get('opengl_sequence_digest', '')} Vulkan={ordering.get('vulkan_sequence_digest', '')}")
     lines.append("")
     lines.append("Difference summary:")
     lines.append(f"- Total differences: {len(differences)}")
@@ -2646,10 +2917,9 @@ def render_diff_report(opengl_log: Path, vulkan_log: Path, limit: int, parse_lim
         lines.append(f"   Vulkan digest={stable_digest(diff.vulkan_values)} values={diff.vulkan_values[:3] or ['not observed']}")
     lines.append("")
     lines.append("Recommended narrowing rule:")
-    lines.append("- Fix strict same-key UBO payload mismatches before sampler metadata mismatches.")
-    lines.append("- Close ubo-payload-not-comparable coverage before treating UBO inputs as proven equivalent.")
-    lines.append("- Fix strict materialized standalone UBO member mismatches before broad shader math changes.")
-    lines.append("- Fix strict standalone uniform payload mismatches before broad shader math changes.")
+    lines.append("- If any strict same-key uniform, UBO, sampler, geometry, or state mismatch exists, fix that before ordering work.")
+    lines.append("- If no strict input/state mismatch exists for stable matched groups, move to semantic ordering and resource-update visibility.")
+    lines.append("- Close ubo-payload-not-comparable coverage before treating newly matched UBO inputs as proven equivalent.")
     lines.append("- Treat layout-binding differences as architectural cleanup unless payloads differ.")
     lines.append("- Treat backend-only observations as coverage/instrumentation suspects until reproduced in synchronized captures.")
     return "\n".join(lines) + "\n"

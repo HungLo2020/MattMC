@@ -101,6 +101,11 @@ public class GlRenderPass implements RenderPass {
 		}
 
 		this.pipeline = this.encoder.getDevice().getOrCompilePipeline(renderPipeline);
+		VulkanicAPI.traceShaderInputParityOrdering(
+			"pipeline-bind",
+			"opengl-renderpass-setPipeline",
+			"pipeline=" + renderPipeline.getLocation()
+		);
 	}
 
 	@Override
@@ -119,6 +124,11 @@ public class GlRenderPass implements RenderPass {
 			gpuTextureView,
 			-1,
 			"opengl-renderpass-bindSampler"
+		);
+		VulkanicAPI.traceShaderInputParityOrdering(
+			"resource-bind",
+			"opengl-renderpass-bindSampler",
+			"name=" + string + "|present=" + (gpuTextureView != null)
 		);
 		this.dirtyUniforms.add(string);
 	}
@@ -144,6 +154,11 @@ public class GlRenderPass implements RenderPass {
 			textureId,
 			-1,
 			"opengl-renderpass-bindLegacySampler"
+		);
+		VulkanicAPI.traceShaderInputParityOrdering(
+			"resource-bind",
+			"opengl-renderpass-bindLegacySampler",
+			"name=" + string + "|present=true"
 		);
 		this.dirtyUniforms.add(string);
 		return true;
@@ -215,6 +230,11 @@ public class GlRenderPass implements RenderPass {
 					this.describeUniformResourceSliceKeys()
 				);
 			}
+			VulkanicAPI.traceShaderInputParityOrdering(
+				"uniform-update",
+				"opengl-renderpass-setUniform",
+				"name=" + string + "|offset=" + gpuBufferSlice.offset() + "|length=" + gpuBufferSlice.length()
+			);
 			this.dirtyUniforms.add(string);
 		}
 	}
@@ -231,6 +251,11 @@ public class GlRenderPass implements RenderPass {
 				this.describeUniformResourceSliceKeys()
 			);
 		}
+		VulkanicAPI.traceShaderInputParityOrdering(
+			"uniform-update",
+			"opengl-renderpass-setUniform-vulkanic",
+			"name=" + string + "|offset=" + vulkanicBufferSlice.offset() + "|length=" + vulkanicBufferSlice.length()
+		);
 		this.dirtyUniforms.add(string);
 	}
 
@@ -348,6 +373,11 @@ public class GlRenderPass implements RenderPass {
 
 				this.closed = true;
 				try {
+					VulkanicAPI.traceShaderInputParityOrdering(
+						"pass-end",
+						"opengl-renderpass-close",
+						"target=" + (this.renderTargetDescriptor == null ? "framebuffer:" + this.framebuffer : this.renderTargetDescriptor.debugSignature())
+					);
 					this.encoder.finishRenderPass();
 					VulkanicAPI.recordScopedCompositeColortex0ProducerCompletion(
 						this.renderTargetDescriptor,

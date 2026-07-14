@@ -137,6 +137,14 @@ public class GlCommandEncoder implements CommandEncoder {
 
 				this.inRenderPass = true;
 				this.device.debugLabels().pushDebugGroup(supplier);
+				VulkanicAPI.traceShaderInputParityOrdering(
+					"pass-begin",
+					"opengl-commandencoder-createRenderPass-texture",
+					"color=" + gpuTextureView.getWidth(0) + "x" + gpuTextureView.getHeight(0)
+						+ "|clearColor=" + optionalInt.isPresent()
+						+ "|depth=" + (gpuTextureView2 != null)
+						+ "|clearDepth=" + optionalDouble.isPresent()
+				);
 
 				int framebuffer = VulkanicAPI.resolveFramebufferForTextures(
 					gpuTextureView.texture(),
@@ -208,6 +216,11 @@ public class GlCommandEncoder implements CommandEncoder {
 		this.inRenderPass = true;
 		this.device.debugLabels().pushDebugGroup(supplier);
 		this.lastPipeline = null;
+		VulkanicAPI.traceShaderInputParityOrdering(
+			"pass-begin",
+			"opengl-commandencoder-createRenderPass-framebuffer",
+			"framebuffer=" + framebuffer + "|depth=" + hasDepthTexture
+		);
 
 		try {
 			CommandContext ctx = commandContext();
@@ -240,6 +253,11 @@ public class GlCommandEncoder implements CommandEncoder {
 		this.inRenderPass = true;
 		this.device.debugLabels().pushDebugGroup(descriptor.label());
 		this.lastPipeline = null;
+		VulkanicAPI.traceShaderInputParityOrdering(
+			"pass-begin",
+			"opengl-commandencoder-createRenderPass-descriptor",
+			"target=" + descriptor.debugSignature()
+		);
 
 		CommandContext ctx = commandContext();
 		if (ctx.isImmediate()) {
@@ -995,6 +1013,11 @@ public class GlCommandEncoder implements CommandEncoder {
 							+ " size buffer)"
 					);
 				} else {
+					VulkanicAPI.traceShaderInputParityOrdering(
+						"buffer-upload",
+						"opengl-commandencoder-writeToBuffer",
+						"offset=" + gpuBufferSlice.offset() + "|length=" + i + "|sliceLength=" + gpuBufferSlice.length()
+					);
 					this.device.directStateAccess().bufferSubData(requireBufferHandle(gpuBuffer), gpuBufferSlice.offset(), byteBuffer, gpuBuffer.usage());
 				}
 			}

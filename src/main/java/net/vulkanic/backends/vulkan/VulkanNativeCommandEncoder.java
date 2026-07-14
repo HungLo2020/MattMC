@@ -115,6 +115,14 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             VulkanicRenderPass pass = this.backend.beginRenderPass(ctx, label, colorView, clearColor, depthView, clearDepth);
             renderPassStarted = true;
             this.inRenderPass = true;
+            VulkanicAPI.traceShaderInputParityOrdering(
+                "pass-begin",
+                "vulkan-native-commandencoder-createRenderPass-texture",
+                "color=" + colorTextureView.getWidth(0) + "x" + colorTextureView.getHeight(0)
+                    + "|clearColor=" + clearColor.isPresent()
+                    + "|depth=" + (depthTextureView != null)
+                    + "|clearDepth=" + clearDepth.isPresent()
+            );
             return new NativeRenderPass(ctx, pass, 0, depthView != null, null, colorView, depthView);
         } finally {
             if (!renderPassStarted) {
@@ -136,6 +144,11 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         CommandContext ctx = this.backend.beginCommandBuffer();
         VulkanicRenderPass pass = this.backend.beginRenderPass(ctx, label, framebuffer, hasDepthTexture);
         this.inRenderPass = true;
+        VulkanicAPI.traceShaderInputParityOrdering(
+            "pass-begin",
+            "vulkan-native-commandencoder-createRenderPass-framebuffer",
+            "framebuffer=" + framebuffer + "|depth=" + hasDepthTexture
+        );
         return new NativeRenderPass(ctx, pass, framebuffer, hasDepthTexture, null, null, null);
     }
 
@@ -145,6 +158,11 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         CommandContext ctx = this.backend.beginCommandBuffer();
         VulkanicRenderPass pass = this.backend.beginRenderPass(ctx, descriptor);
         this.inRenderPass = true;
+        VulkanicAPI.traceShaderInputParityOrdering(
+            "pass-begin",
+            "vulkan-native-commandencoder-createRenderPass-descriptor",
+            "target=" + descriptor.debugSignature()
+        );
         return new NativeRenderPass(ctx, pass, 0, descriptor.hasDepthAttachment(), descriptor, null, null);
     }
 
@@ -192,6 +210,11 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         }
 
         int handle = this.requireBufferHandle(buffer, "writeToBuffer");
+        VulkanicAPI.traceShaderInputParityOrdering(
+            "buffer-upload",
+            "vulkan-native-commandencoder-writeToBuffer",
+            "offset=" + slice.offset() + "|length=" + bytes + "|sliceLength=" + slice.length()
+        );
         VulkanicAPI.namedBufferSubDataDSA(this.commandContext(), handle, slice.offset(), data);
     }
 
@@ -904,6 +927,11 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             }
             this.renderPipeline = renderPipeline;
             this.pipelineDescriptor = resolvedDescriptor;
+            VulkanicAPI.traceShaderInputParityOrdering(
+                "pipeline-bind",
+                "vulkan-native-renderpass-setPipeline",
+                "pipeline=" + renderPipeline.getLocation()
+            );
         }
 
         @Override
@@ -939,6 +967,11 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                 textureUnit,
                 "vulkan-renderpass-bindSampler"
             );
+            VulkanicAPI.traceShaderInputParityOrdering(
+                "resource-bind",
+                "vulkan-native-renderpass-bindSampler",
+                "name=" + name + "|present=true|unit=" + textureUnit
+            );
         }
 
         @Override
@@ -970,6 +1003,11 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                 textureUnit,
                 "vulkan-renderpass-bindLegacySampler"
             );
+            VulkanicAPI.traceShaderInputParityOrdering(
+                "resource-bind",
+                "vulkan-native-renderpass-bindLegacySampler",
+                "name=" + name + "|present=true|unit=" + textureUnit
+            );
             return true;
         }
 
@@ -990,6 +1028,11 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                 this.markResourceBindingsDirty();
             }
             this.uniforms.put(name, resolvedSlice);
+            VulkanicAPI.traceShaderInputParityOrdering(
+                "uniform-update",
+                "vulkan-native-renderpass-setUniform",
+                "name=" + name + "|offset=" + slice.offset() + "|length=" + slice.length()
+            );
         }
 
         @Override
@@ -1223,6 +1266,11 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             }
             this.closed = true;
             try {
+                VulkanicAPI.traceShaderInputParityOrdering(
+                    "pass-end",
+                    "vulkan-native-renderpass-close",
+                    "target=" + this.semanticOutputTarget()
+                );
                 this.pass.close();
                 VulkanNativeCommandEncoder.this.backend.submitCommandBuffer(this.ctx);
                 VulkanicAPI.traceDeferredScopedCompositeColortex0SamplerReadbacks(

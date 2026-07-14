@@ -57,6 +57,14 @@ public class VulkanicAPI {
         diagnosticLimit("mattmc.vulkan.traceStandaloneUniforms.maxLogs", 512);
     private static final java.util.concurrent.atomic.AtomicInteger STANDALONE_UNIFORM_TRACE_LOG_COUNT = new java.util.concurrent.atomic.AtomicInteger();
     private static final boolean TRACE_SHADER_INPUT_PARITY = Boolean.getBoolean("mattmc.vulkan.traceShaderInputParity");
+    private static final java.util.Set<String> DECODED_STANDALONE_UNIFORM_TRACE_NAMES = java.util.Set.of(
+        "uProj",
+        "uInvProj",
+        "uInvMvmProj",
+        "uDhInvMvmProj",
+        "uMcInvMvmProj",
+        "uCameraBlockYPos"
+    );
     private static final boolean TRACE_STANDALONE_UNIFORM_BLOCK_MEMBERS =
         Boolean.getBoolean("mattmc.vulkan.traceStandaloneUniformBlockMembers");
     private static final boolean TRACE_RENDER_TARGET_CONTENT_HASHES =
@@ -82,6 +90,8 @@ public class VulkanicAPI {
     private static final int MAX_SHADER_INPUT_PARITY_LOGS =
         diagnosticLimit("mattmc.vulkan.traceShaderInputParity.maxLogs", 20000);
     private static final java.util.concurrent.atomic.AtomicInteger SHADER_INPUT_PARITY_LOG_COUNT = new java.util.concurrent.atomic.AtomicInteger();
+    private static final java.util.concurrent.atomic.AtomicLong SHADER_INPUT_PARITY_ORDERING_ORDINAL =
+        new java.util.concurrent.atomic.AtomicLong();
     private static final java.util.concurrent.ConcurrentMap<Integer, String> SHADER_INPUT_PARITY_PROGRAM_NAMES =
         new java.util.concurrent.ConcurrentHashMap<>();
     private static final ThreadLocal<ShaderInputParitySemanticDrawIdentity> SHADER_INPUT_PARITY_SEMANTIC_DRAW =
@@ -1460,6 +1470,11 @@ public class VulkanicAPI {
      * @param mask Bitwise OR of masks (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, etc.)
      */
     public static void clearBuffers(CommandContext ctx, int mask) {
+        traceShaderInputParityOrdering(
+            "clear",
+            "vulkanic-clearBuffers-mask",
+            "mask=0x" + Integer.toHexString(mask)
+        );
         getBackend().clearBuffers(ctx, mask);
     }
 
@@ -1467,6 +1482,11 @@ public class VulkanicAPI {
      * Clears buffers using backend-neutral clear-buffer bits.
      */
     public static void clearBuffers(CommandContext ctx, VulkanicClearBuffer... buffers) {
+        traceShaderInputParityOrdering(
+            "clear",
+            "vulkanic-clearBuffers",
+            "buffers=" + shaderInputParitySanitizeLabel(java.util.Arrays.toString(buffers))
+        );
         getBackend().clearBuffers(ctx, buffers);
     }
 
@@ -1486,7 +1506,7 @@ public class VulkanicAPI {
      * Clears buffers and drains the error queue on macOS for compatibility with legacy GL behavior.
      */
     public static void clearBuffersWithMacosWorkaround(CommandContext ctx, int mask) {
-        getBackend().clearBuffers(ctx, mask);
+        clearBuffers(ctx, mask);
         if (IS_MACOS) {
             getBackend().getError(ctx);
         }
@@ -2862,6 +2882,12 @@ public class VulkanicAPI {
     
     public static void uploadTexture2D(CommandContext ctx, int target, int level, int internalFormat, int width, int height, 
                                         int border, int format, int type, java.nio.ByteBuffer pixels) {
+        traceShaderInputParityOrdering(
+            "texture-upload",
+            "vulkanic-uploadTexture2D",
+            "target=" + target + "|level=" + level + "|internalFormat=" + internalFormat
+                + "|format=" + format + "|type=" + type + "|size=" + width + "x" + height
+        );
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
 
         // Preserve exact legacy GL tuples on OpenGL to avoid any accidental
@@ -2903,6 +2929,11 @@ public class VulkanicAPI {
         int border,
         java.nio.ByteBuffer pixels
     ) {
+        traceShaderInputParityOrdering(
+            "texture-upload",
+            "vulkanic-uploadTexture2D-typed",
+            "target=" + target + "|level=" + level + "|format=" + uploadFormat + "|size=" + width + "x" + height
+        );
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         if (directVulkanBackend != null) {
             directVulkanBackend.uploadTexture2D(ctx, target, level, uploadFormat, width, height, border, pixels);
@@ -2924,6 +2955,11 @@ public class VulkanicAPI {
         int border,
         java.nio.ByteBuffer pixels
     ) {
+        traceShaderInputParityOrdering(
+            "texture-upload",
+            "vulkanic-uploadTexture2D-typed-default",
+            "target=TEXTURE_2D|level=" + level + "|format=" + uploadFormat + "|size=" + width + "x" + height
+        );
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         if (directVulkanBackend != null) {
             directVulkanBackend.uploadTexture2D(ctx, VulkanicTextureTarget.TEXTURE_2D, level, uploadFormat, width, height, border, pixels);
@@ -2942,6 +2978,12 @@ public class VulkanicAPI {
     
     public static void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset, 
                                                 int width, int height, int format, int type, long pixels) {
+        traceShaderInputParityOrdering(
+            "texture-upload",
+            "vulkanic-uploadTexture2DSubImage-address",
+            "target=" + target + "|level=" + level + "|offset=" + xOffset + "x" + yOffset
+                + "|format=" + format + "|type=" + type + "|size=" + width + "x" + height
+        );
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         if (directVulkanBackend != null) {
             directVulkanBackend.uploadTexture2DSubImage(ctx, target, level, xOffset, yOffset, width, height, format, type, pixels);
@@ -2960,6 +3002,12 @@ public class VulkanicAPI {
      */
     public static void uploadTexture2DSubImage(CommandContext ctx, int level, int xOffset, int yOffset,
                                                 int width, int height, int format, int type, long pixels) {
+        traceShaderInputParityOrdering(
+            "texture-upload",
+            "vulkanic-uploadTexture2DSubImage-address-default",
+            "target=" + GL_TEXTURE_2D + "|level=" + level + "|offset=" + xOffset + "x" + yOffset
+                + "|format=" + format + "|type=" + type + "|size=" + width + "x" + height
+        );
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         if (directVulkanBackend != null) {
             directVulkanBackend.uploadTexture2DSubImage(ctx, GL_TEXTURE_2D, level, xOffset, yOffset, width, height, format, type, pixels);
@@ -2970,6 +3018,12 @@ public class VulkanicAPI {
     
     public static void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset, 
                                                 int width, int height, int format, int type, java.nio.ByteBuffer pixels) {
+        traceShaderInputParityOrdering(
+            "texture-upload",
+            "vulkanic-uploadTexture2DSubImage-buffer",
+            "target=" + target + "|level=" + level + "|offset=" + xOffset + "x" + yOffset
+                + "|format=" + format + "|type=" + type + "|size=" + width + "x" + height
+        );
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         if (directVulkanBackend != null) {
             directVulkanBackend.uploadTexture2DSubImage(ctx, target, level, xOffset, yOffset, width, height, format, type, pixels);
@@ -2988,6 +3042,12 @@ public class VulkanicAPI {
      */
     public static void uploadTexture2DSubImage(CommandContext ctx, int level, int xOffset, int yOffset,
                                                 int width, int height, int format, int type, java.nio.ByteBuffer pixels) {
+        traceShaderInputParityOrdering(
+            "texture-upload",
+            "vulkanic-uploadTexture2DSubImage-buffer-default",
+            "target=" + GL_TEXTURE_2D + "|level=" + level + "|offset=" + xOffset + "x" + yOffset
+                + "|format=" + format + "|type=" + type + "|size=" + width + "x" + height
+        );
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         if (directVulkanBackend != null) {
             directVulkanBackend.uploadTexture2DSubImage(ctx, GL_TEXTURE_2D, level, xOffset, yOffset, width, height, format, type, pixels);
@@ -8887,7 +8947,7 @@ public class VulkanicAPI {
         bytes.flip();
 
         LOGGER.info(
-            "ShaderInputParityStandaloneUniform backend={} source={} program={} programIdentity={} shaderStages={} location={} renderPhase={} drawKey={} name={} valueKind={} componentCount={} transpose={} {} {} payloadHash={},sample={}",
+            "ShaderInputParityStandaloneUniform backend={} source={} program={} programIdentity={} shaderStages={} location={} renderPhase={} drawKey={} name={} valueKind={} componentCount={} transpose={} {} {} payloadHash={},sample={}{}",
             getActiveBackendType().name().toLowerCase(Locale.ROOT),
             source,
             program,
@@ -8903,7 +8963,8 @@ public class VulkanicAPI {
             shaderInputParitySemanticDrawContextFields(),
             shaderInputParityDeterministicContextFields(),
             shaderInputParityHash(bytes, bytes.remaining()),
-            shaderInputParityFloatSample(normalized)
+            shaderInputParityFloatSample(normalized),
+            shaderInputParityDecodedFloatField(name, normalized)
         );
     }
 
@@ -8996,7 +9057,7 @@ public class VulkanicAPI {
         bytes.flip();
 
         LOGGER.info(
-            "ShaderInputParityStandaloneUniformBlockMember backend={} source={} program={} programIdentity={} shaderStages={} location={} renderPhase={} drawKey={} name={} valueKind={} componentCount={} offset={} arraySize={} stride={} {} {} payloadHash={},sample={}",
+            "ShaderInputParityStandaloneUniformBlockMember backend={} source={} program={} programIdentity={} shaderStages={} location={} renderPhase={} drawKey={} name={} valueKind={} componentCount={} offset={} arraySize={} stride={} {} {} payloadHash={},sample={}{}",
             getActiveBackendType().name().toLowerCase(Locale.ROOT),
             source,
             program,
@@ -9014,7 +9075,8 @@ public class VulkanicAPI {
             shaderInputParitySemanticDrawContextFields(),
             shaderInputParityDeterministicContextFields(),
             shaderInputParityHash(bytes, bytes.remaining()),
-            shaderInputParityFloatSample(values)
+            shaderInputParityFloatSample(values),
+            shaderInputParityDecodedFloatField(name, values)
         );
     }
 
@@ -9540,6 +9602,21 @@ public class VulkanicAPI {
         }
         if (values.length > limit) {
             builder.append(",...");
+        }
+        return builder.append(']').toString();
+    }
+
+    private static String shaderInputParityDecodedFloatField(@Nullable String name, float[] values) {
+        String sanitizedName = sanitizeShaderInputParityUniformName(name);
+        if (!DECODED_STANDALONE_UNIFORM_TRACE_NAMES.contains(sanitizedName)) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder(" decoded=[");
+        for (int index = 0; index < values.length; index++) {
+            if (index > 0) {
+                builder.append(',');
+            }
+            builder.append(Float.toString(values[index]));
         }
         return builder.append(']').toString();
     }
@@ -10516,6 +10593,13 @@ public class VulkanicAPI {
         int framebuffer,
         boolean hasDepthTexture
     ) {
+        traceShaderInputParityOrdering(
+            "pass-begin",
+            "vulkanic-beginRenderPass-framebuffer",
+            "label=" + shaderInputParitySanitizeLabel(shaderInputParitySupplierLabel(label))
+                + "|target=framebuffer:" + framebuffer
+                + "|depth=" + hasDepthTexture
+        );
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         if (directVulkanBackend != null) {
             return directVulkanBackend.beginRenderPass(ctx, label, framebuffer, hasDepthTexture);
@@ -10530,6 +10614,11 @@ public class VulkanicAPI {
         CommandContext ctx,
         VulkanicRenderTargetDescriptor descriptor
     ) {
+        traceShaderInputParityOrdering(
+            "pass-begin",
+            "vulkanic-beginRenderPass-targetDescriptor",
+            "target=" + shaderInputParitySanitizeLabel(descriptor.debugSignature())
+        );
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         if (directVulkanBackend != null) {
             return directVulkanBackend.beginRenderPass(ctx, descriptor);
@@ -10546,10 +10635,72 @@ public class VulkanicAPI {
      */
     public static VulkanicRenderPass beginRenderPass(CommandContext ctx,
             VulkanicRenderPassDescriptor descriptor) {
+        traceShaderInputParityOrdering(
+            "pass-begin",
+            "vulkanic-beginRenderPass-descriptor",
+            "target=" + shaderInputParitySanitizeLabel(shaderInputParityRenderPassDescriptorSignature(descriptor))
+        );
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         if (directVulkanBackend != null) {
             return directVulkanBackend.beginRenderPass(ctx, descriptor);
         }
         return getBackend().beginRenderPass(ctx, descriptor);
+    }
+
+    public static void traceShaderInputParityOrdering(String operation, String source, String detail) {
+        if (!shouldTraceShaderInputParityLog()) {
+            return;
+        }
+        String normalizedOperation = shaderInputParitySanitizeLabel(shaderInputParityValueOrUnknown(operation));
+        String normalizedSource = shaderInputParitySanitizeLabel(shaderInputParityValueOrUnknown(source));
+        String normalizedDetail = shaderInputParitySanitizeLabel(shaderInputParityValueOrUnknown(detail));
+        long ordinal = SHADER_INPUT_PARITY_ORDERING_ORDINAL.incrementAndGet();
+        String semanticContext = shaderInputParitySemanticDrawContextFields();
+        String poseContext = shaderInputParityDeterministicContextFields();
+        String orderKey = shaderInputParityHashString(normalizedOperation + "|" + normalizedSource + "|" + normalizedDetail + "|" + poseContext);
+        LOGGER.info(
+            "ShaderInputParityOrdering backend={} operation={} source={} orderOrdinal={} orderKey={} detail={} {} {}",
+            getActiveBackendType().name().toLowerCase(Locale.ROOT),
+            normalizedOperation,
+            normalizedSource,
+            ordinal,
+            orderKey,
+            normalizedDetail,
+            semanticContext,
+            poseContext
+        );
+    }
+
+    private static String shaderInputParitySupplierLabel(@Nullable java.util.function.Supplier<String> label) {
+        if (label == null) {
+            return "unknown";
+        }
+        try {
+            String value = label.get();
+            return value == null || value.isBlank() ? "unknown" : value;
+        } catch (Throwable throwable) {
+            return "unavailable:" + throwable.getClass().getSimpleName();
+        }
+    }
+
+    private static String shaderInputParityRenderPassDescriptorSignature(VulkanicRenderPassDescriptor descriptor) {
+        VulkanicRenderPassDescriptor.ColorAttachment color = descriptor.colorAttachment();
+        VulkanicRenderPassDescriptor.DepthAttachment depth = descriptor.depthAttachment();
+        return "label=" + shaderInputParitySupplierLabel(descriptor.label())
+            + "|colorLoad=" + color.loadOp()
+            + "|colorStore=" + color.storeOp()
+            + "|colorInitial=" + color.initialUsage()
+            + "|colorPass=" + color.passUsage()
+            + "|colorFinal=" + color.finalUsage()
+            + "|colorClear=" + color.clearColor().isPresent()
+            + "|depth=" + (depth != null)
+            + (depth == null
+                ? ""
+                : "|depthLoad=" + depth.loadOp()
+                    + "|depthStore=" + depth.storeOp()
+                    + "|depthInitial=" + depth.initialUsage()
+                    + "|depthPass=" + depth.passUsage()
+                    + "|depthFinal=" + depth.finalUsage()
+                    + "|depthClear=" + depth.clearDepth().isPresent());
     }
 }
