@@ -61,6 +61,7 @@ import org.lwjgl.vulkan.VK11;
 import org.lwjgl.vulkan.VkAttachmentDescription;
 import org.lwjgl.vulkan.VkAttachmentReference;
 import org.lwjgl.vulkan.VkApplicationInfo;
+import org.lwjgl.vulkan.VkBufferCopy;
 import org.lwjgl.vulkan.VkBufferCreateInfo;
 import org.lwjgl.vulkan.VkBufferViewCreateInfo;
 import org.lwjgl.vulkan.VkBufferImageCopy;
@@ -1464,6 +1465,10 @@ void main() {
         int handle = 0;
         try {
             handle = net.vulkanic.VulkanicAPI.createBuffer(ctx);
+            NativeSpine spine = nativeSpine;
+            if (spine != null) {
+                spine.setLegacyBufferExplicitUsage(handle, usage);
+            }
             int target = selectLegacyBufferTarget(usage);
             net.vulkanic.VulkanicAPI.bindBuffer(ctx, target, handle);
             net.vulkanic.VulkanicAPI.namedBufferDataDSA(ctx, handle, size, net.blaze3d.opengl.GlConst.bufferUsageToGlEnum(usage));
@@ -1499,6 +1504,10 @@ void main() {
             java.nio.ByteBuffer initialData = data.duplicate();
             int size = initialData.remaining();
             handle = net.vulkanic.VulkanicAPI.createBuffer(ctx);
+            NativeSpine spine = nativeSpine;
+            if (spine != null) {
+                spine.setLegacyBufferExplicitUsage(handle, usage);
+            }
             int target = selectLegacyBufferTarget(usage);
             net.vulkanic.VulkanicAPI.bindBuffer(ctx, target, handle);
             net.vulkanic.VulkanicAPI.namedBufferDataDSA(ctx, handle, initialData, net.blaze3d.opengl.GlConst.bufferUsageToGlEnum(usage));
@@ -10935,7 +10944,6 @@ void main() {
 
         private static final int MAX_FRAMES_IN_FLIGHT = 2;
         private static final int IMMEDIATE_SUBMIT_SLOTS = 3;
-
         private final VulkanBackend backend;
 
         private VkInstance instance;
@@ -10967,6 +10975,7 @@ void main() {
         private int maxTextureImageUnits = 32;
 
         private final Map<Long, Long> managedBufferAllocations = new ConcurrentHashMap<>();
+        private final Map<Long, Long> managedBufferAllocationSizes = new ConcurrentHashMap<>();
         private final AtomicInteger nextLegacyBufferId = new AtomicInteger(1);
         private final Map<Integer, LegacyBufferObject> legacyBuffers = new ConcurrentHashMap<>();
         private final Map<Integer, Integer> legacyBufferBindings = new ConcurrentHashMap<>();
@@ -11001,7 +11010,11 @@ void main() {
         private final List<List<VulkanBuffer>> transientFrameDescriptorBuffers = createTransientDescriptorBufferBuckets();
         private final Map<Integer, Deque<VulkanBuffer>> recycledDescriptorUniformBuffers = new HashMap<>();
         private int recycledDescriptorUniformBufferCount;
-        private static final int MAX_RECYCLED_DESCRIPTOR_UNIFORM_BUFFERS = 4096;
+        private long recycledDescriptorUniformBufferAllocationBytes;
+        private static final int MAX_RECYCLED_DESCRIPTOR_UNIFORM_BUFFERS =
+            Integer.getInteger("mattmc.vulkan.maxRecycledDescriptorUniformBuffers", 512);
+        private static final long MAX_RECYCLED_DESCRIPTOR_UNIFORM_BUFFER_BYTES =
+            Long.getLong("mattmc.vulkan.maxRecycledDescriptorUniformBufferBytes", 64L * 1024L * 1024L);
         private final Map<Long, Long> submittedWorkGenerationByFence = new ConcurrentHashMap<>();
         private final List<PendingVulkanResourceDestroy> pendingVulkanResourceDestroys = Collections.synchronizedList(new ArrayList<>());
         private final long[] reservedFrameWorkGenerations = new long[MAX_FRAMES_IN_FLIGHT];
@@ -11159,6 +11172,7 @@ void main() {
             private volatile VulkanBuffer buffer;
             private volatile int logicalSizeBytes;
             private volatile int lastTarget;
+            private volatile int explicitUsage;
 
             private LegacyBufferObject(int id) {
                 this.id = id;
@@ -12925,6 +12939,11 @@ void main() {
             for (int i = 0; i < buffers.length; i++) {
                 buffers[i] = createLegacyBuffer();
             }
+        }
+
+        private void setLegacyBufferExplicitUsage(int bufferId, int usage) {
+            LegacyBufferObject legacy = requireLegacyBuffer(bufferId);
+            legacy.explicitUsage = usage;
         }
 
         private void deleteLegacyBuffer(int bufferId) {
@@ -15563,7 +15582,9 @@ void main() {
                 return;
             }
 
-            int usage = toLegacyBufferUsage(target);
+            int usage = legacy.explicitUsage != 0
+                ? legacy.explicitUsage
+                : toLegacyBufferUsage(target, usageHint);
             legacy.buffer = (VulkanBuffer) createManagedBuffer(
                 "LegacyBuffer-" + legacy.id,
                 usage,
@@ -15580,11 +15601,15 @@ void main() {
             }
         }
 
-        private int toLegacyBufferUsage(int target) {
-            int usage = VulkanicBuffer.USAGE_MAP_READ
-                | VulkanicBuffer.USAGE_MAP_WRITE
-                | VulkanicBuffer.USAGE_COPY_SRC
-                | VulkanicBuffer.USAGE_COPY_DST;
+        private int toLegacyBufferUsage(int target, int usageHint) {
+            int usage = VulkanicBuffer.USAGE_COPY_SRC | VulkanicBuffer.USAGE_COPY_DST;
+
+            if ((usageHint & GL_MAP_READ_BIT) != 0 || target == VulkanicAPI.GL_PIXEL_PACK_BUFFER) {
+                usage |= VulkanicBuffer.USAGE_MAP_READ;
+            }
+            if ((usageHint & VulkanicAPI.GL_MAP_WRITE_BIT) != 0 || legacyUsageHintPrefersHostWrites(usageHint)) {
+                usage |= VulkanicBuffer.USAGE_MAP_WRITE;
+            }
 
             if (target == VulkanicAPI.GL_ARRAY_BUFFER) {
                 // GL allows rebinding the same buffer name between ARRAY/ELEMENT targets.
@@ -15600,6 +15625,13 @@ void main() {
             }
 
             return usage;
+        }
+
+        private static boolean legacyUsageHintPrefersHostWrites(int usageHint) {
+            return usageHint == VulkanicAPI.GL_DYNAMIC_DRAW
+                || usageHint == 0x88E0 // GL_STREAM_DRAW
+                || usageHint == 0x88EA // GL_DYNAMIC_COPY
+                || usageHint == 0x88E2; // GL_STREAM_COPY
         }
 
         private LegacyBufferObject requireLegacyBuffer(int bufferId) {
@@ -15681,12 +15713,16 @@ void main() {
             }
 
             VulkanBuffer buffer = requireAllocatedLegacyBuffer(legacy, "namedBufferSubDataDSA");
-            try (VulkanicBuffer.MappedView mapped = mapManagedBuffer(buffer, false, true)) {
-                java.nio.ByteBuffer mappedData = mapped.data();
-                java.nio.ByteBuffer source = data.duplicate();
-                mappedData.position((int) offset);
-                mappedData.put(source);
-                mappedData.position(0);
+            if ((buffer.usage() & VulkanicBuffer.USAGE_MAP_WRITE) != 0) {
+                try (VulkanicBuffer.MappedView mapped = mapManagedBuffer(buffer, false, true)) {
+                    java.nio.ByteBuffer mappedData = mapped.data();
+                    java.nio.ByteBuffer source = data.duplicate();
+                    mappedData.position((int) offset);
+                    mappedData.put(source);
+                    mappedData.position(0);
+                }
+            } else {
+                copyDataToBufferImmediate(buffer.getVkBufferHandle(), offset, data);
             }
         }
 
@@ -15728,7 +15764,10 @@ void main() {
             int readPos = (int) readOffset;
             int writePos = (int) writeOffset;
 
-            if (readBufferId == writeBufferId) {
+            boolean readMappable = (readBuffer.usage() & VulkanicBuffer.USAGE_MAP_READ) != 0;
+            boolean writeMappable = (writeBuffer.usage() & VulkanicBuffer.USAGE_MAP_WRITE) != 0;
+
+            if (readBufferId == writeBufferId && readMappable && writeMappable) {
                 try (VulkanicBuffer.MappedView mapped = mapManagedBuffer(readBuffer, true, true)) {
                     java.nio.ByteBuffer mappedData = mapped.data();
                     byte[] temp = new byte[copySize];
@@ -15742,13 +15781,23 @@ void main() {
                 return;
             }
 
-            try (VulkanicBuffer.MappedView srcView = mapManagedBuffer(readBuffer, true, false);
-                 VulkanicBuffer.MappedView dstView = mapManagedBuffer(writeBuffer, false, true)) {
-                java.nio.ByteBuffer src = srcView.data().duplicate();
-                java.nio.ByteBuffer dst = dstView.data().duplicate();
-                src.position(readPos).limit(readPos + copySize);
-                dst.position(writePos);
-                dst.put(src);
+            if (readMappable && writeMappable) {
+                try (VulkanicBuffer.MappedView srcView = mapManagedBuffer(readBuffer, true, false);
+                     VulkanicBuffer.MappedView dstView = mapManagedBuffer(writeBuffer, false, true)) {
+                    java.nio.ByteBuffer src = srcView.data().duplicate();
+                    java.nio.ByteBuffer dst = dstView.data().duplicate();
+                    src.position(readPos).limit(readPos + copySize);
+                    dst.position(writePos);
+                    dst.put(src);
+                }
+            } else {
+                copyBufferRegionImmediate(
+                    readBuffer.getVkBufferHandle(),
+                    writeBuffer.getVkBufferHandle(),
+                    readOffset,
+                    writeOffset,
+                    size
+                );
             }
         }
 
@@ -15964,6 +16013,16 @@ void main() {
 
             try (MemoryStack stack = stackPush()) {
                 int bufferUsageFlags = toVkBufferUsageFlags(usage);
+                boolean requiresHostVisibleMemory = requiresHostVisibleBufferMemory(usage);
+                if (!requiresHostVisibleMemory && initialData != null && renderPassRecording) {
+                    // Device-local initial data uploads require a transfer command, which cannot
+                    // be encoded inside an active render pass. Legacy GL callers may allocate
+                    // during rendering, so fall back to host-visible memory for this edge.
+                    requiresHostVisibleMemory = true;
+                }
+                if (initialData != null && !requiresHostVisibleMemory) {
+                    bufferUsageFlags |= VK10.VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+                }
 
                 VkBufferCreateInfo bufferCreateInfo = VkBufferCreateInfo.calloc(stack)
                     .sType$Default()
@@ -15979,13 +16038,31 @@ void main() {
                 VkMemoryRequirements memoryRequirements = VkMemoryRequirements.malloc(stack);
                 VK10.vkGetBufferMemoryRequirements(logicalDevice, bufferHandle, memoryRequirements);
 
-                int memoryTypeIndex = findMemoryTypeIndex(
-                    memoryRequirements.memoryTypeBits(),
-                    VK10.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK10.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-                );
+                int memoryTypeIndex = requiresHostVisibleMemory
+                    ? findMemoryTypeIndex(
+                        memoryRequirements.memoryTypeBits(),
+                        VK10.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK10.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                    )
+                    : findMemoryTypeIndex(
+                        memoryRequirements.memoryTypeBits(),
+                        VK10.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+                    );
+                if (memoryTypeIndex < 0 && !requiresHostVisibleMemory) {
+                    LOGGER.warn(
+                        "Falling back to host-visible memory for non-mappable Vulkan buffer allocation label={} size={} usage=0x{}",
+                        label,
+                        size,
+                        Integer.toHexString(usage)
+                    );
+                    requiresHostVisibleMemory = true;
+                    memoryTypeIndex = findMemoryTypeIndex(
+                        memoryRequirements.memoryTypeBits(),
+                        VK10.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK10.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                    );
+                }
                 if (memoryTypeIndex < 0) {
                     throw new IllegalStateException(
-                        "No host-visible/coherent memory type available for managed Vulkan buffer allocation.");
+                        "No suitable memory type available for managed Vulkan buffer allocation.");
                 }
 
                 VkMemoryAllocateInfo memoryAllocateInfo = VkMemoryAllocateInfo.calloc(stack)
@@ -15997,15 +16074,18 @@ void main() {
                 int allocateMemoryResult = VK10.vkAllocateMemory(logicalDevice, memoryAllocateInfo, null, pMemory);
                 checkVkAllocation("vkAllocateMemory", allocateMemoryResult, size, label);
                 memoryHandle = pMemory.get(0);
+                long allocationSizeBytes = memoryRequirements.size();
 
                 checkVk("vkBindBufferMemory", VK10.vkBindBufferMemory(logicalDevice, bufferHandle, memoryHandle, 0));
 
-                if (initialData != null) {
+                if (initialData != null && requiresHostVisibleMemory) {
                     uploadInitialBufferData(memoryHandle, size, initialData);
+                } else if (initialData != null) {
+                    uploadInitialDeviceLocalBufferData(bufferHandle, initialData);
                 }
 
                 managedBufferAllocations.put(bufferHandle, memoryHandle);
-
+                managedBufferAllocationSizes.put(bufferHandle, allocationSizeBytes);
                 String debugLabel = (label == null || label.isBlank())
                     ? "VulkanBuffer-0x" + Long.toHexString(bufferHandle)
                     : label;
@@ -16031,6 +16111,12 @@ void main() {
                 }
                 throw exception;
             }
+        }
+
+        private static boolean requiresHostVisibleBufferMemory(int usage) {
+            return (usage & (VulkanicBuffer.USAGE_MAP_READ
+                | VulkanicBuffer.USAGE_MAP_WRITE
+                | VulkanicBuffer.USAGE_HINT_CLIENT_STORAGE)) != 0;
         }
 
         private VulkanicBuffer.MappedView mapManagedBuffer(VulkanBuffer buffer, boolean read, boolean write) {
@@ -16074,6 +16160,102 @@ void main() {
                 java.nio.ByteBuffer source = initialData.duplicate();
                 mappedData.put(source);
                 VK10.vkUnmapMemory(logicalDevice, memoryHandle);
+            }
+        }
+
+        private void uploadInitialDeviceLocalBufferData(long destinationBufferHandle, java.nio.ByteBuffer initialData) {
+            copyDataToBufferImmediate(destinationBufferHandle, 0L, initialData);
+        }
+
+        private void copyDataToBufferImmediate(long destinationBufferHandle,
+                                               long destinationOffset,
+                                               java.nio.ByteBuffer data) {
+            if (commandBufferRecording && primaryCommandBuffer != null) {
+                copyDataToBuffer(primaryCommandBuffer.address(), destinationBufferHandle, destinationOffset, data);
+                return;
+            }
+            if (frameInProgress && isCurrentFrameCommandBufferRecording()) {
+                copyDataToBuffer(currentFrameCommandBufferHandle(), destinationBufferHandle, destinationOffset, data);
+                return;
+            }
+            long commandBufferHandle = beginPrimaryCommandBuffer();
+            try {
+                copyDataToBuffer(commandBufferHandle, destinationBufferHandle, destinationOffset, data);
+            } finally {
+                submitPrimaryCommandBuffer(commandBufferHandle);
+            }
+        }
+
+        private void copyDataToBuffer(long commandBufferHandle,
+                                      long destinationBufferHandle,
+                                      long destinationOffset,
+                                      java.nio.ByteBuffer data) {
+            java.nio.ByteBuffer source = data.duplicate();
+            if (!source.hasRemaining()) {
+                return;
+            }
+            VkCommandBuffer commandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "copyDataToBuffer");
+            StagingBuffer stagingBuffer = createStagingBuffer(source);
+            try (MemoryStack stack = stackPush()) {
+                VkBufferCopy.Buffer copyRegion = VkBufferCopy.calloc(1, stack);
+                copyRegion.get(0)
+                    .srcOffset(0L)
+                    .dstOffset(destinationOffset)
+                    .size(source.remaining());
+                VK10.vkCmdCopyBuffer(
+                    commandBuffer,
+                    stagingBuffer.bufferHandle,
+                    destinationBufferHandle,
+                    copyRegion
+                );
+            } finally {
+                deferStagingBufferDestroy(stagingBuffer);
+            }
+        }
+
+        private void copyBufferRegionImmediate(long sourceBufferHandle,
+                                               long destinationBufferHandle,
+                                               long sourceOffset,
+                                               long destinationOffset,
+                                               long size) {
+            if (commandBufferRecording && primaryCommandBuffer != null) {
+                copyBufferRegion(primaryCommandBuffer.address(), sourceBufferHandle, destinationBufferHandle, sourceOffset, destinationOffset, size);
+                return;
+            }
+            if (frameInProgress && isCurrentFrameCommandBufferRecording()) {
+                copyBufferRegion(currentFrameCommandBufferHandle(), sourceBufferHandle, destinationBufferHandle, sourceOffset, destinationOffset, size);
+                return;
+            }
+            long commandBufferHandle = beginPrimaryCommandBuffer();
+            try {
+                copyBufferRegion(commandBufferHandle, sourceBufferHandle, destinationBufferHandle, sourceOffset, destinationOffset, size);
+            } finally {
+                submitPrimaryCommandBuffer(commandBufferHandle);
+            }
+        }
+
+        private void copyBufferRegion(long commandBufferHandle,
+                                      long sourceBufferHandle,
+                                      long destinationBufferHandle,
+                                      long sourceOffset,
+                                      long destinationOffset,
+                                      long size) {
+            if (size <= 0L) {
+                return;
+            }
+            VkCommandBuffer commandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "copyBufferRegion");
+            try (MemoryStack stack = stackPush()) {
+                VkBufferCopy.Buffer copyRegion = VkBufferCopy.calloc(1, stack);
+                copyRegion.get(0)
+                    .srcOffset(sourceOffset)
+                    .dstOffset(destinationOffset)
+                    .size(size);
+                VK10.vkCmdCopyBuffer(
+                    commandBuffer,
+                    sourceBufferHandle,
+                    destinationBufferHandle,
+                    copyRegion
+                );
             }
         }
 
@@ -16129,6 +16311,7 @@ void main() {
 
         private void destroyManagedBuffer(long bufferHandle, long memoryHandle) {
             Long trackedMemoryHandle = managedBufferAllocations.remove(bufferHandle);
+            managedBufferAllocationSizes.remove(bufferHandle);
             long effectiveMemoryHandle = trackedMemoryHandle == null ? memoryHandle : trackedMemoryHandle;
 
             if (logicalDevice == null) {
@@ -16432,7 +16615,11 @@ void main() {
             if (logicalDevice == null) {
                 return;
             }
-            enqueueVulkanResourceDestroy(() -> destroyManagedTextureHandles(imageHandle, memoryHandle, defaultViewHandle));
+            enqueueVulkanResourceDestroy(() -> destroyManagedTextureHandles(
+                imageHandle,
+                memoryHandle,
+                defaultViewHandle
+            ));
         }
 
         private void destroyManagedTextureHandles(long imageHandle, long memoryHandle, long defaultViewHandle) {
@@ -19725,6 +19912,10 @@ void main() {
                 while (bucket != null && !bucket.isEmpty()) {
                     VulkanBuffer candidate = bucket.removeFirst();
                     recycledDescriptorUniformBufferCount--;
+                    recycledDescriptorUniformBufferAllocationBytes = Math.max(
+                        0L,
+                        recycledDescriptorUniformBufferAllocationBytes - managedBufferAllocationSize(candidate)
+                    );
                     if (!candidate.isClosed()) {
                         buffer = candidate;
                         break;
@@ -19772,8 +19963,10 @@ void main() {
             }
 
             int bucketSize = descriptorUniformBufferBucketSize(buffer.size());
+            long allocationSizeBytes = managedBufferAllocationSize(buffer);
             synchronized (recycledDescriptorUniformBuffers) {
-                if (recycledDescriptorUniformBufferCount >= MAX_RECYCLED_DESCRIPTOR_UNIFORM_BUFFERS) {
+                if (recycledDescriptorUniformBufferCount >= MAX_RECYCLED_DESCRIPTOR_UNIFORM_BUFFERS
+                    || recycledDescriptorUniformBufferAllocationBytes + allocationSizeBytes > MAX_RECYCLED_DESCRIPTOR_UNIFORM_BUFFER_BYTES) {
                     buffer.close();
                     return;
                 }
@@ -19781,7 +19974,13 @@ void main() {
                     .computeIfAbsent(bucketSize, ignored -> new ArrayDeque<>())
                     .addLast(buffer);
                 recycledDescriptorUniformBufferCount++;
+                recycledDescriptorUniformBufferAllocationBytes += allocationSizeBytes;
             }
+        }
+
+        private long managedBufferAllocationSize(VulkanBuffer buffer) {
+            Long trackedSize = managedBufferAllocationSizes.get(buffer.getVkBufferHandle());
+            return trackedSize == null ? buffer.size() : Math.max(0L, trackedSize);
         }
 
         private void destroyRecycledDescriptorUniformBuffers() {
@@ -19793,6 +19992,7 @@ void main() {
                 }
                 recycledDescriptorUniformBuffers.clear();
                 recycledDescriptorUniformBufferCount = 0;
+                recycledDescriptorUniformBufferAllocationBytes = 0L;
             }
         }
 

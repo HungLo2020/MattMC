@@ -166,6 +166,24 @@ public class VulkanManagedBufferLifecycleTest {
             "CommandEncoder mapBuffer must return a native-order mapped view to render-system callers");
     }
 
+    @Test
+    public void testLegacyBufferMemoryPolicyKeepsDynamicUploadsHostWritable() throws Exception {
+        String backendSource = readSource(
+            SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java")
+        );
+
+        assertTrue(backendSource.contains("legacyUsageHintPrefersHostWrites(usageHint)"),
+            "Legacy GL dynamic/stream buffer hints must feed the host-writable memory policy");
+        assertTrue(backendSource.contains("usageHint == VulkanicAPI.GL_DYNAMIC_DRAW"),
+            "GL_DYNAMIC_DRAW legacy buffers must remain host-writable for frequent bufferData/subData updates");
+        assertTrue(backendSource.contains("usageHint == 0x88E0 // GL_STREAM_DRAW"),
+            "GL_STREAM_DRAW legacy buffers must remain host-writable for streaming updates");
+        assertTrue(backendSource.contains("if (!requiresHostVisibleMemory && initialData != null && renderPassRecording)"),
+            "Device-local staging uploads must not be scheduled from inside an active render pass");
+        assertTrue(backendSource.contains("requiresHostVisibleMemory = true;"),
+            "Render-pass-time initial data uploads should fall back to host-visible storage instead of encoding illegal transfer commands");
+    }
+
     private static void assertReadinessFailure(IllegalStateException failure) {
         String message = failure.getMessage();
         assertNotNull(message);
