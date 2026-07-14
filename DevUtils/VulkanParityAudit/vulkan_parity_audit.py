@@ -2664,7 +2664,11 @@ def _empty_family_coverage() -> dict[str, object]:
     }
 
 
-def ordering_visibility_coverage(opengl_events: CaptureEvents, vulkan_events: CaptureEvents) -> dict[str, object]:
+def ordering_visibility_coverage(
+    opengl_events: CaptureEvents,
+    vulkan_events: CaptureEvents,
+    differences: list[Difference] | None = None,
+) -> dict[str, object]:
     def operation_counts(events: list[OrderingEvent]) -> dict[str, int]:
         return dict(Counter(event.operation or "unknown" for event in events))
 
@@ -2674,12 +2678,155 @@ def ordering_visibility_coverage(opengl_events: CaptureEvents, vulkan_events: Ca
             grouped[event.pose_key][event.operation or "unknown"] += 1
         return {pose: dict(counter) for pose, counter in sorted(grouped.items())}
 
-    def sequence_digest(events: list[OrderingEvent]) -> str:
-        ordered = sorted(events, key=lambda event: event.order_ordinal)
-        return ordered_digest(
-            f"{event.pose_key}|{event.operation}|{event.semantic_signature}|{event.detail}"
-            for event in ordered
+    def ordering_draw_match_signature(event: SemanticDrawEvent) -> str:
+        return "|".join([
+            f"subsystem={event.semantic_subsystem or 'unknown'}",
+            f"phase={event.semantic_phase or 'unknown'}",
+            f"pass={event.semantic_pass or 'unknown'}",
+            f"pipeline={event.semantic_pipeline or 'unknown'}",
+            f"vertex={event.semantic_vertex_shader or 'unknown'}",
+            f"fragment={event.semantic_fragment_shader or 'unknown'}",
+            f"material={event.semantic_material or 'unknown'}",
+            f"output={event.semantic_output or 'unknown'}",
+            f"pose={event.det_pose or 'none'}",
+        ])
+
+    def semantic_draw_index(events: CaptureEvents) -> tuple[dict[str, list[SemanticDrawEvent]], dict[str, str]]:
+        by_signature: dict[str, list[SemanticDrawEvent]] = defaultdict(list)
+        key_to_signature: dict[str, str] = {}
+        for event in events.semantic_draws:
+            signature = ordering_draw_match_signature(event)
+            by_signature[signature].append(event)
+            if event.semantic_group_key != "unavailable":
+                key_to_signature[event.semantic_group_key] = signature
+        return by_signature, key_to_signature
+
+    def keys_for_signature(by_signature: dict[str, list[SemanticDrawEvent]], signature: str) -> set[str]:
+        return {
+            event.semantic_group_key for event in by_signature.get(signature, [])
+            if event.semantic_group_key != "unavailable"
+        }
+
+    def resource_keys(events: CaptureEvents, keys: set[str]) -> set[str]:
+        observed: set[str] = set()
+        for records in events.resources.values():
+            for record in records:
+                if record.semantic_draw_key in keys:
+                    observed.add("|".join([
+                        f"name={record.name}",
+                        f"type={record.resource_type}",
+                        f"pipeline={record.semantic_pipeline or 'unknown'}",
+                        f"material={record.semantic_material or 'unknown'}",
+                    ]))
+        return observed
+
+    def uniform_keys(events: CaptureEvents, keys: set[str]) -> set[str]:
+        observed: set[str] = set()
+        for event_list in events.standalone_uniforms.values():
+            for event in event_list:
+                if event.semantic_draw_key in keys:
+                    observed.add(f"name={event.name}|type={event.value_kind}|stages={event.shader_stages}")
+        for event_list in events.standalone_uniform_block_members.values():
+            for event in event_list:
+                if event.semantic_draw_key in keys:
+                    observed.add(f"name={event.name}|type={event.value_kind}|stages={event.shader_stages}")
+        return observed
+
+    def target_state_signatures(events: CaptureEvents, keys: set[str]) -> set[str]:
+        observed: set[str] = set()
+        for key in keys:
+            for state in events.draw_states.get(key, []):
+                observed.add(state.logical_target_signature)
+        return observed
+
+    def classify_observed_data(
+        name: str,
+        gl_by_signature: dict[str, list[SemanticDrawEvent]],
+        vk_by_signature: dict[str, list[SemanticDrawEvent]],
+        matched_signatures: set[str],
+        extractor,
+    ) -> dict[str, object]:
+        equivalent = 0
+        representational_or_empty = 0
+        gap = 0
+        divergent = 0
+        examples: list[dict[str, object]] = []
+        for signature in sorted(matched_signatures):
+            gl_values = extractor(opengl_events, keys_for_signature(gl_by_signature, signature))
+            vk_values = extractor(vulkan_events, keys_for_signature(vk_by_signature, signature))
+            if gl_values and vk_values and gl_values == vk_values:
+                equivalent += 1
+            elif not gl_values and not vk_values:
+                representational_or_empty += 1
+            elif not gl_values or not vk_values:
+                gap += 1
+                if len(examples) < 8:
+                    examples.append({
+                        "signature": signature,
+                        "reason": f"{name}-visibility-records-only-on-one-backend",
+                        "opengl_records": len(gl_values),
+                        "vulkan_records": len(vk_values),
+                    })
+            else:
+                divergent += 1
+                if len(examples) < 8:
+                    examples.append({
+                        "signature": signature,
+                        "reason": f"{name}-semantic-key-set-differs",
+                        "opengl_examples": sorted(gl_values)[:4],
+                        "vulkan_examples": sorted(vk_values)[:4],
+                    })
+        return {
+            "equivalent_groups": equivalent,
+            "both_unobserved_or_not_applicable_groups": representational_or_empty,
+            "coverage_gap_groups": gap,
+            "semantic_key_set_divergent_groups": divergent,
+            "examples": examples,
+        }
+
+    def normalize_clear_load_events(events: list[OrderingEvent]) -> Counter:
+        clear_loads: Counter = Counter()
+        for event in events:
+            detail = parse_struct_fields(event.detail.replace("|", " "))
+            pose = event.pose_key
+            if event.operation == "clear":
+                mask = detail.get("mask", event.detail)
+                if "COLOR" in event.detail or mask in {"0x4000", "0x4100", "0x4500"}:
+                    clear_loads[f"{pose}|color-clear"] += 1
+                if "DEPTH" in event.detail or mask in {"0x100", "0x4100", "0x4500"}:
+                    clear_loads[f"{pose}|depth-clear"] += 1
+                continue
+            if event.operation != "pass-begin":
+                continue
+            if detail.get("clearColor") == "true" or detail.get("colorClear") == "true" or detail.get("colorLoad") == "CLEAR":
+                clear_loads[f"{pose}|color-clear-or-loadop"] += 1
+            if detail.get("clearDepth") == "true" or detail.get("depthClear") == "true" or detail.get("depthLoad") == "CLEAR":
+                clear_loads[f"{pose}|depth-clear-or-loadop"] += 1
+            if detail.get("colorLoad") == "LOAD":
+                clear_loads[f"{pose}|color-load"] += 1
+            if detail.get("depthLoad") == "LOAD":
+                clear_loads[f"{pose}|depth-load"] += 1
+        return clear_loads
+
+    def diff_category_counts() -> Counter:
+        counts: Counter = Counter()
+        for diff in differences or []:
+            counts[diff.category] += 1
+        return counts
+
+    def strict_ordering_relevant_categories(counts: Counter) -> dict[str, int]:
+        relevant_prefixes = (
+            "strict-render-target",
+            "strict-fixed-function",
+            "strict-resource",
+            "strict-sampler",
+            "strict-ubo",
+            "strict-standalone",
         )
+        return {
+            category: count for category, count in counts.items()
+            if category.startswith(relevant_prefixes)
+        }
 
     gl_operation_counts = operation_counts(opengl_events.ordering)
     vk_operation_counts = operation_counts(vulkan_events.ordering)
@@ -2693,45 +2840,112 @@ def ordering_visibility_coverage(opengl_events: CaptureEvents, vulkan_events: Ca
         if gl_operation_counts.get(operation, 0) != vk_operation_counts.get(operation, 0)
     }
 
-    gl_semantic_counts = Counter(event.semantic_signature for event in opengl_events.ordering)
-    vk_semantic_counts = Counter(event.semantic_signature for event in vulkan_events.ordering)
-    matched_semantic_order_keys = sum(
-        min(count, vk_semantic_counts.get(signature, 0))
-        for signature, count in gl_semantic_counts.items()
+    gl_by_signature, _ = semantic_draw_index(opengl_events)
+    vk_by_signature, _ = semantic_draw_index(vulkan_events)
+    matched_signatures = set(gl_by_signature) & set(vk_by_signature)
+    resource_visibility = classify_observed_data(
+        "resource",
+        gl_by_signature,
+        vk_by_signature,
+        matched_signatures,
+        resource_keys,
     )
-    unmatched_opengl = [
-        signature for signature, count in gl_semantic_counts.items()
-        if vk_semantic_counts.get(signature, 0) != count
-    ]
-    unmatched_vulkan = [
-        signature for signature, count in vk_semantic_counts.items()
-        if gl_semantic_counts.get(signature, 0) != count
-    ]
+    uniform_visibility = classify_observed_data(
+        "uniform",
+        gl_by_signature,
+        vk_by_signature,
+        matched_signatures,
+        uniform_keys,
+    )
+    target_visibility = classify_observed_data(
+        "target-state",
+        gl_by_signature,
+        vk_by_signature,
+        matched_signatures,
+        target_state_signatures,
+    )
+    gl_clear_loads = normalize_clear_load_events(opengl_events.ordering)
+    vk_clear_loads = normalize_clear_load_events(vulkan_events.ordering)
+    diff_counts = diff_category_counts()
+    strict_categories = strict_ordering_relevant_categories(diff_counts)
+    producer_consumer_status = "coverage-gap:no-scoped-content-history-for-no-shader-targets"
+    if not strict_categories:
+        producer_consumer_status = "no-strict-input-or-target-divergence-observed-for-stable-matched-groups"
 
     return {
+        "schema": "mattmc.vulkan_parity.ordering_visibility.v2",
         "opengl_ordering_events": len(opengl_events.ordering),
         "vulkan_ordering_events": len(vulkan_events.ordering),
-        "opengl_operation_counts": gl_operation_counts,
-        "vulkan_operation_counts": vk_operation_counts,
-        "operation_count_deltas": operation_deltas,
+        "stable_matched_semantic_groups": len(matched_signatures),
+        "raw_operation_counts": {
+            "opengl": gl_operation_counts,
+            "vulkan": vk_operation_counts,
+        },
+        "raw_operation_count_deltas_backend_internal": operation_deltas,
         "pose_operation_counts": {
             "opengl": pose_operation_counts(opengl_events.ordering),
             "vulkan": pose_operation_counts(vulkan_events.ordering),
         },
-        "matched_semantic_order_events": matched_semantic_order_keys,
-        "unmatched_opengl_semantic_order_signatures": len(unmatched_opengl),
-        "unmatched_vulkan_semantic_order_signatures": len(unmatched_vulkan),
-        "unmatched_opengl_examples": sorted(unmatched_opengl)[:20],
-        "unmatched_vulkan_examples": sorted(unmatched_vulkan)[:20],
-        "opengl_sequence_digest": sequence_digest(opengl_events.ordering),
-        "vulkan_sequence_digest": sequence_digest(vulkan_events.ordering),
+        "draw_observed_resource_visibility": resource_visibility,
+        "draw_observed_uniform_visibility": uniform_visibility,
+        "draw_observed_target_state_visibility": target_visibility,
+        "logical_clear_load_visibility": {
+            "opengl": dict(sorted(gl_clear_loads.items())),
+            "vulkan": dict(sorted(vk_clear_loads.items())),
+            "classification": (
+                "representational-or-backend-internal"
+                if not any(category.startswith("strict-render-target") for category in strict_categories)
+                else "strict-render-target-divergence-present"
+            ),
+            "reason": (
+                "clear/load operation counts are not compared directly; matched draw target state is the semantic visibility proof"
+            ),
+        },
+        "uniform_resource_update_before_draw": {
+            "classification": "covered-by-draw-attached-resource-and-uniform-records",
+            "resource_groups": resource_visibility,
+            "uniform_groups": uniform_visibility,
+        },
+        "producer_consumer_visibility": {
+            "classification": producer_consumer_status,
+            "reason": "no-shader ordering currently proves draw-observed inputs/state; full prior attachment content history needs scoped target hashes",
+        },
+        "strict_ordering_relevant_difference_categories": strict_categories,
+        "backend_internal_differences": {
+            "buffer_uploads": {
+                "opengl": gl_operation_counts.get("buffer-upload", 0),
+                "vulkan": vk_operation_counts.get("buffer-upload", 0),
+                "classification": "backend-internal",
+                "reason": "buffer writes are staged/sliced differently; geometry, UBO, and uniform draw-observed records are the semantic visibility proof",
+            },
+            "pass_lifetime": {
+                "opengl_pass_begin": gl_operation_counts.get("pass-begin", 0),
+                "opengl_pass_end": gl_operation_counts.get("pass-end", 0),
+                "vulkan_pass_begin": vk_operation_counts.get("pass-begin", 0),
+                "vulkan_pass_end": vk_operation_counts.get("pass-end", 0),
+                "classification": "backend-internal",
+                "reason": "native Vulkan render-pass boundaries and OpenGL compatibility pass lifetimes are not one-to-one; logical target state is compared per semantic draw",
+            },
+            "uniform_updates": {
+                "opengl": gl_operation_counts.get("uniform-update", 0),
+                "vulkan": vk_operation_counts.get("uniform-update", 0),
+                "classification": "backend-internal",
+                "reason": "raw setter/update counts differ because Vulkan materializes standalone uniforms into UBO-backed state; decoded uniform and UBO records are compared semantically",
+            },
+            "resource_binds": {
+                "opengl": gl_operation_counts.get("resource-bind", 0),
+                "vulkan": vk_operation_counts.get("resource-bind", 0),
+                "classification": "backend-internal",
+                "reason": "descriptor/resource binding counts differ by backend; draw-attached semantic resource metadata is compared instead",
+            },
+        },
     }
 
 
 def build_coverage_report(opengl_events: CaptureEvents, vulkan_events: CaptureEvents, differences: list[Difference]) -> dict[str, object]:
     families: dict[str, dict[str, object]] = {family: _empty_family_coverage() for family in PASS_FAMILIES}
     semantic_coverage = semantic_draw_coverage(opengl_events, vulkan_events)
-    ordering_coverage = ordering_visibility_coverage(opengl_events, vulkan_events)
+    ordering_coverage = ordering_visibility_coverage(opengl_events, vulkan_events, differences)
     opengl_draw_signature_counts = Counter(event.signature for event in opengl_events.draws)
     vulkan_draw_signature_counts = Counter(event.signature for event in vulkan_events.draws)
 
@@ -2885,19 +3099,53 @@ def render_diff_report(opengl_log: Path, vulkan_log: Path, limit: int, parse_lim
                 + f"GL verts={entry.get('opengl_total_vertices')} VK verts={entry.get('vulkan_total_vertices')} "
                 + str(entry.get("signature", ""))[:160]
             )
-    ordering = ordering_visibility_coverage(opengl_events, vulkan_events)
+    ordering = ordering_visibility_coverage(opengl_events, vulkan_events, differences)
     lines.append("- Semantic ordering / resource visibility:")
-    lines.append(f"  ordering events: OpenGL={ordering.get('opengl_ordering_events', 0)} Vulkan={ordering.get('vulkan_ordering_events', 0)}")
-    lines.append(f"  operation counts OpenGL={ordering.get('opengl_operation_counts', {})}")
-    lines.append(f"  operation counts Vulkan={ordering.get('vulkan_operation_counts', {})}")
-    lines.append(f"  operation count deltas={ordering.get('operation_count_deltas', {})}")
-    lines.append(f"  matched semantic order events={ordering.get('matched_semantic_order_events', 0)}")
+    lines.append(f"  schema={ordering.get('schema', 'unknown')}")
+    lines.append(f"  stable matched semantic groups={ordering.get('stable_matched_semantic_groups', 0)}")
+    resource_visibility = ordering.get("draw_observed_resource_visibility", {})
+    uniform_visibility = ordering.get("draw_observed_uniform_visibility", {})
+    target_visibility = ordering.get("draw_observed_target_state_visibility", {})
     lines.append(
-        "  unmatched semantic order signatures: "
-        + f"OpenGL={ordering.get('unmatched_opengl_semantic_order_signatures', 0)} "
-        + f"Vulkan={ordering.get('unmatched_vulkan_semantic_order_signatures', 0)}"
+        "  draw-observed resources: "
+        + f"equivalent={resource_visibility.get('equivalent_groups', 0)} "
+        + f"bothUnobserved={resource_visibility.get('both_unobserved_or_not_applicable_groups', 0)} "
+        + f"gaps={resource_visibility.get('coverage_gap_groups', 0)} "
+        + f"keySetDivergent={resource_visibility.get('semantic_key_set_divergent_groups', 0)}"
     )
-    lines.append(f"  sequence digests: OpenGL={ordering.get('opengl_sequence_digest', '')} Vulkan={ordering.get('vulkan_sequence_digest', '')}")
+    lines.append(
+        "  draw-observed uniforms: "
+        + f"equivalent={uniform_visibility.get('equivalent_groups', 0)} "
+        + f"bothUnobserved={uniform_visibility.get('both_unobserved_or_not_applicable_groups', 0)} "
+        + f"gaps={uniform_visibility.get('coverage_gap_groups', 0)} "
+        + f"keySetDivergent={uniform_visibility.get('semantic_key_set_divergent_groups', 0)}"
+    )
+    lines.append(
+        "  draw-observed target state: "
+        + f"equivalent={target_visibility.get('equivalent_groups', 0)} "
+        + f"bothUnobserved={target_visibility.get('both_unobserved_or_not_applicable_groups', 0)} "
+        + f"gaps={target_visibility.get('coverage_gap_groups', 0)} "
+        + f"keySetDivergent={target_visibility.get('semantic_key_set_divergent_groups', 0)}"
+    )
+    clear_load = ordering.get("logical_clear_load_visibility", {})
+    producer_consumer = ordering.get("producer_consumer_visibility", {})
+    lines.append(f"  clear/load classification={clear_load.get('classification', 'unknown')}: {clear_load.get('reason', '')}")
+    lines.append(f"  producer/consumer classification={producer_consumer.get('classification', 'unknown')}: {producer_consumer.get('reason', '')}")
+    strict_ordering = ordering.get("strict_ordering_relevant_difference_categories", {})
+    lines.append(f"  strict ordering-relevant categories={strict_ordering}")
+    backend_internal = ordering.get("backend_internal_differences", {})
+    for name, entry in backend_internal.items():
+        lines.append(f"  backend-internal {name}: {entry}")
+    for label, coverage in (
+        ("resource", resource_visibility),
+        ("uniform", uniform_visibility),
+        ("target", target_visibility),
+    ):
+        examples = coverage.get("examples", [])
+        if examples:
+            lines.append(f"  {label} visibility examples:")
+            for example in examples[:3]:
+                lines.append("    " + str(example)[:220])
     lines.append("")
     lines.append("Difference summary:")
     lines.append(f"- Total differences: {len(differences)}")
