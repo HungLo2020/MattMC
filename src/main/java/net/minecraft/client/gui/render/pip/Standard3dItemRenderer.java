@@ -82,14 +82,14 @@ public class Standard3dItemRenderer extends PictureInPictureRenderer<OversizedIt
 	protected void renderToTexture(OversizedItemRenderState oversizedItemRenderState, PoseStack poseStack) {
 		GuiItemRenderState guiItemRenderState = oversizedItemRenderState.guiItemRenderState();
 		TrackingItemStackRenderState trackingItemStackRenderState = guiItemRenderState.itemStackRenderState();
-		poseStack.scale(1.0F, 1.0F, -1.0F);
+		poseStack.scale(1.0F, -1.0F, -1.0F);
 		if (this.usesExpandedStandardItemTexture(guiItemRenderState)) {
 			AABB aABB = trackingItemStackRenderState.getModelBoundingBox();
 			float f = (float)(-(aABB.minX + aABB.maxX) / 2.0);
 			float g = (float)(-(aABB.minY + aABB.maxY) / 2.0);
 			poseStack.translate(f, g, 0.0F);
 		}
-		Minecraft.getInstance().gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_3D);
+		Minecraft.getInstance().gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_3D_UPRIGHT);
 
 		FeatureRenderDispatcher featureRenderDispatcher = Minecraft.getInstance().gameRenderer.getFeatureRenderDispatcher();
 		SubmitNodeStorage submitNodeStorage = featureRenderDispatcher.getSubmitNodeStorage();
@@ -100,7 +100,7 @@ public class Standard3dItemRenderer extends PictureInPictureRenderer<OversizedIt
 
 	@Override
 	protected void blitTexture(OversizedItemRenderState oversizedItemRenderState, GuiRenderState guiRenderState) {
-		super.blitTexture(oversizedItemRenderState, guiRenderState);
+		this.submitBlitTexture(guiRenderState, oversizedItemRenderState, 0.0F, 1.0F, 0.0F, 1.0F);
 		this.usedOnThisFrame = true;
 	}
 
