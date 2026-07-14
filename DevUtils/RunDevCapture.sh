@@ -21,6 +21,7 @@ Additional diagnostics captured:
 Environment overrides:
     MAX_SECS                    (default: 120)
     DUMP_SECS                   (default: 45)
+    CLIENT_RSS_LIMIT_MB         (default: 6144, 0 disables)
     SCREENSHOT_INTERVAL_SECS    (default: 5)
     SCREENSHOT_MAX_COUNT        (default: 6)
     SCREENSHOT_START_DELAY_SECS (default: 0)
@@ -41,6 +42,7 @@ EOF
 BACKEND="vulkan"
 MAX_SECS="${MAX_SECS:-120}"
 DUMP_SECS="${DUMP_SECS:-45}"
+CLIENT_RSS_LIMIT_MB="${CLIENT_RSS_LIMIT_MB:-6144}"
 SCREENSHOT_INTERVAL_SECS="${SCREENSHOT_INTERVAL_SECS:-5}"
 SCREENSHOT_MAX_COUNT="${SCREENSHOT_MAX_COUNT:-6}"
 SCREENSHOT_START_DELAY_SECS="${SCREENSHOT_START_DELAY_SECS:-0}"
@@ -101,6 +103,11 @@ fi
 
 if ! [[ "$MAX_SECS" =~ ^[0-9]+$ ]] || ! [[ "$DUMP_SECS" =~ ^[0-9]+$ ]]; then
     echo "--max-secs and --dump-secs must be integers" >&2
+    exit 1
+fi
+
+if ! [[ "$CLIENT_RSS_LIMIT_MB" =~ ^[0-9]+$ ]]; then
+    echo "CLIENT_RSS_LIMIT_MB must be an integer number of MiB, or 0 to disable" >&2
     exit 1
 fi
 
@@ -215,6 +222,7 @@ KEY_SUMMARY_PATTERN='Using shaderpack:|Loaded Shaderpack:|Profile:|Reloading pip
     echo "backend=$BACKEND"
     echo "max_secs=$MAX_SECS"
     echo "dump_secs=$DUMP_SECS"
+    echo "client_rss_limit_mb=$CLIENT_RSS_LIMIT_MB"
     echo "validation_mode=$VALIDATION_MODE"
     echo "shader_input_parity=$SHADER_INPUT_PARITY"
     echo "shader_input_parity_max_logs=$SHADER_INPUT_PARITY_MAX_LOGS"
@@ -805,23 +813,34 @@ find_client_pid() {
     # Prefer the per-run JVM marker. Gradle may launch runClient from a daemon
     # outside the wrapper process group, so process-group matching alone is not
     # enough to identify the actual client reliably.
-    pid="$(ps -eo pid=,cmd= \
-        | awk -v marker="-Dmattmc.dev.runCaptureId=$RUN_ID" '$0 ~ /(KnotClient|devlaunchinjector|MattMC-1\\.21)/ && index($0, marker) {print $1; exit}' 2>/dev/null || true)"
+    pid="$(ps -eo pid=,comm=,cmd= \
+        | awk -v marker="-Dmattmc.dev.runCaptureId=$RUN_ID" '$2 == "java" && $0 ~ /(KnotClient|devlaunchinjector|MattMC-1\\.21)/ && index($0, marker) {print $1; exit}' 2>/dev/null || true)"
+    if [[ -n "${pid:-}" ]]; then
+        echo "$pid"
+        return
+    fi
+
+    # Gradle may launch the actual client through a daemon, and JAVA_TOOL_OPTIONS
+    # markers do not necessarily appear in the process command line. The
+    # preflight check rejects already-running clients, so the live KnotClient is
+    # still the correct process for this capture.
+    pid="$(jcmd -l 2>/dev/null \
+        | awk '/KnotClient|devlaunchinjector|MattMC-1\.21/ && $0 !~ /jcmd|GradleWrapperMain|GradleDaemon/ {print $1; exit}' || true)"
     if [[ -n "${pid:-}" ]]; then
         echo "$pid"
         return
     fi
 
     # Prefer Java processes in the same process group as this run, with Minecraft/Fabric markers.
-    pid="$(ps -eo pid=,pgid=,cmd= \
-        | awk -v pg="$GRADLE_PID" '$2 == pg && $0 ~ /java/ && $0 ~ /(devlaunchinjector|minecraft|fabric|MattMC-1\\.21)/ {print $1; exit}' 2>/dev/null || true)"
+    pid="$(ps -eo pid=,pgid=,comm=,cmd= \
+        | awk -v pg="$GRADLE_PID" '$2 == pg && $3 == "java" && $0 ~ /(devlaunchinjector|minecraft|fabric|MattMC-1\\.21)/ {print $1; exit}' 2>/dev/null || true)"
     if [[ -n "${pid:-}" ]]; then
         echo "$pid"
         return
     fi
 
     # Last resort: any Java process in this run's process group.
-    pid="$(ps -eo pid=,pgid=,cmd= | awk -v pg="$GRADLE_PID" '$2 == pg && $0 ~ /java/ {print $1; exit}' || true)"
+    pid="$(ps -eo pid=,pgid=,comm=,cmd= | awk -v pg="$GRADLE_PID" '$2 == pg && $3 == "java" {print $1; exit}' || true)"
     if [[ -n "${pid:-}" ]]; then
         echo "$pid"
     fi
@@ -829,10 +848,47 @@ find_client_pid() {
 
 dump_taken="false"
 timed_out="false"
+memory_guard_triggered="false"
+memory_guard_peak_rss_kb=0
+memory_guard_rss_kb=0
 exit_code=""
 deterministic_validation_status="not_requested"
 GRADLE_PID=""
 RUN_CLIENT_ACTIVE="false"
+
+check_client_memory_guard() {
+    local client_pid="$1"
+    local elapsed="$2"
+    local rss_kb
+    local limit_kb
+    local message
+
+    if [[ "$CLIENT_RSS_LIMIT_MB" -eq 0 || -z "$client_pid" ]]; then
+        return 0
+    fi
+
+    rss_kb="$(ps -o rss= -p "$client_pid" 2>/dev/null | awk '{print $1+0}')"
+    rss_kb="${rss_kb:-0}"
+    if [[ "$rss_kb" -le 0 ]]; then
+        return 0
+    fi
+
+    if [[ "$rss_kb" -gt "$memory_guard_peak_rss_kb" ]]; then
+        memory_guard_peak_rss_kb="$rss_kb"
+    fi
+
+    limit_kb=$((CLIENT_RSS_LIMIT_MB * 1024))
+    if [[ "$rss_kb" -le "$limit_kb" ]]; then
+        return 0
+    fi
+
+    memory_guard_triggered="true"
+    memory_guard_rss_kb="$rss_kb"
+    message="client_rss_limit_exceeded elapsed=${elapsed}s pid=$client_pid rss_kb=$rss_kb limit_kb=$limit_kb"
+    echo "$message" | tee -a "$META_LOG" "$RUN_LOG" >&2
+    terminate_run_processes "client_rss_limit"
+    return 1
+}
 
 terminate_run_processes() {
     local reason="$1"
@@ -983,6 +1039,9 @@ while kill -0 "$GRADLE_PID" 2>/dev/null; do
     elapsed=$((elapsed + 1))
 
     CLIENT_PID="$(find_client_pid)"
+    if ! check_client_memory_guard "$CLIENT_PID" "$elapsed"; then
+        break
+    fi
 
     if [[ "$DETERMINISTIC_CAMERA_CAPTURE" != "true" && "$screenshot_enabled" == "true" && "$SCREENSHOT_INTERVAL_SECS" -gt 0 && "$elapsed" -ge "$SCREENSHOT_START_DELAY_SECS" && $(((elapsed - SCREENSHOT_START_DELAY_SECS) % SCREENSHOT_INTERVAL_SECS)) -eq 0 ]]; then
         capture_root_screenshot "tick" "$elapsed" "$CLIENT_PID"
@@ -1060,6 +1119,11 @@ fi
 RUN_CLIENT_ACTIVE="false"
 
 echo "exit_code=$exit_code" >> "$META_LOG"
+echo "memory_guard_triggered=$memory_guard_triggered" >> "$META_LOG"
+echo "memory_guard_peak_rss_kb=$memory_guard_peak_rss_kb" >> "$META_LOG"
+if [[ "$memory_guard_triggered" == "true" ]]; then
+    echo "memory_guard_rss_kb=$memory_guard_rss_kb" >> "$META_LOG"
+fi
 echo "end_epoch=$(date +%s)" >> "$META_LOG"
 
 copy_config_snapshot "$CONFIG_AFTER_DIR"
@@ -1139,7 +1203,7 @@ done < "$CRASH_REPORT_LIST"
     grep -nEi "$KEY_SUMMARY_PATTERN" "$RUN_LOG" | head -n 200 || true
 } > "$SHADER_SUMMARY"
 
-if [[ "$DETERMINISTIC_CAMERA_CAPTURE" == "true" ]]; then
+if [[ "$DETERMINISTIC_CAMERA_CAPTURE" == "true" && "$memory_guard_triggered" != "true" ]]; then
     if python3 - "$DETERMINISTIC_METADATA" "$DETERMINISTIC_SCREENSHOT_DIR" "$DETERMINISTIC_POSE_TOLERANCE" <<'PY'
 import json
 import math
@@ -1275,10 +1339,16 @@ fi
 
 if [[ "$timed_out" == "true" ]]; then
     echo "Result: timed out after ${MAX_SECS}s and was terminated automatically."
+elif [[ "$memory_guard_triggered" == "true" ]]; then
+    echo "Result: terminated because client RSS exceeded ${CLIENT_RSS_LIMIT_MB} MiB."
 elif [[ "$exit_code" -ne 0 ]]; then
     echo "Result: exited with non-zero code $exit_code."
 else
     echo "Result: exited cleanly."
+fi
+
+if [[ "$memory_guard_triggered" == "true" ]]; then
+    exit 124
 fi
 
 if [[ "$DETERMINISTIC_CAMERA_CAPTURE" == "true" && "$deterministic_validation_status" != "ok" ]]; then

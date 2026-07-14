@@ -52,7 +52,8 @@ public class VulkanicAPI {
     private static final String GENERATED_STANDALONE_UNIFORM_BLOCK_NAME = "VulkanicStandaloneUniforms";
     private static final org.slf4j.Logger LOGGER = net.logging.LogUtils.getLogger();
     private static final boolean TRACE_STANDALONE_UNIFORMS = Boolean.getBoolean("mattmc.vulkan.traceStandaloneUniforms");
-    private static final int MAX_STANDALONE_UNIFORM_TRACE_LOGS = Integer.getInteger("mattmc.vulkan.traceStandaloneUniforms.maxLogs", 512);
+    private static final int MAX_STANDALONE_UNIFORM_TRACE_LOGS =
+        diagnosticLimit("mattmc.vulkan.traceStandaloneUniforms.maxLogs", 512);
     private static final java.util.concurrent.atomic.AtomicInteger STANDALONE_UNIFORM_TRACE_LOG_COUNT = new java.util.concurrent.atomic.AtomicInteger();
     private static final boolean TRACE_SHADER_INPUT_PARITY = Boolean.getBoolean("mattmc.vulkan.traceShaderInputParity");
     private static final boolean TRACE_STANDALONE_UNIFORM_BLOCK_MEMBERS =
@@ -68,7 +69,7 @@ public class VulkanicAPI {
     private static final boolean TRACE_SHADER_INPUT_SAMPLER_CONTENT_HASHES =
         Boolean.getBoolean("mattmc.vulkan.traceShaderInputSamplerContentHashes");
     private static final int MAX_RENDER_TARGET_CONTENT_READBACKS =
-        Integer.getInteger("mattmc.vulkan.traceRenderTargetContentHashes.maxReadbacks", 8);
+        diagnosticLimit("mattmc.vulkan.traceRenderTargetContentHashes.maxReadbacks", 8);
     private static final boolean TRACE_RENDER_TARGET_CONTENT_HASHES_INITIAL_POSE_ONLY =
         Boolean.getBoolean("mattmc.vulkan.traceRenderTargetContentHashes.initialPoseOnly");
     private static final java.util.concurrent.atomic.AtomicInteger RENDER_TARGET_CONTENT_READBACK_COUNT =
@@ -77,7 +78,8 @@ public class VulkanicAPI {
         java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
     private static final java.util.Set<String> IRIS_COLORTEX0_PHASE_HASH_KEYS =
         java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
-    private static final int MAX_SHADER_INPUT_PARITY_LOGS = Integer.getInteger("mattmc.vulkan.traceShaderInputParity.maxLogs", 20000);
+    private static final int MAX_SHADER_INPUT_PARITY_LOGS =
+        diagnosticLimit("mattmc.vulkan.traceShaderInputParity.maxLogs", 20000);
     private static final java.util.concurrent.atomic.AtomicInteger SHADER_INPUT_PARITY_LOG_COUNT = new java.util.concurrent.atomic.AtomicInteger();
     private static final java.util.concurrent.ConcurrentMap<Integer, String> SHADER_INPUT_PARITY_PROGRAM_NAMES =
         new java.util.concurrent.ConcurrentHashMap<>();
@@ -131,6 +133,15 @@ public class VulkanicAPI {
         intConsumer.accept(i + 3);
         intConsumer.accept(i);
     });
+
+    private static int diagnosticLimit(String property, int defaultValue) {
+        int value = Integer.getInteger(property, defaultValue);
+        if (value < 0) {
+            LOGGER.warn("Ignoring negative diagnostic limit {}={}; using {}", property, value, defaultValue);
+            return defaultValue;
+        }
+        return value;
+    }
 
     private record ScopedCompositeColortex0Binding(
         PipelineHandle pipeline,
@@ -3390,8 +3401,7 @@ public class VulkanicAPI {
         if (!isStandaloneUniformTracingEnabled()) {
             return false;
         }
-        return MAX_STANDALONE_UNIFORM_TRACE_LOGS < 0
-            || STANDALONE_UNIFORM_TRACE_LOG_COUNT.incrementAndGet() <= MAX_STANDALONE_UNIFORM_TRACE_LOGS;
+        return STANDALONE_UNIFORM_TRACE_LOG_COUNT.incrementAndGet() <= MAX_STANDALONE_UNIFORM_TRACE_LOGS;
     }
 
     public static boolean shouldTraceStandaloneUniform(String name) {
@@ -8451,9 +8461,6 @@ public class VulkanicAPI {
         if (!TRACE_RENDER_TARGET_CONTENT_HASHES) {
             return false;
         }
-        if (MAX_RENDER_TARGET_CONTENT_READBACKS < 0) {
-            return true;
-        }
 
         String normalizedKey = feature + '|' + readbackKey;
         if (!RENDER_TARGET_CONTENT_READBACK_KEYS.add(normalizedKey)) {
@@ -8475,15 +8482,13 @@ public class VulkanicAPI {
         if (featureDisabledReason != null && !featureDisabledReason.isBlank()) {
             return featureDisabledReason;
         }
-        if (MAX_RENDER_TARGET_CONTENT_READBACKS >= 0) {
-            String normalizedKey = feature + '|' + readbackKey;
-            boolean alreadyReserved = RENDER_TARGET_CONTENT_READBACK_KEYS.contains(normalizedKey);
-            if (alreadyReserved) {
-                return "content-readback-duplicate-skipped";
-            }
-            if (RENDER_TARGET_CONTENT_READBACK_COUNT.get() >= MAX_RENDER_TARGET_CONTENT_READBACKS) {
-                return "content-readback-budget-exhausted";
-            }
+        String normalizedKey = feature + '|' + readbackKey;
+        boolean alreadyReserved = RENDER_TARGET_CONTENT_READBACK_KEYS.contains(normalizedKey);
+        if (alreadyReserved) {
+            return "content-readback-duplicate-skipped";
+        }
+        if (RENDER_TARGET_CONTENT_READBACK_COUNT.get() >= MAX_RENDER_TARGET_CONTENT_READBACKS) {
+            return "content-readback-budget-exhausted";
         }
         return "content-readback-unavailable";
     }
@@ -8761,8 +8766,7 @@ public class VulkanicAPI {
         if (!TRACE_SHADER_INPUT_PARITY) {
             return false;
         }
-        return MAX_SHADER_INPUT_PARITY_LOGS < 0
-            || SHADER_INPUT_PARITY_LOG_COUNT.incrementAndGet() <= MAX_SHADER_INPUT_PARITY_LOGS;
+        return SHADER_INPUT_PARITY_LOG_COUNT.incrementAndGet() <= MAX_SHADER_INPUT_PARITY_LOGS;
     }
 
     private static String sanitizeShaderInputParityUniformName(@Nullable String name) {
