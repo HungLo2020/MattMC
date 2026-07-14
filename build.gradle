@@ -1238,6 +1238,12 @@ tasks.register('clientDist') {
                     windowsScript.text = windowsScriptTemplate
                         .replace('@VERSION@', version)
                 }
+            } else if (scriptFile.name.endsWith('.ps1')) {
+                // PowerShell script - process template placeholders
+                def powershellScriptTemplate = scriptFile.text
+                def powershellScript = file("${distDir}/${scriptFile.name}")
+                powershellScript.text = powershellScriptTemplate
+                    .replace('@VERSION@', version)
             } else {
                 // Copy any other files as-is (e.g., README, documentation)
                 // Special handling for SERVER-README.md
@@ -1267,7 +1273,12 @@ tasks.register('clientDistZip', Zip) {
     
     dependsOn 'clientDist'
     
-    archiveBaseName = 'MattMC-Client'
+    def platformKey = resolveCurrentPlatformKey()
+    if (platformKey == null) {
+        throw new GradleException("Unsupported platform for client distribution zip: ${System.getProperty('os.name')} ${System.getProperty('os.arch')}")
+    }
+
+    archiveFileName = "MattMC-Client-${platformKey}.zip"
     
     from "${buildDir}/client-dist"
     
