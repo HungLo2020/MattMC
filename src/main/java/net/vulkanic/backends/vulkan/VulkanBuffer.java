@@ -13,6 +13,7 @@ public class VulkanBuffer extends VulkanicBuffer {
     private final int size;
     private final String debugLabel;
     private final Runnable closeAction;
+    private final ByteBuffer diagnosticShadowData;
 
     private boolean closed;
     private boolean mapped;
@@ -23,6 +24,16 @@ public class VulkanBuffer extends VulkanicBuffer {
                         int size,
                         String debugLabel,
                         Runnable closeAction) {
+        this(vkBufferHandle, vkMemoryHandle, usage, size, debugLabel, closeAction, null);
+    }
+
+    public VulkanBuffer(long vkBufferHandle,
+                        long vkMemoryHandle,
+                        int usage,
+                        int size,
+                        String debugLabel,
+                        Runnable closeAction,
+                        ByteBuffer diagnosticShadowData) {
         if (size <= 0) {
             throw new IllegalArgumentException("size must be > 0, got: " + size);
         }
@@ -32,6 +43,7 @@ public class VulkanBuffer extends VulkanicBuffer {
         this.size = size;
         this.debugLabel = debugLabel == null ? "VulkanBuffer" : debugLabel;
         this.closeAction = Objects.requireNonNull(closeAction, "closeAction must not be null");
+        this.diagnosticShadowData = diagnosticShadowData;
     }
 
     long getVkBufferHandle() {
@@ -57,6 +69,48 @@ public class VulkanBuffer extends VulkanicBuffer {
     void endMappedScope() {
         synchronized (this) {
             mapped = false;
+        }
+    }
+
+    public synchronized ByteBuffer diagnosticShadowRead(int offset, int length) {
+        if (diagnosticShadowData == null || closed || offset < 0 || length < 0 || offset + length > diagnosticShadowData.capacity()) {
+            return null;
+        }
+
+        ByteBuffer source = diagnosticShadowData.duplicate();
+        source.position(offset);
+        source.limit(offset + length);
+        ByteBuffer copy = org.lwjgl.BufferUtils.createByteBuffer(length)
+            .order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        copy.put(source.slice());
+        copy.flip();
+        return copy;
+    }
+
+    synchronized void diagnosticShadowWrite(int offset, ByteBuffer sourceData) {
+        if (diagnosticShadowData == null || closed || sourceData == null) {
+            return;
+        }
+
+        ByteBuffer source = sourceData.duplicate();
+        int length = source.remaining();
+        if (offset < 0 || offset + length > diagnosticShadowData.capacity()) {
+            return;
+        }
+
+        ByteBuffer target = diagnosticShadowData.duplicate();
+        target.position(offset);
+        target.put(source);
+    }
+
+    synchronized void diagnosticShadowCopyFrom(VulkanBuffer sourceBuffer, int sourceOffset, int destinationOffset, int length) {
+        if (diagnosticShadowData == null || sourceBuffer == null || length <= 0) {
+            return;
+        }
+
+        ByteBuffer source = sourceBuffer.diagnosticShadowRead(sourceOffset, length);
+        if (source != null) {
+            diagnosticShadowWrite(destinationOffset, source);
         }
     }
 

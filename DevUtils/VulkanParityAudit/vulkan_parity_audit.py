@@ -128,6 +128,28 @@ class ResourceRecord:
             name = f"{self.name}@{self.projection_label}"
         if self.content_hash and self.det_pose:
             name = f"{name}@pose:{self.det_pose}@source:{self.source or 'unknown'}"
+        context_parts: list[str] = []
+        if self.semantic_draw_key and self.semantic_draw_key != "unavailable":
+            context_parts.append(f"draw:{self.semantic_draw_key}")
+        else:
+            if self.det_pose:
+                context_parts.append(f"pose:{self.det_pose}")
+            if self.det_rendered_frame:
+                context_parts.append(f"frame:{self.det_rendered_frame}")
+            if self.semantic_subsystem:
+                context_parts.append(f"subsystem:{self.semantic_subsystem}")
+            if self.semantic_pass:
+                context_parts.append(f"pass:{self.semantic_pass}")
+            if self.semantic_pipeline:
+                context_parts.append(f"semanticPipeline:{self.semantic_pipeline}")
+            if self.semantic_material:
+                context_parts.append(f"material:{self.semantic_material}")
+            if self.semantic_output:
+                context_parts.append(f"output:{self.semantic_output}")
+            if self.semantic_ordinal:
+                context_parts.append(f"ordinal:{self.semantic_ordinal}")
+        if context_parts:
+            name = f"{name}@{'/'.join(context_parts)}"
         pipeline_identity = self.pipeline_location or self.stable_key
         return (pipeline_identity, self.stable_key, name, self.resource_type)
 
@@ -560,7 +582,24 @@ def int_or_zero(value: str) -> int:
         return 0
 
 
+def is_pre_pose_deterministic_record(fields: dict[str, str]) -> bool:
+    return fields.get("detCapture") == "true" and fields.get("detAwaitingScreenshot") != "true"
+
+
 def standalone_uniform_key(event: StandaloneUniformEvent | StandaloneUniformBlockMemberEvent) -> str:
+    if event.semantic_draw_key and event.semantic_draw_key != "unavailable":
+        return "|".join([
+            f"draw={event.semantic_draw_key}",
+            f"subsystem={event.semantic_subsystem or 'unknown'}",
+            f"phase={event.semantic_phase or event.render_phase or 'unknown'}",
+            f"pass={event.semantic_pass or 'unknown'}",
+            f"pipeline={event.semantic_pipeline or 'unknown'}",
+            f"material={event.semantic_material or 'unknown'}",
+            f"output={event.semantic_output or 'unknown'}",
+            f"stages={event.shader_stages or 'unknown'}",
+            f"name={event.name}",
+            f"type={event.value_kind}",
+        ])
     return "|".join([
         f"program={event.program_identity or 'unknown'}",
         f"stages={event.shader_stages or 'unknown'}",
@@ -702,6 +741,9 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             events.skipped["Resources"] += 1
             return
         fields = parse_top_fields(payload)
+        if is_pre_pose_deterministic_record(fields):
+            events.skipped["ResourcesPrePose"] += 1
+            return
         backend = fields.get("backend", "unknown")
         events.backend = backend
         source = fields.get("source", "")
@@ -749,6 +791,9 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             events.skipped["StandaloneUniformBlockMember"] += 1
             return
         fields = parse_top_fields(payload)
+        if is_pre_pose_deterministic_record(fields):
+            events.skipped["StandaloneUniformBlockMemberPrePose"] += 1
+            return
         hashes = extract_hashes(payload)
         backend = fields.get("backend", "unknown")
         events.backend = backend
@@ -791,6 +836,9 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             events.skipped["StandaloneUniform"] += 1
             return
         fields = parse_top_fields(payload)
+        if is_pre_pose_deterministic_record(fields):
+            events.skipped["StandaloneUniformPrePose"] += 1
+            return
         hashes = extract_hashes(payload)
         backend = fields.get("backend", "unknown")
         events.backend = backend
@@ -1990,6 +2038,8 @@ def _empty_family_coverage() -> dict[str, object]:
 def build_coverage_report(opengl_events: CaptureEvents, vulkan_events: CaptureEvents, differences: list[Difference]) -> dict[str, object]:
     families: dict[str, dict[str, object]] = {family: _empty_family_coverage() for family in PASS_FAMILIES}
     semantic_coverage = semantic_draw_coverage(opengl_events, vulkan_events)
+    opengl_draw_signature_counts = Counter(event.signature for event in opengl_events.draws)
+    vulkan_draw_signature_counts = Counter(event.signature for event in vulkan_events.draws)
 
     all_resource_keys = set(opengl_events.resources) | set(vulkan_events.resources)
     for key in all_resource_keys:
@@ -2047,18 +2097,18 @@ def build_coverage_report(opengl_events: CaptureEvents, vulkan_events: CaptureEv
             "opengl_draw_events": len(opengl_events.draws),
             "vulkan_draw_events": len(vulkan_events.draws),
             "matched_by_parameter_signature": sum(
-                min(count, Counter(event.signature for event in vulkan_events.draws).get(signature, 0))
-                for signature, count in Counter(event.signature for event in opengl_events.draws).items()
+                min(count, vulkan_draw_signature_counts.get(signature, 0))
+                for signature, count in opengl_draw_signature_counts.items()
             ),
             "unmatched_opengl_parameter_signatures": sum(
                 1
-                for signature, count in Counter(event.signature for event in opengl_events.draws).items()
-                if Counter(event.signature for event in vulkan_events.draws).get(signature, 0) != count
+                for signature, count in opengl_draw_signature_counts.items()
+                if vulkan_draw_signature_counts.get(signature, 0) != count
             ),
             "unmatched_vulkan_parameter_signatures": sum(
                 1
-                for signature, count in Counter(event.signature for event in vulkan_events.draws).items()
-                if Counter(event.signature for event in opengl_events.draws).get(signature, 0) != count
+                for signature, count in vulkan_draw_signature_counts.items()
+                if opengl_draw_signature_counts.get(signature, 0) != count
             ),
             "semantic_coverage": semantic_coverage,
         },

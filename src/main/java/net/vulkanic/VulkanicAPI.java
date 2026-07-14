@@ -10192,6 +10192,13 @@ public class VulkanicAPI {
             }
         }
 
+        if (slice.buffer() instanceof net.vulkanic.backends.vulkan.VulkanBuffer vulkanBuffer) {
+            java.nio.ByteBuffer shadowData = vulkanBuffer.diagnosticShadowRead(slice.offset(), length);
+            if (shadowData != null) {
+                return shadowData;
+            }
+        }
+
         try (VulkanicBuffer.MappedView mappedView = mapManagedBuffer(slice.buffer(), true, false)) {
             java.nio.ByteBuffer data = mappedView.data().duplicate();
             int start = slice.offset();

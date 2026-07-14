@@ -43,16 +43,35 @@ public abstract class AbstractShaderRenderer
 			return;
 		}
 		
-		this.shader.bind(ctx);
-		try
+		String shaderName = this.getClass().getSimpleName();
+		try (VulkanicAPI.ShaderInputParityScope ignored = VulkanicAPI.beginShaderInputParitySemanticDraw(
+			"dh-shader-renderer",
+			"distant-horizons",
+			"shader:" + shaderName,
+			null,
+			null,
+			"distant-horizons:" + shaderName,
+			"distant-horizons-framebuffer",
+			false,
+			0,
+			0,
+			0,
+			0,
+			1,
+			0
+		))
 		{
-			this.onApplyUniforms(ctx, partialTicks);
-			VulkanicAPI.setViewport(ctx, 0, 0, width, height);
-			this.onRender(ctx);
-		}
-		finally
-		{
-			this.shader.unbind(ctx);
+			this.shader.bind(ctx);
+			try
+			{
+				this.onApplyUniforms(ctx, partialTicks);
+				VulkanicAPI.setViewport(ctx, 0, 0, width, height);
+				this.onRender(ctx);
+			}
+			finally
+			{
+				this.shader.unbind(ctx);
+			}
 		}
 	}
 	

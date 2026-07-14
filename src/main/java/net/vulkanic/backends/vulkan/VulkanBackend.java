@@ -11022,7 +11022,7 @@ void main() {
         private final AtomicInteger nextLegacyBufferId = new AtomicInteger(1);
         private final Map<Integer, LegacyBufferObject> legacyBuffers = new ConcurrentHashMap<>();
         private final Map<Integer, Integer> legacyBufferBindings = new ConcurrentHashMap<>();
-        private final Map<Integer, VulkanicBuffer.MappedView> legacyBufferMappedViews = new ConcurrentHashMap<>();
+        private final Map<Integer, LegacyMappedBufferView> legacyBufferMappedViews = new ConcurrentHashMap<>();
         private final AtomicInteger nextLegacyTextureId = new AtomicInteger(1);
         private final Map<Integer, LegacyTextureObject> legacyTextures = new ConcurrentHashMap<>();
         private final VulkanImageStateTracker imageStateTracker = new VulkanImageStateTracker();
@@ -11221,6 +11221,15 @@ void main() {
                 this.id = id;
                 this.lastTarget = VulkanicAPI.GL_ARRAY_BUFFER;
             }
+        }
+
+        private record LegacyMappedBufferView(
+            VulkanicBuffer.MappedView view,
+            VulkanBuffer buffer,
+            int offset,
+            int length,
+            boolean write
+        ) {
         }
 
         private record BoundIndexBufferState(long bufferHandle, int sizeBytes, VulkanicIndexType indexType) {
@@ -15756,6 +15765,7 @@ void main() {
             }
 
             VulkanBuffer buffer = requireAllocatedLegacyBuffer(legacy, "namedBufferSubDataDSA");
+            java.nio.ByteBuffer shadowSource = data.duplicate();
             if ((buffer.usage() & VulkanicBuffer.USAGE_MAP_WRITE) != 0) {
                 try (VulkanicBuffer.MappedView mapped = mapManagedBuffer(buffer, false, true)) {
                     java.nio.ByteBuffer mappedData = mapped.data();
@@ -15767,6 +15777,7 @@ void main() {
             } else {
                 copyDataToBufferImmediate(buffer.getVkBufferHandle(), offset, data);
             }
+            buffer.diagnosticShadowWrite((int) offset, shadowSource);
         }
 
         private void bufferSubDataByTarget(int target, long offset, java.nio.ByteBuffer data) {
@@ -15821,6 +15832,7 @@ void main() {
                     dst.position(writePos);
                     dst.put(temp);
                 }
+                writeBuffer.diagnosticShadowCopyFrom(readBuffer, readPos, writePos, copySize);
                 return;
             }
 
@@ -15842,6 +15854,7 @@ void main() {
                     size
                 );
             }
+            writeBuffer.diagnosticShadowCopyFrom(readBuffer, readPos, writePos, copySize);
         }
 
         private void copyBufferSubDataByTarget(int readTarget,
@@ -15875,7 +15888,7 @@ void main() {
 
             VulkanBuffer buffer = requireAllocatedLegacyBuffer(legacy, "mapNamedBufferRangeDSA");
             VulkanicBuffer.MappedView view = mapManagedBuffer(buffer, read, write);
-            legacyBufferMappedViews.put(bufferId, view);
+            legacyBufferMappedViews.put(bufferId, new LegacyMappedBufferView(view, buffer, (int) offset, (int) length, write));
 
             java.nio.ByteBuffer mapped = view.data().duplicate().order(ByteOrder.nativeOrder());
             mapped.position((int) offset);
@@ -15889,9 +15902,15 @@ void main() {
         }
 
         private void unmapNamedBuffer(int bufferId) {
-            VulkanicBuffer.MappedView mappedView = legacyBufferMappedViews.remove(bufferId);
+            LegacyMappedBufferView mappedView = legacyBufferMappedViews.remove(bufferId);
             if (mappedView != null) {
-                mappedView.close();
+                if (mappedView.write()) {
+                    java.nio.ByteBuffer source = mappedView.view().data().duplicate();
+                    source.position(mappedView.offset());
+                    source.limit(mappedView.offset() + mappedView.length());
+                    mappedView.buffer().diagnosticShadowWrite(mappedView.offset(), source);
+                }
+                mappedView.view().close();
             }
         }
 
@@ -16138,6 +16157,8 @@ void main() {
                     : label;
                 long finalBufferHandle = bufferHandle;
                 long finalMemoryHandle = memoryHandle;
+                java.nio.ByteBuffer diagnosticShadowData =
+                    createDiagnosticUniformBufferShadow(usage, size, initialData);
 
                 return new VulkanBuffer(
                     finalBufferHandle,
@@ -16145,7 +16166,8 @@ void main() {
                     usage,
                     size,
                     debugLabel,
-                    () -> destroyManagedBuffer(finalBufferHandle, finalMemoryHandle)
+                    () -> destroyManagedBuffer(finalBufferHandle, finalMemoryHandle),
+                    diagnosticShadowData
                 );
             } catch (RuntimeException exception) {
                 if (logicalDevice != null) {
@@ -16158,6 +16180,29 @@ void main() {
                 }
                 throw exception;
             }
+        }
+
+        private static java.nio.ByteBuffer createDiagnosticUniformBufferShadow(
+            int usage,
+            int size,
+            @Nullable java.nio.ByteBuffer initialData
+        ) {
+            if (!VulkanicAPI.isShaderInputParityTracingEnabled()
+                || (usage & VulkanicBuffer.USAGE_UNIFORM) == 0
+                || size <= 0) {
+                return null;
+            }
+
+            java.nio.ByteBuffer shadow = org.lwjgl.BufferUtils.createByteBuffer(size)
+                .order(ByteOrder.LITTLE_ENDIAN);
+            if (initialData != null) {
+                java.nio.ByteBuffer source = initialData.duplicate();
+                int copyLength = Math.min(size, source.remaining());
+                source.limit(source.position() + copyLength);
+                shadow.put(source);
+                shadow.position(0);
+            }
+            return shadow;
         }
 
         private static boolean requiresHostVisibleBufferMemory(int usage) {
@@ -20002,6 +20047,10 @@ void main() {
                 destination.position(0);
                 destination.put(source);
             }
+            java.nio.ByteBuffer shadowSource = initialData.duplicate();
+            shadowSource.clear();
+            shadowSource.limit(requestedSize);
+            buffer.diagnosticShadowWrite(0, shadowSource);
         }
 
         private void recycleDescriptorUniformBuffer(VulkanBuffer buffer) {
