@@ -1468,6 +1468,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                 this.hasDepthAttachment,
                 colorAttachmentCount,
                 translatedState,
+                VulkanicAPI.drawStateParityViewportSnapshot(),
                 scissor,
                 draw,
                 resources

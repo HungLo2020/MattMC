@@ -1796,6 +1796,7 @@ public class GlCommandEncoder implements CommandEncoder {
 			glRenderPass.hasDepthTexture(),
 			colorAttachmentCount,
 			VulkanicDrawStateSnapshot.TranslatedPipelineState.opengl(renderPipeline),
+			VulkanicAPI.drawStateParityViewportSnapshot(),
 			scissor,
 			draw,
 			resources

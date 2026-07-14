@@ -453,6 +453,89 @@ class GeometryEvent:
 
 
 @dataclass
+class DrawStateEvent:
+    backend: str
+    raw: str
+    det_pose: str = ""
+    det_rendered_frame: str = ""
+    semantic_draw_key: str = ""
+    semantic_subsystem: str = ""
+    semantic_phase: str = ""
+    semantic_pass: str = ""
+    semantic_pipeline: str = ""
+    semantic_material: str = ""
+    semantic_output: str = ""
+    semantic_ordinal: str = ""
+    path: str = ""
+    pipeline: str = ""
+    framebuffer: str = ""
+    render_target: str = ""
+    color_attachments: str = ""
+    has_depth: str = ""
+    requested: str = ""
+    translated: str = ""
+    viewport: str = ""
+    scissor: str = ""
+    draw: str = ""
+    resources: str = ""
+
+    @property
+    def semantic_key(self) -> str:
+        if self.semantic_draw_key and self.semantic_draw_key != "unavailable":
+            return self.semantic_draw_key
+        return "|".join([
+            f"pose={self.det_pose or 'none'}",
+            f"frame={self.det_rendered_frame or 'none'}",
+            f"pipeline={self.semantic_pipeline or self.pipeline or 'unknown'}",
+            f"output={self.semantic_output or 'unknown'}",
+            f"ordinal={self.semantic_ordinal or '0'}",
+            f"draw={self.draw}",
+        ])
+
+    @property
+    def logical_target_signature(self) -> str:
+        return "|".join([
+            f"output={self.semantic_output or 'unknown'}",
+            f"target={normalize_render_target_signature(self.render_target)}",
+            f"colors={self.color_attachments}",
+            f"hasDepth={self.has_depth}",
+        ])
+
+    @property
+    def fixed_function_signature(self) -> str:
+        requested = parse_struct_fields(self.requested)
+        translated = parse_struct_fields(self.translated)
+        depth_test = requested.get('depthTest', '')
+        depth_compare = "disabled" if depth_test == "NO_DEPTH_TEST" else normalize_depth_compare(
+            translated.get('depthCompare', depth_test)
+        )
+        cull = requested.get('cull', '')
+        front_face = "cull-disabled" if cull == "false" else normalize_front_face(translated.get('frontFace', ''))
+        return "|".join([
+            self.logical_target_signature,
+            f"viewport={normalize_rect_signature(self.viewport, include_known=True)}",
+            f"scissor={normalize_rect_signature(self.scissor, include_known=False)}",
+            f"depthTest={depth_test}",
+            f"depthWrite={requested.get('depthWrite', '')}",
+            f"depthCompare={depth_compare}",
+            f"stencilTest={translated.get('stencilTest', 'false')}",
+            f"cull={cull}",
+            f"frontFace={front_face}",
+            f"polygonMode={normalize_polygon_mode(translated.get('polygonMode', requested.get('polygonMode', '')))}",
+            f"topology={normalize_topology(requested.get('topology', translated.get('topology', '')))}",
+            f"blend={requested.get('blend', '')}",
+            f"blendState={requested.get('blendState', '')}",
+            f"colorWriteMask={normalize_color_write_mask(translated.get('colorWriteMask', ''))}",
+            f"logic={requested.get('logic', '')}",
+            f"depthBias={translated.get('depthBias', '')}",
+            f"depthBiasConstant={translated.get('depthBiasConstant', '')}",
+            f"depthBiasSlope={translated.get('depthBiasSlope', '')}",
+            f"multisampling={translated.get('multisampling', requested.get('multisampling', ''))}",
+            f"lineWidth={translated.get('lineWidth', requested.get('lineWidth', ''))}",
+        ])
+
+
+@dataclass
 class SemanticDrawEvent:
     backend: str
     source: str
@@ -524,6 +607,7 @@ class CaptureEvents:
     draws: list[DrawEvent] = field(default_factory=list)
     semantic_draws: list[SemanticDrawEvent] = field(default_factory=list)
     geometry: list[GeometryEvent] = field(default_factory=list)
+    draw_states: dict[str, list[DrawStateEvent]] = field(default_factory=lambda: defaultdict(list))
     counters: Counter = field(default_factory=Counter)
     skipped: Counter = field(default_factory=Counter)
 
@@ -601,6 +685,127 @@ def parse_top_fields(text: str) -> dict[str, str]:
 
 def parse_struct_fields(text: str) -> dict[str, str]:
     return {match.group(1): match.group(2).strip('"') for match in STRUCT_FIELD_RE.finditer(text)}
+
+
+def normalize_render_target_signature(text: str) -> str:
+    if not text:
+        return "unknown"
+    normalized = normalize_identity(text)
+    if normalized in {"framebuffer", "framebuffer-or-texture-view"}:
+        return "legacy-framebuffer"
+    normalized = re.sub(r"\btex=\d+", "tex=<id>", normalized)
+    return normalized
+
+
+def normalize_rect_signature(text: str, include_known: bool) -> str:
+    fields = parse_struct_fields(text)
+    if not fields:
+        return "unknown"
+    if include_known and fields.get("known") == "false":
+        return "known=false"
+    keys = ["x", "y", "width", "height"]
+    if include_known:
+        keys.insert(0, "known")
+    else:
+        keys.insert(0, "enabled")
+    return ",".join(f"{key}={fields.get(key, 'unknown')}" for key in keys)
+
+
+def normalize_depth_compare(value: str) -> str:
+    normalized = value.replace("VK_COMPARE_OP_", "").replace("_DEPTH_TEST", "")
+    if normalized == "LESS_OR_EQUAL":
+        return "LEQUAL"
+    return normalized
+
+
+def normalize_front_face(value: str) -> str:
+    if value in {"OPENGL_CURRENT", "VK_FRONT_FACE_COUNTER_CLOCKWISE", "COUNTER_CLOCKWISE", "unknown", ""}:
+        return "semantic-default"
+    return value.replace("VK_FRONT_FACE_", "")
+
+
+def normalize_polygon_mode(value: str) -> str:
+    return value.replace("VK_POLYGON_MODE_", "")
+
+
+def normalize_topology(value: str) -> str:
+    normalized = value.replace("VK_PRIMITIVE_TOPOLOGY_", "")
+    if normalized == "TRIANGLE_LIST":
+        return "TRIANGLES"
+    return normalized
+
+
+def normalize_color_write_mask(value: str) -> str:
+    if not value:
+        return "unknown"
+    return "".join(sorted(value))
+
+
+FLOAT_RE = re.compile(r"[-+]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?")
+SEMANTIC_BLOCK_RE = re.compile(r"semantic=\{([^}]*)\}")
+SEMANTIC_FLOAT_TOLERANCE = 1.0e-5
+
+
+def extract_semantic_float_values(text: str) -> list[float]:
+    match = SEMANTIC_BLOCK_RE.search(text)
+    if not match:
+        return []
+    return [float(value) for value in FLOAT_RE.findall(match.group(1))]
+
+
+def semantic_float_values_equivalent(gl_records: list[ResourceRecord], vk_records: list[ResourceRecord]) -> tuple[bool, str]:
+    gl_values = [extract_semantic_float_values(record.raw) for record in gl_records]
+    vk_values = [extract_semantic_float_values(record.raw) for record in vk_records]
+    if len(gl_values) != len(vk_values) or not gl_values or not all(gl_values) or not all(vk_values):
+        return False, ""
+    max_delta = 0.0
+    for gl_record_values, vk_record_values in zip(gl_values, vk_values):
+        if len(gl_record_values) != len(vk_record_values):
+            return False, ""
+        for gl_value, vk_value in zip(gl_record_values, vk_record_values):
+            max_delta = max(max_delta, abs(gl_value - vk_value))
+            if max_delta > SEMANTIC_FLOAT_TOLERANCE:
+                return False, f"maxDelta={max_delta:.9g}"
+    return True, f"maxDelta={max_delta:.9g};tolerance={SEMANTIC_FLOAT_TOLERANCE:.1e}"
+
+
+def without_signature_field(signature: str, field_name: str) -> str:
+    prefix = f"{field_name}="
+    return "|".join(part for part in signature.split("|") if not part.startswith(prefix))
+
+
+def without_signature_fields(signature: str, field_names: set[str]) -> str:
+    prefixes = tuple(f"{field_name}=" for field_name in field_names)
+    return "|".join(part for part in signature.split("|") if not part.startswith(prefixes))
+
+
+def is_gui_item_atlas_pip_state_gap(gl_events: list["DrawStateEvent"], vk_events: list["DrawStateEvent"], gl_sigs: list[str], vk_sigs: list[str]) -> bool:
+    pipelines = {event.semantic_pipeline for event in gl_events + vk_events}
+    if not pipelines or not all(
+        pipeline in {
+            "minecraft:pipeline/entity_cutout",
+            "minecraft:pipeline/entity_cutout_no_cull",
+            "minecraft:pipeline/item_entity_translucent_cull",
+        }
+        for pipeline in pipelines
+    ):
+        return False
+    gl_without_viewport_scissor = sorted({without_signature_fields(signature, {"viewport", "scissor"}) for signature in gl_sigs})
+    vk_without_viewport_scissor = sorted({without_signature_fields(signature, {"viewport", "scissor"}) for signature in vk_sigs})
+    if gl_without_viewport_scissor != vk_without_viewport_scissor:
+        return False
+    gl_uses_item_atlas_tile = any(
+        "viewport=known=true,x=0,y=0,width=512,height=512" in signature
+        and "scissor=enabled=true" in signature
+        and "width=48,height=48" in signature
+        for signature in gl_sigs
+    )
+    vk_uses_pip_full_target = any(
+        "viewport=known=true,x=0,y=0,width=1280,height=720" in signature
+        and "scissor=enabled=false" in signature
+        for signature in vk_sigs
+    )
+    return gl_uses_item_atlas_tile and vk_uses_pip_full_target
 
 
 def extract_hashes(text: str) -> dict[str, str]:
@@ -771,6 +976,41 @@ def parse_capture_log(path: Path, limits: ParseLimits | None = None) -> CaptureE
 
 
 def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) -> None:
+    if "VulkanicDrawStateParity" in line:
+        payload = line.split("VulkanicDrawStateParity", 1)[1]
+        events.counters["DrawState"] += 1
+        fields = parse_top_fields(payload)
+        backend = fields.get("backend", "unknown")
+        events.backend = backend
+        event = DrawStateEvent(
+            backend=backend,
+            raw=payload.strip(),
+            det_pose=fields.get("detPose", ""),
+            det_rendered_frame=fields.get("detRenderedFrame", ""),
+            semantic_draw_key=fields.get("semanticDrawKey", ""),
+            semantic_subsystem=fields.get("semanticSubsystem", ""),
+            semantic_phase=fields.get("semanticPhase", ""),
+            semantic_pass=fields.get("semanticPass", ""),
+            semantic_pipeline=fields.get("semanticPipeline", ""),
+            semantic_material=fields.get("semanticMaterial", ""),
+            semantic_output=fields.get("semanticOutput", ""),
+            semantic_ordinal=fields.get("semanticOrdinal", ""),
+            path=fields.get("path", ""),
+            pipeline=fields.get("pipeline", ""),
+            framebuffer=fields.get("framebuffer", ""),
+            render_target=fields.get("renderTarget", ""),
+            color_attachments=fields.get("colorAttachments", ""),
+            has_depth=fields.get("hasDepth", ""),
+            requested=extract_balanced_after("requested", payload),
+            translated=extract_balanced_after("translated", payload),
+            viewport=extract_balanced_after("viewport", payload),
+            scissor=extract_balanced_after("scissor", payload),
+            draw=extract_balanced_after("draw", payload),
+            resources=extract_balanced_after("resources", payload),
+        )
+        events.draw_states[event.semantic_key].append(event)
+        return
+
     if "ShaderInputParity" not in line:
         return
     payload = line.split("ShaderInputParity", 1)[1]
@@ -1152,6 +1392,64 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
     opengl_draw_parameters = semantic_draw_parameter_signatures(opengl)
     vulkan_draw_parameters = semantic_draw_parameter_signatures(vulkan)
 
+    all_draw_state_keys = sorted(set(opengl.draw_states) | set(vulkan.draw_states))
+    for key in all_draw_state_keys:
+        gl_events = opengl.draw_states.get(key, [])
+        vk_events = vulkan.draw_states.get(key, [])
+        key_text = f"semanticDrawKey={key}"
+        if not gl_events or not vk_events:
+            differences.append(Difference(
+                severity=35,
+                category="backend-only-draw-state",
+                key=key_text,
+                reason="fixed-function draw-state snapshot only observed on one backend",
+                opengl_count=len(gl_events),
+                vulkan_count=len(vk_events),
+                opengl_values=[event.fixed_function_signature for event in gl_events[:4]],
+                vulkan_values=[event.fixed_function_signature for event in vk_events[:4]],
+            ))
+            continue
+        gl_sigs = sorted({event.fixed_function_signature for event in gl_events})
+        vk_sigs = sorted({event.fixed_function_signature for event in vk_events})
+        if set(gl_sigs) == set(vk_sigs):
+            continue
+        gl_without_viewport = sorted({without_signature_field(signature, "viewport") for signature in gl_sigs})
+        vk_without_viewport = sorted({without_signature_field(signature, "viewport") for signature in vk_sigs})
+        gl_targets = sorted({event.logical_target_signature for event in gl_events})
+        vk_targets = sorted({event.logical_target_signature for event in vk_events})
+        gl_draws = sorted({event.draw for event in gl_events})
+        vk_draws = sorted({event.draw for event in vk_events})
+        if gl_draws != vk_draws:
+            category = "draw-state-semantic-draw-parameter-matching-gap"
+            severity = 38
+            reason = "same semantic draw key has different physical draw parameters; state records should not be paired one-to-one"
+        elif gl_targets != vk_targets:
+            category = "strict-render-target-state-mismatch"
+            severity = 92
+            reason = "matched semantic draw has different logical output target or attachment behavior"
+        elif gl_without_viewport == vk_without_viewport:
+            category = "draw-state-viewport-coverage-gap"
+            severity = 36
+            reason = "matched semantic draw differs only because one backend did not report a comparable viewport snapshot"
+        elif is_gui_item_atlas_pip_state_gap(gl_events, vk_events, gl_sigs, vk_sigs):
+            category = "draw-state-gui-item-atlas-pip-implementation-gap"
+            severity = 35
+            reason = "OpenGL renders this GUI item draw through the shared item atlas tile while Vulkan renders the equivalent item through a per-item PIP target; viewport/scissor are intentionally not one-to-one"
+        else:
+            category = "strict-fixed-function-state-mismatch"
+            severity = 90
+            reason = "matched semantic draw has different normalized fixed-function state"
+        differences.append(Difference(
+            severity=severity,
+            category=category,
+            key=key_text,
+            reason=reason,
+            opengl_count=len(gl_events),
+            vulkan_count=len(vk_events),
+            opengl_values=gl_sigs[:4],
+            vulkan_values=vk_sigs[:4],
+        ))
+
     all_resource_keys = sorted(set(opengl.resources) | set(vulkan.resources))
     for key in all_resource_keys:
         gl_records = opengl.resources.get(key, [])
@@ -1257,6 +1555,19 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
             if gl_payloads and vk_payloads and set(gl_payloads) != set(vk_payloads):
                 gl_pipeline_keys = values_for_pipeline_keys(gl_records)
                 vk_pipeline_keys = values_for_pipeline_keys(vk_records)
+                semantic_equivalent, semantic_detail = semantic_float_values_equivalent(gl_records, vk_records)
+                if semantic_equivalent:
+                    differences.append(Difference(
+                        severity=20,
+                        category="ubo-byte-different-semantic-float-equivalent",
+                        key=key_text,
+                        reason="same semantic UBO has different raw payload hashes, but decoded semantic float values are equal within tolerance",
+                        opengl_count=len(gl_records),
+                        vulkan_count=len(vk_records),
+                        opengl_values=[semantic_detail, *gl_payloads[:3]],
+                        vulkan_values=[semantic_detail, *vk_payloads[:3]],
+                    ))
+                    continue
                 if len(gl_pipeline_keys) > 1 or len(vk_pipeline_keys) > 1:
                     differences.append(Difference(
                         severity=50,
@@ -1477,6 +1788,19 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
                     vulkan_count=len(vk_events),
                     opengl_values=[f"shared={','.join(overlap[:3])}", *gl_values[:6]],
                     vulkan_values=[f"shared={','.join(overlap[:3])}", *vk_values[:6]],
+                ))
+                continue
+
+            if not any(event.sample for event in gl_events + vk_events):
+                differences.append(Difference(
+                    severity=60,
+                    category="standalone-uniform-hash-only-not-comparable",
+                    key=name,
+                    reason="same standalone uniform semantic key has disjoint payload hashes, but no decoded sample/semantic values were logged; this is a comparison blocker, not a proven semantic mismatch",
+                    opengl_count=len(gl_events),
+                    vulkan_count=len(vk_events),
+                    opengl_values=gl_values[:6],
+                    vulkan_values=vk_values[:6],
                 ))
                 continue
 

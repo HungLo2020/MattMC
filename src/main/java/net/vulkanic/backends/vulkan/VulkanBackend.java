@@ -12,6 +12,7 @@ import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.textures.TextureFormat;
+import net.blaze3d.vertex.VertexFormat;
 import net.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -5300,7 +5301,15 @@ void main() {
             pipelineState.depthWriteEnabled(),
             vkCompareOpName(pipelineState.depthCompareOp()),
             vkColorWriteMaskName(pipelineState.colorWriteMask()),
-            pipelineState.colorBlendAttachments().size()
+            pipelineState.colorBlendAttachments().size(),
+            vkPolygonModeName(pipelineState.polygonMode()),
+            vkPrimitiveTopologyName(descriptor.getPortableState().vertexFormatMode()),
+            pipelineState.depthBiasEnabled(),
+            pipelineState.depthBiasConstantFactor(),
+            pipelineState.depthBiasSlopeFactor(),
+            "samples=1,sampleShading=false",
+            1.0F,
+            pipelineState.stencilTestEnabled()
         );
     }
 
@@ -5351,6 +5360,25 @@ void main() {
             builder.append('A');
         }
         return builder.isEmpty() ? "NONE" : builder.toString();
+    }
+
+    private static String vkPolygonModeName(int mode) {
+        return switch (mode) {
+            case VK10.VK_POLYGON_MODE_FILL -> "VK_POLYGON_MODE_FILL";
+            case VK10.VK_POLYGON_MODE_LINE -> "VK_POLYGON_MODE_LINE";
+            case VK10.VK_POLYGON_MODE_POINT -> "VK_POLYGON_MODE_POINT";
+            default -> "VK_POLYGON_MODE_UNKNOWN(" + mode + ")";
+        };
+    }
+
+    private static String vkPrimitiveTopologyName(VertexFormat.Mode mode) {
+        return switch (mode) {
+            case LINES, DEBUG_LINES -> "VK_PRIMITIVE_TOPOLOGY_LINE_LIST";
+            case LINE_STRIP, DEBUG_LINE_STRIP -> "VK_PRIMITIVE_TOPOLOGY_LINE_STRIP";
+            case TRIANGLES, QUADS -> "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST";
+            case TRIANGLE_STRIP -> "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP";
+            case TRIANGLE_FAN -> "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN";
+        };
     }
 
     private static int toDiagnosticVkPolygonMode(PolygonMode mode) {

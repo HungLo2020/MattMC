@@ -254,6 +254,20 @@ public class VulkanicAPI {
         }
     }
 
+    public static VulkanicDrawStateSnapshot.ViewportStateSnapshot drawStateParityViewportSnapshot() {
+        DiagnosticViewportState viewport = diagnosticLastViewport;
+        if (viewport == null) {
+            return VulkanicDrawStateSnapshot.ViewportStateSnapshot.unknown();
+        }
+        return new VulkanicDrawStateSnapshot.ViewportStateSnapshot(
+            true,
+            viewport.x(),
+            viewport.y(),
+            viewport.width(),
+            viewport.height()
+        );
+    }
+
     public record DiagnosticTextureContentHash(
         String logicalResource,
         int width,
@@ -1407,7 +1421,8 @@ public class VulkanicAPI {
      * @param height The height of the viewport in pixels
      */
     public static void setDynamicViewport(CommandContext ctx, int x, int y, int width, int height) {
-        if (TRACE_RENDER_TARGET_CONTENT_HASHES && DeterministicCameraCapture.isEnabledForDiagnostics()) {
+        if ((TRACE_RENDER_TARGET_CONTENT_HASHES && DeterministicCameraCapture.isEnabledForDiagnostics())
+            || VulkanicDrawStateDiagnostics.enabled()) {
             diagnosticLastViewport = new DiagnosticViewportState(x, y, width, height);
         }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
@@ -9072,6 +9087,10 @@ public class VulkanicAPI {
         return identity == null
             ? "semanticDrawKey=unavailable semanticSubsystem=unknown semanticPhase=unknown semanticPass=unknown semanticPipeline=unknown semanticVertexShader=unknown semanticFragmentShader=unknown semanticMaterial=unknown semanticOutput=unknown semanticOrdinal=0"
             : identity.fields();
+    }
+
+    public static String currentShaderInputParitySemanticDrawContextFields() {
+        return shaderInputParitySemanticDrawContextFields();
     }
 
     private static String shaderInputParitySemanticDrawKeyOrUnavailable() {

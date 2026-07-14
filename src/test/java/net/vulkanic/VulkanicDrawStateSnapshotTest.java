@@ -35,8 +35,17 @@ public class VulkanicDrawStateSnapshotTest {
                 true,
                 "VK_COMPARE_OP_LESS",
                 "RGBA",
-                1
+                1,
+                "VK_POLYGON_MODE_FILL",
+                "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST",
+                false,
+                0.0F,
+                0.0F,
+                "samples=1,sampleShading=false",
+                1.0F,
+                false
             ),
+            new VulkanicDrawStateSnapshot.ViewportStateSnapshot(true, 0, 0, 16, 16),
             new VulkanicDrawStateSnapshot.ScissorStateSnapshot(true, 1, 2, 3, 4),
             new VulkanicDrawStateSnapshot.DrawCall(true, 0, 5, 6, 7, 0, 1, VertexFormat.IndexType.INT),
             new VulkanicDrawStateSnapshot.ResourceState(4, 3, 2, 1, List.of("Sampler2"))
@@ -47,7 +56,11 @@ public class VulkanicDrawStateSnapshotTest {
         assertTrue(logFields.contains("backend=vulkan"));
         assertTrue(logFields.contains("pipeline=minecraft:pipeline/draw_state_snapshot_test"));
         assertTrue(logFields.contains("requested{depthTest=LESS_DEPTH_TEST,depthWrite=true,cull=true"));
+        assertTrue(logFields.contains("topology=TRIANGLES"));
+        assertTrue(logFields.contains("depthBiasScale=0.0,depthBiasConstant=0.0,lineWidth=1.0"));
         assertTrue(logFields.contains("translated{cullMode=VK_CULL_MODE_NONE,frontFace=VK_FRONT_FACE_CLOCKWISE"));
+        assertTrue(logFields.contains("polygonMode=VK_POLYGON_MODE_FILL,topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST"));
+        assertTrue(logFields.contains("viewport{known=true,x=0,y=0,width=16,height=16}"));
         assertTrue(logFields.contains("scissor{enabled=true,x=1,y=2,width=3,height=4}"));
         assertTrue(logFields.contains("draw{indexed=true,firstVertex=0,baseVertex=5,firstIndex=6,indexCount=7"));
         assertTrue(logFields.contains("resources{reflected=4,submitted=3,samplers=2,uniforms=1,missing=[Sampler2]}"));
@@ -70,6 +83,10 @@ public class VulkanicDrawStateSnapshotTest {
         assertEquals("LESS_DEPTH_TEST", state.depthCompareOp());
         assertEquals("RGB", state.colorWriteMask());
         assertEquals(1, state.blendAttachmentCount());
+        assertEquals("FILL", state.polygonMode());
+        assertEquals("TRIANGLES", state.topology());
+        assertEquals("samples=1,sampleShading=false", state.multisampling());
+        assertEquals(1.0F, state.lineWidth());
     }
 
     private static RenderPipeline.Builder pipelineBuilder() {
