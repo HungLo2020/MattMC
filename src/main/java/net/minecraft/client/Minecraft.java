@@ -1348,7 +1348,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			net.minecraft.client.dev.DeterministicCameraCapture.beforeRender(this);
 			this.gameRenderer.render(this.deltaTracker, bl);
 			net.minecraft.client.dev.DeterministicCameraCapture.afterRender(this);
-			net.minecraft.client.dev.RunCaptureAutomation.afterRender(this);
 		}
 		net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadOperation("frame.gameRenderer", Util.getNanos() - startTime);
 

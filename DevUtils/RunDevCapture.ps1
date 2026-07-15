@@ -17,7 +17,15 @@ param(
     [string]$ArtifactRoot,
 
     [ValidateRange(1, 120)]
-    [int]$MinRenderedFrames = 8
+    [int]$MinRenderedFrames = 8,
+
+    [switch]$RequireMeshingReport,
+
+    [ValidateRange(0, 100)]
+    [double]$MinNonBlackPixelPercent = 1.0,
+
+    [ValidateRange(1, 20)]
+    [int]$CaptureRetries = 6
 )
 
 Set-StrictMode -Version Latest
@@ -236,23 +244,294 @@ function Copy-IfExists {
     }
 }
 
+function Initialize-WindowCapture {
+    if ("MattMcWindowCapture" -as [type]) {
+        return
+    }
+
+    Add-Type -AssemblyName System.Drawing
+    Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+
+public static class MattMcWindowCapture {
+    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RECT {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct POINT {
+        public int X;
+        public int Y;
+    }
+
+    [DllImport("user32.dll")]
+    public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    public static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+    [DllImport("user32.dll")]
+    public static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll")]
+    public static extern bool ClientToScreen(IntPtr hWnd, ref POINT lpPoint);
+}
+"@
+}
+
+function Get-ClientProcessIds {
+    param([string]$RepoRoot)
+
+    @(Get-MattMcProcesses -RepoRoot $RepoRoot |
+        Where-Object {
+            $_.CommandLine -match "KnotClient|net\.minecraft\.client" -and
+            $_.CommandLine -notmatch "GradleWrapperMain|GradleDaemon"
+        } |
+        ForEach-Object { [int]$_.ProcessId })
+}
+
+function Find-ClientWindow {
+    param([string]$RepoRoot)
+
+    Initialize-WindowCapture
+    $clientPids = @(Get-ClientProcessIds -RepoRoot $RepoRoot)
+    if ($clientPids.Count -eq 0) {
+        return $null
+    }
+
+    $windows = New-Object System.Collections.Generic.List[object]
+    $callback = [MattMcWindowCapture+EnumWindowsProc] {
+        param([IntPtr]$hWnd, [IntPtr]$lParam)
+
+        if (-not [MattMcWindowCapture]::IsWindowVisible($hWnd)) {
+            return $true
+        }
+
+        $windowProcessId = [uint32]0
+        [void][MattMcWindowCapture]::GetWindowThreadProcessId($hWnd, [ref]$windowProcessId)
+        if ($script:WindowCaptureClientPids -notcontains [int]$windowProcessId) {
+            return $true
+        }
+
+        $clientRect = New-Object MattMcWindowCapture+RECT
+        if (-not [MattMcWindowCapture]::GetClientRect($hWnd, [ref]$clientRect)) {
+            return $true
+        }
+
+        $width = $clientRect.Right - $clientRect.Left
+        $height = $clientRect.Bottom - $clientRect.Top
+        if ($width -lt 320 -or $height -lt 200) {
+            return $true
+        }
+
+        $origin = New-Object MattMcWindowCapture+POINT
+        $origin.X = 0
+        $origin.Y = 0
+        if (-not [MattMcWindowCapture]::ClientToScreen($hWnd, [ref]$origin)) {
+            return $true
+        }
+
+        $titleBuilder = New-Object System.Text.StringBuilder 512
+        [void][MattMcWindowCapture]::GetWindowText($hWnd, $titleBuilder, $titleBuilder.Capacity)
+
+        $script:WindowCaptureWindows.Add([pscustomobject]@{
+            Handle = $hWnd
+            ProcessId = [int]$windowProcessId
+            Title = $titleBuilder.ToString()
+            Left = $origin.X
+            Top = $origin.Y
+            Width = $width
+            Height = $height
+        })
+        return $true
+    }
+
+    $script:WindowCaptureClientPids = $clientPids
+    $script:WindowCaptureWindows = $windows
+    [void][MattMcWindowCapture]::EnumWindows($callback, [IntPtr]::Zero)
+    $script:WindowCaptureClientPids = @()
+
+    return @($windows | Sort-Object @{ Expression = { if ($_.Title -match "Minecraft|MattMC") { 0 } else { 1 } } }, ProcessId | Select-Object -First 1)[0]
+}
+
+function Save-ClientWindowScreenshot {
+    param(
+        [string]$RepoRoot,
+        [string]$Path
+    )
+
+    Initialize-WindowCapture
+    $window = Find-ClientWindow -RepoRoot $RepoRoot
+    if (-not $window) {
+        throw "Could not find a visible MattMC client window to capture."
+    }
+
+    $parent = Split-Path -Parent $Path
+    if ($parent) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+
+    $bitmap = $null
+    $graphics = $null
+    try {
+        $bitmap = New-Object System.Drawing.Bitmap $window.Width, $window.Height
+        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+        $graphics.CopyFromScreen($window.Left, $window.Top, 0, 0, $bitmap.Size)
+        $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
+    } finally {
+        if ($graphics) {
+            $graphics.Dispose()
+        }
+        if ($bitmap) {
+            $bitmap.Dispose()
+        }
+    }
+
+    return [pscustomobject]@{
+        path = $Path
+        processId = $window.ProcessId
+        title = $window.Title
+        left = $window.Left
+        top = $window.Top
+        width = $window.Width
+        height = $window.Height
+    }
+}
+
+function Test-ScreenshotContent {
+    param(
+        [string]$Path,
+        [double]$MinNonBlackPixelPercent
+    )
+
+    $result = [ordered]@{
+        path = $Path
+        exists = $false
+        width = 0
+        height = 0
+        sampledPixels = 0
+        nonBlackPixels = 0
+        nonBlackPixelPercent = 0.0
+        averageBrightness = 0.0
+        minNonBlackPixelPercent = $MinNonBlackPixelPercent
+        passed = $false
+    }
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return [pscustomobject]$result
+    }
+
+    Add-Type -AssemblyName System.Drawing
+    $bitmap = $null
+    try {
+        $bitmap = [System.Drawing.Bitmap]::new($Path)
+        $width = $bitmap.Width
+        $height = $bitmap.Height
+        $totalPixels = [double]($width * $height)
+        $stride = [Math]::Max(1, [int][Math]::Floor([Math]::Sqrt($totalPixels / 250000.0)))
+        $samples = 0L
+        $nonBlack = 0L
+        $brightnessTotal = 0L
+
+        for ($y = 0; $y -lt $height; $y += $stride) {
+            for ($x = 0; $x -lt $width; $x += $stride) {
+                $pixel = $bitmap.GetPixel($x, $y)
+                $brightness = [Math]::Max($pixel.R, [Math]::Max($pixel.G, $pixel.B))
+                if ($pixel.A -gt 0 -and $brightness -ge 12) {
+                    $nonBlack++
+                }
+                $brightnessTotal += $brightness
+                $samples++
+            }
+        }
+
+        $percent = 0.0
+        $average = 0.0
+        if ($samples -gt 0) {
+            $percent = [double]$nonBlack * 100.0 / [double]$samples
+            $average = [double]$brightnessTotal / [double]$samples
+        }
+
+        $result.exists = $true
+        $result.width = $width
+        $result.height = $height
+        $result.sampledPixels = $samples
+        $result.nonBlackPixels = $nonBlack
+        $result.nonBlackPixelPercent = $percent
+        $result.averageBrightness = $average
+        $result.passed = $percent -ge $MinNonBlackPixelPercent
+    } finally {
+        if ($bitmap) {
+            $bitmap.Dispose()
+        }
+    }
+
+    return [pscustomobject]$result
+}
+
+function Test-LogPattern {
+    param(
+        [string[]]$Paths,
+        [string]$Pattern
+    )
+
+    foreach ($path in $Paths) {
+        if (Test-Path -LiteralPath $path) {
+            if (Select-String -LiteralPath $path -Pattern $Pattern -Quiet -ErrorAction SilentlyContinue) {
+                return $true
+            }
+        }
+    }
+
+    return $false
+}
+
+function Get-ActiveLogPaths {
+    param(
+        [string]$StdoutPath,
+        [string]$StderrPath,
+        [string]$LatestLogPath,
+        [datetime]$Since
+    )
+
+    $paths = New-Object System.Collections.Generic.List[string]
+    if (Test-Path -LiteralPath $StdoutPath) {
+        $paths.Add($StdoutPath)
+    }
+    if (Test-Path -LiteralPath $StderrPath) {
+        $paths.Add($StderrPath)
+    }
+    if ((Test-Path -LiteralPath $LatestLogPath) -and (Get-Item -LiteralPath $LatestLogPath).LastWriteTime -ge $Since) {
+        $paths.Add($LatestLogPath)
+    }
+
+    return $paths.ToArray()
+}
+
 function Write-Result {
     param(
         [string]$Path,
         [string]$Result,
         [string]$Reason,
         [int]$ExitCode,
-        [object]$Status
+        [object]$WindowCapture,
+        [object]$ScreenshotAnalysis,
+        [bool]$FallbackReportObserved
     )
-
-    $actualWorld = $null
-    $backendName = $null
-    $screenshot = $null
-    if ($Status) {
-        $actualWorld = $Status.actualWorld
-        $backendName = $Status.backend
-        $screenshot = $Status.screenshot
-    }
 
     $json = [ordered]@{
         result = $Result
@@ -261,10 +540,13 @@ function Write-Result {
         backend = $script:Backend
         shaders = $script:Shaders
         world = $script:World
-        actualWorld = $actualWorld
-        clientBackend = $backendName
         timeoutSeconds = $script:TimeoutSeconds
-        screenshot = $screenshot
+        minNonBlackPixelPercent = $script:MinNonBlackPixelPercent
+        captureRetries = $script:CaptureRetries
+        requireMeshingReport = $script:RequireMeshingReport.IsPresent
+        fallbackReportObserved = $FallbackReportObserved
+        windowCapture = $WindowCapture
+        screenshotAnalysis = $ScreenshotAnalysis
         artifactDir = $script:ArtifactDir
         completedAt = (Get-Date).ToString("o")
     } | ConvertTo-Json -Depth 5
@@ -276,6 +558,9 @@ $script:Backend = $Backend
 $script:Shaders = $Shaders
 $script:World = $World
 $script:TimeoutSeconds = $TimeoutSeconds
+$script:MinNonBlackPixelPercent = $MinNonBlackPixelPercent
+$script:CaptureRetries = $CaptureRetries
+$script:RequireMeshingReport = $RequireMeshingReport
 $script:RunLogPath = $null
 $script:ArtifactDir = $null
 $exitCode = 1
@@ -284,17 +569,13 @@ $reason = "unexpected failure"
 $repoRoot = $null
 $gradlePath = $null
 $process = $null
-$oldJavaToolOptions = $env:JAVA_TOOL_OPTIONS
-$oldRunCapture = $env:MATTMC_DEV_RUN_CAPTURE
-$oldRunCaptureWorld = $env:MATTMC_DEV_RUN_CAPTURE_WORLD
-$oldRunCaptureStatus = $env:MATTMC_DEV_RUN_CAPTURE_STATUS
-$oldRunCaptureScreenshot = $env:MATTMC_DEV_RUN_CAPTURE_SCREENSHOT
-$oldRunCaptureFrames = $env:MATTMC_DEV_RUN_CAPTURE_MIN_RENDERED_FRAMES
 $optionsBytes = $null
 $irisBytes = $null
 $optionsPath = $null
 $irisPath = $null
-$status = $null
+$windowCapture = $null
+$screenshotAnalysis = $null
+$fallbackReportObserved = $false
 $startTime = Get-Date
 
 try {
@@ -367,25 +648,12 @@ try {
     Copy-Item -LiteralPath $optionsPath -Destination (Join-Path $script:ArtifactDir "config-effective\options.txt") -Force
     Copy-Item -LiteralPath $irisPath -Destination (Join-Path $script:ArtifactDir "config-effective\iris.properties") -Force
 
-    $statusPath = Join-Path $script:ArtifactDir "run-capture-status.json"
-    $screenshotPath = Join-Path $script:ArtifactDir "screenshots\rendered.png"
     $stdoutPath = Join-Path $script:ArtifactDir "logs\runClient.stdout.log"
     $stderrPath = Join-Path $script:ArtifactDir "logs\runClient.stderr.log"
     $latestLogPath = Join-Path $runDir "logs\latest.log"
 
-    $toolOptions = @("-Dmattmc.dev.runCapture=true")
-    if (-not [string]::IsNullOrWhiteSpace($oldJavaToolOptions)) {
-        $env:JAVA_TOOL_OPTIONS = "$oldJavaToolOptions $($toolOptions -join ' ')"
-    } else {
-        $env:JAVA_TOOL_OPTIONS = $toolOptions -join " "
-    }
-    $env:MATTMC_DEV_RUN_CAPTURE = "true"
-    $env:MATTMC_DEV_RUN_CAPTURE_WORLD = $World
-    $env:MATTMC_DEV_RUN_CAPTURE_STATUS = $statusPath
-    $env:MATTMC_DEV_RUN_CAPTURE_SCREENSHOT = $screenshotPath
-    $env:MATTMC_DEV_RUN_CAPTURE_MIN_RENDERED_FRAMES = [string]$MinRenderedFrames
-
-    $gradleArgs = @("runClient", "--no-daemon")
+    $quickPlayArg = "--quickPlaySingleplayer=$World"
+    $gradleArgs = @("runClient", "--no-daemon", "--args=$quickPlayArg")
     Write-RunLog "Launching .\gradlew.bat $($gradleArgs -join ' ')"
     $startTime = Get-Date
     $process = Start-Process -FilePath $gradlePath `
@@ -397,7 +665,9 @@ try {
         -PassThru
 
     $deadline = $startTime.AddSeconds($TimeoutSeconds)
-    $ready = $false
+    $worldLoaded = $false
+    $captureComplete = $false
+    $captureAttempts = 0
     $startupSeen = $false
     $crashReason = $null
 
@@ -408,12 +678,13 @@ try {
         if (Test-Path -LiteralPath $latestLogPath) {
             $latestLogIsFresh = (Get-Item -LiteralPath $latestLogPath).LastWriteTime -ge $startTime
         }
-        if (-not $startupSeen -and ($latestLogIsFresh -or (Test-Path -LiteralPath $statusPath))) {
+        if (-not $startupSeen -and $latestLogIsFresh) {
             $startupSeen = $true
             Write-RunLog "Startup activity detected."
         }
 
-        $crashReason = Test-LogForCrash -Paths @($stdoutPath, $stderrPath, $latestLogPath) -Since $startTime
+        $activeLogPaths = Get-ActiveLogPaths -StdoutPath $stdoutPath -StderrPath $stderrPath -LatestLogPath $latestLogPath -Since $startTime
+        $crashReason = Test-LogForCrash -Paths $activeLogPaths -Since $startTime
         if ($crashReason) {
             $exitCode = 4
             $result = "crash"
@@ -422,36 +693,68 @@ try {
             break
         }
 
-        $status = Read-StatusJson -Path $statusPath
-        if ($status -and $status.status -eq "failed") {
-            $exitCode = 4
-            $result = "failed"
-            $reason = "development capture hook failed: $($status.reason)"
+        if (-not $worldLoaded -and @(Get-ClientProcessIds -RepoRoot $repoRoot).Count -gt 0 -and (Test-LogPattern -Paths $activeLogPaths -Pattern "Sent player skin to server|Timed out while waiting for the client to load chunks, letting the player into the world anyway")) {
+            $worldLoaded = $true
+            Write-RunLog "World-load activity detected for '$World'."
+        }
+
+        $fallbackReportObserved = Test-LogPattern -Paths $activeLogPaths -Pattern "Native meshing fallback report"
+
+        if ($worldLoaded -and -not $captureComplete -and $captureAttempts -lt $CaptureRetries) {
+            $attemptNumber = $captureAttempts + 1
+            $attemptPath = Join-Path $script:ArtifactDir ("screenshots\client-attempt-{0}.png" -f $attemptNumber)
+            try {
+                $windowCapture = Save-ClientWindowScreenshot -RepoRoot $repoRoot -Path $attemptPath
+                $captureAttempts = $attemptNumber
+                $screenshotAnalysis = Test-ScreenshotContent -Path $attemptPath -MinNonBlackPixelPercent $MinNonBlackPixelPercent
+                [ordered]@{
+                    capture = $windowCapture
+                    analysis = $screenshotAnalysis
+                } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $script:ArtifactDir ("screenshots\client-attempt-{0}.analysis.json" -f $attemptNumber)) -Encoding utf8
+
+                if ($screenshotAnalysis.passed) {
+                    $captureComplete = $true
+                    Write-RunLog "Client-area screenshot accepted on attempt ${attemptNumber}: nonBlackPixelPercent=$([Math]::Round($screenshotAnalysis.nonBlackPixelPercent, 4))."
+                } else {
+                    Write-RunLog "Client-area screenshot attempt $attemptNumber was too dark: nonBlackPixelPercent=$([Math]::Round($screenshotAnalysis.nonBlackPixelPercent, 4)) < $MinNonBlackPixelPercent."
+                }
+            } catch {
+                Write-RunLog "Client-area screenshot attempt $attemptNumber deferred: $($_.Exception.Message)"
+            }
+        }
+
+        if ($captureComplete -and (-not $RequireMeshingReport -or $fallbackReportObserved)) {
+            $exitCode = 0
+            $result = "passed"
+            $reason = "World loaded and client-area screenshot contains nonblack rendered content."
+            if ($RequireMeshingReport) {
+                $reason = "$reason Native meshing fallback report was observed."
+            }
             Write-RunLog $reason
             break
         }
 
-        if ($status -and $status.status -eq "rendered") {
-            $actualWorld = [string]$status.actualWorld
-            if ($actualWorld -and $actualWorld -ne $World) {
-                $exitCode = 3
-                $result = "world-load-failed"
-                $reason = "Loaded world '$actualWorld' did not match requested world '$World'."
-                Write-RunLog $reason
-                break
-            }
-            if (-not $ready) {
-                $ready = $true
-                Write-RunLog "World '$World' reached usable rendered state."
-            }
+        if ($worldLoaded -and -not $captureComplete -and $captureAttempts -ge $CaptureRetries) {
+            $exitCode = 5
+            $result = "black-screenshot"
+            $reason = "All $CaptureRetries client-area screenshot attempts were missing or below the nonblack threshold."
+            Write-RunLog $reason
+            break
         }
 
         if ($process.HasExited) {
-            $status = Read-StatusJson -Path $statusPath
-            if (-not $ready) {
+            if (-not $worldLoaded) {
                 $exitCode = 3
                 $result = "startup-failed"
-                $reason = "Gradle/client exited before the world reached a rendered state. Exit code: $($process.ExitCode)"
+                $reason = "Gradle/client exited before world-load activity was detected. Exit code: $($process.ExitCode)"
+            } elseif (-not $captureComplete) {
+                $exitCode = 5
+                $result = "capture-failed"
+                $reason = "Gradle/client exited before a nonblack client-area screenshot was captured. Exit code: $($process.ExitCode)"
+            } elseif ($RequireMeshingReport -and -not $fallbackReportObserved) {
+                $exitCode = 5
+                $result = "fallback-report-missing"
+                $reason = "Gradle/client exited before a Native meshing fallback report was observed. Exit code: $($process.ExitCode)"
             } elseif ($process.ExitCode -ne 0) {
                 $exitCode = 4
                 $result = "client-exited"
@@ -466,16 +769,28 @@ try {
         }
     }
 
-    if (-not $process.HasExited -and -not $crashReason) {
-        if ($ready) {
+    if ($exitCode -eq 1 -and -not $process.HasExited -and -not $crashReason) {
+        $finalLogPaths = Get-ActiveLogPaths -StdoutPath $stdoutPath -StderrPath $stderrPath -LatestLogPath $latestLogPath -Since $startTime
+        $fallbackReportObserved = Test-LogPattern -Paths $finalLogPaths -Pattern "Native meshing fallback report"
+        if ($worldLoaded -and $captureComplete -and (-not $RequireMeshingReport -or $fallbackReportObserved)) {
             $exitCode = 0
             $result = "passed"
-            $reason = "World reached rendered state and remained alive for $TimeoutSeconds seconds; terminating scheduled run."
+            $reason = "World loaded and client-area screenshot contains nonblack rendered content; terminating scheduled run."
+            Write-RunLog $reason
+        } elseif ($worldLoaded -and $captureComplete -and $RequireMeshingReport -and -not $fallbackReportObserved) {
+            $exitCode = 5
+            $result = "fallback-report-missing"
+            $reason = "Timed out after $TimeoutSeconds seconds after capture succeeded, but no Native meshing fallback report was observed."
+            Write-RunLog $reason
+        } elseif ($worldLoaded) {
+            $exitCode = 5
+            $result = "capture-failed"
+            $reason = "Timed out after $TimeoutSeconds seconds before a nonblack client-area screenshot was captured."
             Write-RunLog $reason
         } else {
             $exitCode = 124
             $result = "timeout"
-            $reason = "Timed out after $TimeoutSeconds seconds before the world reached a rendered state."
+            $reason = "Timed out after $TimeoutSeconds seconds before world-load activity was detected."
             Write-RunLog $reason
         }
     }
@@ -521,18 +836,13 @@ try {
         Copy-Item -LiteralPath $irisPath -Destination (Join-Path $script:ArtifactDir "config-after\iris.properties") -Force
     }
 
-    $env:JAVA_TOOL_OPTIONS = $oldJavaToolOptions
-    $env:MATTMC_DEV_RUN_CAPTURE = $oldRunCapture
-    $env:MATTMC_DEV_RUN_CAPTURE_WORLD = $oldRunCaptureWorld
-    $env:MATTMC_DEV_RUN_CAPTURE_STATUS = $oldRunCaptureStatus
-    $env:MATTMC_DEV_RUN_CAPTURE_SCREENSHOT = $oldRunCaptureScreenshot
-    $env:MATTMC_DEV_RUN_CAPTURE_MIN_RENDERED_FRAMES = $oldRunCaptureFrames
-
-    $finalStatus = $null
     if ($script:ArtifactDir) {
-        $statusPath = Join-Path $script:ArtifactDir "run-capture-status.json"
-        $finalStatus = Read-StatusJson -Path $statusPath
-        Write-Result -Path (Join-Path $script:ArtifactDir "result.json") -Result $result -Reason $reason -ExitCode $exitCode -Status $finalStatus
+        $fallbackReportObserved = Test-LogPattern -Paths @(
+            (Join-Path $script:ArtifactDir "logs\runClient.stdout.log"),
+            (Join-Path $script:ArtifactDir "logs\runClient.stderr.log"),
+            (Join-Path $script:ArtifactDir "logs\latest.log")
+        ) -Pattern "Native meshing fallback report"
+        Write-Result -Path (Join-Path $script:ArtifactDir "result.json") -Result $result -Reason $reason -ExitCode $exitCode -WindowCapture $windowCapture -ScreenshotAnalysis $screenshotAnalysis -FallbackReportObserved $fallbackReportObserved
         Write-RunLog "Result: $result ($exitCode) - $reason"
     }
 }
