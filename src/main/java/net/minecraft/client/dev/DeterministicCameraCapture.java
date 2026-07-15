@@ -1,6 +1,7 @@
 package net.minecraft.client.dev;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.Screenshot;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.irisshaders.iris.uniforms.SystemTimeUniforms;
@@ -31,8 +32,10 @@ public final class DeterministicCameraCapture {
 	private static final boolean ENABLED = Boolean.getBoolean("mattmc.dev.deterministicCameraCapture");
 	private static final int FRAMES_PER_POSE = Math.max(1, Integer.getInteger("mattmc.dev.deterministicCameraCapture.framesPerPose", 8));
 	private static final int ACK_TIMEOUT_FRAMES = Math.max(1, Integer.getInteger("mattmc.dev.deterministicCameraCapture.ackTimeoutFrames", 600));
+	private static final int POSE_COUNT = Math.max(1, Math.min(4, Integer.getInteger("mattmc.dev.deterministicCameraCapture.poseCount", 4)));
 	private static final float YAW_DELTA = Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.yawDelta", "35.0"));
 	private static final boolean STOP_AFTER_COMPLETE = Boolean.parseBoolean(System.getProperty("mattmc.dev.deterministicCameraCapture.stopAfterComplete", "true"));
+	private static final boolean INTERNAL_SCREENSHOTS = Boolean.parseBoolean(System.getProperty("mattmc.dev.deterministicCameraCapture.internalScreenshots", "false"));
 	private static final float FIXED_VIGNETTE_BRIGHTNESS =
 		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.vignetteBrightness", "1.0"));
 	private static final Path METADATA_PATH = Path.of(System.getProperty("mattmc.dev.deterministicCameraCapture.metadata", "run/deterministic_camera_capture.json"));
@@ -42,6 +45,7 @@ public final class DeterministicCameraCapture {
 	private static boolean initialized;
 	private static boolean complete;
 	private static boolean failed;
+	private static boolean stopIssued;
 	private static Pose[] poses;
 	private static Pose initialPose;
 	private static Vec3 initialPosition;
@@ -61,6 +65,11 @@ public final class DeterministicCameraCapture {
 	}
 
 	public static void beforeTick(Minecraft minecraft) {
+		if (ENABLED && complete && STOP_AFTER_COMPLETE && !stopIssued) {
+			stopIssued = true;
+			minecraft.stop();
+			return;
+		}
 		if (!ENABLED || complete || failed) {
 			return;
 		}
@@ -132,7 +141,11 @@ public final class DeterministicCameraCapture {
 		}
 
 		VulkanicAPI.traceScopedCompositeColortex0PoseBoundary();
-		requestCurrentPoseScreenshot(minecraft);
+		if (INTERNAL_SCREENSHOTS) {
+			captureCurrentPoseInternally(minecraft);
+		} else {
+			requestCurrentPoseScreenshot(minecraft);
+		}
 		renderedFramesAtPose = 0;
 	}
 
@@ -214,12 +227,13 @@ public final class DeterministicCameraCapture {
 		initialDimension = level.dimension().location().toString();
 		initialPose = new Pose("initial", player.getYRot(), player.getXRot());
 		stabilizeGuiState(minecraft);
-		poses = new Pose[] {
+		Pose[] fullSequence = new Pose[] {
 			initialPose,
 			new Pose("right", initialPose.yaw() + YAW_DELTA, initialPose.pitch()),
 			new Pose("left", initialPose.yaw() - YAW_DELTA, initialPose.pitch()),
 			new Pose("return", initialPose.yaw(), initialPose.pitch())
 		};
+		poses = java.util.Arrays.copyOf(fullSequence, POSE_COUNT);
 		startedGameTime = level.getGameTime();
 		windowWidth = minecraft.getWindow().getWidth();
 		windowHeight = minecraft.getWindow().getHeight();
@@ -291,6 +305,61 @@ public final class DeterministicCameraCapture {
 		);
 	}
 
+	private static void captureCurrentPoseInternally(Minecraft minecraft) {
+		Pose pose = poses[poseIndex];
+		int captureIndex = poseIndex + 1;
+		String fileName = String.format(Locale.ROOT, "%02d_%s.png", captureIndex, pose.name());
+		currentScreenshotPath = SCREENSHOT_DIR.resolve(fileName);
+		currentAckPath = SCREENSHOT_DIR.resolve(String.format(Locale.ROOT, "capture_request_%02d_%s.ack.json", captureIndex, pose.name()));
+		awaitingScreenshotAck = true;
+		framesAwaitingAck = 0;
+		writeMetadata(minecraft, "capturing_screenshot");
+		try {
+			Files.createDirectories(SCREENSHOT_DIR);
+		} catch (IOException exception) {
+			fail("failed to create deterministic screenshot directory " + SCREENSHOT_DIR + ": " + exception.getMessage());
+			return;
+		}
+
+		try {
+			Screenshot.takeScreenshot(minecraft.getMainRenderTarget(), nativeImage -> {
+				try (nativeImage) {
+					nativeImage.writeToFile(currentScreenshotPath);
+					writeInternalScreenshotAck(minecraft, pose, captureIndex);
+					checkScreenshotAck(minecraft);
+				} catch (IOException exception) {
+					fail("failed to write deterministic internal screenshot " + currentScreenshotPath + ": " + exception.getMessage());
+				}
+			});
+		} catch (RuntimeException exception) {
+			fail("failed to capture deterministic internal screenshot " + currentScreenshotPath + ": " + exception.getMessage());
+		}
+	}
+
+	private static void writeInternalScreenshotAck(Minecraft minecraft, Pose pose, int captureIndex) throws IOException {
+		if (currentAckPath == null || currentScreenshotPath == null) {
+			return;
+		}
+		StringBuilder json = new StringBuilder(1024);
+		json.append("{\n");
+		json.append("  \"index\": ").append(captureIndex).append(",\n");
+		appendField(json, "poseName", pose.name()).append(",\n");
+		appendField(json, "screenshot", currentScreenshotPath.toAbsolutePath().toString()).append(",\n");
+		appendField(json, "ack", currentAckPath.toAbsolutePath().toString()).append(",\n");
+		appendField(json, "dimension", minecraft.level == null ? "missing" : minecraft.level.dimension().location().toString()).append(",\n");
+		appendVec3(json, "position", minecraft.player == null ? Vec3.ZERO : minecraft.player.position()).append(",\n");
+		json.append("  \"requestedYaw\": ").append(format(pose.yaw())).append(",\n");
+		json.append("  \"requestedPitch\": ").append(format(pose.pitch())).append(",\n");
+		json.append("  \"observedYaw\": ").append(format(minecraft.player == null ? 0.0F : minecraft.player.getYRot())).append(",\n");
+		json.append("  \"observedPitch\": ").append(format(minecraft.player == null ? 0.0F : minecraft.player.getXRot())).append(",\n");
+		json.append("  \"renderedFrameIndex\": ").append(renderedFrameIndex).append(",\n");
+		json.append("  \"gameTime\": ").append(minecraft.level == null ? -1L : minecraft.level.getGameTime()).append(",\n");
+		appendField(json, "status", "captured", 2).append(",\n");
+		appendField(json, "captureMethod", "internal-main-render-target", 2).append("\n");
+		json.append("}\n");
+		Files.writeString(currentAckPath, json.toString(), StandardCharsets.UTF_8);
+	}
+
 	private static boolean checkScreenshotAck(Minecraft minecraft) {
 		if (currentAckPath == null || !Files.isRegularFile(currentAckPath)) {
 			return false;
@@ -346,9 +415,6 @@ public final class DeterministicCameraCapture {
 		complete = true;
 		writeMetadata(minecraft, "complete");
 		LOGGER.info("Deterministic camera capture complete metadata={}", METADATA_PATH);
-		if (STOP_AFTER_COMPLETE) {
-			minecraft.stop();
-		}
 	}
 
 	private static void fail(String reason) {
@@ -414,6 +480,18 @@ public final class DeterministicCameraCapture {
 		json.append("  \"distantHorizonsActive\": ").append(isDistantHorizonsActive()).append(",\n");
 		json.append("  \"framesPerPose\": ").append(FRAMES_PER_POSE).append(",\n");
 		json.append("  \"ackTimeoutFrames\": ").append(ACK_TIMEOUT_FRAMES).append(",\n");
+			json.append("  \"poseCount\": ").append(poses == null ? POSE_COUNT : poses.length).append(",\n");
+			json.append("  \"poseSequence\": [");
+			if (poses != null) {
+				for (int i = 0; i < poses.length; i++) {
+					if (i > 0) {
+						json.append(", ");
+					}
+					json.append('"').append(escape(poses[i].name())).append('"');
+				}
+			}
+			json.append("],\n");
+			json.append("  \"internalScreenshots\": ").append(INTERNAL_SCREENSHOTS).append(",\n");
 			json.append("  \"yawDelta\": ").append(format(YAW_DELTA)).append(",\n");
 			json.append("  \"deterministicTemporalParity\": { \"enabled\": ").append(SystemTimeUniforms.isDeterministicTemporalParityEnabled())
 				.append(", \"frameIndex\": ").append(deterministicTemporalFrameIndex())
@@ -421,6 +499,9 @@ public final class DeterministicCameraCapture {
 				.append(", \"frameTime\": ").append(format(SystemTimeUniforms.deterministicTemporalFrameTime()))
 				.append(", \"frameTimeCounter\": ").append(format(SystemTimeUniforms.deterministicTemporalFrameTimeCounter()))
 				.append(", \"frameTimeSmooth\": ").append(format(SystemTimeUniforms.deterministicTemporalFrameTimeSmooth()))
+				.append(", \"partialTick\": ").append(format(SystemTimeUniforms.deterministicTemporalPartialTick()))
+				.append(", \"fovModifier\": ").append(format(SystemTimeUniforms.deterministicTemporalFovModifier()))
+				.append(", \"worldTime\": ").append(SystemTimeUniforms.deterministicTemporalWorldTime())
 				.append(" },\n");
 			json.append("  \"renderedFrameIndex\": ").append(renderedFrameIndex).append(",\n");
 		json.append("  \"currentPoseIndex\": ").append(poseIndex).append(",\n");
@@ -451,6 +532,9 @@ public final class DeterministicCameraCapture {
 					.append(", \"frameTime\": ").append(format(SystemTimeUniforms.deterministicTemporalFrameTime()))
 					.append(", \"frameTimeCounter\": ").append(format((capture.index() * FRAMES_PER_POSE * SystemTimeUniforms.deterministicTemporalFrameTime()) % 3600.0F))
 					.append(", \"frameTimeSmooth\": ").append(format(SystemTimeUniforms.deterministicTemporalFrameTimeSmooth()))
+					.append(", \"partialTick\": ").append(format(SystemTimeUniforms.deterministicTemporalPartialTick()))
+					.append(", \"fovModifier\": ").append(format(SystemTimeUniforms.deterministicTemporalFovModifier()))
+					.append(", \"worldTime\": ").append(SystemTimeUniforms.deterministicTemporalWorldTime())
 					.append(" },\n");
 				json.append("      \"gameTime\": ").append(capture.gameTime()).append("\n");
 			json.append("    }").append(i + 1 == CAPTURES.size() ? "\n" : ",\n");

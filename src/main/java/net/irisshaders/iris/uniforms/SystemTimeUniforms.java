@@ -2,6 +2,7 @@ package net.irisshaders.iris.uniforms;
 
 import net.irisshaders.iris.gl.uniform.UniformHolder;
 import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
+import net.minecraft.world.level.dimension.DimensionType;
 
 import java.util.OptionalLong;
 import java.util.function.IntSupplier;
@@ -21,6 +22,12 @@ public final class SystemTimeUniforms {
 		Float.parseFloat(System.getProperty("mattmc.vulkan.deterministicTemporalParity.frameTime", "0.016666668"));
 	private static final float DETERMINISTIC_FRAME_TIME_COUNTER_SECONDS =
 		Float.parseFloat(System.getProperty("mattmc.vulkan.deterministicTemporalParity.frameTimeCounter", "0.0"));
+	private static final long DETERMINISTIC_WORLD_TIME =
+		Long.getLong("mattmc.vulkan.deterministicTemporalParity.worldTime", 6000L);
+	private static final float DETERMINISTIC_PARTIAL_TICK =
+		Float.parseFloat(System.getProperty("mattmc.vulkan.deterministicTemporalParity.partialTick", "1.0"));
+	private static final float DETERMINISTIC_FOV_MODIFIER =
+		Float.parseFloat(System.getProperty("mattmc.vulkan.deterministicTemporalParity.fovModifier", "1.0"));
 
 	private SystemTimeUniforms() {
 	}
@@ -58,6 +65,35 @@ public final class SystemTimeUniforms {
 
 	public static float deterministicTemporalFrameTimeSmooth() {
 		return DETERMINISTIC_FRAME_TIME_SECONDS;
+	}
+
+	public static float deterministicTemporalPartialTick() {
+		return DETERMINISTIC_PARTIAL_TICK;
+	}
+
+	public static float deterministicTemporalFovModifier() {
+		return DETERMINISTIC_FOV_MODIFIER;
+	}
+
+	public static long deterministicTemporalWorldTime() {
+		return DETERMINISTIC_WORLD_TIME;
+	}
+
+	public static int deterministicTemporalWorldDayTime(DimensionType dimensionType) {
+		long dayTime = dimensionType.fixedTime().orElse(Math.floorMod(DETERMINISTIC_WORLD_TIME, 24000L));
+		return (int)dayTime;
+	}
+
+	public static int deterministicTemporalWorldDay() {
+		return (int)Math.floorDiv(DETERMINISTIC_WORLD_TIME, 24000L);
+	}
+
+	public static int deterministicTemporalMoonPhase(DimensionType dimensionType) {
+		return dimensionType.moonPhase(DETERMINISTIC_WORLD_TIME);
+	}
+
+	public static float deterministicTemporalTimeOfDay(DimensionType dimensionType) {
+		return dimensionType.timeOfDay(DETERMINISTIC_WORLD_TIME);
 	}
 
 	/**

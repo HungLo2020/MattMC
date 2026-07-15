@@ -74,6 +74,10 @@ public final class CelestialUniforms {
 	}
 
 	private static float getSkyAngle() {
+		if (SystemTimeUniforms.isDeterministicTemporalParityEnabled()) {
+			return SystemTimeUniforms.deterministicTemporalTimeOfDay(getWorld().dimensionType());
+		}
+
 		return getWorld().getTimeOfDay(CapturedRenderingState.INSTANCE.getTickDelta());
 	}
 

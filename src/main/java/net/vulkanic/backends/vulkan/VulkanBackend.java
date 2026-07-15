@@ -16194,7 +16194,9 @@ void main() {
                     usage,
                     size,
                     debugLabel,
-                    () -> destroyManagedBuffer(finalBufferHandle, finalMemoryHandle),
+                    () -> enqueueVulkanResourceDestroy(
+                        () -> destroyManagedBuffer(finalBufferHandle, finalMemoryHandle)
+                    ),
                     diagnosticShadowData
                 );
             } catch (RuntimeException exception) {

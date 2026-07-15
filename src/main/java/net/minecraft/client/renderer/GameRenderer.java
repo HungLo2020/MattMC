@@ -62,6 +62,7 @@ import net.vulkanic.VulkanicAPI;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.client.tacz.TaczCameraRecoil;
 import net.minecraft.client.tacz.TaczScopeData;
+import net.irisshaders.iris.uniforms.SystemTimeUniforms;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Registry;
@@ -456,6 +457,13 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	}
 
 	private void tickFov() {
+		if (SystemTimeUniforms.isDeterministicTemporalParityEnabled()) {
+			float modifier = SystemTimeUniforms.deterministicTemporalFovModifier();
+			this.oldFovModifier = modifier;
+			this.fovModifier = modifier;
+			return;
+		}
+
 		float g;
 		if (this.minecraft.getCameraEntity() instanceof AbstractClientPlayer abstractClientPlayer) {
 			Options options = this.minecraft.options;
@@ -475,6 +483,10 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		if (this.panoramicMode) {
 			return 90.0F;
 		} else {
+			if (SystemTimeUniforms.isDeterministicTemporalParityEnabled()) {
+				f = SystemTimeUniforms.deterministicTemporalPartialTick();
+			}
+
 			float g = 70.0F;
 			if (bl) {
 				g = this.minecraft.options.fov().get().intValue();
@@ -662,7 +674,10 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 
 	public void render(DeltaTracker deltaTracker, boolean bl) {
 		// Iris: From MixinGameRenderer - set real tick delta and begin frame timers
-		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setRealTickDelta(deltaTracker.getGameTimeDeltaPartialTick(true));
+		float realTickDelta = SystemTimeUniforms.isDeterministicTemporalParityEnabled()
+			? SystemTimeUniforms.deterministicTemporalPartialTick()
+			: deltaTracker.getGameTimeDeltaPartialTick(true);
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setRealTickDelta(realTickDelta);
 		net.irisshaders.iris.uniforms.SystemTimeUniforms.COUNTER.beginFrame();
 		net.irisshaders.iris.uniforms.SystemTimeUniforms.TIMER.beginFrame(net.minecraft.Util.getNanos());
 		
@@ -885,7 +900,9 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		// Iris: Save shaders state (merged from MixinModelViewBobbing)
 		areShadersOn = net.irisshaders.iris.Iris.isPackInUseQuick();
 		
-		float f = deltaTracker.getGameTimeDeltaPartialTick(true);
+		float f = SystemTimeUniforms.isDeterministicTemporalParityEnabled()
+			? SystemTimeUniforms.deterministicTemporalPartialTick()
+			: deltaTracker.getGameTimeDeltaPartialTick(true);
 		LocalPlayer localPlayer = this.minecraft.player;
 		this.lightTexture.updateLightTexture(f);
 		if (this.minecraft.getCameraEntity() == null) {

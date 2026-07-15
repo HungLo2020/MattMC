@@ -23,10 +23,14 @@ public final class WorldTimeUniforms {
 		uniforms
 			.uniform1i(PER_TICK, "worldTime", WorldTimeUniforms::getWorldDayTime)
 			.uniform1i(PER_TICK, "worldDay", WorldTimeUniforms::getWorldDay)
-			.uniform1i(PER_TICK, "moonPhase", () -> getWorld().getMoonPhase());
+			.uniform1i(PER_TICK, "moonPhase", WorldTimeUniforms::getMoonPhase);
 	}
 
 	static int getWorldDayTime() {
+		if (SystemTimeUniforms.isDeterministicTemporalParityEnabled()) {
+			return SystemTimeUniforms.deterministicTemporalWorldDayTime(getWorld().dimensionType());
+		}
+
 		long timeOfDay = getWorld().getDayTime();
 
 		if (Iris.getCurrentDimension() == DimensionId.END || Iris.getCurrentDimension() == DimensionId.NETHER) {
@@ -42,10 +46,22 @@ public final class WorldTimeUniforms {
 	}
 
 	private static int getWorldDay() {
+		if (SystemTimeUniforms.isDeterministicTemporalParityEnabled()) {
+			return SystemTimeUniforms.deterministicTemporalWorldDay();
+		}
+
 		long timeOfDay = getWorld().getDayTime();
 		long day = timeOfDay / 24000L;
 
 		return (int) day;
+	}
+
+	private static int getMoonPhase() {
+		if (SystemTimeUniforms.isDeterministicTemporalParityEnabled()) {
+			return SystemTimeUniforms.deterministicTemporalMoonPhase(getWorld().dimensionType());
+		}
+
+		return getWorld().getMoonPhase();
 	}
 
 	private static ClientLevel getWorld() {

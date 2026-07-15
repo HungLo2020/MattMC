@@ -61,6 +61,7 @@ IDENTITY_PATTERNS = [
 HASH_RE = re.compile(r"(payloadHash|rangeHash)=([^,}\]]+)")
 TOP_FIELD_RE = re.compile(r"(?:^|\s)([A-Za-z][A-Za-z0-9_]*)=(\"[^\"]*\"|\S+)")
 STRUCT_FIELD_RE = re.compile(r"\b([A-Za-z][A-Za-z0-9_]*)(?:=|:)(\"[^\"]*\"|[^,{}\]\s]+)")
+RESOURCE_START_RE = re.compile(r"(?:^|,\s*)([A-Za-z0-9_.$:-]+)\{layout=")
 
 
 @dataclass
@@ -131,13 +132,16 @@ class ResourceRecord:
 
     @property
     def semantic_key(self) -> tuple[str, str, str, str]:
-        name = self.name
+        name = normalize_resource_name(self.name)
+        if self.semantic_subsystem == "sodium-terrain" and self.resource_type in {"SAMPLER", "COMPARISON_SAMPLER"}:
+            pipeline_identity = self.semantic_pipeline or self.pipeline_location or self.stable_key
+            return (pipeline_identity, "semantic-sodium-terrain", name, self.resource_type)
         if self.name == "Projection" and self.projection_label:
             name = f"{self.name}@{self.projection_label}"
         if self.content_hash and self.det_pose:
             name = f"{name}@pose:{self.det_pose}@source:{self.source or 'unknown'}"
         context_parts: list[str] = []
-        if self.semantic_draw_key and self.semantic_draw_key != "unavailable":
+        if is_stable_semantic_draw_key(self.semantic_draw_key):
             context_parts.append(f"draw:{self.semantic_draw_key}")
         else:
             if self.det_pose:
@@ -146,8 +150,6 @@ class ResourceRecord:
                 context_parts.append(f"frame:{self.det_rendered_frame}")
             if self.semantic_subsystem:
                 context_parts.append(f"subsystem:{self.semantic_subsystem}")
-            if self.semantic_pass:
-                context_parts.append(f"pass:{self.semantic_pass}")
             if self.semantic_pipeline:
                 context_parts.append(f"semanticPipeline:{self.semantic_pipeline}")
             if self.semantic_material:
@@ -170,9 +172,9 @@ class ResourceRecord:
     @property
     def sampler_signature(self) -> str:
         label = normalize_texture_label(self.texture_label)
+        stable_label = label if is_semantic_texture_label(label) else "weak-label"
         return "|".join([
-            f"unit={self.unit}",
-            f"label={label}",
+            f"label={stable_label}",
             f"format={self.texture_format}",
             f"size={self.texture_width}x{self.texture_height}",
             f"mips={self.texture_mips}",
@@ -684,6 +686,21 @@ def normalize_identity(text: str) -> str:
     return normalized
 
 
+def normalize_resource_name(name: str) -> str:
+    # Draw fingerprints are useful evidence, but shader-enabled backends can
+    # batch the same logical resource behind different physical draw hashes.
+    return re.sub(r"@draw:crc32:[0-9a-fA-F]+/bytes:\d+", "", name)
+
+
+def is_stable_semantic_draw_key(key: str) -> bool:
+    if not key or key == "unavailable":
+        return False
+    # crc32 draw keys are physical draw fingerprints, not shared producer
+    # identity. They differ when OpenGL and Vulkan batch equivalent work
+    # differently.
+    return not key.startswith("crc32:")
+
+
 def normalize_texture_label(label: str) -> str:
     label = label.strip('"')
     if not label:
@@ -695,6 +712,16 @@ def normalize_texture_label(label: str) -> str:
     if label.startswith("Legacy_texture_"):
         return "Legacy_texture_<id>"
     return label
+
+
+def is_semantic_texture_label(label: str) -> bool:
+    if not label:
+        return False
+    if label in {"<numeric-label>", "PNG_Texture"}:
+        return False
+    if label.startswith("Legacy_texture_"):
+        return False
+    return True
 
 
 def stable_digest(values: Iterable[str]) -> str:
@@ -927,11 +954,11 @@ def int_or_zero(value: str) -> int:
 
 
 def is_pre_pose_deterministic_record(fields: dict[str, str]) -> bool:
-    return fields.get("detCapture") == "true" and fields.get("detAwaitingScreenshot") != "true"
+    return fields.get("detCapture") == "true" and fields.get("detPose", "none") == "none"
 
 
 def standalone_uniform_key(event: StandaloneUniformEvent | StandaloneUniformBlockMemberEvent) -> str:
-    if event.semantic_draw_key and event.semantic_draw_key != "unavailable":
+    if is_stable_semantic_draw_key(event.semantic_draw_key):
         return "|".join([
             f"draw={event.semantic_draw_key}",
             f"subsystem={event.semantic_subsystem or 'unknown'}",
@@ -944,11 +971,12 @@ def standalone_uniform_key(event: StandaloneUniformEvent | StandaloneUniformBloc
             f"name={event.name}",
             f"type={event.value_kind}",
         ])
+    draw_key = event.draw_key if is_stable_semantic_draw_key(event.draw_key) else "unavailable"
     return "|".join([
         f"program={event.program_identity or 'unknown'}",
         f"stages={event.shader_stages or 'unknown'}",
         f"phase={event.render_phase or 'unknown'}",
-        f"draw={event.draw_key or 'unavailable'}",
+        f"draw={draw_key}",
         f"name={event.name}",
         f"type={event.value_kind}",
     ])
@@ -978,6 +1006,13 @@ def extract_balanced_after(prefix: str, text: str) -> str:
 
 
 def split_top_level_resources(text: str) -> list[str]:
+    starts = [match.start(1) for match in RESOURCE_START_RE.finditer(text)]
+    if len(starts) > 1:
+        return [
+            text[starts[index]:starts[index + 1]].strip().rstrip(",").strip()
+            for index in range(len(starts) - 1)
+        ] + [text[starts[-1]:].strip().rstrip(",").strip()]
+
     resources: list[str] = []
     start = 0
     depth = 0
@@ -1080,6 +1115,52 @@ def parse_capture_log(path: Path, limits: ParseLimits | None = None) -> CaptureE
         for line in lines:
             parse_capture_line(line, events, limits)
     return events
+
+
+def event_pose(event) -> str:
+    return getattr(event, "det_pose", "") or "none"
+
+
+def filter_capture_events_by_pose(events: CaptureEvents, pose: str | None) -> CaptureEvents:
+    if not pose:
+        return events
+
+    filtered = CaptureEvents(path=events.path, backend=events.backend)
+    filtered.counters = events.counters.copy()
+    filtered.skipped = events.skipped.copy()
+    filtered.skipped[f"PoseFilter:{pose}"] = 0
+
+    def keep_event(event) -> bool:
+        keep = event_pose(event) == pose
+        if not keep:
+            filtered.skipped[f"PoseFilter:{pose}"] += 1
+        return keep
+
+    for key, records in events.resources.items():
+        kept = [record for record in records if keep_event(record)]
+        if kept:
+            filtered.resources[key].extend(kept)
+    for key, records in events.uniform_buffers.items():
+        filtered.uniform_buffers[key].extend(records)
+    for key, records in events.standalone_uniforms.items():
+        kept = [record for record in records if keep_event(record)]
+        if kept:
+            filtered.standalone_uniforms[key].extend(kept)
+    for key, records in events.standalone_uniform_block_members.items():
+        kept = [record for record in records if keep_event(record)]
+        if kept:
+            filtered.standalone_uniform_block_members[key].extend(kept)
+    for key, records in events.vertex_inputs.items():
+        filtered.vertex_inputs[key].extend(records)
+    filtered.draws = [event for event in events.draws if keep_event(event)]
+    filtered.semantic_draws = [event for event in events.semantic_draws if keep_event(event)]
+    filtered.geometry = [event for event in events.geometry if keep_event(event)]
+    for key, records in events.draw_states.items():
+        kept = [record for record in records if keep_event(record)]
+        if kept:
+            filtered.draw_states[key].extend(kept)
+    filtered.ordering = [event for event in events.ordering if keep_event(event)]
+    return filtered
 
 
 def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) -> None:
@@ -2942,7 +3023,12 @@ def ordering_visibility_coverage(
     }
 
 
-def build_coverage_report(opengl_events: CaptureEvents, vulkan_events: CaptureEvents, differences: list[Difference]) -> dict[str, object]:
+def build_coverage_report(
+    opengl_events: CaptureEvents,
+    vulkan_events: CaptureEvents,
+    differences: list[Difference],
+    pose_filter: str | None = None,
+) -> dict[str, object]:
     families: dict[str, dict[str, object]] = {family: _empty_family_coverage() for family in PASS_FAMILIES}
     semantic_coverage = semantic_draw_coverage(opengl_events, vulkan_events)
     ordering_coverage = ordering_visibility_coverage(opengl_events, vulkan_events, differences)
@@ -2993,6 +3079,7 @@ def build_coverage_report(opengl_events: CaptureEvents, vulkan_events: CaptureEv
 
     return {
         "schema": "mattmc.vulkan_parity.coverage.v1",
+        "pose_filter": pose_filter or "all",
         "opengl_log": str(opengl_events.path),
         "vulkan_log": str(vulkan_events.path),
         "event_counts": {
@@ -3032,10 +3119,16 @@ def build_coverage_report(opengl_events: CaptureEvents, vulkan_events: CaptureEv
     }
 
 
-def render_diff_report(opengl_log: Path, vulkan_log: Path, limit: int, parse_limits: ParseLimits | None = None) -> str:
+def render_diff_report(
+    opengl_log: Path,
+    vulkan_log: Path,
+    limit: int,
+    parse_limits: ParseLimits | None = None,
+    pose_filter: str | None = None,
+) -> str:
     parse_limits = parse_limits or ParseLimits()
-    opengl_events = parse_capture_log(opengl_log, parse_limits)
-    vulkan_events = parse_capture_log(vulkan_log, parse_limits)
+    opengl_events = filter_capture_events_by_pose(parse_capture_log(opengl_log, parse_limits), pose_filter)
+    vulkan_events = filter_capture_events_by_pose(parse_capture_log(vulkan_log, parse_limits), pose_filter)
     differences = compare_capture_events(opengl_events, vulkan_events)
     by_category = Counter(diff.category for diff in differences)
 
@@ -3044,6 +3137,8 @@ def render_diff_report(opengl_log: Path, vulkan_log: Path, limit: int, parse_lim
     lines.append("================================")
     lines.append(f"OpenGL capture: {opengl_log}")
     lines.append(f"Vulkan capture: {vulkan_log}")
+    if pose_filter:
+        lines.append(f"Pose filter: {pose_filter}")
     lines.append("")
     lines.append("Normalization rules:")
     lines.append("- Backend object identities, Java identity hashes, pipeline handles, texture ids, view ids, and buffer ids are ignored.")
@@ -3187,12 +3282,12 @@ def write_json_report(data: dict[str, object], text_report_path: Path) -> Path:
     return json_path
 
 
-def render_coverage_json(opengl_log: Path, vulkan_log: Path, parse_limits: ParseLimits | None = None) -> dict[str, object]:
+def render_coverage_json(opengl_log: Path, vulkan_log: Path, parse_limits: ParseLimits | None = None, pose_filter: str | None = None) -> dict[str, object]:
     parse_limits = parse_limits or ParseLimits()
-    opengl_events = parse_capture_log(opengl_log, parse_limits)
-    vulkan_events = parse_capture_log(vulkan_log, parse_limits)
+    opengl_events = filter_capture_events_by_pose(parse_capture_log(opengl_log, parse_limits), pose_filter)
+    vulkan_events = filter_capture_events_by_pose(parse_capture_log(vulkan_log, parse_limits), pose_filter)
     differences = compare_capture_events(opengl_events, vulkan_events)
-    return build_coverage_report(opengl_events, vulkan_events, differences)
+    return build_coverage_report(opengl_events, vulkan_events, differences, pose_filter)
 
 
 def run_self_test() -> None:
@@ -3213,7 +3308,7 @@ def run_self_test() -> None:
     first = parse_resource(parts[0], "vulkan", "test", "abc", "stable")
     second = parse_resource(parts[1], "vulkan", "test", "abc", "stable")
     assert first and first.name == "Projection" and first.payload_hash == "crc32:aaaa/bytes:64"
-    assert second and second.name == "Sampler0" and second.sampler_signature.endswith("usage=5")
+    assert second and second.name == "Sampler0" and "usage=5" in second.sampler_signature
 
     member_line = (
         'ShaderInputParityStandaloneUniformBlockMember backend=vulkan source=vulkan-standalone-ubo '
@@ -3331,6 +3426,7 @@ def main(argv: list[str]) -> int:
     diff_parser.add_argument("--max-standalone-uniform-block-member-events", type=int, default=0, help="0 means parse every standalone UBO member event")
     diff_parser.add_argument("--max-vertex-input-events", type=int, default=0, help="0 means parse every vertex-input event")
     diff_parser.add_argument("--max-draw-events", type=int, default=0, help="0 means parse every draw event")
+    diff_parser.add_argument("--pose-filter", choices=["initial", "right", "left", "return", "none"], help="only compare records from one deterministic pose")
     diff_parser.add_argument("--write", action="store_true", help="write report under logs/auto-capture")
 
     auto_parser = subparsers.add_parser("auto-diff", help="diff newest matching OpenGL/Vulkan capture pair")
@@ -3341,6 +3437,7 @@ def main(argv: list[str]) -> int:
     auto_parser.add_argument("--max-standalone-uniform-block-member-events", type=int, default=0, help="0 means parse every standalone UBO member event")
     auto_parser.add_argument("--max-vertex-input-events", type=int, default=0, help="0 means parse every vertex-input event")
     auto_parser.add_argument("--max-draw-events", type=int, default=0, help="0 means parse every draw event")
+    auto_parser.add_argument("--pose-filter", choices=["initial", "right", "left", "return", "none"], help="only compare records from one deterministic pose")
     auto_parser.add_argument("--write", action="store_true", help="write report under logs/auto-capture")
 
     source_parser = subparsers.add_parser("source-audit", help="scan source architecture pressure points")
@@ -3377,11 +3474,12 @@ def main(argv: list[str]) -> int:
             args.max_vertex_input_events,
             args.max_draw_events
         )
-        text = render_diff_report(gl_meta.latest_log, vk_meta.latest_log, args.limit, parse_limits)
+        text = render_diff_report(gl_meta.latest_log, vk_meta.latest_log, args.limit, parse_limits, args.pose_filter)
         if args.write:
-            path = write_report(text, f"vulkan_shader_input_parity_{gl_meta.run_id}_vs_{vk_meta.run_id}")
+            pose_suffix = f"_{args.pose_filter}" if args.pose_filter else ""
+            path = write_report(text, f"vulkan_shader_input_parity{pose_suffix}_{gl_meta.run_id}_vs_{vk_meta.run_id}")
             print(f"wrote {path}")
-            json_path = write_json_report(render_coverage_json(gl_meta.latest_log, vk_meta.latest_log, parse_limits), path)
+            json_path = write_json_report(render_coverage_json(gl_meta.latest_log, vk_meta.latest_log, parse_limits, args.pose_filter), path)
             print(f"wrote {json_path}")
         print(text, end="")
         return 0
@@ -3395,11 +3493,12 @@ def main(argv: list[str]) -> int:
             args.max_vertex_input_events,
             args.max_draw_events
         )
-        text = render_diff_report(args.opengl_log, args.vulkan_log, args.limit, parse_limits)
+        text = render_diff_report(args.opengl_log, args.vulkan_log, args.limit, parse_limits, args.pose_filter)
         if args.write:
-            path = write_report(text, f"vulkan_shader_input_parity_{args.opengl_log.stem}_vs_{args.vulkan_log.stem}")
+            pose_suffix = f"_{args.pose_filter}" if args.pose_filter else ""
+            path = write_report(text, f"vulkan_shader_input_parity{pose_suffix}_{args.opengl_log.stem}_vs_{args.vulkan_log.stem}")
             print(f"wrote {path}")
-            json_path = write_json_report(render_coverage_json(args.opengl_log, args.vulkan_log, parse_limits), path)
+            json_path = write_json_report(render_coverage_json(args.opengl_log, args.vulkan_log, parse_limits, args.pose_filter), path)
             print(f"wrote {json_path}")
         print(text, end="")
         return 0

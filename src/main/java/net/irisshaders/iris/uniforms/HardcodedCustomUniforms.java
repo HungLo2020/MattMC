@@ -160,6 +160,10 @@ public class HardcodedCustomUniforms {
 	}
 
 	private static int getWorldDayTime() {
+		if (SystemTimeUniforms.isDeterministicTemporalParityEnabled()) {
+			return WorldTimeUniforms.getWorldDayTime();
+		}
+
 		Level level = Minecraft.getInstance().level;
 		long timeOfDay = level.getDayTime();
 		long dayTime = level.dimensionType().fixedTime().orElse(timeOfDay % 24000L);

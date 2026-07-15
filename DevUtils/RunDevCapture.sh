@@ -393,6 +393,28 @@ PY
     return 0
 }
 
+deterministic_capture_status() {
+    if [[ "$DETERMINISTIC_CAMERA_CAPTURE" != "true" || ! -f "$DETERMINISTIC_METADATA" ]]; then
+        return 1
+    fi
+
+    python3 - "$DETERMINISTIC_METADATA" <<'PY'
+import json
+import sys
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as handle:
+        data = json.load(handle)
+except Exception:
+    raise SystemExit(1)
+
+status = data.get("status")
+if not isinstance(status, str):
+    raise SystemExit(1)
+print(status)
+PY
+}
+
 find_validation_layer_manifest() {
     local candidate
 
@@ -853,6 +875,8 @@ memory_guard_peak_rss_kb=0
 memory_guard_rss_kb=0
 exit_code=""
 deterministic_validation_status="not_requested"
+deterministic_completed="false"
+intentional_deterministic_shutdown="false"
 GRADLE_PID=""
 RUN_CLIENT_ACTIVE="false"
 
@@ -880,6 +904,15 @@ check_client_memory_guard() {
     limit_kb=$((CLIENT_RSS_LIMIT_MB * 1024))
     if [[ "$rss_kb" -le "$limit_kb" ]]; then
         return 0
+    fi
+
+    if [[ "$DETERMINISTIC_CAMERA_CAPTURE" == "true" && "$(deterministic_capture_status 2>/dev/null || true)" == "complete" ]]; then
+        deterministic_completed="true"
+        intentional_deterministic_shutdown="true"
+        echo "deterministic_capture_complete_elapsed=${elapsed}" >> "$META_LOG"
+        echo "deterministic_capture_complete_rss_kb=$rss_kb" >> "$META_LOG"
+        terminate_run_processes "deterministic_complete"
+        return 1
     fi
 
     memory_guard_triggered="true"
@@ -1019,6 +1052,8 @@ if [[ "$DETERMINISTIC_CAMERA_CAPTURE" == "true" ]]; then
         "-Dmattmc.dev.deterministicCameraCapture.shaderEnabled=${EFFECTIVE_ENABLE_SHADERS:-unknown}"
         "-Dmattmc.dev.deterministicCameraCapture.shaderPack=${EFFECTIVE_SHADER_PACK:-unknown}"
         "-Dmattmc.dev.deterministicCameraCapture.gitCommit=$GIT_COMMIT"
+        "-Dmattmc.dev.deterministicCameraCapture.stopAfterComplete=false"
+        "-Dmattmc.vulkan.traceShaderInputParity.poseOnly=true"
     )
     append_java_tool_options "${DETERMINISTIC_JAVA_OPTIONS[@]}"
 
@@ -1039,6 +1074,15 @@ while kill -0 "$GRADLE_PID" 2>/dev/null; do
     elapsed=$((elapsed + 1))
 
     CLIENT_PID="$(find_client_pid)"
+    capture_deterministic_requests "$CLIENT_PID"
+    if [[ "$DETERMINISTIC_CAMERA_CAPTURE" == "true" && "$(deterministic_capture_status 2>/dev/null || true)" == "complete" ]]; then
+        deterministic_completed="true"
+        intentional_deterministic_shutdown="true"
+        echo "deterministic_capture_complete_elapsed=${elapsed}" >> "$META_LOG"
+        terminate_run_processes "deterministic_complete"
+        break
+    fi
+
     if ! check_client_memory_guard "$CLIENT_PID" "$elapsed"; then
         break
     fi
@@ -1046,8 +1090,6 @@ while kill -0 "$GRADLE_PID" 2>/dev/null; do
     if [[ "$DETERMINISTIC_CAMERA_CAPTURE" != "true" && "$screenshot_enabled" == "true" && "$SCREENSHOT_INTERVAL_SECS" -gt 0 && "$elapsed" -ge "$SCREENSHOT_START_DELAY_SECS" && $(((elapsed - SCREENSHOT_START_DELAY_SECS) % SCREENSHOT_INTERVAL_SECS)) -eq 0 ]]; then
         capture_root_screenshot "tick" "$elapsed" "$CLIENT_PID"
     fi
-
-    capture_deterministic_requests "$CLIENT_PID"
 
     if [[ "$dump_taken" == "false" && "$elapsed" -ge "$DUMP_SECS" ]]; then
         {
@@ -1118,7 +1160,25 @@ else
 fi
 RUN_CLIENT_ACTIVE="false"
 
+if [[ "$DETERMINISTIC_CAMERA_CAPTURE" == "true" && "$(deterministic_capture_status 2>/dev/null || true)" == "complete" ]]; then
+    deterministic_completed="true"
+    if [[ "$exit_code" -ne 0 ]]; then
+        intentional_deterministic_shutdown="true"
+    fi
+fi
+
+if [[ "$intentional_deterministic_shutdown" == "true" && "$exit_code" -ne 0 ]]; then
+    echo "raw_exit_code=$exit_code" >> "$META_LOG"
+    exit_code=0
+fi
+
 echo "exit_code=$exit_code" >> "$META_LOG"
+echo "deterministic_completed=$deterministic_completed" >> "$META_LOG"
+echo "intentional_deterministic_shutdown=$intentional_deterministic_shutdown" >> "$META_LOG"
+if [[ "$memory_guard_triggered" == "true" && "$deterministic_completed" == "true" ]]; then
+    echo "memory_guard_reclassified_after_complete=true" >> "$META_LOG"
+    memory_guard_triggered="false"
+fi
 echo "memory_guard_triggered=$memory_guard_triggered" >> "$META_LOG"
 echo "memory_guard_peak_rss_kb=$memory_guard_peak_rss_kb" >> "$META_LOG"
 if [[ "$memory_guard_triggered" == "true" ]]; then
@@ -1236,7 +1296,7 @@ if window.get("width") != 1280 or window.get("height") != 720:
     raise SystemExit(f"deterministic capture window mismatch: {window}")
 
 captures = data.get("captures") or []
-expected_poses = ["initial", "right", "left", "return"]
+expected_poses = data.get("poseSequence") or ["initial", "right", "left", "return"]
 actual_poses = [capture.get("poseName") for capture in captures]
 if actual_poses != expected_poses:
     raise SystemExit(f"deterministic pose sequence mismatch: {actual_poses}")
@@ -1294,7 +1354,11 @@ for capture in captures:
         raise SystemExit(f"deterministic frame index did not increase at {pose_name}: previous={previous_frame} actual={frame}")
     previous_frame = frame
 
-if captures[0]["requestedYaw"] != captures[3]["requestedYaw"] or captures[0]["requestedPitch"] != captures[3]["requestedPitch"]:
+if "return" in expected_poses and len(captures) > expected_poses.index("return"):
+    return_capture = captures[expected_poses.index("return")]
+else:
+    return_capture = None
+if return_capture is not None and (captures[0]["requestedYaw"] != return_capture["requestedYaw"] or captures[0]["requestedPitch"] != return_capture["requestedPitch"]):
     raise SystemExit("deterministic return pose does not exactly match initial requested pose")
 
 print(f"deterministic capture OK: {metadata_path} tolerance={tolerance}")

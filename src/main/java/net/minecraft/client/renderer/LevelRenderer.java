@@ -460,7 +460,9 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		net.irisshaders.iris.uniforms.IrisTimeUniforms.updateTime();
 		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setGbufferModelView(matrix4f);
 		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setGbufferProjection(matrix4f2);
-		float fakeTickDelta = deltaTracker.getGameTimeDeltaPartialTick(false);
+		float fakeTickDelta = net.irisshaders.iris.uniforms.SystemTimeUniforms.isDeterministicTemporalParityEnabled()
+			? net.irisshaders.iris.uniforms.SystemTimeUniforms.deterministicTemporalPartialTick()
+			: deltaTracker.getGameTimeDeltaPartialTick(false);
 		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setTickDelta(fakeTickDelta);
 		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCloudTime((this.ticks + fakeTickDelta) * 0.03F);
 		
@@ -483,7 +485,9 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			hook.onBeforeRenderLevel(camera, matrix4f, matrix4f2);
 		}
 		
-		float f = deltaTracker.getGameTimeDeltaPartialTick(false);
+		float f = net.irisshaders.iris.uniforms.SystemTimeUniforms.isDeterministicTemporalParityEnabled()
+			? net.irisshaders.iris.uniforms.SystemTimeUniforms.deterministicTemporalPartialTick()
+			: deltaTracker.getGameTimeDeltaPartialTick(false);
 		this.levelRenderState.reset();
 		this.blockEntityRenderDispatcher.prepare(camera);
 		this.entityRenderDispatcher.prepare(camera, this.minecraft.crosshairPickEntity);

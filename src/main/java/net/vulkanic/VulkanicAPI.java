@@ -57,13 +57,20 @@ public class VulkanicAPI {
         diagnosticLimit("mattmc.vulkan.traceStandaloneUniforms.maxLogs", 512);
     private static final java.util.concurrent.atomic.AtomicInteger STANDALONE_UNIFORM_TRACE_LOG_COUNT = new java.util.concurrent.atomic.AtomicInteger();
     private static final boolean TRACE_SHADER_INPUT_PARITY = Boolean.getBoolean("mattmc.vulkan.traceShaderInputParity");
+    private static final boolean TRACE_SHADER_INPUT_PARITY_POSE_ONLY =
+        Boolean.getBoolean("mattmc.vulkan.traceShaderInputParity.poseOnly");
     private static final java.util.Set<String> DECODED_STANDALONE_UNIFORM_TRACE_NAMES = java.util.Set.of(
         "uProj",
         "uInvProj",
         "uInvMvmProj",
         "uDhInvMvmProj",
         "uMcInvMvmProj",
-        "uCameraBlockYPos"
+        "uCameraBlockYPos",
+        "dhProjectionInverse",
+        "iris_ModelViewMatrix",
+        "iris_ProjectionMatrix",
+        "shadowModelView",
+        "shadowModelViewInverse"
     );
     private static final boolean TRACE_STANDALONE_UNIFORM_BLOCK_MEMBERS =
         Boolean.getBoolean("mattmc.vulkan.traceStandaloneUniformBlockMembers");
@@ -3570,6 +3577,10 @@ public class VulkanicAPI {
         String fragmentShader = shaderInputParityFragmentShader(renderPipeline, portableState);
         String normalizedMaterial = shaderInputParityValueOrUnknown(material != null ? material : pipeline);
         String normalizedOutput = shaderInputParityValueOrUnknown(output);
+        String projectionLabel = shaderInputParityCurrentProjectionLabel();
+        if (!projectionLabel.isEmpty()) {
+            normalizedOutput = normalizedOutput + "|projection:" + projectionLabel;
+        }
         String poseContext = shaderInputParityDeterministicContextFields().replace(' ', '|');
         String ordinalKey = String.join("|",
             normalizedSubsystem,
@@ -4366,6 +4377,43 @@ public class VulkanicAPI {
         }
 
         projectionMatrixLabels.put(gpuBufferSlice, label);
+    }
+
+    private static String shaderInputParityCurrentProjectionLabel() {
+        GpuBufferSlice current = projectionMatrixBuffer;
+        if (current == null) {
+            return "";
+        }
+
+        String currentBufferKey = null;
+        try {
+            currentBufferKey = shaderInputParityBufferKey(resolveVulkanicBuffer(current.buffer()));
+        } catch (RuntimeException ignored) {
+            // Diagnostic identity should never perturb rendering if a transient buffer is unavailable.
+        }
+
+        synchronized (projectionMatrixLabels) {
+            for (java.util.Map.Entry<GpuBufferSlice, String> entry : projectionMatrixLabels.entrySet()) {
+                GpuBufferSlice labeled = entry.getKey();
+                if (labeled == null || labeled.offset() != current.offset() || labeled.length() != current.length()) {
+                    continue;
+                }
+                if (labeled.equals(current)) {
+                    return shaderInputParitySanitizeLabel(entry.getValue());
+                }
+                if (currentBufferKey != null) {
+                    try {
+                        if (currentBufferKey.equals(shaderInputParityBufferKey(resolveVulkanicBuffer(labeled.buffer())))) {
+                            return shaderInputParitySanitizeLabel(entry.getValue());
+                        }
+                    } catch (RuntimeException ignored) {
+                        // Keep searching; this is diagnostic-only identity metadata.
+                    }
+                }
+            }
+        }
+
+        return "";
     }
 
     public static void backupProjectionMatrix() {
@@ -7388,6 +7436,74 @@ public class VulkanicAPI {
         );
     }
 
+    public static void traceShaderInputParitySyntheticResources(
+            String source,
+            String pipelineLocation,
+            @Nullable String vertexShader,
+            @Nullable String fragmentShader,
+            String stableKey,
+            java.util.List<String> resources) {
+        if (resources == null || resources.isEmpty() || !shouldTraceShaderInputParityLog()) {
+            return;
+        }
+
+        LOGGER.info(
+            "ShaderInputParityResources backend={} source={} pipelineLocation={} vertexShader={} fragmentShader={} pipelineHandle=none pipelineKey=synthetic stableKey={} {} {} resources=[{}]",
+            getActiveBackendType().name().toLowerCase(java.util.Locale.ROOT),
+            source,
+            shaderInputParitySanitizeLabel(pipelineLocation),
+            vertexShader == null || vertexShader.isBlank() ? "unknown" : shaderInputParitySanitizeLabel(vertexShader),
+            fragmentShader == null || fragmentShader.isBlank() ? "unknown" : shaderInputParitySanitizeLabel(fragmentShader),
+            shaderInputParitySanitizeLabel(stableKey),
+            shaderInputParitySemanticDrawContextFields(),
+            shaderInputParityDeterministicContextFields(),
+            String.join(", ", resources)
+        );
+    }
+
+    public static String shaderInputParitySamplerResource(String name, int unit, @Nullable GpuTextureView textureView) {
+        StringBuilder builder = new StringBuilder();
+        builder.append(shaderInputParitySanitizeLabel(name))
+            .append("{layout=set:0,binding:").append(unit)
+            .append(",type=SAMPLER")
+            .append(",stages:[FRAGMENT, VERTEX]")
+            .append(",sampler={unit=").append(unit)
+            .append(",samplerObject=none");
+
+        if (textureView == null) {
+            return builder.append(",view=missing}}").toString();
+        }
+
+        GpuTexture texture = textureView.texture();
+        if (texture == null) {
+            return builder.append(",view={viewClass=").append(textureView.getClass().getSimpleName())
+                .append(",baseMip=").append(textureView.baseMipLevel())
+                .append(",mips=").append(textureView.mipLevels())
+                .append(",texture=missing}}}").toString();
+        }
+
+        builder.append(",view={viewClass=").append(textureView.getClass().getSimpleName())
+            .append(",viewId=").append(Integer.toHexString(System.identityHashCode(textureView)))
+            .append(",baseMip=").append(textureView.baseMipLevel())
+            .append(",mips=").append(textureView.mipLevels())
+            .append(",width=").append(textureView.getWidth(0))
+            .append(",height=").append(textureView.getHeight(0))
+            .append(",closed=").append(textureView.isClosed())
+            .append(",texture={class=").append(texture.getClass().getSimpleName())
+            .append(",id=").append(Integer.toHexString(System.identityHashCode(texture)))
+            .append(",label=\"").append(shaderInputParitySanitizeLabel(texture.getLabel())).append('"')
+            .append(",format=").append(texture.getVulkanicFormat())
+            .append(",width=").append(texture.getWidth(0))
+            .append(",height=").append(texture.getHeight(0))
+            .append(",layers=").append(texture.getDepthOrLayers())
+            .append(",mips=").append(texture.getMipLevels())
+            .append(",usage=").append(texture.usage())
+            .append(",closed=").append(texture.isClosed())
+            .append(",samplerState={").append(shaderInputParitySamplerState(texture)).append('}')
+            .append("}}}}");
+        return builder.toString();
+    }
+
     public static void traceShaderInputParityDraw(
             String source,
             boolean indexed,
@@ -9559,6 +9675,12 @@ public class VulkanicAPI {
         if (!TRACE_SHADER_INPUT_PARITY) {
             return false;
         }
+        if (TRACE_SHADER_INPUT_PARITY_POSE_ONLY) {
+            String poseName = DeterministicCameraCapture.currentPoseNameForDiagnostics();
+            if ("none".equals(poseName) || "complete".equals(poseName)) {
+                return false;
+            }
+        }
         return SHADER_INPUT_PARITY_LOG_COUNT.incrementAndGet() <= MAX_SHADER_INPUT_PARITY_LOGS;
     }
 
@@ -9706,7 +9828,7 @@ public class VulkanicAPI {
             .append(",usage=").append(texture.usage())
             .append(",closed=").append(texture.isClosed())
             .append(",samplerState={").append(shaderInputParitySamplerState(texture)).append('}')
-            .append("}}}");
+            .append("}}}}");
 
         if (TRACE_SHADER_INPUT_SAMPLER_CONTENT_HASHES && shouldTraceRenderTargetContentHash(resourceBinding.name(), texture.getLabel())) {
             builder.append(",contentHash={")
@@ -10134,6 +10256,7 @@ public class VulkanicAPI {
             case "Projection" -> 64;
             case "DynamicTransforms" -> 164;
             case "Fog" -> 40;
+            case "Lighting" -> 32;
             case "LightmapInfo" -> 64;
             default -> 0;
         };
@@ -10168,6 +10291,16 @@ public class VulkanicAPI {
                 data.getFloat(28),
                 data.getFloat(32),
                 data.getFloat(36)
+            );
+            case "Lighting" -> String.format(
+                java.util.Locale.ROOT,
+                ",semantic={Light0_Direction=(%.8f,%.8f,%.8f),Light1_Direction=(%.8f,%.8f,%.8f)}",
+                data.getFloat(0),
+                data.getFloat(4),
+                data.getFloat(8),
+                data.getFloat(16),
+                data.getFloat(20),
+                data.getFloat(24)
             );
             case "LightmapInfo" -> String.format(
                 java.util.Locale.ROOT,

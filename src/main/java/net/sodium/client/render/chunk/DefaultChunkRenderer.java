@@ -11,6 +11,7 @@ import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.vertex.VertexFormat;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
+import net.irisshaders.iris.pbr.TextureTracker;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
 import net.sodium.client.SodiumClientMod;
 import net.sodium.client.gl.buffer.GlBuffer;
@@ -112,6 +113,10 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         ChunkShaderInterface shader = this.activeProgram.getInterface();
         shader.setProjectionMatrix(matrices.projection());
         shader.setModelViewMatrix(matrices.modelView());
+        RenderPassChunkShaderInterface renderPassShader = Iris.getIrisConfig().areShadersEnabled()
+            && shader instanceof RenderPassChunkShaderInterface sharedShader
+            ? sharedShader
+            : null;
 
         Iterator<ChunkRenderList> iterator = renderLists.iterator(renderPass.isTranslucent());
 
@@ -159,6 +164,7 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                 batch,
                 useIndexedTessellation
             )) {
+                traceOpenGlSodiumTerrainResources(renderPass, renderPassShader);
                 traceOpenGlSodiumTerrainGeometry(renderPass, shader, tessellation, batch);
                 executeDrawBatch(commandList, tessellation, batch);
             }
@@ -649,6 +655,127 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
             }
         }
         return total > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) total;
+    }
+
+    private static void traceOpenGlSodiumTerrainResources(TerrainRenderPass terrainPass, RenderPassChunkShaderInterface renderPassShader) {
+        if (!VulkanicAPI.isShaderInputParityTracingEnabled()) {
+            return;
+        }
+
+        GpuTextureView blockAtlas = terrainPass.getAtlas();
+        GpuTextureView lightTexture = net.minecraft.client.Minecraft.getInstance().gameRenderer.lightTexture().getTextureView();
+        java.util.LinkedHashMap<String, String> resources = new java.util.LinkedHashMap<>();
+        if (renderPassShader != null) {
+            DiagnosticResourceCollector collector = new DiagnosticResourceCollector();
+            renderPassShader.bindRenderPassResources(collector, terrainPass);
+            for (String resource : collector.resources()) {
+                String name = resource.substring(0, resource.indexOf('{'));
+                resources.put(name, resource);
+            }
+        }
+        resources.putIfAbsent("Sampler0", VulkanicAPI.shaderInputParitySamplerResource("Sampler0", 0, blockAtlas));
+        resources.putIfAbsent("Sampler2", VulkanicAPI.shaderInputParitySamplerResource("Sampler2", 2, lightTexture));
+        VulkanicAPI.traceShaderInputParitySyntheticResources(
+            "opengl-sodium-terrain-resources",
+            String.valueOf(terrainPass.getPipeline().getLocation()),
+            null,
+            null,
+            "semantic-sodium-terrain",
+            List.copyOf(resources.values())
+        );
+    }
+
+    private static final class DiagnosticResourceCollector implements RenderPass, net.vulkanic.RenderPassResourceBinder {
+        private final List<String> resources = new ArrayList<>();
+
+        List<String> resources() {
+            return this.resources;
+        }
+
+        @Override
+        public void bindSampler(String name, GpuTextureView view, int textureUnit) {
+            if (view != null) {
+                this.resources.add(VulkanicAPI.shaderInputParitySamplerResource(name, textureUnit, view));
+            }
+        }
+
+        @Override
+        public boolean bindLegacySampler(String name, int textureId, int textureUnit) {
+            GpuTextureView view = TextureTracker.INSTANCE.getTextureView(textureId);
+            if (view == null) {
+                view = TextureTracker.INSTANCE.getShaderTexture(textureUnit);
+            }
+            if (view == null) {
+                return false;
+            }
+            this.resources.add(VulkanicAPI.shaderInputParitySamplerResource(name, textureUnit, view));
+            return true;
+        }
+
+        @Override
+        public void bindSampler(String name, GpuTextureView view) {
+            if (view != null) {
+                this.resources.add(VulkanicAPI.shaderInputParitySamplerResource(name, -1, view));
+            }
+        }
+
+        @Override
+        public void pushDebugGroup(java.util.function.Supplier<String> supplier) {
+        }
+
+        @Override
+        public void popDebugGroup() {
+        }
+
+        @Override
+        public void setPipeline(net.blaze3d.pipeline.RenderPipeline renderPipeline) {
+        }
+
+        @Override
+        public void setUniform(String name, GpuBuffer gpuBuffer) {
+        }
+
+        @Override
+        public void setUniform(String name, GpuBufferSlice gpuBufferSlice) {
+        }
+
+        @Override
+        public void enableScissor(int x, int y, int width, int height) {
+        }
+
+        @Override
+        public void disableScissor() {
+        }
+
+        @Override
+        public void setVertexBuffer(int slot, GpuBuffer gpuBuffer) {
+        }
+
+        @Override
+        public void setIndexBuffer(GpuBuffer gpuBuffer, VertexFormat.IndexType indexType) {
+        }
+
+        @Override
+        public void drawIndexed(int baseVertex, int firstIndex, int indexCount, int instances) {
+        }
+
+        @Override
+        public <T> void drawMultipleIndexed(
+            java.util.Collection<RenderPass.Draw<T>> draws,
+            GpuBuffer indexBuffer,
+            VertexFormat.IndexType indexType,
+            java.util.Collection<String> dynamicUniforms,
+            T uniformState
+        ) {
+        }
+
+        @Override
+        public void draw(int firstVertex, int vertexCount) {
+        }
+
+        @Override
+        public void close() {
+        }
     }
 
     private static void traceOpenGlSodiumTerrainGeometry(

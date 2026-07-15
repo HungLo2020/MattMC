@@ -28,6 +28,7 @@ import net.irisshaders.iris.shadows.frustum.fallback.NonCullingFrustum;
 import net.irisshaders.iris.uniforms.CameraUniforms;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import net.irisshaders.iris.uniforms.CelestialUniforms;
+import net.irisshaders.iris.uniforms.SystemTimeUniforms;
 import net.irisshaders.iris.uniforms.custom.CustomUniforms;
 import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
@@ -192,6 +193,10 @@ public class ShadowRenderer {
 	}
 
 	private static float getSkyAngle() {
+		if (SystemTimeUniforms.isDeterministicTemporalParityEnabled()) {
+			return SystemTimeUniforms.deterministicTemporalTimeOfDay(getLevel().dimensionType());
+		}
+
 		return getLevel().getTimeOfDay(CapturedRenderingState.INSTANCE.getTickDelta());
 	}
 

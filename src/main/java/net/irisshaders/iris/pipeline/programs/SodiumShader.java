@@ -240,6 +240,11 @@ public class SodiumShader implements RenderPassChunkShaderInterface {
 	}
 
 	@Override
+	public java.util.Map<String, Integer> getRenderPassSamplerUnits() {
+		return samplers.getRenderPassSamplerUnits();
+	}
+
+	@Override
 	public java.util.Collection<BufferBlendInformation> getRenderPassBufferBlendOverrides() {
 		return bufferBlendInformations;
 	}
