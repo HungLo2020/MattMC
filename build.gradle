@@ -388,6 +388,21 @@ def findRustBuildPython = {
             candidates << new File(pathEntry, exeName)
         }
     }
+    if (System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('win')) {
+        [System.getenv('LOCALAPPDATA'), System.getenv('ProgramFiles'), System.getenv('ProgramFiles(x86)')]
+            .findAll { it }
+            .each { root ->
+                def rootDir = new File(root.toString())
+                [
+                    new File(rootDir, 'Programs/Python'),
+                    rootDir
+                ].findAll { it.isDirectory() }.each { searchDir ->
+                    searchDir.listFiles()?.findAll { it.isDirectory() && it.name.toLowerCase(Locale.ROOT).startsWith('python') }?.each { pythonDir ->
+                        candidates << new File(pythonDir, 'python.exe')
+                    }
+                }
+            }
+    }
 
     return candidates.find { isUsablePython(it) }
 }

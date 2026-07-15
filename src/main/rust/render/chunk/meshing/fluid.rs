@@ -1,3 +1,11 @@
+//! Native fluid face production.
+//!
+//! Fluid meshing keeps Java parity by separating semantic face selection from
+//! packed quad emission: visibility and corner heights decide which faces exist,
+//! UV/overlay/backface rules build deterministic records, and the builder layer
+//! performs the final compact encoding. Custom fluids that cannot be represented
+//! by these native rules continue to use the compatibility fallback.
+
 use std::slice;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::OnceLock;
@@ -578,54 +586,52 @@ fn native_section_fluid_faces_to_sink<S: NativeFluidFaceSink>(
         ));
         let top_uses_still =
             block.fluid_flow_x == 0.0 && block.fluid_flow_z == 0.0 && state.fluid_falling == 0;
-        let top =
-            if top_uses_still {
-                native_fluid_diag_log(format_args!(
-                    "top-uv-still pos={},{},{}",
-                    block.absolute_x, block.absolute_y, block.absolute_z
-                ));
-                still_fluid_top_uvs(state.fluid_still)
-            } else {
-                let sprite = state.fluid_flow;
-                native_fluid_diag_log(format_args!(
-                    "top-uv-flowing-before-atan pos={},{},{}",
-                    block.absolute_x, block.absolute_y, block.absolute_z
-                ));
-                let dir = (mth_atan2(block.fluid_flow_z as f64, block.fluid_flow_x as f64)
-                    as f32)
-                    - 1.5707964_f32;
-                native_fluid_diag_log(format_args!(
-                    "top-uv-flowing-after-atan pos={},{},{} dir={:.6}",
-                    block.absolute_x, block.absolute_y, block.absolute_z, dir
-                ));
-                let sin = mth_sin(dir) * 0.25;
-                let cos = mth_cos(dir) * 0.25;
-                native_fluid_diag_log(format_args!(
-                    "top-uv-flowing-after-trig pos={},{},{} sin={:.6} cos={:.6}",
-                    block.absolute_x, block.absolute_y, block.absolute_z, sin, cos
-                ));
-                shrink_fluid_uvs(
-                    [
-                        (
-                            sprite_u(sprite, 0.5 + (-cos - sin)),
-                            sprite_v(sprite, 0.5 + -cos + sin),
-                        ),
-                        (
-                            sprite_u(sprite, 0.5 + -cos + sin),
-                            sprite_v(sprite, 0.5 + cos + sin),
-                        ),
-                        (
-                            sprite_u(sprite, 0.5 + cos + sin),
-                            sprite_v(sprite, 0.5 + (cos - sin)),
-                        ),
-                        (
-                            sprite_u(sprite, 0.5 + (cos - sin)),
-                            sprite_v(sprite, 0.5 + (-cos - sin)),
-                        ),
-                    ],
-                    state.fluid_still.shrink,
-                )
-            };
+        let top = if top_uses_still {
+            native_fluid_diag_log(format_args!(
+                "top-uv-still pos={},{},{}",
+                block.absolute_x, block.absolute_y, block.absolute_z
+            ));
+            still_fluid_top_uvs(state.fluid_still)
+        } else {
+            let sprite = state.fluid_flow;
+            native_fluid_diag_log(format_args!(
+                "top-uv-flowing-before-atan pos={},{},{}",
+                block.absolute_x, block.absolute_y, block.absolute_z
+            ));
+            let dir = (mth_atan2(block.fluid_flow_z as f64, block.fluid_flow_x as f64) as f32)
+                - 1.5707964_f32;
+            native_fluid_diag_log(format_args!(
+                "top-uv-flowing-after-atan pos={},{},{} dir={:.6}",
+                block.absolute_x, block.absolute_y, block.absolute_z, dir
+            ));
+            let sin = mth_sin(dir) * 0.25;
+            let cos = mth_cos(dir) * 0.25;
+            native_fluid_diag_log(format_args!(
+                "top-uv-flowing-after-trig pos={},{},{} sin={:.6} cos={:.6}",
+                block.absolute_x, block.absolute_y, block.absolute_z, sin, cos
+            ));
+            shrink_fluid_uvs(
+                [
+                    (
+                        sprite_u(sprite, 0.5 + (-cos - sin)),
+                        sprite_v(sprite, 0.5 + -cos + sin),
+                    ),
+                    (
+                        sprite_u(sprite, 0.5 + -cos + sin),
+                        sprite_v(sprite, 0.5 + cos + sin),
+                    ),
+                    (
+                        sprite_u(sprite, 0.5 + cos + sin),
+                        sprite_v(sprite, 0.5 + (cos - sin)),
+                    ),
+                    (
+                        sprite_u(sprite, 0.5 + (cos - sin)),
+                        sprite_v(sprite, 0.5 + (-cos - sin)),
+                    ),
+                ],
+                state.fluid_still.shrink,
+            )
+        };
         sink.profile()
             .add_optional_stage(PROFILE_FLUID_STILL_FLOWING_UV, uv_started);
         native_fluid_diag_log(format_args!(
@@ -671,10 +677,7 @@ fn native_section_fluid_faces_to_sink<S: NativeFluidFaceSink>(
         );
         native_fluid_diag_log(format_args!(
             "top-face-after-quad pos={},{},{} normal=0x{:08x}",
-            block.absolute_x,
-            block.absolute_y,
-            block.absolute_z,
-            top_face.packed_normal
+            block.absolute_x, block.absolute_y, block.absolute_z, top_face.packed_normal
         ));
         fluid_semantic_record_diag(
             block,
@@ -754,7 +757,11 @@ fn native_section_fluid_faces_to_sink<S: NativeFluidFaceSink>(
             let append_started = profile_start(profile_fluid_substages);
             native_fluid_diag_log(format_args!(
                 "emit-top-back pos={},{},{} facing={} kind={}",
-                block.absolute_x, block.absolute_y, block.absolute_z, backward_face.facing, top_face_kind
+                block.absolute_x,
+                block.absolute_y,
+                block.absolute_z,
+                backward_face.facing,
+                top_face_kind
             ));
             sink.emit(backward_face)?;
             sink.mark_fluid_sprite(fluid_sprite_mask(state.fluid_type, top_uses_still, false));
@@ -1092,7 +1099,8 @@ fn fluid_diag_target_matches(record: &FluidFaceRecord) -> bool {
         return true;
     };
     let mut parts = target.split(',');
-    let (Some(x), Some(y), Some(z), None) = (parts.next(), parts.next(), parts.next(), parts.next())
+    let (Some(x), Some(y), Some(z), None) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
     else {
         return true;
     };
@@ -1239,7 +1247,11 @@ fn apply_fluid_lighting(
         light_face,
         cull_face: -1,
         normal_face: -1,
-        has_ao: if state.fluid_type == FLUID_WATER { 1 } else { 0 },
+        has_ao: if state.fluid_type == FLUID_WATER {
+            1
+        } else {
+            0
+        },
         shade: 0,
         ..StaticModelQuadRecord::default()
     };
@@ -1640,8 +1652,7 @@ fn mth_sin_table() -> &'static [f32; 65_536] {
         .get_or_init(|| {
             let mut table = vec![0.0_f32; 65_536].into_boxed_slice();
             for (index, value) in table.iter_mut().enumerate() {
-                *value =
-                    ((index as f64) * std::f64::consts::PI * 2.0 / 65_536.0).sin() as f32;
+                *value = ((index as f64) * std::f64::consts::PI * 2.0 / 65_536.0).sin() as f32;
             }
             match table.try_into() {
                 Ok(table) => table,

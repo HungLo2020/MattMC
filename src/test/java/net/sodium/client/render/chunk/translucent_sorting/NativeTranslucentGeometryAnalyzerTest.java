@@ -220,8 +220,9 @@ class NativeTranslucentGeometryAnalyzerTest {
 
         String nativeFullQuad = Files.readString(Path.of(
                 "src/main/java/net/sodium/client/render/chunk/translucent_sorting/quad/NativeFullTQuad.java"));
-        String rustTranslucent = Files.readString(Path.of(
-                "src/main/rust/render/chunk/translucent.rs"));
+        Path rustTranslucentDir = Path.of("src/main/rust/render/chunk/translucent");
+        String rustTranslucent = Files.readString(rustTranslucentDir.resolve("mod.rs"))
+                + Files.readString(rustTranslucentDir.resolve("ffi.rs"));
 
         assertTrue(nativeFullQuad.contains("mattmc_sodium_translucent_full_quad_split_even"));
         assertTrue(nativeFullQuad.contains("mattmc_sodium_translucent_full_quad_split_triangle_vertex"));

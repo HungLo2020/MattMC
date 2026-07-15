@@ -1,3 +1,11 @@
+//! Rust chunk meshing core.
+//!
+//! Production enters through the compact all-pass section snapshot path: Java
+//! snapshots one section into stable ABI arrays, Rust scans that snapshot once,
+//! and each emitted quad is routed to the solid, cutout, or translucent builder.
+//! The legacy record-shaped entry points remain for benchmark and ABI coverage
+//! only; production must not grow new dependencies on them.
+
 use std::slice;
 use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
@@ -16,6 +24,7 @@ mod model;
 mod packing;
 mod quad;
 mod scan;
+mod section;
 mod tint;
 mod updates;
 
@@ -38,6 +47,8 @@ use model::*;
 use packing::*;
 use quad::*;
 use scan::*;
+#[cfg(test)]
+use section::{CompactSectionSnapshot, NativeSectionRecordSource};
 use tint::*;
 use updates::*;
 

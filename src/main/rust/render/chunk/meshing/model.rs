@@ -161,10 +161,19 @@ pub(super) fn resolve_selector_model_ids(
         }
         SELECTOR_GROUP => {
             let child_seed = legacy_next_long(seed);
-            profile.add_count(PROFILE_COUNT_MULTIPART_CHILDREN_TESTED, selector.entries.len());
+            profile.add_count(
+                PROFILE_COUNT_MULTIPART_CHILDREN_TESTED,
+                selector.entries.len(),
+            );
             for entry in &selector.entries {
                 let before = output.len();
-                resolve_selector_model_ids(entry.target_id, child_seed, selectors, output, profile)?;
+                resolve_selector_model_ids(
+                    entry.target_id,
+                    child_seed,
+                    selectors,
+                    output,
+                    profile,
+                )?;
                 if output.len() != before {
                     profile.add_count(PROFILE_COUNT_MULTIPART_CHILDREN_SELECTED, 1);
                 }
@@ -305,8 +314,7 @@ pub(super) fn static_quad_applies_tint(
 pub(super) fn max_brightness(a: i32, b: i32) -> i32 {
     let a = a as u32;
     let b = b as u32;
-    ((a & 0x0000_ffff).max(b & 0x0000_ffff)
-        | (a & 0xffff_0000).max(b & 0xffff_0000)) as i32
+    ((a & 0x0000_ffff).max(b & 0x0000_ffff) | (a & 0xffff_0000).max(b & 0xffff_0000)) as i32
 }
 
 #[inline(always)]

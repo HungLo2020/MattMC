@@ -112,14 +112,28 @@ pub(super) fn smooth_lighting(
             if java_float_equal(depth, 1.0) {
                 blend_ao_face(face_cache.get(block, light_face, false), weights)
             } else {
-                blend_inset_ao_face_cached(&mut face_cache, block, light_face, depth, 1.0 - depth, weights)
+                blend_inset_ao_face_cached(
+                    &mut face_cache,
+                    block,
+                    light_face,
+                    depth,
+                    1.0 - depth,
+                    weights,
+                )
             }
         } else if java_float_equal(depth, 0.0) {
             blend_ao_face(face_cache.get(block, light_face, true), weights)
         } else if java_float_equal(depth, 1.0) {
             blend_ao_face(face_cache.get(block, light_face, false), weights)
         } else {
-            blend_inset_ao_face_cached(&mut face_cache, block, light_face, depth, 1.0 - depth, weights)
+            blend_inset_ao_face_cached(
+                &mut face_cache,
+                block,
+                light_face,
+                depth,
+                1.0 - depth,
+                weights,
+            )
         };
         out.ao[i] = ao * ambient_shade(light_face, shade);
         out.lm[i] = lm;

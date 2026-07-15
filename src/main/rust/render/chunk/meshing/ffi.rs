@@ -1,3 +1,9 @@
+//! C ABI entry points for Java chunk meshing calls.
+//!
+//! These functions validate raw pointers, construct Rust-owned views or builder
+//! handles, call the meshing subsystem, and translate failures back to integer
+//! result codes. Meshing behavior should live in sibling modules, not here.
+
 use super::*;
 
 #[no_mangle]

@@ -201,12 +201,7 @@ pub(super) fn is_compact_fast_format(format: NativeFormat) -> bool {
 
 #[inline(always)]
 fn encode_quad_compact(quad: &NativeQuad, output: &mut [u8], section_index: i32) {
-    encode_compact_quad_vertices(
-        &quad.vertices,
-        quad.material_bits,
-        section_index,
-        output,
-    );
+    encode_compact_quad_vertices(&quad.vertices, quad.material_bits, section_index, output);
 }
 
 #[inline(always)]
