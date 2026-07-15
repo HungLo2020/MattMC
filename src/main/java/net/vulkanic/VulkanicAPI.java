@@ -9461,6 +9461,13 @@ public class VulkanicAPI {
         return shaderInputParitySemanticDrawContextFields();
     }
 
+    public static void recordShaderInputParitySubmittedWorkIdentity(String family, String identity) {
+        if (!TRACE_SHADER_INPUT_PARITY) {
+            return;
+        }
+        DeterministicCameraCapture.recordSubmittedWorkIdentity(family, identity);
+    }
+
     private static String shaderInputParitySemanticDrawKeyOrUnavailable() {
         ShaderInputParitySemanticDrawIdentity identity = SHADER_INPUT_PARITY_SEMANTIC_DRAW.get();
         return identity == null ? "unavailable" : identity.key();
@@ -9604,41 +9611,36 @@ public class VulkanicAPI {
                 if (indexData == null) {
                     return new GeometryParityResult("not-comparable", "index-read-unavailable", logicalVertices, totalIndices, "unavailable", "unavailable", "none");
                 }
-                int minVertex = Integer.MAX_VALUE;
-                int maxVertex = Integer.MIN_VALUE;
                 int[] logicalIndices = new int[safeIndexCount];
                 for (int index = 0; index < safeIndexCount; index++) {
                     int rawIndex = readShaderInputParityIndex(indexData, index * indexType.bytes, indexType);
                     int logicalIndex = rawIndex + baseVertex;
+                    if (logicalIndex < 0) {
+                        return new GeometryParityResult("not-comparable", "indexed-vertex-range-invalid", logicalVertices, totalIndices, "unavailable", "unavailable", "none");
+                    }
                     logicalIndices[index] = logicalIndex;
-                    minVertex = Math.min(minVertex, logicalIndex);
-                    maxVertex = Math.max(maxVertex, logicalIndex);
                 }
-                if (safeIndexCount == 0) {
-                    minVertex = 0;
-                    maxVertex = -1;
-                }
-                if (minVertex < 0 || maxVertex < minVertex) {
-                    return new GeometryParityResult("not-comparable", "indexed-vertex-range-invalid", logicalVertices, totalIndices, "unavailable", "unavailable", "none");
-                }
-                int vertexReadBytes = Math.multiplyExact(maxVertex - minVertex + 1, stride);
-                int vertexReadOffset = Math.multiplyExact(minVertex, stride);
-                if ((long) vertexReadOffset + vertexReadBytes > vertexBuffer.size()) {
-                    return new GeometryParityResult("not-comparable", "indexed-vertex-range-out-of-bounds", logicalVertices, totalIndices, "unavailable", "unavailable", "none");
-                }
-                java.nio.ByteBuffer vertexData = shaderInputParityRead(new VulkanicBufferSlice(resolvedVertexBuffer, vertexReadOffset, vertexReadBytes), vertexReadBytes);
-                if (vertexData == null) {
-                    return new GeometryParityResult("not-comparable", "vertex-read-unavailable", logicalVertices, totalIndices, "unavailable", "unavailable", "none");
-                }
+                java.util.Map<Integer, java.nio.ByteBuffer> vertexCache = new java.util.HashMap<>();
                 for (int instance = 0; instance < safeInstances; instance++) {
                     updateShaderInputParityInt(indexCrc, instance);
                     updateShaderInputParityInt(vertexCrc, instance);
                     for (int logicalIndex : logicalIndices) {
                         updateShaderInputParityInt(indexCrc, logicalIndex);
-                        int localVertex = logicalIndex - minVertex;
-                        updateShaderInputParityVertex(vertexCrc, vertexData, localVertex * stride, vertexFormat);
+                        java.nio.ByteBuffer vertexData = vertexCache.get(logicalIndex);
+                        if (vertexData == null) {
+                            int vertexReadOffset = Math.multiplyExact(logicalIndex, stride);
+                            if ((long) vertexReadOffset + stride > vertexBuffer.size()) {
+                                return new GeometryParityResult("not-comparable", "indexed-vertex-range-out-of-bounds", logicalVertices, totalIndices, "unavailable", "unavailable", "none");
+                            }
+                            vertexData = shaderInputParityRead(new VulkanicBufferSlice(resolvedVertexBuffer, vertexReadOffset, stride), stride);
+                            if (vertexData == null) {
+                                return new GeometryParityResult("not-comparable", "vertex-read-unavailable", logicalVertices, totalIndices, "unavailable", "unavailable", "none");
+                            }
+                            vertexCache.put(logicalIndex, vertexData);
+                        }
+                        updateShaderInputParityVertex(vertexCrc, vertexData, 0, vertexFormat);
                         if (includeDetail && detailVertexOrdinal < TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_MAX_VERTICES) {
-                            appendShaderInputParityVertexDetail(detail, detailVertexOrdinal, instance, logicalIndex, vertexData, localVertex * stride, vertexFormat);
+                            appendShaderInputParityVertexDetail(detail, detailVertexOrdinal, instance, logicalIndex, vertexData, 0, vertexFormat);
                         }
                         detailVertexOrdinal++;
                     }
@@ -9962,6 +9964,9 @@ public class VulkanicAPI {
             return false;
         }
         if (TRACE_SHADER_INPUT_PARITY_POSE_ONLY) {
+            if (!DeterministicCameraCapture.isReadyForShaderInputParityPoseDiagnostics()) {
+                return false;
+            }
             String poseName = DeterministicCameraCapture.currentPoseNameForDiagnostics();
             if ("none".equals(poseName) || "complete".equals(poseName)) {
                 return false;
@@ -9975,6 +9980,9 @@ public class VulkanicAPI {
             return false;
         }
         if (TRACE_SHADER_INPUT_PARITY_POSE_ONLY) {
+            if (!DeterministicCameraCapture.isReadyForShaderInputParityPoseDiagnostics()) {
+                return false;
+            }
             String poseName = DeterministicCameraCapture.currentPoseNameForDiagnostics();
             if ("none".equals(poseName) || "complete".equals(poseName)) {
                 return false;

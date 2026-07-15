@@ -1499,6 +1499,7 @@ void main() {
             NativeSpine spine = nativeSpine;
             if (spine != null) {
                 spine.setLegacyBufferExplicitUsage(handle, usage);
+                spine.setLegacyBufferDebugLabel(handle, supplier == null ? null : supplier.get());
             }
             int target = selectLegacyBufferTarget(usage);
             net.vulkanic.VulkanicAPI.bindBuffer(ctx, target, handle);
@@ -1538,6 +1539,7 @@ void main() {
             NativeSpine spine = nativeSpine;
             if (spine != null) {
                 spine.setLegacyBufferExplicitUsage(handle, usage);
+                spine.setLegacyBufferDebugLabel(handle, supplier == null ? null : supplier.get());
             }
             int target = selectLegacyBufferTarget(usage);
             net.vulkanic.VulkanicAPI.bindBuffer(ctx, target, handle);
@@ -11272,6 +11274,7 @@ void main() {
             private volatile int logicalSizeBytes;
             private volatile int lastTarget;
             private volatile int explicitUsage;
+            private volatile String debugLabel;
 
             private LegacyBufferObject(int id) {
                 this.id = id;
@@ -13052,6 +13055,11 @@ void main() {
         private void setLegacyBufferExplicitUsage(int bufferId, int usage) {
             LegacyBufferObject legacy = requireLegacyBuffer(bufferId);
             legacy.explicitUsage = usage;
+        }
+
+        private void setLegacyBufferDebugLabel(int bufferId, @Nullable String debugLabel) {
+            LegacyBufferObject legacy = requireLegacyBuffer(bufferId);
+            legacy.debugLabel = debugLabel;
         }
 
         private void deleteLegacyBuffer(int bufferId) {
@@ -15694,7 +15702,9 @@ void main() {
                 ? legacy.explicitUsage
                 : toLegacyBufferUsage(target, usageHint);
             legacy.buffer = (VulkanBuffer) createManagedBuffer(
-                "LegacyBuffer-" + legacy.id,
+                legacy.debugLabel == null || legacy.debugLabel.isBlank()
+                    ? "LegacyBuffer-" + legacy.id
+                    : legacy.debugLabel,
                 usage,
                 size,
                 initialData == null ? null : initialData.duplicate()
@@ -16216,7 +16226,7 @@ void main() {
                 java.nio.ByteBuffer diagnosticShadowData =
                     createDiagnosticBufferShadow(usage, size, initialData);
                 int diagnosticGeometryShadowBytes = diagnosticGeometryShadowBytes(usage, diagnosticShadowData, size);
-                boolean diagnosticSparseGeometryShadow = diagnosticSparseGeometryShadowEnabled(usage, diagnosticShadowData);
+                boolean diagnosticSparseGeometryShadow = diagnosticSparseGeometryShadowEnabled(usage, diagnosticShadowData, debugLabel);
 
                 return new VulkanBuffer(
                     finalBufferHandle,
@@ -16307,11 +16317,13 @@ void main() {
 
         private static boolean diagnosticSparseGeometryShadowEnabled(
             int usage,
-            @Nullable java.nio.ByteBuffer diagnosticShadowData
+            @Nullable java.nio.ByteBuffer diagnosticShadowData,
+            String debugLabel
         ) {
             return diagnosticShadowData == null
                 && VulkanicAPI.isShaderInputParityTracingEnabled()
-                && (usage & (VulkanicBuffer.USAGE_VERTEX | VulkanicBuffer.USAGE_INDEX)) != 0;
+                && (usage & (VulkanicBuffer.USAGE_VERTEX | VulkanicBuffer.USAGE_INDEX)) != 0
+                && (debugLabel.contains("Chunk geometry buffer") || debugLabel.contains("Chunk index buffer"));
         }
 
         private static boolean requiresHostVisibleBufferMemory(int usage) {

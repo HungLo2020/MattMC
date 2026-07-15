@@ -16,8 +16,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Development-only deterministic camera capture hook.
@@ -36,6 +41,9 @@ public final class DeterministicCameraCapture {
 	private static final float YAW_DELTA = Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.yawDelta", "35.0"));
 	private static final boolean STOP_AFTER_COMPLETE = Boolean.parseBoolean(System.getProperty("mattmc.dev.deterministicCameraCapture.stopAfterComplete", "true"));
 	private static final boolean INTERNAL_SCREENSHOTS = Boolean.parseBoolean(System.getProperty("mattmc.dev.deterministicCameraCapture.internalScreenshots", "false"));
+	private static final int SETTLED_READY_FRAMES = Math.max(0, Integer.getInteger("mattmc.dev.deterministicCameraCapture.settledReadyFrames", 0));
+	private static final int SETTLED_READY_MAX_WAIT_FRAMES = Math.max(1, Integer.getInteger("mattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames", 900));
+	private static final Set<String> SETTLED_READY_FAMILIES = parseSettledReadyFamilies();
 	private static final float FIXED_VIGNETTE_BRIGHTNESS =
 		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.vignetteBrightness", "1.0"));
 	private static final Path METADATA_PATH = Path.of(System.getProperty("mattmc.dev.deterministicCameraCapture.metadata", "run/deterministic_camera_capture.json"));
@@ -60,6 +68,9 @@ public final class DeterministicCameraCapture {
 	private static long renderedFrameIndex;
 	private static int windowWidth;
 	private static int windowHeight;
+	private static boolean settledReadyGateSatisfied;
+	private static int framesWaitingForSettledReady;
+	private static final Map<Long, Map<String, Set<String>>> SUBMITTED_WORK_BY_FRAME = new LinkedHashMap<>();
 
 	private DeterministicCameraCapture() {
 	}
@@ -124,6 +135,16 @@ public final class DeterministicCameraCapture {
 		stabilizeGuiState(minecraft);
 		applyPose(minecraft.player, poses[poseIndex]);
 		renderedFrameIndex++;
+		if (!settledReadyGateSatisfied && !settledReadyGateSatisfied(minecraft)) {
+			renderedFramesAtPose = 0;
+			framesWaitingForSettledReady++;
+			if (framesWaitingForSettledReady > SETTLED_READY_MAX_WAIT_FRAMES) {
+				fail("timed out waiting for settled submitted work: " + settledReadySummary());
+			} else if ((framesWaitingForSettledReady % 30) == 0) {
+				writeMetadata(minecraft, "waiting_for_settled_ready_work");
+			}
+			return;
+		}
 		if (awaitingScreenshotAck) {
 			if (checkScreenshotAck(minecraft)) {
 				return;
@@ -151,6 +172,10 @@ public final class DeterministicCameraCapture {
 
 	public static boolean isEnabledForDiagnostics() {
 		return ENABLED && initialized && !failed;
+	}
+
+	public static boolean isReadyForShaderInputParityPoseDiagnostics() {
+		return !ENABLED || !initialized || SETTLED_READY_FRAMES <= 0 || settledReadyGateSatisfied || poseIndex > 0;
 	}
 
 	public static String currentPoseNameForDiagnostics() {
@@ -187,6 +212,27 @@ public final class DeterministicCameraCapture {
 			+ " detAwaitingScreenshot=" + awaitingScreenshotAck
 				+ " detComplete=" + complete
 				+ " detFailed=" + failed;
+	}
+
+	public static void recordSubmittedWorkIdentity(String family, String identity) {
+		if (!ENABLED || !initialized || complete || failed || SETTLED_READY_FRAMES <= 0 || family == null || identity == null) {
+			return;
+		}
+		String normalizedFamily = family.trim();
+		if (!SETTLED_READY_FAMILIES.contains(normalizedFamily)) {
+			return;
+		}
+		String normalizedIdentity = identity.trim();
+		if (normalizedIdentity.isEmpty()) {
+			return;
+		}
+		synchronized (SUBMITTED_WORK_BY_FRAME) {
+			SUBMITTED_WORK_BY_FRAME
+				.computeIfAbsent(renderedFrameIndex, ignored -> new LinkedHashMap<>())
+				.computeIfAbsent(normalizedFamily, ignored -> new LinkedHashSet<>())
+				.add(normalizedIdentity);
+			pruneSubmittedWorkFrames();
+		}
 	}
 
 	public static int deterministicTemporalFrameIndex() {
@@ -252,6 +298,99 @@ public final class DeterministicCameraCapture {
 		);
 		writeMetadata(minecraft, "running");
 		return true;
+	}
+
+	private static boolean settledReadyGateSatisfied(Minecraft minecraft) {
+		if (SETTLED_READY_FRAMES <= 0) {
+			settledReadyGateSatisfied = true;
+			return true;
+		}
+		if (poseIndex > 0) {
+			settledReadyGateSatisfied = true;
+			return true;
+		}
+
+		long latestCompletedFrame = Math.max(0L, renderedFrameIndex - 1L);
+		synchronized (SUBMITTED_WORK_BY_FRAME) {
+			for (String family : SETTLED_READY_FAMILIES) {
+				Set<String> stableIntersection = null;
+				for (int offset = SETTLED_READY_FRAMES - 1; offset >= 0; offset--) {
+					Map<String, Set<String>> frameWork = SUBMITTED_WORK_BY_FRAME.get(latestCompletedFrame - offset);
+					Set<String> current = frameWork == null ? null : frameWork.get(family);
+					if (current == null || current.isEmpty()) {
+						return false;
+					}
+					if (stableIntersection == null) {
+						stableIntersection = new LinkedHashSet<>(current);
+					} else {
+						stableIntersection.retainAll(current);
+					}
+				}
+				if (stableIntersection == null || stableIntersection.isEmpty()) {
+					return false;
+				}
+			}
+		}
+
+		settledReadyGateSatisfied = true;
+		writeMetadata(minecraft, "settled_ready_work");
+		LOGGER.info(
+			"Deterministic camera capture settled submitted work after {} frames: {}",
+			framesWaitingForSettledReady,
+			settledReadySummary()
+		);
+		return true;
+	}
+
+	private static void pruneSubmittedWorkFrames() {
+		long minimumFrame = Math.max(0L, renderedFrameIndex - Math.max(SETTLED_READY_FRAMES * 4L, 64L));
+		SUBMITTED_WORK_BY_FRAME.keySet().removeIf(frame -> frame < minimumFrame);
+	}
+
+	private static String settledReadySummary() {
+		if (SETTLED_READY_FRAMES <= 0) {
+			return "disabled";
+		}
+		long latestCompletedFrame = Math.max(0L, renderedFrameIndex - 1L);
+		StringBuilder summary = new StringBuilder();
+		synchronized (SUBMITTED_WORK_BY_FRAME) {
+			summary.append("frames=").append(Math.max(0L, latestCompletedFrame - SETTLED_READY_FRAMES + 1L))
+				.append("..").append(latestCompletedFrame);
+			for (String family : SETTLED_READY_FAMILIES) {
+				Map<String, Set<String>> frameWork = SUBMITTED_WORK_BY_FRAME.get(latestCompletedFrame);
+				Set<String> work = frameWork == null ? null : frameWork.get(family);
+				Set<String> stableIntersection = null;
+				for (int offset = SETTLED_READY_FRAMES - 1; offset >= 0; offset--) {
+					Map<String, Set<String>> windowFrameWork = SUBMITTED_WORK_BY_FRAME.get(latestCompletedFrame - offset);
+					Set<String> current = windowFrameWork == null ? null : windowFrameWork.get(family);
+					if (current == null || current.isEmpty()) {
+						stableIntersection = null;
+						break;
+					}
+					if (stableIntersection == null) {
+						stableIntersection = new LinkedHashSet<>(current);
+					} else {
+						stableIntersection.retainAll(current);
+					}
+				}
+				summary.append(";").append(family).append("=").append(work == null ? 0 : work.size())
+					.append("/stable=").append(stableIntersection == null ? 0 : stableIntersection.size());
+			}
+		}
+		return summary.toString();
+	}
+
+	private static Set<String> parseSettledReadyFamilies() {
+		String raw = System.getProperty("mattmc.dev.deterministicCameraCapture.settledReadyFamilies", "sodium-terrain,distant-horizons");
+		LinkedHashSet<String> families = new LinkedHashSet<>();
+		Arrays.stream(raw.split(","))
+			.map(String::trim)
+			.filter(value -> !value.isEmpty())
+			.forEach(families::add);
+		if (families.isEmpty()) {
+			families.add("sodium-terrain");
+		}
+		return Set.copyOf(families);
 	}
 
 	private static void stabilizeGuiState(Minecraft minecraft) {
@@ -479,6 +618,10 @@ public final class DeterministicCameraCapture {
 		appendField(json, "gitCommit", gitCommit()).append(",\n");
 		json.append("  \"distantHorizonsActive\": ").append(isDistantHorizonsActive()).append(",\n");
 		json.append("  \"framesPerPose\": ").append(FRAMES_PER_POSE).append(",\n");
+		json.append("  \"settledReadyFrames\": ").append(SETTLED_READY_FRAMES).append(",\n");
+		json.append("  \"settledReadyMaxWaitFrames\": ").append(SETTLED_READY_MAX_WAIT_FRAMES).append(",\n");
+		json.append("  \"settledReadyGateSatisfied\": ").append(settledReadyGateSatisfied).append(",\n");
+		appendField(json, "settledReadySummary", settledReadySummary()).append(",\n");
 		json.append("  \"ackTimeoutFrames\": ").append(ACK_TIMEOUT_FRAMES).append(",\n");
 			json.append("  \"poseCount\": ").append(poses == null ? POSE_COUNT : poses.length).append(",\n");
 			json.append("  \"poseSequence\": [");

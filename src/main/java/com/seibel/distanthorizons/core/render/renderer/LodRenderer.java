@@ -965,10 +965,16 @@ public class LodRenderer
 				submittedVbos++;
 				submittedVertices += vbo.getVertexCount();
 				submittedIndices += indexCount;
+				String bucketName = phase.bufferBucket().name().toLowerCase(java.util.Locale.ROOT);
+				String lodWorkIdentity = "lod:" + bucketName
+						+ ":lodIndex=" + lodIndex
+						+ ":vboIndex=" + vboIndex
+						+ ":vertices=" + vbo.getVertexCount()
+						+ ":indices=" + indexCount;
 				try (VulkanicAPI.ShaderInputParityScope ignored = VulkanicAPI.beginShaderInputParitySemanticDraw(
 						"dh-lod-terrain-draw",
 						"distant-horizons",
-						"lod:" + phase.bufferBucket().name().toLowerCase(java.util.Locale.ROOT),
+						lodWorkIdentity,
 						null,
 						null,
 						"distant-horizons:lod-terrain:" + shaderProgram.getClass().getSimpleName(),
@@ -1000,6 +1006,13 @@ public class LodRenderer
 				vbo.unbind();
 			}
 		}
+		VulkanicAPI.recordShaderInputParitySubmittedWorkIdentity(
+				"distant-horizons",
+				"lod-phase:" + phase.bufferBucket().name().toLowerCase(java.util.Locale.ROOT)
+						+ ":containers=" + lodBufferContainers.size()
+						+ ":submittedVbos=" + submittedVbos
+						+ ":submittedVertices=" + submittedVertices
+						+ ":submittedIndices=" + submittedIndices);
 		traceDhLodPhaseSummary(shaderProgram, phase, lodBufferContainers.size(), submittedVbos, submittedVertices, submittedIndices);
 	}
 

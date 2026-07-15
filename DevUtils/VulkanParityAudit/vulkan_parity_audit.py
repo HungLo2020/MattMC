@@ -194,7 +194,6 @@ class ResourceRecord:
     @property
     def sampler_shader_visible_signature(self) -> str:
         return "|".join([
-            f"unit={self.unit}",
             f"format={self.texture_format}",
             f"size={self.texture_width}x{self.texture_height}",
             f"mips={self.texture_mips}",
@@ -212,7 +211,6 @@ class ResourceRecord:
     def sampler_signature_without_usage(self) -> str:
         label = normalize_texture_label(self.texture_label)
         return "|".join([
-            f"unit={self.unit}",
             f"label={label}",
             f"format={self.texture_format}",
             f"size={self.texture_width}x{self.texture_height}",
@@ -2819,7 +2817,7 @@ def pass_family_for_record(record: ResourceRecord) -> str:
     return "unknown"
 
 
-def semantic_draw_coverage(opengl_events: CaptureEvents, vulkan_events: CaptureEvents) -> dict[str, object]:
+def semantic_draw_coverage(opengl_events: CaptureEvents, vulkan_events: CaptureEvents, settled_ready_frames: int = 0) -> dict[str, object]:
     gl_by_signature: dict[str, list[SemanticDrawEvent]] = defaultdict(list)
     vk_by_signature: dict[str, list[SemanticDrawEvent]] = defaultdict(list)
     for event in opengl_events.semantic_draws:
@@ -2863,7 +2861,7 @@ def semantic_draw_coverage(opengl_events: CaptureEvents, vulkan_events: CaptureE
         entry for entry in matched
         if entry["opengl_physical_draw_events"] != entry["vulkan_physical_draw_events"]
     ][:20]
-    geometry = geometry_coverage(opengl_events, vulkan_events, set(gl_by_signature) & set(vk_by_signature))
+    geometry = geometry_coverage(opengl_events, vulkan_events, set(gl_by_signature) & set(vk_by_signature), settled_ready_frames)
 
     return {
         "opengl_semantic_draw_events": len(opengl_events.semantic_draws),
@@ -2888,17 +2886,48 @@ def semantic_draw_coverage(opengl_events: CaptureEvents, vulkan_events: CaptureE
     }
 
 
-def geometry_coverage(opengl_events: CaptureEvents, vulkan_events: CaptureEvents, matched_signatures: set[str]) -> dict[str, object]:
+SETTLED_READY_GEOMETRY_SUBSYSTEMS = {"sodium-terrain", "distant-horizons"}
+
+
+def geometry_coverage(
+    opengl_events: CaptureEvents,
+    vulkan_events: CaptureEvents,
+    matched_signatures: set[str],
+    settled_ready_frames: int = 0,
+) -> dict[str, object]:
     gl_sampler_signatures = sampler_resource_signatures_by_draw_key(opengl_events)
     vk_sampler_signatures = sampler_resource_signatures_by_draw_key(vulkan_events)
+    settled_gate = settled_ready_geometry_gate(
+        opengl_events,
+        vulkan_events,
+        gl_sampler_signatures,
+        vk_sampler_signatures,
+        settled_ready_frames,
+    )
     gl_geometry: dict[str, list[GeometryEvent]] = defaultdict(list)
     vk_geometry: dict[str, list[GeometryEvent]] = defaultdict(list)
     for event in opengl_events.geometry:
-        if event.semantic_match_signature in matched_signatures:
-            gl_geometry[geometry_match_signature(event, gl_sampler_signatures)].append(event)
+        if (
+            event.semantic_match_signature in matched_signatures
+            or (
+                settled_gate.get("enabled")
+                and event.semantic_subsystem in SETTLED_READY_GEOMETRY_SUBSYSTEMS
+            )
+        ):
+            signature = settled_geometry_match_signature(event, gl_sampler_signatures, settled_gate, "opengl")
+            if signature:
+                gl_geometry[signature].append(event)
     for event in vulkan_events.geometry:
-        if event.semantic_match_signature in matched_signatures:
-            vk_geometry[geometry_match_signature(event, vk_sampler_signatures)].append(event)
+        if (
+            event.semantic_match_signature in matched_signatures
+            or (
+                settled_gate.get("enabled")
+                and event.semantic_subsystem in SETTLED_READY_GEOMETRY_SUBSYSTEMS
+            )
+        ):
+            signature = settled_geometry_match_signature(event, vk_sampler_signatures, settled_gate, "vulkan")
+            if signature:
+                vk_geometry[signature].append(event)
 
     group_results: list[dict[str, object]] = []
     equivalent = 0
@@ -2986,7 +3015,176 @@ def geometry_coverage(opengl_events: CaptureEvents, vulkan_events: CaptureEvents
         "missing_geometry_groups": missing,
         "opengl_geometry_events": len(opengl_events.geometry),
         "vulkan_geometry_events": len(vulkan_events.geometry),
+        "settled_ready_gate": settled_ready_gate_for_report(settled_gate),
         "group_results": group_results,
+    }
+
+
+def settled_ready_gate_for_report(gate: dict[str, object]) -> dict[str, object]:
+    if not gate.get("enabled"):
+        return {"enabled": False}
+
+    def clean_family(entry: dict[str, object]) -> dict[str, object]:
+        cleaned = dict(entry)
+        if "work" in cleaned:
+            cleaned["work"] = sorted(cleaned["work"])
+        return cleaned
+
+    return {
+        "enabled": True,
+        "settled_ready_frames": gate.get("settled_ready_frames", 0),
+        "summary": gate.get("summary", {}),
+        "opengl": {
+            family: clean_family(entry)
+            for family, entry in gate.get("opengl", {}).items()
+        },
+        "vulkan": {
+            family: clean_family(entry)
+            for family, entry in gate.get("vulkan", {}).items()
+        },
+        "intersections": {
+            family: sorted(values)
+            for family, values in gate.get("intersections", {}).items()
+        },
+    }
+
+
+def settled_geometry_match_signature(
+    event: GeometryEvent,
+    sampler_signatures: dict[str, str],
+    settled_gate: dict[str, object],
+    backend: str,
+) -> str:
+    if settled_gate.get("enabled") and event.semantic_subsystem in SETTLED_READY_GEOMETRY_SUBSYSTEMS:
+        family = event.semantic_subsystem
+        backend_gate = settled_gate.get(backend, {})
+        family_gate = backend_gate.get(family, {}) if isinstance(backend_gate, dict) else {}
+        frame = family_gate.get("selected_frame")
+        if frame is None or str(event.det_rendered_frame) != str(frame):
+            return ""
+        signature = geometry_logical_work_signature(event, sampler_signatures)
+        intersection = settled_gate.get("intersections", {}).get(family, set())
+        if signature not in intersection:
+            return ""
+        return signature
+    return geometry_match_signature(event, sampler_signatures)
+
+
+def geometry_logical_work_signature(event: GeometryEvent, sampler_signatures: dict[str, str]) -> str:
+    signature = geometry_match_signature(event, sampler_signatures)
+    signature = re.sub(r"\|frame=[^|]+", "|frame=settled", signature)
+    if event.semantic_subsystem == "sodium-terrain":
+        signature = re.sub(r";vf=[^;:|]+", ";vf=settled", signature)
+        signature = re.sub(r";h=[^:|]+", ";h=settled", signature)
+        signature = re.sub(r":draws=[^|]+", "", signature)
+    return signature
+
+
+def settled_ready_geometry_gate(
+    opengl_events: CaptureEvents,
+    vulkan_events: CaptureEvents,
+    gl_sampler_signatures: dict[str, str],
+    vk_sampler_signatures: dict[str, str],
+    settled_ready_frames: int,
+) -> dict[str, object]:
+    if settled_ready_frames <= 0:
+        return {"enabled": False}
+
+    gl = settled_ready_backend_geometry(opengl_events, gl_sampler_signatures, settled_ready_frames)
+    vk = settled_ready_backend_geometry(vulkan_events, vk_sampler_signatures, settled_ready_frames)
+    intersections: dict[str, set[str]] = {}
+    families = sorted(SETTLED_READY_GEOMETRY_SUBSYSTEMS)
+    for family in families:
+        gl_set = set(gl.get(family, {}).get("work", set()))
+        vk_set = set(vk.get(family, {}).get("work", set()))
+        intersections[family] = gl_set & vk_set
+
+    return {
+        "enabled": True,
+        "settled_ready_frames": settled_ready_frames,
+        "opengl": gl,
+        "vulkan": vk,
+        "intersections": intersections,
+        "summary": {
+            family: {
+                "opengl_work": len(gl.get(family, {}).get("work", set())),
+                "vulkan_work": len(vk.get(family, {}).get("work", set())),
+                "intersection_work": len(intersections.get(family, set())),
+                "opengl_selected_frame": gl.get(family, {}).get("selected_frame"),
+                "vulkan_selected_frame": vk.get(family, {}).get("selected_frame"),
+                "opengl_status": gl.get(family, {}).get("status", "missing"),
+                "vulkan_status": vk.get(family, {}).get("status", "missing"),
+            }
+            for family in families
+        },
+    }
+
+
+def settled_ready_backend_geometry(
+    events: CaptureEvents,
+    sampler_signatures: dict[str, str],
+    settled_ready_frames: int,
+) -> dict[str, dict[str, object]]:
+    by_family_frame: dict[str, dict[int, set[str]]] = {
+        family: defaultdict(set) for family in SETTLED_READY_GEOMETRY_SUBSYSTEMS
+    }
+    for event in events.geometry:
+        if event.semantic_subsystem not in SETTLED_READY_GEOMETRY_SUBSYSTEMS:
+            continue
+        if not str(event.det_rendered_frame).isdigit():
+            continue
+        by_family_frame[event.semantic_subsystem][int(event.det_rendered_frame)].add(
+            geometry_logical_work_signature(event, sampler_signatures)
+        )
+
+    result: dict[str, dict[str, object]] = {}
+    for family, frames in by_family_frame.items():
+        result[family] = find_settled_ready_window(frames, settled_ready_frames)
+    return result
+
+
+def find_settled_ready_window(frames: dict[int, set[str]], settled_ready_frames: int) -> dict[str, object]:
+    if not frames:
+        return {"status": "no-work-observed", "selected_frame": None, "work": set()}
+    sorted_frames = sorted(frames)
+    selected_frame = None
+    selected_work: set[str] = set()
+    selected_latest_work_count = 0
+    frame_set = set(sorted_frames)
+    for frame in sorted_frames:
+        start = frame - settled_ready_frames + 1
+        if start < 0:
+            continue
+        window = list(range(start, frame + 1))
+        if any(candidate not in frame_set for candidate in window):
+            continue
+        stable_work = set(frames[window[0]])
+        if not stable_work:
+            continue
+        for candidate in window[1:]:
+            stable_work &= frames[candidate]
+        if stable_work:
+            selected_frame = frame
+            selected_work = stable_work
+            selected_latest_work_count = len(frames[frame])
+    if selected_frame is None:
+        last_frame = sorted_frames[-1]
+        return {
+            "status": "no-stable-intersection",
+            "selected_frame": None,
+            "observed_frames": sorted_frames,
+            "latest_frame": last_frame,
+            "latest_work_count": len(frames[last_frame]),
+            "work": set(),
+        }
+    return {
+        "status": "stable-intersection",
+        "selected_frame": selected_frame,
+        "window_start": selected_frame - settled_ready_frames + 1,
+        "work_count": len(selected_work),
+        "latest_work_count": selected_latest_work_count,
+        "excluded_work_count": max(0, selected_latest_work_count - len(selected_work)),
+        "work": selected_work,
     }
 
 
@@ -3134,6 +3332,11 @@ def geometry_not_comparable_override(signature: str, classification: str, first_
         and ".UV0@" in first_vulkan
     ):
         return "gui-item-atlas-vs-pip-uv-representation"
+    if (
+        "pipeline=minecraft:pipeline/gui_textured|" in signature
+        and "ctx=gui:gui-item:" in signature
+    ):
+        return "gui-item-atlas-vs-pip-geometry-representation"
     if "pipeline=minecraft:pipeline/gui_textured|" in signature and "label=voxelmap-map-" in signature:
         return "voxelmap-minimap-source-offset-angle-state-not-logged"
     if "pipeline=minecraft:pipeline/entity_" in signature and ".POSITION0@" in first_opengl and ".POSITION0@" in first_vulkan:
@@ -3549,9 +3752,10 @@ def build_coverage_report(
     pose_filter: str | None = None,
     stable_pose_only: bool = False,
     stable_window_frames: int = 1,
+    settled_ready_frames: int = 0,
 ) -> dict[str, object]:
     families: dict[str, dict[str, object]] = {family: _empty_family_coverage() for family in PASS_FAMILIES}
-    semantic_coverage = semantic_draw_coverage(opengl_events, vulkan_events)
+    semantic_coverage = semantic_draw_coverage(opengl_events, vulkan_events, settled_ready_frames)
     ordering_coverage = ordering_visibility_coverage(opengl_events, vulkan_events, differences)
     opengl_draw_signature_counts = Counter(event.signature for event in opengl_events.draws)
     vulkan_draw_signature_counts = Counter(event.signature for event in vulkan_events.draws)
@@ -3603,6 +3807,7 @@ def build_coverage_report(
         "pose_filter": pose_filter or "all",
         "stable_pose_only": stable_pose_only,
         "stable_window_frames": max(1, stable_window_frames) if stable_pose_only else 0,
+        "settled_ready_frames": max(0, settled_ready_frames),
         "opengl_log": str(opengl_events.path),
         "vulkan_log": str(vulkan_events.path),
         "event_counts": {
@@ -3650,6 +3855,7 @@ def render_diff_report(
     pose_filter: str | None = None,
     stable_pose_only: bool = False,
     stable_window_frames: int = 1,
+    settled_ready_frames: int = 0,
 ) -> str:
     parse_limits = parse_limits or ParseLimits()
     opengl_events = filter_capture_events_by_pose(
@@ -3676,6 +3882,8 @@ def render_diff_report(
         lines.append(f"Pose filter: {pose_filter}")
     if stable_pose_only:
         lines.append(f"Stable pose only: true (windowFrames={max(1, stable_window_frames)}, ends at first detAwaitingScreenshot=true frame)")
+    if settled_ready_frames > 0:
+        lines.append(f"Settled ready geometry gate: true (frames={settled_ready_frames})")
     lines.append("")
     lines.append("Normalization rules:")
     lines.append("- Backend object identities, Java identity hashes, pipeline handles, texture ids, view ids, and buffer ids are ignored.")
@@ -3699,7 +3907,7 @@ def render_diff_report(
         lines.append(f"- OpenGL skipped: {dict(opengl_events.skipped)}")
         lines.append(f"- Vulkan skipped: {dict(vulkan_events.skipped)}")
     lines.append("")
-    semantic_coverage = semantic_draw_coverage(opengl_events, vulkan_events)
+    semantic_coverage = semantic_draw_coverage(opengl_events, vulkan_events, settled_ready_frames)
     lines.append("Semantic draw coverage:")
     lines.append(f"- OpenGL semantic draw events: {semantic_coverage['opengl_semantic_draw_events']}")
     lines.append(f"- Vulkan semantic draw events: {semantic_coverage['vulkan_semantic_draw_events']}")
@@ -3723,6 +3931,17 @@ def render_diff_report(
         lines.append("- Geometry coverage:")
         lines.append(f"  checked={geometry.get('matched_groups_checked', 0)} equivalent={geometry.get('equivalent_groups', 0)} divergent={geometry.get('divergent_groups', 0)} notComparable={geometry.get('not_comparable_groups', 0)}")
         lines.append(f"  geometry events: OpenGL={geometry.get('opengl_geometry_events', 0)} Vulkan={geometry.get('vulkan_geometry_events', 0)}")
+        gate = geometry.get("settled_ready_gate", {})
+        if gate.get("enabled"):
+            lines.append("  settled ready intersections:")
+            for family, summary in gate.get("summary", {}).items():
+                lines.append(
+                    "    "
+                    + f"{family}: GL frame={summary.get('opengl_selected_frame')} work={summary.get('opengl_work')} "
+                    + f"VK frame={summary.get('vulkan_selected_frame')} work={summary.get('vulkan_work')} "
+                    + f"intersection={summary.get('intersection_work')} "
+                    + f"status={summary.get('opengl_status')}/{summary.get('vulkan_status')}"
+                )
         for entry in geometry.get("group_results", [])[:5]:
             lines.append(
                 "  "
@@ -3826,6 +4045,7 @@ def render_coverage_json(
     pose_filter: str | None = None,
     stable_pose_only: bool = False,
     stable_window_frames: int = 1,
+    settled_ready_frames: int = 0,
 ) -> dict[str, object]:
     parse_limits = parse_limits or ParseLimits()
     opengl_events = filter_capture_events_by_pose(
@@ -3841,7 +4061,7 @@ def render_coverage_json(
         stable_window_frames,
     )
     differences = compare_capture_events(opengl_events, vulkan_events)
-    return build_coverage_report(opengl_events, vulkan_events, differences, pose_filter, stable_pose_only, stable_window_frames)
+    return build_coverage_report(opengl_events, vulkan_events, differences, pose_filter, stable_pose_only, stable_window_frames, settled_ready_frames)
 
 
 def run_self_test() -> None:
@@ -3983,6 +4203,7 @@ def main(argv: list[str]) -> int:
     diff_parser.add_argument("--pose-filter", choices=["initial", "right", "left", "return", "none"], help="only compare records from one deterministic pose")
     diff_parser.add_argument("--stable-pose-only", action="store_true", help="with --pose-filter, compare only deterministic records emitted once the pose is screenshot-ready")
     diff_parser.add_argument("--stable-window-frames", type=int, default=1, help="with --stable-pose-only, compare this many rendered frames ending at the first screenshot-ready frame")
+    diff_parser.add_argument("--settled-ready-frames", type=int, default=0, help="compare Sodium/DH geometry only after this many identical submitted-work frames")
     diff_parser.add_argument("--write", action="store_true", help="write report under logs/auto-capture")
 
     auto_parser = subparsers.add_parser("auto-diff", help="diff newest matching OpenGL/Vulkan capture pair")
@@ -3996,6 +4217,7 @@ def main(argv: list[str]) -> int:
     auto_parser.add_argument("--pose-filter", choices=["initial", "right", "left", "return", "none"], help="only compare records from one deterministic pose")
     auto_parser.add_argument("--stable-pose-only", action="store_true", help="with --pose-filter, compare only deterministic records emitted once the pose is screenshot-ready")
     auto_parser.add_argument("--stable-window-frames", type=int, default=1, help="with --stable-pose-only, compare this many rendered frames ending at the first screenshot-ready frame")
+    auto_parser.add_argument("--settled-ready-frames", type=int, default=0, help="compare Sodium/DH geometry only after this many identical submitted-work frames")
     auto_parser.add_argument("--write", action="store_true", help="write report under logs/auto-capture")
 
     source_parser = subparsers.add_parser("source-audit", help="scan source architecture pressure points")
@@ -4040,6 +4262,7 @@ def main(argv: list[str]) -> int:
             args.pose_filter,
             args.stable_pose_only,
             args.stable_window_frames,
+            args.settled_ready_frames,
         )
         if args.write:
             pose_suffix = f"_{args.pose_filter}" if args.pose_filter else ""
@@ -4047,6 +4270,8 @@ def main(argv: list[str]) -> int:
                 pose_suffix += "_stable"
                 if args.stable_window_frames > 1:
                     pose_suffix += f"_window{args.stable_window_frames}"
+            if args.settled_ready_frames > 0:
+                pose_suffix += f"_settled{args.settled_ready_frames}"
             path = write_report(text, f"vulkan_shader_input_parity{pose_suffix}_{gl_meta.run_id}_vs_{vk_meta.run_id}")
             print(f"wrote {path}")
             json_path = write_json_report(
@@ -4057,6 +4282,7 @@ def main(argv: list[str]) -> int:
                     args.pose_filter,
                     args.stable_pose_only,
                     args.stable_window_frames,
+                    args.settled_ready_frames,
                 ),
                 path,
             )
@@ -4081,6 +4307,7 @@ def main(argv: list[str]) -> int:
             args.pose_filter,
             args.stable_pose_only,
             args.stable_window_frames,
+            args.settled_ready_frames,
         )
         if args.write:
             pose_suffix = f"_{args.pose_filter}" if args.pose_filter else ""
@@ -4088,6 +4315,8 @@ def main(argv: list[str]) -> int:
                 pose_suffix += "_stable"
                 if args.stable_window_frames > 1:
                     pose_suffix += f"_window{args.stable_window_frames}"
+            if args.settled_ready_frames > 0:
+                pose_suffix += f"_settled{args.settled_ready_frames}"
             path = write_report(text, f"vulkan_shader_input_parity{pose_suffix}_{args.opengl_log.stem}_vs_{args.vulkan_log.stem}")
             print(f"wrote {path}")
             json_path = write_json_report(
@@ -4098,6 +4327,7 @@ def main(argv: list[str]) -> int:
                     args.pose_filter,
                     args.stable_pose_only,
                     args.stable_window_frames,
+                    args.settled_ready_frames,
                 ),
                 path,
             )

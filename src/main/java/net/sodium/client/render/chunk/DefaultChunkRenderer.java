@@ -542,10 +542,12 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         String terrainState,
         MultiDrawBatch batch
     ) {
+        String passLabel = sodiumTerrainPassLabel(terrainPass, region, terrainState);
+        VulkanicAPI.recordShaderInputParitySubmittedWorkIdentity("sodium-terrain", sodiumTerrainReadinessLabel(terrainPass, region, terrainState));
         return VulkanicAPI.beginShaderInputParitySemanticDraw(
             source,
             "sodium-terrain",
-            sodiumTerrainPassLabel(terrainPass, region, terrainState),
+            passLabel,
             terrainPass.getPipeline(),
             null,
             sodiumTerrainMaterial(terrainPass),
@@ -558,6 +560,14 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
             Math.max(1, batch.size),
             0
         );
+    }
+
+    private static String sodiumTerrainReadinessLabel(TerrainRenderPass terrainPass, RenderRegion region, String terrainState) {
+        String stableState = terrainState
+            .replaceAll(";vf=[^;:]+", ";vf=settled")
+            .replaceAll(";h=[^:]+", ";h=settled")
+            .replaceAll(":draws=[^:]+$", "");
+        return sodiumTerrainPassLabel(terrainPass, region, stableState);
     }
 
     private static String sodiumTerrainPassLabel(TerrainRenderPass terrainPass, RenderRegion region, String terrainState) {

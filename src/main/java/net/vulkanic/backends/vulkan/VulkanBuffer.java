@@ -6,6 +6,8 @@ import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class VulkanBuffer extends VulkanicBuffer {
 
@@ -18,6 +20,7 @@ public class VulkanBuffer extends VulkanicBuffer {
     private final ByteBuffer diagnosticShadowData;
     private final boolean diagnosticSparseShadowEnabled;
     private final TreeMap<Integer, ByteBuffer> diagnosticSparseShadowRanges = new TreeMap<>();
+    private static final Set<VulkanBuffer> DIAGNOSTIC_SPARSE_SHADOW_BUFFERS = ConcurrentHashMap.newKeySet();
 
     private boolean closed;
     private boolean mapped;
@@ -61,6 +64,9 @@ public class VulkanBuffer extends VulkanicBuffer {
         this.closeAction = Objects.requireNonNull(closeAction, "closeAction must not be null");
         this.diagnosticShadowData = diagnosticShadowData;
         this.diagnosticSparseShadowEnabled = diagnosticSparseShadowEnabled;
+        if (diagnosticSparseShadowEnabled) {
+            DIAGNOSTIC_SPARSE_SHADOW_BUFFERS.add(this);
+        }
     }
 
     long getVkBufferHandle() {
@@ -184,8 +190,10 @@ public class VulkanBuffer extends VulkanicBuffer {
             VulkanBackend.releaseDiagnosticGeometryShadowBytes(previous.capacity());
         }
 
-        if (!VulkanBackend.reserveDiagnosticGeometryShadowBytes(length)) {
-            return;
+        while (!VulkanBackend.reserveDiagnosticGeometryShadowBytes(length)) {
+            if (!evictOldestGlobalDiagnosticSparseShadowRange()) {
+                return;
+            }
         }
 
         ByteBuffer copy = org.lwjgl.BufferUtils.createByteBuffer(length)
@@ -196,8 +204,28 @@ public class VulkanBuffer extends VulkanicBuffer {
         diagnosticSparseShadowBytes += length;
     }
 
+    private static boolean evictOldestGlobalDiagnosticSparseShadowRange() {
+        for (VulkanBuffer buffer : DIAGNOSTIC_SPARSE_SHADOW_BUFFERS) {
+            if (buffer.evictOldestDiagnosticSparseShadowRange()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private synchronized boolean evictOldestDiagnosticSparseShadowRange() {
+        Map.Entry<Integer, ByteBuffer> oldest = diagnosticSparseShadowRanges.pollFirstEntry();
+        if (oldest == null) {
+            return false;
+        }
+        int evictedBytes = oldest.getValue().capacity();
+        diagnosticSparseShadowBytes -= evictedBytes;
+        VulkanBackend.releaseDiagnosticGeometryShadowBytes(evictedBytes);
+        return true;
+    }
+
     synchronized void diagnosticShadowCopyFrom(VulkanBuffer sourceBuffer, int sourceOffset, int destinationOffset, int length) {
-        if (diagnosticShadowData == null || sourceBuffer == null || length <= 0) {
+        if (sourceBuffer == null || length <= 0) {
             return;
         }
 
@@ -235,6 +263,7 @@ public class VulkanBuffer extends VulkanicBuffer {
                 diagnosticSparseShadowRanges.clear();
             }
         }
+        DIAGNOSTIC_SPARSE_SHADOW_BUFFERS.remove(this);
         closeAction.run();
     }
 
