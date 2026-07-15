@@ -43,8 +43,6 @@ use fluid::{
     emit_native_section_fluid_faces, native_fluid_diag_enabled,
     section_builder_append_fluid_face_records_encoded,
 };
-#[cfg(test)]
-use fluid::{flowing_top_trig_for_test, fluid_face_record_to_quad, fluid_semantic_face};
 use format::*;
 use lighting::*;
 use model::*;
