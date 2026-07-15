@@ -3542,6 +3542,17 @@ public class VulkanicAPI {
         }
     }
 
+    private static String shaderInputParityNormalizeSemanticOutput(@Nullable String output) {
+        String normalized = shaderInputParityValueOrUnknown(output);
+        if (normalized.equals("framebuffer")
+            || normalized.equals("framebuffer-or-texture-view")
+            || normalized.startsWith("framebuffer:")
+            || normalized.startsWith("extent=")) {
+            return "legacy-framebuffer";
+        }
+        return normalized.replaceAll("\\btex=\\d+", "tex=<id>");
+    }
+
     public static ShaderInputParityScope beginShaderInputParitySemanticDraw(
         String source,
         String subsystem,
@@ -3576,7 +3587,7 @@ public class VulkanicAPI {
         String vertexShader = shaderInputParityVertexShader(renderPipeline, portableState);
         String fragmentShader = shaderInputParityFragmentShader(renderPipeline, portableState);
         String normalizedMaterial = shaderInputParityValueOrUnknown(material != null ? material : pipeline);
-        String normalizedOutput = shaderInputParityValueOrUnknown(output);
+        String normalizedOutput = shaderInputParityNormalizeSemanticOutput(output);
         String projectionLabel = shaderInputParityCurrentProjectionLabel();
         if (!projectionLabel.isEmpty()) {
             normalizedOutput = normalizedOutput + "|projection:" + projectionLabel;

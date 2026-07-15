@@ -119,6 +119,7 @@ class ResourceRecord:
     content_hash_tiles: str = ""
     det_pose: str = ""
     det_rendered_frame: str = ""
+    det_awaiting_screenshot: str = ""
     semantic_draw_key: str = ""
     semantic_subsystem: str = ""
     semantic_phase: str = ""
@@ -266,6 +267,7 @@ class StandaloneUniformEvent:
     draw_key: str = ""
     det_pose: str = ""
     det_rendered_frame: str = ""
+    det_awaiting_screenshot: str = ""
     semantic_draw_key: str = ""
     semantic_subsystem: str = ""
     semantic_phase: str = ""
@@ -305,6 +307,7 @@ class StandaloneUniformBlockMemberEvent:
     draw_key: str = ""
     det_pose: str = ""
     det_rendered_frame: str = ""
+    det_awaiting_screenshot: str = ""
     semantic_draw_key: str = ""
     semantic_subsystem: str = ""
     semantic_phase: str = ""
@@ -364,6 +367,7 @@ class DrawEvent:
     base_vertex: str
     det_pose: str = ""
     det_rendered_frame: str = ""
+    det_awaiting_screenshot: str = ""
     semantic_draw_key: str = ""
     semantic_subsystem: str = ""
     semantic_phase: str = ""
@@ -432,6 +436,7 @@ class GeometryEvent:
     detail: str = ""
     det_pose: str = ""
     det_rendered_frame: str = ""
+    det_awaiting_screenshot: str = ""
 
     @property
     def semantic_match_signature(self) -> str:
@@ -462,6 +467,7 @@ class DrawStateEvent:
     raw: str
     det_pose: str = ""
     det_rendered_frame: str = ""
+    det_awaiting_screenshot: str = ""
     semantic_draw_key: str = ""
     semantic_subsystem: str = ""
     semantic_phase: str = ""
@@ -562,6 +568,7 @@ class SemanticDrawEvent:
     base_vertex: str
     det_pose: str = ""
     det_rendered_frame: str = ""
+    det_awaiting_screenshot: str = ""
 
     @property
     def semantic_group_key(self) -> str:
@@ -609,6 +616,7 @@ class OrderingEvent:
     detail: str
     det_pose: str = ""
     det_rendered_frame: str = ""
+    det_awaiting_screenshot: str = ""
     semantic_draw_key: str = ""
     semantic_subsystem: str = ""
     semantic_phase: str = ""
@@ -762,6 +770,25 @@ def normalize_render_target_signature(text: str) -> str:
         return "legacy-framebuffer"
     normalized = re.sub(r"\btex=\d+", "tex=<id>", normalized)
     return normalized
+
+
+def normalize_semantic_output(text: str) -> str:
+    if not text:
+        return ""
+    normalized = normalize_identity(text)
+    projection_suffix = ""
+    if "|projection:" in normalized:
+        normalized, projection = normalized.split("|projection:", 1)
+        projection_suffix = f"|projection:{projection}"
+    if (
+        normalized in {"framebuffer", "framebuffer-or-texture-view"}
+        or normalized.startswith("framebuffer:")
+        or normalized.startswith("extent=")
+    ):
+        normalized = "legacy-framebuffer"
+    else:
+        normalized = re.sub(r"\btex=\d+", "tex=<id>", normalized)
+    return normalized + projection_suffix
 
 
 def normalize_rect_signature(text: str, include_known: bool) -> str:
@@ -1095,7 +1122,8 @@ def parse_resource(raw: str, backend: str, source: str, pipeline_key: str, stabl
         semantic_pass=top_fields.get("semanticPass", ""),
         semantic_pipeline=top_fields.get("semanticPipeline", ""),
         semantic_material=top_fields.get("semanticMaterial", ""),
-        semantic_output=top_fields.get("semanticOutput", ""),
+        det_awaiting_screenshot=top_fields.get("detAwaitingScreenshot", ""),
+        semantic_output=normalize_semantic_output(top_fields.get("semanticOutput", "")),
         semantic_ordinal=top_fields.get("semanticOrdinal", ""),
         projection_label=fields.get("projectionLabel", ""),
     )
@@ -1121,7 +1149,7 @@ def event_pose(event) -> str:
     return getattr(event, "det_pose", "") or "none"
 
 
-def filter_capture_events_by_pose(events: CaptureEvents, pose: str | None) -> CaptureEvents:
+def filter_capture_events_by_pose(events: CaptureEvents, pose: str | None, stable_pose_only: bool = False) -> CaptureEvents:
     if not pose:
         return events
 
@@ -1129,11 +1157,46 @@ def filter_capture_events_by_pose(events: CaptureEvents, pose: str | None) -> Ca
     filtered.counters = events.counters.copy()
     filtered.skipped = events.skipped.copy()
     filtered.skipped[f"PoseFilter:{pose}"] = 0
+    if stable_pose_only:
+        filtered.skipped[f"StablePoseFilter:{pose}"] = 0
+
+    def all_pose_scoped_events():
+        for records in events.resources.values():
+            yield from records
+        for records in events.standalone_uniforms.values():
+            yield from records
+        for records in events.standalone_uniform_block_members.values():
+            yield from records
+        yield from events.draws
+        yield from events.semantic_draws
+        yield from events.geometry
+        for records in events.draw_states.values():
+            yield from records
+        yield from events.ordering
+
+    stable_frame = ""
+    if stable_pose_only:
+        stable_frames = [
+            int(getattr(event, "det_rendered_frame", ""))
+            for event in all_pose_scoped_events()
+            if event_pose(event) == pose
+            and getattr(event, "det_awaiting_screenshot", "") == "true"
+            and str(getattr(event, "det_rendered_frame", "")).isdigit()
+        ]
+        if stable_frames:
+            stable_frame = str(min(stable_frames))
 
     def keep_event(event) -> bool:
         keep = event_pose(event) == pose
         if not keep:
             filtered.skipped[f"PoseFilter:{pose}"] += 1
+            return False
+        if stable_pose_only and (
+            not stable_frame
+            or getattr(event, "det_rendered_frame", "") != stable_frame
+        ):
+            filtered.skipped[f"StablePoseFilter:{pose}"] += 1
+            return False
         return keep
 
     for key, records in events.resources.items():
@@ -1175,13 +1238,14 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             raw=payload.strip(),
             det_pose=fields.get("detPose", ""),
             det_rendered_frame=fields.get("detRenderedFrame", ""),
+            det_awaiting_screenshot=fields.get("detAwaitingScreenshot", ""),
             semantic_draw_key=fields.get("semanticDrawKey", ""),
             semantic_subsystem=fields.get("semanticSubsystem", ""),
             semantic_phase=fields.get("semanticPhase", ""),
             semantic_pass=fields.get("semanticPass", ""),
             semantic_pipeline=fields.get("semanticPipeline", ""),
             semantic_material=fields.get("semanticMaterial", ""),
-            semantic_output=fields.get("semanticOutput", ""),
+            semantic_output=normalize_semantic_output(fields.get("semanticOutput", "")),
             semantic_ordinal=fields.get("semanticOrdinal", ""),
             path=fields.get("path", ""),
             pipeline=fields.get("pipeline", ""),
@@ -1224,13 +1288,14 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             detail=fields.get("detail", ""),
             det_pose=fields.get("detPose", ""),
             det_rendered_frame=fields.get("detRenderedFrame", ""),
+            det_awaiting_screenshot=fields.get("detAwaitingScreenshot", ""),
             semantic_draw_key=fields.get("semanticDrawKey", ""),
             semantic_subsystem=fields.get("semanticSubsystem", ""),
             semantic_phase=fields.get("semanticPhase", ""),
             semantic_pass=fields.get("semanticPass", ""),
             semantic_pipeline=fields.get("semanticPipeline", ""),
             semantic_material=fields.get("semanticMaterial", ""),
-            semantic_output=fields.get("semanticOutput", ""),
+            semantic_output=normalize_semantic_output(fields.get("semanticOutput", "")),
             semantic_ordinal=fields.get("semanticOrdinal", ""),
         ))
 
@@ -1316,13 +1381,14 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             draw_key=fields.get("drawKey", ""),
             det_pose=fields.get("detPose", ""),
             det_rendered_frame=fields.get("detRenderedFrame", ""),
+            det_awaiting_screenshot=fields.get("detAwaitingScreenshot", ""),
             semantic_draw_key=fields.get("semanticDrawKey", ""),
             semantic_subsystem=fields.get("semanticSubsystem", ""),
             semantic_phase=fields.get("semanticPhase", ""),
             semantic_pass=fields.get("semanticPass", ""),
             semantic_pipeline=fields.get("semanticPipeline", ""),
             semantic_material=fields.get("semanticMaterial", ""),
-            semantic_output=fields.get("semanticOutput", ""),
+            semantic_output=normalize_semantic_output(fields.get("semanticOutput", "")),
             semantic_ordinal=fields.get("semanticOrdinal", ""),
             offset=fields.get("offset", ""),
             array_size=fields.get("arraySize", ""),
@@ -1362,13 +1428,14 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             draw_key=fields.get("drawKey", ""),
             det_pose=fields.get("detPose", ""),
             det_rendered_frame=fields.get("detRenderedFrame", ""),
+            det_awaiting_screenshot=fields.get("detAwaitingScreenshot", ""),
             semantic_draw_key=fields.get("semanticDrawKey", ""),
             semantic_subsystem=fields.get("semanticSubsystem", ""),
             semantic_phase=fields.get("semanticPhase", ""),
             semantic_pass=fields.get("semanticPass", ""),
             semantic_pipeline=fields.get("semanticPipeline", ""),
             semantic_material=fields.get("semanticMaterial", ""),
-            semantic_output=fields.get("semanticOutput", ""),
+            semantic_output=normalize_semantic_output(fields.get("semanticOutput", "")),
             semantic_ordinal=fields.get("semanticOrdinal", ""),
         )
         events.standalone_uniforms[event.key].append(event)
@@ -1416,13 +1483,14 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             base_vertex=fields.get("baseVertex", ""),
             det_pose=fields.get("detPose", ""),
             det_rendered_frame=fields.get("detRenderedFrame", ""),
+            det_awaiting_screenshot=fields.get("detAwaitingScreenshot", ""),
             semantic_draw_key=fields.get("semanticDrawKey", ""),
             semantic_subsystem=fields.get("semanticSubsystem", ""),
             semantic_phase=fields.get("semanticPhase", ""),
             semantic_pass=fields.get("semanticPass", ""),
             semantic_pipeline=fields.get("semanticPipeline", ""),
             semantic_material=fields.get("semanticMaterial", ""),
-            semantic_output=fields.get("semanticOutput", ""),
+            semantic_output=normalize_semantic_output(fields.get("semanticOutput", "")),
             semantic_ordinal=fields.get("semanticOrdinal", ""),
         ))
 
@@ -1442,7 +1510,7 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             semantic_vertex_shader=fields.get("semanticVertexShader", ""),
             semantic_fragment_shader=fields.get("semanticFragmentShader", ""),
             semantic_material=fields.get("semanticMaterial", ""),
-            semantic_output=fields.get("semanticOutput", ""),
+            semantic_output=normalize_semantic_output(fields.get("semanticOutput", "")),
             semantic_ordinal=fields.get("semanticOrdinal", ""),
             indexed=fields.get("indexed", ""),
             first_vertex=fields.get("firstVertex", ""),
@@ -1453,6 +1521,7 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             base_vertex=fields.get("baseVertex", ""),
             det_pose=fields.get("detPose", ""),
             det_rendered_frame=fields.get("detRenderedFrame", ""),
+            det_awaiting_screenshot=fields.get("detAwaitingScreenshot", ""),
         ))
 
     elif payload.startswith("Geometry "):
@@ -1471,7 +1540,7 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             semantic_vertex_shader=fields.get("semanticVertexShader", ""),
             semantic_fragment_shader=fields.get("semanticFragmentShader", ""),
             semantic_material=fields.get("semanticMaterial", ""),
-            semantic_output=fields.get("semanticOutput", ""),
+            semantic_output=normalize_semantic_output(fields.get("semanticOutput", "")),
             semantic_ordinal=fields.get("semanticOrdinal", ""),
             mode=fields.get("mode", ""),
             indexed=fields.get("indexed", ""),
@@ -1489,6 +1558,7 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             detail=fields.get("detail", ""),
             det_pose=fields.get("detPose", ""),
             det_rendered_frame=fields.get("detRenderedFrame", ""),
+            det_awaiting_screenshot=fields.get("detAwaitingScreenshot", ""),
         ))
 
     elif payload.startswith("Sampler "):
@@ -3028,6 +3098,7 @@ def build_coverage_report(
     vulkan_events: CaptureEvents,
     differences: list[Difference],
     pose_filter: str | None = None,
+    stable_pose_only: bool = False,
 ) -> dict[str, object]:
     families: dict[str, dict[str, object]] = {family: _empty_family_coverage() for family in PASS_FAMILIES}
     semantic_coverage = semantic_draw_coverage(opengl_events, vulkan_events)
@@ -3080,6 +3151,7 @@ def build_coverage_report(
     return {
         "schema": "mattmc.vulkan_parity.coverage.v1",
         "pose_filter": pose_filter or "all",
+        "stable_pose_only": stable_pose_only,
         "opengl_log": str(opengl_events.path),
         "vulkan_log": str(vulkan_events.path),
         "event_counts": {
@@ -3125,10 +3197,11 @@ def render_diff_report(
     limit: int,
     parse_limits: ParseLimits | None = None,
     pose_filter: str | None = None,
+    stable_pose_only: bool = False,
 ) -> str:
     parse_limits = parse_limits or ParseLimits()
-    opengl_events = filter_capture_events_by_pose(parse_capture_log(opengl_log, parse_limits), pose_filter)
-    vulkan_events = filter_capture_events_by_pose(parse_capture_log(vulkan_log, parse_limits), pose_filter)
+    opengl_events = filter_capture_events_by_pose(parse_capture_log(opengl_log, parse_limits), pose_filter, stable_pose_only)
+    vulkan_events = filter_capture_events_by_pose(parse_capture_log(vulkan_log, parse_limits), pose_filter, stable_pose_only)
     differences = compare_capture_events(opengl_events, vulkan_events)
     by_category = Counter(diff.category for diff in differences)
 
@@ -3139,6 +3212,8 @@ def render_diff_report(
     lines.append(f"Vulkan capture: {vulkan_log}")
     if pose_filter:
         lines.append(f"Pose filter: {pose_filter}")
+    if stable_pose_only:
+        lines.append("Stable pose only: true (detAwaitingScreenshot=true)")
     lines.append("")
     lines.append("Normalization rules:")
     lines.append("- Backend object identities, Java identity hashes, pipeline handles, texture ids, view ids, and buffer ids are ignored.")
@@ -3282,12 +3357,18 @@ def write_json_report(data: dict[str, object], text_report_path: Path) -> Path:
     return json_path
 
 
-def render_coverage_json(opengl_log: Path, vulkan_log: Path, parse_limits: ParseLimits | None = None, pose_filter: str | None = None) -> dict[str, object]:
+def render_coverage_json(
+    opengl_log: Path,
+    vulkan_log: Path,
+    parse_limits: ParseLimits | None = None,
+    pose_filter: str | None = None,
+    stable_pose_only: bool = False,
+) -> dict[str, object]:
     parse_limits = parse_limits or ParseLimits()
-    opengl_events = filter_capture_events_by_pose(parse_capture_log(opengl_log, parse_limits), pose_filter)
-    vulkan_events = filter_capture_events_by_pose(parse_capture_log(vulkan_log, parse_limits), pose_filter)
+    opengl_events = filter_capture_events_by_pose(parse_capture_log(opengl_log, parse_limits), pose_filter, stable_pose_only)
+    vulkan_events = filter_capture_events_by_pose(parse_capture_log(vulkan_log, parse_limits), pose_filter, stable_pose_only)
     differences = compare_capture_events(opengl_events, vulkan_events)
-    return build_coverage_report(opengl_events, vulkan_events, differences, pose_filter)
+    return build_coverage_report(opengl_events, vulkan_events, differences, pose_filter, stable_pose_only)
 
 
 def run_self_test() -> None:
@@ -3427,6 +3508,7 @@ def main(argv: list[str]) -> int:
     diff_parser.add_argument("--max-vertex-input-events", type=int, default=0, help="0 means parse every vertex-input event")
     diff_parser.add_argument("--max-draw-events", type=int, default=0, help="0 means parse every draw event")
     diff_parser.add_argument("--pose-filter", choices=["initial", "right", "left", "return", "none"], help="only compare records from one deterministic pose")
+    diff_parser.add_argument("--stable-pose-only", action="store_true", help="with --pose-filter, compare only deterministic records emitted once the pose is screenshot-ready")
     diff_parser.add_argument("--write", action="store_true", help="write report under logs/auto-capture")
 
     auto_parser = subparsers.add_parser("auto-diff", help="diff newest matching OpenGL/Vulkan capture pair")
@@ -3438,6 +3520,7 @@ def main(argv: list[str]) -> int:
     auto_parser.add_argument("--max-vertex-input-events", type=int, default=0, help="0 means parse every vertex-input event")
     auto_parser.add_argument("--max-draw-events", type=int, default=0, help="0 means parse every draw event")
     auto_parser.add_argument("--pose-filter", choices=["initial", "right", "left", "return", "none"], help="only compare records from one deterministic pose")
+    auto_parser.add_argument("--stable-pose-only", action="store_true", help="with --pose-filter, compare only deterministic records emitted once the pose is screenshot-ready")
     auto_parser.add_argument("--write", action="store_true", help="write report under logs/auto-capture")
 
     source_parser = subparsers.add_parser("source-audit", help="scan source architecture pressure points")
@@ -3474,12 +3557,14 @@ def main(argv: list[str]) -> int:
             args.max_vertex_input_events,
             args.max_draw_events
         )
-        text = render_diff_report(gl_meta.latest_log, vk_meta.latest_log, args.limit, parse_limits, args.pose_filter)
+        text = render_diff_report(gl_meta.latest_log, vk_meta.latest_log, args.limit, parse_limits, args.pose_filter, args.stable_pose_only)
         if args.write:
             pose_suffix = f"_{args.pose_filter}" if args.pose_filter else ""
+            if args.stable_pose_only:
+                pose_suffix += "_stable"
             path = write_report(text, f"vulkan_shader_input_parity{pose_suffix}_{gl_meta.run_id}_vs_{vk_meta.run_id}")
             print(f"wrote {path}")
-            json_path = write_json_report(render_coverage_json(gl_meta.latest_log, vk_meta.latest_log, parse_limits, args.pose_filter), path)
+            json_path = write_json_report(render_coverage_json(gl_meta.latest_log, vk_meta.latest_log, parse_limits, args.pose_filter, args.stable_pose_only), path)
             print(f"wrote {json_path}")
         print(text, end="")
         return 0
@@ -3493,12 +3578,14 @@ def main(argv: list[str]) -> int:
             args.max_vertex_input_events,
             args.max_draw_events
         )
-        text = render_diff_report(args.opengl_log, args.vulkan_log, args.limit, parse_limits, args.pose_filter)
+        text = render_diff_report(args.opengl_log, args.vulkan_log, args.limit, parse_limits, args.pose_filter, args.stable_pose_only)
         if args.write:
             pose_suffix = f"_{args.pose_filter}" if args.pose_filter else ""
+            if args.stable_pose_only:
+                pose_suffix += "_stable"
             path = write_report(text, f"vulkan_shader_input_parity{pose_suffix}_{args.opengl_log.stem}_vs_{args.vulkan_log.stem}")
             print(f"wrote {path}")
-            json_path = write_json_report(render_coverage_json(args.opengl_log, args.vulkan_log, parse_limits, args.pose_filter), path)
+            json_path = write_json_report(render_coverage_json(args.opengl_log, args.vulkan_log, parse_limits, args.pose_filter, args.stable_pose_only), path)
             print(f"wrote {json_path}")
         print(text, end="")
         return 0
