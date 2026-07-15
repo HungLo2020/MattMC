@@ -18,6 +18,7 @@ import hashlib
 import json
 import os
 import re
+import struct
 import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
@@ -452,8 +453,6 @@ class GeometryEvent:
             f"pose={self.det_pose or 'none'}",
             f"frame={self.det_rendered_frame or 'none'}",
         ]
-        if self.semantic_subsystem == "sodium-terrain":
-            parts.append(f"ordinal={self.semantic_ordinal or '0'}")
         return "|".join(parts)
 
     @property
@@ -791,6 +790,15 @@ def normalize_semantic_output(text: str) -> str:
     return normalized + projection_suffix
 
 
+def normalize_semantic_pass(text: str) -> str:
+    if not text:
+        return ""
+    normalized = normalize_identity(text)
+    if normalized.startswith("extent="):
+        return "legacy-renderpass"
+    return normalized
+
+
 def normalize_rect_signature(text: str, include_known: bool) -> str:
     fields = parse_struct_fields(text)
     if not fields:
@@ -855,7 +863,32 @@ def parse_decoded_float_values(text: str) -> list[float]:
 
 
 def decoded_float_values(event: StandaloneUniformEvent | StandaloneUniformBlockMemberEvent) -> list[float]:
-    return parse_decoded_float_values(event.decoded)
+    decoded = parse_decoded_float_values(event.decoded)
+    if decoded:
+        return decoded
+    return parse_float_sample_values(event)
+
+
+def parse_float_sample_values(event: StandaloneUniformEvent | StandaloneUniformBlockMemberEvent) -> list[float]:
+    if "float" not in event.value_kind and "vec" not in event.value_kind and "mat" not in event.value_kind:
+        return []
+    if not event.sample.startswith("[") or not event.sample.endswith("]") or "..." in event.sample:
+        return []
+    try:
+        expected_count = int(event.component_count)
+    except (TypeError, ValueError):
+        return []
+    parts = [part.strip() for part in event.sample[1:-1].split(",") if part.strip()]
+    if not parts or len(parts) != expected_count:
+        return []
+    values: list[float] = []
+    for part in parts:
+        try:
+            raw = int(part, 16) & 0xFFFFFFFF
+        except ValueError:
+            return []
+        values.append(struct.unpack(">f", struct.pack(">I", raw))[0])
+    return values
 
 
 def semantic_float_tolerance_for(left: float, right: float) -> float:
@@ -1013,6 +1046,33 @@ def standalone_uniform_key_has_semantic_identity(key: str) -> bool:
     return key.startswith("draw=") and "draw=unavailable" not in key
 
 
+def semantic_field_or_fallback(value: str, fallback: str = "unknown") -> str:
+    if not value or value == "unknown" or value == "unavailable":
+        return fallback or "unknown"
+    return value
+
+
+def standalone_uniform_program_level_key(event: StandaloneUniformEvent | StandaloneUniformBlockMemberEvent) -> str:
+    return "|".join([
+        f"program={semantic_field_or_fallback(event.program_identity)}",
+        f"stages={semantic_field_or_fallback(event.shader_stages)}",
+        f"phase={semantic_field_or_fallback(event.semantic_phase, event.render_phase)}",
+        f"name={event.name}",
+        f"type={event.value_kind}",
+        f"pose={semantic_field_or_fallback(event.det_pose)}",
+    ])
+
+
+def standalone_uniform_program_level_index(
+    events: dict[str, list[StandaloneUniformEvent]] | dict[str, list[StandaloneUniformBlockMemberEvent]],
+) -> dict[str, list[StandaloneUniformEvent | StandaloneUniformBlockMemberEvent]]:
+    indexed: dict[str, list[StandaloneUniformEvent | StandaloneUniformBlockMemberEvent]] = defaultdict(list)
+    for values in events.values():
+        for event in values:
+            indexed[standalone_uniform_program_level_key(event)].append(event)
+    return indexed
+
+
 def extract_balanced_after(prefix: str, text: str) -> str:
     start = text.find(prefix)
     if start < 0:
@@ -1123,7 +1183,7 @@ def parse_resource(raw: str, backend: str, source: str, pipeline_key: str, stabl
         semantic_draw_key=top_fields.get("semanticDrawKey", ""),
         semantic_subsystem=top_fields.get("semanticSubsystem", ""),
         semantic_phase=top_fields.get("semanticPhase", ""),
-        semantic_pass=top_fields.get("semanticPass", ""),
+        semantic_pass=normalize_semantic_pass(top_fields.get("semanticPass", "")),
         semantic_pipeline=top_fields.get("semanticPipeline", ""),
         semantic_material=top_fields.get("semanticMaterial", ""),
         det_awaiting_screenshot=top_fields.get("detAwaitingScreenshot", ""),
@@ -1256,7 +1316,7 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             semantic_draw_key=fields.get("semanticDrawKey", ""),
             semantic_subsystem=fields.get("semanticSubsystem", ""),
             semantic_phase=fields.get("semanticPhase", ""),
-            semantic_pass=fields.get("semanticPass", ""),
+            semantic_pass=normalize_semantic_pass(fields.get("semanticPass", "")),
             semantic_pipeline=fields.get("semanticPipeline", ""),
             semantic_material=fields.get("semanticMaterial", ""),
             semantic_output=normalize_semantic_output(fields.get("semanticOutput", "")),
@@ -1306,7 +1366,7 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             semantic_draw_key=fields.get("semanticDrawKey", ""),
             semantic_subsystem=fields.get("semanticSubsystem", ""),
             semantic_phase=fields.get("semanticPhase", ""),
-            semantic_pass=fields.get("semanticPass", ""),
+            semantic_pass=normalize_semantic_pass(fields.get("semanticPass", "")),
             semantic_pipeline=fields.get("semanticPipeline", ""),
             semantic_material=fields.get("semanticMaterial", ""),
             semantic_output=normalize_semantic_output(fields.get("semanticOutput", "")),
@@ -1399,7 +1459,7 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             semantic_draw_key=fields.get("semanticDrawKey", ""),
             semantic_subsystem=fields.get("semanticSubsystem", ""),
             semantic_phase=fields.get("semanticPhase", ""),
-            semantic_pass=fields.get("semanticPass", ""),
+            semantic_pass=normalize_semantic_pass(fields.get("semanticPass", "")),
             semantic_pipeline=fields.get("semanticPipeline", ""),
             semantic_material=fields.get("semanticMaterial", ""),
             semantic_output=normalize_semantic_output(fields.get("semanticOutput", "")),
@@ -1446,7 +1506,7 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             semantic_draw_key=fields.get("semanticDrawKey", ""),
             semantic_subsystem=fields.get("semanticSubsystem", ""),
             semantic_phase=fields.get("semanticPhase", ""),
-            semantic_pass=fields.get("semanticPass", ""),
+            semantic_pass=normalize_semantic_pass(fields.get("semanticPass", "")),
             semantic_pipeline=fields.get("semanticPipeline", ""),
             semantic_material=fields.get("semanticMaterial", ""),
             semantic_output=normalize_semantic_output(fields.get("semanticOutput", "")),
@@ -1501,7 +1561,7 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             semantic_draw_key=fields.get("semanticDrawKey", ""),
             semantic_subsystem=fields.get("semanticSubsystem", ""),
             semantic_phase=fields.get("semanticPhase", ""),
-            semantic_pass=fields.get("semanticPass", ""),
+            semantic_pass=normalize_semantic_pass(fields.get("semanticPass", "")),
             semantic_pipeline=fields.get("semanticPipeline", ""),
             semantic_material=fields.get("semanticMaterial", ""),
             semantic_output=normalize_semantic_output(fields.get("semanticOutput", "")),
@@ -1519,7 +1579,7 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             semantic_draw_key=fields.get("semanticDrawKey", ""),
             semantic_subsystem=fields.get("semanticSubsystem", ""),
             semantic_phase=fields.get("semanticPhase", ""),
-            semantic_pass=fields.get("semanticPass", ""),
+            semantic_pass=normalize_semantic_pass(fields.get("semanticPass", "")),
             semantic_pipeline=fields.get("semanticPipeline", ""),
             semantic_vertex_shader=fields.get("semanticVertexShader", ""),
             semantic_fragment_shader=fields.get("semanticFragmentShader", ""),
@@ -1549,7 +1609,7 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             semantic_draw_key=fields.get("semanticDrawKey", ""),
             semantic_subsystem=fields.get("semanticSubsystem", ""),
             semantic_phase=fields.get("semanticPhase", ""),
-            semantic_pass=fields.get("semanticPass", ""),
+            semantic_pass=normalize_semantic_pass(fields.get("semanticPass", "")),
             semantic_pipeline=fields.get("semanticPipeline", ""),
             semantic_vertex_shader=fields.get("semanticVertexShader", ""),
             semantic_fragment_shader=fields.get("semanticFragmentShader", ""),
@@ -2100,6 +2160,9 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
                 vulkan_values=vk_values[:6],
             ))
 
+    gl_program_level_standalone = standalone_uniform_program_level_index(opengl.standalone_uniforms)
+    vk_program_level_block_members = standalone_uniform_program_level_index(vulkan.standalone_uniform_block_members)
+
     all_standalone_names = sorted(set(opengl.standalone_uniforms) | set(vulkan.standalone_uniforms))
     for name in all_standalone_names:
         gl_events = opengl.standalone_uniforms.get(name, [])
@@ -2107,6 +2170,36 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
         if not gl_events or not vk_events:
             if gl_events and not vk_events and name in vulkan.standalone_uniform_block_members:
                 continue
+            if gl_events and not vk_events:
+                paired_block_members: list[StandaloneUniformEvent | StandaloneUniformBlockMemberEvent] = []
+                for event in gl_events:
+                    paired_block_members.extend(vk_program_level_block_members.get(standalone_uniform_program_level_key(event), []))
+                if paired_block_members:
+                    decoded_status, decoded_reason = decoded_float_sets_equivalent(gl_events, paired_block_members)  # type: ignore[arg-type]
+                    if decoded_status == "equivalent":
+                        differences.append(Difference(
+                            severity=12,
+                            category="standalone-vs-ubo-program-level-equivalent",
+                            key=f"name={name}",
+                            reason="OpenGL updated this standalone uniform at program scope and Vulkan materialized the same value as per-draw UBO members; decoded values match within tolerance",
+                            opengl_count=len(gl_events),
+                            vulkan_count=len(paired_block_members),
+                            opengl_values=[decoded_reason],
+                            vulkan_values=[decoded_reason],
+                        ))
+                        continue
+                    if decoded_status == "different":
+                        differences.append(Difference(
+                            severity=98,
+                            category="strict-standalone-vs-ubo-program-level-decoded-float-mismatch",
+                            key=f"name={name}",
+                            reason="OpenGL standalone uniform and Vulkan materialized UBO members match by program/phase/name/type/pose but decoded values differ beyond tolerance",
+                            opengl_count=len(gl_events),
+                            vulkan_count=len(paired_block_members),
+                            opengl_values=[event.decoded or event.sample for event in gl_events[:4]],
+                            vulkan_values=[event.decoded or event.sample for event in paired_block_members[:4]],
+                        ))
+                        continue
             has_semantic_identity = standalone_uniform_key_has_semantic_identity(name)
             category = (
                 "backend-only-standalone-uniform"
@@ -2214,6 +2307,33 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
         if not vk_events:
             continue
         if not gl_events:
+            paired_gl_events = gl_program_level_standalone.get(standalone_uniform_program_level_key(vk_events[0]), [])
+            if paired_gl_events:
+                decoded_status, decoded_reason = decoded_float_sets_equivalent(paired_gl_events, vk_events)  # type: ignore[arg-type]
+                if decoded_status == "equivalent":
+                    differences.append(Difference(
+                        severity=12,
+                        category="standalone-vs-ubo-program-level-equivalent",
+                        key=f"name={name}",
+                        reason="Vulkan materialized this standalone uniform as per-draw UBO members and the matching OpenGL program-scope standalone setter has equivalent decoded values",
+                        opengl_count=len(paired_gl_events),
+                        vulkan_count=len(vk_events),
+                        opengl_values=[decoded_reason],
+                        vulkan_values=[decoded_reason],
+                    ))
+                    continue
+                if decoded_status == "different":
+                    differences.append(Difference(
+                        severity=98,
+                        category="strict-standalone-vs-ubo-program-level-decoded-float-mismatch",
+                        key=f"name={name}",
+                        reason="Vulkan materialized UBO member and OpenGL program-scope standalone uniform match by program/phase/name/type/pose but decoded values differ beyond tolerance",
+                        opengl_count=len(paired_gl_events),
+                        vulkan_count=len(vk_events),
+                        opengl_values=[event.decoded or event.sample for event in paired_gl_events[:4]],
+                        vulkan_values=[event.decoded or event.sample for event in vk_events[:4]],
+                    ))
+                    continue
             has_semantic_identity = standalone_uniform_key_has_semantic_identity(name)
             differences.append(Difference(
                 severity=25 if has_semantic_identity else 22,
@@ -2238,6 +2358,31 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
         gl_values = sorted({event.signature for event in gl_events})
         vk_values = sorted({event.signature for event in vk_events})
         if set(gl_values) != set(vk_values):
+            decoded_status, decoded_reason = decoded_float_sets_equivalent(gl_events, vk_events)
+            if decoded_status == "equivalent":
+                differences.append(Difference(
+                    severity=12,
+                    category="standalone-vs-ubo-decoded-float-equivalent",
+                    key=f"name={name}",
+                    reason="OpenGL standalone uniform and Vulkan materialized UBO member have different raw payload hashes, but decoded float values match within tolerance",
+                    opengl_count=len(gl_events),
+                    vulkan_count=len(vk_events),
+                    opengl_values=[decoded_reason, *gl_values[:5]],
+                    vulkan_values=[decoded_reason, *vk_values[:5]],
+                ))
+                continue
+            if decoded_status == "different":
+                differences.append(Difference(
+                    severity=98,
+                    category="strict-standalone-ubo-member-decoded-float-mismatch",
+                    key=f"name={name}",
+                    reason="OpenGL standalone uniform and Vulkan materialized UBO member decoded values differ beyond tolerance",
+                    opengl_count=len(gl_events),
+                    vulkan_count=len(vk_events),
+                    opengl_values=[event.decoded or event.sample for event in gl_events[:4]],
+                    vulkan_values=[event.decoded or event.sample for event in vk_events[:4]],
+                ))
+                continue
             overlap = sorted(set(gl_values) & set(vk_values))
             if overlap:
                 differences.append(Difference(
@@ -2625,7 +2770,10 @@ def geometry_coverage(opengl_events: CaptureEvents, vulkan_events: CaptureEvents
         vk_stream = ordered_digest(geometry_stream_parts(vk_events))
         classification = "equivalent"
         reason = "ok"
-        if gl_not_comparable or vk_not_comparable:
+        if generated_geometry_equivalent(gl_events, vk_events, gl_not_comparable, vk_not_comparable):
+            classification = "equivalent"
+            reason = "generated-fullscreen-geometry"
+        elif gl_not_comparable or vk_not_comparable:
             classification = "not-comparable"
             reason = geometry_event_not_comparable_reason(gl_not_comparable, vk_not_comparable)
         elif gl_layouts != vk_layouts:
@@ -2685,6 +2833,54 @@ def geometry_coverage(opengl_events: CaptureEvents, vulkan_events: CaptureEvents
     }
 
 
+def generated_geometry_equivalent(
+    gl_events: list[GeometryEvent],
+    vk_events: list[GeometryEvent],
+    gl_not_comparable: list[str],
+    vk_not_comparable: list[str],
+) -> bool:
+    if not gl_events or not vk_events:
+        return False
+    if set(gl_not_comparable) != {"vertex-buffer-missing-or-closed"}:
+        return False
+    if set(vk_not_comparable) != {"vertex-buffer-missing-or-closed"}:
+        return False
+    if len(gl_events) != len(vk_events):
+        return False
+
+    generated_vertex_shaders = {"minecraft:core/screenquad"}
+    generated_pipelines = {
+        "minecraft:pipeline/blit",
+        "minecraft:pipeline/blit_screen",
+        "minecraft:pipeline/entity_outline_blit",
+        "minecraft:pipeline/lightmap",
+    }
+    for gl_event, vk_event in zip(gl_events, vk_events):
+        if gl_event.semantic_vertex_shader not in generated_vertex_shaders:
+            return False
+        if vk_event.semantic_vertex_shader != gl_event.semantic_vertex_shader:
+            return False
+        if gl_event.semantic_pipeline not in generated_pipelines and vk_event.semantic_pipeline not in generated_pipelines:
+            return False
+        if (
+            gl_event.mode,
+            gl_event.indexed,
+            gl_event.total_vertices,
+            gl_event.total_indices,
+            gl_event.total_primitives,
+            gl_event.instances,
+        ) != (
+            vk_event.mode,
+            vk_event.indexed,
+            vk_event.total_vertices,
+            vk_event.total_indices,
+            vk_event.total_primitives,
+            vk_event.instances,
+        ):
+            return False
+    return True
+
+
 def sampler_resource_signatures_by_draw_key(events: CaptureEvents) -> dict[str, str]:
     by_draw_key: dict[str, set[str]] = defaultdict(set)
     for records in events.resources.values():
@@ -2704,6 +2900,8 @@ def sampler_resource_signatures_by_draw_key(events: CaptureEvents) -> dict[str, 
 
 def geometry_match_signature(event: GeometryEvent, sampler_signatures: dict[str, str]) -> str:
     if event.semantic_pipeline not in GEOMETRY_SAMPLER_AWARE_PIPELINES:
+        return event.semantic_match_signature
+    if "ctx=gui:gui-item:" in event.semantic_pass:
         return event.semantic_match_signature
     sampler_signature = sampler_signatures.get(event.semantic_draw_key, "samplers=unavailable")
     return event.semantic_match_signature + "|samplers=" + sampler_signature
@@ -2727,6 +2925,25 @@ def geometry_missing_reason(signature: str, gl_events: list[GeometryEvent], vk_e
         if gl_events and not vk_events:
             return "sodium-terrain-ready-work-unmatched:vulkan-missing"
         return "sodium-terrain-ready-work-unmatched"
+    if "samplers=" in signature and "numeric-gl-label" in signature:
+        if gl_events and not vk_events:
+            return "opengl-legacy-texture-context-not-resolved"
+        if not gl_events and vk_events:
+            return "vulkan-texture-context-not-paired-with-opengl-legacy-label"
+    if (
+        "pipeline=minecraft:pipeline/gui_textured|" in signature
+        and "samplers=" in signature
+        and not gl_events
+        and vk_events
+    ):
+        return "vulkan-gui-texture-context-not-paired-with-opengl-label"
+    if (
+        "pipeline=minecraft:pipeline/entity_" in signature
+        and "samplers=" in signature
+        and not gl_events
+        and vk_events
+    ):
+        return "vulkan-entity-texture-context-not-paired-with-opengl-label"
     missing = []
     if not gl_events:
         missing.append("opengl")
@@ -2758,6 +2975,11 @@ def geometry_not_comparable_override(signature: str, classification: str, first_
     if "pipeline=minecraft:pipeline/entity_" in signature and ".POSITION0@" in first_opengl and ".POSITION0@" in first_vulkan:
         return "entity-animation-pose-state-not-logged"
     if "pipeline=minecraft:pipeline/armor_" in signature and ".POSITION0@" in first_opengl and ".POSITION0@" in first_vulkan:
+        return "entity-armor-animation-pose-state-not-logged"
+    if (
+        "pipeline=minecraft:pipeline/armor_" in signature
+        and "|projection:perspective:Iris_shadow_map_projection|" in signature
+    ):
         return "entity-armor-animation-pose-state-not-logged"
     return ""
 

@@ -129,6 +129,8 @@ public class GuiRenderer implements AutoCloseable {
 	@Nullable
 	private TextureSetup previousTextureSetup = null;
 	@Nullable
+	private String previousShaderInputParityGeometryContext = null;
+	@Nullable
 	private BufferBuilder bufferBuilder = null;
 
 	public GuiRenderer(
@@ -221,10 +223,11 @@ public class GuiRenderer implements AutoCloseable {
 		this.previousScissorArea = null;
 		this.previousPipeline = null;
 		this.previousTextureSetup = null;
+		this.previousShaderInputParityGeometryContext = null;
 		this.bufferBuilder = null;
 		this.renderState.forEachElement(this::addElementToMesh, traverseRange);
 		if (this.bufferBuilder != null) {
-			this.recordMesh(this.bufferBuilder, this.previousPipeline, this.previousTextureSetup, this.previousScissorArea);
+			this.recordMesh(this.bufferBuilder, this.previousPipeline, this.previousTextureSetup, this.previousScissorArea, this.previousShaderInputParityGeometryContext);
 		}
 	}
 
@@ -298,17 +301,22 @@ public class GuiRenderer implements AutoCloseable {
 		RenderPipeline renderPipeline = guiElementRenderState.pipeline();
 		TextureSetup textureSetup = guiElementRenderState.textureSetup();
 		ScreenRectangle screenRectangle = guiElementRenderState.scissorArea();
+		String shaderInputParityGeometryContext = VulkanicAPI.isShaderInputParityTracingEnabled()
+			? guiElementRenderState.shaderInputParityGeometryContext()
+			: "";
 		if (renderPipeline != this.previousPipeline
 			|| this.scissorChanged(screenRectangle, this.previousScissorArea)
-			|| !textureSetup.equals(this.previousTextureSetup)) {
+			|| !textureSetup.equals(this.previousTextureSetup)
+			|| !java.util.Objects.equals(shaderInputParityGeometryContext, this.previousShaderInputParityGeometryContext)) {
 			if (this.bufferBuilder != null) {
-				this.recordMesh(this.bufferBuilder, this.previousPipeline, this.previousTextureSetup, this.previousScissorArea);
+				this.recordMesh(this.bufferBuilder, this.previousPipeline, this.previousTextureSetup, this.previousScissorArea, this.previousShaderInputParityGeometryContext);
 			}
 
 			this.bufferBuilder = this.getBufferBuilder(renderPipeline);
 			this.previousPipeline = renderPipeline;
 			this.previousTextureSetup = textureSetup;
 			this.previousScissorArea = screenRectangle;
+			this.previousShaderInputParityGeometryContext = shaderInputParityGeometryContext;
 		}
 
 		guiElementRenderState.buildVertices(this.bufferBuilder);
@@ -527,9 +535,18 @@ public class GuiRenderer implements AutoCloseable {
 					k,
 					-1,
 					guiItemRenderState.scissorArea(),
-					null
+					null,
+					shaderInputParityGuiItemContext("gui-item", guiItemRenderState)
 				)
 			);
+	}
+
+	public static String shaderInputParityGuiItemContext(String source, GuiItemRenderState guiItemRenderState) {
+		String name = VulkanicAPI.shaderInputParityDiagnosticLabel(guiItemRenderState.name());
+		return source
+			+ ":name=" + name
+			+ ":pos=" + guiItemRenderState.x() + "x" + guiItemRenderState.y()
+			+ ":oversized=" + (guiItemRenderState.oversizedItemBounds() != null);
 	}
 
 	private void createAtlasTextures(int i) {
@@ -615,10 +632,16 @@ public class GuiRenderer implements AutoCloseable {
 		}
 	}
 
-	private void recordMesh(BufferBuilder bufferBuilder, RenderPipeline renderPipeline, TextureSetup textureSetup, @Nullable ScreenRectangle screenRectangle) {
+	private void recordMesh(
+		BufferBuilder bufferBuilder,
+		RenderPipeline renderPipeline,
+		TextureSetup textureSetup,
+		@Nullable ScreenRectangle screenRectangle,
+		@Nullable String shaderInputParityGeometryContext
+	) {
 		MeshData meshData = bufferBuilder.build();
 		if (meshData != null) {
-			this.meshesToDraw.add(new GuiRenderer.MeshToDraw(meshData, renderPipeline, textureSetup, screenRectangle));
+			this.meshesToDraw.add(new GuiRenderer.MeshToDraw(meshData, renderPipeline, textureSetup, screenRectangle, shaderInputParityGeometryContext));
 		}
 	}
 
@@ -654,7 +677,8 @@ public class GuiRenderer implements AutoCloseable {
 						drawState.indexCount(),
 						meshToDraw.pipeline,
 						meshToDraw.textureSetup,
-						meshToDraw.scissorArea
+						meshToDraw.scissorArea,
+						meshToDraw.shaderInputParityGeometryContext
 					)
 				);
 			meshToDraw.close();
@@ -718,7 +742,9 @@ public class GuiRenderer implements AutoCloseable {
 		}
 
 		renderPass.setIndexBuffer(gpuBuffer, indexType);
-		renderPass.drawIndexed(draw.baseVertex, 0, draw.indexCount, 1);
+		try (VulkanicAPI.ShaderInputParityScope ignored = VulkanicAPI.pushShaderInputParitySemanticContext("gui:" + draw.shaderInputParityGeometryContext())) {
+			renderPass.drawIndexed(draw.baseVertex, 0, draw.indexCount, 1);
+		}
 	}
 
 	private BufferBuilder getBufferBuilder(RenderPipeline renderPipeline) {
@@ -799,12 +825,19 @@ public class GuiRenderer implements AutoCloseable {
 		int indexCount,
 		RenderPipeline pipeline,
 		TextureSetup textureSetup,
-		@Nullable ScreenRectangle scissorArea
+		@Nullable ScreenRectangle scissorArea,
+		String shaderInputParityGeometryContext
 	) {
 	}
 
 	@Environment(EnvType.CLIENT)
-	record MeshToDraw(MeshData mesh, RenderPipeline pipeline, TextureSetup textureSetup, @Nullable ScreenRectangle scissorArea) implements AutoCloseable {
+	record MeshToDraw(
+		MeshData mesh,
+		RenderPipeline pipeline,
+		TextureSetup textureSetup,
+		@Nullable ScreenRectangle scissorArea,
+		@Nullable String shaderInputParityGeometryContext
+	) implements AutoCloseable {
 
 		public void close() {
 			this.mesh.close();

@@ -14,9 +14,11 @@ import java.nio.file.Path;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.render.GuiRenderer;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.gui.render.state.BlitRenderState;
 import net.minecraft.client.gui.render.state.GuiRenderState;
+import net.minecraft.client.gui.render.state.pip.OversizedItemRenderState;
 import net.minecraft.client.gui.render.state.pip.PictureInPictureRenderState;
 import net.minecraft.client.renderer.CachedOrthoProjectionMatrixBuffer;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -120,9 +122,19 @@ public abstract class PictureInPictureRenderer<T extends PictureInPictureRenderS
 				i,
 				-1,
 				pictureInPictureRenderState.scissorArea(),
-				null
+				this.shaderInputParityPictureInPictureContext(pictureInPictureRenderState)
 			)
 		);
+	}
+
+	private String shaderInputParityPictureInPictureContext(T pictureInPictureRenderState) {
+		if (pictureInPictureRenderState instanceof OversizedItemRenderState oversizedItemRenderState) {
+			return GuiRenderer.shaderInputParityGuiItemContext("gui-item", oversizedItemRenderState.guiItemRenderState());
+		}
+		return "gui-pip:renderer=" + VulkanicAPI.shaderInputParityDiagnosticLabel(this.getClass().getSimpleName())
+			+ ":state=" + VulkanicAPI.shaderInputParityDiagnosticLabel(pictureInPictureRenderState.getClass().getSimpleName())
+			+ ":bounds=" + pictureInPictureRenderState.x0() + "x" + pictureInPictureRenderState.y0()
+			+ "-" + pictureInPictureRenderState.x1() + "x" + pictureInPictureRenderState.y1();
 	}
 
 	private void prepareTexturesAndProjection(boolean bl, int i, int j) {

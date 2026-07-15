@@ -24,8 +24,15 @@ public record BlitRenderState(
 	float v1,
 	int color,
 	@Nullable ScreenRectangle scissorArea,
-	@Nullable ScreenRectangle bounds
+	@Nullable ScreenRectangle bounds,
+	@Nullable String shaderInputParityGeometryContext
 ) implements GuiElementRenderState {
+	public BlitRenderState {
+		if (shaderInputParityGeometryContext != null && shaderInputParityGeometryContext.isBlank()) {
+			shaderInputParityGeometryContext = null;
+		}
+	}
+
 	public BlitRenderState(
 		RenderPipeline renderPipeline,
 		TextureSetup textureSetup,
@@ -41,7 +48,42 @@ public record BlitRenderState(
 		int n,
 		@Nullable ScreenRectangle screenRectangle
 	) {
-		this(renderPipeline, textureSetup, matrix3x2f, i, j, k, l, f, g, h, m, n, screenRectangle, getBounds(i, j, k, l, matrix3x2f, screenRectangle));
+		this(renderPipeline, textureSetup, matrix3x2f, i, j, k, l, f, g, h, m, n, screenRectangle, getBounds(i, j, k, l, matrix3x2f, screenRectangle), null);
+	}
+
+	public BlitRenderState(
+		RenderPipeline renderPipeline,
+		TextureSetup textureSetup,
+		Matrix3x2f matrix3x2f,
+		int i,
+		int j,
+		int k,
+		int l,
+		float f,
+		float g,
+		float h,
+		float m,
+		int n,
+		@Nullable ScreenRectangle screenRectangle,
+		@Nullable String shaderInputParityGeometryContext
+	) {
+		this(
+			renderPipeline,
+			textureSetup,
+			matrix3x2f,
+			i,
+			j,
+			k,
+			l,
+			f,
+			g,
+			h,
+			m,
+			n,
+			screenRectangle,
+			getBounds(i, j, k, l, matrix3x2f, screenRectangle),
+			shaderInputParityGeometryContext
+		);
 	}
 
 	@Override
@@ -56,5 +98,10 @@ public record BlitRenderState(
 	private static ScreenRectangle getBounds(int i, int j, int k, int l, Matrix3x2f matrix3x2f, @Nullable ScreenRectangle screenRectangle) {
 		ScreenRectangle screenRectangle2 = new ScreenRectangle(i, j, k - i, l - j).transformMaxBounds(matrix3x2f);
 		return screenRectangle != null ? screenRectangle.intersection(screenRectangle2) : screenRectangle2;
+	}
+
+	@Override
+	public String shaderInputParityGeometryContext() {
+		return this.shaderInputParityGeometryContext != null ? this.shaderInputParityGeometryContext : GuiElementRenderState.super.shaderInputParityGeometryContext();
 	}
 }

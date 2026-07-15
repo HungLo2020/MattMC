@@ -1034,6 +1034,17 @@ if [[ "$SHADER_INPUT_PARITY" != "off" ]]; then
     if [[ "$SHADER_INPUT_PARITY" == "full" ]]; then
         SHADER_INPUT_PARITY_JAVA_OPTIONS+=("-Dmattmc.vulkan.traceStandaloneUniformBlockMembers=true")
     fi
+    if [[ "$DETERMINISTIC_CAMERA_CAPTURE" == "true" ]]; then
+        SHADER_INPUT_PARITY_JAVA_OPTIONS+=(
+            "-Dmattmc.vulkan.deterministicTemporalParity=true"
+            "-Dmattmc.vulkan.deterministicTemporalParity.frameCounter=0"
+            "-Dmattmc.vulkan.deterministicTemporalParity.frameTime=0.016666668"
+            "-Dmattmc.vulkan.deterministicTemporalParity.frameTimeCounter=0.0"
+            "-Dmattmc.vulkan.deterministicTemporalParity.partialTick=1.0"
+            "-Dmattmc.vulkan.deterministicTemporalParity.fovModifier=1.0"
+            "-Dmattmc.vulkan.deterministicTemporalParity.worldTime=6000"
+        )
+    fi
 
     append_java_tool_options "${SHADER_INPUT_PARITY_JAVA_OPTIONS[@]}"
 
@@ -1041,6 +1052,9 @@ if [[ "$SHADER_INPUT_PARITY" != "off" ]]; then
         echo "shader_input_parity_java_options=${SHADER_INPUT_PARITY_JAVA_OPTIONS[*]}"
         echo "java_tool_options=$JAVA_TOOL_OPTIONS"
         echo "deterministic_lightmap_parity=true"
+        if [[ "$DETERMINISTIC_CAMERA_CAPTURE" == "true" ]]; then
+            echo "deterministic_temporal_parity=true"
+        fi
     } >> "$META_LOG"
 fi
 

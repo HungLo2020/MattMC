@@ -18,4 +18,8 @@ public interface GuiElementRenderState extends ScreenArea {
 
 	@Nullable
 	ScreenRectangle scissorArea();
+
+	default String shaderInputParityGeometryContext() {
+		return this.getClass().getSimpleName();
+	}
 }

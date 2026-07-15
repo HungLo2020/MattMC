@@ -632,6 +632,14 @@ public class LodRenderer
 	{
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		DhLodRenderPlan renderPlan = this.createLodRenderPlan(opaquePass);
+		SortedArraySet<LodBufferContainer> lodBufferContainers = lodBufferHandler.getColumnRenderBuffers();
+		traceDhLodRenderPlan(
+				"begin",
+				shaderProgram,
+				renderPlan,
+				opaquePass,
+				lodBufferContainers,
+				"framebufferPending=true");
 
 		boolean renderWireframe = Config.Client.Advanced.Debugging.renderWireframe.get();
 		if (renderWireframe)
@@ -664,6 +672,14 @@ public class LodRenderer
 
 		if (!this.isCurrentDrawFramebufferComplete(ctx, opaquePass))
 		{
+			traceDhLodRenderPlan(
+					"skip-framebuffer-incomplete",
+					shaderProgram,
+					renderPlan,
+					opaquePass,
+					lodBufferContainers,
+					"activeFramebuffer=" + this.activeFramebufferId
+							+ ":drawFramebuffer=" + VulkanicAPI.getDrawFramebufferBinding());
 			renderPlan.cleanupState().applyIfPresent(ctx);
 			if (renderWireframe)
 			{
@@ -674,9 +690,9 @@ public class LodRenderer
 		}
 		
 		
-		SortedArraySet<LodBufferContainer> lodBufferContainers = lodBufferHandler.getColumnRenderBuffers();
 		if (lodBufferContainers != null)
 		{
+			traceDhLodRenderPlan("ready", shaderProgram, renderPlan, opaquePass, lodBufferContainers, "framebufferComplete=true");
 			try
 			{
 				try (RenderPass ignored = this.createVulkanCompatibilityRenderPass("Distant Horizons LOD"))
@@ -693,6 +709,10 @@ public class LodRenderer
 			{
 				renderPlan.cleanupState().applyIfPresent(ctx);
 			}
+		}
+		else
+		{
+			traceDhLodRenderPlan("skip-no-containers", shaderProgram, renderPlan, opaquePass, null, "framebufferComplete=true");
 		}
 		renderPlan.cleanupState().applyIfPresent(ctx);
 		
@@ -914,6 +934,9 @@ public class LodRenderer
 			DhLodRenderPhase phase)
 	{
 		CommandContext ctx = VulkanicAPI.getCommandContext();
+		int submittedVbos = 0;
+		int submittedVertices = 0;
+		int submittedIndices = 0;
 		for (int lodIndex = 0; lodIndex < lodBufferContainers.size(); lodIndex++)
 		{
 			LodBufferContainer bufferContainer = lodBufferContainers.get(lodIndex);
@@ -937,6 +960,9 @@ public class LodRenderer
 				shaderProgram.bindVertexBuffer(vbo.getId());
 				this.quadIBO.bind();
 				int indexCount = (vbo.getVertexCount() / 4) * 6; // 4 vertices per DH quad, 6 indices per rendered quad.
+				submittedVbos++;
+				submittedVertices += vbo.getVertexCount();
+				submittedIndices += indexCount;
 				try (VulkanicAPI.ShaderInputParityScope ignored = VulkanicAPI.beginShaderInputParitySemanticDraw(
 						"dh-lod-terrain-draw",
 						"distant-horizons",
@@ -963,6 +989,56 @@ public class LodRenderer
 				vbo.unbind();
 			}
 		}
+		traceDhLodPhaseSummary(shaderProgram, phase, lodBufferContainers.size(), submittedVbos, submittedVertices, submittedIndices);
+	}
+
+	private static void traceDhLodRenderPlan(
+			String status,
+			IDhApiShaderProgram shaderProgram,
+			DhLodRenderPlan renderPlan,
+			boolean opaquePass,
+			@Nullable SortedArraySet<LodBufferContainer> lodBufferContainers,
+			String detail)
+	{
+		if (!VulkanicAPI.isShaderInputParityTracingEnabled())
+		{
+			return;
+		}
+
+		int containerCount = lodBufferContainers == null ? -1 : lodBufferContainers.size();
+		VulkanicAPI.traceShaderInputParityOrdering(
+				"dh-lod-plan",
+				"distant-horizons-lod-renderer",
+				"status=" + status
+						+ ":shader=" + shaderProgram.getClass().getSimpleName()
+						+ ":opaque=" + opaquePass
+						+ ":containers=" + containerCount
+						+ ":phases=" + renderPlan.phases().length
+						+ ":" + detail);
+	}
+
+	private static void traceDhLodPhaseSummary(
+			IDhApiShaderProgram shaderProgram,
+			DhLodRenderPhase phase,
+			int containerCount,
+			int submittedVbos,
+			int submittedVertices,
+			int submittedIndices)
+	{
+		if (!VulkanicAPI.isShaderInputParityTracingEnabled())
+		{
+			return;
+		}
+
+		VulkanicAPI.traceShaderInputParityOrdering(
+				"dh-lod-phase-summary",
+				"distant-horizons-lod-renderer",
+				"shader=" + shaderProgram.getClass().getSimpleName()
+						+ ":bucket=" + phase.bufferBucket().name().toLowerCase(java.util.Locale.ROOT)
+						+ ":containers=" + containerCount
+						+ ":submittedVbos=" + submittedVbos
+						+ ":submittedVertices=" + submittedVertices
+						+ ":submittedIndices=" + submittedIndices);
 	}
 
 	private static void traceDhLodTerrainResources(
