@@ -150,6 +150,8 @@ final class NativeSectionSnapshot implements AutoCloseable {
     }
 
     int[] flushAll(TranslucentGeometryCollector collector) {
+        // The compact snapshot stores ids into Rust's model/state tables. A model reload clears those
+        // native tables, so the snapshot must fail before Rust can interpret ids from an old generation.
         if (this.modelReloadGeneration != NativeStaticBlockModelRegistry.reloadGeneration()) {
             throw new IllegalStateException("Native section snapshot was built against stale native model metadata");
         }

@@ -573,6 +573,7 @@ $optionsBytes = $null
 $irisBytes = $null
 $optionsPath = $null
 $irisPath = $null
+$oldJavaToolOptions = $null
 $windowCapture = $null
 $screenshotAnalysis = $null
 $fallbackReportObserved = $false
@@ -647,6 +648,16 @@ try {
     Set-KeyValueLine -Path $irisPath -Key "shaderPack" -Value "ComplementaryHungLoIfied.zip"
     Copy-Item -LiteralPath $optionsPath -Destination (Join-Path $script:ArtifactDir "config-effective\options.txt") -Force
     Copy-Item -LiteralPath $irisPath -Destination (Join-Path $script:ArtifactDir "config-effective\iris.properties") -Force
+
+    $oldJavaToolOptions = [Environment]::GetEnvironmentVariable("JAVA_TOOL_OPTIONS", "Process")
+    if ($RequireMeshingReport) {
+        $reportProperty = "-Dmattmc.nativeMeshing.reportFallbacks=true"
+        if ([string]::IsNullOrWhiteSpace($oldJavaToolOptions)) {
+            [Environment]::SetEnvironmentVariable("JAVA_TOOL_OPTIONS", $reportProperty, "Process")
+        } elseif ($oldJavaToolOptions -notmatch [regex]::Escape($reportProperty)) {
+            [Environment]::SetEnvironmentVariable("JAVA_TOOL_OPTIONS", "$oldJavaToolOptions $reportProperty", "Process")
+        }
+    }
 
     $stdoutPath = Join-Path $script:ArtifactDir "logs\runClient.stdout.log"
     $stderrPath = Join-Path $script:ArtifactDir "logs\runClient.stderr.log"
@@ -804,6 +815,12 @@ try {
         Write-Host "Failure: $reason"
     }
 } finally {
+    if ($null -ne $oldJavaToolOptions) {
+        [Environment]::SetEnvironmentVariable("JAVA_TOOL_OPTIONS", $oldJavaToolOptions, "Process")
+    } elseif ($RequireMeshingReport) {
+        [Environment]::SetEnvironmentVariable("JAVA_TOOL_OPTIONS", $null, "Process")
+    }
+
     if ($process -and -not $process.HasExited) {
         Stop-ProcessTree -ProcessId $process.Id -Reason "scheduled run completion or failure"
     }

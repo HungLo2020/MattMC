@@ -111,6 +111,12 @@ public final class NativeStaticBlockModelRegistry {
     private NativeStaticBlockModelRegistry() {
     }
 
+    /**
+     * Rebuilds the Java-owned model/state registry and the Rust-owned native cache as one generation.
+     * Native section snapshots capture {@link #reloadGeneration()} when allocated and must be flushed
+     * before the next reload. After this method clears {@link NativeStaticBlockModelCache}, old native
+     * state, selector, and model ids are invalid and must not be used by a later compact snapshot.
+     */
     public static synchronized void reload(Map<BlockState, BlockStateModel> models) {
         reloadGeneration++;
         MODELS.clear();

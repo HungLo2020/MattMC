@@ -3,6 +3,16 @@
 //! Keep these functions thin: validate pointer/handle arguments, create safe
 //! slices or owned handles, call the analyzer/topology/BSP routines, then return
 //! the stable Java-facing result code.
+//!
+//! # Safety
+//!
+//! These exports are entered from Java through raw C ABI calls. Java must pass
+//! handles created by the matching native constructor, destroy each handle at
+//! most once, keep input buffers alive for the duration of the call, and ensure
+//! output buffers are writable for the supplied element count. The wrappers
+//! reject null pointers, negative counts, invalid enum-like arguments, and
+//! capacity mismatches before constructing Rust slices, but non-null foreign
+//! pointers and nonzero handles are trusted to still refer to live allocations.
 
 use super::*;
 
