@@ -25,6 +25,7 @@ import com.seibel.distanthorizons.core.util.math.Vec3d;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
+import net.vulkanic.VulkanicAPI;
 
 import java.util.Iterator;
 
@@ -161,6 +162,11 @@ public class RenderBufferHandler implements AutoCloseable
 		}
 		
 		// setup iterator with culling frustum
+		int visitedNodeCount = 0;
+		int nullSectionCount = 0;
+		int nullBufferCount = 0;
+		int disabledSectionCount = 0;
+		int addedBufferCount = 0;
 		Iterator<QuadNode<LodRenderSection>> nodeIterator = this.lodQuadTree.nodeIteratorWithStoppingFilter((QuadNode<LodRenderSection> node) ->
 		{
 			if (node == null)
@@ -212,11 +218,13 @@ public class RenderBufferHandler implements AutoCloseable
 		while (nodeIterator.hasNext())
 		{
 			QuadNode<LodRenderSection> node = nodeIterator.next();
+			visitedNodeCount++;
 			
 			long sectionPos = node.sectionPos;
 			LodRenderSection renderSection = node.value;
 			if (renderSection == null)
 			{
+				nullSectionCount++;
 				continue;
 			}
 			
@@ -225,13 +233,19 @@ public class RenderBufferHandler implements AutoCloseable
 			try
 			{
 				LodBufferContainer bufferContainer = renderSection.bufferContainer;
-				if (bufferContainer == null 
-					|| !renderSection.getRenderingEnabled())
+				if (bufferContainer == null)
 				{
+					nullBufferCount++;
+					continue;
+				}
+				if (!renderSection.getRenderingEnabled())
+				{
+					disabledSectionCount++;
 					continue;
 				}
 				
 				this.loadedNearToFarBuffers.add(bufferContainer);
+				addedBufferCount++;
 			}
 			catch (Exception e)
 			{
@@ -246,6 +260,21 @@ public class RenderBufferHandler implements AutoCloseable
 		else
 		{
 			this.visibleBufferCount = this.loadedNearToFarBuffers.size();
+		}
+		if (VulkanicAPI.isShaderInputParityTracingEnabled())
+		{
+			VulkanicAPI.traceShaderInputParityOrdering(
+					"dh-render-list-summary",
+					"distant-horizons-render-buffer-handler",
+					"shadowPass=" + isShadowPass
+							+ ":frustumCulling=" + enableFrustumCulling
+							+ ":visitedNodes=" + visitedNodeCount
+							+ ":nullSections=" + nullSectionCount
+							+ ":nullBuffers=" + nullBufferCount
+							+ ":disabledSections=" + disabledSectionCount
+							+ ":addedBuffers=" + addedBufferCount
+							+ ":visibleBuffers=" + this.loadedNearToFarBuffers.size()
+							+ ":culledBuffers=" + (isShadowPass ? this.shadowCulledBufferCount : this.culledBufferCount));
 		}
 	}
 	

@@ -34,6 +34,8 @@ import com.seibel.distanthorizons.coreapi.DependencyInjection.OverrideInjector;
 import com.seibel.distanthorizons.core.util.math.Vec3f;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.textures.GpuTexture;
+import net.blaze3d.textures.GpuTextureView;
+import net.minecraft.client.Minecraft;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicBlendEquation;
 import net.vulkanic.VulkanicBlendFactor;
@@ -980,6 +982,15 @@ public class LodRenderer
 						0))
 				{
 					traceDhLodTerrainResources(shaderProgram, phase, bufferContainer, lodIndex, vboIndex);
+					VulkanicAPI.traceShaderInputParityDhLodGeometry(
+							"dh-lod-terrain-geometry",
+							vbo.getId(),
+							vbo.getVertexCount(),
+							this.quadIBO.getId(),
+							indexCount,
+							this.quadIBO.getType(),
+							com.seibel.distanthorizons.core.util.LodUtil.LOD_VERTEX_FORMAT.getByteSize(),
+							com.seibel.distanthorizons.core.util.LodUtil.LOD_VERTEX_FORMAT.toString());
 					VulkanicAPI.drawElements(
 							ctx,
 							VulkanicPrimitiveMode.TRIANGLES,
@@ -1056,7 +1067,7 @@ public class LodRenderer
 		int lightmapTextureUnit = VulkanicAPI.isVulkanBackendSelected()
 				? ILightMapWrapper.VULKAN_LIGHTMAP_TEXTURE_UNIT
 				: ILightMapWrapper.OPENGL_LIGHTMAP_TEXTURE_UNIT;
-		net.blaze3d.textures.GpuTextureView lightmap = net.irisshaders.iris.pbr.TextureTracker.INSTANCE.getShaderTexture(lightmapTextureUnit);
+		GpuTextureView lightmap = Minecraft.getInstance().gameRenderer.lightTexture().getTextureView();
 		java.util.List<String> resources = java.util.List.of(
 				VulkanicAPI.shaderInputParitySamplerResource("uLightMap", lightmapTextureUnit, lightmap)
 		);

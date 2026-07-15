@@ -177,6 +177,34 @@ public class VulkanBackend {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final boolean FORCE_MAPPABLE_GEOMETRY_PARITY_BUFFERS =
         Boolean.getBoolean("mattmc.vulkan.traceShaderInputParity.forceMappableGeometryBuffers");
+    private static final int DIAGNOSTIC_GEOMETRY_SHADOW_MAX_BUFFER_BYTES =
+        Integer.getInteger("mattmc.vulkan.traceShaderInputParity.geometryShadowMaxBufferBytes", 2 * 1024 * 1024);
+    private static final long DIAGNOSTIC_GEOMETRY_SHADOW_MAX_TOTAL_BYTES =
+        Long.getLong("mattmc.vulkan.traceShaderInputParity.geometryShadowMaxTotalBytes", 96L * 1024L * 1024L);
+    private static final AtomicLong DIAGNOSTIC_GEOMETRY_SHADOW_BYTES = new AtomicLong();
+
+    static boolean reserveDiagnosticGeometryShadowBytes(int size) {
+        if (size <= 0) {
+            return true;
+        }
+        while (true) {
+            long current = DIAGNOSTIC_GEOMETRY_SHADOW_BYTES.get();
+            long next = current + size;
+            if (next > DIAGNOSTIC_GEOMETRY_SHADOW_MAX_TOTAL_BYTES) {
+                return false;
+            }
+            if (DIAGNOSTIC_GEOMETRY_SHADOW_BYTES.compareAndSet(current, next)) {
+                return true;
+            }
+        }
+    }
+
+    static void releaseDiagnosticGeometryShadowBytes(int size) {
+        if (size > 0) {
+            DIAGNOSTIC_GEOMETRY_SHADOW_BYTES.addAndGet(-size);
+        }
+    }
+
     private static final Set<String> STANDALONE_SLICE_TRACE_KEYS = ConcurrentHashMap.newKeySet();
     private static final AtomicLong STANDALONE_UNIFORM_CALL_COUNT = new AtomicLong();
     private static final AtomicLong STANDALONE_UNIFORM_TOKEN_HIT_COUNT = new AtomicLong();
@@ -16186,7 +16214,9 @@ void main() {
                 long finalBufferHandle = bufferHandle;
                 long finalMemoryHandle = memoryHandle;
                 java.nio.ByteBuffer diagnosticShadowData =
-                    createDiagnosticUniformBufferShadow(usage, size, initialData);
+                    createDiagnosticBufferShadow(usage, size, initialData);
+                int diagnosticGeometryShadowBytes = diagnosticGeometryShadowBytes(usage, diagnosticShadowData, size);
+                boolean diagnosticSparseGeometryShadow = diagnosticSparseGeometryShadowEnabled(usage, diagnosticShadowData);
 
                 return new VulkanBuffer(
                     finalBufferHandle,
@@ -16194,10 +16224,16 @@ void main() {
                     usage,
                     size,
                     debugLabel,
-                    () -> enqueueVulkanResourceDestroy(
-                        () -> destroyManagedBuffer(finalBufferHandle, finalMemoryHandle)
-                    ),
-                    diagnosticShadowData
+                    () -> {
+                        if (diagnosticGeometryShadowBytes > 0) {
+                            DIAGNOSTIC_GEOMETRY_SHADOW_BYTES.addAndGet(-diagnosticGeometryShadowBytes);
+                        }
+                        enqueueVulkanResourceDestroy(
+                            () -> destroyManagedBuffer(finalBufferHandle, finalMemoryHandle)
+                        );
+                    },
+                    diagnosticShadowData,
+                    diagnosticSparseGeometryShadow
                 );
             } catch (RuntimeException exception) {
                 if (logicalDevice != null) {
@@ -16212,27 +16248,70 @@ void main() {
             }
         }
 
-        private static java.nio.ByteBuffer createDiagnosticUniformBufferShadow(
+        private static java.nio.ByteBuffer createDiagnosticBufferShadow(
             int usage,
             int size,
             @Nullable java.nio.ByteBuffer initialData
         ) {
-            if (!VulkanicAPI.isShaderInputParityTracingEnabled()
-                || (usage & VulkanicBuffer.USAGE_UNIFORM) == 0
-                || size <= 0) {
+            if (!VulkanicAPI.isShaderInputParityTracingEnabled() || size <= 0) {
+                return null;
+            }
+            boolean uniform = (usage & VulkanicBuffer.USAGE_UNIFORM) != 0;
+            boolean geometry = (usage & (VulkanicBuffer.USAGE_VERTEX | VulkanicBuffer.USAGE_INDEX)) != 0;
+            if (!uniform && !geometry) {
+                return null;
+            }
+            if (geometry && !reserveDiagnosticGeometryShadow(size)) {
                 return null;
             }
 
-            java.nio.ByteBuffer shadow = org.lwjgl.BufferUtils.createByteBuffer(size)
-                .order(ByteOrder.LITTLE_ENDIAN);
-            if (initialData != null) {
-                java.nio.ByteBuffer source = initialData.duplicate();
-                int copyLength = Math.min(size, source.remaining());
-                source.limit(source.position() + copyLength);
-                shadow.put(source);
-                shadow.position(0);
+            try {
+                java.nio.ByteBuffer shadow = org.lwjgl.BufferUtils.createByteBuffer(size)
+                    .order(ByteOrder.LITTLE_ENDIAN);
+                if (initialData != null) {
+                    java.nio.ByteBuffer source = initialData.duplicate();
+                    int copyLength = Math.min(size, source.remaining());
+                    source.limit(source.position() + copyLength);
+                    shadow.put(source);
+                    shadow.position(0);
+                }
+                return shadow;
+            } catch (RuntimeException ex) {
+                if (geometry) {
+                    DIAGNOSTIC_GEOMETRY_SHADOW_BYTES.addAndGet(-size);
+                }
+                throw ex;
             }
-            return shadow;
+        }
+
+        private static boolean reserveDiagnosticGeometryShadow(int size) {
+            if (size > DIAGNOSTIC_GEOMETRY_SHADOW_MAX_BUFFER_BYTES) {
+                return false;
+            }
+            return reserveDiagnosticGeometryShadowBytes(size);
+        }
+
+        private static int diagnosticGeometryShadowBytes(
+            int usage,
+            @Nullable java.nio.ByteBuffer diagnosticShadowData,
+            int size
+        ) {
+            if (diagnosticShadowData == null || (usage & (VulkanicBuffer.USAGE_VERTEX | VulkanicBuffer.USAGE_INDEX)) == 0) {
+                return 0;
+            }
+            if (size > DIAGNOSTIC_GEOMETRY_SHADOW_MAX_BUFFER_BYTES) {
+                return 0;
+            }
+            return size;
+        }
+
+        private static boolean diagnosticSparseGeometryShadowEnabled(
+            int usage,
+            @Nullable java.nio.ByteBuffer diagnosticShadowData
+        ) {
+            return diagnosticShadowData == null
+                && VulkanicAPI.isShaderInputParityTracingEnabled()
+                && (usage & (VulkanicBuffer.USAGE_VERTEX | VulkanicBuffer.USAGE_INDEX)) != 0;
         }
 
         private static boolean requiresHostVisibleBufferMemory(int usage) {

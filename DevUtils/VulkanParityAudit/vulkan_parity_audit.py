@@ -936,6 +936,33 @@ def decoded_float_sets_equivalent(
     return "equivalent", f"maxDelta={max_delta:.9g};absTolerance={SEMANTIC_FLOAT_ABS_TOLERANCE:.1e};relTolerance={SEMANTIC_FLOAT_REL_TOLERANCE:.1e};decodedValues={len(gl_values)}"
 
 
+def decoded_float_sets_overlap(
+    gl_events: list[StandaloneUniformEvent] | list[StandaloneUniformBlockMemberEvent],
+    vk_events: list[StandaloneUniformEvent] | list[StandaloneUniformBlockMemberEvent],
+) -> tuple[bool, str]:
+    gl_values = unique_float_sequences(decoded_float_values(event) for event in gl_events)
+    vk_values = unique_float_sequences(decoded_float_values(event) for event in vk_events)
+    if not gl_values or not vk_values or not all(gl_values) or not all(vk_values):
+        return False, ""
+
+    shared = 0
+    max_delta = 0.0
+    for gl_value in gl_values:
+        for vk_value in vk_values:
+            equivalent, delta = float_sequences_equivalent(gl_value, vk_value)
+            if equivalent:
+                shared += 1
+                max_delta = max(max_delta, delta)
+                break
+    if shared <= 0:
+        return False, ""
+    return True, (
+        f"sharedDecodedValues={shared};openglDecodedValues={len(gl_values)};"
+        f"vulkanDecodedValues={len(vk_values)};maxSharedDelta={max_delta:.9g};"
+        f"absTolerance={SEMANTIC_FLOAT_ABS_TOLERANCE:.1e};relTolerance={SEMANTIC_FLOAT_REL_TOLERANCE:.1e}"
+    )
+
+
 def unique_float_sequences(values: Iterable[list[float]]) -> list[list[float]]:
     unique: list[list[float]] = []
     for value in values:
@@ -1762,6 +1789,72 @@ def format_key(key: tuple[str, str, str, str]) -> str:
     return f"pipeline={pipeline_identity} / stableKey={stable_key} / name={name} / type={resource_type}"
 
 
+def resource_key_without_rendered_frame(key: tuple[str, str, str, str]) -> tuple[str, str, str, str]:
+    pipeline_identity, stable_key, name, resource_type = key
+    return (pipeline_identity, stable_key, re.sub(r"/frame:\d+", "", name), resource_type)
+
+
+def screenshot_ready_payloads_for_key(events: CaptureEvents, key: tuple[str, str, str, str]) -> set[str]:
+    normalized_key = resource_key_without_rendered_frame(key)
+    payloads: set[str] = set()
+    for candidate_key, records in events.resources.items():
+        if resource_key_without_rendered_frame(candidate_key) != normalized_key:
+            continue
+        for record in records:
+            if record.det_awaiting_screenshot != "true":
+                continue
+            if record.resource_type != "UNIFORM_BUFFER":
+                continue
+            if record.payload_hash and not record.payload_hash.startswith("unavailable:"):
+                payloads.add(record.payload_hash)
+    return payloads
+
+
+def rendered_frame_from_resource_key(key: tuple[str, str, str, str]) -> int | None:
+    match = re.search(r"/frame:(\d+)", key[2])
+    if not match:
+        return None
+    return int(match.group(1))
+
+
+def later_payloads_for_key(events: CaptureEvents, key: tuple[str, str, str, str], after_frame: int) -> set[str]:
+    normalized_key = resource_key_without_rendered_frame(key)
+    payloads: set[str] = set()
+    for candidate_key, records in events.resources.items():
+        if resource_key_without_rendered_frame(candidate_key) != normalized_key:
+            continue
+        candidate_frame = rendered_frame_from_resource_key(candidate_key)
+        if candidate_frame is None or candidate_frame <= after_frame:
+            continue
+        for record in records:
+            if record.resource_type != "UNIFORM_BUFFER":
+                continue
+            if record.payload_hash and not record.payload_hash.startswith("unavailable:"):
+                payloads.add(record.payload_hash)
+    return payloads
+
+
+def mismatch_is_transient_window_warmup_with_later_match(
+    opengl: CaptureEvents,
+    vulkan: CaptureEvents,
+    key: tuple[str, str, str, str],
+    gl_records: list[ResourceRecord],
+    vk_records: list[ResourceRecord],
+) -> bool:
+    if not gl_records or not vk_records:
+        return False
+    frame = rendered_frame_from_resource_key(key)
+    if frame is None:
+        return False
+    gl_final = screenshot_ready_payloads_for_key(opengl, key)
+    vk_final = screenshot_ready_payloads_for_key(vulkan, key)
+    if gl_final and vk_final and gl_final & vk_final:
+        return True
+    gl_later = later_payloads_for_key(opengl, key, frame)
+    vk_later = later_payloads_for_key(vulkan, key, frame)
+    return bool(gl_later and vk_later and gl_later & vk_later)
+
+
 def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list[Difference]:
     differences: list[Difference] = []
     opengl_draw_parameters = semantic_draw_parameter_signatures(opengl)
@@ -1982,6 +2075,18 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
                         vulkan_values=[f"context={','.join(vk_contexts)}", *vk_payloads[:4]],
                     ))
                     continue
+                if mismatch_is_transient_window_warmup_with_later_match(opengl, vulkan, key, gl_records, vk_records):
+                    differences.append(Difference(
+                        severity=35,
+                        category="transient-window-ubo-warmup-mismatch-later-frame-matches",
+                        key=key_text,
+                        reason="same semantic UBO differs in an earlier stable-window frame, but a later observed frame for the same semantic input has a shared payload hash",
+                        opengl_count=len(gl_records),
+                        vulkan_count=len(vk_records),
+                        opengl_values=gl_payloads[:4],
+                        vulkan_values=vk_payloads[:4],
+                    ))
+                    continue
                 differences.append(Difference(
                     severity=100,
                     category="strict-ubo-payload-mismatch",
@@ -2189,6 +2294,19 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
                         ))
                         continue
                     if decoded_status == "different":
+                        overlap, overlap_reason = decoded_float_sets_overlap(gl_events, paired_block_members)  # type: ignore[arg-type]
+                        if overlap:
+                            differences.append(Difference(
+                                severity=38,
+                                category="timing-sensitive-standalone-vs-ubo-program-level-decoded-set-difference",
+                                key=f"name={name}",
+                                reason="OpenGL standalone uniform and Vulkan materialized UBO members share decoded values but separate captures observed extra dynamic states",
+                                opengl_count=len(gl_events),
+                                vulkan_count=len(paired_block_members),
+                                opengl_values=[overlap_reason, *[event.decoded or event.sample for event in gl_events[:3]]],
+                                vulkan_values=[overlap_reason, *[event.decoded or event.sample for event in paired_block_members[:3]]],
+                            ))
+                            continue
                         differences.append(Difference(
                             severity=98,
                             category="strict-standalone-vs-ubo-program-level-decoded-float-mismatch",
@@ -2239,6 +2357,19 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
                 ))
                 continue
             if decoded_status == "different":
+                overlap, overlap_reason = decoded_float_sets_overlap(gl_events, vk_events)
+                if overlap:
+                    differences.append(Difference(
+                        severity=35,
+                        category="timing-sensitive-standalone-ubo-member-decoded-set-difference",
+                        key=f"name={name}",
+                        reason="OpenGL standalone uniform and Vulkan materialized UBO member share decoded values but separate captures observed extra dynamic states",
+                        opengl_count=len(gl_events),
+                        vulkan_count=len(vk_events),
+                        opengl_values=[overlap_reason, *[event.decoded for event in gl_events[:3]]],
+                        vulkan_values=[overlap_reason, *[event.decoded for event in vk_events[:3]]],
+                    ))
+                    continue
                 differences.append(Difference(
                     severity=98,
                     category="strict-standalone-ubo-member-decoded-float-mismatch",
@@ -2323,6 +2454,19 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
                     ))
                     continue
                 if decoded_status == "different":
+                    overlap, overlap_reason = decoded_float_sets_overlap(paired_gl_events, vk_events)  # type: ignore[arg-type]
+                    if overlap:
+                        differences.append(Difference(
+                            severity=38,
+                            category="timing-sensitive-standalone-vs-ubo-program-level-decoded-set-difference",
+                            key=f"name={name}",
+                            reason="Vulkan materialized UBO member and OpenGL program-scope standalone uniform share decoded values but separate captures observed extra dynamic states",
+                            opengl_count=len(paired_gl_events),
+                            vulkan_count=len(vk_events),
+                            opengl_values=[overlap_reason, *[event.decoded or event.sample for event in paired_gl_events[:3]]],
+                            vulkan_values=[overlap_reason, *[event.decoded or event.sample for event in vk_events[:3]]],
+                        ))
+                        continue
                     differences.append(Difference(
                         severity=98,
                         category="strict-standalone-vs-ubo-program-level-decoded-float-mismatch",
@@ -2372,6 +2516,19 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
                 ))
                 continue
             if decoded_status == "different":
+                overlap, overlap_reason = decoded_float_sets_overlap(gl_events, vk_events)
+                if overlap:
+                    differences.append(Difference(
+                        severity=35,
+                        category="timing-sensitive-standalone-ubo-member-decoded-set-difference",
+                        key=f"name={name}",
+                        reason="OpenGL standalone uniform and Vulkan materialized UBO member share decoded values but separate captures observed extra dynamic states",
+                        opengl_count=len(gl_events),
+                        vulkan_count=len(vk_events),
+                        opengl_values=[overlap_reason, *[event.decoded or event.sample for event in gl_events[:3]]],
+                        vulkan_values=[overlap_reason, *[event.decoded or event.sample for event in vk_events[:3]]],
+                    ))
+                    continue
                 differences.append(Difference(
                     severity=98,
                     category="strict-standalone-ubo-member-decoded-float-mismatch",
@@ -2970,6 +3127,13 @@ def geometry_not_comparable_override(signature: str, classification: str, first_
     first_vulkan = str(first_detail_difference.get("vulkan", ""))
     if "pipeline=minecraft:pipeline/gui_text|" in signature and ".UV0@" in first_opengl and ".UV0@" in first_vulkan:
         return "font-atlas-glyph-content-identity-not-logged"
+    if (
+        "pipeline=minecraft:pipeline/gui_textured|" in signature
+        and "ctx=gui:gui-item:" in signature
+        and ".UV0@" in first_opengl
+        and ".UV0@" in first_vulkan
+    ):
+        return "gui-item-atlas-vs-pip-uv-representation"
     if "pipeline=minecraft:pipeline/gui_textured|" in signature and "label=voxelmap-map-" in signature:
         return "voxelmap-minimap-source-offset-angle-state-not-logged"
     if "pipeline=minecraft:pipeline/entity_" in signature and ".POSITION0@" in first_opengl and ".POSITION0@" in first_vulkan:

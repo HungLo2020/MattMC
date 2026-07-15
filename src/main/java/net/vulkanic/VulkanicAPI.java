@@ -7740,6 +7740,50 @@ public class VulkanicAPI {
         );
     }
 
+    public static void traceShaderInputParityDhLodGeometry(
+            String source,
+            int vertexBufferHandle,
+            int vertexCount,
+            int indexBufferHandle,
+            int indexCount,
+            int indexType,
+            int vertexStride,
+            String vertexFormatLabel) {
+        if (!shouldTraceShaderInputParityLog()) {
+            return;
+        }
+
+        GeometryParityResult result = buildShaderInputParityDhLodGeometry(
+            vertexBufferHandle,
+            vertexCount,
+            indexBufferHandle,
+            indexCount,
+            VulkanicIndexType.fromLegacyGlConstant(indexType).orElse(VulkanicIndexType.INT),
+            vertexStride
+        );
+        LOGGER.info(
+            "ShaderInputParityGeometry backend={} source={} {} mode={} indexed={} vertexFormat={} vertexStride={} layoutHash={} totalVertices={} totalIndices={} totalPrimitives={} instances={} vertexHash={} indexHash={} status={} reason={} detail={} {}",
+            getActiveBackendType().name().toLowerCase(Locale.ROOT),
+            source,
+            shaderInputParitySemanticDrawContextFields(),
+            VertexFormat.Mode.TRIANGLES,
+            true,
+            shaderInputParitySanitizeLabel(vertexFormatLabel),
+            vertexStride,
+            shaderInputParityHashString(vertexFormatLabel + "|stride=" + vertexStride),
+            result.totalVertices(),
+            result.totalIndices(),
+            shaderInputParityPrimitiveCount(VertexFormat.Mode.TRIANGLES, indexCount, 1),
+            1,
+            result.vertexHash(),
+            result.indexHash(),
+            result.status(),
+            result.reason(),
+            result.detail(),
+            shaderInputParityDeterministicContextFields()
+        );
+    }
+
     private static @Nullable GpuBuffer shaderInputParityOpenGLLegacyBuffer(int handle, int usage) {
         if (handle <= 0) {
             return null;
@@ -7756,6 +7800,21 @@ public class VulkanicAPI {
         }
 
         return new ShaderInputParityOpenGLLegacyGpuBuffer(handle, usage, size);
+    }
+
+    private static @Nullable GpuBuffer shaderInputParityLegacyDrawBuffer(int handle, int usage, int requiredSize) {
+        if (handle <= 0 || requiredSize < 0) {
+            return null;
+        }
+        return switch (getActiveBackendType()) {
+            case OPENGL -> shaderInputParityOpenGLLegacyBuffer(handle, usage);
+            case VULKAN -> new net.blaze3d.opengl.LegacyHandleGlBuffer(
+                () -> "ShaderInputParityLegacyBuffer-" + handle,
+                usage,
+                requiredSize,
+                handle
+            );
+        };
     }
 
     private static void recordScopedCompositeColortex0Binding(
@@ -9481,8 +9540,8 @@ public class VulkanicAPI {
     }
 
     private static GeometryParityResult buildShaderInputParityGeometry(
-        @Nullable GpuBuffer vertexBuffer,
-        @Nullable GpuBuffer indexBuffer,
+            @Nullable GpuBuffer vertexBuffer,
+            @Nullable GpuBuffer indexBuffer,
         VertexFormat vertexFormat,
         boolean indexed,
         int firstVertex,
@@ -9634,6 +9693,89 @@ public class VulkanicAPI {
         }
     }
 
+    private static GeometryParityResult buildShaderInputParityDhLodGeometry(
+            int vertexBufferHandle,
+            int vertexCount,
+            int indexBufferHandle,
+            int indexCount,
+            VulkanicIndexType indexType,
+            int vertexStride
+    ) {
+        if (vertexCount <= 0 || indexCount <= 0) {
+            return new GeometryParityResult("equivalent-candidate", "empty-dh-lod-draw", 0, 0, "crc32:0/vertices:0", "crc32:0/indices:0", "none");
+        }
+        if (vertexStride <= 0) {
+            return new GeometryParityResult("not-comparable", "dh-lod-vertex-stride-invalid", 0, indexCount, "unavailable", "unavailable", "none");
+        }
+        long vertexBytes = (long) vertexCount * vertexStride;
+        if (vertexBytes > Integer.MAX_VALUE) {
+            return new GeometryParityResult("not-comparable", "dh-lod-geometry-range-too-large", vertexCount, indexCount, "unavailable", "unavailable", "none");
+        }
+        GpuBuffer vertexBuffer = shaderInputParityLegacyDrawBuffer(vertexBufferHandle, GpuBuffer.USAGE_VERTEX, (int) vertexBytes);
+        if (vertexBuffer == null || vertexBuffer.isClosed()) {
+            return new GeometryParityResult("not-comparable", "dh-lod-vertex-buffer-missing-or-closed", vertexCount, indexCount, "unavailable", "unavailable", "none");
+        }
+        if (vertexBytes > SHADER_INPUT_PARITY_GEOMETRY_MAX_BYTES) {
+            return new GeometryParityResult(
+                "not-comparable",
+                "dh-lod-geometry-byte-budget-exceeded:" + vertexBytes + ">" + SHADER_INPUT_PARITY_GEOMETRY_MAX_BYTES,
+                vertexCount,
+                indexCount,
+                "unavailable",
+                "unavailable",
+                "none"
+            );
+        }
+        if (vertexBytes > vertexBuffer.size()) {
+            return new GeometryParityResult("not-comparable", "dh-lod-vertex-range-out-of-bounds", vertexCount, indexCount, "unavailable", "unavailable", "none");
+        }
+        int expectedGeneratedIndexCount = (vertexCount / 4) * 6;
+        if (indexCount < 0 || indexCount > expectedGeneratedIndexCount) {
+            return new GeometryParityResult("not-comparable", "dh-lod-index-count-not-generated-quad-range", vertexCount, indexCount, "unavailable", "unavailable", "expected=" + expectedGeneratedIndexCount);
+        }
+
+        try {
+            VulkanicBuffer resolvedVertexBuffer = resolveVulkanicBuffer(vertexBuffer);
+            java.nio.ByteBuffer vertexData = shaderInputParityRead(new VulkanicBufferSlice(resolvedVertexBuffer, 0, Math.toIntExact(vertexBytes)), Math.toIntExact(vertexBytes));
+            if (vertexData == null) {
+                return new GeometryParityResult("not-comparable", "dh-lod-vertex-read-unavailable", vertexCount, indexCount, "unavailable", "unavailable", "none");
+            }
+            java.util.zip.CRC32 vertexCrc = new java.util.zip.CRC32();
+            java.util.zip.CRC32 indexCrc = new java.util.zip.CRC32();
+            for (int index = 0; index < indexCount; index++) {
+                int vertexIndex = generatedDhLodQuadIndex(index);
+                updateShaderInputParityInt(indexCrc, vertexIndex);
+                int vertexOffset = Math.multiplyExact(vertexIndex, vertexStride);
+                if (vertexOffset < 0 || vertexOffset + vertexStride > vertexData.limit()) {
+                    return new GeometryParityResult("not-comparable", "dh-lod-indexed-vertex-range-out-of-bounds", vertexCount, indexCount, "unavailable", "unavailable", "index=" + vertexIndex);
+                }
+                updateShaderInputParityInt(vertexCrc, vertexIndex);
+                for (int byteIndex = 0; byteIndex < vertexStride; byteIndex++) {
+                    vertexCrc.update(vertexData.get(vertexOffset + byteIndex) & 0xFF);
+                }
+            }
+            return new GeometryParityResult(
+                "equivalent-candidate",
+                "ok",
+                indexCount,
+                indexCount,
+                "crc32:" + Long.toHexString(vertexCrc.getValue()) + "/vertices:" + indexCount,
+                "crc32:" + Long.toHexString(indexCrc.getValue()) + "/indices:" + indexCount,
+                "dh-lod-generated-quad-indexed-stream"
+            );
+        } catch (RuntimeException ex) {
+            return new GeometryParityResult(
+                "not-comparable",
+                "dh-lod-exception:" + ex.getClass().getSimpleName(),
+                vertexCount,
+                indexCount,
+                "unavailable",
+                "unavailable",
+                "none"
+            );
+        }
+    }
+
     private static void updateShaderInputParityVertex(java.util.zip.CRC32 crc, java.nio.ByteBuffer vertexData, int baseOffset, VertexFormat vertexFormat) {
         for (VertexFormatElement element : vertexFormat.getElements()) {
             updateShaderInputParityInt(crc, element.id());
@@ -9740,6 +9882,19 @@ public class VulkanicAPI {
             case SHORT -> data.getShort(offset) & 0xFFFF;
             case INT -> data.getInt(offset);
         };
+    }
+
+    private static int generatedDhLodQuadIndex(int index) {
+        int quadIndex = index / 6;
+        int vertexInQuad = switch (index % 6) {
+            case 0 -> 0;
+            case 1 -> 1;
+            case 2, 3 -> 2;
+            case 4 -> 3;
+            case 5 -> 0;
+            default -> throw new IllegalStateException("Unexpected generated DH quad index remainder");
+        };
+        return quadIndex * 4 + vertexInQuad;
     }
 
     private static void updateShaderInputParityInt(java.util.zip.CRC32 crc, int value) {
