@@ -545,3 +545,6 @@ pub(super) fn pack_norm_i8(x: f32, y: f32, z: f32, w: f32) -> i32 {
         | ((((z * 127.0) as i32) & 0xff) << 16)
         | ((((w * 127.0) as i32) & 0xff) << 24)
 }
+
+#[cfg(test)]
+mod tests;

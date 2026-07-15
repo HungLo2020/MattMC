@@ -50,11 +50,6 @@ use packing::*;
 use profile::*;
 use quad::*;
 use scan::*;
-#[cfg(test)]
-use section::{CompactSectionSnapshot, NativeSectionRecordSource};
 use tint::*;
 use types::*;
 use updates::*;
-
-#[cfg(test)]
-mod tests;

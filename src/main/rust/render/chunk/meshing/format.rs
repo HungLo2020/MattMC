@@ -98,3 +98,6 @@ pub(super) fn compact_format_value(value: i32) -> i32 {
         _ => ERR_INVALID_ARGUMENT,
     }
 }
+
+#[cfg(test)]
+mod tests;

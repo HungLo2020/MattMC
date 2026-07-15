@@ -270,3 +270,6 @@ impl NativeSectionRecordSource for CompactSectionSnapshot<'_> {
         Ok(record)
     }
 }
+
+#[cfg(test)]
+mod tests;

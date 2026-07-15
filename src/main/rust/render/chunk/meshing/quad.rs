@@ -206,3 +206,6 @@ pub(super) unsafe fn native_quad_position(
         _ => 0.0,
     }
 }
+
+#[cfg(test)]
+mod tests;

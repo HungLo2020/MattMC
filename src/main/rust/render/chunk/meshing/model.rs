@@ -311,13 +311,6 @@ pub(super) fn static_quad_applies_tint(
 }
 
 #[inline(always)]
-pub(super) fn max_brightness(a: i32, b: i32) -> i32 {
-    let a = a as u32;
-    let b = b as u32;
-    ((a & 0x0000_ffff).max(b & 0x0000_ffff) | (a & 0xffff_0000).max(b & 0xffff_0000)) as i32
-}
-
-#[inline(always)]
 pub(super) fn choose_block_id(record_block_id: i32, state_block_id: i32) -> i32 {
     if record_block_id >= 0 {
         record_block_id
@@ -364,3 +357,6 @@ pub(super) fn mth_seed(x: i32, y: i32, z: i32) -> i64 {
         .wrapping_add(value.wrapping_mul(11));
     value >> 16
 }
+
+#[cfg(test)]
+mod tests;
