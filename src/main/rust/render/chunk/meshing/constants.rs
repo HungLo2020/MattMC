@@ -1,0 +1,95 @@
+//! Shared constants for meshing ABI values, render flags, tint ids, and compact vertex layout.
+//!
+//! These values are mirrored by Java callers and benchmark fixtures, so changes here must preserve
+//! the exported native ABI and replay encoding.
+
+pub(super) const OK: i32 = 0;
+pub(super) const ERR_NULL_POINTER: i32 = -1;
+pub(super) const ERR_INVALID_ARGUMENT: i32 = -2;
+pub(super) const ERR_CAPACITY: i32 = -3;
+
+pub(super) const MODEL_QUAD_FACING_COUNT: usize = 7;
+pub(super) const MODEL_QUAD_FACING_POS_X: usize = 0;
+pub(super) const MODEL_QUAD_FACING_POS_Y: usize = 1;
+pub(super) const MODEL_QUAD_FACING_POS_Z: usize = 2;
+pub(super) const MODEL_QUAD_FACING_NEG_X: usize = 3;
+pub(super) const MODEL_QUAD_FACING_NEG_Y: usize = 4;
+pub(super) const MODEL_QUAD_FACING_NEG_Z: usize = 5;
+pub(super) const MODEL_QUAD_FACING_UNASSIGNED: usize = 6;
+pub(super) const FLUID_ALIGNED_EQUALS_EPSILON: f32 = 0.011;
+pub(super) const FLUID_FACE_TOP_NE_SW: i32 = 0;
+pub(super) const FLUID_FACE_TOP_NW_SE: i32 = 1;
+pub(super) const FLUID_FACE_BOTTOM: i32 = 2;
+pub(super) const FLUID_FACE_SIDE: i32 = 3;
+pub(super) const NATIVE_SECTION_BLOCK_FLAG_SUPPRESS_FLUID: i32 = 1;
+pub(super) const COMPACT_SECTION_SNAPSHOT_VERSION: i32 = 1;
+pub(super) const COMPACT_SECTION_PADDED_LENGTH: usize = 18;
+pub(super) const COMPACT_SECTION_BLOCK_COUNT: usize = 16 * 16 * 16;
+pub(super) const POSITION_MAX_VALUE: f32 = (1 << 20) as f32;
+pub(super) const TEXTURE_MAX_VALUE: f32 = (1 << 15) as f32;
+pub(super) const MODEL_ORIGIN: f32 = 8.0;
+pub(super) const MODEL_RANGE: f32 = 32.0;
+pub(super) const INDEX_MODE_NONE: i32 = 0;
+pub(super) const INDEX_MODE_SHARED: i32 = 1;
+pub(super) const INDEX_MODE_SORTED_QUADS: i32 = 2;
+pub(super) const INDEX_MODE_KEY_SORTED: i32 = 3;
+pub(super) const PENDING_BATCH_QUAD_CAPACITY: usize = 256;
+pub(super) const STATIC_MODEL_EMPTY_RECORD_ID: i32 = -1;
+pub(super) const STATIC_MODEL_LIGHT_BLOCK_RECORD_ID: i32 = -2;
+pub(super) const STATE_FLAG_AIR: i32 = 1;
+pub(super) const STATE_FLAG_MODEL: i32 = 1 << 1;
+pub(super) const STATE_FLAG_FLUID: i32 = 1 << 2;
+pub(super) const STATE_FLAG_SOLID_RENDER: i32 = 1 << 3;
+pub(super) const STATE_FLAG_FULL_OCCLUSION: i32 = 1 << 4;
+pub(super) const STATE_FLAG_LIGHT_BLOCK: i32 = 1 << 5;
+pub(super) const STATE_FLAG_CAN_OCCLUDE: i32 = 1 << 7;
+pub(super) const STATE_FLAG_BLOCKS_MOTION: i32 = 1 << 8;
+pub(super) const STATE_FLAG_MODEL_FACE_CULLABLE: i32 = 1 << 9;
+pub(super) const MODEL_QUAD_FLAG_PARTIAL: i32 = 1;
+pub(super) const MODEL_QUAD_FLAG_PARALLEL: i32 = 1 << 1;
+pub(super) const MODEL_QUAD_FLAG_ALIGNED: i32 = 1 << 2;
+pub(super) const TINT_NONE: i32 = 0;
+pub(super) const TINT_WATER: i32 = 3;
+pub(super) const TINT_REDSTONE: i32 = 4;
+pub(super) const TINT_CONSTANT: i32 = 5;
+pub(super) const TINT_STEM: i32 = 6;
+pub(super) const TINT_SPRUCE: i32 = 8;
+pub(super) const TINT_BIRCH: i32 = 9;
+pub(super) const FLUID_WATER: i32 = 1;
+pub(super) const FLUID_LAVA: i32 = 2;
+pub(super) const FLUID_SPRITE_WATER_STILL: i32 = 1;
+pub(super) const FLUID_SPRITE_WATER_FLOW: i32 = 1 << 1;
+pub(super) const FLUID_SPRITE_WATER_OVERLAY: i32 = 1 << 2;
+pub(super) const FLUID_SPRITE_LAVA_STILL: i32 = 1 << 8;
+pub(super) const FLUID_SPRITE_LAVA_FLOW: i32 = 1 << 9;
+pub(super) const OFFSET_NONE: i32 = 0;
+pub(super) const OFFSET_XZ: i32 = 1;
+pub(super) const OFFSET_XYZ: i32 = 2;
+pub(super) const LIGHT_FULL_BRIGHT: i32 = 0x00f0_00f0;
+pub(super) const SELECTOR_DIRECT: i32 = 0;
+pub(super) const SELECTOR_WEIGHTED: i32 = 1;
+pub(super) const SELECTOR_GROUP: i32 = 2;
+
+pub(super) const COMPACT_VALUE_STRIDE: i32 = 0;
+pub(super) const COMPACT_VALUE_POSITION_OFFSET: i32 = 1;
+pub(super) const COMPACT_VALUE_COLOR_OFFSET: i32 = 2;
+pub(super) const COMPACT_VALUE_TEXTURE_OFFSET: i32 = 3;
+pub(super) const COMPACT_VALUE_LIGHT_MATERIAL_INDEX_OFFSET: i32 = 4;
+pub(super) const COMPACT_VALUE_BLOCK_ID_OFFSET: i32 = 5;
+pub(super) const COMPACT_VALUE_NORMAL_OFFSET: i32 = 6;
+pub(super) const COMPACT_VALUE_TANGENT_OFFSET: i32 = 7;
+pub(super) const COMPACT_VALUE_MID_UV_OFFSET: i32 = 8;
+pub(super) const COMPACT_VALUE_MID_BLOCK_OFFSET: i32 = 9;
+pub(super) const COMPACT_VALUE_POSITION_MAX_VALUE: i32 = 10;
+pub(super) const COMPACT_VALUE_TEXTURE_MAX_VALUE: i32 = 11;
+
+pub(super) const COMPACT_VERTEX_STRIDE: i32 = 20;
+pub(super) const COMPACT_POSITION_OFFSET: i32 = 0;
+pub(super) const COMPACT_COLOR_OFFSET: i32 = 8;
+pub(super) const COMPACT_TEXTURE_OFFSET: i32 = 12;
+pub(super) const COMPACT_LIGHT_MATERIAL_INDEX_OFFSET: i32 = 16;
+pub(super) const COMPACT_NATIVE_BLOCK_ID_OFFSET: i32 = 0;
+pub(super) const COMPACT_NATIVE_NORMAL_OFFSET: i32 = 0;
+pub(super) const COMPACT_NATIVE_TANGENT_OFFSET: i32 = 0;
+pub(super) const COMPACT_NATIVE_MID_UV_OFFSET: i32 = 0;
+pub(super) const COMPACT_NATIVE_MID_BLOCK_OFFSET: i32 = 0;
