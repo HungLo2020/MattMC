@@ -1855,6 +1855,73 @@ public class GlCommandEncoder implements CommandEncoder {
 			customPass.setupState();
 			
 			RenderPipeline renderPipeline = glRenderPass.pipeline.info();
+
+			if (VulkanicAPI.getActiveBackendType() == net.vulkanic.GraphicsBackendType.OPENGL
+				&& VulkanicAPI.shouldCollectShaderInputParityDiagnostics()) {
+				PipelineDescriptor customPipelineDescriptor = customPass.pipelineDescriptor();
+				if (customPipelineDescriptor == null) {
+					try {
+						customPipelineDescriptor = VulkanicAPI.createLiveProgramPipelineDescriptor(
+							ctx,
+							PipelineDescriptor.fromRenderPipeline(renderPipeline),
+							customPass.program().getProgramId()
+						);
+					} catch (RuntimeException ignored) {
+						customPipelineDescriptor = null;
+					}
+				}
+				if (customPipelineDescriptor != null) {
+					PipelineResourcePlanner.Plan diagnosticSubmission = this.buildCustomPassPipelineResourceBindings(
+						glRenderPass,
+						customPipelineDescriptor,
+						customPass.program()
+					);
+					if (diagnosticSubmission != null) {
+						VulkanicAPI.traceShaderInputParityResources(
+							"opengl-custom-pass-resources",
+							null,
+							diagnosticSubmission.descriptor(),
+							diagnosticSubmission.bindings()
+						);
+						java.util.Map<String, Integer> renderPassSamplerUnits = customPass.program().getRenderPassSamplerUnits();
+						java.util.List<String> legacySamplerResources = new java.util.ArrayList<>();
+						for (PipelineDescriptor.ResourceBinding resourceBinding : diagnosticSubmission.descriptor().getResourceLayout().bindings()) {
+							if (resourceBinding.type() != PipelineDescriptor.ResourceType.SAMPLER
+								&& resourceBinding.type() != PipelineDescriptor.ResourceType.COMPARISON_SAMPLER) {
+								continue;
+							}
+							if (diagnosticSubmission.bindings().getSamplerBindingOrNull(resourceBinding.name()) != null) {
+								continue;
+							}
+							Integer samplerUnit = renderPassSamplerUnits.get(resourceBinding.name());
+							if (samplerUnit != null) {
+								net.vulkanic.VulkanicTextureView samplerResourceView = glRenderPass.getSamplerResourceView(resourceBinding.name());
+								if (samplerResourceView != null) {
+									legacySamplerResources.add(VulkanicAPI.shaderInputParitySamplerResource(resourceBinding.name(), samplerUnit, samplerResourceView));
+								} else {
+									GpuTextureView samplerView = null;
+									int textureId = IrisRenderSystem.getTextureBinding(samplerUnit);
+									if (textureId != 0) {
+										samplerView = TextureTracker.INSTANCE.getTextureView(textureId);
+									}
+									if (samplerView == null) {
+										samplerView = TextureTracker.INSTANCE.getShaderTexture(samplerUnit);
+									}
+									legacySamplerResources.add(VulkanicAPI.shaderInputParitySamplerResource(resourceBinding.name(), samplerUnit, samplerView));
+								}
+							}
+						}
+						VulkanicAPI.traceShaderInputParitySyntheticResources(
+							"opengl-custom-pass-legacy-samplers",
+							diagnosticSubmission.descriptor().getPortableState().location().toString(),
+							diagnosticSubmission.descriptor().getPortableState().vertexShader().toString(),
+							diagnosticSubmission.descriptor().getPortableState().fragmentShader().toString(),
+							diagnosticSubmission.descriptor().getStableCacheKey(),
+							legacySamplerResources
+						);
+					}
+				}
+			}
 			
 			if (glRenderPass.isScissorEnabled()) {
 				VulkanicAPI.setScissorTestEnabled(ctx, true);

@@ -1009,6 +1009,10 @@ def standalone_uniform_key(event: StandaloneUniformEvent | StandaloneUniformBloc
     ])
 
 
+def standalone_uniform_key_has_semantic_identity(key: str) -> bool:
+    return key.startswith("draw=") and "draw=unavailable" not in key
+
+
 def extract_balanced_after(prefix: str, text: str) -> str:
     start = text.find(prefix)
     if start < 0:
@@ -1149,7 +1153,12 @@ def event_pose(event) -> str:
     return getattr(event, "det_pose", "") or "none"
 
 
-def filter_capture_events_by_pose(events: CaptureEvents, pose: str | None, stable_pose_only: bool = False) -> CaptureEvents:
+def filter_capture_events_by_pose(
+    events: CaptureEvents,
+    pose: str | None,
+    stable_pose_only: bool = False,
+    stable_window_frames: int = 1,
+) -> CaptureEvents:
     if not pose:
         return events
 
@@ -1175,6 +1184,7 @@ def filter_capture_events_by_pose(events: CaptureEvents, pose: str | None, stabl
         yield from events.ordering
 
     stable_frame = ""
+    stable_window_start = ""
     if stable_pose_only:
         stable_frames = [
             int(getattr(event, "det_rendered_frame", ""))
@@ -1184,7 +1194,9 @@ def filter_capture_events_by_pose(events: CaptureEvents, pose: str | None, stabl
             and str(getattr(event, "det_rendered_frame", "")).isdigit()
         ]
         if stable_frames:
-            stable_frame = str(min(stable_frames))
+            selected_stable_frame = min(stable_frames)
+            stable_frame = str(selected_stable_frame)
+            stable_window_start = str(max(0, selected_stable_frame - max(1, stable_window_frames) + 1))
 
     def keep_event(event) -> bool:
         keep = event_pose(event) == pose
@@ -1193,7 +1205,9 @@ def filter_capture_events_by_pose(events: CaptureEvents, pose: str | None, stabl
             return False
         if stable_pose_only and (
             not stable_frame
-            or getattr(event, "det_rendered_frame", "") != stable_frame
+            or not str(getattr(event, "det_rendered_frame", "")).isdigit()
+            or int(getattr(event, "det_rendered_frame", "")) < int(stable_window_start)
+            or int(getattr(event, "det_rendered_frame", "")) > int(stable_frame)
         ):
             filtered.skipped[f"StablePoseFilter:{pose}"] += 1
             return False
@@ -1569,6 +1583,16 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
 
 def values_for_resources(records: list[ResourceRecord]) -> list[str]:
     return sorted({record.short_signature for record in records})
+
+
+def sampler_metadata_incomplete(records: list[ResourceRecord]) -> bool:
+    return any(
+        not record.texture_format
+        or not record.texture_width
+        or not record.texture_height
+        or not record.texture_mips
+        for record in records
+    )
 
 
 def values_for_content_hashes(records: list[ResourceRecord]) -> list[str]:
@@ -1965,6 +1989,10 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
                     reason = "GUI textured sampler records are shifted by Vulkan item picture-in-picture blits; the same ordinal does not identify the same logical GUI resource"
                     severity = 40
                     category = "sampler-gui-pip-ordinal-matching-gap"
+                elif sampler_metadata_incomplete(gl_records) or sampler_metadata_incomplete(vk_records):
+                    reason = "same semantic sampler was observed on both backends, but at least one side lacks comparable texture view metadata"
+                    severity = 42
+                    category = "sampler-metadata-not-comparable"
                 elif len(gl_shader_visible) > 1 or len(vk_shader_visible) > 1:
                     reason = "same pipeline/resource bucket contains multiple sampler states; missing draw identity prevents pairing individual sampler observations"
                     severity = 44
@@ -2079,11 +2107,21 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
         if not gl_events or not vk_events:
             if gl_events and not vk_events and name in vulkan.standalone_uniform_block_members:
                 continue
+            has_semantic_identity = standalone_uniform_key_has_semantic_identity(name)
+            category = (
+                "backend-only-standalone-uniform"
+                if has_semantic_identity
+                else "standalone-uniform-missing-semantic-identity"
+            )
             differences.append(Difference(
-                severity=35,
-                category="backend-only-standalone-uniform",
+                severity=35 if has_semantic_identity else 28,
+                category=category,
                 key=f"name={name}",
-                reason="standalone uniform update only observed on one backend; this may be a sampler/unused-uniform coverage difference",
+                reason=(
+                    "standalone uniform update only observed on one backend despite a stable semantic draw identity; classify as missing input unless paired with a Vulkan UBO member"
+                    if has_semantic_identity
+                    else "standalone uniform update lacks stable semantic draw identity, so the audit cannot determine whether the opposite backend has the equivalent input"
+                ),
                 opengl_count=len(gl_events),
                 vulkan_count=len(vk_events),
                 opengl_values=sorted({event.signature for event in gl_events})[:4],
@@ -2176,11 +2214,20 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
         if not vk_events:
             continue
         if not gl_events:
+            has_semantic_identity = standalone_uniform_key_has_semantic_identity(name)
             differences.append(Difference(
-                severity=25,
-                category="vulkan-only-standalone-ubo-member",
+                severity=25 if has_semantic_identity else 22,
+                category=(
+                    "standalone-vs-ubo-representation-unpaired"
+                    if has_semantic_identity
+                    else "standalone-ubo-member-missing-semantic-identity"
+                ),
                 key=f"name={name}",
-                reason="materialized Vulkan standalone UBO member was observed, but the matching OpenGL capture did not update that standalone uniform name",
+                reason=(
+                    "Vulkan materialized this standalone uniform as a UBO member at a stable semantic draw, but the matching OpenGL standalone setter was not observed"
+                    if has_semantic_identity
+                    else "Vulkan materialized this standalone uniform as a UBO member without a stable semantic draw identity, so it cannot be paired with OpenGL yet"
+                ),
                 opengl_count=0,
                 vulkan_count=len(vk_events),
                 opengl_values=[],
@@ -2422,15 +2469,29 @@ def pass_family_for_record(record: ResourceRecord) -> str:
         record.fragment_shader,
         record.name,
         record.source,
+        record.semantic_subsystem,
+        record.semantic_phase,
+        record.semantic_pass,
+        record.semantic_pipeline,
+        record.semantic_material,
+        record.semantic_output,
+        record.projection_label,
     ]).lower()
+    if record.semantic_subsystem == "sodium-terrain" or "sodium-terrain" in text:
+        return "Sodium terrain"
+    if (
+        record.semantic_subsystem == "distant-horizons"
+        or "distant-horizons" in text
+        or "distant horizons" in text
+        or "dhdepth" in text
+    ):
+        return "Distant Horizons"
     if "iris:shadow" in text or "shadow" in text and "iris:" in text:
         return "Iris shadow passes"
     if "iris:deferred" in text or "deferred" in text and "iris:" in text:
         return "Iris deferred passes"
     if "iris:composite" in text or "composite" in text and "iris:" in text:
         return "Iris composite passes"
-    if "distant" in text or "dh" in text:
-        return "Distant Horizons"
     if "sodium" in text or "terrain" in text and "pipeline" in text:
         return "Sodium terrain"
     if "gui" in text or "text" in text or "font" in text or "crosshair" in text:
@@ -2696,6 +2757,8 @@ def geometry_not_comparable_override(signature: str, classification: str, first_
         return "voxelmap-minimap-source-offset-angle-state-not-logged"
     if "pipeline=minecraft:pipeline/entity_" in signature and ".POSITION0@" in first_opengl and ".POSITION0@" in first_vulkan:
         return "entity-animation-pose-state-not-logged"
+    if "pipeline=minecraft:pipeline/armor_" in signature and ".POSITION0@" in first_opengl and ".POSITION0@" in first_vulkan:
+        return "entity-armor-animation-pose-state-not-logged"
     return ""
 
 
@@ -3099,6 +3162,7 @@ def build_coverage_report(
     differences: list[Difference],
     pose_filter: str | None = None,
     stable_pose_only: bool = False,
+    stable_window_frames: int = 1,
 ) -> dict[str, object]:
     families: dict[str, dict[str, object]] = {family: _empty_family_coverage() for family in PASS_FAMILIES}
     semantic_coverage = semantic_draw_coverage(opengl_events, vulkan_events)
@@ -3152,6 +3216,7 @@ def build_coverage_report(
         "schema": "mattmc.vulkan_parity.coverage.v1",
         "pose_filter": pose_filter or "all",
         "stable_pose_only": stable_pose_only,
+        "stable_window_frames": max(1, stable_window_frames) if stable_pose_only else 0,
         "opengl_log": str(opengl_events.path),
         "vulkan_log": str(vulkan_events.path),
         "event_counts": {
@@ -3198,10 +3263,21 @@ def render_diff_report(
     parse_limits: ParseLimits | None = None,
     pose_filter: str | None = None,
     stable_pose_only: bool = False,
+    stable_window_frames: int = 1,
 ) -> str:
     parse_limits = parse_limits or ParseLimits()
-    opengl_events = filter_capture_events_by_pose(parse_capture_log(opengl_log, parse_limits), pose_filter, stable_pose_only)
-    vulkan_events = filter_capture_events_by_pose(parse_capture_log(vulkan_log, parse_limits), pose_filter, stable_pose_only)
+    opengl_events = filter_capture_events_by_pose(
+        parse_capture_log(opengl_log, parse_limits),
+        pose_filter,
+        stable_pose_only,
+        stable_window_frames,
+    )
+    vulkan_events = filter_capture_events_by_pose(
+        parse_capture_log(vulkan_log, parse_limits),
+        pose_filter,
+        stable_pose_only,
+        stable_window_frames,
+    )
     differences = compare_capture_events(opengl_events, vulkan_events)
     by_category = Counter(diff.category for diff in differences)
 
@@ -3213,7 +3289,7 @@ def render_diff_report(
     if pose_filter:
         lines.append(f"Pose filter: {pose_filter}")
     if stable_pose_only:
-        lines.append("Stable pose only: true (detAwaitingScreenshot=true)")
+        lines.append(f"Stable pose only: true (windowFrames={max(1, stable_window_frames)}, ends at first detAwaitingScreenshot=true frame)")
     lines.append("")
     lines.append("Normalization rules:")
     lines.append("- Backend object identities, Java identity hashes, pipeline handles, texture ids, view ids, and buffer ids are ignored.")
@@ -3363,12 +3439,23 @@ def render_coverage_json(
     parse_limits: ParseLimits | None = None,
     pose_filter: str | None = None,
     stable_pose_only: bool = False,
+    stable_window_frames: int = 1,
 ) -> dict[str, object]:
     parse_limits = parse_limits or ParseLimits()
-    opengl_events = filter_capture_events_by_pose(parse_capture_log(opengl_log, parse_limits), pose_filter, stable_pose_only)
-    vulkan_events = filter_capture_events_by_pose(parse_capture_log(vulkan_log, parse_limits), pose_filter, stable_pose_only)
+    opengl_events = filter_capture_events_by_pose(
+        parse_capture_log(opengl_log, parse_limits),
+        pose_filter,
+        stable_pose_only,
+        stable_window_frames,
+    )
+    vulkan_events = filter_capture_events_by_pose(
+        parse_capture_log(vulkan_log, parse_limits),
+        pose_filter,
+        stable_pose_only,
+        stable_window_frames,
+    )
     differences = compare_capture_events(opengl_events, vulkan_events)
-    return build_coverage_report(opengl_events, vulkan_events, differences, pose_filter, stable_pose_only)
+    return build_coverage_report(opengl_events, vulkan_events, differences, pose_filter, stable_pose_only, stable_window_frames)
 
 
 def run_self_test() -> None:
@@ -3509,6 +3596,7 @@ def main(argv: list[str]) -> int:
     diff_parser.add_argument("--max-draw-events", type=int, default=0, help="0 means parse every draw event")
     diff_parser.add_argument("--pose-filter", choices=["initial", "right", "left", "return", "none"], help="only compare records from one deterministic pose")
     diff_parser.add_argument("--stable-pose-only", action="store_true", help="with --pose-filter, compare only deterministic records emitted once the pose is screenshot-ready")
+    diff_parser.add_argument("--stable-window-frames", type=int, default=1, help="with --stable-pose-only, compare this many rendered frames ending at the first screenshot-ready frame")
     diff_parser.add_argument("--write", action="store_true", help="write report under logs/auto-capture")
 
     auto_parser = subparsers.add_parser("auto-diff", help="diff newest matching OpenGL/Vulkan capture pair")
@@ -3521,6 +3609,7 @@ def main(argv: list[str]) -> int:
     auto_parser.add_argument("--max-draw-events", type=int, default=0, help="0 means parse every draw event")
     auto_parser.add_argument("--pose-filter", choices=["initial", "right", "left", "return", "none"], help="only compare records from one deterministic pose")
     auto_parser.add_argument("--stable-pose-only", action="store_true", help="with --pose-filter, compare only deterministic records emitted once the pose is screenshot-ready")
+    auto_parser.add_argument("--stable-window-frames", type=int, default=1, help="with --stable-pose-only, compare this many rendered frames ending at the first screenshot-ready frame")
     auto_parser.add_argument("--write", action="store_true", help="write report under logs/auto-capture")
 
     source_parser = subparsers.add_parser("source-audit", help="scan source architecture pressure points")
@@ -3557,14 +3646,34 @@ def main(argv: list[str]) -> int:
             args.max_vertex_input_events,
             args.max_draw_events
         )
-        text = render_diff_report(gl_meta.latest_log, vk_meta.latest_log, args.limit, parse_limits, args.pose_filter, args.stable_pose_only)
+        text = render_diff_report(
+            gl_meta.latest_log,
+            vk_meta.latest_log,
+            args.limit,
+            parse_limits,
+            args.pose_filter,
+            args.stable_pose_only,
+            args.stable_window_frames,
+        )
         if args.write:
             pose_suffix = f"_{args.pose_filter}" if args.pose_filter else ""
             if args.stable_pose_only:
                 pose_suffix += "_stable"
+                if args.stable_window_frames > 1:
+                    pose_suffix += f"_window{args.stable_window_frames}"
             path = write_report(text, f"vulkan_shader_input_parity{pose_suffix}_{gl_meta.run_id}_vs_{vk_meta.run_id}")
             print(f"wrote {path}")
-            json_path = write_json_report(render_coverage_json(gl_meta.latest_log, vk_meta.latest_log, parse_limits, args.pose_filter, args.stable_pose_only), path)
+            json_path = write_json_report(
+                render_coverage_json(
+                    gl_meta.latest_log,
+                    vk_meta.latest_log,
+                    parse_limits,
+                    args.pose_filter,
+                    args.stable_pose_only,
+                    args.stable_window_frames,
+                ),
+                path,
+            )
             print(f"wrote {json_path}")
         print(text, end="")
         return 0
@@ -3578,14 +3687,34 @@ def main(argv: list[str]) -> int:
             args.max_vertex_input_events,
             args.max_draw_events
         )
-        text = render_diff_report(args.opengl_log, args.vulkan_log, args.limit, parse_limits, args.pose_filter, args.stable_pose_only)
+        text = render_diff_report(
+            args.opengl_log,
+            args.vulkan_log,
+            args.limit,
+            parse_limits,
+            args.pose_filter,
+            args.stable_pose_only,
+            args.stable_window_frames,
+        )
         if args.write:
             pose_suffix = f"_{args.pose_filter}" if args.pose_filter else ""
             if args.stable_pose_only:
                 pose_suffix += "_stable"
+                if args.stable_window_frames > 1:
+                    pose_suffix += f"_window{args.stable_window_frames}"
             path = write_report(text, f"vulkan_shader_input_parity{pose_suffix}_{args.opengl_log.stem}_vs_{args.vulkan_log.stem}")
             print(f"wrote {path}")
-            json_path = write_json_report(render_coverage_json(args.opengl_log, args.vulkan_log, parse_limits, args.pose_filter, args.stable_pose_only), path)
+            json_path = write_json_report(
+                render_coverage_json(
+                    args.opengl_log,
+                    args.vulkan_log,
+                    parse_limits,
+                    args.pose_filter,
+                    args.stable_pose_only,
+                    args.stable_window_frames,
+                ),
+                path,
+            )
             print(f"wrote {json_path}")
         print(text, end="")
         return 0

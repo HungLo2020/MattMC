@@ -684,7 +684,7 @@ public class LodRenderer
 					for (DhLodRenderPhase phase : renderPlan.phases())
 					{
 						phase.stateOverride().applyIfPresent(ctx);
-						this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, phase.bufferBucket().selector());
+						this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, phase);
 					}
 					renderPlan.renderPassExitState().applyIfPresent(ctx);
 				}
@@ -911,7 +911,7 @@ public class LodRenderer
 			SortedArraySet<LodBufferContainer> lodBufferContainers,
 			IDhApiShaderProgram shaderProgram,
 			RenderParams renderEventParam,
-			java.util.function.Function<LodBufferContainer, GLVertexBuffer[]> vboSelector)
+			DhLodRenderPhase phase)
 	{
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		for (int lodIndex = 0; lodIndex < lodBufferContainers.size(); lodIndex++)
@@ -919,7 +919,7 @@ public class LodRenderer
 			LodBufferContainer bufferContainer = lodBufferContainers.get(lodIndex);
 			this.setShaderProgramMvmOffset(bufferContainer.minCornerBlockPos, shaderProgram, renderEventParam);
 
-			GLVertexBuffer[] vbos = vboSelector.apply(bufferContainer);
+			GLVertexBuffer[] vbos = phase.bufferBucket().selector().apply(bufferContainer);
 			for (int vboIndex = 0; vboIndex < vbos.length; vboIndex++)
 			{
 				GLVertexBuffer vbo = vbos[vboIndex];
@@ -936,14 +936,66 @@ public class LodRenderer
 				vbo.bind();
 				shaderProgram.bindVertexBuffer(vbo.getId());
 				this.quadIBO.bind();
-				VulkanicAPI.drawElements(
-						ctx,
-						VulkanicPrimitiveMode.TRIANGLES,
-						(vbo.getVertexCount() / 4) * 6, // TODO what does the 4 and 6 here represent?
-						this.quadIBO.getType(), 0);
+				int indexCount = (vbo.getVertexCount() / 4) * 6; // 4 vertices per DH quad, 6 indices per rendered quad.
+				try (VulkanicAPI.ShaderInputParityScope ignored = VulkanicAPI.beginShaderInputParitySemanticDraw(
+						"dh-lod-terrain-draw",
+						"distant-horizons",
+						"lod:" + phase.bufferBucket().name().toLowerCase(java.util.Locale.ROOT),
+						null,
+						null,
+						"distant-horizons:lod-terrain:" + shaderProgram.getClass().getSimpleName(),
+						"distant-horizons-framebuffer",
+						true,
+						0,
+						vbo.getVertexCount(),
+						0,
+						indexCount,
+						1,
+						0))
+				{
+					traceDhLodTerrainResources(shaderProgram, phase, bufferContainer, lodIndex, vboIndex);
+					VulkanicAPI.drawElements(
+							ctx,
+							VulkanicPrimitiveMode.TRIANGLES,
+							indexCount,
+							this.quadIBO.getType(), 0);
+				}
 				vbo.unbind();
 			}
 		}
+	}
+
+	private static void traceDhLodTerrainResources(
+			IDhApiShaderProgram shaderProgram,
+			DhLodRenderPhase phase,
+			LodBufferContainer bufferContainer,
+			int lodIndex,
+			int vboIndex)
+	{
+		if (!VulkanicAPI.isShaderInputParityTracingEnabled())
+		{
+			return;
+		}
+
+		int lightmapTextureUnit = VulkanicAPI.isVulkanBackendSelected()
+				? ILightMapWrapper.VULKAN_LIGHTMAP_TEXTURE_UNIT
+				: ILightMapWrapper.OPENGL_LIGHTMAP_TEXTURE_UNIT;
+		net.blaze3d.textures.GpuTextureView lightmap = net.irisshaders.iris.pbr.TextureTracker.INSTANCE.getShaderTexture(lightmapTextureUnit);
+		java.util.List<String> resources = java.util.List.of(
+				VulkanicAPI.shaderInputParitySamplerResource("uLightMap", lightmapTextureUnit, lightmap)
+		);
+		String bucketName = phase.bufferBucket().name().toLowerCase(java.util.Locale.ROOT);
+		VulkanicAPI.traceShaderInputParitySyntheticResources(
+				"dh-lod-terrain-resources",
+				"distant-horizons:lod-terrain:" + bucketName,
+				"dh:" + shaderProgram.getClass().getSimpleName() + ":vertex",
+				"dh:" + shaderProgram.getClass().getSimpleName() + ":fragment",
+				"distant-horizons:lod-terrain:" + bucketName
+						+ ":region=" + bufferContainer.pos
+						+ ":lod=" + lodIndex
+						+ ":vbo=" + vboIndex,
+				resources
+		);
 	}
 
 	private boolean shouldUseVulkanNoShaderWaterOrdering()

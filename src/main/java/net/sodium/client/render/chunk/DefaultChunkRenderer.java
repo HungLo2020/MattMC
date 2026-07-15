@@ -701,6 +701,11 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
 
         @Override
         public boolean bindLegacySampler(String name, int textureId, int textureUnit) {
+            net.vulkanic.VulkanicTextureView legacyView = VulkanicAPI.createManagedLegacyTextureView(textureId);
+            if (legacyView != null) {
+                this.resources.add(VulkanicAPI.shaderInputParitySamplerResource(name, textureUnit, legacyView));
+                return true;
+            }
             GpuTextureView view = TextureTracker.INSTANCE.getTextureView(textureId);
             if (view == null) {
                 view = TextureTracker.INSTANCE.getShaderTexture(textureUnit);

@@ -193,13 +193,7 @@ public class ProgramSamplers {
 					textureId,
 					"program-samplers-opengl-legacy"
 				);
-				VulkanicAPI.recordScopedCompositeColortex0RenderPassLegacyBinding(
-					glRenderPass.pipeline == null ? null : glRenderPass.pipeline.info(),
-					name,
-					textureId,
-					binding.textureUnit(),
-					"iris-program-sampler-legacy"
-				);
+				glRenderPass.bindLegacySampler(name, textureId);
 			}
 		}
 	}

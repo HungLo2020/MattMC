@@ -7515,6 +7515,20 @@ public class VulkanicAPI {
         return builder.toString();
     }
 
+    public static String shaderInputParitySamplerResource(String name, int unit, @Nullable VulkanicTextureView textureView) {
+        PipelineDescriptor.ResourceBinding binding = new PipelineDescriptor.ResourceBinding(
+            0,
+            Math.max(0, unit),
+            shaderInputParitySanitizeLabel(name),
+            PipelineDescriptor.ResourceType.SAMPLER,
+            null
+        );
+        return describeShaderInputParitySampler(
+            binding,
+            new PipelineResourceBindings.SamplerBinding(Math.max(0, unit), null, textureView)
+        );
+    }
+
     public static void traceShaderInputParityDraw(
             String source,
             boolean indexed,
@@ -9693,6 +9707,19 @@ public class VulkanicAPI {
             }
         }
         return SHADER_INPUT_PARITY_LOG_COUNT.incrementAndGet() <= MAX_SHADER_INPUT_PARITY_LOGS;
+    }
+
+    public static boolean shouldCollectShaderInputParityDiagnostics() {
+        if (!TRACE_SHADER_INPUT_PARITY) {
+            return false;
+        }
+        if (TRACE_SHADER_INPUT_PARITY_POSE_ONLY) {
+            String poseName = DeterministicCameraCapture.currentPoseNameForDiagnostics();
+            if ("none".equals(poseName) || "complete".equals(poseName)) {
+                return false;
+            }
+        }
+        return SHADER_INPUT_PARITY_LOG_COUNT.get() < MAX_SHADER_INPUT_PARITY_LOGS;
     }
 
     private static String sanitizeShaderInputParityUniformName(@Nullable String name) {
