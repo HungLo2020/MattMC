@@ -186,4 +186,36 @@ public class VulkanTextureUploadLifecycleTest {
         assertTrue(source.contains("setPixelStore("),
             "Vulkan texture upload path should track GL unpack state for uploads");
     }
+
+    @Test
+    public void testVulkanBackendSourceMakesManagedBufferCopiesVisibleBeforeUse() throws Exception {
+        String source = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+
+        assertTrue(source.contains("barrierAfterBufferTransferWrite"),
+            "Vulkan managed buffer copy paths should centralize transfer-write visibility barriers");
+        assertTrue(source.contains("VK_ACCESS_TRANSFER_WRITE_BIT"),
+            "Vulkan managed buffer copy barriers should wait on transfer writes");
+        assertTrue(source.contains("VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT"),
+            "Vulkan managed buffer copy barriers should make copied vertex data visible");
+        assertTrue(source.contains("VK_ACCESS_INDEX_READ_BIT"),
+            "Vulkan managed buffer copy barriers should make copied index data visible");
+        assertTrue(source.contains("VK_ACCESS_UNIFORM_READ_BIT"),
+            "Vulkan managed buffer copy barriers should make copied uniform data visible");
+        assertTrue(countOccurrences(source, "barrierAfterBufferTransferWrite(commandBuffer, destinationBufferHandle") >= 2,
+            "Both direct data copies and buffer-to-buffer copies should publish destination-buffer contents");
+    }
+
+    private static int countOccurrences(String text, String needle) {
+        int count = 0;
+        int from = 0;
+        while (true) {
+            int index = text.indexOf(needle, from);
+            if (index < 0) {
+                return count;
+            }
+            count++;
+            from = index + needle.length();
+        }
+    }
 }

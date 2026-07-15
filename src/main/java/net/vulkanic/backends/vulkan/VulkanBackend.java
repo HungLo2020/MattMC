@@ -64,6 +64,7 @@ import org.lwjgl.vulkan.VkAttachmentReference;
 import org.lwjgl.vulkan.VkApplicationInfo;
 import org.lwjgl.vulkan.VkBufferCopy;
 import org.lwjgl.vulkan.VkBufferCreateInfo;
+import org.lwjgl.vulkan.VkBufferMemoryBarrier;
 import org.lwjgl.vulkan.VkBufferViewCreateInfo;
 import org.lwjgl.vulkan.VkBufferImageCopy;
 import org.lwjgl.vulkan.VkClearColorValue;
@@ -16409,18 +16410,20 @@ void main() {
             }
             VkCommandBuffer commandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "copyDataToBuffer");
             StagingBuffer stagingBuffer = createStagingBuffer(source);
+            long copySize = source.remaining();
             try (MemoryStack stack = stackPush()) {
                 VkBufferCopy.Buffer copyRegion = VkBufferCopy.calloc(1, stack);
                 copyRegion.get(0)
                     .srcOffset(0L)
                     .dstOffset(destinationOffset)
-                    .size(source.remaining());
+                    .size(copySize);
                 VK10.vkCmdCopyBuffer(
                     commandBuffer,
                     stagingBuffer.bufferHandle,
                     destinationBufferHandle,
                     copyRegion
                 );
+                barrierAfterBufferTransferWrite(commandBuffer, destinationBufferHandle, destinationOffset, copySize);
             } finally {
                 deferStagingBufferDestroy(stagingBuffer);
             }
@@ -16468,6 +16471,50 @@ void main() {
                     sourceBufferHandle,
                     destinationBufferHandle,
                     copyRegion
+                );
+                barrierAfterBufferTransferWrite(commandBuffer, destinationBufferHandle, destinationOffset, size);
+            }
+        }
+
+        private void barrierAfterBufferTransferWrite(VkCommandBuffer commandBuffer,
+                                                     long bufferHandle,
+                                                     long offset,
+                                                     long size) {
+            if (commandBuffer == null || bufferHandle == VK10.VK_NULL_HANDLE || size <= 0L) {
+                return;
+            }
+
+            try (MemoryStack stack = stackPush()) {
+                VkBufferMemoryBarrier.Buffer barrier = VkBufferMemoryBarrier.calloc(1, stack);
+                barrier.get(0)
+                    .sType$Default()
+                    .srcAccessMask(VK10.VK_ACCESS_TRANSFER_WRITE_BIT)
+                    .dstAccessMask(VK10.VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT
+                        | VK10.VK_ACCESS_INDEX_READ_BIT
+                        | VK10.VK_ACCESS_UNIFORM_READ_BIT
+                        | VK10.VK_ACCESS_SHADER_READ_BIT
+                        | VK10.VK_ACCESS_SHADER_WRITE_BIT
+                        | VK10.VK_ACCESS_INDIRECT_COMMAND_READ_BIT
+                        | VK10.VK_ACCESS_TRANSFER_READ_BIT)
+                    .srcQueueFamilyIndex(VK10.VK_QUEUE_FAMILY_IGNORED)
+                    .dstQueueFamilyIndex(VK10.VK_QUEUE_FAMILY_IGNORED)
+                    .buffer(bufferHandle)
+                    .offset(offset)
+                    .size(size);
+
+                VK10.vkCmdPipelineBarrier(
+                    commandBuffer,
+                    VK10.VK_PIPELINE_STAGE_TRANSFER_BIT,
+                    VK10.VK_PIPELINE_STAGE_VERTEX_INPUT_BIT
+                        | VK10.VK_PIPELINE_STAGE_VERTEX_SHADER_BIT
+                        | VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
+                        | VK10.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+                        | VK10.VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT
+                        | VK10.VK_PIPELINE_STAGE_TRANSFER_BIT,
+                    0,
+                    null,
+                    barrier,
+                    null
                 );
             }
         }
