@@ -16735,11 +16735,7 @@ void main() {
             if (logicalDevice == null) {
                 return;
             }
-            enqueueVulkanResourceDestroy(() -> destroyManagedTextureHandles(
-                imageHandle,
-                memoryHandle,
-                defaultViewHandle
-            ));
+            enqueueVulkanResourceDestroy(() -> destroyManagedTextureHandles(imageHandle, memoryHandle, defaultViewHandle));
         }
 
         private void destroyManagedTextureHandles(long imageHandle, long memoryHandle, long defaultViewHandle) {

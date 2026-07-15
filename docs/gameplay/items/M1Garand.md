@@ -8,13 +8,13 @@ M1 Garand can be obtained from the Creative Menu. It is registered as `minecraft
 
 ## Usage
 
-M1 Garand is a TaCZ firearm. It uses [Rifle Ammo](RifleAmmo.md) and fires with the TaCZ gun controls. Reload it with the reload key and aim down sights with the aim key.
+M1 Garand is a TaCZ firearm. It uses [.30-06 Springfield Bullet](3006SpringfieldBullet.md) and fires with the TaCZ gun controls. Reload it with the reload key and aim down sights with the aim key.
 
 ## Properties
 
 | Property | Value |
 | --- | --- |
-| Ammo | [Rifle Ammo](RifleAmmo.md) |
+| Ammo | [.30-06 Springfield Bullet](3006SpringfieldBullet.md) |
 | Magazine size | 8 |
 | Extended magazine sizes | None |
 | Fire modes | SEMI |

@@ -1,5 +1,5 @@
 {
-  "ammo": "minecraft:rifles_ammo",
+  "ammo": "minecraft:30_06",
   "ammo_amount": 8,
   "bolt": "open_bolt",
   "rpm": 165,

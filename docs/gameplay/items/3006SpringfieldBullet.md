@@ -13,7 +13,7 @@
 | Property | Value |
 | --- | --- |
 | Stack size | 36 |
-| Used by | [.30-06 Lonetrail Hand Cannon](3006LonetrailHandCannon.md), [M700 Sniper Rifle](M700SniperRifle.md) |
+| Used by | [.30-06 Lonetrail Hand Cannon](3006LonetrailHandCannon.md), [M1 Garand](M1Garand.md), [M700 Sniper Rifle](M700SniperRifle.md) |
 
 ## Behavior
 

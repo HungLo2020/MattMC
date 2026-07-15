@@ -360,6 +360,51 @@ def rustSourceFiles = fileTree(rustSourceDir) {
     include 'Cargo.lock'
     exclude 'target/**'
 }
+def isWindowsStorePythonAlias = { File candidate ->
+    candidate.absolutePath.replace('\\', '/').toLowerCase(Locale.ROOT).contains('/microsoft/windowsapps/')
+}
+def isUsablePython = { File candidate ->
+    if (candidate == null || !candidate.isFile() || isWindowsStorePythonAlias(candidate)) {
+        return false
+    }
+
+    try {
+        def process = new ProcessBuilder(candidate.absolutePath, '--version')
+            .redirectErrorStream(true)
+            .start()
+        def output = process.inputStream.getText('UTF-8')
+        return process.waitFor() == 0 && output.toLowerCase(Locale.ROOT).contains('python')
+    } catch (Exception ignored) {
+        return false
+    }
+}
+def findRustBuildPython = {
+    def candidates = []
+    [findProperty('mattmcPython'), System.getenv('PYTHON3'), System.getenv('PYTHON')].findAll { it }.each {
+        candidates << file(it.toString())
+    }
+    System.getenv('PATH').split(java.util.regex.Pattern.quote(File.pathSeparator)).each { pathEntry ->
+        ['python3.exe', 'python.exe', 'python3', 'python'].each { exeName ->
+            candidates << new File(pathEntry, exeName)
+        }
+    }
+
+    return candidates.find { isUsablePython(it) }
+}
+def configureRustBuildPython = { Exec task ->
+    def python = findRustBuildPython()
+    if (python == null) {
+        throw new GradleException(
+            "MattMC's Rust native build compiles shaderc from source, which requires Python 3. " +
+            "Install Python 3 and make it available on PATH, or pass -PmattmcPython=C:\\\\path\\\\to\\\\python.exe. " +
+            "The Windows Store python.exe alias is not a usable interpreter."
+        )
+    }
+
+    task.environment 'PYTHON', python.absolutePath
+    task.environment 'PYTHON3', python.absolutePath
+    task.environment 'PATH', "${python.parentFile.absolutePath}${File.pathSeparator}${System.getenv('PATH')}"
+}
 
 tasks.register('buildRustNative', Exec) {
     group = 'build'
@@ -371,6 +416,9 @@ tasks.register('buildRustNative', Exec) {
 
     environment 'CARGO_TARGET_DIR', rustTargetDir.get().asFile.absolutePath
     commandLine rustCargoBuildCommand
+    doFirst {
+        configureRustBuildPython(delegate)
+    }
 
     doLast {
         def cargoLibrary = rustTargetDir.get().file("${rustCargoProfileDir}/${rustCargoLibraryName}").asFile
@@ -394,6 +442,9 @@ tasks.register('testRustNative', Exec) {
 
     environment 'CARGO_TARGET_DIR', rustTargetDir.get().asFile.absolutePath
     commandLine 'cargo', 'test', '--manifest-path', rustManifest.absolutePath, '--locked'
+    doFirst {
+        configureRustBuildPython(delegate)
+    }
 }
 
 tasks.named('classes') {

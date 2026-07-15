@@ -13,7 +13,7 @@ Rifle Ammo is ammunition for TaCZ firearms. It is consumed when compatible guns 
 | Property | Value |
 | --- | --- |
 | Stack size | 64 |
-| Used by | [M1 Garand](M1Garand.md) |
+| Used by | No integrated guns currently use this ammo |
 
 ## Behavior
 
