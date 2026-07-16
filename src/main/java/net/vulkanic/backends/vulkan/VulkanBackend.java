@@ -4942,7 +4942,21 @@ void main() {
         if (textureId <= 0) {
             textureId = net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(unit);
         }
-        VulkanicTextureView textureView = textureId > 0 ? createManagedLegacyTextureView(textureId) : null;
+        VulkanicTextureView textureView = null;
+        if (textureId > 0) {
+            net.blaze3d.textures.GpuTextureView trackedTextureView =
+                net.irisshaders.iris.pbr.TextureTracker.INSTANCE.getTextureView(textureId);
+            if (trackedTextureView != null && trackedTextureView.texture() instanceof VulkanicTexture trackedTexture) {
+                textureView = createManagedTextureView(
+                    trackedTexture,
+                    trackedTextureView.baseMipLevel(),
+                    trackedTextureView.mipLevels()
+                );
+            }
+            if (textureView == null) {
+                textureView = createManagedLegacyTextureView(textureId);
+            }
+        }
         return textureView != null
             ? textureView
             : createLegacyFallbackSamplerView(commandBufferHandle, binding, unit);
@@ -10005,6 +10019,7 @@ void main() {
         }
 
         if (texture instanceof net.blaze3d.textures.GpuTexture gpuTexture) {
+            gpuTexture.flushModeChanges2D();
             return resolveGpuTextureLegacyHandle(gpuTexture);
         }
 

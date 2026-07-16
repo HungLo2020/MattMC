@@ -325,6 +325,22 @@ public class Phase3DrawPathTest {
             "Vulkan descriptor samplers should derive magnification mode from live GpuTexture state");
         assertTrue(backendSource.contains("toLegacyWrapMode(gpuTexture.getAddressModeU())"),
             "Vulkan descriptor samplers should derive wrap state from live GpuTexture state");
+        assertTrue(backendSource.contains("gpuTexture.flushModeChanges2D();")
+                && backendSource.indexOf("gpuTexture.flushModeChanges2D();")
+                < backendSource.indexOf("return resolveGpuTextureLegacyHandle(gpuTexture);"),
+            "Vulkan texture-handle resolution must flush pending GpuTexture filter/wrap state before descriptors sample the legacy texture id");
+        int legacySamplerResolver = backendSource.indexOf("VulkanicTextureView resolveLegacySamplerViewForProgram(");
+        assertTrue(legacySamplerResolver >= 0,
+            "Vulkan backend should expose the legacy shader sampler resolver");
+        int trackedViewLookup = backendSource.indexOf("TextureTracker.INSTANCE.getTextureView(textureId)", legacySamplerResolver);
+        int anonymousLegacyViewFallback = backendSource.indexOf("createManagedLegacyTextureView(textureId)", legacySamplerResolver);
+        assertTrue(trackedViewLookup >= 0
+                && backendSource.contains("trackedTextureView.texture() instanceof VulkanicTexture trackedTexture")
+                && backendSource.contains("trackedTextureView.baseMipLevel()")
+                && backendSource.contains("trackedTextureView.mipLevels()")
+                && anonymousLegacyViewFallback >= 0
+                && trackedViewLookup < anonymousLegacyViewFallback,
+            "Vulkan legacy shader sampler resolution should prefer the tracked GpuTextureView so descriptor samplers keep live atlas filter/wrap state");
     }
 
     @Test
