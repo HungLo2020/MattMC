@@ -71,51 +71,46 @@ json_get_latest_tag() {
     sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$1" | head -n 1
 }
 
+json_download_urls() {
+    sed 's/"browser_download_url"/\
+"browser_download_url"/g' "$1" |
+        sed -n 's/.*"browser_download_url"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'
+}
+
 select_exact_asset() {
     local json_file="$1"
     local platform="$2"
     local release_tag="$3"
-    local line name="" url=""
+    local name url
     local tag_version expected_name version
 
     tag_version="$(normalize_release_tag "$release_tag")"
     if [[ -n "$tag_version" && "$tag_version" != "latest" ]]; then
         expected_name="$(expected_asset_name "$tag_version" "$platform")"
 
-        while IFS= read -r line; do
-            if [[ "$line" == *'"name"'* ]]; then
-                name="$(printf '%s' "$line" | sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
-            elif [[ "$line" == *'"browser_download_url"'* ]]; then
-                url="$(printf '%s' "$line" | sed -n 's/.*"browser_download_url"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
-                if [[ "$name" == "$expected_name" ]]; then
-                    printf '%s\t%s\t%s' "$url" "$tag_version" "$expected_name"
-                    return 0
-                fi
-                name=""
-                url=""
+        while IFS= read -r url; do
+            name="${url##*/}"
+            if [[ "$name" == "$expected_name" ]]; then
+                printf '%s\t%s\t%s' "$url" "$tag_version" "$expected_name"
+                return 0
             fi
-        done < "$json_file"
+        done < <(json_download_urls "$json_file")
 
         return 1
     fi
 
-    while IFS= read -r line; do
-        if [[ "$line" == *'"name"'* ]]; then
-            name="$(printf '%s' "$line" | sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
-        elif [[ "$line" == *'"browser_download_url"'* ]]; then
-            url="$(printf '%s' "$line" | sed -n 's/.*"browser_download_url"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
-            case "$name" in
-                MattMC-Client-*-"$platform".zip)
-                    version="${name#MattMC-Client-}"
-                    version="${version%-"$platform".zip}"
-                    printf '%s\t%s\t%s' "$url" "$version" "$name"
-                    return 0
-                    ;;
-            esac
-            name=""
-            url=""
-        fi
-    done < "$json_file"
+    while IFS= read -r url; do
+        name="${url##*/}"
+        case "$name" in
+            MattMC-Client-*-"$platform".zip)
+                version="${name#MattMC-Client-}"
+                version="${version%-"$platform".zip}"
+                version="${version%-"$platform"}"
+                printf '%s\t%s\t%s' "$url" "$version" "$name"
+                return 0
+                ;;
+        esac
+    done < <(json_download_urls "$json_file")
 
     return 1
 }
