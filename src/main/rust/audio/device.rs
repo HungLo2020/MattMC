@@ -1,4 +1,5 @@
 use alto::{Context, ContextAttrs, DeviceObject, DistanceModel, OutputDevice};
+use std::thread::{self, ThreadId};
 
 use super::context::{alto_call, cstring_to_string, NativeAlto};
 use super::errors::{AudioError, AudioResult};
@@ -30,6 +31,7 @@ pub(crate) struct NativeDevice {
     pub(crate) streaming_used: usize,
     pub(crate) default_device_name: Option<String>,
     pub(crate) current_device_name: String,
+    owner_thread: ThreadId,
 }
 
 impl NativeDevice {
@@ -65,6 +67,7 @@ impl NativeDevice {
                         streaming_used: 0,
                         default_device_name,
                         current_device_name,
+                        owner_thread: thread::current().id(),
                     });
                 }
                 Err(error) => last_error = Some(error),
@@ -104,6 +107,14 @@ impl NativeDevice {
             .connected()
             .map(|connected| !connected)
             .unwrap_or(false)
+    }
+
+    pub(crate) fn ensure_owner_thread(&self) -> AudioResult<()> {
+        if self.owner_thread == thread::current().id() {
+            Ok(())
+        } else {
+            Err(AudioError::WrongThread)
+        }
     }
 }
 

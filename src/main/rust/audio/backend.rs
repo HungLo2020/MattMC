@@ -4,7 +4,7 @@ use super::buffer::{create_buffer, NativeBuffer};
 use super::context::{cstring_to_string, load_openal, NativeAlto};
 use super::device::{ChannelPool, NativeDevice};
 use super::errors::*;
-use super::handles::HandleTable;
+use super::handles::{HandleTable, ResourceKind};
 use super::listener::{self, ListenerTransform};
 use super::source::{NativeSource, SourceKind};
 
@@ -26,9 +26,9 @@ impl AudioBackend {
     fn new() -> Self {
         Self {
             openal: None,
-            devices: HandleTable::default(),
-            sources: HandleTable::default(),
-            buffers: HandleTable::default(),
+            devices: HandleTable::new(ResourceKind::Device),
+            sources: HandleTable::new(ResourceKind::Source),
+            buffers: HandleTable::new(ResourceKind::Buffer),
         }
     }
 
@@ -65,6 +65,8 @@ pub(crate) fn create_device(preferred: Option<String>, hrtf: bool) -> AudioResul
 
 pub(crate) fn destroy_device(device_handle: u64) -> AudioResult<()> {
     with_backend(|backend| {
+        backend.ensure_device_owner(device_handle)?;
+
         let source_handles = backend
             .sources
             .handles_for(|source| source.device == device_handle);
@@ -96,6 +98,7 @@ pub(crate) fn create_source(device_handle: u64, pool: ChannelPool) -> AudioResul
                 .devices
                 .get_mut(device_handle)
                 .ok_or(AudioError::InvalidHandle)?;
+            device.ensure_owner_thread()?;
             if !device.acquire_pool(pool) {
                 return Err(AudioError::PoolExhausted);
             }
@@ -118,6 +121,7 @@ pub(crate) fn create_source(device_handle: u64, pool: ChannelPool) -> AudioResul
                 device: device_handle,
                 pool,
                 kind,
+                queued_stream_buffers: 0,
             })),
             Err(error) => {
                 if let Some(device) = backend.devices.get_mut(device_handle) {
@@ -131,6 +135,13 @@ pub(crate) fn create_source(device_handle: u64, pool: ChannelPool) -> AudioResul
 
 pub(crate) fn destroy_source(source_handle: u64) -> AudioResult<()> {
     with_backend(|backend| {
+        let device_handle = backend
+            .sources
+            .get(source_handle)
+            .ok_or(AudioError::InvalidHandle)?
+            .device;
+        backend.ensure_device_owner(device_handle)?;
+
         let mut source = backend
             .sources
             .remove(source_handle)
@@ -166,11 +177,12 @@ pub(crate) fn source_stop(source_handle: u64) -> AudioResult<()> {
 
 pub(crate) fn source_state(source_handle: u64) -> AudioResult<i32> {
     with_backend(|backend| {
-        Ok(backend
+        let source = backend
             .sources
             .get(source_handle)
-            .ok_or(AudioError::InvalidHandle)?
-            .state())
+            .ok_or(AudioError::InvalidHandle)?;
+        backend.ensure_device_owner(source.device)?;
+        Ok(source.state())
     })
 }
 
@@ -217,9 +229,11 @@ pub(crate) fn create_buffer_handle(
         let context = backend
             .devices
             .get(device_handle)
-            .ok_or(AudioError::InvalidHandle)?
-            .context
-            .clone();
+            .ok_or(AudioError::InvalidHandle)
+            .and_then(|device| {
+                device.ensure_owner_thread()?;
+                Ok(device.context.clone())
+            })?;
         let buffer = create_buffer(&context, data, channels, bits, pcm, sample_rate)?;
         Ok(backend.buffers.insert(NativeBuffer {
             device: device_handle,
@@ -230,6 +244,12 @@ pub(crate) fn create_buffer_handle(
 
 pub(crate) fn destroy_buffer(buffer_handle: u64) -> AudioResult<()> {
     with_backend(|backend| {
+        let device_handle = backend
+            .buffers
+            .get(buffer_handle)
+            .ok_or(AudioError::InvalidHandle)?
+            .device;
+        backend.ensure_device_owner(device_handle)?;
         backend
             .buffers
             .remove(buffer_handle)
@@ -240,6 +260,12 @@ pub(crate) fn destroy_buffer(buffer_handle: u64) -> AudioResult<()> {
 
 pub(crate) fn attach_static_buffer(source_handle: u64, buffer_handle: u64) -> AudioResult<()> {
     with_backend(|backend| {
+        let source_device = backend
+            .sources
+            .get(source_handle)
+            .ok_or(AudioError::InvalidHandle)?
+            .device;
+        backend.ensure_device_owner(source_device)?;
         let buffer = backend
             .buffers
             .get(buffer_handle)
@@ -270,6 +296,7 @@ pub(crate) fn queue_stream_buffer(
             .get(source_handle)
             .ok_or(AudioError::InvalidHandle)?
             .device;
+        backend.ensure_device_owner(device_handle)?;
         let context = backend
             .devices
             .get(device_handle)
@@ -297,7 +324,11 @@ pub(crate) fn listener_set_transform(
         let context = &backend
             .devices
             .get(device_handle)
-            .ok_or(AudioError::InvalidHandle)?
+            .ok_or(AudioError::InvalidHandle)
+            .and_then(|device| {
+                device.ensure_owner_thread()?;
+                Ok(device)
+            })?
             .context;
         listener::set_transform(context, transform)
     })
@@ -308,7 +339,11 @@ pub(crate) fn listener_reset(device_handle: u64) -> AudioResult<()> {
         let context = &backend
             .devices
             .get(device_handle)
-            .ok_or(AudioError::InvalidHandle)?
+            .ok_or(AudioError::InvalidHandle)
+            .and_then(|device| {
+                device.ensure_owner_thread()?;
+                Ok(device)
+            })?
             .context;
         listener::reset(context)
     })
@@ -319,7 +354,11 @@ pub(crate) fn listener_set_gain(device_handle: u64, gain: f32) -> AudioResult<()
         let context = &backend
             .devices
             .get(device_handle)
-            .ok_or(AudioError::InvalidHandle)?
+            .ok_or(AudioError::InvalidHandle)
+            .and_then(|device| {
+                device.ensure_owner_thread()?;
+                Ok(device)
+            })?
             .context;
         listener::set_gain(context, gain)
     })
@@ -373,6 +412,31 @@ pub(crate) fn device_pool_counts(device_handle: u64) -> AudioResult<PoolCounts> 
     })
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg(test)]
+pub(crate) struct LiveCounts {
+    pub(crate) devices: usize,
+    pub(crate) sources: usize,
+    pub(crate) buffers: usize,
+    pub(crate) queued_stream_buffers: i32,
+}
+
+#[cfg(test)]
+pub(crate) fn live_counts() -> AudioResult<LiveCounts> {
+    with_backend(|backend| {
+        Ok(LiveCounts {
+            devices: backend.devices.len(),
+            sources: backend.sources.len(),
+            buffers: backend.buffers.len(),
+            queued_stream_buffers: backend
+                .sources
+                .values()
+                .map(NativeSource::queued_stream_buffers)
+                .sum(),
+        })
+    })
+}
+
 pub(crate) fn default_device_name() -> AudioResult<String> {
     with_backend(|backend| {
         Ok(backend
@@ -420,6 +484,12 @@ fn with_source_mut_value<T>(
     f: impl FnOnce(&mut NativeSource) -> AudioResult<T>,
 ) -> AudioResult<T> {
     with_backend(|backend| {
+        let device_handle = backend
+            .sources
+            .get(source_handle)
+            .ok_or(AudioError::InvalidHandle)?
+            .device;
+        backend.ensure_device_owner(device_handle)?;
         let source = backend
             .sources
             .get_mut(source_handle)
@@ -428,16 +498,18 @@ fn with_source_mut_value<T>(
     })
 }
 
+impl AudioBackend {
+    fn ensure_device_owner(&self, device_handle: u64) -> AudioResult<()> {
+        self.devices
+            .get(device_handle)
+            .ok_or(AudioError::InvalidHandle)?
+            .ensure_owner_thread()
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod test_support {
     use super::*;
-
-    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    pub(crate) struct BackendCounts {
-        pub(crate) devices: usize,
-        pub(crate) sources: usize,
-        pub(crate) buffers: usize,
-    }
 
     pub(crate) fn reset_backend_for_tests() {
         if let Some(mutex) = BACKEND.get() {
@@ -447,14 +519,7 @@ pub(crate) mod test_support {
         }
     }
 
-    pub(crate) fn counts_for_tests() -> BackendCounts {
-        with_backend(|backend| {
-            Ok(BackendCounts {
-                devices: backend.devices.len(),
-                sources: backend.sources.len(),
-                buffers: backend.buffers.len(),
-            })
-        })
-        .expect("audio backend counts should be readable in tests")
+    pub(crate) fn counts_for_tests() -> LiveCounts {
+        live_counts().expect("audio backend counts should be readable in tests")
     }
 }

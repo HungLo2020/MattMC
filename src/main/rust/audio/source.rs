@@ -21,6 +21,7 @@ pub(crate) struct NativeSource {
     pub(crate) device: u64,
     pub(crate) pool: ChannelPool,
     pub(crate) kind: SourceKind,
+    pub(crate) queued_stream_buffers: i32,
 }
 
 pub(crate) enum SourceKind {
@@ -150,15 +151,28 @@ impl NativeSource {
 
     pub(crate) fn queue_stream_buffer(&mut self, buffer: Buffer) -> AudioResult<()> {
         match &mut self.kind {
-            SourceKind::Streaming(source) => stream::queue_buffer(source, buffer),
+            SourceKind::Streaming(source) => {
+                stream::queue_buffer(source, buffer)?;
+                self.queued_stream_buffers += 1;
+                Ok(())
+            }
             SourceKind::Static(_) => Err(AudioError::InvalidArgument),
         }
     }
 
     pub(crate) fn remove_processed_buffers(&mut self) -> AudioResult<i32> {
         match &mut self.kind {
-            SourceKind::Streaming(source) => stream::remove_processed_buffers(source),
+            SourceKind::Streaming(source) => {
+                let processed = stream::remove_processed_buffers(source)?;
+                self.queued_stream_buffers = self.queued_stream_buffers.saturating_sub(processed);
+                Ok(processed)
+            }
             SourceKind::Static(_) => Ok(0),
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn queued_stream_buffers(&self) -> i32 {
+        self.queued_stream_buffers
     }
 }
