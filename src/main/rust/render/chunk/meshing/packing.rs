@@ -201,12 +201,7 @@ pub(super) fn is_compact_fast_format(format: NativeFormat) -> bool {
 
 #[inline(always)]
 fn encode_quad_compact(quad: &NativeQuad, output: &mut [u8], section_index: i32) {
-    encode_compact_quad_vertices(
-        &quad.vertices,
-        quad.material_bits,
-        section_index,
-        output,
-    );
+    encode_compact_quad_vertices(&quad.vertices, quad.material_bits, section_index, output);
 }
 
 #[inline(always)]
@@ -550,3 +545,6 @@ pub(super) fn pack_norm_i8(x: f32, y: f32, z: f32, w: f32) -> i32 {
         | ((((z * 127.0) as i32) & 0xff) << 16)
         | ((((w * 127.0) as i32) & 0xff) << 24)
 }
+
+#[cfg(test)]
+mod tests;

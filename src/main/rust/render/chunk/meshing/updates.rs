@@ -101,3 +101,6 @@ pub(super) unsafe fn updated_quads_apply(
         format,
     )
 }
+
+#[cfg(test)]
+mod tests;

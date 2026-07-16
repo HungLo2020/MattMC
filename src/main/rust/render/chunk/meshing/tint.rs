@@ -49,3 +49,6 @@ pub(super) fn argb_to_abgr(color: i32) -> i32 {
     let blue = (color & 0x0000_00ff) << 16;
     (alpha_green | red | blue) as i32
 }
+
+#[cfg(test)]
+mod tests;

@@ -1,3 +1,10 @@
+//! Section mesh builder storage and append staging.
+//!
+//! Builders own native quad buffers, pending per-facing batches, translucent
+//! analyzer retention, compact vertex encoding, and final assembly counters.
+//! They deliberately do not decide model/fluid semantics; scan and producer
+//! modules hand them already-classified quads and records.
+
 use super::*;
 
 pub(super) fn create_section_mesh_builder(capacity: usize) -> NativeSectionMeshBuilder {
