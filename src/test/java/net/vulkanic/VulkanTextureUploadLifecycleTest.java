@@ -191,17 +191,21 @@ public class VulkanTextureUploadLifecycleTest {
     public void testVulkanBackendSourceMakesManagedBufferCopiesVisibleBeforeUse() throws Exception {
         String source = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String plannerSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanSynchronizationPlanner.java"));
 
         assertTrue(source.contains("barrierAfterBufferTransferWrite"),
             "Vulkan managed buffer copy paths should centralize transfer-write visibility barriers");
-        assertTrue(source.contains("VK_ACCESS_TRANSFER_WRITE_BIT"),
+        assertTrue(plannerSource.contains("VK_ACCESS_TRANSFER_WRITE_BIT"),
             "Vulkan managed buffer copy barriers should wait on transfer writes");
-        assertTrue(source.contains("VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT"),
+        assertTrue(plannerSource.contains("VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT"),
             "Vulkan managed buffer copy barriers should make copied vertex data visible");
-        assertTrue(source.contains("VK_ACCESS_INDEX_READ_BIT"),
+        assertTrue(plannerSource.contains("VK_ACCESS_INDEX_READ_BIT"),
             "Vulkan managed buffer copy barriers should make copied index data visible");
-        assertTrue(source.contains("VK_ACCESS_UNIFORM_READ_BIT"),
+        assertTrue(plannerSource.contains("VK_ACCESS_UNIFORM_READ_BIT"),
             "Vulkan managed buffer copy barriers should make copied uniform data visible");
+        assertTrue(source.contains("VulkanSynchronizationPlanner.planBufferTransferWriteVisibility(offset, size)"),
+            "VulkanBackend should materialize planner-owned buffer transfer-write visibility barriers");
         assertTrue(countOccurrences(source, "barrierAfterBufferTransferWrite(commandBuffer, destinationBufferHandle") >= 2,
             "Both direct data copies and buffer-to-buffer copies should publish destination-buffer contents");
     }

@@ -112,15 +112,15 @@ public class Phase3SynchronizationTest {
 
     @Test
     public void testVulkanBarrierMaskMappingIncludesShaderStagesAndAccessMasks() throws Exception {
-        Method mappingMethod = VulkanBackend.class.getDeclaredMethod(
-            "toVkBarrierMasks",
-            VulkanicResourceBarriers.class
-        );
+        Method mappingMethod = Class
+            .forName("net.vulkanic.backends.vulkan.VulkanSynchronizationPlanner")
+            .getDeclaredMethod("planResourceBarrier", VulkanicResourceBarriers.class, boolean.class);
         mappingMethod.setAccessible(true);
 
         Object masks = mappingMethod.invoke(
             null,
-            VulkanicResourceBarriers.computeWritesVisibleToTextureSampling()
+            VulkanicResourceBarriers.computeWritesVisibleToTextureSampling(),
+            false
         );
 
         int srcStageMask = invokeIntAccessor(masks, "srcStageMask");
@@ -140,15 +140,15 @@ public class Phase3SynchronizationTest {
 
     @Test
     public void testVulkanRenderPassBarrierMaskMappingRemovesIllegalNonGraphicsStages() throws Exception {
-        Method mappingMethod = VulkanBackend.class.getDeclaredMethod(
-            "toVkRenderPassBarrierMasks",
-            VulkanicResourceBarriers.class
-        );
+        Method mappingMethod = Class
+            .forName("net.vulkanic.backends.vulkan.VulkanSynchronizationPlanner")
+            .getDeclaredMethod("planResourceBarrier", VulkanicResourceBarriers.class, boolean.class);
         mappingMethod.setAccessible(true);
 
         Object masks = mappingMethod.invoke(
             null,
-            VulkanicResourceBarriers.computeWritesVisibleToTextureSampling()
+            VulkanicResourceBarriers.computeWritesVisibleToTextureSampling(),
+            true
         );
 
         int srcStageMask = invokeIntAccessor(masks, "srcStageMask");
@@ -212,11 +212,11 @@ public class Phase3SynchronizationTest {
             "Vulkan raw memoryBarrier calls with unsupported bits should still emit a conservative native barrier");
         assertTrue(source.contains("VK10.vkCmdPipelineBarrier("),
             "Vulkan native barrier path should use vkCmdPipelineBarrier");
-        assertTrue(source.contains("toVkRenderPassBarrierMasks(barriers)"),
-            "In-render-pass barriers should use render-pass-compatible masks");
-        assertTrue(source.contains("renderPassRecording ? VK10.VK_DEPENDENCY_BY_REGION_BIT : 0"),
+        assertTrue(source.contains("VulkanSynchronizationPlanner.planResourceBarrier(barriers, renderPassRecording)"),
+            "In-render-pass barriers should use planner-owned render-pass-compatible masks");
+        assertTrue(source.contains("plan.dependencyFlags()"),
             "In-render-pass barriers should opt into BY_REGION self-dependency synchronization");
-        assertTrue(source.contains("toVkRenderPassConservativeBarrierMasks()"),
+        assertTrue(source.contains("VulkanSynchronizationPlanner.planConservativeMemoryBarrier(renderPassRecording)"),
             "Conservative memory barriers should also be legal inside an active render pass");
         assertFalse(source.contains("Vulkan-native resource barrier mapping is not implemented yet."),
             "Vulkan barrier mapping should no longer be marked unsupported");

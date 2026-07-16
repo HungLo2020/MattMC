@@ -284,8 +284,8 @@ public class GlCommandEncoder implements CommandEncoder {
 	 * <p>Now that {@code GlTexture} implements {@code VulkanicTexture} (via {@code GpuTexture}),
 	 * no GL-handle bridge object is needed. An {@code OpenGLTextureView} is constructed
 	 * directly from the {@code GlTexture} and the view's mip range. This is a lightweight
-	 * descriptor with no new GPU allocations, and {@link net.vulkanic.backends.opengl.OpenGLTextureView#close()}
-	 * does not delete the underlying texture (the caller remains the owner).
+	 * descriptor with no new GPU allocations; closing the view does not delete the
+	 * underlying texture (the caller remains the owner).
 	 */
 	net.vulkanic.VulkanicTextureView createSamplerResourceView(GpuTextureView view) {
 		return toVulkanicTextureView(view);

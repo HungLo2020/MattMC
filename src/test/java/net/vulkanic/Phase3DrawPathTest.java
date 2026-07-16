@@ -5771,23 +5771,23 @@ public class Phase3DrawPathTest {
                 && renderTargetCompatibilitySource.contains("allowsDescriptorBackedRenderPass()")
                 && renderTargetCompatibilitySource.contains("return this == EXACT;"),
             "VulkanBackend should keep exact parity diagnostics while exposing typed compatibility and an exact-only proven-safe render-pass gate");
-        assertTrue(vulkanBackendSource.contains("boolean includeDepth = compatibilityKey.hasDepthAttachment()"),
-            "Vulkan target-specific pipelines should match the actual descriptor depth attachment contract");
+        assertTrue(vulkanBackendSource.contains("VulkanRenderPassLayoutPlanner.planPipelineCompatible(compatibilityKey)")
+                && vulkanBackendSource.contains("layoutPlan.hasDepthAttachment()"),
+            "Vulkan target-specific pipelines should consume the planner depth attachment contract");
     }
 
     @Test
     public void testVulkanFeedbackLoopPipelineRenderPassUsesFeedbackSubpassLayouts() throws IOException {
         Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
         String source = readSource(vulkanBackendFile);
+        String plannerSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanRenderPassLayoutPlanner.java"));
 
-        assertTrue(source.contains("int colorAttachmentRefLayout = compatibilityKey.feedbackLoop()"),
-            "Pipeline-compatible render passes should choose color subpass layouts from attachment-feedback-loop mode");
-        assertTrue(source.contains("int depthAttachmentRefLayout = compatibilityKey.feedbackLoop()"),
-            "Pipeline-compatible render passes should choose depth subpass layouts from attachment-feedback-loop mode");
-        assertTrue(source.contains(".layout(colorAttachmentRefLayout);"),
-            "Color attachment references in the pipeline-compatible render pass must use the selected layout");
-        assertTrue(source.contains(".layout(depthAttachmentRefLayout);"),
-            "Depth attachment references in the pipeline-compatible render pass must use the selected layout");
+        assertTrue(plannerSource.contains("int colorLayout = compatibilityKey.feedbackLoop()")
+                && plannerSource.contains("int depthLayout = compatibilityKey.feedbackLoop()"),
+            "Pipeline-compatible render-pass layouts should be chosen by attachment-feedback-loop mode in the planner");
+        assertTrue(source.contains(".layout(colorPlan.subpassLayout());")
+                && source.contains(".layout(depthPlan.subpassLayout());"),
+            "VulkanBackend should materialize planner-selected color/depth attachment reference layouts");
     }
 
     @Test
@@ -5799,10 +5799,12 @@ public class Phase3DrawPathTest {
             "Vulkan pipeline creation should distinguish swapchain-present render-pass compatibility from feedback-loop compatibility");
         assertTrue(source.contains("swapchainImageFormat,\n                    true"),
             "Swapchain present compose pipeline should request the swapchain-present-compatible render pass contract");
-        assertTrue(source.contains("case SWAPCHAIN_PRESENT -> allocateSwapchainPresentDependencies(stack);"),
-            "Pipeline-compatible render pass creation should emit a dedicated dependency set for swapchain-present passes");
-        assertTrue(source.contains(".dstSubpass(VK10.VK_SUBPASS_EXTERNAL)")
-                && source.contains(".dstStageMask(VK10.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT)"),
+        assertTrue(source.contains("VulkanRenderPassLayoutPlanner.planPipelineCompatible(compatibilityKey)")
+                && source.contains("allocateCompatibleSubpassDependencies(stack, layoutPlan)"),
+            "Pipeline-compatible render pass creation should consume the extracted planner dependency intent");
+        String plannerSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanRenderPassLayoutPlanner.java"));
+        assertTrue(plannerSource.contains("VK10.VK_SUBPASS_EXTERNAL")
+                && plannerSource.contains("VK10.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT"),
             "Swapchain-present-compatible placeholder render passes should match the persistent swapchain present render pass dependencies");
     }
 
@@ -5828,12 +5830,15 @@ public class Phase3DrawPathTest {
             "Texture-view pipeline variants should snapshot the same attachment feedback-loop capability used by live render passes");
         assertTrue(source.contains("createPipelineCompatibleRenderPass(\n                    stack,\n                    renderPassCompatibilityKey"),
             "Vulkan pipeline creation should compile against the same compatibility key used for draw-time render passes");
-        assertTrue(source.contains("allocateCompatibleSubpassDependencies(stack, compatibilityKey)"),
-            "Pipeline-compatible render passes and live render passes should share dependency profile construction");
-        assertTrue(source.contains("case TEXTURE_VIEW -> allocateTextureViewDependencies(stack, compatibilityKey);")
-                && source.contains("case FRAMEBUFFER -> allocateFramebufferDependencies(stack, compatibilityKey);")
-                && source.contains("case SWAPCHAIN_PRESENT -> allocateSwapchainPresentDependencies(stack);"),
-            "Texture-view, framebuffer, and swapchain-present render-pass profiles should stay distinct");
+        Path plannerFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanRenderPassLayoutPlanner.java");
+        String plannerSource = readSource(plannerFile);
+        assertTrue(source.contains("allocateCompatibleSubpassDependencies(stack, layoutPlan)")
+                && source.contains("VulkanRenderPassLayoutPlanner.dependencyIntent(compatibilityKey)"),
+            "Pipeline-compatible render passes and live render passes should consume planner-owned dependency intent");
+        assertTrue(plannerSource.contains("case TEXTURE_VIEW -> textureViewDependencies(compatibilityKey);")
+                && plannerSource.contains("case FRAMEBUFFER -> framebufferDependencies(compatibilityKey);")
+                && plannerSource.contains("case SWAPCHAIN_PRESENT -> swapchainPresentDependencies();"),
+            "Texture-view, framebuffer, and swapchain-present render-pass profiles should stay distinct in the planner");
     }
 
     @Test
