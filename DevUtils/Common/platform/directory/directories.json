@@ -16,7 +16,7 @@
   },
   "local_install": {
     "linux": "~/Games/MattMC",
-    "windows": null,
+    "windows": "~/Games/MattMC",
     "macos": null
   }
 }
