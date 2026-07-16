@@ -930,7 +930,7 @@ public class DistantHorizonsCommandContextMigrationTest {
             "Legacy standalone program pipelines should compile against the active render pass contract");
         assertTrue(backendSource.contains("withVertexInputState(vertexInputState)"),
             "Legacy standalone program descriptors should carry explicit VAO-derived vertex input");
-        int legacyTextureLookup = backendSource.indexOf("spine.legacyTexture2DBindingsByUnit.getOrDefault(unit, 0)");
+        int legacyTextureLookup = backendSource.indexOf("spine.textureResources.legacyTexture2DBindingsByUnit.getOrDefault(unit, 0)");
         int irisTextureLookup = backendSource.indexOf("IrisRenderSystem.getTextureBinding(unit)", legacyTextureLookup);
         assertTrue(legacyTextureLookup >= 0 && irisTextureLookup > legacyTextureLookup,
             "Legacy standalone sampler resolution should trust Vulkanic's tracked texture-unit binding before falling back to Iris' cache");

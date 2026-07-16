@@ -143,8 +143,8 @@ public class VulkanRenderPassLifecycleTest {
     @Test
     public void testFeedbackLoopCapableAttachmentWritesUseFeedbackLoopLayout() throws Exception {
         Method imageLayoutForUsage = Class
-            .forName("net.vulkanic.backends.vulkan.VulkanBackend$NativeSpine")
-            .getDeclaredMethod("imageLayoutForUsage", VulkanicResourceUsage.class, boolean.class, boolean.class, int.class);
+            .forName("net.vulkanic.backends.vulkan.VulkanRenderPassLayoutPlanner")
+            .getDeclaredMethod("layoutForUsage", VulkanicResourceUsage.class, boolean.class, boolean.class, int.class);
         imageLayoutForUsage.setAccessible(true);
 
         int feedbackLoopLayout = EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;

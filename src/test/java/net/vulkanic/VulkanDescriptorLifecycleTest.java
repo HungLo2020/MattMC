@@ -295,7 +295,10 @@ public class VulkanDescriptorLifecycleTest {
     public void testFeedbackLoopSamplerLayoutIsOnlyUsedForActiveAttachments() throws Exception {
         String source = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String plannerSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanRenderPassLayoutPlanner.java"));
         String normalized = source.replaceAll("\\s+", " ");
+        String normalizedPlanner = plannerSource.replaceAll("\\s+", " ");
         String descriptorSelection = source.substring(source.indexOf("private int descriptorImageLayoutFor"),
             source.indexOf("private boolean isStorageImageLayoutCompatibleSampler"));
         String sampleTransition = source.substring(source.indexOf("private void transitionLegacyTextureToSampleLayout(@Nullable LegacyTextureObject texture,"),
@@ -314,7 +317,7 @@ public class VulkanDescriptorLifecycleTest {
             "Descriptor image layout selection should route feedback-loop layout through the active-attachment predicate");
         assertTrue(normalized.contains("int targetLayout = shouldUseFeedbackLoopLayoutForSampling(texture) ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT"),
             "Sampler transitions should route feedback-loop layout through the active-attachment predicate");
-        assertTrue(normalized.contains("if (feedbackLoopCapable && usage == VulkanicResourceUsage.ATTACHMENT_FEEDBACK_LOOP)"),
+        assertTrue(normalizedPlanner.contains("if (feedbackLoopCapable && usage == VulkanicResourceUsage.ATTACHMENT_FEEDBACK_LOOP)"),
             "Resource usage mapping should select feedback-loop layout only for explicit attachment feedback");
         assertFalse(normalized.contains("|| usage == VulkanicResourceUsage.SAMPLED_READ"),
             "SAMPLED_READ must resolve to shader/depth read-only layouts even for feedback-loop-capable images");

@@ -2,10 +2,8 @@ package net.vulkanic.backends.vulkan;
 
 import net.vulkanic.VulkanicAPI;
 import org.junit.jupiter.api.Test;
-import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.EXTAttachmentFeedbackLoopLayout;
 import org.lwjgl.vulkan.VK10;
-import org.lwjgl.vulkan.VkSubpassDependency;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -27,9 +25,9 @@ public class VulkanBackendFramebufferCompatibilityTest {
 
 	@Test
 	public void testDepthReadOnlyLayoutBarrierStageSupportsShaderReadAccess() throws Exception {
-		Class<?> nativeSpine = Class.forName("net.vulkanic.backends.vulkan.VulkanBackend$NativeSpine");
-		Method accessMaskForLayout = nativeSpine.getDeclaredMethod("accessMaskForLayout", int.class);
-		Method stageMaskForLayout = nativeSpine.getDeclaredMethod("stageMaskForLayout", int.class);
+		Class<?> planner = Class.forName("net.vulkanic.backends.vulkan.VulkanSynchronizationPlanner");
+		Method accessMaskForLayout = planner.getDeclaredMethod("accessMaskForLayout", int.class);
+		Method stageMaskForLayout = planner.getDeclaredMethod("stageMaskForLayout", int.class);
 		accessMaskForLayout.setAccessible(true);
 		stageMaskForLayout.setAccessible(true);
 
@@ -239,103 +237,76 @@ public class VulkanBackendFramebufferCompatibilityTest {
 	}
 
 	@Test
-	public void testTextureViewDepthRenderPassDependenciesIncludeFragmentTests() throws Exception {
-		Method allocator = Class.forName("net.vulkanic.backends.vulkan.VulkanBackend$NativeSpine")
-			.getDeclaredMethod(
-				"allocateTextureViewDependencies",
-				MemoryStack.class,
-				VulkanRenderPassCompatibilityKey.class
-			);
-		allocator.setAccessible(true);
-
+	public void testTextureViewDepthRenderPassDependenciesIncludeFragmentTests() {
 		VulkanRenderPassCompatibilityKey key = VulkanRenderPassCompatibilityKey.textureView(
 			List.of(VK10.VK_FORMAT_R8G8B8A8_UNORM),
 			VK10.VK_FORMAT_D32_SFLOAT,
 			false
 		);
 
-		try (MemoryStack stack = MemoryStack.stackPush()) {
-			VkSubpassDependency.Buffer dependencies = (VkSubpassDependency.Buffer) allocator.invoke(null, stack, key);
-			int entryStages = dependencies.get(0).dstStageMask();
-			int entryAccess = dependencies.get(0).dstAccessMask();
-			int exitStages = dependencies.get(1).srcStageMask();
-			int exitAccess = dependencies.get(1).srcAccessMask();
+		List<VulkanRenderPassLayoutPlanner.SubpassDependencyPlan> dependencies =
+			VulkanRenderPassLayoutPlanner.dependencyIntent(key);
+		int entryStages = dependencies.get(0).dstStageMask();
+		int entryAccess = dependencies.get(0).dstAccessMask();
+		int exitStages = dependencies.get(1).srcStageMask();
+		int exitAccess = dependencies.get(1).srcAccessMask();
 
-			assertTrue((entryStages & VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT) != 0);
-			assertTrue((entryStages & VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT) != 0);
-			assertTrue((entryAccess & VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT) != 0);
-			assertTrue((entryAccess & VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT) != 0);
-			assertTrue((exitStages & VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT) != 0);
-			assertTrue((exitStages & VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT) != 0);
-			assertTrue((exitAccess & VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT) != 0);
-			assertTrue((exitAccess & VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT) != 0);
-		}
+		assertTrue((entryStages & VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT) != 0);
+		assertTrue((entryStages & VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT) != 0);
+		assertTrue((entryAccess & VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT) != 0);
+		assertTrue((entryAccess & VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT) != 0);
+		assertTrue((exitStages & VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT) != 0);
+		assertTrue((exitStages & VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT) != 0);
+		assertTrue((exitAccess & VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT) != 0);
+		assertTrue((exitAccess & VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT) != 0);
 	}
 
 	@Test
-	public void testFramebufferRenderPassDependenciesIncludeGraphicsBarrierSelfDependency() throws Exception {
-		Method allocator = Class.forName("net.vulkanic.backends.vulkan.VulkanBackend$NativeSpine")
-			.getDeclaredMethod(
-				"allocateFramebufferDependencies",
-				MemoryStack.class,
-				VulkanRenderPassCompatibilityKey.class
-			);
-		allocator.setAccessible(true);
-
+	public void testFramebufferRenderPassDependenciesIncludeGraphicsBarrierSelfDependency() {
 		VulkanRenderPassCompatibilityKey key = VulkanRenderPassCompatibilityKey.framebuffer(
 			List.of(VK10.VK_FORMAT_R8G8B8A8_UNORM),
 			VK10.VK_FORMAT_D32_SFLOAT,
 			false
 		);
 
-		try (MemoryStack stack = MemoryStack.stackPush()) {
-			VkSubpassDependency.Buffer dependencies = (VkSubpassDependency.Buffer) allocator.invoke(null, stack, key);
-			VkSubpassDependency selfDependency = dependencies.get(2);
+		List<VulkanRenderPassLayoutPlanner.SubpassDependencyPlan> dependencies =
+			VulkanRenderPassLayoutPlanner.dependencyIntent(key);
+		VulkanRenderPassLayoutPlanner.SubpassDependencyPlan selfDependency = dependencies.get(2);
 
-			assertEquals(3, dependencies.capacity());
-			assertEquals(0, selfDependency.srcSubpass());
-			assertEquals(0, selfDependency.dstSubpass());
-			assertEquals(0, selfDependency.srcStageMask() & VK10.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-			assertEquals(0, selfDependency.dstStageMask() & VK10.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-			assertEquals(0, selfDependency.srcStageMask() & VK10.VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
-			assertEquals(0, selfDependency.dstStageMask() & VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-			assertTrue((selfDependency.srcStageMask() & VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT) != 0);
-			assertTrue((selfDependency.dstStageMask() & VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT) != 0);
-			assertTrue((selfDependency.srcAccessMask() & VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT) != 0);
-			assertTrue((selfDependency.dstAccessMask() & VK10.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT) != 0);
-			assertTrue((selfDependency.dependencyFlags() & VK10.VK_DEPENDENCY_BY_REGION_BIT) != 0);
-		}
+		assertEquals(3, dependencies.size());
+		assertEquals(0, selfDependency.srcSubpass());
+		assertEquals(0, selfDependency.dstSubpass());
+		assertEquals(0, selfDependency.srcStageMask() & VK10.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+		assertEquals(0, selfDependency.dstStageMask() & VK10.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+		assertEquals(0, selfDependency.srcStageMask() & VK10.VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+		assertEquals(0, selfDependency.dstStageMask() & VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+		assertTrue((selfDependency.srcStageMask() & VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT) != 0);
+		assertTrue((selfDependency.dstStageMask() & VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT) != 0);
+		assertTrue((selfDependency.srcAccessMask() & VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT) != 0);
+		assertTrue((selfDependency.dstAccessMask() & VK10.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT) != 0);
+		assertTrue((selfDependency.dependencyFlags() & VK10.VK_DEPENDENCY_BY_REGION_BIT) != 0);
 	}
 
 	@Test
-	public void testTextureViewFeedbackDependenciesKeepDedicatedFeedbackLoopDependency() throws Exception {
-		Method allocator = Class.forName("net.vulkanic.backends.vulkan.VulkanBackend$NativeSpine")
-			.getDeclaredMethod(
-				"allocateTextureViewDependencies",
-				MemoryStack.class,
-				VulkanRenderPassCompatibilityKey.class
-			);
-		allocator.setAccessible(true);
-
+	public void testTextureViewFeedbackDependenciesKeepDedicatedFeedbackLoopDependency() {
 		VulkanRenderPassCompatibilityKey key = VulkanRenderPassCompatibilityKey.textureView(
 			List.of(VK10.VK_FORMAT_R8G8B8A8_UNORM),
 			VK10.VK_FORMAT_UNDEFINED,
 			true
 		);
 
-		try (MemoryStack stack = MemoryStack.stackPush()) {
-			VkSubpassDependency.Buffer dependencies = (VkSubpassDependency.Buffer) allocator.invoke(null, stack, key);
-			VkSubpassDependency graphicsSelfDependency = dependencies.get(2);
-			VkSubpassDependency feedbackDependency = dependencies.get(3);
+		List<VulkanRenderPassLayoutPlanner.SubpassDependencyPlan> dependencies =
+			VulkanRenderPassLayoutPlanner.dependencyIntent(key);
+		VulkanRenderPassLayoutPlanner.SubpassDependencyPlan graphicsSelfDependency = dependencies.get(2);
+		VulkanRenderPassLayoutPlanner.SubpassDependencyPlan feedbackDependency = dependencies.get(3);
 
-			assertEquals(4, dependencies.capacity());
-			assertEquals(0, graphicsSelfDependency.srcSubpass());
-			assertEquals(0, graphicsSelfDependency.dstSubpass());
-			assertEquals(0, graphicsSelfDependency.srcStageMask() & VK10.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-			assertTrue((graphicsSelfDependency.dependencyFlags() & VK10.VK_DEPENDENCY_BY_REGION_BIT) != 0);
-			assertTrue((feedbackDependency.dependencyFlags()
-				& EXTAttachmentFeedbackLoopLayout.VK_DEPENDENCY_FEEDBACK_LOOP_BIT_EXT) != 0);
-		}
+		assertEquals(4, dependencies.size());
+		assertEquals(0, graphicsSelfDependency.srcSubpass());
+		assertEquals(0, graphicsSelfDependency.dstSubpass());
+		assertEquals(0, graphicsSelfDependency.srcStageMask() & VK10.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+		assertTrue((graphicsSelfDependency.dependencyFlags() & VK10.VK_DEPENDENCY_BY_REGION_BIT) != 0);
+		assertTrue((feedbackDependency.dependencyFlags()
+			& EXTAttachmentFeedbackLoopLayout.VK_DEPENDENCY_FEEDBACK_LOOP_BIT_EXT) != 0);
 	}
 
 	@Test
