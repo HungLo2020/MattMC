@@ -89,7 +89,6 @@ final class VulkanTextureResourceManager {
         texture.imageHandle = VK10.VK_NULL_HANDLE;
         texture.memoryHandle = VK10.VK_NULL_HANDLE;
         texture.defaultViewHandle = VK10.VK_NULL_HANDLE;
-        texture.currentLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
         texture.imageUsageFlags = 0;
         texture.feedbackLoopCapable = false;
         texture.width = 0;
@@ -97,7 +96,6 @@ final class VulkanTextureResourceManager {
         texture.depth = 1;
         texture.mipLevels = 1;
         texture.levels.clear();
-        texture.levelLayouts.clear();
     }
 
     void registerManagedTexture(long imageHandle, long memoryHandle, long defaultViewHandle) {
@@ -234,7 +232,6 @@ final class LegacyTextureObject {
     volatile int target;
     final Map<Integer, Integer> integerParameters = new ConcurrentHashMap<>();
     final Map<Integer, TextureLevelInfo> levels = new ConcurrentHashMap<>();
-    final Map<Integer, Integer> levelLayouts = new ConcurrentHashMap<>();
     final Set<Long> managedViewHandles = ConcurrentHashMap.newKeySet();
     final Map<LegacySampledDepthViewKey, Long> sampledDepthViewHandles = new ConcurrentHashMap<>();
 
@@ -246,7 +243,6 @@ final class LegacyTextureObject {
     volatile int imageUsageFlags;
     volatile boolean feedbackLoopCapable;
     volatile int pixelBytes;
-    volatile int currentLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
     volatile int mipLevels = 1;
     volatile int width;
     volatile int height;

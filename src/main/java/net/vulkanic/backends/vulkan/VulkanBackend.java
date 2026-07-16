@@ -12221,7 +12221,7 @@ void main() {
             List<VulkanImageStateTracker.VulkanImageTransition> transitions =
                 imageStateTracker.planTransitions(texture.id, safeBaseMip, endMipExclusive - safeBaseMip, targetLayout);
             for (VulkanImageStateTracker.VulkanImageTransition transition : transitions) {
-                int level = transition.mipLevel();
+                int level = transition.baseMipLevel();
                 int trackedLayout = transition.oldLayout();
 
                 if (renderPassRecording) {
@@ -12239,8 +12239,16 @@ void main() {
                     continue;
                 }
 
-                transitionImageLayout(texture, trackedLayout, targetLayout, level, 1);
-                trackLayoutForLevel(texture, level, targetLayout);
+                transitionImageLayout(
+                    texture,
+                    trackedLayout,
+                    targetLayout,
+                    transition.baseMipLevel(),
+                    transition.levelCount(),
+                    transition.baseLayer(),
+                    transition.layerCount()
+                );
+                imageStateTracker.recordTransition(transition);
             }
         }
 
@@ -12266,7 +12274,7 @@ void main() {
                     VK10.VK_IMAGE_LAYOUT_GENERAL
                 );
             for (VulkanImageStateTracker.VulkanImageTransition transition : transitions) {
-                int level = transition.mipLevel();
+                int level = transition.baseMipLevel();
                 int trackedLayout = transition.oldLayout();
                 if (renderPassRecording) {
                     LOGGER.warn(
@@ -12277,8 +12285,16 @@ void main() {
                     );
                     continue;
                 }
-                transitionImageLayout(texture, trackedLayout, VK10.VK_IMAGE_LAYOUT_GENERAL, level, 1);
-                trackLayoutForLevel(texture, level, VK10.VK_IMAGE_LAYOUT_GENERAL);
+                transitionImageLayout(
+                    texture,
+                    trackedLayout,
+                    VK10.VK_IMAGE_LAYOUT_GENERAL,
+                    transition.baseMipLevel(),
+                    transition.levelCount(),
+                    transition.baseLayer(),
+                    transition.layerCount()
+                );
+                imageStateTracker.recordTransition(transition);
             }
         }
 
@@ -13382,13 +13398,11 @@ void main() {
                 texture.imageUsageFlags = legacyImageUsage;
                 texture.feedbackLoopCapable = isFeedbackLoopCapableImageUsage(legacyImageUsage);
                 texture.pixelBytes = formatInfo.pixelBytes;
-                texture.currentLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
                 texture.mipLevels = mipLevels;
                 texture.width = width;
                 texture.height = height;
                 texture.depth = texture3D ? Math.max(1, depth) : 1;
                 texture.levels.clear();
-                texture.levelLayouts.clear();
                 imageStateTracker.registerTexture(
                     texture.id,
                     imageHandle,
@@ -13508,19 +13522,11 @@ void main() {
         }
 
         private int trackedLayoutForLevel(LegacyTextureObject texture, int level) {
-            int mirrorLayout = texture.levelLayouts.getOrDefault(level, VK10.VK_IMAGE_LAYOUT_UNDEFINED);
-            int fallback = mirrorLayout != VK10.VK_IMAGE_LAYOUT_UNDEFINED
-                ? mirrorLayout
-                : (level == 0 ? texture.currentLayout : VK10.VK_IMAGE_LAYOUT_UNDEFINED);
-            return imageStateTracker.layoutFor(texture.id, level, fallback);
+            return imageStateTracker.layoutFor(texture.id, level, VK10.VK_IMAGE_LAYOUT_UNDEFINED);
         }
 
         private void trackLayoutForLevel(LegacyTextureObject texture, int level, int layout) {
             imageStateTracker.recordLayout(texture.id, level, layout);
-            texture.levelLayouts.put(level, layout);
-            if (level == 0) {
-                texture.currentLayout = layout;
-            }
         }
 
         private static int legacyTextureLayerCount(LegacyTextureObject texture) {
@@ -13624,6 +13630,24 @@ void main() {
                                            int newLayout,
                                            int baseMipLevel,
                                            int levelCount) {
+            transitionImageLayout(
+                texture,
+                oldLayout,
+                newLayout,
+                baseMipLevel,
+                levelCount,
+                0,
+                legacyTextureLayerCount(texture)
+            );
+        }
+
+        private void transitionImageLayout(LegacyTextureObject texture,
+                                           int oldLayout,
+                                           int newLayout,
+                                           int baseMipLevel,
+                                           int levelCount,
+                                           int baseLayer,
+                                           int layerCount) {
             VkCommandBuffer recordingCommandBuffer = requireRecordingCommandBuffer(
                 primaryCommandBuffer.address(),
                 "transitionImageLayout"
@@ -13636,7 +13660,8 @@ void main() {
                 newLayout,
                 baseMipLevel,
                 levelCount,
-                legacyTextureLayerCount(texture)
+                baseLayer,
+                layerCount
             );
         }
 
@@ -13648,15 +13673,37 @@ void main() {
                                             int baseMipLevel,
                                             int levelCount,
                                             int layerCount) {
+            transitionImageLayout(
+                commandBuffer,
+                imageHandle,
+                aspectMask,
+                oldLayout,
+                newLayout,
+                baseMipLevel,
+                levelCount,
+                0,
+                layerCount
+            );
+        }
+
+        private void transitionImageLayout(VkCommandBuffer commandBuffer,
+                                            long imageHandle,
+                                            int aspectMask,
+                                            int oldLayout,
+                                            int newLayout,
+                                            int baseMipLevel,
+                                            int levelCount,
+                                            int baseLayer,
+                                            int layerCount) {
             if (imageHandle == VK10.VK_NULL_HANDLE) {
                 throw new IllegalStateException("transitionImageLayout requires a valid VkImage handle");
             }
             if (commandBuffer == null) {
                 throw new IllegalStateException("transitionImageLayout requires a non-null recording command buffer");
             }
-            if (baseMipLevel < 0 || levelCount <= 0 || layerCount <= 0) {
+            if (baseMipLevel < 0 || levelCount <= 0 || baseLayer < 0 || layerCount <= 0) {
                 throw new IllegalArgumentException(
-                    "transitionImageLayout requires non-negative baseMipLevel and positive levelCount/layerCount"
+                    "transitionImageLayout requires non-negative baseMipLevel/baseLayer and positive levelCount/layerCount"
                 );
             }
             java.util.Optional<VulkanSynchronizationPlanner.ImageBarrierPlan> maybePlan =
@@ -13666,7 +13713,10 @@ void main() {
                     newLayout,
                     baseMipLevel,
                     levelCount,
-                    layerCount
+                    baseLayer,
+                    layerCount,
+                    VK10.VK_QUEUE_FAMILY_IGNORED,
+                    VK10.VK_QUEUE_FAMILY_IGNORED
                 );
             if (maybePlan.isEmpty()) {
                 return;

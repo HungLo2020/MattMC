@@ -50,13 +50,12 @@ final class VulkanTextureResourceManagerTest {
     }
 
     @Test
-    void clearingLegacyStorageInvalidatesDefaultViewAndPerLevelState() {
+    void clearingLegacyStorageInvalidatesDefaultViewAndStorageMetadata() {
         VulkanTextureResourceManager manager = new VulkanTextureResourceManager();
         LegacyTextureObject texture = manager.getLegacyTexture(manager.createLegacyTexture(VulkanicAPI.GL_TEXTURE_2D));
         texture.imageHandle = 10L;
         texture.memoryHandle = 20L;
         texture.defaultViewHandle = 30L;
-        texture.currentLayout = VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         texture.imageUsageFlags = VK10.VK_IMAGE_USAGE_SAMPLED_BIT;
         texture.feedbackLoopCapable = true;
         texture.width = 64;
@@ -64,14 +63,12 @@ final class VulkanTextureResourceManagerTest {
         texture.depth = 2;
         texture.mipLevels = 4;
         texture.levels.put(0, new TextureLevelInfo(64, 32, VulkanicAPI.GL_RGBA8));
-        texture.levelLayouts.put(0, VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         manager.clearLegacyTextureStorage(texture);
 
         assertEquals(VK10.VK_NULL_HANDLE, texture.imageHandle);
         assertEquals(VK10.VK_NULL_HANDLE, texture.memoryHandle);
         assertEquals(VK10.VK_NULL_HANDLE, texture.defaultViewHandle);
-        assertEquals(VK10.VK_IMAGE_LAYOUT_UNDEFINED, texture.currentLayout);
         assertEquals(0, texture.imageUsageFlags);
         assertFalse(texture.feedbackLoopCapable);
         assertEquals(0, texture.width);
@@ -79,7 +76,6 @@ final class VulkanTextureResourceManagerTest {
         assertEquals(1, texture.depth);
         assertEquals(1, texture.mipLevels);
         assertTrue(texture.levels.isEmpty());
-        assertTrue(texture.levelLayouts.isEmpty());
     }
 
     @Test

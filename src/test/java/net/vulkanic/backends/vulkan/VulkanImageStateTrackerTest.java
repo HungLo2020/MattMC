@@ -33,6 +33,26 @@ public class VulkanImageStateTrackerTest {
     }
 
     @Test
+    public void testTracksMipLayerLayoutsIndependently() {
+        VulkanImageStateTracker tracker = new VulkanImageStateTracker();
+        tracker.registerTexture(
+            17,
+            0xFACE,
+            VK10.VK_IMAGE_ASPECT_COLOR_BIT,
+            2,
+            3,
+            false,
+            VK10.VK_IMAGE_LAYOUT_UNDEFINED
+        );
+
+        tracker.recordLayoutRange(17, 1, 1, 1, 1, VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+        assertEquals(VK10.VK_IMAGE_LAYOUT_UNDEFINED, tracker.layoutFor(17, 1, 0, VK10.VK_IMAGE_LAYOUT_GENERAL));
+        assertEquals(VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, tracker.layoutFor(17, 1, 1, VK10.VK_IMAGE_LAYOUT_GENERAL));
+        assertEquals(VK10.VK_IMAGE_LAYOUT_UNDEFINED, tracker.layoutFor(17, 1, 2, VK10.VK_IMAGE_LAYOUT_GENERAL));
+    }
+
+    @Test
     public void testTransitionPlanOnlyIncludesMipsThatNeedWork() {
         VulkanImageStateTracker tracker = new VulkanImageStateTracker();
         tracker.registerTexture(
@@ -50,10 +70,74 @@ public class VulkanImageStateTrackerTest {
             tracker.planTransitions(11, 0, 3, VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         assertEquals(2, transitions.size());
-        assertEquals(0, transitions.get(0).mipLevel());
+        assertEquals(0, transitions.get(0).baseMipLevel());
+        assertEquals(1, transitions.get(0).levelCount());
+        assertEquals(0, transitions.get(0).baseLayer());
+        assertEquals(1, transitions.get(0).layerCount());
         assertEquals(VK10.VK_IMAGE_LAYOUT_UNDEFINED, transitions.get(0).oldLayout());
         assertEquals(VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, transitions.get(0).newLayout());
-        assertEquals(2, transitions.get(1).mipLevel());
+        assertEquals(2, transitions.get(1).baseMipLevel());
+    }
+
+    @Test
+    public void testTransitionPlanningAggregatesLayerRuns() {
+        VulkanImageStateTracker tracker = new VulkanImageStateTracker();
+        tracker.registerTexture(
+            19,
+            0xA11CE,
+            VK10.VK_IMAGE_ASPECT_COLOR_BIT,
+            1,
+            4,
+            false,
+            VK10.VK_IMAGE_LAYOUT_UNDEFINED
+        );
+        tracker.recordLayoutRange(19, 0, 1, 1, 2, VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+        List<VulkanImageStateTracker.VulkanImageTransition> transitions =
+            tracker.planTransitions(19, 0, 1, VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+        assertEquals(2, transitions.size());
+        assertEquals(0, transitions.get(0).baseLayer());
+        assertEquals(1, transitions.get(0).layerCount());
+        assertEquals(3, transitions.get(1).baseLayer());
+        assertEquals(1, transitions.get(1).layerCount());
+    }
+
+    @Test
+    public void testNoOpSameLayoutTransitionsAreSkipped() {
+        VulkanImageStateTracker tracker = new VulkanImageStateTracker();
+        tracker.registerTexture(
+            23,
+            0x600D,
+            VK10.VK_IMAGE_ASPECT_COLOR_BIT,
+            2,
+            2,
+            false,
+            VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        );
+
+        assertTrue(tracker.planTransitions(23, 0, 2, VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL).isEmpty());
+    }
+
+    @Test
+    public void testStateUpdatesOnlyWhenCompletedTransitionIsRecorded() {
+        VulkanImageStateTracker tracker = new VulkanImageStateTracker();
+        tracker.registerTexture(
+            29,
+            0xABC,
+            VK10.VK_IMAGE_ASPECT_COLOR_BIT,
+            1,
+            1,
+            false,
+            VK10.VK_IMAGE_LAYOUT_UNDEFINED
+        );
+
+        VulkanImageStateTracker.VulkanImageTransition transition =
+            tracker.planTransitions(29, 0, 1, VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL).get(0);
+
+        assertEquals(VK10.VK_IMAGE_LAYOUT_UNDEFINED, tracker.layoutFor(29, 0, VK10.VK_IMAGE_LAYOUT_GENERAL));
+        tracker.recordTransition(transition);
+        assertEquals(VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, tracker.layoutFor(29, 0, VK10.VK_IMAGE_LAYOUT_GENERAL));
     }
 
     @Test
@@ -65,6 +149,39 @@ public class VulkanImageStateTrackerTest {
         assertNotNull(tracker.state(3));
         assertEquals(VK10.VK_IMAGE_LAYOUT_UNDEFINED, tracker.layoutFor(3, 0, VK10.VK_IMAGE_LAYOUT_GENERAL));
         assertTrue(tracker.planTransitions(3, 0, 1, VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL).isEmpty());
+    }
+
+    @Test
+    public void testImageReplacementAndDeletionCleanupResetTrackedState() {
+        VulkanImageStateTracker tracker = new VulkanImageStateTracker();
+        tracker.registerTexture(31, 0x111, VK10.VK_IMAGE_ASPECT_COLOR_BIT, 1, 1, false, VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        assertEquals(VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, tracker.layoutFor(31, 0, VK10.VK_IMAGE_LAYOUT_GENERAL));
+
+        tracker.registerTexture(31, 0x222, VK10.VK_IMAGE_ASPECT_DEPTH_BIT, 2, 1, false, VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+        VulkanImageState replacement = tracker.state(31);
+        assertNotNull(replacement);
+        assertEquals(0x222, replacement.imageHandle());
+        assertEquals(VK10.VK_IMAGE_ASPECT_DEPTH_BIT, replacement.aspectMask());
+        assertEquals(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, tracker.layoutFor(31, 0, VK10.VK_IMAGE_LAYOUT_GENERAL));
+        assertEquals(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, tracker.layoutFor(31, 1, VK10.VK_IMAGE_LAYOUT_GENERAL));
+
+        tracker.unregisterTexture(31);
+        assertNull(tracker.state(31));
+        assertEquals(VK10.VK_IMAGE_LAYOUT_GENERAL, tracker.layoutFor(31, 0, VK10.VK_IMAGE_LAYOUT_GENERAL));
+    }
+
+    @Test
+    public void testFeedbackLoopAndDepthLayoutsAreTrackedAsImageState() {
+        VulkanImageStateTracker tracker = new VulkanImageStateTracker();
+        int feedbackLayout = EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+        tracker.registerTexture(37, 0x333, VK10.VK_IMAGE_ASPECT_DEPTH_BIT, 1, 1, true, feedbackLayout);
+
+        VulkanImageState state = tracker.state(37);
+        assertNotNull(state);
+        assertTrue(state.feedbackLoopCapable());
+        assertEquals(VK10.VK_IMAGE_ASPECT_DEPTH_BIT, state.aspectMask());
+        assertEquals(feedbackLayout, tracker.layoutFor(37, 0, VK10.VK_IMAGE_LAYOUT_GENERAL));
     }
 
     @Test

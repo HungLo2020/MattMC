@@ -57,16 +57,29 @@ final class VulkanImageState {
         this.feedbackLoopCapable = feedbackLoopCapable;
         this.layouts.clear();
         for (int mip = 0; mip < this.mipLevels; mip++) {
-            recordLayout(mip, initialLayout);
+            recordLayout(mip, 0, this.layerCount, initialLayout);
         }
     }
 
     int layoutFor(int mipLevel) {
-        return this.layouts.getOrDefault(new VulkanImageSubresourceKey(mipLevel, 0), VK10.VK_IMAGE_LAYOUT_UNDEFINED);
+        return layoutFor(mipLevel, 0);
+    }
+
+    int layoutFor(int mipLevel, int layer) {
+        return this.layouts.getOrDefault(new VulkanImageSubresourceKey(mipLevel, layer), VK10.VK_IMAGE_LAYOUT_UNDEFINED);
     }
 
     void recordLayout(int mipLevel, int layout) {
-        this.layouts.put(new VulkanImageSubresourceKey(mipLevel, 0), layout);
+        recordLayout(mipLevel, 0, this.layerCount, layout);
+    }
+
+    void recordLayout(int mipLevel, int baseLayer, int layerCount, int layout) {
+        int safeBaseLayer = Math.max(0, baseLayer);
+        int safeLayerCount = Math.max(1, layerCount);
+        int endLayerExclusive = Math.min(this.layerCount, safeBaseLayer + safeLayerCount);
+        for (int layer = safeBaseLayer; layer < endLayerExclusive; layer++) {
+            this.layouts.put(new VulkanImageSubresourceKey(mipLevel, layer), layout);
+        }
     }
 
     void clear() {
