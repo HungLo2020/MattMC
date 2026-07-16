@@ -279,37 +279,6 @@ pub(crate) fn source_state(source_handle: u64) -> AudioResult<i32> {
     })
 }
 
-pub(crate) fn source_set_position(source_handle: u64, x: f32, y: f32, z: f32) -> AudioResult<()> {
-    with_source_mut(source_handle, |source| source.set_position(x, y, z))
-}
-
-pub(crate) fn source_set_pitch(source_handle: u64, pitch: f32) -> AudioResult<()> {
-    with_source_mut(source_handle, |source| source.set_pitch(pitch))
-}
-
-pub(crate) fn source_set_volume(source_handle: u64, gain: f32) -> AudioResult<()> {
-    with_source_mut(source_handle, |source| source.set_volume(gain))
-}
-
-pub(crate) fn source_set_looping(source_handle: u64, looping: bool) -> AudioResult<()> {
-    with_source_mut(source_handle, |source| {
-        source.set_looping(looping);
-        Ok(())
-    })
-}
-
-pub(crate) fn source_set_relative(source_handle: u64, relative: bool) -> AudioResult<()> {
-    with_source_mut(source_handle, |source| source.set_relative(relative))
-}
-
-pub(crate) fn source_disable_attenuation(source_handle: u64) -> AudioResult<()> {
-    with_source_mut(source_handle, |source| source.disable_attenuation())
-}
-
-pub(crate) fn source_linear_attenuation(source_handle: u64, distance: f32) -> AudioResult<()> {
-    with_source_mut(source_handle, |source| source.linear_attenuation(distance))
-}
-
 pub(crate) fn create_buffer_handle(
     device_handle: u64,
     data: &[u8],
@@ -375,36 +344,6 @@ pub(crate) fn attach_static_buffer(source_handle: u64, buffer_handle: u64) -> Au
     })
 }
 
-pub(crate) fn queue_stream_buffer(
-    source_handle: u64,
-    data: &[u8],
-    channels: i32,
-    bits: i32,
-    pcm: bool,
-    sample_rate: i32,
-) -> AudioResult<()> {
-    with_backend(|backend| {
-        let device_handle = backend
-            .sources
-            .get(source_handle)
-            .ok_or(AudioError::InvalidHandle)?
-            .device;
-        backend.ensure_device_owner(device_handle)?;
-        let context = backend
-            .devices
-            .get(device_handle)
-            .ok_or(AudioError::InvalidHandle)?
-            .context
-            .clone();
-        let buffer = create_buffer(&context, data, channels, bits, pcm, sample_rate)?;
-        backend
-            .sources
-            .get_mut(source_handle)
-            .ok_or(AudioError::InvalidHandle)?
-            .queue_stream_buffer(buffer)
-    })
-}
-
 pub(crate) fn remove_processed_stream_buffers(source_handle: u64) -> AudioResult<i32> {
     with_source_mut_value(source_handle, |source| source.remove_processed_buffers())
 }
@@ -424,21 +363,6 @@ pub(crate) fn listener_set_transform(
             })?
             .context;
         listener::set_transform(context, transform)
-    })
-}
-
-pub(crate) fn listener_reset(device_handle: u64) -> AudioResult<()> {
-    with_backend(|backend| {
-        let context = &backend
-            .devices
-            .get(device_handle)
-            .ok_or(AudioError::InvalidHandle)
-            .and_then(|device| {
-                device.ensure_owner_thread()?;
-                Ok(device)
-            })?
-            .context;
-        listener::reset(context)
     })
 }
 
@@ -506,7 +430,6 @@ pub(crate) fn device_pool_counts(device_handle: u64) -> AudioResult<PoolCounts> 
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg(test)]
 pub(crate) struct LiveCounts {
     pub(crate) devices: usize,
     pub(crate) sources: usize,
@@ -514,7 +437,6 @@ pub(crate) struct LiveCounts {
     pub(crate) queued_stream_buffers: i32,
 }
 
-#[cfg(test)]
 pub(crate) fn live_counts() -> AudioResult<LiveCounts> {
     with_backend(|backend| {
         Ok(LiveCounts {

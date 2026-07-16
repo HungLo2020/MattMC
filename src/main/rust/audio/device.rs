@@ -12,16 +12,6 @@ pub(crate) enum ChannelPool {
     Streaming,
 }
 
-impl ChannelPool {
-    pub(crate) fn from_id(id: i32) -> Option<Self> {
-        match id {
-            0 => Some(Self::Static),
-            1 => Some(Self::Streaming),
-            _ => None,
-        }
-    }
-}
-
 pub(crate) struct NativeDevice {
     pub(crate) device: OutputDevice,
     pub(crate) context: Context,

@@ -15,9 +15,7 @@ use super::ffi::{
     mattmc_audio_buffer_create, mattmc_audio_buffer_destroy, mattmc_audio_device_create,
     mattmc_audio_device_destroy, mattmc_audio_format_to_openal, mattmc_audio_sound_create_static,
     mattmc_audio_sound_create_streaming, mattmc_audio_sound_state,
-    mattmc_audio_sound_submit_stream_chunks, mattmc_audio_source_create,
-    mattmc_audio_source_destroy, mattmc_audio_source_queue_stream_buffer,
-    mattmc_audio_source_state,
+    mattmc_audio_sound_stop_and_destroy, mattmc_audio_sound_submit_stream_chunks,
 };
 use super::format::audio_format_to_openal;
 use super::handles::{HandleTable, NativeHandle, ResourceKind};
@@ -271,8 +269,9 @@ fn streaming_queue_ownership_is_released_with_source() {
         let source = backend::create_source(device, ChannelPool::Streaming)
             .expect("streaming source should be created");
         let pcm = [0_u8, 0, 0, 0, 0, 0, 0, 0];
-        backend::queue_stream_buffer(source, &pcm, 1, 16, true, 44_100)
-            .expect("streaming buffer should queue");
+        let chunks: [&[u8]; 1] = [&pcm];
+        backend::submit_stream_chunks(source, &chunks, 1, 16, true, 44_100)
+            .expect("streaming chunk should queue");
         assert_eq!(1, backend::live_counts().unwrap().queued_stream_buffers);
         let processed = backend::remove_processed_stream_buffers(source)
             .expect("processed buffers should read");
@@ -355,8 +354,9 @@ fn counter_reset_after_shutdown_clears_live_resources_and_queued_stream_buffers(
         let pcm = [0_u8, 0, 0, 0];
         let buffer = backend::create_buffer_handle(device, &pcm, 1, 16, true, 44_100)
             .expect("buffer should be created");
-        backend::queue_stream_buffer(source, &pcm, 1, 16, true, 44_100)
-            .expect("streaming buffer should queue");
+        let chunks: [&[u8]; 1] = [&pcm];
+        backend::submit_stream_chunks(source, &chunks, 1, 16, true, 44_100)
+            .expect("streaming chunk should queue");
 
         let before = backend::live_counts().expect("live counts should read");
         assert_eq!(1, before.devices);
@@ -391,11 +391,10 @@ fn listener_state_updates_are_bound_to_live_device_handles() {
         )
         .expect("listener transform should update");
         backend::listener_set_gain(device, 0.5).expect("listener gain should update");
-        backend::listener_reset(device).expect("listener reset should update");
         backend::destroy_device(device).expect("device should destroy");
         assert_eq!(
             Err(AudioError::InvalidHandle),
-            backend::listener_reset(device)
+            backend::listener_set_gain(device, 1.0)
         );
     });
 }
@@ -443,14 +442,15 @@ fn ffi_wrong_thread_returns_distinct_status_and_safe_fallback_state() {
         assert_eq!(OK, unsafe {
             mattmc_audio_device_create(std::ptr::null(), 0, 0, &mut device)
         });
-        let mut source = 0_u64;
+        let config = SoundConfigRecord::default();
+        let mut sound = 0_u64;
         assert_eq!(OK, unsafe {
-            mattmc_audio_source_create(device, 0, &mut source)
+            mattmc_audio_sound_create_streaming(device, &config, &mut sound)
         });
 
         let result = std::thread::spawn(move || {
             let mut state = 0_i32;
-            let status = unsafe { mattmc_audio_source_state(source, &mut state) };
+            let status = unsafe { mattmc_audio_sound_state(sound, &mut state) };
             (status, state)
         })
         .join()
@@ -495,15 +495,15 @@ fn ffi_format_mapping_reports_status_and_value() {
 }
 
 #[test]
-fn ffi_invalid_source_state_fails_safely() {
+fn ffi_invalid_sound_state_fails_safely() {
     with_audio_backend(|| {
         let mut state = 0_i32;
         assert_eq!(ERR_INVALID_HANDLE, unsafe {
-            mattmc_audio_source_state(42, &mut state)
+            mattmc_audio_sound_state(42, &mut state)
         });
         assert_eq!(AL_STOPPED, state);
         assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
-            mattmc_audio_source_state(42, std::ptr::null_mut())
+            mattmc_audio_sound_state(42, std::ptr::null_mut())
         });
     });
 }
@@ -515,13 +515,14 @@ fn ffi_lifecycle_rejects_double_destroy_and_stale_handles() {
         assert_eq!(OK, unsafe {
             mattmc_audio_device_create(std::ptr::null(), 0, 0, &mut device)
         });
-        let mut source = 0_u64;
+        let config = SoundConfigRecord::default();
+        let mut sound = 0_u64;
         assert_eq!(OK, unsafe {
-            mattmc_audio_source_create(device, 0, &mut source)
+            mattmc_audio_sound_create_streaming(device, &config, &mut sound)
         });
-        assert_eq!(OK, unsafe { mattmc_audio_source_destroy(source) });
+        assert_eq!(OK, unsafe { mattmc_audio_sound_stop_and_destroy(sound) });
         assert_eq!(ERR_INVALID_HANDLE, unsafe {
-            mattmc_audio_source_destroy(source)
+            mattmc_audio_sound_stop_and_destroy(sound)
         });
         assert_eq!(OK, unsafe { mattmc_audio_device_destroy(device) });
         assert_eq!(ERR_INVALID_HANDLE, unsafe {
@@ -537,26 +538,47 @@ fn ffi_streaming_queue_validates_pointer_and_handle_ownership() {
         assert_eq!(OK, unsafe {
             mattmc_audio_device_create(std::ptr::null(), 0, 0, &mut device)
         });
-        let mut source = 0_u64;
+        let config = SoundConfigRecord::default();
+        let mut sound = 0_u64;
         assert_eq!(OK, unsafe {
-            mattmc_audio_source_create(device, 1, &mut source)
+            mattmc_audio_sound_create_streaming(device, &config, &mut sound)
         });
+        let mut accepted = -1_i32;
+        let bad_chunk = StreamChunkRecord {
+            data_ptr: std::ptr::null(),
+            data_len: 4,
+        };
         assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
-            mattmc_audio_source_queue_stream_buffer(source, std::ptr::null(), 4, 1, 16, 1, 44_100)
-        });
-
-        let pcm = [0_u8, 0, 0, 0];
-        assert_eq!(OK, unsafe {
-            mattmc_audio_source_queue_stream_buffer(
-                source,
-                pcm.as_ptr(),
-                pcm.len() as u64,
+            mattmc_audio_sound_submit_stream_chunks(
+                sound,
+                &bad_chunk,
+                1,
                 1,
                 16,
                 1,
                 44_100,
+                &mut accepted,
             )
         });
+
+        let pcm = [0_u8, 0, 0, 0];
+        let chunk = StreamChunkRecord {
+            data_ptr: pcm.as_ptr(),
+            data_len: pcm.len() as u64,
+        };
+        assert_eq!(OK, unsafe {
+            mattmc_audio_sound_submit_stream_chunks(
+                sound,
+                &chunk,
+                1,
+                1,
+                16,
+                1,
+                44_100,
+                &mut accepted,
+            )
+        });
+        assert_eq!(1, accepted);
     });
 }
 

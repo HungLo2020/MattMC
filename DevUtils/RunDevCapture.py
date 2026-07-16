@@ -60,6 +60,7 @@ class CaptureConfig:
     client_args: str
     deterministic_camera_capture: bool
     deterministic_pose_tolerance: float
+    audio_validation: bool
     platform_name: str | None
 
 
@@ -108,6 +109,7 @@ class CaptureRunner:
         self.window_tree_dump = self.artifact_dir / f"window_tree_dump_{self.run_id}.txt"
         self.deterministic_metadata = self.artifact_dir / f"deterministic_camera_capture_{self.run_id}.json"
         self.deterministic_screenshot_dir = self.artifact_dir / f"deterministic_camera_capture_{self.run_id}"
+        self.audio_validation_status = self.artifact_dir / f"audio_validation_{self.run_id}.json"
 
         self.validation_layer_manifest = ""
         self.validation_layer_dir = ""
@@ -132,6 +134,7 @@ class CaptureRunner:
         self.deterministic_completed = False
         self.intentional_deterministic_shutdown = False
         self.deterministic_validation_status = "not_requested"
+        self.audio_validation_result = "not_requested"
         self.env = os.environ.copy()
 
     def run(self) -> int:
@@ -159,6 +162,7 @@ class CaptureRunner:
         self.append_final_meta(exit_code)
         self.collect_final_artifacts()
         self.validate_deterministic_capture()
+        self.validate_audio_status()
         self.print_summary(exit_code)
         self.release_lock()
 
@@ -166,6 +170,8 @@ class CaptureRunner:
             return 124
         if self.config.deterministic_camera_capture and self.deterministic_validation_status != "ok":
             return 2
+        if self.config.audio_validation and self.audio_validation_result != "ok":
+            return 3
         return 0
 
     def acquire_lock(self) -> None:
@@ -562,6 +568,16 @@ class CaptureRunner:
             self.append_meta(f"deterministic_camera_capture_java_options={' '.join(deterministic_options)}")
             self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
 
+        if self.config.audio_validation:
+            audio_options = [
+                "-Dmattmc.dev.audioValidation=true",
+                f"-Dmattmc.dev.audioValidation.status={self.audio_validation_status}",
+            ]
+            self.append_java_tool_options(audio_options)
+            self.append_meta(f"audio_validation_java_options={' '.join(audio_options)}")
+            self.append_meta(f"audio_validation_status={self.audio_validation_status}")
+            self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
+
     def append_java_tool_options(self, options: list[str]) -> None:
         current = self.env.get("JAVA_TOOL_OPTIONS", "")
         joined = " ".join(options)
@@ -905,6 +921,41 @@ class CaptureRunner:
             print(str(exc), file=sys.stderr)
         self.append_meta(f"deterministic_validation={self.deterministic_validation_status}")
 
+    def validate_audio_status(self) -> None:
+        if not self.config.audio_validation:
+            return
+        try:
+            data = json.loads(self.audio_validation_status.read_text(encoding="utf-8"))
+            required_true = [
+                "openAlOnSoundThread",
+                "listenerUpdated",
+                "staticUpdatesSucceeded",
+                "streamingUpdatesSucceeded",
+                "reloadSucceeded",
+            ]
+            for key in required_true:
+                if not data.get(key):
+                    raise RuntimeError(f"audio validation {key} was not true")
+            if data.get("status") != "complete":
+                raise RuntimeError(f"audio validation status was {data.get('status')!r}: {data.get('error')!r}")
+            if int(data.get("streamingChunksSubmitted", 0)) <= 0:
+                raise RuntimeError("audio validation submitted no streaming chunks")
+            if int(data.get("streamingChunksProcessed", 0)) <= 0:
+                raise RuntimeError("audio validation consumed no streaming chunks")
+            for name in ("afterReleaseCounts", "shutdownCounts"):
+                counts = data.get(name) or {}
+                if any(int(counts.get(key, -1)) != 0 for key in ("sounds", "buffers", "queuedStreamBuffers")):
+                    raise RuntimeError(f"audio validation {name} retained native resources: {counts}")
+            shutdown = data.get("shutdownCounts") or {}
+            if int(shutdown.get("devices", -1)) != 0:
+                raise RuntimeError(f"audio validation shutdown retained device: {shutdown}")
+            self.audio_validation_result = "ok"
+            print(f"audio validation OK: {self.audio_validation_status}")
+        except Exception as exc:
+            self.audio_validation_result = "failed"
+            print(str(exc), file=sys.stderr)
+        self.append_meta(f"audio_validation={self.audio_validation_result}")
+
     def print_summary(self, exit_code: int) -> None:
         print("Capture complete.")
         print(f"- Meta:        {self.meta_log}")
@@ -931,6 +982,9 @@ class CaptureRunner:
             print(f"- Deterministic metadata: {self.deterministic_metadata}")
             print(f"- Deterministic screenshots: {self.deterministic_screenshot_dir}")
             print(f"- Deterministic validation: {self.deterministic_validation_status}")
+        if self.config.audio_validation:
+            print(f"- Audio validation: {self.audio_validation_status}")
+            print(f"- Audio result:     {self.audio_validation_result}")
 
         if self.timed_out:
             print(f"Result: timed out after {self.config.max_secs}s and was terminated automatically.")
@@ -1484,6 +1538,7 @@ def parse_args() -> CaptureConfig:
         default=os.environ.get("SHADER_INPUT_PARITY", "off"),
     )
     parser.add_argument("--deterministic-camera-capture", action="store_true")
+    parser.add_argument("--audio-validation", action="store_true")
     parser.add_argument(
         "--skip-tests",
         action="store_true",
@@ -1521,6 +1576,7 @@ def parse_args() -> CaptureConfig:
         client_args=args.client_args,
         deterministic_camera_capture=bool(args.deterministic_camera_capture),
         deterministic_pose_tolerance=float(pose_tolerance),
+        audio_validation=bool(args.audio_validation),
         platform_name=args.platform,
     )
 

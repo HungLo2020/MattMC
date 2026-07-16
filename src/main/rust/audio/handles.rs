@@ -145,12 +145,10 @@ impl<T> HandleTable<T> {
             .collect()
     }
 
-    #[cfg(test)]
     pub(crate) fn len(&self) -> usize {
         self.entries.len()
     }
 
-    #[cfg(test)]
     pub(crate) fn values(&self) -> impl Iterator<Item = &T> {
         self.entries.values().map(|entry| &entry.value)
     }

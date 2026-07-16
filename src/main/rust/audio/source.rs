@@ -171,7 +171,6 @@ impl NativeSource {
         }
     }
 
-    #[cfg(test)]
     pub(crate) fn queued_stream_buffers(&self) -> i32 {
         self.queued_stream_buffers
     }

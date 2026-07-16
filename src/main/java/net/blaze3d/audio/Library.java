@@ -29,6 +29,10 @@ public class Library {
 		LOGGER.info("OpenAL initialized on device {}", this.getCurrentDeviceName());
 	}
 
+	long currentDeviceHandleForDevValidation() {
+		return this.currentDevice;
+	}
+
 	@Nullable
 	public static String getDefaultDeviceName() {
 		String name = NativeAudio.defaultDeviceName();
