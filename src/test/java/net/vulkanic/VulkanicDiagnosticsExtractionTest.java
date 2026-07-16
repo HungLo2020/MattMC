@@ -4,6 +4,7 @@ import net.vulkanic.diagnostics.VulkanicDiagnostics;
 import net.vulkanic.diagnostics.RenderTargetContentDiagnostics;
 import net.vulkanic.diagnostics.RenderTargetContentDiagnostics.DiagnosticTextureContentHash;
 import net.vulkanic.diagnostics.RenderTargetContentDiagnostics.PendingScopedCompositeColortex0SamplerReadback;
+import net.vulkanic.diagnostics.VulkanBackendDiagnosticFormatting;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -119,6 +120,72 @@ class VulkanicDiagnosticsExtractionTest {
         assertEquals(1, RenderTargetContentDiagnostics.drainPendingScopedCompositeSamplerReadbacks().size());
         assertEquals(0, RenderTargetContentDiagnostics.pendingReadbackCountForTests());
         assertEquals(0, RenderTargetContentDiagnostics.drainPendingScopedCompositeSamplerReadbacks().size());
+    }
+
+    @Test
+    void vulkanBackendDiagnosticFormattingNamesLayoutsStagesAndAccessMasks() {
+        assertEquals("COLOR_ATTACHMENT_OPTIMAL", VulkanBackendDiagnosticFormatting.imageLayoutName(2));
+        assertEquals("SHADER_READ_ONLY_OPTIMAL", VulkanBackendDiagnosticFormatting.imageLayoutName(5));
+        assertEquals("PRESENT_SRC_KHR", VulkanBackendDiagnosticFormatting.imageLayoutName(1000001002));
+        assertEquals("ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT", VulkanBackendDiagnosticFormatting.imageLayoutName(1000339000));
+        assertEquals("layout-123456", VulkanBackendDiagnosticFormatting.imageLayoutName(123456));
+
+        assertEquals("COLOR_ATTACHMENT_OUTPUT", VulkanBackendDiagnosticFormatting.stageMaskName(0x00000400));
+        assertEquals(
+            "FRAGMENT_SHADER|EARLY_FRAGMENT_TESTS|LATE_FRAGMENT_TESTS",
+            VulkanBackendDiagnosticFormatting.stageMaskName(0x00000100 | 0x00000200 | 0x00000080)
+        );
+        assertEquals("COLOR_ATTACHMENT_WRITE", VulkanBackendDiagnosticFormatting.accessMaskName(0x00000100));
+        assertEquals(
+            "SHADER_READ|COLOR_ATTACHMENT_WRITE",
+            VulkanBackendDiagnosticFormatting.accessMaskName(0x00000100 | 0x00000020)
+        );
+    }
+
+    @Test
+    void vulkanBackendDiagnosticFormattingBuildsLifecycleDescriptions() {
+        String lifecycle = VulkanBackendDiagnosticFormatting.textureLifecycle(
+            "colortex0",
+            17,
+            0xABCDL,
+            0xBEEFL,
+            0xCAFE,
+            0x2c,
+            5,
+            0x00008000 | 0x00000800,
+            0x00000020,
+            2,
+            5
+        );
+
+        assertTrue(lifecycle.contains("backend=vulkan"));
+        assertTrue(lifecycle.contains("logicalResource=colortex0"));
+        assertTrue(lifecycle.contains("legacyTextureId=17"));
+        assertTrue(lifecycle.contains("image=0xabcd"));
+        assertTrue(lifecycle.contains("trackedLayout=SHADER_READ_ONLY_OPTIMAL(0x5)"));
+        assertTrue(lifecycle.contains("stageMask=0x8800"));
+        assertTrue(lifecycle.contains("accessMask=0x20"));
+        assertTrue(lifecycle.contains("producerAttachmentLayout=COLOR_ATTACHMENT_OPTIMAL"));
+        assertTrue(lifecycle.contains("consumerShaderReadLayout=SHADER_READ_ONLY_OPTIMAL"));
+
+        assertEquals(
+            "backend=vulkan,logicalResource=colortex0,lifecycle=unavailable:not-vulkan-view",
+            VulkanBackendDiagnosticFormatting.unavailableTextureLifecycle("colortex0", "not-vulkan-view")
+        );
+    }
+
+    @Test
+    void vulkanBackendDiagnosticFormattingBuildsUnavailableReadbackResults() {
+        DiagnosticTextureContentHash hash = VulkanBackendDiagnosticFormatting.unavailableTextureReadback(
+            "colortex0",
+            null,
+            null,
+            "not-vulkan-view"
+        );
+
+        assertEquals("colortex0", hash.logicalResource());
+        assertEquals("unavailable", hash.canonicalFormat());
+        assertEquals("unavailable:not-vulkan-view", hash.hash());
     }
 
     @Test

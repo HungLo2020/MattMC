@@ -189,6 +189,8 @@ public class VulkanDescriptorLifecycleTest {
     public void testVulkanDescriptorSourceNoLongerUsesUnsupportedStubs() throws Exception {
         String source = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String descriptorManagerSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanDescriptorManager.java"));
 
         assertTrue(source.contains("new VulkanDescriptorPoolHandle"),
             "Vulkan descriptor lifecycle should allocate VulkanDescriptorPoolHandle");
@@ -202,13 +204,14 @@ public class VulkanDescriptorLifecycleTest {
             "Vulkan backend should resolve legacy integer buffer handles to real VulkanBuffer storage");
         assertTrue(source.contains("updateAndBindDescriptorSet("),
             "Vulkan descriptor lifecycle should route binding requests through a native descriptor update+bind helper");
-        assertTrue(source.contains("descriptorSetCache"),
-            "Vulkan descriptor lifecycle should cache descriptor sets for repeated resolved bindings instead of allocating every bind");
+        assertTrue(source.contains("descriptorManager.updateAndBindDescriptorSet(")
+                && descriptorManagerSource.contains("descriptorSetCache"),
+            "Vulkan descriptor lifecycle should cache descriptor sets in the backend-internal descriptor manager");
         assertTrue(source.contains("lastBoundGraphicsPipelineByCommandBuffer"),
             "Vulkan backend should track per-command-buffer pipeline binds so redundant vkCmdBindPipeline calls can be skipped safely");
-        assertTrue(source.contains("vkUpdateDescriptorSets"),
+        assertTrue(descriptorManagerSource.contains("vkUpdateDescriptorSets"),
             "Vulkan descriptor lifecycle should now issue vkUpdateDescriptorSets on descriptor binding path");
-        assertTrue(source.contains("vkCmdBindDescriptorSets"),
+        assertTrue(descriptorManagerSource.contains("vkCmdBindDescriptorSets"),
             "Vulkan descriptor lifecycle should now issue vkCmdBindDescriptorSets on descriptor binding path");
         assertTrue(source.contains("bindLegacyTexelBufferForActiveUnit("),
             "Vulkan texel-buffer bindings should route through native VkBufferView-backed helper");

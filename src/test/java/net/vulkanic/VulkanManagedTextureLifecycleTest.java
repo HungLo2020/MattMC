@@ -290,27 +290,29 @@ public class VulkanManagedTextureLifecycleTest {
         Path backendFile = PROJECT_ROOT.resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java");
         String source = Files.readString(backendFile);
 
-        assertTrue(source.contains("pendingVulkanResourceDestroys"),
-            "Vulkan backend should centralize native resource retirement behind a pending destroy queue");
-        assertTrue(source.contains("submittedWorkGenerationByFence"),
-            "Vulkan backend should associate submitted work generations with Vulkan fences");
-        assertTrue(source.contains("reservedFrameWorkGenerations[currentFrameSyncIndex] = reserveWorkGeneration()"),
+        assertTrue(source.contains("VulkanDeferredResourceLifetime<StagingBuffer, VulkanBuffer> lifetime"),
+            "Vulkan backend should centralize native resource retirement behind the deferred lifetime manager");
+        assertTrue(source.contains("lifetime.reserveFrameWorkGeneration(currentFrameSyncIndex)"),
             "Frame command recording should reserve a generation before resources can be closed during that frame");
-        assertTrue(source.contains("reservedImmediateWorkGenerations[currentImmediateSubmitSlot] = reserveWorkGeneration()"),
+        assertTrue(source.contains("lifetime.reserveImmediateWorkGeneration(currentImmediateSubmitSlot)"),
             "Immediate command recording should reserve a generation before resources can be closed during that submit");
-        assertTrue(source.contains("registerSubmittedWork(frameFence, reservedFrameWorkGenerations[currentFrameSyncIndex])"),
-            "Frame submits should publish their reserved generation to the submitted fence map");
-        assertTrue(source.contains("registerSubmittedWork(submitFence, reservedImmediateWorkGenerations[submitSlot])"),
-            "Immediate submits should publish their reserved generation to the submitted fence map");
+        assertTrue(source.contains("registerSubmittedWork(frameFence, lifetime.reservedFrameWorkGeneration(currentFrameSyncIndex))"),
+            "Frame submits should publish their reserved generation to the lifetime manager");
+        assertTrue(source.contains("registerSubmittedWork(submitFence, lifetime.reservedImmediateWorkGeneration(submitSlot))"),
+            "Immediate submits should publish their reserved generation to the lifetime manager");
         assertTrue(source.contains("markFenceComplete(frameFence)") && source.contains("markFenceComplete(submitFence)"),
             "Fence waits should mark submitted generations complete before native resources are retired");
+        assertTrue(source.contains("lifetime.markFenceComplete(fenceHandle, logicalDevice != null)"),
+            "Fence completion should retire lifetime-managed native resources through the shared manager");
+        assertTrue(source.contains("lifetime.enqueueDestroy("),
+            "Deferred native destruction should enqueue through the shared lifetime manager");
         assertTrue(source.contains("enqueueVulkanResourceDestroy(() -> destroyManagedTextureHandles(imageHandle, memoryHandle, defaultViewHandle))"),
             "Managed textures should defer VkImage/VkImageView destruction until submitted GPU work has completed");
         assertTrue(source.contains("destroyImageView(finalImageViewHandle)"),
             "Temporary present-source image views should use deferred image-view retirement");
         assertTrue(source.contains("destroyBufferView(previous.vkBufferViewHandle)"),
             "Descriptor-backed buffer views should use the same deferred retirement path");
-        assertTrue(source.contains("flushPendingVulkanResourceDestroys(true)"),
+        assertTrue(source.contains("lifetime.flushPendingDestroys(logicalDevice != null, force)"),
             "Device shutdown should force-flush pending destroys after waiting for the device to idle");
     }
 

@@ -48,6 +48,7 @@ import net.vulkanic.VulkanicBufferTarget;
 import net.vulkanic.VulkanicResourceBarriers;
 import net.vulkanic.diagnostics.RenderTargetContentDiagnostics;
 import net.vulkanic.diagnostics.RenderTargetContentDiagnostics.DiagnosticTextureContentHash;
+import net.vulkanic.diagnostics.VulkanBackendDiagnosticFormatting;
 import net.vulkanic.diagnostics.VulkanicDiagnostics;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
@@ -75,9 +76,6 @@ import org.lwjgl.vulkan.VkClearDepthStencilValue;
 import org.lwjgl.vulkan.VkClearValue;
 import org.lwjgl.vulkan.VkDescriptorBufferInfo;
 import org.lwjgl.vulkan.VkDescriptorImageInfo;
-import org.lwjgl.vulkan.VkDescriptorPoolCreateInfo;
-import org.lwjgl.vulkan.VkDescriptorPoolSize;
-import org.lwjgl.vulkan.VkDescriptorSetAllocateInfo;
 import org.lwjgl.vulkan.VkExtensionProperties;
 import org.lwjgl.vulkan.VkImageBlit;
 import org.lwjgl.vulkan.VkImageCopy;
@@ -152,9 +150,7 @@ import org.lwjgl.vulkan.VkVertexInputAttributeDescription;
 import org.lwjgl.vulkan.VkVertexInputBindingDescription;
 
 import java.util.ArrayList;
-import java.util.ArrayDeque;
 import java.util.Collections;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -3615,7 +3611,7 @@ void main() {
             throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
         }
         if (!(textureView instanceof VulkanTextureView vulkanTextureView)) {
-            return DiagnosticTextureContentHash.unavailable(
+            return VulkanBackendDiagnosticFormatting.unavailableTextureReadback(
                 logicalResource,
                 textureView == null ? null : textureView.texture(),
                 textureView,
@@ -3625,7 +3621,7 @@ void main() {
         try {
             return spine.diagnosticTextureContentHash(vulkanTextureView, logicalResource);
         } catch (RuntimeException exception) {
-            return DiagnosticTextureContentHash.unavailable(
+            return VulkanBackendDiagnosticFormatting.unavailableTextureReadback(
                 logicalResource,
                 textureView.texture(),
                 textureView,
@@ -3642,13 +3638,15 @@ void main() {
         ensureNativeReady("diagnosticTextureLifecycleInfo");
         NativeSpine spine = nativeSpine;
         if (spine == null || !(textureView instanceof VulkanTextureView vulkanTextureView)) {
-            return "backend=vulkan,logicalResource=" + logicalResource + ",lifecycle=unavailable:not-vulkan-view";
+            return VulkanBackendDiagnosticFormatting.unavailableTextureLifecycle(logicalResource, "not-vulkan-view");
         }
         try {
             return spine.diagnosticTextureLifecycleInfo(vulkanTextureView, logicalResource);
         } catch (RuntimeException exception) {
-            return "backend=vulkan,logicalResource=" + logicalResource
-                + ",lifecycle=unavailable:" + exception.getClass().getSimpleName();
+            return VulkanBackendDiagnosticFormatting.unavailableTextureLifecycle(
+                logicalResource,
+                exception.getClass().getSimpleName()
+            );
         }
     }
 
@@ -7059,37 +7057,15 @@ void main() {
             return;
         }
 
-        if (equivalent) {
-            LOGGER.info(
-                "Vulkan render-target parity#{} label={} framebuffer={} equivalent=true signature={}",
-                logIndex,
-                label,
-                framebuffer,
-                framebufferSignature
-            );
-            return;
-        }
-
-        if (exception != null) {
-            LOGGER.warn(
-                "Vulkan render-target parity#{} label={} framebuffer={} equivalent=false reason={} framebufferSignature={} descriptorSignature={}",
-                logIndex,
-                label,
-                framebuffer,
-                exception.getClass().getSimpleName() + ": " + exception.getMessage(),
-                framebufferSignature,
-                descriptorSignature
-            );
-            return;
-        }
-
-        LOGGER.warn(
-            "Vulkan render-target parity#{} label={} framebuffer={} equivalent=false framebufferSignature={} descriptorSignature={}",
+        VulkanBackendDiagnosticFormatting.emitRenderTargetParity(
+            LOGGER,
             logIndex,
-            label,
+            equivalent,
             framebuffer,
+            label,
             framebufferSignature,
-            descriptorSignature
+            descriptorSignature,
+            exception
         );
     }
 
@@ -7107,29 +7083,16 @@ void main() {
             return;
         }
 
-        if (exception != null) {
-            LOGGER.warn(
-                "Vulkan render-target compatibility#{} label={} framebuffer={} compatible=false relation={} reason={} framebufferSignature={} descriptorSignature={}",
-                logIndex,
-                label,
-                framebuffer,
-                compatibility,
-                exception.getClass().getSimpleName() + ": " + exception.getMessage(),
-                framebufferSignature,
-                descriptorSignature
-            );
-            return;
-        }
-
-        LOGGER.info(
-            "Vulkan render-target compatibility#{} label={} framebuffer={} compatible={} relation={} framebufferSignature={} descriptorSignature={}",
+        VulkanBackendDiagnosticFormatting.emitRenderTargetCompatibility(
+            LOGGER,
             logIndex,
-            label,
-            framebuffer,
             compatible,
             compatibility,
+            framebuffer,
+            label,
             framebufferSignature,
-            descriptorSignature
+            descriptorSignature,
+            exception
         );
     }
 
@@ -11129,41 +11092,14 @@ void main() {
         ) {
         }
 
-        private sealed interface ResolvedDescriptorBinding permits ResolvedSamplerDescriptorBinding,
+        private sealed interface ResolvedDescriptorBinding extends VulkanDescriptorManager.DescriptorWriteBinding permits ResolvedSamplerDescriptorBinding,
             ResolvedUniformBufferDescriptorBinding, ResolvedStorageImageDescriptorBinding,
             ResolvedTexelBufferDescriptorBinding {
-
-            int bindingIndex();
-
-            int descriptorType();
-
-            DescriptorBindingCacheKey cacheKey();
-
-            void populateWrite(VkWriteDescriptorSet write, MemoryStack stack);
-        }
-
-        private record DescriptorBindingCacheKey(
-            int bindingIndex,
-            int descriptorType,
-            long primaryHandle,
-            long secondaryHandle,
-            long tertiaryHandle,
-            long quaternaryHandle
-        ) {
-        }
-
-        private record DescriptorSetCacheKey(
-            long descriptorSetLayoutHandle,
-            List<DescriptorBindingCacheKey> bindings
-        ) {
-            private DescriptorSetCacheKey {
-                bindings = List.copyOf(bindings);
-            }
         }
 
         private record DescriptorWritePlan(
             List<ResolvedDescriptorBinding> bindings,
-            DescriptorSetCacheKey cacheKey
+            VulkanDescriptorManager.DescriptorSetCacheKey cacheKey
         ) {
             private DescriptorWritePlan {
                 bindings = List.copyOf(bindings);
@@ -11194,8 +11130,8 @@ void main() {
         ) implements ResolvedDescriptorBinding {
 
             @Override
-            public DescriptorBindingCacheKey cacheKey() {
-                return new DescriptorBindingCacheKey(
+            public VulkanDescriptorManager.DescriptorBindingCacheKey cacheKey() {
+                return new VulkanDescriptorManager.DescriptorBindingCacheKey(
                     bindingIndex,
                     descriptorType,
                     imageViewHandle,
@@ -11225,8 +11161,8 @@ void main() {
         ) implements ResolvedDescriptorBinding {
 
             @Override
-            public DescriptorBindingCacheKey cacheKey() {
-                return new DescriptorBindingCacheKey(
+            public VulkanDescriptorManager.DescriptorBindingCacheKey cacheKey() {
+                return new VulkanDescriptorManager.DescriptorBindingCacheKey(
                     bindingIndex,
                     descriptorType,
                     samplerHandle,
@@ -11256,8 +11192,8 @@ void main() {
         ) implements ResolvedDescriptorBinding {
 
             @Override
-            public DescriptorBindingCacheKey cacheKey() {
-                return new DescriptorBindingCacheKey(
+            public VulkanDescriptorManager.DescriptorBindingCacheKey cacheKey() {
+                return new VulkanDescriptorManager.DescriptorBindingCacheKey(
                     bindingIndex,
                     descriptorType,
                     bufferHandle,
@@ -11285,8 +11221,8 @@ void main() {
         ) implements ResolvedDescriptorBinding {
 
             @Override
-            public DescriptorBindingCacheKey cacheKey() {
-                return new DescriptorBindingCacheKey(
+            public VulkanDescriptorManager.DescriptorBindingCacheKey cacheKey() {
+                return new VulkanDescriptorManager.DescriptorBindingCacheKey(
                     bindingIndex,
                     descriptorType,
                     bufferViewHandle,
@@ -11300,9 +11236,6 @@ void main() {
             public void populateWrite(VkWriteDescriptorSet write, MemoryStack stack) {
                 write.pTexelBufferView(stack.longs(bufferViewHandle));
             }
-        }
-
-        private record BoundDescriptorSetState(long pipelineHandle, long descriptorSetHandle, int bindPoint) {
         }
 
         private record LegacySampledDepthViewKey(int baseMipLevel, int mipLevelCount) {
@@ -11323,8 +11256,6 @@ void main() {
         private long commandPool;
         private final long[] immediateCommandPools = new long[IMMEDIATE_SUBMIT_SLOTS];
         private final long[] frameCommandPools = new long[MAX_FRAMES_IN_FLIGHT];
-        private long descriptorPool;
-        private final long[] immediateDescriptorPools = new long[IMMEDIATE_SUBMIT_SLOTS];
         private long defaultDescriptorSampler;
         private final long[] swapchainImageAvailableSemaphores = new long[MAX_FRAMES_IN_FLIGHT];
         private final long[] swapchainFrameFences = new long[MAX_FRAMES_IN_FLIGHT];
@@ -11354,39 +11285,22 @@ void main() {
         private final Map<Integer, LegacyTexelBufferBinding> legacyTexelBufferBindingsByTextureId = new ConcurrentHashMap<>();
         private volatile int legacyFallbackSamplerTextureId;
         private final Map<Integer, TextureLevelInfo> proxyTexture2DLevels = new ConcurrentHashMap<>();
-        private final Map<DescriptorSamplerKey, Long> descriptorSamplerCache = new ConcurrentHashMap<>();
-        private final Map<DescriptorSetCacheKey, Long> descriptorSetCache = new HashMap<>();
         private final Map<Long, Long> lastBoundGraphicsPipelineByCommandBuffer = new HashMap<>();
         private final Map<Long, Long> lastBoundComputePipelineByCommandBuffer = new HashMap<>();
-        private final Map<Long, BoundDescriptorSetState> lastBoundDescriptorSetByCommandBuffer = new HashMap<>();
         private final Map<Long, BoundIndexBufferState> boundIndexBuffersByCommandBuffer = new ConcurrentHashMap<>();
         @Nullable
         private volatile VulkanBuffer legacyDefaultVertexAttributeBuffer;
         private final Set<Long> managedShaderModules = ConcurrentHashMap.newKeySet();
-        private final Set<Long> transientRenderPassHandles = ConcurrentHashMap.newKeySet();
-        private final List<Set<Long>> transientRenderPassHandlesByImmediateSlot = createTransientHandleBuckets(IMMEDIATE_SUBMIT_SLOTS);
         /** Permanently-cached VkRenderPass handles keyed by typed attachment compatibility state. */
         private final Map<VulkanRenderPassKey, Long> permanentRenderPassCache = new HashMap<>();
-        private final Set<Long> transientFramebufferHandles = ConcurrentHashMap.newKeySet();
-        private final List<Set<Long>> transientFramebufferHandlesByImmediateSlot = createTransientHandleBuckets(IMMEDIATE_SUBMIT_SLOTS);
-        private final List<StagingBuffer> transientStagingBuffers = Collections.synchronizedList(new ArrayList<>());
-        private final List<List<StagingBuffer>> transientStagingBuffersByImmediateSlot = createTransientListBuckets(IMMEDIATE_SUBMIT_SLOTS);
-        private final List<VulkanBuffer> transientDescriptorBuffers = Collections.synchronizedList(new ArrayList<>());
-        private final List<List<VulkanBuffer>> transientDescriptorBuffersByImmediateSlot = createTransientListBuckets(IMMEDIATE_SUBMIT_SLOTS);
-        private final List<List<VulkanBuffer>> transientFrameDescriptorBuffers = createTransientDescriptorBufferBuckets();
-        private final Map<Integer, Deque<VulkanBuffer>> recycledDescriptorUniformBuffers = new HashMap<>();
-        private int recycledDescriptorUniformBufferCount;
-        private long recycledDescriptorUniformBufferAllocationBytes;
-        private static final int MAX_RECYCLED_DESCRIPTOR_UNIFORM_BUFFERS =
-            Integer.getInteger("mattmc.vulkan.maxRecycledDescriptorUniformBuffers", 512);
-        private static final long MAX_RECYCLED_DESCRIPTOR_UNIFORM_BUFFER_BYTES =
-            Long.getLong("mattmc.vulkan.maxRecycledDescriptorUniformBufferBytes", 64L * 1024L * 1024L);
-        private final Map<Long, Long> submittedWorkGenerationByFence = new ConcurrentHashMap<>();
-        private final List<PendingVulkanResourceDestroy> pendingVulkanResourceDestroys = Collections.synchronizedList(new ArrayList<>());
-        private final long[] reservedFrameWorkGenerations = new long[MAX_FRAMES_IN_FLIGHT];
-        private final long[] reservedImmediateWorkGenerations = new long[IMMEDIATE_SUBMIT_SLOTS];
-        private long submittedWorkGeneration;
-        private long completedWorkGeneration;
+        private final VulkanDeferredResourceLifetime<StagingBuffer, VulkanBuffer> lifetime =
+            new VulkanDeferredResourceLifetime<>(MAX_FRAMES_IN_FLIGHT, IMMEDIATE_SUBMIT_SLOTS);
+        private final VulkanDescriptorManager<VulkanBuffer> descriptorManager =
+            new VulkanDescriptorManager<>(
+                IMMEDIATE_SUBMIT_SLOTS,
+                Integer.getInteger("mattmc.vulkan.maxRecycledDescriptorUniformBuffers", 512),
+                Long.getLong("mattmc.vulkan.maxRecycledDescriptorUniformBufferBytes", 64L * 1024L * 1024L)
+            );
     /** Tracks {@code VkPipeline} handles owned by live {@link VulkanPipelineHandle} objects. */
     private final Set<Long> managedVkPipelineHandles = ConcurrentHashMap.newKeySet();
     /** Tracks {@code VkPipelineLayout} handles owned by live {@link VulkanPipelineHandle} objects. */
@@ -11483,10 +11397,7 @@ void main() {
         private int debugParticleDescriptorSamplerLogCount;
         private int debugDescriptorUboLogCount;
         private int debugComparisonSamplerFallbackLogCount;
-        private long descriptorSetCacheHitCount;
-        private long descriptorSetCacheStoreCount;
         private long skippedRedundantPipelineBindCount;
-        private long skippedRedundantDescriptorSetBindCount;
 
         private final PixelStoreState pixelStoreState = new PixelStoreState();
 
@@ -11504,30 +11415,6 @@ void main() {
         private static final int FRAME_FENCE_TIMEOUTS_BEFORE_SWAPCHAIN_RECREATE = 180;
         private static final int PRIMARY_COMMAND_TIMEOUTS_BEFORE_SWAPCHAIN_RECREATE = 180;
         private static final long ACQUIRE_TIMEOUT_LOG_INTERVAL_NANOS = 5_000_000_000L;
-
-        private static List<List<VulkanBuffer>> createTransientDescriptorBufferBuckets() {
-            List<List<VulkanBuffer>> buckets = new ArrayList<>(MAX_FRAMES_IN_FLIGHT);
-            for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-                buckets.add(Collections.synchronizedList(new ArrayList<>()));
-            }
-            return buckets;
-        }
-
-        private static List<Set<Long>> createTransientHandleBuckets(int bucketCount) {
-            List<Set<Long>> buckets = new ArrayList<>(bucketCount);
-            for (int i = 0; i < bucketCount; i++) {
-                buckets.add(ConcurrentHashMap.newKeySet());
-            }
-            return buckets;
-        }
-
-        private static <T> List<List<T>> createTransientListBuckets(int bucketCount) {
-            List<List<T>> buckets = new ArrayList<>(bucketCount);
-            for (int i = 0; i < bucketCount; i++) {
-                buckets.add(Collections.synchronizedList(new ArrayList<>()));
-            }
-            return buckets;
-        }
 
         private NativeSpine(VulkanBackend backend) {
             this.backend = Objects.requireNonNull(backend, "backend must not be null");
@@ -12068,35 +11955,8 @@ void main() {
 
         private void createSharedDescriptorResources() {
             try (MemoryStack stack = stackPush()) {
-                VkDescriptorPoolSize.Buffer poolSizes = VkDescriptorPoolSize.calloc(4, stack);
-                poolSizes.get(0)
-                    .type(VK10.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-                    .descriptorCount(2048);
-                poolSizes.get(1)
-                    .type(VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-                    .descriptorCount(2048);
-                poolSizes.get(2)
-                    .type(VK10.VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER)
-                    .descriptorCount(1024);
-                poolSizes.get(3)
-                    .type(VK10.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
-                    .descriptorCount(1024);
-
-                VkDescriptorPoolCreateInfo poolInfo = VkDescriptorPoolCreateInfo.calloc(stack)
-                    .sType$Default()
-                    .flags(VK10.VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT)
-                    .maxSets(2048)
-                    .pPoolSizes(poolSizes);
-
-                java.nio.LongBuffer pPool = stack.mallocLong(1);
-                for (int slot = 0; slot < IMMEDIATE_SUBMIT_SLOTS; slot++) {
-                    checkVk(
-                        "vkCreateDescriptorPool(immediate[" + slot + "])",
-                        VK10.vkCreateDescriptorPool(logicalDevice, poolInfo, null, pPool)
-                    );
-                    immediateDescriptorPools[slot] = pPool.get(0);
-                }
-                descriptorPool = immediateDescriptorPools[currentImmediateSubmitSlot];
+                descriptorManager.createDescriptorPools(logicalDevice, NativeSpine::checkVk);
+                descriptorManager.activateImmediateSlot(currentImmediateSubmitSlot);
 
                 VkSamplerCreateInfo samplerInfo = VkSamplerCreateInfo.calloc(stack)
                     .sType$Default()
@@ -12153,69 +12013,17 @@ void main() {
         }
 
         private void resetSharedDescriptorPool() {
-            if (descriptorPool != VK10.VK_NULL_HANDLE) {
-                checkVk("vkResetDescriptorPool",
-                    VK10.vkResetDescriptorPool(logicalDevice, descriptorPool, 0));
-            }
-            descriptorSetCache.clear();
+            descriptorManager.resetActiveDescriptorPool(logicalDevice, NativeSpine::checkVk);
             lastBoundGraphicsPipelineByCommandBuffer.clear();
             lastBoundComputePipelineByCommandBuffer.clear();
-            lastBoundDescriptorSetByCommandBuffer.clear();
             boundIndexBuffersByCommandBuffer.clear();
         }
 
         private void clearTrackedCommandBufferState(long commandBufferHandle) {
             lastBoundGraphicsPipelineByCommandBuffer.remove(commandBufferHandle);
             lastBoundComputePipelineByCommandBuffer.remove(commandBufferHandle);
-            lastBoundDescriptorSetByCommandBuffer.remove(commandBufferHandle);
+            descriptorManager.clearCommandBufferState(commandBufferHandle);
             boundIndexBuffersByCommandBuffer.remove(commandBufferHandle);
-        }
-
-        private void bindDescriptorSetIfNeeded(
-            long commandBufferHandle,
-            VkCommandBuffer activeCommandBuffer,
-            VulkanPipelineHandle pipeline,
-            long descriptorSetHandle
-        ) {
-            bindDescriptorSetIfNeeded(
-                commandBufferHandle,
-                activeCommandBuffer,
-                pipeline,
-                descriptorSetHandle,
-                VK10.VK_PIPELINE_BIND_POINT_GRAPHICS
-            );
-        }
-
-        private void bindDescriptorSetIfNeeded(
-            long commandBufferHandle,
-            VkCommandBuffer activeCommandBuffer,
-            VulkanPipelineHandle pipeline,
-            long descriptorSetHandle,
-            int bindPoint
-        ) {
-            BoundDescriptorSetState currentState = lastBoundDescriptorSetByCommandBuffer.get(commandBufferHandle);
-            if (currentState != null
-                && currentState.pipelineHandle() == pipeline.getVkPipelineHandle()
-                && currentState.descriptorSetHandle() == descriptorSetHandle
-                && currentState.bindPoint() == bindPoint) {
-                skippedRedundantDescriptorSetBindCount++;
-                return;
-            }
-
-            try (MemoryStack stack = stackPush()) {
-                VK10.vkCmdBindDescriptorSets(
-                activeCommandBuffer,
-                    bindPoint,
-                pipeline.getVkPipelineLayoutHandle(),
-                0,
-                stack.longs(descriptorSetHandle),
-                    null
-                );
-            }
-            lastBoundDescriptorSetByCommandBuffer.put(
-                commandBufferHandle,
-                new BoundDescriptorSetState(pipeline.getVkPipelineHandle(), descriptorSetHandle, bindPoint)
-            );
         }
 
         private int descriptorImageLayoutFor(@Nullable LegacyTextureObject texture, boolean storageImageCompatible) {
@@ -12347,7 +12155,7 @@ void main() {
             long descriptorSetLayoutHandle
         ) {
             List<ResolvedDescriptorBinding> resolvedBindings = new ArrayList<>(layoutBindings.size());
-            List<DescriptorBindingCacheKey> cacheKeys = new ArrayList<>(layoutBindings.size());
+            List<VulkanDescriptorManager.DescriptorBindingCacheKey> cacheKeys = new ArrayList<>(layoutBindings.size());
             Set<Integer> storageImageTextureIds = collectStorageImageTextureIds(layoutBindings, bindings);
             boolean cacheable = true;
 
@@ -12382,7 +12190,7 @@ void main() {
 
             return new DescriptorWritePlan(
                 resolvedBindings,
-                cacheable ? new DescriptorSetCacheKey(descriptorSetLayoutHandle, cacheKeys) : null
+                cacheable ? new VulkanDescriptorManager.DescriptorSetCacheKey(descriptorSetLayoutHandle, cacheKeys) : null
             );
         }
 
@@ -12844,7 +12652,7 @@ void main() {
             long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
             VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "bindPipelineResources");
 
-            if (descriptorPool == VK10.VK_NULL_HANDLE) {
+            if (descriptorManager.activeDescriptorPool() == VK10.VK_NULL_HANDLE) {
                 throw new IllegalStateException("Descriptor pool is unavailable for Vulkan descriptor updates");
             }
             if (defaultDescriptorSampler == VK10.VK_NULL_HANDLE) {
@@ -12883,7 +12691,7 @@ void main() {
                 bindPipeline(commandBufferHandle, pipeline.getVkPipelineHandle());
             }
 
-            try (MemoryStack stack = stackPush()) {
+            try {
                 DescriptorWritePlan writePlan = buildDescriptorWritePlan(
                     layoutBindings,
                     bindings,
@@ -12894,50 +12702,18 @@ void main() {
                     pipeline.getVkDescriptorSetLayoutHandle()
                 );
 
-                if (writePlan.cacheable()) {
-                    Long cachedDescriptorSetHandle = descriptorSetCache.get(writePlan.cacheKey());
-                    if (cachedDescriptorSetHandle != null) {
-                        descriptorSetCacheHitCount++;
-                        bindDescriptorSetIfNeeded(
-                            commandBufferHandle,
-                            activeCommandBuffer,
-                            pipeline,
-                            cachedDescriptorSetHandle,
-                            bindPoint
-                        );
-                        return;
-                    }
-                }
-
-                VkDescriptorSetAllocateInfo allocInfo = VkDescriptorSetAllocateInfo.calloc(stack)
-                    .sType$Default()
-                    .descriptorPool(descriptorPool)
-                    .pSetLayouts(stack.longs(pipeline.getVkDescriptorSetLayoutHandle()));
-
-                java.nio.LongBuffer pDescriptorSet = stack.mallocLong(1);
-                checkVk("vkAllocateDescriptorSets(bindPipelineResources)",
-                    VK10.vkAllocateDescriptorSets(logicalDevice, allocInfo, pDescriptorSet));
-                long descriptorSetHandle = pDescriptorSet.get(0);
-
-                VkWriteDescriptorSet.Buffer writes = VkWriteDescriptorSet.calloc(writePlan.bindings().size(), stack);
-                for (int i = 0; i < writePlan.bindings().size(); i++) {
-                    ResolvedDescriptorBinding resolvedBinding = writePlan.bindings().get(i);
-                    VkWriteDescriptorSet write = writes.get(i)
-                        .sType$Default()
-                        .dstSet(descriptorSetHandle)
-                        .dstBinding(resolvedBinding.bindingIndex())
-                        .dstArrayElement(0)
-                        .descriptorCount(1)
-                        .descriptorType(resolvedBinding.descriptorType());
-                    resolvedBinding.populateWrite(write, stack);
-                }
-
-                VK10.vkUpdateDescriptorSets(logicalDevice, writes, null);
-                if (writePlan.cacheable()) {
-                    descriptorSetCache.put(writePlan.cacheKey(), descriptorSetHandle);
-                    descriptorSetCacheStoreCount++;
-                }
-                bindDescriptorSetIfNeeded(commandBufferHandle, activeCommandBuffer, pipeline, descriptorSetHandle, bindPoint);
+                descriptorManager.updateAndBindDescriptorSet(
+                    logicalDevice,
+                    commandBufferHandle,
+                    activeCommandBuffer,
+                    pipeline.getVkPipelineHandle(),
+                    pipeline.getVkPipelineLayoutHandle(),
+                    pipeline.getVkDescriptorSetLayoutHandle(),
+                    bindPoint,
+                    writePlan.bindings(),
+                    writePlan.cacheKey(),
+                    NativeSpine::checkVk
+                );
             } finally {
                 if (auditStartNanos != 0L) {
                     VulkanPerfAudit.recordDescriptorBind(System.nanoTime() - auditStartNanos);
@@ -12946,23 +12722,12 @@ void main() {
         }
 
         private long resolveDescriptorSamplerHandle(@Nullable DescriptorSamplerKey key) {
-            if (key == null) {
-                return defaultDescriptorSampler;
-            }
-
-            Long cachedSampler = descriptorSamplerCache.get(key);
-            if (cachedSampler != null) {
-                return cachedSampler;
-            }
-
-            long createdSampler = createDescriptorSampler(key);
-            Long existingSampler = descriptorSamplerCache.putIfAbsent(key, createdSampler);
-            if (existingSampler != null) {
-                VK10.vkDestroySampler(logicalDevice, createdSampler, null);
-                return existingSampler;
-            }
-
-            return createdSampler;
+            return descriptorManager.resolveDescriptorSampler(
+                key,
+                defaultDescriptorSampler,
+                samplerKey -> createDescriptorSampler((DescriptorSamplerKey) samplerKey),
+                samplerHandle -> VK10.vkDestroySampler(logicalDevice, samplerHandle, null)
+            );
         }
 
         private long resolveDescriptorSamplerHandle(VulkanTextureView textureView) {
@@ -14064,16 +13829,6 @@ void main() {
             }
         }
 
-        private static final class PendingVulkanResourceDestroy {
-            private final long retireAfterGeneration;
-            private final Runnable destroyAction;
-
-            private PendingVulkanResourceDestroy(long retireAfterGeneration, Runnable destroyAction) {
-                this.retireAfterGeneration = retireAfterGeneration;
-                this.destroyAction = destroyAction;
-            }
-        }
-
         private void recreateLegacyTextureStorage(LegacyTextureObject texture,
                                                   LegacyTextureFormatInfo formatInfo,
                                                   int width,
@@ -14287,78 +14042,38 @@ void main() {
         }
 
         private boolean hasPotentiallyPendingGpuWork() {
-            if (submittedWorkGeneration > completedWorkGeneration) {
-                return true;
-            }
-            if (renderPassRecording || commandBufferRecording || immediateSubmitInFlight || frameInProgress) {
-                return true;
-            }
-            for (boolean inFlight : immediateSubmitSlotsInFlight) {
-                if (inFlight) {
-                    return true;
-                }
-            }
-            for (boolean recording : frameCommandBufferRecording) {
-                if (recording) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private long retireAfterGeneration() {
-            long retireAfterGeneration = submittedWorkGeneration;
-            if (frameInProgress) {
-                retireAfterGeneration = Math.max(retireAfterGeneration, reservedFrameWorkGenerations[currentFrameSyncIndex]);
-            }
-            if (commandBufferRecording && recordingImmediateSubmitSlot >= 0) {
-                retireAfterGeneration = Math.max(retireAfterGeneration, reservedImmediateWorkGenerations[recordingImmediateSubmitSlot]);
-            }
-            return retireAfterGeneration;
+            return lifetime.hasPotentiallyPendingGpuWork(
+                renderPassRecording,
+                commandBufferRecording,
+                immediateSubmitInFlight,
+                frameInProgress,
+                immediateSubmitSlotsInFlight,
+                frameCommandBufferRecording
+            );
         }
 
         private void enqueueVulkanResourceDestroy(Runnable destroyAction) {
-            if (logicalDevice == null) {
-                return;
-            }
-            if (!hasPotentiallyPendingGpuWork()) {
-                destroyAction.run();
-                return;
-            }
-            pendingVulkanResourceDestroys.add(new PendingVulkanResourceDestroy(retireAfterGeneration(), destroyAction));
-        }
-
-        private long reserveWorkGeneration() {
-            return ++submittedWorkGeneration;
+            lifetime.enqueueDestroy(
+                logicalDevice != null,
+                hasPotentiallyPendingGpuWork(),
+                frameInProgress,
+                currentFrameSyncIndex,
+                commandBufferRecording,
+                recordingImmediateSubmitSlot,
+                destroyAction
+            );
         }
 
         private void registerSubmittedWork(long fenceHandle, long generation) {
-            if (fenceHandle == VK10.VK_NULL_HANDLE) {
-                return;
-            }
-            if (generation <= 0) {
-                generation = reserveWorkGeneration();
-            }
-            submittedWorkGenerationByFence.put(fenceHandle, generation);
+            lifetime.registerSubmittedWork(fenceHandle, generation);
         }
 
         private void markFenceComplete(long fenceHandle) {
-            if (fenceHandle == VK10.VK_NULL_HANDLE) {
-                return;
-            }
-            Long generation = submittedWorkGenerationByFence.remove(fenceHandle);
-            if (generation != null && generation > completedWorkGeneration) {
-                completedWorkGeneration = generation;
-            }
-            flushPendingVulkanResourceDestroys(false);
+            lifetime.markFenceComplete(fenceHandle, logicalDevice != null);
         }
 
         private void markAllSubmittedWorkComplete() {
-            completedWorkGeneration = submittedWorkGeneration;
-            submittedWorkGenerationByFence.clear();
-            java.util.Arrays.fill(reservedFrameWorkGenerations, 0L);
-            java.util.Arrays.fill(reservedImmediateWorkGenerations, 0L);
-            flushPendingVulkanResourceDestroys(false);
+            lifetime.markAllSubmittedWorkComplete(logicalDevice != null);
         }
 
         private void destroyLegacyTextureStorageHandles(long viewHandle, long imageHandle, long memoryHandle) {
@@ -14377,33 +14092,7 @@ void main() {
         }
 
         private void flushPendingVulkanResourceDestroys(boolean force) {
-            if (logicalDevice == null) {
-                pendingVulkanResourceDestroys.clear();
-                return;
-            }
-            if (force) {
-                completedWorkGeneration = submittedWorkGeneration;
-                submittedWorkGenerationByFence.clear();
-            }
-
-            java.util.List<PendingVulkanResourceDestroy> ready = new ArrayList<>();
-            synchronized (pendingVulkanResourceDestroys) {
-                if (pendingVulkanResourceDestroys.isEmpty()) {
-                    return;
-                }
-                java.util.Iterator<PendingVulkanResourceDestroy> iterator = pendingVulkanResourceDestroys.iterator();
-                while (iterator.hasNext()) {
-                    PendingVulkanResourceDestroy pending = iterator.next();
-                    if (force || pending.retireAfterGeneration <= completedWorkGeneration) {
-                        ready.add(pending);
-                        iterator.remove();
-                    }
-                }
-            }
-
-            for (PendingVulkanResourceDestroy pending : ready) {
-                pending.destroyAction.run();
-            }
+            lifetime.flushPendingDestroys(logicalDevice != null, force);
         }
 
         private int trackedLayoutForLevel(LegacyTextureObject texture, int level) {
@@ -15217,7 +14906,7 @@ void main() {
             String logicalResource
         ) {
             if (renderPassRecording) {
-                return DiagnosticTextureContentHash.unavailable(
+                return VulkanBackendDiagnosticFormatting.unavailableTextureReadback(
                     logicalResource,
                     textureView.texture(),
                     textureView,
@@ -15225,7 +14914,7 @@ void main() {
                 );
             }
             if (textureView.getBaseMipLevel() != 0) {
-                return DiagnosticTextureContentHash.unavailable(
+                return VulkanBackendDiagnosticFormatting.unavailableTextureReadback(
                     logicalResource,
                     textureView.texture(),
                     textureView,
@@ -15235,7 +14924,7 @@ void main() {
 
             LegacyTextureObject sourceTexture = tryResolveLegacyTexture(textureView);
             if (sourceTexture == null) {
-                return DiagnosticTextureContentHash.unavailable(
+                return VulkanBackendDiagnosticFormatting.unavailableTextureReadback(
                     logicalResource,
                     textureView.texture(),
                     textureView,
@@ -15243,7 +14932,7 @@ void main() {
                 );
             }
             if (sourceTexture.imageHandle == VK10.VK_NULL_HANDLE) {
-                return DiagnosticTextureContentHash.unavailable(
+                return VulkanBackendDiagnosticFormatting.unavailableTextureReadback(
                     logicalResource,
                     textureView.texture(),
                     textureView,
@@ -15251,7 +14940,7 @@ void main() {
                 );
             }
             if (sourceTexture.aspectMask != VK10.VK_IMAGE_ASPECT_COLOR_BIT) {
-                return DiagnosticTextureContentHash.unavailable(
+                return VulkanBackendDiagnosticFormatting.unavailableTextureReadback(
                     logicalResource,
                     textureView.texture(),
                     textureView,
@@ -15263,7 +14952,7 @@ void main() {
             int height = Math.max(0, textureView.getHeight(0));
             int pixelBytes = Math.max(1, sourceTexture.pixelBytes);
             if (width <= 0 || height <= 0) {
-                return DiagnosticTextureContentHash.unavailable(
+                return VulkanBackendDiagnosticFormatting.unavailableTextureReadback(
                     logicalResource,
                     textureView.texture(),
                     textureView,
@@ -15301,7 +14990,7 @@ void main() {
                         height
                     );
                     if (canonical == null) {
-                        return DiagnosticTextureContentHash.unavailable(
+                        return VulkanBackendDiagnosticFormatting.unavailableTextureReadback(
                             logicalResource,
                             textureView.texture(),
                             textureView,
@@ -15335,43 +15024,22 @@ void main() {
         ) {
             LegacyTextureObject texture = tryResolveLegacyTexture(textureView);
             if (texture == null) {
-                return "backend=vulkan,logicalResource=" + logicalResource + ",lifecycle=unavailable:not-legacy-backed";
+                return VulkanBackendDiagnosticFormatting.unavailableTextureLifecycle(logicalResource, "not-legacy-backed");
             }
             int trackedLayout = trackedLayoutForLevel(texture, textureView.getBaseMipLevel());
-            return "backend=vulkan"
-                + ",logicalResource=" + logicalResource
-                + ",legacyTextureId=" + texture.id
-                + ",image=0x" + Long.toHexString(texture.imageHandle)
-                + ",view=0x" + Long.toHexString(textureView.getVkImageViewHandle())
-                + ",defaultView=0x" + Long.toHexString(texture.defaultViewHandle)
-                + ",vkFormat=0x" + Integer.toHexString(texture.vkFormat)
-                + ",trackedLayout=" + vkImageLayoutName(trackedLayout) + "(0x" + Integer.toHexString(trackedLayout) + ")"
-                + ",stageMask=0x" + Integer.toHexString(stageMaskForLayout(trackedLayout))
-                + ",accessMask=0x" + Integer.toHexString(accessMaskForLayout(trackedLayout))
-                + ",producerAttachmentLayout=" + vkImageLayoutName(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
-                + ",producerStage=COLOR_ATTACHMENT_OUTPUT"
-                + ",producerAccess=COLOR_ATTACHMENT_WRITE"
-                + ",consumerShaderReadLayout=" + vkImageLayoutName(VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-                + ",consumerStage=FRAGMENT_SHADER"
-                + ",consumerAccess=SHADER_READ"
-                + ",queueOwnership=ignored";
-        }
-
-        private static String vkImageLayoutName(int layout) {
-            return switch (layout) {
-                case VK10.VK_IMAGE_LAYOUT_UNDEFINED -> "UNDEFINED";
-                case VK10.VK_IMAGE_LAYOUT_GENERAL -> "GENERAL";
-                case VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL -> "COLOR_ATTACHMENT_OPTIMAL";
-                case VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL -> "DEPTH_STENCIL_ATTACHMENT_OPTIMAL";
-                case VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL -> "DEPTH_STENCIL_READ_ONLY_OPTIMAL";
-                case VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL -> "SHADER_READ_ONLY_OPTIMAL";
-                case VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL -> "TRANSFER_SRC_OPTIMAL";
-                case VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL -> "TRANSFER_DST_OPTIMAL";
-                case KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR -> "PRESENT_SRC_KHR";
-                default -> layout == EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-                    ? "ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT"
-                    : "layout-" + layout;
-            };
+            return VulkanBackendDiagnosticFormatting.textureLifecycle(
+                logicalResource,
+                texture.id,
+                texture.imageHandle,
+                textureView.getVkImageViewHandle(),
+                texture.defaultViewHandle,
+                texture.vkFormat,
+                trackedLayout,
+                stageMaskForLayout(trackedLayout),
+                accessMaskForLayout(trackedLayout),
+                VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
         }
 
         @Nullable
@@ -18071,7 +17739,7 @@ void main() {
             }
 
             markFenceComplete(fence);
-            reservedImmediateWorkGenerations[slot] = 0L;
+            lifetime.clearReservedImmediateWorkGeneration(slot);
             immediateSubmitSlotsInFlight[slot] = false;
             immediateSubmitInFlight = anyImmediateSubmitSlotInFlight();
             consecutiveImmediateSubmitTimeouts = 0;
@@ -18175,7 +17843,7 @@ void main() {
 
                 checkVk("vkWaitForFences(swapchainFrame)", frameFenceWaitResult);
                 markFenceComplete(frameFence);
-                reservedFrameWorkGenerations[currentFrameSyncIndex] = 0L;
+                lifetime.clearReservedFrameWorkGeneration(currentFrameSyncIndex);
                 destroyTransientFrameDescriptorBuffers(currentFrameSyncIndex);
                 consecutiveFrameFenceTimeouts = 0;
 
@@ -18304,7 +17972,7 @@ void main() {
 
                 acquiredSwapchainImageIndex = imageIndex;
                 frameInProgress = true;
-                reservedFrameWorkGenerations[currentFrameSyncIndex] = reserveWorkGeneration();
+                lifetime.reserveFrameWorkGeneration(currentFrameSyncIndex);
                 successfulFrameAcquireCount++;
                 VulkanPerfAudit.recordBeginFrameAcquireSuccess();
                 if (successfulFrameAcquireCount <= 5) {
@@ -18977,7 +18645,7 @@ void main() {
                     awaitImmediateSubmitSlotCompletion(currentImmediateSubmitSlot);
                 }
                 commandPool = immediateCommandPools[currentImmediateSubmitSlot];
-                descriptorPool = immediateDescriptorPools[currentImmediateSubmitSlot];
+                descriptorManager.activateImmediateSlot(currentImmediateSubmitSlot);
                 immediateSubmitFence = immediateSubmitFences[currentImmediateSubmitSlot];
                 primaryCommandBuffer = nextCommandBuffer;
                 flushPendingVulkanResourceDestroys(false);
@@ -18992,7 +18660,7 @@ void main() {
                 clearTrackedCommandBufferState(primaryCommandBuffer.address());
                 commandBufferRecording = true;
                 recordingImmediateSubmitSlot = currentImmediateSubmitSlot;
-                reservedImmediateWorkGenerations[currentImmediateSubmitSlot] = reserveWorkGeneration();
+                lifetime.reserveImmediateWorkGeneration(currentImmediateSubmitSlot);
                 renderPassRecording = false;
                 return primaryCommandBuffer.address();
             }
@@ -19117,7 +18785,7 @@ void main() {
                 long queueSubmitStartNanos = totalStartNanos != 0L ? System.nanoTime() : 0L;
                 checkVk("vkQueueSubmit(immediate)",
                     VK10.vkQueueSubmit(graphicsQueue, submitInfos, submitFence));
-                registerSubmittedWork(submitFence, reservedImmediateWorkGenerations[submitSlot]);
+                registerSubmittedWork(submitFence, lifetime.reservedImmediateWorkGeneration(submitSlot));
                 immediateSubmitSlotsInFlight[submitSlot] = true;
                 immediateSubmitInFlight = true;
                 commandBufferRecording = false;
@@ -19155,7 +18823,7 @@ void main() {
                     }
                     checkVk("vkWaitForFences(immediateSubmitComplete[" + submitSlot + "])", waitAfterResult);
                     markFenceComplete(submitFence);
-                    reservedImmediateWorkGenerations[submitSlot] = 0L;
+                    lifetime.clearReservedImmediateWorkGeneration(submitSlot);
                     immediateSubmitSlotsInFlight[submitSlot] = false;
                     immediateSubmitInFlight = anyImmediateSubmitSlotInFlight();
                     consecutiveImmediateSubmitTimeouts = 0;
@@ -19166,7 +18834,7 @@ void main() {
 
                 currentImmediateSubmitSlot = (submitSlot + 1) % IMMEDIATE_SUBMIT_SLOTS;
                 commandPool = immediateCommandPools[currentImmediateSubmitSlot];
-                descriptorPool = immediateDescriptorPools[currentImmediateSubmitSlot];
+                descriptorManager.activateImmediateSlot(currentImmediateSubmitSlot);
                 immediateSubmitFence = immediateSubmitFences[currentImmediateSubmitSlot];
                 primaryCommandBuffer = immediateCommandBuffers[currentImmediateSubmitSlot];
                 if (totalStartNanos != 0L) {
@@ -19203,7 +18871,7 @@ void main() {
                 java.nio.LongBuffer frameFenceBuffer = stack.longs(frameFence);
                 checkVk("vkResetFences(swapchainFrame)", VK10.vkResetFences(logicalDevice, frameFenceBuffer));
                 checkVk("vkQueueSubmit(frameBridge)", VK10.vkQueueSubmit(graphicsQueue, submitInfos, frameFence));
-                registerSubmittedWork(frameFence, reservedFrameWorkGenerations[currentFrameSyncIndex]);
+                registerSubmittedWork(frameFence, lifetime.reservedFrameWorkGeneration(currentFrameSyncIndex));
             }
         }
 
@@ -19238,7 +18906,7 @@ void main() {
                 java.nio.LongBuffer frameFenceBuffer = stack.longs(frameFence);
                 checkVk("vkResetFences(swapchainFrame)", VK10.vkResetFences(logicalDevice, frameFenceBuffer));
                 checkVk("vkQueueSubmit(frame)", VK10.vkQueueSubmit(graphicsQueue, submitInfos, frameFence));
-                registerSubmittedWork(frameFence, reservedFrameWorkGenerations[currentFrameSyncIndex]);
+                registerSubmittedWork(frameFence, lifetime.reservedFrameWorkGeneration(currentFrameSyncIndex));
 
                 frameCommandBufferRecording[currentFrameSyncIndex] = false;
                 clearTrackedCommandBufferState(frameCommandBuffer.address());
@@ -19731,20 +19399,20 @@ void main() {
                 activeRenderPassWidth = width;
                 activeRenderPassHeight = height;
                 trackTransientRenderPassHandle(renderPassHandle);
-	                trackTransientFramebufferHandle(framebufferHandle);
+                trackTransientFramebufferHandle(framebufferHandle);
                 return compatibilityKey;
-	            } catch (RuntimeException exception) {
+            } catch (RuntimeException exception) {
                 if (framebufferHandle != VK10.VK_NULL_HANDLE) {
                     VK10.vkDestroyFramebuffer(logicalDevice, framebufferHandle, null);
                 }
                 if (renderPassHandle != VK10.VK_NULL_HANDLE) {
                     VK10.vkDestroyRenderPass(logicalDevice, renderPassHandle, null);
                 }
-	                throw exception;
-	            }
-	        }
+                throw exception;
+            }
+        }
 
-	        private VulkanRenderPassCompatibilityKey beginFramebufferRenderPass(long commandBufferHandle, VulkanRenderTargetPlan plan) {
+        private VulkanRenderPassCompatibilityKey beginFramebufferRenderPass(long commandBufferHandle, VulkanRenderTargetPlan plan) {
             ResolvedFramebufferTargets targets = plan.requireFramebufferTargets();
             VulkanPerfAudit.recordRenderPassBegin();
             VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "beginFramebufferRenderPass");
@@ -20102,9 +19770,9 @@ void main() {
                 if (!permanentRenderPassCache.containsValue(renderPassHandle)) {
                     trackTransientRenderPassHandle(renderPassHandle);
                 }
-	                trackTransientFramebufferHandle(framebufferHandle);
+                trackTransientFramebufferHandle(framebufferHandle);
                 return compatibilityKey;
-	            } catch (RuntimeException exception) {
+            } catch (RuntimeException exception) {
                 if (framebufferHandle != VK10.VK_NULL_HANDLE) {
                     VK10.vkDestroyFramebuffer(logicalDevice, framebufferHandle, null);
                 }
@@ -20281,167 +19949,71 @@ void main() {
         }
 
         private void trackTransientRenderPassHandle(long renderPassHandle) {
-            if (renderPassHandle == VK10.VK_NULL_HANDLE) {
-                return;
-            }
-            int slot = activeImmediateResourceSlot();
-            if (slot >= 0) {
-                transientRenderPassHandlesByImmediateSlot.get(slot).add(renderPassHandle);
-            } else {
-                transientRenderPassHandles.add(renderPassHandle);
-            }
+            lifetime.trackTransientRenderPassHandle(renderPassHandle, activeImmediateResourceSlot());
         }
 
         private void trackTransientFramebufferHandle(long framebufferHandle) {
-            if (framebufferHandle == VK10.VK_NULL_HANDLE) {
-                return;
-            }
-            int slot = activeImmediateResourceSlot();
-            if (slot >= 0) {
-                transientFramebufferHandlesByImmediateSlot.get(slot).add(framebufferHandle);
-            } else {
-                transientFramebufferHandles.add(framebufferHandle);
-            }
+            lifetime.trackTransientFramebufferHandle(framebufferHandle, activeImmediateResourceSlot());
         }
 
         private void trackTransientStagingBuffer(StagingBuffer stagingBuffer) {
-            int slot = activeImmediateResourceSlot();
-            if (slot >= 0) {
-                transientStagingBuffersByImmediateSlot.get(slot).add(stagingBuffer);
-            } else {
-                transientStagingBuffers.add(stagingBuffer);
-            }
+            lifetime.trackTransientStagingResource(stagingBuffer, activeImmediateResourceSlot());
         }
 
         private void trackTransientDescriptorBuffer(VulkanBuffer transientBuffer) {
-            int slot = activeImmediateResourceSlot();
-            if (slot >= 0) {
-                transientDescriptorBuffersByImmediateSlot.get(slot).add(transientBuffer);
-            } else {
-                transientDescriptorBuffers.add(transientBuffer);
+            lifetime.trackTransientDescriptorResource(transientBuffer, activeImmediateResourceSlot());
+        }
+
+        private void destroyTransientFramebufferHandle(long framebufferHandle) {
+            if (logicalDevice != null && framebufferHandle != VK10.VK_NULL_HANDLE) {
+                VK10.vkDestroyFramebuffer(logicalDevice, framebufferHandle, null);
+            }
+        }
+
+        private void destroyTransientRenderPassHandle(long renderPassHandle) {
+            if (logicalDevice != null && renderPassHandle != VK10.VK_NULL_HANDLE) {
+                VK10.vkDestroyRenderPass(logicalDevice, renderPassHandle, null);
             }
         }
 
         private void destroyTransientRenderPassResources() {
-            synchronized (transientStagingBuffers) {
-                if (!transientStagingBuffers.isEmpty()) {
-                    new ArrayList<>(transientStagingBuffers).forEach(this::destroyStagingBuffer);
-                    transientStagingBuffers.clear();
-                }
-            }
-            synchronized (transientDescriptorBuffers) {
-                if (!transientDescriptorBuffers.isEmpty()) {
-                    new ArrayList<>(transientDescriptorBuffers).forEach(this::recycleDescriptorUniformBuffer);
-                    transientDescriptorBuffers.clear();
-                }
-            }
-            if (!transientFramebufferHandles.isEmpty()) {
-                new ArrayList<>(transientFramebufferHandles).forEach(framebufferHandle -> {
-                    transientFramebufferHandles.remove(framebufferHandle);
-                    if (logicalDevice != null && framebufferHandle != VK10.VK_NULL_HANDLE) {
-                        VK10.vkDestroyFramebuffer(logicalDevice, framebufferHandle, null);
-                    }
-                });
-            }
-            if (!transientRenderPassHandles.isEmpty()) {
-                new ArrayList<>(transientRenderPassHandles).forEach(renderPassHandle -> {
-                    transientRenderPassHandles.remove(renderPassHandle);
-                    if (logicalDevice != null && renderPassHandle != VK10.VK_NULL_HANDLE) {
-                        VK10.vkDestroyRenderPass(logicalDevice, renderPassHandle, null);
-                    }
-                });
-            }
+            lifetime.retireGlobalTransientResources(
+                this::destroyStagingBuffer,
+                this::recycleDescriptorUniformBuffer,
+                this::destroyTransientFramebufferHandle,
+                this::destroyTransientRenderPassHandle
+            );
         }
 
         private void destroyTransientRenderPassResources(int slot) {
-            if (slot < 0 || slot >= IMMEDIATE_SUBMIT_SLOTS) {
-                return;
-            }
-
-            List<StagingBuffer> stagingBuffers = transientStagingBuffersByImmediateSlot.get(slot);
-            synchronized (stagingBuffers) {
-                if (!stagingBuffers.isEmpty()) {
-                    new ArrayList<>(stagingBuffers).forEach(this::destroyStagingBuffer);
-                    stagingBuffers.clear();
-                }
-            }
-
-            List<VulkanBuffer> descriptorBuffers = transientDescriptorBuffersByImmediateSlot.get(slot);
-            synchronized (descriptorBuffers) {
-                if (!descriptorBuffers.isEmpty()) {
-                    new ArrayList<>(descriptorBuffers).forEach(this::recycleDescriptorUniformBuffer);
-                    descriptorBuffers.clear();
-                }
-            }
-
-            Set<Long> framebufferHandles = transientFramebufferHandlesByImmediateSlot.get(slot);
-            if (!framebufferHandles.isEmpty()) {
-                new ArrayList<>(framebufferHandles).forEach(framebufferHandle -> {
-                    framebufferHandles.remove(framebufferHandle);
-                    if (logicalDevice != null && framebufferHandle != VK10.VK_NULL_HANDLE) {
-                        VK10.vkDestroyFramebuffer(logicalDevice, framebufferHandle, null);
-                    }
-                });
-            }
-
-            Set<Long> renderPassHandles = transientRenderPassHandlesByImmediateSlot.get(slot);
-            if (!renderPassHandles.isEmpty()) {
-                new ArrayList<>(renderPassHandles).forEach(renderPassHandle -> {
-                    renderPassHandles.remove(renderPassHandle);
-                    if (logicalDevice != null && renderPassHandle != VK10.VK_NULL_HANDLE) {
-                        VK10.vkDestroyRenderPass(logicalDevice, renderPassHandle, null);
-                    }
-                });
-            }
+            lifetime.retireImmediateTransientResources(
+                slot,
+                this::destroyStagingBuffer,
+                this::recycleDescriptorUniformBuffer,
+                this::destroyTransientFramebufferHandle,
+                this::destroyTransientRenderPassHandle
+            );
         }
 
         private void destroyTransientFrameDescriptorBuffers(int frameIndex) {
-            if (frameIndex < 0 || frameIndex >= transientFrameDescriptorBuffers.size()) {
-                return;
-            }
-
-            List<VulkanBuffer> frameBuffers = transientFrameDescriptorBuffers.get(frameIndex);
-            synchronized (frameBuffers) {
-                if (!frameBuffers.isEmpty()) {
-                    new ArrayList<>(frameBuffers).forEach(this::recycleDescriptorUniformBuffer);
-                    frameBuffers.clear();
-                }
-            }
+            lifetime.retireFrameDescriptorResources(frameIndex, this::recycleDescriptorUniformBuffer);
         }
 
         private void destroyAllTransientFrameDescriptorBuffers() {
-            for (int frameIndex = 0; frameIndex < transientFrameDescriptorBuffers.size(); frameIndex++) {
-                destroyTransientFrameDescriptorBuffers(frameIndex);
-            }
+            lifetime.retireAllFrameDescriptorResources(this::recycleDescriptorUniformBuffer);
         }
 
         private static int descriptorUniformBufferBucketSize(int requestedSize) {
-            int size = Math.max(1, requestedSize);
-            int bucketSize = 1;
-            while (bucketSize < size && bucketSize < (1 << 30)) {
-                bucketSize <<= 1;
-            }
-            return bucketSize;
+            return VulkanDescriptorManager.descriptorUniformBufferBucketSize(requestedSize);
         }
 
         private VulkanBuffer acquireDescriptorUniformBuffer(String label, int requestedSize, java.nio.ByteBuffer initialData) {
             int bucketSize = descriptorUniformBufferBucketSize(requestedSize);
-            VulkanBuffer buffer = null;
-            synchronized (recycledDescriptorUniformBuffers) {
-                Deque<VulkanBuffer> bucket = recycledDescriptorUniformBuffers.get(bucketSize);
-                while (bucket != null && !bucket.isEmpty()) {
-                    VulkanBuffer candidate = bucket.removeFirst();
-                    recycledDescriptorUniformBufferCount--;
-                    recycledDescriptorUniformBufferAllocationBytes = Math.max(
-                        0L,
-                        recycledDescriptorUniformBufferAllocationBytes - managedBufferAllocationSize(candidate)
-                    );
-                    if (!candidate.isClosed()) {
-                        buffer = candidate;
-                        break;
-                    }
-                }
-            }
+            VulkanBuffer buffer = descriptorManager.takeRecycledUniformBuffer(
+                requestedSize,
+                candidate -> !candidate.isClosed(),
+                this::managedBufferAllocationSize
+            );
 
             if (buffer == null) {
                 buffer = (VulkanBuffer) createManagedBuffer(
@@ -20486,20 +20058,12 @@ void main() {
                 return;
             }
 
-            int bucketSize = descriptorUniformBufferBucketSize(buffer.size());
-            long allocationSizeBytes = managedBufferAllocationSize(buffer);
-            synchronized (recycledDescriptorUniformBuffers) {
-                if (recycledDescriptorUniformBufferCount >= MAX_RECYCLED_DESCRIPTOR_UNIFORM_BUFFERS
-                    || recycledDescriptorUniformBufferAllocationBytes + allocationSizeBytes > MAX_RECYCLED_DESCRIPTOR_UNIFORM_BUFFER_BYTES) {
-                    buffer.close();
-                    return;
-                }
-                recycledDescriptorUniformBuffers
-                    .computeIfAbsent(bucketSize, ignored -> new ArrayDeque<>())
-                    .addLast(buffer);
-                recycledDescriptorUniformBufferCount++;
-                recycledDescriptorUniformBufferAllocationBytes += allocationSizeBytes;
-            }
+            descriptorManager.recycleUniformBuffer(
+                buffer,
+                buffer.size(),
+                this::managedBufferAllocationSize,
+                VulkanBuffer::close
+            );
         }
 
         private long managedBufferAllocationSize(VulkanBuffer buffer) {
@@ -20508,16 +20072,7 @@ void main() {
         }
 
         private void destroyRecycledDescriptorUniformBuffers() {
-            synchronized (recycledDescriptorUniformBuffers) {
-                for (Deque<VulkanBuffer> bucket : recycledDescriptorUniformBuffers.values()) {
-                    while (!bucket.isEmpty()) {
-                        bucket.removeFirst().close();
-                    }
-                }
-                recycledDescriptorUniformBuffers.clear();
-                recycledDescriptorUniformBufferCount = 0;
-                recycledDescriptorUniformBufferAllocationBytes = 0L;
-            }
+            descriptorManager.destroyRecycledUniformBuffers(VulkanBuffer::close);
         }
 
         private VulkanBuffer materializeDescriptorUniformBuffer(
@@ -20539,7 +20094,7 @@ void main() {
                 initialData
             );
             if (frameInProgress) {
-                transientFrameDescriptorBuffers.get(currentFrameSyncIndex).add(transientBuffer);
+                lifetime.trackFrameDescriptorResource(currentFrameSyncIndex, transientBuffer);
             } else {
                 trackTransientDescriptorBuffer(transientBuffer);
             }
@@ -20564,7 +20119,7 @@ void main() {
                 initialData
             );
             if (frameInProgress) {
-                transientFrameDescriptorBuffers.get(currentFrameSyncIndex).add(transientBuffer);
+                lifetime.trackFrameDescriptorResource(currentFrameSyncIndex, transientBuffer);
             } else {
                 trackTransientDescriptorBuffer(transientBuffer);
             }
@@ -21105,7 +20660,7 @@ void main() {
                 VK10.VK_PIPELINE_BIND_POINT_GRAPHICS,
                 pipelineHandle);
             lastBoundGraphicsPipelineByCommandBuffer.put(commandBufferHandle, pipelineHandle);
-            lastBoundDescriptorSetByCommandBuffer.remove(commandBufferHandle);
+            descriptorManager.clearCommandBufferState(commandBufferHandle);
         }
 
         private void bindComputePipeline(long commandBufferHandle, long pipelineHandle) {
@@ -21120,7 +20675,7 @@ void main() {
                 VK10.VK_PIPELINE_BIND_POINT_COMPUTE,
                 pipelineHandle);
             lastBoundComputePipelineByCommandBuffer.put(commandBufferHandle, pipelineHandle);
-            lastBoundDescriptorSetByCommandBuffer.remove(commandBufferHandle);
+            descriptorManager.clearCommandBufferState(commandBufferHandle);
         }
 
         private static void applyStencilFaceState(
@@ -22051,28 +21606,20 @@ void main() {
                     frameCommandBufferRecording[frameIndex] = false;
                 }
 
-                for (int slot = 0; slot < IMMEDIATE_SUBMIT_SLOTS; slot++) {
-                    if (immediateDescriptorPools[slot] != VK10.VK_NULL_HANDLE) {
-                        VK10.vkDestroyDescriptorPool(logicalDevice, immediateDescriptorPools[slot], null);
-                        immediateDescriptorPools[slot] = VK10.VK_NULL_HANDLE;
-                    }
-                }
-                descriptorPool = VK10.VK_NULL_HANDLE;
-                if (descriptorSetCacheHitCount > 0
-                    || descriptorSetCacheStoreCount > 0
-                    || skippedRedundantPipelineBindCount > 0
-                    || skippedRedundantDescriptorSetBindCount > 0) {
+                descriptorManager.destroyDescriptorPools(logicalDevice);
+                VulkanDescriptorManager.DescriptorReuseSummary descriptorReuseSummary =
+                    descriptorManager.descriptorReuseSummary(skippedRedundantPipelineBindCount);
+                if (descriptorReuseSummary.shouldLog()) {
                     LOGGER.info(
                         "Vulkan descriptor reuse summary: cacheHits={} cacheStores={} skippedPipelineBinds={} skippedDescriptorSetBinds={}",
-                        descriptorSetCacheHitCount,
-                        descriptorSetCacheStoreCount,
-                        skippedRedundantPipelineBindCount,
-                        skippedRedundantDescriptorSetBindCount
+                        descriptorReuseSummary.cacheHits(),
+                        descriptorReuseSummary.cacheStores(),
+                        descriptorReuseSummary.skippedPipelineBinds(),
+                        descriptorReuseSummary.skippedDescriptorSetBinds()
                     );
                 }
-                descriptorSetCache.clear();
                 lastBoundGraphicsPipelineByCommandBuffer.clear();
-                lastBoundDescriptorSetByCommandBuffer.clear();
+                lastBoundComputePipelineByCommandBuffer.clear();
 
                 for (int slot = 0; slot < IMMEDIATE_SUBMIT_SLOTS; slot++) {
                     if (immediateSubmitFences[slot] != VK10.VK_NULL_HANDLE) {
@@ -22096,14 +21643,7 @@ void main() {
                 swapchainImagesInFlight = new long[0];
                 currentFrameSyncIndex = 0;
 
-                if (!descriptorSamplerCache.isEmpty()) {
-                    new ArrayList<>(descriptorSamplerCache.values()).forEach(samplerHandle -> {
-                        if (samplerHandle != null && samplerHandle != VK10.VK_NULL_HANDLE) {
-                            VK10.vkDestroySampler(logicalDevice, samplerHandle, null);
-                        }
-                    });
-                    descriptorSamplerCache.clear();
-                }
+                descriptorManager.destroyDescriptorSamplers(samplerHandle -> VK10.vkDestroySampler(logicalDevice, samplerHandle, null));
 
                 if (defaultDescriptorSampler != VK10.VK_NULL_HANDLE) {
                     VK10.vkDestroySampler(logicalDevice, defaultDescriptorSampler, null);
