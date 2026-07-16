@@ -1,6 +1,12 @@
 use std::sync::{Arc, Mutex, OnceLock};
 
 use super::buffer::{create_buffer, NativeBuffer};
+use super::commands::{
+    ListenerStateRecord, SoundConfigRecord, SOUND_FLAG_DISABLE_ATTENUATION,
+    SOUND_FLAG_LINEAR_ATTENUATION, SOUND_FLAG_LOOPING, SOUND_FLAG_RELATIVE,
+    SOUND_UPDATE_ATTENUATION, SOUND_UPDATE_GAIN, SOUND_UPDATE_LOOPING, SOUND_UPDATE_PITCH,
+    SOUND_UPDATE_POSITION, SOUND_UPDATE_RELATIVE,
+};
 use super::context::{cstring_to_string, load_openal, NativeAlto};
 use super::device::{ChannelPool, NativeDevice};
 use super::errors::*;
@@ -152,6 +158,93 @@ pub(crate) fn destroy_source(source_handle: u64) -> AudioResult<()> {
         }
         Ok(())
     })
+}
+
+pub(crate) fn create_static_sound(
+    device_handle: u64,
+    config: SoundConfigRecord,
+    buffer_handle: u64,
+) -> AudioResult<u64> {
+    let source = create_source(device_handle, ChannelPool::Static)?;
+    if let Err(error) = update_sound(source, super::commands::SOUND_UPDATE_ALL, config)
+        .and_then(|_| attach_static_buffer(source, buffer_handle))
+    {
+        let _ = destroy_source(source);
+        return Err(error);
+    }
+    Ok(source)
+}
+
+pub(crate) fn create_streaming_sound(
+    device_handle: u64,
+    config: SoundConfigRecord,
+) -> AudioResult<u64> {
+    let source = create_source(device_handle, ChannelPool::Streaming)?;
+    if let Err(error) = update_sound(source, super::commands::SOUND_UPDATE_ALL, config) {
+        let _ = destroy_source(source);
+        return Err(error);
+    }
+    Ok(source)
+}
+
+pub(crate) fn update_sound(
+    source_handle: u64,
+    update_mask: u32,
+    config: SoundConfigRecord,
+) -> AudioResult<()> {
+    with_source_mut(source_handle, |source| {
+        apply_sound_config(source, update_mask, config)
+    })
+}
+
+pub(crate) fn submit_stream_chunks(
+    source_handle: u64,
+    chunks: &[&[u8]],
+    channels: i32,
+    bits: i32,
+    pcm: bool,
+    sample_rate: i32,
+) -> AudioResult<i32> {
+    with_backend(|backend| {
+        let device_handle = backend
+            .sources
+            .get(source_handle)
+            .ok_or(AudioError::InvalidHandle)?
+            .device;
+        backend.ensure_device_owner(device_handle)?;
+        let context = backend
+            .devices
+            .get(device_handle)
+            .ok_or(AudioError::InvalidHandle)?
+            .context
+            .clone();
+        let mut accepted = 0_i32;
+        for chunk in chunks {
+            let buffer = create_buffer(&context, chunk, channels, bits, pcm, sample_rate)?;
+            backend
+                .sources
+                .get_mut(source_handle)
+                .ok_or(AudioError::InvalidHandle)?
+                .queue_stream_buffer(buffer)?;
+            accepted += 1;
+        }
+        Ok(accepted)
+    })
+}
+
+pub(crate) fn update_listener(
+    device_handle: u64,
+    listener_state: ListenerStateRecord,
+) -> AudioResult<()> {
+    listener_set_transform(
+        device_handle,
+        ListenerTransform {
+            position: listener_state.position,
+            forward: listener_state.forward,
+            up: listener_state.up,
+        },
+    )?;
+    listener_set_gain(device_handle, listener_state.gain)
 }
 
 pub(crate) fn source_play(source_handle: u64) -> AudioResult<()> {
@@ -496,6 +589,36 @@ fn with_source_mut_value<T>(
             .ok_or(AudioError::InvalidHandle)?;
         f(source)
     })
+}
+
+fn apply_sound_config(
+    source: &mut NativeSource,
+    update_mask: u32,
+    config: SoundConfigRecord,
+) -> AudioResult<()> {
+    if update_mask & SOUND_UPDATE_POSITION != 0 {
+        source.set_position(config.x, config.y, config.z)?;
+    }
+    if update_mask & SOUND_UPDATE_PITCH != 0 {
+        source.set_pitch(config.pitch)?;
+    }
+    if update_mask & SOUND_UPDATE_GAIN != 0 {
+        source.set_volume(config.gain)?;
+    }
+    if update_mask & SOUND_UPDATE_LOOPING != 0 {
+        source.set_looping(config.flags & SOUND_FLAG_LOOPING != 0);
+    }
+    if update_mask & SOUND_UPDATE_RELATIVE != 0 {
+        source.set_relative(config.flags & SOUND_FLAG_RELATIVE != 0)?;
+    }
+    if update_mask & SOUND_UPDATE_ATTENUATION != 0 {
+        if config.flags & SOUND_FLAG_DISABLE_ATTENUATION != 0 {
+            source.disable_attenuation()?;
+        } else if config.flags & SOUND_FLAG_LINEAR_ATTENUATION != 0 {
+            source.linear_attenuation(config.attenuation_distance)?;
+        }
+    }
+    Ok(())
 }
 
 impl AudioBackend {

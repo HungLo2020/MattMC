@@ -7,7 +7,6 @@ import java.util.Iterator;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import net.minecraft.api.EnvType;
@@ -18,9 +17,9 @@ import org.jetbrains.annotations.Nullable;
 public class ChannelAccess {
 	private final Set<ChannelAccess.ChannelHandle> channels = Sets.newIdentityHashSet();
 	final Library library;
-	final Executor executor;
+	final SoundEngineExecutor executor;
 
-	public ChannelAccess(Library library, Executor executor) {
+	public ChannelAccess(Library library, SoundEngineExecutor executor) {
 		this.library = library;
 		this.executor = executor;
 	}
@@ -60,6 +59,10 @@ public class ChannelAccess {
 	}
 
 	public void clear() {
+		this.executor.executeBlocking(this::clearOnExecutor);
+	}
+
+	private void clearOnExecutor() {
 		this.channels.forEach(ChannelAccess.ChannelHandle::release);
 		this.channels.clear();
 	}
@@ -88,8 +91,10 @@ public class ChannelAccess {
 
 		public void release() {
 			this.stopped = true;
-			ChannelAccess.this.library.releaseChannel(this.channel);
-			this.channel = null;
+			if (this.channel != null) {
+				ChannelAccess.this.library.releaseChannel(this.channel);
+				this.channel = null;
+			}
 		}
 	}
 }

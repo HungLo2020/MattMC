@@ -1,6 +1,11 @@
 use std::sync::{Mutex, OnceLock};
 
 use super::backend::{self, test_support};
+use super::commands::{
+    SoundConfigRecord, StreamChunkRecord, SOUND_FLAG_DISABLE_ATTENUATION,
+    SOUND_FLAG_LINEAR_ATTENUATION, SOUND_FLAG_LOOPING, SOUND_FLAG_RELATIVE, SOUND_UPDATE_GAIN,
+    SOUND_UPDATE_POSITION,
+};
 use super::device::{split_channel_counts, ChannelPool, NativeDevice};
 use super::errors::{
     AudioError, ERR_INVALID_ARGUMENT, ERR_INVALID_HANDLE, ERR_POOL_EXHAUSTED,
@@ -8,7 +13,9 @@ use super::errors::{
 };
 use super::ffi::{
     mattmc_audio_buffer_create, mattmc_audio_buffer_destroy, mattmc_audio_device_create,
-    mattmc_audio_device_destroy, mattmc_audio_format_to_openal, mattmc_audio_source_create,
+    mattmc_audio_device_destroy, mattmc_audio_format_to_openal, mattmc_audio_sound_create_static,
+    mattmc_audio_sound_create_streaming, mattmc_audio_sound_state,
+    mattmc_audio_sound_submit_stream_chunks, mattmc_audio_source_create,
     mattmc_audio_source_destroy, mattmc_audio_source_queue_stream_buffer,
     mattmc_audio_source_state,
 };
@@ -276,6 +283,70 @@ fn streaming_queue_ownership_is_released_with_source() {
 }
 
 #[test]
+fn coarse_static_sound_create_configures_and_tracks_pool() {
+    with_audio_backend(|| {
+        let device = create_test_device().expect("default audio device should open");
+        let pcm = [0_u8, 0, 0, 0];
+        let buffer = backend::create_buffer_handle(device, &pcm, 1, 16, true, 44_100)
+            .expect("buffer should be created");
+        let config = SoundConfigRecord {
+            x: 1.0,
+            y: 2.0,
+            z: 3.0,
+            pitch: 0.75,
+            gain: 0.5,
+            attenuation_distance: 16.0,
+            flags: SOUND_FLAG_LOOPING | SOUND_FLAG_RELATIVE | SOUND_FLAG_LINEAR_ATTENUATION,
+        };
+
+        let sound = backend::create_static_sound(device, config, buffer)
+            .expect("static sound should be created with its initial config");
+        let counts = backend::device_pool_counts(device).expect("pool counts should read");
+        assert_eq!(1, counts.static_used);
+
+        backend::update_sound(
+            sound,
+            SOUND_UPDATE_POSITION | SOUND_UPDATE_GAIN,
+            SoundConfigRecord {
+                x: 4.0,
+                y: 5.0,
+                z: 6.0,
+                gain: 0.25,
+                ..config
+            },
+        )
+        .expect("coarse update should apply selected fields");
+        backend::destroy_source(sound).expect("sound destroy should release pool");
+        let counts = backend::device_pool_counts(device).expect("pool counts should read");
+        assert_eq!(0, counts.static_used);
+    });
+}
+
+#[test]
+fn coarse_streaming_sound_owns_queued_buffers() {
+    with_audio_backend(|| {
+        let device = create_test_device().expect("default audio device should open");
+        let config = SoundConfigRecord {
+            flags: SOUND_FLAG_DISABLE_ATTENUATION,
+            ..SoundConfigRecord::default()
+        };
+        let sound = backend::create_streaming_sound(device, config)
+            .expect("streaming sound should be created");
+        let first = [0_u8, 0, 0, 0];
+        let second = [0_u8, 0, 0, 0];
+        let chunks: [&[u8]; 2] = [&first, &second];
+        assert_eq!(
+            2,
+            backend::submit_stream_chunks(sound, &chunks, 1, 16, true, 44_100)
+                .expect("stream chunks should submit as a batch")
+        );
+        assert_eq!(2, backend::live_counts().unwrap().queued_stream_buffers);
+        backend::destroy_source(sound).expect("sound destroy should release stream queue");
+        assert_eq!(0, backend::live_counts().unwrap().queued_stream_buffers);
+    });
+}
+
+#[test]
 fn counter_reset_after_shutdown_clears_live_resources_and_queued_stream_buffers() {
     with_audio_backend(|| {
         let device = create_test_device().expect("default audio device should open");
@@ -485,6 +556,94 @@ fn ffi_streaming_queue_validates_pointer_and_handle_ownership() {
                 1,
                 44_100,
             )
+        });
+    });
+}
+
+#[test]
+fn ffi_coarse_sound_calls_validate_config_chunks_and_outputs() {
+    with_audio_backend(|| {
+        let mut sound = 0_u64;
+        assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
+            mattmc_audio_sound_create_streaming(0, std::ptr::null(), &mut sound)
+        });
+        let config = SoundConfigRecord::default();
+        assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
+            mattmc_audio_sound_create_streaming(0, &config, std::ptr::null_mut())
+        });
+
+        let mut device = 0_u64;
+        assert_eq!(OK, unsafe {
+            mattmc_audio_device_create(std::ptr::null(), 0, 0, &mut device)
+        });
+        assert_eq!(OK, unsafe {
+            mattmc_audio_sound_create_streaming(device, &config, &mut sound)
+        });
+
+        let mut accepted = -1_i32;
+        let bad_chunk = StreamChunkRecord {
+            data_ptr: std::ptr::null(),
+            data_len: 4,
+        };
+        assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
+            mattmc_audio_sound_submit_stream_chunks(
+                sound,
+                &bad_chunk,
+                1,
+                1,
+                16,
+                1,
+                44_100,
+                &mut accepted,
+            )
+        });
+        assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
+            mattmc_audio_sound_submit_stream_chunks(
+                sound,
+                std::ptr::null(),
+                1,
+                1,
+                16,
+                1,
+                44_100,
+                &mut accepted,
+            )
+        });
+        assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
+            mattmc_audio_sound_submit_stream_chunks(
+                sound,
+                std::ptr::null(),
+                0,
+                1,
+                16,
+                1,
+                44_100,
+                std::ptr::null_mut(),
+            )
+        });
+
+        let mut state = 0_i32;
+        assert_eq!(OK, unsafe { mattmc_audio_sound_state(sound, &mut state) });
+        assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
+            mattmc_audio_sound_state(sound, std::ptr::null_mut())
+        });
+
+        let pcm = [0_u8, 0, 0, 0];
+        let mut buffer = 0_u64;
+        assert_eq!(OK, unsafe {
+            mattmc_audio_buffer_create(
+                device,
+                pcm.as_ptr(),
+                pcm.len() as u64,
+                1,
+                16,
+                1,
+                44_100,
+                &mut buffer,
+            )
+        });
+        assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
+            mattmc_audio_sound_create_static(device, std::ptr::null(), buffer, &mut sound)
         });
     });
 }

@@ -7,6 +7,7 @@
 
 mod backend;
 mod buffer;
+mod commands;
 mod context;
 mod device;
 mod errors;

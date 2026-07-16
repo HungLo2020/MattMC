@@ -102,8 +102,19 @@ public class SoundEngine {
 		if (!this.loaded) {
 			try {
 				String string = this.options.soundDevice().get();
-				this.library.init("".equals(string) ? null : string, this.options.directionalAudio().get());
-				this.listener.reset();
+				boolean directionalAudio = this.options.directionalAudio().get();
+				AtomicReference<RuntimeException> loadFailure = new AtomicReference<>();
+				this.executor.executeBlocking(() -> {
+					try {
+						this.library.init("".equals(string) ? null : string, directionalAudio);
+						this.listener.reset();
+					} catch (RuntimeException runtimeException) {
+						loadFailure.set(runtimeException);
+					}
+				});
+				if (loadFailure.get() != null) {
+					throw loadFailure.get();
+				}
 				this.soundBuffers.preload(this.preloadQueue).thenRun(this.preloadQueue::clear);
 				this.loaded = true;
 				LOGGER.info(MARKER, "Sound engine started");
@@ -130,14 +141,14 @@ public class SoundEngine {
 		if (this.loaded) {
 			this.stopAll();
 			this.soundBuffers.clear();
-			this.library.cleanup();
+			this.executor.executeBlocking(this.library::cleanup);
 			this.loaded = false;
 		}
 	}
 
 	public void emergencyShutdown() {
 		if (this.loaded) {
-			this.library.cleanup();
+			this.executor.executeBlocking(this.library::cleanup);
 		}
 	}
 
@@ -161,7 +172,7 @@ public class SoundEngine {
 
 	public void stopAll() {
 		if (this.loaded) {
-			this.executor.shutDown();
+			this.executor.dropQueuedTasks();
 			this.instanceToChannel.clear();
 			this.channelAccess.clear();
 			this.queuedSounds.clear();
@@ -169,7 +180,6 @@ public class SoundEngine {
 			this.instanceBySource.clear();
 			this.soundDeleteTime.clear();
 			this.queuedTickableSounds.clear();
-			this.executor.startUp();
 		}
 	}
 

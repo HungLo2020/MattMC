@@ -18,7 +18,29 @@ final class NativeAudio {
 	static final int ERR_INVALID_HANDLE = -1;
 	static final int ERR_INVALID_ARGUMENT = -2;
 	static final int ERR_POOL_EXHAUSTED = -6;
+	static final int SOUND_FLAG_LOOPING = 1 << 0;
+	static final int SOUND_FLAG_RELATIVE = 1 << 1;
+	static final int SOUND_FLAG_DISABLE_ATTENUATION = 1 << 2;
+	static final int SOUND_FLAG_LINEAR_ATTENUATION = 1 << 3;
+	static final int SOUND_UPDATE_POSITION = 1 << 0;
+	static final int SOUND_UPDATE_PITCH = 1 << 1;
+	static final int SOUND_UPDATE_GAIN = 1 << 2;
+	static final int SOUND_UPDATE_LOOPING = 1 << 3;
+	static final int SOUND_UPDATE_RELATIVE = 1 << 4;
+	static final int SOUND_UPDATE_ATTENUATION = 1 << 5;
 	private static final int STRING_BUFFER_LIMIT = 16 * 1024;
+	private static final long SOUND_CONFIG_SIZE = 28L;
+	private static final long SOUND_CONFIG_X = 0L;
+	private static final long SOUND_CONFIG_Y = 4L;
+	private static final long SOUND_CONFIG_Z = 8L;
+	private static final long SOUND_CONFIG_PITCH = 12L;
+	private static final long SOUND_CONFIG_GAIN = 16L;
+	private static final long SOUND_CONFIG_ATTENUATION_DISTANCE = 20L;
+	private static final long SOUND_CONFIG_FLAGS = 24L;
+	private static final long STREAM_CHUNK_SIZE = 16L;
+	private static final long STREAM_CHUNK_DATA = 0L;
+	private static final long STREAM_CHUNK_LENGTH = 8L;
+	private static final long LISTENER_STATE_SIZE = 40L;
 	private static final FunctionDescriptor STRING_GLOBAL_DESCRIPTOR = FunctionDescriptor.of(
 		ValueLayout.JAVA_INT,
 		ValueLayout.ADDRESS,
@@ -40,33 +62,10 @@ final class NativeAudio {
 		ValueLayout.ADDRESS
 	);
 	private static final FunctionDescriptor HANDLE_DESCRIPTOR = FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG);
-	private static final FunctionDescriptor SOURCE_CREATE_DESCRIPTOR = FunctionDescriptor.of(
-		ValueLayout.JAVA_INT,
-		ValueLayout.JAVA_LONG,
-		ValueLayout.JAVA_INT,
-		ValueLayout.ADDRESS
-	);
 	private static final FunctionDescriptor SOURCE_STATE_DESCRIPTOR = FunctionDescriptor.of(
 		ValueLayout.JAVA_INT,
 		ValueLayout.JAVA_LONG,
 		ValueLayout.ADDRESS
-	);
-	private static final FunctionDescriptor SOURCE_POSITION_DESCRIPTOR = FunctionDescriptor.of(
-		ValueLayout.JAVA_INT,
-		ValueLayout.JAVA_LONG,
-		ValueLayout.JAVA_FLOAT,
-		ValueLayout.JAVA_FLOAT,
-		ValueLayout.JAVA_FLOAT
-	);
-	private static final FunctionDescriptor SOURCE_FLOAT_DESCRIPTOR = FunctionDescriptor.of(
-		ValueLayout.JAVA_INT,
-		ValueLayout.JAVA_LONG,
-		ValueLayout.JAVA_FLOAT
-	);
-	private static final FunctionDescriptor SOURCE_INT_DESCRIPTOR = FunctionDescriptor.of(
-		ValueLayout.JAVA_INT,
-		ValueLayout.JAVA_LONG,
-		ValueLayout.JAVA_INT
 	);
 	private static final FunctionDescriptor BUFFER_CREATE_DESCRIPTOR = FunctionDescriptor.of(
 		ValueLayout.JAVA_INT,
@@ -79,12 +78,26 @@ final class NativeAudio {
 		ValueLayout.JAVA_INT,
 		ValueLayout.ADDRESS
 	);
-	private static final FunctionDescriptor ATTACH_DESCRIPTOR = FunctionDescriptor.of(
+	private static final FunctionDescriptor SOUND_CREATE_STATIC_DESCRIPTOR = FunctionDescriptor.of(
 		ValueLayout.JAVA_INT,
 		ValueLayout.JAVA_LONG,
-		ValueLayout.JAVA_LONG
+		ValueLayout.ADDRESS,
+		ValueLayout.JAVA_LONG,
+		ValueLayout.ADDRESS
 	);
-	private static final FunctionDescriptor QUEUE_DESCRIPTOR = FunctionDescriptor.of(
+	private static final FunctionDescriptor SOUND_CREATE_STREAMING_DESCRIPTOR = FunctionDescriptor.of(
+		ValueLayout.JAVA_INT,
+		ValueLayout.JAVA_LONG,
+		ValueLayout.ADDRESS,
+		ValueLayout.ADDRESS
+	);
+	private static final FunctionDescriptor SOUND_UPDATE_DESCRIPTOR = FunctionDescriptor.of(
+		ValueLayout.JAVA_INT,
+		ValueLayout.JAVA_LONG,
+		ValueLayout.JAVA_INT,
+		ValueLayout.ADDRESS
+	);
+	private static final FunctionDescriptor SOUND_SUBMIT_STREAM_DESCRIPTOR = FunctionDescriptor.of(
 		ValueLayout.JAVA_INT,
 		ValueLayout.JAVA_LONG,
 		ValueLayout.ADDRESS,
@@ -92,25 +105,13 @@ final class NativeAudio {
 		ValueLayout.JAVA_INT,
 		ValueLayout.JAVA_INT,
 		ValueLayout.JAVA_INT,
-		ValueLayout.JAVA_INT
+		ValueLayout.JAVA_INT,
+		ValueLayout.ADDRESS
 	);
-	private static final FunctionDescriptor LISTENER_TRANSFORM_DESCRIPTOR = FunctionDescriptor.of(
+	private static final FunctionDescriptor LISTENER_UPDATE_DESCRIPTOR = FunctionDescriptor.of(
 		ValueLayout.JAVA_INT,
 		ValueLayout.JAVA_LONG,
-		ValueLayout.JAVA_FLOAT,
-		ValueLayout.JAVA_FLOAT,
-		ValueLayout.JAVA_FLOAT,
-		ValueLayout.JAVA_FLOAT,
-		ValueLayout.JAVA_FLOAT,
-		ValueLayout.JAVA_FLOAT,
-		ValueLayout.JAVA_FLOAT,
-		ValueLayout.JAVA_FLOAT,
-		ValueLayout.JAVA_FLOAT
-	);
-	private static final FunctionDescriptor LISTENER_GAIN_DESCRIPTOR = FunctionDescriptor.of(
-		ValueLayout.JAVA_INT,
-		ValueLayout.JAVA_LONG,
-		ValueLayout.JAVA_FLOAT
+		ValueLayout.ADDRESS
 	);
 	private static final FunctionDescriptor FORMAT_DESCRIPTOR = FunctionDescriptor.of(
 		ValueLayout.JAVA_INT,
@@ -139,48 +140,34 @@ final class NativeAudio {
 		SOURCE_STATE_DESCRIPTOR
 	);
 	private static final MethodHandle DEVICE_POOL_COUNTS = downcall("mattmc_audio_device_pool_counts", SOURCE_STATE_DESCRIPTOR);
-	private static final MethodHandle SOURCE_CREATE = downcall("mattmc_audio_source_create", SOURCE_CREATE_DESCRIPTOR);
-	private static final MethodHandle SOURCE_DESTROY = downcall("mattmc_audio_source_destroy", HANDLE_DESCRIPTOR);
-	private static final MethodHandle SOURCE_PLAY = downcall("mattmc_audio_source_play", HANDLE_DESCRIPTOR);
-	private static final MethodHandle SOURCE_PAUSE = downcall("mattmc_audio_source_pause", HANDLE_DESCRIPTOR);
-	private static final MethodHandle SOURCE_STOP = downcall("mattmc_audio_source_stop", HANDLE_DESCRIPTOR);
-	private static final MethodHandle SOURCE_STATE = downcall("mattmc_audio_source_state", SOURCE_STATE_DESCRIPTOR);
-	private static final MethodHandle SOURCE_SET_POSITION = downcall(
-		"mattmc_audio_source_set_position",
-		SOURCE_POSITION_DESCRIPTOR
-	);
-	private static final MethodHandle SOURCE_SET_PITCH = downcall("mattmc_audio_source_set_pitch", SOURCE_FLOAT_DESCRIPTOR);
-	private static final MethodHandle SOURCE_SET_VOLUME = downcall("mattmc_audio_source_set_volume", SOURCE_FLOAT_DESCRIPTOR);
-	private static final MethodHandle SOURCE_SET_LOOPING = downcall("mattmc_audio_source_set_looping", SOURCE_INT_DESCRIPTOR);
-	private static final MethodHandle SOURCE_SET_RELATIVE = downcall("mattmc_audio_source_set_relative", SOURCE_INT_DESCRIPTOR);
-	private static final MethodHandle SOURCE_DISABLE_ATTENUATION = downcall(
-		"mattmc_audio_source_disable_attenuation",
-		HANDLE_DESCRIPTOR
-	);
-	private static final MethodHandle SOURCE_LINEAR_ATTENUATION = downcall(
-		"mattmc_audio_source_linear_attenuation",
-		SOURCE_FLOAT_DESCRIPTOR
-	);
 	private static final MethodHandle BUFFER_CREATE = downcall("mattmc_audio_buffer_create", BUFFER_CREATE_DESCRIPTOR);
 	private static final MethodHandle BUFFER_DESTROY = downcall("mattmc_audio_buffer_destroy", HANDLE_DESCRIPTOR);
-	private static final MethodHandle SOURCE_ATTACH_STATIC_BUFFER = downcall(
-		"mattmc_audio_source_attach_static_buffer",
-		ATTACH_DESCRIPTOR
+	private static final MethodHandle SOUND_CREATE_STATIC = downcall(
+		"mattmc_audio_sound_create_static",
+		SOUND_CREATE_STATIC_DESCRIPTOR
 	);
-	private static final MethodHandle SOURCE_QUEUE_STREAM_BUFFER = downcall(
-		"mattmc_audio_source_queue_stream_buffer",
-		QUEUE_DESCRIPTOR
+	private static final MethodHandle SOUND_CREATE_STREAMING = downcall(
+		"mattmc_audio_sound_create_streaming",
+		SOUND_CREATE_STREAMING_DESCRIPTOR
 	);
-	private static final MethodHandle SOURCE_REMOVE_PROCESSED_BUFFERS = downcall(
-		"mattmc_audio_source_remove_processed_buffers",
+	private static final MethodHandle SOUND_UPDATE = downcall("mattmc_audio_sound_update", SOUND_UPDATE_DESCRIPTOR);
+	private static final MethodHandle SOUND_SUBMIT_STREAM_CHUNKS = downcall(
+		"mattmc_audio_sound_submit_stream_chunks",
+		SOUND_SUBMIT_STREAM_DESCRIPTOR
+	);
+	private static final MethodHandle SOUND_PLAY = downcall("mattmc_audio_sound_play", HANDLE_DESCRIPTOR);
+	private static final MethodHandle SOUND_PAUSE = downcall("mattmc_audio_sound_pause", HANDLE_DESCRIPTOR);
+	private static final MethodHandle SOUND_STOP = downcall("mattmc_audio_sound_stop", HANDLE_DESCRIPTOR);
+	private static final MethodHandle SOUND_STATE = downcall("mattmc_audio_sound_state", SOURCE_STATE_DESCRIPTOR);
+	private static final MethodHandle SOUND_STOP_AND_DESTROY = downcall(
+		"mattmc_audio_sound_stop_and_destroy",
+		HANDLE_DESCRIPTOR
+	);
+	private static final MethodHandle SOUND_REMOVE_PROCESSED_STREAM_BUFFERS = downcall(
+		"mattmc_audio_sound_remove_processed_stream_buffers",
 		SOURCE_STATE_DESCRIPTOR
 	);
-	private static final MethodHandle LISTENER_SET_TRANSFORM = downcall(
-		"mattmc_audio_listener_set_transform",
-		LISTENER_TRANSFORM_DESCRIPTOR
-	);
-	private static final MethodHandle LISTENER_RESET = downcall("mattmc_audio_listener_reset", HANDLE_DESCRIPTOR);
-	private static final MethodHandle LISTENER_SET_GAIN = downcall("mattmc_audio_listener_set_gain", LISTENER_GAIN_DESCRIPTOR);
+	private static final MethodHandle LISTENER_UPDATE = downcall("mattmc_audio_listener_update", LISTENER_UPDATE_DESCRIPTOR);
 	private static final MethodHandle FORMAT_TO_OPENAL = downcall("mattmc_audio_format_to_openal", FORMAT_DESCRIPTOR);
 
 	private NativeAudio() {
@@ -251,80 +238,6 @@ final class NativeAudio {
 		}
 	}
 
-	static long sourceCreate(long deviceHandle, Library.Pool pool) {
-		try (Arena arena = Arena.ofConfined()) {
-			MemorySegment output = arena.allocate(ValueLayout.JAVA_LONG);
-			int status = (int)SOURCE_CREATE.invokeExact(deviceHandle, pool == Library.Pool.STREAMING ? 1 : 0, output);
-			if (status == ERR_POOL_EXHAUSTED) {
-				return 0L;
-			}
-
-			check(status, "Create audio source");
-			return output.get(ValueLayout.JAVA_LONG, 0);
-		} catch (Throwable throwable) {
-			throw nativeFailure("Create audio source", throwable);
-		}
-	}
-
-	static void sourceDestroy(long sourceHandle) {
-		checkHandle(SOURCE_DESTROY, sourceHandle, "Destroy audio source");
-	}
-
-	static void sourcePlay(long sourceHandle) {
-		checkHandle(SOURCE_PLAY, sourceHandle, "Play source");
-	}
-
-	static void sourcePause(long sourceHandle) {
-		checkHandle(SOURCE_PAUSE, sourceHandle, "Pause source");
-	}
-
-	static void sourceStop(long sourceHandle) {
-		checkHandle(SOURCE_STOP, sourceHandle, "Stop source");
-	}
-
-	static int sourceState(long sourceHandle) {
-		try (Arena arena = Arena.ofConfined()) {
-			MemorySegment output = arena.allocate(ValueLayout.JAVA_INT);
-			int status = (int)SOURCE_STATE.invokeExact(sourceHandle, output);
-			check(status, "Read source state");
-			return output.get(ValueLayout.JAVA_INT, 0);
-		} catch (Throwable throwable) {
-			throw nativeFailure("Read source state", throwable);
-		}
-	}
-
-	static void sourceSetPosition(long sourceHandle, float x, float y, float z) {
-		try {
-			check((int)SOURCE_SET_POSITION.invokeExact(sourceHandle, x, y, z), "Set source position");
-		} catch (Throwable throwable) {
-			throw nativeFailure("Set source position", throwable);
-		}
-	}
-
-	static void sourceSetPitch(long sourceHandle, float pitch) {
-		checkFloat(SOURCE_SET_PITCH, sourceHandle, pitch, "Set source pitch");
-	}
-
-	static void sourceSetVolume(long sourceHandle, float volume) {
-		checkFloat(SOURCE_SET_VOLUME, sourceHandle, volume, "Set source volume");
-	}
-
-	static void sourceSetLooping(long sourceHandle, boolean looping) {
-		checkInt(SOURCE_SET_LOOPING, sourceHandle, looping ? 1 : 0, "Set source looping");
-	}
-
-	static void sourceSetRelative(long sourceHandle, boolean relative) {
-		checkInt(SOURCE_SET_RELATIVE, sourceHandle, relative ? 1 : 0, "Set source relative mode");
-	}
-
-	static void sourceDisableAttenuation(long sourceHandle) {
-		checkHandle(SOURCE_DISABLE_ATTENUATION, sourceHandle, "Disable source attenuation");
-	}
-
-	static void sourceLinearAttenuation(long sourceHandle, float distance) {
-		checkFloat(SOURCE_LINEAR_ATTENUATION, sourceHandle, distance, "Set source linear attenuation");
-	}
-
 	static long bufferCreate(long deviceHandle, ByteBuffer data, javax.sound.sampled.AudioFormat format) {
 		BufferSlice slice = bufferSlice(data);
 		try (Arena arena = Arena.ofConfined()) {
@@ -350,36 +263,109 @@ final class NativeAudio {
 		checkHandle(BUFFER_DESTROY, bufferHandle, "Destroy audio buffer");
 	}
 
-	static void sourceAttachStaticBuffer(long sourceHandle, long bufferHandle) {
-		try {
-			check((int)SOURCE_ATTACH_STATIC_BUFFER.invokeExact(sourceHandle, bufferHandle), "Attach static audio buffer");
+	static long soundCreateStatic(long deviceHandle, SoundConfig config, long bufferHandle) {
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment configSegment = writeSoundConfig(arena, config);
+			MemorySegment output = arena.allocate(ValueLayout.JAVA_LONG);
+			int status = (int)SOUND_CREATE_STATIC.invokeExact(deviceHandle, configSegment, bufferHandle, output);
+			if (status == ERR_POOL_EXHAUSTED) {
+				return 0L;
+			}
+
+			check(status, "Create static sound");
+			return output.get(ValueLayout.JAVA_LONG, 0);
 		} catch (Throwable throwable) {
-			throw nativeFailure("Attach static audio buffer", throwable);
+			throw nativeFailure("Create static sound", throwable);
 		}
 	}
 
-	static void sourceQueueStreamBuffer(long sourceHandle, ByteBuffer data, javax.sound.sampled.AudioFormat format) {
-		BufferSlice slice = bufferSlice(data);
-		try {
-			int status = (int)SOURCE_QUEUE_STREAM_BUFFER.invokeExact(
-				sourceHandle,
-				slice.segment,
-				slice.length,
+	static long soundCreateStreaming(long deviceHandle, SoundConfig config) {
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment configSegment = writeSoundConfig(arena, config);
+			MemorySegment output = arena.allocate(ValueLayout.JAVA_LONG);
+			int status = (int)SOUND_CREATE_STREAMING.invokeExact(deviceHandle, configSegment, output);
+			if (status == ERR_POOL_EXHAUSTED) {
+				return 0L;
+			}
+
+			check(status, "Create streaming sound");
+			return output.get(ValueLayout.JAVA_LONG, 0);
+		} catch (Throwable throwable) {
+			throw nativeFailure("Create streaming sound", throwable);
+		}
+	}
+
+	static void soundUpdate(long soundHandle, int updateMask, SoundConfig config) {
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment configSegment = writeSoundConfig(arena, config);
+			check((int)SOUND_UPDATE.invokeExact(soundHandle, updateMask, configSegment), "Update sound");
+		} catch (Throwable throwable) {
+			throw nativeFailure("Update sound", throwable);
+		}
+	}
+
+	static int soundSubmitStreamChunks(long soundHandle, List<ByteBuffer> chunks, javax.sound.sampled.AudioFormat format) {
+		if (chunks.isEmpty()) {
+			return 0;
+		}
+
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment records = arena.allocate(STREAM_CHUNK_SIZE * chunks.size(), 8L);
+			for (int i = 0; i < chunks.size(); i++) {
+				BufferSlice slice = bufferSlice(chunks.get(i));
+				long offset = i * STREAM_CHUNK_SIZE;
+				records.set(ValueLayout.ADDRESS, offset + STREAM_CHUNK_DATA, slice.segment);
+				records.set(ValueLayout.JAVA_LONG, offset + STREAM_CHUNK_LENGTH, slice.length);
+			}
+			MemorySegment accepted = arena.allocate(ValueLayout.JAVA_INT);
+			int status = (int)SOUND_SUBMIT_STREAM_CHUNKS.invokeExact(
+				soundHandle,
+				records,
+				(long)chunks.size(),
 				format.getChannels(),
 				format.getSampleSizeInBits(),
 				isPcm(format) ? 1 : 0,
-				(int)format.getSampleRate()
+				(int)format.getSampleRate(),
+				accepted
 			);
-			check(status, "Queue streaming audio buffer");
+			check(status, "Submit streaming sound chunks");
+			return accepted.get(ValueLayout.JAVA_INT, 0);
 		} catch (Throwable throwable) {
-			throw nativeFailure("Queue streaming audio buffer", throwable);
+			throw nativeFailure("Submit streaming sound chunks", throwable);
 		}
 	}
 
-	static int sourceRemoveProcessedBuffers(long sourceHandle) {
+	static void soundPlay(long soundHandle) {
+		checkHandle(SOUND_PLAY, soundHandle, "Play sound");
+	}
+
+	static void soundPause(long soundHandle) {
+		checkHandle(SOUND_PAUSE, soundHandle, "Pause sound");
+	}
+
+	static void soundStop(long soundHandle) {
+		checkHandle(SOUND_STOP, soundHandle, "Stop sound");
+	}
+
+	static int soundState(long soundHandle) {
 		try (Arena arena = Arena.ofConfined()) {
 			MemorySegment output = arena.allocate(ValueLayout.JAVA_INT);
-			int status = (int)SOURCE_REMOVE_PROCESSED_BUFFERS.invokeExact(sourceHandle, output);
+			int status = (int)SOUND_STATE.invokeExact(soundHandle, output);
+			check(status, "Read sound state");
+			return output.get(ValueLayout.JAVA_INT, 0);
+		} catch (Throwable throwable) {
+			throw nativeFailure("Read sound state", throwable);
+		}
+	}
+
+	static void soundStopAndDestroy(long soundHandle) {
+		checkHandle(SOUND_STOP_AND_DESTROY, soundHandle, "Stop and destroy sound");
+	}
+
+	static int soundRemoveProcessedStreamBuffers(long soundHandle) {
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment output = arena.allocate(ValueLayout.JAVA_INT);
+			int status = (int)SOUND_REMOVE_PROCESSED_STREAM_BUFFERS.invokeExact(soundHandle, output);
 			check(status, "Remove processed stream buffers");
 			return output.get(ValueLayout.JAVA_INT, 0);
 		} catch (Throwable throwable) {
@@ -387,37 +373,26 @@ final class NativeAudio {
 		}
 	}
 
-	static void listenerSetTransform(long deviceHandle, ListenerTransform transform) {
+	static void listenerUpdate(long deviceHandle, ListenerTransform transform, float gain) {
 		var position = transform.position();
 		var forward = transform.forward();
 		var up = transform.up();
-		try {
-			check(
-				(int)LISTENER_SET_TRANSFORM.invokeExact(
-					deviceHandle,
-					(float)position.x,
-					(float)position.y,
-					(float)position.z,
-					(float)forward.x,
-					(float)forward.y,
-					(float)forward.z,
-					(float)up.x(),
-					(float)up.y(),
-					(float)up.z()
-				),
-				"Set listener transform"
-			);
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment state = arena.allocate(LISTENER_STATE_SIZE, 4L);
+			state.set(ValueLayout.JAVA_FLOAT, 0L, (float)position.x);
+			state.set(ValueLayout.JAVA_FLOAT, 4L, (float)position.y);
+			state.set(ValueLayout.JAVA_FLOAT, 8L, (float)position.z);
+			state.set(ValueLayout.JAVA_FLOAT, 12L, (float)forward.x);
+			state.set(ValueLayout.JAVA_FLOAT, 16L, (float)forward.y);
+			state.set(ValueLayout.JAVA_FLOAT, 20L, (float)forward.z);
+			state.set(ValueLayout.JAVA_FLOAT, 24L, (float)up.x());
+			state.set(ValueLayout.JAVA_FLOAT, 28L, (float)up.y());
+			state.set(ValueLayout.JAVA_FLOAT, 32L, (float)up.z());
+			state.set(ValueLayout.JAVA_FLOAT, 36L, gain);
+			check((int)LISTENER_UPDATE.invokeExact(deviceHandle, state), "Update listener");
 		} catch (Throwable throwable) {
-			throw nativeFailure("Set listener transform", throwable);
+			throw nativeFailure("Update listener", throwable);
 		}
-	}
-
-	static void listenerReset(long deviceHandle) {
-		checkHandle(LISTENER_RESET, deviceHandle, "Reset listener");
-	}
-
-	static void listenerSetGain(long deviceHandle, float gain) {
-		checkFloat(LISTENER_SET_GAIN, deviceHandle, gain, "Set listener gain");
 	}
 
 	static int audioFormatToOpenAl(javax.sound.sampled.AudioFormat format) {
@@ -507,22 +482,6 @@ final class NativeAudio {
 		}
 	}
 
-	private static void checkFloat(MethodHandle handle, long handleValue, float value, String operation) {
-		try {
-			check((int)handle.invokeExact(handleValue, value), operation);
-		} catch (Throwable throwable) {
-			throw nativeFailure(operation, throwable);
-		}
-	}
-
-	private static void checkInt(MethodHandle handle, long handleValue, int value, String operation) {
-		try {
-			check((int)handle.invokeExact(handleValue, value), operation);
-		} catch (Throwable throwable) {
-			throw nativeFailure(operation, throwable);
-		}
-	}
-
 	private static void check(int status, String operation) {
 		if (status != OK) {
 			throw new IllegalStateException(operation + " failed with native audio status " + status);
@@ -548,6 +507,28 @@ final class NativeAudio {
 		var encoding = format.getEncoding();
 		return encoding.equals(javax.sound.sampled.AudioFormat.Encoding.PCM_UNSIGNED)
 			|| encoding.equals(javax.sound.sampled.AudioFormat.Encoding.PCM_SIGNED);
+	}
+
+	private static MemorySegment writeSoundConfig(Arena arena, SoundConfig config) {
+		MemorySegment segment = arena.allocate(SOUND_CONFIG_SIZE, 4L);
+		segment.set(ValueLayout.JAVA_FLOAT, SOUND_CONFIG_X, config.x);
+		segment.set(ValueLayout.JAVA_FLOAT, SOUND_CONFIG_Y, config.y);
+		segment.set(ValueLayout.JAVA_FLOAT, SOUND_CONFIG_Z, config.z);
+		segment.set(ValueLayout.JAVA_FLOAT, SOUND_CONFIG_PITCH, config.pitch);
+		segment.set(ValueLayout.JAVA_FLOAT, SOUND_CONFIG_GAIN, config.gain);
+		segment.set(ValueLayout.JAVA_FLOAT, SOUND_CONFIG_ATTENUATION_DISTANCE, config.attenuationDistance);
+		segment.set(ValueLayout.JAVA_INT, SOUND_CONFIG_FLAGS, config.flags);
+		return segment;
+	}
+
+	static final class SoundConfig {
+		float x;
+		float y;
+		float z;
+		float pitch = 1.0F;
+		float gain = 1.0F;
+		float attenuationDistance;
+		int flags;
 	}
 
 	private record BufferSlice(MemorySegment segment, long length) {

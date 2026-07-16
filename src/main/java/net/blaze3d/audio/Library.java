@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Locale;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
-import net.minecraft.SharedConstants;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -82,16 +81,7 @@ public class Library {
 			return null;
 		}
 
-		long source = NativeAudio.sourceCreate(this.currentDevice, pool);
-		if (source == 0L) {
-			if (SharedConstants.IS_RUNNING_IN_IDE) {
-				LOGGER.warn("Maximum sound pool size reached for {}", pool);
-			}
-
-			return null;
-		}
-
-		return new Channel(this.currentDevice, source);
+		return new Channel(this.currentDevice, pool);
 	}
 
 	public void releaseChannel(Channel channel) {

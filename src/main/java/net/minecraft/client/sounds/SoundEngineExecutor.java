@@ -55,6 +55,10 @@ public class SoundEngineExecutor extends BlockableEventLoop<Runnable> {
 		LockSupport.park("waiting for tasks");
 	}
 
+	public void dropQueuedTasks() {
+		this.dropAllTasks();
+	}
+
 	public void shutDown() {
 		this.shutdown = true;
 		this.dropAllTasks();

@@ -19,14 +19,14 @@ public class Listener {
 	public void setTransform(ListenerTransform listenerTransform) {
 		this.transform = listenerTransform;
 		if (this.deviceHandle != 0L) {
-			NativeAudio.listenerSetTransform(this.deviceHandle, listenerTransform);
+			NativeAudio.listenerUpdate(this.deviceHandle, listenerTransform, 1.0F);
 		}
 	}
 
 	public void reset() {
 		this.transform = ListenerTransform.INITIAL;
 		if (this.deviceHandle != 0L) {
-			NativeAudio.listenerReset(this.deviceHandle);
+			NativeAudio.listenerUpdate(this.deviceHandle, this.transform, 1.0F);
 		}
 	}
 
