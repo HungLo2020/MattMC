@@ -3,10 +3,11 @@
 # SetupProject.sh - Prepare this MattMC checkout for local development.
 #
 # This script is intended to be the first setup step for a fresh developer
-# machine. For now it ensures the Rust Cargo toolchain is available because the
-# project builds mandatory Rust native code. If Cargo is missing, it installs
-# rustup with the stable toolchain using the minimal profile, then verifies that
-# cargo is available before exiting.
+# machine. It ensures Python 3 and the Rust Cargo toolchain are available
+# because the project builds mandatory Rust native code and uses Python-based
+# developer tooling. If Cargo is missing, it installs rustup with the stable
+# toolchain using the minimal profile, then verifies that cargo is available
+# before exiting.
 
 set -euo pipefail
 
@@ -23,6 +24,98 @@ if [ ! -f "$PROJECT_ROOT/gradlew" ]; then
 fi
 
 cd "$PROJECT_ROOT"
+
+run_as_root() {
+	if [ "$(id -u)" -eq 0 ]; then
+		"$@"
+	elif command -v sudo >/dev/null 2>&1; then
+		sudo "$@"
+	else
+		echo "ERROR: Need root privileges to install packages, but sudo is not installed."
+		exit 1
+	fi
+}
+
+find_python3() {
+	if command -v python3 >/dev/null 2>&1; then
+		printf '%s' python3
+		return 0
+	fi
+
+	if command -v python >/dev/null 2>&1 && python - <<'PY' >/dev/null 2>&1
+import sys
+raise SystemExit(0 if sys.version_info.major >= 3 else 1)
+PY
+	then
+		printf '%s' python
+		return 0
+	fi
+
+	return 1
+}
+
+install_python() {
+	case "$(uname -s)" in
+		Linux)
+			if command -v apt-get >/dev/null 2>&1; then
+				run_as_root apt-get update
+				run_as_root apt-get install -y python3 python3-pip
+			elif command -v dnf >/dev/null 2>&1; then
+				run_as_root dnf install -y python3 python3-pip
+			elif command -v yum >/dev/null 2>&1; then
+				run_as_root yum install -y python3 python3-pip
+			elif command -v pacman >/dev/null 2>&1; then
+				run_as_root pacman -S --needed --noconfirm python python-pip
+			elif command -v zypper >/dev/null 2>&1; then
+				run_as_root zypper --non-interactive install python3 python3-pip
+			else
+				echo "ERROR: Python 3 is missing and no supported package manager was found."
+				echo "Install Python 3 and pip, then rerun this script."
+				exit 1
+			fi
+			;;
+		Darwin)
+			if command -v brew >/dev/null 2>&1; then
+				brew install python
+			else
+				echo "ERROR: Python 3 is missing and Homebrew is not installed."
+				echo "Install Python 3 from https://www.python.org/ or install Homebrew, then rerun this script."
+				exit 1
+			fi
+			;;
+		*)
+			echo "ERROR: Python 3 is missing on unsupported OS: $(uname -s)"
+			exit 1
+			;;
+	esac
+}
+
+ensure_python() {
+	local python_cmd
+
+	if python_cmd="$(find_python3)"; then
+		echo "Python is already installed: $("$python_cmd" --version)"
+	else
+		echo "Python 3 is missing. Installing Python 3..."
+		install_python
+		if ! python_cmd="$(find_python3)"; then
+			echo "ERROR: Python 3 installation completed, but python is still not available on PATH."
+			exit 1
+		fi
+		echo "Python installed: $("$python_cmd" --version)"
+	fi
+
+	if ! "$python_cmd" -m pip --version >/dev/null 2>&1; then
+		echo "pip is missing. Attempting to install pip for Python 3..."
+		if ! "$python_cmd" -m ensurepip --upgrade >/dev/null 2>&1; then
+			echo "ERROR: pip is missing for $python_cmd."
+			echo "Install the Python pip package for your system, then rerun this script."
+			exit 1
+		fi
+	fi
+
+	echo "pip is available: $("$python_cmd" -m pip --version)"
+}
 
 load_cargo_env() {
 	if [ -f "$HOME/.cargo/env" ]; then
@@ -82,6 +175,8 @@ echo "  MattMC Project Setup"
 echo "========================================="
 echo ""
 
+ensure_python
+echo ""
 ensure_cargo
 
 echo ""
