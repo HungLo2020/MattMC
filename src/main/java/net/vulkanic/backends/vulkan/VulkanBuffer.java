@@ -1,6 +1,7 @@
 package net.vulkanic.backends.vulkan;
 
 import net.vulkanic.VulkanicBuffer;
+import net.vulkanic.diagnostics.VulkanicDiagnostics;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
@@ -187,10 +188,10 @@ public class VulkanBuffer extends VulkanicBuffer {
         ByteBuffer previous = diagnosticSparseShadowRanges.remove(offset);
         if (previous != null) {
             diagnosticSparseShadowBytes -= previous.capacity();
-            VulkanBackend.releaseDiagnosticGeometryShadowBytes(previous.capacity());
+            VulkanicDiagnostics.releaseGeometryShadowBytes(previous.capacity());
         }
 
-        while (!VulkanBackend.reserveDiagnosticGeometryShadowBytes(length)) {
+        while (!VulkanicDiagnostics.reserveGeometryShadowBytes(length)) {
             if (!evictOldestGlobalDiagnosticSparseShadowRange()) {
                 return;
             }
@@ -220,7 +221,7 @@ public class VulkanBuffer extends VulkanicBuffer {
         }
         int evictedBytes = oldest.getValue().capacity();
         diagnosticSparseShadowBytes -= evictedBytes;
-        VulkanBackend.releaseDiagnosticGeometryShadowBytes(evictedBytes);
+        VulkanicDiagnostics.releaseGeometryShadowBytes(evictedBytes);
         return true;
     }
 
@@ -258,7 +259,7 @@ public class VulkanBuffer extends VulkanicBuffer {
             }
             closed = true;
             if (diagnosticSparseShadowBytes > 0) {
-                VulkanBackend.releaseDiagnosticGeometryShadowBytes(diagnosticSparseShadowBytes);
+                VulkanicDiagnostics.releaseGeometryShadowBytes(diagnosticSparseShadowBytes);
                 diagnosticSparseShadowBytes = 0;
                 diagnosticSparseShadowRanges.clear();
             }

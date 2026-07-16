@@ -24,6 +24,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.TimeSource.NanoTimeSource;
 import net.vulkanic.backends.opengl.OpenGLBackend;
 import net.vulkanic.backends.vulkan.VulkanBackend;
+import net.vulkanic.diagnostics.VulkanicDiagnostics;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
@@ -50,84 +51,7 @@ import java.util.function.BiFunction;
  */
 public class VulkanicAPI {
     private static final String LWJGL_STACK_SIZE_PROPERTY = "org.lwjgl.system.stackSize";
-    private static final String GENERATED_STANDALONE_UNIFORM_BLOCK_NAME = "VulkanicStandaloneUniforms";
     private static final org.slf4j.Logger LOGGER = net.logging.LogUtils.getLogger();
-    private static final boolean TRACE_STANDALONE_UNIFORMS = Boolean.getBoolean("mattmc.vulkan.traceStandaloneUniforms");
-    private static final int MAX_STANDALONE_UNIFORM_TRACE_LOGS =
-        diagnosticLimit("mattmc.vulkan.traceStandaloneUniforms.maxLogs", 512);
-    private static final java.util.concurrent.atomic.AtomicInteger STANDALONE_UNIFORM_TRACE_LOG_COUNT = new java.util.concurrent.atomic.AtomicInteger();
-    private static final boolean TRACE_SHADER_INPUT_PARITY = Boolean.getBoolean("mattmc.vulkan.traceShaderInputParity");
-    private static final boolean TRACE_SHADER_INPUT_PARITY_POSE_ONLY =
-        Boolean.getBoolean("mattmc.vulkan.traceShaderInputParity.poseOnly");
-    private static final java.util.Set<String> DECODED_STANDALONE_UNIFORM_TRACE_NAMES = java.util.Set.of(
-        "uProj",
-        "uInvProj",
-        "uInvMvmProj",
-        "uDhInvMvmProj",
-        "uMcInvMvmProj",
-        "uCameraBlockYPos",
-        "frameCounter",
-        "frameTime",
-        "frameTimeCounter",
-        "frameTimeSmooth",
-        "dhProjectionInverse",
-        "iris_ModelViewMatrix",
-        "iris_ProjectionMatrix",
-        "shadowModelView",
-        "shadowModelViewInverse"
-    );
-    private static final boolean TRACE_STANDALONE_UNIFORM_BLOCK_MEMBERS =
-        Boolean.getBoolean("mattmc.vulkan.traceStandaloneUniformBlockMembers");
-    private static final boolean DEDUPE_STANDALONE_UNIFORM_BLOCK_MEMBER_TRACE =
-        Boolean.parseBoolean(System.getProperty("mattmc.vulkan.traceStandaloneUniformBlockMembers.dedupe", "true"));
-    private static final java.util.Set<String> STANDALONE_UNIFORM_BLOCK_MEMBER_TRACE_KEYS =
-        java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
-    private static final boolean TRACE_RENDER_TARGET_CONTENT_HASHES =
-        Boolean.getBoolean("mattmc.vulkan.traceRenderTargetContentHashes");
-    private static final boolean TRACE_RENDER_TARGET_PRODUCER_HASHES =
-        Boolean.getBoolean("mattmc.vulkan.traceRenderTargetProducerHashes");
-    private static final boolean TRACE_RENDER_TARGET_SAMPLER_BINDING_HASHES =
-        Boolean.getBoolean("mattmc.vulkan.traceRenderTargetSamplerBindingHashes");
-    private static final boolean TRACE_IRIS_COLORTEX0_PHASE_HASHES =
-        Boolean.getBoolean("mattmc.vulkan.traceIrisColortex0PhaseHashes");
-    private static final boolean TRACE_SHADER_INPUT_SAMPLER_CONTENT_HASHES =
-        Boolean.getBoolean("mattmc.vulkan.traceShaderInputSamplerContentHashes");
-    private static final int MAX_RENDER_TARGET_CONTENT_READBACKS =
-        diagnosticLimit("mattmc.vulkan.traceRenderTargetContentHashes.maxReadbacks", 8);
-    private static final boolean TRACE_RENDER_TARGET_CONTENT_HASHES_INITIAL_POSE_ONLY =
-        Boolean.getBoolean("mattmc.vulkan.traceRenderTargetContentHashes.initialPoseOnly");
-    private static final java.util.concurrent.atomic.AtomicInteger RENDER_TARGET_CONTENT_READBACK_COUNT =
-        new java.util.concurrent.atomic.AtomicInteger();
-    private static final java.util.Set<String> RENDER_TARGET_CONTENT_READBACK_KEYS =
-        java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
-    private static final java.util.Set<String> IRIS_COLORTEX0_PHASE_HASH_KEYS =
-        java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
-    private static final int MAX_SHADER_INPUT_PARITY_LOGS =
-        diagnosticLimit("mattmc.vulkan.traceShaderInputParity.maxLogs", 20000);
-    private static final java.util.concurrent.atomic.AtomicInteger SHADER_INPUT_PARITY_LOG_COUNT = new java.util.concurrent.atomic.AtomicInteger();
-    private static final java.util.concurrent.atomic.AtomicLong SHADER_INPUT_PARITY_ORDERING_ORDINAL =
-        new java.util.concurrent.atomic.AtomicLong();
-    private static final java.util.concurrent.ConcurrentMap<Integer, String> SHADER_INPUT_PARITY_PROGRAM_NAMES =
-        new java.util.concurrent.ConcurrentHashMap<>();
-    private static final ThreadLocal<ShaderInputParitySemanticDrawIdentity> SHADER_INPUT_PARITY_SEMANTIC_DRAW =
-        new ThreadLocal<>();
-    private static final ThreadLocal<java.util.ArrayDeque<String>> SHADER_INPUT_PARITY_SEMANTIC_CONTEXT =
-        ThreadLocal.withInitial(java.util.ArrayDeque::new);
-    private static final java.util.concurrent.ConcurrentMap<String, java.util.concurrent.atomic.AtomicInteger> SHADER_INPUT_PARITY_SEMANTIC_DRAW_ORDINALS =
-        new java.util.concurrent.ConcurrentHashMap<>();
-    private static final int SHADER_INPUT_PARITY_GEOMETRY_MAX_BYTES =
-        diagnosticLimit("mattmc.vulkan.traceShaderInputParity.geometryMaxBytes", 2 * 1024 * 1024);
-    private static final boolean TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL =
-        Boolean.getBoolean("mattmc.vulkan.traceShaderInputParity.geometryDetail");
-    private static final String TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINE =
-        System.getProperty("mattmc.vulkan.traceShaderInputParity.geometryDetailPipeline", "minecraft:pipeline/vignette");
-    private static final java.util.Set<String> TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINES =
-        java.util.Arrays.stream(TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINE.split(","))
-            .map(String::trim)
-            .filter(entry -> !entry.isEmpty())
-            .collect(java.util.stream.Collectors.toUnmodifiableSet());
-    private static final int TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_MAX_VERTICES =
-        diagnosticLimit("mattmc.vulkan.traceShaderInputParity.geometryDetailMaxVertices", 12);
     private static final int VULKAN_LWJGL_STACK_SIZE_KB = 512;
     private static GraphicsBackend backend;
     @Nullable
@@ -178,15 +102,6 @@ public class VulkanicAPI {
         intConsumer.accept(i + 3);
         intConsumer.accept(i);
     });
-
-    private static int diagnosticLimit(String property, int defaultValue) {
-        int value = Integer.getInteger(property, defaultValue);
-        if (value < 0) {
-            LOGGER.warn("Ignoring negative diagnostic limit {}={}; using {}", property, value, defaultValue);
-            return defaultValue;
-        }
-        return value;
-    }
 
     private record ScopedCompositeColortex0Binding(
         PipelineHandle pipeline,
@@ -1448,7 +1363,7 @@ public class VulkanicAPI {
      * @param height The height of the viewport in pixels
      */
     public static void setDynamicViewport(CommandContext ctx, int x, int y, int width, int height) {
-        if ((TRACE_RENDER_TARGET_CONTENT_HASHES && DeterministicCameraCapture.isEnabledForDiagnostics())
+        if ((VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES && DeterministicCameraCapture.isEnabledForDiagnostics())
             || VulkanicDrawStateDiagnostics.enabled()) {
             diagnosticLastViewport = new DiagnosticViewportState(x, y, width, height);
         }
@@ -3485,37 +3400,31 @@ public class VulkanicAPI {
     }
 
     public static String generatedStandaloneUniformBlockName() {
-        return GENERATED_STANDALONE_UNIFORM_BLOCK_NAME;
+        return VulkanicDiagnostics.GENERATED_STANDALONE_UNIFORM_BLOCK_NAME;
     }
 
     public static boolean isStandaloneUniformTracingEnabled() {
-        return TRACE_STANDALONE_UNIFORMS;
+        return VulkanicDiagnostics.TRACE_STANDALONE_UNIFORMS;
     }
 
     public static boolean isShaderInputParityTracingEnabled() {
-        return TRACE_SHADER_INPUT_PARITY;
+        return VulkanicDiagnostics.TRACE_SHADER_INPUT_PARITY;
     }
 
     public static void registerShaderInputParityProgramName(int program, String name) {
-        if (program <= 0 || name == null || name.isBlank()) {
-            return;
-        }
-        SHADER_INPUT_PARITY_PROGRAM_NAMES.put(program, name);
+        VulkanicDiagnostics.registerProgramName(program, name);
     }
 
     public static boolean shouldTraceStandaloneUniformBlockMembers() {
-        return TRACE_SHADER_INPUT_PARITY && TRACE_STANDALONE_UNIFORM_BLOCK_MEMBERS;
+        return VulkanicDiagnostics.shouldTraceStandaloneUniformBlockMembers();
     }
 
     public static boolean shouldTraceStandaloneUniforms() {
-        if (!isStandaloneUniformTracingEnabled()) {
-            return false;
-        }
-        return STANDALONE_UNIFORM_TRACE_LOG_COUNT.incrementAndGet() <= MAX_STANDALONE_UNIFORM_TRACE_LOGS;
+        return VulkanicDiagnostics.shouldTraceStandaloneUniforms();
     }
 
     public static boolean shouldTraceStandaloneUniform(String name) {
-        return GENERATED_STANDALONE_UNIFORM_BLOCK_NAME.equals(name) && shouldTraceStandaloneUniforms();
+        return VulkanicDiagnostics.shouldTraceStandaloneUniform(name);
     }
 
     public interface ShaderInputParityScope extends AutoCloseable {
@@ -3523,44 +3432,8 @@ public class VulkanicAPI {
         void close();
     }
 
-    private static final ShaderInputParityScope NO_SHADER_INPUT_PARITY_SCOPE = () -> {
-    };
-
-    private record ShaderInputParitySemanticDrawIdentity(
-        String key,
-        String subsystem,
-        String phase,
-        String pass,
-        String pipeline,
-        String vertexShader,
-        String fragmentShader,
-        String material,
-        String output,
-        int ordinal
-    ) {
-        String fields() {
-            return "semanticDrawKey=" + key
-                + " semanticSubsystem=" + subsystem
-                + " semanticPhase=" + phase
-                + " semanticPass=" + pass
-                + " semanticPipeline=" + pipeline
-                + " semanticVertexShader=" + vertexShader
-                + " semanticFragmentShader=" + fragmentShader
-                + " semanticMaterial=" + material
-                + " semanticOutput=" + output
-                + " semanticOrdinal=" + ordinal;
-        }
-    }
-
     private static String shaderInputParityNormalizeSemanticOutput(@Nullable String output) {
-        String normalized = shaderInputParityValueOrUnknown(output);
-        if (normalized.equals("framebuffer")
-            || normalized.equals("framebuffer-or-texture-view")
-            || normalized.startsWith("framebuffer:")
-            || normalized.startsWith("extent=")) {
-            return "legacy-framebuffer";
-        }
-        return normalized.replaceAll("\\btex=\\d+", "tex=<id>");
+        return VulkanicDiagnostics.normalizeSemanticOutput(output);
     }
 
     public static String shaderInputParityDiagnosticLabel(@Nullable String value) {
@@ -3568,25 +3441,8 @@ public class VulkanicAPI {
     }
 
     public static ShaderInputParityScope pushShaderInputParitySemanticContext(@Nullable String context) {
-        if (!TRACE_SHADER_INPUT_PARITY || context == null || context.isBlank()) {
-            return NO_SHADER_INPUT_PARITY_SCOPE;
-        }
-        java.util.ArrayDeque<String> stack = SHADER_INPUT_PARITY_SEMANTIC_CONTEXT.get();
-        stack.push(shaderInputParityValueOrUnknown(context));
-        return () -> {
-            java.util.ArrayDeque<String> currentStack = SHADER_INPUT_PARITY_SEMANTIC_CONTEXT.get();
-            if (!currentStack.isEmpty()) {
-                currentStack.pop();
-            }
-            if (currentStack.isEmpty()) {
-                SHADER_INPUT_PARITY_SEMANTIC_CONTEXT.remove();
-            }
-        };
-    }
-
-    private static String shaderInputParityCurrentSemanticContext() {
-        java.util.ArrayDeque<String> stack = SHADER_INPUT_PARITY_SEMANTIC_CONTEXT.get();
-        return stack.isEmpty() ? "" : stack.peek();
+        VulkanicDiagnostics.Scope scope = VulkanicDiagnostics.pushSemanticContext(context);
+        return scope::close;
     }
 
     public static ShaderInputParityScope beginShaderInputParitySemanticDraw(
@@ -3605,89 +3461,30 @@ public class VulkanicAPI {
         int instanceCount,
         int baseVertex
     ) {
-        if (!TRACE_SHADER_INPUT_PARITY) {
-            return NO_SHADER_INPUT_PARITY_SCOPE;
-        }
-
-        ShaderInputParitySemanticDrawIdentity previous = SHADER_INPUT_PARITY_SEMANTIC_DRAW.get();
-        PipelineDescriptor.PortableState portableState = descriptor != null ? descriptor.getPortableState() : null;
-        String phase = shaderInputParityRenderPhase();
-        String normalizedSubsystem = shaderInputParityValueOrUnknown(subsystem);
-        if (previous != null
-            && "sodium-terrain".equals(previous.subsystem())
-            && "blaze3d-renderpass".equals(normalizedSubsystem)) {
-            return NO_SHADER_INPUT_PARITY_SCOPE;
-        }
-        String normalizedPass = shaderInputParityValueOrUnknown(pass);
-        if ("blaze3d-renderpass".equals(normalizedSubsystem) && normalizedPass.startsWith("extent=")) {
-            normalizedPass = "legacy-renderpass";
-        }
-        String pipeline = shaderInputParityPipelineLocation(renderPipeline, portableState);
-        String vertexShader = shaderInputParityVertexShader(renderPipeline, portableState);
-        String fragmentShader = shaderInputParityFragmentShader(renderPipeline, portableState);
-        String normalizedMaterial = shaderInputParityValueOrUnknown(material != null ? material : pipeline);
-        String semanticContext = shaderInputParityCurrentSemanticContext();
-        if (!semanticContext.isEmpty()) {
-            normalizedPass = normalizedPass + ":ctx=" + semanticContext;
-            normalizedMaterial = normalizedMaterial + ":ctx=" + semanticContext;
-        }
-        String normalizedOutput = shaderInputParityNormalizeSemanticOutput(output);
+        String normalizedOutput = VulkanicDiagnostics.normalizeSemanticOutput(output);
         String projectionLabel = shaderInputParityCurrentProjectionLabel();
         if (!projectionLabel.isEmpty()) {
             normalizedOutput = normalizedOutput + "|projection:" + projectionLabel;
         }
-        String poseContext = shaderInputParityDeterministicContextFields().replace(' ', '|');
-        String ordinalKey = String.join("|",
-            normalizedSubsystem,
-            phase,
-            normalizedPass,
-            pipeline,
-            normalizedMaterial,
+        VulkanicDiagnostics.Scope scope = VulkanicDiagnostics.beginSemanticDraw(
+            getActiveBackendType().name().toLowerCase(Locale.ROOT),
+            source,
+            subsystem,
+            shaderInputParityRenderPhase(),
+            pass,
+            renderPipeline,
+            descriptor,
+            material,
             normalizedOutput,
-            poseContext
+            indexed,
+            firstVertex,
+            vertexCount,
+            firstIndex,
+            indexCount,
+            instanceCount,
+            baseVertex
         );
-        int ordinal = SHADER_INPUT_PARITY_SEMANTIC_DRAW_ORDINALS
-            .computeIfAbsent(ordinalKey, ignored -> new java.util.concurrent.atomic.AtomicInteger())
-            .incrementAndGet();
-        String semanticKey = shaderInputParityHashString(ordinalKey + "|ordinal=" + ordinal);
-        ShaderInputParitySemanticDrawIdentity identity = new ShaderInputParitySemanticDrawIdentity(
-            semanticKey,
-            normalizedSubsystem,
-            phase,
-            normalizedPass,
-            pipeline,
-            vertexShader,
-            fragmentShader,
-            normalizedMaterial,
-            normalizedOutput,
-            ordinal
-        );
-        SHADER_INPUT_PARITY_SEMANTIC_DRAW.set(identity);
-
-        if (shouldTraceShaderInputParityLog()) {
-            LOGGER.info(
-                "ShaderInputParitySemanticDraw backend={} source={} {} indexed={} firstVertex={} vertexCount={} firstIndex={} indexCount={} instanceCount={} baseVertex={} {}",
-                getActiveBackendType().name().toLowerCase(Locale.ROOT),
-                source,
-                identity.fields(),
-                indexed,
-                firstVertex,
-                vertexCount,
-                firstIndex,
-                indexCount,
-                instanceCount,
-                baseVertex,
-                shaderInputParityDeterministicContextFields()
-            );
-        }
-
-        return () -> {
-            if (previous == null) {
-                SHADER_INPUT_PARITY_SEMANTIC_DRAW.remove();
-            } else {
-                SHADER_INPUT_PARITY_SEMANTIC_DRAW.set(previous);
-            }
-        };
+        return scope::close;
     }
 
     @Nullable
@@ -5613,7 +5410,7 @@ public class VulkanicAPI {
             if (!seenNames.add(name)) {
                 continue;
             }
-            if (GENERATED_STANDALONE_UNIFORM_BLOCK_NAME.equals(name)) {
+            if (VulkanicDiagnostics.GENERATED_STANDALONE_UNIFORM_BLOCK_NAME.equals(name)) {
                 hasGeneratedStandaloneUniformBlock = true;
                 continue;
             }
@@ -5658,7 +5455,7 @@ public class VulkanicAPI {
             bindings.add(new PipelineDescriptor.ResourceBinding(
                 0,
                 bindingIndex,
-                GENERATED_STANDALONE_UNIFORM_BLOCK_NAME,
+                VulkanicDiagnostics.GENERATED_STANDALONE_UNIFORM_BLOCK_NAME,
                 PipelineDescriptor.ResourceType.UNIFORM_BUFFER,
                 null,
                 normalizedStages
@@ -7295,6 +7092,14 @@ public class VulkanicAPI {
     }
 
     /**
+     * Wraps a legacy OpenGL pipeline in the neutral Vulkanic pipeline handle type.
+     * This keeps backend implementation classes behind the Vulkanic package boundary.
+     */
+    public static PipelineHandle createOpenGLPipelineHandle(net.blaze3d.opengl.GlRenderPipeline pipeline) {
+        return new net.vulkanic.backends.opengl.OpenGLPipelineHandle(pipeline);
+    }
+
+    /**
      * Convenience overload: creates a pipeline descriptor carrying portable state
      * and precompiled SPIR-V modules, then compiles through the active backend.
      */
@@ -7824,7 +7629,7 @@ public class VulkanicAPI {
         PipelineDescriptor.ResourceBinding resourceBinding,
         PipelineResourceBindings.SamplerBinding samplerBinding
     ) {
-        if (!TRACE_RENDER_TARGET_CONTENT_HASHES) {
+        if (!VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES) {
             return;
         }
         if (!DeterministicCameraCapture.isEnabledForDiagnostics()) {
@@ -7920,7 +7725,7 @@ public class VulkanicAPI {
         int textureId,
         String source
     ) {
-        if (!TRACE_RENDER_TARGET_CONTENT_HASHES || !DeterministicCameraCapture.isEnabledForDiagnostics()) {
+        if (!VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES || !DeterministicCameraCapture.isEnabledForDiagnostics()) {
             return;
         }
         if (!isScopedCompositeColortex0ResourceName(resourceName)) {
@@ -7945,7 +7750,7 @@ public class VulkanicAPI {
             + '|' + customPassName
             + '|' + physicalKey
             + "|unit:" + textureUnit;
-        if (!TRACE_RENDER_TARGET_SAMPLER_BINDING_HASHES) {
+        if (!VulkanicDiagnostics.TRACE_RENDER_TARGET_SAMPLER_BINDING_HASHES) {
             contentHash = DiagnosticTextureContentHash.unavailable(
                 "colortex0",
                 textureView == null ? null : textureView.texture(),
@@ -8018,7 +7823,7 @@ public class VulkanicAPI {
         @Nullable RenderPipeline renderPipeline,
         String resourceName
     ) {
-        if (!TRACE_RENDER_TARGET_CONTENT_HASHES) {
+        if (!VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES) {
             return false;
         }
         if (!DeterministicCameraCapture.isEnabledForDiagnostics()) {
@@ -8071,7 +7876,7 @@ public class VulkanicAPI {
         boolean writesMain,
         String source
     ) {
-        if (!TRACE_RENDER_TARGET_CONTENT_HASHES || textureId <= 0) {
+        if (!VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES || textureId <= 0) {
             return;
         }
         DiagnosticIrisColorAttachment attachment = new DiagnosticIrisColorAttachment(
@@ -8096,7 +7901,7 @@ public class VulkanicAPI {
     }
 
     public static void traceIrisColortex0PhaseHash(String phase, String pingPong, int textureId) {
-        if (!TRACE_RENDER_TARGET_CONTENT_HASHES || !TRACE_IRIS_COLORTEX0_PHASE_HASHES) {
+        if (!VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES || !VulkanicDiagnostics.TRACE_IRIS_COLORTEX0_PHASE_HASHES) {
             return;
         }
         if (!DeterministicCameraCapture.isEnabledForDiagnostics() || !isDeterministicCaptureEligiblePose()) {
@@ -8109,7 +7914,7 @@ public class VulkanicAPI {
         String backendName = getActiveBackendType().name().toLowerCase(java.util.Locale.ROOT);
         String poseName = DeterministicCameraCapture.currentPoseNameForDiagnostics();
         String phaseKey = backendName + '|' + poseName + '|' + phase + '|' + pingPong + "|tex:" + textureId;
-        if (!IRIS_COLORTEX0_PHASE_HASH_KEYS.add(phaseKey)) {
+        if (!VulkanicDiagnostics.IRIS_COLORTEX0_PHASE_HASH_KEYS.add(phaseKey)) {
             return;
         }
 
@@ -8168,7 +7973,7 @@ public class VulkanicAPI {
         @Nullable Object customPass,
         String source
     ) {
-        if (!TRACE_RENDER_TARGET_CONTENT_HASHES || !DeterministicCameraCapture.isEnabledForDiagnostics()) {
+        if (!VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES || !DeterministicCameraCapture.isEnabledForDiagnostics()) {
             return;
         }
 
@@ -8198,7 +8003,7 @@ public class VulkanicAPI {
                 + '|' + attachment.logicalName()
                 + '|' + attachment.pingPong()
                 + '|' + physicalKey;
-            if (!TRACE_RENDER_TARGET_PRODUCER_HASHES) {
+            if (!VulkanicDiagnostics.TRACE_RENDER_TARGET_PRODUCER_HASHES) {
                 contentHash = DiagnosticTextureContentHash.unavailable(
                     "colortex0",
                     textureView == null ? null : textureView.texture(),
@@ -8288,7 +8093,7 @@ public class VulkanicAPI {
         if ("composite".equals(customPassName)) {
             return "main".equals(attachment.pingPong());
         }
-        if (TRACE_RENDER_TARGET_CONTENT_HASHES_INITIAL_POSE_ONLY) {
+        if (VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES_INITIAL_POSE_ONLY) {
             return false;
         }
         if ("composite3".equals(customPassName)) {
@@ -8298,7 +8103,7 @@ public class VulkanicAPI {
     }
 
     private static boolean isDeterministicCaptureEligiblePose() {
-        if (TRACE_RENDER_TARGET_CONTENT_HASHES_INITIAL_POSE_ONLY) {
+        if (VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES_INITIAL_POSE_ONLY) {
             return "initial".equals(DeterministicCameraCapture.currentPoseNameForDiagnostics());
         }
         String poseName = DeterministicCameraCapture.currentPoseNameForDiagnostics();
@@ -8503,7 +8308,7 @@ public class VulkanicAPI {
         if (getActiveBackendType() != GraphicsBackendType.VULKAN) {
             return;
         }
-        if (!TRACE_RENDER_TARGET_CONTENT_HASHES || !TRACE_RENDER_TARGET_SAMPLER_BINDING_HASHES) {
+        if (!VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES || !VulkanicDiagnostics.TRACE_RENDER_TARGET_SAMPLER_BINDING_HASHES) {
             return;
         }
         if (!"composite".equals(customPassName) || !"main".equals(outputAttachment.pingPong())) {
@@ -8575,7 +8380,7 @@ public class VulkanicAPI {
     }
 
     public static void traceDeferredScopedCompositeColortex0SamplerReadbacks(String source) {
-        if (!TRACE_RENDER_TARGET_CONTENT_HASHES || !TRACE_RENDER_TARGET_SAMPLER_BINDING_HASHES) {
+        if (!VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES || !VulkanicDiagnostics.TRACE_RENDER_TARGET_SAMPLER_BINDING_HASHES) {
             return;
         }
         if (PENDING_SCOPED_COMPOSITE_COLORTEX0_SAMPLER_READBACKS.isEmpty()) {
@@ -8650,7 +8455,7 @@ public class VulkanicAPI {
         @Nullable RenderPipeline renderPipeline,
         @Nullable Object customPass
     ) {
-        if (!TRACE_RENDER_TARGET_CONTENT_HASHES || !DeterministicCameraCapture.isEnabledForDiagnostics()) {
+        if (!VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES || !DeterministicCameraCapture.isEnabledForDiagnostics()) {
             return false;
         }
         if (renderPipeline == null || !"iris:composite".contentEquals(String.valueOf(renderPipeline.getLocation()))) {
@@ -8868,7 +8673,7 @@ public class VulkanicAPI {
     }
 
     public static void traceScopedCompositeColortex0PoseBoundary() {
-        if (!TRACE_RENDER_TARGET_CONTENT_HASHES) {
+        if (!VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES) {
             return;
         }
         if (!DeterministicCameraCapture.isEnabledForDiagnostics()) {
@@ -9104,36 +8909,36 @@ public class VulkanicAPI {
     }
 
     private static boolean reserveDiagnosticContentReadback(String feature, String readbackKey) {
-        if (!TRACE_RENDER_TARGET_CONTENT_HASHES) {
+        if (!VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES) {
             return false;
         }
 
         String normalizedKey = feature + '|' + readbackKey;
-        if (!RENDER_TARGET_CONTENT_READBACK_KEYS.add(normalizedKey)) {
+        if (!VulkanicDiagnostics.RENDER_TARGET_CONTENT_READBACK_KEYS.add(normalizedKey)) {
             return false;
         }
 
-        int count = RENDER_TARGET_CONTENT_READBACK_COUNT.incrementAndGet();
-        if (count <= MAX_RENDER_TARGET_CONTENT_READBACKS) {
+        int count = VulkanicDiagnostics.RENDER_TARGET_CONTENT_READBACK_COUNT.incrementAndGet();
+        if (count <= VulkanicDiagnostics.MAX_RENDER_TARGET_CONTENT_READBACKS) {
             return true;
         }
-        RENDER_TARGET_CONTENT_READBACK_KEYS.remove(normalizedKey);
+        VulkanicDiagnostics.RENDER_TARGET_CONTENT_READBACK_KEYS.remove(normalizedKey);
         return false;
     }
 
     private static String diagnosticContentReadbackUnavailableReason(String featureDisabledReason, String feature, String readbackKey) {
-        if (!TRACE_RENDER_TARGET_CONTENT_HASHES) {
+        if (!VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES) {
             return "content-hashes-disabled";
         }
         if (featureDisabledReason != null && !featureDisabledReason.isBlank()) {
             return featureDisabledReason;
         }
         String normalizedKey = feature + '|' + readbackKey;
-        boolean alreadyReserved = RENDER_TARGET_CONTENT_READBACK_KEYS.contains(normalizedKey);
+        boolean alreadyReserved = VulkanicDiagnostics.RENDER_TARGET_CONTENT_READBACK_KEYS.contains(normalizedKey);
         if (alreadyReserved) {
             return "content-readback-duplicate-skipped";
         }
-        if (RENDER_TARGET_CONTENT_READBACK_COUNT.get() >= MAX_RENDER_TARGET_CONTENT_READBACKS) {
+        if (VulkanicDiagnostics.RENDER_TARGET_CONTENT_READBACK_COUNT.get() >= VulkanicDiagnostics.MAX_RENDER_TARGET_CONTENT_READBACKS) {
             return "content-readback-budget-exhausted";
         }
         return "content-readback-unavailable";
@@ -9426,24 +9231,21 @@ public class VulkanicAPI {
         int stride,
         String payloadHash
     ) {
-        if (DEDUPE_STANDALONE_UNIFORM_BLOCK_MEMBER_TRACE) {
-            String key = getActiveBackendType().name().toLowerCase(Locale.ROOT)
-                + "|source=" + shaderInputParityValueOrUnknown(source)
-                + "|program=" + shaderInputParityProgramIdentity(program, programIdentity)
-                + "|stages=" + shaderInputParityValueOrUnknown(shaderStages)
-                + "|phase=" + shaderInputParityRenderPhase()
-                + "|name=" + sanitizeShaderInputParityUniformName(name)
-                + "|kind=" + valueKind
-                + "|offset=" + offset
-                + "|array=" + arraySize
-                + "|stride=" + stride
-                + "|payload=" + payloadHash
-                + "|" + shaderInputParityDeterministicContextFields();
-            if (!STANDALONE_UNIFORM_BLOCK_MEMBER_TRACE_KEYS.add(key)) {
-                return false;
-            }
-        }
-        return shouldTraceShaderInputParityLog();
+        return VulkanicDiagnostics.shouldTraceStandaloneUniformBlockMember(
+            getActiveBackendType().name().toLowerCase(Locale.ROOT),
+            source,
+            program,
+            programIdentity,
+            shaderStages,
+            name,
+            valueKind,
+            offset,
+            arraySize,
+            stride,
+            payloadHash,
+            shaderInputParityRenderPhase(),
+            shaderInputParityDeterministicContextFields()
+        );
     }
 
     private static String shaderInputParityDeterministicContextFields() {
@@ -9451,10 +9253,7 @@ public class VulkanicAPI {
     }
 
     private static String shaderInputParitySemanticDrawContextFields() {
-        ShaderInputParitySemanticDrawIdentity identity = SHADER_INPUT_PARITY_SEMANTIC_DRAW.get();
-        return identity == null
-            ? "semanticDrawKey=unavailable semanticSubsystem=unknown semanticPhase=unknown semanticPass=unknown semanticPipeline=unknown semanticVertexShader=unknown semanticFragmentShader=unknown semanticMaterial=unknown semanticOutput=unknown semanticOrdinal=0"
-            : identity.fields();
+        return VulkanicDiagnostics.currentSemanticDrawContextFields();
     }
 
     public static String currentShaderInputParitySemanticDrawContextFields() {
@@ -9462,15 +9261,11 @@ public class VulkanicAPI {
     }
 
     public static void recordShaderInputParitySubmittedWorkIdentity(String family, String identity) {
-        if (!TRACE_SHADER_INPUT_PARITY) {
-            return;
-        }
-        DeterministicCameraCapture.recordSubmittedWorkIdentity(family, identity);
+        VulkanicDiagnostics.recordSubmittedWorkIdentity(family, identity);
     }
 
     private static String shaderInputParitySemanticDrawKeyOrUnavailable() {
-        ShaderInputParitySemanticDrawIdentity identity = SHADER_INPUT_PARITY_SEMANTIC_DRAW.get();
-        return identity == null ? "unavailable" : identity.key();
+        return VulkanicDiagnostics.currentSemanticDrawKeyOrUnavailable();
     }
 
     private static String shaderInputParityPipelineLocation(
@@ -9582,10 +9377,10 @@ public class VulkanicAPI {
             logicalIndexBytes = (long) safeIndexCount * indexType.bytes;
         }
         long logicalVertexBytes = logicalVertices * stride;
-        if (logicalVertexBytes + logicalIndexBytes > SHADER_INPUT_PARITY_GEOMETRY_MAX_BYTES) {
+        if (logicalVertexBytes + logicalIndexBytes > VulkanicDiagnostics.SHADER_INPUT_PARITY_GEOMETRY_MAX_BYTES) {
             return new GeometryParityResult(
                 "not-comparable",
-                "geometry-byte-budget-exceeded:" + (logicalVertexBytes + logicalIndexBytes) + ">" + SHADER_INPUT_PARITY_GEOMETRY_MAX_BYTES,
+                "geometry-byte-budget-exceeded:" + (logicalVertexBytes + logicalIndexBytes) + ">" + VulkanicDiagnostics.SHADER_INPUT_PARITY_GEOMETRY_MAX_BYTES,
                 logicalVertices,
                 indexed ? safeIndexCount * (long) safeInstances : 0L,
                 "unavailable",
@@ -9600,7 +9395,7 @@ public class VulkanicAPI {
             java.util.zip.CRC32 indexCrc = new java.util.zip.CRC32();
             long totalIndices = indexed ? safeIndexCount * (long) safeInstances : 0L;
             boolean includeDetail = shaderInputParityGeometryDetailEnabled()
-                && logicalVertices <= TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_MAX_VERTICES;
+                && logicalVertices <= VulkanicDiagnostics.TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_MAX_VERTICES;
             StringBuilder detail = includeDetail ? new StringBuilder() : null;
             int detailVertexOrdinal = 0;
             if (indexed) {
@@ -9639,7 +9434,7 @@ public class VulkanicAPI {
                             vertexCache.put(logicalIndex, vertexData);
                         }
                         updateShaderInputParityVertex(vertexCrc, vertexData, 0, vertexFormat);
-                        if (includeDetail && detailVertexOrdinal < TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_MAX_VERTICES) {
+                        if (includeDetail && detailVertexOrdinal < VulkanicDiagnostics.TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_MAX_VERTICES) {
                             appendShaderInputParityVertexDetail(detail, detailVertexOrdinal, instance, logicalIndex, vertexData, 0, vertexFormat);
                         }
                         detailVertexOrdinal++;
@@ -9662,7 +9457,7 @@ public class VulkanicAPI {
                     updateShaderInputParityInt(vertexCrc, instance);
                     for (int vertex = 0; vertex < safeVertexCount; vertex++) {
                         updateShaderInputParityVertex(vertexCrc, vertexData, vertex * stride, vertexFormat);
-                        if (includeDetail && detailVertexOrdinal < TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_MAX_VERTICES) {
+                        if (includeDetail && detailVertexOrdinal < VulkanicDiagnostics.TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_MAX_VERTICES) {
                             appendShaderInputParityVertexDetail(detail, detailVertexOrdinal, instance, firstVertex + vertex, vertexData, vertex * stride, vertexFormat);
                         }
                         detailVertexOrdinal++;
@@ -9717,10 +9512,10 @@ public class VulkanicAPI {
         if (vertexBuffer == null || vertexBuffer.isClosed()) {
             return new GeometryParityResult("not-comparable", "dh-lod-vertex-buffer-missing-or-closed", vertexCount, indexCount, "unavailable", "unavailable", "none");
         }
-        if (vertexBytes > SHADER_INPUT_PARITY_GEOMETRY_MAX_BYTES) {
+        if (vertexBytes > VulkanicDiagnostics.SHADER_INPUT_PARITY_GEOMETRY_MAX_BYTES) {
             return new GeometryParityResult(
                 "not-comparable",
-                "dh-lod-geometry-byte-budget-exceeded:" + vertexBytes + ">" + SHADER_INPUT_PARITY_GEOMETRY_MAX_BYTES,
+                "dh-lod-geometry-byte-budget-exceeded:" + vertexBytes + ">" + VulkanicDiagnostics.SHADER_INPUT_PARITY_GEOMETRY_MAX_BYTES,
                 vertexCount,
                 indexCount,
                 "unavailable",
@@ -9794,17 +9589,7 @@ public class VulkanicAPI {
     }
 
     private static boolean shaderInputParityGeometryDetailEnabled() {
-        if (!TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL) {
-            return false;
-        }
-        ShaderInputParitySemanticDrawIdentity identity = SHADER_INPUT_PARITY_SEMANTIC_DRAW.get();
-        if (identity == null) {
-            return TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINES.isEmpty()
-                || TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINES.contains("*");
-        }
-        return TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINES.isEmpty()
-            || TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINES.contains("*")
-            || TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINES.contains(identity.pipeline());
+        return VulkanicDiagnostics.shouldTraceGeometryDetail();
     }
 
     private static void appendShaderInputParityVertexDetail(
@@ -9937,7 +9722,7 @@ public class VulkanicAPI {
         if (explicitIdentity != null && !explicitIdentity.isBlank()) {
             return shaderInputParitySanitizeLabel(explicitIdentity);
         }
-        String registeredName = SHADER_INPUT_PARITY_PROGRAM_NAMES.get(program);
+        String registeredName = VulkanicDiagnostics.SHADER_INPUT_PARITY_PROGRAM_NAMES.get(program);
         if (registeredName != null && !registeredName.isBlank()) {
             return shaderInputParitySanitizeLabel(registeredName);
         }
@@ -9960,10 +9745,10 @@ public class VulkanicAPI {
     }
 
     private static boolean shouldTraceShaderInputParityLog() {
-        if (!TRACE_SHADER_INPUT_PARITY) {
+        if (!VulkanicDiagnostics.TRACE_SHADER_INPUT_PARITY) {
             return false;
         }
-        if (TRACE_SHADER_INPUT_PARITY_POSE_ONLY) {
+        if (VulkanicDiagnostics.TRACE_SHADER_INPUT_PARITY_POSE_ONLY) {
             if (!DeterministicCameraCapture.isReadyForShaderInputParityPoseDiagnostics()) {
                 return false;
             }
@@ -9972,14 +9757,14 @@ public class VulkanicAPI {
                 return false;
             }
         }
-        return SHADER_INPUT_PARITY_LOG_COUNT.incrementAndGet() <= MAX_SHADER_INPUT_PARITY_LOGS;
+        return VulkanicDiagnostics.SHADER_INPUT_PARITY_LOG_COUNT.incrementAndGet() <= VulkanicDiagnostics.MAX_SHADER_INPUT_PARITY_LOGS;
     }
 
     public static boolean shouldCollectShaderInputParityDiagnostics() {
-        if (!TRACE_SHADER_INPUT_PARITY) {
+        if (!VulkanicDiagnostics.TRACE_SHADER_INPUT_PARITY) {
             return false;
         }
-        if (TRACE_SHADER_INPUT_PARITY_POSE_ONLY) {
+        if (VulkanicDiagnostics.TRACE_SHADER_INPUT_PARITY_POSE_ONLY) {
             if (!DeterministicCameraCapture.isReadyForShaderInputParityPoseDiagnostics()) {
                 return false;
             }
@@ -9988,7 +9773,7 @@ public class VulkanicAPI {
                 return false;
             }
         }
-        return SHADER_INPUT_PARITY_LOG_COUNT.get() < MAX_SHADER_INPUT_PARITY_LOGS;
+        return VulkanicDiagnostics.SHADER_INPUT_PARITY_LOG_COUNT.get() < VulkanicDiagnostics.MAX_SHADER_INPUT_PARITY_LOGS;
     }
 
     private static String sanitizeShaderInputParityUniformName(@Nullable String name) {
@@ -10037,7 +9822,7 @@ public class VulkanicAPI {
 
     private static String shaderInputParityDecodedFloatField(@Nullable String name, float[] values) {
         String sanitizedName = sanitizeShaderInputParityUniformName(name);
-        if (!DECODED_STANDALONE_UNIFORM_TRACE_NAMES.contains(sanitizedName)) {
+        if (!VulkanicDiagnostics.DECODED_STANDALONE_UNIFORM_TRACE_NAMES.contains(sanitizedName)) {
             return "";
         }
         StringBuilder builder = new StringBuilder(" decoded=[");
@@ -10137,7 +9922,7 @@ public class VulkanicAPI {
             .append(",samplerState={").append(shaderInputParitySamplerState(texture)).append('}')
             .append("}}}}");
 
-        if (TRACE_SHADER_INPUT_SAMPLER_CONTENT_HASHES && shouldTraceRenderTargetContentHash(resourceBinding.name(), texture.getLabel())) {
+        if (VulkanicDiagnostics.TRACE_SHADER_INPUT_SAMPLER_CONTENT_HASHES && shouldTraceRenderTargetContentHash(resourceBinding.name(), texture.getLabel())) {
             builder.append(",contentHash={")
                 .append("logicalResource=").append(shaderInputParitySanitizeLabel(resourceBinding.name()))
                 .append(",mip=").append(textureView.getBaseMipLevel())
@@ -11094,7 +10879,7 @@ public class VulkanicAPI {
         String normalizedOperation = shaderInputParitySanitizeLabel(shaderInputParityValueOrUnknown(operation));
         String normalizedSource = shaderInputParitySanitizeLabel(shaderInputParityValueOrUnknown(source));
         String normalizedDetail = shaderInputParitySanitizeLabel(shaderInputParityValueOrUnknown(detail));
-        long ordinal = SHADER_INPUT_PARITY_ORDERING_ORDINAL.incrementAndGet();
+        long ordinal = VulkanicDiagnostics.nextOrderingOrdinal();
         String semanticContext = shaderInputParitySemanticDrawContextFields();
         String poseContext = shaderInputParityDeterministicContextFields();
         String orderKey = shaderInputParityHashString(normalizedOperation + "|" + normalizedSource + "|" + normalizedDetail + "|" + poseContext);

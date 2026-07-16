@@ -2221,7 +2221,7 @@ public class GlCommandEncoder implements CommandEncoder {
 			PipelineDescriptor submissionDescriptor = submission.descriptor();
 			net.vulkanic.PipelineHandle pipelineHandle;
 			if (ctx.isImmediate()) {
-				pipelineHandle = new net.vulkanic.backends.opengl.OpenGLPipelineHandle(glRenderPass.pipeline);
+				pipelineHandle = VulkanicAPI.createOpenGLPipelineHandle(glRenderPass.pipeline);
 			} else {
 				VulkanicRenderTargetDescriptor renderTargetDescriptor = glRenderPass.getRenderTargetDescriptor();
 				boolean useDescriptorCompatiblePipeline = renderTargetDescriptor != null;

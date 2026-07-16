@@ -46,6 +46,7 @@ import net.vulkanic.VulkanNativeInitializationInfo;
 import net.vulkanic.VulkanSwapchainSurfaceInfo;
 import net.vulkanic.VulkanicBufferTarget;
 import net.vulkanic.VulkanicResourceBarriers;
+import net.vulkanic.diagnostics.VulkanicDiagnostics;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWVulkan;
@@ -176,48 +177,8 @@ import org.slf4j.Logger;
 public class VulkanBackend {
 
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static final boolean FORCE_MAPPABLE_GEOMETRY_PARITY_BUFFERS =
-        Boolean.getBoolean("mattmc.vulkan.traceShaderInputParity.forceMappableGeometryBuffers");
-    private static final int DIAGNOSTIC_GEOMETRY_SHADOW_MAX_BUFFER_BYTES =
-        Integer.getInteger("mattmc.vulkan.traceShaderInputParity.geometryShadowMaxBufferBytes", 2 * 1024 * 1024);
-    private static final long DIAGNOSTIC_GEOMETRY_SHADOW_MAX_TOTAL_BYTES =
-        Long.getLong("mattmc.vulkan.traceShaderInputParity.geometryShadowMaxTotalBytes", 96L * 1024L * 1024L);
-    private static final AtomicLong DIAGNOSTIC_GEOMETRY_SHADOW_BYTES = new AtomicLong();
-
-    static boolean reserveDiagnosticGeometryShadowBytes(int size) {
-        if (size <= 0) {
-            return true;
-        }
-        while (true) {
-            long current = DIAGNOSTIC_GEOMETRY_SHADOW_BYTES.get();
-            long next = current + size;
-            if (next > DIAGNOSTIC_GEOMETRY_SHADOW_MAX_TOTAL_BYTES) {
-                return false;
-            }
-            if (DIAGNOSTIC_GEOMETRY_SHADOW_BYTES.compareAndSet(current, next)) {
-                return true;
-            }
-        }
-    }
-
-    static void releaseDiagnosticGeometryShadowBytes(int size) {
-        if (size > 0) {
-            DIAGNOSTIC_GEOMETRY_SHADOW_BYTES.addAndGet(-size);
-        }
-    }
-
-    private static final Set<String> STANDALONE_SLICE_TRACE_KEYS = ConcurrentHashMap.newKeySet();
-    private static final AtomicLong STANDALONE_UNIFORM_CALL_COUNT = new AtomicLong();
-    private static final AtomicLong STANDALONE_UNIFORM_TOKEN_HIT_COUNT = new AtomicLong();
-    private static final AtomicLong STANDALONE_UNIFORM_FALLBACK_COUNT = new AtomicLong();
-    private static final AtomicLong STANDALONE_UNIFORM_WRITE_COUNT = new AtomicLong();
-    private static final AtomicInteger STANDALONE_UNIFORM_STATS_LOG_COUNT = new AtomicInteger();
-    private static final AtomicInteger STANDALONE_SLICE_TRACE_LOG_COUNT = new AtomicInteger();
-    private static final AtomicInteger STANDALONE_LOOKUP_SAMPLE_PROGRAM = new AtomicInteger(-1);
-    private static final int MAX_STANDALONE_SLICE_TRACE_LOGS = Integer.getInteger("mattmc.vulkan.traceStandaloneUniforms.maxLogs", 512);
     private static final boolean TRACE_PIPELINE_CREATION = Boolean.getBoolean("mattmc.vulkan.tracePipelineCreation");
     private static final boolean TRACE_RENDER_TARGET_PARITY = Boolean.getBoolean("mattmc.vulkan.traceRenderTargetParity");
-    private static final int MAX_RENDER_TARGET_PARITY_LOGS = Integer.getInteger("mattmc.vulkan.traceRenderTargetParity.maxLogs", 160);
     private static final AtomicInteger RENDER_TARGET_PARITY_LOG_COUNT = new AtomicInteger();
     private static final java.util.concurrent.atomic.AtomicLong glslDumpCounter = new java.util.concurrent.atomic.AtomicLong(0);
     private static final Set<Integer> LEGACY_SAMPLER_UNSUPPORTED_FORMAT_LOGS = ConcurrentHashMap.newKeySet();
@@ -2966,12 +2927,12 @@ void main() {
         if (!VulkanicAPI.shouldTraceStandaloneUniforms()) {
             return;
         }
-        if (STANDALONE_SLICE_TRACE_LOG_COUNT.get() >= MAX_STANDALONE_SLICE_TRACE_LOGS) {
+        if (VulkanicDiagnostics.STANDALONE_SLICE_TRACE_LOG_COUNT.get() >= VulkanicDiagnostics.MAX_STANDALONE_SLICE_TRACE_LOGS) {
             return;
         }
 
         String traceKey = stage + "#" + programId;
-        if (dedupe && !STANDALONE_SLICE_TRACE_KEYS.add(traceKey)) {
+        if (dedupe && !VulkanicDiagnostics.STANDALONE_SLICE_TRACE_KEYS.add(traceKey)) {
             return;
         }
 
@@ -2998,7 +2959,7 @@ void main() {
             reason = "available";
         }
 
-        if (STANDALONE_SLICE_TRACE_LOG_COUNT.incrementAndGet() <= MAX_STANDALONE_SLICE_TRACE_LOGS) {
+        if (VulkanicDiagnostics.STANDALONE_SLICE_TRACE_LOG_COUNT.incrementAndGet() <= VulkanicDiagnostics.MAX_STANDALONE_SLICE_TRACE_LOGS) {
             LOGGER.info(
                 "StandaloneSliceTrace stage={} programId={} programName={} programRecordPresent={} reflectedStandaloneBlockPresent={} backingAllocated={} sliceAvailable={} activeUniformBlockCount={} standaloneFieldCount={} backingSize={} gpuBufferPresent={} dirty={} reason={}{}",
                 stage,
@@ -7092,7 +7053,7 @@ void main() {
         @Nullable RuntimeException exception
     ) {
         int logIndex = RENDER_TARGET_PARITY_LOG_COUNT.incrementAndGet();
-        if (logIndex > MAX_RENDER_TARGET_PARITY_LOGS) {
+        if (logIndex > VulkanicDiagnostics.MAX_RENDER_TARGET_PARITY_LOGS) {
             return;
         }
 
@@ -7140,7 +7101,7 @@ void main() {
         @Nullable RuntimeException exception
     ) {
         int logIndex = RENDER_TARGET_PARITY_LOG_COUNT.incrementAndGet();
-        if (logIndex > MAX_RENDER_TARGET_PARITY_LOGS) {
+        if (logIndex > VulkanicDiagnostics.MAX_RENDER_TARGET_PARITY_LOGS) {
             return;
         }
 
@@ -8124,11 +8085,11 @@ void main() {
         if (values == null || values.length == 0) {
             return;
         }
-        STANDALONE_UNIFORM_CALL_COUNT.incrementAndGet();
+        VulkanicDiagnostics.STANDALONE_UNIFORM_CALL_COUNT.incrementAndGet();
 
         UniformLocationRef locationRef = resolveUniformLocationRef(location);
         if (locationRef != null) {
-            STANDALONE_UNIFORM_TOKEN_HIT_COUNT.incrementAndGet();
+            VulkanicDiagnostics.STANDALONE_UNIFORM_TOKEN_HIT_COUNT.incrementAndGet();
             VirtualProgram program = virtualPrograms.get(locationRef.programId());
             if (program != null) {
                 captureOpaqueResourceUniformInt(program, locationRef.uniformIndex(), values[0]);
@@ -8142,7 +8103,7 @@ void main() {
 
         VirtualProgram boundProgram = virtualPrograms.get(boundVirtualProgram);
         if (boundProgram != null) {
-            STANDALONE_UNIFORM_FALLBACK_COUNT.incrementAndGet();
+            VulkanicDiagnostics.STANDALONE_UNIFORM_FALLBACK_COUNT.incrementAndGet();
             captureOpaqueResourceUniformInt(boundProgram, location, values[0]);
             if (writeStandaloneUniformInts(boundProgram, location, values)) {
                 traceStandaloneUniformInts(boundVirtualProgram, boundProgram, location, values);
@@ -8167,11 +8128,11 @@ void main() {
         if (values == null || values.length == 0) {
             return;
         }
-        STANDALONE_UNIFORM_CALL_COUNT.incrementAndGet();
+        VulkanicDiagnostics.STANDALONE_UNIFORM_CALL_COUNT.incrementAndGet();
 
         UniformLocationRef locationRef = resolveUniformLocationRef(location);
         if (locationRef != null) {
-            STANDALONE_UNIFORM_TOKEN_HIT_COUNT.incrementAndGet();
+            VulkanicDiagnostics.STANDALONE_UNIFORM_TOKEN_HIT_COUNT.incrementAndGet();
             VirtualProgram program = virtualPrograms.get(locationRef.programId());
             if (program != null) {
                 if (writeStandaloneUniformFloats(program, locationRef.uniformIndex(), values)) {
@@ -8184,7 +8145,7 @@ void main() {
 
         VirtualProgram boundProgram = virtualPrograms.get(boundVirtualProgram);
         if (boundProgram != null) {
-            STANDALONE_UNIFORM_FALLBACK_COUNT.incrementAndGet();
+            VulkanicDiagnostics.STANDALONE_UNIFORM_FALLBACK_COUNT.incrementAndGet();
             if (writeStandaloneUniformFloats(boundProgram, location, values)) {
                 traceStandaloneUniformFloats(boundVirtualProgram, boundProgram, location, values);
             }
@@ -8261,20 +8222,24 @@ void main() {
     }
 
     private void maybeLogStandaloneUniformStats() {
-        if (STANDALONE_UNIFORM_STATS_LOG_COUNT.get() >= 16) {
+        if (!VulkanicDiagnostics.TRACE_STANDALONE_UNIFORMS
+            && !VulkanicDiagnostics.TRACE_SHADER_INPUT_PARITY) {
             return;
         }
-        long callCount = STANDALONE_UNIFORM_CALL_COUNT.get();
+        if (VulkanicDiagnostics.STANDALONE_UNIFORM_STATS_LOG_COUNT.get() >= 16) {
+            return;
+        }
+        long callCount = VulkanicDiagnostics.STANDALONE_UNIFORM_CALL_COUNT.get();
         if (callCount % 200 != 0) {
             return;
         }
-        if (STANDALONE_UNIFORM_STATS_LOG_COUNT.incrementAndGet() <= 16) {
+        if (VulkanicDiagnostics.STANDALONE_UNIFORM_STATS_LOG_COUNT.incrementAndGet() <= 16) {
             LOGGER.info(
                 "Standalone uniform stats calls={} tokenHits={} fallbacks={} writes={}",
                 callCount,
-                STANDALONE_UNIFORM_TOKEN_HIT_COUNT.get(),
-                STANDALONE_UNIFORM_FALLBACK_COUNT.get(),
-                STANDALONE_UNIFORM_WRITE_COUNT.get()
+                VulkanicDiagnostics.STANDALONE_UNIFORM_TOKEN_HIT_COUNT.get(),
+                VulkanicDiagnostics.STANDALONE_UNIFORM_FALLBACK_COUNT.get(),
+                VulkanicDiagnostics.STANDALONE_UNIFORM_WRITE_COUNT.get()
             );
         }
     }
@@ -8293,7 +8258,7 @@ void main() {
 
             writeIntUniform(field, backingData, values);
             virtualProgram.standaloneDirty = true;
-            STANDALONE_UNIFORM_WRITE_COUNT.incrementAndGet();
+            VulkanicDiagnostics.STANDALONE_UNIFORM_WRITE_COUNT.incrementAndGet();
             return true;
         }
     }
@@ -8312,7 +8277,7 @@ void main() {
 
             writeFloatUniform(field, backingData, values);
             virtualProgram.standaloneDirty = true;
-            STANDALONE_UNIFORM_WRITE_COUNT.incrementAndGet();
+            VulkanicDiagnostics.STANDALONE_UNIFORM_WRITE_COUNT.incrementAndGet();
             return true;
         }
     }
@@ -8578,16 +8543,16 @@ void main() {
 
     @Nullable
     public VulkanicBufferSlice getStandaloneUniformBufferSlice(CommandContext ctx, int program) {
-        int sampledProgram = STANDALONE_LOOKUP_SAMPLE_PROGRAM.get();
+        int sampledProgram = VulkanicDiagnostics.STANDALONE_LOOKUP_SAMPLE_PROGRAM.get();
         boolean traceLookup = VulkanicAPI.isStandaloneUniformTracingEnabled()
-            && (program == sampledProgram || (sampledProgram < 0 && STANDALONE_LOOKUP_SAMPLE_PROGRAM.compareAndSet(-1, program)));
+            && (program == sampledProgram || (sampledProgram < 0 && VulkanicDiagnostics.STANDALONE_LOOKUP_SAMPLE_PROGRAM.compareAndSet(-1, program)));
         if (traceLookup) {
             boolean ctxIsVulkan = ctx instanceof VulkanCommandContext;
             long ctxHandle = ctx != null ? ctx.getHandle() : 0L;
             LOGGER.info(
                 "StandaloneLookupDecisionTrace stage=enter programId={} sampledProgram={} commandBufferContextIsVulkan={} commandBufferHandle={} commandBufferExists={}",
                 program,
-                STANDALONE_LOOKUP_SAMPLE_PROGRAM.get(),
+                VulkanicDiagnostics.STANDALONE_LOOKUP_SAMPLE_PROGRAM.get(),
                 yesNo(ctxIsVulkan),
                 ctxHandle,
                 yesNo(ctxIsVulkan && ctxHandle != 0L)
@@ -8676,7 +8641,7 @@ void main() {
                 virtualProgram.standaloneBackingSize
             );
             virtualProgram.standaloneDirty = false;
-            int sampledAfterCreate = STANDALONE_LOOKUP_SAMPLE_PROGRAM.get();
+            int sampledAfterCreate = VulkanicDiagnostics.STANDALONE_LOOKUP_SAMPLE_PROGRAM.get();
             if (traceLookup && program == sampledAfterCreate) {
                 logStandaloneProgramKeyTrace("slice-created", program, virtualProgram, "new VulkanicBufferSlice from virtualPrograms map entry");
                 LOGGER.info(
@@ -16438,7 +16403,7 @@ void main() {
             long memoryHandle = VK10.VK_NULL_HANDLE;
 
             try (MemoryStack stack = stackPush()) {
-                if (FORCE_MAPPABLE_GEOMETRY_PARITY_BUFFERS
+                if (VulkanicDiagnostics.FORCE_MAPPABLE_GEOMETRY_PARITY_BUFFERS
                     && (usage & (VulkanicBuffer.USAGE_VERTEX | VulkanicBuffer.USAGE_INDEX)) != 0) {
                     usage |= VulkanicBuffer.USAGE_MAP_READ;
                 }
@@ -16534,7 +16499,7 @@ void main() {
                     debugLabel,
                     () -> {
                         if (diagnosticGeometryShadowBytes > 0) {
-                            DIAGNOSTIC_GEOMETRY_SHADOW_BYTES.addAndGet(-diagnosticGeometryShadowBytes);
+                            VulkanicDiagnostics.releaseGeometryShadowBytes(diagnosticGeometryShadowBytes);
                         }
                         enqueueVulkanResourceDestroy(
                             () -> destroyManagedBuffer(finalBufferHandle, finalMemoryHandle)
@@ -16586,17 +16551,17 @@ void main() {
                 return shadow;
             } catch (RuntimeException ex) {
                 if (geometry) {
-                    DIAGNOSTIC_GEOMETRY_SHADOW_BYTES.addAndGet(-size);
+                    VulkanicDiagnostics.releaseGeometryShadowBytes(size);
                 }
                 throw ex;
             }
         }
 
         private static boolean reserveDiagnosticGeometryShadow(int size) {
-            if (size > DIAGNOSTIC_GEOMETRY_SHADOW_MAX_BUFFER_BYTES) {
+            if (size > VulkanicDiagnostics.DIAGNOSTIC_GEOMETRY_SHADOW_MAX_BUFFER_BYTES) {
                 return false;
             }
-            return reserveDiagnosticGeometryShadowBytes(size);
+            return VulkanicDiagnostics.reserveGeometryShadowBytes(size);
         }
 
         private static int diagnosticGeometryShadowBytes(
@@ -16607,7 +16572,7 @@ void main() {
             if (diagnosticShadowData == null || (usage & (VulkanicBuffer.USAGE_VERTEX | VulkanicBuffer.USAGE_INDEX)) == 0) {
                 return 0;
             }
-            if (size > DIAGNOSTIC_GEOMETRY_SHADOW_MAX_BUFFER_BYTES) {
+            if (size > VulkanicDiagnostics.DIAGNOSTIC_GEOMETRY_SHADOW_MAX_BUFFER_BYTES) {
                 return 0;
             }
             return size;

@@ -102,6 +102,15 @@ public class ArchitecturalBoundaryTest {
     }
 
     @Test
+    public void testBackendReferencesOnlyFromVulkanicPackage() throws IOException {
+        List<String> violations = checkBackendReferenceViolations();
+
+        if (!violations.isEmpty()) {
+            fail(buildBackendViolationMessage(violations));
+        }
+    }
+
+    @Test
     public void testOpenGLBackendDoesNotReferenceVulkanBackendImplementation() throws IOException {
         List<String> violations = checkForbiddenBackendReferences(
             OPENGL_BACKEND_PATH,
@@ -176,6 +185,50 @@ public class ArchitecturalBoundaryTest {
             }
         }
         
+        return violations;
+    }
+
+    private List<String> checkBackendReferenceViolations() throws IOException {
+        List<String> violations = new ArrayList<>();
+
+        try (Stream<Path> paths = Files.walk(SRC_MAIN_JAVA)) {
+            List<Path> javaFiles = paths
+                .filter(Files::isRegularFile)
+                .filter(path -> path.toString().endsWith(".java"))
+                .collect(Collectors.toList());
+
+            for (Path file : javaFiles) {
+                if (file.startsWith(VULKANIC_PATH)) {
+                    continue;
+                }
+
+                String[] lines = Files.readString(file).split("\\R", -1);
+                List<String> illegalReferences = new ArrayList<>();
+                for (int index = 0; index < lines.length; index++) {
+                    String line = lines[index];
+                    String trimmed = line.trim();
+                    if (trimmed.startsWith("import ")
+                        || trimmed.startsWith("//")
+                        || trimmed.startsWith("*")
+                        || trimmed.startsWith("/*")) {
+                        continue;
+                    }
+                    if (line.contains("net.vulkanic.backends.")) {
+                        illegalReferences.add("line " + (index + 1) + ": " + trimmed);
+                    }
+                }
+
+                if (!illegalReferences.isEmpty()) {
+                    String relativePath = SRC_MAIN_JAVA.relativize(file).toString();
+                    violations.add(String.format(
+                        "File: %s\n  Illegal backend references:\n    %s",
+                        relativePath,
+                        String.join("\n    ", illegalReferences)
+                    ));
+                }
+            }
+        }
+
         return violations;
     }
 
