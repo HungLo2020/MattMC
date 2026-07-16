@@ -1,0 +1,1543 @@
+#!/usr/bin/env python3
+"""Run a bounded MattMC dev-client capture with diagnostic artifacts."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import os
+import platform as py_platform
+import re
+import shutil
+import signal
+import stat
+import subprocess
+import sys
+import time
+from dataclasses import dataclass
+from pathlib import Path
+
+
+SHADER_EVENT_PATTERN = (
+    r"Using shaderpack:|Loaded Shaderpack:|shaderPack=|enableShaders=|Profile:|"
+    r"Reloading pipeline on dimension change|Creating pipeline for dimension|"
+    r"Skipping compute shader|Missing program .*sodium:pipeline|"
+    r"Sodium Vulkan chunk pipelines|raw GLSL imports|ShaderInputParity|"
+    r"LightmapInfoParity|Type is (VERTEX|FRAGMENT|GEOMETRY|COMPUTE)|"
+    r"bindVertexBuffer requires an active render pass|No active Vulkan render pass to end|"
+    r"shader compose into swapchain|Unexpected error|DistantHorizons|\[DH-|"
+    r"DH Ready|DH Iris events|Validation Error|Validation Warning|VUID-|"
+    r"UNASSIGNED-|VK_LAYER_KHRONOS_validation|GL_INVALID|OpenGL debug"
+)
+VALIDATION_EVENT_PATTERN = r"VK_LAYER_KHRONOS_validation|Validation Error|Validation Warning|VUID-|UNASSIGNED-"
+KEY_SUMMARY_PATTERN = (
+    r"Using shaderpack:|Loaded Shaderpack:|Profile:|Reloading pipeline on dimension change|"
+    r"Creating pipeline for dimension|Skipping compute shader|Missing program .*sodium:pipeline|"
+    r"Sodium Vulkan chunk pipelines|raw GLSL imports|ShaderInputParity|LightmapInfoParity|"
+    r"bindVertexBuffer requires an active render pass|No active Vulkan render pass to end|"
+    r"Unexpected error|DistantHorizons|\[DH-|DH Ready|DH Iris events|Validation Error|"
+    r"Validation Warning|VUID-|UNASSIGNED-"
+)
+CLIENT_PROCESS_PATTERN = re.compile(r"KnotClient|devlaunchinjector|MattMC-1\.21", re.IGNORECASE)
+
+
+@dataclass
+class CaptureConfig:
+    backend: str
+    shaders: str
+    max_secs: int
+    dump_secs: int
+    client_rss_limit_mb: int
+    screenshot_interval_secs: int
+    screenshot_max_count: int
+    screenshot_start_delay_secs: int
+    validation_mode: str
+    shader_input_parity: str
+    shader_input_parity_max_logs: int
+    lightmap_info_parity_max_logs: int
+    client_args: str
+    deterministic_camera_capture: bool
+    deterministic_pose_tolerance: float
+    platform_name: str | None
+
+
+class CaptureRunner:
+    def __init__(self, config: CaptureConfig) -> None:
+        self.config = config
+        self.platform_info, self.normalize_platform = load_platform_detection()
+        self.platform_name = (
+            self.normalize_platform(config.platform_name) if config.platform_name else self.platform_info.platform
+        )
+        self.root = repo_root()
+        self.gradle = gradle_command(self.root, self.platform_name)
+        self.run_dir = self.root / "run"
+        self.options_file = self.run_dir / "options.txt"
+        self.artifact_dir = self.root / "logs" / "auto-capture"
+        self.artifact_dir.mkdir(parents=True, exist_ok=True)
+        self.lock_file = self.artifact_dir / ".RunDevCapture.lock"
+        self.lock_handle = None
+
+        self.run_id = time.strftime("%Y%m%d_%H%M%S")
+        self.start_epoch = int(time.time())
+        self.git_commit = command_text(["git", "rev-parse", "HEAD"], cwd=self.root).strip() or "unknown"
+
+        self.run_log = self.artifact_dir / f"runClient_{self.run_id}.log"
+        self.meta_log = self.artifact_dir / f"meta_{self.run_id}.txt"
+        self.thread_dump = self.artifact_dir / f"thread_dump_{self.run_id}.txt"
+        self.process_snapshot = self.artifact_dir / f"process_snapshot_{self.run_id}.txt"
+        self.system_snapshot = self.artifact_dir / f"system_snapshot_{self.run_id}.txt"
+        self.git_snapshot = self.artifact_dir / f"git_snapshot_{self.run_id}.txt"
+        self.shaderpack_info = self.artifact_dir / f"shaderpack_{self.run_id}.txt"
+        self.shader_summary = self.artifact_dir / f"shader_summary_{self.run_id}.txt"
+        self.shader_event_log = self.artifact_dir / f"shader_events_{self.run_id}.log"
+        self.validation_event_log = self.artifact_dir / f"validation_events_{self.run_id}.log"
+        self.latest_log_copy = self.artifact_dir / f"latest_{self.run_id}.log"
+        self.latest_tail = self.artifact_dir / f"latest_tail_{self.run_id}.log"
+        self.hserr_list = self.artifact_dir / f"hs_err_{self.run_id}.txt"
+        self.crash_report_list = self.artifact_dir / f"crash_reports_{self.run_id}.txt"
+        self.crash_report_dir = self.artifact_dir / f"crash_reports_{self.run_id}"
+        self.debug_file_list = self.artifact_dir / f"debug_files_{self.run_id}.txt"
+        self.debug_snapshot_dir = self.artifact_dir / f"debug_{self.run_id}"
+        self.config_before_dir = self.artifact_dir / f"config_before_{self.run_id}"
+        self.config_after_dir = self.artifact_dir / f"config_after_{self.run_id}"
+        self.patched_shaders_snapshot = self.artifact_dir / f"patched_shaders_{self.run_id}"
+        self.patched_shaders_manifest = self.artifact_dir / f"patched_shaders_manifest_{self.run_id}.txt"
+        self.window_tree = self.artifact_dir / f"window_tree_{self.run_id}.txt"
+        self.window_tree_dump = self.artifact_dir / f"window_tree_dump_{self.run_id}.txt"
+        self.deterministic_metadata = self.artifact_dir / f"deterministic_camera_capture_{self.run_id}.json"
+        self.deterministic_screenshot_dir = self.artifact_dir / f"deterministic_camera_capture_{self.run_id}"
+
+        self.validation_layer_manifest = ""
+        self.validation_layer_dir = ""
+        self.validation_layer_available = False
+        self.validation_enabled = False
+        self.client_arg_shader_pack = ""
+        self.client_arg_enable_shaders = ""
+        self.iris_property_shader_pack = ""
+        self.iris_property_enable_shaders = ""
+        self.iris_property_color_space = ""
+        self.effective_shader_pack = ""
+        self.effective_enable_shaders = ""
+        self.screenshot_count = 0
+        self.screenshot_enabled = False
+        self.gradle_process: subprocess.Popen[bytes] | None = None
+        self.run_client_active = False
+        self.dump_taken = False
+        self.timed_out = False
+        self.memory_guard_triggered = False
+        self.memory_guard_peak_rss_kb = 0
+        self.memory_guard_rss_kb = 0
+        self.deterministic_completed = False
+        self.intentional_deterministic_shutdown = False
+        self.deterministic_validation_status = "not_requested"
+        self.env = os.environ.copy()
+
+    def run(self) -> int:
+        self.acquire_lock()
+        self.write_initial_meta()
+        self.preflight_existing_clients()
+        self.configure_screenshots()
+        self.configure_backend_and_validation()
+        self.configure_client_args()
+        self.prepare_snapshots()
+        self.start_gradle()
+
+        exit_code = self.monitor_gradle()
+        self.run_client_active = False
+
+        if self.config.deterministic_camera_capture and self.deterministic_capture_status() == "complete":
+            self.deterministic_completed = True
+            if exit_code != 0:
+                self.intentional_deterministic_shutdown = True
+
+        if self.intentional_deterministic_shutdown and exit_code != 0:
+            self.append_meta(f"raw_exit_code={exit_code}")
+            exit_code = 0
+
+        self.append_final_meta(exit_code)
+        self.collect_final_artifacts()
+        self.validate_deterministic_capture()
+        self.print_summary(exit_code)
+        self.release_lock()
+
+        if self.memory_guard_triggered:
+            return 124
+        if self.config.deterministic_camera_capture and self.deterministic_validation_status != "ok":
+            return 2
+        return 0
+
+    def acquire_lock(self) -> None:
+        self.lock_file.parent.mkdir(parents=True, exist_ok=True)
+        handle = self.lock_file.open("a+", encoding="utf-8")
+        try:
+            handle.seek(0)
+            if os.name == "nt":
+                import msvcrt
+
+                try:
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                except OSError as exc:
+                    raise SystemExit(lock_refusal_message()) from exc
+            else:
+                import fcntl
+
+                try:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except OSError as exc:
+                    raise SystemExit(lock_refusal_message()) from exc
+
+            handle.seek(0)
+            handle.truncate()
+            handle.write(f"pid={os.getpid()}\nstarted_epoch={int(time.time())}\n")
+            handle.flush()
+            self.lock_handle = handle
+        except Exception:
+            handle.close()
+            raise
+
+    def release_lock(self) -> None:
+        if not self.lock_handle:
+            return
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                self.lock_handle.seek(0)
+                msvcrt.locking(self.lock_handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(self.lock_handle.fileno(), fcntl.LOCK_UN)
+        finally:
+            self.lock_handle.close()
+            self.lock_handle = None
+
+    def write_initial_meta(self) -> None:
+        lines = [
+            f"run_id={self.run_id}",
+            f"start_epoch={self.start_epoch}",
+            f"backend={self.config.backend}",
+            f"shaders={self.config.shaders}",
+            f"max_secs={self.config.max_secs}",
+            f"dump_secs={self.config.dump_secs}",
+            f"client_rss_limit_mb={self.config.client_rss_limit_mb}",
+            f"validation_mode={self.config.validation_mode}",
+            f"shader_input_parity={self.config.shader_input_parity}",
+            f"shader_input_parity_max_logs={self.config.shader_input_parity_max_logs}",
+            f"lightmap_info_parity_max_logs={self.config.lightmap_info_parity_max_logs}",
+            f"deterministic_camera_capture={str(self.config.deterministic_camera_capture).lower()}",
+            f"deterministic_pose_tolerance={self.config.deterministic_pose_tolerance}",
+            f"client_args_initial={self.config.client_args}",
+        ]
+        self.meta_log.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def append_meta(self, text: str) -> None:
+        with self.meta_log.open("a", encoding="utf-8") as handle:
+            handle.write(text.rstrip("\n") + "\n")
+
+    def preflight_existing_clients(self) -> None:
+        clients = find_existing_mattmc_clients()
+        if not clients:
+            return
+        self.append_meta("preflight_existing_clients=true")
+        for client in clients:
+            self.append_meta(f"preflight_existing_client={client}")
+        print("Refusing to start RunDevCapture because a MattMC client is already running:", file=sys.stderr)
+        print("\n".join(clients), file=sys.stderr)
+        print("Stop the existing client first; concurrent runs can lock Origin and corrupt capture results.", file=sys.stderr)
+        raise SystemExit(1)
+
+    def configure_screenshots(self) -> None:
+        self.screenshot_enabled = screenshot_backend_available(self.platform_name)
+        if self.screenshot_enabled:
+            self.append_meta("screenshot_enabled=true")
+            self.append_meta(f"screenshot_interval_secs={self.config.screenshot_interval_secs}")
+            self.append_meta(f"screenshot_max_count={self.config.screenshot_max_count}")
+            self.append_meta(f"screenshot_start_delay_secs={self.config.screenshot_start_delay_secs}")
+            self.append_meta(f"display={os.environ.get('DISPLAY', 'unset')}")
+            if self.platform_name == "linux" and shutil.which("xwininfo"):
+                write_command(self.window_tree, ["xwininfo", "-root", "-tree"], cwd=self.root)
+        else:
+            self.append_meta("screenshot_enabled=false")
+            self.append_meta(f"display={os.environ.get('DISPLAY', 'unset')}")
+
+        if self.config.deterministic_camera_capture and not self.screenshot_enabled:
+            raise SystemExit(
+                "--deterministic-camera-capture requires a supported screenshot tool "
+                "for this platform"
+            )
+        if self.config.deterministic_camera_capture:
+            self.config.screenshot_interval_secs = 0
+            self.append_meta("deterministic_wall_clock_screenshots=false")
+            self.append_meta("screenshot_interval_secs_effective=0")
+
+    def configure_backend_and_validation(self) -> None:
+        upsert_property(self.options_file, "graphics_backend", self.config.backend)
+
+        manifest = find_validation_layer_manifest(self.platform_name)
+        if manifest:
+            self.validation_layer_manifest = str(manifest)
+            self.validation_layer_dir = str(manifest.parent)
+            self.validation_layer_available = True
+        if (
+            self.config.backend == "vulkan"
+            and self.config.validation_mode == "standard"
+            and self.validation_layer_available
+        ):
+            self.validation_enabled = True
+
+        if self.config.validation_mode != "off" and self.config.backend != "vulkan":
+            self.append_meta("validation_note=ignored_for_non_vulkan_backend")
+        elif self.config.validation_mode != "off" and not self.validation_enabled:
+            self.append_meta("validation_note=requested_but_khronos_layer_unavailable")
+
+    def configure_client_args(self) -> None:
+        shaders_enabled = "true" if self.config.shaders == "on" else "false"
+        self.config.client_args = remove_client_arg_option(self.config.client_args, "--quickPlaySingleplayer")
+        self.config.client_args = remove_client_arg_assignment(self.config.client_args, "enableShaders")
+        self.config.client_args = append_client_arg(self.config.client_args, "--quickPlaySingleplayer=Origin")
+        self.config.client_args = append_client_arg(self.config.client_args, f"enableShaders={shaders_enabled}")
+        self.append_meta("forced_quick_play_singleplayer=Origin")
+        self.append_meta(f"forced_enable_shaders={shaders_enabled}")
+
+        if not self.config.deterministic_camera_capture:
+            return
+        configured_shader_pack = extract_property_value(self.run_dir / "config" / "iris.properties", "shaderPack")
+        if not client_args_contains_option(self.config.client_args, "--width"):
+            self.config.client_args = append_client_arg(self.config.client_args, "--width 1280")
+        if not client_args_contains_option(self.config.client_args, "--height"):
+            self.config.client_args = append_client_arg(self.config.client_args, "--height 720")
+        if not client_args_contains_assignment(self.config.client_args, "shaderPack"):
+            if self.config.shaders == "on" and not configured_shader_pack:
+                raise SystemExit(
+                    "--deterministic-camera-capture requires a shaderPack in CLIENT_ARGS "
+                    "or run/config/iris.properties"
+                )
+            if configured_shader_pack:
+                self.config.client_args = append_client_arg(
+                    self.config.client_args, f"shaderPack={configured_shader_pack}"
+                )
+
+    def prepare_snapshots(self) -> None:
+        copy_config_snapshot(self.run_dir, self.config_before_dir)
+        self.client_arg_shader_pack = extract_client_arg_assignment(self.config.client_args, "shaderPack")
+        self.client_arg_enable_shaders = extract_client_arg_assignment(self.config.client_args, "enableShaders")
+        iris_snapshot = self.config_before_dir / "iris.properties"
+        self.iris_property_shader_pack = extract_property_value(iris_snapshot, "shaderPack")
+        self.iris_property_enable_shaders = extract_property_value(iris_snapshot, "enableShaders")
+        self.iris_property_color_space = extract_property_value(iris_snapshot, "colorSpace")
+        self.effective_shader_pack = self.client_arg_shader_pack or self.iris_property_shader_pack
+        self.effective_enable_shaders = self.client_arg_enable_shaders or self.iris_property_enable_shaders
+
+        self.apply_iris_overrides()
+        self.collect_system_snapshot()
+        self.collect_git_snapshot()
+        self.write_shaderpack_info()
+
+        for line in [
+            f"validation_enabled={str(self.validation_enabled).lower()}",
+            f"validation_layer_available={str(self.validation_layer_available).lower()}",
+            f"validation_layer_manifest={self.validation_layer_manifest or 'unavailable'}",
+            f"config_before={self.config_before_dir}",
+            f"system_snapshot={self.system_snapshot}",
+            f"git_snapshot={self.git_snapshot}",
+            f"shaderpack_info={self.shaderpack_info}",
+            f"effective_enable_shaders={self.effective_enable_shaders or 'unset'}",
+            f"effective_shader_pack={self.effective_shader_pack or 'unset'}",
+            f"client_args_effective={self.config.client_args}",
+            f"deterministic_metadata={self.deterministic_metadata}",
+            f"deterministic_screenshot_dir={self.deterministic_screenshot_dir}",
+        ]:
+            self.append_meta(line)
+
+    def apply_iris_overrides(self) -> None:
+        iris_file = self.run_dir / "config" / "iris.properties"
+        if not iris_file.is_file():
+            self.append_meta("iris_override_note=iris.properties_missing")
+            return
+
+        if self.client_arg_enable_shaders:
+            normalized = self.client_arg_enable_shaders.lower()
+            if normalized in {"true", "false"}:
+                upsert_property(iris_file, "enableShaders", normalized)
+                self.append_meta(f"iris_override_enable_shaders={normalized}")
+            else:
+                self.append_meta(f"iris_override_enable_shaders_ignored={self.client_arg_enable_shaders}")
+
+        if self.client_arg_shader_pack:
+            upsert_property(iris_file, "shaderPack", self.client_arg_shader_pack)
+            self.append_meta(f"iris_override_shader_pack={self.client_arg_shader_pack}")
+
+    def collect_system_snapshot(self) -> None:
+        lines = [
+            f"backend={self.config.backend}",
+            f"shaders={self.config.shaders}",
+            f"validation_mode={self.config.validation_mode}",
+            f"validation_enabled={str(self.validation_enabled).lower()}",
+            f"validation_layer_available={str(self.validation_layer_available).lower()}",
+            f"validation_layer_manifest={self.validation_layer_manifest or 'unavailable'}",
+            f"shader_input_parity={self.config.shader_input_parity}",
+            f"shader_input_parity_max_logs={self.config.shader_input_parity_max_logs}",
+            f"display={os.environ.get('DISPLAY', 'unset')}",
+            f"wayland_display={os.environ.get('WAYLAND_DISPLAY', 'unset')}",
+            f"xdg_session_type={os.environ.get('XDG_SESSION_TYPE', 'unset')}",
+            "",
+            "===== platform =====",
+            py_platform.platform(),
+            f"python={sys.version.split()[0]}",
+            f"detected_platform={self.platform_info.platform}",
+            f"detected_arch={self.platform_info.arch}",
+        ]
+        for label, command in [
+            ("uname -a", ["uname", "-a"]),
+            ("java -version", ["java", "-version"]),
+            ("vulkaninfo --summary", ["vulkaninfo", "--summary"]),
+            ("glxinfo -B", ["glxinfo", "-B"]),
+            ("nvidia-smi", ["nvidia-smi", "--query-gpu=name,driver_version,vbios_version", "--format=csv,noheader"]),
+            ("systeminfo", ["systeminfo"]),
+        ]:
+            if not shutil.which(command[0]):
+                continue
+            if label.startswith("glxinfo") and self.platform_name != "linux":
+                continue
+            if label == "systeminfo" and self.platform_name != "windows":
+                continue
+            lines.extend(["", f"===== {label} =====", command_text(command, cwd=self.root)])
+        self.system_snapshot.write_text("\n".join(lines), encoding="utf-8", errors="replace")
+
+    def collect_git_snapshot(self) -> None:
+        sections = [
+            ("git branch", ["git", "-C", str(self.root), "branch", "--show-current"]),
+            ("git rev-parse HEAD", ["git", "-C", str(self.root), "rev-parse", "HEAD"]),
+            ("git status --short", ["git", "-C", str(self.root), "status", "--short"]),
+        ]
+        write_sections(self.git_snapshot, sections, cwd=self.root)
+
+    def write_shaderpack_info(self) -> None:
+        iris_file = self.config_before_dir / "iris.properties"
+        lines = [
+            f"client_args={self.config.client_args}",
+            f"client_arg_enable_shaders={self.client_arg_enable_shaders or 'unset'}",
+            f"client_arg_shader_pack={self.client_arg_shader_pack or 'unset'}",
+            f"iris_property_enable_shaders={self.iris_property_enable_shaders or 'unset'}",
+            f"iris_property_shader_pack={self.iris_property_shader_pack or 'unset'}",
+            f"iris_property_color_space={self.iris_property_color_space or 'unset'}",
+            f"effective_enable_shaders={self.effective_enable_shaders or 'unset'}",
+            f"effective_shader_pack={self.effective_shader_pack or 'unset'}",
+            f"config_snapshot={iris_file}",
+        ]
+        shader_pack_path = resolve_shader_pack_path(self.run_dir, self.root, self.effective_shader_pack)
+        if shader_pack_path:
+            lines.extend(["", f"shader_pack_path={shader_pack_path}", "", "===== shader pack stat ====="])
+            lines.append(stat_text(shader_pack_path))
+            lines.extend(["", "===== shader pack sha256 ====="])
+            lines.append(file_sha256_text(shader_pack_path))
+            if shader_pack_path.is_file() and shader_pack_path.suffix == ".zip" and shutil.which("unzip"):
+                lines.extend(["", "===== shader pack zip listing (first 200 lines) ====="])
+                unzip_output = command_text(["unzip", "-l", str(shader_pack_path)], cwd=self.root)
+                lines.extend(unzip_output.splitlines()[:200])
+            elif shader_pack_path.is_dir():
+                lines.extend(["", "===== shader pack file listing ====="])
+                lines.extend(str(path) for path in sorted(shader_pack_path.rglob("*")) if path.is_file())
+        else:
+            lines.append("shader_pack_path=unresolved")
+        self.shaderpack_info.write_text("\n".join(lines) + "\n", encoding="utf-8", errors="replace")
+
+    def start_gradle(self) -> None:
+        print(f"Starting bounded runClient capture (run_id={self.run_id}, backend={self.config.backend})")
+        gradle_cmd = [*self.gradle, "-x", "test", "runClient"]
+        if self.config.client_args:
+            gradle_cmd.append(f"--args={self.config.client_args}")
+
+        self.configure_validation_environment()
+        self.configure_java_tool_options()
+
+        log_handle = self.run_log.open("wb")
+        try:
+            if self.platform_name == "windows":
+                creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+                self.gradle_process = subprocess.Popen(
+                    gradle_cmd,
+                    cwd=self.root,
+                    stdout=log_handle,
+                    stderr=subprocess.STDOUT,
+                    env=self.env,
+                    creationflags=creationflags,
+                )
+            else:
+                self.gradle_process = subprocess.Popen(
+                    gradle_cmd,
+                    cwd=self.root,
+                    stdout=log_handle,
+                    stderr=subprocess.STDOUT,
+                    env=self.env,
+                    start_new_session=True,
+                )
+        except Exception:
+            log_handle.close()
+            raise
+        log_handle.close()
+        self.run_client_active = True
+        self.append_meta(f"gradle_pid={self.gradle_process.pid}")
+
+    def configure_validation_environment(self) -> None:
+        if not self.validation_enabled:
+            return
+        current_layers = self.env.get("VK_INSTANCE_LAYERS", "")
+        layer = "VK_LAYER_KHRONOS_validation"
+        if current_layers:
+            layers = current_layers.split(":")
+            if layer not in layers:
+                self.env["VK_INSTANCE_LAYERS"] = f"{layer}:{current_layers}"
+        else:
+            self.env["VK_INSTANCE_LAYERS"] = layer
+
+        if self.validation_layer_dir:
+            current_paths = self.env.get("VK_ADD_LAYER_PATH", "")
+            sep = os.pathsep
+            if current_paths:
+                paths = current_paths.split(sep)
+                if self.validation_layer_dir not in paths:
+                    self.env["VK_ADD_LAYER_PATH"] = f"{self.validation_layer_dir}{sep}{current_paths}"
+            else:
+                self.env["VK_ADD_LAYER_PATH"] = self.validation_layer_dir
+        self.env.setdefault("VK_LOADER_DEBUG", "error,warn,layer")
+        self.append_meta(f"vk_instance_layers={self.env.get('VK_INSTANCE_LAYERS', '')}")
+        self.append_meta(f"vk_add_layer_path={self.env.get('VK_ADD_LAYER_PATH', 'unset')}")
+        self.append_meta(f"vk_loader_debug={self.env.get('VK_LOADER_DEBUG', '')}")
+
+    def configure_java_tool_options(self) -> None:
+        options = [f"-Dmattmc.dev.runCaptureId={self.run_id}"]
+        self.append_java_tool_options(options)
+        self.append_meta(f"run_capture_java_options={' '.join(options)}")
+        self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
+
+        if self.config.shader_input_parity != "off":
+            parity_options = [
+                "-Dmattmc.vulkan.traceShaderInputParity=true",
+                f"-Dmattmc.vulkan.traceShaderInputParity.maxLogs={self.config.shader_input_parity_max_logs}",
+                "-Dmattmc.vulkan.deterministicLightmapParity=true",
+                "-Dmattmc.vulkan.traceLightmapInfoParity=true",
+                f"-Dmattmc.vulkan.traceLightmapInfoParity.maxLogs={self.config.lightmap_info_parity_max_logs}",
+            ]
+            if self.config.shader_input_parity == "full":
+                parity_options.append("-Dmattmc.vulkan.traceStandaloneUniformBlockMembers=true")
+            if self.config.deterministic_camera_capture:
+                parity_options.extend(
+                    [
+                        "-Dmattmc.vulkan.deterministicTemporalParity=true",
+                        "-Dmattmc.vulkan.deterministicTemporalParity.frameCounter=0",
+                        "-Dmattmc.vulkan.deterministicTemporalParity.frameTime=0.016666668",
+                        "-Dmattmc.vulkan.deterministicTemporalParity.frameTimeCounter=0.0",
+                        "-Dmattmc.vulkan.deterministicTemporalParity.partialTick=1.0",
+                        "-Dmattmc.vulkan.deterministicTemporalParity.fovModifier=1.0",
+                        "-Dmattmc.vulkan.deterministicTemporalParity.worldTime=6000",
+                    ]
+                )
+            self.append_java_tool_options(parity_options)
+            self.append_meta(f"shader_input_parity_java_options={' '.join(parity_options)}")
+            self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
+            self.append_meta("deterministic_lightmap_parity=true")
+            if self.config.deterministic_camera_capture:
+                self.append_meta("deterministic_temporal_parity=true")
+
+        if self.config.deterministic_camera_capture:
+            deterministic_options = [
+                "-Dmattmc.dev.deterministicCameraCapture=true",
+                f"-Dmattmc.dev.deterministicCameraCapture.metadata={self.deterministic_metadata}",
+                f"-Dmattmc.dev.deterministicCameraCapture.screenshotDir={self.deterministic_screenshot_dir}",
+                f"-Dmattmc.dev.deterministicCameraCapture.shaderEnabled={self.effective_enable_shaders or 'unknown'}",
+                f"-Dmattmc.dev.deterministicCameraCapture.shaderPack={self.effective_shader_pack or 'unknown'}",
+                f"-Dmattmc.dev.deterministicCameraCapture.gitCommit={self.git_commit}",
+                "-Dmattmc.dev.deterministicCameraCapture.stopAfterComplete=false",
+                "-Dmattmc.vulkan.traceShaderInputParity.poseOnly=true",
+            ]
+            self.append_java_tool_options(deterministic_options)
+            self.append_meta(f"deterministic_camera_capture_java_options={' '.join(deterministic_options)}")
+            self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
+
+    def append_java_tool_options(self, options: list[str]) -> None:
+        current = self.env.get("JAVA_TOOL_OPTIONS", "")
+        joined = " ".join(options)
+        self.env["JAVA_TOOL_OPTIONS"] = f"{current} {joined}".strip() if current else joined
+
+    def monitor_gradle(self) -> int:
+        assert self.gradle_process is not None
+        elapsed = 0
+        while self.gradle_process.poll() is None:
+            time.sleep(1)
+            elapsed += 1
+            client_pid = self.find_client_pid()
+            self.capture_deterministic_requests(client_pid)
+            if self.config.deterministic_camera_capture and self.deterministic_capture_status() == "complete":
+                self.deterministic_completed = True
+                self.intentional_deterministic_shutdown = True
+                self.append_meta(f"deterministic_capture_complete_elapsed={elapsed}")
+                self.terminate_run_processes("deterministic_complete")
+                break
+
+            if not self.check_client_memory_guard(client_pid, elapsed):
+                break
+
+            if (
+                not self.config.deterministic_camera_capture
+                and self.screenshot_enabled
+                and self.config.screenshot_interval_secs > 0
+                and elapsed >= self.config.screenshot_start_delay_secs
+                and (elapsed - self.config.screenshot_start_delay_secs) % self.config.screenshot_interval_secs == 0
+            ):
+                self.capture_root_screenshot("tick", elapsed, client_pid)
+
+            if not self.dump_taken and elapsed >= self.config.dump_secs:
+                self.take_dump(elapsed, client_pid)
+
+            if elapsed >= self.config.max_secs:
+                self.timed_out = True
+                break
+
+        if self.timed_out:
+            self.append_meta("timeout=true")
+            if not self.config.deterministic_camera_capture:
+                self.capture_root_screenshot("timeout", elapsed, None)
+            client_pid = self.find_client_pid()
+            if client_pid:
+                append_text(self.thread_dump, f"\n===== final jcmd Thread.print before termination (pid={client_pid}) =====\n")
+                append_text(self.thread_dump, command_text(["jcmd", str(client_pid), "Thread.print"], cwd=self.root))
+            self.terminate_run_processes("timeout")
+
+        if self.gradle_process.poll() is None:
+            return self.gradle_process.wait()
+        return self.gradle_process.returncode or 0
+
+    def find_client_pid(self) -> int | None:
+        marker = f"-Dmattmc.dev.runCaptureId={self.run_id}"
+        for pid, command in list_java_processes():
+            if CLIENT_PROCESS_PATTERN.search(command) and marker in command:
+                return pid
+        for pid, command in list_java_processes():
+            if CLIENT_PROCESS_PATTERN.search(command):
+                return pid
+        if self.platform_name != "windows" and self.gradle_process is not None:
+            pgid = self.gradle_process.pid
+            output = command_text(["ps", "-eo", "pid=,pgid=,comm=,cmd="], cwd=self.root)
+            for line in output.splitlines():
+                parts = line.strip().split(None, 3)
+                if len(parts) < 4:
+                    continue
+                try:
+                    pid = int(parts[0])
+                    line_pgid = int(parts[1])
+                except ValueError:
+                    continue
+                if line_pgid == pgid and parts[2] == "java":
+                    if re.search(r"devlaunchinjector|minecraft|fabric|MattMC-1\.21", parts[3], re.IGNORECASE):
+                        return pid
+            for line in output.splitlines():
+                parts = line.strip().split(None, 3)
+                if len(parts) >= 3 and parts[2] == "java":
+                    try:
+                        if int(parts[1]) == pgid:
+                            return int(parts[0])
+                    except ValueError:
+                        continue
+        return None
+
+    def capture_root_screenshot(self, label: str, elapsed_secs: int, client_pid: int | None) -> None:
+        if not self.screenshot_enabled or self.config.screenshot_max_count == 0:
+            return
+        if self.screenshot_count >= self.config.screenshot_max_count:
+            return
+        self.screenshot_count += 1
+        screenshot_file = self.artifact_dir / (
+            f"screenshot_{self.run_id}_{self.screenshot_count}_{label}_{elapsed_secs}s.png"
+        )
+        target = capture_screenshot(self.platform_name, screenshot_file, client_pid)
+        if target:
+            self.append_meta(f"screenshot_{self.screenshot_count}={screenshot_file}")
+            self.append_meta(f"screenshot_{self.screenshot_count}_target={target}")
+        else:
+            safe_unlink(screenshot_file)
+            self.append_meta(f"screenshot_{self.screenshot_count}=failed:{label}:{elapsed_secs}")
+
+    def capture_deterministic_requests(self, client_pid: int | None) -> None:
+        if not self.config.deterministic_camera_capture or not self.deterministic_screenshot_dir.is_dir():
+            return
+        for request in sorted(self.deterministic_screenshot_dir.glob("capture_request_*.json")):
+            if request.name.endswith(".ack.json"):
+                continue
+            ack = request.with_name(request.name.removesuffix(".json") + ".ack.json")
+            if ack.is_file():
+                continue
+            try:
+                data = json.loads(request.read_text(encoding="utf-8"))
+                screenshot = Path(data.get("screenshot", ""))
+            except Exception:
+                self.append_meta(f"deterministic_capture_request_invalid={request}")
+                continue
+            if not str(screenshot):
+                self.append_meta(f"deterministic_capture_request_invalid={request}")
+                continue
+            target = capture_screenshot(self.platform_name, screenshot, client_pid)
+            if target:
+                data["status"] = "captured"
+                data["screenshot"] = str(screenshot)
+                data["targetWindow"] = target
+                data["capturedAtEpoch"] = int(time.time())
+                ack.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+                self.append_meta(f"deterministic_capture_ack={ack}")
+                self.append_meta(f"deterministic_capture_screenshot={screenshot}")
+                self.append_meta(f"deterministic_capture_target={target}")
+            else:
+                self.append_meta(f"deterministic_capture_failed={request}")
+
+    def deterministic_capture_status(self) -> str | None:
+        if not self.config.deterministic_camera_capture or not self.deterministic_metadata.is_file():
+            return None
+        try:
+            data = json.loads(self.deterministic_metadata.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+        status = data.get("status")
+        return status if isinstance(status, str) else None
+
+    def check_client_memory_guard(self, client_pid: int | None, elapsed: int) -> bool:
+        if self.config.client_rss_limit_mb == 0 or not client_pid:
+            return True
+        rss_kb = process_rss_kb(client_pid, self.platform_name)
+        if rss_kb <= 0:
+            return True
+        self.memory_guard_peak_rss_kb = max(self.memory_guard_peak_rss_kb, rss_kb)
+        limit_kb = self.config.client_rss_limit_mb * 1024
+        if rss_kb <= limit_kb:
+            return True
+        if self.config.deterministic_camera_capture and self.deterministic_capture_status() == "complete":
+            self.deterministic_completed = True
+            self.intentional_deterministic_shutdown = True
+            self.append_meta(f"deterministic_capture_complete_elapsed={elapsed}")
+            self.append_meta(f"deterministic_capture_complete_rss_kb={rss_kb}")
+            self.terminate_run_processes("deterministic_complete")
+            return False
+        self.memory_guard_triggered = True
+        self.memory_guard_rss_kb = rss_kb
+        message = (
+            f"client_rss_limit_exceeded elapsed={elapsed}s pid={client_pid} "
+            f"rss_kb={rss_kb} limit_kb={limit_kb}"
+        )
+        self.append_meta(message)
+        append_text(self.run_log, message + "\n")
+        print(message, file=sys.stderr)
+        self.terminate_run_processes("client_rss_limit")
+        return False
+
+    def take_dump(self, elapsed: int, client_pid: int | None) -> None:
+        lines = [f"===== process snapshot at dump point (elapsed={elapsed}s, gradle_pid={self.gradle_process.pid}) ====="]
+        if self.platform_name == "windows":
+            lines.append(command_text(["tasklist", "/v"], cwd=self.root))
+        else:
+            process_table = command_text(["ps", "-eo", "pid,ppid,pgid,cmd"], cwd=self.root)
+            lines.extend(
+                line for line in process_table.splitlines()
+                if line.strip().startswith("PID") or f" {self.gradle_process.pid} " in f" {line} "
+            )
+        lines.extend(["", "===== jcmd -l =====", command_text(["jcmd", "-l"], cwd=self.root)])
+        self.process_snapshot.write_text("\n".join(lines) + "\n", encoding="utf-8", errors="replace")
+
+        if self.screenshot_enabled and self.platform_name == "linux" and shutil.which("xwininfo"):
+            write_command(self.window_tree_dump, ["xwininfo", "-root", "-tree"], cwd=self.root)
+            self.append_meta(f"window_tree_dump={self.window_tree_dump}")
+
+        self.append_meta(f"dump_epoch={int(time.time())}")
+        self.append_meta(f"dump_elapsed_secs={elapsed}")
+        self.append_meta(f"client_pid={client_pid or 'none'}")
+        if client_pid:
+            text = f"===== jcmd Thread.print (pid={client_pid}) =====\n"
+            text += command_text(["jcmd", str(client_pid), "Thread.print"], cwd=self.root)
+            self.thread_dump.write_text(text, encoding="utf-8", errors="replace")
+        else:
+            self.thread_dump.write_text("No Minecraft Java PID found at dump point.\n", encoding="utf-8")
+        if not self.config.deterministic_camera_capture:
+            self.capture_root_screenshot("dump", elapsed, client_pid)
+        self.dump_taken = True
+
+    def terminate_run_processes(self, reason: str) -> None:
+        if not self.gradle_process:
+            return
+        self.append_meta(f"cleanup_reason={reason}")
+        client_pid = self.find_client_pid()
+        if client_pid:
+            self.append_meta(f"cleanup_client_pid={client_pid}")
+        if self.platform_name == "windows":
+            if client_pid:
+                subprocess.run(["taskkill", "/PID", str(client_pid), "/T"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(["taskkill", "/PID", str(self.gradle_process.pid), "/T"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(5)
+            if client_pid and process_exists(client_pid, self.platform_name):
+                self.append_meta("cleanup_client_kill=true")
+                subprocess.run(["taskkill", "/PID", str(client_pid), "/T", "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if process_exists(self.gradle_process.pid, self.platform_name):
+                self.append_meta("cleanup_gradle_kill=true")
+                subprocess.run(["taskkill", "/PID", str(self.gradle_process.pid), "/T", "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            if client_pid:
+                safe_kill(client_pid, signal.SIGTERM)
+            try:
+                os.killpg(self.gradle_process.pid, signal.SIGTERM)
+            except OSError:
+                pass
+            safe_kill(self.gradle_process.pid, signal.SIGTERM)
+            time.sleep(5)
+            if client_pid and process_exists(client_pid, self.platform_name):
+                self.append_meta("cleanup_client_kill=true")
+                safe_kill(client_pid, signal.SIGKILL)
+            if process_exists(self.gradle_process.pid, self.platform_name):
+                self.append_meta("cleanup_gradle_kill=true")
+                try:
+                    os.killpg(self.gradle_process.pid, signal.SIGKILL)
+                except OSError:
+                    pass
+                safe_kill(self.gradle_process.pid, signal.SIGKILL)
+        self.run_client_active = False
+
+    def append_final_meta(self, exit_code: int) -> None:
+        self.append_meta(f"exit_code={exit_code}")
+        self.append_meta(f"deterministic_completed={str(self.deterministic_completed).lower()}")
+        self.append_meta(
+            f"intentional_deterministic_shutdown={str(self.intentional_deterministic_shutdown).lower()}"
+        )
+        if self.memory_guard_triggered and self.deterministic_completed:
+            self.append_meta("memory_guard_reclassified_after_complete=true")
+            self.memory_guard_triggered = False
+        self.append_meta(f"memory_guard_triggered={str(self.memory_guard_triggered).lower()}")
+        self.append_meta(f"memory_guard_peak_rss_kb={self.memory_guard_peak_rss_kb}")
+        if self.memory_guard_triggered:
+            self.append_meta(f"memory_guard_rss_kb={self.memory_guard_rss_kb}")
+        self.append_meta(f"end_epoch={int(time.time())}")
+
+    def collect_final_artifacts(self) -> None:
+        copy_config_snapshot(self.run_dir, self.config_after_dir)
+        self.append_meta(f"config_after={self.config_after_dir}")
+
+        latest = self.run_dir / "logs" / "latest.log"
+        if latest.is_file():
+            shutil.copy2(latest, self.latest_log_copy)
+            self.latest_tail.write_text("\n".join(tail_lines(self.latest_log_copy, 240)) + "\n", encoding="utf-8", errors="replace")
+
+        hs_err_files = [
+            path for path in self.run_dir.glob("hs_err_pid*.log")
+            if path.is_file() and path.stat().st_mtime >= self.start_epoch
+        ]
+        self.hserr_list.write_text("\n".join(str(path) for path in sorted(hs_err_files)) + "\n", encoding="utf-8")
+        for path in hs_err_files:
+            shutil.copy2(path, self.artifact_dir / f"{path.stem}_{self.run_id}.log")
+
+        copy_recent_files_since_start(self.run_dir / "crash-reports", self.crash_report_dir, self.crash_report_list, self.start_epoch)
+        copy_recent_files_since_start(self.run_dir / "debug", self.debug_snapshot_dir, self.debug_file_list, self.start_epoch)
+
+        patched = self.run_dir / "patched_shaders"
+        if patched.is_dir():
+            if self.patched_shaders_snapshot.exists():
+                shutil.rmtree(self.patched_shaders_snapshot)
+            shutil.copytree(patched, self.patched_shaders_snapshot)
+            with self.patched_shaders_manifest.open("w", encoding="utf-8") as handle:
+                handle.write(f"source={patched}\n")
+                for path in sorted(patched.rglob("*")):
+                    if path.is_file():
+                        handle.write(f"{file_sha256(path)} {path.relative_to(patched)}\n")
+
+        self.shader_event_log.write_text("", encoding="utf-8")
+        append_filtered_section("runClient log", self.run_log, SHADER_EVENT_PATTERN, self.shader_event_log)
+        append_filtered_section("latest.log", self.latest_log_copy, SHADER_EVENT_PATTERN, self.shader_event_log)
+        for path in read_list_paths(self.crash_report_list):
+            append_filtered_section("crash report", path, SHADER_EVENT_PATTERN, self.shader_event_log)
+        for path in read_list_paths(self.hserr_list):
+            append_filtered_section("hs_err", path, SHADER_EVENT_PATTERN, self.shader_event_log)
+
+        self.validation_event_log.write_text("", encoding="utf-8")
+        append_filtered_section("runClient log", self.run_log, VALIDATION_EVENT_PATTERN, self.validation_event_log)
+        append_filtered_section("latest.log", self.latest_log_copy, VALIDATION_EVENT_PATTERN, self.validation_event_log)
+        for path in read_list_paths(self.crash_report_list):
+            append_filtered_section("crash report", path, VALIDATION_EVENT_PATTERN, self.validation_event_log)
+
+        lines = [
+            f"backend={self.config.backend}",
+            f"validation_mode={self.config.validation_mode}",
+            f"validation_enabled={str(self.validation_enabled).lower()}",
+            f"validation_layer_available={str(self.validation_layer_available).lower()}",
+            f"validation_layer_manifest={self.validation_layer_manifest or 'unavailable'}",
+            f"shader_input_parity={self.config.shader_input_parity}",
+            f"shader_input_parity_max_logs={self.config.shader_input_parity_max_logs}",
+            f"lightmap_info_parity_max_logs={self.config.lightmap_info_parity_max_logs}",
+            f"effective_enable_shaders={self.effective_enable_shaders or 'unset'}",
+            f"effective_shader_pack={self.effective_shader_pack or 'unset'}",
+            f"run_log={self.run_log}",
+            f"latest_log={self.latest_log_copy if self.latest_log_copy.is_file() else 'missing'}",
+            f"shader_events={self.shader_event_log}",
+            f"validation_events={self.validation_event_log}",
+            f"patched_shaders_snapshot={self.patched_shaders_snapshot if self.patched_shaders_snapshot.is_dir() else 'absent'}",
+            f"patched_shaders_manifest={self.patched_shaders_manifest if self.patched_shaders_manifest.is_file() else 'absent'}",
+            f"crash_report_count={count_list_entries(self.crash_report_list)}",
+            f"hs_err_count={count_list_entries(self.hserr_list)}",
+            f"debug_artifact_count={count_list_entries(self.debug_file_list)}",
+            "",
+            "===== key events from runClient log =====",
+        ]
+        lines.extend(filtered_lines(self.run_log, KEY_SUMMARY_PATTERN, limit=200))
+        self.shader_summary.write_text("\n".join(lines) + "\n", encoding="utf-8", errors="replace")
+
+    def validate_deterministic_capture(self) -> None:
+        if not self.config.deterministic_camera_capture or self.memory_guard_triggered:
+            return
+        try:
+            validate_deterministic_metadata(
+                self.deterministic_metadata,
+                self.deterministic_screenshot_dir,
+                self.config.deterministic_pose_tolerance,
+            )
+            self.deterministic_validation_status = "ok"
+        except Exception as exc:
+            self.deterministic_validation_status = "failed"
+            print(str(exc), file=sys.stderr)
+        self.append_meta(f"deterministic_validation={self.deterministic_validation_status}")
+
+    def print_summary(self, exit_code: int) -> None:
+        print("Capture complete.")
+        print(f"- Meta:        {self.meta_log}")
+        print(f"- System:      {self.system_snapshot}")
+        print(f"- Git:         {self.git_snapshot}")
+        print(f"- Shader info: {self.shaderpack_info}")
+        print(f"- Shader sum:  {self.shader_summary}")
+        print(f"- Shader log:  {self.shader_event_log}")
+        print(f"- Validation:  {self.validation_event_log}")
+        print(f"- Run log:     {self.run_log}")
+        if self.latest_log_copy.is_file():
+            print(f"- Latest log:  {self.latest_log_copy}")
+        print(f"- Thread dump: {self.thread_dump}")
+        print(f"- Proc snap:   {self.process_snapshot}")
+        print(f"- Latest tail: {self.latest_tail}")
+        print(f"- hs_err list: {self.hserr_list}")
+        print(f"- Crash list:  {self.crash_report_list}")
+        print(f"- Debug list:  {self.debug_file_list}")
+        if self.patched_shaders_snapshot.is_dir():
+            print(f"- Patched shaders: {self.patched_shaders_snapshot}")
+        if self.window_tree.is_file():
+            print(f"- Window tree: {self.window_tree}")
+        if self.config.deterministic_camera_capture:
+            print(f"- Deterministic metadata: {self.deterministic_metadata}")
+            print(f"- Deterministic screenshots: {self.deterministic_screenshot_dir}")
+            print(f"- Deterministic validation: {self.deterministic_validation_status}")
+
+        if self.timed_out:
+            print(f"Result: timed out after {self.config.max_secs}s and was terminated automatically.")
+        elif self.memory_guard_triggered:
+            print(f"Result: terminated because client RSS exceeded {self.config.client_rss_limit_mb} MiB.")
+        elif exit_code != 0:
+            print(f"Result: exited with non-zero code {exit_code}.")
+        else:
+            print("Result: exited cleanly.")
+
+
+def script_dir() -> Path:
+    return Path(__file__).resolve().parent
+
+
+def common_platform_dir() -> Path:
+    return script_dir() / "Common" / "platform"
+
+
+def load_platform_detection():
+    detection_dir = common_platform_dir() / "detection"
+    sys.path.insert(0, str(detection_dir))
+    from platform_detection import detect_platform_info, normalize_platform
+
+    return detect_platform_info(), normalize_platform
+
+
+def repo_root() -> Path:
+    current = script_dir()
+    while current != current.parent:
+        if (current / "gradlew").is_file() or (current / "gradlew.bat").is_file():
+            return current
+        current = current.parent
+    raise SystemExit("ERROR: Could not find gradlew from DevUtils")
+
+
+def gradle_command(root: Path, platform_name: str) -> list[str]:
+    if platform_name == "windows":
+        wrapper = root / "gradlew.bat"
+        if wrapper.is_file():
+            return [str(wrapper)]
+    wrapper = root / "gradlew"
+    if wrapper.is_file():
+        return [str(wrapper)]
+    fallback = root / "gradlew.bat"
+    if fallback.is_file():
+        return [str(fallback)]
+    raise SystemExit("ERROR: Could not find gradlew. Are you in the MattMC project?")
+
+
+def lock_refusal_message() -> str:
+    return (
+        "Refusing to start RunDevCapture because another RunDevCapture instance is already running.\n"
+        "Concurrent captures can lock Origin and corrupt capture results."
+    )
+
+
+def command_text(command: list[str], *, cwd: Path) -> str:
+    if not shutil.which(command[0]) and not Path(command[0]).exists():
+        return ""
+    try:
+        result = subprocess.run(command, cwd=cwd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    except OSError as exc:
+        return str(exc)
+    return result.stdout or ""
+
+
+def write_command(path: Path, command: list[str], *, cwd: Path) -> None:
+    path.write_text(command_text(command, cwd=cwd), encoding="utf-8", errors="replace")
+
+
+def write_sections(path: Path, sections: list[tuple[str, list[str]]], *, cwd: Path) -> None:
+    lines: list[str] = []
+    for label, command in sections:
+        lines.extend([f"===== {label} =====", command_text(command, cwd=cwd), ""])
+    path.write_text("\n".join(lines), encoding="utf-8", errors="replace")
+
+
+def safe_unlink(path: Path) -> None:
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
+
+
+def append_text(path: Path, text: str) -> None:
+    with path.open("a", encoding="utf-8", errors="replace") as handle:
+        handle.write(text)
+
+
+def find_existing_mattmc_clients() -> list[str]:
+    lines = command_text(["jcmd", "-l"], cwd=Path.cwd()).splitlines()
+    return [
+        line for line in lines
+        if CLIENT_PROCESS_PATTERN.search(line)
+        and not re.search(r"jcmd|GradleWrapperMain|GradleDaemon", line)
+    ]
+
+
+def list_java_processes() -> list[tuple[int, str]]:
+    processes: list[tuple[int, str]] = []
+    jcmd_output = command_text(["jcmd", "-l"], cwd=Path.cwd())
+    for line in jcmd_output.splitlines():
+        parts = line.strip().split(maxsplit=1)
+        if not parts:
+            continue
+        try:
+            pid = int(parts[0])
+        except ValueError:
+            continue
+        command = parts[1] if len(parts) > 1 else ""
+        if not re.search(r"jcmd|GradleWrapperMain|GradleDaemon", command):
+            processes.append((pid, command))
+    return processes
+
+
+def screenshot_backend_available(platform_name: str) -> bool:
+    if platform_name == "linux":
+        return bool(shutil.which("import") and os.environ.get("DISPLAY"))
+    if platform_name == "macos":
+        return bool(shutil.which("screencapture"))
+    if platform_name == "windows":
+        return bool(shutil.which("powershell") or shutil.which("pwsh"))
+    return False
+
+
+def capture_screenshot(platform_name: str, screenshot_file: Path, client_pid: int | None) -> str | None:
+    screenshot_file.parent.mkdir(parents=True, exist_ok=True)
+    if platform_name == "linux":
+        target = find_linux_client_window_id(client_pid) or "root"
+        if subprocess.run(
+            ["import", "-window", target, str(screenshot_file)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode == 0:
+            return target
+        return None
+    if platform_name == "macos":
+        if subprocess.run(
+            ["screencapture", "-x", str(screenshot_file)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode == 0:
+            return "screen"
+        return None
+    if platform_name == "windows":
+        shell = shutil.which("powershell") or shutil.which("pwsh")
+        if not shell:
+            return None
+        escaped_screenshot = str(screenshot_file).replace("'", "''")
+        script = (
+            "Add-Type -AssemblyName System.Windows.Forms;"
+            "Add-Type -AssemblyName System.Drawing;"
+            "$b=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds;"
+            "$bmp=New-Object System.Drawing.Bitmap $b.Width,$b.Height;"
+            "$g=[System.Drawing.Graphics]::FromImage($bmp);"
+            "$g.CopyFromScreen($b.Location,[System.Drawing.Point]::Empty,$b.Size);"
+            f"$bmp.Save('{escaped_screenshot}',[System.Drawing.Imaging.ImageFormat]::Png);"
+            "$g.Dispose();$bmp.Dispose();"
+        )
+        if subprocess.run(
+            [shell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode == 0:
+            return "screen"
+    return None
+
+
+def find_linux_client_window_id(client_pid: int | None) -> str | None:
+    if not shutil.which("xprop"):
+        return None
+    client_list = command_text(["xprop", "-root", "_NET_CLIENT_LIST_STACKING"], cwd=Path.cwd())
+    raw_ids = re.findall(r"0x[0-9a-fA-F]+", client_list)
+    for window_id in reversed(raw_ids):
+        props = command_text(
+            ["xprop", "-id", window_id, "_NET_WM_PID", "WM_NAME", "_NET_WM_NAME", "WM_CLASS"],
+            cwd=Path.cwd(),
+        )
+        pid_match = re.search(r"_NET_WM_PID\(CARDINAL\)\s*=\s*(\d+)", props)
+        if client_pid and pid_match and pid_match.group(1) == str(client_pid):
+            return window_id
+        if re.search(r"Minecraft|LWJGL|GLFW|KnotClient|devlaunchinjector", props, re.IGNORECASE):
+            return window_id
+    return None
+
+
+def find_validation_layer_manifest(platform_name: str) -> Path | None:
+    candidates: list[Path] = []
+    vulkan_sdk = os.environ.get("VULKAN_SDK")
+    if vulkan_sdk:
+        root = Path(vulkan_sdk)
+        candidates.extend(
+            [
+                root / "share" / "vulkan" / "explicit_layer.d" / "VkLayer_khronos_validation.json",
+                root / "Bin" / "VkLayer_khronos_validation.json",
+                root / "Bin32" / "VkLayer_khronos_validation.json",
+            ]
+        )
+    if platform_name == "linux":
+        candidates.extend(
+            Path(path) for path in [
+                "/usr/share/vulkan/explicit_layer.d/VkLayer_khronos_validation.json",
+                "/usr/local/share/vulkan/explicit_layer.d/VkLayer_khronos_validation.json",
+                "/etc/vulkan/explicit_layer.d/VkLayer_khronos_validation.json",
+            ]
+        )
+    elif platform_name == "macos":
+        candidates.extend(
+            Path(path) for path in [
+                "/usr/local/share/vulkan/explicit_layer.d/VkLayer_khronos_validation.json",
+                "/opt/homebrew/share/vulkan/explicit_layer.d/VkLayer_khronos_validation.json",
+            ]
+        )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def copy_config_snapshot(run_dir: Path, target_dir: Path) -> None:
+    target_dir.mkdir(parents=True, exist_ok=True)
+    for rel_path in [
+        "options.txt",
+        "config/iris.properties",
+        "config/iris-excluded.json",
+        "config/DistantHorizons.toml",
+        "config/sodium-options.json",
+        "config/sodium-mixins.properties",
+        "config/voxelmap.properties",
+    ]:
+        source = run_dir / rel_path
+        if source.is_file():
+            shutil.copy2(source, target_dir / source.name)
+
+
+def extract_property_value(file_path: Path, key: str) -> str:
+    if not file_path.is_file():
+        return ""
+    for line in file_path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if line.startswith(f"{key}="):
+            return line.split("=", 1)[1]
+    return ""
+
+
+def extract_client_arg_assignment(client_args: str, key: str) -> str:
+    if not client_args:
+        return ""
+    match = re.search(rf"(^|\s){re.escape(key)}=([^\s]+)", client_args)
+    return match.group(2) if match else ""
+
+
+def append_client_arg(client_args: str, arg: str) -> str:
+    return f"{client_args} {arg}".strip() if client_args else arg
+
+
+def remove_client_arg_option(client_args: str, option: str) -> str:
+    if not client_args:
+        return ""
+    pattern = rf"(^|\s){re.escape(option)}(=[^\s]+|\s+[^\s]+)?"
+    return re.sub(pattern, " ", client_args).strip()
+
+
+def remove_client_arg_assignment(client_args: str, key: str) -> str:
+    if not client_args:
+        return ""
+    pattern = rf"(^|\s){re.escape(key)}=[^\s]+"
+    return re.sub(pattern, " ", client_args).strip()
+
+
+def client_args_contains_option(client_args: str, option: str) -> bool:
+    return f" {option}" in f" {client_args} "
+
+
+def client_args_contains_assignment(client_args: str, key: str) -> bool:
+    return f" {key}=" in f" {client_args} "
+
+
+def upsert_property(file_path: Path, key: str, value: str) -> bool:
+    if not file_path.is_file():
+        return False
+    lines = file_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    changed = False
+    for index, line in enumerate(lines):
+        if line.startswith(f"{key}="):
+            lines[index] = f"{key}={value}"
+            changed = True
+            break
+    if not changed:
+        lines.append(f"{key}={value}")
+    file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return True
+
+
+def resolve_shader_pack_path(run_dir: Path, root: Path, shader_pack_name: str) -> Path | None:
+    if not shader_pack_name:
+        return None
+    path = Path(shader_pack_name)
+    if path.is_file() or path.is_dir():
+        return path
+    for candidate in [run_dir / "shaderpacks" / shader_pack_name, root / "shaderpacks" / shader_pack_name]:
+        if candidate.is_file() or candidate.is_dir():
+            return candidate
+    return None
+
+
+def stat_text(path: Path) -> str:
+    try:
+        info = path.stat()
+    except OSError as exc:
+        return str(exc)
+    mode = stat.filemode(info.st_mode)
+    return f"{mode} size={info.st_size} mtime={int(info.st_mtime)} path={path}"
+
+
+def file_sha256(path: Path) -> str:
+    import hashlib
+
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def file_sha256_text(path: Path) -> str:
+    if not path.is_file():
+        return f"not a file: {path}"
+    return f"{file_sha256(path)}  {path}"
+
+
+def copy_recent_files_since_start(source_dir: Path, dest_dir: Path, list_file: Path, start_epoch: int) -> None:
+    if not source_dir.is_dir():
+        list_file.write_text("", encoding="utf-8")
+        return
+    files = sorted(path for path in source_dir.rglob("*") if path.is_file() and path.stat().st_mtime >= start_epoch)
+    list_file.write_text("\n".join(str(path) for path in files) + ("\n" if files else ""), encoding="utf-8")
+    for path in files:
+        rel_path = path.relative_to(source_dir)
+        target = dest_dir / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, target)
+
+
+def append_filtered_section(label: str, file_path: Path, pattern: str, output_file: Path) -> None:
+    if not file_path.is_file():
+        return
+    matches = filtered_lines(file_path, pattern)
+    with output_file.open("a", encoding="utf-8", errors="replace") as handle:
+        handle.write(f"===== {label}: {file_path} =====\n")
+        if matches:
+            handle.write("\n".join(matches) + "\n")
+        else:
+            handle.write("(no matches)\n")
+        handle.write("\n")
+
+
+def filtered_lines(file_path: Path, pattern: str, limit: int | None = None) -> list[str]:
+    if not file_path.is_file():
+        return []
+    regex = re.compile(pattern, re.IGNORECASE)
+    matches: list[str] = []
+    with file_path.open("r", encoding="utf-8", errors="replace") as handle:
+        for number, line in enumerate(handle, 1):
+            if regex.search(line):
+                matches.append(f"{number}:{line.rstrip()}")
+                if limit and len(matches) >= limit:
+                    break
+    return matches
+
+
+def count_list_entries(file_path: Path) -> int:
+    if not file_path.is_file():
+        return 0
+    return sum(1 for line in file_path.read_text(encoding="utf-8", errors="replace").splitlines() if line.strip())
+
+
+def read_list_paths(file_path: Path) -> list[Path]:
+    if not file_path.is_file():
+        return []
+    return [Path(line.strip()) for line in file_path.read_text(encoding="utf-8", errors="replace").splitlines() if line.strip()]
+
+
+def tail_lines(path: Path, count: int) -> list[str]:
+    if not path.is_file():
+        return []
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    return lines[-count:]
+
+
+def process_rss_kb(pid: int, platform_name: str) -> int:
+    if platform_name == "windows":
+        output = command_text(
+            ["wmic", "process", "where", f"ProcessId={pid}", "get", "WorkingSetSize", "/value"],
+            cwd=Path.cwd(),
+        )
+        match = re.search(r"WorkingSetSize=(\d+)", output)
+        return int(match.group(1)) // 1024 if match else 0
+    output = command_text(["ps", "-o", "rss=", "-p", str(pid)], cwd=Path.cwd()).strip()
+    try:
+        return int(output.split()[0])
+    except (IndexError, ValueError):
+        return 0
+
+
+def process_exists(pid: int, platform_name: str) -> bool:
+    if platform_name == "windows":
+        output = command_text(["tasklist", "/FI", f"PID eq {pid}"], cwd=Path.cwd())
+        return str(pid) in output
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def safe_kill(pid: int, sig: signal.Signals) -> None:
+    try:
+        os.kill(pid, sig)
+    except OSError:
+        pass
+
+
+def validate_deterministic_metadata(metadata_path: Path, screenshot_dir: Path, tolerance: float) -> None:
+    if not metadata_path.is_file():
+        raise RuntimeError(f"deterministic metadata was not written: {metadata_path}")
+    data = json.loads(metadata_path.read_text(encoding="utf-8"))
+    if data.get("status") != "complete":
+        raise RuntimeError(
+            f"deterministic capture did not complete: status={data.get('status')!r} "
+            f"reason={data.get('reason')!r}"
+        )
+
+    backend = data.get("backend")
+    shader_enabled = data.get("shaderEnabled")
+    shader_pack = data.get("shaderPack")
+    git_commit = data.get("gitCommit")
+    dimension = data.get("dimension")
+    yaw_delta = float(data.get("yawDelta", float("nan")))
+    initial_pose = data.get("initialPose") or {}
+    initial_yaw = float(initial_pose.get("yaw", float("nan")))
+    initial_pitch = float(initial_pose.get("pitch", float("nan")))
+    window = data.get("window") or {}
+    if window.get("width") != 1280 or window.get("height") != 720:
+        raise RuntimeError(f"deterministic capture window mismatch: {window}")
+
+    captures = data.get("captures") or []
+    expected_poses = data.get("poseSequence") or ["initial", "right", "left", "return"]
+    actual_poses = [capture.get("poseName") for capture in captures]
+    if actual_poses != expected_poses:
+        raise RuntimeError(f"deterministic pose sequence mismatch: {actual_poses}")
+    if not screenshot_dir.is_dir():
+        raise RuntimeError(f"deterministic screenshot directory missing: {screenshot_dir}")
+
+    expected_requested = {
+        "initial": (initial_yaw, initial_pitch),
+        "right": (initial_yaw + yaw_delta, initial_pitch),
+        "left": (initial_yaw - yaw_delta, initial_pitch),
+        "return": (initial_yaw, initial_pitch),
+    }
+    initial_position = data.get("initialPosition") or {}
+    previous_frame = -1
+    for capture in captures:
+        screenshot = Path(capture.get("screenshot", ""))
+        if not screenshot.is_file():
+            raise RuntimeError(f"deterministic screenshot missing for {capture.get('poseName')}: {screenshot}")
+        if not screenshot.name.startswith(f"{capture.get('index'):02d}_{capture.get('poseName')}"):
+            raise RuntimeError(f"deterministic screenshot name does not match pose: {screenshot}")
+        for key, expected in [
+            ("backend", backend),
+            ("shaderEnabled", shader_enabled),
+            ("shaderPack", shader_pack),
+            ("gitCommit", git_commit),
+            ("window", window),
+            ("dimension", dimension),
+        ]:
+            if capture.get(key) != expected:
+                raise RuntimeError(f"deterministic capture {key} mismatch: {capture}")
+        position = capture.get("position") or {}
+        for axis in ("x", "y", "z"):
+            if not math.isclose(
+                float(position.get(axis, float("nan"))),
+                float(initial_position.get(axis, float("nan"))),
+                rel_tol=0.0,
+                abs_tol=0.0001,
+            ):
+                raise RuntimeError(
+                    f"deterministic player position changed on {capture.get('poseName')} axis {axis}: "
+                    f"initial={initial_position} capture={position}"
+                )
+        pose_name = capture.get("poseName")
+        expected_yaw, expected_pitch = expected_requested[pose_name]
+        requested_yaw = float(capture.get("requestedYaw", float("nan")))
+        requested_pitch = float(capture.get("requestedPitch", float("nan")))
+        observed_yaw = float(capture.get("observedYaw", float("nan")))
+        observed_pitch = float(capture.get("observedPitch", float("nan")))
+        if not math.isclose(requested_yaw, expected_yaw, rel_tol=0.0, abs_tol=tolerance):
+            raise RuntimeError(
+                f"deterministic requested yaw mismatch for {pose_name}: "
+                f"expected={expected_yaw} actual={requested_yaw} tolerance={tolerance}"
+            )
+        if not math.isclose(requested_pitch, expected_pitch, rel_tol=0.0, abs_tol=tolerance):
+            raise RuntimeError(
+                f"deterministic requested pitch mismatch for {pose_name}: "
+                f"expected={expected_pitch} actual={requested_pitch} tolerance={tolerance}"
+            )
+        if not math.isclose(observed_yaw, requested_yaw, rel_tol=0.0, abs_tol=tolerance):
+            raise RuntimeError(
+                f"deterministic observed yaw mismatch for {pose_name}: "
+                f"requested={requested_yaw} observed={observed_yaw} tolerance={tolerance}"
+            )
+        if not math.isclose(observed_pitch, requested_pitch, rel_tol=0.0, abs_tol=tolerance):
+            raise RuntimeError(
+                f"deterministic observed pitch mismatch for {pose_name}: "
+                f"requested={requested_pitch} observed={observed_pitch} tolerance={tolerance}"
+            )
+        frame = int(capture.get("renderedFrameIndex", -1))
+        if frame <= previous_frame:
+            raise RuntimeError(f"deterministic frame index did not increase at {pose_name}: previous={previous_frame} actual={frame}")
+        previous_frame = frame
+    if "return" in expected_poses and len(captures) > expected_poses.index("return"):
+        return_capture = captures[expected_poses.index("return")]
+        if captures[0]["requestedYaw"] != return_capture["requestedYaw"] or captures[0]["requestedPitch"] != return_capture["requestedPitch"]:
+            raise RuntimeError("deterministic return pose does not exactly match initial requested pose")
+    print(f"deterministic capture OK: {metadata_path} tolerance={tolerance}")
+
+
+def int_env(name: str, default: int, *, signed: bool = False) -> int:
+    value = os.environ.get(name, str(default))
+    pattern = r"^-?[0-9]+$" if signed else r"^[0-9]+$"
+    if not re.match(pattern, value):
+        raise SystemExit(f"{name} must be an integer" if signed else f"{name} must be an integer number")
+    return int(value)
+
+
+def parse_args() -> CaptureConfig:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Runs Gradle runClient in a bounded session, captures diagnostics, "
+            "and self-terminates so no manual kill is required."
+        )
+    )
+    parser.add_argument("--backend", choices=("vulkan", "opengl"), required=True)
+    parser.add_argument("--shaders", choices=("on", "off"), required=True)
+    parser.add_argument("--max-secs", type=int, default=int_env("MAX_SECS", 120))
+    parser.add_argument("--dump-secs", type=int, default=int_env("DUMP_SECS", 45))
+    parser.add_argument("--validation", choices=("off", "standard"), default=os.environ.get("VALIDATION_MODE", "off"))
+    parser.add_argument(
+        "--shader-input-parity",
+        choices=("off", "standard", "full"),
+        default=os.environ.get("SHADER_INPUT_PARITY", "off"),
+    )
+    parser.add_argument("--deterministic-camera-capture", action="store_true")
+    parser.add_argument("--client-args", default=os.environ.get("CLIENT_ARGS", ""))
+    parser.add_argument("--platform", help="platform to pass to shared helpers: linux, windows, or macos")
+    args = parser.parse_args()
+
+    if args.max_secs < 0 or args.dump_secs < 0:
+        raise SystemExit("--max-secs and --dump-secs must be integers")
+
+    pose_tolerance = os.environ.get("DETERMINISTIC_POSE_TOLERANCE", "0.001")
+    if not re.match(r"^[0-9]+([.][0-9]+)?$", pose_tolerance):
+        raise SystemExit("DETERMINISTIC_POSE_TOLERANCE must be a non-negative number")
+
+    return CaptureConfig(
+        backend=args.backend,
+        shaders=args.shaders,
+        max_secs=args.max_secs,
+        dump_secs=args.dump_secs,
+        client_rss_limit_mb=int_env("CLIENT_RSS_LIMIT_MB", 6144),
+        screenshot_interval_secs=int_env("SCREENSHOT_INTERVAL_SECS", 5),
+        screenshot_max_count=int_env("SCREENSHOT_MAX_COUNT", 6),
+        screenshot_start_delay_secs=int_env("SCREENSHOT_START_DELAY_SECS", 0),
+        validation_mode=args.validation,
+        shader_input_parity=args.shader_input_parity,
+        shader_input_parity_max_logs=int_env("SHADER_INPUT_PARITY_MAX_LOGS", 120000, signed=True),
+        lightmap_info_parity_max_logs=int_env("LIGHTMAP_INFO_PARITY_MAX_LOGS", 512, signed=True),
+        client_args=args.client_args,
+        deterministic_camera_capture=bool(args.deterministic_camera_capture),
+        deterministic_pose_tolerance=float(pose_tolerance),
+        platform_name=args.platform,
+    )
+
+
+def main() -> int:
+    runner = CaptureRunner(parse_args())
+
+    def handle_signal(signum, _frame) -> None:
+        signal_name = signal.Signals(signum).name
+        runner.terminate_run_processes(f"signal_{signal_name}")
+        runner.release_lock()
+        raise SystemExit(128)
+
+    for signal_name in ("SIGINT", "SIGTERM", "SIGHUP"):
+        if hasattr(signal, signal_name):
+            signal.signal(getattr(signal, signal_name), handle_signal)
+
+    try:
+        return runner.run()
+    except KeyboardInterrupt:
+        runner.terminate_run_processes("signal_INT")
+        runner.release_lock()
+        return 128
+    except SystemExit:
+        runner.release_lock()
+        raise
+    except Exception:
+        if runner.run_client_active:
+            runner.terminate_run_processes("script_exit_1")
+        runner.release_lock()
+        raise
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
