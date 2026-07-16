@@ -1,48 +1,12 @@
 use std::ptr;
 use std::slice;
-use std::sync::{Arc, Mutex, OnceLock};
 
-use super::buffer::{audio_format_to_openal, create_buffer, NativeBuffer};
-use super::context::{cstring_to_string, load_openal, NativeAlto};
-use super::device::{ChannelPool, NativeDevice};
+use super::backend;
+use super::device::ChannelPool;
 use super::errors::*;
-use super::handles::HandleTable;
-use super::listener::{INITIAL_FORWARD, INITIAL_POSITION, INITIAL_UP};
-use super::source::{NativeSource, SourceKind, AL_STOPPED};
-
-struct AudioBackend {
-    openal: Option<NativeAlto>,
-    devices: HandleTable<NativeDevice>,
-    sources: HandleTable<NativeSource>,
-    buffers: HandleTable<NativeBuffer>,
-}
-
-impl AudioBackend {
-    fn new() -> Self {
-        Self {
-            openal: None,
-            devices: HandleTable::default(),
-            sources: HandleTable::default(),
-            buffers: HandleTable::default(),
-        }
-    }
-
-    fn openal(&mut self) -> AudioResult<&NativeAlto> {
-        if self.openal.is_none() {
-            self.openal = Some(load_openal()?);
-        }
-        Ok(self
-            .openal
-            .as_ref()
-            .expect("OpenAL loader was just initialized"))
-    }
-}
-
-static BACKEND: OnceLock<Mutex<AudioBackend>> = OnceLock::new();
-
-fn backend() -> &'static Mutex<AudioBackend> {
-    BACKEND.get_or_init(|| Mutex::new(AudioBackend::new()))
-}
+use super::format::audio_format_to_openal;
+use super::listener::ListenerTransform;
+use super::source::AL_STOPPED;
 
 fn status(result: AudioResult<()>) -> i32 {
     match result {
@@ -51,11 +15,29 @@ fn status(result: AudioResult<()>) -> i32 {
     }
 }
 
-fn with_backend<T>(f: impl FnOnce(&mut AudioBackend) -> AudioResult<T>) -> AudioResult<T> {
-    let mut guard = backend()
-        .lock()
-        .map_err(|_| AudioError::OpenAlCall("Lock audio backend", "mutex poisoned".to_string()))?;
-    f(&mut guard)
+fn status_with_output<T>(result: AudioResult<T>, output: *mut T, fallback: Option<T>) -> i32
+where
+    T: Copy,
+{
+    if output.is_null() {
+        return ERR_INVALID_ARGUMENT;
+    }
+    match result {
+        Ok(value) => {
+            unsafe {
+                *output = value;
+            }
+            OK
+        }
+        Err(error) => {
+            if let Some(value) = fallback {
+                unsafe {
+                    *output = value;
+                }
+            }
+            error.status()
+        }
+    }
 }
 
 /// # Safety
@@ -72,45 +54,25 @@ pub unsafe extern "C" fn mattmc_audio_device_create(
     if output_handle.is_null() {
         return ERR_INVALID_ARGUMENT;
     }
-    match with_backend(|backend| {
-        let preferred = ptr_to_string(preferred_ptr, preferred_len)?;
-        let device = NativeDevice::open(backend.openal()?, preferred, hrtf != 0)?;
-        let handle = backend.devices.insert(device);
-        unsafe {
-            *output_handle = handle;
-        }
-        Ok(())
-    }) {
-        Ok(()) => OK,
-        Err(error) => error.status(),
-    }
+    let preferred = match unsafe { ptr_to_string(preferred_ptr, preferred_len) } {
+        Ok(preferred) => preferred,
+        Err(error) => return error.status(),
+    };
+    status_with_output(
+        backend::create_device(preferred, hrtf != 0),
+        output_handle,
+        None,
+    )
 }
 
 /// # Safety
 ///
-/// `device_handle` must be a handle returned by `mattmc_audio_device_create`.
-/// Invalid or stale handles are ignored safely.
+/// `device_handle` may be any value. Live devices are destroyed exactly once;
+/// stale or invalid handles return `ERR_INVALID_HANDLE` without touching other
+/// live devices.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_audio_device_destroy(device_handle: u64) -> i32 {
-    status(with_backend(|backend| {
-        let source_handles = backend
-            .sources
-            .handles_for(|source| source.device == device_handle);
-        for handle in source_handles {
-            backend.sources.remove(handle);
-        }
-        let buffer_handles = backend
-            .buffers
-            .handles_for(|buffer| buffer.device == device_handle);
-        for handle in buffer_handles {
-            backend.buffers.remove(handle);
-        }
-        backend
-            .devices
-            .remove(device_handle)
-            .ok_or(AudioError::InvalidHandle)?;
-        Ok(())
-    }))
+    status(backend::destroy_device(device_handle))
 }
 
 /// # Safety
@@ -126,43 +88,15 @@ pub unsafe extern "C" fn mattmc_audio_source_create(
     if output_handle.is_null() {
         return ERR_INVALID_ARGUMENT;
     }
-    match with_backend(|backend| {
-        let pool = ChannelPool::from_id(pool_id).ok_or(AudioError::InvalidArgument)?;
-        let (context, kind) = {
-            let device = backend
-                .devices
-                .get_mut(device_handle)
-                .ok_or(AudioError::InvalidHandle)?;
-            if !device.acquire_pool(pool) {
-                return Err(AudioError::PoolExhausted);
-            }
-            let context = device.context.clone();
-            let kind = match pool {
-                ChannelPool::Static => SourceKind::Static(super::context::alto_call(
-                    "Create static source",
-                    context.new_static_source(),
-                )?),
-                ChannelPool::Streaming => SourceKind::Streaming(super::context::alto_call(
-                    "Create streaming source",
-                    context.new_streaming_source(),
-                )?),
-            };
-            (context, kind)
-        };
-        drop(context);
-        let handle = backend.sources.insert(NativeSource {
-            device: device_handle,
-            pool,
-            kind,
-        });
-        unsafe {
-            *output_handle = handle;
-        }
-        Ok(())
-    }) {
-        Ok(()) => OK,
-        Err(error) => error.status(),
-    }
+    let pool = match ChannelPool::from_id(pool_id) {
+        Some(pool) => pool,
+        None => return ERR_INVALID_ARGUMENT,
+    };
+    status_with_output(
+        backend::create_source(device_handle, pool),
+        output_handle,
+        None,
+    )
 }
 
 /// # Safety
@@ -171,17 +105,7 @@ pub unsafe extern "C" fn mattmc_audio_source_create(
 /// invalid or stale handles return `ERR_INVALID_HANDLE`.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_audio_source_destroy(source_handle: u64) -> i32 {
-    status(with_backend(|backend| {
-        let mut source = backend
-            .sources
-            .remove(source_handle)
-            .ok_or(AudioError::InvalidHandle)?;
-        source.stop();
-        if let Some(device) = backend.devices.get_mut(source.device) {
-            device.release_pool(source.pool);
-        }
-        Ok(())
-    }))
+    status(backend::destroy_source(source_handle))
 }
 
 /// # Safety
@@ -189,10 +113,7 @@ pub unsafe extern "C" fn mattmc_audio_source_destroy(source_handle: u64) -> i32 
 /// `source_handle` must name a live source.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_audio_source_play(source_handle: u64) -> i32 {
-    status(with_source_mut(source_handle, |source| {
-        source.play();
-        Ok(())
-    }))
+    status(backend::source_play(source_handle))
 }
 
 /// # Safety
@@ -200,10 +121,7 @@ pub unsafe extern "C" fn mattmc_audio_source_play(source_handle: u64) -> i32 {
 /// `source_handle` must name a live source.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_audio_source_pause(source_handle: u64) -> i32 {
-    status(with_source_mut(source_handle, |source| {
-        source.pause();
-        Ok(())
-    }))
+    status(backend::source_pause(source_handle))
 }
 
 /// # Safety
@@ -211,10 +129,7 @@ pub unsafe extern "C" fn mattmc_audio_source_pause(source_handle: u64) -> i32 {
 /// `source_handle` must name a live source.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_audio_source_stop(source_handle: u64) -> i32 {
-    status(with_source_mut(source_handle, |source| {
-        source.stop();
-        Ok(())
-    }))
+    status(backend::source_stop(source_handle))
 }
 
 /// # Safety
@@ -226,28 +141,11 @@ pub unsafe extern "C" fn mattmc_audio_source_state(
     source_handle: u64,
     output_state: *mut i32,
 ) -> i32 {
-    if output_state.is_null() {
-        return ERR_INVALID_ARGUMENT;
-    }
-    match with_backend(|backend| {
-        let state = backend
-            .sources
-            .get(source_handle)
-            .ok_or(AudioError::InvalidHandle)?
-            .state();
-        unsafe {
-            *output_state = state;
-        }
-        Ok(())
-    }) {
-        Ok(()) => OK,
-        Err(error) => {
-            unsafe {
-                *output_state = AL_STOPPED;
-            }
-            error.status()
-        }
-    }
+    status_with_output(
+        backend::source_state(source_handle),
+        output_state,
+        Some(AL_STOPPED),
+    )
 }
 
 /// # Safety
@@ -260,9 +158,7 @@ pub unsafe extern "C" fn mattmc_audio_source_set_position(
     y: f32,
     z: f32,
 ) -> i32 {
-    status(with_source_mut(source_handle, |source| {
-        source.set_position(x, y, z)
-    }))
+    status(backend::source_set_position(source_handle, x, y, z))
 }
 
 /// # Safety
@@ -270,9 +166,7 @@ pub unsafe extern "C" fn mattmc_audio_source_set_position(
 /// `source_handle` must name a live source.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_audio_source_set_pitch(source_handle: u64, pitch: f32) -> i32 {
-    status(with_source_mut(source_handle, |source| {
-        source.set_pitch(pitch)
-    }))
+    status(backend::source_set_pitch(source_handle, pitch))
 }
 
 /// # Safety
@@ -280,9 +174,7 @@ pub unsafe extern "C" fn mattmc_audio_source_set_pitch(source_handle: u64, pitch
 /// `source_handle` must name a live source.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_audio_source_set_volume(source_handle: u64, gain: f32) -> i32 {
-    status(with_source_mut(source_handle, |source| {
-        source.set_volume(gain)
-    }))
+    status(backend::source_set_volume(source_handle, gain))
 }
 
 /// # Safety
@@ -290,10 +182,7 @@ pub unsafe extern "C" fn mattmc_audio_source_set_volume(source_handle: u64, gain
 /// `source_handle` must name a live source.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_audio_source_set_looping(source_handle: u64, looping: i32) -> i32 {
-    status(with_source_mut(source_handle, |source| {
-        source.set_looping(looping != 0);
-        Ok(())
-    }))
+    status(backend::source_set_looping(source_handle, looping != 0))
 }
 
 /// # Safety
@@ -304,9 +193,7 @@ pub unsafe extern "C" fn mattmc_audio_source_set_relative(
     source_handle: u64,
     relative: i32,
 ) -> i32 {
-    status(with_source_mut(source_handle, |source| {
-        source.set_relative(relative != 0)
-    }))
+    status(backend::source_set_relative(source_handle, relative != 0))
 }
 
 /// # Safety
@@ -314,9 +201,7 @@ pub unsafe extern "C" fn mattmc_audio_source_set_relative(
 /// `source_handle` must name a live source.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_audio_source_disable_attenuation(source_handle: u64) -> i32 {
-    status(with_source_mut(source_handle, |source| {
-        source.disable_attenuation()
-    }))
+    status(backend::source_disable_attenuation(source_handle))
 }
 
 /// # Safety
@@ -327,9 +212,7 @@ pub unsafe extern "C" fn mattmc_audio_source_linear_attenuation(
     source_handle: u64,
     distance: f32,
 ) -> i32 {
-    status(with_source_mut(source_handle, |source| {
-        source.linear_attenuation(distance)
-    }))
+    status(backend::source_linear_attenuation(source_handle, distance))
 }
 
 /// # Safety
@@ -351,27 +234,15 @@ pub unsafe extern "C" fn mattmc_audio_buffer_create(
     if output_handle.is_null() {
         return ERR_INVALID_ARGUMENT;
     }
-    match with_backend(|backend| {
-        let data = bytes_from_ptr(data_ptr, data_len)?;
-        let context = backend
-            .devices
-            .get(device_handle)
-            .ok_or(AudioError::InvalidHandle)?
-            .context
-            .clone();
-        let buffer = create_buffer(&context, data, channels, bits, pcm != 0, sample_rate)?;
-        let handle = backend.buffers.insert(NativeBuffer {
-            device: device_handle,
-            buffer: Arc::new(buffer),
-        });
-        unsafe {
-            *output_handle = handle;
-        }
-        Ok(())
-    }) {
-        Ok(()) => OK,
-        Err(error) => error.status(),
-    }
+    let data = match unsafe { bytes_from_ptr(data_ptr, data_len) } {
+        Ok(data) => data,
+        Err(error) => return error.status(),
+    };
+    status_with_output(
+        backend::create_buffer_handle(device_handle, data, channels, bits, pcm != 0, sample_rate),
+        output_handle,
+        None,
+    )
 }
 
 /// # Safety
@@ -379,13 +250,7 @@ pub unsafe extern "C" fn mattmc_audio_buffer_create(
 /// `buffer_handle` may be any value. Live handles are removed exactly once.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_audio_buffer_destroy(buffer_handle: u64) -> i32 {
-    status(with_backend(|backend| {
-        backend
-            .buffers
-            .remove(buffer_handle)
-            .ok_or(AudioError::InvalidHandle)?;
-        Ok(())
-    }))
+    status(backend::destroy_buffer(buffer_handle))
 }
 
 /// # Safety
@@ -397,21 +262,7 @@ pub unsafe extern "C" fn mattmc_audio_source_attach_static_buffer(
     source_handle: u64,
     buffer_handle: u64,
 ) -> i32 {
-    status(with_backend(|backend| {
-        let buffer = backend
-            .buffers
-            .get(buffer_handle)
-            .ok_or(AudioError::InvalidHandle)?
-            .clone();
-        let source = backend
-            .sources
-            .get_mut(source_handle)
-            .ok_or(AudioError::InvalidHandle)?;
-        if source.device != buffer.device {
-            return Err(AudioError::InvalidHandle);
-        }
-        source.attach_static_buffer(buffer.buffer)
-    }))
+    status(backend::attach_static_buffer(source_handle, buffer_handle))
 }
 
 /// # Safety
@@ -428,26 +279,18 @@ pub unsafe extern "C" fn mattmc_audio_source_queue_stream_buffer(
     pcm: i32,
     sample_rate: i32,
 ) -> i32 {
-    status(with_backend(|backend| {
-        let data = bytes_from_ptr(data_ptr, data_len)?;
-        let device_handle = backend
-            .sources
-            .get(source_handle)
-            .ok_or(AudioError::InvalidHandle)?
-            .device;
-        let context = backend
-            .devices
-            .get(device_handle)
-            .ok_or(AudioError::InvalidHandle)?
-            .context
-            .clone();
-        let buffer = create_buffer(&context, data, channels, bits, pcm != 0, sample_rate)?;
-        backend
-            .sources
-            .get_mut(source_handle)
-            .ok_or(AudioError::InvalidHandle)?
-            .queue_stream_buffer(buffer)
-    }))
+    let data = match unsafe { bytes_from_ptr(data_ptr, data_len) } {
+        Ok(data) => data,
+        Err(error) => return error.status(),
+    };
+    status(backend::queue_stream_buffer(
+        source_handle,
+        data,
+        channels,
+        bits,
+        pcm != 0,
+        sample_rate,
+    ))
 }
 
 /// # Safety
@@ -458,19 +301,11 @@ pub unsafe extern "C" fn mattmc_audio_source_remove_processed_buffers(
     source_handle: u64,
     output_processed: *mut i32,
 ) -> i32 {
-    if output_processed.is_null() {
-        return ERR_INVALID_ARGUMENT;
-    }
-    match with_source_mut(source_handle, |source| {
-        let processed = source.remove_processed_buffers()?;
-        unsafe {
-            *output_processed = processed;
-        }
-        Ok(())
-    }) {
-        Ok(()) => OK,
-        Err(error) => error.status(),
-    }
+    status_with_output(
+        backend::remove_processed_stream_buffers(source_handle),
+        output_processed,
+        None,
+    )
 }
 
 /// # Safety
@@ -489,18 +324,14 @@ pub unsafe extern "C" fn mattmc_audio_listener_set_transform(
     uy: f32,
     uz: f32,
 ) -> i32 {
-    status(with_backend(|backend| {
-        let context = &backend
-            .devices
-            .get(device_handle)
-            .ok_or(AudioError::InvalidHandle)?
-            .context;
-        super::context::alto_call("Set listener position", context.set_position([px, py, pz]))?;
-        super::context::alto_call(
-            "Set listener orientation",
-            context.set_orientation(([fx, fy, fz], [ux, uy, uz])),
-        )
-    }))
+    status(backend::listener_set_transform(
+        device_handle,
+        ListenerTransform {
+            position: [px, py, pz],
+            forward: [fx, fy, fz],
+            up: [ux, uy, uz],
+        },
+    ))
 }
 
 /// # Safety
@@ -508,20 +339,7 @@ pub unsafe extern "C" fn mattmc_audio_listener_set_transform(
 /// `device_handle` must name a live device.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_audio_listener_reset(device_handle: u64) -> i32 {
-    unsafe {
-        mattmc_audio_listener_set_transform(
-            device_handle,
-            INITIAL_POSITION[0],
-            INITIAL_POSITION[1],
-            INITIAL_POSITION[2],
-            INITIAL_FORWARD[0],
-            INITIAL_FORWARD[1],
-            INITIAL_FORWARD[2],
-            INITIAL_UP[0],
-            INITIAL_UP[1],
-            INITIAL_UP[2],
-        )
-    }
+    status(backend::listener_reset(device_handle))
 }
 
 /// # Safety
@@ -529,41 +347,22 @@ pub unsafe extern "C" fn mattmc_audio_listener_reset(device_handle: u64) -> i32 
 /// `device_handle` must name a live device.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_audio_listener_set_gain(device_handle: u64, gain: f32) -> i32 {
-    status(with_backend(|backend| {
-        let context = &backend
-            .devices
-            .get(device_handle)
-            .ok_or(AudioError::InvalidHandle)?
-            .context;
-        super::context::alto_call("Set listener gain", context.set_gain(gain))
-    }))
+    status(backend::listener_set_gain(device_handle, gain))
 }
 
 /// # Safety
 ///
-/// `output_connected` must be writable.
+/// `output_disconnected` must be writable.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_audio_device_is_disconnected(
     device_handle: u64,
     output_disconnected: *mut i32,
 ) -> i32 {
-    if output_disconnected.is_null() {
-        return ERR_INVALID_ARGUMENT;
-    }
-    match with_backend(|backend| {
-        let disconnected = backend
-            .devices
-            .get(device_handle)
-            .ok_or(AudioError::InvalidHandle)?
-            .is_disconnected();
-        unsafe {
-            *output_disconnected = if disconnected { 1 } else { 0 };
-        }
-        Ok(())
-    }) {
-        Ok(()) => OK,
-        Err(error) => error.status(),
-    }
+    status_with_output(
+        backend::device_is_disconnected(device_handle).map(|value| if value { 1 } else { 0 }),
+        output_disconnected,
+        None,
+    )
 }
 
 /// # Safety
@@ -574,27 +373,11 @@ pub unsafe extern "C" fn mattmc_audio_device_has_default_changed(
     device_handle: u64,
     output_changed: *mut i32,
 ) -> i32 {
-    if output_changed.is_null() {
-        return ERR_INVALID_ARGUMENT;
-    }
-    match with_backend(|backend| {
-        let current = backend.openal()?.0.default_output().map(cstring_to_string);
-        let device = backend
-            .devices
-            .get_mut(device_handle)
-            .ok_or(AudioError::InvalidHandle)?;
-        let changed = device.default_device_name != current;
-        if changed {
-            device.default_device_name = current;
-        }
-        unsafe {
-            *output_changed = if changed { 1 } else { 0 };
-        }
-        Ok(())
-    }) {
-        Ok(()) => OK,
-        Err(error) => error.status(),
-    }
+    status_with_output(
+        backend::device_has_default_changed(device_handle).map(|value| if value { 1 } else { 0 }),
+        output_changed,
+        None,
+    )
 }
 
 /// # Safety
@@ -609,20 +392,16 @@ pub unsafe extern "C" fn mattmc_audio_device_pool_counts(
     if output_counts.is_null() {
         return ERR_INVALID_ARGUMENT;
     }
-    match with_backend(|backend| {
-        let device = backend
-            .devices
-            .get(device_handle)
-            .ok_or(AudioError::InvalidHandle)?;
-        unsafe {
-            *output_counts.add(0) = device.static_used as i32;
-            *output_counts.add(1) = device.static_limit as i32;
-            *output_counts.add(2) = device.streaming_used as i32;
-            *output_counts.add(3) = device.streaming_limit as i32;
+    match backend::device_pool_counts(device_handle) {
+        Ok(counts) => {
+            unsafe {
+                *output_counts.add(0) = counts.static_used;
+                *output_counts.add(1) = counts.static_limit;
+                *output_counts.add(2) = counts.streaming_used;
+                *output_counts.add(3) = counts.streaming_limit;
+            }
+            OK
         }
-        Ok(())
-    }) {
-        Ok(()) => OK,
         Err(error) => error.status(),
     }
 }
@@ -638,14 +417,7 @@ pub unsafe extern "C" fn mattmc_audio_default_device_name(
     out_capacity: u64,
     out_len: *mut u64,
 ) -> i32 {
-    write_string(out_ptr, out_capacity, out_len, |backend| {
-        Ok(backend
-            .openal()?
-            .0
-            .default_output()
-            .map(cstring_to_string)
-            .unwrap_or_default())
-    })
+    write_string(out_ptr, out_capacity, out_len, backend::default_device_name)
 }
 
 /// # Safety
@@ -658,13 +430,8 @@ pub unsafe extern "C" fn mattmc_audio_current_device_name(
     out_capacity: u64,
     out_len: *mut u64,
 ) -> i32 {
-    write_string(out_ptr, out_capacity, out_len, |backend| {
-        Ok(backend
-            .devices
-            .get(device_handle)
-            .ok_or(AudioError::InvalidHandle)?
-            .current_device_name
-            .clone())
+    write_string(out_ptr, out_capacity, out_len, || {
+        backend::current_device_name(device_handle)
     })
 }
 
@@ -678,16 +445,7 @@ pub unsafe extern "C" fn mattmc_audio_available_devices(
     out_capacity: u64,
     out_len: *mut u64,
 ) -> i32 {
-    write_string(out_ptr, out_capacity, out_len, |backend| {
-        Ok(backend
-            .openal()?
-            .0
-            .enumerate_outputs()
-            .into_iter()
-            .map(cstring_to_string)
-            .collect::<Vec<_>>()
-            .join("\n"))
-    })
+    write_string(out_ptr, out_capacity, out_len, backend::available_devices)
 }
 
 /// # Safety
@@ -700,31 +458,11 @@ pub unsafe extern "C" fn mattmc_audio_format_to_openal(
     pcm: i32,
     output_format: *mut i32,
 ) -> i32 {
-    if output_format.is_null() {
-        return ERR_INVALID_ARGUMENT;
-    }
-    match audio_format_to_openal(channels, bits, pcm != 0) {
-        Ok(format) => {
-            unsafe {
-                *output_format = format;
-            }
-            OK
-        }
-        Err(error) => error.status(),
-    }
-}
-
-fn with_source_mut(
-    source_handle: u64,
-    f: impl FnOnce(&mut NativeSource) -> AudioResult<()>,
-) -> AudioResult<()> {
-    with_backend(|backend| {
-        let source = backend
-            .sources
-            .get_mut(source_handle)
-            .ok_or(AudioError::InvalidHandle)?;
-        f(source)
-    })
+    status_with_output(
+        audio_format_to_openal(channels, bits, pcm != 0),
+        output_format,
+        None,
+    )
 }
 
 unsafe fn ptr_to_string(ptr: *const u8, len: u64) -> AudioResult<Option<String>> {
@@ -735,7 +473,7 @@ unsafe fn ptr_to_string(ptr: *const u8, len: u64) -> AudioResult<Option<String>>
             Err(AudioError::InvalidArgument)
         };
     }
-    let bytes = bytes_from_ptr(ptr, len)?;
+    let bytes = unsafe { bytes_from_ptr(ptr, len) }?;
     std::str::from_utf8(bytes)
         .map(|value| Some(value.to_string()))
         .map_err(|_| AudioError::InvalidArgument)
@@ -760,12 +498,12 @@ fn write_string(
     out_ptr: *mut u8,
     out_capacity: u64,
     out_len: *mut u64,
-    build: impl FnOnce(&mut AudioBackend) -> AudioResult<String>,
+    build: impl FnOnce() -> AudioResult<String>,
 ) -> i32 {
     if out_len.is_null() {
         return ERR_INVALID_ARGUMENT;
     }
-    match with_backend(build).and_then(|value| unsafe {
+    match build().and_then(|value| unsafe {
         let bytes = value.as_bytes();
         *out_len = bytes.len() as u64;
         if out_ptr.is_null() {
@@ -780,18 +518,5 @@ fn write_string(
     }) {
         Ok(()) => OK,
         Err(error) => error.status(),
-    }
-}
-
-#[cfg(test)]
-pub(crate) mod test_support {
-    use super::*;
-
-    pub(crate) fn reset_backend_for_tests() {
-        if let Some(mutex) = BACKEND.get() {
-            if let Ok(mut guard) = mutex.lock() {
-                *guard = AudioBackend::new();
-            }
-        }
     }
 }

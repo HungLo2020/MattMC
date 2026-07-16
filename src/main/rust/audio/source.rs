@@ -5,12 +5,18 @@ use alto::{Buffer, DistanceModel, Source, SourceState, StaticSource, StreamingSo
 use super::context::alto_call;
 use super::device::ChannelPool;
 use super::errors::{AudioError, AudioResult};
+use super::stream;
 
 pub(crate) const AL_INITIAL: i32 = 0x1011;
 pub(crate) const AL_PLAYING: i32 = 0x1012;
 pub(crate) const AL_PAUSED: i32 = 0x1013;
 pub(crate) const AL_STOPPED: i32 = 0x1014;
 
+/// Native OpenAL source owned by the Rust backend.
+///
+/// Java keeps `SoundInstance` and scheduling state, but the source handle is the
+/// only authority for OpenAL source lifetime. Destroying the source stops it,
+/// drops any queued stream buffers, and releases exactly one channel-pool slot.
 pub(crate) struct NativeSource {
     pub(crate) device: u64,
     pub(crate) pool: ChannelPool,
@@ -144,22 +150,14 @@ impl NativeSource {
 
     pub(crate) fn queue_stream_buffer(&mut self, buffer: Buffer) -> AudioResult<()> {
         match &mut self.kind {
-            SourceKind::Streaming(source) => {
-                alto_call("Queue streaming buffer", source.queue_buffer(buffer))
-            }
+            SourceKind::Streaming(source) => stream::queue_buffer(source, buffer),
             SourceKind::Static(_) => Err(AudioError::InvalidArgument),
         }
     }
 
     pub(crate) fn remove_processed_buffers(&mut self) -> AudioResult<i32> {
         match &mut self.kind {
-            SourceKind::Streaming(source) => {
-                let processed = source.buffers_processed().max(0);
-                for _ in 0..processed {
-                    alto_call("Unqueue streaming buffer", source.unqueue_buffer())?;
-                }
-                Ok(processed)
-            }
+            SourceKind::Streaming(source) => stream::remove_processed_buffers(source),
             SourceKind::Static(_) => Ok(0),
         }
     }

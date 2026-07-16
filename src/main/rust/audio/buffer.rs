@@ -4,24 +4,17 @@ use alto::{Buffer, Context, Mono, Stereo};
 
 use super::context::alto_call;
 use super::errors::{AudioError, AudioResult};
+use super::format::audio_format_to_openal;
 
+/// Native OpenAL buffer owned by the Rust backend.
+///
+/// The `device` field ties the opaque buffer handle to the OpenAL context that
+/// created it. Static source attachment rejects buffers from other devices so a
+/// stale Java buffer handle cannot silently cross a reload boundary.
 #[derive(Clone)]
 pub(crate) struct NativeBuffer {
     pub(crate) device: u64,
     pub(crate) buffer: Arc<Buffer>,
-}
-
-pub(crate) fn audio_format_to_openal(channels: i32, bits: i32, pcm: bool) -> AudioResult<i32> {
-    if !pcm {
-        return Err(AudioError::UnsupportedFormat);
-    }
-    match (channels, bits) {
-        (1, 8) => Ok(0x1100),
-        (1, 16) => Ok(0x1101),
-        (2, 8) => Ok(0x1102),
-        (2, 16) => Ok(0x1103),
-        _ => Err(AudioError::UnsupportedFormat),
-    }
 }
 
 pub(crate) fn create_buffer(

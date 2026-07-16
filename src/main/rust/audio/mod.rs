@@ -5,14 +5,17 @@
 //! resources behind opaque handles: devices, contexts, sources, buffers, stream
 //! queues, listener state, pool limits, and native error translation.
 
+mod backend;
 mod buffer;
 mod context;
 mod device;
 mod errors;
 pub mod ffi;
+mod format;
 mod handles;
 mod listener;
 mod source;
+mod stream;
 
 #[cfg(test)]
 mod tests;
