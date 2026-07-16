@@ -4,12 +4,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.Strictness;
+import com.google.gson.stream.JsonReader;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.world.item.TaczGunBallistics.DamagePoint;
@@ -107,6 +112,85 @@ class TaczGunBallisticsTest {
 		assertEquals(0.7F, conditional.eval(0.4), 0.0001F);
 		assertEquals(17.0F, defaultValueExpressionHigh.eval(12.0), 0.0001F);
 		assertEquals(12.0F, defaultValueExpressionLow.eval(4.0), 0.0001F);
+	}
+
+	@Test
+	void nativeModifierEvaluatorMatchesLegacyJavaExpressionSemantics() {
+		String[] expressions = {
+			"y = x + r * 2",
+			"y = (x + r) * 2",
+			"y = -x - +r",
+			"if x >= r then y = 1 else y = 0 end",
+			"if x <= r then y = 1 else y = 0 end",
+			"if x == r then y = 1 else y = 0 end",
+			"if x ~= r then y = 1 else y = 0 end",
+			"if x > r then y = x / r else y = r / x end",
+			"if x < r then y = .5 else y = 1. end",
+			"if r - 3 then y = x else y = r end",
+			" z = x + r ",
+			"if x then y = 1"
+		};
+		double[][] inputs = {
+			{2.0, 3.0},
+			{3.0, 2.0},
+			{0.0, 3.0},
+			{Double.POSITIVE_INFINITY, 1.0}
+		};
+
+		for (String expression : expressions) {
+			for (double[] input : inputs) {
+				assertNativeMatchesLegacy(input[0], input[1], expression);
+			}
+		}
+	}
+
+	@Test
+	void nativeModifierEvaluatorFallsBackLikeLegacyJavaOnMalformedExpressions() {
+		String[] expressions = {
+			"y =",
+			"y = x + nope",
+			"y = (x + r",
+			"y = 1e3",
+			"if x > then y = 1 else y = 0 end"
+		};
+
+		for (String expression : expressions) {
+			assertNativeMatchesLegacy(5.0, 2.0, expression);
+			assertEquals(5.0, NativeTaczFunctionModifierEvaluator.eval(5.0, 2.0, expression), 0.0000001);
+		}
+	}
+
+	@Test
+	void nativeModifierEvaluatorMatchesRealAttachmentFunctionExpressions() throws IOException {
+		List<String> expressions = loadRealAttachmentFunctionExpressions();
+		assertTrue(expressions.contains("if (x > 0.5) then y = x*1.5 else y = x*1.75 end"));
+		assertTrue(expressions.contains("if (x > 2) then y = x + 2 else y = x end"));
+		assertTrue(expressions.contains("y = 1"));
+
+		double[][] inputs = {
+			{0.4, 0.4},
+			{0.8, 0.8},
+			{2.5, 1.0},
+			{22.0, 12.0}
+		};
+		for (String expression : expressions) {
+			for (double[] input : inputs) {
+				assertNativeMatchesLegacy(input[0], input[1], expression);
+			}
+		}
+	}
+
+	@Test
+	void productionParameterizedModifiersUseNativeEvaluatorFallback() {
+		TaczGunBallistics.ParameterizedModifiers malformed = new TaczGunBallistics.ParameterizedModifiers(List.of(
+			new TaczGunBallistics.Modifier(2.0, 0.0, 1.0, "y =")
+		));
+		TaczGunBallistics.ParameterizedModifiers wrongAssignmentTarget = new TaczGunBallistics.ParameterizedModifiers(List.of(
+			new TaczGunBallistics.Modifier(2.0, 0.0, 1.0, "z = x + 1")
+		));
+
+		assertEquals(6.0F, malformed.eval(4.0), 0.0001F);
+		assertEquals(6.0F, wrongAssignmentTarget.eval(4.0), 0.0001F);
 	}
 
 	@Test
@@ -272,5 +356,222 @@ class TaczGunBallisticsTest {
 	private static void assertDamagePoint(DamagePoint actual, float distance, float damage) {
 		assertEquals(distance, actual.distance(), 0.0001F);
 		assertEquals(damage, actual.damage(), 0.0001F);
+	}
+
+	private static void assertNativeMatchesLegacy(double value, double input, String expression) {
+		double expected = LegacyFunctionModifierEvaluator.eval(value, input, expression);
+		double actual = NativeTaczFunctionModifierEvaluator.eval(value, input, expression);
+		if (Double.isNaN(expected)) {
+			assertTrue(Double.isNaN(actual), "Expected NaN for " + expression);
+		} else {
+			assertEquals(expected, actual, 0.0000001, expression);
+		}
+	}
+
+	private static List<String> loadRealAttachmentFunctionExpressions() throws IOException {
+		List<String> expressions = new ArrayList<>();
+		Path attachments = PROJECT_ROOT.resolve("src/main/resources/data/minecraft/data/attachments");
+		try (var paths = Files.list(attachments)) {
+			for (Path path : paths.filter(path -> path.getFileName().toString().endsWith("_data.json")).toList()) {
+				try (JsonReader reader = new JsonReader(Files.newBufferedReader(path, StandardCharsets.UTF_8))) {
+					reader.setStrictness(Strictness.LENIENT);
+					collectFunctionExpressions(JsonParser.parseReader(reader), expressions);
+				}
+			}
+		}
+		return expressions;
+	}
+
+	private static void collectFunctionExpressions(JsonElement element, List<String> expressions) {
+		if (element == null || element.isJsonNull()) {
+			return;
+		}
+		if (element.isJsonObject()) {
+			for (Map.Entry<String, JsonElement> entry : element.getAsJsonObject().entrySet()) {
+				if ("function".equals(entry.getKey()) && entry.getValue().isJsonPrimitive()) {
+					expressions.add(entry.getValue().getAsString());
+				} else {
+					collectFunctionExpressions(entry.getValue(), expressions);
+				}
+			}
+		} else if (element.isJsonArray()) {
+			for (JsonElement child : element.getAsJsonArray()) {
+				collectFunctionExpressions(child, expressions);
+			}
+		}
+	}
+
+	private static final class LegacyFunctionModifierEvaluator {
+		private LegacyFunctionModifierEvaluator() {
+		}
+
+		static double eval(double value, double input, String function) {
+			try {
+				return evalUnchecked(value, input, function);
+			} catch (RuntimeException exception) {
+				return value;
+			}
+		}
+
+		private static double evalUnchecked(double value, double input, String function) {
+			String script = function.trim().toLowerCase(java.util.Locale.ENGLISH);
+			if (script.startsWith("if")) {
+				int thenIndex = script.indexOf("then");
+				int elseIndex = script.indexOf("else", thenIndex + 4);
+				int endIndex = script.lastIndexOf("end");
+				if (thenIndex < 0 || elseIndex < 0 || endIndex < 0) {
+					return value;
+				}
+				String condition = script.substring(2, thenIndex).trim();
+				if (condition.startsWith("(") && condition.endsWith(")")) {
+					condition = condition.substring(1, condition.length() - 1);
+				}
+				String branch = evalCondition(condition, value, input)
+					? script.substring(thenIndex + 4, elseIndex)
+					: script.substring(elseIndex + 4, endIndex);
+				return evalAssignment(branch, value, input);
+			}
+			return evalAssignment(script, value, input);
+		}
+
+		private static boolean evalCondition(String condition, double value, double input) {
+			for (String operator : new String[]{">=", "<=", "==", "~=", ">", "<"}) {
+				int index = condition.indexOf(operator);
+				if (index < 0) {
+					continue;
+				}
+				double left = new ExpressionParser(condition.substring(0, index), value, input).parse();
+				double right = new ExpressionParser(condition.substring(index + operator.length()), value, input).parse();
+				return switch (operator) {
+					case ">=" -> left >= right;
+					case "<=" -> left <= right;
+					case "==" -> left == right;
+					case "~=" -> left != right;
+					case ">" -> left > right;
+					case "<" -> left < right;
+					default -> false;
+				};
+			}
+			return new ExpressionParser(condition, value, input).parse() != 0.0;
+		}
+
+		private static double evalAssignment(String assignment, double value, double input) {
+			String trimmed = assignment.trim();
+			int equals = trimmed.indexOf('=');
+			if (equals >= 0) {
+				String target = trimmed.substring(0, equals).trim();
+				if (!target.equals("y")) {
+					return value;
+				}
+				trimmed = trimmed.substring(equals + 1);
+			}
+			return new ExpressionParser(trimmed, value, input).parse();
+		}
+
+		private static final class ExpressionParser {
+			private final String expression;
+			private final double x;
+			private final double r;
+			private int cursor;
+
+			ExpressionParser(String expression, double x, double r) {
+				this.expression = expression;
+				this.x = x;
+				this.r = r;
+			}
+
+			double parse() {
+				double result = this.parseAddSubtract();
+				this.skipWhitespace();
+				if (this.cursor != this.expression.length()) {
+					throw new IllegalArgumentException("Unexpected expression tail");
+				}
+				return result;
+			}
+
+			private double parseAddSubtract() {
+				double value = this.parseMultiplyDivide();
+				while (true) {
+					this.skipWhitespace();
+					if (this.consume('+')) {
+						value += this.parseMultiplyDivide();
+					} else if (this.consume('-')) {
+						value -= this.parseMultiplyDivide();
+					} else {
+						return value;
+					}
+				}
+			}
+
+			private double parseMultiplyDivide() {
+				double value = this.parseUnary();
+				while (true) {
+					this.skipWhitespace();
+					if (this.consume('*')) {
+						value *= this.parseUnary();
+					} else if (this.consume('/')) {
+						value /= this.parseUnary();
+					} else {
+						return value;
+					}
+				}
+			}
+
+			private double parseUnary() {
+				this.skipWhitespace();
+				if (this.consume('+')) {
+					return this.parseUnary();
+				}
+				if (this.consume('-')) {
+					return -this.parseUnary();
+				}
+				return this.parsePrimary();
+			}
+
+			private double parsePrimary() {
+				this.skipWhitespace();
+				if (this.consume('(')) {
+					double value = this.parseAddSubtract();
+					if (!this.consume(')')) {
+						throw new IllegalArgumentException("Unclosed parenthesis");
+					}
+					return value;
+				}
+				if (this.consume('x')) {
+					return this.x;
+				}
+				if (this.consume('r')) {
+					return this.r;
+				}
+				int start = this.cursor;
+				while (this.cursor < this.expression.length()) {
+					char c = this.expression.charAt(this.cursor);
+					if ((c >= '0' && c <= '9') || c == '.') {
+						this.cursor++;
+					} else {
+						break;
+					}
+				}
+				if (start == this.cursor) {
+					throw new IllegalArgumentException("Expected expression value");
+				}
+				return Double.parseDouble(this.expression.substring(start, this.cursor));
+			}
+
+			private boolean consume(char expected) {
+				this.skipWhitespace();
+				if (this.cursor < this.expression.length() && this.expression.charAt(this.cursor) == expected) {
+					this.cursor++;
+					return true;
+				}
+				return false;
+			}
+
+			private void skipWhitespace() {
+				while (this.cursor < this.expression.length() && Character.isWhitespace(this.expression.charAt(this.cursor))) {
+					this.cursor++;
+				}
+			}
+		}
 	}
 }
