@@ -47,7 +47,7 @@ def repo_root() -> Path:
 
 
 def resolve_directory(name: str, platform_name: str | None) -> Path:
-    helper = script_dir() / "Common" / "directory_helper.py"
+    helper = script_dir() / "Common" / "platform" / "directory" / "directory_helper.py"
     command = [sys.executable, str(helper), name]
     if platform_name:
         command.extend(["--platform", platform_name])

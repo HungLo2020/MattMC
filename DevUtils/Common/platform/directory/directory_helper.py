@@ -6,41 +6,16 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import platform
 import sys
 from pathlib import Path
 from typing import Any
 
 
 CONFIG_PATH = Path(__file__).with_name("directories.json")
-PLATFORM_ALIASES = {
-    "darwin": "macos",
-    "mac": "macos",
-    "macos": "macos",
-    "osx": "macos",
-    "linux": "linux",
-    "win": "windows",
-    "win32": "windows",
-    "windows": "windows",
-}
+DETECTION_DIR = Path(__file__).resolve().parents[1] / "detection"
+sys.path.insert(0, str(DETECTION_DIR))
 
-
-def current_platform() -> str:
-    system = platform.system().lower()
-    if system == "darwin":
-        return "macos"
-    if system == "windows":
-        return "windows"
-    if system == "linux":
-        return "linux"
-    return system
-
-
-def normalize_platform(value: str) -> str:
-    normalized = PLATFORM_ALIASES.get(value.strip().lower())
-    if normalized is None:
-        raise ValueError(f"Unsupported platform: {value}")
-    return normalized
+from platform_detection import detect_platform_info, normalize_platform  # noqa: E402
 
 
 def load_directories(config_path: Path) -> dict[str, Any]:
@@ -82,14 +57,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("name", nargs="?", help="logical directory name to resolve")
     parser.add_argument(
         "--platform",
-        default=current_platform(),
+        default=detect_platform_info().platform,
         help="platform to resolve for: linux, windows, or macos; default: current platform",
     )
     parser.add_argument(
         "--config",
         type=Path,
         default=CONFIG_PATH,
-        help="directory JSON file; default: DevUtils/Common/directories.json",
+        help="directory JSON file; default: DevUtils/Common/platform/directory/directories.json",
     )
     parser.add_argument(
         "--list",

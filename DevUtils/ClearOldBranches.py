@@ -6,14 +6,22 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+from pathlib import Path
+
+
+DETECTION_DIR = Path(__file__).resolve().parent / "Common" / "platform" / "detection"
+sys.path.insert(0, str(DETECTION_DIR))
+
+from platform_detection import detect_platform_info  # noqa: E402
 
 
 PROTECTED_BRANCHES = {"main", "master", "develop"}
+GIT_EXECUTABLE = "git"
 
 
 def run_git(args: list[str], *, check: bool = True, capture: bool = False) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        ["git", *args],
+        [GIT_EXECUTABLE, *args],
         check=check,
         text=True,
         stdout=subprocess.PIPE if capture else subprocess.DEVNULL,
@@ -47,8 +55,12 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    global GIT_EXECUTABLE
+
     args = parse_args()
     remote = args.remote
+    platform_info = detect_platform_info()
+    GIT_EXECUTABLE = "git.exe" if platform_info.platform == "windows" else "git"
 
     repo_check = run_git(["rev-parse", "--git-dir"], check=False, capture=True)
     if repo_check.returncode != 0:
