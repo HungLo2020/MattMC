@@ -56,6 +56,7 @@ class CaptureConfig:
     shader_input_parity: str
     shader_input_parity_max_logs: int
     lightmap_info_parity_max_logs: int
+    skip_tests: bool
     client_args: str
     deterministic_camera_capture: bool
     deterministic_pose_tolerance: float
@@ -226,6 +227,7 @@ class CaptureRunner:
             f"shader_input_parity={self.config.shader_input_parity}",
             f"shader_input_parity_max_logs={self.config.shader_input_parity_max_logs}",
             f"lightmap_info_parity_max_logs={self.config.lightmap_info_parity_max_logs}",
+            f"skip_tests={str(self.config.skip_tests).lower()}",
             f"deterministic_camera_capture={str(self.config.deterministic_camera_capture).lower()}",
             f"deterministic_pose_tolerance={self.config.deterministic_pose_tolerance}",
             f"client_args_initial={self.config.client_args}",
@@ -446,7 +448,10 @@ class CaptureRunner:
 
     def start_gradle(self) -> None:
         print(f"Starting bounded runClient capture (run_id={self.run_id}, backend={self.config.backend})")
-        gradle_cmd = [*self.gradle, "-x", "test", "runClient"]
+        gradle_cmd = [*self.gradle]
+        if self.config.skip_tests:
+            gradle_cmd.extend(["-x", "test"])
+        gradle_cmd.append("runClient")
         if self.config.client_args:
             gradle_cmd.append(f"--args={self.config.client_args}")
 
@@ -1479,6 +1484,15 @@ def parse_args() -> CaptureConfig:
         default=os.environ.get("SHADER_INPUT_PARITY", "off"),
     )
     parser.add_argument("--deterministic-camera-capture", action="store_true")
+    parser.add_argument(
+        "--skip-tests",
+        action="store_true",
+        help=(
+            "Skip the Gradle test task before runClient. By default RunDevCapture runs tests, "
+            "matching RunDev.py/build-gate behavior; use this only for fast local capture loops "
+            "when the current test status is already known."
+        ),
+    )
     parser.add_argument("--client-args", default=os.environ.get("CLIENT_ARGS", ""))
     parser.add_argument("--platform", help="platform to pass to shared helpers: linux, windows, or macos")
     args = parser.parse_args()
@@ -1503,6 +1517,7 @@ def parse_args() -> CaptureConfig:
         shader_input_parity=args.shader_input_parity,
         shader_input_parity_max_logs=int_env("SHADER_INPUT_PARITY_MAX_LOGS", 120000, signed=True),
         lightmap_info_parity_max_logs=int_env("LIGHTMAP_INFO_PARITY_MAX_LOGS", 512, signed=True),
+        skip_tests=bool(args.skip_tests),
         client_args=args.client_args,
         deterministic_camera_capture=bool(args.deterministic_camera_capture),
         deterministic_pose_tolerance=float(pose_tolerance),

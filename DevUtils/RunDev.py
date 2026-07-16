@@ -68,7 +68,7 @@ def main() -> int:
 
     root = repo_root()
     gradle = gradle_command(root, platform_name)
-    return subprocess.run([*gradle, "clean", "runClient"], cwd=root).returncode
+    return subprocess.run([*gradle, "runClient"], cwd=root).returncode
 
 
 if __name__ == "__main__":

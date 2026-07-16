@@ -959,7 +959,8 @@ public class Phase3DrawPathTest {
             "VulkanBackend should implement render-target binding seam");
         assertTrue(vulkanBackendSource.contains("int framebuffer = resolveFramebufferForTextures(ctx, colorTexture, depthTexture);"),
             "VulkanBackend render-target binding should keep attachment-pair routing inside backend code");
-        assertTrue(vulkanBackendSource.contains("descriptorPipelineCache")
+        assertTrue(vulkanBackendSource.contains("VulkanPipelineLifecycleManager.CacheKind.DESCRIPTOR_VARIANT")
+                && vulkanBackendSource.contains("pipelineLifecycle.cachePipeline(")
                 && vulkanBackendSource.contains("matchesStableDescriptor("),
             "VulkanBackend should cache descriptor-layout pipeline variants for partial-coverage Vulkan draws instead of forcing them onto the full-layout precompile");
     }
@@ -3989,11 +3990,11 @@ public class Phase3DrawPathTest {
             "Vulkan render-pass clears should emit a VkClearAttachment for each active color attachment");
         assertTrue(backendSource.contains(".colorAttachment(colorAttachment);"),
             "Vulkan render-pass clears should target the looped attachment index");
-        assertTrue(backendSource.contains("activeRenderPassWidth > 0 ? activeRenderPassWidth : swapchainWidth"),
+        assertTrue(backendSource.contains("renderTargetState.activeWidth() > 0 ? renderTargetState.activeWidth() : swapchainWidth"),
             "Vulkan render-pass clears should use the active render area width when clearing framebuffer-backed passes");
-        assertTrue(backendSource.contains("activeRenderPassHeight > 0 ? activeRenderPassHeight : swapchainHeight"),
+        assertTrue(backendSource.contains("renderTargetState.activeHeight() > 0 ? renderTargetState.activeHeight() : swapchainHeight"),
             "Vulkan render-pass clears should use the active render area height when clearing framebuffer-backed passes");
-        assertTrue(backendSource.contains("return activeRenderPassTargetsSwapchain ? 1 : 0;"),
+        assertTrue(backendSource.contains("return renderTargetState.activeColorAttachmentCount();"),
             "Vulkan render-pass clears should still clear swapchain-only render passes that do not track legacy color textures");
     }
 

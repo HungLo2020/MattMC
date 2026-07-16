@@ -308,7 +308,7 @@ public class VulkanDescriptorLifecycleTest {
 
         assertTrue(normalized.contains("private boolean shouldUseFeedbackLoopLayoutForSampling(@Nullable LegacyTextureObject texture)"),
             "Feedback-loop-capable images should not be described as feedback-loop layout for ordinary sampled reads");
-        assertTrue(normalized.contains("texture.feedbackLoopCapable && renderPassRecording && (activeRenderPassColorTextures.contains(texture) || texture == activeRenderPassDepthTexture)"),
+        assertTrue(normalized.contains("texture.feedbackLoopCapable && renderPassRecording && renderTargetState.isActiveAttachment(texture)"),
             "Feedback-loop layout should be limited to textures that are actively bound as attachments in the current render pass");
         assertTrue(normalized.contains("if (shouldUseFeedbackLoopLayoutForSampling(texture)) { return VulkanImageUse.FEEDBACK_LOOP.vkLayout(); }"),
             "Descriptor image layout selection should route feedback-loop layout through the active-attachment predicate");

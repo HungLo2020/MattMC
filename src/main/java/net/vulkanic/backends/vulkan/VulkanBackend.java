@@ -241,7 +241,7 @@ public class VulkanBackend {
     private volatile boolean rendererDebuggingEnabled;
 
     private final SpirvCompiler spirvCompiler;
-    private final Map<RenderPipeline, PrecompiledPipelineState> precompiledPipelineCache = new ConcurrentHashMap<>();
+    private final VulkanPipelineLifecycleManager pipelineLifecycle = new VulkanPipelineLifecycleManager();
     private final AtomicInteger nextVirtualShaderId = new AtomicInteger(1);
     private final AtomicInteger nextVirtualProgramId = new AtomicInteger(1);
     private final AtomicInteger nextVirtualUniformLocationToken = new AtomicInteger(1);
@@ -294,10 +294,7 @@ public class VulkanBackend {
     private volatile int pendingDrawBuffer  = 0x0405 /* GL_BACK */;
 
     // Virtual FBO tracking (mirrors legacy-buffer pattern for GL compat calls)
-    private final AtomicInteger nextVirtualFboId = new AtomicInteger(1);
-    private final Set<Integer>  virtualFbos      = ConcurrentHashMap.newKeySet();
-    private final Map<Integer, VirtualFramebufferState> virtualFramebufferStates = new ConcurrentHashMap<>();
-    private final Map<FramebufferTexturePairKey, Integer> implicitFramebufferByTexturePair = new ConcurrentHashMap<>();
+    private final VulkanVirtualFramebufferManager virtualFramebuffers = new VulkanVirtualFramebufferManager();
     private volatile int        boundReadFbo     = 0;
     private volatile int        boundDrawFbo     = 0;
 
@@ -313,11 +310,6 @@ public class VulkanBackend {
     private final ConcurrentHashMap<Integer, VirtualSamplerState> virtualSamplerStates = new ConcurrentHashMap<>();
     /** Per-unit sampler binding cache: texture-unit → bound sampler handle */
     private final ConcurrentHashMap<Integer, Integer> boundSamplerPerUnit = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<DescriptorPipelineKey, PipelineHandle> descriptorPipelineCache = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<RenderTargetPipelineKey, PipelineHandle> renderTargetPipelineCache = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<LegacyProgramPipelineKey, PipelineHandle> legacyProgramPipelineCache = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<LegacyComputePipelineKey, PipelineHandle> legacyComputePipelineCache = new ConcurrentHashMap<>();
-
     // Virtual query/sync tracking for GL-compat control flow on the Vulkan path
     private final AtomicInteger nextVirtualQueryId = new AtomicInteger(1);
     private final Set<Integer> virtualQueries      = ConcurrentHashMap.newKeySet();
@@ -356,7 +348,7 @@ public class VulkanBackend {
         this.spirvCompiler = Objects.requireNonNull(spirvCompiler, "spirvCompiler must not be null");
     }
 
-    private static final class PrecompiledPipelineState implements CompiledRenderPipeline {
+    private static final class PrecompiledPipelineState implements CompiledRenderPipeline, AutoCloseable {
         private final PipelineHandle pipelineHandle;
         private final PipelineDescriptor descriptor;
         private final String stableCacheKey;
@@ -407,6 +399,11 @@ public class VulkanBackend {
             if (pipelineHandle != null) {
                 pipelineHandle.close();
             }
+        }
+
+        @Override
+        public void close() {
+            closeIfNeeded();
         }
     }
 
@@ -494,47 +491,6 @@ public class VulkanBackend {
                 + ":" + dstRgb
                 + ":" + srcAlpha
                 + ":" + dstAlpha;
-        }
-    }
-
-    private record FramebufferTexturePairKey(
-        int colorTexture,
-        int depthTexture
-    ) {
-    }
-
-    private static final class VirtualFramebufferState {
-        private final Map<Integer, Integer> attachments = new ConcurrentHashMap<>();
-        private volatile int readBuffer = GL_COLOR_ATTACHMENT0;
-        private volatile int[] drawBuffers = new int[]{GL_COLOR_ATTACHMENT0};
-
-        void setAttachment(int attachment, int texture) {
-            if (texture == 0) {
-                attachments.remove(attachment);
-            } else {
-                attachments.put(attachment, texture);
-            }
-        }
-
-        int getAttachment(int attachment) {
-            return attachments.getOrDefault(attachment, 0);
-        }
-
-        int[] getDrawBuffers() {
-            return drawBuffers.clone();
-        }
-
-        int getPrimaryDrawBuffer() {
-            return drawBuffers.length == 0 ? GL_NONE : drawBuffers[0];
-        }
-
-        void setDrawBuffers(int[] buffers) {
-            if (buffers == null || buffers.length == 0) {
-                this.drawBuffers = new int[]{GL_NONE};
-                return;
-            }
-
-            this.drawBuffers = buffers.clone();
         }
     }
 
@@ -687,41 +643,14 @@ void main() {
             return PrecompiledPipelineState.failed();
         }
 
-        return precompiledPipelineCache.computeIfAbsent(
+        return pipelineLifecycle.computePrecompiled(
             renderPipeline,
-            pipeline -> compilePrecompiledPipeline(pipeline, sourceProvider)
+            pipeline -> compilePrecompiledPipeline((RenderPipeline) pipeline, sourceProvider)
         );
     }
 
     public void clearPrecompiledPipelineCache() {
-        for (PrecompiledPipelineState state : new ArrayList<>(precompiledPipelineCache.values())) {
-            state.closeIfNeeded();
-        }
-        precompiledPipelineCache.clear();
-        for (PipelineHandle pipelineHandle : new ArrayList<>(descriptorPipelineCache.values())) {
-            if (pipelineHandle != null) {
-                pipelineHandle.close();
-            }
-        }
-        descriptorPipelineCache.clear();
-        for (PipelineHandle pipelineHandle : new ArrayList<>(renderTargetPipelineCache.values())) {
-            if (pipelineHandle != null) {
-                pipelineHandle.close();
-            }
-        }
-        renderTargetPipelineCache.clear();
-        for (PipelineHandle pipelineHandle : new ArrayList<>(legacyProgramPipelineCache.values())) {
-            if (pipelineHandle != null) {
-                pipelineHandle.close();
-            }
-        }
-        legacyProgramPipelineCache.clear();
-        for (PipelineHandle pipelineHandle : new ArrayList<>(legacyComputePipelineCache.values())) {
-            if (pipelineHandle != null) {
-                pipelineHandle.close();
-            }
-        }
-        legacyComputePipelineCache.clear();
+        pipelineLifecycle.clearCachedPipelines();
     }
 
     private PrecompiledPipelineState compilePrecompiledPipeline(
@@ -1430,7 +1359,10 @@ void main() {
 
     @Nullable
     PipelineDescriptor resolvePrecompiledPipelineDescriptor(RenderPipeline renderPipeline) {
-        PrecompiledPipelineState state = precompiledPipelineCache.get(renderPipeline);
+        PrecompiledPipelineState state = pipelineLifecycle.getPrecompiled(
+            renderPipeline,
+            PrecompiledPipelineState.class
+        );
         return state != null && state.isValid() ? state.descriptor : null;
     }
 
@@ -5018,20 +4950,17 @@ void main() {
             submissionDescriptor.getResourceLayoutCacheKey(),
             compatibilityKey
         );
-        PipelineHandle pipelineHandle = legacyProgramPipelineCache.get(key);
-        if (pipelineHandle != null && !pipelineHandle.isValid()) {
-            legacyProgramPipelineCache.remove(key, pipelineHandle);
-            pipelineHandle = null;
-        }
+        PipelineHandle pipelineHandle = pipelineLifecycle.getCachedPipeline(
+            VulkanPipelineLifecycleManager.CacheKind.LEGACY_PROGRAM,
+            key
+        );
         if (pipelineHandle == null) {
             PipelineHandle created = createPipeline(submissionDescriptor, compatibilityKey);
-            PipelineHandle raced = legacyProgramPipelineCache.putIfAbsent(key, created);
-            if (raced != null) {
-                created.close();
-                pipelineHandle = raced;
-            } else {
-                pipelineHandle = created;
-            }
+            pipelineHandle = pipelineLifecycle.cachePipeline(
+                VulkanPipelineLifecycleManager.CacheKind.LEGACY_PROGRAM,
+                key,
+                created
+            );
         }
         if (pipelineHandle == null || !pipelineHandle.isValid()) {
             return;
@@ -5076,11 +5005,10 @@ void main() {
             submissionDescriptor.getPipelineCompilationKey(),
             submissionDescriptor.getResourceLayoutCacheKey()
         );
-        PipelineHandle pipelineHandle = legacyComputePipelineCache.get(key);
-        if (pipelineHandle != null && !pipelineHandle.isValid()) {
-            legacyComputePipelineCache.remove(key, pipelineHandle);
-            pipelineHandle = null;
-        }
+        PipelineHandle pipelineHandle = pipelineLifecycle.getCachedPipeline(
+            VulkanPipelineLifecycleManager.CacheKind.LEGACY_COMPUTE,
+            key
+        );
         if (pipelineHandle == null) {
             VulkanicSpirvModule computeModule = submissionDescriptor.getSpirvModules().stream()
                 .filter(module -> module.stage() == VulkanicShaderStage.COMPUTE)
@@ -5089,13 +5017,11 @@ void main() {
             long computeModuleHandle = spine.createShaderModule(computeModule);
             try {
                 PipelineHandle created = spine.createVulkanComputePipeline(submissionDescriptor, computeModuleHandle);
-                PipelineHandle raced = legacyComputePipelineCache.putIfAbsent(key, created);
-                if (raced != null) {
-                    created.close();
-                    pipelineHandle = raced;
-                } else {
-                    pipelineHandle = created;
-                }
+                pipelineHandle = pipelineLifecycle.cachePipeline(
+                    VulkanPipelineLifecycleManager.CacheKind.LEGACY_COMPUTE,
+                    key,
+                    created
+                );
             } finally {
                 spine.destroyShaderModule(computeModuleHandle);
             }
@@ -5229,7 +5155,10 @@ void main() {
         if (renderPipeline == null) {
             return null;
         }
-        PrecompiledPipelineState state = precompiledPipelineCache.get(renderPipeline);
+        PrecompiledPipelineState state = pipelineLifecycle.getPrecompiled(
+            renderPipeline,
+            PrecompiledPipelineState.class
+        );
         if (state == null || !state.isValid()) {
             return null;
         }
@@ -5252,12 +5181,12 @@ void main() {
             variantDescriptor.getStableCacheKey(),
             variantDescriptor.getResourceLayoutCacheKey()
         );
-        PipelineHandle cached = descriptorPipelineCache.get(key);
+        PipelineHandle cached = pipelineLifecycle.getCachedPipeline(
+            VulkanPipelineLifecycleManager.CacheKind.DESCRIPTOR_VARIANT,
+            key
+        );
         if (cached != null) {
-            if (cached.isValid()) {
-                return cached;
-            }
-            descriptorPipelineCache.remove(key, cached);
+            return cached;
         }
 
         PipelineHandle descriptorVariant = createPipeline(variantDescriptor);
@@ -5268,15 +5197,11 @@ void main() {
             return null;
         }
 
-        PipelineHandle raced = descriptorPipelineCache.putIfAbsent(key, descriptorVariant);
-        if (raced != null) {
-            if (raced.isValid()) {
-                descriptorVariant.close();
-                return raced;
-            }
-            descriptorPipelineCache.put(key, descriptorVariant);
-        }
-        return descriptorVariant;
+        return pipelineLifecycle.cachePipeline(
+            VulkanPipelineLifecycleManager.CacheKind.DESCRIPTOR_VARIANT,
+            key,
+            descriptorVariant
+        );
     }
 
     public net.vulkanic.PipelineHandle resolvePipelineHandle(
@@ -5351,7 +5276,10 @@ void main() {
             net.blaze3d.pipeline.RenderPipeline renderPipeline,
             net.vulkanic.PipelineDescriptor descriptor,
             VulkanRenderPassCompatibilityKey renderPassCompatibilityKey) {
-        PrecompiledPipelineState state = precompiledPipelineCache.get(renderPipeline);
+        PrecompiledPipelineState state = pipelineLifecycle.getPrecompiled(
+            renderPipeline,
+            PrecompiledPipelineState.class
+        );
         if (state == null || !state.isValid()) {
             return null;
         }
@@ -5368,12 +5296,12 @@ void main() {
             renderPassCompatibilityKey,
             dynamicPipelineStateCacheKey(pipelineDescriptor.getPortableState(), renderPassCompatibilityKey)
         );
-        PipelineHandle cached = renderTargetPipelineCache.get(key);
+        PipelineHandle cached = pipelineLifecycle.getCachedPipeline(
+            VulkanPipelineLifecycleManager.CacheKind.RENDER_TARGET_VARIANT,
+            key
+        );
         if (cached != null) {
-            if (cached.isValid()) {
-                return cached;
-            }
-            renderTargetPipelineCache.remove(key, cached);
+            return cached;
         }
 
         PipelineHandle framebufferCompatible = createPipeline(pipelineDescriptor, renderPassCompatibilityKey);
@@ -5384,15 +5312,11 @@ void main() {
             return null;
         }
 
-        PipelineHandle raced = renderTargetPipelineCache.putIfAbsent(key, framebufferCompatible);
-        if (raced != null) {
-            if (raced.isValid()) {
-                framebufferCompatible.close();
-                return raced;
-            }
-            renderTargetPipelineCache.put(key, framebufferCompatible);
-        }
-        return framebufferCompatible;
+        return pipelineLifecycle.cachePipeline(
+            VulkanPipelineLifecycleManager.CacheKind.RENDER_TARGET_VARIANT,
+            key,
+            framebufferCompatible
+        );
     }
 
     private String indexedBlendStateCacheKey(PipelineDescriptor.PortableState portableState, int colorAttachmentCount) {
@@ -6728,12 +6652,8 @@ void main() {
             throw new IllegalArgumentException("Framebuffer-backed Vulkan render passes require a non-default framebuffer id");
         }
 
-        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
-        if (state == null) {
-            throw new IllegalArgumentException("Unknown Vulkan virtual framebuffer handle: " + framebuffer);
-        }
-
-        int[] drawBuffers = framebufferDrawBuffers(framebuffer);
+        VulkanVirtualFramebufferManager.FramebufferSnapshot state = virtualFramebuffers.requireSnapshot(framebuffer);
+        int[] drawBuffers = state.drawBuffers();
         List<NativeSpine.LegacyTextureObject> colorTextures = new ArrayList<>(drawBuffers.length);
         List<Long> colorViewHandles = new ArrayList<>(drawBuffers.length);
         int width = -1;
@@ -6745,7 +6665,7 @@ void main() {
             }
 
             int attachment = drawBuffer == VulkanicAPI.GL_BACK ? GL_COLOR_ATTACHMENT0 : drawBuffer;
-            int textureId = state.getAttachment(attachment);
+            int textureId = state.attachment(attachment);
             if (textureId == 0) {
                 throw new IllegalStateException(
                     "Framebuffer " + framebuffer + " draw buffer 0x" + Integer.toHexString(drawBuffer)
@@ -6779,10 +6699,7 @@ void main() {
             );
         }
 
-        int depthTextureId = state.getAttachment(GL_DEPTH_ATTACHMENT);
-        if (depthTextureId == 0) {
-            depthTextureId = state.getAttachment(GL_DEPTH_STENCIL_ATTACHMENT);
-        }
+        int depthTextureId = state.depthAttachmentTexture();
 
         NativeSpine.LegacyTextureObject depthTexture = null;
         long depthViewHandle = VK10.VK_NULL_HANDLE;
@@ -7974,10 +7891,7 @@ void main() {
      */
     public int createFramebuffer(CommandContext ctx) {
         requireVulkanCommandBufferHandle("createFramebuffer", ctx);
-        int id = nextVirtualFboId.getAndIncrement();
-        virtualFbos.add(id);
-        virtualFramebufferStates.put(id, new VirtualFramebufferState());
-        return id;
+        return virtualFramebuffers.createFramebuffer();
     }
 
     /** Allocates multiple virtual FBO handles. */
@@ -8018,9 +7932,7 @@ void main() {
      */
     public void deleteFramebuffer(CommandContext ctx, int fbo) {
         requireVulkanCommandBufferHandle("deleteFramebuffer", ctx);
-        virtualFbos.remove(fbo);
-        virtualFramebufferStates.remove(fbo);
-        releaseImplicitFramebufferBinding(fbo);
+        virtualFramebuffers.deleteFramebuffer(fbo);
         if (boundReadFbo == fbo) boundReadFbo = 0;
         if (boundDrawFbo == fbo) boundDrawFbo = 0;
     }
@@ -8036,7 +7948,7 @@ void main() {
         final int GL_FRAMEBUFFER_COMPLETE   = 0x8CD5;
         final int GL_FRAMEBUFFER_UNDEFINED  = 0x8219;
         int fbo = (target == 0x8CA8 /* GL_READ_FRAMEBUFFER */) ? boundReadFbo : boundDrawFbo;
-        if (fbo == 0 || virtualFbos.contains(fbo)) {
+        if (virtualFramebuffers.isDefaultOrKnownFramebuffer(fbo)) {
             return GL_FRAMEBUFFER_COMPLETE;
         }
         return GL_FRAMEBUFFER_UNDEFINED;
@@ -9037,12 +8949,7 @@ void main() {
             return;
         }
 
-        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
-        if (state == null) {
-            return;
-        }
-
-        int texture = state.getAttachment(attachment);
+        int texture = virtualFramebuffers.getAttachment(framebuffer, attachment);
         if (texture == 0) {
             return;
         }
@@ -9058,12 +8965,14 @@ void main() {
 
     private void clearFramebufferDepthAttachment(CommandContext ctx, int framebuffer, float depth) {
         long commandBufferHandle = requireVulkanCommandBufferHandle("clearFramebufferDepthAttachment", ctx);
-        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
-        if (state == null) {
+        VulkanVirtualFramebufferManager.FramebufferSnapshot state;
+        try {
+            state = virtualFramebuffers.requireSnapshot(framebuffer);
+        } catch (IllegalArgumentException ignored) {
             return;
         }
 
-        int texture = framebufferDepthAttachmentTexture(state);
+        int texture = state.depthAttachmentTexture();
         if (texture == 0) {
             return;
         }
@@ -9386,12 +9295,7 @@ void main() {
     public int getFramebufferAttachmentParameteri(CommandContext ctx, int target, int attachment, int pname) {
         requireVulkanCommandBufferHandle("getFramebufferAttachmentParameteri", ctx);
         int framebuffer = resolveFramebufferBinding(target);
-        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
-        if (state == null) {
-            return 0;
-        }
-
-        int texture = state.getAttachment(attachment);
+        int texture = virtualFramebuffers.getAttachment(framebuffer, attachment);
         return switch (pname) {
             case GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME -> texture;
             case GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE -> texture == 0 ? GL_NONE : GL_TEXTURE;
@@ -9635,7 +9539,7 @@ void main() {
 
     public boolean isFramebuffer(CommandContext ctx, int framebuffer) {
         requireVulkanCommandBufferHandle("isFramebuffer", ctx);
-        return framebuffer != 0 && virtualFbos.contains(framebuffer);
+        return virtualFramebuffers.isFramebuffer(framebuffer);
     }
 
     public boolean isProgram(CommandContext ctx, int program) {
@@ -9759,21 +9663,15 @@ void main() {
 
     public void namedFramebufferDrawBuffers(CommandContext ctx, int framebuffer, int[] bufs) {
         requireVulkanCommandBufferHandle("namedFramebufferDrawBuffers", ctx);
-        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
-        if (state != null) {
-            state.setDrawBuffers(bufs);
-            if (framebuffer == boundDrawFbo) {
-                pendingDrawBuffer = state.getPrimaryDrawBuffer();
-            }
+        virtualFramebuffers.setDrawBuffers(framebuffer, bufs);
+        if (framebuffer == boundDrawFbo) {
+            pendingDrawBuffer = virtualFramebuffers.drawBuffer(framebuffer, pendingDrawBuffer);
         }
     }
 
     public void namedFramebufferReadBuffer(CommandContext ctx, int framebuffer, int mode) {
         requireVulkanCommandBufferHandle("namedFramebufferReadBuffer", ctx);
-        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
-        if (state != null) {
-            state.readBuffer = mode;
-        }
+        virtualFramebuffers.setReadBuffer(framebuffer, mode);
         if (framebuffer == boundReadFbo) {
             pendingReadBuffer = mode;
         }
@@ -9829,117 +9727,11 @@ void main() {
             return 0;
         }
 
-        int matchedFramebuffer = 0;
-        for (Map.Entry<Integer, VirtualFramebufferState> entry : virtualFramebufferStates.entrySet()) {
-            int framebuffer = entry.getKey();
-            if (framebuffer == 0) {
-                continue;
-            }
-
-            if (!matchesSingleColorFramebufferContract(entry.getValue(), colorHandle, depthHandle)) {
-                continue;
-            }
-
-            if (matchedFramebuffer == 0 || framebuffer < matchedFramebuffer) {
-                matchedFramebuffer = framebuffer;
-            }
-        }
-
-        return matchedFramebuffer != 0 ? matchedFramebuffer : resolveOrCreateImplicitFramebuffer(colorHandle, depthHandle);
-    }
-
-    private static boolean matchesSingleColorFramebufferContract(VirtualFramebufferState state, int colorHandle, int depthHandle) {
-        int colorAttachmentCount = 0;
-        for (int drawBuffer : state.getDrawBuffers()) {
-            if (drawBuffer == GL_NONE) {
-                continue;
-            }
-
-            int attachment = drawBuffer == VulkanicAPI.GL_BACK ? GL_COLOR_ATTACHMENT0 : drawBuffer;
-            if (state.getAttachment(attachment) != colorHandle) {
-                return false;
-            }
-
-            colorAttachmentCount++;
-            if (colorAttachmentCount > 1) {
-                return false;
-            }
-        }
-
-        return colorAttachmentCount == 1 && framebufferDepthAttachmentTexture(state) == depthHandle;
-    }
-
-    private static int framebufferDepthAttachmentTexture(VirtualFramebufferState state) {
-        int depthTexture = state.getAttachment(GL_DEPTH_ATTACHMENT);
-        if (depthTexture != 0) {
-            return depthTexture;
-        }
-        return state.getAttachment(GL_DEPTH_STENCIL_ATTACHMENT);
-    }
-
-    private int resolveOrCreateImplicitFramebuffer(int colorHandle, int depthHandle) {
-        FramebufferTexturePairKey key = new FramebufferTexturePairKey(colorHandle, depthHandle);
-        while (true) {
-            Integer cachedFramebuffer = implicitFramebufferByTexturePair.get(key);
-            if (cachedFramebuffer != null) {
-                if (virtualFramebufferStates.containsKey(cachedFramebuffer)) {
-                    return cachedFramebuffer;
-                }
-
-                implicitFramebufferByTexturePair.remove(key, cachedFramebuffer);
-            }
-
-            int framebuffer = nextVirtualFboId.getAndIncrement();
-            VirtualFramebufferState state = new VirtualFramebufferState();
-            state.setAttachment(GL_COLOR_ATTACHMENT0, colorHandle);
-            if (depthHandle != 0) {
-                state.setAttachment(GL_DEPTH_ATTACHMENT, depthHandle);
-            }
-
-            virtualFbos.add(framebuffer);
-            virtualFramebufferStates.put(framebuffer, state);
-
-            Integer racedFramebuffer = implicitFramebufferByTexturePair.putIfAbsent(key, framebuffer);
-            if (racedFramebuffer == null) {
-                return framebuffer;
-            }
-
-            virtualFbos.remove(framebuffer);
-            virtualFramebufferStates.remove(framebuffer);
-            if (virtualFramebufferStates.containsKey(racedFramebuffer)) {
-                return racedFramebuffer;
-            }
-
-            implicitFramebufferByTexturePair.remove(key, racedFramebuffer);
-        }
+        return virtualFramebuffers.resolveFramebufferForTextures(colorHandle, depthHandle);
     }
 
     private void releaseImplicitFramebuffersForTexture(int texture) {
-        for (Map.Entry<FramebufferTexturePairKey, Integer> entry : new ArrayList<>(implicitFramebufferByTexturePair.entrySet())) {
-            FramebufferTexturePairKey key = entry.getKey();
-            if (key.colorTexture() != texture && key.depthTexture() != texture) {
-                continue;
-            }
-
-            Integer framebuffer = entry.getValue();
-            if (!implicitFramebufferByTexturePair.remove(key, framebuffer)) {
-                continue;
-            }
-
-            if (framebuffer != null) {
-                virtualFbos.remove(framebuffer);
-                virtualFramebufferStates.remove(framebuffer);
-            }
-        }
-    }
-
-    private void releaseImplicitFramebufferBinding(int framebuffer) {
-        for (Map.Entry<FramebufferTexturePairKey, Integer> entry : new ArrayList<>(implicitFramebufferByTexturePair.entrySet())) {
-            Integer mappedFramebuffer = entry.getValue();
-            if (mappedFramebuffer != null && mappedFramebuffer == framebuffer) {
-                implicitFramebufferByTexturePair.remove(entry.getKey(), mappedFramebuffer);
-            }
-        }
+        virtualFramebuffers.releaseImplicitFramebuffersForTexture(texture);
     }
 
     public int resolveTextureHandle(CommandContext ctx, net.vulkanic.VulkanicTexture texture) {
@@ -10324,11 +10116,8 @@ void main() {
      */
     public void drawBuffers(CommandContext ctx, int[] buffers) {
         requireVulkanCommandBufferHandle("drawBuffers", ctx);
-        VirtualFramebufferState state = virtualFramebufferStates.get(boundDrawFbo);
-        if (state != null) {
-            state.setDrawBuffers(buffers);
-            pendingDrawBuffer = state.getPrimaryDrawBuffer();
-        }
+        virtualFramebuffers.setDrawBuffers(boundDrawFbo, buffers);
+        pendingDrawBuffer = virtualFramebuffers.drawBuffer(boundDrawFbo, pendingDrawBuffer);
     }
 
     // =====================================================================
@@ -10692,17 +10481,11 @@ void main() {
     }
 
     private void applyFramebufferReadState(int framebuffer) {
-        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
-        if (state != null) {
-            pendingReadBuffer = state.readBuffer;
-        }
+        pendingReadBuffer = virtualFramebuffers.applyReadBuffer(framebuffer, pendingReadBuffer);
     }
 
     private void applyFramebufferDrawState(int framebuffer) {
-        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
-        if (state != null) {
-            pendingDrawBuffer = state.getPrimaryDrawBuffer();
-        }
+        pendingDrawBuffer = virtualFramebuffers.applyDrawBuffer(framebuffer, pendingDrawBuffer);
     }
 
     private int resolveFramebufferBinding(int target) {
@@ -10716,30 +10499,19 @@ void main() {
     }
 
     private void recordFramebufferAttachment(int framebuffer, int attachment, int texture) {
-        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
-        if (state == null) {
-            return;
-        }
-
-        state.setAttachment(attachment, texture);
-        if (attachment == GL_DEPTH_STENCIL_ATTACHMENT) {
-            state.setAttachment(GL_DEPTH_ATTACHMENT, texture);
-        }
+        virtualFramebuffers.recordAttachment(framebuffer, attachment, texture);
     }
 
     private int framebufferReadBuffer(int framebuffer) {
-        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
-        return state != null ? state.readBuffer : pendingReadBuffer;
+        return virtualFramebuffers.readBuffer(framebuffer, pendingReadBuffer);
     }
 
     private int framebufferDrawBuffer(int framebuffer) {
-        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
-        return state != null ? state.getPrimaryDrawBuffer() : pendingDrawBuffer;
+        return virtualFramebuffers.drawBuffer(framebuffer, pendingDrawBuffer);
     }
 
     private int[] framebufferDrawBuffers(int framebuffer) {
-        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
-        return state != null ? state.getDrawBuffers() : new int[]{pendingDrawBuffer};
+        return virtualFramebuffers.drawBuffers(framebuffer, pendingDrawBuffer);
     }
 
     private Integer resolveFramebufferTextureForCopy(int framebuffer, int selectedBuffer) {
@@ -10747,22 +10519,7 @@ void main() {
     }
 
     private Integer resolveFramebufferTextureForBlit(int framebuffer, int mask, int selectedBuffer) {
-        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
-        if (state == null) {
-            return null;
-        }
-
-        if ((mask & (GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT)) != 0) {
-            int depthTexture = state.getAttachment(GL_DEPTH_ATTACHMENT);
-            if (depthTexture == 0) {
-                depthTexture = state.getAttachment(GL_DEPTH_STENCIL_ATTACHMENT);
-            }
-            return depthTexture == 0 ? null : depthTexture;
-        }
-
-        int attachment = selectedBuffer == GL_NONE ? GL_COLOR_ATTACHMENT0 : selectedBuffer;
-        int colorTexture = state.getAttachment(attachment);
-        return colorTexture == 0 ? null : colorTexture;
+        return virtualFramebuffers.textureForBlit(framebuffer, mask, selectedBuffer);
     }
 
     private static net.vulkanic.GraphicsCapabilities createVulkanGraphicsCapabilities() {
@@ -11290,9 +11047,8 @@ void main() {
         private final Map<Long, BoundIndexBufferState> boundIndexBuffersByCommandBuffer = new ConcurrentHashMap<>();
         @Nullable
         private volatile VulkanBuffer legacyDefaultVertexAttributeBuffer;
-        private final Set<Long> managedShaderModules = ConcurrentHashMap.newKeySet();
-        /** Permanently-cached VkRenderPass handles keyed by typed attachment compatibility state. */
-        private final Map<VulkanRenderPassKey, Long> permanentRenderPassCache = new HashMap<>();
+        private final VulkanRenderTargetStateManager<LegacyTextureObject, LegacyTextureObject> renderTargetState =
+            new VulkanRenderTargetStateManager<>();
         private final VulkanDeferredResourceLifetime<StagingBuffer, VulkanBuffer> lifetime =
             new VulkanDeferredResourceLifetime<>(MAX_FRAMES_IN_FLIGHT, IMMEDIATE_SUBMIT_SLOTS);
         private final VulkanDescriptorManager<VulkanBuffer> descriptorManager =
@@ -11301,14 +11057,6 @@ void main() {
                 Integer.getInteger("mattmc.vulkan.maxRecycledDescriptorUniformBuffers", 512),
                 Long.getLong("mattmc.vulkan.maxRecycledDescriptorUniformBufferBytes", 64L * 1024L * 1024L)
             );
-    /** Tracks {@code VkPipeline} handles owned by live {@link VulkanPipelineHandle} objects. */
-    private final Set<Long> managedVkPipelineHandles = ConcurrentHashMap.newKeySet();
-    /** Tracks {@code VkPipelineLayout} handles owned by live {@link VulkanPipelineHandle} objects. */
-    private final Set<Long> managedVkPipelineLayoutHandles = ConcurrentHashMap.newKeySet();
-    /** Tracks {@code VkDescriptorSetLayout} handles owned by live {@link VulkanPipelineHandle} objects. */
-    private final Set<Long> managedVkDescriptorSetLayoutHandles = ConcurrentHashMap.newKeySet();
-
-
         /** Maps {@code VkImage} handle → {@code VkDeviceMemory} handle for all live managed textures. */
         private final Map<Long, Long> managedImageAllocations = new ConcurrentHashMap<>();
         /** Maps {@code VkImage} handle → default {@code VkImageView} handle (covering all mip levels). */
@@ -11359,17 +11107,8 @@ void main() {
         private boolean commandBufferRecording;
         private final boolean[] frameCommandBufferRecording = new boolean[MAX_FRAMES_IN_FLIGHT];
         private boolean renderPassRecording;
-        private final java.util.ArrayList<LegacyTextureObject> activeRenderPassColorTextures = new java.util.ArrayList<>();
-        private final java.util.ArrayList<Integer> activeRenderPassColorFinalLayouts = new java.util.ArrayList<>();
-        @Nullable private LegacyTextureObject activeRenderPassDepthTexture;
-        private int activeRenderPassDepthFinalLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
-        @Nullable private VulkanRenderPassCompatibilityKey activeRenderPassCompatibilityKey;
         private boolean frameInProgress;
         private int acquiredSwapchainImageIndex = -1;
-        private int renderPassSwapchainImageIndex = -1;
-        private int activeRenderPassWidth;
-        private int activeRenderPassHeight;
-        private boolean activeRenderPassTargetsSwapchain;
         private boolean scissorTestEnabled;
         private boolean hasCachedScissorRect;
         private int cachedScissorX;
@@ -12098,7 +11837,7 @@ void main() {
             return texture != null
                 && texture.feedbackLoopCapable
                 && renderPassRecording
-                && (activeRenderPassColorTextures.contains(texture) || texture == activeRenderPassDepthTexture);
+                && renderTargetState.isActiveAttachment(texture);
         }
 
         private boolean isStorageImageLayoutCompatibleSampler(@Nullable LegacyTextureObject texture,
@@ -19132,16 +18871,22 @@ void main() {
 	                    if (legacyColorTexture != null) {
 	                        trackLayoutForLevel(legacyColorTexture, 0, VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 	                    }
-	                    activeRenderPassColorTextures.clear();
-	                    activeRenderPassColorFinalLayouts.clear();
 	                    trackSwapchainImageLayout(swapchainColorImageIndex, VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-                    renderPassSwapchainImageIndex = swapchainColorImageIndex;
-                    activeRenderPassTargetsSwapchain = true;
                     renderPassRecording = true;
-                    activeRenderPassCompatibilityKey = VulkanRenderPassCompatibilityKey.swapchainPresent(swapchainImageFormat);
-                    activeRenderPassWidth = width;
-                    activeRenderPassHeight = height;
-                    return VulkanRenderPassCompatibilityKey.swapchainPresent(swapchainImageFormat);
+                    VulkanRenderPassCompatibilityKey swapchainCompatibility =
+                        VulkanRenderPassCompatibilityKey.swapchainPresent(swapchainImageFormat);
+                    renderTargetState.beginPass(
+                        swapchainCompatibility,
+                        width,
+                        height,
+                        true,
+                        swapchainColorImageIndex,
+                        List.of(),
+                        List.of(),
+                        null,
+                        VK10.VK_IMAGE_LAYOUT_UNDEFINED
+                    );
+                    return swapchainCompatibility;
 	                }
 
                 int colorInitialLayout = swapchainColorAttachment
@@ -19361,21 +19106,12 @@ void main() {
 
                 if (legacyColorTexture != null) {
                     trackLayoutForLevel(legacyColorTexture, 0, colorSubpassLayoutSingle);
-                    activeRenderPassColorTextures.clear();
-                    activeRenderPassColorTextures.add(legacyColorTexture);
-                    activeRenderPassColorFinalLayouts.clear();
-                    activeRenderPassColorFinalLayouts.add(colorFinalLayout);
-                } else {
-                    activeRenderPassColorTextures.clear();
-                    activeRenderPassColorFinalLayouts.clear();
                 }
                 if (swapchainColorAttachment && swapchainColorImageIndex >= 0) {
                     trackSwapchainImageLayout(swapchainColorImageIndex, VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-                    renderPassSwapchainImageIndex = swapchainColorImageIndex;
-                } else {
-                    renderPassSwapchainImageIndex = -1;
                 }
-                activeRenderPassTargetsSwapchain = swapchainColorAttachment;
+                LegacyTextureObject activeDepthTexture = null;
+                int activeDepthFinalLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
                 if (legacyDepthTexture != null) {
                     int depthActiveLayout = legacyDepthTexture.feedbackLoopCapable
                         ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
@@ -19387,17 +19123,22 @@ void main() {
                         depthActiveLayout
                     );
                     trackLayoutForLevel(legacyDepthTexture, 0, depthActiveLayout);
-                    activeRenderPassDepthTexture = legacyDepthTexture;
-                    activeRenderPassDepthFinalLayout = depthFinalLayout;
-                } else {
-                    activeRenderPassDepthTexture = null;
-                    activeRenderPassDepthFinalLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
+                    activeDepthTexture = legacyDepthTexture;
+                    activeDepthFinalLayout = depthFinalLayout;
                 }
 
                 renderPassRecording = true;
-                activeRenderPassCompatibilityKey = compatibilityKey;
-                activeRenderPassWidth = width;
-                activeRenderPassHeight = height;
+                renderTargetState.beginPass(
+                    compatibilityKey,
+                    width,
+                    height,
+                    swapchainColorAttachment,
+                    swapchainColorAttachment ? swapchainColorImageIndex : -1,
+                    legacyColorTexture != null ? List.of(legacyColorTexture) : List.of(),
+                    legacyColorTexture != null ? List.of(colorFinalLayout) : List.of(),
+                    activeDepthTexture,
+                    activeDepthFinalLayout
+                );
                 trackTransientRenderPassHandle(renderPassHandle);
                 trackTransientFramebufferHandle(framebufferHandle);
                 return compatibilityKey;
@@ -19598,7 +19339,7 @@ void main() {
                 VulkanRenderPassKey renderPassKey =
                     VulkanRenderPassKey.framebuffer(colorAttachmentKeys, depthAttachmentKey, hasFeedbackLoop);
 
-                Long cachedRenderPass2 = permanentRenderPassCache.get(renderPassKey);
+                Long cachedRenderPass2 = renderTargetState.cachedRenderPass(renderPassKey);
                 if (cachedRenderPass2 != null) {
                     renderPassHandle = cachedRenderPass2;
                 } else {
@@ -19611,7 +19352,7 @@ void main() {
                     checkVk("vkCreateRenderPass(framebuffer)",
                         VK10.vkCreateRenderPass(logicalDevice, renderPassCreateInfo2, null, pRenderPass2));
                     renderPassHandle = pRenderPass2.get(0);
-                    permanentRenderPassCache.put(renderPassKey, renderPassHandle);
+                    renderTargetState.cacheRenderPass(renderPassKey, renderPassHandle);
                 }
 
                 if (debugColorAttachmentLogCount < 200) {
@@ -19722,21 +19463,19 @@ void main() {
 	                    );
 	                    trackLayoutForLevel(colorTexture, 0, colorActiveLayout2);
 	                }
-	                activeRenderPassColorTextures.clear();
-	                activeRenderPassColorTextures.addAll(targets.colorTextures);
-	                activeRenderPassColorFinalLayouts.clear();
+                    List<Integer> trackedColorFinalLayouts = new ArrayList<>(targets.colorTextures.size());
 	                for (int colorIndex = 0; colorIndex < targets.colorTextures.size(); colorIndex++) {
 	                    LegacyTextureObject colorTexture = targets.colorTextures.get(colorIndex);
 	                    int postLayout = VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	                    activeRenderPassColorFinalLayouts.add(imageLayoutForUsage(
+	                    trackedColorFinalLayouts.add(imageLayoutForUsage(
 	                        targets.colorFinalUsage(colorIndex),
 	                        false,
 	                        colorTexture.feedbackLoopCapable,
 	                        postLayout
 	                    ));
 	                }
-                activeRenderPassTargetsSwapchain = false;
-                renderPassSwapchainImageIndex = -1;
+                LegacyTextureObject activeDepthTexture = null;
+                int activeDepthFinalLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
                 if (targets.hasDepthTarget()) {
 	                    int depthActiveLayout2 = targets.depthTexture.feedbackLoopCapable
 	                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
@@ -19748,26 +19487,31 @@ void main() {
 	                        depthActiveLayout2
 	                    );
 	                    trackLayoutForLevel(targets.depthTexture, 0, depthActiveLayout2);
-	                    activeRenderPassDepthTexture = targets.depthTexture;
+	                    activeDepthTexture = targets.depthTexture;
 	                    int depthPostLayout = VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-	                    activeRenderPassDepthFinalLayout = imageLayoutForUsage(
+	                    activeDepthFinalLayout = imageLayoutForUsage(
 	                        targets.depthFinalUsage(),
 	                        true,
 	                        targets.depthTexture.feedbackLoopCapable,
 	                        depthPostLayout
 	                    );
-	                } else {
-	                    activeRenderPassDepthTexture = null;
-	                    activeRenderPassDepthFinalLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
 	                }
 
                 renderPassRecording = true;
-                activeRenderPassCompatibilityKey = compatibilityKey;
-                activeRenderPassWidth = targets.width;
-                activeRenderPassHeight = targets.height;
+                renderTargetState.beginPass(
+                    compatibilityKey,
+                    targets.width,
+                    targets.height,
+                    false,
+                    -1,
+                    targets.colorTextures,
+                    trackedColorFinalLayouts,
+                    activeDepthTexture,
+                    activeDepthFinalLayout
+                );
                 // Permanently-cached render passes must NOT be added to transient handles.
                 // Only add to transient if this was a newly-created (non-cached) handle.
-                if (!permanentRenderPassCache.containsValue(renderPassHandle)) {
+                if (!renderTargetState.isPermanentRenderPass(renderPassHandle)) {
                     trackTransientRenderPassHandle(renderPassHandle);
                 }
                 trackTransientFramebufferHandle(framebufferHandle);
@@ -19778,7 +19522,7 @@ void main() {
                 }
                 // Only destroy the render pass on exception if it was just created (not a cached one).
                 if (renderPassHandle != VK10.VK_NULL_HANDLE
-                    && !permanentRenderPassCache.containsValue(renderPassHandle)) {
+                    && !renderTargetState.isPermanentRenderPass(renderPassHandle)) {
                     VK10.vkDestroyRenderPass(logicalDevice, renderPassHandle, null);
                 }
                 throw exception;
@@ -19797,31 +19541,21 @@ void main() {
 
             VK10.vkCmdEndRenderPass(activeCommandBuffer);
             renderPassRecording = false;
-            activeRenderPassCompatibilityKey = null;
-            activeRenderPassWidth = 0;
-            activeRenderPassHeight = 0;
-            activeRenderPassTargetsSwapchain = false;
-	            for (int colorIndex = 0; colorIndex < activeRenderPassColorTextures.size(); colorIndex++) {
-	                LegacyTextureObject colorTexture = activeRenderPassColorTextures.get(colorIndex);
-	                int postLayout = colorIndex >= 0 && colorIndex < activeRenderPassColorFinalLayouts.size()
-	                    ? activeRenderPassColorFinalLayouts.get(colorIndex)
-	                    : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	                trackLayoutForLevel(colorTexture, 0, postLayout);
-	            }
-	            activeRenderPassColorTextures.clear();
-	            activeRenderPassColorFinalLayouts.clear();
-	            if (activeRenderPassDepthTexture != null) {
-	                int depthPostLayout = activeRenderPassDepthFinalLayout != VK10.VK_IMAGE_LAYOUT_UNDEFINED
-	                    ? activeRenderPassDepthFinalLayout
-	                    : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-	                trackLayoutForLevel(activeRenderPassDepthTexture, 0, depthPostLayout);
-	                activeRenderPassDepthTexture = null;
-	            }
-	            activeRenderPassDepthFinalLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
-            if (renderPassSwapchainImageIndex >= 0) {
-                trackSwapchainImageLayout(renderPassSwapchainImageIndex, KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-                renderPassSwapchainImageIndex = -1;
+            renderTargetState.forEachActiveColorAttachment((texture, finalLayout) ->
+                trackLayoutForLevel(texture, 0, finalLayout)
+            );
+            if (renderTargetState.hasActiveDepthAttachment()) {
+                LegacyTextureObject depthTexture = renderTargetState.activeDepthAttachment();
+                int depthPostLayout = renderTargetState.activeDepthFinalLayout() != VK10.VK_IMAGE_LAYOUT_UNDEFINED
+                    ? renderTargetState.activeDepthFinalLayout()
+                    : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+                trackLayoutForLevel(depthTexture, 0, depthPostLayout);
             }
+            int swapchainImageIndex = renderTargetState.activeSwapchainImageIndex();
+            if (swapchainImageIndex >= 0) {
+                trackSwapchainImageLayout(swapchainImageIndex, KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+            }
+            renderTargetState.resetActivePass();
         }
 
         private void bindVertexBuffer(long commandBufferHandle, int slot, long bufferHandle) {
@@ -20281,7 +20015,7 @@ void main() {
                         VK10.vkCreateDescriptorSetLayout(logicalDevice, dslInfo, null, pDsl));
                     descriptorSetLayoutHandle = pDsl.get(0);
                 }
-                managedVkDescriptorSetLayoutHandles.add(descriptorSetLayoutHandle);
+                backend.pipelineLifecycle.registerDescriptorSetLayout(descriptorSetLayoutHandle);
 
                 // --- 2. VkPipelineLayout ---
                 java.nio.LongBuffer dslBuf = stack.longs(descriptorSetLayoutHandle);
@@ -20308,7 +20042,7 @@ void main() {
                 checkVk("vkCreatePipelineLayout",
                     VK10.vkCreatePipelineLayout(logicalDevice, pipelineLayoutInfo, null, pPipelineLayout));
                 long pipelineLayoutHandle = pPipelineLayout.get(0);
-                managedVkPipelineLayoutHandles.add(pipelineLayoutHandle);
+                backend.pipelineLifecycle.registerPipelineLayout(pipelineLayoutHandle);
 
                 // --- 3. Shader stages ---
                 java.nio.ByteBuffer mainEntry = stack.UTF8("main");
@@ -20522,7 +20256,7 @@ void main() {
                     VK10.vkCreateGraphicsPipelines(
                         logicalDevice, VK10.VK_NULL_HANDLE, pipelineInfo, null, pPipeline));
                 long pipelineHandle = pPipeline.get(0);
-                managedVkPipelineHandles.add(pipelineHandle);
+                backend.pipelineLifecycle.registerPipeline(pipelineHandle);
 
                 // Destroy the transient placeholder render pass immediately; it was only needed
                 // during pipeline compilation and is not required at draw time.
@@ -20578,7 +20312,7 @@ void main() {
                         VK10.vkCreateDescriptorSetLayout(logicalDevice, dslInfo, null, pDsl));
                     descriptorSetLayoutHandle = pDsl.get(0);
                 }
-                managedVkDescriptorSetLayoutHandles.add(descriptorSetLayoutHandle);
+                backend.pipelineLifecycle.registerDescriptorSetLayout(descriptorSetLayoutHandle);
 
                 VkPipelineLayoutCreateInfo pipelineLayoutInfo = VkPipelineLayoutCreateInfo.calloc(stack)
                     .sType$Default()
@@ -20587,7 +20321,7 @@ void main() {
                 checkVk("vkCreatePipelineLayout(compute)",
                     VK10.vkCreatePipelineLayout(logicalDevice, pipelineLayoutInfo, null, pPipelineLayout));
                 long pipelineLayoutHandle = pPipelineLayout.get(0);
-                managedVkPipelineLayoutHandles.add(pipelineLayoutHandle);
+                backend.pipelineLifecycle.registerPipelineLayout(pipelineLayoutHandle);
 
                 VkPipelineShaderStageCreateInfo stage = VkPipelineShaderStageCreateInfo.calloc(stack)
                     .sType$Default()
@@ -20608,7 +20342,7 @@ void main() {
                     VK10.vkCreateComputePipelines(
                         logicalDevice, VK10.VK_NULL_HANDLE, pipelineInfo, null, pPipeline));
                 long pipelineHandle = pPipeline.get(0);
-                managedVkPipelineHandles.add(pipelineHandle);
+                backend.pipelineLifecycle.registerPipeline(pipelineHandle);
 
                 return new VulkanPipelineHandle(
                     pipelineHandle,
@@ -20630,17 +20364,38 @@ void main() {
             long pipelineLayoutHandle,
             long descriptorSetLayoutHandle
         ) {
-            if (logicalDevice == null) return;
-            if (pipelineHandle != VK10.VK_NULL_HANDLE) {
-                managedVkPipelineHandles.remove(pipelineHandle);
+            backend.pipelineLifecycle.retirePipelineResources(
+                pipelineHandle,
+                pipelineLayoutHandle,
+                descriptorSetLayoutHandle,
+                this::enqueueVulkanResourceDestroy,
+                pipelineDestroyActions()
+            );
+        }
+
+        private VulkanPipelineLifecycleManager.NativeDestroyActions pipelineDestroyActions() {
+            return new VulkanPipelineLifecycleManager.NativeDestroyActions(
+                this::destroyPipelineNow,
+                this::destroyPipelineLayoutNow,
+                this::destroyDescriptorSetLayoutNow,
+                this::destroyShaderModuleNow
+            );
+        }
+
+        private void destroyPipelineNow(long pipelineHandle) {
+            if (pipelineHandle != VK10.VK_NULL_HANDLE && logicalDevice != null) {
                 VK10.vkDestroyPipeline(logicalDevice, pipelineHandle, null);
             }
-            if (pipelineLayoutHandle != VK10.VK_NULL_HANDLE) {
-                managedVkPipelineLayoutHandles.remove(pipelineLayoutHandle);
+        }
+
+        private void destroyPipelineLayoutNow(long pipelineLayoutHandle) {
+            if (pipelineLayoutHandle != VK10.VK_NULL_HANDLE && logicalDevice != null) {
                 VK10.vkDestroyPipelineLayout(logicalDevice, pipelineLayoutHandle, null);
             }
-            if (descriptorSetLayoutHandle != VK10.VK_NULL_HANDLE) {
-                managedVkDescriptorSetLayoutHandles.remove(descriptorSetLayoutHandle);
+        }
+
+        private void destroyDescriptorSetLayoutNow(long descriptorSetLayoutHandle) {
+            if (descriptorSetLayoutHandle != VK10.VK_NULL_HANDLE && logicalDevice != null) {
                 VK10.vkDestroyDescriptorSetLayout(logicalDevice, descriptorSetLayoutHandle, null);
             }
         }
@@ -21223,18 +20978,17 @@ void main() {
                     VK10.vkCreateShaderModule(logicalDevice, createInfo, null, pShaderModule));
 
                 long shaderModuleHandle = pShaderModule.get(0);
-                managedShaderModules.add(shaderModuleHandle);
+                backend.pipelineLifecycle.registerShaderModule(shaderModuleHandle);
                 return shaderModuleHandle;
             }
         }
 
         private void destroyShaderModule(long shaderModuleHandle) {
-            if (shaderModuleHandle == VK10.VK_NULL_HANDLE) {
-                return;
-            }
+            backend.pipelineLifecycle.destroyShaderModule(shaderModuleHandle, this::destroyShaderModuleNow);
+        }
 
-            managedShaderModules.remove(shaderModuleHandle);
-            if (logicalDevice != null) {
+        private void destroyShaderModuleNow(long shaderModuleHandle) {
+            if (shaderModuleHandle != VK10.VK_NULL_HANDLE && logicalDevice != null) {
                 VK10.vkDestroyShaderModule(logicalDevice, shaderModuleHandle, null);
             }
         }
@@ -21306,22 +21060,25 @@ void main() {
 
         @Nullable
         private VulkanRenderPassCompatibilityKey activeRenderPassCompatibilityKey() {
-            return renderPassRecording ? activeRenderPassCompatibilityKey : null;
+            return renderPassRecording ? renderTargetState.activeCompatibilityKey() : null;
         }
 
         private void cmdSetViewport(long commandBufferHandle, int x, int y, int width, int height) {
             VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "cmdSetViewport");
-            if (renderPassRecording && activeRenderPassTargetsSwapchain && activeRenderPassWidth > 0 && activeRenderPassHeight > 0) {
+            if (renderPassRecording
+                && renderTargetState.activeTargetsSwapchain()
+                && renderTargetState.activeWidth() > 0
+                && renderTargetState.activeHeight() > 0) {
                 // Keep swapchain passes full-frame; shrinking viewport here clips title/loading output into a strip.
                 x = 0;
                 y = 0;
-                width = activeRenderPassWidth;
-                height = activeRenderPassHeight;
+                width = renderTargetState.activeWidth();
+                height = renderTargetState.activeHeight();
             }
             int viewportWidth = Math.max(width, 1);
             int viewportHeight = Math.max(height, 1);
-            int framebufferHeight = activeRenderPassHeight > 0
-                ? activeRenderPassHeight
+            int framebufferHeight = renderTargetState.activeHeight() > 0
+                ? renderTargetState.activeHeight()
                 : Math.max(swapchainHeight, viewportHeight);
             try (MemoryStack stack = stackPush()) {
                 org.lwjgl.vulkan.VkViewport.Buffer viewport = org.lwjgl.vulkan.VkViewport.calloc(1, stack)
@@ -21329,7 +21086,7 @@ void main() {
                     .width((float) viewportWidth)
                     .minDepth(0.0f)
                     .maxDepth(1.0f);
-                if (renderPassRecording && activeRenderPassTargetsSwapchain) {
+                if (renderPassRecording && renderTargetState.activeTargetsSwapchain()) {
                     viewport.y((float) y)
                         .height((float) viewportHeight);
                 } else {
@@ -21348,7 +21105,7 @@ void main() {
             cachedScissorHeight = height;
             hasCachedScissorRect = true;
 
-            if (renderPassRecording && activeRenderPassTargetsSwapchain) {
+            if (renderPassRecording && renderTargetState.activeTargetsSwapchain()) {
                 applyFullRenderAreaScissor(activeCommandBuffer);
                 return;
             }
@@ -21382,11 +21139,11 @@ void main() {
         private void applyScissorRect(VkCommandBuffer activeCommandBuffer, int x, int y, int width, int height) {
             int scissorWidth = Math.max(width, 0);
             int scissorHeight = Math.max(height, 0);
-            int framebufferWidth = activeRenderPassWidth > 0
-                ? activeRenderPassWidth
+            int framebufferWidth = renderTargetState.activeWidth() > 0
+                ? renderTargetState.activeWidth()
                 : Math.max(swapchainWidth, scissorWidth);
-            int framebufferHeight = activeRenderPassHeight > 0
-                ? activeRenderPassHeight
+            int framebufferHeight = renderTargetState.activeHeight() > 0
+                ? renderTargetState.activeHeight()
                 : Math.max(swapchainHeight, scissorHeight);
             int translatedY = framebufferHeight - (y + scissorHeight);
             int clampedX = Math.max(0, Math.min(x, framebufferWidth));
@@ -21413,8 +21170,8 @@ void main() {
         }
 
         private void applyFullRenderAreaScissor(VkCommandBuffer activeCommandBuffer) {
-            int fullWidth = activeRenderPassWidth > 0 ? activeRenderPassWidth : swapchainWidth;
-            int fullHeight = activeRenderPassHeight > 0 ? activeRenderPassHeight : swapchainHeight;
+            int fullWidth = renderTargetState.activeWidth() > 0 ? renderTargetState.activeWidth() : swapchainWidth;
+            int fullHeight = renderTargetState.activeHeight() > 0 ? renderTargetState.activeHeight() : swapchainHeight;
             if (fullWidth <= 0 || fullHeight <= 0) {
                 return;
             }
@@ -21432,7 +21189,7 @@ void main() {
                 return;
             }
             int colorAttachmentCount = clearColor ? activeRenderPassColorAttachmentCount() : 0;
-            boolean clearActiveDepthStencil = (clearDepth || clearStencil) && activeRenderPassDepthTexture != null;
+            boolean clearActiveDepthStencil = (clearDepth || clearStencil) && renderTargetState.hasActiveDepthAttachment();
             int attachmentCount = colorAttachmentCount + (clearActiveDepthStencil ? 1 : 0);
             if (attachmentCount == 0) return;
 
@@ -21464,8 +21221,8 @@ void main() {
                     attachments.get(idx).clearValue().depthStencil().depth(depth).stencil(stencil);
                 }
 
-                int w = Math.max(1, activeRenderPassWidth > 0 ? activeRenderPassWidth : swapchainWidth);
-                int h = Math.max(1, activeRenderPassHeight > 0 ? activeRenderPassHeight : swapchainHeight);
+                int w = Math.max(1, renderTargetState.activeWidth() > 0 ? renderTargetState.activeWidth() : swapchainWidth);
+                int h = Math.max(1, renderTargetState.activeHeight() > 0 ? renderTargetState.activeHeight() : swapchainHeight);
                 rects.get(0)
                     .rect(r -> r.offset(o -> o.x(0).y(0)).extent(e -> e.width(w).height(h)))
                     .baseArrayLayer(0)
@@ -21476,10 +21233,7 @@ void main() {
         }
 
         private int activeRenderPassColorAttachmentCount() {
-            if (!activeRenderPassColorTextures.isEmpty()) {
-                return activeRenderPassColorTextures.size();
-            }
-            return activeRenderPassTargetsSwapchain ? 1 : 0;
+            return renderTargetState.activeColorAttachmentCount();
         }
 
         private void close() {
@@ -21530,36 +21284,7 @@ void main() {
                 }
 
                 releaseSwapchainPresentComposePipeline();
-
-                // Destroy pipelines before their layouts and descriptor set layouts.
-                if (!managedVkPipelineHandles.isEmpty()) {
-                    new ArrayList<>(managedVkPipelineHandles).forEach(pipelineHandle -> {
-                        managedVkPipelineHandles.remove(pipelineHandle);
-                        if (pipelineHandle != VK10.VK_NULL_HANDLE) {
-                            VK10.vkDestroyPipeline(logicalDevice, pipelineHandle, null);
-                        }
-                    });
-                }
-                if (!managedVkPipelineLayoutHandles.isEmpty()) {
-                    new ArrayList<>(managedVkPipelineLayoutHandles).forEach(layoutHandle -> {
-                        managedVkPipelineLayoutHandles.remove(layoutHandle);
-                        if (layoutHandle != VK10.VK_NULL_HANDLE) {
-                            VK10.vkDestroyPipelineLayout(logicalDevice, layoutHandle, null);
-                        }
-                    });
-                }
-                if (!managedVkDescriptorSetLayoutHandles.isEmpty()) {
-                    new ArrayList<>(managedVkDescriptorSetLayoutHandles).forEach(dslHandle -> {
-                        managedVkDescriptorSetLayoutHandles.remove(dslHandle);
-                        if (dslHandle != VK10.VK_NULL_HANDLE) {
-                            VK10.vkDestroyDescriptorSetLayout(logicalDevice, dslHandle, null);
-                        }
-                    });
-                }
-
-                if (!managedShaderModules.isEmpty()) {
-                    new ArrayList<>(managedShaderModules).forEach(shaderModuleHandle -> destroyShaderModule(shaderModuleHandle));
-                }
+                backend.pipelineLifecycle.destroyAllNow(pipelineDestroyActions());
 
                 destroyTransientRenderPassResources();
                 for (int slot = 0; slot < IMMEDIATE_SUBMIT_SLOTS; slot++) {
@@ -21568,14 +21293,11 @@ void main() {
                 destroyAllTransientFrameDescriptorBuffers();
                 destroyRecycledDescriptorUniformBuffers();
 
-                if (!permanentRenderPassCache.isEmpty()) {
-                    new ArrayList<>(permanentRenderPassCache.values()).forEach(rpHandle -> {
-                        if (rpHandle != null && rpHandle != VK10.VK_NULL_HANDLE) {
-                            VK10.vkDestroyRenderPass(logicalDevice, rpHandle, null);
-                        }
-                    });
-                    permanentRenderPassCache.clear();
-                }
+                renderTargetState.invalidatePermanentRenderPassCache(renderPassHandle -> {
+                    if (logicalDevice != null && renderPassHandle != VK10.VK_NULL_HANDLE) {
+                        VK10.vkDestroyRenderPass(logicalDevice, renderPassHandle, null);
+                    }
+                });
 
                 destroyTrackedSwapchainImageViews();
 
