@@ -1,6 +1,7 @@
 package net.blaze3d.audio;
 
 import net.logging.LogUtils;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -10,7 +11,6 @@ import net.minecraft.api.Environment;
 import net.minecraft.client.sounds.AudioStream;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.openal.AL10;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
@@ -18,27 +18,24 @@ public class Channel {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final int QUEUED_BUFFER_COUNT = 4;
 	public static final int BUFFER_DURATION_SECONDS = 1;
-	private final int source;
+	private static final int AL_PLAYING = 4114;
+	private static final int AL_PAUSED = 4115;
+	private static final int AL_STOPPED = 4116;
+	private final long deviceHandle;
+	private final long sourceHandle;
 	private final AtomicBoolean initialized = new AtomicBoolean(true);
 	private int streamingBufferSize = 16384;
 	@Nullable
 	private AudioStream stream;
 
-	@Nullable
-	static Channel create() {
-		int[] is = new int[1];
-		AL10.alGenSources(is);
-		return OpenAlUtil.checkALError("Allocate new source") ? null : new Channel(is[0]);
-	}
-
-	private Channel(int i) {
-		this.source = i;
+	Channel(long deviceHandle, long sourceHandle) {
+		this.deviceHandle = deviceHandle;
+		this.sourceHandle = sourceHandle;
 	}
 
 	public void destroy() {
 		if (this.initialized.compareAndSet(true, false)) {
-			AL10.alSourceStop(this.source);
-			OpenAlUtil.checkALError("Stop");
+			NativeAudio.sourceStop(this.sourceHandle);
 			if (this.stream != null) {
 				try {
 					this.stream.close();
@@ -50,86 +47,81 @@ public class Channel {
 				this.stream = null;
 			}
 
-			AL10.alDeleteSources(new int[]{this.source});
-			OpenAlUtil.checkALError("Cleanup");
+			NativeAudio.sourceDestroy(this.sourceHandle);
 		}
 	}
 
 	public void play() {
-		AL10.alSourcePlay(this.source);
+		NativeAudio.sourcePlay(this.sourceHandle);
 	}
 
 	private int getState() {
-		return !this.initialized.get() ? 4116 : AL10.alGetSourcei(this.source, 4112);
+		return !this.initialized.get() ? AL_STOPPED : NativeAudio.sourceState(this.sourceHandle);
 	}
 
 	public void pause() {
-		if (this.getState() == 4114) {
-			AL10.alSourcePause(this.source);
+		if (this.getState() == AL_PLAYING) {
+			NativeAudio.sourcePause(this.sourceHandle);
 		}
 	}
 
 	public void unpause() {
-		if (this.getState() == 4115) {
-			AL10.alSourcePlay(this.source);
+		if (this.getState() == AL_PAUSED) {
+			NativeAudio.sourcePlay(this.sourceHandle);
 		}
 	}
 
 	public void stop() {
 		if (this.initialized.get()) {
-			AL10.alSourceStop(this.source);
-			OpenAlUtil.checkALError("Stop");
+			NativeAudio.sourceStop(this.sourceHandle);
 		}
 	}
 
 	public boolean playing() {
-		return this.getState() == 4114;
+		return this.getState() == AL_PLAYING;
 	}
 
 	public boolean stopped() {
-		return this.getState() == 4116;
+		return this.getState() == AL_STOPPED;
 	}
 
 	public void setSelfPosition(Vec3 vec3) {
-		AL10.alSourcefv(this.source, 4100, new float[]{(float)vec3.x, (float)vec3.y, (float)vec3.z});
+		NativeAudio.sourceSetPosition(this.sourceHandle, (float)vec3.x, (float)vec3.y, (float)vec3.z);
 	}
 
 	public void setPitch(float f) {
-		AL10.alSourcef(this.source, 4099, f);
+		NativeAudio.sourceSetPitch(this.sourceHandle, f);
 	}
 
 	public void setLooping(boolean bl) {
-		AL10.alSourcei(this.source, 4103, bl ? 1 : 0);
+		NativeAudio.sourceSetLooping(this.sourceHandle, bl);
 	}
 
 	public void setVolume(float f) {
-		AL10.alSourcef(this.source, 4106, f);
+		NativeAudio.sourceSetVolume(this.sourceHandle, f);
 	}
 
 	public void disableAttenuation() {
-		AL10.alSourcei(this.source, 53248, 0);
+		NativeAudio.sourceDisableAttenuation(this.sourceHandle);
 	}
 
 	public void linearAttenuation(float f) {
-		AL10.alSourcei(this.source, 53248, 53251);
-		AL10.alSourcef(this.source, 4131, f);
-		AL10.alSourcef(this.source, 4129, 1.0F);
-		AL10.alSourcef(this.source, 4128, 0.0F);
+		NativeAudio.sourceLinearAttenuation(this.sourceHandle, f);
 	}
 
 	public void setRelative(boolean bl) {
-		AL10.alSourcei(this.source, 514, bl ? 1 : 0);
+		NativeAudio.sourceSetRelative(this.sourceHandle, bl);
 	}
 
 	public void attachStaticBuffer(SoundBuffer soundBuffer) {
-		soundBuffer.getAlBuffer().ifPresent(i -> AL10.alSourcei(this.source, 4105, i));
+		soundBuffer.getNativeBuffer(this.deviceHandle).ifPresent(buffer -> NativeAudio.sourceAttachStaticBuffer(this.sourceHandle, buffer));
 	}
 
 	public void attachBufferStream(AudioStream audioStream) {
 		this.stream = audioStream;
 		AudioFormat audioFormat = audioStream.getFormat();
 		this.streamingBufferSize = calculateBufferSize(audioFormat, 1);
-		this.pumpBuffers(4);
+		this.pumpBuffers(QUEUED_BUFFER_COUNT);
 	}
 
 	private static int calculateBufferSize(AudioFormat audioFormat, int i) {
@@ -142,7 +134,7 @@ public class Channel {
 				for (int j = 0; j < i; j++) {
 					ByteBuffer byteBuffer = this.stream.read(this.streamingBufferSize);
 					if (byteBuffer != null) {
-						new SoundBuffer(byteBuffer, this.stream.getFormat()).releaseAlBuffer().ifPresent(ix -> AL10.alSourceQueueBuffers(this.source, new int[]{ix}));
+						NativeAudio.sourceQueueStreamBuffer(this.sourceHandle, byteBuffer, this.stream.getFormat());
 					}
 				}
 			} catch (IOException var4) {
@@ -159,15 +151,6 @@ public class Channel {
 	}
 
 	private int removeProcessedBuffers() {
-		int i = AL10.alGetSourcei(this.source, 4118);
-		if (i > 0) {
-			int[] is = new int[i];
-			AL10.alSourceUnqueueBuffers(this.source, is);
-			OpenAlUtil.checkALError("Unqueue buffers");
-			AL10.alDeleteBuffers(is);
-			OpenAlUtil.checkALError("Remove processed buffers");
-		}
-
-		return i;
+		return NativeAudio.sourceRemoveProcessedBuffers(this.sourceHandle);
 	}
 }

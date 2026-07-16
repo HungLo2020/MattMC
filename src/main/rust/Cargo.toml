@@ -8,9 +8,13 @@ crate-type = ["cdylib"]
 path = "lib.rs"
 
 [dependencies]
+alto = { version = "3.0.4", default-features = false }
 ash = { version = "0.38", default-features = false, features = ["loaded", "std"] }
 glow = "0.18"
 shaderc = { version = "0.10.1", features = ["build-from-source"] }
+
+[build-dependencies]
+cmake = "0.1"
 
 [profile.dev]
 opt-level = 0
