@@ -10776,11 +10776,8 @@ void main() {
         private final long[] immediateCommandPools = new long[IMMEDIATE_SUBMIT_SLOTS];
         private final long[] frameCommandPools = new long[MAX_FRAMES_IN_FLIGHT];
         private long defaultDescriptorSampler;
-        private final long[] swapchainImageAvailableSemaphores = new long[MAX_FRAMES_IN_FLIGHT];
-        private final long[] swapchainFrameFences = new long[MAX_FRAMES_IN_FLIGHT];
-        private long[] swapchainRenderFinishedSemaphoresByImage = new long[0];
-        private long[] swapchainImagesInFlight = new long[0];
-        private int currentFrameSyncIndex;
+        private final VulkanSwapchainStateManager swapchainState =
+            new VulkanSwapchainStateManager(MAX_FRAMES_IN_FLIGHT);
         private long immediateSubmitFence;
         private final long[] immediateSubmitFences = new long[IMMEDIATE_SUBMIT_SLOTS];
         private final boolean[] immediateSubmitSlotsInFlight = new boolean[IMMEDIATE_SUBMIT_SLOTS];
@@ -10812,17 +10809,6 @@ void main() {
                 Integer.getInteger("mattmc.vulkan.maxRecycledDescriptorUniformBuffers", 512),
                 Long.getLong("mattmc.vulkan.maxRecycledDescriptorUniformBufferBytes", 64L * 1024L * 1024L)
             );
-        private int swapchainImageFormat = VK10.VK_FORMAT_UNDEFINED;
-        private int swapchainColorSpace = -1;
-        private int swapchainPresentMode = -1;
-        private int swapchainImageCount = 0;
-        private int swapchainWidth = 0;
-        private int swapchainHeight = 0;
-        private final List<Long> swapchainImageHandles = new ArrayList<>();
-        private final List<Long> swapchainImageViewHandles = new ArrayList<>();
-        private final List<Long> swapchainPresentFramebufferHandles = new ArrayList<>();
-        private final List<Integer> swapchainImageLayouts = new ArrayList<>();
-        private long swapchainPresentRenderPass = VK10.VK_NULL_HANDLE;
         private VulkanPipelineHandle swapchainPresentComposePipeline;
         private PipelineDescriptor swapchainPresentComposeDescriptor;
         private int swapchainPresentComposePipelineFormat = VK10.VK_FORMAT_UNDEFINED;
@@ -10853,10 +10839,7 @@ void main() {
         private long nextPresentId = 1L;
         private long windowHandle;
         private boolean commandBufferRecording;
-        private final boolean[] frameCommandBufferRecording = new boolean[MAX_FRAMES_IN_FLIGHT];
         private boolean renderPassRecording;
-        private boolean frameInProgress;
-        private int acquiredSwapchainImageIndex = -1;
         private boolean scissorTestEnabled;
         private boolean hasCachedScissorRect;
         private int cachedScissorX;
@@ -11418,15 +11401,15 @@ void main() {
                         "vkCreateSemaphore(swapchainImageAvailable[" + frameIndex + "])",
                         VK10.vkCreateSemaphore(logicalDevice, semaphoreInfo, null, pSemaphore)
                     );
-                    swapchainImageAvailableSemaphores[frameIndex] = pSemaphore.get(0);
+                    swapchainState.setImageAvailableSemaphore(frameIndex, pSemaphore.get(0));
 
                     checkVk(
                         "vkCreateFence(swapchainFrame[" + frameIndex + "])",
                         VK10.vkCreateFence(logicalDevice, frameFenceInfo, null, pFrameFence)
                     );
-                    swapchainFrameFences[frameIndex] = pFrameFence.get(0);
+                    swapchainState.setFrameFence(frameIndex, pFrameFence.get(0));
                 }
-                currentFrameSyncIndex = 0;
+                swapchainState.resetFrameState();
 
                 for (int slot = 0; slot < IMMEDIATE_SUBMIT_SLOTS; slot++) {
                     checkVk(
@@ -13472,9 +13455,9 @@ void main() {
                 renderPassRecording,
                 commandBufferRecording,
                 immediateSubmitInFlight,
-                frameInProgress,
+                swapchainState.frameInProgress(),
                 immediateSubmitSlotsInFlight,
-                frameCommandBufferRecording
+                swapchainState.frameCommandBufferRecordingState()
             );
         }
 
@@ -13482,8 +13465,8 @@ void main() {
             lifetime.enqueueDestroy(
                 logicalDevice != null,
                 hasPotentiallyPendingGpuWork(),
-                frameInProgress,
-                currentFrameSyncIndex,
+                swapchainState.frameInProgress(),
+                swapchainState.currentFrameSyncIndex(),
                 commandBufferRecording,
                 recordingImmediateSubmitSlot,
                 destroyAction
@@ -15708,7 +15691,7 @@ void main() {
                 copyDataToBuffer(primaryCommandBuffer.address(), destinationBufferHandle, destinationOffset, data);
                 return;
             }
-            if (frameInProgress && isCurrentFrameCommandBufferRecording()) {
+            if (swapchainState.frameInProgress() && isCurrentFrameCommandBufferRecording()) {
                 copyDataToBuffer(currentFrameCommandBufferHandle(), destinationBufferHandle, destinationOffset, data);
                 return;
             }
@@ -15758,7 +15741,7 @@ void main() {
                 copyBufferRegion(primaryCommandBuffer.address(), sourceBufferHandle, destinationBufferHandle, sourceOffset, destinationOffset, size);
                 return;
             }
-            if (frameInProgress && isCurrentFrameCommandBufferRecording()) {
+            if (swapchainState.frameInProgress() && isCurrentFrameCommandBufferRecording()) {
                 copyBufferRegion(currentFrameCommandBufferHandle(), sourceBufferHandle, destinationBufferHandle, sourceOffset, destinationOffset, size);
                 return;
             }
@@ -16353,44 +16336,36 @@ void main() {
                 );
                 newRenderFinishedSemaphores = createSwapchainRenderFinishedSemaphores(imageResources.imageHandles.size());
 
-                List<Long> previousImageViewHandles = new ArrayList<>(swapchainImageViewHandles);
+                List<Long> previousImageViewHandles = swapchainState.imageViewHandlesSnapshot();
 
                 destroySwapchainPresentTargets();
 
                 destroySwapchainImageViews(previousImageViewHandles);
 
                 swapchain = newSwapchainHandle;
-                swapchainImageFormat = chosenFormat.format();
-                swapchainColorSpace = chosenFormat.colorSpace();
-                swapchainPresentMode = presentMode;
-                swapchainWidth = extent.width();
-                swapchainHeight = extent.height();
-                swapchainImageCount = imageResources.imageHandles.size();
-
-                swapchainImageHandles.clear();
-                swapchainImageHandles.addAll(imageResources.imageHandles);
-
-                swapchainImageViewHandles.clear();
-                swapchainImageViewHandles.addAll(imageResources.imageViewHandles);
                 createSwapchainPresentTargets(imageResources.imageViewHandles, chosenFormat.format(), extent.width(), extent.height());
                 nextPresentId = 1L;
 
-                swapchainImageLayouts.clear();
-                for (int i = 0; i < swapchainImageCount; i++) {
-                    swapchainImageLayouts.add(VK10.VK_IMAGE_LAYOUT_UNDEFINED);
-                }
-                swapchainImagesInFlight = new long[swapchainImageCount];
                 destroySwapchainRenderFinishedSemaphores();
-                swapchainRenderFinishedSemaphoresByImage = newRenderFinishedSemaphores;
+                swapchainState.installSwapchain(
+                    chosenFormat.format(),
+                    chosenFormat.colorSpace(),
+                    presentMode,
+                    extent.width(),
+                    extent.height(),
+                    imageResources.imageHandles,
+                    imageResources.imageViewHandles,
+                    newRenderFinishedSemaphores
+                );
                 newRenderFinishedSemaphores = new long[0];
 
                 LOGGER.info(
                     "Created Vulkan swapchain: extent={}x{}, images={}, format=0x{}, presentMode=0x{}, usage=0x{}, windowHandle=0x{}",
-                    swapchainWidth,
-                    swapchainHeight,
-                    swapchainImageCount,
-                    Integer.toHexString(swapchainImageFormat),
-                    Integer.toHexString(swapchainPresentMode),
+                    swapchainState.width(),
+                    swapchainState.height(),
+                    swapchainState.imageCount(),
+                    Integer.toHexString(swapchainState.imageFormat()),
+                    Integer.toHexString(swapchainState.presentMode()),
                     Integer.toHexString(swapchainImageUsage),
                     Long.toHexString(windowHandle)
                 );
@@ -16510,8 +16485,7 @@ void main() {
         }
 
         private void destroySwapchainRenderFinishedSemaphores() {
-            destroySemaphores(swapchainRenderFinishedSemaphoresByImage);
-            swapchainRenderFinishedSemaphoresByImage = new long[0];
+            destroySemaphores(swapchainState.renderFinishedSemaphoresByImage());
         }
 
         private void createSwapchainPresentTargets(List<Long> imageViewHandles,
@@ -16602,61 +16576,44 @@ void main() {
                 throw exception;
             }
 
-            swapchainPresentRenderPass = renderPassHandle;
-            swapchainPresentFramebufferHandles.clear();
-            swapchainPresentFramebufferHandles.addAll(framebufferHandles);
+            swapchainState.recordPresentTargets(renderPassHandle, framebufferHandles);
         }
 
         private void destroySwapchainPresentTargets() {
             if (logicalDevice == null) {
-                swapchainPresentFramebufferHandles.clear();
-                swapchainPresentRenderPass = VK10.VK_NULL_HANDLE;
+                swapchainState.clearPresentTargets();
                 return;
             }
 
-            for (Long framebufferHandle : new ArrayList<>(swapchainPresentFramebufferHandles)) {
+            for (Long framebufferHandle : swapchainState.presentFramebufferHandlesSnapshot()) {
                 if (framebufferHandle != null && framebufferHandle != VK10.VK_NULL_HANDLE) {
                     VK10.vkDestroyFramebuffer(logicalDevice, framebufferHandle, null);
                 }
             }
-            swapchainPresentFramebufferHandles.clear();
 
-            if (swapchainPresentRenderPass != VK10.VK_NULL_HANDLE) {
-                VK10.vkDestroyRenderPass(logicalDevice, swapchainPresentRenderPass, null);
-                swapchainPresentRenderPass = VK10.VK_NULL_HANDLE;
+            if (swapchainState.presentRenderPass() != VK10.VK_NULL_HANDLE) {
+                VK10.vkDestroyRenderPass(logicalDevice, swapchainState.presentRenderPass(), null);
             }
+            swapchainState.clearPresentTargets();
         }
 
         private void destroyTrackedSwapchainImageViews() {
             destroySwapchainPresentTargets();
-            destroySwapchainImageViews(new ArrayList<>(swapchainImageViewHandles));
+            destroySwapchainImageViews(swapchainState.imageViewHandlesSnapshot());
             destroySwapchainRenderFinishedSemaphores();
-            swapchainImageViewHandles.clear();
-            swapchainImageHandles.clear();
-            swapchainImageLayouts.clear();
-            swapchainImagesInFlight = new long[0];
-            swapchainImageCount = 0;
+            swapchainState.clearSwapchainImages();
         }
 
         private int trackedSwapchainImageLayout(int imageIndex) {
-            if (imageIndex < 0 || imageIndex >= swapchainImageLayouts.size()) {
-                return VK10.VK_IMAGE_LAYOUT_UNDEFINED;
-            }
-            return swapchainImageLayouts.get(imageIndex);
+            return swapchainState.imageLayout(imageIndex);
         }
 
         private void trackSwapchainImageLayout(int imageIndex, int layout) {
-            if (imageIndex < 0 || imageIndex >= swapchainImageLayouts.size()) {
-                return;
-            }
-            swapchainImageLayouts.set(imageIndex, layout);
+            swapchainState.recordImageLayout(imageIndex, layout);
         }
 
         private int swapchainImageIndexForViewHandle(long imageViewHandle) {
-            if (imageViewHandle == VK10.VK_NULL_HANDLE) {
-                return -1;
-            }
-            return swapchainImageViewHandles.indexOf(imageViewHandle);
+            return swapchainState.imageIndexForViewHandle(imageViewHandle);
         }
 
         private void recreateSwapchain() {
@@ -16673,10 +16630,7 @@ void main() {
                 KHRSwapchain.vkDestroySwapchainKHR(logicalDevice, oldSwapchainHandle, null);
             }
 
-            acquiredSwapchainImageIndex = -1;
-            frameInProgress = false;
-            currentFrameSyncIndex = 0;
-            clearFrameCommandBufferRecordingState();
+            swapchainState.resetFrameState();
         }
 
         private void refreshSurfaceAndSwapchain() {
@@ -16704,18 +16658,13 @@ void main() {
             createSurface();
             createSwapchain();
 
-            acquiredSwapchainImageIndex = -1;
-            frameInProgress = false;
-            currentFrameSyncIndex = 0;
+            swapchainState.resetFrameState();
             consecutiveAcquireTimeouts = 0;
             lastAcquireTimeoutLogNanos = 0L;
-            clearFrameCommandBufferRecordingState();
         }
 
         private void clearFrameCommandBufferRecordingState() {
-            for (int frameIndex = 0; frameIndex < MAX_FRAMES_IN_FLIGHT; frameIndex++) {
-                frameCommandBufferRecording[frameIndex] = false;
-            }
+            swapchainState.clearFrameCommandBufferRecordingState();
         }
 
         private String describeWindowState() {
@@ -16776,7 +16725,7 @@ void main() {
                     return false;
                 }
 
-                return currentWidth != swapchainWidth || currentHeight != swapchainHeight;
+                return currentWidth != swapchainState.width() || currentHeight != swapchainState.height();
             }
         }
 
@@ -16936,60 +16885,25 @@ void main() {
                         VK10.vkAllocateCommandBuffers(logicalDevice, allocateInfo, pCommandBuffer)
                     );
                     frameCommandBuffers[frameIndex] = new VkCommandBuffer(pCommandBuffer.get(0), logicalDevice);
-                    frameCommandBufferRecording[frameIndex] = false;
+                    swapchainState.setFrameCommandBufferRecording(frameIndex, false);
                 }
             }
         }
 
         private boolean hasValidFrameSyncPrimitives() {
-            for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-                if (swapchainImageAvailableSemaphores[i] == VK10.VK_NULL_HANDLE
-                    || swapchainFrameFences[i] == VK10.VK_NULL_HANDLE) {
-                    return false;
-                }
-            }
-            if (swapchainImageCount <= 0) {
-                return false;
-            }
-            if (swapchainImagesInFlight.length != swapchainImageCount) {
-                return false;
-            }
-            if (swapchainRenderFinishedSemaphoresByImage.length != swapchainImageCount) {
-                return false;
-            }
-            for (long semaphore : swapchainRenderFinishedSemaphoresByImage) {
-                if (semaphore == VK10.VK_NULL_HANDLE) {
-                    return false;
-                }
-            }
-            return true;
+            return swapchainState.hasValidFrameSyncPrimitives();
         }
 
         private long currentSwapchainImageAvailableSemaphore() {
-            return swapchainImageAvailableSemaphores[currentFrameSyncIndex];
+            return swapchainState.currentImageAvailableSemaphore();
         }
 
         private long acquiredSwapchainRenderFinishedSemaphore() {
-            if (acquiredSwapchainImageIndex < 0
-                || acquiredSwapchainImageIndex >= swapchainRenderFinishedSemaphoresByImage.length) {
-                throw new IllegalStateException(
-                    "Render-finished semaphore is unavailable for acquired swapchain image "
-                        + acquiredSwapchainImageIndex + " (semaphores="
-                        + swapchainRenderFinishedSemaphoresByImage.length + ")."
-                );
-            }
-            long semaphoreHandle = swapchainRenderFinishedSemaphoresByImage[acquiredSwapchainImageIndex];
-            if (semaphoreHandle == VK10.VK_NULL_HANDLE) {
-                throw new IllegalStateException(
-                    "Render-finished semaphore for acquired swapchain image "
-                        + acquiredSwapchainImageIndex + " is unavailable."
-                );
-            }
-            return semaphoreHandle;
+            return swapchainState.acquiredRenderFinishedSemaphore();
         }
 
         private long currentSwapchainFrameFence() {
-            return swapchainFrameFences[currentFrameSyncIndex];
+            return swapchainState.currentFrameFence();
         }
 
         private int swapchainAcquireWaitStageMask() {
@@ -17004,7 +16918,7 @@ void main() {
             try (MemoryStack stack = stackPush()) {
                 java.nio.LongBuffer fenceBuffer = stack.mallocLong(MAX_FRAMES_IN_FLIGHT);
                 for (int frameIndex = 0; frameIndex < MAX_FRAMES_IN_FLIGHT; frameIndex++) {
-                    fenceBuffer.put(frameIndex, swapchainFrameFences[frameIndex]);
+                    fenceBuffer.put(frameIndex, swapchainState.frameFence(frameIndex));
                 }
                 int waitResult = VK10.vkWaitForFences(
                     logicalDevice,
@@ -17146,7 +17060,7 @@ void main() {
             if (!hasValidFrameSyncPrimitives()) {
                 throw new IllegalStateException("Cannot begin frame: Vulkan swapchain frame sync primitives are unavailable.");
             }
-            if (frameInProgress) {
+            if (swapchainState.frameInProgress()) {
                 throw new IllegalStateException("beginFrame called while a Vulkan frame is already in progress.");
             }
 
@@ -17167,7 +17081,7 @@ void main() {
                 if (shouldLogFrameSyncDetails()) {
                     LOGGER.info(
                         "Beginning Vulkan frame on sync slot {} (imageAvailable=0x{}, frameFence=0x{}).",
-                        currentFrameSyncIndex,
+                        swapchainState.currentFrameSyncIndex(),
                         Long.toHexString(imageAvailableSemaphore),
                         Long.toHexString(frameFence)
                     );
@@ -17216,16 +17130,14 @@ void main() {
                         lastFrameFenceTimeoutLogNanos = 0L;
                     }
 
-                    acquiredSwapchainImageIndex = -1;
-                    frameInProgress = false;
-                    currentFrameSyncIndex = (currentFrameSyncIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+                    swapchainState.skipFrameAndAdvance();
                     return -1;
                 }
 
                 checkVk("vkWaitForFences(swapchainFrame)", frameFenceWaitResult);
                 markFenceComplete(frameFence);
-                lifetime.clearReservedFrameWorkGeneration(currentFrameSyncIndex);
-                destroyTransientFrameDescriptorBuffers(currentFrameSyncIndex);
+                lifetime.clearReservedFrameWorkGeneration(swapchainState.currentFrameSyncIndex());
+                destroyTransientFrameDescriptorBuffers(swapchainState.currentFrameSyncIndex());
                 consecutiveFrameFenceTimeouts = 0;
 
                 java.nio.IntBuffer pImageIndex = stack.ints(0);
@@ -17239,6 +17151,7 @@ void main() {
                 );
 
                 if (acquireResult == KHRSwapchain.VK_ERROR_OUT_OF_DATE_KHR) {
+                    swapchainState.markAcquireOutOfDate();
                     recreateSwapchain();
                     acquireResult = KHRSwapchain.vkAcquireNextImageKHR(
                         logicalDevice,
@@ -17270,6 +17183,7 @@ void main() {
                     );
 
                     if (acquireResult == KHRSwapchain.VK_ERROR_OUT_OF_DATE_KHR) {
+                        swapchainState.markAcquireOutOfDate();
                         recreateSwapchain();
                         acquireResult = KHRSwapchain.vkAcquireNextImageKHR(
                             logicalDevice,
@@ -17317,9 +17231,7 @@ void main() {
                         lastAcquireTimeoutLogNanos = 0L;
                     }
 
-                    acquiredSwapchainImageIndex = -1;
-                    frameInProgress = false;
-                    currentFrameSyncIndex = (currentFrameSyncIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+                    swapchainState.skipFrameAndAdvance();
                     return -1;
                 }
 
@@ -17334,14 +17246,14 @@ void main() {
                 if (imageIndex < 0) {
                     throw new IllegalStateException("vkAcquireNextImageKHR returned invalid image index: " + imageIndex);
                 }
-                if (imageIndex >= swapchainImageHandles.size() || imageIndex >= swapchainImageViewHandles.size()) {
+                if (imageIndex >= swapchainState.imageCount()) {
                     throw new IllegalStateException(
                         "vkAcquireNextImageKHR returned image index " + imageIndex
                             + " outside tracked swapchain image/view range (images="
-                            + swapchainImageHandles.size() + ", views=" + swapchainImageViewHandles.size() + ").");
+                            + swapchainState.imageCount() + ", views=" + swapchainState.imageCount() + ").");
                 }
 
-                long imageInFlightFence = swapchainImagesInFlight[imageIndex];
+                long imageInFlightFence = swapchainState.imageInFlightFence(imageIndex);
                 if (imageInFlightFence != VK10.VK_NULL_HANDLE && imageInFlightFence != frameFence) {
                     checkVk(
                         "vkWaitForFences(imageInFlight[" + imageIndex + "])",
@@ -17349,11 +17261,9 @@ void main() {
                     );
                     markFenceComplete(imageInFlightFence);
                 }
-                swapchainImagesInFlight[imageIndex] = frameFence;
 
-                acquiredSwapchainImageIndex = imageIndex;
-                frameInProgress = true;
-                lifetime.reserveFrameWorkGeneration(currentFrameSyncIndex);
+                swapchainState.beginAcquiredFrame(imageIndex, frameFence);
+                lifetime.reserveFrameWorkGeneration(swapchainState.currentFrameSyncIndex());
                 successfulFrameAcquireCount++;
                 VulkanPerfAudit.recordBeginFrameAcquireSuccess();
                 if (successfulFrameAcquireCount <= 5) {
@@ -17361,7 +17271,7 @@ void main() {
                         "vkAcquireNextImageKHR succeeded for image {} (frame acquire #{}, sync slot {})",
                         imageIndex,
                         successfulFrameAcquireCount,
-                        currentFrameSyncIndex
+                        swapchainState.currentFrameSyncIndex()
                     );
                 }
                 return imageIndex;
@@ -17369,7 +17279,7 @@ void main() {
         }
 
         private void endFrame() {
-            if (!frameInProgress) {
+            if (!swapchainState.frameInProgress()) {
                 throw new IllegalStateException("endFrame called without an active Vulkan frame.");
             }
             if (renderPassRecording) {
@@ -17395,7 +17305,7 @@ void main() {
 
             try (MemoryStack stack = stackPush()) {
                 java.nio.LongBuffer pSwapchains = stack.longs(swapchain);
-                java.nio.IntBuffer pImageIndices = stack.ints(acquiredSwapchainImageIndex);
+                java.nio.IntBuffer pImageIndices = stack.ints(swapchainState.acquiredImageIndex());
                 long presentId = 0L;
 
                 VkPresentInfoKHR presentInfo = VkPresentInfoKHR.calloc(stack)
@@ -17416,11 +17326,16 @@ void main() {
                 VkQueue queueForPresent = presentQueue != null ? presentQueue : graphicsQueue;
                 
                 // PHASE 1: Validate swapchain layout before presentation
-                validateSwapchainLayoutBeforePresent(acquiredSwapchainImageIndex);
+                validateSwapchainLayoutBeforePresent(swapchainState.acquiredImageIndex());
                 
                 int presentResult = KHRSwapchain.vkQueuePresentKHR(queueForPresent, presentInfo);
                 if (presentResult == KHRSwapchain.VK_ERROR_OUT_OF_DATE_KHR
                     || presentResult == KHRSwapchain.VK_SUBOPTIMAL_KHR) {
+                    if (presentResult == KHRSwapchain.VK_ERROR_OUT_OF_DATE_KHR) {
+                        swapchainState.markPresentOutOfDate();
+                    } else {
+                        swapchainState.markPresentSuboptimal();
+                    }
                     recreateSwapchain();
                 } else {
                     checkVk("vkQueuePresentKHR", presentResult);
@@ -17435,18 +17350,16 @@ void main() {
                     if (successfulFramePresentCount <= 5) {
                         LOGGER.info(
                             "vkQueuePresentKHR succeeded for image {} (frame present #{}, sync slot {})",
-                            acquiredSwapchainImageIndex,
+                            swapchainState.acquiredImageIndex(),
                             successfulFramePresentCount,
-                            currentFrameSyncIndex
+                            swapchainState.currentFrameSyncIndex()
                         );
                     }
                 }
 
             } finally {
                 pendingPresentTextureRequest = null;
-                acquiredSwapchainImageIndex = -1;
-                frameInProgress = false;
-                currentFrameSyncIndex = (currentFrameSyncIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+                swapchainState.finishFrameAndAdvance();
             }
         }
 
@@ -17498,13 +17411,13 @@ void main() {
                 return;
             }
 
-            if (!frameInProgress || acquiredSwapchainImageIndex < 0) {
+            if (!swapchainState.frameInProgress() || swapchainState.acquiredImageIndex() < 0) {
                 throw new IllegalStateException("Cannot compose present texture without an acquired swapchain image.");
             }
-            if (acquiredSwapchainImageIndex >= swapchainImageHandles.size()) {
+            if (swapchainState.acquiredImageIndex() >= swapchainState.imageCount()) {
                 throw new IllegalStateException(
-                    "Acquired swapchain image index " + acquiredSwapchainImageIndex
-                        + " is outside swapchain image range " + swapchainImageHandles.size()
+                    "Acquired swapchain image index " + swapchainState.acquiredImageIndex()
+                        + " is outside swapchain image range " + swapchainState.imageCount()
                 );
             }
 
@@ -17515,13 +17428,13 @@ void main() {
                 );
             }
 
-            long swapchainImageHandle = swapchainImageHandles.get(acquiredSwapchainImageIndex);
+            long swapchainImageHandle = swapchainState.imageHandle(swapchainState.acquiredImageIndex());
             if (swapchainImageHandle == VK10.VK_NULL_HANDLE) {
                 throw new IllegalStateException("Acquired swapchain image handle is null");
             }
 
-            int dstWidth = Math.max(1, swapchainWidth);
-            int dstHeight = Math.max(1, swapchainHeight);
+            int dstWidth = Math.max(1, swapchainState.width());
+            int dstHeight = Math.max(1, swapchainState.height());
             int srcWidth = Math.max(1, request.width);
             int srcHeight = Math.max(1, request.height);
             if (srcWidth <= 0 || srcHeight <= 0 || dstWidth <= 0 || dstHeight <= 0) {
@@ -17539,20 +17452,20 @@ void main() {
                     Integer.toHexString(sourceTexture.vkFormat),
                     srcWidth,
                     srcHeight,
-                    Integer.toHexString(swapchainImageFormat),
+                    Integer.toHexString(swapchainState.imageFormat()),
                     dstWidth,
                     dstHeight
                 );
             }
 
-            boolean requiresShaderCompose = sourceTexture.vkFormat != swapchainImageFormat
+            boolean requiresShaderCompose = sourceTexture.vkFormat != swapchainState.imageFormat()
                 || srcWidth != dstWidth
                 || srcHeight != dstHeight;
             if (requiresShaderCompose && PRESENT_FORMAT_MISMATCH_LOG_COUNT.getAndIncrement() < 12) {
                 LOGGER.warn(
                     "Vulkan present source requires shader compose into swapchain (srcFormat=0x{}, dstFormat=0x{}, src={}x{}, dst={}x{}).",
                     Integer.toHexString(sourceTexture.vkFormat),
-                    Integer.toHexString(swapchainImageFormat),
+                    Integer.toHexString(swapchainState.imageFormat()),
                     srcWidth,
                     srcHeight,
                     dstWidth,
@@ -17583,18 +17496,18 @@ void main() {
             }
 
             if (DEBUG_CLEAR_SWAPCHAIN_PRESENT_EXPERIMENT) {
-                clearSwapchainImageWithRenderPass(frameCommandBuffer, acquiredSwapchainImageIndex, request.legacyTextureHandle);
+                clearSwapchainImageWithRenderPass(frameCommandBuffer, swapchainState.acquiredImageIndex(), request.legacyTextureHandle);
             } else if (requiresShaderCompose) {
                 composePendingPresentTextureWithFullscreenPass(
                     frameCommandBuffer,
                     sourceTexture,
                     request.mipLevel,
-                    acquiredSwapchainImageIndex,
+                    swapchainState.acquiredImageIndex(),
                     dstWidth,
                     dstHeight
                 );
             } else {
-                int swapchainImageLayout = trackedSwapchainImageLayout(acquiredSwapchainImageIndex);
+                int swapchainImageLayout = trackedSwapchainImageLayout(swapchainState.acquiredImageIndex());
                 transitionImageLayout(
                     frameCommandBuffer,
                     swapchainImageHandle,
@@ -17605,7 +17518,7 @@ void main() {
                     1,
                     1
                 );
-                trackSwapchainImageLayout(acquiredSwapchainImageIndex, VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+                trackSwapchainImageLayout(swapchainState.acquiredImageIndex(), VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
                 try (MemoryStack stack = stackPush()) {
                     VkImageCopy.Buffer region = VkImageCopy.calloc(1, stack);
@@ -17643,7 +17556,7 @@ void main() {
                     1,
                     1
                 );
-                trackSwapchainImageLayout(acquiredSwapchainImageIndex, KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+                trackSwapchainImageLayout(swapchainState.acquiredImageIndex(), KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
             }
 
             if (!DEBUG_CLEAR_SWAPCHAIN_PRESENT_EXPERIMENT) {
@@ -17741,7 +17654,7 @@ void main() {
         private synchronized VulkanPipelineHandle ensureSwapchainPresentComposePipeline() {
             if (swapchainPresentComposePipeline != null
                 && swapchainPresentComposePipeline.isValid()
-                && swapchainPresentComposePipelineFormat == swapchainImageFormat) {
+                && swapchainPresentComposePipelineFormat == swapchainState.imageFormat()) {
                 return swapchainPresentComposePipeline;
             }
 
@@ -17789,11 +17702,11 @@ void main() {
                     descriptor,
                     vertShaderModuleHandle,
                     fragShaderModuleHandle,
-                    swapchainImageFormat,
+                    swapchainState.imageFormat(),
                     true
                 );
                 swapchainPresentComposeDescriptor = descriptor;
-                swapchainPresentComposePipelineFormat = swapchainImageFormat;
+                swapchainPresentComposePipelineFormat = swapchainState.imageFormat();
                 return swapchainPresentComposePipeline;
             } finally {
                 destroyShaderModule(vertShaderModuleHandle);
@@ -17852,12 +17765,12 @@ void main() {
         }
 
         private ResolvedRenderTargets createSwapchainPresentResolvedTargets(int swapchainImageIndex, int width, int height) {
-            if (swapchainImageIndex < 0 || swapchainImageIndex >= swapchainImageHandles.size()) {
+            if (swapchainImageIndex < 0 || swapchainImageIndex >= swapchainState.imageCount()) {
                 throw new IllegalArgumentException("Invalid swapchain image index for present compose: " + swapchainImageIndex);
             }
 
-            long swapchainImageHandle = swapchainImageHandles.get(swapchainImageIndex);
-            long swapchainImageViewHandle = swapchainImageViewHandles.get(swapchainImageIndex);
+            long swapchainImageHandle = swapchainState.imageHandle(swapchainImageIndex);
+            long swapchainImageViewHandle = swapchainState.imageViewHandle(swapchainImageIndex);
             VulkanTexture swapchainTexture = new VulkanTexture(
                 swapchainImageHandle,
                 VK10.VK_NULL_HANDLE,
@@ -17919,10 +17832,10 @@ void main() {
         private void clearSwapchainImageWithRenderPass(VkCommandBuffer commandBuffer,
                                                        int swapchainImageIndex,
                                                        int sourceTextureHandle) {
-            if (swapchainPresentRenderPass == VK10.VK_NULL_HANDLE) {
+            if (swapchainState.presentRenderPass() == VK10.VK_NULL_HANDLE) {
                 throw new IllegalStateException("Swapchain present render pass is unavailable for debug clear composition.");
             }
-            if (swapchainImageIndex < 0 || swapchainImageIndex >= swapchainPresentFramebufferHandles.size()) {
+            if (swapchainImageIndex < 0 || swapchainImageIndex >= swapchainState.imageCount()) {
                 throw new IllegalStateException(
                     "Swapchain present framebuffer is unavailable for image index " + swapchainImageIndex
                 );
@@ -17949,12 +17862,12 @@ void main() {
 
                 VkRenderPassBeginInfo beginInfo = VkRenderPassBeginInfo.calloc(stack)
                     .sType$Default()
-                    .renderPass(swapchainPresentRenderPass)
-                    .framebuffer(swapchainPresentFramebufferHandles.get(swapchainImageIndex))
+                    .renderPass(swapchainState.presentRenderPass())
+                    .framebuffer(swapchainState.presentFramebufferHandle(swapchainImageIndex))
                     .pClearValues(clearValues);
                 beginInfo.renderArea()
                     .offset(it -> it.x(0).y(0))
-                    .extent(it -> it.width(swapchainWidth).height(swapchainHeight));
+                    .extent(it -> it.width(swapchainState.width()).height(swapchainState.height()));
 
                 VK10.vkCmdBeginRenderPass(commandBuffer, beginInfo, VK10.VK_SUBPASS_CONTENTS_INLINE);
                 VK10.vkCmdEndRenderPass(commandBuffer);
@@ -17964,22 +17877,22 @@ void main() {
         }
 
         private void ensureAcquiredSwapchainImagePresentLayout() {
-            if (!frameInProgress || acquiredSwapchainImageIndex < 0) {
+            if (!swapchainState.frameInProgress() || swapchainState.acquiredImageIndex() < 0) {
                 throw new IllegalStateException("Cannot prepare swapchain image for present without an acquired frame image.");
             }
-            if (acquiredSwapchainImageIndex >= swapchainImageHandles.size()) {
+            if (swapchainState.acquiredImageIndex() >= swapchainState.imageCount()) {
                 throw new IllegalStateException(
-                    "Acquired swapchain image index " + acquiredSwapchainImageIndex
-                        + " is outside swapchain image range " + swapchainImageHandles.size()
+                    "Acquired swapchain image index " + swapchainState.acquiredImageIndex()
+                        + " is outside swapchain image range " + swapchainState.imageCount()
                 );
             }
 
-            long swapchainImageHandle = swapchainImageHandles.get(acquiredSwapchainImageIndex);
+            long swapchainImageHandle = swapchainState.imageHandle(swapchainState.acquiredImageIndex());
             if (swapchainImageHandle == VK10.VK_NULL_HANDLE) {
                 throw new IllegalStateException("Acquired swapchain image handle is null");
             }
 
-            int swapchainImageLayout = trackedSwapchainImageLayout(acquiredSwapchainImageIndex);
+            int swapchainImageLayout = trackedSwapchainImageLayout(swapchainState.acquiredImageIndex());
             VkCommandBuffer frameCommandBuffer = ensureCurrentFrameCommandBufferRecording("ensureAcquiredSwapchainImagePresentLayout");
 
             if (swapchainImageLayout == KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) {
@@ -18005,7 +17918,7 @@ void main() {
                 1,
                 1
             );
-            trackSwapchainImageLayout(acquiredSwapchainImageIndex, KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+            trackSwapchainImageLayout(swapchainState.acquiredImageIndex(), KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
         }
 
         private long beginPrimaryCommandBuffer() {
@@ -18048,10 +17961,10 @@ void main() {
         }
 
         private VkCommandBuffer currentFrameCommandBuffer() {
-            VkCommandBuffer commandBuffer = frameCommandBuffers[currentFrameSyncIndex];
+            VkCommandBuffer commandBuffer = frameCommandBuffers[swapchainState.currentFrameSyncIndex()];
             if (commandBuffer == null) {
                 throw new IllegalStateException(
-                    "Frame Vulkan command buffer for sync slot " + currentFrameSyncIndex + " has not been allocated."
+                    "Frame Vulkan command buffer for sync slot " + swapchainState.currentFrameSyncIndex() + " has not been allocated."
                 );
             }
             return commandBuffer;
@@ -18062,15 +17975,15 @@ void main() {
         }
 
         private boolean isFrameInProgress() {
-            return frameInProgress;
+            return swapchainState.frameInProgress();
         }
 
         private boolean isCurrentFrameCommandBufferHandle(long commandBufferHandle) {
-            return frameInProgress && currentFrameCommandBufferHandle() == commandBufferHandle;
+            return swapchainState.frameInProgress() && currentFrameCommandBufferHandle() == commandBufferHandle;
         }
 
         private boolean isCurrentFrameCommandBufferRecording() {
-            return frameCommandBufferRecording[currentFrameSyncIndex];
+            return swapchainState.isCurrentFrameCommandBufferRecording();
         }
 
         private VkCommandBuffer ensureCurrentFrameCommandBufferRecording(String operation) {
@@ -18082,28 +17995,28 @@ void main() {
             try (MemoryStack stack = stackPush()) {
                 java.nio.LongBuffer frameFenceBuffer = stack.longs(currentSwapchainFrameFence());
                 checkVk(
-                    "vkWaitForFences(frameCommandBuffer[" + currentFrameSyncIndex + "])",
+                    "vkWaitForFences(frameCommandBuffer[" + swapchainState.currentFrameSyncIndex() + "])",
                     VK10.vkWaitForFences(logicalDevice, frameFenceBuffer, true, Long.MAX_VALUE)
                 );
                 markFenceComplete(currentSwapchainFrameFence());
                 checkVk(
-                    "vkResetCommandPool(frame[" + currentFrameSyncIndex + "])",
-                    VK10.vkResetCommandPool(logicalDevice, frameCommandPools[currentFrameSyncIndex], 0)
+                    "vkResetCommandPool(frame[" + swapchainState.currentFrameSyncIndex() + "])",
+                    VK10.vkResetCommandPool(logicalDevice, frameCommandPools[swapchainState.currentFrameSyncIndex()], 0)
                 );
 
                 VkCommandBufferBeginInfo beginInfo = VkCommandBufferBeginInfo.calloc(stack)
                     .sType$Default()
                     .flags(VK10.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
                 checkVk(
-                    "vkBeginCommandBuffer(frame[" + currentFrameSyncIndex + "])",
+                    "vkBeginCommandBuffer(frame[" + swapchainState.currentFrameSyncIndex() + "])",
                     VK10.vkBeginCommandBuffer(commandBuffer, beginInfo)
                 );
                 clearTrackedCommandBufferState(commandBuffer.address());
-                frameCommandBufferRecording[currentFrameSyncIndex] = true;
+                swapchainState.setCurrentFrameCommandBufferRecording(true);
                 return commandBuffer;
             } catch (RuntimeException exception) {
                 throw new IllegalStateException(
-                    "Failed to begin Vulkan frame command buffer for sync slot " + currentFrameSyncIndex
+                    "Failed to begin Vulkan frame command buffer for sync slot " + swapchainState.currentFrameSyncIndex()
                         + " during " + operation,
                     exception
                 );
@@ -18252,7 +18165,7 @@ void main() {
                 java.nio.LongBuffer frameFenceBuffer = stack.longs(frameFence);
                 checkVk("vkResetFences(swapchainFrame)", VK10.vkResetFences(logicalDevice, frameFenceBuffer));
                 checkVk("vkQueueSubmit(frameBridge)", VK10.vkQueueSubmit(graphicsQueue, submitInfos, frameFence));
-                registerSubmittedWork(frameFence, lifetime.reservedFrameWorkGeneration(currentFrameSyncIndex));
+                registerSubmittedWork(frameFence, lifetime.reservedFrameWorkGeneration(swapchainState.currentFrameSyncIndex()));
             }
         }
 
@@ -18260,7 +18173,7 @@ void main() {
             VkCommandBuffer frameCommandBuffer = currentFrameCommandBuffer();
             if (!isCurrentFrameCommandBufferRecording()) {
                 throw new IllegalStateException(
-                    "Cannot submit Vulkan frame command buffer for sync slot " + currentFrameSyncIndex + " because it is not recording."
+                    "Cannot submit Vulkan frame command buffer for sync slot " + swapchainState.currentFrameSyncIndex() + " because it is not recording."
                 );
             }
 
@@ -18270,7 +18183,7 @@ void main() {
                 long renderFinishedSemaphore = acquiredSwapchainRenderFinishedSemaphore();
 
                 checkVk(
-                    "vkEndCommandBuffer(frame[" + currentFrameSyncIndex + "])",
+                    "vkEndCommandBuffer(frame[" + swapchainState.currentFrameSyncIndex() + "])",
                     VK10.vkEndCommandBuffer(frameCommandBuffer)
                 );
 
@@ -18287,9 +18200,9 @@ void main() {
                 java.nio.LongBuffer frameFenceBuffer = stack.longs(frameFence);
                 checkVk("vkResetFences(swapchainFrame)", VK10.vkResetFences(logicalDevice, frameFenceBuffer));
                 checkVk("vkQueueSubmit(frame)", VK10.vkQueueSubmit(graphicsQueue, submitInfos, frameFence));
-                registerSubmittedWork(frameFence, lifetime.reservedFrameWorkGeneration(currentFrameSyncIndex));
+                registerSubmittedWork(frameFence, lifetime.reservedFrameWorkGeneration(swapchainState.currentFrameSyncIndex()));
 
-                frameCommandBufferRecording[currentFrameSyncIndex] = false;
+                swapchainState.setCurrentFrameCommandBufferRecording(false);
                 clearTrackedCommandBufferState(frameCommandBuffer.address());
                 backend.boundPipelineResourcesByCommandBuffer.remove(frameCommandBuffer.address());
             }
@@ -18349,7 +18262,7 @@ void main() {
 
             if (commandBufferHandle == primaryCommandBuffer.address()) {
                 if (!commandBufferRecording) {
-                    if (immediateSubmitInFlight && frameInProgress) {
+                    if (immediateSubmitInFlight && swapchainState.frameInProgress()) {
                         return ensureCurrentFrameCommandBufferRecording(operation + " (rerouted from deferred primary submit)");
                     }
                     beginPrimaryCommandBuffer();
@@ -18365,7 +18278,7 @@ void main() {
                     }
                     return primaryCommandBuffer;
                 }
-                if (immediateSubmitInFlight && frameInProgress && immediateSubmitSlotsInFlight[immediateSlot]) {
+                if (immediateSubmitInFlight && swapchainState.frameInProgress() && immediateSubmitSlotsInFlight[immediateSlot]) {
                     return ensureCurrentFrameCommandBufferRecording(operation + " (rerouted from deferred primary submit)");
                 }
                 currentImmediateSubmitSlot = immediateSlot;
@@ -18445,10 +18358,10 @@ void main() {
                     );
                 }
                 if (usePersistentSwapchainPass) {
-                    if (swapchainPresentRenderPass == VK10.VK_NULL_HANDLE) {
+                    if (swapchainState.presentRenderPass() == VK10.VK_NULL_HANDLE) {
                         throw new IllegalStateException("Swapchain present render pass is unavailable for swapchain-targeted compose pass.");
                     }
-                    if (swapchainColorImageIndex < 0 || swapchainColorImageIndex >= swapchainPresentFramebufferHandles.size()) {
+                    if (swapchainColorImageIndex < 0 || swapchainColorImageIndex >= swapchainState.imageCount()) {
                         throw new IllegalStateException(
                             "Swapchain present framebuffer is unavailable for image index " + swapchainColorImageIndex
                         );
@@ -18468,8 +18381,8 @@ void main() {
 
                     VkRenderPassBeginInfo beginInfo = VkRenderPassBeginInfo.calloc(stack)
                         .sType$Default()
-                        .renderPass(swapchainPresentRenderPass)
-                        .framebuffer(swapchainPresentFramebufferHandles.get(swapchainColorImageIndex))
+                        .renderPass(swapchainState.presentRenderPass())
+                        .framebuffer(swapchainState.presentFramebufferHandle(swapchainColorImageIndex))
                         .pClearValues(clearValues);
                     beginInfo.renderArea()
                         .offset(it -> it.x(0).y(0))
@@ -18506,7 +18419,7 @@ void main() {
 	                    trackSwapchainImageLayout(swapchainColorImageIndex, VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
                     renderPassRecording = true;
                     VulkanRenderPassCompatibilityKey swapchainCompatibility =
-                        VulkanRenderPassCompatibilityKey.swapchainPresent(swapchainImageFormat);
+                        VulkanRenderPassCompatibilityKey.swapchainPresent(swapchainState.imageFormat());
                     renderTargetState.beginPass(
                         swapchainCompatibility,
                         width,
@@ -18529,7 +18442,7 @@ void main() {
                 VulkanRenderPassLayoutPlanner.AttachmentInput colorInput =
                     VulkanRenderPassLayoutPlanner.AttachmentInput.color(
                         0,
-                        swapchainColorAttachment ? swapchainImageFormat : toVkFormat(colorTexture.getVulkanicFormat()),
+                        swapchainColorAttachment ? swapchainState.imageFormat() : toVkFormat(colorTexture.getVulkanicFormat()),
                         !swapchainColorAttachment && legacyColorTexture != null && legacyColorTexture.feedbackLoopCapable,
                         swapchainColorAttachment,
                         colorTrackedLayout,
@@ -19019,7 +18932,7 @@ void main() {
         }
 
         private boolean isSwapchainImageViewHandle(long imageViewHandle) {
-            return imageViewHandle != VK10.VK_NULL_HANDLE && swapchainImageViewHandles.contains(imageViewHandle);
+            return swapchainState.imageIndexForViewHandle(imageViewHandle) >= 0;
         }
 
         private void endRenderPass(long commandBufferHandle) {
@@ -19299,8 +19212,8 @@ void main() {
                 slice.length(),
                 initialData
             );
-            if (frameInProgress) {
-                lifetime.trackFrameDescriptorResource(currentFrameSyncIndex, transientBuffer);
+            if (swapchainState.frameInProgress()) {
+                lifetime.trackFrameDescriptorResource(swapchainState.currentFrameSyncIndex(), transientBuffer);
             } else {
                 trackTransientDescriptorBuffer(transientBuffer);
             }
@@ -19324,8 +19237,8 @@ void main() {
                 size,
                 initialData
             );
-            if (frameInProgress) {
-                lifetime.trackFrameDescriptorResource(currentFrameSyncIndex, transientBuffer);
+            if (swapchainState.frameInProgress()) {
+                lifetime.trackFrameDescriptorResource(swapchainState.currentFrameSyncIndex(), transientBuffer);
             } else {
                 trackTransientDescriptorBuffer(transientBuffer);
             }
@@ -20349,27 +20262,27 @@ void main() {
         }
 
         private int swapchainImageFormat() {
-            return swapchainImageFormat;
+            return swapchainState.imageFormat();
         }
 
         private int swapchainColorSpace() {
-            return swapchainColorSpace;
+            return swapchainState.colorSpace();
         }
 
         private int swapchainPresentMode() {
-            return swapchainPresentMode;
+            return swapchainState.presentMode();
         }
 
         private int swapchainImageCount() {
-            return swapchainImageCount;
+            return swapchainState.imageCount();
         }
 
         private int swapchainWidth() {
-            return swapchainWidth;
+            return swapchainState.width();
         }
 
         private int swapchainHeight() {
-            return swapchainHeight;
+            return swapchainState.height();
         }
 
         private boolean isRenderPassActive() {
@@ -20397,7 +20310,7 @@ void main() {
             int viewportHeight = Math.max(height, 1);
             int framebufferHeight = renderTargetState.activeHeight() > 0
                 ? renderTargetState.activeHeight()
-                : Math.max(swapchainHeight, viewportHeight);
+                : Math.max(swapchainState.height(), viewportHeight);
             try (MemoryStack stack = stackPush()) {
                 org.lwjgl.vulkan.VkViewport.Buffer viewport = org.lwjgl.vulkan.VkViewport.calloc(1, stack)
                     .x((float) x)
@@ -20459,10 +20372,10 @@ void main() {
             int scissorHeight = Math.max(height, 0);
             int framebufferWidth = renderTargetState.activeWidth() > 0
                 ? renderTargetState.activeWidth()
-                : Math.max(swapchainWidth, scissorWidth);
+                : Math.max(swapchainState.width(), scissorWidth);
             int framebufferHeight = renderTargetState.activeHeight() > 0
                 ? renderTargetState.activeHeight()
-                : Math.max(swapchainHeight, scissorHeight);
+                : Math.max(swapchainState.height(), scissorHeight);
             int translatedY = framebufferHeight - (y + scissorHeight);
             int clampedX = Math.max(0, Math.min(x, framebufferWidth));
             int clampedY = Math.max(0, Math.min(translatedY, framebufferHeight));
@@ -20488,8 +20401,8 @@ void main() {
         }
 
         private void applyFullRenderAreaScissor(VkCommandBuffer activeCommandBuffer) {
-            int fullWidth = renderTargetState.activeWidth() > 0 ? renderTargetState.activeWidth() : swapchainWidth;
-            int fullHeight = renderTargetState.activeHeight() > 0 ? renderTargetState.activeHeight() : swapchainHeight;
+            int fullWidth = renderTargetState.activeWidth() > 0 ? renderTargetState.activeWidth() : swapchainState.width();
+            int fullHeight = renderTargetState.activeHeight() > 0 ? renderTargetState.activeHeight() : swapchainState.height();
             if (fullWidth <= 0 || fullHeight <= 0) {
                 return;
             }
@@ -20539,8 +20452,8 @@ void main() {
                     attachments.get(idx).clearValue().depthStencil().depth(depth).stencil(stencil);
                 }
 
-                int w = Math.max(1, renderTargetState.activeWidth() > 0 ? renderTargetState.activeWidth() : swapchainWidth);
-                int h = Math.max(1, renderTargetState.activeHeight() > 0 ? renderTargetState.activeHeight() : swapchainHeight);
+                int w = Math.max(1, renderTargetState.activeWidth() > 0 ? renderTargetState.activeWidth() : swapchainState.width());
+                int h = Math.max(1, renderTargetState.activeHeight() > 0 ? renderTargetState.activeHeight() : swapchainState.height());
                 rects.get(0)
                     .rect(r -> r.offset(o -> o.x(0).y(0)).extent(e -> e.width(w).height(h)))
                     .baseArrayLayer(0)
@@ -20644,7 +20557,7 @@ void main() {
                         frameCommandPools[frameIndex] = VK10.VK_NULL_HANDLE;
                     }
                     frameCommandBuffers[frameIndex] = null;
-                    frameCommandBufferRecording[frameIndex] = false;
+                    swapchainState.setFrameCommandBufferRecording(frameIndex, false);
                 }
 
                 descriptorManager.destroyDescriptorPools(logicalDevice);
@@ -20672,17 +20585,18 @@ void main() {
                 immediateSubmitInFlight = false;
 
                 for (int frameIndex = 0; frameIndex < MAX_FRAMES_IN_FLIGHT; frameIndex++) {
-                    if (swapchainImageAvailableSemaphores[frameIndex] != VK10.VK_NULL_HANDLE) {
-                        VK10.vkDestroySemaphore(logicalDevice, swapchainImageAvailableSemaphores[frameIndex], null);
-                        swapchainImageAvailableSemaphores[frameIndex] = VK10.VK_NULL_HANDLE;
+                    long imageAvailableSemaphore = swapchainState.imageAvailableSemaphore(frameIndex);
+                    if (imageAvailableSemaphore != VK10.VK_NULL_HANDLE) {
+                        VK10.vkDestroySemaphore(logicalDevice, imageAvailableSemaphore, null);
+                        swapchainState.setImageAvailableSemaphore(frameIndex, VK10.VK_NULL_HANDLE);
                     }
-                    if (swapchainFrameFences[frameIndex] != VK10.VK_NULL_HANDLE) {
-                        VK10.vkDestroyFence(logicalDevice, swapchainFrameFences[frameIndex], null);
-                        swapchainFrameFences[frameIndex] = VK10.VK_NULL_HANDLE;
+                    long frameFence = swapchainState.frameFence(frameIndex);
+                    if (frameFence != VK10.VK_NULL_HANDLE) {
+                        VK10.vkDestroyFence(logicalDevice, frameFence, null);
+                        swapchainState.setFrameFence(frameIndex, VK10.VK_NULL_HANDLE);
                     }
                 }
-                swapchainImagesInFlight = new long[0];
-                currentFrameSyncIndex = 0;
+                swapchainState.resetFrameState();
 
                 descriptorManager.destroyDescriptorSamplers(samplerHandle -> VK10.vkDestroySampler(logicalDevice, samplerHandle, null));
 
@@ -20700,8 +20614,7 @@ void main() {
                 presentIdExtensionEnabled = false;
                 presentWaitExtensionEnabled = false;
                 nextPresentId = 1L;
-                frameInProgress = false;
-                acquiredSwapchainImageIndex = -1;
+                swapchainState.resetFrameState();
                 pendingPresentTextureRequest = null;
             }
 

@@ -3990,9 +3990,9 @@ public class Phase3DrawPathTest {
             "Vulkan render-pass clears should emit a VkClearAttachment for each active color attachment");
         assertTrue(backendSource.contains(".colorAttachment(colorAttachment);"),
             "Vulkan render-pass clears should target the looped attachment index");
-        assertTrue(backendSource.contains("renderTargetState.activeWidth() > 0 ? renderTargetState.activeWidth() : swapchainWidth"),
+        assertTrue(backendSource.contains("renderTargetState.activeWidth() > 0 ? renderTargetState.activeWidth() : swapchainState.width()"),
             "Vulkan render-pass clears should use the active render area width when clearing framebuffer-backed passes");
-        assertTrue(backendSource.contains("renderTargetState.activeHeight() > 0 ? renderTargetState.activeHeight() : swapchainHeight"),
+        assertTrue(backendSource.contains("renderTargetState.activeHeight() > 0 ? renderTargetState.activeHeight() : swapchainState.height()"),
             "Vulkan render-pass clears should use the active render area height when clearing framebuffer-backed passes");
         assertTrue(backendSource.contains("return renderTargetState.activeColorAttachmentCount();"),
             "Vulkan render-pass clears should still clear swapchain-only render passes that do not track legacy color textures");
@@ -5797,7 +5797,7 @@ public class Phase3DrawPathTest {
 
         assertTrue(source.contains("boolean swapchainPresentCompatible"),
             "Vulkan pipeline creation should distinguish swapchain-present render-pass compatibility from feedback-loop compatibility");
-        assertTrue(source.contains("swapchainImageFormat,\n                    true"),
+        assertTrue(source.contains("swapchainState.imageFormat(),\n                    true"),
             "Swapchain present compose pipeline should request the swapchain-present-compatible render pass contract");
         assertTrue(source.contains("VulkanRenderPassLayoutPlanner.planPipelineCompatible(compatibilityKey)")
                 && source.contains("allocateCompatibleSubpassDependencies(stack, layoutPlan)"),

@@ -292,11 +292,11 @@ public class VulkanManagedTextureLifecycleTest {
 
         assertTrue(source.contains("VulkanDeferredResourceLifetime<StagingBuffer, VulkanBuffer> lifetime"),
             "Vulkan backend should centralize native resource retirement behind the deferred lifetime manager");
-        assertTrue(source.contains("lifetime.reserveFrameWorkGeneration(currentFrameSyncIndex)"),
+        assertTrue(source.contains("lifetime.reserveFrameWorkGeneration(swapchainState.currentFrameSyncIndex())"),
             "Frame command recording should reserve a generation before resources can be closed during that frame");
         assertTrue(source.contains("lifetime.reserveImmediateWorkGeneration(currentImmediateSubmitSlot)"),
             "Immediate command recording should reserve a generation before resources can be closed during that submit");
-        assertTrue(source.contains("registerSubmittedWork(frameFence, lifetime.reservedFrameWorkGeneration(currentFrameSyncIndex))"),
+        assertTrue(source.contains("registerSubmittedWork(frameFence, lifetime.reservedFrameWorkGeneration(swapchainState.currentFrameSyncIndex()))"),
             "Frame submits should publish their reserved generation to the lifetime manager");
         assertTrue(source.contains("registerSubmittedWork(submitFence, lifetime.reservedImmediateWorkGeneration(submitSlot))"),
             "Immediate submits should publish their reserved generation to the lifetime manager");

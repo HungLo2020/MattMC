@@ -127,7 +127,8 @@ public class VulkanSwapchainSurfaceInfoTest {
             "Swapchain lifecycle should enumerate swapchain images during creation/recreation");
         assertTrue(source.contains("vkCreateImageView(swapchain)"),
             "Swapchain lifecycle should materialize VkImageView handles for swapchain images");
-        assertTrue(source.contains("swapchainImageViewHandles"),
+        assertTrue(source.contains("swapchainState.imageViewHandlesSnapshot()")
+                && source.contains("swapchainState.installSwapchain("),
             "Swapchain lifecycle should track swapchain image view handles for cleanup/recreation");
         assertTrue(source.contains("destroyTrackedSwapchainImageViews()"),
             "Swapchain lifecycle should destroy tracked image views during teardown");
