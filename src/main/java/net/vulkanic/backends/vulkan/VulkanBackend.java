@@ -46,6 +46,8 @@ import net.vulkanic.VulkanNativeInitializationInfo;
 import net.vulkanic.VulkanSwapchainSurfaceInfo;
 import net.vulkanic.VulkanicBufferTarget;
 import net.vulkanic.VulkanicResourceBarriers;
+import net.vulkanic.diagnostics.RenderTargetContentDiagnostics;
+import net.vulkanic.diagnostics.RenderTargetContentDiagnostics.DiagnosticTextureContentHash;
 import net.vulkanic.diagnostics.VulkanicDiagnostics;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
@@ -3602,7 +3604,7 @@ void main() {
         return spine.createManagedTextureViewForLegacyTexture(legacyTextureWrapper, legacyTextureHandle, 0, mipLevels);
     }
 
-    public VulkanicAPI.DiagnosticTextureContentHash diagnosticTextureContentHash(
+    public DiagnosticTextureContentHash diagnosticTextureContentHash(
         CommandContext ctx,
         VulkanicTextureView textureView,
         String logicalResource
@@ -3613,7 +3615,7 @@ void main() {
             throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
         }
         if (!(textureView instanceof VulkanTextureView vulkanTextureView)) {
-            return VulkanicAPI.DiagnosticTextureContentHash.unavailable(
+            return DiagnosticTextureContentHash.unavailable(
                 logicalResource,
                 textureView == null ? null : textureView.texture(),
                 textureView,
@@ -3623,7 +3625,7 @@ void main() {
         try {
             return spine.diagnosticTextureContentHash(vulkanTextureView, logicalResource);
         } catch (RuntimeException exception) {
-            return VulkanicAPI.DiagnosticTextureContentHash.unavailable(
+            return DiagnosticTextureContentHash.unavailable(
                 logicalResource,
                 textureView.texture(),
                 textureView,
@@ -15210,12 +15212,12 @@ void main() {
             trackLayoutForLevel(sourceTexture, 0, sourceOriginalLayout);
         }
 
-        private VulkanicAPI.DiagnosticTextureContentHash diagnosticTextureContentHash(
+        private DiagnosticTextureContentHash diagnosticTextureContentHash(
             VulkanTextureView textureView,
             String logicalResource
         ) {
             if (renderPassRecording) {
-                return VulkanicAPI.DiagnosticTextureContentHash.unavailable(
+                return DiagnosticTextureContentHash.unavailable(
                     logicalResource,
                     textureView.texture(),
                     textureView,
@@ -15223,7 +15225,7 @@ void main() {
                 );
             }
             if (textureView.getBaseMipLevel() != 0) {
-                return VulkanicAPI.DiagnosticTextureContentHash.unavailable(
+                return DiagnosticTextureContentHash.unavailable(
                     logicalResource,
                     textureView.texture(),
                     textureView,
@@ -15233,7 +15235,7 @@ void main() {
 
             LegacyTextureObject sourceTexture = tryResolveLegacyTexture(textureView);
             if (sourceTexture == null) {
-                return VulkanicAPI.DiagnosticTextureContentHash.unavailable(
+                return DiagnosticTextureContentHash.unavailable(
                     logicalResource,
                     textureView.texture(),
                     textureView,
@@ -15241,7 +15243,7 @@ void main() {
                 );
             }
             if (sourceTexture.imageHandle == VK10.VK_NULL_HANDLE) {
-                return VulkanicAPI.DiagnosticTextureContentHash.unavailable(
+                return DiagnosticTextureContentHash.unavailable(
                     logicalResource,
                     textureView.texture(),
                     textureView,
@@ -15249,7 +15251,7 @@ void main() {
                 );
             }
             if (sourceTexture.aspectMask != VK10.VK_IMAGE_ASPECT_COLOR_BIT) {
-                return VulkanicAPI.DiagnosticTextureContentHash.unavailable(
+                return DiagnosticTextureContentHash.unavailable(
                     logicalResource,
                     textureView.texture(),
                     textureView,
@@ -15261,7 +15263,7 @@ void main() {
             int height = Math.max(0, textureView.getHeight(0));
             int pixelBytes = Math.max(1, sourceTexture.pixelBytes);
             if (width <= 0 || height <= 0) {
-                return VulkanicAPI.DiagnosticTextureContentHash.unavailable(
+                return DiagnosticTextureContentHash.unavailable(
                     logicalResource,
                     textureView.texture(),
                     textureView,
@@ -15299,14 +15301,14 @@ void main() {
                         height
                     );
                     if (canonical == null) {
-                        return VulkanicAPI.DiagnosticTextureContentHash.unavailable(
+                        return DiagnosticTextureContentHash.unavailable(
                             logicalResource,
                             textureView.texture(),
                             textureView,
                             "format-0x" + Integer.toHexString(sourceTexture.vkFormat)
                         );
                     }
-                    return VulkanicAPI.diagnosticContentHashFromCanonical(
+                    return RenderTargetContentDiagnostics.contentHashFromCanonical(
                         logicalResource,
                         textureView.texture(),
                         textureView,

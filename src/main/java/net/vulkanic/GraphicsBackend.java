@@ -12,6 +12,7 @@ import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderPass;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.diagnostics.RenderTargetContentDiagnostics.DiagnosticTextureContentHash;
 import org.jetbrains.annotations.Nullable;
 
 import java.nio.ByteBuffer;
@@ -3866,12 +3867,12 @@ public interface GraphicsBackend {
      * <p>Backends should leave rendering behavior unchanged and return an explicit
      * {@code unavailable:*} hash when the requested texture cannot be read safely.</p>
      */
-    default VulkanicAPI.DiagnosticTextureContentHash diagnosticTextureContentHash(
+    default DiagnosticTextureContentHash diagnosticTextureContentHash(
         CommandContext ctx,
         VulkanicTextureView textureView,
         String logicalResource
     ) {
-        return VulkanicAPI.DiagnosticTextureContentHash.unavailable(
+        return DiagnosticTextureContentHash.unavailable(
             logicalResource,
             textureView == null ? null : textureView.texture(),
             textureView,

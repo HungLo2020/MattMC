@@ -24,6 +24,13 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.TimeSource.NanoTimeSource;
 import net.vulkanic.backends.opengl.OpenGLBackend;
 import net.vulkanic.backends.vulkan.VulkanBackend;
+import net.vulkanic.diagnostics.RenderTargetContentDiagnostics;
+import net.vulkanic.diagnostics.RenderTargetContentDiagnostics.DiagnosticProducerAttachment;
+import net.vulkanic.diagnostics.RenderTargetContentDiagnostics.DiagnosticTextureContentHash;
+import net.vulkanic.diagnostics.RenderTargetContentDiagnostics.DiagnosticViewportState;
+import net.vulkanic.diagnostics.RenderTargetContentDiagnostics.PendingScopedCompositeColortex0SamplerReadback;
+import net.vulkanic.diagnostics.RenderTargetContentDiagnostics.ScopedCompositeColortex0Binding;
+import net.vulkanic.diagnostics.RenderTargetContentDiagnostics.ScopedCompositeColortex0Producer;
 import net.vulkanic.diagnostics.VulkanicDiagnostics;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
@@ -56,20 +63,6 @@ public class VulkanicAPI {
     private static GraphicsBackend backend;
     @Nullable
     private static VulkanBackend rawVulkanBackend;
-    @Nullable
-    private static ScopedCompositeColortex0Binding scopedCompositeColortex0Binding;
-    private static final java.util.Set<String> SCOPED_COMPOSITE_COLORTEX0_EMITTED =
-        java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
-    private static final java.util.concurrent.ConcurrentMap<Integer, java.util.List<DiagnosticIrisColorAttachment>> DIAGNOSTIC_IRIS_FRAMEBUFFER_ATTACHMENTS =
-        new java.util.concurrent.ConcurrentHashMap<>();
-    private static final java.util.concurrent.ConcurrentMap<Integer, DiagnosticIrisColorAttachment> DIAGNOSTIC_IRIS_TEXTURE_ATTACHMENTS =
-        new java.util.concurrent.ConcurrentHashMap<>();
-    private static final java.util.concurrent.ConcurrentMap<String, ScopedCompositeColortex0Producer> SCOPED_COMPOSITE_COLORTEX0_PRODUCERS =
-        new java.util.concurrent.ConcurrentHashMap<>();
-    private static final java.util.concurrent.ConcurrentMap<String, PendingScopedCompositeColortex0SamplerReadback> PENDING_SCOPED_COMPOSITE_COLORTEX0_SAMPLER_READBACKS =
-        new java.util.concurrent.ConcurrentHashMap<>();
-    @Nullable
-    private static volatile DiagnosticViewportState diagnosticLastViewport;
 
     private static final boolean IS_MACOS = System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("mac");
     @Nullable
@@ -103,150 +96,8 @@ public class VulkanicAPI {
         intConsumer.accept(i);
     });
 
-    private record ScopedCompositeColortex0Binding(
-        PipelineHandle pipeline,
-        String pipelineLocation,
-        String vertexShader,
-        String fragmentShader,
-        String pipelineKey,
-        String stableKey,
-        String resourceName,
-        int resourceSet,
-        int resourceBinding,
-        String resourceType,
-        java.util.List<String> stages,
-        int samplerUnit,
-        @Nullable Object samplerObject,
-        @Nullable VulkanicTexture texture,
-        int baseMipLevel,
-        int mipLevelCount,
-        int legacyTextureId,
-        String source
-    ) {}
-
-    private record DiagnosticIrisColorAttachment(
-        int framebuffer,
-        int colorAttachment,
-        int logicalIndex,
-        int textureId,
-        String logicalName,
-        String pingPong,
-        String source
-    ) {}
-
-    private record ScopedCompositeColortex0Producer(
-        String backend,
-        String source,
-        String passLabel,
-        String customPassName,
-        String pipelineLocation,
-        String physicalKey,
-        int textureId,
-        String logicalAttachment,
-        int colorAttachment,
-        String pingPong,
-        String descriptorSignature,
-        String attachmentUsage,
-        String lifecycleInfo,
-        String poseName,
-        String deterministicFields,
-        DiagnosticTextureContentHash hash
-    ) {}
-
-    private record PendingScopedCompositeColortex0SamplerReadback(
-        String backend,
-        String customPassName,
-        String pipelineLocation,
-        String vertexShader,
-        String fragmentShader,
-        String pipelineKey,
-        String stableKey,
-        String resourceName,
-        int textureUnit,
-        @Nullable Object samplerObject,
-        VulkanicTextureView textureView,
-        int legacyTextureId,
-        String physicalKey,
-        String outputLogical,
-        String outputPingPong,
-        int colorAttachment,
-        int outputTextureId,
-        String renderTarget,
-        String attachmentUsage,
-        String draw,
-        String vertexInput,
-        String pipelineState,
-        String viewport,
-        String scissor,
-        String poseName,
-        String deterministicFields
-    ) {}
-
-    private record DiagnosticProducerAttachment(
-        int colorAttachment,
-        int textureId,
-        String logicalName,
-        String pingPong,
-        String usage
-    ) {}
-
-    private record DiagnosticViewportState(int x, int y, int width, int height) {
-        private String describe() {
-            return x + "," + y + "," + width + "," + height;
-        }
-    }
-
     public static VulkanicDrawStateSnapshot.ViewportStateSnapshot drawStateParityViewportSnapshot() {
-        DiagnosticViewportState viewport = diagnosticLastViewport;
-        if (viewport == null) {
-            return VulkanicDrawStateSnapshot.ViewportStateSnapshot.unknown();
-        }
-        return new VulkanicDrawStateSnapshot.ViewportStateSnapshot(
-            true,
-            viewport.x(),
-            viewport.y(),
-            viewport.width(),
-            viewport.height()
-        );
-    }
-
-    public record DiagnosticTextureContentHash(
-        String logicalResource,
-        int width,
-        int height,
-        VulkanicTextureFormat storageFormat,
-        String canonicalFormat,
-        int mip,
-        int layer,
-        String originConvention,
-        String channelInterpretation,
-        String hash,
-        String tileHashes
-    ) {
-        public static DiagnosticTextureContentHash unavailable(
-            String logicalResource,
-            @Nullable VulkanicTexture texture,
-            @Nullable VulkanicTextureView textureView,
-            String reason
-        ) {
-            VulkanicTextureFormat format = texture == null ? null : texture.getVulkanicFormat();
-            int width = textureView == null ? -1 : safeTextureViewWidth(textureView);
-            int height = textureView == null ? -1 : safeTextureViewHeight(textureView);
-            int mip = textureView == null ? 0 : textureView.getBaseMipLevel();
-            return new DiagnosticTextureContentHash(
-                shaderInputParitySanitizeLabel(logicalResource),
-                width,
-                height,
-                format,
-                "unavailable",
-                mip,
-                0,
-                "unavailable",
-                "unavailable",
-                "unavailable:" + shaderInputParitySanitizeLabel(reason),
-                ""
-            );
-        }
+        return RenderTargetContentDiagnostics.viewportSnapshot();
     }
     private static final VulkanicAPI.AutoStorageIndexBuffer sharedSequentialLines = new VulkanicAPI.AutoStorageIndexBuffer(4, 6, (intConsumer, i) -> {
         intConsumer.accept(i);
@@ -1365,7 +1216,7 @@ public class VulkanicAPI {
     public static void setDynamicViewport(CommandContext ctx, int x, int y, int width, int height) {
         if ((VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES && DeterministicCameraCapture.isEnabledForDiagnostics())
             || VulkanicDrawStateDiagnostics.enabled()) {
-            diagnosticLastViewport = new DiagnosticViewportState(x, y, width, height);
+            RenderTargetContentDiagnostics.recordViewport(x, y, width, height);
         }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         if (directVulkanBackend != null) {
@@ -7649,8 +7500,8 @@ public class VulkanicAPI {
             .map(Enum::name)
             .sorted()
             .toList();
-        scopedCompositeColortex0Binding = new ScopedCompositeColortex0Binding(
-            pipeline,
+        RenderTargetContentDiagnostics.recordScopedCompositeBinding(new ScopedCompositeColortex0Binding(
+            pipeline == null ? null : pipeline.getClass().getSimpleName(),
             String.valueOf(descriptor.getPortableState().location()),
             String.valueOf(descriptor.getPortableState().vertexShader()),
             String.valueOf(descriptor.getPortableState().fragmentShader()),
@@ -7668,7 +7519,7 @@ public class VulkanicAPI {
             textureView.getMipLevelCount(),
             legacyTextureIdFromLabel(textureView.texture().getLabel()),
             source
-        );
+        ));
     }
 
     public static void recordScopedCompositeColortex0RenderPassBinding(
@@ -7737,7 +7588,7 @@ public class VulkanicAPI {
         } catch (RuntimeException exception) {
             customPassName = "unavailable:" + exception.getClass().getSimpleName();
         }
-        if (!shouldTraceScopedCompositeColortex0Pass(customPassName)) {
+        if (!RenderTargetContentDiagnostics.shouldTraceScopedCompositeColortex0Pass(customPassName)) {
             return;
         }
 
@@ -7764,7 +7615,7 @@ public class VulkanicAPI {
                 textureView,
                 "sampler-binding-hash-out-of-scope"
             );
-        } else if (!isDeterministicCaptureEligiblePose()) {
+        } else if (!RenderTargetContentDiagnostics.isDeterministicCaptureEligiblePose()) {
             contentHash = DiagnosticTextureContentHash.unavailable(
                 "colortex0",
                 textureView == null ? null : textureView.texture(),
@@ -7778,12 +7629,12 @@ public class VulkanicAPI {
                 textureView,
                 "sampler-binding-deferred-until-renderpass-close"
             );
-        } else if (!reserveDiagnosticContentReadback("sampler-binding", readbackKey)) {
+        } else if (!RenderTargetContentDiagnostics.reserveContentReadback("sampler-binding", readbackKey)) {
             contentHash = DiagnosticTextureContentHash.unavailable(
                 "colortex0",
                 textureView == null ? null : textureView.texture(),
                 textureView,
-                diagnosticContentReadbackUnavailableReason(null, "sampler-binding", readbackKey)
+                RenderTargetContentDiagnostics.contentReadbackUnavailableReason(null, "sampler-binding", readbackKey)
             );
         } else {
             try {
@@ -7815,7 +7666,7 @@ public class VulkanicAPI {
             physicalKey,
             shaderInputParitySanitizeLabel(lifecycleInfo),
             shaderInputParityDeterministicContextFields(),
-            diagnosticContentHashFields(contentHash)
+            RenderTargetContentDiagnostics.contentHashFields(contentHash)
         );
     }
 
@@ -7846,7 +7697,7 @@ public class VulkanicAPI {
         String source
     ) {
         PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(renderPipeline);
-        scopedCompositeColortex0Binding = new ScopedCompositeColortex0Binding(
+        RenderTargetContentDiagnostics.recordScopedCompositeBinding(new ScopedCompositeColortex0Binding(
             null,
             String.valueOf(renderPipeline.getLocation()),
             String.valueOf(renderPipeline.getVertexShader()),
@@ -7865,7 +7716,7 @@ public class VulkanicAPI {
             mipLevelCount,
             legacyTextureId > 0 ? legacyTextureId : legacyTextureIdFromLabel(texture == null ? null : texture.getLabel()),
             source
-        );
+        ));
     }
 
     public static void recordDiagnosticIrisColorAttachment(
@@ -7876,35 +7727,21 @@ public class VulkanicAPI {
         boolean writesMain,
         String source
     ) {
-        if (!VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES || textureId <= 0) {
-            return;
-        }
-        DiagnosticIrisColorAttachment attachment = new DiagnosticIrisColorAttachment(
+        RenderTargetContentDiagnostics.recordIrisColorAttachment(
             framebuffer,
             colorAttachment,
             logicalIndex,
             textureId,
-            "colortex" + logicalIndex,
-            writesMain ? "main" : "alt",
+            writesMain,
             source
         );
-        DIAGNOSTIC_IRIS_TEXTURE_ATTACHMENTS.put(textureId, attachment);
-        DIAGNOSTIC_IRIS_FRAMEBUFFER_ATTACHMENTS.compute(framebuffer, (ignored, existing) -> {
-            java.util.ArrayList<DiagnosticIrisColorAttachment> updated = existing == null
-                ? new java.util.ArrayList<>()
-                : new java.util.ArrayList<>(existing);
-            updated.removeIf(previous -> previous.colorAttachment() == colorAttachment);
-            updated.add(attachment);
-            updated.sort(java.util.Comparator.comparingInt(DiagnosticIrisColorAttachment::colorAttachment));
-            return java.util.List.copyOf(updated);
-        });
     }
 
     public static void traceIrisColortex0PhaseHash(String phase, String pingPong, int textureId) {
         if (!VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES || !VulkanicDiagnostics.TRACE_IRIS_COLORTEX0_PHASE_HASHES) {
             return;
         }
-        if (!DeterministicCameraCapture.isEnabledForDiagnostics() || !isDeterministicCaptureEligiblePose()) {
+        if (!DeterministicCameraCapture.isEnabledForDiagnostics() || !RenderTargetContentDiagnostics.isDeterministicCaptureEligiblePose()) {
             return;
         }
         if (textureId <= 0) {
@@ -7927,12 +7764,12 @@ public class VulkanicAPI {
             + '|' + phase
             + '|' + pingPong
             + '|' + physicalKey;
-        if (!reserveDiagnosticContentReadback("iris-phase", readbackKey)) {
+        if (!RenderTargetContentDiagnostics.reserveContentReadback("iris-phase", readbackKey)) {
             contentHash = DiagnosticTextureContentHash.unavailable(
                 "colortex0",
                 textureView == null ? null : textureView.texture(),
                 textureView,
-                diagnosticContentReadbackUnavailableReason(null, "iris-phase", readbackKey)
+                RenderTargetContentDiagnostics.contentReadbackUnavailableReason(null, "iris-phase", readbackKey)
             );
         } else {
             try {
@@ -7962,7 +7799,7 @@ public class VulkanicAPI {
             physicalKey,
             shaderInputParitySanitizeLabel(lifecycleInfo),
             shaderInputParityDeterministicContextFields(),
-            diagnosticContentHashFields(contentHash)
+            RenderTargetContentDiagnostics.contentHashFields(contentHash)
         );
     }
 
@@ -7977,7 +7814,7 @@ public class VulkanicAPI {
             return;
         }
 
-        java.util.List<DiagnosticProducerAttachment> attachments = diagnosticProducerAttachments(descriptor, framebuffer);
+        java.util.List<DiagnosticProducerAttachment> attachments = RenderTargetContentDiagnostics.producerAttachments(descriptor, framebuffer);
         if (attachments.isEmpty()) {
             return;
         }
@@ -8010,19 +7847,19 @@ public class VulkanicAPI {
                     textureView,
                     "producer-hash-disabled"
                 );
-            } else if (!shouldHashScopedCompositeColortex0Producer(customPassName, attachment)) {
+            } else if (!RenderTargetContentDiagnostics.shouldHashScopedCompositeColortex0Producer(customPassName, attachment)) {
                 contentHash = DiagnosticTextureContentHash.unavailable(
                     "colortex0",
                     textureView == null ? null : textureView.texture(),
                     textureView,
                     "producer-hash-out-of-scope"
                 );
-            } else if (!reserveDiagnosticContentReadback("producer", readbackKey)) {
+            } else if (!RenderTargetContentDiagnostics.reserveContentReadback("producer", readbackKey)) {
                 contentHash = DiagnosticTextureContentHash.unavailable(
                     "colortex0",
                     textureView == null ? null : textureView.texture(),
                     textureView,
-                    diagnosticContentReadbackUnavailableReason(null, "producer", readbackKey)
+                    RenderTargetContentDiagnostics.contentReadbackUnavailableReason(null, "producer", readbackKey)
                 );
             } else {
                 try {
@@ -8061,7 +7898,7 @@ public class VulkanicAPI {
                 shaderInputParityDeterministicContextFields(),
                 contentHash
             );
-            SCOPED_COMPOSITE_COLORTEX0_PRODUCERS.put(backendName + '|' + physicalKey, producer);
+            RenderTargetContentDiagnostics.recordProducer(producer);
             LOGGER.info(
                 "ShaderInputParityScopedColortex0Lifecycle backend={} event=producer-complete source={} logicalAttachment={} colorAttachment={} pingPong={} textureId={} physicalKey={} passLabel={} customPass={} pipelineLocation={} descriptorSignature=\"{}\" attachmentUsage=\"{}\" lifecycle=\"{}\" {} contentHash={{{}}}",
                 backendName,
@@ -8078,84 +7915,9 @@ public class VulkanicAPI {
                 shaderInputParitySanitizeLabel(producer.attachmentUsage()),
                 shaderInputParitySanitizeLabel(producer.lifecycleInfo()),
                 producer.deterministicFields(),
-                diagnosticContentHashFields(producer.hash())
+                RenderTargetContentDiagnostics.contentHashFields(producer.hash())
             );
         }
-    }
-
-    private static boolean shouldHashScopedCompositeColortex0Producer(
-        String customPassName,
-        DiagnosticProducerAttachment attachment
-    ) {
-        if (!isDeterministicCaptureEligiblePose()) {
-            return false;
-        }
-        if ("composite".equals(customPassName)) {
-            return "main".equals(attachment.pingPong());
-        }
-        if (VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES_INITIAL_POSE_ONLY) {
-            return false;
-        }
-        if ("composite3".equals(customPassName)) {
-            return "alt".equals(attachment.pingPong());
-        }
-        return false;
-    }
-
-    private static boolean isDeterministicCaptureEligiblePose() {
-        if (VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES_INITIAL_POSE_ONLY) {
-            return "initial".equals(DeterministicCameraCapture.currentPoseNameForDiagnostics());
-        }
-        String poseName = DeterministicCameraCapture.currentPoseNameForDiagnostics();
-        return "initial".equals(poseName)
-            || "right".equals(poseName)
-            || "left".equals(poseName)
-            || "return".equals(poseName);
-    }
-
-    private static boolean shouldTraceScopedCompositeColortex0Pass(String customPassName) {
-        return "composite".equals(customPassName) || "composite3".equals(customPassName);
-    }
-
-    private static java.util.List<DiagnosticProducerAttachment> diagnosticProducerAttachments(
-        @Nullable VulkanicRenderTargetDescriptor descriptor,
-        int framebuffer
-    ) {
-        java.util.ArrayList<DiagnosticProducerAttachment> attachments = new java.util.ArrayList<>();
-        if (descriptor != null) {
-            for (int colorIndex = 0; colorIndex < descriptor.colorAttachments().size(); colorIndex++) {
-                VulkanicRenderTargetDescriptor.ColorAttachment colorAttachment = descriptor.colorAttachments().get(colorIndex);
-                DiagnosticIrisColorAttachment irisAttachment = DIAGNOSTIC_IRIS_TEXTURE_ATTACHMENTS.get(colorAttachment.textureId());
-                String logicalName = irisAttachment == null ? "unknown" : irisAttachment.logicalName();
-                String pingPong = irisAttachment == null ? "unknown" : irisAttachment.pingPong();
-                String usage = "initial=" + colorAttachment.initialUsage()
-                    + ",pass=" + colorAttachment.passUsage()
-                    + ",final=" + colorAttachment.finalUsage()
-                    + ",load=" + colorAttachment.loadOp()
-                    + ",store=" + colorAttachment.storeOp();
-                attachments.add(new DiagnosticProducerAttachment(
-                    colorIndex,
-                    colorAttachment.textureId(),
-                    logicalName,
-                    pingPong,
-                    usage
-                ));
-            }
-            return attachments;
-        }
-
-        java.util.List<DiagnosticIrisColorAttachment> framebufferAttachments =
-            DIAGNOSTIC_IRIS_FRAMEBUFFER_ATTACHMENTS.getOrDefault(framebuffer, java.util.List.of());
-        for (DiagnosticIrisColorAttachment attachment : framebufferAttachments) {
-            attachments.add(new DiagnosticProducerAttachment(
-                attachment.colorAttachment(),
-                attachment.textureId(),
-                attachment.logicalName(),
-                attachment.pingPong(),
-                "irisFramebufferAttachment=true,source=" + attachment.source()
-            ));
-        }
-        return attachments;
     }
 
     public static void traceScopedCompositeColortex0ProducerDraw(
@@ -8187,8 +7949,8 @@ public class VulkanicAPI {
         String customPassName = diagnosticCustomPassName(customPass);
 
         DiagnosticProducerAttachment outputAttachment = null;
-        for (DiagnosticProducerAttachment attachment : diagnosticProducerAttachments(descriptor, framebuffer)) {
-            if (isScopedCompositeColortex0ProducerOutput(customPassName, attachment)) {
+        for (DiagnosticProducerAttachment attachment : RenderTargetContentDiagnostics.producerAttachments(descriptor, framebuffer)) {
+            if (RenderTargetContentDiagnostics.isScopedCompositeColortex0ProducerOutput(customPassName, attachment)) {
                 outputAttachment = attachment;
                 break;
             }
@@ -8200,7 +7962,7 @@ public class VulkanicAPI {
         PipelineDescriptor resolvedDescriptor = pipelineDescriptor != null
             ? pipelineDescriptor
             : PipelineDescriptor.fromRenderPipeline(renderPipeline);
-        DiagnosticViewportState viewport = diagnosticLastViewport;
+        DiagnosticViewportState viewport = RenderTargetContentDiagnostics.lastViewport();
         PipelineDescriptor.PortableState state = resolvedDescriptor.getPortableState();
         String backendName = getActiveBackendType().name().toLowerCase(java.util.Locale.ROOT);
         String renderTarget = descriptor == null ? "framebuffer:" + framebuffer : descriptor.debugSignature();
@@ -8268,7 +8030,7 @@ public class VulkanicAPI {
     }
 
     private static String diagnosticScopedCompositeColortex0BindingResourceSummary() {
-        ScopedCompositeColortex0Binding binding = scopedCompositeColortex0Binding;
+        ScopedCompositeColortex0Binding binding = RenderTargetContentDiagnostics.scopedCompositeBinding();
         if (binding == null) {
             return "unavailable:no-scoped-colortex0-binding";
         }
@@ -8283,7 +8045,12 @@ public class VulkanicAPI {
                 textureView,
                 "draw-resource-list-no-readback"
             );
-            return scopedCompositeColortex0ResourceString(binding, textureView, contentHash);
+            return RenderTargetContentDiagnostics.scopedCompositeColortex0ResourceString(
+                binding,
+                textureView,
+                contentHash,
+                shaderInputParityDeterministicContextFields()
+            );
         } finally {
             if (textureView != null) {
                 textureView.close();
@@ -8314,7 +8081,7 @@ public class VulkanicAPI {
         if (!"composite".equals(customPassName) || !"main".equals(outputAttachment.pingPong())) {
             return;
         }
-        if (!isDeterministicCaptureEligiblePose() || bindings == null) {
+        if (!RenderTargetContentDiagnostics.isDeterministicCaptureEligiblePose() || bindings == null) {
             return;
         }
 
@@ -8346,7 +8113,8 @@ public class VulkanicAPI {
             + '|' + resourceBinding.name()
             + '|' + physicalKey
             + "|unit:" + samplerBinding.textureUnit();
-        PENDING_SCOPED_COMPOSITE_COLORTEX0_SAMPLER_READBACKS.putIfAbsent(
+        VulkanicTextureView pendingTextureView = textureView;
+        RenderTargetContentDiagnostics.recordPendingScopedCompositeSamplerReadback(
             pendingKey,
             new PendingScopedCompositeColortex0SamplerReadback(
                 getActiveBackendType().name().toLowerCase(java.util.Locale.ROOT),
@@ -8359,7 +8127,6 @@ public class VulkanicAPI {
                 resourceBinding.name(),
                 samplerBinding.textureUnit(),
                 samplerBinding.samplerObject(),
-                textureView,
                 legacyTextureId,
                 physicalKey,
                 outputAttachment.logicalName(),
@@ -8374,7 +8141,18 @@ public class VulkanicAPI {
                 viewport,
                 scissor,
                 DeterministicCameraCapture.currentPoseNameForDiagnostics(),
-                shaderInputParityDeterministicContextFields()
+                shaderInputParityDeterministicContextFields(),
+                new RenderTargetContentDiagnostics.PendingReadbackAction() {
+                    @Override
+                    public DiagnosticTextureContentHash read() {
+                        return diagnosticTextureContentHash(pendingTextureView, "colortex0");
+                    }
+
+                    @Override
+                    public String lifecycleInfo() {
+                        return diagnosticTextureLifecycleInfo(pendingTextureView, "colortex0");
+                    }
+                }
             )
         );
     }
@@ -8383,39 +8161,34 @@ public class VulkanicAPI {
         if (!VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES || !VulkanicDiagnostics.TRACE_RENDER_TARGET_SAMPLER_BINDING_HASHES) {
             return;
         }
-        if (PENDING_SCOPED_COMPOSITE_COLORTEX0_SAMPLER_READBACKS.isEmpty()) {
+        if (!RenderTargetContentDiagnostics.hasPendingScopedCompositeSamplerReadbacks()) {
             return;
         }
-        java.util.List<java.util.Map.Entry<String, PendingScopedCompositeColortex0SamplerReadback>> pending =
-            new java.util.ArrayList<>(PENDING_SCOPED_COMPOSITE_COLORTEX0_SAMPLER_READBACKS.entrySet());
-        pending.sort(java.util.Map.Entry.comparingByKey());
-        for (java.util.Map.Entry<String, PendingScopedCompositeColortex0SamplerReadback> entry : pending) {
+        for (java.util.Map.Entry<String, PendingScopedCompositeColortex0SamplerReadback> entry
+            : RenderTargetContentDiagnostics.drainPendingScopedCompositeSamplerReadbacks()) {
             PendingScopedCompositeColortex0SamplerReadback snapshot = entry.getValue();
-            if (!PENDING_SCOPED_COMPOSITE_COLORTEX0_SAMPLER_READBACKS.remove(entry.getKey(), snapshot)) {
-                continue;
-            }
 
             DiagnosticTextureContentHash contentHash;
-            if (!reserveDiagnosticContentReadback("deferred-sampler", entry.getKey())) {
+            if (!RenderTargetContentDiagnostics.reserveContentReadback("deferred-sampler", entry.getKey())) {
                 contentHash = DiagnosticTextureContentHash.unavailable(
                     "colortex0",
-                    snapshot.textureView().texture(),
-                    snapshot.textureView(),
-                    diagnosticContentReadbackUnavailableReason(null, "deferred-sampler", entry.getKey())
+                    null,
+                    null,
+                    RenderTargetContentDiagnostics.contentReadbackUnavailableReason(null, "deferred-sampler", entry.getKey())
                 );
             } else {
                 try {
-                    contentHash = diagnosticTextureContentHash(snapshot.textureView(), "colortex0");
+                    contentHash = snapshot.readbackAction().read();
                 } catch (RuntimeException exception) {
                     contentHash = DiagnosticTextureContentHash.unavailable(
                         "colortex0",
-                        snapshot.textureView().texture(),
-                        snapshot.textureView(),
+                        null,
+                        null,
                         "exception-" + exception.getClass().getSimpleName() + '-' + exception.getMessage()
                     );
                 }
             }
-            String lifecycleInfo = diagnosticTextureLifecycleInfo(snapshot.textureView(), "colortex0");
+            String lifecycleInfo = snapshot.readbackAction().lifecycleInfo();
             LOGGER.info(
                 "ShaderInputParityScopedColortex0DeferredSamplerReadback backend={} source={} customPass={} pipelineLocation={} vertexShader={} fragmentShader={} pipelineKey={} stableKey={} resourceName={} textureUnit={} samplerObject={} legacyTextureId={} physicalKey={} outputLogical={} outputPingPong={} colorAttachment={} outputTextureId={} renderTarget=\"{}\" attachmentUsage=\"{}\" viewport={} scissor={} draw={} vertexInput={} pipelineState={} lifecycle=\"{}\" {} contentHash={{{}}}",
                 snapshot.backend(),
@@ -8444,7 +8217,7 @@ public class VulkanicAPI {
                 snapshot.pipelineState(),
                 shaderInputParitySanitizeLabel(lifecycleInfo),
                 snapshot.deterministicFields(),
-                diagnosticContentHashFields(contentHash)
+                RenderTargetContentDiagnostics.contentHashFields(contentHash)
             );
         }
     }
@@ -8462,29 +8235,13 @@ public class VulkanicAPI {
             return false;
         }
         String customPassName = diagnosticCustomPassName(customPass);
-        if (!shouldTraceScopedCompositeColortex0Pass(customPassName)) {
+        if (!RenderTargetContentDiagnostics.shouldTraceScopedCompositeColortex0Pass(customPassName)) {
             return false;
         }
-        for (DiagnosticProducerAttachment attachment : diagnosticProducerAttachments(descriptor, framebuffer)) {
-            if (isScopedCompositeColortex0ProducerOutput(customPassName, attachment)) {
+        for (DiagnosticProducerAttachment attachment : RenderTargetContentDiagnostics.producerAttachments(descriptor, framebuffer)) {
+            if (RenderTargetContentDiagnostics.isScopedCompositeColortex0ProducerOutput(customPassName, attachment)) {
                 return true;
             }
-        }
-        return false;
-    }
-
-    private static boolean isScopedCompositeColortex0ProducerOutput(
-        String customPassName,
-        DiagnosticProducerAttachment attachment
-    ) {
-        if (!"colortex0".equals(attachment.logicalName())) {
-            return false;
-        }
-        if ("composite".equals(customPassName)) {
-            return "main".equals(attachment.pingPong());
-        }
-        if ("composite3".equals(customPassName)) {
-            return "alt".equals(attachment.pingPong());
         }
         return false;
     }
@@ -8679,10 +8436,10 @@ public class VulkanicAPI {
         if (!DeterministicCameraCapture.isEnabledForDiagnostics()) {
             return;
         }
-        if (!isDeterministicCaptureEligiblePose()) {
+        if (!RenderTargetContentDiagnostics.isDeterministicCaptureEligiblePose()) {
             return;
         }
-        ScopedCompositeColortex0Binding binding = scopedCompositeColortex0Binding;
+        ScopedCompositeColortex0Binding binding = RenderTargetContentDiagnostics.scopedCompositeBinding();
         if (binding == null) {
             LOGGER.info(
                 "ShaderInputParityResources backend={} source=scoped-composite-colortex0-content pipelineLocation=iris:composite vertexShader=unknown fragmentShader=unknown pipelineHandle=none pipelineKey=unavailable stableKey=unavailable {} resources=[colortex0{layout=set:0,binding:0,type:SAMPLER,stages:[FRAGMENT],sampler={unit=0,view=missing},contentHash={logicalResource=colortex0,mip=0,layer=0,region=0:0:-1:-1,canonicalFormat=unavailable,origin=unavailable,channels=unavailable,hash=unavailable:not-bound-at-pose-boundary,poseContext={}}}]",
@@ -8694,29 +8451,27 @@ public class VulkanicAPI {
         }
 
         String poseName = DeterministicCameraCapture.currentPoseNameForDiagnostics();
-        String emitKey = getActiveBackendType() + "|" + poseName + "|"
-            + binding.stableKey() + "|"
-            + (binding.texture() == null ? "legacy:" + binding.legacyTextureId() : "texture:" + System.identityHashCode(binding.texture()))
-            + "|mip:" + binding.baseMipLevel() + ':' + binding.mipLevelCount();
-        if (!SCOPED_COMPOSITE_COLORTEX0_EMITTED.add(emitKey)) {
+        String backendName = getActiveBackendType().name().toLowerCase(java.util.Locale.ROOT);
+        String physicalKey = physicalResourceKey(binding.legacyTextureId(), binding.texture());
+        if (!RenderTargetContentDiagnostics.markScopedCompositePoseEmitted(backendName, poseName, binding, physicalKey)) {
             return;
         }
 
         VulkanicTextureView textureView = createScopedCompositeColortex0DiagnosticView(binding);
         DiagnosticTextureContentHash contentHash;
-        String physicalKey = physicalResourceKey(binding.legacyTextureId(), textureView == null ? binding.texture() : textureView.texture());
-        String readbackKey = getActiveBackendType().name().toLowerCase(java.util.Locale.ROOT)
+        physicalKey = physicalResourceKey(binding.legacyTextureId(), textureView == null ? binding.texture() : textureView.texture());
+        String readbackKey = backendName
             + "|pose-boundary|"
             + poseName
             + '|' + binding.pipelineLocation()
             + '|' + binding.stableKey()
             + '|' + physicalKey;
-        if (!reserveDiagnosticContentReadback("pose-boundary", readbackKey)) {
+        if (!RenderTargetContentDiagnostics.reserveContentReadback("pose-boundary", readbackKey)) {
             contentHash = DiagnosticTextureContentHash.unavailable(
                 "colortex0",
                 textureView == null ? binding.texture() : textureView.texture(),
                 textureView,
-                diagnosticContentReadbackUnavailableReason(null, "pose-boundary", readbackKey)
+                RenderTargetContentDiagnostics.contentReadbackUnavailableReason(null, "pose-boundary", readbackKey)
             );
         } else {
             try {
@@ -8730,9 +8485,13 @@ public class VulkanicAPI {
                 );
             }
         }
-        String resource = scopedCompositeColortex0ResourceString(binding, textureView, contentHash);
-        String backendName = getActiveBackendType().name().toLowerCase(java.util.Locale.ROOT);
-        ScopedCompositeColortex0Producer producer = SCOPED_COMPOSITE_COLORTEX0_PRODUCERS.get(backendName + '|' + physicalKey);
+        String resource = RenderTargetContentDiagnostics.scopedCompositeColortex0ResourceString(
+            binding,
+            textureView,
+            contentHash,
+            shaderInputParityDeterministicContextFields()
+        );
+        ScopedCompositeColortex0Producer producer = RenderTargetContentDiagnostics.producer(backendName, physicalKey);
         String lifecycleInfo = textureView == null
             ? "textureView=missing"
             : diagnosticTextureLifecycleInfo(textureView, "colortex0");
@@ -8747,7 +8506,7 @@ public class VulkanicAPI {
             binding.pipelineLocation(),
             binding.vertexShader(),
             binding.fragmentShader(),
-            binding.pipeline() == null ? "none" : binding.pipeline().getClass().getSimpleName() + "@" + Integer.toHexString(System.identityHashCode(binding.pipeline())),
+            binding.pipelineHandleDescription() == null ? "none" : binding.pipelineHandleDescription(),
             binding.pipelineKey(),
             binding.stableKey(),
             shaderInputParityDeterministicContextFields(),
@@ -8787,7 +8546,7 @@ public class VulkanicAPI {
             shaderInputParitySanitizeLabel(lifecycleInfo),
             shaderInputParityDeterministicContextFields(),
             producer == null ? "unavailable:no-producer" : producer.hash().hash(),
-            diagnosticContentHashFields(contentHash)
+            RenderTargetContentDiagnostics.contentHashFields(contentHash)
         );
     }
 
@@ -8813,63 +8572,6 @@ public class VulkanicAPI {
             );
         }
         return null;
-    }
-
-    private static String scopedCompositeColortex0ResourceString(
-        ScopedCompositeColortex0Binding binding,
-        @Nullable VulkanicTextureView textureView,
-        DiagnosticTextureContentHash contentHash
-    ) {
-        VulkanicTexture texture = textureView == null ? binding.texture() : textureView.texture();
-        String viewDescription = textureView == null
-            ? "missing"
-            : "{viewClass=" + textureView.getClass().getSimpleName()
-            + ",baseMip=" + textureView.getBaseMipLevel()
-            + ",mips=" + textureView.getMipLevelCount()
-            + ",width=" + safeTextureViewWidth(textureView)
-            + ",height=" + safeTextureViewHeight(textureView)
-            + ",closed=" + textureView.isClosed()
-            + ",texture=" + scopedCompositeColortex0TextureString(texture)
-            + "}";
-        return binding.resourceName()
-            + "{layout=set:" + binding.resourceSet()
-            + ",binding:" + binding.resourceBinding()
-            + ",type:" + binding.resourceType()
-            + ",stages:[" + String.join(", ", binding.stages()) + "]"
-            + ",sampler={unit=" + binding.samplerUnit()
-            + ",samplerObject=" + (binding.samplerObject() == null ? "none" : binding.samplerObject())
-            + ",legacyTextureId=" + binding.legacyTextureId()
-            + ",view=" + viewDescription
-            + "},contentHash={" + diagnosticContentHashFields(contentHash)
-            + ",poseContext={" + shaderInputParityDeterministicContextFields().replace(' ', ',') + "}}}";
-    }
-
-    private static String diagnosticContentHashFields(DiagnosticTextureContentHash contentHash) {
-        return "logicalResource=" + contentHash.logicalResource()
-            + ",mip=" + contentHash.mip()
-            + ",layer=" + contentHash.layer()
-            + ",region=0:0:" + contentHash.width() + ':' + contentHash.height()
-            + ",canonicalFormat=" + contentHash.canonicalFormat()
-            + ",storageFormat=" + contentHash.storageFormat()
-            + ",origin=" + contentHash.originConvention()
-            + ",channels=" + contentHash.channelInterpretation()
-            + ",hash=" + contentHash.hash()
-            + (contentHash.tileHashes().isBlank() ? "" : ",tileHashes=" + contentHash.tileHashes());
-    }
-
-    private static String scopedCompositeColortex0TextureString(@Nullable VulkanicTexture texture) {
-        if (texture == null) {
-            return "missing";
-        }
-        return "{label=\"" + shaderInputParitySanitizeLabel(texture.getLabel()) + '"'
-            + ",format=" + texture.getVulkanicFormat()
-            + ",width=" + safeTextureWidth(texture, 0)
-            + ",height=" + safeTextureHeight(texture, 0)
-            + ",layers=" + texture.getDepthOrLayers()
-            + ",mips=" + texture.getMipLevels()
-            + ",usage=" + texture.usage()
-            + ",closed=" + texture.isClosed()
-            + "}";
     }
 
     private static boolean isLogicalColortex0(String resourceName, @Nullable VulkanicTextureView textureView) {
@@ -8906,42 +8608,6 @@ public class VulkanicAPI {
         return directVulkanBackend != null
             ? directVulkanBackend.diagnosticTextureContentHash(getCommandContext(), textureView, logicalResource)
             : getBackend().diagnosticTextureContentHash(getCommandContext(), textureView, logicalResource);
-    }
-
-    private static boolean reserveDiagnosticContentReadback(String feature, String readbackKey) {
-        if (!VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES) {
-            return false;
-        }
-
-        String normalizedKey = feature + '|' + readbackKey;
-        if (!VulkanicDiagnostics.RENDER_TARGET_CONTENT_READBACK_KEYS.add(normalizedKey)) {
-            return false;
-        }
-
-        int count = VulkanicDiagnostics.RENDER_TARGET_CONTENT_READBACK_COUNT.incrementAndGet();
-        if (count <= VulkanicDiagnostics.MAX_RENDER_TARGET_CONTENT_READBACKS) {
-            return true;
-        }
-        VulkanicDiagnostics.RENDER_TARGET_CONTENT_READBACK_KEYS.remove(normalizedKey);
-        return false;
-    }
-
-    private static String diagnosticContentReadbackUnavailableReason(String featureDisabledReason, String feature, String readbackKey) {
-        if (!VulkanicDiagnostics.TRACE_RENDER_TARGET_CONTENT_HASHES) {
-            return "content-hashes-disabled";
-        }
-        if (featureDisabledReason != null && !featureDisabledReason.isBlank()) {
-            return featureDisabledReason;
-        }
-        String normalizedKey = feature + '|' + readbackKey;
-        boolean alreadyReserved = VulkanicDiagnostics.RENDER_TARGET_CONTENT_READBACK_KEYS.contains(normalizedKey);
-        if (alreadyReserved) {
-            return "content-readback-duplicate-skipped";
-        }
-        if (VulkanicDiagnostics.RENDER_TARGET_CONTENT_READBACK_COUNT.get() >= VulkanicDiagnostics.MAX_RENDER_TARGET_CONTENT_READBACKS) {
-            return "content-readback-budget-exhausted";
-        }
-        return "content-readback-unavailable";
     }
 
     private static String diagnosticTextureLifecycleInfo(VulkanicTextureView textureView, String logicalResource) {
@@ -9922,7 +9588,8 @@ public class VulkanicAPI {
             .append(",samplerState={").append(shaderInputParitySamplerState(texture)).append('}')
             .append("}}}}");
 
-        if (VulkanicDiagnostics.TRACE_SHADER_INPUT_SAMPLER_CONTENT_HASHES && shouldTraceRenderTargetContentHash(resourceBinding.name(), texture.getLabel())) {
+        if (VulkanicDiagnostics.TRACE_SHADER_INPUT_SAMPLER_CONTENT_HASHES
+            && RenderTargetContentDiagnostics.shouldTraceRenderTargetContentHash(resourceBinding.name(), texture.getLabel())) {
             builder.append(",contentHash={")
                 .append("logicalResource=").append(shaderInputParitySanitizeLabel(resourceBinding.name()))
                 .append(",mip=").append(textureView.getBaseMipLevel())
@@ -9956,23 +9623,6 @@ public class VulkanicAPI {
             case RED8, RED8I -> "linear-red";
             case DEPTH32, DEPTH24_STENCIL8, DEPTH32F_STENCIL8 -> "depth";
         };
-    }
-
-    private static boolean shouldTraceRenderTargetContentHash(String resourceName, @Nullable String label) {
-        String normalizedName = resourceName == null ? "" : resourceName.toLowerCase(Locale.ROOT);
-        String normalizedLabel = label == null ? "" : label.toLowerCase(Locale.ROOT);
-        return normalizedName.startsWith("colortex")
-            || normalizedName.startsWith("depthtex")
-            || normalizedName.contains("dhdepth")
-            || normalizedName.contains("shadow")
-            || normalizedName.contains("floodfill")
-            || normalizedName.contains("history")
-            || normalizedLabel.startsWith("colortex")
-            || normalizedLabel.startsWith("depthtex")
-            || normalizedLabel.contains("dhdepth")
-            || normalizedLabel.contains("shadow")
-            || normalizedLabel.contains("floodfill")
-            || normalizedLabel.contains("history");
     }
 
     private static String shaderInputParityTextureContentHash(VulkanicTextureView textureView, String resourceName) {
@@ -10126,128 +9776,14 @@ public class VulkanicAPI {
         }
         componentBytes.position(0);
         componentBytes.limit(componentBytes.capacity());
-        java.nio.ByteBuffer canonical = canonicalizeFloatComponentsToRgba32fTopLeft(
+        java.nio.ByteBuffer canonical = RenderTargetContentDiagnostics.canonicalizeFloatComponentsToRgba32fTopLeft(
             componentBytes,
             width,
             height,
             componentCount,
             true
         );
-        return diagnosticContentHashFromCanonical(logicalResource, texture, textureView, canonical, width, height);
-    }
-
-    public static DiagnosticTextureContentHash diagnosticContentHashFromCanonical(
-        String logicalResource,
-        VulkanicTexture texture,
-        VulkanicTextureView textureView,
-        java.nio.ByteBuffer canonicalRgba32fTopLeft,
-        int width,
-        int height
-    ) {
-        java.nio.ByteBuffer bytes = canonicalRgba32fTopLeft.duplicate();
-        bytes.position(0);
-        bytes.limit(bytes.capacity());
-        bytes.limit(width * height * 4 * Float.BYTES);
-        String hash = shaderInputParityHash(bytes, bytes.remaining());
-        String tileHashes;
-        try {
-            tileHashes = diagnosticTileHashes(bytes, width, height);
-        } catch (RuntimeException exception) {
-            tileHashes = "unavailable:" + shaderInputParitySanitizeLabel(
-                exception.getClass().getSimpleName() + '-' + exception.getMessage()
-            );
-        }
-        return new DiagnosticTextureContentHash(
-            shaderInputParitySanitizeLabel(logicalResource),
-            width,
-            height,
-            texture.getVulkanicFormat(),
-            "RGBA32F_LE",
-            textureView.getBaseMipLevel(),
-            0,
-            "top-left-row-major",
-            "raw-linear-shader-visible-components-alpha-one-when-source-lacks-alpha",
-            hash,
-            tileHashes
-        );
-    }
-
-    public static java.nio.ByteBuffer canonicalizeFloatComponentsToRgba32fTopLeft(
-        java.nio.ByteBuffer source,
-        int width,
-        int height,
-        int sourceComponents,
-        boolean sourceRowsAreBottomToTop
-    ) {
-        java.nio.ByteBuffer input = source.duplicate().order(java.nio.ByteOrder.nativeOrder());
-        input.position(0);
-        java.nio.FloatBuffer floats = input.asFloatBuffer();
-        java.nio.ByteBuffer canonical = BufferUtils.createByteBuffer(width * height * 4 * Float.BYTES)
-            .order(java.nio.ByteOrder.LITTLE_ENDIAN);
-        for (int y = 0; y < height; y++) {
-            int sourceY = sourceRowsAreBottomToTop ? height - 1 - y : y;
-            for (int x = 0; x < width; x++) {
-                int sourceIndex = (sourceY * width + x) * sourceComponents;
-                float r = sourceComponents >= 1 ? floats.get(sourceIndex) : 0.0F;
-                float g = sourceComponents >= 2 ? floats.get(sourceIndex + 1) : r;
-                float b = sourceComponents >= 3 ? floats.get(sourceIndex + 2) : r;
-                float a = sourceComponents >= 4 ? floats.get(sourceIndex + 3) : 1.0F;
-                canonical.putFloat(r);
-                canonical.putFloat(g);
-                canonical.putFloat(b);
-                canonical.putFloat(a);
-            }
-        }
-        canonical.flip();
-        return canonical;
-    }
-
-    public static String diagnosticHash(java.nio.ByteBuffer data, int length) {
-        return shaderInputParityHash(data, length);
-    }
-
-    private static String diagnosticTileHashes(java.nio.ByteBuffer canonical, int width, int height) {
-        if (width <= 0 || height <= 0) {
-            return "";
-        }
-        int tilesX = 4;
-        int tilesY = 4;
-        int bytesPerPixel = 4 * Float.BYTES;
-        int expectedBytes = width * height * bytesPerPixel;
-        if (canonical.capacity() < expectedBytes) {
-            return "unavailable:canonical-size-mismatch:expected-" + expectedBytes + ":actual-" + canonical.capacity();
-        }
-        java.util.List<String> hashes = new java.util.ArrayList<>(tilesX * tilesY);
-        for (int tileY = 0; tileY < tilesY; tileY++) {
-            int y0 = tileY * height / tilesY;
-            int y1 = (tileY + 1) * height / tilesY;
-            for (int tileX = 0; tileX < tilesX; tileX++) {
-                int x0 = tileX * width / tilesX;
-                int x1 = (tileX + 1) * width / tilesX;
-                java.security.MessageDigest digest;
-                try {
-                    digest = java.security.MessageDigest.getInstance("SHA-256");
-                } catch (java.security.NoSuchAlgorithmException exception) {
-                    throw new IllegalStateException("SHA-256 digest unavailable", exception);
-                }
-                java.nio.ByteBuffer tileSource = canonical.duplicate();
-                tileSource.position(0);
-                tileSource.limit(tileSource.capacity());
-                for (int y = y0; y < y1; y++) {
-                    int rowOffset = (y * width + x0) * bytesPerPixel;
-                    int rowLength = (x1 - x0) * bytesPerPixel;
-                    if (rowOffset < 0 || rowLength < 0 || rowOffset + rowLength > tileSource.capacity()) {
-                        return "unavailable:tile-range-mismatch:offset-" + rowOffset + ":length-" + rowLength + ":capacity-" + tileSource.capacity();
-                    }
-                    tileSource.limit(tileSource.capacity());
-                    tileSource.position(rowOffset);
-                    tileSource.limit(rowOffset + rowLength);
-                    digest.update(tileSource.slice());
-                }
-                hashes.add(tileX + "x" + tileY + ":" + toHex(digest.digest()).substring(0, 16));
-            }
-        }
-        return String.join("|", hashes);
+        return RenderTargetContentDiagnostics.contentHashFromCanonical(logicalResource, texture, textureView, canonical, width, height);
     }
 
     private static String toHex(byte[] bytes) {

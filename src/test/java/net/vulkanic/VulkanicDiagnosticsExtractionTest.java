@@ -1,6 +1,9 @@
 package net.vulkanic;
 
 import net.vulkanic.diagnostics.VulkanicDiagnostics;
+import net.vulkanic.diagnostics.RenderTargetContentDiagnostics;
+import net.vulkanic.diagnostics.RenderTargetContentDiagnostics.DiagnosticTextureContentHash;
+import net.vulkanic.diagnostics.RenderTargetContentDiagnostics.PendingScopedCompositeColortex0SamplerReadback;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -22,6 +25,7 @@ class VulkanicDiagnosticsExtractionTest {
     @AfterEach
     void resetDiagnostics() {
         VulkanicDiagnostics.resetMutableStateForTests();
+        RenderTargetContentDiagnostics.resetMutableStateForTests();
     }
 
     @Test
@@ -43,6 +47,78 @@ class VulkanicDiagnosticsExtractionTest {
         assertEquals(16L, VulkanicDiagnostics.geometryShadowBytesForTests());
         VulkanicDiagnostics.releaseGeometryShadowBytes(16);
         assertEquals(0L, VulkanicDiagnostics.geometryShadowBytesForTests());
+    }
+
+    @Test
+    void renderTargetContentDiagnosticsAreDisabledByDefault() {
+        assertFalse(RenderTargetContentDiagnostics.reserveContentReadback("pose-boundary", "disabled-key"));
+        assertEquals("content-hashes-disabled",
+            RenderTargetContentDiagnostics.contentReadbackUnavailableReason(null, "pose-boundary", "disabled-key"));
+        assertEquals(0, RenderTargetContentDiagnostics.pendingReadbackCountForTests());
+        assertEquals(0, RenderTargetContentDiagnostics.producerCountForTests());
+    }
+
+    @Test
+    void renderTargetReadbackBudgetDeduplicatesAndStaysBounded() {
+        assertTrue(RenderTargetContentDiagnostics.reserveContentReadbackForTests("pose-boundary", "same-resource", 2));
+        assertFalse(RenderTargetContentDiagnostics.reserveContentReadbackForTests("pose-boundary", "same-resource", 2));
+        assertEquals(1, VulkanicDiagnostics.RENDER_TARGET_CONTENT_READBACK_COUNT.get());
+        assertEquals("content-readback-duplicate-skipped",
+            RenderTargetContentDiagnostics.contentReadbackUnavailableReasonForTests(null, "pose-boundary", "same-resource", 2));
+
+        assertFalse(RenderTargetContentDiagnostics.reserveContentReadbackForTests("pose-boundary", "over-budget", 1));
+        assertEquals("content-readback-budget-exhausted",
+            RenderTargetContentDiagnostics.contentReadbackUnavailableReasonForTests(null, "pose-boundary", "over-budget", 1));
+    }
+
+    @Test
+    void renderTargetPendingReadbackLifecycleDrainsOnce() {
+        PendingScopedCompositeColortex0SamplerReadback request = new PendingScopedCompositeColortex0SamplerReadback(
+            "vulkan",
+            "composite",
+            "iris:composite",
+            "vertex",
+            "fragment",
+            "pipeline-key",
+            "stable-key",
+            "colortex0",
+            0,
+            null,
+            42,
+            "legacy:42",
+            "colortex0",
+            "main",
+            0,
+            42,
+            "target",
+            "usage",
+            "draw",
+            "vertex-input",
+            "pipeline-state",
+            "0,0,1280,720",
+            "0,0,1280,720",
+            "initial",
+            "pose=initial frame=1",
+            new RenderTargetContentDiagnostics.PendingReadbackAction() {
+                @Override
+                public DiagnosticTextureContentHash read() {
+                    return DiagnosticTextureContentHash.unavailable("colortex0", null, null, "test");
+                }
+
+                @Override
+                public String lifecycleInfo() {
+                    return "test-lifecycle";
+                }
+            }
+        );
+
+        RenderTargetContentDiagnostics.recordPendingScopedCompositeSamplerReadback("pending", request);
+        RenderTargetContentDiagnostics.recordPendingScopedCompositeSamplerReadback("pending", request);
+
+        assertEquals(1, RenderTargetContentDiagnostics.pendingReadbackCountForTests());
+        assertEquals(1, RenderTargetContentDiagnostics.drainPendingScopedCompositeSamplerReadbacks().size());
+        assertEquals(0, RenderTargetContentDiagnostics.pendingReadbackCountForTests());
+        assertEquals(0, RenderTargetContentDiagnostics.drainPendingScopedCompositeSamplerReadbacks().size());
     }
 
     @Test
