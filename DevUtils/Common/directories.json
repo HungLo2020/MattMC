@@ -1,22 +1,22 @@
 {
   "backup_destination": {
     "linux": "/mnt/storage/OneDrive/Apps/Programming/MattMC",
-    "windows": "~/OneDrive/Apps/Programming/MattMC",
+    "windows": null,
     "macos": null
   },
   "downloads": {
     "linux": "~/Downloads",
-    "windows": "~/Downloads",
-    "macos": "~/Downloads"
+    "windows": null,
+    "macos": null
   },
   "java_perf_repo": {
     "linux": "~/Documents/Repos/MattMC_JavaPerfTesting/MattMC",
-    "windows": "~/Documents/Repos/MattMC_JavaPerfTesting/MattMC",
-    "macos": "~/Documents/Repos/MattMC_JavaPerfTesting/MattMC"
+    "windows": null,
+    "macos": null
   },
   "local_install": {
     "linux": "~/Games/MattMC",
-    "windows": "~/Games/MattMC",
+    "windows": null,
     "macos": null
   }
 }
