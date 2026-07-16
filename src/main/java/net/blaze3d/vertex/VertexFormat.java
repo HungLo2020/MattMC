@@ -96,7 +96,14 @@ public class VertexFormat implements net.irisshaders.iris.pipeline.programs.Vert
 
 	public int getShaderAttributeLocation(int attributeOrdinal) {
 		VertexFormatElement element = this.elements.get(attributeOrdinal);
-		return element.usage() == VertexFormatElement.Usage.GENERIC ? element.index() : attributeOrdinal;
+		String name = this.names.get(attributeOrdinal);
+		return switch (name) {
+			case "mc_Entity" -> 11;
+			case "mc_midTexCoord" -> this.names.contains("mc_Entity") ? 12 : attributeOrdinal;
+			case "at_tangent" -> this.names.contains("mc_Entity") ? 13 : attributeOrdinal;
+			case "at_midBlock" -> this.names.contains("mc_Entity") ? 14 : attributeOrdinal;
+			default -> element.usage() == VertexFormatElement.Usage.GENERIC ? element.index() : attributeOrdinal;
+		};
 	}
 
 	public boolean equals(Object object) {
@@ -153,7 +160,7 @@ public class VertexFormat implements net.irisshaders.iris.pipeline.programs.Vert
 		int j = 0;
 
 		for (String string : this.getElementAttributeNames()) {
-			VulkanicAPI.setAttributeLocation(ctx, programId, j, ATTRIBUTE_LIST.contains(string) && !isFallback ? "iris_" + string : string);
+			VulkanicAPI.setAttributeLocation(ctx, programId, this.getShaderAttributeLocation(j), ATTRIBUTE_LIST.contains(string) && !isFallback ? "iris_" + string : string);
 			j++;
 		}
 	}

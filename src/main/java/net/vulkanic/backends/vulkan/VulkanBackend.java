@@ -264,6 +264,11 @@ public class VulkanBackend {
     private static final int GL_STENCIL = 0x1802;
     private static final int GL_NEAREST = 0x2600;
     private static final int LEGACY_DEFAULT_VERTEX_ATTRIBUTE_BINDING = 15;
+    private static final boolean TRACE_IRIS_ENTITY_VERTEX_INTERFACE =
+        Boolean.getBoolean("mattmc.vulkan.traceIrisEntityVertexInterface");
+    private static final int MAX_IRIS_ENTITY_VERTEX_INTERFACE_LOGS =
+        Integer.getInteger("mattmc.vulkan.traceIrisEntityVertexInterface.maxLogs", 80);
+    private static final AtomicInteger IRIS_ENTITY_VERTEX_INTERFACE_LOG_COUNT = new AtomicInteger();
 
     private final Object nativeInitLock = new Object();
     private volatile NativeSpine nativeSpine;
@@ -703,7 +708,6 @@ void main() {
     fragColor = alpha < 0.1 ? vec4(0.0, 1.0, 0.0, 1.0) : vec4(1.0, 0.0, 1.0, 1.0);
 }
 """;
-
     private static boolean isParticlePipeline(RenderPipeline renderPipeline) {
         String pipelineLocation = renderPipeline.getLocation().toString();
         return "minecraft:pipeline/opaque_particle".equals(pipelineLocation)
@@ -805,7 +809,6 @@ void main() {
                     fragmentWithDefines = DEBUG_VULKAN_PARTICLE_ALPHA_MASK_SOURCE;
                 }
             }
-
             List<String> standaloneUniformDeclarations = collectStandaloneUniformDeclarations(
                 List.of(vertexWithDefines, fragmentWithDefines)
             );
@@ -967,13 +970,92 @@ void main() {
         String reboundSource = shaderSource;
         List<String> attributeNames = renderPipeline.getVertexFormat().getElementAttributeNames();
         for (int location = 0; location < attributeNames.size(); location++) {
-			reboundSource = injectExplicitVertexInputLocation(
-				reboundSource,
-				attributeNames.get(location),
-				renderPipeline.getVertexFormat().getShaderAttributeLocation(location)
-			);
+            int shaderLocation = renderPipeline.getVertexFormat().getShaderAttributeLocation(location);
+            for (String attributeName : shaderAttributeAliases(attributeNames.get(location))) {
+                reboundSource = injectExplicitVertexInputLocation(reboundSource, attributeName, shaderLocation);
+            }
+        }
+        reboundSource = injectIrisEntityExtensionInputLocations(reboundSource);
+        return reboundSource;
+    }
+
+    private static List<String> shaderAttributeAliases(String attributeName) {
+        return switch (attributeName) {
+            case "Position", "Color", "Normal", "UV0", "UV1", "UV2" -> List.of(attributeName, "iris_" + attributeName);
+            default -> List.of(attributeName);
+        };
+    }
+
+    private static String injectIrisEntityExtensionInputLocations(String shaderSource) {
+        if (!shaderSource.contains("iris_Entity")) {
+            return shaderSource;
+        }
+
+        VertexFormat entityFormat = net.irisshaders.iris.vertices.IrisVertexFormats.ENTITY;
+        String reboundSource = shaderSource;
+        List<String> entityAttributes = entityFormat.getElementAttributeNames();
+        for (String attributeName : List.of("iris_Entity", "mc_midTexCoord", "at_tangent")) {
+            int attributeIndex = entityAttributes.indexOf(attributeName);
+            if (attributeIndex >= 0) {
+                reboundSource = injectExplicitVertexInputLocation(
+                    reboundSource,
+                    attributeName,
+                    entityFormat.getShaderAttributeLocation(attributeIndex)
+                );
+            }
         }
         return reboundSource;
+    }
+
+    private static boolean shouldInspectIrisEntityVertexInterface(String shaderSource) {
+        return shaderSource.contains("iris_Entity")
+            && (shaderSource.contains("iris_Position") || shaderSource.contains("Position"))
+            && (shaderSource.contains("mc_Entity") || shaderSource.contains("at_midBlock") || shaderSource.contains("iris_Normal"));
+    }
+
+    private static void traceIrisEntityVertexInterface(String phase, String sourceName, String shaderSource) {
+        if (!TRACE_IRIS_ENTITY_VERTEX_INTERFACE) {
+            return;
+        }
+        int logIndex = IRIS_ENTITY_VERTEX_INTERFACE_LOG_COUNT.incrementAndGet();
+        if (logIndex > MAX_IRIS_ENTITY_VERTEX_INTERFACE_LOGS) {
+            return;
+        }
+        LOGGER.info(
+            "IrisEntityVertexInterface#{} phase={} source={} inputs={} mcEntityRefs={} atMidBlockRefs={}",
+            logIndex,
+            phase,
+            sourceName,
+            collectVertexInputSummary(shaderSource),
+            countWordOccurrences(shaderSource, "mc_Entity"),
+            countWordOccurrences(shaderSource, "at_midBlock")
+        );
+    }
+
+    private static String collectVertexInputSummary(String shaderSource) {
+        List<String> inputs = new ArrayList<>();
+        Matcher matcher = GLSL_VERTEX_INPUT_DECLARATION_PATTERN.matcher(shaderSource);
+        while (matcher.find()) {
+            String layoutBody = matcher.group(2);
+            String location = "?";
+            if (layoutBody != null) {
+                Matcher locationMatcher = GLSL_LAYOUT_LOCATION_PATTERN.matcher(layoutBody);
+                if (locationMatcher.find()) {
+                    location = locationMatcher.group(1);
+                }
+            }
+            inputs.add(matcher.group(5) + ":" + matcher.group(4) + "@loc" + location);
+        }
+        return inputs.toString();
+    }
+
+    private static int countWordOccurrences(String source, String word) {
+        int count = 0;
+        Matcher matcher = Pattern.compile("\\b" + Pattern.quote(word) + "\\b").matcher(source);
+        while (matcher.find()) {
+            count++;
+        }
+        return count;
     }
 
     private static String injectExplicitVertexInputLocation(String shaderSource, String attributeName, int location) {
@@ -985,14 +1067,14 @@ void main() {
         Matcher layoutMatcher = layoutPattern.matcher(shaderSource);
         if (layoutMatcher.find()) {
             String layoutBody = layoutMatcher.group(2);
-            if (layoutBody.contains("location")) {
-                return shaderSource;
-            }
+            String reboundLayoutBody = GLSL_LAYOUT_LOCATION_PATTERN.matcher(layoutBody).find()
+                ? GLSL_LAYOUT_LOCATION_PATTERN.matcher(layoutBody).replaceFirst("location = " + location)
+                : layoutBody + ", location = " + location;
 
             return layoutMatcher.replaceFirst(
                 Matcher.quoteReplacement(
                     layoutMatcher.group(1)
-                        + "layout(" + layoutBody + ", location = " + location + ") "
+                        + "layout(" + reboundLayoutBody + ") "
                         + layoutMatcher.group(3)
                         + "in "
                         + layoutMatcher.group(4)
@@ -2123,6 +2205,9 @@ void main() {
             standaloneUniformDeclarations,
             standaloneUniformBindingIndex
         );
+        if (shaderStage == VulkanicShaderStage.VERTEX && shouldInspectIrisEntityVertexInterface(normalizedSource)) {
+            traceIrisEntityVertexInterface("normalized-before-experiment", sourceName, normalizedSource);
+        }
         try {
             java.nio.file.Path dbgDir = java.nio.file.Path.of("/tmp/vulkanic-glsl-dump");
             java.nio.file.Files.createDirectories(dbgDir);
@@ -4435,7 +4520,7 @@ void main() {
             return null;
         }
 
-        PipelineDescriptor.VertexInputState vertexInputState = createLegacyVertexInputState(virtualProgram);
+        PipelineDescriptor.VertexInputState vertexInputState = createLegacyVertexInputState(programId, virtualProgram);
         if (vertexInputState == null) {
             return null;
         }
@@ -4544,7 +4629,7 @@ void main() {
     }
 
     @Nullable
-    private PipelineDescriptor.VertexInputState createLegacyVertexInputState(VirtualProgram virtualProgram) {
+    private PipelineDescriptor.VertexInputState createLegacyVertexInputState(int programId, VirtualProgram virtualProgram) {
         VirtualVaoState vaoState = currentVirtualVaoState();
         List<LegacyVertexAttribute> attributes = vaoState.enabledAttributes.stream()
             .map(vaoState.attributes::get)
@@ -4555,6 +4640,14 @@ void main() {
             return null;
         }
 
+        traceLegacyIrisEntityVaoState(programId, virtualProgram, attributes, vaoState);
+        Map<Integer, String> reflectedInputTypesByLocation = virtualProgram.vertexInputs.stream()
+            .collect(java.util.stream.Collectors.toMap(
+                ReflectedVertexInput::location,
+                ReflectedVertexInput::typeName,
+                (left, right) -> left,
+                java.util.LinkedHashMap::new
+            ));
         java.util.LinkedHashMap<Integer, PipelineDescriptor.VertexInputBinding> bindings = new java.util.LinkedHashMap<>();
         List<PipelineDescriptor.VertexInputAttribute> vertexAttributes = new ArrayList<>(attributes.size());
         java.util.Set<Integer> providedLocations = new java.util.HashSet<>();
@@ -4573,7 +4666,13 @@ void main() {
             vertexAttributes.add(new PipelineDescriptor.VertexInputAttribute(
                 attribute.index(),
                 attribute.binding(),
-                toVertexAttributeFormat(attribute.type(), attribute.size(), attribute.normalized(), attribute.integer()),
+                legacyVertexAttributeFormatForShaderInput(
+                    attribute.type(),
+                    attribute.size(),
+                    attribute.normalized(),
+                    attribute.integer(),
+                    reflectedInputTypesByLocation.get(attribute.index())
+                ),
                 attribute.offset()
             ));
             providedLocations.add(attribute.index());
@@ -4607,6 +4706,46 @@ void main() {
         }
 
         return new PipelineDescriptor.VertexInputState(new ArrayList<>(bindings.values()), vertexAttributes);
+    }
+
+    private static void traceLegacyIrisEntityVaoState(
+        int programId,
+        VirtualProgram virtualProgram,
+        List<LegacyVertexAttribute> attributes,
+        VirtualVaoState vaoState
+    ) {
+        if (!TRACE_IRIS_ENTITY_VERTEX_INTERFACE || !looksLikeIrisEntityVertexInputSet(virtualProgram.vertexInputs)) {
+            return;
+        }
+        int logIndex = IRIS_ENTITY_VERTEX_INTERFACE_LOG_COUNT.incrementAndGet();
+        if (logIndex > MAX_IRIS_ENTITY_VERTEX_INTERFACE_LOGS) {
+            return;
+        }
+
+        LOGGER.info(
+            "IrisEntityVertexInterface#{} phase=legacy-vao program={} label={} reflectedInputs={} vaoAttributes={} vaoBindings={}",
+            logIndex,
+            programId,
+            virtualProgram.debugLabel == null ? "unknown" : virtualProgram.debugLabel,
+            virtualProgram.vertexInputs,
+            attributes,
+            vaoState.bindings
+        );
+    }
+
+    private static boolean looksLikeIrisEntityVertexInputSet(List<ReflectedVertexInput> inputs) {
+        boolean hasEntityIdLikeInput = false;
+        boolean hasPackedEntityLikeInput = false;
+        for (ReflectedVertexInput input : inputs) {
+            if ((input.location() == 5 || input.location() == 6 || input.location() == 11)
+                && ("ivec3".equals(input.typeName()) || "uint".equals(input.typeName()) || "vec4".equals(input.typeName()))) {
+                hasEntityIdLikeInput = true;
+            }
+            if (input.location() == 14 && "vec3".equals(input.typeName())) {
+                hasPackedEntityLikeInput = true;
+            }
+        }
+        return hasEntityIdLikeInput || hasPackedEntityLikeInput;
     }
 
     private PipelineResourcePlanner.Plan buildLegacyProgramResourcePlan(
@@ -4721,6 +4860,92 @@ void main() {
                 imageBinding.access(),
                 imageBinding.format()
             );
+    }
+
+    @Nullable
+    Integer resolveLegacySamplerUnitForProgram(int programId, PipelineDescriptor.ResourceBinding binding) {
+        VirtualProgram virtualProgram = virtualPrograms.get(programId);
+        if (virtualProgram == null) {
+            return null;
+        }
+
+        int uniformIndex = virtualProgram.activeUniformNames.indexOf(binding.name());
+        if (uniformIndex >= 0) {
+            Integer uploadedUnit = virtualProgram.opaqueResourceUniformValuesByIndex.get(uniformIndex);
+            if (uploadedUnit != null) {
+                return uploadedUnit;
+            }
+        }
+
+        Integer aliasedUnit = resolveLegacySamplerAliasUnit(virtualProgram, binding.name());
+        if (aliasedUnit != null) {
+            return aliasedUnit;
+        }
+
+        Integer defaultUnit = defaultLegacySamplerUnit(binding.name());
+        return defaultUnit != null ? defaultUnit : binding.binding();
+    }
+
+    @Nullable
+    private static Integer resolveLegacySamplerAliasUnit(VirtualProgram virtualProgram, String bindingName) {
+        for (String aliasName : legacySamplerAliasNames(bindingName)) {
+            int aliasIndex = virtualProgram.activeUniformNames.indexOf(aliasName);
+            if (aliasIndex < 0) {
+                continue;
+            }
+
+            Integer uploadedUnit = virtualProgram.opaqueResourceUniformValuesByIndex.get(aliasIndex);
+            if (uploadedUnit != null) {
+                return uploadedUnit;
+            }
+        }
+
+        return null;
+    }
+
+    static List<String> legacySamplerAliasNames(String bindingName) {
+        return switch (bindingName) {
+            case "Sampler0" -> List.of("tex", "gtexture", "texture");
+            case "Sampler1" -> List.of("iris_overlay", "overlay");
+            case "Sampler2" -> List.of("lightmap", "iris_lightmap", "gaux2");
+            default -> List.of();
+        };
+    }
+
+    @Nullable
+    static Integer defaultLegacySamplerUnit(String bindingName) {
+        return switch (bindingName) {
+            case "Sampler0" -> 0;
+            case "Sampler1" -> 1;
+            case "Sampler2" -> 2;
+            default -> null;
+        };
+    }
+
+    @Nullable
+    VulkanicTextureView resolveLegacySamplerViewForProgram(
+        CommandContext ctx,
+        PipelineDescriptor.ResourceBinding binding,
+        int programId
+    ) {
+        long commandBufferHandle = requireVulkanCommandBufferHandle("resolveLegacySamplerViewForProgram", ctx);
+        Integer unit = resolveLegacySamplerUnitForProgram(programId, binding);
+        if (unit == null) {
+            return null;
+        }
+
+        NativeSpine spine = nativeSpine;
+        int textureId = 0;
+        if (spine != null) {
+            textureId = spine.legacyTexture2DBindingsByUnit.getOrDefault(unit, 0);
+        }
+        if (textureId <= 0) {
+            textureId = net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(unit);
+        }
+        VulkanicTextureView textureView = textureId > 0 ? createManagedLegacyTextureView(textureId) : null;
+        return textureView != null
+            ? textureView
+            : createLegacyFallbackSamplerView(commandBufferHandle, binding, unit);
     }
 
     @Nullable
@@ -5039,7 +5264,7 @@ void main() {
         if (state.matchesDescriptor(descriptor)) {
             return state.pipelineHandle;
         }
-        if (!matchesStableDescriptor(state, descriptor)) {
+        if (!isAllowedDescriptorVariant(state, descriptor)) {
             return null;
         }
 
@@ -5159,7 +5384,7 @@ void main() {
         if (pipelineDescriptor == null) {
             return null;
         }
-        if (!state.matchesDescriptor(pipelineDescriptor) && !matchesStableDescriptor(state, pipelineDescriptor)) {
+        if (!state.matchesDescriptor(pipelineDescriptor) && !isAllowedDescriptorVariant(state, pipelineDescriptor)) {
             return null;
         }
 
@@ -5472,6 +5697,38 @@ void main() {
         return size * bytesPerComponent;
     }
 
+    static PipelineDescriptor.VertexAttributeFormat legacyVertexAttributeFormatForShaderInput(
+        int type,
+        int size,
+        boolean normalized,
+        boolean integer,
+        @Nullable String reflectedTypeName
+    ) {
+        boolean shaderRequiresIntegerInput = reflectedTypeName != null && isIntegerGlslVertexInputType(reflectedTypeName);
+        boolean effectiveInteger = integer || (shaderRequiresIntegerInput && isIntegerCompatibleVertexAttributeType(type));
+        return toVertexAttributeFormat(type, size, normalized, effectiveInteger);
+    }
+
+    private static boolean isIntegerGlslVertexInputType(String typeName) {
+        return typeName.equals("int")
+            || typeName.equals("ivec2")
+            || typeName.equals("ivec3")
+            || typeName.equals("ivec4")
+            || typeName.equals("uint")
+            || typeName.equals("uvec2")
+            || typeName.equals("uvec3")
+            || typeName.equals("uvec4");
+    }
+
+    private static boolean isIntegerCompatibleVertexAttributeType(int type) {
+        return type == VulkanicAPI.GL_UNSIGNED_BYTE
+            || type == VulkanicAPI.GL_BYTE
+            || type == VulkanicAPI.GL_UNSIGNED_SHORT
+            || type == VulkanicAPI.GL_SHORT
+            || type == VulkanicAPI.GL_UNSIGNED_INT
+            || type == VulkanicAPI.GL_INT;
+    }
+
     private static PipelineDescriptor.VertexAttributeFormat toVertexAttributeFormat(
         int type,
         int size,
@@ -5606,6 +5863,11 @@ void main() {
         return descriptor != null
             && state.stableCacheKey != null
             && state.stableCacheKey.equals(descriptor.getStableCacheKey());
+    }
+
+    private static boolean isAllowedDescriptorVariant(PrecompiledPipelineState state, @Nullable PipelineDescriptor descriptor) {
+        return descriptor != null
+            && (descriptor.hasSpirvModules() || matchesStableDescriptor(state, descriptor));
     }
 
     public void bindPipelineResources(CommandContext ctx,
@@ -9450,10 +9712,26 @@ void main() {
 
     public void labelDebugObject(CommandContext ctx, int identifier, int name, String label) {
         requireVulkanCommandBufferHandle("labelDebugObject", ctx);
+        rememberDebugLabel(identifier, name, label);
     }
 
     public void labelObjectExt(CommandContext ctx, int type, int object, String label) {
         requireVulkanCommandBufferHandle("labelObjectExt", ctx);
+        rememberDebugLabel(type, object, label);
+    }
+
+    private void rememberDebugLabel(int type, int object, @Nullable String label) {
+        if (type == VulkanicAPI.GL_PROGRAM) {
+            VirtualProgram virtualProgram = virtualPrograms.get(object);
+            if (virtualProgram != null) {
+                virtualProgram.debugLabel = label;
+            }
+        } else if (type == VulkanicAPI.GL_SHADER) {
+            VirtualShader virtualShader = virtualShaders.get(object);
+            if (virtualShader != null) {
+                virtualShader.debugLabel = label;
+            }
+        }
     }
 
         public void memoryBarrier(CommandContext ctx, int barriers) {
@@ -10652,6 +10930,8 @@ void main() {
         private volatile boolean compileStatus;
         private volatile boolean deletionPending;
         private volatile String infoLog = "";
+        @Nullable
+        private volatile String debugLabel;
 
         private VirtualShader(VulkanicShaderStage stage) {
             this.stage = stage;
@@ -10680,6 +10960,8 @@ void main() {
         private volatile boolean standaloneDirty;
         private volatile boolean linkStatus;
         private volatile String infoLog = "";
+        @Nullable
+        private volatile String debugLabel;
 
         private void closeStandaloneUniformBacking() {
             VulkanBuffer buffer = standaloneGpuBuffer;

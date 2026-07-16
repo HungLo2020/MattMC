@@ -962,15 +962,21 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 				}
 
 				RenderTarget renderTarget = this.state.outputState.getRenderTarget();
-				GpuTextureView gpuTextureView = VulkanicAPI.getOutputColorTextureOverride() != null
-					? VulkanicAPI.getOutputColorTextureOverride()
-					: renderTarget.getColorTextureView();
-				GpuTextureView gpuTextureView2 = renderTarget.useDepth
-					? (VulkanicAPI.getOutputDepthTextureOverride() != null ? VulkanicAPI.getOutputDepthTextureOverride() : renderTarget.getDepthTextureView())
-					: null;
+				GpuTextureView outputColorOverride = VulkanicAPI.getOutputColorTextureOverride();
+				GpuTextureView outputDepthOverride = VulkanicAPI.getOutputDepthTextureOverride();
+				int drawFramebuffer = outputColorOverride == null && outputDepthOverride == null
+					? VulkanicAPI.getDrawFramebufferBinding()
+					: 0;
 
-				try (RenderPass renderPass = VulkanicAPI.createRenderPass(
-						() -> "Immediate draw for " + this.getName(), gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
+				try (RenderPass renderPass = drawFramebuffer != 0
+						? VulkanicAPI.createRenderPass(() -> "Immediate draw for " + this.getName(), drawFramebuffer, renderTarget.useDepth)
+						: VulkanicAPI.createRenderPass(
+							() -> "Immediate draw for " + this.getName(),
+							outputColorOverride != null ? outputColorOverride : renderTarget.getColorTextureView(),
+							OptionalInt.empty(),
+							renderTarget.useDepth ? (outputDepthOverride != null ? outputDepthOverride : renderTarget.getDepthTextureView()) : null,
+							OptionalDouble.empty()
+						)) {
 					renderPass.setPipeline(this.renderPipeline);
 					ScissorState scissorState = VulkanicAPI.getScissorStateForRenderTypeDraws();
 					if (scissorState.enabled()) {

@@ -16,6 +16,7 @@ import net.blaze3d.shaders.UniformType;
 import net.blaze3d.vertex.DefaultVertexFormat;
 import net.blaze3d.vertex.VertexFormat;
 import net.blaze3d.vertex.VertexFormatElement;
+import net.irisshaders.iris.vertices.IrisVertexFormats;
 import net.minecraft.client.renderer.ShaderDefines;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Test;
@@ -39,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class VulkanBackendSpirvPathTest {
@@ -565,6 +567,141 @@ public class VulkanBackendSpirvPathTest {
     }
 
     @Test
+    public void testNormalizeForVulkanKeepsIrisAtlasSizeUniform() {
+        String source = "#version 330\n"
+            + "uniform ivec2 atlasSize;\n"
+            + "uniform vec4 UsedColor;\n"
+            + "uniform vec4 UnusedColor;\n"
+            + "layout(location = 0) out vec4 fragColor;\n"
+            + "void main(){ fragColor = UsedColor; }";
+
+        String normalized = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
+
+        assertTrue(normalized.contains("uniform VulkanicStandaloneUniforms {"));
+        assertTrue(normalized.contains("ivec2 atlasSize;"));
+        assertTrue(normalized.contains("vec4 UsedColor;"));
+        assertFalse(normalized.contains("vec4 UnusedColor;"));
+        assertFalse(normalized.contains("uniform ivec2 atlasSize;"));
+    }
+
+    @Test
+    public void testLegacySamplerAliasesMatchIrisFallbackUniformNames() {
+        assertEquals(List.of("tex", "gtexture", "texture"),
+            VulkanBackend.legacySamplerAliasNames("Sampler0"));
+        assertEquals(List.of("iris_overlay", "overlay"),
+            VulkanBackend.legacySamplerAliasNames("Sampler1"));
+        assertEquals(List.of("lightmap", "iris_lightmap", "gaux2"),
+            VulkanBackend.legacySamplerAliasNames("Sampler2"));
+        assertEquals(List.of(),
+            VulkanBackend.legacySamplerAliasNames("Sampler3"));
+    }
+
+    @Test
+    public void testLegacySamplerFallbackUnitsMatchOpenGlTextureUnitConvention() {
+        assertEquals(0, VulkanBackend.defaultLegacySamplerUnit("Sampler0"));
+        assertEquals(1, VulkanBackend.defaultLegacySamplerUnit("Sampler1"));
+        assertEquals(2, VulkanBackend.defaultLegacySamplerUnit("Sampler2"));
+        assertNull(VulkanBackend.defaultLegacySamplerUnit("Sampler3"));
+    }
+
+    @Test
+    public void testIrisExtendedVertexAttributesUseOpenGlCompatibleLocations() {
+        assertEquals(6, shaderAttributeLocation(IrisVertexFormats.ENTITY, "iris_Entity"));
+        assertEquals(7, shaderAttributeLocation(IrisVertexFormats.ENTITY, "mc_midTexCoord"));
+        assertEquals(8, shaderAttributeLocation(IrisVertexFormats.ENTITY, "at_tangent"));
+
+        assertEquals(11, shaderAttributeLocation(IrisVertexFormats.TERRAIN, "mc_Entity"));
+        assertEquals(12, shaderAttributeLocation(IrisVertexFormats.TERRAIN, "mc_midTexCoord"));
+        assertEquals(13, shaderAttributeLocation(IrisVertexFormats.TERRAIN, "at_tangent"));
+        assertEquals(14, shaderAttributeLocation(IrisVertexFormats.TERRAIN, "at_midBlock"));
+    }
+
+    private static int shaderAttributeLocation(VertexFormat format, String name) {
+        int index = format.getElementAttributeNames().indexOf(name);
+        assertTrue(index >= 0, "Missing vertex attribute " + name + " in " + format);
+        return format.getShaderAttributeLocation(index);
+    }
+
+    @Test
+    public void testPortableDescriptorCanRebaseToEffectiveIrisEntityVertexFormat() {
+        RenderPipeline entityPipeline = new TestRenderPipeline(
+            ResourceLocation.withDefaultNamespace("pipeline/entity_cutout"),
+            DefaultVertexFormat.NEW_ENTITY,
+            VertexFormat.Mode.QUADS
+        );
+
+        PipelineDescriptor baseDescriptor = PipelineDescriptor.fromRenderPipeline(entityPipeline);
+        PipelineDescriptor rebasedDescriptor = baseDescriptor.withPortableVertexFormat(IrisVertexFormats.ENTITY);
+
+        assertEquals(DefaultVertexFormat.NEW_ENTITY, baseDescriptor.getPortableState().vertexFormat());
+        assertEquals(IrisVertexFormats.ENTITY, rebasedDescriptor.getPortableState().vertexFormat());
+        assertEquals(baseDescriptor.getPortableState().location(), rebasedDescriptor.getPortableState().location());
+        assertEquals(baseDescriptor.getPortableState().vertexFormatMode(), rebasedDescriptor.getPortableState().vertexFormatMode());
+        assertEquals(baseDescriptor.getPortableState().depthTestFunction(), rebasedDescriptor.getPortableState().depthTestFunction());
+        assertEquals(baseDescriptor.getPortableState().cull(), rebasedDescriptor.getPortableState().cull());
+    }
+
+    @Test
+    public void testSpirvBackedLiveDescriptorsAreAllowedAsPipelineVariants() throws Exception {
+        String source = Files.readString(Paths.get("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+
+        assertTrue(
+            source.contains("descriptor.hasSpirvModules() || matchesStableDescriptor(state, descriptor)"),
+            "Live Iris descriptors carry their own SPIR-V modules and must not be rejected solely because "
+                + "their effective vertex format differs from the precompiled vanilla pipeline key"
+        );
+        assertTrue(
+            source.contains("isAllowedDescriptorVariant(state, descriptor)"),
+            "Pipeline handle resolution should route descriptor-variant acceptance through the shared guard"
+        );
+    }
+
+    @Test
+    public void testIrisProgramAttributeBindingUsesSemanticShaderLocations() throws Exception {
+        String source = Files.readString(Paths.get("src/main/java/net/blaze3d/vertex/VertexFormat.java"));
+        assertTrue(
+            source.contains("VulkanicAPI.setAttributeLocation(ctx, programId, this.getShaderAttributeLocation(j),"),
+            "Iris shaderpack programs must bind attributes through VertexFormat's semantic shader locations"
+        );
+    }
+
+    @Test
+    public void testLegacyVertexInputFormatFollowsReflectedIntegerShaderInput() {
+        assertEquals(
+            PipelineDescriptor.VertexAttributeFormat.R16G16B16_UINT,
+            VulkanBackend.legacyVertexAttributeFormatForShaderInput(
+                VulkanicAPI.GL_UNSIGNED_SHORT,
+                3,
+                false,
+                false,
+                "ivec3"
+            ),
+            "Iris entity IDs are uploaded as unsigned shorts but consumed by entity shaders as integer attributes"
+        );
+        assertEquals(
+            PipelineDescriptor.VertexAttributeFormat.R16G16B16_USCALED,
+            VulkanBackend.legacyVertexAttributeFormatForShaderInput(
+                VulkanicAPI.GL_UNSIGNED_SHORT,
+                3,
+                false,
+                false,
+                "vec3"
+            ),
+            "Float shader inputs must preserve the legacy non-integer conversion path"
+        );
+        assertEquals(
+            PipelineDescriptor.VertexAttributeFormat.R32G32_SFLOAT,
+            VulkanBackend.legacyVertexAttributeFormatForShaderInput(
+                VulkanicAPI.GL_FLOAT,
+                2,
+                false,
+                false,
+                "vec2"
+            )
+        );
+    }
+
+    @Test
     public void testNormalizeForVulkanLegalizesDistantHorizonsTerrainFragmentShaderShape() {
         String source = "#version 150\n"
             + "in vec4 vertexColor;\n"
@@ -677,6 +814,112 @@ public class VulkanBackendSpirvPathTest {
 
         assertTrue(normalized.contains("out vec4 vertexColor;"));
         assertFalse(normalized.contains("layout(location = 1) out vec4 vertexColor;"));
+    }
+
+    @Test
+    public void testNormalizeForVulkanPinsIrisShaderpackStageVaryingsByName() {
+        String vertexSource = "#version 150 core\n"
+            + "in vec3 iris_Position;\n"
+            + "in vec4 iris_Color;\n"
+            + "out float iris_FogFragCoord;\n"
+            + "flat out ivec3 iris_entityInfo;\n"
+            + "out vec2 texCoord;\n"
+            + "out vec2 lmCoord;\n"
+            + "flat out vec3 upVec, sunVec, northVec, eastVec;\n"
+            + "out vec3 normal;\n"
+            + "out vec4 glColor;\n"
+            + "flat out int mat;\n"
+            + "out vec4 position;\n"
+            + "out vec3 playerPos;\n"
+            + "out vec3 viewVector;\n"
+            + "flat out vec3 binormal, tangent;\n"
+            + "out vec2 signMidCoordPos;\n"
+            + "flat out vec2 absMidCoordPos;\n"
+            + "flat out vec2 midCoord;\n"
+            + "void main(){ gl_Position = vec4(iris_Position, 1.0); glColor = iris_Color; }\n";
+        String fragmentSource = "#version 150\n"
+            + "layout(location = 0) out vec4 iris_FragData0;\n"
+            + "in vec2 lmCoord;\n"
+            + "in vec2 texCoord;\n"
+            + "flat in ivec3 iris_entityInfo;\n"
+            + "in float iris_FogFragCoord;\n"
+            + "flat in vec3 eastVec, northVec, sunVec, upVec;\n"
+            + "in vec4 glColor;\n"
+            + "in vec3 normal;\n"
+            + "flat in vec3 tangent, binormal;\n"
+            + "in vec3 viewVector;\n"
+            + "in vec3 playerPos;\n"
+            + "in vec4 position;\n"
+            + "flat in int mat;\n"
+            + "flat in vec2 midCoord;\n"
+            + "flat in vec2 absMidCoordPos;\n"
+            + "in vec2 signMidCoordPos;\n"
+            + "void main(){ iris_FragData0 = vec4(texCoord, lmCoord.x, glColor.a); }\n";
+
+        String normalizedVertex = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, vertexSource);
+        String normalizedFragment = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, fragmentSource);
+
+        assertTrue(normalizedVertex.contains("layout(location = 0) out float iris_FogFragCoord;"));
+        assertTrue(normalizedFragment.contains("layout(location = 0) in float iris_FogFragCoord;"));
+        assertTrue(normalizedVertex.contains("layout(location = 1) flat out ivec3 iris_entityInfo;"));
+        assertTrue(normalizedFragment.contains("layout(location = 1) flat in ivec3 iris_entityInfo;"));
+        assertTrue(normalizedVertex.contains("layout(location = 2) out vec2 texCoord;"));
+        assertTrue(normalizedFragment.contains("layout(location = 2) in vec2 texCoord;"));
+        assertTrue(normalizedVertex.contains("layout(location = 3) out vec2 lmCoord;"));
+        assertTrue(normalizedFragment.contains("layout(location = 3) in vec2 lmCoord;"));
+        assertTrue(normalizedVertex.contains("layout(location = 4) flat out vec3 upVec;"));
+        assertTrue(normalizedFragment.contains("layout(location = 4) flat in vec3 upVec;"));
+        assertTrue(normalizedVertex.contains("layout(location = 5) flat out vec3 sunVec;"));
+        assertTrue(normalizedFragment.contains("layout(location = 5) flat in vec3 sunVec;"));
+        assertTrue(normalizedVertex.contains("layout(location = 6) flat out vec3 northVec;"));
+        assertTrue(normalizedFragment.contains("layout(location = 6) flat in vec3 northVec;"));
+        assertTrue(normalizedVertex.contains("layout(location = 7) flat out vec3 eastVec;"));
+        assertTrue(normalizedFragment.contains("layout(location = 7) flat in vec3 eastVec;"));
+        assertTrue(normalizedVertex.contains("layout(location = 8) out vec3 normal;"));
+        assertTrue(normalizedFragment.contains("layout(location = 8) in vec3 normal;"));
+        assertTrue(normalizedVertex.contains("layout(location = 9) out vec4 glColor;"));
+        assertTrue(normalizedFragment.contains("layout(location = 9) in vec4 glColor;"));
+        assertTrue(normalizedVertex.contains("layout(location = 13) flat out int mat;"));
+        assertTrue(normalizedFragment.contains("layout(location = 13) flat in int mat;"));
+        assertTrue(normalizedVertex.contains("layout(location = 14) out vec4 position;"));
+        assertTrue(normalizedFragment.contains("layout(location = 14) in vec4 position;"));
+        assertTrue(normalizedVertex.contains("layout(location = 15) out vec3 playerPos;"));
+        assertTrue(normalizedFragment.contains("layout(location = 15) in vec3 playerPos;"));
+        assertTrue(normalizedVertex.contains("layout(location = 16) out vec3 viewVector;"));
+        assertTrue(normalizedFragment.contains("layout(location = 16) in vec3 viewVector;"));
+        assertTrue(normalizedVertex.contains("layout(location = 17) flat out vec3 binormal;"));
+        assertTrue(normalizedFragment.contains("layout(location = 17) flat in vec3 binormal;"));
+        assertTrue(normalizedVertex.contains("layout(location = 18) flat out vec3 tangent;"));
+        assertTrue(normalizedFragment.contains("layout(location = 18) flat in vec3 tangent;"));
+    }
+
+    @Test
+    public void testNormalizeForVulkanPinsIrisShaderpackEntityVaryingsBeforeAttributeBindingRewrite() {
+        String vertexSource = "#version 150 core\n"
+            + "// This mirrors shaderpack sources before VulkanBackend injects explicit iris_Position bindings.\n"
+            + "out float iris_FogFragCoord;\n"
+            + "flat out ivec3 iris_entityInfo;\n"
+            + "flat out int mat;\n"
+            + "out vec2 texCoord;\n"
+            + "flat out vec3 sunVec, upVec;\n"
+            + "out vec4 position;\n"
+            + "flat out vec4 glColor;\n"
+            + "out vec2 signMidCoordPos;\n"
+            + "flat out vec2 absMidCoordPos;\n"
+            + "void main(){ gl_Position = position; }\n";
+
+        String normalizedVertex = ShadercSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, vertexSource);
+
+        assertTrue(normalizedVertex.contains("layout(location = 0) out float iris_FogFragCoord;"));
+        assertTrue(normalizedVertex.contains("layout(location = 1) flat out ivec3 iris_entityInfo;"));
+        assertTrue(normalizedVertex.contains("layout(location = 13) flat out int mat;"));
+        assertTrue(normalizedVertex.contains("layout(location = 2) out vec2 texCoord;"));
+        assertTrue(normalizedVertex.contains("layout(location = 5) flat out vec3 sunVec;"));
+        assertTrue(normalizedVertex.contains("layout(location = 4) flat out vec3 upVec;"));
+        assertTrue(normalizedVertex.contains("layout(location = 14) out vec4 position;"));
+        assertTrue(normalizedVertex.contains("layout(location = 9) flat out vec4 glColor;"));
+        assertTrue(normalizedVertex.contains("layout(location = 10) out vec2 signMidCoordPos;"));
+        assertTrue(normalizedVertex.contains("layout(location = 11) flat out vec2 absMidCoordPos;"));
     }
 
     @Test
@@ -804,6 +1047,123 @@ public class VulkanBackendSpirvPathTest {
         assertTrue(rewritten.contains("layout(location = 1) in vec2 UV0;"));
         assertTrue(rewritten.contains("layout(location = 2) in vec4 Color;"));
         assertTrue(rewritten.contains("layout(location = 3) in ivec2 UV2;"));
+    }
+
+    @Test
+    public void testInjectExplicitVulkanBindingsPreservesIrisEntityAttributeLocations() throws Exception {
+        Method injector = VulkanBackend.class.getDeclaredMethod(
+            "injectExplicitVulkanBindings",
+            RenderPipeline.class,
+            net.blaze3d.shaders.ShaderType.class,
+            String.class
+        );
+        injector.setAccessible(true);
+
+        RenderPipeline entityPipeline = new TestRenderPipeline(
+            ResourceLocation.withDefaultNamespace("pipeline/entity_cutout"),
+            IrisVertexFormats.ENTITY,
+            VertexFormat.Mode.QUADS
+        );
+
+        String source = "#version 330\n"
+            + "layout(location = 0) in vec3 Position;\n"
+            + "layout(location = 1) in vec4 Color;\n"
+            + "layout(location = 2) in vec2 UV0;\n"
+            + "layout(location = 3) in ivec2 UV1;\n"
+            + "layout(location = 4) in ivec2 UV2;\n"
+            + "layout(location = 5) in vec3 Normal;\n"
+            + "layout(location = 6) in ivec3 iris_Entity;\n"
+            + "layout(location = 7) in vec4 mc_midTexCoord;\n"
+            + "layout(location = 8) in vec4 at_tangent;\n"
+            + "void main() { gl_Position = vec4(Position, 1.0); }\n";
+
+        String rewritten = (String) injector.invoke(null, entityPipeline, net.blaze3d.shaders.ShaderType.VERTEX, source);
+
+        assertTrue(rewritten.contains("layout(location = 6) in ivec3 iris_Entity;"));
+        assertTrue(rewritten.contains("layout(location = 7) in vec4 mc_midTexCoord;"));
+        assertTrue(rewritten.contains("layout(location = 8) in vec4 at_tangent;"));
+        assertFalse(rewritten.contains("layout(location = 11) in ivec3 iris_Entity;"));
+        assertFalse(rewritten.contains("layout(location = 12) in vec4 mc_midTexCoord;"));
+        assertFalse(rewritten.contains("layout(location = 13) in vec4 at_tangent;"));
+    }
+
+    @Test
+    public void testInjectExplicitVulkanBindingsRebasesIrisEntityAliases() throws Exception {
+        Method injector = VulkanBackend.class.getDeclaredMethod(
+            "injectExplicitVulkanBindings",
+            RenderPipeline.class,
+            net.blaze3d.shaders.ShaderType.class,
+            String.class
+        );
+        injector.setAccessible(true);
+
+        RenderPipeline entityPipeline = new TestRenderPipeline(
+            ResourceLocation.withDefaultNamespace("pipeline/entity_cutout"),
+            DefaultVertexFormat.NEW_ENTITY,
+            VertexFormat.Mode.QUADS
+        );
+
+        String source = "#version 330\n"
+            + "layout(location = 0) in vec3 iris_Position;\n"
+            + "layout(location = 1) in vec4 iris_Color;\n"
+            + "layout(location = 2) in vec2 iris_UV0;\n"
+            + "layout(location = 3) in ivec2 iris_UV2;\n"
+            + "layout(location = 4) in vec3 iris_Normal;\n"
+            + "in ivec3 iris_Entity;\n"
+            + "in vec2 mc_midTexCoord;\n"
+            + "in vec4 at_tangent;\n"
+            + "void main() { gl_Position = vec4(iris_Position, 1.0); }\n";
+
+        String rewritten = (String) injector.invoke(null, entityPipeline, net.blaze3d.shaders.ShaderType.VERTEX, source);
+
+        assertTrue(rewritten.contains("layout(location = 0) in vec3 iris_Position;"));
+        assertTrue(rewritten.contains("layout(location = 1) in vec4 iris_Color;"));
+        assertTrue(rewritten.contains("layout(location = 2) in vec2 iris_UV0;"));
+        assertTrue(rewritten.contains("layout(location = 4) in ivec2 iris_UV2;"));
+        assertTrue(rewritten.contains("layout(location = 5) in vec3 iris_Normal;"));
+        assertTrue(rewritten.contains("layout(location = 6) in ivec3 iris_Entity;"));
+        assertTrue(rewritten.contains("layout(location = 7) in vec2 mc_midTexCoord;"));
+        assertTrue(rewritten.contains("layout(location = 8) in vec4 at_tangent;"));
+    }
+
+    @Test
+    public void testInjectExplicitVulkanBindingsRebasesExistingIrisTerrainLocations() throws Exception {
+        Method injector = VulkanBackend.class.getDeclaredMethod(
+            "injectExplicitVulkanBindings",
+            RenderPipeline.class,
+            net.blaze3d.shaders.ShaderType.class,
+            String.class
+        );
+        injector.setAccessible(true);
+
+        RenderPipeline terrainPipeline = new TestRenderPipeline(
+            ResourceLocation.withDefaultNamespace("pipeline/solid"),
+            IrisVertexFormats.TERRAIN,
+            VertexFormat.Mode.QUADS
+        );
+
+        String source = "#version 330\n"
+            + "layout(location = 0) in vec3 Position;\n"
+            + "layout(location = 1) in vec4 Color;\n"
+            + "layout(location = 2) in vec2 UV0;\n"
+            + "layout(location = 3) in ivec2 UV2;\n"
+            + "layout(location = 4) in vec3 Normal;\n"
+            + "layout(location = 5) in vec4 mc_Entity;\n"
+            + "layout(location = 6) in vec4 mc_midTexCoord;\n"
+            + "layout(location = 7) in vec4 at_tangent;\n"
+            + "layout(location = 8) in vec3 at_midBlock;\n"
+            + "void main() { gl_Position = vec4(Position, 1.0); }\n";
+
+        String rewritten = (String) injector.invoke(null, terrainPipeline, net.blaze3d.shaders.ShaderType.VERTEX, source);
+
+        assertTrue(rewritten.contains("layout(location = 11) in vec4 mc_Entity;"));
+        assertTrue(rewritten.contains("layout(location = 12) in vec4 mc_midTexCoord;"));
+        assertTrue(rewritten.contains("layout(location = 13) in vec4 at_tangent;"));
+        assertTrue(rewritten.contains("layout(location = 14) in vec3 at_midBlock;"));
+        assertFalse(rewritten.contains("layout(location = 5) in vec4 mc_Entity;"));
+        assertFalse(rewritten.contains("layout(location = 6) in vec4 mc_midTexCoord;"));
+        assertFalse(rewritten.contains("layout(location = 7) in vec4 at_tangent;"));
+        assertFalse(rewritten.contains("layout(location = 8) in vec3 at_midBlock;"));
     }
 
     @Test

@@ -274,7 +274,7 @@ find_client_window_id() {
             printf '%s\n' "$id"
             return 0
         fi
-        if printf '%s\n' "$props" | grep -Eiq 'Minecraft|MattMC'; then
+        if printf '%s\n' "$props" | grep -Eiq 'Minecraft|LWJGL|GLFW|KnotClient|devlaunchinjector'; then
             printf '%s\n' "$id"
             return 0
         fi

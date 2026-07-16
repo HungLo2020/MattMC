@@ -70,6 +70,17 @@ final class ShadercSpirvCompiler implements SpirvCompiler {
         "vertexWorldPos", 2,
         "vertexYPos", 3
     );
+    private static final java.util.Map<String, Integer> IRIS_SHADERPACK_VARYING_LOCATIONS_BY_NAME =
+        createIrisShaderpackVaryingLocations();
+    private static final java.util.regex.Pattern VARYING_LINE_PATTERN = java.util.regex.Pattern.compile(
+        "^(\\s*)((?:(?:flat|smooth|noperspective|centroid|sample)\\s+)*)(in|out)\\s+([^;]+);(\\s*(?://.*)?)$"
+    );
+    private static final java.util.regex.Pattern VARYING_DECLARATION_BODY_PATTERN = java.util.regex.Pattern.compile(
+        "([A-Za-z_][A-Za-z0-9_]*(?:\\s*\\[[^\\]]+\\])?)\\s+(.+)"
+    );
+    private static final java.util.regex.Pattern VARYING_NAME_PATTERN = java.util.regex.Pattern.compile(
+        "([A-Za-z_][A-Za-z0-9_]*)(\\s*\\[[^\\]]+\\])?"
+    );
     static final String GENERATED_UNIFORM_BLOCK_NAME = "VulkanicStandaloneUniforms";
     private static final String VIEW_HEIGHT_UNIFORM_DECLARATION = "float viewHeight;";
     private static final String LEGACY_SHADOW_DEPTH_TEXEL_FETCH_HELPER_NAME =
@@ -136,6 +147,7 @@ final class ShadercSpirvCompiler implements SpirvCompiler {
         String normalized = injectVulkanicBackendDefine(promoteVersionForVulkan(shaderSource));
         normalized = rewriteLightmapSkyCoordinateForVulkan(stage, sourceName, normalized);
         normalized = injectDistantHorizonsTerrainVaryingLocationsForVulkan(stage, normalized);
+        normalized = injectIrisShaderpackVaryingLocationsForVulkan(stage, normalized);
         if (stage == VulkanicShaderStage.FRAGMENT) {
             normalized = LEGACY_FRAG_COORD_INPUT_DECLARATION_PATTERN.matcher(normalized).replaceAll("");
         }
@@ -266,6 +278,142 @@ final class ShadercSpirvCompiler implements SpirvCompiler {
         return rewritten.toString();
     }
 
+    private static java.util.Map<String, Integer> createIrisShaderpackVaryingLocations() {
+        java.util.LinkedHashMap<String, Integer> locations = new java.util.LinkedHashMap<>();
+        locations.put("iris_FogFragCoord", 0);
+        locations.put("iris_entityInfo", 1);
+        locations.put("texCoord", 2);
+        locations.put("lmCoord", 3);
+        locations.put("upVec", 4);
+        locations.put("sunVec", 5);
+        locations.put("northVec", 6);
+        locations.put("eastVec", 7);
+        locations.put("normal", 8);
+        locations.put("glColor", 9);
+        locations.put("signMidCoordPos", 10);
+        locations.put("absMidCoordPos", 11);
+        locations.put("midCoord", 12);
+        locations.put("mat", 13);
+        locations.put("position", 14);
+        locations.put("playerPos", 15);
+        locations.put("viewVector", 16);
+        locations.put("binormal", 17);
+        locations.put("tangent", 18);
+        locations.put("glColorRaw", 19);
+        locations.put("entityColor", 20);
+        locations.put("iris_vertexColor", 21);
+        locations.put("vlFactor", 22);
+        locations.put("vanillaStars", 23);
+        locations.put("uv", 24);
+        return java.util.Collections.unmodifiableMap(locations);
+    }
+
+    private static String injectIrisShaderpackVaryingLocationsForVulkan(VulkanicShaderStage stage, String shaderSource) {
+        if (stage != VulkanicShaderStage.VERTEX && stage != VulkanicShaderStage.FRAGMENT) {
+            return shaderSource;
+        }
+        if (!isIrisShaderpackStageInterface(stage, shaderSource)) {
+            return shaderSource;
+        }
+
+        StringBuilder rewritten = new StringBuilder(shaderSource.length() + 512);
+        String[] lines = shaderSource.split("\\R", -1);
+        boolean targetVertexOutputs = stage == VulkanicShaderStage.VERTEX;
+        for (int i = 0; i < lines.length; i++) {
+            rewritten.append(rewriteIrisShaderpackVaryingLine(lines[i], targetVertexOutputs));
+            if (i + 1 < lines.length) {
+                rewritten.append('\n');
+            }
+        }
+        return rewritten.toString();
+    }
+
+    private static boolean isIrisShaderpackStageInterface(VulkanicShaderStage stage, String shaderSource) {
+        if (stage == VulkanicShaderStage.VERTEX) {
+            return shaderSource.contains("out float iris_FogFragCoord")
+                || shaderSource.contains("flat out ivec3 iris_entityInfo")
+                || (shaderSource.contains("out vec2 texCoord") && shaderSource.contains("out vec4 glColor"))
+                || (shaderSource.contains("flat out int mat") && shaderSource.contains("out vec4 position"));
+        }
+
+        return shaderSource.contains("iris_FragData")
+            && (shaderSource.contains("in vec2 texCoord")
+                || shaderSource.contains("in vec4 glColor")
+                || shaderSource.contains("in float iris_FogFragCoord")
+                || shaderSource.contains("flat in ivec3 iris_entityInfo"));
+    }
+
+    private static String rewriteIrisShaderpackVaryingLine(String line, boolean targetVertexOutputs) {
+        if (line.contains("layout")) {
+            return line;
+        }
+
+        java.util.regex.Matcher lineMatcher = VARYING_LINE_PATTERN.matcher(line);
+        if (!lineMatcher.matches()) {
+            return line;
+        }
+
+        String direction = lineMatcher.group(3);
+        if ((targetVertexOutputs && !"out".equals(direction)) || (!targetVertexOutputs && !"in".equals(direction))) {
+            return line;
+        }
+
+        java.util.regex.Matcher bodyMatcher = VARYING_DECLARATION_BODY_PATTERN.matcher(lineMatcher.group(4).trim());
+        if (!bodyMatcher.matches()) {
+            return line;
+        }
+
+        String type = bodyMatcher.group(1).trim();
+        String[] declarators = bodyMatcher.group(2).split(",");
+        java.util.List<VaryingDeclarator> parsedDeclarators = new ArrayList<>(declarators.length);
+        boolean hasKnownVarying = false;
+        for (String declarator : declarators) {
+            java.util.regex.Matcher nameMatcher = VARYING_NAME_PATTERN.matcher(declarator.trim());
+            if (!nameMatcher.matches()) {
+                return line;
+            }
+
+            String name = nameMatcher.group(1);
+            String arraySuffix = nameMatcher.group(2) == null ? "" : nameMatcher.group(2);
+            Integer location = IRIS_SHADERPACK_VARYING_LOCATIONS_BY_NAME.get(name);
+            hasKnownVarying |= location != null;
+            parsedDeclarators.add(new VaryingDeclarator(name, arraySuffix, location));
+        }
+
+        if (!hasKnownVarying) {
+            return line;
+        }
+
+        StringBuilder replacement = new StringBuilder(line.length() + parsedDeclarators.size() * 32);
+        for (int i = 0; i < parsedDeclarators.size(); i++) {
+            VaryingDeclarator declarator = parsedDeclarators.get(i);
+            if (i > 0) {
+                replacement.append('\n');
+            }
+            replacement.append(lineMatcher.group(1));
+            if (declarator.location() != null) {
+                replacement.append("layout(location = ")
+                    .append(declarator.location())
+                    .append(") ");
+            }
+            replacement.append(lineMatcher.group(2))
+                .append(direction)
+                .append(' ')
+                .append(type)
+                .append(' ')
+                .append(declarator.name())
+                .append(declarator.arraySuffix())
+                .append(';');
+        }
+        if (!lineMatcher.group(5).isBlank()) {
+            replacement.append(lineMatcher.group(5));
+        }
+        return replacement.toString();
+    }
+
+    private record VaryingDeclarator(String name, String arraySuffix, Integer location) {
+    }
+
     private static boolean isDistantHorizonsTerrainInterfaceShader(VulkanicShaderStage stage, String shaderSource) {
         if (stage == VulkanicShaderStage.VERTEX) {
             return shaderSource.contains("in uvec4 vPosition;")
@@ -329,8 +477,16 @@ final class ShadercSpirvCompiler implements SpirvCompiler {
 
     private static boolean isStandaloneUniformActiveForVulkan(String searchableSource, String uniformName) {
         return isIdentifierReferenced(searchableSource, uniformName)
+            || isAlwaysMaterializedIrisStandaloneUniform(uniformName)
             || ("viewHeight".equals(uniformName)
                 && requiresSyntheticViewHeightForFragmentCoordRewrite(searchableSource));
+    }
+
+    private static boolean isAlwaysMaterializedIrisStandaloneUniform(String uniformName) {
+        // Iris updates atlasSize from the atlas bound on texture unit 0 before shaderpack draws.
+        // Some shaderpack include/macro paths can hide the direct token from the active-use scan,
+        // but dropping this uniform leaves Vulkan without the atlas dimensions OpenGL receives.
+        return "atlasSize".equals(uniformName);
     }
 
     private static boolean isSodiumTerrainRegionOffsetSource(String shaderSource) {

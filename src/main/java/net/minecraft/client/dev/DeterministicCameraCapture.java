@@ -1,5 +1,6 @@
 package net.minecraft.client.dev;
 
+import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -44,6 +45,8 @@ public final class DeterministicCameraCapture {
 	private static final int SETTLED_READY_FRAMES = Math.max(0, Integer.getInteger("mattmc.dev.deterministicCameraCapture.settledReadyFrames", 0));
 	private static final int SETTLED_READY_MAX_WAIT_FRAMES = Math.max(1, Integer.getInteger("mattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames", 900));
 	private static final Set<String> SETTLED_READY_FAMILIES = parseSettledReadyFamilies();
+	private static final String FORCED_CAMERA_TYPE = System.getProperty("mattmc.dev.deterministicCameraCapture.cameraType", "").trim();
+	private static final int FORCED_SELECTED_HOTBAR_SLOT = Integer.getInteger("mattmc.dev.deterministicCameraCapture.selectedHotbarSlot", 0);
 	private static final float FIXED_VIGNETTE_BRIGHTNESS =
 		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.vignetteBrightness", "1.0"));
 	private static final Path METADATA_PATH = Path.of(System.getProperty("mattmc.dev.deterministicCameraCapture.metadata", "run/deterministic_camera_capture.json"));
@@ -70,6 +73,8 @@ public final class DeterministicCameraCapture {
 	private static int windowHeight;
 	private static boolean settledReadyGateSatisfied;
 	private static int framesWaitingForSettledReady;
+	private static CameraType originalCameraType;
+	private static int originalSelectedHotbarSlot;
 	private static final Map<Long, Map<String, Set<String>>> SUBMITTED_WORK_BY_FRAME = new LinkedHashMap<>();
 
 	private DeterministicCameraCapture() {
@@ -96,6 +101,7 @@ public final class DeterministicCameraCapture {
 		player.setSprinting(false);
 		player.setShiftKeyDown(false);
 		player.setDeltaMovement(Vec3.ZERO);
+		applyRuntimeOverrides(minecraft, player);
 		if (initialized && initialPosition != null && initialPose != null) {
 			player.setPos(initialPosition);
 			player.setOldPosAndRot(initialPosition, initialPose.yaw(), initialPose.pitch());
@@ -271,6 +277,9 @@ public final class DeterministicCameraCapture {
 
 		initialPosition = player.position();
 		initialDimension = level.dimension().location().toString();
+		originalCameraType = minecraft.options.getCameraType();
+		originalSelectedHotbarSlot = player.getInventory().getSelectedSlot();
+		applyRuntimeOverrides(minecraft, player);
 		initialPose = new Pose("initial", player.getYRot(), player.getXRot());
 		stabilizeGuiState(minecraft);
 		Pose[] fullSequence = new Pose[] {
@@ -285,7 +294,7 @@ public final class DeterministicCameraCapture {
 		windowHeight = minecraft.getWindow().getHeight();
 		initialized = true;
 		LOGGER.info(
-			"Deterministic camera capture started dimension={} pos=({}, {}, {}) yaw={} pitch={} framesPerPose={} yawDelta={} screenshots={}",
+			"Deterministic camera capture started dimension={} pos=({}, {}, {}) yaw={} pitch={} framesPerPose={} yawDelta={} cameraType={} selectedHotbarSlot={} screenshots={}",
 			initialDimension,
 			initialPosition.x,
 			initialPosition.y,
@@ -294,6 +303,8 @@ public final class DeterministicCameraCapture {
 			initialPose.pitch(),
 			FRAMES_PER_POSE,
 			YAW_DELTA,
+			currentCameraType(minecraft),
+			currentSelectedHotbarSlot(player),
 			SCREENSHOT_DIR
 		);
 		writeMetadata(minecraft, "running");
@@ -553,6 +564,7 @@ public final class DeterministicCameraCapture {
 		}
 		complete = true;
 		writeMetadata(minecraft, "complete");
+		restoreRuntimeOverrides(minecraft);
 		LOGGER.info("Deterministic camera capture complete metadata={}", METADATA_PATH);
 	}
 
@@ -577,6 +589,50 @@ public final class DeterministicCameraCapture {
 		player.yHeadRotO = pose.yaw();
 		player.yBodyRot = pose.yaw();
 		player.yBodyRotO = pose.yaw();
+	}
+
+	private static void applyRuntimeOverrides(Minecraft minecraft, LocalPlayer player) {
+		CameraType cameraType = forcedCameraType();
+		if (cameraType != null && minecraft.options.getCameraType() != cameraType) {
+			minecraft.options.setCameraType(cameraType);
+			minecraft.gameRenderer.checkEntityPostEffect(cameraType.isFirstPerson() ? minecraft.getCameraEntity() : null);
+		}
+		if (FORCED_SELECTED_HOTBAR_SLOT > 0) {
+			int selectedSlot = Math.max(1, Math.min(9, FORCED_SELECTED_HOTBAR_SLOT)) - 1;
+			if (player.getInventory().getSelectedSlot() != selectedSlot) {
+				player.getInventory().setSelectedSlot(selectedSlot);
+			}
+		}
+	}
+
+	private static void restoreRuntimeOverrides(Minecraft minecraft) {
+		if (minecraft.player != null && FORCED_SELECTED_HOTBAR_SLOT > 0 && originalSelectedHotbarSlot >= 0 && originalSelectedHotbarSlot < 9) {
+			minecraft.player.getInventory().setSelectedSlot(originalSelectedHotbarSlot);
+		}
+		if (!FORCED_CAMERA_TYPE.isBlank() && originalCameraType != null && minecraft.options.getCameraType() != originalCameraType) {
+			minecraft.options.setCameraType(originalCameraType);
+			minecraft.gameRenderer.checkEntityPostEffect(originalCameraType.isFirstPerson() ? minecraft.getCameraEntity() : null);
+		}
+	}
+
+	private static CameraType forcedCameraType() {
+		if (FORCED_CAMERA_TYPE.isBlank()) {
+			return null;
+		}
+		try {
+			return CameraType.valueOf(FORCED_CAMERA_TYPE.toUpperCase(Locale.ROOT).replace('-', '_'));
+		} catch (IllegalArgumentException exception) {
+			fail("invalid deterministic camera type override: " + FORCED_CAMERA_TYPE);
+			return null;
+		}
+	}
+
+	private static String currentCameraType(Minecraft minecraft) {
+		return minecraft.options.getCameraType().name();
+	}
+
+	private static int currentSelectedHotbarSlot(LocalPlayer player) {
+		return player.getInventory().getSelectedSlot() + 1;
 	}
 
 	private static void writeFailureMetadata(String reason) {
@@ -617,6 +673,8 @@ public final class DeterministicCameraCapture {
 		json.append("  \"startedGameTime\": ").append(startedGameTime).append(",\n");
 		appendField(json, "gitCommit", gitCommit()).append(",\n");
 		json.append("  \"distantHorizonsActive\": ").append(isDistantHorizonsActive()).append(",\n");
+		appendField(json, "cameraType", minecraft.options.getCameraType().name()).append(",\n");
+		json.append("  \"selectedHotbarSlot\": ").append(player == null ? -1 : currentSelectedHotbarSlot(player)).append(",\n");
 		json.append("  \"framesPerPose\": ").append(FRAMES_PER_POSE).append(",\n");
 		json.append("  \"settledReadyFrames\": ").append(SETTLED_READY_FRAMES).append(",\n");
 		json.append("  \"settledReadyMaxWaitFrames\": ").append(SETTLED_READY_MAX_WAIT_FRAMES).append(",\n");

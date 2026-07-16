@@ -254,6 +254,49 @@ public final class PipelineDescriptor {
     }
 
     /**
+     * Returns a copy of this descriptor with the portable vertex format updated.
+     *
+     * <p>This is used when a shared high-level pipeline is rendered through a
+     * context-dependent extended vertex format, such as Iris entity/terrain
+     * formats. The shader modules and resource layout stay unchanged, while
+     * Vulkan pipeline creation sees the same logical vertex layout as the
+     * submitted buffer.</p>
+     */
+    public PipelineDescriptor withPortableVertexFormat(VertexFormat vertexFormat) {
+        PortableState state = this.portableState;
+        PortableState updatedState = new PortableState(
+            state.location(),
+            state.vertexShader(),
+            state.fragmentShader(),
+            state.shaderDefineValues(),
+            state.shaderDefineFlags(),
+            state.samplers(),
+            state.uniforms(),
+            state.blendState(),
+            state.depthTestFunction(),
+            state.polygonMode(),
+            state.cull(),
+            state.cullFaceMode(),
+            state.writeColor(),
+            state.writeAlpha(),
+            state.writeDepth(),
+            state.colorLogic(),
+            Objects.requireNonNull(vertexFormat, "vertexFormat must not be null"),
+            state.vertexFormatMode(),
+            state.depthBiasScaleFactor(),
+            state.depthBiasConstant()
+        );
+        return new PipelineDescriptor(
+            this.nativeDescriptor,
+            updatedState,
+            this.explicitResourceLayout,
+            this.spirvModules,
+            this.pushConstantRanges,
+            this.vertexInputState
+        );
+    }
+
+    /**
      * Returns a copy of this descriptor with explicit resource-layout metadata attached.
      */
     public PipelineDescriptor withResourceLayout(ResourceLayout resourceLayout) {

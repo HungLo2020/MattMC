@@ -241,6 +241,29 @@ public class VulkanDescriptorLifecycleTest {
     }
 
     @Test
+    public void testNativeRenderPassUsesIrisOverrideProgramDescriptors() throws Exception {
+        String encoderSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanNativeCommandEncoder.java"));
+        String backendSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+
+        assertTrue(encoderSource.contains("resolveIrisOverrideProgram"),
+            "Native Vulkan render passes must resolve the same Iris RenderPipeline overrides used by OpenGL");
+        assertTrue(encoderSource.contains("createIrisProgramLiveDescriptor"),
+            "Native Vulkan render passes must build pipeline descriptors from the linked Iris program SPIR-V");
+        assertTrue(encoderSource.contains("setupIrisProgramStateIfNeeded"),
+            "Native Vulkan render passes must let Iris populate shader uniforms and sampler units before descriptor binding");
+        assertTrue(encoderSource.contains("clearIrisProgramState"),
+            "Native Vulkan render passes must clear Iris override state after the pass");
+        assertTrue(encoderSource.contains("irisProgramResourceLookup"),
+            "Native Vulkan render passes must resolve Iris sampler names rather than only vanilla Sampler0-style names");
+        assertTrue(backendSource.contains("resolveLegacySamplerUnitForProgram"),
+            "Vulkan Iris resource lookup must use reflected opaque sampler uniform values to find the intended texture unit");
+        assertTrue(backendSource.contains("resolveLegacySamplerViewForProgram"),
+            "Vulkan Iris resource lookup must bind the texture actually visible through the reflected sampler unit");
+    }
+
+    @Test
     public void testSharedStorageImageSamplerDescriptorsUseGeneralLayout() throws Exception {
         String source = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"))

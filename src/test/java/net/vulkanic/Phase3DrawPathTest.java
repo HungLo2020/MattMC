@@ -3545,6 +3545,12 @@ public class Phase3DrawPathTest {
             "RenderType draw path should first resolve sampler views from TextureTracker unit bindings");
         assertTrue(renderTypeSource.contains("TextureTracker.INSTANCE.getTextureView(textureId)"),
             "RenderType draw path should resolve texture views through TextureTracker before binding samplers");
+        assertTrue(renderTypeSource.contains("int drawFramebuffer = outputColorOverride == null && outputDepthOverride == null")
+                && renderTypeSource.contains("VulkanicAPI.getDrawFramebufferBinding()"),
+            "RenderType immediate draws should honor an active framebuffer binding before falling back to vanilla render-target views");
+        assertTrue(renderTypeSource.contains("? VulkanicAPI.createRenderPass(() -> \"Immediate draw for \" + this.getName(), drawFramebuffer, renderTarget.useDepth)")
+                && renderTypeSource.contains(": VulkanicAPI.createRenderPass("),
+            "RenderType immediate draws should use framebuffer-backed Vulkan render passes for Iris/OpenGL-style bound framebuffers");
 
         Path textureTrackerFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/TextureTracker.java");
         String textureTrackerSource = readSource(textureTrackerFile);

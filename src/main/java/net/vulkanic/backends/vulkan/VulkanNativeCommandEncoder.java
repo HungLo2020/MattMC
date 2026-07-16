@@ -4,6 +4,7 @@ import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuFence;
 import net.blaze3d.buffers.GpuBufferSlice;
 import net.blaze3d.opengl.GlConst;
+import net.blaze3d.opengl.GlProgram;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.platform.NativeImage;
 import net.blaze3d.systems.CommandEncoder;
@@ -11,10 +12,17 @@ import net.blaze3d.systems.RenderPass;
 import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.vertex.VertexFormat;
+import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.program.Program;
 import net.irisshaders.iris.mixinterface.CustomPass;
 import net.irisshaders.iris.pbr.TextureTracker;
+import net.irisshaders.iris.pipeline.IrisPipelines;
+import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
+import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
+import net.irisshaders.iris.pipeline.programs.IrisProgram;
+import net.irisshaders.iris.pipeline.programs.ShaderKey;
+import net.irisshaders.iris.vertices.ImmediateState;
 import net.sodium.client.render.chunk.shader.SharedChunkProgramOverrides;
 import net.sodium.client.render.chunk.shader.VulkanTerrainPipelineDiagnostics;
 import net.minecraft.util.ARGB;
@@ -42,6 +50,8 @@ import org.jetbrains.annotations.Nullable;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Collection;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -63,6 +73,9 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final boolean DEBUG_DESCRIPTOR_BINDINGS =
         Boolean.getBoolean("mattmc.vulkan.debugDescriptorBindingSeam");
+    private static final int MAX_IRIS_PROGRAM_LIVE_DESCRIPTOR_CACHE_ENTRIES = 128;
+    private static final Map<IrisProgramLiveDescriptorKey, PipelineDescriptor> IRIS_PROGRAM_LIVE_DESCRIPTOR_CACHE =
+        new java.util.concurrent.ConcurrentHashMap<>();
     private static int debugCustomPassLogs;
     private static final java.util.Set<String> WARNED_INCOMPLETE_CUSTOM_PASS_KEYS =
         java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
@@ -80,6 +93,21 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         boolean customPass
     ) {}
 
+    private record IrisProgramLiveDescriptorKey(RenderPipeline renderPipeline, PipelineDescriptor baseDescriptor, int programHandle) {
+        @Override
+        public boolean equals(Object object) {
+            return object instanceof IrisProgramLiveDescriptorKey other
+                && this.renderPipeline == other.renderPipeline
+                && this.programHandle == other.programHandle
+                && Objects.equals(this.baseDescriptor, other.baseDescriptor);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(System.identityHashCode(this.renderPipeline), this.baseDescriptor, this.programHandle);
+        }
+    }
+
     private final VulkanBackend backend;
     private final ResourceMode resourceMode;
     private boolean inRenderPass;
@@ -91,6 +119,63 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
     VulkanNativeCommandEncoder(VulkanBackend backend, ResourceMode resourceMode) {
         this.backend = backend;
         this.resourceMode = resourceMode;
+    }
+
+    @Nullable
+    private static GlProgram resolveIrisOverrideProgram(RenderPipeline renderPipeline) {
+        if (renderPipeline == net.irisshaders.iris.pipeline.CompositeRenderer.COMPOSITE_PIPELINE) {
+            return null;
+        }
+        WorldRenderingPipeline pipeline = Iris.getPipelineManager().getPipelineNullable();
+        if (!(pipeline instanceof IrisRenderingPipeline irisPipeline)
+            || !irisPipeline.shouldOverrideShaders()
+            || ImmediateState.bypass) {
+            return null;
+        }
+
+        ShaderKey shaderKey = IrisPipelines.getPipeline(irisPipeline, renderPipeline);
+        if (shaderKey == null) {
+            return null;
+        }
+        return irisPipeline.getShaderMap().getShader(shaderKey);
+    }
+
+    @Nullable
+    private static PipelineDescriptor createIrisProgramLiveDescriptor(
+        CommandContext ctx,
+        RenderPipeline renderPipeline,
+        PipelineDescriptor baseDescriptor,
+        GlProgram program
+    ) {
+        if (!(program instanceof IrisProgram) || program == GlProgram.INVALID_PROGRAM) {
+            return null;
+        }
+
+        VertexFormat effectiveVertexFormat = renderPipeline.getVertexFormat();
+        if (!effectiveVertexFormat.equals(baseDescriptor.getPortableState().vertexFormat())) {
+            baseDescriptor = baseDescriptor.withPortableVertexFormat(effectiveVertexFormat);
+        }
+
+        int programHandle = program.getProgramId();
+        if (programHandle <= 0 || VulkanicAPI.getLinkedProgramSpirvModules(ctx, programHandle).isEmpty()) {
+            return null;
+        }
+
+        IrisProgramLiveDescriptorKey cacheKey = new IrisProgramLiveDescriptorKey(renderPipeline, baseDescriptor, programHandle);
+        PipelineDescriptor cachedDescriptor = IRIS_PROGRAM_LIVE_DESCRIPTOR_CACHE.get(cacheKey);
+        if (cachedDescriptor != null) {
+            return cachedDescriptor;
+        }
+
+        PipelineDescriptor liveDescriptor = VulkanicAPI.createLiveProgramPipelineDescriptor(ctx, baseDescriptor, programHandle);
+        if (liveDescriptor != null && liveDescriptor.hasSpirvModules()) {
+            if (IRIS_PROGRAM_LIVE_DESCRIPTOR_CACHE.size() >= MAX_IRIS_PROGRAM_LIVE_DESCRIPTOR_CACHE_ENTRIES) {
+                IRIS_PROGRAM_LIVE_DESCRIPTOR_CACHE.clear();
+            }
+            IRIS_PROGRAM_LIVE_DESCRIPTOR_CACHE.put(cacheKey, liveDescriptor);
+            return liveDescriptor;
+        }
+        return null;
     }
 
     @Override
@@ -860,6 +945,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         private long resourceStateGeneration;
         @Nullable
         private CachedResourceSubmission cachedResourceSubmission;
+        private final List<IrisProgram> irisProgramsToClear = new ArrayList<>();
         private boolean scissorEnabled;
         private int scissorX;
         private int scissorY;
@@ -956,6 +1042,10 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
             if (textureUnit >= 0) {
                 this.samplerUnits.put(name, textureUnit);
+                IrisRenderSystem.setTextureBinding(
+                    textureUnit,
+                    VulkanNativeCommandEncoder.this.backend.resolveTextureHandle(this.ctx, texture)
+                );
             } else {
                 this.samplerUnits.remove(name);
             }
@@ -1295,6 +1385,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                 if (this.depthView != null) {
                     this.depthView.close();
                 }
+                this.clearIrisProgramState();
             }
         }
 
@@ -1306,7 +1397,15 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             RenderPipeline pipeline = this.requirePipeline();
             PipelineDescriptor baseDescriptor = this.requirePipelineDescriptor();
             PipelineDescriptor selectedDescriptor = this.selectDescriptor(pipeline, baseDescriptor);
-            PipelineResourcePlanner.Plan submission = this.buildResourceBindings(selectedDescriptor);
+            GlProgram irisProgram = resolveIrisOverrideProgram(pipeline);
+            if (irisProgram != null) {
+                this.setupIrisProgramStateIfNeeded(irisProgram);
+                PipelineDescriptor liveDescriptor = createIrisProgramLiveDescriptor(this.ctx, pipeline, selectedDescriptor, irisProgram);
+                if (liveDescriptor != null) {
+                    selectedDescriptor = liveDescriptor;
+                }
+            }
+            PipelineResourcePlanner.Plan submission = this.buildResourceBindings(selectedDescriptor, irisProgram);
             if (submission == null) {
                 throw new IllegalStateException("No Vulkan resource bindings available for pipeline " + pipeline.getLocation());
             }
@@ -1336,6 +1435,29 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             VulkanNativeCommandEncoder.this.backend.bindPipelineResources(this.ctx, handle, submission.descriptor(), submission.bindings());
             this.cacheSubmittedResources(handle, submission, false);
             return true;
+        }
+
+        private void setupIrisProgramStateIfNeeded(@Nullable GlProgram program) {
+            if (!(program instanceof IrisProgram irisProgram) || irisProgram.iris$isSetUp()) {
+                return;
+            }
+
+            VulkanicTextureView sampler0 = this.samplers.get("Sampler0");
+            if (sampler0 != null) {
+                IrisRenderSystem.setTextureBinding(
+                    0,
+                    VulkanNativeCommandEncoder.this.backend.resolveTextureHandle(this.ctx, sampler0.texture())
+                );
+            }
+            irisProgram.iris$setupState();
+            this.irisProgramsToClear.add(irisProgram);
+        }
+
+        private void clearIrisProgramState() {
+            for (IrisProgram irisProgram : this.irisProgramsToClear) {
+                irisProgram.iris$clearState();
+            }
+            this.irisProgramsToClear.clear();
         }
 
         private boolean bindCustomPassPipelineAndResources(CustomPass pass) {
@@ -1584,10 +1706,18 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
         @Nullable
         private PipelineResourcePlanner.Plan buildResourceBindings(PipelineDescriptor descriptor) {
+            return this.buildResourceBindings(descriptor, null);
+        }
+
+        @Nullable
+        private PipelineResourcePlanner.Plan buildResourceBindings(
+            PipelineDescriptor descriptor,
+            @Nullable GlProgram irisProgram
+        ) {
             PipelineResourcePlanner.Plan submission = VulkanicPipelineResourceResolver.buildPlan(
                 this.ctx,
                 descriptor,
-                this.pipelineResourceLookup(),
+                irisProgram != null ? this.irisProgramResourceLookup(irisProgram) : this.pipelineResourceLookup(),
                 resourcePlannerOptions()
                     .missingResourceDescriber(
                         VulkanNativeCommandEncoder.this.resourceMode == ResourceMode.TERRAIN && VulkanTerrainPipelineDiagnostics.enabled()
@@ -1687,6 +1817,57 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                     return NativeRenderPass.this.renderPipeline != null
                         ? SharedChunkProgramOverrides.activeProgramHandle(NativeRenderPass.this.renderPipeline)
                         : -1;
+                }
+
+                @Override
+                @Nullable
+                public Integer samplerObject(int samplerUnit) {
+                    return currentBoundSamplerObject(samplerUnit);
+                }
+            };
+        }
+
+        private VulkanicPipelineResourceResolver.ResourceLookup irisProgramResourceLookup(GlProgram program) {
+            int programId = program.getProgramId();
+            return new VulkanicPipelineResourceResolver.ResourceLookup() {
+                @Override
+                @Nullable
+                public VulkanicTextureView samplerView(PipelineDescriptor.ResourceBinding binding) {
+                    return VulkanNativeCommandEncoder.this.backend.resolveLegacySamplerViewForProgram(
+                        NativeRenderPass.this.ctx,
+                        binding,
+                        programId
+                    );
+                }
+
+                @Override
+                @Nullable
+                public Integer samplerUnit(PipelineDescriptor.ResourceBinding binding) {
+                    return VulkanNativeCommandEncoder.this.backend.resolveLegacySamplerUnitForProgram(programId, binding);
+                }
+
+                @Override
+                @Nullable
+                public VulkanicBufferSlice uniformBufferSlice(PipelineDescriptor.ResourceBinding binding) {
+                    return NativeRenderPass.this.uniforms.get(binding.name());
+                }
+
+                @Override
+                @Nullable
+                public Integer texelBufferUnit(PipelineDescriptor.ResourceBinding binding) {
+                    return samplerUnit(binding);
+                }
+
+                @Override
+                @Nullable
+                public PipelineResourceBindings.StorageImageBinding storageImageBinding(PipelineDescriptor.ResourceBinding binding) {
+                    return VulkanNativeCommandEncoder.this.backend.resolveLegacyStorageImageBindingForProgram(programId, binding);
+                }
+
+                @Override
+                @Nullable
+                public Integer standaloneProgramId(PipelineDescriptor.ResourceBinding binding) {
+                    return programId;
                 }
 
                 @Override
