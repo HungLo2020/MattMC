@@ -142,14 +142,45 @@ payload_root() {
     return 1
 }
 
+copy_update_payload() {
+    local source_root="$1"
+    local destination_root="$2"
+    local pending_updater=""
+    local item base_name
+
+    if [[ -f "$source_root/update-mattmc.sh" ]] &&
+        grep -q 'copy_update_payload()' "$source_root/update-mattmc.sh"; then
+        pending_updater="$TMP_ROOT/update-mattmc.sh.pending"
+        cp -f "$source_root/update-mattmc.sh" "$pending_updater"
+        chmod +x "$pending_updater" 2>/dev/null || true
+    fi
+
+    while IFS= read -r -d '' item; do
+        base_name="$(basename "$item")"
+        if [[ "$base_name" == "update-mattmc.sh" ]]; then
+            continue
+        fi
+        cp -R "$item" "$destination_root"/
+    done < <(find "$source_root" -mindepth 1 -maxdepth 1 -print0)
+
+    if [[ -n "$pending_updater" ]]; then
+        PENDING_UPDATER="$pending_updater"
+    fi
+}
+
 require_command curl
 require_command unzip
 
 PLATFORM="$(detect_platform)"
 API_URL="https://api.github.com/repos/$REPO/releases/latest"
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/mattmc-update.XXXXXX")"
+PENDING_UPDATER=""
 
 cleanup() {
+    if [[ -n "${PENDING_UPDATER:-}" && -f "$PENDING_UPDATER" ]]; then
+        cp -f "$PENDING_UPDATER" "$INSTALL_DIR/update-mattmc.sh"
+        chmod +x "$INSTALL_DIR/update-mattmc.sh" 2>/dev/null || true
+    fi
     rm -rf "$TMP_ROOT"
 }
 trap cleanup EXIT
@@ -198,7 +229,7 @@ unzip -q "$ZIP_PATH" -d "$EXTRACT_DIR"
 PAYLOAD_ROOT="$(payload_root "$EXTRACT_DIR")"
 echo "Applying update from: $PAYLOAD_ROOT"
 
-cp -R "$PAYLOAD_ROOT"/. "$INSTALL_DIR"/
+copy_update_payload "$PAYLOAD_ROOT" "$INSTALL_DIR"
 
 echo "Update complete."
 echo "Installed release asset: $EXPECTED_ASSET_NAME"
