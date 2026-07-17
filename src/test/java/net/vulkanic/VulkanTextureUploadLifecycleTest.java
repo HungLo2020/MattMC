@@ -126,12 +126,16 @@ public class VulkanTextureUploadLifecycleTest {
 
     @Test
     public void testVulkanBackendSourcePreservesLegacyMipMetadataWhenGrowingStorage() throws Exception {
-        String source = Files.readString(PROJECT_ROOT
+        String backendSource = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String coordinatorSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanTextureTransferExecutionCoordinator.java"));
 
-        assertTrue(source.contains("Map<Integer, TextureLevelInfo> preservedLevels = null;"),
-            "Vulkan legacy texture uploads should preserve previously defined mip metadata before recreating storage");
-        assertTrue(source.contains("texture.levels.putAll(preservedLevels);"),
+        assertTrue(backendSource.contains("StorageDefinitionPlan storagePlan"),
+            "Vulkan legacy texture uploads should delegate storage-redefinition decisions to the transfer coordinator");
+        assertTrue(coordinatorSource.contains("Map<Integer, TextureLevelInfo> preservedLevels"),
+            "Vulkan texture transfer coordinator should preserve previously defined mip metadata before recreating storage");
+        assertTrue(backendSource.contains("texture.levels.putAll(storagePlan.preservedLevels())"),
             "Vulkan legacy texture uploads should restore preserved mip metadata after recreating storage");
     }
 
@@ -150,12 +154,14 @@ public class VulkanTextureUploadLifecycleTest {
 
     @Test
     public void testVulkanBackendSourceSizesLegacyMipStorageUsingConfiguredMaxLevel() throws Exception {
-        String source = Files.readString(PROJECT_ROOT
+        String backendSource = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String coordinatorSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanTextureTransferExecutionCoordinator.java"));
 
-        assertTrue(source.contains("GL_TEXTURE_MAX_LEVEL"),
+        assertTrue(backendSource.contains("GL_TEXTURE_MAX_LEVEL"),
             "Vulkan legacy texture uploads should consider GL_TEXTURE_MAX_LEVEL to allocate the intended mip chain up front");
-        assertTrue(source.contains("maxMipLevelsForExtent("),
+        assertTrue(coordinatorSource.contains("maxMipLevelsForExtent("),
             "Vulkan legacy texture uploads should clamp configured mip levels to valid texture extent-derived limits");
     }
 

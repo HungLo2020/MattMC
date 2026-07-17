@@ -561,7 +561,7 @@ class CaptureRunner:
                 f"-Dmattmc.dev.deterministicCameraCapture.shaderEnabled={self.effective_enable_shaders or 'unknown'}",
                 f"-Dmattmc.dev.deterministicCameraCapture.shaderPack={self.effective_shader_pack or 'unknown'}",
                 f"-Dmattmc.dev.deterministicCameraCapture.gitCommit={self.git_commit}",
-                "-Dmattmc.dev.deterministicCameraCapture.stopAfterComplete=false",
+                "-Dmattmc.dev.deterministicCameraCapture.stopAfterComplete=true",
                 "-Dmattmc.vulkan.traceShaderInputParity.poseOnly=true",
             ]
             self.append_java_tool_options(deterministic_options)
@@ -595,7 +595,8 @@ class CaptureRunner:
                 self.deterministic_completed = True
                 self.intentional_deterministic_shutdown = True
                 self.append_meta(f"deterministic_capture_complete_elapsed={elapsed}")
-                self.terminate_run_processes("deterministic_complete")
+                if not self.wait_for_deterministic_shutdown():
+                    self.terminate_run_processes("deterministic_complete")
                 break
 
             if not self.check_client_memory_guard(client_pid, elapsed):
@@ -630,6 +631,20 @@ class CaptureRunner:
         if self.gradle_process.poll() is None:
             return self.gradle_process.wait()
         return self.gradle_process.returncode or 0
+
+    def wait_for_deterministic_shutdown(self, grace_secs: int = 20) -> bool:
+        assert self.gradle_process is not None
+        self.append_meta(f"deterministic_shutdown_grace_secs={grace_secs}")
+        for waited in range(grace_secs):
+            if self.gradle_process.poll() is not None:
+                self.append_meta(f"deterministic_shutdown_grace_elapsed={waited}")
+                return True
+            time.sleep(1)
+        if self.gradle_process.poll() is not None:
+            self.append_meta(f"deterministic_shutdown_grace_elapsed={grace_secs}")
+            return True
+        self.append_meta("deterministic_shutdown_grace_expired=true")
+        return False
 
     def find_client_pid(self) -> int | None:
         marker = f"-Dmattmc.dev.runCaptureId={self.run_id}"

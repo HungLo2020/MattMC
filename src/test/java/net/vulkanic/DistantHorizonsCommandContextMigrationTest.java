@@ -914,22 +914,29 @@ public class DistantHorizonsCommandContextMigrationTest {
     @Test
     public void testVulkanLegacyDhDrawsBindProgramPipelineAndExplicitVertexInput() throws IOException {
         Path backend = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
+        Path resourceManager = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBufferVertexResourceManager.java");
+        Path drawCoordinator = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanDrawExecutionCoordinator.java");
         Path descriptor = SRC_MAIN_JAVA.resolve("net/vulkanic/PipelineDescriptor.java");
         String backendSource = readSourceWithoutComments(backend);
+        String resourceManagerSource = readSourceWithoutComments(resourceManager);
+        String drawCoordinatorSource = readSourceWithoutComments(drawCoordinator);
         String descriptorSource = readSourceWithoutComments(descriptor);
 
-        assertTrue(backendSource.contains("bindLegacyProgramPipelineForDraw(commandBufferHandle, mode)"),
-            "Legacy DH draw calls should bind a Vulkan pipeline before issuing indexed draws");
-        assertTrue(backendSource.contains("currentVirtualVaoState().setAttributeFormat"),
-            "VulkanBackend should record GL43 vertex attribute format calls instead of accepting them as no-ops");
-        assertTrue(backendSource.contains("currentVirtualVaoState().setAttributeBinding"),
-            "VulkanBackend should record GL43 vertex attribute binding calls for pipeline vertex input");
-        assertTrue(backendSource.contains("createLegacyProgramPipelineDescriptor"),
-            "VulkanBackend should derive a pipeline descriptor from the currently bound standalone shader program");
+        assertTrue(backendSource.contains("backend.bindLegacyProgramPipelineForDraw(commandBufferHandle, plan)")
+                && backendSource.contains("drawExecution.planLegacyDraw("),
+            "Legacy DH draw calls should resolve a draw execution plan and bind a Vulkan pipeline before issuing indexed draws");
+        assertTrue(backendSource.contains("bufferVertexResources.setVertexAttributeFormat")
+                && resourceManagerSource.contains("void setVertexAttributeFormat"),
+            "VulkanBackend should route GL43 vertex attribute format calls into the buffer/vertex resource manager instead of accepting them as no-ops");
+        assertTrue(backendSource.contains("bufferVertexResources.setVertexAttributeBinding")
+                && resourceManagerSource.contains("void setVertexAttributeBinding"),
+            "VulkanBackend should route GL43 vertex attribute binding calls into the buffer/vertex resource manager for pipeline vertex input");
+        assertTrue(drawCoordinatorSource.contains("createLegacyProgramPipelineDescriptor"),
+            "VulkanDrawExecutionCoordinator should derive a pipeline descriptor from the currently bound standalone shader program snapshot");
         assertTrue(backendSource.contains("spine.activeRenderPassCompatibilityKey()"),
             "Legacy standalone program pipelines should compile against the active render pass contract");
-        assertTrue(backendSource.contains("withVertexInputState(vertexInputState)"),
-            "Legacy standalone program descriptors should carry explicit VAO-derived vertex input");
+        assertTrue(drawCoordinatorSource.contains("withVertexInputState(vertexInputState)"),
+            "Legacy standalone program descriptors should carry explicit coordinator-planned vertex input");
         int legacyTextureLookup = backendSource.indexOf("spine.textureResources.boundLegacyTexture2D(unit)");
         int irisTextureLookup = backendSource.indexOf("IrisRenderSystem.getTextureBinding(unit)", legacyTextureLookup);
         assertTrue(legacyTextureLookup >= 0 && irisTextureLookup > legacyTextureLookup,

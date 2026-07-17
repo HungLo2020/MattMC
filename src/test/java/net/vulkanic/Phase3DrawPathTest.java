@@ -1265,20 +1265,24 @@ public class Phase3DrawPathTest {
     @Test
     public void testVulkanLegacyVaoCapturesAttributeBufferBindingsForInstancedDraws() throws IOException {
         Path backendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
+        Path resourceManagerFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBufferVertexResourceManager.java");
         String backendSource = readSource(backendFile);
+        String resourceManagerSource = readSource(resourceManagerFile);
 
-        assertTrue(backendSource.contains("currentVirtualVaoState().setAttributePointer(index, size, type, normalized, false, stride, pointer, currentLegacyArrayBufferBinding())")
-                && backendSource.contains("currentVirtualVaoState().setAttributePointer(index, size, type, false, true, stride, pointer, currentLegacyArrayBufferBinding())"),
-            "Legacy glVertexAttribPointer/IPointer must capture the array buffer bound when the attribute is specified");
-        assertTrue(backendSource.contains("LegacyVertexAttribute previous = attributes.get(index);")
-                && backendSource.contains("int divisor = previous != null ? previous.divisor() : 0;")
-                && backendSource.contains("new LegacyVertexAttribute(index, index, size, type, normalized, integer, Math.toIntExact(pointer), divisor)")
-                && backendSource.contains("bindings.put(index, new LegacyVertexBinding(index, effectiveStride, 0, divisor, buffer))"),
-            "Pre-GL43 attribute pointers should preserve captured buffers and any divisor set before the pointer call");
-        assertTrue(backendSource.contains("bindLegacyVertexBuffersForDraw(commandBufferHandle)")
-                && backendSource.contains("filter(binding -> binding.buffer() > 0)")
+        assertTrue(backendSource.contains("bufferVertexResources.setVertexAttributePointer(index, size, type, normalized, false, stride, pointer)")
+                && backendSource.contains("bufferVertexResources.setVertexAttributePointer(index, size, type, false, true, stride, pointer)"),
+            "Legacy glVertexAttribPointer/IPointer should delegate attribute capture to the buffer/vertex resource manager");
+        assertTrue(resourceManagerSource.contains("boundLegacyBufferId(VulkanicAPI.GL_ARRAY_BUFFER)")
+                && resourceManagerSource.contains("LegacyVertexAttribute previous = attributes.get(index);")
+                && resourceManagerSource.contains("int divisor = previous != null ? previous.divisor() : 0;")
+                && resourceManagerSource.contains("new LegacyVertexAttribute(index, index, size, type, normalized, integer, Math.toIntExact(pointer), divisor)")
+                && resourceManagerSource.contains("bindings.put(index, new LegacyVertexBinding(index, effectiveStride, 0, divisor, buffer))"),
+            "Pre-GL43 attribute pointers should preserve captured buffers and any divisor set before the pointer call inside the manager");
+        assertTrue(backendSource.contains("backend.legacyDrawResourceSnapshot()")
+                && backendSource.contains("plan.vertexStream()")
+                && backendSource.contains("for (VulkanDrawExecutionCoordinator.VertexBufferBindingPlan binding : vertexStream.vertexBuffers())")
                 && backendSource.contains("bindVertexBuffer(commandBufferHandle, binding.binding(), vertexBuffer.getVkBufferHandle(), binding.offset())"),
-            "Legacy draw calls should bind every captured VAO vertex buffer before indexed or instanced draws");
+            "Legacy draw calls should bind every coordinator-planned immutable draw-resource vertex buffer before indexed or instanced draws");
     }
 
     @Test

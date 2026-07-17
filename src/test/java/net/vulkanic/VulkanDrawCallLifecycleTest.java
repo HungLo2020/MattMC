@@ -88,10 +88,14 @@ public class VulkanDrawCallLifecycleTest {
             "Vulkan backend should expose drawArrays entrypoint");
         assertTrue(source.contains("public void drawElements("),
             "Vulkan backend should expose drawElements entrypoint");
-        assertTrue(source.contains("drawLegacyArrays("),
-            "Vulkan draw-call path should route through legacy drawArrays bridge");
-        assertTrue(source.contains("drawLegacyElements("),
-            "Vulkan draw-call path should route through legacy drawElements bridge");
+        assertTrue(source.contains("VulkanDrawExecutionCoordinator.SemanticDrawRequest.arrays("),
+            "Vulkan arrays draw-call path should be converted into a semantic draw request");
+        assertTrue(source.contains("VulkanDrawExecutionCoordinator.SemanticDrawRequest.indexed("),
+            "Vulkan indexed draw-call path should be converted into a semantic draw request");
+        assertTrue(source.contains("private void executeLegacyDraw("),
+            "Vulkan draw-call path should converge on one legacy draw execution lifecycle");
+        assertTrue(source.contains("drawExecution.planLegacyDraw("),
+            "Vulkan draw-call path should resolve immutable draw plans through VulkanDrawExecutionCoordinator");
         assertTrue(source.contains("vkCmdDrawIndexed"),
             "Vulkan draw-call path should record vkCmdDrawIndexed");
         assertTrue(source.contains("BoundIndexBufferState"),

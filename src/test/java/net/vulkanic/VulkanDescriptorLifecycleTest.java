@@ -309,6 +309,8 @@ public class VulkanDescriptorLifecycleTest {
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanDescriptorBindingPlanner.java"));
         String imageCoordinatorSource = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanImageResourceViewCoordinator.java"));
+        String transferCoordinatorSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanTextureTransferExecutionCoordinator.java"));
         String normalized = source.replaceAll("\\s+", " ");
         String normalizedRenderPassPlanner = renderPassPlannerSource.replaceAll("\\s+", " ");
         String normalizedImageCoordinator = imageCoordinatorSource.replaceAll("\\s+", " ");
@@ -318,6 +320,7 @@ public class VulkanDescriptorLifecycleTest {
             source.indexOf("private void clearLegacyColorTexture"));
         String normalizedSampleTransition = sampleTransition.replaceAll("\\s+", " ");
         String normalizedPreferredIdleLayout = preferredIdleLayout.replaceAll("\\s+", " ");
+        String normalizedTransferCoordinator = transferCoordinatorSource.replaceAll("\\s+", " ");
 
         assertTrue(normalizedImageCoordinator.contains("int descriptorImageLayoutFor("),
             "Feedback-loop-capable images should not be described as feedback-loop layout for ordinary sampled reads");
@@ -337,9 +340,9 @@ public class VulkanDescriptorLifecycleTest {
             "Sampler transitions should use feedback-loop layout only for active attachment feedback, not all feedback-capable textures");
         assertTrue(normalizedPreferredIdleLayout.contains("Feedback-loop layout is a render-pass usage, not an idle layout"),
             "Idle layout policy should document why feedback-loop-capable textures still idle as sampled reads");
-        assertFalse(normalizedPreferredIdleLayout.contains("if (texture.feedbackLoopCapable) { return VulkanImageUse.FEEDBACK_LOOP.vkLayout(); }"),
+        assertFalse(normalizedTransferCoordinator.contains("if (storage.feedbackLoopCapable()) { return VulkanImageUse.FEEDBACK_LOOP.vkLayout(); }"),
             "Feedback-loop-capable textures should not permanently idle in feedback-loop layout");
-        assertTrue(normalizedPreferredIdleLayout.contains("? VulkanImageUse.SAMPLED_COLOR.vkLayout() : VulkanImageUse.SAMPLED_DEPTH.vkLayout()"),
+        assertTrue(normalizedTransferCoordinator.contains("? VulkanImageUse.SAMPLED_DEPTH.vkLayout() : VulkanImageUse.SAMPLED_COLOR.vkLayout()"),
             "Idle layout should match ordinary descriptor sampled-read layouts");
     }
 
