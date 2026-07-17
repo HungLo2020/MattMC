@@ -669,6 +669,66 @@ tasks.register('runClient', JavaExec) {
     configureBundledJdk(it)
 }
 
+tasks.register('runRealChunkMeshingReplay', JavaExec) {
+    group = 'verification'
+    description = 'Runs the real production chunk meshing replay runner inside the Minecraft client.'
+
+    dependsOn 'jar', 'copyJdkToRun', 'shaderPackZip'
+
+    classpath = files(jar.archiveFile.get().asFile) + configurations.runtimeClasspath
+    mainClass = 'net.fabricmc.loader.impl.launch.knot.KnotClient'
+
+    def replayRunDirProvider = providers.gradleProperty('mattmcReplayRunDir')
+            .orElse("${buildDir}/real-chunk-meshing-replay/run")
+    def replayRunDir = file(replayRunDirProvider.get())
+    def replayOutput = providers.gradleProperty('mattmcReplayOutput')
+            .orElse("${buildDir}/real-chunk-meshing-replay/result.json")
+    def replayWarmup = providers.gradleProperty('mattmcReplayWarmup').orElse('30')
+    def replayWarmupSeconds = providers.gradleProperty('mattmcReplayWarmupSeconds').orElse('0')
+    def replayMeasure = providers.gradleProperty('mattmcReplayMeasure').orElse('80')
+    def replayMeasureSeconds = providers.gradleProperty('mattmcReplayMeasureSeconds').orElse('0')
+    def replayRebuildsPerSample = providers.gradleProperty('mattmcReplayRebuildsPerSample').orElse('1')
+    def replayValidateEachSample = providers.gradleProperty('mattmcReplayValidateEachSample').orElse('1')
+    def replayRustProfile = providers.gradleProperty('mattmcReplayRustProfile').orElse('none')
+    def replayFixture = providers.gradleProperty('mattmcReplayFixture').orElse('')
+
+    workingDir = replayRunDir
+    jvmArgs = clientJvmArgs + [
+        '-Dfabric.development=true',
+        '-Dmattmc.realMeshingReplay=true',
+        "-Dmattmc.realMeshingReplay.output=${replayOutput.get()}",
+        "-Dmattmc.realMeshingReplay.warmup=${replayWarmup.get()}",
+        "-Dmattmc.realMeshingReplay.warmupSeconds=${replayWarmupSeconds.get()}",
+        "-Dmattmc.realMeshingReplay.measure=${replayMeasure.get()}",
+        "-Dmattmc.realMeshingReplay.measureSeconds=${replayMeasureSeconds.get()}",
+        "-Dmattmc.realMeshingReplay.rebuildsPerSample=${replayRebuildsPerSample.get()}",
+        "-Dmattmc.realMeshingReplay.validateEachSample=${replayValidateEachSample.get()}",
+        "-Dmattmc.realMeshingReplay.rustProfile=${replayRustProfile.get()}",
+        "-Dmattmc.realMeshingReplay.fixture=${replayFixture.get()}"
+    ]
+
+    args = [
+        '--version', '1.21.10',
+        '--accessToken', '0',
+        '--gameDir', replayRunDir.absolutePath
+    ]
+
+    doFirst {
+        delete replayRunDir
+        replayRunDir.mkdirs()
+        file("${replayRunDir}/resourcepacks").mkdirs()
+        def shaderpacksDir = file("${replayRunDir}/shaderpacks")
+        shaderpacksDir.mkdirs()
+        copy {
+            from file("${buildDir}/shaderpacks")
+            into shaderpacksDir
+            include '*.zip'
+        }
+    }
+
+    configureBundledJdk(it)
+}
+
 // Task to download bundled JDK if not present
 tasks.register('downloadJdk', Exec) {
     group = 'minecraft'

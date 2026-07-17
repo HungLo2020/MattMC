@@ -41,6 +41,11 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
     // TODO: move fluid rendering to a separate render pass and control glPolygonOffset and glDepthFunc to fix this properly
     public static final float EPSILON = 0.001f;
     private static final float ALIGNED_EQUALS_EPSILON = 0.011f;
+    private static final int FLUID_FACE_TOP_NE_SW = 0;
+    private static final int FLUID_FACE_TOP_NW_SE = 1;
+    private static final boolean JAVA_FLUID_DIAG = System.getenv("MATTMC_JAVA_FLUID_DIAG") != null;
+    private static final int JAVA_FLUID_DIAG_LIMIT = 10_000;
+    private static int javaFluidDiagCount;
 
     private final BlockPos.MutableBlockPos scratchPos = new BlockPos.MutableBlockPos();
     private final MutableFloat scratchHeight = new MutableFloat(0);
@@ -230,9 +235,15 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
             }
 
             this.updateQuad(quad, level, blockPos, lighter, Direction.UP, ModelQuadFacing.POS_Y, 1.0F, colorProvider, fluidState);
+            this.logJavaFluidDiag(offset, material, aligned ? ModelQuadFacing.POS_Y : ModelQuadFacing.UNASSIGNED,
+                    false, creaseNorthEastSouthWest ? FLUID_FACE_TOP_NE_SW : FLUID_FACE_TOP_NW_SE, 0.0F,
+                    northWestHeight, southWestHeight, southEastHeight, northEastHeight);
             this.writeQuad(meshBuilder, collector, material, offset, quad, aligned ? ModelQuadFacing.POS_Y : ModelQuadFacing.UNASSIGNED, false);
 
             if (fluidState.shouldRenderBackwardUpFace(level, this.scratchPos.set(posX, posY + 1, posZ))) {
+                this.logJavaFluidDiag(offset, material, aligned ? ModelQuadFacing.NEG_Y : ModelQuadFacing.UNASSIGNED,
+                        true, creaseNorthEastSouthWest ? FLUID_FACE_TOP_NE_SW : FLUID_FACE_TOP_NW_SE, 0.0F,
+                        northWestHeight, southWestHeight, southEastHeight, northEastHeight);
                 this.writeQuad(meshBuilder, collector, material, offset, quad,
                         aligned ? ModelQuadFacing.NEG_Y : ModelQuadFacing.UNASSIGNED, true);
             }
@@ -444,6 +455,82 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
 
         var vertexBuffer = builder.getVertexBuffer(facing);
         vertexBuffer.push(vertices, material);
+    }
+
+    private void logJavaFluidDiag(BlockPos offset, Material material, ModelQuadFacing facing, boolean flip,
+                                  int faceKind, float yOffset, float height0, float height1, float height2,
+                                  float height3) {
+        if (!JAVA_FLUID_DIAG || javaFluidDiagCount >= JAVA_FLUID_DIAG_LIMIT || !shouldLogFluidDiag(this.iris$localX,
+                this.iris$localY, this.iris$localZ)) {
+            return;
+        }
+        if (!fluidDiagTargetMatches(offset)) {
+            return;
+        }
+
+        int index = javaFluidDiagCount++;
+        int[] encodedTextures = encodedFluidDiagTextures(flip);
+        System.out.printf("MATTMC_JAVA_FLUID_DIAG #%d pos=%d,%d,%d blockId=%d renderType=%d material=%d facing=%s flip=%s face=%d origin=%d,%d,%d yOffset=%.4f heights=%.4f,%.4f,%.4f,%.4f uv0=%.5f,%.5f uv1=%.5f,%.5f uv2=%.5f,%.5f uv3=%.5f,%.5f tex=0x%08x,0x%08x,0x%08x,0x%08x color0=0x%08x ao0=%.4f light=0x%08x,0x%08x,0x%08x,0x%08x%n",
+                index, this.iris$localX, this.iris$localY, this.iris$localZ, this.iris$blockId,
+                this.iris$isFluid, material.bits(), facing, flip, faceKind, offset.getX(), offset.getY(),
+                offset.getZ(), yOffset, height0, height1, height2, height3,
+                this.quad.getTexU(0), this.quad.getTexV(0), this.quad.getTexU(1), this.quad.getTexV(1),
+                this.quad.getTexU(2), this.quad.getTexV(2), this.quad.getTexU(3), this.quad.getTexV(3),
+                encodedTextures[0], encodedTextures[1], encodedTextures[2], encodedTextures[3],
+                this.quadColors[0], this.brightness[0], this.quadLightData.lm[0], this.quadLightData.lm[1],
+                this.quadLightData.lm[2], this.quadLightData.lm[3]);
+    }
+
+    private int[] encodedFluidDiagTextures(boolean flip) {
+        float uCenter = (this.quad.getTexU(0) + this.quad.getTexU(1) + this.quad.getTexU(2) + this.quad.getTexU(3)) * 0.25f;
+        float vCenter = (this.quad.getTexV(0) + this.quad.getTexV(1) + this.quad.getTexV(2) + this.quad.getTexV(3)) * 0.25f;
+        int[] output = new int[4];
+        for (int vertex = 0; vertex < 4; vertex++) {
+            output[vertex] = packDiagTexture(encodeDiagTexture(uCenter, this.quad.getTexU(vertex)),
+                    encodeDiagTexture(vCenter, this.quad.getTexV(vertex)));
+        }
+        if (flip) {
+            return new int[] { output[0], output[3], output[2], output[1] };
+        }
+        return output;
+    }
+
+    private static int encodeDiagTexture(float center, float value) {
+        int bias = value < center ? 1 : -1;
+        int quantized = Math.round(value * (1 << 15)) + bias;
+        return (quantized & 0x7fff) | ((bias >>> 31) << 15);
+    }
+
+    private static int packDiagTexture(int u, int v) {
+        return (u & 0xffff) | ((v & 0xffff) << 16);
+    }
+
+    private static boolean shouldLogFluidDiag(int x, int y, int z) {
+        if (System.getenv("MATTMC_FLUID_DIAG_REPLAY") != null) {
+            return x >= 0 && x <= 15 && z >= 0 && z <= 15 && (y >= 0 && y <= 15 || y >= 64 && y <= 79);
+        }
+
+        return x >= 0 && x <= 160 && y >= 60 && y <= 72 && z >= 360 && z <= 660;
+    }
+
+    private static boolean fluidDiagTargetMatches(BlockPos offset) {
+        String target = System.getenv("MATTMC_FLUID_DIAG_TARGET");
+        if (target == null || target.isBlank()) {
+            return true;
+        }
+
+        String[] parts = target.split(",");
+        if (parts.length != 3) {
+            return true;
+        }
+
+        try {
+            return offset.getX() == Integer.parseInt(parts[0].trim()) &&
+                    offset.getY() == Integer.parseInt(parts[1].trim()) &&
+                    offset.getZ() == Integer.parseInt(parts[2].trim());
+        } catch (NumberFormatException ignored) {
+            return true;
+        }
     }
 
     private static void setVertex(ModelQuadViewMutable quad, int i, float x, float y, float z, float u, float v) {
