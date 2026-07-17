@@ -37,16 +37,39 @@ final class VulkanTextureResourceManagerTest {
 
         int sampler = manager.createSampler();
         manager.bindSampler(3, sampler);
-        manager.virtualSamplerStates.get(sampler).setParameteri(VulkanicAPI.GL_TEXTURE_WRAP_S, VulkanicAPI.GL_CLAMP_TO_EDGE);
+        manager.setSamplerParameteri(sampler, VulkanicAPI.GL_TEXTURE_WRAP_S, VulkanicAPI.GL_CLAMP_TO_EDGE);
 
-        assertEquals(sampler, manager.boundSamplerPerUnit.get(3));
-        assertEquals(VulkanicAPI.GL_CLAMP_TO_EDGE, manager.virtualSamplerStates.get(sampler).wrapS);
+        assertEquals(sampler, manager.boundSampler(3));
+        assertEquals(VulkanicAPI.GL_CLAMP_TO_EDGE, manager.samplerStateSnapshot(sampler).wrapS());
 
         manager.deleteSampler(sampler);
 
-        assertFalse(manager.virtualSamplers.contains(sampler));
-        assertFalse(manager.virtualSamplerStates.containsKey(sampler));
-        assertFalse(manager.boundSamplerPerUnit.containsKey(3));
+        assertFalse(manager.hasSampler(sampler));
+        assertNull(manager.samplerStateSnapshot(sampler));
+        assertEquals(0, manager.boundSampler(3));
+    }
+
+    @Test
+    void textureBindingSnapshotsAreImmutable() {
+        VulkanTextureResourceManager manager = new VulkanTextureResourceManager();
+        int texture = manager.createLegacyTexture(VulkanicAPI.GL_TEXTURE_2D);
+        int sampler = manager.createSampler();
+        manager.bindLegacyTexture2D(3, texture);
+        manager.bindSampler(3, sampler);
+        manager.setSamplerParameteri(sampler, VulkanicAPI.GL_TEXTURE_WRAP_S, VulkanicAPI.GL_CLAMP_TO_EDGE);
+
+        TextureBindingSnapshot snapshot = manager.textureBindingSnapshot(3);
+
+        manager.unbindLegacyTexture2D(3);
+        manager.bindSampler(3, 0);
+        manager.setSamplerParameteri(sampler, VulkanicAPI.GL_TEXTURE_WRAP_S, VulkanicAPI.GL_REPEAT);
+
+        assertEquals(3, snapshot.unit());
+        assertEquals(texture, snapshot.texture2D());
+        assertEquals(sampler, snapshot.sampler());
+        assertEquals(VulkanicAPI.GL_CLAMP_TO_EDGE, snapshot.samplerState().wrapS());
+        assertEquals(0, manager.textureBindingSnapshot(3).texture2D());
+        assertEquals(0, manager.textureBindingSnapshot(3).sampler());
     }
 
     @Test
@@ -110,15 +133,75 @@ final class VulkanTextureResourceManagerTest {
         manager.registerManagedTexture(1L, 2L, 3L);
         manager.trackManagedImageView(4L);
 
-        assertEquals(2L, manager.managedImageAllocations.get(1L));
-        assertEquals(3L, manager.managedImageDefaultViews.get(1L));
-        assertTrue(manager.managedExtraImageViews.contains(4L));
+        ManagedImageSnapshot snapshot = manager.managedImageSnapshot(1L);
+        assertEquals(1L, snapshot.imageHandle());
+        assertEquals(2L, snapshot.memoryHandle());
+        assertEquals(3L, snapshot.defaultViewHandle());
+        assertTrue(manager.isManagedExtraImageViewTracked(4L));
 
         manager.unregisterManagedTexture(1L);
-        assertNull(manager.managedImageAllocations.get(1L));
-        assertNull(manager.managedImageDefaultViews.get(1L));
+        assertNull(manager.managedImageSnapshot(1L));
         assertTrue(manager.untrackManagedImageView(4L));
         assertFalse(manager.untrackManagedImageView(4L));
+    }
+
+    @Test
+    void fallbackTextureTracksRegisteredObjectAndClearsOnDeletion() {
+        VulkanTextureResourceManager manager = new VulkanTextureResourceManager();
+        int texture = manager.createLegacyTexture(VulkanicAPI.GL_TEXTURE_2D);
+
+        manager.setLegacyFallbackSamplerTextureId(texture);
+
+        assertEquals(texture, manager.legacyFallbackSamplerTextureId());
+        assertSame(manager.getLegacyTexture(texture), manager.legacyFallbackSamplerTexture());
+
+        manager.clearLegacyFallbackSamplerTextureIdIfMatches(texture);
+
+        assertEquals(0, manager.legacyFallbackSamplerTextureId());
+        assertNull(manager.legacyFallbackSamplerTexture());
+    }
+
+    @Test
+    void proxyAndTexelBufferBindingsUseExplicitOperations() {
+        VulkanTextureResourceManager manager = new VulkanTextureResourceManager();
+        int texture = manager.createLegacyTexture(VulkanicAPI.GL_TEXTURE_2D);
+
+        manager.bindLegacyTexture2D(2, texture);
+        manager.setProxyTexture2DLevel(0, new TextureLevelInfo(16, 8, VulkanicAPI.GL_RGBA8));
+        manager.setLegacyTexelBufferBinding(texture, new LegacyTexelBufferBinding(VulkanicAPI.GL_RGBA8, 9, 10L));
+
+        assertEquals(texture, manager.boundLegacyTexture2D(2));
+        assertEquals(16, manager.proxyTexture2DLevel(0).width);
+        assertEquals(8, manager.proxyTexture2DLevel(0).height);
+        assertEquals(9, manager.legacyTexelBufferBinding(texture).legacyBufferId);
+        assertEquals(10L, manager.legacyTexelBufferBinding(texture).vkBufferViewHandle);
+
+        assertEquals(10L, manager.removeLegacyTexelBufferBinding(texture).vkBufferViewHandle);
+        manager.removeProxyTexture2DLevel(0);
+        manager.unbindLegacyTexture2D(2);
+
+        assertNull(manager.legacyTexelBufferBinding(texture));
+        assertNull(manager.proxyTexture2DLevel(0));
+        assertEquals(0, manager.boundLegacyTexture2D(2));
+    }
+
+    @Test
+    void deletionAndInvalidationRemoveBindingsWithoutExposingMaps() {
+        VulkanTextureResourceManager manager = new VulkanTextureResourceManager();
+        int texture = manager.createLegacyTexture(VulkanicAPI.GL_TEXTURE_2D);
+        manager.bindLegacyTexture2D(0, texture);
+        manager.bindLegacyTexture2D(1, texture);
+        manager.bindLegacyImage(0, new LegacyImageBinding(0, texture, 0, false, 0, 0, 0));
+        manager.setLegacyTexelBufferBinding(texture, new LegacyTexelBufferBinding(0, 2, 3L));
+
+        manager.unbindLegacyTextureFromAllUnits(texture);
+        manager.unbindLegacyImage(0);
+        LegacyTexelBufferBinding removed = manager.removeLegacyTexelBufferBinding(texture);
+
+        assertEquals(0, manager.boundLegacyTexture2D(0));
+        assertEquals(0, manager.boundLegacyTexture2D(1));
+        assertNull(manager.legacyImageBinding(0));
+        assertEquals(3L, removed.vkBufferViewHandle);
     }
 
     @Test
@@ -127,10 +210,10 @@ final class VulkanTextureResourceManagerTest {
         int texture = manager.createLegacyTexture(VulkanicAPI.GL_TEXTURE_2D);
         int sampler = manager.createSampler();
         manager.bindSampler(1, sampler);
-        manager.legacyTexture2DBindingsByUnit.put(1, texture);
-        manager.legacyImageBindingsByUnit.put(0, new LegacyImageBinding(0, texture, 0, false, 0, 0, 0));
-        manager.legacyTexelBufferBindingsByTextureId.put(texture, new LegacyTexelBufferBinding(0, 2, 3L));
-        manager.proxyTexture2DLevels.put(0, new TextureLevelInfo(1, 1, VulkanicAPI.GL_RGBA8));
+        manager.bindLegacyTexture2D(1, texture);
+        manager.bindLegacyImage(0, new LegacyImageBinding(0, texture, 0, false, 0, 0, 0));
+        manager.setLegacyTexelBufferBinding(texture, new LegacyTexelBufferBinding(0, 2, 3L));
+        manager.setProxyTexture2DLevel(0, new TextureLevelInfo(1, 1, VulkanicAPI.GL_RGBA8));
         manager.registerManagedTexture(10L, 11L, 12L);
         manager.trackManagedImageView(13L);
         manager.setLegacyFallbackSamplerTextureId(texture);
@@ -138,16 +221,14 @@ final class VulkanTextureResourceManagerTest {
         manager.clearAll();
 
         assertFalse(manager.hasLegacyTextures());
-        assertTrue(manager.legacyTexture2DBindingsByUnit.isEmpty());
-        assertTrue(manager.legacyImageBindingsByUnit.isEmpty());
-        assertTrue(manager.legacyTexelBufferBindingsByTextureId.isEmpty());
-        assertTrue(manager.proxyTexture2DLevels.isEmpty());
-        assertTrue(manager.managedImageAllocations.isEmpty());
-        assertTrue(manager.managedImageDefaultViews.isEmpty());
-        assertTrue(manager.managedExtraImageViews.isEmpty());
-        assertTrue(manager.virtualSamplers.isEmpty());
-        assertTrue(manager.virtualSamplerStates.isEmpty());
-        assertTrue(manager.boundSamplerPerUnit.isEmpty());
+        assertEquals(0, manager.legacyTexture2DBindingCountForTests());
+        assertEquals(0, manager.legacyImageBindingCountForTests());
+        assertEquals(0, manager.legacyTexelBufferBindingCountForTests());
+        assertEquals(0, manager.proxyTexture2DLevelCountForTests());
+        assertEquals(0, manager.managedImageCountForTests());
+        assertEquals(0, manager.managedExtraImageViewCountForTests());
+        assertEquals(0, manager.virtualSamplerCountForTests());
+        assertEquals(0, manager.boundSamplerCountForTests());
         assertEquals(0, manager.legacyFallbackSamplerTextureId());
     }
 

@@ -309,6 +309,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testVulkanDescriptorSamplerKeysUseLiveGpuTextureState() throws IOException {
         String backendSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String plannerSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanDescriptorBindingPlanner.java"));
         String textureSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/textures/GpuTexture.java"));
 
         assertTrue(textureSource.contains("public FilterMode getMinFilter()"),
@@ -317,13 +318,13 @@ public class Phase3DrawPathTest {
             "GpuTexture should expose its live mag filter so Vulkan descriptor samplers can follow current texture state");
         assertTrue(textureSource.contains("public boolean usesMipmaps()"),
             "GpuTexture should expose whether mipmaps are live-enabled for descriptor sampler selection");
-        assertTrue(backendSource.contains("GpuTexture gpuTexture = boundTexture instanceof GpuTexture blazeTexture ? blazeTexture : null;"),
+        assertTrue(plannerSource.contains("GpuTexture gpuTexture = boundTexture instanceof GpuTexture blazeTexture ? blazeTexture : null;"),
             "Vulkan descriptor sampler keys should bridge the backend-neutral bound texture to live GpuTexture state when available");
-        assertTrue(backendSource.contains("toLegacyMinFilter(gpuTexture.getMinFilter(), gpuTexture.usesMipmaps())"),
+        assertTrue(plannerSource.contains("toLegacyMinFilter(gpuTexture.getMinFilter(), gpuTexture.usesMipmaps())"),
             "Vulkan descriptor samplers should derive minification mode from live GpuTexture state");
-        assertTrue(backendSource.contains("toLegacyMagFilter(gpuTexture.getMagFilter())"),
+        assertTrue(plannerSource.contains("toLegacyMagFilter(gpuTexture.getMagFilter())"),
             "Vulkan descriptor samplers should derive magnification mode from live GpuTexture state");
-        assertTrue(backendSource.contains("toLegacyWrapMode(gpuTexture.getAddressModeU())"),
+        assertTrue(plannerSource.contains("toLegacyWrapMode(gpuTexture.getAddressModeU())"),
             "Vulkan descriptor samplers should derive wrap state from live GpuTexture state");
         assertTrue(backendSource.contains("gpuTexture.flushModeChanges2D();")
                 && backendSource.indexOf("gpuTexture.flushModeChanges2D();")
@@ -347,7 +348,7 @@ public class Phase3DrawPathTest {
     public void testVulkanDescriptorSamplersUseCapturedIrisSamplerObjectState() throws IOException {
         String commandEncoderSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
         String resourceResolverSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicPipelineResourceResolver.java"));
-        String backendSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String plannerSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanDescriptorBindingPlanner.java"));
         String irisRenderSystemSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java"));
 
         assertTrue(irisRenderSystemSource.contains("public static int getBoundSamplerOnUnit(int unit)"),
@@ -358,11 +359,11 @@ public class Phase3DrawPathTest {
                 && resourceResolverSource.contains("PipelineResourcePlanner.ResolvedResource.sampler(")
                 && resourceResolverSource.contains("new PipelineResourceBindings.SamplerBinding("),
             "Shared Vulkan descriptor resolution should carry the captured Iris sampler object, not only the texture unit");
-        assertTrue(backendSource.contains("samplerBinding.samplerObject()"),
+        assertTrue(plannerSource.contains("samplerBinding.samplerObject()"),
             "Vulkan descriptor resolution should consume the captured sampler object from PipelineResourceBindings");
-        assertTrue(backendSource.contains("VirtualSamplerState samplerState = samplerObject != null")
-                && backendSource.contains("backend.getVirtualSamplerState(samplerObject)")
-                && backendSource.contains("backend.getBoundVirtualSamplerStateForUnit(textureUnit)"),
+        assertTrue(plannerSource.contains("VirtualSamplerStateSnapshot samplerState = samplerObject != null")
+                && plannerSource.contains("samplerStateLookup.samplerState(samplerObject)")
+                && plannerSource.contains("samplerStateLookup.samplerStateForTextureUnit(textureUnit)"),
             "Vulkan descriptor sampler keys should prefer captured sampler-object state and only fall back to the live texture-unit binding");
     }
 
@@ -1491,11 +1492,14 @@ public class Phase3DrawPathTest {
             "GlProgram linking should bind declared attribute names to the shader locations supplied by the vertex format");
 
         Path backendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
+        Path plannerFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanPipelineCreationPlanner.java");
         String backendSource = readSource(backendFile);
+        String plannerSource = readSource(plannerFile);
         assertTrue(backendSource.contains("renderPipeline.getVertexFormat().getShaderAttributeLocation(location)"),
             "Vulkan shader-source rebinding should inject explicit locations from the declared vertex format instead of forcing sequential chunk attributes");
-        assertTrue(backendSource.contains(".location(vertexFormat.getShaderAttributeLocation(i))"),
-            "Vulkan pipeline vertex input descriptions should preserve explicit generic attribute locations for extended terrain formats");
+        assertTrue(plannerSource.contains("vertexFormat.getShaderAttributeLocation(i)")
+                && backendSource.contains("allocateVertexInputState(stack, pipelinePlan.vertexInput())"),
+            "Vulkan pipeline vertex input planning should preserve explicit generic attribute locations for extended terrain formats");
     }
 
     @Test
@@ -5812,8 +5816,10 @@ public class Phase3DrawPathTest {
     public void testVulkanPipelineRenderPassCompatibilityUsesLiveRenderPassProfile() throws IOException {
         Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
         Path compatibilityKeyFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanRenderPassCompatibilityKey.java");
+        Path pipelinePlannerFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanPipelineCreationPlanner.java");
         String source = readSource(vulkanBackendFile);
         String keySource = readSource(compatibilityKeyFile);
+        String pipelinePlannerSource = readSource(pipelinePlannerFile);
 
         assertTrue(keySource.contains("record VulkanRenderPassCompatibilityKey("),
             "VulkanBackend should use a typed render-pass compatibility contract for pipeline variants");
@@ -5828,7 +5834,8 @@ public class Phase3DrawPathTest {
                 && source.contains("boolean depthFeedbackLoopCapable = isFeedbackLoopCapable(depthTexture)")
                 && source.contains("targets.hasFeedbackLoopTarget()"),
             "Texture-view pipeline variants should snapshot the same attachment feedback-loop capability used by live render passes");
-        assertTrue(source.contains("createPipelineCompatibleRenderPass(\n                    stack,\n                    renderPassCompatibilityKey"),
+        assertTrue(source.contains("createPipelineCompatibleRenderPass(\n                    stack,\n                    pipelinePlan.renderPassCompatibility().compatibilityKey()")
+                && pipelinePlannerSource.contains("new RenderPassCompatibilityPlan(renderPassCompatibilityKey, 0)"),
             "Vulkan pipeline creation should compile against the same compatibility key used for draw-time render passes");
         Path plannerFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanRenderPassLayoutPlanner.java");
         String plannerSource = readSource(plannerFile);

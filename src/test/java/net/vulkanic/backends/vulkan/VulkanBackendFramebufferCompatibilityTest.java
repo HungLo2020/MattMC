@@ -69,10 +69,14 @@ public class VulkanBackendFramebufferCompatibilityTest {
 			.resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"))
 			.replace("\r\n", "\n")
 			.replace('\r', '\n');
+		String plannerSource = Files.readString(PROJECT_ROOT
+			.resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanDescriptorBindingPlanner.java"))
+			.replace("\r\n", "\n")
+			.replace('\r', '\n');
 
-		String descriptorLayoutHelper = source.substring(
-			source.indexOf("private int descriptorImageLayoutFor"),
-			source.indexOf("private boolean shouldUseFeedbackLoopLayoutForSampling")
+		String descriptorLayoutHelper = plannerSource.substring(
+			plannerSource.indexOf("int descriptorImageLayoutFor"),
+			plannerSource.indexOf("private boolean shouldUseFeedbackLoopLayoutForSampling")
 		);
 		assertTrue(descriptorLayoutHelper.contains("hasDepthAspect(texture)"),
 			"Depth/stencil textures sampled by shaders must use the depth-read descriptor layout");

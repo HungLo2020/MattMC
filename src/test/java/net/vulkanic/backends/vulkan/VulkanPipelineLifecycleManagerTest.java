@@ -113,6 +113,40 @@ class VulkanPipelineLifecycleManagerTest {
     }
 
     @Test
+    void multipleDescriptorSetLayoutsRetireWithPipelineResources() {
+        VulkanPipelineLifecycleManager manager = new VulkanPipelineLifecycleManager();
+        List<String> destroyed = new ArrayList<>();
+        List<Runnable> deferred = new ArrayList<>();
+        manager.registerPipeline(10);
+        manager.registerPipelineLayout(20);
+        manager.registerDescriptorSetLayouts(new long[]{30, 31, 32});
+
+        manager.retirePipelineResources(
+            10,
+            20,
+            new long[]{30, 31, 32},
+            deferred::add,
+            destroyActions(destroyed)
+        );
+
+        assertEquals(1, deferred.size());
+        assertEquals(0, manager.trackedDescriptorSetLayoutCount());
+
+        deferred.getFirst().run();
+
+        assertEquals(
+            List.of(
+                "pipeline:10",
+                "pipelineLayout:20",
+                "descriptorSetLayout:30",
+                "descriptorSetLayout:31",
+                "descriptorSetLayout:32"
+            ),
+            destroyed
+        );
+    }
+
+    @Test
     void duplicatePipelineRetirementIsHarmless() {
         VulkanPipelineLifecycleManager manager = new VulkanPipelineLifecycleManager();
         List<Runnable> deferred = new ArrayList<>();

@@ -3,6 +3,7 @@ package net.vulkanic.backends.vulkan;
 import net.vulkanic.PipelineHandle;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -113,6 +114,13 @@ final class VulkanPipelineLifecycleManager {
         }
     }
 
+    void registerDescriptorSetLayouts(long[] descriptorSetLayoutHandles) {
+        Objects.requireNonNull(descriptorSetLayoutHandles, "descriptorSetLayoutHandles");
+        for (long descriptorSetLayoutHandle : descriptorSetLayoutHandles) {
+            registerDescriptorSetLayout(descriptorSetLayoutHandle);
+        }
+    }
+
     void registerShaderModule(long shaderModuleHandle) {
         if (shaderModuleHandle != 0L) {
             shaderModuleHandles.add(shaderModuleHandle);
@@ -126,13 +134,34 @@ final class VulkanPipelineLifecycleManager {
         Consumer<Runnable> deferredDestroy,
         NativeDestroyActions destroyActions
     ) {
+        retirePipelineResources(
+            pipelineHandle,
+            pipelineLayoutHandle,
+            new long[]{descriptorSetLayoutHandle},
+            deferredDestroy,
+            destroyActions
+        );
+    }
+
+    void retirePipelineResources(
+        long pipelineHandle,
+        long pipelineLayoutHandle,
+        long[] descriptorSetLayoutHandles,
+        Consumer<Runnable> deferredDestroy,
+        NativeDestroyActions destroyActions
+    ) {
         Objects.requireNonNull(deferredDestroy, "deferredDestroy");
         Objects.requireNonNull(destroyActions, "destroyActions");
+        Objects.requireNonNull(descriptorSetLayoutHandles, "descriptorSetLayoutHandles");
         boolean pipelineTracked = pipelineHandle != 0L && pipelineHandles.remove(pipelineHandle);
         boolean layoutTracked = pipelineLayoutHandle != 0L && pipelineLayoutHandles.remove(pipelineLayoutHandle);
-        boolean descriptorLayoutTracked =
-            descriptorSetLayoutHandle != 0L && descriptorSetLayoutHandles.remove(descriptorSetLayoutHandle);
-        if (!pipelineTracked && !layoutTracked && !descriptorLayoutTracked) {
+        List<Long> trackedDescriptorLayouts = new ArrayList<>();
+        for (long descriptorSetLayoutHandle : descriptorSetLayoutHandles) {
+            if (descriptorSetLayoutHandle != 0L && this.descriptorSetLayoutHandles.remove(descriptorSetLayoutHandle)) {
+                trackedDescriptorLayouts.add(descriptorSetLayoutHandle);
+            }
+        }
+        if (!pipelineTracked && !layoutTracked && trackedDescriptorLayouts.isEmpty()) {
             return;
         }
         deferredDestroy.accept(() -> {
@@ -142,7 +171,7 @@ final class VulkanPipelineLifecycleManager {
             if (layoutTracked) {
                 destroyActions.destroyPipelineLayout().accept(pipelineLayoutHandle);
             }
-            if (descriptorLayoutTracked) {
+            for (long descriptorSetLayoutHandle : trackedDescriptorLayouts) {
                 destroyActions.destroyDescriptorSetLayout().accept(descriptorSetLayoutHandle);
             }
         });
