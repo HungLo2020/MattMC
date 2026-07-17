@@ -22,3 +22,5 @@ Source Code: https://github.com/HungLo2020/MattMC
 - download or clone the repository, ```git clone https://github.com/HungLo2020/MattMC.git```
 - run ```./DevUtils/SetupProject.sh``` on Linux/macOS or ```.\DevUtils\SetupProject.ps1``` on Windows to set up the project.
 - run ```./gradlew runClient``` to launch the client or ```./gradlew runServer``` to launch the server. Or optioinally use the built in scripts, ```./DevUtils/RunDev.sh``` to launch the game in the dev environment. ```./DevUtils/ExportToDownloads.sh``` to export the build.
+
+May need to launch with "code --disable-gpu" on linux. stupid.
