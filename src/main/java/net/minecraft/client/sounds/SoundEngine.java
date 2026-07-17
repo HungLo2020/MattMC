@@ -433,15 +433,29 @@ public class SoundEngine {
 						channel.setRelative(bl);
 					});
 					if (!bl4) {
-						this.soundBuffers.getCompleteBuffer(sound.getPath()).thenAccept(soundBuffer -> channelHandle.execute(channel -> {
-							channel.attachStaticBuffer(soundBuffer);
-							channel.play();
-						}));
+						this.soundBuffers.getCompleteBuffer(sound.getPath()).whenComplete((soundBuffer, throwable) -> {
+							if (throwable != null) {
+								LOGGER.warn(MARKER, "Failed to load sound {}", sound.getPath(), throwable);
+								channelHandle.execute(Channel::failAttachment);
+							} else {
+								channelHandle.execute(channel -> {
+									channel.attachStaticBuffer(soundBuffer);
+									channel.play();
+								});
+							}
+						});
 					} else {
-						this.soundBuffers.getStream(sound.getPath(), bl3).thenAccept(audioStream -> channelHandle.execute(channel -> {
-							channel.attachBufferStream(audioStream);
-							channel.play();
-						}));
+						this.soundBuffers.getStream(sound.getPath(), bl3).whenComplete((audioStream, throwable) -> {
+							if (throwable != null) {
+								LOGGER.warn(MARKER, "Failed to open audio stream {}", sound.getPath(), throwable);
+								channelHandle.execute(Channel::failAttachment);
+							} else {
+								channelHandle.execute(channel -> {
+									channel.attachBufferStream(audioStream);
+									channel.play();
+								});
+							}
+						});
 					}
 
 					if (soundInstance instanceof TickableSoundInstance) {

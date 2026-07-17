@@ -25,6 +25,8 @@ public class Channel {
 	private final long deviceHandle;
 	private final NativeAudio.SoundConfig config = new NativeAudio.SoundConfig();
 	private long soundHandle;
+	private boolean awaitingAttachment = true;
+	private boolean stopRequested;
 	private int streamingBufferSize = 16384;
 	@Nullable
 	private AudioStream stream;
@@ -34,6 +36,8 @@ public class Channel {
 	}
 
 	public void destroy() {
+		this.awaitingAttachment = false;
+		this.stopRequested = true;
 		this.closeStream();
 		if (this.soundHandle != 0L) {
 			NativeAudio.soundStopAndDestroy(this.soundHandle);
@@ -42,7 +46,7 @@ public class Channel {
 	}
 
 	public void play() {
-		if (this.soundHandle != 0L) {
+		if (!this.stopRequested && this.soundHandle != 0L) {
 			NativeAudio.soundPlay(this.soundHandle);
 		}
 	}
@@ -64,6 +68,8 @@ public class Channel {
 	}
 
 	public void stop() {
+		this.awaitingAttachment = false;
+		this.stopRequested = true;
 		if (this.soundHandle != 0L) {
 			NativeAudio.soundStop(this.soundHandle);
 		}
@@ -74,7 +80,7 @@ public class Channel {
 	}
 
 	public boolean stopped() {
-		return this.getState() == AL_STOPPED;
+		return !this.awaitingAttachment && this.getState() == AL_STOPPED;
 	}
 
 	public void setSelfPosition(Vec3 vec3) {
@@ -118,27 +124,52 @@ public class Channel {
 	}
 
 	public void attachStaticBuffer(SoundBuffer soundBuffer) {
-		if (this.soundHandle != 0L) {
+		if (this.stopRequested) {
+			this.awaitingAttachment = false;
 			return;
 		}
 
-		soundBuffer.getNativeBuffer(this.deviceHandle).ifPresent(buffer -> {
-			this.soundHandle = NativeAudio.soundCreateStatic(this.deviceHandle, this.config, buffer);
-			this.warnIfPoolExhausted("static");
-		});
+		if (this.soundHandle != 0L) {
+			this.awaitingAttachment = false;
+			return;
+		}
+
+		try {
+			soundBuffer.getNativeBuffer(this.deviceHandle).ifPresent(buffer -> {
+				this.soundHandle = NativeAudio.soundCreateStatic(this.deviceHandle, this.config, buffer);
+				this.warnIfPoolExhausted("static");
+			});
+		} finally {
+			this.awaitingAttachment = false;
+		}
 	}
 
 	public void attachBufferStream(AudioStream audioStream) {
+		if (this.stopRequested) {
+			this.closeAudioStream(audioStream);
+			this.awaitingAttachment = false;
+			return;
+		}
+
 		this.stream = audioStream;
-		AudioFormat audioFormat = audioStream.getFormat();
-		this.streamingBufferSize = calculateBufferSize(audioFormat, 1);
-		if (this.soundHandle == 0L) {
-			this.soundHandle = NativeAudio.soundCreateStreaming(this.deviceHandle, this.config);
-			this.warnIfPoolExhausted("streaming");
+		try {
+			AudioFormat audioFormat = audioStream.getFormat();
+			this.streamingBufferSize = calculateBufferSize(audioFormat, 1);
+			if (this.soundHandle == 0L) {
+				this.soundHandle = NativeAudio.soundCreateStreaming(this.deviceHandle, this.config);
+				this.warnIfPoolExhausted("streaming");
+			}
+			if (this.soundHandle != 0L) {
+				this.pumpBuffers(QUEUED_BUFFER_COUNT);
+			}
+		} finally {
+			this.awaitingAttachment = false;
 		}
-		if (this.soundHandle != 0L) {
-			this.pumpBuffers(QUEUED_BUFFER_COUNT);
-		}
+	}
+
+	public void failAttachment() {
+		this.awaitingAttachment = false;
+		this.stopRequested = true;
 	}
 
 	private static int calculateBufferSize(AudioFormat audioFormat, int i) {
@@ -195,13 +226,16 @@ public class Channel {
 
 	private void closeStream() {
 		if (this.stream != null) {
-			try {
-				this.stream.close();
-			} catch (IOException ioException) {
-				LOGGER.error("Failed to close audio stream", (Throwable)ioException);
-			}
-
+			this.closeAudioStream(this.stream);
 			this.stream = null;
+		}
+	}
+
+	private void closeAudioStream(AudioStream audioStream) {
+		try {
+			audioStream.close();
+		} catch (IOException ioException) {
+			LOGGER.error("Failed to close audio stream", (Throwable)ioException);
 		}
 	}
 }
