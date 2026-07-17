@@ -11,6 +11,7 @@ path = "lib.rs"
 alto = { version = "3.0.4", default-features = false }
 ash = { version = "0.38", default-features = false, features = ["loaded", "std"] }
 glow = "0.18"
+lewton = "0.10.2"
 shaderc = { version = "0.10.1", features = ["build-from-source"] }
 
 [build-dependencies]

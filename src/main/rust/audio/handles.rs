@@ -13,6 +13,7 @@ pub(crate) enum ResourceKind {
     Device = 1,
     Source = 2,
     Buffer = 3,
+    Asset = 4,
 }
 
 impl ResourceKind {
@@ -21,6 +22,7 @@ impl ResourceKind {
             1 => Some(Self::Device),
             2 => Some(Self::Source),
             3 => Some(Self::Buffer),
+            4 => Some(Self::Asset),
             _ => None,
         }
     }
@@ -29,7 +31,7 @@ impl ResourceKind {
 /// Packed 64-bit handle layout shared with Java as an opaque `long`.
 ///
 /// ```text
-/// 63..56  resource kind: 1=device, 2=source, 3=buffer
+/// 63..56  resource kind: 1=device, 2=source, 3=buffer, 4=encoded asset
 /// 55..32  generation: monotonically advanced on every insert
 /// 31..00  slot: table-local nonzero index
 /// ```
@@ -151,6 +153,11 @@ impl<T> HandleTable<T> {
 
     pub(crate) fn values(&self) -> impl Iterator<Item = &T> {
         self.entries.values().map(|entry| &entry.value)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn clear(&mut self) {
+        self.entries.clear();
     }
 
     fn decode_for_table(&self, handle: u64) -> Option<NativeHandle> {

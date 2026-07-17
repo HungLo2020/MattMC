@@ -3,8 +3,8 @@ package net.minecraft.client.sounds;
 import com.google.common.collect.Sets;
 import net.blaze3d.audio.Channel;
 import net.blaze3d.audio.Library;
-import java.util.Iterator;
-import java.util.Objects;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -40,21 +40,37 @@ public class ChannelAccess {
 	}
 
 	public void executeOnChannels(Consumer<Stream<Channel>> consumer) {
-		this.executor.execute(() -> consumer.accept(this.channels.stream().map(channelHandle -> channelHandle.channel).filter(Objects::nonNull)));
+		this.executor.execute(() -> {
+			List<Channel> list = new ArrayList<>();
+
+			for (ChannelAccess.ChannelHandle channelHandle : this.channels) {
+				Channel channel = channelHandle.channelOrNull();
+				if (channel != null) {
+					list.add(channel);
+				}
+			}
+
+			consumer.accept(list.stream());
+		});
 	}
 
 	public void scheduleTick() {
 		this.executor.execute(() -> {
-			Iterator<ChannelAccess.ChannelHandle> iterator = this.channels.iterator();
+			List<ChannelAccess.ChannelHandle> stoppedChannels = new ArrayList<>();
 
-			while (iterator.hasNext()) {
-				ChannelAccess.ChannelHandle channelHandle = (ChannelAccess.ChannelHandle)iterator.next();
-				channelHandle.channel.updateStream();
-				if (channelHandle.channel.stopped()) {
-					channelHandle.release();
-					iterator.remove();
+			for (ChannelAccess.ChannelHandle channelHandle : this.channels) {
+				Channel channel = channelHandle.channelOrNull();
+				if (channel == null) {
+					stoppedChannels.add(channelHandle);
+				} else {
+					channel.updateStream();
+					if (channel.stopped()) {
+						stoppedChannels.add(channelHandle);
+					}
 				}
 			}
+
+			stoppedChannels.forEach(ChannelAccess.ChannelHandle::release);
 		});
 	}
 
@@ -63,18 +79,22 @@ public class ChannelAccess {
 	}
 
 	private void clearOnExecutor() {
-		this.channels.forEach(ChannelAccess.ChannelHandle::release);
-		this.channels.clear();
+		List<ChannelAccess.ChannelHandle> handles = new ArrayList<>(this.channels);
+		handles.forEach(ChannelAccess.ChannelHandle::release);
 	}
 
 	@Environment(EnvType.CLIENT)
 	public class ChannelHandle {
 		@Nullable
-		Channel channel;
-		private boolean stopped;
+		private Channel channel;
+		private volatile boolean released;
 
 		public boolean isStopped() {
-			return this.stopped;
+			return this.isReleased();
+		}
+
+		public boolean isReleased() {
+			return this.released;
 		}
 
 		public ChannelHandle(final Channel channel) {
@@ -82,19 +102,59 @@ public class ChannelAccess {
 		}
 
 		public void execute(Consumer<Channel> consumer) {
+			this.execute(consumer, () -> {
+			});
+		}
+
+		public void execute(Consumer<Channel> consumer, Runnable releasedCallback) {
 			ChannelAccess.this.executor.execute(() -> {
-				if (this.channel != null) {
-					consumer.accept(this.channel);
+				Channel channel = this.channel;
+				if (channel != null) {
+					consumer.accept(channel);
+				} else {
+					releasedCallback.run();
 				}
 			});
 		}
 
+		public void failAttachment() {
+			ChannelAccess.this.executor.execute(() -> {
+				Channel channel = this.channel;
+				if (channel != null) {
+					channel.failAttachment();
+				}
+
+				this.releaseOnExecutor();
+			});
+		}
+
 		public void release() {
-			this.stopped = true;
-			if (this.channel != null) {
-				ChannelAccess.this.library.releaseChannel(this.channel);
-				this.channel = null;
+			if (ChannelAccess.this.executor.isSameThread()) {
+				this.releaseOnExecutor();
+			} else {
+				ChannelAccess.this.executor.execute(this::releaseOnExecutor);
 			}
+		}
+
+		private void releaseOnExecutor() {
+			Channel channel = this.detach();
+			if (channel != null) {
+				ChannelAccess.this.library.releaseChannel(channel);
+			}
+		}
+
+		@Nullable
+		private Channel channelOrNull() {
+			return this.channel;
+		}
+
+		@Nullable
+		private Channel detach() {
+			this.released = true;
+			Channel channel = this.channel;
+			this.channel = null;
+			ChannelAccess.this.channels.remove(this);
+			return channel;
 		}
 	}
 }

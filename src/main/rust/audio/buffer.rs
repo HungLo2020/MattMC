@@ -1,21 +1,8 @@
-use std::sync::Arc;
-
 use alto::{Buffer, Context, Mono, Stereo};
 
 use super::context::alto_call;
 use super::errors::{AudioError, AudioResult};
 use super::format::audio_format_to_openal;
-
-/// Native OpenAL buffer owned by the Rust backend.
-///
-/// The `device` field ties the opaque buffer handle to the OpenAL context that
-/// created it. Static source attachment rejects buffers from other devices so a
-/// stale Java buffer handle cannot silently cross a reload boundary.
-#[derive(Clone)]
-pub(crate) struct NativeBuffer {
-    pub(crate) device: u64,
-    pub(crate) buffer: Arc<Buffer>,
-}
 
 pub(crate) fn create_buffer(
     context: &Context,

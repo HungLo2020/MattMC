@@ -10,6 +10,7 @@ pub const ERR_OPENAL_CALL: i32 = -4;
 pub const ERR_POOL_EXHAUSTED: i32 = -6;
 pub const ERR_UNSUPPORTED_FORMAT: i32 = -7;
 pub const ERR_WRONG_THREAD: i32 = -8;
+pub const ERR_DECODE_FAILED: i32 = -9;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum AudioError {
@@ -20,6 +21,7 @@ pub(crate) enum AudioError {
     PoolExhausted,
     UnsupportedFormat,
     WrongThread,
+    DecodeFailed(String),
 }
 
 impl AudioError {
@@ -32,6 +34,7 @@ impl AudioError {
             AudioError::PoolExhausted => ERR_POOL_EXHAUSTED,
             AudioError::UnsupportedFormat => ERR_UNSUPPORTED_FORMAT,
             AudioError::WrongThread => ERR_WRONG_THREAD,
+            AudioError::DecodeFailed(_) => ERR_DECODE_FAILED,
         }
     }
 
@@ -55,6 +58,7 @@ impl fmt::Display for AudioError {
             AudioError::PoolExhausted => write!(f, "native audio channel pool exhausted"),
             AudioError::UnsupportedFormat => write!(f, "unsupported audio format"),
             AudioError::WrongThread => write!(f, "native audio handle used from the wrong thread"),
+            AudioError::DecodeFailed(message) => write!(f, "audio decode failed: {message}"),
         }
     }
 }

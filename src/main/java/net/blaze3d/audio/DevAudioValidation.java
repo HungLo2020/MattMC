@@ -19,6 +19,7 @@ public final class DevAudioValidation {
 	private static final int AL_PAUSED = 4115;
 	private static final int AL_STOPPED = 4116;
 	private static final AudioFormat PCM = new AudioFormat(44100.0F, 16, 1, true, false);
+	private static final String STATIC_VALIDATION_SOUND = "assets/minecraft/sounds/random/pop.ogg";
 
 	private DevAudioValidation() {
 	}
@@ -80,8 +81,9 @@ public final class DevAudioValidation {
 
 	private static void validateStaticSound(Library library, Result result) throws Exception {
 		long device = library.currentDeviceHandleForDevValidation();
-		long buffer = NativeAudio.bufferCreate(device, pcmBuffer(44100, 0.07F), PCM);
+		NativeAudioAsset asset = loadStaticValidationAsset();
 		long sound = 0L;
+		long repeatedSound = 0L;
 		try {
 			NativeAudio.SoundConfig config = new NativeAudio.SoundConfig();
 			config.pitch = 0.85F;
@@ -91,8 +93,10 @@ public final class DevAudioValidation {
 			config.z = 3.0F;
 			config.attenuationDistance = 16.0F;
 			config.flags = NativeAudio.SOUND_FLAG_LOOPING | NativeAudio.SOUND_FLAG_LINEAR_ATTENUATION;
-			sound = NativeAudio.soundCreateStatic(device, config, buffer);
+			sound = NativeAudio.soundCreateStaticFromAsset(device, config, asset.handleForPlayback());
 			require(sound != 0L, "static sound was not created");
+			repeatedSound = NativeAudio.soundCreateStaticFromAsset(device, config, asset.handleForPlayback());
+			require(repeatedSound != 0L, "repeated static sound was not created from the same asset");
 			NativeAudio.soundPlay(sound);
 			Thread.sleep(75L);
 			result.staticPlaybackState = NativeAudio.soundState(sound);
@@ -129,10 +133,13 @@ public final class DevAudioValidation {
 			result.stopState = NativeAudio.soundState(sound);
 			require(result.stopState == AL_STOPPED || result.stopState == AL_INITIAL, "stop returned unexpected state");
 		} finally {
+			if (repeatedSound != 0L) {
+				NativeAudio.soundStopAndDestroy(repeatedSound);
+			}
 			if (sound != 0L) {
 				NativeAudio.soundStopAndDestroy(sound);
 			}
-			NativeAudio.bufferDestroy(buffer);
+			asset.close();
 		}
 	}
 
@@ -194,6 +201,16 @@ public final class DevAudioValidation {
 		return buffer;
 	}
 
+	private static NativeAudioAsset loadStaticValidationAsset() throws IOException {
+		try (var inputStream = DevAudioValidation.class.getClassLoader().getResourceAsStream(STATIC_VALIDATION_SOUND)) {
+			if (inputStream == null) {
+				throw new IOException("Missing static validation sound resource " + STATIC_VALIDATION_SOUND);
+			}
+
+			return NativeAudioAsset.create(inputStream.readAllBytes(), STATIC_VALIDATION_SOUND, 1L);
+		}
+	}
+
 	private static boolean isValidPlaybackState(int state) {
 		return state == AL_INITIAL || state == AL_PLAYING || state == AL_PAUSED || state == AL_STOPPED;
 	}
@@ -205,12 +222,20 @@ public final class DevAudioValidation {
 	}
 
 	private static void requireZeroChildren(int[] counts, String label) {
-		require(counts[1] == 0 && counts[2] == 0 && counts[3] == 0, "native audio counts were not clear " + label);
+		require(
+			counts[1] == 0 && counts[2] == 0 && counts[3] == 0 && counts[4] == 0 && counts[5] == 0,
+			"native audio counts were not clear " + label
+		);
 	}
 
 	private static void requireCounts(int[] counts, int devices, int sounds, int buffers, int queued, String label) {
 		require(
-			counts[0] == devices && counts[1] == sounds && counts[2] == buffers && counts[3] == queued,
+			counts[0] == devices
+				&& counts[1] == sounds
+				&& counts[2] == buffers
+				&& counts[3] == queued
+				&& counts[4] == 0
+				&& counts[5] == 0,
 			"unexpected native audio counts " + label
 		);
 	}
@@ -235,7 +260,19 @@ public final class DevAudioValidation {
 		if (counts == null) {
 			return "null";
 		}
-		return "{\"devices\":" + counts[0] + ",\"sounds\":" + counts[1] + ",\"buffers\":" + counts[2] + ",\"queuedStreamBuffers\":" + counts[3] + "}";
+		return "{\"devices\":"
+			+ counts[0]
+			+ ",\"sounds\":"
+			+ counts[1]
+			+ ",\"buffers\":"
+			+ counts[2]
+			+ ",\"queuedStreamBuffers\":"
+			+ counts[3]
+			+ ",\"assets\":"
+			+ counts[4]
+			+ ",\"staticCacheEntries\":"
+			+ counts[5]
+			+ "}";
 	}
 
 	private static String jsonString(String value) {

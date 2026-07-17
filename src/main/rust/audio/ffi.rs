@@ -2,7 +2,10 @@ use std::ptr;
 use std::slice;
 
 use super::backend;
-use super::commands::{ListenerStateRecord, SoundConfigRecord, StreamChunkRecord};
+use super::commands::{
+    ListenerStateRecord, SoundConfigRecord, StaticDecodeParityRecord, StreamChunkRecord,
+};
+use super::decoder::MAX_DECODED_PCM_BYTES;
 use super::errors::*;
 use super::format::audio_format_to_openal;
 use super::source::AL_STOPPED;
@@ -76,18 +79,18 @@ pub unsafe extern "C" fn mattmc_audio_device_destroy(device_handle: u64) -> i32 
 
 /// # Safety
 ///
-/// `data_ptr` must point to `data_len` readable PCM bytes. `output_handle`
-/// must be writable. Java retains ownership of the input bytes; Rust copies
-/// them into an OpenAL buffer before the call returns.
+/// `data_ptr` must point to `data_len` readable encoded audio bytes for the
+/// duration of the call. `debug_name_ptr` must be null with length zero or
+/// point to `debug_name_len` readable UTF-8 bytes. `output_handle` must be
+/// writable. Rust copies both byte ranges before returning and never retains
+/// Java-owned pointers.
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_audio_buffer_create(
-    device_handle: u64,
+pub unsafe extern "C" fn mattmc_audio_asset_create(
     data_ptr: *const u8,
     data_len: u64,
-    channels: i32,
-    bits: i32,
-    pcm: i32,
-    sample_rate: i32,
+    debug_name_ptr: *const u8,
+    debug_name_len: u64,
+    reload_generation: u64,
     output_handle: *mut u64,
 ) -> i32 {
     if output_handle.is_null() {
@@ -97,8 +100,12 @@ pub unsafe extern "C" fn mattmc_audio_buffer_create(
         Ok(data) => data,
         Err(error) => return error.status(),
     };
+    let debug_name = match unsafe { ptr_to_string(debug_name_ptr, debug_name_len) } {
+        Ok(value) => value,
+        Err(error) => return error.status(),
+    };
     status_with_output(
-        backend::create_buffer_handle(device_handle, data, channels, bits, pcm != 0, sample_rate),
+        backend::create_asset(data, debug_name, reload_generation),
         output_handle,
         None,
     )
@@ -106,23 +113,79 @@ pub unsafe extern "C" fn mattmc_audio_buffer_create(
 
 /// # Safety
 ///
-/// `buffer_handle` may be any value. Live handles are removed exactly once.
+/// `asset_handle` may be any value. Live encoded audio assets are removed
+/// exactly once; stale, wrong-kind, or invalid handles return
+/// `ERR_INVALID_HANDLE` without touching unrelated resources.
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_audio_buffer_destroy(buffer_handle: u64) -> i32 {
-    status(backend::destroy_buffer(buffer_handle))
+pub unsafe extern "C" fn mattmc_audio_asset_destroy(asset_handle: u64) -> i32 {
+    status(backend::destroy_asset(asset_handle))
+}
+
+/// # Safety
+///
+/// Destroys all encoded assets whose reload generation is at or before
+/// `reload_generation`, then rejects future registrations for those stale
+/// generations. This function does not touch OpenAL device/source/buffer
+/// handles.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_audio_asset_destroy_generation(reload_generation: u64) -> i32 {
+    status(backend::destroy_asset_generation(reload_generation))
+}
+
+/// # Safety
+///
+/// `java_pcm_ptr` must point to `java_pcm_len` readable Java-decoded PCM bytes
+/// for the duration of the call. `output_record` must point to one writable
+/// `StaticDecodeParityRecord`. Rust decodes the encoded asset behind
+/// `asset_handle`, compares internally, and writes only compact mismatch
+/// metadata back to Java.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_audio_asset_compare_static_pcm(
+    asset_handle: u64,
+    java_pcm_ptr: *const u8,
+    java_pcm_len: u64,
+    channels: i32,
+    bits: i32,
+    pcm: i32,
+    sample_rate: i32,
+    output_record: *mut StaticDecodeParityRecord,
+) -> i32 {
+    if output_record.is_null() {
+        return ERR_INVALID_ARGUMENT;
+    }
+    if java_pcm_len > MAX_DECODED_PCM_BYTES as u64 {
+        return ERR_INVALID_ARGUMENT;
+    }
+    let java_pcm = match unsafe { bytes_from_ptr(java_pcm_ptr, java_pcm_len) } {
+        Ok(data) => data,
+        Err(error) => return error.status(),
+    };
+    status_with_output(
+        backend::compare_asset_static_pcm(
+            asset_handle,
+            java_pcm,
+            channels,
+            bits,
+            pcm != 0,
+            sample_rate,
+        ),
+        output_record,
+        Some(StaticDecodeParityRecord::default()),
+    )
 }
 
 /// # Safety
 ///
 /// `config_ptr` must point to one readable `SoundConfigRecord`, and
-/// `output_handle` must be writable. `buffer_handle` must name a live static
-/// PCM buffer owned by the same device. Rust creates and configures the OpenAL
-/// source, attaches the buffer, and returns the owned native sound handle.
+/// `output_handle` must be writable. `asset_handle` must name a live encoded
+/// Ogg Vorbis audio asset. Rust lazily decodes the asset, owns the device-local
+/// OpenAL buffer cache, creates/configures the source, and returns the owned
+/// native sound handle.
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_audio_sound_create_static(
+pub unsafe extern "C" fn mattmc_audio_sound_create_static_from_asset(
     device_handle: u64,
     config_ptr: *const SoundConfigRecord,
-    buffer_handle: u64,
+    asset_handle: u64,
     output_handle: *mut u64,
 ) -> i32 {
     if output_handle.is_null() {
@@ -133,7 +196,7 @@ pub unsafe extern "C" fn mattmc_audio_sound_create_static(
         Err(error) => return error.status(),
     };
     status_with_output(
-        backend::create_static_sound(device_handle, config, buffer_handle),
+        backend::create_static_sound(device_handle, config, asset_handle),
         output_handle,
         None,
     )
@@ -351,10 +414,11 @@ pub unsafe extern "C" fn mattmc_audio_device_pool_counts(
 
 /// # Safety
 ///
-/// `output_counts` must point to four writable `i32` values. The values are
-/// live devices, live sounds/sources, live static buffers, and queued streaming
-/// buffers. This diagnostic API is used by dev-only validation hooks and does
-/// not require a live device handle.
+/// `output_counts` must point to six writable `i32` values. The values are
+/// live devices, live sounds/sources, Java-visible static buffers, queued
+/// streaming buffers, encoded assets, and decoded static-cache entries. This
+/// diagnostic API is used by dev-only validation hooks and does not require a
+/// live device handle.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_audio_debug_live_counts(output_counts: *mut i32) -> i32 {
     if output_counts.is_null() {
@@ -367,6 +431,8 @@ pub unsafe extern "C" fn mattmc_audio_debug_live_counts(output_counts: *mut i32)
                 *output_counts.add(1) = counts.sources as i32;
                 *output_counts.add(2) = counts.buffers as i32;
                 *output_counts.add(3) = counts.queued_stream_buffers;
+                *output_counts.add(4) = counts.assets as i32;
+                *output_counts.add(5) = counts.static_cache_entries as i32;
             }
             OK
         }

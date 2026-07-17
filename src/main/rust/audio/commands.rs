@@ -69,6 +69,36 @@ pub struct ListenerStateRecord {
     pub(crate) gain: f32,
 }
 
+/// Result of shadow static decode parity between Java JOrbis PCM and Rust
+/// asset decoding.
+///
+/// Rust writes this compact record instead of copying Rust-decoded PCM back to
+/// Java. `rust_status` is `OK` when Rust decoded the asset; otherwise the other
+/// Rust fields stay zero and the status explains the decoder failure.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct StaticDecodeParityRecord {
+    pub(crate) java_byte_count: u64,
+    pub(crate) rust_byte_count: u64,
+    pub(crate) java_frame_count: u64,
+    pub(crate) rust_frame_count: u64,
+    pub(crate) first_differing_sample: i64,
+    pub(crate) mismatch_count: u64,
+    pub(crate) rust_status: i32,
+    pub(crate) format_match: i32,
+    pub(crate) exact_pcm_match: i32,
+    pub(crate) max_abs_sample_delta: i32,
+    pub(crate) java_sample_rate: i32,
+    pub(crate) rust_sample_rate: i32,
+    pub(crate) java_channels: i32,
+    pub(crate) rust_channels: i32,
+    pub(crate) first_differing_frame: i64,
+    pub(crate) first_differing_channel: i32,
+    pub(crate) first_differing_packet: i32,
+    pub(crate) first_java_sample: i32,
+    pub(crate) first_rust_sample: i32,
+}
+
 #[cfg(test)]
 mod tests {
     use std::mem::{align_of, size_of};
@@ -83,5 +113,7 @@ mod tests {
         assert_eq!(8, align_of::<StreamChunkRecord>());
         assert_eq!(40, size_of::<ListenerStateRecord>());
         assert_eq!(4, align_of::<ListenerStateRecord>());
+        assert_eq!(104, size_of::<StaticDecodeParityRecord>());
+        assert_eq!(8, align_of::<StaticDecodeParityRecord>());
     }
 }

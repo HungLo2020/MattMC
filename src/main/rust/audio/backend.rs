@@ -1,31 +1,59 @@
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
 
-use super::buffer::{create_buffer, NativeBuffer};
+use super::asset::AudioAsset;
+#[cfg(test)]
+use super::asset::AudioAssetSnapshot;
+use super::buffer::create_buffer;
 use super::commands::{
-    ListenerStateRecord, SoundConfigRecord, SOUND_FLAG_DISABLE_ATTENUATION,
-    SOUND_FLAG_LINEAR_ATTENUATION, SOUND_FLAG_LOOPING, SOUND_FLAG_RELATIVE,
-    SOUND_UPDATE_ATTENUATION, SOUND_UPDATE_GAIN, SOUND_UPDATE_LOOPING, SOUND_UPDATE_PITCH,
-    SOUND_UPDATE_POSITION, SOUND_UPDATE_RELATIVE,
+    ListenerStateRecord, SoundConfigRecord, StaticDecodeParityRecord,
+    SOUND_FLAG_DISABLE_ATTENUATION, SOUND_FLAG_LINEAR_ATTENUATION, SOUND_FLAG_LOOPING,
+    SOUND_FLAG_RELATIVE, SOUND_UPDATE_ATTENUATION, SOUND_UPDATE_GAIN, SOUND_UPDATE_LOOPING,
+    SOUND_UPDATE_PITCH, SOUND_UPDATE_POSITION, SOUND_UPDATE_RELATIVE,
 };
 use super::context::{cstring_to_string, load_openal, NativeAlto};
+use super::decoder;
 use super::device::{ChannelPool, NativeDevice};
 use super::errors::*;
 use super::handles::{HandleTable, ResourceKind};
 use super::listener::{self, ListenerTransform};
 use super::source::{NativeSource, SourceKind};
+use alto::Buffer;
 
 /// Owns all OpenAL objects reachable through the Java native audio API.
 ///
 /// Java may hold opaque numeric handles, but Rust is the lifetime authority for
-/// devices, contexts, sources, buffers, stream queues, and listener state. A
-/// device destroy is a reload/shutdown boundary: all sources and buffers tied to
-/// that device are removed first, then the context/device drops. Calls using old
-/// handles after that point fail with `ERR_INVALID_HANDLE`.
+/// devices, contexts, sources, encoded static assets, decoded static cache
+/// entries, stream queues, and listener state. A device destroy is a
+/// reload/shutdown boundary: all sources and device-local static cache entries
+/// tied to that device are removed first, then the context/device drops. Calls
+/// using old handles after that point fail with `ERR_INVALID_HANDLE`.
 struct AudioBackend {
     openal: Option<NativeAlto>,
     devices: HandleTable<NativeDevice>,
     sources: HandleTable<NativeSource>,
-    buffers: HandleTable<NativeBuffer>,
+    assets: HandleTable<AudioAsset>,
+    static_cache: HashMap<StaticCacheKey, StaticCacheEntry>,
+    static_cache_hits: u64,
+    static_cache_misses: u64,
+    minimum_asset_generation: u64,
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+struct StaticCacheKey {
+    device: u64,
+    asset: u64,
+}
+
+#[derive(Clone)]
+enum StaticCacheEntry {
+    Ready {
+        buffer: Arc<Buffer>,
+        sample_rate: u32,
+        channels: u16,
+        frames: u64,
+    },
+    Failed(AudioError),
 }
 
 impl AudioBackend {
@@ -34,7 +62,11 @@ impl AudioBackend {
             openal: None,
             devices: HandleTable::new(ResourceKind::Device),
             sources: HandleTable::new(ResourceKind::Source),
-            buffers: HandleTable::new(ResourceKind::Buffer),
+            assets: HandleTable::new(ResourceKind::Asset),
+            static_cache: HashMap::new(),
+            static_cache_hits: 0,
+            static_cache_misses: 0,
+            minimum_asset_generation: 1,
         }
     }
 
@@ -69,6 +101,100 @@ pub(crate) fn create_device(preferred: Option<String>, hrtf: bool) -> AudioResul
     })
 }
 
+pub(crate) fn create_asset(
+    encoded: &[u8],
+    debug_name: Option<String>,
+    reload_generation: u64,
+) -> AudioResult<u64> {
+    if encoded.is_empty() || reload_generation == 0 {
+        return Err(AudioError::InvalidArgument);
+    }
+    with_backend(|backend| {
+        if reload_generation < backend.minimum_asset_generation {
+            return Err(AudioError::InvalidHandle);
+        }
+        Ok(backend
+            .assets
+            .insert(AudioAsset::new(encoded, debug_name, reload_generation)))
+    })
+}
+
+pub(crate) fn destroy_asset(asset_handle: u64) -> AudioResult<()> {
+    with_backend(|backend| {
+        backend
+            .assets
+            .remove(asset_handle)
+            .ok_or(AudioError::InvalidHandle)?;
+        backend
+            .static_cache
+            .retain(|key, _| key.asset != asset_handle);
+        Ok(())
+    })
+}
+
+pub(crate) fn destroy_asset_generation(reload_generation: u64) -> AudioResult<()> {
+    if reload_generation == 0 {
+        return Err(AudioError::InvalidArgument);
+    }
+    with_backend(|backend| {
+        let handles = backend
+            .assets
+            .handles_for(|asset| asset.reload_generation() <= reload_generation);
+        for handle in handles {
+            backend.assets.remove(handle);
+            backend.static_cache.retain(|key, _| key.asset != handle);
+        }
+        backend.minimum_asset_generation =
+            backend.minimum_asset_generation.max(reload_generation + 1);
+        Ok(())
+    })
+}
+
+pub(crate) fn compare_asset_static_pcm(
+    asset_handle: u64,
+    java_pcm: &[u8],
+    java_channels: i32,
+    java_bits: i32,
+    java_pcm_flag: bool,
+    java_sample_rate: i32,
+) -> AudioResult<StaticDecodeParityRecord> {
+    with_backend(|backend| {
+        let asset = backend
+            .assets
+            .get(asset_handle)
+            .ok_or(AudioError::InvalidHandle)?;
+        decoder::compare_static_pcm(
+            asset.encoded(),
+            java_pcm,
+            java_channels,
+            java_bits,
+            java_pcm_flag,
+            java_sample_rate,
+        )
+    })
+}
+
+#[cfg(test)]
+pub(crate) fn validate_asset(asset_handle: u64) -> AudioResult<()> {
+    with_backend(|backend| {
+        backend
+            .assets
+            .get(asset_handle)
+            .ok_or(AudioError::InvalidHandle)?;
+        Ok(())
+    })
+}
+
+#[cfg(test)]
+pub(crate) fn clear_assets_for_shutdown() -> AudioResult<()> {
+    with_backend(|backend| {
+        backend.assets.clear();
+        backend.static_cache.clear();
+        backend.minimum_asset_generation = 1;
+        Ok(())
+    })
+}
+
 pub(crate) fn destroy_device(device_handle: u64) -> AudioResult<()> {
     with_backend(|backend| {
         backend.ensure_device_owner(device_handle)?;
@@ -82,12 +208,9 @@ pub(crate) fn destroy_device(device_handle: u64) -> AudioResult<()> {
             }
         }
 
-        let buffer_handles = backend
-            .buffers
-            .handles_for(|buffer| buffer.device == device_handle);
-        for handle in buffer_handles {
-            backend.buffers.remove(handle);
-        }
+        backend
+            .static_cache
+            .retain(|key, _| key.device != device_handle);
 
         backend
             .devices
@@ -163,16 +286,63 @@ pub(crate) fn destroy_source(source_handle: u64) -> AudioResult<()> {
 pub(crate) fn create_static_sound(
     device_handle: u64,
     config: SoundConfigRecord,
-    buffer_handle: u64,
+    asset_handle: u64,
 ) -> AudioResult<u64> {
-    let source = create_source(device_handle, ChannelPool::Static)?;
-    if let Err(error) = update_sound(source, super::commands::SOUND_UPDATE_ALL, config)
-        .and_then(|_| attach_static_buffer(source, buffer_handle))
-    {
-        let _ = destroy_source(source);
-        return Err(error);
-    }
-    Ok(source)
+    with_backend(|backend| {
+        let static_buffer = backend.static_buffer_for_asset(device_handle, asset_handle)?;
+        let context = {
+            let device = backend
+                .devices
+                .get_mut(device_handle)
+                .ok_or(AudioError::InvalidHandle)?;
+            device.ensure_owner_thread()?;
+            if !device.acquire_pool(ChannelPool::Static) {
+                return Err(AudioError::PoolExhausted);
+            }
+            device.context.clone()
+        };
+
+        let kind =
+            match super::context::alto_call("Create static source", context.new_static_source())
+                .map(SourceKind::Static)
+            {
+                Ok(kind) => kind,
+                Err(error) => {
+                    if let Some(device) = backend.devices.get_mut(device_handle) {
+                        device.release_pool(ChannelPool::Static);
+                    }
+                    return Err(error);
+                }
+            };
+
+        let source_handle = backend.sources.insert(NativeSource {
+            device: device_handle,
+            pool: ChannelPool::Static,
+            kind,
+            queued_stream_buffers: 0,
+        });
+
+        let result = backend
+            .sources
+            .get_mut(source_handle)
+            .ok_or(AudioError::InvalidHandle)
+            .and_then(|source| {
+                apply_sound_config(source, super::commands::SOUND_UPDATE_ALL, config)?;
+                source.attach_static_buffer(static_buffer)
+            });
+
+        if let Err(error) = result {
+            if let Some(mut source) = backend.sources.remove(source_handle) {
+                source.stop();
+                if let Some(device) = backend.devices.get_mut(source.device) {
+                    device.release_pool(source.pool);
+                }
+            }
+            return Err(error);
+        }
+
+        Ok(source_handle)
+    })
 }
 
 pub(crate) fn create_streaming_sound(
@@ -279,71 +449,6 @@ pub(crate) fn source_state(source_handle: u64) -> AudioResult<i32> {
     })
 }
 
-pub(crate) fn create_buffer_handle(
-    device_handle: u64,
-    data: &[u8],
-    channels: i32,
-    bits: i32,
-    pcm: bool,
-    sample_rate: i32,
-) -> AudioResult<u64> {
-    with_backend(|backend| {
-        let context = backend
-            .devices
-            .get(device_handle)
-            .ok_or(AudioError::InvalidHandle)
-            .and_then(|device| {
-                device.ensure_owner_thread()?;
-                Ok(device.context.clone())
-            })?;
-        let buffer = create_buffer(&context, data, channels, bits, pcm, sample_rate)?;
-        Ok(backend.buffers.insert(NativeBuffer {
-            device: device_handle,
-            buffer: Arc::new(buffer),
-        }))
-    })
-}
-
-pub(crate) fn destroy_buffer(buffer_handle: u64) -> AudioResult<()> {
-    with_backend(|backend| {
-        let device_handle = backend
-            .buffers
-            .get(buffer_handle)
-            .ok_or(AudioError::InvalidHandle)?
-            .device;
-        backend.ensure_device_owner(device_handle)?;
-        backend
-            .buffers
-            .remove(buffer_handle)
-            .ok_or(AudioError::InvalidHandle)?;
-        Ok(())
-    })
-}
-
-pub(crate) fn attach_static_buffer(source_handle: u64, buffer_handle: u64) -> AudioResult<()> {
-    with_backend(|backend| {
-        let source_device = backend
-            .sources
-            .get(source_handle)
-            .ok_or(AudioError::InvalidHandle)?
-            .device;
-        backend.ensure_device_owner(source_device)?;
-        let buffer = backend
-            .buffers
-            .get(buffer_handle)
-            .ok_or(AudioError::InvalidHandle)?
-            .clone();
-        let source = backend
-            .sources
-            .get_mut(source_handle)
-            .ok_or(AudioError::InvalidHandle)?;
-        if source.device != buffer.device {
-            return Err(AudioError::InvalidHandle);
-        }
-        source.attach_static_buffer(buffer.buffer)
-    })
-}
-
 pub(crate) fn remove_processed_stream_buffers(source_handle: u64) -> AudioResult<i32> {
     with_source_mut_value(source_handle, |source| source.remove_processed_buffers())
 }
@@ -435,20 +540,53 @@ pub(crate) struct LiveCounts {
     pub(crate) sources: usize,
     pub(crate) buffers: usize,
     pub(crate) queued_stream_buffers: i32,
+    pub(crate) assets: usize,
+    pub(crate) static_cache_entries: usize,
 }
 
 pub(crate) fn live_counts() -> AudioResult<LiveCounts> {
     with_backend(|backend| {
+        let _static_cache_metadata =
+            backend
+                .static_cache
+                .values()
+                .fold(0_u64, |accumulator, entry| match entry {
+                    StaticCacheEntry::Ready {
+                        sample_rate,
+                        channels,
+                        frames,
+                        ..
+                    } => accumulator ^ *frames ^ u64::from(*sample_rate) ^ u64::from(*channels),
+                    StaticCacheEntry::Failed(_) => accumulator,
+                });
         Ok(LiveCounts {
             devices: backend.devices.len(),
             sources: backend.sources.len(),
-            buffers: backend.buffers.len(),
+            buffers: 0,
             queued_stream_buffers: backend
                 .sources
                 .values()
                 .map(NativeSource::queued_stream_buffers)
                 .sum(),
+            assets: backend.assets.len(),
+            static_cache_entries: backend.static_cache.len(),
         })
+    })
+}
+
+#[cfg(test)]
+pub(crate) fn asset_count() -> AudioResult<usize> {
+    with_backend(|backend| Ok(backend.assets.len()))
+}
+
+#[cfg(test)]
+pub(crate) fn asset_snapshot_for_tests(asset_handle: u64) -> AudioResult<AudioAssetSnapshot> {
+    with_backend(|backend| {
+        backend
+            .assets
+            .get(asset_handle)
+            .map(AudioAsset::snapshot)
+            .ok_or(AudioError::InvalidHandle)
     })
 }
 
@@ -550,6 +688,83 @@ impl AudioBackend {
             .ok_or(AudioError::InvalidHandle)?
             .ensure_owner_thread()
     }
+
+    fn static_buffer_for_asset(
+        &mut self,
+        device_handle: u64,
+        asset_handle: u64,
+    ) -> AudioResult<Arc<Buffer>> {
+        let key = StaticCacheKey {
+            device: device_handle,
+            asset: asset_handle,
+        };
+
+        if let Some(entry) = self.static_cache.get(&key).cloned() {
+            self.static_cache_hits += 1;
+            return match entry {
+                StaticCacheEntry::Ready { buffer, .. } => Ok(buffer),
+                StaticCacheEntry::Failed(error) => Err(error),
+            };
+        }
+
+        self.static_cache_misses += 1;
+        let asset = self
+            .assets
+            .get(asset_handle)
+            .ok_or(AudioError::InvalidHandle)?
+            .clone();
+        let context = self
+            .devices
+            .get(device_handle)
+            .ok_or(AudioError::InvalidHandle)
+            .and_then(|device| {
+                device.ensure_owner_thread()?;
+                Ok(device.context.clone())
+            })?;
+
+        let decoded = match decoder::decode_vorbis(asset.encoded()) {
+            Ok(decoded) => decoded,
+            Err(error) => {
+                self.static_cache
+                    .insert(key, StaticCacheEntry::Failed(error.clone()));
+                return Err(error);
+            }
+        };
+        let bytes = samples_to_le_bytes(&decoded.samples);
+        let buffer = match create_buffer(
+            &context,
+            &bytes,
+            decoded.channels as i32,
+            16,
+            true,
+            decoded.sample_rate as i32,
+        ) {
+            Ok(buffer) => Arc::new(buffer),
+            Err(error) => {
+                self.static_cache
+                    .insert(key, StaticCacheEntry::Failed(error.clone()));
+                return Err(error);
+            }
+        };
+        self.static_cache.insert(
+            key,
+            StaticCacheEntry::Ready {
+                buffer: buffer.clone(),
+                sample_rate: decoded.sample_rate,
+                channels: decoded.channels,
+                frames: decoded.frames,
+            },
+        );
+        Ok(buffer)
+    }
+}
+
+fn samples_to_le_bytes(samples: &[i16]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(samples.len() * 2);
+    for sample in samples {
+        bytes.extend_from_slice(&sample.to_le_bytes());
+    }
+    bytes
 }
 
 #[cfg(test)]
@@ -566,5 +781,60 @@ pub(crate) mod test_support {
 
     pub(crate) fn counts_for_tests() -> LiveCounts {
         live_counts().expect("audio backend counts should be readable in tests")
+    }
+
+    pub(crate) fn asset_count_for_tests() -> usize {
+        asset_count().expect("audio asset count should be readable in tests")
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) struct StaticCacheStats {
+        pub(crate) entries: usize,
+        pub(crate) ready_entries: usize,
+        pub(crate) failed_entries: usize,
+        pub(crate) total_frames: u64,
+        pub(crate) first_sample_rate: u32,
+        pub(crate) first_channels: u16,
+        pub(crate) hits: u64,
+        pub(crate) misses: u64,
+    }
+
+    pub(crate) fn static_cache_stats_for_tests() -> StaticCacheStats {
+        with_backend(|backend| {
+            let mut ready_entries = 0_usize;
+            let mut failed_entries = 0_usize;
+            let mut total_frames = 0_u64;
+            let mut first_sample_rate = 0_u32;
+            let mut first_channels = 0_u16;
+            for entry in backend.static_cache.values() {
+                match entry {
+                    StaticCacheEntry::Ready {
+                        sample_rate,
+                        channels,
+                        frames,
+                        ..
+                    } => {
+                        ready_entries += 1;
+                        total_frames += *frames;
+                        if first_sample_rate == 0 {
+                            first_sample_rate = *sample_rate;
+                            first_channels = *channels;
+                        }
+                    }
+                    StaticCacheEntry::Failed(_) => failed_entries += 1,
+                }
+            }
+            Ok(StaticCacheStats {
+                entries: backend.static_cache.len(),
+                ready_entries,
+                failed_entries,
+                total_frames,
+                first_sample_rate,
+                first_channels,
+                hits: backend.static_cache_hits,
+                misses: backend.static_cache_misses,
+            })
+        })
+        .expect("audio static cache stats should be readable in tests")
     }
 }

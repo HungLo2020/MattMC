@@ -2,18 +2,19 @@ use std::sync::{Mutex, OnceLock};
 
 use super::backend::{self, test_support};
 use super::commands::{
-    SoundConfigRecord, StreamChunkRecord, SOUND_FLAG_DISABLE_ATTENUATION,
+    SoundConfigRecord, StaticDecodeParityRecord, StreamChunkRecord, SOUND_FLAG_DISABLE_ATTENUATION,
     SOUND_FLAG_LINEAR_ATTENUATION, SOUND_FLAG_LOOPING, SOUND_FLAG_RELATIVE, SOUND_UPDATE_GAIN,
     SOUND_UPDATE_POSITION,
 };
 use super::device::{split_channel_counts, ChannelPool, NativeDevice};
 use super::errors::{
-    AudioError, ERR_INVALID_ARGUMENT, ERR_INVALID_HANDLE, ERR_POOL_EXHAUSTED,
+    AudioError, ERR_DECODE_FAILED, ERR_INVALID_ARGUMENT, ERR_INVALID_HANDLE, ERR_POOL_EXHAUSTED,
     ERR_UNSUPPORTED_FORMAT, ERR_WRONG_THREAD, OK,
 };
 use super::ffi::{
-    mattmc_audio_buffer_create, mattmc_audio_buffer_destroy, mattmc_audio_device_create,
-    mattmc_audio_device_destroy, mattmc_audio_format_to_openal, mattmc_audio_sound_create_static,
+    mattmc_audio_asset_compare_static_pcm, mattmc_audio_asset_create, mattmc_audio_asset_destroy,
+    mattmc_audio_asset_destroy_generation, mattmc_audio_device_create, mattmc_audio_device_destroy,
+    mattmc_audio_format_to_openal, mattmc_audio_sound_create_static_from_asset,
     mattmc_audio_sound_create_streaming, mattmc_audio_sound_state,
     mattmc_audio_sound_stop_and_destroy, mattmc_audio_sound_submit_stream_chunks,
 };
@@ -22,6 +23,10 @@ use super::handles::{HandleTable, NativeHandle, ResourceKind};
 use super::listener::ListenerTransform;
 use super::source::AL_STOPPED;
 use super::{context::load_openal, errors::AudioResult};
+
+const PARITY_MONO_OGG: &[u8] =
+    include_bytes!("../../../resources/assets/minecraft/sounds/random/pop.ogg");
+const OVERSIZED_STATIC_PCM_LEN: u64 = (super::decoder::MAX_DECODED_PCM_BYTES as u64) + 1;
 
 fn audio_test_lock() -> &'static Mutex<()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -38,6 +43,97 @@ fn with_audio_backend<T>(f: impl FnOnce() -> T) -> T {
 
 fn create_test_device() -> AudioResult<u64> {
     backend::create_device(None, false)
+}
+
+#[test]
+fn encoded_audio_asset_creation_copies_bytes_and_metadata() {
+    with_audio_backend(|| {
+        let mut encoded = b"OggSasset-bytes".to_vec();
+        let asset = backend::create_asset(&encoded, Some("minecraft:test".to_string()), 1)
+            .expect("asset should be created");
+        encoded[0] = b'X';
+
+        let snapshot = backend::asset_snapshot_for_tests(asset).expect("asset should remain live");
+        assert_eq!(b"OggSasset-bytes".to_vec(), snapshot.encoded);
+        assert_eq!(Some("minecraft:test".to_string()), snapshot.debug_name);
+        assert_eq!(1, snapshot.reload_generation);
+        assert_eq!(snapshot.encoded.len() as u64, snapshot.metadata.byte_len);
+        assert!(snapshot.metadata.ogg_container);
+        assert_eq!(1, test_support::asset_count_for_tests());
+    });
+}
+
+#[test]
+fn encoded_audio_asset_handles_are_typed_and_generation_safe() {
+    with_audio_backend(|| {
+        let first = backend::create_asset(b"OggSfirst", None, 1).expect("asset should create");
+        let decoded = NativeHandle::decode(first).expect("asset handle should decode");
+        assert_eq!(ResourceKind::Asset, decoded.kind);
+        assert_eq!(1, decoded.generation);
+
+        backend::destroy_asset(first).expect("asset should destroy");
+        let second = backend::create_asset(b"OggSsecond", None, 1).expect("asset should create");
+        let second_decoded = NativeHandle::decode(second).expect("asset handle should decode");
+        assert_eq!(ResourceKind::Asset, second_decoded.kind);
+        assert_ne!(first, second);
+        assert_ne!(decoded.generation, second_decoded.generation);
+        assert_eq!(
+            Err(AudioError::InvalidHandle),
+            backend::validate_asset(first)
+        );
+        assert!(backend::validate_asset(second).is_ok());
+    });
+}
+
+#[test]
+fn encoded_audio_asset_wrong_kind_and_double_destroy_fail_safely() {
+    with_audio_backend(|| {
+        let asset = backend::create_asset(b"OggSasset", None, 1).expect("asset should create");
+        assert_eq!(Err(AudioError::InvalidHandle), backend::source_state(asset));
+        backend::destroy_asset(asset).expect("first destroy should succeed");
+        assert_eq!(
+            Err(AudioError::InvalidHandle),
+            backend::destroy_asset(asset)
+        );
+    });
+}
+
+#[test]
+fn reload_generation_invalidation_rejects_late_old_assets() {
+    with_audio_backend(|| {
+        let old = backend::create_asset(b"OggSold", Some("old".to_string()), 1)
+            .expect("old asset should create");
+        let current = backend::create_asset(b"OggScurrent", Some("current".to_string()), 2)
+            .expect("current asset should create");
+
+        backend::destroy_asset_generation(1).expect("generation 1 should invalidate");
+        assert_eq!(Err(AudioError::InvalidHandle), backend::validate_asset(old));
+        assert!(backend::validate_asset(current).is_ok());
+        assert_eq!(
+            Err(AudioError::InvalidHandle),
+            backend::create_asset(b"OggSlate", Some("late".to_string()), 1)
+        );
+        assert!(backend::create_asset(b"OggSnew", Some("new".to_string()), 2).is_ok());
+    });
+}
+
+#[test]
+fn encoded_audio_asset_shutdown_clear_removes_all_assets() {
+    with_audio_backend(|| {
+        let first = backend::create_asset(b"OggSfirst", None, 1).expect("asset should create");
+        let second = backend::create_asset(b"OggSsecond", None, 2).expect("asset should create");
+        assert_eq!(2, test_support::asset_count_for_tests());
+        backend::clear_assets_for_shutdown().expect("shutdown asset clear should succeed");
+        assert_eq!(0, test_support::asset_count_for_tests());
+        assert_eq!(
+            Err(AudioError::InvalidHandle),
+            backend::validate_asset(first)
+        );
+        assert_eq!(
+            Err(AudioError::InvalidHandle),
+            backend::validate_asset(second)
+        );
+    });
 }
 
 #[test]
@@ -72,14 +168,11 @@ fn handle_table_encodes_kind_generation_and_slot() {
 fn owner_thread_can_use_context_sensitive_handles() {
     with_audio_backend(|| {
         let device = create_test_device().expect("default audio device should open");
-        let source = backend::create_source(device, ChannelPool::Static)
-            .expect("static source should be created on owner thread");
+        let asset = backend::create_asset(PARITY_MONO_OGG, Some("owner-thread".to_string()), 1)
+            .expect("asset should be created");
+        let source = backend::create_static_sound(device, SoundConfigRecord::default(), asset)
+            .expect("static sound should be created on owner thread");
         assert!(backend::source_state(source).is_ok());
-        let pcm = [0_u8, 0, 0, 0];
-        let buffer = backend::create_buffer_handle(device, &pcm, 1, 16, true, 44_100)
-            .expect("buffer should be created on owner thread");
-        backend::attach_static_buffer(source, buffer)
-            .expect("same-device source/buffer attach should succeed on owner thread");
     });
 }
 
@@ -150,25 +243,20 @@ fn wrong_resource_type_fails_safely() {
         );
         assert_eq!(
             Err(AudioError::InvalidHandle),
-            backend::destroy_buffer(source)
+            backend::destroy_asset(source)
         );
     });
 }
 
 #[test]
-fn source_and_buffer_from_different_devices_cannot_attach() {
+fn static_sound_rejects_wrong_asset_type() {
     with_audio_backend(|| {
-        let source_device = create_test_device().expect("source device should open");
-        let buffer_device = create_test_device().expect("buffer device should open");
-        let source = backend::create_source(source_device, ChannelPool::Static)
-            .expect("static source should be created");
-        let pcm = [0_u8, 0, 0, 0];
-        let buffer = backend::create_buffer_handle(buffer_device, &pcm, 1, 16, true, 44_100)
-            .expect("buffer should be created");
-
+        let device = create_test_device().expect("device should open");
+        let source =
+            backend::create_source(device, ChannelPool::Static).expect("source should be created");
         assert_eq!(
             Err(AudioError::InvalidHandle),
-            backend::attach_static_buffer(source, buffer)
+            backend::create_static_sound(device, SoundConfigRecord::default(), source)
         );
     });
 }
@@ -230,20 +318,21 @@ fn double_destroy_and_stale_handles_fail_without_leaking_pool_slots() {
 }
 
 #[test]
-fn device_cleanup_removes_owned_sources_and_buffers() {
+fn device_cleanup_removes_owned_sources_and_static_cache() {
     with_audio_backend(|| {
         let device = create_test_device().expect("default audio device should open");
-        let source = backend::create_source(device, ChannelPool::Static)
-            .expect("static source should be created");
-        let pcm = [0_u8, 0, 0, 0];
-        let buffer = backend::create_buffer_handle(device, &pcm, 1, 16, true, 44_100)
-            .expect("buffer should be created");
+        let asset = backend::create_asset(PARITY_MONO_OGG, Some("cleanup".to_string()), 1)
+            .expect("asset should be created");
+        let source = backend::create_static_sound(device, SoundConfigRecord::default(), asset)
+            .expect("static sound should be created");
 
         let before = test_support::counts_for_tests();
         assert_eq!(1, before.devices);
         assert_eq!(1, before.sources);
-        assert_eq!(1, before.buffers);
+        assert_eq!(0, before.buffers);
         assert_eq!(0, before.queued_stream_buffers);
+        assert_eq!(1, before.assets);
+        assert_eq!(1, before.static_cache_entries);
 
         backend::destroy_device(device).expect("device destroy should clean owned handles");
         let after = test_support::counts_for_tests();
@@ -251,14 +340,13 @@ fn device_cleanup_removes_owned_sources_and_buffers() {
         assert_eq!(0, after.sources);
         assert_eq!(0, after.buffers);
         assert_eq!(0, after.queued_stream_buffers);
+        assert_eq!(1, after.assets);
+        assert_eq!(0, after.static_cache_entries);
         assert_eq!(
             Err(AudioError::InvalidHandle),
             backend::source_state(source)
         );
-        assert_eq!(
-            Err(AudioError::InvalidHandle),
-            backend::destroy_buffer(buffer)
-        );
+        backend::destroy_asset(asset).expect("asset cleanup should succeed");
     });
 }
 
@@ -285,9 +373,8 @@ fn streaming_queue_ownership_is_released_with_source() {
 fn coarse_static_sound_create_configures_and_tracks_pool() {
     with_audio_backend(|| {
         let device = create_test_device().expect("default audio device should open");
-        let pcm = [0_u8, 0, 0, 0];
-        let buffer = backend::create_buffer_handle(device, &pcm, 1, 16, true, 44_100)
-            .expect("buffer should be created");
+        let asset = backend::create_asset(PARITY_MONO_OGG, Some("coarse-static".to_string()), 1)
+            .expect("asset should be created");
         let config = SoundConfigRecord {
             x: 1.0,
             y: 2.0,
@@ -298,7 +385,7 @@ fn coarse_static_sound_create_configures_and_tracks_pool() {
             flags: SOUND_FLAG_LOOPING | SOUND_FLAG_RELATIVE | SOUND_FLAG_LINEAR_ATTENUATION,
         };
 
-        let sound = backend::create_static_sound(device, config, buffer)
+        let sound = backend::create_static_sound(device, config, asset)
             .expect("static sound should be created with its initial config");
         let counts = backend::device_pool_counts(device).expect("pool counts should read");
         assert_eq!(1, counts.static_used);
@@ -316,8 +403,110 @@ fn coarse_static_sound_create_configures_and_tracks_pool() {
         )
         .expect("coarse update should apply selected fields");
         backend::destroy_source(sound).expect("sound destroy should release pool");
+        backend::destroy_asset(asset).expect("asset should destroy");
         let counts = backend::device_pool_counts(device).expect("pool counts should read");
         assert_eq!(0, counts.static_used);
+    });
+}
+
+#[test]
+fn static_asset_playback_reuses_device_scoped_cache_for_repeated_sounds() {
+    with_audio_backend(|| {
+        let device = create_test_device().expect("default audio device should open");
+        let asset = backend::create_asset(PARITY_MONO_OGG, Some("cache-hit".to_string()), 1)
+            .expect("asset should be created");
+
+        let first = backend::create_static_sound(device, SoundConfigRecord::default(), asset)
+            .expect("first static sound should decode and create");
+        let after_first = test_support::static_cache_stats_for_tests();
+        assert_eq!(1, after_first.entries);
+        assert_eq!(1, after_first.ready_entries);
+        assert_eq!(0, after_first.failed_entries);
+        assert_eq!(1, after_first.first_channels);
+        assert!(after_first.first_sample_rate > 0);
+        assert!(after_first.total_frames > 0);
+        assert_eq!(0, after_first.hits);
+        assert_eq!(1, after_first.misses);
+
+        let second = backend::create_static_sound(device, SoundConfigRecord::default(), asset)
+            .expect("second static sound should reuse cached buffer");
+        let after_second = test_support::static_cache_stats_for_tests();
+        assert_eq!(1, after_second.entries);
+        assert_eq!(1, after_second.hits);
+        assert_eq!(1, after_second.misses);
+        assert_ne!(first, second);
+
+        let counts = backend::device_pool_counts(device).expect("pool counts should read");
+        assert_eq!(2, counts.static_used);
+        backend::destroy_source(first).expect("first source should destroy");
+        backend::destroy_source(second).expect("second source should destroy");
+        backend::destroy_asset(asset).expect("asset destroy should clear cache");
+        assert_eq!(0, test_support::static_cache_stats_for_tests().entries);
+    });
+}
+
+#[test]
+fn static_asset_cache_is_invalidated_by_device_and_asset_generation() {
+    with_audio_backend(|| {
+        let device = create_test_device().expect("default audio device should open");
+        let asset = backend::create_asset(PARITY_MONO_OGG, Some("cache-invalidate".to_string()), 1)
+            .expect("asset should be created");
+        let sound = backend::create_static_sound(device, SoundConfigRecord::default(), asset)
+            .expect("static sound should create");
+        assert_eq!(1, test_support::static_cache_stats_for_tests().entries);
+
+        backend::destroy_device(device).expect("device destroy should clear static cache");
+        assert_eq!(0, test_support::static_cache_stats_for_tests().entries);
+        assert_eq!(Err(AudioError::InvalidHandle), backend::source_state(sound));
+
+        let reloaded = create_test_device().expect("device should reopen");
+        let reloaded_sound =
+            backend::create_static_sound(reloaded, SoundConfigRecord::default(), asset)
+                .expect("asset should decode again for the reloaded device");
+        assert_eq!(1, test_support::static_cache_stats_for_tests().entries);
+        backend::destroy_source(reloaded_sound).expect("reloaded sound should destroy");
+
+        backend::destroy_asset_generation(1).expect("asset generation should invalidate");
+        assert_eq!(0, test_support::static_cache_stats_for_tests().entries);
+        assert_eq!(
+            Err(AudioError::InvalidHandle),
+            backend::create_static_sound(reloaded, SoundConfigRecord::default(), asset)
+        );
+    });
+}
+
+#[test]
+fn failed_static_asset_decode_is_cached_until_asset_destroy() {
+    with_audio_backend(|| {
+        let device = create_test_device().expect("default audio device should open");
+        let asset = backend::create_asset(b"not ogg", Some("bad".to_string()), 1)
+            .expect("bad encoded asset still owns bytes");
+
+        assert!(matches!(
+            backend::create_static_sound(device, SoundConfigRecord::default(), asset),
+            Err(AudioError::DecodeFailed(_))
+        ));
+        let after_first = test_support::static_cache_stats_for_tests();
+        assert_eq!(1, after_first.entries);
+        assert_eq!(0, after_first.ready_entries);
+        assert_eq!(1, after_first.failed_entries);
+        assert_eq!(0, after_first.hits);
+        assert_eq!(1, after_first.misses);
+
+        assert!(matches!(
+            backend::create_static_sound(device, SoundConfigRecord::default(), asset),
+            Err(AudioError::DecodeFailed(_))
+        ));
+        let after_second = test_support::static_cache_stats_for_tests();
+        assert_eq!(1, after_second.entries);
+        assert_eq!(1, after_second.hits);
+        assert_eq!(1, after_second.misses);
+
+        let counts = backend::device_pool_counts(device).expect("pool counts should read");
+        assert_eq!(0, counts.static_used);
+        backend::destroy_asset(asset)
+            .expect("destroying failed asset should clear failed cache entry");
+        assert_eq!(0, test_support::static_cache_stats_for_tests().entries);
     });
 }
 
@@ -351,18 +540,23 @@ fn counter_reset_after_shutdown_clears_live_resources_and_queued_stream_buffers(
         let device = create_test_device().expect("default audio device should open");
         let source = backend::create_source(device, ChannelPool::Streaming)
             .expect("streaming source should be created");
+        let asset = backend::create_asset(PARITY_MONO_OGG, Some("shutdown".to_string()), 1)
+            .expect("asset should be created");
+        let static_sound =
+            backend::create_static_sound(device, SoundConfigRecord::default(), asset)
+                .expect("static sound should be created");
         let pcm = [0_u8, 0, 0, 0];
-        let buffer = backend::create_buffer_handle(device, &pcm, 1, 16, true, 44_100)
-            .expect("buffer should be created");
         let chunks: [&[u8]; 1] = [&pcm];
         backend::submit_stream_chunks(source, &chunks, 1, 16, true, 44_100)
             .expect("streaming chunk should queue");
 
         let before = backend::live_counts().expect("live counts should read");
         assert_eq!(1, before.devices);
-        assert_eq!(1, before.sources);
-        assert_eq!(1, before.buffers);
+        assert_eq!(2, before.sources);
+        assert_eq!(0, before.buffers);
         assert_eq!(1, before.queued_stream_buffers);
+        assert_eq!(1, before.assets);
+        assert_eq!(1, before.static_cache_entries);
 
         backend::destroy_device(device).expect("device shutdown should clear children");
         let after = backend::live_counts().expect("live counts should read");
@@ -370,10 +564,13 @@ fn counter_reset_after_shutdown_clears_live_resources_and_queued_stream_buffers(
         assert_eq!(0, after.sources);
         assert_eq!(0, after.buffers);
         assert_eq!(0, after.queued_stream_buffers);
+        assert_eq!(1, after.assets);
+        assert_eq!(0, after.static_cache_entries);
         assert_eq!(
             Err(AudioError::InvalidHandle),
-            backend::destroy_buffer(buffer)
+            backend::source_state(static_sound)
         );
+        backend::clear_assets_for_shutdown().expect("asset shutdown should clear assets");
     });
 }
 
@@ -433,6 +630,10 @@ fn public_status_codes_are_stable() {
         ERR_UNSUPPORTED_FORMAT,
         AudioError::UnsupportedFormat.status()
     );
+    assert_eq!(
+        ERR_DECODE_FAILED,
+        AudioError::DecodeFailed("bad".to_string()).status()
+    );
 }
 
 #[test]
@@ -470,13 +671,262 @@ fn ffi_rejects_malformed_arguments_without_openal() {
         assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
             mattmc_audio_device_create(std::ptr::null(), 0, 0, std::ptr::null_mut())
         });
-        assert_eq!(ERR_INVALID_HANDLE, unsafe {
-            mattmc_audio_buffer_destroy(0xdead_beef)
+    });
+}
+
+#[test]
+fn ffi_audio_asset_lifecycle_validates_pointers_generations_and_handles() {
+    with_audio_backend(|| {
+        let encoded = b"OggSffi";
+        let debug_name = b"minecraft:ffi";
+        let mut asset = 0_u64;
+
+        assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
+            mattmc_audio_asset_create(std::ptr::null(), 1, std::ptr::null(), 0, 1, &mut asset)
         });
         assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
-            mattmc_audio_buffer_create(0, std::ptr::null(), 1, 1, 16, 1, 44_100, &mut handle)
+            mattmc_audio_asset_create(
+                encoded.as_ptr(),
+                encoded.len() as u64,
+                std::ptr::null(),
+                1,
+                1,
+                &mut asset,
+            )
+        });
+        assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
+            mattmc_audio_asset_create(
+                encoded.as_ptr(),
+                encoded.len() as u64,
+                debug_name.as_ptr(),
+                debug_name.len() as u64,
+                0,
+                &mut asset,
+            )
+        });
+        assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
+            mattmc_audio_asset_create(
+                encoded.as_ptr(),
+                encoded.len() as u64,
+                debug_name.as_ptr(),
+                debug_name.len() as u64,
+                1,
+                std::ptr::null_mut(),
+            )
+        });
+        assert_eq!(OK, unsafe {
+            mattmc_audio_asset_create(
+                encoded.as_ptr(),
+                encoded.len() as u64,
+                debug_name.as_ptr(),
+                debug_name.len() as u64,
+                1,
+                &mut asset,
+            )
+        });
+        let decoded = NativeHandle::decode(asset).expect("asset handle should decode");
+        assert_eq!(ResourceKind::Asset, decoded.kind);
+
+        assert_eq!(OK, unsafe { mattmc_audio_asset_destroy(asset) });
+        assert_eq!(ERR_INVALID_HANDLE, unsafe {
+            mattmc_audio_asset_destroy(asset)
+        });
+
+        let mut old = 0_u64;
+        assert_eq!(OK, unsafe {
+            mattmc_audio_asset_create(
+                encoded.as_ptr(),
+                encoded.len() as u64,
+                debug_name.as_ptr(),
+                debug_name.len() as u64,
+                2,
+                &mut old,
+            )
+        });
+        assert_eq!(OK, unsafe { mattmc_audio_asset_destroy_generation(2) });
+        assert_eq!(ERR_INVALID_HANDLE, unsafe {
+            mattmc_audio_asset_create(
+                encoded.as_ptr(),
+                encoded.len() as u64,
+                debug_name.as_ptr(),
+                debug_name.len() as u64,
+                2,
+                &mut old,
+            )
+        });
+        assert_eq!(OK, unsafe {
+            mattmc_audio_asset_create(
+                encoded.as_ptr(),
+                encoded.len() as u64,
+                debug_name.as_ptr(),
+                debug_name.len() as u64,
+                3,
+                &mut old,
+            )
         });
     });
+}
+
+#[test]
+fn ffi_static_decode_parity_reports_exact_match_mismatch_and_decode_errors() {
+    with_audio_backend(|| {
+        let decoded =
+            super::decoder::decode_vorbis(PARITY_MONO_OGG).expect("mono fixture should decode");
+        let java_pcm = samples_to_le_bytes(&decoded.samples);
+        let mut asset = 0_u64;
+        assert_eq!(OK, unsafe {
+            mattmc_audio_asset_create(
+                PARITY_MONO_OGG.as_ptr(),
+                PARITY_MONO_OGG.len() as u64,
+                std::ptr::null(),
+                0,
+                1,
+                &mut asset,
+            )
+        });
+
+        let mut record = StaticDecodeParityRecord::default();
+        assert_eq!(OK, unsafe {
+            mattmc_audio_asset_compare_static_pcm(
+                asset,
+                java_pcm.as_ptr(),
+                java_pcm.len() as u64,
+                decoded.channels as i32,
+                16,
+                1,
+                decoded.sample_rate as i32,
+                &mut record,
+            )
+        });
+        assert_eq!(OK, record.rust_status);
+        assert_eq!(1, record.format_match);
+        assert_eq!(1, record.exact_pcm_match);
+        assert_eq!(0, record.mismatch_count);
+
+        let mut mismatched = java_pcm.clone();
+        mismatched[0] ^= 0x7f;
+        assert_eq!(OK, unsafe {
+            mattmc_audio_asset_compare_static_pcm(
+                asset,
+                mismatched.as_ptr(),
+                mismatched.len() as u64,
+                decoded.channels as i32,
+                16,
+                1,
+                decoded.sample_rate as i32,
+                &mut record,
+            )
+        });
+        assert_eq!(0, record.exact_pcm_match);
+        assert_eq!(0, record.first_differing_sample);
+        assert!(record.max_abs_sample_delta > 0);
+        assert!(record.mismatch_count > 0);
+
+        let mut bad_asset = 0_u64;
+        let bad = b"not ogg";
+        assert_eq!(OK, unsafe {
+            mattmc_audio_asset_create(
+                bad.as_ptr(),
+                bad.len() as u64,
+                std::ptr::null(),
+                0,
+                1,
+                &mut bad_asset,
+            )
+        });
+        assert_eq!(OK, unsafe {
+            mattmc_audio_asset_compare_static_pcm(
+                bad_asset,
+                java_pcm.as_ptr(),
+                java_pcm.len() as u64,
+                decoded.channels as i32,
+                16,
+                1,
+                decoded.sample_rate as i32,
+                &mut record,
+            )
+        });
+        assert_eq!(ERR_DECODE_FAILED, record.rust_status);
+    });
+}
+
+#[test]
+fn ffi_static_decode_parity_rejects_invalid_and_stale_asset_handles() {
+    with_audio_backend(|| {
+        let decoded =
+            super::decoder::decode_vorbis(PARITY_MONO_OGG).expect("mono fixture should decode");
+        let java_pcm = samples_to_le_bytes(&decoded.samples);
+        let mut record = StaticDecodeParityRecord::default();
+        assert_eq!(ERR_INVALID_HANDLE, unsafe {
+            mattmc_audio_asset_compare_static_pcm(
+                42,
+                java_pcm.as_ptr(),
+                java_pcm.len() as u64,
+                decoded.channels as i32,
+                16,
+                1,
+                decoded.sample_rate as i32,
+                &mut record,
+            )
+        });
+
+        let mut asset = 0_u64;
+        assert_eq!(OK, unsafe {
+            mattmc_audio_asset_create(
+                PARITY_MONO_OGG.as_ptr(),
+                PARITY_MONO_OGG.len() as u64,
+                std::ptr::null(),
+                0,
+                2,
+                &mut asset,
+            )
+        });
+        assert_eq!(OK, unsafe { mattmc_audio_asset_destroy_generation(2) });
+        assert_eq!(ERR_INVALID_HANDLE, unsafe {
+            mattmc_audio_asset_compare_static_pcm(
+                asset,
+                java_pcm.as_ptr(),
+                java_pcm.len() as u64,
+                decoded.channels as i32,
+                16,
+                1,
+                decoded.sample_rate as i32,
+                &mut record,
+            )
+        });
+        assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
+            mattmc_audio_asset_compare_static_pcm(
+                asset,
+                std::ptr::null(),
+                1,
+                decoded.channels as i32,
+                16,
+                1,
+                decoded.sample_rate as i32,
+                &mut record,
+            )
+        });
+        assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
+            mattmc_audio_asset_compare_static_pcm(
+                asset,
+                std::ptr::NonNull::<u8>::dangling().as_ptr(),
+                OVERSIZED_STATIC_PCM_LEN,
+                decoded.channels as i32,
+                16,
+                1,
+                decoded.sample_rate as i32,
+                &mut record,
+            )
+        });
+    });
+}
+
+fn samples_to_le_bytes(samples: &[i16]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(samples.len() * 2);
+    for sample in samples {
+        bytes.extend_from_slice(&sample.to_le_bytes());
+    }
+    bytes
 }
 
 #[test]
@@ -650,22 +1100,19 @@ fn ffi_coarse_sound_calls_validate_config_chunks_and_outputs() {
             mattmc_audio_sound_state(sound, std::ptr::null_mut())
         });
 
-        let pcm = [0_u8, 0, 0, 0];
-        let mut buffer = 0_u64;
+        let mut asset = 0_u64;
         assert_eq!(OK, unsafe {
-            mattmc_audio_buffer_create(
-                device,
-                pcm.as_ptr(),
-                pcm.len() as u64,
+            mattmc_audio_asset_create(
+                PARITY_MONO_OGG.as_ptr(),
+                PARITY_MONO_OGG.len() as u64,
+                std::ptr::null(),
+                0,
                 1,
-                16,
-                1,
-                44_100,
-                &mut buffer,
+                &mut asset,
             )
         });
         assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
-            mattmc_audio_sound_create_static(device, std::ptr::null(), buffer, &mut sound)
+            mattmc_audio_sound_create_static_from_asset(device, std::ptr::null(), asset, &mut sound)
         });
     });
 }

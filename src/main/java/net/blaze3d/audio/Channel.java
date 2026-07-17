@@ -123,7 +123,7 @@ public class Channel {
 		this.updateNativeSound(NativeAudio.SOUND_UPDATE_RELATIVE);
 	}
 
-	public void attachStaticBuffer(SoundBuffer soundBuffer) {
+	public void attachStaticAsset(NativeAudioAsset asset) {
 		if (this.stopRequested) {
 			this.awaitingAttachment = false;
 			return;
@@ -135,10 +135,8 @@ public class Channel {
 		}
 
 		try {
-			soundBuffer.getNativeBuffer(this.deviceHandle).ifPresent(buffer -> {
-				this.soundHandle = NativeAudio.soundCreateStatic(this.deviceHandle, this.config, buffer);
-				this.warnIfPoolExhausted("static");
-			});
+			this.soundHandle = NativeAudio.soundCreateStaticFromAsset(this.deviceHandle, this.config, asset.handleForPlayback());
+			this.warnIfPoolExhausted("static");
 		} finally {
 			this.awaitingAttachment = false;
 		}

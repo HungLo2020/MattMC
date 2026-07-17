@@ -68,18 +68,16 @@ final class NativeAudio {
 		ValueLayout.ADDRESS
 	);
 	private static final FunctionDescriptor INT_ARRAY_OUTPUT_DESCRIPTOR = FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS);
-	private static final FunctionDescriptor BUFFER_CREATE_DESCRIPTOR = FunctionDescriptor.of(
+	private static final FunctionDescriptor ASSET_CREATE_DESCRIPTOR = FunctionDescriptor.of(
 		ValueLayout.JAVA_INT,
+		ValueLayout.ADDRESS,
 		ValueLayout.JAVA_LONG,
 		ValueLayout.ADDRESS,
 		ValueLayout.JAVA_LONG,
-		ValueLayout.JAVA_INT,
-		ValueLayout.JAVA_INT,
-		ValueLayout.JAVA_INT,
-		ValueLayout.JAVA_INT,
+		ValueLayout.JAVA_LONG,
 		ValueLayout.ADDRESS
 	);
-	private static final FunctionDescriptor SOUND_CREATE_STATIC_DESCRIPTOR = FunctionDescriptor.of(
+	private static final FunctionDescriptor SOUND_CREATE_STATIC_FROM_ASSET_DESCRIPTOR = FunctionDescriptor.of(
 		ValueLayout.JAVA_INT,
 		ValueLayout.JAVA_LONG,
 		ValueLayout.ADDRESS,
@@ -142,11 +140,15 @@ final class NativeAudio {
 	);
 	private static final MethodHandle DEVICE_POOL_COUNTS = downcall("mattmc_audio_device_pool_counts", HANDLE_INT_OUTPUT_DESCRIPTOR);
 	private static final MethodHandle DEBUG_LIVE_COUNTS = downcall("mattmc_audio_debug_live_counts", INT_ARRAY_OUTPUT_DESCRIPTOR);
-	private static final MethodHandle BUFFER_CREATE = downcall("mattmc_audio_buffer_create", BUFFER_CREATE_DESCRIPTOR);
-	private static final MethodHandle BUFFER_DESTROY = downcall("mattmc_audio_buffer_destroy", HANDLE_DESCRIPTOR);
-	private static final MethodHandle SOUND_CREATE_STATIC = downcall(
-		"mattmc_audio_sound_create_static",
-		SOUND_CREATE_STATIC_DESCRIPTOR
+	private static final MethodHandle ASSET_CREATE = downcall("mattmc_audio_asset_create", ASSET_CREATE_DESCRIPTOR);
+	private static final MethodHandle ASSET_DESTROY = downcall("mattmc_audio_asset_destroy", HANDLE_DESCRIPTOR);
+	private static final MethodHandle ASSET_DESTROY_GENERATION = downcall(
+		"mattmc_audio_asset_destroy_generation",
+		HANDLE_DESCRIPTOR
+	);
+	private static final MethodHandle SOUND_CREATE_STATIC_FROM_ASSET = downcall(
+		"mattmc_audio_sound_create_static_from_asset",
+		SOUND_CREATE_STATIC_FROM_ASSET_DESCRIPTOR
 	);
 	private static final MethodHandle SOUND_CREATE_STREAMING = downcall(
 		"mattmc_audio_sound_create_streaming",
@@ -237,45 +239,51 @@ final class NativeAudio {
 
 	static int[] debugLiveCounts() {
 		try (Arena arena = Arena.ofConfined()) {
-			MemorySegment output = arena.allocate(ValueLayout.JAVA_INT, 4);
+			MemorySegment output = arena.allocate(ValueLayout.JAVA_INT, 6);
 			int status = (int)DEBUG_LIVE_COUNTS.invokeExact(output);
 			check(status, "Read native audio live counts");
-			return readIntArray4(output);
+			return readIntArray6(output);
 		} catch (Throwable throwable) {
 			throw nativeFailure("Read native audio live counts", throwable);
 		}
 	}
 
-	static long bufferCreate(long deviceHandle, ByteBuffer data, javax.sound.sampled.AudioFormat format) {
-		BufferSlice slice = bufferSlice(data);
+	static long assetCreate(byte[] encoded, String debugName, long reloadGeneration) {
+		byte[] debugBytes = debugName == null || debugName.isBlank() ? null : debugName.getBytes(StandardCharsets.UTF_8);
 		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment encodedSegment = arena.allocateFrom(ValueLayout.JAVA_BYTE, encoded);
+			MemorySegment debugSegment = debugBytes == null
+				? MemorySegment.NULL
+				: arena.allocateFrom(ValueLayout.JAVA_BYTE, debugBytes);
 			MemorySegment output = arena.allocate(ValueLayout.JAVA_LONG);
-			int status = (int)BUFFER_CREATE.invokeExact(
-				deviceHandle,
-				slice.segment,
-				slice.length,
-				format.getChannels(),
-				format.getSampleSizeInBits(),
-				isPcm(format) ? 1 : 0,
-				(int)format.getSampleRate(),
+			int status = (int)ASSET_CREATE.invokeExact(
+				encodedSegment,
+				(long)encoded.length,
+				debugSegment,
+				(long)(debugBytes == null ? 0 : debugBytes.length),
+				reloadGeneration,
 				output
 			);
-			check(status, "Create audio buffer");
+			check(status, "Create native audio asset");
 			return output.get(ValueLayout.JAVA_LONG, 0);
 		} catch (Throwable throwable) {
-			throw nativeFailure("Create audio buffer", throwable);
+			throw nativeFailure("Create native audio asset", throwable);
 		}
 	}
 
-	static void bufferDestroy(long bufferHandle) {
-		checkHandle(BUFFER_DESTROY, bufferHandle, "Destroy audio buffer");
+	static void assetDestroy(long assetHandle) {
+		checkHandleAllowInvalid(ASSET_DESTROY, assetHandle, "Destroy native audio asset");
 	}
 
-	static long soundCreateStatic(long deviceHandle, SoundConfig config, long bufferHandle) {
+	static void assetDestroyGeneration(long reloadGeneration) {
+		checkHandleAllowInvalid(ASSET_DESTROY_GENERATION, reloadGeneration, "Destroy native audio asset generation");
+	}
+
+	static long soundCreateStaticFromAsset(long deviceHandle, SoundConfig config, long assetHandle) {
 		try (Arena arena = Arena.ofConfined()) {
 			MemorySegment configSegment = writeSoundConfig(arena, config);
 			MemorySegment output = arena.allocate(ValueLayout.JAVA_LONG);
-			int status = (int)SOUND_CREATE_STATIC.invokeExact(deviceHandle, configSegment, bufferHandle, output);
+			int status = (int)SOUND_CREATE_STATIC_FROM_ASSET.invokeExact(deviceHandle, configSegment, assetHandle, output);
 			if (status == ERR_POOL_EXHAUSTED) {
 				return 0L;
 			}
@@ -491,9 +499,31 @@ final class NativeAudio {
 		};
 	}
 
+	private static int[] readIntArray6(MemorySegment output) {
+		return new int[]{
+			output.get(ValueLayout.JAVA_INT, 0),
+			output.get(ValueLayout.JAVA_INT, Integer.BYTES),
+			output.get(ValueLayout.JAVA_INT, 2L * Integer.BYTES),
+			output.get(ValueLayout.JAVA_INT, 3L * Integer.BYTES),
+			output.get(ValueLayout.JAVA_INT, 4L * Integer.BYTES),
+			output.get(ValueLayout.JAVA_INT, 5L * Integer.BYTES)
+		};
+	}
+
 	private static void checkHandle(MethodHandle handle, long handleValue, String operation) {
 		try {
 			check((int)handle.invokeExact(handleValue), operation);
+		} catch (Throwable throwable) {
+			throw nativeFailure(operation, throwable);
+		}
+	}
+
+	private static void checkHandleAllowInvalid(MethodHandle handle, long handleValue, String operation) {
+		try {
+			int status = (int)handle.invokeExact(handleValue);
+			if (status != ERR_INVALID_HANDLE) {
+				check(status, operation);
+			}
 		} catch (Throwable throwable) {
 			throw nativeFailure(operation, throwable);
 		}

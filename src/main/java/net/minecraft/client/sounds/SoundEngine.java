@@ -10,6 +10,7 @@ import net.blaze3d.audio.Library;
 import net.blaze3d.audio.Listener;
 import net.blaze3d.audio.ListenerTransform;
 import net.logging.LogUtils;
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +18,7 @@ import java.util.Set;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.SharedConstants;
@@ -173,13 +175,8 @@ public class SoundEngine {
 	public void stopAll() {
 		if (this.loaded) {
 			this.executor.dropQueuedTasks();
-			this.instanceToChannel.clear();
 			this.channelAccess.clear();
-			this.queuedSounds.clear();
-			this.tickingSounds.clear();
-			this.instanceBySource.clear();
-			this.soundDeleteTime.clear();
-			this.queuedTickableSounds.clear();
+			this.clearSoundPolicyState();
 		}
 	}
 
@@ -264,34 +261,7 @@ public class SoundEngine {
 			}
 		}
 
-		Iterator<Entry<SoundInstance, ChannelAccess.ChannelHandle>> iterator = this.instanceToChannel.entrySet().iterator();
-
-		while (iterator.hasNext()) {
-			Entry<SoundInstance, ChannelAccess.ChannelHandle> entry = (Entry<SoundInstance, ChannelAccess.ChannelHandle>)iterator.next();
-			ChannelAccess.ChannelHandle channelHandle2 = (ChannelAccess.ChannelHandle)entry.getValue();
-			SoundInstance soundInstance = (SoundInstance)entry.getKey();
-			if (channelHandle2.isStopped()) {
-				int i = (Integer)this.soundDeleteTime.get(soundInstance);
-				if (i <= this.tickCount) {
-					if (shouldLoopManually(soundInstance)) {
-						this.queuedSounds.put(soundInstance, this.tickCount + soundInstance.getDelay());
-					}
-
-					iterator.remove();
-					LOGGER.debug(MARKER, "Removed channel {} because it's not playing anymore", channelHandle2);
-					this.soundDeleteTime.remove(soundInstance);
-
-					try {
-						this.instanceBySource.remove(soundInstance.getSource(), soundInstance);
-					} catch (RuntimeException var7) {
-					}
-
-					if (soundInstance instanceof TickableSoundInstance) {
-						this.tickingSounds.remove(soundInstance);
-					}
-				}
-			}
-		}
+		this.cleanupReleasedSoundPolicies(true, true, soundInstance -> true);
 
 		Iterator<Entry<SoundInstance, Integer>> iterator2 = this.queuedSounds.entrySet().iterator();
 
@@ -310,19 +280,51 @@ public class SoundEngine {
 	}
 
 	private void tickMusicWhenPaused() {
+		this.cleanupReleasedSoundPolicies(false, false, soundInstance -> soundInstance.getSource() == SoundSource.MUSIC);
+		this.cleanupReleasedSoundPolicies(false, true, soundInstance -> soundInstance.getSource() != SoundSource.MUSIC);
+	}
+
+	private void cleanupReleasedSoundPolicies(boolean allowManualLooping, boolean respectMinimumLifetime, Predicate<SoundInstance> filter) {
 		Iterator<Entry<SoundInstance, ChannelAccess.ChannelHandle>> iterator = this.instanceToChannel.entrySet().iterator();
 
 		while (iterator.hasNext()) {
 			Entry<SoundInstance, ChannelAccess.ChannelHandle> entry = (Entry<SoundInstance, ChannelAccess.ChannelHandle>)iterator.next();
-			ChannelAccess.ChannelHandle channelHandle = (ChannelAccess.ChannelHandle)entry.getValue();
 			SoundInstance soundInstance = (SoundInstance)entry.getKey();
-			if (soundInstance.getSource() == SoundSource.MUSIC && channelHandle.isStopped()) {
-				iterator.remove();
-				LOGGER.debug(MARKER, "Removed channel {} because it's not playing anymore", channelHandle);
-				this.soundDeleteTime.remove(soundInstance);
-				this.instanceBySource.remove(soundInstance.getSource(), soundInstance);
+			ChannelAccess.ChannelHandle channelHandle = (ChannelAccess.ChannelHandle)entry.getValue();
+			if (filter.test(soundInstance) && channelHandle.isReleased() && this.canForgetReleasedSound(soundInstance, respectMinimumLifetime)) {
+				if (allowManualLooping && shouldLoopManually(soundInstance)) {
+					this.queuedSounds.put(soundInstance, this.tickCount + soundInstance.getDelay());
+				}
+
+				this.removeReleasedSoundPolicy(soundInstance, channelHandle, iterator);
 			}
 		}
+	}
+
+	private boolean canForgetReleasedSound(SoundInstance soundInstance, boolean respectMinimumLifetime) {
+		return !respectMinimumLifetime || this.soundDeleteTime.getOrDefault(soundInstance, this.tickCount) <= this.tickCount;
+	}
+
+	private void removeReleasedSoundPolicy(
+		SoundInstance soundInstance, ChannelAccess.ChannelHandle channelHandle, Iterator<Entry<SoundInstance, ChannelAccess.ChannelHandle>> iterator
+	) {
+		iterator.remove();
+		LOGGER.debug(MARKER, "Removed channel {} because it's not playing anymore", channelHandle);
+		this.soundDeleteTime.remove(soundInstance);
+		this.instanceBySource.remove(soundInstance.getSource(), soundInstance);
+
+		if (soundInstance instanceof TickableSoundInstance) {
+			this.tickingSounds.remove(soundInstance);
+		}
+	}
+
+	private void clearSoundPolicyState() {
+		this.instanceToChannel.clear();
+		this.instanceBySource.clear();
+		this.tickingSounds.clear();
+		this.queuedSounds.clear();
+		this.soundDeleteTime.clear();
+		this.queuedTickableSounds.clear();
 	}
 
 	private static boolean requiresManualLooping(SoundInstance soundInstance) {
@@ -433,13 +435,13 @@ public class SoundEngine {
 						channel.setRelative(bl);
 					});
 					if (!bl4) {
-						this.soundBuffers.getCompleteBuffer(sound.getPath()).whenComplete((soundBuffer, throwable) -> {
+						this.soundBuffers.getCompleteAsset(sound.getPath()).whenComplete((audioAsset, throwable) -> {
 							if (throwable != null) {
 								LOGGER.warn(MARKER, "Failed to load sound {}", sound.getPath(), throwable);
-								channelHandle.execute(Channel::failAttachment);
+								channelHandle.failAttachment();
 							} else {
 								channelHandle.execute(channel -> {
-									channel.attachStaticBuffer(soundBuffer);
+									channel.attachStaticAsset(audioAsset);
 									channel.play();
 								});
 							}
@@ -448,12 +450,12 @@ public class SoundEngine {
 						this.soundBuffers.getStream(sound.getPath(), bl3).whenComplete((audioStream, throwable) -> {
 							if (throwable != null) {
 								LOGGER.warn(MARKER, "Failed to open audio stream {}", sound.getPath(), throwable);
-								channelHandle.execute(Channel::failAttachment);
+								channelHandle.failAttachment();
 							} else {
 								channelHandle.execute(channel -> {
 									channel.attachBufferStream(audioStream);
 									channel.play();
-								});
+								}, () -> closeAudioStream(audioStream));
 							}
 						});
 					}
@@ -486,6 +488,14 @@ public class SoundEngine {
 
 	private float calculateVolume(float f, SoundSource soundSource) {
 		return Mth.clamp(f, 0.0F, 1.0F) * Mth.clamp(this.options.getFinalSoundSourceVolume(soundSource), 0.0F, 1.0F);
+	}
+
+	private static void closeAudioStream(AudioStream audioStream) {
+		try {
+			audioStream.close();
+		} catch (IOException ioException) {
+			LOGGER.error("Failed to close audio stream", (Throwable)ioException);
+		}
 	}
 
 	public void pauseAllExcept(SoundSource... soundSources) {
