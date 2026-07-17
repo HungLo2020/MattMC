@@ -10772,17 +10772,11 @@ void main() {
 
         private long surface;
         private long swapchain;
-        private long commandPool;
-        private final long[] immediateCommandPools = new long[IMMEDIATE_SUBMIT_SLOTS];
-        private final long[] frameCommandPools = new long[MAX_FRAMES_IN_FLIGHT];
+        private final VulkanCommandSubmissionStateManager commandSubmissionState =
+            new VulkanCommandSubmissionStateManager(IMMEDIATE_SUBMIT_SLOTS, MAX_FRAMES_IN_FLIGHT);
         private long defaultDescriptorSampler;
         private final VulkanSwapchainStateManager swapchainState =
             new VulkanSwapchainStateManager(MAX_FRAMES_IN_FLIGHT);
-        private long immediateSubmitFence;
-        private final long[] immediateSubmitFences = new long[IMMEDIATE_SUBMIT_SLOTS];
-        private final boolean[] immediateSubmitSlotsInFlight = new boolean[IMMEDIATE_SUBMIT_SLOTS];
-        private int currentImmediateSubmitSlot;
-        private int recordingImmediateSubmitSlot = -1;
         private long minUniformBufferOffsetAlignment = 1L;
         private int maxImageDimension2D = 16384;
         private int maxTextureImageUnits = 32;
@@ -10813,9 +10807,6 @@ void main() {
         private PipelineDescriptor swapchainPresentComposeDescriptor;
         private int swapchainPresentComposePipelineFormat = VK10.VK_FORMAT_UNDEFINED;
 
-        private VkCommandBuffer primaryCommandBuffer;
-        private final VkCommandBuffer[] immediateCommandBuffers = new VkCommandBuffer[IMMEDIATE_SUBMIT_SLOTS];
-    private final VkCommandBuffer[] frameCommandBuffers = new VkCommandBuffer[MAX_FRAMES_IN_FLIGHT];
         private int graphicsQueueFamilyIndex;
         private int graphicsQueueFamilyQueueCount = 1;
         private int physicalDeviceVendorId;
@@ -10838,7 +10829,6 @@ void main() {
         private boolean attachmentFeedbackLoopLayoutEnabled;
         private long nextPresentId = 1L;
         private long windowHandle;
-        private boolean commandBufferRecording;
         private boolean renderPassRecording;
         private boolean scissorTestEnabled;
         private boolean hasCachedScissorRect;
@@ -10847,7 +10837,6 @@ void main() {
         private int cachedScissorWidth;
         private int cachedScissorHeight;
         private volatile PendingPresentTextureRequest pendingPresentTextureRequest;
-        private boolean immediateSubmitInFlight;
         private int activeTextureUnitIndex;
         private int consecutiveAcquireTimeouts;
         private long lastAcquireTimeoutLogNanos;
@@ -11366,7 +11355,7 @@ void main() {
         private void createSharedDescriptorResources() {
             try (MemoryStack stack = stackPush()) {
                 descriptorManager.createDescriptorPools(logicalDevice, NativeSpine::checkVk);
-                descriptorManager.activateImmediateSlot(currentImmediateSubmitSlot);
+                descriptorManager.activateImmediateSlot(commandSubmissionState.currentImmediateSubmitSlot());
 
                 VkSamplerCreateInfo samplerInfo = VkSamplerCreateInfo.calloc(stack)
                     .sType$Default()
@@ -11416,9 +11405,8 @@ void main() {
                         "vkCreateFence(immediateSubmit[" + slot + "])",
                         VK10.vkCreateFence(logicalDevice, frameFenceInfo, null, pFrameFence)
                     );
-                    immediateSubmitFences[slot] = pFrameFence.get(0);
+                    commandSubmissionState.setImmediateSubmitFence(slot, pFrameFence.get(0));
                 }
-                immediateSubmitFence = immediateSubmitFences[currentImmediateSubmitSlot];
             }
         }
 
@@ -12569,7 +12557,7 @@ void main() {
             if (existingTexture != null && existingTexture.imageHandle != VK10.VK_NULL_HANDLE) {
                 return true;
             }
-            return commandBufferHandle != 0L && commandBufferRecording && !renderPassRecording;
+            return commandBufferHandle != 0L && commandSubmissionState.commandBufferRecording() && !renderPassRecording;
         }
 
         private int ensureLegacyFallbackSamplerTexture(long commandBufferHandle) {
@@ -12578,7 +12566,7 @@ void main() {
             if (existingTexture != null && existingTexture.imageHandle != VK10.VK_NULL_HANDLE) {
                 return existingId;
             }
-            if (commandBufferHandle == 0L || !commandBufferRecording || renderPassRecording) {
+            if (commandBufferHandle == 0L || !commandSubmissionState.commandBufferRecording() || renderPassRecording) {
                 throw new IllegalStateException(
                     "Cannot initialize Vulkan legacy fallback sampler texture without an active command buffer outside a render pass"
                 );
@@ -13453,10 +13441,10 @@ void main() {
         private boolean hasPotentiallyPendingGpuWork() {
             return lifetime.hasPotentiallyPendingGpuWork(
                 renderPassRecording,
-                commandBufferRecording,
-                immediateSubmitInFlight,
+                commandSubmissionState.commandBufferRecording(),
+                commandSubmissionState.immediateSubmitInFlight(),
                 swapchainState.frameInProgress(),
-                immediateSubmitSlotsInFlight,
+                commandSubmissionState.immediateSubmitSlotsInFlightState(),
                 swapchainState.frameCommandBufferRecordingState()
             );
         }
@@ -13467,8 +13455,8 @@ void main() {
                 hasPotentiallyPendingGpuWork(),
                 swapchainState.frameInProgress(),
                 swapchainState.currentFrameSyncIndex(),
-                commandBufferRecording,
-                recordingImmediateSubmitSlot,
+                commandSubmissionState.commandBufferRecording(),
+                commandSubmissionState.recordingImmediateSubmitSlot(),
                 destroyAction
             );
         }
@@ -13632,7 +13620,7 @@ void main() {
                                            int baseLayer,
                                            int layerCount) {
             VkCommandBuffer recordingCommandBuffer = requireRecordingCommandBuffer(
-                primaryCommandBuffer.address(),
+                commandSubmissionState.primaryCommandBufferHandle(),
                 "transitionImageLayout"
             );
             transitionImageLayout(
@@ -14336,8 +14324,8 @@ void main() {
             try {
                 bindLegacyBuffer(VulkanicAPI.GL_PIXEL_PACK_BUFFER, readbackBuffer);
                 namedBufferStorage(readbackBuffer, byteCount, 0);
-                if (commandBufferRecording) {
-                    submitPrimaryCommandBuffer(primaryCommandBuffer.address());
+                if (commandSubmissionState.commandBufferRecording()) {
+                    submitPrimaryCommandBuffer(commandSubmissionState.primaryCommandBufferHandle());
                 }
                 long commandBufferHandle = beginPrimaryCommandBuffer();
                 readLegacyTextureRegionToBoundPixelPackBuffer(
@@ -15687,8 +15675,8 @@ void main() {
         private void copyDataToBufferImmediate(long destinationBufferHandle,
                                                long destinationOffset,
                                                java.nio.ByteBuffer data) {
-            if (commandBufferRecording && primaryCommandBuffer != null) {
-                copyDataToBuffer(primaryCommandBuffer.address(), destinationBufferHandle, destinationOffset, data);
+            if (commandSubmissionState.commandBufferRecording() && commandSubmissionState.primaryCommandBuffer() != null) {
+                copyDataToBuffer(commandSubmissionState.primaryCommandBufferHandle(), destinationBufferHandle, destinationOffset, data);
                 return;
             }
             if (swapchainState.frameInProgress() && isCurrentFrameCommandBufferRecording()) {
@@ -15737,8 +15725,8 @@ void main() {
                                                long sourceOffset,
                                                long destinationOffset,
                                                long size) {
-            if (commandBufferRecording && primaryCommandBuffer != null) {
-                copyBufferRegion(primaryCommandBuffer.address(), sourceBufferHandle, destinationBufferHandle, sourceOffset, destinationOffset, size);
+            if (commandSubmissionState.commandBufferRecording() && commandSubmissionState.primaryCommandBuffer() != null) {
+                copyBufferRegion(commandSubmissionState.primaryCommandBufferHandle(), sourceBufferHandle, destinationBufferHandle, sourceOffset, destinationOffset, size);
                 return;
             }
             if (swapchainState.frameInProgress() && isCurrentFrameCommandBufferRecording()) {
@@ -16859,32 +16847,38 @@ void main() {
                         "vkCreateCommandPool(immediate[" + slot + "])",
                         VK10.vkCreateCommandPool(logicalDevice, poolCreateInfo, null, pCommandPool)
                     );
-                    immediateCommandPools[slot] = pCommandPool.get(0);
+                    long immediateCommandPool = pCommandPool.get(0);
 
-                    allocateInfo.commandPool(immediateCommandPools[slot]);
+                    allocateInfo.commandPool(immediateCommandPool);
                     checkVk(
                         "vkAllocateCommandBuffers(immediate[" + slot + "])",
                         VK10.vkAllocateCommandBuffers(logicalDevice, allocateInfo, pCommandBuffer)
                     );
-                    immediateCommandBuffers[slot] = new VkCommandBuffer(pCommandBuffer.get(0), logicalDevice);
+                    commandSubmissionState.installImmediateCommandResources(
+                        slot,
+                        immediateCommandPool,
+                        new VkCommandBuffer(pCommandBuffer.get(0), logicalDevice)
+                    );
                 }
-                currentImmediateSubmitSlot = 0;
-                commandPool = immediateCommandPools[currentImmediateSubmitSlot];
-                primaryCommandBuffer = immediateCommandBuffers[currentImmediateSubmitSlot];
+                commandSubmissionState.activateImmediateSlot(0);
 
                 for (int frameIndex = 0; frameIndex < MAX_FRAMES_IN_FLIGHT; frameIndex++) {
                     checkVk(
                         "vkCreateCommandPool(frame[" + frameIndex + "])",
                         VK10.vkCreateCommandPool(logicalDevice, poolCreateInfo, null, pCommandPool)
                     );
-                    frameCommandPools[frameIndex] = pCommandPool.get(0);
+                    long frameCommandPool = pCommandPool.get(0);
 
-                    allocateInfo.commandPool(frameCommandPools[frameIndex]);
+                    allocateInfo.commandPool(frameCommandPool);
                     checkVk(
                         "vkAllocateCommandBuffers(frame[" + frameIndex + "])",
                         VK10.vkAllocateCommandBuffers(logicalDevice, allocateInfo, pCommandBuffer)
                     );
-                    frameCommandBuffers[frameIndex] = new VkCommandBuffer(pCommandBuffer.get(0), logicalDevice);
+                    commandSubmissionState.installFrameSlot(
+                        frameIndex,
+                        frameCommandPool,
+                        new VkCommandBuffer(pCommandBuffer.get(0), logicalDevice)
+                    );
                     swapchainState.setFrameCommandBufferRecording(frameIndex, false);
                 }
             }
@@ -16968,31 +16962,21 @@ void main() {
         }
 
         private void awaitDeferredImmediateSubmitCompletion() {
-            if (!immediateSubmitInFlight || logicalDevice == null) {
+            if (!commandSubmissionState.immediateSubmitInFlight() || logicalDevice == null) {
                 return;
             }
 
             for (int slot = 0; slot < IMMEDIATE_SUBMIT_SLOTS; slot++) {
-                if (immediateSubmitSlotsInFlight[slot]) {
+                if (commandSubmissionState.isImmediateSubmitSlotInFlight(slot)) {
                     awaitImmediateSubmitSlotCompletion(slot);
                 }
             }
 
-            immediateSubmitInFlight = anyImmediateSubmitSlotInFlight();
-            if (!immediateSubmitInFlight) {
+            if (!commandSubmissionState.immediateSubmitInFlight()) {
                 consecutiveImmediateSubmitTimeouts = 0;
                 lastImmediateSubmitTimeoutLogNanos = 0L;
                 flushPendingVulkanResourceDestroys(false);
             }
-        }
-
-        private boolean anyImmediateSubmitSlotInFlight() {
-            for (boolean inFlight : immediateSubmitSlotsInFlight) {
-                if (inFlight) {
-                    return true;
-                }
-            }
-            return false;
         }
 
         private boolean shouldSynchronizeImmediateSubmitCompletion() {
@@ -17000,8 +16984,8 @@ void main() {
         }
 
         private void awaitImmediateSubmitSlotCompletion(int slot) {
-            long fence = immediateSubmitFences[slot];
-            if (!immediateSubmitSlotsInFlight[slot] || logicalDevice == null || fence == VK10.VK_NULL_HANDLE) {
+            long fence = commandSubmissionState.immediateSubmitFence(slot);
+            if (!commandSubmissionState.isImmediateSubmitSlotInFlight(slot) || logicalDevice == null || fence == VK10.VK_NULL_HANDLE) {
                 return;
             }
 
@@ -17035,8 +17019,7 @@ void main() {
 
             markFenceComplete(fence);
             lifetime.clearReservedImmediateWorkGeneration(slot);
-            immediateSubmitSlotsInFlight[slot] = false;
-            immediateSubmitInFlight = anyImmediateSubmitSlotInFlight();
+            commandSubmissionState.markImmediateSlotComplete(slot);
             consecutiveImmediateSubmitTimeouts = 0;
             lastImmediateSubmitTimeoutLogNanos = 0L;
             destroyTransientRenderPassResources(slot);
@@ -17064,11 +17047,11 @@ void main() {
                 throw new IllegalStateException("beginFrame called while a Vulkan frame is already in progress.");
             }
 
-            if (commandBufferRecording) {
+            if (commandSubmissionState.commandBufferRecording()) {
                 if (renderPassRecording) {
                     throw new IllegalStateException("beginFrame cannot proceed while a render pass is active.");
                 }
-                submitPrimaryCommandBuffer(primaryCommandBuffer.address());
+                submitPrimaryCommandBuffer(commandSubmissionState.primaryCommandBufferHandle());
             }
 
             refreshSurfaceIfRegisteredWindowChanged();
@@ -17263,7 +17246,7 @@ void main() {
                 }
 
                 swapchainState.beginAcquiredFrame(imageIndex, frameFence);
-                lifetime.reserveFrameWorkGeneration(swapchainState.currentFrameSyncIndex());
+                commandSubmissionState.reserveFrameWorkGeneration(lifetime, swapchainState.currentFrameSyncIndex());
                 successfulFrameAcquireCount++;
                 VulkanPerfAudit.recordBeginFrameAcquireSuccess();
                 if (successfulFrameAcquireCount <= 5) {
@@ -17286,9 +17269,9 @@ void main() {
                 throw new IllegalStateException("endFrame cannot run while a render pass is active.");
             }
 
-            if (commandBufferRecording) {
+            if (commandSubmissionState.commandBufferRecording()) {
                 // Ensure current-frame render work is visible before present composition.
-                submitPrimaryCommandBuffer(primaryCommandBuffer.address());
+                submitPrimaryCommandBuffer(commandSubmissionState.primaryCommandBufferHandle());
             }
 
             if (pendingPresentTextureRequest == null && successfulFramePresentCount < 6) {
@@ -17922,12 +17905,12 @@ void main() {
         }
 
         private long beginPrimaryCommandBuffer() {
-            VkCommandBuffer nextCommandBuffer = immediateCommandBuffers[currentImmediateSubmitSlot];
+            VkCommandBuffer nextCommandBuffer = commandSubmissionState.primaryCommandBuffer();
             if (nextCommandBuffer == null) {
                 throw new IllegalStateException("Primary Vulkan command buffer has not been allocated.");
             }
 
-            if (commandBufferRecording) {
+            if (commandSubmissionState.commandBufferRecording()) {
                 throw new IllegalStateException("Primary command buffer is already recording.");
             }
 
@@ -17936,32 +17919,28 @@ void main() {
                     awaitDeferredImmediateSubmitCompletion();
                     waitForAllSwapchainFrameFences();
                 } else {
-                    awaitImmediateSubmitSlotCompletion(currentImmediateSubmitSlot);
+                    awaitImmediateSubmitSlotCompletion(commandSubmissionState.currentImmediateSubmitSlot());
                 }
-                commandPool = immediateCommandPools[currentImmediateSubmitSlot];
-                descriptorManager.activateImmediateSlot(currentImmediateSubmitSlot);
-                immediateSubmitFence = immediateSubmitFences[currentImmediateSubmitSlot];
-                primaryCommandBuffer = nextCommandBuffer;
+                descriptorManager.activateImmediateSlot(commandSubmissionState.currentImmediateSubmitSlot());
                 flushPendingVulkanResourceDestroys(false);
-                checkVk("vkResetCommandPool", VK10.vkResetCommandPool(logicalDevice, commandPool, 0));
+                checkVk("vkResetCommandPool", VK10.vkResetCommandPool(logicalDevice, commandSubmissionState.currentCommandPool(), 0));
                 resetSharedDescriptorPool();
 
                 VkCommandBufferBeginInfo beginInfo = VkCommandBufferBeginInfo.calloc(stack)
                     .sType$Default()
                     .flags(VK10.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
-                checkVk("vkBeginCommandBuffer", VK10.vkBeginCommandBuffer(primaryCommandBuffer, beginInfo));
-                clearTrackedCommandBufferState(primaryCommandBuffer.address());
-                commandBufferRecording = true;
-                recordingImmediateSubmitSlot = currentImmediateSubmitSlot;
-                lifetime.reserveImmediateWorkGeneration(currentImmediateSubmitSlot);
+                checkVk("vkBeginCommandBuffer", VK10.vkBeginCommandBuffer(nextCommandBuffer, beginInfo));
+                clearTrackedCommandBufferState(nextCommandBuffer.address());
+                commandSubmissionState.markImmediateRecordingStarted();
+                commandSubmissionState.reserveImmediateWorkGeneration(lifetime);
                 renderPassRecording = false;
-                return primaryCommandBuffer.address();
+                return nextCommandBuffer.address();
             }
         }
 
         private VkCommandBuffer currentFrameCommandBuffer() {
-            VkCommandBuffer commandBuffer = frameCommandBuffers[swapchainState.currentFrameSyncIndex()];
+            VkCommandBuffer commandBuffer = commandSubmissionState.frameCommandBuffer(swapchainState.currentFrameSyncIndex());
             if (commandBuffer == null) {
                 throw new IllegalStateException(
                     "Frame Vulkan command buffer for sync slot " + swapchainState.currentFrameSyncIndex() + " has not been allocated."
@@ -18001,7 +17980,7 @@ void main() {
                 markFenceComplete(currentSwapchainFrameFence());
                 checkVk(
                     "vkResetCommandPool(frame[" + swapchainState.currentFrameSyncIndex() + "])",
-                    VK10.vkResetCommandPool(logicalDevice, frameCommandPools[swapchainState.currentFrameSyncIndex()], 0)
+                    VK10.vkResetCommandPool(logicalDevice, commandSubmissionState.frameCommandPool(swapchainState.currentFrameSyncIndex()), 0)
                 );
 
                 VkCommandBufferBeginInfo beginInfo = VkCommandBufferBeginInfo.calloc(stack)
@@ -18024,7 +18003,7 @@ void main() {
         }
 
         private boolean isPrimaryCommandBufferRecording() {
-            return commandBufferRecording;
+            return commandSubmissionState.commandBufferRecording();
         }
 
         private boolean isRenderPassRecording() {
@@ -18035,18 +18014,18 @@ void main() {
             if (renderPassRecording) {
                 throw new IllegalStateException("Cannot submit command buffer while a render pass is still active.");
             }
-            if (!commandBufferRecording) {
+            if (!commandSubmissionState.commandBufferRecording()) {
                 return;
             }
             int submitSlot = immediateSubmitSlotForKnownCommandBuffer(commandBufferHandle);
-            if (submitSlot != recordingImmediateSubmitSlot || submitSlot < 0) {
+            if (submitSlot != commandSubmissionState.recordingImmediateSubmitSlot() || submitSlot < 0) {
                 return;
             }
-            VkCommandBuffer submitCommandBuffer = immediateCommandBuffers[submitSlot];
+            VkCommandBuffer submitCommandBuffer = commandSubmissionState.immediateCommandBuffer(submitSlot);
             if (submitCommandBuffer == null) {
                 throw new IllegalStateException("Immediate Vulkan command buffer is unavailable for slot " + submitSlot + ".");
             }
-            long submitFence = immediateSubmitFences[submitSlot];
+            long submitFence = commandSubmissionState.immediateSubmitFence(submitSlot);
             if (submitFence == VK10.VK_NULL_HANDLE) {
                 throw new IllegalStateException("Immediate Vulkan submit fence is unavailable.");
             }
@@ -18056,6 +18035,7 @@ void main() {
             long queueSubmitNanos = 0L;
             long waitAfterNanos = 0L;
             boolean synchronizeCompletion = shouldSynchronizeImmediateSubmitCompletion();
+            boolean submittedToQueue = false;
             try (MemoryStack stack = stackPush()) {
                 java.nio.LongBuffer immediateFenceBuffer = stack.longs(submitFence);
                 awaitImmediateSubmitSlotCompletion(submitSlot);
@@ -18068,7 +18048,7 @@ void main() {
                     waitBeforeNanos = System.nanoTime() - waitBeforeStartNanos;
                 }
                 checkVk("vkResetFences(immediateSubmit[" + submitSlot + "])", VK10.vkResetFences(logicalDevice, immediateFenceBuffer));
-                checkVk("vkEndCommandBuffer", VK10.vkEndCommandBuffer(primaryCommandBuffer));
+                checkVk("vkEndCommandBuffer", VK10.vkEndCommandBuffer(submitCommandBuffer));
 
                 VkSubmitInfo.Buffer submitInfos = VkSubmitInfo.calloc(1, stack)
                     .sType$Default();
@@ -18079,11 +18059,9 @@ void main() {
                 long queueSubmitStartNanos = totalStartNanos != 0L ? System.nanoTime() : 0L;
                 checkVk("vkQueueSubmit(immediate)",
                     VK10.vkQueueSubmit(graphicsQueue, submitInfos, submitFence));
-                registerSubmittedWork(submitFence, lifetime.reservedImmediateWorkGeneration(submitSlot));
-                immediateSubmitSlotsInFlight[submitSlot] = true;
-                immediateSubmitInFlight = true;
-                commandBufferRecording = false;
-                recordingImmediateSubmitSlot = -1;
+                submittedToQueue = true;
+                registerSubmittedWork(submitFence, commandSubmissionState.reservedImmediateWorkGeneration(lifetime, submitSlot));
+                commandSubmissionState.markImmediateSubmitted(submitSlot);
                 clearTrackedCommandBufferState(submitCommandBuffer.address());
                 if (queueSubmitStartNanos != 0L) {
                     queueSubmitNanos = System.nanoTime() - queueSubmitStartNanos;
@@ -18118,35 +18096,30 @@ void main() {
                     checkVk("vkWaitForFences(immediateSubmitComplete[" + submitSlot + "])", waitAfterResult);
                     markFenceComplete(submitFence);
                     lifetime.clearReservedImmediateWorkGeneration(submitSlot);
-                    immediateSubmitSlotsInFlight[submitSlot] = false;
-                    immediateSubmitInFlight = anyImmediateSubmitSlotInFlight();
+                    commandSubmissionState.markImmediateSlotComplete(submitSlot);
                     consecutiveImmediateSubmitTimeouts = 0;
                     lastImmediateSubmitTimeoutLogNanos = 0L;
                     destroyTransientRenderPassResources(submitSlot);
                     flushPendingVulkanResourceDestroys(false);
                 }
 
-                currentImmediateSubmitSlot = (submitSlot + 1) % IMMEDIATE_SUBMIT_SLOTS;
-                commandPool = immediateCommandPools[currentImmediateSubmitSlot];
-                descriptorManager.activateImmediateSlot(currentImmediateSubmitSlot);
-                immediateSubmitFence = immediateSubmitFences[currentImmediateSubmitSlot];
-                primaryCommandBuffer = immediateCommandBuffers[currentImmediateSubmitSlot];
+                commandSubmissionState.advanceImmediateSlotAfterSubmit(submitSlot);
+                descriptorManager.activateImmediateSlot(commandSubmissionState.currentImmediateSubmitSlot());
                 if (totalStartNanos != 0L) {
                     long totalNanos = System.nanoTime() - totalStartNanos;
                     long otherNanos = totalNanos - waitBeforeNanos - queueSubmitNanos - waitAfterNanos;
                     VulkanPerfAudit.recordPrimarySubmit(totalNanos, waitBeforeNanos, queueSubmitNanos, waitAfterNanos, otherNanos);
                 }
+            } catch (RuntimeException exception) {
+                if (!submittedToQueue) {
+                    commandSubmissionState.markImmediateSubmitFailed(submitSlot);
+                }
+                throw exception;
             }
         }
 
         private int immediateSubmitSlotForKnownCommandBuffer(long commandBufferHandle) {
-            for (int slot = 0; slot < IMMEDIATE_SUBMIT_SLOTS; slot++) {
-                VkCommandBuffer commandBuffer = immediateCommandBuffers[slot];
-                if (commandBuffer != null && commandBuffer.address() == commandBufferHandle) {
-                    return slot;
-                }
-            }
-            return -1;
+            return commandSubmissionState.immediateSubmitSlotForCommandBuffer(commandBufferHandle);
         }
 
         private void submitFrameSemaphoreBridge() {
@@ -18165,7 +18138,7 @@ void main() {
                 java.nio.LongBuffer frameFenceBuffer = stack.longs(frameFence);
                 checkVk("vkResetFences(swapchainFrame)", VK10.vkResetFences(logicalDevice, frameFenceBuffer));
                 checkVk("vkQueueSubmit(frameBridge)", VK10.vkQueueSubmit(graphicsQueue, submitInfos, frameFence));
-                registerSubmittedWork(frameFence, lifetime.reservedFrameWorkGeneration(swapchainState.currentFrameSyncIndex()));
+                registerSubmittedWork(frameFence, commandSubmissionState.reservedFrameWorkGeneration(lifetime, swapchainState.currentFrameSyncIndex()));
             }
         }
 
@@ -18200,7 +18173,7 @@ void main() {
                 java.nio.LongBuffer frameFenceBuffer = stack.longs(frameFence);
                 checkVk("vkResetFences(swapchainFrame)", VK10.vkResetFences(logicalDevice, frameFenceBuffer));
                 checkVk("vkQueueSubmit(frame)", VK10.vkQueueSubmit(graphicsQueue, submitInfos, frameFence));
-                registerSubmittedWork(frameFence, lifetime.reservedFrameWorkGeneration(swapchainState.currentFrameSyncIndex()));
+                registerSubmittedWork(frameFence, commandSubmissionState.reservedFrameWorkGeneration(lifetime, swapchainState.currentFrameSyncIndex()));
 
                 swapchainState.setCurrentFrameCommandBufferRecording(false);
                 clearTrackedCommandBufferState(frameCommandBuffer.address());
@@ -18256,34 +18229,38 @@ void main() {
 	        }
 
 	        private VkCommandBuffer requireRecordingCommandBuffer(long commandBufferHandle, String operation) {
+            VkCommandBuffer primaryCommandBuffer = commandSubmissionState.primaryCommandBuffer();
             if (primaryCommandBuffer == null) {
                 throw new IllegalStateException("Primary Vulkan command buffer has not been allocated.");
             }
 
             if (commandBufferHandle == primaryCommandBuffer.address()) {
-                if (!commandBufferRecording) {
-                    if (immediateSubmitInFlight && swapchainState.frameInProgress()) {
+                if (!commandSubmissionState.commandBufferRecording()) {
+                    if (commandSubmissionState.immediateSubmitInFlight() && swapchainState.frameInProgress()) {
                         return ensureCurrentFrameCommandBufferRecording(operation + " (rerouted from deferred primary submit)");
                     }
                     beginPrimaryCommandBuffer();
+                    primaryCommandBuffer = commandSubmissionState.primaryCommandBuffer();
                 }
                 return primaryCommandBuffer;
             }
 
             int immediateSlot = immediateSubmitSlotForKnownCommandBuffer(commandBufferHandle);
             if (immediateSlot >= 0) {
-                if (commandBufferRecording) {
-                    if (immediateSlot == recordingImmediateSubmitSlot) {
-                        return immediateCommandBuffers[immediateSlot];
+                if (commandSubmissionState.commandBufferRecording()) {
+                    if (immediateSlot == commandSubmissionState.recordingImmediateSubmitSlot()) {
+                        return commandSubmissionState.immediateCommandBuffer(immediateSlot);
                     }
                     return primaryCommandBuffer;
                 }
-                if (immediateSubmitInFlight && swapchainState.frameInProgress() && immediateSubmitSlotsInFlight[immediateSlot]) {
+                if (commandSubmissionState.immediateSubmitInFlight()
+                    && swapchainState.frameInProgress()
+                    && commandSubmissionState.isImmediateSubmitSlotInFlight(immediateSlot)) {
                     return ensureCurrentFrameCommandBufferRecording(operation + " (rerouted from deferred primary submit)");
                 }
-                currentImmediateSubmitSlot = immediateSlot;
+                commandSubmissionState.activateImmediateSlot(immediateSlot);
                 beginPrimaryCommandBuffer();
-                return primaryCommandBuffer;
+                return commandSubmissionState.primaryCommandBuffer();
             }
 
             VkCommandBuffer frameCommandBuffer = currentFrameCommandBuffer();
@@ -19061,8 +19038,9 @@ void main() {
         }
 
         private int activeImmediateResourceSlot() {
-            if (recordingImmediateSubmitSlot >= 0 && recordingImmediateSubmitSlot < IMMEDIATE_SUBMIT_SLOTS) {
-                return recordingImmediateSubmitSlot;
+            int recordingSlot = commandSubmissionState.recordingImmediateSubmitSlot();
+            if (recordingSlot >= 0 && recordingSlot < IMMEDIATE_SUBMIT_SLOTS) {
+                return recordingSlot;
             }
             return -1;
         }
@@ -20225,10 +20203,7 @@ void main() {
         }
 
         private long primaryCommandBufferHandle() {
-            if (primaryCommandBuffer == null) {
-                return 0L;
-            }
-            return primaryCommandBuffer.address();
+            return commandSubmissionState.primaryCommandBufferHandle();
         }
 
         private long logicalDeviceHandle() {
@@ -20250,7 +20225,7 @@ void main() {
         }
 
         private long commandPoolHandle() {
-            return commandPool;
+            return commandSubmissionState.currentCommandPool();
         }
 
         private long surfaceHandle() {
@@ -20539,24 +20514,19 @@ void main() {
                 }
 
                 for (int slot = 0; slot < IMMEDIATE_SUBMIT_SLOTS; slot++) {
-                    if (immediateCommandPools[slot] != VK10.VK_NULL_HANDLE) {
-                        VK10.vkDestroyCommandPool(logicalDevice, immediateCommandPools[slot], null);
-                        immediateCommandPools[slot] = VK10.VK_NULL_HANDLE;
+                    long immediateCommandPool = commandSubmissionState.immediateCommandPool(slot);
+                    if (immediateCommandPool != VK10.VK_NULL_HANDLE) {
+                        VK10.vkDestroyCommandPool(logicalDevice, immediateCommandPool, null);
                     }
-                    immediateCommandBuffers[slot] = null;
-                    immediateSubmitSlotsInFlight[slot] = false;
+                    commandSubmissionState.clearImmediateCommandResources(slot);
                 }
-                commandPool = VK10.VK_NULL_HANDLE;
-                primaryCommandBuffer = null;
-                currentImmediateSubmitSlot = 0;
-                recordingImmediateSubmitSlot = -1;
 
                 for (int frameIndex = 0; frameIndex < MAX_FRAMES_IN_FLIGHT; frameIndex++) {
-                    if (frameCommandPools[frameIndex] != VK10.VK_NULL_HANDLE) {
-                        VK10.vkDestroyCommandPool(logicalDevice, frameCommandPools[frameIndex], null);
-                        frameCommandPools[frameIndex] = VK10.VK_NULL_HANDLE;
+                    long frameCommandPool = commandSubmissionState.frameCommandPool(frameIndex);
+                    if (frameCommandPool != VK10.VK_NULL_HANDLE) {
+                        VK10.vkDestroyCommandPool(logicalDevice, frameCommandPool, null);
                     }
-                    frameCommandBuffers[frameIndex] = null;
+                    commandSubmissionState.clearFrameSlot(frameIndex);
                     swapchainState.setFrameCommandBufferRecording(frameIndex, false);
                 }
 
@@ -20576,13 +20546,12 @@ void main() {
                 lastBoundComputePipelineByCommandBuffer.clear();
 
                 for (int slot = 0; slot < IMMEDIATE_SUBMIT_SLOTS; slot++) {
-                    if (immediateSubmitFences[slot] != VK10.VK_NULL_HANDLE) {
-                        VK10.vkDestroyFence(logicalDevice, immediateSubmitFences[slot], null);
-                        immediateSubmitFences[slot] = VK10.VK_NULL_HANDLE;
+                    long immediateSubmitFence = commandSubmissionState.immediateSubmitFence(slot);
+                    if (immediateSubmitFence != VK10.VK_NULL_HANDLE) {
+                        VK10.vkDestroyFence(logicalDevice, immediateSubmitFence, null);
+                        commandSubmissionState.setImmediateSubmitFence(slot, VK10.VK_NULL_HANDLE);
                     }
                 }
-                immediateSubmitFence = VK10.VK_NULL_HANDLE;
-                immediateSubmitInFlight = false;
 
                 for (int frameIndex = 0; frameIndex < MAX_FRAMES_IN_FLIGHT; frameIndex++) {
                     long imageAvailableSemaphore = swapchainState.imageAvailableSemaphore(frameIndex);
@@ -20608,8 +20577,7 @@ void main() {
                 VK10.vkDestroyDevice(logicalDevice, null);
                 logicalDevice = null;
                 graphicsQueue = null;
-                primaryCommandBuffer = null;
-                commandBufferRecording = false;
+                commandSubmissionState.clearForDeviceLossOrShutdown();
                 instanceProperties2ExtensionEnabled = false;
                 presentIdExtensionEnabled = false;
                 presentWaitExtensionEnabled = false;

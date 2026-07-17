@@ -292,13 +292,13 @@ public class VulkanManagedTextureLifecycleTest {
 
         assertTrue(source.contains("VulkanDeferredResourceLifetime<StagingBuffer, VulkanBuffer> lifetime"),
             "Vulkan backend should centralize native resource retirement behind the deferred lifetime manager");
-        assertTrue(source.contains("lifetime.reserveFrameWorkGeneration(swapchainState.currentFrameSyncIndex())"),
+        assertTrue(source.contains("commandSubmissionState.reserveFrameWorkGeneration(lifetime, swapchainState.currentFrameSyncIndex())"),
             "Frame command recording should reserve a generation before resources can be closed during that frame");
-        assertTrue(source.contains("lifetime.reserveImmediateWorkGeneration(currentImmediateSubmitSlot)"),
+        assertTrue(source.contains("commandSubmissionState.reserveImmediateWorkGeneration(lifetime)"),
             "Immediate command recording should reserve a generation before resources can be closed during that submit");
-        assertTrue(source.contains("registerSubmittedWork(frameFence, lifetime.reservedFrameWorkGeneration(swapchainState.currentFrameSyncIndex()))"),
+        assertTrue(source.contains("registerSubmittedWork(frameFence, commandSubmissionState.reservedFrameWorkGeneration(lifetime, swapchainState.currentFrameSyncIndex()))"),
             "Frame submits should publish their reserved generation to the lifetime manager");
-        assertTrue(source.contains("registerSubmittedWork(submitFence, lifetime.reservedImmediateWorkGeneration(submitSlot))"),
+        assertTrue(source.contains("registerSubmittedWork(submitFence, commandSubmissionState.reservedImmediateWorkGeneration(lifetime, submitSlot))"),
             "Immediate submits should publish their reserved generation to the lifetime manager");
         assertTrue(source.contains("markFenceComplete(frameFence)") && source.contains("markFenceComplete(submitFence)"),
             "Fence waits should mark submitted generations complete before native resources are retired");

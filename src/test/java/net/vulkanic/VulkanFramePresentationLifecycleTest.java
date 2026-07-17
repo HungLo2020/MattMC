@@ -100,8 +100,8 @@ public class VulkanFramePresentationLifecycleTest {
             "Vulkan backend should expose frame end lifecycle entrypoint");
         assertTrue(vulkanBackendSource.contains("composePendingPresentTexture("),
             "Vulkan backend should compose queued present textures into acquired swapchain images during endFrame");
-        assertTrue(vulkanBackendSource.contains("frameCommandBuffers"),
-            "Vulkan backend should dedicate separate command buffers to swapchain frame submission");
+        assertTrue(vulkanBackendSource.contains("commandSubmissionState.installFrameSlot"),
+            "Vulkan backend should dedicate manager-owned command buffers to swapchain frame submission");
         assertTrue(vulkanBackendSource.contains("ensureCurrentFrameCommandBufferRecording"),
             "Vulkan backend should begin frame-presentation command recording on a dedicated frame buffer path");
         assertTrue(vulkanBackendSource.contains("createSwapchainRenderFinishedSemaphores(imageResources.imageHandles.size())"),
@@ -147,8 +147,8 @@ public class VulkanFramePresentationLifecycleTest {
         assertTrue(vulkanBackendSource.contains("if (spine.isCurrentFrameCommandBufferHandle(commandBufferHandle))"),
             "Vulkan submitCommandBuffer should avoid force-submitting the active frame command buffer per render pass");
         assertTrue(vulkanBackendSource.contains("int submitSlot = immediateSubmitSlotForKnownCommandBuffer(commandBufferHandle);")
-                && vulkanBackendSource.contains("if (submitSlot != recordingImmediateSubmitSlot || submitSlot < 0)")
-                && vulkanBackendSource.contains("VkCommandBuffer submitCommandBuffer = immediateCommandBuffers[submitSlot];")
+                && vulkanBackendSource.contains("if (submitSlot != commandSubmissionState.recordingImmediateSubmitSlot() || submitSlot < 0)")
+                && vulkanBackendSource.contains("VkCommandBuffer submitCommandBuffer = commandSubmissionState.immediateCommandBuffer(submitSlot);")
                 && vulkanBackendSource.contains("commandBuffers.put(0, submitCommandBuffer.address());"),
             "Vulkan immediate submits must submit and mark the same recording ring slot to avoid fence/command-buffer mismatches");
         assertTrue(vulkanBackendSource.contains("shouldSynchronizeImmediateSubmitCompletion()")

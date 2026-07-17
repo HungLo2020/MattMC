@@ -141,7 +141,7 @@ public class VulkanRendererStartupInitializationTest {
             "Fail-fast Vulkan proxy should invoke default interface methods instead of failing");
         assertTrue(vulkanBackendSource.contains("beginPrimaryCommandBuffer();"),
             "VulkanBackend should auto-begin command recording for immediate-mode compatibility operations");
-        assertTrue(vulkanBackendSource.contains("submitPrimaryCommandBuffer(primaryCommandBuffer.address());"),
+        assertTrue(vulkanBackendSource.contains("submitPrimaryCommandBuffer(commandSubmissionState.primaryCommandBufferHandle());"),
             "VulkanBackend frame lifecycle should auto-submit pending primary command buffers when needed");
     }
 
