@@ -96,6 +96,12 @@ public class Library {
 		channel.destroy();
 	}
 
+	public void tick() {
+		if (this.currentDevice != NO_DEVICE) {
+			NativeAudio.deviceTick(this.currentDevice);
+		}
+	}
+
 	public String getDebugString() {
 		if (this.currentDevice == NO_DEVICE) {
 			return "Sounds: 0/0 + 0/0";

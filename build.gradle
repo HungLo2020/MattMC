@@ -158,7 +158,6 @@ dependencies {
     implementation 'ca.weblite:java-objc-bridge:1.2'
     
     // JOrbis - Ogg Vorbis audio decoder
-    implementation 'org.jcraft:jorbis:0.0.17'
     
     // ===== CLIENT DEPENDENCIES =====
     

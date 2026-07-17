@@ -83,12 +83,12 @@ pub(crate) fn packet_index_for_sample(
     Ok(None)
 }
 
-fn java_i16_from_float(sample: f32) -> i16 {
+pub(crate) fn java_i16_from_float(sample: f32) -> i16 {
     let value = (sample * 32767.5 - 0.5) as i32;
     value.clamp(-32768, 32767) as i16
 }
 
-fn final_ogg_granule_position(encoded: &[u8]) -> AudioResult<Option<u64>> {
+pub(crate) fn final_ogg_granule_position(encoded: &[u8]) -> AudioResult<Option<u64>> {
     let mut cursor = 0_usize;
     let mut final_granule = None;
     while let Some(relative) = encoded[cursor..]

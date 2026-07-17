@@ -10,7 +10,6 @@ import net.blaze3d.audio.Library;
 import net.blaze3d.audio.Listener;
 import net.blaze3d.audio.ListenerTransform;
 import net.logging.LogUtils;
-import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -447,15 +446,15 @@ public class SoundEngine {
 							}
 						});
 					} else {
-						this.soundBuffers.getStream(sound.getPath(), bl3).whenComplete((audioStream, throwable) -> {
+						this.soundBuffers.getCompleteAsset(sound.getPath()).whenComplete((audioAsset, throwable) -> {
 							if (throwable != null) {
 								LOGGER.warn(MARKER, "Failed to open audio stream {}", sound.getPath(), throwable);
 								channelHandle.failAttachment();
 							} else {
 								channelHandle.execute(channel -> {
-									channel.attachBufferStream(audioStream);
+									channel.attachStreamingAsset(audioAsset, bl3);
 									channel.play();
-								}, () -> closeAudioStream(audioStream));
+								});
 							}
 						});
 					}
@@ -488,14 +487,6 @@ public class SoundEngine {
 
 	private float calculateVolume(float f, SoundSource soundSource) {
 		return Mth.clamp(f, 0.0F, 1.0F) * Mth.clamp(this.options.getFinalSoundSourceVolume(soundSource), 0.0F, 1.0F);
-	}
-
-	private static void closeAudioStream(AudioStream audioStream) {
-		try {
-			audioStream.close();
-		} catch (IOException ioException) {
-			LOGGER.error("Failed to close audio stream", (Throwable)ioException);
-		}
 	}
 
 	public void pauseAllExcept(SoundSource... soundSources) {

@@ -2,7 +2,7 @@ use std::sync::{Mutex, OnceLock};
 
 use super::backend::{self, test_support};
 use super::commands::{
-    SoundConfigRecord, StaticDecodeParityRecord, StreamChunkRecord, SOUND_FLAG_DISABLE_ATTENUATION,
+    SoundConfigRecord, StaticDecodeParityRecord, SOUND_FLAG_DISABLE_ATTENUATION,
     SOUND_FLAG_LINEAR_ATTENUATION, SOUND_FLAG_LOOPING, SOUND_FLAG_RELATIVE, SOUND_UPDATE_GAIN,
     SOUND_UPDATE_POSITION,
 };
@@ -14,9 +14,9 @@ use super::errors::{
 use super::ffi::{
     mattmc_audio_asset_compare_static_pcm, mattmc_audio_asset_create, mattmc_audio_asset_destroy,
     mattmc_audio_asset_destroy_generation, mattmc_audio_device_create, mattmc_audio_device_destroy,
-    mattmc_audio_format_to_openal, mattmc_audio_sound_create_static_from_asset,
-    mattmc_audio_sound_create_streaming, mattmc_audio_sound_state,
-    mattmc_audio_sound_stop_and_destroy, mattmc_audio_sound_submit_stream_chunks,
+    mattmc_audio_device_tick, mattmc_audio_format_to_openal,
+    mattmc_audio_sound_create_static_from_asset, mattmc_audio_sound_create_streaming_from_asset,
+    mattmc_audio_sound_state, mattmc_audio_sound_stop_and_destroy,
 };
 use super::format::audio_format_to_openal;
 use super::handles::{HandleTable, NativeHandle, ResourceKind};
@@ -34,7 +34,9 @@ fn audio_test_lock() -> &'static Mutex<()> {
 }
 
 fn with_audio_backend<T>(f: impl FnOnce() -> T) -> T {
-    let _guard = audio_test_lock().lock().expect("audio test lock poisoned");
+    let _guard = audio_test_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     test_support::reset_backend_for_tests();
     let result = f();
     test_support::reset_backend_for_tests();
@@ -354,18 +356,22 @@ fn device_cleanup_removes_owned_sources_and_static_cache() {
 fn streaming_queue_ownership_is_released_with_source() {
     with_audio_backend(|| {
         let device = create_test_device().expect("default audio device should open");
-        let source = backend::create_source(device, ChannelPool::Streaming)
-            .expect("streaming source should be created");
-        let pcm = [0_u8, 0, 0, 0, 0, 0, 0, 0];
-        let chunks: [&[u8]; 1] = [&pcm];
-        backend::submit_stream_chunks(source, &chunks, 1, 16, true, 44_100)
-            .expect("streaming chunk should queue");
-        assert_eq!(1, backend::live_counts().unwrap().queued_stream_buffers);
-        let processed = backend::remove_processed_stream_buffers(source)
-            .expect("processed buffers should read");
-        assert!(processed >= 0);
+        let asset = backend::create_asset(PARITY_MONO_OGG, Some("stream-owned".to_string()), 1)
+            .expect("asset should be created");
+        let source = backend::create_streaming_sound_from_asset(
+            device,
+            SoundConfigRecord::default(),
+            asset,
+            false,
+        )
+        .expect("streaming source should be created from asset");
+        assert!(backend::live_counts().unwrap().queued_stream_buffers > 0);
+        assert_eq!(1, backend::live_counts().unwrap().stream_decoders);
         backend::destroy_source(source).expect("streaming source should drop queued buffers");
-        assert_eq!(0, backend::live_counts().unwrap().queued_stream_buffers);
+        let after = backend::live_counts().unwrap();
+        assert_eq!(0, after.queued_stream_buffers);
+        assert_eq!(0, after.stream_decoders);
+        backend::destroy_asset(asset).expect("asset cleanup should succeed");
     });
 }
 
@@ -514,23 +520,96 @@ fn failed_static_asset_decode_is_cached_until_asset_destroy() {
 fn coarse_streaming_sound_owns_queued_buffers() {
     with_audio_backend(|| {
         let device = create_test_device().expect("default audio device should open");
+        let asset = backend::create_asset(PARITY_MONO_OGG, Some("coarse-stream".to_string()), 1)
+            .expect("asset should be created");
         let config = SoundConfigRecord {
             flags: SOUND_FLAG_DISABLE_ATTENUATION,
             ..SoundConfigRecord::default()
         };
-        let sound = backend::create_streaming_sound(device, config)
-            .expect("streaming sound should be created");
-        let first = [0_u8, 0, 0, 0];
-        let second = [0_u8, 0, 0, 0];
-        let chunks: [&[u8]; 2] = [&first, &second];
-        assert_eq!(
-            2,
-            backend::submit_stream_chunks(sound, &chunks, 1, 16, true, 44_100)
-                .expect("stream chunks should submit as a batch")
-        );
-        assert_eq!(2, backend::live_counts().unwrap().queued_stream_buffers);
+        let sound = backend::create_streaming_sound_from_asset(device, config, asset, false)
+            .expect("streaming sound should be created from asset");
+        let counts = backend::live_counts().unwrap();
+        assert!(counts.queued_stream_buffers > 0);
+        assert_eq!(1, counts.stream_decoders);
+        let stats =
+            test_support::stream_stats_for_tests(sound).expect("stream stats should be available");
+        assert!(stats.decoded_chunks > 0);
+        assert!(!stats.decode_failed);
         backend::destroy_source(sound).expect("sound destroy should release stream queue");
-        assert_eq!(0, backend::live_counts().unwrap().queued_stream_buffers);
+        let after = backend::live_counts().unwrap();
+        assert_eq!(0, after.queued_stream_buffers);
+        assert_eq!(0, after.stream_decoders);
+        backend::destroy_asset(asset).expect("asset cleanup should succeed");
+    });
+}
+
+#[test]
+fn streaming_sounds_from_same_asset_have_independent_decoder_cursors() {
+    with_audio_backend(|| {
+        let device = create_test_device().expect("default audio device should open");
+        let asset = backend::create_asset(PARITY_MONO_OGG, Some("shared-stream".to_string()), 1)
+            .expect("asset should be created");
+
+        let first = backend::create_streaming_sound_from_asset(
+            device,
+            SoundConfigRecord::default(),
+            asset,
+            false,
+        )
+        .expect("first stream should create");
+        let second = backend::create_streaming_sound_from_asset(
+            device,
+            SoundConfigRecord::default(),
+            asset,
+            false,
+        )
+        .expect("second stream should create");
+
+        let first_stats =
+            test_support::stream_stats_for_tests(first).expect("first stats should read");
+        let second_stats =
+            test_support::stream_stats_for_tests(second).expect("second stats should read");
+        assert!(first_stats.decoded_chunks > 0);
+        assert!(second_stats.decoded_chunks > 0);
+        assert_eq!(2, backend::live_counts().unwrap().stream_decoders);
+
+        backend::destroy_source(first).expect("destroying one stream should not affect the other");
+        assert_eq!(1, backend::live_counts().unwrap().stream_decoders);
+        let second_after =
+            test_support::stream_stats_for_tests(second).expect("second stream should remain live");
+        assert_eq!(second_stats.decoded_chunks, second_after.decoded_chunks);
+
+        backend::destroy_source(second).expect("second stream should destroy");
+        backend::destroy_asset(asset).expect("asset cleanup should succeed");
+    });
+}
+
+#[test]
+fn looping_stream_restarts_decoder_and_generation_invalidation_stops_streams() {
+    with_audio_backend(|| {
+        let device = create_test_device().expect("default audio device should open");
+        let asset = backend::create_asset(PARITY_MONO_OGG, Some("loop-stream".to_string()), 1)
+            .expect("asset should be created");
+        let sound = backend::create_streaming_sound_from_asset(
+            device,
+            SoundConfigRecord::default(),
+            asset,
+            true,
+        )
+        .expect("looping stream should create");
+
+        let stats =
+            test_support::stream_stats_for_tests(sound).expect("stream stats should be available");
+        assert!(stats.decoded_chunks > 1);
+        assert!(stats.loop_restarts > 0);
+        assert!(backend::live_counts().unwrap().queued_stream_buffers > 1);
+
+        backend::destroy_asset_generation(1).expect("generation invalidation should stop streams");
+        let counts = backend::live_counts().unwrap();
+        assert_eq!(0, counts.sources);
+        assert_eq!(0, counts.stream_decoders);
+        assert_eq!(0, counts.queued_stream_buffers);
+        assert_eq!(Err(AudioError::InvalidHandle), backend::source_state(sound));
     });
 }
 
@@ -538,25 +617,27 @@ fn coarse_streaming_sound_owns_queued_buffers() {
 fn counter_reset_after_shutdown_clears_live_resources_and_queued_stream_buffers() {
     with_audio_backend(|| {
         let device = create_test_device().expect("default audio device should open");
-        let source = backend::create_source(device, ChannelPool::Streaming)
-            .expect("streaming source should be created");
         let asset = backend::create_asset(PARITY_MONO_OGG, Some("shutdown".to_string()), 1)
             .expect("asset should be created");
         let static_sound =
             backend::create_static_sound(device, SoundConfigRecord::default(), asset)
                 .expect("static sound should be created");
-        let pcm = [0_u8, 0, 0, 0];
-        let chunks: [&[u8]; 1] = [&pcm];
-        backend::submit_stream_chunks(source, &chunks, 1, 16, true, 44_100)
-            .expect("streaming chunk should queue");
+        let stream_sound = backend::create_streaming_sound_from_asset(
+            device,
+            SoundConfigRecord::default(),
+            asset,
+            false,
+        )
+        .expect("streaming sound should be created");
 
         let before = backend::live_counts().expect("live counts should read");
         assert_eq!(1, before.devices);
         assert_eq!(2, before.sources);
         assert_eq!(0, before.buffers);
-        assert_eq!(1, before.queued_stream_buffers);
+        assert!(before.queued_stream_buffers > 0);
         assert_eq!(1, before.assets);
         assert_eq!(1, before.static_cache_entries);
+        assert_eq!(1, before.stream_decoders);
 
         backend::destroy_device(device).expect("device shutdown should clear children");
         let after = backend::live_counts().expect("live counts should read");
@@ -566,9 +647,14 @@ fn counter_reset_after_shutdown_clears_live_resources_and_queued_stream_buffers(
         assert_eq!(0, after.queued_stream_buffers);
         assert_eq!(1, after.assets);
         assert_eq!(0, after.static_cache_entries);
+        assert_eq!(0, after.stream_decoders);
         assert_eq!(
             Err(AudioError::InvalidHandle),
             backend::source_state(static_sound)
+        );
+        assert_eq!(
+            Err(AudioError::InvalidHandle),
+            backend::source_state(stream_sound)
         );
         backend::clear_assets_for_shutdown().expect("asset shutdown should clear assets");
     });
@@ -644,9 +730,20 @@ fn ffi_wrong_thread_returns_distinct_status_and_safe_fallback_state() {
             mattmc_audio_device_create(std::ptr::null(), 0, 0, &mut device)
         });
         let config = SoundConfigRecord::default();
+        let mut asset = 0_u64;
+        assert_eq!(OK, unsafe {
+            mattmc_audio_asset_create(
+                PARITY_MONO_OGG.as_ptr(),
+                PARITY_MONO_OGG.len() as u64,
+                std::ptr::null(),
+                0,
+                1,
+                &mut asset,
+            )
+        });
         let mut sound = 0_u64;
         assert_eq!(OK, unsafe {
-            mattmc_audio_sound_create_streaming(device, &config, &mut sound)
+            mattmc_audio_sound_create_streaming_from_asset(device, &config, asset, 0, &mut sound)
         });
 
         let result = std::thread::spawn(move || {
@@ -965,10 +1062,21 @@ fn ffi_lifecycle_rejects_double_destroy_and_stale_handles() {
         assert_eq!(OK, unsafe {
             mattmc_audio_device_create(std::ptr::null(), 0, 0, &mut device)
         });
+        let mut asset = 0_u64;
+        assert_eq!(OK, unsafe {
+            mattmc_audio_asset_create(
+                PARITY_MONO_OGG.as_ptr(),
+                PARITY_MONO_OGG.len() as u64,
+                std::ptr::null(),
+                0,
+                1,
+                &mut asset,
+            )
+        });
         let config = SoundConfigRecord::default();
         let mut sound = 0_u64;
         assert_eq!(OK, unsafe {
-            mattmc_audio_sound_create_streaming(device, &config, &mut sound)
+            mattmc_audio_sound_create_streaming_from_asset(device, &config, asset, 0, &mut sound)
         });
         assert_eq!(OK, unsafe { mattmc_audio_sound_stop_and_destroy(sound) });
         assert_eq!(ERR_INVALID_HANDLE, unsafe {
@@ -982,53 +1090,33 @@ fn ffi_lifecycle_rejects_double_destroy_and_stale_handles() {
 }
 
 #[test]
-fn ffi_streaming_queue_validates_pointer_and_handle_ownership() {
+fn ffi_device_tick_validates_device_and_refills_asset_streams() {
     with_audio_backend(|| {
         let mut device = 0_u64;
         assert_eq!(OK, unsafe {
             mattmc_audio_device_create(std::ptr::null(), 0, 0, &mut device)
         });
+        let mut asset = 0_u64;
+        assert_eq!(OK, unsafe {
+            mattmc_audio_asset_create(
+                PARITY_MONO_OGG.as_ptr(),
+                PARITY_MONO_OGG.len() as u64,
+                std::ptr::null(),
+                0,
+                1,
+                &mut asset,
+            )
+        });
         let config = SoundConfigRecord::default();
         let mut sound = 0_u64;
         assert_eq!(OK, unsafe {
-            mattmc_audio_sound_create_streaming(device, &config, &mut sound)
+            mattmc_audio_sound_create_streaming_from_asset(device, &config, asset, 0, &mut sound)
         });
-        let mut accepted = -1_i32;
-        let bad_chunk = StreamChunkRecord {
-            data_ptr: std::ptr::null(),
-            data_len: 4,
-        };
-        assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
-            mattmc_audio_sound_submit_stream_chunks(
-                sound,
-                &bad_chunk,
-                1,
-                1,
-                16,
-                1,
-                44_100,
-                &mut accepted,
-            )
-        });
-
-        let pcm = [0_u8, 0, 0, 0];
-        let chunk = StreamChunkRecord {
-            data_ptr: pcm.as_ptr(),
-            data_len: pcm.len() as u64,
-        };
-        assert_eq!(OK, unsafe {
-            mattmc_audio_sound_submit_stream_chunks(
-                sound,
-                &chunk,
-                1,
-                1,
-                16,
-                1,
-                44_100,
-                &mut accepted,
-            )
-        });
-        assert_eq!(1, accepted);
+        let before = backend::live_counts().expect("live counts should read");
+        assert!(before.queued_stream_buffers > 0);
+        assert_eq!(1, before.stream_decoders);
+        assert_eq!(OK, unsafe { mattmc_audio_device_tick(device) });
+        assert_eq!(ERR_INVALID_HANDLE, unsafe { mattmc_audio_device_tick(42) });
     });
 }
 
@@ -1037,63 +1125,35 @@ fn ffi_coarse_sound_calls_validate_config_chunks_and_outputs() {
     with_audio_backend(|| {
         let mut sound = 0_u64;
         assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
-            mattmc_audio_sound_create_streaming(0, std::ptr::null(), &mut sound)
+            mattmc_audio_sound_create_streaming_from_asset(0, std::ptr::null(), 0, 0, &mut sound)
         });
         let config = SoundConfigRecord::default();
         assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
-            mattmc_audio_sound_create_streaming(0, &config, std::ptr::null_mut())
+            mattmc_audio_sound_create_streaming_from_asset(0, &config, 0, 0, std::ptr::null_mut())
         });
 
         let mut device = 0_u64;
         assert_eq!(OK, unsafe {
             mattmc_audio_device_create(std::ptr::null(), 0, 0, &mut device)
         });
-        assert_eq!(OK, unsafe {
-            mattmc_audio_sound_create_streaming(device, &config, &mut sound)
+        assert_eq!(ERR_INVALID_HANDLE, unsafe {
+            mattmc_audio_sound_create_streaming_from_asset(device, &config, 42, 0, &mut sound)
         });
 
-        let mut accepted = -1_i32;
-        let bad_chunk = StreamChunkRecord {
-            data_ptr: std::ptr::null(),
-            data_len: 4,
-        };
-        assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
-            mattmc_audio_sound_submit_stream_chunks(
-                sound,
-                &bad_chunk,
-                1,
-                1,
-                16,
-                1,
-                44_100,
-                &mut accepted,
-            )
-        });
-        assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
-            mattmc_audio_sound_submit_stream_chunks(
-                sound,
-                std::ptr::null(),
-                1,
-                1,
-                16,
-                1,
-                44_100,
-                &mut accepted,
-            )
-        });
-        assert_eq!(ERR_INVALID_ARGUMENT, unsafe {
-            mattmc_audio_sound_submit_stream_chunks(
-                sound,
+        let mut asset = 0_u64;
+        assert_eq!(OK, unsafe {
+            mattmc_audio_asset_create(
+                PARITY_MONO_OGG.as_ptr(),
+                PARITY_MONO_OGG.len() as u64,
                 std::ptr::null(),
                 0,
                 1,
-                16,
-                1,
-                44_100,
-                std::ptr::null_mut(),
+                &mut asset,
             )
         });
-
+        assert_eq!(OK, unsafe {
+            mattmc_audio_sound_create_streaming_from_asset(device, &config, asset, 0, &mut sound)
+        });
         let mut state = 0_i32;
         assert_eq!(OK, unsafe { mattmc_audio_sound_state(sound, &mut state) });
         assert_eq!(ERR_INVALID_ARGUMENT, unsafe {

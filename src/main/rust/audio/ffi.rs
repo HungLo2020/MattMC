@@ -2,9 +2,7 @@ use std::ptr;
 use std::slice;
 
 use super::backend;
-use super::commands::{
-    ListenerStateRecord, SoundConfigRecord, StaticDecodeParityRecord, StreamChunkRecord,
-};
+use super::commands::{ListenerStateRecord, SoundConfigRecord, StaticDecodeParityRecord};
 use super::decoder::MAX_DECODED_PCM_BYTES;
 use super::errors::*;
 use super::format::audio_format_to_openal;
@@ -205,12 +203,15 @@ pub unsafe extern "C" fn mattmc_audio_sound_create_static_from_asset(
 /// # Safety
 ///
 /// `config_ptr` must point to one readable `SoundConfigRecord`, and
-/// `output_handle` must be writable. Rust creates the streaming OpenAL source
-/// and owns all queued stream buffers submitted later for this handle.
+/// `output_handle` must be writable. `asset_handle` must name a live encoded
+/// Ogg Vorbis asset. Rust creates a streaming OpenAL source, owns an
+/// independent decoder cursor, and pre-fills/refills the queue on device ticks.
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_audio_sound_create_streaming(
+pub unsafe extern "C" fn mattmc_audio_sound_create_streaming_from_asset(
     device_handle: u64,
     config_ptr: *const SoundConfigRecord,
+    asset_handle: u64,
+    looping: i32,
     output_handle: *mut u64,
 ) -> i32 {
     if output_handle.is_null() {
@@ -221,7 +222,12 @@ pub unsafe extern "C" fn mattmc_audio_sound_create_streaming(
         Err(error) => return error.status(),
     };
     status_with_output(
-        backend::create_streaming_sound(device_handle, config),
+        backend::create_streaming_sound_from_asset(
+            device_handle,
+            config,
+            asset_handle,
+            looping != 0,
+        ),
         output_handle,
         None,
     )
@@ -242,37 +248,6 @@ pub unsafe extern "C" fn mattmc_audio_sound_update(
         Err(error) => return error.status(),
     };
     status(backend::update_sound(sound_handle, update_mask, config))
-}
-
-/// # Safety
-///
-/// `chunks_ptr` must point to `chunk_count` readable `StreamChunkRecord`
-/// entries. Each record must point to readable PCM bytes for the duration of
-/// the call. Rust copies every accepted chunk into an OpenAL queue buffer.
-/// `output_accepted` must be writable.
-#[no_mangle]
-pub unsafe extern "C" fn mattmc_audio_sound_submit_stream_chunks(
-    sound_handle: u64,
-    chunks_ptr: *const StreamChunkRecord,
-    chunk_count: u64,
-    channels: i32,
-    bits: i32,
-    pcm: i32,
-    sample_rate: i32,
-    output_accepted: *mut i32,
-) -> i32 {
-    if output_accepted.is_null() {
-        return ERR_INVALID_ARGUMENT;
-    }
-    let chunks = match unsafe { stream_chunks_from_ptr(chunks_ptr, chunk_count) } {
-        Ok(chunks) => chunks,
-        Err(error) => return error.status(),
-    };
-    status_with_output(
-        backend::submit_stream_chunks(sound_handle, &chunks, channels, bits, pcm != 0, sample_rate),
-        output_accepted,
-        Some(0),
-    )
 }
 
 /// # Safety
@@ -326,21 +301,6 @@ pub unsafe extern "C" fn mattmc_audio_sound_stop_and_destroy(sound_handle: u64) 
 
 /// # Safety
 ///
-/// `output_processed` must be writable.
-#[no_mangle]
-pub unsafe extern "C" fn mattmc_audio_sound_remove_processed_stream_buffers(
-    sound_handle: u64,
-    output_processed: *mut i32,
-) -> i32 {
-    status_with_output(
-        backend::remove_processed_stream_buffers(sound_handle),
-        output_processed,
-        None,
-    )
-}
-
-/// # Safety
-///
 /// `listener_state` must point to one readable `ListenerStateRecord`.
 /// Java supplies policy-computed transform/gain values; Rust applies them to
 /// the listener for the live device/context.
@@ -354,6 +314,16 @@ pub unsafe extern "C" fn mattmc_audio_listener_update(
         Err(error) => return error.status(),
     };
     status(backend::update_listener(device_handle, listener_state))
+}
+
+/// # Safety
+///
+/// `device_handle` may be any value. Live devices must be ticked from their
+/// owning sound thread. Rust removes processed streaming buffers and refills all
+/// active asset-backed streams for that device.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_audio_device_tick(device_handle: u64) -> i32 {
+    status(backend::tick_device(device_handle))
 }
 
 /// # Safety
@@ -414,11 +384,11 @@ pub unsafe extern "C" fn mattmc_audio_device_pool_counts(
 
 /// # Safety
 ///
-/// `output_counts` must point to six writable `i32` values. The values are
+/// `output_counts` must point to eight writable `i32` values. The values are
 /// live devices, live sounds/sources, Java-visible static buffers, queued
-/// streaming buffers, encoded assets, and decoded static-cache entries. This
-/// diagnostic API is used by dev-only validation hooks and does not require a
-/// live device handle.
+/// streaming buffers, encoded assets, decoded static-cache entries, and stream
+/// decoders, plus live-stream decoded chunk count. This diagnostic API is used
+/// by dev-only validation hooks and does not require a live device handle.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_audio_debug_live_counts(output_counts: *mut i32) -> i32 {
     if output_counts.is_null() {
@@ -433,6 +403,8 @@ pub unsafe extern "C" fn mattmc_audio_debug_live_counts(output_counts: *mut i32)
                 *output_counts.add(3) = counts.queued_stream_buffers;
                 *output_counts.add(4) = counts.assets as i32;
                 *output_counts.add(5) = counts.static_cache_entries as i32;
+                *output_counts.add(6) = counts.stream_decoders as i32;
+                *output_counts.add(7) = counts.stream_decoded_chunks.min(i32::MAX as u64) as i32;
             }
             OK
         }
@@ -533,29 +505,6 @@ unsafe fn value_from_ptr<T: Copy>(ptr: *const T) -> AudioResult<T> {
         return Err(AudioError::InvalidArgument);
     }
     Ok(unsafe { *ptr })
-}
-
-unsafe fn stream_chunks_from_ptr<'a>(
-    ptr: *const StreamChunkRecord,
-    len: u64,
-) -> AudioResult<Vec<&'a [u8]>> {
-    let len = usize::try_from(len).map_err(|_| AudioError::InvalidArgument)?;
-    if ptr.is_null() {
-        return if len == 0 {
-            Ok(Vec::new())
-        } else {
-            Err(AudioError::InvalidArgument)
-        };
-    }
-    if len > isize::MAX as usize / std::mem::size_of::<StreamChunkRecord>() {
-        return Err(AudioError::InvalidArgument);
-    }
-    let records = unsafe { slice::from_raw_parts(ptr, len) };
-    let mut chunks = Vec::with_capacity(records.len());
-    for record in records {
-        chunks.push(unsafe { bytes_from_ptr(record.data_ptr, record.data_len) }?);
-    }
-    Ok(chunks)
 }
 
 fn write_string(

@@ -57,13 +57,13 @@ public class ChannelAccess {
 	public void scheduleTick() {
 		this.executor.execute(() -> {
 			List<ChannelAccess.ChannelHandle> stoppedChannels = new ArrayList<>();
+			this.library.tick();
 
 			for (ChannelAccess.ChannelHandle channelHandle : this.channels) {
 				Channel channel = channelHandle.channelOrNull();
 				if (channel == null) {
 					stoppedChannels.add(channelHandle);
 				} else {
-					channel.updateStream();
 					if (channel.stopped()) {
 						stoppedChannels.add(channelHandle);
 					}

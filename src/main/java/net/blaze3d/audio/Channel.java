@@ -1,23 +1,14 @@
 package net.blaze3d.audio;
 
-import net.logging.LogUtils;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.nio.ByteBuffer;
-import javax.sound.sampled.AudioFormat;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
-import net.minecraft.client.sounds.AudioStream;
 import net.minecraft.world.phys.Vec3;
-import org.jetbrains.annotations.Nullable;
+import net.logging.LogUtils;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
 public class Channel {
 	private static final Logger LOGGER = LogUtils.getLogger();
-	private static final int QUEUED_BUFFER_COUNT = 4;
 	public static final int BUFFER_DURATION_SECONDS = 1;
 	private static final int AL_PLAYING = 4114;
 	private static final int AL_PAUSED = 4115;
@@ -27,9 +18,6 @@ public class Channel {
 	private long soundHandle;
 	private boolean awaitingAttachment = true;
 	private boolean stopRequested;
-	private int streamingBufferSize = 16384;
-	@Nullable
-	private AudioStream stream;
 
 	Channel(long deviceHandle) {
 		this.deviceHandle = deviceHandle;
@@ -38,7 +26,6 @@ public class Channel {
 	public void destroy() {
 		this.awaitingAttachment = false;
 		this.stopRequested = true;
-		this.closeStream();
 		if (this.soundHandle != 0L) {
 			NativeAudio.soundStopAndDestroy(this.soundHandle);
 			this.soundHandle = 0L;
@@ -142,24 +129,20 @@ public class Channel {
 		}
 	}
 
-	public void attachBufferStream(AudioStream audioStream) {
+	public void attachStreamingAsset(NativeAudioAsset asset, boolean looping) {
 		if (this.stopRequested) {
-			this.closeAudioStream(audioStream);
 			this.awaitingAttachment = false;
 			return;
 		}
 
-		this.stream = audioStream;
+		if (this.soundHandle != 0L) {
+			this.awaitingAttachment = false;
+			return;
+		}
+
 		try {
-			AudioFormat audioFormat = audioStream.getFormat();
-			this.streamingBufferSize = calculateBufferSize(audioFormat, 1);
-			if (this.soundHandle == 0L) {
-				this.soundHandle = NativeAudio.soundCreateStreaming(this.deviceHandle, this.config);
-				this.warnIfPoolExhausted("streaming");
-			}
-			if (this.soundHandle != 0L) {
-				this.pumpBuffers(QUEUED_BUFFER_COUNT);
-			}
+			this.soundHandle = NativeAudio.soundCreateStreamingFromAsset(this.deviceHandle, this.config, asset.handleForPlayback(), looping);
+			this.warnIfPoolExhausted("streaming");
 		} finally {
 			this.awaitingAttachment = false;
 		}
@@ -168,38 +151,6 @@ public class Channel {
 	public void failAttachment() {
 		this.awaitingAttachment = false;
 		this.stopRequested = true;
-	}
-
-	private static int calculateBufferSize(AudioFormat audioFormat, int i) {
-		return (int)(i * audioFormat.getSampleSizeInBits() / 8.0F * audioFormat.getChannels() * audioFormat.getSampleRate());
-	}
-
-	private void pumpBuffers(int i) {
-		if (this.stream != null && this.soundHandle != 0L) {
-			try {
-				List<ByteBuffer> buffers = new ArrayList<>(i);
-				for (int j = 0; j < i; j++) {
-					ByteBuffer byteBuffer = this.stream.read(this.streamingBufferSize);
-					if (byteBuffer != null) {
-						buffers.add(byteBuffer);
-					}
-				}
-				NativeAudio.soundSubmitStreamChunks(this.soundHandle, buffers, this.stream.getFormat());
-			} catch (IOException var4) {
-				LOGGER.error("Failed to read from audio stream", (Throwable)var4);
-			}
-		}
-	}
-
-	public void updateStream() {
-		if (this.stream != null && this.soundHandle != 0L) {
-			int i = this.removeProcessedBuffers();
-			this.pumpBuffers(i);
-		}
-	}
-
-	private int removeProcessedBuffers() {
-		return NativeAudio.soundRemoveProcessedStreamBuffers(this.soundHandle);
 	}
 
 	private void updateNativeSound(int updateMask) {
@@ -222,18 +173,4 @@ public class Channel {
 		}
 	}
 
-	private void closeStream() {
-		if (this.stream != null) {
-			this.closeAudioStream(this.stream);
-			this.stream = null;
-		}
-	}
-
-	private void closeAudioStream(AudioStream audioStream) {
-		try {
-			audioStream.close();
-		} catch (IOException ioException) {
-			LOGGER.error("Failed to close audio stream", (Throwable)ioException);
-		}
-	}
 }

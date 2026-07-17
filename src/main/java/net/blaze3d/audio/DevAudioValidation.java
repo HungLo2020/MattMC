@@ -1,14 +1,9 @@
 package net.blaze3d.audio;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
-import javax.sound.sampled.AudioFormat;
 
 public final class DevAudioValidation {
 	private static final boolean ENABLED = Boolean.getBoolean("mattmc.dev.audioValidation");
@@ -18,8 +13,8 @@ public final class DevAudioValidation {
 	private static final int AL_PLAYING = 4114;
 	private static final int AL_PAUSED = 4115;
 	private static final int AL_STOPPED = 4116;
-	private static final AudioFormat PCM = new AudioFormat(44100.0F, 16, 1, true, false);
 	private static final String STATIC_VALIDATION_SOUND = "assets/minecraft/sounds/random/pop.ogg";
+	private static final String STREAMING_VALIDATION_SOUND = "assets/minecraft/sounds/music/game/dry_hands.ogg";
 
 	private DevAudioValidation() {
 	}
@@ -81,7 +76,7 @@ public final class DevAudioValidation {
 
 	private static void validateStaticSound(Library library, Result result) throws Exception {
 		long device = library.currentDeviceHandleForDevValidation();
-		NativeAudioAsset asset = loadStaticValidationAsset();
+		NativeAudioAsset asset = loadValidationAsset(STATIC_VALIDATION_SOUND);
 		long sound = 0L;
 		long repeatedSound = 0L;
 		try {
@@ -145,28 +140,36 @@ public final class DevAudioValidation {
 
 	private static void validateStreamingSound(Library library, Result result) throws Exception {
 		long device = library.currentDeviceHandleForDevValidation();
+		NativeAudioAsset asset = loadValidationAsset(STREAMING_VALIDATION_SOUND);
 		long sound = 0L;
 		try {
 			NativeAudio.SoundConfig config = new NativeAudio.SoundConfig();
 			config.pitch = 1.0F;
 			config.gain = 0.25F;
 			config.flags = NativeAudio.SOUND_FLAG_DISABLE_ATTENUATION;
-			sound = NativeAudio.soundCreateStreaming(device, config);
+			sound = NativeAudio.soundCreateStreamingFromAsset(device, config, asset.handleForPlayback(), false);
 			require(sound != 0L, "streaming sound was not created");
-			List<ByteBuffer> chunks = new ArrayList<>();
-			chunks.add(pcmBuffer(2205, 0.03F));
-			chunks.add(pcmBuffer(2205, 0.04F));
-			chunks.add(pcmBuffer(2205, 0.05F));
-			result.streamingChunksSubmitted = NativeAudio.soundSubmitStreamChunks(sound, chunks, PCM);
-			require(result.streamingChunksSubmitted == chunks.size(), "streaming chunks were not fully accepted");
+			int[] countsBeforePlay = NativeAudio.debugLiveCounts();
+			int queuedBeforePlay = countsBeforePlay[3];
+			int decodedBeforePlay = countsBeforePlay[7];
+			result.streamingChunksSubmitted = queuedBeforePlay;
+			result.streamingChunksDecoded = decodedBeforePlay;
+			require(queuedBeforePlay > 1, "streaming sound did not queue multiple Rust-decoded buffers");
+			require(decodedBeforePlay >= queuedBeforePlay, "streaming decoder count did not cover the initial queue");
 			NativeAudio.soundPlay(sound);
-			int processed = 0;
-			for (int i = 0; i < 20 && processed == 0; i++) {
+			int maxDecodedChunks = decodedBeforePlay;
+			for (int i = 0; i < 60; i++) {
 				Thread.sleep(50L);
-				processed += NativeAudio.soundRemoveProcessedStreamBuffers(sound);
+				NativeAudio.deviceTick(device);
+				int decodedChunks = NativeAudio.debugLiveCounts()[7];
+				maxDecodedChunks = Math.max(maxDecodedChunks, decodedChunks);
+				if (decodedChunks > decodedBeforePlay) {
+					break;
+				}
 			}
-			result.streamingChunksProcessed = processed;
-			require(processed > 0, "streaming sound did not consume any queued chunks");
+			result.streamingChunksDecoded = maxDecodedChunks;
+			result.streamingChunksProcessed = Math.max(0, maxDecodedChunks - decodedBeforePlay);
+			require(result.streamingChunksProcessed > 0, "streaming sound did not refill after playback consumed a chunk");
 
 			config.pitch = 0.95F;
 			config.gain = 0.15F;
@@ -188,26 +191,44 @@ public final class DevAudioValidation {
 			if (sound != 0L) {
 				NativeAudio.soundStopAndDestroy(sound);
 			}
+			asset.close();
+		}
+
+		validateLoopingStreamingSound(library, result);
+	}
+
+	private static void validateLoopingStreamingSound(Library library, Result result) throws Exception {
+		long device = library.currentDeviceHandleForDevValidation();
+		NativeAudioAsset asset = loadValidationAsset(STATIC_VALIDATION_SOUND);
+		long sound = 0L;
+		try {
+			NativeAudio.SoundConfig config = new NativeAudio.SoundConfig();
+			config.pitch = 1.0F;
+			config.gain = 0.1F;
+			config.flags = NativeAudio.SOUND_FLAG_LOOPING | NativeAudio.SOUND_FLAG_DISABLE_ATTENUATION;
+			sound = NativeAudio.soundCreateStreamingFromAsset(device, config, asset.handleForPlayback(), true);
+			require(sound != 0L, "looping streaming sound was not created");
+			int decodedChunks = NativeAudio.debugLiveCounts()[7];
+			result.loopingStreamingChunksDecoded = decodedChunks;
+			require(decodedChunks > 1, "looping streaming sound did not restart the Rust decoder");
+			NativeAudio.soundPlay(sound);
+			Thread.sleep(50L);
+			NativeAudio.deviceTick(device);
+		} finally {
+			if (sound != 0L) {
+				NativeAudio.soundStopAndDestroy(sound);
+			}
+			asset.close();
 		}
 	}
 
-	private static ByteBuffer pcmBuffer(int frames, float phaseStep) {
-		ByteBuffer buffer = ByteBuffer.allocateDirect(frames * Short.BYTES).order(ByteOrder.LITTLE_ENDIAN);
-		for (int i = 0; i < frames; i++) {
-			short sample = (short)(Math.sin(i * phaseStep) * 8000.0);
-			buffer.putShort(sample);
-		}
-		buffer.flip();
-		return buffer;
-	}
-
-	private static NativeAudioAsset loadStaticValidationAsset() throws IOException {
-		try (var inputStream = DevAudioValidation.class.getClassLoader().getResourceAsStream(STATIC_VALIDATION_SOUND)) {
+	private static NativeAudioAsset loadValidationAsset(String resource) throws IOException {
+		try (var inputStream = DevAudioValidation.class.getClassLoader().getResourceAsStream(resource)) {
 			if (inputStream == null) {
-				throw new IOException("Missing static validation sound resource " + STATIC_VALIDATION_SOUND);
+				throw new IOException("Missing validation sound resource " + resource);
 			}
 
-			return NativeAudioAsset.create(inputStream.readAllBytes(), STATIC_VALIDATION_SOUND, 1L);
+			return NativeAudioAsset.create(inputStream.readAllBytes(), resource, 1L);
 		}
 	}
 
@@ -223,7 +244,13 @@ public final class DevAudioValidation {
 
 	private static void requireZeroChildren(int[] counts, String label) {
 		require(
-			counts[1] == 0 && counts[2] == 0 && counts[3] == 0 && counts[4] == 0 && counts[5] == 0,
+			counts[1] == 0
+				&& counts[2] == 0
+				&& counts[3] == 0
+				&& counts[4] == 0
+				&& counts[5] == 0
+				&& counts[6] == 0
+				&& counts[7] == 0,
 			"native audio counts were not clear " + label
 		);
 	}
@@ -235,7 +262,9 @@ public final class DevAudioValidation {
 				&& counts[2] == buffers
 				&& counts[3] == queued
 				&& counts[4] == 0
-				&& counts[5] == 0,
+				&& counts[5] == 0
+				&& counts[6] == 0
+				&& counts[7] == 0,
 			"unexpected native audio counts " + label
 		);
 	}
@@ -272,6 +301,10 @@ public final class DevAudioValidation {
 			+ counts[4]
 			+ ",\"staticCacheEntries\":"
 			+ counts[5]
+			+ ",\"streamDecoders\":"
+			+ counts[6]
+			+ ",\"streamDecodedChunks\":"
+			+ counts[7]
 			+ "}";
 	}
 
@@ -297,6 +330,8 @@ public final class DevAudioValidation {
 		int stopState;
 		int streamingChunksSubmitted;
 		int streamingChunksProcessed;
+		int streamingChunksDecoded;
+		int loopingStreamingChunksDecoded;
 		int[] initialCounts;
 		int[] afterReleaseCounts;
 		int[] shutdownCounts;
@@ -316,6 +351,8 @@ public final class DevAudioValidation {
 				+ "  \"stopState\": " + this.stopState + ",\n"
 				+ "  \"streamingChunksSubmitted\": " + this.streamingChunksSubmitted + ",\n"
 				+ "  \"streamingChunksProcessed\": " + this.streamingChunksProcessed + ",\n"
+				+ "  \"streamingChunksDecoded\": " + this.streamingChunksDecoded + ",\n"
+				+ "  \"loopingStreamingChunksDecoded\": " + this.loopingStreamingChunksDecoded + ",\n"
 				+ "  \"streamingUpdatesSucceeded\": " + this.streamingUpdatesSucceeded + ",\n"
 				+ "  \"reloadSucceeded\": " + this.reloadSucceeded + ",\n"
 				+ "  \"initialCounts\": " + countsJson(this.initialCounts) + ",\n"

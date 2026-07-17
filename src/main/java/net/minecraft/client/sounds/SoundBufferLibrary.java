@@ -43,17 +43,6 @@ public class SoundBufferLibrary {
 		}, Util.nonCriticalIoPool()));
 	}
 
-	public CompletableFuture<AudioStream> getStream(ResourceLocation resourceLocation, boolean bl) {
-		return CompletableFuture.supplyAsync(() -> {
-			try {
-				InputStream inputStream = this.resourceManager.open(resourceLocation);
-				return (AudioStream)(bl ? new LoopingAudioStream(JOrbisAudioStream::new, inputStream) : new JOrbisAudioStream(inputStream));
-			} catch (IOException var4) {
-				throw new CompletionException(var4);
-			}
-		}, Util.nonCriticalIoPool());
-	}
-
 	public void clear() {
 		long oldGeneration = this.assetGeneration++;
 		this.cache.values().forEach(completableFuture -> completableFuture.thenAccept(NativeAudioAsset::close));

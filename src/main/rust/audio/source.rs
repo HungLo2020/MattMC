@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use alto::{Buffer, DistanceModel, Source, SourceState, StaticSource, StreamingSource};
+use alto::{Buffer, Context, DistanceModel, Source, SourceState, StaticSource, StreamingSource};
 
 use super::context::alto_call;
 use super::device::ChannelPool;
 use super::errors::{AudioError, AudioResult};
-use super::stream;
+use super::refill::StreamingPlayback;
 
 pub(crate) const AL_INITIAL: i32 = 0x1011;
 pub(crate) const AL_PLAYING: i32 = 0x1012;
@@ -22,6 +22,8 @@ pub(crate) struct NativeSource {
     pub(crate) pool: ChannelPool,
     pub(crate) kind: SourceKind,
     pub(crate) queued_stream_buffers: i32,
+    pub(crate) stream_playback: Option<StreamingPlayback>,
+    pub(crate) stop_requested: bool,
 }
 
 pub(crate) enum SourceKind {
@@ -33,7 +35,10 @@ impl NativeSource {
     pub(crate) fn play(&mut self) {
         match &mut self.kind {
             SourceKind::Static(source) => source.play(),
-            SourceKind::Streaming(source) => source.play(),
+            SourceKind::Streaming(source) => {
+                self.stop_requested = false;
+                source.play();
+            }
         }
     }
 
@@ -47,7 +52,10 @@ impl NativeSource {
     pub(crate) fn stop(&mut self) {
         match &mut self.kind {
             SourceKind::Static(source) => source.stop(),
-            SourceKind::Streaming(source) => source.stop(),
+            SourceKind::Streaming(source) => {
+                self.stop_requested = true;
+                source.stop();
+            }
         }
     }
 
@@ -149,29 +157,75 @@ impl NativeSource {
         }
     }
 
-    pub(crate) fn queue_stream_buffer(&mut self, buffer: Buffer) -> AudioResult<()> {
+    pub(crate) fn queued_stream_buffers(&self) -> i32 {
+        self.queued_stream_buffers
+    }
+
+    pub(crate) fn attach_stream_playback(
+        &mut self,
+        context: &Context,
+        playback: StreamingPlayback,
+    ) -> AudioResult<()> {
         match &mut self.kind {
             SourceKind::Streaming(source) => {
-                stream::queue_buffer(source, buffer)?;
-                self.queued_stream_buffers += 1;
-                Ok(())
+                self.stream_playback = Some(playback);
+                self.stream_playback
+                    .as_mut()
+                    .expect("stream playback was just attached")
+                    .refill(context, source, &mut self.queued_stream_buffers)
             }
             SourceKind::Static(_) => Err(AudioError::InvalidArgument),
         }
     }
 
-    pub(crate) fn remove_processed_buffers(&mut self) -> AudioResult<i32> {
+    pub(crate) fn tick_stream(&mut self, context: &Context) -> AudioResult<()> {
+        if self.stop_requested {
+            return Ok(());
+        }
         match &mut self.kind {
             SourceKind::Streaming(source) => {
-                let processed = stream::remove_processed_buffers(source)?;
-                self.queued_stream_buffers = self.queued_stream_buffers.saturating_sub(processed);
-                Ok(processed)
+                if let Some(playback) = &mut self.stream_playback {
+                    playback.tick(context, source, &mut self.queued_stream_buffers)?;
+                    if playback.finished(self.queued_stream_buffers) {
+                        source.stop();
+                    }
+                }
+                Ok(())
             }
-            SourceKind::Static(_) => Ok(0),
+            SourceKind::Static(_) => Ok(()),
         }
     }
 
-    pub(crate) fn queued_stream_buffers(&self) -> i32 {
-        self.queued_stream_buffers
+    pub(crate) fn stream_asset_handle(&self) -> Option<u64> {
+        self.stream_playback
+            .as_ref()
+            .map(StreamingPlayback::asset_handle)
+    }
+
+    pub(crate) fn stream_decoder_count(&self) -> usize {
+        usize::from(self.stream_playback.is_some())
+    }
+
+    pub(crate) fn stream_decoded_chunks(&self) -> u64 {
+        self.stream_playback
+            .as_ref()
+            .map(StreamingPlayback::decoded_chunks)
+            .unwrap_or(0)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn stream_loop_restarts(&self) -> u64 {
+        self.stream_playback
+            .as_ref()
+            .map(StreamingPlayback::loop_restarts)
+            .unwrap_or(0)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn stream_decode_failed(&self) -> bool {
+        self.stream_playback
+            .as_ref()
+            .map(StreamingPlayback::decode_failed)
+            .unwrap_or(false)
     }
 }

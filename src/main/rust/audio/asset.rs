@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 /// Immutable encoded audio asset owned by the Rust audio backend.
 ///
 /// Java supplies bytes read from Minecraft's `ResourceProvider`; Rust copies
@@ -7,7 +9,7 @@
 /// resource-pack lookup and streaming decode remain Java-owned for now.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct AudioAsset {
-    encoded: Box<[u8]>,
+    encoded: Arc<[u8]>,
     debug_name: Option<String>,
     reload_generation: u64,
     metadata: EncodedAssetMetadata,
@@ -31,7 +33,7 @@ pub(crate) struct AudioAssetSnapshot {
 impl AudioAsset {
     pub(crate) fn new(encoded: &[u8], debug_name: Option<String>, reload_generation: u64) -> Self {
         Self {
-            encoded: encoded.to_vec().into_boxed_slice(),
+            encoded: Arc::<[u8]>::from(encoded),
             debug_name,
             reload_generation,
             metadata: EncodedAssetMetadata {
@@ -47,6 +49,10 @@ impl AudioAsset {
 
     pub(crate) fn encoded(&self) -> &[u8] {
         &self.encoded
+    }
+
+    pub(crate) fn encoded_arc(&self) -> Arc<[u8]> {
+        self.encoded.clone()
     }
 
     #[cfg(test)]

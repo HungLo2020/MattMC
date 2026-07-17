@@ -48,18 +48,6 @@ pub(crate) const SOUND_UPDATE_ALL: u32 = SOUND_UPDATE_POSITION
     | SOUND_UPDATE_RELATIVE
     | SOUND_UPDATE_ATTENUATION;
 
-/// One Java-decoded PCM chunk submitted as part of a streaming batch.
-///
-/// Java owns the pointed-to bytes. Rust copies each chunk into an OpenAL buffer
-/// during the FFI call, then owns the OpenAL queue entry until it is processed
-/// or the sound/source/device is destroyed.
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct StreamChunkRecord {
-    pub(crate) data_ptr: *const u8,
-    pub(crate) data_len: u64,
-}
-
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ListenerStateRecord {
@@ -109,8 +97,6 @@ mod tests {
     fn command_records_have_stable_c_layout() {
         assert_eq!(28, size_of::<SoundConfigRecord>());
         assert_eq!(4, align_of::<SoundConfigRecord>());
-        assert_eq!(16, size_of::<StreamChunkRecord>());
-        assert_eq!(8, align_of::<StreamChunkRecord>());
         assert_eq!(40, size_of::<ListenerStateRecord>());
         assert_eq!(4, align_of::<ListenerStateRecord>());
         assert_eq!(104, size_of::<StaticDecodeParityRecord>());

@@ -18,8 +18,10 @@ pub mod ffi;
 mod format;
 mod handles;
 mod listener;
+mod refill;
 mod source;
 mod stream;
+mod stream_decoder;
 
 #[cfg(test)]
 mod tests;

@@ -17,7 +17,9 @@ use super::device::{ChannelPool, NativeDevice};
 use super::errors::*;
 use super::handles::{HandleTable, ResourceKind};
 use super::listener::{self, ListenerTransform};
+use super::refill::StreamingPlayback;
 use super::source::{NativeSource, SourceKind};
+use super::stream_decoder::StreamDecoder;
 use alto::Buffer;
 
 /// Owns all OpenAL objects reachable through the Java native audio API.
@@ -128,6 +130,7 @@ pub(crate) fn destroy_asset(asset_handle: u64) -> AudioResult<()> {
         backend
             .static_cache
             .retain(|key, _| key.asset != asset_handle);
+        backend.destroy_streams_for_asset(asset_handle);
         Ok(())
     })
 }
@@ -143,6 +146,7 @@ pub(crate) fn destroy_asset_generation(reload_generation: u64) -> AudioResult<()
         for handle in handles {
             backend.assets.remove(handle);
             backend.static_cache.retain(|key, _| key.asset != handle);
+            backend.destroy_streams_for_asset(handle);
         }
         backend.minimum_asset_generation =
             backend.minimum_asset_generation.max(reload_generation + 1);
@@ -220,6 +224,7 @@ pub(crate) fn destroy_device(device_handle: u64) -> AudioResult<()> {
     })
 }
 
+#[cfg(test)]
 pub(crate) fn create_source(device_handle: u64, pool: ChannelPool) -> AudioResult<u64> {
     with_backend(|backend| {
         let context = {
@@ -251,6 +256,8 @@ pub(crate) fn create_source(device_handle: u64, pool: ChannelPool) -> AudioResul
                 pool,
                 kind,
                 queued_stream_buffers: 0,
+                stream_playback: None,
+                stop_requested: false,
             })),
             Err(error) => {
                 if let Some(device) = backend.devices.get_mut(device_handle) {
@@ -320,6 +327,8 @@ pub(crate) fn create_static_sound(
             pool: ChannelPool::Static,
             kind,
             queued_stream_buffers: 0,
+            stream_playback: None,
+            stop_requested: false,
         });
 
         let result = backend
@@ -345,16 +354,98 @@ pub(crate) fn create_static_sound(
     })
 }
 
-pub(crate) fn create_streaming_sound(
+pub(crate) fn create_streaming_sound_from_asset(
     device_handle: u64,
     config: SoundConfigRecord,
+    asset_handle: u64,
+    looping: bool,
 ) -> AudioResult<u64> {
-    let source = create_source(device_handle, ChannelPool::Streaming)?;
-    if let Err(error) = update_sound(source, super::commands::SOUND_UPDATE_ALL, config) {
-        let _ = destroy_source(source);
-        return Err(error);
-    }
-    Ok(source)
+    with_backend(|backend| {
+        let encoded = backend
+            .assets
+            .get(asset_handle)
+            .ok_or(AudioError::InvalidHandle)?
+            .encoded_arc();
+        let context = {
+            let device = backend
+                .devices
+                .get_mut(device_handle)
+                .ok_or(AudioError::InvalidHandle)?;
+            device.ensure_owner_thread()?;
+            if !device.acquire_pool(ChannelPool::Streaming) {
+                return Err(AudioError::PoolExhausted);
+            }
+            device.context.clone()
+        };
+
+        let kind = match super::context::alto_call(
+            "Create asset streaming source",
+            context.new_streaming_source(),
+        )
+        .map(SourceKind::Streaming)
+        {
+            Ok(kind) => kind,
+            Err(error) => {
+                if let Some(device) = backend.devices.get_mut(device_handle) {
+                    device.release_pool(ChannelPool::Streaming);
+                }
+                return Err(error);
+            }
+        };
+
+        let source_handle = backend.sources.insert(NativeSource {
+            device: device_handle,
+            pool: ChannelPool::Streaming,
+            kind,
+            queued_stream_buffers: 0,
+            stream_playback: None,
+            stop_requested: false,
+        });
+
+        let result = StreamDecoder::new(encoded)
+            .map(|decoder| StreamingPlayback::new(asset_handle, decoder, looping))
+            .and_then(|playback| {
+                let source = backend
+                    .sources
+                    .get_mut(source_handle)
+                    .ok_or(AudioError::InvalidHandle)?;
+                apply_sound_config(source, super::commands::SOUND_UPDATE_ALL, config)?;
+                source.attach_stream_playback(&context, playback)
+            });
+
+        if let Err(error) = result {
+            if let Some(mut source) = backend.sources.remove(source_handle) {
+                source.stop();
+                if let Some(device) = backend.devices.get_mut(source.device) {
+                    device.release_pool(source.pool);
+                }
+            }
+            return Err(error);
+        }
+
+        Ok(source_handle)
+    })
+}
+
+pub(crate) fn tick_device(device_handle: u64) -> AudioResult<()> {
+    with_backend(|backend| {
+        backend.ensure_device_owner(device_handle)?;
+        let context = backend
+            .devices
+            .get(device_handle)
+            .ok_or(AudioError::InvalidHandle)?
+            .context
+            .clone();
+        let source_handles = backend
+            .sources
+            .handles_for(|source| source.device == device_handle);
+        for handle in source_handles {
+            if let Some(source) = backend.sources.get_mut(handle) {
+                source.tick_stream(&context)?;
+            }
+        }
+        Ok(())
+    })
 }
 
 pub(crate) fn update_sound(
@@ -364,41 +455,6 @@ pub(crate) fn update_sound(
 ) -> AudioResult<()> {
     with_source_mut(source_handle, |source| {
         apply_sound_config(source, update_mask, config)
-    })
-}
-
-pub(crate) fn submit_stream_chunks(
-    source_handle: u64,
-    chunks: &[&[u8]],
-    channels: i32,
-    bits: i32,
-    pcm: bool,
-    sample_rate: i32,
-) -> AudioResult<i32> {
-    with_backend(|backend| {
-        let device_handle = backend
-            .sources
-            .get(source_handle)
-            .ok_or(AudioError::InvalidHandle)?
-            .device;
-        backend.ensure_device_owner(device_handle)?;
-        let context = backend
-            .devices
-            .get(device_handle)
-            .ok_or(AudioError::InvalidHandle)?
-            .context
-            .clone();
-        let mut accepted = 0_i32;
-        for chunk in chunks {
-            let buffer = create_buffer(&context, chunk, channels, bits, pcm, sample_rate)?;
-            backend
-                .sources
-                .get_mut(source_handle)
-                .ok_or(AudioError::InvalidHandle)?
-                .queue_stream_buffer(buffer)?;
-            accepted += 1;
-        }
-        Ok(accepted)
     })
 }
 
@@ -447,10 +503,6 @@ pub(crate) fn source_state(source_handle: u64) -> AudioResult<i32> {
         backend.ensure_device_owner(source.device)?;
         Ok(source.state())
     })
-}
-
-pub(crate) fn remove_processed_stream_buffers(source_handle: u64) -> AudioResult<i32> {
-    with_source_mut_value(source_handle, |source| source.remove_processed_buffers())
 }
 
 pub(crate) fn listener_set_transform(
@@ -542,6 +594,8 @@ pub(crate) struct LiveCounts {
     pub(crate) queued_stream_buffers: i32,
     pub(crate) assets: usize,
     pub(crate) static_cache_entries: usize,
+    pub(crate) stream_decoders: usize,
+    pub(crate) stream_decoded_chunks: u64,
 }
 
 pub(crate) fn live_counts() -> AudioResult<LiveCounts> {
@@ -570,6 +624,16 @@ pub(crate) fn live_counts() -> AudioResult<LiveCounts> {
                 .sum(),
             assets: backend.assets.len(),
             static_cache_entries: backend.static_cache.len(),
+            stream_decoders: backend
+                .sources
+                .values()
+                .map(NativeSource::stream_decoder_count)
+                .sum(),
+            stream_decoded_chunks: backend
+                .sources
+                .values()
+                .map(NativeSource::stream_decoded_chunks)
+                .sum(),
         })
     })
 }
@@ -757,6 +821,20 @@ impl AudioBackend {
         );
         Ok(buffer)
     }
+
+    fn destroy_streams_for_asset(&mut self, asset_handle: u64) {
+        let handles = self
+            .sources
+            .handles_for(|source| source.stream_asset_handle() == Some(asset_handle));
+        for handle in handles {
+            if let Some(mut source) = self.sources.remove(handle) {
+                source.stop();
+                if let Some(device) = self.devices.get_mut(source.device) {
+                    device.release_pool(source.pool);
+                }
+            }
+        }
+    }
 }
 
 fn samples_to_le_bytes(samples: &[i16]) -> Vec<u8> {
@@ -785,6 +863,27 @@ pub(crate) mod test_support {
 
     pub(crate) fn asset_count_for_tests() -> usize {
         asset_count().expect("audio asset count should be readable in tests")
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) struct StreamStats {
+        pub(crate) decoded_chunks: u64,
+        pub(crate) loop_restarts: u64,
+        pub(crate) decode_failed: bool,
+    }
+
+    pub(crate) fn stream_stats_for_tests(source_handle: u64) -> AudioResult<StreamStats> {
+        with_backend(|backend| {
+            let source = backend
+                .sources
+                .get(source_handle)
+                .ok_or(AudioError::InvalidHandle)?;
+            Ok(StreamStats {
+                decoded_chunks: source.stream_decoded_chunks(),
+                loop_restarts: source.stream_loop_restarts(),
+                decode_failed: source.stream_decode_failed(),
+            })
+        })
     }
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]

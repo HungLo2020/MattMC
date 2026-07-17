@@ -4,6 +4,8 @@ use super::commands::StaticDecodeParityRecord;
 use super::errors::{AudioError, AudioResult, OK};
 
 pub(crate) use vorbis::decode_vorbis;
+pub(crate) use vorbis::final_ogg_granule_position;
+pub(crate) use vorbis::java_i16_from_float;
 
 pub(crate) const MAX_DECODED_PCM_BYTES: usize = 256 * 1024 * 1024;
 
