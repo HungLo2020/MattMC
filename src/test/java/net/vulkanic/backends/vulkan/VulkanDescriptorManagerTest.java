@@ -99,7 +99,7 @@ class VulkanDescriptorManagerTest {
     @Test
     void deferredLifetimeRecyclesDescriptorBuffersOnlyAfterFenceCompletion() {
         VulkanDescriptorManager<FakeUniformBuffer> manager = new VulkanDescriptorManager<>(3, 4, 1024);
-        VulkanDeferredResourceLifetime<String, FakeUniformBuffer> lifetime = new VulkanDeferredResourceLifetime<>(2, 3);
+        VulkanDeferredResourceLifetime<FakeUniformBuffer> lifetime = new VulkanDeferredResourceLifetime<>(2, 3);
         FakeUniformBuffer descriptorBuffer = new FakeUniformBuffer(64);
 
         long generation = lifetime.reserveFrameWorkGeneration(0);

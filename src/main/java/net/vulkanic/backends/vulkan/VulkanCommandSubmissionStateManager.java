@@ -185,19 +185,19 @@ final class VulkanCommandSubmissionStateManager {
         activateImmediateSlot((submittedSlot + 1) % immediateCommandPools.length);
     }
 
-    long reserveImmediateWorkGeneration(VulkanDeferredResourceLifetime<?, ?> lifetime) {
+    long reserveImmediateWorkGeneration(VulkanDeferredResourceLifetime<?> lifetime) {
         return lifetime.reserveImmediateWorkGeneration(currentImmediateSubmitSlot);
     }
 
-    long reserveFrameWorkGeneration(VulkanDeferredResourceLifetime<?, ?> lifetime, int frameSlot) {
+    long reserveFrameWorkGeneration(VulkanDeferredResourceLifetime<?> lifetime, int frameSlot) {
         return lifetime.reserveFrameWorkGeneration(frameSlot);
     }
 
-    long reservedImmediateWorkGeneration(VulkanDeferredResourceLifetime<?, ?> lifetime, int slot) {
+    long reservedImmediateWorkGeneration(VulkanDeferredResourceLifetime<?> lifetime, int slot) {
         return lifetime.reservedImmediateWorkGeneration(slot);
     }
 
-    long reservedFrameWorkGeneration(VulkanDeferredResourceLifetime<?, ?> lifetime, int frameSlot) {
+    long reservedFrameWorkGeneration(VulkanDeferredResourceLifetime<?> lifetime, int frameSlot) {
         return lifetime.reservedFrameWorkGeneration(frameSlot);
     }
 

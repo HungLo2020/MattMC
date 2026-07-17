@@ -162,7 +162,7 @@ class VulkanPipelineLifecycleManagerTest {
     @Test
     void deferredLifetimeDestroysPipelineOnlyAfterFenceCompletion() {
         VulkanPipelineLifecycleManager manager = new VulkanPipelineLifecycleManager();
-        VulkanDeferredResourceLifetime<Object, Object> lifetime = new VulkanDeferredResourceLifetime<>(2, 2);
+        VulkanDeferredResourceLifetime<Object> lifetime = new VulkanDeferredResourceLifetime<>(2, 2);
         List<String> destroyed = new ArrayList<>();
         manager.registerPipeline(10);
         manager.registerPipelineLayout(20);

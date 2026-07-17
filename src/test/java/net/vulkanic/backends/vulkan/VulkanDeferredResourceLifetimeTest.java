@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 class VulkanDeferredResourceLifetimeTest {
     @Test
     void destroysResourcesOnlyAfterSubmittedFenceCompletes() {
-        VulkanDeferredResourceLifetime<String, String> lifetime = new VulkanDeferredResourceLifetime<>(2, 2);
+        VulkanDeferredResourceLifetime<String> lifetime = new VulkanDeferredResourceLifetime<>(2, 2);
         List<String> destroyed = new ArrayList<>();
 
         long generation = lifetime.reserveFrameWorkGeneration(0);
@@ -28,7 +28,7 @@ class VulkanDeferredResourceLifetimeTest {
 
     @Test
     void preservesGenerationOrderingAcrossFrameAndImmediateSubmits() {
-        VulkanDeferredResourceLifetime<String, String> lifetime = new VulkanDeferredResourceLifetime<>(2, 2);
+        VulkanDeferredResourceLifetime<String> lifetime = new VulkanDeferredResourceLifetime<>(2, 2);
         List<String> destroyed = new ArrayList<>();
 
         long frameGeneration = lifetime.reserveFrameWorkGeneration(0);
@@ -50,7 +50,7 @@ class VulkanDeferredResourceLifetimeTest {
 
     @Test
     void duplicateTransientHandleRetirementIsHarmless() {
-        VulkanDeferredResourceLifetime<String, String> lifetime = new VulkanDeferredResourceLifetime<>(2, 2);
+        VulkanDeferredResourceLifetime<String> lifetime = new VulkanDeferredResourceLifetime<>(2, 2);
         List<String> retired = new ArrayList<>();
 
         lifetime.trackTransientRenderPassHandle(11L, -1);
@@ -59,14 +59,12 @@ class VulkanDeferredResourceLifetimeTest {
         lifetime.trackTransientFramebufferHandle(22L, 0);
 
         lifetime.retireGlobalTransientResources(
-            resource -> retired.add("staging:" + resource),
             resource -> retired.add("descriptor:" + resource),
             handle -> retired.add("framebuffer:" + handle),
             handle -> retired.add("renderpass:" + handle)
         );
         lifetime.retireImmediateTransientResources(
             0,
-            resource -> retired.add("staging:" + resource),
             resource -> retired.add("descriptor:" + resource),
             handle -> retired.add("framebuffer:" + handle),
             handle -> retired.add("renderpass:" + handle)
@@ -79,7 +77,7 @@ class VulkanDeferredResourceLifetimeTest {
 
     @Test
     void forcedShutdownDrainsOrDropsSafelyDependingOnDeviceAvailability() {
-        VulkanDeferredResourceLifetime<String, String> lifetime = new VulkanDeferredResourceLifetime<>(2, 2);
+        VulkanDeferredResourceLifetime<String> lifetime = new VulkanDeferredResourceLifetime<>(2, 2);
         List<String> destroyed = new ArrayList<>();
 
         long generation = lifetime.reserveFrameWorkGeneration(0);
@@ -99,7 +97,7 @@ class VulkanDeferredResourceLifetimeTest {
 
     @Test
     void preservesDestructionOrderingForResourceKindsAndTransients() {
-        VulkanDeferredResourceLifetime<String, String> lifetime = new VulkanDeferredResourceLifetime<>(2, 2);
+        VulkanDeferredResourceLifetime<String> lifetime = new VulkanDeferredResourceLifetime<>(2, 2);
         List<String> destroyed = new ArrayList<>();
 
         long generation = lifetime.reserveFrameWorkGeneration(1);
@@ -113,14 +111,12 @@ class VulkanDeferredResourceLifetimeTest {
         lifetime.markFenceComplete(401L, true);
         assertEquals(List.of("buffer", "image", "view", "sampler", "pipeline"), destroyed);
 
-        lifetime.trackTransientStagingResource("stage-a", -1);
         lifetime.trackTransientDescriptorResource("desc-a", -1);
         lifetime.trackTransientFramebufferHandle(501L, -1);
         lifetime.trackTransientRenderPassHandle(502L, -1);
         lifetime.trackFrameDescriptorResource(0, "frame-desc-a");
 
         lifetime.retireGlobalTransientResources(
-            resource -> destroyed.add("staging:" + resource),
             resource -> destroyed.add("descriptor:" + resource),
             handle -> destroyed.add("framebuffer:" + handle),
             handle -> destroyed.add("renderpass:" + handle)
@@ -133,13 +129,11 @@ class VulkanDeferredResourceLifetimeTest {
             "view",
             "sampler",
             "pipeline",
-            "staging:stage-a",
             "descriptor:desc-a",
             "framebuffer:501",
             "renderpass:502",
             "frame-descriptor:frame-desc-a"
         ), destroyed);
-        assertEquals(0, lifetime.transientStagingCountForTests());
         assertEquals(0, lifetime.transientDescriptorCountForTests());
         assertEquals(0, lifetime.transientFramebufferCountForTests());
         assertEquals(0, lifetime.transientFrameDescriptorCountForTests(0));

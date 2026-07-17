@@ -10795,8 +10795,10 @@ void main() {
         private volatile VulkanBuffer legacyDefaultVertexAttributeBuffer;
         private final VulkanRenderTargetStateManager<LegacyTextureObject, LegacyTextureObject> renderTargetState =
             new VulkanRenderTargetStateManager<>();
-        private final VulkanDeferredResourceLifetime<StagingBuffer, VulkanBuffer> lifetime =
+        private final VulkanDeferredResourceLifetime<VulkanBuffer> lifetime =
             new VulkanDeferredResourceLifetime<>(MAX_FRAMES_IN_FLIGHT, IMMEDIATE_SUBMIT_SLOTS);
+        private final VulkanStagingTransferManager stagingTransfers =
+            new VulkanStagingTransferManager(IMMEDIATE_SUBMIT_SLOTS);
         private final VulkanDescriptorManager<VulkanBuffer> descriptorManager =
             new VulkanDescriptorManager<>(
                 IMMEDIATE_SUBMIT_SLOTS,
@@ -13229,16 +13231,6 @@ void main() {
             uploadToLegacyTextureRegion3D(commandBufferHandle, "uploadTexture3D", texture, level, width, height, depth, packedPixels);
         }
 
-        private static final class StagingBuffer {
-            private final long bufferHandle;
-            private final long memoryHandle;
-
-            private StagingBuffer(long bufferHandle, long memoryHandle) {
-                this.bufferHandle = bufferHandle;
-                this.memoryHandle = memoryHandle;
-            }
-        }
-
         private void recreateLegacyTextureStorage(LegacyTextureObject texture,
                                                   LegacyTextureFormatInfo formatInfo,
                                                   int width,
@@ -13512,9 +13504,10 @@ void main() {
             return isLegacyCubemapFaceTarget(target) ? target - 0x8515 : 0;
         }
 
-        private StagingBuffer createStagingBuffer(java.nio.ByteBuffer data) {
+        private VulkanStagingTransferManager.StagingBufferRecord createStagingBuffer(java.nio.ByteBuffer data) {
             long bufferHandle = VK10.VK_NULL_HANDLE;
             long memoryHandle = VK10.VK_NULL_HANDLE;
+            VulkanStagingTransferManager.StagingBufferRecord stagingBuffer = null;
 
             int size = data.remaining();
             if (size <= 0) {
@@ -13554,19 +13547,32 @@ void main() {
 
                 checkVk("vkBindBufferMemory(staging)",
                     VK10.vkBindBufferMemory(logicalDevice, bufferHandle, memoryHandle, 0));
+                stagingBuffer = stagingTransfers.recordUploadAllocation(bufferHandle, memoryHandle, size);
 
                 org.lwjgl.PointerBuffer mappedPointer = stack.mallocPointer(1);
                 checkVk("vkMapMemory(staging)",
                     VK10.vkMapMemory(logicalDevice, memoryHandle, 0, size, 0, mappedPointer));
+                stagingTransfers.markMapped(stagingBuffer);
+                try {
+                    java.nio.ByteBuffer mapped = MemoryUtil.memByteBuffer(mappedPointer.get(0), size)
+                        .order(ByteOrder.nativeOrder());
+                    mapped.put(data.duplicate());
+                } finally {
+                    VK10.vkUnmapMemory(logicalDevice, memoryHandle);
+                    stagingTransfers.markUnmapped(stagingBuffer);
+                }
 
-                java.nio.ByteBuffer mapped = MemoryUtil.memByteBuffer(mappedPointer.get(0), size)
-                    .order(ByteOrder.nativeOrder());
-                mapped.put(data.duplicate());
-                VK10.vkUnmapMemory(logicalDevice, memoryHandle);
-
-                return new StagingBuffer(bufferHandle, memoryHandle);
+                return stagingBuffer;
             } catch (RuntimeException exception) {
-                if (logicalDevice != null) {
+                if (stagingBuffer != null) {
+                    stagingTransfers.cleanupFailedTransfer(
+                        stagingBuffer,
+                        false,
+                        activeImmediateResourceSlot(),
+                        logicalDevice != null,
+                        this::destroyStagingBuffer
+                    );
+                } else if (logicalDevice != null) {
                     if (bufferHandle != VK10.VK_NULL_HANDLE) {
                         VK10.vkDestroyBuffer(logicalDevice, bufferHandle, null);
                     }
@@ -13578,21 +13584,21 @@ void main() {
             }
         }
 
-        private void destroyStagingBuffer(StagingBuffer stagingBuffer) {
+        private void destroyStagingBuffer(VulkanStagingTransferManager.StagingBufferRecord stagingBuffer) {
             if (logicalDevice == null || stagingBuffer == null) {
                 return;
             }
-            if (stagingBuffer.bufferHandle != VK10.VK_NULL_HANDLE) {
-                VK10.vkDestroyBuffer(logicalDevice, stagingBuffer.bufferHandle, null);
+            if (stagingBuffer.bufferHandle() != VK10.VK_NULL_HANDLE) {
+                VK10.vkDestroyBuffer(logicalDevice, stagingBuffer.bufferHandle(), null);
             }
-            if (stagingBuffer.memoryHandle != VK10.VK_NULL_HANDLE) {
-                VK10.vkFreeMemory(logicalDevice, stagingBuffer.memoryHandle, null);
+            if (stagingBuffer.memoryHandle() != VK10.VK_NULL_HANDLE) {
+                VK10.vkFreeMemory(logicalDevice, stagingBuffer.memoryHandle(), null);
             }
         }
 
-        private void deferStagingBufferDestroy(StagingBuffer stagingBuffer) {
+        private void deferStagingBufferDestroy(VulkanStagingTransferManager.StagingBufferRecord stagingBuffer) {
             if (stagingBuffer != null) {
-                trackTransientStagingBuffer(stagingBuffer);
+                stagingTransfers.retireAfterTransfer(stagingBuffer, activeImmediateResourceSlot());
             }
         }
 
@@ -13771,7 +13777,8 @@ void main() {
                                                  int height,
                                                  java.nio.ByteBuffer pixels) {
             VkCommandBuffer commandBuffer = requireRecordingCommandBuffer(commandBufferHandle, operation);
-            StagingBuffer stagingBuffer = createStagingBuffer(pixels);
+            VulkanStagingTransferManager.StagingBufferRecord stagingBuffer = createStagingBuffer(pixels);
+            boolean transferRecorded = false;
             try {
                 int oldLayout = trackedLayoutForLevel(texture, level);
                 transitionImageLayout(
@@ -13801,11 +13808,13 @@ void main() {
 
                     VK10.vkCmdCopyBufferToImage(
                         commandBuffer,
-                        stagingBuffer.bufferHandle,
+                        stagingBuffer.bufferHandle(),
                         texture.imageHandle,
                         VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                         regions
                     );
+                    stagingTransfers.associateTransferCommand(stagingBuffer, commandBufferHandle);
+                    transferRecorded = true;
                 }
 
                 int finalLayout = preferredIdleLayout(texture);
@@ -13820,8 +13829,19 @@ void main() {
                     legacyTextureLayerCount(texture)
                 );
                 trackLayoutForLevel(texture, level, finalLayout);
+            } catch (RuntimeException exception) {
+                stagingTransfers.cleanupFailedTransfer(
+                    stagingBuffer,
+                    transferRecorded,
+                    activeImmediateResourceSlot(),
+                    logicalDevice != null,
+                    this::destroyStagingBuffer
+                );
+                throw exception;
             } finally {
-                deferStagingBufferDestroy(stagingBuffer);
+                if (transferRecorded) {
+                    deferStagingBufferDestroy(stagingBuffer);
+                }
             }
         }
 
@@ -13834,7 +13854,8 @@ void main() {
                                                    int depth,
                                                    java.nio.ByteBuffer pixels) {
             VkCommandBuffer commandBuffer = requireRecordingCommandBuffer(commandBufferHandle, operation);
-            StagingBuffer stagingBuffer = createStagingBuffer(pixels);
+            VulkanStagingTransferManager.StagingBufferRecord stagingBuffer = createStagingBuffer(pixels);
+            boolean transferRecorded = false;
             try {
                 int oldLayout = trackedLayoutForLevel(texture, level);
                 transitionImageLayout(
@@ -13864,11 +13885,13 @@ void main() {
 
                     VK10.vkCmdCopyBufferToImage(
                         commandBuffer,
-                        stagingBuffer.bufferHandle,
+                        stagingBuffer.bufferHandle(),
                         texture.imageHandle,
                         VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                         regions
                     );
+                    stagingTransfers.associateTransferCommand(stagingBuffer, commandBufferHandle);
+                    transferRecorded = true;
                 }
 
                 int finalLayout = preferredIdleLayout(texture);
@@ -13883,8 +13906,19 @@ void main() {
                     1
                 );
                 trackLayoutForLevel(texture, level, finalLayout);
+            } catch (RuntimeException exception) {
+                stagingTransfers.cleanupFailedTransfer(
+                    stagingBuffer,
+                    transferRecorded,
+                    activeImmediateResourceSlot(),
+                    logicalDevice != null,
+                    this::destroyStagingBuffer
+                );
+                throw exception;
             } finally {
-                deferStagingBufferDestroy(stagingBuffer);
+                if (transferRecorded) {
+                    deferStagingBufferDestroy(stagingBuffer);
+                }
             }
         }
 
@@ -14321,9 +14355,11 @@ void main() {
             int byteCount = Math.multiplyExact(Math.multiplyExact(width, height), pixelBytes);
             int previousPixelPackBuffer = legacyBufferBindings.getOrDefault(VulkanicAPI.GL_PIXEL_PACK_BUFFER, 0);
             int readbackBuffer = createLegacyBuffer();
+            VulkanStagingTransferManager.ReadbackTransferRecord readbackTransfer = null;
             try {
                 bindLegacyBuffer(VulkanicAPI.GL_PIXEL_PACK_BUFFER, readbackBuffer);
                 namedBufferStorage(readbackBuffer, byteCount, 0);
+                readbackTransfer = stagingTransfers.recordReadbackStaging(readbackBuffer, byteCount);
                 if (commandSubmissionState.commandBufferRecording()) {
                     submitPrimaryCommandBuffer(commandSubmissionState.primaryCommandBufferHandle());
                 }
@@ -14338,12 +14374,14 @@ void main() {
                     height,
                     0L
                 );
+                stagingTransfers.associateReadbackCommand(readbackTransfer, commandBufferHandle);
                 submitPrimaryCommandBuffer(commandBufferHandle);
 
                 java.nio.ByteBuffer raw = mapNamedBufferRange(readbackBuffer, 0, byteCount, GL_MAP_READ_BIT);
-                try {
+                try (VulkanStagingTransferManager.ReadbackResult readbackResult =
+                         stagingTransfers.mapReadbackResult(readbackTransfer, raw, () -> unmapNamedBuffer(readbackBuffer))) {
                     java.nio.ByteBuffer canonical = canonicalizeVulkanTextureToRgba32fTopLeft(
-                        raw,
+                        readbackResult.data(),
                         sourceTexture.vkFormat,
                         width,
                         height
@@ -14364,10 +14402,9 @@ void main() {
                         width,
                         height
                     );
-                } finally {
-                    unmapNamedBuffer(readbackBuffer);
                 }
             } finally {
+                stagingTransfers.discardReadback(readbackTransfer);
                 if (previousPixelPackBuffer > 0) {
                     bindLegacyBuffer(VulkanicAPI.GL_PIXEL_PACK_BUFFER, previousPixelPackBuffer);
                 } else {
@@ -15700,8 +15737,9 @@ void main() {
                 return;
             }
             VkCommandBuffer commandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "copyDataToBuffer");
-            StagingBuffer stagingBuffer = createStagingBuffer(source);
+            VulkanStagingTransferManager.StagingBufferRecord stagingBuffer = createStagingBuffer(source);
             long copySize = source.remaining();
+            boolean transferRecorded = false;
             try (MemoryStack stack = stackPush()) {
                 VkBufferCopy.Buffer copyRegion = VkBufferCopy.calloc(1, stack);
                 copyRegion.get(0)
@@ -15710,13 +15748,26 @@ void main() {
                     .size(copySize);
                 VK10.vkCmdCopyBuffer(
                     commandBuffer,
-                    stagingBuffer.bufferHandle,
+                    stagingBuffer.bufferHandle(),
                     destinationBufferHandle,
                     copyRegion
                 );
+                stagingTransfers.associateTransferCommand(stagingBuffer, commandBufferHandle);
+                transferRecorded = true;
                 barrierAfterBufferTransferWrite(commandBuffer, destinationBufferHandle, destinationOffset, copySize);
+            } catch (RuntimeException exception) {
+                stagingTransfers.cleanupFailedTransfer(
+                    stagingBuffer,
+                    transferRecorded,
+                    activeImmediateResourceSlot(),
+                    logicalDevice != null,
+                    this::destroyStagingBuffer
+                );
+                throw exception;
             } finally {
-                deferStagingBufferDestroy(stagingBuffer);
+                if (transferRecorded) {
+                    deferStagingBufferDestroy(stagingBuffer);
+                }
             }
         }
 
@@ -19053,10 +19104,6 @@ void main() {
             lifetime.trackTransientFramebufferHandle(framebufferHandle, activeImmediateResourceSlot());
         }
 
-        private void trackTransientStagingBuffer(StagingBuffer stagingBuffer) {
-            lifetime.trackTransientStagingResource(stagingBuffer, activeImmediateResourceSlot());
-        }
-
         private void trackTransientDescriptorBuffer(VulkanBuffer transientBuffer) {
             lifetime.trackTransientDescriptorResource(transientBuffer, activeImmediateResourceSlot());
         }
@@ -19074,8 +19121,8 @@ void main() {
         }
 
         private void destroyTransientRenderPassResources() {
+            stagingTransfers.retireGlobal(this::destroyStagingBuffer);
             lifetime.retireGlobalTransientResources(
-                this::destroyStagingBuffer,
                 this::recycleDescriptorUniformBuffer,
                 this::destroyTransientFramebufferHandle,
                 this::destroyTransientRenderPassHandle
@@ -19083,9 +19130,9 @@ void main() {
         }
 
         private void destroyTransientRenderPassResources(int slot) {
+            stagingTransfers.retireImmediateSlot(slot, this::destroyStagingBuffer);
             lifetime.retireImmediateTransientResources(
                 slot,
-                this::destroyStagingBuffer,
                 this::recycleDescriptorUniformBuffer,
                 this::destroyTransientFramebufferHandle,
                 this::destroyTransientRenderPassHandle

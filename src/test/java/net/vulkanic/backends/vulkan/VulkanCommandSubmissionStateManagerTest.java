@@ -92,7 +92,7 @@ final class VulkanCommandSubmissionStateManagerTest {
     @Test
     void generationReservationAndRetirementAreTiedToSubmissionSlots() {
         VulkanCommandSubmissionStateManager manager = readyManager();
-        VulkanDeferredResourceLifetime<String, String> lifetime = new VulkanDeferredResourceLifetime<>(2, 2);
+        VulkanDeferredResourceLifetime<String> lifetime = new VulkanDeferredResourceLifetime<>(2, 2);
 
         long immediateGeneration = manager.reserveImmediateWorkGeneration(lifetime);
         assertEquals(immediateGeneration, manager.reservedImmediateWorkGeneration(lifetime, 0));

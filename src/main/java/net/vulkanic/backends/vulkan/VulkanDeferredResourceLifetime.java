@@ -19,7 +19,7 @@ import java.util.function.LongConsumer;
  * never calls Vulkan commands directly; {@link VulkanBackend.NativeSpine}
  * supplies narrow destruction callbacks.</p>
  */
-final class VulkanDeferredResourceLifetime<StagingResource, DescriptorResource> {
+final class VulkanDeferredResourceLifetime<DescriptorResource> {
     private final int frameSlots;
     private final int immediateSubmitSlots;
     private final ConcurrentMap<Long, Long> submittedWorkGenerationByFence = new ConcurrentHashMap<>();
@@ -31,8 +31,6 @@ final class VulkanDeferredResourceLifetime<StagingResource, DescriptorResource> 
     private final List<Set<Long>> transientRenderPassHandlesByImmediateSlot;
     private final Set<Long> transientFramebufferHandles = ConcurrentHashMap.newKeySet();
     private final List<Set<Long>> transientFramebufferHandlesByImmediateSlot;
-    private final List<StagingResource> transientStagingResources = Collections.synchronizedList(new ArrayList<>());
-    private final List<List<StagingResource>> transientStagingResourcesByImmediateSlot;
     private final List<DescriptorResource> transientDescriptorResources = Collections.synchronizedList(new ArrayList<>());
     private final List<List<DescriptorResource>> transientDescriptorResourcesByImmediateSlot;
     private final List<List<DescriptorResource>> transientFrameDescriptorResources;
@@ -53,7 +51,6 @@ final class VulkanDeferredResourceLifetime<StagingResource, DescriptorResource> 
         this.reservedImmediateWorkGenerations = new long[immediateSubmitSlots];
         this.transientRenderPassHandlesByImmediateSlot = createTransientHandleBuckets(immediateSubmitSlots);
         this.transientFramebufferHandlesByImmediateSlot = createTransientHandleBuckets(immediateSubmitSlots);
-        this.transientStagingResourcesByImmediateSlot = createTransientListBuckets(immediateSubmitSlots);
         this.transientDescriptorResourcesByImmediateSlot = createTransientListBuckets(immediateSubmitSlots);
         this.transientFrameDescriptorResources = createTransientListBuckets(frameSlots);
     }
@@ -228,17 +225,6 @@ final class VulkanDeferredResourceLifetime<StagingResource, DescriptorResource> 
         }
     }
 
-    void trackTransientStagingResource(StagingResource stagingResource, int activeImmediateSlot) {
-        if (stagingResource == null) {
-            return;
-        }
-        if (isValidImmediateSlot(activeImmediateSlot)) {
-            transientStagingResourcesByImmediateSlot.get(activeImmediateSlot).add(stagingResource);
-        } else {
-            transientStagingResources.add(stagingResource);
-        }
-    }
-
     void trackTransientDescriptorResource(DescriptorResource descriptorResource, int activeImmediateSlot) {
         if (descriptorResource == null) {
             return;
@@ -259,12 +245,10 @@ final class VulkanDeferredResourceLifetime<StagingResource, DescriptorResource> 
     }
 
     void retireGlobalTransientResources(
-        Consumer<StagingResource> stagingDestroy,
         Consumer<DescriptorResource> descriptorRetire,
         LongConsumer framebufferDestroy,
         LongConsumer renderPassDestroy
     ) {
-        drainList(transientStagingResources, stagingDestroy);
         drainList(transientDescriptorResources, descriptorRetire);
         drainHandles(transientFramebufferHandles, framebufferDestroy);
         drainHandles(transientRenderPassHandles, renderPassDestroy);
@@ -272,7 +256,6 @@ final class VulkanDeferredResourceLifetime<StagingResource, DescriptorResource> 
 
     void retireImmediateTransientResources(
         int slot,
-        Consumer<StagingResource> stagingDestroy,
         Consumer<DescriptorResource> descriptorRetire,
         LongConsumer framebufferDestroy,
         LongConsumer renderPassDestroy
@@ -280,7 +263,6 @@ final class VulkanDeferredResourceLifetime<StagingResource, DescriptorResource> 
         if (!isValidImmediateSlot(slot)) {
             return;
         }
-        drainList(transientStagingResourcesByImmediateSlot.get(slot), stagingDestroy);
         drainList(transientDescriptorResourcesByImmediateSlot.get(slot), descriptorRetire);
         drainHandles(transientFramebufferHandlesByImmediateSlot.get(slot), framebufferDestroy);
         drainHandles(transientRenderPassHandlesByImmediateSlot.get(slot), renderPassDestroy);
@@ -321,10 +303,6 @@ final class VulkanDeferredResourceLifetime<StagingResource, DescriptorResource> 
 
     int transientFramebufferCountForTests() {
         return transientFramebufferHandles.size();
-    }
-
-    int transientStagingCountForTests() {
-        return transientStagingResources.size();
     }
 
     int transientDescriptorCountForTests() {

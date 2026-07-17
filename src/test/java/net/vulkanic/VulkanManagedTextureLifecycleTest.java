@@ -290,8 +290,10 @@ public class VulkanManagedTextureLifecycleTest {
         Path backendFile = PROJECT_ROOT.resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java");
         String source = Files.readString(backendFile);
 
-        assertTrue(source.contains("VulkanDeferredResourceLifetime<StagingBuffer, VulkanBuffer> lifetime"),
-            "Vulkan backend should centralize native resource retirement behind the deferred lifetime manager");
+        assertTrue(source.contains("VulkanDeferredResourceLifetime<VulkanBuffer> lifetime"),
+            "Vulkan backend should centralize non-staging native resource retirement behind the deferred lifetime manager");
+        assertTrue(source.contains("VulkanStagingTransferManager stagingTransfers"),
+            "Vulkan backend should isolate staging upload/readback lifecycle behind the staging transfer manager");
         assertTrue(source.contains("commandSubmissionState.reserveFrameWorkGeneration(lifetime, swapchainState.currentFrameSyncIndex())"),
             "Frame command recording should reserve a generation before resources can be closed during that frame");
         assertTrue(source.contains("commandSubmissionState.reserveImmediateWorkGeneration(lifetime)"),
