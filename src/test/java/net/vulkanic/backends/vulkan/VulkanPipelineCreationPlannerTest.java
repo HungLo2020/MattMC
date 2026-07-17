@@ -8,6 +8,7 @@ import net.blaze3d.platform.PolygonMode;
 import net.blaze3d.platform.SourceFactor;
 import net.blaze3d.vertex.DefaultVertexFormat;
 import net.blaze3d.vertex.VertexFormat;
+import net.irisshaders.iris.vertices.IrisVertexFormats;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.VulkanicAPI;
@@ -178,6 +179,55 @@ final class VulkanPipelineCreationPlannerTest {
     }
 
     @Test
+    void irisEntityVertexInputPlansSignedEntityAndTangentLocation() {
+        PipelineDescriptor descriptor = graphicsDescriptor(builder("pipeline/iris_entity")
+            .withVertexFormat(IrisVertexFormats.ENTITY, VertexFormat.Mode.QUADS)
+            .build());
+
+        VulkanPipelineCreationPlanner.GraphicsPipelinePlan plan = graphicsPlan(
+            descriptor,
+            VulkanRenderPassCompatibilityKey.framebuffer(List.of(VK10.VK_FORMAT_R8G8B8A8_UNORM), VK10.VK_FORMAT_D32_SFLOAT, false),
+            false,
+            (state, colorIndex) -> state.blendState(),
+            VulkanPipelineState.StencilState.disabled()
+        );
+
+        assertEquals(56, plan.vertexInput().bindings().get(0).stride());
+        VulkanPipelineCreationPlanner.VertexAttributePlan entity = vertexAttribute(plan, 6);
+        VulkanPipelineCreationPlanner.VertexAttributePlan midTexCoord = vertexAttribute(plan, 7);
+        VulkanPipelineCreationPlanner.VertexAttributePlan tangent = vertexAttribute(plan, 9);
+
+        assertEquals(IrisVertexFormats.ENTITY.getOffset(IrisVertexFormats.ENTITY_ID_ELEMENT), entity.offset());
+        assertEquals(VK10.VK_FORMAT_R16G16B16_SINT, entity.format());
+        assertEquals(36, entity.offset());
+        assertEquals(IrisVertexFormats.ENTITY.getOffset(IrisVertexFormats.MID_TEXTURE_ELEMENT), midTexCoord.offset());
+        assertEquals(VK10.VK_FORMAT_R32G32_SFLOAT, midTexCoord.format());
+        assertEquals(44, midTexCoord.offset());
+        assertEquals(IrisVertexFormats.ENTITY.getOffset(IrisVertexFormats.TANGENT_ELEMENT), tangent.offset());
+        assertEquals(VK10.VK_FORMAT_R8G8B8A8_SNORM, tangent.format());
+        assertEquals(52, tangent.offset());
+    }
+
+    @Test
+    void irisTerrainEntityAttributeUsesFloatCompatibleScaledFormat() {
+        PipelineDescriptor descriptor = graphicsDescriptor(builder("pipeline/iris_terrain")
+            .withVertexFormat(IrisVertexFormats.TERRAIN, VertexFormat.Mode.QUADS)
+            .build());
+
+        VulkanPipelineCreationPlanner.GraphicsPipelinePlan plan = graphicsPlan(
+            descriptor,
+            VulkanRenderPassCompatibilityKey.framebuffer(List.of(VK10.VK_FORMAT_R8G8B8A8_UNORM), VK10.VK_FORMAT_D32_SFLOAT, false),
+            false,
+            (state, colorIndex) -> state.blendState(),
+            VulkanPipelineState.StencilState.disabled()
+        );
+
+        VulkanPipelineCreationPlanner.VertexAttributePlan entity = vertexAttribute(plan, 11);
+        assertEquals(IrisVertexFormats.TERRAIN.getOffset(IrisVertexFormats.ENTITY_ELEMENT), entity.offset());
+        assertEquals(VK10.VK_FORMAT_R16G16_SSCALED, entity.format());
+    }
+
+    @Test
     void computePipelinePlansComputeStageAndLayoutInputs() {
         PipelineDescriptor descriptor = computeDescriptor();
         VulkanDescriptorSetLayoutPlanner.DescriptorLayoutPlan descriptorLayoutPlan =
@@ -258,6 +308,16 @@ final class VulkanPipelineCreationPlannerTest {
             stencilState,
             feedbackLoopEnabled
         ));
+    }
+
+    private static VulkanPipelineCreationPlanner.VertexAttributePlan vertexAttribute(
+        VulkanPipelineCreationPlanner.GraphicsPipelinePlan plan,
+        int location
+    ) {
+        return plan.vertexInput().attributes().stream()
+            .filter(attribute -> attribute.location() == location)
+            .findFirst()
+            .orElseThrow();
     }
 
     private static PipelineDescriptor graphicsDescriptor(RenderPipeline pipeline) {

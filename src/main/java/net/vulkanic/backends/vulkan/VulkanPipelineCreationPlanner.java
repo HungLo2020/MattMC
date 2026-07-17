@@ -215,12 +215,13 @@ final class VulkanPipelineCreationPlanner {
             VK10.VK_VERTEX_INPUT_RATE_VERTEX
         ));
         List<VertexAttributePlan> attributes = new ArrayList<>(elements.size());
+        List<String> attributeNames = vertexFormat.getElementAttributeNames();
         for (int i = 0; i < elements.size(); i++) {
             VertexFormatElement element = elements.get(i);
             attributes.add(new VertexAttributePlan(
                 vertexFormat.getShaderAttributeLocation(i),
                 0,
-                VulkanPipelineFormatClassifier.toVkVertexElementFormat(element),
+                VulkanPipelineFormatClassifier.toVkVertexElementFormat(element, attributeNames.get(i)),
                 vertexFormat.getOffset(element)
             ));
         }

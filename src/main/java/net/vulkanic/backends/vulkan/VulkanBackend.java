@@ -186,7 +186,7 @@ public class VulkanBackend {
     private static final Pattern GLSL_BLOCK_COMMENT_PATTERN = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
     private static final Pattern GLSL_LINE_COMMENT_PATTERN = Pattern.compile("(?m)//.*$");
     private static final Pattern GLSL_VERTEX_INPUT_DECLARATION_PATTERN = Pattern.compile(
-        "(?m)(^\\s*)(?:layout\\s*\\(([^)]*)\\)\\s*)?((?:[A-Za-z0-9_]+\\s+)*)in\\s+([A-Za-z0-9_]+)\\s+([A-Za-z_][A-Za-z0-9_]*)(\\s*\\[[^]]+\\])?\\s*;"
+        "(?m)(^\\s*)(?:layout\\s*\\(([^)]*)\\)\\s*)?((?:[A-Za-z0-9_]+\\s+)*)(?:in|attribute)\\s+([A-Za-z0-9_]+)\\s+([A-Za-z_][A-Za-z0-9_]*)(\\s*\\[[^]]+\\])?\\s*;"
     );
     private static final Pattern GLSL_LAYOUT_LOCATION_PATTERN = Pattern.compile("\\blocation\\s*=\\s*(\\d+)");
     private static final Pattern GLSL_UNIFORM_BLOCK_PATTERN = Pattern.compile("(?m)(?:layout\\s*\\(([^)]*)\\)\\s*)?uniform\\s+(\\w+)\\s*\\{");
@@ -628,6 +628,11 @@ void main() {
                 renderPipeline,
                 List.of(vertexModule, fragmentModule)
             );
+            descriptor = withSupplementalRenderPipelineVertexInputState(
+                descriptor,
+                renderPipeline,
+                collectRenderPipelineVertexInputs(renderPipeline, vertexWithDefines)
+            );
             PipelineHandle pipelineHandle = createPipeline(descriptor);
 
             if (pipelineHandle == null || !pipelineHandle.isValid()) {
@@ -677,6 +682,160 @@ void main() {
         reboundSource = injectExplicitUniformBlockBinding(reboundSource, "VulkanicStandaloneUniforms", bindingIndex);
 
         return reboundSource;
+    }
+
+    private static PipelineDescriptor withSupplementalRenderPipelineVertexInputState(
+        PipelineDescriptor descriptor,
+        RenderPipeline renderPipeline,
+        List<ReflectedVertexInput> reflectedInputs
+    ) {
+        PipelineDescriptor.VertexInputState vertexInputState =
+            createRenderPipelineVertexInputState(renderPipeline, reflectedInputs);
+        return vertexInputState == null ? descriptor : descriptor.withVertexInputState(vertexInputState);
+    }
+
+    private static List<ReflectedVertexInput> collectRenderPipelineVertexInputs(
+        RenderPipeline renderPipeline,
+        String vertexSource
+    ) {
+        String reboundSource = injectExplicitVulkanBindings(
+            renderPipeline,
+            ShaderType.VERTEX,
+            vertexSource
+        );
+        String normalizedSource = ShadercSpirvCompiler.normalizeForVulkan(
+            VulkanicShaderStage.VERTEX,
+            reboundSource,
+            renderPipeline.getVertexShader().toString()
+        );
+        return collectExplicitVertexInputDeclarations(normalizedSource);
+    }
+
+    @Nullable
+    private static PipelineDescriptor.VertexInputState createRenderPipelineVertexInputState(
+        RenderPipeline renderPipeline,
+        List<ReflectedVertexInput> reflectedInputs
+    ) {
+        return createRenderPipelineVertexInputState(renderPipeline.getVertexFormat(), reflectedInputs);
+    }
+
+    @Nullable
+    private static PipelineDescriptor.VertexInputState createRenderPipelineVertexInputState(
+        VertexFormat vertexFormat,
+        List<ReflectedVertexInput> reflectedInputs
+    ) {
+        List<VertexFormatElement> elements = vertexFormat.getElements();
+        List<String> attributeNames = vertexFormat.getElementAttributeNames();
+        java.util.LinkedHashSet<Integer> providedLocations = new java.util.LinkedHashSet<>();
+        List<PipelineDescriptor.VertexInputAttribute> attributes = new ArrayList<>(elements.size());
+        for (int i = 0; i < elements.size(); i++) {
+            VertexFormatElement element = elements.get(i);
+            int location = vertexFormat.getShaderAttributeLocation(i);
+            attributes.add(new PipelineDescriptor.VertexInputAttribute(
+                location,
+                0,
+                VulkanPipelineFormatClassifier.toPipelineVertexElementFormat(element, attributeNames.get(i)),
+                vertexFormat.getOffset(element)
+            ));
+            providedLocations.add(location);
+        }
+
+        boolean needsDefaultBinding = false;
+        for (ReflectedVertexInput input : reflectedInputs) {
+            if (providedLocations.contains(input.location())) {
+                continue;
+            }
+            attributes.add(new PipelineDescriptor.VertexInputAttribute(
+                input.location(),
+                LEGACY_DEFAULT_VERTEX_ATTRIBUTE_BINDING,
+                defaultVertexAttributeFormatForGlslType(input.typeName()),
+                0
+            ));
+            providedLocations.add(input.location());
+            needsDefaultBinding = true;
+        }
+        for (CompatibilityFallbackVertexInput fallback : renderPipelineCompatibilityFallbackInputs(vertexFormat)) {
+            if (providedLocations.contains(fallback.location())) {
+                continue;
+            }
+            attributes.add(new PipelineDescriptor.VertexInputAttribute(
+                fallback.location(),
+                LEGACY_DEFAULT_VERTEX_ATTRIBUTE_BINDING,
+                fallback.format(),
+                0
+            ));
+            providedLocations.add(fallback.location());
+            needsDefaultBinding = true;
+        }
+
+        if (!needsDefaultBinding) {
+            return null;
+        }
+
+        List<PipelineDescriptor.VertexInputBinding> bindings = new ArrayList<>(2);
+        bindings.add(new PipelineDescriptor.VertexInputBinding(
+            0,
+            vertexFormat.getVertexSize(),
+            PipelineDescriptor.VertexInputRate.VERTEX
+        ));
+        bindings.add(new PipelineDescriptor.VertexInputBinding(
+            LEGACY_DEFAULT_VERTEX_ATTRIBUTE_BINDING,
+            16,
+            PipelineDescriptor.VertexInputRate.INSTANCE
+        ));
+        return new PipelineDescriptor.VertexInputState(bindings, attributes);
+    }
+
+    private static List<CompatibilityFallbackVertexInput> renderPipelineCompatibilityFallbackInputs(VertexFormat vertexFormat) {
+        List<String> attributeNames = vertexFormat.getElementAttributeNames();
+        if (attributeNames.contains("iris_Entity")) {
+            return List.of(defaultFloatFallbackVertexInput(8));
+        }
+        if (attributeNames.contains("a_Position") && attributeNames.contains("a_LightAndData")) {
+            return List.of(defaultFloatFallbackVertexInput(8));
+        }
+        if (attributeNames.contains("Normal")
+            && attributeNames.contains("Color")
+            && attributeNames.contains("Position")
+            && !attributeNames.contains("UV0")) {
+            return List.of(
+                defaultFloatFallbackVertexInput(3),
+                defaultFloatFallbackVertexInput(4),
+                defaultFloatFallbackVertexInput(5)
+            );
+        }
+        if (attributeNames.contains("UV0")
+            && attributeNames.contains("Position")
+            && !attributeNames.contains("Color")) {
+            return List.of(new CompatibilityFallbackVertexInput(
+                2,
+                PipelineDescriptor.VertexAttributeFormat.R32G32B32_SINT
+            ));
+        }
+        return List.of();
+    }
+
+    private static CompatibilityFallbackVertexInput defaultFloatFallbackVertexInput(int location) {
+        return new CompatibilityFallbackVertexInput(
+            location,
+            PipelineDescriptor.VertexAttributeFormat.R32G32B32A32_SFLOAT
+        );
+    }
+
+    private record CompatibilityFallbackVertexInput(
+        int location,
+        PipelineDescriptor.VertexAttributeFormat format
+    ) {
+    }
+
+    private static PipelineDescriptor withCompatibilityVertexInputState(PipelineDescriptor descriptor) {
+        if (descriptor.getVertexInputState() != null) {
+            return descriptor;
+        }
+
+        PipelineDescriptor.VertexInputState vertexInputState =
+            createRenderPipelineVertexInputState(descriptor.getPortableState().vertexFormat(), List.of());
+        return vertexInputState == null ? descriptor : descriptor.withVertexInputState(vertexInputState);
     }
 
     private static String injectExplicitParticleStageLocations(ShaderType shaderType, String shaderSource) {
@@ -769,7 +928,8 @@ void main() {
                 reboundSource = injectExplicitVertexInputLocation(reboundSource, attributeName, shaderLocation);
             }
         }
-        reboundSource = injectIrisEntityExtensionInputLocations(reboundSource);
+        reboundSource = injectIrisEntityExtensionInputLocations(renderPipeline.getVertexFormat(), reboundSource);
+        reboundSource = injectSodiumChunkInputLocations(reboundSource);
         return reboundSource;
     }
 
@@ -780,8 +940,10 @@ void main() {
         };
     }
 
-    private static String injectIrisEntityExtensionInputLocations(String shaderSource) {
-        if (!shaderSource.contains("iris_Entity")) {
+    private static String injectIrisEntityExtensionInputLocations(VertexFormat vertexFormat, String shaderSource) {
+        boolean isIrisEntityFormat = vertexFormat.getElementAttributeNames().contains("iris_Entity");
+        boolean hasEntityExtensionInput = shaderSource.contains("iris_Entity") || isIrisEntityFormat;
+        if (!hasEntityExtensionInput) {
             return shaderSource;
         }
 
@@ -798,6 +960,28 @@ void main() {
                 );
             }
         }
+        if (isIrisEntityFormat) {
+            reboundSource = injectExplicitVertexInputLocation(reboundSource, "mc_Entity", 8);
+            reboundSource = injectExplicitVertexInputLocation(reboundSource, "at_midBlock", 9);
+        }
+        return reboundSource;
+    }
+
+    private static String injectSodiumChunkInputLocations(String shaderSource) {
+        if (!shaderSource.contains("a_Position") && !shaderSource.contains("a_LightAndData")) {
+            return shaderSource;
+        }
+
+        String reboundSource = shaderSource;
+        reboundSource = injectExplicitVertexInputLocation(reboundSource, "a_Position", 0);
+        reboundSource = injectExplicitVertexInputLocation(reboundSource, "a_Color", 1);
+        reboundSource = injectExplicitVertexInputLocation(reboundSource, "a_TexCoord", 2);
+        reboundSource = injectExplicitVertexInputLocation(reboundSource, "a_LightAndData", 3);
+        reboundSource = injectExplicitVertexInputLocation(reboundSource, "iris_Normal", 10);
+        reboundSource = injectExplicitVertexInputLocation(reboundSource, "mc_Entity", 11);
+        reboundSource = injectExplicitVertexInputLocation(reboundSource, "mc_midTexCoord", 12);
+        reboundSource = injectExplicitVertexInputLocation(reboundSource, "at_tangent", 13);
+        reboundSource = injectExplicitVertexInputLocation(reboundSource, "at_midBlock", 14);
         return reboundSource;
     }
 
@@ -854,7 +1038,7 @@ void main() {
 
     private static String injectExplicitVertexInputLocation(String shaderSource, String attributeName, int location) {
         Pattern layoutPattern = Pattern.compile(
-            "(?m)(^\\s*)layout\\s*\\(([^)]*)\\)\\s*((?:[A-Za-z0-9_]+\\s+)*)in\\s+([A-Za-z0-9_]+)\\s+"
+            "(?m)(^\\s*)layout\\s*\\(([^)]*)\\)\\s*((?:[A-Za-z0-9_]+\\s+)*)(?:in|attribute)\\s+([A-Za-z0-9_]+)\\s+"
                 + Pattern.quote(attributeName)
                 + "(\\s*\\[[^]]+\\])?\\s*;"
         );
@@ -881,7 +1065,7 @@ void main() {
         }
 
         Pattern plainPattern = Pattern.compile(
-            "(?m)(^\\s*)((?:[A-Za-z0-9_]+\\s+)*)in\\s+([A-Za-z0-9_]+)\\s+"
+            "(?m)(^\\s*)((?:[A-Za-z0-9_]+\\s+)*)(?:in|attribute)\\s+([A-Za-z0-9_]+)\\s+"
                 + Pattern.quote(attributeName)
                 + "(\\s*\\[[^]]+\\])?\\s*;"
         );
@@ -2248,11 +2432,21 @@ void main() {
                 reboundSource = injectExplicitVertexInputLocation(reboundSource, entry.getKey(), entry.getValue());
             }
             reboundSource = injectExplicitRemainingVertexInputLocations(reboundSource);
-            virtualProgram.vertexInputs = collectExplicitVertexInputDeclarations(reboundSource);
         }
         reboundSource = injectExplicitReflectedResourceBindings(reboundSource, virtualProgram);
 
         boolean usesGeneratedStandaloneBlock = shaderHasStandaloneUniformBlockMembers(reboundSource);
+        if (virtualShader.stage == VulkanicShaderStage.VERTEX) {
+            String preprocessedSource = preprocessMojImportsForVulkan("shader-" + shaderId, reboundSource);
+            String normalizedSource = ShadercSpirvCompiler.normalizeForVulkan(
+                virtualShader.stage,
+                preprocessedSource,
+                "shader-" + shaderId,
+                usesGeneratedStandaloneBlock ? virtualProgram.standaloneUniformDeclarations : null,
+                usesGeneratedStandaloneBlock ? standaloneUniformBlockBindingIndex(virtualProgram) : -1
+            );
+            virtualProgram.vertexInputs = collectExplicitVertexInputDeclarations(normalizedSource);
+        }
         if (reboundSource.equals(virtualShader.source)
             && (!usesGeneratedStandaloneBlock || virtualProgram.standaloneUniformDeclarations.isEmpty())) {
             return virtualShader.compiledModule;
@@ -4139,6 +4333,7 @@ void main() {
         if (descriptor == null) {
             throw new IllegalArgumentException("descriptor must not be null");
         }
+        descriptor = withCompatibilityVertexInputState(descriptor);
         ensureNativeReady("createPipeline");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -4219,6 +4414,7 @@ void main() {
         PipelineDescriptor descriptor,
         VulkanRenderPassCompatibilityKey renderPassCompatibilityKey
     ) {
+        descriptor = withCompatibilityVertexInputState(descriptor);
         ensureNativeReady("createPipeline(framebuffer)");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -4439,7 +4635,9 @@ void main() {
             .filter(Objects::nonNull)
             .sorted(java.util.Comparator.comparingInt(LegacyVertexAttribute::index))
             .toList();
-        if (attributes.isEmpty()) {
+        if (attributes.isEmpty()
+            && virtualProgram.vertexInputs.isEmpty()
+            && virtualProgram.attributeLocationsByName.isEmpty()) {
             return null;
         }
 
@@ -4496,6 +4694,25 @@ void main() {
             providedLocations.add(input.location());
             needsDefaultBinding = true;
         }
+        for (Map.Entry<String, Integer> entry : virtualProgram.attributeLocationsByName.entrySet()) {
+            if (providedLocations.contains(entry.getValue())) {
+                continue;
+            }
+            PipelineDescriptor.VertexAttributeFormat defaultFormat =
+                defaultVertexAttributeFormatForKnownAttribute(entry.getKey());
+            if (defaultFormat == null) {
+                continue;
+            }
+
+            vertexAttributes.add(new PipelineDescriptor.VertexInputAttribute(
+                entry.getValue(),
+                LEGACY_DEFAULT_VERTEX_ATTRIBUTE_BINDING,
+                defaultFormat,
+                0
+            ));
+            providedLocations.add(entry.getValue());
+            needsDefaultBinding = true;
+        }
 
         if (needsDefaultBinding) {
             bindings.putIfAbsent(
@@ -4509,6 +4726,18 @@ void main() {
         }
 
         return new PipelineDescriptor.VertexInputState(new ArrayList<>(bindings.values()), vertexAttributes);
+    }
+
+    @Nullable
+    private static PipelineDescriptor.VertexAttributeFormat defaultVertexAttributeFormatForKnownAttribute(String attributeName) {
+        return switch (attributeName) {
+            case "vPosition", "irisExtra" -> PipelineDescriptor.VertexAttributeFormat.R32G32B32A32_UINT;
+            case "iris_color" -> PipelineDescriptor.VertexAttributeFormat.R32G32B32A32_SFLOAT;
+            case "aScale", "aTranslateSubChunk" -> PipelineDescriptor.VertexAttributeFormat.R32G32B32_SFLOAT;
+            case "aTranslateChunk" -> PipelineDescriptor.VertexAttributeFormat.R32G32B32_SINT;
+            case "aMaterial" -> PipelineDescriptor.VertexAttributeFormat.R32_SINT;
+            default -> null;
+        };
     }
 
     private static void traceLegacyIrisEntityVaoState(
@@ -5672,12 +5901,12 @@ void main() {
 
     private static @Nullable PipelineDescriptor descriptorVariantDescriptor(PrecompiledPipelineState state, PipelineDescriptor descriptor) {
         if (descriptor.hasSpirvModules()) {
-            return descriptor;
+            return withCompatibilityVertexInputState(descriptor);
         }
         if (state.descriptor == null) {
             return null;
         }
-        return state.descriptor.withResourceLayout(descriptor.getResourceLayout());
+        return withCompatibilityVertexInputState(state.descriptor.withResourceLayout(descriptor.getResourceLayout()));
     }
 
     private static boolean matchesStableDescriptor(PrecompiledPipelineState state, @Nullable PipelineDescriptor descriptor) {
@@ -6917,6 +7146,11 @@ void main() {
         @Override
         public void drawIndexed(int firstIndex, int indexCount, int baseVertex, int instanceCount) {
             ensureOpen("drawIndexed");
+            spine.bindVertexBuffer(
+                commandBufferHandle,
+                LEGACY_DEFAULT_VERTEX_ATTRIBUTE_BINDING,
+                spine.requireLegacyDefaultVertexAttributeBuffer().getVkBufferHandle()
+            );
             try (VulkanicAPI.ShaderInputParityScope ignored = VulkanicAPI.beginShaderInputParitySemanticDraw(
                 "vulkan-vulkanic-renderpass-drawIndexed",
                 "vulkanic-renderpass",
@@ -17431,6 +17665,11 @@ void main() {
             PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipelineAndSpirvModules(
                 renderPipeline,
                 List.of(vertexModule, fragmentModule)
+            );
+            descriptor = withSupplementalRenderPipelineVertexInputState(
+                descriptor,
+                renderPipeline,
+                collectRenderPipelineVertexInputs(renderPipeline, vertexWithDefines)
             );
 
             long vertShaderModuleHandle = createShaderModule(vertexModule);
