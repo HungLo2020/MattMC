@@ -43,8 +43,16 @@ pub(in crate::render::chunk::meshing) fn native_section_fluid_faces_to_sink<
 ) -> Result<usize, i32> {
     let mut emitted = 0usize;
     let profile_fluid_substages = fluid_substage_profile_enabled();
+    let fluid_diag_enabled = native_fluid_diag_enabled();
+    macro_rules! fluid_log {
+        ($($arg:tt)*) => {
+            if fluid_diag_enabled {
+                native_fluid_diag_log(format_args!($($arg)*));
+            }
+        };
+    }
     let visibility_started = Instant::now();
-    native_fluid_diag_log(format_args!(
+    fluid_log!(
         "begin pos={},{},{} local={},{},{} state={} fluid_type={} pass={} material={} block_id={}",
         block.absolute_x,
         block.absolute_y,
@@ -57,14 +65,17 @@ pub(in crate::render::chunk::meshing) fn native_section_fluid_faces_to_sink<
         state.fluid_pass_id,
         state.fluid_material_bits,
         state.fluid_block_id,
-    ));
+    );
     if state.fluid_type != FLUID_WATER && state.fluid_type != FLUID_LAVA {
         sink.profile()
             .add_stage(PROFILE_FLUID_VIS_HEIGHT, visibility_started);
-        native_fluid_diag_log(format_args!(
+        fluid_log!(
             "skip-unsupported pos={},{},{} fluid_type={}",
-            block.absolute_x, block.absolute_y, block.absolute_z, state.fluid_type
-        ));
+            block.absolute_x,
+            block.absolute_y,
+            block.absolute_z,
+            state.fluid_type
+        );
         return Ok(0);
     }
     let cull_up = fluid_side_occluded(block, state, states, 1);
@@ -76,18 +87,23 @@ pub(in crate::render::chunk::meshing) fn native_section_fluid_faces_to_sink<
     if cull_up && cull_down && cull_north && cull_south && cull_west && cull_east {
         sink.profile()
             .add_stage(PROFILE_FLUID_VIS_HEIGHT, visibility_started);
-        native_fluid_diag_log(format_args!(
+        fluid_log!(
             "skip-occluded pos={},{},{}",
-            block.absolute_x, block.absolute_y, block.absolute_z
-        ));
+            block.absolute_x,
+            block.absolute_y,
+            block.absolute_z
+        );
         return Ok(0);
     }
 
     let h = fluid_height(block, state, states, 0, 0, 0, 1);
-    native_fluid_diag_log(format_args!(
+    fluid_log!(
         "own-height pos={},{},{} height={:.4}",
-        block.absolute_x, block.absolute_y, block.absolute_z, h
-    ));
+        block.absolute_x,
+        block.absolute_y,
+        block.absolute_z,
+        h
+    );
     let heights = if h >= 1.0 {
         [1.0; 4]
     } else {
@@ -194,22 +210,24 @@ pub(in crate::render::chunk::meshing) fn native_section_fluid_faces_to_sink<
     }
     sink.profile()
         .add_stage(PROFILE_FLUID_VIS_HEIGHT, visibility_started);
-    fluid_diag(
-        block,
-        state,
-        "top-check",
-        cull_up,
-        top_exposed,
-        heights,
-        color,
-        light,
-        None,
-    );
+    if fluid_diag_enabled {
+        fluid_diag(
+            block,
+            state,
+            "top-check",
+            cull_up,
+            top_exposed,
+            heights,
+            color,
+            light,
+            None,
+        );
+    }
 
     let geometry_started = Instant::now();
     if emit_top {
         let uv_started = profile_start(profile_fluid_substages);
-        native_fluid_diag_log(format_args!(
+        fluid_log!(
             "top-uv-start pos={},{},{} flow={:.4},{:.4} falling={}",
             block.absolute_x,
             block.absolute_y,
@@ -217,33 +235,44 @@ pub(in crate::render::chunk::meshing) fn native_section_fluid_faces_to_sink<
             block.fluid_flow_x,
             block.fluid_flow_z,
             state.fluid_falling
-        ));
+        );
         let top_uses_still =
             block.fluid_flow_x == 0.0 && block.fluid_flow_z == 0.0 && state.fluid_falling == 0;
         let top = if top_uses_still {
-            native_fluid_diag_log(format_args!(
+            fluid_log!(
                 "top-uv-still pos={},{},{}",
-                block.absolute_x, block.absolute_y, block.absolute_z
-            ));
+                block.absolute_x,
+                block.absolute_y,
+                block.absolute_z
+            );
             still_fluid_top_uvs(state.fluid_still)
         } else {
             let sprite = state.fluid_flow;
-            native_fluid_diag_log(format_args!(
+            fluid_log!(
                 "top-uv-flowing-before-atan pos={},{},{}",
-                block.absolute_x, block.absolute_y, block.absolute_z
-            ));
+                block.absolute_x,
+                block.absolute_y,
+                block.absolute_z
+            );
             let dir = (mth_atan2(block.fluid_flow_z as f64, block.fluid_flow_x as f64) as f32)
                 - 1.5707964_f32;
-            native_fluid_diag_log(format_args!(
+            fluid_log!(
                 "top-uv-flowing-after-atan pos={},{},{} dir={:.6}",
-                block.absolute_x, block.absolute_y, block.absolute_z, dir
-            ));
+                block.absolute_x,
+                block.absolute_y,
+                block.absolute_z,
+                dir
+            );
             let sin = mth_sin(dir) * 0.25;
             let cos = mth_cos(dir) * 0.25;
-            native_fluid_diag_log(format_args!(
+            fluid_log!(
                 "top-uv-flowing-after-trig pos={},{},{} sin={:.6} cos={:.6}",
-                block.absolute_x, block.absolute_y, block.absolute_z, sin, cos
-            ));
+                block.absolute_x,
+                block.absolute_y,
+                block.absolute_z,
+                sin,
+                cos
+            );
             shrink_fluid_uvs(
                 [
                     (
@@ -268,10 +297,14 @@ pub(in crate::render::chunk::meshing) fn native_section_fluid_faces_to_sink<
         };
         sink.profile()
             .add_optional_stage(PROFILE_FLUID_STILL_FLOWING_UV, uv_started);
-        native_fluid_diag_log(format_args!(
+        fluid_log!(
             "top-uv-end pos={},{},{} uv0={:.5},{:.5}",
-            block.absolute_x, block.absolute_y, block.absolute_z, top[0].0, top[0].1
-        ));
+            block.absolute_x,
+            block.absolute_y,
+            block.absolute_z,
+            top[0].0,
+            top[0].1
+        );
         let top_started = profile_start(profile_fluid_substages);
         let top_aligned = fluid_top_aligned(render_heights);
         let top_facing = if top_aligned {
@@ -289,10 +322,14 @@ pub(in crate::render::chunk::meshing) fn native_section_fluid_faces_to_sink<
         } else {
             top
         };
-        native_fluid_diag_log(format_args!(
+        fluid_log!(
             "top-face-before-quad pos={},{},{} facing={} kind={}",
-            block.absolute_x, block.absolute_y, block.absolute_z, top_facing, top_face_kind
-        ));
+            block.absolute_x,
+            block.absolute_y,
+            block.absolute_z,
+            top_facing,
+            top_face_kind
+        );
         let top_face = fluid_semantic_native_face(
             state,
             block,
@@ -309,28 +346,33 @@ pub(in crate::render::chunk::meshing) fn native_section_fluid_faces_to_sink<
             1.0,
             light,
         );
-        native_fluid_diag_log(format_args!(
+        fluid_log!(
             "top-face-after-quad pos={},{},{} normal=0x{:08x}",
-            block.absolute_x, block.absolute_y, block.absolute_z, top_face.packed_normal
-        ));
-        fluid_semantic_record_diag(
-            block,
-            "top-record",
-            state,
-            top_face.facing,
-            false,
-            top_face_kind,
-            0.0,
-            render_heights,
-            [0.0; 4],
-            top_record_uvs,
-            color,
-            1.0,
-            light,
-            top_face.packed_normal,
+            block.absolute_x,
+            block.absolute_y,
+            block.absolute_z,
+            top_face.packed_normal
         );
+        if fluid_diag_enabled {
+            fluid_semantic_record_diag(
+                block,
+                "top-record",
+                state,
+                top_face.facing,
+                false,
+                top_face_kind,
+                0.0,
+                render_heights,
+                [0.0; 4],
+                top_record_uvs,
+                color,
+                1.0,
+                light,
+                top_face.packed_normal,
+            );
+        }
         let append_started = profile_start(profile_fluid_substages);
-        native_fluid_diag_log(format_args!(
+        fluid_log!(
             "emit-top pos={},{},{} facing={} kind={} heights={:.4},{:.4},{:.4},{:.4}",
             block.absolute_x,
             block.absolute_y,
@@ -341,29 +383,33 @@ pub(in crate::render::chunk::meshing) fn native_section_fluid_faces_to_sink<
             render_heights[1],
             render_heights[2],
             render_heights[3]
-        ));
+        );
         sink.emit(top_face)?;
         sink.mark_fluid_sprite(fluid_sprite_mask(state.fluid_type, top_uses_still, false));
-        native_fluid_diag_log(format_args!(
+        fluid_log!(
             "emit-top-done pos={},{},{}",
-            block.absolute_x, block.absolute_y, block.absolute_z
-        ));
+            block.absolute_x,
+            block.absolute_y,
+            block.absolute_z
+        );
         emitted += 1;
         sink.profile()
             .add_optional_stage(PROFILE_FLUID_NATIVE_QUAD_APPEND, append_started);
         sink.profile()
             .add_optional_stage(PROFILE_FLUID_TOP_FACE_CONSTRUCTION, top_started);
-        fluid_diag(
-            block,
-            state,
-            "top-emitted",
-            cull_up,
-            top_exposed,
-            render_heights,
-            color,
-            light,
-            Some(top_facing),
-        );
+        if fluid_diag_enabled {
+            fluid_diag(
+                block,
+                state,
+                "top-emitted",
+                cull_up,
+                top_exposed,
+                render_heights,
+                color,
+                light,
+                Some(top_facing),
+            );
+        }
         let normal_backface_started = profile_start(profile_fluid_substages);
         if fluid_backward_up_face(block, state, states) {
             let backward_facing = if top_facing == MODEL_QUAD_FACING_POS_Y {
@@ -372,31 +418,33 @@ pub(in crate::render::chunk::meshing) fn native_section_fluid_faces_to_sink<
                 MODEL_QUAD_FACING_UNASSIGNED
             };
             let backward_face = flipped_fluid_back_face(top_face, backward_facing);
-            fluid_semantic_record_diag(
-                block,
-                "top-back-record",
-                state,
-                backward_face.facing,
-                true,
-                top_face_kind,
-                0.0,
-                render_heights,
-                [0.0; 4],
-                top_record_uvs,
-                color,
-                1.0,
-                light,
-                backward_face.packed_normal,
-            );
+            if fluid_diag_enabled {
+                fluid_semantic_record_diag(
+                    block,
+                    "top-back-record",
+                    state,
+                    backward_face.facing,
+                    true,
+                    top_face_kind,
+                    0.0,
+                    render_heights,
+                    [0.0; 4],
+                    top_record_uvs,
+                    color,
+                    1.0,
+                    light,
+                    backward_face.packed_normal,
+                );
+            }
             let append_started = profile_start(profile_fluid_substages);
-            native_fluid_diag_log(format_args!(
+            fluid_log!(
                 "emit-top-back pos={},{},{} facing={} kind={}",
                 block.absolute_x,
                 block.absolute_y,
                 block.absolute_z,
                 backward_face.facing,
                 top_face_kind
-            ));
+            );
             sink.emit(backward_face)?;
             sink.mark_fluid_sprite(fluid_sprite_mask(state.fluid_type, top_uses_still, false));
             emitted += 1;
@@ -435,27 +483,32 @@ pub(in crate::render::chunk::meshing) fn native_section_fluid_faces_to_sink<
             1.0,
             light,
         );
-        fluid_semantic_record_diag(
-            block,
-            "bottom-record",
-            state,
-            MODEL_QUAD_FACING_NEG_Y,
-            false,
-            FLUID_FACE_BOTTOM,
-            y_offset,
-            [0.0; 4],
-            [0.0; 4],
-            uvs,
-            color,
-            1.0,
-            light,
-            bottom_face.packed_normal,
-        );
+        if fluid_diag_enabled {
+            fluid_semantic_record_diag(
+                block,
+                "bottom-record",
+                state,
+                MODEL_QUAD_FACING_NEG_Y,
+                false,
+                FLUID_FACE_BOTTOM,
+                y_offset,
+                [0.0; 4],
+                [0.0; 4],
+                uvs,
+                color,
+                1.0,
+                light,
+                bottom_face.packed_normal,
+            );
+        }
         let append_started = profile_start(profile_fluid_substages);
-        native_fluid_diag_log(format_args!(
+        fluid_log!(
             "emit-bottom pos={},{},{} facing={}",
-            block.absolute_x, block.absolute_y, block.absolute_z, bottom_face.facing
-        ));
+            block.absolute_x,
+            block.absolute_y,
+            block.absolute_z,
+            bottom_face.facing
+        );
         sink.emit(bottom_face)?;
         sink.mark_fluid_sprite(fluid_sprite_mask(state.fluid_type, true, false));
         emitted += 1;
@@ -510,24 +563,26 @@ pub(in crate::render::chunk::meshing) fn native_section_fluid_faces_to_sink<
                 shade,
                 light,
             );
-            fluid_semantic_record_diag(
-                block,
-                "side-record",
-                state,
-                facing,
-                false,
-                FLUID_FACE_SIDE,
-                y_offset,
-                [h1, h2, 0.0, 0.0],
-                [x1, z1, x2, z2],
-                uvs,
-                color,
-                shade,
-                light,
-                side_face.packed_normal,
-            );
+            if fluid_diag_enabled {
+                fluid_semantic_record_diag(
+                    block,
+                    "side-record",
+                    state,
+                    facing,
+                    false,
+                    FLUID_FACE_SIDE,
+                    y_offset,
+                    [h1, h2, 0.0, 0.0],
+                    [x1, z1, x2, z2],
+                    uvs,
+                    color,
+                    shade,
+                    light,
+                    side_face.packed_normal,
+                );
+            }
             let append_started = profile_start(profile_fluid_substages);
-            native_fluid_diag_log(format_args!(
+            fluid_log!(
                 "emit-side pos={},{},{} dir={} facing={} overlay={} h={:.4},{:.4}",
                 block.absolute_x,
                 block.absolute_y,
@@ -537,7 +592,7 @@ pub(in crate::render::chunk::meshing) fn native_section_fluid_faces_to_sink<
                 is_overlay,
                 h1,
                 h2
-            ));
+            );
             sink.emit(side_face)?;
             sink.mark_fluid_sprite(fluid_sprite_mask(state.fluid_type, false, is_overlay));
             emitted += 1;
@@ -546,24 +601,26 @@ pub(in crate::render::chunk::meshing) fn native_section_fluid_faces_to_sink<
             if !is_overlay {
                 let normal_backface_started = profile_start(profile_fluid_substages);
                 let back_face = flipped_fluid_back_face(side_face, opposite_facing);
-                fluid_semantic_record_diag(
-                    block,
-                    "side-back-record",
-                    state,
-                    opposite_facing,
-                    true,
-                    FLUID_FACE_SIDE,
-                    y_offset,
-                    [h1, h2, 0.0, 0.0],
-                    [x1, z1, x2, z2],
-                    uvs,
-                    color,
-                    shade,
-                    light,
-                    back_face.packed_normal,
-                );
+                if fluid_diag_enabled {
+                    fluid_semantic_record_diag(
+                        block,
+                        "side-back-record",
+                        state,
+                        opposite_facing,
+                        true,
+                        FLUID_FACE_SIDE,
+                        y_offset,
+                        [h1, h2, 0.0, 0.0],
+                        [x1, z1, x2, z2],
+                        uvs,
+                        color,
+                        shade,
+                        light,
+                        back_face.packed_normal,
+                    );
+                }
                 let append_started = profile_start(profile_fluid_substages);
-                native_fluid_diag_log(format_args!(
+                fluid_log!(
                     "emit-side-back pos={},{},{} dir={} facing={} h={:.4},{:.4}",
                     block.absolute_x,
                     block.absolute_y,
@@ -572,7 +629,7 @@ pub(in crate::render::chunk::meshing) fn native_section_fluid_faces_to_sink<
                     back_face.facing,
                     h1,
                     h2
-                ));
+                );
                 sink.emit(back_face)?;
                 sink.mark_fluid_sprite(fluid_sprite_mask(state.fluid_type, false, false));
                 emitted += 1;
@@ -587,9 +644,12 @@ pub(in crate::render::chunk::meshing) fn native_section_fluid_faces_to_sink<
     }
     sink.profile()
         .add_stage(PROFILE_FLUID_GEOM_UV, geometry_started);
-    native_fluid_diag_log(format_args!(
+    fluid_log!(
         "end pos={},{},{} emitted={}",
-        block.absolute_x, block.absolute_y, block.absolute_z, emitted
-    ));
+        block.absolute_x,
+        block.absolute_y,
+        block.absolute_z,
+        emitted
+    );
     Ok(emitted)
 }
