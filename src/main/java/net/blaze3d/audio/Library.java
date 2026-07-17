@@ -23,6 +23,10 @@ public class Library {
 	}
 
 	public void init(@Nullable String string, boolean bl) {
+		if (this.currentDevice != NO_DEVICE) {
+			this.cleanup();
+		}
+
 		this.currentDevice = NativeAudio.deviceCreate(string, bl);
 		this.listener.setDeviceHandle(this.currentDevice);
 		this.listener.reset();
@@ -85,7 +89,7 @@ public class Library {
 			return null;
 		}
 
-		return new Channel(this.currentDevice, pool);
+		return new Channel(this.currentDevice);
 	}
 
 	public void releaseChannel(Channel channel) {

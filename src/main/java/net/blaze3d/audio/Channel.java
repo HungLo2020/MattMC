@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.nio.ByteBuffer;
-import java.util.concurrent.atomic.AtomicBoolean;
 import javax.sound.sampled.AudioFormat;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
@@ -24,35 +23,21 @@ public class Channel {
 	private static final int AL_PAUSED = 4115;
 	private static final int AL_STOPPED = 4116;
 	private final long deviceHandle;
-	private final Library.Pool pool;
 	private final NativeAudio.SoundConfig config = new NativeAudio.SoundConfig();
-	private final AtomicBoolean initialized = new AtomicBoolean(true);
 	private long soundHandle;
 	private int streamingBufferSize = 16384;
 	@Nullable
 	private AudioStream stream;
 
-	Channel(long deviceHandle, Library.Pool pool) {
+	Channel(long deviceHandle) {
 		this.deviceHandle = deviceHandle;
-		this.pool = pool;
 	}
 
 	public void destroy() {
-		if (this.initialized.compareAndSet(true, false)) {
-			if (this.stream != null) {
-				try {
-					this.stream.close();
-				} catch (IOException var2) {
-					LOGGER.error("Failed to close audio stream", (Throwable)var2);
-				}
-
-				this.stream = null;
-			}
-
-			if (this.soundHandle != 0L) {
-				NativeAudio.soundStopAndDestroy(this.soundHandle);
-				this.soundHandle = 0L;
-			}
+		this.closeStream();
+		if (this.soundHandle != 0L) {
+			NativeAudio.soundStopAndDestroy(this.soundHandle);
+			this.soundHandle = 0L;
 		}
 	}
 
@@ -63,7 +48,7 @@ public class Channel {
 	}
 
 	private int getState() {
-		return !this.initialized.get() || this.soundHandle == 0L ? AL_STOPPED : NativeAudio.soundState(this.soundHandle);
+		return this.soundHandle == 0L ? AL_STOPPED : NativeAudio.soundState(this.soundHandle);
 	}
 
 	public void pause() {
@@ -79,7 +64,7 @@ public class Channel {
 	}
 
 	public void stop() {
-		if (this.initialized.get() && this.soundHandle != 0L) {
+		if (this.soundHandle != 0L) {
 			NativeAudio.soundStop(this.soundHandle);
 		}
 	}
@@ -133,13 +118,13 @@ public class Channel {
 	}
 
 	public void attachStaticBuffer(SoundBuffer soundBuffer) {
-		if (!this.initialized.get() || this.soundHandle != 0L) {
+		if (this.soundHandle != 0L) {
 			return;
 		}
 
 		soundBuffer.getNativeBuffer(this.deviceHandle).ifPresent(buffer -> {
 			this.soundHandle = NativeAudio.soundCreateStatic(this.deviceHandle, this.config, buffer);
-			this.warnIfPoolExhausted();
+			this.warnIfPoolExhausted("static");
 		});
 	}
 
@@ -147,9 +132,9 @@ public class Channel {
 		this.stream = audioStream;
 		AudioFormat audioFormat = audioStream.getFormat();
 		this.streamingBufferSize = calculateBufferSize(audioFormat, 1);
-		if (this.initialized.get() && this.soundHandle == 0L) {
+		if (this.soundHandle == 0L) {
 			this.soundHandle = NativeAudio.soundCreateStreaming(this.deviceHandle, this.config);
-			this.warnIfPoolExhausted();
+			this.warnIfPoolExhausted("streaming");
 		}
 		if (this.soundHandle != 0L) {
 			this.pumpBuffers(QUEUED_BUFFER_COUNT);
@@ -189,7 +174,7 @@ public class Channel {
 	}
 
 	private void updateNativeSound(int updateMask) {
-		if (this.initialized.get() && this.soundHandle != 0L) {
+		if (this.soundHandle != 0L) {
 			NativeAudio.soundUpdate(this.soundHandle, updateMask, this.config);
 		}
 	}
@@ -202,9 +187,21 @@ public class Channel {
 		}
 	}
 
-	private void warnIfPoolExhausted() {
+	private void warnIfPoolExhausted(String pool) {
 		if (this.soundHandle == 0L && net.minecraft.SharedConstants.IS_RUNNING_IN_IDE) {
-			LOGGER.warn("Maximum sound pool size reached for {}", this.pool);
+			LOGGER.warn("Maximum sound pool size reached for {}", pool);
+		}
+	}
+
+	private void closeStream() {
+		if (this.stream != null) {
+			try {
+				this.stream.close();
+			} catch (IOException ioException) {
+				LOGGER.error("Failed to close audio stream", (Throwable)ioException);
+			}
+
+			this.stream = null;
 		}
 	}
 }

@@ -62,11 +62,12 @@ final class NativeAudio {
 		ValueLayout.ADDRESS
 	);
 	private static final FunctionDescriptor HANDLE_DESCRIPTOR = FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG);
-	private static final FunctionDescriptor SOURCE_STATE_DESCRIPTOR = FunctionDescriptor.of(
+	private static final FunctionDescriptor HANDLE_INT_OUTPUT_DESCRIPTOR = FunctionDescriptor.of(
 		ValueLayout.JAVA_INT,
 		ValueLayout.JAVA_LONG,
 		ValueLayout.ADDRESS
 	);
+	private static final FunctionDescriptor INT_ARRAY_OUTPUT_DESCRIPTOR = FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS);
 	private static final FunctionDescriptor BUFFER_CREATE_DESCRIPTOR = FunctionDescriptor.of(
 		ValueLayout.JAVA_INT,
 		ValueLayout.JAVA_LONG,
@@ -133,14 +134,14 @@ final class NativeAudio {
 	private static final MethodHandle DEVICE_DESTROY = downcall("mattmc_audio_device_destroy", HANDLE_DESCRIPTOR);
 	private static final MethodHandle DEVICE_DISCONNECTED = downcall(
 		"mattmc_audio_device_is_disconnected",
-		SOURCE_STATE_DESCRIPTOR
+		HANDLE_INT_OUTPUT_DESCRIPTOR
 	);
 	private static final MethodHandle DEVICE_DEFAULT_CHANGED = downcall(
 		"mattmc_audio_device_has_default_changed",
-		SOURCE_STATE_DESCRIPTOR
+		HANDLE_INT_OUTPUT_DESCRIPTOR
 	);
-	private static final MethodHandle DEVICE_POOL_COUNTS = downcall("mattmc_audio_device_pool_counts", SOURCE_STATE_DESCRIPTOR);
-	private static final MethodHandle DEBUG_LIVE_COUNTS = downcall("mattmc_audio_debug_live_counts", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
+	private static final MethodHandle DEVICE_POOL_COUNTS = downcall("mattmc_audio_device_pool_counts", HANDLE_INT_OUTPUT_DESCRIPTOR);
+	private static final MethodHandle DEBUG_LIVE_COUNTS = downcall("mattmc_audio_debug_live_counts", INT_ARRAY_OUTPUT_DESCRIPTOR);
 	private static final MethodHandle BUFFER_CREATE = downcall("mattmc_audio_buffer_create", BUFFER_CREATE_DESCRIPTOR);
 	private static final MethodHandle BUFFER_DESTROY = downcall("mattmc_audio_buffer_destroy", HANDLE_DESCRIPTOR);
 	private static final MethodHandle SOUND_CREATE_STATIC = downcall(
@@ -159,14 +160,14 @@ final class NativeAudio {
 	private static final MethodHandle SOUND_PLAY = downcall("mattmc_audio_sound_play", HANDLE_DESCRIPTOR);
 	private static final MethodHandle SOUND_PAUSE = downcall("mattmc_audio_sound_pause", HANDLE_DESCRIPTOR);
 	private static final MethodHandle SOUND_STOP = downcall("mattmc_audio_sound_stop", HANDLE_DESCRIPTOR);
-	private static final MethodHandle SOUND_STATE = downcall("mattmc_audio_sound_state", SOURCE_STATE_DESCRIPTOR);
+	private static final MethodHandle SOUND_STATE = downcall("mattmc_audio_sound_state", HANDLE_INT_OUTPUT_DESCRIPTOR);
 	private static final MethodHandle SOUND_STOP_AND_DESTROY = downcall(
 		"mattmc_audio_sound_stop_and_destroy",
 		HANDLE_DESCRIPTOR
 	);
 	private static final MethodHandle SOUND_REMOVE_PROCESSED_STREAM_BUFFERS = downcall(
 		"mattmc_audio_sound_remove_processed_stream_buffers",
-		SOURCE_STATE_DESCRIPTOR
+		HANDLE_INT_OUTPUT_DESCRIPTOR
 	);
 	private static final MethodHandle LISTENER_UPDATE = downcall("mattmc_audio_listener_update", LISTENER_UPDATE_DESCRIPTOR);
 	private static final MethodHandle FORMAT_TO_OPENAL = downcall("mattmc_audio_format_to_openal", FORMAT_DESCRIPTOR);
@@ -228,12 +229,7 @@ final class NativeAudio {
 			MemorySegment output = arena.allocate(ValueLayout.JAVA_INT, 4);
 			int status = (int)DEVICE_POOL_COUNTS.invokeExact(deviceHandle, output);
 			check(status, "Read audio pool counts");
-			return new int[]{
-				output.get(ValueLayout.JAVA_INT, 0),
-				output.get(ValueLayout.JAVA_INT, Integer.BYTES),
-				output.get(ValueLayout.JAVA_INT, 2L * Integer.BYTES),
-				output.get(ValueLayout.JAVA_INT, 3L * Integer.BYTES)
-			};
+			return readIntArray4(output);
 		} catch (Throwable throwable) {
 			throw nativeFailure("Read audio pool counts", throwable);
 		}
@@ -244,12 +240,7 @@ final class NativeAudio {
 			MemorySegment output = arena.allocate(ValueLayout.JAVA_INT, 4);
 			int status = (int)DEBUG_LIVE_COUNTS.invokeExact(output);
 			check(status, "Read native audio live counts");
-			return new int[]{
-				output.get(ValueLayout.JAVA_INT, 0),
-				output.get(ValueLayout.JAVA_INT, Integer.BYTES),
-				output.get(ValueLayout.JAVA_INT, 2L * Integer.BYTES),
-				output.get(ValueLayout.JAVA_INT, 3L * Integer.BYTES)
-			};
+			return readIntArray4(output);
 		} catch (Throwable throwable) {
 			throw nativeFailure("Read native audio live counts", throwable);
 		}
@@ -489,6 +480,15 @@ final class NativeAudio {
 		} catch (Throwable throwable) {
 			throw nativeFailure(operation, throwable);
 		}
+	}
+
+	private static int[] readIntArray4(MemorySegment output) {
+		return new int[]{
+			output.get(ValueLayout.JAVA_INT, 0),
+			output.get(ValueLayout.JAVA_INT, Integer.BYTES),
+			output.get(ValueLayout.JAVA_INT, 2L * Integer.BYTES),
+			output.get(ValueLayout.JAVA_INT, 3L * Integer.BYTES)
+		};
 	}
 
 	private static void checkHandle(MethodHandle handle, long handleValue, String operation) {

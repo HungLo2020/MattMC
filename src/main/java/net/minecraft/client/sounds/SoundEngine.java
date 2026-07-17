@@ -107,7 +107,6 @@ public class SoundEngine {
 				this.executor.executeBlocking(() -> {
 					try {
 						this.library.init("".equals(string) ? null : string, directionalAudio);
-						this.listener.reset();
 						net.blaze3d.audio.DevAudioValidation.maybeRun(this.library, "".equals(string) ? null : string, directionalAudio);
 					} catch (RuntimeException runtimeException) {
 						loadFailure.set(runtimeException);
