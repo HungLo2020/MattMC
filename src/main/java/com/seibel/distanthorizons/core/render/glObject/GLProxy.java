@@ -35,6 +35,9 @@ public class GLProxy
 	public static final Set<String> LOGGED_GL_MESSAGES = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
 	
 	private static final ConcurrentLinkedQueue<Runnable> RENDER_THREAD_RUNNABLE_QUEUE = new ConcurrentLinkedQueue<>();
+	private static final long DEFAULT_RENDER_THREAD_TASK_BUDGET_NANOS = 4_000_000L;
+	private static final long VULKAN_LOD_UPLOAD_TASK_BUDGET_NANOS = 32_000_000L;
+	private static final int VULKAN_LOD_UPLOAD_MIN_TASKS = 64;
 	
 	
 	
@@ -284,23 +287,47 @@ public class GLProxy
 	 */
 	public static void runRenderThreadTasks()
 	{
+		runRenderThreadTasks(DEFAULT_RENDER_THREAD_TASK_BUDGET_NANOS, 0);
+	}
+
+	public static void runLodUploadRenderThreadTasks()
+	{
+		if (VulkanicAPI.isVulkanBackendSelected())
+		{
+			runRenderThreadTasks(VULKAN_LOD_UPLOAD_TASK_BUDGET_NANOS, VULKAN_LOD_UPLOAD_MIN_TASKS);
+			return;
+		}
+		runRenderThreadTasks();
+	}
+
+	static int runRenderThreadTasksForTesting(long maxDurationNanos, int minimumTaskCount)
+	{
+		return runRenderThreadTasks(maxDurationNanos, minimumTaskCount);
+	}
+
+	private static int runRenderThreadTasks(long maxDurationNanos, int minimumTaskCount)
+	{
 		long startTime = System.nanoTime();
+		int tasksRun = 0;
 		
 		Runnable runnable = RENDER_THREAD_RUNNABLE_QUEUE.poll();
 		while(runnable != null)
 		{
 			runnable.run();
+			tasksRun++;
 			
-			// only try running for 4ms (240 FPS) at a time to prevent random lag spikes
+			// Keep a time budget to prevent random lag spikes, while still allowing
+			// Vulkan's slower compatibility uploads to make bounded progress.
 			long currentTime = System.nanoTime();
 			long runDuration = currentTime - startTime;
-			if (runDuration > 4_000_000)
+			if (tasksRun >= minimumTaskCount && runDuration > maxDurationNanos)
 			{
 				break;
 			}
 			
 			runnable = RENDER_THREAD_RUNNABLE_QUEUE.poll();
 		}
+		return tasksRun;
 	}
 	
 	

@@ -108,7 +108,7 @@ final class VulkanDescriptorSetLayoutPlannerTest {
 
     @Test
     void runtimeBindingPlanDescriptorTypesMatchLayoutPlanForSetZero() {
-        LegacyTextureStorageSnapshot texture = textureSnapshot(7);
+        VulkanImageResourceViewCoordinator.ImageStorageSnapshot texture = textureSnapshot(7);
         VulkanTextureView view = textureView(texture);
         VulkanBuffer buffer = new VulkanBuffer(0x7000L, 0x8000L, VulkanicBuffer.USAGE_UNIFORM, 1024, "layout-runtime", () -> {});
         List<PipelineDescriptor.ResourceBinding> layout = List.of(
@@ -131,7 +131,7 @@ final class VulkanDescriptorSetLayoutPlannerTest {
                     .bindUniformBuffer("Globals", new VulkanicBufferSlice(buffer, 0, 128))
                     .bindStorageImage("Image0", new PipelineResourceBindings.StorageImageBinding(
                         0,
-                        texture.id(),
+                        texture.textureId(),
                         0,
                         false,
                         0,
@@ -141,8 +141,10 @@ final class VulkanDescriptorSetLayoutPlannerTest {
                     .bindTexelBuffer("CloudFaces", 1)
                     .build(),
                 new SingleTextureLookup(view, texture),
-                unit -> unit == 1 ? new TextureBindingSnapshot(1, texture.id(), 0, null) : null,
-                id -> id == texture.id() ? new LegacyTexelBufferBinding(VulkanicAPI.GL_RGBA8, 9, 0x9000L) : null,
+                unit -> unit == 1 ? new TextureBindingSnapshot(1, texture.textureId(), 0, null) : null,
+                id -> id == texture.textureId()
+                    ? new VulkanImageResourceViewCoordinator.TexelBufferViewPlan(texture.textureId(), VulkanicAPI.GL_RGBA8, 9, 0x9000L)
+                    : null,
                 NullSamplerStateLookup.INSTANCE,
                 (textureId, level) -> VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 new VulkanDescriptorBindingPlanner.RenderStateSnapshot(false, Set.of()),
@@ -200,8 +202,8 @@ final class VulkanDescriptorSetLayoutPlannerTest {
         return new PipelineDescriptor.ResourceBinding(set, binding, name, type, textureFormat, stages);
     }
 
-    private static LegacyTextureStorageSnapshot textureSnapshot(int id) {
-        return new LegacyTextureStorageSnapshot(
+    private static VulkanImageResourceViewCoordinator.ImageStorageSnapshot textureSnapshot(int id) {
+        return new VulkanImageResourceViewCoordinator.ImageStorageSnapshot(
             id,
             VulkanicAPI.GL_TEXTURE_2D,
             0x5000L + id,
@@ -228,7 +230,7 @@ final class VulkanDescriptorSetLayoutPlannerTest {
         );
     }
 
-    private static VulkanTextureView textureView(LegacyTextureStorageSnapshot texture) {
+    private static VulkanTextureView textureView(VulkanImageResourceViewCoordinator.ImageStorageSnapshot texture) {
         VulkanTexture vulkanTexture = new VulkanTexture(
             texture.imageHandle(),
             texture.memoryHandle(),
@@ -242,21 +244,70 @@ final class VulkanDescriptorSetLayoutPlannerTest {
             "layout-planner-texture",
             () -> {}
         );
-        return new VulkanTextureView(vulkanTexture, texture.defaultViewHandle(), 0, 1, texture.id(), () -> {});
+        return new VulkanTextureView(vulkanTexture, texture.defaultViewHandle(), 0, 1, texture.textureId(), () -> {});
     }
 
     private record SingleTextureLookup(
         VulkanTextureView view,
-        LegacyTextureStorageSnapshot texture
+        VulkanImageResourceViewCoordinator.ImageStorageSnapshot texture
     ) implements VulkanDescriptorBindingPlanner.TextureSnapshotLookup {
         @Override
-        public LegacyTextureStorageSnapshot snapshotForView(VulkanTextureView view) {
+        public VulkanImageResourceViewCoordinator.ImageStorageSnapshot snapshotForView(VulkanTextureView view) {
             return this.view == view ? texture : null;
         }
 
         @Override
-        public LegacyTextureStorageSnapshot snapshotForTexture(int textureId) {
-            return texture.id() == textureId ? texture : null;
+        public VulkanImageResourceViewCoordinator.ImageStorageSnapshot snapshotForTexture(int textureId) {
+            return texture.textureId() == textureId ? texture : null;
+        }
+
+        @Override
+        public VulkanImageResourceViewCoordinator.DescriptorImagePlan descriptorSampledImagePlan(
+            VulkanTextureView view,
+            VulkanImageResourceViewCoordinator.ImageStorageSnapshot storage,
+            Set<Integer> storageImageTextureIds,
+            VulkanDescriptorBindingPlanner.LayoutLookup layoutLookup,
+            VulkanDescriptorBindingPlanner.RenderStateSnapshot renderState
+        ) {
+            return new VulkanImageResourceViewCoordinator.DescriptorImagePlan(
+                view,
+                storage,
+                view.getVkImageViewHandle(),
+                storage != null ? storage.defaultViewHandle() : view.getVkImageViewHandle(),
+                Math.max(0, view.getBaseMipLevel()),
+                Math.max(1, view.getMipLevelCount()),
+                false,
+                storage != null && view.getVkImageViewHandle() != storage.defaultViewHandle(),
+                storage != null && storageImageTextureIds.contains(storage.textureId()),
+                storage != null && storageImageTextureIds.contains(storage.textureId())
+                    ? VulkanDescriptorBindingPlanner.DescriptorTransitionRequirement.STORAGE_IMAGE
+                    : VulkanDescriptorBindingPlanner.DescriptorTransitionRequirement.SAMPLE,
+                storage != null && storageImageTextureIds.contains(storage.textureId())
+                    ? VK10.VK_IMAGE_LAYOUT_GENERAL
+                    : VulkanImageUse.SAMPLED_COLOR.vkLayout(),
+                null
+            );
+        }
+
+        @Override
+        public VulkanImageResourceViewCoordinator.DescriptorImagePlan descriptorStorageImagePlan(
+            int textureId,
+            int mipLevel
+        ) {
+            return new VulkanImageResourceViewCoordinator.DescriptorImagePlan(
+                null,
+                texture.textureId() == textureId ? texture : null,
+                texture.defaultViewHandle(),
+                texture.defaultViewHandle(),
+                Math.max(0, mipLevel),
+                1,
+                false,
+                false,
+                true,
+                VulkanDescriptorBindingPlanner.DescriptorTransitionRequirement.STORAGE_IMAGE,
+                VK10.VK_IMAGE_LAYOUT_GENERAL,
+                null
+            );
         }
     }
 

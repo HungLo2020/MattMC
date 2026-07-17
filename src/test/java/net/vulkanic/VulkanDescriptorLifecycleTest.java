@@ -276,22 +276,26 @@ public class VulkanDescriptorLifecycleTest {
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanDescriptorBindingPlanner.java"))
             .replace("\r\n", "\n")
             .replace('\r', '\n');
+        String imageCoordinatorSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanImageResourceViewCoordinator.java"))
+            .replace("\r\n", "\n")
+            .replace('\r', '\n');
 
         assertTrue(plannerSource.contains("collectStorageImageTextureIds"),
             "Vulkan descriptor planning should detect textures that are also bound as storage images");
-        assertTrue(plannerSource.contains("storageImageCompatibleSample"),
+        assertTrue(imageCoordinatorSource.contains("boolean storageImageCompatible"),
             "Sampler descriptor resolution should classify sampled textures that also have storage-image bindings");
-        assertTrue(plannerSource.contains("isStorageImageLayoutCompatibleSampler"),
+        assertTrue(imageCoordinatorSource.contains("isStorageImageLayoutCompatibleSampler"),
             "Sampler descriptor resolution should preserve GENERAL layout for storage-capable sampled textures already in GENERAL");
-        assertTrue(plannerSource.contains("layoutLookup.trackedLayout(texture.id(), level) != VK10.VK_IMAGE_LAYOUT_GENERAL"),
+        assertTrue(imageCoordinatorSource.contains("layoutLookup.trackedLayout(storage.textureId(), level) != VK10.VK_IMAGE_LAYOUT_GENERAL"),
             "Storage-compatible sampler detection should be based on the tracked per-mip image layout");
-        assertTrue(plannerSource.contains("descriptorImageLayoutFor(\n            sampledTexture,\n            storageImageCompatibleSample,"),
+        assertTrue(plannerSource.contains("request.textureLookup().descriptorSampledImagePlan"),
             "Sampler descriptor writes should choose their image layout with storage-image compatibility in mind");
-        assertTrue(plannerSource.contains("if (storageImageCompatible) {\n            return VK10.VK_IMAGE_LAYOUT_GENERAL;\n        }"),
+        assertTrue(imageCoordinatorSource.contains("if (storageImageCompatible) {\n            return VK10.VK_IMAGE_LAYOUT_GENERAL;\n        }"),
             "A sampled texture that is also bound as a storage image must be described with GENERAL layout");
         assertTrue(backendSource.contains("case STORAGE_IMAGE -> transitionLegacyTextureToStorageImageLayout("),
             "Shared storage/sampled textures should be transitioned to the storage-compatible layout instead of shader-read-only");
-        assertTrue(plannerSource.contains(": storageImageCompatibleSample\n                ? DescriptorTransitionRequirement.NONE\n                : DescriptorTransitionRequirement.SAMPLE"),
+        assertTrue(imageCoordinatorSource.contains("? VulkanDescriptorBindingPlanner.DescriptorTransitionRequirement.NONE\n                : VulkanDescriptorBindingPlanner.DescriptorTransitionRequirement.SAMPLE"),
             "Storage/general-compatible sampled textures should not be forced back to shader-read-only during descriptor writes");
     }
 
@@ -303,24 +307,23 @@ public class VulkanDescriptorLifecycleTest {
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanRenderPassLayoutPlanner.java"));
         String descriptorPlannerSource = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanDescriptorBindingPlanner.java"));
+        String imageCoordinatorSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanImageResourceViewCoordinator.java"));
         String normalized = source.replaceAll("\\s+", " ");
         String normalizedRenderPassPlanner = renderPassPlannerSource.replaceAll("\\s+", " ");
-        String normalizedDescriptorPlanner = descriptorPlannerSource.replaceAll("\\s+", " ");
-        String descriptorSelection = descriptorPlannerSource.substring(descriptorPlannerSource.indexOf("int descriptorImageLayoutFor"),
-            descriptorPlannerSource.indexOf("private boolean shouldUseFeedbackLoopLayoutForSampling"));
+        String normalizedImageCoordinator = imageCoordinatorSource.replaceAll("\\s+", " ");
         String sampleTransition = source.substring(source.indexOf("private void transitionLegacyTextureToSampleLayout(@Nullable LegacyTextureObject texture,"),
             source.indexOf("private void transitionLegacyTextureToStorageImageLayout"));
         String preferredIdleLayout = source.substring(source.indexOf("private int preferredIdleLayout"),
             source.indexOf("private void clearLegacyColorTexture"));
-        String normalizedDescriptorSelection = descriptorSelection.replaceAll("\\s+", " ");
         String normalizedSampleTransition = sampleTransition.replaceAll("\\s+", " ");
         String normalizedPreferredIdleLayout = preferredIdleLayout.replaceAll("\\s+", " ");
 
-        assertTrue(normalizedDescriptorPlanner.contains("private boolean shouldUseFeedbackLoopLayoutForSampling( LegacyTextureStorageSnapshot texture, RenderStateSnapshot renderState )"),
+        assertTrue(normalizedImageCoordinator.contains("int descriptorImageLayoutFor("),
             "Feedback-loop-capable images should not be described as feedback-loop layout for ordinary sampled reads");
-        assertTrue(normalizedDescriptorPlanner.contains("texture.feedbackLoopCapable() && renderState.renderPassRecording() && renderState.activeAttachmentTextureIds().contains(texture.id())"),
+        assertTrue(normalizedImageCoordinator.contains("storage.feedbackLoopCapable() && renderState.renderPassRecording() && renderState.activeAttachmentTextureIds().contains(storage.textureId())"),
             "Feedback-loop layout should be limited to textures that are actively bound as attachments in the current render pass");
-        assertTrue(normalizedDescriptorSelection.contains("if (shouldUseFeedbackLoopLayoutForSampling(texture, renderState)) { return VulkanImageUse.FEEDBACK_LOOP.vkLayout(); }"),
+        assertTrue(normalizedImageCoordinator.contains("return VulkanImageUse.FEEDBACK_LOOP.vkLayout();"),
             "Descriptor image layout selection should route feedback-loop layout through the active-attachment predicate");
         assertTrue(normalized.contains("int targetLayout = shouldUseFeedbackLoopLayoutForSampling(texture) ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT"),
             "Sampler transitions should route feedback-loop layout through the active-attachment predicate");
@@ -328,7 +331,7 @@ public class VulkanDescriptorLifecycleTest {
             "Resource usage mapping should select feedback-loop layout only for explicit attachment feedback");
         assertFalse(normalized.contains("|| usage == VulkanicResourceUsage.SAMPLED_READ"),
             "SAMPLED_READ must resolve to shader/depth read-only layouts even for feedback-loop-capable images");
-        assertFalse(normalizedDescriptorSelection.contains("if (texture.feedbackLoopCapable) { return VulkanImageUse.FEEDBACK_LOOP.vkLayout(); }"),
+        assertFalse(normalizedImageCoordinator.contains("if (storage.feedbackLoopCapable()) { return VulkanImageUse.FEEDBACK_LOOP.vkLayout(); }"),
             "Descriptor image layout selection should not permanently force every feedback-capable texture into feedback-loop layout");
         assertFalse(normalizedSampleTransition.contains("int targetLayout = texture.feedbackLoopCapable ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT"),
             "Sampler transitions should use feedback-loop layout only for active attachment feedback, not all feedback-capable textures");

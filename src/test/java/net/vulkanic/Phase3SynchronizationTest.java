@@ -212,11 +212,11 @@ public class Phase3SynchronizationTest {
             "Vulkan raw memoryBarrier calls with unsupported bits should still emit a conservative native barrier");
         assertTrue(source.contains("VK10.vkCmdPipelineBarrier("),
             "Vulkan native barrier path should use vkCmdPipelineBarrier");
-        assertTrue(source.contains("VulkanSynchronizationPlanner.planResourceBarrier(barriers, renderPassRecording)"),
+        assertTrue(source.contains("VulkanSynchronizationPlanner.planResourceBarrier(barriers, isRenderPassRecording())"),
             "In-render-pass barriers should use planner-owned render-pass-compatible masks");
         assertTrue(source.contains("plan.dependencyFlags()"),
             "In-render-pass barriers should opt into BY_REGION self-dependency synchronization");
-        assertTrue(source.contains("VulkanSynchronizationPlanner.planConservativeMemoryBarrier(renderPassRecording)"),
+        assertTrue(source.contains("VulkanSynchronizationPlanner.planConservativeMemoryBarrier(isRenderPassRecording())"),
             "Conservative memory barriers should also be legal inside an active render pass");
         assertFalse(source.contains("Vulkan-native resource barrier mapping is not implemented yet."),
             "Vulkan barrier mapping should no longer be marked unsupported");

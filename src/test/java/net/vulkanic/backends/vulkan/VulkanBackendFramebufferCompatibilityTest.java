@@ -73,12 +73,16 @@ public class VulkanBackendFramebufferCompatibilityTest {
 			.resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanDescriptorBindingPlanner.java"))
 			.replace("\r\n", "\n")
 			.replace('\r', '\n');
+		String imageCoordinatorSource = Files.readString(PROJECT_ROOT
+			.resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanImageResourceViewCoordinator.java"))
+			.replace("\r\n", "\n")
+			.replace('\r', '\n');
 
-		String descriptorLayoutHelper = plannerSource.substring(
-			plannerSource.indexOf("int descriptorImageLayoutFor"),
-			plannerSource.indexOf("private boolean shouldUseFeedbackLoopLayoutForSampling")
+		String descriptorLayoutHelper = imageCoordinatorSource.substring(
+			imageCoordinatorSource.indexOf("int descriptorImageLayoutFor"),
+			imageCoordinatorSource.indexOf("static int layerCount")
 		);
-		assertTrue(descriptorLayoutHelper.contains("hasDepthAspect(texture)"),
+		assertTrue(descriptorLayoutHelper.contains("storage.hasDepthAspect()"),
 			"Depth/stencil textures sampled by shaders must use the depth-read descriptor layout");
 		assertFalse(descriptorLayoutHelper.contains("texture.aspectMask == VK10.VK_IMAGE_ASPECT_DEPTH_BIT"),
 			"A combined depth/stencil image still has a depth aspect; equality would misclassify it as color");
@@ -94,7 +98,7 @@ public class VulkanBackendFramebufferCompatibilityTest {
 
 		String descriptorViewHelper = source.substring(
 			source.indexOf("private long descriptorImageViewHandleForSampler"),
-			source.indexOf("private boolean shouldUseFeedbackLoopLayoutForSampling")
+			source.indexOf("private DescriptorWritePlan buildDescriptorWritePlan")
 		);
 		String normalizedDescriptorViewHelper = descriptorViewHelper.replaceAll("\\s+", " ");
 		assertTrue(normalizedDescriptorViewHelper.contains("!hasDepthAspect(texture) || !hasStencilAspect(texture)"),

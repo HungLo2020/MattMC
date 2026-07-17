@@ -29,7 +29,7 @@ final class VulkanDescriptorBindingPlannerTest {
     @Test
     void sampledImageAndSamplerStateProduceSamplerEntry() {
         PlanFixture fixture = new PlanFixture();
-        LegacyTextureStorageSnapshot texture = textureSnapshot(11, VK10.VK_IMAGE_ASPECT_COLOR_BIT, 2, 0x1100L);
+        VulkanImageResourceViewCoordinator.ImageStorageSnapshot texture = textureSnapshot(11, VK10.VK_IMAGE_ASPECT_COLOR_BIT, 2, 0x1100L);
         VulkanTextureView view = textureView(texture, 0x2200L, 0, 2);
         fixture.bindView(view, texture);
         fixture.unitSamplerStates.put(3, new VirtualSamplerStateSnapshot(
@@ -77,7 +77,7 @@ final class VulkanDescriptorBindingPlannerTest {
     @Test
     void storageImageAndSharedSamplerUseGeneralLayout() {
         PlanFixture fixture = new PlanFixture();
-        LegacyTextureStorageSnapshot texture = textureSnapshot(
+        VulkanImageResourceViewCoordinator.ImageStorageSnapshot texture = textureSnapshot(
             12,
             VK10.VK_IMAGE_ASPECT_COLOR_BIT,
             3,
@@ -86,7 +86,7 @@ final class VulkanDescriptorBindingPlannerTest {
         );
         VulkanTextureView view = textureView(texture, 0x2201L, 0, 2);
         fixture.bindView(view, texture);
-        fixture.textureLayouts.put(levelKey(texture.id(), 0), VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        fixture.textureLayouts.put(levelKey(texture.textureId(), 0), VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         VulkanDescriptorBindingPlanner.DescriptorBindingPlan plan = fixture.plan(
             List.of(
@@ -97,7 +97,7 @@ final class VulkanDescriptorBindingPlannerTest {
                 .bindSampler("Sampler0", view, 0)
                 .bindStorageImage("Image0", new PipelineResourceBindings.StorageImageBinding(
                     0,
-                    texture.id(),
+                    texture.textureId(),
                     1,
                     false,
                     0,
@@ -157,7 +157,7 @@ final class VulkanDescriptorBindingPlannerTest {
     void texelBufferUsesTextureBindingSnapshot() {
         PlanFixture fixture = new PlanFixture();
         fixture.textureBindings.put(5, new TextureBindingSnapshot(5, 44, 0, null));
-        fixture.texelBindings.put(44, new LegacyTexelBufferBinding(VulkanicAPI.GL_RGBA8, 77, 0x4400L));
+        fixture.texelBindings.put(44, new VulkanImageResourceViewCoordinator.TexelBufferViewPlan(44, VulkanicAPI.GL_RGBA8, 77, 0x4400L));
 
         VulkanDescriptorBindingPlanner.DescriptorBindingPlan plan = fixture.plan(
             List.of(new PipelineDescriptor.ResourceBinding(
@@ -184,8 +184,8 @@ final class VulkanDescriptorBindingPlannerTest {
     @Test
     void comparisonSamplerUsesDepthFallbackWhenPrimaryIsNotDepth() {
         PlanFixture fixture = new PlanFixture();
-        LegacyTextureStorageSnapshot color = textureSnapshot(21, VK10.VK_IMAGE_ASPECT_COLOR_BIT, 1, 0x2100L);
-        LegacyTextureStorageSnapshot depth = textureSnapshot(22, VK10.VK_IMAGE_ASPECT_DEPTH_BIT, 1, 0x2200L);
+        VulkanImageResourceViewCoordinator.ImageStorageSnapshot color = textureSnapshot(21, VK10.VK_IMAGE_ASPECT_COLOR_BIT, 1, 0x2100L);
+        VulkanImageResourceViewCoordinator.ImageStorageSnapshot depth = textureSnapshot(22, VK10.VK_IMAGE_ASPECT_DEPTH_BIT, 1, 0x2200L);
         VulkanTextureView colorView = textureView(color, 0x3100L, 0, 1);
         VulkanTextureView depthView = textureView(depth, 0x3200L, 0, 1);
         fixture.bindView(colorView, color);
@@ -209,7 +209,7 @@ final class VulkanDescriptorBindingPlannerTest {
     @Test
     void plansAreImmutableAndEquivalentStateProducesEquivalentPlans() {
         PlanFixture fixture = new PlanFixture();
-        LegacyTextureStorageSnapshot texture = textureSnapshot(31, VK10.VK_IMAGE_ASPECT_COLOR_BIT, 1, 0x3100L);
+        VulkanImageResourceViewCoordinator.ImageStorageSnapshot texture = textureSnapshot(31, VK10.VK_IMAGE_ASPECT_COLOR_BIT, 1, 0x3100L);
         VulkanTextureView view = textureView(texture, 0x4100L, 0, 1);
         fixture.bindView(view, texture);
         List<PipelineDescriptor.ResourceBinding> layout =
@@ -250,7 +250,7 @@ final class VulkanDescriptorBindingPlannerTest {
     }
 
     private static VulkanTextureView textureView(
-        LegacyTextureStorageSnapshot texture,
+        VulkanImageResourceViewCoordinator.ImageStorageSnapshot texture,
         long imageViewHandle,
         int baseMip,
         int mipCount
@@ -265,13 +265,13 @@ final class VulkanDescriptorBindingPlannerTest {
             texture.height(),
             texture.depth(),
             texture.mipLevels(),
-            "planner-texture-" + texture.id(),
+            "planner-texture-" + texture.textureId(),
             () -> {}
         );
-        return new VulkanTextureView(vulkanTexture, imageViewHandle, baseMip, mipCount, texture.id(), () -> {});
+        return new VulkanTextureView(vulkanTexture, imageViewHandle, baseMip, mipCount, texture.textureId(), () -> {});
     }
 
-    private static LegacyTextureStorageSnapshot textureSnapshot(
+    private static VulkanImageResourceViewCoordinator.ImageStorageSnapshot textureSnapshot(
         int id,
         int aspect,
         int mipLevels,
@@ -280,14 +280,14 @@ final class VulkanDescriptorBindingPlannerTest {
         return textureSnapshot(id, aspect, mipLevels, defaultViewHandle, 0);
     }
 
-    private static LegacyTextureStorageSnapshot textureSnapshot(
+    private static VulkanImageResourceViewCoordinator.ImageStorageSnapshot textureSnapshot(
         int id,
         int aspect,
         int mipLevels,
         long defaultViewHandle,
         int usageFlags
     ) {
-        return new LegacyTextureStorageSnapshot(
+        return new VulkanImageResourceViewCoordinator.ImageStorageSnapshot(
             id,
             VulkanicAPI.GL_TEXTURE_2D,
             0x5000L + id,
@@ -318,24 +318,147 @@ final class VulkanDescriptorBindingPlannerTest {
         );
     }
 
-    private static long levelKey(int textureId, int level) {
-        return (((long) textureId) << 32) ^ (level & 0xffffffffL);
+        private static long levelKey(int textureId, int level) {
+            return (((long) textureId) << 32) ^ (level & 0xffffffffL);
+        }
+
+    private static VulkanImageResourceViewCoordinator.DescriptorImagePlan sampledImagePlan(
+        VulkanTextureView view,
+        VulkanImageResourceViewCoordinator.ImageStorageSnapshot storage,
+        Set<Integer> storageImageTextureIds,
+        VulkanDescriptorBindingPlanner.LayoutLookup layoutLookup,
+        VulkanDescriptorBindingPlanner.RenderStateSnapshot renderState
+    ) {
+        long requestedImageViewHandle = view.getVkImageViewHandle();
+        long descriptorImageViewHandle = requestedImageViewHandle;
+        int baseMipLevel = Math.max(0, view.getBaseMipLevel());
+        int mipLevelCount = Math.max(1, view.getMipLevelCount());
+        boolean remappedToDefaultView = false;
+        if (storage != null
+            && storage.defaultViewHandle() != VK10.VK_NULL_HANDLE
+            && view.getBaseMipLevel() == 0
+            && view.getMipLevelCount() >= storage.mipLevels()) {
+            descriptorImageViewHandle = storage.defaultViewHandle();
+            mipLevelCount = Math.max(1, storage.mipLevels());
+            remappedToDefaultView = requestedImageViewHandle != descriptorImageViewHandle;
+        }
+        boolean explicitStorage = storage != null && storageImageTextureIds.contains(storage.textureId());
+        boolean storageCompatible = explicitStorage || storageImageCompatible(storage, baseMipLevel, mipLevelCount, layoutLookup);
+        VulkanDescriptorBindingPlanner.DescriptorTransitionRequirement transitionRequirement = storage == null
+            ? VulkanDescriptorBindingPlanner.DescriptorTransitionRequirement.NONE
+            : explicitStorage
+            ? VulkanDescriptorBindingPlanner.DescriptorTransitionRequirement.STORAGE_IMAGE
+            : storageCompatible
+            ? VulkanDescriptorBindingPlanner.DescriptorTransitionRequirement.NONE
+            : VulkanDescriptorBindingPlanner.DescriptorTransitionRequirement.SAMPLE;
+        boolean requiresDepthOnlyView = storage != null && storage.hasDepthAspect() && storage.hasStencilAspect();
+        VulkanImageResourceViewCoordinator.ViewMaterializationRequest materializationRequest = requiresDepthOnlyView
+            ? new VulkanImageResourceViewCoordinator.ViewMaterializationRequest(
+                storage.textureId(),
+                storage.imageHandle(),
+                storage.vkFormat(),
+                VK10.VK_IMAGE_ASPECT_DEPTH_BIT,
+                baseMipLevel,
+                mipLevelCount,
+                VulkanImageResourceViewCoordinator.layerCount(storage),
+                VulkanImageResourceViewCoordinator.isCubemapTarget(storage.target()),
+                VulkanImageResourceViewCoordinator.is3DTexture(storage.target()),
+                VulkanImageResourceViewCoordinator.ViewUsage.SAMPLED
+            )
+            : null;
+        return new VulkanImageResourceViewCoordinator.DescriptorImagePlan(
+            view,
+            storage,
+            requestedImageViewHandle,
+            descriptorImageViewHandle,
+            baseMipLevel,
+            mipLevelCount,
+            requiresDepthOnlyView,
+            remappedToDefaultView,
+            storageCompatible,
+            transitionRequirement,
+            imageLayoutFor(storage, storageCompatible, renderState),
+            materializationRequest
+        );
+    }
+
+    private static VulkanImageResourceViewCoordinator.DescriptorImagePlan storageImagePlan(
+        VulkanImageResourceViewCoordinator.ImageStorageSnapshot storage,
+        int mipLevel
+    ) {
+        int safeMipLevel = Math.max(0, mipLevel);
+        return new VulkanImageResourceViewCoordinator.DescriptorImagePlan(
+            null,
+            storage,
+            storage != null ? storage.defaultViewHandle() : VK10.VK_NULL_HANDLE,
+            storage != null ? storage.defaultViewHandle() : VK10.VK_NULL_HANDLE,
+            safeMipLevel,
+            1,
+            false,
+            false,
+            true,
+            VulkanDescriptorBindingPlanner.DescriptorTransitionRequirement.STORAGE_IMAGE,
+            VK10.VK_IMAGE_LAYOUT_GENERAL,
+            null
+        );
+    }
+
+    private static boolean storageImageCompatible(
+        VulkanImageResourceViewCoordinator.ImageStorageSnapshot storage,
+        int baseMipLevel,
+        int mipLevelCount,
+        VulkanDescriptorBindingPlanner.LayoutLookup layoutLookup
+    ) {
+        if (storage == null
+            || storage.feedbackLoopCapable()
+            || storage.aspectMask() != VK10.VK_IMAGE_ASPECT_COLOR_BIT
+            || (storage.imageUsageFlags() & VK10.VK_IMAGE_USAGE_STORAGE_BIT) == 0) {
+            return false;
+        }
+        int endExclusive = Math.min(Math.max(1, storage.mipLevels()), baseMipLevel + Math.max(1, mipLevelCount));
+        for (int level = baseMipLevel; level < endExclusive; level++) {
+            if (layoutLookup.trackedLayout(storage.textureId(), level) != VK10.VK_IMAGE_LAYOUT_GENERAL) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static int imageLayoutFor(
+        VulkanImageResourceViewCoordinator.ImageStorageSnapshot storage,
+        boolean storageCompatible,
+        VulkanDescriptorBindingPlanner.RenderStateSnapshot renderState
+    ) {
+        if (storage == null) {
+            return VulkanImageUse.SAMPLED_COLOR.vkLayout();
+        }
+        if (storageCompatible) {
+            return VK10.VK_IMAGE_LAYOUT_GENERAL;
+        }
+        if (storage.feedbackLoopCapable()
+            && renderState.renderPassRecording()
+            && renderState.activeAttachmentTextureIds().contains(storage.textureId())) {
+            return VulkanImageUse.FEEDBACK_LOOP.vkLayout();
+        }
+        return storage.hasDepthAspect()
+            ? VulkanImageUse.SAMPLED_DEPTH.vkLayout()
+            : VulkanImageUse.SAMPLED_COLOR.vkLayout();
     }
 
     private static final class PlanFixture {
         private final VulkanDescriptorBindingPlanner planner = new VulkanDescriptorBindingPlanner();
-        private final Map<Integer, LegacyTextureStorageSnapshot> textures = new HashMap<>();
-        private final Map<VulkanTextureView, LegacyTextureStorageSnapshot> views = new IdentityHashMap<>();
+        private final Map<Integer, VulkanImageResourceViewCoordinator.ImageStorageSnapshot> textures = new HashMap<>();
+        private final Map<VulkanTextureView, VulkanImageResourceViewCoordinator.ImageStorageSnapshot> views = new IdentityHashMap<>();
         private final Map<Integer, TextureBindingSnapshot> textureBindings = new HashMap<>();
-        private final Map<Integer, LegacyTexelBufferBinding> texelBindings = new HashMap<>();
+        private final Map<Integer, VulkanImageResourceViewCoordinator.TexelBufferViewPlan> texelBindings = new HashMap<>();
         private final Map<Integer, VirtualSamplerStateSnapshot> samplerStates = new HashMap<>();
         private final Map<Integer, VirtualSamplerStateSnapshot> unitSamplerStates = new HashMap<>();
         private final Map<Long, Integer> textureLayouts = new HashMap<>();
         private final List<String> events = new ArrayList<>();
 
-        private void bindView(VulkanTextureView view, LegacyTextureStorageSnapshot texture) {
+        private void bindView(VulkanTextureView view, VulkanImageResourceViewCoordinator.ImageStorageSnapshot texture) {
             views.put(view, texture);
-            textures.put(texture.id(), texture);
+            textures.put(texture.textureId(), texture);
         }
 
         private VulkanDescriptorBindingPlanner.DescriptorBindingPlan plan(
@@ -347,13 +470,32 @@ final class VulkanDescriptorBindingPlannerTest {
                 bindings,
                 new VulkanDescriptorBindingPlanner.TextureSnapshotLookup() {
                     @Override
-                    public LegacyTextureStorageSnapshot snapshotForView(VulkanTextureView view) {
+                    public VulkanImageResourceViewCoordinator.ImageStorageSnapshot snapshotForView(VulkanTextureView view) {
                         return views.get(view);
                     }
 
                     @Override
-                    public LegacyTextureStorageSnapshot snapshotForTexture(int textureId) {
+                    public VulkanImageResourceViewCoordinator.ImageStorageSnapshot snapshotForTexture(int textureId) {
                         return textures.get(textureId);
+                    }
+
+                    @Override
+                    public VulkanImageResourceViewCoordinator.DescriptorImagePlan descriptorSampledImagePlan(
+                        VulkanTextureView view,
+                        VulkanImageResourceViewCoordinator.ImageStorageSnapshot storage,
+                        Set<Integer> storageImageTextureIds,
+                        VulkanDescriptorBindingPlanner.LayoutLookup layoutLookup,
+                        VulkanDescriptorBindingPlanner.RenderStateSnapshot renderState
+                    ) {
+                        return sampledImagePlan(view, storage, storageImageTextureIds, layoutLookup, renderState);
+                    }
+
+                    @Override
+                    public VulkanImageResourceViewCoordinator.DescriptorImagePlan descriptorStorageImagePlan(
+                        int textureId,
+                        int mipLevel
+                    ) {
+                        return storageImagePlan(textures.get(textureId), mipLevel);
                     }
                 },
                 textureBindings::get,
@@ -381,14 +523,14 @@ final class VulkanDescriptorBindingPlannerTest {
                     public void comparisonSamplerRebound(
                         String bindingName,
                         String fallbackBindingName,
-                        LegacyTextureStorageSnapshot texture
+                        VulkanImageResourceViewCoordinator.ImageStorageSnapshot texture
                     ) {
-                        events.add(bindingName + "->" + fallbackBindingName + ":" + (texture != null ? texture.id() : 0));
+                        events.add(bindingName + "->" + fallbackBindingName + ":" + (texture != null ? texture.textureId() : 0));
                     }
 
                     @Override
-                    public void comparisonSamplerDowngraded(String bindingName, LegacyTextureStorageSnapshot texture) {
-                        events.add(bindingName + "->plain:" + (texture != null ? texture.id() : 0));
+                    public void comparisonSamplerDowngraded(String bindingName, VulkanImageResourceViewCoordinator.ImageStorageSnapshot texture) {
+                        events.add(bindingName + "->plain:" + (texture != null ? texture.textureId() : 0));
                     }
                 }
             ));

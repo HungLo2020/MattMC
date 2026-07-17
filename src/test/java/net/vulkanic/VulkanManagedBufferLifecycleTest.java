@@ -178,7 +178,7 @@ public class VulkanManagedBufferLifecycleTest {
             "GL_DYNAMIC_DRAW legacy buffers must remain host-writable for frequent bufferData/subData updates");
         assertTrue(backendSource.contains("usageHint == 0x88E0 // GL_STREAM_DRAW"),
             "GL_STREAM_DRAW legacy buffers must remain host-writable for streaming updates");
-        assertTrue(backendSource.contains("if (!requiresHostVisibleMemory && initialData != null && renderPassRecording)"),
+        assertTrue(backendSource.contains("if (!requiresHostVisibleMemory && initialData != null && isRenderPassRecording())"),
             "Device-local staging uploads must not be scheduled from inside an active render pass");
         assertTrue(backendSource.contains("requiresHostVisibleMemory = true;"),
             "Render-pass-time initial data uploads should fall back to host-visible storage instead of encoding illegal transfer commands");

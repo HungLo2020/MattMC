@@ -583,6 +583,7 @@ final class LegacyTextureObject {
         this.id = id;
         this.target = target;
     }
+
 }
 
 final class LegacyTexelBufferBinding {

@@ -3994,11 +3994,11 @@ public class Phase3DrawPathTest {
             "Vulkan render-pass clears should emit a VkClearAttachment for each active color attachment");
         assertTrue(backendSource.contains(".colorAttachment(colorAttachment);"),
             "Vulkan render-pass clears should target the looped attachment index");
-        assertTrue(backendSource.contains("renderTargetState.activeWidth() > 0 ? renderTargetState.activeWidth() : swapchainState.width()"),
+        assertTrue(backendSource.contains("renderPassExecution.activeWidth() > 0 ? renderPassExecution.activeWidth() : swapchainState.width()"),
             "Vulkan render-pass clears should use the active render area width when clearing framebuffer-backed passes");
-        assertTrue(backendSource.contains("renderTargetState.activeHeight() > 0 ? renderTargetState.activeHeight() : swapchainState.height()"),
+        assertTrue(backendSource.contains("renderPassExecution.activeHeight() > 0 ? renderPassExecution.activeHeight() : swapchainState.height()"),
             "Vulkan render-pass clears should use the active render area height when clearing framebuffer-backed passes");
-        assertTrue(backendSource.contains("return renderTargetState.activeColorAttachmentCount();"),
+        assertTrue(backendSource.contains("return renderPassExecution.activeColorAttachmentCount();"),
             "Vulkan render-pass clears should still clear swapchain-only render passes that do not track legacy color textures");
     }
 

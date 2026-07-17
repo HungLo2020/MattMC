@@ -403,7 +403,7 @@ public class ClientApi
 				GLProxy.getInstance();
 				
 				// these tasks always need to be called, regardless of whether the renderer is enabled or not to prevent memory leaks
-				GLProxy.runRenderThreadTasks();
+				GLProxy.runLodUploadRenderThreadTasks();
 			}
 			catch (Exception e)
 			{
