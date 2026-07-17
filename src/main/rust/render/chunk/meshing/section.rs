@@ -28,6 +28,14 @@ pub(super) trait NativeSectionRecordSource {
         Ok(false)
     }
 
+    fn supports_direct_static_model_emission(&self) -> bool {
+        false
+    }
+
+    unsafe fn model_record_at(&self, index: usize) -> Result<NativeSectionBlockRecord, i32> {
+        self.record_at(index)
+    }
+
     unsafe fn record_at(&self, index: usize) -> Result<NativeSectionBlockRecord, i32>;
 }
 
@@ -214,6 +222,63 @@ impl NativeSectionRecordSource for CompactSectionSnapshot<'_> {
         }
 
         Ok(true)
+    }
+
+    #[inline(always)]
+    fn supports_direct_static_model_emission(&self) -> bool {
+        true
+    }
+
+    unsafe fn model_record_at(&self, index: usize) -> Result<NativeSectionBlockRecord, i32> {
+        let local_index = self.active_local_index(index)?;
+        let local_x = local_index & 15;
+        let local_z = (local_index >> 4) & 15;
+        let local_y = (local_index >> 8) & 15;
+        let padded_x = local_x + 1;
+        let padded_y = local_y + 1;
+        let padded_z = local_z + 1;
+
+        let mut record = NativeSectionBlockRecord {
+            state_id: self.padded_state(padded_x, padded_y, padded_z),
+            block_id: *self.block_ids.get_unchecked(local_index),
+            local_x: local_x as i32,
+            local_y: local_y as i32,
+            local_z: local_z as i32,
+            seed_lo: *self.seed_los.get_unchecked(local_index),
+            seed_hi: *self.seed_his.get_unchecked(local_index),
+            tint: *self.tints.get_unchecked(local_index),
+            fluid_tint: *self.fluid_tints.get_unchecked(local_index),
+            fluid_flow_x: *self.fluid_flow_x.get_unchecked(local_index),
+            fluid_flow_z: *self.fluid_flow_z.get_unchecked(local_index),
+            absolute_x: self.header.min_x + local_x as i32,
+            absolute_y: self.header.min_y + local_y as i32,
+            absolute_z: self.header.min_z + local_z as i32,
+            fluid_block_id: *self.fluid_block_ids.get_unchecked(local_index),
+            flags: *self.flags.get_unchecked(local_index),
+            ..NativeSectionBlockRecord::default()
+        };
+
+        record.neighbor_state_ids[0] = self.padded_state(padded_x, padded_y - 1, padded_z);
+        record.neighbor_state_ids[1] = self.padded_state(padded_x, padded_y + 1, padded_z);
+        record.neighbor_state_ids[2] = self.padded_state(padded_x, padded_y, padded_z - 1);
+        record.neighbor_state_ids[3] = self.padded_state(padded_x, padded_y, padded_z + 1);
+        record.neighbor_state_ids[4] = self.padded_state(padded_x - 1, padded_y, padded_z);
+        record.neighbor_state_ids[5] = self.padded_state(padded_x + 1, padded_y, padded_z);
+
+        let mut neighborhood_index = 0;
+        for dy in 0..3 {
+            for dz in 0..3 {
+                for dx in 0..3 {
+                    let sx = padded_x + dx - 1;
+                    let sy = padded_y + dy - 1;
+                    let sz = padded_z + dz - 1;
+                    record.light_words[neighborhood_index] = self.padded_light_word(sx, sy, sz);
+                    neighborhood_index += 1;
+                }
+            }
+        }
+
+        Ok(record)
     }
 
     unsafe fn record_at(&self, index: usize) -> Result<NativeSectionBlockRecord, i32> {

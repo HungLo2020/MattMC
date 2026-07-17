@@ -12,8 +12,8 @@ use crate::render::chunk::meshing::section::{CompactSectionSnapshot, NativeSecti
 
 use super::*;
 pub(in crate::render::chunk::meshing) struct AllPassEmitTarget {
-    builder: *mut NativeSectionMeshBuilder,
-    analyzer: Option<u64>,
+    pub(in crate::render::chunk::meshing) builder: *mut NativeSectionMeshBuilder,
+    pub(in crate::render::chunk::meshing) analyzer: Option<u64>,
     pending_counts: [usize; MODEL_QUAD_FACING_COUNT],
     total_committed: i32,
 }
@@ -109,6 +109,15 @@ pub(in crate::render::chunk::meshing) unsafe fn flush_all_pass_target(
         }
     }
     Ok(())
+}
+
+#[inline(always)]
+fn can_direct_emit_static_model_quad(
+    target: &AllPassEmitTarget,
+    routed_pass: usize,
+    format: NativeFormat,
+) -> bool {
+    target.analyzer.is_none() && routed_pass != 2 && is_compact_fast_format(format)
 }
 
 pub(in crate::render::chunk::meshing) unsafe fn section_builders_append_compact_native_section_all_passes_encoded(
@@ -262,12 +271,17 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builders_append_native_s
             continue;
         }
 
-        let record = source.record_at(record_index)?;
+        let record = if has_light_block || has_fluid {
+            Some(source.record_at(record_index)?)
+        } else {
+            None
+        };
 
         if has_light_block {
             let target = &mut targets[1];
             let model_started = Instant::now();
             let append_started = profile_start(profile_scan_substages);
+            let record = record.expect("light-block dispatch requires a full record");
             target.push_quad(
                 light_block_record_to_quad(LightBlockRecord {
                     material_bits: state.material_bits,
@@ -351,9 +365,13 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builders_append_native_s
                         .profile
                         .add_count(PROFILE_COUNT_TEMP_VECTOR_CLEARS, 1);
                     let resolution_started = profile_start(profile_static_substages);
+                    let seed_record = match record {
+                        Some(record) => record,
+                        None => source.model_record_at(record_index)?,
+                    };
                     resolve_selector_model_ids(
                         state.selector_id,
-                        record_seed(record),
+                        record_seed(seed_record),
                         &selectors_guard,
                         &mut model_ids,
                         &mut targets[0].builder().profile,
@@ -372,6 +390,11 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builders_append_native_s
                     .add_optional_stage(PROFILE_STATIC_STATE_SELECTOR_LOOKUP, selector_started);
             }
 
+            let model_record = match record {
+                Some(record) => record,
+                None => source.model_record_at(record_index)?,
+            };
+            let mut emitted_direct_for_block = false;
             for model_id in model_id_slice {
                 let model_lookup_started = profile_start(profile_static_substages);
                 let scan_cache_lookup_started = profile_start(profile_scan_substages);
@@ -414,7 +437,7 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builders_append_native_s
 
                     let culling_started = profile_start(profile_static_substages);
                     let scan_culling_started = profile_start(profile_scan_substages);
-                    if native_section_culls_quad(&record, state, quad_record, &states_guard) {
+                    if native_section_culls_quad(&model_record, state, quad_record, &states_guard) {
                         let builder = targets[0].builder();
                         builder
                             .profile
@@ -453,28 +476,67 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builders_append_native_s
                     };
                     let target = &mut targets[routed_pass];
 
-                    let quad = static_model_quad_to_native_section(
-                        record,
-                        state,
-                        quad_record,
-                        target.profile(),
-                        profile_static_substages,
-                        profile_scan_substages,
-                    );
-                    let staging_started = profile_start(profile_static_substages);
-                    let append_started = profile_start(profile_scan_substages);
-                    target.push_quad(
-                        quad,
-                        quad_record.packed_normal,
-                        facing,
-                        format,
-                        profile_staging_substages,
-                    )?;
-                    let builder = target.profile();
-                    builder.add_optional_stage(PROFILE_SCAN_QUAD_APPEND, append_started);
-                    builder.add_optional_stage(PROFILE_STATIC_STAGING, staging_started);
-                    builder.add_count(PROFILE_COUNT_NATIVE_MODEL_QUADS, 1);
+                    if source.supports_direct_static_model_emission()
+                        && can_direct_emit_static_model_quad(target, routed_pass, format)
+                    {
+                        let append_started = profile_start(profile_scan_substages);
+                        append_direct_compact_static_model_quad(
+                            target.builder(),
+                            model_record,
+                            state,
+                            quad_record,
+                            format,
+                            facing,
+                            profile_static_substages,
+                            profile_scan_substages,
+                        )?;
+                        let builder = target.profile();
+                        builder.add_optional_stage(PROFILE_SCAN_QUAD_APPEND, append_started);
+                        builder.add_count(PROFILE_COUNT_NATIVE_MODEL_QUADS, 1);
+                        target.total_committed =
+                            target.total_committed.checked_add(1).ok_or(ERR_CAPACITY)?;
+                        emitted_direct_for_block = true;
+                    } else {
+                        let direct_fallback_counter = if routed_pass == 2 {
+                            PROFILE_COUNT_DIRECT_MODEL_FALLBACK_TRANSLUCENT
+                        } else if !is_compact_fast_format(format) || target.analyzer.is_some() {
+                            PROFILE_COUNT_DIRECT_MODEL_FALLBACK_FORMAT_OR_ANALYZER
+                        } else {
+                            PROFILE_COUNT_DIRECT_MODEL_FALLBACK_GENERIC_FEATURE
+                        };
+                        {
+                            let builder = target.profile();
+                            builder.add_count(direct_fallback_counter, 1);
+                        }
+                        let quad = static_model_quad_to_native_section(
+                            model_record,
+                            state,
+                            quad_record,
+                            target.profile(),
+                            profile_static_substages,
+                            profile_scan_substages,
+                        );
+                        let staging_started = profile_start(profile_static_substages);
+                        let append_started = profile_start(profile_scan_substages);
+                        target.push_quad(
+                            quad,
+                            quad_record.packed_normal,
+                            facing,
+                            format,
+                            profile_staging_substages,
+                        )?;
+                        let builder = target.profile();
+                        builder.add_optional_stage(PROFILE_SCAN_QUAD_APPEND, append_started);
+                        builder.add_optional_stage(PROFILE_STATIC_STAGING, staging_started);
+                        builder.add_count(PROFILE_COUNT_NATIVE_MODEL_QUADS, 1);
+                    }
                 }
+            }
+            if emitted_direct_for_block {
+                targets[0]
+                    .builder()
+                    .profile
+                    .add_count(PROFILE_COUNT_DIRECT_COMPACT_MODEL_BLOCKS, 1);
             }
             targets[0]
                 .builder()
@@ -487,6 +549,7 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builders_append_native_s
         }
 
         if has_fluid {
+            let record = record.expect("fluid dispatch requires a full record");
             let Some(routed_pass) = native_pass_index(state.fluid_pass_id) else {
                 targets[0]
                     .builder()

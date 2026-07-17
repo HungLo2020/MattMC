@@ -127,6 +127,130 @@ pub(super) unsafe fn push_native_section_quad(
     Ok(())
 }
 
+pub(super) unsafe fn append_direct_compact_static_model_quad(
+    builder: &mut NativeSectionMeshBuilder,
+    block: NativeSectionBlockRecord,
+    state: NativeMeshingState,
+    quad_record: StaticModelQuadRecord,
+    format: NativeFormat,
+    facing: usize,
+    profile_static_substages: bool,
+    profile_scan_substages: bool,
+) -> Result<(), i32> {
+    if facing >= MODEL_QUAD_FACING_COUNT || !is_compact_fast_format(format) {
+        return Err(ERR_INVALID_ARGUMENT);
+    }
+
+    let direct_started = Instant::now();
+    let offset_started = profile_start(profile_static_substages);
+    let offset = if block.legacy_offset_x != 0.0
+        || block.legacy_offset_y != 0.0
+        || block.legacy_offset_z != 0.0
+        || state.offset_type != OFFSET_NONE
+    {
+        native_model_offset(block, state)
+    } else {
+        (0.0, 0.0, 0.0)
+    };
+    builder
+        .profile
+        .add_optional_stage(PROFILE_STATIC_POSITION_OFFSET_TRANSFORM, offset_started);
+
+    let lighting_started = profile_start(profile_static_substages);
+    let scan_lighting_started = profile_start(profile_scan_substages);
+    let light = native_quad_lighting(&block, &quad_record, state);
+    builder
+        .profile
+        .add_optional_stage(PROFILE_STATIC_LIGHTING_AO, lighting_started);
+    builder
+        .profile
+        .add_optional_stage(PROFILE_SCAN_LIGHTING_AO, scan_lighting_started);
+
+    let tint_started = profile_start(profile_static_substages);
+    let scan_tint_started = profile_start(profile_scan_substages);
+    let applies_tint = static_quad_applies_tint(quad_record, state);
+    let tint = if applies_tint {
+        native_tint_color(&block, state, false)
+    } else {
+        -1
+    };
+    builder
+        .profile
+        .add_optional_stage(PROFILE_STATIC_TINT, tint_started);
+    builder
+        .profile
+        .add_optional_stage(PROFILE_SCAN_TINTING, scan_tint_started);
+
+    let pack_started = profile_start(profile_static_substages);
+    let start = builder.counts[facing];
+    let required_len = start.checked_add(1).ok_or(ERR_CAPACITY)?;
+    let encoded_quad_len = 4usize
+        .checked_mul(format.vertex_stride)
+        .ok_or(ERR_INVALID_ARGUMENT)?;
+    let buffer = &mut builder.buffers[facing];
+
+    if !buffer.encoded.is_empty() && buffer.encoded_format != Some(format) {
+        buffer.encoded.clear();
+        buffer.encoded_format = None;
+    }
+    if buffer.encoded_format.is_none() {
+        buffer.encoded_format = Some(format);
+    }
+
+    let required_encoded_len = required_len
+        .checked_mul(encoded_quad_len)
+        .ok_or(ERR_INVALID_ARGUMENT)?;
+    ensure_encoded_len(&mut buffer.encoded, required_encoded_len, format);
+
+    let encoded_start = start * encoded_quad_len;
+    let encoded_end = encoded_start + encoded_quad_len;
+    let output = &mut buffer.encoded[encoded_start..encoded_end];
+    let vertices = quad_record.vertices;
+    let tex_centroid_u = (vertices[0].u + vertices[1].u + vertices[2].u + vertices[3].u) * 0.25;
+    let tex_centroid_v = (vertices[0].v + vertices[1].v + vertices[2].v + vertices[3].v) * 0.25;
+    let material_section =
+        ((quad_record.material_bits & 0xff) << 16) | ((format.section_index & 0xff) << 24);
+
+    for index in 0..4 {
+        let source = vertices[index];
+        let mut color = source.color;
+        if applies_tint {
+            color = multiply_argb(color, tint);
+        }
+        encode_compact_vertex_values(
+            block.local_x as f32 + offset.0 + source.x,
+            block.local_y as f32 + offset.1 + source.y,
+            block.local_z as f32 + offset.2 + source.z,
+            argb_to_abgr(color),
+            light.ao[index],
+            source.u,
+            source.v,
+            max_brightness(source.light, light.lm[index]),
+            &mut output[index * format.vertex_stride..(index + 1) * format.vertex_stride],
+            tex_centroid_u,
+            tex_centroid_v,
+            material_section,
+        );
+    }
+
+    builder.counts[facing] = required_len;
+    builder
+        .profile
+        .add_optional_stage(PROFILE_STAGING_VERTEX_ENCODING, pack_started);
+    builder
+        .profile
+        .add_stage(PROFILE_DIRECT_COMPACT_MODEL_EMISSION, direct_started);
+    builder.profile.add_count(PROFILE_COUNT_EMITTED_QUADS, 1);
+    builder
+        .profile
+        .add_count(PROFILE_COUNT_DIRECT_COMPACT_MODEL_QUADS, 1);
+    builder.profile.add_count(
+        PROFILE_COUNT_DIRECT_COMPACT_MODEL_BYTES_WRITTEN,
+        encoded_quad_len,
+    );
+    Ok(())
+}
+
 pub(super) fn resolve_selector_model_ids(
     selector_id: i32,
     seed: u64,

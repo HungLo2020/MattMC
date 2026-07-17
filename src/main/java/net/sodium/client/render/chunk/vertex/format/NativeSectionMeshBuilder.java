@@ -908,7 +908,7 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                 "staging_vertex_encoding",
                 "staging_index_write",
                 "staging_final_buffer_assembly",
-                "reserved_removed_template_stage_51",
+                "direct_compact_model_emission",
                 "reserved_removed_template_stage_52",
                 "reserved_removed_template_stage_53",
                 "reserved_removed_template_stage_54",
@@ -923,9 +923,9 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                 "translucent_quads",
                 "sorted_quads",
                 "emitted_quads",
-                "reserved_removed_direct_template_quads",
+                "direct_compact_model_quads",
                 "generic_native_quads",
-                "reserved_removed_direct_template_bytes_written",
+                "direct_compact_model_bytes_written",
                 "generic_native_bytes_retained",
                 "selector_resolutions",
                 "selector_cache_hits",
@@ -938,7 +938,11 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                 "temporary_vector_clears",
                 "translucent_retained_bytes",
                 "translucent_analyzer_entries",
-                "translucent_validity_bytes"
+                "translucent_validity_bytes",
+                "direct_compact_model_blocks",
+                "direct_model_fallback_translucent",
+                "direct_model_fallback_format_or_analyzer",
+                "direct_model_fallback_generic_feature"
         };
         public static final int STAGE_COUNT = STAGE_NAMES.length;
         public static final int COUNT_COUNT = COUNT_NAMES.length;

@@ -7,7 +7,7 @@ use std::sync::OnceLock;
 use std::time::Instant;
 
 pub(super) const PROFILE_STAGE_COUNT: usize = 56;
-pub(super) const PROFILE_COUNT_COUNT: usize = 24;
+pub(super) const PROFILE_COUNT_COUNT: usize = 28;
 pub(super) const PROFILE_EXPORT_LONGS: usize = PROFILE_STAGE_COUNT + PROFILE_COUNT_COUNT;
 pub(super) const PROFILE_SECTION_SCAN: usize = 0;
 pub(super) const PROFILE_MODEL_LOOKUP_EMIT: usize = 1;
@@ -67,6 +67,7 @@ pub(super) const PROFILE_STAGING_VERTEX_ENCODING: usize = 48;
 pub(super) const PROFILE_STAGING_INDEX_WRITE: usize = 49;
 #[allow(dead_code)]
 pub(super) const PROFILE_STAGING_FINAL_BUFFER_ASSEMBLY: usize = 50;
+pub(super) const PROFILE_DIRECT_COMPACT_MODEL_EMISSION: usize = 51;
 pub(super) const PROFILE_COUNT_SCANNED_BLOCKS: usize = 0;
 pub(super) const PROFILE_COUNT_NATIVE_MODEL_BLOCKS: usize = 1;
 pub(super) const PROFILE_COUNT_NATIVE_MODEL_QUADS: usize = 2;
@@ -76,7 +77,9 @@ pub(super) const PROFILE_COUNT_TRANSLUCENT_QUADS: usize = 5;
 #[allow(dead_code)]
 pub(super) const PROFILE_COUNT_SORTED_QUADS: usize = 6;
 pub(super) const PROFILE_COUNT_EMITTED_QUADS: usize = 7;
+pub(super) const PROFILE_COUNT_DIRECT_COMPACT_MODEL_QUADS: usize = 8;
 pub(super) const PROFILE_COUNT_GENERIC_NATIVE_QUADS: usize = 9;
+pub(super) const PROFILE_COUNT_DIRECT_COMPACT_MODEL_BYTES_WRITTEN: usize = 10;
 pub(super) const PROFILE_COUNT_GENERIC_NATIVE_BYTES_RETAINED: usize = 11;
 pub(super) const PROFILE_COUNT_SELECTOR_RESOLUTIONS: usize = 12;
 pub(super) const PROFILE_COUNT_SELECTOR_CACHE_HITS: usize = 13;
@@ -90,6 +93,10 @@ pub(super) const PROFILE_COUNT_TEMP_VECTOR_CLEARS: usize = 20;
 pub(super) const PROFILE_COUNT_TRANSLUCENT_RETAINED_BYTES: usize = 21;
 pub(super) const PROFILE_COUNT_TRANSLUCENT_ANALYZER_ENTRIES: usize = 22;
 pub(super) const PROFILE_COUNT_TRANSLUCENT_VALIDITY_BYTES: usize = 23;
+pub(super) const PROFILE_COUNT_DIRECT_COMPACT_MODEL_BLOCKS: usize = 24;
+pub(super) const PROFILE_COUNT_DIRECT_MODEL_FALLBACK_TRANSLUCENT: usize = 25;
+pub(super) const PROFILE_COUNT_DIRECT_MODEL_FALLBACK_FORMAT_OR_ANALYZER: usize = 26;
+pub(super) const PROFILE_COUNT_DIRECT_MODEL_FALLBACK_GENERIC_FEATURE: usize = 27;
 
 pub(super) static STATIC_MODEL_SUBSTAGE_PROFILE_ENABLED: OnceLock<bool> = OnceLock::new();
 pub(super) static FLUID_SUBSTAGE_PROFILE_ENABLED: OnceLock<bool> = OnceLock::new();

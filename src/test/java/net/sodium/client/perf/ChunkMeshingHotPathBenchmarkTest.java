@@ -69,6 +69,24 @@ class ChunkMeshingHotPathBenchmarkTest {
     private static final int NATIVE_FLAG_CAN_OCCLUDE = 1 << 7;
     private static final int NATIVE_FLAG_BLOCKS_MOTION = 1 << 8;
     private static final SectionPos BENCHMARK_SECTION_POS = SectionPos.of(0, SECTION_INDEX, 0);
+    private static final int COMPACT_HEADER_VERSION_OFFSET = 0;
+    private static final int COMPACT_HEADER_ACTIVE_COUNT_OFFSET = 4;
+    private static final int COMPACT_HEADER_MIN_X_OFFSET = 8;
+    private static final int COMPACT_HEADER_MIN_Y_OFFSET = 12;
+    private static final int COMPACT_HEADER_MIN_Z_OFFSET = 16;
+    private static final int COMPACT_HEADER_PADDING_OFFSET = 20;
+    private static final int COMPACT_HEADER_ACTIVE_INDICES_ADDRESS_OFFSET = 24;
+    private static final int COMPACT_HEADER_PADDED_STATE_IDS_ADDRESS_OFFSET = 32;
+    private static final int COMPACT_HEADER_PADDED_LIGHT_WORDS_ADDRESS_OFFSET = 40;
+    private static final int COMPACT_HEADER_BLOCK_IDS_ADDRESS_OFFSET = 48;
+    private static final int COMPACT_HEADER_SEED_LOS_ADDRESS_OFFSET = 56;
+    private static final int COMPACT_HEADER_SEED_HIS_ADDRESS_OFFSET = 64;
+    private static final int COMPACT_HEADER_TINTS_ADDRESS_OFFSET = 72;
+    private static final int COMPACT_HEADER_FLUID_TINTS_ADDRESS_OFFSET = 80;
+    private static final int COMPACT_HEADER_FLUID_FLOW_X_ADDRESS_OFFSET = 88;
+    private static final int COMPACT_HEADER_FLUID_FLOW_Z_ADDRESS_OFFSET = 96;
+    private static final int COMPACT_HEADER_FLUID_BLOCK_IDS_ADDRESS_OFFSET = 104;
+    private static final int COMPACT_HEADER_FLAGS_ADDRESS_OFFSET = 112;
     private static final CombinedCameraPos ZERO_CAMERA_POS = new CombinedCameraPos() {
         private final Vector3f relative = new Vector3f();
         private final Vector3d absolute = new Vector3d();
@@ -148,6 +166,28 @@ class ChunkMeshingHotPathBenchmarkTest {
                 } finally {
                     MemoryUtil.memFree(replayRecords);
                     replayBuilder.close();
+                }
+
+                if (section.isCompactBenchmarkTarget()) {
+                    results.add(measure("compact_snapshot_create_" + section.name,
+                            () -> runCompactSnapshotCreate(section)));
+                    NativeSectionMeshBuilder solidBuilder = NativeSectionMeshBuilder.create(4096);
+                    NativeSectionMeshBuilder cutoutBuilder = NativeSectionMeshBuilder.create(4096);
+                    NativeSectionMeshBuilder translucentBuilder = NativeSectionMeshBuilder.create(4096);
+                    CompactReplaySnapshot compactSnapshot = createCompactReplaySectionSnapshot(section);
+                    try {
+                        results.add(measure("full_section_compact_snapshot_" + section.name,
+                                () -> runCompactSnapshotSectionEndToEnd(section, solidBuilder, cutoutBuilder,
+                                        translucentBuilder)));
+                        results.add(measure("compact_snapshot_replay_section_" + section.name,
+                                () -> runCompactSnapshotSection(section, solidBuilder, cutoutBuilder,
+                                        translucentBuilder, compactSnapshot)));
+                    } finally {
+                        compactSnapshot.close();
+                        solidBuilder.close();
+                        cutoutBuilder.close();
+                        translucentBuilder.close();
+                    }
                 }
             }
 
@@ -443,6 +483,17 @@ class ChunkMeshingHotPathBenchmarkTest {
         }
     }
 
+    private static long runCompactSnapshotCreate(ReplaySection section) {
+        StageTimer stages = StageTimer.start();
+        stages.mark("java_snapshot_allocation");
+        try (CompactReplaySnapshot snapshot = createCompactReplaySectionSnapshot(section)) {
+            stages.mark("java_snapshot_population");
+            BenchmarkAccounting.record(0, snapshot.totalBytes, 0, 0,
+                    section.expectedNativeQuads(), 0, 0);
+            return ((long) snapshot.activeRecordCount << 32) ^ sample(snapshot.buffer) ^ stages.checksum();
+        }
+    }
+
     private static long runTransferCopy(int bytes) {
         ByteBuffer source = ByteBuffer.allocateDirect(bytes).order(ByteOrder.nativeOrder());
         ByteBuffer target = ByteBuffer.allocateDirect(bytes).order(ByteOrder.nativeOrder());
@@ -536,6 +587,63 @@ class ChunkMeshingHotPathBenchmarkTest {
         records.limit(recordCount * NativeChunkMeshEncoder.LEGACY_NATIVE_SECTION_BLOCK_RECORD_STRIDE);
         fillReplaySectionRecords(section, records);
         return records;
+    }
+
+    private static CompactReplaySnapshot createCompactReplaySectionSnapshot(ReplaySection section) {
+        CompactReplaySnapshot snapshot = new CompactReplaySnapshot();
+        fillCompactReplaySectionSnapshot(section, snapshot);
+        return snapshot;
+    }
+
+    private static void fillCompactReplaySectionSnapshot(ReplaySection section, CompactReplaySnapshot snapshot) {
+        int activeRecordIndex = 0;
+        for (int index = 0; index < NativeChunkMeshEncoder.COMPACT_SECTION_PADDED_BLOCK_COUNT; index++) {
+            MemoryUtil.memPutInt(snapshot.paddedLightWordsAddress + (long) index * Integer.BYTES, 0xf0);
+        }
+
+        for (int index = 0; index < SECTION_BLOCKS; index++) {
+            int stateId = stateForReplayIndex(section, index);
+            if (stateId == 0) {
+                continue;
+            }
+            int localX = index & 15;
+            int localY = (index >>> 8) & 15;
+            int localZ = (index >>> 4) & 15;
+            int paddedIndex = compactPaddedIndex(localX + 1, localY + 1, localZ + 1);
+            long seed = 0x9e3779b97f4a7c15L ^ (long) index * 0xbf58476d1ce4e5b9L;
+
+            MemoryUtil.memPutShort(snapshot.activeIndicesAddress
+                    + (long) activeRecordIndex * NativeChunkMeshEncoder.COMPACT_SECTION_ACTIVE_INDEX_STRIDE,
+                    (short) index);
+            MemoryUtil.memPutInt(snapshot.paddedStateIdsAddress + (long) paddedIndex * Integer.BYTES, stateId);
+            MemoryUtil.memPutInt(snapshot.blockIdsAddress + (long) index * Integer.BYTES,
+                    stateId == 0 ? -1 : 41 + (stateId % 11));
+            MemoryUtil.memPutInt(snapshot.seedLosAddress + (long) index * Integer.BYTES, (int) seed);
+            MemoryUtil.memPutInt(snapshot.seedHisAddress + (long) index * Integer.BYTES, (int) (seed >>> 32));
+            MemoryUtil.memPutInt(snapshot.tintsAddress + (long) index * Integer.BYTES, 0xff70aa50);
+            MemoryUtil.memPutInt(snapshot.fluidTintsAddress + (long) index * Integer.BYTES, 0xcc3f76e4);
+            MemoryUtil.memPutFloat(snapshot.fluidFlowXAddress + (long) index * Float.BYTES,
+                    (index & 1) == 0 ? 0.0F : 0.35F);
+            MemoryUtil.memPutFloat(snapshot.fluidFlowZAddress + (long) index * Float.BYTES,
+                    (index & 2) == 0 ? 0.0F : -0.25F);
+            if (stateId == 200) {
+                MemoryUtil.memPutInt(snapshot.fluidBlockIdsAddress + (long) index * Integer.BYTES, 44);
+            }
+            activeRecordIndex++;
+        }
+
+        snapshot.activeRecordCount = activeRecordIndex;
+        MemoryUtil.memPutInt(snapshot.address + COMPACT_HEADER_ACTIVE_COUNT_OFFSET, activeRecordIndex);
+    }
+
+    private static int compactPaddedIndex(int x, int y, int z) {
+        int length = NativeChunkMeshEncoder.COMPACT_SECTION_PADDED_LENGTH;
+        return (y * length + z) * length + x;
+    }
+
+    private static long align(long offset, int alignment) {
+        long mask = alignment - 1L;
+        return (offset + mask) & ~mask;
     }
 
     private static void fillReplaySectionRecords(ReplaySection section, ByteBuffer records) {
@@ -834,6 +942,118 @@ class ChunkMeshingHotPathBenchmarkTest {
         appendMemoryDeltaJson(builder, "rss_high_water_delta_bytes", result.memoryBefore.rssHighWaterBytes,
                 result.memoryPeak.rssHighWaterBytes, false);
         builder.append("      }\n");
+    }
+
+    private static long runCompactSnapshotSectionEndToEnd(ReplaySection section,
+            NativeSectionMeshBuilder solidBuilder, NativeSectionMeshBuilder cutoutBuilder,
+            NativeSectionMeshBuilder translucentBuilder) {
+        StageTimer stages = StageTimer.start();
+        stages.mark("java_snapshot_allocation");
+        try (CompactReplaySnapshot snapshot = createCompactReplaySectionSnapshot(section)) {
+            stages.mark("java_snapshot_population");
+            return runCompactSnapshotSectionFromReadySnapshot(section, solidBuilder, cutoutBuilder,
+                    translucentBuilder, snapshot, stages, false);
+        }
+    }
+
+    private static long runCompactSnapshotSection(ReplaySection section, NativeSectionMeshBuilder solidBuilder,
+            NativeSectionMeshBuilder cutoutBuilder, NativeSectionMeshBuilder translucentBuilder,
+            CompactReplaySnapshot snapshot) {
+        StageTimer stages = StageTimer.start();
+        stages.mark("java_snapshot_ready");
+        return runCompactSnapshotSectionFromReadySnapshot(section, solidBuilder, cutoutBuilder, translucentBuilder,
+                snapshot, stages, true);
+    }
+
+    private static long runCompactSnapshotSectionFromReadySnapshot(ReplaySection section,
+            NativeSectionMeshBuilder solidBuilder, NativeSectionMeshBuilder cutoutBuilder,
+            NativeSectionMeshBuilder translucentBuilder, CompactReplaySnapshot snapshot, StageTimer stages,
+            boolean prebuiltSnapshot) {
+        solidBuilder.start(SECTION_INDEX);
+        cutoutBuilder.start(SECTION_INDEX);
+        translucentBuilder.start(SECTION_INDEX);
+        int[] counts = NativeSectionMeshBuilder.appendCompactNativeSectionAllPassesEncoded(solidBuilder,
+                cutoutBuilder, translucentBuilder, snapshot.address, ChunkMeshFormats.COMPACT.getNativeFormat(),
+                SECTION_INDEX, false, 0L);
+        stages.mark("native_all_passes");
+        int committed = counts[0] + counts[1] + counts[2];
+        BuiltSectionMeshParts solidMesh = null;
+        BuiltSectionMeshParts cutoutMesh = null;
+        BuiltSectionMeshParts translucentMesh = null;
+        try {
+            solidMesh = solidBuilder.finishMesh(ChunkMeshFormats.COMPACT.getNativeFormat(), 0,
+                    false, true, false);
+            cutoutMesh = cutoutBuilder.finishMesh(ChunkMeshFormats.COMPACT.getNativeFormat(), 0,
+                    false, true, false);
+            translucentMesh = translucentBuilder.finishMesh(ChunkMeshFormats.COMPACT.getNativeFormat(), 0,
+                    false, true, false);
+            stages.mark("final_assembly_and_handoff");
+            ByteBuffer solidVertices = vertexBuffer(solidMesh);
+            ByteBuffer cutoutVertices = vertexBuffer(cutoutMesh);
+            ByteBuffer translucentVertices = vertexBuffer(translucentMesh);
+            int vertexBytes = remaining(solidVertices) + remaining(cutoutVertices) + remaining(translucentVertices);
+            BenchmarkAccounting.recordNativeProfile(combineProfiles(solidBuilder.copyProfile(),
+                    cutoutBuilder.copyProfile(), translucentBuilder.copyProfile()));
+            BenchmarkAccounting.record(prebuiltSnapshot ? 1 : 2, snapshot.totalBytes,
+                    vertexBytes, (long) committed * INDEX_BYTES_PER_QUAD, committed, 0, 0);
+            ByteBuffer semanticVertices = DIAGNOSTIC
+                    ? joinedVertexBuffer(solidVertices, cutoutVertices, translucentVertices, vertexBytes)
+                    : null;
+            SemanticDiagnostics.record(SemanticSnapshot.create(section, semanticVertices, committed));
+            long meshChecksum = sampleOrZero(solidVertices) ^ Long.rotateLeft(sampleOrZero(cutoutVertices), 17)
+                    ^ Long.rotateLeft(sampleOrZero(translucentVertices), 33);
+            return (((long) committed) << 32) ^ meshChecksum ^ section.expectedSummary() ^ stages.checksum();
+        } finally {
+            freeMesh(solidMesh);
+            freeMesh(cutoutMesh);
+            freeMesh(translucentMesh);
+        }
+    }
+
+    private static ByteBuffer vertexBuffer(BuiltSectionMeshParts mesh) {
+        return mesh == null ? null : mesh.getVertexData().getDirectBuffer().order(ByteOrder.nativeOrder());
+    }
+
+    private static int remaining(ByteBuffer buffer) {
+        return buffer == null ? 0 : buffer.remaining();
+    }
+
+    private static long sampleOrZero(ByteBuffer buffer) {
+        return buffer == null ? 0L : sample(buffer);
+    }
+
+    private static ByteBuffer joinedVertexBuffer(ByteBuffer a, ByteBuffer b, ByteBuffer c, int totalBytes) {
+        if (totalBytes == 0) {
+            return null;
+        }
+        ByteBuffer joined = ByteBuffer.allocateDirect(totalBytes).order(ByteOrder.nativeOrder());
+        putDuplicate(joined, a);
+        putDuplicate(joined, b);
+        putDuplicate(joined, c);
+        joined.flip();
+        return joined;
+    }
+
+    private static void putDuplicate(ByteBuffer output, ByteBuffer input) {
+        if (input != null) {
+            output.put(input.duplicate());
+        }
+    }
+
+    private static void freeMesh(BuiltSectionMeshParts mesh) {
+        if (mesh != null) {
+            mesh.getVertexData().free();
+        }
+    }
+
+    private static long[] combineProfiles(long[]... profiles) {
+        long[] combined = new long[NativeSectionMeshBuilder.Profile.METRIC_COUNT];
+        for (long[] profile : profiles) {
+            for (int index = 0; index < combined.length; index++) {
+                combined[index] += profile[index];
+            }
+        }
+        return combined;
     }
 
     private static void appendRawSamplesJson(StringBuilder builder, long[] samples) {
@@ -1224,6 +1444,10 @@ class ChunkMeshingHotPathBenchmarkTest {
                     + this.translucentBlocks;
         }
 
+        boolean isCompactBenchmarkTarget() {
+            return this.fallbackLikeBlocks == 0 && !this.name.equals("empty");
+        }
+
         int expectedNativeQuads() {
             return this.solidBlocks + this.foliageBlocks + this.weightedMultipartBlocks + this.fluidBlocks
                     + this.translucentBlocks;
@@ -1307,6 +1531,105 @@ class ChunkMeshingHotPathBenchmarkTest {
 
         static Map<String, Long> snapshot() {
             return new LinkedHashMap<>(STAGES.get());
+        }
+    }
+
+    private static final class CompactReplaySnapshot implements AutoCloseable {
+        private final ByteBuffer buffer;
+        private final long address;
+        private final long activeIndicesAddress;
+        private final long paddedStateIdsAddress;
+        private final long paddedLightWordsAddress;
+        private final long blockIdsAddress;
+        private final long seedLosAddress;
+        private final long seedHisAddress;
+        private final long tintsAddress;
+        private final long fluidTintsAddress;
+        private final long fluidFlowXAddress;
+        private final long fluidFlowZAddress;
+        private final long fluidBlockIdsAddress;
+        private final long flagsAddress;
+        private final int totalBytes;
+        private int activeRecordCount;
+
+        private CompactReplaySnapshot() {
+            long offset = NativeChunkMeshEncoder.COMPACT_SECTION_SNAPSHOT_HEADER_STRIDE;
+            long activeIndicesOffset = offset;
+            offset += (long) SECTION_BLOCKS * NativeChunkMeshEncoder.COMPACT_SECTION_ACTIVE_INDEX_STRIDE;
+            offset = align(offset, Integer.BYTES);
+            long paddedStateIdsOffset = offset;
+            offset += (long) NativeChunkMeshEncoder.COMPACT_SECTION_PADDED_BLOCK_COUNT * Integer.BYTES;
+            long paddedLightWordsOffset = offset;
+            offset += (long) NativeChunkMeshEncoder.COMPACT_SECTION_PADDED_BLOCK_COUNT * Integer.BYTES;
+            long blockIdsOffset = offset;
+            offset += (long) SECTION_BLOCKS * Integer.BYTES;
+            long seedLosOffset = offset;
+            offset += (long) SECTION_BLOCKS * Integer.BYTES;
+            long seedHisOffset = offset;
+            offset += (long) SECTION_BLOCKS * Integer.BYTES;
+            long tintsOffset = offset;
+            offset += (long) SECTION_BLOCKS * Integer.BYTES;
+            long fluidTintsOffset = offset;
+            offset += (long) SECTION_BLOCKS * Integer.BYTES;
+            long fluidFlowXOffset = offset;
+            offset += (long) SECTION_BLOCKS * Float.BYTES;
+            long fluidFlowZOffset = offset;
+            offset += (long) SECTION_BLOCKS * Float.BYTES;
+            long fluidBlockIdsOffset = offset;
+            offset += (long) SECTION_BLOCKS * Integer.BYTES;
+            long flagsOffset = offset;
+            offset += (long) SECTION_BLOCKS * Integer.BYTES;
+            this.totalBytes = (int) align(offset, Long.BYTES);
+
+            this.buffer = MemoryUtil.memCalloc(this.totalBytes).order(ByteOrder.nativeOrder());
+            this.address = MemoryUtil.memAddress(this.buffer);
+            this.activeIndicesAddress = this.address + activeIndicesOffset;
+            this.paddedStateIdsAddress = this.address + paddedStateIdsOffset;
+            this.paddedLightWordsAddress = this.address + paddedLightWordsOffset;
+            this.blockIdsAddress = this.address + blockIdsOffset;
+            this.seedLosAddress = this.address + seedLosOffset;
+            this.seedHisAddress = this.address + seedHisOffset;
+            this.tintsAddress = this.address + tintsOffset;
+            this.fluidTintsAddress = this.address + fluidTintsOffset;
+            this.fluidFlowXAddress = this.address + fluidFlowXOffset;
+            this.fluidFlowZAddress = this.address + fluidFlowZOffset;
+            this.fluidBlockIdsAddress = this.address + fluidBlockIdsOffset;
+            this.flagsAddress = this.address + flagsOffset;
+            this.writeHeader();
+        }
+
+        private void writeHeader() {
+            MemoryUtil.memPutInt(this.address + COMPACT_HEADER_VERSION_OFFSET,
+                    NativeChunkMeshEncoder.COMPACT_SECTION_SNAPSHOT_VERSION);
+            MemoryUtil.memPutInt(this.address + COMPACT_HEADER_ACTIVE_COUNT_OFFSET, 0);
+            MemoryUtil.memPutInt(this.address + COMPACT_HEADER_MIN_X_OFFSET, 0);
+            MemoryUtil.memPutInt(this.address + COMPACT_HEADER_MIN_Y_OFFSET, 0);
+            MemoryUtil.memPutInt(this.address + COMPACT_HEADER_MIN_Z_OFFSET, 0);
+            MemoryUtil.memPutInt(this.address + COMPACT_HEADER_PADDING_OFFSET, 0);
+            MemoryUtil.memPutLong(this.address + COMPACT_HEADER_ACTIVE_INDICES_ADDRESS_OFFSET,
+                    this.activeIndicesAddress);
+            MemoryUtil.memPutLong(this.address + COMPACT_HEADER_PADDED_STATE_IDS_ADDRESS_OFFSET,
+                    this.paddedStateIdsAddress);
+            MemoryUtil.memPutLong(this.address + COMPACT_HEADER_PADDED_LIGHT_WORDS_ADDRESS_OFFSET,
+                    this.paddedLightWordsAddress);
+            MemoryUtil.memPutLong(this.address + COMPACT_HEADER_BLOCK_IDS_ADDRESS_OFFSET, this.blockIdsAddress);
+            MemoryUtil.memPutLong(this.address + COMPACT_HEADER_SEED_LOS_ADDRESS_OFFSET, this.seedLosAddress);
+            MemoryUtil.memPutLong(this.address + COMPACT_HEADER_SEED_HIS_ADDRESS_OFFSET, this.seedHisAddress);
+            MemoryUtil.memPutLong(this.address + COMPACT_HEADER_TINTS_ADDRESS_OFFSET, this.tintsAddress);
+            MemoryUtil.memPutLong(this.address + COMPACT_HEADER_FLUID_TINTS_ADDRESS_OFFSET,
+                    this.fluidTintsAddress);
+            MemoryUtil.memPutLong(this.address + COMPACT_HEADER_FLUID_FLOW_X_ADDRESS_OFFSET,
+                    this.fluidFlowXAddress);
+            MemoryUtil.memPutLong(this.address + COMPACT_HEADER_FLUID_FLOW_Z_ADDRESS_OFFSET,
+                    this.fluidFlowZAddress);
+            MemoryUtil.memPutLong(this.address + COMPACT_HEADER_FLUID_BLOCK_IDS_ADDRESS_OFFSET,
+                    this.fluidBlockIdsAddress);
+            MemoryUtil.memPutLong(this.address + COMPACT_HEADER_FLAGS_ADDRESS_OFFSET, this.flagsAddress);
+        }
+
+        @Override
+        public void close() {
+            MemoryUtil.memFree(this.buffer);
         }
     }
 
