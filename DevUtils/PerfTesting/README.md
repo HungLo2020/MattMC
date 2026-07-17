@@ -70,6 +70,9 @@ Common options:
 - `--jvm-arg VALUE`
 - `--gradle-arg VALUE`
 - `--dry-run`
+- `--rebuild-current-native`
+- `--native-rebuild-timeout-seconds N`
+- `--diagnostic`
 - `--benchmark-force-mode clean-test|none|rerun-tasks`
 
 Benchmark options:
@@ -102,6 +105,20 @@ When both targets are selected, the harness alternates execution order by fork b
 - `combined_manifest.json`: commands, metadata, per-target status, and links to aggregate files.
 - `aggregate_summary.json`: machine-readable row classifications, medians, ratios, fallback contamination, and work-equivalence checks.
 - `aggregate_report.md`: compact human-readable comparison table.
+- `diagnostic_summary.json`: per-fork current/frozen work signatures, raw checksums, stage timings, native profile counters, and explicit equivalence limitations.
+
+Use `--rebuild-current-native` before an authoritative run when native identity matters. The harness runs `buildRustNative --rerun-tasks` once before measured benchmark forks, writes `native-rebuild/native_rebuild.json`, records the produced native library SHA-256/size/timestamp in `combined_manifest.json`, and then reuses that artifact for the benchmark.
+
+Use `--diagnostic` for a separate validation pass. It enables the benchmark diagnostic property and Rust native substage profile environment variables for the current repo:
+
+```text
+MATTMC_PROFILE_STATIC_MODEL_SUBSTAGES=true
+MATTMC_PROFILE_FLUID_SUBSTAGES=true
+MATTMC_PROFILE_SCAN_SUBSTAGES=true
+MATTMC_PROFILE_STAGING_SUBSTAGES=true
+```
+
+Do not use diagnostic-mode timing as headline performance data; run a clean non-diagnostic pass for the authoritative comparison.
 
 Artifacts are written under:
 

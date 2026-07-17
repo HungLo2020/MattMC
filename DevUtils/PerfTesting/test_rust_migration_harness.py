@@ -60,10 +60,13 @@ def args(**overrides) -> Namespace:
         "frozen_repo": None,
         "artifact_dir": None,
         "timeout_seconds": 5,
+        "native_rebuild_timeout_seconds": 5,
         "rust_profile": "release",
         "jvm_arg": [],
         "gradle_arg": [],
         "dry_run": False,
+        "rebuild_current_native": False,
+        "diagnostic": False,
         "quads": 1,
         "warmup": 0,
         "iterations": 1,
@@ -126,6 +129,20 @@ class RustMigrationHarnessTests(unittest.TestCase):
             self.assertNotIn("--rerun-tasks", command)
             self.assertIn(str(output), env["JAVA_TOOL_OPTIONS"])
             self.assertIsInstance(command, list)
+
+    def test_diagnostic_mode_enables_current_native_profile_env(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = fake_repo(Path(temp), "current")
+            command, env = harness.build_command(
+                harness.RepoTarget("current", root, "current"),
+                "chunk-meshing-hotpath",
+                args(workload="chunk-meshing-hotpath", diagnostic=True),
+                Path(temp) / "result.json",
+            )
+            self.assertIn("test", command)
+            self.assertIn("-Dmattmc.perf.diagnostic=true", env["JAVA_TOOL_OPTIONS"])
+            self.assertEqual(env["MATTMC_PROFILE_SCAN_SUBSTAGES"], "true")
+            self.assertEqual(env["MATTMC_PROFILE_FLUID_SUBSTAGES"], "true")
 
     def test_chunk_meshing_legacy_rerun_mode_is_explicit(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

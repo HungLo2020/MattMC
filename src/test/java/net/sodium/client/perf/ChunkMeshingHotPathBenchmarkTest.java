@@ -646,6 +646,7 @@ class ChunkMeshingHotPathBenchmarkTest {
                 sorted[sorted.length - 1],
                 Math.sqrt(variance),
                 samples.length,
+                samples,
                 warmupCount,
                 checksum,
                 stageNanos,
@@ -772,6 +773,7 @@ class ChunkMeshingHotPathBenchmarkTest {
             builder.append(String.format(Locale.ROOT, "      \"mega_quads_per_second\": %.6f,%n",
                     result.megaQuadsPerSecond()));
             builder.append("      \"samples\": ").append(result.sampleCount).append(",\n");
+            appendRawSamplesJson(builder, result.sampleNanos);
             builder.append("      \"warmup_invocations\": ").append(result.warmupCount).append(",\n");
             builder.append("      \"checksum\": ").append(result.checksum).append(",\n");
             appendStageJson(builder, result.stageNanos, result.sampleCount);
@@ -820,6 +822,17 @@ class ChunkMeshingHotPathBenchmarkTest {
         appendMemoryDeltaJson(builder, "rss_high_water_delta_bytes", result.memoryBefore.rssHighWaterBytes,
                 result.memoryPeak.rssHighWaterBytes, false);
         builder.append("      }\n");
+    }
+
+    private static void appendRawSamplesJson(StringBuilder builder, long[] samples) {
+        builder.append("      \"sample_nanos\": [");
+        for (int index = 0; index < samples.length; index++) {
+            if (index > 0) {
+                builder.append(", ");
+            }
+            builder.append(samples[index]);
+        }
+        builder.append("],\n");
     }
 
     private static void appendAccountingJson(StringBuilder builder, AccountingSnapshot accounting, int samples) {
@@ -1100,7 +1113,7 @@ class ChunkMeshingHotPathBenchmarkTest {
     }
 
     private record BenchmarkResult(String name, double meanNanos, long medianNanos, long p90Nanos, long p99Nanos,
-            long minNanos, long maxNanos, double stddevNanos, int sampleCount, int warmupCount,
+            long minNanos, long maxNanos, double stddevNanos, int sampleCount, long[] sampleNanos, int warmupCount,
             long checksum, Map<String, Long> stageNanos, AccountingSnapshot accounting,
             MemorySnapshot memoryBefore, MemorySnapshot memoryAfter, MemorySnapshot memoryPeak,
             GcSnapshot gcBefore, GcSnapshot gcAfter) {

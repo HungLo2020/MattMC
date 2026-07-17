@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import platform
@@ -190,6 +191,108 @@ def java_version() -> str:
     return (result.stderr or result.stdout).strip()
 
 
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def native_library_name() -> str:
+    system = platform_name()
+    if system == "windows":
+        return "mattmc_rust-win-x64.dll"
+    if system == "macos":
+        return "libmattmc_rust-macos-universal.dylib"
+    return "libmattmc_rust-linux-x64.so"
+
+
+def native_library_path(root: Path) -> Path:
+    return root / "build" / "rust" / "native" / native_library_name()
+
+
+def native_artifact_identity(target: RepoTarget, rust_profile: str) -> dict[str, object] | None:
+    if target.role != "current":
+        return None
+    path = native_library_path(target.root)
+    if not path.is_file():
+        return {
+            "path": str(path),
+            "exists": False,
+            "rust_profile": rust_profile,
+            "repository": repository_metadata(target),
+        }
+    stat = path.stat()
+    return {
+        "path": str(path),
+        "exists": True,
+        "sha256": sha256_file(path),
+        "size_bytes": stat.st_size,
+        "last_write_time": datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat(),
+        "rust_profile": rust_profile,
+        "repository": repository_metadata(target),
+    }
+
+
+def rebuild_current_native(targets: list[RepoTarget], args: argparse.Namespace, artifact_root: Path) -> dict[str, object] | None:
+    current = next((target for target in targets if target.role == "current"), None)
+    if current is None or args.dry_run:
+        return None
+    rebuild_dir = artifact_root / "native-rebuild"
+    rebuild_dir.mkdir(parents=True, exist_ok=True)
+    stdout_path = rebuild_dir / "stdout.log"
+    stderr_path = rebuild_dir / "stderr.log"
+    command = [
+        *gradle_wrapper(current.root),
+        f"-PmattmcRustProfile={args.rust_profile}",
+        "buildRustNative",
+        "--rerun-tasks",
+        "--no-daemon",
+    ]
+    started_at = utc_now()
+    started = time.monotonic()
+    with stdout_path.open("w", encoding="utf-8") as stdout, stderr_path.open("w", encoding="utf-8") as stderr:
+        process = subprocess.Popen(
+            command,
+            cwd=current.root,
+            text=True,
+            stdout=stdout,
+            stderr=stderr,
+            **popen_kwargs(),
+        )
+        timed_out = False
+        error = ""
+        try:
+            exit_code = process.wait(timeout=args.native_rebuild_timeout_seconds)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            terminate_process_tree(process)
+            exit_code = process.wait(timeout=30)
+            error = f"Timed out after {args.native_rebuild_timeout_seconds}s"
+    ended_at = utc_now()
+    identity = native_artifact_identity(current, args.rust_profile)
+    result = {
+        "schema": "mattmc-native-rebuild-v1",
+        "started_at": started_at.isoformat(),
+        "ended_at": ended_at.isoformat(),
+        "duration_seconds": time.monotonic() - started,
+        "command": command,
+        "success": exit_code == 0 and not timed_out and bool(identity and identity.get("exists")),
+        "timed_out": timed_out,
+        "exit_code": exit_code,
+        "error": error,
+        "stdout_path": str(stdout_path),
+        "stderr_path": str(stderr_path),
+        "native_artifact": identity,
+    }
+    path = rebuild_dir / "native_rebuild.json"
+    path.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    if not result["success"]:
+        raise SystemExit(f"Native rebuild failed; see {path}")
+    return result
+
+
 def repository_metadata(target: RepoTarget) -> dict[str, object]:
     status = dirty_status(target.root)
     return {
@@ -221,6 +324,7 @@ def base_metadata(target: RepoTarget, workload: str, command: Sequence[str], arg
         "jvm_args": args.jvm_arg,
         "benchmark_force_mode": args.benchmark_force_mode if workload == "chunk-meshing-hotpath" else None,
         "fork_index": args.fork_index if workload == "chunk-meshing-hotpath" else None,
+        "diagnostic_mode": args.diagnostic if workload == "chunk-meshing-hotpath" else None,
     }
 
 
@@ -250,6 +354,7 @@ def build_command(target: RepoTarget, workload: str, args: argparse.Namespace, o
     if workload == "chunk-meshing-hotpath":
         jvm = [
             "-Dmattmc.runPerfBenchmarks=true",
+            f"-Dmattmc.perf.diagnostic={str(args.diagnostic).lower()}",
             f"-Dmattmc.perf.quads={args.quads}",
             f"-Dmattmc.perf.warmup={args.warmup}",
             f"-Dmattmc.perf.iterations={args.iterations}",
@@ -274,10 +379,20 @@ def build_command(target: RepoTarget, workload: str, args: argparse.Namespace, o
             command.insert(-len(args.gradle_arg) if args.gradle_arg else len(command), "--rerun-tasks")
         if target.role == "current":
             command.insert(1, f"-PmattmcRustProfile={args.rust_profile}")
-        return command, {
+        extra_env = {
             "MATTMC_RUN_PERF_BENCHMARKS": "true",
             "JAVA_TOOL_OPTIONS": " ".join(jvm),
         }
+        if args.diagnostic and target.role == "current":
+            extra_env.update(
+                {
+                    "MATTMC_PROFILE_STATIC_MODEL_SUBSTAGES": "true",
+                    "MATTMC_PROFILE_FLUID_SUBSTAGES": "true",
+                    "MATTMC_PROFILE_SCAN_SUBSTAGES": "true",
+                    "MATTMC_PROFILE_STAGING_SUBSTAGES": "true",
+                }
+            )
+        return command, extra_env
     raise SystemExit(f"Unsupported workload: {workload}")
 
 
@@ -624,12 +739,143 @@ def write_aggregate_files(artifact_root: Path, aggregate: dict[str, object] | No
     return json_path, text_path
 
 
+def stable_json_hash(value: object) -> str:
+    payload = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def normalized_work_signature(row: dict[str, object]) -> dict[str, object]:
+    row_accounting = accounting(row)
+    keys = (
+        "output_quads_per_invocation",
+        "output_vertex_bytes_per_invocation",
+        "output_index_bytes_per_invocation",
+        "fallback_like_blocks_per_invocation",
+        "fallback_like_quads_per_invocation",
+    )
+    return {key: row_accounting.get(key) for key in keys}
+
+
+def stage_timing(row: dict[str, object]) -> dict[str, object]:
+    value = row.get("stage_timing_ms_per_invocation")
+    return value if isinstance(value, dict) else {}
+
+
+def native_profile(row: dict[str, object]) -> dict[str, object]:
+    value = row.get("native_profile")
+    return value if isinstance(value, dict) else {}
+
+
+def build_diagnostic_summary(results: list[CommandResult], aggregate: dict[str, object] | None) -> dict[str, object] | None:
+    docs_by_fork: dict[int, dict[str, dict[str, object]]] = {}
+    for result in results:
+        if result.workload != "chunk-meshing-hotpath" or not result.success:
+            continue
+        doc = load_benchmark_output(result)
+        if doc is None:
+            continue
+        fork = int(numeric(doc.get("fork_index"), 0.0))
+        docs_by_fork.setdefault(fork, {})[result.target] = doc
+    if not docs_by_fork:
+        return None
+
+    rows: list[dict[str, object]] = []
+    target_workloads = {
+        "full_section_replay_normal_surface_terrain",
+        "full_section_replay_dense_cube_terrain",
+        "full_section_replay_foliage_tinted_models",
+        "full_section_replay_weighted_and_multipart_models",
+        "full_section_replay_waterlogged_geometry",
+        "full_section_replay_translucent_heavy",
+        "full_section_replay_fluid_heavy",
+        "full_section_replay_complex_modded_static_serializable",
+    }
+    for fork, target_docs in sorted(docs_by_fork.items()):
+        current_doc = target_docs.get("current")
+        frozen_doc = target_docs.get("frozen")
+        if current_doc is None or frozen_doc is None:
+            continue
+        current_rows = row_by_name(current_doc)
+        frozen_rows = row_by_name(frozen_doc)
+        for name in sorted(target_workloads & current_rows.keys() & frozen_rows.keys()):
+            current_row = current_rows[name]
+            frozen_row = frozen_rows[name]
+            current_signature = normalized_work_signature(current_row)
+            frozen_signature = normalized_work_signature(frozen_row)
+            work_hash_current = stable_json_hash(current_signature)
+            work_hash_frozen = stable_json_hash(frozen_signature)
+            current_checksum = current_row.get("checksum")
+            frozen_checksum = frozen_row.get("checksum")
+            fallback = fallback_contaminated(current_row) or fallback_contaminated(frozen_row)
+            counts_match = current_signature == frozen_signature
+            if fallback:
+                classification = "fallback-contaminated"
+            elif current_checksum == frozen_checksum:
+                classification = "byte-identical"
+            elif counts_match:
+                classification = "output-count-equivalent-needs-semantic-fingerprint"
+            else:
+                classification = "invalid-comparison"
+            first_mismatch = None
+            if current_checksum != frozen_checksum:
+                first_mismatch = {
+                    "kind": "raw_final_checksum",
+                    "current": current_checksum,
+                    "frozen": frozen_checksum,
+                    "note": "Output sizes and fixture work may still match; comparable decoded semantic quad hashes are not yet emitted by the benchmark.",
+                }
+            rows.append(
+                {
+                    "fork": fork,
+                    "name": name,
+                    "classification": classification,
+                    "current_raw_final_checksum": current_checksum,
+                    "frozen_raw_final_checksum": frozen_checksum,
+                    "current_canonical_work_hash": work_hash_current,
+                    "frozen_canonical_work_hash": work_hash_frozen,
+                    "canonical_work_hash_match": work_hash_current == work_hash_frozen,
+                    "current_work_signature": current_signature,
+                    "frozen_work_signature": frozen_signature,
+                    "first_mismatch": first_mismatch,
+                    "current_stage_timing_ms_per_invocation": stage_timing(current_row),
+                    "frozen_stage_timing_ms_per_invocation": stage_timing(frozen_row),
+                    "current_native_profile": native_profile(current_row),
+                    "current_sample_count": current_row.get("samples"),
+                    "frozen_sample_count": frozen_row.get("samples"),
+                }
+            )
+    return {
+        "schema": "mattmc-chunk-meshing-diagnostic-summary-v1",
+        "created_at": utc_now().isoformat(),
+        "forks_observed": sorted(docs_by_fork.keys()),
+        "diagnostic_limitations": [
+            "The benchmark now preserves raw sample_nanos arrays in per-target output JSON.",
+            "canonical_work_hash currently covers output counts and fallback counters, not decoded vertex/quad semantics.",
+            "raw_final_checksum is implementation-specific and differing values are reported as a first mismatch, not as proof of semantic mismatch.",
+            "Current Rust native_profile includes fine substages only when diagnostic mode enables MATTMC_PROFILE_* environment flags.",
+        ],
+        "aggregate_classifications": aggregate.get("rows", []) if aggregate else [],
+        "rows": rows,
+    }
+
+
+def write_diagnostic_summary(artifact_root: Path, diagnostic: dict[str, object] | None) -> Path | None:
+    if diagnostic is None:
+        return None
+    path = artifact_root / "diagnostic_summary.json"
+    path.write_text(json.dumps(diagnostic, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return path
+
+
 def write_combined_manifest(
     artifact_root: Path,
     results: list[CommandResult],
     args: argparse.Namespace,
     aggregate_path: Path | None = None,
     aggregate_report_path: Path | None = None,
+    diagnostic_path: Path | None = None,
+    native_rebuild: dict[str, object] | None = None,
+    native_artifact: dict[str, object] | None = None,
 ) -> Path:
     manifest = {
         "schema": "mattmc-rust-migration-comparison-v1",
@@ -641,6 +887,9 @@ def write_combined_manifest(
         "alternate_order": args.alternate_order if args.workload == "chunk-meshing-hotpath" else None,
         "aggregate_summary": str(aggregate_path) if aggregate_path else None,
         "aggregate_report": str(aggregate_report_path) if aggregate_report_path else None,
+        "diagnostic_summary": str(diagnostic_path) if diagnostic_path else None,
+        "native_rebuild": native_rebuild,
+        "native_artifact": native_artifact,
         "results": [asdict(result) for result in results],
     }
     path = artifact_root / "combined_manifest.json"
@@ -669,10 +918,21 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--frozen-repo", help="override frozen Java repository path")
     parser.add_argument("--artifact-dir", type=Path)
     parser.add_argument("--timeout-seconds", type=non_negative_int, default=DEFAULT_TIMEOUT_SECONDS)
+    parser.add_argument("--native-rebuild-timeout-seconds", type=non_negative_int, default=900)
     parser.add_argument("--rust-profile", default="release")
     parser.add_argument("--jvm-arg", action="append", default=[])
     parser.add_argument("--gradle-arg", action="append", default=[])
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--rebuild-current-native",
+        action="store_true",
+        help="Force one current-repo release native rebuild before running measured workloads and record its identity.",
+    )
+    parser.add_argument(
+        "--diagnostic",
+        action="store_true",
+        help="Enable validation-only chunk meshing diagnostics and Rust native substage profile env vars.",
+    )
     parser.add_argument("--quads", type=non_negative_int, default=32768)
     parser.add_argument("--warmup", type=non_negative_int, default=8)
     parser.add_argument("--iterations", type=non_negative_int, default=25)
@@ -713,6 +973,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     artifact_root.mkdir(parents=True, exist_ok=True)
 
+    native_rebuild = rebuild_current_native(targets, args, artifact_root) if args.rebuild_current_native else None
+    current_target = next((target for target in targets if target.role == "current"), None)
+    native_artifact = native_artifact_identity(current_target, args.rust_profile) if current_target else None
+
     results: list[CommandResult] = []
     if args.workload == "chunk-meshing-hotpath" and args.forks > 1:
         for fork_number in range(1, args.forks + 1):
@@ -725,12 +989,25 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     aggregate = build_benchmark_aggregate(results) if args.workload == "chunk-meshing-hotpath" else None
     aggregate_path, aggregate_report_path = write_aggregate_files(artifact_root, aggregate)
-    manifest = write_combined_manifest(artifact_root, results, args, aggregate_path, aggregate_report_path)
+    diagnostic = build_diagnostic_summary(results, aggregate) if args.workload == "chunk-meshing-hotpath" else None
+    diagnostic_path = write_diagnostic_summary(artifact_root, diagnostic)
+    manifest = write_combined_manifest(
+        artifact_root,
+        results,
+        args,
+        aggregate_path,
+        aggregate_report_path,
+        diagnostic_path,
+        native_rebuild,
+        native_artifact,
+    )
     print(f"Wrote combined manifest: {manifest}")
     if aggregate_path:
         print(f"Wrote aggregate summary: {aggregate_path}")
     if aggregate_report_path:
         print(f"Wrote aggregate report: {aggregate_report_path}")
+    if diagnostic_path:
+        print(f"Wrote diagnostic summary: {diagnostic_path}")
     for result in results:
         status = "ok" if result.success else "FAILED"
         print(f"{result.target}: {status} ({result.metadata_path})")
