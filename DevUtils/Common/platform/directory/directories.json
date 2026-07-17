@@ -11,7 +11,7 @@
   },
   "java_perf_repo": {
     "linux": "~/Documents/Repos/MattMC_JavaPerfTesting/MattMC",
-    "windows": null,
+    "windows": "C:/repos/MattMC_JavaPerfTesting/MattMC",
     "macos": null
   },
   "local_install": {
