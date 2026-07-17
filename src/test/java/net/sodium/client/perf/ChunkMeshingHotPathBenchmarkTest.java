@@ -30,13 +30,18 @@ import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -51,6 +56,7 @@ class ChunkMeshingHotPathBenchmarkTest {
     private static final long WARMUP_MILLIS = Long.getLong("mattmc.perf.warmupMillis", 1_500L);
     private static final long MEASURE_MILLIS = Long.getLong("mattmc.perf.measureMillis", 2_500L);
     private static final int FORK_INDEX = Integer.getInteger("mattmc.perf.forkIndex", 0);
+    private static final boolean DIAGNOSTIC = Boolean.getBoolean("mattmc.perf.diagnostic");
     private static final int SECTION_INDEX = 11;
     private static final MeshFinisher MESH_FINISHER = createMeshFinisher();
     private static final int SECTION_BLOCKS = 16 * 16 * 16;
@@ -263,15 +269,16 @@ class ChunkMeshingHotPathBenchmarkTest {
             ByteBuffer vertexBuffer = mesh == null ? null
                     : mesh.getVertexData().getDirectBuffer().order(ByteOrder.nativeOrder());
             BenchmarkAccounting.recordNativeProfile(sectionBuilder.copyProfile());
-            BenchmarkAccounting.record((recordCount == 0 ? 0 : 2) + (section.fallbackLikeBlocks > 0 ? 1 : 0),
-                    records.remaining()
-                            + (long) section.fallbackLikeBlocks * NativeChunkMeshEncoder.FLAT_QUAD_RECORD_STRIDE,
-                    vertexBuffer == null ? 0 : vertexBuffer.remaining(),
-                    (long) committed * INDEX_BYTES_PER_QUAD, committed,
-                    section.fallbackLikeBlocks, section.fallbackLikeBlocks);
-            long meshChecksum = vertexBuffer == null ? 0L : sample(vertexBuffer);
-            long summary = section.expectedSummary();
-            return (((long) committed) << 32) ^ meshChecksum ^ summary ^ stages.checksum();
+                BenchmarkAccounting.record((recordCount == 0 ? 0 : 2) + (section.fallbackLikeBlocks > 0 ? 1 : 0),
+                        records.remaining()
+                                + (long) section.fallbackLikeBlocks * NativeChunkMeshEncoder.FLAT_QUAD_RECORD_STRIDE,
+                        vertexBuffer == null ? 0 : vertexBuffer.remaining(),
+                        (long) committed * INDEX_BYTES_PER_QUAD, committed,
+                        section.fallbackLikeBlocks, section.fallbackLikeBlocks);
+                SemanticDiagnostics.record(SemanticSnapshot.create(section, vertexBuffer, committed));
+                long meshChecksum = vertexBuffer == null ? 0L : sample(vertexBuffer);
+                long summary = section.expectedSummary();
+                return (((long) committed) << 32) ^ meshChecksum ^ summary ^ stages.checksum();
         } finally {
             if (mesh != null) {
                 mesh.getVertexData().free();
@@ -314,6 +321,7 @@ class ChunkMeshingHotPathBenchmarkTest {
                         vertexBuffer == null ? 0 : vertexBuffer.remaining(),
                         (long) committed * INDEX_BYTES_PER_QUAD, committed,
                         section.fallbackLikeBlocks, section.fallbackLikeBlocks);
+                SemanticDiagnostics.record(SemanticSnapshot.create(section, vertexBuffer, committed));
                 long meshChecksum = vertexBuffer == null ? 0L : sample(vertexBuffer);
                 return (((long) committed) << 32) ^ meshChecksum ^ section.expectedSummary() ^ stages.checksum();
             } finally {
@@ -603,6 +611,7 @@ class ChunkMeshingHotPathBenchmarkTest {
 
         StageTimer.reset();
         BenchmarkAccounting.reset();
+        SemanticDiagnostics.reset();
         List<Long> sampleList = new ArrayList<>();
         long measureDeadline = System.nanoTime() + MEASURE_MILLIS * 1_000_000L;
         do {
@@ -616,6 +625,7 @@ class ChunkMeshingHotPathBenchmarkTest {
         peak = peak.max(after);
         Map<String, Long> stageNanos = StageTimer.snapshot();
         AccountingSnapshot accounting = BenchmarkAccounting.snapshot();
+        SemanticSnapshot semantic = SemanticDiagnostics.snapshot();
 
         long[] samples = new long[sampleList.size()];
         for (int index = 0; index < sampleList.size(); index++) {
@@ -651,6 +661,7 @@ class ChunkMeshingHotPathBenchmarkTest {
                 checksum,
                 stageNanos,
                 accounting,
+                semantic,
                 before,
                 after,
                 peak,
@@ -778,6 +789,7 @@ class ChunkMeshingHotPathBenchmarkTest {
             builder.append("      \"checksum\": ").append(result.checksum).append(",\n");
             appendStageJson(builder, result.stageNanos, result.sampleCount);
             appendAccountingJson(builder, result.accounting, result.sampleCount);
+            appendSemanticJson(builder, result.semantic);
             appendNativeProfileJson(builder, result.accounting.nativeProfile, result.sampleCount);
             appendGcJson(builder, result.gcBefore, result.gcAfter);
             appendMemoryJson(builder, result);
@@ -854,6 +866,61 @@ class ChunkMeshingHotPathBenchmarkTest {
         appendAccountingValueJson(builder, "fallback_like_quads_total", accounting.fallbackQuads, true);
         appendAccountingValueJson(builder, "fallback_like_quads_per_invocation", accounting.fallbackQuads, samples, false);
         builder.append("      },\n");
+    }
+
+    private static void appendSemanticJson(StringBuilder builder, SemanticSnapshot semantic) {
+        builder.append("      \"semantic_fingerprint\": ");
+        if (semantic == null) {
+            builder.append("null,\n");
+            return;
+        }
+        builder.append("{\n");
+        appendStringJson(builder, "schema", semantic.schema, true, 8);
+        appendStringJson(builder, "capture_kind", semantic.captureKind, true, 8);
+        appendStringJson(builder, "canonical_sort_key", semantic.canonicalSortKey, true, 8);
+        appendStringJson(builder, "float_normalization", semantic.floatNormalization, true, 8);
+        appendStringJson(builder, "raw_vertex_hash", semantic.rawVertexHash, true, 8);
+        appendStringJson(builder, "raw_index_hash", semantic.rawIndexHash, true, 8);
+        appendStringJson(builder, "ordered_semantic_hash", semantic.orderedSemanticHash, true, 8);
+        appendStringJson(builder, "canonical_semantic_hash", semantic.canonicalSemanticHash, true, 8);
+        appendStringJson(builder, "normalized_semantic_hash", semantic.normalizedSemanticHash, true, 8);
+        appendStringJson(builder, "translucent_metadata_hash", semantic.translucentMetadataHash, true, 8);
+        builder.append("        \"quad_count\": ").append(semantic.quadCount).append(",\n");
+        builder.append("        \"vertex_count\": ").append(semantic.vertexCount).append(",\n");
+        builder.append("        \"index_count\": ").append(semantic.indexCount).append(",\n");
+        builder.append("        \"vertex_bytes\": ").append(semantic.vertexBytes).append(",\n");
+        builder.append("        \"index_bytes\": ").append(semantic.indexBytes).append(",\n");
+        appendPassFingerprintsJson(builder, semantic.passFingerprints);
+        builder.append("      },\n");
+    }
+
+    private static void appendPassFingerprintsJson(StringBuilder builder, Map<String, PassFingerprint> passes) {
+        builder.append("        \"per_pass\": {\n");
+        int index = 0;
+        for (Map.Entry<String, PassFingerprint> entry : passes.entrySet()) {
+            PassFingerprint pass = entry.getValue();
+            builder.append("          \"").append(entry.getKey()).append("\": {\n");
+            builder.append("            \"quad_count\": ").append(pass.quadCount).append(",\n");
+            builder.append("            \"vertex_count\": ").append(pass.vertexCount).append(",\n");
+            builder.append("            \"index_count\": ").append(pass.indexCount).append(",\n");
+            appendStringJson(builder, "ordered_semantic_hash", pass.orderedHash, true, 12);
+            appendStringJson(builder, "canonical_semantic_hash", pass.canonicalHash, false, 12);
+            builder.append("          }");
+            if (++index < passes.size()) {
+                builder.append(',');
+            }
+            builder.append('\n');
+        }
+        builder.append("        }\n");
+    }
+
+    private static void appendStringJson(StringBuilder builder, String name, String value, boolean trailingComma,
+            int indent) {
+        builder.append(" ".repeat(indent)).append('"').append(name).append("\": \"").append(value).append('"');
+        if (trailingComma) {
+            builder.append(',');
+        }
+        builder.append('\n');
     }
 
     private static void appendNativeProfileJson(StringBuilder builder, long[] nativeProfile, int samples) {
@@ -1114,7 +1181,7 @@ class ChunkMeshingHotPathBenchmarkTest {
 
     private record BenchmarkResult(String name, double meanNanos, long medianNanos, long p90Nanos, long p99Nanos,
             long minNanos, long maxNanos, double stddevNanos, int sampleCount, long[] sampleNanos, int warmupCount,
-            long checksum, Map<String, Long> stageNanos, AccountingSnapshot accounting,
+            long checksum, Map<String, Long> stageNanos, AccountingSnapshot accounting, SemanticSnapshot semantic,
             MemorySnapshot memoryBefore, MemorySnapshot memoryAfter, MemorySnapshot memoryPeak,
             GcSnapshot gcBefore, GcSnapshot gcAfter) {
         double meanMillis() {
@@ -1160,6 +1227,15 @@ class ChunkMeshingHotPathBenchmarkTest {
         int expectedNativeQuads() {
             return this.solidBlocks + this.foliageBlocks + this.weightedMultipartBlocks + this.fluidBlocks
                     + this.translucentBlocks;
+        }
+
+        boolean isSemanticTarget() {
+            return switch (this.name) {
+                case "normal_surface_terrain", "dense_cube_terrain", "foliage_tinted_models",
+                        "weighted_and_multipart_models", "waterlogged_geometry", "fluid_heavy",
+                        "translucent_heavy" -> true;
+                default -> false;
+            };
         }
 
         long expectedSummary() {
@@ -1231,6 +1307,297 @@ class ChunkMeshingHotPathBenchmarkTest {
 
         static Map<String, Long> snapshot() {
             return new LinkedHashMap<>(STAGES.get());
+        }
+    }
+
+    private static final class SemanticDiagnostics {
+        private static final ThreadLocal<SemanticSnapshot> SNAPSHOT = new ThreadLocal<>();
+
+        static void reset() {
+            SNAPSHOT.remove();
+        }
+
+        static void record(SemanticSnapshot snapshot) {
+            if (snapshot != null) {
+                SNAPSHOT.set(snapshot);
+            }
+        }
+
+        static SemanticSnapshot snapshot() {
+            return SNAPSHOT.get();
+        }
+    }
+
+    private record SemanticSnapshot(String schema, String captureKind, String canonicalSortKey,
+            String floatNormalization, String rawVertexHash, String rawIndexHash, String orderedSemanticHash,
+            String canonicalSemanticHash, String normalizedSemanticHash, String translucentMetadataHash,
+            int quadCount, int vertexCount, int indexCount, int vertexBytes, int indexBytes,
+            Map<String, PassFingerprint> passFingerprints) {
+        static SemanticSnapshot create(ReplaySection section, ByteBuffer vertexBuffer, int committedQuads) {
+            if (!DIAGNOSTIC || section.fallbackLikeBlocks > 0 || !section.isSemanticTarget()) {
+                return null;
+            }
+            List<SemanticQuadRecord> records = SemanticQuadRecord.create(section);
+            String rawVertexHash = HashSink.hashVertexBuffer(vertexBuffer);
+            String rawIndexHash = HashSink.hashGeneratedQuadIndices(committedQuads);
+            String orderedHash = HashSink.hashRecords(records);
+            List<SemanticQuadRecord> canonical = new ArrayList<>(records);
+            canonical.sort(Comparator.comparing(SemanticQuadRecord::canonicalKey));
+            String canonicalHash = HashSink.hashRecords(canonical);
+            String translucentHash = HashSink.hashTranslucentMetadata(records);
+            Map<String, List<SemanticQuadRecord>> byPass = new LinkedHashMap<>();
+            for (SemanticQuadRecord record : records) {
+                byPass.computeIfAbsent(record.renderPass, ignored -> new ArrayList<>()).add(record);
+            }
+            Map<String, PassFingerprint> passes = new LinkedHashMap<>();
+            for (Map.Entry<String, List<SemanticQuadRecord>> entry : byPass.entrySet()) {
+                List<SemanticQuadRecord> passRecords = entry.getValue();
+                List<SemanticQuadRecord> canonicalPassRecords = new ArrayList<>(passRecords);
+                canonicalPassRecords.sort(Comparator.comparing(SemanticQuadRecord::canonicalKey));
+                passes.put(entry.getKey(), new PassFingerprint(passRecords.size(), passRecords.size() * 4,
+                        passRecords.size() * TranslucentData.INDICES_PER_QUAD,
+                        HashSink.hashRecords(passRecords), HashSink.hashRecords(canonicalPassRecords)));
+            }
+            int vertexBytes = vertexBuffer == null ? 0 : vertexBuffer.limit();
+            return new SemanticSnapshot(
+                    "mattmc-chunk-meshing-semantic-fingerprint-v1",
+                    "diagnostic_fixture_semantics_plus_actual_packed_vertex_bytes",
+                    "render_pass|block_position|source_type|face|sprite_identity|material_flags|exact_vertex_bits",
+                    "exact hash uses raw float bits; normalized hash only folds -0.0 to +0.0 and rejects non-finite fields",
+                    rawVertexHash,
+                    rawIndexHash,
+                    orderedHash,
+                    canonicalHash,
+                    HashSink.hashNormalizedRecords(canonical),
+                    translucentHash,
+                    committedQuads,
+                    committedQuads * 4,
+                    committedQuads * TranslucentData.INDICES_PER_QUAD,
+                    vertexBytes,
+                    committedQuads * INDEX_BYTES_PER_QUAD,
+                    passes);
+        }
+    }
+
+    private record PassFingerprint(int quadCount, int vertexCount, int indexCount,
+            String orderedHash, String canonicalHash) {
+    }
+
+    private record SemanticQuadRecord(String renderPass, int blockIndex, int localX, int localY, int localZ,
+            String sourceType, String face, String spriteIdentity, int materialFlags, int tintIndex,
+            boolean shade, int fluidType, String fluidFace, float fluidHeight, float fluidFlowX, float fluidFlowZ,
+            int color, int light, int normal, float[] vertexData) {
+        static List<SemanticQuadRecord> create(ReplaySection section) {
+            List<SemanticQuadRecord> records = new ArrayList<>(section.expectedNativeQuads());
+            for (int index = 0; index < SECTION_BLOCKS; index++) {
+                int stateId = stateForReplayIndex(section, index);
+                if (stateId == 0) {
+                    continue;
+                }
+                int localX = index & 15;
+                int localY = (index >>> 8) & 15;
+                int localZ = (index >>> 4) & 15;
+                String sourceType = sourceType(section, index);
+                long seed = 0x9e3779b97f4a7c15L ^ (long) index * 0xbf58476d1ce4e5b9L;
+                if (sourceType.equals("fluid")) {
+                    records.add(fluidRecord(index, localX, localY, localZ, seed));
+                } else {
+                    records.add(modelRecord(section, index, localX, localY, localZ, stateId, sourceType, seed));
+                }
+            }
+            return records;
+        }
+
+        private static SemanticQuadRecord modelRecord(ReplaySection section, int index, int localX, int localY,
+                int localZ, int stateId, String sourceType, long seed) {
+            int modelId = stateId == 101 ? 78 : 77;
+            if (stateId == 102) {
+                modelId = ((seed >>> 4) & 3L) == 0L ? 78 : 77;
+            }
+            int color = stateId == 101 ? 0xff78b85a : 0xffffffff;
+            int light = 0x00f000f0 | ((stateId & 15) << 4);
+            float offsetX = stateId == 102 && ((seed & 1L) != 0L) ? 0.125F : 0.0F;
+            float offsetZ = stateId == 102 && ((seed & 2L) != 0L) ? -0.125F : 0.0F;
+            float x = localX + offsetX;
+            float y = localY;
+            float z = localZ + offsetZ;
+            return new SemanticQuadRecord("solid_cutout", index, localX, localY, localZ, sourceType, "north",
+                    "model:" + modelId, materialBits(modelId), stateId == 101 ? 0 : -1, true, -1, "none",
+                    0.0F, 0.0F, 0.0F, color, light, 0,
+                    new float[] {x, y, z, 0.0F, 0.0F, x + 1.0F, y, z, 1.0F, 0.0F,
+                            x + 1.0F, y + 1.0F, z, 1.0F, 1.0F, x, y + 1.0F, z, 0.0F, 1.0F});
+        }
+
+        private static SemanticQuadRecord fluidRecord(int index, int localX, int localY, int localZ, long seed) {
+            float height = 0.8888889F;
+            float flow = ((seed >>> 2) & 1L) == 0L ? 0.0F : 0.25F;
+            int color = 0xcc3f76e4;
+            return new SemanticQuadRecord("translucent", index, localX, localY, localZ, "fluid", "up",
+                    flow == 0.0F ? "fluid:still" : "fluid:flowing", materialBits(200), -1, true, 1, "top",
+                    height, flow, 0.0F, color, 0x00f000f0, 1,
+                    new float[] {localX, localY + height, localZ, flow, 0.0F,
+                            localX + 1.0F, localY + height, localZ, 1.0F + flow, 0.0F,
+                            localX + 1.0F, localY + height, localZ + 1.0F, 1.0F + flow, 1.0F,
+                            localX, localY + height, localZ + 1.0F, flow, 1.0F});
+        }
+
+        private static String sourceType(ReplaySection section, int index) {
+            int cursor = index;
+            if (cursor < section.solidBlocks) {
+                return "block_model";
+            }
+            cursor -= section.solidBlocks;
+            if (cursor < section.foliageBlocks) {
+                return "block_model_tinted";
+            }
+            cursor -= section.foliageBlocks;
+            if (cursor < section.weightedMultipartBlocks) {
+                return "block_model_weighted_multipart";
+            }
+            return "fluid";
+        }
+
+        String canonicalKey() {
+            return this.renderPass + "|" + this.localY + "|" + this.localZ + "|" + this.localX + "|"
+                    + this.sourceType + "|" + this.face + "|" + this.spriteIdentity + "|" + this.materialFlags
+                    + "|" + HashSink.hashFloatArray(this.vertexData, false);
+        }
+    }
+
+    private static final class HashSink {
+        private final MessageDigest digest;
+
+        private HashSink() {
+            try {
+                this.digest = MessageDigest.getInstance("SHA-256");
+            } catch (NoSuchAlgorithmException exception) {
+                throw new IllegalStateException("SHA-256 is unavailable", exception);
+            }
+        }
+
+        static String hashVertexBuffer(ByteBuffer buffer) {
+            HashSink sink = new HashSink();
+            sink.string("raw_vertex_buffer_v1");
+            if (buffer != null) {
+                ByteBuffer copy = buffer.duplicate();
+                copy.position(0);
+                while (copy.hasRemaining()) {
+                    sink.byteValue(copy.get());
+                }
+            }
+            return sink.hex();
+        }
+
+        static String hashGeneratedQuadIndices(int quadCount) {
+            HashSink sink = new HashSink();
+            sink.string("generated_quad_indices_v1");
+            for (int quad = 0; quad < quadCount; quad++) {
+                int base = quad * 4;
+                sink.intValue(base);
+                sink.intValue(base + 1);
+                sink.intValue(base + 2);
+                sink.intValue(base + 2);
+                sink.intValue(base + 3);
+                sink.intValue(base);
+            }
+            return sink.hex();
+        }
+
+        static String hashRecords(List<SemanticQuadRecord> records) {
+            return hashRecords(records, false);
+        }
+
+        static String hashNormalizedRecords(List<SemanticQuadRecord> records) {
+            return hashRecords(records, true);
+        }
+
+        private static String hashRecords(List<SemanticQuadRecord> records, boolean normalized) {
+            HashSink sink = new HashSink();
+            sink.string(normalized ? "semantic_records_normalized_v1" : "semantic_records_exact_v1");
+            for (SemanticQuadRecord record : records) {
+                sink.record(record, normalized);
+            }
+            return sink.hex();
+        }
+
+        static String hashTranslucentMetadata(List<SemanticQuadRecord> records) {
+            HashSink sink = new HashSink();
+            sink.string("translucent_metadata_v1");
+            for (SemanticQuadRecord record : records) {
+                if (record.renderPass.equals("translucent")) {
+                    sink.intValue(record.blockIndex);
+                    sink.string(record.sourceType);
+                    sink.string(record.face);
+                    sink.floatValue(record.fluidHeight, false);
+                    sink.floatValue(record.fluidFlowX, false);
+                    sink.floatValue(record.fluidFlowZ, false);
+                }
+            }
+            return sink.hex();
+        }
+
+        static String hashFloatArray(float[] values, boolean normalized) {
+            HashSink sink = new HashSink();
+            for (float value : values) {
+                sink.floatValue(value, normalized);
+            }
+            return sink.hex();
+        }
+
+        private void record(SemanticQuadRecord record, boolean normalized) {
+            string(record.renderPass);
+            intValue(record.blockIndex);
+            intValue(record.localX);
+            intValue(record.localY);
+            intValue(record.localZ);
+            string(record.sourceType);
+            string(record.face);
+            string(record.spriteIdentity);
+            intValue(record.materialFlags);
+            intValue(record.tintIndex);
+            intValue(record.shade ? 1 : 0);
+            intValue(record.fluidType);
+            string(record.fluidFace);
+            floatValue(record.fluidHeight, normalized);
+            floatValue(record.fluidFlowX, normalized);
+            floatValue(record.fluidFlowZ, normalized);
+            intValue(record.color);
+            intValue(record.light);
+            intValue(record.normal);
+            for (float value : record.vertexData) {
+                floatValue(value, normalized);
+            }
+        }
+
+        private void string(String value) {
+            byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+            intValue(bytes.length);
+            this.digest.update(bytes);
+        }
+
+        private void byteValue(byte value) {
+            this.digest.update(value);
+        }
+
+        private void intValue(int value) {
+            this.digest.update((byte) value);
+            this.digest.update((byte) (value >>> 8));
+            this.digest.update((byte) (value >>> 16));
+            this.digest.update((byte) (value >>> 24));
+        }
+
+        private void floatValue(float value, boolean normalized) {
+            if (!Float.isFinite(value)) {
+                throw new IllegalStateException("Non-finite semantic float: " + value);
+            }
+            if (normalized && value == 0.0F) {
+                value = 0.0F;
+            }
+            intValue(Float.floatToRawIntBits(value));
+        }
+
+        private String hex() {
+            return HexFormat.of().formatHex(this.digest.digest());
         }
     }
 

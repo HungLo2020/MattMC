@@ -107,6 +107,12 @@ When both targets are selected, the harness alternates execution order by fork b
 - `aggregate_report.md`: compact human-readable comparison table.
 - `diagnostic_summary.json`: per-fork current/frozen work signatures, raw checksums, stage timings, native profile counters, and explicit equivalence limitations.
 
+Diagnostic benchmark output includes `semantic_fingerprint` for clean full-section replay rows. The raw vertex hash is computed from the actual packed vertex bytes produced by each implementation. The raw index hash is derived from the shared generated quad-index pattern used by these rows. Ordered, canonical, normalized, translucent, and per-pass semantic hashes are encoded from deterministic replay fixture quad records using SHA-256 and explicit little-endian field encoding. The canonical sort key is:
+
+```text
+render_pass|block_position|source_type|face|sprite_identity|material_flags|exact_vertex_bits
+```
+
 Use `--rebuild-current-native` before an authoritative run when native identity matters. The harness runs `buildRustNative --rerun-tasks` once before measured benchmark forks, writes `native-rebuild/native_rebuild.json`, records the produced native library SHA-256/size/timestamp in `combined_manifest.json`, and then reuses that artifact for the benchmark.
 
 Use `--diagnostic` for a separate validation pass. It enables the benchmark diagnostic property and Rust native substage profile environment variables for the current repo:

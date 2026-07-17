@@ -228,6 +228,24 @@ class RustMigrationHarnessTests(unittest.TestCase):
             self.assertEqual(row["classification"], "current-slower")
             self.assertEqual(row["current_over_frozen_ratio"]["median"], 2.0)
 
+    def test_semantic_classifier_distinguishes_byte_and_encoding_differences(self) -> None:
+        fingerprint = {
+            "raw_vertex_hash": "a",
+            "raw_index_hash": "b",
+            "ordered_semantic_hash": "c",
+            "canonical_semantic_hash": "d",
+            "normalized_semantic_hash": "e",
+            "translucent_metadata_hash": "f",
+        }
+        self.assertEqual(harness.classify_semantic(fingerprint, dict(fingerprint), False), "byte-identical")
+        current = dict(fingerprint)
+        current["raw_vertex_hash"] = "different"
+        self.assertEqual(harness.classify_semantic(current, fingerprint, False), "semantic-identical-encoding-different")
+        current["ordered_semantic_hash"] = "different"
+        self.assertEqual(harness.classify_semantic(current, fingerprint, False), "semantic-identical-order-different")
+        current["canonical_semantic_hash"] = "different"
+        self.assertEqual(harness.classify_semantic(current, fingerprint, False), "semantic-mismatch")
+
     def test_metadata_generation_records_dirty_state_and_artifact_separation(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = fake_repo(Path(temp), "current")

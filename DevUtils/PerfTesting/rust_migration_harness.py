@@ -766,6 +766,75 @@ def native_profile(row: dict[str, object]) -> dict[str, object]:
     return value if isinstance(value, dict) else {}
 
 
+def semantic_fingerprint(row: dict[str, object]) -> dict[str, object]:
+    value = row.get("semantic_fingerprint")
+    return value if isinstance(value, dict) else {}
+
+
+def semantic_hash_match(current: dict[str, object], frozen: dict[str, object], key: str) -> bool:
+    return bool(current) and bool(frozen) and current.get(key) == frozen.get(key)
+
+
+def classify_semantic(current: dict[str, object], frozen: dict[str, object], fallback: bool) -> str:
+    if fallback:
+        return "fallback-contaminated"
+    if not current or not frozen:
+        return "invalid"
+    raw_vertex = semantic_hash_match(current, frozen, "raw_vertex_hash")
+    raw_index = semantic_hash_match(current, frozen, "raw_index_hash")
+    ordered = semantic_hash_match(current, frozen, "ordered_semantic_hash")
+    canonical = semantic_hash_match(current, frozen, "canonical_semantic_hash")
+    normalized = semantic_hash_match(current, frozen, "normalized_semantic_hash")
+    translucent = semantic_hash_match(current, frozen, "translucent_metadata_hash")
+    if raw_vertex and raw_index:
+        return "byte-identical"
+    if canonical and normalized and translucent:
+        if ordered:
+            return "semantic-identical-encoding-different"
+        return "semantic-identical-order-different"
+    return "semantic-mismatch"
+
+
+def first_semantic_mismatch(name: str, current: dict[str, object], frozen: dict[str, object]) -> dict[str, object] | None:
+    if not current or not frozen:
+        return {
+            "workload": name,
+            "kind": "missing-semantic-fingerprint",
+            "current_present": bool(current),
+            "frozen_present": bool(frozen),
+        }
+    fields = (
+        "raw_vertex_hash",
+        "raw_index_hash",
+        "ordered_semantic_hash",
+        "canonical_semantic_hash",
+        "normalized_semantic_hash",
+        "translucent_metadata_hash",
+    )
+    for field in fields:
+        if current.get(field) != frozen.get(field):
+            return {
+                "workload": name,
+                "kind": field,
+                "current": current.get(field),
+                "frozen": frozen.get(field),
+                "current_capture_kind": current.get("capture_kind"),
+                "frozen_capture_kind": frozen.get("capture_kind"),
+                "classification_hint": semantic_mismatch_hint(field),
+            }
+    return None
+
+
+def semantic_mismatch_hint(field: str) -> str:
+    if field in {"raw_vertex_hash", "raw_index_hash"}:
+        return "byte-only mismatch if semantic hashes match; otherwise inspect packing or decoded fields"
+    if field == "translucent_metadata_hash":
+        return "translucent metadata difference"
+    if field in {"ordered_semantic_hash", "canonical_semantic_hash", "normalized_semantic_hash"}:
+        return "geometry/material/light/fluid semantic difference"
+    return "unknown"
+
+
 def build_diagnostic_summary(results: list[CommandResult], aggregate: dict[str, object] | None) -> dict[str, object] | None:
     docs_by_fork: dict[int, dict[str, dict[str, object]]] = {}
     for result in results:
@@ -804,33 +873,24 @@ def build_diagnostic_summary(results: list[CommandResult], aggregate: dict[str, 
             frozen_signature = normalized_work_signature(frozen_row)
             work_hash_current = stable_json_hash(current_signature)
             work_hash_frozen = stable_json_hash(frozen_signature)
-            current_checksum = current_row.get("checksum")
-            frozen_checksum = frozen_row.get("checksum")
             fallback = fallback_contaminated(current_row) or fallback_contaminated(frozen_row)
-            counts_match = current_signature == frozen_signature
-            if fallback:
-                classification = "fallback-contaminated"
-            elif current_checksum == frozen_checksum:
-                classification = "byte-identical"
-            elif counts_match:
-                classification = "output-count-equivalent-needs-semantic-fingerprint"
-            else:
-                classification = "invalid-comparison"
-            first_mismatch = None
-            if current_checksum != frozen_checksum:
-                first_mismatch = {
-                    "kind": "raw_final_checksum",
-                    "current": current_checksum,
-                    "frozen": frozen_checksum,
-                    "note": "Output sizes and fixture work may still match; comparable decoded semantic quad hashes are not yet emitted by the benchmark.",
-                }
+            current_semantic = semantic_fingerprint(current_row)
+            frozen_semantic = semantic_fingerprint(frozen_row)
+            classification = classify_semantic(current_semantic, frozen_semantic, fallback)
+            first_mismatch = first_semantic_mismatch(name, current_semantic, frozen_semantic)
             rows.append(
                 {
                     "fork": fork,
                     "name": name,
-                    "classification": classification,
-                    "current_raw_final_checksum": current_checksum,
-                    "frozen_raw_final_checksum": frozen_checksum,
+                    "semantic_classification": classification,
+                    "raw_vertex_hash_match": semantic_hash_match(current_semantic, frozen_semantic, "raw_vertex_hash"),
+                    "raw_index_hash_match": semantic_hash_match(current_semantic, frozen_semantic, "raw_index_hash"),
+                    "ordered_semantic_hash_match": semantic_hash_match(current_semantic, frozen_semantic, "ordered_semantic_hash"),
+                    "canonical_semantic_hash_match": semantic_hash_match(current_semantic, frozen_semantic, "canonical_semantic_hash"),
+                    "normalized_semantic_hash_match": semantic_hash_match(current_semantic, frozen_semantic, "normalized_semantic_hash"),
+                    "translucent_metadata_hash_match": semantic_hash_match(current_semantic, frozen_semantic, "translucent_metadata_hash"),
+                    "current_semantic_fingerprint": current_semantic,
+                    "frozen_semantic_fingerprint": frozen_semantic,
                     "current_canonical_work_hash": work_hash_current,
                     "frozen_canonical_work_hash": work_hash_frozen,
                     "canonical_work_hash_match": work_hash_current == work_hash_frozen,
@@ -850,8 +910,9 @@ def build_diagnostic_summary(results: list[CommandResult], aggregate: dict[str, 
         "forks_observed": sorted(docs_by_fork.keys()),
         "diagnostic_limitations": [
             "The benchmark now preserves raw sample_nanos arrays in per-target output JSON.",
-            "canonical_work_hash currently covers output counts and fallback counters, not decoded vertex/quad semantics.",
-            "raw_final_checksum is implementation-specific and differing values are reported as a first mismatch, not as proof of semantic mismatch.",
+            "semantic_fingerprint raw_vertex_hash is computed from actual packed vertex bytes produced by each benchmark path.",
+            "semantic_fingerprint raw_index_hash is derived from the shared quad index pattern because final index buffers are generated outside these section replay rows.",
+            "ordered and canonical semantic hashes are validation-only deterministic replay fixture records captured beside final packing; they do not mutate production meshing.",
             "Current Rust native_profile includes fine substages only when diagnostic mode enables MATTMC_PROFILE_* environment flags.",
         ],
         "aggregate_classifications": aggregate.get("rows", []) if aggregate else [],
