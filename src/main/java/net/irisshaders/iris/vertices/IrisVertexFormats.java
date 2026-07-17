@@ -55,6 +55,7 @@ public class IrisVertexFormats {
 			.add("Normal", VertexFormatElement.NORMAL)
 			.padding(1)
 			.add("iris_Entity", ENTITY_ID_ELEMENT)
+			.padding(2)
 			.add("mc_midTexCoord", MID_TEXTURE_ELEMENT)
 			.add("at_tangent", TANGENT_ELEMENT)
 			.build();

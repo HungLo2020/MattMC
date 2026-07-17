@@ -18,6 +18,7 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * A singleton that holds references to different openGL contexts
@@ -37,7 +38,15 @@ public class GLProxy
 	private static final ConcurrentLinkedQueue<Runnable> RENDER_THREAD_RUNNABLE_QUEUE = new ConcurrentLinkedQueue<>();
 	private static final long DEFAULT_RENDER_THREAD_TASK_BUDGET_NANOS = 4_000_000L;
 	private static final long VULKAN_LOD_UPLOAD_TASK_BUDGET_NANOS = 32_000_000L;
-	private static final int VULKAN_LOD_UPLOAD_MIN_TASKS = 64;
+	private static final int VULKAN_LOD_UPLOAD_MIN_TASKS = 16;
+	private static final String DH_UPLOAD_DRAIN_DIAGNOSTICS_PROPERTY = "mattmc.dhUploadDrainDiagnostics";
+	private static final long DH_UPLOAD_DRAIN_DIAGNOSTIC_LOG_INTERVAL_FRAMES = 120L;
+	private static final AtomicLong DRAIN_FRAMES = new AtomicLong();
+	private static final AtomicLong DRAIN_TASKS_PROCESSED = new AtomicLong();
+	private static final AtomicLong DRAIN_ELAPSED_NANOS = new AtomicLong();
+	private static final AtomicLong DRAIN_TIME_LIMIT_FRAMES = new AtomicLong();
+	private static final AtomicLong DRAIN_MINIMUM_TASK_FRAMES = new AtomicLong();
+	private static final AtomicLong DRAIN_MAX_BACKLOG = new AtomicLong();
 	
 	
 	
@@ -305,10 +314,38 @@ public class GLProxy
 		return runRenderThreadTasks(maxDurationNanos, minimumTaskCount);
 	}
 
+	static DrainStats drainStatsForTesting()
+	{
+		return new DrainStats(
+			DRAIN_FRAMES.get(),
+			DRAIN_TASKS_PROCESSED.get(),
+			DRAIN_ELAPSED_NANOS.get(),
+			DRAIN_TIME_LIMIT_FRAMES.get(),
+			DRAIN_MINIMUM_TASK_FRAMES.get(),
+			DRAIN_MAX_BACKLOG.get(),
+			RENDER_THREAD_RUNNABLE_QUEUE.size()
+		);
+	}
+
+	static void resetDrainStatsForTesting()
+	{
+		DRAIN_FRAMES.set(0L);
+		DRAIN_TASKS_PROCESSED.set(0L);
+		DRAIN_ELAPSED_NANOS.set(0L);
+		DRAIN_TIME_LIMIT_FRAMES.set(0L);
+		DRAIN_MINIMUM_TASK_FRAMES.set(0L);
+		DRAIN_MAX_BACKLOG.set(0L);
+		RENDER_THREAD_RUNNABLE_QUEUE.clear();
+	}
+
 	private static int runRenderThreadTasks(long maxDurationNanos, int minimumTaskCount)
 	{
 		long startTime = System.nanoTime();
 		int tasksRun = 0;
+		boolean diagnosticsEnabled = Boolean.getBoolean(DH_UPLOAD_DRAIN_DIAGNOSTICS_PROPERTY);
+		int queuedBefore = diagnosticsEnabled ? RENDER_THREAD_RUNNABLE_QUEUE.size() : -1;
+		boolean exitedOnTimeLimit = false;
+		boolean usedMinimumTaskFloor = false;
 		
 		Runnable runnable = RENDER_THREAD_RUNNABLE_QUEUE.poll();
 		while(runnable != null)
@@ -320,14 +357,74 @@ public class GLProxy
 			// Vulkan's slower compatibility uploads to make bounded progress.
 			long currentTime = System.nanoTime();
 			long runDuration = currentTime - startTime;
+			if (minimumTaskCount > 0 && tasksRun < minimumTaskCount && runDuration > maxDurationNanos)
+			{
+				usedMinimumTaskFloor = true;
+			}
 			if (tasksRun >= minimumTaskCount && runDuration > maxDurationNanos)
 			{
+				exitedOnTimeLimit = true;
 				break;
 			}
 			
 			runnable = RENDER_THREAD_RUNNABLE_QUEUE.poll();
 		}
+		if (diagnosticsEnabled)
+		{
+			recordDrainStats(tasksRun, System.nanoTime() - startTime, queuedBefore, exitedOnTimeLimit, usedMinimumTaskFloor);
+		}
 		return tasksRun;
+	}
+
+	private static void recordDrainStats(
+		int tasksRun,
+		long elapsedNanos,
+		int queuedBefore,
+		boolean exitedOnTimeLimit,
+		boolean usedMinimumTaskFloor
+	) {
+		long frames = DRAIN_FRAMES.incrementAndGet();
+		long totalTasks = DRAIN_TASKS_PROCESSED.addAndGet(tasksRun);
+		long totalElapsedNanos = DRAIN_ELAPSED_NANOS.addAndGet(elapsedNanos);
+		if (exitedOnTimeLimit)
+		{
+			DRAIN_TIME_LIMIT_FRAMES.incrementAndGet();
+		}
+		if (usedMinimumTaskFloor)
+		{
+			DRAIN_MINIMUM_TASK_FRAMES.incrementAndGet();
+		}
+		DRAIN_MAX_BACKLOG.accumulateAndGet(Math.max(0, queuedBefore), Math::max);
+		int queuedAfter = RENDER_THREAD_RUNNABLE_QUEUE.size();
+		if (frames <= 5
+			|| exitedOnTimeLimit
+			|| usedMinimumTaskFloor
+			|| frames % DH_UPLOAD_DRAIN_DIAGNOSTIC_LOG_INTERVAL_FRAMES == 0)
+		{
+			LOGGER.info(
+				"DH upload drain diagnostics: frame=" + frames
+					+ " queuedBefore=" + queuedBefore
+					+ " queuedAfter=" + queuedAfter
+					+ " tasksProcessed=" + tasksRun
+					+ " elapsedMs=" + String.format(java.util.Locale.ROOT, "%.3f", elapsedNanos / 1_000_000.0)
+					+ " timeLimit=" + exitedOnTimeLimit
+					+ " minimumFloor=" + usedMinimumTaskFloor
+					+ " totalTasks=" + totalTasks
+					+ " totalElapsedMs=" + String.format(java.util.Locale.ROOT, "%.3f", totalElapsedNanos / 1_000_000.0)
+					+ " maxBacklog=" + DRAIN_MAX_BACKLOG.get()
+			);
+		}
+	}
+
+	static record DrainStats(
+		long frames,
+		long tasksProcessed,
+		long elapsedNanos,
+		long framesHittingTimeLimit,
+		long framesUsingMinimumTaskFloor,
+		long maxObservedBacklog,
+		int queuedAfter
+	) {
 	}
 	
 	

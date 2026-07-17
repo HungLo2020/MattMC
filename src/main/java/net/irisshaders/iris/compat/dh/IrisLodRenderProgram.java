@@ -69,6 +69,10 @@ public class IrisLodRenderProgram {
 		VulkanicAPI.setAttributeLocation(ctx, this.id, 0, "vPosition");
 		VulkanicAPI.setAttributeLocation(ctx, this.id, 1, "iris_color");
 		VulkanicAPI.setAttributeLocation(ctx, this.id, 2, "irisExtra");
+		VulkanicAPI.setAttributeLocation(ctx, this.id, 2, "aScale");
+		VulkanicAPI.setAttributeLocation(ctx, this.id, 3, "aTranslateChunk");
+		VulkanicAPI.setAttributeLocation(ctx, this.id, 4, "aTranslateSubChunk");
+		VulkanicAPI.setAttributeLocation(ctx, this.id, 5, "aMaterial");
 
 		this.bufferBlendOverrides = bufferBlendOverrides;
 

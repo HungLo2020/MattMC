@@ -608,7 +608,7 @@ public class VulkanBackendSpirvPathTest {
     public void testIrisExtendedVertexAttributesUseOpenGlCompatibleLocations() {
         assertEquals(6, shaderAttributeLocation(IrisVertexFormats.ENTITY, "iris_Entity"));
         assertEquals(7, shaderAttributeLocation(IrisVertexFormats.ENTITY, "mc_midTexCoord"));
-        assertEquals(8, shaderAttributeLocation(IrisVertexFormats.ENTITY, "at_tangent"));
+        assertEquals(9, shaderAttributeLocation(IrisVertexFormats.ENTITY, "at_tangent"));
 
         assertEquals(11, shaderAttributeLocation(IrisVertexFormats.TERRAIN, "mc_Entity"));
         assertEquals(12, shaderAttributeLocation(IrisVertexFormats.TERRAIN, "mc_midTexCoord"));
@@ -1074,14 +1074,18 @@ public class VulkanBackendSpirvPathTest {
             + "layout(location = 5) in vec3 Normal;\n"
             + "layout(location = 6) in ivec3 iris_Entity;\n"
             + "layout(location = 7) in vec4 mc_midTexCoord;\n"
-            + "layout(location = 8) in vec4 at_tangent;\n"
+            + "layout(location = 5) in vec4 mc_Entity;\n"
+            + "layout(location = 9) in vec4 at_tangent;\n"
+            + "layout(location = 8) in vec3 at_midBlock;\n"
             + "void main() { gl_Position = vec4(Position, 1.0); }\n";
 
         String rewritten = (String) injector.invoke(null, entityPipeline, net.blaze3d.shaders.ShaderType.VERTEX, source);
 
         assertTrue(rewritten.contains("layout(location = 6) in ivec3 iris_Entity;"));
         assertTrue(rewritten.contains("layout(location = 7) in vec4 mc_midTexCoord;"));
-        assertTrue(rewritten.contains("layout(location = 8) in vec4 at_tangent;"));
+        assertTrue(rewritten.contains("layout(location = 8) in vec4 mc_Entity;"));
+        assertTrue(rewritten.contains("layout(location = 9) in vec4 at_tangent;"));
+        assertTrue(rewritten.contains("layout(location = 9) in vec3 at_midBlock;"));
         assertFalse(rewritten.contains("layout(location = 11) in ivec3 iris_Entity;"));
         assertFalse(rewritten.contains("layout(location = 12) in vec4 mc_midTexCoord;"));
         assertFalse(rewritten.contains("layout(location = 13) in vec4 at_tangent;"));
@@ -1123,7 +1127,7 @@ public class VulkanBackendSpirvPathTest {
         assertTrue(rewritten.contains("layout(location = 5) in vec3 iris_Normal;"));
         assertTrue(rewritten.contains("layout(location = 6) in ivec3 iris_Entity;"));
         assertTrue(rewritten.contains("layout(location = 7) in vec2 mc_midTexCoord;"));
-        assertTrue(rewritten.contains("layout(location = 8) in vec4 at_tangent;"));
+        assertTrue(rewritten.contains("layout(location = 9) in vec4 at_tangent;"));
     }
 
     @Test
@@ -1164,6 +1168,208 @@ public class VulkanBackendSpirvPathTest {
         assertFalse(rewritten.contains("layout(location = 6) in vec4 mc_midTexCoord;"));
         assertFalse(rewritten.contains("layout(location = 7) in vec4 at_tangent;"));
         assertFalse(rewritten.contains("layout(location = 8) in vec3 at_midBlock;"));
+    }
+
+    @Test
+    public void testInjectExplicitVulkanBindingsPinsSodiumChunkShaderInputs() throws Exception {
+        Method injector = VulkanBackend.class.getDeclaredMethod(
+            "injectExplicitVulkanBindings",
+            RenderPipeline.class,
+            net.blaze3d.shaders.ShaderType.class,
+            String.class
+        );
+        injector.setAccessible(true);
+
+        RenderPipeline pipeline = new TestRenderPipeline(
+            ResourceLocation.withDefaultNamespace("pipeline/sodium_chunk"),
+            DefaultVertexFormat.POSITION,
+            VertexFormat.Mode.TRIANGLES
+        );
+
+        String source = "#version 450\n"
+            + "in uvec2 a_Position;\n"
+            + "in vec4 a_Color;\n"
+            + "in uvec2 a_TexCoord;\n"
+            + "in uvec4 a_LightAndData;\n"
+            + "in vec4 iris_Normal;\n"
+            + "in vec2 mc_midTexCoord;\n"
+            + "in vec3 at_midBlock;\n"
+            + "void main() { gl_Position = vec4(a_Color.rgb + iris_Normal.xyz + at_midBlock, 1.0); }\n";
+
+        String rewritten = (String) injector.invoke(null, pipeline, net.blaze3d.shaders.ShaderType.VERTEX, source);
+
+        assertTrue(rewritten.contains("layout(location = 0) in uvec2 a_Position;"));
+        assertTrue(rewritten.contains("layout(location = 1) in vec4 a_Color;"));
+        assertTrue(rewritten.contains("layout(location = 2) in uvec2 a_TexCoord;"));
+        assertTrue(rewritten.contains("layout(location = 3) in uvec4 a_LightAndData;"));
+        assertTrue(rewritten.contains("layout(location = 10) in vec4 iris_Normal;"));
+        assertTrue(rewritten.contains("layout(location = 12) in vec2 mc_midTexCoord;"));
+        assertTrue(rewritten.contains("layout(location = 14) in vec3 at_midBlock;"));
+    }
+
+    @Test
+    public void testRenderPipelineVertexInputReflectionUsesInjectedLocations() throws Exception {
+        RenderPipeline terrainPipeline = new TestRenderPipeline(
+            ResourceLocation.withDefaultNamespace("pipeline/sodium_chunk"),
+            IrisVertexFormats.TERRAIN,
+            VertexFormat.Mode.TRIANGLES
+        );
+
+        String source = "#version 450\n"
+            + "in uvec2 a_Position;\n"
+            + "in vec4 a_Color;\n"
+            + "in uvec2 a_TexCoord;\n"
+            + "in uvec4 a_LightAndData;\n"
+            + "layout(location = 8) in vec4 shaderpackDefaultAttribute;\n"
+            + "in vec4 iris_Normal;\n"
+            + "in uvec4 mc_Entity;\n"
+            + "in vec2 mc_midTexCoord;\n"
+            + "in vec4 at_tangent;\n"
+            + "in vec3 at_midBlock;\n"
+            + "void main() { gl_Position = shaderpackDefaultAttribute + vec4(a_Color.rgb, 1.0); }\n";
+
+        Object vertexInputState = renderPipelineVertexInputState(terrainPipeline, source);
+
+        assertVertexInputAttribute(vertexInputState, 8, 15);
+        assertVertexInputAttribute(vertexInputState, 11, 0);
+        assertVertexInputAttribute(vertexInputState, 12, 0);
+        assertVertexInputAttribute(vertexInputState, 13, 0);
+        assertVertexInputAttribute(vertexInputState, 14, 0);
+    }
+
+    @Test
+    public void testRenderPipelineVertexInputReflectionAddsLineShaderpackInputs() throws Exception {
+        RenderPipeline linePipeline = new TestRenderPipeline(
+            ResourceLocation.withDefaultNamespace("pipeline/lines"),
+            DefaultVertexFormat.POSITION_COLOR_NORMAL,
+            VertexFormat.Mode.LINES
+        );
+
+        String source = "#version 330\n"
+            + "in vec3 Position;\n"
+            + "in vec4 Color;\n"
+            + "in vec3 Normal;\n"
+            + "in vec4 shaderpackLineInput0;\n"
+            + "in vec4 shaderpackLineInput1;\n"
+            + "in vec4 shaderpackLineInput2;\n"
+            + "void main() { gl_Position = vec4(Position, 1.0) + shaderpackLineInput0 + shaderpackLineInput1 + shaderpackLineInput2; }\n";
+
+        Object vertexInputState = renderPipelineVertexInputState(linePipeline, source);
+
+        assertVertexInputAttribute(vertexInputState, 3, 15);
+        assertVertexInputAttribute(vertexInputState, 4, 15);
+        assertVertexInputAttribute(vertexInputState, 5, 15);
+    }
+
+    @Test
+    public void testSpirvDescriptorVariantsGainCompatibilityVertexInputState() throws Exception {
+        Method compatibility = VulkanBackend.class.getDeclaredMethod(
+            "withCompatibilityVertexInputState",
+            PipelineDescriptor.class
+        );
+        compatibility.setAccessible(true);
+
+        RenderPipeline entityPipeline = new TestRenderPipeline(
+            ResourceLocation.withDefaultNamespace("pipeline/entity_cutout_no_cull"),
+            IrisVertexFormats.ENTITY,
+            VertexFormat.Mode.QUADS
+        );
+        PipelineDescriptor entityDescriptor = PipelineDescriptor.fromRenderPipelineAndSpirvModules(
+            entityPipeline,
+            List.of(
+                new VulkanicSpirvModule(VulkanicShaderStage.VERTEX, "main", new byte[]{1}, "entity.vert", "test"),
+                new VulkanicSpirvModule(VulkanicShaderStage.FRAGMENT, "main", new byte[]{2}, "entity.frag", "test")
+            )
+        );
+
+        PipelineDescriptor compatibleEntity = (PipelineDescriptor) compatibility.invoke(null, entityDescriptor);
+        assertVertexInputAttribute(compatibleEntity.getVertexInputState(), 8, 15);
+
+        RenderPipeline linePipeline = new TestRenderPipeline(
+            ResourceLocation.withDefaultNamespace("pipeline/lines"),
+            DefaultVertexFormat.POSITION_COLOR_NORMAL,
+            VertexFormat.Mode.LINES
+        );
+        PipelineDescriptor lineDescriptor = PipelineDescriptor.fromRenderPipelineAndSpirvModules(
+            linePipeline,
+            List.of(
+                new VulkanicSpirvModule(VulkanicShaderStage.VERTEX, "main", new byte[]{3}, "line.vert", "test"),
+                new VulkanicSpirvModule(VulkanicShaderStage.FRAGMENT, "main", new byte[]{4}, "line.frag", "test")
+            )
+        );
+
+        PipelineDescriptor compatibleLine = (PipelineDescriptor) compatibility.invoke(null, lineDescriptor);
+        assertVertexInputAttribute(compatibleLine.getVertexInputState(), 3, 15);
+        assertVertexInputAttribute(compatibleLine.getVertexInputState(), 4, 15);
+        assertVertexInputAttribute(compatibleLine.getVertexInputState(), 5, 15);
+
+        RenderPipeline celestialPipeline = new TestRenderPipeline(
+            ResourceLocation.withDefaultNamespace("pipeline/celestial"),
+            DefaultVertexFormat.POSITION_TEX,
+            VertexFormat.Mode.QUADS
+        );
+        PipelineDescriptor celestialDescriptor = PipelineDescriptor.fromRenderPipelineAndSpirvModules(
+            celestialPipeline,
+            List.of(
+                new VulkanicSpirvModule(VulkanicShaderStage.VERTEX, "main", new byte[]{5}, "celestial.vert", "test"),
+                new VulkanicSpirvModule(VulkanicShaderStage.FRAGMENT, "main", new byte[]{6}, "celestial.frag", "test")
+            )
+        );
+
+        PipelineDescriptor compatibleCelestial = (PipelineDescriptor) compatibility.invoke(null, celestialDescriptor);
+        assertVertexInputAttribute(
+            compatibleCelestial.getVertexInputState(),
+            2,
+            15,
+            PipelineDescriptor.VertexAttributeFormat.R32G32B32_SINT
+        );
+    }
+
+    private static Object renderPipelineVertexInputState(RenderPipeline pipeline, String source) throws Exception {
+        Method collector = VulkanBackend.class.getDeclaredMethod(
+            "collectRenderPipelineVertexInputs",
+            RenderPipeline.class,
+            String.class
+        );
+        collector.setAccessible(true);
+        Object reflectedInputs = collector.invoke(null, pipeline, source);
+
+        Method creator = VulkanBackend.class.getDeclaredMethod(
+            "createRenderPipelineVertexInputState",
+            RenderPipeline.class,
+            List.class
+        );
+        creator.setAccessible(true);
+        Object vertexInputState = creator.invoke(null, pipeline, reflectedInputs);
+        assertTrue(vertexInputState instanceof PipelineDescriptor.VertexInputState);
+        return vertexInputState;
+    }
+
+    private static void assertVertexInputAttribute(Object state, int location, int binding) {
+        PipelineDescriptor.VertexInputState vertexInputState = (PipelineDescriptor.VertexInputState) state;
+        assertTrue(
+            vertexInputState.attributes().stream()
+                .anyMatch(attribute -> attribute.location() == location && attribute.binding() == binding),
+            "Expected vertex input attribute at location " + location + " on binding " + binding
+                + ", got " + vertexInputState.attributes()
+        );
+    }
+
+    private static void assertVertexInputAttribute(
+        Object state,
+        int location,
+        int binding,
+        PipelineDescriptor.VertexAttributeFormat format
+    ) {
+        PipelineDescriptor.VertexInputState vertexInputState = (PipelineDescriptor.VertexInputState) state;
+        assertTrue(
+            vertexInputState.attributes().stream()
+                .anyMatch(attribute -> attribute.location() == location
+                    && attribute.binding() == binding
+                    && attribute.format() == format),
+            "Expected vertex input attribute at location " + location + " on binding " + binding
+                + " with format " + format + ", got " + vertexInputState.attributes()
+        );
     }
 
     @Test
@@ -1256,6 +1462,32 @@ public class VulkanBackendSpirvPathTest {
     }
 
     @Test
+    public void testLegacyAttributeVertexInputsGetNonConflictingLocations() throws Exception {
+        Method injector = VulkanBackend.class.getDeclaredMethod(
+            "injectExplicitRemainingVertexInputLocations",
+            String.class
+        );
+        injector.setAccessible(true);
+
+        String source = "#version 120\n"
+            + "layout(location = 0) attribute uvec4 vPosition;\n"
+            + "layout(location = 1) attribute vec4 iris_color;\n"
+            + "layout(location = 2) attribute uvec4 irisExtra;\n"
+            + "attribute vec4 glColor;\n"
+            + "attribute mat4 mat;\n"
+            + "attribute vec4 at_tangent;\n"
+            + "void main() { gl_Position = mat * glColor + at_tangent + vec4(vPosition); }\n";
+
+        String rewritten = (String) injector.invoke(null, source);
+
+        assertTrue(rewritten.contains("layout(location = 3) in vec4 glColor;"));
+        assertTrue(rewritten.contains("layout(location = 4) in mat4 mat;"));
+        assertTrue(rewritten.contains("layout(location = 8) in vec4 at_tangent;"));
+        assertFalse(rewritten.contains("\nattribute vec4 glColor;"),
+            "Legacy shaderpack attributes must be visible to Vulkan vertex-input planning");
+    }
+
+    @Test
     public void testStandaloneVertexInputReflectionReservesFallbackMatrixColumns() throws Exception {
         Method collector = VulkanBackend.class.getDeclaredMethod(
             "collectExplicitVertexInputDeclarations",
@@ -1273,6 +1505,29 @@ public class VulkanBackendSpirvPathTest {
 
         assertEquals(6, inputs.size(),
             "Fallback input reflection should expand matrix declarations into occupied Vulkan locations");
+        assertTrue(inputs.toString().contains("ReflectedVertexInput[location=3, typeName=vec4]"));
+        assertTrue(inputs.toString().contains("ReflectedVertexInput[location=4, typeName=vec4]"));
+        assertTrue(inputs.toString().contains("ReflectedVertexInput[location=7, typeName=vec4]"));
+        assertTrue(inputs.toString().contains("ReflectedVertexInput[location=8, typeName=uvec4]"));
+    }
+
+    @Test
+    public void testLegacyAttributeReflectionReservesFallbackMatrixColumns() throws Exception {
+        Method collector = VulkanBackend.class.getDeclaredMethod(
+            "collectExplicitVertexInputDeclarations",
+            String.class
+        );
+        collector.setAccessible(true);
+
+        String source = "#version 120\n"
+            + "layout(location = 3) attribute vec4 glColor;\n"
+            + "layout(location = 4) attribute mat4 mat;\n"
+            + "layout(location = 8) attribute uvec4 irisExtra;\n"
+            + "void main() { gl_Position = mat * glColor + vec4(irisExtra); }\n";
+
+        List<?> inputs = (List<?>) collector.invoke(null, source);
+
+        assertEquals(6, inputs.size());
         assertTrue(inputs.toString().contains("ReflectedVertexInput[location=3, typeName=vec4]"));
         assertTrue(inputs.toString().contains("ReflectedVertexInput[location=4, typeName=vec4]"));
         assertTrue(inputs.toString().contains("ReflectedVertexInput[location=7, typeName=vec4]"));

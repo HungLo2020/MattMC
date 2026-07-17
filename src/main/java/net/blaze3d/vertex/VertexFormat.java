@@ -99,9 +99,10 @@ public class VertexFormat implements net.irisshaders.iris.pipeline.programs.Vert
 		String name = this.names.get(attributeOrdinal);
 		return switch (name) {
 			case "mc_Entity" -> 11;
-			case "mc_midTexCoord" -> this.names.contains("mc_Entity") ? 12 : attributeOrdinal;
-			case "at_tangent" -> this.names.contains("mc_Entity") ? 13 : attributeOrdinal;
+			case "mc_midTexCoord" -> this.names.contains("mc_Entity") ? 12 : this.names.contains("iris_Entity") ? 7 : attributeOrdinal;
+			case "at_tangent" -> this.names.contains("mc_Entity") ? 13 : this.names.contains("iris_Entity") ? 9 : attributeOrdinal;
 			case "at_midBlock" -> this.names.contains("mc_Entity") ? 14 : attributeOrdinal;
+			case "iris_Entity" -> 6;
 			default -> element.usage() == VertexFormatElement.Usage.GENERIC ? element.index() : attributeOrdinal;
 		};
 	}
