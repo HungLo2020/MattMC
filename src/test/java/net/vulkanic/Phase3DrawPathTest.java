@@ -5576,6 +5576,7 @@ public class Phase3DrawPathTest {
     public void testVulkanRenderTargetPipelineCacheKeyIncludesAttachmentContract() throws IOException {
         Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
         String source = readSource(vulkanBackendFile);
+        String normalizerSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanPipelineCacheKeyNormalizer.java"));
 
         assertTrue(source.contains("private record RenderTargetPipelineKey("),
             "VulkanBackend should retain a dedicated key for render-target-compatible pipeline variants");
@@ -5583,22 +5584,21 @@ public class Phase3DrawPathTest {
             "Vulkan pipeline variants should no longer be keyed by a GL-style framebuffer identity");
         assertFalse(source.contains("int framebuffer,\n        String dynamicStateKey,"),
             "Render-target pipeline variants must not include the virtual framebuffer id in the compatibility key");
-        assertTrue(source.contains("String dynamicStateKey,"),
-            "Render-target pipeline variants must be keyed by pipeline-baked dynamic state for Iris MRT blend overrides and stencil state");
-        assertTrue(source.contains("VulkanRenderPassCompatibilityKey renderPassCompatibilityKey"),
-            "Render-target pipeline variants must be keyed by the full Vulkan render-pass compatibility contract");
-        assertTrue(source.contains("Objects.requireNonNull(renderPassCompatibilityKey"),
-            "Render-target pipeline keys should require an explicit render-pass compatibility contract");
+        assertTrue(source.contains("VulkanPipelineCacheKeyNormalizer.GraphicsPipelineCacheKey normalizedKey"),
+            "Render-target pipeline variants should be keyed by normalized immutable graphics pipeline creation inputs");
+        assertTrue(normalizerSource.contains("VulkanPipelineCreationPlanner.RenderPassCompatibilityPlan renderPassCompatibility"),
+            "Normalized render-target pipeline keys must include the full Vulkan render-pass compatibility contract");
+        assertTrue(normalizerSource.contains("VulkanPipelineCreationPlanner.ColorBlendCacheKey colorBlendState")
+                && normalizerSource.contains("VulkanPipelineCreationPlanner.DepthStencilCacheKey depthStencilState"),
+            "Normalized render-target pipeline keys must include pipeline-baked blend and stencil state");
         assertTrue(source.contains("VulkanRenderPassCompatibilityKey.framebuffer("),
             "Framebuffer-backed pipeline keys should include color formats, depth format, and feedback-loop dependency profile");
-        assertTrue(source.contains("RenderTargetPipelineKey.from("),
-            "Framebuffer-backed pipeline resolution should derive a render-target compatibility key from resolved attachments");
-        assertTrue(source.contains("dynamicPipelineStateCacheKey(pipelineDescriptor.getPortableState(), renderPassCompatibilityKey)"),
-            "Render-target pipeline resolution should include all pipeline-baked compatibility state");
+        assertTrue(source.contains("normalizedGraphicsPipelineCacheKey(pipelineDescriptor, renderPassCompatibilityKey)"),
+            "Framebuffer-backed pipeline resolution should derive a normalized key from the immutable graphics pipeline plan");
         assertTrue(source.contains("indexedBlendStateCacheKey(portableState, renderPassCompatibilityKey.colorAttachmentCount())"),
-            "Render-target pipeline resolution should include portable blend ownership when deriving blend cache keys");
+            "Legacy pipeline resolution should still include portable blend ownership when deriving blend cache keys");
         assertTrue(source.contains("currentStencilState().cacheKey(renderPassCompatibilityKey.hasStencilAttachment())"),
-            "Render-target pipeline resolution should include effective stencil state in Vulkan pipeline cache keys");
+            "Legacy pipeline resolution should still include effective stencil state in Vulkan pipeline cache keys");
         assertTrue(source.contains("SharedChunkProgramOverrides.indexedBlendState(portableState.location(), index)")
                 && source.contains("key.append(\"shared:\")")
                 && source.contains("key.append(\"portable:\")"),

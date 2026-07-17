@@ -400,73 +400,34 @@ public class VulkanBackend {
     }
 
     private record RenderTargetPipelineKey(
-        String stableCacheKey,
-        String resourceLayoutKey,
-        String dynamicStateKey,
-        VulkanRenderPassCompatibilityKey renderPassCompatibilityKey
+        VulkanPipelineCacheKeyNormalizer.GraphicsPipelineCacheKey normalizedKey
     ) {
         private RenderTargetPipelineKey {
-            Objects.requireNonNull(renderPassCompatibilityKey, "renderPassCompatibilityKey must not be null");
-        }
-
-        private static RenderTargetPipelineKey from(
-            PipelineDescriptor descriptor,
-            ResolvedFramebufferTargets targets,
-            String dynamicStateKey
-        ) {
-            return from(
-                descriptor,
-                VulkanRenderPassCompatibilityKey.framebuffer(
-                    targets.colorFormats(),
-                    targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED,
-                    targets.hasFeedbackLoopTarget()
-                ),
-                dynamicStateKey
-            );
-        }
-
-        private static RenderTargetPipelineKey from(
-            PipelineDescriptor descriptor,
-            VulkanRenderPassCompatibilityKey renderPassCompatibilityKey,
-            String dynamicStateKey
-        ) {
-            return new RenderTargetPipelineKey(
-                descriptor.getStableCacheKey(),
-                descriptor.getResourceLayoutCacheKey(),
-                dynamicStateKey,
-                renderPassCompatibilityKey
-            );
+            Objects.requireNonNull(normalizedKey, "normalizedKey must not be null");
         }
     }
 
     private record DescriptorPipelineKey(
-        String stableCacheKey,
-        String resourceLayoutKey
+        VulkanPipelineCacheKeyNormalizer.GraphicsPipelineCacheKey normalizedKey
     ) {
+        private DescriptorPipelineKey {
+            Objects.requireNonNull(normalizedKey, "normalizedKey must not be null");
+        }
     }
 
     private record LegacyProgramPipelineKey(
-        int programId,
-        int framebuffer,
-        String pipelineCompilationKey,
-        String resourceLayoutKey,
-        VulkanRenderPassCompatibilityKey renderPassCompatibilityKey
+        VulkanPipelineCacheKeyNormalizer.GraphicsPipelineCacheKey normalizedKey
     ) {
         private LegacyProgramPipelineKey {
-            Objects.requireNonNull(pipelineCompilationKey, "pipelineCompilationKey must not be null");
-            Objects.requireNonNull(resourceLayoutKey, "resourceLayoutKey must not be null");
-            Objects.requireNonNull(renderPassCompatibilityKey, "renderPassCompatibilityKey must not be null");
+            Objects.requireNonNull(normalizedKey, "normalizedKey must not be null");
         }
     }
 
     private record LegacyComputePipelineKey(
-        int programId,
-        String pipelineCompilationKey,
-        String resourceLayoutKey
+        VulkanPipelineCacheKeyNormalizer.ComputePipelineCacheKey normalizedKey
     ) {
         private LegacyComputePipelineKey {
-            Objects.requireNonNull(pipelineCompilationKey, "pipelineCompilationKey must not be null");
-            Objects.requireNonNull(resourceLayoutKey, "resourceLayoutKey must not be null");
+            Objects.requireNonNull(normalizedKey, "normalizedKey must not be null");
         }
     }
 
@@ -4891,13 +4852,7 @@ void main() {
 
         PipelineDescriptor submissionDescriptor = resourcePlan.descriptor();
         LegacyProgramPipelineKey key = new LegacyProgramPipelineKey(
-            programId,
-            framebuffer,
-            submissionDescriptor.getPipelineCompilationKey()
-                + '|'
-                + dynamicPipelineStateCacheKey(submissionDescriptor.getPortableState(), compatibilityKey),
-            submissionDescriptor.getResourceLayoutCacheKey(),
-            compatibilityKey
+            normalizedGraphicsPipelineCacheKey(submissionDescriptor, compatibilityKey)
         );
         PipelineHandle pipelineHandle = pipelineLifecycle.getCachedPipeline(
             VulkanPipelineLifecycleManager.CacheKind.LEGACY_PROGRAM,
@@ -4950,9 +4905,7 @@ void main() {
 
         PipelineDescriptor submissionDescriptor = resourcePlan.descriptor();
         LegacyComputePipelineKey key = new LegacyComputePipelineKey(
-            programId,
-            submissionDescriptor.getPipelineCompilationKey(),
-            submissionDescriptor.getResourceLayoutCacheKey()
+            normalizedComputePipelineCacheKey(submissionDescriptor)
         );
         PipelineHandle pipelineHandle = pipelineLifecycle.getCachedPipeline(
             VulkanPipelineLifecycleManager.CacheKind.LEGACY_COMPUTE,
@@ -5127,8 +5080,7 @@ void main() {
         }
 
         DescriptorPipelineKey key = new DescriptorPipelineKey(
-            variantDescriptor.getStableCacheKey(),
-            variantDescriptor.getResourceLayoutCacheKey()
+            normalizedGraphicsPipelineCacheKey(variantDescriptor, defaultRenderPassCompatibilityKey())
         );
         PipelineHandle cached = pipelineLifecycle.getCachedPipeline(
             VulkanPipelineLifecycleManager.CacheKind.DESCRIPTOR_VARIANT,
@@ -5240,10 +5192,8 @@ void main() {
             return null;
         }
 
-        RenderTargetPipelineKey key = RenderTargetPipelineKey.from(
-            pipelineDescriptor,
-            renderPassCompatibilityKey,
-            dynamicPipelineStateCacheKey(pipelineDescriptor.getPortableState(), renderPassCompatibilityKey)
+        RenderTargetPipelineKey key = new RenderTargetPipelineKey(
+            normalizedGraphicsPipelineCacheKey(pipelineDescriptor, renderPassCompatibilityKey)
         );
         PipelineHandle cached = pipelineLifecycle.getCachedPipeline(
             VulkanPipelineLifecycleManager.CacheKind.RENDER_TARGET_VARIANT,
@@ -5329,6 +5279,29 @@ void main() {
             VK10.VK_FORMAT_UNDEFINED,
             false
         );
+    }
+
+    private VulkanPipelineCacheKeyNormalizer.GraphicsPipelineCacheKey normalizedGraphicsPipelineCacheKey(
+        PipelineDescriptor descriptor,
+        VulkanRenderPassCompatibilityKey renderPassCompatibilityKey
+    ) {
+        ensureNativeReady("normalizedGraphicsPipelineCacheKey");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        return spine.normalizedGraphicsPipelineCacheKey(descriptor, renderPassCompatibilityKey);
+    }
+
+    private VulkanPipelineCacheKeyNormalizer.ComputePipelineCacheKey normalizedComputePipelineCacheKey(
+        PipelineDescriptor descriptor
+    ) {
+        ensureNativeReady("normalizedComputePipelineCacheKey");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        return spine.normalizedComputePipelineCacheKey(descriptor);
     }
 
     private java.util.Optional<PipelineDescriptor.BlendState> blendStateForAttachment(
@@ -10765,6 +10738,8 @@ void main() {
             new VulkanDeferredResourceLifetime<>(MAX_FRAMES_IN_FLIGHT, IMMEDIATE_SUBMIT_SLOTS);
         private final VulkanStagingTransferManager stagingTransfers =
             new VulkanStagingTransferManager(IMMEDIATE_SUBMIT_SLOTS);
+        private final VulkanFrameExecutionCoordinator<VulkanBuffer> frameExecution =
+            new VulkanFrameExecutionCoordinator<>(swapchainState, commandSubmissionState, lifetime, stagingTransfers);
         private final VulkanDescriptorManager<VulkanBuffer> descriptorManager =
             new VulkanDescriptorManager<>(
                 IMMEDIATE_SUBMIT_SLOTS,
@@ -13129,38 +13104,19 @@ void main() {
         }
 
         private boolean hasPotentiallyPendingGpuWork() {
-            return lifetime.hasPotentiallyPendingGpuWork(
-                renderPassRecording,
-                commandSubmissionState.commandBufferRecording(),
-                commandSubmissionState.immediateSubmitInFlight(),
-                swapchainState.frameInProgress(),
-                commandSubmissionState.immediateSubmitSlotsInFlightState(),
-                swapchainState.frameCommandBufferRecordingState()
-            );
+            return frameExecution.hasPotentiallyPendingGpuWork(renderPassRecording);
         }
 
         private void enqueueVulkanResourceDestroy(Runnable destroyAction) {
-            lifetime.enqueueDestroy(
+            frameExecution.enqueueDestroy(
                 logicalDevice != null,
-                hasPotentiallyPendingGpuWork(),
-                swapchainState.frameInProgress(),
-                swapchainState.currentFrameSyncIndex(),
-                commandSubmissionState.commandBufferRecording(),
-                commandSubmissionState.recordingImmediateSubmitSlot(),
+                renderPassRecording,
                 destroyAction
             );
         }
 
-        private void registerSubmittedWork(long fenceHandle, long generation) {
-            lifetime.registerSubmittedWork(fenceHandle, generation);
-        }
-
         private void markFenceComplete(long fenceHandle) {
-            lifetime.markFenceComplete(fenceHandle, logicalDevice != null);
-        }
-
-        private void markAllSubmittedWorkComplete() {
-            lifetime.markAllSubmittedWorkComplete(logicalDevice != null);
+            frameExecution.markFenceComplete(fenceHandle, logicalDevice != null);
         }
 
         private void destroyLegacyTextureStorageHandles(long viewHandle, long imageHandle, long memoryHandle) {
@@ -13179,7 +13135,7 @@ void main() {
         }
 
         private void flushPendingVulkanResourceDestroys(boolean force) {
-            lifetime.flushPendingDestroys(logicalDevice != null, force);
+            frameExecution.flushPendingDestroys(logicalDevice != null, force);
         }
 
         private int trackedLayoutForLevel(LegacyTextureObject texture, int level) {
@@ -16637,18 +16593,6 @@ void main() {
             return swapchainState.hasValidFrameSyncPrimitives();
         }
 
-        private long currentSwapchainImageAvailableSemaphore() {
-            return swapchainState.currentImageAvailableSemaphore();
-        }
-
-        private long acquiredSwapchainRenderFinishedSemaphore() {
-            return swapchainState.acquiredRenderFinishedSemaphore();
-        }
-
-        private long currentSwapchainFrameFence() {
-            return swapchainState.currentFrameFence();
-        }
-
         private int swapchainAcquireWaitStageMask() {
             return VK10.VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
         }
@@ -16704,8 +16648,7 @@ void main() {
                     );
                 }
                 checkVk("vkWaitForFences(allSwapchainFrames)", waitResult);
-                markAllSubmittedWorkComplete();
-                destroyAllTransientFrameDescriptorBuffers();
+                frameExecution.completeAllSwapchainFrameFences(logicalDevice != null, frameRetirementHooks());
                 consecutivePrimaryCommandFenceTimeouts = 0;
             }
         }
@@ -16766,12 +16709,9 @@ void main() {
                 checkVk("vkWaitForFences(immediateSubmit)", waitResult);
             }
 
-            markFenceComplete(fence);
-            lifetime.clearReservedImmediateWorkGeneration(slot);
-            commandSubmissionState.markImmediateSlotComplete(slot);
+            frameExecution.completeImmediateSlotWait(slot, logicalDevice != null, frameRetirementHooks());
             consecutiveImmediateSubmitTimeouts = 0;
             lastImmediateSubmitTimeoutLogNanos = 0L;
-            destroyTransientRenderPassResources(slot);
         }
 
         private boolean shouldLogFrameSyncDetails() {
@@ -16789,31 +16729,25 @@ void main() {
             if (swapchain == VK10.VK_NULL_HANDLE) {
                 throw new IllegalStateException("Cannot begin frame: Vulkan swapchain is unavailable.");
             }
-            if (!hasValidFrameSyncPrimitives()) {
-                throw new IllegalStateException("Cannot begin frame: Vulkan swapchain frame sync primitives are unavailable.");
-            }
-            if (swapchainState.frameInProgress()) {
-                throw new IllegalStateException("beginFrame called while a Vulkan frame is already in progress.");
-            }
 
-            if (commandSubmissionState.commandBufferRecording()) {
-                if (renderPassRecording) {
-                    throw new IllegalStateException("beginFrame cannot proceed while a render pass is active.");
-                }
-                submitPrimaryCommandBuffer(commandSubmissionState.primaryCommandBufferHandle());
+            VulkanFrameExecutionCoordinator.FrameBeginPlan beginPlan =
+                frameExecution.planFrameBegin(renderPassRecording);
+            if (beginPlan.pendingImmediateCommandBufferHandle() != VK10.VK_NULL_HANDLE) {
+                submitPrimaryCommandBuffer(beginPlan.pendingImmediateCommandBufferHandle());
             }
 
             refreshSurfaceIfRegisteredWindowChanged();
             recreateSwapchainIfFramebufferSizeChanged();
 
             try (MemoryStack stack = stackPush()) {
-                long frameFence = currentSwapchainFrameFence();
-                long imageAvailableSemaphore = currentSwapchainImageAvailableSemaphore();
+                beginPlan = frameExecution.planFrameBegin(renderPassRecording);
+                long frameFence = beginPlan.frameFence();
+                long imageAvailableSemaphore = beginPlan.imageAvailableSemaphore();
 
                 if (shouldLogFrameSyncDetails()) {
                     LOGGER.info(
                         "Beginning Vulkan frame on sync slot {} (imageAvailable=0x{}, frameFence=0x{}).",
-                        swapchainState.currentFrameSyncIndex(),
+                        beginPlan.frameSlot(),
                         Long.toHexString(imageAvailableSemaphore),
                         Long.toHexString(frameFence)
                     );
@@ -16862,14 +16796,12 @@ void main() {
                         lastFrameFenceTimeoutLogNanos = 0L;
                     }
 
-                    swapchainState.skipFrameAndAdvance();
+                    frameExecution.skipFrameAndAdvance();
                     return -1;
                 }
 
                 checkVk("vkWaitForFences(swapchainFrame)", frameFenceWaitResult);
-                markFenceComplete(frameFence);
-                lifetime.clearReservedFrameWorkGeneration(swapchainState.currentFrameSyncIndex());
-                destroyTransientFrameDescriptorBuffers(swapchainState.currentFrameSyncIndex());
+                frameExecution.completeFrameFenceWait(beginPlan, logicalDevice != null, frameRetirementHooks());
                 consecutiveFrameFenceTimeouts = 0;
 
                 java.nio.IntBuffer pImageIndex = stack.ints(0);
@@ -16883,7 +16815,7 @@ void main() {
                 );
 
                 if (acquireResult == KHRSwapchain.VK_ERROR_OUT_OF_DATE_KHR) {
-                    swapchainState.markAcquireOutOfDate();
+                    frameExecution.markAcquireOutOfDate();
                     recreateSwapchain();
                     acquireResult = KHRSwapchain.vkAcquireNextImageKHR(
                         logicalDevice,
@@ -16915,7 +16847,7 @@ void main() {
                     );
 
                     if (acquireResult == KHRSwapchain.VK_ERROR_OUT_OF_DATE_KHR) {
-                        swapchainState.markAcquireOutOfDate();
+                        frameExecution.markAcquireOutOfDate();
                         recreateSwapchain();
                         acquireResult = KHRSwapchain.vkAcquireNextImageKHR(
                             logicalDevice,
@@ -16963,7 +16895,7 @@ void main() {
                         lastAcquireTimeoutLogNanos = 0L;
                     }
 
-                    swapchainState.skipFrameAndAdvance();
+                    frameExecution.skipFrameAndAdvance();
                     return -1;
                 }
 
@@ -16975,18 +16907,11 @@ void main() {
                 consecutiveAcquireTimeouts = 0;
 
                 int imageIndex = pImageIndex.get(0);
-                if (imageIndex < 0) {
-                    throw new IllegalStateException("vkAcquireNextImageKHR returned invalid image index: " + imageIndex);
-                }
-                if (imageIndex >= swapchainState.imageCount()) {
-                    throw new IllegalStateException(
-                        "vkAcquireNextImageKHR returned image index " + imageIndex
-                            + " outside tracked swapchain image/view range (images="
-                            + swapchainState.imageCount() + ", views=" + swapchainState.imageCount() + ").");
-                }
+                VulkanFrameExecutionCoordinator.AcquiredImagePlan acquiredImagePlan =
+                    frameExecution.planAcquiredImage(imageIndex);
 
-                long imageInFlightFence = swapchainState.imageInFlightFence(imageIndex);
-                if (imageInFlightFence != VK10.VK_NULL_HANDLE && imageInFlightFence != frameFence) {
+                long imageInFlightFence = acquiredImagePlan.imageInFlightFence();
+                if (imageInFlightFence != VK10.VK_NULL_HANDLE && imageInFlightFence != acquiredImagePlan.frameFence()) {
                     checkVk(
                         "vkWaitForFences(imageInFlight[" + imageIndex + "])",
                         VK10.vkWaitForFences(logicalDevice, stack.longs(imageInFlightFence), true, Long.MAX_VALUE)
@@ -16994,8 +16919,7 @@ void main() {
                     markFenceComplete(imageInFlightFence);
                 }
 
-                swapchainState.beginAcquiredFrame(imageIndex, frameFence);
-                commandSubmissionState.reserveFrameWorkGeneration(lifetime, swapchainState.currentFrameSyncIndex());
+                frameExecution.completeFrameAcquire(acquiredImagePlan);
                 successfulFrameAcquireCount++;
                 VulkanPerfAudit.recordBeginFrameAcquireSuccess();
                 if (successfulFrameAcquireCount <= 5) {
@@ -17003,7 +16927,7 @@ void main() {
                         "vkAcquireNextImageKHR succeeded for image {} (frame acquire #{}, sync slot {})",
                         imageIndex,
                         successfulFrameAcquireCount,
-                        swapchainState.currentFrameSyncIndex()
+                        acquiredImagePlan.frameSlot()
                     );
                 }
                 return imageIndex;
@@ -17035,14 +16959,17 @@ void main() {
                 submitFrameSemaphoreBridge();
             }
 
+            VulkanFrameExecutionCoordinator.PresentPlan presentPlan = frameExecution.planPresent();
+            VulkanFrameExecutionCoordinator.PresentResult finalPresentResult =
+                VulkanFrameExecutionCoordinator.PresentResult.SUCCESS;
             try (MemoryStack stack = stackPush()) {
                 java.nio.LongBuffer pSwapchains = stack.longs(swapchain);
-                java.nio.IntBuffer pImageIndices = stack.ints(swapchainState.acquiredImageIndex());
+                java.nio.IntBuffer pImageIndices = stack.ints(presentPlan.imageIndex());
                 long presentId = 0L;
 
                 VkPresentInfoKHR presentInfo = VkPresentInfoKHR.calloc(stack)
                     .sType$Default()
-                    .pWaitSemaphores(stack.longs(acquiredSwapchainRenderFinishedSemaphore()))
+                    .pWaitSemaphores(stack.longs(presentPlan.renderFinishedSemaphore()))
                     .swapchainCount(1)
                     .pSwapchains(pSwapchains)
                     .pImageIndices(pImageIndices);
@@ -17058,15 +16985,15 @@ void main() {
                 VkQueue queueForPresent = presentQueue != null ? presentQueue : graphicsQueue;
                 
                 // PHASE 1: Validate swapchain layout before presentation
-                validateSwapchainLayoutBeforePresent(swapchainState.acquiredImageIndex());
+                validateSwapchainLayoutBeforePresent(presentPlan.imageIndex());
                 
                 int presentResult = KHRSwapchain.vkQueuePresentKHR(queueForPresent, presentInfo);
                 if (presentResult == KHRSwapchain.VK_ERROR_OUT_OF_DATE_KHR
                     || presentResult == KHRSwapchain.VK_SUBOPTIMAL_KHR) {
                     if (presentResult == KHRSwapchain.VK_ERROR_OUT_OF_DATE_KHR) {
-                        swapchainState.markPresentOutOfDate();
+                        finalPresentResult = VulkanFrameExecutionCoordinator.PresentResult.OUT_OF_DATE;
                     } else {
-                        swapchainState.markPresentSuboptimal();
+                        finalPresentResult = VulkanFrameExecutionCoordinator.PresentResult.SUBOPTIMAL;
                     }
                     recreateSwapchain();
                 } else {
@@ -17082,16 +17009,16 @@ void main() {
                     if (successfulFramePresentCount <= 5) {
                         LOGGER.info(
                             "vkQueuePresentKHR succeeded for image {} (frame present #{}, sync slot {})",
-                            swapchainState.acquiredImageIndex(),
+                            presentPlan.imageIndex(),
                             successfulFramePresentCount,
-                            swapchainState.currentFrameSyncIndex()
+                            presentPlan.frameSlot()
                         );
                     }
                 }
 
             } finally {
                 pendingPresentTextureRequest = null;
-                swapchainState.finishFrameAndAdvance();
+                frameExecution.completePresent(presentPlan, finalPresentResult);
             }
         }
 
@@ -17715,36 +17642,39 @@ void main() {
         }
 
         private VkCommandBuffer ensureCurrentFrameCommandBufferRecording(String operation) {
-            VkCommandBuffer commandBuffer = currentFrameCommandBuffer();
+            VulkanFrameExecutionCoordinator.FrameCommandBufferBeginPlan beginPlan =
+                frameExecution.planFrameCommandBufferBegin();
+            VkCommandBuffer commandBuffer = beginPlan.commandBuffer();
             if (isCurrentFrameCommandBufferRecording()) {
                 return commandBuffer;
             }
 
             try (MemoryStack stack = stackPush()) {
-                java.nio.LongBuffer frameFenceBuffer = stack.longs(currentSwapchainFrameFence());
+                java.nio.LongBuffer frameFenceBuffer = stack.longs(beginPlan.frameFence());
                 checkVk(
-                    "vkWaitForFences(frameCommandBuffer[" + swapchainState.currentFrameSyncIndex() + "])",
+                    "vkWaitForFences(frameCommandBuffer[" + beginPlan.frameSlot() + "])",
                     VK10.vkWaitForFences(logicalDevice, frameFenceBuffer, true, Long.MAX_VALUE)
                 );
-                markFenceComplete(currentSwapchainFrameFence());
+                markFenceComplete(beginPlan.frameFence());
                 checkVk(
-                    "vkResetCommandPool(frame[" + swapchainState.currentFrameSyncIndex() + "])",
-                    VK10.vkResetCommandPool(logicalDevice, commandSubmissionState.frameCommandPool(swapchainState.currentFrameSyncIndex()), 0)
+                    "vkResetCommandPool(frame[" + beginPlan.frameSlot() + "])",
+                    VK10.vkResetCommandPool(logicalDevice, beginPlan.commandPool(), 0)
                 );
 
                 VkCommandBufferBeginInfo beginInfo = VkCommandBufferBeginInfo.calloc(stack)
                     .sType$Default()
                     .flags(VK10.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
                 checkVk(
-                    "vkBeginCommandBuffer(frame[" + swapchainState.currentFrameSyncIndex() + "])",
+                    "vkBeginCommandBuffer(frame[" + beginPlan.frameSlot() + "])",
                     VK10.vkBeginCommandBuffer(commandBuffer, beginInfo)
                 );
                 clearTrackedCommandBufferState(commandBuffer.address());
-                swapchainState.setCurrentFrameCommandBufferRecording(true);
+                frameExecution.completeFrameCommandBufferBegin(beginPlan);
                 return commandBuffer;
             } catch (RuntimeException exception) {
+                frameExecution.failFrameCommandBufferBegin(beginPlan);
                 throw new IllegalStateException(
-                    "Failed to begin Vulkan frame command buffer for sync slot " + swapchainState.currentFrameSyncIndex()
+                    "Failed to begin Vulkan frame command buffer for sync slot " + beginPlan.frameSlot()
                         + " during " + operation,
                     exception
                 );
@@ -17763,21 +17693,14 @@ void main() {
             if (renderPassRecording) {
                 throw new IllegalStateException("Cannot submit command buffer while a render pass is still active.");
             }
-            if (!commandSubmissionState.commandBufferRecording()) {
+            VulkanFrameExecutionCoordinator.ImmediateSubmitPlan submitPlan =
+                frameExecution.planImmediateSubmit(commandBufferHandle);
+            if (submitPlan == null) {
                 return;
             }
-            int submitSlot = immediateSubmitSlotForKnownCommandBuffer(commandBufferHandle);
-            if (submitSlot != commandSubmissionState.recordingImmediateSubmitSlot() || submitSlot < 0) {
-                return;
-            }
-            VkCommandBuffer submitCommandBuffer = commandSubmissionState.immediateCommandBuffer(submitSlot);
-            if (submitCommandBuffer == null) {
-                throw new IllegalStateException("Immediate Vulkan command buffer is unavailable for slot " + submitSlot + ".");
-            }
-            long submitFence = commandSubmissionState.immediateSubmitFence(submitSlot);
-            if (submitFence == VK10.VK_NULL_HANDLE) {
-                throw new IllegalStateException("Immediate Vulkan submit fence is unavailable.");
-            }
+            int submitSlot = submitPlan.slot();
+            VkCommandBuffer submitCommandBuffer = submitPlan.commandBuffer();
+            long submitFence = submitPlan.submitFence();
 
             long totalStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
             long waitBeforeNanos = 0L;
@@ -17809,8 +17732,7 @@ void main() {
                 checkVk("vkQueueSubmit(immediate)",
                     VK10.vkQueueSubmit(graphicsQueue, submitInfos, submitFence));
                 submittedToQueue = true;
-                registerSubmittedWork(submitFence, commandSubmissionState.reservedImmediateWorkGeneration(lifetime, submitSlot));
-                commandSubmissionState.markImmediateSubmitted(submitSlot);
+                frameExecution.completeImmediateSubmitQueued(submitPlan);
                 clearTrackedCommandBufferState(submitCommandBuffer.address());
                 if (queueSubmitStartNanos != 0L) {
                     queueSubmitNanos = System.nanoTime() - queueSubmitStartNanos;
@@ -17843,16 +17765,13 @@ void main() {
                         return;
                     }
                     checkVk("vkWaitForFences(immediateSubmitComplete[" + submitSlot + "])", waitAfterResult);
-                    markFenceComplete(submitFence);
-                    lifetime.clearReservedImmediateWorkGeneration(submitSlot);
-                    commandSubmissionState.markImmediateSlotComplete(submitSlot);
+                    frameExecution.completeImmediateSubmitFence(submitPlan, logicalDevice != null, frameRetirementHooks());
                     consecutiveImmediateSubmitTimeouts = 0;
                     lastImmediateSubmitTimeoutLogNanos = 0L;
-                    destroyTransientRenderPassResources(submitSlot);
                     flushPendingVulkanResourceDestroys(false);
                 }
 
-                commandSubmissionState.advanceImmediateSlotAfterSubmit(submitSlot);
+                frameExecution.advanceImmediateAfterSubmit(submitPlan);
                 descriptorManager.activateImmediateSlot(commandSubmissionState.currentImmediateSubmitSlot());
                 if (totalStartNanos != 0L) {
                     long totalNanos = System.nanoTime() - totalStartNanos;
@@ -17861,7 +17780,7 @@ void main() {
                 }
             } catch (RuntimeException exception) {
                 if (!submittedToQueue) {
-                    commandSubmissionState.markImmediateSubmitFailed(submitSlot);
+                    frameExecution.failImmediateSubmitBeforeQueue(submitPlan);
                 }
                 throw exception;
             }
@@ -17872,61 +17791,57 @@ void main() {
         }
 
         private void submitFrameSemaphoreBridge() {
+            VulkanFrameExecutionCoordinator.FrameSubmitPlan submitPlan =
+                frameExecution.planFrameSemaphoreBridgeSubmit();
             try (MemoryStack stack = stackPush()) {
-                long frameFence = currentSwapchainFrameFence();
-                long imageAvailableSemaphore = currentSwapchainImageAvailableSemaphore();
-                long renderFinishedSemaphore = acquiredSwapchainRenderFinishedSemaphore();
-
                 VkSubmitInfo.Buffer submitInfos = VkSubmitInfo.calloc(1, stack)
                     .sType$Default()
                     .waitSemaphoreCount(1)
-                    .pWaitSemaphores(stack.longs(imageAvailableSemaphore))
+                    .pWaitSemaphores(stack.longs(submitPlan.imageAvailableSemaphore()))
                     .pWaitDstStageMask(stack.ints(swapchainAcquireWaitStageMask()))
-                    .pSignalSemaphores(stack.longs(renderFinishedSemaphore));
+                    .pSignalSemaphores(stack.longs(submitPlan.renderFinishedSemaphore()));
 
-                java.nio.LongBuffer frameFenceBuffer = stack.longs(frameFence);
+                java.nio.LongBuffer frameFenceBuffer = stack.longs(submitPlan.frameFence());
                 checkVk("vkResetFences(swapchainFrame)", VK10.vkResetFences(logicalDevice, frameFenceBuffer));
-                checkVk("vkQueueSubmit(frameBridge)", VK10.vkQueueSubmit(graphicsQueue, submitInfos, frameFence));
-                registerSubmittedWork(frameFence, commandSubmissionState.reservedFrameWorkGeneration(lifetime, swapchainState.currentFrameSyncIndex()));
+                checkVk("vkQueueSubmit(frameBridge)", VK10.vkQueueSubmit(graphicsQueue, submitInfos, submitPlan.frameFence()));
+                frameExecution.completeFrameSubmit(submitPlan);
+            } catch (RuntimeException exception) {
+                frameExecution.failFrameSubmit(submitPlan, false);
+                throw exception;
             }
         }
 
         private void submitCurrentFrameCommandBuffer() {
-            VkCommandBuffer frameCommandBuffer = currentFrameCommandBuffer();
-            if (!isCurrentFrameCommandBufferRecording()) {
-                throw new IllegalStateException(
-                    "Cannot submit Vulkan frame command buffer for sync slot " + swapchainState.currentFrameSyncIndex() + " because it is not recording."
-                );
-            }
+            VulkanFrameExecutionCoordinator.FrameSubmitPlan submitPlan =
+                frameExecution.planFrameCommandBufferSubmit();
+            VkCommandBuffer frameCommandBuffer = submitPlan.commandBuffer();
 
             try (MemoryStack stack = stackPush()) {
-                long frameFence = currentSwapchainFrameFence();
-                long imageAvailableSemaphore = currentSwapchainImageAvailableSemaphore();
-                long renderFinishedSemaphore = acquiredSwapchainRenderFinishedSemaphore();
-
                 checkVk(
-                    "vkEndCommandBuffer(frame[" + swapchainState.currentFrameSyncIndex() + "])",
+                    "vkEndCommandBuffer(frame[" + submitPlan.frameSlot() + "])",
                     VK10.vkEndCommandBuffer(frameCommandBuffer)
                 );
 
                 VkSubmitInfo.Buffer submitInfos = VkSubmitInfo.calloc(1, stack)
                     .sType$Default()
                     .waitSemaphoreCount(1)
-                    .pWaitSemaphores(stack.longs(imageAvailableSemaphore))
+                    .pWaitSemaphores(stack.longs(submitPlan.imageAvailableSemaphore()))
                     .pWaitDstStageMask(stack.ints(swapchainAcquireWaitStageMask()))
-                    .pSignalSemaphores(stack.longs(renderFinishedSemaphore));
+                    .pSignalSemaphores(stack.longs(submitPlan.renderFinishedSemaphore()));
                 org.lwjgl.PointerBuffer commandBuffers = stack.mallocPointer(1);
                 commandBuffers.put(0, frameCommandBuffer.address());
                 submitInfos.pCommandBuffers(commandBuffers);
 
-                java.nio.LongBuffer frameFenceBuffer = stack.longs(frameFence);
+                java.nio.LongBuffer frameFenceBuffer = stack.longs(submitPlan.frameFence());
                 checkVk("vkResetFences(swapchainFrame)", VK10.vkResetFences(logicalDevice, frameFenceBuffer));
-                checkVk("vkQueueSubmit(frame)", VK10.vkQueueSubmit(graphicsQueue, submitInfos, frameFence));
-                registerSubmittedWork(frameFence, commandSubmissionState.reservedFrameWorkGeneration(lifetime, swapchainState.currentFrameSyncIndex()));
+                checkVk("vkQueueSubmit(frame)", VK10.vkQueueSubmit(graphicsQueue, submitInfos, submitPlan.frameFence()));
+                frameExecution.completeFrameSubmit(submitPlan);
 
-                swapchainState.setCurrentFrameCommandBufferRecording(false);
                 clearTrackedCommandBufferState(frameCommandBuffer.address());
                 backend.boundPipelineResourcesByCommandBuffer.remove(frameCommandBuffer.address());
+            } catch (RuntimeException exception) {
+                frameExecution.failFrameSubmit(submitPlan, false);
+                throw exception;
             }
         }
 
@@ -18818,31 +18733,13 @@ void main() {
             }
         }
 
-        private void destroyTransientRenderPassResources() {
-            stagingTransfers.retireGlobal(this::destroyStagingBuffer);
-            lifetime.retireGlobalTransientResources(
+        private VulkanFrameExecutionCoordinator.RetirementHooks<VulkanBuffer> frameRetirementHooks() {
+            return new VulkanFrameExecutionCoordinator.RetirementHooks<>(
+                this::destroyStagingBuffer,
                 this::recycleDescriptorUniformBuffer,
                 this::destroyTransientFramebufferHandle,
                 this::destroyTransientRenderPassHandle
             );
-        }
-
-        private void destroyTransientRenderPassResources(int slot) {
-            stagingTransfers.retireImmediateSlot(slot, this::destroyStagingBuffer);
-            lifetime.retireImmediateTransientResources(
-                slot,
-                this::recycleDescriptorUniformBuffer,
-                this::destroyTransientFramebufferHandle,
-                this::destroyTransientRenderPassHandle
-            );
-        }
-
-        private void destroyTransientFrameDescriptorBuffers(int frameIndex) {
-            lifetime.retireFrameDescriptorResources(frameIndex, this::recycleDescriptorUniformBuffer);
-        }
-
-        private void destroyAllTransientFrameDescriptorBuffers() {
-            lifetime.retireAllFrameDescriptorResources(this::recycleDescriptorUniformBuffer);
         }
 
         private static int descriptorUniformBufferBucketSize(int requestedSize) {
@@ -19314,6 +19211,69 @@ void main() {
                 .pDynamicStates(dynamicStates);
         }
 
+        private VulkanPipelineCreationPlanner.GraphicsPipelinePlan planGraphicsPipeline(
+            PipelineDescriptor descriptor,
+            VulkanRenderPassCompatibilityKey renderPassCompatibilityKey
+        ) {
+            VulkanDescriptorSetLayoutPlanner.DescriptorLayoutPlan descriptorLayoutPlan =
+                descriptorSetLayoutPlanner.plan(descriptor.getResourceLayout());
+            return planGraphicsPipeline(descriptor, descriptorLayoutPlan, renderPassCompatibilityKey);
+        }
+
+        private VulkanPipelineCreationPlanner.GraphicsPipelinePlan planGraphicsPipeline(
+            PipelineDescriptor descriptor,
+            VulkanDescriptorSetLayoutPlanner.DescriptorLayoutPlan descriptorLayoutPlan,
+            VulkanRenderPassCompatibilityKey renderPassCompatibilityKey
+        ) {
+            PipelineDescriptor.PortableState portableState = descriptor.getPortableState();
+            return pipelineCreationPlanner.planGraphics(new VulkanPipelineCreationPlanner.GraphicsPlanRequest(
+                descriptor,
+                descriptorLayoutPlan,
+                renderPassCompatibilityKey,
+                mode -> toVkPolygonMode(mode, portableState.location().toString()),
+                backend::blendStateForAttachment,
+                backend.currentStencilState(),
+                attachmentFeedbackLoopLayoutEnabled
+            ));
+        }
+
+        private VulkanPipelineCacheKeyNormalizer.GraphicsPipelineCacheKey normalizedGraphicsPipelineCacheKey(
+            PipelineDescriptor descriptor,
+            VulkanRenderPassCompatibilityKey renderPassCompatibilityKey
+        ) {
+            return VulkanPipelineCacheKeyNormalizer.graphicsKey(
+                planGraphicsPipeline(descriptor, renderPassCompatibilityKey),
+                descriptor.getSpirvModules()
+            );
+        }
+
+        private VulkanPipelineCreationPlanner.ComputePipelinePlan planComputePipeline(
+            PipelineDescriptor descriptor
+        ) {
+            VulkanDescriptorSetLayoutPlanner.DescriptorLayoutPlan descriptorLayoutPlan =
+                descriptorSetLayoutPlanner.plan(descriptor.getResourceLayout());
+            return planComputePipeline(descriptor, descriptorLayoutPlan);
+        }
+
+        private VulkanPipelineCreationPlanner.ComputePipelinePlan planComputePipeline(
+            PipelineDescriptor descriptor,
+            VulkanDescriptorSetLayoutPlanner.DescriptorLayoutPlan descriptorLayoutPlan
+        ) {
+            return pipelineCreationPlanner.planCompute(new VulkanPipelineCreationPlanner.ComputePlanRequest(
+                descriptor,
+                descriptorLayoutPlan
+            ));
+        }
+
+        private VulkanPipelineCacheKeyNormalizer.ComputePipelineCacheKey normalizedComputePipelineCacheKey(
+            PipelineDescriptor descriptor
+        ) {
+            return VulkanPipelineCacheKeyNormalizer.computeKey(
+                planComputePipeline(descriptor),
+                descriptor.getSpirvModules()
+            );
+        }
+
         private VulkanPipelineHandle createVulkanPipeline(
             PipelineDescriptor descriptor,
             long vertShaderModuleHandle,
@@ -19334,15 +19294,7 @@ void main() {
                 VulkanDescriptorSetLayoutPlanner.DescriptorLayoutPlan descriptorLayoutPlan =
                     descriptorSetLayoutPlanner.plan(descriptor.getResourceLayout());
                 VulkanPipelineCreationPlanner.GraphicsPipelinePlan pipelinePlan =
-                    pipelineCreationPlanner.planGraphics(new VulkanPipelineCreationPlanner.GraphicsPlanRequest(
-                        descriptor,
-                        descriptorLayoutPlan,
-                        renderPassCompatibilityKey,
-                        mode -> toVkPolygonMode(mode, portableState.location().toString()),
-                        backend::blendStateForAttachment,
-                        backend.currentStencilState(),
-                        attachmentFeedbackLoopLayoutEnabled
-                    ));
+                    planGraphicsPipeline(descriptor, descriptorLayoutPlan, renderPassCompatibilityKey);
                 java.util.List<VulkanDescriptorSetLayoutPlanner.DescriptorLayoutBindingPlan> bindings =
                     descriptorLayoutPlan.allBindings();
 
@@ -19488,10 +19440,7 @@ void main() {
                 VulkanDescriptorSetLayoutPlanner.DescriptorLayoutPlan descriptorLayoutPlan =
                     descriptorSetLayoutPlanner.plan(descriptor.getResourceLayout());
                 VulkanPipelineCreationPlanner.ComputePipelinePlan pipelinePlan =
-                    pipelineCreationPlanner.planCompute(new VulkanPipelineCreationPlanner.ComputePlanRequest(
-                        descriptor,
-                        descriptorLayoutPlan
-                    ));
+                    planComputePipeline(descriptor, descriptorLayoutPlan);
                 long[] descriptorSetLayoutHandles = createDescriptorSetLayouts(
                     stack,
                     descriptorLayoutPlan,
@@ -20157,11 +20106,7 @@ void main() {
                 releaseSwapchainPresentComposePipeline();
                 backend.pipelineLifecycle.destroyAllNow(pipelineDestroyActions());
 
-                destroyTransientRenderPassResources();
-                for (int slot = 0; slot < IMMEDIATE_SUBMIT_SLOTS; slot++) {
-                    destroyTransientRenderPassResources(slot);
-                }
-                destroyAllTransientFrameDescriptorBuffers();
+                frameExecution.cleanupForShutdownOrDeviceLoss(logicalDevice != null, frameRetirementHooks());
                 destroyRecycledDescriptorUniformBuffers();
 
                 renderTargetState.invalidatePermanentRenderPassCache(renderPassHandle -> {
@@ -20191,7 +20136,7 @@ void main() {
                         VK10.vkDestroyCommandPool(logicalDevice, frameCommandPool, null);
                     }
                     commandSubmissionState.clearFrameSlot(frameIndex);
-                    swapchainState.setFrameCommandBufferRecording(frameIndex, false);
+                    frameExecution.clearFrameCommandBufferRecording(frameIndex);
                 }
 
                 descriptorManager.destroyDescriptorPools(logicalDevice);
@@ -20229,7 +20174,7 @@ void main() {
                         swapchainState.setFrameFence(frameIndex, VK10.VK_NULL_HANDLE);
                     }
                 }
-                swapchainState.resetFrameState();
+                frameExecution.abandonFrame();
 
                 descriptorManager.destroyDescriptorSamplers(samplerHandle -> VK10.vkDestroySampler(logicalDevice, samplerHandle, null));
 
@@ -20241,12 +20186,11 @@ void main() {
                 VK10.vkDestroyDevice(logicalDevice, null);
                 logicalDevice = null;
                 graphicsQueue = null;
-                commandSubmissionState.clearForDeviceLossOrShutdown();
+                frameExecution.resetForDeviceLossOrShutdown();
                 instanceProperties2ExtensionEnabled = false;
                 presentIdExtensionEnabled = false;
                 presentWaitExtensionEnabled = false;
                 nextPresentId = 1L;
-                swapchainState.resetFrameState();
                 pendingPresentTextureRequest = null;
             }
 

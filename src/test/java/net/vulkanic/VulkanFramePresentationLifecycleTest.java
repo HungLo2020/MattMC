@@ -77,6 +77,8 @@ public class VulkanFramePresentationLifecycleTest {
     public void testFramePresentationSourceWiring() throws Exception {
         String vulkanBackendSource = readSource(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String frameCoordinatorSource = readSource(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanFrameExecutionCoordinator.java"));
         String renderSystemSource = readSource(PROJECT_ROOT
             .resolve("src/main/java/net/blaze3d/systems/RenderSystem.java"));
         String glCommandEncoderSource = readSource(PROJECT_ROOT
@@ -106,8 +108,9 @@ public class VulkanFramePresentationLifecycleTest {
             "Vulkan backend should begin frame-presentation command recording on a dedicated frame buffer path");
         assertTrue(vulkanBackendSource.contains("createSwapchainRenderFinishedSemaphores(imageResources.imageHandles.size())"),
             "Vulkan backend should create render-finished semaphores from the swapchain image count");
-        assertTrue(vulkanBackendSource.contains("swapchainState.acquiredRenderFinishedSemaphore()"),
-            "Vulkan backend should signal/present with a render-finished semaphore owned by the acquired swapchain image");
+        assertTrue(vulkanBackendSource.contains("submitPlan.renderFinishedSemaphore()")
+                && vulkanBackendSource.contains("presentPlan.renderFinishedSemaphore()"),
+            "Vulkan backend should signal/present with a coordinator-planned render-finished semaphore owned by the acquired swapchain image");
         assertTrue(vulkanBackendSource.contains("destroySwapchainRenderFinishedSemaphores()"),
             "Vulkan backend should destroy per-image render-finished semaphores with swapchain resources");
         assertFalse(vulkanBackendSource.contains("swapchainRenderFinishedSemaphores[currentFrameSyncIndex]"),
@@ -146,9 +149,9 @@ public class VulkanFramePresentationLifecycleTest {
             "Vulkan beginCommandBuffer should reuse the frame command buffer during an active frame");
         assertTrue(vulkanBackendSource.contains("if (spine.isCurrentFrameCommandBufferHandle(commandBufferHandle))"),
             "Vulkan submitCommandBuffer should avoid force-submitting the active frame command buffer per render pass");
-        assertTrue(vulkanBackendSource.contains("int submitSlot = immediateSubmitSlotForKnownCommandBuffer(commandBufferHandle);")
-                && vulkanBackendSource.contains("if (submitSlot != commandSubmissionState.recordingImmediateSubmitSlot() || submitSlot < 0)")
-                && vulkanBackendSource.contains("VkCommandBuffer submitCommandBuffer = commandSubmissionState.immediateCommandBuffer(submitSlot);")
+        assertTrue(vulkanBackendSource.contains("frameExecution.planImmediateSubmit(commandBufferHandle)")
+                && frameCoordinatorSource.contains("submitSlot != commandSubmissionState.recordingImmediateSubmitSlot() || submitSlot < 0")
+                && frameCoordinatorSource.contains("VkCommandBuffer commandBuffer = commandSubmissionState.immediateCommandBuffer(submitSlot);")
                 && vulkanBackendSource.contains("commandBuffers.put(0, submitCommandBuffer.address());"),
             "Vulkan immediate submits must submit and mark the same recording ring slot to avoid fence/command-buffer mismatches");
         assertTrue(vulkanBackendSource.contains("shouldSynchronizeImmediateSubmitCompletion()")

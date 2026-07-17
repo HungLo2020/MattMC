@@ -98,11 +98,13 @@ final class VulkanPipelineCreationPlanner {
                 layoutInputs,
                 vertexInput.cacheKey(),
                 inputAssembly,
+                viewportState,
                 rasterizationState,
                 multisampleState,
                 depthStencilState.cacheKey(),
                 colorBlendState.cacheKey(),
-                dynamicStates
+                dynamicStates,
+                pipelineCreateFlags
             ),
             pipelineCreateFlags
         );
@@ -438,11 +440,13 @@ final class VulkanPipelineCreationPlanner {
         PipelineLayoutCompatibilityInputs pipelineLayoutCompatibility,
         VertexInputCacheKey vertexInput,
         InputAssemblyPlan inputAssembly,
+        ViewportStatePlan viewportState,
         RasterizationStatePlan rasterizationState,
         MultisampleStatePlan multisampleState,
         DepthStencilCacheKey depthStencilState,
         ColorBlendCacheKey colorBlendState,
-        List<Integer> dynamicStates
+        List<Integer> dynamicStates,
+        int pipelineCreateFlags
     ) {
         PipelineCacheKeyInputs {
             Objects.requireNonNull(pipelineCompilationKey, "pipelineCompilationKey");
@@ -451,6 +455,7 @@ final class VulkanPipelineCreationPlanner {
             Objects.requireNonNull(pipelineLayoutCompatibility, "pipelineLayoutCompatibility");
             Objects.requireNonNull(vertexInput, "vertexInput");
             Objects.requireNonNull(inputAssembly, "inputAssembly");
+            Objects.requireNonNull(viewportState, "viewportState");
             Objects.requireNonNull(rasterizationState, "rasterizationState");
             Objects.requireNonNull(multisampleState, "multisampleState");
             Objects.requireNonNull(depthStencilState, "depthStencilState");

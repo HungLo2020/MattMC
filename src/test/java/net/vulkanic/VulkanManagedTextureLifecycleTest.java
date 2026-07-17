@@ -289,24 +289,29 @@ public class VulkanManagedTextureLifecycleTest {
     public void testVulkanImageAndViewDestructionIsFenceDeferred() throws Exception {
         Path backendFile = PROJECT_ROOT.resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java");
         String source = Files.readString(backendFile);
+        Path frameCoordinatorFile = PROJECT_ROOT.resolve(
+            "src/main/java/net/vulkanic/backends/vulkan/VulkanFrameExecutionCoordinator.java");
+        String frameCoordinatorSource = Files.readString(frameCoordinatorFile);
 
         assertTrue(source.contains("VulkanDeferredResourceLifetime<VulkanBuffer> lifetime"),
             "Vulkan backend should centralize non-staging native resource retirement behind the deferred lifetime manager");
         assertTrue(source.contains("VulkanStagingTransferManager stagingTransfers"),
             "Vulkan backend should isolate staging upload/readback lifecycle behind the staging transfer manager");
-        assertTrue(source.contains("commandSubmissionState.reserveFrameWorkGeneration(lifetime, swapchainState.currentFrameSyncIndex())"),
+        assertTrue(source.contains("VulkanFrameExecutionCoordinator<VulkanBuffer> frameExecution"),
+            "Vulkan backend should coordinate frame execution lifecycle through the frame coordinator");
+        assertTrue(frameCoordinatorSource.contains("commandSubmissionState.reserveFrameWorkGeneration(lifetime, plan.frameSlot())"),
             "Frame command recording should reserve a generation before resources can be closed during that frame");
         assertTrue(source.contains("commandSubmissionState.reserveImmediateWorkGeneration(lifetime)"),
             "Immediate command recording should reserve a generation before resources can be closed during that submit");
-        assertTrue(source.contains("registerSubmittedWork(frameFence, commandSubmissionState.reservedFrameWorkGeneration(lifetime, swapchainState.currentFrameSyncIndex()))"),
+        assertTrue(frameCoordinatorSource.contains("lifetime.registerSubmittedWork(plan.frameFence(), plan.reservedGeneration())"),
             "Frame submits should publish their reserved generation to the lifetime manager");
-        assertTrue(source.contains("registerSubmittedWork(submitFence, commandSubmissionState.reservedImmediateWorkGeneration(lifetime, submitSlot))"),
+        assertTrue(frameCoordinatorSource.contains("lifetime.registerSubmittedWork(plan.submitFence(), plan.reservedGeneration())"),
             "Immediate submits should publish their reserved generation to the lifetime manager");
-        assertTrue(source.contains("markFenceComplete(frameFence)") && source.contains("markFenceComplete(submitFence)"),
+        assertTrue(source.contains("completeFrameFenceWait(") && source.contains("completeImmediateSubmitFence("),
             "Fence waits should mark submitted generations complete before native resources are retired");
-        assertTrue(source.contains("lifetime.markFenceComplete(fenceHandle, logicalDevice != null)"),
+        assertTrue(frameCoordinatorSource.contains("lifetime.markFenceComplete(fenceHandle, deviceAvailable)"),
             "Fence completion should retire lifetime-managed native resources through the shared manager");
-        assertTrue(source.contains("lifetime.enqueueDestroy("),
+        assertTrue(source.contains("frameExecution.enqueueDestroy("),
             "Deferred native destruction should enqueue through the shared lifetime manager");
         assertTrue(source.contains("enqueueVulkanResourceDestroy(() -> destroyManagedTextureHandles(imageHandle, memoryHandle, defaultViewHandle))"),
             "Managed textures should defer VkImage/VkImageView destruction until submitted GPU work has completed");
@@ -314,7 +319,8 @@ public class VulkanManagedTextureLifecycleTest {
             "Temporary present-source image views should use deferred image-view retirement");
         assertTrue(source.contains("destroyBufferView(previous.vkBufferViewHandle)"),
             "Descriptor-backed buffer views should use the same deferred retirement path");
-        assertTrue(source.contains("lifetime.flushPendingDestroys(logicalDevice != null, force)"),
+        assertTrue(source.contains("frameExecution.flushPendingDestroys(logicalDevice != null, force)")
+                && frameCoordinatorSource.contains("lifetime.flushPendingDestroys(deviceAvailable, force)"),
             "Device shutdown should force-flush pending destroys after waiting for the device to idle");
     }
 

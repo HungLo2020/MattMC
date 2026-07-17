@@ -122,6 +122,8 @@ public class VulkanSwapchainSurfaceInfoTest {
     public void testSwapchainSourceTracksImageViewsAcrossLifecycle() throws Exception {
         String source = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String frameCoordinatorSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanFrameExecutionCoordinator.java"));
 
         assertTrue(source.contains("vkGetSwapchainImagesKHR(list)"),
             "Swapchain lifecycle should enumerate swapchain images during creation/recreation");
@@ -132,7 +134,7 @@ public class VulkanSwapchainSurfaceInfoTest {
             "Swapchain lifecycle should track swapchain image view handles for cleanup/recreation");
         assertTrue(source.contains("destroyTrackedSwapchainImageViews()"),
             "Swapchain lifecycle should destroy tracked image views during teardown");
-        assertTrue(source.contains("outside tracked swapchain image/view range"),
+        assertTrue(frameCoordinatorSource.contains("outside tracked swapchain image/view range"),
             "Frame acquisition should validate acquired image indices against tracked swapchain resources");
     }
 
