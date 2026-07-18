@@ -314,7 +314,7 @@ fn cache_registration_ffi_rejects_bad_ids_pointers_and_strides() {
         assert_eq!(
             ERR_INVALID_ARGUMENT,
             mattmc_sodium_native_meshing_state_register(
-                -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, 0, 0, 0.0, 0.0, 0, 0.0, 1.0, 0.0, 1.0,
+                -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, 0, 0, 0.0, 0.0, 0, 0.0, 1.0, 0.0, 1.0,
                 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0,
             )
         );
@@ -562,6 +562,7 @@ fn cleared_native_cache_ids_do_not_resolve_after_reload() {
                 0,
                 0,
                 91,
+                0,
                 0,
                 0,
                 0,

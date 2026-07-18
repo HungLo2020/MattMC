@@ -212,11 +212,11 @@ impl NativeSectionRecordSource for CompactSectionSnapshot<'_> {
             self.padded_state(padded_x + 1, padded_y, padded_z),
         ];
 
-        for neighbor_id in neighbor_ids {
+        for (face, neighbor_id) in neighbor_ids.into_iter().enumerate() {
             let Some(neighbor) = state_by_id(states, neighbor_id) else {
                 return Ok(false);
             };
-            if !state_culls_model_face(state, neighbor) {
+            if !state_culls_model_face(face as i32, state, neighbor) {
                 return Ok(false);
             }
         }

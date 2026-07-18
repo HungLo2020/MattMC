@@ -45,6 +45,7 @@ public final class NativeStaticBlockModelCache {
                     ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_INT,
+                    ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_FLOAT,
                     ValueLayout.JAVA_INT,
                     ValueLayout.JAVA_INT,
@@ -127,14 +128,14 @@ public final class NativeStaticBlockModelCache {
 
     public static void registerState(int stateId, int selectorId, int flags, int materialBits, int passId,
             int blockEmission, int renderType, int blockId, int fluidMaterialBits, int fluidPassId,
-            int fluidBlockId, int skipGroup, int fluidType, float fluidOwnHeight, int fluidFalling,
+            int fluidBlockId, int skipGroup, int skipMask, int fluidType, float fluidOwnHeight, int fluidFalling,
             int offsetType, float maxHorizontalOffset, float maxVerticalOffset, int tintType,
             float fluidStillU0, float fluidStillU1, float fluidStillV0, float fluidStillV1, float fluidStillShrink,
             float fluidFlowU0, float fluidFlowU1, float fluidFlowV0, float fluidFlowV1, float fluidFlowShrink,
             float fluidOverlayU0, float fluidOverlayU1, float fluidOverlayV0, float fluidOverlayV1,
             float fluidOverlayShrink, int fluidOverlayValid) {
         check(invokeRegisterState(stateId, selectorId, flags, materialBits, passId, blockEmission, renderType,
-                blockId, fluidMaterialBits, fluidPassId, fluidBlockId, skipGroup, fluidType, fluidOwnHeight,
+                blockId, fluidMaterialBits, fluidPassId, fluidBlockId, skipGroup, skipMask, fluidType, fluidOwnHeight,
                 fluidFalling, offsetType, maxHorizontalOffset, maxVerticalOffset, tintType,
                 fluidStillU0, fluidStillU1, fluidStillV0, fluidStillV1, fluidStillShrink,
                 fluidFlowU0, fluidFlowU1, fluidFlowV0, fluidFlowV1, fluidFlowShrink,
@@ -146,9 +147,26 @@ public final class NativeStaticBlockModelCache {
     public static void registerState(int stateId, int selectorId, int flags, int materialBits, int passId,
             int blockEmission, int renderType, int blockId, int fluidMaterialBits, int fluidPassId,
             int fluidBlockId, int skipGroup, int fluidType, float fluidOwnHeight, int fluidFalling,
+            int offsetType, float maxHorizontalOffset, float maxVerticalOffset, int tintType,
+            float fluidStillU0, float fluidStillU1, float fluidStillV0, float fluidStillV1, float fluidStillShrink,
+            float fluidFlowU0, float fluidFlowU1, float fluidFlowV0, float fluidFlowV1, float fluidFlowShrink,
+            float fluidOverlayU0, float fluidOverlayU1, float fluidOverlayV0, float fluidOverlayV1,
+            float fluidOverlayShrink, int fluidOverlayValid) {
+        registerState(stateId, selectorId, flags, materialBits, passId, blockEmission, renderType, blockId,
+                fluidMaterialBits, fluidPassId, fluidBlockId, skipGroup, 0, fluidType, fluidOwnHeight,
+                fluidFalling, offsetType, maxHorizontalOffset, maxVerticalOffset, tintType,
+                fluidStillU0, fluidStillU1, fluidStillV0, fluidStillV1, fluidStillShrink,
+                fluidFlowU0, fluidFlowU1, fluidFlowV0, fluidFlowV1, fluidFlowShrink,
+                fluidOverlayU0, fluidOverlayU1, fluidOverlayV0, fluidOverlayV1, fluidOverlayShrink,
+                fluidOverlayValid);
+    }
+
+    public static void registerState(int stateId, int selectorId, int flags, int materialBits, int passId,
+            int blockEmission, int renderType, int blockId, int fluidMaterialBits, int fluidPassId,
+            int fluidBlockId, int skipGroup, int fluidType, float fluidOwnHeight, int fluidFalling,
             int offsetType, float maxHorizontalOffset, float maxVerticalOffset, int tintType) {
         registerState(stateId, selectorId, flags, materialBits, passId, blockEmission, renderType, blockId,
-                fluidMaterialBits, fluidPassId, fluidBlockId, skipGroup, fluidType, fluidOwnHeight, fluidFalling,
+                fluidMaterialBits, fluidPassId, fluidBlockId, skipGroup, 0, fluidType, fluidOwnHeight, fluidFalling,
                 offsetType, maxHorizontalOffset, maxVerticalOffset, tintType,
                 0.0F, 1.0F, 0.0F, 1.0F, 0.0F,
                 0.0F, 1.0F, 0.0F, 1.0F, 0.0F,
@@ -195,7 +213,7 @@ public final class NativeStaticBlockModelCache {
 
     private static int invokeRegisterState(int stateId, int selectorId, int flags, int materialBits, int passId,
             int blockEmission, int renderType, int blockId, int fluidMaterialBits, int fluidPassId,
-            int fluidBlockId, int skipGroup, int fluidType, float fluidOwnHeight, int fluidFalling,
+            int fluidBlockId, int skipGroup, int skipMask, int fluidType, float fluidOwnHeight, int fluidFalling,
             int offsetType, float maxHorizontalOffset, float maxVerticalOffset, int tintType,
             float fluidStillU0, float fluidStillU1, float fluidStillV0, float fluidStillV1, float fluidStillShrink,
             float fluidFlowU0, float fluidFlowU1, float fluidFlowV0, float fluidFlowV1, float fluidFlowShrink,
@@ -203,7 +221,7 @@ public final class NativeStaticBlockModelCache {
             float fluidOverlayShrink, int fluidOverlayValid) {
         try {
             return (int) REGISTER_STATE.invokeExact(stateId, selectorId, flags, materialBits, passId, blockEmission,
-                    renderType, blockId, fluidMaterialBits, fluidPassId, fluidBlockId, skipGroup, fluidType,
+                    renderType, blockId, fluidMaterialBits, fluidPassId, fluidBlockId, skipGroup, skipMask, fluidType,
                     fluidOwnHeight, fluidFalling, offsetType, maxHorizontalOffset, maxVerticalOffset, tintType,
                     fluidStillU0, fluidStillU1, fluidStillV0, fluidStillV1, fluidStillShrink,
                     fluidFlowU0, fluidFlowU1, fluidFlowV0, fluidFlowV1, fluidFlowShrink,

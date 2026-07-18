@@ -16,6 +16,7 @@ import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.data.AtlasIds;
 import net.minecraft.client.resources.model.WeightedVariants;
+import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.util.random.Weighted;
@@ -262,9 +263,11 @@ public final class NativeStaticBlockModelRegistry {
         int fluidType = FORCE_JAVA_FLUIDS ? FLUID_NONE : fluidType(fluidState);
         BlockBehaviour.OffsetType offsetType = state.sodium$getOffsetType();
         FluidSpriteMetadata fluidSprites = fluidSpriteMetadata(fluidState);
+        int sameBlockSkipMask = sameBlockSkipMask(state);
         NativeStaticBlockModelCache.registerState(stateId, selectorId, flags, material.bits(), modelPassId,
                 state.getLightEmission(), 0, irisBlockId(state), fluidMaterialBits, fluidPassId, fluidBlockId,
-                skipGroup(state), fluidType, fluidState.isEmpty() ? 0.0F : fluidState.getOwnHeight(),
+                skipGroup(state, sameBlockSkipMask), sameBlockSkipMask, fluidType,
+                fluidState.isEmpty() ? 0.0F : fluidState.getOwnHeight(),
                 fluidState.hasProperty(net.minecraft.world.level.material.FlowingFluid.FALLING) && fluidState.getValue(net.minecraft.world.level.material.FlowingFluid.FALLING) ? 1 : 0,
                 offsetType.ordinal(), state.sodium$getMaxHorizontalOffset(), state.sodium$getMaxVerticalOffset(),
                 tintType,
@@ -549,7 +552,11 @@ public final class NativeStaticBlockModelRegistry {
         return ids == null ? -1 : ids.getInt(state.createLegacyBlock());
     }
 
-    private static int skipGroup(BlockState state) {
+    private static int skipGroup(BlockState state, int sameBlockSkipMask) {
+        if (sameBlockSkipMask == 0) {
+            return 0;
+        }
+
         Block block = state.getBlock();
         int id = SKIP_GROUPS.getInt(block);
         if (id != 0) {
@@ -559,6 +566,20 @@ public final class NativeStaticBlockModelRegistry {
         id = nextSkipGroup++;
         SKIP_GROUPS.put(block, id);
         return id;
+    }
+
+    static boolean skipsRenderingAgainstSameBlock(BlockState state) {
+        return sameBlockSkipMask(state) == ((1 << Direction.values().length) - 1);
+    }
+
+    static int sameBlockSkipMask(BlockState state) {
+        int mask = 0;
+        for (Direction direction : Direction.values()) {
+            if (state.skipRendering(state, direction)) {
+                mask |= 1 << direction.get3DDataValue();
+            }
+        }
+        return mask;
     }
 
     private record CachedModel(List<CachedQuad> quads, List<TextureAtlasSprite> sprites) {

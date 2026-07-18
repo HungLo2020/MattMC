@@ -227,6 +227,7 @@ pub(super) struct NativeMeshingState {
     pub(super) fluid_pass_id: i32,
     pub(super) fluid_block_id: i32,
     pub(super) skip_group: i32,
+    pub(super) skip_mask: i32,
     pub(super) fluid_type: i32,
     pub(super) fluid_own_height: f32,
     pub(super) fluid_falling: i32,
