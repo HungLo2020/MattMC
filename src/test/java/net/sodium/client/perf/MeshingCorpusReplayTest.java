@@ -141,7 +141,8 @@ class MeshingCorpusReplayTest {
 
     private static JsonObject replay(JsonObject raw, CompactSnapshot snapshot, long prepareNanos,
             int warmupIterations, int measurementIterations, long warmupTargetNanos, long measurementTargetNanos) {
-        ReplayInvocation cold = replayOnce(raw, snapshot);
+        ReplayInvocation coldCore = replayOnce(raw, snapshot);
+        ReplayInvocation coldFull = replayFullOnce(raw);
         TimedSamples warmup = collectSamples(raw, snapshot, warmupIterations, warmupTargetNanos);
         TimedSamples measurement = collectSamples(raw, snapshot, measurementIterations, measurementTargetNanos);
         long[] coreTimes = measurement.coreTimes;
@@ -152,8 +153,8 @@ class MeshingCorpusReplayTest {
         result.addProperty("schema", "mattmc-current-rust-meshing-corpus-fixture-v2");
         result.addProperty("fixture", raw.get("fixture").getAsString());
         result.addProperty("prepare_nanos", prepareNanos);
-        result.addProperty("cold_core_nanos", cold.coreNanos);
-        result.addProperty("cold_full_nanos", cold.fullNanos);
+        result.addProperty("cold_core_nanos", coldCore.fullNanos);
+        result.addProperty("cold_full_nanos", coldFull.fullNanos);
         result.addProperty("core_nanos", median(coreTimes));
         result.addProperty("full_nanos", median(fullTimes));
         result.addProperty("median_ns", median(fullTimes));
@@ -194,11 +195,17 @@ class MeshingCorpusReplayTest {
         List<Long> fullTimes = new ArrayList<>();
         long start = System.nanoTime();
         while (coreTimes.size() < minIterations || System.nanoTime() - start < targetNanos) {
-            ReplayInvocation invocation = replayOnce(raw, snapshot);
-            coreTimes.add(invocation.coreNanos);
-            fullTimes.add(invocation.fullNanos);
+            coreTimes.add(replayOnce(raw, snapshot).fullNanos);
+            fullTimes.add(replayFullOnce(raw).fullNanos);
         }
         return new TimedSamples(toLongArray(coreTimes), toLongArray(fullTimes), System.nanoTime() - start);
+    }
+
+    private static ReplayInvocation replayFullOnce(JsonObject raw) {
+        long start = System.nanoTime();
+        try (CompactSnapshot snapshot = new CompactSnapshot(raw)) {
+            return replayOnce(raw, snapshot).withFullNanos(System.nanoTime() - start);
+        }
     }
 
     private static ReplayInvocation replayOnce(JsonObject raw, CompactSnapshot snapshot) {
@@ -764,6 +771,13 @@ class MeshingCorpusReplayTest {
                                     JsonObject fieldHashes, long[] nativeProfile) {
         private int totalQuads() {
             return this.solidQuads + this.cutoutQuads + this.translucentQuads;
+        }
+
+        private ReplayInvocation withFullNanos(long replacementFullNanos) {
+            return new ReplayInvocation(this.coreNanos, replacementFullNanos, this.nativeSolidQuads,
+                    this.nativeCutoutQuads, this.nativeTranslucentQuads, this.solidVertices, this.cutoutVertices,
+                    this.translucentVertices, this.solidQuads, this.cutoutQuads, this.translucentQuads,
+                    this.rawVertexHash, this.canonicalVertexHash, this.fieldHashes, this.nativeProfile);
         }
     }
 

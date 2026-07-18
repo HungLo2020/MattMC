@@ -595,21 +595,44 @@ def summarize_values(values: list[float]) -> dict[str, object]:
 
 def benchmark_category(name: str) -> str:
     if name.startswith("transfer_copy_"):
-        return "transfer-copy"
+        return "microbenchmark"
     if name in {"compact_chunk_mesh_buffer_build", "translucent_quad_index_emission"}:
-        return "support-kernel"
-    if "replay" in name or name in {
-        "dense_cube_terrain",
-        "normal_surface_terrain",
-        "foliage_tinted_models",
-        "weighted_and_multipart_models",
-        "waterlogged_geometry",
-        "fluid_heavy",
-        "translucent_heavy",
-        "complex_modded_static_serializable",
-    }:
-        return "section-meshing"
+        return "microbenchmark"
+    if name.startswith("compact_snapshot_create_") or name.startswith("snapshot_create_"):
+        return "preparation-diagnostic"
+    if name.startswith("compact_snapshot_replay_section_") or name.startswith("full_section_compact_snapshot_"):
+        return "current-rust-compact-production-diagnostic"
+    if name.startswith("replay_section_") or name.startswith("full_section_replay_"):
+        return "legacy-unmatched-section-replay"
+    if name.startswith("prebuilt_quad_replay_section_"):
+        return "legacy-java-prebuilt-quad-kernel"
+    if name.startswith("diagnostic_"):
+        return "unmatched-diagnostic"
+    if name == "native_section_scan_and_build":
+        return "legacy-rust-316-compatibility"
     return "other"
+
+
+def benchmark_contract(name: str) -> dict[str, object]:
+    category = benchmark_category(name)
+    production_headline = category in {
+        "synthetic-production-full",
+        "synthetic-production-core",
+    }
+    descriptions = {
+        "microbenchmark": "isolated transfer, packing, index, or buffer hot path; not a mesher comparison",
+        "preparation-diagnostic": "isolated fixture/snapshot creation diagnostic; not a meshing throughput row",
+        "current-rust-compact-production-diagnostic": "current Rust compact production path diagnostic without a matched frozen Java synthetic production row",
+        "legacy-unmatched-section-replay": "historical synthetic section replay; frozen Java is simplified and current Rust uses compatibility-shaped legacy records",
+        "legacy-java-prebuilt-quad-kernel": "frozen Java prebuilt quad packing kernel; no production model/lighting/fluid selection",
+        "legacy-rust-316-compatibility": "legacy 316-byte native section compatibility API; not gameplay compact production meshing",
+        "unmatched-diagnostic": "diagnostic variant; excluded from headlines",
+    }
+    return {
+        "category": category,
+        "production_headline_eligible": production_headline,
+        "contract": descriptions.get(category, "unclassified benchmark row; excluded from production headlines"),
+    }
 
 
 def row_by_name(doc: dict[str, object]) -> dict[str, dict[str, object]]:
@@ -719,6 +742,7 @@ def build_benchmark_aggregate(results: list[CommandResult]) -> dict[str, object]
             {
                 "name": name,
                 "category": benchmark_category(name),
+                "benchmark_contract": benchmark_contract(name),
                 "classification": classification,
                 "current_ms": summarize_values(current_values),
                 "frozen_ms": summarize_values(frozen_values),
@@ -732,7 +756,7 @@ def build_benchmark_aggregate(results: list[CommandResult]) -> dict[str, object]
     headline_rows = [
         row
         for row in row_summaries
-        if row["category"] == "section-meshing"
+        if row["benchmark_contract"]["production_headline_eligible"]
         and row["classification"] in {"current-faster", "current-slower", "similar"}
     ]
     return {

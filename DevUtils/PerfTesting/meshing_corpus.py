@@ -879,13 +879,16 @@ def ratio(numerator: float | None, denominator: float | None) -> float | None:
 def drift(warmup: Sequence[float]) -> dict[str, object]:
     if len(warmup) < 6:
         return {"samples": len(warmup), "status": "insufficient-warmup-samples"}
-    third = max(1, len(warmup) // 3)
-    early = median_float(warmup[:third])
-    late = median_float(warmup[-third:])
+    fifth = max(1, len(warmup) // 5)
+    middle_start = max(0, (len(warmup) // 2) - (fifth // 2))
+    early = median_float(warmup[:fifth])
+    middle = median_float(warmup[middle_start:middle_start + fifth])
+    late = median_float(warmup[-fifth:])
     return {
         "samples": len(warmup),
-        "early_median_nanos": early,
-        "late_median_nanos": late,
+        "first_20_percent_median_nanos": early,
+        "middle_20_percent_median_nanos": middle,
+        "final_20_percent_median_nanos": late,
         "late_over_early_ratio": ratio(late, early),
         "drift_percent": ((late - early) / early * 100.0) if early else None,
     }
@@ -1026,8 +1029,20 @@ def build_fixture_rows(
                 "current_over_frozen_core_ratio": core_ratio,
                 "frozen_over_current_full_speedup": ratio(frozen_full_stats.get("p50_nanos"), current_full_stats.get("p50_nanos")),
                 "frozen_over_current_core_speedup": ratio(frozen_core_stats.get("p50_nanos"), current_core_stats.get("p50_nanos")),
-                "current": {"full": current_full_stats, "core": current_core_stats, "warmup_full": drift(current_warm_full)},
-                "frozen": {"full": frozen_full_stats, "core": frozen_core_stats, "warmup_full": drift(frozen_warm_full)},
+                "current": {
+                    "full": current_full_stats,
+                    "core": current_core_stats,
+                    "warmup_full": drift(current_warm_full),
+                    "measurement_full_drift": drift(current_full),
+                    "measurement_core_drift": drift(current_core),
+                },
+                "frozen": {
+                    "full": frozen_full_stats,
+                    "core": frozen_core_stats,
+                    "warmup_full": drift(frozen_warm_full),
+                    "measurement_full_drift": drift(frozen_full),
+                    "measurement_core_drift": drift(frozen_core),
+                },
                 "cold": {key: sample_stats(values) for key, values in cold.items()},
                 "prepare": {key: sample_stats(values) for key, values in prepare.items()},
                 "actual_measurement_samples_by_fork": actual_samples,
@@ -1207,7 +1222,10 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, object]:
             "measurement_seconds_per_fixture": args.measure_seconds,
             "timeout_seconds_per_replay": args.timeout_seconds,
             "excluded_categories": ["empty"],
-            "timed_scope_note": "Replay tests prepare each corpus section once after corpus JSON is already decoded; warmup and measurement samples exclude semantic hashing and JSON writing.",
+            "production_full_scope": "corpus section already decoded in memory -> rebuild repository-native per-section input (Java LevelSlice view or Rust compact snapshot) -> production meshing -> final CPU mesh",
+            "production_core_scope": "prepared repository-native per-section input -> production meshing -> final CPU mesh",
+            "excluded_from_timed_scopes": "corpus disk I/O, decompression, JSON/schema parsing, JVM startup, class loading, native DLL loading, semantic hashing, and report generation",
+            "timed_scope_note": "Global fixture model/state tables and native static model cache registration are prepared outside timing; full samples rebuild per-section view/snapshot each invocation.",
         },
         "corpus": {key: value for key, value in corpus.items() if key != "summary"},
         "preflight": preflight,
