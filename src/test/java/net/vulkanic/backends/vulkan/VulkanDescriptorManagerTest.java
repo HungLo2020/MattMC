@@ -44,17 +44,15 @@ class VulkanDescriptorManagerTest {
     }
 
     @Test
-    void descriptorSetInvalidationClearsCacheAndBoundCommandBufferState() {
+    void descriptorSetInvalidationClearsCache() {
         VulkanDescriptorManager<FakeUniformBuffer> manager = new VulkanDescriptorManager<>(3, 4, 1024);
         VulkanDescriptorManager.DescriptorSetCacheKey key = cacheKey(17L, 2, 99L);
         manager.cacheDescriptorSetForTests(key, 0xCAFE);
-        manager.recordBoundDescriptorSetForTests(1L, 2L, 3L, VK10.VK_PIPELINE_BIND_POINT_GRAPHICS);
 
         manager.invalidateDescriptorSets();
 
         assertNull(manager.cachedDescriptorSetForTests(key));
         assertEquals(0, manager.descriptorSetCacheSizeForTests());
-        assertEquals(0, manager.lastBoundDescriptorSetCountForTests());
     }
 
     @Test
@@ -126,7 +124,6 @@ class VulkanDescriptorManagerTest {
         VulkanDescriptorManager<FakeUniformBuffer> manager = new VulkanDescriptorManager<>(3, 4, 1024);
         FakeUniformBuffer buffer = new FakeUniformBuffer(32);
         manager.cacheDescriptorSetForTests(cacheKey(17L, 2, 99L), 0xCAFE);
-        manager.recordBoundDescriptorSetForTests(1L, 2L, 3L, VK10.VK_PIPELINE_BIND_POINT_GRAPHICS);
         manager.recycleUniformBuffer(buffer, buffer.size(), FakeUniformBuffer::allocationSize, FakeUniformBuffer::close);
 
         manager.destroyRecycledUniformBuffers(FakeUniformBuffer::close);
@@ -135,7 +132,6 @@ class VulkanDescriptorManagerTest {
         assertTrue(buffer.closed());
         assertEquals(0, manager.recycledUniformBufferCountForTests());
         assertEquals(0, manager.descriptorSetCacheSizeForTests());
-        assertEquals(0, manager.lastBoundDescriptorSetCountForTests());
         assertEquals(VK10.VK_NULL_HANDLE, manager.activeDescriptorPool());
     }
 

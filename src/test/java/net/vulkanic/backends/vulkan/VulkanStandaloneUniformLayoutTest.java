@@ -16,7 +16,7 @@ public class VulkanStandaloneUniformLayoutTest {
 
     @Test
     public void packsScalarIntoVec3PaddingBeforeMatrix() {
-        Map<String, List<Integer>> offsets = VulkanBackend.collectStandaloneUniformOffsets(List.of(
+        Map<String, List<Integer>> offsets = VulkanShaderProgramCoordinator.collectStandaloneUniformOffsets(List.of(
             "vec3 previousCameraPositionFract;",
             "int renderStage;",
             "mat4 gbufferProjection;"
@@ -29,7 +29,7 @@ public class VulkanStandaloneUniformLayoutTest {
 
     @Test
     public void matchesShaderPackCameraTailLayout() {
-        Map<String, List<Integer>> offsets = VulkanBackend.collectStandaloneUniformOffsets(List.of(
+        Map<String, List<Integer>> offsets = VulkanShaderProgramCoordinator.collectStandaloneUniformOffsets(List.of(
             "ivec3 cameraPositionInt;",
             "ivec3 previousCameraPositionInt;",
             "vec3 cameraPositionFract;",
@@ -56,7 +56,7 @@ public class VulkanStandaloneUniformLayoutTest {
 
     @Test
     public void keepsVec3ArraysOnSixteenByteStride() {
-        Map<String, List<Integer>> offsets = VulkanBackend.collectStandaloneUniformOffsets(List.of(
+        Map<String, List<Integer>> offsets = VulkanShaderProgramCoordinator.collectStandaloneUniformOffsets(List.of(
             "vec3 samples[2];",
             "float afterSamples;"
         ));
@@ -68,7 +68,7 @@ public class VulkanStandaloneUniformLayoutTest {
     @Test
     public void writesAndReadsVec4ArrayElements() {
         ByteBuffer backingData = ByteBuffer.allocate(64).order(ByteOrder.nativeOrder());
-        VulkanBackend.StandaloneUniformField field = new VulkanBackend.StandaloneUniformField(
+        VulkanShaderProgramCoordinator.StandaloneUniformField field = new VulkanShaderProgramCoordinator.StandaloneUniformField(
             "clipPlanes",
             VulkanicUniformReflectionType.FLOAT_VEC4,
             new int[] {0},
@@ -76,7 +76,7 @@ public class VulkanStandaloneUniformLayoutTest {
             16
         );
 
-        VulkanBackend.writeFloatUniform(field, backingData, new float[] {
+        VulkanShaderProgramCoordinator.writeFloatUniform(field, backingData, new float[] {
             1.0F, 2.0F, 3.0F, 4.0F,
             5.0F, 6.0F, 7.0F, 8.0F
         });
@@ -87,14 +87,14 @@ public class VulkanStandaloneUniformLayoutTest {
         assertEquals(8.0F, backingData.getFloat(28));
         assertArrayEquals(
             new float[] {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F, 7.0F, 8.0F},
-            VulkanBackend.readStandaloneUniformFloats(field, backingData, 0)
+            VulkanShaderProgramCoordinator.readStandaloneUniformFloats(field, backingData, 0)
         );
     }
 
     @Test
     public void writesAndReadsVec3ArrayUsingStd140Stride() {
         ByteBuffer backingData = ByteBuffer.allocate(64).order(ByteOrder.nativeOrder());
-        VulkanBackend.StandaloneUniformField field = new VulkanBackend.StandaloneUniformField(
+        VulkanShaderProgramCoordinator.StandaloneUniformField field = new VulkanShaderProgramCoordinator.StandaloneUniformField(
             "samples",
             VulkanicUniformReflectionType.FLOAT_VEC3,
             new int[] {0},
@@ -102,7 +102,7 @@ public class VulkanStandaloneUniformLayoutTest {
             16
         );
 
-        VulkanBackend.writeFloatUniform(field, backingData, new float[] {
+        VulkanShaderProgramCoordinator.writeFloatUniform(field, backingData, new float[] {
             1.0F, 2.0F, 3.0F,
             4.0F, 5.0F, 6.0F
         });
@@ -114,7 +114,7 @@ public class VulkanStandaloneUniformLayoutTest {
         assertEquals(6.0F, backingData.getFloat(24));
         assertArrayEquals(
             new float[] {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F},
-            VulkanBackend.readStandaloneUniformFloats(field, backingData, 0)
+            VulkanShaderProgramCoordinator.readStandaloneUniformFloats(field, backingData, 0)
         );
     }
 }

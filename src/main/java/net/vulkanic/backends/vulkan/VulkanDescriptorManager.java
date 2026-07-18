@@ -15,7 +15,6 @@ import java.util.function.Predicate;
 import java.util.function.ToLongFunction;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
-import org.lwjgl.vulkan.VkCommandBuffer;
 import org.lwjgl.vulkan.VkDescriptorPoolCreateInfo;
 import org.lwjgl.vulkan.VkDescriptorPoolSize;
 import org.lwjgl.vulkan.VkDescriptorSetAllocateInfo;
@@ -42,7 +41,6 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
     private final long[] immediateDescriptorPools;
     private final Map<Object, Long> descriptorSamplerCache = new ConcurrentHashMap<>();
     private final Map<DescriptorSetCacheKey, Long> descriptorSetCache = new HashMap<>();
-    private final Map<Long, BoundDescriptorSetState> lastBoundDescriptorSetByCommandBuffer = new HashMap<>();
     private final Map<Integer, Deque<DescriptorUniformBuffer>> recycledDescriptorUniformBuffers = new HashMap<>();
     private final int maxRecycledDescriptorUniformBuffers;
     private final long maxRecycledDescriptorUniformBufferBytes;
@@ -52,7 +50,6 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
     private long recycledDescriptorUniformBufferAllocationBytes;
     private long descriptorSetCacheHitCount;
     private long descriptorSetCacheStoreCount;
-    private long skippedRedundantDescriptorSetBindCount;
 
     VulkanDescriptorManager(
         int immediateSubmitSlots,
@@ -170,27 +167,16 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
 
     void invalidateDescriptorSets() {
         descriptorSetCache.clear();
-        lastBoundDescriptorSetByCommandBuffer.clear();
     }
 
-    void clearCommandBufferState(long commandBufferHandle) {
-        lastBoundDescriptorSetByCommandBuffer.remove(commandBufferHandle);
-    }
-
-    void updateAndBindDescriptorSet(
+    long updateDescriptorSet(
         VkDevice device,
-        long commandBufferHandle,
-        VkCommandBuffer activeCommandBuffer,
-        long pipelineHandle,
-        long pipelineLayoutHandle,
         long descriptorSetLayoutHandle,
-        int bindPoint,
         List<? extends DescriptorWriteBinding> bindings,
         DescriptorSetCacheKey cacheKey,
         VkResultChecker checkVk
     ) {
         Objects.requireNonNull(device, "device");
-        Objects.requireNonNull(activeCommandBuffer, "activeCommandBuffer");
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(checkVk, "checkVk");
         if (activeDescriptorPool == VK10.VK_NULL_HANDLE) {
@@ -201,15 +187,7 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
             Long cachedDescriptorSetHandle = descriptorSetCache.get(cacheKey);
             if (cachedDescriptorSetHandle != null) {
                 descriptorSetCacheHitCount++;
-                bindDescriptorSetIfNeeded(
-                    commandBufferHandle,
-                    activeCommandBuffer,
-                    pipelineHandle,
-                    pipelineLayoutHandle,
-                    cachedDescriptorSetHandle,
-                    bindPoint
-                );
-                return;
+                return cachedDescriptorSetHandle;
             }
         }
 
@@ -244,14 +222,7 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
                 descriptorSetCache.put(cacheKey, descriptorSetHandle);
                 descriptorSetCacheStoreCount++;
             }
-            bindDescriptorSetIfNeeded(
-                commandBufferHandle,
-                activeCommandBuffer,
-                pipelineHandle,
-                pipelineLayoutHandle,
-                descriptorSetHandle,
-                bindPoint
-            );
+            return descriptorSetHandle;
         }
     }
 
@@ -340,7 +311,7 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
             descriptorSetCacheHitCount,
             descriptorSetCacheStoreCount,
             skippedRedundantPipelineBindCount,
-            skippedRedundantDescriptorSetBindCount
+            0L
         );
     }
 
@@ -362,22 +333,6 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
 
     Long cachedDescriptorSetForTests(DescriptorSetCacheKey key) {
         return descriptorSetCache.get(key);
-    }
-
-    void recordBoundDescriptorSetForTests(
-        long commandBufferHandle,
-        long pipelineHandle,
-        long descriptorSetHandle,
-        int bindPoint
-    ) {
-        lastBoundDescriptorSetByCommandBuffer.put(
-            commandBufferHandle,
-            new BoundDescriptorSetState(pipelineHandle, descriptorSetHandle, bindPoint)
-        );
-    }
-
-    int lastBoundDescriptorSetCountForTests() {
-        return lastBoundDescriptorSetByCommandBuffer.size();
     }
 
     int recycledUniformBufferCountForTests() {
@@ -409,39 +364,6 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
         return bucketSize;
     }
 
-    private void bindDescriptorSetIfNeeded(
-        long commandBufferHandle,
-        VkCommandBuffer activeCommandBuffer,
-        long pipelineHandle,
-        long pipelineLayoutHandle,
-        long descriptorSetHandle,
-        int bindPoint
-    ) {
-        BoundDescriptorSetState currentState = lastBoundDescriptorSetByCommandBuffer.get(commandBufferHandle);
-        if (currentState != null
-            && currentState.pipelineHandle() == pipelineHandle
-            && currentState.descriptorSetHandle() == descriptorSetHandle
-            && currentState.bindPoint() == bindPoint) {
-            skippedRedundantDescriptorSetBindCount++;
-            return;
-        }
-
-        try (MemoryStack stack = stackPush()) {
-            VK10.vkCmdBindDescriptorSets(
-                activeCommandBuffer,
-                bindPoint,
-                pipelineLayoutHandle,
-                0,
-                stack.longs(descriptorSetHandle),
-                null
-            );
-        }
-        lastBoundDescriptorSetByCommandBuffer.put(
-            commandBufferHandle,
-            new BoundDescriptorSetState(pipelineHandle, descriptorSetHandle, bindPoint)
-        );
-    }
-
     private void clearDescriptorPoolState() {
         activeDescriptorPool = VK10.VK_NULL_HANDLE;
         invalidateDescriptorSets();
@@ -451,9 +373,6 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
         if (slot < 0 || slot >= immediateDescriptorPools.length) {
             throw new IndexOutOfBoundsException("immediate slot " + slot + " outside 0.." + (immediateDescriptorPools.length - 1));
         }
-    }
-
-    private record BoundDescriptorSetState(long pipelineHandle, long descriptorSetHandle, int bindPoint) {
     }
 
     record DescriptorBindingCacheKey(

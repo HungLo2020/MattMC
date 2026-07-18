@@ -83,6 +83,8 @@ public class VulkanDrawCallLifecycleTest {
     public void testVulkanBackendSourceUsesLegacyDrawRouting() throws Exception {
         String source = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String drawCoordinatorSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanDrawExecutionCoordinator.java"));
 
         assertTrue(source.contains("public void drawArrays("),
             "Vulkan backend should expose drawArrays entrypoint");
@@ -98,9 +100,10 @@ public class VulkanDrawCallLifecycleTest {
             "Vulkan draw-call path should resolve immutable draw plans through VulkanDrawExecutionCoordinator");
         assertTrue(source.contains("vkCmdDrawIndexed"),
             "Vulkan draw-call path should record vkCmdDrawIndexed");
-        assertTrue(source.contains("BoundIndexBufferState"),
-            "Vulkan indexed draws should track the bound index buffer range");
-        assertTrue(source.contains("Indexed draw exceeds bound index buffer range"),
+        assertTrue(source.contains("VulkanGraphicsCommandExecutionCoordinator.IndexBufferBindingRequirement")
+                && source.contains("drawExecution.validateBoundIndexRange("),
+            "Vulkan indexed draws should track and validate the bound index buffer range through the graphics command execution plan");
+        assertTrue(drawCoordinatorSource.contains("Indexed draw exceeds bound index buffer range"),
             "Vulkan indexed draws should fail before recording an out-of-range vkCmdDrawIndexed");
     }
 }

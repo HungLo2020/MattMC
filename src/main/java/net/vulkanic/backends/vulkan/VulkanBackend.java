@@ -50,6 +50,14 @@ import net.vulkanic.diagnostics.RenderTargetContentDiagnostics;
 import net.vulkanic.diagnostics.RenderTargetContentDiagnostics.DiagnosticTextureContentHash;
 import net.vulkanic.diagnostics.VulkanBackendDiagnosticFormatting;
 import net.vulkanic.diagnostics.VulkanicDiagnostics;
+import net.vulkanic.backends.vulkan.VulkanShaderProgramCoordinator.LinkedProgramExecutionSnapshot;
+import net.vulkanic.backends.vulkan.VulkanShaderProgramCoordinator.ReflectedResourceBinding;
+import net.vulkanic.backends.vulkan.VulkanShaderProgramCoordinator.ReflectedUniform;
+import net.vulkanic.backends.vulkan.VulkanShaderProgramCoordinator.ReflectedVertexInput;
+import net.vulkanic.backends.vulkan.VulkanShaderProgramCoordinator.StandaloneUniformField;
+import net.vulkanic.backends.vulkan.VulkanShaderProgramCoordinator.UniformLocationRef;
+import net.vulkanic.backends.vulkan.VulkanShaderProgramCoordinator.VirtualProgram;
+import net.vulkanic.backends.vulkan.VulkanShaderProgramCoordinator.VirtualShader;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWVulkan;
@@ -183,25 +191,6 @@ public class VulkanBackend {
 
     private static final int GL_LUMINANCE = 0x1909;
     private static final int GL_LUMINANCE_ALPHA = 0x190A;
-    private static final Pattern GLSL_BLOCK_COMMENT_PATTERN = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
-    private static final Pattern GLSL_LINE_COMMENT_PATTERN = Pattern.compile("(?m)//.*$");
-    private static final Pattern GLSL_VERTEX_INPUT_DECLARATION_PATTERN = Pattern.compile(
-        "(?m)(^\\s*)(?:layout\\s*\\(([^)]*)\\)\\s*)?((?:[A-Za-z0-9_]+\\s+)*)(?:in|attribute)\\s+([A-Za-z0-9_]+)\\s+([A-Za-z_][A-Za-z0-9_]*)(\\s*\\[[^]]+\\])?\\s*;"
-    );
-    private static final Pattern GLSL_LAYOUT_LOCATION_PATTERN = Pattern.compile("\\blocation\\s*=\\s*(\\d+)");
-    private static final Pattern GLSL_UNIFORM_BLOCK_PATTERN = Pattern.compile("(?m)(?:layout\\s*\\(([^)]*)\\)\\s*)?uniform\\s+(\\w+)\\s*\\{");
-    private static final String GLSL_UNIFORM_QUALIFIER_PATTERN =
-        "(?:(?:lowp|mediump|highp|readonly|writeonly|coherent|volatile|restrict)\\s+)*";
-    private static final Pattern GLSL_STANDALONE_UNIFORM_PATTERN = Pattern.compile(
-        "(?m)^\\s*(?:layout\\s*\\(([^)]*)\\)\\s*)?" + GLSL_UNIFORM_QUALIFIER_PATTERN
-            + "uniform\\s+(\\w+)\\s+(\\w+)(?:\\s*\\[\\s*(\\d+)\\s*\\])?(?:\\s*=\\s*[^;]+)?\\s*;"
-    );
-    private static final Pattern GLSL_LAYOUT_SET_PATTERN = Pattern.compile("\\bset\\s*=\\s*(\\d+)\\b");
-    private static final Pattern GLSL_LAYOUT_BINDING_PATTERN = Pattern.compile("\\bbinding\\s*=\\s*(\\d+)\\b");
-    private static final Pattern GLSL_LOCAL_SIZE_PATTERN = Pattern.compile("\\blocal_size_([xyz])\\s*=\\s*(\\d+)\\b");
-    private static final Pattern GLSL_STANDALONE_UNIFORM_MEMBER_PATTERN = Pattern.compile(
-        "^\\s*(\\w+)\\s+(\\w+)(?:\\s*\\[\\s*(\\d+)\\s*\\])?\\s*;\\s*$"
-    );
     private static final int GL_FRAMEBUFFER = 0x8D40;
     private static final int GL_READ_FRAMEBUFFER = 0x8CA8;
     private static final int GL_DRAW_FRAMEBUFFER = 0x8CA9;
@@ -242,15 +231,9 @@ public class VulkanBackend {
     private final VulkanPipelineLifecycleManager pipelineLifecycle = new VulkanPipelineLifecycleManager();
     private final VulkanDrawExecutionCoordinator drawExecution = new VulkanDrawExecutionCoordinator();
     private final VulkanBufferVertexResourceManager bufferVertexResources = new VulkanBufferVertexResourceManager();
-    private final AtomicInteger nextVirtualShaderId = new AtomicInteger(1);
-    private final AtomicInteger nextVirtualProgramId = new AtomicInteger(1);
-    private final AtomicInteger nextVirtualUniformLocationToken = new AtomicInteger(1);
+    private final VulkanShaderProgramCoordinator shaderPrograms = new VulkanShaderProgramCoordinator();
     private final AtomicInteger presentQueueLogCount = new AtomicInteger();
     private static final AtomicInteger PRESENT_FORMAT_MISMATCH_LOG_COUNT = new AtomicInteger();
-    private final Map<Integer, VirtualShader> virtualShaders = new ConcurrentHashMap<>();
-    private final Map<Integer, VirtualProgram> virtualPrograms = new ConcurrentHashMap<>();
-    private final Map<Integer, UniformLocationRef> uniformLocationRefs = new ConcurrentHashMap<>();
-    private final Map<Long, BoundPipelineResources> boundPipelineResourcesByCommandBuffer = new ConcurrentHashMap<>();
 
     // -----------------------------------------------------------------------
     // Deferred render state (pipeline-baked in Vulkan; cached here so callers
@@ -306,9 +289,6 @@ public class VulkanBackend {
     private final Set<Integer> virtualQueries      = ConcurrentHashMap.newKeySet();
     private final AtomicLong nextVirtualSyncId     = new AtomicLong(1L);
     private final Set<Long> virtualSyncs           = ConcurrentHashMap.newKeySet();
-
-    // Lightweight bound-object mirrors for integer state queries
-    private volatile int boundVirtualProgram = 0;
 
     // Cached backend capabilities object for non-OpenGL callers that still query capabilities.
     private final net.vulkanic.GraphicsCapabilities graphicsCapabilities = createVulkanGraphicsCapabilities();
@@ -575,61 +555,70 @@ void main() {
                 return PrecompiledPipelineState.failed();
             }
 
-            String vertexWithDefines = injectExplicitVulkanBindings(
-                renderPipeline,
-                ShaderType.VERTEX,
-                GlslPreprocessor.injectDefines(vertexSource, renderPipeline.getShaderDefines())
+            VulkanShaderVariantPlanner.RenderPipelineSourcePlan sourcePlan =
+                VulkanShaderVariantPlanner.planRenderPipelineSources(
+                    renderPipeline,
+                    GlslPreprocessor.injectDefines(vertexSource, renderPipeline.getShaderDefines()),
+                    GlslPreprocessor.injectDefines(fragmentSource, renderPipeline.getShaderDefines())
             );
-            String fragmentWithDefines = injectExplicitVulkanBindings(
-                renderPipeline,
-                ShaderType.FRAGMENT,
-                GlslPreprocessor.injectDefines(fragmentSource, renderPipeline.getShaderDefines())
-            );
+            String vertexWithDefines = sourcePlan.vertexSource();
+            String fragmentWithDefines = sourcePlan.fragmentSource();
+            boolean fragmentOverridden = false;
 
             if (isParticlePipeline(renderPipeline)) {
                 if (DEBUG_VULKAN_SOLID_PARTICLE_FRAGMENT) {
                     LOGGER.info("Vulkan particle debug fragment override enabled for {}", renderPipeline.getLocation());
                     fragmentWithDefines = DEBUG_VULKAN_SOLID_PARTICLE_FRAGMENT_SOURCE;
+                    fragmentOverridden = true;
                 } else if (DEBUG_VULKAN_PARTICLE_COLOR_ONLY) {
                     LOGGER.info("Vulkan particle color-only debug override enabled for {}", renderPipeline.getLocation());
                     fragmentWithDefines = DEBUG_VULKAN_PARTICLE_COLOR_ONLY_SOURCE;
+                    fragmentOverridden = true;
                 } else if (DEBUG_VULKAN_TEXTURED_PARTICLE_ALPHA_ONE) {
                     LOGGER.info("Vulkan particle textured-alpha-one debug override enabled for {}", renderPipeline.getLocation());
                     fragmentWithDefines = DEBUG_VULKAN_TEXTURED_PARTICLE_ALPHA_ONE_SOURCE;
+                    fragmentOverridden = true;
                 } else if (DEBUG_VULKAN_PARTICLE_ALPHA_MASK) {
                     LOGGER.info("Vulkan particle alpha-mask debug override enabled for {}", renderPipeline.getLocation());
                     fragmentWithDefines = DEBUG_VULKAN_PARTICLE_ALPHA_MASK_SOURCE;
+                    fragmentOverridden = true;
                 }
             }
-            List<String> standaloneUniformDeclarations = collectStandaloneUniformDeclarations(
-                List.of(vertexWithDefines, fragmentWithDefines)
-            );
-            int standaloneUniformBindingIndex = standaloneUniformBlockBindingIndex(renderPipeline);
+            if (fragmentOverridden) {
+                sourcePlan = new VulkanShaderVariantPlanner.RenderPipelineSourcePlan(
+                    vertexWithDefines,
+                    fragmentWithDefines,
+                    VulkanShaderVariantPlanner.collectStandaloneUniformDeclarations(List.of(vertexWithDefines, fragmentWithDefines)),
+                    sourcePlan.standaloneUniformBindingIndex(),
+                    sourcePlan.vertexInputs(),
+                    List.of()
+                );
+            }
             VulkanicSpirvModule vertexModule = compileSpirvModuleForBackend(
                 VulkanicShaderStage.VERTEX,
                 vertexWithDefines,
                 renderPipeline.getVertexShader().toString(),
                 "main",
-                standaloneUniformDeclarations,
-                standaloneUniformBindingIndex
+                sourcePlan.standaloneUniformDeclarations(),
+                sourcePlan.standaloneUniformBindingIndex()
             );
             VulkanicSpirvModule fragmentModule = compileSpirvModuleForBackend(
                 VulkanicShaderStage.FRAGMENT,
                 fragmentWithDefines,
                 renderPipeline.getFragmentShader().toString(),
                 "main",
-                standaloneUniformDeclarations,
-                standaloneUniformBindingIndex
+                sourcePlan.standaloneUniformDeclarations(),
+                sourcePlan.standaloneUniformBindingIndex()
             );
 
             PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipelineAndSpirvModules(
                 renderPipeline,
                 List.of(vertexModule, fragmentModule)
             );
-            descriptor = withSupplementalRenderPipelineVertexInputState(
+            descriptor = VulkanShaderVariantPlanner.applyRenderPipelineVariantPlan(
                 descriptor,
                 renderPipeline,
-                collectRenderPipelineVertexInputs(renderPipeline, vertexWithDefines)
+                sourcePlan
             );
             PipelineHandle pipelineHandle = createPipeline(descriptor);
 
@@ -651,680 +640,6 @@ void main() {
             LOGGER.error("Failed to precompile Vulkan pipeline {}", renderPipeline.getLocation(), exception);
             return PrecompiledPipelineState.failed();
         }
-    }
-
-    private static String injectExplicitVulkanBindings(RenderPipeline renderPipeline, ShaderType shaderType, String shaderSource) {
-        String reboundSource = shaderSource;
-        if (shaderType == ShaderType.VERTEX) {
-            reboundSource = injectExplicitVertexInputLocations(renderPipeline, reboundSource);
-            reboundSource = injectExplicitRemainingVertexInputLocations(reboundSource);
-        }
-        if (isParticlePipeline(renderPipeline)) {
-            reboundSource = injectExplicitParticleStageLocations(shaderType, reboundSource);
-        }
-        int bindingIndex = 0;
-
-        for (String samplerName : renderPipeline.getSamplers()) {
-            reboundSource = injectExplicitNamedUniformBinding(reboundSource, samplerName, bindingIndex++);
-        }
-
-        for (RenderPipeline.UniformDescription uniform : renderPipeline.getUniforms()) {
-            reboundSource = switch (uniform.type()) {
-                case UNIFORM_BUFFER -> injectExplicitUniformBlockBinding(reboundSource, uniform.name(), bindingIndex++);
-                case TEXEL_BUFFER -> injectExplicitNamedUniformBinding(reboundSource, uniform.name(), bindingIndex++);
-            };
-        }
-
-        // The Vulkan shader normalizer can synthesize this block from legacy standalone
-        // uniforms; pin it after declared pipeline resources to avoid auto-map collisions.
-        reboundSource = injectExplicitUniformBlockBinding(reboundSource, "VulkanicStandaloneUniforms", bindingIndex);
-
-        return reboundSource;
-    }
-
-    private static PipelineDescriptor withSupplementalRenderPipelineVertexInputState(
-        PipelineDescriptor descriptor,
-        RenderPipeline renderPipeline,
-        List<ReflectedVertexInput> reflectedInputs
-    ) {
-        PipelineDescriptor.VertexInputState vertexInputState =
-            createRenderPipelineVertexInputState(renderPipeline, reflectedInputs);
-        return vertexInputState == null ? descriptor : descriptor.withVertexInputState(vertexInputState);
-    }
-
-    private static List<ReflectedVertexInput> collectRenderPipelineVertexInputs(
-        RenderPipeline renderPipeline,
-        String vertexSource
-    ) {
-        String reboundSource = injectExplicitVulkanBindings(
-            renderPipeline,
-            ShaderType.VERTEX,
-            vertexSource
-        );
-        String normalizedSource = ShadercSpirvCompiler.normalizeForVulkan(
-            VulkanicShaderStage.VERTEX,
-            reboundSource,
-            renderPipeline.getVertexShader().toString()
-        );
-        return collectExplicitVertexInputDeclarations(normalizedSource);
-    }
-
-    @Nullable
-    private static PipelineDescriptor.VertexInputState createRenderPipelineVertexInputState(
-        RenderPipeline renderPipeline,
-        List<ReflectedVertexInput> reflectedInputs
-    ) {
-        return createRenderPipelineVertexInputState(renderPipeline.getVertexFormat(), reflectedInputs);
-    }
-
-    @Nullable
-    private static PipelineDescriptor.VertexInputState createRenderPipelineVertexInputState(
-        VertexFormat vertexFormat,
-        List<ReflectedVertexInput> reflectedInputs
-    ) {
-        List<VertexFormatElement> elements = vertexFormat.getElements();
-        List<String> attributeNames = vertexFormat.getElementAttributeNames();
-        java.util.LinkedHashSet<Integer> providedLocations = new java.util.LinkedHashSet<>();
-        List<PipelineDescriptor.VertexInputAttribute> attributes = new ArrayList<>(elements.size());
-        for (int i = 0; i < elements.size(); i++) {
-            VertexFormatElement element = elements.get(i);
-            int location = vertexFormat.getShaderAttributeLocation(i);
-            attributes.add(new PipelineDescriptor.VertexInputAttribute(
-                location,
-                0,
-                VulkanPipelineFormatClassifier.toPipelineVertexElementFormat(element, attributeNames.get(i)),
-                vertexFormat.getOffset(element)
-            ));
-            providedLocations.add(location);
-        }
-
-        boolean needsDefaultBinding = false;
-        for (ReflectedVertexInput input : reflectedInputs) {
-            if (providedLocations.contains(input.location())) {
-                continue;
-            }
-            attributes.add(new PipelineDescriptor.VertexInputAttribute(
-                input.location(),
-                LEGACY_DEFAULT_VERTEX_ATTRIBUTE_BINDING,
-                defaultVertexAttributeFormatForGlslType(input.typeName()),
-                0
-            ));
-            providedLocations.add(input.location());
-            needsDefaultBinding = true;
-        }
-        for (CompatibilityFallbackVertexInput fallback : renderPipelineCompatibilityFallbackInputs(vertexFormat)) {
-            if (providedLocations.contains(fallback.location())) {
-                continue;
-            }
-            attributes.add(new PipelineDescriptor.VertexInputAttribute(
-                fallback.location(),
-                LEGACY_DEFAULT_VERTEX_ATTRIBUTE_BINDING,
-                fallback.format(),
-                0
-            ));
-            providedLocations.add(fallback.location());
-            needsDefaultBinding = true;
-        }
-
-        if (!needsDefaultBinding) {
-            return null;
-        }
-
-        List<PipelineDescriptor.VertexInputBinding> bindings = new ArrayList<>(2);
-        bindings.add(new PipelineDescriptor.VertexInputBinding(
-            0,
-            vertexFormat.getVertexSize(),
-            PipelineDescriptor.VertexInputRate.VERTEX
-        ));
-        bindings.add(new PipelineDescriptor.VertexInputBinding(
-            LEGACY_DEFAULT_VERTEX_ATTRIBUTE_BINDING,
-            16,
-            PipelineDescriptor.VertexInputRate.INSTANCE
-        ));
-        return new PipelineDescriptor.VertexInputState(bindings, attributes);
-    }
-
-    private static List<CompatibilityFallbackVertexInput> renderPipelineCompatibilityFallbackInputs(VertexFormat vertexFormat) {
-        List<String> attributeNames = vertexFormat.getElementAttributeNames();
-        if (attributeNames.contains("iris_Entity")) {
-            return List.of(defaultFloatFallbackVertexInput(8));
-        }
-        if (attributeNames.contains("a_Position") && attributeNames.contains("a_LightAndData")) {
-            return List.of(defaultFloatFallbackVertexInput(8));
-        }
-        if (attributeNames.contains("Normal")
-            && attributeNames.contains("Color")
-            && attributeNames.contains("Position")
-            && !attributeNames.contains("UV0")) {
-            return List.of(
-                defaultFloatFallbackVertexInput(3),
-                defaultFloatFallbackVertexInput(4),
-                defaultFloatFallbackVertexInput(5)
-            );
-        }
-        if (attributeNames.contains("UV0")
-            && attributeNames.contains("Position")
-            && !attributeNames.contains("Color")) {
-            return List.of(new CompatibilityFallbackVertexInput(
-                2,
-                PipelineDescriptor.VertexAttributeFormat.R32G32B32_SINT
-            ));
-        }
-        return List.of();
-    }
-
-    private static CompatibilityFallbackVertexInput defaultFloatFallbackVertexInput(int location) {
-        return new CompatibilityFallbackVertexInput(
-            location,
-            PipelineDescriptor.VertexAttributeFormat.R32G32B32A32_SFLOAT
-        );
-    }
-
-    private record CompatibilityFallbackVertexInput(
-        int location,
-        PipelineDescriptor.VertexAttributeFormat format
-    ) {
-    }
-
-    private static PipelineDescriptor withCompatibilityVertexInputState(PipelineDescriptor descriptor) {
-        if (descriptor.getVertexInputState() != null) {
-            return descriptor;
-        }
-
-        PipelineDescriptor.VertexInputState vertexInputState =
-            createRenderPipelineVertexInputState(descriptor.getPortableState().vertexFormat(), List.of());
-        return vertexInputState == null ? descriptor : descriptor.withVertexInputState(vertexInputState);
-    }
-
-    private static String injectExplicitParticleStageLocations(ShaderType shaderType, String shaderSource) {
-        if (shaderType == ShaderType.VERTEX) {
-            String reboundSource = shaderSource;
-            reboundSource = injectExplicitInterfaceLocation(reboundSource, "out", "sphericalVertexDistance", 0);
-            reboundSource = injectExplicitInterfaceLocation(reboundSource, "out", "cylindricalVertexDistance", 1);
-            reboundSource = injectExplicitInterfaceLocation(reboundSource, "out", "texCoord0", 2);
-            reboundSource = injectExplicitInterfaceLocation(reboundSource, "out", "vertexColor", 3);
-            return reboundSource;
-        }
-
-        if (shaderType == ShaderType.FRAGMENT) {
-            String reboundSource = shaderSource;
-            reboundSource = injectExplicitInterfaceLocation(reboundSource, "in", "sphericalVertexDistance", 0);
-            reboundSource = injectExplicitInterfaceLocation(reboundSource, "in", "cylindricalVertexDistance", 1);
-            reboundSource = injectExplicitInterfaceLocation(reboundSource, "in", "texCoord0", 2);
-            reboundSource = injectExplicitInterfaceLocation(reboundSource, "in", "vertexColor", 3);
-            return reboundSource;
-        }
-
-        return shaderSource;
-    }
-
-    private static String injectExplicitInterfaceLocation(String shaderSource, String storageQualifier, String variableName, int location) {
-        Pattern layoutPattern = Pattern.compile(
-            "(?m)(^\\s*)layout\\s*\\(([^)]*)\\)\\s*((?:flat\\s+|noperspective\\s+|smooth\\s+|centroid\\s+|sample\\s+)*)"
-                + Pattern.quote(storageQualifier)
-                + "\\s+([A-Za-z0-9_]+)\\s+"
-                + Pattern.quote(variableName)
-                + "(\\s*\\[[^]]+\\])?\\s*;"
-        );
-        Matcher layoutMatcher = layoutPattern.matcher(shaderSource);
-        if (layoutMatcher.find()) {
-            String layoutBody = layoutMatcher.group(2);
-            if (layoutBody.contains("location")) {
-                return shaderSource;
-            }
-
-            return layoutMatcher.replaceFirst(
-                Matcher.quoteReplacement(
-                    layoutMatcher.group(1)
-                        + "layout(" + layoutBody + ", location = " + location + ") "
-                        + layoutMatcher.group(3)
-                        + storageQualifier
-                        + " "
-                        + layoutMatcher.group(4)
-                        + " "
-                        + variableName
-                        + (layoutMatcher.group(5) == null ? "" : layoutMatcher.group(5))
-                        + ";"
-                )
-            );
-        }
-
-        Pattern plainPattern = Pattern.compile(
-            "(?m)(^\\s*)((?:flat\\s+|noperspective\\s+|smooth\\s+|centroid\\s+|sample\\s+)*)"
-                + Pattern.quote(storageQualifier)
-                + "\\s+([A-Za-z0-9_]+)\\s+"
-                + Pattern.quote(variableName)
-                + "(\\s*\\[[^]]+\\])?\\s*;"
-        );
-        Matcher plainMatcher = plainPattern.matcher(shaderSource);
-        if (!plainMatcher.find()) {
-            return shaderSource;
-        }
-
-        return plainMatcher.replaceFirst(
-            Matcher.quoteReplacement(
-                plainMatcher.group(1)
-                    + "layout(location = " + location + ") "
-                    + plainMatcher.group(2)
-                    + storageQualifier
-                    + " "
-                    + plainMatcher.group(3)
-                    + " "
-                    + variableName
-                    + (plainMatcher.group(4) == null ? "" : plainMatcher.group(4))
-                    + ";"
-            )
-        );
-    }
-
-    private static String injectExplicitVertexInputLocations(RenderPipeline renderPipeline, String shaderSource) {
-        String reboundSource = shaderSource;
-        List<String> attributeNames = renderPipeline.getVertexFormat().getElementAttributeNames();
-        for (int location = 0; location < attributeNames.size(); location++) {
-            int shaderLocation = renderPipeline.getVertexFormat().getShaderAttributeLocation(location);
-            for (String attributeName : shaderAttributeAliases(attributeNames.get(location))) {
-                reboundSource = injectExplicitVertexInputLocation(reboundSource, attributeName, shaderLocation);
-            }
-        }
-        reboundSource = injectIrisEntityExtensionInputLocations(renderPipeline.getVertexFormat(), reboundSource);
-        reboundSource = injectSodiumChunkInputLocations(reboundSource);
-        return reboundSource;
-    }
-
-    private static List<String> shaderAttributeAliases(String attributeName) {
-        return switch (attributeName) {
-            case "Position", "Color", "Normal", "UV0", "UV1", "UV2" -> List.of(attributeName, "iris_" + attributeName);
-            default -> List.of(attributeName);
-        };
-    }
-
-    private static String injectIrisEntityExtensionInputLocations(VertexFormat vertexFormat, String shaderSource) {
-        boolean isIrisEntityFormat = vertexFormat.getElementAttributeNames().contains("iris_Entity");
-        boolean hasEntityExtensionInput = shaderSource.contains("iris_Entity") || isIrisEntityFormat;
-        if (!hasEntityExtensionInput) {
-            return shaderSource;
-        }
-
-        VertexFormat entityFormat = net.irisshaders.iris.vertices.IrisVertexFormats.ENTITY;
-        String reboundSource = shaderSource;
-        List<String> entityAttributes = entityFormat.getElementAttributeNames();
-        for (String attributeName : List.of("iris_Entity", "mc_midTexCoord", "at_tangent")) {
-            int attributeIndex = entityAttributes.indexOf(attributeName);
-            if (attributeIndex >= 0) {
-                reboundSource = injectExplicitVertexInputLocation(
-                    reboundSource,
-                    attributeName,
-                    entityFormat.getShaderAttributeLocation(attributeIndex)
-                );
-            }
-        }
-        if (isIrisEntityFormat) {
-            reboundSource = injectExplicitVertexInputLocation(reboundSource, "mc_Entity", 8);
-            reboundSource = injectExplicitVertexInputLocation(reboundSource, "at_midBlock", 9);
-        }
-        return reboundSource;
-    }
-
-    private static String injectSodiumChunkInputLocations(String shaderSource) {
-        if (!shaderSource.contains("a_Position") && !shaderSource.contains("a_LightAndData")) {
-            return shaderSource;
-        }
-
-        String reboundSource = shaderSource;
-        reboundSource = injectExplicitVertexInputLocation(reboundSource, "a_Position", 0);
-        reboundSource = injectExplicitVertexInputLocation(reboundSource, "a_Color", 1);
-        reboundSource = injectExplicitVertexInputLocation(reboundSource, "a_TexCoord", 2);
-        reboundSource = injectExplicitVertexInputLocation(reboundSource, "a_LightAndData", 3);
-        reboundSource = injectExplicitVertexInputLocation(reboundSource, "iris_Normal", 10);
-        reboundSource = injectExplicitVertexInputLocation(reboundSource, "mc_Entity", 11);
-        reboundSource = injectExplicitVertexInputLocation(reboundSource, "mc_midTexCoord", 12);
-        reboundSource = injectExplicitVertexInputLocation(reboundSource, "at_tangent", 13);
-        reboundSource = injectExplicitVertexInputLocation(reboundSource, "at_midBlock", 14);
-        return reboundSource;
-    }
-
-    private static boolean shouldInspectIrisEntityVertexInterface(String shaderSource) {
-        return shaderSource.contains("iris_Entity")
-            && (shaderSource.contains("iris_Position") || shaderSource.contains("Position"))
-            && (shaderSource.contains("mc_Entity") || shaderSource.contains("at_midBlock") || shaderSource.contains("iris_Normal"));
-    }
-
-    private static void traceIrisEntityVertexInterface(String phase, String sourceName, String shaderSource) {
-        if (!TRACE_IRIS_ENTITY_VERTEX_INTERFACE) {
-            return;
-        }
-        int logIndex = IRIS_ENTITY_VERTEX_INTERFACE_LOG_COUNT.incrementAndGet();
-        if (logIndex > MAX_IRIS_ENTITY_VERTEX_INTERFACE_LOGS) {
-            return;
-        }
-        LOGGER.info(
-            "IrisEntityVertexInterface#{} phase={} source={} inputs={} mcEntityRefs={} atMidBlockRefs={}",
-            logIndex,
-            phase,
-            sourceName,
-            collectVertexInputSummary(shaderSource),
-            countWordOccurrences(shaderSource, "mc_Entity"),
-            countWordOccurrences(shaderSource, "at_midBlock")
-        );
-    }
-
-    private static String collectVertexInputSummary(String shaderSource) {
-        List<String> inputs = new ArrayList<>();
-        Matcher matcher = GLSL_VERTEX_INPUT_DECLARATION_PATTERN.matcher(shaderSource);
-        while (matcher.find()) {
-            String layoutBody = matcher.group(2);
-            String location = "?";
-            if (layoutBody != null) {
-                Matcher locationMatcher = GLSL_LAYOUT_LOCATION_PATTERN.matcher(layoutBody);
-                if (locationMatcher.find()) {
-                    location = locationMatcher.group(1);
-                }
-            }
-            inputs.add(matcher.group(5) + ":" + matcher.group(4) + "@loc" + location);
-        }
-        return inputs.toString();
-    }
-
-    private static int countWordOccurrences(String source, String word) {
-        int count = 0;
-        Matcher matcher = Pattern.compile("\\b" + Pattern.quote(word) + "\\b").matcher(source);
-        while (matcher.find()) {
-            count++;
-        }
-        return count;
-    }
-
-    private static String injectExplicitVertexInputLocation(String shaderSource, String attributeName, int location) {
-        Pattern layoutPattern = Pattern.compile(
-            "(?m)(^\\s*)layout\\s*\\(([^)]*)\\)\\s*((?:[A-Za-z0-9_]+\\s+)*)(?:in|attribute)\\s+([A-Za-z0-9_]+)\\s+"
-                + Pattern.quote(attributeName)
-                + "(\\s*\\[[^]]+\\])?\\s*;"
-        );
-        Matcher layoutMatcher = layoutPattern.matcher(shaderSource);
-        if (layoutMatcher.find()) {
-            String layoutBody = layoutMatcher.group(2);
-            String reboundLayoutBody = GLSL_LAYOUT_LOCATION_PATTERN.matcher(layoutBody).find()
-                ? GLSL_LAYOUT_LOCATION_PATTERN.matcher(layoutBody).replaceFirst("location = " + location)
-                : layoutBody + ", location = " + location;
-
-            return layoutMatcher.replaceFirst(
-                Matcher.quoteReplacement(
-                    layoutMatcher.group(1)
-                        + "layout(" + reboundLayoutBody + ") "
-                        + layoutMatcher.group(3)
-                        + "in "
-                        + layoutMatcher.group(4)
-                        + " "
-                        + attributeName
-                        + (layoutMatcher.group(5) == null ? "" : layoutMatcher.group(5))
-                        + ";"
-                )
-            );
-        }
-
-        Pattern plainPattern = Pattern.compile(
-            "(?m)(^\\s*)((?:[A-Za-z0-9_]+\\s+)*)(?:in|attribute)\\s+([A-Za-z0-9_]+)\\s+"
-                + Pattern.quote(attributeName)
-                + "(\\s*\\[[^]]+\\])?\\s*;"
-        );
-        Matcher plainMatcher = plainPattern.matcher(shaderSource);
-        if (!plainMatcher.find()) {
-            return shaderSource;
-        }
-
-        return plainMatcher.replaceFirst(
-            Matcher.quoteReplacement(
-                plainMatcher.group(1)
-                    + "layout(location = " + location + ") "
-                    + plainMatcher.group(2)
-                    + "in "
-                    + plainMatcher.group(3)
-                    + " "
-                    + attributeName
-                    + (plainMatcher.group(4) == null ? "" : plainMatcher.group(4))
-                    + ";"
-            )
-        );
-    }
-
-    private static String injectExplicitRemainingVertexInputLocations(String shaderSource) {
-        java.util.Set<Integer> occupiedLocations = new java.util.TreeSet<>();
-
-        Matcher occupiedMatcher = GLSL_VERTEX_INPUT_DECLARATION_PATTERN.matcher(shaderSource);
-        while (occupiedMatcher.find()) {
-            String layoutBody = occupiedMatcher.group(2);
-            if (layoutBody == null) {
-                continue;
-            }
-
-            Matcher locationMatcher = GLSL_LAYOUT_LOCATION_PATTERN.matcher(layoutBody);
-            if (!locationMatcher.find()) {
-                continue;
-            }
-
-            int location = Integer.parseInt(locationMatcher.group(1));
-            reserveVertexInputLocations(occupiedLocations, location, occupiedMatcher.group(4));
-        }
-
-        Matcher declarationMatcher = GLSL_VERTEX_INPUT_DECLARATION_PATTERN.matcher(shaderSource);
-        StringBuffer rewritten = new StringBuffer();
-        while (declarationMatcher.find()) {
-            String layoutBody = declarationMatcher.group(2);
-            if (layoutBody != null && GLSL_LAYOUT_LOCATION_PATTERN.matcher(layoutBody).find()) {
-                declarationMatcher.appendReplacement(rewritten, Matcher.quoteReplacement(declarationMatcher.group(0)));
-                continue;
-            }
-
-            int location = nextAvailableVertexInputLocation(occupiedLocations);
-            reserveVertexInputLocations(occupiedLocations, location, declarationMatcher.group(4));
-
-            String layout = layoutBody == null
-                ? "layout(location = " + location + ") "
-                : "layout(" + layoutBody + ", location = " + location + ") ";
-            String replacement = declarationMatcher.group(1)
-                + layout
-                + declarationMatcher.group(3)
-                + "in "
-                + declarationMatcher.group(4)
-                + " "
-                + declarationMatcher.group(5)
-                + (declarationMatcher.group(6) == null ? "" : declarationMatcher.group(6))
-                + ";";
-            declarationMatcher.appendReplacement(rewritten, Matcher.quoteReplacement(replacement));
-        }
-        declarationMatcher.appendTail(rewritten);
-        return rewritten.toString();
-    }
-
-    private static List<ReflectedVertexInput> collectExplicitVertexInputDeclarations(String shaderSource) {
-        java.util.LinkedHashMap<Integer, ReflectedVertexInput> inputsByLocation = new java.util.LinkedHashMap<>();
-        Matcher matcher = GLSL_VERTEX_INPUT_DECLARATION_PATTERN.matcher(shaderSource);
-        while (matcher.find()) {
-            String layoutBody = matcher.group(2);
-            if (layoutBody == null) {
-                continue;
-            }
-
-            Matcher locationMatcher = GLSL_LAYOUT_LOCATION_PATTERN.matcher(layoutBody);
-            if (!locationMatcher.find()) {
-                continue;
-            }
-
-            int location = Integer.parseInt(locationMatcher.group(1));
-            String typeName = matcher.group(4);
-            int span = vertexInputLocationSpan(typeName);
-            for (int i = 0; i < span; i++) {
-                inputsByLocation.putIfAbsent(
-                    location + i,
-                    new ReflectedVertexInput(location + i, vertexInputColumnType(typeName))
-                );
-            }
-        }
-
-        return List.copyOf(inputsByLocation.values());
-    }
-
-    private static int nextAvailableVertexInputLocation(java.util.Set<Integer> occupiedLocations) {
-        int location = 0;
-        while (occupiedLocations.contains(location)) {
-            location++;
-        }
-        return location;
-    }
-
-    private static void reserveVertexInputLocations(java.util.Set<Integer> occupiedLocations, int firstLocation, String typeName) {
-        int count = vertexInputLocationSpan(typeName);
-        for (int i = 0; i < count; i++) {
-            occupiedLocations.add(firstLocation + i);
-        }
-    }
-
-    private static int vertexInputLocationSpan(String typeName) {
-        return switch (typeName) {
-            case "mat2", "mat2x2", "dmat2", "dmat2x2" -> 2;
-            case "mat3", "mat2x3", "mat3x2", "dmat3", "dmat2x3", "dmat3x2" -> 3;
-            case "mat4", "mat2x4", "mat3x4", "mat4x2", "mat4x3",
-                "dmat4", "dmat2x4", "dmat3x4", "dmat4x2", "dmat4x3" -> 4;
-            default -> 1;
-        };
-    }
-
-    private static String vertexInputColumnType(String typeName) {
-        return switch (typeName) {
-            case "mat2", "mat2x2", "mat3x2", "mat4x2" -> "vec2";
-            case "mat3", "mat2x3", "mat3x3", "mat4x3" -> "vec3";
-            case "mat4", "mat2x4", "mat3x4", "mat4x4" -> "vec4";
-            case "dmat2", "dmat2x2", "dmat3x2", "dmat4x2" -> "dvec2";
-            case "dmat3", "dmat2x3", "dmat3x3", "dmat4x3" -> "dvec3";
-            case "dmat4", "dmat2x4", "dmat3x4", "dmat4x4" -> "dvec4";
-            default -> typeName;
-        };
-    }
-
-    private static PipelineDescriptor.VertexAttributeFormat defaultVertexAttributeFormatForGlslType(String typeName) {
-        return VulkanDrawExecutionCoordinator.defaultVertexAttributeFormatForGlslType(typeName);
-    }
-
-    private static String injectExplicitUniformBlockBinding(String shaderSource, String blockName, int bindingIndex) {
-        for (String candidateBlockName : uniformBlockBindingAliases(blockName)) {
-            java.util.regex.Pattern layoutPattern = java.util.regex.Pattern.compile(
-                "(?m)(^\\s*)layout\\s*\\(([^)]*)\\)\\s*uniform\\s+"
-                    + java.util.regex.Pattern.quote(candidateBlockName)
-                    + "\\s*\\{"
-            );
-            java.util.regex.Matcher layoutMatcher = layoutPattern.matcher(shaderSource);
-            if (layoutMatcher.find()) {
-                String layoutBody = layoutMatcher.group(2);
-                if (layoutBody.contains("binding") || layoutBody.contains("set")) {
-                    return shaderSource;
-                }
-
-                return layoutMatcher.replaceFirst(
-                    java.util.regex.Matcher.quoteReplacement(
-                        layoutMatcher.group(1)
-                            + "layout(" + layoutBody + ", set = 0, binding = " + bindingIndex + ") uniform "
-                            + candidateBlockName
-                            + " {"
-                    )
-                );
-            }
-
-            java.util.regex.Pattern plainPattern = java.util.regex.Pattern.compile(
-                "(?m)(^\\s*)uniform\\s+" + java.util.regex.Pattern.quote(candidateBlockName) + "\\s*\\{"
-            );
-            java.util.regex.Matcher plainMatcher = plainPattern.matcher(shaderSource);
-            if (!plainMatcher.find()) {
-                continue;
-            }
-
-            return plainMatcher.replaceFirst(
-                java.util.regex.Matcher.quoteReplacement(
-                    plainMatcher.group(1)
-                        + "layout(set = 0, binding = " + bindingIndex + ") uniform "
-                        + candidateBlockName
-                        + " {"
-                )
-            );
-        }
-
-        return shaderSource;
-    }
-
-    private static java.util.List<String> uniformBlockBindingAliases(String blockName) {
-        String normalizedName = normalizeIrisUniformBlockName(blockName);
-        if (normalizedName.equals(blockName) && isIrisWrappedPipelineUniformBlock(blockName)) {
-            return java.util.List.of(blockName, "iris_" + blockName);
-        }
-        return java.util.List.of(blockName);
-    }
-
-    private static String normalizeIrisUniformBlockName(String blockName) {
-        if (blockName == null || !blockName.startsWith("iris_")) {
-            return blockName;
-        }
-
-        String unprefixed = blockName.substring("iris_".length());
-        return isIrisWrappedPipelineUniformBlock(unprefixed) ? unprefixed : blockName;
-    }
-
-    private static boolean isIrisWrappedPipelineUniformBlock(String blockName) {
-        return "DynamicTransforms".equals(blockName)
-            || "Projection".equals(blockName)
-            || "Globals".equals(blockName)
-            || "Fog".equals(blockName)
-            || "Lighting".equals(blockName);
-    }
-
-    private static String injectExplicitNamedUniformBinding(String shaderSource, String uniformName, int bindingIndex) {
-        java.util.regex.Pattern layoutPattern = java.util.regex.Pattern.compile(
-            "(?m)(^\\s*)layout\\s*\\(([^)]*)\\)\\s*(" + GLSL_UNIFORM_QUALIFIER_PATTERN
-                + ")uniform\\s+([A-Za-z0-9_]+)\\s+"
-                + java.util.regex.Pattern.quote(uniformName)
-                + "\\s*;"
-        );
-        java.util.regex.Matcher layoutMatcher = layoutPattern.matcher(shaderSource);
-        if (layoutMatcher.find()) {
-            String layoutBody = layoutMatcher.group(2);
-            if (layoutBody.contains("binding") || layoutBody.contains("set")) {
-                return shaderSource;
-            }
-
-            return layoutMatcher.replaceFirst(
-                java.util.regex.Matcher.quoteReplacement(
-                    layoutMatcher.group(1)
-                        + "layout(" + layoutBody + ", set = 0, binding = " + bindingIndex + ") "
-                        + layoutMatcher.group(3)
-                        + "uniform "
-                        + layoutMatcher.group(4)
-                        + " "
-                        + uniformName
-                        + ";"
-                )
-            );
-        }
-
-        java.util.regex.Pattern plainPattern = java.util.regex.Pattern.compile(
-            "(?m)(^\\s*)(" + GLSL_UNIFORM_QUALIFIER_PATTERN + ")uniform\\s+([A-Za-z0-9_]+)\\s+"
-                + java.util.regex.Pattern.quote(uniformName)
-                + "\\s*;"
-        );
-        java.util.regex.Matcher plainMatcher = plainPattern.matcher(shaderSource);
-        if (!plainMatcher.find()) {
-            return shaderSource;
-        }
-
-        return plainMatcher.replaceFirst(
-            java.util.regex.Matcher.quoteReplacement(
-                plainMatcher.group(1)
-                    + "layout(set = 0, binding = " + bindingIndex + ") "
-                    + plainMatcher.group(2)
-                    + "uniform "
-                    + plainMatcher.group(3)
-                    + " "
-                    + uniformName
-                    + ";"
-            )
-        );
     }
 
     public GraphicsBackendType getBackendType() {
@@ -2055,12 +1370,8 @@ void main() {
     }
 
     private void materializeCompiledShaderModules(NativeSpine spine) {
-        for (Map.Entry<Integer, VirtualShader> entry : virtualShaders.entrySet()) {
+        for (Map.Entry<Integer, VirtualShader> entry : shaderPrograms.compiledShaderEntriesSnapshot()) {
             VirtualShader virtualShader = entry.getValue();
-            if (!virtualShader.compileStatus || virtualShader.compiledModule == null) {
-                continue;
-            }
-
             try {
                 materializeNativeShaderModuleIfNeeded(entry.getKey(), virtualShader, spine);
             } catch (RuntimeException exception) {
@@ -2130,9 +1441,7 @@ void main() {
         VulkanicShaderStage stage = VulkanicShaderStage.fromLegacyGlShaderType(shaderType)
             .orElseThrow(() -> new IllegalArgumentException("Unsupported shader type for Vulkan SPIR-V path: " + shaderType));
 
-        int shaderId = nextVirtualShaderId.getAndIncrement();
-        virtualShaders.put(shaderId, new VirtualShader(stage));
-        return shaderId;
+        return shaderPrograms.createShader(stage);
     }
 
     public VulkanicSpirvModule compileSpirvModule(
@@ -2170,7 +1479,8 @@ void main() {
             standaloneUniformDeclarations,
             standaloneUniformBindingIndex
         );
-        if (shaderStage == VulkanicShaderStage.VERTEX && shouldInspectIrisEntityVertexInterface(normalizedSource)) {
+        if (shaderStage == VulkanicShaderStage.VERTEX
+            && VulkanShaderVariantPlanner.shouldInspectIrisEntityVertexInterface(normalizedSource)) {
             traceIrisEntityVertexInterface("normalized-before-experiment", sourceName, normalizedSource);
         }
         try {
@@ -2183,6 +1493,34 @@ void main() {
             LOGGER.warn("Failed to dump normalized GLSL for {}: {}", sourceName, e.getMessage());
         }
         return spirvCompiler.compile(shaderStage, normalizedSource, sourceName, entryPoint);
+    }
+
+    private static void traceIrisEntityVertexInterface(String phase, String sourceName, String shaderSource) {
+        if (!TRACE_IRIS_ENTITY_VERTEX_INTERFACE) {
+            return;
+        }
+        int logIndex = IRIS_ENTITY_VERTEX_INTERFACE_LOG_COUNT.incrementAndGet();
+        if (logIndex > MAX_IRIS_ENTITY_VERTEX_INTERFACE_LOGS) {
+            return;
+        }
+        LOGGER.info(
+            "IrisEntityVertexInterface#{} phase={} source={} inputs={} mcEntityRefs={} atMidBlockRefs={}",
+            logIndex,
+            phase,
+            sourceName,
+            VulkanShaderVariantPlanner.collectVertexInputSummary(shaderSource),
+            countWordOccurrences(shaderSource, "mc_Entity"),
+            countWordOccurrences(shaderSource, "at_midBlock")
+        );
+    }
+
+    private static int countWordOccurrences(String source, String word) {
+        int count = 0;
+        Matcher matcher = Pattern.compile("\\b" + Pattern.quote(word) + "\\b").matcher(source);
+        while (matcher.find()) {
+            count++;
+        }
+        return count;
     }
 
     private String preprocessMojImportsForVulkan(String sourceName, String shaderSource) {
@@ -2258,7 +1596,7 @@ void main() {
     }
 
     public Optional<VulkanicSpirvModule> getCompiledSpirvModule(CommandContext ctx, int shader) {
-        VirtualShader virtualShader = virtualShaders.get(shader);
+        VirtualShader virtualShader = shaderPrograms.shader(shader);
         if (virtualShader == null) {
             return Optional.empty();
         }
@@ -2266,12 +1604,7 @@ void main() {
     }
 
     public void uploadShaderSource(CommandContext ctx, int shader, CharSequence source) {
-        VirtualShader virtualShader = requireVirtualShader(shader);
-        releaseVirtualShaderNativeModule(virtualShader);
-        virtualShader.source = source == null ? "" : source.toString();
-        virtualShader.compiledModule = null;
-        virtualShader.compileStatus = false;
-        virtualShader.infoLog = "";
+        shaderPrograms.uploadShaderSource(shader, source, this::releaseVirtualShaderNativeModule);
     }
 
     public void uploadShaderSource(CommandContext ctx, int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
@@ -2279,13 +1612,13 @@ void main() {
     }
 
     public void compileShader(CommandContext ctx, int shader) {
-        VirtualShader virtualShader = requireVirtualShader(shader);
-        releaseVirtualShaderNativeModule(virtualShader);
+        VirtualShader virtualShader = shaderPrograms.beginCompile(shader, this::releaseVirtualShaderNativeModule);
 
         if (virtualShader.source == null || virtualShader.source.isBlank()) {
-            virtualShader.compileStatus = false;
-            virtualShader.compiledModule = null;
-            virtualShader.infoLog = "Shader source is empty. uploadShaderSource must be called before compileShader.";
+            shaderPrograms.markCompileFailed(
+                virtualShader,
+                "Shader source is empty. uploadShaderSource must be called before compileShader."
+            );
             return;
         }
 
@@ -2297,9 +1630,7 @@ void main() {
                 "shader-" + shader,
                 "main"
             );
-            virtualShader.compiledModule = compiledModule;
-            virtualShader.compileStatus = true;
-            virtualShader.infoLog = "";
+            shaderPrograms.markCompileSucceeded(virtualShader, compiledModule);
 
             NativeSpine spine = nativeSpine;
             if (spine != null) {
@@ -2307,11 +1638,9 @@ void main() {
             }
         } catch (RuntimeException exception) {
             releaseVirtualShaderNativeModule(virtualShader);
-            virtualShader.compileStatus = false;
-            virtualShader.compiledModule = null;
-            virtualShader.infoLog = exception.getMessage() == null
+            shaderPrograms.markCompileFailed(virtualShader, exception.getMessage() == null
                 ? exception.getClass().getSimpleName()
-                : exception.getMessage();
+                : exception.getMessage());
         }
     }
 
@@ -2328,41 +1657,45 @@ void main() {
     }
 
     public int createShaderProgram(CommandContext ctx) {
-        int programId = nextVirtualProgramId.getAndIncrement();
-        virtualPrograms.put(programId, new VirtualProgram());
-        return programId;
+        return shaderPrograms.createProgram();
     }
 
     public void attachShader(CommandContext ctx, int program, int shader) {
-        requireVirtualShader(shader);
-        VirtualProgram virtualProgram = requireVirtualProgram(program);
-        virtualProgram.attachedShaderIds.add(shader);
-        virtualProgram.linkStatus = false;
+        shaderPrograms.attachShader(program, shader);
     }
 
     public void detachShader(CommandContext ctx, int program, int shader) {
-        VirtualProgram virtualProgram = requireVirtualProgram(program);
-        virtualProgram.attachedShaderIds.remove(shader);
-        releaseVirtualShaderIfDeletionPendingAndDetached(shader);
+        shaderPrograms.detachShader(program, shader, this::releaseVirtualShaderNativeModule);
     }
 
     public void linkProgram(CommandContext ctx, int program) {
         VirtualProgram virtualProgram = requireVirtualProgram(program);
         if (virtualProgram.attachedShaderIds.isEmpty()) {
-            virtualProgram.linkStatus = false;
-            virtualProgram.infoLog = "Program has no attached shaders.";
-            virtualProgram.linkedSpirvModules = List.of();
+            shaderPrograms.markProgramLinkFailed(virtualProgram, "Program has no attached shaders.");
             return;
         }
 
         NativeSpine spine = nativeSpine;
-        reflectVirtualProgramResources(program, virtualProgram);
+        VulkanShaderVariantPlanner.LinkedProgramReflectionPlan reflectionPlan =
+            planVirtualProgramResources(virtualProgram);
+        shaderPrograms.installReflection(
+            virtualProgram,
+            reflectionPlan.activeUniformNames(),
+            reflectionPlan.activeUniforms(),
+            reflectionPlan.activeUniformBlocks(),
+            reflectionPlan.activeResourceBindings(),
+            reflectionPlan.standaloneUniformDeclarations(),
+            reflectionPlan.computeWorkGroupSize()
+        );
+        logStandaloneSliceTraceInternal(program, "reflection", null, virtualProgram, null, false, null);
+        shaderPrograms.initializeStandaloneUniformState(virtualProgram, reflectionPlan.activeUniformsByName());
+        logStandaloneSliceTraceInternal(program, "backing-init", null, virtualProgram, null, false, null);
 
         List<String> issues = new ArrayList<>();
         List<VulkanicSpirvModule> linkedSpirvModules = new ArrayList<>();
         Set<VulkanicShaderStage> seenStages = new HashSet<>();
-        for (int shaderId : sortedAttachedShaderIds(virtualProgram)) {
-            VirtualShader virtualShader = virtualShaders.get(shaderId);
+        for (int shaderId : shaderPrograms.sortedAttachedShaderIds(virtualProgram)) {
+            VirtualShader virtualShader = shaderPrograms.shader(shaderId);
             if (virtualShader == null) {
                 issues.add("Attached shader " + shaderId + " does not exist.");
                 continue;
@@ -2389,19 +1722,28 @@ void main() {
         }
 
         if (!issues.isEmpty()) {
-            virtualProgram.linkStatus = false;
-            virtualProgram.infoLog = String.join("\n", issues);
-            virtualProgram.activeUniformNames = List.of();
-            virtualProgram.activeUniforms = List.of();
-            virtualProgram.activeUniformBlocks = List.of();
-            virtualProgram.activeResourceBindings = List.of();
-            virtualProgram.linkedSpirvModules = List.of();
+            shaderPrograms.markProgramLinkFailed(virtualProgram, String.join("\n", issues));
             return;
         }
 
-        virtualProgram.linkedSpirvModules = List.copyOf(linkedSpirvModules);
-        virtualProgram.linkStatus = true;
-        virtualProgram.infoLog = "";
+        shaderPrograms.markProgramLinked(virtualProgram, linkedSpirvModules);
+    }
+
+    private VulkanShaderVariantPlanner.LinkedProgramReflectionPlan planVirtualProgramResources(VirtualProgram virtualProgram) {
+        List<VulkanShaderVariantPlanner.ShaderStageSourceRequest> shaderSources = new ArrayList<>();
+        for (int shaderId : shaderPrograms.sortedAttachedShaderIds(virtualProgram)) {
+            VirtualShader virtualShader = shaderPrograms.shader(shaderId);
+            if (virtualShader == null || virtualShader.source == null || virtualShader.source.isBlank()) {
+                continue;
+            }
+            shaderSources.add(new VulkanShaderVariantPlanner.ShaderStageSourceRequest(
+                shaderId,
+                virtualShader.stage,
+                "shader-" + shaderId,
+                VulkanShaderProgramCoordinator.prepareSourceForReflection(virtualShader)
+            ));
+        }
+        return VulkanShaderVariantPlanner.planLinkedProgramReflection(shaderSources);
     }
 
     private VulkanicSpirvModule createLinkedProgramModule(
@@ -2410,250 +1752,52 @@ void main() {
         VirtualShader virtualShader,
         VirtualProgram virtualProgram
     ) {
-        String reboundSource = prepareVirtualShaderSourceForVulkanReflection(virtualShader);
-        if (virtualShader.stage == VulkanicShaderStage.VERTEX) {
-            for (Map.Entry<String, Integer> entry : virtualProgram.attributeLocationsByName.entrySet()) {
-                reboundSource = injectExplicitVertexInputLocation(reboundSource, entry.getKey(), entry.getValue());
-            }
-            reboundSource = injectExplicitRemainingVertexInputLocations(reboundSource);
-        }
-        reboundSource = injectExplicitReflectedResourceBindings(reboundSource, virtualProgram);
-
-        boolean usesGeneratedStandaloneBlock = shaderHasStandaloneUniformBlockMembers(reboundSource);
-        if (virtualShader.stage == VulkanicShaderStage.VERTEX) {
-            String preprocessedSource = preprocessMojImportsForVulkan("shader-" + shaderId, reboundSource);
-            String normalizedSource = ShadercSpirvCompiler.normalizeForVulkan(
-                virtualShader.stage,
-                preprocessedSource,
-                "shader-" + shaderId,
-                usesGeneratedStandaloneBlock ? virtualProgram.standaloneUniformDeclarations : null,
-                usesGeneratedStandaloneBlock ? standaloneUniformBlockBindingIndex(virtualProgram) : -1
+        String sourceName = "shader-" + shaderId;
+        VulkanShaderVariantPlanner.LinkedShaderStagePlan stagePlan =
+            VulkanShaderVariantPlanner.planLinkedShaderStage(
+                new VulkanShaderVariantPlanner.ShaderStageSourceRequest(
+                    shaderId,
+                    virtualShader.stage,
+                    sourceName,
+                    VulkanShaderProgramCoordinator.prepareSourceForReflection(virtualShader)
+                ),
+                virtualProgram.attributeLocationsByName,
+                virtualProgram.activeResourceBindings,
+                virtualProgram.standaloneUniformDeclarations,
+                this::normalizeSourceForVariantPlanning
             );
-            virtualProgram.vertexInputs = collectExplicitVertexInputDeclarations(normalizedSource);
+        if (virtualShader.stage == VulkanicShaderStage.VERTEX) {
+            virtualProgram.vertexInputs = stagePlan.vertexInputs();
         }
-        if (reboundSource.equals(virtualShader.source)
-            && (!usesGeneratedStandaloneBlock || virtualProgram.standaloneUniformDeclarations.isEmpty())) {
+        if (stagePlan.reboundSource().equals(virtualShader.source)
+            && (!stagePlan.usesGeneratedStandaloneBlock() || virtualProgram.standaloneUniformDeclarations.isEmpty())) {
             return virtualShader.compiledModule;
         }
 
         return compileSpirvModuleForBackend(
             virtualShader.stage,
-            reboundSource,
-            "shader-" + shaderId,
+            stagePlan.reboundSource(),
+            sourceName,
             "main",
-            usesGeneratedStandaloneBlock ? virtualProgram.standaloneUniformDeclarations : null,
-            usesGeneratedStandaloneBlock ? standaloneUniformBlockBindingIndex(virtualProgram) : -1
+            stagePlan.usesGeneratedStandaloneBlock() ? virtualProgram.standaloneUniformDeclarations : null,
+            stagePlan.usesGeneratedStandaloneBlock() ? stagePlan.standaloneUniformBindingIndex() : -1
         );
     }
 
-    private static String injectExplicitReflectedResourceBindings(String shaderSource, VirtualProgram virtualProgram) {
-        String reboundSource = shaderSource;
-        for (ReflectedResourceBinding resourceBinding : virtualProgram.activeResourceBindings) {
-            if (resourceBinding.type() == PipelineDescriptor.ResourceType.UNIFORM_BUFFER) {
-                reboundSource = injectExplicitUniformBlockBinding(
-                    reboundSource,
-                    resourceBinding.name(),
-                    resourceBinding.binding()
-                );
-            } else if (resourceBinding.type() == PipelineDescriptor.ResourceType.SAMPLER
-                || resourceBinding.type() == PipelineDescriptor.ResourceType.COMPARISON_SAMPLER
-                || resourceBinding.type() == PipelineDescriptor.ResourceType.STORAGE_IMAGE) {
-                reboundSource = injectExplicitNamedUniformBinding(
-                    reboundSource,
-                    resourceBinding.name(),
-                    resourceBinding.binding()
-                );
-            }
-        }
-
-        return reboundSource;
-    }
-
-    private List<Integer> sortedAttachedShaderIds(VirtualProgram virtualProgram) {
-        List<Integer> shaderIds = new ArrayList<>(virtualProgram.attachedShaderIds);
-        shaderIds.sort((left, right) -> {
-            VirtualShader leftShader = virtualShaders.get(left);
-            VirtualShader rightShader = virtualShaders.get(right);
-            int leftStage = leftShader == null ? Integer.MAX_VALUE : leftShader.stage.ordinal();
-            int rightStage = rightShader == null ? Integer.MAX_VALUE : rightShader.stage.ordinal();
-            int stageCompare = Integer.compare(leftStage, rightStage);
-            return stageCompare != 0 ? stageCompare : Integer.compare(left, right);
-        });
-        return shaderIds;
-    }
-
-    private static String prepareVirtualShaderSourceForVulkanReflection(VirtualShader virtualShader) {
-        String source = virtualShader.source;
-        if (source == null || source.isBlank()) {
-            return source;
-        }
-        return ShadercSpirvCompiler.prepareSourceForVulkanResourceReflection(virtualShader.stage, source);
-    }
-
-    private List<String> collectStandaloneUniformDeclarations(VirtualProgram virtualProgram) {
-        List<String> sources = new ArrayList<>();
-        for (int shaderId : sortedAttachedShaderIds(virtualProgram)) {
-            VirtualShader virtualShader = virtualShaders.get(shaderId);
-            if (virtualShader != null && virtualShader.source != null && !virtualShader.source.isBlank()) {
-                sources.add(prepareVirtualShaderSourceForVulkanReflection(virtualShader));
-            }
-        }
-        return collectStandaloneUniformDeclarations(sources);
-    }
-
-    private static List<String> collectStandaloneUniformDeclarations(List<String> shaderSources) {
-        return ShadercSpirvCompiler.collectActiveStandaloneUniformDeclarations(shaderSources);
-    }
-
-    private static String stripGlslComments(String shaderSource) {
-        return GLSL_LINE_COMMENT_PATTERN.matcher(
-            GLSL_BLOCK_COMMENT_PATTERN.matcher(shaderSource).replaceAll("")
-        ).replaceAll("");
-    }
-
-    private static boolean shaderHasStandaloneUniformBlockMembers(String shaderSource) {
-        if (shaderSource == null || shaderSource.isBlank()) {
-            return false;
-        }
-        return ShadercSpirvCompiler.hasActiveStandaloneUniformBlockMembers(stripGlslComments(shaderSource));
-    }
-
-    private static boolean isOpaqueStandaloneUniformType(String uniformTypeName) {
-        return uniformTypeName.contains("sampler")
-            || uniformTypeName.contains("image")
-            || uniformTypeName.equals("atomic_uint");
-    }
-
-    private static boolean isSamplerStandaloneUniformType(String uniformTypeName) {
-        return uniformTypeName.contains("sampler");
-    }
-
-    private static int standaloneUniformBlockBindingIndex(RenderPipeline renderPipeline) {
-        return renderPipeline.getSamplers().size() + renderPipeline.getUniforms().size();
-    }
-
-    private static int standaloneUniformBlockBindingIndex(VirtualProgram virtualProgram) {
-        for (ReflectedResourceBinding resourceBinding : virtualProgram.activeResourceBindings) {
-            if (ShadercSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME.equals(resourceBinding.name())) {
-                return resourceBinding.binding();
-            }
-        }
-
-        Set<DescriptorSlot> usedSlots = new java.util.LinkedHashSet<>();
-        for (ReflectedResourceBinding resourceBinding : virtualProgram.activeResourceBindings) {
-            usedSlots.add(new DescriptorSlot(resourceBinding.set(), resourceBinding.binding()));
-        }
-        return nextUnusedBinding(0, usedSlots, 0);
-    }
-
-    private static Optional<ExplicitDescriptorBinding> parseExplicitDescriptorBinding(@Nullable String layoutBody) {
-        if (layoutBody == null || layoutBody.isBlank()) {
-            return Optional.empty();
-        }
-
-        Matcher bindingMatcher = GLSL_LAYOUT_BINDING_PATTERN.matcher(layoutBody);
-        if (!bindingMatcher.find()) {
-            return Optional.empty();
-        }
-
-        int set = 0;
-        Matcher setMatcher = GLSL_LAYOUT_SET_PATTERN.matcher(layoutBody);
-        if (setMatcher.find()) {
-            set = Integer.parseInt(setMatcher.group(1));
-        }
-        int binding = Integer.parseInt(bindingMatcher.group(1));
-        return Optional.of(new ExplicitDescriptorBinding(set, binding));
-    }
-
-    private static List<ReflectedResourceBinding> buildReflectedResourceBindings(
-        List<String> activeUniformBlocks,
-        List<ReflectedUniform> activeUniforms,
-        Map<String, ExplicitDescriptorBinding> explicitBindings
+    private String normalizeSourceForVariantPlanning(
+        VulkanicShaderStage stage,
+        String source,
+        String sourceName,
+        @Nullable List<String> standaloneUniformDeclarations,
+        int standaloneUniformBindingIndex
     ) {
-        List<ReflectedResourceRequest> requests = new ArrayList<>();
-        Set<String> seenNames = new java.util.LinkedHashSet<>();
-        boolean hasGeneratedStandaloneUniformBlock = false;
-
-        for (String blockName : activeUniformBlocks) {
-            if (blockName == null || blockName.isBlank() || blockName.startsWith("gl_")) {
-                continue;
-            }
-            if (!seenNames.add(blockName)) {
-                continue;
-            }
-            if (ShadercSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME.equals(blockName)) {
-                hasGeneratedStandaloneUniformBlock = true;
-                continue;
-            }
-            requests.add(new ReflectedResourceRequest(blockName, PipelineDescriptor.ResourceType.UNIFORM_BUFFER));
-        }
-
-        for (ReflectedUniform uniform : activeUniforms) {
-            Optional<net.vulkanic.VulkanicUniformReflectionType> reflectionType =
-                net.vulkanic.VulkanicUniformReflectionType.fromLegacyGlConstant(uniform.legacyType());
-            if (reflectionType.isEmpty() || (!reflectionType.get().isSampler() && !reflectionType.get().isImage())) {
-                continue;
-            }
-            String uniformName = uniform.name();
-            if (uniformName == null || uniformName.isBlank() || uniformName.startsWith("gl_")) {
-                continue;
-            }
-            if (!seenNames.add(uniformName)) {
-                continue;
-            }
-            boolean comparisonSampler = reflectionType.get() == net.vulkanic.VulkanicUniformReflectionType.SAMPLER_1D_SHADOW
-                || reflectionType.get() == net.vulkanic.VulkanicUniformReflectionType.SAMPLER_2D_SHADOW
-                || reflectionType.get() == net.vulkanic.VulkanicUniformReflectionType.SAMPLER_CUBE_SHADOW;
-            requests.add(new ReflectedResourceRequest(
-                uniformName,
-                reflectionType.get().isImage()
-                    ? PipelineDescriptor.ResourceType.STORAGE_IMAGE
-                    : comparisonSampler
-                    ? PipelineDescriptor.ResourceType.COMPARISON_SAMPLER
-                    : PipelineDescriptor.ResourceType.SAMPLER
-            ));
-        }
-
-        if (hasGeneratedStandaloneUniformBlock) {
-            requests.add(new ReflectedResourceRequest(
-                ShadercSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME,
-                PipelineDescriptor.ResourceType.UNIFORM_BUFFER
-            ));
-        }
-
-        List<ReflectedResourceBinding> bindings = new ArrayList<>(requests.size());
-        Set<DescriptorSlot> usedSlots = new java.util.LinkedHashSet<>();
-        for (ExplicitDescriptorBinding explicitBinding : explicitBindings.values()) {
-            usedSlots.add(new DescriptorSlot(explicitBinding.set(), explicitBinding.binding()));
-        }
-        int nextBinding = 0;
-
-        for (ReflectedResourceRequest request : requests) {
-            ExplicitDescriptorBinding explicitBinding = explicitBindings.get(request.name());
-            int set = explicitBinding != null ? explicitBinding.set() : 0;
-            int binding;
-            if (explicitBinding != null) {
-                binding = explicitBinding.binding();
-            } else {
-                binding = nextUnusedBinding(set, usedSlots, nextBinding);
-            }
-
-            usedSlots.add(new DescriptorSlot(set, binding));
-            if (set == 0) {
-                nextBinding = Math.max(nextBinding, binding + 1);
-            }
-            bindings.add(new ReflectedResourceBinding(request.name(), request.type(), set, binding));
-        }
-
-        return List.copyOf(bindings);
-    }
-
-    private static int nextUnusedBinding(int set, Set<DescriptorSlot> usedSlots, int startBinding) {
-        int binding = Math.max(0, startBinding);
-        while (usedSlots.contains(new DescriptorSlot(set, binding))) {
-            binding++;
-        }
-        return binding;
+        return ShadercSpirvCompiler.normalizeForVulkan(
+            stage,
+            preprocessMojImportsForVulkan(sourceName, source),
+            sourceName,
+            standaloneUniformDeclarations,
+            standaloneUniformBindingIndex
+        );
     }
 
     public int getProgramParameter(CommandContext ctx, int program, int pname) {
@@ -2674,247 +1818,6 @@ void main() {
         return requireVirtualProgram(program).infoLog;
     }
 
-    private void reflectVirtualProgramResources(int programId, VirtualProgram virtualProgram) {
-        java.util.LinkedHashMap<String, ReflectedUniform> activeUniforms = new java.util.LinkedHashMap<>();
-        Set<String> activeUniformNames = new java.util.LinkedHashSet<>();
-        Set<String> activeUniformBlocks = new java.util.LinkedHashSet<>();
-        Map<String, ExplicitDescriptorBinding> explicitBindings = new java.util.LinkedHashMap<>();
-        List<String> standaloneUniformDeclarations = collectStandaloneUniformDeclarations(virtualProgram);
-        int[] computeWorkGroupSize = new int[]{1, 1, 1};
-
-        for (int shaderId : sortedAttachedShaderIds(virtualProgram)) {
-            VirtualShader virtualShader = virtualShaders.get(shaderId);
-            if (virtualShader == null || virtualShader.source == null || virtualShader.source.isBlank()) {
-                continue;
-            }
-
-            String reflectedSource = prepareVirtualShaderSourceForVulkanReflection(virtualShader);
-            String normalizedSource = GLSL_LINE_COMMENT_PATTERN.matcher(
-                GLSL_BLOCK_COMMENT_PATTERN.matcher(reflectedSource).replaceAll("")
-            ).replaceAll("");
-            if (virtualShader.stage == VulkanicShaderStage.COMPUTE) {
-                computeWorkGroupSize = parseComputeWorkGroupSize(normalizedSource);
-            }
-            Matcher blockMatcher = GLSL_UNIFORM_BLOCK_PATTERN.matcher(normalizedSource);
-            while (blockMatcher.find()) {
-                String blockName = normalizeIrisUniformBlockName(blockMatcher.group(2));
-                activeUniformBlocks.add(blockName);
-                parseExplicitDescriptorBinding(blockMatcher.group(1))
-                    .ifPresent(binding -> explicitBindings.putIfAbsent(blockName, binding));
-            }
-            // If this shader has standalone non-opaque uniforms, the Vulkan normalizer rewrites
-            // them into VulkanicStandaloneUniforms; mirror that here so reflection stays aligned.
-            Set<String> activeStandaloneUniformNames =
-                ShadercSpirvCompiler.collectActiveStandaloneUniformNames(normalizedSource);
-            Set<String> activeStandaloneUniformNamesIncludingOpaque =
-                ShadercSpirvCompiler.collectActiveStandaloneUniformNamesIncludingOpaque(normalizedSource);
-            if (!activeStandaloneUniformNames.isEmpty()) {
-                activeUniformBlocks.add(ShadercSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME);
-            }
-
-            Matcher uniformMatcher = GLSL_STANDALONE_UNIFORM_PATTERN.matcher(normalizedSource);
-            while (uniformMatcher.find()) {
-                String uniformTypeName = uniformMatcher.group(2);
-                String uniformName = uniformMatcher.group(3);
-                int arraySize = uniformMatcher.group(4) == null ? 1 : Integer.parseInt(uniformMatcher.group(4));
-                boolean opaqueUniform = isOpaqueStandaloneUniformType(uniformTypeName);
-                if (isSamplerStandaloneUniformType(uniformTypeName)
-                    && !activeStandaloneUniformNamesIncludingOpaque.contains(uniformName)) {
-                    continue;
-                }
-                if (!opaqueUniform && !activeStandaloneUniformNames.contains(uniformName)) {
-                    continue;
-                }
-
-                activeUniformNames.add(uniformName);
-                parseExplicitDescriptorBinding(uniformMatcher.group(1))
-                    .ifPresent(binding -> explicitBindings.putIfAbsent(uniformName, binding));
-                activeUniforms.putIfAbsent(
-                    uniformName,
-                    new ReflectedUniform(
-                        uniformName,
-                        arraySize,
-                        net.vulkanic.VulkanicUniformReflectionType.fromGlslTypeName(uniformTypeName)
-                            .map(net.vulkanic.VulkanicUniformReflectionType::toLegacyGlConstant)
-                            .orElse(0)
-                    )
-                );
-            }
-        }
-
-        virtualProgram.activeUniformNames = List.copyOf(activeUniformNames);
-        virtualProgram.activeUniforms = List.copyOf(activeUniforms.values());
-        virtualProgram.activeUniformBlocks = List.copyOf(activeUniformBlocks);
-        virtualProgram.activeResourceBindings = buildReflectedResourceBindings(
-            virtualProgram.activeUniformBlocks,
-            virtualProgram.activeUniforms,
-            explicitBindings
-        );
-        virtualProgram.computeWorkGroupSize = computeWorkGroupSize;
-        virtualProgram.standaloneUniformDeclarations = standaloneUniformDeclarations;
-        logStandaloneSliceTraceInternal(programId, "reflection", null, virtualProgram, null, false, null);
-        initializeStandaloneUniformState(programId, virtualProgram, activeUniforms);
-
-    }
-
-    private static int[] parseComputeWorkGroupSize(String shaderSource) {
-        int[] localSize = new int[]{1, 1, 1};
-        Matcher matcher = GLSL_LOCAL_SIZE_PATTERN.matcher(shaderSource);
-        while (matcher.find()) {
-            int value = Math.max(1, Integer.parseInt(matcher.group(2)));
-            switch (matcher.group(1)) {
-                case "x" -> localSize[0] = value;
-                case "y" -> localSize[1] = value;
-                case "z" -> localSize[2] = value;
-                default -> {
-                }
-            }
-        }
-        return localSize;
-    }
-
-    private void initializeStandaloneUniformState(
-        int programId,
-        VirtualProgram virtualProgram,
-        java.util.LinkedHashMap<String, ReflectedUniform> reflectedUniformsByName
-    ) {
-        Map<String, java.util.List<Integer>> offsetsByName =
-            collectStandaloneUniformOffsets(virtualProgram.standaloneUniformDeclarations);
-        Map<Integer, StandaloneUniformField> fieldsByLocation = new HashMap<>();
-        int backingSize = 0;
-
-        List<String> uniformNames = virtualProgram.activeUniformNames;
-        for (int location = 0; location < uniformNames.size(); location++) {
-            String name = uniformNames.get(location);
-            ReflectedUniform reflectedUniform = reflectedUniformsByName.get(name);
-            if (reflectedUniform == null) {
-                continue;
-            }
-
-            Optional<net.vulkanic.VulkanicUniformReflectionType> reflectionType =
-                net.vulkanic.VulkanicUniformReflectionType.fromLegacyGlConstant(reflectedUniform.legacyType());
-            if (reflectionType.isEmpty() || reflectionType.get().isSampler() || reflectionType.get().isImage()) {
-                continue;
-            }
-
-            int typeSize = std140TypeSize(reflectionType.get());
-            int arraySize = Math.max(1, reflectedUniform.arraySize());
-            int stride = arraySize > 1 ? roundUpTo(typeSize, 16) : typeSize;
-            java.util.List<Integer> offsets = offsetsByName.get(name);
-            if (offsets == null || offsets.isEmpty()) {
-                continue;
-            }
-
-            fieldsByLocation.put(
-                location,
-                new StandaloneUniformField(
-                    name,
-                    reflectionType.get(),
-                    offsets.stream().mapToInt(Integer::intValue).toArray(),
-                    arraySize,
-                    stride
-                )
-            );
-            for (int offset : offsets) {
-                backingSize = Math.max(backingSize, offset + (stride * arraySize));
-            }
-        }
-
-        backingSize = roundUpTo(backingSize, 16);
-        synchronized (virtualProgram) {
-            unregisterUniformLocationTokens(virtualProgram);
-            virtualProgram.standaloneFieldsByLocation = Map.copyOf(fieldsByLocation);
-            virtualProgram.standaloneBackingSize = backingSize;
-            virtualProgram.standaloneBackingData =
-                backingSize > 0 ? java.nio.ByteBuffer.allocate(backingSize).order(ByteOrder.nativeOrder()) : null;
-            if (virtualProgram.standaloneBackingData != null) {
-                initializeStandaloneUniformDefaults(
-                    virtualProgram.standaloneFieldsByLocation,
-                    virtualProgram.standaloneBackingData
-                );
-            }
-            virtualProgram.standaloneDirty = backingSize > 0;
-            virtualProgram.closeStandaloneUniformBacking();
-        }
-        logStandaloneSliceTraceInternal(programId, "backing-init", null, virtualProgram, null, false, null);
-    }
-
-    private static void initializeStandaloneUniformDefaults(
-        Map<Integer, StandaloneUniformField> fieldsByLocation,
-        java.nio.ByteBuffer backingData
-    ) {
-        float[] identity4 = new float[] {
-            1.0F, 0.0F, 0.0F, 0.0F,
-            0.0F, 1.0F, 0.0F, 0.0F,
-            0.0F, 0.0F, 1.0F, 0.0F,
-            0.0F, 0.0F, 0.0F, 1.0F
-        };
-        float[] identity3 = new float[] {
-            1.0F, 0.0F, 0.0F,
-            0.0F, 1.0F, 0.0F,
-            0.0F, 0.0F, 1.0F
-        };
-
-        for (StandaloneUniformField field : fieldsByLocation.values()) {
-            for (int offset : field.offsets()) {
-                switch (field.type()) {
-                    case FLOAT_MAT4 -> writeFloatUniformAtOffset(field, backingData, offset, identity4);
-                    case FLOAT_MAT3 -> writeFloatUniformAtOffset(field, backingData, offset, identity3);
-                    case FLOAT -> {
-                        if (isOneDefaultStandaloneFloat(field.name())) {
-                            backingData.putFloat(offset, 1.0F);
-                        }
-                    }
-                    case FLOAT_VEC2 -> {
-                        if ("u_TexCoordShrink".equals(field.name())) {
-                            backingData.putFloat(offset, 1.0F);
-                            backingData.putFloat(offset + 4, 1.0F);
-                        }
-                    }
-                    default -> {
-                    }
-                }
-            }
-        }
-    }
-
-    private static boolean isOneDefaultStandaloneFloat(String name) {
-        return "iris_FogEnd".equals(name)
-            || "far".equals(name)
-            || "viewWidth".equals(name)
-            || "viewHeight".equals(name)
-            || "aspectRatio".equals(name);
-    }
-
-    static Map<String, java.util.List<Integer>> collectStandaloneUniformOffsets(List<String> standaloneUniformDeclarations) {
-        Map<String, java.util.List<Integer>> offsetsByName = new java.util.LinkedHashMap<>();
-        int offset = 0;
-        for (String declaration : standaloneUniformDeclarations) {
-            Matcher uniformMatcher = GLSL_STANDALONE_UNIFORM_MEMBER_PATTERN.matcher(declaration);
-            if (!uniformMatcher.matches()) {
-                continue;
-            }
-
-            String uniformTypeName = uniformMatcher.group(1);
-            String uniformName = uniformMatcher.group(2);
-            int arraySize = uniformMatcher.group(3) == null ? 1 : Integer.parseInt(uniformMatcher.group(3));
-            Optional<net.vulkanic.VulkanicUniformReflectionType> reflectionType =
-                net.vulkanic.VulkanicUniformReflectionType.fromGlslTypeName(uniformTypeName);
-            if (reflectionType.isEmpty() || reflectionType.get().isSampler() || reflectionType.get().isImage()) {
-                continue;
-            }
-
-            int baseAlignment = std140BaseAlignment(reflectionType.get());
-            int typeSize = std140TypeSize(reflectionType.get());
-            int stride = Math.max(1, arraySize) > 1 ? roundUpTo(typeSize, 16) : typeSize;
-            offset = roundUpTo(offset, baseAlignment);
-            offsetsByName.put(uniformName, List.of(offset));
-            offset += stride * Math.max(1, arraySize);
-        }
-
-        return offsetsByName;
-    }
-
     public void logStandaloneSliceTrace(
         CommandContext ctx,
         String stage,
@@ -2926,7 +1829,7 @@ void main() {
             return;
         }
         requireVulkanCommandBufferHandle("logStandaloneSliceTrace", ctx);
-        logStandaloneSliceTraceInternal(program, stage, programName, virtualPrograms.get(program), null, true, note);
+        logStandaloneSliceTraceInternal(program, stage, programName, shaderPrograms.program(program), null, true, note);
     }
 
     private void logStandaloneSliceTraceInternal(
@@ -3002,15 +1905,14 @@ void main() {
         if (!VulkanicAPI.shouldTraceStandaloneUniforms()) {
             return;
         }
-        java.util.ArrayList<Integer> keys = new java.util.ArrayList<>(virtualPrograms.keySet());
-        java.util.Collections.sort(keys);
+        java.util.List<Integer> keys = shaderPrograms.programIdsSnapshot();
         LOGGER.info(
             "StandaloneLookupKeyTrace stage={} lookupType=program-id key={} keyHash={} mapSize={} containsExactKey={} nearestEntries={} lookupUses=program-id-int storeContainer=virtualPrograms virtualProgramIdentity={} note={}",
             stage,
             programId,
             Integer.toHexString(Integer.hashCode(programId)),
-            virtualPrograms.size(),
-            yesNo(virtualPrograms.containsKey(programId)),
+            shaderPrograms.programCount(),
+            yesNo(shaderPrograms.containsProgram(programId)),
             describeNearestProgramKeys(keys, programId),
             virtualProgram != null ? System.identityHashCode(virtualProgram) : -1,
             note == null ? "none" : note
@@ -3032,111 +1934,17 @@ void main() {
         return keys.subList(from, to).toString();
     }
 
-    private void unregisterUniformLocationTokens(VirtualProgram virtualProgram) {
-        for (Integer token : virtualProgram.uniformLocationTokensByName.values()) {
-            uniformLocationRefs.remove(token);
-        }
-        virtualProgram.uniformLocationTokensByName.clear();
-    }
-
-    private int resolveUniformLocationToken(int programId, VirtualProgram virtualProgram, String uniformName, int uniformIndex) {
-        Integer existing = virtualProgram.uniformLocationTokensByName.get(uniformName);
-        if (existing != null) {
-            return existing;
-        }
-
-        int token = nextVirtualUniformLocationToken.getAndIncrement();
-        Integer raced = virtualProgram.uniformLocationTokensByName.putIfAbsent(uniformName, token);
-        if (raced != null) {
-            return raced;
-        }
-
-        uniformLocationRefs.put(token, new UniformLocationRef(programId, uniformIndex));
-        return token;
-    }
-
     @Nullable
     private UniformLocationRef resolveUniformLocationRef(int location) {
-        if (location < 0) {
-            return null;
-        }
-        return uniformLocationRefs.get(location);
-    }
-
-    private static int roundUpTo(int value, int alignment) {
-        if (alignment <= 0) {
-            return value;
-        }
-        int remainder = value % alignment;
-        return remainder == 0 ? value : value + (alignment - remainder);
-    }
-
-    private static int std140BaseAlignment(net.vulkanic.VulkanicUniformReflectionType type) {
-        return switch (type) {
-            case FLOAT, INT, UINT, BOOL -> 4;
-            case FLOAT_VEC2, INT_VEC2, UINT_VEC2, BOOL_VEC2 -> 8;
-            case FLOAT_VEC3, INT_VEC3, UINT_VEC3, BOOL_VEC3,
-                FLOAT_VEC4, INT_VEC4, UINT_VEC4, BOOL_VEC4,
-                FLOAT_MAT2, FLOAT_MAT3, FLOAT_MAT4 -> 16;
-            default -> 16;
-        };
-    }
-
-    private static int std140TypeSize(net.vulkanic.VulkanicUniformReflectionType type) {
-        return switch (type) {
-            case FLOAT, INT, UINT, BOOL -> 4;
-            case FLOAT_VEC2, INT_VEC2, UINT_VEC2, BOOL_VEC2 -> 8;
-            case FLOAT_VEC3, INT_VEC3, UINT_VEC3, BOOL_VEC3 -> 12;
-            case FLOAT_VEC4, INT_VEC4, UINT_VEC4, BOOL_VEC4 -> 16;
-            case FLOAT_MAT2 -> 32;
-            case FLOAT_MAT3 -> 48;
-            case FLOAT_MAT4 -> 64;
-            default -> 16;
-        };
+        return shaderPrograms.resolveUniformLocationRef(location);
     }
 
     public void deleteShader(CommandContext ctx, int shader) {
-        VirtualShader virtualShader = virtualShaders.get(shader);
-        if (virtualShader == null) {
-            return;
-        }
-        virtualShader.deletionPending = true;
-        releaseVirtualShaderIfDeletionPendingAndDetached(shader);
+        shaderPrograms.deleteShader(shader, this::releaseVirtualShaderNativeModule);
     }
 
     public void deleteProgram(CommandContext ctx, int program) {
-        VirtualProgram removedProgram = virtualPrograms.remove(program);
-        if (removedProgram != null) {
-            unregisterUniformLocationTokens(removedProgram);
-            removedProgram.closeStandaloneUniformBacking();
-            for (int shader : removedProgram.attachedShaderIds) {
-                releaseVirtualShaderIfDeletionPendingAndDetached(shader);
-            }
-        }
-        if (boundVirtualProgram == program) {
-            boundVirtualProgram = 0;
-        }
-    }
-
-    private boolean isShaderAttachedToAnyProgram(int shader) {
-        for (VirtualProgram virtualProgram : virtualPrograms.values()) {
-            if (virtualProgram.attachedShaderIds.contains(shader)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private void releaseVirtualShaderIfDeletionPendingAndDetached(int shader) {
-        VirtualShader virtualShader = virtualShaders.get(shader);
-        if (virtualShader == null || !virtualShader.deletionPending || isShaderAttachedToAnyProgram(shader)) {
-            return;
-        }
-
-        VirtualShader removedShader = virtualShaders.remove(shader);
-        if (removedShader != null) {
-            releaseVirtualShaderNativeModule(removedShader);
-        }
+        shaderPrograms.deleteProgram(program, this::releaseVirtualShaderNativeModule);
     }
 
     public VulkanicBuffer createManagedBuffer(java.util.function.Supplier<String> label, int usage, int size) {
@@ -4317,7 +3125,7 @@ void main() {
         if (descriptor == null) {
             throw new IllegalArgumentException("descriptor must not be null");
         }
-        descriptor = withCompatibilityVertexInputState(descriptor);
+        descriptor = VulkanShaderVariantPlanner.withCompatibilityVertexInputState(descriptor);
         ensureNativeReady("createPipeline");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -4398,7 +3206,7 @@ void main() {
         PipelineDescriptor descriptor,
         VulkanRenderPassCompatibilityKey renderPassCompatibilityKey
     ) {
-        descriptor = withCompatibilityVertexInputState(descriptor);
+        descriptor = VulkanShaderVariantPlanner.withCompatibilityVertexInputState(descriptor);
         ensureNativeReady("createPipeline(framebuffer)");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -4458,7 +3266,7 @@ void main() {
 
     public List<VulkanicSpirvModule> getLinkedProgramSpirvModules(CommandContext ctx, int program) {
         requireVulkanCommandBufferHandle("getLinkedProgramSpirvModules", ctx);
-        VirtualProgram virtualProgram = virtualPrograms.get(program);
+        VirtualProgram virtualProgram = shaderPrograms.program(program);
         return virtualProgram == null ? List.of() : virtualProgram.linkedSpirvModules;
     }
 
@@ -4469,31 +3277,8 @@ void main() {
         java.util.Set<VulkanicShaderStage> stages
     ) {
         requireVulkanCommandBufferHandle("getLinkedProgramResourceLayout", ctx);
-        VirtualProgram virtualProgram = virtualPrograms.get(program);
-        if (virtualProgram == null || !virtualProgram.linkStatus) {
-            return null;
-        }
-
-        java.util.Set<VulkanicShaderStage> normalizedStages = java.util.Set.copyOf(
-            Objects.requireNonNull(stages, "stages must not be null")
-        );
-        if (normalizedStages.isEmpty()) {
-            throw new IllegalArgumentException("stages must not be empty");
-        }
-
-        List<PipelineDescriptor.ResourceBinding> bindings =
-            new ArrayList<>(virtualProgram.activeResourceBindings.size());
-        for (ReflectedResourceBinding resourceBinding : virtualProgram.activeResourceBindings) {
-            bindings.add(new PipelineDescriptor.ResourceBinding(
-                resourceBinding.set(),
-                resourceBinding.binding(),
-                resourceBinding.name(),
-                resourceBinding.type(),
-                null,
-                normalizedStages
-            ));
-        }
-        return new PipelineDescriptor.ResourceLayout(bindings);
+        LinkedProgramExecutionSnapshot snapshot = shaderPrograms.linkedExecutionSnapshot(program, stages);
+        return snapshot == null ? null : snapshot.resourceLayout();
     }
 
     @Nullable
@@ -4501,7 +3286,7 @@ void main() {
         CommandContext ctx,
         int programId
     ) {
-        VirtualProgram virtualProgram = virtualPrograms.get(programId);
+        VirtualProgram virtualProgram = shaderPrograms.program(programId);
         if (virtualProgram == null || !virtualProgram.linkStatus || virtualProgram.linkedSpirvModules.isEmpty()) {
             return null;
         }
@@ -4509,24 +3294,24 @@ void main() {
         Set<VulkanicShaderStage> stages = virtualProgram.linkedSpirvModules.stream()
             .map(VulkanicSpirvModule::stage)
             .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
-        PipelineDescriptor.ResourceLayout resourceLayout = getLinkedProgramResourceLayout(ctx, programId, stages);
-        if (resourceLayout == null) {
-            resourceLayout = new PipelineDescriptor.ResourceLayout(List.of());
+        LinkedProgramExecutionSnapshot snapshot = shaderPrograms.linkedExecutionSnapshot(programId, stages);
+        if (snapshot == null) {
+            return null;
         }
 
         return new VulkanDrawExecutionCoordinator.LegacyProgramSnapshot(
             programId,
-            virtualProgram.linkStatus,
-            virtualProgram.debugLabel,
-            virtualProgram.linkedSpirvModules,
-            virtualProgram.vertexInputs.stream()
+            snapshot.linkStatus(),
+            snapshot.debugLabel(),
+            snapshot.linkedSpirvModules(),
+            snapshot.vertexInputs().stream()
                 .map(input -> new VulkanDrawExecutionCoordinator.ReflectedVertexInputSnapshot(
                     input.location(),
                     input.typeName()
                 ))
                 .toList(),
-            new java.util.LinkedHashMap<>(virtualProgram.attributeLocationsByName),
-            resourceLayout
+            snapshot.attributeLocationsByName(),
+            snapshot.resourceLayout()
         );
     }
 
@@ -4561,25 +3346,19 @@ void main() {
 
     @Nullable
     private PipelineDescriptor createLegacyComputePipelineDescriptor(int programId) {
-        VirtualProgram virtualProgram = virtualPrograms.get(programId);
-        if (virtualProgram == null || !virtualProgram.linkStatus || virtualProgram.linkedSpirvModules.isEmpty()) {
+        LinkedProgramExecutionSnapshot snapshot = shaderPrograms.linkedExecutionSnapshot(
+            programId,
+            Set.of(VulkanicShaderStage.COMPUTE)
+        );
+        if (snapshot == null || snapshot.linkedSpirvModules().isEmpty()) {
             return null;
         }
 
-        List<VulkanicSpirvModule> computeModules = virtualProgram.linkedSpirvModules.stream()
+        List<VulkanicSpirvModule> computeModules = snapshot.linkedSpirvModules().stream()
             .filter(module -> module.stage() == VulkanicShaderStage.COMPUTE)
             .toList();
         if (computeModules.size() != 1) {
             return null;
-        }
-
-        PipelineDescriptor.ResourceLayout resourceLayout = getLinkedProgramResourceLayout(
-            getCurrentCommandContext(),
-            programId,
-            Set.of(VulkanicShaderStage.COMPUTE)
-        );
-        if (resourceLayout == null) {
-            resourceLayout = new PipelineDescriptor.ResourceLayout(List.of());
         }
 
         PipelineDescriptor.PortableState portableState = new PipelineDescriptor.PortableState(
@@ -4606,7 +3385,7 @@ void main() {
         );
 
         return PipelineDescriptor.fromPortableStateAndSpirvModules(portableState, computeModules)
-            .withResourceLayout(resourceLayout);
+            .withResourceLayout(snapshot.resourceLayout());
     }
 
     private PipelineResourcePlanner.Plan buildLegacyProgramResourcePlan(
@@ -4615,8 +3394,13 @@ void main() {
         PipelineDescriptor descriptor,
         int programId
     ) {
-        VirtualProgram virtualProgram = virtualPrograms.get(programId);
-        if (virtualProgram == null) {
+        LinkedProgramExecutionSnapshot programSnapshot = shaderPrograms.linkedExecutionSnapshot(
+            programId,
+            descriptor.getSpirvModules().stream()
+                .map(VulkanicSpirvModule::stage)
+                .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new))
+        );
+        if (programSnapshot == null) {
             return null;
         }
         return net.vulkanic.VulkanicPipelineResourceResolver.buildPlan(
@@ -4647,11 +3431,11 @@ void main() {
                 @Override
                 @Nullable
                 public Integer samplerUnit(PipelineDescriptor.ResourceBinding binding) {
-                    int uniformIndex = virtualProgram.activeUniformNames.indexOf(binding.name());
-                    if (uniformIndex < 0) {
-                        return binding.binding();
-                    }
-                    return virtualProgram.opaqueResourceUniformValuesByIndex.getOrDefault(uniformIndex, binding.binding());
+                    return VulkanShaderProgramCoordinator.samplerOrImageUnit(
+                        programSnapshot.activeUniformNames(),
+                        programSnapshot.opaqueResourceUniformValuesByIndex(),
+                        binding
+                    );
                 }
 
                 @Override
@@ -4669,7 +3453,7 @@ void main() {
                 @Override
                 @Nullable
                 public PipelineResourceBindings.StorageImageBinding storageImageBinding(PipelineDescriptor.ResourceBinding binding) {
-                    return resolveLegacyStorageImageBindingForProgram(programId, binding);
+                    return resolveLegacyStorageImageBindingForSnapshot(programSnapshot, binding);
                 }
 
                 @Override
@@ -4696,15 +3480,23 @@ void main() {
         int programId,
         PipelineDescriptor.ResourceBinding binding
     ) {
-        VirtualProgram virtualProgram = virtualPrograms.get(programId);
-        if (virtualProgram == null) {
+        LinkedProgramExecutionSnapshot snapshot = shaderPrograms.linkedExecutionSnapshot(programId, binding.stages());
+        if (snapshot == null) {
             return null;
         }
+        return resolveLegacyStorageImageBindingForSnapshot(snapshot, binding);
+    }
 
-        int uniformIndex = virtualProgram.activeUniformNames.indexOf(binding.name());
-        int imageUnit = uniformIndex < 0
-            ? binding.binding()
-            : virtualProgram.opaqueResourceUniformValuesByIndex.getOrDefault(uniformIndex, binding.binding());
+    @Nullable
+    private PipelineResourceBindings.StorageImageBinding resolveLegacyStorageImageBindingForSnapshot(
+        LinkedProgramExecutionSnapshot snapshot,
+        PipelineDescriptor.ResourceBinding binding
+    ) {
+        int imageUnit = VulkanShaderProgramCoordinator.samplerOrImageUnit(
+            snapshot.activeUniformNames(),
+            snapshot.opaqueResourceUniformValuesByIndex(),
+            binding
+        );
         NativeSpine spine = nativeSpine;
         if (spine == null) {
             return null;
@@ -4725,20 +3517,20 @@ void main() {
 
     @Nullable
     Integer resolveLegacySamplerUnitForProgram(int programId, PipelineDescriptor.ResourceBinding binding) {
-        VirtualProgram virtualProgram = virtualPrograms.get(programId);
-        if (virtualProgram == null) {
+        LinkedProgramExecutionSnapshot snapshot = shaderPrograms.linkedExecutionSnapshot(programId, binding.stages());
+        if (snapshot == null) {
             return null;
         }
 
-        int uniformIndex = virtualProgram.activeUniformNames.indexOf(binding.name());
+        int uniformIndex = snapshot.activeUniformNames().indexOf(binding.name());
         if (uniformIndex >= 0) {
-            Integer uploadedUnit = virtualProgram.opaqueResourceUniformValuesByIndex.get(uniformIndex);
+            Integer uploadedUnit = snapshot.opaqueResourceUniformValuesByIndex().get(uniformIndex);
             if (uploadedUnit != null) {
                 return uploadedUnit;
             }
         }
 
-        Integer aliasedUnit = resolveLegacySamplerAliasUnit(virtualProgram, binding.name());
+        Integer aliasedUnit = resolveLegacySamplerAliasUnit(snapshot, binding.name());
         if (aliasedUnit != null) {
             return aliasedUnit;
         }
@@ -4748,14 +3540,10 @@ void main() {
     }
 
     @Nullable
-    private static Integer resolveLegacySamplerAliasUnit(VirtualProgram virtualProgram, String bindingName) {
+    private static Integer resolveLegacySamplerAliasUnit(LinkedProgramExecutionSnapshot snapshot, String bindingName) {
         for (String aliasName : legacySamplerAliasNames(bindingName)) {
-            int aliasIndex = virtualProgram.activeUniformNames.indexOf(aliasName);
-            if (aliasIndex < 0) {
-                continue;
-            }
-
-            Integer uploadedUnit = virtualProgram.opaqueResourceUniformValuesByIndex.get(aliasIndex);
+            int aliasIndex = snapshot.activeUniformNames().indexOf(aliasName);
+            Integer uploadedUnit = aliasIndex < 0 ? null : snapshot.opaqueResourceUniformValuesByIndex().get(aliasIndex);
             if (uploadedUnit != null) {
                 return uploadedUnit;
             }
@@ -4869,27 +3657,28 @@ void main() {
         }
     }
 
-    private void bindLegacyProgramPipelineForDraw(
+    @Nullable
+    private MaterializedGraphicsPipelineBinding materializeLegacyProgramPipelineForDraw(
         long commandBufferHandle,
         VulkanDrawExecutionCoordinator.DrawExecutionPlan drawPlan
     ) {
         int programId = drawPlan.programId();
         if (programId <= 0 || drawPlan.descriptor() == null) {
-            return;
+            return null;
         }
         PipelineDescriptor descriptor = drawPlan.descriptor();
 
         CommandContext ctx = getCurrentCommandContext();
         PipelineResourcePlanner.Plan resourcePlan = buildLegacyProgramResourcePlan(ctx, commandBufferHandle, descriptor, programId);
         if (resourcePlan == null) {
-            return;
+            return null;
         }
         if (!resourcePlan.completeCoverage()) {
             logIncompleteLegacyResourcePlan("draw", programId, resourcePlan);
-            return;
+            return null;
         }
 
-        ensureNativeReady("bindLegacyProgramPipelineForDraw");
+        ensureNativeReady("materializeLegacyProgramPipelineForDraw");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
             throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
@@ -4925,18 +3714,23 @@ void main() {
             );
         }
         if (pipelineHandle == null || !pipelineHandle.isValid()) {
-            return;
+            return null;
         }
 
-        if (pipelineHandle instanceof VulkanPipelineHandle vulkanPipeline) {
-            spine.bindPipeline(commandBufferHandle, vulkanPipeline.getVkPipelineHandle());
+        if (!(pipelineHandle instanceof VulkanPipelineHandle vulkanPipeline)) {
+            return null;
         }
-        bindPipelineResources(ctx, pipelineHandle, submissionDescriptor, resourcePlan.bindings());
+        return spine.materializeGraphicsPipelineBinding(
+            commandBufferHandle,
+            vulkanPipeline,
+            submissionDescriptor,
+            resourcePlan.bindings()
+        );
     }
 
     @Nullable
-    private VulkanPipelineHandle bindLegacyComputePipelineForDispatch(long commandBufferHandle) {
-        int programId = boundVirtualProgram;
+    private MaterializedComputePipelineBinding materializeLegacyComputePipelineForDispatch(long commandBufferHandle) {
+        int programId = shaderPrograms.boundProgramId();
         if (programId <= 0) {
             return null;
         }
@@ -4955,7 +3749,7 @@ void main() {
             return null;
         }
 
-        ensureNativeReady("bindLegacyComputePipelineForDispatch");
+        ensureNativeReady("materializeLegacyComputePipelineForDispatch");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
             throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
@@ -4990,29 +3784,35 @@ void main() {
             return null;
         }
 
-        spine.bindComputePipeline(commandBufferHandle, vulkanPipeline.getVkPipelineHandle());
-        spine.updateAndBindComputeDescriptorSet(
+        return spine.materializeComputePipelineBinding(
             commandBufferHandle,
             vulkanPipeline,
             submissionDescriptor,
             resourcePlan.bindings()
         );
-        return vulkanPipeline;
     }
 
-    private static final class BoundPipelineResources {
-        private final PipelineHandle pipeline;
-        private final PipelineDescriptor descriptor;
-        private final PipelineResourceBindings bindings;
+    private record MaterializedGraphicsPipelineBinding(
+        VulkanPipelineHandle pipeline,
+        PipelineDescriptor descriptor,
+        @Nullable Long descriptorSetHandle,
+        @Nullable VulkanDescriptorManager.DescriptorSetCacheKey descriptorCacheKey
+    ) {
+        private MaterializedGraphicsPipelineBinding {
+            Objects.requireNonNull(pipeline, "pipeline");
+            Objects.requireNonNull(descriptor, "descriptor");
+        }
+    }
 
-        private BoundPipelineResources(
-            PipelineHandle pipeline,
-            PipelineDescriptor descriptor,
-            PipelineResourceBindings bindings
-        ) {
-            this.pipeline = pipeline;
-            this.descriptor = descriptor;
-            this.bindings = bindings;
+    private record MaterializedComputePipelineBinding(
+        VulkanPipelineHandle pipeline,
+        PipelineDescriptor descriptor,
+        @Nullable Long descriptorSetHandle,
+        @Nullable VulkanDescriptorManager.DescriptorSetCacheKey descriptorCacheKey
+    ) {
+        private MaterializedComputePipelineBinding {
+            Objects.requireNonNull(pipeline, "pipeline");
+            Objects.requireNonNull(descriptor, "descriptor");
         }
     }
 
@@ -5623,12 +4423,12 @@ void main() {
 
     private static @Nullable PipelineDescriptor descriptorVariantDescriptor(PrecompiledPipelineState state, PipelineDescriptor descriptor) {
         if (descriptor.hasSpirvModules()) {
-            return withCompatibilityVertexInputState(descriptor);
+            return VulkanShaderVariantPlanner.withCompatibilityVertexInputState(descriptor);
         }
         if (state.descriptor == null) {
             return null;
         }
-        return withCompatibilityVertexInputState(state.descriptor.withResourceLayout(descriptor.getResourceLayout()));
+        return VulkanShaderVariantPlanner.withCompatibilityVertexInputState(state.descriptor.withResourceLayout(descriptor.getResourceLayout()));
     }
 
     private static boolean matchesStableDescriptor(PrecompiledPipelineState state, @Nullable PipelineDescriptor descriptor) {
@@ -5730,10 +4530,6 @@ void main() {
             }
             vulkanPipeline = typedPipeline;
         }
-
-        boundPipelineResourcesByCommandBuffer.put(
-            commandBufferHandle,
-            new BoundPipelineResources(pipeline, descriptor, bindings));
 
         if (vulkanPipeline != null) {
             ensureNativeReady("bindPipelineResources");
@@ -6833,7 +5629,7 @@ void main() {
                         + compatibilityKey
                 );
             }
-            spine.bindPipeline(commandBufferHandle, vulkanPipeline.getVkPipelineHandle());
+            spine.bindPipeline(commandBufferHandle, vulkanPipeline);
             this.currentPipelineDescriptor = null;
         }
 
@@ -6948,7 +5744,6 @@ void main() {
             commandBufferHandle = spine.primaryCommandBufferHandle();
         } else {
             commandBufferHandle = spine.beginPrimaryCommandBuffer();
-            boundPipelineResourcesByCommandBuffer.remove(commandBufferHandle);
         }
 
         CommandContext existingContext = currentCommandContext;
@@ -6990,7 +5785,6 @@ void main() {
             }
             throw exception;
         }
-        boundPipelineResourcesByCommandBuffer.remove(commandBufferHandle);
         currentCommandContext = null;
     }
 
@@ -7524,7 +6318,7 @@ void main() {
      */
     public void bindShaderProgram(CommandContext ctx, int programId) {
         requireVulkanCommandBufferHandle("bindShaderProgram", ctx);
-        this.boundVirtualProgram = programId;
+        shaderPrograms.bindProgram(programId);
     }
 
     // =====================================================================
@@ -7759,10 +6553,11 @@ void main() {
         UniformLocationRef locationRef = resolveUniformLocationRef(location);
         if (locationRef != null) {
             VulkanicDiagnostics.STANDALONE_UNIFORM_TOKEN_HIT_COUNT.incrementAndGet();
-            VirtualProgram program = virtualPrograms.get(locationRef.programId());
+            VirtualProgram program = shaderPrograms.program(locationRef.programId());
             if (program != null) {
-                captureOpaqueResourceUniformInt(program, locationRef.uniformIndex(), values[0]);
-                if (writeStandaloneUniformInts(program, locationRef.uniformIndex(), values)) {
+                shaderPrograms.captureOpaqueResourceUniformInt(program, locationRef.uniformIndex(), values[0]);
+                if (shaderPrograms.writeStandaloneUniformInts(program, locationRef.uniformIndex(), values)) {
+                    VulkanicDiagnostics.STANDALONE_UNIFORM_WRITE_COUNT.incrementAndGet();
                     traceStandaloneUniformInts(locationRef.programId(), program, locationRef.uniformIndex(), values);
                 }
             }
@@ -7770,27 +6565,17 @@ void main() {
             return;
         }
 
-        VirtualProgram boundProgram = virtualPrograms.get(boundVirtualProgram);
+        int boundProgramId = shaderPrograms.boundProgramId();
+        VirtualProgram boundProgram = shaderPrograms.program(boundProgramId);
         if (boundProgram != null) {
             VulkanicDiagnostics.STANDALONE_UNIFORM_FALLBACK_COUNT.incrementAndGet();
-            captureOpaqueResourceUniformInt(boundProgram, location, values[0]);
-            if (writeStandaloneUniformInts(boundProgram, location, values)) {
-                traceStandaloneUniformInts(boundVirtualProgram, boundProgram, location, values);
+            shaderPrograms.captureOpaqueResourceUniformInt(boundProgram, location, values[0]);
+            if (shaderPrograms.writeStandaloneUniformInts(boundProgram, location, values)) {
+                VulkanicDiagnostics.STANDALONE_UNIFORM_WRITE_COUNT.incrementAndGet();
+                traceStandaloneUniformInts(boundProgramId, boundProgram, location, values);
             }
         }
         maybeLogStandaloneUniformStats();
-    }
-
-    private void captureOpaqueResourceUniformInt(VirtualProgram program, int uniformIndex, int value) {
-        if (uniformIndex < 0 || uniformIndex >= program.activeUniforms.size()) {
-            return;
-        }
-        ReflectedUniform uniform = program.activeUniforms.get(uniformIndex);
-        Optional<net.vulkanic.VulkanicUniformReflectionType> reflectionType =
-            net.vulkanic.VulkanicUniformReflectionType.fromLegacyGlConstant(uniform.legacyType());
-        if (reflectionType.isPresent() && (reflectionType.get().isSampler() || reflectionType.get().isImage())) {
-            program.opaqueResourceUniformValuesByIndex.put(uniformIndex, value);
-        }
     }
 
     private void captureStandaloneUniformFloats(int location, float[] values) {
@@ -7802,9 +6587,10 @@ void main() {
         UniformLocationRef locationRef = resolveUniformLocationRef(location);
         if (locationRef != null) {
             VulkanicDiagnostics.STANDALONE_UNIFORM_TOKEN_HIT_COUNT.incrementAndGet();
-            VirtualProgram program = virtualPrograms.get(locationRef.programId());
+            VirtualProgram program = shaderPrograms.program(locationRef.programId());
             if (program != null) {
-                if (writeStandaloneUniformFloats(program, locationRef.uniformIndex(), values)) {
+                if (shaderPrograms.writeStandaloneUniformFloats(program, locationRef.uniformIndex(), values)) {
+                    VulkanicDiagnostics.STANDALONE_UNIFORM_WRITE_COUNT.incrementAndGet();
                     traceStandaloneUniformFloats(locationRef.programId(), program, locationRef.uniformIndex(), values);
                 }
             }
@@ -7812,11 +6598,13 @@ void main() {
             return;
         }
 
-        VirtualProgram boundProgram = virtualPrograms.get(boundVirtualProgram);
+        int boundProgramId = shaderPrograms.boundProgramId();
+        VirtualProgram boundProgram = shaderPrograms.program(boundProgramId);
         if (boundProgram != null) {
             VulkanicDiagnostics.STANDALONE_UNIFORM_FALLBACK_COUNT.incrementAndGet();
-            if (writeStandaloneUniformFloats(boundProgram, location, values)) {
-                traceStandaloneUniformFloats(boundVirtualProgram, boundProgram, location, values);
+            if (shaderPrograms.writeStandaloneUniformFloats(boundProgram, location, values)) {
+                VulkanicDiagnostics.STANDALONE_UNIFORM_WRITE_COUNT.incrementAndGet();
+                traceStandaloneUniformFloats(boundProgramId, boundProgram, location, values);
             }
         }
         maybeLogStandaloneUniformStats();
@@ -7913,286 +6701,6 @@ void main() {
         }
     }
 
-    private boolean writeStandaloneUniformInts(VirtualProgram virtualProgram, int location, int[] values) {
-        StandaloneUniformField field = virtualProgram.standaloneFieldsByLocation.get(location);
-        if (field == null) {
-            return false;
-        }
-
-        synchronized (virtualProgram) {
-            java.nio.ByteBuffer backingData = virtualProgram.standaloneBackingData;
-            if (backingData == null) {
-                return false;
-            }
-
-            writeIntUniform(field, backingData, values);
-            virtualProgram.standaloneDirty = true;
-            VulkanicDiagnostics.STANDALONE_UNIFORM_WRITE_COUNT.incrementAndGet();
-            return true;
-        }
-    }
-
-    private boolean writeStandaloneUniformFloats(VirtualProgram virtualProgram, int location, float[] values) {
-        StandaloneUniformField field = virtualProgram.standaloneFieldsByLocation.get(location);
-        if (field == null) {
-            return false;
-        }
-
-        synchronized (virtualProgram) {
-            java.nio.ByteBuffer backingData = virtualProgram.standaloneBackingData;
-            if (backingData == null) {
-                return false;
-            }
-
-            writeFloatUniform(field, backingData, values);
-            virtualProgram.standaloneDirty = true;
-            VulkanicDiagnostics.STANDALONE_UNIFORM_WRITE_COUNT.incrementAndGet();
-            return true;
-        }
-    }
-
-    static void writeIntUniform(StandaloneUniformField field, java.nio.ByteBuffer backingData, int[] values) {
-        for (int offset : field.offsets()) {
-            writeIntUniformAtOffset(field, backingData, offset, values);
-        }
-    }
-
-    private static void writeIntUniformAtOffset(
-        StandaloneUniformField field,
-        java.nio.ByteBuffer backingData,
-        int offset,
-        int[] values
-    ) {
-        int componentCount = standaloneUniformLogicalComponentCount(field.type());
-        int elementCount = Math.min(field.arraySize(), Math.max(1, (values.length + componentCount - 1) / componentCount));
-        int[] padded = new int[componentCount];
-
-        for (int element = 0; element < elementCount; element++) {
-            java.util.Arrays.fill(padded, 0);
-            int sourceBase = element * componentCount;
-            int copyLength = Math.min(componentCount, values.length - sourceBase);
-            if (copyLength > 0) {
-                System.arraycopy(values, sourceBase, padded, 0, copyLength);
-            }
-            writeIntUniformElementAtOffset(field, backingData, offset + (element * field.stride()), padded);
-        }
-    }
-
-    private static void writeIntUniformElementAtOffset(
-        StandaloneUniformField field,
-        java.nio.ByteBuffer backingData,
-        int offset,
-        int[] padded
-    ) {
-        switch (field.type()) {
-            case INT, UINT, BOOL -> backingData.putInt(offset, padded[0]);
-            case INT_VEC2, UINT_VEC2, BOOL_VEC2 -> {
-                backingData.putInt(offset, padded[0]);
-                backingData.putInt(offset + 4, padded[1]);
-            }
-            case INT_VEC3, UINT_VEC3, BOOL_VEC3 -> {
-                backingData.putInt(offset, padded[0]);
-                backingData.putInt(offset + 4, padded[1]);
-                backingData.putInt(offset + 8, padded[2]);
-            }
-            case INT_VEC4, UINT_VEC4, BOOL_VEC4 -> {
-                backingData.putInt(offset, padded[0]);
-                backingData.putInt(offset + 4, padded[1]);
-                backingData.putInt(offset + 8, padded[2]);
-                backingData.putInt(offset + 12, padded[3]);
-            }
-            default -> {
-                // Ignore mismatched updates for non-int field types.
-            }
-        }
-    }
-
-    static void writeFloatUniform(StandaloneUniformField field, java.nio.ByteBuffer backingData, float[] values) {
-        for (int offset : field.offsets()) {
-            writeFloatUniformAtOffset(field, backingData, offset, values);
-        }
-    }
-
-    private static void writeFloatUniformAtOffset(
-        StandaloneUniformField field,
-        java.nio.ByteBuffer backingData,
-        int offset,
-        float[] values
-    ) {
-        int componentCount = standaloneUniformLogicalComponentCount(field.type());
-        int elementCount = Math.min(field.arraySize(), Math.max(1, (values.length + componentCount - 1) / componentCount));
-
-        for (int element = 0; element < elementCount; element++) {
-            int sourceBase = element * componentCount;
-            writeFloatUniformElementAtOffset(field, backingData, offset + (element * field.stride()), values, sourceBase);
-        }
-    }
-
-    private static void writeFloatUniformElementAtOffset(
-        StandaloneUniformField field,
-        java.nio.ByteBuffer backingData,
-        int offset,
-        float[] values,
-        int sourceBase
-    ) {
-        switch (field.type()) {
-            case FLOAT -> backingData.putFloat(offset, floatValueOrZero(values, sourceBase));
-            case FLOAT_VEC2 -> {
-                backingData.putFloat(offset, floatValueOrZero(values, sourceBase));
-                backingData.putFloat(offset + 4, floatValueOrZero(values, sourceBase + 1));
-            }
-            case FLOAT_VEC3 -> {
-                backingData.putFloat(offset, floatValueOrZero(values, sourceBase));
-                backingData.putFloat(offset + 4, floatValueOrZero(values, sourceBase + 1));
-                backingData.putFloat(offset + 8, floatValueOrZero(values, sourceBase + 2));
-            }
-            case FLOAT_VEC4 -> {
-                backingData.putFloat(offset, floatValueOrZero(values, sourceBase));
-                backingData.putFloat(offset + 4, floatValueOrZero(values, sourceBase + 1));
-                backingData.putFloat(offset + 8, floatValueOrZero(values, sourceBase + 2));
-                backingData.putFloat(offset + 12, floatValueOrZero(values, sourceBase + 3));
-            }
-            case FLOAT_MAT2 -> writeStd140MatrixColumns(backingData, offset, values, sourceBase, 2, 2);
-            case FLOAT_MAT3 -> writeStd140MatrixColumns(backingData, offset, values, sourceBase, 3, 3);
-            case FLOAT_MAT4 -> writeStd140MatrixColumns(backingData, offset, values, sourceBase, 4, 4);
-            default -> {
-                // Ignore mismatched updates for non-float field types.
-            }
-        }
-    }
-
-    private static float floatValueOrZero(float[] values, int index) {
-        return index >= 0 && index < values.length ? values[index] : 0.0F;
-    }
-
-    private static void writeStd140MatrixColumns(
-        java.nio.ByteBuffer backingData,
-        int baseOffset,
-        float[] values,
-        int sourceBase,
-        int columns,
-        int rows
-    ) {
-        for (int col = 0; col < columns; col++) {
-            int columnOffset = baseOffset + (col * 16);
-            for (int row = 0; row < rows; row++) {
-                int sourceIndex = sourceBase + (col * rows) + row;
-                float component = floatValueOrZero(values, sourceIndex);
-                backingData.putFloat(columnOffset + (row * 4), component);
-            }
-        }
-    }
-
-    private static int standaloneUniformLogicalComponentCount(net.vulkanic.VulkanicUniformReflectionType type) {
-        return switch (type) {
-            case FLOAT, INT, UINT, BOOL -> 1;
-            case FLOAT_VEC2, INT_VEC2, UINT_VEC2, BOOL_VEC2 -> 2;
-            case FLOAT_VEC3, INT_VEC3, UINT_VEC3, BOOL_VEC3 -> 3;
-            case FLOAT_VEC4, INT_VEC4, UINT_VEC4, BOOL_VEC4 -> 4;
-            case FLOAT_MAT2 -> 4;
-            case FLOAT_MAT3 -> 9;
-            case FLOAT_MAT4 -> 16;
-            default -> 1;
-        };
-    }
-
-    private static boolean standaloneUniformIsFloatLike(net.vulkanic.VulkanicUniformReflectionType type) {
-        return switch (type) {
-            case FLOAT, FLOAT_VEC2, FLOAT_VEC3, FLOAT_VEC4, FLOAT_MAT2, FLOAT_MAT3, FLOAT_MAT4 -> true;
-            default -> false;
-        };
-    }
-
-    private static boolean standaloneUniformIsIntegerLike(net.vulkanic.VulkanicUniformReflectionType type) {
-        return switch (type) {
-            case INT, UINT, BOOL, INT_VEC2, UINT_VEC2, BOOL_VEC2, INT_VEC3, UINT_VEC3, BOOL_VEC3,
-                INT_VEC4, UINT_VEC4, BOOL_VEC4 -> true;
-            default -> false;
-        };
-    }
-
-    static float[] readStandaloneUniformFloats(
-        StandaloneUniformField field,
-        java.nio.ByteBuffer backingData,
-        int offset
-    ) {
-        int componentCount = standaloneUniformLogicalComponentCount(field.type());
-        float[] values = new float[Math.max(1, field.arraySize()) * componentCount];
-        int writeIndex = 0;
-        for (int element = 0; element < Math.max(1, field.arraySize()); element++) {
-            int elementOffset = offset + (element * field.stride());
-            writeIndex = readStandaloneUniformFloatElement(field, backingData, elementOffset, values, writeIndex);
-        }
-        return values;
-    }
-
-    private static int readStandaloneUniformFloatElement(
-        StandaloneUniformField field,
-        java.nio.ByteBuffer backingData,
-        int offset,
-        float[] values,
-        int writeIndex
-    ) {
-        switch (field.type()) {
-            case FLOAT -> values[writeIndex++] = backingData.getFloat(offset);
-            case FLOAT_VEC2 -> {
-                values[writeIndex++] = backingData.getFloat(offset);
-                values[writeIndex++] = backingData.getFloat(offset + 4);
-            }
-            case FLOAT_VEC3 -> {
-                values[writeIndex++] = backingData.getFloat(offset);
-                values[writeIndex++] = backingData.getFloat(offset + 4);
-                values[writeIndex++] = backingData.getFloat(offset + 8);
-            }
-            case FLOAT_VEC4 -> {
-                values[writeIndex++] = backingData.getFloat(offset);
-                values[writeIndex++] = backingData.getFloat(offset + 4);
-                values[writeIndex++] = backingData.getFloat(offset + 8);
-                values[writeIndex++] = backingData.getFloat(offset + 12);
-            }
-            case FLOAT_MAT2 -> writeIndex = readStd140MatrixColumns(backingData, offset, values, writeIndex, 2, 2);
-            case FLOAT_MAT3 -> writeIndex = readStd140MatrixColumns(backingData, offset, values, writeIndex, 3, 3);
-            case FLOAT_MAT4 -> writeIndex = readStd140MatrixColumns(backingData, offset, values, writeIndex, 4, 4);
-            default -> {
-            }
-        }
-        return writeIndex;
-    }
-
-    private static int readStd140MatrixColumns(
-        java.nio.ByteBuffer backingData,
-        int baseOffset,
-        float[] values,
-        int writeIndex,
-        int columns,
-        int rows
-    ) {
-        for (int col = 0; col < columns; col++) {
-            int columnOffset = baseOffset + (col * 16);
-            for (int row = 0; row < rows; row++) {
-                values[writeIndex++] = backingData.getFloat(columnOffset + (row * 4));
-            }
-        }
-        return writeIndex;
-    }
-
-    static int[] readStandaloneUniformInts(
-        StandaloneUniformField field,
-        java.nio.ByteBuffer backingData,
-        int offset
-    ) {
-        int componentCount = standaloneUniformLogicalComponentCount(field.type());
-        int[] values = new int[Math.max(1, field.arraySize()) * componentCount];
-        int writeIndex = 0;
-        for (int element = 0; element < Math.max(1, field.arraySize()); element++) {
-            int elementOffset = offset + (element * field.stride());
-            for (int component = 0; component < componentCount; component++) {
-                values[writeIndex++] = backingData.getInt(elementOffset + (component * 4));
-            }
-        }
-        return values;
-    }
-
     private static float[] transpose3(float[] values) {
         return new float[] {
             values[0], values[3], values[6],
@@ -8230,16 +6738,15 @@ void main() {
 
         requireVulkanCommandBufferHandle("getStandaloneUniformBufferSlice", ctx);
 
-        VirtualProgram virtualProgram = virtualPrograms.get(program);
+        VirtualProgram virtualProgram = shaderPrograms.program(program);
         if (traceLookup) {
             logStandaloneProgramKeyTrace("lookup-request", program, virtualProgram, "getStandaloneUniformBufferSlice-enter");
-            java.util.ArrayList<Integer> keys = new java.util.ArrayList<>(virtualPrograms.keySet());
-            java.util.Collections.sort(keys);
+            java.util.List<Integer> keys = shaderPrograms.programIdsSnapshot();
             LOGGER.info(
                 "StandaloneLookupDecisionTrace stage=virtual-program programId={} containsExactKey={} mapSize={} nearestEntries={} virtualProgramPresent={} reflectedStandaloneBlockPresent={} backingSize={} backingDataPresent={} backingBufferPresent={}",
                 program,
-                yesNo(virtualPrograms.containsKey(program)),
-                virtualPrograms.size(),
+                yesNo(shaderPrograms.containsProgram(program)),
+                shaderPrograms.programCount(),
                 describeNearestProgramKeys(keys, program),
                 yesNo(virtualProgram != null),
                 yesNo(virtualProgram != null
@@ -8345,7 +6852,7 @@ void main() {
             if (offset < 0) {
                 continue;
             }
-            if (standaloneUniformIsIntegerLike(field.type())) {
+            if (VulkanShaderProgramCoordinator.standaloneUniformIsIntegerLike(field.type())) {
                 VulkanicAPI.traceShaderInputParityStandaloneUniformBlockMemberInts(
                     "vulkan-standalone-ubo",
                     program,
@@ -8357,9 +6864,9 @@ void main() {
                     offset,
                     field.arraySize(),
                     field.stride(),
-                    readStandaloneUniformInts(field, source, offset)
+                    VulkanShaderProgramCoordinator.readStandaloneUniformInts(field, source, offset)
                 );
-            } else if (standaloneUniformIsFloatLike(field.type())) {
+            } else if (VulkanShaderProgramCoordinator.standaloneUniformIsFloatLike(field.type())) {
                 VulkanicAPI.traceShaderInputParityStandaloneUniformBlockMemberFloats(
                     "vulkan-standalone-ubo",
                     program,
@@ -8371,7 +6878,7 @@ void main() {
                     offset,
                     field.arraySize(),
                     field.stride(),
-                    readStandaloneUniformFloats(field, source, offset)
+                    VulkanShaderProgramCoordinator.readStandaloneUniformFloats(field, source, offset)
                 );
             }
         }
@@ -8499,7 +7006,7 @@ void main() {
      */
     public int getUniformLocation(CommandContext ctx, int program, CharSequence name) {
         requireVulkanCommandBufferHandle("getUniformLocation", ctx);
-        VirtualProgram virtualProgram = virtualPrograms.get(program);
+        VirtualProgram virtualProgram = shaderPrograms.program(program);
         if (virtualProgram == null) {
             return -1;
         }
@@ -8510,7 +7017,7 @@ void main() {
             return -1;
         }
 
-        return resolveUniformLocationToken(program, virtualProgram, uniformName, uniformIndex);
+        return shaderPrograms.resolveUniformLocationToken(program, virtualProgram, uniformName, uniformIndex);
     }
 
     // =====================================================================
@@ -8964,12 +7471,20 @@ void main() {
         if (spine.isRenderPassRecording()) {
             throw new IllegalStateException("Cannot dispatch Vulkan compute while a render pass is active.");
         }
-        VulkanPipelineHandle pipeline = bindLegacyComputePipelineForDispatch(commandBufferHandle);
-        if (pipeline == null) {
+        MaterializedComputePipelineBinding materialized = materializeLegacyComputePipelineForDispatch(commandBufferHandle);
+        if (materialized == null) {
             throw new IllegalStateException("No valid Vulkan compute pipeline is bound for dispatchCompute.");
         }
-        VkCommandBuffer activeCommandBuffer = spine.requireRecordingCommandBuffer(commandBufferHandle, "dispatchCompute");
-        VK10.vkCmdDispatch(activeCommandBuffer, workX, workY, workZ);
+        spine.executeComputeDispatch(
+            commandBufferHandle,
+            materialized,
+            VulkanComputeCommandExecutionCoordinator.ComputeDispatchRequirement.direct(
+                "dispatchCompute",
+                workX,
+                workY,
+                workZ
+            )
+        );
     }
 
     public void dispatchComputeIndirect(CommandContext ctx, long offset) {
@@ -8981,8 +7496,8 @@ void main() {
         if (spine.isRenderPassRecording()) {
             throw new IllegalStateException("Cannot dispatch Vulkan compute while a render pass is active.");
         }
-        VulkanPipelineHandle pipeline = bindLegacyComputePipelineForDispatch(commandBufferHandle);
-        if (pipeline == null) {
+        MaterializedComputePipelineBinding materialized = materializeLegacyComputePipelineForDispatch(commandBufferHandle);
+        if (materialized == null) {
             throw new IllegalStateException("No valid Vulkan compute pipeline is bound for dispatchComputeIndirect.");
         }
         int bufferId = bufferVertexResources.boundLegacyBufferId(VulkanicAPI.GL_DISPATCH_INDIRECT_BUFFER);
@@ -8995,8 +7510,15 @@ void main() {
         if (indirectBuffer == null || indirectBuffer.isClosed()) {
             throw new IllegalStateException("dispatchComputeIndirect buffer " + bufferId + " has no Vulkan buffer storage.");
         }
-        VkCommandBuffer activeCommandBuffer = spine.requireRecordingCommandBuffer(commandBufferHandle, "dispatchComputeIndirect");
-        VK10.vkCmdDispatchIndirect(activeCommandBuffer, indirectBuffer.getVkBufferHandle(), offset);
+        spine.executeComputeDispatch(
+            commandBufferHandle,
+            materialized,
+            VulkanComputeCommandExecutionCoordinator.ComputeDispatchRequirement.indirect(
+                "dispatchComputeIndirect",
+                indirectBuffer.getVkBufferHandle(),
+                offset
+            )
+        );
     }
 
     public void disposeQueryObject(CommandContext ctx, int id) {
@@ -9235,7 +7757,7 @@ void main() {
         requireVulkanCommandBufferHandle("getProgramiv", ctx);
         if (params != null && params.length > 0) {
             if (pname == VulkanicAPI.GL_COMPUTE_WORK_GROUP_SIZE) {
-                VirtualProgram virtualProgram = virtualPrograms.get(program);
+                VirtualProgram virtualProgram = shaderPrograms.program(program);
                 int[] localSize = virtualProgram == null ? new int[]{1, 1, 1} : virtualProgram.computeWorkGroupSize;
                 for (int i = 0; i < params.length; i++) {
                     params[i] = i < localSize.length ? localSize[i] : 0;
@@ -9337,7 +7859,7 @@ void main() {
 
     public boolean isProgram(CommandContext ctx, int program) {
         requireVulkanCommandBufferHandle("isProgram", ctx);
-        return program != 0 && virtualPrograms.containsKey(program);
+        return shaderPrograms.containsProgram(program);
     }
 
     public boolean isTexture(CommandContext ctx, int texture) {
@@ -9363,12 +7885,12 @@ void main() {
 
     private void rememberDebugLabel(int type, int object, @Nullable String label) {
         if (type == VulkanicAPI.GL_PROGRAM) {
-            VirtualProgram virtualProgram = virtualPrograms.get(object);
+            VirtualProgram virtualProgram = shaderPrograms.program(object);
             if (virtualProgram != null) {
                 virtualProgram.debugLabel = label;
             }
         } else if (type == VulkanicAPI.GL_SHADER) {
-            VirtualShader virtualShader = virtualShaders.get(object);
+            VirtualShader virtualShader = shaderPrograms.shader(object);
             if (virtualShader != null) {
                 virtualShader.debugLabel = label;
             }
@@ -9639,7 +8161,7 @@ void main() {
 
     public String retrieveActiveUniformBlockName(CommandContext ctx, int program, int uniformBlockIndex) {
         requireVulkanCommandBufferHandle("retrieveActiveUniformBlockName", ctx);
-        VirtualProgram virtualProgram = virtualPrograms.get(program);
+        VirtualProgram virtualProgram = shaderPrograms.program(program);
         if (virtualProgram == null || uniformBlockIndex < 0 || uniformBlockIndex >= virtualProgram.activeUniformBlocks.size()) {
             return "";
         }
@@ -9797,7 +8319,7 @@ void main() {
 
     public int getAttributeLocation(CommandContext ctx, int program, CharSequence name) {
         requireVulkanCommandBufferHandle("getAttributeLocation", ctx);
-        VirtualProgram virtualProgram = virtualPrograms.get(program);
+        VirtualProgram virtualProgram = shaderPrograms.program(program);
         if (virtualProgram == null || name == null) {
             return -1;
         }
@@ -9807,7 +8329,7 @@ void main() {
 
     public void setAttributeLocation(CommandContext ctx, int program, int index, CharSequence name) {
         requireVulkanCommandBufferHandle("setAttributeLocation", ctx);
-        VirtualProgram virtualProgram = virtualPrograms.get(program);
+        VirtualProgram virtualProgram = shaderPrograms.program(program);
         if (virtualProgram == null || name == null) {
             return;
         }
@@ -9821,7 +8343,7 @@ void main() {
      */
     public int getUniformBlockIndex(CommandContext ctx, int program, String uniformBlockName) {
         requireVulkanCommandBufferHandle("getUniformBlockIndex", ctx);
-        VirtualProgram virtualProgram = virtualPrograms.get(program);
+        VirtualProgram virtualProgram = shaderPrograms.program(program);
         return virtualProgram == null ? -1 : virtualProgram.activeUniformBlocks.indexOf(uniformBlockName);
     }
 
@@ -9841,7 +8363,7 @@ void main() {
     public String getActiveUniform(CommandContext ctx, int program, int index, int size,
                                    java.nio.IntBuffer type, java.nio.IntBuffer name) {
         requireVulkanCommandBufferHandle("getActiveUniform", ctx);
-        VirtualProgram virtualProgram = virtualPrograms.get(program);
+        VirtualProgram virtualProgram = shaderPrograms.program(program);
         if (virtualProgram == null || index < 0 || index >= virtualProgram.activeUniforms.size()) {
             return "";
         }
@@ -10229,19 +8751,11 @@ void main() {
     }
 
     private VirtualShader requireVirtualShader(int shaderId) {
-        VirtualShader virtualShader = virtualShaders.get(shaderId);
-        if (virtualShader == null) {
-            throw new IllegalArgumentException("Unknown Vulkan virtual shader handle: " + shaderId);
-        }
-        return virtualShader;
+        return shaderPrograms.requireShader(shaderId);
     }
 
     private VirtualProgram requireVirtualProgram(int programId) {
-        VirtualProgram virtualProgram = virtualPrograms.get(programId);
-        if (virtualProgram == null) {
-            throw new IllegalArgumentException("Unknown Vulkan virtual program handle: " + programId);
-        }
-        return virtualProgram;
+        return shaderPrograms.requireProgram(programId);
     }
 
     private void applyFramebufferReadState(int framebuffer) {
@@ -10308,7 +8822,7 @@ void main() {
         NativeSpine spine = nativeSpine;
         return switch (query) {
             case CONTEXT_FLAGS -> 0;
-            case CURRENT_PROGRAM -> boundVirtualProgram;
+            case CURRENT_PROGRAM -> shaderPrograms.boundProgramId();
             case VERTEX_ARRAY_BINDING -> bufferVertexResources.boundVertexArray();
             case ARRAY_BUFFER_BINDING -> spine != null
                 ? bufferVertexResources.boundLegacyBufferId(VulkanicAPI.GL_ARRAY_BUFFER)
@@ -10386,86 +8900,6 @@ void main() {
         }
 
         return sourceBuilder.toString();
-    }
-
-    private static final class VirtualShader {
-        private final VulkanicShaderStage stage;
-        private volatile String source;
-        private volatile VulkanicSpirvModule compiledModule;
-        private volatile long nativeShaderModuleHandle = VK10.VK_NULL_HANDLE;
-        private volatile boolean compileStatus;
-        private volatile boolean deletionPending;
-        private volatile String infoLog = "";
-        @Nullable
-        private volatile String debugLabel;
-
-        private VirtualShader(VulkanicShaderStage stage) {
-            this.stage = stage;
-        }
-    }
-
-    private static final class VirtualProgram {
-        private final Set<Integer> attachedShaderIds = Collections.newSetFromMap(new ConcurrentHashMap<>());
-        private final Map<String, Integer> attributeLocationsByName = new ConcurrentHashMap<>();
-        private final Map<String, Integer> uniformLocationTokensByName = new ConcurrentHashMap<>();
-        private final ConcurrentHashMap<Integer, Integer> opaqueResourceUniformValuesByIndex = new ConcurrentHashMap<>();
-        private volatile List<String> activeUniformNames = List.of();
-        private volatile List<ReflectedUniform> activeUniforms = List.of();
-        private volatile List<String> activeUniformBlocks = List.of();
-        private volatile List<ReflectedResourceBinding> activeResourceBindings = List.of();
-        private volatile List<String> standaloneUniformDeclarations = List.of();
-        private volatile List<VulkanicSpirvModule> linkedSpirvModules = List.of();
-        private volatile List<ReflectedVertexInput> vertexInputs = List.of();
-        private volatile int[] computeWorkGroupSize = new int[]{1, 1, 1};
-        private volatile Map<Integer, StandaloneUniformField> standaloneFieldsByLocation = Map.of();
-        private volatile int standaloneBackingSize;
-        @Nullable
-        private volatile java.nio.ByteBuffer standaloneBackingData;
-        @Nullable
-        private volatile VulkanBuffer standaloneGpuBuffer;
-        private volatile boolean standaloneDirty;
-        private volatile boolean linkStatus;
-        private volatile String infoLog = "";
-        @Nullable
-        private volatile String debugLabel;
-
-        private void closeStandaloneUniformBacking() {
-            VulkanBuffer buffer = standaloneGpuBuffer;
-            standaloneGpuBuffer = null;
-            if (buffer != null && !buffer.isClosed()) {
-                buffer.close();
-            }
-        }
-    }
-
-    private record ReflectedVertexInput(int location, String typeName) {
-    }
-
-    private record ReflectedUniform(String name, int arraySize, int legacyType) {
-    }
-
-    private record ReflectedResourceRequest(String name, PipelineDescriptor.ResourceType type) {
-    }
-
-        private record ReflectedResourceBinding(String name, PipelineDescriptor.ResourceType type, int set, int binding) {
-    }
-
-    private record ExplicitDescriptorBinding(int set, int binding) {
-    }
-
-    private record DescriptorSlot(int set, int binding) {
-    }
-
-    record StandaloneUniformField(
-        String name,
-        net.vulkanic.VulkanicUniformReflectionType type,
-        int[] offsets,
-        int arraySize,
-        int stride
-    ) {
-    }
-
-    private record UniformLocationRef(int programId, int uniformIndex) {
     }
 
     private static final class NativeSpine {
@@ -10634,9 +9068,10 @@ void main() {
         private final Map<Long, Long> managedBufferAllocations = new ConcurrentHashMap<>();
         private final Map<Long, Long> managedBufferAllocationSizes = new ConcurrentHashMap<>();
         private final VulkanImageStateTracker imageStateTracker = new VulkanImageStateTracker();
-        private final Map<Long, Long> lastBoundGraphicsPipelineByCommandBuffer = new HashMap<>();
-        private final Map<Long, Long> lastBoundComputePipelineByCommandBuffer = new HashMap<>();
-        private final Map<Long, BoundIndexBufferState> boundIndexBuffersByCommandBuffer = new ConcurrentHashMap<>();
+        private final VulkanGraphicsCommandExecutionCoordinator graphicsCommandExecution =
+            new VulkanGraphicsCommandExecutionCoordinator();
+        private final VulkanComputeCommandExecutionCoordinator computeCommandExecution =
+            new VulkanComputeCommandExecutionCoordinator();
         @Nullable
         private volatile VulkanBuffer legacyDefaultVertexAttributeBuffer;
         private final VulkanRenderTargetStateManager<
@@ -10688,12 +9123,6 @@ void main() {
         private boolean attachmentFeedbackLoopLayoutEnabled;
         private long nextPresentId = 1L;
         private long windowHandle;
-        private boolean scissorTestEnabled;
-        private boolean hasCachedScissorRect;
-        private int cachedScissorX;
-        private int cachedScissorY;
-        private int cachedScissorWidth;
-        private int cachedScissorHeight;
         private volatile PendingPresentTextureRequest pendingPresentTextureRequest;
         private int activeTextureUnitIndex;
         private int consecutiveAcquireTimeouts;
@@ -10714,8 +9143,6 @@ void main() {
         private int debugParticleDescriptorSamplerLogCount;
         private int debugDescriptorUboLogCount;
         private int debugComparisonSamplerFallbackLogCount;
-        private long skippedRedundantPipelineBindCount;
-
         private final PixelStoreState pixelStoreState = new PixelStoreState();
 
         private static final boolean DEBUG_CLEAR_SWAPCHAIN_PRESENT_EXPERIMENT = false;
@@ -10749,9 +9176,6 @@ void main() {
                 );
             this.renderPassExecution =
                 new VulkanRenderPassExecutionCoordinator<>(backend.virtualFramebuffers, renderTargetState, imageStateTracker);
-        }
-
-        private record BoundIndexBufferState(long bufferHandle, int sizeBytes, VulkanicIndexType indexType) {
         }
 
         private static final class PixelStoreState {
@@ -11260,16 +9684,13 @@ void main() {
 
         private void resetSharedDescriptorPool() {
             descriptorManager.resetActiveDescriptorPool(logicalDevice, NativeSpine::checkVk);
-            lastBoundGraphicsPipelineByCommandBuffer.clear();
-            lastBoundComputePipelineByCommandBuffer.clear();
-            boundIndexBuffersByCommandBuffer.clear();
+            graphicsCommandExecution.clear();
+            computeCommandExecution.clear();
         }
 
         private void clearTrackedCommandBufferState(long commandBufferHandle) {
-            lastBoundGraphicsPipelineByCommandBuffer.remove(commandBufferHandle);
-            lastBoundComputePipelineByCommandBuffer.remove(commandBufferHandle);
-            descriptorManager.clearCommandBufferState(commandBufferHandle);
-            boundIndexBuffersByCommandBuffer.remove(commandBufferHandle);
+            graphicsCommandExecution.resetCommandBuffer(commandBufferHandle);
+            computeCommandExecution.resetCommandBuffer(commandBufferHandle);
         }
 
         private static boolean hasDepthAspect(@Nullable LegacyTextureObject texture) {
@@ -11726,41 +10147,86 @@ void main() {
         }
 
         private void updateAndBindDescriptorSet(long commandBufferHandle,
-                                                VulkanPipelineHandle pipeline,
-                                                PipelineDescriptor descriptor,
-                                                PipelineResourceBindings bindings) {
-            updateAndBindDescriptorSet(
-                commandBufferHandle,
-                pipeline,
-                descriptor,
-                bindings,
-                VK10.VK_PIPELINE_BIND_POINT_GRAPHICS,
-                true
-            );
+                                                 VulkanPipelineHandle pipeline,
+                                                 PipelineDescriptor descriptor,
+                                                 PipelineResourceBindings bindings) {
+            MaterializedGraphicsPipelineBinding materialized =
+                materializeGraphicsPipelineBinding(commandBufferHandle, pipeline, descriptor, bindings);
+            emitGraphicsExecutionPlan(graphicsCommandExecution.planDescriptorBinding(
+                commandBufferIdentity(commandBufferHandle),
+                activeRenderPassCompatibilityKey(),
+                graphicsPipelineRequirement(materialized.pipeline()),
+                graphicsDescriptorRequirement(materialized),
+                "bindPipelineResources"
+            ));
         }
 
-        private void updateAndBindComputeDescriptorSet(long commandBufferHandle,
-                                                       VulkanPipelineHandle pipeline,
-                                                       PipelineDescriptor descriptor,
-                                                       PipelineResourceBindings bindings) {
-            updateAndBindDescriptorSet(
-                commandBufferHandle,
-                pipeline,
-                descriptor,
-                bindings,
-                VK10.VK_PIPELINE_BIND_POINT_COMPUTE,
-                false
-            );
-        }
-
-        private void updateAndBindDescriptorSet(long commandBufferHandle,
-                                                VulkanPipelineHandle pipeline,
-                                                PipelineDescriptor descriptor,
-                                                PipelineResourceBindings bindings,
-                                                int bindPoint,
-                                                boolean bindGraphicsPipeline) {
+        private MaterializedGraphicsPipelineBinding materializeGraphicsPipelineBinding(
+            long commandBufferHandle,
+            VulkanPipelineHandle pipeline,
+            PipelineDescriptor descriptor,
+            PipelineResourceBindings bindings
+        ) {
             long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
-            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "bindPipelineResources");
+            requireRecordingCommandBuffer(commandBufferHandle, "materializeGraphicsPipelineBinding");
+
+            if (descriptorManager.activeDescriptorPool() == VK10.VK_NULL_HANDLE) {
+                throw new IllegalStateException("Descriptor pool is unavailable for Vulkan descriptor updates");
+            }
+            if (defaultDescriptorSampler == VK10.VK_NULL_HANDLE) {
+                throw new IllegalStateException("Default Vulkan sampler is unavailable for descriptor updates");
+            }
+
+            List<PipelineDescriptor.ResourceBinding> layoutBindings =
+                normalizeDescriptorLayoutBindings(descriptor.getResourceLayout().bindings());
+            if (pipeline.getResourceBindingCount() == 0 || layoutBindings.isEmpty()) {
+                return new MaterializedGraphicsPipelineBinding(pipeline, descriptor, null, null);
+            }
+
+            String pipelineLocation = descriptor.getPortableState().location().toString();
+            boolean sodiumChunkDescriptor = layoutBindings.stream()
+                .anyMatch(layoutBinding -> "SodiumChunkParams".contentEquals(layoutBinding.name()));
+            boolean particleDescriptor = "minecraft:pipeline/opaque_particle".equals(pipelineLocation)
+                || "minecraft:pipeline/translucent_particle".equals(pipelineLocation);
+
+            try {
+                DescriptorWritePlan writePlan = buildDescriptorWritePlan(
+                    layoutBindings,
+                    bindings,
+                    sodiumChunkDescriptor,
+                    particleDescriptor,
+                    pipelineLocation,
+                    pipeline.getVkPipelineHandle(),
+                    pipeline.getVkDescriptorSetLayoutHandle()
+                );
+                long descriptorSetHandle = descriptorManager.updateDescriptorSet(
+                    logicalDevice,
+                    pipeline.getVkDescriptorSetLayoutHandle(),
+                    writePlan.bindings(),
+                    writePlan.cacheKey(),
+                    NativeSpine::checkVk
+                );
+                return new MaterializedGraphicsPipelineBinding(
+                    pipeline,
+                    descriptor,
+                    descriptorSetHandle,
+                    writePlan.cacheKey()
+                );
+            } finally {
+                if (auditStartNanos != 0L) {
+                    VulkanPerfAudit.recordDescriptorBind(System.nanoTime() - auditStartNanos);
+                }
+            }
+        }
+
+        private MaterializedComputePipelineBinding materializeComputePipelineBinding(
+            long commandBufferHandle,
+            VulkanPipelineHandle pipeline,
+            PipelineDescriptor descriptor,
+            PipelineResourceBindings bindings
+        ) {
+            long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
+            requireRecordingCommandBuffer(commandBufferHandle, "materializeComputePipelineBinding");
 
             if (descriptorManager.activeDescriptorPool() == VK10.VK_NULL_HANDLE) {
                 throw new IllegalStateException("Descriptor pool is unavailable for Vulkan descriptor updates");
@@ -11777,28 +10243,8 @@ void main() {
             boolean particleDescriptor = "minecraft:pipeline/opaque_particle".equals(pipelineLocation)
                 || "minecraft:pipeline/translucent_particle".equals(pipelineLocation);
 
-            // If the pipeline has no descriptors at all, nothing more to do.
-            if (pipeline.getResourceBindingCount() == 0) {
-                // Even with no descriptors, bind the pipeline
-                if (bindGraphicsPipeline) {
-                    bindPipeline(commandBufferHandle, pipeline.getVkPipelineHandle());
-                }
-                return;
-            }
-
-            if (layoutBindings.isEmpty()) {
-                // Even with empty descriptors, bind the pipeline
-                if (bindGraphicsPipeline) {
-                    bindPipeline(commandBufferHandle, pipeline.getVkPipelineHandle());
-                }
-                return;
-            }
-
-            // Always bind the pipeline first so the GPU knows which shader/layout to use
-            // for subsequent draw calls. vkCmdBindPipeline is valid both inside and
-            // outside a render pass (Vulkan spec §19.3).
-            if (bindGraphicsPipeline) {
-                bindPipeline(commandBufferHandle, pipeline.getVkPipelineHandle());
+            if (pipeline.getResourceBindingCount() == 0 || layoutBindings.isEmpty()) {
+                return new MaterializedComputePipelineBinding(pipeline, descriptor, null, null);
             }
 
             try {
@@ -11811,18 +10257,18 @@ void main() {
                     pipeline.getVkPipelineHandle(),
                     pipeline.getVkDescriptorSetLayoutHandle()
                 );
-
-                descriptorManager.updateAndBindDescriptorSet(
+                long descriptorSetHandle = descriptorManager.updateDescriptorSet(
                     logicalDevice,
-                    commandBufferHandle,
-                    activeCommandBuffer,
-                    pipeline.getVkPipelineHandle(),
-                    pipeline.getVkPipelineLayoutHandle(),
                     pipeline.getVkDescriptorSetLayoutHandle(),
-                    bindPoint,
                     writePlan.bindings(),
                     writePlan.cacheKey(),
                     NativeSpine::checkVk
+                );
+                return new MaterializedComputePipelineBinding(
+                    pipeline,
+                    descriptor,
+                    descriptorSetHandle,
+                    writePlan.cacheKey()
                 );
             } finally {
                 if (auditStartNanos != 0L) {
@@ -14835,10 +13281,11 @@ void main() {
                 }
             }
 
+            int boundProgramId = backend.shaderPrograms.boundProgramId();
             VulkanDrawExecutionCoordinator.LegacyProgramSnapshot program =
-                backend.boundVirtualProgram <= 0
+                boundProgramId <= 0
                     ? null
-                    : backend.legacyProgramSnapshot(backend.getCurrentCommandContext(), backend.boundVirtualProgram);
+                    : backend.legacyProgramSnapshot(backend.getCurrentCommandContext(), boundProgramId);
             VulkanDrawExecutionCoordinator.DrawResourceSnapshot drawResources =
                 backend.legacyDrawResourceSnapshot();
             VulkanDrawExecutionCoordinator.DrawExecutionPlan plan =
@@ -14848,54 +13295,87 @@ void main() {
                     drawResources,
                     backend.legacyRenderStateSnapshot()
                 );
-            backend.bindLegacyProgramPipelineForDraw(commandBufferHandle, plan);
-            bindLegacyVertexBuffersForDraw(commandBufferHandle, plan.vertexStream());
+            MaterializedGraphicsPipelineBinding materialized =
+                backend.materializeLegacyProgramPipelineForDraw(commandBufferHandle, plan);
+            if (materialized == null) {
+                return;
+            }
+            List<VulkanGraphicsCommandExecutionCoordinator.VertexBufferBindingRequirement> vertexBuffers =
+                legacyVertexBufferRequirementsForDraw(plan.vertexStream());
+            VulkanGraphicsCommandExecutionCoordinator.IndexBufferBindingRequirement indexRequirement = null;
             if (request.indexed()) {
                 VulkanDrawExecutionCoordinator.IndexBufferSnapshot indexBuffer = drawResources.indexBuffer();
                 if (indexBuffer == null) {
                     throw new IllegalStateException("drawElements(index) requires allocated legacy buffer storage for GL_ELEMENT_ARRAY_BUFFER");
                 }
-                bindIndexBuffer(commandBufferHandle, indexBuffer.bufferHandle(), indexBuffer.sizeBytes(), request.indexType());
-                BoundIndexBufferState indexBufferState = boundIndexBuffersByCommandBuffer.get(commandBufferHandle);
-                if (indexBufferState == null) {
-                    throw new IllegalStateException("drawIndexed requires a bound index buffer");
-                }
+                indexRequirement = new VulkanGraphicsCommandExecutionCoordinator.IndexBufferBindingRequirement(
+                    indexBuffer.bufferHandle(),
+                    0L,
+                    indexBuffer.sizeBytes(),
+                    request.indexType()
+                );
                 backend.drawExecution.validateBoundIndexRange(
                     new VulkanDrawExecutionCoordinator.BoundIndexStream(
-                        indexBufferState.bufferHandle(),
-                        indexBufferState.sizeBytes(),
-                        indexBufferState.indexType()
+                        indexRequirement.bufferHandle(),
+                        indexRequirement.sizeBytes(),
+                        indexRequirement.indexType()
                     ),
                     plan.indexStream()
                 );
-                drawIndexed(
-                    commandBufferHandle,
-                    plan.command().firstIndex(),
-                    plan.command().indexCount(),
-                    plan.command().baseVertex(),
-                    plan.command().instanceCount()
-                );
-            } else {
-                drawInstanced(
-                    commandBufferHandle,
-                    plan.command().firstVertex(),
-                    plan.command().vertexCount(),
-                    plan.command().instanceCount()
-                );
             }
+            emitGraphicsExecutionPlan(graphicsCommandExecution.planGraphicsExecution(
+                new VulkanGraphicsCommandExecutionCoordinator.GraphicsExecutionRequest(
+                    commandBufferIdentity(commandBufferHandle),
+                    activeRenderPassCompatibilityKey(),
+                    request.source(),
+                    graphicsPipelineRequirement(materialized.pipeline()),
+                    graphicsDescriptorRequirement(materialized),
+                    vertexBuffers,
+                    indexRequirement,
+                    List.of(),
+                    List.of(),
+                    request.indexed()
+                        ? VulkanGraphicsCommandExecutionCoordinator.DrawCommandRequirement.indexed(
+                            request.source(),
+                            plan.command().firstIndex(),
+                            plan.command().indexCount(),
+                            plan.command().baseVertex(),
+                            plan.command().instanceCount()
+                        )
+                        : VulkanGraphicsCommandExecutionCoordinator.DrawCommandRequirement.arrays(
+                            request.source(),
+                            plan.command().firstVertex(),
+                            plan.command().vertexCount(),
+                            plan.command().instanceCount()
+                        )
+                )
+            ));
         }
 
-        private void bindLegacyVertexBuffersForDraw(
-            long commandBufferHandle,
+        private List<VulkanGraphicsCommandExecutionCoordinator.VertexBufferBindingRequirement> legacyVertexBufferRequirementsForDraw(
             VulkanDrawExecutionCoordinator.VertexStreamPlan vertexStream
         ) {
+            List<VulkanGraphicsCommandExecutionCoordinator.VertexBufferBindingRequirement> requirements =
+                new ArrayList<>(vertexStream.vertexBuffers().size());
             for (VulkanDrawExecutionCoordinator.VertexBufferBindingPlan binding : vertexStream.vertexBuffers()) {
+                int stride = 0;
+                PipelineDescriptor.VertexInputState vertexInput = vertexStream.vertexInputState();
+                if (vertexInput != null) {
+                    for (PipelineDescriptor.VertexInputBinding inputBinding : vertexInput.bindings()) {
+                        if (inputBinding.binding() == binding.binding()) {
+                            stride = inputBinding.stride();
+                            break;
+                        }
+                    }
+                }
                 if (binding.defaultAttributeBuffer()) {
-                    bindVertexBuffer(
-                        commandBufferHandle,
+                    requirements.add(new VulkanGraphicsCommandExecutionCoordinator.VertexBufferBindingRequirement(
                         binding.binding(),
-                        requireLegacyDefaultVertexAttributeBuffer().getVkBufferHandle()
-                    );
+                        requireLegacyDefaultVertexAttributeBuffer().getVkBufferHandle(),
+                        0L,
+                        stride,
+                        true
+                    ));
                     continue;
                 }
                 VulkanBufferVertexResourceManager.BufferStorageSnapshot snapshot =
@@ -14904,8 +13384,15 @@ void main() {
                 if (vertexBuffer == null || vertexBuffer.isClosed() || snapshot.logicalSizeBytes() <= 0) {
                     continue;
                 }
-                bindVertexBuffer(commandBufferHandle, binding.binding(), vertexBuffer.getVkBufferHandle(), binding.offset());
+                requirements.add(new VulkanGraphicsCommandExecutionCoordinator.VertexBufferBindingRequirement(
+                    binding.binding(),
+                    vertexBuffer.getVkBufferHandle(),
+                    binding.offset(),
+                    stride,
+                    false
+                ));
             }
+            return requirements;
         }
 
         private VulkanBuffer requireLegacyDefaultVertexAttributeBuffer() {
@@ -17096,7 +15583,7 @@ void main() {
 
                 beginRenderPass(commandBuffer.address(), VulkanRenderTargetPlan.textureView(descriptor, swapchainTargets));
                 passStarted = true;
-                bindPipeline(commandBuffer.address(), composePipeline.getVkPipelineHandle());
+                bindPipeline(commandBuffer.address(), composePipeline);
 
                 PipelineResourceBindings bindings = PipelineResourceBindings.builder()
                     .bindSampler("InSampler", sourceView, 0)
@@ -17162,10 +15649,17 @@ void main() {
                 renderPipeline,
                 List.of(vertexModule, fragmentModule)
             );
-            descriptor = withSupplementalRenderPipelineVertexInputState(
+            descriptor = VulkanShaderVariantPlanner.applyRenderPipelineVariantPlan(
                 descriptor,
                 renderPipeline,
-                collectRenderPipelineVertexInputs(renderPipeline, vertexWithDefines)
+                new VulkanShaderVariantPlanner.RenderPipelineSourcePlan(
+                    vertexWithDefines,
+                    fragmentWithDefines,
+                    VulkanShaderVariantPlanner.collectStandaloneUniformDeclarations(List.of(vertexWithDefines, fragmentWithDefines)),
+                    VulkanShaderVariantPlanner.standaloneUniformBlockBindingIndex(renderPipeline),
+                    VulkanShaderVariantPlanner.collectRenderPipelineVertexInputs(renderPipeline, vertexWithDefines),
+                    List.of()
+                )
             );
 
             long vertShaderModuleHandle = createShaderModule(vertexModule);
@@ -17661,7 +16155,6 @@ void main() {
                 frameExecution.completeFrameSubmit(submitPlan);
 
                 clearTrackedCommandBufferState(frameCommandBuffer.address());
-                backend.boundPipelineResourcesByCommandBuffer.remove(frameCommandBuffer.address());
             } catch (RuntimeException exception) {
                 frameExecution.failFrameSubmit(submitPlan, false);
                 throw exception;
@@ -17946,34 +16439,20 @@ void main() {
 
                     VK10.vkCmdBeginRenderPass(activeCommandBuffer, beginInfo, VK10.VK_SUBPASS_CONTENTS_INLINE);
 
-                    VkViewport.Buffer defaultViewport = VkViewport.calloc(1, stack);
-                    defaultViewport.get(0)
-                        .x(0.0f)
-                        .y(0.0f)
-                        .width((float) width)
-                        .height((float) height)
-                        .minDepth(0.0f)
-                        .maxDepth(1.0f);
-                    VK10.vkCmdSetViewport(activeCommandBuffer, 0, defaultViewport);
-
-                    VkRect2D.Buffer defaultScissor = VkRect2D.calloc(1, stack);
-                    defaultScissor.get(0)
-                        .offset(it -> it.x(0).y(0))
-                        .extent(it -> it.width(width).height(height));
-                    VK10.vkCmdSetScissor(activeCommandBuffer, 0, defaultScissor);
-
-                    scissorTestEnabled = false;
-                    hasCachedScissorRect = false;
-                    cachedScissorX = 0;
-                    cachedScissorY = 0;
-                    cachedScissorWidth = width;
-                    cachedScissorHeight = height;
-
                     trackSwapchainImageLayout(swapchainColorImageIndex, VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
                     renderPassExecution.completeBegin(
                         beginPlan,
                         swapchainState.presentRenderPass(),
                         swapchainState.presentFramebufferHandle(swapchainColorImageIndex)
+                    );
+                    graphicsCommandExecution.beginRenderPass(commandBufferHandle, beginPlan.compatibilityKey());
+                    emitDefaultRenderPassDynamicState(
+                        commandBufferHandle,
+                        true,
+                        width,
+                        height,
+                        beginPlan.compatibilityKey(),
+                        "beginRenderPass(default-swapchain)"
                     );
                     return beginPlan.compatibilityKey();
 	                }
@@ -18098,35 +16577,20 @@ void main() {
 
                 VK10.vkCmdBeginRenderPass(activeCommandBuffer, beginInfo, VK10.VK_SUBPASS_CONTENTS_INLINE);
 
-                VkViewport.Buffer defaultViewport = VkViewport.calloc(1, stack);
-                defaultViewport.get(0)
-                    .x(0.0f)
-					.y(swapchainColorAttachment ? 0.0f : (float) height)
-                    .width((float) width)
-					.height(swapchainColorAttachment ? (float) height : -(float) height)
-                    .minDepth(0.0f)
-                    .maxDepth(1.0f);
-                VK10.vkCmdSetViewport(activeCommandBuffer, 0, defaultViewport);
-
-                VkRect2D.Buffer defaultScissor = VkRect2D.calloc(1, stack);
-                defaultScissor.get(0)
-                    .offset(it -> it.x(0).y(0))
-                    .extent(it -> it.width(width).height(height));
-                VK10.vkCmdSetScissor(activeCommandBuffer, 0, defaultScissor);
-
-                // Start each render pass with an unclipped scissor baseline.
-                scissorTestEnabled = false;
-                hasCachedScissorRect = false;
-                cachedScissorX = 0;
-                cachedScissorY = 0;
-                cachedScissorWidth = width;
-                cachedScissorHeight = height;
-
                 if (swapchainColorAttachment && swapchainColorImageIndex >= 0) {
                     trackSwapchainImageLayout(swapchainColorImageIndex, VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
                 }
-                renderPassExecution.completeBegin(beginPlan, renderPassHandle, framebufferHandle);
-                trackTransientRenderPassHandle(renderPassHandle);
+	                renderPassExecution.completeBegin(beginPlan, renderPassHandle, framebufferHandle);
+                    graphicsCommandExecution.beginRenderPass(commandBufferHandle, compatibilityKey);
+                    emitDefaultRenderPassDynamicState(
+                        commandBufferHandle,
+                        swapchainColorAttachment,
+                        width,
+                        height,
+                        compatibilityKey,
+                        "beginRenderPass(default-texture)"
+                    );
+	                trackTransientRenderPassHandle(renderPassHandle);
                 trackTransientFramebufferHandle(framebufferHandle);
                 return compatibilityKey;
             } catch (RuntimeException exception) {
@@ -18387,30 +16851,16 @@ void main() {
 
                 VK10.vkCmdBeginRenderPass(activeCommandBuffer, beginInfo, VK10.VK_SUBPASS_CONTENTS_INLINE);
 
-                VkViewport.Buffer defaultViewport = VkViewport.calloc(1, stack);
-                defaultViewport.get(0)
-                    .x(0.0f)
-                    .y((float) targets.height)
-                    .width((float) targets.width)
-                    .height(-(float) targets.height)
-                    .minDepth(0.0f)
-                    .maxDepth(1.0f);
-                VK10.vkCmdSetViewport(activeCommandBuffer, 0, defaultViewport);
-
-                VkRect2D.Buffer defaultScissor = VkRect2D.calloc(1, stack);
-                defaultScissor.get(0)
-                    .offset(it -> it.x(0).y(0))
-                    .extent(it -> it.width(targets.width).height(targets.height));
-                VK10.vkCmdSetScissor(activeCommandBuffer, 0, defaultScissor);
-
-                scissorTestEnabled = false;
-                hasCachedScissorRect = false;
-                cachedScissorX = 0;
-                cachedScissorY = 0;
-                cachedScissorWidth = targets.width;
-                cachedScissorHeight = targets.height;
-
                 renderPassExecution.completeBegin(beginPlan, renderPassHandle, framebufferHandle);
+                graphicsCommandExecution.beginRenderPass(commandBufferHandle, compatibilityKey);
+                emitDefaultRenderPassDynamicState(
+                    commandBufferHandle,
+                    false,
+                    targets.width,
+                    targets.height,
+                    compatibilityKey,
+                    "beginRenderPass(default-framebuffer)"
+                );
                 // Permanently-cached render passes must NOT be added to transient handles.
                 // Only add to transient if this was a newly-created (non-cached) handle.
                 if (!renderPassExecution.isPermanentRenderPass(renderPassHandle)) {
@@ -18435,6 +16885,478 @@ void main() {
             return swapchainState.imageIndexForViewHandle(imageViewHandle) >= 0;
         }
 
+        private VulkanGraphicsCommandExecutionCoordinator.CommandBufferIdentity commandBufferIdentity(long commandBufferHandle) {
+            VulkanGraphicsCommandExecutionCoordinator.CommandBufferKind kind =
+                isCurrentFrameCommandBufferHandle(commandBufferHandle)
+                    ? VulkanGraphicsCommandExecutionCoordinator.CommandBufferKind.FRAME
+                    : VulkanGraphicsCommandExecutionCoordinator.CommandBufferKind.PRIMARY;
+            return new VulkanGraphicsCommandExecutionCoordinator.CommandBufferIdentity(commandBufferHandle, 0L, kind);
+        }
+
+        private VulkanComputeCommandExecutionCoordinator.CommandBufferIdentity computeCommandBufferIdentity(long commandBufferHandle) {
+            VulkanComputeCommandExecutionCoordinator.CommandBufferKind kind =
+                isCurrentFrameCommandBufferHandle(commandBufferHandle)
+                    ? VulkanComputeCommandExecutionCoordinator.CommandBufferKind.FRAME
+                    : VulkanComputeCommandExecutionCoordinator.CommandBufferKind.PRIMARY;
+            return new VulkanComputeCommandExecutionCoordinator.CommandBufferIdentity(commandBufferHandle, 0L, kind);
+        }
+
+        private VulkanGraphicsCommandExecutionCoordinator.PipelineBindingRequirement graphicsPipelineRequirement(
+            VulkanPipelineHandle pipeline
+        ) {
+            return new VulkanGraphicsCommandExecutionCoordinator.PipelineBindingRequirement(
+                pipeline.getVkPipelineHandle(),
+                pipeline.getVkPipelineLayoutHandle(),
+                pipeline.getRenderPassCompatibilityKey()
+            );
+        }
+
+        @Nullable
+        private VulkanGraphicsCommandExecutionCoordinator.DescriptorBindingRequirement graphicsDescriptorRequirement(
+            MaterializedGraphicsPipelineBinding materialized
+        ) {
+            Long descriptorSetHandle = materialized.descriptorSetHandle();
+            if (descriptorSetHandle == null || descriptorSetHandle == VK10.VK_NULL_HANDLE) {
+                return null;
+            }
+            return new VulkanGraphicsCommandExecutionCoordinator.DescriptorBindingRequirement(
+                materialized.pipeline().getVkPipelineLayoutHandle(),
+                descriptorSetHandle,
+                materialized.pipeline().getVkDescriptorSetLayoutHandle(),
+                materialized.descriptorCacheKey(),
+                List.of()
+            );
+        }
+
+        private VulkanComputeCommandExecutionCoordinator.ComputePipelineRequirement computePipelineRequirement(
+            VulkanPipelineHandle pipeline
+        ) {
+            return new VulkanComputeCommandExecutionCoordinator.ComputePipelineRequirement(
+                pipeline.getVkPipelineHandle(),
+                pipeline.getVkPipelineLayoutHandle()
+            );
+        }
+
+        @Nullable
+        private VulkanComputeCommandExecutionCoordinator.ComputeDescriptorRequirement computeDescriptorRequirement(
+            MaterializedComputePipelineBinding materialized
+        ) {
+            Long descriptorSetHandle = materialized.descriptorSetHandle();
+            if (descriptorSetHandle == null || descriptorSetHandle == VK10.VK_NULL_HANDLE) {
+                return null;
+            }
+            return new VulkanComputeCommandExecutionCoordinator.ComputeDescriptorRequirement(
+                materialized.pipeline().getVkPipelineLayoutHandle(),
+                descriptorSetHandle,
+                materialized.pipeline().getVkDescriptorSetLayoutHandle(),
+                materialized.descriptorCacheKey(),
+                List.of()
+            );
+        }
+
+        private VulkanGraphicsCommandExecutionCoordinator.RenderTargetContext renderTargetContext() {
+            return new VulkanGraphicsCommandExecutionCoordinator.RenderTargetContext(
+                isRenderPassRecording(),
+                renderPassExecution.activeTargetsSwapchain(),
+                renderPassExecution.activeWidth(),
+                renderPassExecution.activeHeight(),
+                swapchainState.width(),
+                swapchainState.height()
+            );
+        }
+
+        private VulkanGraphicsCommandExecutionCoordinator.RenderTargetContext renderTargetContext(
+            boolean targetsSwapchain,
+            int width,
+            int height
+        ) {
+            return new VulkanGraphicsCommandExecutionCoordinator.RenderTargetContext(
+                true,
+                targetsSwapchain,
+                width,
+                height,
+                swapchainState.width(),
+                swapchainState.height()
+            );
+        }
+
+        private void emitDefaultRenderPassDynamicState(
+            long commandBufferHandle,
+            boolean targetsSwapchain,
+            int width,
+            int height,
+            @Nullable Object renderPassCompatibilityKey,
+            String semanticSource
+        ) {
+            emitGraphicsDynamicStatePlan(graphicsCommandExecution.planRenderPassDefaultDynamicState(
+                commandBufferIdentity(commandBufferHandle),
+                renderPassCompatibilityKey,
+                renderTargetContext(targetsSwapchain, width, height),
+                semanticSource
+            ));
+        }
+
+        private void emitGraphicsExecutionPlan(VulkanGraphicsCommandExecutionCoordinator.GraphicsExecutionPlan plan) {
+            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(
+                plan.request().commandBuffer().handle(),
+                plan.request().semanticSource()
+            );
+            if (!isRenderPassRecording()) {
+                throw new IllegalStateException(plan.request().semanticSource() + " requires an active render pass");
+            }
+
+            try {
+                for (VulkanGraphicsCommandExecutionCoordinator.GraphicsCommandOperation operation : plan.operations()) {
+                    switch (operation.type()) {
+                        case BIND_PIPELINE -> cmdBindGraphicsPipeline(
+                            activeCommandBuffer,
+                            (VulkanGraphicsCommandExecutionCoordinator.PipelineBindingRequirement) operation.payload()
+                        );
+                        case BIND_DESCRIPTOR_SET -> cmdBindGraphicsDescriptorSet(
+                            activeCommandBuffer,
+                            (VulkanGraphicsCommandExecutionCoordinator.DescriptorBindingRequirement) operation.payload()
+                        );
+                        case BIND_VERTEX_BUFFER -> cmdBindVertexBuffer(
+                            activeCommandBuffer,
+                            (VulkanGraphicsCommandExecutionCoordinator.VertexBufferBindingRequirement) operation.payload()
+                        );
+                        case BIND_INDEX_BUFFER -> cmdBindIndexBuffer(
+                            activeCommandBuffer,
+                            (VulkanGraphicsCommandExecutionCoordinator.IndexBufferBindingRequirement) operation.payload()
+                        );
+                        case DYNAMIC_STATE -> cmdSetDynamicGraphicsState(
+                            activeCommandBuffer,
+                            (VulkanGraphicsCommandExecutionCoordinator.DynamicStateRequirement) operation.payload()
+                        );
+                        case PUSH_CONSTANTS -> cmdPushGraphicsConstants(
+                            activeCommandBuffer,
+                            (VulkanGraphicsCommandExecutionCoordinator.PushConstantRequirement) operation.payload()
+                        );
+                        case DRAW -> cmdDrawPlanned(
+                            activeCommandBuffer,
+                            (VulkanGraphicsCommandExecutionCoordinator.DrawCommandRequirement) operation.payload()
+                        );
+                    }
+                }
+                graphicsCommandExecution.complete(plan);
+            } catch (RuntimeException exception) {
+                graphicsCommandExecution.abandon(plan);
+                throw exception;
+            }
+        }
+
+        private void emitGraphicsDynamicStatePlan(
+            VulkanGraphicsCommandExecutionCoordinator.DynamicStatePlan plan
+        ) {
+            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(
+                plan.commandBuffer().handle(),
+                plan.semanticSource()
+            );
+            try {
+                for (VulkanGraphicsCommandExecutionCoordinator.GraphicsCommandOperation operation : plan.operations()) {
+                    if (operation.type() != VulkanGraphicsCommandExecutionCoordinator.GraphicsCommandOperationType.DYNAMIC_STATE) {
+                        throw new IllegalStateException("Unexpected graphics dynamic-state operation: " + operation.type());
+                    }
+                    cmdSetDynamicGraphicsState(
+                        activeCommandBuffer,
+                        (VulkanGraphicsCommandExecutionCoordinator.DynamicStateRequirement) operation.payload()
+                    );
+                }
+                graphicsCommandExecution.complete(plan);
+            } catch (RuntimeException exception) {
+                graphicsCommandExecution.abandon(plan);
+                throw exception;
+            }
+        }
+
+        private void cmdBindGraphicsPipeline(
+            VkCommandBuffer commandBuffer,
+            VulkanGraphicsCommandExecutionCoordinator.PipelineBindingRequirement pipeline
+        ) {
+            VK10.vkCmdBindPipeline(
+                commandBuffer,
+                VK10.VK_PIPELINE_BIND_POINT_GRAPHICS,
+                pipeline.pipelineHandle()
+            );
+        }
+
+        private void cmdBindGraphicsDescriptorSet(
+            VkCommandBuffer commandBuffer,
+            VulkanGraphicsCommandExecutionCoordinator.DescriptorBindingRequirement descriptor
+        ) {
+            try (MemoryStack stack = stackPush()) {
+                java.nio.IntBuffer dynamicOffsets = null;
+                if (!descriptor.dynamicOffsets().isEmpty()) {
+                    dynamicOffsets = stack.mallocInt(descriptor.dynamicOffsets().size());
+                    for (int offset : descriptor.dynamicOffsets()) {
+                        dynamicOffsets.put(offset);
+                    }
+                    dynamicOffsets.flip();
+                }
+                VK10.vkCmdBindDescriptorSets(
+                    commandBuffer,
+                    VK10.VK_PIPELINE_BIND_POINT_GRAPHICS,
+                    descriptor.pipelineLayoutHandle(),
+                    0,
+                    stack.longs(descriptor.descriptorSetHandle()),
+                    dynamicOffsets
+                );
+            }
+        }
+
+        private void cmdSetDynamicGraphicsState(
+            VkCommandBuffer commandBuffer,
+            VulkanGraphicsCommandExecutionCoordinator.DynamicStateRequirement dynamicState
+        ) {
+            switch (dynamicState.name()) {
+                case "viewport" -> cmdSetNormalizedViewport(
+                    commandBuffer,
+                    (VulkanGraphicsCommandExecutionCoordinator.NormalizedViewport) dynamicState.value()
+                );
+                case "scissor" -> cmdSetNormalizedScissor(
+                    commandBuffer,
+                    (VulkanGraphicsCommandExecutionCoordinator.NormalizedScissor) dynamicState.value()
+                );
+                default -> throw new IllegalArgumentException("Unsupported Vulkan dynamic graphics state: " + dynamicState.name());
+            }
+        }
+
+        private void cmdSetNormalizedViewport(
+            VkCommandBuffer commandBuffer,
+            VulkanGraphicsCommandExecutionCoordinator.NormalizedViewport viewport
+        ) {
+            try (MemoryStack stack = stackPush()) {
+                VkViewport.Buffer vkViewport = VkViewport.calloc(1, stack);
+                vkViewport.get(0)
+                    .x(viewport.x())
+                    .y(viewport.y())
+                    .width(viewport.width())
+                    .height(viewport.height())
+                    .minDepth(viewport.minDepth())
+                    .maxDepth(viewport.maxDepth());
+                VK10.vkCmdSetViewport(commandBuffer, 0, vkViewport);
+            }
+        }
+
+        private void cmdSetNormalizedScissor(
+            VkCommandBuffer commandBuffer,
+            VulkanGraphicsCommandExecutionCoordinator.NormalizedScissor scissor
+        ) {
+            try (MemoryStack stack = stackPush()) {
+                VkRect2D.Buffer vkScissor = VkRect2D.calloc(1, stack);
+                vkScissor.get(0).offset().x(scissor.x()).y(scissor.y());
+                vkScissor.get(0).extent().width(scissor.width()).height(scissor.height());
+                VK10.vkCmdSetScissor(commandBuffer, 0, vkScissor);
+            }
+        }
+
+        private void cmdPushGraphicsConstants(
+            VkCommandBuffer commandBuffer,
+            VulkanGraphicsCommandExecutionCoordinator.PushConstantRequirement pushConstant
+        ) {
+            byte[] bytes = pushConstant.bytes();
+            if (bytes.length == 0) {
+                return;
+            }
+            try (MemoryStack stack = stackPush()) {
+                java.nio.ByteBuffer buffer = stack.malloc(bytes.length);
+                buffer.put(bytes);
+                buffer.flip();
+                VK10.vkCmdPushConstants(
+                    commandBuffer,
+                    pushConstant.pipelineLayoutHandle(),
+                    pushConstant.stageFlags(),
+                    pushConstant.offset(),
+                    buffer
+                );
+            }
+        }
+
+        private void executeComputeDispatch(
+            long commandBufferHandle,
+            MaterializedComputePipelineBinding materialized,
+            VulkanComputeCommandExecutionCoordinator.ComputeDispatchRequirement dispatch
+        ) {
+            requireRecordingCommandBuffer(commandBufferHandle, dispatch.semanticSource());
+            if (isRenderPassRecording()) {
+                throw new IllegalStateException("Cannot dispatch Vulkan compute while a render pass is active.");
+            }
+            emitComputeExecutionPlan(computeCommandExecution.planComputeExecution(
+                new VulkanComputeCommandExecutionCoordinator.ComputeExecutionRequest(
+                    computeCommandBufferIdentity(commandBufferHandle),
+                    dispatch.semanticSource(),
+                    computePipelineRequirement(materialized.pipeline()),
+                    computeDescriptorRequirement(materialized),
+                    List.of(),
+                    dispatch
+                )
+            ));
+        }
+
+        private void emitComputeExecutionPlan(VulkanComputeCommandExecutionCoordinator.ComputeExecutionPlan plan) {
+            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(
+                plan.request().commandBuffer().handle(),
+                plan.request().semanticSource()
+            );
+            if (isRenderPassRecording()) {
+                throw new IllegalStateException("Cannot dispatch Vulkan compute while a render pass is active.");
+            }
+
+            try {
+                for (VulkanComputeCommandExecutionCoordinator.ComputeCommandOperation operation : plan.operations()) {
+                    switch (operation.type()) {
+                        case BIND_PIPELINE -> cmdBindComputePipeline(
+                            activeCommandBuffer,
+                            (VulkanComputeCommandExecutionCoordinator.ComputePipelineRequirement) operation.payload()
+                        );
+                        case BIND_DESCRIPTOR_SET -> cmdBindComputeDescriptorSet(
+                            activeCommandBuffer,
+                            (VulkanComputeCommandExecutionCoordinator.ComputeDescriptorRequirement) operation.payload()
+                        );
+                        case PUSH_CONSTANTS -> cmdPushComputeConstants(
+                            activeCommandBuffer,
+                            (VulkanComputeCommandExecutionCoordinator.PushConstantRequirement) operation.payload()
+                        );
+                        case DISPATCH -> cmdDispatchPlanned(
+                            activeCommandBuffer,
+                            (VulkanComputeCommandExecutionCoordinator.ComputeDispatchRequirement) operation.payload()
+                        );
+                    }
+                }
+                computeCommandExecution.complete(plan);
+            } catch (RuntimeException exception) {
+                computeCommandExecution.abandon(plan);
+                throw exception;
+            }
+        }
+
+        private void cmdBindComputePipeline(
+            VkCommandBuffer commandBuffer,
+            VulkanComputeCommandExecutionCoordinator.ComputePipelineRequirement pipeline
+        ) {
+            VK10.vkCmdBindPipeline(
+                commandBuffer,
+                VK10.VK_PIPELINE_BIND_POINT_COMPUTE,
+                pipeline.pipelineHandle()
+            );
+        }
+
+        private void cmdBindComputeDescriptorSet(
+            VkCommandBuffer commandBuffer,
+            VulkanComputeCommandExecutionCoordinator.ComputeDescriptorRequirement descriptor
+        ) {
+            try (MemoryStack stack = stackPush()) {
+                java.nio.IntBuffer dynamicOffsets = null;
+                if (!descriptor.dynamicOffsets().isEmpty()) {
+                    dynamicOffsets = stack.mallocInt(descriptor.dynamicOffsets().size());
+                    for (int offset : descriptor.dynamicOffsets()) {
+                        dynamicOffsets.put(offset);
+                    }
+                    dynamicOffsets.flip();
+                }
+                VK10.vkCmdBindDescriptorSets(
+                    commandBuffer,
+                    VK10.VK_PIPELINE_BIND_POINT_COMPUTE,
+                    descriptor.pipelineLayoutHandle(),
+                    0,
+                    stack.longs(descriptor.descriptorSetHandle()),
+                    dynamicOffsets
+                );
+            }
+        }
+
+        private void cmdPushComputeConstants(
+            VkCommandBuffer commandBuffer,
+            VulkanComputeCommandExecutionCoordinator.PushConstantRequirement pushConstant
+        ) {
+            byte[] bytes = pushConstant.bytes();
+            if (bytes.length == 0) {
+                return;
+            }
+            try (MemoryStack stack = stackPush()) {
+                java.nio.ByteBuffer buffer = stack.malloc(bytes.length);
+                buffer.put(bytes);
+                buffer.flip();
+                VK10.vkCmdPushConstants(
+                    commandBuffer,
+                    pushConstant.pipelineLayoutHandle(),
+                    pushConstant.stageFlags(),
+                    pushConstant.offset(),
+                    buffer
+                );
+            }
+        }
+
+        private void cmdDispatchPlanned(
+            VkCommandBuffer commandBuffer,
+            VulkanComputeCommandExecutionCoordinator.ComputeDispatchRequirement dispatch
+        ) {
+            switch (dispatch.kind()) {
+                case DIRECT -> VK10.vkCmdDispatch(
+                    commandBuffer,
+                    dispatch.workX(),
+                    dispatch.workY(),
+                    dispatch.workZ()
+                );
+                case INDIRECT -> VK10.vkCmdDispatchIndirect(
+                    commandBuffer,
+                    dispatch.indirectBufferHandle(),
+                    dispatch.indirectOffset()
+                );
+            }
+        }
+
+        private void cmdBindVertexBuffer(
+            VkCommandBuffer commandBuffer,
+            VulkanGraphicsCommandExecutionCoordinator.VertexBufferBindingRequirement vertex
+        ) {
+            try (MemoryStack stack = stackPush()) {
+                java.nio.LongBuffer buffers = stack.longs(vertex.bufferHandle());
+                java.nio.LongBuffer offsets = stack.longs(vertex.offset());
+                VK10.vkCmdBindVertexBuffers(commandBuffer, vertex.binding(), buffers, offsets);
+            }
+        }
+
+        private void cmdBindIndexBuffer(
+            VkCommandBuffer commandBuffer,
+            VulkanGraphicsCommandExecutionCoordinator.IndexBufferBindingRequirement index
+        ) {
+            int vkIndexType;
+            switch (index.indexType()) {
+                case SHORT -> vkIndexType = VK10.VK_INDEX_TYPE_UINT16;
+                case INT -> vkIndexType = VK10.VK_INDEX_TYPE_UINT32;
+                case BYTE -> throw new UnsupportedOperationException(
+                    "Vulkan index type BYTE requires VK_EXT_index_type_uint8 and is not supported yet.");
+                default -> throw new IllegalArgumentException("Unsupported VulkanicIndexType: " + index.indexType());
+            }
+            VK10.vkCmdBindIndexBuffer(commandBuffer, index.bufferHandle(), index.offset(), vkIndexType);
+        }
+
+        private void cmdDrawPlanned(
+            VkCommandBuffer commandBuffer,
+            VulkanGraphicsCommandExecutionCoordinator.DrawCommandRequirement draw
+        ) {
+            switch (draw.kind()) {
+                case NONE -> {
+                }
+                case ARRAYS -> VK10.vkCmdDraw(
+                    commandBuffer,
+                    draw.vertexCount(),
+                    draw.instanceCount(),
+                    draw.firstVertex(),
+                    draw.baseInstance()
+                );
+                case INDEXED -> VK10.vkCmdDrawIndexed(
+                    commandBuffer,
+                    draw.indexCount(),
+                    draw.instanceCount(),
+                    draw.firstIndex(),
+                    draw.baseVertex(),
+                    draw.baseInstance()
+                );
+            }
+        }
+
         private void endRenderPass(long commandBufferHandle) {
             VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "endRenderPass");
             if (!isRenderPassRecording()) {
@@ -18450,6 +17372,7 @@ void main() {
             if (endResult.swapchainImageIndex() >= 0) {
                 trackSwapchainImageLayout(endResult.swapchainImageIndex(), endResult.swapchainFinalLayout());
             }
+            graphicsCommandExecution.endRenderPass(commandBufferHandle);
         }
 
         private void bindVertexBuffer(long commandBufferHandle, int slot, long bufferHandle) {
@@ -18457,7 +17380,7 @@ void main() {
         }
 
         private void bindVertexBuffer(long commandBufferHandle, int slot, long bufferHandle, long offset) {
-            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "bindVertexBuffer");
+            requireRecordingCommandBuffer(commandBufferHandle, "bindVertexBuffer");
             if (!isRenderPassRecording()) {
                 throw new IllegalStateException("bindVertexBuffer requires an active render pass");
             }
@@ -18468,15 +17391,22 @@ void main() {
                 throw new IllegalArgumentException("vertex buffer offset must be >= 0, got: " + offset);
             }
 
-            try (MemoryStack stack = stackPush()) {
-                java.nio.LongBuffer buffers = stack.longs(bufferHandle);
-                java.nio.LongBuffer offsets = stack.longs(offset);
-                VK10.vkCmdBindVertexBuffers(activeCommandBuffer, slot, buffers, offsets);
-            }
+            emitGraphicsExecutionPlan(graphicsCommandExecution.planVertexBufferBinding(
+                commandBufferIdentity(commandBufferHandle),
+                activeRenderPassCompatibilityKey(),
+                new VulkanGraphicsCommandExecutionCoordinator.VertexBufferBindingRequirement(
+                    slot,
+                    bufferHandle,
+                    offset,
+                    0,
+                    false
+                ),
+                "bindVertexBuffer"
+            ));
         }
 
         private void bindIndexBuffer(long commandBufferHandle, long bufferHandle, int sizeBytes, VulkanicIndexType indexType) {
-            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "bindIndexBuffer");
+            requireRecordingCommandBuffer(commandBufferHandle, "bindIndexBuffer");
             if (!isRenderPassRecording()) {
                 throw new IllegalStateException("bindIndexBuffer requires an active render pass");
             }
@@ -18485,51 +17415,42 @@ void main() {
                 throw new IllegalArgumentException("index buffer size must be > 0, got: " + sizeBytes);
             }
 
-            int vkIndexType;
-            switch (indexType) {
-                case SHORT -> vkIndexType = VK10.VK_INDEX_TYPE_UINT16;
-                case INT -> vkIndexType = VK10.VK_INDEX_TYPE_UINT32;
-                case BYTE -> throw new UnsupportedOperationException(
-                    "Vulkan index type BYTE requires VK_EXT_index_type_uint8 and is not supported yet.");
-                default -> throw new IllegalArgumentException("Unsupported VulkanicIndexType: " + indexType);
-            }
-
-            VK10.vkCmdBindIndexBuffer(activeCommandBuffer, bufferHandle, 0L, vkIndexType);
-            boundIndexBuffersByCommandBuffer.put(
-                commandBufferHandle,
-                new BoundIndexBufferState(bufferHandle, sizeBytes, indexType)
-            );
+            emitGraphicsExecutionPlan(graphicsCommandExecution.planIndexBufferBinding(
+                commandBufferIdentity(commandBufferHandle),
+                activeRenderPassCompatibilityKey(),
+                new VulkanGraphicsCommandExecutionCoordinator.IndexBufferBindingRequirement(
+                    bufferHandle,
+                    0L,
+                    sizeBytes,
+                    indexType
+                ),
+                "bindIndexBuffer"
+            ));
         }
 
         private void drawIndexed(long commandBufferHandle, int firstIndex, int indexCount, int baseVertex, int instanceCount) {
-            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "drawIndexed");
+            requireRecordingCommandBuffer(commandBufferHandle, "drawIndexed");
             if (!isRenderPassRecording()) {
                 throw new IllegalStateException("drawIndexed requires an active render pass");
             }
             if (firstIndex < 0 || indexCount < 0 || instanceCount < 1) {
                 throw new IllegalArgumentException("Invalid indexed draw arguments");
             }
-            BoundIndexBufferState indexBufferState = boundIndexBuffersByCommandBuffer.get(commandBufferHandle);
-            if (indexBufferState == null) {
-                throw new IllegalStateException("drawIndexed requires a bound index buffer");
-            }
-            long requiredBytes = (long) indexBufferState.indexType().bytesPerIndex() * ((long) firstIndex + indexCount);
-            if (requiredBytes > indexBufferState.sizeBytes()) {
-                throw new IllegalStateException(
-                    "Indexed draw exceeds bound index buffer range: firstIndex=" + firstIndex
-                        + ", indexCount=" + indexCount
-                        + ", indexType=" + indexBufferState.indexType()
-                        + ", requiredBytes=" + requiredBytes
-                        + ", boundSizeBytes=" + indexBufferState.sizeBytes()
-                        + ", buffer=0x" + Long.toHexString(indexBufferState.bufferHandle())
-                );
-            }
-
-            VK10.vkCmdDrawIndexed(activeCommandBuffer, indexCount, instanceCount, firstIndex, baseVertex, 0);
+            emitGraphicsExecutionPlan(graphicsCommandExecution.planDrawFromCurrentState(
+                commandBufferIdentity(commandBufferHandle),
+                activeRenderPassCompatibilityKey(),
+                VulkanGraphicsCommandExecutionCoordinator.DrawCommandRequirement.indexed(
+                    "drawIndexed",
+                    firstIndex,
+                    indexCount,
+                    baseVertex,
+                    instanceCount
+                )
+            ));
         }
 
         private void draw(long commandBufferHandle, int firstVertex, int vertexCount) {
-            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "draw");
+            requireRecordingCommandBuffer(commandBufferHandle, "draw");
             if (!isRenderPassRecording()) {
                 throw new IllegalStateException("draw requires an active render pass");
             }
@@ -18537,11 +17458,20 @@ void main() {
                 throw new IllegalArgumentException("Invalid draw arguments");
             }
 
-            VK10.vkCmdDraw(activeCommandBuffer, vertexCount, 1, firstVertex, 0);
+            emitGraphicsExecutionPlan(graphicsCommandExecution.planDrawFromCurrentState(
+                commandBufferIdentity(commandBufferHandle),
+                activeRenderPassCompatibilityKey(),
+                VulkanGraphicsCommandExecutionCoordinator.DrawCommandRequirement.arrays(
+                    "draw",
+                    firstVertex,
+                    vertexCount,
+                    1
+                )
+            ));
         }
 
         private void drawInstanced(long commandBufferHandle, int firstVertex, int vertexCount, int instanceCount) {
-            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "drawInstanced");
+            requireRecordingCommandBuffer(commandBufferHandle, "drawInstanced");
             if (!isRenderPassRecording()) {
                 throw new IllegalStateException("drawInstanced requires an active render pass");
             }
@@ -18549,7 +17479,16 @@ void main() {
                 throw new IllegalArgumentException("Invalid instanced draw arguments");
             }
 
-            VK10.vkCmdDraw(activeCommandBuffer, vertexCount, instanceCount, firstVertex, 0);
+            emitGraphicsExecutionPlan(graphicsCommandExecution.planDrawFromCurrentState(
+                commandBufferIdentity(commandBufferHandle),
+                activeRenderPassCompatibilityKey(),
+                VulkanGraphicsCommandExecutionCoordinator.DrawCommandRequirement.arrays(
+                    "drawInstanced",
+                    firstVertex,
+                    vertexCount,
+                    instanceCount
+                )
+            ));
         }
 
         private int activeImmediateResourceSlot() {
@@ -19386,34 +18325,14 @@ void main() {
         /**
          * Records a {@code vkCmdBindPipeline} command for {@code VK_PIPELINE_BIND_POINT_GRAPHICS}.
          */
-        private void bindPipeline(long commandBufferHandle, long pipelineHandle) {
-            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "bindPipeline");
-            Long currentlyBoundPipeline = lastBoundGraphicsPipelineByCommandBuffer.get(commandBufferHandle);
-            if (currentlyBoundPipeline != null && currentlyBoundPipeline == pipelineHandle) {
-                skippedRedundantPipelineBindCount++;
-                return;
-            }
-            VK10.vkCmdBindPipeline(
-                activeCommandBuffer,
-                VK10.VK_PIPELINE_BIND_POINT_GRAPHICS,
-                pipelineHandle);
-            lastBoundGraphicsPipelineByCommandBuffer.put(commandBufferHandle, pipelineHandle);
-            descriptorManager.clearCommandBufferState(commandBufferHandle);
-        }
-
-        private void bindComputePipeline(long commandBufferHandle, long pipelineHandle) {
-            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "bindComputePipeline");
-            Long currentlyBoundPipeline = lastBoundComputePipelineByCommandBuffer.get(commandBufferHandle);
-            if (currentlyBoundPipeline != null && currentlyBoundPipeline == pipelineHandle) {
-                skippedRedundantPipelineBindCount++;
-                return;
-            }
-            VK10.vkCmdBindPipeline(
-                activeCommandBuffer,
-                VK10.VK_PIPELINE_BIND_POINT_COMPUTE,
-                pipelineHandle);
-            lastBoundComputePipelineByCommandBuffer.put(commandBufferHandle, pipelineHandle);
-            descriptorManager.clearCommandBufferState(commandBufferHandle);
+        private void bindPipeline(long commandBufferHandle, VulkanPipelineHandle pipeline) {
+            requireRecordingCommandBuffer(commandBufferHandle, "bindPipeline");
+            emitGraphicsExecutionPlan(graphicsCommandExecution.planPipelineBinding(
+                commandBufferIdentity(commandBufferHandle),
+                activeRenderPassCompatibilityKey(),
+                graphicsPipelineRequirement(pipeline),
+                "bindPipeline"
+            ));
         }
 
         private static void applyStencilFaceState(
@@ -19744,118 +18663,46 @@ void main() {
         }
 
         private void cmdSetViewport(long commandBufferHandle, int x, int y, int width, int height) {
-            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "cmdSetViewport");
-            if (isRenderPassRecording()
-                && renderPassExecution.activeTargetsSwapchain()
-                && renderPassExecution.activeWidth() > 0
-                && renderPassExecution.activeHeight() > 0) {
-                // Keep swapchain passes full-frame; shrinking viewport here clips title/loading output into a strip.
-                x = 0;
-                y = 0;
-                width = renderPassExecution.activeWidth();
-                height = renderPassExecution.activeHeight();
-            }
-            int viewportWidth = Math.max(width, 1);
-            int viewportHeight = Math.max(height, 1);
-            int framebufferHeight = renderPassExecution.activeHeight() > 0
-                ? renderPassExecution.activeHeight()
-                : Math.max(swapchainState.height(), viewportHeight);
-            try (MemoryStack stack = stackPush()) {
-                org.lwjgl.vulkan.VkViewport.Buffer viewport = org.lwjgl.vulkan.VkViewport.calloc(1, stack)
-                    .x((float) x)
-                    .width((float) viewportWidth)
-                    .minDepth(0.0f)
-                    .maxDepth(1.0f);
-                if (isRenderPassRecording() && renderPassExecution.activeTargetsSwapchain()) {
-                    viewport.y((float) y)
-                        .height((float) viewportHeight);
-                } else {
-                    viewport.y((float) (framebufferHeight - y))
-                        .height(-(float) viewportHeight);
-                }
-                VK10.vkCmdSetViewport(activeCommandBuffer, 0, viewport);
-            }
+            requireRecordingCommandBuffer(commandBufferHandle, "cmdSetViewport");
+            emitGraphicsDynamicStatePlan(graphicsCommandExecution.planViewport(
+                commandBufferIdentity(commandBufferHandle),
+                activeRenderPassCompatibilityKey(),
+                renderTargetContext(),
+                new VulkanGraphicsCommandExecutionCoordinator.ViewportRequest(x, y, width, height, 0.0f, 1.0f),
+                "cmdSetViewport"
+            ));
         }
 
         private void cmdSetScissor(long commandBufferHandle, int x, int y, int width, int height) {
-            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "cmdSetScissor");
-            cachedScissorX = x;
-            cachedScissorY = y;
-            cachedScissorWidth = width;
-            cachedScissorHeight = height;
-            hasCachedScissorRect = true;
-
-            if (isRenderPassRecording() && renderPassExecution.activeTargetsSwapchain()) {
-                applyFullRenderAreaScissor(activeCommandBuffer);
-                return;
-            }
-
-            if (!isRenderPassRecording() || !scissorTestEnabled) {
-                return;
-            }
-
-            applyScissorRect(activeCommandBuffer, x, y, width, height);
+            requireRecordingCommandBuffer(commandBufferHandle, "cmdSetScissor");
+            emitGraphicsDynamicStatePlan(graphicsCommandExecution.planScissorRect(
+                commandBufferIdentity(commandBufferHandle),
+                activeRenderPassCompatibilityKey(),
+                renderTargetContext(),
+                new VulkanGraphicsCommandExecutionCoordinator.ScissorRequest(x, y, width, height),
+                "cmdSetScissor"
+            ));
         }
 
         private void setScissorTestEnabled(long commandBufferHandle, boolean enabled) {
-            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "setScissorTestEnabled");
-            scissorTestEnabled = enabled;
-            if (!isRenderPassRecording()) {
-                return;
-            }
-
-            if (!enabled) {
-                applyFullRenderAreaScissor(activeCommandBuffer);
-                return;
-            }
-
-            if (hasCachedScissorRect) {
-                applyScissorRect(activeCommandBuffer, cachedScissorX, cachedScissorY, cachedScissorWidth, cachedScissorHeight);
-            } else {
-                applyFullRenderAreaScissor(activeCommandBuffer);
-            }
-        }
-
-        private void applyScissorRect(VkCommandBuffer activeCommandBuffer, int x, int y, int width, int height) {
-            int scissorWidth = Math.max(width, 0);
-            int scissorHeight = Math.max(height, 0);
-            int framebufferWidth = renderPassExecution.activeWidth() > 0
-                ? renderPassExecution.activeWidth()
-                : Math.max(swapchainState.width(), scissorWidth);
-            int framebufferHeight = renderPassExecution.activeHeight() > 0
-                ? renderPassExecution.activeHeight()
-                : Math.max(swapchainState.height(), scissorHeight);
-            int translatedY = framebufferHeight - (y + scissorHeight);
-            int clampedX = Math.max(0, Math.min(x, framebufferWidth));
-            int clampedY = Math.max(0, Math.min(translatedY, framebufferHeight));
-            int maxWidth = Math.max(0, framebufferWidth - clampedX);
-            int maxHeight = Math.max(0, framebufferHeight - clampedY);
-            int clampedWidth = Math.min(scissorWidth, maxWidth);
-            int clampedHeight = Math.min(scissorHeight, maxHeight);
-            try (MemoryStack stack = stackPush()) {
-                org.lwjgl.vulkan.VkRect2D.Buffer scissor = org.lwjgl.vulkan.VkRect2D.calloc(1, stack);
-                scissor.get(0).offset().x(clampedX).y(clampedY);
-                scissor.get(0).extent().width(clampedWidth).height(clampedHeight);
-                VK10.vkCmdSetScissor(activeCommandBuffer, 0, scissor);
-            }
+            requireRecordingCommandBuffer(commandBufferHandle, "setScissorTestEnabled");
+            emitGraphicsDynamicStatePlan(graphicsCommandExecution.planScissorTestEnabled(
+                commandBufferIdentity(commandBufferHandle),
+                activeRenderPassCompatibilityKey(),
+                renderTargetContext(),
+                enabled,
+                "setScissorTestEnabled"
+            ));
         }
 
         private void resetScissorToRenderArea(long commandBufferHandle) {
-            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "resetScissorToRenderArea");
-            if (!isRenderPassRecording()) {
-                return;
-            }
-
-            applyFullRenderAreaScissor(activeCommandBuffer);
-        }
-
-        private void applyFullRenderAreaScissor(VkCommandBuffer activeCommandBuffer) {
-            int fullWidth = renderPassExecution.activeWidth() > 0 ? renderPassExecution.activeWidth() : swapchainState.width();
-            int fullHeight = renderPassExecution.activeHeight() > 0 ? renderPassExecution.activeHeight() : swapchainState.height();
-            if (fullWidth <= 0 || fullHeight <= 0) {
-                return;
-            }
-            applyScissorRect(activeCommandBuffer, 0, 0, fullWidth, fullHeight);
+            requireRecordingCommandBuffer(commandBufferHandle, "resetScissorToRenderArea");
+            emitGraphicsDynamicStatePlan(graphicsCommandExecution.planResetScissorToRenderArea(
+                commandBufferIdentity(commandBufferHandle),
+                activeRenderPassCompatibilityKey(),
+                renderTargetContext(),
+                "resetScissorToRenderArea"
+            ));
         }
 
         private void cmdClearAttachments(long commandBufferHandle,
@@ -19992,7 +18839,10 @@ void main() {
 
                 descriptorManager.destroyDescriptorPools(logicalDevice);
                 VulkanDescriptorManager.DescriptorReuseSummary descriptorReuseSummary =
-                    descriptorManager.descriptorReuseSummary(skippedRedundantPipelineBindCount);
+                    descriptorManager.descriptorReuseSummary(
+                        graphicsCommandExecution.skippedRedundantPipelineBindCount()
+                            + computeCommandExecution.skippedRedundantPipelineBindCount()
+                    );
                 if (descriptorReuseSummary.shouldLog()) {
                     LOGGER.info(
                         "Vulkan descriptor reuse summary: cacheHits={} cacheStores={} skippedPipelineBinds={} skippedDescriptorSetBinds={}",
@@ -20002,8 +18852,8 @@ void main() {
                         descriptorReuseSummary.skippedDescriptorSetBinds()
                     );
                 }
-                lastBoundGraphicsPipelineByCommandBuffer.clear();
-                lastBoundComputePipelineByCommandBuffer.clear();
+                graphicsCommandExecution.clear();
+                computeCommandExecution.clear();
 
                 for (int slot = 0; slot < IMMEDIATE_SUBMIT_SLOTS; slot++) {
                     long immediateSubmitFence = commandSubmissionState.immediateSubmitFence(slot);

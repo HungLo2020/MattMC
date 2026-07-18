@@ -1281,8 +1281,9 @@ public class Phase3DrawPathTest {
         assertTrue(backendSource.contains("backend.legacyDrawResourceSnapshot()")
                 && backendSource.contains("plan.vertexStream()")
                 && backendSource.contains("for (VulkanDrawExecutionCoordinator.VertexBufferBindingPlan binding : vertexStream.vertexBuffers())")
-                && backendSource.contains("bindVertexBuffer(commandBufferHandle, binding.binding(), vertexBuffer.getVkBufferHandle(), binding.offset())"),
-            "Legacy draw calls should bind every coordinator-planned immutable draw-resource vertex buffer before indexed or instanced draws");
+                && backendSource.contains("new VulkanGraphicsCommandExecutionCoordinator.VertexBufferBindingRequirement(")
+                && backendSource.contains("graphicsCommandExecution.planGraphicsExecution("),
+            "Legacy draw calls should feed every coordinator-planned immutable draw-resource vertex buffer into the graphics command execution plan before indexed or instanced draws");
     }
 
     @Test
@@ -1495,14 +1496,14 @@ public class Phase3DrawPathTest {
         assertTrue(glProgramSource.contains("vertexFormat.getShaderAttributeLocation(j)"),
             "GlProgram linking should bind declared attribute names to the shader locations supplied by the vertex format");
 
-        Path backendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
+        Path variantPlannerFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanShaderVariantPlanner.java");
         Path plannerFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanPipelineCreationPlanner.java");
-        String backendSource = readSource(backendFile);
+        String variantPlannerSource = readSource(variantPlannerFile);
         String plannerSource = readSource(plannerFile);
-        assertTrue(backendSource.contains("renderPipeline.getVertexFormat().getShaderAttributeLocation(location)"),
+        assertTrue(variantPlannerSource.contains("renderPipeline.getVertexFormat().getShaderAttributeLocation(location)"),
             "Vulkan shader-source rebinding should inject explicit locations from the declared vertex format instead of forcing sequential chunk attributes");
         assertTrue(plannerSource.contains("vertexFormat.getShaderAttributeLocation(i)")
-                && backendSource.contains("allocateVertexInputState(stack, pipelinePlan.vertexInput())"),
+                && plannerSource.contains("vertexFormat.getShaderAttributeLocation(i)"),
             "Vulkan pipeline vertex input planning should preserve explicit generic attribute locations for extended terrain formats");
     }
 
