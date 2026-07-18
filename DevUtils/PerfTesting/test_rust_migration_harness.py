@@ -13,6 +13,7 @@ from argparse import Namespace
 from pathlib import Path
 
 import rust_migration_harness as harness
+import meshing_corpus
 
 
 def write_fake_gradle(root: Path, *, sleep_seconds: int = 0, exit_code: int = 0) -> None:
@@ -27,7 +28,7 @@ def write_fake_gradle(root: Path, *, sleep_seconds: int = 0, exit_code: int = 0)
                 f"time.sleep({sleep_seconds})",
                 "import os",
                 "parts = list(sys.argv) + os.environ.get('JAVA_TOOL_OPTIONS', '').split()",
-                "outputs = [arg for arg in parts if arg.startswith('-Dmattmc.perf.output=')]",
+                "outputs = [arg for arg in parts if arg.startswith('-Dmattmc.perf.output=') or arg.startswith('-Dmattmc.realMeshingReplay.output=') or arg.startswith('-PmattmcMeshingCorpusReplayOutput=')]",
                 "if outputs:",
                 "    path = pathlib.Path(outputs[-1].split('=', 1)[1])",
                 "    path.parent.mkdir(parents=True, exist_ok=True)",
@@ -76,6 +77,12 @@ def args(**overrides) -> Namespace:
         "forks": 1,
         "alternate_order": True,
         "benchmark_force_mode": "clean-test",
+        "real_warmup": 0,
+        "real_measure": 1,
+        "real_warmup_seconds": 0.0,
+        "real_measure_seconds": 0.0,
+        "real_rebuilds_per_sample": 1,
+        "real_fixture": "",
     }
     values.update(overrides)
     return Namespace(**values)
@@ -298,6 +305,161 @@ class RustMigrationHarnessTests(unittest.TestCase):
             )
             self.assertTrue(result.success)
             self.assertTrue((artifact / "current" / "chunk-meshing-hotpath.json").is_file())
+
+    def test_real_chunk_meshing_replay_command_uses_live_runner_properties(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = fake_repo(Path(temp), "current")
+            target = harness.RepoTarget("current", root, "current")
+            output = Path(temp) / "real-replay.json"
+            command, env = harness.build_command(
+                target,
+                "real-chunk-meshing-replay",
+                args(workload="real-chunk-meshing-replay", real_fixture="normal_surface_terrain"),
+                output,
+            )
+            self.assertIn("runClient", command)
+            self.assertIn("-PmattmcRustProfile=release", command)
+            java_options = env["JAVA_TOOL_OPTIONS"]
+            self.assertIn("-Dmattmc.realMeshingReplay=true", java_options)
+            self.assertIn(f"-Dmattmc.realMeshingReplay.output={output}", java_options)
+            self.assertIn("-Dmattmc.realMeshingReplay.fixture=normal_surface_terrain", java_options)
+
+    def test_real_chunk_meshing_replay_requires_output_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = fake_repo(Path(temp), "current")
+            artifact = Path(temp) / "artifacts"
+            result = harness.run_target(
+                harness.RepoTarget("current", root, "current"),
+                "real-chunk-meshing-replay",
+                artifact,
+                args(workload="real-chunk-meshing-replay"),
+            )
+            self.assertTrue(result.success)
+            self.assertTrue((artifact / "current" / "real-chunk-meshing-replay.json").is_file())
+
+    def test_meshing_corpus_schema_v2_wraps_replayable_raw_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            replay = root / "real-replay.json"
+            corpus = root / "ordinary.mmcm"
+            replay.write_text(
+                json.dumps(
+                    {
+                        "status": "ok",
+                        "runner": "real-production-chunk-meshing",
+                        "fixtures": [
+                            {
+                                "name": "ordinary_terrain_m1",
+                                "summary": {
+                                    "total_vertices": 4,
+                                    "fallback_blocks": 0,
+                                    "fallback_quads": 0,
+                                    "canonical_hash": "abc",
+                                },
+                                "corpus_input": {
+                                    "schema": "mattmc-real-meshing-input-v2",
+                                    "fixture": "ordinary_terrain_m1",
+                                    "unsupported": [],
+                                    "padded_compact_grid": [],
+                                    "active_blocks": [],
+                                    "model_bundle": [],
+                                },
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            summary = meshing_corpus.write_corpus_from_real_replay(replay, corpus)
+            self.assertEqual(summary["schema_version"], 2)
+            self.assertEqual(summary["sections"][0]["classification"], "replayable-raw-input-v2")
+            payload = summary["sections"][0]["payload"]
+            self.assertEqual(payload["payload"]["capture_kind"], "production-real-replay-raw-input-v2")
+
+    def test_meshing_corpus_filters_sections_by_category(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            replay = root / "real-replay.json"
+            corpus = root / "fixtures.mmcm"
+            replay.write_text(
+                json.dumps(
+                    {
+                        "status": "ok",
+                        "fixtures": [
+                            {
+                                "name": "ordinary_terrain_m1",
+                                "summary": {"total_vertices": 4, "fallback_blocks": 0, "fallback_quads": 0},
+                                "corpus_input": {"schema": "mattmc-real-meshing-input-v2", "fixture": "ordinary_terrain_m1", "unsupported": []},
+                            },
+                            {
+                                "name": "fluid_heavy",
+                                "summary": {"total_vertices": 8, "fallback_blocks": 0, "fallback_quads": 0},
+                                "corpus_input": {"schema": "mattmc-real-meshing-input-v2", "fixture": "fluid_heavy", "unsupported": []},
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            summary = meshing_corpus.write_corpus_from_real_replay(replay, corpus)
+            filtered = meshing_corpus.filtered_summary(summary, category="fluid-heavy")
+            self.assertEqual(filtered["section_count"], 1)
+            self.assertEqual(filtered["sections"][0]["name"], "fluid_heavy")
+
+    def test_meshing_corpus_compare_reports_byte_identity_and_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            current = root / "current.json"
+            frozen = root / "frozen.json"
+            current.write_text(
+                json.dumps(
+                    {
+                        "status": "ok",
+                        "fixtures": [
+                            {
+                                "fixture": "ordinary_terrain_m1",
+                                "raw_vertex_hash": "same",
+                                "raw_index_hash": "same-index",
+                                "solid_quads": 1,
+                            },
+                            {
+                                "fixture": "fluid_heavy",
+                                "raw_vertex_hash": "rust",
+                                "raw_index_hash": "same-index",
+                                "solid_quads": 2,
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            frozen.write_text(
+                json.dumps(
+                    {
+                        "status": "ok",
+                        "fixtures": [
+                            {
+                                "fixture": "ordinary_terrain_m1",
+                                "raw_vertex_hash": "same",
+                                "raw_index_hash": "same-index",
+                                "solid_quads": 1,
+                            },
+                            {
+                                "fixture": "fluid_heavy",
+                                "raw_vertex_hash": "java",
+                                "raw_index_hash": "same-index",
+                                "solid_quads": 2,
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            comparison = meshing_corpus.compare_replay_outputs(current, frozen)
+            rows = {row["fixture"]: row for row in comparison["rows"]}
+            self.assertEqual(rows["ordinary_terrain_m1"]["comparison"], "byte-identical")
+            self.assertEqual(rows["fluid_heavy"]["comparison"], "semantic-mismatch")
+            self.assertEqual(comparison["failure_count"], 1)
 
     def test_unsupported_workload_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

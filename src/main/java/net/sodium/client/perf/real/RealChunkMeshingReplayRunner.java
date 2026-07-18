@@ -1,7 +1,14 @@
 package net.sodium.client.perf.real;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.BiomeColors;
+import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.block.model.BlockModelPart;
 import net.minecraft.core.BlockPos;
@@ -14,11 +21,15 @@ import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.LevelSettings;
+import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.WorldDataConfiguration;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.FenceBlock;
 import net.minecraft.world.level.block.LiquidBlock;
+import net.minecraft.world.level.block.LightBlock;
 import net.minecraft.world.level.block.RedStoneWireBlock;
+import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.TrapDoorBlock;
@@ -30,6 +41,7 @@ import net.minecraft.world.level.block.state.properties.SlabType;
 import net.minecraft.world.level.block.state.properties.StairsShape;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.level.levelgen.WorldOptions;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import net.minecraft.hooks.GameHooks;
@@ -37,6 +49,7 @@ import net.sodium.client.render.chunk.terrain.material.DefaultMaterials;
 import net.sodium.client.render.chunk.RenderSection;
 import net.sodium.client.render.chunk.compile.ChunkBuildContext;
 import net.sodium.client.render.chunk.compile.ChunkBuildOutput;
+import net.sodium.client.render.chunk.compile.pipeline.NativeStaticBlockModelRegistry;
 import net.sodium.client.render.chunk.compile.tasks.ChunkBuilderMeshingTask;
 import net.sodium.client.render.chunk.data.BuiltSectionMeshParts;
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
@@ -45,7 +58,9 @@ import net.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.render.chunk.translucent_sorting.SortBehavior;
 import net.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
+import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
+import net.sodium.client.services.PlatformBlockAccess;
 import net.sodium.client.util.task.CancellationToken;
 import net.sodium.client.world.LevelSlice;
 import net.sodium.client.world.cloned.ChunkRenderContext;
@@ -63,11 +78,13 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
 public final class RealChunkMeshingReplayRunner implements GameHooks {
+    private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
     private static final String ENABLE_PROPERTY = "mattmc.realMeshingReplay";
     private static final String OUTPUT_PROPERTY = "mattmc.realMeshingReplay.output";
     private static final String WARMUP_PROPERTY = "mattmc.realMeshingReplay.warmup";
@@ -78,6 +95,7 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
     private static final String VALIDATE_EACH_SAMPLE_PROPERTY = "mattmc.realMeshingReplay.validateEachSample";
     private static final String RUST_PROFILE_PROPERTY = "mattmc.realMeshingReplay.rustProfile";
     private static final String FIXTURE_PROPERTY = "mattmc.realMeshingReplay.fixture";
+    private static final String CAPTURE_INPUTS_PROPERTY = "mattmc.realMeshingReplay.captureInputs";
     private static final String WORLD_NAME = "MattMC Real Chunk Meshing Replay";
     private static final long WORLD_SEED = 0x4d6174744d435265L;
     private static final int SECTION_X = 0;
@@ -101,6 +119,7 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
     private final long measurementNanos;
     private final int rebuildsPerSample;
     private final boolean validateEachSample;
+    private final boolean captureInputs;
     private final List<Fixture> fixtures;
     private Phase phase = Phase.WAITING_FOR_LEVEL;
     private int ticksInPhase;
@@ -115,7 +134,9 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
         this.measurementNanos = measurementNanos;
         this.rebuildsPerSample = Math.max(1, rebuildsPerSample);
         this.validateEachSample = validateEachSample;
+        this.captureInputs = booleanProperty(CAPTURE_INPUTS_PROPERTY, false);
         List<Fixture> allFixtures = List.of(
+                new Fixture("ordinary_terrain_m1"),
                 new Fixture("empty"),
                 new Fixture("dense_cube"),
                 new Fixture("normal_surface"),
@@ -313,6 +334,11 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
             case "empty" -> {
             }
             case "dense_cube" -> fill(minecraft, sectionX, sectionZ, (x, y, z) -> Blocks.STONE.defaultBlockState());
+            case "ordinary_terrain_m1" -> fill(minecraft, sectionX, sectionZ, (x, y, z) -> {
+                if (y < 7) return Blocks.STONE.defaultBlockState();
+                if (y <= 8) return Blocks.DIRT.defaultBlockState();
+                return Blocks.AIR.defaultBlockState();
+            });
             case "normal_surface" -> fill(minecraft, sectionX, sectionZ, (x, y, z) -> {
                 if (y < 7) return Blocks.STONE.defaultBlockState();
                 if (y == 7) return Blocks.DIRT.defaultBlockState();
@@ -464,6 +490,9 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
         long fingerprintStart = System.nanoTime();
         FixtureFingerprint fingerprint = FixtureFingerprint.forFixture(minecraft, fixture.name, section);
         long fingerprintNanos = System.nanoTime() - fingerprintStart;
+        JsonObject corpusInput = this.captureInputs
+                ? captureCorpusInput(minecraft, context, renderContext, sectionPos, fixture.name)
+                : null;
 
         List<Long> warmupTimes = new ArrayList<>();
         long warmupStart = System.nanoTime();
@@ -529,7 +558,414 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
                 toLongArray(warmupTimes), this.rebuildsPerSample, fingerprint, canonicalHashes,
                 new FixtureTiming(fixtureSetupNanos, renderContextNanos, fingerprintNanos, validationNanos,
                         sampleBatchTimes.size() * (long) this.rebuildsPerSample),
-                afterWarmupGc.deltaSince(beforeWarmupGc), afterMeasureGc.deltaSince(beforeMeasureGc), lastSummary);
+                afterWarmupGc.deltaSince(beforeWarmupGc), afterMeasureGc.deltaSince(beforeMeasureGc), lastSummary,
+                corpusInput);
+    }
+
+    private static JsonObject captureCorpusInput(Minecraft minecraft, ChunkBuildContext context,
+            ChunkRenderContext renderContext, SectionPos sectionPos, String fixture) {
+        context.cache.init(renderContext);
+        LevelSlice slice = context.cache.getWorldSlice();
+        JsonObject root = new JsonObject();
+        root.addProperty("schema", "mattmc-real-meshing-input-v2");
+        root.addProperty("fixture", fixture);
+        root.addProperty("capture_hook", "after LevelSlice.prepare and BlockRenderCache.init, before ChunkBuilderMeshingTask.execute");
+        root.addProperty("section_x", sectionPos.getX());
+        root.addProperty("section_y", sectionPos.getY());
+        root.addProperty("section_z", sectionPos.getZ());
+        root.addProperty("origin_x", sectionPos.minBlockX());
+        root.addProperty("origin_y", sectionPos.minBlockY());
+        root.addProperty("origin_z", sectionPos.minBlockZ());
+        root.addProperty("compact_snapshot_version", NativeChunkMeshEncoder.COMPACT_SECTION_SNAPSHOT_VERSION);
+        root.addProperty("compact_padded_length", NativeChunkMeshEncoder.COMPACT_SECTION_PADDED_LENGTH);
+        root.addProperty("compact_padded_radius", 1);
+        root.add("level_slice_volume", volumeJson(renderContext));
+
+        CaptureTables tables = new CaptureTables();
+        root.add("level_slice_blocks", levelSliceBlocksJson(slice, renderContext, tables));
+        JsonArray padded = new JsonArray(NativeChunkMeshEncoder.COMPACT_SECTION_PADDED_BLOCK_COUNT);
+        int minX = sectionPos.minBlockX();
+        int minY = sectionPos.minBlockY();
+        int minZ = sectionPos.minBlockZ();
+        for (int py = 0; py < NativeChunkMeshEncoder.COMPACT_SECTION_PADDED_LENGTH; py++) {
+            int y = minY + py - 1;
+            for (int pz = 0; pz < NativeChunkMeshEncoder.COMPACT_SECTION_PADDED_LENGTH; pz++) {
+                int z = minZ + pz - 1;
+                for (int px = 0; px < NativeChunkMeshEncoder.COMPACT_SECTION_PADDED_LENGTH; px++) {
+                    int x = minX + px - 1;
+                    BlockState state = slice.getBlockState(x, y, z);
+                    JsonObject entry = new JsonObject();
+                    entry.addProperty("x", px);
+                    entry.addProperty("y", py);
+                    entry.addProperty("z", pz);
+                    entry.addProperty("state_table", tables.stateIndex(state));
+                    entry.addProperty("native_state_id", NativeStaticBlockModelRegistry.getStateId(state));
+                    entry.addProperty("light_word", computeLightWord(slice, state, x, y, z));
+                    padded.add(entry);
+                }
+            }
+        }
+        root.add("padded_compact_grid", padded);
+
+        JsonArray active = new JsonArray();
+        BlockPos.MutableBlockPos blockPos = new BlockPos.MutableBlockPos();
+        for (int y = 0; y < 16; y++) {
+            for (int z = 0; z < 16; z++) {
+                for (int x = 0; x < 16; x++) {
+                    int wx = minX + x;
+                    int wy = minY + y;
+                    int wz = minZ + z;
+                    blockPos.set(wx, wy, wz);
+                    BlockState state = slice.getBlockState(wx, wy, wz);
+                    if (state.isAir() && !state.hasBlockEntity()) {
+                        continue;
+                    }
+                    FluidState fluid = state.getFluidState();
+                    JsonObject entry = new JsonObject();
+                    int localIndex = (y << 8) | (z << 4) | x;
+                    long seed = state.getSeed(blockPos);
+                    entry.addProperty("local_index", localIndex);
+                    entry.addProperty("x", x);
+                    entry.addProperty("y", y);
+                    entry.addProperty("z", z);
+                    entry.addProperty("state_table", tables.stateIndex(state));
+                    entry.addProperty("fluid_table", tables.fluidIndex(fluid));
+                    entry.addProperty("native_state_id", NativeStaticBlockModelRegistry.getStateId(state));
+                    entry.addProperty("native_model", NativeStaticBlockModelRegistry.hasNativeModel(state));
+                    entry.addProperty("block_id", irisBlockId(state));
+                    entry.addProperty("seed_lo", (int) seed);
+                    entry.addProperty("seed_hi", (int) (seed >>> 32));
+                    var modelOffset = state.getOffset(blockPos);
+                    entry.addProperty("model_offset_x", (float) modelOffset.x);
+                    entry.addProperty("model_offset_y", (float) modelOffset.y);
+                    entry.addProperty("model_offset_z", (float) modelOffset.z);
+                    entry.addProperty("tint", blockTint(slice, state, blockPos));
+                    entry.addProperty("fluid_tint", fluidTint(slice, fluid, blockPos));
+                    var flow = fluid.isEmpty() ? net.minecraft.world.phys.Vec3.ZERO : fluid.getFlow(slice, blockPos);
+                    entry.addProperty("fluid_flow_x", (float) flow.x);
+                    entry.addProperty("fluid_flow_z", (float) flow.z);
+                    entry.addProperty("fluid_block_id", fluid.isEmpty() ? -1 : irisFluidBlockId(fluid));
+                    entry.addProperty("flags", 0);
+                    active.add(entry);
+                    captureModel(minecraft, tables, state, blockPos);
+                }
+            }
+        }
+        root.add("active_blocks", active);
+        root.add("state_table", tables.stateTableJson());
+        root.add("fluid_table", tables.fluidTableJson());
+        root.add("model_bundle", tables.modelBundleJson());
+        root.add("unsupported", tables.unsupportedJson());
+        context.cleanup();
+        return root;
+    }
+
+    private static JsonArray levelSliceBlocksJson(LevelSlice slice, ChunkRenderContext renderContext,
+            CaptureTables tables) {
+        var volume = renderContext.getVolume();
+        JsonArray blocks = new JsonArray((volume.getXSpan() * volume.getYSpan()) * volume.getZSpan());
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (int y = volume.minY(); y <= volume.maxY(); y++) {
+            for (int z = volume.minZ(); z <= volume.maxZ(); z++) {
+                for (int x = volume.minX(); x <= volume.maxX(); x++) {
+                    pos.set(x, y, z);
+                    BlockState state = slice.getBlockState(x, y, z);
+                    FluidState fluid = state.getFluidState();
+                    JsonObject entry = new JsonObject();
+                    entry.addProperty("x", x);
+                    entry.addProperty("y", y);
+                    entry.addProperty("z", z);
+                    entry.addProperty("state_table", tables.stateIndex(state));
+                    entry.addProperty("fluid_table", tables.fluidIndex(fluid));
+                    entry.addProperty("block_light", slice.getBrightness(LightLayer.BLOCK, pos));
+                    entry.addProperty("sky_light", slice.getBrightness(LightLayer.SKY, pos));
+                    entry.addProperty("light_word", computeLightWord(slice, state, x, y, z));
+                    entry.addProperty("has_block_entity", state.hasBlockEntity());
+                    blocks.add(entry);
+                }
+            }
+        }
+        return blocks;
+    }
+
+    private static JsonObject volumeJson(ChunkRenderContext renderContext) {
+        var volume = renderContext.getVolume();
+        JsonObject object = new JsonObject();
+        object.addProperty("min_x", volume.minX());
+        object.addProperty("min_y", volume.minY());
+        object.addProperty("min_z", volume.minZ());
+        object.addProperty("max_x", volume.maxX());
+        object.addProperty("max_y", volume.maxY());
+        object.addProperty("max_z", volume.maxZ());
+        object.addProperty("note", "LevelSlice copies this 2-block-radius production volume; compact Rust consumes the captured 1-block padded grid.");
+        return object;
+    }
+
+    private static void captureModel(Minecraft minecraft, CaptureTables tables, BlockState state,
+            BlockPos blockPos) {
+        if (state.isAir() || state.getRenderShape() != RenderShape.MODEL || tables.hasModel(state)) {
+            return;
+        }
+
+        JsonObject model = new JsonObject();
+        int stateId = NativeStaticBlockModelRegistry.getStateId(state);
+        int modelId = tables.nextModelId();
+        int selectorId = tables.nextSelectorId();
+        var material = DefaultMaterials.forBlockState(state);
+        model.addProperty("state_table", tables.stateIndex(state));
+        model.addProperty("state_key", stableStateKey(state));
+        model.addProperty("native_state_id", stateId);
+        model.addProperty("model_id", modelId);
+        model.addProperty("selector_id", selectorId);
+        model.addProperty("selector_kind", "direct-selected");
+        model.addProperty("selector_weight", 1);
+        model.addProperty("material_bits", material.bits());
+        model.addProperty("pass", passName(material.pass));
+        model.addProperty("pass_id", passId(material.pass));
+        model.addProperty("state_flags", nativeStateFlags(state));
+        model.addProperty("block_emission", state.getLightEmission());
+        model.addProperty("block_id", irisBlockId(state));
+        model.addProperty("tint_type", nativeTintType(state));
+        var offsetType = state.sodium$getOffsetType();
+        model.addProperty("offset_type", offsetType.ordinal());
+        model.addProperty("offset_type_name", offsetType.name());
+        model.addProperty("max_horizontal_offset", state.sodium$getMaxHorizontalOffset());
+        model.addProperty("max_vertical_offset", state.sodium$getMaxVerticalOffset());
+
+        JsonArray quads = new JsonArray();
+        try {
+            var blockModel = minecraft.getBlockRenderer().getBlockModel(state);
+            List<BlockModelPart> parts = new ArrayList<>();
+            blockModel.collectParts(RandomSource.create(state.getSeed(blockPos)), parts);
+            model.addProperty("model_class", blockModel.getClass().getName());
+            model.addProperty("part_count", parts.size());
+            for (BlockModelPart part : parts) {
+                boolean hasAo = part.useAmbientOcclusion() && state.getLightEmission() == 0;
+                for (int faceIndex = -1; faceIndex < Direction.values().length; faceIndex++) {
+                    Direction cullFace = faceIndex < 0 ? null : Direction.from3DDataValue(faceIndex);
+                    for (BakedQuad quad : part.getQuads(cullFace)) {
+                        JsonObject q = new JsonObject();
+                        q.addProperty("material_bits", material.bits());
+                        q.addProperty("pass_id", passId(material.pass));
+                        q.addProperty("cull_face", cullFace == null ? -1 : cullFace.get3DDataValue());
+                        q.addProperty("normal_face", quad.getNormalFace().ordinal());
+                        q.addProperty("packed_normal", quad.getFaceNormal());
+                        q.addProperty("block_emission", state.getLightEmission());
+                        q.addProperty("render_type", 0);
+                        q.addProperty("shade", quad.hasShade());
+                        q.addProperty("flags", quad.getFlags());
+                        q.addProperty("light_face", quad.getLightFace().get3DDataValue());
+                        q.addProperty("tint_index", quad.getTintIndex());
+                        q.addProperty("has_ao", hasAo);
+                        q.addProperty("sprite", spriteName(quad.sprite()));
+                        JsonArray vertices = new JsonArray();
+                        for (int word : quad.vertices()) {
+                            vertices.add(word);
+                        }
+                        q.add("vertices", vertices);
+                        quads.add(q);
+                    }
+                }
+            }
+        } catch (RuntimeException exception) {
+            tables.unsupported("model-capture-error", stableStateKey(state), exception.getClass().getName());
+        }
+        model.add("quads", quads);
+        tables.model(state, model);
+    }
+
+    private static int passId(TerrainRenderPass pass) {
+        if (pass == DefaultTerrainRenderPasses.SOLID) {
+            return 0;
+        }
+        if (pass == DefaultTerrainRenderPasses.CUTOUT) {
+            return 1;
+        }
+        if (pass == DefaultTerrainRenderPasses.TRANSLUCENT) {
+            return 2;
+        }
+        return -1;
+    }
+
+    private static int nativeStateFlags(BlockState state) {
+        int flags = 0;
+        if (state.isAir()) flags |= NativeStaticBlockModelRegistry.STATE_FLAG_AIR;
+        if (state.getRenderShape() == RenderShape.MODEL && NativeStaticBlockModelRegistry.hasNativeModel(state)) {
+            flags |= NativeStaticBlockModelRegistry.STATE_FLAG_MODEL;
+        }
+        if (!state.getFluidState().isEmpty()) flags |= NativeStaticBlockModelRegistry.STATE_FLAG_FLUID;
+        if (state.isSolidRender()) flags |= NativeStaticBlockModelRegistry.STATE_FLAG_SOLID_RENDER
+                | NativeStaticBlockModelRegistry.STATE_FLAG_FULL_OCCLUSION;
+        if (state.getBlock() instanceof LightBlock) flags |= NativeStaticBlockModelRegistry.STATE_FLAG_LIGHT_BLOCK;
+        if (state.hasBlockEntity()) flags |= NativeStaticBlockModelRegistry.STATE_FLAG_BLOCK_ENTITY;
+        if (state.canOcclude()) flags |= NativeStaticBlockModelRegistry.STATE_FLAG_CAN_OCCLUDE;
+        if (state.blocksMotion()) flags |= NativeStaticBlockModelRegistry.STATE_FLAG_BLOCKS_MOTION;
+        return flags;
+    }
+
+    private static int nativeTintType(BlockState state) {
+        Block block = state.getBlock();
+        if (block == Blocks.GRASS_BLOCK) return 1;
+        if (block == Blocks.FERN || block == Blocks.SHORT_GRASS || block == Blocks.POTTED_FERN
+                || block == Blocks.BUSH || block == Blocks.SUGAR_CANE || block == Blocks.PINK_PETALS
+                || block == Blocks.WILDFLOWERS) return 10;
+        if (block == Blocks.LARGE_FERN || block == Blocks.TALL_GRASS) return 7;
+        if (block == Blocks.OAK_LEAVES || block == Blocks.JUNGLE_LEAVES || block == Blocks.ACACIA_LEAVES
+                || block == Blocks.DARK_OAK_LEAVES || block == Blocks.VINE || block == Blocks.MANGROVE_LEAVES
+                || block == Blocks.LEAF_LITTER) return 2;
+        if (block == Blocks.WATER || block == Blocks.BUBBLE_COLUMN || block == Blocks.WATER_CAULDRON) return 3;
+        if (block == Blocks.REDSTONE_WIRE) return 4;
+        if (block == Blocks.MELON_STEM || block == Blocks.PUMPKIN_STEM) return 6;
+        if (block == Blocks.SPRUCE_LEAVES) return 8;
+        if (block == Blocks.BIRCH_LEAVES) return 9;
+        if (block == Blocks.ATTACHED_MELON_STEM || block == Blocks.ATTACHED_PUMPKIN_STEM
+                || block == Blocks.LILY_PAD) return 5;
+        return 0;
+    }
+
+    private static int computeLightWord(LevelSlice slice, BlockState state, int x, int y, int z) {
+        BlockPos pos = new BlockPos(x, y, z);
+        boolean emissive = state.emissiveRendering(slice, pos);
+        boolean opaque = state.isViewBlocking(slice, pos) && state.getLightBlock() != 0;
+        boolean fullOpaque = state.isSolidRender();
+        boolean fullCube = state.isCollisionShapeFullBlock(slice, pos);
+        int luminance = PlatformBlockAccess.getInstance().getLightEmission(state, slice, pos);
+        int blockLight;
+        int skyLight;
+        if (fullOpaque && luminance == 0) {
+            blockLight = 0;
+            skyLight = 0;
+        } else {
+            if (emissive) {
+                blockLight = slice.getBrightness(LightLayer.BLOCK, pos);
+                skyLight = slice.getBrightness(LightLayer.SKY, pos);
+            } else {
+                int light = LevelRenderer.getLightColor(LevelRenderer.BrightnessGetter.DEFAULT, slice, state, pos);
+                blockLight = LightTexture.block(light);
+                skyLight = LightTexture.sky(light);
+            }
+        }
+        float ao = luminance == 0 ? state.getShadeBrightness(slice, pos) : 1.0F;
+        int aoi = (int) (ao * 4096.0F);
+        return (blockLight & 0xF)
+                | ((skyLight & 0xF) << 4)
+                | ((luminance & 0xF) << 8)
+                | ((aoi & 0xFFFF) << 12)
+                | ((emissive ? 1 : 0) << 28)
+                | ((opaque ? 1 : 0) << 29)
+                | ((fullOpaque ? 1 : 0) << 30)
+                | ((fullCube ? 1 : 0) << 31);
+    }
+
+    private static int blockTint(LevelSlice slice, BlockState state, BlockPos pos) {
+        Block block = state.getBlock();
+        if (block == Blocks.GRASS_BLOCK || block == Blocks.FERN || block == Blocks.SHORT_GRASS
+                || block == Blocks.POTTED_FERN || block == Blocks.BUSH || block == Blocks.SUGAR_CANE
+                || block == Blocks.PINK_PETALS || block == Blocks.WILDFLOWERS
+                || block == Blocks.LARGE_FERN || block == Blocks.TALL_GRASS) {
+            return BiomeColors.getAverageGrassColor(slice, pos) | 0xFF000000;
+        }
+        if (block == Blocks.OAK_LEAVES || block == Blocks.JUNGLE_LEAVES || block == Blocks.ACACIA_LEAVES
+                || block == Blocks.DARK_OAK_LEAVES || block == Blocks.VINE || block == Blocks.MANGROVE_LEAVES
+                || block == Blocks.LEAF_LITTER) {
+            return BiomeColors.getAverageFoliageColor(slice, pos) | 0xFF000000;
+        }
+        if (block == Blocks.REDSTONE_WIRE) {
+            return RedStoneWireBlock.getColorForPower(state.getValue(RedStoneWireBlock.POWER)) | 0xFF000000;
+        }
+        return -1;
+    }
+
+    private static int fluidTint(LevelSlice slice, FluidState state, BlockPos pos) {
+        if (state.is(Fluids.WATER) || state.is(Fluids.FLOWING_WATER)) {
+            return BiomeColors.getAverageWaterColor(slice, pos) | 0xFF000000;
+        }
+        return -1;
+    }
+
+    private static int irisBlockId(BlockState state) {
+        var ids = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds();
+        return ids == null ? -1 : ids.getOrDefault(state, -1);
+    }
+
+    private static int irisFluidBlockId(FluidState state) {
+        var ids = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds();
+        return ids == null ? -1 : ids.getInt(state.createLegacyBlock());
+    }
+
+    private static final class CaptureTables {
+        private final Map<String, Integer> states = new LinkedHashMap<>();
+        private final Map<String, Integer> fluids = new LinkedHashMap<>();
+        private final Map<String, JsonObject> models = new LinkedHashMap<>();
+        private final JsonArray unsupported = new JsonArray();
+        private int nextModelId;
+        private int nextSelectorId;
+
+        private int stateIndex(BlockState state) {
+            return this.states.computeIfAbsent(stableStateKey(state), ignored -> this.states.size());
+        }
+
+        private int fluidIndex(FluidState state) {
+            return this.fluids.computeIfAbsent(stableFluidKey(state), ignored -> this.fluids.size());
+        }
+
+        private boolean hasModel(BlockState state) {
+            return this.models.containsKey(stableStateKey(state));
+        }
+
+        private int nextModelId() {
+            return this.nextModelId++;
+        }
+
+        private int nextSelectorId() {
+            return this.nextSelectorId++;
+        }
+
+        private void model(BlockState state, JsonObject model) {
+            this.models.put(stableStateKey(state), model);
+        }
+
+        private void unsupported(String reason, String subject, String detail) {
+            JsonObject object = new JsonObject();
+            object.addProperty("reason", reason);
+            object.addProperty("subject", subject);
+            object.addProperty("detail", detail);
+            this.unsupported.add(object);
+        }
+
+        private JsonArray stateTableJson() {
+            JsonArray array = new JsonArray();
+            for (Map.Entry<String, Integer> entry : this.states.entrySet()) {
+                JsonObject object = new JsonObject();
+                object.addProperty("index", entry.getValue());
+                object.addProperty("key", entry.getKey());
+                array.add(object);
+            }
+            return array;
+        }
+
+        private JsonArray fluidTableJson() {
+            JsonArray array = new JsonArray();
+            for (Map.Entry<String, Integer> entry : this.fluids.entrySet()) {
+                JsonObject object = new JsonObject();
+                object.addProperty("index", entry.getValue());
+                object.addProperty("key", entry.getKey());
+                array.add(object);
+            }
+            return array;
+        }
+
+        private JsonArray modelBundleJson() {
+            JsonArray array = new JsonArray();
+            for (JsonObject model : this.models.values()) {
+                array.add(model);
+            }
+            return array;
+        }
+
+        private JsonArray unsupportedJson() {
+            return this.unsupported;
+        }
     }
 
     private static long[] toLongArray(List<Long> values) {
@@ -1040,11 +1476,11 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
                                  long[] sampleBatchTimes, long[] warmupTimes, int rebuildsPerSample,
                                  FixtureFingerprint fingerprint, long[] canonicalHashes,
                                  FixtureTiming timing, GcDelta warmupGc, GcDelta measurementGc,
-                                 ChunkSummary summary) {
+                                 ChunkSummary summary, JsonObject corpusInput) {
         private static FixtureResult empty(String name, FixtureFingerprint fingerprint, FixtureTiming timing,
                                            GcDelta warmupGc, GcDelta measurementGc) {
             return new FixtureResult(name, true, new long[0], new long[0], new long[0], 1,
-                    fingerprint, new long[0], timing, warmupGc, measurementGc, ChunkSummary.empty());
+                    fingerprint, new long[0], timing, warmupGc, measurementGc, ChunkSummary.empty(), null);
         }
 
         private void appendJson(StringBuilder builder, String indent) {
@@ -1085,6 +1521,11 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
             builder.append("],\n");
             builder.append(indent).append("  \"summary\": ");
             this.summary.appendJson(builder, indent + "  ");
+            if (this.corpusInput != null) {
+                builder.append(",\n");
+                builder.append(indent).append("  \"corpus_input\": ");
+                builder.append(GSON.toJson(this.corpusInput));
+            }
             builder.append("\n").append(indent).append("}");
         }
 
@@ -1317,6 +1758,11 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
 
     private static BlockState fixtureState(String fixture, int x, int y, int z) {
         return switch (fixture) {
+            case "ordinary_terrain_m1" -> {
+                if (y < 7) yield Blocks.STONE.defaultBlockState();
+                if (y <= 8) yield Blocks.DIRT.defaultBlockState();
+                yield Blocks.AIR.defaultBlockState();
+            }
             case "dense_cube" -> Blocks.STONE.defaultBlockState();
             case "normal_surface" -> {
                 if (y < 7) yield Blocks.STONE.defaultBlockState();
