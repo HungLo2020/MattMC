@@ -58,6 +58,37 @@ class NativeStaticBlockModelRegistryCullingTest {
                 Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH);
     }
 
+    @Test
+    void paneEndpointSkipMasksUseOwnConnectionFacesNotSelfNeighborProperties() {
+        BlockState eastEndpoint = Blocks.GLASS_PANE.defaultBlockState()
+                .setValue(IronBarsBlock.EAST, true);
+        BlockState westNeighbor = Blocks.GLASS_PANE.defaultBlockState()
+                .setValue(IronBarsBlock.WEST, true);
+
+        assertTrue(eastEndpoint.skipRendering(westNeighbor, Direction.EAST),
+                "Vanilla culls the joined face between endpoint panes with opposite connection state");
+        assertMask(NativeStaticBlockModelRegistry.sameBlockSkipMask(eastEndpoint),
+                Direction.DOWN, Direction.UP, Direction.EAST);
+        assertMask(NativeStaticBlockModelRegistry.sameBlockSkipMask(westNeighbor),
+                Direction.DOWN, Direction.UP, Direction.WEST);
+    }
+
+    @Test
+    void paneCornerSkipMasksIncludeEveryConnectedHorizontalArm() {
+        BlockState corner = Blocks.GLASS_PANE.defaultBlockState()
+                .setValue(IronBarsBlock.NORTH, true)
+                .setValue(IronBarsBlock.EAST, true);
+        BlockState southNeighbor = Blocks.GLASS_PANE.defaultBlockState()
+                .setValue(IronBarsBlock.SOUTH, true);
+        BlockState westNeighbor = Blocks.GLASS_PANE.defaultBlockState()
+                .setValue(IronBarsBlock.WEST, true);
+
+        assertTrue(corner.skipRendering(southNeighbor, Direction.NORTH));
+        assertTrue(corner.skipRendering(westNeighbor, Direction.EAST));
+        assertMask(NativeStaticBlockModelRegistry.sameBlockSkipMask(corner),
+                Direction.DOWN, Direction.UP, Direction.NORTH, Direction.EAST);
+    }
+
     private static void assertMask(int mask, Direction... directions) {
         int expected = 0;
         for (Direction direction : directions) {

@@ -22,6 +22,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.util.random.Weighted;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.IronBarsBlock;
 import net.minecraft.world.level.block.LightBlock;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.StemBlock;
@@ -573,9 +574,30 @@ public final class NativeStaticBlockModelRegistry {
     }
 
     static int sameBlockSkipMask(BlockState state) {
+        if (state.getBlock() instanceof IronBarsBlock) {
+            return ironBarsSkipMask(state);
+        }
+
         int mask = 0;
         for (Direction direction : Direction.values()) {
             if (state.skipRendering(state, direction)) {
+                mask |= 1 << direction.get3DDataValue();
+            }
+        }
+        return mask;
+    }
+
+    private static int ironBarsSkipMask(BlockState state) {
+        int mask = 0;
+        for (Direction direction : Direction.values()) {
+            if (!direction.getAxis().isHorizontal()) {
+                if (state.skipRendering(state, direction)) {
+                    mask |= 1 << direction.get3DDataValue();
+                }
+                continue;
+            }
+
+            if (Boolean.TRUE.equals(state.getValue(IronBarsBlock.PROPERTY_BY_DIRECTION.get(direction)))) {
                 mask |= 1 << direction.get3DDataValue();
             }
         }
