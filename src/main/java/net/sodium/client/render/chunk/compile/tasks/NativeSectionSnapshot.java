@@ -300,7 +300,11 @@ final class NativeSectionSnapshot implements AutoCloseable {
             return RedStoneWireBlock.getColorForPower(state.getValue(RedStoneWireBlock.POWER)) | 0xFF000000;
         }
         int color = Minecraft.getInstance().getBlockColors().getColor(state, slice, pos, 0);
-        return color < 0 ? -1 : color | 0xFF000000;
+        return normalizeBlockTintColor(color);
+    }
+
+    static int normalizeBlockTintColor(int color) {
+        return color == -1 ? -1 : color | 0xFF000000;
     }
 
     private static int fluidTint(LevelSlice slice, FluidState state, BlockPos pos) {

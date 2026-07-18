@@ -1,6 +1,7 @@
 use super::*;
 
 const TEST_TINT_FORCE_GRASS: i32 = 10;
+const TEST_TINT_CONSTANT: i32 = 5;
 
 #[test]
 fn static_model_native_quads_use_block_iris_render_type() {
@@ -57,6 +58,23 @@ fn static_model_force_grass_tint_applies_with_quad_tint_index() {
         static_model_quad_to_native_section(block, state, quad, &mut profile, false, false);
 
     assert_eq!(0xff6f_9935u32 as i32, native.vertices[0].color);
+}
+
+#[test]
+fn static_model_constant_tint_applies_lily_pad_color_with_quad_tint_index() {
+    let mut block = static_model_test_block_record();
+    block.tint = 0xff20_8030u32 as i32;
+    let mut state = static_model_test_state_record();
+    state.tint_type = TEST_TINT_CONSTANT;
+    let mut quad = static_model_test_quad();
+    quad.tint_index = 0;
+    quad.vertices[0].color = 0xffff_ffffu32 as i32;
+    let mut profile = NativeMeshingProfile::default();
+
+    let native =
+        static_model_quad_to_native_section(block, state, quad, &mut profile, false, false);
+
+    assert_eq!(0xff30_8020u32 as i32, native.vertices[0].color);
 }
 
 fn static_model_test_quad() -> StaticModelQuadRecord {

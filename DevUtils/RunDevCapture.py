@@ -59,6 +59,7 @@ class CaptureConfig:
     skip_tests: bool
     client_args: str
     deterministic_camera_capture: bool
+    deterministic_static_camera_capture: bool
     deterministic_pose_tolerance: float
     audio_validation: bool
     capture_meshing_corpus: bool
@@ -325,6 +326,12 @@ class CaptureRunner:
 
         if not self.config.deterministic_camera_capture:
             return
+        if self.config.deterministic_static_camera_capture:
+            self.append_java_tool_options([
+                "-Dmattmc.dev.deterministicCameraCapture.poseCount=1",
+                "-Dmattmc.dev.deterministicCameraCapture.yawDelta=0.0",
+            ])
+            self.append_meta("deterministic_static_camera_capture=true")
         configured_shader_pack = extract_property_value(self.run_dir / "config" / "iris.properties", "shaderPack")
         if not client_args_contains_option(self.config.client_args, "--width"):
             self.config.client_args = append_client_arg(self.config.client_args, "--width 1280")
@@ -1625,6 +1632,14 @@ def parse_args() -> CaptureConfig:
         default=os.environ.get("SHADER_INPUT_PARITY", "off"),
     )
     parser.add_argument("--deterministic-camera-capture", action="store_true")
+    parser.add_argument(
+        "--deterministic-static-camera-capture",
+        action="store_true",
+        help=(
+            "Run deterministic capture at only the initial Origin pose. This implies "
+            "--deterministic-camera-capture and avoids the normal camera sweep."
+        ),
+    )
     parser.add_argument("--audio-validation", action="store_true")
     parser.add_argument("--capture-meshing-corpus", action="store_true")
     parser.add_argument("--meshing-corpus-output", default=os.environ.get("MATTMC_MESHING_CORPUS_OUTPUT", ""))
@@ -1649,6 +1664,8 @@ def parse_args() -> CaptureConfig:
         raise SystemExit("--max-secs and --dump-secs must be integers")
     if args.meshing_corpus_warmup < 0 or args.meshing_corpus_measure < 0:
         raise SystemExit("--meshing-corpus-warmup and --meshing-corpus-measure must be non-negative integers")
+    if args.deterministic_static_camera_capture:
+        args.deterministic_camera_capture = True
 
     pose_tolerance = os.environ.get("DETERMINISTIC_POSE_TOLERANCE", "0.001")
     if not re.match(r"^[0-9]+([.][0-9]+)?$", pose_tolerance):
@@ -1670,6 +1687,7 @@ def parse_args() -> CaptureConfig:
         skip_tests=bool(args.skip_tests),
         client_args=args.client_args,
         deterministic_camera_capture=bool(args.deterministic_camera_capture),
+        deterministic_static_camera_capture=bool(args.deterministic_static_camera_capture),
         deterministic_pose_tolerance=float(pose_tolerance),
         audio_validation=bool(args.audio_validation),
         capture_meshing_corpus=bool(args.capture_meshing_corpus),
