@@ -1,13 +1,18 @@
 package net.vulkanic.backends.vulkan;
 
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicLegacyCompatibilityAdapter;
+import net.vulkanic.VulkanicPassResourceModel;
+import net.vulkanic.VulkanicResourceUsage;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.vulkan.VK10;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Map;
+import java.util.List;
 import java.util.Objects;
+import java.util.OptionalInt;
 import java.util.function.Consumer;
 
 /**
@@ -558,6 +563,8 @@ final class VulkanTextureTransferExecutionCoordinator {
             ? preferredIdleLayout(storage)
             : target.trackedLayout();
         int finalLayout = finalLayoutIsIdle ? preferredIdleLayout(storage) : originalLayout;
+        VulkanicPassResourceModel.PassExecutionPlan resourcePlan =
+            explicitTransferPlan(storage, target.mipLevel(), Math.max(0, baseLayer), Math.max(1, layerCount), usage);
         return new TransferOperationPlan(
             storage,
             target.mipLevel(),
@@ -571,8 +578,66 @@ final class VulkanTextureTransferExecutionCoordinator {
             target.height(),
             target.depth(),
             target.pixelBytes(),
-            usage
+            usage,
+            resourcePlan
         );
+    }
+
+    private VulkanicPassResourceModel.PassExecutionPlan explicitTransferPlan(
+        VulkanImageResourceViewCoordinator.ImageStorageSnapshot storage,
+        int mipLevel,
+        int baseLayer,
+        int layerCount,
+        VulkanImageResourceViewCoordinator.ImageTransferUsage usage
+    ) {
+        VulkanicPassResourceModel.ResourceKind kind = switch (usage) {
+            case UPLOAD, COPY_DST -> VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION;
+            case COPY_SRC -> VulkanicPassResourceModel.ResourceKind.TRANSFER_SOURCE;
+            case READBACK -> VulkanicPassResourceModel.ResourceKind.READBACK_SOURCE;
+        };
+        VulkanicPassResourceModel.Access access = switch (usage) {
+            case UPLOAD, COPY_DST -> VulkanicPassResourceModel.Access.WRITE;
+            case COPY_SRC, READBACK -> VulkanicPassResourceModel.Access.READ;
+        };
+        VulkanicResourceUsage usageIntent = switch (usage) {
+            case UPLOAD, COPY_DST -> VulkanicResourceUsage.TRANSFER_DST;
+            case COPY_SRC, READBACK -> VulkanicResourceUsage.TRANSFER_SRC;
+        };
+        VulkanicPassResourceModel.PassKind passKind = usage == VulkanImageResourceViewCoordinator.ImageTransferUsage.READBACK
+            ? VulkanicPassResourceModel.PassKind.READBACK
+            : VulkanicPassResourceModel.PassKind.TRANSFER;
+        return VulkanicLegacyCompatibilityAdapter.planTransfer(new VulkanicLegacyCompatibilityAdapter.TransferSnapshot(
+            passKind,
+            "texture-transfer:" + usage.name().toLowerCase(java.util.Locale.ROOT),
+            "texture-transfer",
+            "texture-transfer-" + storage.textureId(),
+            kind,
+            "texture:" + storage.textureId(),
+            access,
+            subresourceForAspectMask(storage.aspectMask(), mipLevel, 1, baseLayer, layerCount),
+            usageIntent,
+            "texture-transfer:" + usage.name().toLowerCase(java.util.Locale.ROOT),
+            List.of("transition-before-copy", "publish-layout-after-copy"),
+            false,
+            false
+        ));
+    }
+
+    private VulkanicPassResourceModel.Subresource subresourceForAspectMask(
+        int aspectMask,
+        int mipLevel,
+        int levelCount,
+        int baseLayer,
+        int layerCount
+    ) {
+        int depthStencil = VK10.VK_IMAGE_ASPECT_DEPTH_BIT | VK10.VK_IMAGE_ASPECT_STENCIL_BIT;
+        if ((aspectMask & depthStencil) == depthStencil) {
+            return VulkanicPassResourceModel.Subresource.depthStencil(mipLevel, levelCount, baseLayer, layerCount);
+        }
+        if ((aspectMask & VK10.VK_IMAGE_ASPECT_DEPTH_BIT) != 0) {
+            return VulkanicPassResourceModel.Subresource.depth(mipLevel, levelCount, baseLayer, layerCount);
+        }
+        return VulkanicPassResourceModel.Subresource.color(mipLevel, levelCount, baseLayer, layerCount);
     }
 
     private VulkanImageResourceViewCoordinator.ImageStorageSnapshot requireStorage(
@@ -760,11 +825,13 @@ final class VulkanTextureTransferExecutionCoordinator {
         int height,
         int depth,
         int pixelBytes,
-        VulkanImageResourceViewCoordinator.ImageTransferUsage usage
+        VulkanImageResourceViewCoordinator.ImageTransferUsage usage,
+        VulkanicPassResourceModel.PassExecutionPlan resourcePlan
     ) {
         TransferOperationPlan {
             Objects.requireNonNull(storage, "storage");
             Objects.requireNonNull(usage, "usage");
+            Objects.requireNonNull(resourcePlan, "resourcePlan");
         }
 
         long requiredByteCount(int width, int height) {

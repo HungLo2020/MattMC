@@ -1,6 +1,8 @@
 package net.vulkanic.backends.vulkan;
 
 import net.vulkanic.VulkanicRenderPassDescriptor;
+import net.vulkanic.VulkanicLegacyCompatibilityAdapter;
+import net.vulkanic.VulkanicPassResourceModel;
 import net.vulkanic.VulkanicResourceUsage;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.vulkan.KHRSwapchain;
@@ -13,7 +15,6 @@ import java.util.Objects;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.Set;
-import java.util.function.LongConsumer;
 
 /**
  * Coordinates Vulkan render-pass execution state and policy inputs without
@@ -39,23 +40,16 @@ import java.util.function.LongConsumer;
  * layout planning, image-state publication, and synchronization intent.</p>
  */
 final class VulkanRenderPassExecutionCoordinator<ColorAttachment, DepthAttachment> {
-    private final VulkanVirtualFramebufferManager virtualFramebuffers;
     private final VulkanRenderTargetStateManager<ColorAttachment, DepthAttachment> renderTargetState;
     private final VulkanImageStateTracker imageStateTracker;
     private boolean renderPassActive;
 
     VulkanRenderPassExecutionCoordinator(
-        VulkanVirtualFramebufferManager virtualFramebuffers,
         VulkanRenderTargetStateManager<ColorAttachment, DepthAttachment> renderTargetState,
         VulkanImageStateTracker imageStateTracker
     ) {
-        this.virtualFramebuffers = Objects.requireNonNull(virtualFramebuffers, "virtualFramebuffers");
         this.renderTargetState = Objects.requireNonNull(renderTargetState, "renderTargetState");
         this.imageStateTracker = Objects.requireNonNull(imageStateTracker, "imageStateTracker");
-    }
-
-    VulkanVirtualFramebufferManager.FramebufferSnapshot resolveFramebufferSnapshot(int framebuffer) {
-        return virtualFramebuffers.requireSnapshot(framebuffer);
     }
 
     BeginPassPlan<ColorAttachment, DepthAttachment> planTextureViewPass(
@@ -114,24 +108,6 @@ final class VulkanRenderPassExecutionCoordinator<ColorAttachment, DepthAttachmen
                 depth == null ? null : depth.toLayoutInput(colors.size())
             );
         return beginPassPlan(RenderPassKind.FRAMEBUFFER, label, width, height, colors, depth, layoutPlan, false, true);
-    }
-
-    @Nullable
-    Long cachedRenderPass(BeginPassPlan<ColorAttachment, DepthAttachment> plan) {
-        if (!plan.cacheableRenderPass()) {
-            return null;
-        }
-        return renderTargetState.cachedRenderPass(plan.renderPassKey());
-    }
-
-    void cacheRenderPass(BeginPassPlan<ColorAttachment, DepthAttachment> plan, long renderPassHandle) {
-        if (plan.cacheableRenderPass()) {
-            renderTargetState.cacheRenderPass(plan.renderPassKey(), renderPassHandle);
-        }
-    }
-
-    boolean isPermanentRenderPass(long renderPassHandle) {
-        return renderTargetState.isPermanentRenderPass(renderPassHandle);
     }
 
     void completeBegin(
@@ -209,9 +185,8 @@ final class VulkanRenderPassExecutionCoordinator<ColorAttachment, DepthAttachmen
         renderTargetState.resetActivePass();
     }
 
-    void invalidateForResizeDeviceLossOrShutdown(LongConsumer destroyRenderPass) {
+    void resetForResizeDeviceLossOrShutdown() {
         abandonActivePass();
-        renderTargetState.invalidatePermanentRenderPassCache(destroyRenderPass);
     }
 
     PresentComposeTargetPlan planPresentComposeTarget(
@@ -317,6 +292,9 @@ final class VulkanRenderPassExecutionCoordinator<ColorAttachment, DepthAttachmen
             .findFirst()
             .orElse(-1);
         VulkanRenderPassKey renderPassKey = cacheableRenderPass ? layoutPlan.requireRenderPassKey() : null;
+        VulkanicPassResourceModel.PassExecutionPlan resourcePlan = VulkanicLegacyCompatibilityAdapter.planRenderPass(
+            explicitRenderPassSnapshot(kind, label, colors, depth)
+        );
         return new BeginPassPlan<>(
             kind,
             Objects.requireNonNull(label, "label"),
@@ -330,7 +308,64 @@ final class VulkanRenderPassExecutionCoordinator<ColorAttachment, DepthAttachmen
             persistentSwapchainPass,
             cacheableRenderPass,
             targetsSwapchain,
-            swapchainImageIndex
+            swapchainImageIndex,
+            resourcePlan
+        );
+    }
+
+    private VulkanicLegacyCompatibilityAdapter.RenderPassSnapshot explicitRenderPassSnapshot(
+        RenderPassKind kind,
+        String label,
+        List<AttachmentRequest<ColorAttachment>> colors,
+        @Nullable AttachmentRequest<DepthAttachment> depth
+    ) {
+        List<VulkanicLegacyCompatibilityAdapter.AttachmentSnapshot> attachments = new ArrayList<>();
+        for (int colorIndex = 0; colorIndex < colors.size(); colorIndex++) {
+            attachments.add(explicitAttachmentSnapshot(colors.get(colorIndex), colorIndex));
+        }
+        if (depth != null) {
+            attachments.add(explicitAttachmentSnapshot(depth, colors.size()));
+        }
+        return new VulkanicLegacyCompatibilityAdapter.RenderPassSnapshot(
+            kind.name().toLowerCase(java.util.Locale.ROOT) + ":" + label,
+            attachments,
+            List.of(),
+            List.of(),
+            List.of(new VulkanicPassResourceModel.Command("render-pass-body", OptionalInt.empty(), OptionalInt.empty())),
+            List.of("attachments-ready-before-pass", "final-layout-published-after-pass"),
+            false,
+            false
+        );
+    }
+
+    private VulkanicLegacyCompatibilityAdapter.AttachmentSnapshot explicitAttachmentSnapshot(
+        AttachmentRequest<?> request,
+        int attachmentIndex
+    ) {
+        VulkanicPassResourceModel.ResourceKind kind = request.depth()
+            ? VulkanicPassResourceModel.ResourceKind.DEPTH_ATTACHMENT
+            : VulkanicPassResourceModel.ResourceKind.COLOR_ATTACHMENT;
+        VulkanicPassResourceModel.Subresource subresource = request.depth()
+            ? request.stencilCapable()
+                ? VulkanicPassResourceModel.Subresource.depthStencil(0, 1, 0, 1)
+                : VulkanicPassResourceModel.Subresource.depth(0, 1, 0, 1)
+            : VulkanicPassResourceModel.Subresource.color(0, 1, 0, 1);
+        return new VulkanicLegacyCompatibilityAdapter.AttachmentSnapshot(
+            attachmentIndex,
+            request.depth() ? "depth" : "color" + attachmentIndex,
+            kind,
+            request.swapchain()
+                ? "swapchain:" + request.swapchainImageIndex()
+                : "texture:" + request.textureId(),
+            subresource,
+            request.loadOp(),
+            request.storeOp(),
+            request.clearColor(),
+            request.clearDepth(),
+            request.initialUsage(),
+            request.passUsage(),
+            request.finalUsage(),
+            request.feedbackLoopCapable() || request.passUsage() == VulkanicResourceUsage.ATTACHMENT_FEEDBACK_LOOP
         );
     }
 
@@ -503,7 +538,8 @@ final class VulkanRenderPassExecutionCoordinator<ColorAttachment, DepthAttachmen
         boolean persistentSwapchainPass,
         boolean cacheableRenderPass,
         boolean targetsSwapchain,
-        int swapchainImageIndex
+        int swapchainImageIndex,
+        VulkanicPassResourceModel.PassExecutionPlan resourcePlan
     ) {
         BeginPassPlan {
             colors = List.copyOf(colors);
@@ -511,6 +547,7 @@ final class VulkanRenderPassExecutionCoordinator<ColorAttachment, DepthAttachmen
             Objects.requireNonNull(label, "label");
             Objects.requireNonNull(layoutPlan, "layoutPlan");
             Objects.requireNonNull(compatibilityKey, "compatibilityKey");
+            Objects.requireNonNull(resourcePlan, "resourcePlan");
         }
 
         int attachmentCount() {

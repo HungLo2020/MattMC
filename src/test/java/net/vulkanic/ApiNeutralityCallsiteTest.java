@@ -1127,18 +1127,20 @@ public class ApiNeutralityCallsiteTest {
 
         String vulkanBackendRelative = "net/vulkanic/backends/vulkan/VulkanBackend.java";
         String vulkanBackendSource = readSource(SRC_MAIN_JAVA.resolve(vulkanBackendRelative));
+        String vulkanLifecycleRelative = "net/vulkanic/backends/vulkan/VulkanBackendLifecycleManager.java";
+        String vulkanLifecycleSource = readSource(SRC_MAIN_JAVA.resolve(vulkanLifecycleRelative));
         assertTrue(vulkanBackendSource.contains("void releaseCompatibilityDevice(net.blaze3d.opengl.GlDevice device)"),
             "Vulkan backend should expose a dedicated compatibility-device release seam: " + vulkanBackendRelative);
         assertTrue(vulkanBackendSource.contains("if (this.compatibilityDevice == device) {"),
             "Vulkan backend should only clear its cached compatibility device when the closed device still matches: " + vulkanBackendRelative);
         assertTrue(vulkanBackendSource.contains("this.compatibilityDevice = null;"),
             "Vulkan backend should drop stale compatibility-device references after close: " + vulkanBackendRelative);
-        assertTrue(vulkanBackendSource.contains("properties.limits().maxImageDimension2D()"),
-            "Vulkan backend should source max texture size from Vulkan physical-device limits: " + vulkanBackendRelative);
-        assertTrue(vulkanBackendSource.contains("properties.limits().minUniformBufferOffsetAlignment()"),
-            "Vulkan backend should source uniform alignment from Vulkan physical-device limits: " + vulkanBackendRelative);
-        assertTrue(vulkanBackendSource.contains("return spine != null ? spine.maxImageDimension2D : 16384;"),
-            "Vulkan backend max texture size seam should not require the compatibility GlDevice: " + vulkanBackendRelative);
+        assertTrue(vulkanLifecycleSource.contains("properties.limits().maxImageDimension2D()"),
+            "Vulkan lifecycle manager should source max texture size from Vulkan physical-device limits: " + vulkanLifecycleRelative);
+        assertTrue(vulkanLifecycleSource.contains("properties.limits().minUniformBufferOffsetAlignment()"),
+            "Vulkan lifecycle manager should source uniform alignment from Vulkan physical-device limits: " + vulkanLifecycleRelative);
+        assertTrue(vulkanBackendSource.contains("return spine != null ? spine.maxImageDimension2D() : 16384;"),
+            "Vulkan backend max texture size seam should route through lifecycle snapshots instead of the compatibility GlDevice: " + vulkanBackendRelative);
         assertFalse(vulkanBackendSource.contains("return device.getMaxTextureSize();"),
             "Vulkan backend should avoid compatibility-device max texture size queries: " + vulkanBackendRelative);
         assertFalse(vulkanBackendSource.contains("return device.getUniformOffsetAlignment();"),

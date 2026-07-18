@@ -1,6 +1,8 @@
 package net.vulkanic.backends.vulkan;
 
 import net.vulkanic.VulkanicIndexType;
+import net.vulkanic.VulkanicPassResourceModel;
+import net.vulkanic.VulkanicResourceUsage;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -39,6 +41,45 @@ class VulkanGraphicsCommandExecutionCoordinatorTest {
         assertEquals(12, draw.indexCount());
         assertEquals(-2, draw.baseVertex());
         assertEquals(3, draw.instanceCount());
+        assertEquals(2, plan.resourcePlan().orderedUses().size());
+        assertEquals(VulkanicPassResourceModel.ResourceKind.VERTEX_BUFFER, plan.resourcePlan().orderedUses().get(0).kind());
+        assertEquals(VulkanicPassResourceModel.ResourceKind.INDEX_BUFFER, plan.resourcePlan().orderedUses().get(1).kind());
+    }
+
+    @Test
+    void descriptorResourcesParticipateInGraphicsPassContract() {
+        VulkanGraphicsCommandExecutionCoordinator coordinator = new VulkanGraphicsCommandExecutionCoordinator();
+        VulkanicPassResourceModel.ResourceUse sampler = VulkanicPassResourceModel.ResourceUse.of(
+            VulkanicPassResourceModel.ResourceIdentity.of(
+                "Sampler0",
+                VulkanicPassResourceModel.ResourceKind.SAMPLED_TEXTURE,
+                "texture:33"
+            ),
+            VulkanicPassResourceModel.Access.READ,
+            VulkanicPassResourceModel.Subresource.color(0, 1, 0, 1),
+            VulkanicResourceUsage.SAMPLED_READ,
+            "graphics:sampler:Sampler0",
+            false,
+            0
+        );
+
+        VulkanGraphicsCommandExecutionCoordinator.GraphicsExecutionPlan plan =
+            coordinator.planGraphicsExecution(new VulkanGraphicsCommandExecutionCoordinator.GraphicsExecutionRequest(
+                COMMAND_BUFFER,
+                "pass-a",
+                "draw",
+                pipeline(101L, 201L, "pass-a"),
+                descriptor(201L, 301L),
+                List.of(vertex(0, 401L, 0L)),
+                null,
+                List.of(),
+                List.of(),
+                List.of(sampler),
+                VulkanGraphicsCommandExecutionCoordinator.DrawCommandRequirement.arrays("draw", 0, 3, 1)
+            ));
+
+        assertEquals(sampler, plan.resourcePlan().orderedUses().get(0));
+        assertEquals(VulkanicPassResourceModel.ResourceKind.VERTEX_BUFFER, plan.resourcePlan().orderedUses().get(1).kind());
     }
 
     @Test

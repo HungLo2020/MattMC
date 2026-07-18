@@ -3,12 +3,9 @@ package net.vulkanic.backends.vulkan;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiConsumer;
-import java.util.function.LongConsumer;
 
 /**
  * Backend-internal owner for active Vulkan render-target/attachment state.
@@ -29,8 +26,6 @@ final class VulkanRenderTargetStateManager<ColorAttachment, DepthAttachment> {
     private int activeHeight;
     private boolean activeTargetsSwapchain;
     private int activeSwapchainImageIndex = -1;
-
-    private final Map<VulkanRenderPassKey, Long> permanentRenderPassCache = new HashMap<>();
 
     void beginPass(
         VulkanRenderPassCompatibilityKey compatibilityKey,
@@ -127,36 +122,4 @@ final class VulkanRenderTargetStateManager<ColorAttachment, DepthAttachment> {
         }
     }
 
-    @Nullable
-    Long cachedRenderPass(VulkanRenderPassKey key) {
-        return permanentRenderPassCache.get(key);
-    }
-
-    void cacheRenderPass(VulkanRenderPassKey key, long renderPassHandle) {
-        if (renderPassHandle == 0L) {
-            return;
-        }
-        permanentRenderPassCache.put(Objects.requireNonNull(key, "key"), renderPassHandle);
-    }
-
-    boolean isPermanentRenderPass(long renderPassHandle) {
-        return renderPassHandle != 0L && permanentRenderPassCache.containsValue(renderPassHandle);
-    }
-
-    void invalidatePermanentRenderPassCache(LongConsumer destroyRenderPass) {
-        Objects.requireNonNull(destroyRenderPass, "destroyRenderPass");
-        if (permanentRenderPassCache.isEmpty()) {
-            return;
-        }
-        new ArrayList<>(permanentRenderPassCache.values()).forEach(handle -> {
-            if (handle != 0L) {
-                destroyRenderPass.accept(handle);
-            }
-        });
-        permanentRenderPassCache.clear();
-    }
-
-    int permanentRenderPassCountForTests() {
-        return permanentRenderPassCache.size();
-    }
 }

@@ -5645,6 +5645,8 @@ public class Phase3DrawPathTest {
 	            readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicRenderTargetDescriptor.java"));
 	        String vulkanBackendSource =
 	            readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+	        String nativeLifecycleSource =
+	            readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeRenderTargetLifecycleManager.java"));
 	        String renderPassKeySource =
 	            readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanRenderPassKey.java"));
 
@@ -5652,14 +5654,14 @@ public class Phase3DrawPathTest {
 	            "Render-target descriptors should reject only attachmentless passes without explicit extents");
 	        assertTrue(vulkanBackendSource.contains("if (width < 0)"),
 	            "Vulkan render-target resolution should derive depth-only pass dimensions from the depth attachment");
-	        assertTrue(vulkanBackendSource.contains("colorAttachmentCount == 0")
-	                && vulkanBackendSource.contains("? null")
-	                && vulkanBackendSource.contains("VkAttachmentReference.calloc(colorAttachmentCount, stack)"),
+	        assertTrue(nativeLifecycleSource.contains("colorCount == 0")
+	                && nativeLifecycleSource.contains("? null")
+	                && nativeLifecycleSource.contains("VkAttachmentReference.calloc(colorCount, stack)"),
 	            "Vulkan render-pass creation should pass null color references for depth-only or attachmentless subpasses");
 	        assertFalse(renderPassKeySource.contains("colorAttachments.isEmpty() && depthAttachment == null"),
 	            "Vulkan render-pass cache keys should support depth-only and attachmentless cached passes");
-	        assertTrue(vulkanBackendSource.contains("attachmentCount == 0")
-	                && vulkanBackendSource.contains("VkAttachmentDescription.calloc(attachmentCount, stack)")
+	        assertTrue(nativeLifecycleSource.contains("attachmentCount == 0")
+	                && nativeLifecycleSource.contains("VkAttachmentDescription.calloc(attachmentCount, stack)")
 	                && vulkanBackendSource.contains("VkClearValue.calloc(attachmentCount, stack)"),
 	            "Vulkan render-pass creation should avoid fake attachments for attachmentless passes");
 
@@ -5780,8 +5782,9 @@ public class Phase3DrawPathTest {
                 && renderTargetCompatibilitySource.contains("allowsDescriptorBackedRenderPass()")
                 && renderTargetCompatibilitySource.contains("return this == EXACT;"),
             "VulkanBackend should keep exact parity diagnostics while exposing typed compatibility and an exact-only proven-safe render-pass gate");
-        assertTrue(vulkanBackendSource.contains("VulkanRenderPassLayoutPlanner.planPipelineCompatible(compatibilityKey)")
-                && vulkanBackendSource.contains("layoutPlan.hasDepthAttachment()"),
+        String nativeLifecycleSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeRenderTargetLifecycleManager.java"));
+        assertTrue(nativeLifecycleSource.contains("VulkanRenderPassLayoutPlanner.planPipelineCompatible(compatibilityKey)")
+                && nativeLifecycleSource.contains("layoutPlan.hasDepthAttachment()"),
             "Vulkan target-specific pipelines should consume the planner depth attachment contract");
     }
 
@@ -5789,27 +5792,29 @@ public class Phase3DrawPathTest {
     public void testVulkanFeedbackLoopPipelineRenderPassUsesFeedbackSubpassLayouts() throws IOException {
         Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
         String source = readSource(vulkanBackendFile);
+        String nativeLifecycleSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeRenderTargetLifecycleManager.java"));
         String plannerSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanRenderPassLayoutPlanner.java"));
 
         assertTrue(plannerSource.contains("int colorLayout = compatibilityKey.feedbackLoop()")
                 && plannerSource.contains("int depthLayout = compatibilityKey.feedbackLoop()"),
             "Pipeline-compatible render-pass layouts should be chosen by attachment-feedback-loop mode in the planner");
-        assertTrue(source.contains(".layout(colorPlan.subpassLayout());")
-                && source.contains(".layout(depthPlan.subpassLayout());"),
-            "VulkanBackend should materialize planner-selected color/depth attachment reference layouts");
+        assertTrue(nativeLifecycleSource.contains(".layout(layoutPlan.colorAttachment(colorIndex).subpassLayout());")
+                && nativeLifecycleSource.contains(".layout(layoutPlan.depthAttachment().subpassLayout());"),
+            "Native render-target lifecycle should materialize planner-selected color/depth attachment reference layouts");
     }
 
     @Test
     public void testVulkanSwapchainComposePipelineUsesPresentCompatibleRenderPassContract() throws IOException {
         Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
         String source = readSource(vulkanBackendFile);
+        String nativeLifecycleSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeRenderTargetLifecycleManager.java"));
 
         assertTrue(source.contains("boolean swapchainPresentCompatible"),
             "Vulkan pipeline creation should distinguish swapchain-present render-pass compatibility from feedback-loop compatibility");
         assertTrue(source.contains("swapchainState.imageFormat(),\n                    true"),
             "Swapchain present compose pipeline should request the swapchain-present-compatible render pass contract");
-        assertTrue(source.contains("VulkanRenderPassLayoutPlanner.planPipelineCompatible(compatibilityKey)")
-                && source.contains("allocateCompatibleSubpassDependencies(stack, layoutPlan)"),
+        assertTrue(nativeLifecycleSource.contains("VulkanRenderPassLayoutPlanner.planPipelineCompatible(compatibilityKey)")
+                && nativeLifecycleSource.contains("layoutPlan.dependencyIntent()"),
             "Pipeline-compatible render pass creation should consume the extracted planner dependency intent");
         String plannerSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanRenderPassLayoutPlanner.java"));
         assertTrue(plannerSource.contains("VK10.VK_SUBPASS_EXTERNAL")
@@ -5844,8 +5849,9 @@ public class Phase3DrawPathTest {
             "Vulkan pipeline creation should compile against the same compatibility key used for draw-time render passes");
         Path plannerFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanRenderPassLayoutPlanner.java");
         String plannerSource = readSource(plannerFile);
-        assertTrue(source.contains("allocateCompatibleSubpassDependencies(stack, layoutPlan)")
-                && source.contains("VulkanRenderPassLayoutPlanner.dependencyIntent(compatibilityKey)"),
+        String nativeLifecycleSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeRenderTargetLifecycleManager.java"));
+        assertTrue(nativeLifecycleSource.contains("VulkanRenderPassLayoutPlanner.planPipelineCompatible(compatibilityKey)")
+                && nativeLifecycleSource.contains("layoutPlan.dependencyIntent()"),
             "Pipeline-compatible render passes and live render passes should consume planner-owned dependency intent");
         assertTrue(plannerSource.contains("case TEXTURE_VIEW -> textureViewDependencies(compatibilityKey);")
                 && plannerSource.contains("case FRAMEBUFFER -> framebufferDependencies(compatibilityKey);")

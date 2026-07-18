@@ -1,6 +1,7 @@
 package net.vulkanic.backends.vulkan;
 
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicPassResourceModel;
 import org.junit.jupiter.api.Test;
 import org.lwjgl.vulkan.VK10;
 
@@ -153,7 +154,12 @@ final class VulkanTextureTransferExecutionCoordinatorTest {
         assertEquals(VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, upload.originalLayout());
         assertEquals(VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, upload.transferLayout());
         assertEquals(VulkanImageUse.SAMPLED_COLOR.vkLayout(), upload.finalLayout());
+        assertEquals(VulkanicPassResourceModel.PassKind.TRANSFER, upload.resourcePlan().request().kind());
+        assertEquals(VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION, upload.resourcePlan().orderedUses().get(0).kind());
+        assertEquals("texture:" + color.id, upload.resourcePlan().orderedUses().get(0).resource().stableKey());
         assertEquals(VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readback.transferLayout());
+        assertEquals(VulkanicPassResourceModel.PassKind.READBACK, readback.resourcePlan().request().kind());
+        assertEquals(VulkanicPassResourceModel.ResourceKind.READBACK_SOURCE, readback.resourcePlan().orderedUses().get(0).kind());
         assertEquals(color.id, copy.source().storage().textureId());
         assertEquals(destination.id, copy.destination().storage().textureId());
         assertEquals(VK10.VK_IMAGE_ASPECT_COLOR_BIT, blit.operationAspectMask());

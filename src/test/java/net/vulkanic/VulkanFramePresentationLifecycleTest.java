@@ -77,6 +77,8 @@ public class VulkanFramePresentationLifecycleTest {
     public void testFramePresentationSourceWiring() throws Exception {
         String vulkanBackendSource = readSource(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String vulkanLifecycleSource = readSource(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackendLifecycleManager.java"));
         String frameCoordinatorSource = readSource(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanFrameExecutionCoordinator.java"));
         String renderSystemSource = readSource(PROJECT_ROOT
@@ -106,8 +108,8 @@ public class VulkanFramePresentationLifecycleTest {
             "Vulkan backend should dedicate manager-owned command buffers to swapchain frame submission");
         assertTrue(vulkanBackendSource.contains("ensureCurrentFrameCommandBufferRecording"),
             "Vulkan backend should begin frame-presentation command recording on a dedicated frame buffer path");
-        assertTrue(vulkanBackendSource.contains("createSwapchainRenderFinishedSemaphores(imageResources.imageHandles.size())"),
-            "Vulkan backend should create render-finished semaphores from the swapchain image count");
+        assertTrue(vulkanLifecycleSource.contains("createSwapchainRenderFinishedSemaphores(imageResources.imageHandles().size()"),
+            "Vulkan lifecycle manager should create render-finished semaphores from the swapchain image count");
         assertTrue(vulkanBackendSource.contains("submitPlan.renderFinishedSemaphore()")
                 && vulkanBackendSource.contains("presentPlan.renderFinishedSemaphore()"),
             "Vulkan backend should signal/present with a coordinator-planned render-finished semaphore owned by the acquired swapchain image");
@@ -115,28 +117,28 @@ public class VulkanFramePresentationLifecycleTest {
             "Vulkan backend should destroy per-image render-finished semaphores with swapchain resources");
         assertFalse(vulkanBackendSource.contains("swapchainRenderFinishedSemaphores[currentFrameSyncIndex]"),
             "Vulkan backend must not reuse present wait semaphores by frame slot across different swapchain images");
-        assertTrue(vulkanBackendSource.contains("vkGetPhysicalDeviceFeatures(device, features)"),
-            "Vulkan backend should query core physical-device feature support before device creation");
-        assertTrue(vulkanBackendSource.contains("enabledFeatures.fillModeNonSolid(true)"),
-            "Vulkan backend should enable fillModeNonSolid when the selected device supports it");
-        assertTrue(vulkanBackendSource.contains("features.vertexPipelineStoresAndAtomics()")
-                && vulkanBackendSource.contains("enabledFeatures.vertexPipelineStoresAndAtomics(true)")
+        assertTrue(vulkanLifecycleSource.contains("vkGetPhysicalDeviceFeatures(device, features)"),
+            "Vulkan lifecycle manager should query core physical-device feature support before device creation");
+        assertTrue(vulkanLifecycleSource.contains("enabledFeatures.fillModeNonSolid(true)"),
+            "Vulkan lifecycle manager should enable fillModeNonSolid when the selected device supports it");
+        assertTrue(vulkanLifecycleSource.contains("features.vertexPipelineStoresAndAtomics()")
+                && vulkanLifecycleSource.contains("enabledFeatures.vertexPipelineStoresAndAtomics(true)")
                 && vulkanBackendSource.contains("vertexPipelineStoresAndAtomicsEnabled"),
-            "Vulkan backend should enable and track vertex-stage storage image writes when the selected device supports them");
-        assertTrue(vulkanBackendSource.contains("features.fragmentStoresAndAtomics()")
-                && vulkanBackendSource.contains("enabledFeatures.fragmentStoresAndAtomics(true)")
+            "Vulkan lifecycle manager should enable and Vulkan backend should track vertex-stage storage image writes when supported");
+        assertTrue(vulkanLifecycleSource.contains("features.fragmentStoresAndAtomics()")
+                && vulkanLifecycleSource.contains("enabledFeatures.fragmentStoresAndAtomics(true)")
                 && vulkanBackendSource.contains("fragmentStoresAndAtomicsEnabled"),
-            "Vulkan backend should enable and track fragment-stage storage image writes when the selected device supports them");
-        assertTrue(vulkanBackendSource.contains("features.shaderStorageImageReadWithoutFormat()")
-                && vulkanBackendSource.contains("enabledFeatures.shaderStorageImageReadWithoutFormat(true)")
+            "Vulkan lifecycle manager should enable and Vulkan backend should track fragment-stage storage image writes when supported");
+        assertTrue(vulkanLifecycleSource.contains("features.shaderStorageImageReadWithoutFormat()")
+                && vulkanLifecycleSource.contains("enabledFeatures.shaderStorageImageReadWithoutFormat(true)")
                 && vulkanBackendSource.contains("shaderStorageImageReadWithoutFormatEnabled"),
-            "Vulkan backend should enable and track unformatted storage-image reads required by shaderpack image uniforms");
-        assertTrue(vulkanBackendSource.contains("features.shaderStorageImageWriteWithoutFormat()")
-                && vulkanBackendSource.contains("enabledFeatures.shaderStorageImageWriteWithoutFormat(true)")
+            "Vulkan lifecycle manager should enable and Vulkan backend should track unformatted storage-image reads required by shaderpacks");
+        assertTrue(vulkanLifecycleSource.contains("features.shaderStorageImageWriteWithoutFormat()")
+                && vulkanLifecycleSource.contains("enabledFeatures.shaderStorageImageWriteWithoutFormat(true)")
                 && vulkanBackendSource.contains("shaderStorageImageWriteWithoutFormatEnabled"),
-            "Vulkan backend should enable and track unformatted storage-image writes required by shaderpack imageStore SPIR-V");
-        assertTrue(vulkanBackendSource.contains(".pEnabledFeatures(enabledFeatures)"),
-            "Vulkan backend should pass requested core features to vkCreateDevice");
+            "Vulkan lifecycle manager should enable and Vulkan backend should track unformatted storage-image writes required by shaderpacks");
+        assertTrue(vulkanLifecycleSource.contains(".pEnabledFeatures(enabledFeatures)"),
+            "Vulkan lifecycle manager should pass requested core features to vkCreateDevice");
         assertTrue(vulkanBackendSource.contains("mode -> toVkPolygonMode(mode, portableState.location().toString())"),
             "Vulkan backend should map polygon mode with pipeline context for diagnostics");
         assertTrue(vulkanBackendSource.contains("fillModeNonSolidEnabled"),

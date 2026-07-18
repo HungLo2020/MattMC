@@ -177,24 +177,30 @@ public class VulkanRenderPassLifecycleTest {
 
     @Test
     public void testVulkanBackendSourceUsesNativeRenderPassLifecycle() throws Exception {
-        String source = Files.readString(PROJECT_ROOT
+        String backendSource = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String lifecycleSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanNativeRenderTargetLifecycleManager.java"));
 
-        assertTrue(source.contains("vkCreateRenderPass"),
+        assertTrue(lifecycleSource.contains("vkCreateRenderPass"),
             "Vulkan render-pass lifecycle should create VkRenderPass objects");
-        assertTrue(source.contains("vkCreateFramebuffer"),
+        assertTrue(lifecycleSource.contains("vkCreateFramebuffer"),
             "Vulkan render-pass lifecycle should create VkFramebuffer objects");
-        assertTrue(source.contains("vkCmdBeginRenderPass"),
+        assertFalse(backendSource.contains("vkCreateRenderPass"),
+            "VulkanBackend should not directly own native VkRenderPass creation after lifecycle extraction");
+        assertFalse(backendSource.contains("vkCreateFramebuffer"),
+            "VulkanBackend should not directly own native VkFramebuffer creation after lifecycle extraction");
+        assertTrue(backendSource.contains("vkCmdBeginRenderPass"),
             "Vulkan render-pass lifecycle should record vkCmdBeginRenderPass");
-        assertTrue(source.contains("vkCmdEndRenderPass"),
+        assertTrue(backendSource.contains("vkCmdEndRenderPass"),
             "Vulkan render-pass lifecycle should record vkCmdEndRenderPass");
-        assertFalse(source.contains("Vulkan-native render pass lifecycle is not implemented yet."),
+        assertFalse(backendSource.contains("Vulkan-native render pass lifecycle is not implemented yet."),
             "Vulkan render-pass lifecycle should no longer be marked unsupported");
-        assertTrue(source.contains("ResolvedRenderTargets"),
+        assertTrue(backendSource.contains("ResolvedRenderTargets"),
             "Vulkan render target abstraction should resolve and validate attachments before native begin");
-        assertTrue(source.contains("Color attachment texture must include USAGE_RENDER_ATTACHMENT"),
+        assertTrue(backendSource.contains("Color attachment texture must include USAGE_RENDER_ATTACHMENT"),
             "Vulkan render target abstraction should validate color attachment usage flags");
-        assertTrue(source.contains("Depth attachment texture must include USAGE_RENDER_ATTACHMENT"),
+        assertTrue(backendSource.contains("Depth attachment texture must include USAGE_RENDER_ATTACHMENT"),
             "Vulkan render target abstraction should validate depth attachment usage flags");
     }
 

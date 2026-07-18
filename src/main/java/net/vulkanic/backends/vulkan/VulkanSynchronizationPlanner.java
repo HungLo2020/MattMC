@@ -1,6 +1,8 @@
 package net.vulkanic.backends.vulkan;
 
 import net.vulkanic.VulkanicResourceBarriers;
+import net.vulkanic.VulkanicPassResourceModel;
+import net.vulkanic.VulkanicResourceUsage;
 import org.lwjgl.vulkan.EXTAttachmentFeedbackLoopLayout;
 import org.lwjgl.vulkan.KHRSwapchain;
 import org.lwjgl.vulkan.VK10;
@@ -104,6 +106,74 @@ final class VulkanSynchronizationPlanner {
             offset,
             size
         ));
+    }
+
+    static Optional<BufferBarrierPlan> planBufferVisibilityForUse(
+        VulkanicPassResourceModel.ResourceUse priorWrite,
+        VulkanicPassResourceModel.ResourceUse consumer
+    ) {
+        Objects.requireNonNull(priorWrite, "priorWrite");
+        Objects.requireNonNull(consumer, "consumer");
+        if (!priorWrite.writes() || !consumer.reads()) {
+            return Optional.empty();
+        }
+        if (!priorWrite.subresource().overlaps(consumer.subresource())) {
+            return Optional.empty();
+        }
+        if (!priorWrite.subresource().aspects().contains(VulkanicPassResourceModel.Aspect.BUFFER)
+            || !consumer.subresource().aspects().contains(VulkanicPassResourceModel.Aspect.BUFFER)) {
+            return Optional.empty();
+        }
+        int offset = Math.max(priorWrite.subresource().baseMipLevel(), consumer.subresource().baseMipLevel());
+        int priorEnd = priorWrite.subresource().baseMipLevel() + priorWrite.subresource().levelCount();
+        int consumerEnd = consumer.subresource().baseMipLevel() + consumer.subresource().levelCount();
+        int size = Math.max(0, Math.min(priorEnd, consumerEnd) - offset);
+        return planBufferTransferWriteVisibility(offset, size);
+    }
+
+    static Optional<ImageBarrierPlan> planImageLayoutTransitionForUse(
+        int aspectMask,
+        int oldLayout,
+        VulkanicPassResourceModel.ResourceUse use,
+        boolean depth,
+        boolean feedbackLoopCapable,
+        int inferredLayout
+    ) {
+        Objects.requireNonNull(use, "use");
+        int newLayout = layoutForUse(use, depth, feedbackLoopCapable, inferredLayout);
+        return planImageLayoutTransition(
+            aspectMask,
+            oldLayout,
+            newLayout,
+            use.subresource().baseMipLevel(),
+            use.subresource().levelCount(),
+            use.subresource().baseLayer(),
+            use.subresource().layerCount(),
+            VK10.VK_QUEUE_FAMILY_IGNORED,
+            VK10.VK_QUEUE_FAMILY_IGNORED
+        );
+    }
+
+    static int layoutForUse(
+        VulkanicPassResourceModel.ResourceUse use,
+        boolean depth,
+        boolean feedbackLoopCapable,
+        int inferredLayout
+    ) {
+        Objects.requireNonNull(use, "use");
+        VulkanicResourceUsage usage = use.usage();
+        if (usage == VulkanicResourceUsage.INFERRED) {
+            usage = switch (use.kind()) {
+                case COLOR_ATTACHMENT -> VulkanicResourceUsage.COLOR_ATTACHMENT_WRITE;
+                case DEPTH_ATTACHMENT -> VulkanicResourceUsage.DEPTH_ATTACHMENT_WRITE;
+                case SAMPLED_TEXTURE -> VulkanicResourceUsage.SAMPLED_READ;
+                case STORAGE_TEXTURE, STORAGE_BUFFER -> VulkanicResourceUsage.STORAGE_READ_WRITE;
+                case TRANSFER_SOURCE, READBACK_SOURCE -> VulkanicResourceUsage.TRANSFER_SRC;
+                case TRANSFER_DESTINATION -> VulkanicResourceUsage.TRANSFER_DST;
+                case UNIFORM_BUFFER, TEXEL_BUFFER, VERTEX_BUFFER, INDEX_BUFFER, INDIRECT_BUFFER -> VulkanicResourceUsage.SAMPLED_READ;
+            };
+        }
+        return VulkanRenderPassLayoutPlanner.layoutForUsage(usage, depth, feedbackLoopCapable, inferredLayout);
     }
 
     static MemoryBarrierPlan planResourceBarrier(VulkanicResourceBarriers barriers, boolean renderPassRecording) {

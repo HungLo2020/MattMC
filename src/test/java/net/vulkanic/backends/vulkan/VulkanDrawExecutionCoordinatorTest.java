@@ -6,6 +6,7 @@ import net.blaze3d.vertex.VertexFormat;
 import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicIndexType;
+import net.vulkanic.VulkanicPassResourceModel;
 import net.vulkanic.VulkanicShaderStage;
 import net.vulkanic.VulkanicSpirvModule;
 import org.junit.jupiter.api.Test;
@@ -57,6 +58,9 @@ class VulkanDrawExecutionCoordinatorTest {
         assertEquals(2, plan.vertexStream().vertexBuffers().size());
         assertEquals(77, plan.vertexStream().vertexBuffers().get(1).bufferId());
         assertEquals(8L, plan.vertexStream().vertexBuffers().get(1).offset());
+        assertEquals(1, plan.resourcePlan().orderedUses().size());
+        assertEquals(VulkanicPassResourceModel.ResourceKind.VERTEX_BUFFER, plan.resourcePlan().orderedUses().get(0).kind());
+        assertEquals("legacy-buffer:77", plan.resourcePlan().orderedUses().get(0).resource().stableKey());
         PipelineDescriptor.VertexInputAttribute position = attribute(plan.vertexStream().vertexInputState(), 0);
         assertEquals(PipelineDescriptor.VertexAttributeFormat.R32G32B32_SFLOAT, position.format());
     }
@@ -78,12 +82,15 @@ class VulkanDrawExecutionCoordinatorTest {
                 List.of(new VulkanDrawExecutionCoordinator.ReflectedVertexInputSnapshot(0, "vec3")),
                 Map.of()
             ),
-            vao(
+            indexedVao(
                 List.of(new VulkanDrawExecutionCoordinator.LegacyVertexAttributeSnapshot(
                     0, 0, 3, VulkanicAPI.GL_FLOAT, false, false, 0, 0
                 )),
                 List.of(new VulkanDrawExecutionCoordinator.LegacyVertexBindingSnapshot(0, 12, 0L, 0, 9)),
-                List.of(new VulkanDrawExecutionCoordinator.VertexBufferBindingPlan(0, 9, 0L, false))
+                List.of(new VulkanDrawExecutionCoordinator.VertexBufferBindingPlan(0, 9, 0L, false)),
+                5,
+                0x1234L,
+                16
             ),
             renderState()
         );
@@ -93,6 +100,9 @@ class VulkanDrawExecutionCoordinatorTest {
         assertEquals(6, plan.command().indexCount());
         assertEquals(-2, plan.command().baseVertex());
         assertEquals(3, plan.command().instanceCount());
+        assertEquals(2, plan.resourcePlan().orderedUses().size());
+        assertEquals(VulkanicPassResourceModel.ResourceKind.INDEX_BUFFER, plan.resourcePlan().orderedUses().get(1).kind());
+        assertEquals("legacy-buffer:5", plan.resourcePlan().orderedUses().get(1).resource().stableKey());
         coordinator.validateBoundIndexRange(
             new VulkanDrawExecutionCoordinator.BoundIndexStream(0x1234L, 16, VulkanicIndexType.SHORT),
             plan.indexStream()
@@ -285,6 +295,20 @@ class VulkanDrawExecutionCoordinatorTest {
         return new VulkanDrawExecutionCoordinator.DrawResourceSnapshot(
             new VulkanDrawExecutionCoordinator.LegacyVaoSnapshot(attributes, bindings, vertexBuffers),
             null
+        );
+    }
+
+    private static VulkanDrawExecutionCoordinator.DrawResourceSnapshot indexedVao(
+        List<VulkanDrawExecutionCoordinator.LegacyVertexAttributeSnapshot> attributes,
+        List<VulkanDrawExecutionCoordinator.LegacyVertexBindingSnapshot> bindings,
+        List<VulkanDrawExecutionCoordinator.VertexBufferBindingPlan> vertexBuffers,
+        int indexBufferId,
+        long indexBufferHandle,
+        int indexBufferSize
+    ) {
+        return new VulkanDrawExecutionCoordinator.DrawResourceSnapshot(
+            new VulkanDrawExecutionCoordinator.LegacyVaoSnapshot(attributes, bindings, vertexBuffers),
+            new VulkanDrawExecutionCoordinator.IndexBufferSnapshot(indexBufferId, indexBufferHandle, indexBufferSize)
         );
     }
 

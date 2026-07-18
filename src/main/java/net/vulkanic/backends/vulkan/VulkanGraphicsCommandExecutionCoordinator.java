@@ -1,5 +1,7 @@
 package net.vulkanic.backends.vulkan;
 
+import net.vulkanic.VulkanicPassResourceModel;
+import net.vulkanic.VulkanicLegacyCompatibilityAdapter;
 import net.vulkanic.VulkanicIndexType;
 import org.jetbrains.annotations.Nullable;
 
@@ -9,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Owns command-buffer-local graphics execution state for Vulkan command recording.
@@ -119,7 +122,64 @@ final class VulkanGraphicsCommandExecutionCoordinator {
             ),
             nextPushConstants
         );
-        return new GraphicsExecutionPlan(request, operations, published);
+        return new GraphicsExecutionPlan(request, operations, published, explicitGraphicsPlan(request));
+    }
+
+    private VulkanicPassResourceModel.PassExecutionPlan explicitGraphicsPlan(GraphicsExecutionRequest request) {
+        List<VulkanicLegacyCompatibilityAdapter.VertexBufferSnapshot> vertexBuffers = new ArrayList<>();
+        for (VertexBufferBindingRequirement vertex : request.vertexBuffers()) {
+            vertexBuffers.add(new VulkanicLegacyCompatibilityAdapter.VertexBufferSnapshot(
+                vertex.binding(),
+                vertex.defaultAttributeBuffer()
+                    ? "default-attribute-buffer"
+                    : "graphics:" + request.semanticSource() + ":vertex-binding:" + vertex.binding(),
+                vertex.offset(),
+                vertex.stride(),
+                vertex.defaultAttributeBuffer()
+            ));
+        }
+
+        Optional<VulkanicLegacyCompatibilityAdapter.IndexBufferSnapshot> indexBuffer = Optional.empty();
+        if (request.indexBuffer() != null && request.drawCommand().kind() == DrawCommandKind.INDEXED) {
+            indexBuffer = Optional.of(new VulkanicLegacyCompatibilityAdapter.IndexBufferSnapshot(
+                "graphics:" + request.semanticSource() + ":index-buffer",
+                request.indexBuffer().offset(),
+                request.indexBuffer().indexType().bytesPerIndex()
+            ));
+        }
+
+        VulkanicLegacyCompatibilityAdapter.DrawCommandSnapshot command = switch (request.drawCommand().kind()) {
+            case NONE -> new VulkanicLegacyCompatibilityAdapter.DrawCommandSnapshot(
+                VulkanicLegacyCompatibilityAdapter.DrawCommandKind.NONE,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+            );
+            case ARRAYS -> VulkanicLegacyCompatibilityAdapter.DrawCommandSnapshot.arrays(
+                request.drawCommand().firstVertex(),
+                request.drawCommand().vertexCount(),
+                request.drawCommand().instanceCount()
+            );
+            case INDEXED -> VulkanicLegacyCompatibilityAdapter.DrawCommandSnapshot.indexed(
+                request.drawCommand().firstIndex(),
+                request.drawCommand().indexCount(),
+                request.drawCommand().baseVertex(),
+                request.drawCommand().instanceCount()
+            );
+        };
+        return VulkanicLegacyCompatibilityAdapter.planDraw(new VulkanicLegacyCompatibilityAdapter.DrawSnapshot(
+            "graphics:" + request.semanticSource(),
+            vertexBuffers,
+            indexBuffer,
+            request.descriptorResourceUses(),
+            List.of(),
+            command,
+            false,
+            false
+        ));
     }
 
     DynamicStatePlan planRenderPassDefaultDynamicState(
@@ -714,8 +774,36 @@ final class VulkanGraphicsCommandExecutionCoordinator {
         @Nullable IndexBufferBindingRequirement indexBuffer,
         List<DynamicStateRequirement> dynamicStates,
         List<PushConstantRequirement> pushConstants,
+        List<VulkanicPassResourceModel.ResourceUse> descriptorResourceUses,
         DrawCommandRequirement drawCommand
     ) {
+        GraphicsExecutionRequest(
+            CommandBufferIdentity commandBuffer,
+            @Nullable Object renderPassCompatibilityKey,
+            String semanticSource,
+            PipelineBindingRequirement pipeline,
+            @Nullable DescriptorBindingRequirement descriptor,
+            List<VertexBufferBindingRequirement> vertexBuffers,
+            @Nullable IndexBufferBindingRequirement indexBuffer,
+            List<DynamicStateRequirement> dynamicStates,
+            List<PushConstantRequirement> pushConstants,
+            DrawCommandRequirement drawCommand
+        ) {
+            this(
+                commandBuffer,
+                renderPassCompatibilityKey,
+                semanticSource,
+                pipeline,
+                descriptor,
+                vertexBuffers,
+                indexBuffer,
+                dynamicStates,
+                pushConstants,
+                List.of(),
+                drawCommand
+            );
+        }
+
         GraphicsExecutionRequest {
             Objects.requireNonNull(commandBuffer, "commandBuffer");
             Objects.requireNonNull(semanticSource, "semanticSource");
@@ -723,6 +811,7 @@ final class VulkanGraphicsCommandExecutionCoordinator {
             vertexBuffers = List.copyOf(vertexBuffers);
             dynamicStates = List.copyOf(dynamicStates);
             pushConstants = List.copyOf(pushConstants);
+            descriptorResourceUses = List.copyOf(descriptorResourceUses);
             Objects.requireNonNull(drawCommand, "drawCommand");
             if (drawCommand.kind() == DrawCommandKind.INDEXED && indexBuffer == null) {
                 throw new IllegalArgumentException("Indexed graphics execution requires an index buffer");
@@ -971,10 +1060,12 @@ final class VulkanGraphicsCommandExecutionCoordinator {
     record GraphicsExecutionPlan(
         GraphicsExecutionRequest request,
         List<GraphicsCommandOperation> operations,
-        GraphicsCommandBufferState publishedState
+        GraphicsCommandBufferState publishedState,
+        VulkanicPassResourceModel.PassExecutionPlan resourcePlan
     ) {
         GraphicsExecutionPlan {
             operations = List.copyOf(operations);
+            Objects.requireNonNull(resourcePlan, "resourcePlan");
         }
     }
 

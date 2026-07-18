@@ -1,5 +1,7 @@
 package net.vulkanic.backends.vulkan;
 
+import net.vulkanic.VulkanicPassResourceModel;
+import net.vulkanic.VulkanicResourceUsage;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -10,6 +12,7 @@ import static net.vulkanic.backends.vulkan.VulkanComputeCommandExecutionCoordina
 import static net.vulkanic.backends.vulkan.VulkanComputeCommandExecutionCoordinator.ComputeCommandOperationType.PUSH_CONSTANTS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class VulkanComputeCommandExecutionCoordinatorTest {
     private static final VulkanComputeCommandExecutionCoordinator.CommandBufferIdentity COMMAND_BUFFER =
@@ -37,6 +40,39 @@ class VulkanComputeCommandExecutionCoordinatorTest {
         assertEquals(4, dispatch.workX());
         assertEquals(5, dispatch.workY());
         assertEquals(6, dispatch.workZ());
+        assertEquals(VulkanicPassResourceModel.PassKind.COMPUTE, plan.resourcePlan().request().kind());
+        assertTrue(plan.resourcePlan().orderedUses().isEmpty());
+    }
+
+    @Test
+    void descriptorResourcesParticipateInComputePassContract() {
+        VulkanComputeCommandExecutionCoordinator coordinator = new VulkanComputeCommandExecutionCoordinator();
+        VulkanicPassResourceModel.ResourceUse storage = VulkanicPassResourceModel.ResourceUse.of(
+            VulkanicPassResourceModel.ResourceIdentity.of(
+                "Image0",
+                VulkanicPassResourceModel.ResourceKind.STORAGE_TEXTURE,
+                "texture:44"
+            ),
+            VulkanicPassResourceModel.Access.READ_WRITE,
+            VulkanicPassResourceModel.Subresource.color(0, 1, 0, 1),
+            VulkanicResourceUsage.STORAGE_READ_WRITE,
+            "compute:storage-image:Image0",
+            false,
+            0
+        );
+
+        VulkanComputeCommandExecutionCoordinator.ComputeExecutionPlan plan =
+            coordinator.planComputeExecution(new VulkanComputeCommandExecutionCoordinator.ComputeExecutionRequest(
+                COMMAND_BUFFER,
+                "dispatch",
+                pipeline(101L, 201L),
+                descriptor(201L, 301L, List.of()),
+                List.of(),
+                List.of(storage),
+                VulkanComputeCommandExecutionCoordinator.ComputeDispatchRequirement.direct("dispatch", 1, 1, 1)
+            ));
+
+        assertEquals(List.of(storage), plan.resourcePlan().orderedUses());
     }
 
     @Test
@@ -144,6 +180,11 @@ class VulkanComputeCommandExecutionCoordinatorTest {
         assertEquals(VulkanComputeCommandExecutionCoordinator.ComputeDispatchKind.INDIRECT, dispatch.kind());
         assertEquals(909L, dispatch.indirectBufferHandle());
         assertEquals(64L, dispatch.indirectOffset());
+        assertEquals(1, plan.resourcePlan().orderedUses().size());
+        assertEquals(
+            VulkanicPassResourceModel.ResourceKind.INDIRECT_BUFFER,
+            plan.resourcePlan().orderedUses().get(0).kind()
+        );
     }
 
     @Test

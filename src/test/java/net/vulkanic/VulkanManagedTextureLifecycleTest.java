@@ -319,7 +319,7 @@ public class VulkanManagedTextureLifecycleTest {
             "Temporary present-source image views should use deferred image-view retirement");
         assertTrue(source.contains("destroyBufferView(previous.vkBufferViewHandle)"),
             "Descriptor-backed buffer views should use the same deferred retirement path");
-        assertTrue(source.contains("frameExecution.flushPendingDestroys(logicalDevice != null, force)")
+        assertTrue(source.contains("frameExecution.flushPendingDestroys(logicalDevice() != null, force)")
                 && frameCoordinatorSource.contains("lifetime.flushPendingDestroys(deviceAvailable, force)"),
             "Device shutdown should force-flush pending destroys after waiting for the device to idle");
     }

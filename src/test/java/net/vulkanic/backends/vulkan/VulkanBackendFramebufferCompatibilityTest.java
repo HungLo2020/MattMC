@@ -328,12 +328,13 @@ public class VulkanBackendFramebufferCompatibilityTest {
 		backend.namedFramebufferDrawBuffers(TEST_CONTEXT, framebufferB, new int[]{VulkanicAPI.colorAttachment(1)});
 
 		backend.bindFramebuffer(TEST_CONTEXT, VulkanicAPI.GL_FRAMEBUFFER, framebufferA);
-		assertEquals(VulkanicAPI.colorAttachment(2), getPrivateInt(backend, "pendingReadBuffer"));
-		assertEquals(VulkanicAPI.colorAttachment(3), getPrivateInt(backend, "pendingDrawBuffer"));
+		VulkanFramebufferRenderTargetManager manager = getFramebufferRenderTargetManager(backend);
+		assertEquals(VulkanicAPI.colorAttachment(2), manager.readBuffer(manager.boundReadFramebuffer()));
+		assertEquals(VulkanicAPI.colorAttachment(3), manager.drawBuffer(manager.boundDrawFramebuffer()));
 
 		backend.bindFramebuffer(TEST_CONTEXT, VulkanicAPI.GL_FRAMEBUFFER, framebufferB);
-		assertEquals(VulkanicAPI.colorAttachment(0), getPrivateInt(backend, "pendingReadBuffer"));
-		assertEquals(VulkanicAPI.colorAttachment(1), getPrivateInt(backend, "pendingDrawBuffer"));
+		assertEquals(VulkanicAPI.colorAttachment(0), manager.readBuffer(manager.boundReadFramebuffer()));
+		assertEquals(VulkanicAPI.colorAttachment(1), manager.drawBuffer(manager.boundDrawFramebuffer()));
 	}
 
 	@Test
@@ -371,9 +372,9 @@ public class VulkanBackendFramebufferCompatibilityTest {
 			"VulkanNativeCommandEncoder should use native framebuffer render passes when resolvable and keep only unresolved fallback explicit");
 	}
 
-	private static int getPrivateInt(VulkanBackend backend, String fieldName) throws Exception {
-		Field field = VulkanBackend.class.getDeclaredField(fieldName);
+	private static VulkanFramebufferRenderTargetManager getFramebufferRenderTargetManager(VulkanBackend backend) throws Exception {
+		Field field = VulkanBackend.class.getDeclaredField("framebufferRenderTargets");
 		field.setAccessible(true);
-		return field.getInt(backend);
+		return (VulkanFramebufferRenderTargetManager) field.get(backend);
 	}
 }

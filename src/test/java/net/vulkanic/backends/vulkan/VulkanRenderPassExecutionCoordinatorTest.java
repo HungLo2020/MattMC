@@ -1,6 +1,7 @@
 package net.vulkanic.backends.vulkan;
 
 import net.vulkanic.VulkanicRenderPassDescriptor;
+import net.vulkanic.VulkanicPassResourceModel;
 import net.vulkanic.VulkanicResourceUsage;
 import org.junit.jupiter.api.Test;
 import org.lwjgl.vulkan.EXTAttachmentFeedbackLoopLayout;
@@ -15,7 +16,6 @@ import java.util.OptionalInt;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -44,6 +44,10 @@ final class VulkanRenderPassExecutionCoordinatorTest {
         assertTrue(harness.coordinator.hasActiveDepthAttachment());
         assertEquals(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, harness.tracker.layoutFor(color.textureId(), 0, -1));
         assertEquals(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, harness.tracker.layoutFor(depth.textureId(), 0, -1));
+        assertEquals(VulkanicPassResourceModel.PassKind.RENDER, plan.resourcePlan().request().kind());
+        assertEquals(2, plan.resourcePlan().orderedUses().size());
+        assertEquals("texture:1", plan.resourcePlan().orderedUses().get(0).resource().stableKey());
+        assertEquals("texture:2", plan.resourcePlan().orderedUses().get(1).resource().stableKey());
 
         VulkanRenderPassExecutionCoordinator.EndPassResult<TestAttachment, TestAttachment> end =
             harness.coordinator.completeEnd();
@@ -64,7 +68,7 @@ final class VulkanRenderPassExecutionCoordinatorTest {
         harness.virtualFramebuffers.recordAttachment(framebuffer, 0x8CE0, 11);
         harness.virtualFramebuffers.recordAttachment(framebuffer, 0x8CE1, 12);
         VulkanVirtualFramebufferManager.FramebufferSnapshot snapshot =
-            harness.coordinator.resolveFramebufferSnapshot(framebuffer);
+            harness.virtualFramebuffers.requireSnapshot(framebuffer);
 
         TestAttachment color0 = harness.texture(11, VK10.VK_IMAGE_ASPECT_COLOR_BIT);
         TestAttachment color1 = harness.texture(12, VK10.VK_IMAGE_ASPECT_COLOR_BIT);
@@ -84,6 +88,9 @@ final class VulkanRenderPassExecutionCoordinatorTest {
         assertEquals(12, snapshot.attachment(0x8CE1));
         assertEquals(2, plan.layoutPlan().colorAttachments().size());
         assertEquals(2, plan.compatibilityKey().colorAttachmentCount());
+        assertEquals(2, plan.resourcePlan().request().attachments().size());
+        assertEquals("texture:11", plan.resourcePlan().request().attachments().get(0).resource().stableKey());
+        assertEquals("texture:12", plan.resourcePlan().request().attachments().get(1).resource().stableKey());
 
         harness.coordinator.completeBegin(plan, 101, 201);
         assertEquals(2, harness.coordinator.activeColorAttachmentCount());
@@ -149,6 +156,8 @@ final class VulkanRenderPassExecutionCoordinatorTest {
             EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT,
             plan.layoutPlan().colorAttachment(0).subpassLayout()
         );
+        assertTrue(plan.resourcePlan().orderedUses().get(0).feedbackLoop());
+        assertEquals(VulkanicPassResourceModel.Access.READ_WRITE, plan.resourcePlan().orderedUses().get(0).access());
 
         harness.coordinator.completeBegin(plan, 102, 202);
         assertEquals(
@@ -190,7 +199,7 @@ final class VulkanRenderPassExecutionCoordinatorTest {
     }
 
     @Test
-    void compatibleFramebufferReuseInvalidationAndDuplicateAbandonAreSafe() {
+    void duplicateAbandonIsSafeAfterCompatibleFramebufferPlan() {
         TestHarness harness = new TestHarness();
         TestAttachment color = harness.texture(51, VK10.VK_IMAGE_ASPECT_COLOR_BIT);
         VulkanRenderPassExecutionCoordinator.BeginPassPlan<TestAttachment, TestAttachment> plan =
@@ -201,20 +210,11 @@ final class VulkanRenderPassExecutionCoordinatorTest {
                 List.of(color(color, VK10.VK_FORMAT_R8G8B8A8_UNORM)),
                 null
             );
-        List<Long> destroyed = new ArrayList<>();
-
-        assertNull(harness.coordinator.cachedRenderPass(plan));
-        harness.coordinator.cacheRenderPass(plan, 700);
-        assertEquals(700L, harness.coordinator.cachedRenderPass(plan));
 
         harness.coordinator.completeBegin(plan, 700, 800);
         harness.coordinator.abandonActivePass();
         harness.coordinator.abandonActivePass();
         assertFalse(harness.coordinator.isRenderPassActive());
-
-        harness.coordinator.invalidateForResizeDeviceLossOrShutdown(destroyed::add);
-        assertEquals(List.of(700L), destroyed);
-        assertNull(harness.coordinator.cachedRenderPass(plan));
     }
 
     @Test
@@ -261,6 +261,7 @@ final class VulkanRenderPassExecutionCoordinatorTest {
         assertTrue(harness.coordinator.activeTargetsSwapchain());
         assertEquals(2, harness.coordinator.activeSwapchainImageIndex());
         assertEquals(1, harness.coordinator.activeColorAttachmentCount());
+        assertEquals("swapchain:2", pass.resourcePlan().orderedUses().get(0).resource().stableKey());
 
         VulkanRenderPassExecutionCoordinator.EndPassResult<TestAttachment, TestAttachment> end =
             harness.coordinator.completeEnd();
@@ -417,7 +418,7 @@ final class VulkanRenderPassExecutionCoordinatorTest {
             new VulkanRenderTargetStateManager<>();
         final VulkanImageStateTracker tracker = new VulkanImageStateTracker();
         final VulkanRenderPassExecutionCoordinator<TestAttachment, TestAttachment> coordinator =
-            new VulkanRenderPassExecutionCoordinator<>(virtualFramebuffers, renderTargetState, tracker);
+            new VulkanRenderPassExecutionCoordinator<>(renderTargetState, tracker);
 
         TestAttachment texture(int textureId, int aspectMask) {
             tracker.registerTexture(

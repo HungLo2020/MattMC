@@ -122,12 +122,14 @@ public class VulkanSwapchainSurfaceInfoTest {
     public void testSwapchainSourceTracksImageViewsAcrossLifecycle() throws Exception {
         String source = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String lifecycleSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackendLifecycleManager.java"));
         String frameCoordinatorSource = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanFrameExecutionCoordinator.java"));
 
-        assertTrue(source.contains("vkGetSwapchainImagesKHR(list)"),
+        assertTrue(lifecycleSource.contains("vkGetSwapchainImagesKHR(list)"),
             "Swapchain lifecycle should enumerate swapchain images during creation/recreation");
-        assertTrue(source.contains("vkCreateImageView(swapchain)"),
+        assertTrue(lifecycleSource.contains("vkCreateImageView(swapchain)"),
             "Swapchain lifecycle should materialize VkImageView handles for swapchain images");
         assertTrue(source.contains("swapchainState.imageViewHandlesSnapshot()")
                 && source.contains("swapchainState.installSwapchain("),

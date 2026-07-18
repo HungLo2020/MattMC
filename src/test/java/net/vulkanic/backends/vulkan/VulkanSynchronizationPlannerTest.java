@@ -1,6 +1,8 @@
 package net.vulkanic.backends.vulkan;
 
 import net.vulkanic.VulkanicResourceBarriers;
+import net.vulkanic.VulkanicPassResourceModel;
+import net.vulkanic.VulkanicResourceUsage;
 import org.junit.jupiter.api.Test;
 import org.lwjgl.vulkan.EXTAttachmentFeedbackLoopLayout;
 import org.lwjgl.vulkan.VK10;
@@ -107,6 +109,73 @@ public class VulkanSynchronizationPlannerTest {
     @Test
     public void zeroLengthBufferTransferWriteNeedsNoBarrier() {
         assertTrue(VulkanSynchronizationPlanner.planBufferTransferWriteVisibility(0L, 0L).isEmpty());
+    }
+
+    @Test
+    public void explicitImageUseDerivesSameLayoutAndRangePolicy() {
+        VulkanicPassResourceModel.ResourceUse sampledMip = VulkanicPassResourceModel.ResourceUse.of(
+            VulkanicPassResourceModel.ResourceIdentity.of(
+                "Sampler0",
+                VulkanicPassResourceModel.ResourceKind.SAMPLED_TEXTURE,
+                "texture:77"
+            ),
+            VulkanicPassResourceModel.Access.READ,
+            VulkanicPassResourceModel.Subresource.color(2, 1, 3, 4),
+            VulkanicResourceUsage.SAMPLED_READ,
+            "sampler",
+            false,
+            0
+        );
+
+        VulkanSynchronizationPlanner.ImageBarrierPlan plan =
+            VulkanSynchronizationPlanner.planImageLayoutTransitionForUse(
+                VK10.VK_IMAGE_ASPECT_COLOR_BIT,
+                VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                sampledMip,
+                false,
+                false,
+                VK10.VK_IMAGE_LAYOUT_GENERAL
+            ).orElseThrow();
+
+        assertEquals(VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, plan.newLayout());
+        assertEquals(2, plan.range().baseMipLevel());
+        assertEquals(1, plan.range().levelCount());
+        assertEquals(3, plan.range().baseArrayLayer());
+        assertEquals(4, plan.range().layerCount());
+    }
+
+    @Test
+    public void explicitBufferUseDerivesOverlappingTransferWriteVisibility() {
+        VulkanicPassResourceModel.ResourceIdentity buffer = VulkanicPassResourceModel.ResourceIdentity.of(
+            "vertex-buffer",
+            VulkanicPassResourceModel.ResourceKind.VERTEX_BUFFER,
+            "buffer:1"
+        );
+        VulkanicPassResourceModel.ResourceUse write = VulkanicPassResourceModel.ResourceUse.of(
+            buffer,
+            VulkanicPassResourceModel.Access.WRITE,
+            VulkanicPassResourceModel.Subresource.bufferRange(16, 128),
+            VulkanicResourceUsage.TRANSFER_DST,
+            "upload",
+            false,
+            0
+        );
+        VulkanicPassResourceModel.ResourceUse read = VulkanicPassResourceModel.ResourceUse.of(
+            buffer,
+            VulkanicPassResourceModel.Access.READ,
+            VulkanicPassResourceModel.Subresource.bufferRange(64, 32),
+            VulkanicResourceUsage.INFERRED,
+            "draw",
+            false,
+            1
+        );
+
+        VulkanSynchronizationPlanner.BufferBarrierPlan plan =
+            VulkanSynchronizationPlanner.planBufferVisibilityForUse(write, read).orElseThrow();
+
+        assertEquals(64L, plan.offset());
+        assertEquals(32L, plan.size());
+        assertTrue((plan.dstAccessMask() & VK10.VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT) != 0);
     }
 
     @Test

@@ -10,6 +10,8 @@ import net.blaze3d.vertex.VertexFormat;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicLegacyCompatibilityAdapter;
+import net.vulkanic.VulkanicPassResourceModel;
 import net.vulkanic.VulkanicBlendFactor;
 import net.vulkanic.VulkanicIndexType;
 import net.vulkanic.VulkanicSpirvModule;
@@ -22,6 +24,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -67,8 +70,70 @@ final class VulkanDrawExecutionCoordinator {
             descriptor,
             vertexStream,
             indexStream,
-            command
+            command,
+            explicitDrawPlan(request, resources, vertexStream, indexStream)
         );
+    }
+
+    private VulkanicPassResourceModel.PassExecutionPlan explicitDrawPlan(
+        SemanticDrawRequest request,
+        DrawResourceSnapshot resources,
+        VertexStreamPlan vertexStream,
+        @Nullable IndexStreamPlan indexStream
+    ) {
+        List<VulkanicLegacyCompatibilityAdapter.VertexBufferSnapshot> vertexBuffers = new ArrayList<>();
+        for (VertexBufferBindingPlan vertexBuffer : vertexStream.vertexBuffers()) {
+            if (vertexBuffer.defaultAttributeBuffer() || vertexBuffer.bufferId() <= 0) {
+                vertexBuffers.add(new VulkanicLegacyCompatibilityAdapter.VertexBufferSnapshot(
+                    vertexBuffer.binding(),
+                    "default-attribute-buffer",
+                    vertexBuffer.offset(),
+                    0,
+                    true
+                ));
+            } else {
+                LegacyVertexBindingSnapshot binding = resources.vertexArray().binding(vertexBuffer.binding());
+                int stride = binding != null && binding.stride() > 0 ? binding.stride() : 1;
+                vertexBuffers.add(new VulkanicLegacyCompatibilityAdapter.VertexBufferSnapshot(
+                    vertexBuffer.binding(),
+                    "legacy-buffer:" + vertexBuffer.bufferId(),
+                    vertexBuffer.offset(),
+                    stride,
+                    false
+                ));
+            }
+        }
+
+        Optional<VulkanicLegacyCompatibilityAdapter.IndexBufferSnapshot> indexBuffer = Optional.empty();
+        if (request.indexed() && resources.indexBuffer() != null && indexStream != null) {
+            indexBuffer = Optional.of(new VulkanicLegacyCompatibilityAdapter.IndexBufferSnapshot(
+                "legacy-buffer:" + resources.indexBuffer().bufferId(),
+                0,
+                indexStream.indexType().bytesPerIndex()
+            ));
+        }
+        VulkanicLegacyCompatibilityAdapter.DrawCommandSnapshot command = request.indexed()
+            ? VulkanicLegacyCompatibilityAdapter.DrawCommandSnapshot.indexed(
+                indexStream == null ? 0 : indexStream.firstIndex(),
+                request.indexCount(),
+                request.baseVertex(),
+                request.instanceCount()
+            )
+            : VulkanicLegacyCompatibilityAdapter.DrawCommandSnapshot.arrays(
+                request.firstVertex(),
+                request.vertexCount(),
+                request.instanceCount()
+            );
+        return VulkanicLegacyCompatibilityAdapter.planDraw(new VulkanicLegacyCompatibilityAdapter.DrawSnapshot(
+            request.source(),
+            vertexBuffers,
+            indexBuffer,
+            List.of(),
+            List.of(),
+            command,
+            false,
+            false
+        ));
     }
 
     @Nullable
@@ -655,12 +720,14 @@ final class VulkanDrawExecutionCoordinator {
         @Nullable PipelineDescriptor descriptor,
         VertexStreamPlan vertexStream,
         @Nullable IndexStreamPlan indexStream,
-        DrawCommandPlan command
+        DrawCommandPlan command,
+        VulkanicPassResourceModel.PassExecutionPlan resourcePlan
     ) {
         DrawExecutionPlan {
             Objects.requireNonNull(request, "request");
             Objects.requireNonNull(vertexStream, "vertexStream");
             Objects.requireNonNull(command, "command");
+            Objects.requireNonNull(resourcePlan, "resourcePlan");
         }
     }
 }

@@ -86,29 +86,6 @@ class VulkanRenderTargetStateManagerTest {
     }
 
     @Test
-    void permanentRenderPassCacheInvalidatesAndDestroysHandles() {
-        VulkanRenderTargetStateManager<String, String> manager = new VulkanRenderTargetStateManager<>();
-        VulkanRenderPassKey key = VulkanRenderPassKey.framebuffer(
-            List.of(new VulkanRenderPassKey.Attachment(1, 2, 3, 4, 5, 6)),
-            null,
-            false
-        );
-        List<Long> destroyed = new ArrayList<>();
-
-        manager.cacheRenderPass(key, 99);
-
-        assertEquals(99L, manager.cachedRenderPass(key));
-        assertTrue(manager.isPermanentRenderPass(99));
-        assertEquals(1, manager.permanentRenderPassCountForTests());
-
-        manager.invalidatePermanentRenderPassCache(destroyed::add);
-
-        assertNull(manager.cachedRenderPass(key));
-        assertEquals(List.of(99L), destroyed);
-        assertEquals(0, manager.permanentRenderPassCountForTests());
-    }
-
-    @Test
     void beginEndStateResetClearsAllActivePassState() {
         VulkanRenderTargetStateManager<String, String> manager = new VulkanRenderTargetStateManager<>();
         manager.beginPass(

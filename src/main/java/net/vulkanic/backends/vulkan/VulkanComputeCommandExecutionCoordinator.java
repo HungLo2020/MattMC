@@ -1,5 +1,7 @@
 package net.vulkanic.backends.vulkan;
 
+import net.vulkanic.VulkanicPassResourceModel;
+import net.vulkanic.VulkanicLegacyCompatibilityAdapter;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
@@ -7,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Owns command-buffer-local compute execution state for Vulkan command recording.
@@ -69,8 +72,28 @@ final class VulkanComputeCommandExecutionCoordinator {
                 pipeline,
                 descriptor,
                 nextPushConstants
-            )
+            ),
+            explicitComputePlan(request)
         );
+    }
+
+    private VulkanicPassResourceModel.PassExecutionPlan explicitComputePlan(ComputeExecutionRequest request) {
+        Optional<VulkanicLegacyCompatibilityAdapter.IndirectBufferSnapshot> indirectBuffer =
+            request.dispatch().kind() == ComputeDispatchKind.INDIRECT
+                ? Optional.of(new VulkanicLegacyCompatibilityAdapter.IndirectBufferSnapshot(
+                    "indirect-buffer:" + Long.toUnsignedString(request.dispatch().indirectBufferHandle()),
+                    request.dispatch().indirectOffset()
+                ))
+                : Optional.empty();
+        return VulkanicLegacyCompatibilityAdapter.planCompute(new VulkanicLegacyCompatibilityAdapter.ComputeSnapshot(
+            request.semanticSource(),
+            request.dispatch().semanticSource(),
+            request.resourceUses(),
+            List.of(),
+            indirectBuffer,
+            false,
+            false
+        ));
     }
 
     void complete(ComputeExecutionPlan plan) {
@@ -148,13 +171,26 @@ final class VulkanComputeCommandExecutionCoordinator {
         ComputePipelineRequirement pipeline,
         @Nullable ComputeDescriptorRequirement descriptor,
         List<PushConstantRequirement> pushConstants,
+        List<VulkanicPassResourceModel.ResourceUse> resourceUses,
         ComputeDispatchRequirement dispatch
     ) {
+        ComputeExecutionRequest(
+            CommandBufferIdentity commandBuffer,
+            String semanticSource,
+            ComputePipelineRequirement pipeline,
+            @Nullable ComputeDescriptorRequirement descriptor,
+            List<PushConstantRequirement> pushConstants,
+            ComputeDispatchRequirement dispatch
+        ) {
+            this(commandBuffer, semanticSource, pipeline, descriptor, pushConstants, List.of(), dispatch);
+        }
+
         ComputeExecutionRequest {
             Objects.requireNonNull(commandBuffer, "commandBuffer");
             Objects.requireNonNull(semanticSource, "semanticSource");
             Objects.requireNonNull(pipeline, "pipeline");
             pushConstants = List.copyOf(pushConstants);
+            resourceUses = List.copyOf(resourceUses);
             Objects.requireNonNull(dispatch, "dispatch");
         }
     }
@@ -324,10 +360,12 @@ final class VulkanComputeCommandExecutionCoordinator {
     record ComputeExecutionPlan(
         ComputeExecutionRequest request,
         List<ComputeCommandOperation> operations,
-        ComputeCommandBufferState publishedState
+        ComputeCommandBufferState publishedState,
+        VulkanicPassResourceModel.PassExecutionPlan resourcePlan
     ) {
         ComputeExecutionPlan {
             operations = List.copyOf(operations);
+            Objects.requireNonNull(resourcePlan, "resourcePlan");
         }
     }
 }

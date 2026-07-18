@@ -6,6 +6,9 @@ import net.vulkanic.PipelineResourceBindings;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicBuffer;
 import net.vulkanic.VulkanicBufferSlice;
+import net.vulkanic.VulkanicLegacyCompatibilityAdapter;
+import net.vulkanic.VulkanicPassResourceModel;
+import net.vulkanic.VulkanicResourceUsage;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.vulkan.VK10;
 
@@ -179,7 +182,8 @@ final class VulkanDescriptorBindingPlanner {
             request.particleDescriptor()
                 && ("Sampler0".contentEquals(binding.name()) || "Sampler2".contentEquals(binding.name())),
             request.pipelineLocation(),
-            request.pipelineHandle()
+            request.pipelineHandle(),
+            samplerResourceUse(binding, resolvedTextureView, sampledTexture, imagePlan, request.pipelineLocation())
         );
     }
 
@@ -210,7 +214,8 @@ final class VulkanDescriptorBindingPlanner {
             vulkanBuffer.getVkBufferHandle(),
             slice.offset(),
             slice.length(),
-            requiresTransientUniformCopy
+            requiresTransientUniformCopy,
+            uniformBufferResourceUse(binding, slice, request.pipelineLocation())
         );
     }
 
@@ -269,7 +274,8 @@ final class VulkanDescriptorBindingPlanner {
             texture,
             mipLevel,
             imagePlan.descriptorImageViewHandle(),
-            imagePlan.imageLayout()
+            imagePlan.imageLayout(),
+            storageImageResourceUse(binding, imageBinding, texture, mipLevel, request.pipelineLocation())
         );
     }
 
@@ -309,8 +315,103 @@ final class VulkanDescriptorBindingPlanner {
             textureId,
             legacyTexelBinding.internalFormat(),
             legacyTexelBinding.legacyBufferId(),
-            legacyTexelBinding.bufferViewHandle()
+            legacyTexelBinding.bufferViewHandle(),
+            texelBufferResourceUse(binding, legacyTexelBinding, request.pipelineLocation())
         );
+    }
+
+    private VulkanicPassResourceModel.ResourceUse samplerResourceUse(
+        PipelineDescriptor.ResourceBinding binding,
+        VulkanTextureView textureView,
+        @Nullable VulkanImageResourceViewCoordinator.ImageStorageSnapshot texture,
+        VulkanImageResourceViewCoordinator.DescriptorImagePlan imagePlan,
+        String pipelineLocation
+    ) {
+        int textureId = texture != null ? texture.textureId() : textureView.getLegacyTextureHandle();
+        VulkanicPassResourceModel.ResourceIdentity identity = VulkanicPassResourceModel.ResourceIdentity.of(
+            binding.name(),
+            VulkanicPassResourceModel.ResourceKind.SAMPLED_TEXTURE,
+            "texture:" + textureId + ":view-mip:" + imagePlan.baseMipLevel() + "+" + imagePlan.mipLevelCount()
+        );
+        VulkanicPassResourceModel.Subresource subresource = subresourceForAspectMask(
+            texture == null ? 0 : texture.aspectMask(),
+            imagePlan.baseMipLevel(),
+            imagePlan.mipLevelCount(),
+            0,
+            texture == null ? 1 : VulkanImageResourceViewCoordinator.layerCount(texture)
+        );
+        return VulkanicLegacyCompatibilityAdapter.resourceUse(
+            identity.logicalName(),
+            identity.kind(),
+            identity.stableKey(),
+            VulkanicPassResourceModel.Access.READ,
+            subresource,
+            VulkanicResourceUsage.SAMPLED_READ,
+            pipelineLocation + ":sampler:" + binding.name(),
+            false,
+            binding.binding()
+        );
+    }
+
+    private VulkanicPassResourceModel.ResourceUse uniformBufferResourceUse(
+        PipelineDescriptor.ResourceBinding binding,
+        VulkanicBufferSlice slice,
+        String pipelineLocation
+    ) {
+        return VulkanicLegacyCompatibilityAdapter.uniformBufferUse(
+            binding.name(),
+            "uniform:" + binding.name() + ":offset:" + slice.offset() + ":length:" + slice.length(),
+            slice.offset(),
+            slice.length(),
+            pipelineLocation + ":uniform-buffer:" + binding.name(),
+            binding.binding()
+        );
+    }
+
+    private VulkanicPassResourceModel.ResourceUse storageImageResourceUse(
+        PipelineDescriptor.ResourceBinding binding,
+        PipelineResourceBindings.StorageImageBinding imageBinding,
+        VulkanImageResourceViewCoordinator.ImageStorageSnapshot texture,
+        int mipLevel,
+        String pipelineLocation
+    ) {
+        return VulkanicLegacyCompatibilityAdapter.storageTextureUse(
+            binding.name(),
+            "texture:" + imageBinding.texture() + ":storage-mip:" + mipLevel,
+            subresourceForAspectMask(texture.aspectMask(), mipLevel, 1, 0, VulkanImageResourceViewCoordinator.layerCount(texture)),
+            pipelineLocation + ":storage-image:" + binding.name(),
+            binding.binding()
+        );
+    }
+
+    private VulkanicPassResourceModel.ResourceUse texelBufferResourceUse(
+        PipelineDescriptor.ResourceBinding binding,
+        VulkanImageResourceViewCoordinator.TexelBufferViewPlan texelBinding,
+        String pipelineLocation
+    ) {
+        return VulkanicLegacyCompatibilityAdapter.texelBufferUse(
+            binding.name(),
+            "legacy-buffer:" + texelBinding.legacyBufferId() + ":format:" + texelBinding.internalFormat(),
+            pipelineLocation + ":texel-buffer:" + binding.name(),
+            binding.binding()
+        );
+    }
+
+    private VulkanicPassResourceModel.Subresource subresourceForAspectMask(
+        int aspectMask,
+        int baseMipLevel,
+        int levelCount,
+        int baseLayer,
+        int layerCount
+    ) {
+        int depthStencil = VK10.VK_IMAGE_ASPECT_DEPTH_BIT | VK10.VK_IMAGE_ASPECT_STENCIL_BIT;
+        if ((aspectMask & depthStencil) == depthStencil) {
+            return VulkanicPassResourceModel.Subresource.depthStencil(baseMipLevel, levelCount, baseLayer, layerCount);
+        }
+        if ((aspectMask & VK10.VK_IMAGE_ASPECT_DEPTH_BIT) != 0) {
+            return VulkanicPassResourceModel.Subresource.depth(baseMipLevel, levelCount, baseLayer, layerCount);
+        }
+        return VulkanicPassResourceModel.Subresource.color(baseMipLevel, levelCount, baseLayer, layerCount);
     }
 
     private VulkanDescriptorSamplerKey descriptorSamplerKey(
@@ -489,6 +590,12 @@ final class VulkanDescriptorBindingPlanner {
         DescriptorBindingPlan {
             entries = List.copyOf(entries);
         }
+
+        List<VulkanicPassResourceModel.ResourceUse> resourceUses() {
+            return entries.stream()
+                .map(DescriptorPlanEntry::resourceUse)
+                .toList();
+        }
     }
 
     sealed interface DescriptorPlanEntry permits SamplerEntry, UniformBufferEntry, StorageImageEntry, TexelBufferEntry {
@@ -497,6 +604,8 @@ final class VulkanDescriptorBindingPlanner {
         int bindingIndex();
 
         int descriptorType();
+
+        VulkanicPassResourceModel.ResourceUse resourceUse();
     }
 
     enum DescriptorTransitionRequirement {
@@ -527,13 +636,15 @@ final class VulkanDescriptorBindingPlanner {
         boolean sodiumDebugLog,
         boolean particleDebugLog,
         String pipelineLocation,
-        long pipelineHandle
+        long pipelineHandle,
+        VulkanicPassResourceModel.ResourceUse resourceUse
     ) implements DescriptorPlanEntry {
         SamplerEntry {
             Objects.requireNonNull(name, "name");
             Objects.requireNonNull(textureView, "textureView");
             Objects.requireNonNull(transitionRequirement, "transitionRequirement");
             Objects.requireNonNull(pipelineLocation, "pipelineLocation");
+            Objects.requireNonNull(resourceUse, "resourceUse");
         }
     }
 
@@ -546,12 +657,14 @@ final class VulkanDescriptorBindingPlanner {
         long descriptorBufferHandle,
         long descriptorOffset,
         long descriptorRange,
-        boolean requiresTransientCopy
+        boolean requiresTransientCopy,
+        VulkanicPassResourceModel.ResourceUse resourceUse
     ) implements DescriptorPlanEntry {
         UniformBufferEntry {
             Objects.requireNonNull(name, "name");
             Objects.requireNonNull(sourceBuffer, "sourceBuffer");
             Objects.requireNonNull(sourceSlice, "sourceSlice");
+            Objects.requireNonNull(resourceUse, "resourceUse");
         }
     }
 
@@ -563,12 +676,14 @@ final class VulkanDescriptorBindingPlanner {
         VulkanImageResourceViewCoordinator.ImageStorageSnapshot texture,
         int mipLevel,
         long imageViewHandle,
-        int imageLayout
+        int imageLayout,
+        VulkanicPassResourceModel.ResourceUse resourceUse
     ) implements DescriptorPlanEntry {
         StorageImageEntry {
             Objects.requireNonNull(name, "name");
             Objects.requireNonNull(imageBinding, "imageBinding");
             Objects.requireNonNull(texture, "texture");
+            Objects.requireNonNull(resourceUse, "resourceUse");
         }
     }
 
@@ -580,10 +695,12 @@ final class VulkanDescriptorBindingPlanner {
         int textureId,
         int internalFormat,
         int legacyBufferId,
-        long bufferViewHandle
+        long bufferViewHandle,
+        VulkanicPassResourceModel.ResourceUse resourceUse
     ) implements DescriptorPlanEntry {
         TexelBufferEntry {
             Objects.requireNonNull(name, "name");
+            Objects.requireNonNull(resourceUse, "resourceUse");
         }
     }
 

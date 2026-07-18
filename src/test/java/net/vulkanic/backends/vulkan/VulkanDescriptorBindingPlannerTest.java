@@ -6,6 +6,7 @@ import net.vulkanic.PipelineResourceBindings;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicBuffer;
 import net.vulkanic.VulkanicBufferSlice;
+import net.vulkanic.VulkanicPassResourceModel;
 import net.vulkanic.VulkanicTexture;
 import net.vulkanic.VulkanicTextureFormat;
 import org.junit.jupiter.api.Test;
@@ -56,6 +57,9 @@ final class VulkanDescriptorBindingPlannerTest {
         assertEquals(0x1100L, entry.descriptorImageViewHandle());
         assertEquals(VulkanDescriptorBindingPlanner.DescriptorTransitionRequirement.SAMPLE, entry.transitionRequirement());
         assertEquals(VulkanImageUse.SAMPLED_COLOR.vkLayout(), entry.imageLayout());
+        assertEquals(VulkanicPassResourceModel.ResourceKind.SAMPLED_TEXTURE, entry.resourceUse().kind());
+        assertEquals(VulkanicPassResourceModel.Access.READ, entry.resourceUse().access());
+        assertEquals("texture:11:view-mip:0+2", entry.resourceUse().resource().stableKey());
         assertFalse(entry.storageImageCompatible());
         assertTrue(entry.remappedToDefaultView());
         assertEquals(
@@ -119,6 +123,9 @@ final class VulkanDescriptorBindingPlannerTest {
         assertEquals(texture.defaultViewHandle(), storageEntry.imageViewHandle());
         assertEquals(1, storageEntry.mipLevel());
         assertEquals(VK10.VK_IMAGE_LAYOUT_GENERAL, storageEntry.imageLayout());
+        assertEquals(VulkanicPassResourceModel.ResourceKind.STORAGE_TEXTURE, storageEntry.resourceUse().kind());
+        assertEquals(VulkanicPassResourceModel.Access.READ_WRITE, storageEntry.resourceUse().access());
+        assertEquals("texture:12:storage-mip:1", storageEntry.resourceUse().resource().stableKey());
     }
 
     @Test
@@ -137,6 +144,9 @@ final class VulkanDescriptorBindingPlannerTest {
         assertEquals(0x3100L, directEntry.descriptorBufferHandle());
         assertEquals(256, directEntry.descriptorOffset());
         assertEquals(128, directEntry.descriptorRange());
+        assertEquals(VulkanicPassResourceModel.ResourceKind.UNIFORM_BUFFER, directEntry.resourceUse().kind());
+        assertEquals(VulkanicPassResourceModel.Access.READ, directEntry.resourceUse().access());
+        assertEquals("uniform:Globals:offset:256:length:128", directEntry.resourceUse().resource().stableKey());
         assertTrue(directPlan.cacheable());
 
         VulkanBuffer transientBuffer = buffer(0x3200L, VulkanicBuffer.USAGE_VERTEX);
@@ -179,6 +189,8 @@ final class VulkanDescriptorBindingPlannerTest {
         assertEquals(44, entry.textureId());
         assertEquals(77, entry.legacyBufferId());
         assertEquals(0x4400L, entry.bufferViewHandle());
+        assertEquals(VulkanicPassResourceModel.ResourceKind.TEXEL_BUFFER, entry.resourceUse().kind());
+        assertEquals("legacy-buffer:77:format:" + VulkanicAPI.GL_RGBA8, entry.resourceUse().resource().stableKey());
     }
 
     @Test
@@ -226,6 +238,10 @@ final class VulkanDescriptorBindingPlannerTest {
         );
 
         assertEquals(first, second);
+        assertEquals(
+            first.resourceUses().get(0).resource().stableKey(),
+            second.resourceUses().get(0).resource().stableKey()
+        );
         assertThrows(UnsupportedOperationException.class, () -> first.entries().clear());
     }
 
