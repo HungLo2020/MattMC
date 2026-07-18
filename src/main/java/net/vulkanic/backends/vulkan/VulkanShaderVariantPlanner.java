@@ -708,7 +708,7 @@ final class VulkanShaderVariantPlanner {
         return List.copyOf(inputsByLocation.values());
     }
 
-    private static List<ReflectedFragmentOutput> collectFragmentOutputs(String shaderSource) {
+    static List<ReflectedFragmentOutput> collectFragmentOutputs(String shaderSource) {
         LinkedHashMap<Integer, ReflectedFragmentOutput> outputsByLocation = new LinkedHashMap<>();
         Matcher matcher = GLSL_FRAGMENT_OUTPUT_DECLARATION_PATTERN.matcher(shaderSource);
         int implicitLocation = 0;
@@ -725,6 +725,17 @@ final class VulkanShaderVariantPlanner {
             String name = matcher.group(4);
             outputsByLocation.putIfAbsent(location, new ReflectedFragmentOutput(location, name, typeName));
             implicitLocation = Math.max(implicitLocation + 1, location + 1);
+        }
+        java.util.regex.Matcher fragDataMatcher = Pattern.compile("\\bgl_FragData\\s*\\[\\s*(\\d+)\\s*\\]").matcher(shaderSource);
+        while (fragDataMatcher.find()) {
+            int location = Integer.parseInt(fragDataMatcher.group(1));
+            outputsByLocation.putIfAbsent(
+                location,
+                new ReflectedFragmentOutput(location, "gl_FragData[" + location + "]", "vec4")
+            );
+        }
+        if (Pattern.compile("\\bgl_FragColor\\b").matcher(shaderSource).find()) {
+            outputsByLocation.putIfAbsent(0, new ReflectedFragmentOutput(0, "gl_FragColor", "vec4"));
         }
         return List.copyOf(outputsByLocation.values());
     }

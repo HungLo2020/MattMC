@@ -21,6 +21,7 @@ final class VulkanPipelineCacheKeyNormalizer {
         Objects.requireNonNull(plan, "plan");
         return new GraphicsPipelineCacheKey(
             shaderPayloads(spirvModules),
+            plan.fragmentRenderTargetContract().compatibilityKey(),
             plan.pipelineLayoutCompatibility(),
             plan.renderPassCompatibility(),
             plan.vertexInput().cacheKey(),
@@ -69,6 +70,7 @@ final class VulkanPipelineCacheKeyNormalizer {
 
     record GraphicsPipelineCacheKey(
         List<ShaderPayloadKey> shaderPayloads,
+        VulkanFragmentRenderTargetInterfacePlanner.InterfaceCompatibilityKey fragmentRenderTargetInterface,
         VulkanPipelineCreationPlanner.PipelineLayoutCompatibilityInputs pipelineLayout,
         VulkanPipelineCreationPlanner.RenderPassCompatibilityPlan renderPassCompatibility,
         VulkanPipelineCreationPlanner.VertexInputCacheKey vertexInput,
@@ -83,6 +85,7 @@ final class VulkanPipelineCacheKeyNormalizer {
     ) {
         GraphicsPipelineCacheKey {
             shaderPayloads = List.copyOf(shaderPayloads);
+            Objects.requireNonNull(fragmentRenderTargetInterface, "fragmentRenderTargetInterface");
             Objects.requireNonNull(pipelineLayout, "pipelineLayout");
             Objects.requireNonNull(renderPassCompatibility, "renderPassCompatibility");
             Objects.requireNonNull(vertexInput, "vertexInput");

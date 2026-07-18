@@ -5598,8 +5598,8 @@ public class Phase3DrawPathTest {
             "Normalized render-target pipeline keys must include pipeline-baked blend and stencil state");
         assertTrue(source.contains("VulkanRenderPassCompatibilityKey.framebuffer("),
             "Framebuffer-backed pipeline keys should include color formats, depth format, and feedback-loop dependency profile");
-        assertTrue(source.contains("normalizedGraphicsPipelineCacheKey(pipelineDescriptor, renderPassCompatibilityKey)"),
-            "Framebuffer-backed pipeline resolution should derive a normalized key from the immutable graphics pipeline plan");
+        assertTrue(source.contains("normalizedGraphicsPipelineCacheKey(pipelineDescriptor, renderPassCompatibilityKey, renderTargetInterface)"),
+            "Framebuffer-backed pipeline resolution should derive a normalized key from the immutable graphics pipeline and render-target interface plans");
         assertTrue(source.contains("indexedBlendStateCacheKey(portableState, renderPassCompatibilityKey.colorAttachmentCount())"),
             "Legacy pipeline resolution should still include portable blend ownership when deriving blend cache keys");
         assertTrue(source.contains("currentStencilState().cacheKey(renderPassCompatibilityKey.hasStencilAttachment())"),

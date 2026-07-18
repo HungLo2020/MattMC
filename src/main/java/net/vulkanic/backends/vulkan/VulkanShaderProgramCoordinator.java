@@ -247,6 +247,7 @@ final class VulkanShaderProgramCoordinator {
         program.activeUniformBlocks = List.of();
         program.activeResourceBindings = List.of();
         program.linkedSpirvModules = List.of();
+        program.fragmentOutputs = List.of();
         unregisterUniformLocationTokens(program);
     }
 
@@ -259,12 +260,35 @@ final class VulkanShaderProgramCoordinator {
         List<String> standaloneUniformDeclarations,
         int[] computeWorkGroupSize
     ) {
+        installReflection(
+            program,
+            activeUniformNames,
+            activeUniforms,
+            activeUniformBlocks,
+            activeResourceBindings,
+            standaloneUniformDeclarations,
+            computeWorkGroupSize,
+            List.of()
+        );
+    }
+
+    void installReflection(
+        VirtualProgram program,
+        List<String> activeUniformNames,
+        List<ReflectedUniform> activeUniforms,
+        List<String> activeUniformBlocks,
+        List<ReflectedResourceBinding> activeResourceBindings,
+        List<String> standaloneUniformDeclarations,
+        int[] computeWorkGroupSize,
+        List<VulkanicSpirvModule.FragmentOutput> fragmentOutputs
+    ) {
         program.activeUniformNames = List.copyOf(activeUniformNames);
         program.activeUniforms = List.copyOf(activeUniforms);
         program.activeUniformBlocks = List.copyOf(activeUniformBlocks);
         program.activeResourceBindings = List.copyOf(activeResourceBindings);
         program.computeWorkGroupSize = computeWorkGroupSize.clone();
         program.standaloneUniformDeclarations = List.copyOf(standaloneUniformDeclarations);
+        program.fragmentOutputs = List.copyOf(fragmentOutputs);
     }
 
     void initializeStandaloneUniformState(
@@ -394,7 +418,8 @@ final class VulkanShaderProgramCoordinator {
             program.activeUniformBlocks,
             program.activeResourceBindings,
             program.computeWorkGroupSize.clone(),
-            new java.util.LinkedHashMap<>(program.opaqueResourceUniformValuesByIndex)
+            new java.util.LinkedHashMap<>(program.opaqueResourceUniformValuesByIndex),
+            program.fragmentOutputs
         );
     }
 
@@ -870,6 +895,7 @@ final class VulkanShaderProgramCoordinator {
         volatile List<ReflectedResourceBinding> activeResourceBindings = List.of();
         volatile List<String> standaloneUniformDeclarations = List.of();
         volatile List<VulkanicSpirvModule> linkedSpirvModules = List.of();
+        volatile List<VulkanicSpirvModule.FragmentOutput> fragmentOutputs = List.of();
         volatile List<ReflectedVertexInput> vertexInputs = List.of();
         volatile int[] computeWorkGroupSize = new int[]{1, 1, 1};
         volatile Map<Integer, StandaloneUniformField> standaloneFieldsByLocation = Map.of();
@@ -906,7 +932,8 @@ final class VulkanShaderProgramCoordinator {
         List<String> activeUniformBlocks,
         List<ReflectedResourceBinding> activeResourceBindings,
         int[] computeWorkGroupSize,
-        Map<Integer, Integer> opaqueResourceUniformValuesByIndex
+        Map<Integer, Integer> opaqueResourceUniformValuesByIndex,
+        List<VulkanicSpirvModule.FragmentOutput> fragmentOutputs
     ) {
         LinkedProgramExecutionSnapshot {
             linkedSpirvModules = List.copyOf(linkedSpirvModules);
@@ -918,6 +945,7 @@ final class VulkanShaderProgramCoordinator {
             activeResourceBindings = List.copyOf(activeResourceBindings);
             computeWorkGroupSize = computeWorkGroupSize.clone();
             opaqueResourceUniformValuesByIndex = Map.copyOf(opaqueResourceUniformValuesByIndex);
+            fragmentOutputs = List.copyOf(fragmentOutputs);
         }
     }
 

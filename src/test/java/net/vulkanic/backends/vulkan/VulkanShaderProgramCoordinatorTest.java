@@ -112,6 +112,7 @@ class VulkanShaderProgramCoordinatorTest {
             "test-fragment",
             "normalized"
         ));
+        program.fragmentOutputs = List.of(new VulkanicSpirvModule.FragmentOutput(0, "fragColor", "vec4"));
         program.activeUniformNames = List.of("Sampler0");
         program.activeUniforms = List.of(new VulkanShaderProgramCoordinator.ReflectedUniform(
             "Sampler0",
@@ -134,6 +135,8 @@ class VulkanShaderProgramCoordinatorTest {
         assertEquals("Sampler0", snapshot.activeUniformNames().getFirst());
         assertEquals(7, snapshot.opaqueResourceUniformValuesByIndex().get(0));
         assertEquals(3, snapshot.resourceLayout().bindings().getFirst().binding());
+        assertEquals(List.of(new VulkanicSpirvModule.FragmentOutput(0, "fragColor", "vec4")),
+            snapshot.fragmentOutputs());
     }
 
     @Test

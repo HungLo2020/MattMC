@@ -1492,7 +1492,15 @@ void main() {
         } catch (java.io.IOException e) {
             LOGGER.warn("Failed to dump normalized GLSL for {}: {}", sourceName, e.getMessage());
         }
-        return spirvCompiler.compile(shaderStage, normalizedSource, sourceName, entryPoint);
+        VulkanicSpirvModule compiledModule = spirvCompiler.compile(shaderStage, normalizedSource, sourceName, entryPoint);
+        if (shaderStage != VulkanicShaderStage.FRAGMENT) {
+            return compiledModule;
+        }
+        return compiledModule.withFragmentOutputs(
+            VulkanShaderVariantPlanner.collectFragmentOutputs(normalizedSource).stream()
+                .map(output -> new VulkanicSpirvModule.FragmentOutput(output.location(), output.name(), output.typeName()))
+                .toList()
+        );
     }
 
     private static void traceIrisEntityVertexInterface(String phase, String sourceName, String shaderSource) {
@@ -1685,7 +1693,10 @@ void main() {
             reflectionPlan.activeUniformBlocks(),
             reflectionPlan.activeResourceBindings(),
             reflectionPlan.standaloneUniformDeclarations(),
-            reflectionPlan.computeWorkGroupSize()
+            reflectionPlan.computeWorkGroupSize(),
+            reflectionPlan.fragmentOutputs().stream()
+                .map(output -> new VulkanicSpirvModule.FragmentOutput(output.location(), output.name(), output.typeName()))
+                .toList()
         );
         logStandaloneSliceTraceInternal(program, "reflection", null, virtualProgram, null, false, null);
         shaderPrograms.initializeStandaloneUniformState(virtualProgram, reflectionPlan.activeUniformsByName());
@@ -3169,7 +3180,8 @@ void main() {
                 descriptor,
                 vertModuleHandle,
                 fragModuleHandle,
-                defaultRenderPassCompatibilityKey()
+                defaultRenderPassCompatibilityKey(),
+                null
             );
         } finally {
             spine.destroyShaderModule(vertModuleHandle);
@@ -3181,30 +3193,44 @@ void main() {
         if (descriptor == null) {
             throw new IllegalArgumentException("descriptor must not be null");
         }
-        return createPipeline(descriptor, resolveFramebufferTargets(framebuffer));
+        return createPipeline(
+            descriptor,
+            VulkanRenderTargetPlan.framebuffer(
+                () -> "Pipeline-compatible framebuffer target",
+                resolveFramebufferTargets(framebuffer)
+            )
+        );
     }
 
     public PipelineHandle createPipeline(PipelineDescriptor descriptor, VulkanicRenderTargetDescriptor renderTarget) {
         if (descriptor == null) {
             throw new IllegalArgumentException("descriptor must not be null");
         }
-        return createPipeline(descriptor, resolveRenderTargetDescriptor(renderTarget));
+        return createPipeline(descriptor, resolveRenderTargetDescriptorPlan(renderTarget));
     }
 
     private PipelineHandle createPipeline(PipelineDescriptor descriptor, ResolvedFramebufferTargets targets) {
-        return createPipeline(
-            descriptor,
-            VulkanRenderPassCompatibilityKey.framebuffer(
-                targets.colorFormats(),
-                targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED,
-                targets.hasFeedbackLoopTarget()
-            )
-        );
+        return createPipeline(descriptor, VulkanRenderTargetPlan.framebuffer(
+            () -> "Pipeline-compatible framebuffer target",
+            targets
+        ));
+    }
+
+    private PipelineHandle createPipeline(PipelineDescriptor descriptor, VulkanRenderTargetPlan plan) {
+        return createPipeline(descriptor, plan.compatibilityKey(), plan.fragmentRenderTargetInterface());
     }
 
     private PipelineHandle createPipeline(
         PipelineDescriptor descriptor,
         VulkanRenderPassCompatibilityKey renderPassCompatibilityKey
+    ) {
+        return createPipeline(descriptor, renderPassCompatibilityKey, null);
+    }
+
+    private PipelineHandle createPipeline(
+        PipelineDescriptor descriptor,
+        VulkanRenderPassCompatibilityKey renderPassCompatibilityKey,
+        @Nullable VulkanFragmentRenderTargetInterfacePlanner.RenderTargetInterface renderTargetInterface
     ) {
         descriptor = VulkanShaderVariantPlanner.withCompatibilityVertexInputState(descriptor);
         ensureNativeReady("createPipeline(framebuffer)");
@@ -3253,7 +3279,8 @@ void main() {
                 vertModuleHandle,
                 geomModuleHandle,
                 fragModuleHandle,
-                renderPassCompatibilityKey
+                renderPassCompatibilityKey,
+                renderTargetInterface
             );
         } finally {
             spine.destroyShaderModule(vertModuleHandle);
@@ -4027,7 +4054,8 @@ void main() {
         return resolvePipelineHandle(
             renderPipeline,
             descriptor,
-            plan.compatibilityKey()
+            plan.compatibilityKey(),
+            plan.fragmentRenderTargetInterface()
         );
     }
 
@@ -4035,6 +4063,14 @@ void main() {
             net.blaze3d.pipeline.RenderPipeline renderPipeline,
             net.vulkanic.PipelineDescriptor descriptor,
             VulkanRenderPassCompatibilityKey renderPassCompatibilityKey) {
+        return resolvePipelineHandle(renderPipeline, descriptor, renderPassCompatibilityKey, null);
+    }
+
+    private net.vulkanic.PipelineHandle resolvePipelineHandle(
+            net.blaze3d.pipeline.RenderPipeline renderPipeline,
+            net.vulkanic.PipelineDescriptor descriptor,
+            VulkanRenderPassCompatibilityKey renderPassCompatibilityKey,
+            @Nullable VulkanFragmentRenderTargetInterfacePlanner.RenderTargetInterface renderTargetInterface) {
         PrecompiledPipelineState state = pipelineLifecycle.getPrecompiled(
             renderPipeline,
             PrecompiledPipelineState.class
@@ -4051,7 +4087,7 @@ void main() {
         }
 
         RenderTargetPipelineKey key = new RenderTargetPipelineKey(
-            normalizedGraphicsPipelineCacheKey(pipelineDescriptor, renderPassCompatibilityKey)
+            normalizedGraphicsPipelineCacheKey(pipelineDescriptor, renderPassCompatibilityKey, renderTargetInterface)
         );
         PipelineHandle cached = pipelineLifecycle.getCachedPipeline(
             VulkanPipelineLifecycleManager.CacheKind.RENDER_TARGET_VARIANT,
@@ -4061,7 +4097,11 @@ void main() {
             return cached;
         }
 
-        PipelineHandle framebufferCompatible = createPipeline(pipelineDescriptor, renderPassCompatibilityKey);
+        PipelineHandle framebufferCompatible = createPipeline(
+            pipelineDescriptor,
+            renderPassCompatibilityKey,
+            renderTargetInterface
+        );
         if (framebufferCompatible == null || !framebufferCompatible.isValid()) {
             if (framebufferCompatible != null) {
                 framebufferCompatible.close();
@@ -4143,12 +4183,20 @@ void main() {
         PipelineDescriptor descriptor,
         VulkanRenderPassCompatibilityKey renderPassCompatibilityKey
     ) {
+        return normalizedGraphicsPipelineCacheKey(descriptor, renderPassCompatibilityKey, null);
+    }
+
+    private VulkanPipelineCacheKeyNormalizer.GraphicsPipelineCacheKey normalizedGraphicsPipelineCacheKey(
+        PipelineDescriptor descriptor,
+        VulkanRenderPassCompatibilityKey renderPassCompatibilityKey,
+        @Nullable VulkanFragmentRenderTargetInterfacePlanner.RenderTargetInterface renderTargetInterface
+    ) {
         ensureNativeReady("normalizedGraphicsPipelineCacheKey");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
             throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
         }
-        return spine.normalizedGraphicsPipelineCacheKey(descriptor, renderPassCompatibilityKey);
+        return spine.normalizedGraphicsPipelineCacheKey(descriptor, renderPassCompatibilityKey, renderTargetInterface);
     }
 
     private VulkanPipelineCacheKeyNormalizer.ComputePipelineCacheKey normalizedComputePipelineCacheKey(
@@ -4742,6 +4790,37 @@ void main() {
             return framebufferTargets != null && framebufferTargets.hasFeedbackLoopTarget();
         }
 
+        private VulkanFragmentRenderTargetInterfacePlanner.RenderTargetInterface fragmentRenderTargetInterface() {
+            if (framebufferTargets != null) {
+                return framebufferTargets.fragmentRenderTargetInterface(source.name());
+            }
+
+            ResolvedRenderTargets targets = requireTextureViewTargets();
+            VulkanicRenderPassDescriptor descriptor = requireRenderPassDescriptor();
+            int colorFormat = NativeSpine.toVkFormat(targets.colorTexture.getVulkanicFormat());
+            return VulkanFragmentRenderTargetInterfacePlanner.renderTargetInterface(
+                source.name(),
+                List.of(new VulkanFragmentRenderTargetInterfacePlanner.ColorAttachmentInterface(
+                    0,
+                    GL_COLOR_ATTACHMENT0,
+                    colorFormat,
+                    VulkanFragmentRenderTargetInterfacePlanner.numericClassForVkFormat(colorFormat),
+                    Optional.of(descriptor.colorAttachment().loadOp()),
+                    Optional.of(descriptor.colorAttachment().storeOp()),
+                    targets.hasFeedbackLoopTarget()
+                )),
+                targets.hasDepthTarget()
+                    ? NativeSpine.toVkFormat(targets.depthTexture.getVulkanicFormat())
+                    : VK10.VK_FORMAT_UNDEFINED,
+                targets.hasDepthTarget(),
+                targets.hasDepthTarget() && targets.depthTexture.getVulkanicFormat().hasStencilAspect(),
+                targets.hasFeedbackLoopTarget(),
+                VulkanFragmentRenderTargetInterfacePlanner.DrawBufferRoutingSnapshot.fromDrawBuffers(
+                    new int[] {GL_COLOR_ATTACHMENT0}
+                )
+            );
+        }
+
         private VulkanRenderPassCompatibilityKey compatibilityKey() {
             if (framebufferTargets != null) {
                 return VulkanRenderPassCompatibilityKey.framebuffer(
@@ -4991,6 +5070,37 @@ void main() {
             return depthClearValue;
         }
 
+        private VulkanFragmentRenderTargetInterfacePlanner.RenderTargetInterface fragmentRenderTargetInterface(
+            String targetKind
+        ) {
+            List<VulkanFragmentRenderTargetInterfacePlanner.ColorAttachmentInterface> colorAttachments =
+                new ArrayList<>(colorStorages.size());
+            int[] drawBuffers = new int[colorStorages.size()];
+            for (int colorIndex = 0; colorIndex < colorStorages.size(); colorIndex++) {
+                VulkanImageResourceViewCoordinator.ImageStorageSnapshot colorStorage = colorStorages.get(colorIndex);
+                int drawBuffer = GL_COLOR_ATTACHMENT0 + colorIndex;
+                drawBuffers[colorIndex] = drawBuffer;
+                colorAttachments.add(new VulkanFragmentRenderTargetInterfacePlanner.ColorAttachmentInterface(
+                    colorIndex,
+                    drawBuffer,
+                    colorStorage.vkFormat(),
+                    VulkanFragmentRenderTargetInterfacePlanner.numericClassForVkFormat(colorStorage.vkFormat()),
+                    Optional.of(colorLoadOps.get(colorIndex)),
+                    Optional.of(colorStoreOps.get(colorIndex)),
+                    colorStorage.feedbackLoopCapable()
+                ));
+            }
+            return VulkanFragmentRenderTargetInterfacePlanner.renderTargetInterface(
+                targetKind,
+                colorAttachments,
+                hasDepthTarget() ? depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED,
+                hasDepthTarget(),
+                hasDepthTarget() && hasStencilFormat(depthTexture.vkFormat),
+                hasFeedbackLoopTarget(),
+                VulkanFragmentRenderTargetInterfacePlanner.DrawBufferRoutingSnapshot.fromDrawBuffers(drawBuffers)
+            );
+        }
+
         private VulkanicResourceUsage colorInitialUsage(int index) {
             return colorInitialUsages.get(index);
         }
@@ -5059,6 +5169,12 @@ void main() {
 
         private static String optionalDoubleToString(OptionalDouble value) {
             return value.isPresent() ? Double.toString(value.getAsDouble()) : "empty";
+        }
+
+        private static boolean hasStencilFormat(int vkFormat) {
+            return vkFormat == VK10.VK_FORMAT_D16_UNORM_S8_UINT
+                || vkFormat == VK10.VK_FORMAT_D24_UNORM_S8_UINT
+                || vkFormat == VK10.VK_FORMAT_D32_SFLOAT_S8_UINT;
         }
     }
 
@@ -17680,7 +17796,8 @@ void main() {
                 descriptor,
                 vertShaderModuleHandle,
                 fragShaderModuleHandle,
-                defaultRenderPassCompatibilityKey()
+                defaultRenderPassCompatibilityKey(),
+                null
             );
         }
 
@@ -17693,9 +17810,26 @@ void main() {
             return createVulkanPipeline(
                 descriptor,
                 vertShaderModuleHandle,
+                fragShaderModuleHandle,
+                renderPassCompatibilityKey,
+                null
+            );
+        }
+
+        private VulkanPipelineHandle createVulkanPipeline(
+            PipelineDescriptor descriptor,
+            long vertShaderModuleHandle,
+            long fragShaderModuleHandle,
+            VulkanRenderPassCompatibilityKey renderPassCompatibilityKey,
+            @Nullable VulkanFragmentRenderTargetInterfacePlanner.RenderTargetInterface renderTargetInterface
+        ) {
+            return createVulkanPipeline(
+                descriptor,
+                vertShaderModuleHandle,
                 VK10.VK_NULL_HANDLE,
                 fragShaderModuleHandle,
-                renderPassCompatibilityKey
+                renderPassCompatibilityKey,
+                renderTargetInterface
             );
         }
 
@@ -17714,7 +17848,8 @@ void main() {
                     List.of(colorFormat),
                     VK10.VK_FORMAT_UNDEFINED,
                     false
-                )
+                ),
+                null
             );
         }
 
@@ -17736,7 +17871,8 @@ void main() {
                         List.of(colorFormat),
                         VK10.VK_FORMAT_UNDEFINED,
                         false
-                )
+                ),
+                null
             );
         }
 
@@ -18007,7 +18143,22 @@ void main() {
         ) {
             VulkanDescriptorSetLayoutPlanner.DescriptorLayoutPlan descriptorLayoutPlan =
                 descriptorSetLayoutPlanner.plan(descriptor.getResourceLayout());
-            return planGraphicsPipeline(descriptor, descriptorLayoutPlan, renderPassCompatibilityKey);
+            return planGraphicsPipeline(descriptor, descriptorLayoutPlan, renderPassCompatibilityKey, null);
+        }
+
+        private VulkanPipelineCreationPlanner.GraphicsPipelinePlan planGraphicsPipeline(
+            PipelineDescriptor descriptor,
+            VulkanRenderPassCompatibilityKey renderPassCompatibilityKey,
+            @Nullable VulkanFragmentRenderTargetInterfacePlanner.RenderTargetInterface renderTargetInterface
+        ) {
+            VulkanDescriptorSetLayoutPlanner.DescriptorLayoutPlan descriptorLayoutPlan =
+                descriptorSetLayoutPlanner.plan(descriptor.getResourceLayout());
+            return planGraphicsPipeline(
+                descriptor,
+                descriptorLayoutPlan,
+                renderPassCompatibilityKey,
+                renderTargetInterface
+            );
         }
 
         private VulkanPipelineCreationPlanner.GraphicsPipelinePlan planGraphicsPipeline(
@@ -18015,11 +18166,21 @@ void main() {
             VulkanDescriptorSetLayoutPlanner.DescriptorLayoutPlan descriptorLayoutPlan,
             VulkanRenderPassCompatibilityKey renderPassCompatibilityKey
         ) {
+            return planGraphicsPipeline(descriptor, descriptorLayoutPlan, renderPassCompatibilityKey, null);
+        }
+
+        private VulkanPipelineCreationPlanner.GraphicsPipelinePlan planGraphicsPipeline(
+            PipelineDescriptor descriptor,
+            VulkanDescriptorSetLayoutPlanner.DescriptorLayoutPlan descriptorLayoutPlan,
+            VulkanRenderPassCompatibilityKey renderPassCompatibilityKey,
+            @Nullable VulkanFragmentRenderTargetInterfacePlanner.RenderTargetInterface renderTargetInterface
+        ) {
             PipelineDescriptor.PortableState portableState = descriptor.getPortableState();
             return pipelineCreationPlanner.planGraphics(new VulkanPipelineCreationPlanner.GraphicsPlanRequest(
                 descriptor,
                 descriptorLayoutPlan,
                 renderPassCompatibilityKey,
+                renderTargetInterface,
                 mode -> toVkPolygonMode(mode, portableState.location().toString()),
                 backend::blendStateForAttachment,
                 backend.currentStencilState(),
@@ -18031,8 +18192,16 @@ void main() {
             PipelineDescriptor descriptor,
             VulkanRenderPassCompatibilityKey renderPassCompatibilityKey
         ) {
+            return normalizedGraphicsPipelineCacheKey(descriptor, renderPassCompatibilityKey, null);
+        }
+
+        private VulkanPipelineCacheKeyNormalizer.GraphicsPipelineCacheKey normalizedGraphicsPipelineCacheKey(
+            PipelineDescriptor descriptor,
+            VulkanRenderPassCompatibilityKey renderPassCompatibilityKey,
+            @Nullable VulkanFragmentRenderTargetInterfacePlanner.RenderTargetInterface renderTargetInterface
+        ) {
             return VulkanPipelineCacheKeyNormalizer.graphicsKey(
-                planGraphicsPipeline(descriptor, renderPassCompatibilityKey),
+                planGraphicsPipeline(descriptor, renderPassCompatibilityKey, renderTargetInterface),
                 descriptor.getSpirvModules()
             );
         }
@@ -18071,6 +18240,24 @@ void main() {
             long fragShaderModuleHandle,
             VulkanRenderPassCompatibilityKey renderPassCompatibilityKey
         ) {
+            return createVulkanPipeline(
+                descriptor,
+                vertShaderModuleHandle,
+                geomShaderModuleHandle,
+                fragShaderModuleHandle,
+                renderPassCompatibilityKey,
+                null
+            );
+        }
+
+        private VulkanPipelineHandle createVulkanPipeline(
+            PipelineDescriptor descriptor,
+            long vertShaderModuleHandle,
+            long geomShaderModuleHandle,
+            long fragShaderModuleHandle,
+            VulkanRenderPassCompatibilityKey renderPassCompatibilityKey,
+            @Nullable VulkanFragmentRenderTargetInterfacePlanner.RenderTargetInterface renderTargetInterface
+        ) {
             Objects.requireNonNull(descriptor, "descriptor must not be null");
             Objects.requireNonNull(renderPassCompatibilityKey, "renderPassCompatibilityKey must not be null");
             if (logicalDevice == null) {
@@ -18084,7 +18271,12 @@ void main() {
                 VulkanDescriptorSetLayoutPlanner.DescriptorLayoutPlan descriptorLayoutPlan =
                     descriptorSetLayoutPlanner.plan(descriptor.getResourceLayout());
                 VulkanPipelineCreationPlanner.GraphicsPipelinePlan pipelinePlan =
-                    planGraphicsPipeline(descriptor, descriptorLayoutPlan, renderPassCompatibilityKey);
+                    planGraphicsPipeline(
+                        descriptor,
+                        descriptorLayoutPlan,
+                        renderPassCompatibilityKey,
+                        renderTargetInterface
+                    );
                 java.util.List<VulkanDescriptorSetLayoutPlanner.DescriptorLayoutBindingPlan> bindings =
                     descriptorLayoutPlan.allBindings();
 

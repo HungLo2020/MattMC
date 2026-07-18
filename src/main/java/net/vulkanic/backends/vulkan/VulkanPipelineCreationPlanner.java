@@ -25,6 +25,20 @@ final class VulkanPipelineCreationPlanner {
             Objects.requireNonNull(request.renderPassCompatibilityKey(), "renderPassCompatibilityKey");
         VulkanDescriptorSetLayoutPlanner.DescriptorLayoutPlan descriptorLayoutPlan =
             Objects.requireNonNull(request.descriptorLayoutPlan(), "descriptorLayoutPlan");
+        VulkanFragmentRenderTargetInterfacePlanner.RenderTargetInterface renderTargetInterface =
+            request.renderTargetInterface() != null
+                ? request.renderTargetInterface()
+                : VulkanFragmentRenderTargetInterfacePlanner.renderTargetInterface(renderPassCompatibilityKey);
+        VulkanFragmentRenderTargetInterfacePlanner.FragmentRenderTargetCompatibilityResult fragmentRenderTargetContract =
+            VulkanFragmentRenderTargetInterfacePlanner.plan(
+                VulkanFragmentRenderTargetInterfacePlanner.fragmentOutputInterface(descriptor.getSpirvModules()),
+                renderTargetInterface
+            );
+        if (!fragmentRenderTargetContract.compatible()) {
+            throw new IllegalArgumentException("Incompatible Vulkan fragment/render-target interface: "
+                + fragmentRenderTargetContract.diagnostics());
+        }
+        int colorAttachmentCount = fragmentRenderTargetContract.blendPlan().attachments().size();
 
         List<ShaderStagePlan> shaderStages = graphicsShaderStages(descriptor.getSpirvModules());
         VertexInputPlan vertexInput = vertexInputPlan(portableState, descriptor.getVertexInputState());
@@ -35,7 +49,7 @@ final class VulkanPipelineCreationPlanner {
         ViewportStatePlan viewportState = new ViewportStatePlan(1, 1);
         VulkanPipelineState pipelineState = VulkanPipelineState.from(
             portableState,
-            renderPassCompatibilityKey.colorAttachmentCount(),
+            colorAttachmentCount,
             request.polygonModeResolver(),
             request.blendStateResolver(),
             request.stencilState(),
@@ -80,6 +94,7 @@ final class VulkanPipelineCreationPlanner {
         );
 
         return new GraphicsPipelinePlan(
+            fragmentRenderTargetContract,
             shaderStages,
             vertexInput,
             inputAssembly,
@@ -249,11 +264,33 @@ final class VulkanPipelineCreationPlanner {
         PipelineDescriptor descriptor,
         VulkanDescriptorSetLayoutPlanner.DescriptorLayoutPlan descriptorLayoutPlan,
         VulkanRenderPassCompatibilityKey renderPassCompatibilityKey,
+        VulkanFragmentRenderTargetInterfacePlanner.RenderTargetInterface renderTargetInterface,
         VulkanPipelineState.PolygonModeResolver polygonModeResolver,
         VulkanPipelineState.BlendStateResolver blendStateResolver,
         VulkanPipelineState.StencilState stencilState,
         boolean attachmentFeedbackLoopLayoutEnabled
     ) {
+        GraphicsPlanRequest(
+            PipelineDescriptor descriptor,
+            VulkanDescriptorSetLayoutPlanner.DescriptorLayoutPlan descriptorLayoutPlan,
+            VulkanRenderPassCompatibilityKey renderPassCompatibilityKey,
+            VulkanPipelineState.PolygonModeResolver polygonModeResolver,
+            VulkanPipelineState.BlendStateResolver blendStateResolver,
+            VulkanPipelineState.StencilState stencilState,
+            boolean attachmentFeedbackLoopLayoutEnabled
+        ) {
+            this(
+                descriptor,
+                descriptorLayoutPlan,
+                renderPassCompatibilityKey,
+                null,
+                polygonModeResolver,
+                blendStateResolver,
+                stencilState,
+                attachmentFeedbackLoopLayoutEnabled
+            );
+        }
+
         GraphicsPlanRequest {
             Objects.requireNonNull(polygonModeResolver, "polygonModeResolver");
             Objects.requireNonNull(blendStateResolver, "blendStateResolver");
@@ -268,6 +305,7 @@ final class VulkanPipelineCreationPlanner {
     }
 
     record GraphicsPipelinePlan(
+        VulkanFragmentRenderTargetInterfacePlanner.FragmentRenderTargetCompatibilityResult fragmentRenderTargetContract,
         List<ShaderStagePlan> shaderStages,
         VertexInputPlan vertexInput,
         InputAssemblyPlan inputAssembly,
@@ -283,6 +321,7 @@ final class VulkanPipelineCreationPlanner {
         int pipelineCreateFlags
     ) {
         GraphicsPipelinePlan {
+            Objects.requireNonNull(fragmentRenderTargetContract, "fragmentRenderTargetContract");
             shaderStages = List.copyOf(shaderStages);
             dynamicStates = List.copyOf(dynamicStates);
             Objects.requireNonNull(vertexInput, "vertexInput");

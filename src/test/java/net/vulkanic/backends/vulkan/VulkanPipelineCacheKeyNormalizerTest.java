@@ -102,6 +102,40 @@ final class VulkanPipelineCacheKeyNormalizerTest {
     }
 
     @Test
+    void differentFragmentOutputInterfacesCannotShareGraphicsPipelineIdentity() {
+        RenderPipeline pipeline = builder("pipeline/fragment_outputs");
+        PipelineDescriptor first = PipelineDescriptor.fromRenderPipelineAndSpirvModules(
+            pipeline,
+            List.of(
+                module(VulkanicShaderStage.VERTEX, bytes(1), "fragment_outputs.vert"),
+                module(
+                    VulkanicShaderStage.FRAGMENT,
+                    bytes(2),
+                    "fragment_outputs.frag",
+                    new VulkanicSpirvModule.FragmentOutput(0, "fragColor", "vec4")
+                )
+            )
+        );
+        PipelineDescriptor second = PipelineDescriptor.fromRenderPipelineAndSpirvModules(
+            pipeline,
+            List.of(
+                module(VulkanicShaderStage.VERTEX, bytes(1), "fragment_outputs.vert"),
+                module(
+                    VulkanicShaderStage.FRAGMENT,
+                    bytes(2),
+                    "fragment_outputs.frag",
+                    new VulkanicSpirvModule.FragmentOutput(1, "fragColor", "vec4")
+                )
+            )
+        );
+
+        assertNotEquals(
+            graphicsKey(first, defaultCompatibility(), false),
+            graphicsKey(second, defaultCompatibility(), false)
+        );
+    }
+
+    @Test
     void equivalentImmutableGraphicsPlansProduceEqualStableKeys() {
         PipelineDescriptor first = descriptor("pipeline/equivalent", bytes(1), bytes(2));
         PipelineDescriptor second = descriptor("pipeline/equivalent", bytes(1), bytes(2));
@@ -419,6 +453,16 @@ final class VulkanPipelineCacheKeyNormalizerTest {
 
     private static VulkanicSpirvModule module(VulkanicShaderStage stage, byte[] bytes, String sourceName) {
         return new VulkanicSpirvModule(stage, "main", bytes, sourceName, "test");
+    }
+
+    private static VulkanicSpirvModule module(
+        VulkanicShaderStage stage,
+        byte[] bytes,
+        String sourceName,
+        VulkanicSpirvModule.FragmentOutput... fragmentOutputs
+    ) {
+        return new VulkanicSpirvModule(stage, "main", bytes, sourceName, "test")
+            .withFragmentOutputs(List.of(fragmentOutputs));
     }
 
     private static byte[] bytes(int... values) {
