@@ -138,7 +138,7 @@ fn configure_linux_desktop_audio_backend(config: &mut cmake::Config) {
         config.define("PULSEAUDIO_INCLUDE_DIR", &pulseaudio_include_dir);
     }
 
-    if let Some(pulseaudio_library) = find_linux_library("libpulse.so.0") {
+    if let Some(pulseaudio_library) = find_first_linux_library(&["libpulse.so.0", "libpulse.so"]) {
         config.define("PULSEAUDIO_LIBRARY", pulseaudio_library);
     }
 }
@@ -268,10 +268,10 @@ fn config_define_enabled(config: &str, name: &str) -> bool {
     config.lines().any(|line| line.trim() == expected)
 }
 
-fn find_linux_library(file_name: &str) -> Option<PathBuf> {
+fn find_first_linux_library(file_names: &[&str]) -> Option<PathBuf> {
     linux_library_search_dirs()
         .into_iter()
-        .map(|dir| dir.join(file_name))
+        .flat_map(|dir| file_names.iter().map(move |file_name| dir.join(file_name)))
         .find(|path| path.is_file())
 }
 

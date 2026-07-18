@@ -462,6 +462,11 @@ tasks.register('testRustNative', Exec) {
     inputs.files(rustSourceFiles)
 
     environment 'CARGO_TARGET_DIR', rustTargetDir.get().asFile.absolutePath
+    // CI/release builders are often headless. The Rust audio tests need an
+    // OpenAL device to exercise source/buffer ownership, but they do not need
+    // real hardware output, so force OpenAL Soft's deterministic null backend
+    // for tests only. Runtime/client launches are unaffected.
+    environment 'ALSOFT_DRIVERS', 'null'
     commandLine 'cargo', 'test', '--manifest-path', rustManifest.absolutePath, '--locked'
     doFirst {
         configureRustBuildPython(delegate)

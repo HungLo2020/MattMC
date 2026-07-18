@@ -29,12 +29,19 @@ jobs:
           java-version: "21"
           cache: gradle
 
-      - name: Install native shader compiler build tools
+      - name: Install native build tools and audio headers
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build python3
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            pkg-config \
+            python3 \
+            libasound2-dev \
+            libpipewire-0.3-dev \
+            libpulse-dev
 
       - name: Set up Rust stable
         shell: bash
