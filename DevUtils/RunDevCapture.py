@@ -61,6 +61,12 @@ class CaptureConfig:
     deterministic_camera_capture: bool
     deterministic_pose_tolerance: float
     audio_validation: bool
+    capture_meshing_corpus: bool
+    meshing_corpus_output: str
+    meshing_corpus_fixture: str
+    meshing_corpus_warmup: int
+    meshing_corpus_measure: int
+    artifact_dir: str
     platform_name: str | None
 
 
@@ -75,7 +81,9 @@ class CaptureRunner:
         self.gradle = gradle_command(self.root, self.platform_name)
         self.run_dir = self.root / "run"
         self.options_file = self.run_dir / "options.txt"
-        self.artifact_dir = self.root / "logs" / "auto-capture"
+        self.artifact_dir = Path(config.artifact_dir) if config.artifact_dir else self.root / "logs" / "auto-capture"
+        if not self.artifact_dir.is_absolute():
+            self.artifact_dir = self.root / self.artifact_dir
         self.artifact_dir.mkdir(parents=True, exist_ok=True)
         self.lock_file = self.artifact_dir / ".RunDevCapture.lock"
         self.lock_handle = None
@@ -110,6 +118,7 @@ class CaptureRunner:
         self.deterministic_metadata = self.artifact_dir / f"deterministic_camera_capture_{self.run_id}.json"
         self.deterministic_screenshot_dir = self.artifact_dir / f"deterministic_camera_capture_{self.run_id}"
         self.audio_validation_status = self.artifact_dir / f"audio_validation_{self.run_id}.json"
+        self.meshing_corpus_replay = self.artifact_dir / f"real_meshing_replay_{self.run_id}.json"
 
         self.validation_layer_manifest = ""
         self.validation_layer_dir = ""
@@ -236,6 +245,11 @@ class CaptureRunner:
             f"skip_tests={str(self.config.skip_tests).lower()}",
             f"deterministic_camera_capture={str(self.config.deterministic_camera_capture).lower()}",
             f"deterministic_pose_tolerance={self.config.deterministic_pose_tolerance}",
+            f"capture_meshing_corpus={str(self.config.capture_meshing_corpus).lower()}",
+            f"meshing_corpus_output={self.config.meshing_corpus_output or self.meshing_corpus_replay}",
+            f"meshing_corpus_fixture={self.config.meshing_corpus_fixture or 'all'}",
+            f"meshing_corpus_warmup={self.config.meshing_corpus_warmup}",
+            f"meshing_corpus_measure={self.config.meshing_corpus_measure}",
             f"client_args_initial={self.config.client_args}",
         ]
         self.meta_log.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -457,8 +471,26 @@ class CaptureRunner:
         gradle_cmd = [*self.gradle]
         if self.config.skip_tests:
             gradle_cmd.extend(["-x", "test"])
-        gradle_cmd.append("runClient")
-        if self.config.client_args:
+        if self.config.capture_meshing_corpus:
+            output = self.meshing_corpus_output_path()
+            gradle_cmd.extend(
+                [
+                    f"-PmattmcReplayOutput={output}",
+                    f"-PmattmcReplayWarmup={self.config.meshing_corpus_warmup}",
+                    "-PmattmcReplayWarmupSeconds=0",
+                    f"-PmattmcReplayMeasure={self.config.meshing_corpus_measure}",
+                    "-PmattmcReplayMeasureSeconds=0",
+                    "-PmattmcReplayRebuildsPerSample=1",
+                    "-PmattmcReplayValidateEachSample=true",
+                    "-PmattmcReplayCaptureInputs=true",
+                ]
+            )
+            if self.config.meshing_corpus_fixture:
+                gradle_cmd.append(f"-PmattmcReplayFixture={self.config.meshing_corpus_fixture}")
+            gradle_cmd.append("runRealChunkMeshingReplay")
+        else:
+            gradle_cmd.append("runClient")
+        if self.config.client_args and not self.config.capture_meshing_corpus:
             gradle_cmd.append(f"--args={self.config.client_args}")
 
         self.configure_validation_environment()
@@ -577,6 +609,42 @@ class CaptureRunner:
             self.append_meta(f"audio_validation_java_options={' '.join(audio_options)}")
             self.append_meta(f"audio_validation_status={self.audio_validation_status}")
             self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
+
+        if self.config.capture_meshing_corpus:
+            output = self.meshing_corpus_output_path()
+            meshing_options = [
+                "-Dmattmc.realMeshingReplay=true",
+                f"-Dmattmc.realMeshingReplay.output={output}",
+                f"-Dmattmc.realMeshingReplay.warmup={self.config.meshing_corpus_warmup}",
+                f"-Dmattmc.realMeshingReplay.measure={self.config.meshing_corpus_measure}",
+                "-Dmattmc.realMeshingReplay.warmupSeconds=0",
+                "-Dmattmc.realMeshingReplay.measureSeconds=0",
+                "-Dmattmc.realMeshingReplay.rebuildsPerSample=1",
+                "-Dmattmc.realMeshingReplay.validateEachSample=true",
+                "-Dmattmc.realMeshingReplay.captureInputs=true",
+            ]
+            if self.config.meshing_corpus_fixture:
+                meshing_options.append(f"-Dmattmc.realMeshingReplay.fixture={self.config.meshing_corpus_fixture}")
+            self.append_meta(f"meshing_corpus_java_options={' '.join(meshing_options)}")
+            gradle_properties = [
+                f"-PmattmcReplayOutput={output}",
+                f"-PmattmcReplayWarmup={self.config.meshing_corpus_warmup}",
+                "-PmattmcReplayWarmupSeconds=0",
+                f"-PmattmcReplayMeasure={self.config.meshing_corpus_measure}",
+                "-PmattmcReplayMeasureSeconds=0",
+                "-PmattmcReplayRebuildsPerSample=1",
+                "-PmattmcReplayValidateEachSample=true",
+                "-PmattmcReplayCaptureInputs=true",
+            ]
+            if self.config.meshing_corpus_fixture:
+                gradle_properties.append(f"-PmattmcReplayFixture={self.config.meshing_corpus_fixture}")
+            self.append_meta(f"meshing_corpus_gradle_properties={' '.join(gradle_properties)}")
+            self.append_meta(f"meshing_corpus_replay={output}")
+            self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
+
+    def meshing_corpus_output_path(self) -> Path:
+        output = Path(self.config.meshing_corpus_output) if self.config.meshing_corpus_output else self.meshing_corpus_replay
+        return output if output.is_absolute() else (self.root / output)
 
     def append_java_tool_options(self, options: list[str]) -> None:
         current = self.env.get("JAVA_TOOL_OPTIONS", "")
@@ -1000,6 +1068,10 @@ class CaptureRunner:
         if self.config.audio_validation:
             print(f"- Audio validation: {self.audio_validation_status}")
             print(f"- Audio result:     {self.audio_validation_result}")
+        if self.config.capture_meshing_corpus:
+            output = Path(self.config.meshing_corpus_output) if self.config.meshing_corpus_output else self.meshing_corpus_replay
+            output = output if output.is_absolute() else (self.root / output)
+            print(f"- Meshing replay:   {output}")
 
         if self.timed_out:
             print(f"Result: timed out after {self.config.max_secs}s and was terminated automatically.")
@@ -1554,6 +1626,12 @@ def parse_args() -> CaptureConfig:
     )
     parser.add_argument("--deterministic-camera-capture", action="store_true")
     parser.add_argument("--audio-validation", action="store_true")
+    parser.add_argument("--capture-meshing-corpus", action="store_true")
+    parser.add_argument("--meshing-corpus-output", default=os.environ.get("MATTMC_MESHING_CORPUS_OUTPUT", ""))
+    parser.add_argument("--meshing-corpus-fixture", default=os.environ.get("MATTMC_MESHING_CORPUS_FIXTURE", ""))
+    parser.add_argument("--meshing-corpus-warmup", type=int, default=int_env("MATTMC_MESHING_CORPUS_WARMUP", 2))
+    parser.add_argument("--meshing-corpus-measure", type=int, default=int_env("MATTMC_MESHING_CORPUS_MEASURE", 3))
+    parser.add_argument("--artifact-dir", default=os.environ.get("MATTMC_RUN_CAPTURE_ARTIFACT_DIR", ""))
     parser.add_argument(
         "--skip-tests",
         action="store_true",
@@ -1569,6 +1647,8 @@ def parse_args() -> CaptureConfig:
 
     if args.max_secs < 0 or args.dump_secs < 0:
         raise SystemExit("--max-secs and --dump-secs must be integers")
+    if args.meshing_corpus_warmup < 0 or args.meshing_corpus_measure < 0:
+        raise SystemExit("--meshing-corpus-warmup and --meshing-corpus-measure must be non-negative integers")
 
     pose_tolerance = os.environ.get("DETERMINISTIC_POSE_TOLERANCE", "0.001")
     if not re.match(r"^[0-9]+([.][0-9]+)?$", pose_tolerance):
@@ -1592,6 +1672,12 @@ def parse_args() -> CaptureConfig:
         deterministic_camera_capture=bool(args.deterministic_camera_capture),
         deterministic_pose_tolerance=float(pose_tolerance),
         audio_validation=bool(args.audio_validation),
+        capture_meshing_corpus=bool(args.capture_meshing_corpus),
+        meshing_corpus_output=args.meshing_corpus_output,
+        meshing_corpus_fixture=args.meshing_corpus_fixture,
+        meshing_corpus_warmup=args.meshing_corpus_warmup,
+        meshing_corpus_measure=args.meshing_corpus_measure,
+        artifact_dir=args.artifact_dir,
         platform_name=args.platform,
     )
 

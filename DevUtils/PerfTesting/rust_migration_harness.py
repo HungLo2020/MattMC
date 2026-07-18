@@ -20,11 +20,12 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 
-WORKLOADS = ("metadata", "gradle-test", "chunk-meshing-hotpath")
+WORKLOADS = ("metadata", "gradle-test", "chunk-meshing-hotpath", "real-chunk-meshing-replay")
 TARGETS = ("current", "frozen", "both")
 BENCHMARK_FORCE_MODES = ("clean-test", "none", "rerun-tasks")
 DEFAULT_TIMEOUT_SECONDS = 900
 BENCHMARK_OUTPUT = "chunk-meshing-hotpath.json"
+REAL_REPLAY_OUTPUT = "real-chunk-meshing-replay.json"
 
 
 @dataclass(frozen=True)
@@ -323,8 +324,16 @@ def base_metadata(target: RepoTarget, workload: str, command: Sequence[str], arg
         "timeout_seconds": args.timeout_seconds,
         "jvm_args": args.jvm_arg,
         "benchmark_force_mode": args.benchmark_force_mode if workload == "chunk-meshing-hotpath" else None,
-        "fork_index": args.fork_index if workload == "chunk-meshing-hotpath" else None,
+        "fork_index": args.fork_index if workload in {"chunk-meshing-hotpath", "real-chunk-meshing-replay"} else None,
         "diagnostic_mode": args.diagnostic if workload == "chunk-meshing-hotpath" else None,
+        "real_replay": {
+            "warmup": args.real_warmup,
+            "measure": args.real_measure,
+            "warmup_seconds": args.real_warmup_seconds,
+            "measure_seconds": args.real_measure_seconds,
+            "rebuilds_per_sample": args.real_rebuilds_per_sample,
+            "fixture": args.real_fixture,
+        } if workload == "real-chunk-meshing-replay" else None,
     }
 
 
@@ -393,6 +402,30 @@ def build_command(target: RepoTarget, workload: str, args: argparse.Namespace, o
                 }
             )
         return command, extra_env
+    if workload == "real-chunk-meshing-replay":
+        jvm = [
+            "-Dmattmc.realMeshingReplay=true",
+            f"-Dmattmc.realMeshingReplay.output={output_json}",
+            f"-Dmattmc.realMeshingReplay.warmup={args.real_warmup}",
+            f"-Dmattmc.realMeshingReplay.measure={args.real_measure}",
+            f"-Dmattmc.realMeshingReplay.warmupSeconds={args.real_warmup_seconds}",
+            f"-Dmattmc.realMeshingReplay.measureSeconds={args.real_measure_seconds}",
+            f"-Dmattmc.realMeshingReplay.rebuildsPerSample={args.real_rebuilds_per_sample}",
+            "-Dmattmc.realMeshingReplay.validateEachSample=true",
+        ]
+        if args.real_fixture:
+            jvm.append(f"-Dmattmc.realMeshingReplay.fixture={args.real_fixture}")
+        if target.role == "current":
+            jvm.append(f"-Dmattmc.realMeshingReplay.rustProfile={args.rust_profile}")
+        command = [
+            *gradle_wrapper(target.root),
+            "runClient",
+            "--no-daemon",
+            *args.gradle_arg,
+        ]
+        if target.role == "current":
+            command.insert(1, f"-PmattmcRustProfile={args.rust_profile}")
+        return command, {"JAVA_TOOL_OPTIONS": " ".join(jvm)}
     raise SystemExit(f"Unsupported workload: {workload}")
 
 
@@ -459,7 +492,7 @@ def run_target(target: RepoTarget, workload: str, artifact_root: Path, args: arg
                 exit_code = process.wait(timeout=30)
                 error = f"Timed out after {args.timeout_seconds}s"
             success = exit_code == 0 and not timed_out
-            if success and workload == "chunk-meshing-hotpath" and not output_json.is_file():
+            if success and workload in {"chunk-meshing-hotpath", "real-chunk-meshing-replay"} and not output_json.is_file():
                 success = False
                 error = f"Benchmark completed but did not write expected output: {output_json}"
     elif command and args.dry_run:
@@ -514,6 +547,8 @@ def ordered_targets(targets: list[RepoTarget], fork_number: int, alternate_order
 
 
 def benchmark_artifact_path(result: CommandResult) -> Path:
+    if result.workload == "real-chunk-meshing-replay":
+        return Path(result.artifact_dir) / REAL_REPLAY_OUTPUT
     return Path(result.artifact_dir) / BENCHMARK_OUTPUT
 
 
@@ -711,29 +746,195 @@ def build_benchmark_aggregate(results: list[CommandResult]) -> dict[str, object]
     }
 
 
+def fixture_by_name(doc: dict[str, object]) -> dict[str, dict[str, object]]:
+    fixtures = doc.get("fixtures", [])
+    if not isinstance(fixtures, list):
+        return {}
+    return {str(fixture.get("name")): fixture for fixture in fixtures if isinstance(fixture, dict) and fixture.get("name")}
+
+
+def fixture_category(name: str) -> str:
+    lowered = name.lower()
+    if "empty" in lowered:
+        return "empty"
+    if "dense" in lowered:
+        return "dense-terrain"
+    if "foliage" in lowered:
+        return "foliage"
+    if "weighted" in lowered or "multipart" in lowered:
+        return "weighted-multipart"
+    if "waterlogged" in lowered:
+        return "waterlogged"
+    if "fluid" in lowered:
+        return "fluid-heavy"
+    if "translucent" in lowered:
+        return "translucent-heavy"
+    if "complex" in lowered or "modded" in lowered:
+        return "modded-static"
+    return "ordinary-terrain"
+
+
+def fixture_summary(fixture: dict[str, object]) -> dict[str, object]:
+    value = fixture.get("summary")
+    return value if isinstance(value, dict) else {}
+
+
+def fixture_fallback_contaminated(fixture: dict[str, object]) -> bool:
+    summary = fixture_summary(fixture)
+    return numeric(summary.get("fallback_blocks")) > 0 or numeric(summary.get("fallback_quads")) > 0
+
+
+def fixture_canonical_hash(fixture: dict[str, object]) -> object:
+    return fixture_summary(fixture).get("canonical_hash")
+
+
+def build_real_replay_aggregate(results: list[CommandResult]) -> dict[str, object] | None:
+    docs_by_fork: dict[int, dict[str, dict[str, object]]] = {}
+    output_paths: list[str] = []
+    for result in results:
+        if result.workload != "real-chunk-meshing-replay" or not result.success:
+            continue
+        doc = load_benchmark_output(result)
+        if doc is None:
+            continue
+        fork = fork_number_from_artifact(Path(result.artifact_dir))
+        docs_by_fork.setdefault(fork, {})[result.target] = doc
+        output_paths.append(str(benchmark_artifact_path(result)))
+    if not docs_by_fork:
+        return None
+
+    names: set[str] = set()
+    for target_docs in docs_by_fork.values():
+        for doc in target_docs.values():
+            names.update(fixture_by_name(doc).keys())
+
+    rows: list[dict[str, object]] = []
+    for name in sorted(names):
+        current_values: list[float] = []
+        frozen_values: list[float] = []
+        ratios: list[float] = []
+        semantic_failures: list[int] = []
+        fallback_forks: list[int] = []
+        snapshot_tax_values: list[float] = []
+
+        for fork, target_docs in sorted(docs_by_fork.items()):
+            current = fixture_by_name(target_docs.get("current", {})).get(name)
+            frozen = fixture_by_name(target_docs.get("frozen", {})).get(name)
+            if current is not None:
+                current_ns = numeric(current.get("median_ns"))
+                current_values.append(current_ns / 1_000_000.0)
+                timing = current.get("timing") if isinstance(current.get("timing"), dict) else {}
+                execute_count = max(1.0, numeric(timing.get("chunk_builder_execute_invocations"), 1.0))
+                snapshot_tax_values.append(numeric(timing.get("render_context_creation_ns")) / execute_count / 1_000_000.0)
+                if fixture_fallback_contaminated(current):
+                    fallback_forks.append(fork)
+            if frozen is not None:
+                frozen_ns = numeric(frozen.get("median_ns"))
+                frozen_values.append(frozen_ns / 1_000_000.0)
+                if fixture_fallback_contaminated(frozen):
+                    fallback_forks.append(fork)
+            if current is not None and frozen is not None:
+                frozen_ns = numeric(frozen.get("median_ns"))
+                current_ns = numeric(current.get("median_ns"))
+                if frozen_ns:
+                    ratios.append(current_ns / frozen_ns)
+                if fixture_canonical_hash(current) != fixture_canonical_hash(frozen):
+                    semantic_failures.append(fork)
+
+        ratio_summary = summarize_values(ratios)
+        ratio_median = ratio_summary["median"]
+        classification = "incomplete"
+        if fallback_forks:
+            classification = "fallback-contaminated"
+        elif semantic_failures:
+            classification = "semantic-mismatch"
+        elif current_values and frozen_values and isinstance(ratio_median, float):
+            if ratio_median <= 0.95:
+                classification = "current-faster"
+            elif ratio_median >= 1.05:
+                classification = "current-slower"
+            else:
+                classification = "similar"
+
+        rows.append(
+            {
+                "name": name,
+                "category": fixture_category(name),
+                "classification": classification,
+                "current_full_ms": summarize_values(current_values),
+                "frozen_full_ms": summarize_values(frozen_values),
+                "current_over_frozen_ratio": ratio_summary,
+                "current_snapshot_tax_ms": summarize_values(snapshot_tax_values),
+                "semantic_failed_forks": semantic_failures,
+                "fallback_contaminated_forks": sorted(set(fallback_forks)),
+            }
+        )
+
+    return {
+        "schema": "mattmc-real-chunk-meshing-replay-aggregate-v1",
+        "created_at": utc_now().isoformat(),
+        "benchmark_outputs": output_paths,
+        "forks_observed": sorted(docs_by_fork.keys()),
+        "row_count": len(rows),
+        "rows": rows,
+    }
+
+
+def fork_number_from_artifact(path: Path) -> int:
+    for part in reversed(path.parts):
+        if part.startswith("fork-"):
+            try:
+                return int(part.split("-", 1)[1])
+            except ValueError:
+                return 0
+    return 0
+
+
 def write_aggregate_files(artifact_root: Path, aggregate: dict[str, object] | None) -> tuple[Path | None, Path | None]:
     if aggregate is None:
         return None, None
     json_path = artifact_root / "aggregate_summary.json"
     json_path.write_text(json.dumps(aggregate, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
-    lines = [
-        "MattMC chunk meshing cross-repo aggregate",
-        f"forks_observed: {aggregate.get('forks_observed')}",
-        "",
-        "benchmark | category | classification | frozen median ms | current median ms | current/frozen",
-        "--- | --- | --- | ---: | ---: | ---:",
-    ]
-    for row in aggregate.get("rows", []):
-        if not isinstance(row, dict):
-            continue
-        frozen = row.get("frozen_ms", {})
-        current = row.get("current_ms", {})
-        ratio = row.get("current_over_frozen_ratio", {})
-        lines.append(
-            f"{row.get('name')} | {row.get('category')} | {row.get('classification')} | "
-            f"{(frozen or {}).get('median')} | {(current or {}).get('median')} | {(ratio or {}).get('median')}"
-        )
+    schema = aggregate.get("schema")
+    if schema == "mattmc-real-chunk-meshing-replay-aggregate-v1":
+        lines = [
+            "MattMC real production chunk meshing replay aggregate",
+            f"forks_observed: {aggregate.get('forks_observed')}",
+            "",
+            "fixture | category | classification | Java full median ms | Rust full median ms | full ratio | Rust snapshot tax ms",
+            "--- | --- | --- | ---: | ---: | ---: | ---:",
+        ]
+        for row in aggregate.get("rows", []):
+            if not isinstance(row, dict):
+                continue
+            frozen = row.get("frozen_full_ms", {})
+            current = row.get("current_full_ms", {})
+            ratio = row.get("current_over_frozen_ratio", {})
+            tax = row.get("current_snapshot_tax_ms", {})
+            lines.append(
+                f"{row.get('name')} | {row.get('category')} | {row.get('classification')} | "
+                f"{(frozen or {}).get('median')} | {(current or {}).get('median')} | "
+                f"{(ratio or {}).get('median')} | {(tax or {}).get('median')}"
+            )
+    else:
+        lines = [
+            "MattMC chunk meshing cross-repo aggregate",
+            f"forks_observed: {aggregate.get('forks_observed')}",
+            "",
+            "benchmark | category | classification | frozen median ms | current median ms | current/frozen",
+            "--- | --- | --- | ---: | ---: | ---:",
+        ]
+        for row in aggregate.get("rows", []):
+            if not isinstance(row, dict):
+                continue
+            frozen = row.get("frozen_ms", {})
+            current = row.get("current_ms", {})
+            ratio = row.get("current_over_frozen_ratio", {})
+            lines.append(
+                f"{row.get('name')} | {row.get('category')} | {row.get('classification')} | "
+                f"{(frozen or {}).get('median')} | {(current or {}).get('median')} | {(ratio or {}).get('median')}"
+            )
     text_path = artifact_root / "aggregate_report.md"
     text_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return json_path, text_path
@@ -944,8 +1145,8 @@ def write_combined_manifest(
         "workload": args.workload,
         "artifact_dir": str(artifact_root),
         "success": all(result.success for result in results),
-        "forks": args.forks if args.workload == "chunk-meshing-hotpath" else None,
-        "alternate_order": args.alternate_order if args.workload == "chunk-meshing-hotpath" else None,
+        "forks": args.forks if args.workload in {"chunk-meshing-hotpath", "real-chunk-meshing-replay"} else None,
+        "alternate_order": args.alternate_order if args.workload in {"chunk-meshing-hotpath", "real-chunk-meshing-replay"} else None,
         "aggregate_summary": str(aggregate_path) if aggregate_path else None,
         "aggregate_report": str(aggregate_report_path) if aggregate_report_path else None,
         "diagnostic_summary": str(diagnostic_path) if diagnostic_path else None,
@@ -1000,11 +1201,17 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--warmup-ms", type=non_negative_int, default=1500)
     parser.add_argument("--measure-ms", type=non_negative_int, default=2500)
     parser.add_argument("--fork-index", type=non_negative_int, default=0)
+    parser.add_argument("--real-warmup", type=non_negative_int, default=8)
+    parser.add_argument("--real-measure", type=non_negative_int, default=25)
+    parser.add_argument("--real-warmup-seconds", type=float, default=0.0)
+    parser.add_argument("--real-measure-seconds", type=float, default=0.0)
+    parser.add_argument("--real-rebuilds-per-sample", type=positive_int, default=1)
+    parser.add_argument("--real-fixture", default="")
     parser.add_argument(
         "--forks",
         type=positive_int,
         default=1,
-        help="Number of chunk-meshing-hotpath forks to run. Each fork runs each selected target once.",
+        help="Number of chunk meshing benchmark forks to run. Each fork runs each selected target once.",
     )
     parser.add_argument(
         "--alternate-order",
@@ -1021,7 +1228,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             "selected benchmark; none allows Gradle up-to-date skipping; rerun-tasks preserves the old heavy behavior."
         ),
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.real_warmup_seconds < 0 or args.real_measure_seconds < 0:
+        raise SystemExit("--real-warmup-seconds and --real-measure-seconds must be non-negative")
+    return args
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -1039,7 +1249,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     native_artifact = native_artifact_identity(current_target, args.rust_profile) if current_target else None
 
     results: list[CommandResult] = []
-    if args.workload == "chunk-meshing-hotpath" and args.forks > 1:
+    if args.workload in {"chunk-meshing-hotpath", "real-chunk-meshing-replay"} and args.forks > 1:
         for fork_number in range(1, args.forks + 1):
             fork_root = artifact_root / f"fork-{fork_number:02d}"
             fork_args = clone_args(args, fork_index=fork_number)
@@ -1048,7 +1258,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         results = [run_target(target, args.workload, artifact_root, args) for target in targets]
 
-    aggregate = build_benchmark_aggregate(results) if args.workload == "chunk-meshing-hotpath" else None
+    if args.workload == "chunk-meshing-hotpath":
+        aggregate = build_benchmark_aggregate(results)
+    elif args.workload == "real-chunk-meshing-replay":
+        aggregate = build_real_replay_aggregate(results)
+    else:
+        aggregate = None
     aggregate_path, aggregate_report_path = write_aggregate_files(artifact_root, aggregate)
     diagnostic = build_diagnostic_summary(results, aggregate) if args.workload == "chunk-meshing-hotpath" else None
     diagnostic_path = write_diagnostic_summary(artifact_root, diagnostic)

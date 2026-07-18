@@ -476,6 +476,36 @@ tasks.withType(Test).configureEach {
     dependsOn 'buildRustNative', 'testRustNative'
     systemProperty 'mattmc.rust.natives.dir', rustBuiltNativesDir.get().asFile.absolutePath
     jvmArgs rustNativeJvmArgs
+    def corpusReplayInput = providers.gradleProperty('mattmcMeshingCorpusReplayInput')
+    if (corpusReplayInput.isPresent()) {
+        def corpusReplayOutput = providers.gradleProperty('mattmcMeshingCorpusReplayOutput')
+                .orElse("${buildDir}/meshing-corpus/replay-current.json")
+        def corpusReplayWarmup = providers.gradleProperty('mattmcMeshingCorpusReplayWarmup').orElse('8')
+        def corpusReplayMeasure = providers.gradleProperty('mattmcMeshingCorpusReplayMeasure').orElse('25')
+        def corpusReplayWarmupSeconds = providers.gradleProperty('mattmcMeshingCorpusReplayWarmupSeconds').orElse('0')
+        def corpusReplayMeasureSeconds = providers.gradleProperty('mattmcMeshingCorpusReplayMeasureSeconds').orElse('0')
+        def corpusReplayFixture = providers.gradleProperty('mattmcMeshingCorpusReplayFixture').orElse('')
+        def corpusReplayDiagnostics = providers.gradleProperty('mattmcMeshingCorpusReplayDiagnostics').orElse('false')
+        inputs.file(file(corpusReplayInput.get())).withPropertyName('mattmcMeshingCorpusReplayInput')
+        inputs.file(rustBuiltNativesDir.map { it.file(rustNativeFileName) })
+                .withPropertyName('mattmcMeshingCorpusReplayNativeLibrary')
+                .optional()
+        inputs.property('mattmcMeshingCorpusReplayWarmup', corpusReplayWarmup.get())
+        inputs.property('mattmcMeshingCorpusReplayMeasure', corpusReplayMeasure.get())
+        inputs.property('mattmcMeshingCorpusReplayWarmupSeconds', corpusReplayWarmupSeconds.get())
+        inputs.property('mattmcMeshingCorpusReplayMeasureSeconds', corpusReplayMeasureSeconds.get())
+        inputs.property('mattmcMeshingCorpusReplayFixture', corpusReplayFixture.get())
+        inputs.property('mattmcMeshingCorpusReplayDiagnostics', corpusReplayDiagnostics.get())
+        outputs.file(file(corpusReplayOutput.get())).withPropertyName('mattmcMeshingCorpusReplayOutput')
+        systemProperty 'mattmc.meshingCorpusReplay.input', file(corpusReplayInput.get()).absolutePath
+        systemProperty 'mattmc.meshingCorpusReplay.output', file(corpusReplayOutput.get()).absolutePath
+        systemProperty 'mattmc.meshingCorpusReplay.warmup', corpusReplayWarmup.get()
+        systemProperty 'mattmc.meshingCorpusReplay.measure', corpusReplayMeasure.get()
+        systemProperty 'mattmc.meshingCorpusReplay.warmupSeconds', corpusReplayWarmupSeconds.get()
+        systemProperty 'mattmc.meshingCorpusReplay.measureSeconds', corpusReplayMeasureSeconds.get()
+        systemProperty 'mattmc.meshingCorpusReplay.fixture', corpusReplayFixture.get()
+        systemProperty 'mattmc.meshingCorpusReplay.diagnostics', corpusReplayDiagnostics.get()
+    }
 }
 
 tasks.withType(JavaExec).configureEach {
@@ -844,6 +874,7 @@ tasks.register('runRealChunkMeshingReplay', JavaExec) {
     def replayValidateEachSample = providers.gradleProperty('mattmcReplayValidateEachSample').orElse('1')
     def replayRustProfile = providers.gradleProperty('mattmcReplayRustProfile').orElse(rustCargoProfile)
     def replayFixture = providers.gradleProperty('mattmcReplayFixture').orElse('')
+    def replayCaptureInputs = providers.gradleProperty('mattmcReplayCaptureInputs').orElse('false')
 
     workingDir = replayRunDir
     jvmArgs = clientJvmArgs + [
@@ -857,7 +888,8 @@ tasks.register('runRealChunkMeshingReplay', JavaExec) {
         "-Dmattmc.realMeshingReplay.rebuildsPerSample=${replayRebuildsPerSample.get()}",
         "-Dmattmc.realMeshingReplay.validateEachSample=${replayValidateEachSample.get()}",
         "-Dmattmc.realMeshingReplay.rustProfile=${replayRustProfile.get()}",
-        "-Dmattmc.realMeshingReplay.fixture=${replayFixture.get()}"
+        "-Dmattmc.realMeshingReplay.fixture=${replayFixture.get()}",
+        "-Dmattmc.realMeshingReplay.captureInputs=${replayCaptureInputs.get()}"
     ]
 
     args = [

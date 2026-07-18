@@ -61,6 +61,7 @@ Workloads:
 - `metadata`: no child Gradle process; writes repository/platform metadata.
 - `gradle-test`: runs the repository test task.
 - `chunk-meshing-hotpath`: runs `net.sodium.client.perf.ChunkMeshingHotPathBenchmarkTest` with portable `JAVA_TOOL_OPTIONS`.
+- `real-chunk-meshing-replay`: launches the existing development client replay runner and times the production section mesher against deterministic in-game fixture sections.
 
 Common options:
 
@@ -86,6 +87,15 @@ Benchmark options:
 - `--forks N`
 - `--alternate-order` / `--no-alternate-order`
 
+Real replay options:
+
+- `--real-warmup N`
+- `--real-measure N`
+- `--real-warmup-seconds N`
+- `--real-measure-seconds N`
+- `--real-rebuilds-per-sample N`
+- `--real-fixture NAME`
+
 `chunk-meshing-hotpath` defaults to `--benchmark-force-mode clean-test`. That runs:
 
 ```text
@@ -98,6 +108,7 @@ For cross-repository timing, prefer multiple forks:
 
 ```powershell
 python .\DevUtils\PerfTesting\rust_migration_harness.py --target both --workload chunk-meshing-hotpath --forks 3
+python .\DevUtils\PerfTesting\rust_migration_harness.py --target both --workload real-chunk-meshing-replay --forks 3 --real-warmup 8 --real-measure 25
 ```
 
 When both targets are selected, the harness alternates execution order by fork by default. Odd forks run current then frozen; even forks run frozen then current. This reduces bias from first-run JVM, OS cache, and CPU-state effects while keeping each target's benchmark output separate. The root artifact directory receives:
@@ -139,6 +150,35 @@ Each target gets its own subdirectory containing:
 - workload output JSON when the workload produces one
 
 The root artifact directory contains `combined_manifest.json`.
+
+## Real Replay Corpus Helper
+
+The current live replay runner can also be launched from the normal capture wrapper:
+
+```powershell
+python .\DevUtils\RunDevCapture.py --backend opengl --shaders off --capture-meshing-corpus --meshing-corpus-warmup 2 --meshing-corpus-measure 3
+```
+
+That produces the existing `RealChunkMeshingReplayRunner` JSON in the capture artifact directory. Convert and validate that replay output with:
+
+```powershell
+python .\DevUtils\PerfTesting\meshing_corpus.py from-real-replay --input .\build\path\real_meshing_replay.json --output .\build\path\real_meshing_corpus.mmcm --summary .\build\path\real_meshing_corpus.summary.json
+python .\DevUtils\PerfTesting\meshing_corpus.py validate --input .\build\path\real_meshing_corpus.mmcm
+```
+
+Milestone corpus helpers are first-class commands:
+
+```powershell
+python .\DevUtils\PerfTesting\meshing_corpus.py capture --output .\build\meshing-corpus\milestone2.mmcm --summary .\build\meshing-corpus\milestone2_summary.json
+python .\DevUtils\PerfTesting\meshing_corpus.py inspect --input .\build\meshing-corpus\milestone2.mmcm --category fluid-heavy
+python .\DevUtils\PerfTesting\meshing_corpus.py replay-current --input .\build\meshing-corpus\milestone2.mmcm --output .\build\meshing-corpus\current_replay.json
+python .\DevUtils\PerfTesting\meshing_corpus.py replay-frozen --repo C:\repos\MattMC_JavaPerfTesting\MattMC --input .\build\meshing-corpus\milestone2.mmcm --output .\build\meshing-corpus\frozen_replay.json
+python .\DevUtils\PerfTesting\meshing_corpus.py compare --corpus .\build\meshing-corpus\milestone2.mmcm --current .\build\meshing-corpus\current_replay.json --frozen .\build\meshing-corpus\frozen_replay.json --output .\build\meshing-corpus\compare.json
+```
+
+Use `--fixture NAME` for a single fixture or omit it to process the current corpus command's full fixture set. Use `inspect --category NAME` and `--replayable-only` to filter corpus metadata before replay. Replay commands pass corpus paths, output paths, warmup/measurement counts, and fixture filters as Gradle properties so Gradle can track the `.mmcm`, replay adapter, model bundle, semantic configuration, and current native library identity instead of relying on `cleanTest`.
+
+Headless corpus replay outputs report cold first-use timing separately from warm median timing. The timed warm path prepares corpus/model input once, warms the selected adapter, resets per-section output for each invocation, and hashes outside the measured region. Semantic comparison artifacts include raw vertex/index hashes, ordered/canonical/normalized semantic hashes, translucent metadata hash, pass counts, and a bounded mismatch summary. The current semantic hashes are intentionally conservative: byte-identical fixtures are proven strongly, while future milestones should replace byte-derived semantic hashes with fully decoded renderer-independent vertex records.
 
 ## Future World Storage/NBT Workloads
 
