@@ -21,6 +21,8 @@ use super::refill::StreamingPlayback;
 use super::source::{NativeSource, SourceKind};
 use super::stream_decoder::StreamDecoder;
 use alto::Buffer;
+#[cfg(test)]
+use alto::Source;
 
 /// Owns all OpenAL objects reachable through the Java native audio API.
 ///
@@ -861,6 +863,27 @@ pub(crate) mod test_support {
         live_counts().expect("audio backend counts should be readable in tests")
     }
 
+    #[derive(Clone, Debug, PartialEq)]
+    pub(crate) struct DeviceDistanceConfig {
+        pub(crate) distance_model: String,
+        pub(crate) using_source_distance_model: bool,
+    }
+
+    pub(crate) fn device_distance_config_for_tests(
+        device_handle: u64,
+    ) -> AudioResult<DeviceDistanceConfig> {
+        with_backend(|backend| {
+            let device = backend
+                .devices
+                .get(device_handle)
+                .ok_or(AudioError::InvalidHandle)?;
+            Ok(DeviceDistanceConfig {
+                distance_model: format!("{:?}", device.context.distance_model()),
+                using_source_distance_model: device.context.using_source_distance_model(),
+            })
+        })
+    }
+
     pub(crate) fn asset_count_for_tests() -> usize {
         asset_count().expect("audio asset count should be readable in tests")
     }
@@ -883,6 +906,40 @@ pub(crate) mod test_support {
                 loop_restarts: source.stream_loop_restarts(),
                 decode_failed: source.stream_decode_failed(),
             })
+        })
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    pub(crate) struct SourceDistanceConfig {
+        pub(crate) distance_model: String,
+        pub(crate) max_distance: f32,
+        pub(crate) reference_distance: f32,
+        pub(crate) rolloff_factor: f32,
+    }
+
+    pub(crate) fn source_distance_config_for_tests(
+        source_handle: u64,
+    ) -> AudioResult<SourceDistanceConfig> {
+        with_backend(|backend| {
+            let source = backend
+                .sources
+                .get(source_handle)
+                .ok_or(AudioError::InvalidHandle)?;
+            let config = match &source.kind {
+                SourceKind::Static(source) => SourceDistanceConfig {
+                    distance_model: format!("{:?}", source.distance_model()),
+                    max_distance: source.max_distance(),
+                    reference_distance: source.reference_distance(),
+                    rolloff_factor: source.rolloff_factor(),
+                },
+                SourceKind::Streaming(source) => SourceDistanceConfig {
+                    distance_model: format!("{:?}", source.distance_model()),
+                    max_distance: source.max_distance(),
+                    reference_distance: source.reference_distance(),
+                    rolloff_factor: source.rolloff_factor(),
+                },
+            };
+            Ok(config)
         })
     }
 

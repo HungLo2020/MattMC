@@ -271,6 +271,21 @@ fn channel_pool_split_matches_java_limits() {
 }
 
 #[test]
+fn device_enables_source_specific_distance_models() {
+    with_audio_backend(|| {
+        let device = create_test_device().expect("default audio device should open");
+        let distance_config = test_support::device_distance_config_for_tests(device)
+            .expect("device distance config should be readable");
+        assert_eq!("InverseClamped", distance_config.distance_model);
+        assert!(
+            distance_config.using_source_distance_model,
+            "source-specific distance models must be enabled so Minecraft attenuation policy is honored: {:?}",
+            distance_config
+        );
+    });
+}
+
+#[test]
 fn pool_accounting_tracks_source_lifetime() {
     with_audio_backend(|| {
         let device = create_test_device().expect("default audio device should open");
@@ -395,6 +410,24 @@ fn coarse_static_sound_create_configures_and_tracks_pool() {
             .expect("static sound should be created with its initial config");
         let counts = backend::device_pool_counts(device).expect("pool counts should read");
         assert_eq!(1, counts.static_used);
+        let distance_config = test_support::source_distance_config_for_tests(sound)
+            .expect("source distance config should be readable");
+        assert_eq!("Linear", distance_config.distance_model);
+        assert!(
+            (distance_config.max_distance - 16.0).abs() <= f32::EPSILON,
+            "max distance should preserve the Java attenuation distance: {:?}",
+            distance_config
+        );
+        assert!(
+            distance_config.reference_distance.abs() <= f32::EPSILON,
+            "linear attenuation should match the legacy Java reference distance: {:?}",
+            distance_config
+        );
+        assert!(
+            (distance_config.rolloff_factor - 1.0).abs() <= f32::EPSILON,
+            "linear attenuation needs non-zero rolloff so distant sounds actually fade: {:?}",
+            distance_config
+        );
 
         backend::update_sound(
             sound,
@@ -539,6 +572,42 @@ fn coarse_streaming_sound_owns_queued_buffers() {
         let after = backend::live_counts().unwrap();
         assert_eq!(0, after.queued_stream_buffers);
         assert_eq!(0, after.stream_decoders);
+        backend::destroy_asset(asset).expect("asset cleanup should succeed");
+    });
+}
+
+#[test]
+fn coarse_streaming_sound_configures_linear_attenuation() {
+    with_audio_backend(|| {
+        let device = create_test_device().expect("default audio device should open");
+        let asset = backend::create_asset(PARITY_MONO_OGG, Some("linear-stream".to_string()), 1)
+            .expect("asset should be created");
+        let config = SoundConfigRecord {
+            attenuation_distance: 8.0,
+            flags: SOUND_FLAG_LINEAR_ATTENUATION,
+            ..SoundConfigRecord::default()
+        };
+        let sound = backend::create_streaming_sound_from_asset(device, config, asset, false)
+            .expect("streaming sound should be created from asset");
+        let distance_config = test_support::source_distance_config_for_tests(sound)
+            .expect("streaming source distance config should be readable");
+        assert_eq!("Linear", distance_config.distance_model);
+        assert!(
+            (distance_config.max_distance - 8.0).abs() <= f32::EPSILON,
+            "streaming max distance should preserve the Java attenuation distance: {:?}",
+            distance_config
+        );
+        assert!(
+            distance_config.reference_distance.abs() <= f32::EPSILON,
+            "streaming linear attenuation should match the legacy Java reference distance: {:?}",
+            distance_config
+        );
+        assert!(
+            (distance_config.rolloff_factor - 1.0).abs() <= f32::EPSILON,
+            "streaming linear attenuation needs non-zero rolloff: {:?}",
+            distance_config
+        );
+        backend::destroy_source(sound).expect("sound destroy should release stream queue");
         backend::destroy_asset(asset).expect("asset cleanup should succeed");
     });
 }

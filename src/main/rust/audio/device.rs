@@ -48,6 +48,10 @@ impl NativeDevice {
                     let (static_limit, streaming_limit) =
                         split_channel_counts(DEFAULT_CHANNEL_COUNT);
                     context.set_distance_model(DistanceModel::InverseClamped);
+                    alto_call(
+                        "Enable per-source distance models",
+                        context.use_source_distance_model(true),
+                    )?;
                     return Ok(Self {
                         device,
                         context,

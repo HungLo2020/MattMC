@@ -127,8 +127,8 @@ impl NativeSource {
                     source.set_distance_model(DistanceModel::Linear),
                 )?;
                 alto_call("Set max distance", source.set_max_distance(distance))?;
-                alto_call("Set reference distance", source.set_reference_distance(1.0))?;
-                alto_call("Set rolloff factor", source.set_rolloff_factor(0.0))
+                alto_call("Set reference distance", source.set_reference_distance(0.0))?;
+                alto_call("Set rolloff factor", source.set_rolloff_factor(1.0))
             }
             SourceKind::Streaming(source) => {
                 alto_call(
@@ -136,8 +136,8 @@ impl NativeSource {
                     source.set_distance_model(DistanceModel::Linear),
                 )?;
                 alto_call("Set max distance", source.set_max_distance(distance))?;
-                alto_call("Set reference distance", source.set_reference_distance(1.0))?;
-                alto_call("Set rolloff factor", source.set_rolloff_factor(0.0))
+                alto_call("Set reference distance", source.set_reference_distance(0.0))?;
+                alto_call("Set rolloff factor", source.set_rolloff_factor(1.0))
             }
         }
     }
