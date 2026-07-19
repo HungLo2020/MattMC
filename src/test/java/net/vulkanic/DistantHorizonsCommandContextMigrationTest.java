@@ -922,7 +922,7 @@ public class DistantHorizonsCommandContextMigrationTest {
         String drawCoordinatorSource = readSourceWithoutComments(drawCoordinator);
         String descriptorSource = readSourceWithoutComments(descriptor);
 
-        assertTrue(backendSource.contains("backend.materializeLegacyProgramPipelineForDraw(commandBufferHandle, plan)")
+        assertTrue(backendSource.contains("backend.materializeLegacyProgramPipelineForDraw(commandBufferHandle, plan, capturedGalRequest)")
                 && backendSource.contains("drawExecution.planLegacyDraw(")
                 && backendSource.contains("graphicsCommandExecution.planGraphicsExecution("),
             "Legacy DH draw calls should resolve a draw execution plan and route pipeline, descriptor, vertex, index, and draw emission through graphics command execution planning");

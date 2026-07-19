@@ -54,7 +54,7 @@ final class VulkanDrawExecutionCoordinator {
             PipelineDescriptor.VertexInputState vertexInput = planLegacyVertexInput(program, vao);
             if (vertexInput != null) {
                 descriptor = createLegacyProgramPipelineDescriptor(program, request.mode(), renderState, vertexInput);
-                vertexStream = new VertexStreamPlan(vertexInput, vao.vertexBuffersForDraw());
+                vertexStream = new VertexStreamPlan(vertexInput, vertexBuffersForPlannedInput(vao.vertexBuffersForDraw(), vertexInput));
             }
         }
 
@@ -73,6 +73,31 @@ final class VulkanDrawExecutionCoordinator {
             command,
             explicitDrawPlan(request, resources, vertexStream, indexStream)
         );
+    }
+
+    private static List<VertexBufferBindingPlan> vertexBuffersForPlannedInput(
+        List<VertexBufferBindingPlan> vertexBuffers,
+        PipelineDescriptor.VertexInputState vertexInput
+    ) {
+        boolean needsDefaultBinding = vertexInput.bindings().stream()
+            .anyMatch(binding -> binding.binding() == VulkanBackend.LEGACY_DEFAULT_VERTEX_ATTRIBUTE_BINDING);
+        if (!needsDefaultBinding) {
+            return vertexBuffers;
+        }
+        boolean hasDefaultBinding = vertexBuffers.stream()
+            .anyMatch(binding -> binding.binding() == VulkanBackend.LEGACY_DEFAULT_VERTEX_ATTRIBUTE_BINDING);
+        if (hasDefaultBinding) {
+            return vertexBuffers;
+        }
+        ArrayList<VertexBufferBindingPlan> expanded = new ArrayList<>(vertexBuffers.size() + 1);
+        expanded.addAll(vertexBuffers);
+        expanded.add(new VertexBufferBindingPlan(
+            VulkanBackend.LEGACY_DEFAULT_VERTEX_ATTRIBUTE_BINDING,
+            0,
+            0L,
+            true
+        ));
+        return expanded;
     }
 
     private VulkanicPassResourceModel.PassExecutionPlan explicitDrawPlan(

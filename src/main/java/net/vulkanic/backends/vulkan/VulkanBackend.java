@@ -26,7 +26,12 @@ import net.vulkanic.PipelineResourcePlanner;
 import net.vulkanic.VulkanReadinessReport;
 import net.vulkanic.VulkanicBufferSlice;
 import net.vulkanic.VulkanicBuffer;
+import net.vulkanic.VulkanicClearBuffer;
+import net.vulkanic.VulkanicCompatibilityState;
+import net.vulkanic.VulkanicGalExecutionRequest;
+import net.vulkanic.VulkanicGalSnapshotBuilder;
 import net.vulkanic.VulkanicIndexType;
+import net.vulkanic.VulkanicLegacyCompatibilityAdapter;
 import net.vulkanic.VulkanicPrimitiveMode;
 import net.vulkanic.VulkanicRenderPass;
 import net.vulkanic.VulkanicRenderPassDescriptor;
@@ -227,6 +232,20 @@ public class VulkanBackend {
     private final VulkanDrawExecutionCoordinator drawExecution = new VulkanDrawExecutionCoordinator();
     private final VulkanBufferVertexResourceManager bufferVertexResources = new VulkanBufferVertexResourceManager();
     private final VulkanShaderProgramCoordinator shaderPrograms = new VulkanShaderProgramCoordinator();
+    private final Map<VulkanicGalExecutionRequest.GraphicsDrawRequest, java.util.ArrayDeque<CapturedLegacyGalDraw>> pendingCapturedGalDraws =
+        Collections.synchronizedMap(new java.util.IdentityHashMap<>());
+
+    private record CapturedLegacyGalDraw(
+        VulkanDrawExecutionCoordinator.SemanticDrawRequest request,
+        VulkanDrawExecutionCoordinator.DrawExecutionPlan plan,
+        VulkanDrawExecutionCoordinator.DrawResourceSnapshot drawResources
+    ) {
+        private CapturedLegacyGalDraw {
+            Objects.requireNonNull(request, "request");
+            Objects.requireNonNull(plan, "plan");
+            Objects.requireNonNull(drawResources, "drawResources");
+        }
+    }
     private final AtomicInteger presentQueueLogCount = new AtomicInteger();
     private static final AtomicInteger PRESENT_FORMAT_MISMATCH_LOG_COUNT = new AtomicInteger();
 
@@ -3490,6 +3509,168 @@ void main() {
         );
     }
 
+    private PipelineResourcePlanner.Plan buildSharedProgramResourcePlan(
+        CommandContext ctx,
+        long commandBufferHandle,
+        PipelineDescriptor descriptor,
+        int programId,
+        VulkanicCompatibilityState.GraphicsSnapshot sharedSnapshot
+    ) {
+        LinkedProgramExecutionSnapshot programSnapshot = shaderPrograms.linkedExecutionSnapshot(
+            programId,
+            descriptor.getSpirvModules().stream()
+                .map(VulkanicSpirvModule::stage)
+                .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new))
+        );
+        if (programSnapshot == null) {
+            return null;
+        }
+        return net.vulkanic.VulkanicPipelineResourceResolver.buildPlan(
+            ctx,
+            descriptor,
+            new net.vulkanic.VulkanicPipelineResourceResolver.ResourceLookup() {
+                @Override
+                @Nullable
+                public VulkanicTextureView samplerView(PipelineDescriptor.ResourceBinding binding) {
+                    Integer unit = samplerUnit(binding);
+                    if (unit == null) {
+                        return null;
+                    }
+                    int textureId = sharedTextureIdForSampler(sharedSnapshot.textureBindingsByKey(), binding, unit);
+                    VulkanicTextureView textureView = textureId > 0 ? createManagedLegacyTextureView(textureId) : null;
+                    return textureView != null
+                        ? textureView
+                        : createLegacyFallbackSamplerView(commandBufferHandle, binding, unit);
+                }
+
+                @Override
+                @Nullable
+                public Integer samplerUnit(PipelineDescriptor.ResourceBinding binding) {
+                    return VulkanShaderProgramCoordinator.samplerOrImageUnit(
+                        programSnapshot.activeUniformNames(),
+                        programSnapshot.opaqueResourceUniformValuesByIndex(),
+                        binding
+                    );
+                }
+
+                @Override
+                @Nullable
+                public VulkanicBufferSlice uniformBufferSlice(PipelineDescriptor.ResourceBinding binding) {
+                    return null;
+                }
+
+                @Override
+                @Nullable
+                public Integer texelBufferUnit(PipelineDescriptor.ResourceBinding binding) {
+                    return samplerUnit(binding);
+                }
+
+                @Override
+                @Nullable
+                public PipelineResourceBindings.StorageImageBinding storageImageBinding(PipelineDescriptor.ResourceBinding binding) {
+                    return resolveSharedStorageImageBinding(programSnapshot, binding, sharedSnapshot.imageUnitBindings());
+                }
+
+                @Override
+                @Nullable
+                public Integer standaloneProgramId(PipelineDescriptor.ResourceBinding binding) {
+                    return programId;
+                }
+
+                @Override
+                @Nullable
+                public Integer samplerObject(int samplerUnit) {
+                    Integer samplerObject = sharedSnapshot.samplerBindings().get(samplerUnit);
+                    return samplerObject != null && samplerObject > 0 ? samplerObject : null;
+                }
+            },
+            PipelineResourcePlanner.options()
+                .requireAtLeastOneBinding(false)
+                .filterIncompleteLayout(false)
+        );
+    }
+
+    private PipelineResourcePlanner.Plan buildSharedProgramResourcePlan(
+        CommandContext ctx,
+        long commandBufferHandle,
+        PipelineDescriptor descriptor,
+        int programId,
+        VulkanicCompatibilityState.ComputeSnapshot sharedSnapshot
+    ) {
+        LinkedProgramExecutionSnapshot programSnapshot = shaderPrograms.linkedExecutionSnapshot(
+            programId,
+            descriptor.getSpirvModules().stream()
+                .map(VulkanicSpirvModule::stage)
+                .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new))
+        );
+        if (programSnapshot == null) {
+            return null;
+        }
+        return net.vulkanic.VulkanicPipelineResourceResolver.buildPlan(
+            ctx,
+            descriptor,
+            new net.vulkanic.VulkanicPipelineResourceResolver.ResourceLookup() {
+                @Override
+                @Nullable
+                public VulkanicTextureView samplerView(PipelineDescriptor.ResourceBinding binding) {
+                    Integer unit = samplerUnit(binding);
+                    if (unit == null) {
+                        return null;
+                    }
+                    int textureId = sharedTextureIdForSampler(sharedSnapshot.textureBindingsByKey(), binding, unit);
+                    VulkanicTextureView textureView = textureId > 0 ? createManagedLegacyTextureView(textureId) : null;
+                    return textureView != null
+                        ? textureView
+                        : createLegacyFallbackSamplerView(commandBufferHandle, binding, unit);
+                }
+
+                @Override
+                @Nullable
+                public Integer samplerUnit(PipelineDescriptor.ResourceBinding binding) {
+                    return VulkanShaderProgramCoordinator.samplerOrImageUnit(
+                        programSnapshot.activeUniformNames(),
+                        programSnapshot.opaqueResourceUniformValuesByIndex(),
+                        binding
+                    );
+                }
+
+                @Override
+                @Nullable
+                public VulkanicBufferSlice uniformBufferSlice(PipelineDescriptor.ResourceBinding binding) {
+                    return null;
+                }
+
+                @Override
+                @Nullable
+                public Integer texelBufferUnit(PipelineDescriptor.ResourceBinding binding) {
+                    return samplerUnit(binding);
+                }
+
+                @Override
+                @Nullable
+                public PipelineResourceBindings.StorageImageBinding storageImageBinding(PipelineDescriptor.ResourceBinding binding) {
+                    return resolveSharedStorageImageBinding(programSnapshot, binding, sharedSnapshot.imageUnitBindings());
+                }
+
+                @Override
+                @Nullable
+                public Integer standaloneProgramId(PipelineDescriptor.ResourceBinding binding) {
+                    return programId;
+                }
+
+                @Override
+                @Nullable
+                public Integer samplerObject(int samplerUnit) {
+                    Integer samplerObject = sharedSnapshot.samplerBindings().get(samplerUnit);
+                    return samplerObject != null && samplerObject > 0 ? samplerObject : null;
+                }
+            },
+            PipelineResourcePlanner.options()
+                .requireAtLeastOneBinding(false)
+                .filterIncompleteLayout(false)
+        );
+    }
+
     @Nullable
     PipelineResourceBindings.StorageImageBinding resolveLegacyStorageImageBindingForProgram(
         int programId,
@@ -3528,6 +3709,73 @@ void main() {
                 imageBinding.access(),
                 imageBinding.format()
             );
+    }
+
+    @Nullable
+    private static PipelineResourceBindings.StorageImageBinding resolveSharedStorageImageBinding(
+        LinkedProgramExecutionSnapshot snapshot,
+        PipelineDescriptor.ResourceBinding binding,
+        Map<Integer, VulkanicCompatibilityState.ImageUnitBindingState> imageUnitBindings
+    ) {
+        int imageUnit = VulkanShaderProgramCoordinator.samplerOrImageUnit(
+            snapshot.activeUniformNames(),
+            snapshot.opaqueResourceUniformValuesByIndex(),
+            binding
+        );
+        VulkanicCompatibilityState.ImageUnitBindingState imageBinding = imageUnitBindings.get(imageUnit);
+        return imageBinding == null
+            ? null
+            : new PipelineResourceBindings.StorageImageBinding(
+                imageBinding.imageUnit(),
+                imageBinding.texture(),
+                imageBinding.level(),
+                imageBinding.layered(),
+                imageBinding.layer(),
+                imageBinding.access(),
+                imageBinding.format()
+            );
+    }
+
+    private static int sharedTextureIdForSampler(
+        Map<VulkanicCompatibilityState.TextureBindingKey, Integer> textureBindings,
+        PipelineDescriptor.ResourceBinding binding,
+        int unit
+    ) {
+        int texture2D = textureBindings.getOrDefault(
+            new VulkanicCompatibilityState.TextureBindingKey(unit, VulkanicAPI.GL_TEXTURE_2D),
+            0
+        );
+        int texture3D = textureBindings.getOrDefault(
+            new VulkanicCompatibilityState.TextureBindingKey(unit, VulkanicAPI.GL_TEXTURE_3D),
+            0
+        );
+        if (texture3D > 0 && knownIris3DSampler(binding.name())) {
+            return texture3D;
+        }
+        if (texture2D > 0) {
+            return texture2D;
+        }
+        if (texture3D > 0) {
+            return texture3D;
+        }
+        for (Map.Entry<VulkanicCompatibilityState.TextureBindingKey, Integer> entry : textureBindings.entrySet()) {
+            if (entry.getKey().unit() == unit && entry.getValue() != null && entry.getValue() > 0) {
+                return entry.getValue();
+            }
+        }
+        return 0;
+    }
+
+    private static boolean knownIris3DSampler(String name) {
+        return "voxel_sampler".equals(name)
+            || "floodfill_sampler".equals(name)
+            || "floodfill_sampler_copy".equals(name);
+    }
+
+    private static net.blaze3d.platform.LogicOp legacyLogicOp(int opcode) {
+        return opcode == 0x150B /* GL_OR_REVERSE */
+            ? net.blaze3d.platform.LogicOp.OR_REVERSE
+            : net.blaze3d.platform.LogicOp.NONE;
     }
 
     @Nullable
@@ -3675,16 +3923,24 @@ void main() {
     @Nullable
     private MaterializedGraphicsPipelineBinding materializeLegacyProgramPipelineForDraw(
         long commandBufferHandle,
-        VulkanDrawExecutionCoordinator.DrawExecutionPlan drawPlan
+        VulkanDrawExecutionCoordinator.DrawExecutionPlan drawPlan,
+        VulkanicGalExecutionRequest.GraphicsDrawRequest capturedGalRequest
     ) {
+        Objects.requireNonNull(capturedGalRequest, "capturedGalRequest");
+        if (capturedGalRequest.compatibilitySnapshot().source().equals("unresolved-legacy-compatibility")) {
+            throw new IllegalStateException("Vulkan pipeline materialization received an unresolved legacy GAL request");
+        }
+        if (!capturedGalRequest.resourcePlan().orderedUses().equals(drawPlan.resourcePlan().orderedUses())) {
+            throw new IllegalStateException("Captured GAL resource plan no longer matches Vulkan draw execution plan");
+        }
         int programId = drawPlan.programId();
         if (programId <= 0 || drawPlan.descriptor() == null) {
             return null;
         }
         PipelineDescriptor descriptor = drawPlan.descriptor();
 
-        CommandContext ctx = getCurrentCommandContext();
-        PipelineResourcePlanner.Plan resourcePlan = buildLegacyProgramResourcePlan(ctx, commandBufferHandle, descriptor, programId);
+        PipelineResourcePlanner.Plan resourcePlan =
+            capturedGalRequest.compatibilitySnapshot().resourceBindingPlan().orElse(null);
         if (resourcePlan == null) {
             return null;
         }
@@ -3744,7 +4000,7 @@ void main() {
     }
 
     @Nullable
-    private MaterializedComputePipelineBinding materializeLegacyComputePipelineForDispatch(long commandBufferHandle) {
+    private PipelineResourcePlanner.Plan captureLegacyComputeResourceBindingPlan(long commandBufferHandle) {
         int programId = shaderPrograms.boundProgramId();
         if (programId <= 0) {
             return null;
@@ -3753,14 +4009,20 @@ void main() {
         if (descriptor == null) {
             return null;
         }
+        return buildLegacyProgramResourcePlan(getCurrentCommandContext(), commandBufferHandle, descriptor, programId);
+    }
 
-        CommandContext ctx = getCurrentCommandContext();
-        PipelineResourcePlanner.Plan resourcePlan = buildLegacyProgramResourcePlan(ctx, commandBufferHandle, descriptor, programId);
+    @Nullable
+    private MaterializedComputePipelineBinding materializeLegacyComputePipelineForDispatch(
+        long commandBufferHandle,
+        VulkanicGalExecutionRequest.ComputeDispatchRequest capturedRequest
+    ) {
+        PipelineResourcePlanner.Plan resourcePlan = capturedRequest.resourceBindingPlan().orElse(null);
         if (resourcePlan == null) {
             return null;
         }
         if (!resourcePlan.completeCoverage()) {
-            logIncompleteLegacyResourcePlan("dispatch", programId, resourcePlan);
+            logIncompleteLegacyResourcePlan("dispatch", -1, resourcePlan);
             return null;
         }
 
@@ -4377,6 +4639,12 @@ void main() {
 
     private PolygonMode legacyPolygonMode() {
         return pendingPolygonMode == 0x1B01 /* GL_LINE */
+            ? PolygonMode.WIREFRAME
+            : PolygonMode.FILL;
+    }
+
+    private static PolygonMode legacyPolygonMode(int mode) {
+        return mode == 0x1B01 /* GL_LINE */
             ? PolygonMode.WIREFRAME
             : PolygonMode.FILL;
     }
@@ -6033,47 +6301,443 @@ void main() {
     }
 
     public void drawArrays(CommandContext ctx, int mode, int first, int count) {
-        if (first < 0 || count < 0) {
-            throw new IllegalArgumentException("drawArrays requires first/count >= 0, got first=" + first + ", count=" + count);
-        }
-        if (count == 0) {
-            return;
-        }
-
-        executeLegacyDraw(
-            ctx,
-            VulkanDrawExecutionCoordinator.SemanticDrawRequest.arrays("vulkan-drawArrays", mode, first, count, 1)
-        );
+        VulkanicPrimitiveMode typedMode = VulkanicPrimitiveMode.fromLegacyGlConstant(mode)
+            .orElseThrow(() -> new IllegalArgumentException("Unsupported drawArrays primitive mode constant: " + mode));
+        executeGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyArrays(
+            "vulkan-drawArrays",
+            typedMode,
+            first,
+            count,
+            1
+        ));
     }
 
     public void drawElements(CommandContext ctx, int mode, int count, int type, long indices) {
+        VulkanicPrimitiveMode typedMode = VulkanicPrimitiveMode.fromLegacyGlConstant(mode)
+            .orElseThrow(() -> new IllegalArgumentException("Unsupported drawElements primitive mode constant: " + mode));
         VulkanicIndexType indexType = VulkanicIndexType.fromLegacyGlConstant(type)
             .orElseThrow(() -> new IllegalArgumentException("Unsupported drawElements index type constant: " + type));
 
-        if (count < 0 || indices < 0L) {
-            throw new IllegalArgumentException("drawElements requires count >= 0 and indices >= 0, got count="
-                + count + ", indices=" + indices);
-        }
-        if ((indices % indexType.bytesPerIndex()) != 0L) {
-            throw new IllegalArgumentException("Index offset must align to index type size. offset="
-                + indices + ", bytesPerIndex=" + indexType.bytesPerIndex());
-        }
-        if (count == 0) {
-            return;
+        executeGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyIndexed(
+            "vulkan-drawElements",
+            typedMode,
+            count,
+            indexType,
+            indices,
+            1,
+            0
+        ));
+    }
+
+    public VulkanicGalExecutionRequest.GraphicsDrawRequest captureGraphicsRequest(
+        CommandContext ctx,
+        VulkanicGalExecutionRequest.GraphicsDrawRequest request
+    ) {
+        Objects.requireNonNull(request, "request");
+        if (request.compatibilitySnapshot().source().equals("frontend-captured-vulkan-legacy-draw")
+            || pendingCapturedGalDraws.containsKey(request)) {
+            return request;
         }
 
+        VulkanicGalExecutionRequest.GraphicsDrawCommand command = request.command();
+        java.util.ArrayDeque<VulkanDrawExecutionCoordinator.SemanticDrawRequest> semanticRequests =
+            new java.util.ArrayDeque<>();
+        switch (command.kind()) {
+            case ARRAYS -> {
+                if (command.vertexCount() <= 0 || command.instanceCount() < 1) {
+                    return request;
+                }
+                semanticRequests.add(VulkanDrawExecutionCoordinator.SemanticDrawRequest.arrays(
+                    request.semanticIdentity().label(),
+                    command.mode().toGlModeConstant(),
+                    command.firstVertex(),
+                    command.vertexCount(),
+                    command.instanceCount()
+                ));
+            }
+            case INDEXED -> {
+                if (command.indexCount() <= 0 || command.instanceCount() < 1) {
+                    return request;
+                }
+                semanticRequests.add(VulkanDrawExecutionCoordinator.SemanticDrawRequest.indexed(
+                    request.semanticIdentity().label(),
+                    command.mode().toGlModeConstant(),
+                    command.indexCount(),
+                    command.indexType(),
+                    command.indexByteOffset(),
+                    command.instanceCount(),
+                    command.baseVertex()
+                ));
+            }
+            case MULTI_INDEXED_BASE_VERTEX -> {
+                for (VulkanicGalExecutionRequest.IndexedDraw draw : command.indexedDraws()) {
+                    if (draw.indexCount() <= 0) {
+                        continue;
+                    }
+                    semanticRequests.add(VulkanDrawExecutionCoordinator.SemanticDrawRequest.indexed(
+                        request.semanticIdentity().label(),
+                        command.mode().toGlModeConstant(),
+                        draw.indexCount(),
+                        command.indexType(),
+                        (long) draw.firstIndex() * command.indexType().bytesPerIndex(),
+                        1,
+                        draw.baseVertex()
+                    ));
+                }
+            }
+        }
+        if (semanticRequests.isEmpty()) {
+            return request;
+        }
+
+        long commandBufferHandle = requireVulkanCommandBufferHandle("captureGraphicsRequest", ctx);
+        java.util.ArrayDeque<CapturedLegacyGalDraw> capturedDraws = new java.util.ArrayDeque<>(semanticRequests.size());
+        VulkanicGalExecutionRequest.GraphicsDrawRequest capturedRequest = null;
+        java.util.Optional<VulkanicCompatibilityState.GraphicsSnapshot> sharedSnapshot =
+            request.compatibilitySnapshot().sharedCompatibilityState();
+        for (VulkanDrawExecutionCoordinator.SemanticDrawRequest semanticRequest : semanticRequests) {
+            CapturedLegacyGalDraw capturedDraw = sharedSnapshot
+                .map(snapshot -> captureSharedGalDraw(ctx, request, semanticRequest, snapshot))
+                .orElseGet(() -> captureLegacyGalDraw(ctx, semanticRequest));
+            capturedDraws.add(capturedDraw);
+            if (capturedRequest == null) {
+                PipelineResourcePlanner.Plan resourceBindingPlan =
+                    capturedDraw.plan().programId() <= 0 || capturedDraw.plan().descriptor() == null
+                        ? null
+                        : sharedSnapshot
+                            .map(snapshot -> buildSharedProgramResourcePlan(
+                                ctx,
+                                commandBufferHandle,
+                                capturedDraw.plan().descriptor(),
+                                capturedDraw.plan().programId(),
+                                snapshot
+                            ))
+                            .orElseGet(() -> buildLegacyProgramResourcePlan(
+                                ctx,
+                                commandBufferHandle,
+                                capturedDraw.plan().descriptor(),
+                                capturedDraw.plan().programId()
+                            ));
+                capturedRequest = request.withCompatibilitySnapshot(
+                    VulkanicGalSnapshotBuilder.legacyGraphicsSnapshot(
+                        capturedDraw.plan().descriptor(),
+                        sharedSnapshot.isPresent()
+                            ? request.compatibilitySnapshot().vertexInput()
+                            : legacyVertexInputSnapshot(capturedDraw.plan(), capturedDraw.drawResources()),
+                        capturedDraw.plan().resourcePlan().orderedUses(),
+                        resourceBindingPlan,
+                        request.descriptors().isEmpty()
+                            ? request.compatibilitySnapshot().descriptorBindings()
+                            : request.descriptors(),
+                        sharedSnapshot,
+                        "frontend-captured-vulkan-legacy-draw"
+                    )
+                );
+            }
+        }
+
+        if (capturedRequest == null) {
+            return request;
+        }
+        pendingCapturedGalDraws.put(capturedRequest, capturedDraws);
+        return capturedRequest;
+    }
+
+    public void executeGraphicsDraw(CommandContext ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest request) {
+        Objects.requireNonNull(request, "request");
+        if (!request.compatibilitySnapshot().source().equals("frontend-captured-vulkan-legacy-draw")
+            && !pendingCapturedGalDraws.containsKey(request)) {
+            request = captureGraphicsRequest(ctx, request);
+        }
+        VulkanicGalExecutionRequest.GraphicsDrawCommand command = request.command();
+        switch (command.kind()) {
+            case ARRAYS -> {
+                if (command.firstVertex() < 0 || command.vertexCount() < 0 || command.instanceCount() < 1) {
+                    throw new IllegalArgumentException("drawArrays requires first/count >= 0 and instanceCount >= 1, got first="
+                        + command.firstVertex() + ", count=" + command.vertexCount()
+                        + ", instanceCount=" + command.instanceCount());
+                }
+                if (command.vertexCount() == 0) {
+                    return;
+                }
+                executeLegacyDraw(
+                    ctx,
+                    VulkanDrawExecutionCoordinator.SemanticDrawRequest.arrays(
+                        request.semanticIdentity().label(),
+                        command.mode().toGlModeConstant(),
+                        command.firstVertex(),
+                        command.vertexCount(),
+                        command.instanceCount()
+                    ),
+                    request
+                );
+            }
+            case INDEXED -> executeIndexedGalDraw(ctx, request.semanticIdentity().label(), command, request);
+            case MULTI_INDEXED_BASE_VERTEX -> {
+                for (VulkanicGalExecutionRequest.IndexedDraw draw : command.indexedDraws()) {
+                    executeIndexedGalDraw(
+                        ctx,
+                        request.semanticIdentity().label(),
+                        VulkanicGalExecutionRequest.GraphicsDrawCommand.indexed(
+                            command.mode(),
+                            draw.indexCount(),
+                            command.indexType(),
+                            (long) draw.firstIndex() * command.indexType().bytesPerIndex(),
+                            1,
+                            draw.baseVertex()
+                        ),
+                        request
+                    );
+                }
+            }
+        }
+    }
+
+    private void executeIndexedGalDraw(
+        CommandContext ctx,
+        String semanticSource,
+        VulkanicGalExecutionRequest.GraphicsDrawCommand command,
+        VulkanicGalExecutionRequest.GraphicsDrawRequest galRequest
+    ) {
+        if (command.indexCount() < 0 || command.indexByteOffset() < 0L || command.instanceCount() < 1) {
+            throw new IllegalArgumentException(
+                "indexed draw requires count >= 0, index offset >= 0, instanceCount >= 1");
+        }
+        if ((command.indexByteOffset() % command.indexType().bytesPerIndex()) != 0L) {
+            throw new IllegalArgumentException("Index offset must align to index type size. offset="
+                + command.indexByteOffset() + ", bytesPerIndex=" + command.indexType().bytesPerIndex());
+        }
+        if (command.indexCount() == 0) {
+            return;
+        }
         executeLegacyDraw(
             ctx,
             VulkanDrawExecutionCoordinator.SemanticDrawRequest.indexed(
-                "vulkan-drawElements",
-                mode,
-                count,
-                indexType,
-                indices,
-                1,
-                0
-            )
+                semanticSource,
+                command.mode().toGlModeConstant(),
+                command.indexCount(),
+                command.indexType(),
+                command.indexByteOffset(),
+                command.instanceCount(),
+                command.baseVertex()
+            ),
+            galRequest
         );
+    }
+
+    private CapturedLegacyGalDraw captureLegacyGalDraw(
+        CommandContext ctx,
+        VulkanDrawExecutionCoordinator.SemanticDrawRequest request
+    ) {
+        if (request.indexed()) {
+            drawExecution.planIndexStream(request);
+        }
+        ensureNativeReady(request.source());
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        int boundProgramId = shaderPrograms.boundProgramId();
+        VulkanDrawExecutionCoordinator.LegacyProgramSnapshot program =
+            boundProgramId <= 0
+                ? null
+                : legacyProgramSnapshot(ctx, boundProgramId);
+        VulkanDrawExecutionCoordinator.DrawResourceSnapshot drawResources = legacyDrawResourceSnapshot();
+        VulkanDrawExecutionCoordinator.DrawExecutionPlan plan =
+            drawExecution.planLegacyDraw(
+                request,
+                program,
+                drawResources,
+                legacyRenderStateSnapshot()
+        );
+        return new CapturedLegacyGalDraw(request, plan, drawResources);
+    }
+
+    private CapturedLegacyGalDraw captureSharedGalDraw(
+        CommandContext ctx,
+        VulkanicGalExecutionRequest.GraphicsDrawRequest galRequest,
+        VulkanDrawExecutionCoordinator.SemanticDrawRequest request,
+        VulkanicCompatibilityState.GraphicsSnapshot sharedSnapshot
+    ) {
+        if (request.indexed()) {
+            drawExecution.planIndexStream(request);
+        }
+        ensureNativeReady(request.source());
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        VulkanDrawExecutionCoordinator.LegacyProgramSnapshot program =
+            sharedSnapshot.programId() <= 0
+                ? null
+                : legacyProgramSnapshot(ctx, sharedSnapshot.programId());
+        VulkanDrawExecutionCoordinator.DrawResourceSnapshot drawResources =
+            sharedDrawResourceSnapshot(galRequest, sharedSnapshot);
+        VulkanDrawExecutionCoordinator.DrawExecutionPlan plan =
+            drawExecution.planLegacyDraw(
+                request,
+                program,
+                drawResources,
+                sharedRenderStateSnapshot(sharedSnapshot.fixedFunction())
+            );
+        return new CapturedLegacyGalDraw(request, plan, drawResources);
+    }
+
+    private VulkanDrawExecutionCoordinator.DrawResourceSnapshot sharedDrawResourceSnapshot(
+        VulkanicGalExecutionRequest.GraphicsDrawRequest galRequest,
+        VulkanicCompatibilityState.GraphicsSnapshot sharedSnapshot
+    ) {
+        VulkanicCompatibilityState.VaoSnapshot vao = sharedSnapshot.vao();
+        List<VulkanDrawExecutionCoordinator.LegacyVertexAttributeSnapshot> attributes =
+            vao.enabledAttributes().stream()
+                .distinct()
+                .sorted()
+                .map(vao.attributes()::get)
+                .filter(Objects::nonNull)
+                .map(attribute -> new VulkanDrawExecutionCoordinator.LegacyVertexAttributeSnapshot(
+                    attribute.index(),
+                    attribute.binding(),
+                    attribute.size(),
+                    attribute.type(),
+                    attribute.normalized(),
+                    attribute.integer(),
+                    attribute.relativeOffset(),
+                    attribute.divisor()
+                ))
+                .toList();
+        List<VulkanDrawExecutionCoordinator.LegacyVertexBindingSnapshot> bindings =
+            vao.vertexBindings().values().stream()
+                .sorted(java.util.Comparator.comparingInt(VulkanicCompatibilityState.VertexBindingState::binding))
+                .map(binding -> new VulkanDrawExecutionCoordinator.LegacyVertexBindingSnapshot(
+                    binding.binding(),
+                    binding.stride(),
+                    binding.offset(),
+                    binding.divisor(),
+                    binding.buffer()
+                ))
+                .toList();
+        List<VulkanDrawExecutionCoordinator.VertexBufferBindingPlan> vertexBuffers =
+            vao.vertexBindings().values().stream()
+                .sorted(java.util.Comparator.comparingInt(VulkanicCompatibilityState.VertexBindingState::binding))
+                .map(binding -> new VulkanDrawExecutionCoordinator.VertexBufferBindingPlan(
+                    binding.binding(),
+                    binding.buffer(),
+                    binding.offset(),
+                    binding.buffer() <= 0
+                ))
+                .toList();
+        VulkanDrawExecutionCoordinator.IndexBufferSnapshot indexBuffer = null;
+        if (galRequest.command().kind() != VulkanicGalExecutionRequest.DrawCommandKind.ARRAYS
+            && vao.elementBuffer() > 0) {
+            VulkanBufferVertexResourceManager.BufferStorageSnapshot snapshot =
+                bufferVertexResources.requireLegacyBufferSnapshot(vao.elementBuffer());
+            VulkanBuffer buffer = snapshot.buffer();
+            if (buffer != null && !buffer.isClosed()) {
+                indexBuffer = new VulkanDrawExecutionCoordinator.IndexBufferSnapshot(
+                    vao.elementBuffer(),
+                    buffer.getVkBufferHandle(),
+                    Math.toIntExact(Math.max(0L, snapshot.logicalSizeBytes()))
+                );
+            }
+        }
+        return new VulkanDrawExecutionCoordinator.DrawResourceSnapshot(
+            new VulkanDrawExecutionCoordinator.LegacyVaoSnapshot(attributes, bindings, vertexBuffers),
+            indexBuffer
+        );
+    }
+
+    private VulkanDrawExecutionCoordinator.LegacyRenderStateSnapshot sharedRenderStateSnapshot(
+        VulkanicCompatibilityState.FixedFunctionSnapshot fixed
+    ) {
+        return new VulkanDrawExecutionCoordinator.LegacyRenderStateSnapshot(
+            fixed.blendEnabled(),
+            fixed.blendSrcRgb(),
+            fixed.blendDstRgb(),
+            fixed.blendSrcAlpha(),
+            fixed.blendDstAlpha(),
+            fixed.depthTestEnabled(),
+            fixed.depthFunc(),
+            fixed.depthWriteMask(),
+            fixed.cullEnabled(),
+            fixed.cullFaceMode(),
+            fixed.colorMaskR(),
+            fixed.colorMaskG(),
+            fixed.colorMaskB(),
+            fixed.colorMaskA(),
+            fixed.logicOpEnabled() ? legacyLogicOp(fixed.logicOp()) : net.blaze3d.platform.LogicOp.NONE,
+            legacyPolygonMode(fixed.polygonMode()),
+            fixed.polygonOffsetEnabled() ? fixed.polygonOffsetFactor() : 0.0f,
+            fixed.polygonOffsetEnabled() ? fixed.polygonOffsetUnits() : 0.0f
+        );
+    }
+
+    private static VulkanicGalExecutionRequest.VertexInputSnapshot legacyVertexInputSnapshot(
+        VulkanDrawExecutionCoordinator.DrawExecutionPlan plan,
+        VulkanDrawExecutionCoordinator.DrawResourceSnapshot drawResources
+    ) {
+        ArrayList<VulkanicLegacyCompatibilityAdapter.VertexBufferSnapshot> vertexBuffers = new ArrayList<>();
+        for (VulkanDrawExecutionCoordinator.VertexBufferBindingPlan binding : plan.vertexStream().vertexBuffers()) {
+            int stride = 0;
+            PipelineDescriptor.VertexInputState vertexInput = plan.vertexStream().vertexInputState();
+            if (vertexInput != null) {
+                for (PipelineDescriptor.VertexInputBinding inputBinding : vertexInput.bindings()) {
+                    if (inputBinding.binding() == binding.binding()) {
+                        stride = inputBinding.stride();
+                        break;
+                    }
+                }
+            }
+            vertexBuffers.add(new VulkanicLegacyCompatibilityAdapter.VertexBufferSnapshot(
+                binding.binding(),
+                binding.defaultAttributeBuffer() ? "default-attribute-buffer" : "legacy-buffer:" + binding.bufferId(),
+                binding.offset(),
+                stride,
+                binding.defaultAttributeBuffer()
+            ));
+        }
+        Optional<VulkanicLegacyCompatibilityAdapter.IndexBufferSnapshot> indexBuffer = Optional.empty();
+        if (plan.request().indexed() && drawResources.indexBuffer() != null && plan.indexStream() != null) {
+            indexBuffer = Optional.of(new VulkanicLegacyCompatibilityAdapter.IndexBufferSnapshot(
+                "legacy-buffer:" + drawResources.indexBuffer().bufferId(),
+                plan.indexStream().indexByteOffset(),
+                plan.indexStream().indexType().bytesPerIndex()
+            ));
+        }
+        return new VulkanicGalExecutionRequest.VertexInputSnapshot(vertexBuffers, indexBuffer);
+    }
+
+    private CapturedLegacyGalDraw pollCapturedLegacyGalDraw(
+        VulkanicGalExecutionRequest.GraphicsDrawRequest galRequest,
+        VulkanDrawExecutionCoordinator.SemanticDrawRequest expectedRequest
+    ) {
+        java.util.ArrayDeque<CapturedLegacyGalDraw> queue = pendingCapturedGalDraws.get(galRequest);
+        if (queue == null) {
+            return null;
+        }
+        CapturedLegacyGalDraw captured = queue.pollFirst();
+        if (queue.isEmpty()) {
+            pendingCapturedGalDraws.remove(galRequest);
+        }
+        if (captured == null) {
+            return null;
+        }
+        if (!captured.request().source().equals(expectedRequest.source())
+            || captured.request().indexed() != expectedRequest.indexed()
+            || captured.request().mode() != expectedRequest.mode()
+            || captured.request().firstVertex() != expectedRequest.firstVertex()
+            || captured.request().vertexCount() != expectedRequest.vertexCount()
+            || captured.request().indexByteOffset() != expectedRequest.indexByteOffset()
+            || captured.request().indexCount() != expectedRequest.indexCount()
+            || captured.request().indexType() != expectedRequest.indexType()
+            || captured.request().instanceCount() != expectedRequest.instanceCount()
+            || captured.request().baseVertex() != expectedRequest.baseVertex()) {
+            throw new IllegalStateException(
+                "Captured Vulkan GAL draw does not match the semantic draw being executed. captured="
+                    + captured.request() + ", expected=" + expectedRequest);
+        }
+        return captured;
     }
 
     public void drawIndexedInstancedBaseVertex(CommandContext ctx,
@@ -6083,34 +6747,22 @@ void main() {
                                                 long indices,
                                                 int instanceCount,
                                                 int baseVertex) {
+        VulkanicPrimitiveMode typedMode = VulkanicPrimitiveMode.fromLegacyGlConstant(mode)
+            .orElseThrow(() -> new IllegalArgumentException(
+                "Unsupported drawIndexedInstancedBaseVertex primitive mode constant: " + mode));
         VulkanicIndexType indexType = VulkanicIndexType.fromLegacyGlConstant(type)
             .orElseThrow(() -> new IllegalArgumentException(
                 "Unsupported drawIndexedInstancedBaseVertex index type constant: " + type));
 
-        if (count < 0 || indices < 0L || instanceCount < 1) {
-            throw new IllegalArgumentException(
-                "drawIndexedInstancedBaseVertex requires count >= 0, indices >= 0, instanceCount >= 1");
-        }
-        if ((indices % indexType.bytesPerIndex()) != 0L) {
-            throw new IllegalArgumentException("Index offset must align to index type size. offset="
-                + indices + ", bytesPerIndex=" + indexType.bytesPerIndex());
-        }
-        if (count == 0) {
-            return;
-        }
-
-        executeLegacyDraw(
-            ctx,
-            VulkanDrawExecutionCoordinator.SemanticDrawRequest.indexed(
-                "vulkan-drawIndexedInstancedBaseVertex",
-                mode,
-                count,
-                indexType,
-                indices,
-                instanceCount,
-                baseVertex
-            )
-        );
+        executeGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyIndexed(
+            "vulkan-drawIndexedInstancedBaseVertex",
+            typedMode,
+            count,
+            indexType,
+            indices,
+            instanceCount,
+            baseVertex
+        ));
     }
 
     public void drawIndexedBaseVertex(CommandContext ctx,
@@ -6132,30 +6784,23 @@ void main() {
     }
 
     public void drawArraysInstanced(CommandContext ctx, int mode, int first, int count, int instanceCount) {
-        if (first < 0 || count < 0 || instanceCount < 1) {
-            throw new IllegalArgumentException(
-                "drawArraysInstanced requires first/count >= 0 and instanceCount >= 1");
-        }
-        if (count == 0) {
-            return;
-        }
-
-        executeLegacyDraw(
-            ctx,
-            VulkanDrawExecutionCoordinator.SemanticDrawRequest.arrays(
-                "vulkan-drawArraysInstanced",
-                mode,
-                first,
-                count,
-                instanceCount
-            )
-        );
+        VulkanicPrimitiveMode typedMode = VulkanicPrimitiveMode.fromLegacyGlConstant(mode)
+            .orElseThrow(() -> new IllegalArgumentException("Unsupported drawArraysInstanced primitive mode constant: " + mode));
+        executeGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyArrays(
+            "vulkan-drawArraysInstanced",
+            typedMode,
+            first,
+            count,
+            instanceCount
+        ));
     }
 
     private void executeLegacyDraw(
         CommandContext ctx,
-        VulkanDrawExecutionCoordinator.SemanticDrawRequest request
+        VulkanDrawExecutionCoordinator.SemanticDrawRequest request,
+        VulkanicGalExecutionRequest.GraphicsDrawRequest galRequest
     ) {
+        Objects.requireNonNull(galRequest, "galRequest");
         long commandBufferHandle = requireVulkanCommandBufferHandle(request.source(), ctx);
         if (request.indexed()) {
             drawExecution.planIndexStream(request);
@@ -6178,7 +6823,22 @@ void main() {
             throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
         }
 
-        spine.executeLegacyDraw(commandBufferHandle, request);
+        CapturedLegacyGalDraw capturedDraw = pollCapturedLegacyGalDraw(galRequest, request);
+        if (capturedDraw == null) {
+            throw new IllegalStateException(
+                "Vulkan draw execution received a GAL request without a frontend-captured compatibility snapshot: "
+                    + request.source());
+        }
+        if (galRequest.compatibilitySnapshot().source().equals("unresolved-legacy-compatibility")) {
+            throw new IllegalStateException("Vulkan draw execution received an unresolved legacy GAL request");
+        }
+        spine.executeCapturedGalDraw(
+            commandBufferHandle,
+            request,
+            capturedDraw.plan(),
+            capturedDraw.drawResources(),
+            galRequest
+        );
     }
 
     public net.vulkanic.VulkanicRenderPass beginRenderPass(CommandContext ctx,
@@ -7439,6 +8099,33 @@ void main() {
         requireVulkanCommandBufferHandle("clearTexImage", ctx);
     }
 
+    public void executeClear(CommandContext ctx, VulkanicGalExecutionRequest.ClearRequest request) {
+        Objects.requireNonNull(request, "request");
+        clearBuffers(ctx, VulkanicClearBuffer.toLegacyGlMask(request.buffers().toArray(VulkanicClearBuffer[]::new)));
+    }
+
+    public void executeTransfer(CommandContext ctx, VulkanicGalExecutionRequest.TransferRequest request) {
+        Objects.requireNonNull(request, "request");
+        int[] i = request.intArgs();
+        long[] l = request.longArgs();
+        switch (request.kind()) {
+            case COPY_BUFFER_SUB_DATA -> copyBufferSubData(ctx, i[0], i[1], l[0], l[1], l[2]);
+            case COPY_NAMED_BUFFER_SUB_DATA -> copyNamedBufferSubDataDSA(ctx, i[0], i[1], l[0], l[1], l[2]);
+            case COPY_IMAGE_SUB_DATA -> copyImageSubData(
+                ctx,
+                i[0], i[1], i[2], i[3], i[4], i[5],
+                i[6], i[7], i[8], i[9], i[10], i[11],
+                i[12], i[13], i[14]
+            );
+            case COPY_TEXTURE_SUB_IMAGE_2D -> copyTextureSubImage2D(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7]);
+            case COPY_TEX_IMAGE_2D -> copyTexImage2D(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7]);
+            case COPY_TEX_SUB_IMAGE_2D -> copyTexSubImage2D(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7]);
+            case BLIT_FRAMEBUFFER -> blitFramebuffer(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], i[9]);
+            case BLIT_NAMED_FRAMEBUFFER -> blitNamedFramebuffer(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], i[9], i[10], i[11]);
+            case READ_PIXELS -> readPixels(ctx, i[0], i[1], i[2], i[3], i[4], i[5], l[0]);
+        }
+    }
+
     public void concludeQuery(CommandContext ctx, int target) {
         requireVulkanCommandBufferHandle("concludeQuery", ctx);
     }
@@ -7610,7 +8297,61 @@ void main() {
     }
 
     public void dispatchCompute(CommandContext ctx, int workX, int workY, int workZ) {
+        executeComputeDispatch(ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest.legacyDirect(
+            "dispatchCompute",
+            workX,
+            workY,
+            workZ
+        ));
+    }
+
+    public void executeComputeDispatch(CommandContext ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest request) {
+        Objects.requireNonNull(request, "request");
+        request = captureComputeDispatchRequest(ctx, request);
+        VulkanicGalExecutionRequest.ComputeDispatchCommand command = request.command();
+        if (command.indirect()) {
+            dispatchComputeIndirectLegacy(ctx, request);
+            return;
+        }
+        executeComputeDispatchLegacy(ctx, request);
+    }
+
+    public VulkanicGalExecutionRequest.ComputeDispatchRequest captureComputeDispatchRequest(
+        CommandContext ctx,
+        VulkanicGalExecutionRequest.ComputeDispatchRequest request
+    ) {
+        Objects.requireNonNull(request, "request");
+        if (request.resourceBindingPlan().isPresent()) {
+            return request;
+        }
+        long commandBufferHandle = requireVulkanCommandBufferHandle(
+            request.command().indirect() ? "captureComputeDispatchIndirect" : "captureComputeDispatch",
+            ctx
+        );
+        PipelineResourcePlanner.Plan resourceBindingPlan = request.compatibilitySnapshot().sharedCompatibilityState()
+            .map(sharedSnapshot -> {
+                int programId = sharedSnapshot.programId();
+                if (programId <= 0) {
+                    return null;
+                }
+                PipelineDescriptor descriptor = createLegacyComputePipelineDescriptor(programId);
+                return descriptor == null
+                    ? null
+                    : buildSharedProgramResourcePlan(ctx, commandBufferHandle, descriptor, programId, sharedSnapshot);
+            })
+            .orElseGet(() -> captureLegacyComputeResourceBindingPlan(commandBufferHandle));
+        return resourceBindingPlan == null ? request : request.withResourceBindingPlan(resourceBindingPlan);
+    }
+
+    private void executeComputeDispatchLegacy(
+        CommandContext ctx,
+        VulkanicGalExecutionRequest.ComputeDispatchRequest request
+    ) {
         long commandBufferHandle = requireVulkanCommandBufferHandle("dispatchCompute", ctx);
+        VulkanicGalExecutionRequest.ComputeDispatchCommand command = request.command();
+        int workX = command.workX();
+        int workY = command.workY();
+        int workZ = command.workZ();
         if (workX <= 0 || workY <= 0 || workZ <= 0) {
             return;
         }
@@ -7621,7 +8362,8 @@ void main() {
         if (spine.isRenderPassRecording()) {
             throw new IllegalStateException("Cannot dispatch Vulkan compute while a render pass is active.");
         }
-        MaterializedComputePipelineBinding materialized = materializeLegacyComputePipelineForDispatch(commandBufferHandle);
+        MaterializedComputePipelineBinding materialized =
+            materializeLegacyComputePipelineForDispatch(commandBufferHandle, request);
         if (materialized == null) {
             throw new IllegalStateException("No valid Vulkan compute pipeline is bound for dispatchCompute.");
         }
@@ -7629,7 +8371,7 @@ void main() {
             commandBufferHandle,
             materialized,
             VulkanComputeCommandExecutionCoordinator.ComputeDispatchRequirement.direct(
-                "dispatchCompute",
+                request.semanticIdentity().label(),
                 workX,
                 workY,
                 workZ
@@ -7638,7 +8380,18 @@ void main() {
     }
 
     public void dispatchComputeIndirect(CommandContext ctx, long offset) {
+        executeComputeDispatch(ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest.legacyIndirect(
+            "dispatchComputeIndirect",
+            offset
+        ));
+    }
+
+    private void dispatchComputeIndirectLegacy(
+        CommandContext ctx,
+        VulkanicGalExecutionRequest.ComputeDispatchRequest request
+    ) {
         long commandBufferHandle = requireVulkanCommandBufferHandle("dispatchComputeIndirect", ctx);
+        long offset = request.command().indirectOffset();
         NativeSpine spine = nativeSpine;
         if (spine == null) {
             throw new IllegalStateException("Native Vulkan spine is unavailable for dispatchComputeIndirect.");
@@ -7646,11 +8399,14 @@ void main() {
         if (spine.isRenderPassRecording()) {
             throw new IllegalStateException("Cannot dispatch Vulkan compute while a render pass is active.");
         }
-        MaterializedComputePipelineBinding materialized = materializeLegacyComputePipelineForDispatch(commandBufferHandle);
+        MaterializedComputePipelineBinding materialized =
+            materializeLegacyComputePipelineForDispatch(commandBufferHandle, request);
         if (materialized == null) {
             throw new IllegalStateException("No valid Vulkan compute pipeline is bound for dispatchComputeIndirect.");
         }
-        int bufferId = bufferVertexResources.boundLegacyBufferId(VulkanicAPI.GL_DISPATCH_INDIRECT_BUFFER);
+        int bufferId = request.compatibilitySnapshot().sharedCompatibilityState()
+            .map(snapshot -> snapshot.bufferBindings().getOrDefault(VulkanicAPI.GL_DISPATCH_INDIRECT_BUFFER, 0))
+            .orElseGet(() -> bufferVertexResources.boundLegacyBufferId(VulkanicAPI.GL_DISPATCH_INDIRECT_BUFFER));
         if (bufferId == 0) {
             throw new IllegalStateException("dispatchComputeIndirect requires a GL_DISPATCH_INDIRECT_BUFFER binding.");
         }
@@ -8127,6 +8883,16 @@ void main() {
                     1,
                     baseVertex
                 );
+            VulkanicGalExecutionRequest.GraphicsDrawRequest galRequest =
+                VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyIndexed(
+                    "vulkan-multiDrawElementsBaseVertex",
+                    mode,
+                    count,
+                    indexType,
+                    indices,
+                    1,
+                    baseVertex
+                );
             drawExecution.planIndexStream(request);
             VulkanicAPI.traceShaderInputParityDraw(
                 request.source(),
@@ -8140,7 +8906,7 @@ void main() {
                 request.instanceCount(),
                 request.baseVertex()
             );
-            spine.executeLegacyDraw(commandBufferHandle, request);
+            executeLegacyDraw(ctx, request, galRequest);
         }
     }
 
@@ -12965,10 +13731,20 @@ void main() {
             return legacy.buffer();
         }
 
-        private void executeLegacyDraw(
+        private void executeCapturedGalDraw(
             long commandBufferHandle,
-            VulkanDrawExecutionCoordinator.SemanticDrawRequest request
+            VulkanDrawExecutionCoordinator.SemanticDrawRequest request,
+            VulkanDrawExecutionCoordinator.DrawExecutionPlan plan,
+            VulkanDrawExecutionCoordinator.DrawResourceSnapshot drawResources,
+            VulkanicGalExecutionRequest.GraphicsDrawRequest capturedGalRequest
         ) {
+            Objects.requireNonNull(request, "request");
+            Objects.requireNonNull(plan, "plan");
+            Objects.requireNonNull(drawResources, "drawResources");
+            Objects.requireNonNull(capturedGalRequest, "capturedGalRequest");
+            if (capturedGalRequest.compatibilitySnapshot().source().equals("unresolved-legacy-compatibility")) {
+                throw new IllegalStateException("Vulkan draw reached NativeSpine without a captured GAL compatibility snapshot");
+            }
             if (debugLegacyDrawLogCount < 120) {
                 debugLegacyDrawLogCount++;
                 if (request.indexed()) {
@@ -12998,22 +13774,8 @@ void main() {
                 }
             }
 
-            int boundProgramId = backend.shaderPrograms.boundProgramId();
-            VulkanDrawExecutionCoordinator.LegacyProgramSnapshot program =
-                boundProgramId <= 0
-                    ? null
-                    : backend.legacyProgramSnapshot(backend.getCurrentCommandContext(), boundProgramId);
-            VulkanDrawExecutionCoordinator.DrawResourceSnapshot drawResources =
-                backend.legacyDrawResourceSnapshot();
-            VulkanDrawExecutionCoordinator.DrawExecutionPlan plan =
-                backend.drawExecution.planLegacyDraw(
-                    request,
-                    program,
-                    drawResources,
-                    backend.legacyRenderStateSnapshot()
-                );
             MaterializedGraphicsPipelineBinding materialized =
-                backend.materializeLegacyProgramPipelineForDraw(commandBufferHandle, plan);
+                backend.materializeLegacyProgramPipelineForDraw(commandBufferHandle, plan, capturedGalRequest);
             if (materialized == null) {
                 return;
             }

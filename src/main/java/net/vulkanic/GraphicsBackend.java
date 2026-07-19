@@ -27,7 +27,7 @@ import java.util.function.Supplier;
  * Interface for graphics backend implementations.
  * This interface defines the contract that all backends (OpenGL, Vulkan) must implement.
  */
-public interface GraphicsBackend {
+public interface GraphicsBackend extends VulkanicGalExecutor {
     
     // Context operations
     /**

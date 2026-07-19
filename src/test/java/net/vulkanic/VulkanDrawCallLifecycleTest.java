@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -28,7 +29,7 @@ public class VulkanDrawCallLifecycleTest {
             () -> backend.drawArrays(OpenGLCommandContext.IMMEDIATE, VulkanicAPI.GL_TRIANGLES, 0, 3)
         );
 
-        assertTrue(exception.getMessage().contains("drawArrays requires VulkanCommandContext"));
+        assertTrue(exception.getMessage().contains("requires VulkanCommandContext"));
     }
 
     @Test
@@ -77,6 +78,15 @@ public class VulkanDrawCallLifecycleTest {
         );
 
         assertTrue(exception.getMessage().contains("instanceCount >= 1"));
+    }
+
+    @Test
+    public void testZeroCountDrawsReturnBeforeNativeReadinessChecks() {
+        VulkanBackend backend = new VulkanBackend();
+        VulkanCommandContext context = new VulkanCommandContext(1L, "draw-cmd");
+
+        assertDoesNotThrow(() -> backend.drawArrays(context, VulkanicAPI.GL_TRIANGLES, 0, 0));
+        assertDoesNotThrow(() -> backend.drawElements(context, VulkanicAPI.GL_TRIANGLES, 0, VulkanicAPI.GL_UNSIGNED_SHORT, 0L));
     }
 
     @Test

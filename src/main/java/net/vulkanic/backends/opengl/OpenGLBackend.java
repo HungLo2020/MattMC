@@ -22,6 +22,8 @@ import net.vulkanic.VulkanicCapability;
 import net.vulkanic.VulkanicClearBuffer;
 import net.vulkanic.VulkanicCullFaceMode;
 import net.vulkanic.VulkanicDepthCompareOp;
+import net.vulkanic.VulkanicGalExecutionRequest;
+import net.vulkanic.VulkanicGalSnapshotBuilder;
 import net.vulkanic.VulkanicIntegerQuery;
 import net.vulkanic.VulkanicProgramHandle;
 import net.vulkanic.VulkanicShaderHandle;
@@ -346,6 +348,11 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL11.glClear(mask);
+    }
+
+    @Override
+    public void executeClear(CommandContext ctx, VulkanicGalExecutionRequest.ClearRequest request) {
+        clearBuffers(ctx, VulkanicClearBuffer.toLegacyGlMask(request.buffers().toArray(VulkanicClearBuffer[]::new)));
     }
     
     @Override
@@ -718,6 +725,117 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         VulkanicAPI.traceShaderInputParityDraw("opengl-drawElements", true, mode, 0, 0, indices, count, type, 1, 0);
         GL11.glDrawElements(mode, count, type, indices);
+    }
+
+    @Override
+    public VulkanicGalExecutionRequest.GraphicsDrawRequest captureGraphicsRequest(
+        CommandContext ctx,
+        VulkanicGalExecutionRequest.GraphicsDrawRequest request
+    ) {
+        if (!request.compatibilitySnapshot().source().equals("unresolved-legacy-compatibility")) {
+            return request;
+        }
+        return request.withCompatibilitySnapshot(VulkanicGalSnapshotBuilder.legacyGraphicsSnapshot(
+            null,
+            request.vertexInput(),
+            request.resourcePlan().orderedUses(),
+            null,
+            request.descriptors(),
+            "frontend-captured-opengl-legacy-draw"
+        ));
+    }
+
+    @Override
+    public void executeGraphicsDraw(CommandContext ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest request) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        VulkanicGalExecutionRequest.GraphicsDrawCommand command = request.command();
+        switch (command.kind()) {
+            case ARRAYS -> {
+                VulkanicAPI.traceShaderInputParityDraw(
+                    "opengl-" + request.legacyMetadata().operation(),
+                    false,
+                    command.mode().toGlModeConstant(),
+                    command.firstVertex(),
+                    command.vertexCount(),
+                    0L,
+                    0,
+                    0,
+                    command.instanceCount(),
+                    0
+                );
+                if (command.instanceCount() == 1) {
+                    GL11.glDrawArrays(command.mode().toGlModeConstant(), command.firstVertex(), command.vertexCount());
+                } else {
+                    GL31.glDrawArraysInstanced(
+                        command.mode().toGlModeConstant(),
+                        command.firstVertex(),
+                        command.vertexCount(),
+                        command.instanceCount()
+                    );
+                }
+            }
+            case INDEXED -> drawIndexedRequest(request, command);
+            case MULTI_INDEXED_BASE_VERTEX -> {
+                for (VulkanicGalExecutionRequest.IndexedDraw draw : command.indexedDraws()) {
+                    drawIndexedRequest(
+                        request,
+                        VulkanicGalExecutionRequest.GraphicsDrawCommand.indexed(
+                            command.mode(),
+                            draw.indexCount(),
+                            command.indexType(),
+                            (long) draw.firstIndex() * command.indexType().bytesPerIndex(),
+                            1,
+                            draw.baseVertex()
+                        )
+                    );
+                }
+            }
+        }
+    }
+
+    private void drawIndexedRequest(
+        VulkanicGalExecutionRequest.GraphicsDrawRequest request,
+        VulkanicGalExecutionRequest.GraphicsDrawCommand command
+    ) {
+        VulkanicAPI.traceShaderInputParityDraw(
+            "opengl-" + request.legacyMetadata().operation(),
+            true,
+            command.mode().toGlModeConstant(),
+            0,
+            0,
+            command.indexByteOffset(),
+            command.indexCount(),
+            command.indexType().toGlTypeConstant(),
+            command.instanceCount(),
+            command.baseVertex()
+        );
+        if (command.instanceCount() == 1 && command.baseVertex() == 0) {
+            GL11.glDrawElements(
+                command.mode().toGlModeConstant(),
+                command.indexCount(),
+                command.indexType().toGlTypeConstant(),
+                command.indexByteOffset()
+            );
+        } else if (command.instanceCount() == 1) {
+            GL32.glDrawElementsBaseVertex(
+                command.mode().toGlModeConstant(),
+                command.indexCount(),
+                command.indexType().toGlTypeConstant(),
+                command.indexByteOffset(),
+                command.baseVertex()
+            );
+        } else {
+            GL32.glDrawElementsInstancedBaseVertex(
+                command.mode().toGlModeConstant(),
+                command.indexCount(),
+                command.indexType().toGlTypeConstant(),
+                command.indexByteOffset(),
+                command.instanceCount(),
+                command.baseVertex()
+            );
+        }
     }
     
     @Override
@@ -3164,6 +3282,16 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         org.lwjgl.opengl.GL43.glDispatchCompute(workX, workY, workZ);
+    }
+
+    @Override
+    public void executeComputeDispatch(CommandContext ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest request) {
+        VulkanicGalExecutionRequest.ComputeDispatchCommand command = request.command();
+        if (command.indirect()) {
+            dispatchComputeIndirect(ctx, command.indirectOffset());
+        } else {
+            dispatchCompute(ctx, command.workX(), command.workY(), command.workZ());
+        }
     }
     
     @Override

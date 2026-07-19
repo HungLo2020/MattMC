@@ -1266,8 +1266,10 @@ public class Phase3DrawPathTest {
     public void testVulkanLegacyVaoCapturesAttributeBufferBindingsForInstancedDraws() throws IOException {
         Path backendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
         Path resourceManagerFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBufferVertexResourceManager.java");
+        Path galSnapshotBuilderFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicGalSnapshotBuilder.java");
         String backendSource = readSource(backendFile);
         String resourceManagerSource = readSource(resourceManagerFile);
+        String galSnapshotBuilderSource = readSource(galSnapshotBuilderFile);
 
         assertTrue(backendSource.contains("bufferVertexResources.setVertexAttributePointer(index, size, type, normalized, false, stride, pointer)")
                 && backendSource.contains("bufferVertexResources.setVertexAttributePointer(index, size, type, false, true, stride, pointer)"),
@@ -1278,12 +1280,24 @@ public class Phase3DrawPathTest {
                 && resourceManagerSource.contains("new LegacyVertexAttribute(index, index, size, type, normalized, integer, Math.toIntExact(pointer), divisor)")
                 && resourceManagerSource.contains("bindings.put(index, new LegacyVertexBinding(index, effectiveStride, 0, divisor, buffer))"),
             "Pre-GL43 attribute pointers should preserve captured buffers and any divisor set before the pointer call inside the manager");
-        assertTrue(backendSource.contains("backend.legacyDrawResourceSnapshot()")
+        assertTrue(backendSource.contains("DrawResourceSnapshot drawResources = legacyDrawResourceSnapshot();")
+                && backendSource.contains("PipelineResourcePlanner.Plan resourceBindingPlan")
+                && backendSource.contains("VulkanicGalSnapshotBuilder.legacyGraphicsSnapshot(")
+                && backendSource.contains("pollCapturedLegacyGalDraw(galRequest, request)")
+                && backendSource.contains("spine.executeCapturedGalDraw(")
+                && backendSource.contains("private void executeCapturedGalDraw(")
+                && backendSource.contains("VulkanDrawExecutionCoordinator.DrawExecutionPlan plan,")
+                && backendSource.contains("VulkanDrawExecutionCoordinator.DrawResourceSnapshot drawResources")
+                && backendSource.contains("VulkanicGalExecutionRequest.GraphicsDrawRequest capturedGalRequest")
+                && backendSource.contains("unresolved-legacy-compatibility")
+                && !backendSource.contains("backend.legacyDrawResourceSnapshot();")
                 && backendSource.contains("plan.vertexStream()")
-                && backendSource.contains("for (VulkanDrawExecutionCoordinator.VertexBufferBindingPlan binding : vertexStream.vertexBuffers())")
+                && backendSource.contains("for (VulkanDrawExecutionCoordinator.VertexBufferBindingPlan binding : plan.vertexStream().vertexBuffers())")
+                && galSnapshotBuilderSource.contains("VulkanicGalExecutionRequest.GraphicsCompatibilitySnapshot")
+                && galSnapshotBuilderSource.contains("Objects.requireNonNull(vertexInput, \"vertexInput\")")
                 && backendSource.contains("new VulkanGraphicsCommandExecutionCoordinator.VertexBufferBindingRequirement(")
                 && backendSource.contains("graphicsCommandExecution.planGraphicsExecution("),
-            "Legacy draw calls should feed every coordinator-planned immutable draw-resource vertex buffer into the graphics command execution plan before indexed or instanced draws");
+            "Legacy draw calls should capture draw resources before NativeSpine execution and feed every coordinator-planned immutable vertex buffer into the graphics command execution plan");
     }
 
     @Test

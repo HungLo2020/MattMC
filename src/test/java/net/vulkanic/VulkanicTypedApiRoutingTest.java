@@ -19,6 +19,7 @@ import java.lang.reflect.Proxy;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -490,8 +491,26 @@ public class VulkanicTypedApiRoutingTest {
 
         RecordedInvocation invocation = invocationHandler.lastInvocation;
         assertNotNull(invocation);
-        assertEquals("clearBuffers", invocation.method.getName());
-        assertEquals(VulkanicClearBuffer[].class, invocation.method.getParameterTypes()[1]);
+        assertEquals("executeClear", invocation.method.getName());
+        assertEquals(VulkanicGalExecutionRequest.ClearRequest.class, invocation.method.getParameterTypes()[1]);
+        VulkanicGalExecutionRequest.ClearRequest request =
+            (VulkanicGalExecutionRequest.ClearRequest) invocation.args[1];
+        assertEquals(java.util.List.of(VulkanicClearBuffer.COLOR, VulkanicClearBuffer.DEPTH), request.buffers());
+    }
+
+    @Test
+    public void testReadPixelsPointerRoutingUsesExplicitTransferBoundary() {
+        VulkanicAPI.readPixels(TEST_CONTEXT, 1, 2, 3, 4, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_BYTE, 64L);
+
+        RecordedInvocation invocation = invocationHandler.lastInvocation;
+        assertNotNull(invocation);
+        assertEquals("executeTransfer", invocation.method.getName());
+        assertEquals(VulkanicGalExecutionRequest.TransferRequest.class, invocation.method.getParameterTypes()[1]);
+        VulkanicGalExecutionRequest.TransferRequest request =
+            (VulkanicGalExecutionRequest.TransferRequest) invocation.args[1];
+        assertEquals(VulkanicGalExecutionRequest.TransferKind.READ_PIXELS, request.kind());
+        assertArrayEquals(new int[] {1, 2, 3, 4, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_BYTE}, request.intArgs());
+        assertArrayEquals(new long[] {64L}, request.longArgs());
     }
 
     @Test

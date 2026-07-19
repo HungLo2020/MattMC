@@ -129,9 +129,7 @@ class VulkanDrawExecutionCoordinatorTest {
             vao(
                 List.of(),
                 List.of(),
-                List.of(new VulkanDrawExecutionCoordinator.VertexBufferBindingPlan(
-                    VulkanBackend.LEGACY_DEFAULT_VERTEX_ATTRIBUTE_BINDING, 0, 0L, true
-                ))
+                List.of()
             ),
             renderState()
         );
@@ -145,6 +143,12 @@ class VulkanDrawExecutionCoordinatorTest {
         assertEquals(PipelineDescriptor.VertexInputRate.INSTANCE, defaultBinding.inputRate());
         assertEquals(PipelineDescriptor.VertexAttributeFormat.R32G32B32A32_UINT, attribute(vertexInput, 4).format());
         assertEquals(PipelineDescriptor.VertexAttributeFormat.R32G32B32A32_SFLOAT, attribute(vertexInput, 7).format());
+        assertEquals(1, plan.vertexStream().vertexBuffers().size());
+        assertEquals(
+            VulkanBackend.LEGACY_DEFAULT_VERTEX_ATTRIBUTE_BINDING,
+            plan.vertexStream().vertexBuffers().get(0).binding()
+        );
+        assertTrue(plan.vertexStream().vertexBuffers().get(0).defaultAttributeBuffer());
     }
 
     @Test
