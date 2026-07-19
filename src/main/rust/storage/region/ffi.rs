@@ -1,3 +1,10 @@
+//! FFI boundary for region files.
+//!
+//! The handle-based exports are the production API. The path-based exports at
+//! the bottom of this file are isolated test/dev helpers for generated fixture
+//! checks and deterministic storage replay diagnostics; production Java should
+//! not use them.
+
 use std::path::PathBuf;
 use std::ptr;
 use std::slice;

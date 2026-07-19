@@ -11,6 +11,15 @@ import java.lang.invoke.MethodHandle;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 
+/**
+ * Panama bridge for the Rust-owned region-file backend.
+ *
+ * <p>Production callers use a persistent native region handle opened once by
+ * {@link RegionFile}. Rust owns the file handle, header tables, sector bitmap,
+ * external chunk handling, compression, whole-buffer NBT parsing/writing, and
+ * flush/close behavior. This class only marshals coarse Java buffers and typed
+ * native status records.
+ */
 final class NativeRegionFileBridge {
 	static final int OK = 0;
 	static final int OUTPUT_TOO_SMALL = -4;
@@ -61,6 +70,8 @@ final class NativeRegionFileBridge {
 	private static final long WRITE_RESULT_TIMESTAMP = 24L;
 	private static final long WRITE_RESULT_SECTOR_OFFSET = 32L;
 	private static final long WRITE_RESULT_PAYLOAD_LEN = 40L;
+	private static final int INITIAL_OUTPUT_CAPACITY = 64 * 1024;
+	private static final ThreadLocal<NativeScratch> SCRATCH = ThreadLocal.withInitial(NativeScratch::new);
 	private static final FunctionDescriptor OPEN_DESCRIPTOR = FunctionDescriptor.of(
 		ValueLayout.JAVA_INT,
 		ValueLayout.ADDRESS,
@@ -202,25 +213,22 @@ final class NativeRegionFileBridge {
 	}
 
 	static PayloadResult readPayload(long handle, int chunkX, int chunkZ) throws IOException {
-		Result query = readPayloadInto(handle, chunkX, chunkZ, MemorySegment.NULL, 0L);
-		if (query.status != OUTPUT_TOO_SMALL && query.status != OK) {
-			throw ioFailure("Read region chunk payload", query.status, query.errorKind);
-		}
-		if (query.status == OK && !query.present) {
-			return new PayloadResult(query, new byte[0]);
-		}
-
-		try (Arena arena = Arena.ofConfined()) {
-			MemorySegment output = query.outputLength == 0L ? MemorySegment.NULL : arena.allocate(query.outputLength, 1);
-			Result result = readPayloadInto(handle, chunkX, chunkZ, output, query.outputLength);
+		NativeScratch scratch = SCRATCH.get();
+		long capacity = INITIAL_OUTPUT_CAPACITY;
+		for (int attempt = 0; attempt < 3; attempt++) {
+			MemorySegment output = scratch.output(capacity);
+			Result result = readPayloadInto(handle, chunkX, chunkZ, output, capacity);
 			if (result.status != OK) {
+				if (result.status == OUTPUT_TOO_SMALL && result.outputLength > capacity) {
+					capacity = result.outputLength;
+					continue;
+				}
 				throw ioFailure("Read region chunk payload", result.status, result.errorKind);
 			}
-			byte[] bytes = result.outputLength > 0L ? output.asSlice(0L, result.outputLength).toArray(ValueLayout.JAVA_BYTE) : new byte[0];
-			return new PayloadResult(result, bytes);
-		} catch (IOException exception) {
-			throw exception;
+			return new PayloadResult(result, result.present ? scratch.copy(result.outputLength) : new byte[0]);
 		}
+		Result result = readPayloadInto(handle, chunkX, chunkZ, MemorySegment.NULL, 0L);
+		throw ioFailure("Read region chunk payload", result.status, result.errorKind);
 	}
 
 	static NbtResult readNbtFingerprint(long handle, int chunkX, int chunkZ) throws IOException {
@@ -261,7 +269,33 @@ final class NativeRegionFileBridge {
 		long maxAllocationBytes,
 		long maxTotalBytes
 	) throws IOException {
-		TapeMetadata query = readNbtTapeInto(
+		NativeScratch scratch = SCRATCH.get();
+		long capacity = INITIAL_OUTPUT_CAPACITY;
+		for (int attempt = 0; attempt < 3; attempt++) {
+			MemorySegment output = scratch.output(capacity);
+			TapeMetadata result = readNbtTapeInto(
+				handle,
+				chunkX,
+				chunkZ,
+				output,
+				capacity,
+				maxCompressedBytes,
+				maxDecompressedBytes,
+				maxDepth,
+				maxCollectionLength,
+				maxAllocationBytes,
+				maxTotalBytes
+			);
+			if (result.status != OK) {
+				if (result.status == OUTPUT_TOO_SMALL && result.outputLength > capacity) {
+					capacity = result.outputLength;
+					continue;
+				}
+				throw ioFailure("Read region chunk NBT tape", result.status, result.errorKind);
+			}
+			return new TapeResult(result, result.present ? scratch.copy(result.outputLength) : new byte[0]);
+		}
+		TapeMetadata result = readNbtTapeInto(
 			handle,
 			chunkX,
 			chunkZ,
@@ -274,36 +308,7 @@ final class NativeRegionFileBridge {
 			maxAllocationBytes,
 			maxTotalBytes
 		);
-		if (query.status != OUTPUT_TOO_SMALL && query.status != OK) {
-			throw ioFailure("Read region chunk NBT tape", query.status, query.errorKind);
-		}
-		if (query.status == OK && !query.present) {
-			return new TapeResult(query, new byte[0]);
-		}
-
-		try (Arena arena = Arena.ofConfined()) {
-			MemorySegment output = query.outputLength == 0L ? MemorySegment.NULL : arena.allocate(query.outputLength, 1);
-			TapeMetadata result = readNbtTapeInto(
-				handle,
-				chunkX,
-				chunkZ,
-				output,
-				query.outputLength,
-				maxCompressedBytes,
-				maxDecompressedBytes,
-				maxDepth,
-				maxCollectionLength,
-				maxAllocationBytes,
-				maxTotalBytes
-			);
-			if (result.status != OK) {
-				throw ioFailure("Read region chunk NBT tape", result.status, result.errorKind);
-			}
-			byte[] bytes = result.outputLength > 0L ? output.asSlice(0L, result.outputLength).toArray(ValueLayout.JAVA_BYTE) : new byte[0];
-			return new TapeResult(result, bytes);
-		} catch (IOException exception) {
-			throw exception;
-		}
+		throw ioFailure("Read region chunk NBT tape", result.status, result.errorKind);
 	}
 
 	static WriteResult writeNbtTape(
@@ -613,5 +618,28 @@ final class NativeRegionFileBridge {
 		long sectorOffset,
 		long payloadLength
 	) {
+	}
+
+	private static final class NativeScratch {
+		private Arena arena = Arena.ofConfined();
+		private MemorySegment output = MemorySegment.NULL;
+		private long outputCapacity;
+
+		MemorySegment output(long capacity) {
+			if (capacity > this.outputCapacity) {
+				this.arena.close();
+				this.arena = Arena.ofConfined();
+				this.output = this.arena.allocate(capacity, 1);
+				this.outputCapacity = capacity;
+			}
+			return this.output;
+		}
+
+		byte[] copy(long length) {
+			if (length <= 0L) {
+				return new byte[0];
+			}
+			return this.output.asSlice(0L, length).toArray(ValueLayout.JAVA_BYTE);
+		}
 	}
 }

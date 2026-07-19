@@ -9,6 +9,7 @@ import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
+import java.util.Arrays;
 
 final class NativeNbt {
 	static final int OK = 0;
@@ -25,6 +26,8 @@ final class NativeNbt {
 	private static final long RESULT_OUTPUT_LEN = 24L;
 	private static final Limits DEFAULT_LIMITS = new Limits(0, 0, 0, 0);
 	private static final CompressionLimits DEFAULT_COMPRESSION_LIMITS = new CompressionLimits(0, 0);
+	private static final int INITIAL_OUTPUT_CAPACITY = 16 * 1024;
+	private static final ThreadLocal<NativeScratch> SCRATCH = ThreadLocal.withInitial(NativeScratch::new);
 	private static final FunctionDescriptor PARSE_FINGERPRINT_DESCRIPTOR = FunctionDescriptor.of(
 		ValueLayout.JAVA_INT,
 		ValueLayout.ADDRESS,
@@ -233,35 +236,38 @@ final class NativeNbt {
 	}
 
 	static ReencodeResult decodeToTape(byte[] input, int inputCompression, CompressionLimits compressionLimits, Limits limits) {
-		Result query = decodeToTapeInto(input, inputCompression, compressionLimits, limits, MemorySegment.NULL, 0);
-		if (query.status != ERR_OUTPUT_TOO_SMALL && query.status != OK) {
-			return new ReencodeResult(query, new byte[0]);
-		}
-
-		try (Arena arena = Arena.ofConfined()) {
-			MemorySegment output = query.outputLength == 0 ? MemorySegment.NULL : arena.allocate(query.outputLength, 1);
-			Result result = decodeToTapeInto(input, inputCompression, compressionLimits, limits, output, query.outputLength);
-			byte[] bytes = result.status == OK && query.outputLength > 0
-				? output.asSlice(0, query.outputLength).toArray(ValueLayout.JAVA_BYTE)
-				: new byte[0];
-			return new ReencodeResult(result, bytes);
-		}
+		long initialCapacity = Math.max(INITIAL_OUTPUT_CAPACITY, Math.min((long)Integer.MAX_VALUE, Math.max(1L, (long)input.length * 4L)));
+		return callWithOutputBuffer(initialCapacity, (output, outputCapacity) ->
+			decodeToTapeInto(input, inputCompression, compressionLimits, limits, output, outputCapacity)
+		);
 	}
 
 	static ReencodeResult encodeFromTape(byte[] tape, int outputCompression, CompressionLimits compressionLimits, Limits limits) {
-		Result query = encodeFromTapeInto(tape, outputCompression, compressionLimits, limits, MemorySegment.NULL, 0);
-		if (query.status != ERR_OUTPUT_TOO_SMALL && query.status != OK) {
-			return new ReencodeResult(query, new byte[0]);
-		}
+		long initialCapacity = Math.max(INITIAL_OUTPUT_CAPACITY, Math.min((long)Integer.MAX_VALUE, Math.max(1L, tape.length)));
+		return callWithOutputBuffer(initialCapacity, (output, outputCapacity) ->
+			encodeFromTapeInto(tape, outputCompression, compressionLimits, limits, output, outputCapacity)
+		);
+	}
 
-		try (Arena arena = Arena.ofConfined()) {
-			MemorySegment output = query.outputLength == 0 ? MemorySegment.NULL : arena.allocate(query.outputLength, 1);
-			Result result = encodeFromTapeInto(tape, outputCompression, compressionLimits, limits, output, query.outputLength);
-			byte[] bytes = result.status == OK && query.outputLength > 0
-				? output.asSlice(0, query.outputLength).toArray(ValueLayout.JAVA_BYTE)
-				: new byte[0];
-			return new ReencodeResult(result, bytes);
+	private static ReencodeResult callWithOutputBuffer(long initialCapacity, OutputCall call) {
+		NativeScratch scratch = SCRATCH.get();
+		long capacity = initialCapacity;
+		for (int attempt = 0; attempt < 3; attempt++) {
+			MemorySegment output = capacity == 0L ? MemorySegment.NULL : scratch.output(capacity);
+			Result result = call.invoke(output, capacity);
+			if (result.status == OK) {
+				return new ReencodeResult(result, scratch.copy(result.outputLength));
+			}
+			if (result.status != ERR_OUTPUT_TOO_SMALL) {
+				return new ReencodeResult(result, new byte[0]);
+			}
+			if (result.outputLength <= capacity) {
+				return new ReencodeResult(result, new byte[0]);
+			}
+			capacity = result.outputLength;
 		}
+		Result result = call.invoke(MemorySegment.NULL, 0L);
+		return new ReencodeResult(result, new byte[0]);
 	}
 
 	private static Result decodeToTapeInto(
@@ -510,8 +516,9 @@ final class NativeNbt {
 		}
 
 		private byte[] readBytes(int count) throws IOException {
-			byte[] bytes = new byte[count];
-			System.arraycopy(this.readExact(count), 0, bytes, 0, count);
+			this.ensureAvailable(count);
+			byte[] bytes = Arrays.copyOfRange(this.input, this.cursor, this.cursor + count);
+			this.cursor += count;
 			return bytes;
 		}
 
@@ -548,55 +555,72 @@ final class NativeNbt {
 		}
 
 		private byte readByte() throws IOException {
-			return this.readExact(1)[0];
+			this.ensureAvailable(1);
+			return this.input[this.cursor++];
 		}
 
 		private int readUnsignedShortLE() throws IOException {
-			byte[] bytes = this.readExact(2);
-			return Byte.toUnsignedInt(bytes[0]) | (Byte.toUnsignedInt(bytes[1]) << 8);
+			this.ensureAvailable(2);
+			int value = Byte.toUnsignedInt(this.input[this.cursor]) | (Byte.toUnsignedInt(this.input[this.cursor + 1]) << 8);
+			this.cursor += 2;
+			return value;
 		}
 
 		private int readIntLE() throws IOException {
-			byte[] bytes = this.readExact(4);
-			return Byte.toUnsignedInt(bytes[0])
-				| (Byte.toUnsignedInt(bytes[1]) << 8)
-				| (Byte.toUnsignedInt(bytes[2]) << 16)
-				| (Byte.toUnsignedInt(bytes[3]) << 24);
+			this.ensureAvailable(4);
+			int value = Byte.toUnsignedInt(this.input[this.cursor])
+				| (Byte.toUnsignedInt(this.input[this.cursor + 1]) << 8)
+				| (Byte.toUnsignedInt(this.input[this.cursor + 2]) << 16)
+				| (Byte.toUnsignedInt(this.input[this.cursor + 3]) << 24);
+			this.cursor += 4;
+			return value;
 		}
 
 		private long readLongLE() throws IOException {
-			byte[] bytes = this.readExact(8);
-			return (long)Byte.toUnsignedInt(bytes[0])
-				| ((long)Byte.toUnsignedInt(bytes[1]) << 8)
-				| ((long)Byte.toUnsignedInt(bytes[2]) << 16)
-				| ((long)Byte.toUnsignedInt(bytes[3]) << 24)
-				| ((long)Byte.toUnsignedInt(bytes[4]) << 32)
-				| ((long)Byte.toUnsignedInt(bytes[5]) << 40)
-				| ((long)Byte.toUnsignedInt(bytes[6]) << 48)
-				| ((long)Byte.toUnsignedInt(bytes[7]) << 56);
+			this.ensureAvailable(8);
+			long value = (long)Byte.toUnsignedInt(this.input[this.cursor])
+				| ((long)Byte.toUnsignedInt(this.input[this.cursor + 1]) << 8)
+				| ((long)Byte.toUnsignedInt(this.input[this.cursor + 2]) << 16)
+				| ((long)Byte.toUnsignedInt(this.input[this.cursor + 3]) << 24)
+				| ((long)Byte.toUnsignedInt(this.input[this.cursor + 4]) << 32)
+				| ((long)Byte.toUnsignedInt(this.input[this.cursor + 5]) << 40)
+				| ((long)Byte.toUnsignedInt(this.input[this.cursor + 6]) << 48)
+				| ((long)Byte.toUnsignedInt(this.input[this.cursor + 7]) << 56);
+			this.cursor += 8;
+			return value;
 		}
 
-		private byte[] readExact(int count) throws IOException {
+		private void ensureAvailable(int count) throws IOException {
 			if (count < 0 || this.cursor > this.input.length - count) {
 				throw new IOException("Truncated NBT tape at offset " + this.cursor);
 			}
-			byte[] bytes = this.input;
-			this.cursor += count;
-			return java.util.Arrays.copyOfRange(bytes, this.cursor - count, this.cursor);
 		}
 	}
 
 	private static final class TapeWriter {
 		private static final int MAGIC = 0x5442544E;
-		private final ByteArrayOutputStream output = new ByteArrayOutputStream();
+		private static final int HEADER_LEN = 8;
+		private final ByteArrayOutputStream output;
+
+		private TapeWriter(int initialCapacity) {
+			this.output = new ByteArrayOutputStream(initialCapacity);
+		}
 
 		static byte[] writeRoot(CompoundTag tag) throws IOException {
-			TapeWriter writer = new TapeWriter();
+			TapeWriter writer = new TapeWriter(estimateRootBytes(tag));
 			writer.writeIntLE(MAGIC);
 			writer.writeShortLE(1);
 			writer.writeShortLE(0);
 			writer.writeTag("", tag);
 			return writer.output.toByteArray();
+		}
+
+		private static int estimateRootBytes(CompoundTag tag) {
+			long estimate = HEADER_LEN + Math.max(64L, (long)tag.sizeInBytes() * 2L);
+			if (estimate < 64L) {
+				return 64;
+			}
+			return estimate > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int)estimate;
 		}
 
 		private void writeTag(String name, Tag tag) throws IOException {
@@ -718,5 +742,32 @@ final class NativeNbt {
 	}
 
 	record ReencodeResult(Result result, byte[] bytes) {
+	}
+
+	private interface OutputCall {
+		Result invoke(MemorySegment output, long outputCapacity);
+	}
+
+	private static final class NativeScratch {
+		private Arena arena = Arena.ofConfined();
+		private MemorySegment output = MemorySegment.NULL;
+		private long outputCapacity;
+
+		MemorySegment output(long capacity) {
+			if (capacity > this.outputCapacity) {
+				this.arena.close();
+				this.arena = Arena.ofConfined();
+				this.output = this.arena.allocate(capacity, 1);
+				this.outputCapacity = capacity;
+			}
+			return this.output;
+		}
+
+		byte[] copy(long length) {
+			if (length <= 0L) {
+				return new byte[0];
+			}
+			return this.output.asSlice(0L, length).toArray(ValueLayout.JAVA_BYTE);
+		}
 	}
 }

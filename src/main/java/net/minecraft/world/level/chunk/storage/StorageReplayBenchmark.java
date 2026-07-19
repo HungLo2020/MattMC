@@ -8,6 +8,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.io.IOException;
 import java.io.Reader;
+import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -114,8 +115,30 @@ public final class StorageReplayBenchmark {
 				Metric.time(metrics, "nbt.complete_object_roundtrip", encoded.length, () -> NbtBenchmarkAccess.writeObject(NbtBenchmarkAccess.readObject(encoded, compression), compression));
 
 				if (NbtBenchmarkAccess.supportsNativeTape()) {
-					byte[] tape = Metric.time(metrics, "nbt.decode_to_tape", encoded.length, () -> NbtBenchmarkAccess.decodeToTape(encoded, compression));
-					Metric.time(metrics, "nbt.encode_from_tape", tape.length, () -> NbtBenchmarkAccess.encodeFromTape(tape, compression));
+					byte[] tape = Metric.time(
+						metrics,
+						"nbt.decode.rust_decompress_parse_to_tape",
+						encoded.length,
+						encoded.length,
+						() -> NbtBenchmarkAccess.decodeToTape(encoded, compression)
+					);
+					Metric.time(metrics, "nbt.decode.java_tape_to_object", tape.length, tape.length, () -> NbtBenchmarkAccess.readTapeObject(tape));
+					Metric.time(metrics, "nbt.decode_to_tape", encoded.length, encoded.length, () -> NbtBenchmarkAccess.decodeToTape(encoded, compression));
+					byte[] writtenTape = Metric.time(
+						metrics,
+						"nbt.encode.java_object_to_tape",
+						document.rawLength,
+						document.rawLength,
+						() -> NbtBenchmarkAccess.writeTapeObject(tag)
+					);
+					Metric.time(
+						metrics,
+						"nbt.encode.rust_tape_to_encoded",
+						writtenTape.length,
+						writtenTape.length,
+						() -> NbtBenchmarkAccess.encodeFromTape(writtenTape, compression)
+					);
+					Metric.time(metrics, "nbt.encode_from_tape", tape.length, tape.length, () -> NbtBenchmarkAccess.encodeFromTape(tape, compression));
 				}
 
 				if (validate) {
@@ -381,23 +404,43 @@ public final class StorageReplayBenchmark {
 	}
 
 	private static final class Metric {
+		private static final com.sun.management.ThreadMXBean ALLOCATION_BEAN = allocationBean();
 		private long nanos;
 		private long operations;
 		private long bytes;
+		private long copiedBytes;
+		private long allocatedBytes;
+		private long allocationSamples;
 
 		static <T> T time(Map<String, Metric> metrics, String name, long bytes, ThrowingSupplier<T> supplier) throws IOException {
+			return time(metrics, name, bytes, bytes, supplier);
+		}
+
+		static <T> T time(Map<String, Metric> metrics, String name, long bytes, long copiedBytes, ThrowingSupplier<T> supplier) throws IOException {
+			long allocatedBefore = threadAllocatedBytes();
 			long started = System.nanoTime();
 			try {
 				return supplier.get();
 			} finally {
-				metrics.computeIfAbsent(name, key -> new Metric()).add(System.nanoTime() - started, bytes);
+				long allocatedAfter = threadAllocatedBytes();
+				long allocated = allocatedBefore >= 0L && allocatedAfter >= allocatedBefore ? allocatedAfter - allocatedBefore : 0L;
+				metrics.computeIfAbsent(name, key -> new Metric()).add(System.nanoTime() - started, bytes, copiedBytes, allocated, allocatedBefore >= 0L);
 			}
 		}
 
 		void add(long nanos, long bytes) {
+			this.add(nanos, bytes, bytes, 0L, false);
+		}
+
+		void add(long nanos, long bytes, long copiedBytes, long allocatedBytes, boolean allocationMeasured) {
 			this.nanos += nanos;
 			this.operations++;
 			this.bytes += bytes;
+			this.copiedBytes += copiedBytes;
+			if (allocationMeasured) {
+				this.allocatedBytes += allocatedBytes;
+				this.allocationSamples++;
+			}
 		}
 
 		JsonObject toJson() {
@@ -405,7 +448,27 @@ public final class StorageReplayBenchmark {
 			json.addProperty("nanos", this.nanos);
 			json.addProperty("operations", this.operations);
 			json.addProperty("bytes", this.bytes);
+			json.addProperty("copiedBytes", this.copiedBytes);
+			json.addProperty("allocatedBytes", this.allocatedBytes);
+			json.addProperty("allocationSamples", this.allocationSamples);
+			json.addProperty("allocationCountAvailable", false);
 			return json;
+		}
+
+		private static com.sun.management.ThreadMXBean allocationBean() {
+			java.lang.management.ThreadMXBean bean = ManagementFactory.getThreadMXBean();
+			if (bean instanceof com.sun.management.ThreadMXBean threadBean && threadBean.isThreadAllocatedMemorySupported()) {
+				threadBean.setThreadAllocatedMemoryEnabled(true);
+				return threadBean;
+			}
+			return null;
+		}
+
+		private static long threadAllocatedBytes() {
+			if (ALLOCATION_BEAN == null || !ALLOCATION_BEAN.isThreadAllocatedMemoryEnabled()) {
+				return -1L;
+			}
+			return ALLOCATION_BEAN.getThreadAllocatedBytes(Thread.currentThread().getId());
 		}
 	}
 

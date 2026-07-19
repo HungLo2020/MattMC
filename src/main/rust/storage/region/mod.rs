@@ -1,3 +1,12 @@
+//! Rust-owned Anvil region-file implementation.
+//!
+//! Production Java opens one persistent native region handle per `RegionFile`.
+//! Rust owns the `.mca`/`.mcc` file handle, header tables, timestamps, sector
+//! allocation, external chunk transitions, compression, whole-buffer NBT
+//! parsing/writing, and flush/close ordering. Java retains cache and scheduling
+//! policy in `RegionFileStorage`/`IOWorker` plus the gameplay `CompoundTag`
+//! object model.
+
 pub mod decompress;
 pub mod error;
 pub mod external;

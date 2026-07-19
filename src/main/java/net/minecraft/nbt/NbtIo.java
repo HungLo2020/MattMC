@@ -30,6 +30,15 @@ import net.minecraft.util.profiling.storage.StoragePerfDiagnostics;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
+/**
+ * Whole-buffer NBT reads and writes are Rust-authoritative through {@link NativeNbt}.
+ *
+ * <p>Java still owns the public {@link Tag}/{@link CompoundTag} object model,
+ * codec integration, DFU-facing operations, and stream/visitor compatibility
+ * APIs. Methods that accept {@link DataInput}, {@link DataOutput}, or a
+ * {@link StreamTagVisitor} intentionally remain Java implementations for direct
+ * callers that require streaming behavior instead of a complete byte buffer.
+ */
 public class NbtIo {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final boolean RUST_SHADOW_COMPARE = Boolean.getBoolean("mattmc.dev.nbtShadowCompare");

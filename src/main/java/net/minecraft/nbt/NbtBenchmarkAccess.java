@@ -2,8 +2,6 @@ package net.minecraft.nbt;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
@@ -48,6 +46,14 @@ public final class NbtBenchmarkAccess {
 		NativeNbt.ReencodeResult result = NativeNbt.encodeFromTape(tape, compression, new NativeNbt.CompressionLimits(0, 0), new NativeNbt.Limits(0, 0, 0, 0));
 		checkOk("Benchmark NBT encode tape", result.result());
 		return result.bytes();
+	}
+
+	public static CompoundTag readTapeObject(byte[] tape) throws IOException {
+		return NativeNbt.readTape(tape);
+	}
+
+	public static byte[] writeTapeObject(CompoundTag tag) throws IOException {
+		return NativeNbt.writeTape(tag);
 	}
 
 	public static CompoundTag readObject(byte[] input, int compression) throws IOException {
@@ -120,19 +126,5 @@ public final class NbtBenchmarkAccess {
 		if (result.status() != NativeNbt.OK) {
 			throw new IOException(action + " failed with native status " + result.status() + " error " + result.errorKind() + " at offset " + result.offset());
 		}
-	}
-
-	public static CompoundTag readObjectJava(byte[] input, int compression) throws IOException {
-		try (DataInputStream stream = new DataInputStream(new ByteArrayInputStream(decodeToRawBytes(input, compression)))) {
-			return NbtIo.read(stream, NbtAccounter.unlimitedHeap());
-		}
-	}
-
-	public static byte[] writeObjectJava(CompoundTag tag, int compression) throws IOException {
-		ByteArrayOutputStream raw = new ByteArrayOutputStream();
-		try (DataOutputStream output = new DataOutputStream(raw)) {
-			NbtIo.write(tag, output);
-		}
-		return encodeRawBytes(raw.toByteArray(), compression);
 	}
 }

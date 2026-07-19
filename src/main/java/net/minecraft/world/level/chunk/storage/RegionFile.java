@@ -21,6 +21,21 @@ import net.minecraft.world.level.ChunkPos;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
+/**
+ * Java facade for a Rust-owned Anvil region file.
+ *
+ * <p>Rust owns the persistent {@code .mca}/{@code .mcc} file lifecycle,
+ * location and timestamp headers, sector allocation, payload compression,
+ * binary NBT parsing/writing, and chunk delete/flush behavior. Java keeps this
+ * facade so {@link RegionFileStorage}, tooling, and direct callers retain the
+ * Minecraft API shape while normal chunk storage uses coarse NBT tape methods.
+ *
+ * <p>The stream methods below are compatibility surfaces for direct callers
+ * such as stream visitors, region-editor tooling, and Distant Horizons wrappers.
+ * They still delegate payload storage to Rust, but Java performs the requested
+ * stream compression/decompression because those callers explicitly ask for
+ * stream-shaped access.
+ */
 public class RegionFile implements AutoCloseable {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final int CHUNK_HEADER_SIZE = 5;
@@ -63,6 +78,9 @@ public class RegionFile implements AutoCloseable {
 		return this.getChunkDataInputStreamNative(chunkPos);
 	}
 
+	/**
+	 * Deterministic storage replay hook. Not used by production chunk storage.
+	 */
 	public synchronized BenchmarkPayload readBenchmarkPayload(ChunkPos chunkPos) throws IOException {
 		NativeRegionFileBridge.PayloadResult payload = NativeRegionFileBridge.readPayload(this.nativeRegionHandle(), chunkPos.x, chunkPos.z);
 		NativeRegionFileBridge.Result result = payload.result();
