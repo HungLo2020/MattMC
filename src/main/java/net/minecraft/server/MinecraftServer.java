@@ -1107,9 +1107,11 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 			this.status = this.buildServerStatus();
 		}
 
-		this.ticksUntilAutosave--;
-		if (this.ticksUntilAutosave <= 0) {
-			this.autoSave();
+		if (!Boolean.getBoolean("mattmc.dev.storagePerf.disableAutosave")) {
+			this.ticksUntilAutosave--;
+			if (this.ticksUntilAutosave <= 0) {
+				this.autoSave();
+			}
 		}
 
 		ProfilerFiller profilerFiller = Profiler.get();

@@ -59,6 +59,14 @@ public class NbtAccounter {
 		return this.usage;
 	}
 
+	long quota() {
+		return this.quota;
+	}
+
+	int maxDepthLimit() {
+		return this.maxDepth;
+	}
+
 	@VisibleForTesting
 	public int getDepth() {
 		return this.depth;

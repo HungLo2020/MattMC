@@ -520,6 +520,39 @@ tasks.withType(JavaExec).configureEach {
     }
 }
 
+tasks.register('runStorageReplayBenchmark', JavaExec) {
+    group = 'verification'
+    description = 'Runs the deterministic headless NBT/region storage replay benchmark.'
+
+    dependsOn 'classes'
+
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'net.minecraft.world.level.chunk.storage.StorageReplayBenchmark'
+    workingDir = file('run')
+
+    def replayTrace = providers.gradleProperty('mattmcStorageReplayTrace')
+    def replayWorld = providers.gradleProperty('mattmcStorageReplayWorld')
+    def replayOutput = providers.gradleProperty('mattmcStorageReplayOutput')
+    def replayWarmup = providers.gradleProperty('mattmcStorageReplayWarmup').orElse('4')
+    def replayMeasure = providers.gradleProperty('mattmcStorageReplayMeasure').orElse('12')
+    def replayImplementation = providers.gradleProperty('mattmcStorageReplayImplementation').orElse('current-rust')
+
+    doFirst {
+        if (!replayTrace.isPresent() || !replayWorld.isPresent() || !replayOutput.isPresent()) {
+            throw new GradleException('runStorageReplayBenchmark requires mattmcStorageReplayTrace, mattmcStorageReplayWorld, and mattmcStorageReplayOutput')
+        }
+        systemProperty 'mattmc.storageReplay.trace', file(replayTrace.get()).absolutePath
+        systemProperty 'mattmc.storageReplay.world', file(replayWorld.get()).absolutePath
+        systemProperty 'mattmc.storageReplay.output', file(replayOutput.get()).absolutePath
+        systemProperty 'mattmc.storageReplay.warmup', replayWarmup.get()
+        systemProperty 'mattmc.storageReplay.measure', replayMeasure.get()
+        systemProperty 'mattmc.storageReplay.implementation', replayImplementation.get()
+        systemProperty 'java.awt.headless', 'true'
+    }
+
+    configureBundledJdk(it)
+}
+
 // ============================================================================
 // RESOURCE PROCESSING
 // ============================================================================
@@ -820,7 +853,10 @@ tasks.register('runClient', JavaExec) {
     // Use Fabric Loader's KnotClient as the entry point
     mainClass = 'net.fabricmc.loader.impl.launch.knot.KnotClient'
     
-    workingDir = file('run')
+    def runGameDirProvider = providers.gradleProperty('mattmcRunGameDir')
+            .orElse(file('run').absolutePath)
+    def runGameDir = file(runGameDirProvider.get())
+    workingDir = runGameDir
     jvmArgs = clientJvmArgs + [
         // Fabric Loader options
         '-Dfabric.development=true'
@@ -831,18 +867,18 @@ tasks.register('runClient', JavaExec) {
     args = [
         '--version', '1.21.10',
         '--accessToken', '0',
-        '--gameDir', file('run').absolutePath
+        '--gameDir', runGameDir.absolutePath
     ]
     
     doFirst {
         workingDir.mkdirs()
-        file('run/resourcepacks').mkdirs()
+        file("${runGameDir}/resourcepacks").mkdirs()
         
         // Note: No mods folder needed! Everything is in the main JAR
         // Note: Assets are loaded from JAR - no need to copy to filesystem
         
         // Create shaderpacks directory and copy shader pack zip
-        def shaderpacksDir = file('run/shaderpacks')
+        def shaderpacksDir = file("${runGameDir}/shaderpacks")
         shaderpacksDir.mkdirs()
         copy {
             from file("${buildDir}/shaderpacks")

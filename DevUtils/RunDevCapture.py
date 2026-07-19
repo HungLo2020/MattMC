@@ -69,6 +69,10 @@ class CaptureConfig:
     meshing_corpus_measure: int
     artifact_dir: str
     platform_name: str | None
+    world: str
+    game_dir: str
+    region_validation: bool
+    region_validation_copy_world: bool
 
 
 class CaptureRunner:
@@ -81,6 +85,9 @@ class CaptureRunner:
         self.root = repo_root()
         self.gradle = gradle_command(self.root, self.platform_name)
         self.run_dir = self.root / "run"
+        if config.game_dir:
+            configured_game_dir = Path(config.game_dir)
+            self.run_dir = configured_game_dir if configured_game_dir.is_absolute() else self.root / configured_game_dir
         self.options_file = self.run_dir / "options.txt"
         self.artifact_dir = Path(config.artifact_dir) if config.artifact_dir else self.root / "logs" / "auto-capture"
         if not self.artifact_dir.is_absolute():
@@ -119,6 +126,7 @@ class CaptureRunner:
         self.deterministic_metadata = self.artifact_dir / f"deterministic_camera_capture_{self.run_id}.json"
         self.deterministic_screenshot_dir = self.artifact_dir / f"deterministic_camera_capture_{self.run_id}"
         self.audio_validation_status = self.artifact_dir / f"audio_validation_{self.run_id}.json"
+        self.region_validation_status = self.artifact_dir / f"region_validation_{self.run_id}.json"
         self.meshing_corpus_replay = self.artifact_dir / f"real_meshing_replay_{self.run_id}.json"
 
         self.validation_layer_manifest = ""
@@ -145,12 +153,14 @@ class CaptureRunner:
         self.intentional_deterministic_shutdown = False
         self.deterministic_validation_status = "not_requested"
         self.audio_validation_result = "not_requested"
+        self.region_validation_result = "not_requested"
         self.env = os.environ.copy()
 
     def run(self) -> int:
         self.acquire_lock()
         self.write_initial_meta()
         self.preflight_existing_clients()
+        self.prepare_region_validation_game_dir()
         self.configure_screenshots()
         self.configure_backend_and_validation()
         self.configure_client_args()
@@ -173,6 +183,7 @@ class CaptureRunner:
         self.collect_final_artifacts()
         self.validate_deterministic_capture()
         self.validate_audio_status()
+        self.validate_region_status()
         self.print_summary(exit_code)
         self.release_lock()
 
@@ -182,6 +193,8 @@ class CaptureRunner:
             return 2
         if self.config.audio_validation and self.audio_validation_result != "ok":
             return 3
+        if self.config.region_validation and self.region_validation_result != "ok":
+            return 4
         return 0
 
     def acquire_lock(self) -> None:
@@ -236,6 +249,10 @@ class CaptureRunner:
             f"start_epoch={self.start_epoch}",
             f"backend={self.config.backend}",
             f"shaders={self.config.shaders}",
+            f"world={self.config.world}",
+            f"game_dir_initial={self.run_dir}",
+            f"region_validation={str(self.config.region_validation).lower()}",
+            f"region_validation_copy_world={str(self.config.region_validation_copy_world).lower()}",
             f"max_secs={self.config.max_secs}",
             f"dump_secs={self.config.dump_secs}",
             f"client_rss_limit_mb={self.config.client_rss_limit_mb}",
@@ -258,6 +275,39 @@ class CaptureRunner:
     def append_meta(self, text: str) -> None:
         with self.meta_log.open("a", encoding="utf-8") as handle:
             handle.write(text.rstrip("\n") + "\n")
+
+    def prepare_region_validation_game_dir(self) -> None:
+        if not self.config.region_validation_copy_world:
+            return
+        if self.config.game_dir:
+            raise SystemExit("--region-validation-copy-world cannot be combined with --game-dir")
+        source_world = self.root / "run" / "saves" / self.config.world
+        if not source_world.is_dir():
+            raise SystemExit(f"Cannot copy missing validation world: {source_world}")
+        validation_game_dir = self.artifact_dir / f"region_validation_game_{self.run_id}"
+        if validation_game_dir.exists():
+            raise SystemExit(f"Refusing to reuse existing validation game dir: {validation_game_dir}")
+
+        validation_game_dir.mkdir(parents=True)
+        self.copy_optional_path(self.root / "run" / "options.txt", validation_game_dir / "options.txt")
+        self.copy_optional_path(self.root / "run" / "config", validation_game_dir / "config")
+        self.copy_optional_path(self.root / "run" / "resourcepacks", validation_game_dir / "resourcepacks")
+        (validation_game_dir / "saves").mkdir(parents=True)
+        shutil.copytree(source_world, validation_game_dir / "saves" / self.config.world)
+        self.run_dir = validation_game_dir
+        self.options_file = self.run_dir / "options.txt"
+        self.append_meta(f"validation_world_source={source_world}")
+        self.append_meta(f"validation_game_dir={self.run_dir}")
+        self.append_meta(f"validation_world_copy={self.run_dir / 'saves' / self.config.world}")
+
+    def copy_optional_path(self, source: Path, target: Path) -> None:
+        if not source.exists():
+            return
+        if source.is_dir():
+            shutil.copytree(source, target)
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
 
     def preflight_existing_clients(self) -> None:
         clients = find_existing_mattmc_clients()
@@ -319,9 +369,9 @@ class CaptureRunner:
         shaders_enabled = "true" if self.config.shaders == "on" else "false"
         self.config.client_args = remove_client_arg_option(self.config.client_args, "--quickPlaySingleplayer")
         self.config.client_args = remove_client_arg_assignment(self.config.client_args, "enableShaders")
-        self.config.client_args = append_client_arg(self.config.client_args, "--quickPlaySingleplayer=Origin")
+        self.config.client_args = append_client_arg(self.config.client_args, f"--quickPlaySingleplayer={self.config.world}")
         self.config.client_args = append_client_arg(self.config.client_args, f"enableShaders={shaders_enabled}")
-        self.append_meta("forced_quick_play_singleplayer=Origin")
+        self.append_meta(f"forced_quick_play_singleplayer={self.config.world}")
         self.append_meta(f"forced_enable_shaders={shaders_enabled}")
 
         if not self.config.deterministic_camera_capture:
@@ -476,6 +526,7 @@ class CaptureRunner:
     def start_gradle(self) -> None:
         print(f"Starting bounded runClient capture (run_id={self.run_id}, backend={self.config.backend})")
         gradle_cmd = [*self.gradle]
+        gradle_cmd.append(f"-PmattmcRunGameDir={self.run_dir}")
         if self.config.skip_tests:
             gradle_cmd.extend(["-x", "test"])
         if self.config.capture_meshing_corpus:
@@ -601,6 +652,7 @@ class CaptureRunner:
                 f"-Dmattmc.dev.deterministicCameraCapture.shaderPack={self.effective_shader_pack or 'unknown'}",
                 f"-Dmattmc.dev.deterministicCameraCapture.gitCommit={self.git_commit}",
                 "-Dmattmc.dev.deterministicCameraCapture.stopAfterComplete=true",
+                "-Dmattmc.dev.deterministicCameraCapture.ackTimeoutFrames=12000",
                 "-Dmattmc.vulkan.traceShaderInputParity.poseOnly=true",
             ]
             self.append_java_tool_options(deterministic_options)
@@ -615,6 +667,16 @@ class CaptureRunner:
             self.append_java_tool_options(audio_options)
             self.append_meta(f"audio_validation_java_options={' '.join(audio_options)}")
             self.append_meta(f"audio_validation_status={self.audio_validation_status}")
+            self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
+
+        if self.config.region_validation:
+            region_options = [
+                "-Dmattmc.dev.nbtShadowCompare=true",
+                f"-Dmattmc.dev.regionFilesValidationStatus={self.region_validation_status}",
+            ]
+            self.append_java_tool_options(region_options)
+            self.append_meta(f"region_validation_java_options={' '.join(region_options)}")
+            self.append_meta(f"region_validation_status={self.region_validation_status}")
             self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
 
         if self.config.capture_meshing_corpus:
@@ -707,8 +769,10 @@ class CaptureRunner:
             return self.gradle_process.wait()
         return self.gradle_process.returncode or 0
 
-    def wait_for_deterministic_shutdown(self, grace_secs: int = 20) -> bool:
+    def wait_for_deterministic_shutdown(self, grace_secs: int | None = None) -> bool:
         assert self.gradle_process is not None
+        if grace_secs is None:
+            grace_secs = 180 if self.config.region_validation else 20
         self.append_meta(f"deterministic_shutdown_grace_secs={grace_secs}")
         for waited in range(grace_secs):
             if self.gradle_process.poll() is not None:
@@ -1046,6 +1110,33 @@ class CaptureRunner:
             print(str(exc), file=sys.stderr)
         self.append_meta(f"audio_validation={self.audio_validation_result}")
 
+    def validate_region_status(self) -> None:
+        if not self.config.region_validation:
+            return
+        try:
+            data = json.loads(self.region_validation_status.read_text(encoding="utf-8"))
+            counters = data.get("counters") or {}
+            for key in ("rustErrors", "unreadableChunks", "malformedNbt"):
+                if int(counters.get(key, -1)) != 0:
+                    raise RuntimeError(f"region validation {key} was {counters.get(key)}")
+            if int(counters.get("regionsOpened", 0)) <= 0:
+                raise RuntimeError("region validation opened no regions")
+            if int(counters.get("chunksRead", 0)) <= 0:
+                raise RuntimeError("region validation read no chunks")
+            if int(counters.get("chunksWritten", 0)) <= 0:
+                raise RuntimeError("region validation wrote no chunks")
+            if int(counters.get("internalPayloads", 0)) + int(counters.get("externalPayloads", 0)) <= 0:
+                raise RuntimeError("region validation recorded no payloads")
+            leftover_tmp = list(self.run_dir.rglob("tmp-mattmc-region-*.mcc")) + list(self.run_dir.rglob("*.tmp"))
+            if leftover_tmp:
+                raise RuntimeError(f"region validation found leftover temp files: {leftover_tmp[:5]}")
+            self.region_validation_result = "ok"
+            print(f"region validation OK: {self.region_validation_status}")
+        except Exception as exc:
+            self.region_validation_result = "failed"
+            print(str(exc), file=sys.stderr)
+        self.append_meta(f"region_validation_result={self.region_validation_result}")
+
     def print_summary(self, exit_code: int) -> None:
         print("Capture complete.")
         print(f"- Meta:        {self.meta_log}")
@@ -1075,6 +1166,10 @@ class CaptureRunner:
         if self.config.audio_validation:
             print(f"- Audio validation: {self.audio_validation_status}")
             print(f"- Audio result:     {self.audio_validation_result}")
+        if self.config.region_validation:
+            print(f"- Region validation: {self.region_validation_status}")
+            print(f"- Region result:     {self.region_validation_result}")
+            print(f"- Game dir:          {self.run_dir}")
         if self.config.capture_meshing_corpus:
             output = Path(self.config.meshing_corpus_output) if self.config.meshing_corpus_output else self.meshing_corpus_replay
             output = output if output.is_absolute() else (self.root / output)
@@ -1657,6 +1752,10 @@ def parse_args() -> CaptureConfig:
         ),
     )
     parser.add_argument("--client-args", default=os.environ.get("CLIENT_ARGS", ""))
+    parser.add_argument("--world", default=os.environ.get("MATTMC_CAPTURE_WORLD", "Origin"))
+    parser.add_argument("--game-dir", default=os.environ.get("MATTMC_CAPTURE_GAME_DIR", ""))
+    parser.add_argument("--region-validation", action="store_true")
+    parser.add_argument("--region-validation-copy-world", action="store_true")
     parser.add_argument("--platform", help="platform to pass to shared helpers: linux, windows, or macos")
     args = parser.parse_args()
 
@@ -1697,6 +1796,10 @@ def parse_args() -> CaptureConfig:
         meshing_corpus_measure=args.meshing_corpus_measure,
         artifact_dir=args.artifact_dir,
         platform_name=args.platform,
+        world=args.world,
+        game_dir=args.game_dir,
+        region_validation=bool(args.region_validation),
+        region_validation_copy_world=bool(args.region_validation_copy_world),
     )
 
 

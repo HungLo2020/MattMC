@@ -8,5 +8,6 @@ pub mod gameplay;
 pub mod network;
 pub mod platform;
 pub mod render;
+pub mod storage;
 pub mod tools;
 pub mod world;

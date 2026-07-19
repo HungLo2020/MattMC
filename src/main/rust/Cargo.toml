@@ -11,8 +11,11 @@ path = "lib.rs"
 alto = { version = "3.0.4", default-features = false }
 ash = { version = "0.38", default-features = false, features = ["loaded", "std"] }
 glow = "0.18"
+flate2 = { version = "1.0", default-features = false, features = ["rust_backend"] }
 lewton = "0.10.2"
+lz4_flex = "0.11"
 shaderc = { version = "0.10.1", features = ["build-from-source"] }
+xxhash-rust = { version = "0.8", features = ["xxh32"] }
 
 [build-dependencies]
 cmake = "0.1"
