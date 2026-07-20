@@ -78,6 +78,7 @@ class CaptureConfig:
     region_validation_copy_world: bool
     poi_validation: bool
     entity_validation: bool
+    chunk_section_validation: bool
 
 
 class CaptureRunner:
@@ -136,6 +137,7 @@ class CaptureRunner:
         self.region_validation_status = self.artifact_dir / f"region_validation_{self.run_id}.json"
         self.poi_validation_status = self.artifact_dir / f"poi_validation_{self.run_id}.json"
         self.entity_validation_status = self.artifact_dir / f"entity_validation_{self.run_id}.json"
+        self.chunk_section_validation_status = self.artifact_dir / f"chunk_section_validation_{self.run_id}.json"
         self.meshing_corpus_replay = self.artifact_dir / f"real_meshing_replay_{self.run_id}.json"
 
         self.validation_layer_manifest = ""
@@ -165,6 +167,7 @@ class CaptureRunner:
         self.region_validation_result = "not_requested"
         self.poi_validation_result = "not_requested"
         self.entity_validation_result = "not_requested"
+        self.chunk_section_validation_result = "not_requested"
         self.env = os.environ.copy()
 
     def run(self) -> int:
@@ -197,6 +200,7 @@ class CaptureRunner:
         self.validate_region_status()
         self.validate_poi_status()
         self.validate_entity_status()
+        self.validate_chunk_section_status()
         self.print_summary(exit_code)
         self.release_lock()
 
@@ -212,6 +216,8 @@ class CaptureRunner:
             return 5
         if self.config.entity_validation and self.entity_validation_result != "ok":
             return 6
+        if self.config.chunk_section_validation and self.chunk_section_validation_result != "ok":
+            return 7
         return 0
 
     def acquire_lock(self) -> None:
@@ -272,6 +278,7 @@ class CaptureRunner:
             f"region_validation_copy_world={str(self.config.region_validation_copy_world).lower()}",
             f"poi_validation={str(self.config.poi_validation).lower()}",
             f"entity_validation={str(self.config.entity_validation).lower()}",
+            f"chunk_section_validation={str(self.config.chunk_section_validation).lower()}",
             f"max_secs={self.config.max_secs}",
             f"dump_secs={self.config.dump_secs}",
             f"client_rss_limit_mb={self.config.client_rss_limit_mb}",
@@ -299,7 +306,7 @@ class CaptureRunner:
             handle.write(text.rstrip("\n") + "\n")
 
     def prepare_region_validation_game_dir(self) -> None:
-        if not self.config.region_validation_copy_world and not self.config.entity_validation:
+        if not self.config.region_validation_copy_world and not self.config.entity_validation and not self.config.chunk_section_validation:
             return
         if self.config.game_dir:
             if self.config.region_validation_copy_world:
@@ -750,6 +757,17 @@ class CaptureRunner:
             self.append_java_tool_options(entity_options)
             self.append_meta(f"entity_validation_java_options={' '.join(entity_options)}")
             self.append_meta(f"entity_validation_status={self.entity_validation_status}")
+            self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
+
+        if self.config.chunk_section_validation:
+            chunk_section_options = [
+                "-Dmattmc.dev.rustChunkSections=true",
+                "-Dmattmc.dev.chunkSectionValidation=true",
+                f"-Dmattmc.dev.chunkSectionValidation.status={self.chunk_section_validation_status}",
+            ]
+            self.append_java_tool_options(chunk_section_options)
+            self.append_meta(f"chunk_section_validation_java_options={' '.join(chunk_section_options)}")
+            self.append_meta(f"chunk_section_validation_status={self.chunk_section_validation_status}")
             self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
 
         if self.config.capture_meshing_corpus:
@@ -1272,6 +1290,30 @@ class CaptureRunner:
             print(str(exc), file=sys.stderr)
         self.append_meta(f"entity_validation_result={self.entity_validation_result}")
 
+    def validate_chunk_section_status(self) -> None:
+        if not self.config.chunk_section_validation:
+            return
+        try:
+            data = json.loads(self.chunk_section_validation_status.read_text(encoding="utf-8"))
+            if data.get("status") != "complete":
+                raise RuntimeError(f"chunk-section validation status was {data.get('status')!r}: {data.get('error')!r}")
+            for key in ("rustEnabled", "worldReady", "saveRequested", "shutdownRequested", "stopped"):
+                if not data.get(key):
+                    raise RuntimeError(f"chunk-section validation {key} was not true")
+            if int(data.get("rustCurrentVersionSectionReads", 0)) <= 0:
+                raise RuntimeError("chunk-section validation read no current-version chunks through Rust")
+            if int(data.get("parityChecks", 0)) <= 0:
+                raise RuntimeError("chunk-section validation performed no Java/Rust parity checks")
+            for key in ("nativeErrors", "malformedChunks", "parityMismatches"):
+                if int(data.get(key, -1)) != 0:
+                    raise RuntimeError(f"chunk-section validation {key} was {data.get(key)}")
+            self.chunk_section_validation_result = "ok"
+            print(f"chunk-section validation OK: {self.chunk_section_validation_status}")
+        except Exception as exc:
+            self.chunk_section_validation_result = "failed"
+            print(str(exc), file=sys.stderr)
+        self.append_meta(f"chunk_section_validation_result={self.chunk_section_validation_result}")
+
     def print_summary(self, exit_code: int) -> None:
         print("Capture complete.")
         print(f"- Meta:        {self.meta_log}")
@@ -1314,6 +1356,10 @@ class CaptureRunner:
         if self.config.entity_validation:
             print(f"- Entity validation: {self.entity_validation_status}")
             print(f"- Entity result:     {self.entity_validation_result}")
+            print(f"- Game dir:          {self.run_dir}")
+        if self.config.chunk_section_validation:
+            print(f"- Chunk sections:    {self.chunk_section_validation_status}")
+            print(f"- Chunk result:      {self.chunk_section_validation_result}")
             print(f"- Game dir:          {self.run_dir}")
         if self.config.capture_meshing_corpus:
             output = Path(self.config.meshing_corpus_output) if self.config.meshing_corpus_output else self.meshing_corpus_replay
@@ -2170,6 +2216,7 @@ def parse_args() -> CaptureConfig:
     parser.add_argument("--region-validation-copy-world", action="store_true")
     parser.add_argument("--poi-validation", action="store_true")
     parser.add_argument("--entity-validation", action="store_true")
+    parser.add_argument("--chunk-section-validation", action="store_true")
     parser.add_argument("--platform", help="platform to pass to shared helpers: linux, windows, or macos")
     args = parser.parse_args()
 
@@ -2223,6 +2270,7 @@ def parse_args() -> CaptureConfig:
         region_validation_copy_world=bool(args.region_validation_copy_world),
         poi_validation=bool(args.poi_validation),
         entity_validation=bool(args.entity_validation),
+        chunk_section_validation=bool(args.chunk_section_validation),
     )
 
 

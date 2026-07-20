@@ -1282,6 +1282,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		net.minecraft.client.dev.StoragePerfRunController.beforeTick(this);
 		net.minecraft.client.dev.PoiStorageValidationController.beforeTick(this);
 		net.minecraft.client.dev.EntityStorageValidationController.beforeTick(this);
+		net.minecraft.client.dev.ChunkSectionValidationController.beforeTick(this);
 
 		// HOOK: Call registered hooks at beginning of tick
 		for (GameHooks hook : HookRegistry.getGameHooks()) {

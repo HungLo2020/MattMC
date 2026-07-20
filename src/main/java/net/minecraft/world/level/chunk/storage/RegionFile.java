@@ -312,6 +312,10 @@ public class RegionFile implements AutoCloseable {
 		return NativeEntityStorage.decodeChunk(this.nativeRegionHandle(), chunkPos.x, chunkPos.z);
 	}
 
+	public synchronized NativeChunkSectionStorage.DecodeResult readChunkSections(ChunkPos chunkPos) throws IOException {
+		return NativeChunkSectionStorage.decodeChunk(this.nativeRegionHandle(), chunkPos.x, chunkPos.z);
+	}
+
 	public synchronized NativeEntityStorage.WriteResult writeEntityChunk(ChunkPos chunkPos, List<byte[]> entityTapes) throws IOException {
 		long started = StoragePerfDiagnostics.start();
 		try {

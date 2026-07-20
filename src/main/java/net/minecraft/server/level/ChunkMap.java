@@ -87,6 +87,8 @@ import net.minecraft.world.level.chunk.status.ChunkStep;
 import net.minecraft.world.level.chunk.status.ChunkType;
 import net.minecraft.world.level.chunk.status.WorldGenContext;
 import net.minecraft.world.level.chunk.storage.ChunkStorage;
+import net.minecraft.world.level.chunk.storage.ChunkSectionReadDiagnostics;
+import net.minecraft.world.level.chunk.storage.NativeChunkSectionStorage;
 import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
 import net.minecraft.world.level.chunk.storage.SerializableChunkData;
 import net.minecraft.world.level.entity.ChunkStatusUpdateListener;
@@ -559,8 +561,21 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 	}
 
 	private CompletableFuture<ChunkAccess> scheduleChunkLoad(ChunkPos chunkPos) {
-		CompletableFuture<Optional<SerializableChunkData>> completableFuture = this.readChunk(chunkPos).thenApplyAsync(optional -> optional.map(compoundTag -> {
-			SerializableChunkData serializableChunkData = SerializableChunkData.parse(this.level, this.level.palettedContainerFactory(), compoundTag);
+		CompletableFuture<Optional<NativeChunkSectionStorage.DecodeResult>> rustSections = ChunkSectionReadDiagnostics.rustEnabled()
+			? this.readChunkSections(chunkPos).exceptionally(throwable -> {
+				ChunkSectionReadDiagnostics.nativeError(chunkPos, throwable);
+				return Optional.empty();
+			})
+			: CompletableFuture.completedFuture(Optional.empty());
+		CompletableFuture<Optional<SerializableChunkData>> completableFuture = this.readChunk(chunkPos).thenCombineAsync(rustSections, (optional, rustOptional) -> optional.map(compoundTag -> {
+			SerializableChunkData serializableChunkData = SerializableChunkData.parseWithRustSections(
+				this.level.registryAccess(),
+				this.level,
+				this.level.palettedContainerFactory(),
+				compoundTag,
+				rustOptional,
+				chunkPos
+			);
 			if (serializableChunkData == null) {
 				LOGGER.error("Chunk file at {} is missing level data, skipping", chunkPos);
 			}

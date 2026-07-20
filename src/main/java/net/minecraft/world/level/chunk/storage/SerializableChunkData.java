@@ -3,10 +3,12 @@ package net.minecraft.world.level.chunk.storage;
 import com.google.common.collect.Maps;
 import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.shorts.ShortArrayList;
 import it.unimi.dsi.fastutil.shorts.ShortList;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
@@ -16,7 +18,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Map.Entry;
+import java.util.stream.LongStream;
 import net.minecraft.Optionull;
+import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
@@ -31,6 +35,7 @@ import net.minecraft.nbt.NbtException;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.ShortTag;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.ProblemReporter;
@@ -54,6 +59,7 @@ import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraft.world.level.chunk.PalettedContainerFactory;
 import net.minecraft.world.level.chunk.PalettedContainerRO;
+import net.minecraft.world.level.chunk.PalettedContainerRO.PackedData;
 import net.minecraft.world.level.chunk.ProtoChunk;
 import net.minecraft.world.level.chunk.UpgradeData;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
@@ -112,105 +118,406 @@ public record SerializableChunkData(
 		if (compoundTag.getString("Status").isEmpty()) {
 			return null;
 		} else {
-			ChunkPos chunkPos = new ChunkPos(compoundTag.getIntOr("xPos", 0), compoundTag.getIntOr("zPos", 0));
-			long l = compoundTag.getLongOr("LastUpdate", 0L);
-			long m = compoundTag.getLongOr("InhabitedTime", 0L);
 			ChunkStatus chunkStatus = (ChunkStatus)compoundTag.read("Status", ChunkStatus.CODEC).orElse(ChunkStatus.EMPTY);
-			UpgradeData upgradeData = (UpgradeData)compoundTag.getCompound("UpgradeData")
-				.map(compoundTagx -> new UpgradeData(compoundTagx, levelHeightAccessor))
-				.orElse(UpgradeData.EMPTY);
-			boolean bl = compoundTag.getBooleanOr("isLightOn", false);
-			BlendingData.Packed packed = (BlendingData.Packed)compoundTag.read("blending_data", BlendingData.Packed.CODEC).orElse(null);
-			BelowZeroRetrogen belowZeroRetrogen = (BelowZeroRetrogen)compoundTag.read("below_zero_retrogen", BelowZeroRetrogen.CODEC).orElse(null);
-			long[] ls = (long[])compoundTag.getLongArray("carving_mask").orElse(null);
-			Map<Heightmap.Types, long[]> map = new EnumMap(Heightmap.Types.class);
-			compoundTag.getCompound("Heightmaps").ifPresent(compoundTagx -> {
-				for (Heightmap.Types types : chunkStatus.heightmapsAfter()) {
-					compoundTagx.getLongArray(types.getSerializationKey()).ifPresent(lsx -> map.put(types, lsx));
-				}
-			});
-			List<SavedTick<Block>> list = SavedTick.filterTickListForChunk(
-				(List<SavedTick<Block>>)compoundTag.read("block_ticks", BLOCK_TICKS_CODEC).orElse(List.of()), chunkPos
-			);
-			List<SavedTick<Fluid>> list2 = SavedTick.filterTickListForChunk(
-				(List<SavedTick<Fluid>>)compoundTag.read("fluid_ticks", FLUID_TICKS_CODEC).orElse(List.of()), chunkPos
-			);
-			ChunkAccess.PackedTicks packedTicks = new ChunkAccess.PackedTicks(list, list2);
-			ListTag listTag = compoundTag.getListOrEmpty("PostProcessing");
-			ShortList[] shortLists = new ShortList[listTag.size()];
-
-			for (int i = 0; i < listTag.size(); i++) {
-				ListTag listTag2 = listTag.getListOrEmpty(i);
-				ShortList shortList = new ShortArrayList(listTag2.size());
-
-				for (int j = 0; j < listTag2.size(); j++) {
-					shortList.add(listTag2.getShortOr(j, (short)0));
-				}
-
-				shortLists[i] = shortList;
-			}
-
-			List<CompoundTag> list3 = compoundTag.getList("entities").stream().flatMap(ListTag::compoundStream).toList();
-			List<CompoundTag> list4 = compoundTag.getList("block_entities").stream().flatMap(ListTag::compoundStream).toList();
-			CompoundTag compoundTag2 = compoundTag.getCompoundOrEmpty("structures");
-			ListTag listTag3 = compoundTag.getListOrEmpty("sections");
-			List<SerializableChunkData.SectionData> list5 = new ArrayList(listTag3.size());
-			Codec<PalettedContainerRO<Holder<Biome>>> codec = palettedContainerFactory.biomeContainerCodec();
-			Codec<PalettedContainer<BlockState>> codec2 = palettedContainerFactory.blockStatesContainerCodec();
-
-			for (int k = 0; k < listTag3.size(); k++) {
-				Optional<CompoundTag> optional = listTag3.getCompound(k);
-				if (!optional.isEmpty()) {
-					CompoundTag compoundTag3 = (CompoundTag)optional.get();
-					int n = compoundTag3.getByteOr("Y", (byte)0);
-					LevelChunkSection levelChunkSection;
-					if (n >= levelHeightAccessor.getMinSectionY() && n <= levelHeightAccessor.getMaxSectionY()) {
-						PalettedContainer<BlockState> palettedContainer = (PalettedContainer<BlockState>)compoundTag3.getCompound("block_states")
-							.map(
-								compoundTagx -> codec2.parse(NbtOps.INSTANCE, compoundTagx)
-									.promotePartial(string -> logErrors(chunkPos, n, string))
-									.getOrThrow(SerializableChunkData.ChunkReadException::new)
-							)
-							.orElseGet(palettedContainerFactory::createForBlockStates);
-						PalettedContainerRO<Holder<Biome>> palettedContainerRO = (PalettedContainerRO<Holder<Biome>>)compoundTag3.getCompound("biomes")
-							.map(
-								compoundTagx -> codec.parse(NbtOps.INSTANCE, compoundTagx)
-									.promotePartial(string -> logErrors(chunkPos, n, string))
-									.getOrThrow(SerializableChunkData.ChunkReadException::new)
-							)
-							.orElseGet(palettedContainerFactory::createForBiomes);
-						levelChunkSection = new LevelChunkSection(palettedContainer, palettedContainerRO);
-					} else {
-						levelChunkSection = null;
-					}
-
-					DataLayer dataLayer = (DataLayer)compoundTag3.getByteArray("BlockLight").map(DataLayer::new).orElse(null);
-					DataLayer dataLayer2 = (DataLayer)compoundTag3.getByteArray("SkyLight").map(DataLayer::new).orElse(null);
-					list5.add(new SerializableChunkData.SectionData(n, levelChunkSection, dataLayer, dataLayer2));
-				}
-			}
-
-			return new SerializableChunkData(
-				palettedContainerFactory,
-				chunkPos,
-				levelHeightAccessor.getMinSectionY(),
-				l,
-				m,
-				chunkStatus,
-				packed,
-				belowZeroRetrogen,
-				upgradeData,
-				ls,
-				map,
-				packedTicks,
-				shortLists,
-				bl,
-				list5,
-				list3,
-				list4,
-				compoundTag2
-			);
+			NativeSectionBuild sections = parseJavaSectionData(levelHeightAccessor, palettedContainerFactory, compoundTag, chunkStatus);
+			return parseEnvelope(levelHeightAccessor, palettedContainerFactory, compoundTag, sections, compoundTag.getBooleanOr("isLightOn", false));
 		}
+	}
+
+	static NativeSectionBuild parseJavaSectionData(
+		LevelHeightAccessor levelHeightAccessor,
+		PalettedContainerFactory palettedContainerFactory,
+		CompoundTag compoundTag,
+		ChunkStatus chunkStatus
+	) {
+		ChunkPos chunkPos = new ChunkPos(compoundTag.getIntOr("xPos", 0), compoundTag.getIntOr("zPos", 0));
+		Map<Heightmap.Types, long[]> heightmaps = new EnumMap<>(Heightmap.Types.class);
+		compoundTag.getCompound("Heightmaps").ifPresent(compoundTagx -> {
+			for (Heightmap.Types types : chunkStatus.heightmapsAfter()) {
+				compoundTagx.getLongArray(types.getSerializationKey()).ifPresent(lsx -> heightmaps.put(types, lsx));
+			}
+		});
+		ListTag sectionTags = compoundTag.getListOrEmpty("sections");
+		List<SerializableChunkData.SectionData> sections = new ArrayList<>(sectionTags.size());
+		Codec<PalettedContainerRO<Holder<Biome>>> biomeCodec = palettedContainerFactory.biomeContainerCodec();
+		Codec<PalettedContainer<BlockState>> blockStateCodec = palettedContainerFactory.blockStatesContainerCodec();
+
+		for (int k = 0; k < sectionTags.size(); k++) {
+			Optional<CompoundTag> optional = sectionTags.getCompound(k);
+			if (!optional.isEmpty()) {
+				CompoundTag sectionTag = optional.get();
+				int sectionY = sectionTag.getByteOr("Y", (byte)0);
+				LevelChunkSection levelChunkSection;
+				if (sectionY >= levelHeightAccessor.getMinSectionY() && sectionY <= levelHeightAccessor.getMaxSectionY()) {
+					PalettedContainer<BlockState> blockStates = (PalettedContainer<BlockState>)sectionTag.getCompound("block_states")
+						.map(
+							compoundTagx -> blockStateCodec.parse(NbtOps.INSTANCE, compoundTagx)
+								.promotePartial(string -> logErrors(chunkPos, sectionY, string))
+								.getOrThrow(SerializableChunkData.ChunkReadException::new)
+						)
+						.orElseGet(palettedContainerFactory::createForBlockStates);
+					PalettedContainerRO<Holder<Biome>> biomes = (PalettedContainerRO<Holder<Biome>>)sectionTag.getCompound("biomes")
+						.map(
+							compoundTagx -> biomeCodec.parse(NbtOps.INSTANCE, compoundTagx)
+								.promotePartial(string -> logErrors(chunkPos, sectionY, string))
+								.getOrThrow(SerializableChunkData.ChunkReadException::new)
+						)
+						.orElseGet(palettedContainerFactory::createForBiomes);
+					levelChunkSection = new LevelChunkSection(blockStates, biomes);
+				} else {
+					levelChunkSection = null;
+				}
+
+				DataLayer blockLight = (DataLayer)sectionTag.getByteArray("BlockLight").map(DataLayer::new).orElse(null);
+				DataLayer skyLight = (DataLayer)sectionTag.getByteArray("SkyLight").map(DataLayer::new).orElse(null);
+				sections.add(new SerializableChunkData.SectionData(sectionY, levelChunkSection, blockLight, skyLight));
+			}
+		}
+
+		return new NativeSectionBuild(List.copyOf(sections), heightmaps);
+	}
+
+	@Nullable
+	private static SerializableChunkData parseEnvelope(
+		LevelHeightAccessor levelHeightAccessor,
+		PalettedContainerFactory palettedContainerFactory,
+		CompoundTag compoundTag,
+		NativeSectionBuild sectionBuild,
+		boolean lightCorrect
+	) {
+		if (compoundTag.getString("Status").isEmpty()) {
+			return null;
+		}
+		ChunkPos chunkPos = new ChunkPos(compoundTag.getIntOr("xPos", 0), compoundTag.getIntOr("zPos", 0));
+		long l = compoundTag.getLongOr("LastUpdate", 0L);
+		long m = compoundTag.getLongOr("InhabitedTime", 0L);
+		ChunkStatus chunkStatus = (ChunkStatus)compoundTag.read("Status", ChunkStatus.CODEC).orElse(ChunkStatus.EMPTY);
+		UpgradeData upgradeData = (UpgradeData)compoundTag.getCompound("UpgradeData")
+			.map(compoundTagx -> new UpgradeData(compoundTagx, levelHeightAccessor))
+			.orElse(UpgradeData.EMPTY);
+		BlendingData.Packed packed = (BlendingData.Packed)compoundTag.read("blending_data", BlendingData.Packed.CODEC).orElse(null);
+		BelowZeroRetrogen belowZeroRetrogen = (BelowZeroRetrogen)compoundTag.read("below_zero_retrogen", BelowZeroRetrogen.CODEC).orElse(null);
+		long[] ls = (long[])compoundTag.getLongArray("carving_mask").orElse(null);
+		List<SavedTick<Block>> list = SavedTick.filterTickListForChunk(
+			(List<SavedTick<Block>>)compoundTag.read("block_ticks", BLOCK_TICKS_CODEC).orElse(List.of()), chunkPos
+		);
+		List<SavedTick<Fluid>> list2 = SavedTick.filterTickListForChunk(
+			(List<SavedTick<Fluid>>)compoundTag.read("fluid_ticks", FLUID_TICKS_CODEC).orElse(List.of()), chunkPos
+		);
+		ChunkAccess.PackedTicks packedTicks = new ChunkAccess.PackedTicks(list, list2);
+		ListTag listTag = compoundTag.getListOrEmpty("PostProcessing");
+		ShortList[] shortLists = new ShortList[listTag.size()];
+
+		for (int i = 0; i < listTag.size(); i++) {
+			ListTag listTag2 = listTag.getListOrEmpty(i);
+			ShortList shortList = new ShortArrayList(listTag2.size());
+
+			for (int j = 0; j < listTag2.size(); j++) {
+				shortList.add(listTag2.getShortOr(j, (short)0));
+			}
+
+			shortLists[i] = shortList;
+		}
+
+		List<CompoundTag> list3 = compoundTag.getList("entities").stream().flatMap(ListTag::compoundStream).toList();
+		List<CompoundTag> list4 = compoundTag.getList("block_entities").stream().flatMap(ListTag::compoundStream).toList();
+		CompoundTag compoundTag2 = compoundTag.getCompoundOrEmpty("structures");
+		return new SerializableChunkData(
+			palettedContainerFactory,
+			chunkPos,
+			levelHeightAccessor.getMinSectionY(),
+			l,
+			m,
+			chunkStatus,
+			packed,
+			belowZeroRetrogen,
+			upgradeData,
+			ls,
+			sectionBuild.heightmaps(),
+			packedTicks,
+			shortLists,
+			lightCorrect,
+			sectionBuild.sections(),
+			list3,
+			list4,
+			compoundTag2
+		);
+	}
+
+	@Nullable
+	public static SerializableChunkData parseWithRustSections(
+		RegistryAccess registryAccess,
+		LevelHeightAccessor levelHeightAccessor,
+		PalettedContainerFactory palettedContainerFactory,
+		CompoundTag compoundTag,
+		Optional<NativeChunkSectionStorage.DecodeResult> rustSections,
+		ChunkPos requestedChunkPos
+	) {
+		if (rustSections.isEmpty()) {
+			ChunkSectionReadDiagnostics.javaFallback(requestedChunkPos, "pending-write-or-native-unavailable");
+			return parse(levelHeightAccessor, palettedContainerFactory, compoundTag);
+		}
+
+		NativeChunkSectionStorage.DecodeResult decodeResult = rustSections.get();
+		NativeChunkSectionStorage.Result result = decodeResult.result();
+		if (!result.present()) {
+			ChunkSectionReadDiagnostics.absent(requestedChunkPos);
+			return parse(levelHeightAccessor, palettedContainerFactory, compoundTag);
+		}
+		if (result.requiresDfu() || result.dataVersion() < SharedConstants.getCurrentVersion().dataVersion().version()) {
+			ChunkSectionReadDiagnostics.oldVersionFallback(requestedChunkPos, result.dataVersion());
+			return parse(levelHeightAccessor, palettedContainerFactory, compoundTag);
+		}
+
+		try {
+			long resolveStarted = ChunkSectionReadDiagnostics.now();
+			NativeSectionBuild nativeBuild = buildNativeSections(registryAccess, palettedContainerFactory, decodeResult.chunk());
+			long resolveNanos = ChunkSectionReadDiagnostics.elapsed(resolveStarted);
+			if (ChunkSectionReadDiagnostics.shadowValidationEnabled()) {
+				long javaStarted = ChunkSectionReadDiagnostics.now();
+				SerializableChunkData javaData = parse(levelHeightAccessor, palettedContainerFactory, compoundTag);
+				long javaParseNanos = ChunkSectionReadDiagnostics.elapsed(javaStarted);
+				if (javaData == null) {
+					return javaData;
+				}
+				long compareStarted = ChunkSectionReadDiagnostics.now();
+				String mismatch = compareNativeSections(javaData, nativeBuild, palettedContainerFactory, decodeResult.chunk());
+				long compareNanos = ChunkSectionReadDiagnostics.elapsed(compareStarted);
+				if (mismatch != null) {
+					ChunkSectionReadDiagnostics.parityMismatch(requestedChunkPos, mismatch, result, javaParseNanos, resolveNanos, compareNanos);
+					return javaData;
+				}
+				SerializableChunkData nativeData = javaData.withNativeSections(nativeBuild.sections(), nativeBuild.heightmaps(), decodeResult.chunk().lightOn());
+				ChunkSectionReadDiagnostics.rustDecoded(requestedChunkPos, result, javaParseNanos, resolveNanos, compareNanos);
+				return nativeData;
+			}
+
+			long envelopeStarted = ChunkSectionReadDiagnostics.now();
+			SerializableChunkData nativeData = parseEnvelope(
+				levelHeightAccessor,
+				palettedContainerFactory,
+				compoundTag,
+				nativeBuild,
+				decodeResult.chunk().lightOn()
+			);
+			long envelopeNanos = ChunkSectionReadDiagnostics.elapsed(envelopeStarted);
+			ChunkSectionReadDiagnostics.rustDecoded(requestedChunkPos, result, envelopeNanos, resolveNanos, 0L);
+			return nativeData;
+		} catch (Exception exception) {
+			ChunkSectionReadDiagnostics.malformed(requestedChunkPos, exception);
+			return parse(levelHeightAccessor, palettedContainerFactory, compoundTag);
+		}
+	}
+
+	private SerializableChunkData withNativeSections(
+		List<SerializableChunkData.SectionData> nativeSections,
+		Map<Heightmap.Types, long[]> nativeHeightmaps,
+		boolean nativeLightCorrect
+	) {
+		return new SerializableChunkData(
+			this.containerFactory,
+			this.chunkPos,
+			this.minSectionY,
+			this.lastUpdateTime,
+			this.inhabitedTime,
+			this.chunkStatus,
+			this.blendingData,
+			this.belowZeroRetrogen,
+			this.upgradeData,
+			this.carvingMask,
+			nativeHeightmaps,
+			this.packedTicks,
+			this.postProcessingSections,
+			nativeLightCorrect,
+			nativeSections,
+			this.entities,
+			this.blockEntities,
+			this.structureData
+		);
+	}
+
+	static NativeSectionBuild buildNativeSections(
+		RegistryAccess registryAccess,
+		PalettedContainerFactory palettedContainerFactory,
+		NativeChunkSectionStorage.ChunkData chunk
+	) throws IOException {
+		List<SerializableChunkData.SectionData> sections = new ArrayList<>(chunk.sections().size());
+		for (NativeChunkSectionStorage.Section section : chunk.sections()) {
+			LevelChunkSection levelChunkSection = new LevelChunkSection(
+				resolveBlockStates(palettedContainerFactory, section),
+				resolveBiomes(registryAccess, palettedContainerFactory, section)
+			);
+			DataLayer blockLight = section.blockLight().length == 0 ? null : new DataLayer(section.blockLight());
+			DataLayer skyLight = section.skyLight().length == 0 ? null : new DataLayer(section.skyLight());
+			sections.add(new SerializableChunkData.SectionData(section.sectionY(), levelChunkSection, blockLight, skyLight));
+		}
+		Map<Heightmap.Types, long[]> heightmaps = new EnumMap<>(Heightmap.Types.class);
+		for (NativeChunkSectionStorage.Heightmap heightmap : chunk.heightmaps()) {
+			Heightmap.Types type = heightmapType(heightmap.name());
+			if (type != null) {
+				heightmaps.put(type, heightmap.data());
+			}
+		}
+		return new NativeSectionBuild(List.copyOf(sections), heightmaps);
+	}
+
+	private static PalettedContainer<BlockState> resolveBlockStates(
+		PalettedContainerFactory palettedContainerFactory,
+		NativeChunkSectionStorage.Section section
+	) throws IOException {
+		if (!section.hasBlockStates()) {
+			return palettedContainerFactory.createForBlockStates();
+		}
+		List<BlockState> palette = new ArrayList<>(section.blockPalette().size());
+		for (NativeChunkSectionStorage.BlockPaletteEntry entry : section.blockPalette()) {
+			palette.add(NbtUtils.readBlockState(BuiltInRegistries.BLOCK, entry.asTag()));
+		}
+		DataResult<PalettedContainer<BlockState>> result = PalettedContainer.unpack(
+			palettedContainerFactory.blockStatesStrategy(),
+			new PackedData<>(palette, storage(section.blockData()))
+		);
+		return result.getOrThrow(SerializableChunkData.ChunkReadException::new);
+	}
+
+	private static PalettedContainerRO<Holder<Biome>> resolveBiomes(
+		RegistryAccess registryAccess,
+		PalettedContainerFactory palettedContainerFactory,
+		NativeChunkSectionStorage.Section section
+	) throws IOException {
+		if (!section.hasBiomes()) {
+			return palettedContainerFactory.createForBiomes();
+		}
+		Registry<Biome> registry = registryAccess.lookupOrThrow(Registries.BIOME);
+		List<Holder<Biome>> palette = new ArrayList<>(section.biomePalette().size());
+		for (NativeChunkSectionStorage.BiomePaletteEntry entry : section.biomePalette()) {
+			if (entry.resourceId() == null) {
+				throw new IOException("Chunk biome palette NBT tape entries are not supported by the current typed section path");
+			}
+			ResourceLocation location = ResourceLocation.parse(entry.resourceId());
+			ResourceKey<Biome> key = ResourceKey.create(Registries.BIOME, location);
+			palette.add(registry.get(key).orElseThrow(() -> new IOException("Unknown biome in Rust chunk section palette: " + location)));
+		}
+		DataResult<PalettedContainer<Holder<Biome>>> result = PalettedContainer.unpack(
+			palettedContainerFactory.biomeStrategy(),
+			new PackedData<>(palette, storage(section.biomeData()))
+		);
+		return result.getOrThrow(SerializableChunkData.ChunkReadException::new);
+	}
+
+	@Nullable
+	private static Heightmap.Types heightmapType(String name) {
+		for (Heightmap.Types type : Heightmap.Types.values()) {
+			if (type.getSerializationKey().equals(name)) {
+				return type;
+			}
+		}
+		return null;
+	}
+
+	private static Optional<LongStream> storage(long[] values) {
+		return values.length == 0 ? Optional.empty() : Optional.of(Arrays.stream(values));
+	}
+
+	@Nullable
+	static String compareNativeSections(
+		SerializableChunkData javaData,
+		NativeSectionBuild nativeBuild,
+		PalettedContainerFactory palettedContainerFactory,
+		NativeChunkSectionStorage.ChunkData nativeChunk
+	) {
+		if (!Objects.equals(javaData.chunkPos, new ChunkPos(nativeChunk.chunkX(), nativeChunk.chunkZ()))) {
+			return "chunk position mismatch java=" + javaData.chunkPos + " rust=" + nativeChunk.chunkX() + "," + nativeChunk.chunkZ();
+		}
+		String javaStatus = BuiltInRegistries.CHUNK_STATUS.getKey(javaData.chunkStatus).toString();
+		if (!Objects.equals(javaStatus, nativeChunk.status())) {
+			return "chunk status mismatch java=" + javaStatus + " rust=" + nativeChunk.status();
+		}
+		if (javaData.lightCorrect != nativeChunk.lightOn()) {
+			return "isLightOn mismatch java=" + javaData.lightCorrect + " rust=" + nativeChunk.lightOn();
+		}
+		if (javaData.sectionData.size() != nativeBuild.sections().size()) {
+			return "section count mismatch java=" + javaData.sectionData.size() + " rust=" + nativeBuild.sections().size();
+		}
+		for (int i = 0; i < javaData.sectionData.size(); i++) {
+			String mismatch = compareSection(javaData.sectionData.get(i), nativeBuild.sections().get(i), palettedContainerFactory, i);
+			if (mismatch != null) {
+				return mismatch;
+			}
+		}
+		for (Entry<Heightmap.Types, long[]> entry : javaData.heightmaps.entrySet()) {
+			long[] nativeValues = nativeBuild.heightmaps().get(entry.getKey());
+			if (!Arrays.equals(entry.getValue(), nativeValues)) {
+				return "heightmap mismatch for " + entry.getKey().getSerializationKey();
+			}
+		}
+		for (Heightmap.Types type : nativeBuild.heightmaps().keySet()) {
+			if (!javaData.heightmaps.containsKey(type)) {
+				return "extra Rust heightmap " + type.getSerializationKey();
+			}
+		}
+		return null;
+	}
+
+	@Nullable
+	private static String compareSection(
+		SerializableChunkData.SectionData javaSection,
+		SerializableChunkData.SectionData nativeSection,
+		PalettedContainerFactory palettedContainerFactory,
+		int index
+	) {
+		if (javaSection.y != nativeSection.y) {
+			return "section Y mismatch at index " + index + ": java=" + javaSection.y + " rust=" + nativeSection.y;
+		}
+		if ((javaSection.chunkSection == null) != (nativeSection.chunkSection == null)) {
+			return "section presence mismatch at Y " + javaSection.y;
+		}
+		if (javaSection.chunkSection != null) {
+			String blockMismatch = comparePackedData(
+				"block states at Y " + javaSection.y,
+				javaSection.chunkSection.getStates().pack(palettedContainerFactory.blockStatesStrategy()),
+				nativeSection.chunkSection.getStates().pack(palettedContainerFactory.blockStatesStrategy())
+			);
+			if (blockMismatch != null) {
+				return blockMismatch;
+			}
+			String biomeMismatch = comparePackedData(
+				"biomes at Y " + javaSection.y,
+				javaSection.chunkSection.getBiomes().pack(palettedContainerFactory.biomeStrategy()),
+				nativeSection.chunkSection.getBiomes().pack(palettedContainerFactory.biomeStrategy())
+			);
+			if (biomeMismatch != null) {
+				return biomeMismatch;
+			}
+		}
+		if (!Arrays.equals(layerBytes(javaSection.blockLight), layerBytes(nativeSection.blockLight))) {
+			return "BlockLight mismatch at Y " + javaSection.y;
+		}
+		if (!Arrays.equals(layerBytes(javaSection.skyLight), layerBytes(nativeSection.skyLight))) {
+			return "SkyLight mismatch at Y " + javaSection.y;
+		}
+		return null;
+	}
+
+	@Nullable
+	private static String comparePackedData(String label, PackedData<?> javaData, PackedData<?> nativeData) {
+		if (!Objects.equals(javaData.paletteEntries(), nativeData.paletteEntries())) {
+			return label + " palette mismatch";
+		}
+		if (!Arrays.equals(storageBytes(javaData), storageBytes(nativeData))) {
+			return label + " packed data mismatch";
+		}
+		if (javaData.bitsPerEntry() != nativeData.bitsPerEntry()) {
+			return label + " bits-per-entry mismatch java=" + javaData.bitsPerEntry() + " rust=" + nativeData.bitsPerEntry();
+		}
+		return null;
+	}
+
+	private static long[] storageBytes(PackedData<?> data) {
+		return data.storage().map(LongStream::toArray).orElseGet(() -> new long[0]);
+	}
+
+	private static byte[] layerBytes(@Nullable DataLayer layer) {
+		return layer == null ? new byte[0] : layer.getData();
 	}
 
 	public ProtoChunk read(ServerLevel serverLevel, PoiManager poiManager, RegionStorageInfo regionStorageInfo, ChunkPos chunkPos) {
@@ -619,6 +926,9 @@ public record SerializableChunkData(
 		public ChunkReadException(String string) {
 			super(string);
 		}
+	}
+
+	record NativeSectionBuild(List<SerializableChunkData.SectionData> sections, Map<Heightmap.Types, long[]> heightmaps) {
 	}
 
 	public record SectionData(int y, @Nullable LevelChunkSection chunkSection, @Nullable DataLayer blockLight, @Nullable DataLayer skyLight) {

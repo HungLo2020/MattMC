@@ -167,6 +167,16 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 		});
 	}
 
+	public CompletableFuture<Optional<NativeChunkSectionStorage.DecodeResult>> loadChunkSectionsAsync(ChunkPos chunkPos) {
+		return this.submitThrowingTask(() -> {
+			IOWorker.PendingStore pendingStore = (IOWorker.PendingStore)this.pendingWrites.get(chunkPos);
+			if (pendingStore != null) {
+				return Optional.empty();
+			}
+			return Optional.of(this.storage.readChunkSections(chunkPos));
+		});
+	}
+
 	public CompletableFuture<Optional<CompoundTag>> loadAsync(ChunkPos chunkPos) {
 		return this.submitThrowingTask(() -> {
 			IOWorker.PendingStore pendingStore = (IOWorker.PendingStore)this.pendingWrites.get(chunkPos);

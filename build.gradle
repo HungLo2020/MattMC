@@ -511,6 +511,25 @@ tasks.withType(Test).configureEach {
         systemProperty 'mattmc.meshingCorpusReplay.fixture', corpusReplayFixture.get()
         systemProperty 'mattmc.meshingCorpusReplay.diagnostics', corpusReplayDiagnostics.get()
     }
+
+    def chunkSectionBenchmarkEnabled = providers.gradleProperty('mattmcRunChunkSectionBenchmark')
+    if (chunkSectionBenchmarkEnabled.isPresent()) {
+        def chunkSectionBenchmarkOutput = providers.gradleProperty('mattmcChunkSectionBenchmarkOutput')
+                .orElse("${buildDir}/chunk-section-benchmark/chunk_section_benchmark.json")
+        def chunkSectionBenchmarkChunks = providers.gradleProperty('mattmcChunkSectionBenchmarkChunks').orElse('24')
+        def chunkSectionBenchmarkWarmup = providers.gradleProperty('mattmcChunkSectionBenchmarkWarmup').orElse('6')
+        def chunkSectionBenchmarkMeasure = providers.gradleProperty('mattmcChunkSectionBenchmarkMeasure').orElse('18')
+        inputs.property('mattmcRunChunkSectionBenchmark', chunkSectionBenchmarkEnabled.get())
+        inputs.property('mattmcChunkSectionBenchmarkChunks', chunkSectionBenchmarkChunks.get())
+        inputs.property('mattmcChunkSectionBenchmarkWarmup', chunkSectionBenchmarkWarmup.get())
+        inputs.property('mattmcChunkSectionBenchmarkMeasure', chunkSectionBenchmarkMeasure.get())
+        outputs.file(file(chunkSectionBenchmarkOutput.get())).withPropertyName('mattmcChunkSectionBenchmarkOutput')
+        systemProperty 'mattmc.runChunkSectionBenchmark', chunkSectionBenchmarkEnabled.get()
+        systemProperty 'mattmc.chunkSectionBenchmark.output', file(chunkSectionBenchmarkOutput.get()).absolutePath
+        systemProperty 'mattmc.chunkSectionBenchmark.chunks', chunkSectionBenchmarkChunks.get()
+        systemProperty 'mattmc.chunkSectionBenchmark.warmup', chunkSectionBenchmarkWarmup.get()
+        systemProperty 'mattmc.chunkSectionBenchmark.measure', chunkSectionBenchmarkMeasure.get()
+    }
 }
 
 tasks.withType(JavaExec).configureEach {
