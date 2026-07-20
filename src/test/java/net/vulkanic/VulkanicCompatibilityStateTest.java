@@ -2,6 +2,8 @@ package net.vulkanic;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -61,12 +63,32 @@ final class VulkanicCompatibilityStateTest {
         assertEquals(9, snapshot.drawFramebuffer());
         assertEquals(303, snapshot.framebuffer().attachments().get(VulkanicAPI.GL_COLOR_ATTACHMENT0).texture());
         assertEquals(404, snapshot.texture2DByUnit().get(2));
+        assertFalse(snapshot.textureUnitBindings().containsKey(2));
         assertEquals(505, snapshot.samplerBindings().get(2));
         assertEquals(606, snapshot.indexedBufferBindings()
             .get(new VulkanicCompatibilityState.IndexedBufferKey(VulkanicBufferTarget.UNIFORM.toLegacyGlTarget(), 1))
             .buffer());
         assertTrue(snapshot.fixedFunction().viewport().isPresent());
         assertTrue(snapshot.fixedFunction().scissor().isPresent());
+    }
+
+    @Test
+    void defaultFramebufferUsesBackBufferRouting() {
+        VulkanicCompatibilityState state = new VulkanicCompatibilityState();
+
+        VulkanicCompatibilityState.GraphicsSnapshot snapshot = state.captureGraphics(
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyArrays(
+                "default-fbo",
+                VulkanicPrimitiveMode.TRIANGLES,
+                0,
+                3,
+                1
+            )
+        );
+
+        assertEquals(0, snapshot.drawFramebuffer());
+        assertEquals(List.of(VulkanicAPI.GL_BACK), snapshot.framebuffer().drawBuffers());
+        assertEquals(VulkanicAPI.GL_BACK, snapshot.framebuffer().readBuffer());
     }
 
     @Test
@@ -100,6 +122,8 @@ final class VulkanicCompatibilityStateTest {
         assertTrue(snapshot.sharedCompatibilityState().isPresent());
         assertEquals(1, snapshot.sharedCompatibilityState().get().programId());
         assertEquals(2, snapshot.sharedCompatibilityState().get().vaoId());
+        assertEquals(30, snapshot.sharedCompatibilityState().get().textureUnitBindings().get(3));
+        assertFalse(snapshot.sharedCompatibilityState().get().texture2DByUnit().containsKey(3));
         assertEquals(1, snapshot.vertexInput().vertexBuffers().size());
         assertEquals("legacy-buffer:10", snapshot.vertexInput().vertexBuffers().get(0).stableKey());
         assertTrue(snapshot.vertexInput().indexBuffer().isPresent());
@@ -108,11 +132,17 @@ final class VulkanicCompatibilityStateTest {
         assertTrue(snapshot.descriptorBindings().stream()
             .anyMatch(binding -> binding.name().equals("Sampler3")
                 && binding.resourceUse().resource().stableKey().equals("legacy-texture:30")
+                && binding.resourceReference().orElseThrow().legacyId().orElseThrow() == 30
+                && binding.resourceReference().orElseThrow().bindingUnit().orElseThrow() == 3
+                && binding.resourceReference().orElseThrow().legacyTarget().isEmpty()
+                && binding.resourceReference().orElseThrow().targetClass() == VulkanicPassResourceModel.TargetClass.UNKNOWN
                 && binding.set().orElse(-1) == 3
                 && binding.binding().orElse(-1) == 40));
         assertTrue(snapshot.descriptorBindings().stream()
             .anyMatch(binding -> binding.name().equals("Buffer2")
-                && binding.resourceUse().resource().stableKey().equals("legacy-buffer:50")));
+                && binding.resourceUse().resource().stableKey().equals("legacy-buffer:50")
+                && binding.resourceReference().orElseThrow().subresource().baseMipLevel() == 16
+                && binding.resourceReference().orElseThrow().subresource().levelCount() == 32));
     }
 
     @Test
@@ -171,9 +201,11 @@ final class VulkanicCompatibilityStateTest {
 
     @Test
     void imageUnitBindingsAreCapturedAsImmutableStorageImageSemantics() {
+        int glReadOnly = 0x88B8;
         VulkanicCompatibilityState state = new VulkanicCompatibilityState();
         state.bindProgram(9);
         state.bindImageTexture(7, 700, 2, false, 3, VulkanicAPI.GL_READ_WRITE, VulkanicAPI.GL_RGBA8);
+        state.bindImageTexture(8, 800, 1, false, 0, glReadOnly, VulkanicAPI.GL_RGBA8);
 
         VulkanicGalExecutionRequest.GraphicsDrawRequest request =
             VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyArrays(
@@ -199,8 +231,17 @@ final class VulkanicCompatibilityStateTest {
         assertTrue(snapshot.descriptorBindings().stream()
             .anyMatch(binding -> binding.name().equals("Image7")
                 && binding.resourceUse().resource().stableKey().equals("legacy-texture:700")
+                && binding.resourceReference().orElseThrow().bindingKind() == VulkanicPassResourceModel.BindingKind.STORAGE_IMAGE
+                && binding.resourceReference().orElseThrow().imageAccess().orElseThrow() == VulkanicAPI.GL_READ_WRITE
+                && binding.resourceReference().orElseThrow().imageFormat().orElseThrow() == VulkanicAPI.GL_RGBA8
+                && binding.resourceUse().access() == VulkanicPassResourceModel.Access.READ_WRITE
                 && binding.resourceUse().subresource().baseMipLevel() == 2
                 && binding.resourceUse().subresource().baseLayer() == 3));
+        assertTrue(snapshot.descriptorBindings().stream()
+            .anyMatch(binding -> binding.name().equals("Image8")
+                && binding.resourceUse().resource().stableKey().equals("legacy-texture:800")
+                && binding.resourceUse().access() == VulkanicPassResourceModel.Access.READ
+                && binding.resourceUse().usage() == VulkanicResourceUsage.SAMPLED_READ));
     }
 
     @Test
@@ -228,7 +269,8 @@ final class VulkanicCompatibilityStateTest {
 
         VulkanicCompatibilityState.ComputeSnapshot captured = snapshot.sharedCompatibilityState().orElseThrow();
         assertEquals(13, captured.programId());
-        assertEquals(110, captured.texture2DByUnit().get(1));
+        assertFalse(captured.textureUnitBindings().containsKey(1));
+        assertFalse(captured.texture2DByUnit().containsKey(1));
         assertEquals(112, captured.textureBindingsByKey()
             .get(new VulkanicCompatibilityState.TextureBindingKey(1, VulkanicAPI.GL_TEXTURE_3D)));
         assertEquals(111, captured.samplerBindings().get(1));
@@ -239,10 +281,13 @@ final class VulkanicCompatibilityStateTest {
             .buffer());
         assertTrue(snapshot.descriptorBindings().stream()
             .anyMatch(binding -> binding.name().equals("Sampler1")
-                && binding.resourceUse().resource().stableKey().equals("legacy-texture:110")));
+                && binding.resourceUse().resource().stableKey().equals("legacy-texture:112")
+                && binding.resourceReference().orElseThrow().legacyTarget().orElseThrow() == VulkanicAPI.GL_TEXTURE_3D
+                && binding.resourceReference().orElseThrow().targetClass() == VulkanicPassResourceModel.TargetClass.TEXTURE_3D));
         assertTrue(snapshot.descriptorBindings().stream()
             .anyMatch(binding -> binding.name().equals("Image2")
-                && binding.resourceUse().resource().stableKey().equals("legacy-texture:220")));
+                && binding.resourceUse().resource().stableKey().equals("legacy-texture:220")
+                && binding.resourceReference().orElseThrow().layered()));
     }
 
     @Test

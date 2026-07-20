@@ -210,8 +210,8 @@ public class VulkanTextureUploadLifecycleTest {
             "Vulkan managed buffer copy barriers should make copied index data visible");
         assertTrue(plannerSource.contains("VK_ACCESS_UNIFORM_READ_BIT"),
             "Vulkan managed buffer copy barriers should make copied uniform data visible");
-        assertTrue(source.contains("VulkanSynchronizationPlanner.planBufferTransferWriteVisibility(offset, size)"),
-            "VulkanBackend should materialize planner-owned buffer transfer-write visibility barriers");
+        assertTrue(source.contains("VulkanResourceUsageExecutionPlanner.planBufferTransferWriteVisibility(offset, size)"),
+            "VulkanBackend should materialize resource-usage planner-owned buffer transfer-write visibility barriers");
         assertTrue(countOccurrences(source, "barrierAfterBufferTransferWrite(commandBuffer, destinationBufferHandle") >= 2,
             "Both direct data copies and buffer-to-buffer copies should publish destination-buffer contents");
     }

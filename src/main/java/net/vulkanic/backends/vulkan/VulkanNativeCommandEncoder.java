@@ -41,7 +41,9 @@ import net.vulkanic.VulkanicDrawStateDiagnostics;
 import net.vulkanic.VulkanicDrawStateSnapshot;
 import net.vulkanic.VulkanicIndexType;
 import net.vulkanic.VulkanicPipelineResourceResolver;
+import net.vulkanic.VulkanicGalExecutionRequest;
 import net.vulkanic.VulkanicRenderPass;
+import net.vulkanic.VulkanicRenderPassDescriptor;
 import net.vulkanic.VulkanicRenderTargetDescriptor;
 import net.vulkanic.VulkanicTexture;
 import net.vulkanic.VulkanicTextureView;
@@ -197,7 +199,20 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         VulkanicTextureView depthView = depthTextureView != null ? this.createTextureView(depthTextureView) : null;
         boolean renderPassStarted = false;
         try {
-            VulkanicRenderPass pass = this.backend.beginRenderPass(ctx, label, colorView, clearColor, depthView, clearDepth);
+            VulkanicRenderPassDescriptor descriptor = VulkanicRenderPassDescriptor.colorAndDepth(
+                label,
+                colorView,
+                clearColor,
+                depthView,
+                clearDepth
+            );
+            VulkanicRenderPass pass = this.backend.executeRenderPassBegin(
+                ctx,
+                VulkanicGalExecutionRequest.RenderPassBeginRequest.descriptor(
+                    "native-commandencoder-renderpass(texture)",
+                    descriptor
+                )
+            );
             renderPassStarted = true;
             this.inRenderPass = true;
             VulkanicAPI.traceShaderInputParityOrdering(
@@ -227,7 +242,15 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             return this.backend.createCompatibilityCommandEncoder().createRenderPass(label, framebuffer, hasDepthTexture);
         }
         CommandContext ctx = this.backend.beginCommandBuffer();
-        VulkanicRenderPass pass = this.backend.beginRenderPass(ctx, label, framebuffer, hasDepthTexture);
+        VulkanicRenderPass pass = this.backend.executeRenderPassBegin(
+            ctx,
+            VulkanicGalExecutionRequest.RenderPassBeginRequest.framebuffer(
+                "native-commandencoder-renderpass(framebuffer)",
+                label,
+                framebuffer,
+                hasDepthTexture
+            )
+        );
         this.inRenderPass = true;
         VulkanicAPI.traceShaderInputParityOrdering(
             "pass-begin",
@@ -241,7 +264,13 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
     public RenderPass createRenderPass(VulkanicRenderTargetDescriptor descriptor) {
         this.ensureNoRenderPass();
         CommandContext ctx = this.backend.beginCommandBuffer();
-        VulkanicRenderPass pass = this.backend.beginRenderPass(ctx, descriptor);
+        VulkanicRenderPass pass = this.backend.executeRenderPassBegin(
+            ctx,
+            VulkanicGalExecutionRequest.RenderPassBeginRequest.targetDescriptor(
+                "native-commandencoder-renderpass(targetDescriptor)",
+                descriptor
+            )
+        );
         this.inRenderPass = true;
         VulkanicAPI.traceShaderInputParityOrdering(
             "pass-begin",

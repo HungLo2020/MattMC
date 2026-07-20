@@ -19,6 +19,8 @@ import java.util.Set;
  * explicit pass interface.</p>
  */
 public final class VulkanicPassResourceModel {
+    public static final long UNKNOWN_GENERATION = -1L;
+
     private VulkanicPassResourceModel() {
     }
 
@@ -56,6 +58,33 @@ public final class VulkanicPassResourceModel {
         COLOR,
         DEPTH,
         STENCIL
+    }
+
+    public enum BindingKind {
+        BUFFER_RANGE,
+        SAMPLED_TEXTURE,
+        STORAGE_IMAGE,
+        TEXEL_BUFFER,
+        ATTACHMENT
+    }
+
+    public enum TargetClass {
+        UNKNOWN,
+        BUFFER,
+        TEXTURE_1D,
+        TEXTURE_2D,
+        TEXTURE_3D,
+        TEXTURE_CUBE,
+        TEXTURE_2D_ARRAY
+    }
+
+    public enum FormatClass {
+        UNKNOWN,
+        BUFFER,
+        COLOR,
+        DEPTH,
+        STENCIL,
+        DEPTH_STENCIL
     }
 
     public record ResourceIdentity(
@@ -175,6 +204,199 @@ public final class VulkanicPassResourceModel {
         }
     }
 
+    public record CanonicalResourceReference(
+        ResourceIdentity resource,
+        BindingKind bindingKind,
+        Access access,
+        Subresource subresource,
+        VulkanicResourceUsage usage,
+        TargetClass targetClass,
+        FormatClass formatClass,
+        long generation,
+        OptionalInt legacyId,
+        OptionalInt legacyTarget,
+        OptionalInt bindingUnit,
+        OptionalInt samplerObject,
+        OptionalInt imageAccess,
+        OptionalInt imageFormat,
+        boolean layered
+    ) {
+        public CanonicalResourceReference {
+            resource = Objects.requireNonNull(resource, "resource");
+            bindingKind = Objects.requireNonNull(bindingKind, "bindingKind");
+            access = Objects.requireNonNull(access, "access");
+            subresource = Objects.requireNonNull(subresource, "subresource");
+            usage = Objects.requireNonNull(usage, "usage");
+            targetClass = Objects.requireNonNull(targetClass, "targetClass");
+            formatClass = Objects.requireNonNull(formatClass, "formatClass");
+            legacyId = Objects.requireNonNull(legacyId, "legacyId");
+            legacyTarget = Objects.requireNonNull(legacyTarget, "legacyTarget");
+            bindingUnit = Objects.requireNonNull(bindingUnit, "bindingUnit");
+            samplerObject = Objects.requireNonNull(samplerObject, "samplerObject");
+            imageAccess = Objects.requireNonNull(imageAccess, "imageAccess");
+            imageFormat = Objects.requireNonNull(imageFormat, "imageFormat");
+            if (generation < UNKNOWN_GENERATION) {
+                throw new IllegalArgumentException("generation must be >= UNKNOWN_GENERATION");
+            }
+        }
+
+        public ResourceUse asResourceUse(String role, boolean feedbackLoop, int order) {
+            return ResourceUse.of(resource, access, subresource, usage, role, feedbackLoop, order);
+        }
+
+        public static CanonicalResourceReference fromUse(ResourceUse use) {
+            Objects.requireNonNull(use, "use");
+            return new CanonicalResourceReference(
+                use.resource(),
+                bindingKindFor(use.kind()),
+                use.access(),
+                use.subresource(),
+                use.usage(),
+                targetClassFor(use.kind()),
+                formatClassFor(use.kind(), use.subresource()),
+                UNKNOWN_GENERATION,
+                OptionalInt.empty(),
+                OptionalInt.empty(),
+                OptionalInt.empty(),
+                OptionalInt.empty(),
+                OptionalInt.empty(),
+                OptionalInt.empty(),
+                false
+            );
+        }
+
+        public static CanonicalResourceReference sampledTexture(
+            String logicalName,
+            String stableKey,
+            int legacyTextureId,
+            OptionalInt legacyTarget,
+            TargetClass targetClass,
+            Subresource subresource,
+            OptionalInt textureUnit,
+            OptionalInt samplerObject
+        ) {
+            return new CanonicalResourceReference(
+                ResourceIdentity.of(logicalName, ResourceKind.SAMPLED_TEXTURE, stableKey),
+                BindingKind.SAMPLED_TEXTURE,
+                Access.READ,
+                subresource,
+                VulkanicResourceUsage.SAMPLED_READ,
+                targetClass,
+                FormatClass.COLOR,
+                UNKNOWN_GENERATION,
+                OptionalInt.of(legacyTextureId),
+                legacyTarget,
+                textureUnit,
+                samplerObject,
+                OptionalInt.empty(),
+                OptionalInt.empty(),
+                false
+            );
+        }
+
+        public static CanonicalResourceReference storageImage(
+            String logicalName,
+            String stableKey,
+            int legacyTextureId,
+            int level,
+            boolean layered,
+            int layer,
+            Access access,
+            VulkanicResourceUsage usage,
+            OptionalInt imageUnit,
+            OptionalInt imageAccess,
+            OptionalInt imageFormat
+        ) {
+            return new CanonicalResourceReference(
+                ResourceIdentity.of(logicalName, ResourceKind.STORAGE_TEXTURE, stableKey),
+                BindingKind.STORAGE_IMAGE,
+                access,
+                layered
+                    ? Subresource.color(level, 1, 0, Math.max(1, layer + 1))
+                    : Subresource.color(level, 1, Math.max(0, layer), 1),
+                usage,
+                TargetClass.UNKNOWN,
+                FormatClass.COLOR,
+                UNKNOWN_GENERATION,
+                OptionalInt.of(legacyTextureId),
+                OptionalInt.empty(),
+                imageUnit,
+                OptionalInt.empty(),
+                imageAccess,
+                imageFormat,
+                layered
+            );
+        }
+
+        public static CanonicalResourceReference bufferRange(
+            String logicalName,
+            ResourceKind kind,
+            String stableKey,
+            long offset,
+            long size,
+            Access access,
+            VulkanicResourceUsage usage,
+            OptionalInt bindingUnit
+        ) {
+            return new CanonicalResourceReference(
+                ResourceIdentity.of(logicalName, kind, stableKey),
+                BindingKind.BUFFER_RANGE,
+                access,
+                Subresource.bufferRange(offset, size),
+                usage,
+                TargetClass.BUFFER,
+                FormatClass.BUFFER,
+                UNKNOWN_GENERATION,
+                OptionalInt.empty(),
+                OptionalInt.empty(),
+                bindingUnit,
+                OptionalInt.empty(),
+                OptionalInt.empty(),
+                OptionalInt.empty(),
+                false
+            );
+        }
+
+        private static BindingKind bindingKindFor(ResourceKind kind) {
+            return switch (kind) {
+                case SAMPLED_TEXTURE -> BindingKind.SAMPLED_TEXTURE;
+                case STORAGE_TEXTURE -> BindingKind.STORAGE_IMAGE;
+                case TEXEL_BUFFER -> BindingKind.TEXEL_BUFFER;
+                case COLOR_ATTACHMENT, DEPTH_ATTACHMENT -> BindingKind.ATTACHMENT;
+                default -> BindingKind.BUFFER_RANGE;
+            };
+        }
+
+        private static TargetClass targetClassFor(ResourceKind kind) {
+            return switch (kind) {
+                case SAMPLED_TEXTURE, STORAGE_TEXTURE, COLOR_ATTACHMENT, DEPTH_ATTACHMENT -> TargetClass.UNKNOWN;
+                case TEXEL_BUFFER -> TargetClass.BUFFER;
+                default -> TargetClass.BUFFER;
+            };
+        }
+
+        private static FormatClass formatClassFor(ResourceKind kind, Subresource subresource) {
+            if (kind == ResourceKind.TEXEL_BUFFER
+                || kind == ResourceKind.UNIFORM_BUFFER
+                || kind == ResourceKind.STORAGE_BUFFER
+                || kind == ResourceKind.VERTEX_BUFFER
+                || kind == ResourceKind.INDEX_BUFFER
+                || kind == ResourceKind.INDIRECT_BUFFER) {
+                return FormatClass.BUFFER;
+            }
+            if (subresource.aspects().contains(Aspect.DEPTH) && subresource.aspects().contains(Aspect.STENCIL)) {
+                return FormatClass.DEPTH_STENCIL;
+            }
+            if (subresource.aspects().contains(Aspect.DEPTH)) {
+                return FormatClass.DEPTH;
+            }
+            if (subresource.aspects().contains(Aspect.STENCIL)) {
+                return FormatClass.STENCIL;
+            }
+            return FormatClass.COLOR;
+        }
+    }
+
     public record AttachmentUse(
         int attachmentIndex,
         ResourceIdentity resource,
@@ -219,13 +441,35 @@ public final class VulkanicPassResourceModel {
         String name,
         ResourceUse resourceUse,
         OptionalInt set,
-        OptionalInt binding
+        OptionalInt binding,
+        Optional<CanonicalResourceReference> resourceReference
     ) {
         public BindingSnapshot {
             name = requireNonBlank(name, "name");
             resourceUse = Objects.requireNonNull(resourceUse, "resourceUse");
             set = Objects.requireNonNull(set, "set");
             binding = Objects.requireNonNull(binding, "binding");
+            resourceReference = Objects.requireNonNull(resourceReference, "resourceReference");
+            if (resourceReference.isPresent()) {
+                CanonicalResourceReference reference = resourceReference.get();
+                if (!reference.resource().stableKey().equals(resourceUse.resource().stableKey())) {
+                    throw new IllegalArgumentException(
+                        "binding resource reference stable key "
+                            + reference.resource().stableKey()
+                            + " does not match resource use "
+                            + resourceUse.resource().stableKey()
+                    );
+                }
+            }
+        }
+
+        public BindingSnapshot(
+            String name,
+            ResourceUse resourceUse,
+            OptionalInt set,
+            OptionalInt binding
+        ) {
+            this(name, resourceUse, set, binding, Optional.empty());
         }
     }
 

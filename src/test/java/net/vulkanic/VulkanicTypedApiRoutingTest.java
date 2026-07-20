@@ -104,7 +104,7 @@ public class VulkanicTypedApiRoutingTest {
     }
 
     @Test
-    public void testUploadTexture2DRoutingUsesTypedMethodForKnownTuple() {
+    public void testUploadTexture2DRoutingUsesExplicitTransferRequestForKnownTuple() {
         VulkanicAPI.uploadTexture2D(
             TEST_CONTEXT,
             VulkanicAPI.GL_TEXTURE_2D,
@@ -120,11 +120,23 @@ public class VulkanicTypedApiRoutingTest {
 
         RecordedInvocation invocation = invocationHandler.lastInvocation;
         assertNotNull(invocation);
-        assertEquals("uploadTexture2D", invocation.method.getName());
-        assertEquals(VulkanicTextureTarget.class, invocation.method.getParameterTypes()[1]);
-        assertEquals(VulkanicTextureUploadFormat.class, invocation.method.getParameterTypes()[3]);
-        assertEquals(VulkanicTextureTarget.TEXTURE_2D, invocation.args[1]);
-        assertEquals(VulkanicTextureUploadFormat.RED32_SFLOAT, invocation.args[3]);
+        assertEquals("executeTransfer", invocation.method.getName());
+        VulkanicGalExecutionRequest.TransferRequest request =
+            (VulkanicGalExecutionRequest.TransferRequest) invocation.args[1];
+        assertEquals(VulkanicGalExecutionRequest.TransferKind.UPLOAD_TEXTURE_2D, request.kind());
+        assertArrayEquals(
+            new int[] {
+                VulkanicAPI.GL_TEXTURE_2D,
+                0,
+                VulkanicAPI.GL_R32F,
+                1,
+                1,
+                0,
+                VulkanicAPI.GL_RED,
+                VulkanicAPI.GL_FLOAT
+            },
+            request.intArgs()
+        );
     }
 
     @Test
@@ -145,14 +157,15 @@ public class VulkanicTypedApiRoutingTest {
 
         RecordedInvocation invocation = invocationHandler.lastInvocation;
         assertNotNull(invocation);
-        assertEquals("uploadTexture2D", invocation.method.getName());
-        assertEquals(int.class, invocation.method.getParameterTypes()[1]);
-        assertEquals(int.class, invocation.method.getParameterTypes()[3]);
-        assertEquals(unknownInternalFormat, invocation.args[3]);
+        assertEquals("executeTransfer", invocation.method.getName());
+        VulkanicGalExecutionRequest.TransferRequest request =
+            (VulkanicGalExecutionRequest.TransferRequest) invocation.args[1];
+        assertEquals(VulkanicGalExecutionRequest.TransferKind.UPLOAD_TEXTURE_2D, request.kind());
+        assertEquals(unknownInternalFormat, request.intArgs()[2]);
     }
 
     @Test
-    public void testUploadTexture2DRoutingPreservesRawTupleOnOpenGLBackend() {
+    public void testUploadTexture2DRoutingPreservesRawTupleInExplicitRequestOnOpenGLBackend() {
         invocationHandler.setBackendType(GraphicsBackendType.OPENGL);
 
         VulkanicAPI.uploadTexture2D(
@@ -170,10 +183,11 @@ public class VulkanicTypedApiRoutingTest {
 
         RecordedInvocation invocation = invocationHandler.lastInvocation;
         assertNotNull(invocation);
-        assertEquals("uploadTexture2D", invocation.method.getName());
-        assertEquals(int.class, invocation.method.getParameterTypes()[1]);
-        assertEquals(int.class, invocation.method.getParameterTypes()[3]);
-        assertEquals(VulkanicAPI.GL_R32F, invocation.args[3]);
+        assertEquals("executeTransfer", invocation.method.getName());
+        VulkanicGalExecutionRequest.TransferRequest request =
+            (VulkanicGalExecutionRequest.TransferRequest) invocation.args[1];
+        assertEquals(VulkanicGalExecutionRequest.TransferKind.UPLOAD_TEXTURE_2D, request.kind());
+        assertEquals(VulkanicAPI.GL_R32F, request.intArgs()[2]);
     }
 
     @Test

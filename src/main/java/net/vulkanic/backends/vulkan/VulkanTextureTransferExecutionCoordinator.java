@@ -565,6 +565,7 @@ final class VulkanTextureTransferExecutionCoordinator {
         int finalLayout = finalLayoutIsIdle ? preferredIdleLayout(storage) : originalLayout;
         VulkanicPassResourceModel.PassExecutionPlan resourcePlan =
             explicitTransferPlan(storage, target.mipLevel(), Math.max(0, baseLayer), Math.max(1, layerCount), usage);
+        VulkanResourceUsageExecutionPlanner.plan(resourcePlan);
         return new TransferOperationPlan(
             storage,
             target.mipLevel(),

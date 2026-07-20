@@ -368,7 +368,8 @@ public class VulkanBackendFramebufferCompatibilityTest {
 			"VulkanBackend should not blanket-route framebuffer render passes through GlCommandEncoder");
 		assertTrue(nativeEncoderSource.contains("!this.backend.canCreateNativeFramebufferRenderPass(framebuffer, hasDepthTexture)")
 				&& nativeEncoderSource.contains("this.backend.createCompatibilityCommandEncoder().createRenderPass(label, framebuffer, hasDepthTexture)")
-				&& nativeEncoderSource.contains("this.backend.beginRenderPass(ctx, label, framebuffer, hasDepthTexture)"),
+				&& nativeEncoderSource.contains("this.backend.executeRenderPassBegin(")
+				&& nativeEncoderSource.contains("VulkanicGalExecutionRequest.RenderPassBeginRequest.framebuffer("),
 			"VulkanNativeCommandEncoder should use native framebuffer render passes when resolvable and keep only unresolved fallback explicit");
 	}
 

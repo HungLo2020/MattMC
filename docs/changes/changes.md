@@ -18,6 +18,7 @@ This Document is a list of all changes in MattMC over base Minecraft Java 1.21.1
 - Backported features from [Mounts of Mayhem (1.21.11)](../changelog/changelog/7.2026.md) including Nautilus, and Spear
 - Offline Skin System
 - Region Editor accessible via main menu
+- World Map & Mini Map
 
 ## Removals
 - Microsoft Telemetry

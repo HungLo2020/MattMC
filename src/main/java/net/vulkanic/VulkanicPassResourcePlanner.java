@@ -87,7 +87,6 @@ public final class VulkanicPassResourcePlanner {
     ) {
         return left.feedbackLoop()
             && right.feedbackLoop()
-            && left.resource().kind() == VulkanicPassResourceModel.ResourceKind.COLOR_ATTACHMENT
-            && right.resource().kind() == VulkanicPassResourceModel.ResourceKind.COLOR_ATTACHMENT;
+            && sameResource(left, right);
     }
 }

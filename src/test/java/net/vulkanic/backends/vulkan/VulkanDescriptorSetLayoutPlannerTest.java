@@ -6,6 +6,9 @@ import net.vulkanic.PipelineResourceBindings;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicBuffer;
 import net.vulkanic.VulkanicBufferSlice;
+import net.vulkanic.VulkanicPassResourceModel;
+import net.vulkanic.VulkanicPassResourcePlanner;
+import net.vulkanic.VulkanicResourceUsage;
 import net.vulkanic.VulkanicShaderStage;
 import net.vulkanic.VulkanicTexture;
 import net.vulkanic.VulkanicTextureFormat;
@@ -168,6 +171,140 @@ final class VulkanDescriptorSetLayoutPlannerTest {
                 VulkanDescriptorBindingPlanner.DescriptorPlanEntry::descriptorType
             ));
         assertEquals(layoutTypes, runtimeTypes);
+    }
+
+    @Test
+    void descriptorPlannerUsesRequestOwnedCanonicalSamplerReference() {
+        VulkanImageResourceViewCoordinator.ImageStorageSnapshot texture = textureSnapshot(17);
+        VulkanTextureView view = textureView(texture);
+        VulkanicPassResourceModel.CanonicalResourceReference canonicalReference =
+            VulkanicPassResourceModel.CanonicalResourceReference.sampledTexture(
+                "colortex0",
+                "semantic-colortex0-main",
+                texture.textureId(),
+                java.util.OptionalInt.of(VulkanicAPI.GL_TEXTURE_3D),
+                VulkanicPassResourceModel.TargetClass.TEXTURE_3D,
+                VulkanicPassResourceModel.Subresource.color(2, 3, 0, 1),
+                java.util.OptionalInt.of(5),
+                java.util.OptionalInt.of(77)
+            );
+
+        VulkanDescriptorBindingPlanner.DescriptorBindingPlan bindingPlan = new VulkanDescriptorBindingPlanner().plan(
+            new VulkanDescriptorBindingPlanner.PlanRequest(
+                List.of(binding("Sampler5", 0, 5, PipelineDescriptor.ResourceType.SAMPLER, null,
+                    Set.of(VulkanicShaderStage.FRAGMENT))),
+                PipelineResourceBindings.ofResolvedBindings(
+                    Map.of("Sampler5", new PipelineResourceBindings.SamplerBinding(5, 77, view, canonicalReference)),
+                    Map.of(),
+                    Map.of(),
+                    Map.of()
+                ),
+                new SingleTextureLookup(view, texture),
+                unit -> null,
+                id -> null,
+                NullSamplerStateLookup.INSTANCE,
+                (textureId, level) -> VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                new VulkanDescriptorBindingPlanner.RenderStateSnapshot(false, Set.of()),
+                256,
+                false,
+                false,
+                "iris:composite",
+                0x5555L,
+                VulkanDescriptorBindingPlanner.PlannerEvents.NOOP
+            )
+        );
+
+        VulkanicPassResourceModel.ResourceUse use = bindingPlan.entries().getFirst().resourceUse();
+        assertEquals("semantic-colortex0-main", use.resource().stableKey());
+        assertEquals("colortex0", use.resource().logicalName());
+        assertEquals(2, use.subresource().baseMipLevel());
+        assertEquals(3, use.subresource().levelCount());
+    }
+
+    @Test
+    void descriptorPlannerDeclaresSameTextureSamplerStorageImageAlias() {
+        VulkanImageResourceViewCoordinator.ImageStorageSnapshot texture = textureSnapshot(71);
+        VulkanTextureView view = textureView(texture);
+        String stableKey = "legacy-texture:" + texture.textureId();
+        VulkanicPassResourceModel.CanonicalResourceReference samplerReference =
+            VulkanicPassResourceModel.CanonicalResourceReference.sampledTexture(
+                "floodfill",
+                stableKey,
+                texture.textureId(),
+                java.util.OptionalInt.empty(),
+                VulkanicPassResourceModel.TargetClass.UNKNOWN,
+                VulkanicPassResourceModel.Subresource.color(0, 1, 0, 1),
+                java.util.OptionalInt.of(2),
+                java.util.OptionalInt.empty()
+            );
+        VulkanicPassResourceModel.CanonicalResourceReference storageReference =
+            VulkanicPassResourceModel.CanonicalResourceReference.storageImage(
+                "floodfill",
+                stableKey,
+                texture.textureId(),
+                0,
+                false,
+                0,
+                VulkanicPassResourceModel.Access.READ_WRITE,
+                VulkanicResourceUsage.STORAGE_READ_WRITE,
+                java.util.OptionalInt.of(3),
+                java.util.OptionalInt.of(0),
+                java.util.OptionalInt.of(VulkanicAPI.GL_RGBA8)
+            );
+
+        List<PipelineDescriptor.ResourceBinding> layout = List.of(
+            binding("floodfill_sampler", 0, 0, PipelineDescriptor.ResourceType.SAMPLER, null,
+                Set.of(VulkanicShaderStage.COMPUTE)),
+            binding("floodfill_img", 0, 1, PipelineDescriptor.ResourceType.STORAGE_IMAGE, null,
+                Set.of(VulkanicShaderStage.COMPUTE))
+        );
+
+        VulkanDescriptorBindingPlanner.DescriptorBindingPlan bindingPlan = new VulkanDescriptorBindingPlanner().plan(
+            new VulkanDescriptorBindingPlanner.PlanRequest(
+                layout,
+                PipelineResourceBindings.ofResolvedBindings(
+                    Map.of("floodfill_sampler", new PipelineResourceBindings.SamplerBinding(2, null, view, samplerReference)),
+                    Map.of(),
+                    Map.of("floodfill_img", new PipelineResourceBindings.StorageImageBinding(
+                        3,
+                        texture.textureId(),
+                        0,
+                        false,
+                        0,
+                        0,
+                        VulkanicAPI.GL_RGBA8,
+                        storageReference
+                    )),
+                    Map.of()
+                ),
+                new SingleTextureLookup(view, texture),
+                unit -> null,
+                id -> null,
+                NullSamplerStateLookup.INSTANCE,
+                (textureId, level) -> VK10.VK_IMAGE_LAYOUT_GENERAL,
+                new VulkanDescriptorBindingPlanner.RenderStateSnapshot(false, Set.of()),
+                256,
+                false,
+                false,
+                "vulkanic:legacy_compute_program/83",
+                0x6666L,
+                VulkanDescriptorBindingPlanner.PlannerEvents.NOOP
+            )
+        );
+
+        assertEquals(2, bindingPlan.resourceUses().size());
+        assertTrue(bindingPlan.resourceUses().stream().allMatch(VulkanicPassResourceModel.ResourceUse::feedbackLoop));
+        VulkanicPassResourcePlanner.plan(new VulkanicPassResourceModel.PassRequest(
+            VulkanicPassResourceModel.PassKind.COMPUTE,
+            "compute:floodfill",
+            List.of(),
+            bindingPlan.resourceUses(),
+            List.of(),
+            List.of(new VulkanicPassResourceModel.Command("dispatch", java.util.OptionalInt.empty(), java.util.OptionalInt.of(1))),
+            List.of(),
+            false,
+            false
+        ));
     }
 
     @Test

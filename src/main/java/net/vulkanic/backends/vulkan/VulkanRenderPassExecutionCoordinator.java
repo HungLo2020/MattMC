@@ -295,6 +295,7 @@ final class VulkanRenderPassExecutionCoordinator<ColorAttachment, DepthAttachmen
         VulkanicPassResourceModel.PassExecutionPlan resourcePlan = VulkanicLegacyCompatibilityAdapter.planRenderPass(
             explicitRenderPassSnapshot(kind, label, colors, depth)
         );
+        VulkanResourceUsageExecutionPlanner.plan(resourcePlan);
         return new BeginPassPlan<>(
             kind,
             Objects.requireNonNull(label, "label"),

@@ -120,14 +120,60 @@ public class ApiNeutralityCallsiteTest {
             "texture handle resolution should bypass Vulkan proxy reflection");
         assertTrue(source.contains("directVulkanBackend.resolveBufferHandle(ctx, buffer)"),
             "buffer handle resolution should bypass Vulkan proxy reflection");
-        assertTrue(source.contains("directVulkanBackend.uploadTexture2DSubImage(ctx, target, level, xOffset, yOffset, width, height, format, type, pixels);"),
-            "texture sub-image uploads should bypass Vulkan proxy reflection");
+        assertTrue(source.contains("TransferKind.UPLOAD_TEXTURE_2D_SUB_IMAGE_BUFFER")
+                && source.contains("TransferKind.UPLOAD_TEXTURE_2D_SUB_IMAGE_POINTER"),
+            "texture sub-image uploads should route through explicit GAL transfer requests");
         assertTrue(source.contains("directVulkanBackend.setUniform1f(ctx, location.value(), value);"),
             "typed uniform wrappers should call Vulkan's concrete integer-location implementation directly");
-        assertTrue(source.contains("directVulkanBackend.drawIndexedBaseVertex(ctx, mode, count, type, indices, baseVertex);"),
-            "indexed base-vertex draws should bypass Vulkan proxy reflection");
-        assertTrue(source.contains("directVulkanBackend.beginRenderPass(ctx, descriptor);"),
-            "render-pass begin should bypass Vulkan proxy reflection");
+        assertTrue(source.contains("executeGalGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyIndexed(")
+                && source.contains("\"drawIndexedBaseVertex\""),
+            "indexed base-vertex draws should route through the immutable graphics GAL request boundary");
+        assertTrue(source.contains("executeGalRenderPassBegin(")
+                && source.contains("VulkanicGalSnapshotBuilder.captureRenderPassBegin(ctx, backend, request)")
+                && source.contains("backend.executeRenderPassBegin("),
+            "render-pass begin should route through the explicit GAL pass-lifecycle boundary");
+    }
+
+    @Test
+    public void testExplicitResourceUsageModelFeedsBackendExecutionPlanning() throws IOException {
+        String vulkanBackendSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String vulkanExecutionPlannerSource = readSource(
+            SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanResourceUsageExecutionPlanner.java")
+        );
+        String vulkanRenderPassSource = readSource(
+            SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanRenderPassExecutionCoordinator.java")
+        );
+        String vulkanTransferSource = readSource(
+            SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanTextureTransferExecutionCoordinator.java")
+        );
+        String openGlBackendSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/opengl/OpenGLBackend.java"));
+        String openGlExecutionPlannerSource = readSource(
+            SRC_MAIN_JAVA.resolve("net/vulkanic/backends/opengl/OpenGLResourceUsageExecutionPlanner.java")
+        );
+
+        assertTrue(vulkanExecutionPlannerSource.contains("VulkanicPassResourcePlanner.plan(resourcePlan.request())"),
+            "Vulkan execution planning should validate the immutable GAL resource request before deriving native intent");
+        assertTrue(vulkanExecutionPlannerSource.contains("planImageTransitionForUse")
+                && vulkanExecutionPlannerSource.contains("planBufferTransferWriteVisibility")
+                && vulkanExecutionPlannerSource.contains("planResourceBarrier"),
+            "Vulkan image, buffer, and explicit memory-barrier intent should be routed through the resource-usage execution planner");
+        assertTrue(vulkanBackendSource.contains("consumeResourceUsagePlan(request.resourcePlan())"),
+            "Vulkan executor entrypoints should consume request-owned resource plans before native lowering");
+        assertTrue(vulkanBackendSource.contains("VulkanResourceUsageExecutionPlanner.plan(plan.resourcePlan())"),
+            "Native graphics/compute command emission should carry an immutable resource execution plan");
+        assertFalse(vulkanBackendSource.contains("VulkanSynchronizationPlanner.planImageLayoutTransition(\n                    aspectMask"),
+            "NativeSpine should not directly derive image layout transitions without the resource-usage execution planner");
+        assertTrue(vulkanRenderPassSource.contains("VulkanResourceUsageExecutionPlanner.plan(resourcePlan)"),
+            "Render-pass setup should feed attachment/resource declarations into Vulkan execution planning");
+        assertTrue(vulkanTransferSource.contains("VulkanResourceUsageExecutionPlanner.plan(resourcePlan)"),
+            "Texture transfer setup should feed upload/copy/readback declarations into Vulkan execution planning");
+
+        assertTrue(openGlExecutionPlannerSource.contains("VulkanicPassResourcePlanner.plan(resourcePlan.request())"),
+            "OpenGL execution planning should consume the same semantic resource requests as Vulkan");
+        assertTrue(openGlExecutionPlannerSource.contains("postWriteBarrierBits"),
+            "OpenGL lowering should derive GL memory-barrier categories from semantic resource writes");
+        assertTrue(openGlBackendSource.contains("consumeResourceUsagePlan(request.resourcePlan())"),
+            "OpenGL executor entrypoints should consume immutable resource plans before lowering");
     }
 
     @Test
@@ -174,8 +220,8 @@ public class ApiNeutralityCallsiteTest {
             "Descriptor-backed MRT passes should now use the native Vulkan encoder once explicit target descriptors are available");
         assertTrue(nativeEncoderSource.contains("canCreateNativeFramebufferRenderPass(framebuffer, hasDepthTexture)")
                 && nativeEncoderSource.contains("this.backend.createCompatibilityCommandEncoder().createRenderPass(label, framebuffer, hasDepthTexture)")
-                && nativeEncoderSource.contains("VulkanicRenderPass pass = this.backend.beginRenderPass(ctx, label, framebuffer, hasDepthTexture)")
-                && nativeEncoderSource.contains("VulkanicRenderPass pass = this.backend.beginRenderPass(ctx, descriptor);"),
+                && nativeEncoderSource.contains("VulkanicGalExecutionRequest.RenderPassBeginRequest.framebuffer(")
+                && nativeEncoderSource.contains("VulkanicGalExecutionRequest.RenderPassBeginRequest.targetDescriptor("),
             "General native encoders should promote resolvable framebuffer passes while keeping unresolved framebuffer fallback explicit");
         assertFalse(nativeEncoderSource.contains("this.unsupported(\"copyToBuffer\")")
                 || nativeEncoderSource.contains("this.unsupported(\"clearColorTexture\")")

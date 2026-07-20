@@ -92,12 +92,19 @@ public final class VulkanicPipelineResourceResolver {
                 VulkanicTextureView view = lookup.samplerView(binding);
                 Integer samplerUnit = lookup.samplerUnit(binding);
                 if (view != null && samplerUnit != null) {
-                    yield PipelineResourcePlanner.ResolvedResource.sampler(
+                    PipelineResourceBindings.SamplerBinding samplerBinding =
                         new PipelineResourceBindings.SamplerBinding(
                             samplerUnit,
                             lookup.samplerObject(samplerUnit),
                             view
-                        )
+                        );
+                    VulkanicPassResourceModel.CanonicalResourceReference reference =
+                        lookup.samplerReference(binding, samplerUnit, view);
+                    if (reference != null) {
+                        samplerBinding = samplerBinding.withResourceReference(reference);
+                    }
+                    yield PipelineResourcePlanner.ResolvedResource.sampler(
+                        samplerBinding
                     );
                 }
                 yield null;
@@ -108,15 +115,26 @@ public final class VulkanicPipelineResourceResolver {
             }
             case STORAGE_IMAGE -> {
                 PipelineResourceBindings.StorageImageBinding imageBinding = lookup.storageImageBinding(binding);
+                VulkanicPassResourceModel.CanonicalResourceReference reference =
+                    imageBinding == null ? null : lookup.storageImageReference(binding, imageBinding);
+                if (imageBinding != null && reference != null) {
+                    imageBinding = imageBinding.withResourceReference(reference);
+                }
                 yield imageBinding != null ? PipelineResourcePlanner.ResolvedResource.storageImage(imageBinding) : null;
             }
             case TEXEL_BUFFER -> {
                 Integer textureUnit = lookup.texelBufferUnit(binding);
-                yield textureUnit != null
-                    ? PipelineResourcePlanner.ResolvedResource.texelBuffer(
-                        new PipelineResourceBindings.TexelBufferBinding(textureUnit)
-                    )
-                    : null;
+                if (textureUnit == null) {
+                    yield null;
+                }
+                PipelineResourceBindings.TexelBufferBinding texelBufferBinding =
+                    new PipelineResourceBindings.TexelBufferBinding(textureUnit);
+                VulkanicPassResourceModel.CanonicalResourceReference reference =
+                    lookup.texelBufferReference(binding, textureUnit);
+                if (reference != null) {
+                    texelBufferBinding = texelBufferBinding.withResourceReference(reference);
+                }
+                yield PipelineResourcePlanner.ResolvedResource.texelBuffer(texelBufferBinding);
             }
         };
     }
@@ -161,5 +179,30 @@ public final class VulkanicPipelineResourceResolver {
 
         @Nullable
         Integer samplerObject(int samplerUnit);
+
+        @Nullable
+        default VulkanicPassResourceModel.CanonicalResourceReference samplerReference(
+            PipelineDescriptor.ResourceBinding binding,
+            int samplerUnit,
+            VulkanicTextureView textureView
+        ) {
+            return null;
+        }
+
+        @Nullable
+        default VulkanicPassResourceModel.CanonicalResourceReference storageImageReference(
+            PipelineDescriptor.ResourceBinding binding,
+            PipelineResourceBindings.StorageImageBinding imageBinding
+        ) {
+            return null;
+        }
+
+        @Nullable
+        default VulkanicPassResourceModel.CanonicalResourceReference texelBufferReference(
+            PipelineDescriptor.ResourceBinding binding,
+            int textureUnit
+        ) {
+            return null;
+        }
     }
 }

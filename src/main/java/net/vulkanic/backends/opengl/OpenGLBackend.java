@@ -20,6 +20,7 @@ import net.vulkanic.VulkanicBlendFactor;
 import net.vulkanic.VulkanicBufferTarget;
 import net.vulkanic.VulkanicCapability;
 import net.vulkanic.VulkanicClearBuffer;
+import net.vulkanic.VulkanicCompatibilityState;
 import net.vulkanic.VulkanicCullFaceMode;
 import net.vulkanic.VulkanicDepthCompareOp;
 import net.vulkanic.VulkanicGalExecutionRequest;
@@ -352,7 +353,50 @@ public class OpenGLBackend implements GraphicsBackend {
 
     @Override
     public void executeClear(CommandContext ctx, VulkanicGalExecutionRequest.ClearRequest request) {
+        consumeResourceUsagePlan(request.resourcePlan());
         clearBuffers(ctx, VulkanicClearBuffer.toLegacyGlMask(request.buffers().toArray(VulkanicClearBuffer[]::new)));
+    }
+
+    @Override
+    public void executeTransfer(CommandContext ctx, VulkanicGalExecutionRequest.TransferRequest request) {
+        java.util.Objects.requireNonNull(request, "request");
+        consumeResourceUsagePlan(request.resourcePlan());
+        int[] i = request.intArgs();
+        long[] l = request.longArgs();
+        switch (request.kind()) {
+            case COPY_BUFFER_SUB_DATA -> copyBufferSubData(ctx, i[0], i[1], l[0], l[1], l[2]);
+            case COPY_NAMED_BUFFER_SUB_DATA -> copyNamedBufferSubDataDSA(ctx, i[0], i[1], l[0], l[1], l[2]);
+            case COPY_IMAGE_SUB_DATA -> copyImageSubData(
+                ctx,
+                i[0], i[1], i[2], i[3], i[4], i[5],
+                i[6], i[7], i[8], i[9], i[10], i[11],
+                i[12], i[13], i[14]
+            );
+            case COPY_TEXTURE_SUB_IMAGE_2D -> copyTextureSubImage2D(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7]);
+            case COPY_TEX_IMAGE_2D -> copyTexImage2D(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7]);
+            case COPY_TEX_SUB_IMAGE_2D -> copyTexSubImage2D(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7]);
+            case BLIT_FRAMEBUFFER -> blitFramebuffer(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], i[9]);
+            case BLIT_NAMED_FRAMEBUFFER -> blitNamedFramebuffer(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], i[9], i[10], i[11]);
+            case READ_PIXELS -> readPixels(ctx, i[0], i[1], i[2], i[3], i[4], i[5], l[0]);
+            case READ_PIXELS_FLOAT_ARRAY -> readPixels(ctx, i[0], i[1], i[2], i[3], i[4], i[5], request.floatArrayOutput());
+            case BUFFER_SUB_DATA -> bufferSubData(ctx, i[0], l[0], request.bytePayload());
+            case NAMED_BUFFER_SUB_DATA -> namedBufferSubDataDSA(ctx, i[0], l[0], request.bytePayload());
+            case UPLOAD_TEXTURE_1D -> uploadTexture1D(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], request.bytePayload());
+            case UPLOAD_TEXTURE_2D -> uploadTexture2D(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], request.bytePayload());
+            case UPLOAD_TEXTURE_2D_SUB_IMAGE_POINTER -> uploadTexture2DSubImage(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], l[0]);
+            case UPLOAD_TEXTURE_2D_SUB_IMAGE_BUFFER -> uploadTexture2DSubImage(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], request.bytePayload());
+            case UPLOAD_TEXTURE_3D -> uploadTexture3D(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], request.bytePayload());
+            case CLEAR_TEX_IMAGE_INT -> clearTexImage(ctx, i[0], i[1], i[2], i[3], request.intPayload());
+            case CLEAR_BUFFER_SUB_DATA_INT -> clearBufferSubData(ctx, i[0], i[1], l[0], l[1], i[2], i[3], request.intPayload());
+            case CLEAR_BUFFER_FLOAT -> clearBufferfv(ctx, i[0], i[1], request.floatPayload());
+            case CLEAR_BUFFER_INT -> clearBufferiv(ctx, i[0], i[1], request.intPayload());
+            case CLEAR_BUFFER_UINT -> clearBufferuiv(ctx, i[0], i[1], request.intPayload());
+            case CLEAR_NAMED_FRAMEBUFFER_FLOAT -> clearNamedFramebufferfv(ctx, i[0], i[1], i[2], request.floatPayload());
+            case CLEAR_NAMED_FRAMEBUFFER_INT -> clearNamedFramebufferiv(ctx, i[0], i[1], i[2], request.intPayload());
+            case CLEAR_NAMED_FRAMEBUFFER_UINT -> clearNamedFramebufferuiv(ctx, i[0], i[1], i[2], request.intPayload());
+            case GENERATE_MIPMAP -> generateMipmap(ctx, i[0]);
+            case GENERATE_TEXTURE_MIPMAP -> generateTextureMipmapDSA(ctx, i[0]);
+        }
     }
     
     @Override
@@ -732,17 +776,7 @@ public class OpenGLBackend implements GraphicsBackend {
         CommandContext ctx,
         VulkanicGalExecutionRequest.GraphicsDrawRequest request
     ) {
-        if (!request.compatibilitySnapshot().source().equals("unresolved-legacy-compatibility")) {
-            return request;
-        }
-        return request.withCompatibilitySnapshot(VulkanicGalSnapshotBuilder.legacyGraphicsSnapshot(
-            null,
-            request.vertexInput(),
-            request.resourcePlan().orderedUses(),
-            null,
-            request.descriptors(),
-            "frontend-captured-opengl-legacy-draw"
-        ));
+        return java.util.Objects.requireNonNull(request, "request");
     }
 
     @Override
@@ -750,6 +784,8 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        consumeResourceUsagePlan(request.resourcePlan());
+        applyGraphicsRequestState(ctx, request);
         VulkanicGalExecutionRequest.GraphicsDrawCommand command = request.command();
         switch (command.kind()) {
             case ARRAYS -> {
@@ -791,6 +827,291 @@ public class OpenGLBackend implements GraphicsBackend {
                         )
                     );
                 }
+            }
+        }
+    }
+
+    private void applyGraphicsRequestState(CommandContext ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest request) {
+        VulkanicCompatibilityState.GraphicsSnapshot snapshot =
+            request.compatibilitySnapshot().sharedCompatibilityState()
+                .orElseThrow(() -> new IllegalStateException(
+                    "OpenGL GAL graphics execution requires a shared immutable compatibility snapshot"));
+        applyProgramSnapshot(snapshot);
+        applyFramebufferSnapshot(snapshot);
+        applyFixedFunctionSnapshot(snapshot.fixedFunction());
+        applyResourceBindingsSnapshot(ctx, snapshot);
+        applyVertexInputSnapshot(snapshot);
+        applyUniformSnapshot(snapshot.program());
+    }
+
+    private void applyProgramSnapshot(VulkanicCompatibilityState.GraphicsSnapshot snapshot) {
+        GL20.glUseProgram(snapshot.programId());
+    }
+
+    private void applyFramebufferSnapshot(VulkanicCompatibilityState.GraphicsSnapshot snapshot) {
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, snapshot.drawFramebuffer());
+        if (!snapshot.framebuffer().drawBuffers().isEmpty()) {
+            int[] drawBuffers = snapshot.framebuffer().drawBuffers().stream()
+                .mapToInt(buffer -> normalizeDrawBufferForFramebuffer(snapshot.drawFramebuffer(), buffer))
+                .toArray();
+            if (drawBuffers.length == 1) {
+                GL11.glDrawBuffer(drawBuffers[0]);
+            } else {
+                GL20.glDrawBuffers(drawBuffers);
+            }
+        }
+    }
+
+    private static int normalizeDrawBufferForFramebuffer(int framebuffer, int drawBuffer) {
+        if (framebuffer == 0 && drawBuffer == VulkanicAPI.GL_COLOR_ATTACHMENT0) {
+            return VulkanicAPI.GL_BACK;
+        }
+        return drawBuffer;
+    }
+
+    private void applyFixedFunctionSnapshot(VulkanicCompatibilityState.FixedFunctionSnapshot fixed) {
+        fixed.viewport().ifPresent(viewport ->
+            GL11.glViewport(viewport.x(), viewport.y(), viewport.width(), viewport.height()));
+        if (fixed.scissorTestEnabled()) {
+            GL11.glEnable(GL11.GL_SCISSOR_TEST);
+            fixed.scissor().ifPresent(scissor ->
+                GL11.glScissor(scissor.x(), scissor.y(), scissor.width(), scissor.height()));
+        } else {
+            GL11.glDisable(GL11.GL_SCISSOR_TEST);
+        }
+
+        setGlCapability(GL11.GL_BLEND, fixed.blendEnabled());
+        GL14.glBlendFuncSeparate(
+            fixed.blendSrcRgb(),
+            fixed.blendDstRgb(),
+            fixed.blendSrcAlpha(),
+            fixed.blendDstAlpha()
+        );
+        GL20.glBlendEquationSeparate(fixed.blendEquationRgb(), fixed.blendEquationAlpha());
+
+        setGlCapability(GL11.GL_DEPTH_TEST, fixed.depthTestEnabled());
+        GL11.glDepthFunc(fixed.depthFunc());
+        GL11.glDepthMask(fixed.depthWriteMask());
+
+        setGlCapability(GL11.GL_CULL_FACE, fixed.cullEnabled());
+        GL11.glCullFace(fixed.cullFaceMode());
+
+        setGlCapability(GL11.GL_STENCIL_TEST, fixed.stencilTestEnabled());
+        fixed.stencilFuncs().values().forEach(func ->
+            GL20.glStencilFuncSeparate(func.face(), func.func(), func.ref(), func.mask()));
+        fixed.stencilOps().values().forEach(op ->
+            GL20.glStencilOpSeparate(op.face(), op.sfail(), op.dpfail(), op.dppass()));
+        fixed.stencilWriteMasks().forEach(GL20::glStencilMaskSeparate);
+
+        setGlCapability(GL11.GL_COLOR_LOGIC_OP, fixed.logicOpEnabled());
+        if (fixed.logicOpEnabled()) {
+            GL11.glLogicOp(fixed.logicOp());
+        }
+
+        GL11.glPolygonMode(fixed.polygonFace(), fixed.polygonMode());
+        setGlCapability(GL11.GL_POLYGON_OFFSET_FILL, fixed.polygonOffsetEnabled());
+        if (fixed.polygonOffsetEnabled()) {
+            GL11.glPolygonOffset(fixed.polygonOffsetFactor(), fixed.polygonOffsetUnits());
+        }
+
+        GL11.glColorMask(fixed.colorMaskR(), fixed.colorMaskG(), fixed.colorMaskB(), fixed.colorMaskA());
+    }
+
+    private static void setGlCapability(int capability, boolean enabled) {
+        if (enabled) {
+            GL11.glEnable(capability);
+        } else {
+            GL11.glDisable(capability);
+        }
+    }
+
+    private void applyResourceBindingsSnapshot(
+        CommandContext ctx,
+        VulkanicCompatibilityState.GraphicsSnapshot snapshot
+    ) {
+        int previousActiveTextureUnit = activeTextureUnitIndex;
+        try {
+            for (java.util.Map.Entry<Integer, Integer> entry : snapshot.textureUnitBindings().entrySet()) {
+                int unit = entry.getKey();
+                int texture = Math.max(0, entry.getValue());
+                org.lwjgl.opengl.ARBDirectStateAccess.glBindTextureUnit(unit, texture);
+                if (unit >= 0 && unit < texture2DBindings.length) {
+                    texture2DBindings[unit] = texture;
+                }
+            }
+            for (java.util.Map.Entry<VulkanicCompatibilityState.TextureBindingKey, Integer> entry
+                : snapshot.textureBindingsByKey().entrySet()) {
+                VulkanicCompatibilityState.TextureBindingKey key = entry.getKey();
+                int texture = Math.max(0, entry.getValue());
+                GL13.glActiveTexture(GL13.GL_TEXTURE0 + key.unit());
+                GL11.glBindTexture(key.target(), texture);
+                if (key.target() == GL11.GL_TEXTURE_2D && key.unit() >= 0 && key.unit() < texture2DBindings.length) {
+                    texture2DBindings[key.unit()] = texture;
+                }
+            }
+        } finally {
+            restoreActiveTextureUnit(previousActiveTextureUnit);
+        }
+        for (java.util.Map.Entry<Integer, Integer> entry : snapshot.samplerBindings().entrySet()) {
+            GL33.glBindSampler(entry.getKey(), Math.max(0, entry.getValue()));
+        }
+        for (VulkanicCompatibilityState.ImageUnitBindingState image : snapshot.imageUnitBindings().values()) {
+            bindImageTexture(
+                ctx,
+                image.imageUnit(),
+                image.texture(),
+                image.level(),
+                image.layered(),
+                image.layer(),
+                image.access(),
+                image.format()
+            );
+        }
+        for (java.util.Map.Entry<VulkanicCompatibilityState.IndexedBufferKey, VulkanicCompatibilityState.BufferRangeState> entry
+            : snapshot.indexedBufferBindings().entrySet()) {
+            VulkanicCompatibilityState.BufferRangeState range = entry.getValue();
+            if (range.buffer() <= 0) {
+                GL30.glBindBufferBase(entry.getKey().target(), entry.getKey().index(), 0);
+            } else if (range.size() == Long.MAX_VALUE) {
+                GL30.glBindBufferBase(entry.getKey().target(), entry.getKey().index(), range.buffer());
+            } else {
+                GL30.glBindBufferRange(
+                    entry.getKey().target(),
+                    entry.getKey().index(),
+                    range.buffer(),
+                    Math.max(0L, range.offset()),
+                    Math.max(0L, range.size())
+                );
+            }
+        }
+    }
+
+    private void applyVertexInputSnapshot(VulkanicCompatibilityState.GraphicsSnapshot snapshot) {
+        VulkanicCompatibilityState.VaoSnapshot vao = snapshot.vao();
+        GL30.glBindVertexArray(snapshot.vaoId());
+        if (vao.elementBuffer() > 0) {
+            GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, vao.elementBuffer());
+        }
+
+        java.util.Set<Integer> enabled = new java.util.HashSet<>(vao.enabledAttributes());
+        for (java.util.Map.Entry<Integer, float[]> entry : vao.defaultAttributes().entrySet()) {
+            float[] values = entry.getValue();
+            GL20.glVertexAttrib4f(
+                entry.getKey(),
+                values.length > 0 ? values[0] : 0.0f,
+                values.length > 1 ? values[1] : 0.0f,
+                values.length > 2 ? values[2] : 0.0f,
+                values.length > 3 ? values[3] : 1.0f
+            );
+        }
+        for (VulkanicCompatibilityState.VertexAttributeState attribute : vao.attributes().values()) {
+            VulkanicCompatibilityState.VertexBindingState binding = vao.vertexBindings().get(attribute.binding());
+            if (binding == null || !enabled.contains(attribute.index())) {
+                GL20.glDisableVertexAttribArray(attribute.index());
+                continue;
+            }
+            GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, Math.max(0, binding.buffer()));
+            long pointer = Math.max(0L, binding.offset()) + Math.max(0, attribute.relativeOffset());
+            if (attribute.integer()) {
+                GL30.glVertexAttribIPointer(
+                    attribute.index(),
+                    attribute.size(),
+                    attribute.type(),
+                    binding.stride(),
+                    pointer
+                );
+            } else {
+                GL20.glVertexAttribPointer(
+                    attribute.index(),
+                    attribute.size(),
+                    attribute.type(),
+                    attribute.normalized(),
+                    binding.stride(),
+                    pointer
+                );
+            }
+            GL20.glEnableVertexAttribArray(attribute.index());
+            GL33.glVertexAttribDivisor(attribute.index(), attribute.divisor());
+        }
+    }
+
+    private void applyUniformSnapshot(VulkanicCompatibilityState.ProgramSnapshot program) {
+        if (program.programId() <= 0) {
+            return;
+        }
+        for (java.util.Map.Entry<Integer, VulkanicCompatibilityState.UniformValue> entry
+            : program.uniformsByLocation().entrySet()) {
+            int location = entry.getKey();
+            if (location < 0) {
+                continue;
+            }
+            VulkanicCompatibilityState.UniformValue value = entry.getValue();
+            int[] ints = value.ints();
+            float[] floats = value.floats();
+            if (value.columns() > 1 && value.rows() > 1) {
+                applyMatrixUniform(location, value);
+            } else if (ints.length > 0) {
+                applyIntegerUniform(location, ints);
+            } else {
+                applyFloatUniform(location, floats);
+            }
+        }
+    }
+
+    private static void applyIntegerUniform(int location, int[] values) {
+        switch (values.length) {
+            case 1 -> GL20.glUniform1i(location, values[0]);
+            case 2 -> GL20.glUniform2i(location, values[0], values[1]);
+            case 3 -> GL20.glUniform3i(location, values[0], values[1], values[2]);
+            default -> GL20.glUniform4i(
+                location,
+                values.length > 0 ? values[0] : 0,
+                values.length > 1 ? values[1] : 0,
+                values.length > 2 ? values[2] : 0,
+                values.length > 3 ? values[3] : 0
+            );
+        }
+    }
+
+    private static void applyFloatUniform(int location, float[] values) {
+        switch (values.length) {
+            case 0 -> {
+            }
+            case 1 -> GL20.glUniform1f(location, values[0]);
+            case 2 -> GL20.glUniform2f(location, values[0], values[1]);
+            case 3 -> GL20.glUniform3f(location, values[0], values[1], values[2]);
+            default -> GL20.glUniform4f(
+                location,
+                values.length > 0 ? values[0] : 0.0f,
+                values.length > 1 ? values[1] : 0.0f,
+                values.length > 2 ? values[2] : 0.0f,
+                values.length > 3 ? values[3] : 0.0f
+            );
+        }
+    }
+
+    private static void applyMatrixUniform(int location, VulkanicCompatibilityState.UniformValue value) {
+        try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+            java.nio.FloatBuffer data = stack.mallocFloat(value.floats().length);
+            data.put(value.floats()).flip();
+            if (value.columns() == 2 && value.rows() == 2) {
+                GL20.glUniformMatrix2fv(location, value.transpose(), data);
+            } else if (value.columns() == 3 && value.rows() == 3) {
+                GL20.glUniformMatrix3fv(location, value.transpose(), data);
+            } else if (value.columns() == 4 && value.rows() == 4) {
+                GL20.glUniformMatrix4fv(location, value.transpose(), data);
+            } else if (value.columns() == 2 && value.rows() == 3) {
+                GL21.glUniformMatrix2x3fv(location, value.transpose(), data);
+            } else if (value.columns() == 3 && value.rows() == 2) {
+                GL21.glUniformMatrix3x2fv(location, value.transpose(), data);
+            } else if (value.columns() == 2 && value.rows() == 4) {
+                GL21.glUniformMatrix2x4fv(location, value.transpose(), data);
+            } else if (value.columns() == 4 && value.rows() == 2) {
+                GL21.glUniformMatrix4x2fv(location, value.transpose(), data);
+            } else if (value.columns() == 3 && value.rows() == 4) {
+                GL21.glUniformMatrix3x4fv(location, value.transpose(), data);
+            } else if (value.columns() == 4 && value.rows() == 3) {
+                GL21.glUniformMatrix4x3fv(location, value.transpose(), data);
             }
         }
     }
@@ -1263,6 +1584,7 @@ public class OpenGLBackend implements GraphicsBackend {
         try {
             GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, readFbo);
             GL32.glFramebufferTexture(GL30.GL_READ_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0, textureHandle, textureView.baseMipLevel());
+            GL11.glReadBuffer(GL30.GL_COLOR_ATTACHMENT0);
 
             int framebufferStatus = GL30.glCheckFramebufferStatus(GL30.GL_READ_FRAMEBUFFER);
             if (framebufferStatus != GL30.GL_FRAMEBUFFER_COMPLETE) {
@@ -1272,6 +1594,7 @@ public class OpenGLBackend implements GraphicsBackend {
             }
 
             GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, 0);
+            GL11.glDrawBuffer(GL11.GL_BACK);
 
             GL11.glDisable(GL11.GL_SCISSOR_TEST);
             net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(true);
@@ -3286,6 +3609,7 @@ public class OpenGLBackend implements GraphicsBackend {
 
     @Override
     public void executeComputeDispatch(CommandContext ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest request) {
+        consumeResourceUsagePlan(request.resourcePlan());
         VulkanicGalExecutionRequest.ComputeDispatchCommand command = request.command();
         if (command.indirect()) {
             dispatchComputeIndirect(ctx, command.indirectOffset());
@@ -3772,117 +4096,135 @@ public class OpenGLBackend implements GraphicsBackend {
         net.vulkanic.VulkanicAPI.traceShaderInputParityResources("opengl-bindPipelineResources", pipeline, descriptor, bindings);
 
         int program = glPipelineHandle.getGlRenderPipeline().program().getProgramId();
+        int previousActiveTextureUnit = activeTextureUnitIndex;
 
-        for (net.vulkanic.PipelineDescriptor.ResourceBinding resource : layout.bindings()) {
-            switch (resource.type()) {
-                case SAMPLER, COMPARISON_SAMPLER -> {
-                    net.vulkanic.PipelineResourceBindings.SamplerBinding samplerBinding =
-                        bindings.getSamplerBinding(resource.name())
-                            .orElseThrow(() -> new IllegalStateException(
-                                "Missing sampler binding for '" + resource.name() + "' after validation"));
+        try {
+            for (net.vulkanic.PipelineDescriptor.ResourceBinding resource : layout.bindings()) {
+                switch (resource.type()) {
+                    case SAMPLER, COMPARISON_SAMPLER -> {
+                        net.vulkanic.PipelineResourceBindings.SamplerBinding samplerBinding =
+                            bindings.getSamplerBinding(resource.name())
+                                .orElseThrow(() -> new IllegalStateException(
+                                    "Missing sampler binding for '" + resource.name() + "' after validation"));
 
-                    int location = getUniformLocation(ctx, program, resource.name());
-                    if (location >= 0) {
-                        setUniform1i(ctx, location, samplerBinding.textureUnit());
+                        int location = getUniformLocation(ctx, program, resource.name());
+                        if (location >= 0) {
+                            setUniform1i(ctx, location, samplerBinding.textureUnit());
+                        }
+
+                        net.vulkanic.VulkanicTextureView textureView = samplerBinding.textureView();
+                        if (textureView != null) {
+                            if (!(textureView instanceof OpenGLTextureView openGLTextureView)) {
+                                throw new IllegalArgumentException(
+                                    "Sampler binding '" + resource.name() + "' must use OpenGLTextureView in OpenGL backend");
+                            }
+                            if (openGLTextureView.isClosed()) {
+                                throw new IllegalStateException(
+                                    "Sampler binding '" + resource.name() + "' uses a closed OpenGLTextureView");
+                            }
+
+                            setActiveTextureUnit(ctx, GL13.GL_TEXTURE0 + samplerBinding.textureUnit());
+                            int textureHandle = openGLTextureView.glHandle();
+                            net.vulkanic.VulkanicTexture texture = openGLTextureView.texture();
+                            net.vulkanic.VulkanicTextureTarget textureTarget =
+                                samplerBinding.resourceReference() != null
+                                    && samplerBinding.resourceReference().legacyTarget().isPresent()
+                                    ? net.vulkanic.VulkanicTextureTarget.fromLegacyGlTarget(
+                                        samplerBinding.resourceReference().legacyTarget().getAsInt()
+                                    ).orElse(net.vulkanic.VulkanicTextureTarget.TEXTURE_2D)
+                                    : (texture.usage() & net.vulkanic.VulkanicTexture.USAGE_CUBEMAP_COMPATIBLE) != 0
+                                        ? net.vulkanic.VulkanicTextureTarget.TEXTURE_CUBE_MAP
+                                        : net.vulkanic.VulkanicTextureTarget.TEXTURE_2D;
+
+                            bindTexture(ctx, textureTarget, textureHandle);
+                            if (textureTarget == net.vulkanic.VulkanicTextureTarget.TEXTURE_2D
+                                && samplerBinding.textureUnit() >= 0
+                                && samplerBinding.textureUnit() < texture2DBindings.length) {
+                                texture2DBindings[samplerBinding.textureUnit()] = textureHandle;
+                            }
+
+                            setTextureParameter(ctx, textureTarget,
+                                net.vulkanic.VulkanicTextureParameterName.BASE_LEVEL,
+                                openGLTextureView.getBaseMipLevel());
+                            setTextureParameter(ctx, textureTarget,
+                                net.vulkanic.VulkanicTextureParameterName.MAX_LEVEL,
+                                openGLTextureView.getBaseMipLevel() + openGLTextureView.getMipLevelCount() - 1);
+
+                            if (texture instanceof net.blaze3d.textures.GpuTexture gpuTexture) {
+                                gpuTexture.flushModeChanges(textureTarget);
+                            }
+                        }
+
+                        if (samplerBinding.samplerObject() != null) {
+                            bindSampler(ctx, samplerBinding.textureUnit(), samplerBinding.samplerObject());
+                        }
                     }
+                    case UNIFORM_BUFFER -> {
+                        net.vulkanic.VulkanicBufferSlice slice = bindings.getUniformBufferBinding(resource.name())
+                            .orElseThrow(() -> new IllegalStateException(
+                                "Missing uniform-buffer binding for '" + resource.name() + "' after validation"));
 
-                    net.vulkanic.VulkanicTextureView textureView = samplerBinding.textureView();
-                    if (textureView != null) {
-                        if (!(textureView instanceof OpenGLTextureView openGLTextureView)) {
+                        if (!(slice.buffer() instanceof OpenGLBuffer glBuffer)) {
                             throw new IllegalArgumentException(
-                                "Sampler binding '" + resource.name() + "' must use OpenGLTextureView in OpenGL backend");
-                        }
-                        if (openGLTextureView.isClosed()) {
-                            throw new IllegalStateException(
-                                "Sampler binding '" + resource.name() + "' uses a closed OpenGLTextureView");
+                                "Uniform-buffer binding '" + resource.name() + "' must use OpenGLBuffer in OpenGL backend");
                         }
 
-                        VulkanicAPI.setActiveTextureUnitIndex(ctx, samplerBinding.textureUnit());
-                        int textureHandle = openGLTextureView.glHandle();
-                        net.vulkanic.VulkanicTexture texture = openGLTextureView.texture();
-                        net.vulkanic.VulkanicTextureTarget textureTarget =
-                            (texture.usage() & net.vulkanic.VulkanicTexture.USAGE_CUBEMAP_COMPATIBLE) != 0
-                                ? net.vulkanic.VulkanicTextureTarget.TEXTURE_CUBE_MAP
-                                : net.vulkanic.VulkanicTextureTarget.TEXTURE_2D;
-
-                        if (textureTarget == net.vulkanic.VulkanicTextureTarget.TEXTURE_CUBE_MAP) {
-                            bindTexture(ctx, net.vulkanic.VulkanicTextureTarget.TEXTURE_CUBE_MAP, textureHandle);
-                        } else {
-                            bindTexture2D(ctx, textureHandle);
+                        int uniformBlockIndex = getUniformBlockIndex(ctx, program, resource.name());
+                        if (uniformBlockIndex >= 0) {
+                            uniformBlockBinding(ctx, program, uniformBlockIndex, resource.binding());
                         }
 
-                        setTextureParameter(ctx, textureTarget,
-                            net.vulkanic.VulkanicTextureParameterName.BASE_LEVEL,
-                            openGLTextureView.getBaseMipLevel());
-                        setTextureParameter(ctx, textureTarget,
-                            net.vulkanic.VulkanicTextureParameterName.MAX_LEVEL,
-                            openGLTextureView.getBaseMipLevel() + openGLTextureView.getMipLevelCount() - 1);
+                        bindUniformBufferRange(
+                            ctx,
+                            VulkanicAPI.GL_UNIFORM_BUFFER,
+                            resource.binding(),
+                            glBuffer.getGlHandle(),
+                            slice.offset(),
+                            slice.length());
+                    }
+                    case STORAGE_IMAGE -> {
+                        net.vulkanic.PipelineResourceBindings.StorageImageBinding imageBinding =
+                            bindings.getStorageImageBinding(resource.name())
+                                .orElseThrow(() -> new IllegalStateException(
+                                    "Missing storage-image binding for '" + resource.name() + "' after validation"));
 
-                        if (texture instanceof net.blaze3d.textures.GpuTexture gpuTexture) {
-                            gpuTexture.flushModeChanges(textureTarget);
+                        int location = getUniformLocation(ctx, program, resource.name());
+                        if (location >= 0) {
+                            setUniform1i(ctx, location, imageBinding.imageUnit());
                         }
+                        bindImageTexture(
+                            ctx,
+                            imageBinding.imageUnit(),
+                            imageBinding.texture(),
+                            imageBinding.level(),
+                            imageBinding.layered(),
+                            imageBinding.layer(),
+                            imageBinding.access(),
+                            imageBinding.format()
+                        );
                     }
+                    case TEXEL_BUFFER -> {
+                        net.vulkanic.PipelineResourceBindings.TexelBufferBinding texelBufferBinding =
+                            bindings.getTexelBufferBinding(resource.name())
+                                .orElseThrow(() -> new IllegalStateException(
+                                    "Missing texel-buffer binding for '" + resource.name() + "' after validation"));
 
-                    if (samplerBinding.samplerObject() != null) {
-                        bindSampler(ctx, samplerBinding.textureUnit(), samplerBinding.samplerObject());
-                    }
-                }
-                case UNIFORM_BUFFER -> {
-                    net.vulkanic.VulkanicBufferSlice slice = bindings.getUniformBufferBinding(resource.name())
-                        .orElseThrow(() -> new IllegalStateException(
-                            "Missing uniform-buffer binding for '" + resource.name() + "' after validation"));
-
-                    if (!(slice.buffer() instanceof OpenGLBuffer glBuffer)) {
-                        throw new IllegalArgumentException(
-                            "Uniform-buffer binding '" + resource.name() + "' must use OpenGLBuffer in OpenGL backend");
-                    }
-
-                    int uniformBlockIndex = getUniformBlockIndex(ctx, program, resource.name());
-                    if (uniformBlockIndex >= 0) {
-                        uniformBlockBinding(ctx, program, uniformBlockIndex, resource.binding());
-                    }
-
-                    bindUniformBufferRange(
-                        ctx,
-                        VulkanicAPI.GL_UNIFORM_BUFFER,
-                        resource.binding(),
-                        glBuffer.getGlHandle(),
-                        slice.offset(),
-                        slice.length());
-                }
-                case STORAGE_IMAGE -> {
-                    net.vulkanic.PipelineResourceBindings.StorageImageBinding imageBinding =
-                        bindings.getStorageImageBinding(resource.name())
-                            .orElseThrow(() -> new IllegalStateException(
-                                "Missing storage-image binding for '" + resource.name() + "' after validation"));
-
-                    int location = getUniformLocation(ctx, program, resource.name());
-                    if (location >= 0) {
-                        setUniform1i(ctx, location, imageBinding.imageUnit());
-                    }
-                    bindImageTexture(
-                        ctx,
-                        imageBinding.imageUnit(),
-                        imageBinding.texture(),
-                        imageBinding.level(),
-                        imageBinding.layered(),
-                        imageBinding.layer(),
-                        imageBinding.access(),
-                        imageBinding.format()
-                    );
-                }
-                case TEXEL_BUFFER -> {
-                    net.vulkanic.PipelineResourceBindings.TexelBufferBinding texelBufferBinding =
-                        bindings.getTexelBufferBinding(resource.name())
-                            .orElseThrow(() -> new IllegalStateException(
-                                "Missing texel-buffer binding for '" + resource.name() + "' after validation"));
-
-                    int location = getUniformLocation(ctx, program, resource.name());
-                    if (location >= 0) {
-                        setUniform1i(ctx, location, texelBufferBinding.textureUnit());
+                        int location = getUniformLocation(ctx, program, resource.name());
+                        if (location >= 0) {
+                            setUniform1i(ctx, location, texelBufferBinding.textureUnit());
+                        }
                     }
                 }
             }
+        } finally {
+            restoreActiveTextureUnit(previousActiveTextureUnit);
+        }
+    }
+
+    private void restoreActiveTextureUnit(int unitIndex) {
+        if (unitIndex >= 0 && unitIndex < texture2DBindings.length) {
+            activeTextureUnitIndex = unitIndex;
+            GL13.glActiveTexture(GL13.GL_TEXTURE0 + unitIndex);
         }
     }
 
@@ -3908,6 +4250,30 @@ public class OpenGLBackend implements GraphicsBackend {
     // =========================================================================
     // Phase 3b: Render Pass
     // =========================================================================
+
+    @Override
+    public net.vulkanic.VulkanicRenderPass executeRenderPassBegin(
+        CommandContext ctx,
+        VulkanicGalExecutionRequest.RenderPassBeginRequest request
+    ) {
+        consumeResourceUsagePlan(request.resourcePlan());
+        return switch (request.kind()) {
+            case DESCRIPTOR -> beginRenderPass(ctx, request.descriptor().orElseThrow());
+            case TARGET_DESCRIPTOR -> beginRenderPass(ctx, request.targetDescriptor().orElseThrow());
+            case FRAMEBUFFER -> beginRenderPass(
+                ctx,
+                () -> request.label(),
+                request.framebuffer().orElseThrow(),
+                request.hasDepthTexture()
+            );
+        };
+    }
+
+    private OpenGLResourceUsageExecutionPlanner.ExecutionPlan consumeResourceUsagePlan(
+        net.vulkanic.VulkanicPassResourceModel.PassExecutionPlan resourcePlan
+    ) {
+        return OpenGLResourceUsageExecutionPlanner.plan(resourcePlan);
+    }
 
     @Override
     public net.vulkanic.VulkanicRenderPass beginRenderPass(CommandContext ctx,
@@ -3954,6 +4320,8 @@ public class OpenGLBackend implements GraphicsBackend {
             net.vulkanic.VulkanicAPI.GL_COLOR_ATTACHMENT0,
             net.vulkanic.VulkanicAPI.GL_TEXTURE_2D,
             colorHandle, colorMip);
+        net.vulkanic.VulkanicAPI.setDrawBufferColorAttachment0(ctx);
+        net.vulkanic.VulkanicAPI.setReadBufferColorAttachment(ctx, 0);
 
         // 4. Attach the depth texture if provided
         if (depthTarget != null) {
