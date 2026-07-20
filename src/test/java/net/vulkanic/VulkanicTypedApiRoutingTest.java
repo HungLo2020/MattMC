@@ -19,7 +19,6 @@ import java.lang.reflect.Proxy;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -124,19 +123,18 @@ public class VulkanicTypedApiRoutingTest {
         VulkanicGalExecutionRequest.TransferRequest request =
             (VulkanicGalExecutionRequest.TransferRequest) invocation.args[1];
         assertEquals(VulkanicGalExecutionRequest.TransferKind.UPLOAD_TEXTURE_2D, request.kind());
-        assertArrayEquals(
-            new int[] {
-                VulkanicAPI.GL_TEXTURE_2D,
-                0,
-                VulkanicAPI.GL_R32F,
-                1,
-                1,
-                0,
-                VulkanicAPI.GL_RED,
-                VulkanicAPI.GL_FLOAT
-            },
-            request.intArgs()
-        );
+        assertEquals(VulkanicGalExecutionRequest.UploadTexture2D.class, request.operation().getClass());
+        VulkanicGalExecutionRequest.UploadTexture2D upload =
+            (VulkanicGalExecutionRequest.UploadTexture2D) request.operation();
+        assertEquals(VulkanicAPI.GL_TEXTURE_2D, upload.target());
+        assertEquals(0, upload.level());
+        assertEquals(VulkanicAPI.GL_R32F, upload.internalFormat());
+        assertEquals(1, upload.width());
+        assertEquals(1, upload.height());
+        assertEquals(0, upload.border());
+        assertEquals(VulkanicAPI.GL_RED, upload.format());
+        assertEquals(VulkanicAPI.GL_FLOAT, upload.type());
+        assertNull(upload.payload());
     }
 
     @Test
@@ -161,7 +159,10 @@ public class VulkanicTypedApiRoutingTest {
         VulkanicGalExecutionRequest.TransferRequest request =
             (VulkanicGalExecutionRequest.TransferRequest) invocation.args[1];
         assertEquals(VulkanicGalExecutionRequest.TransferKind.UPLOAD_TEXTURE_2D, request.kind());
-        assertEquals(unknownInternalFormat, request.intArgs()[2]);
+        assertEquals(VulkanicGalExecutionRequest.UploadTexture2D.class, request.operation().getClass());
+        VulkanicGalExecutionRequest.UploadTexture2D upload =
+            (VulkanicGalExecutionRequest.UploadTexture2D) request.operation();
+        assertEquals(unknownInternalFormat, upload.internalFormat());
     }
 
     @Test
@@ -187,7 +188,10 @@ public class VulkanicTypedApiRoutingTest {
         VulkanicGalExecutionRequest.TransferRequest request =
             (VulkanicGalExecutionRequest.TransferRequest) invocation.args[1];
         assertEquals(VulkanicGalExecutionRequest.TransferKind.UPLOAD_TEXTURE_2D, request.kind());
-        assertEquals(VulkanicAPI.GL_R32F, request.intArgs()[2]);
+        assertEquals(VulkanicGalExecutionRequest.UploadTexture2D.class, request.operation().getClass());
+        VulkanicGalExecutionRequest.UploadTexture2D upload =
+            (VulkanicGalExecutionRequest.UploadTexture2D) request.operation();
+        assertEquals(VulkanicAPI.GL_R32F, upload.internalFormat());
     }
 
     @Test
@@ -523,8 +527,16 @@ public class VulkanicTypedApiRoutingTest {
         VulkanicGalExecutionRequest.TransferRequest request =
             (VulkanicGalExecutionRequest.TransferRequest) invocation.args[1];
         assertEquals(VulkanicGalExecutionRequest.TransferKind.READ_PIXELS, request.kind());
-        assertArrayEquals(new int[] {1, 2, 3, 4, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_BYTE}, request.intArgs());
-        assertArrayEquals(new long[] {64L}, request.longArgs());
+        assertEquals(VulkanicGalExecutionRequest.ReadPixelsPointer.class, request.operation().getClass());
+        VulkanicGalExecutionRequest.ReadPixelsPointer read =
+            (VulkanicGalExecutionRequest.ReadPixelsPointer) request.operation();
+        assertEquals(1, read.x());
+        assertEquals(2, read.y());
+        assertEquals(3, read.width());
+        assertEquals(4, read.height());
+        assertEquals(VulkanicAPI.GL_RGBA, read.format());
+        assertEquals(VulkanicAPI.GL_UNSIGNED_BYTE, read.type());
+        assertEquals(64L, read.pixels());
     }
 
     @Test
@@ -1203,6 +1215,10 @@ public class VulkanicTypedApiRoutingTest {
         public Object invoke(Object proxy, Method method, Object[] args) {
             this.lastInvocation = new RecordedInvocation(method, args == null ? new Object[0] : args.clone());
 
+            if (method.getReturnType() == VulkanicGalExecutionRequest.ExecutionResult.class) {
+                return VulkanicGalExecutionRequest.success(semanticIdentity(args));
+            }
+
             if (method.getName().equals("getProgramParameter")) {
                 int pname = (int) args[2];
                 if (pname == VulkanicProgramParameterName.ACTIVE_UNIFORM_BLOCKS.toLegacyGlPName()) {
@@ -1296,6 +1312,32 @@ public class VulkanicTypedApiRoutingTest {
             }
 
             return defaultValue(method.getReturnType());
+        }
+
+        private VulkanicGalExecutionRequest.SemanticIdentity semanticIdentity(Object[] args) {
+            Object request = args != null && args.length > 1 ? args[1] : null;
+            if (request instanceof VulkanicGalExecutionRequest.GraphicsDrawRequest typed) {
+                return typed.semanticIdentity();
+            }
+            if (request instanceof VulkanicGalExecutionRequest.ComputeDispatchRequest typed) {
+                return typed.semanticIdentity();
+            }
+            if (request instanceof VulkanicGalExecutionRequest.ClearRequest typed) {
+                return typed.semanticIdentity();
+            }
+            if (request instanceof VulkanicGalExecutionRequest.TransferRequest typed) {
+                return typed.semanticIdentity();
+            }
+            if (request instanceof VulkanicGalExecutionRequest.RenderPassEndRequest typed) {
+                return typed.semanticIdentity();
+            }
+            if (request instanceof VulkanicGalExecutionRequest.ComputePassBeginRequest typed) {
+                return typed.semanticIdentity();
+            }
+            if (request instanceof VulkanicGalExecutionRequest.ComputePassEndRequest typed) {
+                return typed.semanticIdentity();
+            }
+            return VulkanicGalExecutionRequest.SemanticIdentity.legacy("recording-backend");
         }
 
         private Object defaultValue(Class<?> returnType) {

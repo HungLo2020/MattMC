@@ -30,8 +30,19 @@ public final class VulkanicCompatibilityState {
     private static final int GL_FRAMEBUFFER = 0x8D40;
     private static final int GL_READ_FRAMEBUFFER = 0x8CA8;
     private static final int GL_DRAW_FRAMEBUFFER = 0x8CA9;
+    private static final int GL_COPY_READ_BUFFER = 0x8F36;
+    private static final int GL_COPY_WRITE_BUFFER = 0x8F37;
+    private static final int GL_PIXEL_PACK_BUFFER = 0x88EB;
+    private static final int GL_PIXEL_UNPACK_BUFFER = 0x88EC;
+    private static final int GL_TEXTURE_1D = 0x0DE0;
     private static final int GL_TEXTURE_2D = 0x0DE1;
     private static final int GL_TEXTURE_3D = 0x806F;
+    private static final int GL_PACK_ROW_LENGTH = 0x0D02;
+    private static final int GL_PACK_ALIGNMENT = 0x0D05;
+    private static final int GL_UNPACK_ROW_LENGTH = 0x0CF2;
+    private static final int GL_UNPACK_SKIP_ROWS = 0x0CF3;
+    private static final int GL_UNPACK_SKIP_PIXELS = 0x0CF4;
+    private static final int GL_UNPACK_ALIGNMENT = 0x0CF5;
     private static final int GL_READ_ONLY = 0x88B8;
     private static final int GL_WRITE_ONLY = 0x88B9;
     private static final int GL_BACK = 0x0405;
@@ -48,12 +59,47 @@ public final class VulkanicCompatibilityState {
     private final Map<Integer, Integer> textureUnitBindings = new HashMap<>();
     private final Map<Integer, Integer> samplerBindings = new HashMap<>();
     private final Map<Integer, ImageUnitBindingState> imageUnitBindings = new HashMap<>();
+    private final Map<Integer, Long> textureGenerations = new HashMap<>();
+    private final Map<Integer, Long> bufferGenerations = new HashMap<>();
     private final FixedFunctionState fixedFunction = new FixedFunctionState();
+    private final PixelStoreState pixelStore = new PixelStoreState();
     private int currentProgram;
     private int currentVao;
     private int boundReadFramebuffer;
     private int boundDrawFramebuffer;
     private int activeTextureUnitIndex;
+
+    private void registerTexture(int texture) {
+        if (texture > 0) {
+            textureGenerations.putIfAbsent(texture, 0L);
+        }
+    }
+
+    private void registerBuffer(int buffer) {
+        if (buffer > 0) {
+            bufferGenerations.putIfAbsent(buffer, 0L);
+        }
+    }
+
+    private void incrementTextureGeneration(int texture) {
+        if (texture > 0) {
+            textureGenerations.merge(texture, 1L, Long::sum);
+        }
+    }
+
+    private void incrementBufferGeneration(int buffer) {
+        if (buffer > 0) {
+            bufferGenerations.merge(buffer, 1L, Long::sum);
+        }
+    }
+
+    private long textureGenerationUnlocked(int texture) {
+        return texture > 0 ? textureGenerations.getOrDefault(texture, 0L) : VulkanicPassResourceModel.UNKNOWN_GENERATION;
+    }
+
+    private long bufferGenerationUnlocked(int buffer) {
+        return buffer > 0 ? bufferGenerations.getOrDefault(buffer, 0L) : VulkanicPassResourceModel.UNKNOWN_GENERATION;
+    }
 
     public void bindProgram(int programId) {
         synchronized (lock) {
@@ -110,6 +156,7 @@ public final class VulkanicCompatibilityState {
 
     public void bindTexture(int target, int texture) {
         synchronized (lock) {
+            registerTexture(texture);
             textureUnitBindings.remove(activeTextureUnitIndex);
             textureBindings.put(new TextureBindingKey(activeTextureUnitIndex, target), texture);
         }
@@ -118,6 +165,7 @@ public final class VulkanicCompatibilityState {
     public void bindTexture(int unitIndex, int target, int texture) {
         synchronized (lock) {
             int unit = Math.max(0, unitIndex);
+            registerTexture(texture);
             textureUnitBindings.remove(unit);
             textureBindings.put(new TextureBindingKey(unit, target), texture);
         }
@@ -130,6 +178,7 @@ public final class VulkanicCompatibilityState {
     public void bindTextureUnit(int unit, int texture) {
         synchronized (lock) {
             int unitIndex = Math.max(0, unit);
+            registerTexture(texture);
             textureBindings.keySet().removeIf(key -> key.unit() == unitIndex);
             textureUnitBindings.put(unitIndex, texture);
         }
@@ -143,6 +192,7 @@ public final class VulkanicCompatibilityState {
 
     public void bindImageTexture(int unit, int texture, int level, boolean layered, int layer, int access, int format) {
         synchronized (lock) {
+            registerTexture(texture);
             imageUnitBindings.put(
                 Math.max(0, unit),
                 new ImageUnitBindingState(Math.max(0, unit), texture, level, layered, layer, access, format)
@@ -163,11 +213,13 @@ public final class VulkanicCompatibilityState {
         synchronized (lock) {
             textureBindings.values().removeIf(value -> value == texture);
             imageUnitBindings.values().removeIf(value -> value.texture() == texture);
+            incrementTextureGeneration(texture);
         }
     }
 
     public void bindBuffer(int target, int buffer) {
         synchronized (lock) {
+            registerBuffer(buffer);
             bufferBindings.put(target, buffer);
             if (target == GL_ELEMENT_ARRAY_BUFFER) {
                 vao(currentVao).elementBuffer = buffer;
@@ -185,6 +237,7 @@ public final class VulkanicCompatibilityState {
 
     public void bindBufferRange(int target, int index, int buffer, long offset, long size) {
         synchronized (lock) {
+            registerBuffer(buffer);
             indexedBufferBindings.put(new IndexedBufferKey(target, index), new BufferRangeState(buffer, offset, size));
         }
     }
@@ -200,6 +253,77 @@ public final class VulkanicCompatibilityState {
                 vao.vertexBindings.values().removeIf(binding -> binding.buffer() == buffer);
                 vao.attributes.values().removeIf(attribute -> attribute.capturedBuffer() == buffer);
             }
+            incrementBufferGeneration(buffer);
+        }
+    }
+
+    public void markBufferStorageReplaced(int buffer) {
+        synchronized (lock) {
+            incrementBufferGeneration(buffer);
+        }
+    }
+
+    public void markTextureStorageReplaced(int texture) {
+        synchronized (lock) {
+            incrementTextureGeneration(texture);
+        }
+    }
+
+    public void markBoundTextureStorageReplaced(int target) {
+        synchronized (lock) {
+            Integer texture = textureBindings.get(new TextureBindingKey(activeTextureUnitIndex, target));
+            if (texture == null) {
+                texture = textureUnitBindings.get(activeTextureUnitIndex);
+            }
+            incrementTextureGeneration(texture == null ? 0 : texture);
+        }
+    }
+
+    public void markBoundBufferStorageReplaced(int target) {
+        synchronized (lock) {
+            incrementBufferGeneration(bufferBindings.getOrDefault(target, 0));
+        }
+    }
+
+    public long textureGeneration(int texture) {
+        synchronized (lock) {
+            return textureGenerationUnlocked(texture);
+        }
+    }
+
+    public long bufferGeneration(int buffer) {
+        synchronized (lock) {
+            return bufferGenerationUnlocked(buffer);
+        }
+    }
+
+    public void setPixelStore(int pname, int value) {
+        if (value < 0) {
+            throw new IllegalArgumentException("Pixel-store value must be >= 0, got: " + value);
+        }
+        synchronized (lock) {
+            switch (pname) {
+                case GL_PACK_ROW_LENGTH -> pixelStore.packRowLength = value;
+                case GL_PACK_ALIGNMENT -> {
+                    requirePixelStoreAlignment(value, "GL_PACK_ALIGNMENT");
+                    pixelStore.packAlignment = value;
+                }
+                case GL_UNPACK_ROW_LENGTH -> pixelStore.unpackRowLength = value;
+                case GL_UNPACK_SKIP_ROWS -> pixelStore.unpackSkipRows = value;
+                case GL_UNPACK_SKIP_PIXELS -> pixelStore.unpackSkipPixels = value;
+                case GL_UNPACK_ALIGNMENT -> {
+                    requirePixelStoreAlignment(value, "GL_UNPACK_ALIGNMENT");
+                    pixelStore.unpackAlignment = value;
+                }
+                default -> {
+                }
+            }
+        }
+    }
+
+    private static void requirePixelStoreAlignment(int value, String name) {
+        if (value != 1 && value != 2 && value != 4 && value != 8) {
+            throw new IllegalArgumentException(name + " must be one of {1,2,4,8}, got: " + value);
         }
     }
 
@@ -336,6 +460,12 @@ public final class VulkanicCompatibilityState {
             if (framebuffer > 0) {
                 framebuffers.computeIfAbsent(framebuffer, FramebufferState::new);
             }
+        }
+    }
+
+    public int boundDrawFramebuffer() {
+        synchronized (lock) {
+            return boundDrawFramebuffer;
         }
     }
 
@@ -568,6 +698,8 @@ public final class VulkanicCompatibilityState {
                 Map.copyOf(textureBindings),
                 Map.copyOf(samplerBindings),
                 Map.copyOf(imageUnitBindings),
+                Map.copyOf(textureGenerations),
+                Map.copyOf(bufferGenerations),
                 fixedFunction.copy(),
                 request.semanticIdentity().label()
             );
@@ -592,6 +724,8 @@ public final class VulkanicCompatibilityState {
                 Map.copyOf(textureBindings),
                 Map.copyOf(samplerBindings),
                 Map.copyOf(imageUnitBindings),
+                Map.copyOf(textureGenerations),
+                Map.copyOf(bufferGenerations),
                 request.semanticIdentity().label()
             );
         }
@@ -629,6 +763,11 @@ public final class VulkanicCompatibilityState {
         );
     }
 
+    public void validateResourceGenerations(VulkanicGalExecutionRequest.GraphicsCompatibilitySnapshot snapshot) {
+        Objects.requireNonNull(snapshot, "snapshot");
+        validateResourceGenerations(snapshot.descriptorBindings());
+    }
+
     public VulkanicGalExecutionRequest.ComputeCompatibilitySnapshot compatibilitySnapshotFor(
         VulkanicGalExecutionRequest.ComputeDispatchRequest request
     ) {
@@ -640,6 +779,379 @@ public final class VulkanicCompatibilityState {
             snapshot.bindingSnapshots(),
             Optional.of(snapshot),
             "frontend-shared-compatibility-compute"
+        );
+    }
+
+    public void validateResourceGenerations(VulkanicGalExecutionRequest.ComputeCompatibilitySnapshot snapshot) {
+        Objects.requireNonNull(snapshot, "snapshot");
+        validateResourceGenerations(snapshot.descriptorBindings());
+    }
+
+    public VulkanicGalExecutionRequest.TransferCompatibilitySnapshot compatibilitySnapshotFor(
+        VulkanicGalExecutionRequest.TransferRequest request
+    ) {
+        Objects.requireNonNull(request, "request");
+        synchronized (lock) {
+            ArrayList<VulkanicPassResourceModel.CanonicalResourceReference> sources = new ArrayList<>();
+            ArrayList<VulkanicPassResourceModel.CanonicalResourceReference> destinations = new ArrayList<>();
+            String label = request.semanticIdentity().label();
+            switch (request.operation()) {
+                case VulkanicGalExecutionRequest.CopyBufferSubData op -> {
+                    sources.add(boundBufferRef("copy-buffer-source", op.readTarget(), op.readOffset(), op.size(),
+                        VulkanicPassResourceModel.Access.READ, VulkanicResourceUsage.TRANSFER_SRC, label));
+                    destinations.add(boundBufferRef("copy-buffer-destination", op.writeTarget(), op.writeOffset(), op.size(),
+                        VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST, label));
+                }
+                case VulkanicGalExecutionRequest.CopyNamedBufferSubData op -> {
+                    sources.add(bufferRef("named-copy-buffer-source", op.readBuffer(), op.readOffset(), op.size(),
+                        VulkanicPassResourceModel.ResourceKind.TRANSFER_SOURCE,
+                        VulkanicPassResourceModel.Access.READ, VulkanicResourceUsage.TRANSFER_SRC, OptionalInt.empty()));
+                    destinations.add(bufferRef("named-copy-buffer-destination", op.writeBuffer(), op.writeOffset(), op.size(),
+                        VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
+                        VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST, OptionalInt.empty()));
+                }
+                case VulkanicGalExecutionRequest.CopyImageSubData op -> {
+                    sources.add(textureRef("copy-image-source", op.srcName(), OptionalInt.of(op.srcTarget()), op.srcLevel(), op.srcZ(), op.depth(),
+                        VulkanicPassResourceModel.ResourceKind.TRANSFER_SOURCE,
+                        VulkanicPassResourceModel.Access.READ, VulkanicResourceUsage.TRANSFER_SRC));
+                    destinations.add(textureRef("copy-image-destination", op.dstName(), OptionalInt.of(op.dstTarget()), op.dstLevel(), op.dstZ(), op.depth(),
+                        VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
+                        VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST));
+                }
+                case VulkanicGalExecutionRequest.CopyTextureSubImage2D op -> {
+                    sources.add(framebufferRef("copy-texture-sub-image-source", boundReadFramebuffer,
+                        VulkanicPassResourceModel.Access.READ, VulkanicResourceUsage.TRANSFER_SRC));
+                    destinations.add(textureRef("copy-texture-sub-image-destination", op.texture(), OptionalInt.empty(), op.level(), 0, 1,
+                        VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
+                        VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST));
+                }
+                case VulkanicGalExecutionRequest.CopyTexImage2D op -> {
+                    sources.add(framebufferRef(request.kind().name().toLowerCase(java.util.Locale.ROOT) + "-source",
+                        boundReadFramebuffer, VulkanicPassResourceModel.Access.READ, VulkanicResourceUsage.TRANSFER_SRC));
+                    destinations.add(boundTextureRef(request.kind().name().toLowerCase(java.util.Locale.ROOT) + "-destination",
+                        op.target(), op.level(), 0, 1, VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
+                        VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST, label));
+                }
+                case VulkanicGalExecutionRequest.CopyTexSubImage2D op -> {
+                    sources.add(framebufferRef(request.kind().name().toLowerCase(java.util.Locale.ROOT) + "-source",
+                        boundReadFramebuffer, VulkanicPassResourceModel.Access.READ, VulkanicResourceUsage.TRANSFER_SRC));
+                    destinations.add(boundTextureRef(request.kind().name().toLowerCase(java.util.Locale.ROOT) + "-destination",
+                        op.target(), op.level(), 0, 1, VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
+                        VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST, label));
+                }
+                case VulkanicGalExecutionRequest.BlitFramebuffer op -> {
+                    sources.add(framebufferRef("blit-framebuffer-source", boundReadFramebuffer,
+                        VulkanicPassResourceModel.Access.READ, VulkanicResourceUsage.TRANSFER_SRC));
+                    destinations.add(framebufferRef("blit-framebuffer-destination", boundDrawFramebuffer,
+                        VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST));
+                }
+                case VulkanicGalExecutionRequest.BlitNamedFramebuffer op -> {
+                    sources.add(framebufferRef("blit-named-framebuffer-source", op.readFramebuffer(),
+                        VulkanicPassResourceModel.Access.READ, VulkanicResourceUsage.TRANSFER_SRC));
+                    destinations.add(framebufferRef("blit-named-framebuffer-destination", op.drawFramebuffer(),
+                        VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST));
+                }
+                case VulkanicGalExecutionRequest.ReadPixelsPointer op -> {
+                    sources.add(framebufferRef("read-pixels-source", boundReadFramebuffer,
+                        VulkanicPassResourceModel.Access.READ, VulkanicResourceUsage.TRANSFER_SRC));
+                    int packBuffer = bufferBindings.getOrDefault(GL_PIXEL_PACK_BUFFER, 0);
+                    if (packBuffer > 0) {
+                        destinations.add(bufferRef("read-pixels-pack-buffer", packBuffer, op.pixels(), 1L,
+                            VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
+                            VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST,
+                            OptionalInt.of(GL_PIXEL_PACK_BUFFER)));
+                    }
+                }
+                case VulkanicGalExecutionRequest.ReadPixelsFloatArray op -> {
+                    sources.add(framebufferRef("read-pixels-source", boundReadFramebuffer,
+                        VulkanicPassResourceModel.Access.READ, VulkanicResourceUsage.TRANSFER_SRC));
+                    int packBuffer = bufferBindings.getOrDefault(GL_PIXEL_PACK_BUFFER, 0);
+                    if (packBuffer > 0) {
+                        destinations.add(bufferRef("read-pixels-pack-buffer", packBuffer, 0L, 1L,
+                            VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
+                            VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST,
+                            OptionalInt.of(GL_PIXEL_PACK_BUFFER)));
+                    }
+                }
+                case VulkanicGalExecutionRequest.BufferSubData op -> {
+                    destinations.add(boundBufferRef("buffer-sub-data-destination", op.target(), op.offset(), payloadSize(op.payload()),
+                        VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST, label));
+                }
+                case VulkanicGalExecutionRequest.NamedBufferSubData op -> {
+                    destinations.add(bufferRef("named-buffer-sub-data-destination", op.buffer(), op.offset(), payloadSize(op.payload()),
+                        VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
+                        VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST, OptionalInt.empty()));
+                }
+                case VulkanicGalExecutionRequest.UploadTexture1D op -> {
+                    addPixelUnpackSourceIfBound(sources, 0L);
+                    destinations.add(boundTextureRef("upload-texture-1d-destination", op.target(), op.level(), 0, 1,
+                        VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
+                        VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST, label));
+                }
+                case VulkanicGalExecutionRequest.UploadTexture2D op -> {
+                    addPixelUnpackSourceIfBound(sources, 0L);
+                    destinations.add(boundTextureRef("upload-texture-2d-destination", op.target(), op.level(), 0, 1,
+                        VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
+                        VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST, label));
+                }
+                case VulkanicGalExecutionRequest.UploadTexture2DSubImagePointer op -> {
+                    addPixelUnpackSourceIfBound(sources, op.pixels());
+                    destinations.add(boundTextureRef("upload-texture-2d-sub-image-destination", op.target(), op.level(), 0, 1,
+                        VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
+                        VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST, label));
+                }
+                case VulkanicGalExecutionRequest.UploadTexture2DSubImageBuffer op -> {
+                    addPixelUnpackSourceIfBound(sources, 0L);
+                    destinations.add(boundTextureRef("upload-texture-2d-sub-image-destination", op.target(), op.level(), 0, 1,
+                        VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
+                        VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST, label));
+                }
+                case VulkanicGalExecutionRequest.UploadTexture3D op -> {
+                    addPixelUnpackSourceIfBound(sources, 0L);
+                    destinations.add(boundTextureRef("upload-texture-3d-destination", op.target(), op.level(), 0, Math.max(1, op.depth()),
+                        VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
+                        VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST, label));
+                }
+                case VulkanicGalExecutionRequest.ClearTexImageInt op -> {
+                    destinations.add(textureRef("clear-texture-image-destination", op.texture(), OptionalInt.empty(), op.level(), 0, 1,
+                        VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
+                        VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST));
+                }
+                case VulkanicGalExecutionRequest.ClearBufferSubDataInt op -> {
+                    destinations.add(boundBufferRef("clear-buffer-sub-data-destination", op.target(), op.offset(), op.size(),
+                        VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST, label));
+                }
+                case VulkanicGalExecutionRequest.ClearBufferFloat op -> {
+                    destinations.add(framebufferRef(request.kind().name().toLowerCase(java.util.Locale.ROOT) + "-destination",
+                        boundDrawFramebuffer, VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST));
+                }
+                case VulkanicGalExecutionRequest.ClearBufferInt op -> {
+                    destinations.add(framebufferRef(request.kind().name().toLowerCase(java.util.Locale.ROOT) + "-destination",
+                        boundDrawFramebuffer, VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST));
+                }
+                case VulkanicGalExecutionRequest.ClearBufferUint op -> {
+                    destinations.add(framebufferRef(request.kind().name().toLowerCase(java.util.Locale.ROOT) + "-destination",
+                        boundDrawFramebuffer, VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST));
+                }
+                case VulkanicGalExecutionRequest.ClearNamedFramebufferFloat op -> {
+                    destinations.add(framebufferRef(request.kind().name().toLowerCase(java.util.Locale.ROOT) + "-destination",
+                        op.framebuffer(), VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST));
+                }
+                case VulkanicGalExecutionRequest.ClearNamedFramebufferInt op -> {
+                    destinations.add(framebufferRef(request.kind().name().toLowerCase(java.util.Locale.ROOT) + "-destination",
+                        op.framebuffer(), VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST));
+                }
+                case VulkanicGalExecutionRequest.ClearNamedFramebufferUint op -> {
+                    destinations.add(framebufferRef(request.kind().name().toLowerCase(java.util.Locale.ROOT) + "-destination",
+                        op.framebuffer(), VulkanicPassResourceModel.Access.WRITE, VulkanicResourceUsage.TRANSFER_DST));
+                }
+                case VulkanicGalExecutionRequest.GenerateMipmap op -> {
+                    destinations.add(boundTextureRef("generate-mipmap-destination", op.target(), 0, 0, 1,
+                        VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
+                        VulkanicPassResourceModel.Access.READ_WRITE, VulkanicResourceUsage.TRANSFER_DST, label));
+                }
+                case VulkanicGalExecutionRequest.GenerateTextureMipmap op -> {
+                    destinations.add(textureRef("generate-texture-mipmap-destination", op.texture(), OptionalInt.empty(), 0, 0, 1,
+                        VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
+                        VulkanicPassResourceModel.Access.READ_WRITE, VulkanicResourceUsage.TRANSFER_DST));
+                }
+            }
+            return new VulkanicGalExecutionRequest.TransferCompatibilitySnapshot(
+                sources,
+                destinations,
+                pixelStore.copy(),
+                "frontend-shared-compatibility-transfer"
+            );
+        }
+    }
+
+    public void validateResourceGenerations(VulkanicGalExecutionRequest.TransferCompatibilitySnapshot snapshot) {
+        Objects.requireNonNull(snapshot, "snapshot");
+        synchronized (lock) {
+            for (VulkanicPassResourceModel.CanonicalResourceReference reference : snapshot.allResources()) {
+                validateResourceGeneration(reference);
+            }
+        }
+    }
+
+    private void validateResourceGenerations(List<VulkanicPassResourceModel.BindingSnapshot> bindings) {
+        synchronized (lock) {
+            for (VulkanicPassResourceModel.BindingSnapshot binding : bindings) {
+                if (binding.resourceReference().isEmpty()) {
+                    continue;
+                }
+                validateResourceGeneration(binding.resourceReference().get());
+            }
+        }
+    }
+
+    private void validateResourceGeneration(VulkanicPassResourceModel.CanonicalResourceReference reference) {
+        if (reference.generation() == VulkanicPassResourceModel.UNKNOWN_GENERATION
+            || reference.legacyId().isEmpty()) {
+            return;
+        }
+        long currentGeneration = switch (reference.bindingKind()) {
+            case SAMPLED_TEXTURE, STORAGE_IMAGE -> textureGenerationUnlocked(reference.legacyId().getAsInt());
+            case BUFFER_RANGE, TEXEL_BUFFER -> bufferGenerationUnlocked(reference.legacyId().getAsInt());
+            case ATTACHMENT -> VulkanicPassResourceModel.UNKNOWN_GENERATION;
+        };
+        if (currentGeneration != VulkanicPassResourceModel.UNKNOWN_GENERATION
+            && currentGeneration != reference.generation()) {
+            throw new IllegalStateException(
+                "Stale GAL resource reference for " + reference.resource().logicalName()
+                    + " (" + reference.resource().stableKey()
+                    + "): captured generation " + reference.generation()
+                    + " but current generation is " + currentGeneration
+            );
+        }
+    }
+
+    private static long payloadSize(java.nio.ByteBuffer payload) {
+        return Math.max(1L, payload.remaining());
+    }
+
+    private void addPixelUnpackSourceIfBound(
+        List<VulkanicPassResourceModel.CanonicalResourceReference> sources,
+        long offset
+    ) {
+        int unpackBuffer = bufferBindings.getOrDefault(GL_PIXEL_UNPACK_BUFFER, 0);
+        if (unpackBuffer > 0) {
+            sources.add(bufferRef("pixel-unpack-buffer-source", unpackBuffer, Math.max(0L, offset), 1L,
+                VulkanicPassResourceModel.ResourceKind.TRANSFER_SOURCE,
+                VulkanicPassResourceModel.Access.READ,
+                VulkanicResourceUsage.TRANSFER_SRC,
+                OptionalInt.of(GL_PIXEL_UNPACK_BUFFER)));
+        }
+    }
+
+    private VulkanicPassResourceModel.CanonicalResourceReference boundBufferRef(
+        String logicalName,
+        int target,
+        long offset,
+        long size,
+        VulkanicPassResourceModel.Access access,
+        VulkanicResourceUsage usage,
+        String label
+    ) {
+        int buffer = bufferBindings.getOrDefault(target, 0);
+        VulkanicPassResourceModel.ResourceKind kind = usage == VulkanicResourceUsage.TRANSFER_SRC
+            ? VulkanicPassResourceModel.ResourceKind.TRANSFER_SOURCE
+            : VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION;
+        if (buffer <= 0) {
+            return bufferRef(logicalName, 0, offset, size, kind, access, usage, OptionalInt.of(target));
+        }
+        return bufferRef(logicalName, buffer, offset, size, kind, access, usage, OptionalInt.of(target));
+    }
+
+    private VulkanicPassResourceModel.CanonicalResourceReference bufferRef(
+        String logicalName,
+        int buffer,
+        long offset,
+        long size,
+        VulkanicPassResourceModel.ResourceKind kind,
+        VulkanicPassResourceModel.Access access,
+        VulkanicResourceUsage usage,
+        OptionalInt bindingUnit
+    ) {
+        long normalizedSize = Math.max(1L, size);
+        return VulkanicPassResourceModel.CanonicalResourceReference.bufferRange(
+            logicalName,
+            kind,
+            buffer > 0 ? "legacy-buffer:" + buffer : "legacy-buffer:unbound:" + logicalName,
+            Math.max(0L, offset),
+            normalizedSize,
+            access,
+            usage,
+            bindingUnit,
+            buffer > 0 ? OptionalInt.of(buffer) : OptionalInt.empty(),
+            bufferGenerationUnlocked(buffer)
+        );
+    }
+
+    private VulkanicPassResourceModel.CanonicalResourceReference boundTextureRef(
+        String logicalName,
+        int target,
+        int level,
+        int layer,
+        int layerCount,
+        VulkanicPassResourceModel.ResourceKind kind,
+        VulkanicPassResourceModel.Access access,
+        VulkanicResourceUsage usage,
+        String label
+    ) {
+        int texture = boundTextureForTarget(target);
+        return textureRef(logicalName, texture, OptionalInt.of(target), level, layer, layerCount, kind, access, usage);
+    }
+
+    private int boundTextureForTarget(int target) {
+        Integer texture = textureBindings.get(new TextureBindingKey(activeTextureUnitIndex, target));
+        if (texture == null) {
+            texture = textureUnitBindings.get(activeTextureUnitIndex);
+        }
+        return texture == null ? 0 : texture;
+    }
+
+    private VulkanicPassResourceModel.CanonicalResourceReference textureRef(
+        String logicalName,
+        int texture,
+        OptionalInt target,
+        int level,
+        int layer,
+        int layerCount,
+        VulkanicPassResourceModel.ResourceKind kind,
+        VulkanicPassResourceModel.Access access,
+        VulkanicResourceUsage usage
+    ) {
+        return new VulkanicPassResourceModel.CanonicalResourceReference(
+            VulkanicPassResourceModel.ResourceIdentity.of(
+                logicalName,
+                kind,
+                texture > 0 ? "legacy-texture:" + texture : "legacy-texture:unbound:" + logicalName
+            ),
+            VulkanicPassResourceModel.BindingKind.STORAGE_IMAGE,
+            access,
+            VulkanicPassResourceModel.Subresource.color(Math.max(0, level), 1, Math.max(0, layer), Math.max(1, layerCount)),
+            usage,
+            target.isPresent()
+                ? targetClassForLegacyTarget(target.getAsInt())
+                : VulkanicPassResourceModel.TargetClass.UNKNOWN,
+            VulkanicPassResourceModel.FormatClass.COLOR,
+            textureGenerationUnlocked(texture),
+            texture > 0 ? OptionalInt.of(texture) : OptionalInt.empty(),
+            target,
+            OptionalInt.empty(),
+            OptionalInt.empty(),
+            OptionalInt.empty(),
+            OptionalInt.empty(),
+            layerCount > 1
+        );
+    }
+
+    private static VulkanicPassResourceModel.CanonicalResourceReference framebufferRef(
+        String logicalName,
+        int framebuffer,
+        VulkanicPassResourceModel.Access access,
+        VulkanicResourceUsage usage
+    ) {
+        VulkanicPassResourceModel.ResourceKind kind = usage == VulkanicResourceUsage.TRANSFER_SRC
+            ? VulkanicPassResourceModel.ResourceKind.READBACK_SOURCE
+            : VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION;
+        return new VulkanicPassResourceModel.CanonicalResourceReference(
+            VulkanicPassResourceModel.ResourceIdentity.of(logicalName, kind, "legacy-framebuffer:" + framebuffer),
+            VulkanicPassResourceModel.BindingKind.ATTACHMENT,
+            access,
+            VulkanicPassResourceModel.Subresource.color(0, 1, 0, 1),
+            usage,
+            VulkanicPassResourceModel.TargetClass.UNKNOWN,
+            VulkanicPassResourceModel.FormatClass.COLOR,
+            VulkanicPassResourceModel.UNKNOWN_GENERATION,
+            OptionalInt.of(framebuffer),
+            OptionalInt.empty(),
+            OptionalInt.empty(),
+            OptionalInt.empty(),
+            OptionalInt.empty(),
+            OptionalInt.empty(),
+            false
         );
     }
 
@@ -699,6 +1211,8 @@ public final class VulkanicCompatibilityState {
         Map<TextureBindingKey, Integer> textureBindingsByKey,
         Map<Integer, Integer> samplerBindings,
         Map<Integer, ImageUnitBindingState> imageUnitBindings,
+        Map<Integer, Long> textureGenerations,
+        Map<Integer, Long> bufferGenerations,
         FixedFunctionSnapshot fixedFunction,
         String semanticIdentity
     ) {
@@ -713,6 +1227,8 @@ public final class VulkanicCompatibilityState {
             textureBindingsByKey = Map.copyOf(textureBindingsByKey);
             samplerBindings = Map.copyOf(samplerBindings);
             imageUnitBindings = Map.copyOf(imageUnitBindings);
+            textureGenerations = Map.copyOf(textureGenerations);
+            bufferGenerations = Map.copyOf(bufferGenerations);
             fixedFunction = Objects.requireNonNull(fixedFunction, "fixedFunction");
             semanticIdentity = Objects.requireNonNull(semanticIdentity, "semanticIdentity");
         }
@@ -773,7 +1289,8 @@ public final class VulkanicCompatibilityState {
                         texture,
                         unit,
                         samplerBindings.getOrDefault(unit, 0),
-                        OptionalInt.of(GL_TEXTURE_2D)
+                        OptionalInt.of(GL_TEXTURE_2D),
+                        textureGenerations
                     ))
                 ));
             }
@@ -809,7 +1326,8 @@ public final class VulkanicCompatibilityState {
                         texture,
                         unit,
                         samplerBindings.getOrDefault(unit, 0),
-                        OptionalInt.empty()
+                        OptionalInt.empty(),
+                        textureGenerations
                     ))
                 ));
             }
@@ -820,6 +1338,7 @@ public final class VulkanicCompatibilityState {
                 textureUnitBindings,
                 samplerBindings,
                 imageUnitBindings,
+                textureGenerations,
                 semanticIdentity,
                 order
             );
@@ -849,11 +1368,13 @@ public final class VulkanicCompatibilityState {
                         range.size() == Long.MAX_VALUE ? 1L : Math.max(1L, range.size()),
                         use.access(),
                         use.usage(),
-                        OptionalInt.of(entry.getKey().index())
+                        OptionalInt.of(entry.getKey().index()),
+                        OptionalInt.of(range.buffer()),
+                        bufferGenerations.getOrDefault(range.buffer(), 0L)
                     ))
                 ));
             }
-            addStorageImageBindings(bindings, imageUnitBindings, semanticIdentity, order);
+            addStorageImageBindings(bindings, imageUnitBindings, textureGenerations, semanticIdentity, order);
             return bindings;
         }
     }
@@ -868,6 +1389,8 @@ public final class VulkanicCompatibilityState {
         Map<TextureBindingKey, Integer> textureBindingsByKey,
         Map<Integer, Integer> samplerBindings,
         Map<Integer, ImageUnitBindingState> imageUnitBindings,
+        Map<Integer, Long> textureGenerations,
+        Map<Integer, Long> bufferGenerations,
         String semanticIdentity
     ) {
         public ComputeSnapshot {
@@ -879,6 +1402,8 @@ public final class VulkanicCompatibilityState {
             textureBindingsByKey = Map.copyOf(textureBindingsByKey);
             samplerBindings = Map.copyOf(samplerBindings);
             imageUnitBindings = Map.copyOf(imageUnitBindings);
+            textureGenerations = Map.copyOf(textureGenerations);
+            bufferGenerations = Map.copyOf(bufferGenerations);
             semanticIdentity = Objects.requireNonNull(semanticIdentity, "semanticIdentity");
         }
 
@@ -914,7 +1439,8 @@ public final class VulkanicCompatibilityState {
                         texture,
                         unit,
                         samplerBindings.getOrDefault(unit, 0),
-                        OptionalInt.of(GL_TEXTURE_2D)
+                        OptionalInt.of(GL_TEXTURE_2D),
+                        textureGenerations
                     ))
                 ));
             }
@@ -950,7 +1476,8 @@ public final class VulkanicCompatibilityState {
                         texture,
                         unit,
                         samplerBindings.getOrDefault(unit, 0),
-                        OptionalInt.empty()
+                        OptionalInt.empty(),
+                        textureGenerations
                     ))
                 ));
             }
@@ -961,6 +1488,7 @@ public final class VulkanicCompatibilityState {
                 textureUnitBindings,
                 samplerBindings,
                 imageUnitBindings,
+                textureGenerations,
                 semanticIdentity,
                 order
             );
@@ -990,11 +1518,13 @@ public final class VulkanicCompatibilityState {
                         range.size() == Long.MAX_VALUE ? 1L : Math.max(1L, range.size()),
                         use.access(),
                         use.usage(),
-                        OptionalInt.of(entry.getKey().index())
+                        OptionalInt.of(entry.getKey().index()),
+                        OptionalInt.of(range.buffer()),
+                        bufferGenerations.getOrDefault(range.buffer(), 0L)
                     ))
                 ));
             }
-            addStorageImageBindings(bindings, imageUnitBindings, semanticIdentity, order);
+            addStorageImageBindings(bindings, imageUnitBindings, textureGenerations, semanticIdentity, order);
             return bindings;
         }
     }
@@ -1002,6 +1532,7 @@ public final class VulkanicCompatibilityState {
     private static void addStorageImageBindings(
         List<VulkanicPassResourceModel.BindingSnapshot> bindings,
         Map<Integer, ImageUnitBindingState> imageUnitBindings,
+        Map<Integer, Long> textureGenerations,
         String semanticIdentity,
         int order
     ) {
@@ -1040,7 +1571,8 @@ public final class VulkanicCompatibilityState {
                     use.usage(),
                     OptionalInt.of(image.imageUnit()),
                     OptionalInt.of(image.access()),
-                    OptionalInt.of(image.format())
+                    OptionalInt.of(image.format()),
+                    textureGenerations.getOrDefault(image.texture(), 0L)
                 ))
             ));
         }
@@ -1065,6 +1597,7 @@ public final class VulkanicCompatibilityState {
         Map<Integer, Integer> textureUnitBindings,
         Map<Integer, Integer> samplerBindings,
         Map<Integer, ImageUnitBindingState> imageUnitBindings,
+        Map<Integer, Long> textureGenerations,
         String semanticIdentity,
         int order
     ) {
@@ -1100,7 +1633,8 @@ public final class VulkanicCompatibilityState {
                     texture,
                     key.unit(),
                     samplerBindings.getOrDefault(key.unit(), 0),
-                    OptionalInt.of(key.target())
+                    OptionalInt.of(key.target()),
+                    textureGenerations
                 ))
             ));
         }
@@ -1112,7 +1646,8 @@ public final class VulkanicCompatibilityState {
         int texture,
         int unit,
         int sampler,
-        OptionalInt target
+        OptionalInt target,
+        Map<Integer, Long> textureGenerations
     ) {
         return VulkanicPassResourceModel.CanonicalResourceReference.sampledTexture(
             use.resource().logicalName(),
@@ -1124,7 +1659,8 @@ public final class VulkanicCompatibilityState {
                 : VulkanicPassResourceModel.TargetClass.UNKNOWN,
             use.subresource(),
             OptionalInt.of(unit),
-            sampler > 0 ? OptionalInt.of(sampler) : OptionalInt.empty()
+            sampler > 0 ? OptionalInt.of(sampler) : OptionalInt.empty(),
+            textureGenerations.getOrDefault(texture, 0L)
         );
     }
 
@@ -1416,6 +1952,26 @@ public final class VulkanicCompatibilityState {
                 stencilFuncs,
                 stencilOps,
                 stencilWriteMasks
+            );
+        }
+    }
+
+    private static final class PixelStoreState {
+        private int packRowLength;
+        private int packAlignment = 4;
+        private int unpackRowLength;
+        private int unpackSkipRows;
+        private int unpackSkipPixels;
+        private int unpackAlignment = 4;
+
+        private VulkanicGalExecutionRequest.TransferPixelStoreSnapshot copy() {
+            return new VulkanicGalExecutionRequest.TransferPixelStoreSnapshot(
+                packRowLength,
+                packAlignment,
+                unpackRowLength,
+                unpackSkipRows,
+                unpackSkipPixels,
+                unpackAlignment
             );
         }
     }

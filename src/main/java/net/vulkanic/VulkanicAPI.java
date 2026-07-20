@@ -183,6 +183,7 @@ public class VulkanicAPI {
     public static final int GL_COPY_READ_BUFFER = 0x8F36;
     public static final int GL_COPY_WRITE_BUFFER = 0x8F37;
     public static final int GL_PIXEL_PACK_BUFFER = 0x88EB;
+    public static final int GL_PIXEL_UNPACK_BUFFER = 0x88EC;
     public static final int GL_SHADER_STORAGE_BUFFER = 0x90D2;
     
     // OpenGL Constants - Buffer Usage
@@ -440,6 +441,7 @@ public class VulkanicAPI {
     
     // OpenGL Constants - Pixel Store Parameters
     public static final int GL_PACK_ROW_LENGTH = 0x0D02;
+    public static final int GL_PACK_ALIGNMENT = 0x0D05;
     public static final int GL_UNPACK_ROW_LENGTH = 0x0CF2;
     public static final int GL_UNPACK_SKIP_ROWS = 0x0CF3;
     public static final int GL_UNPACK_SKIP_PIXELS = 0x0CF4;
@@ -1268,7 +1270,7 @@ public class VulkanicAPI {
             }
             throw new IllegalArgumentException("Unsupported clear buffer mask: 0x" + Integer.toHexString(mask));
         }
-        executeGalClear(ctx, VulkanicGalExecutionRequest.ClearRequest.legacy(
+        executeGalClear(ctx, VulkanicGalExecutionRequest.ClearRequest.of(
             "clearBuffers",
             clearBuffers.toArray(VulkanicClearBuffer[]::new)
         ));
@@ -1283,7 +1285,7 @@ public class VulkanicAPI {
             "vulkanic-clearBuffers",
             "buffers=" + shaderInputParitySanitizeLabel(java.util.Arrays.toString(buffers))
         );
-        executeGalClear(ctx, VulkanicGalExecutionRequest.ClearRequest.legacy("clearBuffers", buffers));
+        executeGalClear(ctx, VulkanicGalExecutionRequest.ClearRequest.of("clearBuffers", buffers));
     }
 
     public static void clearColorBuffer(CommandContext ctx) {
@@ -1570,15 +1572,13 @@ public class VulkanicAPI {
      * @param target The texture target
      */
     public static void generateTextureMipmap(CommandContext ctx, int target) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacy(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "generateTextureMipmap",
-            VulkanicGalExecutionRequest.TransferKind.GENERATE_MIPMAP,
+            new VulkanicGalExecutionRequest.GenerateMipmap(target),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
             "legacy-bound-texture-target:" + target,
             VulkanicPassResourceModel.Access.READ_WRITE,
-            VulkanicResourceUsage.TRANSFER_DST,
-            new int[] {target},
-            new long[] {}
+            VulkanicResourceUsage.TRANSFER_DST
         ));
     }
     
@@ -1590,6 +1590,7 @@ public class VulkanicAPI {
      * @param value The value to set
      */
     public static void setPixelStore(CommandContext ctx, int pname, int value) {
+        compatibilityState.setPixelStore(pname, value);
         getBackend().setPixelStore(ctx, pname, value);
     }
     
@@ -2085,15 +2086,13 @@ public class VulkanicAPI {
      * @param height The height of the region
      */
     public static void copyTexSubImage2D(CommandContext ctx, int target, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacy(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "copyTexSubImage2D",
-            VulkanicGalExecutionRequest.TransferKind.COPY_TEX_SUB_IMAGE_2D,
+            new VulkanicGalExecutionRequest.CopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
             "legacy-bound-texture-target:" + target,
             VulkanicPassResourceModel.Access.WRITE,
-            VulkanicResourceUsage.TRANSFER_DST,
-            new int[] {target, level, xoffset, yoffset, x, y, width, height},
-            new long[] {}
+            VulkanicResourceUsage.TRANSFER_DST
         ));
     }
 
@@ -2480,6 +2479,7 @@ public class VulkanicAPI {
     }
     
     public static void namedBufferDataDSA(CommandContext ctx, int buffer, long size, int usage) {
+        compatibilityState.markBufferStorageReplaced(buffer);
         dispatchImplementedVoid(
             direct -> direct.namedBufferDataDSA(ctx, buffer, size, usage),
             activeBackend -> activeBackend.namedBufferDataDSA(ctx, buffer, size, usage)
@@ -2487,6 +2487,7 @@ public class VulkanicAPI {
     }
     
     public static void namedBufferDataDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int usage) {
+        compatibilityState.markBufferStorageReplaced(buffer);
         dispatchImplementedVoid(
             direct -> direct.namedBufferDataDSA(ctx, buffer, data, usage),
             activeBackend -> activeBackend.namedBufferDataDSA(ctx, buffer, data, usage)
@@ -2494,16 +2495,13 @@ public class VulkanicAPI {
     }
     
     public static void namedBufferSubDataDSA(CommandContext ctx, int buffer, long offset, java.nio.ByteBuffer data) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacyWithBytePayload(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "namedBufferSubDataDSA",
-            VulkanicGalExecutionRequest.TransferKind.NAMED_BUFFER_SUB_DATA,
+            new VulkanicGalExecutionRequest.NamedBufferSubData(buffer, offset, data),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
             "legacy-buffer:" + buffer,
             VulkanicPassResourceModel.Access.WRITE,
-            VulkanicResourceUsage.TRANSFER_DST,
-            new int[] {buffer},
-            new long[] {offset},
-            data
+            VulkanicResourceUsage.TRANSFER_DST
         ));
     }
     
@@ -2556,15 +2554,13 @@ public class VulkanicAPI {
      * @param size Number of bytes to copy
      */
     public static void copyNamedBufferSubDataDSA(CommandContext ctx, int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacy(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "copyNamedBufferSubDataDSA",
-            VulkanicGalExecutionRequest.TransferKind.COPY_NAMED_BUFFER_SUB_DATA,
+            new VulkanicGalExecutionRequest.CopyNamedBufferSubData(readBuffer, writeBuffer, readOffset, writeOffset, size),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_SOURCE,
             "legacy-buffer-copy:" + readBuffer + "->" + writeBuffer,
             VulkanicPassResourceModel.Access.READ_WRITE,
-            VulkanicResourceUsage.TRANSFER_SRC,
-            new int[] {readBuffer, writeBuffer},
-            new long[] {readOffset, writeOffset, size}
+            VulkanicResourceUsage.TRANSFER_SRC
         ));
     }
     
@@ -2612,20 +2608,18 @@ public class VulkanicAPI {
      */
     public static void blitNamedFramebufferDSA(CommandContext ctx, int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1,
                                                 int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacy(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "blitNamedFramebufferDSA",
-            VulkanicGalExecutionRequest.TransferKind.BLIT_NAMED_FRAMEBUFFER,
-            VulkanicPassResourceModel.ResourceKind.TRANSFER_SOURCE,
-            "legacy-framebuffer-blit-dsa:" + readFramebuffer + "->" + drawFramebuffer,
-            VulkanicPassResourceModel.Access.READ_WRITE,
-            VulkanicResourceUsage.TRANSFER_SRC,
-            new int[] {
+            new VulkanicGalExecutionRequest.BlitNamedFramebuffer(
                 readFramebuffer, drawFramebuffer,
                 srcX0, srcY0, srcX1, srcY1,
                 dstX0, dstY0, dstX1, dstY1,
                 mask, filter
-            },
-            new long[] {}
+            ),
+            VulkanicPassResourceModel.ResourceKind.TRANSFER_SOURCE,
+            "legacy-framebuffer-blit-dsa:" + readFramebuffer + "->" + drawFramebuffer,
+            VulkanicPassResourceModel.Access.READ_WRITE,
+            VulkanicResourceUsage.TRANSFER_SRC
         ));
     }
     
@@ -2649,7 +2643,8 @@ public class VulkanicAPI {
         GraphicsBackend backend = getBackend();
         VulkanicGalExecutionRequest.GraphicsDrawRequest capturedRequest =
             VulkanicGalSnapshotBuilder.captureGraphicsDraw(ctx, backend, compatibilityState, request);
-        backend.executeGraphicsDraw(ctx, capturedRequest);
+        requireGalExecutionAccepted(VulkanicGalExecutionRequest.validateGraphicsDraw(capturedRequest));
+        requireGalExecutionAccepted(backend.executeGraphicsDraw(ctx, capturedRequest));
     }
 
     private static void executeGalComputeDispatch(
@@ -2657,19 +2652,23 @@ public class VulkanicAPI {
         VulkanicGalExecutionRequest.ComputeDispatchRequest request
     ) {
         GraphicsBackend backend = getBackend();
-        String operation = request.legacyMetadata().operation();
+        String operation = request.semanticIdentity().phase();
         VulkanicGalExecutionRequest.ComputePassBeginRequest beginRequest =
             VulkanicGalSnapshotBuilder.captureComputePassBegin(
                 ctx,
                 backend,
-                VulkanicGalExecutionRequest.ComputePassBeginRequest.legacy(operation)
-            );
-        backend.executeComputePassBegin(ctx, beginRequest);
+                VulkanicGalExecutionRequest.ComputePassBeginRequest.begin(operation)
+        );
+        requireGalExecutionAccepted(VulkanicGalExecutionRequest.validateComputePassBegin(beginRequest));
+        requireGalExecutionAccepted(backend.executeComputePassBegin(ctx, beginRequest));
         boolean completed = false;
         VulkanicGalExecutionRequest.ComputeDispatchRequest capturedRequest =
             VulkanicGalSnapshotBuilder.captureComputeDispatch(ctx, backend, compatibilityState, request);
         try {
-            backend.executeComputeDispatch(ctx, capturedRequest == null ? request : capturedRequest);
+            VulkanicGalExecutionRequest.ComputeDispatchRequest executableRequest =
+                capturedRequest == null ? request : capturedRequest;
+            requireGalExecutionAccepted(VulkanicGalExecutionRequest.validateComputeDispatch(executableRequest));
+            requireGalExecutionAccepted(backend.executeComputeDispatch(ctx, executableRequest));
             completed = true;
         } finally {
             VulkanicGalExecutionRequest.ComputePassEndRequest endRequest = completed
@@ -2677,7 +2676,12 @@ public class VulkanicAPI {
                 : VulkanicGalExecutionRequest.ComputePassEndRequest.abandoned(operation, "dispatch failed before completion");
             VulkanicGalExecutionRequest.ComputePassEndRequest capturedEndRequest =
                 VulkanicGalSnapshotBuilder.captureComputePassEnd(ctx, backend, endRequest);
-            backend.executeComputePassEnd(ctx, capturedEndRequest);
+            VulkanicGalExecutionRequest.ExecutionResult endResult =
+                VulkanicGalExecutionRequest.validateComputePassEnd(capturedEndRequest);
+            if (completed) {
+                requireGalExecutionAccepted(endResult);
+            }
+            requireGalExecutionAccepted(backend.executeComputePassEnd(ctx, capturedEndRequest));
         }
     }
 
@@ -2687,8 +2691,11 @@ public class VulkanicAPI {
     ) {
         GraphicsBackend backend = getBackend();
         VulkanicGalExecutionRequest.ClearRequest capturedRequest =
-            VulkanicGalSnapshotBuilder.captureClear(ctx, backend, request);
-        backend.executeClear(ctx, capturedRequest == null ? request : capturedRequest);
+            VulkanicGalSnapshotBuilder.captureClear(ctx, backend, compatibilityState, request);
+        VulkanicGalExecutionRequest.ClearRequest executableRequest =
+            capturedRequest == null ? request : capturedRequest;
+        requireGalExecutionAccepted(VulkanicGalExecutionRequest.validateClear(executableRequest));
+        requireGalExecutionAccepted(backend.executeClear(ctx, executableRequest));
     }
 
     private static void executeGalTransfer(
@@ -2697,8 +2704,11 @@ public class VulkanicAPI {
     ) {
         GraphicsBackend backend = getBackend();
         VulkanicGalExecutionRequest.TransferRequest capturedRequest =
-            VulkanicGalSnapshotBuilder.captureTransfer(ctx, backend, request);
-        backend.executeTransfer(ctx, capturedRequest == null ? request : capturedRequest);
+            VulkanicGalSnapshotBuilder.captureTransfer(ctx, backend, compatibilityState, request);
+        VulkanicGalExecutionRequest.TransferRequest executableRequest =
+            capturedRequest == null ? request : capturedRequest;
+        requireGalExecutionAccepted(VulkanicGalExecutionRequest.validateTransfer(executableRequest));
+        requireGalExecutionAccepted(backend.executeTransfer(ctx, executableRequest));
     }
 
     private static VulkanicRenderPass executeGalRenderPassBegin(
@@ -2708,11 +2718,23 @@ public class VulkanicAPI {
         GraphicsBackend backend = getBackend();
         VulkanicGalExecutionRequest.RenderPassBeginRequest capturedRequest =
             VulkanicGalSnapshotBuilder.captureRenderPassBegin(ctx, backend, request);
+        VulkanicGalExecutionRequest.RenderPassBeginRequest executableRequest =
+            capturedRequest == null ? request : capturedRequest;
+        requireGalExecutionAccepted(VulkanicGalExecutionRequest.validateRenderPassBegin(executableRequest));
         VulkanicRenderPass backendPass = backend.executeRenderPassBegin(
             ctx,
-            capturedRequest == null ? request : capturedRequest
+            executableRequest
         );
-        return new GalRenderPass(ctx, backend, capturedRequest == null ? request : capturedRequest, backendPass);
+        return new GalRenderPass(ctx, backend, executableRequest, backendPass);
+    }
+
+    private static void requireGalExecutionAccepted(VulkanicGalExecutionRequest.ExecutionResult result) {
+        Objects.requireNonNull(result, "result");
+        if (!result.successful()) {
+            throw new IllegalStateException(
+                "GAL request " + result.status() + ": " + result.requestIdentity() + " - " + result.detail()
+            );
+        }
     }
 
     private static final class GalRenderPass implements VulkanicRenderPass {
@@ -2767,12 +2789,13 @@ public class VulkanicAPI {
             closed = true;
             VulkanicGalExecutionRequest.RenderPassEndRequest endRequest =
                 VulkanicGalExecutionRequest.RenderPassEndRequest.complete(
-                    beginRequest.legacyMetadata().operation() + ":end",
+                    beginRequest.semanticIdentity().phase() + ":end",
                     beginRequest.semanticIdentity().label()
                 );
             VulkanicGalExecutionRequest.RenderPassEndRequest capturedEndRequest =
                 VulkanicGalSnapshotBuilder.captureRenderPassEnd(ctx, backend, endRequest);
-            backend.executeRenderPassEnd(ctx, capturedEndRequest, delegate);
+            requireGalExecutionAccepted(VulkanicGalExecutionRequest.validateRenderPassEnd(capturedEndRequest));
+            requireGalExecutionAccepted(backend.executeRenderPassEnd(ctx, capturedEndRequest, delegate));
         }
     }
     
@@ -2786,7 +2809,7 @@ public class VulkanicAPI {
      * Draws array primitives using a backend-neutral primitive mode.
      */
     public static void drawArrays(CommandContext ctx, VulkanicPrimitiveMode mode, int first, int count) {
-        executeGalGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyArrays(
+        executeGalGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
             "drawArrays",
             mode,
             first,
@@ -2829,7 +2852,7 @@ public class VulkanicAPI {
      * Draws indexed primitives using backend-neutral primitive and index types.
      */
     public static void drawElements(CommandContext ctx, VulkanicPrimitiveMode mode, int count, VulkanicIndexType indexType, long indices) {
-        executeGalGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyIndexed(
+        executeGalGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.indexed(
             "drawElements",
             mode,
             count,
@@ -2927,16 +2950,13 @@ public class VulkanicAPI {
             "target=" + target + "|level=" + level + "|internalFormat=" + internalFormat
                 + "|format=" + format + "|type=" + type + "|size=" + width + "x" + height
         );
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacyWithBytePayload(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "uploadTexture2D",
-            VulkanicGalExecutionRequest.TransferKind.UPLOAD_TEXTURE_2D,
+            new VulkanicGalExecutionRequest.UploadTexture2D(target, level, internalFormat, width, height, border, format, type, pixels),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
             "legacy-bound-texture-target:" + target + ":level:" + level,
             VulkanicPassResourceModel.Access.WRITE,
-            VulkanicResourceUsage.TRANSFER_DST,
-            new int[] {target, level, internalFormat, width, height, border, format, type},
-            new long[] {},
-            pixels
+            VulkanicResourceUsage.TRANSFER_DST
         ));
     }
 
@@ -3006,15 +3026,13 @@ public class VulkanicAPI {
             "target=" + target + "|level=" + level + "|offset=" + xOffset + "x" + yOffset
                 + "|format=" + format + "|type=" + type + "|size=" + width + "x" + height
         );
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacy(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "uploadTexture2DSubImage-address",
-            VulkanicGalExecutionRequest.TransferKind.UPLOAD_TEXTURE_2D_SUB_IMAGE_POINTER,
+            new VulkanicGalExecutionRequest.UploadTexture2DSubImagePointer(target, level, xOffset, yOffset, width, height, format, type, pixels),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
             "legacy-bound-texture-target:" + target + ":level:" + level,
             VulkanicPassResourceModel.Access.WRITE,
-            VulkanicResourceUsage.TRANSFER_DST,
-            new int[] {target, level, xOffset, yOffset, width, height, format, type},
-            new long[] {pixels}
+            VulkanicResourceUsage.TRANSFER_DST
         ));
     }
 
@@ -3045,16 +3063,13 @@ public class VulkanicAPI {
             "target=" + target + "|level=" + level + "|offset=" + xOffset + "x" + yOffset
                 + "|format=" + format + "|type=" + type + "|size=" + width + "x" + height
         );
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacyWithBytePayload(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "uploadTexture2DSubImage-buffer",
-            VulkanicGalExecutionRequest.TransferKind.UPLOAD_TEXTURE_2D_SUB_IMAGE_BUFFER,
+            new VulkanicGalExecutionRequest.UploadTexture2DSubImageBuffer(target, level, xOffset, yOffset, width, height, format, type, pixels),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
             "legacy-bound-texture-target:" + target + ":level:" + level,
             VulkanicPassResourceModel.Access.WRITE,
-            VulkanicResourceUsage.TRANSFER_DST,
-            new int[] {target, level, xOffset, yOffset, width, height, format, type},
-            new long[] {},
-            pixels
+            VulkanicResourceUsage.TRANSFER_DST
         ));
     }
 
@@ -3090,18 +3105,22 @@ public class VulkanicAPI {
     }
     
     public static void bufferData(CommandContext ctx, int target, java.nio.ByteBuffer data, int usage) {
+        compatibilityState.markBoundBufferStorageReplaced(target);
         getBackend().bufferData(ctx, target, data, usage);
     }
     
     public static void bufferData(CommandContext ctx, int target, long size, int usage) {
+        compatibilityState.markBoundBufferStorageReplaced(target);
         getBackend().bufferData(ctx, target, size, usage);
     }
     
     public static void bufferData(CommandContext ctx, int target, float[] data, int usage) {
+        compatibilityState.markBoundBufferStorageReplaced(target);
         getBackend().bufferData(ctx, target, data, usage);
     }
     
     public static void bufferData(CommandContext ctx, int target, int[] data, int usage) {
+        compatibilityState.markBoundBufferStorageReplaced(target);
         getBackend().bufferData(ctx, target, data, usage);
     }
     
@@ -3113,31 +3132,25 @@ public class VulkanicAPI {
         VulkanicBufferTarget.fromLegacyGlTarget(target)
             .ifPresentOrElse(
                 typedTarget -> bufferSubData(ctx, typedTarget, offset, data),
-                () -> executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacyWithBytePayload(
+                () -> executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
                     "bufferSubData",
-                    VulkanicGalExecutionRequest.TransferKind.BUFFER_SUB_DATA,
+                    new VulkanicGalExecutionRequest.BufferSubData(target, offset, data),
                     VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
                     "legacy-buffer-target:" + target,
                     VulkanicPassResourceModel.Access.WRITE,
-                    VulkanicResourceUsage.TRANSFER_DST,
-                    new int[] {target},
-                    new long[] {offset},
-                    data
+                    VulkanicResourceUsage.TRANSFER_DST
                 ))
             );
     }
 
     public static void bufferSubData(CommandContext ctx, VulkanicBufferTarget target, long offset, java.nio.ByteBuffer data) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacyWithBytePayload(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "bufferSubData",
-            VulkanicGalExecutionRequest.TransferKind.BUFFER_SUB_DATA,
+            new VulkanicGalExecutionRequest.BufferSubData(target.toLegacyGlTarget(), offset, data),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
             "legacy-buffer-target:" + target.toLegacyGlTarget(),
             VulkanicPassResourceModel.Access.WRITE,
-            VulkanicResourceUsage.TRANSFER_DST,
-            new int[] {target.toLegacyGlTarget()},
-            new long[] {offset},
-            data
+            VulkanicResourceUsage.TRANSFER_DST
         ));
     }
     
@@ -3150,6 +3163,7 @@ public class VulkanicAPI {
     }
 
     public static void bufferStorage(CommandContext ctx, VulkanicBufferTarget target, long size, int flags) {
+        compatibilityState.markBoundBufferStorageReplaced(target.toLegacyGlTarget());
         getBackend().bufferStorage(ctx, target.toLegacyGlTarget(), size, flags);
     }
     
@@ -3162,19 +3176,18 @@ public class VulkanicAPI {
     }
 
     public static void bufferStorage(CommandContext ctx, VulkanicBufferTarget target, java.nio.ByteBuffer data, int flags) {
+        compatibilityState.markBoundBufferStorageReplaced(target.toLegacyGlTarget());
         getBackend().bufferStorage(ctx, target.toLegacyGlTarget(), data, flags);
     }
     
     public static void copyBufferSubData(CommandContext ctx, int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacy(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "copyBufferSubData",
-            VulkanicGalExecutionRequest.TransferKind.COPY_BUFFER_SUB_DATA,
+            new VulkanicGalExecutionRequest.CopyBufferSubData(readTarget, writeTarget, readOffset, writeOffset, size),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_SOURCE,
             "legacy-copy-buffer-targets:" + readTarget + "->" + writeTarget,
             VulkanicPassResourceModel.Access.READ_WRITE,
-            VulkanicResourceUsage.TRANSFER_SRC,
-            new int[] {readTarget, writeTarget},
-            new long[] {readOffset, writeOffset, size}
+            VulkanicResourceUsage.TRANSFER_SRC
         ));
     }
 
@@ -3220,15 +3233,13 @@ public class VulkanicAPI {
     
     public static void blitFramebuffer(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1, 
                                        int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacy(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "blitFramebuffer",
-            VulkanicGalExecutionRequest.TransferKind.BLIT_FRAMEBUFFER,
+            new VulkanicGalExecutionRequest.BlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_SOURCE,
             "legacy-framebuffer-blit",
             VulkanicPassResourceModel.Access.READ_WRITE,
-            VulkanicResourceUsage.TRANSFER_SRC,
-            new int[] {srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter},
-            new long[] {}
+            VulkanicResourceUsage.TRANSFER_SRC
         ));
     }
 
@@ -4571,16 +4582,13 @@ public class VulkanicAPI {
     }
     
     public static void clearTexImage(CommandContext ctx, int texture, int level, int format, int type, int[] data) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacyWithIntPayload(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "clearTexImage",
-            VulkanicGalExecutionRequest.TransferKind.CLEAR_TEX_IMAGE_INT,
+            new VulkanicGalExecutionRequest.ClearTexImageInt(texture, level, format, type, data),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
             "legacy-texture:" + texture + ":level:" + level,
             VulkanicPassResourceModel.Access.WRITE,
-            VulkanicResourceUsage.TRANSFER_DST,
-            new int[] {texture, level, format, type},
-            new long[] {},
-            data
+            VulkanicResourceUsage.TRANSFER_DST
         ));
     }
     
@@ -5055,7 +5063,7 @@ public class VulkanicAPI {
      * Renders indexed primitives with instancing and a base vertex using backend-neutral primitive and index types.
      */
     public static void drawIndexedInstancedBaseVertex(CommandContext ctx, VulkanicPrimitiveMode mode, int count, VulkanicIndexType indexType, long indices, int instanceCount, int baseVertex) {
-        executeGalGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyIndexed(
+        executeGalGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.indexed(
             "drawIndexedInstancedBaseVertex",
             mode,
             count,
@@ -5106,7 +5114,7 @@ public class VulkanicAPI {
      * Renders indexed primitives with a base vertex offset using backend-neutral primitive and index types.
      */
     public static void drawIndexedBaseVertex(CommandContext ctx, VulkanicPrimitiveMode mode, int count, VulkanicIndexType indexType, long indices, int baseVertex) {
-        executeGalGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyIndexed(
+        executeGalGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.indexed(
             "drawIndexedBaseVertex",
             mode,
             count,
@@ -5167,7 +5175,7 @@ public class VulkanicAPI {
      * Renders primitives using array data with instancing via backend-neutral primitive mode.
      */
     public static void drawArraysInstanced(CommandContext ctx, VulkanicPrimitiveMode mode, int first, int count, int instanceCount) {
-        executeGalGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyArrays(
+        executeGalGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
             "drawArraysInstanced",
             mode,
             first,
@@ -5307,7 +5315,7 @@ public class VulkanicAPI {
         if (draws.isEmpty()) {
             return;
         }
-        executeGalGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyMultiIndexedBaseVertex(
+        executeGalGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.multiIndexedBaseVertex(
             "multiDrawElementsBaseVertex",
             mode,
             type,
@@ -5377,32 +5385,26 @@ public class VulkanicAPI {
     
     
     public static void uploadTexture1D(CommandContext ctx, int target, int level, int internalformat, int width, int border, int format, int type, java.nio.ByteBuffer pixels) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacyWithBytePayload(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "uploadTexture1D",
-            VulkanicGalExecutionRequest.TransferKind.UPLOAD_TEXTURE_1D,
+            new VulkanicGalExecutionRequest.UploadTexture1D(target, level, internalformat, width, border, format, type, pixels),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
             "legacy-bound-texture-target:" + target + ":level:" + level,
             VulkanicPassResourceModel.Access.WRITE,
-            VulkanicResourceUsage.TRANSFER_DST,
-            new int[] {target, level, internalformat, width, border, format, type},
-            new long[] {},
-            pixels
+            VulkanicResourceUsage.TRANSFER_DST
         ));
     }
     
     
     
     public static void uploadTexture3D(CommandContext ctx, int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, java.nio.ByteBuffer pixels) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacyWithBytePayload(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "uploadTexture3D",
-            VulkanicGalExecutionRequest.TransferKind.UPLOAD_TEXTURE_3D,
+            new VulkanicGalExecutionRequest.UploadTexture3D(target, level, internalformat, width, height, depth, border, format, type, pixels),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
             "legacy-bound-texture-target:" + target + ":level:" + level,
             VulkanicPassResourceModel.Access.WRITE,
-            VulkanicResourceUsage.TRANSFER_DST,
-            new int[] {target, level, internalformat, width, height, depth, border, format, type},
-            new long[] {},
-            pixels
+            VulkanicResourceUsage.TRANSFER_DST
         ));
     }
     
@@ -5410,15 +5412,14 @@ public class VulkanicAPI {
     
     
     public static void copyTexImage2D(CommandContext ctx, int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacy(
+        compatibilityState.markBoundTextureStorageReplaced(target);
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "copyTexImage2D",
-            VulkanicGalExecutionRequest.TransferKind.COPY_TEX_IMAGE_2D,
+            new VulkanicGalExecutionRequest.CopyTexImage2D(target, level, internalFormat, x, y, width, height, border),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
             "legacy-bound-texture-target:" + target,
             VulkanicPassResourceModel.Access.WRITE,
-            VulkanicResourceUsage.TRANSFER_DST,
-            new int[] {target, level, internalFormat, x, y, width, height, border},
-            new long[] {}
+            VulkanicResourceUsage.TRANSFER_DST
         ));
     }
 
@@ -5547,46 +5548,37 @@ public class VulkanicAPI {
     
     
     public static void clearBufferfv(CommandContext ctx, int buffer, int drawbuffer, float[] values) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacyWithFloatPayload(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "clearBufferfv",
-            VulkanicGalExecutionRequest.TransferKind.CLEAR_BUFFER_FLOAT,
+            new VulkanicGalExecutionRequest.ClearBufferFloat(buffer, drawbuffer, values),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
             "legacy-active-framebuffer-buffer:" + buffer + ":draw:" + drawbuffer,
             VulkanicPassResourceModel.Access.WRITE,
-            VulkanicResourceUsage.TRANSFER_DST,
-            new int[] {buffer, drawbuffer},
-            new long[] {},
-            values
+            VulkanicResourceUsage.TRANSFER_DST
         ));
     }
     
     
     public static void clearBufferiv(CommandContext ctx, int buffer, int drawbuffer, int[] values) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacyWithIntPayload(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "clearBufferiv",
-            VulkanicGalExecutionRequest.TransferKind.CLEAR_BUFFER_INT,
+            new VulkanicGalExecutionRequest.ClearBufferInt(buffer, drawbuffer, values),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
             "legacy-active-framebuffer-buffer:" + buffer + ":draw:" + drawbuffer,
             VulkanicPassResourceModel.Access.WRITE,
-            VulkanicResourceUsage.TRANSFER_DST,
-            new int[] {buffer, drawbuffer},
-            new long[] {},
-            values
+            VulkanicResourceUsage.TRANSFER_DST
         ));
     }
     
     
     public static void clearBufferuiv(CommandContext ctx, int buffer, int drawbuffer, int[] values) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacyWithIntPayload(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "clearBufferuiv",
-            VulkanicGalExecutionRequest.TransferKind.CLEAR_BUFFER_UINT,
+            new VulkanicGalExecutionRequest.ClearBufferUint(buffer, drawbuffer, values),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
             "legacy-active-framebuffer-buffer:" + buffer + ":draw:" + drawbuffer,
             VulkanicPassResourceModel.Access.WRITE,
-            VulkanicResourceUsage.TRANSFER_DST,
-            new int[] {buffer, drawbuffer},
-            new long[] {},
-            values
+            VulkanicResourceUsage.TRANSFER_DST
         ));
     }
     
@@ -6212,29 +6204,24 @@ public class VulkanicAPI {
     
     
     public static void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, float[] pixels) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacyWithFloatArrayOutput(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "readPixels-float-array",
-            VulkanicGalExecutionRequest.TransferKind.READ_PIXELS_FLOAT_ARRAY,
+            new VulkanicGalExecutionRequest.ReadPixelsFloatArray(x, y, width, height, format, type, pixels),
             VulkanicPassResourceModel.ResourceKind.READBACK_SOURCE,
             "legacy-read-framebuffer",
             VulkanicPassResourceModel.Access.READ,
-            VulkanicResourceUsage.TRANSFER_SRC,
-            new int[] {x, y, width, height, format, type},
-            new long[] {},
-            pixels
+            VulkanicResourceUsage.TRANSFER_SRC
         ));
     }
     
     public static void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacy(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "readPixels",
-            VulkanicGalExecutionRequest.TransferKind.READ_PIXELS,
+            new VulkanicGalExecutionRequest.ReadPixelsPointer(x, y, width, height, format, type, pixels),
             VulkanicPassResourceModel.ResourceKind.READBACK_SOURCE,
             "legacy-read-framebuffer",
             VulkanicPassResourceModel.Access.READ,
-            VulkanicResourceUsage.TRANSFER_SRC,
-            new int[] {x, y, width, height, format, type},
-            new long[] {pixels}
+            VulkanicResourceUsage.TRANSFER_SRC
         ));
     }
     
@@ -6280,31 +6267,25 @@ public class VulkanicAPI {
         VulkanicBufferTarget.fromLegacyGlTarget(target)
             .ifPresentOrElse(
                 typedTarget -> clearBufferSubData(ctx, typedTarget, internalformat, offset, size, format, type, data),
-                () -> executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacyWithIntPayload(
+                () -> executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
                     "clearBufferSubData",
-                    VulkanicGalExecutionRequest.TransferKind.CLEAR_BUFFER_SUB_DATA_INT,
+                    new VulkanicGalExecutionRequest.ClearBufferSubDataInt(target, internalformat, offset, size, format, type, data),
                     VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
                     "legacy-buffer-target:" + target,
                     VulkanicPassResourceModel.Access.WRITE,
-                    VulkanicResourceUsage.TRANSFER_DST,
-                    new int[] {target, internalformat, format, type},
-                    new long[] {offset, size},
-                    data
+                    VulkanicResourceUsage.TRANSFER_DST
                 ))
             );
     }
 
     public static void clearBufferSubData(CommandContext ctx, VulkanicBufferTarget target, int internalformat, long offset, long size, int format, int type, int[] data) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacyWithIntPayload(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "clearBufferSubData",
-            VulkanicGalExecutionRequest.TransferKind.CLEAR_BUFFER_SUB_DATA_INT,
+            new VulkanicGalExecutionRequest.ClearBufferSubDataInt(target.toLegacyGlTarget(), internalformat, offset, size, format, type, data),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
             "legacy-buffer-target:" + target.toLegacyGlTarget(),
             VulkanicPassResourceModel.Access.WRITE,
-            VulkanicResourceUsage.TRANSFER_DST,
-            new int[] {target.toLegacyGlTarget(), internalformat, format, type},
-            new long[] {offset, size},
-            data
+            VulkanicResourceUsage.TRANSFER_DST
         ));
     }
     
@@ -6442,7 +6423,7 @@ public class VulkanicAPI {
     
     
     public static void dispatchComputeIndirect(CommandContext ctx, long offset) {
-        executeGalComputeDispatch(ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest.legacyIndirect(
+        executeGalComputeDispatch(ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest.indirect(
             "dispatchComputeIndirect",
             offset
         ));
@@ -6462,19 +6443,17 @@ public class VulkanicAPI {
     public static void copyImageSubData(CommandContext ctx, int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ, 
                                         int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ, 
                                         int width, int height, int depth) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacy(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "copyImageSubData",
-            VulkanicGalExecutionRequest.TransferKind.COPY_IMAGE_SUB_DATA,
-            VulkanicPassResourceModel.ResourceKind.TRANSFER_SOURCE,
-            "legacy-image-copy:" + srcName + "->" + dstName,
-            VulkanicPassResourceModel.Access.READ_WRITE,
-            VulkanicResourceUsage.TRANSFER_SRC,
-            new int[] {
+            new VulkanicGalExecutionRequest.CopyImageSubData(
                 srcName, srcTarget, srcLevel, srcX, srcY, srcZ,
                 dstName, dstTarget, dstLevel, dstX, dstY, dstZ,
                 width, height, depth
-            },
-            new long[] {}
+            ),
+            VulkanicPassResourceModel.ResourceKind.TRANSFER_SOURCE,
+            "legacy-image-copy:" + srcName + "->" + dstName,
+            VulkanicPassResourceModel.Access.READ_WRITE,
+            VulkanicResourceUsage.TRANSFER_SRC
         ));
     }
 
@@ -6577,15 +6556,13 @@ public class VulkanicAPI {
      * @param target The texture target (e.g., GL_TEXTURE_2D)
      */
     public static void generateMipmap(CommandContext ctx, int target) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacy(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "generateMipmap",
-            VulkanicGalExecutionRequest.TransferKind.GENERATE_MIPMAP,
+            new VulkanicGalExecutionRequest.GenerateMipmap(target),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
             "legacy-bound-texture-target:" + target,
             VulkanicPassResourceModel.Access.READ_WRITE,
-            VulkanicResourceUsage.TRANSFER_DST,
-            new int[] {target},
-            new long[] {}
+            VulkanicResourceUsage.TRANSFER_DST
         ));
     }
     
@@ -6594,15 +6571,13 @@ public class VulkanicAPI {
     // DSA (Direct State Access) methods - ARB versions
     
     public static void generateTextureMipmapDSA(CommandContext ctx, int texture) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacy(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "generateTextureMipmapDSA",
-            VulkanicGalExecutionRequest.TransferKind.GENERATE_TEXTURE_MIPMAP,
+            new VulkanicGalExecutionRequest.GenerateTextureMipmap(texture),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
             "legacy-texture:" + texture,
             VulkanicPassResourceModel.Access.READ_WRITE,
-            VulkanicResourceUsage.TRANSFER_DST,
-            new int[] {texture},
-            new long[] {}
+            VulkanicResourceUsage.TRANSFER_DST
         ));
     }
     
@@ -6635,46 +6610,37 @@ public class VulkanicAPI {
     
     
     public static void clearNamedFramebufferfv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, float[] value) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacyWithFloatPayload(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "clearNamedFramebufferfv",
-            VulkanicGalExecutionRequest.TransferKind.CLEAR_NAMED_FRAMEBUFFER_FLOAT,
+            new VulkanicGalExecutionRequest.ClearNamedFramebufferFloat(framebuffer, buffer, drawbuffer, value),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
             "legacy-framebuffer:" + framebuffer + ":buffer:" + buffer + ":draw:" + drawbuffer,
             VulkanicPassResourceModel.Access.WRITE,
-            VulkanicResourceUsage.TRANSFER_DST,
-            new int[] {framebuffer, buffer, drawbuffer},
-            new long[] {},
-            value
+            VulkanicResourceUsage.TRANSFER_DST
         ));
     }
     
     
     public static void clearNamedFramebufferiv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, int[] value) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacyWithIntPayload(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "clearNamedFramebufferiv",
-            VulkanicGalExecutionRequest.TransferKind.CLEAR_NAMED_FRAMEBUFFER_INT,
+            new VulkanicGalExecutionRequest.ClearNamedFramebufferInt(framebuffer, buffer, drawbuffer, value),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
             "legacy-framebuffer:" + framebuffer + ":buffer:" + buffer + ":draw:" + drawbuffer,
             VulkanicPassResourceModel.Access.WRITE,
-            VulkanicResourceUsage.TRANSFER_DST,
-            new int[] {framebuffer, buffer, drawbuffer},
-            new long[] {},
-            value
+            VulkanicResourceUsage.TRANSFER_DST
         ));
     }
     
     
     public static void clearNamedFramebufferuiv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, int[] value) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacyWithIntPayload(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "clearNamedFramebufferuiv",
-            VulkanicGalExecutionRequest.TransferKind.CLEAR_NAMED_FRAMEBUFFER_UINT,
+            new VulkanicGalExecutionRequest.ClearNamedFramebufferUint(framebuffer, buffer, drawbuffer, value),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
             "legacy-framebuffer:" + framebuffer + ":buffer:" + buffer + ":draw:" + drawbuffer,
             VulkanicPassResourceModel.Access.WRITE,
-            VulkanicResourceUsage.TRANSFER_DST,
-            new int[] {framebuffer, buffer, drawbuffer},
-            new long[] {},
-            value
+            VulkanicResourceUsage.TRANSFER_DST
         ));
     }
     
@@ -6689,15 +6655,13 @@ public class VulkanicAPI {
      * See {@link GraphicsBackend#copyTextureSubImage2D(CommandContext, int, int, int, int, int, int, int, int)}
      */
     public static void copyTextureSubImage2D(CommandContext ctx, int texture, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacy(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "copyTextureSubImage2D",
-            VulkanicGalExecutionRequest.TransferKind.COPY_TEXTURE_SUB_IMAGE_2D,
+            new VulkanicGalExecutionRequest.CopyTextureSubImage2D(texture, level, xoffset, yoffset, x, y, width, height),
             VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
             "legacy-texture:" + texture,
             VulkanicPassResourceModel.Access.WRITE,
-            VulkanicResourceUsage.TRANSFER_DST,
-            new int[] {texture, level, xoffset, yoffset, x, y, width, height},
-            new long[] {}
+            VulkanicResourceUsage.TRANSFER_DST
         ));
     }
     
@@ -6765,6 +6729,7 @@ public class VulkanicAPI {
      * See {@link GraphicsBackend#namedBufferData(CommandContext, int, float[], int)}
      */
     public static void namedBufferData(CommandContext ctx, int buffer, float[] data, int usage) {
+        compatibilityState.markBufferStorageReplaced(buffer);
         getBackend().namedBufferData(ctx, buffer, data, usage);
     }
     
@@ -6774,20 +6739,18 @@ public class VulkanicAPI {
      * See {@link GraphicsBackend#blitNamedFramebuffer(CommandContext, int, int, int, int, int, int, int, int, int, int, int, int)}
      */
     public static void blitNamedFramebuffer(CommandContext ctx, int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
-        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacy(
+        executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of(
             "blitNamedFramebuffer",
-            VulkanicGalExecutionRequest.TransferKind.BLIT_NAMED_FRAMEBUFFER,
-            VulkanicPassResourceModel.ResourceKind.TRANSFER_SOURCE,
-            "legacy-framebuffer-blit:" + readFramebuffer + "->" + drawFramebuffer,
-            VulkanicPassResourceModel.Access.READ_WRITE,
-            VulkanicResourceUsage.TRANSFER_SRC,
-            new int[] {
+            new VulkanicGalExecutionRequest.BlitNamedFramebuffer(
                 readFramebuffer, drawFramebuffer,
                 srcX0, srcY0, srcX1, srcY1,
                 dstX0, dstY0, dstX1, dstY1,
                 mask, filter
-            },
-            new long[] {}
+            ),
+            VulkanicPassResourceModel.ResourceKind.TRANSFER_SOURCE,
+            "legacy-framebuffer-blit:" + readFramebuffer + "->" + drawFramebuffer,
+            VulkanicPassResourceModel.Access.READ_WRITE,
+            VulkanicResourceUsage.TRANSFER_SRC
         ));
     }
     
@@ -7400,7 +7363,7 @@ public class VulkanicAPI {
      * @param workZ Number of work groups in Z dimension
      */
     public static void dispatchCompute(CommandContext ctx, int workX, int workY, int workZ) {
-        executeGalComputeDispatch(ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest.legacyDirect(
+        executeGalComputeDispatch(ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest.direct(
             "dispatchCompute",
             workX,
             workY,

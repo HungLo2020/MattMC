@@ -7,6 +7,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class VulkanicCompatibilityStateTest {
@@ -35,7 +36,7 @@ final class VulkanicCompatibilityStateTest {
         state.setScissor(3, 4, 640, 360);
 
         VulkanicGalExecutionRequest.GraphicsDrawRequest request =
-            VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyIndexed(
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.indexed(
                 "shared-state-test",
                 VulkanicPrimitiveMode.TRIANGLES,
                 6,
@@ -77,7 +78,7 @@ final class VulkanicCompatibilityStateTest {
         VulkanicCompatibilityState state = new VulkanicCompatibilityState();
 
         VulkanicCompatibilityState.GraphicsSnapshot snapshot = state.captureGraphics(
-            VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyArrays(
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
                 "default-fbo",
                 VulkanicPrimitiveMode.TRIANGLES,
                 0,
@@ -104,7 +105,7 @@ final class VulkanicCompatibilityStateTest {
         state.bindBufferRange(VulkanicBufferTarget.UNIFORM.toLegacyGlTarget(), 2, 50, 16L, 32L);
 
         VulkanicGalExecutionRequest.GraphicsDrawRequest request =
-            VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyIndexed(
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.indexed(
                 "shared-compatibility-snapshot",
                 VulkanicPrimitiveMode.TRIANGLES,
                 3,
@@ -156,7 +157,7 @@ final class VulkanicCompatibilityStateTest {
         state.disableVertexAttribArray(4);
 
         VulkanicGalExecutionRequest.GraphicsDrawRequest request =
-            VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyArrays(
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
                 "disable-sparse-attribute",
                 VulkanicPrimitiveMode.TRIANGLES,
                 0,
@@ -182,7 +183,7 @@ final class VulkanicCompatibilityStateTest {
         state.enableVertexAttribArray(2);
 
         VulkanicGalExecutionRequest.GraphicsDrawRequest request =
-            VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyArrays(
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
                 "legacy-packed-vertex-offsets",
                 VulkanicPrimitiveMode.TRIANGLES,
                 0,
@@ -208,7 +209,7 @@ final class VulkanicCompatibilityStateTest {
         state.bindImageTexture(8, 800, 1, false, 0, glReadOnly, VulkanicAPI.GL_RGBA8);
 
         VulkanicGalExecutionRequest.GraphicsDrawRequest request =
-            VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyArrays(
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
                 "storage-image-capture",
                 VulkanicPrimitiveMode.TRIANGLES,
                 0,
@@ -257,7 +258,7 @@ final class VulkanicCompatibilityStateTest {
         state.bindBufferRange(VulkanicBufferTarget.SHADER_STORAGE.toLegacyGlTarget(), 4, 440, 64L, 128L);
 
         VulkanicGalExecutionRequest.ComputeDispatchRequest request =
-            VulkanicGalExecutionRequest.ComputeDispatchRequest.legacyIndirect("compute-capture", 16L);
+            VulkanicGalExecutionRequest.ComputeDispatchRequest.indirect("compute-capture", 16L);
         VulkanicGalExecutionRequest.ComputeCompatibilitySnapshot snapshot = state.compatibilitySnapshotFor(request);
 
         state.bindProgram(14);
@@ -300,7 +301,7 @@ final class VulkanicCompatibilityStateTest {
         state.setPolygonOffset(1.25F, 2.5F);
 
         VulkanicGalExecutionRequest.GraphicsDrawRequest request =
-            VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyArrays(
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
                 "fixed-function-capture",
                 VulkanicPrimitiveMode.TRIANGLES,
                 0,
@@ -329,7 +330,7 @@ final class VulkanicCompatibilityStateTest {
         VulkanicCompatibilityState state = new VulkanicCompatibilityState();
 
         VulkanicGalExecutionRequest.GraphicsDrawRequest request =
-            VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyArrays(
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
                 "default-cull-face-mode",
                 VulkanicPrimitiveMode.TRIANGLES,
                 0,
@@ -354,7 +355,7 @@ final class VulkanicCompatibilityStateTest {
         state.bindBufferRange(VulkanicBufferTarget.UNIFORM.toLegacyGlTarget(), 4, 400, 0L, 16L);
 
         VulkanicGalExecutionRequest.GraphicsDrawRequest request =
-            VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyArrays(
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
                 "delete-replacement-snapshot",
                 VulkanicPrimitiveMode.TRIANGLES,
                 0,
@@ -374,11 +375,215 @@ final class VulkanicCompatibilityStateTest {
             .anyMatch(binding -> binding.resourceUse().resource().stableKey().equals("legacy-texture:200")));
         assertTrue(beforeDeletion.descriptorBindings().stream()
             .anyMatch(binding -> binding.resourceUse().resource().stableKey().equals("legacy-buffer:400")));
+        VulkanicPassResourceModel.CanonicalResourceReference capturedTexture =
+            beforeDeletion.descriptorBindings().stream()
+                .map(VulkanicPassResourceModel.BindingSnapshot::resourceReference)
+                .filter(reference -> reference.isPresent()
+                    && reference.get().resource().stableKey().equals("legacy-texture:200"))
+                .map(reference -> reference.get())
+                .findFirst()
+                .orElseThrow();
+        VulkanicPassResourceModel.CanonicalResourceReference capturedBuffer =
+            beforeDeletion.descriptorBindings().stream()
+                .map(VulkanicPassResourceModel.BindingSnapshot::resourceReference)
+                .filter(reference -> reference.isPresent()
+                    && reference.get().resource().stableKey().equals("legacy-buffer:400"))
+                .map(reference -> reference.get())
+                .findFirst()
+                .orElseThrow();
+        assertEquals(0L, capturedTexture.generation());
+        assertEquals(0L, capturedBuffer.generation());
+        assertEquals(200, capturedTexture.legacyId().orElseThrow());
+        assertEquals(400, capturedBuffer.legacyId().orElseThrow());
         assertEquals("legacy-buffer:100", beforeDeletion.vertexInput().vertexBuffers().get(0).stableKey());
         assertTrue(afterReplacement.descriptorBindings().stream()
             .anyMatch(binding -> binding.resourceUse().resource().stableKey().equals("legacy-texture:201")));
         assertTrue(afterReplacement.descriptorBindings().stream()
             .anyMatch(binding -> binding.resourceUse().resource().stableKey().equals("legacy-buffer:401")));
         assertTrue(afterReplacement.vertexInput().vertexBuffers().isEmpty());
+        assertThrows(IllegalStateException.class, () -> state.validateResourceGenerations(beforeDeletion));
+        state.validateResourceGenerations(afterReplacement);
+    }
+
+    @Test
+    void storageReplacementAdvancesBufferGenerationForCapturedRanges() {
+        VulkanicCompatibilityState state = new VulkanicCompatibilityState();
+        state.bindBuffer(VulkanicBufferTarget.UNIFORM, 910);
+        state.markBoundBufferStorageReplaced(VulkanicBufferTarget.UNIFORM.toLegacyGlTarget());
+        state.bindBufferRange(VulkanicBufferTarget.UNIFORM.toLegacyGlTarget(), 0, 910, 16L, 32L);
+
+        VulkanicGalExecutionRequest.GraphicsDrawRequest request =
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
+                "buffer-generation",
+                VulkanicPrimitiveMode.TRIANGLES,
+                0,
+                3,
+                1
+            );
+        VulkanicGalExecutionRequest.GraphicsCompatibilitySnapshot snapshot = state.compatibilitySnapshotFor(request);
+
+        VulkanicPassResourceModel.CanonicalResourceReference capturedBuffer =
+            snapshot.descriptorBindings().stream()
+                .map(VulkanicPassResourceModel.BindingSnapshot::resourceReference)
+                .filter(reference -> reference.isPresent()
+                    && reference.get().resource().stableKey().equals("legacy-buffer:910"))
+                .map(reference -> reference.get())
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals(1L, capturedBuffer.generation());
+        state.validateResourceGenerations(snapshot);
+        state.markBufferStorageReplaced(910);
+        assertThrows(IllegalStateException.class, () -> state.validateResourceGenerations(snapshot));
+    }
+
+    @Test
+    void textureStorageReplacementAdvancesSampledTextureGeneration() {
+        VulkanicCompatibilityState state = new VulkanicCompatibilityState();
+        state.bindTextureUnit(2, 920);
+        state.markTextureStorageReplaced(920);
+
+        VulkanicGalExecutionRequest.GraphicsDrawRequest request =
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
+                "texture-generation",
+                VulkanicPrimitiveMode.TRIANGLES,
+                0,
+                3,
+                1
+            );
+        VulkanicGalExecutionRequest.GraphicsCompatibilitySnapshot snapshot = state.compatibilitySnapshotFor(request);
+
+        VulkanicPassResourceModel.CanonicalResourceReference capturedTexture =
+            snapshot.descriptorBindings().stream()
+                .map(VulkanicPassResourceModel.BindingSnapshot::resourceReference)
+                .filter(reference -> reference.isPresent()
+                    && reference.get().resource().stableKey().equals("legacy-texture:920"))
+                .map(reference -> reference.get())
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals(1L, capturedTexture.generation());
+        state.validateResourceGenerations(snapshot);
+        state.markTextureStorageReplaced(920);
+        assertThrows(IllegalStateException.class, () -> state.validateResourceGenerations(snapshot));
+    }
+
+    @Test
+    void transferSnapshotCapturesBoundTextureGenerationAndPixelStoreImmutably() {
+        VulkanicCompatibilityState state = new VulkanicCompatibilityState();
+        state.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
+        state.bindTexture(VulkanicAPI.GL_TEXTURE_2D, 77);
+        state.setPixelStore(VulkanicAPI.GL_UNPACK_ROW_LENGTH, 16);
+        state.setPixelStore(VulkanicAPI.GL_UNPACK_SKIP_ROWS, 2);
+        state.setPixelStore(VulkanicAPI.GL_UNPACK_SKIP_PIXELS, 3);
+        state.setPixelStore(VulkanicAPI.GL_UNPACK_ALIGNMENT, 8);
+
+        VulkanicGalExecutionRequest.TransferRequest request =
+            VulkanicGalExecutionRequest.TransferRequest.of(
+                "uploadTexture2D",
+                new VulkanicGalExecutionRequest.UploadTexture2D(
+                    VulkanicAPI.GL_TEXTURE_2D,
+                    4,
+                    VulkanicAPI.GL_RGBA8,
+                    8,
+                    8,
+                    0,
+                    VulkanicAPI.GL_RGBA,
+                    VulkanicAPI.GL_UNSIGNED_BYTE,
+                    java.nio.ByteBuffer.allocateDirect(16)
+                ),
+                VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
+                "legacy-bound-texture-target:" + VulkanicAPI.GL_TEXTURE_2D + ":level:4",
+                VulkanicPassResourceModel.Access.WRITE,
+                VulkanicResourceUsage.TRANSFER_DST
+            );
+
+        VulkanicGalExecutionRequest.TransferCompatibilitySnapshot snapshot = state.compatibilitySnapshotFor(request);
+        state.markTextureStorageReplaced(77);
+
+        VulkanicPassResourceModel.CanonicalResourceReference destination = snapshot.destination(0);
+        assertEquals(77, destination.legacyId().orElseThrow());
+        assertEquals(VulkanicAPI.GL_TEXTURE_2D, destination.legacyTarget().orElseThrow());
+        assertEquals(4, destination.subresource().baseMipLevel());
+        assertEquals(0L, destination.generation());
+        assertEquals(16, snapshot.pixelStore().unpackRowLength());
+        assertEquals(2, snapshot.pixelStore().unpackSkipRows());
+        assertEquals(3, snapshot.pixelStore().unpackSkipPixels());
+        assertEquals(8, snapshot.pixelStore().unpackAlignment());
+        assertThrows(IllegalStateException.class, () -> state.validateResourceGenerations(snapshot));
+    }
+
+    @Test
+    void transferSnapshotCapturesBufferCopyGenerationsAndRanges() {
+        VulkanicCompatibilityState state = new VulkanicCompatibilityState();
+        state.bindBuffer(VulkanicAPI.GL_COPY_READ_BUFFER, 10);
+        state.bindBuffer(VulkanicAPI.GL_COPY_WRITE_BUFFER, 20);
+
+        VulkanicGalExecutionRequest.TransferRequest request =
+            VulkanicGalExecutionRequest.TransferRequest.of(
+                "copyBufferSubData",
+                new VulkanicGalExecutionRequest.CopyBufferSubData(
+                    VulkanicAPI.GL_COPY_READ_BUFFER,
+                    VulkanicAPI.GL_COPY_WRITE_BUFFER,
+                    32L,
+                    96L,
+                    128L
+                ),
+                VulkanicPassResourceModel.ResourceKind.TRANSFER_SOURCE,
+                "legacy-copy-buffer-targets",
+                VulkanicPassResourceModel.Access.READ_WRITE,
+                VulkanicResourceUsage.TRANSFER_SRC
+            );
+
+        VulkanicGalExecutionRequest.TransferCompatibilitySnapshot snapshot = state.compatibilitySnapshotFor(request);
+
+        assertEquals(10, snapshot.source(0).legacyId().orElseThrow());
+        assertEquals(VulkanicAPI.GL_COPY_READ_BUFFER, snapshot.source(0).bindingUnit().orElseThrow());
+        assertEquals(32, snapshot.source(0).subresource().baseMipLevel());
+        assertEquals(128, snapshot.source(0).subresource().levelCount());
+        assertEquals(20, snapshot.destination(0).legacyId().orElseThrow());
+        assertEquals(VulkanicAPI.GL_COPY_WRITE_BUFFER, snapshot.destination(0).bindingUnit().orElseThrow());
+        assertEquals(96, snapshot.destination(0).subresource().baseMipLevel());
+        assertEquals(128, snapshot.destination(0).subresource().levelCount());
+
+        state.markBufferStorageReplaced(20);
+        assertThrows(IllegalStateException.class, () -> state.validateResourceGenerations(snapshot));
+    }
+
+    @Test
+    void transferCaptureFreezesUnpackBufferSourceAndRejectsStaleGeneration() {
+        VulkanicCompatibilityState state = new VulkanicCompatibilityState();
+        state.bindBuffer(VulkanicAPI.GL_PIXEL_UNPACK_BUFFER, 50);
+        state.bindTexture(VulkanicAPI.GL_TEXTURE_2D, 60);
+
+        VulkanicGalExecutionRequest.TransferRequest request =
+            VulkanicGalExecutionRequest.TransferRequest.of(
+                "uploadTexture2DSubImage-address",
+                new VulkanicGalExecutionRequest.UploadTexture2DSubImagePointer(
+                    VulkanicAPI.GL_TEXTURE_2D,
+                    0,
+                    0,
+                    0,
+                    4,
+                    4,
+                    VulkanicAPI.GL_RGBA,
+                    VulkanicAPI.GL_UNSIGNED_BYTE,
+                    64L
+                ),
+                VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
+                "legacy-bound-texture-target:" + VulkanicAPI.GL_TEXTURE_2D + ":level:0",
+                VulkanicPassResourceModel.Access.WRITE,
+                VulkanicResourceUsage.TRANSFER_DST
+            );
+
+        VulkanicGalExecutionRequest.TransferCompatibilitySnapshot snapshot = state.compatibilitySnapshotFor(request);
+
+        assertEquals(50, snapshot.source(0).legacyId().orElseThrow());
+        assertEquals(VulkanicAPI.GL_PIXEL_UNPACK_BUFFER, snapshot.source(0).bindingUnit().orElseThrow());
+        assertEquals(64, snapshot.source(0).subresource().baseMipLevel());
+        assertEquals(60, snapshot.destination(0).legacyId().orElseThrow());
+
+        state.markBufferStorageReplaced(50);
+        assertThrows(IllegalStateException.class, () -> state.validateResourceGenerations(snapshot));
     }
 }

@@ -275,6 +275,30 @@ public final class VulkanicPassResourceModel {
             OptionalInt textureUnit,
             OptionalInt samplerObject
         ) {
+            return sampledTexture(
+                logicalName,
+                stableKey,
+                legacyTextureId,
+                legacyTarget,
+                targetClass,
+                subresource,
+                textureUnit,
+                samplerObject,
+                UNKNOWN_GENERATION
+            );
+        }
+
+        public static CanonicalResourceReference sampledTexture(
+            String logicalName,
+            String stableKey,
+            int legacyTextureId,
+            OptionalInt legacyTarget,
+            TargetClass targetClass,
+            Subresource subresource,
+            OptionalInt textureUnit,
+            OptionalInt samplerObject,
+            long generation
+        ) {
             return new CanonicalResourceReference(
                 ResourceIdentity.of(logicalName, ResourceKind.SAMPLED_TEXTURE, stableKey),
                 BindingKind.SAMPLED_TEXTURE,
@@ -283,7 +307,7 @@ public final class VulkanicPassResourceModel {
                 VulkanicResourceUsage.SAMPLED_READ,
                 targetClass,
                 FormatClass.COLOR,
-                UNKNOWN_GENERATION,
+                generation,
                 OptionalInt.of(legacyTextureId),
                 legacyTarget,
                 textureUnit,
@@ -307,6 +331,36 @@ public final class VulkanicPassResourceModel {
             OptionalInt imageAccess,
             OptionalInt imageFormat
         ) {
+            return storageImage(
+                logicalName,
+                stableKey,
+                legacyTextureId,
+                level,
+                layered,
+                layer,
+                access,
+                usage,
+                imageUnit,
+                imageAccess,
+                imageFormat,
+                UNKNOWN_GENERATION
+            );
+        }
+
+        public static CanonicalResourceReference storageImage(
+            String logicalName,
+            String stableKey,
+            int legacyTextureId,
+            int level,
+            boolean layered,
+            int layer,
+            Access access,
+            VulkanicResourceUsage usage,
+            OptionalInt imageUnit,
+            OptionalInt imageAccess,
+            OptionalInt imageFormat,
+            long generation
+        ) {
             return new CanonicalResourceReference(
                 ResourceIdentity.of(logicalName, ResourceKind.STORAGE_TEXTURE, stableKey),
                 BindingKind.STORAGE_IMAGE,
@@ -317,7 +371,7 @@ public final class VulkanicPassResourceModel {
                 usage,
                 TargetClass.UNKNOWN,
                 FormatClass.COLOR,
-                UNKNOWN_GENERATION,
+                generation,
                 OptionalInt.of(legacyTextureId),
                 OptionalInt.empty(),
                 imageUnit,
@@ -338,6 +392,32 @@ public final class VulkanicPassResourceModel {
             VulkanicResourceUsage usage,
             OptionalInt bindingUnit
         ) {
+            return bufferRange(
+                logicalName,
+                kind,
+                stableKey,
+                offset,
+                size,
+                access,
+                usage,
+                bindingUnit,
+                OptionalInt.empty(),
+                UNKNOWN_GENERATION
+            );
+        }
+
+        public static CanonicalResourceReference bufferRange(
+            String logicalName,
+            ResourceKind kind,
+            String stableKey,
+            long offset,
+            long size,
+            Access access,
+            VulkanicResourceUsage usage,
+            OptionalInt bindingUnit,
+            OptionalInt legacyBufferId,
+            long generation
+        ) {
             return new CanonicalResourceReference(
                 ResourceIdentity.of(logicalName, kind, stableKey),
                 BindingKind.BUFFER_RANGE,
@@ -346,8 +426,8 @@ public final class VulkanicPassResourceModel {
                 usage,
                 TargetClass.BUFFER,
                 FormatClass.BUFFER,
-                UNKNOWN_GENERATION,
-                OptionalInt.empty(),
+                generation,
+                legacyBufferId,
                 OptionalInt.empty(),
                 bindingUnit,
                 OptionalInt.empty(),

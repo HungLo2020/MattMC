@@ -1,5 +1,9 @@
 package net.vulkanic;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -12,12 +16,178 @@ import java.util.OptionalInt;
  * <p>These records are the backend-neutral boundary between the legacy
  * OpenGL-shaped frontend and backend execution. Requests intentionally avoid
  * Vulkan layouts, access masks, stages, queue families, descriptor handles, and
- * native object handles. Temporary legacy compatibility metadata is kept in a
- * separate record so future public GAL work can remove it without changing the
- * backend-neutral command model.</p>
+     * native object handles. Compatibility provenance belongs in diagnostics; it is
+     * not part of executable request semantics, equality, caching, or resource
+     * resolution.</p>
  */
 public final class VulkanicGalExecutionRequest {
     private VulkanicGalExecutionRequest() {
+    }
+
+    public static final int CONTRACT_MAJOR_VERSION = 1;
+    public static final int CONTRACT_MINOR_VERSION = 0;
+    public static final int CONTRACT_PATCH_VERSION = 0;
+    public static final String CONTRACT_VERSION = CONTRACT_MAJOR_VERSION + "." + CONTRACT_MINOR_VERSION + "." + CONTRACT_PATCH_VERSION;
+    private static final String CONTRACT_SCHEMA = buildContractSchema();
+    public static final String CONTRACT_SCHEMA_FINGERPRINT = sha256Hex(CONTRACT_SCHEMA);
+
+    public static String contractSchema() {
+        return CONTRACT_SCHEMA;
+    }
+
+    public static String contractSchemaFingerprint() {
+        return CONTRACT_SCHEMA_FINGERPRINT;
+    }
+
+    public enum ExecutionStatus {
+        SUCCESS,
+        REJECTED,
+        ABANDONED,
+        STALE_RESOURCE,
+        DEVICE_LOST,
+        BACKEND_FAILURE
+    }
+
+    public sealed interface ExecutionResult permits ExecutionSuccess, ExecutionFailure {
+        ExecutionStatus status();
+        String requestIdentity();
+        String detail();
+
+        default boolean successful() {
+            return status() == ExecutionStatus.SUCCESS;
+        }
+    }
+
+    public record ExecutionSuccess(String requestIdentity, String detail) implements ExecutionResult {
+        public ExecutionSuccess {
+            requestIdentity = requireNonBlank(requestIdentity, "requestIdentity");
+            detail = requireNonBlank(detail, "detail");
+        }
+
+        @Override
+        public ExecutionStatus status() {
+            return ExecutionStatus.SUCCESS;
+        }
+    }
+
+    public record ExecutionFailure(
+        ExecutionStatus status,
+        String requestIdentity,
+        String detail
+    ) implements ExecutionResult {
+        public ExecutionFailure {
+            status = Objects.requireNonNull(status, "status");
+            if (status == ExecutionStatus.SUCCESS) {
+                throw new IllegalArgumentException("ExecutionFailure cannot use SUCCESS status");
+            }
+            requestIdentity = requireNonBlank(requestIdentity, "requestIdentity");
+            detail = requireNonBlank(detail, "detail");
+        }
+    }
+
+    public static ExecutionResult validateGraphicsDraw(GraphicsDrawRequest request) {
+        Objects.requireNonNull(request, "request");
+        if (request.compatibilitySnapshot().sharedCompatibilityState().isEmpty()) {
+            return rejected(request.semanticIdentity(), "graphics request has no captured shared compatibility state");
+        }
+        if (request.compatibilitySnapshot().source().equals("frontend-compatibility-draft")) {
+            return rejected(request.semanticIdentity(), "graphics request still carries draft compatibility provenance");
+        }
+        if (request.pipeline().stableKey().equals("compatibility-draft-pipeline")) {
+            return rejected(request.semanticIdentity(), "graphics request still carries draft pipeline state");
+        }
+        if (request.framebuffer().stableKey().equals("compatibility-draft-framebuffer")) {
+            return rejected(request.semanticIdentity(), "graphics request still carries draft framebuffer state");
+        }
+        return success(request.semanticIdentity());
+    }
+
+    public static ExecutionResult validateComputeDispatch(ComputeDispatchRequest request) {
+        Objects.requireNonNull(request, "request");
+        if (request.compatibilitySnapshot().sharedCompatibilityState().isEmpty()) {
+            return rejected(request.semanticIdentity(), "compute request has no captured shared compatibility state");
+        }
+        if (request.compatibilitySnapshot().source().equals("frontend-compute-compatibility-draft")) {
+            return rejected(request.semanticIdentity(), "compute request still carries draft compatibility provenance");
+        }
+        if (request.pipeline().stableKey().equals("compatibility-draft-pipeline")) {
+            return rejected(request.semanticIdentity(), "compute request still carries draft pipeline state");
+        }
+        return success(request.semanticIdentity());
+    }
+
+    public static ExecutionResult validateClear(ClearRequest request) {
+        Objects.requireNonNull(request, "request");
+        if (request.framebuffer().stableKey().equals("compatibility-draft-framebuffer")) {
+            return rejected(request.semanticIdentity(), "clear request still carries draft framebuffer state");
+        }
+        return success(request.semanticIdentity());
+    }
+
+    public static ExecutionResult validateTransfer(TransferRequest request) {
+        Objects.requireNonNull(request, "request");
+        if (request.transferSnapshot().isEmpty()) {
+            return rejected(request.semanticIdentity(), "transfer request has no canonical transfer snapshot");
+        }
+        return success(request.semanticIdentity());
+    }
+
+    public static ExecutionResult validateRenderPassBegin(RenderPassBeginRequest request) {
+        Objects.requireNonNull(request, "request");
+        return success(request.semanticIdentity());
+    }
+
+    public static ExecutionResult validateRenderPassEnd(RenderPassEndRequest request) {
+        Objects.requireNonNull(request, "request");
+        if (request.abandoned()) {
+            return new ExecutionFailure(
+                ExecutionStatus.ABANDONED,
+                request.semanticIdentity().label(),
+                request.failureReason().orElse("render pass abandoned")
+            );
+        }
+        return success(request.semanticIdentity());
+    }
+
+    public static ExecutionResult validateComputePassBegin(ComputePassBeginRequest request) {
+        Objects.requireNonNull(request, "request");
+        return success(request.semanticIdentity());
+    }
+
+    public static ExecutionResult validateComputePassEnd(ComputePassEndRequest request) {
+        Objects.requireNonNull(request, "request");
+        if (request.abandoned()) {
+            return new ExecutionFailure(
+                ExecutionStatus.ABANDONED,
+                request.semanticIdentity().label(),
+                request.failureReason().orElse("compute pass abandoned")
+            );
+        }
+        return success(request.semanticIdentity());
+    }
+
+    public static ExecutionResult staleResource(SemanticIdentity identity, String detail) {
+        return new ExecutionFailure(ExecutionStatus.STALE_RESOURCE, identity.label(), detail);
+    }
+
+    public static ExecutionResult deviceLost(SemanticIdentity identity, String detail) {
+        return new ExecutionFailure(ExecutionStatus.DEVICE_LOST, identity.label(), detail);
+    }
+
+    public static ExecutionResult backendFailure(SemanticIdentity identity, String detail) {
+        return new ExecutionFailure(ExecutionStatus.BACKEND_FAILURE, identity.label(), safeDetail(detail, "backend failure"));
+    }
+
+    public static ExecutionResult success(SemanticIdentity identity) {
+        return new ExecutionSuccess(identity.label(), "validated");
+    }
+
+    private static ExecutionResult rejected(SemanticIdentity identity, String detail) {
+        return new ExecutionFailure(ExecutionStatus.REJECTED, identity.label(), detail);
+    }
+
+    private static String safeDetail(String detail, String fallback) {
+        return detail == null || detail.isBlank() ? fallback : detail;
     }
 
     public record SemanticIdentity(
@@ -59,59 +229,14 @@ public final class VulkanicGalExecutionRequest {
         }
     }
 
-    public record LegacyCompatibilityMetadata(
-        String operation,
-        OptionalInt legacyMode,
-        OptionalInt legacyIndexType,
-        List<Integer> legacyTargets
-    ) {
-        public LegacyCompatibilityMetadata {
-            operation = requireNonBlank(operation, "operation");
-            legacyMode = Objects.requireNonNull(legacyMode, "legacyMode");
-            legacyIndexType = Objects.requireNonNull(legacyIndexType, "legacyIndexType");
-            legacyTargets = List.copyOf(Objects.requireNonNull(legacyTargets, "legacyTargets"));
-        }
-
-        public static LegacyCompatibilityMetadata operation(String operation) {
-            return new LegacyCompatibilityMetadata(operation, OptionalInt.empty(), OptionalInt.empty(), List.of());
-        }
-
-        public static LegacyCompatibilityMetadata draw(String operation, VulkanicPrimitiveMode mode) {
-            return new LegacyCompatibilityMetadata(
-                operation,
-                OptionalInt.of(Objects.requireNonNull(mode, "mode").toGlModeConstant()),
-                OptionalInt.empty(),
-                List.of()
-            );
-        }
-
-        public static LegacyCompatibilityMetadata indexedDraw(
-            String operation,
-            VulkanicPrimitiveMode mode,
-            VulkanicIndexType indexType
-        ) {
-            return new LegacyCompatibilityMetadata(
-                operation,
-                OptionalInt.of(Objects.requireNonNull(mode, "mode").toGlModeConstant()),
-                OptionalInt.of(Objects.requireNonNull(indexType, "indexType").toGlTypeConstant()),
-                List.of()
-            );
-        }
-
-        public static LegacyCompatibilityMetadata targets(String operation, int... targets) {
-            List<Integer> targetList = java.util.Arrays.stream(targets).boxed().toList();
-            return new LegacyCompatibilityMetadata(operation, OptionalInt.empty(), OptionalInt.empty(), targetList);
-        }
-    }
-
     public record PipelineSnapshot(String stableKey, String programIdentity) {
         public PipelineSnapshot {
             stableKey = requireNonBlank(stableKey, "stableKey");
             programIdentity = requireNonBlank(programIdentity, "programIdentity");
         }
 
-        public static PipelineSnapshot legacyCurrent() {
-            return new PipelineSnapshot("legacy-current-pipeline", "legacy-current-program");
+        public static PipelineSnapshot compatibilityDraft() {
+            return new PipelineSnapshot("compatibility-draft-pipeline", "compatibility-draft-program");
         }
 
         public static PipelineSnapshot legacyProgram(int programId) {
@@ -125,8 +250,8 @@ public final class VulkanicGalExecutionRequest {
             logicalTarget = requireNonBlank(logicalTarget, "logicalTarget");
         }
 
-        public static FramebufferSnapshot active() {
-            return new FramebufferSnapshot("legacy-active-framebuffer", "active-target");
+        public static FramebufferSnapshot compatibilityDraft() {
+            return new FramebufferSnapshot("compatibility-draft-framebuffer", "active-target");
         }
 
         public static FramebufferSnapshot legacyFramebuffer(int framebuffer) {
@@ -143,7 +268,7 @@ public final class VulkanicGalExecutionRequest {
             scissor = Objects.requireNonNull(scissor, "scissor");
         }
 
-        public static DynamicStateSnapshot currentLegacy() {
+        public static DynamicStateSnapshot empty() {
             return new DynamicStateSnapshot(Optional.empty(), Optional.empty());
         }
     }
@@ -173,7 +298,7 @@ public final class VulkanicGalExecutionRequest {
             indexBuffer = Objects.requireNonNull(indexBuffer, "indexBuffer");
         }
 
-        public static VertexInputSnapshot currentLegacy() {
+        public static VertexInputSnapshot empty() {
             return new VertexInputSnapshot(List.of(), Optional.empty());
         }
     }
@@ -216,15 +341,15 @@ public final class VulkanicGalExecutionRequest {
             );
         }
 
-        public static GraphicsCompatibilitySnapshot unresolvedLegacy() {
+        public static GraphicsCompatibilitySnapshot compatibilityDraft() {
             return new GraphicsCompatibilitySnapshot(
                 Optional.empty(),
-                VertexInputSnapshot.currentLegacy(),
+                VertexInputSnapshot.empty(),
                 List.of(),
                 Optional.empty(),
                 List.of(),
                 Optional.empty(),
-                "unresolved-legacy-compatibility"
+                "frontend-compatibility-draft"
             );
         }
     }
@@ -339,8 +464,7 @@ public final class VulkanicGalExecutionRequest {
         DynamicStateSnapshot dynamicState,
         GraphicsCompatibilitySnapshot compatibilitySnapshot,
         GraphicsDrawCommand command,
-        VulkanicPassResourceModel.PassExecutionPlan resourcePlan,
-        LegacyCompatibilityMetadata legacyMetadata
+        VulkanicPassResourceModel.PassExecutionPlan resourcePlan
     ) {
         public GraphicsDrawRequest {
             semanticIdentity = Objects.requireNonNull(semanticIdentity, "semanticIdentity");
@@ -352,10 +476,9 @@ public final class VulkanicGalExecutionRequest {
             compatibilitySnapshot = Objects.requireNonNull(compatibilitySnapshot, "compatibilitySnapshot");
             command = Objects.requireNonNull(command, "command");
             resourcePlan = Objects.requireNonNull(resourcePlan, "resourcePlan");
-            legacyMetadata = Objects.requireNonNull(legacyMetadata, "legacyMetadata");
         }
 
-        public static GraphicsDrawRequest legacyArrays(
+        public static GraphicsDrawRequest arrays(
             String operation,
             VulkanicPrimitiveMode mode,
             int firstVertex,
@@ -363,10 +486,10 @@ public final class VulkanicGalExecutionRequest {
             int instanceCount
         ) {
             GraphicsDrawCommand command = GraphicsDrawCommand.arrays(mode, firstVertex, vertexCount, instanceCount);
-            return legacyDraw(operation, command, LegacyCompatibilityMetadata.draw(operation, mode));
+            return draw(operation, command);
         }
 
-        public static GraphicsDrawRequest legacyIndexed(
+        public static GraphicsDrawRequest indexed(
             String operation,
             VulkanicPrimitiveMode mode,
             int indexCount,
@@ -376,23 +499,22 @@ public final class VulkanicGalExecutionRequest {
             int baseVertex
         ) {
             GraphicsDrawCommand command = GraphicsDrawCommand.indexed(mode, indexCount, indexType, indexByteOffset, instanceCount, baseVertex);
-            return legacyDraw(operation, command, LegacyCompatibilityMetadata.indexedDraw(operation, mode, indexType));
+            return draw(operation, command);
         }
 
-        public static GraphicsDrawRequest legacyMultiIndexedBaseVertex(
+        public static GraphicsDrawRequest multiIndexedBaseVertex(
             String operation,
             VulkanicPrimitiveMode mode,
             VulkanicIndexType indexType,
             List<IndexedDraw> draws
         ) {
             GraphicsDrawCommand command = GraphicsDrawCommand.multiIndexedBaseVertex(mode, indexType, draws);
-            return legacyDraw(operation, command, LegacyCompatibilityMetadata.indexedDraw(operation, mode, indexType));
+            return draw(operation, command);
         }
 
-        private static GraphicsDrawRequest legacyDraw(
+        private static GraphicsDrawRequest draw(
             String operation,
-            GraphicsDrawCommand command,
-            LegacyCompatibilityMetadata metadata
+            GraphicsDrawCommand command
         ) {
             VulkanicLegacyCompatibilityAdapter.DrawCommandSnapshot drawCommand = switch (command.kind()) {
                 case ARRAYS -> VulkanicLegacyCompatibilityAdapter.DrawCommandSnapshot.arrays(
@@ -434,15 +556,14 @@ public final class VulkanicGalExecutionRequest {
                 ));
             return new GraphicsDrawRequest(
                 SemanticIdentity.legacy(operation),
-                PipelineSnapshot.legacyCurrent(),
-                FramebufferSnapshot.active(),
-                VertexInputSnapshot.currentLegacy(),
+                PipelineSnapshot.compatibilityDraft(),
+                FramebufferSnapshot.compatibilityDraft(),
+                VertexInputSnapshot.empty(),
                 List.of(),
-                DynamicStateSnapshot.currentLegacy(),
-                GraphicsCompatibilitySnapshot.unresolvedLegacy(),
+                DynamicStateSnapshot.empty(),
+                GraphicsCompatibilitySnapshot.compatibilityDraft(),
                 command,
-                resourcePlan,
-                metadata
+                resourcePlan
             );
         }
 
@@ -474,8 +595,7 @@ public final class VulkanicGalExecutionRequest {
                 capturedDynamicState,
                 snapshot,
                 command,
-                capturedPlan,
-                legacyMetadata
+                capturedPlan
             );
         }
     }
@@ -522,14 +642,14 @@ public final class VulkanicGalExecutionRequest {
             source = requireNonBlank(source, "source");
         }
 
-        public static ComputeCompatibilitySnapshot unresolvedLegacy() {
+        public static ComputeCompatibilitySnapshot compatibilityDraft() {
             return new ComputeCompatibilitySnapshot(
                 Optional.empty(),
                 List.of(),
                 Optional.empty(),
                 List.of(),
                 Optional.empty(),
-                "unresolved-legacy-compute-compatibility"
+                "frontend-compute-compatibility-draft"
             );
         }
 
@@ -553,8 +673,7 @@ public final class VulkanicGalExecutionRequest {
         Optional<PipelineResourcePlanner.Plan> resourceBindingPlan,
         ComputeCompatibilitySnapshot compatibilitySnapshot,
         ComputeDispatchCommand command,
-        VulkanicPassResourceModel.PassExecutionPlan resourcePlan,
-        LegacyCompatibilityMetadata legacyMetadata
+        VulkanicPassResourceModel.PassExecutionPlan resourcePlan
     ) {
         public ComputeDispatchRequest {
             semanticIdentity = Objects.requireNonNull(semanticIdentity, "semanticIdentity");
@@ -564,19 +683,18 @@ public final class VulkanicGalExecutionRequest {
             compatibilitySnapshot = Objects.requireNonNull(compatibilitySnapshot, "compatibilitySnapshot");
             command = Objects.requireNonNull(command, "command");
             resourcePlan = Objects.requireNonNull(resourcePlan, "resourcePlan");
-            legacyMetadata = Objects.requireNonNull(legacyMetadata, "legacyMetadata");
         }
 
-        public static ComputeDispatchRequest legacyDirect(String operation, int workX, int workY, int workZ) {
+        public static ComputeDispatchRequest direct(String operation, int workX, int workY, int workZ) {
             ComputeDispatchCommand command = ComputeDispatchCommand.direct(workX, workY, workZ);
-            return legacy(operation, command);
+            return dispatch(operation, command);
         }
 
-        public static ComputeDispatchRequest legacyIndirect(String operation, long offset) {
-            return legacy(operation, ComputeDispatchCommand.indirect(offset));
+        public static ComputeDispatchRequest indirect(String operation, long offset) {
+            return dispatch(operation, ComputeDispatchCommand.indirect(offset));
         }
 
-        private static ComputeDispatchRequest legacy(String operation, ComputeDispatchCommand command) {
+        private static ComputeDispatchRequest dispatch(String operation, ComputeDispatchCommand command) {
             VulkanicPassResourceModel.PassExecutionPlan resourcePlan =
                 VulkanicLegacyCompatibilityAdapter.planCompute(new VulkanicLegacyCompatibilityAdapter.ComputeSnapshot(
                     operation,
@@ -591,13 +709,12 @@ public final class VulkanicGalExecutionRequest {
                 ));
             return new ComputeDispatchRequest(
                 SemanticIdentity.legacy(operation),
-                PipelineSnapshot.legacyCurrent(),
+                PipelineSnapshot.compatibilityDraft(),
                 List.of(),
                 Optional.empty(),
-                ComputeCompatibilitySnapshot.unresolvedLegacy(),
+                ComputeCompatibilitySnapshot.compatibilityDraft(),
                 command,
-                resourcePlan,
-                LegacyCompatibilityMetadata.operation(operation)
+                resourcePlan
             );
         }
 
@@ -611,8 +728,7 @@ public final class VulkanicGalExecutionRequest {
                 Optional.of(bindingPlan),
                 capturedSnapshot,
                 command,
-                resourcePlan,
-                legacyMetadata
+                resourcePlan
             );
         }
 
@@ -622,15 +738,19 @@ public final class VulkanicGalExecutionRequest {
                 snapshot.resourceUses().isEmpty()
                     ? this.resourcePlan
                     : resourcePlanWithResources(this.resourcePlan, snapshot.resourceUses());
+            PipelineSnapshot capturedPipeline = pipeline;
+            Optional<VulkanicCompatibilityState.ComputeSnapshot> sharedState = snapshot.sharedCompatibilityState();
+            if (sharedState.isPresent()) {
+                capturedPipeline = PipelineSnapshot.legacyProgram(sharedState.get().programId());
+            }
             return new ComputeDispatchRequest(
                 semanticIdentity,
-                pipeline,
+                capturedPipeline,
                 snapshot.descriptorBindings(),
                 snapshot.resourceBindingPlan(),
                 snapshot,
                 command,
-                capturedPlan,
-                legacyMetadata
+                capturedPlan
             );
         }
     }
@@ -649,8 +769,7 @@ public final class VulkanicGalExecutionRequest {
         Optional<VulkanicRenderTargetDescriptor> targetDescriptor,
         OptionalInt framebuffer,
         boolean hasDepthTexture,
-        VulkanicPassResourceModel.PassExecutionPlan resourcePlan,
-        LegacyCompatibilityMetadata legacyMetadata
+        VulkanicPassResourceModel.PassExecutionPlan resourcePlan
     ) {
         public RenderPassBeginRequest {
             semanticIdentity = Objects.requireNonNull(semanticIdentity, "semanticIdentity");
@@ -660,7 +779,6 @@ public final class VulkanicGalExecutionRequest {
             targetDescriptor = Objects.requireNonNull(targetDescriptor, "targetDescriptor");
             framebuffer = Objects.requireNonNull(framebuffer, "framebuffer");
             resourcePlan = Objects.requireNonNull(resourcePlan, "resourcePlan");
-            legacyMetadata = Objects.requireNonNull(legacyMetadata, "legacyMetadata");
             int presentShapes = (descriptor.isPresent() ? 1 : 0)
                 + (targetDescriptor.isPresent() ? 1 : 0)
                 + (framebuffer.isPresent() ? 1 : 0);
@@ -690,8 +808,7 @@ public final class VulkanicGalExecutionRequest {
                 Optional.empty(),
                 OptionalInt.empty(),
                 true,
-                renderPassLifecyclePlan("render-pass:" + operation + ":" + label, frozen),
-                LegacyCompatibilityMetadata.operation(operation)
+                renderPassLifecyclePlan("render-pass:" + operation + ":" + label, frozen)
             );
         }
 
@@ -707,8 +824,7 @@ public final class VulkanicGalExecutionRequest {
                 Optional.of(frozen),
                 OptionalInt.empty(),
                 true,
-                renderTargetLifecyclePlan("render-pass:" + operation + ":" + label, frozen),
-                LegacyCompatibilityMetadata.operation(operation)
+                renderTargetLifecyclePlan("render-pass:" + operation + ":" + label, frozen)
             );
         }
 
@@ -730,8 +846,7 @@ public final class VulkanicGalExecutionRequest {
                 Optional.empty(),
                 OptionalInt.of(framebuffer),
                 hasDepthTexture,
-                framebufferLifecyclePlan("render-pass:" + operation + ":" + capturedLabel, framebuffer, hasDepthTexture),
-                LegacyCompatibilityMetadata.operation(operation)
+                framebufferLifecyclePlan("render-pass:" + operation + ":" + capturedLabel, framebuffer, hasDepthTexture)
             );
         }
     }
@@ -741,15 +856,13 @@ public final class VulkanicGalExecutionRequest {
         String renderPassIdentity,
         boolean abandoned,
         Optional<String> failureReason,
-        VulkanicPassResourceModel.PassExecutionPlan resourcePlan,
-        LegacyCompatibilityMetadata legacyMetadata
+        VulkanicPassResourceModel.PassExecutionPlan resourcePlan
     ) {
         public RenderPassEndRequest {
             semanticIdentity = Objects.requireNonNull(semanticIdentity, "semanticIdentity");
             renderPassIdentity = requireNonBlank(renderPassIdentity, "renderPassIdentity");
             failureReason = Objects.requireNonNull(failureReason, "failureReason");
             resourcePlan = Objects.requireNonNull(resourcePlan, "resourcePlan");
-            legacyMetadata = Objects.requireNonNull(legacyMetadata, "legacyMetadata");
         }
 
         public static RenderPassEndRequest complete(String source, String renderPassIdentity) {
@@ -758,8 +871,7 @@ public final class VulkanicGalExecutionRequest {
                 renderPassIdentity,
                 false,
                 Optional.empty(),
-                passLifecyclePlan(VulkanicPassResourceModel.PassKind.RENDER, "render-pass-end:" + renderPassIdentity),
-                LegacyCompatibilityMetadata.operation(source)
+                passLifecyclePlan(VulkanicPassResourceModel.PassKind.RENDER, "render-pass-end:" + renderPassIdentity)
             );
         }
 
@@ -769,8 +881,7 @@ public final class VulkanicGalExecutionRequest {
                 renderPassIdentity,
                 true,
                 Optional.of(requireNonBlank(failureReason, "failureReason")),
-                passLifecyclePlan(VulkanicPassResourceModel.PassKind.RENDER, "render-pass-abandon:" + renderPassIdentity),
-                LegacyCompatibilityMetadata.operation(source)
+                passLifecyclePlan(VulkanicPassResourceModel.PassKind.RENDER, "render-pass-abandon:" + renderPassIdentity)
             );
         }
     }
@@ -778,22 +889,19 @@ public final class VulkanicGalExecutionRequest {
     public record ComputePassBeginRequest(
         SemanticIdentity semanticIdentity,
         String label,
-        VulkanicPassResourceModel.PassExecutionPlan resourcePlan,
-        LegacyCompatibilityMetadata legacyMetadata
+        VulkanicPassResourceModel.PassExecutionPlan resourcePlan
     ) {
         public ComputePassBeginRequest {
             semanticIdentity = Objects.requireNonNull(semanticIdentity, "semanticIdentity");
             label = requireNonBlank(label, "label");
             resourcePlan = Objects.requireNonNull(resourcePlan, "resourcePlan");
-            legacyMetadata = Objects.requireNonNull(legacyMetadata, "legacyMetadata");
         }
 
-        public static ComputePassBeginRequest legacy(String operation) {
+        public static ComputePassBeginRequest begin(String operation) {
             return new ComputePassBeginRequest(
                 SemanticIdentity.legacy(operation),
                 operation,
-                passLifecyclePlan(VulkanicPassResourceModel.PassKind.COMPUTE, "compute-pass:" + operation),
-                LegacyCompatibilityMetadata.operation(operation)
+                passLifecyclePlan(VulkanicPassResourceModel.PassKind.COMPUTE, "compute-pass:" + operation)
             );
         }
     }
@@ -803,15 +911,13 @@ public final class VulkanicGalExecutionRequest {
         String label,
         boolean abandoned,
         Optional<String> failureReason,
-        VulkanicPassResourceModel.PassExecutionPlan resourcePlan,
-        LegacyCompatibilityMetadata legacyMetadata
+        VulkanicPassResourceModel.PassExecutionPlan resourcePlan
     ) {
         public ComputePassEndRequest {
             semanticIdentity = Objects.requireNonNull(semanticIdentity, "semanticIdentity");
             label = requireNonBlank(label, "label");
             failureReason = Objects.requireNonNull(failureReason, "failureReason");
             resourcePlan = Objects.requireNonNull(resourcePlan, "resourcePlan");
-            legacyMetadata = Objects.requireNonNull(legacyMetadata, "legacyMetadata");
         }
 
         public static ComputePassEndRequest complete(String operation) {
@@ -820,8 +926,7 @@ public final class VulkanicGalExecutionRequest {
                 operation,
                 false,
                 Optional.empty(),
-                passLifecyclePlan(VulkanicPassResourceModel.PassKind.COMPUTE, "compute-pass-end:" + operation),
-                LegacyCompatibilityMetadata.operation(operation)
+                passLifecyclePlan(VulkanicPassResourceModel.PassKind.COMPUTE, "compute-pass-end:" + operation)
             );
         }
 
@@ -831,8 +936,7 @@ public final class VulkanicGalExecutionRequest {
                 operation,
                 true,
                 Optional.of(requireNonBlank(failureReason, "failureReason")),
-                passLifecyclePlan(VulkanicPassResourceModel.PassKind.COMPUTE, "compute-pass-abandon:" + operation),
-                LegacyCompatibilityMetadata.operation(operation)
+                passLifecyclePlan(VulkanicPassResourceModel.PassKind.COMPUTE, "compute-pass-abandon:" + operation)
             );
         }
     }
@@ -841,8 +945,7 @@ public final class VulkanicGalExecutionRequest {
         SemanticIdentity semanticIdentity,
         List<VulkanicClearBuffer> buffers,
         FramebufferSnapshot framebuffer,
-        VulkanicPassResourceModel.PassExecutionPlan resourcePlan,
-        LegacyCompatibilityMetadata legacyMetadata
+        VulkanicPassResourceModel.PassExecutionPlan resourcePlan
     ) {
         public ClearRequest {
             semanticIdentity = Objects.requireNonNull(semanticIdentity, "semanticIdentity");
@@ -852,10 +955,9 @@ public final class VulkanicGalExecutionRequest {
             }
             framebuffer = Objects.requireNonNull(framebuffer, "framebuffer");
             resourcePlan = Objects.requireNonNull(resourcePlan, "resourcePlan");
-            legacyMetadata = Objects.requireNonNull(legacyMetadata, "legacyMetadata");
         }
 
-        public static ClearRequest legacy(String operation, VulkanicClearBuffer... buffers) {
+        public static ClearRequest of(String operation, VulkanicClearBuffer... buffers) {
             List<VulkanicClearBuffer> bufferList = List.of(Objects.requireNonNull(buffers, "buffers"));
             VulkanicPassResourceModel.PassExecutionPlan plan =
                 VulkanicLegacyCompatibilityAdapter.planTransfer(new VulkanicLegacyCompatibilityAdapter.TransferSnapshot(
@@ -876,9 +978,20 @@ public final class VulkanicGalExecutionRequest {
             return new ClearRequest(
                 SemanticIdentity.legacy(operation),
                 bufferList,
-                FramebufferSnapshot.active(),
-                plan,
-                LegacyCompatibilityMetadata.operation(operation)
+                FramebufferSnapshot.compatibilityDraft(),
+                plan
+            );
+        }
+
+        public ClearRequest withFramebufferSnapshot(int framebuffer) {
+            if (framebuffer < 0) {
+                throw new IllegalArgumentException("framebuffer must be >= 0");
+            }
+            return new ClearRequest(
+                semanticIdentity,
+                buffers,
+                FramebufferSnapshot.legacyFramebuffer(framebuffer),
+                resourcePlan
             );
         }
     }
@@ -889,7 +1002,7 @@ public final class VulkanicGalExecutionRequest {
         Optional<PipelineSnapshot> pipeline,
         VertexInputSnapshot vertexInput,
         GraphicsDrawCommand command,
-        LegacyCompatibilityMetadata legacyMetadata
+        String source
     ) {
         public RenderPassDrawRequest {
             semanticIdentity = Objects.requireNonNull(semanticIdentity, "semanticIdentity");
@@ -897,7 +1010,7 @@ public final class VulkanicGalExecutionRequest {
             pipeline = Objects.requireNonNull(pipeline, "pipeline");
             vertexInput = Objects.requireNonNull(vertexInput, "vertexInput");
             command = Objects.requireNonNull(command, "command");
-            legacyMetadata = Objects.requireNonNull(legacyMetadata, "legacyMetadata");
+            source = requireNonBlank(source, "source");
         }
 
         public static RenderPassDrawRequest indexed(
@@ -923,8 +1036,8 @@ public final class VulkanicGalExecutionRequest {
                     (long) firstIndex * indexType.bytesPerIndex(),
                     instanceCount,
                     baseVertex
-                ),
-                LegacyCompatibilityMetadata.operation(source)
+                    ),
+                source
             );
         }
 
@@ -942,7 +1055,7 @@ public final class VulkanicGalExecutionRequest {
                 pipeline,
                 vertexInput,
                 GraphicsDrawCommand.arrays(VulkanicPrimitiveMode.TRIANGLES, firstVertex, vertexCount, 1),
-                LegacyCompatibilityMetadata.operation(source)
+                source
             );
         }
     }
@@ -977,40 +1090,399 @@ public final class VulkanicGalExecutionRequest {
         GENERATE_TEXTURE_MIPMAP
     }
 
+    public record TransferPixelStoreSnapshot(
+        int packRowLength,
+        int packAlignment,
+        int unpackRowLength,
+        int unpackSkipRows,
+        int unpackSkipPixels,
+        int unpackAlignment
+    ) {
+        public TransferPixelStoreSnapshot {
+            requireNonNegative(packRowLength, "packRowLength");
+            requireAlignment(packAlignment, "packAlignment");
+            requireNonNegative(unpackRowLength, "unpackRowLength");
+            requireNonNegative(unpackSkipRows, "unpackSkipRows");
+            requireNonNegative(unpackSkipPixels, "unpackSkipPixels");
+            requireAlignment(unpackAlignment, "unpackAlignment");
+        }
+
+        public static TransferPixelStoreSnapshot defaults() {
+            return new TransferPixelStoreSnapshot(0, 4, 0, 0, 0, 4);
+        }
+
+        private static void requireNonNegative(int value, String name) {
+            if (value < 0) {
+                throw new IllegalArgumentException(name + " must be >= 0");
+            }
+        }
+
+        private static void requireAlignment(int value, String name) {
+            if (value != 1 && value != 2 && value != 4 && value != 8) {
+                throw new IllegalArgumentException(name + " must be one of {1,2,4,8}");
+            }
+        }
+    }
+
+    public record TransferCompatibilitySnapshot(
+        List<VulkanicPassResourceModel.CanonicalResourceReference> sources,
+        List<VulkanicPassResourceModel.CanonicalResourceReference> destinations,
+        TransferPixelStoreSnapshot pixelStore,
+        String source
+    ) {
+        public TransferCompatibilitySnapshot {
+            sources = List.copyOf(Objects.requireNonNull(sources, "sources"));
+            destinations = List.copyOf(Objects.requireNonNull(destinations, "destinations"));
+            pixelStore = Objects.requireNonNull(pixelStore, "pixelStore");
+            source = requireNonBlank(source, "source");
+        }
+
+        public List<VulkanicPassResourceModel.CanonicalResourceReference> allResources() {
+            java.util.ArrayList<VulkanicPassResourceModel.CanonicalResourceReference> all =
+                new java.util.ArrayList<>(sources.size() + destinations.size());
+            all.addAll(sources);
+            all.addAll(destinations);
+            return List.copyOf(all);
+        }
+
+        public VulkanicPassResourceModel.CanonicalResourceReference source(int index) {
+            return sources.get(index);
+        }
+
+        public VulkanicPassResourceModel.CanonicalResourceReference destination(int index) {
+            return destinations.get(index);
+        }
+
+        public int sourceLegacyIdOr(int index, int fallback) {
+            return sources.size() > index ? sources.get(index).legacyId().orElse(fallback) : fallback;
+        }
+
+        public int destinationLegacyIdOr(int index, int fallback) {
+            return destinations.size() > index ? destinations.get(index).legacyId().orElse(fallback) : fallback;
+        }
+
+        public int sourceLegacyTargetOr(int index, int fallback) {
+            return sources.size() > index ? sources.get(index).legacyTarget().orElse(fallback) : fallback;
+        }
+
+        public int destinationLegacyTargetOr(int index, int fallback) {
+            return destinations.size() > index ? destinations.get(index).legacyTarget().orElse(fallback) : fallback;
+        }
+    }
+
+    public sealed interface TransferOperation permits
+        CopyBufferSubData,
+        CopyNamedBufferSubData,
+        CopyImageSubData,
+        CopyTextureSubImage2D,
+        CopyTexImage2D,
+        CopyTexSubImage2D,
+        BlitFramebuffer,
+        BlitNamedFramebuffer,
+        ReadPixelsPointer,
+        ReadPixelsFloatArray,
+        BufferSubData,
+        NamedBufferSubData,
+        UploadTexture1D,
+        UploadTexture2D,
+        UploadTexture2DSubImagePointer,
+        UploadTexture2DSubImageBuffer,
+        UploadTexture3D,
+        ClearTexImageInt,
+        ClearBufferSubDataInt,
+        ClearBufferFloat,
+        ClearBufferInt,
+        ClearBufferUint,
+        ClearNamedFramebufferFloat,
+        ClearNamedFramebufferInt,
+        ClearNamedFramebufferUint,
+        GenerateMipmap,
+        GenerateTextureMipmap {
+        TransferKind kind();
+    }
+
+    public record CopyBufferSubData(int readTarget, int writeTarget, long readOffset, long writeOffset, long size)
+        implements TransferOperation {
+        public CopyBufferSubData {
+            requireNonNegative(readOffset, "readOffset");
+            requireNonNegative(writeOffset, "writeOffset");
+            requirePositive(size, "size");
+        }
+        @Override public TransferKind kind() { return TransferKind.COPY_BUFFER_SUB_DATA; }
+    }
+
+    public record CopyNamedBufferSubData(int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size)
+        implements TransferOperation {
+        public CopyNamedBufferSubData {
+            requireNonNegative(readOffset, "readOffset");
+            requireNonNegative(writeOffset, "writeOffset");
+            requirePositive(size, "size");
+        }
+        @Override public TransferKind kind() { return TransferKind.COPY_NAMED_BUFFER_SUB_DATA; }
+    }
+
+    public record CopyImageSubData(
+        int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ,
+        int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ,
+        int width, int height, int depth
+    ) implements TransferOperation {
+        public CopyImageSubData {
+            requireNonNegative(srcLevel, "srcLevel");
+            requireNonNegative(dstLevel, "dstLevel");
+            requirePositive(width, "width");
+            requirePositive(height, "height");
+            requirePositive(depth, "depth");
+        }
+        @Override public TransferKind kind() { return TransferKind.COPY_IMAGE_SUB_DATA; }
+    }
+
+    public record CopyTextureSubImage2D(int texture, int level, int xOffset, int yOffset, int x, int y, int width, int height)
+        implements TransferOperation {
+        public CopyTextureSubImage2D {
+            requireNonNegative(level, "level");
+            requirePositive(width, "width");
+            requirePositive(height, "height");
+        }
+        @Override public TransferKind kind() { return TransferKind.COPY_TEXTURE_SUB_IMAGE_2D; }
+    }
+
+    public record CopyTexImage2D(int target, int level, int internalFormat, int x, int y, int width, int height, int border)
+        implements TransferOperation {
+        public CopyTexImage2D {
+            requireNonNegative(level, "level");
+            requirePositive(width, "width");
+            requirePositive(height, "height");
+        }
+        @Override public TransferKind kind() { return TransferKind.COPY_TEX_IMAGE_2D; }
+    }
+
+    public record CopyTexSubImage2D(int target, int level, int xOffset, int yOffset, int x, int y, int width, int height)
+        implements TransferOperation {
+        public CopyTexSubImage2D {
+            requireNonNegative(level, "level");
+            requirePositive(width, "width");
+            requirePositive(height, "height");
+        }
+        @Override public TransferKind kind() { return TransferKind.COPY_TEX_SUB_IMAGE_2D; }
+    }
+
+    public record BlitFramebuffer(
+        int srcX0, int srcY0, int srcX1, int srcY1,
+        int dstX0, int dstY0, int dstX1, int dstY1,
+        int mask, int filter
+    ) implements TransferOperation {
+        @Override public TransferKind kind() { return TransferKind.BLIT_FRAMEBUFFER; }
+    }
+
+    public record BlitNamedFramebuffer(
+        int readFramebuffer, int drawFramebuffer,
+        int srcX0, int srcY0, int srcX1, int srcY1,
+        int dstX0, int dstY0, int dstX1, int dstY1,
+        int mask, int filter
+    ) implements TransferOperation {
+        @Override public TransferKind kind() { return TransferKind.BLIT_NAMED_FRAMEBUFFER; }
+    }
+
+    public record ReadPixelsPointer(int x, int y, int width, int height, int format, int type, long pixels)
+        implements TransferOperation {
+        public ReadPixelsPointer {
+            requirePositive(width, "width");
+            requirePositive(height, "height");
+        }
+        @Override public TransferKind kind() { return TransferKind.READ_PIXELS; }
+    }
+
+    public record ReadPixelsFloatArray(int x, int y, int width, int height, int format, int type, float[] pixels)
+        implements TransferOperation {
+        public ReadPixelsFloatArray {
+            requirePositive(width, "width");
+            requirePositive(height, "height");
+            Objects.requireNonNull(pixels, "pixels");
+        }
+        @Override public TransferKind kind() { return TransferKind.READ_PIXELS_FLOAT_ARRAY; }
+    }
+
+    public record BufferSubData(int target, long offset, java.nio.ByteBuffer payload) implements TransferOperation {
+        public BufferSubData {
+            requireNonNegative(offset, "offset");
+            payload = copyBytePayload(Objects.requireNonNull(payload, "payload"));
+        }
+        @Override public java.nio.ByteBuffer payload() { return payload.asReadOnlyBuffer(); }
+        @Override public TransferKind kind() { return TransferKind.BUFFER_SUB_DATA; }
+    }
+
+    public record NamedBufferSubData(int buffer, long offset, java.nio.ByteBuffer payload) implements TransferOperation {
+        public NamedBufferSubData {
+            requireNonNegative(offset, "offset");
+            payload = copyBytePayload(Objects.requireNonNull(payload, "payload"));
+        }
+        @Override public java.nio.ByteBuffer payload() { return payload.asReadOnlyBuffer(); }
+        @Override public TransferKind kind() { return TransferKind.NAMED_BUFFER_SUB_DATA; }
+    }
+
+    public record UploadTexture1D(int target, int level, int internalFormat, int width, int border, int format, int type,
+                                  java.nio.ByteBuffer payload) implements TransferOperation {
+        public UploadTexture1D {
+            requireNonNegative(level, "level");
+            requirePositive(width, "width");
+            payload = copyBytePayload(payload);
+        }
+        @Override public java.nio.ByteBuffer payload() { return payload == null ? null : payload.asReadOnlyBuffer(); }
+        @Override public TransferKind kind() { return TransferKind.UPLOAD_TEXTURE_1D; }
+    }
+
+    public record UploadTexture2D(int target, int level, int internalFormat, int width, int height, int border,
+                                  int format, int type, java.nio.ByteBuffer payload) implements TransferOperation {
+        public UploadTexture2D {
+            requireNonNegative(level, "level");
+            requirePositive(width, "width");
+            requirePositive(height, "height");
+            payload = copyBytePayload(payload);
+        }
+        @Override public java.nio.ByteBuffer payload() { return payload == null ? null : payload.asReadOnlyBuffer(); }
+        @Override public TransferKind kind() { return TransferKind.UPLOAD_TEXTURE_2D; }
+    }
+
+    public record UploadTexture2DSubImagePointer(int target, int level, int xOffset, int yOffset, int width, int height,
+                                                 int format, int type, long pixels) implements TransferOperation {
+        public UploadTexture2DSubImagePointer {
+            requireNonNegative(level, "level");
+            requirePositive(width, "width");
+            requirePositive(height, "height");
+            requireNonNegative(pixels, "pixels");
+        }
+        @Override public TransferKind kind() { return TransferKind.UPLOAD_TEXTURE_2D_SUB_IMAGE_POINTER; }
+    }
+
+    public record UploadTexture2DSubImageBuffer(int target, int level, int xOffset, int yOffset, int width, int height,
+                                                int format, int type, java.nio.ByteBuffer payload) implements TransferOperation {
+        public UploadTexture2DSubImageBuffer {
+            requireNonNegative(level, "level");
+            requirePositive(width, "width");
+            requirePositive(height, "height");
+            payload = copyBytePayload(Objects.requireNonNull(payload, "payload"));
+        }
+        @Override public java.nio.ByteBuffer payload() { return payload.asReadOnlyBuffer(); }
+        @Override public TransferKind kind() { return TransferKind.UPLOAD_TEXTURE_2D_SUB_IMAGE_BUFFER; }
+    }
+
+    public record UploadTexture3D(int target, int level, int internalFormat, int width, int height, int depth, int border,
+                                  int format, int type, java.nio.ByteBuffer payload) implements TransferOperation {
+        public UploadTexture3D {
+            requireNonNegative(level, "level");
+            requirePositive(width, "width");
+            requirePositive(height, "height");
+            requirePositive(depth, "depth");
+            payload = copyBytePayload(payload);
+        }
+        @Override public java.nio.ByteBuffer payload() { return payload == null ? null : payload.asReadOnlyBuffer(); }
+        @Override public TransferKind kind() { return TransferKind.UPLOAD_TEXTURE_3D; }
+    }
+
+    public record ClearTexImageInt(int texture, int level, int format, int type, int[] data) implements TransferOperation {
+        public ClearTexImageInt {
+            requireNonNegative(level, "level");
+            data = data == null ? null : java.util.Arrays.copyOf(data, data.length);
+        }
+        @Override public int[] data() { return data == null ? null : java.util.Arrays.copyOf(data, data.length); }
+        @Override public TransferKind kind() { return TransferKind.CLEAR_TEX_IMAGE_INT; }
+    }
+
+    public record ClearBufferSubDataInt(int target, int internalFormat, long offset, long size, int format, int type, int[] data)
+        implements TransferOperation {
+        public ClearBufferSubDataInt {
+            requireNonNegative(offset, "offset");
+            requirePositive(size, "size");
+            data = data == null ? null : java.util.Arrays.copyOf(data, data.length);
+        }
+        @Override public int[] data() { return data == null ? null : java.util.Arrays.copyOf(data, data.length); }
+        @Override public TransferKind kind() { return TransferKind.CLEAR_BUFFER_SUB_DATA_INT; }
+    }
+
+    public record ClearBufferFloat(int buffer, int drawBuffer, float[] values) implements TransferOperation {
+        public ClearBufferFloat {
+            values = values == null ? null : java.util.Arrays.copyOf(values, values.length);
+        }
+        @Override public float[] values() { return values == null ? null : java.util.Arrays.copyOf(values, values.length); }
+        @Override public TransferKind kind() { return TransferKind.CLEAR_BUFFER_FLOAT; }
+    }
+
+    public record ClearBufferInt(int buffer, int drawBuffer, int[] values) implements TransferOperation {
+        public ClearBufferInt {
+            values = values == null ? null : java.util.Arrays.copyOf(values, values.length);
+        }
+        @Override public int[] values() { return values == null ? null : java.util.Arrays.copyOf(values, values.length); }
+        @Override public TransferKind kind() { return TransferKind.CLEAR_BUFFER_INT; }
+    }
+
+    public record ClearBufferUint(int buffer, int drawBuffer, int[] values) implements TransferOperation {
+        public ClearBufferUint {
+            values = values == null ? null : java.util.Arrays.copyOf(values, values.length);
+        }
+        @Override public int[] values() { return values == null ? null : java.util.Arrays.copyOf(values, values.length); }
+        @Override public TransferKind kind() { return TransferKind.CLEAR_BUFFER_UINT; }
+    }
+
+    public record ClearNamedFramebufferFloat(int framebuffer, int buffer, int drawBuffer, float[] values)
+        implements TransferOperation {
+        public ClearNamedFramebufferFloat {
+            values = values == null ? null : java.util.Arrays.copyOf(values, values.length);
+        }
+        @Override public float[] values() { return values == null ? null : java.util.Arrays.copyOf(values, values.length); }
+        @Override public TransferKind kind() { return TransferKind.CLEAR_NAMED_FRAMEBUFFER_FLOAT; }
+    }
+
+    public record ClearNamedFramebufferInt(int framebuffer, int buffer, int drawBuffer, int[] values)
+        implements TransferOperation {
+        public ClearNamedFramebufferInt {
+            values = values == null ? null : java.util.Arrays.copyOf(values, values.length);
+        }
+        @Override public int[] values() { return values == null ? null : java.util.Arrays.copyOf(values, values.length); }
+        @Override public TransferKind kind() { return TransferKind.CLEAR_NAMED_FRAMEBUFFER_INT; }
+    }
+
+    public record ClearNamedFramebufferUint(int framebuffer, int buffer, int drawBuffer, int[] values)
+        implements TransferOperation {
+        public ClearNamedFramebufferUint {
+            values = values == null ? null : java.util.Arrays.copyOf(values, values.length);
+        }
+        @Override public int[] values() { return values == null ? null : java.util.Arrays.copyOf(values, values.length); }
+        @Override public TransferKind kind() { return TransferKind.CLEAR_NAMED_FRAMEBUFFER_UINT; }
+    }
+
+    public record GenerateMipmap(int target) implements TransferOperation {
+        @Override public TransferKind kind() { return TransferKind.GENERATE_MIPMAP; }
+    }
+
+    public record GenerateTextureMipmap(int texture) implements TransferOperation {
+        @Override public TransferKind kind() { return TransferKind.GENERATE_TEXTURE_MIPMAP; }
+    }
+
     public record TransferRequest(
         SemanticIdentity semanticIdentity,
         TransferKind kind,
+        TransferOperation operation,
         List<VulkanicPassResourceModel.ResourceUse> resources,
         VulkanicPassResourceModel.PassExecutionPlan resourcePlan,
-        LegacyCompatibilityMetadata legacyMetadata,
-        int[] intArgs,
-        long[] longArgs,
         java.nio.ByteBuffer bytePayload,
         float[] floatPayload,
         int[] intPayload,
-        float[] floatArrayOutput
+        float[] floatArrayOutput,
+        Optional<TransferCompatibilitySnapshot> transferSnapshot
     ) {
         public TransferRequest {
             semanticIdentity = Objects.requireNonNull(semanticIdentity, "semanticIdentity");
             kind = Objects.requireNonNull(kind, "kind");
+            operation = Objects.requireNonNull(operation, "operation");
+            if (operation.kind() != kind) {
+                throw new IllegalArgumentException("transfer operation kind " + operation.kind() + " does not match request kind " + kind);
+            }
             resources = List.copyOf(Objects.requireNonNull(resources, "resources"));
             resourcePlan = Objects.requireNonNull(resourcePlan, "resourcePlan");
-            legacyMetadata = Objects.requireNonNull(legacyMetadata, "legacyMetadata");
-            intArgs = java.util.Arrays.copyOf(Objects.requireNonNull(intArgs, "intArgs"), intArgs.length);
-            longArgs = java.util.Arrays.copyOf(Objects.requireNonNull(longArgs, "longArgs"), longArgs.length);
             bytePayload = copyBytePayload(bytePayload);
             floatPayload = floatPayload == null ? null : java.util.Arrays.copyOf(floatPayload, floatPayload.length);
             intPayload = intPayload == null ? null : java.util.Arrays.copyOf(intPayload, intPayload.length);
-        }
-
-        @Override
-        public int[] intArgs() {
-            return java.util.Arrays.copyOf(intArgs, intArgs.length);
-        }
-
-        @Override
-        public long[] longArgs() {
-            return java.util.Arrays.copyOf(longArgs, longArgs.length);
+            transferSnapshot = Objects.requireNonNull(transferSnapshot, "transferSnapshot");
         }
 
         @Override
@@ -1028,166 +1500,160 @@ public final class VulkanicGalExecutionRequest {
             return intPayload == null ? null : java.util.Arrays.copyOf(intPayload, intPayload.length);
         }
 
-        public static TransferRequest legacy(
-            String operation,
-            TransferKind kind,
+        public TransferCompatibilitySnapshot requireTransferSnapshot() {
+            return transferSnapshot.orElseThrow(() ->
+                new IllegalStateException("Transfer request reached backend without canonical transfer snapshot"));
+        }
+
+        public TransferRequest withTransferSnapshot(TransferCompatibilitySnapshot snapshot) {
+            Objects.requireNonNull(snapshot, "snapshot");
+            List<VulkanicPassResourceModel.CanonicalResourceReference> references = snapshot.allResources();
+            java.util.ArrayList<VulkanicPassResourceModel.ResourceUse> snapshotUses = new java.util.ArrayList<>(references.size());
+            for (int i = 0; i < references.size(); i++) {
+                VulkanicPassResourceModel.CanonicalResourceReference reference = references.get(i);
+                snapshotUses.add(reference.asResourceUse(
+                    semanticIdentity.label() + ":transfer:" + reference.resource().logicalName(),
+                    false,
+                    i
+                ));
+            }
+            VulkanicPassResourceModel.PassKind passKind = kind == TransferKind.READ_PIXELS
+                || kind == TransferKind.READ_PIXELS_FLOAT_ARRAY
+                    ? VulkanicPassResourceModel.PassKind.READBACK
+                    : VulkanicPassResourceModel.PassKind.TRANSFER;
+            VulkanicPassResourceModel.PassRequest passRequest = new VulkanicPassResourceModel.PassRequest(
+                passKind,
+                semanticIdentity.label(),
+                List.of(),
+                snapshotUses,
+                List.of(),
+                List.of(new VulkanicPassResourceModel.Command(
+                    kind.name().toLowerCase(java.util.Locale.ROOT),
+                    OptionalInt.empty(),
+                    OptionalInt.empty()
+                )),
+                List.of("transition-before-operation", "publish-usage-after-operation"),
+                false,
+                false
+            );
+            return new TransferRequest(
+                semanticIdentity,
+                kind,
+                operation,
+                snapshotUses,
+                VulkanicPassResourcePlanner.plan(passRequest),
+                bytePayload,
+                floatPayload,
+                intPayload,
+                floatArrayOutput,
+                Optional.of(snapshot)
+            );
+        }
+
+        public static TransferRequest of(
+            String operationLabel,
+            TransferOperation operation,
             VulkanicPassResourceModel.ResourceKind resourceKind,
             String stableKey,
             VulkanicPassResourceModel.Access access,
-            VulkanicResourceUsage usage,
-            int[] intArgs,
-            long[] longArgs
+            VulkanicResourceUsage usage
         ) {
+            operationLabel = requireNonBlank(operationLabel, "operationLabel");
+            operation = Objects.requireNonNull(operation, "operation");
+            TransferKind kind = operation.kind();
             VulkanicPassResourceModel.ResourceUse use = VulkanicLegacyCompatibilityAdapter.resourceUse(
-                operation,
+                operationLabel,
                 resourceKind,
                 stableKey,
                 access,
                 VulkanicPassResourceModel.Subresource.bufferRange(0, 1),
                 usage,
-                operation,
+                operationLabel,
                 false,
                 0
             );
             VulkanicPassResourceModel.PassExecutionPlan plan =
                 VulkanicLegacyCompatibilityAdapter.planTransfer(new VulkanicLegacyCompatibilityAdapter.TransferSnapshot(
                     kind == TransferKind.READ_PIXELS
-                        ? VulkanicPassResourceModel.PassKind.READBACK
-                        : VulkanicPassResourceModel.PassKind.TRANSFER,
-                    operation,
+                        || kind == TransferKind.READ_PIXELS_FLOAT_ARRAY
+                            ? VulkanicPassResourceModel.PassKind.READBACK
+                            : VulkanicPassResourceModel.PassKind.TRANSFER,
+                    operationLabel,
                     kind.name().toLowerCase(java.util.Locale.ROOT),
-                    operation,
+                    operationLabel,
                     resourceKind,
                     stableKey,
                     access,
                     VulkanicPassResourceModel.Subresource.bufferRange(0, 1),
                     usage,
-                    operation,
+                    operationLabel,
                     List.of(),
                     false,
                     false
                 ));
             return new TransferRequest(
-                SemanticIdentity.legacy(operation),
+                SemanticIdentity.legacy(operationLabel),
                 kind,
+                operation,
                 List.of(use),
                 plan,
-                LegacyCompatibilityMetadata.operation(operation),
-                intArgs,
-                longArgs,
-                null,
-                null,
-                null,
-                null
+                operationBytePayload(operation),
+                operationFloatPayload(operation),
+                operationIntPayload(operation),
+                operationFloatArrayOutput(operation),
+                Optional.empty()
             );
         }
 
-        public static TransferRequest legacyWithBytePayload(
-            String operation,
-            TransferKind kind,
-            VulkanicPassResourceModel.ResourceKind resourceKind,
-            String stableKey,
-            VulkanicPassResourceModel.Access access,
-            VulkanicResourceUsage usage,
-            int[] intArgs,
-            long[] longArgs,
-            java.nio.ByteBuffer bytePayload
-        ) {
-            TransferRequest request = legacy(operation, kind, resourceKind, stableKey, access, usage, intArgs, longArgs);
-            return new TransferRequest(
-                request.semanticIdentity(),
-                request.kind(),
-                request.resources(),
-                request.resourcePlan(),
-                request.legacyMetadata(),
-                request.intArgs(),
-                request.longArgs(),
-                bytePayload,
-                null,
-                null,
-                null
-            );
+        private static java.nio.ByteBuffer operationBytePayload(TransferOperation operation) {
+            return switch (operation) {
+                case BufferSubData op -> op.payload();
+                case NamedBufferSubData op -> op.payload();
+                case UploadTexture1D op -> op.payload();
+                case UploadTexture2D op -> op.payload();
+                case UploadTexture2DSubImageBuffer op -> op.payload();
+                case UploadTexture3D op -> op.payload();
+                default -> null;
+            };
         }
 
-        public static TransferRequest legacyWithFloatPayload(
-            String operation,
-            TransferKind kind,
-            VulkanicPassResourceModel.ResourceKind resourceKind,
-            String stableKey,
-            VulkanicPassResourceModel.Access access,
-            VulkanicResourceUsage usage,
-            int[] intArgs,
-            long[] longArgs,
-            float[] floatPayload
-        ) {
-            TransferRequest request = legacy(operation, kind, resourceKind, stableKey, access, usage, intArgs, longArgs);
-            return new TransferRequest(
-                request.semanticIdentity(),
-                request.kind(),
-                request.resources(),
-                request.resourcePlan(),
-                request.legacyMetadata(),
-                request.intArgs(),
-                request.longArgs(),
-                null,
-                floatPayload,
-                null,
-                null
-            );
+        private static float[] operationFloatPayload(TransferOperation operation) {
+            return switch (operation) {
+                case ClearBufferFloat op -> op.values();
+                case ClearNamedFramebufferFloat op -> op.values();
+                default -> null;
+            };
         }
 
-        public static TransferRequest legacyWithIntPayload(
-            String operation,
-            TransferKind kind,
-            VulkanicPassResourceModel.ResourceKind resourceKind,
-            String stableKey,
-            VulkanicPassResourceModel.Access access,
-            VulkanicResourceUsage usage,
-            int[] intArgs,
-            long[] longArgs,
-            int[] intPayload
-        ) {
-            TransferRequest request = legacy(operation, kind, resourceKind, stableKey, access, usage, intArgs, longArgs);
-            return new TransferRequest(
-                request.semanticIdentity(),
-                request.kind(),
-                request.resources(),
-                request.resourcePlan(),
-                request.legacyMetadata(),
-                request.intArgs(),
-                request.longArgs(),
-                null,
-                null,
-                intPayload,
-                null
-            );
+        private static int[] operationIntPayload(TransferOperation operation) {
+            return switch (operation) {
+                case ClearTexImageInt op -> op.data();
+                case ClearBufferSubDataInt op -> op.data();
+                case ClearBufferInt op -> op.values();
+                case ClearBufferUint op -> op.values();
+                case ClearNamedFramebufferInt op -> op.values();
+                case ClearNamedFramebufferUint op -> op.values();
+                default -> null;
+            };
         }
 
-        public static TransferRequest legacyWithFloatArrayOutput(
-            String operation,
-            TransferKind kind,
-            VulkanicPassResourceModel.ResourceKind resourceKind,
-            String stableKey,
-            VulkanicPassResourceModel.Access access,
-            VulkanicResourceUsage usage,
-            int[] intArgs,
-            long[] longArgs,
-            float[] floatArrayOutput
-        ) {
-            TransferRequest request = legacy(operation, kind, resourceKind, stableKey, access, usage, intArgs, longArgs);
-            return new TransferRequest(
-                request.semanticIdentity(),
-                request.kind(),
-                request.resources(),
-                request.resourcePlan(),
-                request.legacyMetadata(),
-                request.intArgs(),
-                request.longArgs(),
-                null,
-                null,
-                null,
-                floatArrayOutput
-            );
+        private static float[] operationFloatArrayOutput(TransferOperation operation) {
+            return switch (operation) {
+                case ReadPixelsFloatArray op -> op.pixels();
+                default -> null;
+            };
+        }
+
+        private static void requireLength(int[] values, int minimum, String name) {
+            if (values.length < minimum) {
+                throw new IllegalArgumentException(name + " requires at least " + minimum + " values");
+            }
+        }
+
+        private static void requireLength(long[] values, int minimum, String name) {
+            if (values.length < minimum) {
+                throw new IllegalArgumentException(name + " requires at least " + minimum + " values");
+            }
         }
     }
 
@@ -1208,6 +1674,18 @@ public final class VulkanicGalExecutionRequest {
             throw new IllegalArgumentException(name + " must not be blank");
         }
         return value;
+    }
+
+    private static void requireNonNegative(long value, String name) {
+        if (value < 0L) {
+            throw new IllegalArgumentException(name + " must be >= 0");
+        }
+    }
+
+    private static void requirePositive(long value, String name) {
+        if (value <= 0L) {
+            throw new IllegalArgumentException(name + " must be > 0");
+        }
     }
 
     private static String capturedLabel(java.util.function.Supplier<String> label, String fallback) {
@@ -1502,5 +1980,91 @@ public final class VulkanicGalExecutionRequest {
             + ":baseMip=" + view.getBaseMipLevel()
             + ":levels=" + view.getMipLevelCount()
             + ":extent=" + view.getWidth(0) + "x" + view.getHeight(0);
+    }
+
+    private static String buildContractSchema() {
+        StringBuilder builder = new StringBuilder(4096);
+        builder.append("vulkanic-gal-contract ").append(CONTRACT_VERSION).append('\n');
+        appendLine(builder, "requests",
+            "GraphicsDrawRequest",
+            "RenderPassDrawRequest",
+            "ComputeDispatchRequest",
+            "RenderPassBeginRequest",
+            "RenderPassEndRequest",
+            "ComputePassBeginRequest",
+            "ComputePassEndRequest",
+            "ClearRequest",
+            "TransferRequest");
+        appendEnum(builder, "ExecutionStatus", ExecutionStatus.values());
+        appendEnum(builder, "DrawCommandKind", DrawCommandKind.values());
+        appendLine(builder, "ComputeDispatchCommand", "direct", "indirect");
+        appendEnum(builder, "RenderPassBeginKind", RenderPassBeginKind.values());
+        appendEnum(builder, "TransferKind", TransferKind.values());
+        appendPermitted(builder, "ExecutionResult", ExecutionResult.class);
+        appendPermitted(builder, "TransferOperation", TransferOperation.class);
+        appendLine(builder, "resource-references",
+            "CanonicalResourceReference",
+            "ResourceIdentity(kind,logicalName,stableKey)",
+            "ResourceGeneration",
+            "Subresource(mip,layer,aspect,range)",
+            "Access",
+            "VulkanicResourceUsage");
+        appendLine(builder, "ownership",
+            "requests-own-payloads",
+            "requests-have-no-native-handles",
+            "backends-resolve-stable-resource-identities",
+            "diagnostics-outside-semantic-cache-identity");
+        return builder.toString();
+    }
+
+    private static void appendEnum(StringBuilder builder, String name, Enum<?>[] values) {
+        appendLine(
+            builder,
+            name,
+            Arrays.stream(values)
+                .map(Enum::name)
+                .sorted()
+                .toArray(String[]::new)
+        );
+    }
+
+    private static void appendPermitted(StringBuilder builder, String name, Class<?> type) {
+        Class<?>[] permitted = type.getPermittedSubclasses();
+        appendLine(
+            builder,
+            name,
+            Arrays.stream(permitted == null ? new Class<?>[0] : permitted)
+                .map(Class::getSimpleName)
+                .sorted()
+                .toArray(String[]::new)
+        );
+    }
+
+    private static void appendLine(StringBuilder builder, String name, String... values) {
+        builder.append(name).append('=');
+        for (int index = 0; index < values.length; index++) {
+            if (index > 0) {
+                builder.append(',');
+            }
+            builder.append(values[index]);
+        }
+        builder.append('\n');
+    }
+
+    private static String sha256Hex(String text) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                .digest(text.getBytes(StandardCharsets.UTF_8));
+            char[] output = new char[digest.length * 2];
+            char[] hex = "0123456789abcdef".toCharArray();
+            for (int i = 0; i < digest.length; i++) {
+                int value = digest[i] & 0xFF;
+                output[i * 2] = hex[value >>> 4];
+                output[i * 2 + 1] = hex[value & 0x0F];
+            }
+            return new String(output);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 digest is unavailable", exception);
+        }
     }
 }

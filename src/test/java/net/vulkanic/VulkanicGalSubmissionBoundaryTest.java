@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -23,7 +24,7 @@ final class VulkanicGalSubmissionBoundaryTest {
     @Test
     void legacyDrawRequestsAreImmutableAndCarryExplicitResourcePlan() {
         VulkanicGalExecutionRequest.GraphicsDrawRequest request =
-            VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyIndexed(
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.indexed(
                 "world:terrain",
                 VulkanicPrimitiveMode.TRIANGLES,
                 12,
@@ -45,32 +46,26 @@ final class VulkanicGalSubmissionBoundaryTest {
         source.put(new byte[] {1, 2, 3, 4});
         source.flip();
         VulkanicGalExecutionRequest.TransferRequest upload =
-            VulkanicGalExecutionRequest.TransferRequest.legacyWithBytePayload(
+            VulkanicGalExecutionRequest.TransferRequest.of(
                 "uploadTexture2D",
-                VulkanicGalExecutionRequest.TransferKind.UPLOAD_TEXTURE_2D,
+                new VulkanicGalExecutionRequest.UploadTexture2D(3553, 0, 32856, 1, 1, 0, 6408, 5121, source),
                 VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
                 "legacy-bound-texture-target:3553:level:0",
                 VulkanicPassResourceModel.Access.WRITE,
-                VulkanicResourceUsage.TRANSFER_DST,
-                new int[] {3553, 0, 32856, 1, 1, 0, 6408, 5121},
-                new long[] {},
-                source
+                VulkanicResourceUsage.TRANSFER_DST
             );
         source.put(0, (byte) 99);
         assertEquals(1, Byte.toUnsignedInt(upload.bytePayload().get(0)));
 
         float[] clearFloats = {0.25f, 0.5f, 0.75f, 1.0f};
         VulkanicGalExecutionRequest.TransferRequest clear =
-            VulkanicGalExecutionRequest.TransferRequest.legacyWithFloatPayload(
+            VulkanicGalExecutionRequest.TransferRequest.of(
                 "clearNamedFramebufferfv",
-                VulkanicGalExecutionRequest.TransferKind.CLEAR_NAMED_FRAMEBUFFER_FLOAT,
+                new VulkanicGalExecutionRequest.ClearNamedFramebufferFloat(4, 6144, 0, clearFloats),
                 VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
                 "legacy-framebuffer:4:buffer:6144:draw:0",
                 VulkanicPassResourceModel.Access.WRITE,
-                VulkanicResourceUsage.TRANSFER_DST,
-                new int[] {4, 6144, 0},
-                new long[] {},
-                clearFloats
+                VulkanicResourceUsage.TRANSFER_DST
             );
         clearFloats[0] = 9.0f;
         assertEquals(0.25f, clear.floatPayload()[0], 0.0f);
@@ -79,14 +74,14 @@ final class VulkanicGalSubmissionBoundaryTest {
     @Test
     void capturedGraphicsCompatibilitySnapshotReplacesLegacyPlaceholdersImmutably() {
         VulkanicGalExecutionRequest.GraphicsDrawRequest request =
-            VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyArrays(
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
                 "gui:item",
                 VulkanicPrimitiveMode.TRIANGLES,
                 0,
                 6,
                 1
             );
-        assertEquals("unresolved-legacy-compatibility", request.compatibilitySnapshot().source());
+        assertEquals("frontend-compatibility-draft", request.compatibilitySnapshot().source());
 
         List<VulkanicLegacyCompatibilityAdapter.VertexBufferSnapshot> vertexBuffers = new ArrayList<>();
         vertexBuffers.add(new VulkanicLegacyCompatibilityAdapter.VertexBufferSnapshot(
@@ -128,7 +123,7 @@ final class VulkanicGalSubmissionBoundaryTest {
         assertEquals(1, captured.resourcePlan().orderedUses().size());
         assertEquals("gui-item-vertices", captured.resourcePlan().orderedUses().get(0).resource().stableKey());
         assertTrue(captured.compatibilitySnapshot().resourceBindingPlan().isEmpty());
-        assertEquals("unresolved-legacy-compatibility", request.compatibilitySnapshot().source());
+        assertEquals("frontend-compatibility-draft", request.compatibilitySnapshot().source());
         assertEquals(
             "current-legacy",
             request.vertexInput().vertexBuffers().isEmpty() ? "current-legacy" : "captured",
@@ -140,7 +135,7 @@ final class VulkanicGalSubmissionBoundaryTest {
     void sharedGraphicsSnapshotsCaptureValidDefaultFixedFunctionState() {
         VulkanicCompatibilityState state = new VulkanicCompatibilityState();
         VulkanicGalExecutionRequest.GraphicsDrawRequest request =
-            VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyArrays(
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
                 "defaults",
                 VulkanicPrimitiveMode.TRIANGLES,
                 0,
@@ -167,7 +162,7 @@ final class VulkanicGalSubmissionBoundaryTest {
         state.bindImageTexture(1, 69, 0, false, 0, VulkanicAPI.GL_READ_WRITE, VulkanicAPI.GL_RGBA8);
 
         VulkanicGalExecutionRequest.GraphicsDrawRequest request =
-            VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyArrays(
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
                 "shaderpack:composite",
                 VulkanicPrimitiveMode.TRIANGLES,
                 0,
@@ -201,7 +196,7 @@ final class VulkanicGalSubmissionBoundaryTest {
         state.bindBuffer(0x8893, 12);
 
         VulkanicGalExecutionRequest.GraphicsDrawRequest request =
-            VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyIndexed(
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.indexed(
                 "dh:lod",
                 VulkanicPrimitiveMode.TRIANGLES,
                 6,
@@ -241,24 +236,31 @@ final class VulkanicGalSubmissionBoundaryTest {
     void frontendRoutesMajorCommandFamiliesThroughExplicitBoundary() throws Exception {
         String source = Files.readString(PROJECT_ROOT.resolve("src/main/java/net/vulkanic/VulkanicAPI.java"));
 
-        assertTrue(source.contains("executeGalGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyArrays("));
-        assertTrue(source.contains("executeGalGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyIndexed("));
-        assertTrue(source.contains("executeGalComputeDispatch(ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest.legacyDirect("));
-        assertTrue(source.contains("executeGalComputeDispatch(ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest.legacyIndirect("));
+        assertTrue(source.contains("executeGalGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays("));
+        assertTrue(source.contains("executeGalGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.indexed("));
+        assertTrue(source.contains("executeGalComputeDispatch(ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest.direct("));
+        assertTrue(source.contains("executeGalComputeDispatch(ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest.indirect("));
         assertTrue(source.contains("private static final VulkanicCompatibilityState compatibilityState"));
         assertTrue(source.contains("VulkanicGalSnapshotBuilder.captureGraphicsDraw(ctx, backend, compatibilityState, request)"));
         assertTrue(source.contains("VulkanicGalSnapshotBuilder.captureComputeDispatch(ctx, backend, compatibilityState, request)"));
-        assertTrue(source.contains("executeGalClear(ctx, VulkanicGalExecutionRequest.ClearRequest.legacy("));
-        assertTrue(source.contains("executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.legacy("));
-        assertTrue(source.contains("TransferKind.UPLOAD_TEXTURE_2D"));
-        assertTrue(source.contains("TransferKind.UPLOAD_TEXTURE_2D_SUB_IMAGE_BUFFER"));
-        assertTrue(source.contains("TransferKind.UPLOAD_TEXTURE_2D_SUB_IMAGE_POINTER"));
-        assertTrue(source.contains("TransferKind.BUFFER_SUB_DATA"));
-        assertTrue(source.contains("TransferKind.NAMED_BUFFER_SUB_DATA"));
-        assertTrue(source.contains("TransferKind.CLEAR_NAMED_FRAMEBUFFER_FLOAT"));
-        assertTrue(source.contains("TransferKind.CLEAR_BUFFER_SUB_DATA_INT"));
-        assertTrue(source.contains("TransferKind.READ_PIXELS_FLOAT_ARRAY"));
-        assertTrue(source.contains("TransferKind.GENERATE_TEXTURE_MIPMAP"));
+        assertTrue(source.contains("VulkanicGalSnapshotBuilder.captureTransfer(ctx, backend, compatibilityState, request)"));
+        assertTrue(source.contains("executeGalClear(ctx, VulkanicGalExecutionRequest.ClearRequest.of("));
+        assertFalse(source.contains("GraphicsDrawRequest.legacy"));
+        assertFalse(source.contains("ComputeDispatchRequest.legacy"));
+        assertFalse(source.contains("ComputePassBeginRequest.legacy"));
+        assertFalse(source.contains("ClearRequest.legacy"));
+        assertTrue(source.contains("executeGalTransfer(ctx, VulkanicGalExecutionRequest.TransferRequest.of("));
+        assertFalse(source.contains("TransferRequest.legacy("));
+        assertFalse(source.contains("TransferRequest.legacyWith"));
+        assertTrue(source.contains("new VulkanicGalExecutionRequest.UploadTexture2D("));
+        assertTrue(source.contains("new VulkanicGalExecutionRequest.UploadTexture2DSubImageBuffer("));
+        assertTrue(source.contains("new VulkanicGalExecutionRequest.UploadTexture2DSubImagePointer("));
+        assertTrue(source.contains("new VulkanicGalExecutionRequest.BufferSubData("));
+        assertTrue(source.contains("new VulkanicGalExecutionRequest.NamedBufferSubData("));
+        assertTrue(source.contains("new VulkanicGalExecutionRequest.ClearNamedFramebufferFloat("));
+        assertTrue(source.contains("new VulkanicGalExecutionRequest.ClearBufferSubDataInt("));
+        assertTrue(source.contains("new VulkanicGalExecutionRequest.ReadPixelsFloatArray("));
+        assertTrue(source.contains("new VulkanicGalExecutionRequest.GenerateTextureMipmap("));
         assertTrue(source.contains("snapshotMultiDrawElementsBaseVertex("));
         assertTrue(source.contains("executeGalRenderPassBegin("));
         assertTrue(source.contains("VulkanicGalSnapshotBuilder.captureRenderPassBegin(ctx, backend, request)"));
@@ -278,27 +280,108 @@ final class VulkanicGalSubmissionBoundaryTest {
     }
 
     @Test
+    void requestModelDoesNotExposeWeakTransferPayloadArraysOrLegacyFactories() throws Exception {
+        String requestSource = Files.readString(PROJECT_ROOT.resolve("src/main/java/net/vulkanic/VulkanicGalExecutionRequest.java"));
+
+        assertFalse(requestSource.contains("intArgs"));
+        assertFalse(requestSource.contains("longArgs"));
+        assertFalse(requestSource.contains("LegacyCompatibilityMetadata"));
+        assertFalse(requestSource.contains("legacyMetadata"));
+        assertFalse(requestSource.contains("unresolved-legacy"));
+        assertFalse(requestSource.contains("unresolvedLegacy"));
+        assertFalse(requestSource.contains("legacyCurrent()"));
+        assertFalse(requestSource.contains("currentLegacy()"));
+        assertFalse(requestSource.contains("TransferRequest.legacy("));
+        assertFalse(requestSource.contains("legacyWithBytePayload"));
+        assertFalse(requestSource.contains("legacyWithFloatPayload"));
+        assertFalse(requestSource.contains("legacyWithIntPayload"));
+        assertFalse(requestSource.contains("legacyWithFloatArrayOutput"));
+        assertFalse(requestSource.contains("public static GraphicsDrawRequest legacy"));
+        assertFalse(requestSource.contains("public static ComputeDispatchRequest legacy"));
+        assertFalse(requestSource.contains("public static ComputePassBeginRequest legacy"));
+        assertFalse(requestSource.contains("public static ClearRequest legacy"));
+        assertTrue(requestSource.contains("sealed interface TransferOperation"));
+        assertTrue(requestSource.contains("record UploadTexture2D("));
+        assertTrue(requestSource.contains("record CopyImageSubData("));
+        assertTrue(requestSource.contains("record BlitFramebuffer("));
+        assertTrue(requestSource.contains("record ReadPixelsFloatArray("));
+        assertTrue(requestSource.contains("record GenerateTextureMipmap("));
+        assertTrue(requestSource.contains("sealed interface ExecutionResult"));
+        assertTrue(requestSource.contains("record ExecutionSuccess("));
+        assertTrue(requestSource.contains("record ExecutionFailure("));
+        assertTrue(requestSource.contains("ExecutionStatus.STALE_RESOURCE"));
+        assertTrue(requestSource.contains("ExecutionStatus.DEVICE_LOST"));
+    }
+
+    @Test
+    void executableValidationRejectsDraftRequestsBeforeBackendEntry() {
+        VulkanicGalExecutionRequest.GraphicsDrawRequest draftDraw =
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
+                "draft-draw",
+                VulkanicPrimitiveMode.TRIANGLES,
+                0,
+                3,
+                1
+            );
+        VulkanicGalExecutionRequest.ExecutionResult drawResult =
+            VulkanicGalExecutionRequest.validateGraphicsDraw(draftDraw);
+        assertFalse(drawResult.successful());
+        assertEquals(VulkanicGalExecutionRequest.ExecutionStatus.REJECTED, drawResult.status());
+
+        VulkanicGalExecutionRequest.TransferRequest draftTransfer =
+            VulkanicGalExecutionRequest.TransferRequest.of(
+                "draft-transfer",
+                new VulkanicGalExecutionRequest.GenerateMipmap(3553),
+                VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
+                "legacy-bound-texture-target:3553",
+                VulkanicPassResourceModel.Access.WRITE,
+                VulkanicResourceUsage.TRANSFER_DST
+            );
+        VulkanicGalExecutionRequest.ExecutionResult transferResult =
+            VulkanicGalExecutionRequest.validateTransfer(draftTransfer);
+        assertFalse(transferResult.successful());
+        assertEquals(VulkanicGalExecutionRequest.ExecutionStatus.REJECTED, transferResult.status());
+    }
+
+    @Test
+    void sharedComputeSnapshotsReplaceDraftPipelineBeforeValidation() {
+        VulkanicCompatibilityState state = new VulkanicCompatibilityState();
+        state.bindProgram(77);
+        VulkanicGalExecutionRequest.ComputeDispatchRequest request =
+            VulkanicGalExecutionRequest.ComputeDispatchRequest.direct("shaderpack:shadow-composite", 1, 2, 3);
+
+        VulkanicGalExecutionRequest.ComputeDispatchRequest captured =
+            request.withCompatibilitySnapshot(state.compatibilitySnapshotFor(request));
+
+        assertEquals("legacy-program:77", captured.pipeline().stableKey());
+        assertTrue(captured.compatibilitySnapshot().sharedCompatibilityState().isPresent());
+        assertTrue(VulkanicGalExecutionRequest.validateComputeDispatch(captured).successful());
+    }
+
+    @Test
     void bothBackendsExposeConcreteExplicitConsumers() throws Exception {
         String vulkanSource = Files.readString(PROJECT_ROOT.resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
         String openglSource = Files.readString(PROJECT_ROOT.resolve("src/main/java/net/vulkanic/backends/opengl/OpenGLBackend.java"));
         String backendContract = Files.readString(PROJECT_ROOT.resolve("src/main/java/net/vulkanic/GraphicsBackend.java"));
 
         assertTrue(backendContract.contains("extends VulkanicGalExecutor"));
-        assertTrue(vulkanSource.contains("public void executeGraphicsDraw("));
-        assertTrue(vulkanSource.contains("public void executeComputeDispatch("));
-        assertTrue(vulkanSource.contains("public void executeClear("));
-        assertTrue(vulkanSource.contains("public void executeTransfer("));
+        assertTrue(vulkanSource.contains("public VulkanicGalExecutionRequest.ExecutionResult executeGraphicsDraw("));
+        assertTrue(vulkanSource.contains("public VulkanicGalExecutionRequest.ExecutionResult executeComputeDispatch("));
+        assertTrue(vulkanSource.contains("public VulkanicGalExecutionRequest.ExecutionResult executeClear("));
+        assertTrue(vulkanSource.contains("public VulkanicGalExecutionRequest.ExecutionResult executeTransfer("));
         assertTrue(vulkanSource.contains("public net.vulkanic.VulkanicRenderPass executeRenderPassBegin("));
-        assertTrue(vulkanSource.contains("public void executeRenderPassEnd("));
-        assertTrue(openglSource.contains("public void executeGraphicsDraw("));
-        assertTrue(openglSource.contains("public void executeComputeDispatch("));
-        assertTrue(openglSource.contains("public void executeClear("));
-        assertTrue(openglSource.contains("public void executeTransfer("));
+        assertTrue(vulkanSource.contains("public VulkanicGalExecutionRequest.ExecutionResult executeRenderPassEnd("));
+        assertTrue(openglSource.contains("public VulkanicGalExecutionRequest.ExecutionResult executeGraphicsDraw("));
+        assertTrue(openglSource.contains("public VulkanicGalExecutionRequest.ExecutionResult executeComputeDispatch("));
+        assertTrue(openglSource.contains("public VulkanicGalExecutionRequest.ExecutionResult executeClear("));
+        assertTrue(openglSource.contains("public VulkanicGalExecutionRequest.ExecutionResult executeTransfer("));
         assertTrue(openglSource.contains("public net.vulkanic.VulkanicRenderPass executeRenderPassBegin("));
-        assertTrue(vulkanSource.contains("case UPLOAD_TEXTURE_2D -> uploadTexture2D("));
-        assertTrue(openglSource.contains("case UPLOAD_TEXTURE_2D -> uploadTexture2D("));
-        assertTrue(vulkanSource.contains("case CLEAR_NAMED_FRAMEBUFFER_FLOAT -> clearNamedFramebufferfv("));
-        assertTrue(openglSource.contains("case CLEAR_NAMED_FRAMEBUFFER_FLOAT -> clearNamedFramebufferfv("));
+        assertTrue(vulkanSource.contains("case VulkanicGalExecutionRequest.UploadTexture2D o -> uploadTexture2D("));
+        assertTrue(openglSource.contains("case VulkanicGalExecutionRequest.UploadTexture2D o -> uploadTexture2D("));
+        assertTrue(vulkanSource.contains("request.requireTransferSnapshot()"));
+        assertTrue(openglSource.contains("request.requireTransferSnapshot()"));
+        assertTrue(vulkanSource.contains("case VulkanicGalExecutionRequest.ClearNamedFramebufferFloat o -> clearNamedFramebufferfv("));
+        assertTrue(openglSource.contains("case VulkanicGalExecutionRequest.ClearNamedFramebufferFloat o -> clearNamedFramebufferfv("));
         assertTrue(vulkanSource.contains("spine.executeRenderPassDraw("));
         assertTrue(vulkanSource.contains("spine.executeRenderPassEnd("));
     }
@@ -337,8 +420,7 @@ final class VulkanicGalSubmissionBoundaryTest {
             Optional.empty(),
             OptionalInt.empty(),
             true,
-            VulkanicGalExecutionRequest.RenderPassBeginRequest.framebuffer("good", () -> "good", 1, true).resourcePlan(),
-            VulkanicGalExecutionRequest.LegacyCompatibilityMetadata.operation("bad-pass")
+            VulkanicGalExecutionRequest.RenderPassBeginRequest.framebuffer("good", () -> "good", 1, true).resourcePlan()
         ));
         assertThrows(IllegalArgumentException.class, () ->
             VulkanicGalExecutionRequest.RenderPassBeginRequest.framebuffer("bad-framebuffer", () -> "bad", -1, true)
@@ -348,7 +430,7 @@ final class VulkanicGalSubmissionBoundaryTest {
     @Test
     void computePassLifecycleRequestsAreExplicitAndImmutable() {
         VulkanicGalExecutionRequest.ComputePassBeginRequest begin =
-            VulkanicGalExecutionRequest.ComputePassBeginRequest.legacy("dispatchCompute");
+            VulkanicGalExecutionRequest.ComputePassBeginRequest.begin("dispatchCompute");
         VulkanicGalExecutionRequest.ComputePassEndRequest end =
             VulkanicGalExecutionRequest.ComputePassEndRequest.complete("dispatchCompute");
         VulkanicGalExecutionRequest.ComputePassEndRequest abandoned =
@@ -410,8 +492,8 @@ final class VulkanicGalSubmissionBoundaryTest {
         assertTrue(vulkanSource.contains("Objects.requireNonNull(capturedGalRequest, \"capturedGalRequest\")"),
             "Vulkan graphics materialization should not accept unresolved/null GAL requests");
         assertTrue(vulkanSource.contains("requestOwnedComputeResourceBindingPlan(")
-                && vulkanSource.contains("unresolved-legacy-compute-compatibility"),
-            "Compute GAL lowering should reject unresolved requests and derive native bindings from request-owned snapshots");
+                && vulkanSource.contains("capturedRequest.compatibilitySnapshot().sharedCompatibilityState().isEmpty()"),
+            "Compute GAL lowering should reject uncaptured requests and derive native bindings from request-owned snapshots");
         assertTrue(vulkanSource.contains("containsEquivalentResourceUse(capturedUses, use)"),
             "Vulkan graphics request validation should compare semantic resource-use equivalence, not raw record order/labels");
     }
@@ -456,7 +538,7 @@ final class VulkanicGalSubmissionBoundaryTest {
     @Test
     void invalidRequestsFailBeforeBackendExecution() {
         assertThrows(IllegalArgumentException.class, () ->
-            VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyArrays(
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
                 "bad-arrays",
                 VulkanicPrimitiveMode.TRIANGLES,
                 -1,
@@ -465,10 +547,10 @@ final class VulkanicGalSubmissionBoundaryTest {
             )
         );
         assertThrows(IllegalArgumentException.class, () ->
-            VulkanicGalExecutionRequest.ComputeDispatchRequest.legacyIndirect("bad-dispatch", -1L)
+            VulkanicGalExecutionRequest.ComputeDispatchRequest.indirect("bad-dispatch", -1L)
         );
         assertThrows(IllegalArgumentException.class, () ->
-            VulkanicGalExecutionRequest.ClearRequest.legacy("bad-clear")
+            VulkanicGalExecutionRequest.ClearRequest.of("bad-clear")
         );
     }
 

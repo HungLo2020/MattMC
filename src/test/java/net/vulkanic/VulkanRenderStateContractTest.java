@@ -396,11 +396,17 @@ public class VulkanRenderStateContractTest {
     @Test
     public void testClearBuffersOutsideRenderPassIsSilentNoOp() {
         // NativeSpine is null (not initialized), so no render pass is active.
-        // The method should silently return without throwing.
-        final int GL_COLOR_BUFFER_BIT = 0x00004000;
-        final int GL_DEPTH_BUFFER_BIT = 0x00000100;
-        assertDoesNotThrow(() ->
-            vulkanBackend.clearBuffers(stubCtx, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
+        // The typed clear request should silently return without publishing native state.
+        VulkanicGalExecutionRequest.ExecutionResult result = vulkanBackend.executeClear(
+            stubCtx,
+            VulkanicGalExecutionRequest.ClearRequest.of(
+                "clearBuffers",
+                VulkanicClearBuffer.COLOR,
+                VulkanicClearBuffer.DEPTH
+            )
+        );
+
+        assertTrue(result.successful());
     }
 
     // ================================================================

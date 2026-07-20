@@ -144,27 +144,54 @@ public class VulkanFullContractCoverageTest {
 
     @Test
     public void testCompatibilityCompatibilityMethodsRespectStubAndReadinessContracts() {
-        assertDoesNotThrow(() -> vulkanBackend.blitNamedFramebuffer(stubCtx, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0));
-        assertDoesNotThrow(() -> vulkanBackend.blitNamedFramebufferDSA(stubCtx, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0));
+        assertTransferSucceeds(new VulkanicGalExecutionRequest.BlitNamedFramebuffer(
+            1, 2, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0));
+        assertTransferSucceeds(new VulkanicGalExecutionRequest.BlitNamedFramebuffer(
+            1, 2, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0));
 
-        IllegalStateException copyException = assertThrows(IllegalStateException.class,
-            () -> vulkanBackend.copyImageSubData(stubCtx, 1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1, 1, 1));
-        assertTrue(copyException.getMessage().contains("copyImageSubData"),
+        VulkanicGalExecutionRequest.ExecutionResult copyResult = executeTransfer(
+            "copyImageSubData",
+            new VulkanicGalExecutionRequest.CopyImageSubData(
+                1, 0, 0, 0, 0, 0,
+                2, 0, 0, 0, 0, 0,
+                1, 1, 1
+            )
+        );
+        assertFalse(copyResult.successful());
+        assertEquals(VulkanicGalExecutionRequest.ExecutionStatus.BACKEND_FAILURE, copyResult.status());
+        assertTrue(copyResult.detail().contains("copyImageSubData"),
             "Implemented native-backed copy paths should fail fast with operation context when Vulkan is not ready");
 
-        IllegalStateException dispatchException = assertThrows(IllegalStateException.class,
-            () -> vulkanBackend.dispatchCompute(stubCtx, 1, 1, 1));
-        assertTrue(dispatchException.getMessage().contains("dispatchCompute"));
+        VulkanicGalExecutionRequest.ExecutionResult dispatchResult = vulkanBackend.executeComputeDispatch(
+            stubCtx,
+            VulkanicGalExecutionRequest.ComputeDispatchRequest.direct("dispatchCompute", 1, 1, 1)
+        );
+        assertFalse(dispatchResult.successful());
+        assertEquals(VulkanicGalExecutionRequest.ExecutionStatus.BACKEND_FAILURE, dispatchResult.status());
+        assertTrue(dispatchResult.detail().contains("dispatchCompute"));
 
-        IllegalStateException indirectDispatchException = assertThrows(IllegalStateException.class,
-            () -> vulkanBackend.dispatchComputeIndirect(stubCtx, 0L));
-        assertTrue(indirectDispatchException.getMessage().contains("dispatchComputeIndirect"));
+        VulkanicGalExecutionRequest.ExecutionResult indirectDispatchResult = vulkanBackend.executeComputeDispatch(
+            stubCtx,
+            VulkanicGalExecutionRequest.ComputeDispatchRequest.indirect("dispatchComputeIndirect", 0L)
+        );
+        assertFalse(indirectDispatchResult.successful());
+        assertEquals(VulkanicGalExecutionRequest.ExecutionStatus.BACKEND_FAILURE, indirectDispatchResult.status());
+        assertTrue(indirectDispatchResult.detail().contains("dispatchComputeIndirect"));
         assertDoesNotThrow(() -> vulkanBackend.memoryBarrier(stubCtx, 0));
         assertDoesNotThrow(() -> vulkanBackend.texBuffer(stubCtx, VulkanicAPI.GL_TEXTURE_BUFFER, 0, 0));
-        assertDoesNotThrow(() -> vulkanBackend.uploadTexture1D(stubCtx, VulkanicAPI.GL_TEXTURE_1D, 0, 0, 16, 0, 0, 0, (ByteBuffer) null));
-        IllegalStateException texture3DException = assertThrows(IllegalStateException.class,
-            () -> vulkanBackend.uploadTexture3D(
-                stubCtx,
+        assertTransferSucceeds(new VulkanicGalExecutionRequest.UploadTexture1D(
+            VulkanicAPI.GL_TEXTURE_1D,
+            0,
+            0,
+            16,
+            0,
+            0,
+            0,
+            (ByteBuffer) null
+        ));
+        VulkanicGalExecutionRequest.ExecutionResult texture3DResult = executeTransfer(
+            "uploadTexture3D",
+            new VulkanicGalExecutionRequest.UploadTexture3D(
                 VulkanicAPI.GL_TEXTURE_3D,
                 0,
                 VulkanicAPI.GL_RGBA16F,
@@ -175,9 +202,20 @@ public class VulkanFullContractCoverageTest {
                 VulkanicAPI.GL_RGBA,
                 VulkanicAPI.GL_HALF_FLOAT,
                 (ByteBuffer) null
-            ));
-        assertTrue(texture3DException.getMessage().contains("uploadTexture3D"));
-        assertDoesNotThrow(() -> vulkanBackend.readPixels(stubCtx, 0, 0, 1, 1, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_FLOAT, new float[4]));
+            )
+        );
+        assertFalse(texture3DResult.successful());
+        assertEquals(VulkanicGalExecutionRequest.ExecutionStatus.BACKEND_FAILURE, texture3DResult.status());
+        assertTrue(texture3DResult.detail().contains("uploadTexture3D"));
+        assertTransferSucceeds(new VulkanicGalExecutionRequest.ReadPixelsFloatArray(
+            0,
+            0,
+            1,
+            1,
+            VulkanicAPI.GL_RGBA,
+            VulkanicAPI.GL_FLOAT,
+            new float[4]
+        ));
     }
 
     @Test
@@ -203,6 +241,59 @@ public class VulkanFullContractCoverageTest {
         assertEquals(8.0f, floats[0]);
         assertEquals(0, ints[1]);
         assertEquals(0.0f, floats[1]);
+    }
+
+    private void assertTransferSucceeds(VulkanicGalExecutionRequest.TransferOperation operation) {
+        VulkanicGalExecutionRequest.ExecutionResult result = executeTransfer(operation.kind().name(), operation);
+        assertTrue(result.successful(), result.detail());
+    }
+
+    private VulkanicGalExecutionRequest.ExecutionResult executeTransfer(
+        String label,
+        VulkanicGalExecutionRequest.TransferOperation operation
+    ) {
+        VulkanicGalExecutionRequest.TransferRequest request = VulkanicGalExecutionRequest.TransferRequest.of(
+            label,
+            operation,
+            transferResourceKind(operation.kind()),
+            "test-transfer:" + label,
+            transferAccess(operation.kind()),
+            transferUsage(operation.kind())
+        );
+        VulkanicCompatibilityState state = new VulkanicCompatibilityState();
+        return vulkanBackend.executeTransfer(
+            stubCtx,
+            request.withTransferSnapshot(state.compatibilitySnapshotFor(request))
+        );
+    }
+
+    private static VulkanicPassResourceModel.ResourceKind transferResourceKind(
+        VulkanicGalExecutionRequest.TransferKind kind
+    ) {
+        return switch (kind) {
+            case READ_PIXELS, READ_PIXELS_FLOAT_ARRAY -> VulkanicPassResourceModel.ResourceKind.READBACK_SOURCE;
+            case COPY_BUFFER_SUB_DATA, COPY_NAMED_BUFFER_SUB_DATA, COPY_IMAGE_SUB_DATA, BLIT_FRAMEBUFFER, BLIT_NAMED_FRAMEBUFFER ->
+                VulkanicPassResourceModel.ResourceKind.TRANSFER_SOURCE;
+            default -> VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION;
+        };
+    }
+
+    private static VulkanicPassResourceModel.Access transferAccess(VulkanicGalExecutionRequest.TransferKind kind) {
+        return switch (kind) {
+            case READ_PIXELS, READ_PIXELS_FLOAT_ARRAY -> VulkanicPassResourceModel.Access.READ;
+            case COPY_BUFFER_SUB_DATA, COPY_NAMED_BUFFER_SUB_DATA, COPY_IMAGE_SUB_DATA, BLIT_FRAMEBUFFER, BLIT_NAMED_FRAMEBUFFER ->
+                VulkanicPassResourceModel.Access.READ_WRITE;
+            default -> VulkanicPassResourceModel.Access.WRITE;
+        };
+    }
+
+    private static VulkanicResourceUsage transferUsage(VulkanicGalExecutionRequest.TransferKind kind) {
+        return switch (kind) {
+            case READ_PIXELS, READ_PIXELS_FLOAT_ARRAY -> VulkanicResourceUsage.TRANSFER_SRC;
+            case COPY_BUFFER_SUB_DATA, COPY_NAMED_BUFFER_SUB_DATA, COPY_IMAGE_SUB_DATA, BLIT_FRAMEBUFFER, BLIT_NAMED_FRAMEBUFFER ->
+                VulkanicResourceUsage.TRANSFER_SRC;
+            default -> VulkanicResourceUsage.TRANSFER_DST;
+        };
     }
 
     private static CommandContext makeStubVulkanContext() throws Exception {

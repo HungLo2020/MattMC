@@ -1291,7 +1291,7 @@ public class Phase3DrawPathTest {
                 && backendSource.contains("VulkanDrawExecutionCoordinator.DrawResourceSnapshot drawResources")
                 && backendSource.contains("@Nullable PipelineResourcePlanner.Plan resourceBindingPlan")
                 && backendSource.contains("VulkanicGalExecutionRequest.GraphicsDrawRequest capturedGalRequest")
-                && backendSource.contains("unresolved-legacy-compatibility")
+                && backendSource.contains("capturedGalRequest.compatibilitySnapshot().sharedCompatibilityState().isEmpty()")
                 && !backendSource.contains("legacyDrawResourceSnapshot()")
                 && backendSource.contains("plan.vertexStream()")
                 && backendSource.contains("for (VulkanDrawExecutionCoordinator.VertexBufferBindingPlan binding : vertexStream.vertexBuffers())")

@@ -10,6 +10,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -24,92 +26,92 @@ public class VulkanTextureUploadLifecycleTest {
     public void testUploadTexture2DRejectsNonVulkanContextBeforeNativeReadinessChecks() {
         VulkanBackend backend = new VulkanBackend();
 
-        IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class,
-            () -> backend.uploadTexture2D(
-                OpenGLCommandContext.IMMEDIATE,
-                VulkanicAPI.GL_TEXTURE_2D,
-                0,
-                VulkanicAPI.GL_RGBA8,
-                4,
-                4,
-                0,
-                VulkanicAPI.GL_RGBA,
-                VulkanicAPI.GL_UNSIGNED_BYTE,
-                ByteBuffer.allocateDirect(4 * 4 * 4)
-            )
+        VulkanicGalExecutionRequest.ExecutionResult result = backend.executeTransfer(
+            OpenGLCommandContext.IMMEDIATE,
+            capturedTransfer("uploadTexture2D",
+                new VulkanicGalExecutionRequest.UploadTexture2D(
+                    VulkanicAPI.GL_TEXTURE_2D,
+                    0,
+                    VulkanicAPI.GL_RGBA8,
+                    4,
+                    4,
+                    0,
+                    VulkanicAPI.GL_RGBA,
+                    VulkanicAPI.GL_UNSIGNED_BYTE,
+                    ByteBuffer.allocateDirect(4 * 4 * 4)
+                ))
         );
 
-        assertTrue(exception.getMessage().contains("uploadTexture2D requires VulkanCommandContext"));
+        assertFailureContains(result, "uploadTexture2D requires VulkanCommandContext");
     }
 
     @Test
     public void testUploadTexture2DRejectsUnsupportedTargetBeforeNativeReadinessChecks() {
         VulkanBackend backend = new VulkanBackend();
 
-        IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class,
-            () -> backend.uploadTexture2D(
-                new VulkanCommandContext(1L, "upload-cmd"),
-                VulkanicAPI.GL_TEXTURE_BUFFER,
-                0,
-                VulkanicAPI.GL_RGBA8,
-                4,
-                4,
-                0,
-                VulkanicAPI.GL_RGBA,
-                VulkanicAPI.GL_UNSIGNED_BYTE,
-                ByteBuffer.allocateDirect(4 * 4 * 4)
-            )
+        VulkanicGalExecutionRequest.ExecutionResult result = backend.executeTransfer(
+            new VulkanCommandContext(1L, "upload-cmd"),
+            capturedTransfer("uploadTexture2D",
+                new VulkanicGalExecutionRequest.UploadTexture2D(
+                    VulkanicAPI.GL_TEXTURE_BUFFER,
+                    0,
+                    VulkanicAPI.GL_RGBA8,
+                    4,
+                    4,
+                    0,
+                    VulkanicAPI.GL_RGBA,
+                    VulkanicAPI.GL_UNSIGNED_BYTE,
+                    ByteBuffer.allocateDirect(4 * 4 * 4)
+                ))
         );
 
-        assertTrue(exception.getMessage().contains("supports only GL_TEXTURE_2D/GL_PROXY_TEXTURE_2D"));
+        assertFailureContains(result, "supports only GL_TEXTURE_2D/GL_PROXY_TEXTURE_2D");
     }
 
     @Test
     public void testUploadTexture2DRejectsNonZeroBorderBeforeNativeReadinessChecks() {
         VulkanBackend backend = new VulkanBackend();
 
-        IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class,
-            () -> backend.uploadTexture2D(
-                new VulkanCommandContext(1L, "upload-cmd"),
-                VulkanicAPI.GL_TEXTURE_2D,
-                0,
-                VulkanicAPI.GL_RGBA8,
-                4,
-                4,
-                1,
-                VulkanicAPI.GL_RGBA,
-                VulkanicAPI.GL_UNSIGNED_BYTE,
-                ByteBuffer.allocateDirect(4 * 4 * 4)
-            )
+        VulkanicGalExecutionRequest.ExecutionResult result = backend.executeTransfer(
+            new VulkanCommandContext(1L, "upload-cmd"),
+            capturedTransfer("uploadTexture2D",
+                new VulkanicGalExecutionRequest.UploadTexture2D(
+                    VulkanicAPI.GL_TEXTURE_2D,
+                    0,
+                    VulkanicAPI.GL_RGBA8,
+                    4,
+                    4,
+                    1,
+                    VulkanicAPI.GL_RGBA,
+                    VulkanicAPI.GL_UNSIGNED_BYTE,
+                    ByteBuffer.allocateDirect(4 * 4 * 4)
+                ))
         );
 
-        assertTrue(exception.getMessage().contains("border == 0"));
+        assertFailureContains(result, "border == 0");
     }
 
     @Test
     public void testUploadTexture2DSubImageRejectsNullPointerBeforeNativeReadinessChecks() {
         VulkanBackend backend = new VulkanBackend();
 
-        IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class,
-            () -> backend.uploadTexture2DSubImage(
-                new VulkanCommandContext(1L, "upload-cmd"),
-                VulkanicAPI.GL_TEXTURE_2D,
-                0,
-                0,
-                0,
-                4,
-                4,
-                VulkanicAPI.GL_RGBA,
-                VulkanicAPI.GL_UNSIGNED_BYTE,
-                0L
-            )
+        VulkanicGalExecutionRequest.ExecutionResult result = backend.executeTransfer(
+            new VulkanCommandContext(1L, "upload-cmd"),
+            capturedTransfer("uploadTexture2DSubImage",
+                new VulkanicGalExecutionRequest.UploadTexture2DSubImagePointer(
+                    VulkanicAPI.GL_TEXTURE_2D,
+                    0,
+                    0,
+                    0,
+                    4,
+                    4,
+                    VulkanicAPI.GL_RGBA,
+                    VulkanicAPI.GL_UNSIGNED_BYTE,
+                    0L
+                ))
         );
 
-        assertTrue(exception.getMessage().contains("pixels pointer must not be null"));
+        assertFailureContains(result, "pixels pointer must not be null");
     }
 
     @Test
@@ -181,10 +183,10 @@ public class VulkanTextureUploadLifecycleTest {
         String source = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
 
-        assertTrue(source.contains("public void uploadTexture2D("),
-            "Vulkan backend should expose uploadTexture2D entrypoint");
-        assertTrue(source.contains("public void uploadTexture2DSubImage("),
-            "Vulkan backend should expose uploadTexture2DSubImage entrypoints");
+        assertTrue(source.contains("private void uploadTexture2D("),
+            "Vulkan backend should keep uploadTexture2D as a private native lowering helper behind executeTransfer");
+        assertTrue(source.contains("private void uploadTexture2DSubImage("),
+            "Vulkan backend should keep uploadTexture2DSubImage as private native lowering helpers behind executeTransfer");
         assertTrue(source.contains("vkCmdCopyBufferToImage"),
             "Vulkan texture upload path should record vkCmdCopyBufferToImage");
         assertTrue(source.contains("uploadLegacyTexture2D("),
@@ -227,5 +229,31 @@ public class VulkanTextureUploadLifecycleTest {
             count++;
             from = index + needle.length();
         }
+    }
+
+    private static VulkanicGalExecutionRequest.TransferRequest capturedTransfer(
+        String label,
+        VulkanicGalExecutionRequest.TransferOperation operation
+    ) {
+        VulkanicGalExecutionRequest.TransferRequest request = VulkanicGalExecutionRequest.TransferRequest.of(
+            label,
+            operation,
+            VulkanicPassResourceModel.ResourceKind.TRANSFER_DESTINATION,
+            "test-transfer:" + label,
+            VulkanicPassResourceModel.Access.WRITE,
+            VulkanicResourceUsage.TRANSFER_DST
+        );
+        VulkanicCompatibilityState state = new VulkanicCompatibilityState();
+        return request.withTransferSnapshot(state.compatibilitySnapshotFor(request));
+    }
+
+    private static void assertFailureContains(
+        VulkanicGalExecutionRequest.ExecutionResult result,
+        String expectedDetail
+    ) {
+        assertFalse(result.successful());
+        assertEquals(VulkanicGalExecutionRequest.ExecutionStatus.BACKEND_FAILURE, result.status());
+        assertTrue(result.detail().contains(expectedDetail),
+            "expected failure detail to contain '" + expectedDetail + "' but was: " + result.detail());
     }
 }

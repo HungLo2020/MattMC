@@ -120,12 +120,12 @@ public class ApiNeutralityCallsiteTest {
             "texture handle resolution should bypass Vulkan proxy reflection");
         assertTrue(source.contains("directVulkanBackend.resolveBufferHandle(ctx, buffer)"),
             "buffer handle resolution should bypass Vulkan proxy reflection");
-        assertTrue(source.contains("TransferKind.UPLOAD_TEXTURE_2D_SUB_IMAGE_BUFFER")
-                && source.contains("TransferKind.UPLOAD_TEXTURE_2D_SUB_IMAGE_POINTER"),
+        assertTrue(source.contains("new VulkanicGalExecutionRequest.UploadTexture2DSubImageBuffer(")
+                && source.contains("new VulkanicGalExecutionRequest.UploadTexture2DSubImagePointer("),
             "texture sub-image uploads should route through explicit GAL transfer requests");
         assertTrue(source.contains("directVulkanBackend.setUniform1f(ctx, location.value(), value);"),
             "typed uniform wrappers should call Vulkan's concrete integer-location implementation directly");
-        assertTrue(source.contains("executeGalGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyIndexed(")
+        assertTrue(source.contains("executeGalGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.indexed(")
                 && source.contains("\"drawIndexedBaseVertex\""),
             "indexed base-vertex draws should route through the immutable graphics GAL request boundary");
         assertTrue(source.contains("executeGalRenderPassBegin(")
@@ -1084,12 +1084,15 @@ public class ApiNeutralityCallsiteTest {
     }
 
     @Test
-    public void testGraphicsBackendExposesTypedSeamsForClearLogicAndUniformLocations() throws IOException {
+    public void testGraphicsBackendExposesTypedSeamsForLogicResourcesAndExecutorOwnedClears() throws IOException {
         String relative = "net/vulkanic/GraphicsBackend.java";
         String source = readSource(SRC_MAIN_JAVA.resolve(relative));
+        String executorSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicGalExecutor.java"));
 
-        assertTrue(source.contains("default void clearBuffers(CommandContext ctx, VulkanicClearBuffer... buffers)"),
-            "GraphicsBackend should expose typed clear-buffer overloads at the backend boundary: " + relative);
+        assertFalse(source.contains("void clearBuffers(CommandContext ctx, int mask)"),
+            "GraphicsBackend should not expose raw clear execution at the backend boundary: " + relative);
+        assertTrue(executorSource.contains("executeClear("),
+            "VulkanicGalExecutor should own typed clear execution at the backend boundary");
         assertTrue(source.contains("default void setLogicOp(CommandContext ctx, VulkanicLogicOp opcode)"),
             "GraphicsBackend should expose typed logic-op overloads at the backend boundary: " + relative);
         assertTrue(source.contains("default VulkanicUniformLocation resolveUniformLocation("),
@@ -1104,9 +1107,10 @@ public class ApiNeutralityCallsiteTest {
             "GraphicsBackend should expose typed uniform-buffer range binding overloads at the backend boundary: " + relative);
         assertTrue(source.contains("default void texBuffer(CommandContext ctx, VulkanicTextureTarget target"),
             "GraphicsBackend should expose typed tex-buffer target overloads at the backend boundary: " + relative);
-        assertTrue(source.contains("default void uploadTexture2D(")
-                && source.contains("VulkanicTextureUploadFormat uploadFormat"),
-            "GraphicsBackend should expose typed texture-upload format overloads at the backend boundary: " + relative);
+        assertFalse(source.contains("void uploadTexture2D(CommandContext ctx, int target"),
+            "GraphicsBackend should not expose raw texture upload execution at the backend boundary: " + relative);
+        assertTrue(executorSource.contains("executeTransfer("),
+            "VulkanicGalExecutor should own typed upload/transfer execution at the backend boundary");
     }
 
     @Test

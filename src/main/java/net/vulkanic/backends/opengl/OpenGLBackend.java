@@ -343,8 +343,7 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glViewport(x, y, width, height);
     }
     
-    @Override
-    public void clearBuffers(CommandContext ctx, int mask) {
+    private void clearBuffers(CommandContext ctx, int mask) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
@@ -352,50 +351,55 @@ public class OpenGLBackend implements GraphicsBackend {
     }
 
     @Override
-    public void executeClear(CommandContext ctx, VulkanicGalExecutionRequest.ClearRequest request) {
-        consumeResourceUsagePlan(request.resourcePlan());
-        clearBuffers(ctx, VulkanicClearBuffer.toLegacyGlMask(request.buffers().toArray(VulkanicClearBuffer[]::new)));
+    public VulkanicGalExecutionRequest.ExecutionResult executeClear(CommandContext ctx, VulkanicGalExecutionRequest.ClearRequest request) {
+        try {
+            consumeResourceUsagePlan(request.resourcePlan());
+            clearBuffers(ctx, VulkanicClearBuffer.toLegacyGlMask(request.buffers().toArray(VulkanicClearBuffer[]::new)));
+            return VulkanicGalExecutionRequest.success(request.semanticIdentity());
+        } catch (RuntimeException exception) {
+            return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), exception.getMessage());
+        }
     }
 
     @Override
-    public void executeTransfer(CommandContext ctx, VulkanicGalExecutionRequest.TransferRequest request) {
-        java.util.Objects.requireNonNull(request, "request");
-        consumeResourceUsagePlan(request.resourcePlan());
-        int[] i = request.intArgs();
-        long[] l = request.longArgs();
-        switch (request.kind()) {
-            case COPY_BUFFER_SUB_DATA -> copyBufferSubData(ctx, i[0], i[1], l[0], l[1], l[2]);
-            case COPY_NAMED_BUFFER_SUB_DATA -> copyNamedBufferSubDataDSA(ctx, i[0], i[1], l[0], l[1], l[2]);
-            case COPY_IMAGE_SUB_DATA -> copyImageSubData(
-                ctx,
-                i[0], i[1], i[2], i[3], i[4], i[5],
-                i[6], i[7], i[8], i[9], i[10], i[11],
-                i[12], i[13], i[14]
-            );
-            case COPY_TEXTURE_SUB_IMAGE_2D -> copyTextureSubImage2D(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7]);
-            case COPY_TEX_IMAGE_2D -> copyTexImage2D(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7]);
-            case COPY_TEX_SUB_IMAGE_2D -> copyTexSubImage2D(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7]);
-            case BLIT_FRAMEBUFFER -> blitFramebuffer(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], i[9]);
-            case BLIT_NAMED_FRAMEBUFFER -> blitNamedFramebuffer(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], i[9], i[10], i[11]);
-            case READ_PIXELS -> readPixels(ctx, i[0], i[1], i[2], i[3], i[4], i[5], l[0]);
-            case READ_PIXELS_FLOAT_ARRAY -> readPixels(ctx, i[0], i[1], i[2], i[3], i[4], i[5], request.floatArrayOutput());
-            case BUFFER_SUB_DATA -> bufferSubData(ctx, i[0], l[0], request.bytePayload());
-            case NAMED_BUFFER_SUB_DATA -> namedBufferSubDataDSA(ctx, i[0], l[0], request.bytePayload());
-            case UPLOAD_TEXTURE_1D -> uploadTexture1D(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], request.bytePayload());
-            case UPLOAD_TEXTURE_2D -> uploadTexture2D(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], request.bytePayload());
-            case UPLOAD_TEXTURE_2D_SUB_IMAGE_POINTER -> uploadTexture2DSubImage(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], l[0]);
-            case UPLOAD_TEXTURE_2D_SUB_IMAGE_BUFFER -> uploadTexture2DSubImage(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], request.bytePayload());
-            case UPLOAD_TEXTURE_3D -> uploadTexture3D(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], request.bytePayload());
-            case CLEAR_TEX_IMAGE_INT -> clearTexImage(ctx, i[0], i[1], i[2], i[3], request.intPayload());
-            case CLEAR_BUFFER_SUB_DATA_INT -> clearBufferSubData(ctx, i[0], i[1], l[0], l[1], i[2], i[3], request.intPayload());
-            case CLEAR_BUFFER_FLOAT -> clearBufferfv(ctx, i[0], i[1], request.floatPayload());
-            case CLEAR_BUFFER_INT -> clearBufferiv(ctx, i[0], i[1], request.intPayload());
-            case CLEAR_BUFFER_UINT -> clearBufferuiv(ctx, i[0], i[1], request.intPayload());
-            case CLEAR_NAMED_FRAMEBUFFER_FLOAT -> clearNamedFramebufferfv(ctx, i[0], i[1], i[2], request.floatPayload());
-            case CLEAR_NAMED_FRAMEBUFFER_INT -> clearNamedFramebufferiv(ctx, i[0], i[1], i[2], request.intPayload());
-            case CLEAR_NAMED_FRAMEBUFFER_UINT -> clearNamedFramebufferuiv(ctx, i[0], i[1], i[2], request.intPayload());
-            case GENERATE_MIPMAP -> generateMipmap(ctx, i[0]);
-            case GENERATE_TEXTURE_MIPMAP -> generateTextureMipmapDSA(ctx, i[0]);
+    public VulkanicGalExecutionRequest.ExecutionResult executeTransfer(CommandContext ctx, VulkanicGalExecutionRequest.TransferRequest request) {
+        try {
+            java.util.Objects.requireNonNull(request, "request");
+            consumeResourceUsagePlan(request.resourcePlan());
+            VulkanicGalExecutionRequest.TransferCompatibilitySnapshot transfer = request.requireTransferSnapshot();
+            VulkanicGalExecutionRequest.TransferOperation op = request.operation();
+            switch (op) {
+                case VulkanicGalExecutionRequest.CopyBufferSubData o -> copyBufferSubData(ctx, transfer.sourceLegacyTargetOr(0, o.readTarget()), transfer.destinationLegacyTargetOr(0, o.writeTarget()), o.readOffset(), o.writeOffset(), o.size());
+                case VulkanicGalExecutionRequest.CopyNamedBufferSubData o -> copyNamedBufferSubDataDSA(ctx, transfer.sourceLegacyIdOr(0, o.readBuffer()), transfer.destinationLegacyIdOr(0, o.writeBuffer()), o.readOffset(), o.writeOffset(), o.size());
+                case VulkanicGalExecutionRequest.CopyImageSubData o -> copyImageSubData(ctx, transfer.sourceLegacyIdOr(0, o.srcName()), transfer.sourceLegacyTargetOr(0, o.srcTarget()), o.srcLevel(), o.srcX(), o.srcY(), o.srcZ(), transfer.destinationLegacyIdOr(0, o.dstName()), transfer.destinationLegacyTargetOr(0, o.dstTarget()), o.dstLevel(), o.dstX(), o.dstY(), o.dstZ(), o.width(), o.height(), o.depth());
+                case VulkanicGalExecutionRequest.CopyTextureSubImage2D o -> copyTextureSubImage2D(ctx, transfer.destinationLegacyIdOr(0, o.texture()), o.level(), o.xOffset(), o.yOffset(), o.x(), o.y(), o.width(), o.height());
+                case VulkanicGalExecutionRequest.CopyTexImage2D o -> copyTexImage2D(ctx, transfer.destinationLegacyTargetOr(0, o.target()), o.level(), o.internalFormat(), o.x(), o.y(), o.width(), o.height(), o.border());
+                case VulkanicGalExecutionRequest.CopyTexSubImage2D o -> copyTexSubImage2D(ctx, transfer.destinationLegacyTargetOr(0, o.target()), o.level(), o.xOffset(), o.yOffset(), o.x(), o.y(), o.width(), o.height());
+                case VulkanicGalExecutionRequest.BlitFramebuffer o -> blitFramebuffer(ctx, o.srcX0(), o.srcY0(), o.srcX1(), o.srcY1(), o.dstX0(), o.dstY0(), o.dstX1(), o.dstY1(), o.mask(), o.filter());
+                case VulkanicGalExecutionRequest.BlitNamedFramebuffer o -> blitNamedFramebuffer(ctx, transfer.sourceLegacyIdOr(0, o.readFramebuffer()), transfer.destinationLegacyIdOr(0, o.drawFramebuffer()), o.srcX0(), o.srcY0(), o.srcX1(), o.srcY1(), o.dstX0(), o.dstY0(), o.dstX1(), o.dstY1(), o.mask(), o.filter());
+                case VulkanicGalExecutionRequest.ReadPixelsPointer o -> readPixels(ctx, o.x(), o.y(), o.width(), o.height(), o.format(), o.type(), o.pixels());
+                case VulkanicGalExecutionRequest.ReadPixelsFloatArray o -> readPixels(ctx, o.x(), o.y(), o.width(), o.height(), o.format(), o.type(), o.pixels());
+                case VulkanicGalExecutionRequest.BufferSubData o -> bufferSubData(ctx, transfer.destinationLegacyTargetOr(0, o.target()), o.offset(), o.payload());
+                case VulkanicGalExecutionRequest.NamedBufferSubData o -> namedBufferSubDataDSA(ctx, transfer.destinationLegacyIdOr(0, o.buffer()), o.offset(), o.payload());
+                case VulkanicGalExecutionRequest.UploadTexture1D o -> uploadTexture1D(ctx, transfer.destinationLegacyTargetOr(0, o.target()), o.level(), o.internalFormat(), o.width(), o.border(), o.format(), o.type(), o.payload());
+                case VulkanicGalExecutionRequest.UploadTexture2D o -> uploadTexture2D(ctx, transfer.destinationLegacyTargetOr(0, o.target()), o.level(), o.internalFormat(), o.width(), o.height(), o.border(), o.format(), o.type(), o.payload());
+                case VulkanicGalExecutionRequest.UploadTexture2DSubImagePointer o -> uploadTexture2DSubImage(ctx, transfer.destinationLegacyTargetOr(0, o.target()), o.level(), o.xOffset(), o.yOffset(), o.width(), o.height(), o.format(), o.type(), o.pixels());
+                case VulkanicGalExecutionRequest.UploadTexture2DSubImageBuffer o -> uploadTexture2DSubImage(ctx, transfer.destinationLegacyTargetOr(0, o.target()), o.level(), o.xOffset(), o.yOffset(), o.width(), o.height(), o.format(), o.type(), o.payload());
+                case VulkanicGalExecutionRequest.UploadTexture3D o -> uploadTexture3D(ctx, transfer.destinationLegacyTargetOr(0, o.target()), o.level(), o.internalFormat(), o.width(), o.height(), o.depth(), o.border(), o.format(), o.type(), o.payload());
+                case VulkanicGalExecutionRequest.ClearTexImageInt o -> clearTexImage(ctx, transfer.destinationLegacyIdOr(0, o.texture()), o.level(), o.format(), o.type(), o.data());
+                case VulkanicGalExecutionRequest.ClearBufferSubDataInt o -> clearBufferSubData(ctx, transfer.destinationLegacyTargetOr(0, o.target()), o.internalFormat(), o.offset(), o.size(), o.format(), o.type(), o.data());
+                case VulkanicGalExecutionRequest.ClearBufferFloat o -> clearBufferfv(ctx, o.buffer(), o.drawBuffer(), o.values());
+                case VulkanicGalExecutionRequest.ClearBufferInt o -> clearBufferiv(ctx, o.buffer(), o.drawBuffer(), o.values());
+                case VulkanicGalExecutionRequest.ClearBufferUint o -> clearBufferuiv(ctx, o.buffer(), o.drawBuffer(), o.values());
+                case VulkanicGalExecutionRequest.ClearNamedFramebufferFloat o -> clearNamedFramebufferfv(ctx, transfer.destinationLegacyIdOr(0, o.framebuffer()), o.buffer(), o.drawBuffer(), o.values());
+                case VulkanicGalExecutionRequest.ClearNamedFramebufferInt o -> clearNamedFramebufferiv(ctx, transfer.destinationLegacyIdOr(0, o.framebuffer()), o.buffer(), o.drawBuffer(), o.values());
+                case VulkanicGalExecutionRequest.ClearNamedFramebufferUint o -> clearNamedFramebufferuiv(ctx, transfer.destinationLegacyIdOr(0, o.framebuffer()), o.buffer(), o.drawBuffer(), o.values());
+                case VulkanicGalExecutionRequest.GenerateMipmap o -> generateMipmap(ctx, transfer.destinationLegacyTargetOr(0, o.target()));
+                case VulkanicGalExecutionRequest.GenerateTextureMipmap o -> generateTextureMipmapDSA(ctx, transfer.destinationLegacyIdOr(0, o.texture()));
+            }
+            return VulkanicGalExecutionRequest.success(request.semanticIdentity());
+        } catch (RuntimeException exception) {
+            return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), exception.getMessage());
         }
     }
     
@@ -528,8 +532,7 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glColorMask(r, g, b, a);
     }
     
-    @Override
-    public void generateTextureMipmap(CommandContext ctx, int target) {
+    private void generateTextureMipmap(CommandContext ctx, int target) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
@@ -600,8 +603,7 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glTexParameteri(target, pname, param);
     }
     
-    @Override
-    public void copyTexSubImage2D(CommandContext ctx, int target, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
+    private void copyTexSubImage2D(CommandContext ctx, int target, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
@@ -711,8 +713,7 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.GL45.glFlushMappedNamedBufferRange(buffer, offset, length);
     }
     
-    @Override
-    public void copyNamedBufferSubDataDSA(CommandContext ctx, int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
+    private void copyNamedBufferSubDataDSA(CommandContext ctx, int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
@@ -727,8 +728,7 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.GL45.glNamedFramebufferTexture(framebuffer, attachment, texture, level);
     }
     
-    @Override
-    public void blitNamedFramebufferDSA(CommandContext ctx, int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1,
+    private void blitNamedFramebufferDSA(CommandContext ctx, int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1,
                                         int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
@@ -753,8 +753,7 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glDeleteTextures(texture);
     }
     
-    @Override
-    public void drawArrays(CommandContext ctx, int mode, int first, int count) {
+    private void drawArrays(CommandContext ctx, int mode, int first, int count) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
@@ -762,8 +761,7 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glDrawArrays(mode, first, count);
     }
     
-    @Override
-    public void drawElements(CommandContext ctx, int mode, int count, int type, long indices) {
+    private void drawElements(CommandContext ctx, int mode, int count, int type, long indices) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
@@ -772,62 +770,59 @@ public class OpenGLBackend implements GraphicsBackend {
     }
 
     @Override
-    public VulkanicGalExecutionRequest.GraphicsDrawRequest captureGraphicsRequest(
-        CommandContext ctx,
-        VulkanicGalExecutionRequest.GraphicsDrawRequest request
-    ) {
-        return java.util.Objects.requireNonNull(request, "request");
-    }
-
-    @Override
-    public void executeGraphicsDraw(CommandContext ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest request) {
-        if (!ctx.isImmediate()) {
-            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
-        }
-        consumeResourceUsagePlan(request.resourcePlan());
-        applyGraphicsRequestState(ctx, request);
-        VulkanicGalExecutionRequest.GraphicsDrawCommand command = request.command();
-        switch (command.kind()) {
-            case ARRAYS -> {
-                VulkanicAPI.traceShaderInputParityDraw(
-                    "opengl-" + request.legacyMetadata().operation(),
-                    false,
-                    command.mode().toGlModeConstant(),
-                    command.firstVertex(),
-                    command.vertexCount(),
-                    0L,
-                    0,
-                    0,
-                    command.instanceCount(),
-                    0
-                );
-                if (command.instanceCount() == 1) {
-                    GL11.glDrawArrays(command.mode().toGlModeConstant(), command.firstVertex(), command.vertexCount());
-                } else {
-                    GL31.glDrawArraysInstanced(
+    public VulkanicGalExecutionRequest.ExecutionResult executeGraphicsDraw(CommandContext ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest request) {
+        try {
+            if (!ctx.isImmediate()) {
+                throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+            }
+            consumeResourceUsagePlan(request.resourcePlan());
+            applyGraphicsRequestState(ctx, request);
+            VulkanicGalExecutionRequest.GraphicsDrawCommand command = request.command();
+            switch (command.kind()) {
+                case ARRAYS -> {
+                    VulkanicAPI.traceShaderInputParityDraw(
+                        "opengl-" + request.semanticIdentity().phase(),
+                        false,
                         command.mode().toGlModeConstant(),
                         command.firstVertex(),
                         command.vertexCount(),
-                        command.instanceCount()
+                        0L,
+                        0,
+                        0,
+                        command.instanceCount(),
+                        0
                     );
+                    if (command.instanceCount() == 1) {
+                        GL11.glDrawArrays(command.mode().toGlModeConstant(), command.firstVertex(), command.vertexCount());
+                    } else {
+                        GL31.glDrawArraysInstanced(
+                            command.mode().toGlModeConstant(),
+                            command.firstVertex(),
+                            command.vertexCount(),
+                            command.instanceCount()
+                        );
+                    }
+                }
+                case INDEXED -> drawIndexedRequest(request, command);
+                case MULTI_INDEXED_BASE_VERTEX -> {
+                    for (VulkanicGalExecutionRequest.IndexedDraw draw : command.indexedDraws()) {
+                        drawIndexedRequest(
+                            request,
+                            VulkanicGalExecutionRequest.GraphicsDrawCommand.indexed(
+                                command.mode(),
+                                draw.indexCount(),
+                                command.indexType(),
+                                (long) draw.firstIndex() * command.indexType().bytesPerIndex(),
+                                1,
+                                draw.baseVertex()
+                            )
+                        );
+                    }
                 }
             }
-            case INDEXED -> drawIndexedRequest(request, command);
-            case MULTI_INDEXED_BASE_VERTEX -> {
-                for (VulkanicGalExecutionRequest.IndexedDraw draw : command.indexedDraws()) {
-                    drawIndexedRequest(
-                        request,
-                        VulkanicGalExecutionRequest.GraphicsDrawCommand.indexed(
-                            command.mode(),
-                            draw.indexCount(),
-                            command.indexType(),
-                            (long) draw.firstIndex() * command.indexType().bytesPerIndex(),
-                            1,
-                            draw.baseVertex()
-                        )
-                    );
-                }
-            }
+            return VulkanicGalExecutionRequest.success(request.semanticIdentity());
+        } catch (RuntimeException exception) {
+            return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), exception.getMessage());
         }
     }
 
@@ -1121,7 +1116,7 @@ public class OpenGLBackend implements GraphicsBackend {
         VulkanicGalExecutionRequest.GraphicsDrawCommand command
     ) {
         VulkanicAPI.traceShaderInputParityDraw(
-            "opengl-" + request.legacyMetadata().operation(),
+            "opengl-" + request.semanticIdentity().phase(),
             true,
             command.mode().toGlModeConstant(),
             0,
@@ -1349,8 +1344,7 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     
-    @Override
-    public void uploadTexture2D(CommandContext ctx, int target, int level, int internalFormat, int width, int height, 
+    private void uploadTexture2D(CommandContext ctx, int target, int level, int internalFormat, int width, int height,
                                  int border, int format, int type, java.nio.ByteBuffer pixels) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
@@ -1358,8 +1352,7 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glTexImage2D(target, level, internalFormat, width, height, border, format, type, pixels);
     }
 
-    @Override
-    public void uploadTexture2D(
+    private void uploadTexture2D(
         CommandContext ctx,
         VulkanicTextureTarget target,
         int level,
@@ -1390,8 +1383,7 @@ public class OpenGLBackend implements GraphicsBackend {
         );
     }
     
-    @Override
-    public void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset, 
+    private void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset,
                                          int width, int height, int format, int type, long pixels) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
@@ -1399,8 +1391,7 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glTexSubImage2D(target, level, xOffset, yOffset, width, height, format, type, pixels);
     }
     
-    @Override
-    public void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset, 
+    private void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset,
                                          int width, int height, int format, int type, java.nio.ByteBuffer pixels) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
@@ -1487,8 +1478,7 @@ public class OpenGLBackend implements GraphicsBackend {
         GL44.glBufferStorage(target, data, flags);
     }
     
-    @Override
-    public void copyBufferSubData(CommandContext ctx, int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
+    private void copyBufferSubData(CommandContext ctx, int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
@@ -1548,8 +1538,7 @@ public class OpenGLBackend implements GraphicsBackend {
         GL30.glDeleteFramebuffers(fbo);
     }
     
-    @Override
-    public void blitFramebuffer(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1, 
+    private void blitFramebuffer(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1,
                                 int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
@@ -2200,8 +2189,7 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.GL11.glDrawBuffer(mode);
     }
     
-    @Override
-    public void drawIndexedInstancedBaseVertex(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount, int baseVertex) {
+    private void drawIndexedInstancedBaseVertex(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount, int baseVertex) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
@@ -2209,8 +2197,7 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.GL32.glDrawElementsInstancedBaseVertex(mode, count, type, indices, instanceCount, baseVertex);
     }
     
-    @Override
-    public void drawIndexedBaseVertex(CommandContext ctx, int mode, int count, int type, long indices, int baseVertex) {
+    private void drawIndexedBaseVertex(CommandContext ctx, int mode, int count, int type, long indices, int baseVertex) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
@@ -2218,8 +2205,7 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.GL32.glDrawElementsBaseVertex(mode, count, type, indices, baseVertex);
     }
     
-    @Override
-    public void drawIndexedInstanced(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount) {
+    private void drawIndexedInstanced(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
@@ -2227,8 +2213,7 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.GL31.glDrawElementsInstanced(mode, count, type, indices, instanceCount);
     }
     
-    @Override
-    public void drawArraysInstanced(CommandContext ctx, int mode, int first, int count, int instanceCount) {
+    private void drawArraysInstanced(CommandContext ctx, int mode, int first, int count, int instanceCount) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
@@ -2378,8 +2363,7 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.GL30C.glDeleteVertexArrays(vertexArray);
     }
     
-    @Override
-    public void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
+    private void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
         if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         for (int drawIndex = 0; drawIndex < drawCount; drawIndex++) {
             int count = org.lwjgl.system.MemoryUtil.memGetInt(pCount + ((long) drawIndex * Integer.BYTES));
@@ -2623,8 +2607,7 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     
-    @Override
-    public void uploadTexture1D(CommandContext ctx, int target, int level, int internalformat, int width, int border, int format, int type, java.nio.ByteBuffer pixels) {
+    private void uploadTexture1D(CommandContext ctx, int target, int level, int internalformat, int width, int border, int format, int type, java.nio.ByteBuffer pixels) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
@@ -2633,8 +2616,7 @@ public class OpenGLBackend implements GraphicsBackend {
     
     
     
-    @Override
-    public void uploadTexture3D(CommandContext ctx, int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, java.nio.ByteBuffer pixels) {
+    private void uploadTexture3D(CommandContext ctx, int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, java.nio.ByteBuffer pixels) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
@@ -2644,8 +2626,7 @@ public class OpenGLBackend implements GraphicsBackend {
     
     
     
-    @Override
-    public void copyTexImage2D(CommandContext ctx, int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
+    private void copyTexImage2D(CommandContext ctx, int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
@@ -2881,16 +2862,14 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     
-    @Override
-    public void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, float[] pixels) {
+    private void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, float[] pixels) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         org.lwjgl.opengl.GL32C.glReadPixels(x, y, width, height, format, type, pixels);
     }
     
-    @Override
-    public void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels) {
+    private void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
@@ -3065,8 +3044,7 @@ public class OpenGLBackend implements GraphicsBackend {
     
     
     
-    @Override
-    public void dispatchComputeIndirect(CommandContext ctx, long offset) {
+    private void dispatchComputeIndirect(CommandContext ctx, long offset) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
@@ -3092,9 +3070,8 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     
-    @Override
-    public void copyImageSubData(CommandContext ctx, int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ, 
-                                 int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ, 
+    private void copyImageSubData(CommandContext ctx, int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ,
+                                 int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ,
                                  int width, int height, int depth) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
@@ -3118,8 +3095,7 @@ public class OpenGLBackend implements GraphicsBackend {
     
     
     
-    @Override
-    public void generateMipmap(CommandContext ctx, int target) {
+    private void generateMipmap(CommandContext ctx, int target) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
@@ -3130,8 +3106,7 @@ public class OpenGLBackend implements GraphicsBackend {
     
     // DSA methods
     
-    @Override
-    public void generateTextureMipmapDSA(CommandContext ctx, int texture) {
+    private void generateTextureMipmapDSA(CommandContext ctx, int texture) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
@@ -3228,8 +3203,7 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     
-    @Override
-    public void copyTextureSubImage2D(CommandContext ctx, int texture, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
+    private void copyTextureSubImage2D(CommandContext ctx, int texture, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
@@ -3264,8 +3238,7 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     
-    @Override
-    public void blitNamedFramebuffer(CommandContext ctx, int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+    private void blitNamedFramebuffer(CommandContext ctx, int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
@@ -3599,8 +3572,7 @@ public class OpenGLBackend implements GraphicsBackend {
     // Additional texture methods
     
     
-    @Override
-    public void dispatchCompute(CommandContext ctx, int workX, int workY, int workZ) {
+    private void dispatchCompute(CommandContext ctx, int workX, int workY, int workZ) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
@@ -3608,13 +3580,18 @@ public class OpenGLBackend implements GraphicsBackend {
     }
 
     @Override
-    public void executeComputeDispatch(CommandContext ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest request) {
-        consumeResourceUsagePlan(request.resourcePlan());
-        VulkanicGalExecutionRequest.ComputeDispatchCommand command = request.command();
-        if (command.indirect()) {
-            dispatchComputeIndirect(ctx, command.indirectOffset());
-        } else {
-            dispatchCompute(ctx, command.workX(), command.workY(), command.workZ());
+    public VulkanicGalExecutionRequest.ExecutionResult executeComputeDispatch(CommandContext ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest request) {
+        try {
+            consumeResourceUsagePlan(request.resourcePlan());
+            VulkanicGalExecutionRequest.ComputeDispatchCommand command = request.command();
+            if (command.indirect()) {
+                dispatchComputeIndirect(ctx, command.indirectOffset());
+            } else {
+                dispatchCompute(ctx, command.workX(), command.workY(), command.workZ());
+            }
+            return VulkanicGalExecutionRequest.success(request.semanticIdentity());
+        } catch (RuntimeException exception) {
+            return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), exception.getMessage());
         }
     }
     

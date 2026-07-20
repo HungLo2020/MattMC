@@ -36,9 +36,10 @@ public final class VulkanicGalSnapshotBuilder {
         VulkanicGalExecutionRequest.GraphicsDrawRequest request
     ) {
         Objects.requireNonNull(compatibilityState, "compatibilityState");
-        return request.withCompatibilitySnapshot(
-            compatibilityState.compatibilitySnapshotFor(request)
-        );
+        VulkanicGalExecutionRequest.GraphicsCompatibilitySnapshot snapshot =
+            compatibilityState.compatibilitySnapshotFor(request);
+        compatibilityState.validateResourceGenerations(snapshot);
+        return request.withCompatibilitySnapshot(snapshot);
     }
 
     public static VulkanicGalExecutionRequest.ComputeDispatchRequest captureComputeDispatch(
@@ -48,7 +49,7 @@ public final class VulkanicGalSnapshotBuilder {
     ) {
         Objects.requireNonNull(executor, "executor");
         Objects.requireNonNull(request, "request");
-        return executor.captureComputeDispatchRequest(ctx, request);
+        return request;
     }
 
     public static VulkanicGalExecutionRequest.ComputeDispatchRequest captureComputeDispatch(
@@ -58,9 +59,10 @@ public final class VulkanicGalSnapshotBuilder {
         VulkanicGalExecutionRequest.ComputeDispatchRequest request
     ) {
         Objects.requireNonNull(compatibilityState, "compatibilityState");
-        VulkanicGalExecutionRequest.ComputeDispatchRequest sharedRequest = request.withCompatibilitySnapshot(
-            compatibilityState.compatibilitySnapshotFor(request)
-        );
+        VulkanicGalExecutionRequest.ComputeCompatibilitySnapshot snapshot =
+            compatibilityState.compatibilitySnapshotFor(request);
+        compatibilityState.validateResourceGenerations(snapshot);
+        VulkanicGalExecutionRequest.ComputeDispatchRequest sharedRequest = request.withCompatibilitySnapshot(snapshot);
         return captureComputeDispatch(ctx, executor, sharedRequest);
     }
 
@@ -71,7 +73,19 @@ public final class VulkanicGalSnapshotBuilder {
     ) {
         Objects.requireNonNull(executor, "executor");
         Objects.requireNonNull(request, "request");
-        return executor.captureClearRequest(ctx, request);
+        return request;
+    }
+
+    public static VulkanicGalExecutionRequest.ClearRequest captureClear(
+        CommandContext ctx,
+        VulkanicGalExecutor executor,
+        VulkanicCompatibilityState compatibilityState,
+        VulkanicGalExecutionRequest.ClearRequest request
+    ) {
+        Objects.requireNonNull(compatibilityState, "compatibilityState");
+        VulkanicGalExecutionRequest.ClearRequest sharedRequest =
+            request.withFramebufferSnapshot(compatibilityState.boundDrawFramebuffer());
+        return captureClear(ctx, executor, sharedRequest);
     }
 
     public static VulkanicGalExecutionRequest.TransferRequest captureTransfer(
@@ -81,7 +95,21 @@ public final class VulkanicGalSnapshotBuilder {
     ) {
         Objects.requireNonNull(executor, "executor");
         Objects.requireNonNull(request, "request");
-        return executor.captureTransferRequest(ctx, request);
+        return request;
+    }
+
+    public static VulkanicGalExecutionRequest.TransferRequest captureTransfer(
+        CommandContext ctx,
+        VulkanicGalExecutor executor,
+        VulkanicCompatibilityState compatibilityState,
+        VulkanicGalExecutionRequest.TransferRequest request
+    ) {
+        Objects.requireNonNull(compatibilityState, "compatibilityState");
+        VulkanicGalExecutionRequest.TransferCompatibilitySnapshot snapshot =
+            compatibilityState.compatibilitySnapshotFor(request);
+        compatibilityState.validateResourceGenerations(snapshot);
+        VulkanicGalExecutionRequest.TransferRequest sharedRequest = request.withTransferSnapshot(snapshot);
+        return captureTransfer(ctx, executor, sharedRequest);
     }
 
     public static VulkanicGalExecutionRequest.RenderPassBeginRequest captureRenderPassBegin(
@@ -91,7 +119,7 @@ public final class VulkanicGalSnapshotBuilder {
     ) {
         Objects.requireNonNull(executor, "executor");
         Objects.requireNonNull(request, "request");
-        return executor.captureRenderPassBeginRequest(ctx, request);
+        return request;
     }
 
     public static VulkanicGalExecutionRequest.RenderPassEndRequest captureRenderPassEnd(
@@ -101,7 +129,7 @@ public final class VulkanicGalSnapshotBuilder {
     ) {
         Objects.requireNonNull(executor, "executor");
         Objects.requireNonNull(request, "request");
-        return executor.captureRenderPassEndRequest(ctx, request);
+        return request;
     }
 
     public static VulkanicGalExecutionRequest.ComputePassBeginRequest captureComputePassBegin(
@@ -111,7 +139,7 @@ public final class VulkanicGalSnapshotBuilder {
     ) {
         Objects.requireNonNull(executor, "executor");
         Objects.requireNonNull(request, "request");
-        return executor.captureComputePassBeginRequest(ctx, request);
+        return request;
     }
 
     public static VulkanicGalExecutionRequest.ComputePassEndRequest captureComputePassEnd(
@@ -121,7 +149,7 @@ public final class VulkanicGalSnapshotBuilder {
     ) {
         Objects.requireNonNull(executor, "executor");
         Objects.requireNonNull(request, "request");
-        return executor.captureComputePassEndRequest(ctx, request);
+        return request;
     }
 
     public static VulkanicGalExecutionRequest.GraphicsCompatibilitySnapshot legacyGraphicsSnapshot(

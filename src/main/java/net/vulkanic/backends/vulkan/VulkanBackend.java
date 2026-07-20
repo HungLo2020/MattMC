@@ -2146,7 +2146,7 @@ void main() {
         spine.bufferStorageByTarget(target, data.duplicate(), flags);
     }
 
-    public void copyBufferSubData(CommandContext ctx, int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
+    private void copyBufferSubData(CommandContext ctx, int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
         ensureNativeReady("copyBufferSubData");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -2273,7 +2273,7 @@ void main() {
         spine.flushMappedNamedBufferRange(buffer, offset, length);
     }
 
-    public void copyNamedBufferSubDataDSA(CommandContext ctx, int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
+    private void copyNamedBufferSubDataDSA(CommandContext ctx, int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
         ensureNativeReady("copyNamedBufferSubDataDSA");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -2717,7 +2717,7 @@ void main() {
         return spine.getTextureLevelParameter(target, level, pname);
     }
 
-    public void uploadTexture2D(CommandContext ctx,
+    private void uploadTexture2D(CommandContext ctx,
                                 int target,
                                 int level,
                                 int internalFormat,
@@ -2765,7 +2765,7 @@ void main() {
             pixels == null ? null : pixels.duplicate());
     }
 
-    public void uploadTexture2D(
+    private void uploadTexture2D(
         CommandContext ctx,
         net.vulkanic.VulkanicTextureTarget target,
         int level,
@@ -2796,7 +2796,7 @@ void main() {
         );
     }
 
-    public void uploadTexture2DSubImage(CommandContext ctx,
+    private void uploadTexture2DSubImage(CommandContext ctx,
                                         int target,
                                         int level,
                                         int xOffset,
@@ -2834,7 +2834,7 @@ void main() {
             pixels);
     }
 
-    public void uploadTexture2DSubImage(CommandContext ctx,
+    private void uploadTexture2DSubImage(CommandContext ctx,
                                         int target,
                                         int level,
                                         int xOffset,
@@ -4064,8 +4064,8 @@ void main() {
         @Nullable PipelineResourcePlanner.Plan capturedResourceBindingPlan
     ) {
         Objects.requireNonNull(capturedGalRequest, "capturedGalRequest");
-        if (capturedGalRequest.compatibilitySnapshot().source().equals("unresolved-legacy-compatibility")) {
-            throw new IllegalStateException("Vulkan pipeline materialization received an unresolved legacy GAL request");
+        if (capturedGalRequest.compatibilitySnapshot().sharedCompatibilityState().isEmpty()) {
+            throw new IllegalStateException("Vulkan pipeline materialization received a GAL request without captured shared compatibility state");
         }
         List<VulkanicPassResourceModel.ResourceUse> capturedUses = capturedGalRequest.resourcePlan().orderedUses();
         boolean missingDrawUse = drawPlan.resourcePlan().orderedUses().stream()
@@ -4214,8 +4214,8 @@ void main() {
         VulkanicGalExecutionRequest.ComputeDispatchRequest capturedRequest,
         PipelineResourcePlanner.Plan requestOwnedResourcePlan
     ) {
-        if (capturedRequest.compatibilitySnapshot().source().equals("unresolved-legacy-compute-compatibility")) {
-            throw new IllegalStateException("Vulkan compute execution received an unresolved legacy GAL request");
+        if (capturedRequest.compatibilitySnapshot().sharedCompatibilityState().isEmpty()) {
+            throw new IllegalStateException("Vulkan compute execution received a GAL request without captured shared compatibility state");
         }
         PipelineResourcePlanner.Plan resourcePlan = Objects.requireNonNull(requestOwnedResourcePlan, "requestOwnedResourcePlan");
         if (!resourcePlan.completeCoverage()) {
@@ -6547,10 +6547,10 @@ void main() {
         );
     }
 
-    public void drawArrays(CommandContext ctx, int mode, int first, int count) {
+    private void drawArrays(CommandContext ctx, int mode, int first, int count) {
         VulkanicPrimitiveMode typedMode = VulkanicPrimitiveMode.fromLegacyGlConstant(mode)
             .orElseThrow(() -> new IllegalArgumentException("Unsupported drawArrays primitive mode constant: " + mode));
-        executeGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyArrays(
+        executeGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
             "vulkan-drawArrays",
             typedMode,
             first,
@@ -6559,13 +6559,13 @@ void main() {
         ));
     }
 
-    public void drawElements(CommandContext ctx, int mode, int count, int type, long indices) {
+    private void drawElements(CommandContext ctx, int mode, int count, int type, long indices) {
         VulkanicPrimitiveMode typedMode = VulkanicPrimitiveMode.fromLegacyGlConstant(mode)
             .orElseThrow(() -> new IllegalArgumentException("Unsupported drawElements primitive mode constant: " + mode));
         VulkanicIndexType indexType = VulkanicIndexType.fromLegacyGlConstant(type)
             .orElseThrow(() -> new IllegalArgumentException("Unsupported drawElements index type constant: " + type));
 
-        executeGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyIndexed(
+        executeGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.indexed(
             "vulkan-drawElements",
             typedMode,
             count,
@@ -6576,57 +6576,54 @@ void main() {
         ));
     }
 
-    public VulkanicGalExecutionRequest.GraphicsDrawRequest captureGraphicsRequest(
-        CommandContext ctx,
-        VulkanicGalExecutionRequest.GraphicsDrawRequest request
-    ) {
-        return Objects.requireNonNull(request, "request");
-    }
-
-    public void executeGraphicsDraw(CommandContext ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest request) {
-        Objects.requireNonNull(request, "request");
-        consumeResourceUsagePlan(request.resourcePlan());
-        VulkanicGalExecutionRequest.GraphicsDrawCommand command = request.command();
-        switch (command.kind()) {
-            case ARRAYS -> {
-                if (command.firstVertex() < 0 || command.vertexCount() < 0 || command.instanceCount() < 1) {
-                    throw new IllegalArgumentException("drawArrays requires first/count >= 0 and instanceCount >= 1, got first="
-                        + command.firstVertex() + ", count=" + command.vertexCount()
-                        + ", instanceCount=" + command.instanceCount());
+    public VulkanicGalExecutionRequest.ExecutionResult executeGraphicsDraw(CommandContext ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest request) {
+        try {
+            Objects.requireNonNull(request, "request");
+            consumeResourceUsagePlan(request.resourcePlan());
+            VulkanicGalExecutionRequest.GraphicsDrawCommand command = request.command();
+            switch (command.kind()) {
+                case ARRAYS -> {
+                    if (command.firstVertex() < 0 || command.vertexCount() < 0 || command.instanceCount() < 1) {
+                        throw new IllegalArgumentException("drawArrays requires first/count >= 0 and instanceCount >= 1, got first="
+                            + command.firstVertex() + ", count=" + command.vertexCount()
+                            + ", instanceCount=" + command.instanceCount());
+                    }
+                    if (command.vertexCount() > 0) {
+                        executeTypedGalDrawPlan(
+                            ctx,
+                            VulkanDrawExecutionCoordinator.SemanticDrawRequest.arrays(
+                                request.semanticIdentity().label(),
+                                command.mode().toGlModeConstant(),
+                                command.firstVertex(),
+                                command.vertexCount(),
+                                command.instanceCount()
+                            ),
+                            request
+                        );
+                    }
                 }
-                if (command.vertexCount() == 0) {
-                    return;
-                }
-                executeLegacyDraw(
-                    ctx,
-                    VulkanDrawExecutionCoordinator.SemanticDrawRequest.arrays(
-                        request.semanticIdentity().label(),
-                        command.mode().toGlModeConstant(),
-                        command.firstVertex(),
-                        command.vertexCount(),
-                        command.instanceCount()
-                    ),
-                    request
-                );
-            }
-            case INDEXED -> executeIndexedGalDraw(ctx, request.semanticIdentity().label(), command, request);
-            case MULTI_INDEXED_BASE_VERTEX -> {
-                for (VulkanicGalExecutionRequest.IndexedDraw draw : command.indexedDraws()) {
-                    executeIndexedGalDraw(
-                        ctx,
-                        request.semanticIdentity().label(),
-                        VulkanicGalExecutionRequest.GraphicsDrawCommand.indexed(
-                            command.mode(),
-                            draw.indexCount(),
-                            command.indexType(),
-                            (long) draw.firstIndex() * command.indexType().bytesPerIndex(),
-                            1,
-                            draw.baseVertex()
-                        ),
-                        request
-                    );
+                case INDEXED -> executeIndexedGalDraw(ctx, request.semanticIdentity().label(), command, request);
+                case MULTI_INDEXED_BASE_VERTEX -> {
+                    for (VulkanicGalExecutionRequest.IndexedDraw draw : command.indexedDraws()) {
+                        executeIndexedGalDraw(
+                            ctx,
+                            request.semanticIdentity().label(),
+                            VulkanicGalExecutionRequest.GraphicsDrawCommand.indexed(
+                                command.mode(),
+                                draw.indexCount(),
+                                command.indexType(),
+                                (long) draw.firstIndex() * command.indexType().bytesPerIndex(),
+                                1,
+                                draw.baseVertex()
+                            ),
+                            request
+                        );
+                    }
                 }
             }
+            return VulkanicGalExecutionRequest.success(request.semanticIdentity());
+        } catch (RuntimeException exception) {
+            return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), exception.getMessage());
         }
     }
 
@@ -6647,7 +6644,7 @@ void main() {
         if (command.indexCount() == 0) {
             return;
         }
-        executeLegacyDraw(
+        executeTypedGalDrawPlan(
             ctx,
             VulkanDrawExecutionCoordinator.SemanticDrawRequest.indexed(
                 semanticSource,
@@ -6792,7 +6789,7 @@ void main() {
         );
     }
 
-    public void drawIndexedInstancedBaseVertex(CommandContext ctx,
+    private void drawIndexedInstancedBaseVertex(CommandContext ctx,
                                                 int mode,
                                                 int count,
                                                 int type,
@@ -6806,7 +6803,7 @@ void main() {
             .orElseThrow(() -> new IllegalArgumentException(
                 "Unsupported drawIndexedInstancedBaseVertex index type constant: " + type));
 
-        executeGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyIndexed(
+        executeGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.indexed(
             "vulkan-drawIndexedInstancedBaseVertex",
             typedMode,
             count,
@@ -6817,7 +6814,7 @@ void main() {
         ));
     }
 
-    public void drawIndexedBaseVertex(CommandContext ctx,
+    private void drawIndexedBaseVertex(CommandContext ctx,
                                       int mode,
                                       int count,
                                       int type,
@@ -6826,7 +6823,7 @@ void main() {
         drawIndexedInstancedBaseVertex(ctx, mode, count, type, indices, 1, baseVertex);
     }
 
-    public void drawIndexedInstanced(CommandContext ctx,
+    private void drawIndexedInstanced(CommandContext ctx,
                                      int mode,
                                      int count,
                                      int type,
@@ -6835,10 +6832,10 @@ void main() {
         drawIndexedInstancedBaseVertex(ctx, mode, count, type, indices, instanceCount, 0);
     }
 
-    public void drawArraysInstanced(CommandContext ctx, int mode, int first, int count, int instanceCount) {
+    private void drawArraysInstanced(CommandContext ctx, int mode, int first, int count, int instanceCount) {
         VulkanicPrimitiveMode typedMode = VulkanicPrimitiveMode.fromLegacyGlConstant(mode)
             .orElseThrow(() -> new IllegalArgumentException("Unsupported drawArraysInstanced primitive mode constant: " + mode));
-        executeGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyArrays(
+        executeGraphicsDraw(ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
             "vulkan-drawArraysInstanced",
             typedMode,
             first,
@@ -6847,7 +6844,7 @@ void main() {
         ));
     }
 
-    private void executeLegacyDraw(
+    private void executeTypedGalDrawPlan(
         CommandContext ctx,
         VulkanDrawExecutionCoordinator.SemanticDrawRequest request,
         VulkanicGalExecutionRequest.GraphicsDrawRequest galRequest
@@ -6875,9 +6872,6 @@ void main() {
             throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
         }
 
-        if (galRequest.compatibilitySnapshot().source().equals("unresolved-legacy-compatibility")) {
-            throw new IllegalStateException("Vulkan draw execution received an unresolved legacy GAL request");
-        }
         VulkanicCompatibilityState.GraphicsSnapshot sharedSnapshot =
             galRequest.compatibilitySnapshot().sharedCompatibilityState()
                 .orElseThrow(() -> new IllegalStateException(
@@ -6935,14 +6929,19 @@ void main() {
         };
     }
 
-    public void executeRenderPassEnd(
+    public VulkanicGalExecutionRequest.ExecutionResult executeRenderPassEnd(
         CommandContext ctx,
         VulkanicGalExecutionRequest.RenderPassEndRequest request,
         net.vulkanic.VulkanicRenderPass pass
     ) {
-        Objects.requireNonNull(request, "request");
-        consumeResourceUsagePlan(request.resourcePlan());
-        Objects.requireNonNull(pass, "pass").close();
+        try {
+            Objects.requireNonNull(request, "request");
+            consumeResourceUsagePlan(request.resourcePlan());
+            Objects.requireNonNull(pass, "pass").close();
+            return VulkanicGalExecutionRequest.success(request.semanticIdentity());
+        } catch (RuntimeException exception) {
+            return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), exception.getMessage());
+        }
     }
 
     public net.vulkanic.VulkanicRenderPass beginRenderPass(CommandContext ctx,
@@ -7047,7 +7046,7 @@ void main() {
      * set via {@link #setClearColor}/{@link #setClearDepth} are picked up at
      * render-pass begin via the load-op).
      */
-    public void clearBuffers(CommandContext ctx, int mask) {
+    private void clearBuffers(CommandContext ctx, int mask) {
         long commandBufferHandle = requireVulkanCommandBufferHandle("clearBuffers", ctx);
         VulkanFramebufferRenderTargetManager.ClearOperationRequest clearRequest =
             framebufferRenderTargets.clearRequestForBoundDrawFramebuffer(mask);
@@ -7959,7 +7958,7 @@ void main() {
         );
     }
 
-    public void blitFramebuffer(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1,
+    private void blitFramebuffer(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1,
                                 int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
         long commandBufferHandle = requireVulkanCommandBufferHandle("blitFramebuffer", ctx);
         if (filter != GL_NEAREST) {
@@ -7998,7 +7997,7 @@ void main() {
         );
     }
 
-    public void blitNamedFramebuffer(CommandContext ctx, int readFramebuffer, int drawFramebuffer,
+    private void blitNamedFramebuffer(CommandContext ctx, int readFramebuffer, int drawFramebuffer,
                                      int srcX0, int srcY0, int srcX1, int srcY1,
                                      int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
         long commandBufferHandle = requireVulkanCommandBufferHandle("blitNamedFramebuffer", ctx);
@@ -8038,7 +8037,7 @@ void main() {
         );
     }
 
-    public void blitNamedFramebufferDSA(CommandContext ctx, int readFramebuffer, int drawFramebuffer,
+    private void blitNamedFramebufferDSA(CommandContext ctx, int readFramebuffer, int drawFramebuffer,
                                         int srcX0, int srcY0, int srcX1, int srcY1,
                                         int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
         requireVulkanCommandBufferHandle("blitNamedFramebufferDSA", ctx);
@@ -8186,50 +8185,55 @@ void main() {
         requireVulkanCommandBufferHandle("clearTexImage", ctx);
     }
 
-    public void executeClear(CommandContext ctx, VulkanicGalExecutionRequest.ClearRequest request) {
-        Objects.requireNonNull(request, "request");
-        consumeResourceUsagePlan(request.resourcePlan());
-        clearBuffers(ctx, VulkanicClearBuffer.toLegacyGlMask(request.buffers().toArray(VulkanicClearBuffer[]::new)));
+    public VulkanicGalExecutionRequest.ExecutionResult executeClear(CommandContext ctx, VulkanicGalExecutionRequest.ClearRequest request) {
+        try {
+            Objects.requireNonNull(request, "request");
+            consumeResourceUsagePlan(request.resourcePlan());
+            clearBuffers(ctx, VulkanicClearBuffer.toLegacyGlMask(request.buffers().toArray(VulkanicClearBuffer[]::new)));
+            return VulkanicGalExecutionRequest.success(request.semanticIdentity());
+        } catch (RuntimeException exception) {
+            return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), exception.getMessage());
+        }
     }
 
-    public void executeTransfer(CommandContext ctx, VulkanicGalExecutionRequest.TransferRequest request) {
-        Objects.requireNonNull(request, "request");
-        consumeResourceUsagePlan(request.resourcePlan());
-        int[] i = request.intArgs();
-        long[] l = request.longArgs();
-        switch (request.kind()) {
-            case COPY_BUFFER_SUB_DATA -> copyBufferSubData(ctx, i[0], i[1], l[0], l[1], l[2]);
-            case COPY_NAMED_BUFFER_SUB_DATA -> copyNamedBufferSubDataDSA(ctx, i[0], i[1], l[0], l[1], l[2]);
-            case COPY_IMAGE_SUB_DATA -> copyImageSubData(
-                ctx,
-                i[0], i[1], i[2], i[3], i[4], i[5],
-                i[6], i[7], i[8], i[9], i[10], i[11],
-                i[12], i[13], i[14]
-            );
-            case COPY_TEXTURE_SUB_IMAGE_2D -> copyTextureSubImage2D(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7]);
-            case COPY_TEX_IMAGE_2D -> copyTexImage2D(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7]);
-            case COPY_TEX_SUB_IMAGE_2D -> copyTexSubImage2D(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7]);
-            case BLIT_FRAMEBUFFER -> blitFramebuffer(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], i[9]);
-            case BLIT_NAMED_FRAMEBUFFER -> blitNamedFramebuffer(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], i[9], i[10], i[11]);
-            case READ_PIXELS -> readPixels(ctx, i[0], i[1], i[2], i[3], i[4], i[5], l[0]);
-            case READ_PIXELS_FLOAT_ARRAY -> readPixels(ctx, i[0], i[1], i[2], i[3], i[4], i[5], request.floatArrayOutput());
-            case BUFFER_SUB_DATA -> bufferSubData(ctx, i[0], l[0], request.bytePayload());
-            case NAMED_BUFFER_SUB_DATA -> namedBufferSubDataDSA(ctx, i[0], l[0], request.bytePayload());
-            case UPLOAD_TEXTURE_1D -> uploadTexture1D(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], request.bytePayload());
-            case UPLOAD_TEXTURE_2D -> uploadTexture2D(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], request.bytePayload());
-            case UPLOAD_TEXTURE_2D_SUB_IMAGE_POINTER -> uploadTexture2DSubImage(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], l[0]);
-            case UPLOAD_TEXTURE_2D_SUB_IMAGE_BUFFER -> uploadTexture2DSubImage(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], request.bytePayload());
-            case UPLOAD_TEXTURE_3D -> uploadTexture3D(ctx, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], request.bytePayload());
-            case CLEAR_TEX_IMAGE_INT -> clearTexImage(ctx, i[0], i[1], i[2], i[3], request.intPayload());
-            case CLEAR_BUFFER_SUB_DATA_INT -> clearBufferSubData(ctx, i[0], i[1], l[0], l[1], i[2], i[3], request.intPayload());
-            case CLEAR_BUFFER_FLOAT -> clearBufferfv(ctx, i[0], i[1], request.floatPayload());
-            case CLEAR_BUFFER_INT -> clearBufferiv(ctx, i[0], i[1], request.intPayload());
-            case CLEAR_BUFFER_UINT -> clearBufferuiv(ctx, i[0], i[1], request.intPayload());
-            case CLEAR_NAMED_FRAMEBUFFER_FLOAT -> clearNamedFramebufferfv(ctx, i[0], i[1], i[2], request.floatPayload());
-            case CLEAR_NAMED_FRAMEBUFFER_INT -> clearNamedFramebufferiv(ctx, i[0], i[1], i[2], request.intPayload());
-            case CLEAR_NAMED_FRAMEBUFFER_UINT -> clearNamedFramebufferuiv(ctx, i[0], i[1], i[2], request.intPayload());
-            case GENERATE_MIPMAP -> generateMipmap(ctx, i[0]);
-            case GENERATE_TEXTURE_MIPMAP -> generateTextureMipmapDSA(ctx, i[0]);
+    public VulkanicGalExecutionRequest.ExecutionResult executeTransfer(CommandContext ctx, VulkanicGalExecutionRequest.TransferRequest request) {
+        try {
+            Objects.requireNonNull(request, "request");
+            consumeResourceUsagePlan(request.resourcePlan());
+            VulkanicGalExecutionRequest.TransferCompatibilitySnapshot transfer = request.requireTransferSnapshot();
+            VulkanicGalExecutionRequest.TransferOperation op = request.operation();
+            switch (op) {
+                case VulkanicGalExecutionRequest.CopyBufferSubData o -> copyBufferSubData(ctx, transfer.sourceLegacyTargetOr(0, o.readTarget()), transfer.destinationLegacyTargetOr(0, o.writeTarget()), o.readOffset(), o.writeOffset(), o.size());
+                case VulkanicGalExecutionRequest.CopyNamedBufferSubData o -> copyNamedBufferSubDataDSA(ctx, transfer.sourceLegacyIdOr(0, o.readBuffer()), transfer.destinationLegacyIdOr(0, o.writeBuffer()), o.readOffset(), o.writeOffset(), o.size());
+                case VulkanicGalExecutionRequest.CopyImageSubData o -> copyImageSubData(ctx, transfer.sourceLegacyIdOr(0, o.srcName()), transfer.sourceLegacyTargetOr(0, o.srcTarget()), o.srcLevel(), o.srcX(), o.srcY(), o.srcZ(), transfer.destinationLegacyIdOr(0, o.dstName()), transfer.destinationLegacyTargetOr(0, o.dstTarget()), o.dstLevel(), o.dstX(), o.dstY(), o.dstZ(), o.width(), o.height(), o.depth());
+                case VulkanicGalExecutionRequest.CopyTextureSubImage2D o -> copyTextureSubImage2D(ctx, transfer.destinationLegacyIdOr(0, o.texture()), o.level(), o.xOffset(), o.yOffset(), o.x(), o.y(), o.width(), o.height());
+                case VulkanicGalExecutionRequest.CopyTexImage2D o -> copyTexImage2D(ctx, transfer.destinationLegacyTargetOr(0, o.target()), o.level(), o.internalFormat(), o.x(), o.y(), o.width(), o.height(), o.border());
+                case VulkanicGalExecutionRequest.CopyTexSubImage2D o -> copyTexSubImage2D(ctx, transfer.destinationLegacyTargetOr(0, o.target()), o.level(), o.xOffset(), o.yOffset(), o.x(), o.y(), o.width(), o.height());
+                case VulkanicGalExecutionRequest.BlitFramebuffer o -> blitFramebuffer(ctx, o.srcX0(), o.srcY0(), o.srcX1(), o.srcY1(), o.dstX0(), o.dstY0(), o.dstX1(), o.dstY1(), o.mask(), o.filter());
+                case VulkanicGalExecutionRequest.BlitNamedFramebuffer o -> blitNamedFramebuffer(ctx, transfer.sourceLegacyIdOr(0, o.readFramebuffer()), transfer.destinationLegacyIdOr(0, o.drawFramebuffer()), o.srcX0(), o.srcY0(), o.srcX1(), o.srcY1(), o.dstX0(), o.dstY0(), o.dstX1(), o.dstY1(), o.mask(), o.filter());
+                case VulkanicGalExecutionRequest.ReadPixelsPointer o -> readPixels(ctx, o.x(), o.y(), o.width(), o.height(), o.format(), o.type(), o.pixels());
+                case VulkanicGalExecutionRequest.ReadPixelsFloatArray o -> readPixels(ctx, o.x(), o.y(), o.width(), o.height(), o.format(), o.type(), o.pixels());
+                case VulkanicGalExecutionRequest.BufferSubData o -> bufferSubData(ctx, transfer.destinationLegacyTargetOr(0, o.target()), o.offset(), o.payload());
+                case VulkanicGalExecutionRequest.NamedBufferSubData o -> namedBufferSubDataDSA(ctx, transfer.destinationLegacyIdOr(0, o.buffer()), o.offset(), o.payload());
+                case VulkanicGalExecutionRequest.UploadTexture1D o -> uploadTexture1D(ctx, transfer.destinationLegacyTargetOr(0, o.target()), o.level(), o.internalFormat(), o.width(), o.border(), o.format(), o.type(), o.payload());
+                case VulkanicGalExecutionRequest.UploadTexture2D o -> uploadTexture2D(ctx, transfer.destinationLegacyTargetOr(0, o.target()), o.level(), o.internalFormat(), o.width(), o.height(), o.border(), o.format(), o.type(), o.payload());
+                case VulkanicGalExecutionRequest.UploadTexture2DSubImagePointer o -> uploadTexture2DSubImage(ctx, transfer.destinationLegacyTargetOr(0, o.target()), o.level(), o.xOffset(), o.yOffset(), o.width(), o.height(), o.format(), o.type(), o.pixels());
+                case VulkanicGalExecutionRequest.UploadTexture2DSubImageBuffer o -> uploadTexture2DSubImage(ctx, transfer.destinationLegacyTargetOr(0, o.target()), o.level(), o.xOffset(), o.yOffset(), o.width(), o.height(), o.format(), o.type(), o.payload());
+                case VulkanicGalExecutionRequest.UploadTexture3D o -> uploadTexture3D(ctx, transfer.destinationLegacyTargetOr(0, o.target()), o.level(), o.internalFormat(), o.width(), o.height(), o.depth(), o.border(), o.format(), o.type(), o.payload());
+                case VulkanicGalExecutionRequest.ClearTexImageInt o -> clearTexImage(ctx, transfer.destinationLegacyIdOr(0, o.texture()), o.level(), o.format(), o.type(), o.data());
+                case VulkanicGalExecutionRequest.ClearBufferSubDataInt o -> clearBufferSubData(ctx, transfer.destinationLegacyTargetOr(0, o.target()), o.internalFormat(), o.offset(), o.size(), o.format(), o.type(), o.data());
+                case VulkanicGalExecutionRequest.ClearBufferFloat o -> clearBufferfv(ctx, o.buffer(), o.drawBuffer(), o.values());
+                case VulkanicGalExecutionRequest.ClearBufferInt o -> clearBufferiv(ctx, o.buffer(), o.drawBuffer(), o.values());
+                case VulkanicGalExecutionRequest.ClearBufferUint o -> clearBufferuiv(ctx, o.buffer(), o.drawBuffer(), o.values());
+                case VulkanicGalExecutionRequest.ClearNamedFramebufferFloat o -> clearNamedFramebufferfv(ctx, transfer.destinationLegacyIdOr(0, o.framebuffer()), o.buffer(), o.drawBuffer(), o.values());
+                case VulkanicGalExecutionRequest.ClearNamedFramebufferInt o -> clearNamedFramebufferiv(ctx, transfer.destinationLegacyIdOr(0, o.framebuffer()), o.buffer(), o.drawBuffer(), o.values());
+                case VulkanicGalExecutionRequest.ClearNamedFramebufferUint o -> clearNamedFramebufferuiv(ctx, transfer.destinationLegacyIdOr(0, o.framebuffer()), o.buffer(), o.drawBuffer(), o.values());
+                case VulkanicGalExecutionRequest.GenerateMipmap o -> generateMipmap(ctx, transfer.destinationLegacyTargetOr(0, o.target()));
+                case VulkanicGalExecutionRequest.GenerateTextureMipmap o -> generateTextureMipmapDSA(ctx, transfer.destinationLegacyIdOr(0, o.texture()));
+            }
+            return VulkanicGalExecutionRequest.success(request.semanticIdentity());
+        } catch (RuntimeException exception) {
+            return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), exception.getMessage());
         }
     }
 
@@ -8237,7 +8241,7 @@ void main() {
         requireVulkanCommandBufferHandle("concludeQuery", ctx);
     }
 
-    public void copyImageSubData(CommandContext ctx, int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ,
+    private void copyImageSubData(CommandContext ctx, int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ,
                                  int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ,
                                  int width, int height, int depth) {
         long commandBufferHandle = requireVulkanCommandBufferHandle("copyImageSubData", ctx);
@@ -8266,7 +8270,7 @@ void main() {
         );
     }
 
-    public void copyTexImage2D(CommandContext ctx, int target, int level, int internalFormat,
+    private void copyTexImage2D(CommandContext ctx, int target, int level, int internalFormat,
                                int x, int y, int width, int height, int border) {
         long commandBufferHandle = requireVulkanCommandBufferHandle("copyTexImage2D", ctx);
         if (border != 0) {
@@ -8298,7 +8302,7 @@ void main() {
         );
     }
 
-    public void copyTexSubImage2D(CommandContext ctx, int target, int level,
+    private void copyTexSubImage2D(CommandContext ctx, int target, int level,
                                   int xoffset, int yoffset, int x, int y, int width, int height) {
         long commandBufferHandle = requireVulkanCommandBufferHandle("copyTexSubImage2D", ctx);
         Integer sourceTexture = framebufferRenderTargets.boundReadColorTextureForCopy();
@@ -8327,7 +8331,7 @@ void main() {
         );
     }
 
-    public void copyTextureSubImage2D(CommandContext ctx, int texture, int level,
+    private void copyTextureSubImage2D(CommandContext ctx, int texture, int level,
                                       int xoffset, int yoffset, int x, int y, int width, int height) {
         long commandBufferHandle = requireVulkanCommandBufferHandle("copyTextureSubImage2D", ctx);
         Integer sourceTexture = framebufferRenderTargets.boundReadColorTextureForCopy();
@@ -8403,8 +8407,8 @@ void main() {
         virtualSyncs.remove(sync);
     }
 
-    public void dispatchCompute(CommandContext ctx, int workX, int workY, int workZ) {
-        executeComputeDispatch(ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest.legacyDirect(
+    private void dispatchCompute(CommandContext ctx, int workX, int workY, int workZ) {
+        executeComputeDispatch(ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest.direct(
             "dispatchCompute",
             workX,
             workY,
@@ -8412,25 +8416,23 @@ void main() {
         ));
     }
 
-    public void executeComputeDispatch(CommandContext ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest request) {
-        Objects.requireNonNull(request, "request");
-        consumeResourceUsagePlan(request.resourcePlan());
-        VulkanicGalExecutionRequest.ComputeDispatchCommand command = request.command();
-        if (command.indirect()) {
-            dispatchComputeIndirectLegacy(ctx, request);
-            return;
+    public VulkanicGalExecutionRequest.ExecutionResult executeComputeDispatch(CommandContext ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest request) {
+        try {
+            Objects.requireNonNull(request, "request");
+            consumeResourceUsagePlan(request.resourcePlan());
+            VulkanicGalExecutionRequest.ComputeDispatchCommand command = request.command();
+            if (command.indirect()) {
+                dispatchComputeIndirectLegacy(ctx, request);
+            } else {
+                executeTypedComputeDispatchPlan(ctx, request);
+            }
+            return VulkanicGalExecutionRequest.success(request.semanticIdentity());
+        } catch (RuntimeException exception) {
+            return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), exception.getMessage());
         }
-        executeComputeDispatchLegacy(ctx, request);
     }
 
-    public VulkanicGalExecutionRequest.ComputeDispatchRequest captureComputeDispatchRequest(
-        CommandContext ctx,
-        VulkanicGalExecutionRequest.ComputeDispatchRequest request
-    ) {
-        return Objects.requireNonNull(request, "request");
-    }
-
-    private void executeComputeDispatchLegacy(
+    private void executeTypedComputeDispatchPlan(
         CommandContext ctx,
         VulkanicGalExecutionRequest.ComputeDispatchRequest request
     ) {
@@ -8468,8 +8470,8 @@ void main() {
         );
     }
 
-    public void dispatchComputeIndirect(CommandContext ctx, long offset) {
-        executeComputeDispatch(ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest.legacyIndirect(
+    private void dispatchComputeIndirect(CommandContext ctx, long offset) {
+        executeComputeDispatch(ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest.indirect(
             "dispatchComputeIndirect",
             offset
         ));
@@ -8547,7 +8549,7 @@ void main() {
         }
     }
 
-    public void generateMipmap(CommandContext ctx, int target) {
+    private void generateMipmap(CommandContext ctx, int target) {
         long commandBufferHandle = requireVulkanCommandBufferHandle("generateMipmap", ctx);
         if (!isSupportedLegacyTextureTarget(target)) {
             throw new IllegalArgumentException("Unsupported legacy Vulkan texture target for generateMipmap: " + target);
@@ -8569,12 +8571,12 @@ void main() {
         return id;
     }
 
-    public void generateTextureMipmap(CommandContext ctx, int target) {
+    private void generateTextureMipmap(CommandContext ctx, int target) {
         requireVulkanCommandBufferHandle("generateTextureMipmap", ctx);
         generateMipmap(ctx, target);
     }
 
-    public void generateTextureMipmapDSA(CommandContext ctx, int texture) {
+    private void generateTextureMipmapDSA(CommandContext ctx, int texture) {
         requireVulkanCommandBufferHandle("generateTextureMipmapDSA", ctx);
 
         ensureNativeReady("generateTextureMipmapDSA");
@@ -8910,7 +8912,7 @@ void main() {
             spine.applyConservativeMemoryBarrier(commandBufferHandle);
         }
 
-    public void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type,
+    private void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type,
                                             long pIndices, int drawCount, long pBaseVertex) {
         VulkanicIndexType indexType = VulkanicIndexType.fromLegacyGlConstant(type)
             .orElseThrow(() -> new IllegalArgumentException(
@@ -8929,7 +8931,7 @@ void main() {
         );
     }
 
-    public void multiDrawElementsBaseVertex(CommandContext ctx, VulkanicPrimitiveMode mode, long pCount,
+    private void multiDrawElementsBaseVertex(CommandContext ctx, VulkanicPrimitiveMode mode, long pCount,
                                             VulkanicIndexType indexType, long pIndices, int drawCount,
                                             long pBaseVertex) {
         long commandBufferHandle = requireVulkanCommandBufferHandle("multiDrawElementsBaseVertex", ctx);
@@ -8975,7 +8977,7 @@ void main() {
                     baseVertex
                 );
             VulkanicGalExecutionRequest.GraphicsDrawRequest galRequest =
-                VulkanicGalExecutionRequest.GraphicsDrawRequest.legacyIndexed(
+                VulkanicGalExecutionRequest.GraphicsDrawRequest.indexed(
                     "vulkan-multiDrawElementsBaseVertex",
                     mode,
                     count,
@@ -8997,7 +8999,7 @@ void main() {
                 request.instanceCount(),
                 request.baseVertex()
             );
-            executeLegacyDraw(ctx, request, galRequest);
+            executeTypedGalDrawPlan(ctx, request, galRequest);
         }
     }
 
@@ -9021,14 +9023,14 @@ void main() {
         framebufferRenderTargets.recordAttachment(framebuffer, attachment, texture);
     }
 
-    public void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, float[] pixels) {
+    private void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, float[] pixels) {
         requireVulkanCommandBufferHandle("readPixels", ctx);
         if (pixels != null) {
             java.util.Arrays.fill(pixels, 0.0f);
         }
     }
 
-    public void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels) {
+    private void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels) {
         long commandBufferHandle = requireVulkanCommandBufferHandle("readPixels", ctx);
         if (width <= 0 || height <= 0) {
             return;
@@ -9260,12 +9262,12 @@ void main() {
         }
     }
 
-    public void uploadTexture1D(CommandContext ctx, int target, int level, int internalformat,
+    private void uploadTexture1D(CommandContext ctx, int target, int level, int internalformat,
                                 int width, int border, int format, int type, java.nio.ByteBuffer pixels) {
         requireVulkanCommandBufferHandle("uploadTexture1D", ctx);
     }
 
-    public void uploadTexture3D(CommandContext ctx, int target, int level, int internalformat,
+    private void uploadTexture3D(CommandContext ctx, int target, int level, int internalformat,
                                 int width, int height, int depth, int border,
                                 int format, int type, java.nio.ByteBuffer pixels) {
         long commandBufferHandle = requireVulkanCommandBufferHandle("uploadTexture3D", ctx);
@@ -13832,7 +13834,7 @@ void main() {
             Objects.requireNonNull(plan, "plan");
             Objects.requireNonNull(drawResources, "drawResources");
             Objects.requireNonNull(capturedGalRequest, "capturedGalRequest");
-            if (capturedGalRequest.compatibilitySnapshot().source().equals("unresolved-legacy-compatibility")) {
+            if (capturedGalRequest.compatibilitySnapshot().sharedCompatibilityState().isEmpty()) {
                 throw new IllegalStateException("Vulkan draw reached NativeSpine without a captured GAL compatibility snapshot");
             }
             if (debugLegacyDrawLogCount < 120) {

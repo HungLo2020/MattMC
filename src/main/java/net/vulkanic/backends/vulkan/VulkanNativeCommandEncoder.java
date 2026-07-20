@@ -434,7 +434,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             );
         }
 
-        this.backend.copyNamedBufferSubDataDSA(
+        VulkanicAPI.copyNamedBufferSubDataDSA(
             this.commandContext(),
             this.requireBufferHandle(sourceBuffer, "copyToBuffer(source)"),
             this.requireBufferHandle(targetBuffer, "copyToBuffer(target)"),

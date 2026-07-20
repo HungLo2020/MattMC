@@ -46,15 +46,16 @@ public class VulkanFailFastRoutingTest {
     public void testProxyRoutesPreviouslyMissingMethodsToVulkanBackend() {
         VulkanicAPI.initialize(GraphicsBackendType.VULKAN);
 
-        // `blitFramebuffer()` used to be absent from `VulkanBackend`, which meant the fail-fast
-        // proxy blocked it with an explicit fallback error. Now that the Vulkan contract is fully
-        // covered, the proxy must route the call through to `VulkanBackend`, which then performs
-        // its own normal argument validation.
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-            () -> VulkanicAPI.getBackend().blitFramebuffer(null, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0));
+        // `blitFramebuffer()` is no longer exposed as a raw backend method. The
+        // frontend must translate it into a typed GAL transfer request, then the
+        // backend reports any context failure through the typed result path.
+        IllegalStateException exception = assertThrows(IllegalStateException.class,
+            () -> VulkanicAPI.blitNamedFramebuffer(null, 1, 2, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0));
 
+        assertTrue(exception.getMessage().contains("GAL request BACKEND_FAILURE"),
+            "Implemented transfers should fail through typed GAL execution, but got: " + exception.getMessage());
         assertTrue(exception.getMessage().contains("requires VulkanCommandContext"),
-            "Implemented methods should be routed to VulkanBackend validation, but got: " + exception.getMessage());
+            "Typed failure should retain backend validation detail, but got: " + exception.getMessage());
     }
 
     @Test

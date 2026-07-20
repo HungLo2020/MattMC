@@ -380,24 +380,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
     void setDynamicScissor(CommandContext ctx, int x, int y, int width, int height);
     
     /**
-     * Clears buffers to preset values.
-     * 
-     * In OpenGL: Maps to glClear()
-     * In Vulkan: Maps to vkCmdClearAttachments() within a render pass
-     * 
-     * @param ctx Command context for recording this command
-     * @param mask Bitwise OR of masks indicating which buffers to clear
-     */
-    void clearBuffers(CommandContext ctx, int mask);
-
-    /**
-     * Clears buffers using backend-neutral clear-buffer bits.
-     */
-    default void clearBuffers(CommandContext ctx, VulkanicClearBuffer... buffers) {
-        clearBuffers(ctx, VulkanicClearBuffer.toLegacyGlMask(buffers));
-    }
-    
-    /**
      * Sets blending enabled or disabled.
      * 
      * In OpenGL: Maps to glEnable/glDisable(GL_BLEND)
@@ -656,28 +638,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
      * @param a Alpha channel write enabled
      */
     void setColorMask(CommandContext ctx, boolean r, boolean g, boolean b, boolean a);
-    
-    /**
-     * Generates mipmaps for a texture.
-     * 
-     * In OpenGL: Maps to glGenerateMipmap()
-     * In Vulkan: Requires vkCmdBlitImage or compute shader
-     * 
-     * @param ctx Command context for recording this command
-     * @param target The texture target
-     */
-    void generateTextureMipmap(CommandContext ctx, int target);
-    
-    /**
-     * Generates mipmaps for a texture using Direct State Access (DSA).
-     * 
-     * In OpenGL: Maps to glGenerateTextureMipmap() (DSA)
-     * In Vulkan: Requires vkCmdBlitImage or compute shader
-     * 
-     * @param ctx Command context for recording this command
-     * @param texture The texture object ID
-     */
-    void generateTextureMipmapDSA(CommandContext ctx, int texture);
     
     /**
      * Sets an integer texture parameter using Direct State Access (DSA).
@@ -951,8 +911,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
      * @param width The width of the region
      * @param height The height of the region
      */
-    void copyTexSubImage2D(CommandContext ctx, int target, int level, int xoffset, int yoffset, int x, int y, int width, int height);
-    
     /**
      * Gets a texture parameter value.
      * 
@@ -1044,8 +1002,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
      * In OpenGL: Maps to glCopyNamedBufferSubData()
      * In Vulkan: Maps to vkCmdCopyBuffer()
      */
-    void copyNamedBufferSubDataDSA(CommandContext ctx, int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size);
-    
     // Direct State Access framebuffer operations
     /**
      * Attaches a texture to a framebuffer using Direct State Access (DSA).
@@ -1059,9 +1015,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
      * In OpenGL: Maps to glBlitNamedFramebuffer()
      * In Vulkan: Maps to vkCmdBlitImage()
      */
-    void blitNamedFramebufferDSA(CommandContext ctx, int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, 
-                                  int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter);
-    
     /**
      * Creates a new 2D texture object.
      * 
@@ -1083,33 +1036,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
      * @param texture The texture object ID to delete
      */
     void deleteTexture(CommandContext ctx, int texture);
-    
-    /**
-     * Renders primitives from array data.
-     * 
-     * In OpenGL: Maps to glDrawArrays()
-     * In Vulkan: Maps to vkCmdDraw()
-     * 
-     * @param ctx Command context for recording this command
-     * @param mode The kind of primitives to render
-     * @param first The starting index in the enabled arrays
-     * @param count The number of vertices to be rendered
-     */
-    void drawArrays(CommandContext ctx, int mode, int first, int count);
-    
-    /**
-     * Renders primitives from indexed array data.
-     * 
-     * In OpenGL: Maps to glDrawElements()
-     * In Vulkan: Maps to vkCmdDrawIndexed()
-     * 
-     * @param ctx Command context for recording this command
-     * @param mode The kind of primitives to render
-     * @param count The number of elements to be rendered
-     * @param type The type of the values in indices
-     * @param indices Byte offset into the bound element array buffer
-     */
-    void drawElements(CommandContext ctx, int mode, int count, int type, long indices);
     
     /**
      * Sets the blend function for RGB and alpha channels separately.
@@ -1436,76 +1362,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
     // Texture pixel data transfer
     
     /**
-     * Uploads pixel data to a 2D texture.
-     * 
-     * In OpenGL: Maps to glTexImage2D()
-     * In Vulkan: Maps to vkCmdCopyBufferToImage() after staging buffer setup
-     * 
-     * @param ctx Command context for recording this command
-     * @param target The texture target (e.g., GL_TEXTURE_2D)
-     * @param level Mipmap level
-     * @param internalFormat Internal format of the texture
-     * @param width Width of the texture
-     * @param height Height of the texture
-     * @param border Border width (must be 0)
-     * @param format Format of the pixel data
-     * @param type Data type of the pixel data
-     * @param pixels Pixel data buffer (can be null)
-     */
-    void uploadTexture2D(CommandContext ctx, int target, int level, int internalFormat, int width, int height, 
-                         int border, int format, int type, java.nio.ByteBuffer pixels);
-
-    /**
-     * Uploads pixel data to a 2D texture using backend-neutral upload-format semantics.
-     */
-    default void uploadTexture2D(
-        CommandContext ctx,
-        VulkanicTextureTarget target,
-        int level,
-        VulkanicTextureUploadFormat uploadFormat,
-        int width,
-        int height,
-        int border,
-        java.nio.ByteBuffer pixels
-    ) {
-        if (target == null) {
-            throw new IllegalArgumentException("target must not be null");
-        }
-        if (uploadFormat == null) {
-            throw new IllegalArgumentException("uploadFormat must not be null");
-        }
-
-        uploadTexture2D(
-            ctx,
-            target.toLegacyGlTarget(),
-            level,
-            uploadFormat.legacyInternalFormat(),
-            width,
-            height,
-            border,
-            uploadFormat.legacyFormat(),
-            uploadFormat.legacyType(),
-            pixels
-        );
-    }
-
-    /**
-     * Uploads pixel data to the currently bound GL_TEXTURE_2D target using
-     * backend-neutral upload-format semantics.
-     */
-    default void uploadTexture2D(
-        CommandContext ctx,
-        int level,
-        VulkanicTextureUploadFormat uploadFormat,
-        int width,
-        int height,
-        int border,
-        java.nio.ByteBuffer pixels
-    ) {
-        uploadTexture2D(ctx, VulkanicTextureTarget.TEXTURE_2D, level, uploadFormat, width, height, border, pixels);
-    }
-    
-    /**
      * Uploads pixel data to a subregion of a 2D texture.
      * 
      * In OpenGL: Maps to glTexSubImage2D()
@@ -1522,9 +1378,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
      * @param type Data type of the pixel data
      * @param pixels Pixel data (can be pointer or ByteBuffer)
      */
-    void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset, 
-                                  int width, int height, int format, int type, long pixels);
-    
     /**
      * Uploads pixel data to a subregion of a 2D texture from a ByteBuffer.
      * 
@@ -1542,9 +1395,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
      * @param type Data type of the pixel data
      * @param pixels Pixel data buffer
      */
-    void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset, 
-                                  int width, int height, int format, int type, java.nio.ByteBuffer pixels);
-    
     
     // GPU buffer lifecycle
     
@@ -1680,8 +1530,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
      * @param writeOffset Offset in destination buffer
      * @param size Number of bytes to copy
      */
-    void copyBufferSubData(CommandContext ctx, int readTarget, int writeTarget, long readOffset, long writeOffset, long size);
-    
     /**
      * Flushes modifications to a mapped buffer range.
      * 
@@ -1780,9 +1628,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
      * @param mask Buffer bit mask (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_STENCIL_BUFFER_BIT)
      * @param filter Interpolation filter (GL_NEAREST, GL_LINEAR)
      */
-    void blitFramebuffer(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1, 
-                         int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter);
-    
     
     // Shader pipeline
     
@@ -2823,39 +2668,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
      */
     void setDrawBuffer(CommandContext ctx, int mode);
     
-    // Advanced drawing operations
-    /**
-     * Renders indexed primitives with instancing and a base vertex.
-     * In OpenGL: Maps to glDrawElementsInstancedBaseVertex()
-     * In Vulkan: Maps to vkCmdDrawIndexed() with firstVertex parameter
-     * @param ctx Command context for recording this command
-     */
-    void drawIndexedInstancedBaseVertex(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount, int baseVertex);
-    
-    /**
-     * Renders indexed primitives with a base vertex offset.
-     * In OpenGL: Maps to glDrawElementsBaseVertex()
-     * In Vulkan: Maps to vkCmdDrawIndexed() with vertexOffset parameter
-     * @param ctx Command context for recording this command
-     */
-    void drawIndexedBaseVertex(CommandContext ctx, int mode, int count, int type, long indices, int baseVertex);
-    
-    /**
-     * Renders indexed primitives with instancing.
-     * In OpenGL: Maps to glDrawElementsInstanced()
-     * In Vulkan: Maps to vkCmdDrawIndexed() with instanceCount parameter
-     * @param ctx Command context for recording this command
-     */
-    void drawIndexedInstanced(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount);
-    
-    /**
-     * Renders primitives using array data with instancing.
-     * In OpenGL: Maps to glDrawArraysInstanced()
-     * In Vulkan: Maps to vkCmdDraw() with instanceCount parameter
-     * @param ctx Command context for recording this command
-     */
-    void drawArraysInstanced(CommandContext ctx, int mode, int first, int count, int instanceCount);
-    
     // Uniform buffer operations
     /**
      * Binds a range of a buffer object to a uniform buffer binding point.
@@ -2906,13 +2718,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
     
     // Additional buffer operations for Sodium
     void deleteVertexArrays(CommandContext ctx, int vertexArray);
-    
-    // Multi-draw operations
-    void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex);
-
-    default void multiDrawElementsBaseVertex(CommandContext ctx, VulkanicPrimitiveMode mode, long pCount, VulkanicIndexType type, long pIndices, int drawCount, long pBaseVertex) {
-        multiDrawElementsBaseVertex(ctx, mode.toGlModeConstant(), pCount, type.toGlTypeConstant(), pIndices, drawCount, pBaseVertex);
-    }
     
     // Texture operations
     
@@ -3095,8 +2900,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
      * @param type Data type of the pixel data
      * @param pixels Pixel data buffer (can be null)
      */
-    void uploadTexture1D(CommandContext ctx, int target, int level, int internalformat, int width, int border, int format, int type, java.nio.ByteBuffer pixels);
-    
     /**
      * Uploads pixel data to a 3D texture.
      * 
@@ -3115,8 +2918,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
      * @param type Data type of the pixel data
      * @param pixels Pixel data buffer (can be null)
      */
-    void uploadTexture3D(CommandContext ctx, int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, java.nio.ByteBuffer pixels);
-    
     /**
      * Copies pixels from framebuffer to a 2D texture.
      * 
@@ -3133,8 +2934,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
      * @param height Height of the texture and framebuffer region
      * @param border Border width (must be 0)
      */
-    void copyTexImage2D(CommandContext ctx, int target, int level, int internalFormat, int x, int y, int width, int height, int border);
-    
     /**
      * Copies a region of pixels from one image to another.
      * 
@@ -3158,10 +2957,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
      * @param height Height of the region to copy
      * @param depth Depth of the region to copy
      */
-    void copyImageSubData(CommandContext ctx, int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ, 
-                         int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ, 
-                         int width, int height, int depth);
-    
     
     /**
      * Reads pixels from the framebuffer into a float array.
@@ -3178,8 +2973,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
      * @param type Data type of the pixel data (e.g., GL_FLOAT)
      * @param pixels Float array to receive the pixel data
      */
-    void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, float[] pixels);
-    
     /**
      * Reads a block of pixels from the framebuffer into a native memory address.
      * 
@@ -3195,7 +2988,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
      * @param type Data type of the pixel data (e.g., GL_UNSIGNED_BYTE)
      * @param pixels Native memory address to receive the pixel data
      */
-    void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels);
     
     /**
      * Returns a string value from the OpenGL implementation.
@@ -3241,8 +3033,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
      * @param width The width of the region to copy
      * @param height The height of the region to copy
      */
-    void copyTextureSubImage2D(CommandContext ctx, int texture, int level, int xoffset, int yoffset, int x, int y, int width, int height);
-    
     /**
      * Binds a texture to a specified texture unit using Direct State Access.
      * 
@@ -3322,8 +3112,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
      * @param mask Bitfield of buffers to copy (e.g., GL_COLOR_BUFFER_BIT)
      * @param filter Interpolation filter (GL_NEAREST or GL_LINEAR)
      */
-    void blitNamedFramebuffer(CommandContext ctx, int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter);
-    
     /**
      * Attaches a texture to a framebuffer attachment point using Direct State Access.
      * 
@@ -3360,17 +3148,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
      * @return The texture object ID
      */
     int createTextures(CommandContext ctx, int target);
-    
-    /**
-     * Generates mipmaps for a texture bound to the specified target.
-     * 
-     * In OpenGL: Maps to glGenerateMipmap()
-     * In Vulkan: Maps to vkCmdBlitImage() with mipmap level generation
-     * 
-     * @param ctx Command context for recording this command
-     * @param target The texture target (e.g., GL_TEXTURE_2D)
-     */
-    void generateMipmap(CommandContext ctx, int target);
     
     /**
      * Sets a floating-point texture parameter for a texture bound to the specified target.
@@ -3622,30 +3399,6 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
     void setStencilWriteMaskSeparate(CommandContext ctx, VulkanicStencilFace face, int mask);
     
     // Additional texture methods
-    
-    /**
-     * Dispatches compute shader work groups.
-     * 
-     * In OpenGL: Maps to glDispatchCompute()
-     * In Vulkan: Maps to vkCmdDispatch()
-     * 
-     * @param ctx Command context for recording this command
-     * @param workX Number of work groups in X dimension
-     * @param workY Number of work groups in Y dimension  
-     * @param workZ Number of work groups in Z dimension
-     */
-    void dispatchCompute(CommandContext ctx, int workX, int workY, int workZ);
-    
-    /**
-     * Dispatches compute work groups with parameters from a buffer.
-     * 
-     * In OpenGL: Maps to glDispatchComputeIndirect()
-     * In Vulkan: Maps to vkCmdDispatchIndirect()
-     * 
-     * @param ctx Command context for recording this command
-     * @param offset Offset in the buffer binding where dispatch parameters are stored
-     */
-    void dispatchComputeIndirect(CommandContext ctx, long offset);
     
     /**
      * Checks if a name corresponds to a buffer object.
