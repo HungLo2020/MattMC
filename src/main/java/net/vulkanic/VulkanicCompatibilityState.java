@@ -32,6 +32,9 @@ public final class VulkanicCompatibilityState {
     private static final int GL_DRAW_FRAMEBUFFER = 0x8CA9;
     private static final int GL_TEXTURE_2D = 0x0DE1;
     private static final int GL_TEXTURE_3D = 0x806F;
+    private static final int GL_READ_ONLY = 0x88B8;
+    private static final int GL_WRITE_ONLY = 0x88B9;
+    private static final int GL_BACK = 0x0405;
     private static final int GL_COLOR_ATTACHMENT0 = 0x8CE0;
     private static final int GL_TEXTURE0 = 0x84C0;
 
@@ -42,6 +45,7 @@ public final class VulkanicCompatibilityState {
     private final Map<Integer, Integer> bufferBindings = new HashMap<>();
     private final Map<IndexedBufferKey, BufferRangeState> indexedBufferBindings = new HashMap<>();
     private final Map<TextureBindingKey, Integer> textureBindings = new HashMap<>();
+    private final Map<Integer, Integer> textureUnitBindings = new HashMap<>();
     private final Map<Integer, Integer> samplerBindings = new HashMap<>();
     private final Map<Integer, ImageUnitBindingState> imageUnitBindings = new HashMap<>();
     private final FixedFunctionState fixedFunction = new FixedFunctionState();
@@ -106,7 +110,16 @@ public final class VulkanicCompatibilityState {
 
     public void bindTexture(int target, int texture) {
         synchronized (lock) {
+            textureUnitBindings.remove(activeTextureUnitIndex);
             textureBindings.put(new TextureBindingKey(activeTextureUnitIndex, target), texture);
+        }
+    }
+
+    public void bindTexture(int unitIndex, int target, int texture) {
+        synchronized (lock) {
+            int unit = Math.max(0, unitIndex);
+            textureUnitBindings.remove(unit);
+            textureBindings.put(new TextureBindingKey(unit, target), texture);
         }
     }
 
@@ -116,7 +129,9 @@ public final class VulkanicCompatibilityState {
 
     public void bindTextureUnit(int unit, int texture) {
         synchronized (lock) {
-            textureBindings.put(new TextureBindingKey(Math.max(0, unit), GL_TEXTURE_2D), texture);
+            int unitIndex = Math.max(0, unit);
+            textureBindings.keySet().removeIf(key -> key.unit() == unitIndex);
+            textureUnitBindings.put(unitIndex, texture);
         }
     }
 
@@ -549,6 +564,7 @@ public final class VulkanicCompatibilityState {
                 Map.copyOf(bufferBindings),
                 Map.copyOf(indexedBufferBindings),
                 Map.copyOf(texture2DByUnit),
+                Map.copyOf(textureUnitBindings),
                 Map.copyOf(textureBindings),
                 Map.copyOf(samplerBindings),
                 Map.copyOf(imageUnitBindings),
@@ -572,6 +588,7 @@ public final class VulkanicCompatibilityState {
                 Map.copyOf(bufferBindings),
                 Map.copyOf(indexedBufferBindings),
                 Map.copyOf(texture2DByUnit),
+                Map.copyOf(textureUnitBindings),
                 Map.copyOf(textureBindings),
                 Map.copyOf(samplerBindings),
                 Map.copyOf(imageUnitBindings),
@@ -584,12 +601,29 @@ public final class VulkanicCompatibilityState {
         VulkanicGalExecutionRequest.GraphicsDrawRequest request
     ) {
         GraphicsSnapshot snapshot = captureGraphics(request);
+        VulkanicGalExecutionRequest.VertexInputSnapshot vertexInput = snapshot.vertexInputSnapshot(request);
+        List<VulkanicPassResourceModel.BindingSnapshot> bindings = snapshot.bindingSnapshots();
+        VulkanicPassResourceModel.PassExecutionPlan vertexPlan =
+            VulkanicLegacyCompatibilityAdapter.planDraw(new VulkanicLegacyCompatibilityAdapter.DrawSnapshot(
+                request.semanticIdentity().label(),
+                vertexInput.vertexBuffers(),
+                vertexInput.indexBuffer(),
+                List.of(),
+                List.of(),
+                drawCommandSnapshot(request.command()),
+                false,
+                false
+            ));
+        List<VulkanicPassResourceModel.ResourceUse> resourceUses = new ArrayList<>(vertexPlan.orderedUses());
+        for (VulkanicPassResourceModel.BindingSnapshot binding : bindings) {
+            resourceUses.add(binding.resourceUse());
+        }
         return new VulkanicGalExecutionRequest.GraphicsCompatibilitySnapshot(
             Optional.empty(),
-            snapshot.vertexInputSnapshot(request),
-            request.resourcePlan().orderedUses(),
+            vertexInput,
+            resourceUses,
             Optional.empty(),
-            snapshot.bindingSnapshots(),
+            bindings,
             Optional.of(snapshot),
             "frontend-shared-compatibility-draw"
         );
@@ -607,6 +641,30 @@ public final class VulkanicCompatibilityState {
             Optional.of(snapshot),
             "frontend-shared-compatibility-compute"
         );
+    }
+
+    private static VulkanicLegacyCompatibilityAdapter.DrawCommandSnapshot drawCommandSnapshot(
+        VulkanicGalExecutionRequest.GraphicsDrawCommand command
+    ) {
+        return switch (command.kind()) {
+            case ARRAYS -> VulkanicLegacyCompatibilityAdapter.DrawCommandSnapshot.arrays(
+                command.firstVertex(),
+                command.vertexCount(),
+                command.instanceCount()
+            );
+            case INDEXED -> VulkanicLegacyCompatibilityAdapter.DrawCommandSnapshot.indexed(
+                Math.toIntExact(command.indexByteOffset() / command.indexType().bytesPerIndex()),
+                command.indexCount(),
+                command.baseVertex(),
+                command.instanceCount()
+            );
+            case MULTI_INDEXED_BASE_VERTEX -> VulkanicLegacyCompatibilityAdapter.DrawCommandSnapshot.indexed(
+                command.indexedDraws().get(0).firstIndex(),
+                command.indexedDraws().stream().mapToInt(VulkanicGalExecutionRequest.IndexedDraw::indexCount).sum(),
+                command.indexedDraws().get(0).baseVertex(),
+                command.instanceCount()
+            );
+        };
     }
 
     public VulkanicGalExecutionRequest.DynamicStateSnapshot dynamicStateSnapshot() {
@@ -637,6 +695,7 @@ public final class VulkanicCompatibilityState {
         Map<Integer, Integer> bufferBindings,
         Map<IndexedBufferKey, BufferRangeState> indexedBufferBindings,
         Map<Integer, Integer> texture2DByUnit,
+        Map<Integer, Integer> textureUnitBindings,
         Map<TextureBindingKey, Integer> textureBindingsByKey,
         Map<Integer, Integer> samplerBindings,
         Map<Integer, ImageUnitBindingState> imageUnitBindings,
@@ -650,6 +709,7 @@ public final class VulkanicCompatibilityState {
             bufferBindings = Map.copyOf(bufferBindings);
             indexedBufferBindings = Map.copyOf(indexedBufferBindings);
             texture2DByUnit = Map.copyOf(texture2DByUnit);
+            textureUnitBindings = Map.copyOf(textureUnitBindings);
             textureBindingsByKey = Map.copyOf(textureBindingsByKey);
             samplerBindings = Map.copyOf(samplerBindings);
             imageUnitBindings = Map.copyOf(imageUnitBindings);
@@ -674,7 +734,7 @@ public final class VulkanicCompatibilityState {
             if (request.command().kind() != VulkanicGalExecutionRequest.DrawCommandKind.ARRAYS && vao.elementBuffer() > 0) {
                 indexBuffer = Optional.of(new VulkanicLegacyCompatibilityAdapter.IndexBufferSnapshot(
                     "legacy-buffer:" + vao.elementBuffer(),
-                    request.command().indexByteOffset(),
+                    0,
                     request.command().indexType().bytesPerIndex()
                 ));
             }
@@ -690,20 +750,79 @@ public final class VulkanicCompatibilityState {
                 if (texture <= 0) {
                     continue;
                 }
-                VulkanicPassResourceModel.ResourceUse use = VulkanicLegacyCompatibilityAdapter.sampledTextureUse(
+                boolean storageAlias = imageUnitBindings.values().stream()
+                    .anyMatch(image -> image.texture() == texture);
+                VulkanicPassResourceModel.ResourceUse use = VulkanicLegacyCompatibilityAdapter.resourceUse(
                     "texture-unit-" + unit,
+                    VulkanicPassResourceModel.ResourceKind.SAMPLED_TEXTURE,
                     "legacy-texture:" + texture,
+                    VulkanicPassResourceModel.Access.READ,
                     VulkanicPassResourceModel.Subresource.color(0, 1, 0, 1),
+                    VulkanicResourceUsage.SAMPLED_READ,
                     semanticIdentity + ":texture-unit:" + unit,
+                    storageAlias,
                     order++
                 );
                 bindings.add(new VulkanicPassResourceModel.BindingSnapshot(
                     "Sampler" + unit,
                     use,
                     OptionalInt.of(unit),
-                    OptionalInt.of(samplerBindings.getOrDefault(unit, 0))
+                    OptionalInt.of(samplerBindings.getOrDefault(unit, 0)),
+                    Optional.of(sampledTextureReference(
+                        use,
+                        texture,
+                        unit,
+                        samplerBindings.getOrDefault(unit, 0),
+                        OptionalInt.of(GL_TEXTURE_2D)
+                    ))
                 ));
             }
+            for (Map.Entry<Integer, Integer> entry : textureUnitBindings.entrySet()) {
+                int unit = entry.getKey();
+                if (texture2DByUnit.containsKey(unit)) {
+                    continue;
+                }
+                int texture = entry.getValue();
+                if (texture <= 0) {
+                    continue;
+                }
+                boolean storageAlias = imageUnitBindings.values().stream()
+                    .anyMatch(image -> image.texture() == texture);
+                VulkanicPassResourceModel.ResourceUse use = VulkanicLegacyCompatibilityAdapter.resourceUse(
+                    "texture-unit-" + unit,
+                    VulkanicPassResourceModel.ResourceKind.SAMPLED_TEXTURE,
+                    "legacy-texture:" + texture,
+                    VulkanicPassResourceModel.Access.READ,
+                    VulkanicPassResourceModel.Subresource.color(0, 1, 0, 1),
+                    VulkanicResourceUsage.SAMPLED_READ,
+                    semanticIdentity + ":direct-texture-unit:" + unit,
+                    storageAlias,
+                    order++
+                );
+                bindings.add(new VulkanicPassResourceModel.BindingSnapshot(
+                    "Sampler" + unit,
+                    use,
+                    OptionalInt.of(unit),
+                    OptionalInt.of(samplerBindings.getOrDefault(unit, 0)),
+                    Optional.of(sampledTextureReference(
+                        use,
+                        texture,
+                        unit,
+                        samplerBindings.getOrDefault(unit, 0),
+                        OptionalInt.empty()
+                    ))
+                ));
+            }
+            order = addTargetAwareSamplerBindings(
+                bindings,
+                textureBindingsByKey,
+                texture2DByUnit,
+                textureUnitBindings,
+                samplerBindings,
+                imageUnitBindings,
+                semanticIdentity,
+                order
+            );
             for (Map.Entry<IndexedBufferKey, BufferRangeState> entry : indexedBufferBindings.entrySet()) {
                 BufferRangeState range = entry.getValue();
                 if (range.buffer() <= 0) {
@@ -721,7 +840,17 @@ public final class VulkanicCompatibilityState {
                     "Buffer" + entry.getKey().index(),
                     use,
                     OptionalInt.of(entry.getKey().index()),
-                    OptionalInt.empty()
+                    OptionalInt.empty(),
+                    Optional.of(VulkanicPassResourceModel.CanonicalResourceReference.bufferRange(
+                        use.resource().logicalName(),
+                        use.resource().kind(),
+                        use.resource().stableKey(),
+                        Math.max(0L, range.offset()),
+                        range.size() == Long.MAX_VALUE ? 1L : Math.max(1L, range.size()),
+                        use.access(),
+                        use.usage(),
+                        OptionalInt.of(entry.getKey().index())
+                    ))
                 ));
             }
             addStorageImageBindings(bindings, imageUnitBindings, semanticIdentity, order);
@@ -735,6 +864,7 @@ public final class VulkanicCompatibilityState {
         Map<Integer, Integer> bufferBindings,
         Map<IndexedBufferKey, BufferRangeState> indexedBufferBindings,
         Map<Integer, Integer> texture2DByUnit,
+        Map<Integer, Integer> textureUnitBindings,
         Map<TextureBindingKey, Integer> textureBindingsByKey,
         Map<Integer, Integer> samplerBindings,
         Map<Integer, ImageUnitBindingState> imageUnitBindings,
@@ -745,6 +875,7 @@ public final class VulkanicCompatibilityState {
             bufferBindings = Map.copyOf(bufferBindings);
             indexedBufferBindings = Map.copyOf(indexedBufferBindings);
             texture2DByUnit = Map.copyOf(texture2DByUnit);
+            textureUnitBindings = Map.copyOf(textureUnitBindings);
             textureBindingsByKey = Map.copyOf(textureBindingsByKey);
             samplerBindings = Map.copyOf(samplerBindings);
             imageUnitBindings = Map.copyOf(imageUnitBindings);
@@ -760,20 +891,79 @@ public final class VulkanicCompatibilityState {
                 if (texture <= 0) {
                     continue;
                 }
-                VulkanicPassResourceModel.ResourceUse use = VulkanicLegacyCompatibilityAdapter.sampledTextureUse(
+                boolean storageAlias = imageUnitBindings.values().stream()
+                    .anyMatch(image -> image.texture() == texture);
+                VulkanicPassResourceModel.ResourceUse use = VulkanicLegacyCompatibilityAdapter.resourceUse(
                     "compute-texture-unit-" + unit,
+                    VulkanicPassResourceModel.ResourceKind.SAMPLED_TEXTURE,
                     "legacy-texture:" + texture,
+                    VulkanicPassResourceModel.Access.READ,
                     VulkanicPassResourceModel.Subresource.color(0, 1, 0, 1),
+                    VulkanicResourceUsage.SAMPLED_READ,
                     semanticIdentity + ":compute-texture-unit:" + unit,
+                    storageAlias,
                     order++
                 );
                 bindings.add(new VulkanicPassResourceModel.BindingSnapshot(
                     "Sampler" + unit,
                     use,
                     OptionalInt.of(unit),
-                    OptionalInt.of(samplerBindings.getOrDefault(unit, 0))
+                    OptionalInt.of(samplerBindings.getOrDefault(unit, 0)),
+                    Optional.of(sampledTextureReference(
+                        use,
+                        texture,
+                        unit,
+                        samplerBindings.getOrDefault(unit, 0),
+                        OptionalInt.of(GL_TEXTURE_2D)
+                    ))
                 ));
             }
+            for (Map.Entry<Integer, Integer> entry : textureUnitBindings.entrySet()) {
+                int unit = entry.getKey();
+                if (texture2DByUnit.containsKey(unit)) {
+                    continue;
+                }
+                int texture = entry.getValue();
+                if (texture <= 0) {
+                    continue;
+                }
+                boolean storageAlias = imageUnitBindings.values().stream()
+                    .anyMatch(image -> image.texture() == texture);
+                VulkanicPassResourceModel.ResourceUse use = VulkanicLegacyCompatibilityAdapter.resourceUse(
+                    "compute-texture-unit-" + unit,
+                    VulkanicPassResourceModel.ResourceKind.SAMPLED_TEXTURE,
+                    "legacy-texture:" + texture,
+                    VulkanicPassResourceModel.Access.READ,
+                    VulkanicPassResourceModel.Subresource.color(0, 1, 0, 1),
+                    VulkanicResourceUsage.SAMPLED_READ,
+                    semanticIdentity + ":compute-direct-texture-unit:" + unit,
+                    storageAlias,
+                    order++
+                );
+                bindings.add(new VulkanicPassResourceModel.BindingSnapshot(
+                    "Sampler" + unit,
+                    use,
+                    OptionalInt.of(unit),
+                    OptionalInt.of(samplerBindings.getOrDefault(unit, 0)),
+                    Optional.of(sampledTextureReference(
+                        use,
+                        texture,
+                        unit,
+                        samplerBindings.getOrDefault(unit, 0),
+                        OptionalInt.empty()
+                    ))
+                ));
+            }
+            order = addTargetAwareSamplerBindings(
+                bindings,
+                textureBindingsByKey,
+                texture2DByUnit,
+                textureUnitBindings,
+                samplerBindings,
+                imageUnitBindings,
+                semanticIdentity,
+                order
+            );
             for (Map.Entry<IndexedBufferKey, BufferRangeState> entry : indexedBufferBindings.entrySet()) {
                 BufferRangeState range = entry.getValue();
                 if (range.buffer() <= 0) {
@@ -791,7 +981,17 @@ public final class VulkanicCompatibilityState {
                     "Buffer" + entry.getKey().index(),
                     use,
                     OptionalInt.of(entry.getKey().index()),
-                    OptionalInt.empty()
+                    OptionalInt.empty(),
+                    Optional.of(VulkanicPassResourceModel.CanonicalResourceReference.bufferRange(
+                        use.resource().logicalName(),
+                        use.resource().kind(),
+                        use.resource().stableKey(),
+                        Math.max(0L, range.offset()),
+                        range.size() == Long.MAX_VALUE ? 1L : Math.max(1L, range.size()),
+                        use.access(),
+                        use.usage(),
+                        OptionalInt.of(entry.getKey().index())
+                    ))
                 ));
             }
             addStorageImageBindings(bindings, imageUnitBindings, semanticIdentity, order);
@@ -809,22 +1009,131 @@ public final class VulkanicCompatibilityState {
             if (image.texture() <= 0) {
                 continue;
             }
-            VulkanicPassResourceModel.ResourceUse use = VulkanicLegacyCompatibilityAdapter.storageTextureUse(
+            boolean sampledAlias = bindings.stream()
+                .anyMatch(binding -> binding.resourceUse().resource().stableKey().equals("legacy-texture:" + image.texture()));
+            VulkanicPassResourceModel.ResourceUse use = VulkanicLegacyCompatibilityAdapter.resourceUse(
                 "image-unit-" + image.imageUnit(),
+                VulkanicPassResourceModel.ResourceKind.STORAGE_TEXTURE,
                 "legacy-texture:" + image.texture(),
+                imageAccess(image.access()),
                 image.layered()
                     ? VulkanicPassResourceModel.Subresource.color(image.level(), 1, 0, Math.max(1, image.layer() + 1))
                     : VulkanicPassResourceModel.Subresource.color(image.level(), 1, Math.max(0, image.layer()), 1),
+                imageUsage(image.access()),
                 semanticIdentity + ":image-unit:" + image.imageUnit(),
+                sampledAlias,
                 order++
             );
             bindings.add(new VulkanicPassResourceModel.BindingSnapshot(
                 "Image" + image.imageUnit(),
                 use,
                 OptionalInt.of(image.imageUnit()),
-                OptionalInt.empty()
+                OptionalInt.empty(),
+                Optional.of(VulkanicPassResourceModel.CanonicalResourceReference.storageImage(
+                    use.resource().logicalName(),
+                    use.resource().stableKey(),
+                    image.texture(),
+                    image.level(),
+                    image.layered(),
+                    image.layer(),
+                    use.access(),
+                    use.usage(),
+                    OptionalInt.of(image.imageUnit()),
+                    OptionalInt.of(image.access()),
+                    OptionalInt.of(image.format())
+                ))
             ));
         }
+    }
+
+    private static VulkanicPassResourceModel.Access imageAccess(int access) {
+        return switch (access) {
+            case GL_READ_ONLY -> VulkanicPassResourceModel.Access.READ;
+            case GL_WRITE_ONLY -> VulkanicPassResourceModel.Access.WRITE;
+            default -> VulkanicPassResourceModel.Access.READ_WRITE;
+        };
+    }
+
+    private static VulkanicResourceUsage imageUsage(int access) {
+        return access == GL_READ_ONLY ? VulkanicResourceUsage.SAMPLED_READ : VulkanicResourceUsage.STORAGE_READ_WRITE;
+    }
+
+    private static int addTargetAwareSamplerBindings(
+        List<VulkanicPassResourceModel.BindingSnapshot> bindings,
+        Map<TextureBindingKey, Integer> textureBindingsByKey,
+        Map<Integer, Integer> texture2DByUnit,
+        Map<Integer, Integer> textureUnitBindings,
+        Map<Integer, Integer> samplerBindings,
+        Map<Integer, ImageUnitBindingState> imageUnitBindings,
+        String semanticIdentity,
+        int order
+    ) {
+        for (Map.Entry<TextureBindingKey, Integer> entry : textureBindingsByKey.entrySet()) {
+            TextureBindingKey key = entry.getKey();
+            if (texture2DByUnit.containsKey(key.unit()) || textureUnitBindings.containsKey(key.unit())) {
+                continue;
+            }
+            int texture = entry.getValue();
+            if (texture <= 0) {
+                continue;
+            }
+            boolean storageAlias = imageUnitBindings.values().stream()
+                .anyMatch(image -> image.texture() == texture);
+            VulkanicPassResourceModel.ResourceUse use = VulkanicLegacyCompatibilityAdapter.resourceUse(
+                "texture-unit-" + key.unit() + "-target-" + key.target(),
+                VulkanicPassResourceModel.ResourceKind.SAMPLED_TEXTURE,
+                "legacy-texture:" + texture,
+                VulkanicPassResourceModel.Access.READ,
+                VulkanicPassResourceModel.Subresource.color(0, 1, 0, 1),
+                VulkanicResourceUsage.SAMPLED_READ,
+                semanticIdentity + ":texture-unit:" + key.unit() + ":target:" + key.target(),
+                storageAlias,
+                order++
+            );
+            bindings.add(new VulkanicPassResourceModel.BindingSnapshot(
+                "Sampler" + key.unit(),
+                use,
+                OptionalInt.of(key.unit()),
+                OptionalInt.of(samplerBindings.getOrDefault(key.unit(), 0)),
+                Optional.of(sampledTextureReference(
+                    use,
+                    texture,
+                    key.unit(),
+                    samplerBindings.getOrDefault(key.unit(), 0),
+                    OptionalInt.of(key.target())
+                ))
+            ));
+        }
+        return order;
+    }
+
+    private static VulkanicPassResourceModel.CanonicalResourceReference sampledTextureReference(
+        VulkanicPassResourceModel.ResourceUse use,
+        int texture,
+        int unit,
+        int sampler,
+        OptionalInt target
+    ) {
+        return VulkanicPassResourceModel.CanonicalResourceReference.sampledTexture(
+            use.resource().logicalName(),
+            use.resource().stableKey(),
+            texture,
+            target,
+            target.isPresent()
+                ? targetClassForLegacyTarget(target.getAsInt())
+                : VulkanicPassResourceModel.TargetClass.UNKNOWN,
+            use.subresource(),
+            OptionalInt.of(unit),
+            sampler > 0 ? OptionalInt.of(sampler) : OptionalInt.empty()
+        );
+    }
+
+    private static VulkanicPassResourceModel.TargetClass targetClassForLegacyTarget(int target) {
+        return switch (target) {
+            case GL_TEXTURE_2D -> VulkanicPassResourceModel.TargetClass.TEXTURE_2D;
+            case GL_TEXTURE_3D -> VulkanicPassResourceModel.TargetClass.TEXTURE_3D;
+            default -> VulkanicPassResourceModel.TargetClass.UNKNOWN;
+        };
     }
 
     public record ProgramSnapshot(int programId, Map<Integer, UniformValue> uniformsByLocation) {
@@ -1029,11 +1338,13 @@ public final class VulkanicCompatibilityState {
     private static final class FramebufferState {
         private final int framebuffer;
         private final Map<Integer, AttachmentState> attachments = new LinkedHashMap<>();
-        private List<Integer> drawBuffers = List.of(GL_COLOR_ATTACHMENT0);
-        private int readBuffer = GL_COLOR_ATTACHMENT0;
+        private List<Integer> drawBuffers;
+        private int readBuffer;
 
         private FramebufferState(int framebuffer) {
             this.framebuffer = framebuffer;
+            this.drawBuffers = List.of(framebuffer == 0 ? GL_BACK : GL_COLOR_ATTACHMENT0);
+            this.readBuffer = framebuffer == 0 ? GL_BACK : GL_COLOR_ATTACHMENT0;
         }
 
         private FramebufferSnapshot copy() {
@@ -1045,14 +1356,14 @@ public final class VulkanicCompatibilityState {
         private Optional<VulkanicGalExecutionRequest.Viewport> viewport = Optional.empty();
         private Optional<VulkanicGalExecutionRequest.Scissor> scissor = Optional.empty();
         private boolean blendEnabled;
-        private int blendSrcRgb;
-        private int blendDstRgb;
-        private int blendSrcAlpha;
-        private int blendDstAlpha;
-        private int blendEquationRgb;
-        private int blendEquationAlpha;
+        private int blendSrcRgb = 1 /* GL_ONE */;
+        private int blendDstRgb = 0 /* GL_ZERO */;
+        private int blendSrcAlpha = 1 /* GL_ONE */;
+        private int blendDstAlpha = 0 /* GL_ZERO */;
+        private int blendEquationRgb = 0x8006 /* GL_FUNC_ADD */;
+        private int blendEquationAlpha = 0x8006 /* GL_FUNC_ADD */;
         private boolean depthTestEnabled;
-        private int depthFunc;
+        private int depthFunc = 0x0201 /* GL_LESS */;
         private boolean depthWriteMask = true;
         private boolean cullEnabled;
         private int cullFaceMode = 0x0405 /* GL_BACK */;

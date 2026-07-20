@@ -1280,19 +1280,21 @@ public class Phase3DrawPathTest {
                 && resourceManagerSource.contains("new LegacyVertexAttribute(index, index, size, type, normalized, integer, Math.toIntExact(pointer), divisor)")
                 && resourceManagerSource.contains("bindings.put(index, new LegacyVertexBinding(index, effectiveStride, 0, divisor, buffer))"),
             "Pre-GL43 attribute pointers should preserve captured buffers and any divisor set before the pointer call inside the manager");
-        assertTrue(backendSource.contains("DrawResourceSnapshot drawResources = legacyDrawResourceSnapshot();")
+        assertTrue(backendSource.contains("captureRequestOwnedGalDraw(")
                 && backendSource.contains("PipelineResourcePlanner.Plan resourceBindingPlan")
-                && backendSource.contains("VulkanicGalSnapshotBuilder.legacyGraphicsSnapshot(")
-                && backendSource.contains("pollCapturedLegacyGalDraw(galRequest, request)")
+                && galSnapshotBuilderSource.contains("return request.withCompatibilitySnapshot(")
+                && galSnapshotBuilderSource.contains("compatibilityState.compatibilitySnapshotFor(request)")
+                && !backendSource.contains("pendingCapturedGalDraws")
                 && backendSource.contains("spine.executeCapturedGalDraw(")
                 && backendSource.contains("private void executeCapturedGalDraw(")
                 && backendSource.contains("VulkanDrawExecutionCoordinator.DrawExecutionPlan plan,")
                 && backendSource.contains("VulkanDrawExecutionCoordinator.DrawResourceSnapshot drawResources")
+                && backendSource.contains("@Nullable PipelineResourcePlanner.Plan resourceBindingPlan")
                 && backendSource.contains("VulkanicGalExecutionRequest.GraphicsDrawRequest capturedGalRequest")
                 && backendSource.contains("unresolved-legacy-compatibility")
-                && !backendSource.contains("backend.legacyDrawResourceSnapshot();")
+                && !backendSource.contains("legacyDrawResourceSnapshot()")
                 && backendSource.contains("plan.vertexStream()")
-                && backendSource.contains("for (VulkanDrawExecutionCoordinator.VertexBufferBindingPlan binding : plan.vertexStream().vertexBuffers())")
+                && backendSource.contains("for (VulkanDrawExecutionCoordinator.VertexBufferBindingPlan binding : vertexStream.vertexBuffers())")
                 && galSnapshotBuilderSource.contains("VulkanicGalExecutionRequest.GraphicsCompatibilitySnapshot")
                 && galSnapshotBuilderSource.contains("Objects.requireNonNull(vertexInput, \"vertexInput\")")
                 && backendSource.contains("new VulkanGraphicsCommandExecutionCoordinator.VertexBufferBindingRequirement(")
@@ -1332,9 +1334,10 @@ public class Phase3DrawPathTest {
             "The shared native encoder should satisfy the Mojang CommandEncoder contract used by Sodium");
         assertTrue(nativeEncoderSource.contains("private final class NativeRenderPass implements RenderPass"),
             "The native terrain encoder should provide a Mojang RenderPass adapter for existing Sodium draw code");
-        assertTrue(nativeEncoderSource.contains("this.backend.beginRenderPass(ctx, label, colorView, clearColor, depthView, clearDepth)")
-                && nativeEncoderSource.contains("this.backend.beginRenderPass(ctx, label, framebuffer, hasDepthTexture)"),
-            "The native terrain encoder should begin native Vulkan render passes directly instead of routing through GlCommandEncoder");
+        assertTrue(nativeEncoderSource.contains("this.backend.executeRenderPassBegin(")
+                && nativeEncoderSource.contains("VulkanicGalExecutionRequest.RenderPassBeginRequest.descriptor(")
+                && nativeEncoderSource.contains("VulkanicGalExecutionRequest.RenderPassBeginRequest.framebuffer("),
+            "The native terrain encoder should begin native Vulkan render passes through the explicit GAL lifecycle boundary instead of routing through GlCommandEncoder");
         assertTrue(nativeEncoderSource.contains("this.colorView != null")
                 && nativeEncoderSource.contains("this.colorView,")
                 && nativeEncoderSource.contains("this.depthView"),
@@ -1390,11 +1393,14 @@ public class Phase3DrawPathTest {
         assertTrue(glCommandEncoderSource.contains("VulkanicAPI.beginRenderPass(renderPassCtx, supplier, framebuffer, hasDepthTexture)"),
             "Compatibility framebuffer render passes must pass hasDepthTexture through to Vulkan");
         assertTrue(apiSource.contains("beginRenderPass(ctx, label, framebuffer, true)")
-                && apiSource.contains("directVulkanBackend.beginRenderPass(ctx, label, framebuffer, hasDepthTexture)")
-                && apiSource.contains("getBackend().beginRenderPass(ctx, label, framebuffer, hasDepthTexture)"),
-            "VulkanicAPI should preserve the old default while exposing explicit framebuffer depth participation");
-        assertTrue(nativeEncoderSource.contains("this.backend.beginRenderPass(ctx, label, framebuffer, hasDepthTexture)"),
-            "Native framebuffer render passes must preserve hasDepthTexture when bypassing GlCommandEncoder");
+                && apiSource.contains("VulkanicGalExecutionRequest.RenderPassBeginRequest.framebuffer(")
+                && apiSource.contains("hasDepthTexture")
+                && apiSource.contains("executeGalRenderPassBegin("),
+            "VulkanicAPI should preserve the old default while capturing explicit framebuffer depth participation in the GAL request");
+        assertTrue(nativeEncoderSource.contains("VulkanicGalExecutionRequest.RenderPassBeginRequest.framebuffer(")
+                && nativeEncoderSource.contains("hasDepthTexture")
+                && nativeEncoderSource.contains("this.backend.executeRenderPassBegin("),
+            "Native framebuffer render passes must preserve hasDepthTexture through the explicit GAL lifecycle request");
         assertTrue(backendSource.contains("resolveFramebufferRenderTargetPlan(label, framebuffer, hasDepthTexture)")
                 && backendSource.contains("resolveFramebufferTargets(framebuffer, includeDepthAttachment)")
                 && backendSource.contains("if (includeDepthAttachment && depthTextureId != 0)"),

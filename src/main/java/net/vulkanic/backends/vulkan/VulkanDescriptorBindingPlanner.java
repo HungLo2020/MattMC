@@ -33,6 +33,7 @@ final class VulkanDescriptorBindingPlanner {
         List<PipelineDescriptor.ResourceBinding> layoutBindings = normalizeDescriptorLayoutBindings(request.layoutBindings());
         List<DescriptorPlanEntry> entries = new ArrayList<>(layoutBindings.size());
         Set<Integer> storageImageTextureIds = collectStorageImageTextureIds(layoutBindings, request.bindings());
+        Set<String> readWriteAliasStableKeys = collectReadWriteAliasStableKeys(layoutBindings, request.bindings());
         boolean cacheable = true;
 
         for (PipelineDescriptor.ResourceBinding binding : layoutBindings) {
@@ -41,7 +42,8 @@ final class VulkanDescriptorBindingPlanner {
                 case SAMPLER, COMPARISON_SAMPLER -> planSamplerBinding(
                     effectiveBinding,
                     request,
-                    storageImageTextureIds
+                    storageImageTextureIds,
+                    readWriteAliasStableKeys
                 );
                 case UNIFORM_BUFFER -> {
                     UniformBufferEntry uniformEntry = planUniformBufferBinding(effectiveBinding, request);
@@ -50,8 +52,8 @@ final class VulkanDescriptorBindingPlanner {
                     }
                     yield uniformEntry;
                 }
-                case STORAGE_IMAGE -> planStorageImageBinding(effectiveBinding, request);
-                case TEXEL_BUFFER -> planTexelBufferBinding(effectiveBinding, request);
+                case STORAGE_IMAGE -> planStorageImageBinding(effectiveBinding, request, readWriteAliasStableKeys);
+                case TEXEL_BUFFER -> planTexelBufferBinding(effectiveBinding, request, readWriteAliasStableKeys);
             };
             entries.add(entry);
         }
@@ -91,10 +93,92 @@ final class VulkanDescriptorBindingPlanner {
         return storageImageTextureIds;
     }
 
+    Set<String> collectReadWriteAliasStableKeys(
+        List<PipelineDescriptor.ResourceBinding> layoutBindings,
+        PipelineResourceBindings bindings
+    ) {
+        Set<String> sampledStableKeys = new HashSet<>();
+        Set<String> storageStableKeys = new HashSet<>();
+        Set<Integer> sampledLegacyIds = new HashSet<>();
+        Set<Integer> storageLegacyIds = new HashSet<>();
+
+        for (PipelineDescriptor.ResourceBinding binding : layoutBindings) {
+            PipelineDescriptor.ResourceBinding effectiveBinding = withEffectiveBindingType(binding, bindings);
+            switch (effectiveBinding.type()) {
+                case SAMPLER, COMPARISON_SAMPLER -> {
+                    PipelineResourceBindings.SamplerBinding samplerBinding =
+                        bindings.getSamplerBindingOrNull(effectiveBinding.name());
+                    addReferenceIdentity(samplerBinding == null ? null : samplerBinding.resourceReference(),
+                        sampledStableKeys, sampledLegacyIds);
+                }
+                case STORAGE_IMAGE -> {
+                    PipelineResourceBindings.StorageImageBinding imageBinding =
+                        bindings.getStorageImageBindingOrNull(effectiveBinding.name());
+                    addReferenceIdentity(imageBinding == null ? null : imageBinding.resourceReference(),
+                        storageStableKeys, storageLegacyIds);
+                }
+                case UNIFORM_BUFFER, TEXEL_BUFFER -> {
+                    // These resource classes are not sampled/storage-image read-write aliases.
+                }
+            }
+        }
+
+        Set<String> aliases = new HashSet<>(sampledStableKeys);
+        aliases.retainAll(storageStableKeys);
+        Set<Integer> sharedLegacyIds = new HashSet<>(sampledLegacyIds);
+        sharedLegacyIds.retainAll(storageLegacyIds);
+        if (!sharedLegacyIds.isEmpty()) {
+            addStableKeysForLegacyIds(layoutBindings, bindings, sharedLegacyIds, aliases);
+        }
+        return aliases;
+    }
+
+    private void addStableKeysForLegacyIds(
+        List<PipelineDescriptor.ResourceBinding> layoutBindings,
+        PipelineResourceBindings bindings,
+        Set<Integer> sharedLegacyIds,
+        Set<String> aliases
+    ) {
+        for (PipelineDescriptor.ResourceBinding binding : layoutBindings) {
+            PipelineDescriptor.ResourceBinding effectiveBinding = withEffectiveBindingType(binding, bindings);
+            VulkanicPassResourceModel.CanonicalResourceReference reference = switch (effectiveBinding.type()) {
+                case SAMPLER, COMPARISON_SAMPLER -> {
+                    PipelineResourceBindings.SamplerBinding samplerBinding =
+                        bindings.getSamplerBindingOrNull(effectiveBinding.name());
+                    yield samplerBinding == null ? null : samplerBinding.resourceReference();
+                }
+                case STORAGE_IMAGE -> {
+                    PipelineResourceBindings.StorageImageBinding imageBinding =
+                        bindings.getStorageImageBindingOrNull(effectiveBinding.name());
+                    yield imageBinding == null ? null : imageBinding.resourceReference();
+                }
+                case UNIFORM_BUFFER, TEXEL_BUFFER -> null;
+            };
+            if (reference != null
+                && reference.legacyId().isPresent()
+                && sharedLegacyIds.contains(reference.legacyId().getAsInt())) {
+                aliases.add(reference.resource().stableKey());
+            }
+        }
+    }
+
+    private static void addReferenceIdentity(
+        @Nullable VulkanicPassResourceModel.CanonicalResourceReference reference,
+        Set<String> stableKeys,
+        Set<Integer> legacyIds
+    ) {
+        if (reference == null) {
+            return;
+        }
+        stableKeys.add(reference.resource().stableKey());
+        reference.legacyId().ifPresent(legacyIds::add);
+    }
+
     private SamplerEntry planSamplerBinding(
         PipelineDescriptor.ResourceBinding binding,
         PlanRequest request,
-        Set<Integer> storageImageTextureIds
+        Set<Integer> storageImageTextureIds,
+        Set<String> readWriteAliasStableKeys
     ) {
         PipelineResourceBindings.SamplerBinding samplerBinding = request.bindings().getSamplerBindingOrNull(binding.name());
         if (samplerBinding == null) {
@@ -159,6 +243,16 @@ final class VulkanDescriptorBindingPlanner {
                 : null,
             request.samplerStateLookup()
         );
+        VulkanicPassResourceModel.ResourceUse resourceUse = canonicalResourceUse(
+            samplerBinding.resourceReference(),
+            request.pipelineLocation() + ":sampler:" + binding.name(),
+            isReadWriteAlias(samplerBinding.resourceReference(), readWriteAliasStableKeys),
+            binding.binding()
+        ).orElse(null);
+        if (resourceUse == null) {
+            resourceUse = samplerResourceUse(binding, resolvedTextureView, sampledTexture, imagePlan, request.pipelineLocation());
+        }
+
         return new SamplerEntry(
             binding.name(),
             binding.binding(),
@@ -183,7 +277,7 @@ final class VulkanDescriptorBindingPlanner {
                 && ("Sampler0".contentEquals(binding.name()) || "Sampler2".contentEquals(binding.name())),
             request.pipelineLocation(),
             request.pipelineHandle(),
-            samplerResourceUse(binding, resolvedTextureView, sampledTexture, imagePlan, request.pipelineLocation())
+            resourceUse
         );
     }
 
@@ -221,7 +315,8 @@ final class VulkanDescriptorBindingPlanner {
 
     private StorageImageEntry planStorageImageBinding(
         PipelineDescriptor.ResourceBinding binding,
-        PlanRequest request
+        PlanRequest request,
+        Set<String> readWriteAliasStableKeys
     ) {
         PipelineResourceBindings.StorageImageBinding imageBinding =
             request.bindings().getStorageImageBindingOrNull(binding.name());
@@ -275,13 +370,21 @@ final class VulkanDescriptorBindingPlanner {
             mipLevel,
             imagePlan.descriptorImageViewHandle(),
             imagePlan.imageLayout(),
-            storageImageResourceUse(binding, imageBinding, texture, mipLevel, request.pipelineLocation())
+            canonicalResourceUse(
+                imageBinding.resourceReference(),
+                request.pipelineLocation() + ":storage-image:" + binding.name(),
+                isReadWriteAlias(imageBinding.resourceReference(), readWriteAliasStableKeys),
+                binding.binding()
+            ).orElseGet(() ->
+                storageImageResourceUse(binding, imageBinding, texture, mipLevel, request.pipelineLocation())
+            )
         );
     }
 
     private TexelBufferEntry planTexelBufferBinding(
         PipelineDescriptor.ResourceBinding binding,
-        PlanRequest request
+        PlanRequest request,
+        Set<String> readWriteAliasStableKeys
     ) {
         PipelineResourceBindings.TexelBufferBinding texelBinding =
             request.bindings().getTexelBufferBindingOrNull(binding.name());
@@ -316,8 +419,33 @@ final class VulkanDescriptorBindingPlanner {
             legacyTexelBinding.internalFormat(),
             legacyTexelBinding.legacyBufferId(),
             legacyTexelBinding.bufferViewHandle(),
-            texelBufferResourceUse(binding, legacyTexelBinding, request.pipelineLocation())
+            canonicalResourceUse(
+                texelBinding.resourceReference(),
+                request.pipelineLocation() + ":texel-buffer:" + binding.name(),
+                isReadWriteAlias(texelBinding.resourceReference(), readWriteAliasStableKeys),
+                binding.binding()
+            ).orElseGet(() ->
+                texelBufferResourceUse(binding, legacyTexelBinding, request.pipelineLocation())
+            )
         );
+    }
+
+    private java.util.Optional<VulkanicPassResourceModel.ResourceUse> canonicalResourceUse(
+        @Nullable VulkanicPassResourceModel.CanonicalResourceReference reference,
+        String role,
+        boolean feedbackLoop,
+        int order
+    ) {
+        return reference == null
+            ? java.util.Optional.empty()
+            : java.util.Optional.of(reference.asResourceUse(role, feedbackLoop, order));
+    }
+
+    private static boolean isReadWriteAlias(
+        @Nullable VulkanicPassResourceModel.CanonicalResourceReference reference,
+        Set<String> readWriteAliasStableKeys
+    ) {
+        return reference != null && readWriteAliasStableKeys.contains(reference.resource().stableKey());
     }
 
     private VulkanicPassResourceModel.ResourceUse samplerResourceUse(

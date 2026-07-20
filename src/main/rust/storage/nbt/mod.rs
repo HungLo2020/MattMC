@@ -80,6 +80,9 @@ fn ptr_to_bytes<'a>(ptr: *const u8, len: u64) -> Result<&'a [u8], NativeNbtResul
             output_len: 0,
         });
     }
+    if len == 0 {
+        return Ok(&[]);
+    }
     if len != 0 && ptr.is_null() {
         return Err(NativeNbtResult {
             status: STATUS_INVALID_ARGUMENT,

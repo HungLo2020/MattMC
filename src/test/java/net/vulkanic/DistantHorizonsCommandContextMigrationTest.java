@@ -922,10 +922,12 @@ public class DistantHorizonsCommandContextMigrationTest {
         String drawCoordinatorSource = readSourceWithoutComments(drawCoordinator);
         String descriptorSource = readSourceWithoutComments(descriptor);
 
-        assertTrue(backendSource.contains("backend.materializeLegacyProgramPipelineForDraw(commandBufferHandle, plan, capturedGalRequest)")
+        assertTrue(backendSource.contains("backend.materializeLegacyProgramPipelineForDraw(")
+                && backendSource.contains("capturedResourceBindingPlan")
+                && backendSource.contains("captureRequestOwnedGalDraw(")
                 && backendSource.contains("drawExecution.planLegacyDraw(")
                 && backendSource.contains("graphicsCommandExecution.planGraphicsExecution("),
-            "Legacy DH draw calls should resolve a draw execution plan and route pipeline, descriptor, vertex, index, and draw emission through graphics command execution planning");
+            "Legacy DH draw calls should resolve request-owned draw snapshots and route pipeline, descriptor, vertex, index, and draw emission through graphics command execution planning");
         assertTrue(backendSource.contains("bufferVertexResources.setVertexAttributeFormat")
                 && resourceManagerSource.contains("void setVertexAttributeFormat"),
             "VulkanBackend should route GL43 vertex attribute format calls into the buffer/vertex resource manager instead of accepting them as no-ops");
@@ -975,8 +977,9 @@ public class DistantHorizonsCommandContextMigrationTest {
         assertTrue(vulkanicApiSource.contains("direct -> direct.setVertexAttribDivisor(ctx, index, divisor)"),
             "Instanced attribute divisors should route to the direct Vulkan implementation");
         assertTrue(vulkanicApiSource.contains("private static void drawIndexedInstancedRaw")
-                && vulkanicApiSource.contains("direct -> direct.drawIndexedInstanced(ctx, mode, count, type, indices, instanceCount)"),
-            "Instanced indexed draws should route to the direct Vulkan implementation");
+                && vulkanicApiSource.contains("drawIndexedInstancedBaseVertexRaw(ctx, mode, count, type, indices, instanceCount, 0)")
+                && vulkanicApiSource.contains("\"drawIndexedInstancedBaseVertex\""),
+            "Instanced indexed draws should route through the immutable graphics GAL request boundary");
     }
 
     @Test

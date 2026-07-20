@@ -82,6 +82,10 @@ public final class PipelineResourceBindings {
         return Optional.ofNullable(samplerBindings.get(name));
     }
 
+    public Map<String, SamplerBinding> samplerBindings() {
+        return samplerBindings;
+    }
+
     @Nullable
     public SamplerBinding getSamplerBindingOrNull(String name) {
         Objects.requireNonNull(name, "name must not be null");
@@ -91,6 +95,10 @@ public final class PipelineResourceBindings {
     public Optional<VulkanicBufferSlice> getUniformBufferBinding(String name) {
         Objects.requireNonNull(name, "name must not be null");
         return Optional.ofNullable(uniformBufferBindings.get(name));
+    }
+
+    public Map<String, VulkanicBufferSlice> uniformBufferBindings() {
+        return uniformBufferBindings;
     }
 
     @Nullable
@@ -104,6 +112,10 @@ public final class PipelineResourceBindings {
         return Optional.ofNullable(texelBufferBindings.get(name));
     }
 
+    public Map<String, TexelBufferBinding> texelBufferBindings() {
+        return texelBufferBindings;
+    }
+
     @Nullable
     public TexelBufferBinding getTexelBufferBindingOrNull(String name) {
         Objects.requireNonNull(name, "name must not be null");
@@ -113,6 +125,10 @@ public final class PipelineResourceBindings {
     public Optional<StorageImageBinding> getStorageImageBinding(String name) {
         Objects.requireNonNull(name, "name must not be null");
         return Optional.ofNullable(storageImageBindings.get(name));
+    }
+
+    public Map<String, StorageImageBinding> storageImageBindings() {
+        return storageImageBindings;
     }
 
     @Nullable
@@ -209,7 +225,12 @@ public final class PipelineResourceBindings {
         return Objects.hash(samplerBindings, uniformBufferBindings, storageImageBindings, texelBufferBindings);
     }
 
-    public record SamplerBinding(int textureUnit, @Nullable Integer samplerObject, @Nullable VulkanicTextureView textureView) {
+    public record SamplerBinding(
+        int textureUnit,
+        @Nullable Integer samplerObject,
+        @Nullable VulkanicTextureView textureView,
+        @Nullable VulkanicPassResourceModel.CanonicalResourceReference resourceReference
+    ) {
         public SamplerBinding {
             if (textureUnit < 0) {
                 throw new IllegalArgumentException("textureUnit must be >= 0");
@@ -217,6 +238,14 @@ public final class PipelineResourceBindings {
             if (samplerObject != null && samplerObject < 0) {
                 throw new IllegalArgumentException("samplerObject must be >= 0 when provided");
             }
+            if (resourceReference != null
+                && resourceReference.resource().kind() != VulkanicPassResourceModel.ResourceKind.SAMPLED_TEXTURE) {
+                throw new IllegalArgumentException("sampler resource reference must be a sampled texture");
+            }
+        }
+
+        public SamplerBinding(int textureUnit, @Nullable Integer samplerObject, @Nullable VulkanicTextureView textureView) {
+            this(textureUnit, samplerObject, textureView, null);
         }
 
         public SamplerBinding(int textureUnit, @Nullable Integer samplerObject) {
@@ -227,16 +256,35 @@ public final class PipelineResourceBindings {
             this(textureUnit, null, textureView);
         }
 
-		public SamplerBinding withTextureView(@Nullable VulkanicTextureView textureView) {
-			return new SamplerBinding(textureUnit, samplerObject, textureView);
-		}
+			public SamplerBinding withTextureView(@Nullable VulkanicTextureView textureView) {
+				return new SamplerBinding(textureUnit, samplerObject, textureView, resourceReference);
+			}
+
+        public SamplerBinding withResourceReference(@Nullable VulkanicPassResourceModel.CanonicalResourceReference reference) {
+            return new SamplerBinding(textureUnit, samplerObject, textureView, reference);
+        }
     }
 
-    public record TexelBufferBinding(int textureUnit) {
+    public record TexelBufferBinding(
+        int textureUnit,
+        @Nullable VulkanicPassResourceModel.CanonicalResourceReference resourceReference
+    ) {
         public TexelBufferBinding {
             if (textureUnit < 0) {
                 throw new IllegalArgumentException("textureUnit must be >= 0");
             }
+            if (resourceReference != null
+                && resourceReference.resource().kind() != VulkanicPassResourceModel.ResourceKind.TEXEL_BUFFER) {
+                throw new IllegalArgumentException("texel-buffer resource reference must be a texel buffer");
+            }
+        }
+
+        public TexelBufferBinding(int textureUnit) {
+            this(textureUnit, null);
+        }
+
+        public TexelBufferBinding withResourceReference(@Nullable VulkanicPassResourceModel.CanonicalResourceReference reference) {
+            return new TexelBufferBinding(textureUnit, reference);
         }
     }
 
@@ -247,7 +295,8 @@ public final class PipelineResourceBindings {
         boolean layered,
         int layer,
         int access,
-        int format
+        int format,
+        @Nullable VulkanicPassResourceModel.CanonicalResourceReference resourceReference
     ) {
         public StorageImageBinding {
             if (imageUnit < 0) {
@@ -262,6 +311,26 @@ public final class PipelineResourceBindings {
             if (layer < 0) {
                 throw new IllegalArgumentException("layer must be >= 0");
             }
+            if (resourceReference != null
+                && resourceReference.resource().kind() != VulkanicPassResourceModel.ResourceKind.STORAGE_TEXTURE) {
+                throw new IllegalArgumentException("storage-image resource reference must be a storage texture");
+            }
+        }
+
+        public StorageImageBinding(
+            int imageUnit,
+            int texture,
+            int level,
+            boolean layered,
+            int layer,
+            int access,
+            int format
+        ) {
+            this(imageUnit, texture, level, layered, layer, access, format, null);
+        }
+
+        public StorageImageBinding withResourceReference(@Nullable VulkanicPassResourceModel.CanonicalResourceReference reference) {
+            return new StorageImageBinding(imageUnit, texture, level, layered, layer, access, format, reference);
         }
     }
 
