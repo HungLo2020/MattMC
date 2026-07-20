@@ -10,6 +10,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.world.entity.ai.village.poi.NativePoiStorage;
 import net.minecraft.world.level.ChunkPos;
 import org.jetbrains.annotations.Nullable;
 
@@ -30,6 +31,14 @@ public class SimpleRegionStorage implements AutoCloseable {
 
 	public CompletableFuture<Void> write(ChunkPos chunkPos, @Nullable CompoundTag compoundTag) {
 		return this.worker.store(chunkPos, compoundTag);
+	}
+
+	public CompletableFuture<NativePoiStorage.WriteResult> writePoiTape(ChunkPos chunkPos, byte[] tape) {
+		return this.worker.storePoiTape(chunkPos, tape);
+	}
+
+	public CompletableFuture<NativePoiStorage.DecodeResult> readPoiTape(ChunkPos chunkPos) {
+		return this.worker.loadPoiTapeAsync(chunkPos);
 	}
 
 	public CompoundTag upgradeChunkTag(CompoundTag compoundTag, int i) {

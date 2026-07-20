@@ -1280,6 +1280,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		long frameStart = Util.getNanos();
 		net.minecraft.client.dev.DeterministicCameraCapture.beforeTick(this);
 		net.minecraft.client.dev.StoragePerfRunController.beforeTick(this);
+		net.minecraft.client.dev.PoiStorageValidationController.beforeTick(this);
 
 		// HOOK: Call registered hooks at beginning of tick
 		for (GameHooks hook : HookRegistry.getGameHooks()) {

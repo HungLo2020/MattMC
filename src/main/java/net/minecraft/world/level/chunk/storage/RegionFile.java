@@ -17,6 +17,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NativeNbtRegionAccess;
 import net.minecraft.util.profiling.jfr.JvmProfiler;
 import net.minecraft.util.profiling.storage.StoragePerfDiagnostics;
+import net.minecraft.world.entity.ai.village.poi.NativePoiStorage;
 import net.minecraft.world.level.ChunkPos;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -296,6 +297,14 @@ public class RegionFile implements AutoCloseable {
 				fingerprint
 			);
 		}
+	}
+
+	public synchronized NativePoiStorage.WriteResult writePoiChunk(ChunkPos chunkPos, byte[] tape) throws IOException {
+		return NativePoiStorage.writeChunk(this.nativeRegionHandle(), chunkPos.x, chunkPos.z, this.version.getId(), tape);
+	}
+
+	public synchronized NativePoiStorage.DecodeResult readPoiChunk(ChunkPos chunkPos) throws IOException {
+		return NativePoiStorage.decodeChunk(this.nativeRegionHandle(), chunkPos.x, chunkPos.z);
 	}
 
 	protected synchronized void write(ChunkPos chunkPos, ByteBuffer byteBuffer) throws IOException {

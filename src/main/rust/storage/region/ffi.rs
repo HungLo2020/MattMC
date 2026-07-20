@@ -230,7 +230,7 @@ fn region_from_handle(handle: u64) -> Result<Arc<Mutex<OpenRegion>>, RegionError
         .get(handle)
 }
 
-fn with_open_region<T>(
+pub(crate) fn with_open_region<T>(
     handle: u64,
     operation: impl FnOnce(&mut OpenRegion) -> RegionResult<T>,
 ) -> RegionResult<T> {

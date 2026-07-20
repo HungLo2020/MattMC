@@ -10,6 +10,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.StreamTagVisitor;
+import net.minecraft.world.entity.ai.village.poi.NativePoiStorage;
 import net.minecraft.util.ExceptionCollector;
 import net.minecraft.world.level.ChunkPos;
 import org.jetbrains.annotations.Nullable;
@@ -86,6 +87,19 @@ public final class RegionFileStorage implements AutoCloseable {
 				regionFile.writeChunk(chunkPos, compoundTag);
 			}
 		}
+	}
+
+	protected NativePoiStorage.WriteResult writePoiChunk(ChunkPos chunkPos, byte[] tape) throws IOException {
+		if (SharedConstants.DEBUG_DONT_SAVE_WORLD) {
+			return new NativePoiStorage.WriteResult(0, 0, 0, false, -1, false, 0, 0, 0L, 0L, 0L, 0L, 0L);
+		}
+		RegionFile regionFile = this.getRegionFile(chunkPos);
+		return regionFile.writePoiChunk(chunkPos, tape);
+	}
+
+	protected NativePoiStorage.DecodeResult readPoiChunk(ChunkPos chunkPos) throws IOException {
+		RegionFile regionFile = this.getRegionFile(chunkPos);
+		return regionFile.readPoiChunk(chunkPos);
 	}
 
 	public void close() throws IOException {

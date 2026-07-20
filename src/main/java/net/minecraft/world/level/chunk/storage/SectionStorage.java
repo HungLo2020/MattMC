@@ -192,6 +192,28 @@ public class SectionStorage<R, P> implements AutoCloseable {
 
 	private CompletableFuture<Optional<SectionStorage.PackedChunk<P>>> tryRead(ChunkPos chunkPos) {
 		RegistryOps<Tag> registryOps = this.registryAccess.createSerializationContext(NbtOps.INSTANCE);
+		CompletableFuture<Optional<SectionStorage.PackedChunk<P>>> readFuture = this.tryReadNative(chunkPos, registryOps)
+			.orElseGet(() -> this.tryReadJava(chunkPos, registryOps));
+		return readFuture.exceptionally(throwable -> {
+			if (throwable instanceof CompletionException) {
+				throwable = throwable.getCause();
+			}
+
+			if (throwable instanceof IOException iOException) {
+				LOGGER.error("Error reading chunk {} data from disk", chunkPos, iOException);
+				this.errorReporter.reportChunkLoadFailure(iOException, this.simpleRegionStorage.storageInfo(), chunkPos);
+				return Optional.empty();
+			} else {
+				throw new CompletionException(throwable);
+			}
+		});
+	}
+
+	protected Optional<CompletableFuture<Optional<SectionStorage.PackedChunk<P>>>> tryReadNative(ChunkPos chunkPos, RegistryOps<Tag> registryOps) {
+		return Optional.empty();
+	}
+
+	protected CompletableFuture<Optional<SectionStorage.PackedChunk<P>>> tryReadJava(ChunkPos chunkPos, RegistryOps<Tag> registryOps) {
 		return this.simpleRegionStorage
 			.read(chunkPos)
 			.thenApplyAsync(
@@ -199,20 +221,7 @@ public class SectionStorage<R, P> implements AutoCloseable {
 					compoundTag -> SectionStorage.PackedChunk.parse(this.codec, registryOps, compoundTag, this.simpleRegionStorage, this.levelHeightAccessor)
 				),
 				Util.backgroundExecutor().forName("parseSection")
-			)
-			.exceptionally(throwable -> {
-				if (throwable instanceof CompletionException) {
-					throwable = throwable.getCause();
-				}
-
-				if (throwable instanceof IOException iOException) {
-					LOGGER.error("Error reading chunk {} data from disk", chunkPos, iOException);
-					this.errorReporter.reportChunkLoadFailure(iOException, this.simpleRegionStorage.storageInfo(), chunkPos);
-					return Optional.empty();
-				} else {
-					throw new CompletionException(throwable);
-				}
-			});
+			);
 	}
 
 	private void unpackChunk(ChunkPos chunkPos, @Nullable SectionStorage.PackedChunk<P> packedChunk) {
@@ -239,7 +248,10 @@ public class SectionStorage<R, P> implements AutoCloseable {
 
 	private void writeChunk(ChunkPos chunkPos) {
 		RegistryOps<Tag> registryOps = this.registryAccess.createSerializationContext(NbtOps.INSTANCE);
-		Dynamic<Tag> dynamic = this.writeChunk(chunkPos, registryOps);
+		if (this.tryWriteNative(chunkPos, registryOps)) {
+			return;
+		}
+		Dynamic<Tag> dynamic = this.writeChunkTag(chunkPos, registryOps);
 		Tag tag = dynamic.getValue();
 		if (tag instanceof CompoundTag) {
 			this.simpleRegionStorage.write(chunkPos, (CompoundTag)tag).exceptionally(throwable -> {
@@ -251,7 +263,19 @@ public class SectionStorage<R, P> implements AutoCloseable {
 		}
 	}
 
-	private <T> Dynamic<T> writeChunk(ChunkPos chunkPos, DynamicOps<T> dynamicOps) {
+	protected boolean tryWriteNative(ChunkPos chunkPos, RegistryOps<Tag> registryOps) {
+		return false;
+	}
+
+	protected SimpleRegionStorage simpleRegionStorage() {
+		return this.simpleRegionStorage;
+	}
+
+	protected ChunkIOErrorReporter errorReporter() {
+		return this.errorReporter;
+	}
+
+	protected <T> Dynamic<T> writeChunkTag(ChunkPos chunkPos, DynamicOps<T> dynamicOps) {
 		Map<T, T> map = Maps.<T, T>newHashMap();
 
 		for (int i = this.levelHeightAccessor.getMinSectionY(); i <= this.levelHeightAccessor.getMaxSectionY(); i++) {
@@ -281,6 +305,10 @@ public class SectionStorage<R, P> implements AutoCloseable {
 		return SectionPos.asLong(chunkPos.x, i, chunkPos.z);
 	}
 
+	protected static <T> SectionStorage.PackedChunk<T> packedChunk(Int2ObjectMap<T> sectionsByY, boolean versionChanged) {
+		return new SectionStorage.PackedChunk<>(sectionsByY, versionChanged);
+	}
+
 	protected void onSectionLoad(long l) {
 	}
 
@@ -303,7 +331,7 @@ public class SectionStorage<R, P> implements AutoCloseable {
 		this.simpleRegionStorage.close();
 	}
 
-	record PackedChunk<T>(Int2ObjectMap<T> sectionsByY, boolean versionChanged) {
+	protected static record PackedChunk<T>(Int2ObjectMap<T> sectionsByY, boolean versionChanged) {
 
 		public static <T> SectionStorage.PackedChunk<T> parse(
 			Codec<T> codec, DynamicOps<Tag> dynamicOps, Tag tag, SimpleRegionStorage simpleRegionStorage, LevelHeightAccessor levelHeightAccessor

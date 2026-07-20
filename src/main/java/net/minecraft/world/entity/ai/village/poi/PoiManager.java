@@ -2,14 +2,19 @@ package net.minecraft.world.entity.ai.village.poi;
 
 import com.mojang.datafixers.DataFixer;
 import com.mojang.datafixers.util.Pair;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
 import java.util.function.BooleanSupplier;
@@ -21,6 +26,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.SectionPos;
+import net.minecraft.nbt.Tag;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.SectionTracker;
 import net.minecraft.tags.PoiTypeTags;
@@ -45,6 +52,8 @@ public class PoiManager extends SectionStorage<PoiSection, PoiSection.Packed> {
 	public static final int VILLAGE_SECTION_SIZE = 1;
 	private final PoiManager.DistanceTracker distanceTracker;
 	private final LongSet loadedChunks = new LongOpenHashSet();
+	private final RegistryAccess registryAccess;
+	private final LongSet javaCodecCompatibilityChunks = new LongOpenHashSet();
 
 	public PoiManager(
 		RegionStorageInfo regionStorageInfo,
@@ -66,6 +75,121 @@ public class PoiManager extends SectionStorage<PoiSection, PoiSection.Packed> {
 			levelHeightAccessor
 		);
 		this.distanceTracker = new PoiManager.DistanceTracker();
+		this.registryAccess = registryAccess;
+	}
+
+	@Override
+	protected Optional<CompletableFuture<Optional<SectionStorage.PackedChunk<PoiSection.Packed>>>> tryReadNative(
+		ChunkPos chunkPos, RegistryOps<Tag> registryOps
+	) {
+		long started = PoiReadDiagnostics.now();
+		CompletableFuture<Optional<SectionStorage.PackedChunk<PoiSection.Packed>>> future = this.simpleRegionStorage()
+			.readPoiTape(chunkPos)
+			.thenApplyAsync(
+				decodeResult -> this.convertNativePoiChunk(chunkPos, decodeResult, started),
+				Util.backgroundExecutor().forName("parsePoiRust")
+			)
+			.exceptionallyCompose(throwable -> this.handleNativePoiReadFailure(chunkPos, registryOps, throwable));
+		return Optional.of(future);
+	}
+
+	@Override
+	protected boolean tryWriteNative(ChunkPos chunkPos, RegistryOps<Tag> registryOps) {
+		if (this.usesJavaCodecCompatibility(chunkPos)) {
+			PoiReadDiagnostics.javaCompatibilityWrite(chunkPos, "old-data-version");
+			return false;
+		}
+		Int2ObjectMap<PoiSection.Packed> sections = this.collectPackedSections(chunkPos);
+		byte[] tape;
+		try {
+			tape = NativePoiStorage.encodeTape(sections);
+		} catch (IOException exception) {
+			PoiReadDiagnostics.writeFailure(chunkPos, exception);
+			this.errorReporter().reportChunkSaveFailure(exception, this.simpleRegionStorage().storageInfo(), chunkPos);
+			return true;
+		}
+		long started = PoiReadDiagnostics.now();
+		this.simpleRegionStorage().writePoiTape(chunkPos, tape).thenAccept(result -> {
+			PoiReadDiagnostics.rustWritten(chunkPos, result, PoiReadDiagnostics.now() - started);
+		}).exceptionally(throwable -> {
+			PoiReadDiagnostics.writeFailure(chunkPos, throwable);
+			this.errorReporter().reportChunkSaveFailure(throwable, this.simpleRegionStorage().storageInfo(), chunkPos);
+			return null;
+		});
+		return true;
+	}
+
+	private Int2ObjectMap<PoiSection.Packed> collectPackedSections(ChunkPos chunkPos) {
+		Int2ObjectMap<PoiSection.Packed> sections = new Int2ObjectOpenHashMap<>();
+		for (int sectionY = this.levelHeightAccessor.getMinSectionY(); sectionY <= this.levelHeightAccessor.getMaxSectionY(); sectionY++) {
+			Optional<PoiSection> section = this.get(SectionPos.asLong(chunkPos.x, sectionY, chunkPos.z));
+			if (section != null && section.isPresent()) {
+				sections.put(sectionY, section.get().pack());
+			}
+		}
+		return sections;
+	}
+
+	private Optional<SectionStorage.PackedChunk<PoiSection.Packed>> convertNativePoiChunk(
+		ChunkPos chunkPos, NativePoiStorage.DecodeResult decodeResult, long started
+	) {
+		long decodedAt = PoiReadDiagnostics.now();
+		if (!decodeResult.result().present()) {
+			PoiReadDiagnostics.rustDecoded(chunkPos, decodeResult.result(), decodedAt - started, 0L);
+			return Optional.empty();
+		}
+		try {
+			SectionStorage.PackedChunk<PoiSection.Packed> packedChunk = packedChunk(
+				NativePoiStorage.toPackedSections(decodeResult, this.registryAccess, this.levelHeightAccessor),
+				PoiReadDiagnostics.shouldMarkCurrentVersionDirty()
+			);
+			long constructedAt = PoiReadDiagnostics.now();
+			PoiReadDiagnostics.rustDecoded(chunkPos, decodeResult.result(), decodedAt - started, constructedAt - decodedAt);
+			return Optional.of(packedChunk);
+		} catch (NativePoiStorage.UnknownPoiTypeException exception) {
+			throw new CompletionException(exception);
+		} catch (IOException exception) {
+			throw new CompletionException(exception);
+		}
+	}
+
+	private CompletableFuture<Optional<SectionStorage.PackedChunk<PoiSection.Packed>>> handleNativePoiReadFailure(
+		ChunkPos chunkPos, RegistryOps<Tag> registryOps, Throwable throwable
+	) {
+		Throwable cause = unwrapCompletion(throwable);
+		if (cause instanceof IOException exception && NativePoiStorage.isUnsupportedDataVersion(exception)) {
+			PoiReadDiagnostics.oldVersion(chunkPos);
+			PoiReadDiagnostics.javaCompatibilityRead(chunkPos, "old-data-version");
+			this.markJavaCodecCompatibility(chunkPos);
+			return this.tryReadJava(chunkPos, registryOps);
+		}
+		if (cause instanceof NativePoiStorage.UnknownPoiTypeException exception) {
+			PoiReadDiagnostics.unknownType(chunkPos, exception.type());
+		} else if (cause instanceof IOException exception) {
+			PoiReadDiagnostics.malformed(chunkPos, exception);
+		}
+		return failedFuture(cause);
+	}
+
+	private synchronized void markJavaCodecCompatibility(ChunkPos chunkPos) {
+		this.javaCodecCompatibilityChunks.add(chunkPos.toLong());
+	}
+
+	private synchronized boolean usesJavaCodecCompatibility(ChunkPos chunkPos) {
+		return this.javaCodecCompatibilityChunks.contains(chunkPos.toLong());
+	}
+
+	private static Throwable unwrapCompletion(Throwable throwable) {
+		while (throwable instanceof CompletionException && throwable.getCause() != null) {
+			throwable = throwable.getCause();
+		}
+		return throwable;
+	}
+
+	private static <T> CompletableFuture<T> failedFuture(Throwable throwable) {
+		CompletableFuture<T> future = new CompletableFuture<>();
+		future.completeExceptionally(throwable);
+		return future;
 	}
 
 	@Nullable

@@ -73,6 +73,7 @@ class CaptureConfig:
     game_dir: str
     region_validation: bool
     region_validation_copy_world: bool
+    poi_validation: bool
 
 
 class CaptureRunner:
@@ -127,6 +128,7 @@ class CaptureRunner:
         self.deterministic_screenshot_dir = self.artifact_dir / f"deterministic_camera_capture_{self.run_id}"
         self.audio_validation_status = self.artifact_dir / f"audio_validation_{self.run_id}.json"
         self.region_validation_status = self.artifact_dir / f"region_validation_{self.run_id}.json"
+        self.poi_validation_status = self.artifact_dir / f"poi_validation_{self.run_id}.json"
         self.meshing_corpus_replay = self.artifact_dir / f"real_meshing_replay_{self.run_id}.json"
 
         self.validation_layer_manifest = ""
@@ -154,6 +156,7 @@ class CaptureRunner:
         self.deterministic_validation_status = "not_requested"
         self.audio_validation_result = "not_requested"
         self.region_validation_result = "not_requested"
+        self.poi_validation_result = "not_requested"
         self.env = os.environ.copy()
 
     def run(self) -> int:
@@ -184,6 +187,7 @@ class CaptureRunner:
         self.validate_deterministic_capture()
         self.validate_audio_status()
         self.validate_region_status()
+        self.validate_poi_status()
         self.print_summary(exit_code)
         self.release_lock()
 
@@ -195,6 +199,8 @@ class CaptureRunner:
             return 3
         if self.config.region_validation and self.region_validation_result != "ok":
             return 4
+        if self.config.poi_validation and self.poi_validation_result != "ok":
+            return 5
         return 0
 
     def acquire_lock(self) -> None:
@@ -253,6 +259,7 @@ class CaptureRunner:
             f"game_dir_initial={self.run_dir}",
             f"region_validation={str(self.config.region_validation).lower()}",
             f"region_validation_copy_world={str(self.config.region_validation_copy_world).lower()}",
+            f"poi_validation={str(self.config.poi_validation).lower()}",
             f"max_secs={self.config.max_secs}",
             f"dump_secs={self.config.dump_secs}",
             f"client_rss_limit_mb={self.config.client_rss_limit_mb}",
@@ -294,6 +301,9 @@ class CaptureRunner:
         self.copy_optional_path(self.root / "run" / "resourcepacks", validation_game_dir / "resourcepacks")
         (validation_game_dir / "saves").mkdir(parents=True)
         shutil.copytree(source_world, validation_game_dir / "saves" / self.config.world)
+        if self.config.poi_validation:
+            fixture_path = write_poi_validation_fixture(validation_game_dir / "saves" / self.config.world)
+            self.append_meta(f"poi_validation_fixture={fixture_path}")
         self.run_dir = validation_game_dir
         self.options_file = self.run_dir / "options.txt"
         self.append_meta(f"validation_world_source={source_world}")
@@ -677,6 +687,16 @@ class CaptureRunner:
             self.append_java_tool_options(region_options)
             self.append_meta(f"region_validation_java_options={' '.join(region_options)}")
             self.append_meta(f"region_validation_status={self.region_validation_status}")
+            self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
+
+        if self.config.poi_validation:
+            poi_options = [
+                "-Dmattmc.dev.poiValidation=true",
+                f"-Dmattmc.dev.poiValidation.status={self.poi_validation_status}",
+            ]
+            self.append_java_tool_options(poi_options)
+            self.append_meta(f"poi_validation_java_options={' '.join(poi_options)}")
+            self.append_meta(f"poi_validation_status={self.poi_validation_status}")
             self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
 
         if self.config.capture_meshing_corpus:
@@ -1137,6 +1157,30 @@ class CaptureRunner:
             print(str(exc), file=sys.stderr)
         self.append_meta(f"region_validation_result={self.region_validation_result}")
 
+    def validate_poi_status(self) -> None:
+        if not self.config.poi_validation:
+            return
+        try:
+            data = json.loads(self.poi_validation_status.read_text(encoding="utf-8"))
+            if data.get("status") != "complete":
+                raise RuntimeError(f"POI validation status was {data.get('status')!r}: {data.get('error')!r}")
+            for key in ("worldReady", "saveRequested", "shutdownRequested", "stopped", "currentVersionRustAuthoritative"):
+                if not data.get(key):
+                    raise RuntimeError(f"POI validation {key} was not true")
+            if int(data.get("rustDecodedChunks", 0)) <= 0:
+                raise RuntimeError("POI validation decoded no chunks through Rust")
+            if int(data.get("rustWrittenChunks", 0)) <= 0:
+                raise RuntimeError("POI validation wrote no chunks through Rust")
+            for key in ("unknownTypes", "malformedInputs", "writeFailures"):
+                if int(data.get(key, -1)) != 0:
+                    raise RuntimeError(f"POI validation {key} was {data.get(key)}")
+            self.poi_validation_result = "ok"
+            print(f"POI validation OK: {self.poi_validation_status}")
+        except Exception as exc:
+            self.poi_validation_result = "failed"
+            print(str(exc), file=sys.stderr)
+        self.append_meta(f"poi_validation_result={self.poi_validation_result}")
+
     def print_summary(self, exit_code: int) -> None:
         print("Capture complete.")
         print(f"- Meta:        {self.meta_log}")
@@ -1169,6 +1213,9 @@ class CaptureRunner:
         if self.config.region_validation:
             print(f"- Region validation: {self.region_validation_status}")
             print(f"- Region result:     {self.region_validation_result}")
+        if self.config.poi_validation:
+            print(f"- POI validation:    {self.poi_validation_status}")
+            print(f"- POI result:        {self.poi_validation_result}")
             print(f"- Game dir:          {self.run_dir}")
         if self.config.capture_meshing_corpus:
             output = Path(self.config.meshing_corpus_output) if self.config.meshing_corpus_output else self.meshing_corpus_replay
@@ -1183,6 +1230,137 @@ class CaptureRunner:
             print(f"Result: exited with non-zero code {exit_code}.")
         else:
             print("Result: exited cleanly.")
+
+
+def write_poi_validation_fixture(world_dir: Path) -> Path:
+    """Write a copied-world-only current-version POI region at spawn."""
+    import zlib
+
+    poi_dir = world_dir / "poi"
+    poi_dir.mkdir(parents=True, exist_ok=True)
+    region_path = poi_dir / "r.0.0.mca"
+    nbt = nbt_root_compound(
+        [
+            nbt_int("DataVersion", 4295),
+            nbt_compound(
+                "Sections",
+                [
+                    nbt_compound(
+                        "0",
+                        [
+                            nbt_byte("Valid", 1),
+                            nbt_list(
+                                "Records",
+                                10,
+                                [
+                                    nbt_anonymous_compound(
+                                        [
+                                            nbt_int_array("pos", [0, 64, 0]),
+                                            nbt_string("type", "minecraft:home"),
+                                            nbt_int("free_tickets", 0),
+                                        ]
+                                    ),
+                                    nbt_anonymous_compound(
+                                        [
+                                            nbt_int_array("pos", [1, 64, 0]),
+                                            nbt_string("type", "minecraft:meeting"),
+                                            nbt_int("free_tickets", 1),
+                                        ]
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
+                    nbt_compound(
+                        "4",
+                        [
+                            nbt_byte("Valid", 1),
+                            nbt_list(
+                                "Records",
+                                10,
+                                [
+                                    nbt_anonymous_compound(
+                                        [
+                                            nbt_int_array("pos", [2, 80, 2]),
+                                            nbt_string("type", "minecraft:armorer"),
+                                            nbt_int("free_tickets", 2),
+                                        ]
+                                    )
+                                ],
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        ]
+    )
+    compressed = zlib.compress(nbt)
+    length = len(compressed) + 1
+    chunk = length.to_bytes(4, "big") + bytes([2]) + compressed
+    sector_count = max(1, (len(chunk) + 4095) // 4096)
+    chunk = chunk + bytes(sector_count * 4096 - len(chunk))
+    header = bytearray(8192)
+    header[0:4] = bytes([0, 0, 2, sector_count])
+    header[4096:4100] = int(time.time()).to_bytes(4, "big")
+    region_path.write_bytes(bytes(header) + chunk)
+    return region_path
+
+
+def nbt_root_compound(children: list[bytes]) -> bytes:
+    return bytes([10]) + modified_utf8_name("") + b"".join(children) + bytes([0])
+
+
+def nbt_anonymous_compound(children: list[bytes]) -> bytes:
+    return b"".join(children) + bytes([0])
+
+
+def nbt_compound(name: str, children: list[bytes]) -> bytes:
+    return bytes([10]) + modified_utf8_name(name) + b"".join(children) + bytes([0])
+
+
+def nbt_list(name: str, element_type: int, values: list[bytes]) -> bytes:
+    return bytes([9]) + modified_utf8_name(name) + bytes([element_type]) + len(values).to_bytes(4, "big") + b"".join(values)
+
+
+def nbt_byte(name: str, value: int) -> bytes:
+    return bytes([1]) + modified_utf8_name(name) + int(value).to_bytes(1, "big", signed=True)
+
+
+def nbt_int(name: str, value: int) -> bytes:
+    return bytes([3]) + modified_utf8_name(name) + int(value).to_bytes(4, "big", signed=True)
+
+
+def nbt_string(name: str, value: str) -> bytes:
+    encoded = modified_utf8_bytes(value)
+    return bytes([8]) + modified_utf8_name(name) + len(encoded).to_bytes(2, "big") + encoded
+
+
+def nbt_int_array(name: str, values: list[int]) -> bytes:
+    payload = len(values).to_bytes(4, "big") + b"".join(int(value).to_bytes(4, "big", signed=True) for value in values)
+    return bytes([11]) + modified_utf8_name(name) + payload
+
+
+def modified_utf8_name(value: str) -> bytes:
+    encoded = modified_utf8_bytes(value)
+    return len(encoded).to_bytes(2, "big") + encoded
+
+
+def modified_utf8_bytes(value: str) -> bytes:
+    output = bytearray()
+    units = value.encode("utf-16-be")
+    for index in range(0, len(units), 2):
+        unit = units[index] << 8 | units[index + 1]
+        if unit == 0:
+            output.extend((0xC0, 0x80))
+        elif unit <= 0x7F:
+            output.append(unit)
+        elif unit <= 0x7FF:
+            output.extend((0xC0 | (unit >> 6), 0x80 | (unit & 0x3F)))
+        else:
+            output.extend((0xE0 | (unit >> 12), 0x80 | ((unit >> 6) & 0x3F), 0x80 | (unit & 0x3F)))
+    if len(output) > 65535:
+        raise ValueError("modified UTF-8 string too long")
+    return bytes(output)
 
 
 def script_dir() -> Path:
@@ -1756,6 +1934,7 @@ def parse_args() -> CaptureConfig:
     parser.add_argument("--game-dir", default=os.environ.get("MATTMC_CAPTURE_GAME_DIR", ""))
     parser.add_argument("--region-validation", action="store_true")
     parser.add_argument("--region-validation-copy-world", action="store_true")
+    parser.add_argument("--poi-validation", action="store_true")
     parser.add_argument("--platform", help="platform to pass to shared helpers: linux, windows, or macos")
     args = parser.parse_args()
 
@@ -1800,6 +1979,7 @@ def parse_args() -> CaptureConfig:
         game_dir=args.game_dir,
         region_validation=bool(args.region_validation),
         region_validation_copy_world=bool(args.region_validation_copy_world),
+        poi_validation=bool(args.poi_validation),
     )
 
 

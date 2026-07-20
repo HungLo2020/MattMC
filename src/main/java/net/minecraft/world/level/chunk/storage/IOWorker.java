@@ -22,6 +22,7 @@ import net.minecraft.nbt.visitors.FieldSelector;
 import net.minecraft.util.Unit;
 import net.minecraft.util.thread.PriorityConsecutiveExecutor;
 import net.minecraft.util.thread.StrictQueue;
+import net.minecraft.world.entity.ai.village.poi.NativePoiStorage;
 import net.minecraft.world.level.ChunkPos;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -128,6 +129,14 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 				}
 			)
 			.thenCompose(Function.identity());
+	}
+
+	public CompletableFuture<NativePoiStorage.WriteResult> storePoiTape(ChunkPos chunkPos, byte[] tape) {
+		return this.submitThrowingTask(() -> this.storage.writePoiChunk(chunkPos, tape));
+	}
+
+	public CompletableFuture<NativePoiStorage.DecodeResult> loadPoiTapeAsync(ChunkPos chunkPos) {
+		return this.submitThrowingTask(() -> this.storage.readPoiChunk(chunkPos));
 	}
 
 	public CompletableFuture<Optional<CompoundTag>> loadAsync(ChunkPos chunkPos) {
