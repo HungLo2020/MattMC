@@ -7737,6 +7737,7 @@ void main() {
             traceStandaloneUniformBlockMembers(program, virtualProgram, backingData);
             VulkanicBufferSlice slice = spine.materializeStandaloneUniformBuffer(
                 program,
+                virtualProgram,
                 backingData,
                 virtualProgram.standaloneBackingSize
             );
@@ -9909,11 +9910,13 @@ void main() {
         private record DescriptorWritePlan(
             List<ResolvedDescriptorBinding> bindings,
             VulkanDescriptorManager.DescriptorSetCacheKey cacheKey,
-            List<VulkanicPassResourceModel.ResourceUse> resourceUses
+            List<VulkanicPassResourceModel.ResourceUse> resourceUses,
+            List<VulkanDescriptorBindingPlanner.DescriptorPlanEntry> planEntries
         ) {
             private DescriptorWritePlan {
                 bindings = List.copyOf(bindings);
                 resourceUses = List.copyOf(resourceUses);
+                planEntries = List.copyOf(planEntries);
             }
 
             private boolean cacheable() {
@@ -9921,7 +9924,53 @@ void main() {
             }
         }
 
+        private record DescriptorPlanLookupKey(
+            long descriptorSetLayoutHandle,
+            List<PipelineDescriptor.ResourceBinding> layoutBindings,
+            List<DescriptorPlanSemanticBindingKey> semanticBindings,
+            VulkanDescriptorBindingPlanner.RenderStateSnapshot renderState,
+            long minUniformBufferOffsetAlignment
+        ) {
+            private DescriptorPlanLookupKey {
+                layoutBindings = List.copyOf(layoutBindings);
+                semanticBindings = List.copyOf(semanticBindings);
+                Objects.requireNonNull(renderState, "renderState");
+            }
+        }
+
+        private record DescriptorPlanSemanticBindingKey(
+            String name,
+            PipelineDescriptor.ResourceType type,
+            int binding,
+            Object identity
+        ) {
+            private DescriptorPlanSemanticBindingKey {
+                Objects.requireNonNull(name, "name");
+                Objects.requireNonNull(type, "type");
+                Objects.requireNonNull(identity, "identity");
+            }
+        }
+
+        private record SamplerPlanIdentity(
+            int textureUnit,
+            @Nullable Integer samplerObject,
+            long viewHandle,
+            int baseMipLevel,
+            int mipLevelCount,
+            @Nullable VulkanicPassResourceModel.CanonicalResourceReference resourceReference,
+            @Nullable VirtualSamplerStateSnapshot samplerState
+        ) {
+        }
+
+        private record UniformPlanIdentity(
+            long bufferHandle,
+            long offset,
+            long range
+        ) {
+        }
+
         private record ResolvedStorageImageDescriptorBinding(
+            String name,
             int bindingIndex,
             int descriptorType,
             long imageViewHandle,
@@ -9933,6 +9982,7 @@ void main() {
                 return new VulkanDescriptorManager.DescriptorBindingCacheKey(
                     bindingIndex,
                     descriptorType,
+                    name,
                     imageViewHandle,
                     imageLayout,
                     0L,
@@ -9952,6 +10002,7 @@ void main() {
         }
 
         private record ResolvedSamplerDescriptorBinding(
+            String name,
             int bindingIndex,
             int descriptorType,
             long samplerHandle,
@@ -9964,6 +10015,7 @@ void main() {
                 return new VulkanDescriptorManager.DescriptorBindingCacheKey(
                     bindingIndex,
                     descriptorType,
+                    name,
                     samplerHandle,
                     imageViewHandle,
                     imageLayout,
@@ -9983,6 +10035,7 @@ void main() {
         }
 
         private record ResolvedUniformBufferDescriptorBinding(
+            String name,
             int bindingIndex,
             int descriptorType,
             long bufferHandle,
@@ -9995,6 +10048,7 @@ void main() {
                 return new VulkanDescriptorManager.DescriptorBindingCacheKey(
                     bindingIndex,
                     descriptorType,
+                    name,
                     bufferHandle,
                     offset,
                     range,
@@ -10014,6 +10068,7 @@ void main() {
         }
 
         private record ResolvedTexelBufferDescriptorBinding(
+            String name,
             int bindingIndex,
             int descriptorType,
             long bufferViewHandle
@@ -10024,6 +10079,7 @@ void main() {
                 return new VulkanDescriptorManager.DescriptorBindingCacheKey(
                     bindingIndex,
                     descriptorType,
+                    name,
                     bufferViewHandle,
                     0L,
                     0L,
@@ -10050,6 +10106,10 @@ void main() {
             new VulkanSwapchainStateManager(MAX_FRAMES_IN_FLIGHT);
         private final VulkanDescriptorBindingPlanner descriptorBindingPlanner =
             new VulkanDescriptorBindingPlanner();
+        private final java.util.LinkedHashMap<DescriptorPlanLookupKey, DescriptorWritePlan> descriptorWritePlanCache =
+            new java.util.LinkedHashMap<>(256, 0.75f, true);
+        @Nullable
+        private DescriptorPlanLookupKey lastDescriptorPlanLookupKey;
         private final VulkanDescriptorSetLayoutPlanner descriptorSetLayoutPlanner =
             new VulkanDescriptorSetLayoutPlanner();
         private final VulkanPipelineCreationPlanner pipelineCreationPlanner =
@@ -10113,7 +10173,6 @@ void main() {
         private int debugDescriptorSamplerViewMismatchLogCount;
         private int debugSodiumChunkDescriptorSamplerLogCount;
         private int debugParticleDescriptorSamplerLogCount;
-        private int debugDescriptorUboLogCount;
         private int debugComparisonSamplerFallbackLogCount;
         private final PixelStoreState pixelStoreState = new PixelStoreState();
 
@@ -10385,6 +10444,42 @@ void main() {
             long pipelineHandle,
             long descriptorSetLayoutHandle
         ) {
+            VulkanDescriptorBindingPlanner.RenderStateSnapshot renderState =
+                new VulkanDescriptorBindingPlanner.RenderStateSnapshot(
+                    isRenderPassRecording(),
+                    activeAttachmentTextureIds()
+                );
+            DescriptorPlanLookupKey lookupKey = new DescriptorPlanLookupKey(
+                descriptorSetLayoutHandle,
+                layoutBindings,
+                descriptorPlanSemanticBindings(layoutBindings, bindings),
+                renderState,
+                minUniformBufferOffsetAlignment()
+            );
+            boolean equivalentConsecutive = lookupKey.equals(lastDescriptorPlanLookupKey);
+            DescriptorWritePlan cachedPlan = descriptorWritePlanCache.get(lookupKey);
+            if (cachedPlan != null && descriptorWritePlanStillValid(cachedPlan)) {
+                lastDescriptorPlanLookupKey = lookupKey;
+                replayDescriptorPlanSideEffects(cachedPlan.planEntries());
+                VulkanPerfAudit.recordDescriptorPlanReuseLookup(
+                    pipelineLocation,
+                    true,
+                    equivalentConsecutive,
+                    descriptorWritePlanCache.size()
+                );
+                return cachedPlan;
+            }
+            if (cachedPlan != null) {
+                descriptorWritePlanCache.remove(lookupKey);
+            }
+            VulkanPerfAudit.recordDescriptorPlanReuseLookup(
+                pipelineLocation,
+                false,
+                equivalentConsecutive,
+                descriptorWritePlanCache.size()
+            );
+
+            long planStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
             VulkanDescriptorBindingPlanner.DescriptorBindingPlan plan = descriptorBindingPlanner.plan(
                 new VulkanDescriptorBindingPlanner.PlanRequest(
                     layoutBindings,
@@ -10442,10 +10537,7 @@ void main() {
                             ? VK10.VK_IMAGE_LAYOUT_UNDEFINED
                             : imageStateTracker.layoutFor(texture.textureId(), level, VK10.VK_IMAGE_LAYOUT_UNDEFINED);
                     },
-                    new VulkanDescriptorBindingPlanner.RenderStateSnapshot(
-                        isRenderPassRecording(),
-                        activeAttachmentTextureIds()
-                    ),
+                    renderState,
                     minUniformBufferOffsetAlignment(),
                     sodiumChunkDescriptor,
                     particleDescriptor,
@@ -10458,18 +10550,219 @@ void main() {
             List<ResolvedDescriptorBinding> resolvedBindings = new ArrayList<>(plan.entries().size());
             List<VulkanDescriptorManager.DescriptorBindingCacheKey> cacheKeys = new ArrayList<>(plan.entries().size());
             boolean cacheable = plan.cacheable();
+            int samplerBindings = 0;
+            int uniformBufferBindings = 0;
+            int storageImageBindings = 0;
+            int texelBufferBindings = 0;
             for (VulkanDescriptorBindingPlanner.DescriptorPlanEntry entry : plan.entries()) {
-                ResolvedDescriptorBinding resolvedBinding = materializeDescriptorPlanEntry(entry);
+                if (entry instanceof VulkanDescriptorBindingPlanner.SamplerEntry) {
+                    samplerBindings++;
+                } else if (entry instanceof VulkanDescriptorBindingPlanner.UniformBufferEntry) {
+                    uniformBufferBindings++;
+                } else if (entry instanceof VulkanDescriptorBindingPlanner.StorageImageEntry) {
+                    storageImageBindings++;
+                } else if (entry instanceof VulkanDescriptorBindingPlanner.TexelBufferEntry) {
+                    texelBufferBindings++;
+                }
+                ResolvedDescriptorBinding resolvedBinding = materializeDescriptorPlanEntry(pipelineLocation, entry);
                 resolvedBindings.add(resolvedBinding);
                 if (cacheable) {
                     cacheKeys.add(resolvedBinding.cacheKey());
                 }
             }
-            return new DescriptorWritePlan(
+            if (planStartNanos != 0L) {
+                VulkanPerfAudit.recordDescriptorPlan(
+                    pipelineLocation,
+                    cacheable,
+                    plan.entries().size(),
+                    samplerBindings,
+                    uniformBufferBindings,
+                    storageImageBindings,
+                    texelBufferBindings,
+                    System.nanoTime() - planStartNanos
+                );
+            }
+            DescriptorWritePlan writePlan = new DescriptorWritePlan(
                 resolvedBindings,
                 cacheable ? new VulkanDescriptorManager.DescriptorSetCacheKey(descriptorSetLayoutHandle, cacheKeys) : null,
-                plan.resourceUses()
+                plan.resourceUses(),
+                plan.entries()
             );
+            if (writePlan.cacheable()) {
+                descriptorWritePlanCache.put(lookupKey, writePlan);
+                trimDescriptorWritePlanCache();
+            }
+            lastDescriptorPlanLookupKey = lookupKey;
+            return writePlan;
+        }
+
+        private List<DescriptorPlanSemanticBindingKey> descriptorPlanSemanticBindings(
+            List<PipelineDescriptor.ResourceBinding> layoutBindings,
+            PipelineResourceBindings bindings
+        ) {
+            List<DescriptorPlanSemanticBindingKey> keys = new ArrayList<>(layoutBindings.size());
+            for (PipelineDescriptor.ResourceBinding binding : layoutBindings) {
+                Object identity = switch (binding.type()) {
+                    case SAMPLER, COMPARISON_SAMPLER -> samplerPlanIdentity(binding, bindings);
+                    case UNIFORM_BUFFER -> uniformPlanIdentity(binding, bindings);
+                    case STORAGE_IMAGE -> storageImagePlanIdentity(binding, bindings);
+                    case TEXEL_BUFFER -> texelBufferPlanIdentity(binding, bindings);
+                };
+                keys.add(new DescriptorPlanSemanticBindingKey(binding.name(), binding.type(), binding.binding(), identity));
+            }
+            return keys;
+        }
+
+        private Object samplerPlanIdentity(
+            PipelineDescriptor.ResourceBinding binding,
+            PipelineResourceBindings bindings
+        ) {
+            PipelineResourceBindings.SamplerBinding samplerBinding = bindings.getSamplerBindingOrNull(binding.name());
+            if (samplerBinding == null) {
+                return "missing";
+            }
+            long viewHandle = 0L;
+            int baseMip = 0;
+            int mipCount = 1;
+            if (samplerBinding.textureView() instanceof VulkanTextureView view) {
+                viewHandle = view.getVkImageViewHandle();
+                baseMip = view.getBaseMipLevel();
+                mipCount = view.getMipLevelCount();
+            }
+            VirtualSamplerStateSnapshot samplerState = samplerBinding.samplerObject() != null
+                ? backend.getVirtualSamplerState(samplerBinding.samplerObject())
+                : backend.getBoundVirtualSamplerStateForUnit(samplerBinding.textureUnit());
+            return new SamplerPlanIdentity(
+                samplerBinding.textureUnit(),
+                samplerBinding.samplerObject(),
+                viewHandle,
+                baseMip,
+                mipCount,
+                samplerBinding.resourceReference(),
+                samplerState
+            );
+        }
+
+        private Object uniformPlanIdentity(
+            PipelineDescriptor.ResourceBinding binding,
+            PipelineResourceBindings bindings
+        ) {
+            VulkanicBufferSlice slice = bindings.getUniformBufferBindingOrNull(binding.name());
+            if (slice == null || !(slice.buffer() instanceof VulkanBuffer buffer)) {
+                return "missing";
+            }
+            return new UniformPlanIdentity(
+                buffer.getVkBufferHandle(),
+                slice.offset(),
+                slice.length()
+            );
+        }
+
+        private Object storageImagePlanIdentity(
+            PipelineDescriptor.ResourceBinding binding,
+            PipelineResourceBindings bindings
+        ) {
+            PipelineResourceBindings.StorageImageBinding imageBinding = bindings.getStorageImageBindingOrNull(binding.name());
+            return imageBinding == null ? "missing" : imageBinding;
+        }
+
+        private Object texelBufferPlanIdentity(
+            PipelineDescriptor.ResourceBinding binding,
+            PipelineResourceBindings bindings
+        ) {
+            PipelineResourceBindings.TexelBufferBinding texelBinding = bindings.getTexelBufferBindingOrNull(binding.name());
+            if (texelBinding == null) {
+                return "missing";
+            }
+            TextureBindingSnapshot textureBinding = imageResourceViews.textureBindingSnapshot(texelBinding.textureUnit());
+            return List.of(
+                texelBinding,
+                textureBinding == null ? 0 : textureBinding.texture2D()
+            );
+        }
+
+        private void trimDescriptorWritePlanCache() {
+            int maxEntries = Math.max(0, Integer.getInteger("mattmc.vulkan.maxDescriptorWritePlans", 8192));
+            while (descriptorWritePlanCache.size() > maxEntries && !descriptorWritePlanCache.isEmpty()) {
+                java.util.Iterator<DescriptorPlanLookupKey> iterator = descriptorWritePlanCache.keySet().iterator();
+                iterator.next();
+                iterator.remove();
+            }
+        }
+
+        private boolean descriptorWritePlanStillValid(DescriptorWritePlan plan) {
+            for (VulkanDescriptorBindingPlanner.DescriptorPlanEntry entry : plan.planEntries()) {
+                if (entry instanceof VulkanDescriptorBindingPlanner.SamplerEntry samplerEntry) {
+                    if (samplerEntry.textureView().isClosed()) {
+                        return false;
+                    }
+                    VulkanImageResourceViewCoordinator.ImageStorageSnapshot texture = samplerEntry.texture();
+                    if (texture != null && textureResources.getLegacyTexture(texture.textureId()) == null) {
+                        return false;
+                    }
+                } else if (entry instanceof VulkanDescriptorBindingPlanner.UniformBufferEntry uniformEntry) {
+                    if (uniformEntry.sourceBuffer().isClosed()) {
+                        return false;
+                    }
+                } else if (entry instanceof VulkanDescriptorBindingPlanner.StorageImageEntry storageImageEntry) {
+                    if (textureResources.getLegacyTexture(storageImageEntry.texture().textureId()) == null) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        private void replayDescriptorPlanSideEffects(
+            List<VulkanDescriptorBindingPlanner.DescriptorPlanEntry> entries
+        ) {
+            for (VulkanDescriptorBindingPlanner.DescriptorPlanEntry entry : entries) {
+                if (entry instanceof VulkanDescriptorBindingPlanner.SamplerEntry samplerEntry) {
+                    LegacyTextureObject texture = samplerEntry.texture() == null
+                        ? null
+                        : textureResources.getLegacyTexture(samplerEntry.texture().textureId());
+                    if (texture == null) {
+                        continue;
+                    }
+                    if (samplerEntry.materializationRequest() != null) {
+                        descriptorImageViewHandleForSampler(
+                            texture,
+                            samplerEntry.descriptorImageViewHandle(),
+                            samplerEntry.materializationRequest().baseMipLevel(),
+                            samplerEntry.materializationRequest().mipLevelCount()
+                        );
+                    }
+                    switch (samplerEntry.transitionRequirement()) {
+                        case STORAGE_IMAGE -> transitionLegacyTextureToStorageImageLayout(
+                            texture,
+                            samplerEntry.baseMipLevel(),
+                            samplerEntry.mipLevelCount()
+                        );
+                        case SAMPLE -> transitionLegacyTextureToSampleLayout(
+                            texture,
+                            samplerEntry.baseMipLevel(),
+                            samplerEntry.mipLevelCount()
+                        );
+                        case NONE -> {
+                        }
+                    }
+                } else if (entry instanceof VulkanDescriptorBindingPlanner.StorageImageEntry storageImageEntry) {
+                    LegacyTextureObject texture = textureResources.getLegacyTexture(storageImageEntry.texture().textureId());
+                    transitionLegacyTextureToStorageImageLayout(texture, storageImageEntry.mipLevel(), 1);
+                } else if (entry instanceof VulkanDescriptorBindingPlanner.UniformBufferEntry uniformEntry
+                    && "DynamicTransforms".equals(uniformEntry.name())) {
+                    VulkanPerfAudit.recordDynamicTransformsBinding(
+                        uniformEntry.descriptorBufferHandle(),
+                        uniformEntry.descriptorOffset(),
+                        uniformEntry.descriptorRange(),
+                        descriptorSliceContentHash(
+                            uniformEntry.sourceBuffer(),
+                            uniformEntry.descriptorOffset(),
+                            uniformEntry.descriptorRange()
+                        )
+                    );
+                }
+            }
         }
 
         private Set<Integer> activeAttachmentTextureIds() {
@@ -10515,19 +10808,21 @@ void main() {
         }
 
         private ResolvedDescriptorBinding materializeDescriptorPlanEntry(
+            String pipelineLocation,
             VulkanDescriptorBindingPlanner.DescriptorPlanEntry entry
         ) {
             if (entry instanceof VulkanDescriptorBindingPlanner.SamplerEntry samplerEntry) {
                 return materializeSamplerDescriptorBinding(samplerEntry);
             }
             if (entry instanceof VulkanDescriptorBindingPlanner.UniformBufferEntry uniformEntry) {
-                return materializeUniformBufferDescriptorBinding(uniformEntry);
+                return materializeUniformBufferDescriptorBinding(pipelineLocation, uniformEntry);
             }
             if (entry instanceof VulkanDescriptorBindingPlanner.StorageImageEntry storageImageEntry) {
                 return materializeStorageImageDescriptorBinding(storageImageEntry);
             }
             if (entry instanceof VulkanDescriptorBindingPlanner.TexelBufferEntry texelEntry) {
                 return new ResolvedTexelBufferDescriptorBinding(
+                    texelEntry.name(),
                     texelEntry.bindingIndex(),
                     texelEntry.descriptorType(),
                     texelEntry.bufferViewHandle()
@@ -10574,6 +10869,7 @@ void main() {
             long samplerHandle = resolveDescriptorSamplerHandle(entry.samplerKey());
             logSamplerDescriptorPlan(entry, sampledLegacyTexture, samplerHandle, descriptorImageViewHandle);
             return new ResolvedSamplerDescriptorBinding(
+                entry.name(),
                 entry.bindingIndex(),
                 entry.descriptorType(),
                 samplerHandle,
@@ -10583,6 +10879,7 @@ void main() {
         }
 
         private ResolvedUniformBufferDescriptorBinding materializeUniformBufferDescriptorBinding(
+            String pipelineLocation,
             VulkanDescriptorBindingPlanner.UniformBufferEntry entry
         ) {
             VulkanBuffer descriptorBuffer = entry.sourceBuffer();
@@ -10590,38 +10887,64 @@ void main() {
             long descriptorRange = entry.descriptorRange();
 
             if (entry.requiresTransientCopy()) {
+                long transientCopyStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
                 descriptorBuffer = materializeDescriptorUniformBuffer(
                     entry.name(),
                     entry.sourceSlice(),
                     entry.sourceBuffer()
                 );
+                if (transientCopyStartNanos != 0L) {
+                    VulkanPerfAudit.recordDescriptorTransientUniformCopy(
+                        pipelineLocation,
+                        entry.sourceSlice().length(),
+                        System.nanoTime() - transientCopyStartNanos
+                    );
+                }
                 descriptorOffset = 0;
                 descriptorRange = entry.sourceSlice().length();
             }
 
-            if (debugDescriptorUboLogCount < 200) {
-                debugDescriptorUboLogCount++;
-                LOGGER.info(
-                    "Vulkan uboDescriptor#{} binding={} sourceBuffer=0x{} sourceOffset={} sourceLength={} transientCopy={} descriptorBuffer=0x{} descriptorOffset={} descriptorRange={}",
-                    debugDescriptorUboLogCount,
-                    entry.name(),
-                    Long.toHexString(entry.sourceBuffer().getVkBufferHandle()),
-                    entry.sourceSlice().offset(),
-                    entry.sourceSlice().length(),
-                    entry.requiresTransientCopy(),
-                    Long.toHexString(descriptorBuffer.getVkBufferHandle()),
+            if ("DynamicTransforms".equals(entry.name())) {
+                VulkanPerfAudit.recordDynamicTransformsBinding(
+                    descriptorBuffer.getVkBufferHandle(),
                     descriptorOffset,
-                    descriptorRange
+                    descriptorRange,
+                    descriptorSliceContentHash(descriptorBuffer, descriptorOffset, descriptorRange)
                 );
             }
 
             return new ResolvedUniformBufferDescriptorBinding(
+                entry.name(),
                 entry.bindingIndex(),
                 entry.descriptorType(),
                 descriptorBuffer.getVkBufferHandle(),
                 descriptorOffset,
                 descriptorRange
             );
+        }
+
+        private long descriptorSliceContentHash(VulkanBuffer buffer, long offset, long range) {
+            if (buffer == null || buffer.isClosed() || offset < 0L || range <= 0L || range > Integer.MAX_VALUE) {
+                return 0L;
+            }
+            if (offset > Integer.MAX_VALUE) {
+                return 0L;
+            }
+            java.nio.ByteBuffer data = buffer.diagnosticShadowRead((int) offset, (int) range);
+            if (data == null) {
+                return 0L;
+            }
+            return descriptorContentHash(data);
+        }
+
+        private long descriptorContentHash(java.nio.ByteBuffer data) {
+            long hash = 0xcbf29ce484222325L;
+            java.nio.ByteBuffer source = data.duplicate();
+            while (source.hasRemaining()) {
+                hash ^= (source.get() & 0xFFL);
+                hash *= 0x100000001b3L;
+            }
+            return hash;
         }
 
         private ResolvedStorageImageDescriptorBinding materializeStorageImageDescriptorBinding(
@@ -10638,6 +10961,7 @@ void main() {
 
             transitionLegacyTextureToStorageImageLayout(texture, entry.mipLevel(), 1);
             return new ResolvedStorageImageDescriptorBinding(
+                entry.name(),
                 entry.bindingIndex(),
                 entry.descriptorType(),
                 entry.imageViewHandle(),
@@ -10822,6 +11146,7 @@ void main() {
                     pipeline.getVkDescriptorSetLayoutHandle(),
                     writePlan.bindings(),
                     writePlan.cacheKey(),
+                    pipelineLocation,
                     NativeSpine::checkVk
                 );
                 return new MaterializedGraphicsPipelineBinding(
@@ -10881,6 +11206,7 @@ void main() {
                     pipeline.getVkDescriptorSetLayoutHandle(),
                     writePlan.bindings(),
                     writePlan.cacheKey(),
+                    pipelineLocation,
                     NativeSpine::checkVk
                 );
                 return new MaterializedComputePipelineBinding(
@@ -14127,7 +14453,7 @@ void main() {
                 long finalBufferHandle = bufferHandle;
                 long finalMemoryHandle = memoryHandle;
                 java.nio.ByteBuffer diagnosticShadowData =
-                    createDiagnosticBufferShadow(usage, size, initialData);
+                    createDiagnosticBufferShadow(usage, size, initialData, debugLabel);
                 int diagnosticGeometryShadowBytes = diagnosticGeometryShadowBytes(usage, diagnosticShadowData, size);
                 boolean diagnosticSparseGeometryShadow = diagnosticSparseGeometryShadowEnabled(usage, diagnosticShadowData, debugLabel);
 
@@ -14164,14 +14490,23 @@ void main() {
         private static java.nio.ByteBuffer createDiagnosticBufferShadow(
             int usage,
             int size,
-            @Nullable java.nio.ByteBuffer initialData
+            @Nullable java.nio.ByteBuffer initialData,
+            String debugLabel
         ) {
-            if (!VulkanicAPI.isShaderInputParityTracingEnabled() || size <= 0) {
+            if (size <= 0) {
                 return null;
             }
             boolean uniform = (usage & VulkanicBuffer.USAGE_UNIFORM) != 0;
             boolean geometry = (usage & (VulkanicBuffer.USAGE_VERTEX | VulkanicBuffer.USAGE_INDEX)) != 0;
             if (!uniform && !geometry) {
+                return null;
+            }
+            boolean traceEnabled = VulkanicAPI.isShaderInputParityTracingEnabled();
+            boolean dynamicTransformsPerfShadow = uniform
+                && VulkanPerfAudit.isEnabled()
+                && debugLabel != null
+                && debugLabel.contains("Dynamic Transforms UBO");
+            if (!traceEnabled && !dynamicTransformsPerfShadow) {
                 return null;
             }
             if (geometry && !reserveDiagnosticGeometryShadow(size)) {
@@ -17300,6 +17635,7 @@ void main() {
             VkCommandBuffer commandBuffer,
             VulkanGraphicsCommandExecutionCoordinator.DescriptorBindingRequirement descriptor
         ) {
+            long bindStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
             try (MemoryStack stack = stackPush()) {
                 java.nio.IntBuffer dynamicOffsets = null;
                 if (!descriptor.dynamicOffsets().isEmpty()) {
@@ -17317,6 +17653,9 @@ void main() {
                     stack.longs(descriptor.descriptorSetHandle()),
                     dynamicOffsets
                 );
+            }
+            if (bindStartNanos != 0L) {
+                VulkanPerfAudit.recordDescriptorCommandBind("graphics", System.nanoTime() - bindStartNanos);
             }
         }
 
@@ -17463,6 +17802,7 @@ void main() {
             VkCommandBuffer commandBuffer,
             VulkanComputeCommandExecutionCoordinator.ComputeDescriptorRequirement descriptor
         ) {
+            long bindStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
             try (MemoryStack stack = stackPush()) {
                 java.nio.IntBuffer dynamicOffsets = null;
                 if (!descriptor.dynamicOffsets().isEmpty()) {
@@ -17480,6 +17820,9 @@ void main() {
                     stack.longs(descriptor.descriptorSetHandle()),
                     dynamicOffsets
                 );
+            }
+            if (bindStartNanos != 0L) {
+                VulkanPerfAudit.recordDescriptorCommandBind("compute", System.nanoTime() - bindStartNanos);
             }
         }
 
@@ -17914,9 +18257,18 @@ void main() {
 
         private VulkanicBufferSlice materializeStandaloneUniformBuffer(
             int program,
+            VulkanShaderProgramCoordinator.VirtualProgram virtualProgram,
             java.nio.ByteBuffer backingData,
             int size
         ) {
+            VulkanBuffer cachedBuffer = virtualProgram.standaloneGpuBuffer;
+            if (!virtualProgram.standaloneDirty
+                && cachedBuffer != null
+                && !cachedBuffer.isClosed()
+                && cachedBuffer.size() >= size) {
+                return new VulkanicBufferSlice(cachedBuffer, 0, size);
+            }
+
             java.nio.ByteBuffer initialData = org.lwjgl.BufferUtils.createByteBuffer(size);
             java.nio.ByteBuffer source = backingData.duplicate();
             source.clear();
@@ -17924,17 +18276,21 @@ void main() {
             initialData.put(source);
             initialData.flip();
 
-            VulkanBuffer transientBuffer = acquireDescriptorUniformBuffer(
+            VulkanBuffer previousBuffer = virtualProgram.standaloneGpuBuffer;
+            VulkanBuffer standaloneBuffer = (VulkanBuffer) createManagedBuffer(
                 "StandaloneUniform-" + program,
+                VulkanicBuffer.USAGE_UNIFORM
+                    | VulkanicBuffer.USAGE_COPY_DST
+                    | VulkanicBuffer.USAGE_MAP_READ
+                    | VulkanicBuffer.USAGE_MAP_WRITE,
                 size,
                 initialData
             );
-            if (swapchainState.frameInProgress()) {
-                lifetime.trackFrameDescriptorResource(swapchainState.currentFrameSyncIndex(), transientBuffer);
-            } else {
-                trackTransientDescriptorBuffer(transientBuffer);
+            virtualProgram.standaloneGpuBuffer = standaloneBuffer;
+            if (previousBuffer != null && previousBuffer != standaloneBuffer && !previousBuffer.isClosed()) {
+                previousBuffer.close();
             }
-            return new VulkanicBufferSlice(transientBuffer, 0, size);
+            return new VulkanicBufferSlice(standaloneBuffer, 0, size);
         }
 
         // =====================================================================

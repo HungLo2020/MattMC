@@ -32,6 +32,7 @@ public enum GlPrimitiveType {
             case LINES -> LINES;
             case TRIANGLES -> TRIANGLES;
             case PATCHES -> PATCHES;
+            case TRIANGLE_STRIP -> throw new IllegalArgumentException("TRIANGLE_STRIP is not supported by Sodium tessellation");
             case TRIANGLE_FAN -> throw new IllegalArgumentException("TRIANGLE_FAN is not supported by Sodium tessellation");
         };
     }

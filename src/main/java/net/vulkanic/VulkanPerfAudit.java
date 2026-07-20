@@ -20,6 +20,8 @@ import java.util.concurrent.atomic.LongAdder;
 public final class VulkanPerfAudit {
     private static final boolean ENABLED = Boolean.getBoolean("mattmc.vulkan.perfAudit")
         || Boolean.getBoolean("mattmc.perfAudit");
+    private static final boolean DETERMINISTIC_PERFORMANCE_CAPTURE =
+        Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.performanceMode");
     private static final long SNAPSHOT_INTERVAL_NANOS = 5_000_000_000L;
     private static final int MAX_FRAME_SAMPLES = Math.max(1, Integer.getInteger("mattmc.perfAudit.maxFrameSamples", 4096));
 
@@ -44,6 +46,44 @@ public final class VulkanPerfAudit {
     private static final Map<String, SubmitCounters> submitDetails = new ConcurrentHashMap<>();
     private static final LongAdder descriptorBindCount = new LongAdder();
     private static final LongAdder descriptorBindTotalNanos = new LongAdder();
+    private static final LongAdder descriptorPlanCount = new LongAdder();
+    private static final LongAdder descriptorPlanTotalNanos = new LongAdder();
+    private static final LongAdder descriptorPlanCacheableCount = new LongAdder();
+    private static final LongAdder descriptorPlanNonCacheableCount = new LongAdder();
+    private static final LongAdder descriptorPlanBindingCount = new LongAdder();
+    private static final LongAdder descriptorPlanReuseLookupCount = new LongAdder();
+    private static final LongAdder descriptorPlanReuseHitCount = new LongAdder();
+    private static final LongAdder descriptorPlanReuseMissCount = new LongAdder();
+    private static final LongAdder descriptorPlanReuseEquivalentConsecutiveCount = new LongAdder();
+    private static final AtomicLong descriptorPlanReuseCacheSize = new AtomicLong();
+    private static final LongAdder descriptorCacheLookupCount = new LongAdder();
+    private static final LongAdder descriptorCacheHitCount = new LongAdder();
+    private static final LongAdder descriptorCacheMissCount = new LongAdder();
+    private static final LongAdder descriptorCacheInvalidationCount = new LongAdder();
+    private static final LongAdder descriptorCacheInvalidatedEntryCount = new LongAdder();
+    private static final Map<String, LongAdder> descriptorCacheMissReasons = new ConcurrentHashMap<>();
+    private static final LongAdder descriptorSetAllocationCount = new LongAdder();
+    private static final LongAdder descriptorSetAllocationNanos = new LongAdder();
+    private static final LongAdder descriptorSetUpdateCount = new LongAdder();
+    private static final LongAdder descriptorSetUpdateNanos = new LongAdder();
+    private static final LongAdder descriptorWriteCount = new LongAdder();
+    private static final LongAdder descriptorWriteSamplerCount = new LongAdder();
+    private static final LongAdder descriptorWriteUniformBufferCount = new LongAdder();
+    private static final LongAdder descriptorWriteStorageImageCount = new LongAdder();
+    private static final LongAdder descriptorWriteTexelBufferCount = new LongAdder();
+    private static final LongAdder descriptorCommandBindCount = new LongAdder();
+    private static final LongAdder descriptorCommandBindNanos = new LongAdder();
+    private static final LongAdder descriptorTransientUniformCopyCount = new LongAdder();
+    private static final LongAdder descriptorTransientUniformCopyBytes = new LongAdder();
+    private static final LongAdder descriptorTransientUniformCopyNanos = new LongAdder();
+    private static final LongAdder dynamicTransformsBindingCount = new LongAdder();
+    private static final LongAdder dynamicTransformsHandleChangeCount = new LongAdder();
+    private static final LongAdder dynamicTransformsOffsetChangeCount = new LongAdder();
+    private static final LongAdder dynamicTransformsRangeChangeCount = new LongAdder();
+    private static final LongAdder dynamicTransformsContentChangeCount = new LongAdder();
+    private static final LongAdder dynamicTransformsContentReuseCount = new LongAdder();
+    private static final AtomicLong dynamicTransformsDistinctContentCount = new AtomicLong();
+    private static final Map<String, DescriptorCounters> descriptorPipelines = new ConcurrentHashMap<>();
     private static final LongAdder bindingBuildCount = new LongAdder();
     private static final LongAdder bindingBuildTotalNanos = new LongAdder();
     private static final LongAdder bindingBuildCompleteCoverageCount = new LongAdder();
@@ -64,6 +104,9 @@ public final class VulkanPerfAudit {
     private static final long initialGcTimeMillis = gcCollectionTimeMillis();
 
     private static final AtomicLong lastSnapshotNanos = new AtomicLong();
+    private static volatile boolean deterministicMeasurementFrameActive;
+    private static volatile DynamicTransformsSample lastDynamicTransformsSample;
+    private static final Map<Long, Boolean> dynamicTransformsContentHashes = new ConcurrentHashMap<>();
     private static final Path reportFile = initReportFile();
 
     static {
@@ -79,15 +122,25 @@ public final class VulkanPerfAudit {
         return ENABLED && reportFile != null;
     }
 
+    public static void setDeterministicMeasurementFrameActive(boolean active) {
+        if (isEnabled() && DETERMINISTIC_PERFORMANCE_CAPTURE) {
+            deterministicMeasurementFrameActive = active;
+        }
+    }
+
+    private static boolean descriptorEventsEnabled() {
+        return isEnabled() && (!DETERMINISTIC_PERFORMANCE_CAPTURE || deterministicMeasurementFrameActive);
+    }
+
     public static void recordBeginFrameCall() {
-        if (!isEnabled()) {
+        if (!descriptorEventsEnabled()) {
             return;
         }
         beginFrameCallCount.increment();
     }
 
     public static void recordBeginFrameFenceWait(long nanos) {
-        if (!isEnabled()) {
+        if (!descriptorEventsEnabled()) {
             return;
         }
         beginFrameFenceWaitNanos.add(Math.max(0L, nanos));
@@ -193,11 +246,217 @@ public final class VulkanPerfAudit {
     }
 
     public static void recordDescriptorBind(long nanos) {
-        if (!isEnabled()) {
+        if (!descriptorEventsEnabled()) {
             return;
         }
         descriptorBindCount.increment();
         descriptorBindTotalNanos.add(Math.max(0L, nanos));
+    }
+
+    public static void recordDescriptorPlan(
+        String pipelineLocation,
+        boolean cacheable,
+        int bindingCount,
+        int samplerBindings,
+        int uniformBufferBindings,
+        int storageImageBindings,
+        int texelBufferBindings,
+        long nanos
+    ) {
+        if (!descriptorEventsEnabled()) {
+            return;
+        }
+        DescriptorCounters counters = descriptorCounters(pipelineLocation);
+        long clampedNanos = Math.max(0L, nanos);
+        int clampedBindingCount = Math.max(0, bindingCount);
+        descriptorPlanCount.increment();
+        descriptorPlanTotalNanos.add(clampedNanos);
+        descriptorPlanBindingCount.add(clampedBindingCount);
+        counters.planCount.increment();
+        counters.planNanos.add(clampedNanos);
+        counters.planBindings.add(clampedBindingCount);
+        counters.samplerBindings.add(Math.max(0, samplerBindings));
+        counters.uniformBufferBindings.add(Math.max(0, uniformBufferBindings));
+        counters.storageImageBindings.add(Math.max(0, storageImageBindings));
+        counters.texelBufferBindings.add(Math.max(0, texelBufferBindings));
+        if (cacheable) {
+            descriptorPlanCacheableCount.increment();
+            counters.cacheablePlanCount.increment();
+        } else {
+            descriptorPlanNonCacheableCount.increment();
+            counters.nonCacheablePlanCount.increment();
+        }
+    }
+
+    public static void recordDescriptorPlanReuseLookup(
+        String pipelineLocation,
+        boolean hit,
+        boolean equivalentConsecutive,
+        int cacheSize
+    ) {
+        if (!descriptorEventsEnabled()) {
+            return;
+        }
+        DescriptorCounters counters = descriptorCounters(pipelineLocation);
+        descriptorPlanReuseLookupCount.increment();
+        counters.planReuseLookupCount.increment();
+        if (hit) {
+            descriptorPlanReuseHitCount.increment();
+            counters.planReuseHitCount.increment();
+        } else {
+            descriptorPlanReuseMissCount.increment();
+            counters.planReuseMissCount.increment();
+        }
+        if (equivalentConsecutive) {
+            descriptorPlanReuseEquivalentConsecutiveCount.increment();
+            counters.equivalentConsecutivePlanCount.increment();
+        }
+        descriptorPlanReuseCacheSize.set(Math.max(0, cacheSize));
+    }
+
+    public static void recordDynamicTransformsBinding(long bufferHandle, long offset, long range, long contentHash) {
+        if (!descriptorEventsEnabled()) {
+            return;
+        }
+        dynamicTransformsBindingCount.increment();
+        DynamicTransformsSample previous = lastDynamicTransformsSample;
+        if (previous != null) {
+            if (previous.bufferHandle() != bufferHandle) {
+                dynamicTransformsHandleChangeCount.increment();
+            }
+            if (previous.offset() != offset) {
+                dynamicTransformsOffsetChangeCount.increment();
+            }
+            if (previous.range() != range) {
+                dynamicTransformsRangeChangeCount.increment();
+            }
+            if (previous.contentHash() != contentHash) {
+                dynamicTransformsContentChangeCount.increment();
+            } else {
+                dynamicTransformsContentReuseCount.increment();
+            }
+        }
+        if (dynamicTransformsContentHashes.size() < 4096) {
+            dynamicTransformsContentHashes.putIfAbsent(contentHash, Boolean.TRUE);
+            dynamicTransformsDistinctContentCount.set(dynamicTransformsContentHashes.size());
+        }
+        lastDynamicTransformsSample = new DynamicTransformsSample(bufferHandle, offset, range, contentHash);
+    }
+
+    public static void recordDescriptorCacheLookup(String pipelineLocation, boolean cacheable, boolean hit) {
+        if (!descriptorEventsEnabled() || !cacheable) {
+            return;
+        }
+        DescriptorCounters counters = descriptorCounters(pipelineLocation);
+        descriptorCacheLookupCount.increment();
+        counters.cacheLookupCount.increment();
+        if (hit) {
+            descriptorCacheHitCount.increment();
+            counters.cacheHitCount.increment();
+        } else {
+            descriptorCacheMissCount.increment();
+            counters.cacheMissCount.increment();
+        }
+    }
+
+    public static void recordDescriptorCacheMissReason(String pipelineLocation, String reason) {
+        if (!descriptorEventsEnabled()) {
+            return;
+        }
+        String normalizedReason = normalizeKey(reason, "unknown");
+        DescriptorCounters counters = descriptorCounters(pipelineLocation);
+        descriptorCacheMissReasons
+            .computeIfAbsent(normalizedReason, ignored -> new LongAdder())
+            .increment();
+        counters.cacheMissReasons
+            .computeIfAbsent(normalizedReason, ignored -> new LongAdder())
+            .increment();
+    }
+
+    public static void recordDescriptorCacheInvalidation(String reason, int entryCount) {
+        if (!descriptorEventsEnabled()) {
+            return;
+        }
+        descriptorCacheInvalidationCount.increment();
+        descriptorCacheInvalidatedEntryCount.add(Math.max(0, entryCount));
+        String normalizedReason = "invalidation:" + normalizeKey(reason, "unknown");
+        descriptorCacheMissReasons
+            .computeIfAbsent(normalizedReason, ignored -> new LongAdder())
+            .increment();
+    }
+
+    public static void recordDescriptorSetAllocation(String pipelineLocation, long nanos) {
+        if (!descriptorEventsEnabled()) {
+            return;
+        }
+        DescriptorCounters counters = descriptorCounters(pipelineLocation);
+        long clampedNanos = Math.max(0L, nanos);
+        descriptorSetAllocationCount.increment();
+        descriptorSetAllocationNanos.add(clampedNanos);
+        counters.allocationCount.increment();
+        counters.allocationNanos.add(clampedNanos);
+    }
+
+    public static void recordDescriptorSetUpdate(
+        String pipelineLocation,
+        int bindingCount,
+        int samplerWrites,
+        int uniformBufferWrites,
+        int storageImageWrites,
+        int texelBufferWrites,
+        long nanos
+    ) {
+        if (!descriptorEventsEnabled()) {
+            return;
+        }
+        DescriptorCounters counters = descriptorCounters(pipelineLocation);
+        long clampedNanos = Math.max(0L, nanos);
+        int clampedBindingCount = Math.max(0, bindingCount);
+        int clampedSamplerWrites = Math.max(0, samplerWrites);
+        int clampedUniformWrites = Math.max(0, uniformBufferWrites);
+        int clampedStorageWrites = Math.max(0, storageImageWrites);
+        int clampedTexelWrites = Math.max(0, texelBufferWrites);
+        descriptorSetUpdateCount.increment();
+        descriptorSetUpdateNanos.add(clampedNanos);
+        descriptorWriteCount.add(clampedBindingCount);
+        descriptorWriteSamplerCount.add(clampedSamplerWrites);
+        descriptorWriteUniformBufferCount.add(clampedUniformWrites);
+        descriptorWriteStorageImageCount.add(clampedStorageWrites);
+        descriptorWriteTexelBufferCount.add(clampedTexelWrites);
+        counters.updateCount.increment();
+        counters.updateNanos.add(clampedNanos);
+        counters.writeCount.add(clampedBindingCount);
+        counters.samplerWrites.add(clampedSamplerWrites);
+        counters.uniformBufferWrites.add(clampedUniformWrites);
+        counters.storageImageWrites.add(clampedStorageWrites);
+        counters.texelBufferWrites.add(clampedTexelWrites);
+    }
+
+    public static void recordDescriptorCommandBind(String pipelineLocation, long nanos) {
+        if (!descriptorEventsEnabled()) {
+            return;
+        }
+        DescriptorCounters counters = descriptorCounters(pipelineLocation);
+        long clampedNanos = Math.max(0L, nanos);
+        descriptorCommandBindCount.increment();
+        descriptorCommandBindNanos.add(clampedNanos);
+        counters.commandBindCount.increment();
+        counters.commandBindNanos.add(clampedNanos);
+    }
+
+    public static void recordDescriptorTransientUniformCopy(String pipelineLocation, int bytes, long nanos) {
+        if (!descriptorEventsEnabled()) {
+            return;
+        }
+        DescriptorCounters counters = descriptorCounters(pipelineLocation);
+        long clampedNanos = Math.max(0L, nanos);
+        int clampedBytes = Math.max(0, bytes);
+        descriptorTransientUniformCopyCount.increment();
+        descriptorTransientUniformCopyBytes.add(clampedBytes);
+        descriptorTransientUniformCopyNanos.add(clampedNanos);
+        counters.transientUniformCopyCount.increment();
+        counters.transientUniformCopyBytes.add(clampedBytes);
+        counters.transientUniformCopyNanos.add(clampedNanos);
     }
 
     public static void recordBindingBuild(long nanos, boolean completeCoverage) {
@@ -300,6 +559,8 @@ public final class VulkanPerfAudit {
         double trackedCpuMs = primarySubmitMs + descriptorBindMs + bindingBuildMs + frameStartWaitMs;
         double presentedFrames = Math.max(1.0, presentedFrameCount.sum());
         String diagnosticIssue = dominantIssue(primarySubmitMs, descriptorBindMs, bindingBuildMs, frameStartWaitMs);
+        Runtime runtime = Runtime.getRuntime();
+        long heapUsedBytes = Math.max(0L, runtime.totalMemory() - runtime.freeMemory());
 
         StringBuilder builder = new StringBuilder(1024);
         builder.append("timestamp_utc=").append(Instant.now()).append('\n');
@@ -349,6 +610,7 @@ public final class VulkanPerfAudit {
         builder.append("transfer_count=").append(transferCount.sum()).append('\n');
         builder.append("descriptor_bind_count=").append(descriptorBindCount.sum()).append('\n');
         builder.append("descriptor_bind_total_ms=").append(format(descriptorBindMs)).append('\n');
+        appendDescriptorSummary(builder, presentedFrames);
         builder.append("pipeline_resolve_count=0\n");
         builder.append("pipeline_resolve_total_ms=0.0000\n");
         builder.append("pipeline_resolve_miss_count=0\n");
@@ -366,6 +628,9 @@ public final class VulkanPerfAudit {
         builder.append("frame_start_wait_share_of_tracked_cpu_time_pct=").append(format(percent(frameStartWaitMs, trackedCpuMs))).append('\n');
         builder.append("gc_collection_count_delta=").append(Math.max(0L, gcCollectionCount() - initialGcCount)).append('\n');
         builder.append("gc_collection_time_ms_delta=").append(Math.max(0L, gcCollectionTimeMillis() - initialGcTimeMillis)).append('\n');
+        builder.append("java_heap_used_bytes=").append(heapUsedBytes).append('\n');
+        builder.append("java_heap_committed_bytes=").append(runtime.totalMemory()).append('\n');
+        builder.append("java_heap_max_bytes=").append(runtime.maxMemory()).append('\n');
         appendSubmitSummary(builder, presentedFrames);
         appendPhaseSummary(builder);
         return builder.toString();
@@ -552,6 +817,145 @@ public final class VulkanPerfAudit {
         }
     }
 
+    private static void appendDescriptorSummary(StringBuilder builder, double presentedFrames) {
+        long planCount = descriptorPlanCount.sum();
+        long lookupCount = descriptorCacheLookupCount.sum();
+        long hitCount = descriptorCacheHitCount.sum();
+        long commandBindCount = descriptorCommandBindCount.sum();
+        long drawDispatchCount = graphicsDrawCount.sum() + computeDispatchCount.sum();
+        double measuredFrames = Math.max(1.0, deterministicMeasuredFrameCount.sum());
+        double uniquePlans = Math.max(1.0, descriptorPlanCacheableCount.sum() + descriptorPlanNonCacheableCount.sum());
+        builder.append("descriptor_plan_count=").append(planCount).append('\n');
+        builder.append("descriptor_plan_total_ms=").append(format(nanosToMillis(descriptorPlanTotalNanos.sum()))).append('\n');
+        builder.append("descriptor_plan_cacheable_count=").append(descriptorPlanCacheableCount.sum()).append('\n');
+        builder.append("descriptor_plan_noncacheable_count=").append(descriptorPlanNonCacheableCount.sum()).append('\n');
+        builder.append("descriptor_plan_bindings=").append(descriptorPlanBindingCount.sum()).append('\n');
+        builder.append("descriptor_plan_reuse_lookup_count=").append(descriptorPlanReuseLookupCount.sum()).append('\n');
+        builder.append("descriptor_plan_reuse_hit_count=").append(descriptorPlanReuseHitCount.sum()).append('\n');
+        builder.append("descriptor_plan_reuse_miss_count=").append(descriptorPlanReuseMissCount.sum()).append('\n');
+        builder.append("descriptor_plan_reuse_hit_rate_pct=")
+            .append(format(percent(descriptorPlanReuseHitCount.sum(), Math.max(1.0, descriptorPlanReuseLookupCount.sum()))))
+            .append('\n');
+        builder.append("descriptor_plan_reuse_equivalent_consecutive_count=")
+            .append(descriptorPlanReuseEquivalentConsecutiveCount.sum()).append('\n');
+        builder.append("descriptor_plan_reuse_cache_size=").append(descriptorPlanReuseCacheSize.get()).append('\n');
+        builder.append("descriptor_cache_lookup_count=").append(lookupCount).append('\n');
+        builder.append("descriptor_cache_hit_count=").append(hitCount).append('\n');
+        builder.append("descriptor_cache_miss_count=").append(descriptorCacheMissCount.sum()).append('\n');
+        builder.append("descriptor_cache_hit_rate_pct=").append(format(percent(hitCount, Math.max(1.0, lookupCount)))).append('\n');
+        builder.append("descriptor_cache_invalidation_count=").append(descriptorCacheInvalidationCount.sum()).append('\n');
+        builder.append("descriptor_cache_invalidated_entries=").append(descriptorCacheInvalidatedEntryCount.sum()).append('\n');
+        builder.append("descriptor_set_allocation_count=").append(descriptorSetAllocationCount.sum()).append('\n');
+        builder.append("descriptor_set_allocation_ms=").append(format(nanosToMillis(descriptorSetAllocationNanos.sum()))).append('\n');
+        builder.append("descriptor_set_update_count=").append(descriptorSetUpdateCount.sum()).append('\n');
+        builder.append("descriptor_set_update_ms=").append(format(nanosToMillis(descriptorSetUpdateNanos.sum()))).append('\n');
+        builder.append("descriptor_write_count=").append(descriptorWriteCount.sum()).append('\n');
+        builder.append("descriptor_write_sampler_count=").append(descriptorWriteSamplerCount.sum()).append('\n');
+        builder.append("descriptor_write_uniform_buffer_count=").append(descriptorWriteUniformBufferCount.sum()).append('\n');
+        builder.append("descriptor_write_storage_image_count=").append(descriptorWriteStorageImageCount.sum()).append('\n');
+        builder.append("descriptor_write_texel_buffer_count=").append(descriptorWriteTexelBufferCount.sum()).append('\n');
+        builder.append("descriptor_command_bind_count=").append(commandBindCount).append('\n');
+        builder.append("descriptor_command_bind_ms=").append(format(nanosToMillis(descriptorCommandBindNanos.sum()))).append('\n');
+        builder.append("descriptor_transient_uniform_copy_count=").append(descriptorTransientUniformCopyCount.sum()).append('\n');
+        builder.append("descriptor_transient_uniform_copy_bytes=").append(descriptorTransientUniformCopyBytes.sum()).append('\n');
+        builder.append("descriptor_transient_uniform_copy_ms=").append(format(nanosToMillis(descriptorTransientUniformCopyNanos.sum()))).append('\n');
+        builder.append("dynamic_transforms_binding_count=").append(dynamicTransformsBindingCount.sum()).append('\n');
+        builder.append("dynamic_transforms_handle_change_count=").append(dynamicTransformsHandleChangeCount.sum()).append('\n');
+        builder.append("dynamic_transforms_offset_change_count=").append(dynamicTransformsOffsetChangeCount.sum()).append('\n');
+        builder.append("dynamic_transforms_range_change_count=").append(dynamicTransformsRangeChangeCount.sum()).append('\n');
+        builder.append("dynamic_transforms_content_change_count=").append(dynamicTransformsContentChangeCount.sum()).append('\n');
+        builder.append("dynamic_transforms_content_reuse_count=").append(dynamicTransformsContentReuseCount.sum()).append('\n');
+        builder.append("dynamic_transforms_distinct_content_count=").append(dynamicTransformsDistinctContentCount.get()).append('\n');
+        builder.append("descriptor_plans_per_measured_frame=").append(format(planCount / measuredFrames)).append('\n');
+        builder.append("descriptor_sets_allocated_per_measured_frame=").append(format(descriptorSetAllocationCount.sum() / measuredFrames)).append('\n');
+        builder.append("descriptor_sets_updated_per_measured_frame=").append(format(descriptorSetUpdateCount.sum() / measuredFrames)).append('\n');
+        builder.append("descriptor_commands_bound_per_measured_frame=").append(format(commandBindCount / measuredFrames)).append('\n');
+        builder.append("descriptor_plans_per_presented_frame=").append(format(planCount / presentedFrames)).append('\n');
+        builder.append("descriptor_sets_allocated_per_presented_frame=").append(format(descriptorSetAllocationCount.sum() / presentedFrames)).append('\n');
+        builder.append("descriptor_sets_updated_per_presented_frame=").append(format(descriptorSetUpdateCount.sum() / presentedFrames)).append('\n');
+        builder.append("descriptor_commands_bound_per_presented_frame=").append(format(commandBindCount / presentedFrames)).append('\n');
+        builder.append("descriptor_plans_per_draw_dispatch=").append(format(planCount / Math.max(1.0, drawDispatchCount))).append('\n');
+        builder.append("descriptor_commands_bound_per_draw_dispatch=").append(format(commandBindCount / Math.max(1.0, drawDispatchCount))).append('\n');
+        builder.append("descriptor_lookups_per_unique_plan=").append(format(lookupCount / uniquePlans)).append('\n');
+        List<Map.Entry<String, LongAdder>> missReasons = new ArrayList<>(descriptorCacheMissReasons.entrySet());
+        missReasons.sort((left, right) -> Long.compare(right.getValue().sum(), left.getValue().sum()));
+        int missReasonRank = 1;
+        for (Map.Entry<String, LongAdder> entry : missReasons) {
+            if (missReasonRank > 12) {
+                break;
+            }
+            builder.append("descriptor_cache_miss_reason_rank_").append(missReasonRank)
+                .append('=').append(entry.getKey())
+                .append("|count=").append(entry.getValue().sum())
+                .append('\n');
+            missReasonRank++;
+        }
+
+        List<Map.Entry<String, DescriptorCounters>> entries = new ArrayList<>(descriptorPipelines.entrySet());
+        entries.sort((left, right) -> Long.compare(right.getValue().totalWeight(), left.getValue().totalWeight()));
+        int rank = 1;
+        for (Map.Entry<String, DescriptorCounters> entry : entries) {
+            if (rank > 20) {
+                break;
+            }
+            DescriptorCounters counters = entry.getValue();
+            String prefix = "descriptor_pipeline_rank_" + rank;
+            builder.append(prefix).append('=').append(entry.getKey())
+                .append("|plans=").append(counters.planCount.sum())
+                .append("|planReuseLookups=").append(counters.planReuseLookupCount.sum())
+                .append("|planReuseHits=").append(counters.planReuseHitCount.sum())
+                .append("|equivConsecutive=").append(counters.equivalentConsecutivePlanCount.sum())
+                .append("|noncacheable=").append(counters.nonCacheablePlanCount.sum())
+                .append("|lookups=").append(counters.cacheLookupCount.sum())
+                .append("|hits=").append(counters.cacheHitCount.sum())
+                .append("|misses=").append(counters.cacheMissCount.sum())
+                .append("|missReason=").append(counters.dominantMissReason())
+                .append("|allocs=").append(counters.allocationCount.sum())
+                .append("|updates=").append(counters.updateCount.sum())
+                .append("|writes=").append(counters.writeCount.sum())
+                .append("|cmdBinds=").append(counters.commandBindCount.sum())
+                .append("|transientCopies=").append(counters.transientUniformCopyCount.sum())
+                .append("|transientBytes=").append(counters.transientUniformCopyBytes.sum())
+                .append("|planMs=").append(format(nanosToMillis(counters.planNanos.sum())))
+                .append("|allocMs=").append(format(nanosToMillis(counters.allocationNanos.sum())))
+                .append("|updateMs=").append(format(nanosToMillis(counters.updateNanos.sum())))
+                .append("|cmdBindMs=").append(format(nanosToMillis(counters.commandBindNanos.sum())))
+                .append("|transientCopyMs=").append(format(nanosToMillis(counters.transientUniformCopyNanos.sum())))
+                .append('\n');
+            rank++;
+        }
+    }
+
+    private static DescriptorCounters descriptorCounters(String pipelineLocation) {
+        return descriptorPipelines.computeIfAbsent(descriptorFamily(pipelineLocation), ignored -> new DescriptorCounters());
+    }
+
+    private static String descriptorFamily(String pipelineLocation) {
+        String key = normalizeKey(pipelineLocation, "unknown");
+        if (key.contains("sodium") || key.contains("chunk") || key.contains("terrain")) {
+            return "terrain";
+        }
+        if (key.contains("distanthorizons") || key.contains("distant_horizons") || key.contains("dh")) {
+            return "distant_horizons";
+        }
+        if (key.contains("iris") && (key.contains("composite") || key.contains("deferred") || key.contains("shadow"))) {
+            return key;
+        }
+        if (key.contains("gui") || key.contains("text")) {
+            return "gui_text";
+        }
+        if (key.contains("entity") || key.contains("armor") || key.contains("player") || key.contains("item")) {
+            return "entities_items";
+        }
+        if (key.contains("hand")) {
+            return "hand";
+        }
+        if (key.contains("compute")) {
+            return "compute";
+        }
+        return key;
+    }
+
     private static long gcCollectionCount() {
         long total = 0L;
         for (GarbageCollectorMXBean bean : ManagementFactory.getGarbageCollectorMXBeans()) {
@@ -572,6 +976,9 @@ public final class VulkanPerfAudit {
             }
         }
         return total;
+    }
+
+    private record DynamicTransformsSample(long bufferHandle, long offset, long range, long contentHash) {
     }
 
     private static final class PhaseCounters {
@@ -629,6 +1036,62 @@ public final class VulkanPerfAudit {
             if (immediateCompletionRequired) {
                 immediateCompletionRequiredCount.increment();
             }
+        }
+    }
+
+    private static final class DescriptorCounters {
+        private final LongAdder planCount = new LongAdder();
+        private final LongAdder planNanos = new LongAdder();
+        private final LongAdder planBindings = new LongAdder();
+        private final LongAdder planReuseLookupCount = new LongAdder();
+        private final LongAdder planReuseHitCount = new LongAdder();
+        private final LongAdder planReuseMissCount = new LongAdder();
+        private final LongAdder equivalentConsecutivePlanCount = new LongAdder();
+        private final LongAdder cacheablePlanCount = new LongAdder();
+        private final LongAdder nonCacheablePlanCount = new LongAdder();
+        private final LongAdder samplerBindings = new LongAdder();
+        private final LongAdder uniformBufferBindings = new LongAdder();
+        private final LongAdder storageImageBindings = new LongAdder();
+        private final LongAdder texelBufferBindings = new LongAdder();
+        private final LongAdder cacheLookupCount = new LongAdder();
+        private final LongAdder cacheHitCount = new LongAdder();
+        private final LongAdder cacheMissCount = new LongAdder();
+        private final Map<String, LongAdder> cacheMissReasons = new ConcurrentHashMap<>();
+        private final LongAdder allocationCount = new LongAdder();
+        private final LongAdder allocationNanos = new LongAdder();
+        private final LongAdder updateCount = new LongAdder();
+        private final LongAdder updateNanos = new LongAdder();
+        private final LongAdder writeCount = new LongAdder();
+        private final LongAdder samplerWrites = new LongAdder();
+        private final LongAdder uniformBufferWrites = new LongAdder();
+        private final LongAdder storageImageWrites = new LongAdder();
+        private final LongAdder texelBufferWrites = new LongAdder();
+        private final LongAdder commandBindCount = new LongAdder();
+        private final LongAdder commandBindNanos = new LongAdder();
+        private final LongAdder transientUniformCopyCount = new LongAdder();
+        private final LongAdder transientUniformCopyBytes = new LongAdder();
+        private final LongAdder transientUniformCopyNanos = new LongAdder();
+
+        private long totalWeight() {
+            return planCount.sum()
+                + planReuseLookupCount.sum()
+                + allocationCount.sum()
+                + updateCount.sum()
+                + commandBindCount.sum()
+                + transientUniformCopyCount.sum();
+        }
+
+        private String dominantMissReason() {
+            String dominantReason = "none";
+            long dominantCount = 0L;
+            for (Map.Entry<String, LongAdder> entry : cacheMissReasons.entrySet()) {
+                long count = entry.getValue().sum();
+                if (count > dominantCount) {
+                    dominantCount = count;
+                    dominantReason = entry.getKey() + ":" + count;
+                }
+            }
+            return dominantReason;
         }
     }
 

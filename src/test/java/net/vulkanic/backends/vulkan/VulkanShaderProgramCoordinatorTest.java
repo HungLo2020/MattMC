@@ -10,8 +10,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.nio.ByteOrder;
 import net.vulkanic.PipelineDescriptor;
+import net.vulkanic.VulkanicBuffer;
 import net.vulkanic.VulkanicShaderStage;
 import net.vulkanic.VulkanicSpirvModule;
 import net.vulkanic.VulkanicUniformReflectionType;
@@ -171,6 +173,50 @@ class VulkanShaderProgramCoordinatorTest {
 
         assertNull(coordinator.resolveUniformLocationRef(token));
         assertEquals(64, program.standaloneBackingSize);
+        assertTrue(program.standaloneDirty);
+    }
+
+    @Test
+    void standaloneUniformBackingCacheIsClosedWhenStateIsRebuilt() {
+        VulkanShaderProgramCoordinator coordinator = new VulkanShaderProgramCoordinator();
+        int programId = coordinator.createProgram();
+        VulkanShaderProgramCoordinator.VirtualProgram program = coordinator.requireProgram(programId);
+        VulkanShaderProgramCoordinator.ReflectedUniform uniform =
+            new VulkanShaderProgramCoordinator.ReflectedUniform(
+                "uTint",
+                1,
+                VulkanicUniformReflectionType.FLOAT_VEC4.toLegacyGlConstant()
+            );
+        AtomicInteger closes = new AtomicInteger();
+        VulkanBuffer cachedSnapshot = new VulkanBuffer(
+            0x1000L,
+            0x2000L,
+            VulkanicBuffer.USAGE_UNIFORM,
+            64,
+            "standalone-test",
+            closes::incrementAndGet
+        );
+        program.standaloneGpuBuffer = cachedSnapshot;
+
+        coordinator.installReflection(
+            program,
+            List.of("uTint"),
+            List.of(uniform),
+            List.of(ShadercSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME),
+            List.of(new VulkanShaderProgramCoordinator.ReflectedResourceBinding(
+                ShadercSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME,
+                PipelineDescriptor.ResourceType.UNIFORM_BUFFER,
+                0,
+                0
+            )),
+            List.of("vec4 uTint;"),
+            new int[] {1, 1, 1}
+        );
+        coordinator.initializeStandaloneUniformState(program, Map.of("uTint", uniform));
+
+        assertNull(program.standaloneGpuBuffer);
+        assertTrue(cachedSnapshot.isClosed());
+        assertEquals(1, closes.get());
         assertTrue(program.standaloneDirty);
     }
 

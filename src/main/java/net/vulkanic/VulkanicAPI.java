@@ -211,6 +211,7 @@ public class VulkanicAPI {
     // OpenGL Constants - Primitive Types
     public static final int GL_LINES = 0x0001;
     public static final int GL_TRIANGLES = 0x0004;
+    public static final int GL_TRIANGLE_STRIP = 0x0005;
     public static final int GL_TRIANGLE_FAN = 0x0006;
     public static final int GL_PATCHES = 0x000E;
     

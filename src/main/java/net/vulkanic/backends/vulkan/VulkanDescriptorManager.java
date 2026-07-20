@@ -13,6 +13,7 @@ import java.util.function.Function;
 import java.util.function.LongConsumer;
 import java.util.function.Predicate;
 import java.util.function.ToLongFunction;
+import net.vulkanic.VulkanPerfAudit;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkDescriptorPoolCreateInfo;
@@ -42,6 +43,7 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
     private final long[] immediateDescriptorPools;
     private final Map<Object, Long> descriptorSamplerCache = new ConcurrentHashMap<>();
     private final Map<DescriptorSetCacheKey, Long> descriptorSetCache = new HashMap<>();
+    private final Map<String, DescriptorSetCacheKey> lastDescriptorSetKeyByPipeline = new HashMap<>();
     private final Map<Integer, Deque<DescriptorUniformBuffer>> recycledDescriptorUniformBuffers = new HashMap<>();
     private final int maxRecycledDescriptorUniformBuffers;
     private final long maxRecycledDescriptorUniformBufferBytes;
@@ -180,10 +182,15 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
                 VK10.vkResetDescriptorPool(device, activeDescriptorPool, 0)
             );
         }
-        invalidateDescriptorSets();
+        invalidateDescriptorSets("reset_active_pool");
     }
 
     void invalidateDescriptorSets() {
+        invalidateDescriptorSets("manual");
+    }
+
+    private void invalidateDescriptorSets(String reason) {
+        VulkanPerfAudit.recordDescriptorCacheInvalidation(reason, descriptorSetCache.size());
         descriptorSetCache.clear();
     }
 
@@ -192,6 +199,7 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
         long descriptorSetLayoutHandle,
         List<? extends DescriptorWriteBinding> bindings,
         DescriptorSetCacheKey cacheKey,
+        String auditPipelineLocation,
         VkResultChecker checkVk
     ) {
         Objects.requireNonNull(device, "device");
@@ -205,8 +213,14 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
             Long cachedDescriptorSetHandle = descriptorSetCache.get(cacheKey);
             if (cachedDescriptorSetHandle != null) {
                 descriptorSetCacheHitCount++;
+                VulkanPerfAudit.recordDescriptorCacheLookup(auditPipelineLocation, true, true);
                 return cachedDescriptorSetHandle;
             }
+            VulkanPerfAudit.recordDescriptorCacheLookup(auditPipelineLocation, true, false);
+            VulkanPerfAudit.recordDescriptorCacheMissReason(
+                auditPipelineLocation,
+                descriptorCacheMissReason(auditPipelineLocation, cacheKey)
+            );
         }
 
         try (MemoryStack stack = stackPush()) {
@@ -216,15 +230,31 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
                 .pSetLayouts(stack.longs(descriptorSetLayoutHandle));
 
             java.nio.LongBuffer pDescriptorSet = stack.mallocLong(1);
+            long allocationStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
             checkVk.check(
                 "vkAllocateDescriptorSets(bindPipelineResources)",
                 VK10.vkAllocateDescriptorSets(device, allocInfo, pDescriptorSet)
             );
+            if (allocationStartNanos != 0L) {
+                VulkanPerfAudit.recordDescriptorSetAllocation(auditPipelineLocation, System.nanoTime() - allocationStartNanos);
+            }
             long descriptorSetHandle = pDescriptorSet.get(0);
 
             VkWriteDescriptorSet.Buffer writes = VkWriteDescriptorSet.calloc(bindings.size(), stack);
+            int samplerWrites = 0;
+            int uniformBufferWrites = 0;
+            int storageImageWrites = 0;
+            int texelBufferWrites = 0;
             for (int i = 0; i < bindings.size(); i++) {
                 DescriptorWriteBinding resolvedBinding = bindings.get(i);
+                switch (resolvedBinding.descriptorType()) {
+                    case VK10.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER -> samplerWrites++;
+                    case VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER -> uniformBufferWrites++;
+                    case VK10.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE -> storageImageWrites++;
+                    case VK10.VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER -> texelBufferWrites++;
+                    default -> {
+                    }
+                }
                 VkWriteDescriptorSet write = writes.get(i)
                     .sType$Default()
                     .dstSet(descriptorSetHandle)
@@ -235,9 +265,22 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
                 resolvedBinding.populateWrite(write, stack);
             }
 
+            long updateStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
             VK10.vkUpdateDescriptorSets(device, writes, null);
+            if (updateStartNanos != 0L) {
+                VulkanPerfAudit.recordDescriptorSetUpdate(
+                    auditPipelineLocation,
+                    bindings.size(),
+                    samplerWrites,
+                    uniformBufferWrites,
+                    storageImageWrites,
+                    texelBufferWrites,
+                    System.nanoTime() - updateStartNanos
+                );
+            }
             if (cacheKey != null) {
                 descriptorSetCache.put(cacheKey, descriptorSetHandle);
+                rememberDescriptorSetKey(auditPipelineLocation, cacheKey);
                 descriptorSetCacheStoreCount++;
             }
             return descriptorSetHandle;
@@ -394,7 +437,86 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
 
     private void clearDescriptorPoolState() {
         activeDescriptorPool = VK10.VK_NULL_HANDLE;
-        invalidateDescriptorSets();
+        invalidateDescriptorSets("destroy_pools");
+    }
+
+    private String descriptorCacheMissReason(String pipelineLocation, DescriptorSetCacheKey nextKey) {
+        DescriptorSetCacheKey previousKey = lastDescriptorSetKeyByPipeline.get(descriptorPipelineKey(pipelineLocation));
+        if (previousKey == null) {
+            return descriptorSetCache.isEmpty() ? "first_key_or_cache_empty" : "first_key_for_pipeline";
+        }
+        if (previousKey.equals(nextKey)) {
+            return descriptorSetCache.isEmpty() ? "cache_invalidated_same_key" : "same_key_missing";
+        }
+        if (previousKey.descriptorSetLayoutHandle() != nextKey.descriptorSetLayoutHandle()) {
+            return "layout_changed";
+        }
+        List<DescriptorBindingCacheKey> previousBindings = previousKey.bindings();
+        List<DescriptorBindingCacheKey> nextBindings = nextKey.bindings();
+        if (previousBindings.size() != nextBindings.size()) {
+            return "binding_count_changed";
+        }
+        for (int i = 0; i < nextBindings.size(); i++) {
+            DescriptorBindingCacheKey previous = previousBindings.get(i);
+            DescriptorBindingCacheKey next = nextBindings.get(i);
+            if (previous.equals(next)) {
+                continue;
+            }
+            String bindingName = next.debugName();
+            if (previous.bindingIndex() != next.bindingIndex() || previous.descriptorType() != next.descriptorType()) {
+                return withBindingName("binding_shape_changed", bindingName);
+            }
+            return withBindingName(descriptorValueChangeReason(previous, next), bindingName);
+        }
+        return "different_key_unclassified";
+    }
+
+    private static String withBindingName(String reason, String bindingName) {
+        return bindingName == null || bindingName.isBlank() ? reason : reason + ":" + bindingName;
+    }
+
+    private static String descriptorValueChangeReason(DescriptorBindingCacheKey previous, DescriptorBindingCacheKey next) {
+        return switch (next.descriptorType()) {
+            case VK10.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER -> {
+                if (previous.primaryHandle() != next.primaryHandle()) {
+                    yield "sampler_changed";
+                }
+                if (previous.secondaryHandle() != next.secondaryHandle()) {
+                    yield "sampled_image_view_changed";
+                }
+                if (previous.tertiaryHandle() != next.tertiaryHandle()) {
+                    yield "sampled_image_layout_changed";
+                }
+                yield "sampler_or_image_changed";
+            }
+            case VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC -> {
+                if (previous.primaryHandle() != next.primaryHandle()) {
+                    yield "uniform_buffer_handle_changed";
+                }
+                if (previous.secondaryHandle() != next.secondaryHandle()) {
+                    yield "uniform_buffer_offset_changed";
+                }
+                if (previous.tertiaryHandle() != next.tertiaryHandle()) {
+                    yield "uniform_buffer_range_changed";
+                }
+                yield "uniform_buffer_changed";
+            }
+            case VK10.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE -> "storage_image_changed";
+            case VK10.VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER -> "texel_buffer_changed";
+            default -> "descriptor_value_changed";
+        };
+    }
+
+    private void rememberDescriptorSetKey(String pipelineLocation, DescriptorSetCacheKey key) {
+        String pipelineKey = descriptorPipelineKey(pipelineLocation);
+        if (lastDescriptorSetKeyByPipeline.size() >= 256 && !lastDescriptorSetKeyByPipeline.containsKey(pipelineKey)) {
+            pipelineKey = "overflow";
+        }
+        lastDescriptorSetKeyByPipeline.put(pipelineKey, key);
+    }
+
+    private static String descriptorPipelineKey(String pipelineLocation) {
+        return pipelineLocation == null || pipelineLocation.isBlank() ? "unknown" : pipelineLocation;
     }
 
     private void checkFrameSlot(int slot) {
@@ -409,14 +531,88 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
         }
     }
 
-    record DescriptorBindingCacheKey(
-        int bindingIndex,
-        int descriptorType,
-        long primaryHandle,
-        long secondaryHandle,
-        long tertiaryHandle,
-        long quaternaryHandle
-    ) {
+    static final class DescriptorBindingCacheKey {
+        private final int bindingIndex;
+        private final int descriptorType;
+        private final String debugName;
+        private final long primaryHandle;
+        private final long secondaryHandle;
+        private final long tertiaryHandle;
+        private final long quaternaryHandle;
+
+        DescriptorBindingCacheKey(
+            int bindingIndex,
+            int descriptorType,
+            String debugName,
+            long primaryHandle,
+            long secondaryHandle,
+            long tertiaryHandle,
+            long quaternaryHandle
+        ) {
+            this.bindingIndex = bindingIndex;
+            this.descriptorType = descriptorType;
+            this.debugName = debugName == null ? "" : debugName;
+            this.primaryHandle = primaryHandle;
+            this.secondaryHandle = secondaryHandle;
+            this.tertiaryHandle = tertiaryHandle;
+            this.quaternaryHandle = quaternaryHandle;
+        }
+
+        int bindingIndex() {
+            return bindingIndex;
+        }
+
+        int descriptorType() {
+            return descriptorType;
+        }
+
+        String debugName() {
+            return debugName;
+        }
+
+        long primaryHandle() {
+            return primaryHandle;
+        }
+
+        long secondaryHandle() {
+            return secondaryHandle;
+        }
+
+        long tertiaryHandle() {
+            return tertiaryHandle;
+        }
+
+        long quaternaryHandle() {
+            return quaternaryHandle;
+        }
+
+        @Override
+        public boolean equals(Object object) {
+            if (this == object) {
+                return true;
+            }
+            if (!(object instanceof DescriptorBindingCacheKey other)) {
+                return false;
+            }
+            return bindingIndex == other.bindingIndex
+                && descriptorType == other.descriptorType
+                && primaryHandle == other.primaryHandle
+                && secondaryHandle == other.secondaryHandle
+                && tertiaryHandle == other.tertiaryHandle
+                && quaternaryHandle == other.quaternaryHandle;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(
+                bindingIndex,
+                descriptorType,
+                primaryHandle,
+                secondaryHandle,
+                tertiaryHandle,
+                quaternaryHandle
+            );
+        }
     }
 
     record DescriptorSetCacheKey(

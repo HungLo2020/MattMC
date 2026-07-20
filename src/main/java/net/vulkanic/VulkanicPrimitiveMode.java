@@ -8,6 +8,7 @@ import java.util.Optional;
 public enum VulkanicPrimitiveMode {
     LINES,
     TRIANGLES,
+    TRIANGLE_STRIP,
     TRIANGLE_FAN,
     PATCHES;
 
@@ -18,6 +19,7 @@ public enum VulkanicPrimitiveMode {
         return switch (constant) {
             case VulkanicAPI.GL_LINES -> Optional.of(LINES);
             case VulkanicAPI.GL_TRIANGLES -> Optional.of(TRIANGLES);
+            case VulkanicAPI.GL_TRIANGLE_STRIP -> Optional.of(TRIANGLE_STRIP);
             case VulkanicAPI.GL_TRIANGLE_FAN -> Optional.of(TRIANGLE_FAN);
             case VulkanicAPI.GL_PATCHES -> Optional.of(PATCHES);
             default -> Optional.empty();
@@ -31,6 +33,7 @@ public enum VulkanicPrimitiveMode {
         return switch (this) {
             case LINES -> VulkanicAPI.GL_LINES;
             case TRIANGLES -> VulkanicAPI.GL_TRIANGLES;
+            case TRIANGLE_STRIP -> VulkanicAPI.GL_TRIANGLE_STRIP;
             case TRIANGLE_FAN -> VulkanicAPI.GL_TRIANGLE_FAN;
             case PATCHES -> VulkanicAPI.GL_PATCHES;
         };

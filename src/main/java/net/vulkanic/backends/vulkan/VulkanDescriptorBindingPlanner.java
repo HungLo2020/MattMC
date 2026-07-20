@@ -298,7 +298,6 @@ final class VulkanDescriptorBindingPlanner {
         boolean requiresTransientUniformCopy =
             (vulkanBuffer.usage() & VulkanicBuffer.USAGE_UNIFORM) == 0
                 || (slice.offset() % request.minUniformBufferOffsetAlignment()) != 0;
-
         return new UniformBufferEntry(
             binding.name(),
             binding.binding(),

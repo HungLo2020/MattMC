@@ -141,6 +141,7 @@ final class VulkanDescriptorBindingPlannerTest {
         VulkanDescriptorBindingPlanner.UniformBufferEntry directEntry =
             (VulkanDescriptorBindingPlanner.UniformBufferEntry) directPlan.entries().get(0);
         assertFalse(directEntry.requiresTransientCopy());
+        assertEquals(VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, directEntry.descriptorType());
         assertEquals(0x3100L, directEntry.descriptorBufferHandle());
         assertEquals(256, directEntry.descriptorOffset());
         assertEquals(128, directEntry.descriptorRange());
@@ -159,6 +160,7 @@ final class VulkanDescriptorBindingPlannerTest {
         VulkanDescriptorBindingPlanner.UniformBufferEntry transientEntry =
             (VulkanDescriptorBindingPlanner.UniformBufferEntry) transientPlan.entries().get(0);
         assertTrue(transientEntry.requiresTransientCopy());
+        assertEquals(VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, transientEntry.descriptorType());
         assertEquals(0x3200L, transientEntry.descriptorBufferHandle());
         assertFalse(transientPlan.cacheable());
     }

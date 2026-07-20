@@ -619,6 +619,8 @@ public class ApiNeutralityCallsiteTest {
     public void testPrimitiveAndPolygonLegacyMappingsRemainAvailable() {
         assertTrue(VulkanicPrimitiveMode.fromLegacyGlConstant(VulkanicAPI.GL_TRIANGLES).isPresent(),
             "Primitive mode mapping should recognize GL_TRIANGLES");
+        assertTrue(VulkanicPrimitiveMode.fromLegacyGlConstant(VulkanicAPI.GL_TRIANGLE_STRIP).isPresent(),
+            "Primitive mode mapping should recognize GL_TRIANGLE_STRIP for legal Minecraft GUI/entity draws");
         assertTrue(VulkanicPrimitiveMode.fromLegacyGlConstant(VulkanicAPI.GL_PATCHES).isPresent(),
             "Primitive mode mapping should recognize GL_PATCHES for tessellation draw routing");
         assertTrue(VulkanicPolygonFace.fromLegacyGlConstant(VulkanicAPI.GL_FRONT_AND_BACK).isPresent(),

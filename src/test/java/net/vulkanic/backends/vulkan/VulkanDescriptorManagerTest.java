@@ -24,6 +24,35 @@ class VulkanDescriptorManagerTest {
     }
 
     @Test
+    void descriptorBindingDebugNameDoesNotAffectSemanticCacheIdentity() {
+        VulkanDescriptorManager.DescriptorBindingCacheKey first =
+            new VulkanDescriptorManager.DescriptorBindingCacheKey(
+                2,
+                VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                "DynamicTransforms",
+                99L,
+                192L,
+                192L,
+                0L
+            );
+        VulkanDescriptorManager.DescriptorBindingCacheKey second =
+            new VulkanDescriptorManager.DescriptorBindingCacheKey(
+                2,
+                VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                "Projection",
+                99L,
+                192L,
+                192L,
+                0L
+            );
+
+        assertEquals(first, second);
+        assertEquals(first.hashCode(), second.hashCode());
+        assertEquals("DynamicTransforms", first.debugName());
+        assertEquals("Projection", second.debugName());
+    }
+
+    @Test
     void descriptorSamplerCacheReusesOpaquePolicyKeysAndDestroysOnShutdown() {
         VulkanDescriptorManager<FakeUniformBuffer> manager = new VulkanDescriptorManager<>(2, 3, 4, 1024);
         List<Long> destroyed = new ArrayList<>();
@@ -154,6 +183,7 @@ class VulkanDescriptorManagerTest {
             List.of(new VulkanDescriptorManager.DescriptorBindingCacheKey(
                 binding,
                 VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                "TestUniform",
                 resourceHandle,
                 0L,
                 16L,

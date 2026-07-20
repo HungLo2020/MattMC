@@ -121,6 +121,9 @@ public final class DeterministicCameraCapture {
 		if (!ensureInitialized(minecraft)) {
 			return;
 		}
+		if (PERFORMANCE_MODE) {
+			VulkanPerfAudit.setDeterministicMeasurementFrameActive(isPerformanceMeasurementFrame());
+		}
 		if (poseIndex >= poses.length) {
 			stabilizeGuiState(minecraft);
 			applyPose(minecraft.player, initialPose);
@@ -274,6 +277,7 @@ public final class DeterministicCameraCapture {
 		boolean measurementFrame = performanceFrames >= PERFORMANCE_WARMUP_FRAMES
 			&& performanceFrames < PERFORMANCE_WARMUP_FRAMES + PERFORMANCE_MEASURE_FRAMES;
 		VulkanPerfAudit.recordDeterministicFrame(frameNanos, measurementFrame);
+		VulkanPerfAudit.setDeterministicMeasurementFrameActive(false);
 		performanceFrames++;
 		if ((performanceFrames % 30) == 0) {
 			writePerformanceStatus(minecraft, "running");
@@ -283,6 +287,11 @@ public final class DeterministicCameraCapture {
 			VulkanPerfAudit.flush();
 			finish(minecraft);
 		}
+	}
+
+	private static boolean isPerformanceMeasurementFrame() {
+		return performanceFrames >= PERFORMANCE_WARMUP_FRAMES
+			&& performanceFrames < PERFORMANCE_WARMUP_FRAMES + PERFORMANCE_MEASURE_FRAMES;
 	}
 
 	private static boolean ensureInitialized(Minecraft minecraft) {
