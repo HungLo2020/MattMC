@@ -280,6 +280,27 @@ public class PersistentEntitySectionManager<T extends EntityAccess> implements A
 		this.permanentStorage.flush(true);
 	}
 
+	@VisibleForDebug
+	public int saveLoadedChunksForStorageValidation() {
+		this.processPendingLoads();
+		long[] ls = this.sectionStorage.getAllChunksWithExistingSections().toLongArray();
+		int i = 0;
+
+		for (long l : ls) {
+			List<T> list = (List<T>)this.sectionStorage
+				.getExistingSectionsInChunk(l)
+				.flatMap(entitySection -> entitySection.getEntities().filter(EntityAccess::shouldBeSaved))
+				.collect(Collectors.toList());
+			if (!list.isEmpty()) {
+				this.permanentStorage.storeEntities(new ChunkEntities<>(new ChunkPos(l), list));
+				i++;
+			}
+		}
+
+		this.permanentStorage.flush(true);
+		return i;
+	}
+
 	public void close() throws IOException {
 		this.saveAll();
 		this.permanentStorage.close();

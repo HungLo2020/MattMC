@@ -102,6 +102,19 @@ public final class RegionFileStorage implements AutoCloseable {
 		return regionFile.readPoiChunk(chunkPos);
 	}
 
+	protected NativeEntityStorage.DecodeResult readEntityChunk(ChunkPos chunkPos) throws IOException {
+		RegionFile regionFile = this.getRegionFile(chunkPos);
+		return regionFile.readEntityChunk(chunkPos);
+	}
+
+	protected NativeEntityStorage.WriteResult writeEntityChunk(ChunkPos chunkPos, NativeEntityStorage.WriteRequest request) throws IOException {
+		if (SharedConstants.DEBUG_DONT_SAVE_WORLD) {
+			return new NativeEntityStorage.WriteResult(0, 0, 0, false, -1, false, request.entityCount(), 0L, 0L, 0L, 0L, 0L);
+		}
+		RegionFile regionFile = this.getRegionFile(chunkPos);
+		return regionFile.writeEntityChunk(chunkPos, request.entityTapes());
+	}
+
 	public void close() throws IOException {
 		ExceptionCollector<IOException> exceptionCollector = new ExceptionCollector();
 

@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::ptr;
 use std::slice;
 use std::sync::{Arc, Mutex, OnceLock};
+use std::time::Instant;
 
 use crate::storage::nbt::compression::CompressionLimits;
 use crate::storage::nbt::fingerprint::fingerprint_document;
@@ -243,6 +244,50 @@ pub(crate) fn with_open_region<T>(
         )
     })?;
     operation(&mut guard)
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct RegionLockTimings {
+    pub handle_lookup_nanos: u64,
+    pub lock_wait_nanos: u64,
+    pub lock_hold_nanos: u64,
+}
+
+pub(crate) fn with_open_region_timed<T>(
+    handle: u64,
+    operation: impl FnOnce(&mut OpenRegion) -> RegionResult<T>,
+) -> RegionResult<(T, RegionLockTimings)> {
+    let lookup_started = Instant::now();
+    let region = region_from_handle(handle)?;
+    let handle_lookup_nanos = elapsed_nanos(lookup_started);
+
+    let lock_started = Instant::now();
+    let mut guard = region.lock().map_err(|_| {
+        RegionError::new(
+            RegionErrorKind::InvalidArgument,
+            0,
+            "region handle is poisoned",
+        )
+    })?;
+    let lock_wait_nanos = elapsed_nanos(lock_started);
+
+    let hold_started = Instant::now();
+    let result = operation(&mut guard);
+    let lock_hold_nanos = elapsed_nanos(hold_started);
+    result.map(|value| {
+        (
+            value,
+            RegionLockTimings {
+                handle_lookup_nanos,
+                lock_wait_nanos,
+                lock_hold_nanos,
+            },
+        )
+    })
+}
+
+fn elapsed_nanos(started: Instant) -> u64 {
+    started.elapsed().as_nanos().min(u128::from(u64::MAX)) as u64
 }
 
 fn write_result(output: *mut NativeRegionPayloadResult, result: NativeRegionPayloadResult) -> bool {

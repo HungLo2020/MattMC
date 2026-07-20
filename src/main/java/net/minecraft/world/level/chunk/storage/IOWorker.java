@@ -125,6 +125,20 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 					IOWorker.PendingStore pendingStore = (IOWorker.PendingStore)this.pendingWrites
 						.computeIfAbsent(chunkPos, chunkPosxx -> new IOWorker.PendingStore(compoundTag));
 					pendingStore.data = compoundTag;
+					pendingStore.entityWrite = null;
+					return pendingStore.result;
+				}
+			)
+			.thenCompose(Function.identity());
+	}
+
+	public CompletableFuture<Void> storeEntityTapes(ChunkPos chunkPos, NativeEntityStorage.WriteRequest request) {
+		return this.submitTask(
+				() -> {
+					IOWorker.PendingStore pendingStore = (IOWorker.PendingStore)this.pendingWrites
+						.computeIfAbsent(chunkPos, chunkPosxx -> new IOWorker.PendingStore(request));
+					pendingStore.data = request.pendingTag();
+					pendingStore.entityWrite = request;
 					return pendingStore.result;
 				}
 			)
@@ -137,6 +151,20 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 
 	public CompletableFuture<NativePoiStorage.DecodeResult> loadPoiTapeAsync(ChunkPos chunkPos) {
 		return this.submitThrowingTask(() -> this.storage.readPoiChunk(chunkPos));
+	}
+
+	public CompletableFuture<Optional<NativeEntityStorage.DecodeResult>> loadEntityTapeAsync(ChunkPos chunkPos) {
+		long queuedAt = System.nanoTime();
+		return this.submitThrowingTask(() -> {
+			long started = System.nanoTime();
+			IOWorker.PendingStore pendingStore = (IOWorker.PendingStore)this.pendingWrites.get(chunkPos);
+			if (pendingStore != null) {
+				return Optional.empty();
+			}
+			NativeEntityStorage.DecodeResult result = this.storage.readEntityChunk(chunkPos);
+			long finished = System.nanoTime();
+			return Optional.of(result.withAsyncTimings(started - queuedAt, finished - started));
+		});
 	}
 
 	public CompletableFuture<Optional<CompoundTag>> loadAsync(ChunkPos chunkPos) {
@@ -233,9 +261,18 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 
 	private void runStore(ChunkPos chunkPos, IOWorker.PendingStore pendingStore) {
 		try {
-			this.storage.write(chunkPos, pendingStore.data);
+			if (pendingStore.entityWrite != null) {
+				long nativeStarted = EntityReadDiagnostics.now();
+				NativeEntityStorage.WriteResult result = this.storage.writeEntityChunk(chunkPos, pendingStore.entityWrite);
+				EntityReadDiagnostics.rustWritten(chunkPos, result, pendingStore.entityWrite, EntityReadDiagnostics.elapsed(nativeStarted));
+			} else {
+				this.storage.write(chunkPos, pendingStore.data);
+			}
 			pendingStore.result.complete(null);
 		} catch (Exception var4) {
+			if (pendingStore.entityWrite != null) {
+				EntityReadDiagnostics.writeFailure(chunkPos, var4);
+			}
 			LOGGER.error("Failed to store chunk {}", chunkPos, var4);
 			pendingStore.result.completeExceptionally(var4);
 		}
@@ -265,10 +302,17 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 	static class PendingStore {
 		@Nullable
 		CompoundTag data;
+		@Nullable
+		NativeEntityStorage.WriteRequest entityWrite;
 		final CompletableFuture<Void> result = new CompletableFuture();
 
 		public PendingStore(@Nullable CompoundTag compoundTag) {
 			this.data = compoundTag;
+		}
+
+		public PendingStore(NativeEntityStorage.WriteRequest request) {
+			this.data = request.pendingTag();
+			this.entityWrite = request;
 		}
 
 		@Nullable

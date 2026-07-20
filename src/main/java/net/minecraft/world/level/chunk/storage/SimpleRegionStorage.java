@@ -33,12 +33,20 @@ public class SimpleRegionStorage implements AutoCloseable {
 		return this.worker.store(chunkPos, compoundTag);
 	}
 
+	public CompletableFuture<Void> writeEntityTapes(ChunkPos chunkPos, NativeEntityStorage.WriteRequest request) {
+		return this.worker.storeEntityTapes(chunkPos, request);
+	}
+
 	public CompletableFuture<NativePoiStorage.WriteResult> writePoiTape(ChunkPos chunkPos, byte[] tape) {
 		return this.worker.storePoiTape(chunkPos, tape);
 	}
 
 	public CompletableFuture<NativePoiStorage.DecodeResult> readPoiTape(ChunkPos chunkPos) {
 		return this.worker.loadPoiTapeAsync(chunkPos);
+	}
+
+	public CompletableFuture<Optional<NativeEntityStorage.DecodeResult>> readEntityTape(ChunkPos chunkPos) {
+		return this.worker.loadEntityTapeAsync(chunkPos);
 	}
 
 	public CompoundTag upgradeChunkTag(CompoundTag compoundTag, int i) {

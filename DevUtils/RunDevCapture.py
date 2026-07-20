@@ -74,6 +74,7 @@ class CaptureConfig:
     region_validation: bool
     region_validation_copy_world: bool
     poi_validation: bool
+    entity_validation: bool
 
 
 class CaptureRunner:
@@ -129,6 +130,7 @@ class CaptureRunner:
         self.audio_validation_status = self.artifact_dir / f"audio_validation_{self.run_id}.json"
         self.region_validation_status = self.artifact_dir / f"region_validation_{self.run_id}.json"
         self.poi_validation_status = self.artifact_dir / f"poi_validation_{self.run_id}.json"
+        self.entity_validation_status = self.artifact_dir / f"entity_validation_{self.run_id}.json"
         self.meshing_corpus_replay = self.artifact_dir / f"real_meshing_replay_{self.run_id}.json"
 
         self.validation_layer_manifest = ""
@@ -157,6 +159,7 @@ class CaptureRunner:
         self.audio_validation_result = "not_requested"
         self.region_validation_result = "not_requested"
         self.poi_validation_result = "not_requested"
+        self.entity_validation_result = "not_requested"
         self.env = os.environ.copy()
 
     def run(self) -> int:
@@ -188,6 +191,7 @@ class CaptureRunner:
         self.validate_audio_status()
         self.validate_region_status()
         self.validate_poi_status()
+        self.validate_entity_status()
         self.print_summary(exit_code)
         self.release_lock()
 
@@ -201,6 +205,8 @@ class CaptureRunner:
             return 4
         if self.config.poi_validation and self.poi_validation_result != "ok":
             return 5
+        if self.config.entity_validation and self.entity_validation_result != "ok":
+            return 6
         return 0
 
     def acquire_lock(self) -> None:
@@ -260,6 +266,7 @@ class CaptureRunner:
             f"region_validation={str(self.config.region_validation).lower()}",
             f"region_validation_copy_world={str(self.config.region_validation_copy_world).lower()}",
             f"poi_validation={str(self.config.poi_validation).lower()}",
+            f"entity_validation={str(self.config.entity_validation).lower()}",
             f"max_secs={self.config.max_secs}",
             f"dump_secs={self.config.dump_secs}",
             f"client_rss_limit_mb={self.config.client_rss_limit_mb}",
@@ -284,10 +291,20 @@ class CaptureRunner:
             handle.write(text.rstrip("\n") + "\n")
 
     def prepare_region_validation_game_dir(self) -> None:
-        if not self.config.region_validation_copy_world:
+        if not self.config.region_validation_copy_world and not self.config.entity_validation:
             return
         if self.config.game_dir:
-            raise SystemExit("--region-validation-copy-world cannot be combined with --game-dir")
+            if self.config.region_validation_copy_world:
+                raise SystemExit("--region-validation-copy-world cannot be combined with --game-dir")
+            world_dir = self.run_dir / "saves" / self.config.world
+            if not world_dir.is_dir():
+                raise SystemExit(f"Cannot validate missing copied world in --game-dir: {world_dir}")
+            if self.config.entity_validation:
+                fixture_path = ensure_entity_validation_fixture(world_dir)
+                self.append_meta(f"entity_validation_fixture={fixture_path or 'existing-populated-entity-region'}")
+            self.append_meta(f"validation_game_dir={self.run_dir}")
+            self.append_meta(f"validation_world_copy={world_dir}")
+            return
         source_world = self.root / "run" / "saves" / self.config.world
         if not source_world.is_dir():
             raise SystemExit(f"Cannot copy missing validation world: {source_world}")
@@ -304,6 +321,9 @@ class CaptureRunner:
         if self.config.poi_validation:
             fixture_path = write_poi_validation_fixture(validation_game_dir / "saves" / self.config.world)
             self.append_meta(f"poi_validation_fixture={fixture_path}")
+        if self.config.entity_validation:
+            fixture_path = ensure_entity_validation_fixture(validation_game_dir / "saves" / self.config.world)
+            self.append_meta(f"entity_validation_fixture={fixture_path or 'existing-populated-entity-region'}")
         self.run_dir = validation_game_dir
         self.options_file = self.run_dir / "options.txt"
         self.append_meta(f"validation_world_source={source_world}")
@@ -697,6 +717,17 @@ class CaptureRunner:
             self.append_java_tool_options(poi_options)
             self.append_meta(f"poi_validation_java_options={' '.join(poi_options)}")
             self.append_meta(f"poi_validation_status={self.poi_validation_status}")
+            self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
+
+        if self.config.entity_validation:
+            entity_options = [
+                "-Dmattmc.dev.entityValidation=true",
+                "-Dmattmc.dev.rustEntityWritesShadow=true",
+                f"-Dmattmc.dev.entityValidation.status={self.entity_validation_status}",
+            ]
+            self.append_java_tool_options(entity_options)
+            self.append_meta(f"entity_validation_java_options={' '.join(entity_options)}")
+            self.append_meta(f"entity_validation_status={self.entity_validation_status}")
             self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
 
         if self.config.capture_meshing_corpus:
@@ -1181,6 +1212,36 @@ class CaptureRunner:
             print(str(exc), file=sys.stderr)
         self.append_meta(f"poi_validation_result={self.poi_validation_result}")
 
+    def validate_entity_status(self) -> None:
+        if not self.config.entity_validation:
+            return
+        try:
+            data = json.loads(self.entity_validation_status.read_text(encoding="utf-8"))
+            if data.get("status") != "complete":
+                raise RuntimeError(f"entity validation status was {data.get('status')!r}: {data.get('error')!r}")
+            for key in ("worldReady", "saveRequested", "shutdownRequested", "stopped", "rustEntityReadsEnabled", "rustEntityWritesEnabled"):
+                if not data.get(key):
+                    raise RuntimeError(f"entity validation {key} was not true")
+            if int(data.get("currentVersionRustReads", 0)) <= 0:
+                raise RuntimeError("entity validation read no current-version chunks through Rust")
+            if int(data.get("currentVersionRustWrites", 0)) <= 0:
+                raise RuntimeError("entity validation wrote no current-version chunks through Rust")
+            if int(data.get("parityChecks", 0)) <= 0:
+                raise RuntimeError("entity validation performed no Java/Rust parity checks")
+            if int(data.get("rustWriteShadowChecks", 0)) <= 0:
+                raise RuntimeError("entity validation performed no Java/Rust write shadow checks")
+            if int(data.get("generatedBehaviorChecks", 0)) <= 0:
+                raise RuntimeError("entity validation performed no generated unknown/malformed behavior checks")
+            for key in ("nativeErrors", "nativeWriteErrors", "malformedInputs", "parityMismatches", "rustWriteShadowMismatches", "generatedBehaviorMismatches"):
+                if int(data.get(key, -1)) != 0:
+                    raise RuntimeError(f"entity validation {key} was {data.get(key)}")
+            self.entity_validation_result = "ok"
+            print(f"entity validation OK: {self.entity_validation_status}")
+        except Exception as exc:
+            self.entity_validation_result = "failed"
+            print(str(exc), file=sys.stderr)
+        self.append_meta(f"entity_validation_result={self.entity_validation_result}")
+
     def print_summary(self, exit_code: int) -> None:
         print("Capture complete.")
         print(f"- Meta:        {self.meta_log}")
@@ -1216,6 +1277,10 @@ class CaptureRunner:
         if self.config.poi_validation:
             print(f"- POI validation:    {self.poi_validation_status}")
             print(f"- POI result:        {self.poi_validation_result}")
+            print(f"- Game dir:          {self.run_dir}")
+        if self.config.entity_validation:
+            print(f"- Entity validation: {self.entity_validation_status}")
+            print(f"- Entity result:     {self.entity_validation_result}")
             print(f"- Game dir:          {self.run_dir}")
         if self.config.capture_meshing_corpus:
             output = Path(self.config.meshing_corpus_output) if self.config.meshing_corpus_output else self.meshing_corpus_replay
@@ -1306,6 +1371,87 @@ def write_poi_validation_fixture(world_dir: Path) -> Path:
     return region_path
 
 
+def ensure_entity_validation_fixture(world_dir: Path) -> Path | None:
+    """Create a tiny copied-world-only entity region only if Origin has none."""
+    entities_dir = world_dir / "entities"
+    if entity_regions_have_present_chunks(entities_dir):
+        return None
+    return write_entity_validation_fixture(world_dir)
+
+
+def entity_regions_have_present_chunks(entities_dir: Path) -> bool:
+    if not entities_dir.is_dir():
+        return False
+    for region_path in sorted(entities_dir.glob("*.mca")):
+        try:
+            header = region_path.read_bytes()[:4096]
+        except OSError:
+            continue
+        if len(header) < 4096:
+            continue
+        for index in range(0, 4096, 4):
+            if header[index : index + 4] != b"\x00\x00\x00\x00":
+                return True
+    return False
+
+
+def write_entity_validation_fixture(world_dir: Path) -> Path:
+    """Write a copied-world-only current-version entity region at spawn."""
+    import zlib
+
+    entities_dir = world_dir / "entities"
+    entities_dir.mkdir(parents=True, exist_ok=True)
+    region_path = entities_dir / "r.0.0.mca"
+    nbt = nbt_root_compound(
+        [
+            nbt_int("DataVersion", 4556),
+            nbt_int_array("Position", [0, 0]),
+            nbt_list(
+                "Entities",
+                10,
+                [
+                    nbt_anonymous_compound(
+                        [
+                            nbt_string("id", "minecraft:pig"),
+                            nbt_int_array("UUID", [1, 2, 3, 4]),
+                            nbt_list("Pos", 6, [nbt_anonymous_double(0.5), nbt_anonymous_double(64.0), nbt_anonymous_double(0.5)]),
+                            nbt_list("Rotation", 5, [nbt_anonymous_float(0.0), nbt_anonymous_float(0.0)]),
+                            nbt_list(
+                                "Passengers",
+                                10,
+                                [
+                                    nbt_anonymous_compound(
+                                        [
+                                            nbt_string("id", "minecraft:chicken"),
+                                            nbt_int_array("UUID", [5, 6, 7, 8]),
+                                            nbt_list(
+                                                "Pos",
+                                                6,
+                                                [nbt_anonymous_double(0.5), nbt_anonymous_double(64.0), nbt_anonymous_double(0.5)],
+                                            ),
+                                            nbt_list("Rotation", 5, [nbt_anonymous_float(0.0), nbt_anonymous_float(0.0)]),
+                                        ]
+                                    )
+                                ],
+                            ),
+                        ]
+                    )
+                ],
+            ),
+        ]
+    )
+    compressed = zlib.compress(nbt)
+    length = len(compressed) + 1
+    chunk = length.to_bytes(4, "big") + bytes([2]) + compressed
+    sector_count = max(1, (len(chunk) + 4095) // 4096)
+    chunk = chunk + bytes(sector_count * 4096 - len(chunk))
+    header = bytearray(8192)
+    header[0:4] = bytes([0, 0, 2, sector_count])
+    header[4096:4100] = int(time.time()).to_bytes(4, "big")
+    region_path.write_bytes(bytes(header) + chunk)
+    return region_path
+
+
 def nbt_root_compound(children: list[bytes]) -> bytes:
     return bytes([10]) + modified_utf8_name("") + b"".join(children) + bytes([0])
 
@@ -1328,6 +1474,18 @@ def nbt_byte(name: str, value: int) -> bytes:
 
 def nbt_int(name: str, value: int) -> bytes:
     return bytes([3]) + modified_utf8_name(name) + int(value).to_bytes(4, "big", signed=True)
+
+
+def nbt_anonymous_float(value: float) -> bytes:
+    import struct
+
+    return struct.pack(">f", float(value))
+
+
+def nbt_anonymous_double(value: float) -> bytes:
+    import struct
+
+    return struct.pack(">d", float(value))
 
 
 def nbt_string(name: str, value: str) -> bytes:
@@ -1935,6 +2093,7 @@ def parse_args() -> CaptureConfig:
     parser.add_argument("--region-validation", action="store_true")
     parser.add_argument("--region-validation-copy-world", action="store_true")
     parser.add_argument("--poi-validation", action="store_true")
+    parser.add_argument("--entity-validation", action="store_true")
     parser.add_argument("--platform", help="platform to pass to shared helpers: linux, windows, or macos")
     args = parser.parse_args()
 
@@ -1980,6 +2139,7 @@ def parse_args() -> CaptureConfig:
         region_validation=bool(args.region_validation),
         region_validation_copy_world=bool(args.region_validation_copy_world),
         poi_validation=bool(args.poi_validation),
+        entity_validation=bool(args.entity_validation),
     )
 
 

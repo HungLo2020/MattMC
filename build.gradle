@@ -553,6 +553,52 @@ tasks.register('runStorageReplayBenchmark', JavaExec) {
     configureBundledJdk(it)
 }
 
+tasks.register('runEntityStorageReplayBenchmark', JavaExec) {
+    group = 'verification'
+    description = 'Runs the deterministic headless entity-storage replay benchmark.'
+
+    dependsOn 'testClasses'
+
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.minecraft.world.level.chunk.storage.EntityStorageReplayBenchmark'
+    workingDir = file('run')
+
+    def replayTrace = providers.gradleProperty('mattmcEntityReplayTrace')
+    def replayWorld = providers.gradleProperty('mattmcEntityReplayWorld')
+    def replayOutput = providers.gradleProperty('mattmcEntityReplayOutput')
+    def replayScratch = providers.gradleProperty('mattmcEntityReplayScratch')
+    def replayWarmup = providers.gradleProperty('mattmcEntityReplayWarmup').orElse('8')
+    def replayMeasure = providers.gradleProperty('mattmcEntityReplayMeasure').orElse('24')
+    def replayImplementation = providers.gradleProperty('mattmcEntityReplayImplementation').orElse('current-rust')
+    def replayGenerateTrace = providers.gradleProperty('mattmcEntityReplayGenerateTrace').orElse('false')
+    def replayMaxRealChunks = providers.gradleProperty('mattmcEntityReplayMaxRealChunks').orElse('32')
+
+    doFirst {
+        if (!replayTrace.isPresent() || !replayWorld.isPresent()) {
+            throw new GradleException('runEntityStorageReplayBenchmark requires mattmcEntityReplayTrace and mattmcEntityReplayWorld')
+        }
+        if (replayGenerateTrace.get() != 'true' && (!replayOutput.isPresent() || !replayScratch.isPresent())) {
+            throw new GradleException('runEntityStorageReplayBenchmark requires mattmcEntityReplayOutput and mattmcEntityReplayScratch unless generating a trace')
+        }
+        systemProperty 'mattmc.entityReplay.trace', file(replayTrace.get()).absolutePath
+        systemProperty 'mattmc.entityReplay.world', file(replayWorld.get()).absolutePath
+        if (replayOutput.isPresent()) {
+            systemProperty 'mattmc.entityReplay.output', file(replayOutput.get()).absolutePath
+        }
+        if (replayScratch.isPresent()) {
+            systemProperty 'mattmc.entityReplay.scratch', file(replayScratch.get()).absolutePath
+        }
+        systemProperty 'mattmc.entityReplay.warmup', replayWarmup.get()
+        systemProperty 'mattmc.entityReplay.measure', replayMeasure.get()
+        systemProperty 'mattmc.entityReplay.implementation', replayImplementation.get()
+        systemProperty 'mattmc.entityReplay.generateTrace', replayGenerateTrace.get()
+        systemProperty 'mattmc.entityReplay.maxRealChunks', replayMaxRealChunks.get()
+        systemProperty 'java.awt.headless', 'true'
+    }
+
+    configureBundledJdk(it)
+}
+
 // ============================================================================
 // RESOURCE PROCESSING
 // ============================================================================

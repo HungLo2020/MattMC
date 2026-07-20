@@ -11,6 +11,7 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.util.List;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import net.minecraft.nbt.CompoundTag;
@@ -305,6 +306,50 @@ public class RegionFile implements AutoCloseable {
 
 	public synchronized NativePoiStorage.DecodeResult readPoiChunk(ChunkPos chunkPos) throws IOException {
 		return NativePoiStorage.decodeChunk(this.nativeRegionHandle(), chunkPos.x, chunkPos.z);
+	}
+
+	public synchronized NativeEntityStorage.DecodeResult readEntityChunk(ChunkPos chunkPos) throws IOException {
+		return NativeEntityStorage.decodeChunk(this.nativeRegionHandle(), chunkPos.x, chunkPos.z);
+	}
+
+	public synchronized NativeEntityStorage.WriteResult writeEntityChunk(ChunkPos chunkPos, List<byte[]> entityTapes) throws IOException {
+		long started = StoragePerfDiagnostics.start();
+		try {
+			NativeEntityStorage.WriteResult result = NativeEntityStorage.writeChunk(
+				this.nativeRegionHandle(),
+				chunkPos.x,
+				chunkPos.z,
+				this.version.getId(),
+				entityTapes
+			);
+			StoragePerfDiagnostics.recordRegionWrite(
+				this.path,
+				chunkPos.x,
+				chunkPos.z,
+				result.compressionId(),
+				result.external(),
+				result.compressedLength(),
+				StoragePerfDiagnostics.elapsed(started)
+			);
+			JvmProfiler.INSTANCE.onRegionFileWrite(this.info, chunkPos, this.version, Math.toIntExact(result.compressedLength() + 1));
+			if (RegionFileRustValidation.enabled()) {
+				RegionFileRustValidation.recordWrite(
+					this.path,
+					chunkPos,
+					result.compressionId(),
+					result.external(),
+					result.timestamp(),
+					result.compressedLength(),
+					"",
+					result.fingerprint()
+				);
+			}
+			return result;
+		} catch (IOException exception) {
+			StoragePerfDiagnostics.recordError("region-write-entity-rust", exception);
+			RegionFileRustValidation.recordRustError(this.path, chunkPos, "write-entity", exception.getMessage());
+			throw exception;
+		}
 	}
 
 	protected synchronized void write(ChunkPos chunkPos, ByteBuffer byteBuffer) throws IOException {
