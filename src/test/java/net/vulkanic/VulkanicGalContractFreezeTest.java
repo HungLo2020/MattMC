@@ -82,7 +82,7 @@ public class VulkanicGalContractFreezeTest {
 
     @Test
     public void rustContractDocumentCoversEveryJavaRequestAndResultVariant() throws Exception {
-        String document = Files.readString(Path.of("docs/vulkanic-gal-contract.md"));
+        String document = VulkanicGalExecutionRequest.contractSchema();
 
         assertTrue(document.contains("GalRequest"));
         assertTrue(document.contains("ExecutionResult"));

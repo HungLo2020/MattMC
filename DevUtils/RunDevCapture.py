@@ -61,6 +61,9 @@ class CaptureConfig:
     deterministic_camera_capture: bool
     deterministic_static_camera_capture: bool
     deterministic_pose_tolerance: float
+    performance_capture: bool
+    perf_warmup_frames: int
+    perf_measure_frames: int
     audio_validation: bool
     capture_meshing_corpus: bool
     meshing_corpus_output: str
@@ -127,6 +130,8 @@ class CaptureRunner:
         self.window_tree_dump = self.artifact_dir / f"window_tree_dump_{self.run_id}.txt"
         self.deterministic_metadata = self.artifact_dir / f"deterministic_camera_capture_{self.run_id}.json"
         self.deterministic_screenshot_dir = self.artifact_dir / f"deterministic_camera_capture_{self.run_id}"
+        self.performance_status = self.artifact_dir / f"deterministic_performance_capture_{self.run_id}.json"
+        self.performance_audit_dir = self.artifact_dir / f"performance_audit_{self.run_id}"
         self.audio_validation_status = self.artifact_dir / f"audio_validation_{self.run_id}.json"
         self.region_validation_status = self.artifact_dir / f"region_validation_{self.run_id}.json"
         self.poi_validation_status = self.artifact_dir / f"poi_validation_{self.run_id}.json"
@@ -277,6 +282,9 @@ class CaptureRunner:
             f"skip_tests={str(self.config.skip_tests).lower()}",
             f"deterministic_camera_capture={str(self.config.deterministic_camera_capture).lower()}",
             f"deterministic_pose_tolerance={self.config.deterministic_pose_tolerance}",
+            f"performance_capture={str(self.config.performance_capture).lower()}",
+            f"perf_warmup_frames={self.config.perf_warmup_frames}",
+            f"perf_measure_frames={self.config.perf_measure_frames}",
             f"capture_meshing_corpus={str(self.config.capture_meshing_corpus).lower()}",
             f"meshing_corpus_output={self.config.meshing_corpus_output or self.meshing_corpus_replay}",
             f"meshing_corpus_fixture={self.config.meshing_corpus_fixture or 'all'}",
@@ -365,7 +373,7 @@ class CaptureRunner:
             self.append_meta("screenshot_enabled=false")
             self.append_meta(f"display={os.environ.get('DISPLAY', 'unset')}")
 
-        if self.config.deterministic_camera_capture and not self.screenshot_enabled:
+        if self.config.deterministic_camera_capture and not self.config.performance_capture and not self.screenshot_enabled:
             raise SystemExit(
                 "--deterministic-camera-capture requires a supported screenshot tool "
                 "for this platform"
@@ -457,6 +465,8 @@ class CaptureRunner:
             f"client_args_effective={self.config.client_args}",
             f"deterministic_metadata={self.deterministic_metadata}",
             f"deterministic_screenshot_dir={self.deterministic_screenshot_dir}",
+            f"performance_status={self.performance_status}",
+            f"performance_audit_dir={self.performance_audit_dir}",
         ]:
             self.append_meta(line)
 
@@ -685,6 +695,18 @@ class CaptureRunner:
                 "-Dmattmc.dev.deterministicCameraCapture.ackTimeoutFrames=12000",
                 "-Dmattmc.vulkan.traceShaderInputParity.poseOnly=true",
             ]
+            if self.config.performance_capture:
+                deterministic_options.extend(
+                    [
+                        "-Dmattmc.dev.deterministicCameraCapture.performanceMode=true",
+                        f"-Dmattmc.dev.deterministicCameraCapture.performanceWarmupFrames={self.config.perf_warmup_frames}",
+                        f"-Dmattmc.dev.deterministicCameraCapture.performanceMeasureFrames={self.config.perf_measure_frames}",
+                        f"-Dmattmc.dev.deterministicCameraCapture.performanceStatus={self.performance_status}",
+                        "-Dmattmc.perfAudit=true",
+                        f"-Dmattmc.perfAudit.backend={self.config.backend}",
+                        f"-Dmattmc.perfAuditReportDir={self.performance_audit_dir}",
+                    ]
+                )
             self.append_java_tool_options(deterministic_options)
             self.append_meta(f"deterministic_camera_capture_java_options={' '.join(deterministic_options)}")
             self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
@@ -1115,11 +1137,19 @@ class CaptureRunner:
         if not self.config.deterministic_camera_capture or self.memory_guard_triggered:
             return
         try:
-            validate_deterministic_metadata(
-                self.deterministic_metadata,
-                self.deterministic_screenshot_dir,
-                self.config.deterministic_pose_tolerance,
-            )
+            if self.config.performance_capture:
+                validate_deterministic_performance_metadata(
+                    self.deterministic_metadata,
+                    self.performance_status,
+                    self.performance_audit_dir,
+                    self.config.perf_measure_frames,
+                )
+            else:
+                validate_deterministic_metadata(
+                    self.deterministic_metadata,
+                    self.deterministic_screenshot_dir,
+                    self.config.deterministic_pose_tolerance,
+                )
             self.deterministic_validation_status = "ok"
         except Exception as exc:
             self.deterministic_validation_status = "failed"
@@ -1268,6 +1298,9 @@ class CaptureRunner:
             print(f"- Deterministic metadata: {self.deterministic_metadata}")
             print(f"- Deterministic screenshots: {self.deterministic_screenshot_dir}")
             print(f"- Deterministic validation: {self.deterministic_validation_status}")
+        if self.config.performance_capture:
+            print(f"- Performance status: {self.performance_status}")
+            print(f"- Performance audit:  {self.performance_audit_dir}")
         if self.config.audio_validation:
             print(f"- Audio validation: {self.audio_validation_status}")
             print(f"- Audio result:     {self.audio_validation_result}")
@@ -2037,6 +2070,38 @@ def validate_deterministic_metadata(metadata_path: Path, screenshot_dir: Path, t
     print(f"deterministic capture OK: {metadata_path} tolerance={tolerance}")
 
 
+def validate_deterministic_performance_metadata(
+    metadata_path: Path,
+    status_path: Path,
+    audit_dir: Path,
+    expected_measure_frames: int,
+) -> None:
+    if not metadata_path.is_file():
+        raise RuntimeError(f"deterministic metadata was not written: {metadata_path}")
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    if metadata.get("status") != "complete":
+        raise RuntimeError(
+            f"deterministic performance capture did not complete: status={metadata.get('status')!r} "
+            f"reason={metadata.get('reason')!r}"
+        )
+    if not metadata.get("performanceMode"):
+        raise RuntimeError("deterministic metadata did not report performanceMode=true")
+    if not status_path.is_file():
+        raise RuntimeError(f"performance status was not written: {status_path}")
+    status = json.loads(status_path.read_text(encoding="utf-8"))
+    if status.get("status") != "complete":
+        raise RuntimeError(f"performance capture status was not complete: {status.get('status')!r}")
+    measured = int(status.get("measureFramesRecorded", -1))
+    if measured < expected_measure_frames:
+        raise RuntimeError(
+            f"performance capture recorded too few measured frames: {measured} < {expected_measure_frames}"
+        )
+    reports = sorted(audit_dir.glob("vulkan-perf-audit-*.txt")) if audit_dir.is_dir() else []
+    if not reports:
+        raise RuntimeError(f"performance audit report was not written under: {audit_dir}")
+    print(f"deterministic performance capture OK: {status_path} measuredFrames={measured}")
+
+
 def int_env(name: str, default: int, *, signed: bool = False) -> int:
     value = os.environ.get(name, str(default))
     pattern = r"^-?[0-9]+$" if signed else r"^[0-9]+$"
@@ -2071,6 +2136,17 @@ def parse_args() -> CaptureConfig:
             "--deterministic-camera-capture and avoids the normal camera sweep."
         ),
     )
+    parser.add_argument(
+        "--performance-capture",
+        action="store_true",
+        help=(
+            "Use deterministic Origin capture as a bounded performance run. This implies "
+            "--deterministic-camera-capture, writes lightweight perf counters/timers, "
+            "and validates performance artifacts instead of screenshot requests."
+        ),
+    )
+    parser.add_argument("--perf-warmup-frames", type=int, default=int_env("MATTMC_PERF_WARMUP_FRAMES", 120))
+    parser.add_argument("--perf-measure-frames", type=int, default=int_env("MATTMC_PERF_MEASURE_FRAMES", 300))
     parser.add_argument("--audio-validation", action="store_true")
     parser.add_argument("--capture-meshing-corpus", action="store_true")
     parser.add_argument("--meshing-corpus-output", default=os.environ.get("MATTMC_MESHING_CORPUS_OUTPUT", ""))
@@ -2101,8 +2177,12 @@ def parse_args() -> CaptureConfig:
         raise SystemExit("--max-secs and --dump-secs must be integers")
     if args.meshing_corpus_warmup < 0 or args.meshing_corpus_measure < 0:
         raise SystemExit("--meshing-corpus-warmup and --meshing-corpus-measure must be non-negative integers")
+    if args.performance_capture:
+        args.deterministic_camera_capture = True
     if args.deterministic_static_camera_capture:
         args.deterministic_camera_capture = True
+    if args.perf_warmup_frames < 0 or args.perf_measure_frames <= 0:
+        raise SystemExit("--perf-warmup-frames must be >= 0 and --perf-measure-frames must be > 0")
 
     pose_tolerance = os.environ.get("DETERMINISTIC_POSE_TOLERANCE", "0.001")
     if not re.match(r"^[0-9]+([.][0-9]+)?$", pose_tolerance):
@@ -2126,6 +2206,9 @@ def parse_args() -> CaptureConfig:
         deterministic_camera_capture=bool(args.deterministic_camera_capture),
         deterministic_static_camera_capture=bool(args.deterministic_static_camera_capture),
         deterministic_pose_tolerance=float(pose_tolerance),
+        performance_capture=bool(args.performance_capture),
+        perf_warmup_frames=args.perf_warmup_frames,
+        perf_measure_frames=args.perf_measure_frames,
         audio_validation=bool(args.audio_validation),
         capture_meshing_corpus=bool(args.capture_meshing_corpus),
         meshing_corpus_output=args.meshing_corpus_output,

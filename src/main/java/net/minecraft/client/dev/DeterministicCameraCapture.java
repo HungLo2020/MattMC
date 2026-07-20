@@ -8,6 +8,7 @@ import net.minecraft.client.player.LocalPlayer;
 import net.irisshaders.iris.uniforms.SystemTimeUniforms;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.phys.Vec3;
+import net.vulkanic.VulkanPerfAudit;
 import net.vulkanic.VulkanicAPI;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +43,9 @@ public final class DeterministicCameraCapture {
 	private static final float YAW_DELTA = Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.yawDelta", "35.0"));
 	private static final boolean STOP_AFTER_COMPLETE = Boolean.parseBoolean(System.getProperty("mattmc.dev.deterministicCameraCapture.stopAfterComplete", "true"));
 	private static final boolean INTERNAL_SCREENSHOTS = Boolean.parseBoolean(System.getProperty("mattmc.dev.deterministicCameraCapture.internalScreenshots", "false"));
+	private static final boolean PERFORMANCE_MODE = Boolean.parseBoolean(System.getProperty("mattmc.dev.deterministicCameraCapture.performanceMode", "false"));
+	private static final int PERFORMANCE_WARMUP_FRAMES = Math.max(0, Integer.getInteger("mattmc.dev.deterministicCameraCapture.performanceWarmupFrames", 120));
+	private static final int PERFORMANCE_MEASURE_FRAMES = Math.max(1, Integer.getInteger("mattmc.dev.deterministicCameraCapture.performanceMeasureFrames", 300));
 	private static final int SETTLED_READY_FRAMES = Math.max(0, Integer.getInteger("mattmc.dev.deterministicCameraCapture.settledReadyFrames", 0));
 	private static final int SETTLED_READY_MAX_WAIT_FRAMES = Math.max(1, Integer.getInteger("mattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames", 900));
 	private static final Set<String> SETTLED_READY_FAMILIES = parseSettledReadyFamilies();
@@ -51,6 +55,7 @@ public final class DeterministicCameraCapture {
 		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.vignetteBrightness", "1.0"));
 	private static final Path METADATA_PATH = Path.of(System.getProperty("mattmc.dev.deterministicCameraCapture.metadata", "run/deterministic_camera_capture.json"));
 	private static final Path SCREENSHOT_DIR = Path.of(System.getProperty("mattmc.dev.deterministicCameraCapture.screenshotDir", "run/deterministic_camera_capture"));
+	private static final Path PERFORMANCE_STATUS_PATH = Path.of(System.getProperty("mattmc.dev.deterministicCameraCapture.performanceStatus", "run/deterministic_performance_capture.json"));
 
 	private static final List<PoseCapture> CAPTURES = new ArrayList<>();
 	private static boolean initialized;
@@ -75,6 +80,7 @@ public final class DeterministicCameraCapture {
 	private static int framesWaitingForSettledReady;
 	private static CameraType originalCameraType;
 	private static int originalSelectedHotbarSlot;
+	private static int performanceFrames;
 	private static final Map<Long, Map<String, Set<String>>> SUBMITTED_WORK_BY_FRAME = new LinkedHashMap<>();
 
 	private DeterministicCameraCapture() {
@@ -163,6 +169,17 @@ public final class DeterministicCameraCapture {
 		}
 
 		renderedFramesAtPose++;
+		if (PERFORMANCE_MODE) {
+			if (renderedFramesAtPose >= FRAMES_PER_POSE) {
+				renderedFramesAtPose = 0;
+				poseIndex++;
+				if (poseIndex >= poses.length) {
+					poseIndex = 0;
+				}
+				writeMetadata(minecraft, "measuring_performance");
+			}
+			return;
+		}
 		if (renderedFramesAtPose < FRAMES_PER_POSE) {
 			return;
 		}
@@ -250,6 +267,24 @@ public final class DeterministicCameraCapture {
 		return clampedPoseIndex * FRAMES_PER_POSE + clampedFrameAtPose;
 	}
 
+	public static void recordPerformanceFrame(Minecraft minecraft, long frameNanos) {
+		if (!ENABLED || !PERFORMANCE_MODE || !initialized || complete || failed || !settledReadyGateSatisfied) {
+			return;
+		}
+		boolean measurementFrame = performanceFrames >= PERFORMANCE_WARMUP_FRAMES
+			&& performanceFrames < PERFORMANCE_WARMUP_FRAMES + PERFORMANCE_MEASURE_FRAMES;
+		VulkanPerfAudit.recordDeterministicFrame(frameNanos, measurementFrame);
+		performanceFrames++;
+		if ((performanceFrames % 30) == 0) {
+			writePerformanceStatus(minecraft, "running");
+		}
+		if (performanceFrames >= PERFORMANCE_WARMUP_FRAMES + PERFORMANCE_MEASURE_FRAMES) {
+			writePerformanceStatus(minecraft, "complete");
+			VulkanPerfAudit.flush();
+			finish(minecraft);
+		}
+	}
+
 	private static boolean ensureInitialized(Minecraft minecraft) {
 		if (initialized) {
 			return true;
@@ -294,7 +329,7 @@ public final class DeterministicCameraCapture {
 		windowHeight = minecraft.getWindow().getHeight();
 		initialized = true;
 		LOGGER.info(
-			"Deterministic camera capture started dimension={} pos=({}, {}, {}) yaw={} pitch={} framesPerPose={} yawDelta={} cameraType={} selectedHotbarSlot={} screenshots={}",
+			"Deterministic camera capture started dimension={} pos=({}, {}, {}) yaw={} pitch={} framesPerPose={} yawDelta={} cameraType={} selectedHotbarSlot={} screenshots={} performanceMode={}",
 			initialDimension,
 			initialPosition.x,
 			initialPosition.y,
@@ -305,9 +340,13 @@ public final class DeterministicCameraCapture {
 			YAW_DELTA,
 			currentCameraType(minecraft),
 			currentSelectedHotbarSlot(player),
-			SCREENSHOT_DIR
+			SCREENSHOT_DIR,
+			PERFORMANCE_MODE
 		);
 		writeMetadata(minecraft, "running");
+		if (PERFORMANCE_MODE) {
+			writePerformanceStatus(minecraft, "running");
+		}
 		return true;
 	}
 
@@ -676,6 +715,10 @@ public final class DeterministicCameraCapture {
 		appendField(json, "cameraType", minecraft.options.getCameraType().name()).append(",\n");
 		json.append("  \"selectedHotbarSlot\": ").append(player == null ? -1 : currentSelectedHotbarSlot(player)).append(",\n");
 		json.append("  \"framesPerPose\": ").append(FRAMES_PER_POSE).append(",\n");
+		json.append("  \"performanceMode\": ").append(PERFORMANCE_MODE).append(",\n");
+		json.append("  \"performanceWarmupFrames\": ").append(PERFORMANCE_WARMUP_FRAMES).append(",\n");
+		json.append("  \"performanceMeasureFrames\": ").append(PERFORMANCE_MEASURE_FRAMES).append(",\n");
+		json.append("  \"performanceFrames\": ").append(performanceFrames).append(",\n");
 		json.append("  \"settledReadyFrames\": ").append(SETTLED_READY_FRAMES).append(",\n");
 		json.append("  \"settledReadyMaxWaitFrames\": ").append(SETTLED_READY_MAX_WAIT_FRAMES).append(",\n");
 		json.append("  \"settledReadyGateSatisfied\": ").append(settledReadyGateSatisfied).append(",\n");
@@ -747,6 +790,42 @@ public final class DeterministicCameraCapture {
 			Files.writeString(METADATA_PATH, json.toString(), StandardCharsets.UTF_8);
 		} catch (IOException exception) {
 			LOGGER.error("Unable to write deterministic capture metadata", exception);
+		}
+	}
+
+	private static void writePerformanceStatus(Minecraft minecraft, String status) {
+		StringBuilder json = new StringBuilder(2048);
+		ClientLevel level = minecraft.level;
+		LocalPlayer player = minecraft.player;
+		int measuredFrames = Math.max(0, performanceFrames - PERFORMANCE_WARMUP_FRAMES);
+		measuredFrames = Math.min(measuredFrames, PERFORMANCE_MEASURE_FRAMES);
+		json.append("{\n");
+		appendField(json, "status", status).append(",\n");
+		appendField(json, "backend", activeBackend()).append(",\n");
+		appendField(json, "shaderEnabled", shaderEnabled()).append(",\n");
+		appendField(json, "shaderPack", shaderPack()).append(",\n");
+		json.append("  \"window\": { \"width\": ").append(windowWidth).append(", \"height\": ").append(windowHeight).append(" },\n");
+		appendField(json, "dimension", level == null ? "missing" : level.dimension().location().toString()).append(",\n");
+		appendVec3(json, "position", player == null ? Vec3.ZERO : player.position()).append(",\n");
+		json.append("  \"yaw\": ").append(format(player == null ? 0.0F : player.getYRot())).append(",\n");
+		json.append("  \"pitch\": ").append(format(player == null ? 0.0F : player.getXRot())).append(",\n");
+		json.append("  \"gameTime\": ").append(level == null ? -1L : level.getGameTime()).append(",\n");
+		json.append("  \"renderedFrameIndex\": ").append(renderedFrameIndex).append(",\n");
+		appendField(json, "poseName", currentPoseNameForDiagnostics()).append(",\n");
+		json.append("  \"warmupFramesRequested\": ").append(PERFORMANCE_WARMUP_FRAMES).append(",\n");
+		json.append("  \"measureFramesRequested\": ").append(PERFORMANCE_MEASURE_FRAMES).append(",\n");
+		json.append("  \"warmupFramesRecorded\": ").append(Math.min(performanceFrames, PERFORMANCE_WARMUP_FRAMES)).append(",\n");
+		json.append("  \"measureFramesRecorded\": ").append(measuredFrames).append(",\n");
+		json.append("  \"totalFramesRecorded\": ").append(performanceFrames).append("\n");
+		json.append("}\n");
+		try {
+			Path parent = PERFORMANCE_STATUS_PATH.getParent();
+			if (parent != null) {
+				Files.createDirectories(parent);
+			}
+			Files.writeString(PERFORMANCE_STATUS_PATH, json.toString(), StandardCharsets.UTF_8);
+		} catch (IOException exception) {
+			LOGGER.warn("Unable to write deterministic performance status {}", PERFORMANCE_STATUS_PATH, exception);
 		}
 	}
 

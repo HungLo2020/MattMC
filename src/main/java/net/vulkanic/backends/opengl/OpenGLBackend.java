@@ -34,6 +34,7 @@ import net.vulkanic.VulkanicStencilOperation;
 import net.vulkanic.VulkanicTextureParameterName;
 import net.vulkanic.VulkanicTextureTarget;
 import net.vulkanic.VulkanicTextureUploadFormat;
+import net.vulkanic.VulkanPerfAudit;
 import net.vulkanic.VulkanExecutionContextInfo;
 import net.vulkanic.VulkanNativeInitializationInfo;
 import net.vulkanic.VulkanSwapchainSurfaceInfo;
@@ -352,17 +353,23 @@ public class OpenGLBackend implements GraphicsBackend {
 
     @Override
     public VulkanicGalExecutionRequest.ExecutionResult executeClear(CommandContext ctx, VulkanicGalExecutionRequest.ClearRequest request) {
+        long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         try {
             consumeResourceUsagePlan(request.resourcePlan());
             clearBuffers(ctx, VulkanicClearBuffer.toLegacyGlMask(request.buffers().toArray(VulkanicClearBuffer[]::new)));
             return VulkanicGalExecutionRequest.success(request.semanticIdentity());
         } catch (RuntimeException exception) {
             return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), exception.getMessage());
+        } finally {
+            if (auditStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("backend.opengl.clear", System.nanoTime() - auditStartNanos);
+            }
         }
     }
 
     @Override
     public VulkanicGalExecutionRequest.ExecutionResult executeTransfer(CommandContext ctx, VulkanicGalExecutionRequest.TransferRequest request) {
+        long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         try {
             java.util.Objects.requireNonNull(request, "request");
             consumeResourceUsagePlan(request.resourcePlan());
@@ -400,6 +407,10 @@ public class OpenGLBackend implements GraphicsBackend {
             return VulkanicGalExecutionRequest.success(request.semanticIdentity());
         } catch (RuntimeException exception) {
             return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), exception.getMessage());
+        } finally {
+            if (auditStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("backend.opengl.transfer", System.nanoTime() - auditStartNanos);
+            }
         }
     }
     
@@ -771,6 +782,7 @@ public class OpenGLBackend implements GraphicsBackend {
 
     @Override
     public VulkanicGalExecutionRequest.ExecutionResult executeGraphicsDraw(CommandContext ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest request) {
+        long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         try {
             if (!ctx.isImmediate()) {
                 throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
@@ -823,6 +835,10 @@ public class OpenGLBackend implements GraphicsBackend {
             return VulkanicGalExecutionRequest.success(request.semanticIdentity());
         } catch (RuntimeException exception) {
             return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), exception.getMessage());
+        } finally {
+            if (auditStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("backend.opengl.graphics", System.nanoTime() - auditStartNanos);
+            }
         }
     }
 
@@ -3581,6 +3597,7 @@ public class OpenGLBackend implements GraphicsBackend {
 
     @Override
     public VulkanicGalExecutionRequest.ExecutionResult executeComputeDispatch(CommandContext ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest request) {
+        long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         try {
             consumeResourceUsagePlan(request.resourcePlan());
             VulkanicGalExecutionRequest.ComputeDispatchCommand command = request.command();
@@ -3592,6 +3609,10 @@ public class OpenGLBackend implements GraphicsBackend {
             return VulkanicGalExecutionRequest.success(request.semanticIdentity());
         } catch (RuntimeException exception) {
             return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), exception.getMessage());
+        } finally {
+            if (auditStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("backend.opengl.compute", System.nanoTime() - auditStartNanos);
+            }
         }
     }
     

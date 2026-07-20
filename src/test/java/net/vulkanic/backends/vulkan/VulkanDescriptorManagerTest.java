@@ -14,7 +14,7 @@ import org.lwjgl.vulkan.VK10;
 class VulkanDescriptorManagerTest {
     @Test
     void descriptorSetCacheReusesEquivalentSemanticKeys() {
-        VulkanDescriptorManager<FakeUniformBuffer> manager = new VulkanDescriptorManager<>(3, 4, 1024);
+        VulkanDescriptorManager<FakeUniformBuffer> manager = new VulkanDescriptorManager<>(2, 3, 4, 1024);
         VulkanDescriptorManager.DescriptorSetCacheKey key = cacheKey(17L, 2, 99L);
 
         manager.cacheDescriptorSetForTests(key, 0xCAFE);
@@ -25,7 +25,7 @@ class VulkanDescriptorManagerTest {
 
     @Test
     void descriptorSamplerCacheReusesOpaquePolicyKeysAndDestroysOnShutdown() {
-        VulkanDescriptorManager<FakeUniformBuffer> manager = new VulkanDescriptorManager<>(3, 4, 1024);
+        VulkanDescriptorManager<FakeUniformBuffer> manager = new VulkanDescriptorManager<>(2, 3, 4, 1024);
         List<Long> destroyed = new ArrayList<>();
 
         long first = manager.resolveDescriptorSampler("sampler-key", 1L, ignored -> 42L, destroyed::add);
@@ -45,7 +45,7 @@ class VulkanDescriptorManagerTest {
 
     @Test
     void descriptorSetInvalidationClearsCache() {
-        VulkanDescriptorManager<FakeUniformBuffer> manager = new VulkanDescriptorManager<>(3, 4, 1024);
+        VulkanDescriptorManager<FakeUniformBuffer> manager = new VulkanDescriptorManager<>(2, 3, 4, 1024);
         VulkanDescriptorManager.DescriptorSetCacheKey key = cacheKey(17L, 2, 99L);
         manager.cacheDescriptorSetForTests(key, 0xCAFE);
 
@@ -57,20 +57,22 @@ class VulkanDescriptorManagerTest {
 
     @Test
     void descriptorPoolConfigurationKeepsFixedImmediateSlotsAndLimits() {
-        VulkanDescriptorManager<FakeUniformBuffer> manager = new VulkanDescriptorManager<>(3, 4, 1024);
+        VulkanDescriptorManager<FakeUniformBuffer> manager = new VulkanDescriptorManager<>(2, 3, 4, 1024);
 
         assertEquals(3, manager.immediateDescriptorPoolCountForTests());
+        assertEquals(2, manager.frameDescriptorPoolCountForTests());
         assertEquals(2048, VulkanDescriptorManager.DEFAULT_MAX_DESCRIPTOR_SETS);
         assertEquals(2048, VulkanDescriptorManager.DEFAULT_COMBINED_IMAGE_SAMPLER_DESCRIPTORS);
         assertEquals(2048, VulkanDescriptorManager.DEFAULT_UNIFORM_BUFFER_DESCRIPTORS);
         assertEquals(1024, VulkanDescriptorManager.DEFAULT_UNIFORM_TEXEL_BUFFER_DESCRIPTORS);
         assertEquals(1024, VulkanDescriptorManager.DEFAULT_STORAGE_IMAGE_DESCRIPTORS);
         assertThrows(IndexOutOfBoundsException.class, () -> manager.activateImmediateSlot(3));
+        assertThrows(IndexOutOfBoundsException.class, () -> manager.activateFrameSlot(2));
     }
 
     @Test
     void recycledUniformBuffersHonorCountAndByteLimits() {
-        VulkanDescriptorManager<FakeUniformBuffer> manager = new VulkanDescriptorManager<>(3, 1, 64);
+        VulkanDescriptorManager<FakeUniformBuffer> manager = new VulkanDescriptorManager<>(2, 3, 1, 64);
         List<FakeUniformBuffer> closed = new ArrayList<>();
         FakeUniformBuffer retained = new FakeUniformBuffer(32);
         FakeUniformBuffer rejectedByCount = new FakeUniformBuffer(32);
@@ -87,7 +89,7 @@ class VulkanDescriptorManagerTest {
         );
         assertEquals(0, manager.recycledUniformBufferCountForTests());
 
-        VulkanDescriptorManager<FakeUniformBuffer> byteLimited = new VulkanDescriptorManager<>(3, 4, 48);
+        VulkanDescriptorManager<FakeUniformBuffer> byteLimited = new VulkanDescriptorManager<>(2, 3, 4, 48);
         FakeUniformBuffer tooLarge = new FakeUniformBuffer(64);
         byteLimited.recycleUniformBuffer(tooLarge, tooLarge.size(), FakeUniformBuffer::allocationSize, closed::add);
         assertTrue(closed.contains(tooLarge));
@@ -96,7 +98,7 @@ class VulkanDescriptorManagerTest {
 
     @Test
     void deferredLifetimeRecyclesDescriptorBuffersOnlyAfterFenceCompletion() {
-        VulkanDescriptorManager<FakeUniformBuffer> manager = new VulkanDescriptorManager<>(3, 4, 1024);
+        VulkanDescriptorManager<FakeUniformBuffer> manager = new VulkanDescriptorManager<>(2, 3, 4, 1024);
         VulkanDeferredResourceLifetime<FakeUniformBuffer> lifetime = new VulkanDeferredResourceLifetime<>(2, 3);
         FakeUniformBuffer descriptorBuffer = new FakeUniformBuffer(64);
 
@@ -121,7 +123,7 @@ class VulkanDescriptorManagerTest {
 
     @Test
     void shutdownAndDeviceLossCleanupClearDescriptorStateSafely() {
-        VulkanDescriptorManager<FakeUniformBuffer> manager = new VulkanDescriptorManager<>(3, 4, 1024);
+        VulkanDescriptorManager<FakeUniformBuffer> manager = new VulkanDescriptorManager<>(2, 3, 4, 1024);
         FakeUniformBuffer buffer = new FakeUniformBuffer(32);
         manager.cacheDescriptorSetForTests(cacheKey(17L, 2, 99L), 0xCAFE);
         manager.recycleUniformBuffer(buffer, buffer.size(), FakeUniformBuffer::allocationSize, FakeUniformBuffer::close);
@@ -137,7 +139,7 @@ class VulkanDescriptorManagerTest {
 
     @Test
     void staleDescriptorCacheIsNotReusedAfterResourceInvalidation() {
-        VulkanDescriptorManager<FakeUniformBuffer> manager = new VulkanDescriptorManager<>(3, 4, 1024);
+        VulkanDescriptorManager<FakeUniformBuffer> manager = new VulkanDescriptorManager<>(2, 3, 4, 1024);
         VulkanDescriptorManager.DescriptorSetCacheKey destroyedResourceKey = cacheKey(17L, 2, 99L);
         manager.cacheDescriptorSetForTests(destroyedResourceKey, 0xCAFE);
 

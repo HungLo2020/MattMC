@@ -2641,10 +2641,23 @@ public class VulkanicAPI {
         VulkanicGalExecutionRequest.GraphicsDrawRequest request
     ) {
         GraphicsBackend backend = getBackend();
+        long captureStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         VulkanicGalExecutionRequest.GraphicsDrawRequest capturedRequest =
             VulkanicGalSnapshotBuilder.captureGraphicsDraw(ctx, backend, compatibilityState, request);
+        if (captureStartNanos != 0L) {
+            VulkanPerfAudit.recordPhase("gal.graphics.capture", System.nanoTime() - captureStartNanos);
+        }
+        long validationStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         requireGalExecutionAccepted(VulkanicGalExecutionRequest.validateGraphicsDraw(capturedRequest));
+        if (validationStartNanos != 0L) {
+            VulkanPerfAudit.recordPhase("gal.graphics.validation", System.nanoTime() - validationStartNanos);
+        }
+        long backendStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
+        VulkanPerfAudit.recordGraphicsDraw();
         requireGalExecutionAccepted(backend.executeGraphicsDraw(ctx, capturedRequest));
+        if (backendStartNanos != 0L) {
+            VulkanPerfAudit.recordPhase("gal.graphics.backend", System.nanoTime() - backendStartNanos);
+        }
     }
 
     private static void executeGalComputeDispatch(
@@ -2653,22 +2666,39 @@ public class VulkanicAPI {
     ) {
         GraphicsBackend backend = getBackend();
         String operation = request.semanticIdentity().phase();
+        long passCaptureStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         VulkanicGalExecutionRequest.ComputePassBeginRequest beginRequest =
             VulkanicGalSnapshotBuilder.captureComputePassBegin(
                 ctx,
                 backend,
                 VulkanicGalExecutionRequest.ComputePassBeginRequest.begin(operation)
         );
+        if (passCaptureStartNanos != 0L) {
+            VulkanPerfAudit.recordPhase("gal.compute_pass.capture", System.nanoTime() - passCaptureStartNanos);
+        }
         requireGalExecutionAccepted(VulkanicGalExecutionRequest.validateComputePassBegin(beginRequest));
         requireGalExecutionAccepted(backend.executeComputePassBegin(ctx, beginRequest));
         boolean completed = false;
+        long captureStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         VulkanicGalExecutionRequest.ComputeDispatchRequest capturedRequest =
             VulkanicGalSnapshotBuilder.captureComputeDispatch(ctx, backend, compatibilityState, request);
+        if (captureStartNanos != 0L) {
+            VulkanPerfAudit.recordPhase("gal.compute.capture", System.nanoTime() - captureStartNanos);
+        }
         try {
             VulkanicGalExecutionRequest.ComputeDispatchRequest executableRequest =
                 capturedRequest == null ? request : capturedRequest;
+            long validationStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
             requireGalExecutionAccepted(VulkanicGalExecutionRequest.validateComputeDispatch(executableRequest));
+            if (validationStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("gal.compute.validation", System.nanoTime() - validationStartNanos);
+            }
+            long backendStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
+            VulkanPerfAudit.recordComputeDispatch();
             requireGalExecutionAccepted(backend.executeComputeDispatch(ctx, executableRequest));
+            if (backendStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("gal.compute.backend", System.nanoTime() - backendStartNanos);
+            }
             completed = true;
         } finally {
             VulkanicGalExecutionRequest.ComputePassEndRequest endRequest = completed
@@ -2690,12 +2720,25 @@ public class VulkanicAPI {
         VulkanicGalExecutionRequest.ClearRequest request
     ) {
         GraphicsBackend backend = getBackend();
+        long captureStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         VulkanicGalExecutionRequest.ClearRequest capturedRequest =
             VulkanicGalSnapshotBuilder.captureClear(ctx, backend, compatibilityState, request);
+        if (captureStartNanos != 0L) {
+            VulkanPerfAudit.recordPhase("gal.clear.capture", System.nanoTime() - captureStartNanos);
+        }
         VulkanicGalExecutionRequest.ClearRequest executableRequest =
             capturedRequest == null ? request : capturedRequest;
+        long validationStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         requireGalExecutionAccepted(VulkanicGalExecutionRequest.validateClear(executableRequest));
+        if (validationStartNanos != 0L) {
+            VulkanPerfAudit.recordPhase("gal.clear.validation", System.nanoTime() - validationStartNanos);
+        }
+        long backendStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
+        VulkanPerfAudit.recordClear();
         requireGalExecutionAccepted(backend.executeClear(ctx, executableRequest));
+        if (backendStartNanos != 0L) {
+            VulkanPerfAudit.recordPhase("gal.clear.backend", System.nanoTime() - backendStartNanos);
+        }
     }
 
     private static void executeGalTransfer(
@@ -2703,12 +2746,25 @@ public class VulkanicAPI {
         VulkanicGalExecutionRequest.TransferRequest request
     ) {
         GraphicsBackend backend = getBackend();
+        long captureStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         VulkanicGalExecutionRequest.TransferRequest capturedRequest =
             VulkanicGalSnapshotBuilder.captureTransfer(ctx, backend, compatibilityState, request);
+        if (captureStartNanos != 0L) {
+            VulkanPerfAudit.recordPhase("gal.transfer.capture", System.nanoTime() - captureStartNanos);
+        }
         VulkanicGalExecutionRequest.TransferRequest executableRequest =
             capturedRequest == null ? request : capturedRequest;
+        long validationStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         requireGalExecutionAccepted(VulkanicGalExecutionRequest.validateTransfer(executableRequest));
+        if (validationStartNanos != 0L) {
+            VulkanPerfAudit.recordPhase("gal.transfer.validation", System.nanoTime() - validationStartNanos);
+        }
+        long backendStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
+        VulkanPerfAudit.recordTransfer();
         requireGalExecutionAccepted(backend.executeTransfer(ctx, executableRequest));
+        if (backendStartNanos != 0L) {
+            VulkanPerfAudit.recordPhase("gal.transfer.backend", System.nanoTime() - backendStartNanos);
+        }
     }
 
     private static VulkanicRenderPass executeGalRenderPassBegin(
@@ -2716,15 +2772,27 @@ public class VulkanicAPI {
         VulkanicGalExecutionRequest.RenderPassBeginRequest request
     ) {
         GraphicsBackend backend = getBackend();
+        long captureStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         VulkanicGalExecutionRequest.RenderPassBeginRequest capturedRequest =
             VulkanicGalSnapshotBuilder.captureRenderPassBegin(ctx, backend, request);
+        if (captureStartNanos != 0L) {
+            VulkanPerfAudit.recordPhase("gal.render_pass_begin.capture", System.nanoTime() - captureStartNanos);
+        }
         VulkanicGalExecutionRequest.RenderPassBeginRequest executableRequest =
             capturedRequest == null ? request : capturedRequest;
+        long validationStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         requireGalExecutionAccepted(VulkanicGalExecutionRequest.validateRenderPassBegin(executableRequest));
+        if (validationStartNanos != 0L) {
+            VulkanPerfAudit.recordPhase("gal.render_pass_begin.validation", System.nanoTime() - validationStartNanos);
+        }
+        long backendStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         VulkanicRenderPass backendPass = backend.executeRenderPassBegin(
             ctx,
             executableRequest
         );
+        if (backendStartNanos != 0L) {
+            VulkanPerfAudit.recordPhase("gal.render_pass_begin.backend", System.nanoTime() - backendStartNanos);
+        }
         return new GalRenderPass(ctx, backend, executableRequest, backendPass);
     }
 

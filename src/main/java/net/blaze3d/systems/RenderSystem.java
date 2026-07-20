@@ -26,6 +26,7 @@ public class RenderSystem {
 	public static final int PROJECTION_MATRIX_UBO_SIZE = new Std140SizeCalculator().putMat4f().get();
 	// Sodium: Track WGL context for security checks (from RenderSystemMixin)
 	private static long wglPrevContext = MemoryUtil.NULL;
+	private static boolean vulkanFrameAcquired;
 
 	public static void cleanupRendererBootstrapResources() {
 		net.vulkanic.VulkanicAPI.cleanupRendererBootstrapResources();
@@ -51,15 +52,18 @@ public class RenderSystem {
 		}
 
 		boolean vulkanBackendSelected = net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
-		boolean vulkanFrameAcquired = false;
-		if (vulkanBackendSelected) {
+		if (vulkanBackendSelected && !vulkanFrameAcquired) {
 			vulkanFrameAcquired = net.vulkanic.VulkanicAPI.beginFrame() >= 0;
 		}
 		
 		Tesselator.getInstance().clear();
 		if (vulkanBackendSelected) {
-			if (vulkanFrameAcquired) {
-				net.vulkanic.VulkanicAPI.endFrame();
+			try {
+				if (vulkanFrameAcquired) {
+					net.vulkanic.VulkanicAPI.endFrame();
+				}
+			} finally {
+				vulkanFrameAcquired = false;
 			}
 		} else {
 			GLFW.glfwSwapBuffers(window.handle());
@@ -89,6 +93,16 @@ public class RenderSystem {
 				wglPrevContext = context;
 			}
 		}
+	}
+
+	public static boolean beginVulkanFrameForRenderWork() {
+		if (!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			return true;
+		}
+		if (!vulkanFrameAcquired) {
+			vulkanFrameAcquired = net.vulkanic.VulkanicAPI.beginFrame() >= 0;
+		}
+		return vulkanFrameAcquired;
 	}
 
 	public static void initRenderer(long l, int i, boolean bl, BiFunction<ResourceLocation, ShaderType, String> biFunction, boolean bl2) {

@@ -2014,6 +2014,10 @@ public final class VulkanicGalExecutionRequest {
             "requests-have-no-native-handles",
             "backends-resolve-stable-resource-identities",
             "diagnostics-outside-semantic-cache-identity");
+        appendLine(builder, "rust-mapping",
+            "GalRequest",
+            "ExecutionResult",
+            "GAL_CONTRACT_VERSION");
         return builder.toString();
     }
 

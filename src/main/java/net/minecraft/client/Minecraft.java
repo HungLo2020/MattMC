@@ -1299,6 +1299,8 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			this.reloadResourcePacks().thenRun(() -> completableFuture.complete(null));
 		}
 
+		RenderSystem.beginVulkanFrameForRenderWork();
+
 		int i = this.deltaTracker.advanceTime(Util.getMillis(), bl);
 		ProfilerFiller profilerFiller = Profiler.get();
 		long startTime;
@@ -1341,11 +1343,12 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			if (bl2) {
 				TimerQuery.getInstance().beginProfile();
 			}
-		}
+			}
 
-		RenderTarget renderTarget = this.getMainRenderTarget();
-		VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
-		profilerFiller.push("gameRenderer");
+			RenderTarget renderTarget = this.getMainRenderTarget();
+			RenderSystem.beginVulkanFrameForRenderWork();
+			VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
+			profilerFiller.push("gameRenderer");
 		startTime = Util.getNanos();
 		if (!this.noRender) {
 			net.minecraft.client.dev.DeterministicCameraCapture.beforeRender(this);
@@ -1360,7 +1363,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		}
 
 		this.frameTimeNs = Util.getNanos() - l;
-		net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadFrame(Util.getNanos() - frameStart);
+		long renderThreadFrameNanos = Util.getNanos() - frameStart;
+		net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadFrame(renderThreadFrameNanos);
+		net.minecraft.client.dev.DeterministicCameraCapture.recordPerformanceFrame(this, renderThreadFrameNanos);
 		
 		if (bl2) {
 			this.currentFrameProfile = TimerQuery.getInstance().endProfile();

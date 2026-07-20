@@ -1117,8 +1117,18 @@ void main() {
         }
 
         CommandContext context = currentCommandContext;
-        long commandBufferHandle = context == null ? spine.primaryCommandBufferHandle() : context.getHandle();
-        String commandContextDebugName = context == null ? "Vulkan-PrimaryCommandBuffer" : context.getDebugName();
+        long commandBufferHandle;
+        String commandContextDebugName;
+        if (spine.isFrameInProgress()) {
+            commandBufferHandle = spine.currentFrameCommandBufferHandle();
+            commandContextDebugName = "Vulkan-FrameCommandBuffer";
+        } else if (context == null) {
+            commandBufferHandle = spine.primaryCommandBufferHandle();
+            commandContextDebugName = "Vulkan-PrimaryCommandBuffer";
+        } else {
+            commandBufferHandle = context.getHandle();
+            commandContextDebugName = context.getDebugName();
+        }
 
         return VulkanExecutionContextInfo.available(
             GraphicsBackendType.VULKAN,
@@ -1423,16 +1433,23 @@ void main() {
     public CommandContext getCurrentCommandContext() {
         ensureNativeReady("getCurrentCommandContext");
 
-        CommandContext context = currentCommandContext;
-        if (context == null) {
-            NativeSpine spine = nativeSpine;
-            if (spine == null) {
-                throw new IllegalStateException("Native Vulkan spine disappeared while resolving current command context.");
-            }
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine disappeared while resolving current command context.");
+        }
 
+        long expectedHandle = spine.isFrameInProgress()
+            ? spine.currentFrameCommandBufferHandle()
+            : spine.primaryCommandBufferHandle();
+        String expectedDebugName = spine.isFrameInProgress()
+            ? "Vulkan-FrameCommandBuffer"
+            : "Vulkan-CurrentCommandBuffer";
+
+        CommandContext context = currentCommandContext;
+        if (context == null || context.getHandle() != expectedHandle) {
             context = new VulkanCommandContext(
-                spine.primaryCommandBufferHandle(),
-                "Vulkan-CurrentCommandBuffer"
+                expectedHandle,
+                expectedDebugName
             );
             currentCommandContext = context;
         }
@@ -6465,7 +6482,7 @@ void main() {
         }
 
         try {
-            spine.submitPrimaryCommandBuffer(commandBufferHandle);
+            spine.submitPrimaryCommandBuffer(commandBufferHandle, "compatibility_immediate_submit");
         } catch (IllegalStateException exception) {
             String message = exception.getMessage();
             if (message != null
@@ -6487,7 +6504,9 @@ void main() {
         if (spine == null) {
             throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
         }
-        return spine.beginFrame();
+        int imageIndex = spine.beginFrame();
+        currentCommandContext = null;
+        return imageIndex;
     }
 
     public void endFrame() {
@@ -6496,7 +6515,11 @@ void main() {
         if (spine == null) {
             throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
         }
-        spine.endFrame();
+        try {
+            spine.endFrame();
+        } finally {
+            currentCommandContext = null;
+        }
     }
 
     public void presentTextureToScreen(CommandContext ctx, GpuTextureView textureView) {
@@ -6577,6 +6600,7 @@ void main() {
     }
 
     public VulkanicGalExecutionRequest.ExecutionResult executeGraphicsDraw(CommandContext ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest request) {
+        long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         try {
             Objects.requireNonNull(request, "request");
             consumeResourceUsagePlan(request.resourcePlan());
@@ -6624,6 +6648,10 @@ void main() {
             return VulkanicGalExecutionRequest.success(request.semanticIdentity());
         } catch (RuntimeException exception) {
             return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), exception.getMessage());
+        } finally {
+            if (auditStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("backend.vulkan.graphics", System.nanoTime() - auditStartNanos);
+            }
         }
     }
 
@@ -8186,6 +8214,7 @@ void main() {
     }
 
     public VulkanicGalExecutionRequest.ExecutionResult executeClear(CommandContext ctx, VulkanicGalExecutionRequest.ClearRequest request) {
+        long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         try {
             Objects.requireNonNull(request, "request");
             consumeResourceUsagePlan(request.resourcePlan());
@@ -8193,10 +8222,15 @@ void main() {
             return VulkanicGalExecutionRequest.success(request.semanticIdentity());
         } catch (RuntimeException exception) {
             return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), exception.getMessage());
+        } finally {
+            if (auditStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("backend.vulkan.clear", System.nanoTime() - auditStartNanos);
+            }
         }
     }
 
     public VulkanicGalExecutionRequest.ExecutionResult executeTransfer(CommandContext ctx, VulkanicGalExecutionRequest.TransferRequest request) {
+        long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         try {
             Objects.requireNonNull(request, "request");
             consumeResourceUsagePlan(request.resourcePlan());
@@ -8234,6 +8268,10 @@ void main() {
             return VulkanicGalExecutionRequest.success(request.semanticIdentity());
         } catch (RuntimeException exception) {
             return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), exception.getMessage());
+        } finally {
+            if (auditStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("backend.vulkan.transfer", System.nanoTime() - auditStartNanos);
+            }
         }
     }
 
@@ -8417,6 +8455,7 @@ void main() {
     }
 
     public VulkanicGalExecutionRequest.ExecutionResult executeComputeDispatch(CommandContext ctx, VulkanicGalExecutionRequest.ComputeDispatchRequest request) {
+        long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         try {
             Objects.requireNonNull(request, "request");
             consumeResourceUsagePlan(request.resourcePlan());
@@ -8429,6 +8468,10 @@ void main() {
             return VulkanicGalExecutionRequest.success(request.semanticIdentity());
         } catch (RuntimeException exception) {
             return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), exception.getMessage());
+        } finally {
+            if (auditStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("backend.vulkan.compute", System.nanoTime() - auditStartNanos);
+            }
         }
     }
 
@@ -10041,6 +10084,7 @@ void main() {
         private final VulkanTextureTransferExecutionCoordinator textureTransfers;
         private final VulkanDescriptorManager<VulkanBuffer> descriptorManager =
             new VulkanDescriptorManager<>(
+                MAX_FRAMES_IN_FLIGHT,
                 IMMEDIATE_SUBMIT_SLOTS,
                 Integer.getInteger("mattmc.vulkan.maxRecycledDescriptorUniformBuffers", 512),
                 Long.getLong("mattmc.vulkan.maxRecycledDescriptorUniformBufferBytes", 64L * 1024L * 1024L)
@@ -11202,7 +11246,7 @@ void main() {
             try {
                 ensureLegacyFallbackSamplerTexture(commandBufferHandle);
             } finally {
-                submitPrimaryCommandBuffer(commandBufferHandle);
+                submitPrimaryCommandBuffer(commandBufferHandle, "texture_upload_fallback_sampler");
             }
         }
 
@@ -12128,8 +12172,11 @@ void main() {
                                            int levelCount,
                                            int baseLayer,
                                            int layerCount) {
+            long commandBufferHandle = swapchainState.frameInProgress()
+                ? currentFrameCommandBufferHandle()
+                : commandSubmissionState.primaryCommandBufferHandle();
             VkCommandBuffer recordingCommandBuffer = requireRecordingCommandBuffer(
-                commandSubmissionState.primaryCommandBufferHandle(),
+                commandBufferHandle,
                 "transitionImageLayout"
             );
             transitionImageLayout(
@@ -12884,7 +12931,7 @@ void main() {
                 namedBufferStorage(readbackBuffer, byteCount, 0);
                 readbackTransfer = textureTransfers.recordReadbackStaging(readbackBuffer, byteCount);
                 if (commandSubmissionState.commandBufferRecording()) {
-                    submitPrimaryCommandBuffer(commandSubmissionState.primaryCommandBufferHandle());
+                    submitPrimaryCommandBuffer(commandSubmissionState.primaryCommandBufferHandle(), "readback_flush_before_diagnostic_texture_hash");
                 }
                 long commandBufferHandle = beginPrimaryCommandBuffer();
                 readLegacyTextureRegionToBoundPixelPackBuffer(
@@ -12898,7 +12945,7 @@ void main() {
                     0L
                 );
                 textureTransfers.associateReadbackCommand(readbackTransfer, commandBufferHandle);
-                submitPrimaryCommandBuffer(commandBufferHandle);
+                submitPrimaryCommandBuffer(commandBufferHandle, "readback_diagnostic_texture_hash");
 
                 java.nio.ByteBuffer raw = mapNamedBufferRange(readbackBuffer, 0, byteCount, GL_MAP_READ_BIT);
                 try (VulkanStagingTransferManager.ReadbackResult readbackResult =
@@ -14243,7 +14290,7 @@ void main() {
                 copyDataToBuffer(commandSubmissionState.primaryCommandBufferHandle(), destinationBufferHandle, destinationOffset, data);
                 return;
             }
-            if (swapchainState.frameInProgress() && isCurrentFrameCommandBufferRecording()) {
+            if (swapchainState.frameInProgress()) {
                 copyDataToBuffer(currentFrameCommandBufferHandle(), destinationBufferHandle, destinationOffset, data);
                 return;
             }
@@ -14251,7 +14298,7 @@ void main() {
             try {
                 copyDataToBuffer(commandBufferHandle, destinationBufferHandle, destinationOffset, data);
             } finally {
-                submitPrimaryCommandBuffer(commandBufferHandle);
+                submitPrimaryCommandBuffer(commandBufferHandle, "buffer_upload_immediate");
             }
         }
 
@@ -14307,7 +14354,7 @@ void main() {
                 copyBufferRegion(commandSubmissionState.primaryCommandBufferHandle(), sourceBufferHandle, destinationBufferHandle, sourceOffset, destinationOffset, size);
                 return;
             }
-            if (swapchainState.frameInProgress() && isCurrentFrameCommandBufferRecording()) {
+            if (swapchainState.frameInProgress()) {
                 copyBufferRegion(currentFrameCommandBufferHandle(), sourceBufferHandle, destinationBufferHandle, sourceOffset, destinationOffset, size);
                 return;
             }
@@ -14315,7 +14362,7 @@ void main() {
             try {
                 copyBufferRegion(commandBufferHandle, sourceBufferHandle, destinationBufferHandle, sourceOffset, destinationOffset, size);
             } finally {
-                submitPrimaryCommandBuffer(commandBufferHandle);
+                submitPrimaryCommandBuffer(commandBufferHandle, "staging_transfer_immediate");
             }
         }
 
@@ -15194,7 +15241,7 @@ void main() {
             VulkanFrameExecutionCoordinator.FrameBeginPlan beginPlan =
                 frameExecution.planFrameBegin(isRenderPassRecording());
             if (beginPlan.pendingImmediateCommandBufferHandle() != VK10.VK_NULL_HANDLE) {
-                submitPrimaryCommandBuffer(beginPlan.pendingImmediateCommandBufferHandle());
+                submitPrimaryCommandBuffer(beginPlan.pendingImmediateCommandBufferHandle(), "compatibility_immediate_pending_before_frame");
             }
 
             refreshSurfaceIfRegisteredWindowChanged();
@@ -15409,7 +15456,7 @@ void main() {
 
             if (commandSubmissionState.commandBufferRecording()) {
                 // Ensure current-frame render work is visible before present composition.
-                submitPrimaryCommandBuffer(commandSubmissionState.primaryCommandBufferHandle());
+                submitPrimaryCommandBuffer(commandSubmissionState.primaryCommandBufferHandle(), "compatibility_immediate_flush_before_present");
             }
 
             if (pendingPresentTextureRequest == null && successfulFramePresentCount < 6) {
@@ -16143,10 +16190,12 @@ void main() {
                 checkVk(
                     "vkWaitForFences(frameCommandBuffer[" + beginPlan.frameSlot() + "])",
                     VK10.vkWaitForFences(logicalDevice(), frameFenceBuffer, true, Long.MAX_VALUE)
-                );
-                markFenceComplete(beginPlan.frameFence());
-                checkVk(
-                    "vkResetCommandPool(frame[" + beginPlan.frameSlot() + "])",
+	                );
+	                markFenceComplete(beginPlan.frameFence());
+	                descriptorManager.activateFrameSlot(beginPlan.frameSlot());
+	                resetSharedDescriptorPool();
+	                checkVk(
+	                    "vkResetCommandPool(frame[" + beginPlan.frameSlot() + "])",
                     VK10.vkResetCommandPool(logicalDevice(), beginPlan.commandPool(), 0)
                 );
 
@@ -16178,7 +16227,7 @@ void main() {
             return renderPassExecution.isRenderPassActive();
         }
 
-        private void submitPrimaryCommandBuffer(long commandBufferHandle) {
+        private void submitPrimaryCommandBuffer(long commandBufferHandle, String reason) {
             requireRuntimeSnapshot("submitPrimaryCommandBuffer");
             if (isRenderPassRecording()) {
                 throw new IllegalStateException("Cannot submit command buffer while a render pass is still active.");
@@ -16266,28 +16315,78 @@ void main() {
 
                 frameExecution.advanceImmediateAfterSubmit(submitPlan);
                 descriptorManager.activateImmediateSlot(commandSubmissionState.currentImmediateSubmitSlot());
-                if (totalStartNanos != 0L) {
-                    long totalNanos = System.nanoTime() - totalStartNanos;
-                    long otherNanos = totalNanos - waitBeforeNanos - queueSubmitNanos - waitAfterNanos;
-                    VulkanPerfAudit.recordPrimarySubmit(totalNanos, waitBeforeNanos, queueSubmitNanos, waitAfterNanos, otherNanos);
-                }
-            } catch (RuntimeException exception) {
+	                if (totalStartNanos != 0L) {
+	                    long totalNanos = System.nanoTime() - totalStartNanos;
+	                    long otherNanos = totalNanos - waitBeforeNanos - queueSubmitNanos - waitAfterNanos;
+	                    VulkanPerfAudit.recordPrimarySubmit(totalNanos, waitBeforeNanos, queueSubmitNanos, waitAfterNanos, otherNanos);
+	                    VulkanPerfAudit.recordVulkanSubmit(
+	                        submitCategoryForReason(reason),
+	                        reason,
+	                        1,
+	                        0L,
+	                        0L,
+	                        synchronizeCompletion,
+	                        synchronizeCompletion,
+	                        totalNanos,
+	                        waitBeforeNanos,
+	                        queueSubmitNanos,
+	                        waitAfterNanos,
+	                        otherNanos,
+	                        submitPlan.reservedGeneration() > 0L ? 1L : 0L,
+	                        cannotJoinFrameReason(reason)
+	                    );
+	                }
+	            } catch (RuntimeException exception) {
                 if (!submittedToQueue) {
                     frameExecution.failImmediateSubmitBeforeQueue(submitPlan);
                 }
                 throw exception;
             }
-        }
+	        }
 
-        private int immediateSubmitSlotForKnownCommandBuffer(long commandBufferHandle) {
+	        private String submitCategoryForReason(String reason) {
+	            if (reason == null) {
+	                return "other";
+	            }
+	            if (reason.contains("readback")) {
+	                return "readback";
+	            }
+	            if (reason.contains("texture_upload")) {
+	                return "texture_upload";
+	            }
+	            if (reason.contains("buffer_upload")) {
+	                return "buffer_upload";
+	            }
+	            if (reason.contains("staging_transfer")) {
+	                return "staging_transfer";
+	            }
+	            if (reason.contains("clear") || reason.contains("copy") || reason.contains("blit")) {
+	                return "clear_copy_blit";
+	            }
+	            if (reason.contains("compatibility")) {
+	                return "compatibility_immediate_submit";
+	            }
+	            return "other";
+	        }
+
+	        private String cannotJoinFrameReason(String reason) {
+	            if (swapchainState.frameInProgress()) {
+	                return "should_have_joined_active_frame";
+	            }
+	            return "no_active_frame";
+	        }
+
+	        private int immediateSubmitSlotForKnownCommandBuffer(long commandBufferHandle) {
             return commandSubmissionState.immediateSubmitSlotForCommandBuffer(commandBufferHandle);
         }
 
-        private void submitFrameSemaphoreBridge() {
-            requireRuntimeSnapshot("submitFrameSemaphoreBridge");
-            VulkanFrameExecutionCoordinator.FrameSubmitPlan submitPlan =
-                frameExecution.planFrameSemaphoreBridgeSubmit();
-            try (MemoryStack stack = stackPush()) {
+	        private void submitFrameSemaphoreBridge() {
+	            requireRuntimeSnapshot("submitFrameSemaphoreBridge");
+	            VulkanFrameExecutionCoordinator.FrameSubmitPlan submitPlan =
+	                frameExecution.planFrameSemaphoreBridgeSubmit();
+	            long totalStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
+	            long queueSubmitNanos = 0L;
+	            try (MemoryStack stack = stackPush()) {
                 VkSubmitInfo.Buffer submitInfos = VkSubmitInfo.calloc(1, stack)
                     .sType$Default()
                     .waitSemaphoreCount(1)
@@ -16295,27 +16394,52 @@ void main() {
                     .pWaitDstStageMask(stack.ints(swapchainAcquireWaitStageMask()))
                     .pSignalSemaphores(stack.longs(submitPlan.renderFinishedSemaphore()));
 
-                java.nio.LongBuffer frameFenceBuffer = stack.longs(submitPlan.frameFence());
-                checkVk("vkResetFences(swapchainFrame)", VK10.vkResetFences(logicalDevice(), frameFenceBuffer));
-                int submitResult = VK10.vkQueueSubmit(graphicsQueue(), submitInfos, submitPlan.frameFence());
-                if (submitResult == VK10.VK_ERROR_DEVICE_LOST) {
-                    lifecycle.markDeviceLost();
-                }
-                checkVk("vkQueueSubmit(frameBridge)", submitResult);
-                frameExecution.completeFrameSubmit(submitPlan);
-            } catch (RuntimeException exception) {
+	                java.nio.LongBuffer frameFenceBuffer = stack.longs(submitPlan.frameFence());
+	                checkVk("vkResetFences(swapchainFrame)", VK10.vkResetFences(logicalDevice(), frameFenceBuffer));
+	                long queueSubmitStartNanos = totalStartNanos != 0L ? System.nanoTime() : 0L;
+	                int submitResult = VK10.vkQueueSubmit(graphicsQueue(), submitInfos, submitPlan.frameFence());
+	                if (queueSubmitStartNanos != 0L) {
+	                    queueSubmitNanos = System.nanoTime() - queueSubmitStartNanos;
+	                }
+	                if (submitResult == VK10.VK_ERROR_DEVICE_LOST) {
+	                    lifecycle.markDeviceLost();
+	                }
+	                checkVk("vkQueueSubmit(frameBridge)", submitResult);
+	                frameExecution.completeFrameSubmit(submitPlan);
+	                if (totalStartNanos != 0L) {
+	                    long totalNanos = System.nanoTime() - totalStartNanos;
+	                    VulkanPerfAudit.recordVulkanSubmit(
+	                        "semaphore_bridge",
+	                        "submitFrameSemaphoreBridge",
+	                        0,
+	                        0L,
+	                        0L,
+	                        false,
+	                        false,
+	                        totalNanos,
+	                        0L,
+	                        queueSubmitNanos,
+	                        0L,
+	                        Math.max(0L, totalNanos - queueSubmitNanos),
+	                        submitPlan.reservedGeneration() > 0L ? 1L : 0L,
+	                        "no_frame_commands_recorded"
+	                    );
+	                }
+	            } catch (RuntimeException exception) {
                 frameExecution.failFrameSubmit(submitPlan, false);
                 throw exception;
             }
         }
 
-        private void submitCurrentFrameCommandBuffer() {
-            requireRuntimeSnapshot("submitCurrentFrameCommandBuffer");
-            VulkanFrameExecutionCoordinator.FrameSubmitPlan submitPlan =
-                frameExecution.planFrameCommandBufferSubmit();
-            VkCommandBuffer frameCommandBuffer = submitPlan.commandBuffer();
+	        private void submitCurrentFrameCommandBuffer() {
+	            requireRuntimeSnapshot("submitCurrentFrameCommandBuffer");
+	            VulkanFrameExecutionCoordinator.FrameSubmitPlan submitPlan =
+	                frameExecution.planFrameCommandBufferSubmit();
+	            VkCommandBuffer frameCommandBuffer = submitPlan.commandBuffer();
+	            long totalStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
+	            long queueSubmitNanos = 0L;
 
-            try (MemoryStack stack = stackPush()) {
+	            try (MemoryStack stack = stackPush()) {
                 checkVk(
                     "vkEndCommandBuffer(frame[" + submitPlan.frameSlot() + "])",
                     VK10.vkEndCommandBuffer(frameCommandBuffer)
@@ -16331,16 +16455,39 @@ void main() {
                 commandBuffers.put(0, frameCommandBuffer.address());
                 submitInfos.pCommandBuffers(commandBuffers);
 
-                java.nio.LongBuffer frameFenceBuffer = stack.longs(submitPlan.frameFence());
-                checkVk("vkResetFences(swapchainFrame)", VK10.vkResetFences(logicalDevice(), frameFenceBuffer));
-                int submitResult = VK10.vkQueueSubmit(graphicsQueue(), submitInfos, submitPlan.frameFence());
-                if (submitResult == VK10.VK_ERROR_DEVICE_LOST) {
-                    lifecycle.markDeviceLost();
-                }
-                checkVk("vkQueueSubmit(frame)", submitResult);
-                frameExecution.completeFrameSubmit(submitPlan);
+	                java.nio.LongBuffer frameFenceBuffer = stack.longs(submitPlan.frameFence());
+	                checkVk("vkResetFences(swapchainFrame)", VK10.vkResetFences(logicalDevice(), frameFenceBuffer));
+	                long queueSubmitStartNanos = totalStartNanos != 0L ? System.nanoTime() : 0L;
+	                int submitResult = VK10.vkQueueSubmit(graphicsQueue(), submitInfos, submitPlan.frameFence());
+	                if (queueSubmitStartNanos != 0L) {
+	                    queueSubmitNanos = System.nanoTime() - queueSubmitStartNanos;
+	                }
+	                if (submitResult == VK10.VK_ERROR_DEVICE_LOST) {
+	                    lifecycle.markDeviceLost();
+	                }
+	                checkVk("vkQueueSubmit(frame)", submitResult);
+	                frameExecution.completeFrameSubmit(submitPlan);
+	                if (totalStartNanos != 0L) {
+	                    long totalNanos = System.nanoTime() - totalStartNanos;
+	                    VulkanPerfAudit.recordVulkanSubmit(
+	                        "normal_frame_graphics_submit",
+	                        "submitCurrentFrameCommandBuffer",
+	                        1,
+	                        0L,
+	                        0L,
+	                        false,
+	                        false,
+	                        totalNanos,
+	                        0L,
+	                        queueSubmitNanos,
+	                        0L,
+	                        Math.max(0L, totalNanos - queueSubmitNanos),
+	                        submitPlan.reservedGeneration() > 0L ? 1L : 0L,
+	                        "joined_active_frame"
+	                    );
+	                }
 
-                clearTrackedCommandBufferState(frameCommandBuffer.address());
+	                clearTrackedCommandBufferState(frameCommandBuffer.address());
             } catch (RuntimeException exception) {
                 frameExecution.failFrameSubmit(submitPlan, false);
                 throw exception;

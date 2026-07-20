@@ -38,6 +38,7 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
     static final int DEFAULT_UNIFORM_TEXEL_BUFFER_DESCRIPTORS = 1024;
     static final int DEFAULT_STORAGE_IMAGE_DESCRIPTORS = 1024;
 
+    private final long[] frameDescriptorPools;
     private final long[] immediateDescriptorPools;
     private final Map<Object, Long> descriptorSamplerCache = new ConcurrentHashMap<>();
     private final Map<DescriptorSetCacheKey, Long> descriptorSetCache = new HashMap<>();
@@ -52,10 +53,14 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
     private long descriptorSetCacheStoreCount;
 
     VulkanDescriptorManager(
+        int frameSlots,
         int immediateSubmitSlots,
         int maxRecycledDescriptorUniformBuffers,
         long maxRecycledDescriptorUniformBufferBytes
     ) {
+        if (frameSlots <= 0) {
+            throw new IllegalArgumentException("frameSlots must be positive");
+        }
         if (immediateSubmitSlots <= 0) {
             throw new IllegalArgumentException("immediateSubmitSlots must be positive");
         }
@@ -65,6 +70,7 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
         if (maxRecycledDescriptorUniformBufferBytes < 0L) {
             throw new IllegalArgumentException("maxRecycledDescriptorUniformBufferBytes must be non-negative");
         }
+        this.frameDescriptorPools = new long[frameSlots];
         this.immediateDescriptorPools = new long[immediateSubmitSlots];
         this.maxRecycledDescriptorUniformBuffers = maxRecycledDescriptorUniformBuffers;
         this.maxRecycledDescriptorUniformBufferBytes = maxRecycledDescriptorUniformBufferBytes;
@@ -95,6 +101,13 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
                 .pPoolSizes(poolSizes);
 
             java.nio.LongBuffer pPool = stack.mallocLong(1);
+            for (int slot = 0; slot < frameDescriptorPools.length; slot++) {
+                checkVk.check(
+                    "vkCreateDescriptorPool(frame[" + slot + "])",
+                    VK10.vkCreateDescriptorPool(device, poolInfo, null, pPool)
+                );
+                frameDescriptorPools[slot] = pPool.get(0);
+            }
             for (int slot = 0; slot < immediateDescriptorPools.length; slot++) {
                 checkVk.check(
                     "vkCreateDescriptorPool(immediate[" + slot + "])",
@@ -104,6 +117,11 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
             }
             activeDescriptorPool = immediateDescriptorPools[0];
         }
+    }
+
+    void activateFrameSlot(int slot) {
+        checkFrameSlot(slot);
+        activeDescriptorPool = frameDescriptorPools[slot];
     }
 
     void activateImmediateSlot(int slot) {
@@ -297,6 +315,12 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
             clearDescriptorPoolState();
             return;
         }
+        for (int slot = 0; slot < frameDescriptorPools.length; slot++) {
+            if (frameDescriptorPools[slot] != VK10.VK_NULL_HANDLE) {
+                VK10.vkDestroyDescriptorPool(device, frameDescriptorPools[slot], null);
+                frameDescriptorPools[slot] = VK10.VK_NULL_HANDLE;
+            }
+        }
         for (int slot = 0; slot < immediateDescriptorPools.length; slot++) {
             if (immediateDescriptorPools[slot] != VK10.VK_NULL_HANDLE) {
                 VK10.vkDestroyDescriptorPool(device, immediateDescriptorPools[slot], null);
@@ -355,6 +379,10 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
         return immediateDescriptorPools.length;
     }
 
+    int frameDescriptorPoolCountForTests() {
+        return frameDescriptorPools.length;
+    }
+
     static int descriptorUniformBufferBucketSize(int requestedSize) {
         int size = Math.max(1, requestedSize);
         int bucketSize = 1;
@@ -367,6 +395,12 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
     private void clearDescriptorPoolState() {
         activeDescriptorPool = VK10.VK_NULL_HANDLE;
         invalidateDescriptorSets();
+    }
+
+    private void checkFrameSlot(int slot) {
+        if (slot < 0 || slot >= frameDescriptorPools.length) {
+            throw new IndexOutOfBoundsException("frame slot " + slot + " outside 0.." + (frameDescriptorPools.length - 1));
+        }
     }
 
     private void checkImmediateSlot(int slot) {
