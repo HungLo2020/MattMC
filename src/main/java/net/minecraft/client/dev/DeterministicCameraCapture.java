@@ -10,15 +10,19 @@ import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.phys.Vec3;
 import net.vulkanic.VulkanPerfAudit;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicGalExecutionRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -51,6 +55,16 @@ public final class DeterministicCameraCapture {
 	private static final Set<String> SETTLED_READY_FAMILIES = parseSettledReadyFamilies();
 	private static final String FORCED_CAMERA_TYPE = System.getProperty("mattmc.dev.deterministicCameraCapture.cameraType", "").trim();
 	private static final int FORCED_SELECTED_HOTBAR_SLOT = Integer.getInteger("mattmc.dev.deterministicCameraCapture.selectedHotbarSlot", 0);
+	private static final String WORLD_NAME = System.getProperty("mattmc.dev.deterministicCameraCapture.world", "Origin");
+	private static final String CAMERA_PATH_ID = System.getProperty("mattmc.dev.deterministicCameraCapture.cameraPathId", "saved-pose-sweep");
+	private static final boolean HAS_FIXED_POSITION = hasProperty("fixedX") && hasProperty("fixedY") && hasProperty("fixedZ");
+	private static final boolean HAS_FIXED_YAW = hasProperty("fixedYaw");
+	private static final boolean HAS_FIXED_PITCH = hasProperty("fixedPitch");
+	private static final double FIXED_X = doubleProperty("fixedX", 0.0);
+	private static final double FIXED_Y = doubleProperty("fixedY", 0.0);
+	private static final double FIXED_Z = doubleProperty("fixedZ", 0.0);
+	private static final float FIXED_YAW = (float) doubleProperty("fixedYaw", 0.0);
+	private static final float FIXED_PITCH = (float) doubleProperty("fixedPitch", 0.0);
 	private static final float FIXED_VIGNETTE_BRIGHTNESS =
 		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.vignetteBrightness", "1.0"));
 	private static final Path METADATA_PATH = Path.of(System.getProperty("mattmc.dev.deterministicCameraCapture.metadata", "run/deterministic_camera_capture.json"));
@@ -319,11 +333,12 @@ public final class DeterministicCameraCapture {
 			return false;
 		}
 
-		initialPosition = player.position();
-		initialDimension = level.dimension().location().toString();
 		originalCameraType = minecraft.options.getCameraType();
 		originalSelectedHotbarSlot = player.getInventory().getSelectedSlot();
 		applyRuntimeOverrides(minecraft, player);
+		applyFixedBenchmarkStart(player);
+		initialPosition = player.position();
+		initialDimension = level.dimension().location().toString();
 		initialPose = new Pose("initial", player.getYRot(), player.getXRot());
 		stabilizeGuiState(minecraft);
 		Pose[] fullSequence = new Pose[] {
@@ -449,7 +464,7 @@ public final class DeterministicCameraCapture {
 		if (families.isEmpty()) {
 			families.add("sodium-terrain");
 		}
-		return Set.copyOf(families);
+		return Collections.unmodifiableSet(families);
 	}
 
 	private static void stabilizeGuiState(Minecraft minecraft) {
@@ -653,6 +668,24 @@ public final class DeterministicCameraCapture {
 		}
 	}
 
+	private static void applyFixedBenchmarkStart(LocalPlayer player) {
+		if (player == null) {
+			return;
+		}
+		double x = HAS_FIXED_POSITION ? FIXED_X : player.getX();
+		double y = HAS_FIXED_POSITION ? FIXED_Y : player.getY();
+		double z = HAS_FIXED_POSITION ? FIXED_Z : player.getZ();
+		float yaw = HAS_FIXED_YAW ? FIXED_YAW : player.getYRot();
+		float pitch = HAS_FIXED_PITCH ? FIXED_PITCH : player.getXRot();
+		Vec3 fixedPosition = new Vec3(x, y, z);
+		if (HAS_FIXED_POSITION) {
+			player.setPos(fixedPosition);
+			player.setDeltaMovement(Vec3.ZERO);
+		}
+		applyPose(player, new Pose("initial", yaw, pitch));
+		player.setOldPosAndRot(fixedPosition, yaw, pitch);
+	}
+
 	private static void restoreRuntimeOverrides(Minecraft minecraft) {
 		if (minecraft.player != null && FORCED_SELECTED_HOTBAR_SLOT > 0 && originalSelectedHotbarSlot >= 0 && originalSelectedHotbarSlot < 9) {
 			minecraft.player.getInventory().setSelectedSlot(originalSelectedHotbarSlot);
@@ -728,6 +761,8 @@ public final class DeterministicCameraCapture {
 		json.append("  \"performanceWarmupFrames\": ").append(PERFORMANCE_WARMUP_FRAMES).append(",\n");
 		json.append("  \"performanceMeasureFrames\": ").append(PERFORMANCE_MEASURE_FRAMES).append(",\n");
 		json.append("  \"performanceFrames\": ").append(performanceFrames).append(",\n");
+		appendBenchmarkFingerprint(json, currentDimension, initialPosition == null ? currentPosition : initialPosition).append(",\n");
+		appendField(json, "benchmarkFingerprintHash", benchmarkFingerprintHash(currentDimension, initialPosition == null ? currentPosition : initialPosition)).append(",\n");
 		json.append("  \"settledReadyFrames\": ").append(SETTLED_READY_FRAMES).append(",\n");
 		json.append("  \"settledReadyMaxWaitFrames\": ").append(SETTLED_READY_MAX_WAIT_FRAMES).append(",\n");
 		json.append("  \"settledReadyGateSatisfied\": ").append(settledReadyGateSatisfied).append(",\n");
@@ -825,7 +860,20 @@ public final class DeterministicCameraCapture {
 		json.append("  \"measureFramesRequested\": ").append(PERFORMANCE_MEASURE_FRAMES).append(",\n");
 		json.append("  \"warmupFramesRecorded\": ").append(Math.min(performanceFrames, PERFORMANCE_WARMUP_FRAMES)).append(",\n");
 		json.append("  \"measureFramesRecorded\": ").append(measuredFrames).append(",\n");
-		json.append("  \"totalFramesRecorded\": ").append(performanceFrames).append("\n");
+		json.append("  \"totalFramesRecorded\": ").append(performanceFrames).append(",\n");
+		appendBenchmarkFingerprint(
+			json,
+			level == null ? "missing" : level.dimension().location().toString(),
+			initialPosition == null ? (player == null ? Vec3.ZERO : player.position()) : initialPosition
+		).append(",\n");
+		appendField(
+			json,
+			"benchmarkFingerprintHash",
+			benchmarkFingerprintHash(
+				level == null ? "missing" : level.dimension().location().toString(),
+				initialPosition == null ? (player == null ? Vec3.ZERO : player.position()) : initialPosition
+			)
+		).append("\n");
 		json.append("}\n");
 		try {
 			Path parent = PERFORMANCE_STATUS_PATH.getParent();
@@ -861,6 +909,100 @@ public final class DeterministicCameraCapture {
 
 	private static String gitCommit() {
 		return System.getProperty("mattmc.dev.deterministicCameraCapture.gitCommit", "unknown");
+	}
+
+	private static StringBuilder appendBenchmarkFingerprint(StringBuilder json, String dimension, Vec3 benchmarkPosition) {
+		json.append("  \"benchmarkFingerprint\": {\n");
+		appendField(json, "schemaVersion", "1", 4).append(",\n");
+		appendField(json, "backend", activeBackend(), 4).append(",\n");
+		appendField(json, "shaderEnabled", shaderEnabled(), 4).append(",\n");
+		appendField(json, "shaderPack", shaderPack(), 4).append(",\n");
+		appendField(json, "resolution", windowWidth + "x" + windowHeight, 4).append(",\n");
+		appendField(json, "world", WORLD_NAME, 4).append(",\n");
+		appendField(json, "dimension", dimension, 4).append(",\n");
+		json.append("    \"distantHorizonsActive\": ").append(isDistantHorizonsActive()).append(",\n");
+		appendField(json, "cameraPath", CAMERA_PATH_ID, 4).append(",\n");
+		appendVec3(json, "position", benchmarkPosition, 4).append(",\n");
+		json.append("    \"yaw\": ").append(format(initialPose == null ? 0.0F : initialPose.yaw())).append(",\n");
+		json.append("    \"pitch\": ").append(format(initialPose == null ? 0.0F : initialPose.pitch())).append(",\n");
+		json.append("    \"yawDelta\": ").append(format(YAW_DELTA)).append(",\n");
+		json.append("    \"poseCount\": ").append(poses == null ? POSE_COUNT : poses.length).append(",\n");
+		json.append("    \"framesPerPose\": ").append(FRAMES_PER_POSE).append(",\n");
+		json.append("    \"warmupFrames\": ").append(PERFORMANCE_WARMUP_FRAMES).append(",\n");
+		json.append("    \"measureFrames\": ").append(PERFORMANCE_MEASURE_FRAMES).append(",\n");
+		json.append("    \"settledReadyFrames\": ").append(SETTLED_READY_FRAMES).append(",\n");
+		json.append("    \"settledReadyMaxWaitFrames\": ").append(SETTLED_READY_MAX_WAIT_FRAMES).append(",\n");
+		appendField(json, "settledReadyFamilies", String.join(",", SETTLED_READY_FAMILIES), 4).append(",\n");
+		appendField(json, "profilerFlags", profilerFlags(), 4).append(",\n");
+		appendField(json, "galContractVersion", VulkanicGalExecutionRequest.CONTRACT_VERSION, 4).append(",\n");
+		appendField(json, "galContractFingerprint", VulkanicGalExecutionRequest.contractSchemaFingerprint(), 4).append("\n");
+		json.append("  }");
+		return json;
+	}
+
+	private static String benchmarkFingerprintHash(String dimension, Vec3 benchmarkPosition) {
+		String canonical = "schemaVersion=1\n"
+			+ "backend=" + activeBackend() + "\n"
+			+ "shaderEnabled=" + shaderEnabled() + "\n"
+			+ "shaderPack=" + shaderPack() + "\n"
+			+ "resolution=" + windowWidth + "x" + windowHeight + "\n"
+			+ "world=" + WORLD_NAME + "\n"
+			+ "dimension=" + dimension + "\n"
+			+ "distantHorizonsActive=" + isDistantHorizonsActive() + "\n"
+			+ "cameraPath=" + CAMERA_PATH_ID + "\n"
+			+ "position=" + format(benchmarkPosition.x) + "," + format(benchmarkPosition.y) + "," + format(benchmarkPosition.z) + "\n"
+			+ "yaw=" + format(initialPose == null ? 0.0F : initialPose.yaw()) + "\n"
+			+ "pitch=" + format(initialPose == null ? 0.0F : initialPose.pitch()) + "\n"
+			+ "yawDelta=" + format(YAW_DELTA) + "\n"
+			+ "poseCount=" + (poses == null ? POSE_COUNT : poses.length) + "\n"
+			+ "framesPerPose=" + FRAMES_PER_POSE + "\n"
+			+ "warmupFrames=" + PERFORMANCE_WARMUP_FRAMES + "\n"
+			+ "measureFrames=" + PERFORMANCE_MEASURE_FRAMES + "\n"
+			+ "settledReadyFrames=" + SETTLED_READY_FRAMES + "\n"
+			+ "settledReadyMaxWaitFrames=" + SETTLED_READY_MAX_WAIT_FRAMES + "\n"
+			+ "settledReadyFamilies=" + String.join(",", SETTLED_READY_FAMILIES) + "\n"
+			+ "profilerFlags=" + profilerFlags() + "\n"
+			+ "galContractVersion=" + VulkanicGalExecutionRequest.CONTRACT_VERSION + "\n"
+			+ "galContractFingerprint=" + VulkanicGalExecutionRequest.contractSchemaFingerprint() + "\n";
+		return sha256Hex(canonical);
+	}
+
+	private static String profilerFlags() {
+		return "perfAudit=" + Boolean.getBoolean("mattmc.perfAudit")
+			+ ";vulkanPerfAudit=" + Boolean.getBoolean("mattmc.vulkan.perfAudit")
+			+ ";legacyGraphicsLowering=" + Boolean.getBoolean("mattmc.perfAudit.legacyGraphicsLowering")
+			+ ";resourcePlanBreakdown=" + Boolean.getBoolean("mattmc.perfAudit.resourcePlanBreakdown")
+			+ ";maxFrameSamples=" + Integer.getInteger("mattmc.perfAudit.maxFrameSamples", 4096);
+	}
+
+	private static boolean hasProperty(String key) {
+		return System.getProperty("mattmc.dev.deterministicCameraCapture." + key) != null;
+	}
+
+	private static double doubleProperty(String key, double fallback) {
+		String value = System.getProperty("mattmc.dev.deterministicCameraCapture." + key);
+		if (value == null || value.isBlank()) {
+			return fallback;
+		}
+		try {
+			return Double.parseDouble(value);
+		} catch (NumberFormatException exception) {
+			throw new IllegalArgumentException("Invalid deterministic camera capture numeric property " + key + "=" + value, exception);
+		}
+	}
+
+	private static String sha256Hex(String value) {
+		try {
+			MessageDigest digest = MessageDigest.getInstance("SHA-256");
+			byte[] bytes = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+			StringBuilder builder = new StringBuilder(bytes.length * 2);
+			for (byte b : bytes) {
+				builder.append(String.format(Locale.ROOT, "%02x", b & 0xFF));
+			}
+			return builder.toString();
+		} catch (NoSuchAlgorithmException exception) {
+			throw new IllegalStateException("SHA-256 is unavailable", exception);
+		}
 	}
 
 	private static StringBuilder appendField(StringBuilder json, String key, String value) {

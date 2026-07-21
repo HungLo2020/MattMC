@@ -82,7 +82,7 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
         Objects.requireNonNull(device, "device");
         Objects.requireNonNull(checkVk, "checkVk");
         try (MemoryStack stack = stackPush()) {
-            VkDescriptorPoolSize.Buffer poolSizes = VkDescriptorPoolSize.calloc(4, stack);
+            VkDescriptorPoolSize.Buffer poolSizes = VkDescriptorPoolSize.calloc(5, stack);
             poolSizes.get(0)
                 .type(VK10.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
                 .descriptorCount(DEFAULT_COMBINED_IMAGE_SAMPLER_DESCRIPTORS);
@@ -90,9 +90,12 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
                 .type(VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
                 .descriptorCount(DEFAULT_UNIFORM_BUFFER_DESCRIPTORS);
             poolSizes.get(2)
+                .type(VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
+                .descriptorCount(DEFAULT_UNIFORM_BUFFER_DESCRIPTORS);
+            poolSizes.get(3)
                 .type(VK10.VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER)
                 .descriptorCount(DEFAULT_UNIFORM_TEXEL_BUFFER_DESCRIPTORS);
-            poolSizes.get(3)
+            poolSizes.get(4)
                 .type(VK10.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
                 .descriptorCount(DEFAULT_STORAGE_IMAGE_DESCRIPTORS);
 
@@ -249,7 +252,7 @@ final class VulkanDescriptorManager<DescriptorUniformBuffer> {
                 DescriptorWriteBinding resolvedBinding = bindings.get(i);
                 switch (resolvedBinding.descriptorType()) {
                     case VK10.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER -> samplerWrites++;
-                    case VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER -> uniformBufferWrites++;
+                    case VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC -> uniformBufferWrites++;
                     case VK10.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE -> storageImageWrites++;
                     case VK10.VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER -> texelBufferWrites++;
                     default -> {

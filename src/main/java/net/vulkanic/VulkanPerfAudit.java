@@ -20,6 +20,10 @@ import java.util.concurrent.atomic.LongAdder;
 public final class VulkanPerfAudit {
     private static final boolean ENABLED = Boolean.getBoolean("mattmc.vulkan.perfAudit")
         || Boolean.getBoolean("mattmc.perfAudit");
+    private static final boolean LEGACY_GRAPHICS_LOWERING_ENABLED =
+        Boolean.getBoolean("mattmc.perfAudit.legacyGraphicsLowering");
+    private static final boolean RESOURCE_PLAN_BREAKDOWN_ENABLED =
+        Boolean.getBoolean("mattmc.perfAudit.resourcePlanBreakdown");
     private static final boolean DETERMINISTIC_PERFORMANCE_CAPTURE =
         Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.performanceMode");
     private static final long SNAPSHOT_INTERVAL_NANOS = 5_000_000_000L;
@@ -83,7 +87,34 @@ public final class VulkanPerfAudit {
     private static final LongAdder dynamicTransformsContentChangeCount = new LongAdder();
     private static final LongAdder dynamicTransformsContentReuseCount = new LongAdder();
     private static final AtomicLong dynamicTransformsDistinctContentCount = new AtomicLong();
+    private static final LongAdder dynamicTransformsArenaBufferAllocationCount = new LongAdder();
+    private static final LongAdder dynamicTransformsArenaGrowthCount = new LongAdder();
+    private static final LongAdder dynamicTransformsArenaUploadCount = new LongAdder();
+    private static final LongAdder dynamicTransformsArenaUploadBytes = new LongAdder();
+    private static final LongAdder dynamicTransformsArenaReservedBytes = new LongAdder();
+    private static final LongAdder dynamicTransformsArenaReuseHitCount = new LongAdder();
+    private static final AtomicLong dynamicTransformsArenaHighWaterBytes = new AtomicLong();
+    private static final AtomicLong dynamicTransformsArenaCapacityBytes = new AtomicLong();
+    private static final LongAdder standaloneUniformBindingCount = new LongAdder();
+    private static final LongAdder standaloneUniformHandleChangeCount = new LongAdder();
+    private static final LongAdder standaloneUniformOffsetChangeCount = new LongAdder();
+    private static final LongAdder standaloneUniformRangeChangeCount = new LongAdder();
+    private static final LongAdder standaloneUniformContentChangeCount = new LongAdder();
+    private static final LongAdder standaloneUniformContentReuseCount = new LongAdder();
+    private static final AtomicLong standaloneUniformDistinctContentCount = new AtomicLong();
+    private static final LongAdder standaloneUniformArenaBufferAllocationCount = new LongAdder();
+    private static final LongAdder standaloneUniformArenaGrowthCount = new LongAdder();
+    private static final LongAdder standaloneUniformArenaUploadCount = new LongAdder();
+    private static final LongAdder standaloneUniformArenaUploadBytes = new LongAdder();
+    private static final LongAdder standaloneUniformArenaReservedBytes = new LongAdder();
+    private static final LongAdder standaloneUniformArenaReuseHitCount = new LongAdder();
+    private static final LongAdder standaloneUniformSourceReuseCount = new LongAdder();
+    private static final AtomicLong standaloneUniformArenaHighWaterBytes = new AtomicLong();
+    private static final AtomicLong standaloneUniformArenaCapacityBytes = new AtomicLong();
     private static final Map<String, DescriptorCounters> descriptorPipelines = new ConcurrentHashMap<>();
+    private static final Map<String, StandaloneUniformCounters> standaloneUniformPipelines = new ConcurrentHashMap<>();
+    private static final Map<String, LegacyGraphicsLoweringCounters> legacyGraphicsLoweringFamilies = new ConcurrentHashMap<>();
+    private static final Map<String, LongAdder> legacyGraphicsLoweringCacheInvalidationReasons = new ConcurrentHashMap<>();
     private static final LongAdder bindingBuildCount = new LongAdder();
     private static final LongAdder bindingBuildTotalNanos = new LongAdder();
     private static final LongAdder bindingBuildCompleteCoverageCount = new LongAdder();
@@ -92,6 +123,9 @@ public final class VulkanPerfAudit {
     private static final LongAdder deterministicMeasuredFrameCount = new LongAdder();
     private static final LongAdder deterministicMeasuredFrameTotalNanos = new LongAdder();
     private static final LongAdder graphicsDrawCount = new LongAdder();
+    private static final LongAdder galV2GraphicsDrawCount = new LongAdder();
+    private static final LongAdder galV2LegacyFallbackDrawCount = new LongAdder();
+    private static final Map<String, LongAdder> galV2FallbackReasons = new ConcurrentHashMap<>();
     private static final LongAdder computeDispatchCount = new LongAdder();
     private static final LongAdder clearCount = new LongAdder();
     private static final LongAdder transferCount = new LongAdder();
@@ -107,6 +141,8 @@ public final class VulkanPerfAudit {
     private static volatile boolean deterministicMeasurementFrameActive;
     private static volatile DynamicTransformsSample lastDynamicTransformsSample;
     private static final Map<Long, Boolean> dynamicTransformsContentHashes = new ConcurrentHashMap<>();
+    private static final Map<String, UniformBindingSample> lastStandaloneUniformSampleByPipeline = new ConcurrentHashMap<>();
+    private static final Map<Long, Boolean> standaloneUniformContentHashes = new ConcurrentHashMap<>();
     private static final Path reportFile = initReportFile();
 
     static {
@@ -120,6 +156,14 @@ public final class VulkanPerfAudit {
 
     public static boolean isEnabled() {
         return ENABLED && reportFile != null;
+    }
+
+    public static boolean shouldTraceLegacyGraphicsLowering() {
+        return descriptorEventsEnabled() && LEGACY_GRAPHICS_LOWERING_ENABLED;
+    }
+
+    public static boolean shouldTraceResourcePlanBreakdown() {
+        return shouldTraceLegacyGraphicsLowering() && RESOURCE_PLAN_BREAKDOWN_ENABLED;
     }
 
     public static void setDeterministicMeasurementFrameActive(boolean active) {
@@ -343,6 +387,186 @@ public final class VulkanPerfAudit {
         lastDynamicTransformsSample = new DynamicTransformsSample(bufferHandle, offset, range, contentHash);
     }
 
+    public static void recordDynamicTransformsArenaBufferAllocation(int capacityBytes, boolean growth) {
+        if (!isEnabled()) {
+            return;
+        }
+        dynamicTransformsArenaBufferAllocationCount.increment();
+        if (growth) {
+            dynamicTransformsArenaGrowthCount.increment();
+        }
+        updateMax(dynamicTransformsArenaCapacityBytes, Math.max(0, capacityBytes));
+    }
+
+    public static void recordDynamicTransformsArenaAllocation(
+        boolean reused,
+        int reservedBytes,
+        int writtenBytes,
+        int frameHighWaterBytes,
+        int frameCapacityBytes
+    ) {
+        if (!descriptorEventsEnabled()) {
+            return;
+        }
+        dynamicTransformsArenaReservedBytes.add(Math.max(0, reservedBytes));
+        if (reused) {
+            dynamicTransformsArenaReuseHitCount.increment();
+        }
+        if (writtenBytes > 0) {
+            dynamicTransformsArenaUploadCount.increment();
+            dynamicTransformsArenaUploadBytes.add(writtenBytes);
+        }
+        updateMax(dynamicTransformsArenaHighWaterBytes, Math.max(0, frameHighWaterBytes));
+        updateMax(dynamicTransformsArenaCapacityBytes, Math.max(0, frameCapacityBytes));
+    }
+
+    public static void recordStandaloneUniformBinding(
+        String pipelineLocation,
+        String bindingName,
+        long bufferHandle,
+        long offset,
+        long range,
+        long contentHash
+    ) {
+        if (!descriptorEventsEnabled()) {
+            return;
+        }
+        String pipeline = descriptorFamily(pipelineLocation);
+        StandaloneUniformCounters counters =
+            standaloneUniformPipelines.computeIfAbsent(pipeline, ignored -> new StandaloneUniformCounters());
+        standaloneUniformBindingCount.increment();
+        counters.bindingCount.increment();
+
+        String key = pipeline + "|" + normalizeKey(bindingName, "unknown");
+        UniformBindingSample previous = lastStandaloneUniformSampleByPipeline.get(key);
+        if (previous != null) {
+            if (previous.bufferHandle() != bufferHandle) {
+                standaloneUniformHandleChangeCount.increment();
+                counters.handleChangeCount.increment();
+            }
+            if (previous.offset() != offset) {
+                standaloneUniformOffsetChangeCount.increment();
+                counters.offsetChangeCount.increment();
+            }
+            if (previous.range() != range) {
+                standaloneUniformRangeChangeCount.increment();
+                counters.rangeChangeCount.increment();
+            }
+            if (previous.contentHash() != contentHash) {
+                standaloneUniformContentChangeCount.increment();
+                counters.contentChangeCount.increment();
+            } else {
+                standaloneUniformContentReuseCount.increment();
+                counters.contentReuseCount.increment();
+            }
+        }
+        if (standaloneUniformContentHashes.size() < 8192) {
+            standaloneUniformContentHashes.putIfAbsent(contentHash, Boolean.TRUE);
+            standaloneUniformDistinctContentCount.set(standaloneUniformContentHashes.size());
+        }
+        lastStandaloneUniformSampleByPipeline.put(key, new UniformBindingSample(bufferHandle, offset, range, contentHash));
+    }
+
+    public static void recordStandaloneUniformArenaBufferAllocation(int capacityBytes, boolean growth) {
+        if (!isEnabled()) {
+            return;
+        }
+        standaloneUniformArenaBufferAllocationCount.increment();
+        if (growth) {
+            standaloneUniformArenaGrowthCount.increment();
+        }
+        updateMax(standaloneUniformArenaCapacityBytes, Math.max(0, capacityBytes));
+    }
+
+    public static void recordStandaloneUniformArenaAllocation(
+        String pipelineLocation,
+        boolean reused,
+        int reservedBytes,
+        int writtenBytes,
+        int frameHighWaterBytes,
+        int frameCapacityBytes
+    ) {
+        if (!descriptorEventsEnabled()) {
+            return;
+        }
+        StandaloneUniformCounters counters = standaloneUniformPipelines.computeIfAbsent(
+            descriptorFamily(pipelineLocation),
+            ignored -> new StandaloneUniformCounters()
+        );
+        int clampedReserved = Math.max(0, reservedBytes);
+        int clampedWritten = Math.max(0, writtenBytes);
+        standaloneUniformArenaReservedBytes.add(clampedReserved);
+        counters.reservedBytes.add(clampedReserved);
+        if (reused) {
+            standaloneUniformArenaReuseHitCount.increment();
+            counters.reuseHitCount.increment();
+        }
+        if (clampedWritten > 0) {
+            standaloneUniformArenaUploadCount.increment();
+            standaloneUniformArenaUploadBytes.add(clampedWritten);
+            counters.uploadCount.increment();
+            counters.uploadBytes.add(clampedWritten);
+        }
+        updateMax(standaloneUniformArenaHighWaterBytes, Math.max(0, frameHighWaterBytes));
+        updateMax(standaloneUniformArenaCapacityBytes, Math.max(0, frameCapacityBytes));
+    }
+
+    public static void recordStandaloneUniformSourceReuse(String pipelineLocation) {
+        if (!descriptorEventsEnabled()) {
+            return;
+        }
+        standaloneUniformSourceReuseCount.increment();
+        standaloneUniformPipelines.computeIfAbsent(
+            descriptorFamily(pipelineLocation),
+            ignored -> new StandaloneUniformCounters()
+        ).sourceReuseCount.increment();
+    }
+
+    public static void recordLegacyGraphicsLoweringStep(String pipelineLocation, String step, long nanos) {
+        if (!shouldTraceLegacyGraphicsLowering()) {
+            return;
+        }
+        legacyGraphicsLoweringCounters(pipelineLocation).step(normalizeKey(step, "unknown")).add(Math.max(0L, nanos));
+    }
+
+    public static void recordLegacyGraphicsLoweringCacheLookup(
+        String pipelineLocation,
+        String artifact,
+        boolean hit,
+        int cacheSize,
+        int highWater
+    ) {
+        if (!shouldTraceLegacyGraphicsLowering()) {
+            return;
+        }
+        legacyGraphicsLoweringCounters(pipelineLocation)
+            .cache(normalizeKey(artifact, "unknown"))
+            .record(hit, cacheSize, highWater);
+    }
+
+    public static void recordLegacyGraphicsLoweringCacheInvalidation(String reason, int removedEntries) {
+        if (!shouldTraceLegacyGraphicsLowering()) {
+            return;
+        }
+        legacyGraphicsLoweringCacheInvalidationReasons
+            .computeIfAbsent(normalizeKey(reason, "unknown"), ignored -> new LongAdder())
+            .add(Math.max(1, removedEntries));
+    }
+
+    public static void recordLegacyGraphicsLoweringAllocation(
+        String pipelineLocation,
+        String structure,
+        long objectCount,
+        long estimatedBytes
+    ) {
+        if (!shouldTraceLegacyGraphicsLowering()) {
+            return;
+        }
+        legacyGraphicsLoweringCounters(pipelineLocation)
+            .allocation(normalizeKey(structure, "unknown"))
+            .record(objectCount, estimatedBytes);
+    }
+
     public static void recordDescriptorCacheLookup(String pipelineLocation, boolean cacheable, boolean hit) {
         if (!descriptorEventsEnabled() || !cacheable) {
             return;
@@ -506,6 +730,25 @@ public final class VulkanPerfAudit {
         }
     }
 
+    public static void recordGalV2GraphicsDraw(boolean explicitV2) {
+        if (!isEnabled()) {
+            return;
+        }
+        if (explicitV2) {
+            galV2GraphicsDrawCount.increment();
+        } else {
+            galV2LegacyFallbackDrawCount.increment();
+        }
+    }
+
+    public static void recordGalV2FallbackReason(String reason) {
+        if (!isEnabled()) {
+            return;
+        }
+        String normalized = reason == null || reason.isBlank() ? "unknown" : reason;
+        galV2FallbackReasons.computeIfAbsent(normalized, ignored -> new LongAdder()).increment();
+    }
+
     public static void recordComputeDispatch() {
         if (isEnabled()) {
             computeDispatchCount.increment();
@@ -605,6 +848,9 @@ public final class VulkanPerfAudit {
         builder.append("deterministic_measured_frame_p99_ms=").append(format(nanosToMillis(frameStats.p99Nanos()))).append('\n');
         builder.append("deterministic_measured_frame_worst_ms=").append(format(nanosToMillis(frameStats.worstNanos()))).append('\n');
         builder.append("graphics_draw_count=").append(graphicsDrawCount.sum()).append('\n');
+        builder.append("gal_v2_graphics_draw_count=").append(galV2GraphicsDrawCount.sum()).append('\n');
+        builder.append("gal_v2_legacy_fallback_draw_count=").append(galV2LegacyFallbackDrawCount.sum()).append('\n');
+        appendLongAdderMap(builder, "gal_v2_fallback_reason", galV2FallbackReasons);
         builder.append("compute_dispatch_count=").append(computeDispatchCount.sum()).append('\n');
         builder.append("clear_count=").append(clearCount.sum()).append('\n');
         builder.append("transfer_count=").append(transferCount.sum()).append('\n');
@@ -632,6 +878,7 @@ public final class VulkanPerfAudit {
         builder.append("java_heap_committed_bytes=").append(runtime.totalMemory()).append('\n');
         builder.append("java_heap_max_bytes=").append(runtime.maxMemory()).append('\n');
         appendSubmitSummary(builder, presentedFrames);
+        appendLegacyGraphicsLoweringSummary(builder, presentedFrames);
         appendPhaseSummary(builder);
         return builder.toString();
     }
@@ -669,6 +916,22 @@ public final class VulkanPerfAudit {
 
     private static String format(double value) {
         return String.format(Locale.ROOT, "%.4f", value);
+    }
+
+    private static void appendLongAdderMap(StringBuilder builder, String prefix, Map<String, LongAdder> values) {
+        if (values.isEmpty()) {
+            return;
+        }
+        ArrayList<Map.Entry<String, LongAdder>> entries = new ArrayList<>(values.entrySet());
+        entries.sort(Map.Entry.comparingByKey());
+        for (Map.Entry<String, LongAdder> entry : entries) {
+            builder.append(prefix)
+                .append('.')
+                .append(normalizeKey(entry.getKey(), "unknown"))
+                .append('=')
+                .append(entry.getValue().sum())
+                .append('\n');
+        }
     }
 
     private static String normalizeKey(String value, String fallback) {
@@ -866,6 +1129,30 @@ public final class VulkanPerfAudit {
         builder.append("dynamic_transforms_content_change_count=").append(dynamicTransformsContentChangeCount.sum()).append('\n');
         builder.append("dynamic_transforms_content_reuse_count=").append(dynamicTransformsContentReuseCount.sum()).append('\n');
         builder.append("dynamic_transforms_distinct_content_count=").append(dynamicTransformsDistinctContentCount.get()).append('\n');
+        builder.append("dynamic_transforms_arena_buffer_allocation_count=").append(dynamicTransformsArenaBufferAllocationCount.sum()).append('\n');
+        builder.append("dynamic_transforms_arena_growth_count=").append(dynamicTransformsArenaGrowthCount.sum()).append('\n');
+        builder.append("dynamic_transforms_arena_upload_count=").append(dynamicTransformsArenaUploadCount.sum()).append('\n');
+        builder.append("dynamic_transforms_arena_upload_bytes=").append(dynamicTransformsArenaUploadBytes.sum()).append('\n');
+        builder.append("dynamic_transforms_arena_reserved_bytes=").append(dynamicTransformsArenaReservedBytes.sum()).append('\n');
+        builder.append("dynamic_transforms_arena_reuse_hit_count=").append(dynamicTransformsArenaReuseHitCount.sum()).append('\n');
+        builder.append("dynamic_transforms_arena_high_water_bytes=").append(dynamicTransformsArenaHighWaterBytes.get()).append('\n');
+        builder.append("dynamic_transforms_arena_capacity_bytes=").append(dynamicTransformsArenaCapacityBytes.get()).append('\n');
+        builder.append("standalone_uniform_binding_count=").append(standaloneUniformBindingCount.sum()).append('\n');
+        builder.append("standalone_uniform_handle_change_count=").append(standaloneUniformHandleChangeCount.sum()).append('\n');
+        builder.append("standalone_uniform_offset_change_count=").append(standaloneUniformOffsetChangeCount.sum()).append('\n');
+        builder.append("standalone_uniform_range_change_count=").append(standaloneUniformRangeChangeCount.sum()).append('\n');
+        builder.append("standalone_uniform_content_change_count=").append(standaloneUniformContentChangeCount.sum()).append('\n');
+        builder.append("standalone_uniform_content_reuse_count=").append(standaloneUniformContentReuseCount.sum()).append('\n');
+        builder.append("standalone_uniform_distinct_content_count=").append(standaloneUniformDistinctContentCount.get()).append('\n');
+        builder.append("standalone_uniform_arena_buffer_allocation_count=").append(standaloneUniformArenaBufferAllocationCount.sum()).append('\n');
+        builder.append("standalone_uniform_arena_growth_count=").append(standaloneUniformArenaGrowthCount.sum()).append('\n');
+        builder.append("standalone_uniform_arena_upload_count=").append(standaloneUniformArenaUploadCount.sum()).append('\n');
+        builder.append("standalone_uniform_arena_upload_bytes=").append(standaloneUniformArenaUploadBytes.sum()).append('\n');
+        builder.append("standalone_uniform_arena_reserved_bytes=").append(standaloneUniformArenaReservedBytes.sum()).append('\n');
+        builder.append("standalone_uniform_arena_reuse_hit_count=").append(standaloneUniformArenaReuseHitCount.sum()).append('\n');
+        builder.append("standalone_uniform_source_reuse_count=").append(standaloneUniformSourceReuseCount.sum()).append('\n');
+        builder.append("standalone_uniform_arena_high_water_bytes=").append(standaloneUniformArenaHighWaterBytes.get()).append('\n');
+        builder.append("standalone_uniform_arena_capacity_bytes=").append(standaloneUniformArenaCapacityBytes.get()).append('\n');
         builder.append("descriptor_plans_per_measured_frame=").append(format(planCount / measuredFrames)).append('\n');
         builder.append("descriptor_sets_allocated_per_measured_frame=").append(format(descriptorSetAllocationCount.sum() / measuredFrames)).append('\n');
         builder.append("descriptor_sets_updated_per_measured_frame=").append(format(descriptorSetUpdateCount.sum() / measuredFrames)).append('\n');
@@ -924,10 +1211,43 @@ public final class VulkanPerfAudit {
                 .append('\n');
             rank++;
         }
+
+        List<Map.Entry<String, StandaloneUniformCounters>> standaloneEntries =
+            new ArrayList<>(standaloneUniformPipelines.entrySet());
+        standaloneEntries.sort((left, right) -> Long.compare(right.getValue().totalWeight(), left.getValue().totalWeight()));
+        int standaloneRank = 1;
+        for (Map.Entry<String, StandaloneUniformCounters> entry : standaloneEntries) {
+            if (standaloneRank > 12) {
+                break;
+            }
+            StandaloneUniformCounters counters = entry.getValue();
+            builder.append("standalone_uniform_pipeline_rank_").append(standaloneRank)
+                .append('=').append(entry.getKey())
+                .append("|bindings=").append(counters.bindingCount.sum())
+                .append("|handleChanges=").append(counters.handleChangeCount.sum())
+                .append("|offsetChanges=").append(counters.offsetChangeCount.sum())
+                .append("|rangeChanges=").append(counters.rangeChangeCount.sum())
+                .append("|contentChanges=").append(counters.contentChangeCount.sum())
+                .append("|contentReuse=").append(counters.contentReuseCount.sum())
+                .append("|uploads=").append(counters.uploadCount.sum())
+                .append("|uploadBytes=").append(counters.uploadBytes.sum())
+                .append("|reuseHits=").append(counters.reuseHitCount.sum())
+                .append("|sourceReuse=").append(counters.sourceReuseCount.sum())
+                .append("|reservedBytes=").append(counters.reservedBytes.sum())
+                .append('\n');
+            standaloneRank++;
+        }
     }
 
     private static DescriptorCounters descriptorCounters(String pipelineLocation) {
         return descriptorPipelines.computeIfAbsent(descriptorFamily(pipelineLocation), ignored -> new DescriptorCounters());
+    }
+
+    private static LegacyGraphicsLoweringCounters legacyGraphicsLoweringCounters(String pipelineLocation) {
+        return legacyGraphicsLoweringFamilies.computeIfAbsent(
+            descriptorFamily(pipelineLocation),
+            ignored -> new LegacyGraphicsLoweringCounters()
+        );
     }
 
     private static String descriptorFamily(String pipelineLocation) {
@@ -956,6 +1276,96 @@ public final class VulkanPerfAudit {
         return key;
     }
 
+    private static void appendLegacyGraphicsLoweringSummary(StringBuilder builder, double presentedFrames) {
+        List<Map.Entry<String, LegacyGraphicsLoweringCounters>> entries =
+            new ArrayList<>(legacyGraphicsLoweringFamilies.entrySet());
+        entries.sort((left, right) -> Long.compare(right.getValue().totalWeight(), left.getValue().totalWeight()));
+        int rank = 1;
+        for (Map.Entry<String, LegacyGraphicsLoweringCounters> entry : entries) {
+            if (rank > 20) {
+                break;
+            }
+            LegacyGraphicsLoweringCounters counters = entry.getValue();
+            String prefix = "legacy_graphics_lowering_rank_" + rank;
+            builder.append(prefix).append('=').append(entry.getKey())
+                .append("|steps=").append(counters.stepCount())
+                .append("|totalMs=").append(format(nanosToMillis(counters.stepNanos())))
+                .append("|perPresentedFrameMs=").append(format(nanosToMillis(counters.stepNanos()) / presentedFrames))
+                .append('\n');
+
+            List<Map.Entry<String, PhaseCounters>> steps = new ArrayList<>(counters.steps.entrySet());
+            steps.sort((left, right) -> Long.compare(right.getValue().totalNanos.sum(), left.getValue().totalNanos.sum()));
+            int stepRank = 1;
+            for (Map.Entry<String, PhaseCounters> step : steps) {
+                if (stepRank > 24) {
+                    break;
+                }
+                PhaseCounters stepCounters = step.getValue();
+                builder.append(prefix).append(".step_rank_").append(stepRank)
+                    .append('=').append(step.getKey())
+                    .append("|count=").append(stepCounters.count.sum())
+                    .append("|ms=").append(format(nanosToMillis(stepCounters.totalNanos.sum())))
+                    .append('\n');
+                stepRank++;
+            }
+
+            List<Map.Entry<String, LoweringCacheCounters>> caches = new ArrayList<>(counters.caches.entrySet());
+            caches.sort((left, right) -> Long.compare(right.getValue().lookupCount.sum(), left.getValue().lookupCount.sum()));
+            int cacheRank = 1;
+            for (Map.Entry<String, LoweringCacheCounters> cache : caches) {
+                if (cacheRank > 8) {
+                    break;
+                }
+                LoweringCacheCounters cacheCounters = cache.getValue();
+                long lookups = cacheCounters.lookupCount.sum();
+                builder.append(prefix).append(".cache_rank_").append(cacheRank)
+                    .append('=').append(cache.getKey())
+                    .append("|lookups=").append(lookups)
+                    .append("|hits=").append(cacheCounters.hitCount.sum())
+                    .append("|misses=").append(cacheCounters.missCount.sum())
+                    .append("|hitRatePct=").append(format(percent(cacheCounters.hitCount.sum(), Math.max(1.0, lookups))))
+                    .append("|size=").append(cacheCounters.cacheSize.get())
+                    .append("|highWater=").append(cacheCounters.highWater.get())
+                    .append('\n');
+                cacheRank++;
+            }
+
+            List<Map.Entry<String, LoweringAllocationCounters>> allocations =
+                new ArrayList<>(counters.allocations.entrySet());
+            allocations.sort((left, right) -> Long.compare(right.getValue().estimatedBytes.sum(), left.getValue().estimatedBytes.sum()));
+            int allocationRank = 1;
+            for (Map.Entry<String, LoweringAllocationCounters> allocation : allocations) {
+                if (allocationRank > 12) {
+                    break;
+                }
+                LoweringAllocationCounters allocationCounters = allocation.getValue();
+                builder.append(prefix).append(".allocation_rank_").append(allocationRank)
+                    .append('=').append(allocation.getKey())
+                    .append("|events=").append(allocationCounters.eventCount.sum())
+                    .append("|objects=").append(allocationCounters.objectCount.sum())
+                    .append("|estimatedBytes=").append(allocationCounters.estimatedBytes.sum())
+                    .append('\n');
+                allocationRank++;
+            }
+            rank++;
+        }
+
+        List<Map.Entry<String, LongAdder>> invalidations =
+            new ArrayList<>(legacyGraphicsLoweringCacheInvalidationReasons.entrySet());
+        invalidations.sort((left, right) -> Long.compare(right.getValue().sum(), left.getValue().sum()));
+        int invalidationRank = 1;
+        for (Map.Entry<String, LongAdder> invalidation : invalidations) {
+            if (invalidationRank > 8) {
+                break;
+            }
+            builder.append("legacy_graphics_lowering_invalidation_rank_").append(invalidationRank)
+                .append('=').append(invalidation.getKey())
+                .append("|removed=").append(invalidation.getValue().sum())
+                .append('\n');
+            invalidationRank++;
+        }
+    }
+
     private static long gcCollectionCount() {
         long total = 0L;
         for (GarbageCollectorMXBean bean : ManagementFactory.getGarbageCollectorMXBeans()) {
@@ -978,7 +1388,17 @@ public final class VulkanPerfAudit {
         return total;
     }
 
+    private static void updateMax(AtomicLong target, long value) {
+        long current = target.get();
+        while (value > current && !target.compareAndSet(current, value)) {
+            current = target.get();
+        }
+    }
+
     private record DynamicTransformsSample(long bufferHandle, long offset, long range, long contentHash) {
+    }
+
+    private record UniformBindingSample(long bufferHandle, long offset, long range, long contentHash) {
     }
 
     private static final class PhaseCounters {
@@ -1092,6 +1512,97 @@ public final class VulkanPerfAudit {
                 }
             }
             return dominantReason;
+        }
+    }
+
+    private static final class StandaloneUniformCounters {
+        private final LongAdder bindingCount = new LongAdder();
+        private final LongAdder handleChangeCount = new LongAdder();
+        private final LongAdder offsetChangeCount = new LongAdder();
+        private final LongAdder rangeChangeCount = new LongAdder();
+        private final LongAdder contentChangeCount = new LongAdder();
+        private final LongAdder contentReuseCount = new LongAdder();
+        private final LongAdder uploadCount = new LongAdder();
+        private final LongAdder uploadBytes = new LongAdder();
+        private final LongAdder reuseHitCount = new LongAdder();
+        private final LongAdder sourceReuseCount = new LongAdder();
+        private final LongAdder reservedBytes = new LongAdder();
+
+        private long totalWeight() {
+            return bindingCount.sum() + uploadCount.sum() + reuseHitCount.sum() + sourceReuseCount.sum();
+        }
+    }
+
+    private static final class LegacyGraphicsLoweringCounters {
+        private final Map<String, PhaseCounters> steps = new ConcurrentHashMap<>();
+        private final Map<String, LoweringCacheCounters> caches = new ConcurrentHashMap<>();
+        private final Map<String, LoweringAllocationCounters> allocations = new ConcurrentHashMap<>();
+
+        private PhaseCounters step(String name) {
+            return steps.computeIfAbsent(name, ignored -> new PhaseCounters());
+        }
+
+        private LoweringCacheCounters cache(String name) {
+            return caches.computeIfAbsent(name, ignored -> new LoweringCacheCounters());
+        }
+
+        private LoweringAllocationCounters allocation(String name) {
+            return allocations.computeIfAbsent(name, ignored -> new LoweringAllocationCounters());
+        }
+
+        private long stepCount() {
+            long total = 0L;
+            for (PhaseCounters counters : steps.values()) {
+                total += counters.count.sum();
+            }
+            return total;
+        }
+
+        private long stepNanos() {
+            long total = 0L;
+            for (PhaseCounters counters : steps.values()) {
+                total += counters.totalNanos.sum();
+            }
+            return total;
+        }
+
+        private long totalWeight() {
+            long total = stepCount();
+            for (LoweringCacheCounters counters : caches.values()) {
+                total += counters.lookupCount.sum();
+            }
+            return total;
+        }
+    }
+
+    private static final class LoweringCacheCounters {
+        private final LongAdder lookupCount = new LongAdder();
+        private final LongAdder hitCount = new LongAdder();
+        private final LongAdder missCount = new LongAdder();
+        private final AtomicLong cacheSize = new AtomicLong();
+        private final AtomicLong highWater = new AtomicLong();
+
+        private void record(boolean hit, int size, int highWater) {
+            lookupCount.increment();
+            if (hit) {
+                hitCount.increment();
+            } else {
+                missCount.increment();
+            }
+            cacheSize.set(Math.max(0, size));
+            updateMax(this.highWater, Math.max(0, highWater));
+        }
+    }
+
+    private static final class LoweringAllocationCounters {
+        private final LongAdder eventCount = new LongAdder();
+        private final LongAdder objectCount = new LongAdder();
+        private final LongAdder estimatedBytes = new LongAdder();
+
+        private void record(long objects, long bytes) {
+            eventCount.increment();
+            objectCount.add(Math.max(0L, objects));
+            estimatedBytes.add(Math.max(0L, bytes));
         }
     }
 

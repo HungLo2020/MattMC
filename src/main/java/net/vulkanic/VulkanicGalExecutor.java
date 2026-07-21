@@ -15,6 +15,13 @@ public interface VulkanicGalExecutor {
         return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), "backend does not implement typed graphics draw execution");
     }
 
+    default VulkanicGalExecutionRequest.ExecutionResult executeGraphicsDrawV2(
+        CommandContext ctx,
+        VulkanicGalV2.ExplicitGraphicsDrawRequest request
+    ) {
+        return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), "backend does not implement explicit GAL v2 graphics draw execution");
+    }
+
     default VulkanicGalExecutionRequest.ExecutionResult executeComputeDispatch(
         CommandContext ctx,
         VulkanicGalExecutionRequest.ComputeDispatchRequest request

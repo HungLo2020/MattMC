@@ -19,6 +19,19 @@ final class VulkanDescriptorResourceClassifier {
         };
     }
 
+    static int toVkDescriptorType(PipelineDescriptor.ResourceBinding binding) {
+        if (binding.type() == PipelineDescriptor.ResourceType.UNIFORM_BUFFER
+            && isDynamicUniformBufferBinding(binding.name())) {
+            return VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+        }
+        return toVkDescriptorType(binding.type());
+    }
+
+    static boolean isDynamicUniformBufferBinding(String name) {
+        return "DynamicTransforms".equals(name)
+            || "VulkanicStandaloneUniforms".equals(name);
+    }
+
     static int toVkShaderStageFlags(Set<VulkanicShaderStage> stages) {
         int flags = 0;
         for (VulkanicShaderStage stage : stages) {

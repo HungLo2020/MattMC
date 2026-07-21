@@ -45,10 +45,10 @@ public final class PipelineResourceBindings {
         boolean adoptResolvedBindings
     ) {
         if (adoptResolvedBindings) {
-            this.samplerBindings = Collections.unmodifiableMap(Objects.requireNonNull(samplerBindings, "samplerBindings must not be null"));
-            this.uniformBufferBindings = Collections.unmodifiableMap(Objects.requireNonNull(uniformBufferBindings, "uniformBufferBindings must not be null"));
-            this.storageImageBindings = Collections.unmodifiableMap(Objects.requireNonNull(storageImageBindings, "storageImageBindings must not be null"));
-            this.texelBufferBindings = Collections.unmodifiableMap(Objects.requireNonNull(texelBufferBindings, "texelBufferBindings must not be null"));
+            this.samplerBindings = immutableAdoptedMap(samplerBindings, "samplerBindings");
+            this.uniformBufferBindings = immutableAdoptedMap(uniformBufferBindings, "uniformBufferBindings");
+            this.storageImageBindings = immutableAdoptedMap(storageImageBindings, "storageImageBindings");
+            this.texelBufferBindings = immutableAdoptedMap(texelBufferBindings, "texelBufferBindings");
             return;
         }
 
@@ -56,6 +56,11 @@ public final class PipelineResourceBindings {
         this.uniformBufferBindings = Map.copyOf(uniformBufferBindings);
         this.storageImageBindings = Map.copyOf(storageImageBindings);
         this.texelBufferBindings = Map.copyOf(texelBufferBindings);
+    }
+
+    private static <K, V> Map<K, V> immutableAdoptedMap(Map<K, V> map, String name) {
+        Objects.requireNonNull(map, name + " must not be null");
+        return map.isEmpty() ? Map.of() : Collections.unmodifiableMap(map);
     }
 
     public static Builder builder() {

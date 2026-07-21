@@ -58,7 +58,7 @@ final class VulkanDescriptorSetLayoutPlanner {
     }
 
     private static DescriptorLayoutBindingPlan bindingPlan(PipelineDescriptor.ResourceBinding binding) {
-        int descriptorType = VulkanDescriptorResourceClassifier.toVkDescriptorType(binding.type());
+        int descriptorType = VulkanDescriptorResourceClassifier.toVkDescriptorType(binding);
         int stageFlags = VulkanDescriptorResourceClassifier.toVkShaderStageFlags(binding.stages());
         return new DescriptorLayoutBindingPlan(
             binding.name(),

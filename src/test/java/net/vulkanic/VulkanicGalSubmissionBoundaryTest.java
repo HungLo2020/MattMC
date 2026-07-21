@@ -365,13 +365,18 @@ final class VulkanicGalSubmissionBoundaryTest {
         String backendContract = Files.readString(PROJECT_ROOT.resolve("src/main/java/net/vulkanic/GraphicsBackend.java"));
 
         assertTrue(backendContract.contains("extends VulkanicGalExecutor"));
+        assertTrue(backendContract.contains("executeGraphicsDrawV2(")
+                || Files.readString(PROJECT_ROOT.resolve("src/main/java/net/vulkanic/VulkanicGalExecutor.java"))
+                    .contains("executeGraphicsDrawV2("));
         assertTrue(vulkanSource.contains("public VulkanicGalExecutionRequest.ExecutionResult executeGraphicsDraw("));
+        assertTrue(vulkanSource.contains("public VulkanicGalExecutionRequest.ExecutionResult executeGraphicsDrawV2("));
         assertTrue(vulkanSource.contains("public VulkanicGalExecutionRequest.ExecutionResult executeComputeDispatch("));
         assertTrue(vulkanSource.contains("public VulkanicGalExecutionRequest.ExecutionResult executeClear("));
         assertTrue(vulkanSource.contains("public VulkanicGalExecutionRequest.ExecutionResult executeTransfer("));
         assertTrue(vulkanSource.contains("public net.vulkanic.VulkanicRenderPass executeRenderPassBegin("));
         assertTrue(vulkanSource.contains("public VulkanicGalExecutionRequest.ExecutionResult executeRenderPassEnd("));
         assertTrue(openglSource.contains("public VulkanicGalExecutionRequest.ExecutionResult executeGraphicsDraw("));
+        assertTrue(openglSource.contains("public VulkanicGalExecutionRequest.ExecutionResult executeGraphicsDrawV2("));
         assertTrue(openglSource.contains("public VulkanicGalExecutionRequest.ExecutionResult executeComputeDispatch("));
         assertTrue(openglSource.contains("public VulkanicGalExecutionRequest.ExecutionResult executeClear("));
         assertTrue(openglSource.contains("public VulkanicGalExecutionRequest.ExecutionResult executeTransfer("));
@@ -384,6 +389,168 @@ final class VulkanicGalSubmissionBoundaryTest {
         assertTrue(openglSource.contains("case VulkanicGalExecutionRequest.ClearNamedFramebufferFloat o -> clearNamedFramebufferfv("));
         assertTrue(vulkanSource.contains("spine.executeRenderPassDraw("));
         assertTrue(vulkanSource.contains("spine.executeRenderPassEnd("));
+    }
+
+    @Test
+    void galV2HasSeparateVersionedContractFingerprint() {
+        assertEquals("2.0.0", VulkanicGalV2.CONTRACT_VERSION);
+        assertTrue(VulkanicGalV2.contractSchema().startsWith("vulkanic-gal-v2-contract 2.0.0"));
+        assertEquals(VulkanicGalV2.contractSchemaFingerprint(), VulkanicGalV2.contractSchemaFingerprint());
+        assertFalse(VulkanicGalV2.contractSchemaFingerprint().equals(VulkanicGalExecutionRequest.contractSchemaFingerprint()));
+    }
+
+    @Test
+    void hotLegacyProgramDrawsProduceStableExplicitV2Objects() {
+        VulkanicGalV2.clearForTests();
+        VulkanicCompatibilityState state = new VulkanicCompatibilityState();
+        state.bindProgram(11);
+        state.setUniformInt(3, 7);
+
+        VulkanicGalExecutionRequest.GraphicsDrawRequest draft =
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
+                "drawArrays",
+                VulkanicPrimitiveMode.TRIANGLES,
+                0,
+                6,
+                1
+            );
+        VulkanicGalExecutionRequest.GraphicsDrawRequest first =
+            VulkanicGalSnapshotBuilder.captureGraphicsDraw(immediateContext(), new NoopGalExecutor(), state, draft);
+        VulkanicGalExecutionRequest.GraphicsDrawRequest second =
+            VulkanicGalSnapshotBuilder.captureGraphicsDraw(immediateContext(), new NoopGalExecutor(), state, draft);
+
+        VulkanicGalV2.ExplicitGraphicsDrawRequest firstV2 =
+            VulkanicGalV2.tryCaptureLegacyProgramSlice(first).orElseThrow();
+        VulkanicGalV2.ExplicitGraphicsDrawRequest secondV2 =
+            VulkanicGalV2.tryCaptureLegacyProgramSlice(second).orElseThrow();
+
+        assertEquals(firstV2.graphicsObjects(), secondV2.graphicsObjects());
+        assertEquals(1, VulkanicGalV2.graphicsObjectCountForTests());
+
+        state.setUniformInt(3, 8);
+        VulkanicGalExecutionRequest.GraphicsDrawRequest changed =
+            VulkanicGalSnapshotBuilder.captureGraphicsDraw(immediateContext(), new NoopGalExecutor(), state, draft);
+        VulkanicGalV2.ExplicitGraphicsDrawRequest changedV2 =
+            VulkanicGalV2.tryCaptureLegacyProgramSlice(changed).orElseThrow();
+
+        assertEquals(firstV2.graphicsObjects(), changedV2.graphicsObjects());
+        assertEquals(1, VulkanicGalV2.graphicsObjectCountForTests());
+        assertEquals(8, changedV2.compatibilitySnapshot()
+            .program()
+            .uniformsByLocation()
+            .get(3)
+            .ints()[0]);
+    }
+
+    @Test
+    void galV2SeparatesVertexLayoutFromOffsetOnlyStreamChanges() {
+        VulkanicGalV2.clearForTests();
+        VulkanicCompatibilityState state = new VulkanicCompatibilityState();
+        state.bindProgram(11);
+        state.bindVertexArray(2);
+        state.setVertexAttribFormat(0, 3, VulkanicAPI.GL_FLOAT, false, false, 4);
+        state.setVertexAttribBinding(0, 0);
+        state.bindVertexBuffer(0, 41, 4L, 20);
+        state.enableVertexAttribArray(0);
+        state.setVertexAttribDivisor(0, 1);
+        state.bindBuffer(0x8893, 55);
+
+        VulkanicGalExecutionRequest.GraphicsDrawRequest draft =
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.indexed(
+                "drawElementsBaseVertex",
+                VulkanicPrimitiveMode.TRIANGLES,
+                6,
+                VulkanicIndexType.SHORT,
+                8L,
+                2,
+                3
+            );
+        VulkanicGalV2.ExplicitGraphicsDrawRequest first =
+            VulkanicGalV2.tryCaptureLegacyProgramSlice(
+                VulkanicGalSnapshotBuilder.captureGraphicsDraw(immediateContext(), new NoopGalExecutor(), state, draft)
+            ).orElseThrow();
+
+        state.bindVertexBuffer(0, 41, 36L, 20);
+        VulkanicGalV2.ExplicitGraphicsDrawRequest offsetChanged =
+            VulkanicGalV2.tryCaptureLegacyProgramSlice(
+                VulkanicGalSnapshotBuilder.captureGraphicsDraw(immediateContext(), new NoopGalExecutor(), state, draft)
+            ).orElseThrow();
+
+        VulkanicGalV2.ExplicitGraphicsObjects firstObjects =
+            VulkanicGalV2.requireGraphicsObjects(first.graphicsObjects());
+        VulkanicGalV2.ExplicitGraphicsObjects offsetObjects =
+            VulkanicGalV2.requireGraphicsObjects(offsetChanged.graphicsObjects());
+        assertEquals(firstObjects.vertexLayoutHandle(), offsetObjects.vertexLayoutHandle());
+        assertEquals(firstObjects.pipeline(), offsetObjects.pipeline());
+        assertEquals(4L, first.vertexStreams().vertexStreams().get(0).baseOffset());
+        assertEquals(36L, offsetChanged.vertexStreams().vertexStreams().get(0).baseOffset());
+        assertEquals(55, offsetChanged.vertexStreams().indexStream().orElseThrow().buffer());
+        assertEquals(8L, offsetChanged.vertexStreams().indexStream().orElseThrow().baseOffset());
+    }
+
+    @Test
+    void galV2VertexLayoutChangesWhenAttributeRelativeOffsetChanges() {
+        VulkanicGalV2.clearForTests();
+        VulkanicCompatibilityState state = new VulkanicCompatibilityState();
+        state.bindProgram(11);
+        state.bindVertexArray(3);
+        state.bindBuffer(0x8892, 42);
+        state.setVertexAttribPointer(0, 3, VulkanicAPI.GL_FLOAT, false, false, 20, 4L);
+        state.enableVertexAttribArray(0);
+
+        VulkanicGalExecutionRequest.GraphicsDrawRequest draft =
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
+                "drawArrays",
+                VulkanicPrimitiveMode.TRIANGLES,
+                0,
+                3,
+                1
+            );
+        VulkanicGalV2.ExplicitGraphicsDrawRequest first =
+            VulkanicGalV2.tryCaptureLegacyProgramSlice(
+                VulkanicGalSnapshotBuilder.captureGraphicsDraw(immediateContext(), new NoopGalExecutor(), state, draft)
+            ).orElseThrow();
+
+        state.setVertexAttribFormat(0, 3, VulkanicAPI.GL_FLOAT, false, false, 12);
+        VulkanicGalV2.ExplicitGraphicsDrawRequest changed =
+            VulkanicGalV2.tryCaptureLegacyProgramSlice(
+                VulkanicGalSnapshotBuilder.captureGraphicsDraw(immediateContext(), new NoopGalExecutor(), state, draft)
+            ).orElseThrow();
+
+        VulkanicGalV2.ExplicitGraphicsObjects firstObjects =
+            VulkanicGalV2.requireGraphicsObjects(first.graphicsObjects());
+        VulkanicGalV2.ExplicitGraphicsObjects changedObjects =
+            VulkanicGalV2.requireGraphicsObjects(changed.graphicsObjects());
+        assertFalse(firstObjects.vertexLayoutHandle().equals(changedObjects.vertexLayoutHandle()));
+    }
+
+    private static CommandContext immediateContext() {
+        return new CommandContext() {
+            @Override
+            public boolean isImmediate() {
+                return true;
+            }
+
+            @Override
+            public long getHandle() {
+                return 0L;
+            }
+
+            @Override
+            public String getDebugName() {
+                return "test-immediate";
+            }
+        };
+    }
+
+    private static final class NoopGalExecutor implements VulkanicGalExecutor {
+        @Override
+        public VulkanicRenderPass executeRenderPassBegin(
+            CommandContext ctx,
+            VulkanicGalExecutionRequest.RenderPassBeginRequest request
+        ) {
+            throw new UnsupportedOperationException("not used");
+        }
     }
 
     @Test
@@ -449,8 +616,10 @@ final class VulkanicGalSubmissionBoundaryTest {
         String vulkanSource = Files.readString(PROJECT_ROOT.resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
         String builderSource = Files.readString(PROJECT_ROOT.resolve("src/main/java/net/vulkanic/VulkanicGalSnapshotBuilder.java"));
 
-        assertTrue(vulkanSource.contains("PipelineResourcePlanner.Plan resourcePlan = capturedResourceBindingPlan;"),
-            "Graphics descriptor materialization should consume the resource plan derived from the immutable request snapshot");
+        assertTrue(vulkanSource.contains("VulkanCompactResourceBindingTable resourceTable = capturedResourceBindingTable;")
+                && vulkanSource.contains("spine.materializeGraphicsPipelineBinding(")
+                && vulkanSource.contains("resourceTable"),
+            "Graphics descriptor materialization should consume the compact resource table derived from the immutable request snapshot");
         assertTrue(vulkanSource.contains("requestOwnedComputeResourceBindingPlan(")
                 && vulkanSource.contains("materializeLegacyComputePipelineForDispatch(commandBufferHandle, request, requestOwnedResourcePlan)"),
             "Compute descriptor materialization should lower the request-owned shared snapshot without enriching the request");

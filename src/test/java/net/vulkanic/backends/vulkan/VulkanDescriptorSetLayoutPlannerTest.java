@@ -73,7 +73,11 @@ final class VulkanDescriptorSetLayoutPlannerTest {
                 Set.of(VulkanicShaderStage.COMPUTE)),
             binding("Globals", 0, 2, PipelineDescriptor.ResourceType.UNIFORM_BUFFER, null,
                 Set.of(VulkanicShaderStage.VERTEX)),
-            binding("CloudFaces", 0, 3, PipelineDescriptor.ResourceType.TEXEL_BUFFER, TextureFormat.RGBA8,
+            binding("DynamicTransforms", 0, 3, PipelineDescriptor.ResourceType.UNIFORM_BUFFER, null,
+                Set.of(VulkanicShaderStage.VERTEX)),
+            binding("VulkanicStandaloneUniforms", 0, 5, PipelineDescriptor.ResourceType.UNIFORM_BUFFER, null,
+                Set.of(VulkanicShaderStage.VERTEX, VulkanicShaderStage.FRAGMENT)),
+            binding("CloudFaces", 0, 4, PipelineDescriptor.ResourceType.TEXEL_BUFFER, TextureFormat.RGBA8,
                 Set.of(VulkanicShaderStage.FRAGMENT))
         ));
 
@@ -81,6 +85,8 @@ final class VulkanDescriptorSetLayoutPlannerTest {
         assertEquals(VK10.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, byName.get("Sampler0").descriptorType());
         assertEquals(VK10.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, byName.get("Image0").descriptorType());
         assertEquals(VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, byName.get("Globals").descriptorType());
+        assertEquals(VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, byName.get("DynamicTransforms").descriptorType());
+        assertEquals(VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, byName.get("VulkanicStandaloneUniforms").descriptorType());
         assertEquals(VK10.VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, byName.get("CloudFaces").descriptorType());
         for (VulkanDescriptorSetLayoutPlanner.DescriptorLayoutBindingPlan binding : byName.values()) {
             assertEquals(1, binding.descriptorCount());

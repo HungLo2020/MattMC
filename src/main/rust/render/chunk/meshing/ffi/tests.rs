@@ -1,6 +1,12 @@
 use super::*;
 use crate::render::chunk::meshing::section::CompactSectionSnapshot;
 use std::mem;
+use std::sync::{Mutex, MutexGuard, OnceLock};
+
+fn native_cache_test_lock() -> MutexGuard<'static, ()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(())).lock().unwrap()
+}
 
 struct CompactSnapshotStorage {
     active_indices: Vec<u16>,
@@ -277,6 +283,7 @@ fn ffi_rejects_malformed_handles_lengths_and_formats() {
 
 #[test]
 fn cache_registration_ffi_rejects_bad_ids_pointers_and_strides() {
+    let _cache_guard = native_cache_test_lock();
     unsafe {
         assert_eq!(OK, mattmc_sodium_static_model_cache_clear());
         assert_eq!(
@@ -473,6 +480,7 @@ fn compact_ffi_rejects_malformed_snapshot_header() {
 
 #[test]
 fn cleared_native_cache_ids_do_not_resolve_after_reload() {
+    let _cache_guard = native_cache_test_lock();
     unsafe {
         assert_eq!(OK, mattmc_sodium_static_model_cache_clear());
 

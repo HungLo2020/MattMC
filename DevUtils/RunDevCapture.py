@@ -61,6 +61,7 @@ class CaptureConfig:
     deterministic_camera_capture: bool
     deterministic_static_camera_capture: bool
     deterministic_pose_tolerance: float
+    compare_benchmark_fingerprint: str
     performance_capture: bool
     perf_warmup_frames: int
     perf_measure_frames: int
@@ -289,6 +290,7 @@ class CaptureRunner:
             f"skip_tests={str(self.config.skip_tests).lower()}",
             f"deterministic_camera_capture={str(self.config.deterministic_camera_capture).lower()}",
             f"deterministic_pose_tolerance={self.config.deterministic_pose_tolerance}",
+            f"compare_benchmark_fingerprint={self.config.compare_benchmark_fingerprint or 'unset'}",
             f"performance_capture={str(self.config.performance_capture).lower()}",
             f"perf_warmup_frames={self.config.perf_warmup_frames}",
             f"perf_measure_frames={self.config.perf_measure_frames}",
@@ -691,6 +693,7 @@ class CaptureRunner:
                 self.append_meta("deterministic_temporal_parity=true")
 
         if self.config.deterministic_camera_capture:
+            benchmark_pose = deterministic_benchmark_pose()
             deterministic_options = [
                 "-Dmattmc.dev.deterministicCameraCapture=true",
                 f"-Dmattmc.dev.deterministicCameraCapture.metadata={self.deterministic_metadata}",
@@ -698,17 +701,27 @@ class CaptureRunner:
                 f"-Dmattmc.dev.deterministicCameraCapture.shaderEnabled={self.effective_enable_shaders or 'unknown'}",
                 f"-Dmattmc.dev.deterministicCameraCapture.shaderPack={self.effective_shader_pack or 'unknown'}",
                 f"-Dmattmc.dev.deterministicCameraCapture.gitCommit={self.git_commit}",
+                f"-Dmattmc.dev.deterministicCameraCapture.world={self.config.world}",
+                f"-Dmattmc.dev.deterministicCameraCapture.fixedX={benchmark_pose['x']}",
+                f"-Dmattmc.dev.deterministicCameraCapture.fixedY={benchmark_pose['y']}",
+                f"-Dmattmc.dev.deterministicCameraCapture.fixedZ={benchmark_pose['z']}",
+                f"-Dmattmc.dev.deterministicCameraCapture.fixedYaw={benchmark_pose['yaw']}",
+                f"-Dmattmc.dev.deterministicCameraCapture.fixedPitch={benchmark_pose['pitch']}",
+                f"-Dmattmc.dev.deterministicCameraCapture.cameraPathId={benchmark_pose['camera_path']}",
                 "-Dmattmc.dev.deterministicCameraCapture.stopAfterComplete=true",
                 "-Dmattmc.dev.deterministicCameraCapture.ackTimeoutFrames=12000",
                 "-Dmattmc.vulkan.traceShaderInputParity.poseOnly=true",
             ]
             if self.config.performance_capture:
+                settled_frames = int_env("MATTMC_BENCHMARK_SETTLED_READY_FRAMES", 0)
                 deterministic_options.extend(
                     [
                         "-Dmattmc.dev.deterministicCameraCapture.performanceMode=true",
                         f"-Dmattmc.dev.deterministicCameraCapture.performanceWarmupFrames={self.config.perf_warmup_frames}",
                         f"-Dmattmc.dev.deterministicCameraCapture.performanceMeasureFrames={self.config.perf_measure_frames}",
                         f"-Dmattmc.dev.deterministicCameraCapture.performanceStatus={self.performance_status}",
+                        f"-Dmattmc.dev.deterministicCameraCapture.settledReadyFrames={settled_frames}",
+                        "-Dmattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames=2400",
                         "-Dmattmc.perfAudit=true",
                         f"-Dmattmc.perfAudit.backend={self.config.backend}",
                         f"-Dmattmc.perfAuditReportDir={self.performance_audit_dir}",
@@ -716,6 +729,11 @@ class CaptureRunner:
                 )
             self.append_java_tool_options(deterministic_options)
             self.append_meta(f"deterministic_camera_capture_java_options={' '.join(deterministic_options)}")
+            self.append_meta(
+                "deterministic_benchmark_pose="
+                f"x={benchmark_pose['x']},y={benchmark_pose['y']},z={benchmark_pose['z']},"
+                f"yaw={benchmark_pose['yaw']},pitch={benchmark_pose['pitch']},cameraPath={benchmark_pose['camera_path']}"
+            )
             self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
 
         if self.config.audio_validation:
@@ -1161,6 +1179,7 @@ class CaptureRunner:
                     self.performance_status,
                     self.performance_audit_dir,
                     self.config.perf_measure_frames,
+                    self.config.compare_benchmark_fingerprint,
                 )
             else:
                 validate_deterministic_metadata(
@@ -2121,6 +2140,7 @@ def validate_deterministic_performance_metadata(
     status_path: Path,
     audit_dir: Path,
     expected_measure_frames: int,
+    compare_fingerprint_path: str = "",
 ) -> None:
     if not metadata_path.is_file():
         raise RuntimeError(f"deterministic metadata was not written: {metadata_path}")
@@ -2145,7 +2165,55 @@ def validate_deterministic_performance_metadata(
     reports = sorted(audit_dir.glob("vulkan-perf-audit-*.txt")) if audit_dir.is_dir() else []
     if not reports:
         raise RuntimeError(f"performance audit report was not written under: {audit_dir}")
+    if compare_fingerprint_path:
+        expected_hash = load_benchmark_fingerprint_hash(Path(compare_fingerprint_path))
+        actual_hash = metadata.get("benchmarkFingerprintHash")
+        if actual_hash != expected_hash:
+            raise RuntimeError(
+                "benchmark fingerprint mismatch: "
+                f"actual={actual_hash!r} expected={expected_hash!r} reference={compare_fingerprint_path}"
+            )
     print(f"deterministic performance capture OK: {status_path} measuredFrames={measured}")
+
+
+def load_benchmark_fingerprint_hash(path: Path) -> str:
+    if not path.is_file():
+        raise RuntimeError(f"benchmark fingerprint reference is missing: {path}")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    fingerprint_hash = data.get("benchmarkFingerprintHash")
+    if isinstance(fingerprint_hash, str) and fingerprint_hash:
+        return fingerprint_hash
+    fingerprint = data.get("benchmarkFingerprint")
+    if isinstance(fingerprint, dict):
+        return json.dumps(fingerprint, sort_keys=True, separators=(",", ":"))
+    raise RuntimeError(f"benchmark fingerprint reference does not contain a fingerprint hash: {path}")
+
+
+def deterministic_benchmark_pose() -> dict[str, str]:
+    defaults = {
+        "x": "150.5",
+        "y": "100.0",
+        "z": "530.5",
+        "yaw": "150.0",
+        "pitch": "10.0",
+        "camera_path": "origin-fixed-sweep-v1",
+    }
+    env_map = {
+        "x": "MATTMC_BENCHMARK_X",
+        "y": "MATTMC_BENCHMARK_Y",
+        "z": "MATTMC_BENCHMARK_Z",
+        "yaw": "MATTMC_BENCHMARK_YAW",
+        "pitch": "MATTMC_BENCHMARK_PITCH",
+        "camera_path": "MATTMC_BENCHMARK_CAMERA_PATH",
+    }
+    pose = {key: os.environ.get(env_name, defaults[key]) for key, env_name in env_map.items()}
+    number_pattern = re.compile(r"^-?[0-9]+([.][0-9]+)?$")
+    for key in ("x", "y", "z", "yaw", "pitch"):
+        if not number_pattern.match(pose[key]):
+            raise SystemExit(f"{env_map[key]} must be a finite decimal number")
+    if not pose["camera_path"].strip():
+        raise SystemExit("MATTMC_BENCHMARK_CAMERA_PATH must not be blank")
+    return pose
 
 
 def int_env(name: str, default: int, *, signed: bool = False) -> int:
@@ -2189,6 +2257,14 @@ def parse_args() -> CaptureConfig:
             "Use deterministic Origin capture as a bounded performance run. This implies "
             "--deterministic-camera-capture, writes lightweight perf counters/timers, "
             "and validates performance artifacts instead of screenshot requests."
+        ),
+    )
+    parser.add_argument(
+        "--compare-benchmark-fingerprint",
+        default=os.environ.get("MATTMC_COMPARE_BENCHMARK_FINGERPRINT", ""),
+        help=(
+            "Path to a deterministic metadata JSON from a prior performance run. "
+            "When set, this run fails if its benchmark fingerprint does not match."
         ),
     )
     parser.add_argument("--perf-warmup-frames", type=int, default=int_env("MATTMC_PERF_WARMUP_FRAMES", 120))
@@ -2253,6 +2329,7 @@ def parse_args() -> CaptureConfig:
         deterministic_camera_capture=bool(args.deterministic_camera_capture),
         deterministic_static_camera_capture=bool(args.deterministic_static_camera_capture),
         deterministic_pose_tolerance=float(pose_tolerance),
+        compare_benchmark_fingerprint=args.compare_benchmark_fingerprint,
         performance_capture=bool(args.performance_capture),
         perf_warmup_frames=args.perf_warmup_frames,
         perf_measure_frames=args.perf_measure_frames,

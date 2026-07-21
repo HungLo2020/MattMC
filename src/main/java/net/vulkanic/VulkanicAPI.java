@@ -2655,7 +2655,16 @@ public class VulkanicAPI {
         }
         long backendStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         VulkanPerfAudit.recordGraphicsDraw();
-        requireGalExecutionAccepted(backend.executeGraphicsDraw(ctx, capturedRequest));
+        java.util.Optional<VulkanicGalV2.ExplicitGraphicsDrawRequest> explicitV2Request =
+            VulkanicGalV2.tryCaptureLegacyProgramSlice(capturedRequest);
+        if (explicitV2Request.isPresent()) {
+            VulkanPerfAudit.recordGalV2GraphicsDraw(true);
+            requireGalExecutionAccepted(backend.executeGraphicsDrawV2(ctx, explicitV2Request.get()));
+        } else {
+            VulkanPerfAudit.recordGalV2GraphicsDraw(false);
+            VulkanPerfAudit.recordGalV2FallbackReason(VulkanicGalV2.fallbackReasonFor(capturedRequest));
+            requireGalExecutionAccepted(backend.executeGraphicsDraw(ctx, capturedRequest));
+        }
         if (backendStartNanos != 0L) {
             VulkanPerfAudit.recordPhase("gal.graphics.backend", System.nanoTime() - backendStartNanos);
         }

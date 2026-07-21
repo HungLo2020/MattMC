@@ -923,7 +923,7 @@ public class DistantHorizonsCommandContextMigrationTest {
         String descriptorSource = readSourceWithoutComments(descriptor);
 
         assertTrue(backendSource.contains("backend.materializeLegacyProgramPipelineForDraw(")
-                && backendSource.contains("capturedResourceBindingPlan")
+                && backendSource.contains("capturedResourceBindingTable")
                 && backendSource.contains("captureRequestOwnedGalDraw(")
                 && backendSource.contains("drawExecution.planLegacyDraw(")
                 && backendSource.contains("graphicsCommandExecution.planGraphicsExecution("),

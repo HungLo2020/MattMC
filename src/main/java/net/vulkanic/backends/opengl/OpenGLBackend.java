@@ -842,6 +842,78 @@ public class OpenGLBackend implements GraphicsBackend {
         }
     }
 
+    @Override
+    public VulkanicGalExecutionRequest.ExecutionResult executeGraphicsDrawV2(
+        CommandContext ctx,
+        net.vulkanic.VulkanicGalV2.ExplicitGraphicsDrawRequest request
+    ) {
+        long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
+        try {
+            if (!ctx.isImmediate()) {
+                throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+            }
+            consumeResourceUsagePlan(request.resourcePlan());
+            VulkanicCompatibilityState.GraphicsSnapshot snapshot = request.compatibilitySnapshot();
+            applyProgramSnapshot(snapshot);
+            applyFramebufferSnapshot(snapshot);
+            applyFixedFunctionSnapshot(snapshot.fixedFunction());
+            applyResourceBindingsSnapshot(ctx, snapshot);
+            applyVertexInputSnapshot(snapshot);
+            applyUniformSnapshot(snapshot.program());
+
+            VulkanicGalExecutionRequest.GraphicsDrawCommand command = request.command();
+            switch (command.kind()) {
+                case ARRAYS -> {
+                    VulkanicAPI.traceShaderInputParityDraw(
+                        "opengl-gal-v2-" + request.semanticIdentity().phase(),
+                        false,
+                        command.mode().toGlModeConstant(),
+                        command.firstVertex(),
+                        command.vertexCount(),
+                        0L,
+                        0,
+                        0,
+                        command.instanceCount(),
+                        0
+                    );
+                    if (command.instanceCount() == 1) {
+                        GL11.glDrawArrays(command.mode().toGlModeConstant(), command.firstVertex(), command.vertexCount());
+                    } else {
+                        GL31.glDrawArraysInstanced(
+                            command.mode().toGlModeConstant(),
+                            command.firstVertex(),
+                            command.vertexCount(),
+                            command.instanceCount()
+                        );
+                    }
+                }
+                case INDEXED -> drawIndexedRequest(request.semanticIdentity().phase(), command);
+                case MULTI_INDEXED_BASE_VERTEX -> {
+                    for (VulkanicGalExecutionRequest.IndexedDraw draw : command.indexedDraws()) {
+                        drawIndexedRequest(
+                            request.semanticIdentity().phase(),
+                            VulkanicGalExecutionRequest.GraphicsDrawCommand.indexed(
+                                command.mode(),
+                                draw.indexCount(),
+                                command.indexType(),
+                                (long) draw.firstIndex() * command.indexType().bytesPerIndex(),
+                                1,
+                                draw.baseVertex()
+                            )
+                        );
+                    }
+                }
+            }
+            return VulkanicGalExecutionRequest.success(request.semanticIdentity());
+        } catch (RuntimeException exception) {
+            return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), exception.getMessage());
+        } finally {
+            if (auditStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("backend.opengl.graphics.v2", System.nanoTime() - auditStartNanos);
+            }
+        }
+    }
+
     private void applyGraphicsRequestState(CommandContext ctx, VulkanicGalExecutionRequest.GraphicsDrawRequest request) {
         VulkanicCompatibilityState.GraphicsSnapshot snapshot =
             request.compatibilitySnapshot().sharedCompatibilityState()
@@ -1131,8 +1203,15 @@ public class OpenGLBackend implements GraphicsBackend {
         VulkanicGalExecutionRequest.GraphicsDrawRequest request,
         VulkanicGalExecutionRequest.GraphicsDrawCommand command
     ) {
+        drawIndexedRequest(request.semanticIdentity().phase(), command);
+    }
+
+    private void drawIndexedRequest(
+        String phase,
+        VulkanicGalExecutionRequest.GraphicsDrawCommand command
+    ) {
         VulkanicAPI.traceShaderInputParityDraw(
-            "opengl-" + request.semanticIdentity().phase(),
+            "opengl-" + phase,
             true,
             command.mode().toGlModeConstant(),
             0,

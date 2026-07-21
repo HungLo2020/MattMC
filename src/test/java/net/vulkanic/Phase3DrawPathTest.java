@@ -1281,7 +1281,7 @@ public class Phase3DrawPathTest {
                 && resourceManagerSource.contains("bindings.put(index, new LegacyVertexBinding(index, effectiveStride, 0, divisor, buffer))"),
             "Pre-GL43 attribute pointers should preserve captured buffers and any divisor set before the pointer call inside the manager");
         assertTrue(backendSource.contains("captureRequestOwnedGalDraw(")
-                && backendSource.contains("PipelineResourcePlanner.Plan resourceBindingPlan")
+                && backendSource.contains("VulkanCompactResourceBindingTable resourceBindingTable")
                 && galSnapshotBuilderSource.contains("return request.withCompatibilitySnapshot(")
                 && galSnapshotBuilderSource.contains("compatibilityState.compatibilitySnapshotFor(request)")
                 && !backendSource.contains("pendingCapturedGalDraws")
@@ -1289,7 +1289,7 @@ public class Phase3DrawPathTest {
                 && backendSource.contains("private void executeCapturedGalDraw(")
                 && backendSource.contains("VulkanDrawExecutionCoordinator.DrawExecutionPlan plan,")
                 && backendSource.contains("VulkanDrawExecutionCoordinator.DrawResourceSnapshot drawResources")
-                && backendSource.contains("@Nullable PipelineResourcePlanner.Plan resourceBindingPlan")
+                && backendSource.contains("@Nullable VulkanCompactResourceBindingTable resourceBindingTable")
                 && backendSource.contains("VulkanicGalExecutionRequest.GraphicsDrawRequest capturedGalRequest")
                 && backendSource.contains("capturedGalRequest.compatibilitySnapshot().sharedCompatibilityState().isEmpty()")
                 && !backendSource.contains("legacyDrawResourceSnapshot()")

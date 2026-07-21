@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -238,6 +239,104 @@ class VulkanDrawExecutionCoordinatorTest {
         assertEquals(VertexFormat.Mode.QUADS, VulkanDrawExecutionCoordinator.legacyVertexMode(0x0007));
     }
 
+    @Test
+    void equivalentLegacyDrawsReuseImmutableDescriptorAndVertexTemplate() {
+        VulkanDrawExecutionCoordinator.LegacyProgramSnapshot program =
+            program(46, List.of(new VulkanDrawExecutionCoordinator.ReflectedVertexInputSnapshot(0, "vec3")), Map.of());
+        VulkanDrawExecutionCoordinator.DrawResourceSnapshot vao = vao(
+            List.of(new VulkanDrawExecutionCoordinator.LegacyVertexAttributeSnapshot(
+                0, 0, 3, VulkanicAPI.GL_FLOAT, false, false, 0, 0
+            )),
+            List.of(new VulkanDrawExecutionCoordinator.LegacyVertexBindingSnapshot(0, 12, 0L, 0, 10)),
+            List.of(new VulkanDrawExecutionCoordinator.VertexBufferBindingPlan(0, 10, 0L, false))
+        );
+
+        VulkanDrawExecutionCoordinator.DrawExecutionPlan first = coordinator.planLegacyDraw(
+            VulkanDrawExecutionCoordinator.SemanticDrawRequest.arrays("first", VulkanicAPI.GL_TRIANGLES, 0, 3, 1),
+            program,
+            vao,
+            renderState()
+        );
+        VulkanDrawExecutionCoordinator.DrawExecutionPlan second = coordinator.planLegacyDraw(
+            VulkanDrawExecutionCoordinator.SemanticDrawRequest.arrays("second", VulkanicAPI.GL_TRIANGLES, 12, 6, 1),
+            program,
+            vao,
+            renderState()
+        );
+
+        assertEquals(1, coordinator.legacyDrawTemplateCacheSizeForTests());
+        assertSame(first.descriptor(), second.descriptor());
+        assertSame(first.vertexStream().vertexInputState(), second.vertexStream().vertexInputState());
+        assertNotEquals(first.command(), second.command());
+    }
+
+    @Test
+    void vertexOrRenderStateChangesProduceDistinctLegacyDrawTemplates() {
+        VulkanDrawExecutionCoordinator.LegacyProgramSnapshot program =
+            program(47, List.of(new VulkanDrawExecutionCoordinator.ReflectedVertexInputSnapshot(0, "vec3")), Map.of());
+        VulkanDrawExecutionCoordinator.DrawResourceSnapshot vao = vao(
+            List.of(new VulkanDrawExecutionCoordinator.LegacyVertexAttributeSnapshot(
+                0, 0, 3, VulkanicAPI.GL_FLOAT, false, false, 0, 0
+            )),
+            List.of(new VulkanDrawExecutionCoordinator.LegacyVertexBindingSnapshot(0, 12, 0L, 0, 10)),
+            List.of(new VulkanDrawExecutionCoordinator.VertexBufferBindingPlan(0, 10, 0L, false))
+        );
+        VulkanDrawExecutionCoordinator.DrawResourceSnapshot widerVao = vao(
+            List.of(new VulkanDrawExecutionCoordinator.LegacyVertexAttributeSnapshot(
+                0, 0, 4, VulkanicAPI.GL_FLOAT, false, false, 0, 0
+            )),
+            List.of(new VulkanDrawExecutionCoordinator.LegacyVertexBindingSnapshot(0, 16, 0L, 0, 10)),
+            List.of(new VulkanDrawExecutionCoordinator.VertexBufferBindingPlan(0, 10, 0L, false))
+        );
+        VulkanDrawExecutionCoordinator.LegacyRenderStateSnapshot blendedState =
+            new VulkanDrawExecutionCoordinator.LegacyRenderStateSnapshot(
+                true,
+                1,
+                0,
+                1,
+                0,
+                true,
+                0x0203,
+                true,
+                true,
+                VulkanicAPI.GL_BACK,
+                true,
+                true,
+                true,
+                true,
+                LogicOp.NONE,
+                PolygonMode.FILL,
+                0.0F,
+                0.0F
+            );
+
+        VulkanDrawExecutionCoordinator.DrawExecutionPlan base = coordinator.planLegacyDraw(
+            VulkanDrawExecutionCoordinator.SemanticDrawRequest.arrays("base", VulkanicAPI.GL_TRIANGLES, 0, 3, 1),
+            program,
+            vao,
+            renderState()
+        );
+        VulkanDrawExecutionCoordinator.DrawExecutionPlan differentVertex = coordinator.planLegacyDraw(
+            VulkanDrawExecutionCoordinator.SemanticDrawRequest.arrays("vertex", VulkanicAPI.GL_TRIANGLES, 0, 3, 1),
+            program,
+            widerVao,
+            renderState()
+        );
+        VulkanDrawExecutionCoordinator.DrawExecutionPlan differentState = coordinator.planLegacyDraw(
+            VulkanDrawExecutionCoordinator.SemanticDrawRequest.arrays("state", VulkanicAPI.GL_TRIANGLES, 0, 3, 1),
+            program,
+            vao,
+            blendedState
+        );
+
+        assertEquals(3, coordinator.legacyDrawTemplateCacheSizeForTests());
+        assertNotEquals(base.descriptor().getVertexInputState(), differentVertex.descriptor().getVertexInputState());
+        assertNotEquals(
+            base.descriptor().getPortableState().blendState(),
+            differentState.descriptor().getPortableState().blendState()
+        );
+    }
+
     private static VulkanDrawExecutionCoordinator.LegacyProgramSnapshot program(
         int programId,
         List<VulkanDrawExecutionCoordinator.ReflectedVertexInputSnapshot> vertexInputs,
@@ -260,7 +359,9 @@ class VulkanDrawExecutionCoordinatorTest {
                 PipelineDescriptor.ResourceType.SAMPLER,
                 null,
                 Set.of(VulkanicShaderStage.VERTEX, VulkanicShaderStage.FRAGMENT)
-            )))
+            ))),
+            List.of("Sampler0"),
+            Map.of(0, 0)
         );
     }
 

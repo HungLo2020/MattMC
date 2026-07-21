@@ -14,6 +14,7 @@ import net.vulkanic.VulkanicLegacyCompatibilityAdapter;
 import net.vulkanic.VulkanicPassResourceModel;
 import net.vulkanic.VulkanicBlendFactor;
 import net.vulkanic.VulkanicIndexType;
+import net.vulkanic.VulkanPerfAudit;
 import net.vulkanic.VulkanicSpirvModule;
 import org.jetbrains.annotations.Nullable;
 
@@ -37,6 +38,13 @@ import java.util.stream.Collectors;
  * recording, and synchronization remain in {@link VulkanBackend.NativeSpine}.</p>
  */
 final class VulkanDrawExecutionCoordinator {
+    private static final int MAX_LEGACY_DRAW_TEMPLATE_CACHE_ENTRIES =
+        Math.max(0, Integer.getInteger("mattmc.vulkan.maxLegacyDrawTemplateCacheEntries", 4096));
+
+    private final Map<LegacyDrawTemplateKey, LegacyDrawTemplate> legacyDrawTemplateCache =
+        new LinkedHashMap<>(64, 0.75f, true);
+    private int legacyDrawTemplateCacheHighWater;
+
     DrawExecutionPlan planLegacyDraw(
         SemanticDrawRequest request,
         @Nullable LegacyProgramSnapshot program,
@@ -51,10 +59,18 @@ final class VulkanDrawExecutionCoordinator {
         LegacyVaoSnapshot vao = resources.vertexArray();
         VertexStreamPlan vertexStream = VertexStreamPlan.noProgram(vao.vertexBuffersForDraw());
         if (program != null && program.linked() && !program.spirvModules().isEmpty()) {
-            PipelineDescriptor.VertexInputState vertexInput = planLegacyVertexInput(program, vao);
-            if (vertexInput != null) {
-                descriptor = createLegacyProgramPipelineDescriptor(program, request.mode(), renderState, vertexInput);
-                vertexStream = new VertexStreamPlan(vertexInput, vertexBuffersForPlannedInput(vao.vertexBuffersForDraw(), vertexInput));
+            long templateStartNanos = VulkanPerfAudit.shouldTraceLegacyGraphicsLowering() ? System.nanoTime() : 0L;
+            LegacyDrawTemplate template = legacyDrawTemplate(program, vao, renderState, request.mode());
+            if (templateStartNanos != 0L) {
+                VulkanPerfAudit.recordLegacyGraphicsLoweringStep(
+                    legacyPipelineLocation(program),
+                    "legacy_draw_template_resolve",
+                    System.nanoTime() - templateStartNanos
+                );
+            }
+            if (template != null) {
+                descriptor = template.descriptor();
+                vertexStream = template.vertexStream();
             }
         }
 
@@ -73,6 +89,101 @@ final class VulkanDrawExecutionCoordinator {
             command,
             explicitDrawPlan(request, resources, vertexStream, indexStream)
         );
+    }
+
+    @Nullable
+    private LegacyDrawTemplate legacyDrawTemplate(
+        LegacyProgramSnapshot program,
+        LegacyVaoSnapshot vao,
+        LegacyRenderStateSnapshot renderState,
+        int mode
+    ) {
+        if (MAX_LEGACY_DRAW_TEMPLATE_CACHE_ENTRIES <= 0) {
+            return createLegacyDrawTemplate(program, vao, renderState, mode);
+        }
+        LegacyDrawTemplateKey key = new LegacyDrawTemplateKey(program, vao, renderState, mode);
+        synchronized (legacyDrawTemplateCache) {
+            LegacyDrawTemplate cached = legacyDrawTemplateCache.get(key);
+            if (cached != null) {
+                recordLegacyTemplateCache(program, true);
+                return cached;
+            }
+        }
+
+        LegacyDrawTemplate created = createLegacyDrawTemplate(program, vao, renderState, mode);
+        if (created == null) {
+            recordLegacyTemplateCache(program, false);
+            return null;
+        }
+        synchronized (legacyDrawTemplateCache) {
+            legacyDrawTemplateCache.put(key, created);
+            while (legacyDrawTemplateCache.size() > MAX_LEGACY_DRAW_TEMPLATE_CACHE_ENTRIES) {
+                java.util.Iterator<LegacyDrawTemplateKey> iterator = legacyDrawTemplateCache.keySet().iterator();
+                if (!iterator.hasNext()) {
+                    break;
+                }
+                iterator.next();
+                iterator.remove();
+            }
+            legacyDrawTemplateCacheHighWater = Math.max(legacyDrawTemplateCacheHighWater, legacyDrawTemplateCache.size());
+            recordLegacyTemplateCache(program, false);
+        }
+        return created;
+    }
+
+    @Nullable
+    private LegacyDrawTemplate createLegacyDrawTemplate(
+        LegacyProgramSnapshot program,
+        LegacyVaoSnapshot vao,
+        LegacyRenderStateSnapshot renderState,
+        int mode
+    ) {
+        long vertexInputStartNanos = VulkanPerfAudit.shouldTraceLegacyGraphicsLowering() ? System.nanoTime() : 0L;
+        PipelineDescriptor.VertexInputState vertexInput = planLegacyVertexInput(program, vao);
+        if (vertexInputStartNanos != 0L) {
+            VulkanPerfAudit.recordLegacyGraphicsLoweringStep(
+                legacyPipelineLocation(program),
+                "vertex_input_plan_build",
+                System.nanoTime() - vertexInputStartNanos
+            );
+        }
+        if (vertexInput == null) {
+            return null;
+        }
+
+        long descriptorStartNanos = VulkanPerfAudit.shouldTraceLegacyGraphicsLowering() ? System.nanoTime() : 0L;
+        PipelineDescriptor descriptor = createLegacyProgramPipelineDescriptor(program, mode, renderState, vertexInput);
+        if (descriptorStartNanos != 0L) {
+            VulkanPerfAudit.recordLegacyGraphicsLoweringStep(
+                legacyPipelineLocation(program),
+                "pipeline_descriptor_build",
+                System.nanoTime() - descriptorStartNanos
+            );
+        }
+        return new LegacyDrawTemplate(
+            descriptor,
+            new VertexStreamPlan(vertexInput, vertexBuffersForPlannedInput(vao.vertexBuffersForDraw(), vertexInput))
+        );
+    }
+
+    private void recordLegacyTemplateCache(LegacyProgramSnapshot program, boolean hit) {
+        VulkanPerfAudit.recordLegacyGraphicsLoweringCacheLookup(
+            legacyPipelineLocation(program),
+            "legacy_draw_template",
+            hit,
+            legacyDrawTemplateCache.size(),
+            legacyDrawTemplateCacheHighWater
+        );
+    }
+
+    private static String legacyPipelineLocation(LegacyProgramSnapshot program) {
+        return "vulkanic:legacy_program/" + program.programId();
+    }
+
+    int legacyDrawTemplateCacheSizeForTests() {
+        synchronized (legacyDrawTemplateCache) {
+            return legacyDrawTemplateCache.size();
+        }
     }
 
     private static List<VertexBufferBindingPlan> vertexBuffersForPlannedInput(
@@ -641,12 +752,16 @@ final class VulkanDrawExecutionCoordinator {
         List<VulkanicSpirvModule> spirvModules,
         List<ReflectedVertexInputSnapshot> vertexInputs,
         Map<String, Integer> attributeLocationsByName,
-        @Nullable PipelineDescriptor.ResourceLayout resourceLayout
+        @Nullable PipelineDescriptor.ResourceLayout resourceLayout,
+        List<String> activeUniformNames,
+        Map<Integer, Integer> opaqueResourceUniformValuesByIndex
     ) {
         LegacyProgramSnapshot {
             spirvModules = List.copyOf(spirvModules);
             vertexInputs = List.copyOf(vertexInputs);
             attributeLocationsByName = Map.copyOf(attributeLocationsByName);
+            activeUniformNames = List.copyOf(activeUniformNames);
+            opaqueResourceUniformValuesByIndex = Map.copyOf(opaqueResourceUniformValuesByIndex);
         }
     }
 
@@ -694,6 +809,28 @@ final class VulkanDrawExecutionCoordinator {
     }
 
     record VertexBufferBindingPlan(int binding, int bufferId, long offset, boolean defaultAttributeBuffer) {
+    }
+
+    private record LegacyDrawTemplateKey(
+        LegacyProgramSnapshot program,
+        LegacyVaoSnapshot vao,
+        LegacyRenderStateSnapshot renderState,
+        int mode
+    ) {
+        private LegacyDrawTemplateKey {
+            Objects.requireNonNull(program, "program");
+            Objects.requireNonNull(vao, "vao");
+            Objects.requireNonNull(renderState, "renderState");
+        }
+    }
+
+    private record LegacyDrawTemplate(
+        @Nullable PipelineDescriptor descriptor,
+        VertexStreamPlan vertexStream
+    ) {
+        private LegacyDrawTemplate {
+            Objects.requireNonNull(vertexStream, "vertexStream");
+        }
     }
 
     record VertexStreamPlan(

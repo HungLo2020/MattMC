@@ -61,6 +61,41 @@ final class VulkanDescriptorBindingPlanner {
         return new DescriptorBindingPlan(entries, cacheable);
     }
 
+    DescriptorBindingPlan plan(CompactPlanRequest request) {
+        Objects.requireNonNull(request, "request");
+        VulkanCompactResourceBindingTable table = request.bindings();
+        List<DescriptorPlanEntry> entries = new ArrayList<>(table.slotCount());
+        Set<Integer> storageImageTextureIds = collectStorageImageTextureIds(table);
+        Set<String> readWriteAliasStableKeys = collectReadWriteAliasStableKeys(table);
+        boolean cacheable = true;
+
+        for (int index = 0; index < table.slotCount(); index++) {
+            PipelineDescriptor.ResourceBinding binding = table.layoutBinding(index);
+            DescriptorPlanEntry entry = switch (binding.type()) {
+                case SAMPLER, COMPARISON_SAMPLER -> planSamplerBinding(
+                    binding,
+                    table,
+                    index,
+                    request,
+                    storageImageTextureIds,
+                    readWriteAliasStableKeys
+                );
+                case UNIFORM_BUFFER -> {
+                    UniformBufferEntry uniformEntry = planUniformBufferBinding(binding, table, index, request);
+                    if (uniformEntry.requiresTransientCopy()) {
+                        cacheable = false;
+                    }
+                    yield uniformEntry;
+                }
+                case STORAGE_IMAGE -> planStorageImageBinding(binding, table, index, request, readWriteAliasStableKeys);
+                case TEXEL_BUFFER -> planTexelBufferBinding(binding, table, index, request, readWriteAliasStableKeys);
+            };
+            entries.add(entry);
+        }
+
+        return new DescriptorBindingPlan(entries, cacheable);
+    }
+
     List<PipelineDescriptor.ResourceBinding> normalizeDescriptorLayoutBindings(
         List<PipelineDescriptor.ResourceBinding> bindings
     ) {
@@ -86,6 +121,21 @@ final class VulkanDescriptorBindingPlanner {
             }
             PipelineResourceBindings.StorageImageBinding imageBinding =
                 bindings.getStorageImageBindingOrNull(effectiveBinding.name());
+            if (imageBinding != null && imageBinding.texture() > 0) {
+                storageImageTextureIds.add(imageBinding.texture());
+            }
+        }
+        return storageImageTextureIds;
+    }
+
+    Set<Integer> collectStorageImageTextureIds(VulkanCompactResourceBindingTable bindings) {
+        Set<Integer> storageImageTextureIds = new HashSet<>();
+        for (int index = 0; index < bindings.slotCount(); index++) {
+            PipelineDescriptor.ResourceBinding binding = bindings.layoutBinding(index);
+            if (binding.type() != PipelineDescriptor.ResourceType.STORAGE_IMAGE) {
+                continue;
+            }
+            PipelineResourceBindings.StorageImageBinding imageBinding = bindings.storageImageBinding(index);
             if (imageBinding != null && imageBinding.texture() > 0) {
                 storageImageTextureIds.add(imageBinding.texture());
             }
@@ -133,6 +183,39 @@ final class VulkanDescriptorBindingPlanner {
         return aliases;
     }
 
+    Set<String> collectReadWriteAliasStableKeys(VulkanCompactResourceBindingTable bindings) {
+        Set<String> sampledStableKeys = new HashSet<>();
+        Set<String> storageStableKeys = new HashSet<>();
+        Set<Integer> sampledLegacyIds = new HashSet<>();
+        Set<Integer> storageLegacyIds = new HashSet<>();
+
+        for (int index = 0; index < bindings.slotCount(); index++) {
+            switch (bindings.layoutBinding(index).type()) {
+                case SAMPLER, COMPARISON_SAMPLER -> {
+                    PipelineResourceBindings.SamplerBinding samplerBinding = bindings.samplerBinding(index);
+                    addReferenceIdentity(samplerBinding == null ? null : samplerBinding.resourceReference(),
+                        sampledStableKeys, sampledLegacyIds);
+                }
+                case STORAGE_IMAGE -> {
+                    PipelineResourceBindings.StorageImageBinding imageBinding = bindings.storageImageBinding(index);
+                    addReferenceIdentity(imageBinding == null ? null : imageBinding.resourceReference(),
+                        storageStableKeys, storageLegacyIds);
+                }
+                case UNIFORM_BUFFER, TEXEL_BUFFER -> {
+                }
+            }
+        }
+
+        Set<String> aliases = new HashSet<>(sampledStableKeys);
+        aliases.retainAll(storageStableKeys);
+        Set<Integer> sharedLegacyIds = new HashSet<>(sampledLegacyIds);
+        sharedLegacyIds.retainAll(storageLegacyIds);
+        if (!sharedLegacyIds.isEmpty()) {
+            addStableKeysForLegacyIds(bindings, sharedLegacyIds, aliases);
+        }
+        return aliases;
+    }
+
     private void addStableKeysForLegacyIds(
         List<PipelineDescriptor.ResourceBinding> layoutBindings,
         PipelineResourceBindings bindings,
@@ -154,6 +237,21 @@ final class VulkanDescriptorBindingPlanner {
                 }
                 case UNIFORM_BUFFER, TEXEL_BUFFER -> null;
             };
+            if (reference != null
+                && reference.legacyId().isPresent()
+                && sharedLegacyIds.contains(reference.legacyId().getAsInt())) {
+                aliases.add(reference.resource().stableKey());
+            }
+        }
+    }
+
+    private void addStableKeysForLegacyIds(
+        VulkanCompactResourceBindingTable bindings,
+        Set<Integer> sharedLegacyIds,
+        Set<String> aliases
+    ) {
+        for (int index = 0; index < bindings.slotCount(); index++) {
+            VulkanicPassResourceModel.CanonicalResourceReference reference = bindings.resourceReference(index);
             if (reference != null
                 && reference.legacyId().isPresent()
                 && sharedLegacyIds.contains(reference.legacyId().getAsInt())) {
@@ -281,6 +379,115 @@ final class VulkanDescriptorBindingPlanner {
         );
     }
 
+    private SamplerEntry planSamplerBinding(
+        PipelineDescriptor.ResourceBinding binding,
+        VulkanCompactResourceBindingTable table,
+        int slotIndex,
+        CompactPlanRequest request,
+        Set<Integer> storageImageTextureIds,
+        Set<String> readWriteAliasStableKeys
+    ) {
+        PipelineResourceBindings.SamplerBinding samplerBinding = table.samplerBinding(slotIndex);
+        if (samplerBinding == null) {
+            throw new DescriptorValidationException("Missing sampler binding for '" + binding.name() + "'");
+        }
+
+        if (!(samplerBinding.textureView() instanceof VulkanTextureView vulkanTextureView)) {
+            throw new IllegalArgumentException(
+                "Sampler binding '" + binding.name() + "' requires VulkanTextureView on Vulkan backend");
+        }
+
+        VulkanTextureView resolvedTextureView = vulkanTextureView;
+        VulkanImageResourceViewCoordinator.ImageStorageSnapshot sampledTexture = request.textureLookup().snapshotForView(resolvedTextureView);
+
+        boolean wantsComparisonSampler = binding.type() == PipelineDescriptor.ResourceType.COMPARISON_SAMPLER;
+        boolean canUseComparisonSampler = hasDepthAspect(sampledTexture);
+        String depthFallbackBindingName = null;
+        if (wantsComparisonSampler && !canUseComparisonSampler) {
+            for (String fallbackBindingName : depthFallbackBindings(binding.name())) {
+                PipelineResourceBindings.SamplerBinding fallbackSamplerBinding =
+                    request.bindings().samplerBinding(fallbackBindingName);
+                if (fallbackSamplerBinding == null
+                    || !(fallbackSamplerBinding.textureView() instanceof VulkanTextureView fallbackView)) {
+                    continue;
+                }
+                VulkanImageResourceViewCoordinator.ImageStorageSnapshot fallbackTexture = request.textureLookup().snapshotForView(fallbackView);
+                if (!hasDepthAspect(fallbackTexture)) {
+                    continue;
+                }
+                resolvedTextureView = fallbackView;
+                sampledTexture = fallbackTexture;
+                canUseComparisonSampler = true;
+                depthFallbackBindingName = fallbackBindingName;
+                break;
+            }
+        }
+
+        VulkanImageResourceViewCoordinator.DescriptorImagePlan imagePlan =
+            request.textureLookup().descriptorSampledImagePlan(
+                resolvedTextureView,
+                sampledTexture,
+                storageImageTextureIds,
+                request.layoutLookup(),
+                request.renderState()
+            );
+
+        if (wantsComparisonSampler && !canUseComparisonSampler) {
+            request.events().comparisonSamplerDowngraded(binding.name(), sampledTexture);
+        } else if (depthFallbackBindingName != null) {
+            request.events().comparisonSamplerRebound(binding.name(), depthFallbackBindingName, sampledTexture);
+        }
+
+        boolean useComparisonSampler = wantsComparisonSampler && canUseComparisonSampler;
+        VulkanDescriptorSamplerKey samplerKey = descriptorSamplerKey(
+            resolvedTextureView,
+            sampledTexture,
+            samplerBinding.samplerObject(),
+            samplerBinding.textureUnit(),
+            binding.type() == PipelineDescriptor.ResourceType.COMPARISON_SAMPLER
+                ? useComparisonSampler
+                : binding.type() == PipelineDescriptor.ResourceType.SAMPLER ? Boolean.FALSE
+                : null,
+            request.samplerStateLookup()
+        );
+        VulkanicPassResourceModel.ResourceUse resourceUse = canonicalResourceUse(
+            samplerBinding.resourceReference(),
+            request.pipelineLocation() + ":sampler:" + binding.name(),
+            isReadWriteAlias(samplerBinding.resourceReference(), readWriteAliasStableKeys),
+            binding.binding()
+        ).orElse(null);
+        if (resourceUse == null) {
+            resourceUse = samplerResourceUse(binding, resolvedTextureView, sampledTexture, imagePlan, request.pipelineLocation());
+        }
+
+        return new SamplerEntry(
+            binding.name(),
+            binding.binding(),
+            VulkanDescriptorResourceClassifier.toVkDescriptorType(binding.type()),
+            resolvedTextureView,
+            sampledTexture,
+            samplerBinding.textureUnit(),
+            samplerBinding.samplerObject(),
+            samplerKey,
+            imagePlan.requestedImageViewHandle(),
+            imagePlan.descriptorImageViewHandle(),
+            imagePlan.baseMipLevel(),
+            imagePlan.mipLevelCount(),
+            imagePlan.requiresDepthOnlyView(),
+            imagePlan.remappedToDefaultView(),
+            imagePlan.storageImageCompatible(),
+            imagePlan.transitionRequirement(),
+            imagePlan.imageLayout(),
+            imagePlan.materializationRequest(),
+            request.sodiumChunkDescriptor() && shouldLogSodiumDescriptorBinding(binding.name()),
+            request.particleDescriptor()
+                && ("Sampler0".contentEquals(binding.name()) || "Sampler2".contentEquals(binding.name())),
+            request.pipelineLocation(),
+            request.pipelineHandle(),
+            resourceUse
+        );
+    }
+
     private UniformBufferEntry planUniformBufferBinding(
         PipelineDescriptor.ResourceBinding binding,
         PlanRequest request
@@ -295,13 +502,48 @@ final class VulkanDescriptorBindingPlanner {
                 "Uniform-buffer binding '" + binding.name() + "' requires VulkanBuffer on Vulkan backend");
         }
 
-        boolean requiresTransientUniformCopy =
-            (vulkanBuffer.usage() & VulkanicBuffer.USAGE_UNIFORM) == 0
-                || (slice.offset() % request.minUniformBufferOffsetAlignment()) != 0;
+        boolean dynamicUniform = VulkanDescriptorResourceClassifier.isDynamicUniformBufferBinding(binding.name());
+        boolean requiresTransientUniformCopy = !dynamicUniform
+            && ((vulkanBuffer.usage() & VulkanicBuffer.USAGE_UNIFORM) == 0
+                || (slice.offset() % request.minUniformBufferOffsetAlignment()) != 0);
         return new UniformBufferEntry(
             binding.name(),
             binding.binding(),
-            VulkanDescriptorResourceClassifier.toVkDescriptorType(binding.type()),
+            VulkanDescriptorResourceClassifier.toVkDescriptorType(binding),
+            vulkanBuffer,
+            slice,
+            vulkanBuffer.getVkBufferHandle(),
+            slice.offset(),
+            slice.length(),
+            requiresTransientUniformCopy,
+            uniformBufferResourceUse(binding, slice, request.pipelineLocation())
+        );
+    }
+
+    private UniformBufferEntry planUniformBufferBinding(
+        PipelineDescriptor.ResourceBinding binding,
+        VulkanCompactResourceBindingTable table,
+        int slotIndex,
+        CompactPlanRequest request
+    ) {
+        VulkanicBufferSlice slice = table.uniformBufferBinding(slotIndex);
+        if (slice == null) {
+            throw new DescriptorValidationException("Missing uniform-buffer binding for '" + binding.name() + "'");
+        }
+
+        if (!(slice.buffer() instanceof VulkanBuffer vulkanBuffer)) {
+            throw new IllegalArgumentException(
+                "Uniform-buffer binding '" + binding.name() + "' requires VulkanBuffer on Vulkan backend");
+        }
+
+        boolean dynamicUniform = VulkanDescriptorResourceClassifier.isDynamicUniformBufferBinding(binding.name());
+        boolean requiresTransientUniformCopy = !dynamicUniform
+            && ((vulkanBuffer.usage() & VulkanicBuffer.USAGE_UNIFORM) == 0
+                || (slice.offset() % request.minUniformBufferOffsetAlignment()) != 0);
+        return new UniformBufferEntry(
+            binding.name(),
+            binding.binding(),
+            VulkanDescriptorResourceClassifier.toVkDescriptorType(binding),
             vulkanBuffer,
             slice,
             vulkanBuffer.getVkBufferHandle(),
@@ -380,6 +622,75 @@ final class VulkanDescriptorBindingPlanner {
         );
     }
 
+    private StorageImageEntry planStorageImageBinding(
+        PipelineDescriptor.ResourceBinding binding,
+        VulkanCompactResourceBindingTable table,
+        int slotIndex,
+        CompactPlanRequest request,
+        Set<String> readWriteAliasStableKeys
+    ) {
+        PipelineResourceBindings.StorageImageBinding imageBinding = table.storageImageBinding(slotIndex);
+        if (imageBinding == null) {
+            throw new DescriptorValidationException("Missing storage-image binding for '" + binding.name() + "'");
+        }
+
+        VulkanImageResourceViewCoordinator.DescriptorImagePlan imagePlan =
+            request.textureLookup().descriptorStorageImagePlan(imageBinding.texture(), imageBinding.level());
+        VulkanImageResourceViewCoordinator.ImageStorageSnapshot texture = imagePlan.storage();
+        if (texture == null
+            || texture.imageHandle() == VK10.VK_NULL_HANDLE
+            || imagePlan.descriptorImageViewHandle() == VK10.VK_NULL_HANDLE) {
+            throw new IllegalStateException(
+                "Storage-image binding '" + binding.name() + "' on image unit "
+                    + imageBinding.imageUnit()
+                    + " references texture "
+                    + imageBinding.texture()
+                    + " before Vulkan image storage is available"
+            );
+        }
+
+        if (texture.aspectMask() != VK10.VK_IMAGE_ASPECT_COLOR_BIT) {
+            throw new IllegalStateException(
+                "Storage-image binding '" + binding.name() + "' references non-color texture "
+                    + imageBinding.texture()
+                    + " aspectMask=0x"
+                    + Integer.toHexString(texture.aspectMask())
+            );
+        }
+
+        int mipLevel = Math.max(0, imageBinding.level());
+        if (mipLevel >= Math.max(1, texture.mipLevels())) {
+            throw new IllegalStateException(
+                "Storage-image binding '" + binding.name() + "' requested mip level "
+                    + mipLevel
+                    + " but texture "
+                    + imageBinding.texture()
+                    + " only has "
+                    + texture.mipLevels()
+                    + " levels"
+            );
+        }
+
+        return new StorageImageEntry(
+            binding.name(),
+            binding.binding(),
+            VulkanDescriptorResourceClassifier.toVkDescriptorType(binding.type()),
+            imageBinding,
+            texture,
+            mipLevel,
+            imagePlan.descriptorImageViewHandle(),
+            imagePlan.imageLayout(),
+            canonicalResourceUse(
+                imageBinding.resourceReference(),
+                request.pipelineLocation() + ":storage-image:" + binding.name(),
+                isReadWriteAlias(imageBinding.resourceReference(), readWriteAliasStableKeys),
+                binding.binding()
+            ).orElseGet(() ->
+                storageImageResourceUse(binding, imageBinding, texture, mipLevel, request.pipelineLocation())
+            )
+        );
+    }
+
     private TexelBufferEntry planTexelBufferBinding(
         PipelineDescriptor.ResourceBinding binding,
         PlanRequest request,
@@ -387,6 +698,56 @@ final class VulkanDescriptorBindingPlanner {
     ) {
         PipelineResourceBindings.TexelBufferBinding texelBinding =
             request.bindings().getTexelBufferBindingOrNull(binding.name());
+        if (texelBinding == null) {
+            throw new DescriptorValidationException("Missing texel-buffer binding for '" + binding.name() + "'");
+        }
+
+        int unit = texelBinding.textureUnit();
+        TextureBindingSnapshot textureBinding = request.textureBindingLookup().bindingSnapshot(unit);
+        int textureId = textureBinding != null ? textureBinding.texture2D() : 0;
+        if (textureId == 0) {
+            throw new IllegalStateException(
+                "Texel-buffer binding '" + binding.name() + "' requires a texture-buffer object bound on unit "
+                    + unit + " before descriptor binding");
+        }
+
+        VulkanImageResourceViewCoordinator.TexelBufferViewPlan legacyTexelBinding = request.texelBufferLookup().texelBufferBinding(textureId);
+        if (legacyTexelBinding == null
+            || legacyTexelBinding.bufferViewHandle() == VK10.VK_NULL_HANDLE) {
+            throw new IllegalStateException(
+                "Texel-buffer binding '" + binding.name() + "' on unit "
+                    + unit
+                    + " has no uploaded buffer-view. Ensure bindTextureBufferData/texBuffer was called");
+        }
+
+        return new TexelBufferEntry(
+            binding.name(),
+            binding.binding(),
+            VulkanDescriptorResourceClassifier.toVkDescriptorType(binding.type()),
+            unit,
+            textureId,
+            legacyTexelBinding.internalFormat(),
+            legacyTexelBinding.legacyBufferId(),
+            legacyTexelBinding.bufferViewHandle(),
+            canonicalResourceUse(
+                texelBinding.resourceReference(),
+                request.pipelineLocation() + ":texel-buffer:" + binding.name(),
+                isReadWriteAlias(texelBinding.resourceReference(), readWriteAliasStableKeys),
+                binding.binding()
+            ).orElseGet(() ->
+                texelBufferResourceUse(binding, legacyTexelBinding, request.pipelineLocation())
+            )
+        );
+    }
+
+    private TexelBufferEntry planTexelBufferBinding(
+        PipelineDescriptor.ResourceBinding binding,
+        VulkanCompactResourceBindingTable table,
+        int slotIndex,
+        CompactPlanRequest request,
+        Set<String> readWriteAliasStableKeys
+    ) {
+        PipelineResourceBindings.TexelBufferBinding texelBinding = table.texelBufferBinding(slotIndex);
         if (texelBinding == null) {
             throw new DescriptorValidationException("Missing texel-buffer binding for '" + binding.name() + "'");
         }
@@ -686,6 +1047,37 @@ final class VulkanDescriptorBindingPlanner {
     ) {
         PlanRequest {
             layoutBindings = List.copyOf(layoutBindings);
+            Objects.requireNonNull(bindings, "bindings");
+            Objects.requireNonNull(textureLookup, "textureLookup");
+            Objects.requireNonNull(textureBindingLookup, "textureBindingLookup");
+            Objects.requireNonNull(texelBufferLookup, "texelBufferLookup");
+            Objects.requireNonNull(samplerStateLookup, "samplerStateLookup");
+            Objects.requireNonNull(layoutLookup, "layoutLookup");
+            Objects.requireNonNull(renderState, "renderState");
+            Objects.requireNonNull(pipelineLocation, "pipelineLocation");
+            events = events != null ? events : PlannerEvents.NOOP;
+            if (minUniformBufferOffsetAlignment <= 0) {
+                throw new IllegalArgumentException("minUniformBufferOffsetAlignment must be positive");
+            }
+        }
+    }
+
+    record CompactPlanRequest(
+        VulkanCompactResourceBindingTable bindings,
+        TextureSnapshotLookup textureLookup,
+        TextureBindingLookup textureBindingLookup,
+        TexelBufferLookup texelBufferLookup,
+        SamplerStateLookup samplerStateLookup,
+        LayoutLookup layoutLookup,
+        RenderStateSnapshot renderState,
+        long minUniformBufferOffsetAlignment,
+        boolean sodiumChunkDescriptor,
+        boolean particleDescriptor,
+        String pipelineLocation,
+        long pipelineHandle,
+        PlannerEvents events
+    ) {
+        CompactPlanRequest {
             Objects.requireNonNull(bindings, "bindings");
             Objects.requireNonNull(textureLookup, "textureLookup");
             Objects.requireNonNull(textureBindingLookup, "textureBindingLookup");

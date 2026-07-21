@@ -1,6 +1,7 @@
 package net.vulkanic.backends.vulkan;
 
 import net.blaze3d.textures.TextureFormat;
+import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.PipelineResourceBindings;
 import net.vulkanic.VulkanicAPI;
@@ -17,6 +18,7 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -76,6 +78,63 @@ final class VulkanDescriptorBindingPlannerTest {
             entry.samplerKey()
         );
         assertTrue(plan.cacheable());
+    }
+
+    @Test
+    void compactResourceBindingTableProducesEquivalentSamplerPlan() {
+        PlanFixture fixture = new PlanFixture();
+        VulkanImageResourceViewCoordinator.ImageStorageSnapshot texture = textureSnapshot(21, VK10.VK_IMAGE_ASPECT_COLOR_BIT, 2, 0x2100L);
+        VulkanTextureView view = textureView(texture, 0x2200L, 0, 2);
+        fixture.bindView(view, texture);
+        fixture.unitSamplerStates.put(4, new VirtualSamplerStateSnapshot(
+            VulkanicAPI.GL_LINEAR,
+            VulkanicAPI.GL_LINEAR,
+            VulkanicAPI.GL_CLAMP_TO_EDGE,
+            VulkanicAPI.GL_CLAMP_TO_EDGE,
+            VulkanicAPI.GL_CLAMP_TO_EDGE,
+            0,
+            VulkanicAPI.GL_LEQUAL,
+            0.0f
+        ));
+        List<PipelineDescriptor.ResourceBinding> layout =
+            List.of(binding("Sampler0", 0, PipelineDescriptor.ResourceType.SAMPLER));
+        PipelineResourceBindings bindings = PipelineResourceBindings.builder()
+            .bindSampler("Sampler0", view, 4)
+            .build();
+
+        VulkanDescriptorBindingPlanner.SamplerEntry oldEntry = samplerEntry(fixture.plan(layout, bindings), 0);
+        VulkanDescriptorBindingPlanner.SamplerEntry compactEntry = samplerEntry(fixture.compactPlan(layout, bindings), 0);
+
+        assertEquals(oldEntry.bindingIndex(), compactEntry.bindingIndex());
+        assertEquals(oldEntry.descriptorType(), compactEntry.descriptorType());
+        assertEquals(oldEntry.descriptorImageViewHandle(), compactEntry.descriptorImageViewHandle());
+        assertEquals(oldEntry.imageLayout(), compactEntry.imageLayout());
+        assertEquals(oldEntry.samplerKey(), compactEntry.samplerKey());
+        assertEquals(oldEntry.resourceUse(), compactEntry.resourceUse());
+    }
+
+    @Test
+    void compactResourceBindingTableTracksMissingAndRejectsInvalidSlots() {
+        PipelineDescriptor.ResourceBinding sampler = binding("Sampler0", 0, PipelineDescriptor.ResourceType.SAMPLER);
+        VulkanCompactResourceBindingTable table = new VulkanCompactResourceBindingTable(
+            descriptor(layout(sampler)),
+            new PipelineDescriptor.ResourceBinding[]{sampler},
+            new Object[1],
+            0,
+            1
+        );
+
+        assertFalse(table.completeCoverage());
+        assertEquals(List.of("Sampler0(SAMPLER)"), table.missingResources());
+        assertThrows(IllegalArgumentException.class, () ->
+            new VulkanCompactResourceBindingTable(
+                descriptor(layout(sampler)),
+                new PipelineDescriptor.ResourceBinding[]{sampler},
+                new Object[]{new VulkanicBufferSlice(buffer(0x9900L, VulkanicBuffer.USAGE_UNIFORM), 0, 16)},
+                1,
+                0
+            )
+        );
     }
 
     @Test
@@ -163,6 +222,34 @@ final class VulkanDescriptorBindingPlannerTest {
         assertEquals(VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, transientEntry.descriptorType());
         assertEquals(0x3200L, transientEntry.descriptorBufferHandle());
         assertFalse(transientPlan.cacheable());
+
+        VulkanBuffer dynamicTransformsSource = buffer(0x3300L, VulkanicBuffer.USAGE_VERTEX);
+        VulkanDescriptorBindingPlanner.DescriptorBindingPlan dynamicPlan = fixture.plan(
+            List.of(binding("DynamicTransforms", 0, PipelineDescriptor.ResourceType.UNIFORM_BUFFER)),
+            PipelineResourceBindings.builder()
+                .bindUniformBuffer("DynamicTransforms", new VulkanicBufferSlice(dynamicTransformsSource, 4, 164))
+                .build()
+        );
+        VulkanDescriptorBindingPlanner.UniformBufferEntry dynamicEntry =
+            (VulkanDescriptorBindingPlanner.UniformBufferEntry) dynamicPlan.entries().get(0);
+        assertFalse(dynamicEntry.requiresTransientCopy());
+        assertEquals(VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, dynamicEntry.descriptorType());
+        assertEquals(0x3300L, dynamicEntry.descriptorBufferHandle());
+        assertTrue(dynamicPlan.cacheable());
+
+        VulkanBuffer standaloneSource = buffer(0x3400L, VulkanicBuffer.USAGE_VERTEX);
+        VulkanDescriptorBindingPlanner.DescriptorBindingPlan standalonePlan = fixture.plan(
+            List.of(binding("VulkanicStandaloneUniforms", 0, PipelineDescriptor.ResourceType.UNIFORM_BUFFER)),
+            PipelineResourceBindings.builder()
+                .bindUniformBuffer("VulkanicStandaloneUniforms", new VulkanicBufferSlice(standaloneSource, 8, 256))
+                .build()
+        );
+        VulkanDescriptorBindingPlanner.UniformBufferEntry standaloneEntry =
+            (VulkanDescriptorBindingPlanner.UniformBufferEntry) standalonePlan.entries().get(0);
+        assertFalse(standaloneEntry.requiresTransientCopy());
+        assertEquals(VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, standaloneEntry.descriptorType());
+        assertEquals(0x3400L, standaloneEntry.descriptorBufferHandle());
+        assertTrue(standalonePlan.cacheable());
     }
 
     @Test
@@ -261,6 +348,36 @@ final class VulkanDescriptorBindingPlannerTest {
         PipelineDescriptor.ResourceType type
     ) {
         return new PipelineDescriptor.ResourceBinding(0, binding, name, type, null);
+    }
+
+    private static PipelineDescriptor.ResourceLayout layout(PipelineDescriptor.ResourceBinding... bindings) {
+        return new PipelineDescriptor.ResourceLayout(List.of(bindings));
+    }
+
+    private static PipelineDescriptor descriptor(PipelineDescriptor.ResourceLayout layout) {
+        PipelineDescriptor.PortableState state = new PipelineDescriptor.PortableState(
+            ResourceLocation.withDefaultNamespace("test/pipeline"),
+            ResourceLocation.withDefaultNamespace("test/pipeline/vertex"),
+            ResourceLocation.withDefaultNamespace("test/pipeline/fragment"),
+            Map.of(),
+            Set.of(),
+            List.of(),
+            List.of(),
+            Optional.empty(),
+            net.blaze3d.platform.DepthTestFunction.NO_DEPTH_TEST,
+            net.blaze3d.platform.PolygonMode.FILL,
+            false,
+            VulkanicAPI.GL_BACK,
+            true,
+            true,
+            false,
+            net.blaze3d.platform.LogicOp.NONE,
+            net.blaze3d.vertex.DefaultVertexFormat.POSITION,
+            net.blaze3d.vertex.VertexFormat.Mode.TRIANGLES,
+            0.0F,
+            0.0F
+        );
+        return PipelineDescriptor.fromPortableState(state).withResourceLayout(layout);
     }
 
     private static VulkanBuffer buffer(long handle, int usage) {
@@ -486,6 +603,110 @@ final class VulkanDescriptorBindingPlannerTest {
             return planner.plan(new VulkanDescriptorBindingPlanner.PlanRequest(
                 layout,
                 bindings,
+                new VulkanDescriptorBindingPlanner.TextureSnapshotLookup() {
+                    @Override
+                    public VulkanImageResourceViewCoordinator.ImageStorageSnapshot snapshotForView(VulkanTextureView view) {
+                        return views.get(view);
+                    }
+
+                    @Override
+                    public VulkanImageResourceViewCoordinator.ImageStorageSnapshot snapshotForTexture(int textureId) {
+                        return textures.get(textureId);
+                    }
+
+                    @Override
+                    public VulkanImageResourceViewCoordinator.DescriptorImagePlan descriptorSampledImagePlan(
+                        VulkanTextureView view,
+                        VulkanImageResourceViewCoordinator.ImageStorageSnapshot storage,
+                        Set<Integer> storageImageTextureIds,
+                        VulkanDescriptorBindingPlanner.LayoutLookup layoutLookup,
+                        VulkanDescriptorBindingPlanner.RenderStateSnapshot renderState
+                    ) {
+                        return sampledImagePlan(view, storage, storageImageTextureIds, layoutLookup, renderState);
+                    }
+
+                    @Override
+                    public VulkanImageResourceViewCoordinator.DescriptorImagePlan descriptorStorageImagePlan(
+                        int textureId,
+                        int mipLevel
+                    ) {
+                        return storageImagePlan(textures.get(textureId), mipLevel);
+                    }
+                },
+                textureBindings::get,
+                texelBindings::get,
+                new VulkanDescriptorBindingPlanner.SamplerStateLookup() {
+                    @Override
+                    public VirtualSamplerStateSnapshot samplerState(int sampler) {
+                        return samplerStates.get(sampler);
+                    }
+
+                    @Override
+                    public VirtualSamplerStateSnapshot samplerStateForTextureUnit(int unit) {
+                        return unitSamplerStates.get(unit);
+                    }
+                },
+                (textureId, level) -> textureLayouts.getOrDefault(levelKey(textureId, level), VK10.VK_IMAGE_LAYOUT_UNDEFINED),
+                new VulkanDescriptorBindingPlanner.RenderStateSnapshot(false, Set.of()),
+                256,
+                false,
+                false,
+                "test:pipeline",
+                0x1234L,
+                new VulkanDescriptorBindingPlanner.PlannerEvents() {
+                    @Override
+                    public void comparisonSamplerRebound(
+                        String bindingName,
+                        String fallbackBindingName,
+                        VulkanImageResourceViewCoordinator.ImageStorageSnapshot texture
+                    ) {
+                        events.add(bindingName + "->" + fallbackBindingName + ":" + (texture != null ? texture.textureId() : 0));
+                    }
+
+                    @Override
+                    public void comparisonSamplerDowngraded(String bindingName, VulkanImageResourceViewCoordinator.ImageStorageSnapshot texture) {
+                        events.add(bindingName + "->plain:" + (texture != null ? texture.textureId() : 0));
+                    }
+                }
+            ));
+        }
+
+        private VulkanDescriptorBindingPlanner.DescriptorBindingPlan compactPlan(
+            List<PipelineDescriptor.ResourceBinding> layout,
+            PipelineResourceBindings bindings
+        ) {
+            int slotCount = layout.size();
+            PipelineDescriptor.ResourceBinding[] layoutBindingSlots = new PipelineDescriptor.ResourceBinding[slotCount];
+            Object[] resourceBindingSlots = new Object[slotCount];
+            int bound = 0;
+            int missing = 0;
+            int index = 0;
+            for (PipelineDescriptor.ResourceBinding binding : layout) {
+                Object resourceBinding = switch (binding.type()) {
+                    case SAMPLER, COMPARISON_SAMPLER -> bindings.getSamplerBindingOrNull(binding.name());
+                    case UNIFORM_BUFFER -> bindings.getUniformBufferBindingOrNull(binding.name());
+                    case STORAGE_IMAGE -> bindings.getStorageImageBindingOrNull(binding.name());
+                    case TEXEL_BUFFER -> bindings.getTexelBufferBindingOrNull(binding.name());
+                };
+                if (resourceBinding != null) {
+                    bound++;
+                } else {
+                    missing++;
+                }
+                layoutBindingSlots[index] = binding;
+                resourceBindingSlots[index] = resourceBinding;
+                index++;
+            }
+            VulkanCompactResourceBindingTable table =
+                new VulkanCompactResourceBindingTable(
+                    descriptor(new PipelineDescriptor.ResourceLayout(layout)),
+                    layoutBindingSlots,
+                    resourceBindingSlots,
+                    bound,
+                    missing
+                );
+            return planner.plan(new VulkanDescriptorBindingPlanner.CompactPlanRequest(
+                table,
                 new VulkanDescriptorBindingPlanner.TextureSnapshotLookup() {
                     @Override
                     public VulkanImageResourceViewCoordinator.ImageStorageSnapshot snapshotForView(VulkanTextureView view) {
