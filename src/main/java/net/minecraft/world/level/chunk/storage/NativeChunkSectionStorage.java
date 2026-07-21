@@ -233,7 +233,7 @@ public final class NativeChunkSectionStorage implements Closeable {
 		}
 		try (Arena arena = Arena.ofConfined()) {
 			MemorySegment resultSegment = arena.allocate(RESULT_SIZE, 8);
-			Result result = decodeInto(thisHandle(handle), chunkX, chunkZ, MemorySegment.NULL, 0L, resultSegment);
+			Result result = decodeInto(handle, chunkX, chunkZ, MemorySegment.NULL, 0L, resultSegment);
 			throw new DecodeException("Decode chunk sections", result);
 		}
 	}
@@ -252,10 +252,6 @@ public final class NativeChunkSectionStorage implements Closeable {
 		return exception instanceof DecodeException decodeException
 			&& decodeException.result().errorDomain() == ERROR_DOMAIN_CHUNK
 			&& decodeException.result().errorKind() == CHUNK_UNSUPPORTED_DATA_VERSION;
-	}
-
-	private static long thisHandle(long handle) {
-		return handle;
 	}
 
 	private static Result decodeInto(long handle, int chunkX, int chunkZ, MemorySegment output, long outputCapacity, MemorySegment resultSegment) {

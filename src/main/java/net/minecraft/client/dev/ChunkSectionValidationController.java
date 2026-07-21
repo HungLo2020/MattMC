@@ -8,7 +8,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.entity.ai.village.poi.PoiReadDiagnostics;
 import net.minecraft.world.level.chunk.storage.ChunkSectionReadDiagnostics;
+import net.minecraft.world.level.chunk.storage.EntityReadDiagnostics;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -66,10 +68,19 @@ public final class ChunkSectionValidationController {
 
 		readyTicks++;
 		if (readyTicks >= SETTLE_TICKS) {
+			if (EntityReadDiagnostics.validationAwaitingShutdown()) {
+				return;
+			}
 			stopIssued = true;
 			ChunkSectionReadDiagnostics.recordSaveRequested();
 			ChunkSectionReadDiagnostics.recordShutdownRequested();
 			ChunkSectionReadDiagnostics.recordStopped();
+			stopWhenAllStorageValidationFinished(minecraft);
+		}
+	}
+
+	private static void stopWhenAllStorageValidationFinished(Minecraft minecraft) {
+		if (!EntityReadDiagnostics.validationAwaitingShutdown() && !PoiReadDiagnostics.validationAwaitingShutdown()) {
 			minecraft.stop();
 		}
 	}

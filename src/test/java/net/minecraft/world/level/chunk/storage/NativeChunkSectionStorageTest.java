@@ -221,7 +221,7 @@ class NativeChunkSectionStorageTest {
 			NativeChunkSectionStorage.DecodeResult rust = storage.decodeChunk(pos.x, pos.z);
 			SerializableChunkData rustParsed = SerializableChunkData.parseCurrentVersionRustSections(registryAccess, VANILLA_HEIGHT, factory, rust, pos);
 			assertNotNull(rustParsed);
-			String mismatch = SerializableChunkData.compareNativeSections(
+			String mismatch = ChunkSectionStorageValidation.compareNativeSections(
 				parsed,
 				new SerializableChunkData.NativeSectionBuild(rustParsed.sectionData(), rustParsed.heightmaps()),
 				factory,
@@ -1103,7 +1103,7 @@ class NativeChunkSectionStorageTest {
 				javaResidualEnvelope.add(javaResidualEnvelopeNanos, rust.result().residualTapeLength());
 				totalRust.add(rustDecodeNanos + javaPaletteNanos + javaResidualEnvelopeNanos, rust.result().compressedLength(), rust.result().outputLength());
 
-				String mismatch = SerializableChunkData.compareNativeSections(
+				String mismatch = ChunkSectionStorageValidation.compareNativeSections(
 					javaFullData,
 					rustSections,
 					chunk.factory(),

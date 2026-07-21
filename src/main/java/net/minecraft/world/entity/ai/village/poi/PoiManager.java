@@ -141,7 +141,7 @@ public class PoiManager extends SectionStorage<PoiSection, PoiSection.Packed> {
 		try {
 			SectionStorage.PackedChunk<PoiSection.Packed> packedChunk = packedChunk(
 				NativePoiStorage.toPackedSections(decodeResult, this.registryAccess, this.levelHeightAccessor),
-				PoiReadDiagnostics.shouldMarkCurrentVersionDirty()
+				PoiReadDiagnostics.validationEnabled()
 			);
 			long constructedAt = PoiReadDiagnostics.now();
 			PoiReadDiagnostics.rustDecoded(chunkPos, decodeResult.result(), decodedAt - started, constructedAt - decodedAt);

@@ -7,7 +7,6 @@ import com.google.gson.JsonObject;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
 
 /**
@@ -23,7 +22,6 @@ public final class ChunkSectionReadDiagnostics {
 	private static final boolean SHADOW_VALIDATION_ENABLED = Boolean.getBoolean("mattmc.dev.chunkSectionValidation");
 	private static final boolean WRITE_VALIDATION_ENABLED = Boolean.getBoolean("mattmc.dev.chunkSectionWriteValidation");
 	private static final boolean WRITE_SHADOW_VALIDATION_ENABLED = Boolean.getBoolean("mattmc.dev.rustChunkSectionWriteShadow");
-	private static final String CUSTOM_ROOT_FIELD = "mattmc:chunk_section_validation_custom";
 	private static final Path STATUS_PATH = statusPath();
 	private static final boolean ENABLED = SHADOW_VALIDATION_ENABLED || WRITE_VALIDATION_ENABLED || WRITE_SHADOW_VALIDATION_ENABLED || STATUS_PATH != null;
 	private static final Object LOCK = new Object();
@@ -89,6 +87,15 @@ public final class ChunkSectionReadDiagnostics {
 
 	public static boolean writeValidationEnabled() {
 		return WRITE_VALIDATION_ENABLED;
+	}
+
+	public static boolean validationAwaitingShutdown() {
+		if (!SHADOW_VALIDATION_ENABLED && !WRITE_VALIDATION_ENABLED) {
+			return false;
+		}
+		synchronized (LOCK) {
+			return !stopped && status.equals("running");
+		}
 	}
 
 	public static boolean writeShadowValidationEnabled() {
@@ -338,20 +345,6 @@ public final class ChunkSectionReadDiagnostics {
 			}
 		}
 		writeStatus();
-	}
-
-	public static CompoundTag prepareWriteValidationResidual(CompoundTag residual) {
-		if (!WRITE_VALIDATION_ENABLED || residual == null) {
-			return residual;
-		}
-		boolean observed = residual.contains(CUSTOM_ROOT_FIELD);
-		boolean injected = false;
-		if (!observed) {
-			residual.putString(CUSTOM_ROOT_FIELD, System.getProperty("mattmc.dev.runCaptureId", "unknown"));
-			injected = true;
-		}
-		forcedValidationChunk(injected, observed);
-		return residual;
 	}
 
 	public static void recordWorldReady() {

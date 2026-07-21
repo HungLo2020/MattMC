@@ -5,6 +5,8 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.world.entity.ai.village.poi.PoiReadDiagnostics;
 import net.minecraft.world.entity.player.Input;
+import net.minecraft.world.level.chunk.storage.ChunkSectionReadDiagnostics;
+import net.minecraft.world.level.chunk.storage.EntityReadDiagnostics;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -57,10 +59,19 @@ public final class PoiStorageValidationController {
 
 		readyTicks++;
 		if (readyTicks >= SETTLE_TICKS) {
+			if (EntityReadDiagnostics.validationAwaitingShutdown()) {
+				return;
+			}
 			stopIssued = true;
 			PoiReadDiagnostics.recordSaveRequested();
 			PoiReadDiagnostics.recordShutdownRequested();
 			PoiReadDiagnostics.recordStopped();
+			stopWhenAllStorageValidationFinished(minecraft);
+		}
+	}
+
+	private static void stopWhenAllStorageValidationFinished(Minecraft minecraft) {
+		if (!EntityReadDiagnostics.validationAwaitingShutdown() && !ChunkSectionReadDiagnostics.validationAwaitingShutdown()) {
 			minecraft.stop();
 		}
 	}

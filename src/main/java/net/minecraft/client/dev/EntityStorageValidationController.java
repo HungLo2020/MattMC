@@ -13,13 +13,15 @@ import net.minecraft.nbt.DoubleTag;
 import net.minecraft.nbt.FloatTag;
 import net.minecraft.nbt.IntTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtBenchmarkAccess;
+import net.minecraft.nbt.NativeNbtRegionAccess;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Input;
+import net.minecraft.world.entity.ai.village.poi.PoiReadDiagnostics;
+import net.minecraft.world.level.chunk.storage.ChunkSectionReadDiagnostics;
 import net.minecraft.world.level.chunk.storage.EntityReadDiagnostics;
 import net.minecraft.world.level.storage.NativeEntityValueInput;
 import net.minecraft.world.level.storage.TagValueInput;
@@ -125,6 +127,12 @@ public final class EntityStorageValidationController {
 			stopIssued = true;
 			EntityReadDiagnostics.recordShutdownRequested();
 			EntityReadDiagnostics.recordStopped();
+			stopWhenAllStorageValidationFinished(minecraft);
+		}
+	}
+
+	private static void stopWhenAllStorageValidationFinished(Minecraft minecraft) {
+		if (!PoiReadDiagnostics.validationAwaitingShutdown() && !ChunkSectionReadDiagnostics.validationAwaitingShutdown()) {
 			minecraft.stop();
 		}
 	}
@@ -198,7 +206,7 @@ public final class EntityStorageValidationController {
 	private static List<Entity> loadRust(ServerLevel level, List<CompoundTag> entityTags) throws IOException {
 		List<byte[]> tapes = entityTags.stream().map(tag -> {
 			try {
-				return NbtBenchmarkAccess.writeTapeObject(tag);
+				return NativeNbtRegionAccess.writeTape(tag);
 			} catch (IOException exception) {
 				throw new RuntimeException(exception);
 			}
@@ -278,7 +286,7 @@ public final class EntityStorageValidationController {
 				EntityType.getKey(entity.getType()).toString(),
 				entity.getUUID().toString(),
 				entity.getPassengers().size(),
-				NbtBenchmarkAccess.implementationFingerprint(NbtBenchmarkAccess.writeObject(saved, NbtBenchmarkAccess.FORMAT_RAW), NbtBenchmarkAccess.FORMAT_RAW)
+				NativeNbtRegionAccess.rawFingerprint(saved)
 			);
 		}
 

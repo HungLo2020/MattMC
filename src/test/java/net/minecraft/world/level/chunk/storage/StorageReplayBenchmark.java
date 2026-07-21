@@ -9,6 +9,7 @@ import com.google.gson.JsonParser;
 import java.io.IOException;
 import java.io.Reader;
 import java.lang.management.ManagementFactory;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -22,7 +23,6 @@ import net.minecraft.SharedConstants;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtBenchmarkAccess;
 import net.minecraft.server.Bootstrap;
-import net.minecraft.world.level.ChunkPos;
 
 public final class StorageReplayBenchmark {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -165,11 +165,11 @@ public final class StorageReplayBenchmark {
 				for (RegionOperation operation : this.trace.regionOperations) {
 					switch (operation.op) {
 						case "read" -> {
-							RegionFile.BenchmarkPayload payload = Metric.time(
+							BenchmarkPayload payload = Metric.time(
 								metrics,
 								"region.read_payload",
 								Math.max(0, operation.payloadBytes),
-								() -> session.region(operation).readBenchmarkPayload(new ChunkPos(operation.chunkX, operation.chunkZ))
+								() -> session.readPayload(operation)
 							);
 							if (validate) {
 								operation.validateRead(payload);
@@ -178,16 +178,16 @@ public final class StorageReplayBenchmark {
 						case "write" -> {
 							byte[] payload = operation.payload;
 							Metric.time(metrics, "region.write_payload", payload.length, () -> {
-								session.region(operation).writeBenchmarkPayload(new ChunkPos(operation.chunkX, operation.chunkZ), payload);
+								session.writePayload(operation, payload);
 								return null;
 							});
 						}
 						case "delete" -> Metric.time(metrics, "region.delete", 0, () -> {
-							session.region(operation).clear(new ChunkPos(operation.chunkX, operation.chunkZ));
+							NativeRegionFileBridge.deleteChunk(session.region(operation), operation.chunkX, operation.chunkZ);
 							return null;
 						});
 						case "flush" -> Metric.time(metrics, "region.flush", 0, () -> {
-							session.region(operation).flush();
+							NativeRegionFileBridge.flush(session.region(operation));
 							return null;
 						});
 						case "reopen" -> Metric.time(metrics, "region.reopen", 0, () -> {
@@ -207,33 +207,63 @@ public final class StorageReplayBenchmark {
 	private static final class RegionSession implements AutoCloseable {
 		private final Path worldPath;
 		private final Map<String, Metric> metrics;
-		private final Map<String, RegionFile> open = new HashMap<>();
+		private final Map<String, Long> open = new HashMap<>();
 
 		private RegionSession(Path worldPath, Map<String, Metric> metrics) {
 			this.worldPath = worldPath;
 			this.metrics = metrics;
 		}
 
-		RegionFile region(RegionOperation operation) throws IOException {
+		long region(RegionOperation operation) throws IOException {
 			String key = operation.region;
-			RegionFile existing = this.open.get(key);
+			Long existing = this.open.get(key);
 			if (existing != null) {
 				return existing;
 			}
 			Path path = this.worldPath.resolve(operation.region);
 			Files.createDirectories(path.getParent());
-			RegionFile created = Metric.time(
+			long created = Metric.time(
 				this.metrics,
 				"region.open",
 				0,
-				() -> new RegionFile(new RegionStorageInfo("storage-benchmark", null, operation.storageType), path, path.getParent(), false)
+				() -> NativeRegionFileBridge.open(path, false)
 			);
 			this.open.put(key, created);
 			return created;
 		}
 
+		BenchmarkPayload readPayload(RegionOperation operation) throws IOException {
+			NativeRegionFileBridge.PayloadResult payload = NativeRegionFileBridge.readPayload(this.region(operation), operation.chunkX, operation.chunkZ);
+			NativeRegionFileBridge.Result result = payload.result();
+			if (!result.present()) {
+				return BenchmarkPayload.missing();
+			}
+
+			ByteBuffer encoded = ByteBuffer.allocate(5 + payload.bytes().length);
+			encoded.putInt(payload.bytes().length + 1);
+			encoded.put((byte)result.compressionId());
+			encoded.put(payload.bytes());
+			return new BenchmarkPayload(true, result.compressionId(), result.external(), result.timestamp(), encoded.array());
+		}
+
+		void writePayload(RegionOperation operation, byte[] encodedPayload) throws IOException {
+			ByteBuffer encoded = ByteBuffer.wrap(encodedPayload);
+			if (encoded.remaining() < 5) {
+				throw new IOException("Encoded region payload is too small: " + encodedPayload.length);
+			}
+			int declaredLength = encoded.getInt();
+			int payloadLength = declaredLength - 1;
+			if (payloadLength < 0 || payloadLength != encoded.remaining() - 1) {
+				throw new IOException("Encoded region payload length " + declaredLength + " does not match buffer size " + encodedPayload.length);
+			}
+			int compressionId = Byte.toUnsignedInt(encoded.get());
+			byte[] payload = new byte[payloadLength];
+			encoded.get(payload);
+			NativeRegionFileBridge.writePayload(this.region(operation), operation.chunkX, operation.chunkZ, compressionId, payload);
+		}
+
 		void reopen(RegionOperation operation) throws IOException {
-			RegionFile existing = this.open.remove(operation.region);
+			Long existing = this.open.remove(operation.region);
 			if (existing != null) {
 				this.closeRegion(existing);
 			}
@@ -243,7 +273,7 @@ public final class StorageReplayBenchmark {
 		@Override
 		public void close() throws IOException {
 			IOException failure = null;
-			for (RegionFile region : this.open.values()) {
+			for (long region : this.open.values()) {
 				try {
 					this.closeRegion(region);
 				} catch (IOException exception) {
@@ -260,9 +290,9 @@ public final class StorageReplayBenchmark {
 			}
 		}
 
-		private void closeRegion(RegionFile region) throws IOException {
+		private void closeRegion(long region) throws IOException {
 			Metric.time(this.metrics, "region.close", 0, () -> {
-				region.close();
+				NativeRegionFileBridge.close(region);
 				return null;
 			});
 		}
@@ -383,7 +413,7 @@ public final class StorageReplayBenchmark {
 			);
 		}
 
-		void validateRead(RegionFile.BenchmarkPayload payload) throws IOException {
+		void validateRead(BenchmarkPayload payload) throws IOException {
 			if (payload.present() != this.expectedPresent) {
 				throw new IOException("Region presence mismatch for " + this.region + " " + this.chunkX + "," + this.chunkZ);
 			}
@@ -400,6 +430,12 @@ public final class StorageReplayBenchmark {
 			if (!actualHash.equals(this.payloadSha256)) {
 				throw new IOException("Region payload hash mismatch for " + this.region + " " + this.chunkX + "," + this.chunkZ);
 			}
+		}
+	}
+
+	private record BenchmarkPayload(boolean present, int compressionId, boolean external, long timestamp, byte[] encodedPayload) {
+		static BenchmarkPayload missing() {
+			return new BenchmarkPayload(false, -1, false, 0L, new byte[0]);
 		}
 	}
 

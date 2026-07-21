@@ -89,6 +89,7 @@ import net.minecraft.world.level.chunk.status.ChunkType;
 import net.minecraft.world.level.chunk.status.WorldGenContext;
 import net.minecraft.world.level.chunk.storage.ChunkStorage;
 import net.minecraft.world.level.chunk.storage.ChunkSectionReadDiagnostics;
+import net.minecraft.world.level.chunk.storage.ChunkSectionStorageValidation;
 import net.minecraft.world.level.chunk.storage.NativeChunkSectionStorage;
 import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
 import net.minecraft.world.level.chunk.storage.SerializableChunkData;
@@ -604,7 +605,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 					return this.readChunk(chunkPos)
 						.thenApplyAsync(
 							optional -> optional.map(compoundTag -> {
-								SerializableChunkData serializableChunkData = SerializableChunkData.parseWithRustSectionsForValidation(
+								SerializableChunkData serializableChunkData = ChunkSectionStorageValidation.parseWithRustSectionsForValidation(
 									this.level.registryAccess(),
 									this.level,
 									this.level.palettedContainerFactory(),

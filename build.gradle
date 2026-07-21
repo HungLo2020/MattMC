@@ -562,9 +562,9 @@ tasks.register('runStorageReplayBenchmark', JavaExec) {
     group = 'verification'
     description = 'Runs the deterministic headless NBT/region storage replay benchmark.'
 
-    dependsOn 'classes'
+    dependsOn 'testClasses'
 
-    classpath = sourceSets.main.runtimeClasspath
+    classpath = sourceSets.test.runtimeClasspath
     mainClass = 'net.minecraft.world.level.chunk.storage.StorageReplayBenchmark'
     workingDir = file('run')
 
