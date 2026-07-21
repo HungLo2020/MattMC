@@ -530,6 +530,25 @@ tasks.withType(Test).configureEach {
         systemProperty 'mattmc.chunkSectionBenchmark.warmup', chunkSectionBenchmarkWarmup.get()
         systemProperty 'mattmc.chunkSectionBenchmark.measure', chunkSectionBenchmarkMeasure.get()
     }
+
+    def chunkSectionWriteBenchmarkEnabled = providers.gradleProperty('mattmcRunChunkSectionWriteBenchmark')
+    if (chunkSectionWriteBenchmarkEnabled.isPresent()) {
+        def chunkSectionWriteBenchmarkOutput = providers.gradleProperty('mattmcChunkSectionWriteBenchmarkOutput')
+                .orElse("${buildDir}/chunk-section-benchmark/chunk_section_write_benchmark.json")
+        def chunkSectionBenchmarkChunks = providers.gradleProperty('mattmcChunkSectionBenchmarkChunks').orElse('24')
+        def chunkSectionBenchmarkWarmup = providers.gradleProperty('mattmcChunkSectionBenchmarkWarmup').orElse('4')
+        def chunkSectionBenchmarkMeasure = providers.gradleProperty('mattmcChunkSectionBenchmarkMeasure').orElse('12')
+        inputs.property('mattmcRunChunkSectionWriteBenchmark', chunkSectionWriteBenchmarkEnabled.get())
+        inputs.property('mattmcChunkSectionBenchmarkChunks', chunkSectionBenchmarkChunks.get())
+        inputs.property('mattmcChunkSectionBenchmarkWarmup', chunkSectionBenchmarkWarmup.get())
+        inputs.property('mattmcChunkSectionBenchmarkMeasure', chunkSectionBenchmarkMeasure.get())
+        outputs.file(file(chunkSectionWriteBenchmarkOutput.get())).withPropertyName('mattmcChunkSectionWriteBenchmarkOutput')
+        systemProperty 'mattmc.runChunkSectionWriteBenchmark', chunkSectionWriteBenchmarkEnabled.get()
+        systemProperty 'mattmc.chunkSectionWriteBenchmark.output', file(chunkSectionWriteBenchmarkOutput.get()).absolutePath
+        systemProperty 'mattmc.chunkSectionBenchmark.chunks', chunkSectionBenchmarkChunks.get()
+        systemProperty 'mattmc.chunkSectionBenchmark.warmup', chunkSectionBenchmarkWarmup.get()
+        systemProperty 'mattmc.chunkSectionBenchmark.measure', chunkSectionBenchmarkMeasure.get()
+    }
 }
 
 tasks.withType(JavaExec).configureEach {

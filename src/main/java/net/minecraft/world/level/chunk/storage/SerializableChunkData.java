@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.Map.Entry;
 import java.util.stream.LongStream;
 import net.minecraft.Optionull;
@@ -35,6 +36,7 @@ import net.minecraft.nbt.NbtException;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.ShortTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -97,7 +99,8 @@ public record SerializableChunkData(
 	List<SerializableChunkData.SectionData> sectionData,
 	List<CompoundTag> entities,
 	List<CompoundTag> blockEntities,
-	CompoundTag structureData
+	CompoundTag structureData,
+	@Nullable CompoundTag rustSectionResidual
 ) {
 	private static final Codec<List<SavedTick<Block>>> BLOCK_TICKS_CODEC = SavedTick.codec(BuiltInRegistries.BLOCK.byNameCodec()).listOf();
 	private static final Codec<List<SavedTick<Fluid>>> FLUID_TICKS_CODEC = SavedTick.codec(BuiltInRegistries.FLUID.byNameCodec()).listOf();
@@ -112,6 +115,30 @@ public record SerializableChunkData(
 	public static final String SECTIONS_TAG = "sections";
 	public static final String BLOCK_LIGHT_TAG = "BlockLight";
 	public static final String SKY_LIGHT_TAG = "SkyLight";
+	private static final Set<String> RUST_SECTION_OWNED_ROOT_FIELDS = Set.of(
+		"DataVersion",
+		"xPos",
+		"yPos",
+		"zPos",
+		"LastUpdate",
+		"InhabitedTime",
+		"Status",
+		SECTIONS_TAG,
+		IS_LIGHT_ON_TAG,
+		HEIGHTMAPS_TAG
+	);
+	private static final Set<String> JAVA_RESIDUAL_ROOT_FIELDS = Set.of(
+		"blending_data",
+		"below_zero_retrogen",
+		TAG_UPGRADE_DATA,
+		"block_entities",
+		"entities",
+		"carving_mask",
+		BLOCK_TICKS_TAG,
+		FLUID_TICKS_TAG,
+		"PostProcessing",
+		"structures"
+	);
 
 	@Nullable
 	public static SerializableChunkData parse(LevelHeightAccessor levelHeightAccessor, PalettedContainerFactory palettedContainerFactory, CompoundTag compoundTag) {
@@ -120,7 +147,7 @@ public record SerializableChunkData(
 		} else {
 			ChunkStatus chunkStatus = (ChunkStatus)compoundTag.read("Status", ChunkStatus.CODEC).orElse(ChunkStatus.EMPTY);
 			NativeSectionBuild sections = parseJavaSectionData(levelHeightAccessor, palettedContainerFactory, compoundTag, chunkStatus);
-			return parseEnvelope(levelHeightAccessor, palettedContainerFactory, compoundTag, sections, compoundTag.getBooleanOr("isLightOn", false));
+			return parseEnvelope(levelHeightAccessor, palettedContainerFactory, compoundTag, sections, compoundTag.getBooleanOr("isLightOn", false), null);
 		}
 	}
 
@@ -178,12 +205,13 @@ public record SerializableChunkData(
 	}
 
 	@Nullable
-	private static SerializableChunkData parseEnvelope(
+	static SerializableChunkData parseEnvelope(
 		LevelHeightAccessor levelHeightAccessor,
 		PalettedContainerFactory palettedContainerFactory,
 		CompoundTag compoundTag,
 		NativeSectionBuild sectionBuild,
-		boolean lightCorrect
+		boolean lightCorrect,
+		@Nullable CompoundTag rustResidual
 	) {
 		if (compoundTag.getString("Status").isEmpty()) {
 			return null;
@@ -240,12 +268,13 @@ public record SerializableChunkData(
 			sectionBuild.sections(),
 			list3,
 			list4,
-			compoundTag2
+			compoundTag2,
+			rustResidual == null ? null : copyRustSectionResidual(rustResidual)
 		);
 	}
 
 	@Nullable
-	public static SerializableChunkData parseWithRustSections(
+	public static SerializableChunkData parseWithRustSectionsForValidation(
 		RegistryAccess registryAccess,
 		LevelHeightAccessor levelHeightAccessor,
 		PalettedContainerFactory palettedContainerFactory,
@@ -287,7 +316,12 @@ public record SerializableChunkData(
 					ChunkSectionReadDiagnostics.parityMismatch(requestedChunkPos, mismatch, result, javaParseNanos, resolveNanos, compareNanos);
 					return javaData;
 				}
-				SerializableChunkData nativeData = javaData.withNativeSections(nativeBuild.sections(), nativeBuild.heightmaps(), decodeResult.chunk().lightOn());
+				SerializableChunkData nativeData = javaData.withNativeSections(
+					nativeBuild.sections(),
+					nativeBuild.heightmaps(),
+					decodeResult.chunk().lightOn(),
+					decodeResult.chunk().residual()
+				);
 				ChunkSectionReadDiagnostics.rustDecoded(requestedChunkPos, result, javaParseNanos, resolveNanos, compareNanos);
 				return nativeData;
 			}
@@ -296,9 +330,10 @@ public record SerializableChunkData(
 			SerializableChunkData nativeData = parseEnvelope(
 				levelHeightAccessor,
 				palettedContainerFactory,
-				compoundTag,
+				decodeResult.chunk().residual(),
 				nativeBuild,
-				decodeResult.chunk().lightOn()
+				decodeResult.chunk().lightOn(),
+				decodeResult.chunk().residual()
 			);
 			long envelopeNanos = ChunkSectionReadDiagnostics.elapsed(envelopeStarted);
 			ChunkSectionReadDiagnostics.rustDecoded(requestedChunkPos, result, envelopeNanos, resolveNanos, 0L);
@@ -309,10 +344,46 @@ public record SerializableChunkData(
 		}
 	}
 
+	@Nullable
+	public static SerializableChunkData parseCurrentVersionRustSections(
+		RegistryAccess registryAccess,
+		LevelHeightAccessor levelHeightAccessor,
+		PalettedContainerFactory palettedContainerFactory,
+		NativeChunkSectionStorage.DecodeResult decodeResult,
+		ChunkPos requestedChunkPos
+	) throws IOException {
+		NativeChunkSectionStorage.Result result = decodeResult.result();
+		if (!result.present()) {
+			ChunkSectionReadDiagnostics.absent(requestedChunkPos);
+			return null;
+		}
+		if (result.requiresDfu() || result.dataVersion() < SharedConstants.getCurrentVersion().dataVersion().version()) {
+			ChunkSectionReadDiagnostics.oldVersionFallback(requestedChunkPos, result.dataVersion());
+			throw new IOException("Rust chunk-section decode requires Java DFU for " + requestedChunkPos + " data version " + result.dataVersion());
+		}
+
+		long resolveStarted = ChunkSectionReadDiagnostics.now();
+		NativeSectionBuild nativeBuild = buildNativeSections(registryAccess, palettedContainerFactory, decodeResult.chunk());
+		long resolveNanos = ChunkSectionReadDiagnostics.elapsed(resolveStarted);
+		long envelopeStarted = ChunkSectionReadDiagnostics.now();
+		SerializableChunkData nativeData = parseEnvelope(
+			levelHeightAccessor,
+			palettedContainerFactory,
+			decodeResult.chunk().residual(),
+			nativeBuild,
+			decodeResult.chunk().lightOn(),
+			decodeResult.chunk().residual()
+		);
+		long envelopeNanos = ChunkSectionReadDiagnostics.elapsed(envelopeStarted);
+		ChunkSectionReadDiagnostics.rustDecoded(requestedChunkPos, result, envelopeNanos, resolveNanos, 0L);
+		return nativeData;
+	}
+
 	private SerializableChunkData withNativeSections(
 		List<SerializableChunkData.SectionData> nativeSections,
 		Map<Heightmap.Types, long[]> nativeHeightmaps,
-		boolean nativeLightCorrect
+		boolean nativeLightCorrect,
+		@Nullable CompoundTag rustResidual
 	) {
 		return new SerializableChunkData(
 			this.containerFactory,
@@ -332,7 +403,8 @@ public record SerializableChunkData(
 			nativeSections,
 			this.entities,
 			this.blockEntities,
-			this.structureData
+			this.structureData,
+			rustResidual
 		);
 	}
 
@@ -601,6 +673,7 @@ public record SerializableChunkData(
 		}
 
 		chunkAccess.setLightCorrect(this.lightCorrect);
+		chunkAccess.setRustChunkSectionResidual(this.rustSectionResidual);
 		EnumSet<Heightmap.Types> enumSet = EnumSet.noneOf(Heightmap.Types.class);
 
 		for (Heightmap.Types types : chunkAccess.getPersistedStatus().heightmapsAfter()) {
@@ -621,7 +694,9 @@ public record SerializableChunkData(
 		}
 
 		if (chunkType == ChunkType.LEVELCHUNK) {
-			return new ImposterProtoChunk((LevelChunk)chunkAccess, false);
+			ImposterProtoChunk imposterProtoChunk = new ImposterProtoChunk((LevelChunk)chunkAccess, false);
+			imposterProtoChunk.setRustChunkSectionResidual(this.rustSectionResidual);
+			return imposterProtoChunk;
 		} else {
 			ProtoChunk protoChunk2 = (ProtoChunk)chunkAccess;
 
@@ -721,7 +796,8 @@ public record SerializableChunkData(
 				list,
 				list3,
 				list2,
-				compoundTag2
+				compoundTag2,
+				ChunkSectionReadDiagnostics.prepareWriteValidationResidual(chunkAccess.getRustChunkSectionResidual())
 			);
 		}
 	}
@@ -790,6 +866,75 @@ public record SerializableChunkData(
 		compoundTag.put("Heightmaps", compoundTag3);
 		compoundTag.put("structures", this.structureData);
 		return compoundTag;
+	}
+
+	CompoundTag writeWithRustSectionResidual() {
+		CompoundTag compoundTag = this.write();
+		if (this.rustSectionResidual != null) {
+			CompoundTag residual = this.rustSectionResidual.copy();
+			stripRustSectionOwnedRootFields(residual);
+			stripJavaResidualRootFields(residual);
+			for (String key : residual.keySet()) {
+				Tag tag = residual.get(key);
+				if (tag != null) {
+					compoundTag.put(key, tag.copy());
+				}
+			}
+		}
+		return compoundTag;
+	}
+
+	CompoundTag writeResidualForRustSections() {
+		CompoundTag compoundTag = this.rustSectionResidual == null ? new CompoundTag() : this.rustSectionResidual.copy();
+		stripRustSectionOwnedRootFields(compoundTag);
+		stripJavaResidualRootFields(compoundTag);
+		compoundTag.storeNullable("blending_data", BlendingData.Packed.CODEC, this.blendingData);
+		compoundTag.storeNullable("below_zero_retrogen", BelowZeroRetrogen.CODEC, this.belowZeroRetrogen);
+		if (!this.upgradeData.isEmpty()) {
+			compoundTag.put("UpgradeData", this.upgradeData.write());
+		}
+
+		ListTag blockEntityTags = new ListTag();
+		blockEntityTags.addAll(this.blockEntities);
+		compoundTag.put("block_entities", blockEntityTags);
+		if (this.chunkStatus.getChunkType() == ChunkType.PROTOCHUNK) {
+			ListTag entityTags = new ListTag();
+			entityTags.addAll(this.entities);
+			compoundTag.put("entities", entityTags);
+			if (this.carvingMask != null) {
+				compoundTag.putLongArray("carving_mask", this.carvingMask);
+			}
+		}
+
+		saveTicks(compoundTag, this.packedTicks);
+		compoundTag.put("PostProcessing", packOffsets(this.postProcessingSections));
+		compoundTag.put("structures", this.structureData);
+		return compoundTag;
+	}
+
+	private static CompoundTag copyRustSectionResidual(CompoundTag compoundTag) {
+		CompoundTag residual = new CompoundTag();
+		for (String key : compoundTag.keySet()) {
+			if (!RUST_SECTION_OWNED_ROOT_FIELDS.contains(key)) {
+				Tag tag = compoundTag.get(key);
+				if (tag != null) {
+					residual.put(key, tag.copy());
+				}
+			}
+		}
+		return residual;
+	}
+
+	private static void stripRustSectionOwnedRootFields(CompoundTag compoundTag) {
+		for (String key : RUST_SECTION_OWNED_ROOT_FIELDS) {
+			compoundTag.remove(key);
+		}
+	}
+
+	private static void stripJavaResidualRootFields(CompoundTag compoundTag) {
+		for (String key : JAVA_RESIDUAL_ROOT_FIELDS) {
+			compoundTag.remove(key);
+		}
 	}
 
 	private static void saveTicks(CompoundTag compoundTag, ChunkAccess.PackedTicks packedTicks) {

@@ -3,7 +3,9 @@ use crate::storage::nbt::model::{CompoundEntry, JavaString, ListTag, NbtDocument
 use crate::storage::nbt::tape::document_to_tape;
 
 use super::error::{ChunkError, ChunkErrorKind, ChunkResult};
-use super::model::{BiomePaletteEntry, ChunkSectionDecode, ChunkSectionRecord, HeightmapRecord};
+use super::model::{
+    BiomePaletteEntry, ChunkSectionDecode, ChunkSectionRecord, HeightmapRecord, UnifiedChunkDecode,
+};
 
 pub const CURRENT_CHUNK_DATA_VERSION: i32 = 4556;
 const DEFAULT_MIN_SECTION_Y: i32 = -4;
@@ -17,16 +19,26 @@ pub fn decode_chunk_document(
     requested_chunk_x: i32,
     requested_chunk_z: i32,
 ) -> ChunkResult<ChunkSectionDecode> {
+    Ok(decode_unified_chunk_document(document, requested_chunk_x, requested_chunk_z)?.sections)
+}
+
+pub fn decode_unified_chunk_document(
+    document: &NbtDocument,
+    requested_chunk_x: i32,
+    requested_chunk_z: i32,
+) -> ChunkResult<UnifiedChunkDecode> {
     let root = compound(&document.root, "root")?;
     let Some(data_version) = optional_int(root, "DataVersion")? else {
-        return Ok(requires_dfu_chunk(0, requested_chunk_x, requested_chunk_z));
+        return Ok(UnifiedChunkDecode {
+            sections: requires_dfu_chunk(0, requested_chunk_x, requested_chunk_z),
+            residual: empty_residual(document),
+        });
     };
     if data_version < CURRENT_CHUNK_DATA_VERSION {
-        return Ok(requires_dfu_chunk(
-            data_version,
-            requested_chunk_x,
-            requested_chunk_z,
-        ));
+        return Ok(UnifiedChunkDecode {
+            sections: requires_dfu_chunk(data_version, requested_chunk_x, requested_chunk_z),
+            residual: empty_residual(document),
+        });
     }
     if data_version > CURRENT_CHUNK_DATA_VERSION {
         return Err(ChunkError::new(
@@ -57,18 +69,43 @@ pub fn decode_chunk_document(
     let sections = decode_sections(find_entry(root, "sections"))?;
     let heightmaps = decode_heightmaps(find_entry(root, "Heightmaps"))?;
 
-    Ok(ChunkSectionDecode {
-        data_version,
-        chunk_x,
-        chunk_z,
-        y_pos,
-        status,
-        is_light_on,
-        last_update,
-        inhabited_time,
-        requires_dfu: false,
-        sections,
-        heightmaps,
+    Ok(UnifiedChunkDecode {
+        sections: ChunkSectionDecode {
+            data_version,
+            chunk_x,
+            chunk_z,
+            y_pos,
+            status,
+            is_light_on,
+            last_update,
+            inhabited_time,
+            requires_dfu: false,
+            sections,
+            heightmaps,
+        },
+        residual: residual_document(document)?,
+    })
+}
+
+fn empty_residual(document: &NbtDocument) -> NbtDocument {
+    NbtDocument {
+        name: document.name.clone(),
+        root: NbtTag::Compound(Vec::new()),
+    }
+}
+
+fn residual_document(document: &NbtDocument) -> ChunkResult<NbtDocument> {
+    let root = compound(&document.root, "root")?;
+    let residual_entries = root
+        .iter()
+        .filter(|entry| {
+            !matches_name(&entry.name, "sections") && !matches_name(&entry.name, "Heightmaps")
+        })
+        .cloned()
+        .collect();
+    Ok(NbtDocument {
+        name: document.name.clone(),
+        root: NbtTag::Compound(residual_entries),
     })
 }
 
@@ -346,8 +383,12 @@ fn tag_to_tape(tag: &NbtTag, field: &str) -> ChunkResult<Vec<u8>> {
 fn find_entry<'a>(entries: &'a [CompoundEntry], name: &str) -> Option<&'a NbtTag> {
     entries
         .iter()
-        .find(|entry| entry.name.units() == JavaString::from_str(name).units())
+        .find(|entry| matches_name(&entry.name, name))
         .map(|entry| &entry.value)
+}
+
+fn matches_name(value: &JavaString, name: &str) -> bool {
+    value.units() == JavaString::from_str(name).units()
 }
 
 fn compound<'a>(tag: &'a NbtTag, field: &str) -> ChunkResult<&'a [CompoundEntry]> {

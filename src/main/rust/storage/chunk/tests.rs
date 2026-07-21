@@ -1,9 +1,16 @@
 use crate::storage::nbt::model::{CompoundEntry, JavaString, ListTag, NbtDocument, NbtTag, TagId};
+use crate::storage::nbt::tape::{document_from_tape, document_to_tape};
 
-use super::decoder::{decode_chunk_document, CURRENT_CHUNK_DATA_VERSION};
+use super::decoder::{
+    decode_chunk_document, decode_unified_chunk_document, CURRENT_CHUNK_DATA_VERSION,
+};
 use super::error::ChunkErrorKind;
 use super::model::BiomePaletteEntry;
-use super::tape::encode_chunk_tape;
+use super::tape::{encode_chunk_tape, encode_unified_chunk_tape};
+use super::writer::{
+    document_from_typed_chunk_tape, document_from_typed_chunk_tape_for_position,
+    merge_typed_chunk_document,
+};
 
 #[test]
 fn decodes_current_version_section_records() {
@@ -156,6 +163,252 @@ fn preserves_biome_resource_identifier_units() {
     );
 }
 
+#[test]
+fn unified_decode_returns_residual_without_section_owned_fields() {
+    let document = chunk_document(
+        CURRENT_CHUNK_DATA_VERSION,
+        2,
+        3,
+        vec![section(
+            0,
+            block_states(vec![block_state("minecraft:air")], None),
+            biomes(vec!["minecraft:plains"], None),
+            None,
+            None,
+        )],
+        vec![heightmap("MOTION_BLOCKING", vec![7; 37])],
+    );
+    let mut document = document;
+    let NbtTag::Compound(entries) = &mut document.root else {
+        unreachable!();
+    };
+    entries.push(entry(
+        "block_entities",
+        NbtTag::List(ListTag {
+            element_type: TagId::Compound,
+            elements: vec![NbtTag::Compound(vec![entry(
+                "id",
+                NbtTag::String(JavaString::from_str("minecraft:chest")),
+            )])],
+        }),
+    ));
+    entries.push(entry(
+        "mattmc:custom",
+        NbtTag::String(JavaString::from_str("preserved")),
+    ));
+
+    let unified = decode_unified_chunk_document(&document, 2, 3).expect("decode");
+    let tape = encode_unified_chunk_tape(&unified.sections, &unified.residual).expect("tape");
+    assert!(!tape.is_empty());
+    let NbtTag::Compound(residual) = &unified.residual.root else {
+        panic!("expected residual compound");
+    };
+
+    assert!(find_entry(residual, "sections").is_none());
+    assert!(find_entry(residual, "Heightmaps").is_none());
+    assert!(find_entry(residual, "block_entities").is_some());
+    assert!(find_entry(residual, "mattmc:custom").is_some());
+    assert!(document_from_tape(
+        &crate::storage::nbt::tape::document_to_tape(
+            &unified.residual,
+            crate::storage::nbt::limits::NbtLimits::defaults()
+        )
+        .unwrap(),
+        crate::storage::nbt::limits::NbtLimits::defaults()
+    )
+    .is_ok());
+}
+
+#[test]
+fn typed_write_merges_sections_heightmaps_and_residual_without_duplicates() {
+    let document = chunk_document(
+        CURRENT_CHUNK_DATA_VERSION,
+        2,
+        3,
+        vec![section(
+            0,
+            block_states(
+                vec![block_state("minecraft:air"), block_state("minecraft:stone")],
+                Some(vec![0; 256]),
+            ),
+            biomes(vec!["minecraft:plains"], None),
+            Some(vec![1; 2048]),
+            None,
+        )],
+        vec![heightmap("MOTION_BLOCKING", vec![7; 37])],
+    );
+    let unified = decode_unified_chunk_document(&document, 2, 3).expect("decode");
+    let mut residual = unified.residual.clone();
+    let NbtTag::Compound(entries) = &mut residual.root else {
+        panic!("expected residual compound");
+    };
+    entries.push(entry("sections", NbtTag::Compound(Vec::new())));
+    entries.push(entry("Heightmaps", NbtTag::Compound(Vec::new())));
+    entries.push(entry(
+        "mattmc:custom",
+        NbtTag::String(JavaString::from_str("preserved")),
+    ));
+
+    let merged = merge_typed_chunk_document(
+        &unified.sections,
+        &residual,
+        crate::storage::nbt::limits::NbtLimits::defaults(),
+    )
+    .expect("merge");
+    let NbtTag::Compound(root) = &merged.root else {
+        panic!("expected root compound");
+    };
+
+    assert_eq!(1, count_entries(root, "sections"));
+    assert_eq!(1, count_entries(root, "Heightmaps"));
+    assert_eq!(Some(&NbtTag::Int(2)), find_entry(root, "xPos"));
+    assert_eq!(Some(&NbtTag::Int(3)), find_entry(root, "zPos"));
+    assert!(find_entry(root, "mattmc:custom").is_some());
+    assert!(matches!(
+        find_entry(root, "sections"),
+        Some(NbtTag::List(_))
+    ));
+    assert!(matches!(
+        find_entry(root, "Heightmaps"),
+        Some(NbtTag::Compound(_))
+    ));
+}
+
+#[test]
+fn typed_write_omits_empty_block_state_properties_like_java_serializer() {
+    let document = chunk_document(
+        CURRENT_CHUNK_DATA_VERSION,
+        0,
+        0,
+        vec![section(
+            0,
+            block_states(
+                vec![
+                    block_state_with_properties("minecraft:air", Vec::new()),
+                    block_state_with_properties(
+                        "minecraft:oak_log",
+                        vec![entry("axis", NbtTag::String(JavaString::from_str("y")))],
+                    ),
+                ],
+                Some(vec![0; 256]),
+            ),
+            biomes(vec!["minecraft:plains"], None),
+            None,
+            None,
+        )],
+        Vec::new(),
+    );
+    let unified = decode_unified_chunk_document(&document, 0, 0).expect("decode");
+    let merged = merge_typed_chunk_document(
+        &unified.sections,
+        &unified.residual,
+        crate::storage::nbt::limits::NbtLimits::defaults(),
+    )
+    .expect("merge");
+    let NbtTag::Compound(root) = &merged.root else {
+        panic!("expected root compound");
+    };
+    let Some(NbtTag::List(sections)) = find_entry(root, "sections") else {
+        panic!("expected sections");
+    };
+    let NbtTag::Compound(section) = &sections.elements[0] else {
+        panic!("expected section");
+    };
+    let Some(NbtTag::Compound(block_states)) = find_entry(section, "block_states") else {
+        panic!("expected block_states");
+    };
+    let Some(NbtTag::List(palette)) = find_entry(block_states, "palette") else {
+        panic!("expected palette");
+    };
+    let NbtTag::Compound(air) = &palette.elements[0] else {
+        panic!("expected air");
+    };
+    let NbtTag::Compound(oak_log) = &palette.elements[1] else {
+        panic!("expected oak_log");
+    };
+
+    assert!(find_entry(air, "Properties").is_none());
+    assert!(matches!(
+        find_entry(oak_log, "Properties"),
+        Some(NbtTag::Compound(properties)) if !properties.is_empty()
+    ));
+}
+
+#[test]
+fn typed_write_tape_round_trips_to_current_version_document() {
+    let document = chunk_document(
+        CURRENT_CHUNK_DATA_VERSION,
+        -5,
+        9,
+        vec![section(
+            -4,
+            block_states(vec![block_state("minecraft:air")], None),
+            biomes(vec!["minecraft:plains", "minecraft:forest"], Some(vec![0])),
+            None,
+            Some(vec![15; 2048]),
+        )],
+        vec![heightmap("WORLD_SURFACE", vec![3; 37])],
+    );
+    let unified = decode_unified_chunk_document(&document, -5, 9).expect("decode");
+    let tape = encode_unified_chunk_tape(&unified.sections, &unified.residual).expect("tape");
+    let merged =
+        document_from_typed_chunk_tape(&tape, crate::storage::nbt::limits::NbtLimits::defaults())
+            .expect("write document");
+    let encoded_tape =
+        document_to_tape(&merged, crate::storage::nbt::limits::NbtLimits::defaults()).unwrap();
+    assert!(document_from_tape(
+        &encoded_tape,
+        crate::storage::nbt::limits::NbtLimits::defaults()
+    )
+    .is_ok());
+}
+
+#[test]
+fn typed_write_rejects_coordinate_mismatch() {
+    let document = chunk_document(CURRENT_CHUNK_DATA_VERSION, 4, 5, Vec::new(), Vec::new());
+    let unified = decode_unified_chunk_document(&document, 4, 5).expect("decode");
+    let tape = encode_unified_chunk_tape(&unified.sections, &unified.residual).expect("tape");
+    let error = document_from_typed_chunk_tape_for_position(
+        &tape,
+        Some((4, 6)),
+        crate::storage::nbt::limits::NbtLimits::defaults(),
+    )
+    .expect_err("coordinate mismatch");
+    assert_eq!(ChunkErrorKind::InvalidPosition, error.kind);
+}
+
+#[test]
+fn typed_write_rejects_invalid_light_and_old_versions() {
+    let old = chunk_document(CURRENT_CHUNK_DATA_VERSION - 1, 0, 0, Vec::new(), Vec::new());
+    let unified = decode_unified_chunk_document(&old, 0, 0).expect("old decode");
+    assert!(unified.sections.requires_dfu);
+    let tape = encode_chunk_tape(&unified.sections).expect("old tape");
+    let error =
+        document_from_typed_chunk_tape(&tape, crate::storage::nbt::limits::NbtLimits::defaults())
+            .expect_err("old typed write");
+    assert_eq!(ChunkErrorKind::UnsupportedDataVersion, error.kind);
+
+    let invalid = chunk_document(
+        CURRENT_CHUNK_DATA_VERSION,
+        0,
+        0,
+        vec![section(
+            0,
+            block_states(vec![block_state("minecraft:air")], None),
+            biomes(vec!["minecraft:plains"], None),
+            Some(vec![0; 7]),
+            None,
+        )],
+        Vec::new(),
+    );
+    assert_eq!(
+        ChunkErrorKind::InvalidLightArray,
+        decode_unified_chunk_document(&invalid, 0, 0)
+            .expect_err("invalid light")
+            .kind
+    );
+}
+
 fn chunk_document(
     data_version: i32,
     x: i32,
@@ -254,6 +507,13 @@ fn block_state(name: &str) -> NbtTag {
     )])
 }
 
+fn block_state_with_properties(name: &str, properties: Vec<CompoundEntry>) -> NbtTag {
+    NbtTag::Compound(vec![
+        entry("Name", NbtTag::String(JavaString::from_str(name))),
+        entry("Properties", NbtTag::Compound(properties)),
+    ])
+}
+
 fn heightmap(name: &str, data: Vec<i64>) -> CompoundEntry {
     entry(name, NbtTag::LongArray(data))
 }
@@ -263,4 +523,18 @@ fn entry(name: &str, value: NbtTag) -> CompoundEntry {
         name: JavaString::from_str(name),
         value,
     }
+}
+
+fn find_entry<'a>(entries: &'a [CompoundEntry], name: &str) -> Option<&'a NbtTag> {
+    entries
+        .iter()
+        .find(|entry| entry.name.units() == JavaString::from_str(name).units())
+        .map(|entry| &entry.value)
+}
+
+fn count_entries(entries: &[CompoundEntry], name: &str) -> usize {
+    entries
+        .iter()
+        .filter(|entry| entry.name.units() == JavaString::from_str(name).units())
+        .count()
 }

@@ -83,6 +83,8 @@ public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, Ligh
 	protected final Map<BlockPos, BlockEntity> blockEntities = new Object2ObjectOpenHashMap<>();
 	protected final LevelHeightAccessor levelHeightAccessor;
 	protected final LevelChunkSection[] sections;
+	@Nullable
+	private CompoundTag rustChunkSectionResidual;
 
 	public ChunkAccess(
 		ChunkPos chunkPos,
@@ -401,6 +403,15 @@ public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, Ligh
 	public void setLightCorrect(boolean bl) {
 		this.isLightCorrect = bl;
 		this.markUnsaved();
+	}
+
+	@Nullable
+	public CompoundTag getRustChunkSectionResidual() {
+		return this.rustChunkSectionResidual == null ? null : this.rustChunkSectionResidual.copy();
+	}
+
+	public void setRustChunkSectionResidual(@Nullable CompoundTag compoundTag) {
+		this.rustChunkSectionResidual = compoundTag == null ? null : compoundTag.copy();
 	}
 
 	@Override

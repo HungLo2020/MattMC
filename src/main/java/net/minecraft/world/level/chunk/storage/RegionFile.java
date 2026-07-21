@@ -15,7 +15,10 @@ import java.util.List;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.CollectionTag;
+import net.minecraft.nbt.NbtBenchmarkAccess;
 import net.minecraft.nbt.NativeNbtRegionAccess;
+import net.minecraft.nbt.Tag;
 import net.minecraft.util.profiling.jfr.JvmProfiler;
 import net.minecraft.util.profiling.storage.StoragePerfDiagnostics;
 import net.minecraft.world.entity.ai.village.poi.NativePoiStorage;
@@ -314,6 +317,118 @@ public class RegionFile implements AutoCloseable {
 
 	public synchronized NativeChunkSectionStorage.DecodeResult readChunkSections(ChunkPos chunkPos) throws IOException {
 		return NativeChunkSectionStorage.decodeChunk(this.nativeRegionHandle(), chunkPos.x, chunkPos.z);
+	}
+
+	public synchronized NativeChunkSectionStorage.WriteResult writeChunkSections(ChunkPos chunkPos, SerializableChunkData data) throws IOException {
+		long started = StoragePerfDiagnostics.start();
+		try {
+			NativeChunkSectionStorage.WriteResult result = NativeChunkSectionStorage.writeChunk(
+				this.nativeRegionHandle(),
+				chunkPos.x,
+				chunkPos.z,
+				this.version.getId(),
+				data
+			);
+			StoragePerfDiagnostics.recordRegionWrite(
+				this.path,
+				chunkPos.x,
+				chunkPos.z,
+				result.compressionId(),
+				result.external(),
+				result.compressedLength(),
+				StoragePerfDiagnostics.elapsed(started)
+			);
+			JvmProfiler.INSTANCE.onRegionFileWrite(this.info, chunkPos, this.version, Math.toIntExact(result.compressedLength() + 1));
+			if (ChunkSectionReadDiagnostics.writeShadowValidationEnabled()) {
+				this.validateChunkSectionWriteShadow(chunkPos, data);
+			}
+			if (RegionFileRustValidation.enabled()) {
+				RegionFileRustValidation.recordWrite(
+					this.path,
+					chunkPos,
+					result.compressionId(),
+					result.external(),
+					result.timestamp(),
+					result.compressedLength(),
+					"",
+					this.readNativeNbtFingerprint(chunkPos, "write-chunk-sections")
+				);
+			}
+			return result;
+		} catch (IOException exception) {
+			StoragePerfDiagnostics.recordError("region-write-chunk-sections-rust", exception);
+			RegionFileRustValidation.recordRustError(this.path, chunkPos, "write-chunk-sections", exception.getMessage());
+			throw exception;
+		}
+	}
+
+	private void validateChunkSectionWriteShadow(ChunkPos chunkPos, SerializableChunkData data) throws IOException {
+		long started = ChunkSectionReadDiagnostics.now();
+		CompoundTag javaRoot = data.writeWithRustSectionResidual();
+		CompoundTag rustRoot = this.readChunk(chunkPos);
+		long compareStarted = ChunkSectionReadDiagnostics.now();
+		String javaFingerprint = NbtBenchmarkAccess.objectFingerprint(javaRoot);
+		String rustFingerprint = rustRoot == null ? "missing" : NbtBenchmarkAccess.objectFingerprint(rustRoot);
+		if (rustRoot == null || !javaRoot.equals(rustRoot)) {
+			ChunkSectionReadDiagnostics.writeShadowMismatch(
+				chunkPos,
+				javaFingerprint,
+				rustFingerprint,
+				rustRoot == null ? "missing rust chunk" : firstDifference("$", javaRoot, rustRoot),
+				ChunkSectionReadDiagnostics.elapsed(started),
+				ChunkSectionReadDiagnostics.elapsed(compareStarted)
+			);
+		} else {
+			ChunkSectionReadDiagnostics.writeShadowMatch(
+				chunkPos,
+				javaFingerprint,
+				ChunkSectionReadDiagnostics.elapsed(started),
+				ChunkSectionReadDiagnostics.elapsed(compareStarted)
+			);
+		}
+	}
+
+	private static String firstDifference(String path, Tag expected, Tag actual) {
+		if (expected.getId() != actual.getId()) {
+			return path + " type expected=" + expected.getType().getName() + " actual=" + actual.getType().getName();
+		}
+		if (expected instanceof CompoundTag expectedCompound && actual instanceof CompoundTag actualCompound) {
+			for (String key : expectedCompound.keySet()) {
+				Tag expectedChild = expectedCompound.get(key);
+				Tag actualChild = actualCompound.get(key);
+				if (actualChild == null) {
+					return path + "." + key + " missing in actual";
+				}
+				if (!expectedChild.equals(actualChild)) {
+					return firstDifference(path + "." + key, expectedChild, actualChild);
+				}
+			}
+			for (String key : actualCompound.keySet()) {
+				if (!expectedCompound.contains(key)) {
+					return path + "." + key + " extra in actual";
+				}
+			}
+			return path + " compound differs";
+		}
+		if (expected instanceof CollectionTag expectedCollection && actual instanceof CollectionTag actualCollection) {
+			if (expectedCollection.size() != actualCollection.size()) {
+				return path + " size expected=" + expectedCollection.size() + " actual=" + actualCollection.size();
+			}
+			for (int i = 0; i < expectedCollection.size(); i++) {
+				Tag expectedChild = expectedCollection.get(i);
+				Tag actualChild = actualCollection.get(i);
+				if (!expectedChild.equals(actualChild)) {
+					return firstDifference(path + "[" + i + "]", expectedChild, actualChild);
+				}
+			}
+			return path + " collection differs";
+		}
+		return truncateDifference(path + " expected=" + expected + " actual=" + actual);
+	}
+
+	private static String truncateDifference(String difference) {
+		int limit = 512;
+		return difference.length() <= limit ? difference : difference.substring(0, limit) + "...";
 	}
 
 	public synchronized NativeEntityStorage.WriteResult writeEntityChunk(ChunkPos chunkPos, List<byte[]> entityTapes) throws IOException {

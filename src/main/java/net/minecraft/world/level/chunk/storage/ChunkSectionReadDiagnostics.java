@@ -7,22 +7,25 @@ import com.google.gson.JsonObject;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
 
 /**
  * Development-only counters for the Rust typed chunk-section read path.
  *
- * <p>Enabled by {@code -Dmattmc.dev.rustChunkSections=true}. Production chunk
- * reads remain Java-owned unless that explicit property is present. Old chunks,
- * pending in-memory writes, malformed typed data, and parity mismatches fall
- * back to the existing Java {@link SerializableChunkData} section path.
+ * <p>Current-version chunk sections are Rust-owned in normal reads. These
+ * counters are enabled only by {@code -Dmattmc.dev.chunkSectionValidation=true}
+ * or an explicit status output path. Old chunks, pending in-memory writes, and
+ * malformed typed data fall back before a partial chunk is published.
  */
 public final class ChunkSectionReadDiagnostics {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-	private static final boolean RUST_ENABLED = Boolean.getBoolean("mattmc.dev.rustChunkSections");
 	private static final boolean SHADOW_VALIDATION_ENABLED = Boolean.getBoolean("mattmc.dev.chunkSectionValidation");
+	private static final boolean WRITE_VALIDATION_ENABLED = Boolean.getBoolean("mattmc.dev.chunkSectionWriteValidation");
+	private static final boolean WRITE_SHADOW_VALIDATION_ENABLED = Boolean.getBoolean("mattmc.dev.rustChunkSectionWriteShadow");
+	private static final String CUSTOM_ROOT_FIELD = "mattmc:chunk_section_validation_custom";
 	private static final Path STATUS_PATH = statusPath();
-	private static final boolean ENABLED = RUST_ENABLED || STATUS_PATH != null;
+	private static final boolean ENABLED = SHADOW_VALIDATION_ENABLED || WRITE_VALIDATION_ENABLED || WRITE_SHADOW_VALIDATION_ENABLED || STATUS_PATH != null;
 	private static final Object LOCK = new Object();
 	private static final int MAX_EVENTS = 128;
 	private static long rustCurrentVersionSectionReads;
@@ -42,6 +45,27 @@ public final class ChunkSectionReadDiagnostics {
 	private static long javaPaletteResolveNanos;
 	private static long javaSectionCompareNanos;
 	private static long javaBaselineParseNanos;
+	private static long rustCurrentVersionSectionWrites;
+	private static long writeFallbacks;
+	private static long nativeWriteErrors;
+	private static long writeShadowChecks;
+	private static long writeShadowMatches;
+	private static long writeShadowMismatches;
+	private static long writeCompressedBytes;
+	private static long writeDecompressedBytes;
+	private static long writeTapeBytes;
+	private static long writeTapeCreationBytes;
+	private static long writeTapeCreationNanos;
+	private static long writeMergeNanos;
+	private static long writeNbtEncodeNanos;
+	private static long writeCompressionNanos;
+	private static long writeRegionWriteNanos;
+	private static long writeRustFfiTotalNanos;
+	private static long writeShadowJavaNanos;
+	private static long writeShadowCompareNanos;
+	private static long forcedValidationChunks;
+	private static long generatedCustomRootFieldsInjected;
+	private static long generatedCustomRootFieldsObserved;
 	private static boolean worldReady;
 	private static boolean saveRequested;
 	private static boolean shutdownRequested;
@@ -59,12 +83,16 @@ public final class ChunkSectionReadDiagnostics {
 	private ChunkSectionReadDiagnostics() {
 	}
 
-	public static boolean rustEnabled() {
-		return RUST_ENABLED;
-	}
-
 	public static boolean shadowValidationEnabled() {
 		return SHADOW_VALIDATION_ENABLED || STATUS_PATH != null;
+	}
+
+	public static boolean writeValidationEnabled() {
+		return WRITE_VALIDATION_ENABLED;
+	}
+
+	public static boolean writeShadowValidationEnabled() {
+		return WRITE_SHADOW_VALIDATION_ENABLED || STATUS_PATH != null && WRITE_VALIDATION_ENABLED;
 	}
 
 	public static long now() {
@@ -199,6 +227,133 @@ public final class ChunkSectionReadDiagnostics {
 		writeStatus();
 	}
 
+	public static void rustWriteTapeCreated(long nanos, long tapeBytes) {
+		if (!ENABLED) {
+			return;
+		}
+		synchronized (LOCK) {
+			writeTapeCreationNanos += nanos;
+			writeTapeCreationBytes += tapeBytes;
+		}
+	}
+
+	public static void rustWritten(ChunkPos chunkPos, NativeChunkSectionStorage.WriteResult result, long totalNanos) {
+		if (!ENABLED) {
+			return;
+		}
+		synchronized (LOCK) {
+			rustCurrentVersionSectionWrites++;
+			writeCompressedBytes += result.compressedLength();
+			writeDecompressedBytes += result.decompressedLength();
+			writeTapeBytes += result.tapeLength();
+			writeMergeNanos += result.mergeNanos();
+			writeNbtEncodeNanos += result.nbtEncodeNanos();
+			writeCompressionNanos += result.compressionNanos();
+			writeRegionWriteNanos += result.regionWriteNanos();
+			writeRustFfiTotalNanos += result.rustFfiTotalNanos();
+			JsonObject event = event("rustChunkSectionWrite", chunkPos);
+			event.addProperty("compressionId", result.compressionId());
+			event.addProperty("external", result.external());
+			event.addProperty("compressedBytes", result.compressedLength());
+			event.addProperty("decompressedBytes", result.decompressedLength());
+			event.addProperty("tapeBytes", result.tapeLength());
+			event.addProperty("totalNanos", totalNanos);
+			event.addProperty("mergeNanos", result.mergeNanos());
+			event.addProperty("nbtEncodeNanos", result.nbtEncodeNanos());
+			event.addProperty("compressionNanos", result.compressionNanos());
+			event.addProperty("regionWriteNanos", result.regionWriteNanos());
+			event.addProperty("rustFfiTotalNanos", result.rustFfiTotalNanos());
+		}
+		writeStatus();
+	}
+
+	public static void writeFallback(ChunkPos chunkPos, Throwable throwable) {
+		if (!ENABLED) {
+			return;
+		}
+		synchronized (LOCK) {
+			writeFallbacks++;
+			nativeWriteErrors++;
+			JsonObject event = event("rustChunkSectionWriteFallback", chunkPos);
+			event.addProperty("exception", throwable.getClass().getName());
+			event.addProperty("message", throwable.getMessage());
+		}
+		writeStatus();
+	}
+
+	public static void writeShadowMatch(ChunkPos chunkPos, String fingerprint, long javaNanos, long compareNanos) {
+		if (!ENABLED) {
+			return;
+		}
+		synchronized (LOCK) {
+			writeShadowChecks++;
+			writeShadowMatches++;
+			writeShadowJavaNanos += javaNanos;
+			writeShadowCompareNanos += compareNanos;
+			JsonObject event = event("rustChunkSectionWriteShadowMatch", chunkPos);
+			event.addProperty("fingerprint", fingerprint);
+			event.addProperty("javaNanos", javaNanos);
+			event.addProperty("compareNanos", compareNanos);
+		}
+		writeStatus();
+	}
+
+	public static void writeShadowMismatch(
+		ChunkPos chunkPos,
+		String javaFingerprint,
+		String rustFingerprint,
+		String mismatch,
+		long javaNanos,
+		long compareNanos
+	) {
+		if (!ENABLED) {
+			return;
+		}
+		synchronized (LOCK) {
+			writeShadowChecks++;
+			writeShadowMismatches++;
+			writeShadowJavaNanos += javaNanos;
+			writeShadowCompareNanos += compareNanos;
+			JsonObject event = event("rustChunkSectionWriteShadowMismatch", chunkPos);
+			event.addProperty("javaFingerprint", javaFingerprint);
+			event.addProperty("rustFingerprint", rustFingerprint);
+			event.addProperty("mismatch", mismatch);
+			event.addProperty("javaNanos", javaNanos);
+			event.addProperty("compareNanos", compareNanos);
+		}
+		writeStatus();
+	}
+
+	public static void forcedValidationChunk(boolean customInjected, boolean customObserved) {
+		if (!ENABLED) {
+			return;
+		}
+		synchronized (LOCK) {
+			forcedValidationChunks++;
+			if (customInjected) {
+				generatedCustomRootFieldsInjected++;
+			}
+			if (customObserved) {
+				generatedCustomRootFieldsObserved++;
+			}
+		}
+		writeStatus();
+	}
+
+	public static CompoundTag prepareWriteValidationResidual(CompoundTag residual) {
+		if (!WRITE_VALIDATION_ENABLED || residual == null) {
+			return residual;
+		}
+		boolean observed = residual.contains(CUSTOM_ROOT_FIELD);
+		boolean injected = false;
+		if (!observed) {
+			residual.putString(CUSTOM_ROOT_FIELD, System.getProperty("mattmc.dev.runCaptureId", "unknown"));
+			injected = true;
+		}
+		forcedValidationChunk(injected, observed);
+		return residual;
+	}
+
 	public static void recordWorldReady() {
 		if (!ENABLED) {
 			return;
@@ -267,7 +422,7 @@ public final class ChunkSectionReadDiagnostics {
 			root = new JsonObject();
 			root.addProperty("status", status);
 			root.addProperty("error", error);
-			root.addProperty("rustEnabled", RUST_ENABLED);
+			root.addProperty("rustEnabled", true);
 			root.addProperty("worldReady", worldReady);
 			root.addProperty("saveRequested", saveRequested);
 			root.addProperty("shutdownRequested", shutdownRequested);
@@ -289,6 +444,30 @@ public final class ChunkSectionReadDiagnostics {
 			root.addProperty("javaBaselineParseNanos", javaBaselineParseNanos);
 			root.addProperty("javaPaletteResolveNanos", javaPaletteResolveNanos);
 			root.addProperty("javaSectionCompareNanos", javaSectionCompareNanos);
+			root.addProperty("rustSectionWritesEnabled", true);
+			root.addProperty("chunkSectionWriteValidationEnabled", WRITE_VALIDATION_ENABLED);
+			root.addProperty("writeShadowValidationEnabled", writeShadowValidationEnabled());
+			root.addProperty("rustCurrentVersionSectionWrites", rustCurrentVersionSectionWrites);
+			root.addProperty("writeFallbacks", writeFallbacks);
+			root.addProperty("nativeWriteErrors", nativeWriteErrors);
+			root.addProperty("writeShadowChecks", writeShadowChecks);
+			root.addProperty("writeShadowMatches", writeShadowMatches);
+			root.addProperty("writeShadowMismatches", writeShadowMismatches);
+			root.addProperty("writeCompressedBytes", writeCompressedBytes);
+			root.addProperty("writeDecompressedBytes", writeDecompressedBytes);
+			root.addProperty("writeTapeBytes", writeTapeBytes);
+			root.addProperty("writeTapeCreationBytes", writeTapeCreationBytes);
+			root.addProperty("writeTapeCreationNanos", writeTapeCreationNanos);
+			root.addProperty("writeMergeNanos", writeMergeNanos);
+			root.addProperty("writeNbtEncodeNanos", writeNbtEncodeNanos);
+			root.addProperty("writeCompressionNanos", writeCompressionNanos);
+			root.addProperty("writeRegionWriteNanos", writeRegionWriteNanos);
+			root.addProperty("writeRustFfiTotalNanos", writeRustFfiTotalNanos);
+			root.addProperty("writeShadowJavaNanos", writeShadowJavaNanos);
+			root.addProperty("writeShadowCompareNanos", writeShadowCompareNanos);
+			root.addProperty("forcedValidationChunks", forcedValidationChunks);
+			root.addProperty("generatedCustomRootFieldsInjected", generatedCustomRootFieldsInjected);
+			root.addProperty("generatedCustomRootFieldsObserved", generatedCustomRootFieldsObserved);
 			root.add("events", EVENTS.deepCopy());
 		}
 		try {

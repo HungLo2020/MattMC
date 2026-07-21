@@ -1,5 +1,7 @@
 use crate::storage::nbt::model::JavaString;
 
+use crate::storage::nbt::model::NbtDocument;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ChunkSectionDecode {
     pub data_version: i32,
@@ -38,4 +40,10 @@ pub enum BiomePaletteEntry {
 pub struct HeightmapRecord {
     pub name: JavaString,
     pub data: Vec<i64>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct UnifiedChunkDecode {
+    pub sections: ChunkSectionDecode,
+    pub residual: NbtDocument,
 }
