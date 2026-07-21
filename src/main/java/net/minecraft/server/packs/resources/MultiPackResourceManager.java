@@ -11,7 +11,6 @@ import java.util.TreeMap;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.packs.NativePackBackend;
 import net.minecraft.server.packs.PackResources;
 import net.minecraft.server.packs.PackType;
 import org.jetbrains.annotations.Nullable;
@@ -25,7 +24,6 @@ public class MultiPackResourceManager implements CloseableResourceManager {
 	public MultiPackResourceManager(PackType packType, List<PackResources> list) {
 		this.packs = List.copyOf(list);
 		Map<String, FallbackResourceManager> map = new HashMap();
-		list.forEach(NativePackBackend::recordUnsupportedIfNeeded);
 		List<String> list2 = list.stream().flatMap(packResourcesx -> packResourcesx.getNamespaces(packType).stream()).distinct().toList();
 
 		for (PackResources packResources : list) {

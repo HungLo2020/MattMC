@@ -30,7 +30,7 @@ import net.minecraft.world.phys.Vec3;
 import org.slf4j.Logger;
 
 /**
- * Development-only validator for the dev-gated Rust resource-pack byte/index backend.
+ * Development-only validator for the Rust resource-pack byte/index backend.
  *
  * <p>Enabled only by {@code -Dmattmc.dev.resourcePackReloadValidation=true}. The controller
  * drives the normal client resource-reload path with generated directory and ZIP packs,

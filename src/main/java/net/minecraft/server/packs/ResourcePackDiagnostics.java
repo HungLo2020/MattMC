@@ -16,42 +16,19 @@ public final class ResourcePackDiagnostics {
 	private static final String RELOAD_VALIDATION_PROPERTY = "mattmc.dev.resourcePackReloadValidation";
 	private static final int TRACE_LIMIT = Math.max(16, Integer.getInteger("mattmc.dev.resourcePackReloadValidation.traceLimit", 96));
 
-	private static final AtomicLong eligiblePacks = new AtomicLong();
-	private static final AtomicLong unsupportedPacks = new AtomicLong();
-	private static final AtomicLong directoryPacks = new AtomicLong();
-	private static final AtomicLong zipPacks = new AtomicLong();
 	private static final AtomicLong handlesOpened = new AtomicLong();
 	private static final AtomicLong handlesClosed = new AtomicLong();
 	private static final AtomicLong activeHandles = new AtomicLong();
-	private static final AtomicLong entriesIndexed = new AtomicLong();
-	private static final AtomicLong namespacesIndexed = new AtomicLong();
-	private static final AtomicLong indexNanos = new AtomicLong();
 	private static final AtomicLong nativeFailures = new AtomicLong();
 	private static final AtomicLong invalidPathRejections = new AtomicLong();
 	private static final AtomicLong staleHandleFailures = new AtomicLong();
-	private static final AtomicLong panamaCalls = new AtomicLong();
-	private static final AtomicLong bytesTransferred = new AtomicLong();
-	private static final AtomicLong unsupportedCustomPacks = new AtomicLong();
-	private static final AtomicLong unsupportedNonDefaultDirectoryPacks = new AtomicLong();
 	private static final AtomicLong reloadsRequested = new AtomicLong();
 	private static final AtomicLong reloadsCompleted = new AtomicLong();
 	private static final AtomicLong reloadsFailed = new AtomicLong();
 	private static final AtomicLong reloadNanos = new AtomicLong();
 	private static final AtomicLong targetedReads = new AtomicLong();
 	private static final AtomicLong targetedListings = new AtomicLong();
-	private static final AtomicLong targetedBytes = new AtomicLong();
-	private static final AtomicLong fixturePacks = new AtomicLong();
 	private static final AtomicLong fixtureEntries = new AtomicLong();
-	private static final AtomicLong fixtureBytes = new AtomicLong();
-	private static final AtomicLong nativeNamespaceCalls = new AtomicLong();
-	private static final AtomicLong nativeListCalls = new AtomicLong();
-	private static final AtomicLong nativeExistsCalls = new AtomicLong();
-	private static final AtomicLong nativeRootExistsCalls = new AtomicLong();
-	private static final AtomicLong nativeResourceReadCalls = new AtomicLong();
-	private static final AtomicLong nativeRootReadCalls = new AtomicLong();
-	private static final AtomicLong nativeDurationNanos = new AtomicLong();
-	private static final AtomicLong nativeEntriesReturned = new AtomicLong();
-	private static final AtomicLong nativeBytesReturned = new AtomicLong();
 	private static final AtomicReference<String> firstProblem = new AtomicReference<>();
 	private static final AtomicReference<String> validationPhase = new AtomicReference<>("disabled");
 	private static final AtomicReference<String> terminalStatus = new AtomicReference<>("running");
@@ -81,42 +58,14 @@ public final class ResourcePackDiagnostics {
 	private ResourcePackDiagnostics() {
 	}
 
-	private static boolean enabled() {
+	public static boolean enabled() {
 		return Boolean.getBoolean(RELOAD_VALIDATION_PROPERTY);
 	}
 
-	static void eligible(String kind) {
-		if (!enabled()) {
-			return;
-		}
-		eligiblePacks.incrementAndGet();
-		if ("directory".equals(kind)) {
-			directoryPacks.incrementAndGet();
-		} else if ("zip".equals(kind)) {
-			zipPacks.incrementAndGet();
-		}
-	}
-
-	static void unsupported(String reason) {
-		if (!enabled()) {
-			return;
-		}
-		unsupportedPacks.incrementAndGet();
-		if ("custom-pack".equals(reason)) {
-			unsupportedCustomPacks.incrementAndGet();
-		} else if ("non-default-filesystem-directory".equals(reason)) {
-			unsupportedNonDefaultDirectoryPacks.incrementAndGet();
-		}
-		writeStatus();
-	}
-
-	static void opened(NativePackBridge.OpenStats stats) {
+	static void opened() {
 		if (enabled()) {
 			handlesOpened.incrementAndGet();
 			activeHandles.incrementAndGet();
-			entriesIndexed.addAndGet(stats.entriesIndexed());
-			namespacesIndexed.addAndGet(stats.namespacesIndexed());
-			indexNanos.addAndGet(stats.indexNanos());
 			writeStatus();
 		}
 	}
@@ -153,13 +102,6 @@ public final class ResourcePackDiagnostics {
 		}
 	}
 
-	static void panamaCall(long bytes) {
-		if (enabled()) {
-			panamaCalls.incrementAndGet();
-			bytesTransferred.addAndGet(Math.max(0L, bytes));
-		}
-	}
-
 	public static void validationPhase(String phase) {
 		if (enabled()) {
 			validationPhase.set(phase);
@@ -185,9 +127,7 @@ public final class ResourcePackDiagnostics {
 	public static void validationFixture(String names, long packs, long entries, long bytes) {
 		if (enabled()) {
 			fixtureNames.set(names);
-			fixturePacks.set(packs);
 			fixtureEntries.set(entries);
-			fixtureBytes.set(bytes);
 			writeStatus();
 		}
 	}
@@ -250,14 +190,12 @@ public final class ResourcePackDiagnostics {
 	public static void validationTargetedRead(long bytes) {
 		if (enabled()) {
 			targetedReads.incrementAndGet();
-			targetedBytes.addAndGet(Math.max(0L, bytes));
 		}
 	}
 
 	public static void validationTargetedListing(int entries) {
 		if (enabled()) {
 			targetedListings.incrementAndGet();
-			nativeEntriesReturned.addAndGet(Math.max(0, entries));
 		}
 	}
 
@@ -284,25 +222,6 @@ public final class ResourcePackDiagnostics {
 		}
 	}
 
-	static void nativeResult(String operation, NativePackBridge.Result result) {
-		if (!enabled()) {
-			return;
-		}
-		switch (operation) {
-			case "listNamespaces" -> nativeNamespaceCalls.incrementAndGet();
-			case "listResources" -> nativeListCalls.incrementAndGet();
-			case "exists" -> nativeExistsCalls.incrementAndGet();
-			case "rootExists" -> nativeRootExistsCalls.incrementAndGet();
-			case "readResource" -> nativeResourceReadCalls.incrementAndGet();
-			case "readRootResource" -> nativeRootReadCalls.incrementAndGet();
-			default -> {
-			}
-		}
-		nativeDurationNanos.addAndGet(Math.max(0L, result.durationNanos()));
-		nativeEntriesReturned.addAndGet(Math.max(0L, result.entryCount() + result.namespaceCount()));
-		nativeBytesReturned.addAndGet(Math.max(0L, result.bytesReturned()));
-	}
-
 	static void writeStatus() {
 		if (!enabled()) {
 			return;
@@ -322,40 +241,17 @@ public final class ResourcePackDiagnostics {
 		root.addProperty("reloadsFailed", reloadsFailed.get());
 		root.addProperty("reloadNanos", reloadNanos.get());
 		root.addProperty("fixtureNames", fixtureNames.get());
-		root.addProperty("fixturePacks", fixturePacks.get());
 		root.addProperty("fixtureEntries", fixtureEntries.get());
-		root.addProperty("fixtureBytes", fixtureBytes.get());
 		root.addProperty("runtimePackStack", runtimePackStack.get());
-		root.addProperty("eligiblePacks", eligiblePacks.get());
-		root.addProperty("unsupportedPacks", unsupportedPacks.get());
-		root.addProperty("unsupportedCustomPacks", unsupportedCustomPacks.get());
-		root.addProperty("unsupportedNonDefaultDirectoryPacks", unsupportedNonDefaultDirectoryPacks.get());
-		root.addProperty("directoryPacks", directoryPacks.get());
-		root.addProperty("zipPacks", zipPacks.get());
 		root.addProperty("handlesOpened", handlesOpened.get());
 		root.addProperty("handlesClosed", handlesClosed.get());
 		root.addProperty("activeHandles", activeHandles.get());
-		root.addProperty("entriesIndexed", entriesIndexed.get());
-		root.addProperty("namespacesIndexed", namespacesIndexed.get());
-		root.addProperty("indexNanos", indexNanos.get());
 		root.addProperty("nativeFailures", nativeFailures.get());
 		root.addProperty("invalidPathRejections", invalidPathRejections.get());
 		root.addProperty("javaFallbacks", 0);
 		root.addProperty("staleHandleFailures", staleHandleFailures.get());
-		root.addProperty("panamaCalls", panamaCalls.get());
-		root.addProperty("bytesTransferred", bytesTransferred.get());
 		root.addProperty("targetedReads", targetedReads.get());
 		root.addProperty("targetedListings", targetedListings.get());
-		root.addProperty("targetedBytes", targetedBytes.get());
-		root.addProperty("nativeNamespaceCalls", nativeNamespaceCalls.get());
-		root.addProperty("nativeListCalls", nativeListCalls.get());
-		root.addProperty("nativeExistsCalls", nativeExistsCalls.get());
-		root.addProperty("nativeRootExistsCalls", nativeRootExistsCalls.get());
-		root.addProperty("nativeResourceReadCalls", nativeResourceReadCalls.get());
-		root.addProperty("nativeRootReadCalls", nativeRootReadCalls.get());
-		root.addProperty("nativeDurationNanos", nativeDurationNanos.get());
-		root.addProperty("nativeEntriesReturned", nativeEntriesReturned.get());
-		root.addProperty("nativeBytesReturned", nativeBytesReturned.get());
 		root.addProperty("overlayRuntimeCoverage", overlayRuntimeCoverage.get());
 		root.addProperty("directoryModificationCoverage", directoryModificationCoverage.get());
 		root.addProperty("zipReplacementCoverage", zipReplacementCoverage.get());

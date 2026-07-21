@@ -215,7 +215,6 @@ final class NativePackBridge {
 			);
 			Result result = readResult(resultSegment, status);
 			check("Resource exists", result.status());
-			ResourcePackDiagnostics.nativeResult("exists", result);
 			return result.present();
 		} catch (IOException exception) {
 			throw exception;
@@ -236,7 +235,6 @@ final class NativePackBridge {
 			);
 			Result result = readResult(resultSegment, status);
 			check("Root resource exists", result.status());
-			ResourcePackDiagnostics.nativeResult("rootExists", result);
 			return result.present();
 		} catch (IOException exception) {
 			throw exception;
@@ -315,7 +313,6 @@ final class NativePackBridge {
 					continue;
 				}
 				check(label, result.status());
-				ResourcePackDiagnostics.nativeResult(operation, result);
 				return result.present() ? output.asSlice(0, result.outputLength()).toArray(ValueLayout.JAVA_BYTE) : null;
 			} catch (IOException exception) {
 				throw exception;

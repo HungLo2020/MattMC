@@ -16,27 +16,23 @@ import org.jetbrains.annotations.Nullable;
 
 public final class NativePackBackend implements AutoCloseable {
 	private final String packId;
-	private final String kind;
 	private final long handle;
 	private final AtomicBoolean closed = new AtomicBoolean();
 
-	private NativePackBackend(String packId, String kind, long handle) {
+	private NativePackBackend(String packId, long handle) {
 		this.packId = packId;
-		this.kind = kind;
 		this.handle = handle;
 	}
 
 	@Nullable
 	static NativePackBackend openDirectory(PackLocationInfo location, Path root) {
 		if (root.getFileSystem() != FileSystems.getDefault()) {
-			ResourcePackDiagnostics.unsupported("non-default-filesystem-directory");
 			return null;
 		}
-		ResourcePackDiagnostics.eligible("directory");
 		try {
 			NativePackBridge.OpenStats stats = NativePackBridge.openDirectory(root);
-			ResourcePackDiagnostics.opened(stats);
-			return new NativePackBackend(location.id(), "directory", stats.handle());
+			ResourcePackDiagnostics.opened();
+			return new NativePackBackend(location.id(), stats.handle());
 		} catch (IOException | UnsatisfiedLinkError exception) {
 			ResourcePackDiagnostics.nativeFailure("open directory pack", location.id(), exception);
 			throw backendFailure("open directory pack", location.id(), exception);
@@ -44,22 +40,14 @@ public final class NativePackBackend implements AutoCloseable {
 	}
 
 	static NativePackBackend openZip(PackLocationInfo location, Path path, String prefix) {
-		ResourcePackDiagnostics.eligible("zip");
 		try {
 			NativePackBridge.OpenStats stats = NativePackBridge.openZip(path, prefix);
-			ResourcePackDiagnostics.opened(stats);
-			return new NativePackBackend(location.id() + (prefix.isEmpty() ? "" : "#" + prefix), "zip", stats.handle());
+			ResourcePackDiagnostics.opened();
+			return new NativePackBackend(location.id() + (prefix.isEmpty() ? "" : "#" + prefix), stats.handle());
 		} catch (IOException | UnsatisfiedLinkError exception) {
 			ResourcePackDiagnostics.nativeFailure("open zip pack", location.id(), exception);
 			throw backendFailure("open zip pack", location.id(), exception);
 		}
-	}
-
-	public static void recordUnsupportedIfNeeded(PackResources packResources) {
-		if (packResources instanceof PathPackResources || packResources instanceof FilePackResources || packResources instanceof CompositePackResources) {
-			return;
-		}
-		ResourcePackDiagnostics.unsupported("custom-pack");
 	}
 
 	Set<String> getNamespaces(PackType type) {
@@ -75,7 +63,6 @@ public final class NativePackBackend implements AutoCloseable {
 	IoSupplier<InputStream> getRootResource(String path) {
 		try {
 			boolean present = NativePackBridge.rootExists(this.openHandle(), path);
-			ResourcePackDiagnostics.panamaCall(0L);
 			if (!present) {
 				return null;
 			}
@@ -91,7 +78,6 @@ public final class NativePackBackend implements AutoCloseable {
 		String path = location.getPath();
 		try {
 			boolean present = NativePackBridge.exists(this.openHandle(), type, location.getNamespace(), path);
-			ResourcePackDiagnostics.panamaCall(0L);
 			if (!present) {
 				return null;
 			}
@@ -154,7 +140,6 @@ public final class NativePackBackend implements AutoCloseable {
 		}
 		try {
 			byte[] bytes = read.read();
-			ResourcePackDiagnostics.panamaCall(bytes == null ? 0L : bytes.length);
 			if (bytes == null) {
 				throw new IOException("Native resource disappeared after lookup: " + this.packId + " " + path);
 			}
@@ -167,7 +152,7 @@ public final class NativePackBackend implements AutoCloseable {
 
 	private long openHandle() throws IOException {
 		if (this.closed.get()) {
-			throw new IOException("Native resource pack is closed: " + this.packId + " (" + this.kind + ")");
+			throw new IOException("Native resource pack is closed: " + this.packId);
 		}
 		return this.handle;
 	}

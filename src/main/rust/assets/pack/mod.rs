@@ -1,4 +1,4 @@
-//! Test/dev resource-pack byte and index subsystem.
+//! Resource-pack byte and index subsystem.
 //!
 //! Java keeps pack selection, fallback-stack policy, metadata parsing, reload
 //! listeners, resource consumers, and `ResourceLocation` objects. This module
