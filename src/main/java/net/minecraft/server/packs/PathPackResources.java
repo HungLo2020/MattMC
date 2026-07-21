@@ -33,10 +33,13 @@ public class PathPackResources extends AbstractPackResources {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final Joiner PATH_JOINER = Joiner.on("/");
 	private final Path root;
+	@Nullable
+	private final NativePackBackend nativeBackend;
 
 	public PathPackResources(PackLocationInfo packLocationInfo, Path path) {
 		super(packLocationInfo);
 		this.root = path;
+		this.nativeBackend = NativePackBackend.openDirectory(packLocationInfo, path);
 	}
 
 	@Nullable
@@ -44,6 +47,10 @@ public class PathPackResources extends AbstractPackResources {
 	public IoSupplier<InputStream> getRootResource(String... strings) {
 		FileUtil.validatePath(strings);
 		Path path = FileUtil.resolvePath(this.root, List.of(strings));
+		if (this.nativeBackend != null) {
+			String nativePath = String.join("/", strings);
+			return this.nativeBackend.getRootResource(nativePath);
+		}
 		return Files.exists(path, new LinkOption[0]) ? IoSupplier.create(path) : null;
 	}
 
@@ -66,7 +73,7 @@ public class PathPackResources extends AbstractPackResources {
 	@Override
 	public IoSupplier<InputStream> getResource(PackType packType, ResourceLocation resourceLocation) {
 		Path path = this.root.resolve(packType.getDirectory()).resolve(resourceLocation.getNamespace());
-		return getResource(resourceLocation, path);
+		return this.nativeBackend != null ? this.nativeBackend.getResource(packType, resourceLocation) : getResource(resourceLocation, path);
 	}
 
 	@Nullable
@@ -87,6 +94,14 @@ public class PathPackResources extends AbstractPackResources {
 
 	@Override
 	public void listResources(PackType packType, String string, String string2, PackResources.ResourceOutput resourceOutput) {
+		if (this.nativeBackend != null) {
+			this.nativeBackend.listResources(packType, string, string2, resourceOutput);
+			return;
+		}
+		this.listResourcesJava(packType, string, string2, resourceOutput);
+	}
+
+	private void listResourcesJava(PackType packType, String string, String string2, PackResources.ResourceOutput resourceOutput) {
 		FileUtil.decomposePath(string2).ifSuccess(list -> {
 			Path path = this.root.resolve(packType.getDirectory()).resolve(string);
 			listPath(string, path, list, resourceOutput);
@@ -138,6 +153,13 @@ public class PathPackResources extends AbstractPackResources {
 
 	@Override
 	public Set<String> getNamespaces(PackType packType) {
+		if (this.nativeBackend != null) {
+			return this.nativeBackend.getNamespaces(packType);
+		}
+		return this.getNamespacesJava(packType);
+	}
+
+	private Set<String> getNamespacesJava(PackType packType) {
 		Set<String> set = Sets.<String>newHashSet();
 		Path path = this.root.resolve(packType.getDirectory());
 
@@ -178,6 +200,9 @@ public class PathPackResources extends AbstractPackResources {
 
 	@Override
 	public void close() {
+		if (this.nativeBackend != null) {
+			this.nativeBackend.close();
+		}
 	}
 
 	public static class PathResourcesSupplier implements Pack.ResourcesSupplier {

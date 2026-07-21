@@ -15,6 +15,7 @@ import stat
 import subprocess
 import sys
 import time
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -81,6 +82,7 @@ class CaptureConfig:
     entity_validation: bool
     chunk_section_validation: bool
     chunk_section_write_validation: bool
+    resource_pack_reload_validation: bool
 
 
 class CaptureRunner:
@@ -140,6 +142,7 @@ class CaptureRunner:
         self.poi_validation_status = self.artifact_dir / f"poi_validation_{self.run_id}.json"
         self.entity_validation_status = self.artifact_dir / f"entity_validation_{self.run_id}.json"
         self.chunk_section_validation_status = self.artifact_dir / f"chunk_section_validation_{self.run_id}.json"
+        self.resource_pack_validation_status = self.artifact_dir / f"resource_pack_reload_validation_{self.run_id}.json"
         self.meshing_corpus_replay = self.artifact_dir / f"real_meshing_replay_{self.run_id}.json"
 
         self.validation_layer_manifest = ""
@@ -170,6 +173,7 @@ class CaptureRunner:
         self.poi_validation_result = "not_requested"
         self.entity_validation_result = "not_requested"
         self.chunk_section_validation_result = "not_requested"
+        self.resource_pack_validation_result = "not_requested"
         self.env = os.environ.copy()
 
     def run(self) -> int:
@@ -203,6 +207,7 @@ class CaptureRunner:
         self.validate_poi_status()
         self.validate_entity_status()
         self.validate_chunk_section_status()
+        self.validate_resource_pack_status()
         self.print_summary(exit_code)
         self.release_lock()
 
@@ -220,6 +225,8 @@ class CaptureRunner:
             return 6
         if self.config.chunk_section_validation and self.chunk_section_validation_result != "ok":
             return 7
+        if self.config.resource_pack_reload_validation and self.resource_pack_validation_result != "ok":
+            return 8
         return 0
 
     def acquire_lock(self) -> None:
@@ -281,6 +288,7 @@ class CaptureRunner:
             f"poi_validation={str(self.config.poi_validation).lower()}",
             f"entity_validation={str(self.config.entity_validation).lower()}",
             f"chunk_section_validation={str(self.config.chunk_section_validation).lower()}",
+            f"resource_pack_reload_validation={str(self.config.resource_pack_reload_validation).lower()}",
             f"max_secs={self.config.max_secs}",
             f"dump_secs={self.config.dump_secs}",
             f"client_rss_limit_mb={self.config.client_rss_limit_mb}",
@@ -309,17 +317,24 @@ class CaptureRunner:
             handle.write(text.rstrip("\n") + "\n")
 
     def prepare_region_validation_game_dir(self) -> None:
-        if not self.config.region_validation_copy_world and not self.config.entity_validation and not self.config.chunk_section_validation:
+        if (
+            not self.config.region_validation_copy_world
+            and not self.config.entity_validation
+            and not self.config.chunk_section_validation
+            and not self.config.resource_pack_reload_validation
+        ):
             return
         if self.config.game_dir:
-            if self.config.region_validation_copy_world:
-                raise SystemExit("--region-validation-copy-world cannot be combined with --game-dir")
+            if self.config.region_validation_copy_world or self.config.resource_pack_reload_validation:
+                raise SystemExit("--region-validation-copy-world and --resource-pack-reload-validation cannot be combined with --game-dir")
             world_dir = self.run_dir / "saves" / self.config.world
             if not world_dir.is_dir():
                 raise SystemExit(f"Cannot validate missing copied world in --game-dir: {world_dir}")
             if self.config.entity_validation:
                 fixture_path = ensure_entity_validation_fixture(world_dir)
                 self.append_meta(f"entity_validation_fixture={fixture_path or 'existing-populated-entity-region'}")
+            if self.config.resource_pack_reload_validation:
+                prepare_resource_pack_validation_fixtures(self.run_dir, self.append_meta)
             self.append_meta(f"validation_game_dir={self.run_dir}")
             self.append_meta(f"validation_world_copy={world_dir}")
             return
@@ -333,7 +348,8 @@ class CaptureRunner:
         validation_game_dir.mkdir(parents=True)
         self.copy_optional_path(self.root / "run" / "options.txt", validation_game_dir / "options.txt")
         self.copy_optional_path(self.root / "run" / "config", validation_game_dir / "config")
-        self.copy_optional_path(self.root / "run" / "resourcepacks", validation_game_dir / "resourcepacks")
+        if not self.config.resource_pack_reload_validation:
+            self.copy_optional_path(self.root / "run" / "resourcepacks", validation_game_dir / "resourcepacks")
         (validation_game_dir / "saves").mkdir(parents=True)
         shutil.copytree(source_world, validation_game_dir / "saves" / self.config.world)
         if self.config.poi_validation:
@@ -342,6 +358,8 @@ class CaptureRunner:
         if self.config.entity_validation:
             fixture_path = ensure_entity_validation_fixture(validation_game_dir / "saves" / self.config.world)
             self.append_meta(f"entity_validation_fixture={fixture_path or 'existing-populated-entity-region'}")
+        if self.config.resource_pack_reload_validation:
+            prepare_resource_pack_validation_fixtures(validation_game_dir, self.append_meta)
         self.run_dir = validation_game_dir
         self.options_file = self.run_dir / "options.txt"
         self.append_meta(f"validation_world_source={source_world}")
@@ -417,9 +435,10 @@ class CaptureRunner:
         shaders_enabled = "true" if self.config.shaders == "on" else "false"
         self.config.client_args = remove_client_arg_option(self.config.client_args, "--quickPlaySingleplayer")
         self.config.client_args = remove_client_arg_assignment(self.config.client_args, "enableShaders")
-        self.config.client_args = append_client_arg(self.config.client_args, f"--quickPlaySingleplayer={self.config.world}")
+        if not self.config.resource_pack_reload_validation:
+            self.config.client_args = append_client_arg(self.config.client_args, f"--quickPlaySingleplayer={self.config.world}")
         self.config.client_args = append_client_arg(self.config.client_args, f"enableShaders={shaders_enabled}")
-        self.append_meta(f"forced_quick_play_singleplayer={self.config.world}")
+        self.append_meta(f"forced_quick_play_singleplayer={'disabled_for_resource_pack_validation' if self.config.resource_pack_reload_validation else self.config.world}")
         self.append_meta(f"forced_enable_shaders={shaders_enabled}")
 
         if not self.config.deterministic_camera_capture:
@@ -793,6 +812,21 @@ class CaptureRunner:
             self.append_java_tool_options(chunk_section_options)
             self.append_meta(f"chunk_section_validation_java_options={' '.join(chunk_section_options)}")
             self.append_meta(f"chunk_section_validation_status={self.chunk_section_validation_status}")
+            self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
+
+        if self.config.resource_pack_reload_validation:
+            resource_pack_options = [
+                "-Dmattmc.dev.resourcePackReloadValidation=true",
+                f"-Dmattmc.dev.resourcePack.status={self.resource_pack_validation_status}",
+                f"-Dmattmc.dev.resourcePackReloadValidation.fixtureDir={self.run_dir / 'resourcepacks'}",
+                f"-Dmattmc.dev.resourcePackReloadValidation.world={self.config.world}",
+                "-Dmattmc.dev.resourcePackReloadValidation.dirPackId=file/mattmc-validation-dir",
+                "-Dmattmc.dev.resourcePackReloadValidation.zipPackId=file/mattmc-validation-zip.zip",
+                "-Dmattmc.dev.resourcePackReloadValidation.extraPackId=file/mattmc-validation-extra",
+            ]
+            self.append_java_tool_options(resource_pack_options)
+            self.append_meta(f"resource_pack_validation_java_options={' '.join(resource_pack_options)}")
+            self.append_meta(f"resource_pack_validation_status={self.resource_pack_validation_status}")
             self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
 
         if self.config.capture_meshing_corpus:
@@ -1349,6 +1383,46 @@ class CaptureRunner:
             print(str(exc), file=sys.stderr)
         self.append_meta(f"chunk_section_validation_result={self.chunk_section_validation_result}")
 
+    def validate_resource_pack_status(self) -> None:
+        if not self.config.resource_pack_reload_validation:
+            return
+        try:
+            data = json.loads(self.resource_pack_validation_status.read_text(encoding="utf-8"))
+            if data.get("status") != "complete":
+                raise RuntimeError(
+                    f"resource-pack validation status was {data.get('status')!r}: {data.get('firstProblem')!r}"
+                )
+            if data.get("validationPhase") != "complete":
+                raise RuntimeError(f"resource-pack validation phase was {data.get('validationPhase')!r}")
+            if int(data.get("reloadsRequested", 0)) < 4 or int(data.get("reloadsCompleted", 0)) < 4:
+                raise RuntimeError(f"resource-pack validation did not complete all reloads: {data}")
+            if int(data.get("reloadsFailed", -1)) != 0:
+                raise RuntimeError(f"resource-pack validation reloadsFailed was {data.get('reloadsFailed')}")
+            if int(data.get("targetedReads", 0)) <= 0 or int(data.get("targetedListings", 0)) <= 0:
+                raise RuntimeError("resource-pack validation did not exercise targeted reads/listings")
+            if int(data.get("fixtureEntries", 0)) < 500:
+                raise RuntimeError(f"resource-pack validation fixture was too small: {data.get('fixtureEntries')}")
+            for key in ("directoryModificationCoverage", "zipReplacementCoverage", "packSelectionCoverage"):
+                if data.get(key) != "true":
+                    raise RuntimeError(f"resource-pack validation {key} was {data.get(key)!r}")
+            if data.get("overlayRuntimeCoverage") != "runtime-proven":
+                raise RuntimeError(f"resource-pack validation overlayRuntimeCoverage was {data.get('overlayRuntimeCoverage')!r}")
+            if int(data.get("activeHandles", -1)) != 0:
+                raise RuntimeError(f"resource-pack validation leaked native handles: {data.get('activeHandles')}")
+            for key in ("nativeFailures", "staleHandleFailures", "javaFallbacks"):
+                if int(data.get(key, -1)) != 0:
+                    raise RuntimeError(f"resource-pack validation {key} was {data.get(key)}")
+            if int(data.get("handlesOpened", 0)) <= 0 or int(data.get("handlesOpened", 0)) != int(data.get("handlesClosed", -1)):
+                raise RuntimeError(
+                    f"resource-pack validation handle mismatch opened={data.get('handlesOpened')} closed={data.get('handlesClosed')}"
+                )
+            self.resource_pack_validation_result = "ok"
+            print(f"resource-pack validation OK: {self.resource_pack_validation_status}")
+        except Exception as exc:
+            self.resource_pack_validation_result = "failed"
+            print(str(exc), file=sys.stderr)
+        self.append_meta(f"resource_pack_validation_result={self.resource_pack_validation_result}")
+
     def print_summary(self, exit_code: int) -> None:
         print("Capture complete.")
         print(f"- Meta:        {self.meta_log}")
@@ -1395,6 +1469,10 @@ class CaptureRunner:
         if self.config.chunk_section_validation:
             print(f"- Chunk sections:    {self.chunk_section_validation_status}")
             print(f"- Chunk result:      {self.chunk_section_validation_result}")
+            print(f"- Game dir:          {self.run_dir}")
+        if self.config.resource_pack_reload_validation:
+            print(f"- Resource packs:    {self.resource_pack_validation_status}")
+            print(f"- Resource result:   {self.resource_pack_validation_result}")
             print(f"- Game dir:          {self.run_dir}")
         if self.config.capture_meshing_corpus:
             output = Path(self.config.meshing_corpus_output) if self.config.meshing_corpus_output else self.meshing_corpus_replay
@@ -1564,6 +1642,143 @@ def write_entity_validation_fixture(world_dir: Path) -> Path:
     header[4096:4100] = int(time.time()).to_bytes(4, "big")
     region_path.write_bytes(bytes(header) + chunk)
     return region_path
+
+
+def prepare_resource_pack_validation_fixtures(game_dir: Path, append_meta_fn) -> None:
+    resourcepacks = game_dir / "resourcepacks"
+    if resourcepacks.exists():
+        shutil.rmtree(resourcepacks)
+    resourcepacks.mkdir(parents=True)
+
+    dir_pack = resourcepacks / "mattmc-validation-dir"
+    zip_source = resourcepacks / "mattmc-validation-zip-source"
+    extra_pack = resourcepacks / "mattmc-validation-extra"
+    zip_path = resourcepacks / "mattmc-validation-zip.zip"
+    write_validation_pack_tree(dir_pack, "Directory validation pack", "dir", entry_count=320, include_overlay=True)
+    write_validation_pack_tree(zip_source, "ZIP validation pack", "zip", entry_count=260, include_overlay=True)
+    write_validation_pack_tree(extra_pack, "Extra validation pack", "extra", entry_count=140, include_overlay=False, namespace="mattmc_extra")
+    write_zip_from_directory(zip_source, zip_path, "")
+    shutil.rmtree(zip_source)
+
+    upsert_options_entry(game_dir / "options.txt", "resourcePacks", '["file/mattmc-validation-dir","file/mattmc-validation-zip.zip"]')
+    upsert_options_entry(game_dir / "options.txt", "incompatibleResourcePacks", '["file/mattmc-validation-dir","file/mattmc-validation-zip.zip"]')
+
+    files = [path for path in resourcepacks.rglob("*") if path.is_file()]
+    total_bytes = sum(path.stat().st_size for path in files)
+    append_meta_fn(f"resource_pack_validation_fixtures={resourcepacks}")
+    append_meta_fn("resource_pack_validation_fixture_names=mattmc-validation-dir,mattmc-validation-zip.zip,mattmc-validation-extra")
+    append_meta_fn(f"resource_pack_validation_fixture_entries={len(files)}")
+    append_meta_fn(f"resource_pack_validation_fixture_bytes={total_bytes}")
+
+
+def write_validation_pack_tree(
+    root: Path,
+    description: str,
+    label: str,
+    *,
+    entry_count: int,
+    include_overlay: bool,
+    namespace: str = "mattmc_validation",
+) -> None:
+    if root.exists():
+        shutil.rmtree(root)
+    write_bytes(root / "pack.mcmeta", pack_meta_bytes(description, include_overlay))
+    write_bytes(root / "pack.png", deterministic_bytes(label + "-icon", 1024))
+    write_bytes(root / f"assets/{namespace}/validation/common_000.txt", f"{label} common 000\n".encode("utf-8"))
+    write_bytes(root / f"assets/{namespace}/validation/override.txt", f"{label} override\n".encode("utf-8"))
+    write_bytes(root / f"assets/{namespace}/validation/override.txt.mcmeta", f'{{"pack":"{label}"}}'.encode("utf-8"))
+    write_bytes(root / f"assets/{namespace}/validation/{label}_only.txt", f"{label} only\n".encode("utf-8"))
+    write_bytes(root / f"assets/{namespace}/validation/binary_000.bin", deterministic_bytes(label + "-binary", 8192))
+    write_bytes(root / f"assets/{namespace}/validation/large.bin", deterministic_bytes(label + "-large", 1024 * 1024))
+    if label == "dir":
+        write_bytes(root / f"assets/{namespace}/validation/dir_removed.txt", b"remove me on reload\n")
+    if include_overlay:
+        write_bytes(root / f"overlay64/assets/{namespace}/validation/overlay_marker.txt", f"{label} overlay\n".encode("utf-8"))
+        write_bytes(root / f"overlay64/assets/{namespace}/validation/override.txt", f"{label} overlay override\n".encode("utf-8"))
+    for index in range(entry_count):
+        subdir = f"group_{index % 16:02d}"
+        write_bytes(
+            root / f"assets/{namespace}/validation/{subdir}/{label}_{index:04d}.txt",
+            f"{label} fixture entry {index:04d}\n".encode("utf-8"),
+        )
+        if index % 23 == 0:
+            write_bytes(
+                root / f"assets/{namespace}/validation/{subdir}/{label}_{index:04d}.txt.mcmeta",
+                f'{{"index":{index},"pack":"{label}"}}'.encode("utf-8"),
+            )
+    write_bytes(root / "assets/BAD/validation/ignored.txt", b"invalid namespace should be ignored\n")
+
+
+def write_zip_from_directory(root: Path, zip_path: Path, prefix: str) -> None:
+    zip_path.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for path in sorted(candidate for candidate in root.rglob("*") if candidate.is_file()):
+            name = path.relative_to(root).as_posix()
+            if prefix:
+                name = f"{prefix}/{name}"
+            archive.write(path, name)
+
+
+def pack_meta_bytes(description: str, include_overlay: bool) -> bytes:
+    major, minor = current_resource_pack_format()
+    format_range = {"min_format": [major, minor], "max_format": [major, minor]}
+    metadata = {
+        "pack": {
+            "pack_format": major,
+            **format_range,
+            "description": description,
+        }
+    }
+    if include_overlay:
+        metadata["overlays"] = {
+            "entries": [
+                {
+                    **format_range,
+                    "directory": "overlay64",
+                }
+            ]
+        }
+    return (json.dumps(metadata, separators=(",", ":")) + "\n").encode("utf-8")
+
+
+def current_resource_pack_format() -> tuple[int, int]:
+    constants = repo_root() / "src/main/java/net/minecraft/SharedConstants.java"
+    text = constants.read_text(encoding="utf-8")
+    major = re.search(r"RESOURCE_PACK_FORMAT_MAJOR\s*=\s*(\d+)", text)
+    minor = re.search(r"RESOURCE_PACK_FORMAT_MINOR\s*=\s*(\d+)", text)
+    if major is None or minor is None:
+        raise RuntimeError(f"could not read current resource-pack format from {constants}")
+    return int(major.group(1)), int(minor.group(1))
+
+
+def deterministic_bytes(seed: str, length: int) -> bytes:
+    value = sum(seed.encode("utf-8")) & 0xFF
+    output = bytearray(length)
+    for index in range(length):
+        value = (value * 31 + index * 17 + 13) & 0xFF
+        output[index] = value
+    return bytes(output)
+
+
+def write_bytes(path: Path, bytes_value: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(bytes_value)
+
+
+def upsert_options_entry(file_path: Path, key: str, value: str) -> None:
+    lines: list[str] = []
+    if file_path.is_file():
+        lines = file_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    changed = False
+    for index, line in enumerate(lines):
+        if line.startswith(f"{key}:") or line.startswith(f"{key}="):
+            lines[index] = f"{key}:{value}"
+            changed = True
+            break
+    if not changed:
+        lines.append(f"{key}:{value}")
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def nbt_root_compound(children: list[bytes]) -> bytes:
@@ -2310,6 +2525,7 @@ def parse_args() -> CaptureConfig:
     parser.add_argument("--entity-validation", action="store_true")
     parser.add_argument("--chunk-section-validation", action="store_true")
     parser.add_argument("--chunk-section-write-validation", action="store_true")
+    parser.add_argument("--resource-pack-reload-validation", action="store_true")
     parser.add_argument("--platform", help="platform to pass to shared helpers: linux, windows, or macos")
     args = parser.parse_args()
 
@@ -2366,6 +2582,7 @@ def parse_args() -> CaptureConfig:
         entity_validation=bool(args.entity_validation),
         chunk_section_validation=bool(args.chunk_section_validation or args.chunk_section_write_validation),
         chunk_section_write_validation=bool(args.chunk_section_write_validation),
+        resource_pack_reload_validation=bool(args.resource_pack_reload_validation),
     )
 
 

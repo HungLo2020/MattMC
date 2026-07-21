@@ -689,6 +689,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 				}
 
 				this.reloadStateTracker.finishReload();
+				net.minecraft.client.dev.ResourcePackReloadValidationController.afterInitialReload(this);
 				this.onResourceLoadFinished(gameLoadCookie);
 			}), false)
 		);
@@ -1077,6 +1078,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 							for (GameHooks hook : HookRegistry.getGameHooks()) {
 								hook.afterResourceReload(this);
 							}
+							net.minecraft.client.dev.ResourcePackReloadValidationController.afterResourceReload(this);
 						}),
 						!bl
 					)
@@ -1283,6 +1285,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		net.minecraft.client.dev.PoiStorageValidationController.beforeTick(this);
 		net.minecraft.client.dev.EntityStorageValidationController.beforeTick(this);
 		net.minecraft.client.dev.ChunkSectionValidationController.beforeTick(this);
+		net.minecraft.client.dev.ResourcePackReloadValidationController.beforeTick(this);
 
 		// HOOK: Call registered hooks at beginning of tick
 		for (GameHooks hook : HookRegistry.getGameHooks()) {

@@ -58,6 +58,8 @@ public class LoadingOverlay extends Overlay {
 	private float currentProgress;
 	private long fadeOutStart = -1L;
 	private long fadeInStart = -1L;
+	private boolean mattmcValidationReloadDoneLogged;
+	private boolean finishCallbackInvoked;
 
 	public LoadingOverlay(Minecraft minecraft, ReloadInstance reloadInstance, Consumer<Optional<Throwable>> consumer, boolean bl) {
 		this.minecraft = minecraft;
@@ -91,6 +93,7 @@ public class LoadingOverlay extends Overlay {
 
 		if (this.fadeOutStart == -1L
 			&& this.minecraft.isGameLoadFinished()
+			&& this.finishCallbackInvoked
 			&& this.isReadyToFadeOut()) {
 			this.fadeOutStart = m;
 		}
@@ -98,6 +101,7 @@ public class LoadingOverlay extends Overlay {
 		if (this.fadeOutStart == -1L
 			&& this.minecraft.screen != null
 			&& !(this.minecraft.screen instanceof GenericMessageScreen)
+			&& this.finishCallbackInvoked
 			&& this.isReadyToFadeOut()) {
 			this.fadeOutStart = m;
 		}
@@ -196,7 +200,19 @@ public class LoadingOverlay extends Overlay {
 
 	@Override
 	public void tick() {
-		if (this.fadeOutStart == -1L && this.reload.isDone() && this.isReadyToFadeOut()) {
+		if (net.minecraft.client.dev.ResourcePackReloadValidationController.allowTickDrivenLoadingOverlayFadeIn()
+			&& this.fadeIn
+			&& this.fadeInStart == -1L) {
+			this.fadeInStart = Util.getMillis();
+			net.minecraft.client.dev.ResourcePackReloadValidationController.onLoadingOverlayTickFadeStarted(this.fadeInStart);
+		}
+
+		if (net.minecraft.client.dev.ResourcePackReloadValidationController.isEnabled() && this.reload.isDone() && !this.mattmcValidationReloadDoneLogged) {
+			this.mattmcValidationReloadDoneLogged = true;
+			net.minecraft.client.dev.ResourcePackReloadValidationController.onLoadingOverlayTick(this.reload.isDone(), this.fadeIn, this.fadeInStart, this.fadeOutStart);
+		}
+
+		if (!this.finishCallbackInvoked && this.reload.isDone() && this.isReadyToFadeOut()) {
 			try {
 				this.reload.checkExceptions();
 				this.onFinish.accept(Optional.empty());
@@ -204,7 +220,10 @@ public class LoadingOverlay extends Overlay {
 				this.onFinish.accept(Optional.of(var2));
 			}
 
-			this.fadeOutStart = Util.getMillis();
+			this.finishCallbackInvoked = true;
+			if (this.fadeOutStart == -1L) {
+				this.fadeOutStart = Util.getMillis();
+			}
 			if (this.minecraft.screen != null) {
 				Window window = this.minecraft.getWindow();
 				this.minecraft.screen.init(this.minecraft, window.getGuiScaledWidth(), window.getGuiScaledHeight());
@@ -213,6 +232,7 @@ public class LoadingOverlay extends Overlay {
 
 		if (this.fadeOutStart == -1L
 			&& this.minecraft.isGameLoadFinished()
+			&& this.finishCallbackInvoked
 			&& this.isReadyToFadeOut()) {
 			this.fadeOutStart = Util.getMillis();
 		}
@@ -220,6 +240,7 @@ public class LoadingOverlay extends Overlay {
 		if (this.fadeOutStart == -1L
 			&& this.minecraft.screen != null
 			&& !(this.minecraft.screen instanceof GenericMessageScreen)
+			&& this.finishCallbackInvoked
 			&& Util.getMillis() - this.createdAt >= FORCE_FADE_OUT_WHEN_SCREEN_READY_MS) {
 			this.fadeOutStart = Util.getMillis();
 		}
