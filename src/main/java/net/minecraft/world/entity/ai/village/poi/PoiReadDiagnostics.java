@@ -57,8 +57,13 @@ public final class PoiReadDiagnostics {
 		return VALIDATION_ENABLED;
 	}
 
-	static boolean shouldMarkCurrentVersionDirty() {
-		return VALIDATION_ENABLED;
+	public static boolean validationAwaitingShutdown() {
+		if (!VALIDATION_ENABLED) {
+			return false;
+		}
+		synchronized (LOCK) {
+			return !stopped && status.equals("running");
+		}
 	}
 
 	static long now() {

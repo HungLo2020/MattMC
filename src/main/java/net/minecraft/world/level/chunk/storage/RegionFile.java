@@ -12,12 +12,9 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.List;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NativeNbtRegionAccess;
 import net.minecraft.util.profiling.jfr.JvmProfiler;
-import net.minecraft.util.profiling.storage.StoragePerfDiagnostics;
 import net.minecraft.world.entity.ai.village.poi.NativePoiStorage;
 import net.minecraft.world.level.ChunkPos;
 import org.jetbrains.annotations.Nullable;
@@ -54,8 +51,7 @@ public class RegionFile implements AutoCloseable {
 		this.info = regionStorageInfo;
 		this.path = path;
 		this.version = regionFileVersion;
-		RegionFileRustValidation.regionOpened(path);
-		StoragePerfDiagnostics.recordRegionOpen(path);
+		RegionFileDiagnostics.opened(path);
 		if (!Files.isDirectory(path2, new LinkOption[0])) {
 			throw new IllegalArgumentException("Expected directory, got " + path2.toAbsolutePath());
 		} else {
@@ -80,44 +76,25 @@ public class RegionFile implements AutoCloseable {
 		return this.getChunkDataInputStreamNative(chunkPos);
 	}
 
-	/**
-	 * Deterministic storage replay hook. Not used by production chunk storage.
-	 */
-	public synchronized BenchmarkPayload readBenchmarkPayload(ChunkPos chunkPos) throws IOException {
-		NativeRegionFileBridge.PayloadResult payload = NativeRegionFileBridge.readPayload(this.nativeRegionHandle(), chunkPos.x, chunkPos.z);
-		NativeRegionFileBridge.Result result = payload.result();
-		if (!result.present()) {
-			return BenchmarkPayload.missing();
-		}
-
-		ByteBuffer encoded = ByteBuffer.allocate(CHUNK_HEADER_SIZE + payload.bytes().length);
-		encoded.putInt(payload.bytes().length + 1);
-		encoded.put((byte)result.compressionId());
-		encoded.put(payload.bytes());
-		return new BenchmarkPayload(true, result.compressionId(), result.external(), result.timestamp(), encoded.array());
-	}
-
 	@Nullable
 	public synchronized CompoundTag readChunk(ChunkPos chunkPos) throws IOException {
 		NativeRegionFileBridge.TapeResult tape;
-		long started = StoragePerfDiagnostics.start();
+		long started = RegionFileDiagnostics.start();
 		try {
 			tape = NativeRegionFileBridge.readNbtTape(this.nativeRegionHandle(), chunkPos.x, chunkPos.z, 0L, 0L, 0, 0, 0L, 0L);
 		} catch (IOException exception) {
-			StoragePerfDiagnostics.recordError("region-read-nbt-rust", exception);
-			RegionFileRustValidation.recordRustError(this.path, chunkPos, "read-nbt", exception.getMessage());
+			RegionFileDiagnostics.recordError(this.path, chunkPos, "region-read-nbt-rust", "read-nbt", exception);
 			throw exception;
 		}
 		NativeRegionFileBridge.TapeMetadata result = tape.result();
-		StoragePerfDiagnostics.recordRegionRead(
+		RegionFileDiagnostics.recordRead(
 			this.path,
-			chunkPos.x,
-			chunkPos.z,
+			chunkPos,
 			result.present(),
 			result.present() ? result.compressionId() : -1,
 			result.present() && result.external(),
 			result.compressedLength(),
-			StoragePerfDiagnostics.elapsed(started)
+			RegionFileDiagnostics.elapsed(started)
 		);
 		if (!result.present()) {
 			return null;
@@ -125,7 +102,7 @@ public class RegionFile implements AutoCloseable {
 
 		RegionFileVersion regionFileVersion = RegionFileVersion.fromId(result.compressionId());
 		if (regionFileVersion == null || regionFileVersion == RegionFileVersion.VERSION_CUSTOM) {
-			RegionFileRustValidation.recordUnreadableChunk(
+			RegionFileDiagnostics.recordUnreadable(
 				this.path,
 				chunkPos,
 				"Rust region NBT reader returned unsupported compression id " + result.compressionId()
@@ -133,54 +110,37 @@ public class RegionFile implements AutoCloseable {
 			throw new IOException("Rust region NBT reader returned unsupported compression id " + result.compressionId() + " for chunk " + chunkPos);
 		}
 
-		if (RegionFileRustValidation.enabled()) {
-			RegionFileRustValidation.recordRead(
-				this.path,
-				chunkPos,
-				result.compressionId(),
-				result.external(),
-				result.timestamp(),
-				Math.toIntExact(result.compressedLength()),
-				"",
-				result.fingerprint()
-			);
-		}
+		RegionFileDiagnostics.recordNbtRead(this.path, this.nativeRegionHandle(), chunkPos, result);
 		JvmProfiler.INSTANCE.onRegionFileRead(this.info, chunkPos, regionFileVersion, Math.toIntExact(result.compressedLength()));
 		return NativeNbtRegionAccess.readTape(tape.bytes());
-	}
-
-	public synchronized void writeBenchmarkPayload(ChunkPos chunkPos, byte[] encodedPayload) throws IOException {
-		this.write(chunkPos, ByteBuffer.wrap(encodedPayload));
 	}
 
 	@Nullable
 	private DataInputStream getChunkDataInputStreamNative(ChunkPos chunkPos) throws IOException {
 		NativeRegionFileBridge.PayloadResult payload;
-		long started = StoragePerfDiagnostics.start();
+		long started = RegionFileDiagnostics.start();
 		try {
 			payload = NativeRegionFileBridge.readPayload(this.nativeRegionHandle(), chunkPos.x, chunkPos.z);
 		} catch (IOException exception) {
-			StoragePerfDiagnostics.recordError("region-read-rust", exception);
-			RegionFileRustValidation.recordRustError(this.path, chunkPos, "read", exception.getMessage());
+			RegionFileDiagnostics.recordError(this.path, chunkPos, "region-read-rust", "read", exception);
 			throw exception;
 		}
 		NativeRegionFileBridge.Result result = payload.result();
-		StoragePerfDiagnostics.recordRegionRead(
+		RegionFileDiagnostics.recordRead(
 			this.path,
-			chunkPos.x,
-			chunkPos.z,
+			chunkPos,
 			result.present(),
 			result.present() ? result.compressionId() : -1,
 			result.present() && result.external(),
 			payload.bytes().length,
-			StoragePerfDiagnostics.elapsed(started)
+			RegionFileDiagnostics.elapsed(started)
 		);
 		if (!result.present()) {
 			return null;
 		} else {
 			RegionFileVersion regionFileVersion = RegionFileVersion.fromId(result.compressionId());
 			if (regionFileVersion == null || regionFileVersion == RegionFileVersion.VERSION_CUSTOM) {
-				RegionFileRustValidation.recordUnreadableChunk(
+				RegionFileDiagnostics.recordUnreadable(
 					this.path,
 					chunkPos,
 					"Rust region reader returned unsupported compression id " + result.compressionId()
@@ -188,19 +148,7 @@ public class RegionFile implements AutoCloseable {
 				throw new IOException("Rust region reader returned unsupported compression id " + result.compressionId() + " for chunk " + chunkPos);
 			}
 
-			if (RegionFileRustValidation.enabled()) {
-				long fingerprint = this.readNativeNbtFingerprint(chunkPos, "read");
-				RegionFileRustValidation.recordRead(
-					this.path,
-					chunkPos,
-					result.compressionId(),
-					result.external(),
-					result.timestamp(),
-					payload.bytes().length,
-					sha256(payload.bytes()),
-					fingerprint
-				);
-			}
+			RegionFileDiagnostics.recordPayloadRead(this.path, this.nativeRegionHandle(), chunkPos, result, payload.bytes());
 			JvmProfiler.INSTANCE.onRegionFileRead(this.info, chunkPos, regionFileVersion, payload.bytes().length);
 			return this.createChunkInputStream(chunkPos, result.compressionId(), new ByteArrayInputStream(payload.bytes()));
 		}
@@ -226,36 +174,32 @@ public class RegionFile implements AutoCloseable {
 	}
 
 	public synchronized void flush() throws IOException {
-		long started = StoragePerfDiagnostics.start();
+		long started = RegionFileDiagnostics.start();
 		try {
 			NativeRegionFileBridge.flush(this.nativeRegionHandle());
-			StoragePerfDiagnostics.recordRegionFlush(this.path, StoragePerfDiagnostics.elapsed(started));
-			RegionFileRustValidation.recordFlush(this.path);
+			RegionFileDiagnostics.recordFlush(this.path, RegionFileDiagnostics.elapsed(started));
 		} catch (IOException exception) {
-			StoragePerfDiagnostics.recordError("region-flush-rust", exception);
-			RegionFileRustValidation.recordRustError(this.path, null, "flush", exception.getMessage());
+			RegionFileDiagnostics.recordError(this.path, null, "region-flush-rust", "flush", exception);
 			throw exception;
 		}
 	}
 
 	public synchronized void clear(ChunkPos chunkPos) throws IOException {
 		NativeRegionFileBridge.WriteResult result;
-		long started = StoragePerfDiagnostics.start();
+		long started = RegionFileDiagnostics.start();
 		try {
 			result = NativeRegionFileBridge.deleteChunk(this.nativeRegionHandle(), chunkPos.x, chunkPos.z);
 		} catch (IOException exception) {
-			StoragePerfDiagnostics.recordError("region-delete-rust", exception);
-			RegionFileRustValidation.recordRustError(this.path, chunkPos, "delete", exception.getMessage());
+			RegionFileDiagnostics.recordError(this.path, chunkPos, "region-delete-rust", "delete", exception);
 			throw exception;
 		}
-		StoragePerfDiagnostics.recordRegionDelete(this.path, chunkPos.x, chunkPos.z, StoragePerfDiagnostics.elapsed(started));
-		RegionFileRustValidation.recordDelete(this.path, chunkPos, result.timestamp());
+		RegionFileDiagnostics.recordDelete(this.path, chunkPos, RegionFileDiagnostics.elapsed(started), result.timestamp());
 	}
 
 	public synchronized void writeChunk(ChunkPos chunkPos, CompoundTag compoundTag) throws IOException {
 		byte[] tape = NativeNbtRegionAccess.writeTape(compoundTag);
 		NativeRegionFileBridge.WriteResult result;
-		long started = StoragePerfDiagnostics.start();
+		long started = RegionFileDiagnostics.start();
 		try {
 			result = NativeRegionFileBridge.writeNbtTape(
 				this.nativeRegionHandle(),
@@ -271,33 +215,19 @@ public class RegionFile implements AutoCloseable {
 				0L
 			);
 		} catch (IOException exception) {
-			StoragePerfDiagnostics.recordError("region-write-nbt-rust", exception);
-			RegionFileRustValidation.recordRustError(this.path, chunkPos, "write-nbt", exception.getMessage());
+			RegionFileDiagnostics.recordError(this.path, chunkPos, "region-write-nbt-rust", "write-nbt", exception);
 			throw exception;
 		}
-		StoragePerfDiagnostics.recordRegionWrite(
+		RegionFileDiagnostics.recordWrite(
 			this.path,
-			chunkPos.x,
-			chunkPos.z,
+			chunkPos,
 			result.compressionId(),
 			result.external(),
 			result.payloadLength(),
-			StoragePerfDiagnostics.elapsed(started)
+			RegionFileDiagnostics.elapsed(started)
 		);
 		JvmProfiler.INSTANCE.onRegionFileWrite(this.info, chunkPos, this.version, Math.toIntExact(result.payloadLength() + 1));
-		if (RegionFileRustValidation.enabled()) {
-			long fingerprint = this.readNativeNbtFingerprint(chunkPos, "write-nbt");
-			RegionFileRustValidation.recordWrite(
-				this.path,
-				chunkPos,
-				result.compressionId(),
-				result.external(),
-				result.timestamp(),
-				result.payloadLength(),
-				"",
-				fingerprint
-			);
-		}
+		RegionFileDiagnostics.recordNbtWrite(this.path, this.nativeRegionHandle(), chunkPos, result, "write-nbt");
 	}
 
 	public synchronized NativePoiStorage.WriteResult writePoiChunk(ChunkPos chunkPos, byte[] tape) throws IOException {
@@ -316,8 +246,38 @@ public class RegionFile implements AutoCloseable {
 		return NativeChunkSectionStorage.decodeChunk(this.nativeRegionHandle(), chunkPos.x, chunkPos.z);
 	}
 
+	public synchronized NativeChunkSectionStorage.WriteResult writeChunkSections(ChunkPos chunkPos, SerializableChunkData data) throws IOException {
+		long started = RegionFileDiagnostics.start();
+		try {
+			NativeChunkSectionStorage.WriteResult result = NativeChunkSectionStorage.writeChunk(
+				this.nativeRegionHandle(),
+				chunkPos.x,
+				chunkPos.z,
+				this.version.getId(),
+				data
+			);
+			RegionFileDiagnostics.recordWrite(
+				this.path,
+				chunkPos,
+				result.compressionId(),
+				result.external(),
+				result.compressedLength(),
+				RegionFileDiagnostics.elapsed(started)
+			);
+			JvmProfiler.INSTANCE.onRegionFileWrite(this.info, chunkPos, this.version, Math.toIntExact(result.compressedLength() + 1));
+			if (RegionFileDiagnostics.chunkSectionWriteShadowEnabled()) {
+				RegionFileDiagnostics.validateChunkSectionWriteShadow(this, chunkPos, data);
+			}
+			RegionFileDiagnostics.recordChunkSectionWrite(this.path, this.nativeRegionHandle(), chunkPos, result);
+			return result;
+		} catch (IOException exception) {
+			RegionFileDiagnostics.recordError(this.path, chunkPos, "region-write-chunk-sections-rust", "write-chunk-sections", exception);
+			throw exception;
+		}
+	}
+
 	public synchronized NativeEntityStorage.WriteResult writeEntityChunk(ChunkPos chunkPos, List<byte[]> entityTapes) throws IOException {
-		long started = StoragePerfDiagnostics.start();
+		long started = RegionFileDiagnostics.start();
 		try {
 			NativeEntityStorage.WriteResult result = NativeEntityStorage.writeChunk(
 				this.nativeRegionHandle(),
@@ -326,32 +286,19 @@ public class RegionFile implements AutoCloseable {
 				this.version.getId(),
 				entityTapes
 			);
-			StoragePerfDiagnostics.recordRegionWrite(
+			RegionFileDiagnostics.recordWrite(
 				this.path,
-				chunkPos.x,
-				chunkPos.z,
+				chunkPos,
 				result.compressionId(),
 				result.external(),
 				result.compressedLength(),
-				StoragePerfDiagnostics.elapsed(started)
+				RegionFileDiagnostics.elapsed(started)
 			);
 			JvmProfiler.INSTANCE.onRegionFileWrite(this.info, chunkPos, this.version, Math.toIntExact(result.compressedLength() + 1));
-			if (RegionFileRustValidation.enabled()) {
-				RegionFileRustValidation.recordWrite(
-					this.path,
-					chunkPos,
-					result.compressionId(),
-					result.external(),
-					result.timestamp(),
-					result.compressedLength(),
-					"",
-					result.fingerprint()
-				);
-			}
+			RegionFileDiagnostics.recordEntityWrite(this.path, chunkPos, result);
 			return result;
 		} catch (IOException exception) {
-			StoragePerfDiagnostics.recordError("region-write-entity-rust", exception);
-			RegionFileRustValidation.recordRustError(this.path, chunkPos, "write-entity", exception.getMessage());
+			RegionFileDiagnostics.recordError(this.path, chunkPos, "region-write-entity-rust", "write-entity", exception);
 			throw exception;
 		}
 	}
@@ -376,36 +323,22 @@ public class RegionFile implements AutoCloseable {
 		duplicate.position(duplicate.position() + CHUNK_HEADER_SIZE);
 		duplicate.get(payload);
 		NativeRegionFileBridge.WriteResult result;
-		long started = StoragePerfDiagnostics.start();
+		long started = RegionFileDiagnostics.start();
 		try {
 			result = NativeRegionFileBridge.writePayload(this.nativeRegionHandle(), chunkPos.x, chunkPos.z, compressionId, payload);
 		} catch (IOException exception) {
-			StoragePerfDiagnostics.recordError("region-write-rust", exception);
-			RegionFileRustValidation.recordRustError(this.path, chunkPos, "write", exception.getMessage());
+			RegionFileDiagnostics.recordError(this.path, chunkPos, "region-write-rust", "write", exception);
 			throw exception;
 		}
-		StoragePerfDiagnostics.recordRegionWrite(
+		RegionFileDiagnostics.recordWrite(
 			this.path,
-			chunkPos.x,
-			chunkPos.z,
+			chunkPos,
 			result.compressionId(),
 			result.external(),
 			result.payloadLength(),
-			StoragePerfDiagnostics.elapsed(started)
+			RegionFileDiagnostics.elapsed(started)
 		);
-		if (RegionFileRustValidation.enabled()) {
-			long fingerprint = this.readNativeNbtFingerprint(chunkPos, "write");
-			RegionFileRustValidation.recordWrite(
-				this.path,
-				chunkPos,
-				result.compressionId(),
-				result.external(),
-				result.timestamp(),
-				result.payloadLength(),
-				sha256(payload),
-				fingerprint
-			);
-		}
+		RegionFileDiagnostics.recordPayloadWrite(this.path, this.nativeRegionHandle(), chunkPos, result, payload);
 	}
 
 	public synchronized boolean hasChunk(ChunkPos chunkPos) {
@@ -413,35 +346,6 @@ public class RegionFile implements AutoCloseable {
 			return NativeRegionFileBridge.readPayload(this.nativeRegionHandle(), chunkPos.x, chunkPos.z).result().present();
 		} catch (IOException exception) {
 			return false;
-		}
-	}
-
-	private static String sha256(byte[] bytes) throws IOException {
-		try {
-			byte[] digest = MessageDigest.getInstance("SHA-256").digest(bytes);
-			StringBuilder builder = new StringBuilder(digest.length * 2);
-			for (byte value : digest) {
-				builder.append(Character.forDigit(value >>> 4 & 0xF, 16));
-				builder.append(Character.forDigit(value & 0xF, 16));
-			}
-			return builder.toString();
-		} catch (NoSuchAlgorithmException exception) {
-			throw new IOException("SHA-256 digest is unavailable", exception);
-		}
-	}
-
-	private long readNativeNbtFingerprint(ChunkPos chunkPos, String operation) throws IOException {
-		try {
-			NativeRegionFileBridge.NbtResult result = NativeRegionFileBridge.readNbtFingerprint(this.nativeRegionHandle(), chunkPos.x, chunkPos.z);
-			if (!result.present()) {
-				RegionFileRustValidation.recordUnreadableChunk(this.path, chunkPos, "NBT fingerprint missing after " + operation);
-				throw new IOException("Rust region NBT fingerprint missing for " + chunkPos + " after " + operation);
-			}
-
-			return result.fingerprint();
-		} catch (IOException exception) {
-			RegionFileRustValidation.recordMalformedNbt(this.path, chunkPos, exception.getMessage());
-			throw exception;
 		}
 	}
 
@@ -456,7 +360,7 @@ public class RegionFile implements AutoCloseable {
 				failure = exception;
 			}
 		}
-		StoragePerfDiagnostics.recordRegionClose(this.path);
+		RegionFileDiagnostics.recordClose(this.path);
 		if (failure != null) {
 			throw failure;
 		}
@@ -481,12 +385,6 @@ public class RegionFile implements AutoCloseable {
 			JvmProfiler.INSTANCE.onRegionFileWrite(RegionFile.this.info, this.pos, RegionFile.this.version, i);
 			byteBuffer.putInt(0, i);
 			RegionFile.this.write(this.pos, byteBuffer);
-		}
-	}
-
-	public record BenchmarkPayload(boolean present, int compressionId, boolean external, long timestamp, byte[] encodedPayload) {
-		static BenchmarkPayload missing() {
-			return new BenchmarkPayload(false, -1, false, 0L, new byte[0]);
 		}
 	}
 }

@@ -2,7 +2,17 @@ package net.minecraft.world.level.chunk.storage;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NativeNbtRegionAccess;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
 import net.minecraft.util.NativeLibraryLoader;
+import net.minecraft.core.Holder;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.chunk.DataLayer;
+import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.PalettedContainerRO.PackedData;
+import net.minecraft.world.level.block.state.BlockState;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -13,23 +23,28 @@ import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.LongStream;
 
 /**
- * Dev/test-only bridge for Rust current-version chunk-section decoding.
+ * Bulk bridge for Rust-owned current-version chunk-section storage work.
  *
- * <p>Rust decodes the chunk NBT shape and returns one bulk typed buffer with
- * simple metadata, section palette tapes, packed arrays, light arrays, and
- * heightmaps. Production chunk loading still uses {@link SerializableChunkData}
- * and Java remains authoritative for DFU, registries, codecs, block entities,
- * ticks, structures, and chunk object construction.
+ * <p>Production reads use Rust to parse the region payload once and return
+ * typed section/light/heightmap data plus residual Java-owned NBT. Supported
+ * current-version writes use the matching typed operation: Java supplies packed
+ * section data and residual NBT, then Rust merges, encodes, compresses, and
+ * writes one complete chunk payload. Java remains authoritative for DFU,
+ * registries, codecs, block entities, ticks, structures, and chunk object
+ * construction.
  */
 public final class NativeChunkSectionStorage implements Closeable {
 	public static final int OK = 0;
 	public static final int OUTPUT_TOO_SMALL = -4;
 	public static final int ERROR_DOMAIN_CHUNK = 6;
 	public static final int CHUNK_UNSUPPORTED_DATA_VERSION = 4;
-	private static final long RESULT_SIZE = 168L;
+	private static final long RESULT_SIZE = 184L;
 	private static final long RESULT_STATUS = 0L;
 	private static final long RESULT_ERROR_DOMAIN = 4L;
 	private static final long RESULT_ERROR_KIND = 8L;
@@ -52,14 +67,34 @@ public final class NativeChunkSectionStorage implements Closeable {
 	private static final long RESULT_NBT_PARSE_NANOS = 104L;
 	private static final long RESULT_CHUNK_DECODE_NANOS = 112L;
 	private static final long RESULT_TAPE_CREATION_NANOS = 120L;
-	private static final long RESULT_REGION_HANDLE_LOOKUP_NANOS = 128L;
-	private static final long RESULT_REGION_LOCK_WAIT_NANOS = 136L;
-	private static final long RESULT_REGION_LOCK_HOLD_NANOS = 144L;
-	private static final long RESULT_RUST_OUTPUT_COPY_NANOS = 152L;
-	private static final long RESULT_RUST_FFI_TOTAL_NANOS = 160L;
+	private static final long RESULT_RESIDUAL_TAPE_LEN = 128L;
+	private static final long RESULT_RESIDUAL_TAPE_CREATION_NANOS = 136L;
+	private static final long RESULT_REGION_HANDLE_LOOKUP_NANOS = 144L;
+	private static final long RESULT_REGION_LOCK_WAIT_NANOS = 152L;
+	private static final long RESULT_REGION_LOCK_HOLD_NANOS = 160L;
+	private static final long RESULT_RUST_OUTPUT_COPY_NANOS = 168L;
+	private static final long RESULT_RUST_FFI_TOTAL_NANOS = 176L;
+	private static final long WRITE_RESULT_SIZE = 112L;
+	private static final long WRITE_RESULT_STATUS = 0L;
+	private static final long WRITE_RESULT_ERROR_DOMAIN = 4L;
+	private static final long WRITE_RESULT_ERROR_KIND = 8L;
+	private static final long WRITE_RESULT_PRESENT = 12L;
+	private static final long WRITE_RESULT_COMPRESSION_ID = 16L;
+	private static final long WRITE_RESULT_EXTERNAL = 20L;
+	private static final long WRITE_RESULT_SECTOR_COUNT = 24L;
+	private static final long WRITE_RESULT_TIMESTAMP = 32L;
+	private static final long WRITE_RESULT_SECTOR_OFFSET = 40L;
+	private static final long WRITE_RESULT_COMPRESSED_LEN = 48L;
+	private static final long WRITE_RESULT_DECOMPRESSED_LEN = 56L;
+	private static final long WRITE_RESULT_TAPE_LEN = 64L;
+	private static final long WRITE_RESULT_MERGE_NANOS = 72L;
+	private static final long WRITE_RESULT_NBT_ENCODE_NANOS = 80L;
+	private static final long WRITE_RESULT_COMPRESSION_NANOS = 88L;
+	private static final long WRITE_RESULT_REGION_WRITE_NANOS = 96L;
+	private static final long WRITE_RESULT_RUST_FFI_TOTAL_NANOS = 104L;
 	private static final int INITIAL_OUTPUT_CAPACITY = 65536;
 	private static final int MAGIC = 0x4B48434D;
-	private static final int VERSION = 1;
+	private static final int VERSION = 2;
 	private static final int SECTION_HAS_BLOCK_STATES = 1;
 	private static final int SECTION_HAS_BIOMES = 1 << 1;
 	private static final int SECTION_HAS_BLOCK_LIGHT = 1 << 2;
@@ -86,6 +121,27 @@ public final class NativeChunkSectionStorage implements Closeable {
 		"mattmc_chunk_decode_sections_from_region",
 		DECODE_DESCRIPTOR
 	);
+	private static final FunctionDescriptor WRITE_DESCRIPTOR = FunctionDescriptor.of(
+		ValueLayout.JAVA_INT,
+		ValueLayout.JAVA_LONG,
+		ValueLayout.JAVA_INT,
+		ValueLayout.JAVA_INT,
+		ValueLayout.JAVA_INT,
+		ValueLayout.ADDRESS,
+		ValueLayout.JAVA_LONG,
+		ValueLayout.JAVA_LONG,
+		ValueLayout.JAVA_LONG,
+		ValueLayout.JAVA_INT,
+		ValueLayout.JAVA_INT,
+		ValueLayout.JAVA_LONG,
+		ValueLayout.JAVA_LONG,
+		ValueLayout.ADDRESS
+	);
+	private static final MethodHandle WRITE = NativeLibraryLoader.downcallHandle(
+		"mattmc_rust",
+		"mattmc_chunk_write_sections_to_region",
+		WRITE_DESCRIPTOR
+	);
 	private long handle;
 
 	private NativeChunkSectionStorage(long handle) {
@@ -98,6 +154,58 @@ public final class NativeChunkSectionStorage implements Closeable {
 
 	public DecodeResult decodeChunk(int chunkX, int chunkZ) throws IOException {
 		return decodeChunk(this.handle, chunkX, chunkZ);
+	}
+
+	public WriteResult writeChunk(int chunkX, int chunkZ, int compressionId, SerializableChunkData data) throws IOException {
+		return writeChunk(this.handle, chunkX, chunkZ, compressionId, data);
+	}
+
+	WriteResult writeChunkTape(int chunkX, int chunkZ, int compressionId, byte[] tape) throws IOException {
+		return writeChunkTape(this.handle, chunkX, chunkZ, compressionId, tape);
+	}
+
+	public static WriteResult writeChunk(long handle, int chunkX, int chunkZ, int compressionId, SerializableChunkData data) throws IOException {
+		if (handle == 0L) {
+			throw new IOException("Write chunk sections failed with closed native region handle");
+		}
+		long tapeStarted = ChunkSectionReadDiagnostics.now();
+		byte[] tape = encodeWriteTape(data);
+		ChunkSectionReadDiagnostics.rustWriteTapeCreated(ChunkSectionReadDiagnostics.elapsed(tapeStarted), tape.length);
+		return writeChunkTape(handle, chunkX, chunkZ, compressionId, tape);
+	}
+
+	static WriteResult writeChunkTape(long handle, int chunkX, int chunkZ, int compressionId, byte[] tape) throws IOException {
+		if (handle == 0L) {
+			throw new IOException("Write chunk sections failed with closed native region handle");
+		}
+		try (Arena arena = Arena.ofConfined()) {
+			MemorySegment tapeSegment = tape.length == 0 ? MemorySegment.NULL : arena.allocateFrom(ValueLayout.JAVA_BYTE, tape);
+			MemorySegment resultSegment = arena.allocate(WRITE_RESULT_SIZE, 8);
+			int status = (int)WRITE.invokeExact(
+				handle,
+				chunkX,
+				chunkZ,
+				compressionId,
+				tapeSegment,
+				(long)tape.length,
+				0L,
+				0L,
+				0,
+				0,
+				0L,
+				0L,
+				resultSegment
+			);
+			WriteResult result = readWriteResult(resultSegment, status);
+			if (result.status != OK) {
+				throw new WriteException("Write chunk sections", result);
+			}
+			return result;
+		} catch (IOException exception) {
+			throw exception;
+		} catch (Throwable throwable) {
+			throw nativeFailure("Write chunk sections", throwable);
+		}
 	}
 
 	public static DecodeResult decodeChunk(long handle, int chunkX, int chunkZ) throws IOException {
@@ -125,7 +233,7 @@ public final class NativeChunkSectionStorage implements Closeable {
 		}
 		try (Arena arena = Arena.ofConfined()) {
 			MemorySegment resultSegment = arena.allocate(RESULT_SIZE, 8);
-			Result result = decodeInto(thisHandle(handle), chunkX, chunkZ, MemorySegment.NULL, 0L, resultSegment);
+			Result result = decodeInto(handle, chunkX, chunkZ, MemorySegment.NULL, 0L, resultSegment);
 			throw new DecodeException("Decode chunk sections", result);
 		}
 	}
@@ -144,10 +252,6 @@ public final class NativeChunkSectionStorage implements Closeable {
 		return exception instanceof DecodeException decodeException
 			&& decodeException.result().errorDomain() == ERROR_DOMAIN_CHUNK
 			&& decodeException.result().errorKind() == CHUNK_UNSUPPORTED_DATA_VERSION;
-	}
-
-	private static long thisHandle(long handle) {
-		return handle;
 	}
 
 	private static Result decodeInto(long handle, int chunkX, int chunkZ, MemorySegment output, long outputCapacity, MemorySegment resultSegment) {
@@ -200,6 +304,8 @@ public final class NativeChunkSectionStorage implements Closeable {
 			resultSegment.get(ValueLayout.JAVA_LONG, RESULT_NBT_PARSE_NANOS),
 			resultSegment.get(ValueLayout.JAVA_LONG, RESULT_CHUNK_DECODE_NANOS),
 			resultSegment.get(ValueLayout.JAVA_LONG, RESULT_TAPE_CREATION_NANOS),
+			resultSegment.get(ValueLayout.JAVA_LONG, RESULT_RESIDUAL_TAPE_LEN),
+			resultSegment.get(ValueLayout.JAVA_LONG, RESULT_RESIDUAL_TAPE_CREATION_NANOS),
 			resultSegment.get(ValueLayout.JAVA_LONG, RESULT_REGION_HANDLE_LOOKUP_NANOS),
 			resultSegment.get(ValueLayout.JAVA_LONG, RESULT_REGION_LOCK_WAIT_NANOS),
 			resultSegment.get(ValueLayout.JAVA_LONG, RESULT_REGION_LOCK_HOLD_NANOS),
@@ -216,7 +322,8 @@ public final class NativeChunkSectionStorage implements Closeable {
 		if (reader.readIntLE() != MAGIC) {
 			throw new IOException("Invalid chunk-section tape magic");
 		}
-		if (reader.readUnsignedShortLE() != VERSION) {
+		int version = reader.readUnsignedShortLE();
+		if (version < 1 || version > VERSION) {
 			throw new IOException("Unsupported chunk-section tape version");
 		}
 		reader.readUnsignedShortLE();
@@ -238,10 +345,141 @@ public final class NativeChunkSectionStorage implements Closeable {
 		for (int i = 0; i < heightmapCount; i++) {
 			heightmaps.add(new Heightmap(reader.readJavaString(), reader.readLongArray(reader.readIntLE())));
 		}
+		CompoundTag residual = new CompoundTag();
+		if (version >= 2) {
+			residual = NativeNbtRegionAccess.readTape(reader.readBytes(reader.readIntLE()));
+		}
 		if (!reader.done()) {
 			throw new IOException("Trailing bytes in chunk-section tape");
 		}
-		return new ChunkData(dataVersion, chunkX, chunkZ, yPos, status, lightOn, lastUpdate, inhabitedTime, List.copyOf(sections), List.copyOf(heightmaps));
+		return new ChunkData(dataVersion, chunkX, chunkZ, yPos, status, lightOn, lastUpdate, inhabitedTime, List.copyOf(sections), List.copyOf(heightmaps), residual);
+	}
+
+	private static WriteResult readWriteResult(MemorySegment resultSegment, int callStatus) {
+		int status = resultSegment.get(ValueLayout.JAVA_INT, WRITE_RESULT_STATUS);
+		if (status == 0 && callStatus != 0) {
+			status = callStatus;
+		}
+		return new WriteResult(
+			status,
+			resultSegment.get(ValueLayout.JAVA_INT, WRITE_RESULT_ERROR_DOMAIN),
+			resultSegment.get(ValueLayout.JAVA_INT, WRITE_RESULT_ERROR_KIND),
+			resultSegment.get(ValueLayout.JAVA_INT, WRITE_RESULT_PRESENT) != 0,
+			resultSegment.get(ValueLayout.JAVA_INT, WRITE_RESULT_COMPRESSION_ID),
+			resultSegment.get(ValueLayout.JAVA_INT, WRITE_RESULT_EXTERNAL) != 0,
+			resultSegment.get(ValueLayout.JAVA_INT, WRITE_RESULT_SECTOR_COUNT),
+			resultSegment.get(ValueLayout.JAVA_LONG, WRITE_RESULT_TIMESTAMP),
+			resultSegment.get(ValueLayout.JAVA_LONG, WRITE_RESULT_SECTOR_OFFSET),
+			resultSegment.get(ValueLayout.JAVA_LONG, WRITE_RESULT_COMPRESSED_LEN),
+			resultSegment.get(ValueLayout.JAVA_LONG, WRITE_RESULT_DECOMPRESSED_LEN),
+			resultSegment.get(ValueLayout.JAVA_LONG, WRITE_RESULT_TAPE_LEN),
+			resultSegment.get(ValueLayout.JAVA_LONG, WRITE_RESULT_MERGE_NANOS),
+			resultSegment.get(ValueLayout.JAVA_LONG, WRITE_RESULT_NBT_ENCODE_NANOS),
+			resultSegment.get(ValueLayout.JAVA_LONG, WRITE_RESULT_COMPRESSION_NANOS),
+			resultSegment.get(ValueLayout.JAVA_LONG, WRITE_RESULT_REGION_WRITE_NANOS),
+			resultSegment.get(ValueLayout.JAVA_LONG, WRITE_RESULT_RUST_FFI_TOTAL_NANOS)
+		);
+	}
+
+	static byte[] encodeWriteTape(SerializableChunkData data) throws IOException {
+		TapeWriter writer = new TapeWriter();
+		writer.writeIntLE(MAGIC);
+		writer.writeShortLE(VERSION);
+		writer.writeShortLE(0);
+		writer.writeIntLE(net.minecraft.SharedConstants.getCurrentVersion().dataVersion().version());
+		writer.writeIntLE(data.chunkPos().x);
+		writer.writeIntLE(data.chunkPos().z);
+		writer.writeIntLE(data.minSectionY());
+		writer.writeIntLE(data.lightCorrect() ? 1 : 0);
+		writer.writeLongLE(data.lastUpdateTime());
+		writer.writeLongLE(data.inhabitedTime());
+		writer.writeIntLE(data.sectionData().size());
+		writer.writeIntLE(data.heightmaps().size());
+		writer.writeJavaString(BuiltInRegistries.CHUNK_STATUS.getKey(data.chunkStatus()).toString());
+		for (SerializableChunkData.SectionData section : data.sectionData()) {
+			writeSection(writer, data, section);
+		}
+		for (java.util.Map.Entry<net.minecraft.world.level.levelgen.Heightmap.Types, long[]> entry : data.heightmaps().entrySet()) {
+			writer.writeJavaString(entry.getKey().getSerializationKey());
+			writer.writeLongArray(entry.getValue());
+		}
+		writer.writeBytes(NativeNbtRegionAccess.writeTape(data.writeResidualForRustSections()));
+		return writer.toByteArray();
+	}
+
+	private static void writeSection(TapeWriter writer, SerializableChunkData data, SerializableChunkData.SectionData section) throws IOException {
+		LevelChunkSection levelChunkSection = section.chunkSection();
+		boolean hasBlockStates = levelChunkSection != null;
+		boolean hasBiomes = levelChunkSection != null;
+		byte[] blockLight = layerBytes(section.blockLight());
+		byte[] skyLight = layerBytes(section.skyLight());
+		int flags = 0;
+		if (hasBlockStates) {
+			flags |= SECTION_HAS_BLOCK_STATES;
+		}
+		if (hasBiomes) {
+			flags |= SECTION_HAS_BIOMES;
+		}
+		if (blockLight.length != 0) {
+			flags |= SECTION_HAS_BLOCK_LIGHT;
+		}
+		if (skyLight.length != 0) {
+			flags |= SECTION_HAS_SKY_LIGHT;
+		}
+		PackedData<BlockState> blockStates = hasBlockStates ? levelChunkSection.getStates().pack(data.containerFactory().blockStatesStrategy()) : emptyPacked();
+		PackedData<Holder<Biome>> biomes = hasBiomes ? levelChunkSection.getBiomes().pack(data.containerFactory().biomeStrategy()) : emptyPacked();
+		long[] blockData = storageBytes(blockStates);
+		long[] biomeData = storageBytes(biomes);
+		writer.writeIntLE(section.y());
+		writer.writeIntLE(flags);
+		writer.writeIntLE(blockStates.paletteEntries().size());
+		writer.writeIntLE(blockData.length);
+		writer.writeIntLE(biomes.paletteEntries().size());
+		writer.writeIntLE(biomeData.length);
+		writer.writeIntLE(blockLight.length);
+		writer.writeIntLE(skyLight.length);
+		for (BlockState state : blockStates.paletteEntries()) {
+			writer.writeBytes(NativeNbtRegionAccess.writeTape(encodeBlockStatePaletteEntry(state)));
+		}
+		writer.writeLongArrayRaw(blockData);
+		for (Holder<Biome> biome : biomes.paletteEntries()) {
+			Optional<ResourceKey<Biome>> key = biome.unwrapKey();
+			if (key.isEmpty()) {
+				throw new IOException("Cannot write unregistered biome in Rust typed chunk section tape");
+			}
+			writer.writeIntLE(BIOME_ENTRY_RESOURCE_ID_UTF16);
+			writer.writeJavaString(key.get().location().toString());
+		}
+		writer.writeLongArrayRaw(biomeData);
+		writer.writeRaw(blockLight);
+		writer.writeRaw(skyLight);
+	}
+
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	private static <T> PackedData<T> emptyPacked() {
+		return new PackedData(List.of(), Optional.empty());
+	}
+
+	private static long[] storageBytes(PackedData<?> data) {
+		return data.storage().map(LongStream::toArray).orElseGet(() -> new long[0]);
+	}
+
+	private static CompoundTag encodeBlockStatePaletteEntry(BlockState state) throws IOException {
+		Tag tag;
+		try {
+			tag = BlockState.CODEC.encodeStart(NbtOps.INSTANCE, state)
+				.getOrThrow(message -> new IllegalArgumentException("Failed to encode block-state palette entry: " + message));
+		} catch (RuntimeException exception) {
+			throw new IOException("Failed to encode block-state palette entry", exception);
+		}
+		if (tag instanceof CompoundTag compoundTag) {
+			return compoundTag;
+		}
+		throw new IOException("Block-state palette entry encoded as " + tag.getType().getName() + ", expected compound");
+	}
+
+	private static byte[] layerBytes(DataLayer layer) {
+		return layer == null ? new byte[0] : layer.getData();
 	}
 
 	private static Section readSection(TapeReader reader) throws IOException {
@@ -318,6 +556,27 @@ public final class NativeChunkSectionStorage implements Closeable {
 		}
 	}
 
+	public static final class WriteException extends IOException {
+		private final WriteResult result;
+
+		private WriteException(String action, WriteResult result) {
+			super(
+				action
+					+ " failed with native chunk status "
+					+ result.status
+					+ " domain "
+					+ result.errorDomain
+					+ " error "
+					+ result.errorKind
+			);
+			this.result = result;
+		}
+
+		public WriteResult result() {
+			return this.result;
+		}
+	}
+
 	public record DecodeResult(Result result, ChunkData chunk) {
 	}
 
@@ -344,10 +603,33 @@ public final class NativeChunkSectionStorage implements Closeable {
 		long nbtParseNanos,
 		long chunkDecodeNanos,
 		long tapeCreationNanos,
+		long residualTapeLength,
+		long residualTapeCreationNanos,
 		long regionHandleLookupNanos,
 		long regionLockWaitNanos,
 		long regionLockHoldNanos,
 		long rustOutputCopyNanos,
+		long rustFfiTotalNanos
+	) {
+	}
+
+	public record WriteResult(
+		int status,
+		int errorDomain,
+		int errorKind,
+		boolean present,
+		int compressionId,
+		boolean external,
+		int sectorCount,
+		long timestamp,
+		long sectorOffset,
+		long compressedLength,
+		long decompressedLength,
+		long tapeLength,
+		long mergeNanos,
+		long nbtEncodeNanos,
+		long compressionNanos,
+		long regionWriteNanos,
 		long rustFfiTotalNanos
 	) {
 	}
@@ -362,10 +644,11 @@ public final class NativeChunkSectionStorage implements Closeable {
 		long lastUpdate,
 		long inhabitedTime,
 		List<Section> sections,
-		List<Heightmap> heightmaps
+		List<Heightmap> heightmaps,
+		CompoundTag residual
 	) {
 		private static ChunkData empty() {
-			return new ChunkData(0, 0, 0, 0, "", false, 0L, 0L, List.of(), List.of());
+			return new ChunkData(0, 0, 0, 0, "", false, 0L, 0L, List.of(), List.of(), new CompoundTag());
 		}
 	}
 
@@ -476,6 +759,89 @@ public final class NativeChunkSectionStorage implements Closeable {
 			if (length < 0 || bytes.length - cursor < length) {
 				throw new IOException("Truncated chunk-section tape");
 			}
+		}
+	}
+
+	private static final class TapeWriter {
+		private byte[] bytes = new byte[8192];
+		private int cursor;
+
+		byte[] toByteArray() {
+			return Arrays.copyOf(this.bytes, this.cursor);
+		}
+
+		void writeJavaString(String value) {
+			char[] chars = value.toCharArray();
+			this.writeIntLE(chars.length);
+			this.ensure(chars.length * 2);
+			for (char c : chars) {
+				this.bytes[this.cursor++] = (byte)c;
+				this.bytes[this.cursor++] = (byte)(c >>> 8);
+			}
+		}
+
+		void writeBytes(byte[] value) {
+			this.writeIntLE(value.length);
+			this.writeRaw(value);
+		}
+
+		void writeLongArray(long[] values) {
+			this.writeIntLE(values.length);
+			this.writeLongArrayRaw(values);
+		}
+
+		void writeLongArrayRaw(long[] values) {
+			this.ensure(values.length * Long.BYTES);
+			for (long value : values) {
+				this.writeLongLE(value);
+			}
+		}
+
+		void writeRaw(byte[] value) {
+			this.ensure(value.length);
+			System.arraycopy(value, 0, this.bytes, this.cursor, value.length);
+			this.cursor += value.length;
+		}
+
+		void writeShortLE(int value) {
+			this.ensure(2);
+			this.bytes[this.cursor++] = (byte)value;
+			this.bytes[this.cursor++] = (byte)(value >>> 8);
+		}
+
+		void writeIntLE(int value) {
+			this.ensure(4);
+			this.bytes[this.cursor++] = (byte)value;
+			this.bytes[this.cursor++] = (byte)(value >>> 8);
+			this.bytes[this.cursor++] = (byte)(value >>> 16);
+			this.bytes[this.cursor++] = (byte)(value >>> 24);
+		}
+
+		void writeLongLE(long value) {
+			this.ensure(8);
+			this.bytes[this.cursor++] = (byte)value;
+			this.bytes[this.cursor++] = (byte)(value >>> 8);
+			this.bytes[this.cursor++] = (byte)(value >>> 16);
+			this.bytes[this.cursor++] = (byte)(value >>> 24);
+			this.bytes[this.cursor++] = (byte)(value >>> 32);
+			this.bytes[this.cursor++] = (byte)(value >>> 40);
+			this.bytes[this.cursor++] = (byte)(value >>> 48);
+			this.bytes[this.cursor++] = (byte)(value >>> 56);
+		}
+
+		private void ensure(int length) {
+			if (length < 0) {
+				throw new IllegalArgumentException("Negative chunk-section tape write length");
+			}
+			int required = this.cursor + length;
+			if (required <= this.bytes.length) {
+				return;
+			}
+			int next = this.bytes.length;
+			while (next < required) {
+				next = Math.multiplyExact(next, 2);
+			}
+			this.bytes = Arrays.copyOf(this.bytes, next);
 		}
 	}
 }

@@ -48,6 +48,7 @@ import net.minecraft.CrashReport;
 import net.minecraft.CrashReportCategory;
 import net.minecraft.CrashReportDetail;
 import net.minecraft.ReportedException;
+import net.minecraft.SharedConstants;
 import net.minecraft.Util;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.SectionPos;
@@ -88,6 +89,7 @@ import net.minecraft.world.level.chunk.status.ChunkType;
 import net.minecraft.world.level.chunk.status.WorldGenContext;
 import net.minecraft.world.level.chunk.storage.ChunkStorage;
 import net.minecraft.world.level.chunk.storage.ChunkSectionReadDiagnostics;
+import net.minecraft.world.level.chunk.storage.ChunkSectionStorageValidation;
 import net.minecraft.world.level.chunk.storage.NativeChunkSectionStorage;
 import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
 import net.minecraft.world.level.chunk.storage.SerializableChunkData;
@@ -561,27 +563,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 	}
 
 	private CompletableFuture<ChunkAccess> scheduleChunkLoad(ChunkPos chunkPos) {
-		CompletableFuture<Optional<NativeChunkSectionStorage.DecodeResult>> rustSections = ChunkSectionReadDiagnostics.rustEnabled()
-			? this.readChunkSections(chunkPos).exceptionally(throwable -> {
-				ChunkSectionReadDiagnostics.nativeError(chunkPos, throwable);
-				return Optional.empty();
-			})
-			: CompletableFuture.completedFuture(Optional.empty());
-		CompletableFuture<Optional<SerializableChunkData>> completableFuture = this.readChunk(chunkPos).thenCombineAsync(rustSections, (optional, rustOptional) -> optional.map(compoundTag -> {
-			SerializableChunkData serializableChunkData = SerializableChunkData.parseWithRustSections(
-				this.level.registryAccess(),
-				this.level,
-				this.level.palettedContainerFactory(),
-				compoundTag,
-				rustOptional,
-				chunkPos
-			);
-			if (serializableChunkData == null) {
-				LOGGER.error("Chunk file at {} is missing level data, skipping", chunkPos);
-			}
-
-			return serializableChunkData;
-		}), Util.backgroundExecutor().forName("parseChunk"));
+		CompletableFuture<Optional<SerializableChunkData>> completableFuture = this.readSerializableChunkData(chunkPos);
 		CompletableFuture<?> completableFuture2 = this.poiManager.prefetch(chunkPos);
 		return completableFuture.thenCombine(completableFuture2, (optional, object) -> optional).thenApplyAsync(optional -> {
 			Profiler.get().incrementCounter("chunkLoad");
@@ -593,6 +575,81 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 				return this.createEmptyChunk(chunkPos);
 			}
 		}, this.mainThreadExecutor).exceptionallyAsync(throwable -> this.handleChunkLoadFailure(throwable, chunkPos), this.mainThreadExecutor);
+	}
+
+	private CompletableFuture<Optional<SerializableChunkData>> readSerializableChunkData(ChunkPos chunkPos) {
+		return this.readChunkSections(chunkPos)
+			.exceptionally(throwable -> {
+				ChunkSectionReadDiagnostics.nativeError(chunkPos, throwable);
+				return Optional.empty();
+			})
+			.thenComposeAsync(rustOptional -> {
+				if (rustOptional.isEmpty()) {
+					ChunkSectionReadDiagnostics.javaFallback(chunkPos, "pending-write-or-native-unavailable");
+					return this.readChunk(chunkPos)
+						.thenApplyAsync(optional -> optional.map(compoundTag -> this.parseJavaChunkData(chunkPos, compoundTag)), Util.backgroundExecutor().forName("parseChunk"));
+				}
+
+				NativeChunkSectionStorage.DecodeResult rust = rustOptional.get();
+				NativeChunkSectionStorage.Result result = rust.result();
+				if (!result.present()) {
+					ChunkSectionReadDiagnostics.absent(chunkPos);
+					return CompletableFuture.completedFuture(Optional.empty());
+				}
+				if (result.requiresDfu() || result.dataVersion() < SharedConstants.getCurrentVersion().dataVersion().version()) {
+					ChunkSectionReadDiagnostics.oldVersionFallback(chunkPos, result.dataVersion());
+					return this.readChunk(chunkPos)
+						.thenApplyAsync(optional -> optional.map(compoundTag -> this.parseJavaChunkData(chunkPos, compoundTag)), Util.backgroundExecutor().forName("parseChunk"));
+				}
+				if (ChunkSectionReadDiagnostics.shadowValidationEnabled()) {
+					return this.readChunk(chunkPos)
+						.thenApplyAsync(
+							optional -> optional.map(compoundTag -> {
+								SerializableChunkData serializableChunkData = ChunkSectionStorageValidation.parseWithRustSectionsForValidation(
+									this.level.registryAccess(),
+									this.level,
+									this.level.palettedContainerFactory(),
+									compoundTag,
+									Optional.of(rust),
+									chunkPos
+								);
+								if (serializableChunkData == null) {
+									LOGGER.error("Chunk file at {} is missing level data, skipping", chunkPos);
+								}
+								return serializableChunkData;
+							}),
+							Util.backgroundExecutor().forName("parseChunk")
+						);
+				}
+
+				try {
+					SerializableChunkData serializableChunkData = SerializableChunkData.parseCurrentVersionRustSections(
+						this.level.registryAccess(),
+						this.level,
+						this.level.palettedContainerFactory(),
+						rust,
+						chunkPos
+					);
+					if (serializableChunkData == null) {
+						LOGGER.error("Chunk file at {} is missing level data, skipping", chunkPos);
+					}
+					return CompletableFuture.completedFuture(Optional.ofNullable(serializableChunkData));
+				} catch (Exception exception) {
+					ChunkSectionReadDiagnostics.malformed(chunkPos, exception);
+					return this.readChunk(chunkPos)
+						.thenApplyAsync(optional -> optional.map(compoundTag -> this.parseJavaChunkData(chunkPos, compoundTag)), Util.backgroundExecutor().forName("parseChunk"));
+				}
+			}, Util.backgroundExecutor().forName("parseChunk"));
+	}
+
+	@Nullable
+	private SerializableChunkData parseJavaChunkData(ChunkPos chunkPos, CompoundTag compoundTag) {
+		SerializableChunkData serializableChunkData = SerializableChunkData.parse(this.level, this.level.palettedContainerFactory(), compoundTag);
+		if (serializableChunkData == null) {
+			LOGGER.error("Chunk file at {} is missing level data, skipping", chunkPos);
+		}
+
+		return serializableChunkData;
 	}
 
 	private ChunkAccess handleChunkLoadFailure(Throwable throwable, ChunkPos chunkPos) {
@@ -784,8 +841,10 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 				Profiler.get().incrementCounter("chunkSave");
 				this.activeChunkWrites.incrementAndGet();
 				SerializableChunkData serializableChunkData = SerializableChunkData.copyOf(this.level, chunkAccess);
-				CompletableFuture<CompoundTag> completableFuture = CompletableFuture.supplyAsync(serializableChunkData::write, Util.backgroundExecutor());
-				this.write(chunkPos, completableFuture::join).handle((void_, throwable) -> {
+				CompletableFuture<Void> writeFuture = serializableChunkData.rustSectionResidual() != null
+					? this.writeChunkSections(chunkPos, serializableChunkData)
+					: this.write(chunkPos, CompletableFuture.supplyAsync(serializableChunkData::write, Util.backgroundExecutor())::join);
+				writeFuture.handle((void_, throwable) -> {
 					if (throwable != null) {
 						this.level.getServer().reportChunkSaveFailure(throwable, this.storageInfo(), chunkPos);
 					}

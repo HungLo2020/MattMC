@@ -12,7 +12,6 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtBenchmarkAccess;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.ProblemReporter;
@@ -41,7 +40,7 @@ import org.slf4j.Logger;
  * published.
  */
 public class EntityStorage implements EntityPersistentStorage<Entity> {
-	private static final Logger LOGGER = LogUtils.getLogger();
+	static final Logger LOGGER = LogUtils.getLogger();
 	private static final String ENTITIES_TAG = "Entities";
 	private static final String POSITION_TAG = "Position";
 	private final ServerLevel level;
@@ -100,9 +99,7 @@ public class EntityStorage implements EntityPersistentStorage<Entity> {
 				return this.loadEntitiesWithJavaPath(chunkPos);
 			}
 
-			CompletableFuture<Optional<CompoundTag>> javaFuture = EntityReadDiagnostics.validationEnabled()
-				? this.simpleRegionStorage.read(chunkPos)
-				: CompletableFuture.completedFuture(Optional.empty());
+			CompletableFuture<Optional<CompoundTag>> javaFuture = EntityStorageValidation.readJavaBaselineIfEnabled(this.simpleRegionStorage, chunkPos);
 			long javaReadStarted = EntityReadDiagnostics.now();
 			if (EntityReadDiagnostics.validationEnabled()) {
 				this.reportLoadFailureIfPresent(javaFuture, chunkPos);
@@ -112,7 +109,7 @@ public class EntityStorage implements EntityPersistentStorage<Entity> {
 					try {
 						ChunkEntities<Entity> rustEntities = this.loadEntitiesFromNative(chunkPos, result, nativeNanos);
 						if (EntityReadDiagnostics.validationEnabled()) {
-							this.validateNativeParity(chunkPos, javaOptional, rustEntities, EntityReadDiagnostics.elapsed(javaReadStarted));
+							EntityStorageValidation.validateNativeParity(this, chunkPos, javaOptional, rustEntities, EntityReadDiagnostics.elapsed(javaReadStarted));
 						}
 						return rustEntities;
 					} catch (IOException exception) {
@@ -133,7 +130,7 @@ public class EntityStorage implements EntityPersistentStorage<Entity> {
 		return this.loadEntitiesFromTag(chunkPos, optional.orElseThrow());
 	}
 
-	private ChunkEntities<Entity> loadEntitiesFromTag(ChunkPos chunkPos, CompoundTag compoundTag) {
+	ChunkEntities<Entity> loadEntitiesFromTag(ChunkPos chunkPos, CompoundTag compoundTag) {
 		this.reportStoredPosition(chunkPos, compoundTag);
 		CompoundTag upgraded = this.simpleRegionStorage.upgradeChunkTag(compoundTag, -1);
 
@@ -184,86 +181,6 @@ public class EntityStorage implements EntityPersistentStorage<Entity> {
 		ChunkPos stored = new ChunkPos(result.result().chunkX(), result.result().chunkZ());
 		LOGGER.error("Chunk file at {} is in the wrong location. (Expected {}, got {})", chunkPos, chunkPos, stored);
 		this.level.getServer().reportMisplacedChunk(stored, chunkPos, this.simpleRegionStorage.storageInfo());
-	}
-
-	private void validateNativeParity(ChunkPos chunkPos, Optional<CompoundTag> javaOptional, ChunkEntities<Entity> rustEntities, long javaReadNanos) throws IOException {
-		long javaLoadStarted = EntityReadDiagnostics.now();
-		if (javaOptional.isEmpty()) {
-			EntityReadDiagnostics.parityMismatch(
-				chunkPos,
-				"Java path returned no entity chunk while Rust returned entities",
-				javaReadNanos,
-				EntityReadDiagnostics.elapsed(javaLoadStarted),
-				0L
-			);
-			throw new IOException("Rust entity read parity mismatch for " + chunkPos + ": Java path returned no entity chunk");
-		}
-		ChunkEntities<Entity> javaEntities = this.loadEntitiesFromTag(chunkPos, javaOptional.orElseThrow());
-		long javaLoadNanos = EntityReadDiagnostics.elapsed(javaLoadStarted);
-		List<Entity> javaList = javaEntities.getEntities().toList();
-		List<Entity> rustList = rustEntities.getEntities().toList();
-		long validationStarted = EntityReadDiagnostics.now();
-		String mismatch = compareEntityLists(javaList, rustList);
-		long validationNanos = EntityReadDiagnostics.elapsed(validationStarted);
-		if (mismatch == null) {
-			EntityReadDiagnostics.parityMatch(chunkPos, javaList.size(), rustList.size(), javaReadNanos, javaLoadNanos, validationNanos);
-			return;
-		}
-		EntityReadDiagnostics.parityMismatch(chunkPos, mismatch, javaReadNanos, javaLoadNanos, validationNanos);
-		throw new IOException("Rust entity read parity mismatch for " + chunkPos + ": " + mismatch);
-	}
-
-	private static String compareEntityLists(List<Entity> javaEntities, List<Entity> rustEntities) throws IOException {
-		if (javaEntities.size() != rustEntities.size()) {
-			return "entity count mismatch: java=" + javaEntities.size() + " rust=" + rustEntities.size();
-		}
-		for (int i = 0; i < javaEntities.size(); i++) {
-			EntitySnapshot javaSnapshot = EntitySnapshot.create(javaEntities.get(i));
-			EntitySnapshot rustSnapshot = EntitySnapshot.create(rustEntities.get(i));
-			if (!javaSnapshot.equals(rustSnapshot)) {
-				return "entity " + i + " mismatch: java=" + javaSnapshot + " rust=" + rustSnapshot;
-			}
-		}
-		return null;
-	}
-
-	private record EntitySnapshot(
-		String type,
-		String uuid,
-		double x,
-		double y,
-		double z,
-		float yRot,
-		float xRot,
-		int directPassengers,
-		int totalPassengers,
-		long savedFingerprint
-	) {
-		static EntitySnapshot create(Entity entity) throws IOException {
-			CompoundTag saved = saveEntity(entity);
-			return new EntitySnapshot(
-				EntityType.getKey(entity.getType()).toString(),
-				entity.getUUID().toString(),
-				entity.getX(),
-				entity.getY(),
-				entity.getZ(),
-				entity.getYRot(),
-				entity.getXRot(),
-				entity.getPassengers().size(),
-				(int)entity.getPassengersAndSelf().count() - 1,
-				NbtBenchmarkAccess.implementationFingerprint(NbtBenchmarkAccess.writeObject(saved, NbtBenchmarkAccess.FORMAT_RAW), NbtBenchmarkAccess.FORMAT_RAW)
-			);
-		}
-
-		private static CompoundTag saveEntity(Entity entity) throws IOException {
-			try (ProblemReporter.ScopedCollector scopedCollector = new ProblemReporter.ScopedCollector(entity.problemPath(), LOGGER)) {
-				TagValueOutput output = TagValueOutput.createWithContext(scopedCollector, entity.registryAccess());
-				if (!entity.saveAsPassenger(output)) {
-					throw new IOException("Entity refused to save for parity comparison: " + EntityType.getKey(entity.getType()));
-				}
-				return output.buildResult();
-			}
-		}
 	}
 
 	@Override
@@ -326,26 +243,7 @@ public class EntityStorage implements EntityPersistentStorage<Entity> {
 		}
 
 		CompoundTag pendingTag = this.entityRoot(chunkPos, debugTags);
-		long shadowValidationNanos = 0L;
-		if (EntityReadDiagnostics.writeShadowEnabled()) {
-			long shadowStarted = EntityReadDiagnostics.now();
-			CompoundTag javaTag;
-			try (ProblemReporter.ScopedCollector scopedCollector = new ProblemReporter.ScopedCollector(ChunkAccess.problemPath(chunkPos), LOGGER)) {
-				javaTag = this.buildJavaEntityChunkTag(chunkEntities, scopedCollector);
-			}
-			long javaFingerprint = fingerprint(javaTag);
-			long rustFingerprint = fingerprint(pendingTag);
-			shadowValidationNanos = EntityReadDiagnostics.elapsed(shadowStarted);
-			if (javaFingerprint != rustFingerprint) {
-				String message = "Java/Rust entity write shadow mismatch: java="
-					+ Long.toUnsignedString(javaFingerprint)
-					+ " rust="
-					+ Long.toUnsignedString(rustFingerprint);
-				EntityReadDiagnostics.writeShadowMismatch(chunkPos, message, shadowValidationNanos);
-				throw new IOException(message);
-			}
-			EntityReadDiagnostics.writeShadowMatch(chunkPos, shadowValidationNanos);
-		}
+		long shadowValidationNanos = EntityStorageValidation.validateWriteShadow(this, chunkEntities, pendingTag);
 
 		return new NativeEntityStorage.WriteRequest(
 			tapes,
@@ -359,7 +257,7 @@ public class EntityStorage implements EntityPersistentStorage<Entity> {
 		);
 	}
 
-	private CompoundTag buildJavaEntityChunkTag(ChunkEntities<Entity> chunkEntities, ProblemReporter.ScopedCollector scopedCollector) {
+	CompoundTag buildJavaEntityChunkTag(ChunkEntities<Entity> chunkEntities, ProblemReporter.ScopedCollector scopedCollector) {
 		List<CompoundTag> entities = new java.util.ArrayList<>();
 		chunkEntities.getEntities().forEach(entity -> {
 			TagValueOutput tagValueOutput = TagValueOutput.createWithContext(scopedCollector.forChild(entity.problemPath()), entity.registryAccess());
@@ -377,10 +275,6 @@ public class EntityStorage implements EntityPersistentStorage<Entity> {
 		compoundTag.put("Entities", listTag);
 		compoundTag.store("Position", ChunkPos.CODEC, chunkPos);
 		return compoundTag;
-	}
-
-	private static long fingerprint(CompoundTag tag) throws IOException {
-		return NbtBenchmarkAccess.implementationFingerprint(NbtBenchmarkAccess.writeObject(tag, NbtBenchmarkAccess.FORMAT_RAW), NbtBenchmarkAccess.FORMAT_RAW);
 	}
 
 	private void reportSaveFailureIfPresent(CompletableFuture<?> completableFuture, ChunkPos chunkPos) {

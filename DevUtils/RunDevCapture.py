@@ -80,6 +80,7 @@ class CaptureConfig:
     poi_validation: bool
     entity_validation: bool
     chunk_section_validation: bool
+    chunk_section_write_validation: bool
 
 
 class CaptureRunner:
@@ -779,10 +780,16 @@ class CaptureRunner:
 
         if self.config.chunk_section_validation:
             chunk_section_options = [
-                "-Dmattmc.dev.rustChunkSections=true",
                 "-Dmattmc.dev.chunkSectionValidation=true",
                 f"-Dmattmc.dev.chunkSectionValidation.status={self.chunk_section_validation_status}",
             ]
+            if self.config.chunk_section_write_validation:
+                chunk_section_options.extend(
+                    [
+                        "-Dmattmc.dev.chunkSectionWriteValidation=true",
+                        "-Dmattmc.dev.rustChunkSectionWriteShadow=true",
+                    ]
+                )
             self.append_java_tool_options(chunk_section_options)
             self.append_meta(f"chunk_section_validation_java_options={' '.join(chunk_section_options)}")
             self.append_meta(f"chunk_section_validation_status={self.chunk_section_validation_status}")
@@ -1323,7 +1330,16 @@ class CaptureRunner:
                 raise RuntimeError("chunk-section validation read no current-version chunks through Rust")
             if int(data.get("parityChecks", 0)) <= 0:
                 raise RuntimeError("chunk-section validation performed no Java/Rust parity checks")
-            for key in ("nativeErrors", "malformedChunks", "parityMismatches"):
+            if self.config.chunk_section_write_validation:
+                if int(data.get("rustCurrentVersionSectionWrites", 0)) <= 0:
+                    raise RuntimeError("chunk-section validation wrote no current-version chunks through Rust")
+                if int(data.get("writeShadowChecks", 0)) <= 0:
+                    raise RuntimeError("chunk-section validation performed no Java/Rust write shadow checks")
+                if int(data.get("forcedValidationChunks", 0)) <= 0:
+                    raise RuntimeError("chunk-section validation forced no copied-world chunks dirty for typed writes")
+                if int(data.get("writeFallbacks", 0)) != 0:
+                    raise RuntimeError(f"chunk-section validation writeFallbacks was {data.get('writeFallbacks')}")
+            for key in ("nativeErrors", "malformedChunks", "parityMismatches", "nativeWriteErrors", "writeShadowMismatches"):
                 if int(data.get(key, -1)) != 0:
                     raise RuntimeError(f"chunk-section validation {key} was {data.get(key)}")
             self.chunk_section_validation_result = "ok"
@@ -2293,6 +2309,7 @@ def parse_args() -> CaptureConfig:
     parser.add_argument("--poi-validation", action="store_true")
     parser.add_argument("--entity-validation", action="store_true")
     parser.add_argument("--chunk-section-validation", action="store_true")
+    parser.add_argument("--chunk-section-write-validation", action="store_true")
     parser.add_argument("--platform", help="platform to pass to shared helpers: linux, windows, or macos")
     args = parser.parse_args()
 
@@ -2347,7 +2364,8 @@ def parse_args() -> CaptureConfig:
         region_validation_copy_world=bool(args.region_validation_copy_world),
         poi_validation=bool(args.poi_validation),
         entity_validation=bool(args.entity_validation),
-        chunk_section_validation=bool(args.chunk_section_validation),
+        chunk_section_validation=bool(args.chunk_section_validation or args.chunk_section_write_validation),
+        chunk_section_write_validation=bool(args.chunk_section_write_validation),
     )
 
 

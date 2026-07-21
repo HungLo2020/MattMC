@@ -46,8 +46,10 @@ class StorageRustOwnershipContractTest {
 
 	@Test
 	void deterministicBenchmarkDoesNotKeepJavaObjectFallbackHelpers() throws IOException {
-		String benchmarkAccess = source("src/main/java/net/minecraft/nbt/NbtBenchmarkAccess.java");
+		Path productionBenchmarkAccess = ROOT.resolve("src/main/java/net/minecraft/nbt/NbtBenchmarkAccess.java");
+		String benchmarkAccess = source("src/test/java/net/minecraft/nbt/NbtBenchmarkAccess.java");
 
+		assertFalse(Files.exists(productionBenchmarkAccess));
 		assertTrue(benchmarkAccess.contains("return NativeNbt.read(input, compression, NbtAccounter.unlimitedHeap());"));
 		assertTrue(benchmarkAccess.contains("return NativeNbt.write(tag, compression);"));
 		assertFalse(benchmarkAccess.contains("readObjectJava("));

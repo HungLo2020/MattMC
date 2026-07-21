@@ -14,6 +14,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.Reader;
 import java.lang.reflect.Method;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -188,25 +189,25 @@ public final class EntityStorageReplayBenchmark {
 				}
 			}
 			Files.createDirectories(this.scratchPath);
-			Map<String, RegionFile> regions = new HashMap<>();
+			Map<String, Long> regions = new HashMap<>();
 			try {
 				for (Fixture fixture : this.trace.fixtures) {
-					RegionFile region = regions.computeIfAbsent(fixture.region, key -> {
+					long region = regions.computeIfAbsent(fixture.region, key -> {
 						try {
 							Path path = this.scratchPath.resolve(key);
 							Files.createDirectories(path.getParent());
-							return new RegionFile(STORAGE_INFO, path, path.getParent(), RegionFileVersion.VERSION_DEFLATE, false);
+							return NativeRegionFileBridge.open(path, false);
 						} catch (IOException exception) {
 							throw new RegionUncheckedIOException(exception);
 						}
 					});
-					region.writeBenchmarkPayload(new ChunkPos(fixture.chunkX, fixture.chunkZ), fixture.encodedPayload);
+					writeEncodedPayload(region, fixture.chunkX, fixture.chunkZ, fixture.encodedPayload);
 				}
 			} catch (RegionUncheckedIOException exception) {
 				throw exception.unwrap();
 			} finally {
-				for (RegionFile region : regions.values()) {
-					region.close();
+				for (long region : regions.values()) {
+					NativeRegionFileBridge.close(region);
 				}
 			}
 		}
@@ -241,7 +242,7 @@ public final class EntityStorageReplayBenchmark {
 
 		private JsonObject runJavaFixture(Fixture fixture, Map<String, Metric> metrics, boolean validate) throws Exception {
 			long completeStarted = System.nanoTime();
-			RegionFile.BenchmarkPayload payload = this.readRegionPayload(fixture, metrics);
+			BenchmarkPayload payload = this.readRegionPayload(fixture, metrics);
 			CompoundTag root = Metric.time(metrics, "java.decompress_nbt_parse", payload.encodedPayload().length, () -> readPayloadObject(payload.encodedPayload()));
 			List<CompoundTag> entityTags = Metric.time(metrics, "java.entity_tag_list", payload.encodedPayload().length, () -> entityTags(root));
 			ValueInput.ValueInputList inputs = Metric.time(
@@ -329,13 +330,14 @@ public final class EntityStorageReplayBenchmark {
 			return new ValidationResult(javaLoaded, javaFingerprint);
 		}
 
-		private RegionFile.BenchmarkPayload readRegionPayload(Fixture fixture, Map<String, Metric> metrics) throws Exception {
-			try (RegionFile region = Metric.time(metrics, "region.open", 0, () -> {
+		private BenchmarkPayload readRegionPayload(Fixture fixture, Map<String, Metric> metrics) throws Exception {
+			long region = Metric.time(metrics, "region.open", 0, () -> {
 				Path path = this.scratchPath.resolve(fixture.region);
-				return new RegionFile(STORAGE_INFO, path, path.getParent(), false);
-			})) {
+				return NativeRegionFileBridge.open(path, false);
+			});
+			try {
 				return Metric.time(metrics, "region.read_payload", fixture.encodedPayload.length, () -> {
-					RegionFile.BenchmarkPayload payload = region.readBenchmarkPayload(new ChunkPos(fixture.chunkX, fixture.chunkZ));
+					BenchmarkPayload payload = readEncodedPayload(region, fixture.chunkX, fixture.chunkZ);
 					if (!payload.present()) {
 						throw new IOException("Benchmark fixture chunk missing: " + fixture.id);
 					}
@@ -344,6 +346,8 @@ public final class EntityStorageReplayBenchmark {
 					}
 					return payload;
 				});
+			} finally {
+				NativeRegionFileBridge.close(region);
 			}
 		}
 	}
@@ -560,6 +564,46 @@ public final class EntityStorageReplayBenchmark {
 		return NbtIo.read(new DataInputStream(version.wrap(new ByteArrayInputStream(encodedPayload, 5, encodedPayload.length - 5))));
 	}
 
+	private static BenchmarkPayload readEncodedPayload(long region, int chunkX, int chunkZ) throws IOException {
+		NativeRegionFileBridge.PayloadResult payload = NativeRegionFileBridge.readPayload(region, chunkX, chunkZ);
+		NativeRegionFileBridge.Result result = payload.result();
+		if (!result.present()) {
+			return BenchmarkPayload.missing();
+		}
+
+		return new BenchmarkPayload(true, result.compressionId(), result.external(), result.timestamp(), encodeRegionPayload(payload.bytes(), result.compressionId()));
+	}
+
+	private static void writeEncodedPayload(long region, int chunkX, int chunkZ, byte[] encodedPayload) throws IOException {
+		if (encodedPayload.length < 5) {
+			throw new IOException("Encoded region payload is too small: " + encodedPayload.length);
+		}
+		ByteBuffer encoded = ByteBuffer.wrap(encodedPayload);
+		int declaredLength = encoded.getInt();
+		int payloadLength = declaredLength - 1;
+		if (payloadLength < 0 || payloadLength != encoded.remaining() - 1) {
+			throw new IOException("Encoded region payload length " + declaredLength + " does not match buffer size " + encodedPayload.length);
+		}
+		int compressionId = Byte.toUnsignedInt(encoded.get());
+		byte[] payload = new byte[payloadLength];
+		encoded.get(payload);
+		NativeRegionFileBridge.writePayload(region, chunkX, chunkZ, compressionId, payload);
+	}
+
+	private static byte[] encodeRegionPayload(byte[] payload, int compressionId) {
+		ByteBuffer encoded = ByteBuffer.allocate(5 + payload.length);
+		encoded.putInt(payload.length + 1);
+		encoded.put((byte)compressionId);
+		encoded.put(payload);
+		return encoded.array();
+	}
+
+	private record BenchmarkPayload(boolean present, int compressionId, boolean external, long timestamp, byte[] encodedPayload) {
+		static BenchmarkPayload missing() {
+			return new BenchmarkPayload(false, -1, false, 0L, new byte[0]);
+		}
+	}
+
 	private static List<CompoundTag> entityTags(CompoundTag root) {
 		Optional<ListTag> entities = root.getList("Entities");
 		if (entities.isEmpty()) {
@@ -659,14 +703,15 @@ public final class EntityStorageReplayBenchmark {
 						return;
 					}
 					int[] coords = parseRegionCoords(regionPath.getFileName().toString());
-					try (RegionFile region = new RegionFile(STORAGE_INFO, regionPath, regionPath.getParent(), false)) {
+					long region = NativeRegionFileBridge.open(regionPath, false);
+					try {
 						for (int index = 0; index < 1024 && this.realFixtureCount() < maxChunks; index++) {
 							if (!headerHasChunk(regionPath, index)) {
 								continue;
 							}
 							int chunkX = coords[0] * 32 + (index & 31);
 							int chunkZ = coords[1] * 32 + (index >> 5);
-							RegionFile.BenchmarkPayload payload = region.readBenchmarkPayload(new ChunkPos(chunkX, chunkZ));
+							BenchmarkPayload payload = readEncodedPayload(region, chunkX, chunkZ);
 							if (!payload.present()) {
 								continue;
 							}
@@ -684,6 +729,8 @@ public final class EntityStorageReplayBenchmark {
 								root
 							);
 						}
+					} finally {
+						NativeRegionFileBridge.close(region);
 					}
 				}
 			}
@@ -693,7 +740,8 @@ public final class EntityStorageReplayBenchmark {
 			Path generatedDir = this.tracePath.getParent().resolve("generated-world").resolve("entities");
 			Files.createDirectories(generatedDir);
 			Path regionPath = generatedDir.resolve("r.0.0.mca");
-			try (RegionFile region = new RegionFile(STORAGE_INFO, regionPath, generatedDir, RegionFileVersion.VERSION_DEFLATE, false)) {
+			long region = NativeRegionFileBridge.open(regionPath, false);
+			try {
 				this.writeGenerated(region, "generated-empty", new ChunkPos(0, 0), entityRoot(new ChunkPos(0, 0)));
 				this.writeGenerated(region, "generated-ordinary", new ChunkPos(1, 0), entityRoot(new ChunkPos(1, 0), entity("minecraft:pig")));
 				this.writeGenerated(
@@ -709,6 +757,8 @@ public final class EntityStorageReplayBenchmark {
 					entityRoot(new ChunkPos(3, 0), entity("minecraft:area_effect_cloud", entity("minecraft:armor_stand", entity("minecraft:pig"))))
 				);
 				this.writeGenerated(region, "generated-unknown-id", new ChunkPos(4, 0), entityRoot(new ChunkPos(4, 0), entity("mattmc:not_registered"), entity("minecraft:armor_stand")));
+			} finally {
+				NativeRegionFileBridge.close(region);
 			}
 		}
 
@@ -726,11 +776,10 @@ public final class EntityStorageReplayBenchmark {
 			Files.writeString(this.tracePath, GSON.toJson(root));
 		}
 
-		private void writeGenerated(RegionFile region, String id, ChunkPos pos, CompoundTag root) throws IOException {
-			try (DataOutputStream output = region.getChunkDataOutputStream(pos)) {
-				NbtIo.write(root, output);
-			}
-			RegionFile.BenchmarkPayload payload = region.readBenchmarkPayload(pos);
+		private void writeGenerated(long region, String id, ChunkPos pos, CompoundTag root) throws IOException {
+			byte[] encodedPayload = encodeRegionPayload(NbtBenchmarkAccess.writeObject(root, NbtBenchmarkAccess.FORMAT_ZLIB), RegionFileVersion.VERSION_DEFLATE.getId());
+			writeEncodedPayload(region, pos.x, pos.z, encodedPayload);
+			BenchmarkPayload payload = readEncodedPayload(region, pos.x, pos.z);
 			this.addPayload(id, "generated", "entities/r.0.0.mca", pos.x, pos.z, payload.encodedPayload(), root);
 		}
 

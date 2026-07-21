@@ -112,6 +112,14 @@ public final class RegionFileStorage implements AutoCloseable {
 		return regionFile.readChunkSections(chunkPos);
 	}
 
+	protected NativeChunkSectionStorage.WriteResult writeChunkSections(ChunkPos chunkPos, SerializableChunkData data) throws IOException {
+		if (SharedConstants.DEBUG_DONT_SAVE_WORLD) {
+			return new NativeChunkSectionStorage.WriteResult(0, 0, 0, false, -1, false, 0, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L);
+		}
+		RegionFile regionFile = this.getRegionFile(chunkPos);
+		return regionFile.writeChunkSections(chunkPos, data);
+	}
+
 	protected NativeEntityStorage.WriteResult writeEntityChunk(ChunkPos chunkPos, NativeEntityStorage.WriteRequest request) throws IOException {
 		if (SharedConstants.DEBUG_DONT_SAVE_WORLD) {
 			return new NativeEntityStorage.WriteResult(0, 0, 0, false, -1, false, request.entityCount(), 0L, 0L, 0L, 0L, 0L);
