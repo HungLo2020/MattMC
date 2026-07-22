@@ -13,6 +13,7 @@ pub enum ChunkErrorKind {
     InvalidString = 10,
     OutputTooSmall = 11,
     Overflow = 12,
+    InvalidTick = 13,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

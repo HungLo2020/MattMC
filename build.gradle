@@ -549,6 +549,23 @@ tasks.withType(Test).configureEach {
         systemProperty 'mattmc.chunkSectionBenchmark.warmup', chunkSectionBenchmarkWarmup.get()
         systemProperty 'mattmc.chunkSectionBenchmark.measure', chunkSectionBenchmarkMeasure.get()
     }
+
+    def chunkTickBenchmarkEnabled = providers.gradleProperty('mattmcRunChunkTickBenchmark')
+    if (chunkTickBenchmarkEnabled.isPresent()) {
+        def chunkTickBenchmarkOutput = providers.gradleProperty('mattmcChunkTickBenchmarkOutput')
+                .orElse("${buildDir}/chunk-tick-benchmark/chunk_tick_benchmark.json")
+        def chunkTickBenchmarkWarmup = providers.gradleProperty('mattmcChunkTickBenchmarkWarmup').orElse('8')
+        def chunkTickBenchmarkMeasure = providers.gradleProperty('mattmcChunkTickBenchmarkMeasure').orElse('24')
+        inputs.property('mattmcRunChunkTickBenchmark', chunkTickBenchmarkEnabled.get())
+        inputs.property('mattmcChunkTickBenchmarkWarmup', chunkTickBenchmarkWarmup.get())
+        inputs.property('mattmcChunkTickBenchmarkMeasure', chunkTickBenchmarkMeasure.get())
+        outputs.file(file(chunkTickBenchmarkOutput.get())).withPropertyName('mattmcChunkTickBenchmarkOutput')
+        systemProperty 'mattmc.runChunkTickBenchmark', chunkTickBenchmarkEnabled.get()
+        systemProperty 'mattmc.chunkTickBenchmark.output', file(chunkTickBenchmarkOutput.get()).absolutePath
+        systemProperty 'mattmc.chunkTickBenchmark.warmup', chunkTickBenchmarkWarmup.get()
+        systemProperty 'mattmc.chunkTickBenchmark.measure', chunkTickBenchmarkMeasure.get()
+        systemProperty 'mattmcRustProfile', rustCargoProfile
+    }
 }
 
 tasks.withType(JavaExec).configureEach {

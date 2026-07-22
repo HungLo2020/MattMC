@@ -6,11 +6,17 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.LongStream;
 import net.minecraft.SharedConstants;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.DataLayer;
+import net.minecraft.world.level.material.Fluids;
+import net.minecraft.world.ticks.SavedTick;
+import net.minecraft.world.ticks.TickPriority;
 import net.minecraft.world.level.chunk.PalettedContainerFactory;
 import net.minecraft.world.level.chunk.PalettedContainerRO.PackedData;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -67,20 +73,28 @@ public final class ChunkSectionStorageValidation {
 			if (javaData == null) {
 				return null;
 			}
+			long tickStarted = ChunkSectionReadDiagnostics.now();
+			ChunkAccess.PackedTicks nativeTicks = SerializableChunkData.resolveNativeTicks(decodeResult, requestedChunkPos);
+			long tickNanos = ChunkSectionReadDiagnostics.elapsed(tickStarted);
 			long compareStarted = ChunkSectionReadDiagnostics.now();
 			String mismatch = compareNativeSections(javaData, nativeBuild, palettedContainerFactory, decodeResult.chunk());
+			if (mismatch == null) {
+				mismatch = compareNativeTicks(javaData.packedTicks(), nativeTicks);
+			}
 			long compareNanos = ChunkSectionReadDiagnostics.elapsed(compareStarted);
 			if (mismatch != null) {
 				ChunkSectionReadDiagnostics.parityMismatch(requestedChunkPos, mismatch, result, javaParseNanos, resolveNanos, compareNanos);
 				return javaData;
 			}
-			SerializableChunkData nativeData = javaData.withNativeSections(
+			SerializableChunkData nativeData = javaData.withNativeSectionsAndTicks(
 				nativeBuild.sections(),
 				nativeBuild.heightmaps(),
 				decodeResult.chunk().lightOn(),
-				decodeResult.chunk().residual()
+				decodeResult.chunk().residual(),
+				nativeTicks
 			);
 			ChunkSectionReadDiagnostics.rustDecoded(requestedChunkPos, result, javaParseNanos, resolveNanos, compareNanos);
+			ChunkSectionReadDiagnostics.rustTicksDecoded(requestedChunkPos, result, nativeTicks, tickNanos);
 			return nativeData;
 		} catch (Exception exception) {
 			ChunkSectionReadDiagnostics.malformed(requestedChunkPos, exception);
@@ -128,6 +142,17 @@ public final class ChunkSectionStorageValidation {
 		return null;
 	}
 
+	@Nullable
+	private static String compareNativeTicks(ChunkAccess.PackedTicks javaTicks, ChunkAccess.PackedTicks nativeTicks) {
+		if (!Objects.equals(javaTicks.blocks(), nativeTicks.blocks())) {
+			return "block scheduled ticks mismatch java=" + javaTicks.blocks() + " rust=" + nativeTicks.blocks();
+		}
+		if (!Objects.equals(javaTicks.fluids(), nativeTicks.fluids())) {
+			return "fluid scheduled ticks mismatch java=" + javaTicks.fluids() + " rust=" + nativeTicks.fluids();
+		}
+		return null;
+	}
+
 	static CompoundTag prepareWriteResidual(CompoundTag residual) {
 		if (!ChunkSectionReadDiagnostics.writeValidationEnabled() || residual == null) {
 			return residual;
@@ -140,6 +165,23 @@ public final class ChunkSectionStorageValidation {
 		}
 		ChunkSectionReadDiagnostics.forcedValidationChunk(injected, observed);
 		return residual;
+	}
+
+	static ChunkAccess.PackedTicks prepareTickValidationFixture(ChunkPos chunkPos, ChunkAccess.PackedTicks ticks) {
+		if (!ChunkSectionReadDiagnostics.writeValidationEnabled()) {
+			return ticks;
+		}
+		if (!ticks.blocks().isEmpty() && !ticks.fluids().isEmpty()) {
+			return ticks;
+		}
+		BlockPos base = new BlockPos(chunkPos.getMinBlockX(), 0, chunkPos.getMinBlockZ());
+		java.util.List<SavedTick<net.minecraft.world.level.block.Block>> blocks = ticks.blocks().isEmpty()
+			? java.util.List.of(new SavedTick<>(Blocks.STONE, base, 100000, TickPriority.HIGH))
+			: ticks.blocks();
+		java.util.List<SavedTick<net.minecraft.world.level.material.Fluid>> fluids = ticks.fluids().isEmpty()
+			? java.util.List.of(new SavedTick<>(Fluids.WATER, base.above(), 100001, TickPriority.LOW))
+			: ticks.fluids();
+		return new ChunkAccess.PackedTicks(blocks, fluids);
 	}
 
 	@Nullable

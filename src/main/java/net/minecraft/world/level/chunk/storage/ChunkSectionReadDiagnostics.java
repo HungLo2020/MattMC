@@ -39,11 +39,16 @@ public final class ChunkSectionReadDiagnostics {
 	private static long decompressedBytes;
 	private static long sectionCount;
 	private static long heightmapCount;
+	private static long rustCurrentVersionTickReads;
+	private static long blockTickCount;
+	private static long fluidTickCount;
+	private static long rustTickResolveNanos;
 	private static long rustDecodeTapeNanos;
 	private static long javaPaletteResolveNanos;
 	private static long javaSectionCompareNanos;
 	private static long javaBaselineParseNanos;
 	private static long rustCurrentVersionSectionWrites;
+	private static long rustCurrentVersionTickWrites;
 	private static long writeFallbacks;
 	private static long nativeWriteErrors;
 	private static long writeShadowChecks;
@@ -59,6 +64,8 @@ public final class ChunkSectionReadDiagnostics {
 	private static long writeCompressionNanos;
 	private static long writeRegionWriteNanos;
 	private static long writeRustFfiTotalNanos;
+	private static long writeTickTapeBytes;
+	private static long writeTickTapeCreationNanos;
 	private static long writeShadowJavaNanos;
 	private static long writeShadowCompareNanos;
 	private static long forcedValidationChunks;
@@ -234,6 +241,41 @@ public final class ChunkSectionReadDiagnostics {
 		writeStatus();
 	}
 
+	public static void rustTicksDecoded(
+		ChunkPos chunkPos,
+		NativeChunkSectionStorage.Result result,
+		net.minecraft.world.level.chunk.ChunkAccess.PackedTicks ticks,
+		long resolveNanos
+	) {
+		if (!ENABLED) {
+			return;
+		}
+		synchronized (LOCK) {
+			rustCurrentVersionTickReads++;
+			blockTickCount += ticks.blocks().size();
+			fluidTickCount += ticks.fluids().size();
+			rustTickResolveNanos += resolveNanos;
+			JsonObject event = event("rustChunkTicks", chunkPos);
+			event.addProperty("dataVersion", result.dataVersion());
+			event.addProperty("blockTicks", ticks.blocks().size());
+			event.addProperty("fluidTicks", ticks.fluids().size());
+			event.addProperty("nativeBlockTicks", result.blockTickCount());
+			event.addProperty("nativeFluidTicks", result.fluidTickCount());
+			event.addProperty("resolveNanos", resolveNanos);
+		}
+		writeStatus();
+	}
+
+	public static void rustTickWriteTapeCreated(long nanos, long tapeBytes) {
+		if (!ENABLED) {
+			return;
+		}
+		synchronized (LOCK) {
+			writeTickTapeCreationNanos += nanos;
+			writeTickTapeBytes += tapeBytes;
+		}
+	}
+
 	public static void rustWriteTapeCreated(long nanos, long tapeBytes) {
 		if (!ENABLED) {
 			return;
@@ -250,6 +292,7 @@ public final class ChunkSectionReadDiagnostics {
 		}
 		synchronized (LOCK) {
 			rustCurrentVersionSectionWrites++;
+			rustCurrentVersionTickWrites++;
 			writeCompressedBytes += result.compressedLength();
 			writeDecompressedBytes += result.decompressedLength();
 			writeTapeBytes += result.tapeLength();
@@ -433,6 +476,11 @@ public final class ChunkSectionReadDiagnostics {
 			root.addProperty("decompressedBytes", decompressedBytes);
 			root.addProperty("sectionCount", sectionCount);
 			root.addProperty("heightmapCount", heightmapCount);
+			root.addProperty("rustChunkTicksOwned", NativeChunkSectionStorage.rustChunkTicksOwned());
+			root.addProperty("rustCurrentVersionTickReads", rustCurrentVersionTickReads);
+			root.addProperty("blockTickCount", blockTickCount);
+			root.addProperty("fluidTickCount", fluidTickCount);
+			root.addProperty("rustTickResolveNanos", rustTickResolveNanos);
 			root.addProperty("rustDecodeTapeNanos", rustDecodeTapeNanos);
 			root.addProperty("javaBaselineParseNanos", javaBaselineParseNanos);
 			root.addProperty("javaPaletteResolveNanos", javaPaletteResolveNanos);
@@ -441,6 +489,7 @@ public final class ChunkSectionReadDiagnostics {
 			root.addProperty("chunkSectionWriteValidationEnabled", WRITE_VALIDATION_ENABLED);
 			root.addProperty("writeShadowValidationEnabled", writeShadowValidationEnabled());
 			root.addProperty("rustCurrentVersionSectionWrites", rustCurrentVersionSectionWrites);
+			root.addProperty("rustCurrentVersionTickWrites", rustCurrentVersionTickWrites);
 			root.addProperty("writeFallbacks", writeFallbacks);
 			root.addProperty("nativeWriteErrors", nativeWriteErrors);
 			root.addProperty("writeShadowChecks", writeShadowChecks);
@@ -456,6 +505,8 @@ public final class ChunkSectionReadDiagnostics {
 			root.addProperty("writeCompressionNanos", writeCompressionNanos);
 			root.addProperty("writeRegionWriteNanos", writeRegionWriteNanos);
 			root.addProperty("writeRustFfiTotalNanos", writeRustFfiTotalNanos);
+			root.addProperty("writeTickTapeBytes", writeTickTapeBytes);
+			root.addProperty("writeTickTapeCreationNanos", writeTickTapeCreationNanos);
 			root.addProperty("writeShadowJavaNanos", writeShadowJavaNanos);
 			root.addProperty("writeShadowCompareNanos", writeShadowCompareNanos);
 			root.addProperty("forcedValidationChunks", forcedValidationChunks);

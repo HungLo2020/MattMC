@@ -1,6 +1,7 @@
 use super::error::{ChunkError, ChunkErrorKind, ChunkResult};
 use super::model::{BiomePaletteEntry, ChunkSectionDecode, ChunkSectionRecord, HeightmapRecord};
 use super::tape::{decode_chunk_tape, decode_residual_tape};
+use super::ticks::{decode_scheduled_tick_tape, merge_scheduled_ticks_document};
 use crate::storage::nbt::limits::NbtLimits;
 use crate::storage::nbt::model::{CompoundEntry, JavaString, ListTag, NbtDocument, NbtTag, TagId};
 use crate::storage::nbt::tape::document_from_tape;
@@ -34,7 +35,7 @@ pub fn document_from_typed_chunk_tape_for_position(
     expected_position: Option<(i32, i32)>,
     limits: NbtLimits,
 ) -> ChunkResult<NbtDocument> {
-    let (chunk, residual_tape) = decode_chunk_tape(input)?;
+    let (chunk, residual_tape, tick_tape) = decode_chunk_tape(input)?;
     if let Some((expected_x, expected_z)) = expected_position {
         if chunk.chunk_x != expected_x || chunk.chunk_z != expected_z {
             return Err(ChunkError::new(
@@ -53,7 +54,13 @@ pub fn document_from_typed_chunk_tape_for_position(
         ));
     }
     let residual = decode_residual_tape(&residual_tape, limits)?;
-    merge_typed_chunk_document(&chunk, &residual, limits)
+    let document = merge_typed_chunk_document(&chunk, &residual, limits)?;
+    if tick_tape.is_empty() {
+        Ok(document)
+    } else {
+        let ticks = decode_scheduled_tick_tape(&tick_tape)?;
+        merge_scheduled_ticks_document(&document, &ticks, expected_position)
+    }
 }
 
 pub fn merge_typed_chunk_document(

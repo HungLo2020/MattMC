@@ -452,7 +452,8 @@ class NativeChunkSectionStorageTest {
 				)
 			),
 			List.of(),
-			root
+			root,
+			NativeChunkTickStorage.TickData.empty()
 		);
 		SerializableChunkData.NativeSectionBuild nativeBuild = SerializableChunkData.buildNativeSections(registryAccess, factory, nativeChunk);
 		SerializableChunkData rustParsed = SerializableChunkData.parseEnvelope(
@@ -461,7 +462,8 @@ class NativeChunkSectionStorageTest {
 			root,
 			nativeBuild,
 			true,
-			root
+			root,
+			null
 		);
 		assertNotNull(rustParsed);
 		assertNotNull(rustParsed.rustSectionResidual());
@@ -1094,7 +1096,8 @@ class NativeChunkSectionStorageTest {
 					rust.chunk().residual(),
 					rustSections,
 					rust.chunk().lightOn(),
-					rust.chunk().residual()
+					rust.chunk().residual(),
+					null
 				);
 				long javaResidualEnvelopeNanos = System.nanoTime() - started;
 				if (rustData == null) {

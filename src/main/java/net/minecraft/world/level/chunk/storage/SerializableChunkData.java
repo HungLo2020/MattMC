@@ -147,7 +147,7 @@ public record SerializableChunkData(
 		} else {
 			ChunkStatus chunkStatus = (ChunkStatus)compoundTag.read("Status", ChunkStatus.CODEC).orElse(ChunkStatus.EMPTY);
 			NativeSectionBuild sections = parseJavaSectionData(levelHeightAccessor, palettedContainerFactory, compoundTag, chunkStatus);
-			return parseEnvelope(levelHeightAccessor, palettedContainerFactory, compoundTag, sections, compoundTag.getBooleanOr("isLightOn", false), null);
+			return parseEnvelope(levelHeightAccessor, palettedContainerFactory, compoundTag, sections, compoundTag.getBooleanOr("isLightOn", false), null, null);
 		}
 	}
 
@@ -211,7 +211,8 @@ public record SerializableChunkData(
 		CompoundTag compoundTag,
 		NativeSectionBuild sectionBuild,
 		boolean lightCorrect,
-		@Nullable CompoundTag rustResidual
+		@Nullable CompoundTag rustResidual,
+		@Nullable ChunkAccess.PackedTicks nativePackedTicks
 	) {
 		if (compoundTag.getString("Status").isEmpty()) {
 			return null;
@@ -226,13 +227,7 @@ public record SerializableChunkData(
 		BlendingData.Packed packed = (BlendingData.Packed)compoundTag.read("blending_data", BlendingData.Packed.CODEC).orElse(null);
 		BelowZeroRetrogen belowZeroRetrogen = (BelowZeroRetrogen)compoundTag.read("below_zero_retrogen", BelowZeroRetrogen.CODEC).orElse(null);
 		long[] ls = (long[])compoundTag.getLongArray("carving_mask").orElse(null);
-		List<SavedTick<Block>> list = SavedTick.filterTickListForChunk(
-			(List<SavedTick<Block>>)compoundTag.read("block_ticks", BLOCK_TICKS_CODEC).orElse(List.of()), chunkPos
-		);
-		List<SavedTick<Fluid>> list2 = SavedTick.filterTickListForChunk(
-			(List<SavedTick<Fluid>>)compoundTag.read("fluid_ticks", FLUID_TICKS_CODEC).orElse(List.of()), chunkPos
-		);
-		ChunkAccess.PackedTicks packedTicks = new ChunkAccess.PackedTicks(list, list2);
+		ChunkAccess.PackedTicks packedTicks = nativePackedTicks == null ? parseJavaPackedTicks(compoundTag, chunkPos) : nativePackedTicks;
 		ListTag listTag = compoundTag.getListOrEmpty("PostProcessing");
 		ShortList[] shortLists = new ShortList[listTag.size()];
 
@@ -294,6 +289,9 @@ public record SerializableChunkData(
 		long resolveStarted = ChunkSectionReadDiagnostics.now();
 		NativeSectionBuild nativeBuild = buildNativeSections(registryAccess, palettedContainerFactory, decodeResult.chunk());
 		long resolveNanos = ChunkSectionReadDiagnostics.elapsed(resolveStarted);
+		long tickStarted = ChunkSectionReadDiagnostics.now();
+		ChunkAccess.PackedTicks nativeTicks = resolveNativeTicks(decodeResult, requestedChunkPos);
+		long tickNanos = ChunkSectionReadDiagnostics.elapsed(tickStarted);
 		long envelopeStarted = ChunkSectionReadDiagnostics.now();
 		SerializableChunkData nativeData = parseEnvelope(
 			levelHeightAccessor,
@@ -301,10 +299,12 @@ public record SerializableChunkData(
 			decodeResult.chunk().residual(),
 			nativeBuild,
 			decodeResult.chunk().lightOn(),
-			decodeResult.chunk().residual()
+			decodeResult.chunk().residual(),
+			nativeTicks
 		);
 		long envelopeNanos = ChunkSectionReadDiagnostics.elapsed(envelopeStarted);
 		ChunkSectionReadDiagnostics.rustDecoded(requestedChunkPos, result, envelopeNanos, resolveNanos, 0L);
+		ChunkSectionReadDiagnostics.rustTicksDecoded(requestedChunkPos, result, nativeTicks, tickNanos);
 		return nativeData;
 	}
 
@@ -335,6 +335,59 @@ public record SerializableChunkData(
 			this.structureData,
 			rustResidual
 		);
+	}
+
+	SerializableChunkData withNativeSectionsAndTicks(
+		List<SerializableChunkData.SectionData> nativeSections,
+		Map<Heightmap.Types, long[]> nativeHeightmaps,
+		boolean nativeLightCorrect,
+		@Nullable CompoundTag rustResidual,
+		ChunkAccess.PackedTicks nativeTicks
+	) {
+		return new SerializableChunkData(
+			this.containerFactory,
+			this.chunkPos,
+			this.minSectionY,
+			this.lastUpdateTime,
+			this.inhabitedTime,
+			this.chunkStatus,
+			this.blendingData,
+			this.belowZeroRetrogen,
+			this.upgradeData,
+			this.carvingMask,
+			nativeHeightmaps,
+			nativeTicks,
+			this.postProcessingSections,
+			nativeLightCorrect,
+			nativeSections,
+			this.entities,
+			this.blockEntities,
+			this.structureData,
+			rustResidual
+		);
+	}
+
+	static ChunkAccess.PackedTicks parseJavaPackedTicks(CompoundTag compoundTag, ChunkPos chunkPos) {
+		List<SavedTick<Block>> list = SavedTick.filterTickListForChunk(
+			(List<SavedTick<Block>>)compoundTag.read("block_ticks", BLOCK_TICKS_CODEC).orElse(List.of()), chunkPos
+		);
+		List<SavedTick<Fluid>> list2 = SavedTick.filterTickListForChunk(
+			(List<SavedTick<Fluid>>)compoundTag.read("fluid_ticks", FLUID_TICKS_CODEC).orElse(List.of()), chunkPos
+		);
+		return new ChunkAccess.PackedTicks(list, list2);
+	}
+
+	static ChunkAccess.PackedTicks resolveNativeTicks(NativeChunkSectionStorage.DecodeResult decodeResult, ChunkPos requestedChunkPos) throws IOException {
+		NativeChunkTickStorage.TickData ticks = decodeResult.chunk().scheduledTicks();
+		if (!ticks.isPresent()) {
+			throw new IOException("Rust chunk tick tape is missing for " + requestedChunkPos);
+		}
+		if (ticks.dataVersion() != SharedConstants.getCurrentVersion().dataVersion().version()
+			|| ticks.chunkX() != requestedChunkPos.x
+			|| ticks.chunkZ() != requestedChunkPos.z) {
+			throw new IOException("Rust chunk tick tape metadata does not match " + requestedChunkPos);
+		}
+		return new ChunkAccess.PackedTicks(NativeChunkTickStorage.resolveBlockTicks(ticks), NativeChunkTickStorage.resolveFluidTicks(ticks));
 	}
 
 	static NativeSectionBuild buildNativeSections(
@@ -599,7 +652,10 @@ public record SerializableChunkData(
 				}
 			}
 
-			ChunkAccess.PackedTicks packedTicks = chunkAccess.getTicksForSerialization(serverLevel.getGameTime());
+			ChunkAccess.PackedTicks packedTicks = ChunkSectionStorageValidation.prepareTickValidationFixture(
+				chunkPos,
+				chunkAccess.getTicksForSerialization(serverLevel.getGameTime())
+			);
 			ShortList[] shortLists = (ShortList[])Arrays.stream(chunkAccess.getPostProcessing())
 				.map(shortList -> shortList != null ? new ShortArrayList(shortList) : null)
 				.toArray(ShortList[]::new);
@@ -734,10 +790,18 @@ public record SerializableChunkData(
 			}
 		}
 
-		saveTicks(compoundTag, this.packedTicks);
 		compoundTag.put("PostProcessing", packOffsets(this.postProcessingSections));
 		compoundTag.put("structures", this.structureData);
 		return compoundTag;
+	}
+
+	NativeChunkTickStorage.TickData nativeScheduledTickData() throws IOException {
+		return NativeChunkTickStorage.fromSavedTicks(
+			SharedConstants.getCurrentVersion().dataVersion().version(),
+			this.chunkPos,
+			this.packedTicks.blocks(),
+			this.packedTicks.fluids()
+		);
 	}
 
 	private static CompoundTag copyRustSectionResidual(CompoundTag compoundTag) {

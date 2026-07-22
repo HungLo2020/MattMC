@@ -5,7 +5,7 @@ use crate::storage::nbt::model::NbtDocument;
 use crate::storage::nbt::tape::{document_from_tape, document_to_tape};
 
 const MAGIC: u32 = 0x4b48_434d; // MCHK
-const VERSION: u16 = 2;
+const VERSION: u16 = 3;
 
 const SECTION_HAS_BLOCK_STATES: u32 = 1 << 0;
 const SECTION_HAS_BIOMES: u32 = 1 << 1;
@@ -43,7 +43,7 @@ pub fn encode_chunk_tape_with_residual_bytes(
     encode_chunk_tape_inner(chunk, &residual_tape)
 }
 
-pub fn decode_chunk_tape(input: &[u8]) -> ChunkResult<(ChunkSectionDecode, Vec<u8>)> {
+pub fn decode_chunk_tape(input: &[u8]) -> ChunkResult<(ChunkSectionDecode, Vec<u8>, Vec<u8>)> {
     let mut reader = ChunkTapeReader::new(input);
     if reader.read_u32()? != MAGIC {
         return Err(ChunkError::new(
@@ -83,6 +83,12 @@ pub fn decode_chunk_tape(input: &[u8]) -> ChunkResult<(ChunkSectionDecode, Vec<u
     } else {
         Vec::new()
     };
+    let tick_tape = if version >= 3 {
+        let len = reader.read_len("scheduled-tick tape")?;
+        reader.read_bytes_owned(len)?
+    } else {
+        Vec::new()
+    };
     if !reader.done() {
         return Err(ChunkError::new(
             ChunkErrorKind::InvalidArgument,
@@ -104,6 +110,7 @@ pub fn decode_chunk_tape(input: &[u8]) -> ChunkResult<(ChunkSectionDecode, Vec<u
             heightmaps,
         },
         residual_tape,
+        tick_tape,
     ))
 }
 
@@ -122,6 +129,22 @@ pub fn decode_residual_tape(input: &[u8], limits: NbtLimits) -> ChunkResult<NbtD
 fn encode_chunk_tape_inner(
     chunk: &ChunkSectionDecode,
     residual_tape: &[u8],
+) -> ChunkResult<Vec<u8>> {
+    encode_chunk_tape_inner_with_ticks(chunk, residual_tape, &[])
+}
+
+pub fn encode_chunk_tape_with_residual_and_tick_bytes(
+    chunk: &ChunkSectionDecode,
+    residual_tape: &[u8],
+    tick_tape: &[u8],
+) -> ChunkResult<Vec<u8>> {
+    encode_chunk_tape_inner_with_ticks(chunk, residual_tape, tick_tape)
+}
+
+fn encode_chunk_tape_inner_with_ticks(
+    chunk: &ChunkSectionDecode,
+    residual_tape: &[u8],
+    tick_tape: &[u8],
 ) -> ChunkResult<Vec<u8>> {
     let section_count = checked_u32(chunk.sections.len(), "section count")?;
     let heightmap_count = checked_u32(chunk.heightmaps.len(), "heightmap count")?;
@@ -146,6 +169,7 @@ fn encode_chunk_tape_inner(
         encode_heightmap(&mut output, heightmap)?;
     }
     write_bytes(&mut output, residual_tape, "residual chunk NBT tape")?;
+    write_bytes(&mut output, tick_tape, "scheduled-tick tape")?;
     Ok(output)
 }
 

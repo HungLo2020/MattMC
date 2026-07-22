@@ -15,6 +15,8 @@ pub mod error;
 pub mod ffi;
 pub mod model;
 pub mod tape;
+pub mod tick_ffi;
+pub mod ticks;
 pub mod writer;
 
 #[cfg(test)]

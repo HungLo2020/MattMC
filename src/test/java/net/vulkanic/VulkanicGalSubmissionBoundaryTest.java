@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -629,25 +631,31 @@ final class VulkanicGalSubmissionBoundaryTest {
     @Test
     void galV2StandaloneUniformPublicationDoesNotUsePerDrawSliceLookup() throws Exception {
         String vulkanSource = Files.readString(PROJECT_ROOT.resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
-        int v2ResolveStart = vulkanSource.indexOf(
-            "private VulkanCompactResourceBindingTable resolveCompact(\n"
-                + "            CommandContext ctx,\n"
-                + "            long commandBufferHandle,\n"
-                + "            PipelineDescriptor descriptor,\n"
-                + "            VulkanDrawExecutionCoordinator.LegacyProgramSnapshot programSnapshot,\n"
-                + "            VulkanicGalV2.ResourceSet resourceSet");
-        assertTrue(v2ResolveStart >= 0);
+        Matcher v2ResolveMatcher = Pattern.compile(
+            "private\\s+VulkanCompactResourceBindingTable\\s+resolveCompact\\s*\\(\\s*"
+                + "CommandContext\\s+ctx\\s*,\\s*"
+                + "long\\s+commandBufferHandle\\s*,\\s*"
+                + "PipelineDescriptor\\s+descriptor\\s*,\\s*"
+                + "VulkanDrawExecutionCoordinator\\.LegacyProgramSnapshot\\s+programSnapshot\\s*,\\s*"
+                + "VulkanicGalV2\\.ResourceSet\\s+resourceSet\\s*\\)",
+            Pattern.DOTALL
+        ).matcher(vulkanSource);
+        assertTrue(v2ResolveMatcher.find());
+        int v2ResolveStart = v2ResolveMatcher.start();
         int v2ResolveEnd = vulkanSource.indexOf("private VulkanStandaloneUniformBinding resolveTemplateStandaloneUniformBinding", v2ResolveStart);
         assertTrue(v2ResolveEnd > v2ResolveStart);
         String v2Resolve = vulkanSource.substring(v2ResolveStart, v2ResolveEnd);
 
         assertTrue(v2Resolve.contains("resolveTemplateStandaloneUniformBinding(programSnapshot.programId(), binding.name(), resourceSet)"));
         assertFalse(v2Resolve.contains("getStandaloneUniformBufferSlice("));
-        assertTrue(vulkanSource.contains("materializeStandaloneUniformArenaBinding(\n"
-            + "                                frameSlot,\n"
-            + "                                pipelineLocation,\n"
-            + "                                binding.name(),\n"
-            + "                                standaloneBinding"));
+        assertTrue(Pattern.compile(
+            "materializeStandaloneUniformArenaBinding\\s*\\(\\s*"
+                + "frameSlot\\s*,\\s*"
+                + "pipelineLocation\\s*,\\s*"
+                + "binding\\.name\\(\\)\\s*,\\s*"
+                + "standaloneBinding\\s*\\)",
+            Pattern.DOTALL
+        ).matcher(vulkanSource).find());
         assertTrue(vulkanSource.contains("bindingTable.withUniformBufferBindings(dynamicUniformSlices(dynamicUniformStates))"));
     }
 

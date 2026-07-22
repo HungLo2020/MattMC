@@ -22,7 +22,8 @@ use crate::storage::region::ffi::{
 
 use super::decoder::decode_unified_chunk_document;
 use super::error::{ChunkError, ChunkErrorKind};
-use super::tape::{encode_chunk_tape_with_residual_bytes, encode_residual_tape};
+use super::tape::{encode_chunk_tape_with_residual_and_tick_bytes, encode_residual_tape};
+use super::ticks::{decode_scheduled_ticks_document, encode_scheduled_tick_tape};
 use super::writer::document_from_typed_chunk_tape_for_position;
 
 const STATUS_REGION_ERROR: i32 = -3;
@@ -66,6 +67,8 @@ pub struct NativeChunkSectionDecodeResult {
     pub region_lock_hold_nanos: u64,
     pub rust_output_copy_nanos: u64,
     pub rust_ffi_total_nanos: u64,
+    pub block_tick_count: u32,
+    pub fluid_tick_count: u32,
 }
 
 #[repr(C)]
@@ -223,6 +226,8 @@ pub unsafe extern "C" fn mattmc_chunk_decode_sections_from_region(
     let tape_started = Instant::now();
     let mut residual_tape_len = 0;
     let mut residual_tape_creation_nanos = 0;
+    let mut block_tick_count = 0;
+    let mut fluid_tick_count = 0;
     let tape = if chunk.requires_dfu {
         Vec::new()
     } else {
@@ -243,7 +248,39 @@ pub unsafe extern "C" fn mattmc_chunk_decode_sections_from_region(
         };
         residual_tape_creation_nanos = elapsed_nanos(residual_started);
         residual_tape_len = residual_tape.len() as u64;
-        match encode_chunk_tape_with_residual_bytes(chunk, &residual_tape) {
+        let ticks = match decode_scheduled_ticks_document(&document, chunk_x, chunk_z) {
+            Ok(ticks) => ticks,
+            Err(error) => {
+                let mut result = chunk_error_result(STATUS_CHUNK_ERROR, error);
+                result.region_read_nanos = region_read_nanos;
+                result.decompression_nanos = decompression_nanos;
+                result.nbt_parse_nanos = nbt_parse_nanos;
+                result.chunk_decode_nanos = chunk_decode_nanos;
+                result.residual_tape_len = residual_tape_len;
+                result.residual_tape_creation_nanos = residual_tape_creation_nanos;
+                result.tape_creation_nanos = elapsed_nanos(tape_started);
+                apply_lock_timings(&mut result, lock_timings);
+                return finish(output_result, result, ffi_started);
+            }
+        };
+        let tick_tape = match encode_scheduled_tick_tape(&ticks) {
+            Ok(tape) => tape,
+            Err(error) => {
+                let mut result = chunk_error_result(STATUS_CHUNK_ERROR, error);
+                result.region_read_nanos = region_read_nanos;
+                result.decompression_nanos = decompression_nanos;
+                result.nbt_parse_nanos = nbt_parse_nanos;
+                result.chunk_decode_nanos = chunk_decode_nanos;
+                result.residual_tape_len = residual_tape_len;
+                result.residual_tape_creation_nanos = residual_tape_creation_nanos;
+                result.tape_creation_nanos = elapsed_nanos(tape_started);
+                apply_lock_timings(&mut result, lock_timings);
+                return finish(output_result, result, ffi_started);
+            }
+        };
+        block_tick_count = ticks.block_ticks.len() as u32;
+        fluid_tick_count = ticks.fluid_ticks.len() as u32;
+        match encode_chunk_tape_with_residual_and_tick_bytes(chunk, &residual_tape, &tick_tape) {
             Ok(tape) => tape,
             Err(error) => {
                 let mut result = chunk_error_result(STATUS_CHUNK_ERROR, error);
@@ -291,6 +328,8 @@ pub unsafe extern "C" fn mattmc_chunk_decode_sections_from_region(
         region_lock_hold_nanos: lock_timings.lock_hold_nanos,
         rust_output_copy_nanos: 0,
         rust_ffi_total_nanos: 0,
+        block_tick_count,
+        fluid_tick_count,
     };
     if output_capacity < tape.len() as u64 {
         result.status = STATUS_OUTPUT_TOO_SMALL;

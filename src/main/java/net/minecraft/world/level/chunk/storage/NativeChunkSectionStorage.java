@@ -44,7 +44,7 @@ public final class NativeChunkSectionStorage implements Closeable {
 	public static final int OUTPUT_TOO_SMALL = -4;
 	public static final int ERROR_DOMAIN_CHUNK = 6;
 	public static final int CHUNK_UNSUPPORTED_DATA_VERSION = 4;
-	private static final long RESULT_SIZE = 184L;
+	private static final long RESULT_SIZE = 192L;
 	private static final long RESULT_STATUS = 0L;
 	private static final long RESULT_ERROR_DOMAIN = 4L;
 	private static final long RESULT_ERROR_KIND = 8L;
@@ -74,6 +74,8 @@ public final class NativeChunkSectionStorage implements Closeable {
 	private static final long RESULT_REGION_LOCK_HOLD_NANOS = 160L;
 	private static final long RESULT_RUST_OUTPUT_COPY_NANOS = 168L;
 	private static final long RESULT_RUST_FFI_TOTAL_NANOS = 176L;
+	private static final long RESULT_BLOCK_TICK_COUNT = 184L;
+	private static final long RESULT_FLUID_TICK_COUNT = 188L;
 	private static final long WRITE_RESULT_SIZE = 112L;
 	private static final long WRITE_RESULT_STATUS = 0L;
 	private static final long WRITE_RESULT_ERROR_DOMAIN = 4L;
@@ -94,7 +96,7 @@ public final class NativeChunkSectionStorage implements Closeable {
 	private static final long WRITE_RESULT_RUST_FFI_TOTAL_NANOS = 104L;
 	private static final int INITIAL_OUTPUT_CAPACITY = 65536;
 	private static final int MAGIC = 0x4B48434D;
-	private static final int VERSION = 2;
+	private static final int VERSION = 3;
 	private static final int SECTION_HAS_BLOCK_STATES = 1;
 	private static final int SECTION_HAS_BIOMES = 1 << 1;
 	private static final int SECTION_HAS_BLOCK_LIGHT = 1 << 2;
@@ -254,6 +256,10 @@ public final class NativeChunkSectionStorage implements Closeable {
 			&& decodeException.result().errorKind() == CHUNK_UNSUPPORTED_DATA_VERSION;
 	}
 
+	static boolean rustChunkTicksOwned() {
+		return true;
+	}
+
 	private static Result decodeInto(long handle, int chunkX, int chunkZ, MemorySegment output, long outputCapacity, MemorySegment resultSegment) {
 		try {
 			int status = (int)DECODE.invokeExact(
@@ -310,7 +316,9 @@ public final class NativeChunkSectionStorage implements Closeable {
 			resultSegment.get(ValueLayout.JAVA_LONG, RESULT_REGION_LOCK_WAIT_NANOS),
 			resultSegment.get(ValueLayout.JAVA_LONG, RESULT_REGION_LOCK_HOLD_NANOS),
 			resultSegment.get(ValueLayout.JAVA_LONG, RESULT_RUST_OUTPUT_COPY_NANOS),
-			resultSegment.get(ValueLayout.JAVA_LONG, RESULT_RUST_FFI_TOTAL_NANOS)
+			resultSegment.get(ValueLayout.JAVA_LONG, RESULT_RUST_FFI_TOTAL_NANOS),
+			resultSegment.get(ValueLayout.JAVA_INT, RESULT_BLOCK_TICK_COUNT),
+			resultSegment.get(ValueLayout.JAVA_INT, RESULT_FLUID_TICK_COUNT)
 		);
 	}
 
@@ -349,10 +357,14 @@ public final class NativeChunkSectionStorage implements Closeable {
 		if (version >= 2) {
 			residual = NativeNbtRegionAccess.readTape(reader.readBytes(reader.readIntLE()));
 		}
+		NativeChunkTickStorage.TickData ticks = NativeChunkTickStorage.TickData.empty();
+		if (version >= 3) {
+			ticks = NativeChunkTickStorage.decodeTape(reader.readBytes(reader.readIntLE()));
+		}
 		if (!reader.done()) {
 			throw new IOException("Trailing bytes in chunk-section tape");
 		}
-		return new ChunkData(dataVersion, chunkX, chunkZ, yPos, status, lightOn, lastUpdate, inhabitedTime, List.copyOf(sections), List.copyOf(heightmaps), residual);
+		return new ChunkData(dataVersion, chunkX, chunkZ, yPos, status, lightOn, lastUpdate, inhabitedTime, List.copyOf(sections), List.copyOf(heightmaps), residual, ticks);
 	}
 
 	private static WriteResult readWriteResult(MemorySegment resultSegment, int callStatus) {
@@ -404,6 +416,10 @@ public final class NativeChunkSectionStorage implements Closeable {
 			writer.writeLongArray(entry.getValue());
 		}
 		writer.writeBytes(NativeNbtRegionAccess.writeTape(data.writeResidualForRustSections()));
+		long tickTapeStarted = ChunkSectionReadDiagnostics.now();
+		byte[] tickTape = NativeChunkTickStorage.encodeTickTape(data.nativeScheduledTickData());
+		ChunkSectionReadDiagnostics.rustTickWriteTapeCreated(ChunkSectionReadDiagnostics.elapsed(tickTapeStarted), tickTape.length);
+		writer.writeBytes(tickTape);
 		return writer.toByteArray();
 	}
 
@@ -609,7 +625,9 @@ public final class NativeChunkSectionStorage implements Closeable {
 		long regionLockWaitNanos,
 		long regionLockHoldNanos,
 		long rustOutputCopyNanos,
-		long rustFfiTotalNanos
+		long rustFfiTotalNanos,
+		int blockTickCount,
+		int fluidTickCount
 	) {
 	}
 
@@ -645,10 +663,11 @@ public final class NativeChunkSectionStorage implements Closeable {
 		long inhabitedTime,
 		List<Section> sections,
 		List<Heightmap> heightmaps,
-		CompoundTag residual
+		CompoundTag residual,
+		NativeChunkTickStorage.TickData scheduledTicks
 	) {
 		private static ChunkData empty() {
-			return new ChunkData(0, 0, 0, 0, "", false, 0L, 0L, List.of(), List.of(), new CompoundTag());
+			return new ChunkData(0, 0, 0, 0, "", false, 0L, 0L, List.of(), List.of(), new CompoundTag(), NativeChunkTickStorage.TickData.empty());
 		}
 	}
 

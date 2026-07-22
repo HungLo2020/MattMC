@@ -83,6 +83,7 @@ class CaptureConfig:
     entity_validation: bool
     chunk_section_validation: bool
     chunk_section_write_validation: bool
+    chunk_tick_validation: bool
     resource_pack_reload_validation: bool
 
 
@@ -1387,6 +1388,13 @@ class CaptureRunner:
                     raise RuntimeError("chunk-section validation forced no copied-world chunks dirty for typed writes")
                 if int(data.get("writeFallbacks", 0)) != 0:
                     raise RuntimeError(f"chunk-section validation writeFallbacks was {data.get('writeFallbacks')}")
+            if self.config.chunk_tick_validation:
+                if not data.get("rustChunkTicksOwned"):
+                    raise RuntimeError("chunk tick validation did not use Rust-owned chunk ticks")
+                if int(data.get("rustCurrentVersionTickReads", 0)) <= 0:
+                    raise RuntimeError("chunk tick validation read no current-version chunks through Rust")
+                if int(data.get("rustCurrentVersionTickWrites", 0)) <= 0:
+                    raise RuntimeError("chunk tick validation wrote no current-version chunks through Rust")
             for key in ("nativeErrors", "malformedChunks", "parityMismatches", "nativeWriteErrors", "writeShadowMismatches"):
                 if int(data.get(key, -1)) != 0:
                     raise RuntimeError(f"chunk-section validation {key} was {data.get(key)}")
@@ -2588,6 +2596,7 @@ def parse_args() -> CaptureConfig:
     parser.add_argument("--entity-validation", action="store_true")
     parser.add_argument("--chunk-section-validation", action="store_true")
     parser.add_argument("--chunk-section-write-validation", action="store_true")
+    parser.add_argument("--chunk-tick-validation", action="store_true")
     parser.add_argument("--resource-pack-reload-validation", action="store_true")
     parser.add_argument("--platform", help="platform to pass to shared helpers: linux, windows, or macos")
     args = parser.parse_args()
@@ -2643,8 +2652,9 @@ def parse_args() -> CaptureConfig:
         region_validation_copy_world=bool(args.region_validation_copy_world),
         poi_validation=bool(args.poi_validation),
         entity_validation=bool(args.entity_validation),
-        chunk_section_validation=bool(args.chunk_section_validation or args.chunk_section_write_validation),
+        chunk_section_validation=bool(args.chunk_section_validation or args.chunk_section_write_validation or args.chunk_tick_validation),
         chunk_section_write_validation=bool(args.chunk_section_write_validation),
+        chunk_tick_validation=bool(args.chunk_tick_validation),
         resource_pack_reload_validation=bool(args.resource_pack_reload_validation),
     )
 
