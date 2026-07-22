@@ -52,7 +52,12 @@ public final class DeterministicCameraCapture {
 	private static final int PERFORMANCE_MEASURE_FRAMES = Math.max(1, Integer.getInteger("mattmc.dev.deterministicCameraCapture.performanceMeasureFrames", 300));
 	private static final int SETTLED_READY_FRAMES = Math.max(0, Integer.getInteger("mattmc.dev.deterministicCameraCapture.settledReadyFrames", 0));
 	private static final int SETTLED_READY_MAX_WAIT_FRAMES = Math.max(1, Integer.getInteger("mattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames", 900));
+	private static final int SETTLED_READY_EVIDENCE_TIMEOUT_FRAMES = Math.max(
+		1,
+		Integer.getInteger("mattmc.dev.deterministicCameraCapture.settledReadyEvidenceTimeoutFrames", 180)
+	);
 	private static final Set<String> SETTLED_READY_FAMILIES = parseSettledReadyFamilies();
+	private static final Map<String, Integer> SETTLED_READY_MINIMUM_COUNTS = parseSettledReadyMinimumCounts();
 	private static final String FORCED_CAMERA_TYPE = System.getProperty("mattmc.dev.deterministicCameraCapture.cameraType", "").trim();
 	private static final int FORCED_SELECTED_HOTBAR_SLOT = Integer.getInteger("mattmc.dev.deterministicCameraCapture.selectedHotbarSlot", 0);
 	private static final String WORLD_NAME = System.getProperty("mattmc.dev.deterministicCameraCapture.world", "Origin");
@@ -138,7 +143,9 @@ public final class DeterministicCameraCapture {
 			return;
 		}
 		if (PERFORMANCE_MODE) {
-			VulkanPerfAudit.setDeterministicMeasurementFrameActive(isPerformanceMeasurementFrame());
+			boolean measurementFrame = isPerformanceMeasurementFrame();
+			VulkanPerfAudit.setDeterministicPerformanceFrameContext(performanceFrames, measurementFrame);
+			VulkanPerfAudit.setDeterministicMeasurementFrameActive(measurementFrame);
 		}
 		if (poseIndex >= poses.length) {
 			stabilizeGuiState(minecraft);
@@ -169,7 +176,12 @@ public final class DeterministicCameraCapture {
 		if (!settledReadyGateSatisfied && !settledReadyGateSatisfied(minecraft)) {
 			renderedFramesAtPose = 0;
 			framesWaitingForSettledReady++;
-			if (framesWaitingForSettledReady > SETTLED_READY_MAX_WAIT_FRAMES) {
+			if (
+				framesWaitingForSettledReady > SETTLED_READY_EVIDENCE_TIMEOUT_FRAMES
+					&& !hasAnySubmittedWorkForReadyFamilies()
+			) {
+				fail("timed out waiting for settled submitted-work evidence: " + settledReadySummary());
+			} else if (framesWaitingForSettledReady > SETTLED_READY_MAX_WAIT_FRAMES) {
 				fail("timed out waiting for settled submitted work: " + settledReadySummary());
 			} else if ((framesWaitingForSettledReady % 30) == 0) {
 				writeMetadata(minecraft, "waiting_for_settled_ready_work");
@@ -389,20 +401,27 @@ public final class DeterministicCameraCapture {
 		long latestCompletedFrame = Math.max(0L, renderedFrameIndex - 1L);
 		synchronized (SUBMITTED_WORK_BY_FRAME) {
 			for (String family : SETTLED_READY_FAMILIES) {
-				Set<String> stableIntersection = null;
+				int minimumCount = SETTLED_READY_MINIMUM_COUNTS.getOrDefault(family, 0);
+				if (minimumCount <= 0) {
+					continue;
+				}
+				Set<String> stableWork = null;
 				for (int offset = SETTLED_READY_FRAMES - 1; offset >= 0; offset--) {
 					Map<String, Set<String>> frameWork = SUBMITTED_WORK_BY_FRAME.get(latestCompletedFrame - offset);
 					Set<String> current = frameWork == null ? null : frameWork.get(family);
 					if (current == null || current.isEmpty()) {
 						return false;
 					}
-					if (stableIntersection == null) {
-						stableIntersection = new LinkedHashSet<>(current);
-					} else {
-						stableIntersection.retainAll(current);
+					if (current.size() < minimumCount) {
+						return false;
+					}
+					if (stableWork == null) {
+						stableWork = new LinkedHashSet<>(current);
+					} else if (!stableWork.equals(current)) {
+						return false;
 					}
 				}
-				if (stableIntersection == null || stableIntersection.isEmpty()) {
+				if (stableWork == null || stableWork.isEmpty()) {
 					return false;
 				}
 			}
@@ -423,6 +442,20 @@ public final class DeterministicCameraCapture {
 		SUBMITTED_WORK_BY_FRAME.keySet().removeIf(frame -> frame < minimumFrame);
 	}
 
+	private static boolean hasAnySubmittedWorkForReadyFamilies() {
+		synchronized (SUBMITTED_WORK_BY_FRAME) {
+			for (Map<String, Set<String>> frameWork : SUBMITTED_WORK_BY_FRAME.values()) {
+				for (String family : SETTLED_READY_FAMILIES) {
+					Set<String> work = frameWork.get(family);
+					if (work != null && !work.isEmpty()) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
+
 	private static String settledReadySummary() {
 		if (SETTLED_READY_FRAMES <= 0) {
 			return "disabled";
@@ -435,25 +468,49 @@ public final class DeterministicCameraCapture {
 			for (String family : SETTLED_READY_FAMILIES) {
 				Map<String, Set<String>> frameWork = SUBMITTED_WORK_BY_FRAME.get(latestCompletedFrame);
 				Set<String> work = frameWork == null ? null : frameWork.get(family);
-				Set<String> stableIntersection = null;
+				Set<String> stableWork = null;
+				boolean exactlyStable = true;
 				for (int offset = SETTLED_READY_FRAMES - 1; offset >= 0; offset--) {
 					Map<String, Set<String>> windowFrameWork = SUBMITTED_WORK_BY_FRAME.get(latestCompletedFrame - offset);
 					Set<String> current = windowFrameWork == null ? null : windowFrameWork.get(family);
 					if (current == null || current.isEmpty()) {
-						stableIntersection = null;
+						stableWork = null;
+						exactlyStable = false;
 						break;
 					}
-					if (stableIntersection == null) {
-						stableIntersection = new LinkedHashSet<>(current);
-					} else {
-						stableIntersection.retainAll(current);
+					if (stableWork == null) {
+						stableWork = new LinkedHashSet<>(current);
+					} else if (!stableWork.equals(current)) {
+						exactlyStable = false;
 					}
 				}
 				summary.append(";").append(family).append("=").append(work == null ? 0 : work.size())
-					.append("/stable=").append(stableIntersection == null ? 0 : stableIntersection.size());
+					.append("/stable=").append(exactlyStable && stableWork != null ? stableWork.size() : 0);
 			}
 		}
 		return summary.toString();
+	}
+
+	private static String settledReadyFingerprint() {
+		if (SETTLED_READY_FRAMES <= 0) {
+			return "disabled";
+		}
+		long latestCompletedFrame = Math.max(0L, renderedFrameIndex - 1L);
+		StringBuilder canonical = new StringBuilder();
+		synchronized (SUBMITTED_WORK_BY_FRAME) {
+			for (String family : SETTLED_READY_FAMILIES) {
+				Map<String, Set<String>> frameWork = SUBMITTED_WORK_BY_FRAME.get(latestCompletedFrame);
+				Set<String> work = frameWork == null ? null : frameWork.get(family);
+				canonical.append(family).append('=');
+				if (work != null) {
+					for (String identity : work) {
+						canonical.append(identity).append('\n');
+					}
+				}
+				canonical.append('\n');
+			}
+		}
+		return sha256Hex(canonical.toString());
 	}
 
 	private static Set<String> parseSettledReadyFamilies() {
@@ -467,6 +524,37 @@ public final class DeterministicCameraCapture {
 			families.add("sodium-terrain");
 		}
 		return Collections.unmodifiableSet(families);
+	}
+
+	private static Map<String, Integer> parseSettledReadyMinimumCounts() {
+		String raw = System.getProperty("mattmc.dev.deterministicCameraCapture.settledReadyMinimumCounts", "").trim();
+		if (raw.isEmpty()) {
+			return Map.of();
+		}
+		LinkedHashMap<String, Integer> counts = new LinkedHashMap<>();
+		Arrays.stream(raw.split("[,;]"))
+			.map(String::trim)
+			.filter(value -> !value.isEmpty())
+			.forEach(entry -> {
+				String[] parts = entry.split("=", 2);
+				if (parts.length != 2) {
+					return;
+				}
+				try {
+					counts.put(parts[0].trim(), Math.max(0, Integer.parseInt(parts[1].trim())));
+				} catch (NumberFormatException ignored) {
+				}
+		});
+		return Collections.unmodifiableMap(counts);
+	}
+
+	private static String settledReadyMinimumCountsFingerprintValue() {
+		if (SETTLED_READY_MINIMUM_COUNTS.isEmpty()) {
+			return "none";
+		}
+		return SETTLED_READY_MINIMUM_COUNTS.entrySet().stream()
+			.map(entry -> entry.getKey() + "=" + entry.getValue())
+			.collect(java.util.stream.Collectors.joining(","));
 	}
 
 	private static void stabilizeGuiState(Minecraft minecraft) {
@@ -765,10 +853,16 @@ public final class DeterministicCameraCapture {
 		json.append("  \"performanceFrames\": ").append(performanceFrames).append(",\n");
 		appendBenchmarkFingerprint(json, currentDimension, initialPosition == null ? currentPosition : initialPosition).append(",\n");
 		appendField(json, "benchmarkFingerprintHash", benchmarkFingerprintHash(currentDimension, initialPosition == null ? currentPosition : initialPosition)).append(",\n");
+		VulkanPerfAudit.appendObservedWorkloadSignatureJson(json, 2);
+		json.append(",\n");
+		appendField(json, "observedWorkloadSignatureHash", VulkanPerfAudit.observedWorkloadSignatureHash()).append(",\n");
 		json.append("  \"settledReadyFrames\": ").append(SETTLED_READY_FRAMES).append(",\n");
 		json.append("  \"settledReadyMaxWaitFrames\": ").append(SETTLED_READY_MAX_WAIT_FRAMES).append(",\n");
+		json.append("  \"settledReadyEvidenceTimeoutFrames\": ").append(SETTLED_READY_EVIDENCE_TIMEOUT_FRAMES).append(",\n");
 		json.append("  \"settledReadyGateSatisfied\": ").append(settledReadyGateSatisfied).append(",\n");
 		appendField(json, "settledReadySummary", settledReadySummary()).append(",\n");
+		appendField(json, "settledReadyMinimumCounts", settledReadyMinimumCountsFingerprintValue()).append(",\n");
+		appendField(json, "settledReadyFingerprint", settledReadyFingerprint()).append(",\n");
 		json.append("  \"ackTimeoutFrames\": ").append(ACK_TIMEOUT_FRAMES).append(",\n");
 			json.append("  \"poseCount\": ").append(poses == null ? POSE_COUNT : poses.length).append(",\n");
 			json.append("  \"poseSequence\": [");
@@ -875,7 +969,10 @@ public final class DeterministicCameraCapture {
 				level == null ? "missing" : level.dimension().location().toString(),
 				initialPosition == null ? (player == null ? Vec3.ZERO : player.position()) : initialPosition
 			)
-		).append("\n");
+		).append(",\n");
+		VulkanPerfAudit.appendObservedWorkloadSignatureJson(json, 2);
+		json.append(",\n");
+		appendField(json, "observedWorkloadSignatureHash", VulkanPerfAudit.observedWorkloadSignatureHash()).append("\n");
 		json.append("}\n");
 		try {
 			Path parent = PERFORMANCE_STATUS_PATH.getParent();
@@ -976,7 +1073,9 @@ public final class DeterministicCameraCapture {
 		json.append("    \"measureFrames\": ").append(PERFORMANCE_MEASURE_FRAMES).append(",\n");
 		json.append("    \"settledReadyFrames\": ").append(SETTLED_READY_FRAMES).append(",\n");
 		json.append("    \"settledReadyMaxWaitFrames\": ").append(SETTLED_READY_MAX_WAIT_FRAMES).append(",\n");
+		json.append("    \"settledReadyEvidenceTimeoutFrames\": ").append(SETTLED_READY_EVIDENCE_TIMEOUT_FRAMES).append(",\n");
 		appendField(json, "settledReadyFamilies", String.join(",", SETTLED_READY_FAMILIES), 4).append(",\n");
+		appendField(json, "settledReadyMinimumCounts", settledReadyMinimumCountsFingerprintValue(), 4).append(",\n");
 		appendField(json, "graphicsSettings", graphicsSettingsFingerprint(), 4).append(",\n");
 		appendField(json, "jvm", jvmFingerprint(), 4).append(",\n");
 		appendField(json, "harness", HARNESS_VERSION, 4).append(",\n");
@@ -1013,7 +1112,9 @@ public final class DeterministicCameraCapture {
 			+ "measureFrames=" + PERFORMANCE_MEASURE_FRAMES + "\n"
 			+ "settledReadyFrames=" + SETTLED_READY_FRAMES + "\n"
 			+ "settledReadyMaxWaitFrames=" + SETTLED_READY_MAX_WAIT_FRAMES + "\n"
+			+ "settledReadyEvidenceTimeoutFrames=" + SETTLED_READY_EVIDENCE_TIMEOUT_FRAMES + "\n"
 			+ "settledReadyFamilies=" + String.join(",", SETTLED_READY_FAMILIES) + "\n"
+			+ "settledReadyMinimumCounts=" + settledReadyMinimumCountsFingerprintValue() + "\n"
 			+ "graphicsSettings=" + graphicsSettingsFingerprint() + "\n"
 			+ "jvm=" + jvmFingerprint() + "\n"
 			+ "harness=" + HARNESS_VERSION + "\n"
@@ -1030,6 +1131,8 @@ public final class DeterministicCameraCapture {
 			+ ";vulkanPerfAudit=" + Boolean.getBoolean("mattmc.vulkan.perfAudit")
 			+ ";legacyGraphicsLowering=" + Boolean.getBoolean("mattmc.perfAudit.legacyGraphicsLowering")
 			+ ";resourcePlanBreakdown=" + Boolean.getBoolean("mattmc.perfAudit.resourcePlanBreakdown")
+			+ ";openGlDrawDetails=" + Boolean.getBoolean("mattmc.perfAudit.openGlDrawDetails")
+			+ ";openGlStateDetails=" + Boolean.getBoolean("mattmc.perfAudit.openGlStateDetails")
 			+ ";maxFrameSamples=" + Integer.getInteger("mattmc.perfAudit.maxFrameSamples", 4096);
 	}
 

@@ -746,6 +746,7 @@ class CaptureRunner:
             ]
             if self.config.performance_capture:
                 settled_frames = int_env("MATTMC_BENCHMARK_SETTLED_READY_FRAMES", 0)
+                settled_minimum_counts = os.environ.get("MATTMC_BENCHMARK_SETTLED_READY_MINIMUM_COUNTS", "").strip()
                 deterministic_options.extend(
                     [
                         "-Dmattmc.dev.deterministicCameraCapture.performanceMode=true",
@@ -753,12 +754,17 @@ class CaptureRunner:
                         f"-Dmattmc.dev.deterministicCameraCapture.performanceMeasureFrames={self.config.perf_measure_frames}",
                         f"-Dmattmc.dev.deterministicCameraCapture.performanceStatus={self.performance_status}",
                         f"-Dmattmc.dev.deterministicCameraCapture.settledReadyFrames={settled_frames}",
+                        f"-Dmattmc.dev.deterministicCameraCapture.settledReadyMinimumCounts={settled_minimum_counts}",
                         "-Dmattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames=2400",
                         "-Dmattmc.perfAudit=true",
+                        "-Dmattmc.perfAudit.legacyGraphicsLowering=true",
                         f"-Dmattmc.perfAudit.backend={self.config.backend}",
                         f"-Dmattmc.perfAuditReportDir={self.performance_audit_dir}",
                     ]
                 )
+                semantic_workload = os.environ.get("MATTMC_PERF_SEMANTIC_DRAW_IDENTITY", "").strip().lower()
+                if semantic_workload in {"1", "true", "yes", "on"}:
+                    deterministic_options.append("-Dmattmc.perfAudit.semanticDrawIdentity=true")
             self.append_java_tool_options(deterministic_options)
             self.append_meta(f"deterministic_camera_capture_java_options={' '.join(deterministic_options)}")
             self.append_meta(
@@ -1957,11 +1963,22 @@ def settings_fingerprint(paths: list[Path]) -> str:
         digest.update(str(path.name).encode("utf-8", errors="replace"))
         digest.update(b"\0")
         if path.is_file():
-            digest.update(path.read_bytes())
+            digest.update(canonical_settings_bytes(path))
         else:
             digest.update(b"<missing>")
         digest.update(b"\0")
     return digest.hexdigest()
+
+
+def canonical_settings_bytes(path: Path) -> bytes:
+    lines: list[str] = []
+    for raw_line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        lines.append(line)
+    lines.sort()
+    return ("\n".join(lines) + "\n").encode("utf-8")
 
 
 def distant_horizons_config_fingerprint(run_dir: Path) -> str:
@@ -2475,6 +2492,16 @@ def validate_deterministic_performance_metadata(
                 "benchmark fingerprint mismatch: "
                 f"actual={actual_hash!r} expected={expected_hash!r} reference={compare_fingerprint_path}"
             )
+        expected_workload_hash = load_observed_workload_signature_hash(Path(compare_fingerprint_path))
+        actual_workload_hash = (
+            status.get("observedWorkloadSignatureHash")
+            or metadata.get("observedWorkloadSignatureHash")
+        )
+        if actual_workload_hash != expected_workload_hash:
+            raise RuntimeError(
+                "observed workload signature mismatch: "
+                f"actual={actual_workload_hash!r} expected={expected_workload_hash!r} reference={compare_fingerprint_path}"
+            )
     print(f"deterministic performance capture OK: {status_path} measuredFrames={measured}")
 
 
@@ -2489,6 +2516,16 @@ def load_benchmark_fingerprint_hash(path: Path) -> str:
     if isinstance(fingerprint, dict):
         return json.dumps(fingerprint, sort_keys=True, separators=(",", ":"))
     raise RuntimeError(f"benchmark fingerprint reference does not contain a fingerprint hash: {path}")
+
+
+def load_observed_workload_signature_hash(path: Path) -> str:
+    if not path.is_file():
+        raise RuntimeError(f"observed workload signature reference is missing: {path}")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    workload_hash = data.get("observedWorkloadSignatureHash")
+    if isinstance(workload_hash, str) and workload_hash:
+        return workload_hash
+    raise RuntimeError(f"benchmark reference does not contain an observed workload signature hash: {path}")
 
 
 def deterministic_benchmark_pose() -> dict[str, str]:

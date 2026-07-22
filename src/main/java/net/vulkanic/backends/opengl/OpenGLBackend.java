@@ -25,6 +25,7 @@ import net.vulkanic.VulkanicCullFaceMode;
 import net.vulkanic.VulkanicDepthCompareOp;
 import net.vulkanic.VulkanicGalExecutionRequest;
 import net.vulkanic.VulkanicGalV2;
+import net.vulkanic.VulkanicIndexType;
 import net.vulkanic.VulkanicPassResourceModel;
 import net.vulkanic.VulkanicGalSnapshotBuilder;
 import net.vulkanic.VulkanicIntegerQuery;
@@ -64,10 +65,26 @@ public class OpenGLBackend implements GraphicsBackend {
     private long appliedResourceBindingVersion = Long.MIN_VALUE;
     private long appliedVertexInputVersion = Long.MIN_VALUE;
     private long appliedUniformVersion = Long.MIN_VALUE;
+    private String appliedGalV2ProgramKey = "";
+    private String appliedGalV2RenderTargetKey = "";
+    private String appliedGalV2FixedFunctionKey = "";
+    private String appliedGalV2UniformPayloadKey = "";
     private String appliedGalV2VertexInputKey = "";
+    private String appliedGalV2VertexLayoutKey = "";
+    private VulkanicGalV2.Handle appliedGalV2VertexArrayHandle;
+    private final GalV2IndexStreamBindingState appliedGalV2IndexStream = new GalV2IndexStreamBindingState();
+    private final java.util.Map<Integer, GalV2VertexStreamBindingState> appliedGalV2VertexStreams = new java.util.HashMap<>();
+    private static final int NO_PENDING_COMPATIBILITY_VERTEX_ARRAY = Integer.MIN_VALUE;
+    private int pendingCompatibilityVertexArray = NO_PENDING_COMPATIBILITY_VERTEX_ARRAY;
+    private String appliedGalV2ResourceSetKey = "";
+    private AppliedV2ResourceBindings appliedGalV2ResourceCoverage = AppliedV2ResourceBindings.empty();
+    private @Nullable VulkanicCompatibilityState.FixedFunctionSnapshot appliedFixedFunctionState;
     private final java.util.concurrent.ConcurrentMap<VulkanicGalV2.Handle, Integer> galV2VertexArrays =
         new java.util.concurrent.ConcurrentHashMap<>();
-    private final java.util.Set<Integer> appliedGalV2Attributes = new java.util.HashSet<>();
+    private final java.util.concurrent.ConcurrentMap<VulkanicGalV2.Handle, GalV2VertexArrayBindingState> galV2VertexArrayBindingStates =
+        new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Set<VulkanicGalV2.Handle> configuredGalV2VertexLayouts =
+        java.util.concurrent.ConcurrentHashMap.newKeySet();
     private volatile int presentScratchReadFbo;
 
     /**
@@ -92,18 +109,68 @@ public class OpenGLBackend implements GraphicsBackend {
         appliedResourceBindingVersion = Long.MIN_VALUE;
         appliedVertexInputVersion = Long.MIN_VALUE;
         appliedUniformVersion = Long.MIN_VALUE;
+        appliedGalV2ProgramKey = "";
+        appliedGalV2RenderTargetKey = "";
+        appliedGalV2FixedFunctionKey = "";
+        appliedGalV2UniformPayloadKey = "";
         appliedGalV2VertexInputKey = "";
-        appliedGalV2Attributes.clear();
+        appliedGalV2VertexLayoutKey = "";
+        appliedGalV2VertexArrayHandle = null;
+        pendingCompatibilityVertexArray = NO_PENDING_COMPATIBILITY_VERTEX_ARRAY;
+        appliedGalV2IndexStream.clear();
+        appliedGalV2VertexStreams.clear();
+        appliedGalV2ResourceSetKey = "";
+        appliedGalV2ResourceCoverage = AppliedV2ResourceBindings.empty();
+        appliedFixedFunctionState = null;
+    }
+
+    private void invalidateAppliedGalV2VertexArraySelection() {
+        appliedGalV2VertexArrayHandle = null;
+        appliedGalV2IndexStream.clear();
+        appliedGalV2VertexStreams.clear();
+    }
+
+    private void materializePendingCompatibilityVertexArray() {
+        if (pendingCompatibilityVertexArray == NO_PENDING_COMPATIBILITY_VERTEX_ARRAY) {
+            return;
+        }
+        GL30.glBindVertexArray(pendingCompatibilityVertexArray);
+        pendingCompatibilityVertexArray = NO_PENDING_COMPATIBILITY_VERTEX_ARRAY;
+        invalidateAppliedGalV2VertexArraySelection();
+    }
+
+    private void discardPendingCompatibilityVertexArrayForGalV2Draw() {
+        pendingCompatibilityVertexArray = NO_PENDING_COMPATIBILITY_VERTEX_ARRAY;
+    }
+
+    private void invalidateGalV2GeneratedVertexArrayBindingCaches() {
+        galV2VertexArrayBindingStates.clear();
+        invalidateAppliedGalV2VertexArraySelection();
     }
 
     private void invalidateAppliedFramebufferState() {
         appliedFramebufferVersion = Long.MIN_VALUE;
+        appliedGalV2RenderTargetKey = "";
+    }
+
+    private void invalidateAppliedResourceState() {
+        appliedResourceBindingVersion = Long.MIN_VALUE;
+        appliedGalV2ResourceSetKey = "";
+        appliedGalV2ResourceCoverage = AppliedV2ResourceBindings.empty();
     }
 
     private void invalidateAppliedResourceAndVertexState() {
         appliedFramebufferVersion = Long.MIN_VALUE;
         appliedResourceBindingVersion = Long.MIN_VALUE;
         appliedVertexInputVersion = Long.MIN_VALUE;
+        appliedGalV2RenderTargetKey = "";
+        appliedGalV2ResourceSetKey = "";
+        appliedGalV2ResourceCoverage = AppliedV2ResourceBindings.empty();
+        appliedGalV2VertexInputKey = "";
+        appliedGalV2VertexLayoutKey = "";
+        appliedGalV2VertexArrayHandle = null;
+        appliedGalV2IndexStream.clear();
+        appliedGalV2VertexStreams.clear();
     }
 
     private static boolean supportsDepthStencilTextureMode() {
@@ -410,7 +477,8 @@ public class OpenGLBackend implements GraphicsBackend {
     public VulkanicGalExecutionRequest.ExecutionResult executeTransfer(CommandContext ctx, VulkanicGalExecutionRequest.TransferRequest request) {
         long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         try {
-            invalidateAppliedResourceAndVertexState();
+            invalidateAppliedResourceState();
+            invalidateAppliedFramebufferState();
             java.util.Objects.requireNonNull(request, "request");
             consumeResourceUsagePlan(request.resourcePlan());
             VulkanicGalExecutionRequest.TransferCompatibilitySnapshot transfer = request.requireTransferSnapshot();
@@ -618,7 +686,13 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        if (target == GL15.GL_ELEMENT_ARRAY_BUFFER) {
+            materializePendingCompatibilityVertexArray();
+        }
         GL15.glBindBuffer(target, buffer);
+        if (target == GL15.GL_ELEMENT_ARRAY_BUFFER) {
+            invalidateGalV2GeneratedVertexArrayBindingCaches();
+        }
     }
 
     @Override
@@ -809,6 +883,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        materializePendingCompatibilityVertexArray();
         VulkanicAPI.traceShaderInputParityDraw("opengl-drawArrays", false, mode, first, count, 0L, 0, 0, 1, 0);
         GL11.glDrawArrays(mode, first, count);
     }
@@ -817,6 +892,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        materializePendingCompatibilityVertexArray();
         VulkanicAPI.traceShaderInputParityDraw("opengl-drawElements", true, mode, 0, 0, indices, count, type, 1, 0);
         GL11.glDrawElements(mode, count, type, indices);
     }
@@ -897,55 +973,41 @@ public class OpenGLBackend implements GraphicsBackend {
             consumeResourceUsagePlan(request.resourcePlan());
             VulkanicGalV2.ExplicitGraphicsObjects objects =
                 VulkanicGalV2.requireGraphicsObjects(request.graphicsObjects());
-            VulkanicCompatibilityState.GraphicsSnapshot snapshot = objects.immutableCompatibilitySeed();
-            applyProgramSnapshot(snapshot);
-            applyFramebufferSnapshot(snapshot);
-            applyFixedFunctionSnapshot(snapshot);
-            VulkanicGalV2.ResourceSet resourceSet = VulkanicGalV2.requireResourceSet(request.resourceSet());
-            applyResourceBindingsSnapshot(ctx, snapshot, resourceSet, request.resourceSet().equals(objects.resourceSet()));
-            applyVertexInputV2(request, objects);
-            applyUniformSnapshot(request.programUniforms(), request.programVersion());
-
+            String family = request.semanticIdentity().label();
             VulkanicGalExecutionRequest.GraphicsDrawCommand command = request.command();
-            switch (command.kind()) {
-                case ARRAYS -> {
-                    VulkanicAPI.traceShaderInputParityDraw(
-                        "opengl-gal-v2-" + request.semanticIdentity().phase(),
-                        false,
-                        command.mode().toGlModeConstant(),
-                        command.firstVertex(),
-                        command.vertexCount(),
-                        0L,
-                        0,
-                        0,
-                        command.instanceCount(),
-                        0
-                    );
-                    if (command.instanceCount() == 1) {
-                        GL11.glDrawArrays(command.mode().toGlModeConstant(), command.firstVertex(), command.vertexCount());
-                    } else {
-                        GL31.glDrawArraysInstanced(
-                            command.mode().toGlModeConstant(),
-                            command.firstVertex(),
-                            command.vertexCount(),
-                            command.instanceCount()
-                        );
+            VulkanPerfAudit.recordOpenGlGalV2RequestedDraw(
+                family,
+                command.kind().name(),
+                command.kind() == VulkanicGalExecutionRequest.DrawCommandKind.MULTI_INDEXED_BASE_VERTEX
+                    ? command.indexedDraws().size()
+                    : 1
+            );
+            VulkanicGalV2.ResourceSet resourceSet = VulkanicGalV2.requireResourceSet(request.resourceSet());
+            boolean vertexInputDirty = false;
+            boolean uniformPayloadDirty = false;
+            for (VulkanicGalV2.GraphicsCommand streamCommand : request.commandStream().commands()) {
+                switch (streamCommand.kind()) {
+                    case BIND_RENDER_TARGET -> applyRenderTargetStateV2(request, objects.renderTargetState());
+                    case BIND_GRAPHICS_PIPELINE -> applyProgramStateV2(request, objects.programState());
+                    case BIND_RESOURCE_SET -> {
+                        applyV2ResourceSetBindings(ctx, resourceSet);
+                        uniformPayloadDirty = true;
                     }
-                }
-                case INDEXED -> drawIndexedRequest(request.semanticIdentity().phase(), command);
-                case MULTI_INDEXED_BASE_VERTEX -> {
-                    for (VulkanicGalExecutionRequest.IndexedDraw draw : command.indexedDraws()) {
-                        drawIndexedRequest(
-                            request.semanticIdentity().phase(),
-                            VulkanicGalExecutionRequest.GraphicsDrawCommand.indexed(
-                                command.mode(),
-                                draw.indexCount(),
-                                command.indexType(),
-                                (long) draw.firstIndex() * command.indexType().bytesPerIndex(),
-                                1,
-                                draw.baseVertex()
-                            )
-                        );
+                    case BIND_VERTEX_STREAMS, BIND_INDEX_STREAM -> vertexInputDirty = true;
+                    case SET_DYNAMIC_STATE -> applyFixedFunctionStateV2(request, objects.pipelineState());
+                    case SET_DYNAMIC_OFFSETS, PUSH_CONSTANTS, BEGIN_RENDER_PASS, END_RENDER_PASS -> {
+                        // The current migrated slice has no backend-neutral dynamic offset or push-constant payloads.
+                    }
+                    case DRAW -> {
+                        if (vertexInputDirty) {
+                            applyVertexInputV2(request, objects);
+                            vertexInputDirty = false;
+                        }
+                        if (uniformPayloadDirty) {
+                            applyUniformPayloadV2(request.uniformPayload());
+                            uniformPayloadDirty = false;
+                        }
+                        executeGalV2DrawCommand(family, request.semanticIdentity().phase(), command);
                     }
                 }
             }
@@ -957,6 +1019,43 @@ public class OpenGLBackend implements GraphicsBackend {
             if (auditStartNanos != 0L) {
                 VulkanPerfAudit.recordPhase("backend.opengl.graphics.v2", System.nanoTime() - auditStartNanos);
             }
+        }
+    }
+
+    private void executeGalV2DrawCommand(
+        String family,
+        String phase,
+        VulkanicGalExecutionRequest.GraphicsDrawCommand command
+    ) {
+        switch (command.kind()) {
+            case ARRAYS -> {
+                VulkanicAPI.traceShaderInputParityDraw(
+                    "opengl-gal-v2-" + phase,
+                    false,
+                    command.mode().toGlModeConstant(),
+                    command.firstVertex(),
+                    command.vertexCount(),
+                    0L,
+                    0,
+                    0,
+                    command.instanceCount(),
+                    0
+                );
+                if (command.instanceCount() == 1) {
+                    VulkanPerfAudit.recordOpenGlGalV2EmittedDraw(family, "ARRAYS", 1);
+                    GL11.glDrawArrays(command.mode().toGlModeConstant(), command.firstVertex(), command.vertexCount());
+                } else {
+                    VulkanPerfAudit.recordOpenGlGalV2EmittedDraw(family, "ARRAYS_INSTANCED", 1);
+                    GL31.glDrawArraysInstanced(
+                        command.mode().toGlModeConstant(),
+                        command.firstVertex(),
+                        command.vertexCount(),
+                        command.instanceCount()
+                    );
+                }
+            }
+            case INDEXED -> drawIndexedRequest(phase, command);
+            case MULTI_INDEXED_BASE_VERTEX -> drawMultiIndexedBaseVertexRequest(family, phase, command);
         }
     }
 
@@ -975,16 +1074,21 @@ public class OpenGLBackend implements GraphicsBackend {
 
     private void applyProgramSnapshot(VulkanicCompatibilityState.GraphicsSnapshot snapshot) {
         if (appliedProgramVersion == snapshot.programVersion()) {
+            VulkanPerfAudit.recordOpenGlGalV2StateOperation(snapshot.semanticIdentity(), "program", false);
             return;
         }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(snapshot.semanticIdentity(), "program", true);
         GL20.glUseProgram(snapshot.programId());
         appliedProgramVersion = snapshot.programVersion();
+        appliedGalV2ProgramKey = "";
     }
 
     private void applyFramebufferSnapshot(VulkanicCompatibilityState.GraphicsSnapshot snapshot) {
         if (appliedFramebufferVersion == snapshot.framebufferVersion()) {
+            VulkanPerfAudit.recordOpenGlGalV2StateOperation(snapshot.semanticIdentity(), "framebuffer", false);
             return;
         }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(snapshot.semanticIdentity(), "framebuffer", true);
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, snapshot.drawFramebuffer());
         if (!snapshot.framebuffer().drawBuffers().isEmpty()) {
             int[] drawBuffers = snapshot.framebuffer().drawBuffers().stream()
@@ -997,6 +1101,7 @@ public class OpenGLBackend implements GraphicsBackend {
             }
         }
         appliedFramebufferVersion = snapshot.framebufferVersion();
+        appliedGalV2RenderTargetKey = "";
     }
 
     private static int normalizeDrawBufferForFramebuffer(int framebuffer, int drawBuffer) {
@@ -1008,55 +1113,232 @@ public class OpenGLBackend implements GraphicsBackend {
 
     private void applyFixedFunctionSnapshot(VulkanicCompatibilityState.GraphicsSnapshot snapshot) {
         if (appliedFixedFunctionVersion == snapshot.fixedFunctionVersion()) {
+            VulkanPerfAudit.recordOpenGlGalV2StateOperation(snapshot.semanticIdentity(), "fixed_function", false);
             return;
         }
-        VulkanicCompatibilityState.FixedFunctionSnapshot fixed = snapshot.fixedFunction();
-        fixed.viewport().ifPresent(viewport ->
-            GL11.glViewport(viewport.x(), viewport.y(), viewport.width(), viewport.height()));
-        if (fixed.scissorTestEnabled()) {
-            GL11.glEnable(GL11.GL_SCISSOR_TEST);
+        boolean emitted = applyFixedFunctionState(snapshot.semanticIdentity(), snapshot.fixedFunction());
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(snapshot.semanticIdentity(), "fixed_function", emitted);
+        appliedFixedFunctionVersion = snapshot.fixedFunctionVersion();
+        appliedGalV2FixedFunctionKey = "";
+    }
+
+    private void applyProgramStateV2(
+        VulkanicGalV2.ExplicitGraphicsDrawRequest request,
+        VulkanicGalV2.ProgramState program
+    ) {
+        if (program.semanticKey().equals(appliedGalV2ProgramKey)) {
+            VulkanPerfAudit.recordOpenGlGalV2StateOperation(request.semanticIdentity().label(), "program", false);
+            return;
+        }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(request.semanticIdentity().label(), "program", true);
+        GL20.glUseProgram(program.programId());
+        appliedGalV2ProgramKey = program.semanticKey();
+        appliedProgramVersion = Long.MIN_VALUE;
+    }
+
+    private void applyRenderTargetStateV2(
+        VulkanicGalV2.ExplicitGraphicsDrawRequest request,
+        VulkanicGalV2.RenderTargetState renderTarget
+    ) {
+        if (renderTarget.semanticKey().equals(appliedGalV2RenderTargetKey)) {
+            VulkanPerfAudit.recordOpenGlGalV2StateOperation(request.semanticIdentity().label(), "framebuffer", false);
+            return;
+        }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(request.semanticIdentity().label(), "framebuffer", true);
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, renderTarget.framebuffer());
+        if (!renderTarget.framebufferState().drawBuffers().isEmpty()) {
+            int[] drawBuffers = renderTarget.framebufferState().drawBuffers().stream()
+                .mapToInt(buffer -> normalizeDrawBufferForFramebuffer(renderTarget.framebuffer(), buffer))
+                .toArray();
+            if (drawBuffers.length == 1) {
+                GL11.glDrawBuffer(drawBuffers[0]);
+            } else {
+                GL20.glDrawBuffers(drawBuffers);
+            }
+        }
+        appliedGalV2RenderTargetKey = renderTarget.semanticKey();
+        appliedFramebufferVersion = Long.MIN_VALUE;
+    }
+
+    private void applyFixedFunctionStateV2(
+        VulkanicGalV2.ExplicitGraphicsDrawRequest request,
+        VulkanicGalV2.PipelineState pipeline
+    ) {
+        if (pipeline.fixedFunctionKey().equals(appliedGalV2FixedFunctionKey)) {
+            VulkanPerfAudit.recordOpenGlGalV2StateOperation(request.semanticIdentity().label(), "fixed_function", false);
+            return;
+        }
+        boolean emitted = applyFixedFunctionState(request.semanticIdentity().label(), pipeline.fixedFunction());
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(request.semanticIdentity().label(), "fixed_function", emitted);
+        appliedGalV2FixedFunctionKey = pipeline.fixedFunctionKey();
+        appliedFixedFunctionVersion = Long.MIN_VALUE;
+    }
+
+    private boolean applyFixedFunctionState(String semanticIdentity, VulkanicCompatibilityState.FixedFunctionSnapshot fixed) {
+        VulkanicCompatibilityState.FixedFunctionSnapshot previous = appliedFixedFunctionState;
+        boolean emitted = false;
+
+        boolean viewportChanged = previous == null || !previous.viewport().equals(fixed.viewport());
+        if (viewportChanged) {
+            fixed.viewport().ifPresent(viewport ->
+                GL11.glViewport(viewport.x(), viewport.y(), viewport.width(), viewport.height()));
+            emitted |= fixed.viewport().isPresent();
+        }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(semanticIdentity, "fixed_function.viewport", viewportChanged && fixed.viewport().isPresent());
+
+        boolean scissorEnableChanged = previous == null || previous.scissorTestEnabled() != fixed.scissorTestEnabled();
+        if (scissorEnableChanged) {
+            setGlCapability(GL11.GL_SCISSOR_TEST, fixed.scissorTestEnabled());
+            emitted = true;
+        }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(semanticIdentity, "fixed_function.scissor_enable", scissorEnableChanged);
+        boolean scissorBoxChanged = previous == null || !previous.scissor().equals(fixed.scissor()) || scissorEnableChanged;
+        if (fixed.scissorTestEnabled() && scissorBoxChanged) {
             fixed.scissor().ifPresent(scissor ->
                 GL11.glScissor(scissor.x(), scissor.y(), scissor.width(), scissor.height()));
-        } else {
-            GL11.glDisable(GL11.GL_SCISSOR_TEST);
+            emitted |= fixed.scissor().isPresent();
         }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(semanticIdentity, "fixed_function.scissor_box", fixed.scissorTestEnabled() && scissorBoxChanged && fixed.scissor().isPresent());
 
-        setGlCapability(GL11.GL_BLEND, fixed.blendEnabled());
-        GL14.glBlendFuncSeparate(
-            fixed.blendSrcRgb(),
-            fixed.blendDstRgb(),
-            fixed.blendSrcAlpha(),
-            fixed.blendDstAlpha()
-        );
-        GL20.glBlendEquationSeparate(fixed.blendEquationRgb(), fixed.blendEquationAlpha());
+        boolean blendEnableChanged = previous == null || previous.blendEnabled() != fixed.blendEnabled();
+        if (blendEnableChanged) {
+            setGlCapability(GL11.GL_BLEND, fixed.blendEnabled());
+            emitted = true;
+        }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(semanticIdentity, "fixed_function.blend_enable", blendEnableChanged);
+        boolean blendFuncChanged = previous == null
+            || previous.blendSrcRgb() != fixed.blendSrcRgb()
+            || previous.blendDstRgb() != fixed.blendDstRgb()
+            || previous.blendSrcAlpha() != fixed.blendSrcAlpha()
+            || previous.blendDstAlpha() != fixed.blendDstAlpha();
+        if (blendFuncChanged) {
+            GL14.glBlendFuncSeparate(
+                fixed.blendSrcRgb(),
+                fixed.blendDstRgb(),
+                fixed.blendSrcAlpha(),
+                fixed.blendDstAlpha()
+            );
+            emitted = true;
+        }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(semanticIdentity, "fixed_function.blend_func", blendFuncChanged);
+        boolean blendEquationChanged = previous == null
+            || previous.blendEquationRgb() != fixed.blendEquationRgb()
+            || previous.blendEquationAlpha() != fixed.blendEquationAlpha();
+        if (blendEquationChanged) {
+            GL20.glBlendEquationSeparate(fixed.blendEquationRgb(), fixed.blendEquationAlpha());
+            emitted = true;
+        }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(semanticIdentity, "fixed_function.blend_equation", blendEquationChanged);
 
-        setGlCapability(GL11.GL_DEPTH_TEST, fixed.depthTestEnabled());
-        GL11.glDepthFunc(fixed.depthFunc());
-        GL11.glDepthMask(fixed.depthWriteMask());
+        boolean depthEnableChanged = previous == null || previous.depthTestEnabled() != fixed.depthTestEnabled();
+        if (depthEnableChanged) {
+            setGlCapability(GL11.GL_DEPTH_TEST, fixed.depthTestEnabled());
+            emitted = true;
+        }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(semanticIdentity, "fixed_function.depth_enable", depthEnableChanged);
+        boolean depthFuncChanged = previous == null || previous.depthFunc() != fixed.depthFunc();
+        if (depthFuncChanged) {
+            GL11.glDepthFunc(fixed.depthFunc());
+            emitted = true;
+        }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(semanticIdentity, "fixed_function.depth_func", depthFuncChanged);
+        boolean depthMaskChanged = previous == null || previous.depthWriteMask() != fixed.depthWriteMask();
+        if (depthMaskChanged) {
+            GL11.glDepthMask(fixed.depthWriteMask());
+            emitted = true;
+        }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(semanticIdentity, "fixed_function.depth_mask", depthMaskChanged);
 
-        setGlCapability(GL11.GL_CULL_FACE, fixed.cullEnabled());
-        GL11.glCullFace(fixed.cullFaceMode());
+        boolean cullEnableChanged = previous == null || previous.cullEnabled() != fixed.cullEnabled();
+        if (cullEnableChanged) {
+            setGlCapability(GL11.GL_CULL_FACE, fixed.cullEnabled());
+            emitted = true;
+        }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(semanticIdentity, "fixed_function.cull_enable", cullEnableChanged);
+        boolean cullFaceChanged = previous == null || previous.cullFaceMode() != fixed.cullFaceMode();
+        if (cullFaceChanged) {
+            GL11.glCullFace(fixed.cullFaceMode());
+            emitted = true;
+        }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(semanticIdentity, "fixed_function.cull_face", cullFaceChanged);
 
-        setGlCapability(GL11.GL_STENCIL_TEST, fixed.stencilTestEnabled());
-        fixed.stencilFuncs().values().forEach(func ->
-            GL20.glStencilFuncSeparate(func.face(), func.func(), func.ref(), func.mask()));
-        fixed.stencilOps().values().forEach(op ->
-            GL20.glStencilOpSeparate(op.face(), op.sfail(), op.dpfail(), op.dppass()));
-        fixed.stencilWriteMasks().forEach(GL20::glStencilMaskSeparate);
+        boolean stencilEnableChanged = previous == null || previous.stencilTestEnabled() != fixed.stencilTestEnabled();
+        if (stencilEnableChanged) {
+            setGlCapability(GL11.GL_STENCIL_TEST, fixed.stencilTestEnabled());
+            emitted = true;
+        }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(semanticIdentity, "fixed_function.stencil_enable", stencilEnableChanged);
+        boolean stencilFuncChanged = previous == null || !previous.stencilFuncs().equals(fixed.stencilFuncs());
+        if (stencilFuncChanged) {
+            fixed.stencilFuncs().values().forEach(func ->
+                GL20.glStencilFuncSeparate(func.face(), func.func(), func.ref(), func.mask()));
+            emitted |= !fixed.stencilFuncs().isEmpty();
+        }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(semanticIdentity, "fixed_function.stencil_func", stencilFuncChanged && !fixed.stencilFuncs().isEmpty());
+        boolean stencilOpChanged = previous == null || !previous.stencilOps().equals(fixed.stencilOps());
+        if (stencilOpChanged) {
+            fixed.stencilOps().values().forEach(op ->
+                GL20.glStencilOpSeparate(op.face(), op.sfail(), op.dpfail(), op.dppass()));
+            emitted |= !fixed.stencilOps().isEmpty();
+        }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(semanticIdentity, "fixed_function.stencil_op", stencilOpChanged && !fixed.stencilOps().isEmpty());
+        boolean stencilMaskChanged = previous == null || !previous.stencilWriteMasks().equals(fixed.stencilWriteMasks());
+        if (stencilMaskChanged) {
+            fixed.stencilWriteMasks().forEach(GL20::glStencilMaskSeparate);
+            emitted |= !fixed.stencilWriteMasks().isEmpty();
+        }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(semanticIdentity, "fixed_function.stencil_mask", stencilMaskChanged && !fixed.stencilWriteMasks().isEmpty());
 
-        setGlCapability(GL11.GL_COLOR_LOGIC_OP, fixed.logicOpEnabled());
-        if (fixed.logicOpEnabled()) {
+        boolean logicEnableChanged = previous == null || previous.logicOpEnabled() != fixed.logicOpEnabled();
+        if (logicEnableChanged) {
+            setGlCapability(GL11.GL_COLOR_LOGIC_OP, fixed.logicOpEnabled());
+            emitted = true;
+        }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(semanticIdentity, "fixed_function.logic_enable", logicEnableChanged);
+        boolean logicOpChanged = previous == null || previous.logicOp() != fixed.logicOp() || logicEnableChanged;
+        if (fixed.logicOpEnabled() && logicOpChanged) {
             GL11.glLogicOp(fixed.logicOp());
+            emitted = true;
         }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(semanticIdentity, "fixed_function.logic_op", fixed.logicOpEnabled() && logicOpChanged);
 
-        GL11.glPolygonMode(fixed.polygonFace(), fixed.polygonMode());
-        setGlCapability(GL11.GL_POLYGON_OFFSET_FILL, fixed.polygonOffsetEnabled());
-        if (fixed.polygonOffsetEnabled()) {
+        boolean polygonModeChanged = previous == null
+            || previous.polygonFace() != fixed.polygonFace()
+            || previous.polygonMode() != fixed.polygonMode();
+        if (polygonModeChanged) {
+            GL11.glPolygonMode(fixed.polygonFace(), fixed.polygonMode());
+            emitted = true;
+        }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(semanticIdentity, "fixed_function.polygon_mode", polygonModeChanged);
+        boolean polygonOffsetEnableChanged = previous == null || previous.polygonOffsetEnabled() != fixed.polygonOffsetEnabled();
+        if (polygonOffsetEnableChanged) {
+            setGlCapability(GL11.GL_POLYGON_OFFSET_FILL, fixed.polygonOffsetEnabled());
+            emitted = true;
+        }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(semanticIdentity, "fixed_function.polygon_offset_enable", polygonOffsetEnableChanged);
+        boolean polygonOffsetChanged = previous == null
+            || Float.compare(previous.polygonOffsetFactor(), fixed.polygonOffsetFactor()) != 0
+            || Float.compare(previous.polygonOffsetUnits(), fixed.polygonOffsetUnits()) != 0
+            || polygonOffsetEnableChanged;
+        if (fixed.polygonOffsetEnabled() && polygonOffsetChanged) {
             GL11.glPolygonOffset(fixed.polygonOffsetFactor(), fixed.polygonOffsetUnits());
+            emitted = true;
         }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(semanticIdentity, "fixed_function.polygon_offset", fixed.polygonOffsetEnabled() && polygonOffsetChanged);
 
-        GL11.glColorMask(fixed.colorMaskR(), fixed.colorMaskG(), fixed.colorMaskB(), fixed.colorMaskA());
-        appliedFixedFunctionVersion = snapshot.fixedFunctionVersion();
+        boolean colorMaskChanged = previous == null
+            || previous.colorMaskR() != fixed.colorMaskR()
+            || previous.colorMaskG() != fixed.colorMaskG()
+            || previous.colorMaskB() != fixed.colorMaskB()
+            || previous.colorMaskA() != fixed.colorMaskA();
+        if (colorMaskChanged) {
+            GL11.glColorMask(fixed.colorMaskR(), fixed.colorMaskG(), fixed.colorMaskB(), fixed.colorMaskA());
+            emitted = true;
+        }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(semanticIdentity, "fixed_function.color_mask", colorMaskChanged);
+
+        appliedFixedFunctionState = fixed;
+        return emitted;
     }
 
     private static void setGlCapability(int capability, boolean enabled) {
@@ -1089,6 +1371,7 @@ public class OpenGLBackend implements GraphicsBackend {
         boolean replayLegacyMissingBindings
     ) {
         if (resourceSet == null && appliedResourceBindingVersion == snapshot.resourceBindingVersion()) {
+            VulkanPerfAudit.recordOpenGlGalV2StateOperation(snapshot.semanticIdentity(), "legacy_resources", false);
             return;
         }
         AppliedV2ResourceBindings appliedV2 = resourceSet == null
@@ -1169,12 +1452,19 @@ public class OpenGLBackend implements GraphicsBackend {
             }
         }
         appliedResourceBindingVersion = snapshot.resourceBindingVersion();
+        appliedGalV2ResourceSetKey = "";
+        appliedGalV2ResourceCoverage = AppliedV2ResourceBindings.empty();
     }
 
     private AppliedV2ResourceBindings applyV2ResourceSetBindings(
         CommandContext ctx,
         VulkanicGalV2.ResourceSet resourceSet
     ) {
+        if (resourceSet.semanticKey().equals(appliedGalV2ResourceSetKey)) {
+            VulkanPerfAudit.recordOpenGlGalV2StateOperation("opengl-gal-v2-resource-set", "resource_set", false);
+            return appliedGalV2ResourceCoverage;
+        }
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation("opengl-gal-v2-resource-set", "resource_set", true);
         java.util.Set<Integer> sampledTextureUnits = new java.util.HashSet<>();
         java.util.Set<Integer> imageUnits = new java.util.HashSet<>();
         java.util.Set<VulkanicCompatibilityState.IndexedBufferKey> bufferBindings = new java.util.HashSet<>();
@@ -1259,11 +1549,14 @@ public class OpenGLBackend implements GraphicsBackend {
         } finally {
             restoreActiveTextureUnit(previousActiveTextureUnit);
         }
-        return new AppliedV2ResourceBindings(
+        AppliedV2ResourceBindings applied = new AppliedV2ResourceBindings(
             java.util.Set.copyOf(sampledTextureUnits),
             java.util.Set.copyOf(imageUnits),
             java.util.Set.copyOf(bufferBindings)
         );
+        appliedGalV2ResourceSetKey = resourceSet.semanticKey();
+        appliedGalV2ResourceCoverage = applied;
+        return applied;
     }
 
     private record AppliedV2ResourceBindings(
@@ -1327,37 +1620,178 @@ public class OpenGLBackend implements GraphicsBackend {
             GL33.glVertexAttribDivisor(attribute.index(), attribute.divisor());
         }
         appliedVertexInputVersion = snapshot.vertexInputVersion();
+        appliedGalV2VertexInputKey = "";
+        appliedGalV2VertexLayoutKey = "";
+        appliedGalV2VertexArrayHandle = null;
+        appliedGalV2IndexStream.clear();
+        appliedGalV2VertexStreams.clear();
     }
 
     private void applyVertexInputV2(
         VulkanicGalV2.ExplicitGraphicsDrawRequest request,
         VulkanicGalV2.ExplicitGraphicsObjects objects
     ) {
-        String key = objects.vertexLayoutHandle().semanticKey() + "|" + request.vertexStreams();
-        if (key.equals(appliedGalV2VertexInputKey)) {
-            return;
-        }
+        String layoutKey = objects.vertexLayoutHandle().semanticKey();
+        discardPendingCompatibilityVertexArrayForGalV2Draw();
         int vao = galV2VertexArrays.computeIfAbsent(objects.vertexLayoutHandle(), ignored -> GL30.glGenVertexArrays());
-        GL30.glBindVertexArray(vao);
-        if (request.vertexStreams().indexStream().isPresent()) {
-            GL15.glBindBuffer(
-                GL15.GL_ELEMENT_ARRAY_BUFFER,
-                Math.max(0, request.vertexStreams().indexStream().orElseThrow().buffer())
-            );
-        } else {
-            GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, 0);
+        boolean emitted = false;
+        boolean vertexArrayChanged = !objects.vertexLayoutHandle().equals(appliedGalV2VertexArrayHandle);
+        GalV2VertexArrayBindingState vaoBindingState =
+            galV2VertexArrayBindingStates.computeIfAbsent(objects.vertexLayoutHandle(), ignored -> new GalV2VertexArrayBindingState());
+        if (vertexArrayChanged) {
+            GL30.glBindVertexArray(vao);
+            appliedGalV2VertexArrayHandle = objects.vertexLayoutHandle();
+            appliedGalV2IndexStream.copyFrom(vaoBindingState.indexStream);
+            appliedGalV2VertexStreams.clear();
+            vaoBindingState.vertexStreams.forEach((binding, state) ->
+                appliedGalV2VertexStreams.put(binding, state.copy()));
+            emitted = true;
+        }
+        boolean layoutChanged = !layoutKey.equals(appliedGalV2VertexLayoutKey);
+        if (configuredGalV2VertexLayouts.add(objects.vertexLayoutHandle())) {
+            configureGalV2VertexLayout(objects.vertexLayout());
+            layoutChanged = true;
+            emitted = true;
+        }
+        if (layoutChanged) {
+            applyGalV2DisabledAttributeDefaults(objects.vertexLayout());
+            appliedGalV2VertexLayoutKey = layoutKey;
+            emitted = true;
         }
 
-        java.util.Map<Integer, VulkanicGalV2.VertexStream> streamsByBinding = new java.util.HashMap<>();
-        for (VulkanicGalV2.VertexStream stream : request.vertexStreams().vertexStreams()) {
-            streamsByBinding.put(stream.binding(), stream);
+        int indexBuffer = 0;
+        VulkanicIndexType indexType = null;
+        if (request.vertexStreams().indexStream().isPresent()) {
+            VulkanicGalV2.IndexStream stream = request.vertexStreams().indexStream().orElseThrow();
+            indexBuffer = Math.max(0, stream.buffer());
+            indexType = stream.type();
         }
-        java.util.Map<Integer, VulkanicGalV2.VertexBindingLayout> layoutsByBinding = new java.util.HashMap<>();
+        if (!appliedGalV2IndexStream.matches(indexBuffer, indexType)) {
+            GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+            appliedGalV2IndexStream.set(indexBuffer, indexType);
+            vaoBindingState.indexStream.set(indexBuffer, indexType);
+            emitted = true;
+        }
+
         for (VulkanicGalV2.VertexBindingLayout binding : objects.vertexLayout().bindings()) {
-            layoutsByBinding.put(binding.binding(), binding);
+            VulkanicGalV2.VertexStream stream = vertexStreamForBinding(request.vertexStreams(), binding.binding());
+            int buffer = stream == null || stream.defaultAttributeBuffer() ? 0 : Math.max(0, stream.buffer());
+            long offset = stream == null ? 0L : Math.max(0L, stream.baseOffset());
+            GalV2VertexStreamBindingState appliedStream = appliedGalV2VertexStreams.get(binding.binding());
+            if (appliedStream == null || !appliedStream.matches(buffer, offset, binding.stride())) {
+                GL43C.glBindVertexBuffer(binding.binding(), buffer, offset, binding.stride());
+                appliedGalV2VertexStreams
+                    .computeIfAbsent(binding.binding(), ignored -> new GalV2VertexStreamBindingState())
+                    .set(buffer, offset, binding.stride());
+                vaoBindingState.vertexStreams
+                    .computeIfAbsent(binding.binding(), ignored -> new GalV2VertexStreamBindingState())
+                    .set(buffer, offset, binding.stride());
+                emitted = true;
+            }
         }
-        java.util.Set<Integer> enabledNow = new java.util.HashSet<>();
-        for (java.util.Map.Entry<Integer, float[]> entry : objects.vertexLayout().disabledAttributeDefaults().entrySet()) {
+        VulkanPerfAudit.recordOpenGlGalV2StateOperation(request.semanticIdentity().label(), "vertex_input", emitted);
+        appliedGalV2VertexInputKey = layoutKey;
+        appliedVertexInputVersion = Long.MIN_VALUE;
+    }
+
+    @Nullable
+    private static VulkanicGalV2.VertexStream vertexStreamForBinding(
+        VulkanicGalV2.VertexStreamBindings streams,
+        int binding
+    ) {
+        for (VulkanicGalV2.VertexStream stream : streams.vertexStreams()) {
+            if (stream.binding() == binding) {
+                return stream;
+            }
+        }
+        return null;
+    }
+
+    private static final class GalV2VertexArrayBindingState {
+        private final GalV2IndexStreamBindingState indexStream = new GalV2IndexStreamBindingState();
+        private final java.util.Map<Integer, GalV2VertexStreamBindingState> vertexStreams = new java.util.HashMap<>();
+    }
+
+    private static final class GalV2IndexStreamBindingState {
+        private int buffer = Integer.MIN_VALUE;
+        private VulkanicIndexType type;
+
+        private boolean matches(int buffer, @Nullable VulkanicIndexType type) {
+            return this.buffer == buffer && this.type == type;
+        }
+
+        private void set(int buffer, @Nullable VulkanicIndexType type) {
+            this.buffer = buffer;
+            this.type = type;
+        }
+
+        private void copyFrom(GalV2IndexStreamBindingState other) {
+            this.buffer = other.buffer;
+            this.type = other.type;
+        }
+
+        private void clear() {
+            this.buffer = Integer.MIN_VALUE;
+            this.type = null;
+        }
+    }
+
+    private static final class GalV2VertexStreamBindingState {
+        private int buffer = Integer.MIN_VALUE;
+        private long offset = Long.MIN_VALUE;
+        private int stride = Integer.MIN_VALUE;
+
+        private boolean matches(int buffer, long offset, int stride) {
+            return this.buffer == buffer && this.offset == offset && this.stride == stride;
+        }
+
+        private void set(int buffer, long offset, int stride) {
+            this.buffer = buffer;
+            this.offset = offset;
+            this.stride = stride;
+        }
+
+        private GalV2VertexStreamBindingState copy() {
+            GalV2VertexStreamBindingState copy = new GalV2VertexStreamBindingState();
+            copy.set(buffer, offset, stride);
+            return copy;
+        }
+    }
+
+    private static void configureGalV2VertexLayout(VulkanicGalV2.VertexLayout layout) {
+        java.util.Map<Integer, VulkanicGalV2.VertexBindingLayout> layoutsByBinding = new java.util.HashMap<>();
+        for (VulkanicGalV2.VertexBindingLayout binding : layout.bindings()) {
+            layoutsByBinding.put(binding.binding(), binding);
+            GL43C.glVertexBindingDivisor(binding.binding(), binding.divisor());
+        }
+        for (VulkanicGalV2.VertexAttributeLayout attribute : layout.attributes()) {
+            if (attribute.integer()) {
+                GL43C.glVertexAttribIFormat(
+                    attribute.location(),
+                    attribute.size(),
+                    attribute.type(),
+                    attribute.relativeOffset()
+                );
+            } else {
+                GL43C.glVertexAttribFormat(
+                    attribute.location(),
+                    attribute.size(),
+                    attribute.type(),
+                    attribute.normalized(),
+                    attribute.relativeOffset()
+                );
+            }
+            GL43C.glVertexAttribBinding(attribute.location(), attribute.binding());
+            GL20.glEnableVertexAttribArray(attribute.location());
+            VulkanicGalV2.VertexBindingLayout binding = layoutsByBinding.get(attribute.binding());
+            if (binding != null && binding.divisor() != attribute.divisor()) {
+                GL43C.glVertexBindingDivisor(attribute.binding(), Math.max(binding.divisor(), attribute.divisor()));
+            }
+        }
+    }
+
+    private static void applyGalV2DisabledAttributeDefaults(VulkanicGalV2.VertexLayout layout) {
+        for (java.util.Map.Entry<Integer, float[]> entry : layout.disabledAttributeDefaults().entrySet()) {
             float[] values = entry.getValue();
             GL20.glVertexAttrib4f(
                 entry.getKey(),
@@ -1367,46 +1801,6 @@ public class OpenGLBackend implements GraphicsBackend {
                 values.length > 3 ? values[3] : 1.0f
             );
         }
-        for (VulkanicGalV2.VertexAttributeLayout attribute : objects.vertexLayout().attributes()) {
-            VulkanicGalV2.VertexStream stream = streamsByBinding.get(attribute.binding());
-            VulkanicGalV2.VertexBindingLayout binding = layoutsByBinding.get(attribute.binding());
-            if (stream == null || stream.defaultAttributeBuffer() || stream.buffer() <= 0) {
-                GL20.glDisableVertexAttribArray(attribute.location());
-                continue;
-            }
-            GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, Math.max(0, stream.buffer()));
-            long pointer = Math.max(0L, stream.baseOffset()) + Math.max(0, attribute.relativeOffset());
-            if (attribute.integer()) {
-                GL30.glVertexAttribIPointer(
-                    attribute.location(),
-                    attribute.size(),
-                    attribute.type(),
-                    binding == null ? 0 : binding.stride(),
-                    pointer
-                );
-            } else {
-                GL20.glVertexAttribPointer(
-                    attribute.location(),
-                    attribute.size(),
-                    attribute.type(),
-                    attribute.normalized(),
-                    binding == null ? 0 : binding.stride(),
-                    pointer
-                );
-            }
-            GL20.glEnableVertexAttribArray(attribute.location());
-            GL33.glVertexAttribDivisor(attribute.location(), attribute.divisor());
-            enabledNow.add(attribute.location());
-        }
-        for (Integer previous : appliedGalV2Attributes) {
-            if (!enabledNow.contains(previous)) {
-                GL20.glDisableVertexAttribArray(previous);
-            }
-        }
-        appliedGalV2Attributes.clear();
-        appliedGalV2Attributes.addAll(enabledNow);
-        appliedGalV2VertexInputKey = key;
-        appliedVertexInputVersion = Long.MIN_VALUE;
     }
 
     private void applyUniformSnapshot(VulkanicCompatibilityState.GraphicsSnapshot snapshot) {
@@ -1437,6 +1831,35 @@ public class OpenGLBackend implements GraphicsBackend {
             }
         }
         appliedUniformVersion = programVersion;
+        appliedGalV2UniformPayloadKey = "";
+    }
+
+    private void applyUniformPayloadV2(VulkanicGalV2.UniformPayload payload) {
+        if (payload.semanticKey().equals(appliedGalV2UniformPayloadKey)) {
+            return;
+        }
+        if (payload.programId() <= 0) {
+            return;
+        }
+        for (java.util.Map.Entry<Integer, VulkanicCompatibilityState.UniformValue> entry
+            : payload.uniformsByLocation().entrySet()) {
+            int location = entry.getKey();
+            if (location < 0) {
+                continue;
+            }
+            VulkanicCompatibilityState.UniformValue value = entry.getValue();
+            int[] ints = value.ints();
+            float[] floats = value.floats();
+            if (value.columns() > 1 && value.rows() > 1) {
+                applyMatrixUniform(location, value);
+            } else if (ints.length > 0) {
+                applyIntegerUniform(location, ints);
+            } else {
+                applyFloatUniform(location, floats);
+            }
+        }
+        appliedGalV2UniformPayloadKey = payload.semanticKey();
+        appliedUniformVersion = Long.MIN_VALUE;
     }
 
     private static void applyIntegerUniform(int location, int[] values) {
@@ -1520,6 +1943,7 @@ public class OpenGLBackend implements GraphicsBackend {
             command.instanceCount(),
             command.baseVertex()
         );
+        VulkanPerfAudit.recordOpenGlGalV2EmittedDraw(phase, "INDEXED", 1);
         if (command.instanceCount() == 1 && command.baseVertex() == 0) {
             GL11.glDrawElements(
                 command.mode().toGlModeConstant(),
@@ -1543,6 +1967,52 @@ public class OpenGLBackend implements GraphicsBackend {
                 command.indexByteOffset(),
                 command.instanceCount(),
                 command.baseVertex()
+            );
+        }
+    }
+
+    private void drawMultiIndexedBaseVertexRequest(
+        String family,
+        String phase,
+        VulkanicGalExecutionRequest.GraphicsDrawCommand command
+    ) {
+        java.util.List<VulkanicGalExecutionRequest.IndexedDraw> draws = command.indexedDraws();
+        if (draws.isEmpty()) {
+            VulkanPerfAudit.recordOpenGlGalV2EmittedDraw(family, "MULTI_INDEXED_BASE_VERTEX_EMPTY", 0);
+            return;
+        }
+        VulkanicAPI.traceShaderInputParityDraw(
+            "opengl-gal-v2-" + phase,
+            true,
+            command.mode().toGlModeConstant(),
+            0,
+            draws.stream().mapToInt(VulkanicGalExecutionRequest.IndexedDraw::indexCount).sum(),
+            (long) draws.get(0).firstIndex() * command.indexType().bytesPerIndex(),
+            draws.get(0).baseVertex(),
+            0,
+            1,
+            0
+        );
+        try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+            java.nio.IntBuffer counts = stack.mallocInt(draws.size());
+            org.lwjgl.PointerBuffer indices = stack.mallocPointer(draws.size());
+            java.nio.IntBuffer baseVertices = stack.mallocInt(draws.size());
+            for (VulkanicGalExecutionRequest.IndexedDraw draw : draws) {
+                counts.put(draw.indexCount());
+                indices.put((long) draw.firstIndex() * command.indexType().bytesPerIndex());
+                baseVertices.put(draw.baseVertex());
+            }
+            counts.flip();
+            indices.flip();
+            baseVertices.flip();
+            VulkanPerfAudit.recordOpenGlGalV2EmittedDraw(family, "MULTI_INDEXED_BASE_VERTEX", 1);
+            GL32C.nglMultiDrawElementsBaseVertex(
+                command.mode().toGlModeConstant(),
+                org.lwjgl.system.MemoryUtil.memAddress(counts),
+                command.indexType().toGlTypeConstant(),
+                org.lwjgl.system.MemoryUtil.memAddress(indices),
+                draws.size(),
+                org.lwjgl.system.MemoryUtil.memAddress(baseVertices)
             );
         }
     }
@@ -1647,6 +2117,9 @@ public class OpenGLBackend implements GraphicsBackend {
     public int getInteger(CommandContext ctx, int pname) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        if (pname == VulkanicAPI.GL_VERTEX_ARRAY_BINDING) {
+            materializePendingCompatibilityVertexArray();
         }
         return GL11.glGetInteger(pname);
     }
@@ -1809,6 +2282,9 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL15.glDeleteBuffers(buffer);
+        galV2VertexArrayBindingStates.clear();
+        appliedGalV2IndexStream.clear();
+        appliedGalV2VertexStreams.clear();
     }
     
     @Override
@@ -1900,7 +2376,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
-        GL30.glBindVertexArray(vao);
+        pendingCompatibilityVertexArray = vao;
     }
     
     
@@ -2272,6 +2748,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        materializePendingCompatibilityVertexArray();
         GL20.glVertexAttribPointer(index, size, type, normalized, stride, pointer);
     }
     
@@ -2280,6 +2757,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        materializePendingCompatibilityVertexArray();
         GL20.glEnableVertexAttribArray(index);
     }
     
@@ -2288,6 +2766,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        materializePendingCompatibilityVertexArray();
         GL43.glBindVertexBuffer(bindingindex, buffer, offset, stride);
     }
     
@@ -2297,6 +2776,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        materializePendingCompatibilityVertexArray();
         org.lwjgl.opengl.GL30.glVertexAttribIPointer(index, size, type, stride, pointer);
     }
     
@@ -2307,6 +2787,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        materializePendingCompatibilityVertexArray();
         GL20.glDisableVertexAttribArray(index);
     }
     
@@ -2316,6 +2797,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        materializePendingCompatibilityVertexArray();
         org.lwjgl.opengl.GL33.glVertexAttribDivisor(index, divisor);
     }
     
@@ -2586,6 +3068,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        materializePendingCompatibilityVertexArray();
         VulkanicAPI.traceShaderInputParityDraw("opengl-drawIndexedInstancedBaseVertex", true, mode, 0, 0, indices, count, type, instanceCount, baseVertex);
         org.lwjgl.opengl.GL32.glDrawElementsInstancedBaseVertex(mode, count, type, indices, instanceCount, baseVertex);
     }
@@ -2594,6 +3077,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        materializePendingCompatibilityVertexArray();
         VulkanicAPI.traceShaderInputParityDraw("opengl-drawIndexedBaseVertex", true, mode, 0, 0, indices, count, type, 1, baseVertex);
         org.lwjgl.opengl.GL32.glDrawElementsBaseVertex(mode, count, type, indices, baseVertex);
     }
@@ -2602,6 +3086,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        materializePendingCompatibilityVertexArray();
         VulkanicAPI.traceShaderInputParityDraw("opengl-drawIndexedInstanced", true, mode, 0, 0, indices, count, type, instanceCount, 0);
         org.lwjgl.opengl.GL31.glDrawElementsInstanced(mode, count, type, indices, instanceCount);
     }
@@ -2610,6 +3095,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        materializePendingCompatibilityVertexArray();
         VulkanicAPI.traceShaderInputParityDraw("opengl-drawArraysInstanced", false, mode, first, count, 0L, 0, 0, instanceCount, 0);
         org.lwjgl.opengl.GL31.glDrawArraysInstanced(mode, first, count, instanceCount);
     }
@@ -2754,10 +3240,15 @@ public class OpenGLBackend implements GraphicsBackend {
     public void deleteVertexArrays(CommandContext ctx, int vertexArray) {
         if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         org.lwjgl.opengl.GL30C.glDeleteVertexArrays(vertexArray);
+        if (pendingCompatibilityVertexArray == vertexArray) {
+            pendingCompatibilityVertexArray = NO_PENDING_COMPATIBILITY_VERTEX_ARRAY;
+        }
+        invalidateAppliedGalV2VertexArraySelection();
     }
     
     private void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
         if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        materializePendingCompatibilityVertexArray();
         for (int drawIndex = 0; drawIndex < drawCount; drawIndex++) {
             int count = org.lwjgl.system.MemoryUtil.memGetInt(pCount + ((long) drawIndex * Integer.BYTES));
             if (count <= 0) {
@@ -3748,6 +4239,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        materializePendingCompatibilityVertexArray();
         org.lwjgl.opengl.GL43C.glVertexAttribFormat(attribindex, size, type, normalized, relativeoffset);
     }
     
@@ -3756,6 +4248,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        materializePendingCompatibilityVertexArray();
         org.lwjgl.opengl.GL43C.glVertexAttribIFormat(attribindex, size, type, relativeoffset);
     }
     
@@ -3764,6 +4257,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        materializePendingCompatibilityVertexArray();
         org.lwjgl.opengl.GL43C.glVertexAttribBinding(attribindex, bindingindex);
     }
     

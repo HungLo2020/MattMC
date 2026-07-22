@@ -7503,43 +7503,11 @@ void main() {
         try {
             Objects.requireNonNull(request, "request");
             consumeResourceUsagePlan(request.resourcePlan());
-            VulkanicGalExecutionRequest.GraphicsDrawCommand command = request.command();
-            switch (command.kind()) {
-                case ARRAYS -> {
-                    if (command.firstVertex() < 0 || command.vertexCount() < 0 || command.instanceCount() < 1) {
-                        throw new IllegalArgumentException("GAL v2 drawArrays requires first/count >= 0 and instanceCount >= 1");
-                    }
-                    if (command.vertexCount() > 0) {
-                        executeExplicitV2DrawPlan(
-                            ctx,
-                            VulkanDrawExecutionCoordinator.SemanticDrawRequest.arrays(
-                                request.semanticIdentity().label(),
-                                command.mode().toGlModeConstant(),
-                                command.firstVertex(),
-                                command.vertexCount(),
-                                command.instanceCount()
-                            ),
-                            request
-                        );
-                    }
+            for (VulkanicGalV2.GraphicsCommand streamCommand : request.commandStream().commands()) {
+                if (streamCommand.kind() != VulkanicGalV2.GraphicsCommandKind.DRAW) {
+                    continue;
                 }
-                case INDEXED -> executeExplicitV2IndexedDraw(ctx, command, request);
-                case MULTI_INDEXED_BASE_VERTEX -> {
-                    for (VulkanicGalExecutionRequest.IndexedDraw draw : command.indexedDraws()) {
-                        executeExplicitV2IndexedDraw(
-                            ctx,
-                            VulkanicGalExecutionRequest.GraphicsDrawCommand.indexed(
-                                command.mode(),
-                                draw.indexCount(),
-                                command.indexType(),
-                                (long) draw.firstIndex() * command.indexType().bytesPerIndex(),
-                                1,
-                                draw.baseVertex()
-                            ),
-                            request
-                        );
-                    }
-                }
+                executeExplicitV2DrawCommand(ctx, ((VulkanicGalV2.DrawCommand) streamCommand).command(), request);
             }
             return VulkanicGalExecutionRequest.success(request.semanticIdentity());
         } catch (RuntimeException exception) {
@@ -7547,6 +7515,50 @@ void main() {
         } finally {
             if (auditStartNanos != 0L) {
                 VulkanPerfAudit.recordPhase("backend.vulkan.graphics.v2", System.nanoTime() - auditStartNanos);
+            }
+        }
+    }
+
+    private void executeExplicitV2DrawCommand(
+        CommandContext ctx,
+        VulkanicGalExecutionRequest.GraphicsDrawCommand command,
+        VulkanicGalV2.ExplicitGraphicsDrawRequest request
+    ) {
+        switch (command.kind()) {
+            case ARRAYS -> {
+                if (command.firstVertex() < 0 || command.vertexCount() < 0 || command.instanceCount() < 1) {
+                    throw new IllegalArgumentException("GAL v2 drawArrays requires first/count >= 0 and instanceCount >= 1");
+                }
+                if (command.vertexCount() > 0) {
+                    executeExplicitV2DrawPlan(
+                        ctx,
+                        VulkanDrawExecutionCoordinator.SemanticDrawRequest.arrays(
+                            request.semanticIdentity().label(),
+                            command.mode().toGlModeConstant(),
+                            command.firstVertex(),
+                            command.vertexCount(),
+                            command.instanceCount()
+                        ),
+                        request
+                    );
+                }
+            }
+            case INDEXED -> executeExplicitV2IndexedDraw(ctx, command, request);
+            case MULTI_INDEXED_BASE_VERTEX -> {
+                for (VulkanicGalExecutionRequest.IndexedDraw draw : command.indexedDraws()) {
+                    executeExplicitV2IndexedDraw(
+                        ctx,
+                        VulkanicGalExecutionRequest.GraphicsDrawCommand.indexed(
+                            command.mode(),
+                            draw.indexCount(),
+                            command.indexType(),
+                            (long) draw.firstIndex() * command.indexType().bytesPerIndex(),
+                            1,
+                            draw.baseVertex()
+                        ),
+                        request
+                    );
+                }
             }
         }
     }
@@ -8096,7 +8108,6 @@ void main() {
     ) {
         VulkanicGalV2.ExplicitGraphicsObjects objects =
             VulkanicGalV2.requireGraphicsObjects(explicitRequest.graphicsObjects());
-        VulkanicCompatibilityState.GraphicsSnapshot sharedSnapshot = objects.immutableCompatibilitySeed();
         if (request.indexed()) {
             drawExecution.planIndexStream(request);
         }
@@ -8105,19 +8116,20 @@ void main() {
         if (spine == null) {
             throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
         }
-        String pipelineLocation = sharedSnapshot.programId() <= 0
+        VulkanicGalV2.ProgramState programState = objects.programState();
+        String pipelineLocation = programState.programId() <= 0
             ? request.source()
-            : "vulkanic:legacy_program/" + sharedSnapshot.programId();
+            : "vulkanic:legacy_program/" + programState.programId();
         long programStartNanos = VulkanPerfAudit.shouldTraceLegacyGraphicsLowering() ? System.nanoTime() : 0L;
         VulkanDrawExecutionCoordinator.LegacyProgramSnapshot program =
-            sharedSnapshot.programId() <= 0
+            programState.programId() <= 0
                 ? null
-                : requestProgramExecutionSnapshot(ctx, sharedSnapshot.programId());
+                : requestProgramExecutionSnapshot(ctx, programState.programId());
         recordLegacyGraphicsLoweringStep(pipelineLocation, "program_snapshot_resolve", programStartNanos);
 
         long renderStateStartNanos = VulkanPerfAudit.shouldTraceLegacyGraphicsLowering() ? System.nanoTime() : 0L;
         VulkanDrawExecutionCoordinator.LegacyRenderStateSnapshot renderState =
-            sharedRenderStateSnapshot(sharedSnapshot.fixedFunction());
+            sharedRenderStateSnapshot(objects.pipelineState().fixedFunction());
         recordLegacyGraphicsLoweringStep(pipelineLocation, "fixed_state_snapshot", renderStateStartNanos);
 
         long drawPlanStartNanos = VulkanPerfAudit.shouldTraceLegacyGraphicsLowering() ? System.nanoTime() : 0L;
@@ -8200,10 +8212,10 @@ void main() {
                 );
             }
         }
-        VulkanicCompatibilityState.GraphicsSnapshot sharedSnapshot = objects.immutableCompatibilitySeed();
-        String pipelineLocation = sharedSnapshot.programId() <= 0
+        VulkanicGalV2.ProgramState programState = objects.programState();
+        String pipelineLocation = programState.programId() <= 0
             ? explicitRequest.semanticIdentity().label()
-            : "vulkanic:legacy_program/" + sharedSnapshot.programId();
+            : "vulkanic:legacy_program/" + programState.programId();
         recordLegacyGraphicsLoweringAllocation(
             pipelineLocation,
             "GalV2VertexStreams",
@@ -16897,8 +16909,7 @@ void main() {
                     "Legacy texture " + legacyTextureHandle + " has no Vulkan image/view storage for render-pass usage.");
             }
 
-            boolean forceOwnedView = (texture.usage() & VulkanicTexture.USAGE_RENDER_ATTACHMENT) == 0;
-            boolean canUseDefaultView = !forceOwnedView && baseMipLevel == 0 && mipLevelCount == texture.getMipLevels();
+            boolean canUseDefaultView = baseMipLevel == 0 && mipLevelCount == legacyTexture.mipLevels;
             if (canUseDefaultView) {
                 return new VulkanTextureView(
                     texture,

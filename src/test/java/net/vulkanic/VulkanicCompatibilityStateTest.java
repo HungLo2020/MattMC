@@ -292,7 +292,7 @@ final class VulkanicCompatibilityStateTest {
     }
 
     @Test
-    void legacyVertexAttribPointerKeepsPointerAsAttributeRelativeOffsetOnly() {
+    void legacyVertexAttribPointerSeparatesPointerIntoVertexBindingOffsetForGalV2() {
         VulkanicCompatibilityState state = new VulkanicCompatibilityState();
         state.bindVertexArray(1);
         state.bindBuffer(VulkanicBufferTarget.VERTEX, 77);
@@ -314,11 +314,11 @@ final class VulkanicCompatibilityStateTest {
         VulkanicCompatibilityState.VaoSnapshot vao = state.captureGraphics(request).vao();
 
         assertEquals(0L, vao.vertexBindings().get(0).offset());
-        assertEquals(0L, vao.vertexBindings().get(1).offset());
-        assertEquals(0L, vao.vertexBindings().get(2).offset());
+        assertEquals(8L, vao.vertexBindings().get(1).offset());
+        assertEquals(12L, vao.vertexBindings().get(2).offset());
         assertEquals(0, vao.attributes().get(0).relativeOffset());
-        assertEquals(8, vao.attributes().get(1).relativeOffset());
-        assertEquals(12, vao.attributes().get(2).relativeOffset());
+        assertEquals(0, vao.attributes().get(1).relativeOffset());
+        assertEquals(0, vao.attributes().get(2).relativeOffset());
     }
 
     @Test

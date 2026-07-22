@@ -49,8 +49,14 @@ public final class VulkanicGalV2 {
         "ResourceSet(layout,bindings,generations)",
         "UniformLayout(bindingName,set,binding,members)",
         "UniformBinding(layout,bindingName,programId)",
+        "PersistentDrawTemplate(objects,resourceSet,commandShape)",
+        "GraphicsCommandStream(commands)",
+        "ProgramState(programId,shaderShape)",
+        "PipelineState(program,fixedFunction,topologyShape)",
+        "RenderTargetState(framebuffer,drawBuffers,attachments)",
         "ExplicitGraphicsObjects(program,pipeline,vertexLayout,resourceLayout,resourceSet,renderTarget)",
-        "ExplicitGraphicsDrawRequest(identity,objects,resourceSet,programUniforms,programVersion,drawCommand,vertexStreams,resourcePlanFingerprint)"
+        "UniformPayload(binding,programId,payloadVersion,semanticKey)",
+        "ExplicitGraphicsDrawRequest(identity,objects,resourceSet,uniformPayload,commandStream,drawCommand,vertexStreams,resourcePlanFingerprint)"
     );
     public static final String CONTRACT_SCHEMA_FINGERPRINT = sha256Hex(CONTRACT_SCHEMA);
 
@@ -61,7 +67,12 @@ public final class VulkanicGalV2 {
     private static final int HOT_LEGACY_PROGRAM_B =
         Integer.getInteger("mattmc.gal.v2.legacyProgramB", 9);
     private static final boolean ALL_LEGACY_PROGRAMS_ENABLED =
-        Boolean.parseBoolean(System.getProperty("mattmc.gal.v2.allLegacyPrograms", "false"));
+        Boolean.parseBoolean(System.getProperty("mattmc.gal.v2.allLegacyPrograms", "true"));
+    private static final String NON_EAGER_RESOURCE_PLAN_FINGERPRINT = "non-eager-empty-resource-plan";
+    private static final VulkanicPassResourceModel.PassExecutionPlan NON_EAGER_RESOURCE_PLAN =
+        nonEagerResourcePlan();
+    private static final int MAX_GLOBAL_REGISTRY_ENTRIES =
+        Math.max(1024, Integer.getInteger("mattmc.gal.v2.maxGlobalRegistryEntries", 16384));
 
     private static final AtomicInteger NEXT_HANDLE_ID = new AtomicInteger(1);
     private static final Map<String, Handle> HANDLES_BY_SEMANTIC_KEY = new ConcurrentHashMap<>();
@@ -77,6 +88,8 @@ public final class VulkanicGalV2 {
     private static final Map<Handle, UniformLayout> UNIFORM_LAYOUTS_BY_HANDLE = new ConcurrentHashMap<>();
     private static final Map<String, UniformBinding> UNIFORM_BINDINGS_BY_KEY = new ConcurrentHashMap<>();
     private static final Map<Handle, UniformBinding> UNIFORM_BINDINGS_BY_HANDLE = new ConcurrentHashMap<>();
+    private static final Map<PersistentDrawTemplateKey, PersistentDrawTemplate> DRAW_TEMPLATES_BY_KEY =
+        new ConcurrentHashMap<>();
 
     public static String contractSchema() {
         return CONTRACT_SCHEMA;
@@ -95,6 +108,7 @@ public final class VulkanicGalV2 {
         UNIFORM_LAYOUT,
         UNIFORM_BINDING,
         RENDER_TARGET,
+        DRAW_TEMPLATE,
         GRAPHICS_OBJECT_SET
     }
 
@@ -125,8 +139,11 @@ public final class VulkanicGalV2 {
         String resourceLayoutKey,
         String resourceSetKey,
         String renderTargetKey,
+        ProgramState programState,
+        PipelineState pipelineState,
+        RenderTargetState renderTargetState,
         VertexLayout vertexLayout,
-        VulkanicCompatibilityState.GraphicsSnapshot immutableCompatibilitySeed
+        String semanticKey
     ) {
         public ExplicitGraphicsObjects {
             handle = Objects.requireNonNull(handle, "handle");
@@ -142,8 +159,57 @@ public final class VulkanicGalV2 {
             resourceLayoutKey = requireNonBlank(resourceLayoutKey, "resourceLayoutKey");
             resourceSetKey = requireNonBlank(resourceSetKey, "resourceSetKey");
             renderTargetKey = requireNonBlank(renderTargetKey, "renderTargetKey");
+            programState = Objects.requireNonNull(programState, "programState");
+            pipelineState = Objects.requireNonNull(pipelineState, "pipelineState");
+            renderTargetState = Objects.requireNonNull(renderTargetState, "renderTargetState");
             vertexLayout = Objects.requireNonNull(vertexLayout, "vertexLayout");
-            immutableCompatibilitySeed = Objects.requireNonNull(immutableCompatibilitySeed, "immutableCompatibilitySeed");
+            semanticKey = requireNonBlank(semanticKey, "semanticKey");
+        }
+    }
+
+    public record ProgramState(
+        int programId,
+        long shaderGeneration,
+        String semanticKey
+    ) {
+        public ProgramState {
+            if (programId < 0) {
+                throw new IllegalArgumentException("programId must be >= 0");
+            }
+            if (shaderGeneration < 0L) {
+                throw new IllegalArgumentException("shaderGeneration must be >= 0");
+            }
+            semanticKey = requireNonBlank(semanticKey, "semanticKey");
+        }
+    }
+
+    public record PipelineState(
+        Handle program,
+        VulkanicCompatibilityState.FixedFunctionSnapshot fixedFunction,
+        String fixedFunctionKey,
+        String topologyShapeKey,
+        String semanticKey
+    ) {
+        public PipelineState {
+            program = Objects.requireNonNull(program, "program");
+            fixedFunction = Objects.requireNonNull(fixedFunction, "fixedFunction");
+            fixedFunctionKey = requireNonBlank(fixedFunctionKey, "fixedFunctionKey");
+            topologyShapeKey = requireNonBlank(topologyShapeKey, "topologyShapeKey");
+            semanticKey = requireNonBlank(semanticKey, "semanticKey");
+        }
+    }
+
+    public record RenderTargetState(
+        int framebuffer,
+        VulkanicCompatibilityState.FramebufferSnapshot framebufferState,
+        String semanticKey
+    ) {
+        public RenderTargetState {
+            if (framebuffer < 0) {
+                throw new IllegalArgumentException("framebuffer must be >= 0");
+            }
+            framebufferState = Objects.requireNonNull(framebufferState, "framebufferState");
+            semanticKey = requireNonBlank(semanticKey, "semanticKey");
         }
     }
 
@@ -418,12 +484,48 @@ public final class VulkanicGalV2 {
         }
     }
 
+    public record UniformPayload(
+        Handle binding,
+        int programId,
+        long payloadVersion,
+        java.util.Map<Integer, VulkanicCompatibilityState.UniformValue> uniformsByLocation,
+        String semanticKey
+    ) {
+        public UniformPayload {
+            binding = Objects.requireNonNull(binding, "binding");
+            if (programId <= 0) {
+                throw new IllegalArgumentException("programId must be positive");
+            }
+            if (payloadVersion < 0L) {
+                throw new IllegalArgumentException("payloadVersion must be >= 0");
+            }
+            uniformsByLocation = java.util.Map.copyOf(Objects.requireNonNull(uniformsByLocation, "uniformsByLocation"));
+            semanticKey = requireNonBlank(semanticKey, "semanticKey");
+        }
+    }
+
+    public record PersistentDrawTemplate(
+        Handle handle,
+        Handle graphicsObjects,
+        Handle resourceSet,
+        String commandShapeKey,
+        String semanticKey
+    ) {
+        public PersistentDrawTemplate {
+            handle = Objects.requireNonNull(handle, "handle");
+            graphicsObjects = Objects.requireNonNull(graphicsObjects, "graphicsObjects");
+            resourceSet = Objects.requireNonNull(resourceSet, "resourceSet");
+            commandShapeKey = requireNonBlank(commandShapeKey, "commandShapeKey");
+            semanticKey = requireNonBlank(semanticKey, "semanticKey");
+        }
+    }
+
     public record ExplicitGraphicsDrawRequest(
         VulkanicGalExecutionRequest.SemanticIdentity semanticIdentity,
         Handle graphicsObjects,
         Handle resourceSet,
-        VulkanicCompatibilityState.ProgramSnapshot programUniforms,
-        long programVersion,
+        UniformPayload uniformPayload,
+        GraphicsCommandStream commandStream,
         VulkanicGalExecutionRequest.GraphicsDrawCommand command,
         VertexStreamBindings vertexStreams,
         VulkanicPassResourceModel.PassExecutionPlan resourcePlan,
@@ -433,11 +535,232 @@ public final class VulkanicGalV2 {
             semanticIdentity = Objects.requireNonNull(semanticIdentity, "semanticIdentity");
             graphicsObjects = Objects.requireNonNull(graphicsObjects, "graphicsObjects");
             resourceSet = Objects.requireNonNull(resourceSet, "resourceSet");
-            programUniforms = Objects.requireNonNull(programUniforms, "programUniforms");
+            uniformPayload = Objects.requireNonNull(uniformPayload, "uniformPayload");
+            commandStream = Objects.requireNonNull(commandStream, "commandStream");
             command = Objects.requireNonNull(command, "command");
             vertexStreams = Objects.requireNonNull(vertexStreams, "vertexStreams");
             resourcePlan = Objects.requireNonNull(resourcePlan, "resourcePlan");
             resourcePlanFingerprint = requireNonBlank(resourcePlanFingerprint, "resourcePlanFingerprint");
+        }
+
+        public ExplicitGraphicsDrawRequest withCommandStream(GraphicsCommandStream stream) {
+            return new ExplicitGraphicsDrawRequest(
+                semanticIdentity,
+                graphicsObjects,
+                resourceSet,
+                uniformPayload,
+                stream,
+                command,
+                vertexStreams,
+                resourcePlan,
+                resourcePlanFingerprint
+            );
+        }
+    }
+
+    public enum GraphicsCommandKind {
+        BEGIN_RENDER_PASS,
+        BIND_GRAPHICS_PIPELINE,
+        BIND_RENDER_TARGET,
+        BIND_RESOURCE_SET,
+        BIND_VERTEX_STREAMS,
+        BIND_INDEX_STREAM,
+        SET_DYNAMIC_STATE,
+        SET_DYNAMIC_OFFSETS,
+        PUSH_CONSTANTS,
+        DRAW,
+        END_RENDER_PASS
+    }
+
+    public sealed interface GraphicsCommand permits
+        BeginRenderPassCommand,
+        BindGraphicsPipelineCommand,
+        BindRenderTargetCommand,
+        BindResourceSetCommand,
+        BindVertexStreamsCommand,
+        BindIndexStreamCommand,
+        SetDynamicStateCommand,
+        SetDynamicOffsetsCommand,
+        PushConstantsCommand,
+        DrawCommand,
+        EndRenderPassCommand {
+        GraphicsCommandKind kind();
+    }
+
+    public record BeginRenderPassCommand(Handle renderTarget) implements GraphicsCommand {
+        public BeginRenderPassCommand {
+            renderTarget = Objects.requireNonNull(renderTarget, "renderTarget");
+        }
+
+        @Override
+        public GraphicsCommandKind kind() {
+            return GraphicsCommandKind.BEGIN_RENDER_PASS;
+        }
+    }
+
+    public record BindGraphicsPipelineCommand(Handle pipeline) implements GraphicsCommand {
+        public BindGraphicsPipelineCommand {
+            pipeline = Objects.requireNonNull(pipeline, "pipeline");
+        }
+
+        @Override
+        public GraphicsCommandKind kind() {
+            return GraphicsCommandKind.BIND_GRAPHICS_PIPELINE;
+        }
+    }
+
+    public record BindRenderTargetCommand(Handle renderTarget) implements GraphicsCommand {
+        public BindRenderTargetCommand {
+            renderTarget = Objects.requireNonNull(renderTarget, "renderTarget");
+        }
+
+        @Override
+        public GraphicsCommandKind kind() {
+            return GraphicsCommandKind.BIND_RENDER_TARGET;
+        }
+    }
+
+    public record BindResourceSetCommand(Handle resourceSet) implements GraphicsCommand {
+        public BindResourceSetCommand {
+            resourceSet = Objects.requireNonNull(resourceSet, "resourceSet");
+        }
+
+        @Override
+        public GraphicsCommandKind kind() {
+            return GraphicsCommandKind.BIND_RESOURCE_SET;
+        }
+    }
+
+    public record BindVertexStreamsCommand(Handle vertexLayout, VertexStreamBindings streams) implements GraphicsCommand {
+        public BindVertexStreamsCommand {
+            vertexLayout = Objects.requireNonNull(vertexLayout, "vertexLayout");
+            streams = Objects.requireNonNull(streams, "streams");
+        }
+
+        @Override
+        public GraphicsCommandKind kind() {
+            return GraphicsCommandKind.BIND_VERTEX_STREAMS;
+        }
+    }
+
+    public record BindIndexStreamCommand(Optional<IndexStream> indexStream) implements GraphicsCommand {
+        public BindIndexStreamCommand {
+            indexStream = Objects.requireNonNull(indexStream, "indexStream");
+        }
+
+        @Override
+        public GraphicsCommandKind kind() {
+            return GraphicsCommandKind.BIND_INDEX_STREAM;
+        }
+    }
+
+    public record SetDynamicStateCommand(String fixedFunctionKey) implements GraphicsCommand {
+        public SetDynamicStateCommand {
+            fixedFunctionKey = requireNonBlank(fixedFunctionKey, "fixedFunctionKey");
+        }
+
+        @Override
+        public GraphicsCommandKind kind() {
+            return GraphicsCommandKind.SET_DYNAMIC_STATE;
+        }
+    }
+
+    public record SetDynamicOffsetsCommand(Handle resourceSet, List<Integer> dynamicOffsets) implements GraphicsCommand {
+        public SetDynamicOffsetsCommand {
+            resourceSet = Objects.requireNonNull(resourceSet, "resourceSet");
+            dynamicOffsets = List.copyOf(Objects.requireNonNull(dynamicOffsets, "dynamicOffsets"));
+        }
+
+        @Override
+        public GraphicsCommandKind kind() {
+            return GraphicsCommandKind.SET_DYNAMIC_OFFSETS;
+        }
+    }
+
+    public record PushConstantsCommand(byte[] payload) implements GraphicsCommand {
+        public PushConstantsCommand {
+            payload = payload == null ? new byte[0] : java.util.Arrays.copyOf(payload, payload.length);
+        }
+
+        @Override
+        public byte[] payload() {
+            return java.util.Arrays.copyOf(payload, payload.length);
+        }
+
+        @Override
+        public GraphicsCommandKind kind() {
+            return GraphicsCommandKind.PUSH_CONSTANTS;
+        }
+    }
+
+    public record DrawCommand(VulkanicGalExecutionRequest.GraphicsDrawCommand command) implements GraphicsCommand {
+        public DrawCommand {
+            command = Objects.requireNonNull(command, "command");
+        }
+
+        @Override
+        public GraphicsCommandKind kind() {
+            return GraphicsCommandKind.DRAW;
+        }
+    }
+
+    public record EndRenderPassCommand(Handle renderTarget) implements GraphicsCommand {
+        public EndRenderPassCommand {
+            renderTarget = Objects.requireNonNull(renderTarget, "renderTarget");
+        }
+
+        @Override
+        public GraphicsCommandKind kind() {
+            return GraphicsCommandKind.END_RENDER_PASS;
+        }
+    }
+
+    public record GraphicsCommandStream(List<GraphicsCommand> commands) {
+        public GraphicsCommandStream {
+            commands = List.copyOf(Objects.requireNonNull(commands, "commands"));
+            if (commands.isEmpty()) {
+                throw new IllegalArgumentException("GAL v2 graphics command stream must contain at least a draw command");
+            }
+            if (commands.stream().noneMatch(command -> command.kind() == GraphicsCommandKind.DRAW)) {
+                throw new IllegalArgumentException("GAL v2 graphics command stream must contain a draw command");
+            }
+        }
+
+        public static GraphicsCommandStream drawOnly(VulkanicGalExecutionRequest.GraphicsDrawCommand command) {
+            return new GraphicsCommandStream(List.of(new DrawCommand(command)));
+        }
+    }
+
+    public record GraphicsEncoderState(
+        Handle pipeline,
+        Handle renderTarget,
+        Handle resourceSet,
+        Handle vertexLayout,
+        String vertexStreamsKey,
+        String indexStreamKey,
+        Handle uniformBinding,
+        long uniformPayloadVersion,
+        String fixedFunctionKey
+    ) {
+        public GraphicsEncoderState {
+            pipeline = Objects.requireNonNull(pipeline, "pipeline");
+            renderTarget = Objects.requireNonNull(renderTarget, "renderTarget");
+            resourceSet = Objects.requireNonNull(resourceSet, "resourceSet");
+            vertexLayout = Objects.requireNonNull(vertexLayout, "vertexLayout");
+            vertexStreamsKey = requireNonBlank(vertexStreamsKey, "vertexStreamsKey");
+            indexStreamKey = requireNonBlank(indexStreamKey, "indexStreamKey");
+            uniformBinding = Objects.requireNonNull(uniformBinding, "uniformBinding");
+            if (uniformPayloadVersion < 0L) {
+                throw new IllegalArgumentException("uniformPayloadVersion must be >= 0");
+            }
+            fixedFunctionKey = requireNonBlank(fixedFunctionKey, "fixedFunctionKey");
+        }
+    }
+
+    public record GraphicsCommandStreamResult(GraphicsCommandStream stream, GraphicsEncoderState nextState) {
+        public GraphicsCommandStreamResult {
+            stream = Objects.requireNonNull(stream, "stream");
+            nextState = Objects.requireNonNull(nextState, "nextState");
         }
     }
 
@@ -448,7 +771,7 @@ public final class VulkanicGalV2 {
         if (!LEGACY_PROGRAM_SLICE_ENABLED) {
             return Optional.empty();
         }
-        Optional<VulkanicCompatibilityState.GraphicsSnapshot> shared =
+        Optional<? extends VulkanicCompatibilityState.GraphicsStateView> shared =
             capturedV1Request.compatibilitySnapshot().sharedCompatibilityState();
         if (shared.isEmpty()) {
             return Optional.empty();
@@ -462,8 +785,8 @@ public final class VulkanicGalV2 {
             capturedV1Request.semanticIdentity(),
             objects.handle(),
             objects.resourceSet(),
-            shared.get().program(),
-            shared.get().programVersion(),
+            uniformPayloadFor(shared.get(), objects.resourceSet()),
+            GraphicsCommandStream.drawOnly(capturedV1Request.command()),
             capturedV1Request.command(),
             vertexStreamsFor(shared.get(), capturedV1Request.command()),
             capturedV1Request.resourcePlan(),
@@ -472,7 +795,7 @@ public final class VulkanicGalV2 {
     }
 
     public static Optional<ExplicitGraphicsDrawRequest> tryCaptureLegacyProgramSlice(
-        VulkanicCompatibilityState.GraphicsSnapshot snapshot,
+        VulkanicCompatibilityState.GraphicsStateView snapshot,
         VulkanicGalExecutionRequest.GraphicsDrawRequest draftRequest,
         boolean eagerResourceDeclarations
     ) {
@@ -481,13 +804,14 @@ public final class VulkanicGalV2 {
         if (!LEGACY_PROGRAM_SLICE_ENABLED || !isSupportedLegacyProgram(snapshot.programId(), eagerResourceDeclarations)) {
             return Optional.empty();
         }
+        pruneGlobalRegistriesIfNeeded();
 
-        VulkanicGalExecutionRequest.VertexInputSnapshot vertexInput =
-            snapshot.vertexInputSnapshot(draftRequest);
-        List<VulkanicPassResourceModel.BindingSnapshot> bindings =
-            eagerResourceDeclarations ? snapshot.bindingSnapshots() : List.of();
-        VulkanicPassResourceModel.PassExecutionPlan resourcePlan =
-            VulkanicLegacyCompatibilityAdapter.planDraw(new VulkanicLegacyCompatibilityAdapter.DrawSnapshot(
+        VulkanicPassResourceModel.PassExecutionPlan resourcePlan;
+        if (eagerResourceDeclarations) {
+            VulkanicGalExecutionRequest.VertexInputSnapshot vertexInput =
+                snapshot.vertexInputSnapshot(draftRequest);
+            List<VulkanicPassResourceModel.BindingSnapshot> bindings = snapshot.bindingSnapshots();
+            resourcePlan = VulkanicLegacyCompatibilityAdapter.planDraw(new VulkanicLegacyCompatibilityAdapter.DrawSnapshot(
                 draftRequest.semanticIdentity().label(),
                 vertexInput.vertexBuffers(),
                 vertexInput.indexBuffer(),
@@ -497,33 +821,112 @@ public final class VulkanicGalV2 {
                 false,
                 false
             ));
-        VulkanicGalExecutionRequest.GraphicsCompatibilitySnapshot compatibilitySnapshot =
-            new VulkanicGalExecutionRequest.GraphicsCompatibilitySnapshot(
-                Optional.empty(),
-                vertexInput,
-                resourcePlan.orderedUses(),
-                Optional.empty(),
-                bindings,
-                Optional.of(snapshot),
-                "frontend-shared-gal-v2-draw"
-            );
-        VulkanicGalExecutionRequest.GraphicsDrawRequest capturedRequest =
-            draftRequest.withCompatibilitySnapshot(compatibilitySnapshot);
-        ExplicitGraphicsObjects objects = graphicsObjectsFor(snapshot, capturedRequest, eagerResourceDeclarations);
+        } else {
+            resourcePlan = NON_EAGER_RESOURCE_PLAN;
+        }
+        PersistentDrawTemplate template = persistentDrawTemplateFor(snapshot, draftRequest, eagerResourceDeclarations);
         ResourceSet requestResourceSet = eagerResourceDeclarations
-            ? requireResourceSet(objects.resourceSet())
+            ? requireResourceSet(template.resourceSet())
             : currentRequestResourceSetFor(snapshot);
         return Optional.of(new ExplicitGraphicsDrawRequest(
             draftRequest.semanticIdentity(),
-            objects.handle(),
+            template.graphicsObjects(),
             requestResourceSet.handle(),
-            snapshot.program(),
-            snapshot.programVersion(),
+            uniformPayloadFor(snapshot, requestResourceSet.handle()),
+            GraphicsCommandStream.drawOnly(draftRequest.command()),
             draftRequest.command(),
             vertexStreamsFor(snapshot, draftRequest.command()),
             resourcePlan,
-            sha256Hex(resourcePlan.orderedUses().toString())
+            eagerResourceDeclarations
+                ? sha256Hex(resourcePlan.orderedUses().toString())
+                : NON_EAGER_RESOURCE_PLAN_FINGERPRINT
         ));
+    }
+
+    public static GraphicsCommandStreamResult encodeGraphicsCommandStream(
+        ExplicitGraphicsDrawRequest request,
+        @Nullable GraphicsEncoderState previous
+    ) {
+        Objects.requireNonNull(request, "request");
+        ExplicitGraphicsObjects objects = requireGraphicsObjects(request.graphicsObjects());
+        ResourceSet resourceSet = requireResourceSet(request.resourceSet());
+        String vertexStreamsKey = vertexStreamsKey(request.vertexStreams());
+        String indexStreamKey = indexStreamKey(request.vertexStreams().indexStream());
+        GraphicsEncoderState next = new GraphicsEncoderState(
+            objects.pipeline(),
+            objects.renderTarget(),
+            resourceSet.handle(),
+            objects.vertexLayoutHandle(),
+            vertexStreamsKey,
+            indexStreamKey,
+            request.uniformPayload().binding(),
+            request.uniformPayload().payloadVersion(),
+            objects.pipelineState().fixedFunctionKey()
+        );
+
+        ArrayList<GraphicsCommand> commands = new ArrayList<>(8);
+        if (previous == null || !previous.renderTarget().equals(next.renderTarget())) {
+            commands.add(new BindRenderTargetCommand(objects.renderTarget()));
+        }
+        if (previous == null || !previous.pipeline().equals(next.pipeline())) {
+            commands.add(new BindGraphicsPipelineCommand(objects.pipeline()));
+        }
+        if (previous == null
+            || !previous.resourceSet().equals(next.resourceSet())
+            || !previous.uniformBinding().equals(next.uniformBinding())
+            || previous.uniformPayloadVersion() != next.uniformPayloadVersion()) {
+            commands.add(new BindResourceSetCommand(resourceSet.handle()));
+            commands.add(new SetDynamicOffsetsCommand(resourceSet.handle(), List.of()));
+        }
+        if (previous == null
+            || !previous.vertexLayout().equals(next.vertexLayout())
+            || !previous.vertexStreamsKey().equals(next.vertexStreamsKey())) {
+            commands.add(new BindVertexStreamsCommand(objects.vertexLayoutHandle(), request.vertexStreams()));
+        }
+        if (previous == null || !previous.indexStreamKey().equals(next.indexStreamKey())) {
+            commands.add(new BindIndexStreamCommand(request.vertexStreams().indexStream()));
+        }
+        if (previous == null || !previous.fixedFunctionKey().equals(next.fixedFunctionKey())) {
+            commands.add(new SetDynamicStateCommand(objects.pipelineState().fixedFunctionKey()));
+        }
+        commands.add(new DrawCommand(request.command()));
+        int bindCount = 0;
+        int drawCount = 0;
+        for (GraphicsCommand command : commands) {
+            if (command.kind() == GraphicsCommandKind.DRAW) {
+                drawCount++;
+            } else if (command.kind() != GraphicsCommandKind.BEGIN_RENDER_PASS
+                && command.kind() != GraphicsCommandKind.END_RENDER_PASS) {
+                bindCount++;
+            }
+        }
+        int possibleBindCount = 7;
+        VulkanPerfAudit.recordGalV2CommandStream(
+            commands.size(),
+            bindCount,
+            drawCount,
+            Math.max(0, possibleBindCount - bindCount)
+        );
+        return new GraphicsCommandStreamResult(new GraphicsCommandStream(commands), next);
+    }
+
+    private static VulkanicPassResourceModel.PassExecutionPlan nonEagerResourcePlan() {
+        VulkanicPassResourceModel.PassRequest passRequest = new VulkanicPassResourceModel.PassRequest(
+            VulkanicPassResourceModel.PassKind.RENDER,
+            "draw:non-eager-gal-v2",
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(new VulkanicPassResourceModel.Command(
+                "non-eager-draw",
+                OptionalInt.empty(),
+                OptionalInt.empty()
+            )),
+            List.of("backend-does-not-require-eager-resource-declarations"),
+            false,
+            false
+        );
+        return new VulkanicPassResourceModel.PassExecutionPlan(passRequest, List.of(), List.of());
     }
 
     public static String fallbackReasonFor(VulkanicGalExecutionRequest.GraphicsDrawRequest capturedV1Request) {
@@ -531,7 +934,7 @@ public final class VulkanicGalV2 {
         if (!LEGACY_PROGRAM_SLICE_ENABLED) {
             return "disabled";
         }
-        Optional<VulkanicCompatibilityState.GraphicsSnapshot> shared =
+        Optional<? extends VulkanicCompatibilityState.GraphicsStateView> shared =
             capturedV1Request.compatibilitySnapshot().sharedCompatibilityState();
         if (shared.isEmpty()) {
             return "missing-shared-compatibility-snapshot";
@@ -582,11 +985,19 @@ public final class VulkanicGalV2 {
         return UNIFORM_BINDINGS_BY_HANDLE.size();
     }
 
+    public static int uniformPayloadCountForTests() {
+        return 0;
+    }
+
     public static boolean supportsLegacyProgramId(int programId) {
         return LEGACY_PROGRAM_SLICE_ENABLED && isHotLegacyProgram(programId);
     }
 
     public static void clearForTests() {
+        clearGlobalRegistries();
+    }
+
+    private static void clearGlobalRegistries() {
         GRAPHICS_OBJECTS_BY_KEY.clear();
         GRAPHICS_OBJECTS_BY_HANDLE.clear();
         RESOURCE_LAYOUTS_BY_KEY.clear();
@@ -597,19 +1008,87 @@ public final class VulkanicGalV2 {
         UNIFORM_LAYOUTS_BY_HANDLE.clear();
         UNIFORM_BINDINGS_BY_KEY.clear();
         UNIFORM_BINDINGS_BY_HANDLE.clear();
+        DRAW_TEMPLATES_BY_KEY.clear();
         HANDLES_BY_SEMANTIC_KEY.clear();
         NEXT_HANDLE_ID.set(1);
     }
 
+    private static void pruneGlobalRegistriesIfNeeded() {
+        int totalEntries = registryEntryCount();
+        recordRegistrySnapshot(totalEntries);
+        if (totalEntries <= MAX_GLOBAL_REGISTRY_ENTRIES) {
+            return;
+        }
+        clearGlobalRegistries();
+        VulkanPerfAudit.recordGalV2RegistryPrune(totalEntries);
+        recordRegistrySnapshot(0);
+    }
+
+    private static int registryEntryCount() {
+        return HANDLES_BY_SEMANTIC_KEY.size()
+            + GRAPHICS_OBJECTS_BY_KEY.size()
+            + GRAPHICS_OBJECTS_BY_HANDLE.size()
+            + RESOURCE_LAYOUTS_BY_KEY.size()
+            + RESOURCE_LAYOUTS_BY_HANDLE.size()
+            + RESOURCE_SETS_BY_KEY.size()
+            + RESOURCE_SETS_BY_HANDLE.size()
+            + UNIFORM_LAYOUTS_BY_KEY.size()
+            + UNIFORM_LAYOUTS_BY_HANDLE.size()
+            + UNIFORM_BINDINGS_BY_KEY.size()
+            + UNIFORM_BINDINGS_BY_HANDLE.size()
+            + DRAW_TEMPLATES_BY_KEY.size();
+    }
+
+    private static void recordRegistrySnapshot(int totalEntries) {
+        VulkanPerfAudit.recordGalV2RegistrySnapshot(
+            totalEntries,
+            HANDLES_BY_SEMANTIC_KEY.size(),
+            GRAPHICS_OBJECTS_BY_KEY.size() + GRAPHICS_OBJECTS_BY_HANDLE.size(),
+            RESOURCE_LAYOUTS_BY_KEY.size() + RESOURCE_LAYOUTS_BY_HANDLE.size(),
+            RESOURCE_SETS_BY_KEY.size() + RESOURCE_SETS_BY_HANDLE.size(),
+            UNIFORM_LAYOUTS_BY_KEY.size() + UNIFORM_LAYOUTS_BY_HANDLE.size(),
+            UNIFORM_BINDINGS_BY_KEY.size() + UNIFORM_BINDINGS_BY_HANDLE.size(),
+            DRAW_TEMPLATES_BY_KEY.size()
+        );
+    }
+
+    private static PersistentDrawTemplate persistentDrawTemplateFor(
+        VulkanicCompatibilityState.GraphicsStateView snapshot,
+        VulkanicGalExecutionRequest.GraphicsDrawRequest request,
+        boolean includeResourceBindings
+    ) {
+        PersistentDrawTemplateKey key = PersistentDrawTemplateKey.of(snapshot, request, includeResourceBindings);
+        PersistentDrawTemplate cached = DRAW_TEMPLATES_BY_KEY.get(key);
+        if (cached != null) {
+            VulkanPerfAudit.recordGalV2DrawTemplateLookup(false, DRAW_TEMPLATES_BY_KEY.size());
+            return cached;
+        }
+        final boolean[] created = {false};
+        PersistentDrawTemplate template = DRAW_TEMPLATES_BY_KEY.computeIfAbsent(key, createdKey -> {
+            created[0] = true;
+            ExplicitGraphicsObjects objects = graphicsObjectsFor(snapshot, request, includeResourceBindings);
+            Handle handle = handleFor(ObjectKind.DRAW_TEMPLATE, createdKey.semanticKey());
+            return new PersistentDrawTemplate(
+                handle,
+                objects.handle(),
+                objects.resourceSet(),
+                createdKey.commandShapeKey(),
+                createdKey.semanticKey()
+            );
+        });
+        VulkanPerfAudit.recordGalV2DrawTemplateLookup(created[0], DRAW_TEMPLATES_BY_KEY.size());
+        return template;
+    }
+
     private static ExplicitGraphicsObjects graphicsObjectsFor(
-        VulkanicCompatibilityState.GraphicsSnapshot snapshot,
+        VulkanicCompatibilityState.GraphicsStateView snapshot,
         VulkanicGalExecutionRequest.GraphicsDrawRequest request
     ) {
         return graphicsObjectsFor(snapshot, request, true);
     }
 
     private static ExplicitGraphicsObjects graphicsObjectsFor(
-        VulkanicCompatibilityState.GraphicsSnapshot snapshot,
+        VulkanicCompatibilityState.GraphicsStateView snapshot,
         VulkanicGalExecutionRequest.GraphicsDrawRequest request,
         boolean includeResourceBindings
     ) {
@@ -619,7 +1098,7 @@ public final class VulkanicGalV2 {
         List<ResourceBinding> resourceBindings = includeResourceBindings
             ? v2ResourceBindings(snapshot)
             : List.of();
-        ExplicitGraphicsObjectKey key = explicitKey(snapshot, request, includeResourceBindings, layoutBindings);
+        ExplicitGraphicsObjectKey key = explicitKey(snapshot, request, includeResourceBindings, layoutBindings, resourceBindings);
         ResourceLayout resourceLayout = resourceLayoutFor(key.resourceLayoutKey(), layoutBindings);
         ResourceSet resourceSet = resourceSetFor(resourceLayout.handle(), key.resourceSetKey(), resourceBindings);
         return GRAPHICS_OBJECTS_BY_KEY.computeIfAbsent(key, createdKey -> {
@@ -643,12 +1122,77 @@ public final class VulkanicGalV2 {
                 createdKey.resourceLayoutKey(),
                 createdKey.resourceSetKey(),
                 createdKey.renderTargetKey(),
+                programStateFor(snapshot, createdKey.programKey()),
+                pipelineStateFor(snapshot, request, handleFor(ObjectKind.PROGRAM, createdKey.programKey()), createdKey.pipelineKey()),
+                renderTargetStateFor(snapshot, createdKey.renderTargetKey()),
                 vertexLayoutFor(snapshot),
-                snapshot
+                createdKey.semanticKey()
             );
             GRAPHICS_OBJECTS_BY_HANDLE.put(handle, objects);
             return objects;
         });
+    }
+
+    private static ProgramState programStateFor(
+        VulkanicCompatibilityState.GraphicsStateView snapshot,
+        String programKey
+    ) {
+        return new ProgramState(
+            snapshot.programId(),
+            Integer.toUnsignedLong(programKey.hashCode()),
+            programKey
+        );
+    }
+
+    private static UniformPayload uniformPayloadFor(
+        VulkanicCompatibilityState.GraphicsStateView snapshot,
+        Handle resourceSetHandle
+    ) {
+        ResourceSet resourceSet = requireResourceSet(resourceSetHandle);
+        ResourceBinding standalone =
+            resourceSet.uniformBindingOrNull(VulkanicAPI.generatedStandaloneUniformBlockName());
+        UniformLayout layout = uniformLayoutFor(snapshot, VulkanicAPI.generatedStandaloneUniformBlockName());
+        Handle binding = standalone == null || standalone.uniformBinding().isEmpty()
+            ? uniformBindingFor(snapshot, layout).handle()
+            : standalone.uniformBinding().orElseThrow();
+        String payloadKey = "uniform-payload:"
+            + snapshot.programId()
+            + ":binding=" + binding.semanticKey()
+            + ":values=" + snapshot.program().uniformContentKey();
+        return new UniformPayload(
+            binding,
+            snapshot.programId(),
+            Integer.toUnsignedLong(payloadKey.hashCode()),
+            snapshot.program().uniformsByLocation(),
+            payloadKey
+        );
+    }
+
+    private static PipelineState pipelineStateFor(
+        VulkanicCompatibilityState.GraphicsStateView snapshot,
+        VulkanicGalExecutionRequest.GraphicsDrawRequest request,
+        Handle program,
+        String pipelineKey
+    ) {
+        String fixedKey = "fixed:" + snapshot.fixedFunction().shapeKey();
+        return new PipelineState(
+            program,
+            snapshot.fixedFunction(),
+            fixedKey,
+            drawCommandShapeKey(request.command()),
+            pipelineKey
+        );
+    }
+
+    private static RenderTargetState renderTargetStateFor(
+        VulkanicCompatibilityState.GraphicsStateView snapshot,
+        String renderTargetKey
+    ) {
+        return new RenderTargetState(
+            snapshot.drawFramebuffer(),
+            snapshot.framebuffer(),
+            renderTargetKey
+        );
     }
 
     private static Handle handleFor(ObjectKind kind, String semanticKey) {
@@ -660,36 +1204,39 @@ public final class VulkanicGalV2 {
     }
 
     private static ExplicitGraphicsObjectKey explicitKey(
-        VulkanicCompatibilityState.GraphicsSnapshot snapshot,
+        VulkanicCompatibilityState.GraphicsStateView snapshot,
         VulkanicGalExecutionRequest.GraphicsDrawRequest request
     ) {
-        return explicitKey(snapshot, request, true, v2ResourceLayoutBindings(snapshot));
+        List<ResourceLayoutBinding> layoutBindings = v2ResourceLayoutBindings(snapshot);
+        List<ResourceBinding> resourceBindings = v2ResourceBindings(snapshot);
+        return explicitKey(snapshot, request, true, layoutBindings, resourceBindings);
     }
 
     private static ExplicitGraphicsObjectKey explicitKey(
-        VulkanicCompatibilityState.GraphicsSnapshot snapshot,
+        VulkanicCompatibilityState.GraphicsStateView snapshot,
         VulkanicGalExecutionRequest.GraphicsDrawRequest request,
         boolean includeResourceBindings,
-        List<ResourceLayoutBinding> layoutBindings
+        List<ResourceLayoutBinding> layoutBindings,
+        List<ResourceBinding> resourceBindings
     ) {
         String programKey = "legacy-program:" + snapshot.programId()
-            + ":uniform-shape=" + sha256Hex(programUniformShapeKey(snapshot.program()));
+            + ":uniform-shape=" + snapshot.program().shapeKey();
         String pipelineKey = "pipeline:" + snapshot.programId()
             + ":mode=" + request.command().mode()
-            + ":fixed=" + sha256Hex(snapshot.fixedFunction().toString());
+            + ":fixed=" + snapshot.fixedFunction().shapeKey();
         String vertexInputKey = "vertex-layout:"
-            + sha256Hex(vertexLayoutShapeKey(snapshot.vao()));
+            + snapshot.vao().shapeKey();
         String resourceLayoutKey = includeResourceBindings
             ? "resource-layout:" + sha256Hex(resourceLayoutShapeKey(layoutBindings))
             : "resource-layout:none";
         String resourceSetKey = includeResourceBindings
             ? "resource-set:"
                 + "program=" + snapshot.programId()
-                + ":uniform-shape=" + sha256Hex(programUniformShapeKey(snapshot.program()))
-                + ":resourceBindingVersion=" + snapshot.resourceBindingVersion()
+                + ":uniform-shape=" + snapshot.program().shapeKey()
+                + ":bindings=" + sha256Hex(resourceSetSemanticKey(resourceBindings))
             : "resource-set:none";
         String renderTargetKey = "framebuffer:" + snapshot.drawFramebuffer()
-            + ":state=" + sha256Hex(framebufferSnapshotKey(snapshot.framebuffer()));
+            + ":state=" + snapshot.framebuffer().shapeKey();
         String semanticKey = String.join("|", programKey, pipelineKey, vertexInputKey, resourceSetKey, renderTargetKey);
         long generation = Integer.toUnsignedLong(semanticKey.hashCode());
         return new ExplicitGraphicsObjectKey(
@@ -744,15 +1291,19 @@ public final class VulkanicGalV2 {
         return resourceSet;
     }
 
-    private static ResourceSet currentRequestResourceSetFor(VulkanicCompatibilityState.GraphicsSnapshot snapshot) {
+    private static ResourceSet currentRequestResourceSetFor(VulkanicCompatibilityState.GraphicsStateView snapshot) {
+        return currentResourceSetForMutationState(snapshot);
+    }
+
+    public static ResourceSet currentResourceSetForMutationState(VulkanicCompatibilityState.GraphicsStateView snapshot) {
         List<ResourceLayoutBinding> layoutBindings = v2ResourceLayoutBindings(snapshot);
         List<ResourceBinding> resourceBindings = v2ResourceBindings(snapshot);
         String layoutKey = "resource-layout:" + sha256Hex(resourceLayoutShapeKey(layoutBindings));
-        ResourceLayout resourceLayout = resourceLayoutFor(layoutKey, layoutBindings);
         String resourceSetKey = "resource-set:"
             + "program=" + snapshot.programId()
-            + ":uniform-shape=" + sha256Hex(programUniformShapeKey(snapshot.program()))
-            + ":resourceBindingVersion=" + snapshot.resourceBindingVersion();
+            + ":uniform-shape=" + snapshot.program().shapeKey()
+            + ":bindings=" + sha256Hex(resourceSetSemanticKey(resourceBindings));
+        ResourceLayout resourceLayout = resourceLayoutFor(layoutKey, layoutBindings);
         return resourceSetFor(resourceLayout.handle(), resourceSetKey, resourceBindings);
     }
 
@@ -782,7 +1333,7 @@ public final class VulkanicGalV2 {
         );
     }
 
-    private static List<ResourceLayoutBinding> v2ResourceLayoutBindings(VulkanicCompatibilityState.GraphicsSnapshot snapshot) {
+    private static List<ResourceLayoutBinding> v2ResourceLayoutBindings(VulkanicCompatibilityState.GraphicsStateView snapshot) {
         ArrayList<ResourceLayoutBinding> bindings = new ArrayList<>(snapshot.bindingSnapshots().size() + 1);
         snapshot.bindingSnapshots().stream()
             .map(VulkanicGalV2::resourceLayoutBindingFor)
@@ -791,7 +1342,7 @@ public final class VulkanicGalV2 {
         return List.copyOf(bindings);
     }
 
-    private static List<ResourceBinding> v2ResourceBindings(VulkanicCompatibilityState.GraphicsSnapshot snapshot) {
+    private static List<ResourceBinding> v2ResourceBindings(VulkanicCompatibilityState.GraphicsStateView snapshot) {
         ArrayList<ResourceBinding> bindings = new ArrayList<>(snapshot.bindingSnapshots().size() + 1);
         snapshot.bindingSnapshots().stream()
             .map(VulkanicGalV2::resourceBindingFor)
@@ -801,7 +1352,7 @@ public final class VulkanicGalV2 {
     }
 
     private static Optional<ResourceLayoutBinding> standaloneUniformLayoutBinding(
-        VulkanicCompatibilityState.GraphicsSnapshot snapshot
+        VulkanicCompatibilityState.GraphicsStateView snapshot
     ) {
         if (!isHotLegacyProgram(snapshot.programId())) {
             return Optional.empty();
@@ -817,7 +1368,7 @@ public final class VulkanicGalV2 {
     }
 
     private static Optional<ResourceBinding> standaloneUniformResourceBinding(
-        VulkanicCompatibilityState.GraphicsSnapshot snapshot
+        VulkanicCompatibilityState.GraphicsStateView snapshot
     ) {
         if (!isHotLegacyProgram(snapshot.programId())) {
             return Optional.empty();
@@ -844,12 +1395,12 @@ public final class VulkanicGalV2 {
     }
 
     private static UniformLayout uniformLayoutFor(
-        VulkanicCompatibilityState.GraphicsSnapshot snapshot,
+        VulkanicCompatibilityState.GraphicsStateView snapshot,
         String bindingName
     ) {
         String key = "uniform-layout:program=" + snapshot.programId()
             + ":binding=" + bindingName
-            + ":shape=" + sha256Hex(programUniformShapeKey(snapshot.program()));
+            + ":shape=" + snapshot.program().shapeKey();
         return UNIFORM_LAYOUTS_BY_KEY.computeIfAbsent(key, createdKey -> {
             Handle handle = handleFor(ObjectKind.UNIFORM_LAYOUT, createdKey);
             UniformLayout layout = new UniformLayout(
@@ -866,7 +1417,7 @@ public final class VulkanicGalV2 {
     }
 
     private static UniformBinding uniformBindingFor(
-        VulkanicCompatibilityState.GraphicsSnapshot snapshot,
+        VulkanicCompatibilityState.GraphicsStateView snapshot,
         UniformLayout layout
     ) {
         String key = "uniform-binding:program=" + snapshot.programId()
@@ -885,7 +1436,7 @@ public final class VulkanicGalV2 {
         });
     }
 
-    private static List<UniformMember> standaloneUniformMembers(VulkanicCompatibilityState.ProgramSnapshot program) {
+    private static List<UniformMember> standaloneUniformMembers(VulkanicCompatibilityState.ProgramStateView program) {
         ArrayList<UniformMember> members = new ArrayList<>(program.uniformsByLocation().size());
         int[] ordinal = {0};
         program.uniformsByLocation().entrySet().stream()
@@ -899,7 +1450,7 @@ public final class VulkanicGalV2 {
         return List.copyOf(members);
     }
 
-    private static String programUniformShapeKey(VulkanicCompatibilityState.ProgramSnapshot program) {
+    private static String programUniformShapeKey(VulkanicCompatibilityState.ProgramStateView program) {
         StringBuilder builder = new StringBuilder(128);
         builder.append("program=").append(program.programId()).append(';');
         program.uniformsByLocation().entrySet().stream()
@@ -921,7 +1472,7 @@ public final class VulkanicGalV2 {
             + ":floats=" + value.floats().length;
     }
 
-    private static VertexLayout vertexLayoutFor(VulkanicCompatibilityState.GraphicsSnapshot snapshot) {
+    private static VertexLayout vertexLayoutFor(VulkanicCompatibilityState.GraphicsStateView snapshot) {
         VulkanicCompatibilityState.VaoSnapshot vao = snapshot.vao();
         java.util.ArrayList<VertexBindingLayout> bindings = new java.util.ArrayList<>(vao.vertexBindings().size());
         vao.vertexBindings().entrySet().stream()
@@ -962,7 +1513,7 @@ public final class VulkanicGalV2 {
     }
 
     private static VertexStreamBindings vertexStreamsFor(
-        VulkanicCompatibilityState.GraphicsSnapshot snapshot,
+        VulkanicCompatibilityState.GraphicsStateView snapshot,
         VulkanicGalExecutionRequest.GraphicsDrawCommand command
     ) {
         VulkanicCompatibilityState.VaoSnapshot vao = snapshot.vao();
@@ -1020,6 +1571,13 @@ public final class VulkanicGalV2 {
                 .append(entry.getValue().stride())
                 .append(":divisor:")
                 .append(entry.getValue().divisor())
+                .append(';'));
+        vao.defaultAttributes().entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .forEach(entry -> builder.append("default[")
+                .append(entry.getKey())
+                .append("]=")
+                .append(java.util.Arrays.toString(entry.getValue()))
                 .append(';'));
         return builder.toString();
     }
@@ -1202,6 +1760,101 @@ public final class VulkanicGalV2 {
                 throw new IllegalArgumentException("generation must be >= 0");
             }
         }
+    }
+
+    private record PersistentDrawTemplateKey(
+        int programId,
+        int vaoId,
+        int drawFramebuffer,
+        String programShapeKey,
+        String vertexLayoutKey,
+        String framebufferKey,
+        String resourceSetKey,
+        long fixedFunctionVersion,
+        boolean includeResourceBindings,
+        String commandShapeKey,
+        String semanticKey
+    ) {
+        private PersistentDrawTemplateKey {
+            commandShapeKey = requireNonBlank(commandShapeKey, "commandShapeKey");
+            semanticKey = requireNonBlank(semanticKey, "semanticKey");
+        }
+
+        private static PersistentDrawTemplateKey of(
+            VulkanicCompatibilityState.GraphicsStateView snapshot,
+            VulkanicGalExecutionRequest.GraphicsDrawRequest request,
+            boolean includeResourceBindings
+        ) {
+            String commandShapeKey = drawCommandShapeKey(request.command());
+            String semanticKey = "draw-template:"
+                + "program=" + snapshot.programId()
+                + ":vao=" + snapshot.vaoId()
+                + ":fbo=" + snapshot.drawFramebuffer()
+                + ":programShape=" + snapshot.program().shapeKey()
+                + ":vertexLayout=" + snapshot.vao().shapeKey()
+                + ":framebuffer=" + snapshot.framebuffer().shapeKey()
+                + ":resourceSet=" + (includeResourceBindings
+                    ? sha256Hex(resourceSetSemanticKey(v2ResourceBindings(snapshot)))
+                    : "none")
+                + ":fixedFunctionVersion=" + snapshot.fixedFunctionVersion()
+                + ":eagerResources=" + includeResourceBindings
+                + ":commandShape=" + commandShapeKey;
+            return new PersistentDrawTemplateKey(
+                snapshot.programId(),
+                snapshot.vaoId(),
+                snapshot.drawFramebuffer(),
+                snapshot.program().shapeKey(),
+                snapshot.vao().shapeKey(),
+                snapshot.framebuffer().shapeKey(),
+                includeResourceBindings
+                    ? Long.toString(snapshot.resourceBindingVersion())
+                    : "none",
+                snapshot.fixedFunctionVersion(),
+                includeResourceBindings,
+                commandShapeKey,
+                semanticKey
+            );
+        }
+    }
+
+    private static String drawCommandShapeKey(VulkanicGalExecutionRequest.GraphicsDrawCommand command) {
+        StringBuilder builder = new StringBuilder(96);
+        builder.append(command.kind())
+            .append(":mode=")
+            .append(command.mode())
+            .append(":indexType=")
+            .append(command.indexType())
+            .append(":instances=")
+            .append(command.instanceCount());
+        if (command.kind() == VulkanicGalExecutionRequest.DrawCommandKind.MULTI_INDEXED_BASE_VERTEX) {
+            builder.append(":subdraws=").append(command.indexedDraws().size());
+        }
+        return builder.toString();
+    }
+
+    private static String vertexStreamsKey(VertexStreamBindings streams) {
+        StringBuilder builder = new StringBuilder(128);
+        streams.vertexStreams().stream()
+            .sorted(Comparator.comparingInt(VertexStream::binding))
+            .forEach(stream -> builder.append("stream[")
+                .append(stream.binding())
+                .append("]=")
+                .append(stream.buffer())
+                .append('@')
+                .append(stream.baseOffset())
+                .append(":default=")
+                .append(stream.defaultAttributeBuffer())
+                .append(';'));
+        builder.append("index=").append(indexStreamKey(streams.indexStream()));
+        return builder.toString();
+    }
+
+    private static String indexStreamKey(Optional<IndexStream> stream) {
+        if (stream.isEmpty()) {
+            return "none";
+        }
+        IndexStream index = stream.orElseThrow();
+        return index.buffer() + ":" + index.type() + ":" + index.baseOffset();
     }
 
     private static Optional<Integer> optionalIntAsOptional(OptionalInt value) {

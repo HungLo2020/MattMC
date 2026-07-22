@@ -34,6 +34,9 @@ public final class VulkanicDiagnostics {
         Boolean.getBoolean("mattmc.vulkan.traceStandaloneUniforms");
     public static final boolean TRACE_SHADER_INPUT_PARITY =
         Boolean.getBoolean("mattmc.vulkan.traceShaderInputParity");
+    private static final boolean TRACE_SEMANTIC_DRAW_CONTEXT =
+        TRACE_SHADER_INPUT_PARITY
+            || Boolean.getBoolean("mattmc.perfAudit.semanticDrawIdentity");
     public static final boolean TRACE_SHADER_INPUT_PARITY_POSE_ONLY =
         Boolean.getBoolean("mattmc.vulkan.traceShaderInputParity.poseOnly");
     public static final boolean TRACE_STANDALONE_UNIFORM_BLOCK_MEMBERS =
@@ -201,7 +204,7 @@ public final class VulkanicDiagnostics {
     }
 
     public static Scope pushSemanticContext(@Nullable String context) {
-        if (!TRACE_SHADER_INPUT_PARITY || context == null || context.isBlank()) {
+        if (!TRACE_SEMANTIC_DRAW_CONTEXT || context == null || context.isBlank()) {
             return NO_SCOPE;
         }
         java.util.ArrayDeque<String> stack = SHADER_INPUT_PARITY_SEMANTIC_CONTEXT.get();
@@ -240,7 +243,7 @@ public final class VulkanicDiagnostics {
         int instanceCount,
         int baseVertex
     ) {
-        if (!TRACE_SHADER_INPUT_PARITY) {
+        if (!TRACE_SEMANTIC_DRAW_CONTEXT) {
             return NO_SCOPE;
         }
 
@@ -322,6 +325,22 @@ public final class VulkanicDiagnostics {
         return identity == null
             ? "semanticDrawKey=unavailable semanticSubsystem=unknown semanticPhase=unknown semanticPass=unknown semanticPipeline=unknown semanticVertexShader=unknown semanticFragmentShader=unknown semanticMaterial=unknown semanticOutput=unknown semanticOrdinal=0"
             : identity.fields();
+    }
+
+    public static String currentSemanticWorkloadFamily() {
+        SemanticDrawIdentity identity = SHADER_INPUT_PARITY_SEMANTIC_DRAW.get();
+        if (identity == null) {
+            return "unavailable";
+        }
+        return String.join(
+            "|",
+            valueOrUnknown(identity.subsystem()),
+            valueOrUnknown(identity.phase()),
+            valueOrUnknown(identity.pass()),
+            valueOrUnknown(identity.pipeline()),
+            valueOrUnknown(identity.material()),
+            valueOrUnknown(identity.output())
+        );
     }
 
     public static String currentSemanticDrawKeyOrUnavailable() {
@@ -516,9 +535,7 @@ public final class VulkanicDiagnostics {
     }
 
     public static void recordSubmittedWorkIdentity(String family, String identity) {
-        if (TRACE_SHADER_INPUT_PARITY) {
-            DeterministicCameraCapture.recordSubmittedWorkIdentity(family, identity);
-        }
+        DeterministicCameraCapture.recordSubmittedWorkIdentity(family, identity);
     }
 
     public static boolean defaultDiagnosticsDisabledForTests() {

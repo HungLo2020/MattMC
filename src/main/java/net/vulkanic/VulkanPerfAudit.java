@@ -1,11 +1,15 @@
 package net.vulkanic;
 
+import net.vulkanic.diagnostics.VulkanicDiagnostics;
+
 import java.io.IOException;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -24,6 +28,10 @@ public final class VulkanPerfAudit {
         Boolean.getBoolean("mattmc.perfAudit.legacyGraphicsLowering");
     private static final boolean RESOURCE_PLAN_BREAKDOWN_ENABLED =
         Boolean.getBoolean("mattmc.perfAudit.resourcePlanBreakdown");
+    private static final boolean OPENGL_DRAW_DETAIL_ENABLED =
+        Boolean.getBoolean("mattmc.perfAudit.openGlDrawDetails");
+    private static final boolean OPENGL_STATE_DETAIL_ENABLED =
+        Boolean.getBoolean("mattmc.perfAudit.openGlStateDetails");
     private static final boolean DETERMINISTIC_PERFORMANCE_CAPTURE =
         Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.performanceMode");
     private static final long SNAPSHOT_INTERVAL_NANOS = 5_000_000_000L;
@@ -132,6 +140,34 @@ public final class VulkanPerfAudit {
     private static final LongAdder galV2ResourceSetLookupCount = new LongAdder();
     private static final LongAdder galV2ResourceSetCreateCount = new LongAdder();
     private static final AtomicLong galV2ResourceSetCacheSize = new AtomicLong();
+    private static final LongAdder galV2DrawTemplateLookupCount = new LongAdder();
+    private static final LongAdder galV2DrawTemplateCreateCount = new LongAdder();
+    private static final AtomicLong galV2DrawTemplateCacheSize = new AtomicLong();
+    private static final LongAdder galV2CommandStreamCount = new LongAdder();
+    private static final LongAdder galV2CommandStreamCommandCount = new LongAdder();
+    private static final LongAdder galV2CommandStreamBindCount = new LongAdder();
+    private static final LongAdder galV2CommandStreamDrawCount = new LongAdder();
+    private static final LongAdder galV2CommandStreamSuppressedBindCount = new LongAdder();
+    private static final LongAdder galV2RegistryPruneCount = new LongAdder();
+    private static final AtomicLong galV2RegistryPrunedEntryCount = new AtomicLong();
+    private static final AtomicLong galV2RegistryEntryCount = new AtomicLong();
+    private static final AtomicLong galV2RegistryHighWaterEntryCount = new AtomicLong();
+    private static final AtomicLong galV2RegistryHandleCount = new AtomicLong();
+    private static final AtomicLong galV2RegistryGraphicsObjectCount = new AtomicLong();
+    private static final AtomicLong galV2RegistryResourceLayoutCount = new AtomicLong();
+    private static final AtomicLong galV2RegistryResourceSetCount = new AtomicLong();
+    private static final AtomicLong galV2RegistryUniformLayoutCount = new AtomicLong();
+    private static final AtomicLong galV2RegistryUniformBindingCount = new AtomicLong();
+    private static final AtomicLong galV2RegistryDrawTemplateCount = new AtomicLong();
+    private static final Map<String, LongAdder> openGlGalV2RequestedDraws = new ConcurrentHashMap<>();
+    private static final Map<String, LongAdder> openGlGalV2EmittedDraws = new ConcurrentHashMap<>();
+    private static final Map<String, LongAdder> openGlGalV2RequestedDrawDetails = new ConcurrentHashMap<>();
+    private static final Map<String, LongAdder> openGlGalV2EmittedDrawDetails = new ConcurrentHashMap<>();
+    private static final Map<String, LongAdder> openGlGalV2StateRequested = new ConcurrentHashMap<>();
+    private static final Map<String, LongAdder> openGlGalV2StateEmitted = new ConcurrentHashMap<>();
+    private static final Map<String, LongAdder> measuredFrameWorkloadCounters = new ConcurrentHashMap<>();
+    private static final AtomicLong deterministicPerformanceFrameOrdinal = new AtomicLong(-1L);
+    private static final AtomicLong deterministicPerformanceMeasuredOrdinal = new AtomicLong(-1L);
     private static final LongAdder computeDispatchCount = new LongAdder();
     private static final LongAdder clearCount = new LongAdder();
     private static final LongAdder transferCount = new LongAdder();
@@ -204,7 +240,7 @@ public final class VulkanPerfAudit {
     }
 
     public static void recordRenderPassBegin() {
-        if (!isEnabled()) {
+        if (!descriptorEventsEnabled()) {
             return;
         }
         renderPassBeginCount.increment();
@@ -723,6 +759,14 @@ public final class VulkanPerfAudit {
         maybeWriteSnapshot();
     }
 
+    public static void setDeterministicPerformanceFrameContext(int frameOrdinal, boolean measurementFrame) {
+        if (!isEnabled()) {
+            return;
+        }
+        deterministicPerformanceFrameOrdinal.set(Math.max(0, frameOrdinal));
+        deterministicPerformanceMeasuredOrdinal.set(measurementFrame ? Math.max(0, deterministicMeasuredFrameCount.sum()) : -1L);
+    }
+
     public static void recordPhase(String name, long nanos) {
         if (!isEnabled() || name == null || name.isBlank()) {
             return;
@@ -731,24 +775,27 @@ public final class VulkanPerfAudit {
     }
 
     public static void recordGraphicsDraw() {
-        if (isEnabled()) {
+        if (descriptorEventsEnabled()) {
             graphicsDrawCount.increment();
+            recordMeasuredFrameWorkload("graphicsDraws", 1L);
         }
     }
 
     public static void recordGalV2GraphicsDraw(boolean explicitV2) {
-        if (!isEnabled()) {
+        if (!descriptorEventsEnabled()) {
             return;
         }
         if (explicitV2) {
             galV2GraphicsDrawCount.increment();
+            recordMeasuredFrameWorkload("galV2GraphicsDraws", 1L);
         } else {
             galV2LegacyFallbackDrawCount.increment();
+            recordMeasuredFrameWorkload("galV2FallbackDraws", 1L);
         }
     }
 
     public static void recordGalV2FallbackReason(String reason) {
-        if (!isEnabled()) {
+        if (!descriptorEventsEnabled()) {
             return;
         }
         String normalized = reason == null || reason.isBlank() ? "unknown" : reason;
@@ -777,26 +824,174 @@ public final class VulkanPerfAudit {
         galV2ResourceSetCacheSize.set(Math.max(0, cacheSize));
     }
 
+    public static void recordGalV2DrawTemplateLookup(boolean created, int cacheSize) {
+        if (!isEnabled()) {
+            return;
+        }
+        galV2DrawTemplateLookupCount.increment();
+        if (created) {
+            galV2DrawTemplateCreateCount.increment();
+        }
+        galV2DrawTemplateCacheSize.set(Math.max(0, cacheSize));
+    }
+
+    public static void recordGalV2CommandStream(int commandCount, int bindCount, int drawCount, int suppressedBindCount) {
+        if (!isEnabled()) {
+            return;
+        }
+        galV2CommandStreamCount.increment();
+        galV2CommandStreamCommandCount.add(Math.max(0, commandCount));
+        galV2CommandStreamBindCount.add(Math.max(0, bindCount));
+        galV2CommandStreamDrawCount.add(Math.max(0, drawCount));
+        galV2CommandStreamSuppressedBindCount.add(Math.max(0, suppressedBindCount));
+    }
+
+    public static void recordGalV2RegistryPrune(int entryCount) {
+        if (!isEnabled()) {
+            return;
+        }
+        galV2RegistryPruneCount.increment();
+        galV2RegistryPrunedEntryCount.set(Math.max(0, entryCount));
+    }
+
+    public static void recordGalV2RegistrySnapshot(
+        int totalEntries,
+        int handleEntries,
+        int graphicsObjectEntries,
+        int resourceLayoutEntries,
+        int resourceSetEntries,
+        int uniformLayoutEntries,
+        int uniformBindingEntries,
+        int drawTemplateEntries
+    ) {
+        if (!isEnabled()) {
+            return;
+        }
+        int clampedTotal = Math.max(0, totalEntries);
+        galV2RegistryEntryCount.set(clampedTotal);
+        updateMax(galV2RegistryHighWaterEntryCount, clampedTotal);
+        galV2RegistryHandleCount.set(Math.max(0, handleEntries));
+        galV2RegistryGraphicsObjectCount.set(Math.max(0, graphicsObjectEntries));
+        galV2RegistryResourceLayoutCount.set(Math.max(0, resourceLayoutEntries));
+        galV2RegistryResourceSetCount.set(Math.max(0, resourceSetEntries));
+        galV2RegistryUniformLayoutCount.set(Math.max(0, uniformLayoutEntries));
+        galV2RegistryUniformBindingCount.set(Math.max(0, uniformBindingEntries));
+        galV2RegistryDrawTemplateCount.set(Math.max(0, drawTemplateEntries));
+    }
+
+    public static void recordOpenGlGalV2RequestedDraw(String family, String commandKind, int semanticSubdraws) {
+        if (!shouldTraceLegacyGraphicsLowering()) {
+            return;
+        }
+        String key = descriptorFamily(family) + "." + normalizeKey(commandKind, "unknown");
+        openGlGalV2RequestedDraws.computeIfAbsent(key, ignored -> new LongAdder()).increment();
+        recordMeasuredFrameWorkload("openglRequestedDraws." + key, 1L);
+        if (OPENGL_DRAW_DETAIL_ENABLED) {
+            String detailKey = normalizeKey(family, "unknown") + "." + normalizeKey(commandKind, "unknown");
+            openGlGalV2RequestedDrawDetails.computeIfAbsent(detailKey, ignored -> new LongAdder()).increment();
+            recordMeasuredFrameWorkload("openglRequestedDrawDetails." + detailKey, 1L);
+        }
+        recordLegacyGraphicsLoweringAllocation(
+            family,
+            "opengl_requested_subdraws_" + normalizeKey(commandKind, "unknown"),
+            Math.max(0, semanticSubdraws),
+            0L
+        );
+    }
+
+    public static void recordOpenGlGalV2EmittedDraw(String family, String commandKind, int glCommandCount) {
+        if (!shouldTraceLegacyGraphicsLowering()) {
+            return;
+        }
+        String key = descriptorFamily(family) + "." + normalizeKey(commandKind, "unknown");
+        openGlGalV2EmittedDraws.computeIfAbsent(key, ignored -> new LongAdder()).add(Math.max(0, glCommandCount));
+        recordMeasuredFrameWorkload("openglEmittedDraws." + key, Math.max(0, glCommandCount));
+        if (OPENGL_DRAW_DETAIL_ENABLED) {
+            String detailKey = normalizeKey(family, "unknown") + "." + normalizeKey(commandKind, "unknown");
+            openGlGalV2EmittedDrawDetails.computeIfAbsent(detailKey, ignored -> new LongAdder()).add(Math.max(0, glCommandCount));
+            recordMeasuredFrameWorkload("openglEmittedDrawDetails." + detailKey, Math.max(0, glCommandCount));
+        }
+    }
+
+    public static void recordOpenGlGalV2StateOperation(String family, String operation, boolean emitted) {
+        if (!shouldTraceLegacyGraphicsLowering()) {
+            return;
+        }
+        if (!OPENGL_STATE_DETAIL_ENABLED && operation.indexOf('.') >= 0) {
+            return;
+        }
+        String key = descriptorFamily(family) + "." + normalizeKey(operation, "unknown");
+        openGlGalV2StateRequested.computeIfAbsent(key, ignored -> new LongAdder()).increment();
+        if (emitted) {
+            openGlGalV2StateEmitted.computeIfAbsent(key, ignored -> new LongAdder()).increment();
+        }
+    }
+
     public static void recordComputeDispatch() {
-        if (isEnabled()) {
+        if (descriptorEventsEnabled()) {
             computeDispatchCount.increment();
+            recordMeasuredFrameWorkload("computeDispatches", 1L);
         }
     }
 
     public static void recordClear() {
-        if (isEnabled()) {
+        if (descriptorEventsEnabled()) {
             clearCount.increment();
+            recordMeasuredFrameWorkload("clears", 1L);
         }
     }
 
     public static void recordTransfer() {
-        if (isEnabled()) {
+        if (descriptorEventsEnabled()) {
             transferCount.increment();
+            recordMeasuredFrameWorkload("transfers", 1L);
         }
+    }
+
+    private static void recordMeasuredFrameWorkload(String key, long amount) {
+        long measuredOrdinal = deterministicPerformanceMeasuredOrdinal.get();
+        if (measuredOrdinal < 0L || amount <= 0L) {
+            return;
+        }
+        String counterKey = "frame" + measuredOrdinal + "." + normalizeKey(key, "unknown");
+        measuredFrameWorkloadCounters.computeIfAbsent(counterKey, ignored -> new LongAdder()).add(amount);
     }
 
     public static void flush() {
         writeSnapshotQuietly();
+    }
+
+    public static String observedWorkloadSignatureHash() {
+        return sha256Hex(observedWorkloadSignatureCanonical());
+    }
+
+    public static void appendObservedWorkloadSignatureJson(StringBuilder builder, int indent) {
+        String spaces = " ".repeat(Math.max(0, indent));
+        builder.append(spaces).append("\"observedWorkloadSignature\": {\n");
+        appendJsonNumberField(builder, indent + 2, "schemaVersion", 1).append(",\n");
+        appendJsonNumberField(builder, indent + 2, "presentedFrames", presentedFrameCount.sum()).append(",\n");
+        appendJsonNumberField(builder, indent + 2, "warmupFrames", deterministicWarmupFrameCount.sum()).append(",\n");
+        appendJsonNumberField(builder, indent + 2, "measuredFrames", deterministicMeasuredFrameCount.sum()).append(",\n");
+        appendJsonNumberField(builder, indent + 2, "renderPassBegins", renderPassBeginCount.sum()).append(",\n");
+        appendJsonNumberField(builder, indent + 2, "graphicsDraws", graphicsDrawCount.sum()).append(",\n");
+        appendJsonNumberField(builder, indent + 2, "galV2GraphicsDraws", galV2GraphicsDrawCount.sum()).append(",\n");
+        appendJsonNumberField(builder, indent + 2, "galV2FallbackDraws", galV2LegacyFallbackDrawCount.sum()).append(",\n");
+        appendJsonNumberField(builder, indent + 2, "computeDispatches", computeDispatchCount.sum()).append(",\n");
+        appendJsonNumberField(builder, indent + 2, "clears", clearCount.sum()).append(",\n");
+        appendJsonNumberField(builder, indent + 2, "transfers", transferCount.sum()).append(",\n");
+        appendJsonNumberField(builder, indent + 2, "descriptorPlans", descriptorPlanCount.sum()).append(",\n");
+        appendJsonNumberField(builder, indent + 2, "descriptorSetsAllocated", descriptorSetAllocationCount.sum()).append(",\n");
+        appendJsonNumberField(builder, indent + 2, "descriptorSetsUpdated", descriptorSetUpdateCount.sum()).append(",\n");
+        appendJsonMap(builder, indent + 2, "galV2FallbackReasons", galV2FallbackReasons).append(",\n");
+        appendJsonMap(builder, indent + 2, "openglRequestedDraws", openGlGalV2RequestedDraws).append(",\n");
+        appendJsonMap(builder, indent + 2, "openglEmittedDraws", openGlGalV2EmittedDraws).append(",\n");
+        appendJsonMap(builder, indent + 2, "openglRequestedDrawDetails", openGlGalV2RequestedDrawDetails).append(",\n");
+        appendJsonMap(builder, indent + 2, "openglEmittedDrawDetails", openGlGalV2EmittedDrawDetails).append(",\n");
+        appendJsonMap(builder, indent + 2, "openglStateRequested", openGlGalV2StateRequested).append(",\n");
+        appendJsonMap(builder, indent + 2, "openglStateEmitted", openGlGalV2StateEmitted).append(",\n");
+        appendJsonLegacyGraphicsFamilies(builder, indent + 2).append(",\n");
+        appendJsonMap(builder, indent + 2, "measuredFrameWorkload", measuredFrameWorkloadCounters);
+        builder.append('\n').append(spaces).append('}');
     }
 
     private static void maybeWriteSnapshot() {
@@ -836,6 +1031,7 @@ public final class VulkanPerfAudit {
         StringBuilder builder = new StringBuilder(1024);
         builder.append("timestamp_utc=").append(Instant.now()).append('\n');
         builder.append("backend=").append(System.getProperty("mattmc.perfAudit.backend", "vulkan")).append('\n');
+        builder.append("observed_workload_signature_hash=").append(observedWorkloadSignatureHash()).append('\n');
         builder.append("diagnostic_issue=").append(diagnosticIssue).append('\n');
         builder.append("diagnostic_hint=").append(diagnosticHint(diagnosticIssue)).append('\n');
         builder.append("begin_frame_call_count=").append(beginFrameCallCount.sum()).append('\n');
@@ -890,6 +1086,34 @@ public final class VulkanPerfAudit {
             .append(Math.max(0L, galV2ResourceSetLookupCount.sum() - galV2ResourceSetCreateCount.sum()))
             .append('\n');
         builder.append("gal_v2_resource_set_cache_size=").append(galV2ResourceSetCacheSize.get()).append('\n');
+        builder.append("gal_v2_draw_template_lookup_count=").append(galV2DrawTemplateLookupCount.sum()).append('\n');
+        builder.append("gal_v2_draw_template_create_count=").append(galV2DrawTemplateCreateCount.sum()).append('\n');
+        builder.append("gal_v2_draw_template_reuse_count=")
+            .append(Math.max(0L, galV2DrawTemplateLookupCount.sum() - galV2DrawTemplateCreateCount.sum()))
+            .append('\n');
+        builder.append("gal_v2_draw_template_cache_size=").append(galV2DrawTemplateCacheSize.get()).append('\n');
+        builder.append("gal_v2_command_stream_count=").append(galV2CommandStreamCount.sum()).append('\n');
+        builder.append("gal_v2_command_stream_command_count=").append(galV2CommandStreamCommandCount.sum()).append('\n');
+        builder.append("gal_v2_command_stream_bind_count=").append(galV2CommandStreamBindCount.sum()).append('\n');
+        builder.append("gal_v2_command_stream_draw_count=").append(galV2CommandStreamDrawCount.sum()).append('\n');
+        builder.append("gal_v2_command_stream_suppressed_bind_count=").append(galV2CommandStreamSuppressedBindCount.sum()).append('\n');
+        builder.append("gal_v2_registry_prune_count=").append(galV2RegistryPruneCount.sum()).append('\n');
+        builder.append("gal_v2_registry_pruned_entry_count=").append(galV2RegistryPrunedEntryCount.get()).append('\n');
+        builder.append("gal_v2_registry_entry_count=").append(galV2RegistryEntryCount.get()).append('\n');
+        builder.append("gal_v2_registry_high_water_entry_count=").append(galV2RegistryHighWaterEntryCount.get()).append('\n');
+        builder.append("gal_v2_registry_handle_count=").append(galV2RegistryHandleCount.get()).append('\n');
+        builder.append("gal_v2_registry_graphics_object_count=").append(galV2RegistryGraphicsObjectCount.get()).append('\n');
+        builder.append("gal_v2_registry_resource_layout_count=").append(galV2RegistryResourceLayoutCount.get()).append('\n');
+        builder.append("gal_v2_registry_resource_set_count=").append(galV2RegistryResourceSetCount.get()).append('\n');
+        builder.append("gal_v2_registry_uniform_layout_count=").append(galV2RegistryUniformLayoutCount.get()).append('\n');
+        builder.append("gal_v2_registry_uniform_binding_count=").append(galV2RegistryUniformBindingCount.get()).append('\n');
+        builder.append("gal_v2_registry_draw_template_count=").append(galV2RegistryDrawTemplateCount.get()).append('\n');
+        appendLongAdderMap(builder, "opengl_gal_v2_requested_draw", openGlGalV2RequestedDraws);
+        appendLongAdderMap(builder, "opengl_gal_v2_emitted_draw", openGlGalV2EmittedDraws);
+        appendLongAdderMap(builder, "opengl_gal_v2_requested_draw_detail", openGlGalV2RequestedDrawDetails);
+        appendLongAdderMap(builder, "opengl_gal_v2_emitted_draw_detail", openGlGalV2EmittedDrawDetails);
+        appendLongAdderMap(builder, "opengl_gal_v2_state_requested", openGlGalV2StateRequested);
+        appendLongAdderMap(builder, "opengl_gal_v2_state_emitted", openGlGalV2StateEmitted);
         appendLongAdderMap(builder, "gal_v2_fallback_reason", galV2FallbackReasons);
         builder.append("compute_dispatch_count=").append(computeDispatchCount.sum()).append('\n');
         builder.append("clear_count=").append(clearCount.sum()).append('\n');
@@ -971,6 +1195,182 @@ public final class VulkanPerfAudit {
                 .append('=')
                 .append(entry.getValue().sum())
                 .append('\n');
+        }
+    }
+
+    private static String observedWorkloadSignatureCanonical() {
+        StringBuilder builder = new StringBuilder(1024);
+        builder.append("schemaVersion=1\n");
+        builder.append("presentedFrames=").append(presentedFrameCount.sum()).append('\n');
+        builder.append("warmupFrames=").append(deterministicWarmupFrameCount.sum()).append('\n');
+        builder.append("measuredFrames=").append(deterministicMeasuredFrameCount.sum()).append('\n');
+        builder.append("renderPassBegins=").append(renderPassBeginCount.sum()).append('\n');
+        builder.append("graphicsDraws=").append(graphicsDrawCount.sum()).append('\n');
+        builder.append("galV2GraphicsDraws=").append(galV2GraphicsDrawCount.sum()).append('\n');
+        builder.append("galV2FallbackDraws=").append(galV2LegacyFallbackDrawCount.sum()).append('\n');
+        builder.append("computeDispatches=").append(computeDispatchCount.sum()).append('\n');
+        builder.append("clears=").append(clearCount.sum()).append('\n');
+        builder.append("transfers=").append(transferCount.sum()).append('\n');
+        builder.append("descriptorPlans=").append(descriptorPlanCount.sum()).append('\n');
+        builder.append("descriptorSetsAllocated=").append(descriptorSetAllocationCount.sum()).append('\n');
+        builder.append("descriptorSetsUpdated=").append(descriptorSetUpdateCount.sum()).append('\n');
+        appendCanonicalMap(builder, "galV2FallbackReasons", galV2FallbackReasons);
+        appendCanonicalMap(builder, "openglRequestedDraws", openGlGalV2RequestedDraws);
+        appendCanonicalMap(builder, "openglEmittedDraws", openGlGalV2EmittedDraws);
+        appendCanonicalMap(builder, "openglRequestedDrawDetails", openGlGalV2RequestedDrawDetails);
+        appendCanonicalMap(builder, "openglEmittedDrawDetails", openGlGalV2EmittedDrawDetails);
+        appendCanonicalMap(builder, "openglStateRequested", openGlGalV2StateRequested);
+        appendCanonicalMap(builder, "openglStateEmitted", openGlGalV2StateEmitted);
+        appendCanonicalLegacyGraphicsFamilies(builder);
+        appendCanonicalMap(builder, "measuredFrameWorkload", measuredFrameWorkloadCounters);
+        return builder.toString();
+    }
+
+    private static void appendCanonicalMap(StringBuilder builder, String prefix, Map<String, LongAdder> values) {
+        ArrayList<Map.Entry<String, LongAdder>> entries = new ArrayList<>(values.entrySet());
+        entries.sort(Map.Entry.comparingByKey());
+        for (Map.Entry<String, LongAdder> entry : entries) {
+            builder.append(prefix)
+                .append('.')
+                .append(normalizeKey(entry.getKey(), "unknown"))
+                .append('=')
+                .append(entry.getValue().sum())
+                .append('\n');
+        }
+    }
+
+    private static void appendCanonicalLegacyGraphicsFamilies(StringBuilder builder) {
+        ArrayList<Map.Entry<String, LegacyGraphicsLoweringCounters>> families =
+            new ArrayList<>(legacyGraphicsLoweringFamilies.entrySet());
+        families.sort(Map.Entry.comparingByKey());
+        for (Map.Entry<String, LegacyGraphicsLoweringCounters> family : families) {
+            String familyKey = normalizeKey(family.getKey(), "unknown");
+            builder.append("legacyGraphicsFamily.").append(familyKey)
+                .append(".stepCount=").append(family.getValue().stepCount()).append('\n');
+            appendCanonicalPhaseCounts(builder, "legacyGraphicsFamily." + familyKey + ".step", family.getValue().steps);
+            appendCanonicalCacheCounts(builder, "legacyGraphicsFamily." + familyKey + ".cache", family.getValue().caches);
+            appendCanonicalAllocationCounts(builder, "legacyGraphicsFamily." + familyKey + ".allocation", family.getValue().allocations);
+        }
+    }
+
+    private static void appendCanonicalPhaseCounts(StringBuilder builder, String prefix, Map<String, PhaseCounters> values) {
+        ArrayList<Map.Entry<String, PhaseCounters>> entries = new ArrayList<>(values.entrySet());
+        entries.sort(Map.Entry.comparingByKey());
+        for (Map.Entry<String, PhaseCounters> entry : entries) {
+            builder.append(prefix).append('.').append(normalizeKey(entry.getKey(), "unknown"))
+                .append(".count=").append(entry.getValue().count.sum()).append('\n');
+        }
+    }
+
+    private static void appendCanonicalCacheCounts(StringBuilder builder, String prefix, Map<String, LoweringCacheCounters> values) {
+        ArrayList<Map.Entry<String, LoweringCacheCounters>> entries = new ArrayList<>(values.entrySet());
+        entries.sort(Map.Entry.comparingByKey());
+        for (Map.Entry<String, LoweringCacheCounters> entry : entries) {
+            LoweringCacheCounters counters = entry.getValue();
+            String key = prefix + "." + normalizeKey(entry.getKey(), "unknown");
+            builder.append(key).append(".lookups=").append(counters.lookupCount.sum()).append('\n');
+            builder.append(key).append(".hits=").append(counters.hitCount.sum()).append('\n');
+            builder.append(key).append(".misses=").append(counters.missCount.sum()).append('\n');
+        }
+    }
+
+    private static void appendCanonicalAllocationCounts(
+        StringBuilder builder,
+        String prefix,
+        Map<String, LoweringAllocationCounters> values
+    ) {
+        ArrayList<Map.Entry<String, LoweringAllocationCounters>> entries = new ArrayList<>(values.entrySet());
+        entries.sort(Map.Entry.comparingByKey());
+        for (Map.Entry<String, LoweringAllocationCounters> entry : entries) {
+            LoweringAllocationCounters counters = entry.getValue();
+            String key = prefix + "." + normalizeKey(entry.getKey(), "unknown");
+            builder.append(key).append(".objects=").append(counters.objectCount.sum()).append('\n');
+            builder.append(key).append(".bytes=").append(counters.estimatedBytes.sum()).append('\n');
+        }
+    }
+
+    private static StringBuilder appendJsonNumberField(StringBuilder builder, int indent, String key, long value) {
+        builder.append(" ".repeat(Math.max(0, indent))).append('"').append(key).append("\": ").append(value);
+        return builder;
+    }
+
+    private static StringBuilder appendJsonMap(StringBuilder builder, int indent, String key, Map<String, LongAdder> values) {
+        builder.append(" ".repeat(Math.max(0, indent))).append('"').append(key).append("\": {");
+        ArrayList<Map.Entry<String, LongAdder>> entries = new ArrayList<>(values.entrySet());
+        entries.sort(Map.Entry.comparingByKey());
+        if (!entries.isEmpty()) {
+            builder.append('\n');
+            for (int index = 0; index < entries.size(); index++) {
+                Map.Entry<String, LongAdder> entry = entries.get(index);
+                builder.append(" ".repeat(Math.max(0, indent + 2)))
+                    .append('"').append(jsonEscape(normalizeKey(entry.getKey(), "unknown"))).append("\": ")
+                    .append(entry.getValue().sum())
+                    .append(index + 1 == entries.size() ? "\n" : ",\n");
+            }
+            builder.append(" ".repeat(Math.max(0, indent)));
+        }
+        builder.append('}');
+        return builder;
+    }
+
+    private static StringBuilder appendJsonLegacyGraphicsFamilies(StringBuilder builder, int indent) {
+        builder.append(" ".repeat(Math.max(0, indent))).append("\"legacyGraphicsFamilies\": {");
+        ArrayList<Map.Entry<String, LegacyGraphicsLoweringCounters>> families =
+            new ArrayList<>(legacyGraphicsLoweringFamilies.entrySet());
+        families.sort(Map.Entry.comparingByKey());
+        if (!families.isEmpty()) {
+            builder.append('\n');
+            for (int index = 0; index < families.size(); index++) {
+                Map.Entry<String, LegacyGraphicsLoweringCounters> family = families.get(index);
+                String key = normalizeKey(family.getKey(), "unknown");
+                builder.append(" ".repeat(Math.max(0, indent + 2)))
+                    .append('"').append(jsonEscape(key)).append("\": { ");
+                builder.append("\"stepCount\": ").append(family.getValue().stepCount());
+                builder.append(", \"cacheLookups\": ").append(cacheLookupCount(family.getValue().caches));
+                builder.append(", \"allocationObjects\": ").append(allocationObjectCount(family.getValue().allocations));
+                builder.append(" }").append(index + 1 == families.size() ? "\n" : ",\n");
+            }
+            builder.append(" ".repeat(Math.max(0, indent)));
+        }
+        builder.append('}');
+        return builder;
+    }
+
+    private static long cacheLookupCount(Map<String, LoweringCacheCounters> values) {
+        long total = 0L;
+        for (LoweringCacheCounters counters : values.values()) {
+            total += counters.lookupCount.sum();
+        }
+        return total;
+    }
+
+    private static long allocationObjectCount(Map<String, LoweringAllocationCounters> values) {
+        long total = 0L;
+        for (LoweringAllocationCounters counters : values.values()) {
+            total += counters.objectCount.sum();
+        }
+        return total;
+    }
+
+    private static String jsonEscape(String value) {
+        return value == null ? "" : value
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r");
+    }
+
+    private static String sha256Hex(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] bytes = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder(bytes.length * 2);
+            for (byte b : bytes) {
+                builder.append(String.format(Locale.ROOT, "%02x", b & 0xFF));
+            }
+            return builder.toString();
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
         }
     }
 
@@ -1292,6 +1692,25 @@ public final class VulkanPerfAudit {
 
     private static String descriptorFamily(String pipelineLocation) {
         String key = normalizeKey(pipelineLocation, "unknown");
+        if (key.startsWith("gal-v2_legacy-program_")) {
+            int start = "gal-v2_legacy-program_".length();
+            int end = start;
+            while (end < key.length() && Character.isDigit(key.charAt(end))) {
+                end++;
+            }
+            if (end > start) {
+                key = "vulkanic_legacy_program_" + key.substring(start, end);
+            } else {
+                key = "gal_v2_legacy_program";
+            }
+        }
+        if (key.startsWith("legacy_") || key.contains("compatibility-state")) {
+            String semanticFamily = VulkanicDiagnostics.currentSemanticWorkloadFamily();
+            String normalizedSemanticFamily = normalizeKey(semanticFamily, "");
+            if (!normalizedSemanticFamily.isEmpty() && !"unavailable".equals(normalizedSemanticFamily)) {
+                key = key + "." + normalizedSemanticFamily;
+            }
+        }
         if (key.contains("sodium") || key.contains("chunk") || key.contains("terrain")) {
             return "terrain";
         }

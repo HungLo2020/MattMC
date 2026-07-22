@@ -971,6 +971,9 @@ public class LodRenderer
 						+ ":vboIndex=" + vboIndex
 						+ ":vertices=" + vbo.getVertexCount()
 						+ ":indices=" + indexCount;
+				VulkanicAPI.recordShaderInputParitySubmittedWorkIdentity(
+						"distant-horizons",
+						lodWorkIdentity);
 				try (VulkanicAPI.ShaderInputParityScope ignored = VulkanicAPI.beginShaderInputParitySemanticDraw(
 						"dh-lod-terrain-draw",
 						"distant-horizons",

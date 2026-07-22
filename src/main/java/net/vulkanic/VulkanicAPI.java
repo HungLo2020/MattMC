@@ -2643,10 +2643,8 @@ public class VulkanicAPI {
     ) {
         GraphicsBackend backend = getBackend();
         long captureStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
-        VulkanicCompatibilityState.GraphicsSnapshot graphicsSnapshot = compatibilityState.captureGraphics(request);
         java.util.Optional<VulkanicGalV2.ExplicitGraphicsDrawRequest> explicitV2Request =
-            VulkanicGalV2.tryCaptureLegacyProgramSlice(
-                graphicsSnapshot,
+            compatibilityState.tryCaptureGalV2GraphicsDraw(
                 request,
                 backend.requiresEagerGraphicsResourceDeclarations());
         VulkanicGalExecutionRequest.GraphicsDrawRequest capturedRequest = null;
@@ -2669,6 +2667,7 @@ public class VulkanicAPI {
                 VulkanPerfAudit.recordPhase("gal.graphics.backend", System.nanoTime() - backendStartNanos);
             }
         } else {
+            compatibilityState.resetGalV2CommandEncoder();
             capturedRequest = VulkanicGalSnapshotBuilder.captureGraphicsDraw(ctx, backend, compatibilityState, request);
             if (captureStartNanos != 0L) {
                 VulkanPerfAudit.recordPhase("gal.graphics.capture", System.nanoTime() - captureStartNanos);
@@ -10984,6 +10983,7 @@ public class VulkanicAPI {
      * In Vulkan this acquires the next swapchain image and returns its index.
      */
     public static int beginFrame() {
+        compatibilityState.resetGalV2CommandEncoder();
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         if (directVulkanBackend != null) {
             return directVulkanBackend.beginFrame();
@@ -10998,6 +10998,7 @@ public class VulkanicAPI {
      * In Vulkan this presents the currently acquired swapchain image.
      */
     public static void endFrame() {
+        compatibilityState.resetGalV2CommandEncoder();
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         if (directVulkanBackend != null) {
             directVulkanBackend.endFrame();

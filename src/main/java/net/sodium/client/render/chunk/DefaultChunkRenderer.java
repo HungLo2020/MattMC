@@ -566,7 +566,7 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         String stableState = terrainState
             .replaceAll(";vf=[^;:]+", ";vf=settled")
             .replaceAll(";h=[^:]+", ";h=settled")
-            .replaceAll(":draws=[^:]+$", "");
+            .replaceAll(";dh=[^:]+", ";dh=settled");
         return sodiumTerrainPassLabel(terrainPass, region, stableState);
     }
 

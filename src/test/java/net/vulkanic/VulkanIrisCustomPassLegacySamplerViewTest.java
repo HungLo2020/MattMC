@@ -56,4 +56,16 @@ public class VulkanIrisCustomPassLegacySamplerViewTest {
 		assertTrue(backendSource.contains("return null;"),
 			"Unsupported legacy sampler formats should leave the custom-pass sampler unbound instead of crashing the client");
 	}
+
+	@Test
+	void fullRangeLegacySamplerViewsReuseDefaultImageView() throws IOException {
+		String backendSource = readSource("net/vulkanic/backends/vulkan/VulkanBackend.java");
+
+		assertTrue(backendSource.contains("boolean canUseDefaultView = baseMipLevel == 0 && mipLevelCount == legacyTexture.mipLevels"),
+			"Full-range legacy sampler views should use the already-owned default VkImageView");
+		assertTrue(backendSource.contains("legacyTexture.defaultViewHandle"),
+			"Default legacy image views should remain the sampled descriptor identity for full-range views");
+		assertTrue(!backendSource.contains("boolean forceOwnedView = (texture.usage() & VulkanicTexture.USAGE_RENDER_ATTACHMENT) == 0"),
+			"Texture wrapper usage must not force per-draw owned VkImageViews that descriptor planning remaps away");
+	}
 }
