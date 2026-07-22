@@ -70,6 +70,8 @@ public final class DeterministicCameraCapture {
 	private static final Path METADATA_PATH = Path.of(System.getProperty("mattmc.dev.deterministicCameraCapture.metadata", "run/deterministic_camera_capture.json"));
 	private static final Path SCREENSHOT_DIR = Path.of(System.getProperty("mattmc.dev.deterministicCameraCapture.screenshotDir", "run/deterministic_camera_capture"));
 	private static final Path PERFORMANCE_STATUS_PATH = Path.of(System.getProperty("mattmc.dev.deterministicCameraCapture.performanceStatus", "run/deterministic_performance_capture.json"));
+	private static final String BENCHMARK_FINGERPRINT_SCHEMA_VERSION = "2";
+	private static final String HARNESS_VERSION = "rundevcapture-perf-matrix-v2";
 
 	private static final List<PoseCapture> CAPTURES = new ArrayList<>();
 	private static boolean initialized;
@@ -911,9 +913,50 @@ public final class DeterministicCameraCapture {
 		return System.getProperty("mattmc.dev.deterministicCameraCapture.gitCommit", "unknown");
 	}
 
+	private static String repositoryIdentity() {
+		return System.getProperty("mattmc.dev.deterministicCameraCapture.repositoryIdentity", "current");
+	}
+
+	private static String repositoryWorktree() {
+		return System.getProperty("mattmc.dev.deterministicCameraCapture.repositoryWorktree", "unknown");
+	}
+
+	private static String jvmFingerprint() {
+		return System.getProperty(
+			"mattmc.dev.deterministicCameraCapture.jvmFingerprint",
+			System.getProperty("java.vm.name", "unknown-vm") + "|"
+				+ System.getProperty("java.vendor", "unknown-vendor") + "|"
+				+ System.getProperty("java.version", "unknown-version")
+		);
+	}
+
+	private static String graphicsSettingsFingerprint() {
+		return System.getProperty("mattmc.dev.deterministicCameraCapture.graphicsSettingsFingerprint", "unknown");
+	}
+
+	private static String distantHorizonsConfigFingerprint() {
+		return System.getProperty("mattmc.dev.deterministicCameraCapture.dhConfigFingerprint", "unknown");
+	}
+
+	private static String optionalStaticString(String className, String fieldName, String methodName) {
+		try {
+			Class<?> type = Class.forName(className, false, DeterministicCameraCapture.class.getClassLoader());
+			try {
+				return String.valueOf(type.getField(fieldName).get(null));
+			} catch (NoSuchFieldException ignored) {
+				return String.valueOf(type.getMethod(methodName).invoke(null));
+			}
+		} catch (ReflectiveOperationException | LinkageError exception) {
+			return "unavailable";
+		}
+	}
+
 	private static StringBuilder appendBenchmarkFingerprint(StringBuilder json, String dimension, Vec3 benchmarkPosition) {
 		json.append("  \"benchmarkFingerprint\": {\n");
-		appendField(json, "schemaVersion", "1", 4).append(",\n");
+		appendField(json, "schemaVersion", BENCHMARK_FINGERPRINT_SCHEMA_VERSION, 4).append(",\n");
+		appendField(json, "repositoryIdentity", repositoryIdentity(), 4).append(",\n");
+		appendField(json, "repositoryCommit", gitCommit(), 4).append(",\n");
+		appendField(json, "repositoryWorktree", repositoryWorktree(), 4).append(",\n");
 		appendField(json, "backend", activeBackend(), 4).append(",\n");
 		appendField(json, "shaderEnabled", shaderEnabled(), 4).append(",\n");
 		appendField(json, "shaderPack", shaderPack(), 4).append(",\n");
@@ -921,6 +964,7 @@ public final class DeterministicCameraCapture {
 		appendField(json, "world", WORLD_NAME, 4).append(",\n");
 		appendField(json, "dimension", dimension, 4).append(",\n");
 		json.append("    \"distantHorizonsActive\": ").append(isDistantHorizonsActive()).append(",\n");
+		appendField(json, "distantHorizonsConfig", distantHorizonsConfigFingerprint(), 4).append(",\n");
 		appendField(json, "cameraPath", CAMERA_PATH_ID, 4).append(",\n");
 		appendVec3(json, "position", benchmarkPosition, 4).append(",\n");
 		json.append("    \"yaw\": ").append(format(initialPose == null ? 0.0F : initialPose.yaw())).append(",\n");
@@ -933,15 +977,23 @@ public final class DeterministicCameraCapture {
 		json.append("    \"settledReadyFrames\": ").append(SETTLED_READY_FRAMES).append(",\n");
 		json.append("    \"settledReadyMaxWaitFrames\": ").append(SETTLED_READY_MAX_WAIT_FRAMES).append(",\n");
 		appendField(json, "settledReadyFamilies", String.join(",", SETTLED_READY_FAMILIES), 4).append(",\n");
+		appendField(json, "graphicsSettings", graphicsSettingsFingerprint(), 4).append(",\n");
+		appendField(json, "jvm", jvmFingerprint(), 4).append(",\n");
+		appendField(json, "harness", HARNESS_VERSION, 4).append(",\n");
 		appendField(json, "profilerFlags", profilerFlags(), 4).append(",\n");
 		appendField(json, "galContractVersion", VulkanicGalExecutionRequest.CONTRACT_VERSION, 4).append(",\n");
-		appendField(json, "galContractFingerprint", VulkanicGalExecutionRequest.contractSchemaFingerprint(), 4).append("\n");
+		appendField(json, "galContractFingerprint", VulkanicGalExecutionRequest.contractSchemaFingerprint(), 4).append(",\n");
+		appendField(json, "galV2ContractVersion", optionalStaticString("net.vulkanic.VulkanicGalV2", "CONTRACT_VERSION", "contractVersion"), 4).append(",\n");
+		appendField(json, "galV2ContractFingerprint", optionalStaticString("net.vulkanic.VulkanicGalV2", "CONTRACT_SCHEMA_FINGERPRINT", "contractSchemaFingerprint"), 4).append("\n");
 		json.append("  }");
 		return json;
 	}
 
 	private static String benchmarkFingerprintHash(String dimension, Vec3 benchmarkPosition) {
-		String canonical = "schemaVersion=1\n"
+		String canonical = "schemaVersion=" + BENCHMARK_FINGERPRINT_SCHEMA_VERSION + "\n"
+			+ "repositoryIdentity=" + repositoryIdentity() + "\n"
+			+ "repositoryCommit=" + gitCommit() + "\n"
+			+ "repositoryWorktree=" + repositoryWorktree() + "\n"
 			+ "backend=" + activeBackend() + "\n"
 			+ "shaderEnabled=" + shaderEnabled() + "\n"
 			+ "shaderPack=" + shaderPack() + "\n"
@@ -949,6 +1001,7 @@ public final class DeterministicCameraCapture {
 			+ "world=" + WORLD_NAME + "\n"
 			+ "dimension=" + dimension + "\n"
 			+ "distantHorizonsActive=" + isDistantHorizonsActive() + "\n"
+			+ "distantHorizonsConfig=" + distantHorizonsConfigFingerprint() + "\n"
 			+ "cameraPath=" + CAMERA_PATH_ID + "\n"
 			+ "position=" + format(benchmarkPosition.x) + "," + format(benchmarkPosition.y) + "," + format(benchmarkPosition.z) + "\n"
 			+ "yaw=" + format(initialPose == null ? 0.0F : initialPose.yaw()) + "\n"
@@ -961,9 +1014,14 @@ public final class DeterministicCameraCapture {
 			+ "settledReadyFrames=" + SETTLED_READY_FRAMES + "\n"
 			+ "settledReadyMaxWaitFrames=" + SETTLED_READY_MAX_WAIT_FRAMES + "\n"
 			+ "settledReadyFamilies=" + String.join(",", SETTLED_READY_FAMILIES) + "\n"
+			+ "graphicsSettings=" + graphicsSettingsFingerprint() + "\n"
+			+ "jvm=" + jvmFingerprint() + "\n"
+			+ "harness=" + HARNESS_VERSION + "\n"
 			+ "profilerFlags=" + profilerFlags() + "\n"
 			+ "galContractVersion=" + VulkanicGalExecutionRequest.CONTRACT_VERSION + "\n"
-			+ "galContractFingerprint=" + VulkanicGalExecutionRequest.contractSchemaFingerprint() + "\n";
+			+ "galContractFingerprint=" + VulkanicGalExecutionRequest.contractSchemaFingerprint() + "\n"
+			+ "galV2ContractVersion=" + optionalStaticString("net.vulkanic.VulkanicGalV2", "CONTRACT_VERSION", "contractVersion") + "\n"
+			+ "galV2ContractFingerprint=" + optionalStaticString("net.vulkanic.VulkanicGalV2", "CONTRACT_SCHEMA_FINGERPRINT", "contractSchemaFingerprint") + "\n";
 		return sha256Hex(canonical);
 	}
 

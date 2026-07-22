@@ -268,4 +268,46 @@ class VulkanShaderProgramCoordinatorTest {
             )
         );
     }
+
+    @Test
+    void standaloneUniformPayloadVersionChangesOnlyWhenPackedBytesChange() {
+        VulkanShaderProgramCoordinator coordinator = new VulkanShaderProgramCoordinator();
+        int programId = coordinator.createProgram();
+        VulkanShaderProgramCoordinator.VirtualProgram program = coordinator.requireProgram(programId);
+        VulkanShaderProgramCoordinator.ReflectedUniform tint =
+            new VulkanShaderProgramCoordinator.ReflectedUniform(
+                "uTint",
+                1,
+                VulkanicUniformReflectionType.FLOAT_VEC4.toLegacyGlConstant()
+            );
+        coordinator.installReflection(
+            program,
+            List.of("uTint"),
+            List.of(tint),
+            List.of(ShadercSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME),
+            List.of(new VulkanShaderProgramCoordinator.ReflectedResourceBinding(
+                ShadercSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME,
+                PipelineDescriptor.ResourceType.UNIFORM_BUFFER,
+                0,
+                0
+            )),
+            List.of("vec4 uTint;"),
+            new int[] {1, 1, 1}
+        );
+        coordinator.initializeStandaloneUniformState(program, Map.of("uTint", tint));
+        long initializedVersion = program.standalonePayloadVersion;
+
+        assertTrue(coordinator.writeStandaloneUniformFloats(program, 0, new float[] {1.0F, 0.5F, 0.25F, 1.0F}));
+        long changedVersion = program.standalonePayloadVersion;
+        assertTrue(changedVersion > initializedVersion);
+        program.standaloneDirty = false;
+
+        assertTrue(coordinator.writeStandaloneUniformFloats(program, 0, new float[] {1.0F, 0.5F, 0.25F, 1.0F}));
+        assertEquals(changedVersion, program.standalonePayloadVersion);
+        assertFalse(program.standaloneDirty);
+
+        assertTrue(coordinator.writeStandaloneUniformFloats(program, 0, new float[] {0.0F, 0.5F, 0.25F, 1.0F}));
+        assertTrue(program.standalonePayloadVersion > changedVersion);
+        assertTrue(program.standaloneDirty);
+    }
 }

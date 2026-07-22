@@ -126,6 +126,12 @@ public final class VulkanPerfAudit {
     private static final LongAdder galV2GraphicsDrawCount = new LongAdder();
     private static final LongAdder galV2LegacyFallbackDrawCount = new LongAdder();
     private static final Map<String, LongAdder> galV2FallbackReasons = new ConcurrentHashMap<>();
+    private static final LongAdder galV2ResourceLayoutLookupCount = new LongAdder();
+    private static final LongAdder galV2ResourceLayoutCreateCount = new LongAdder();
+    private static final AtomicLong galV2ResourceLayoutCacheSize = new AtomicLong();
+    private static final LongAdder galV2ResourceSetLookupCount = new LongAdder();
+    private static final LongAdder galV2ResourceSetCreateCount = new LongAdder();
+    private static final AtomicLong galV2ResourceSetCacheSize = new AtomicLong();
     private static final LongAdder computeDispatchCount = new LongAdder();
     private static final LongAdder clearCount = new LongAdder();
     private static final LongAdder transferCount = new LongAdder();
@@ -749,6 +755,28 @@ public final class VulkanPerfAudit {
         galV2FallbackReasons.computeIfAbsent(normalized, ignored -> new LongAdder()).increment();
     }
 
+    public static void recordGalV2ResourceLayoutLookup(boolean created, int cacheSize) {
+        if (!isEnabled()) {
+            return;
+        }
+        galV2ResourceLayoutLookupCount.increment();
+        if (created) {
+            galV2ResourceLayoutCreateCount.increment();
+        }
+        galV2ResourceLayoutCacheSize.set(Math.max(0, cacheSize));
+    }
+
+    public static void recordGalV2ResourceSetLookup(boolean created, int cacheSize) {
+        if (!isEnabled()) {
+            return;
+        }
+        galV2ResourceSetLookupCount.increment();
+        if (created) {
+            galV2ResourceSetCreateCount.increment();
+        }
+        galV2ResourceSetCacheSize.set(Math.max(0, cacheSize));
+    }
+
     public static void recordComputeDispatch() {
         if (isEnabled()) {
             computeDispatchCount.increment();
@@ -850,6 +878,18 @@ public final class VulkanPerfAudit {
         builder.append("graphics_draw_count=").append(graphicsDrawCount.sum()).append('\n');
         builder.append("gal_v2_graphics_draw_count=").append(galV2GraphicsDrawCount.sum()).append('\n');
         builder.append("gal_v2_legacy_fallback_draw_count=").append(galV2LegacyFallbackDrawCount.sum()).append('\n');
+        builder.append("gal_v2_resource_layout_lookup_count=").append(galV2ResourceLayoutLookupCount.sum()).append('\n');
+        builder.append("gal_v2_resource_layout_create_count=").append(galV2ResourceLayoutCreateCount.sum()).append('\n');
+        builder.append("gal_v2_resource_layout_reuse_count=")
+            .append(Math.max(0L, galV2ResourceLayoutLookupCount.sum() - galV2ResourceLayoutCreateCount.sum()))
+            .append('\n');
+        builder.append("gal_v2_resource_layout_cache_size=").append(galV2ResourceLayoutCacheSize.get()).append('\n');
+        builder.append("gal_v2_resource_set_lookup_count=").append(galV2ResourceSetLookupCount.sum()).append('\n');
+        builder.append("gal_v2_resource_set_create_count=").append(galV2ResourceSetCreateCount.sum()).append('\n');
+        builder.append("gal_v2_resource_set_reuse_count=")
+            .append(Math.max(0L, galV2ResourceSetLookupCount.sum() - galV2ResourceSetCreateCount.sum()))
+            .append('\n');
+        builder.append("gal_v2_resource_set_cache_size=").append(galV2ResourceSetCacheSize.get()).append('\n');
         appendLongAdderMap(builder, "gal_v2_fallback_reason", galV2FallbackReasons);
         builder.append("compute_dispatch_count=").append(computeDispatchCount.sum()).append('\n');
         builder.append("clear_count=").append(clearCount.sum()).append('\n');

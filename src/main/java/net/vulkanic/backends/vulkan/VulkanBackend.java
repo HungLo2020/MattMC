@@ -241,6 +241,9 @@ public class VulkanBackend {
     private final Map<LegacyResourcePlanTemplateKey, LegacyResourcePlanTemplate> legacyResourcePlanTemplateCache =
         new java.util.LinkedHashMap<>(128, 0.75f, true);
     private int legacyResourcePlanTemplateCacheHighWater;
+    private final Map<GalV2ResourcePlanTemplateKey, LegacyResourcePlanTemplate> galV2ResourcePlanTemplateCache =
+        new java.util.LinkedHashMap<>(128, 0.75f, true);
+    private int galV2ResourcePlanTemplateCacheHighWater;
     private final Map<LegacyProgramPipelineKeyCacheKey, LegacyProgramPipelineKey> legacyProgramPipelineKeyCache =
         new java.util.LinkedHashMap<>(128, 0.75f, true);
     private int legacyProgramPipelineKeyCacheHighWater;
@@ -279,6 +282,19 @@ public class VulkanBackend {
         @Nullable VulkanDrawExecutionCoordinator.LegacyProgramSnapshot programSnapshot
     ) {
         private CapturedV2StaticGalDraw {
+        }
+    }
+
+    private record GalV2ResourcePlanTemplateKey(
+        int programId,
+        String descriptorStableKey,
+        String descriptorResourceLayoutKey,
+        VulkanicGalV2.Handle resourceLayout
+    ) {
+        private GalV2ResourcePlanTemplateKey {
+            descriptorStableKey = Objects.requireNonNull(descriptorStableKey, "descriptorStableKey");
+            descriptorResourceLayoutKey = Objects.requireNonNull(descriptorResourceLayoutKey, "descriptorResourceLayoutKey");
+            resourceLayout = Objects.requireNonNull(resourceLayout, "resourceLayout");
         }
     }
 
@@ -3562,6 +3578,71 @@ void main() {
             .resolveCompact(ctx, commandBufferHandle, descriptor, programSnapshot, sharedSnapshot);
     }
 
+    private VulkanCompactResourceBindingTable buildExplicitV2ProgramResourceTable(
+        CommandContext ctx,
+        long commandBufferHandle,
+        PipelineDescriptor descriptor,
+        VulkanDrawExecutionCoordinator.LegacyProgramSnapshot programSnapshot,
+        VulkanicGalV2.ResourceSet resourceSet
+    ) {
+        if (programSnapshot == null) {
+            return null;
+        }
+        return galV2ResourcePlanTemplate(descriptor, programSnapshot, resourceSet.layout())
+            .resolveCompact(ctx, commandBufferHandle, descriptor, programSnapshot, resourceSet);
+    }
+
+    private LegacyResourcePlanTemplate galV2ResourcePlanTemplate(
+        PipelineDescriptor descriptor,
+        VulkanDrawExecutionCoordinator.LegacyProgramSnapshot programSnapshot,
+        VulkanicGalV2.Handle resourceLayout
+    ) {
+        GalV2ResourcePlanTemplateKey key = new GalV2ResourcePlanTemplateKey(
+            programSnapshot.programId(),
+            descriptor.getStableCacheKey(),
+            descriptor.getResourceLayoutCacheKey(),
+            resourceLayout
+        );
+        if (MAX_LEGACY_RESOURCE_PLAN_TEMPLATE_CACHE_ENTRIES <= 0) {
+            return createLegacyResourcePlanTemplate(descriptor, programSnapshot);
+        }
+        synchronized (galV2ResourcePlanTemplateCache) {
+            LegacyResourcePlanTemplate cached = galV2ResourcePlanTemplateCache.get(key);
+            if (cached != null) {
+                VulkanPerfAudit.recordLegacyGraphicsLoweringCacheLookup(
+                    descriptor.getPortableState().location().toString(),
+                    "gal_v2_resource_plan_template",
+                    true,
+                    galV2ResourcePlanTemplateCache.size(),
+                    galV2ResourcePlanTemplateCacheHighWater
+                );
+                return cached;
+            }
+        }
+
+        LegacyResourcePlanTemplate created = createLegacyResourcePlanTemplate(descriptor, programSnapshot);
+        synchronized (galV2ResourcePlanTemplateCache) {
+            if (galV2ResourcePlanTemplateCache.size() >= MAX_LEGACY_RESOURCE_PLAN_TEMPLATE_CACHE_ENTRIES) {
+                java.util.Iterator<GalV2ResourcePlanTemplateKey> iterator = galV2ResourcePlanTemplateCache.keySet().iterator();
+                if (iterator.hasNext()) {
+                    iterator.next();
+                    iterator.remove();
+                }
+            }
+            galV2ResourcePlanTemplateCache.put(key, created);
+            galV2ResourcePlanTemplateCacheHighWater =
+                Math.max(galV2ResourcePlanTemplateCacheHighWater, galV2ResourcePlanTemplateCache.size());
+            VulkanPerfAudit.recordLegacyGraphicsLoweringCacheLookup(
+                descriptor.getPortableState().location().toString(),
+                "gal_v2_resource_plan_template",
+                false,
+                galV2ResourcePlanTemplateCache.size(),
+                galV2ResourcePlanTemplateCacheHighWater
+            );
+        }
+        return created;
+    }
+
     private LegacyResourcePlanTemplate legacyResourcePlanTemplate(
         PipelineDescriptor descriptor,
         VulkanDrawExecutionCoordinator.LegacyProgramSnapshot programSnapshot
@@ -3666,6 +3747,16 @@ void main() {
                     }
                 }
             }
+            synchronized (galV2ResourcePlanTemplateCache) {
+                java.util.Iterator<GalV2ResourcePlanTemplateKey> iterator = galV2ResourcePlanTemplateCache.keySet().iterator();
+                while (iterator.hasNext()) {
+                    GalV2ResourcePlanTemplateKey key = iterator.next();
+                    if (key.programId() == programId) {
+                        iterator.remove();
+                        removed++;
+                    }
+                }
+            }
         }
         if (MAX_LEGACY_PROGRAM_PIPELINE_KEY_CACHE_ENTRIES > 0) {
             synchronized (legacyProgramPipelineKeyCache) {
@@ -3751,9 +3842,14 @@ void main() {
                         }
                     }
                     case UNIFORM_BUFFER -> {
+                        long uniformLookupStartNanos =
+                            VulkanPerfAudit.shouldTraceResourcePlanBreakdown() ? System.nanoTime() : 0L;
                         VulkanicBufferSlice uniformBufferBinding = template.generatedStandaloneUniformBlock()
                             ? VulkanicAPI.getStandaloneUniformBufferSlice(ctx, programSnapshot.programId())
                             : null;
+                        if (uniformLookupStartNanos != 0L) {
+                            metrics.uniformBufferLookupNanos += System.nanoTime() - uniformLookupStartNanos;
+                        }
                         if (uniformBufferBinding != null) {
                             resourceBinding = uniformBufferBinding;
                             boundResourceCount++;
@@ -3812,6 +3908,124 @@ void main() {
                 boundResourceCount,
                 missingResourceCount
             );
+        }
+
+        private VulkanCompactResourceBindingTable resolveCompact(
+            CommandContext ctx,
+            long commandBufferHandle,
+            PipelineDescriptor descriptor,
+            VulkanDrawExecutionCoordinator.LegacyProgramSnapshot programSnapshot,
+            VulkanicGalV2.ResourceSet resourceSet
+        ) {
+            String pipelineLocation = descriptor.getPortableState().location().toString();
+            long traversalStartNanos = VulkanPerfAudit.shouldTraceLegacyGraphicsLowering() ? System.nanoTime() : 0L;
+            int layoutBindingCount = bindings.length;
+            Object[] resourceBindingSlots = new Object[layoutBindingCount];
+            int boundResourceCount = 0;
+            int missingResourceCount = 0;
+            ResourcePlanResolveMetrics metrics = new ResourcePlanResolveMetrics();
+            recordLegacyGraphicsLoweringStep(
+                pipelineLocation,
+                "resource_plan.v2_resource_set_traversal",
+                traversalStartNanos
+            );
+
+            int slotIndex = 0;
+            for (LegacyResourceBindingTemplate template : bindings) {
+                PipelineDescriptor.ResourceBinding binding = template.binding();
+                Object resourceBinding = null;
+                switch (binding.type()) {
+                    case SAMPLER, COMPARISON_SAMPLER -> {
+                        PipelineResourceBindings.SamplerBinding samplerBinding =
+                            resolveTemplateSamplerBinding(commandBufferHandle, binding, template.resourceUnit(), resourceSet, metrics);
+                        if (samplerBinding != null) {
+                            resourceBinding = samplerBinding;
+                            boundResourceCount++;
+                        } else {
+                            missingResourceCount++;
+                        }
+                    }
+                    case UNIFORM_BUFFER -> {
+                        VulkanStandaloneUniformBinding uniformBinding = template.generatedStandaloneUniformBlock()
+                            ? resolveTemplateStandaloneUniformBinding(programSnapshot.programId(), binding.name(), resourceSet)
+                            : null;
+                        if (uniformBinding != null) {
+                            resourceBinding = uniformBinding;
+                            boundResourceCount++;
+                        } else {
+                            missingResourceCount++;
+                        }
+                    }
+                    case STORAGE_IMAGE -> {
+                        PipelineResourceBindings.StorageImageBinding imageBinding =
+                            resolveTemplateStorageImageBinding(template.resourceUnit(), resourceSet);
+                        if (imageBinding != null) {
+                            resourceBinding = imageBinding;
+                            boundResourceCount++;
+                        } else {
+                            missingResourceCount++;
+                        }
+                    }
+                    case TEXEL_BUFFER -> {
+                        Integer textureUnit = template.resourceUnit();
+                        if (textureUnit != null) {
+                            VulkanicGalV2.ResourceBinding bindingReference =
+                                resourceSet.sampledTextureBindingOrNull(textureUnit);
+                            VulkanicPassResourceModel.CanonicalResourceReference reference =
+                                bindingReference == null ? null : bindingReference.resourceReference().orElse(null);
+                            resourceBinding = new PipelineResourceBindings.TexelBufferBinding(textureUnit, reference);
+                            boundResourceCount++;
+                        } else {
+                            missingResourceCount++;
+                        }
+                    }
+                }
+                resourceBindingSlots[slotIndex] = resourceBinding;
+                slotIndex++;
+            }
+            recordResourcePlanResolveMetrics(pipelineLocation, metrics);
+            recordLegacyGraphicsLoweringAllocation(
+                pipelineLocation,
+                "VulkanCompactResourceBindingTable",
+                1L + (layoutBindingCount == 0 ? 0L : 1L),
+                80L + 8L * layoutBindingCount
+            );
+            recordLegacyGraphicsLoweringAllocation(
+                pipelineLocation,
+                "VulkanCompactResourceBindingPlan",
+                1L,
+                48L + (missingResourceCount == 0 ? 0L : 32L + 32L * missingResourceCount)
+            );
+            return new VulkanCompactResourceBindingTable(
+                descriptor,
+                layoutBindings,
+                resourceBindingSlots,
+                boundResourceCount,
+                missingResourceCount
+            );
+        }
+
+        @Nullable
+        private VulkanStandaloneUniformBinding resolveTemplateStandaloneUniformBinding(
+            int programId,
+            String bindingName,
+            VulkanicGalV2.ResourceSet resourceSet
+        ) {
+            VulkanicGalV2.ResourceBinding requestBinding = resourceSet.uniformBindingOrNull(bindingName);
+            if (requestBinding == null || requestBinding.uniformBinding().isEmpty()) {
+                return null;
+            }
+            VulkanicGalV2.Handle handle = requestBinding.uniformBinding().orElseThrow();
+            VulkanicGalV2.UniformBinding uniformBinding = VulkanicGalV2.requireUniformBinding(handle);
+            if (uniformBinding.programId() != programId || !uniformBinding.bindingName().equals(bindingName)) {
+                throw new IllegalStateException(
+                    "Mismatched GAL v2 uniform binding for " + bindingName
+                        + ": expected program="
+                        + programId
+                        + " actual="
+                        + uniformBinding);
+            }
+            return new VulkanStandaloneUniformBinding(programId, bindingName, handle);
         }
 
         @Nullable
@@ -3877,6 +4091,49 @@ void main() {
         }
 
         @Nullable
+        private PipelineResourceBindings.SamplerBinding resolveTemplateSamplerBinding(
+            long commandBufferHandle,
+            PipelineDescriptor.ResourceBinding binding,
+            @Nullable Integer unit,
+            VulkanicGalV2.ResourceSet resourceSet,
+            ResourcePlanResolveMetrics metrics
+        ) {
+            if (unit == null) {
+                return null;
+            }
+            VulkanicGalV2.ResourceBinding requestBinding =
+                resourceSet.sampledTextureBindingOrNull(unit);
+            VulkanicPassResourceModel.CanonicalResourceReference reference =
+                requestBinding == null ? null : requestBinding.resourceReference().orElse(null);
+            int textureId = reference != null && reference.legacyId().isPresent()
+                ? reference.legacyId().getAsInt()
+                : 0;
+            Integer samplerObject = reference != null && reference.samplerObject().isPresent()
+                ? reference.samplerObject().getAsInt()
+                : null;
+
+            long fallbackStartNanos = VulkanPerfAudit.shouldTraceResourcePlanBreakdown() ? System.nanoTime() : 0L;
+            VulkanicTextureView textureView = textureId > 0 ? createManagedLegacyTextureView(textureId) : null;
+            if (textureView == null) {
+                textureView = createLegacyFallbackSamplerView(commandBufferHandle, binding, unit);
+            }
+            if (fallbackStartNanos != 0L) {
+                metrics.fallbackSelectionNanos += System.nanoTime() - fallbackStartNanos;
+            }
+            if (textureView == null) {
+                return null;
+            }
+
+            long entryStartNanos = VulkanPerfAudit.shouldTraceResourcePlanBreakdown() ? System.nanoTime() : 0L;
+            PipelineResourceBindings.SamplerBinding samplerBinding =
+                new PipelineResourceBindings.SamplerBinding(unit, samplerObject, textureView, reference);
+            if (entryStartNanos != 0L) {
+                metrics.descriptorEntryConstructionNanos += System.nanoTime() - entryStartNanos;
+            }
+            return samplerBinding;
+        }
+
+        @Nullable
         private PipelineResourceBindings.StorageImageBinding resolveTemplateStorageImageBinding(
             @Nullable Integer imageUnit,
             Map<Integer, VulkanicCompatibilityState.ImageUnitBindingState> imageUnitBindings
@@ -3896,6 +4153,38 @@ void main() {
                     imageBinding.access(),
                     imageBinding.format()
                 );
+        }
+
+        @Nullable
+        private PipelineResourceBindings.StorageImageBinding resolveTemplateStorageImageBinding(
+            @Nullable Integer imageUnit,
+            VulkanicGalV2.ResourceSet resourceSet
+        ) {
+            if (imageUnit == null) {
+                return null;
+            }
+            VulkanicGalV2.ResourceBinding requestBinding =
+                resourceSet.storageImageBindingOrNull(imageUnit);
+            if (requestBinding == null || requestBinding.resourceReference().isEmpty()) {
+                return null;
+            }
+            VulkanicPassResourceModel.CanonicalResourceReference reference =
+                requestBinding.resourceReference().orElseThrow();
+            if (reference.legacyId().isEmpty()) {
+                return null;
+            }
+            int level = reference.subresource().baseMipLevel();
+            int layer = reference.subresource().baseLayer();
+            return new PipelineResourceBindings.StorageImageBinding(
+                imageUnit,
+                reference.legacyId().getAsInt(),
+                level,
+                reference.layered(),
+                layer,
+                reference.imageAccess().orElse(VulkanicAPI.GL_READ_WRITE),
+                reference.imageFormat().orElse(VulkanicAPI.GL_RGBA8),
+                reference
+            );
         }
     }
 
@@ -3971,6 +4260,13 @@ void main() {
                 metrics.canonicalReferenceNanos
             );
         }
+        if (metrics.uniformBufferLookupNanos > 0L) {
+            VulkanPerfAudit.recordLegacyGraphicsLoweringStep(
+                pipelineLocation,
+                "resource_plan.uniform_buffer_lookup",
+                metrics.uniformBufferLookupNanos
+            );
+        }
         if (metrics.descriptorEntryConstructionNanos > 0L) {
             VulkanPerfAudit.recordLegacyGraphicsLoweringStep(
                 pipelineLocation,
@@ -3984,6 +4280,7 @@ void main() {
         private long samplerImageBufferLookupNanos;
         private long fallbackSelectionNanos;
         private long canonicalReferenceNanos;
+        private long uniformBufferLookupNanos;
         private long descriptorEntryConstructionNanos;
     }
 
@@ -4483,23 +4780,31 @@ void main() {
         if (spine == null) {
             return null;
         }
-        if (!spine.canEnsureLegacyFallbackSamplerTexture(commandBufferHandle)) {
+        int target = fallbackSamplerTarget(binding);
+        if (!spine.canEnsureLegacyFallbackSamplerTexture(commandBufferHandle, target)) {
             return null;
         }
 
-        int fallbackTextureId = spine.ensureLegacyFallbackSamplerTexture(commandBufferHandle);
+        int fallbackTextureId = spine.ensureLegacyFallbackSamplerTexture(commandBufferHandle, target);
         VulkanicTextureView fallbackView = createManagedLegacyTextureView(fallbackTextureId);
         if (fallbackView != null) {
             String key = binding.name() + '|' + samplerUnit;
             if (LEGACY_FALLBACK_SAMPLER_LOGS.add(key)) {
                 LOGGER.warn(
-                    "Binding Vulkan legacy sampler '{}' on unit {} to the backend fallback black texture because no legacy texture is bound.",
+                    "Binding Vulkan legacy sampler '{}' on unit {} to the backend fallback black texture target=0x{} because no legacy texture is bound.",
                     binding.name(),
-                    samplerUnit
+                    samplerUnit,
+                    Integer.toHexString(target)
                 );
             }
         }
         return fallbackView;
+    }
+
+    private static int fallbackSamplerTarget(PipelineDescriptor.ResourceBinding binding) {
+        return knownIris3DSampler(binding.name())
+            ? VulkanicAPI.GL_TEXTURE_3D
+            : VulkanicAPI.GL_TEXTURE_2D;
     }
 
     private static void logIncompleteLegacyResourcePlan(
@@ -4540,20 +4845,16 @@ void main() {
     private MaterializedGraphicsPipelineBinding materializeLegacyProgramPipelineForDraw(
         long commandBufferHandle,
         VulkanDrawExecutionCoordinator.DrawExecutionPlan drawPlan,
-        VulkanicGalExecutionRequest.GraphicsDrawRequest capturedGalRequest,
+        List<VulkanicPassResourceModel.ResourceUse> capturedUses,
         @Nullable VulkanCompactResourceBindingTable capturedResourceBindingTable
     ) {
-        Objects.requireNonNull(capturedGalRequest, "capturedGalRequest");
-        if (capturedGalRequest.compatibilitySnapshot().sharedCompatibilityState().isEmpty()) {
-            throw new IllegalStateException("Vulkan pipeline materialization received a GAL request without captured shared compatibility state");
-        }
-        List<VulkanicPassResourceModel.ResourceUse> capturedUses = capturedGalRequest.resourcePlan().orderedUses();
+        Objects.requireNonNull(capturedUses, "capturedUses");
         boolean missingDrawUse = drawPlan.resourcePlan().orderedUses().stream()
             .anyMatch(use -> !containsEquivalentResourceUse(capturedUses, use));
         if (missingDrawUse) {
             throw new IllegalStateException(
                 "Captured GAL resource plan no longer matches Vulkan draw execution plan. missing="
-                    + missingCapturedResourceUses(capturedGalRequest, drawPlan)
+                    + missingCapturedResourceUses(capturedUses, drawPlan)
             );
         }
         int programId = drawPlan.programId();
@@ -4695,10 +4996,9 @@ void main() {
     }
 
     private static String missingCapturedResourceUses(
-        VulkanicGalExecutionRequest.GraphicsDrawRequest capturedGalRequest,
+        List<VulkanicPassResourceModel.ResourceUse> capturedUses,
         VulkanDrawExecutionCoordinator.DrawExecutionPlan drawPlan
     ) {
-        List<VulkanicPassResourceModel.ResourceUse> capturedUses = capturedGalRequest.resourcePlan().orderedUses();
         return drawPlan.resourcePlan().orderedUses().stream()
             .filter(use -> !containsEquivalentResourceUse(capturedUses, use))
             .limit(8)
@@ -7391,6 +7691,22 @@ void main() {
         }
     }
 
+    private VulkanCompactResourceBindingTable timedBuildExplicitV2ProgramResourceTable(
+        String pipelineLocation,
+        CommandContext ctx,
+        long commandBufferHandle,
+        PipelineDescriptor descriptor,
+        VulkanDrawExecutionCoordinator.LegacyProgramSnapshot programSnapshot,
+        VulkanicGalV2.ResourceSet resourceSet
+    ) {
+        long startNanos = VulkanPerfAudit.shouldTraceLegacyGraphicsLowering() ? System.nanoTime() : 0L;
+        try {
+            return buildExplicitV2ProgramResourceTable(ctx, commandBufferHandle, descriptor, programSnapshot, resourceSet);
+        } finally {
+            recordLegacyGraphicsLoweringStep(pipelineLocation, "resource_plan_build", startNanos);
+        }
+    }
+
     private static void recordLegacyGraphicsLoweringStep(String pipelineLocation, String step, long startNanos) {
         if (startNanos != 0L) {
             VulkanPerfAudit.recordLegacyGraphicsLoweringStep(
@@ -7627,7 +7943,6 @@ void main() {
             explicitRequest,
             request
         );
-        VulkanicCompatibilityState.GraphicsSnapshot sharedSnapshot = explicitRequest.compatibilitySnapshot();
         VulkanDrawExecutionCoordinator.DrawResourceSnapshot drawResources =
             explicitV2DrawResourceSnapshot(explicitRequest);
         VulkanDrawExecutionCoordinator.DrawExecutionPlan currentPlan =
@@ -7635,26 +7950,26 @@ void main() {
         String pipelineLocation = currentPlan.descriptor() == null
             ? request.source()
             : currentPlan.descriptor().getPortableState().location().toString();
+        VulkanicGalV2.ResourceSet resourceSet =
+            VulkanicGalV2.requireResourceSet(explicitRequest.resourceSet());
         VulkanCompactResourceBindingTable resourceBindingTable =
             currentPlan.programId() <= 0 || currentPlan.descriptor() == null
                 ? null
-                : timedBuildSharedProgramResourceTable(
+                : timedBuildExplicitV2ProgramResourceTable(
                     pipelineLocation,
                     ctx,
                     commandBufferHandle,
                     currentPlan.descriptor(),
                     staticDraw.programSnapshot(),
-                    sharedSnapshot
+                    resourceSet
                 );
-        VulkanicGalExecutionRequest.GraphicsDrawRequest capturedV2CompatibilityRequest =
-            compatibilityRequestForExplicitV2Draw(explicitRequest);
         spine.executeCapturedGalDraw(
             commandBufferHandle,
             request,
             currentPlan,
             drawResources,
             resourceBindingTable,
-            capturedV2CompatibilityRequest
+            explicitRequest.resourcePlan().orderedUses()
         );
     }
 
@@ -7823,74 +8138,6 @@ void main() {
         );
     }
 
-    private static VulkanicGalExecutionRequest.GraphicsDrawRequest compatibilityRequestForExplicitV2Draw(
-        VulkanicGalV2.ExplicitGraphicsDrawRequest explicitRequest
-    ) {
-        VulkanicGalExecutionRequest.GraphicsDrawCommand command = explicitRequest.command();
-        VulkanicGalExecutionRequest.GraphicsDrawRequest request = switch (command.kind()) {
-            case ARRAYS -> VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
-                "gal-v2-compatibility-" + explicitRequest.semanticIdentity().label(),
-                command.mode(),
-                command.firstVertex(),
-                command.vertexCount(),
-                command.instanceCount()
-            );
-            case INDEXED -> VulkanicGalExecutionRequest.GraphicsDrawRequest.indexed(
-                "gal-v2-compatibility-" + explicitRequest.semanticIdentity().label(),
-                command.mode(),
-                command.indexCount(),
-                command.indexType(),
-                command.indexByteOffset(),
-                command.instanceCount(),
-                command.baseVertex()
-            );
-            case MULTI_INDEXED_BASE_VERTEX -> VulkanicGalExecutionRequest.GraphicsDrawRequest.multiIndexedBaseVertex(
-                "gal-v2-compatibility-" + explicitRequest.semanticIdentity().label(),
-                command.mode(),
-                command.indexType(),
-                command.indexedDraws()
-            );
-        };
-        VulkanicGalExecutionRequest.VertexInputSnapshot vertexInput = vertexInputSnapshotForExplicitV2Draw(explicitRequest);
-        VulkanicGalExecutionRequest.GraphicsCompatibilitySnapshot snapshot =
-            VulkanicGalSnapshotBuilder.legacyGraphicsSnapshot(
-                null,
-                vertexInput,
-                explicitRequest.resourcePlan().orderedUses(),
-                null,
-                List.of(),
-                java.util.Optional.of(explicitRequest.compatibilitySnapshot()),
-                "gal-v2-explicit-compatibility-wrapper"
-            );
-        return request.withCompatibilitySnapshot(snapshot);
-    }
-
-    private static VulkanicGalExecutionRequest.VertexInputSnapshot vertexInputSnapshotForExplicitV2Draw(
-        VulkanicGalV2.ExplicitGraphicsDrawRequest explicitRequest
-    ) {
-        ArrayList<VulkanicLegacyCompatibilityAdapter.VertexBufferSnapshot> vertexBuffers =
-            new ArrayList<>(explicitRequest.vertexStreams().vertexStreams().size());
-        for (VulkanicGalV2.VertexStream stream : explicitRequest.vertexStreams().vertexStreams()) {
-            vertexBuffers.add(new VulkanicLegacyCompatibilityAdapter.VertexBufferSnapshot(
-                stream.binding(),
-                stream.defaultAttributeBuffer() || stream.buffer() <= 0
-                    ? "default-attribute-buffer"
-                    : "legacy-buffer:" + stream.buffer(),
-                stream.baseOffset(),
-                0,
-                stream.defaultAttributeBuffer() || stream.buffer() <= 0
-            ));
-        }
-        java.util.Optional<VulkanicLegacyCompatibilityAdapter.IndexBufferSnapshot> indexBuffer =
-            explicitRequest.vertexStreams().indexStream()
-                .map(index -> new VulkanicLegacyCompatibilityAdapter.IndexBufferSnapshot(
-                    "legacy-buffer:" + index.buffer(),
-                    index.baseOffset(),
-                    index.type().bytesPerIndex()
-                ));
-        return new VulkanicGalExecutionRequest.VertexInputSnapshot(vertexBuffers, indexBuffer);
-    }
-
     private VulkanDrawExecutionCoordinator.DrawResourceSnapshot explicitV2DrawResourceSnapshot(
         VulkanicGalV2.ExplicitGraphicsDrawRequest explicitRequest
     ) {
@@ -7953,9 +8200,10 @@ void main() {
                 );
             }
         }
-        String pipelineLocation = explicitRequest.compatibilitySnapshot().programId() <= 0
+        VulkanicCompatibilityState.GraphicsSnapshot sharedSnapshot = objects.immutableCompatibilitySeed();
+        String pipelineLocation = sharedSnapshot.programId() <= 0
             ? explicitRequest.semanticIdentity().label()
-            : "vulkanic:legacy_program/" + explicitRequest.compatibilitySnapshot().programId();
+            : "vulkanic:legacy_program/" + sharedSnapshot.programId();
         recordLegacyGraphicsLoweringAllocation(
             pipelineLocation,
             "GalV2VertexStreams",
@@ -8014,7 +8262,7 @@ void main() {
             capturedDraw.plan(),
             capturedDraw.drawResources(),
             capturedDraw.resourceBindingTable(),
-            galRequest
+            galRequest.resourcePlan().orderedUses()
         );
     }
 
@@ -11073,6 +11321,7 @@ void main() {
 
         private record DynamicUniformBindingState(
             String name,
+            VulkanBuffer buffer,
             long bufferHandle,
             int dynamicOffset,
             int range,
@@ -11093,6 +11342,21 @@ void main() {
             private StandaloneUniformSourceKey {
                 Objects.requireNonNull(pipelineLocation, "pipelineLocation");
                 Objects.requireNonNull(bindingName, "bindingName");
+            }
+        }
+
+        private record StandaloneUniformProgramKey(
+            int frameSlot,
+            String pipelineLocation,
+            String bindingName,
+            int programId,
+            long payloadVersion,
+            VulkanicGalV2.Handle bindingHandle
+        ) {
+            private StandaloneUniformProgramKey {
+                Objects.requireNonNull(pipelineLocation, "pipelineLocation");
+                Objects.requireNonNull(bindingName, "bindingName");
+                Objects.requireNonNull(bindingHandle, "bindingHandle");
             }
         }
 
@@ -11237,6 +11501,8 @@ void main() {
         private final java.util.LinkedHashMap<DescriptorPlanLookupKey, DescriptorWritePlan> descriptorWritePlanCache =
             new java.util.LinkedHashMap<>(256, 0.75f, true);
         private final Map<StandaloneUniformSourceKey, DynamicUniformBindingState> standaloneUniformSourceCache =
+            new HashMap<>();
+        private final Map<StandaloneUniformProgramKey, DynamicUniformBindingState> standaloneUniformProgramCache =
             new HashMap<>();
         @Nullable
         private DescriptorPlanLookupKey lastDescriptorPlanLookupKey;
@@ -11606,11 +11872,13 @@ void main() {
                 );
             Map<String, DynamicUniformBindingState> dynamicUniformStates =
                 materializeDynamicUniformBindings(bindingTable, pipelineLocation);
-            List<Integer> dynamicOffsets = dynamicDescriptorOffsets(bindingTable, dynamicUniformStates);
+            VulkanCompactResourceBindingTable descriptorBindingTable =
+                bindingTable.withUniformBufferBindings(dynamicUniformSlices(dynamicUniformStates));
+            List<Integer> dynamicOffsets = dynamicDescriptorOffsets(descriptorBindingTable, dynamicUniformStates);
             DescriptorPlanLookupKey lookupKey = new DescriptorPlanLookupKey(
                 descriptorSetLayoutHandle,
                 layoutBindings,
-                descriptorPlanSemanticBindings(bindingTable, dynamicUniformStates),
+                descriptorPlanSemanticBindings(descriptorBindingTable, dynamicUniformStates),
                 renderState,
                 minUniformBufferOffsetAlignment()
             );
@@ -11638,9 +11906,9 @@ void main() {
             );
 
             long planStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
-            VulkanDescriptorBindingPlanner.DescriptorBindingPlan plan = descriptorBindingPlanner.plan(
+	            VulkanDescriptorBindingPlanner.DescriptorBindingPlan plan = descriptorBindingPlanner.plan(
                 new VulkanDescriptorBindingPlanner.CompactPlanRequest(
-                    bindingTable,
+                    descriptorBindingTable,
                     new VulkanDescriptorBindingPlanner.TextureSnapshotLookup() {
                         @Override
                         public VulkanImageResourceViewCoordinator.ImageStorageSnapshot snapshotForView(VulkanTextureView view) {
@@ -11864,31 +12132,66 @@ void main() {
                     || states.containsKey(binding.name())) {
                     continue;
                 }
-                VulkanicBufferSlice slice = bindingTable.uniformBufferBinding(index);
-                if (slice == null) {
-                    continue;
-                }
-                if (!(slice.buffer() instanceof VulkanBuffer sourceBuffer)) {
-                    throw new IllegalArgumentException(binding.name() + " requires a VulkanBuffer on Vulkan backend");
-                }
                 int frameSlot = currentDynamicUniformFrameSlot();
                 DynamicUniformBindingState state = switch (binding.name()) {
-                    case "DynamicTransforms" -> materializeDynamicTransformsArenaBinding(
-                        frameSlot,
-                        dynamicUniformPayload(binding.name(), sourceBuffer, slice)
-                    );
-                    case "VulkanicStandaloneUniforms" -> materializeStandaloneUniformArenaBinding(
-                        frameSlot,
-                        pipelineLocation,
-                        binding.name(),
-                        sourceBuffer,
-                        slice
-                    );
+                    case "DynamicTransforms" -> {
+                        VulkanicBufferSlice slice = bindingTable.uniformBufferBinding(index);
+                        if (slice == null) {
+                            yield null;
+                        }
+                        if (!(slice.buffer() instanceof VulkanBuffer sourceBuffer)) {
+                            throw new IllegalArgumentException(binding.name() + " requires a VulkanBuffer on Vulkan backend");
+                        }
+                        yield materializeDynamicTransformsArenaBinding(
+                            frameSlot,
+                            dynamicUniformPayload(binding.name(), sourceBuffer, slice)
+                        );
+                    }
+                    case "VulkanicStandaloneUniforms" -> {
+                        VulkanStandaloneUniformBinding standaloneBinding = bindingTable.standaloneUniformBinding(index);
+                        if (standaloneBinding != null) {
+                            yield materializeStandaloneUniformArenaBinding(
+                                frameSlot,
+                                pipelineLocation,
+                                binding.name(),
+                                standaloneBinding
+                            );
+                        }
+                        VulkanicBufferSlice slice = bindingTable.uniformBufferBinding(index);
+                        if (slice == null) {
+                            yield null;
+                        }
+                        if (!(slice.buffer() instanceof VulkanBuffer sourceBuffer)) {
+                            throw new IllegalArgumentException(binding.name() + " requires a VulkanBuffer on Vulkan backend");
+                        }
+                        yield materializeStandaloneUniformArenaBinding(
+                            frameSlot,
+                            pipelineLocation,
+                            binding.name(),
+                            sourceBuffer,
+                            slice
+                        );
+                    }
                     default -> throw new IllegalStateException("Unexpected dynamic uniform binding " + binding.name());
                 };
-                states.put(binding.name(), state);
+                if (state != null) {
+                    states.put(binding.name(), state);
+                }
             }
             return Map.copyOf(states);
+        }
+
+        private Map<String, VulkanicBufferSlice> dynamicUniformSlices(
+            Map<String, DynamicUniformBindingState> dynamicUniformStates
+        ) {
+            if (dynamicUniformStates.isEmpty()) {
+                return Map.of();
+            }
+            Map<String, VulkanicBufferSlice> slices = new HashMap<>(dynamicUniformStates.size());
+            for (DynamicUniformBindingState state : dynamicUniformStates.values()) {
+                slices.put(state.name(), new VulkanicBufferSlice(state.buffer(), 0, state.range()));
+            }
+            return Map.copyOf(slices);
         }
 
         private DynamicUniformBindingState materializeDynamicTransformsArenaBinding(
@@ -11911,6 +12214,103 @@ void main() {
                 allocation.contentHash()
             );
             return dynamicUniformState("DynamicTransforms", allocation);
+        }
+
+        private DynamicUniformBindingState materializeStandaloneUniformArenaBinding(
+            int frameSlot,
+            String pipelineLocation,
+            String bindingName,
+            VulkanStandaloneUniformBinding standaloneBinding
+        ) {
+            VulkanicGalV2.UniformBinding uniformBinding =
+                VulkanicGalV2.requireUniformBinding(standaloneBinding.handle());
+            if (uniformBinding.programId() != standaloneBinding.programId()
+                || !uniformBinding.bindingName().equals(bindingName)) {
+                throw new IllegalStateException(
+                    "GAL v2 standalone uniform binding mismatch for " + bindingName
+                        + ": handle=" + uniformBinding
+                        + " lowering=" + standaloneBinding);
+            }
+            VulkanShaderProgramCoordinator.VirtualProgram virtualProgram =
+                backend.shaderPrograms.program(standaloneBinding.programId());
+            if (virtualProgram == null || virtualProgram.standaloneBackingSize <= 0) {
+                throw new IllegalStateException(
+                    "Missing standalone uniform payload for GAL v2 binding "
+                        + bindingName
+                        + " program="
+                        + standaloneBinding.programId());
+            }
+
+            synchronized (virtualProgram) {
+                java.nio.ByteBuffer backingData = virtualProgram.standaloneBackingData;
+                int size = virtualProgram.standaloneBackingSize;
+                if (backingData == null || size <= 0) {
+                    throw new IllegalStateException(
+                        "Unavailable standalone uniform backing data for GAL v2 binding "
+                            + bindingName
+                            + " program="
+                            + standaloneBinding.programId());
+                }
+
+                StandaloneUniformProgramKey sourceKey = new StandaloneUniformProgramKey(
+                    frameSlot,
+                    pipelineLocation,
+                    bindingName,
+                    standaloneBinding.programId(),
+                    virtualProgram.standalonePayloadVersion,
+                    standaloneBinding.handle()
+                );
+                DynamicUniformBindingState cached = standaloneUniformProgramCache.get(sourceKey);
+                if (cached != null && !cached.buffer().isClosed()) {
+                    VulkanPerfAudit.recordStandaloneUniformSourceReuse(pipelineLocation);
+                    VulkanPerfAudit.recordStandaloneUniformBinding(
+                        pipelineLocation,
+                        bindingName,
+                        cached.bufferHandle(),
+                        cached.dynamicOffset(),
+                        cached.range(),
+                        cached.contentHash()
+                    );
+                    return cached;
+                }
+
+                backend.traceStandaloneUniformBlockMembers(standaloneBinding.programId(), virtualProgram, backingData);
+                java.nio.ByteBuffer payload = backingData.duplicate();
+                payload.clear();
+                payload.limit(size);
+                VulkanDynamicTransformsArena<VulkanBuffer> arena = requireStandaloneUniformArena();
+                String reuseScope = pipelineLocation
+                    + "|"
+                    + bindingName
+                    + "|program="
+                    + standaloneBinding.programId()
+                    + "|binding="
+                    + standaloneBinding.handle().semanticKey()
+                    + "|bytes="
+                    + payload.remaining();
+                VulkanDynamicTransformsArena.Allocation<VulkanBuffer> allocation =
+                    arena.allocate(frameSlot, reuseScope, payload);
+                VulkanPerfAudit.recordStandaloneUniformArenaAllocation(
+                    pipelineLocation,
+                    allocation.reused(),
+                    allocation.reservedBytes(),
+                    allocation.writtenBytes(),
+                    arena.highWaterBytes(frameSlot),
+                    arena.capacityBytes(frameSlot)
+                );
+                VulkanPerfAudit.recordStandaloneUniformBinding(
+                    pipelineLocation,
+                    bindingName,
+                    allocation.buffer().getVkBufferHandle(),
+                    allocation.offset(),
+                    allocation.range(),
+                    allocation.contentHash()
+                );
+                DynamicUniformBindingState state = dynamicUniformState(bindingName, allocation);
+                standaloneUniformProgramCache.put(sourceKey, state);
+                virtualProgram.standaloneDirty = false;
+                return state;
+            }
         }
 
         private DynamicUniformBindingState materializeStandaloneUniformArenaBinding(
@@ -11976,6 +12376,7 @@ void main() {
         ) {
             return new DynamicUniformBindingState(
                 name,
+                allocation.buffer(),
                 allocation.buffer().getVkBufferHandle(),
                 allocation.offset(),
                 allocation.range(),
@@ -12919,18 +13320,18 @@ void main() {
             return textureResources.createLegacyTexture(target);
         }
 
-        private boolean canEnsureLegacyFallbackSamplerTexture(long commandBufferHandle) {
-            int existingId = textureResources.legacyFallbackSamplerTextureId();
-            LegacyTextureObject existingTexture = textureResources.legacyFallbackSamplerTexture();
+        private boolean canEnsureLegacyFallbackSamplerTexture(long commandBufferHandle, int target) {
+            int existingId = textureResources.legacyFallbackSamplerTextureId(target);
+            LegacyTextureObject existingTexture = textureResources.legacyFallbackSamplerTexture(target);
             if (existingTexture != null && existingTexture.imageHandle != VK10.VK_NULL_HANDLE) {
                 return true;
             }
             return commandBufferHandle != 0L && commandSubmissionState.commandBufferRecording() && !isRenderPassRecording();
         }
 
-        private int ensureLegacyFallbackSamplerTexture(long commandBufferHandle) {
-            int existingId = textureResources.legacyFallbackSamplerTextureId();
-            LegacyTextureObject existingTexture = textureResources.legacyFallbackSamplerTexture();
+        private int ensureLegacyFallbackSamplerTexture(long commandBufferHandle, int target) {
+            int existingId = textureResources.legacyFallbackSamplerTextureId(target);
+            LegacyTextureObject existingTexture = textureResources.legacyFallbackSamplerTexture(target);
             if (existingTexture != null && existingTexture.imageHandle != VK10.VK_NULL_HANDLE) {
                 return existingId;
             }
@@ -12941,7 +13342,7 @@ void main() {
             }
 
             int textureId = textureResources.allocateLegacyTextureId();
-            LegacyTextureObject texture = new LegacyTextureObject(textureId, VulkanicAPI.GL_TEXTURE_2D);
+            LegacyTextureObject texture = new LegacyTextureObject(textureId, target);
             LegacyTextureObject racedTexture = textureResources.putLegacyTextureIfAbsent(textureId, texture);
             if (racedTexture != null) {
                 texture = racedTexture;
@@ -12961,20 +13362,33 @@ void main() {
                 java.nio.ByteBuffer pixel = java.nio.ByteBuffer.allocateDirect(4).order(ByteOrder.nativeOrder());
                 pixel.putInt(0);
                 pixel.flip();
-                uploadToLegacyTextureRegion(
-                    commandBufferHandle,
-                    "createLegacyFallbackSamplerTexture",
-                    texture,
-                    VulkanicAPI.GL_TEXTURE_2D,
-                    0,
-                    0,
-                    0,
-                    1,
-                    1,
-                    pixel
-                );
-                textureResources.setLegacyFallbackSamplerTextureId(textureId);
-                LOGGER.info("Created Vulkan legacy fallback sampler texture texId={}.", textureId);
+                if (target == VulkanicAPI.GL_TEXTURE_3D) {
+                    uploadToLegacyTextureRegion3D(
+                        commandBufferHandle,
+                        "createLegacyFallbackSamplerTexture3D",
+                        texture,
+                        0,
+                        1,
+                        1,
+                        1,
+                        pixel
+                    );
+                } else {
+                    uploadToLegacyTextureRegion(
+                        commandBufferHandle,
+                        "createLegacyFallbackSamplerTexture2D",
+                        texture,
+                        VulkanicAPI.GL_TEXTURE_2D,
+                        0,
+                        0,
+                        0,
+                        1,
+                        1,
+                        pixel
+                    );
+                }
+                textureResources.setLegacyFallbackSamplerTextureId(target, textureId);
+                LOGGER.info("Created Vulkan legacy fallback sampler texture target=0x{} texId={}.", Integer.toHexString(target), textureId);
                 return textureId;
             } catch (RuntimeException exception) {
                 textureResources.removeLegacyTexture(textureId);
@@ -12986,7 +13400,8 @@ void main() {
         private void createLegacyFallbackSamplerTexture() {
             long commandBufferHandle = beginPrimaryCommandBuffer();
             try {
-                ensureLegacyFallbackSamplerTexture(commandBufferHandle);
+                ensureLegacyFallbackSamplerTexture(commandBufferHandle, VulkanicAPI.GL_TEXTURE_2D);
+                ensureLegacyFallbackSamplerTexture(commandBufferHandle, VulkanicAPI.GL_TEXTURE_3D);
             } finally {
                 submitPrimaryCommandBuffer(commandBufferHandle, "texture_upload_fallback_sampler");
             }
@@ -15617,15 +16032,12 @@ void main() {
             VulkanDrawExecutionCoordinator.DrawExecutionPlan plan,
             VulkanDrawExecutionCoordinator.DrawResourceSnapshot drawResources,
             @Nullable VulkanCompactResourceBindingTable resourceBindingTable,
-            VulkanicGalExecutionRequest.GraphicsDrawRequest capturedGalRequest
+            List<VulkanicPassResourceModel.ResourceUse> capturedUses
         ) {
             Objects.requireNonNull(request, "request");
             Objects.requireNonNull(plan, "plan");
             Objects.requireNonNull(drawResources, "drawResources");
-            Objects.requireNonNull(capturedGalRequest, "capturedGalRequest");
-            if (capturedGalRequest.compatibilitySnapshot().sharedCompatibilityState().isEmpty()) {
-                throw new IllegalStateException("Vulkan draw reached NativeSpine without a captured GAL compatibility snapshot");
-            }
+            Objects.requireNonNull(capturedUses, "capturedUses");
             if (debugLegacyDrawLogCount < 120) {
                 debugLegacyDrawLogCount++;
                 if (request.indexed()) {
@@ -15663,7 +16075,7 @@ void main() {
                 backend.materializeLegacyProgramPipelineForDraw(
                     commandBufferHandle,
                     plan,
-                    capturedGalRequest,
+                    capturedUses,
                     resourceBindingTable
                 );
             recordLegacyGraphicsLoweringStep(pipelineLocation, "materialize_legacy_program_pipeline", materializeStartNanos);
@@ -15969,6 +16381,7 @@ void main() {
                 standaloneArena.beginFrameSlot(frameSlot);
             }
             standaloneUniformSourceCache.clear();
+            standaloneUniformProgramCache.clear();
         }
 
         private void destroyDynamicTransformsArena() {

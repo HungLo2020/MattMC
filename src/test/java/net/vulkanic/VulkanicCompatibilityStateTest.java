@@ -7,10 +7,58 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class VulkanicCompatibilityStateTest {
+    @Test
+    void graphicsSnapshotReusesCachedCopyUntilSemanticStateChanges() {
+        VulkanicCompatibilityState state = new VulkanicCompatibilityState();
+        state.bindProgram(11);
+        state.setUniformInt(1, 7);
+        state.bindVertexArray(3);
+        state.bindBuffer(VulkanicBufferTarget.VERTEX, 101);
+        state.setVertexAttribPointer(0, 3, VulkanicAPI.GL_FLOAT, false, false, 12, 0L);
+
+        VulkanicGalExecutionRequest.GraphicsDrawRequest request =
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
+                "cached-graphics-snapshot",
+                VulkanicPrimitiveMode.TRIANGLES,
+                0,
+                3,
+                1
+            );
+
+        VulkanicCompatibilityState.GraphicsSnapshot first = state.captureGraphics(request);
+        VulkanicCompatibilityState.GraphicsSnapshot second = state.captureGraphics(request);
+        assertSame(first, second);
+
+        VulkanicGalExecutionRequest.GraphicsDrawRequest sameStateDifferentLabel =
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
+                "cached-graphics-snapshot-relabeled",
+                VulkanicPrimitiveMode.TRIANGLES,
+                0,
+                3,
+                1
+            );
+        VulkanicCompatibilityState.GraphicsSnapshot relabeled = state.captureGraphics(sameStateDifferentLabel);
+        VulkanicCompatibilityState.GraphicsSnapshot relabeledAgain = state.captureGraphics(sameStateDifferentLabel);
+        assertNotSame(first, relabeled);
+        assertSame(relabeled, relabeledAgain);
+        assertEquals(sameStateDifferentLabel.semanticIdentity().label(), relabeled.semanticIdentity());
+        assertEquals(7, relabeled.program().uniformsByLocation().get(1).ints()[0]);
+
+        state.setUniformInt(1, 8);
+        VulkanicCompatibilityState.GraphicsSnapshot changed = state.captureGraphics(request);
+        VulkanicCompatibilityState.GraphicsSnapshot changedAgain = state.captureGraphics(request);
+        assertNotSame(first, changed);
+        assertSame(changed, changedAgain);
+        assertEquals(8, changed.program().uniformsByLocation().get(1).ints()[0]);
+        assertEquals(7, first.program().uniformsByLocation().get(1).ints()[0]);
+    }
+
     @Test
     void graphicsSnapshotCapturesProgramVaoFramebufferAndResourceBindingsImmutably() {
         VulkanicCompatibilityState state = new VulkanicCompatibilityState();
@@ -144,6 +192,42 @@ final class VulkanicCompatibilityStateTest {
                 && binding.resourceUse().resource().stableKey().equals("legacy-buffer:50")
                 && binding.resourceReference().orElseThrow().subresource().baseMipLevel() == 16
                 && binding.resourceReference().orElseThrow().subresource().levelCount() == 32));
+    }
+
+    @Test
+    void sharedCompatibilitySnapshotCanDeferDerivedResourceDeclarations() {
+        VulkanicCompatibilityState state = new VulkanicCompatibilityState();
+        state.bindProgram(1);
+        state.bindVertexArray(2);
+        state.bindBuffer(VulkanicBufferTarget.VERTEX, 10);
+        state.setVertexAttribPointer(0, 3, VulkanicAPI.GL_FLOAT, false, false, 12, 0L);
+        state.bindTextureUnit(3, 30);
+        state.bindSampler(3, 40);
+
+        VulkanicGalExecutionRequest.GraphicsDrawRequest request =
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
+                "shared-compatibility-deferred-resources",
+                VulkanicPrimitiveMode.TRIANGLES,
+                0,
+                3,
+                1
+            );
+
+        VulkanicGalExecutionRequest.GraphicsCompatibilitySnapshot eager =
+            state.compatibilitySnapshotFor(request, true);
+        VulkanicGalExecutionRequest.GraphicsCompatibilitySnapshot deferred =
+            state.compatibilitySnapshotFor(request, false);
+
+        assertFalse(eager.descriptorBindings().isEmpty());
+        assertFalse(eager.resourceUses().isEmpty());
+        assertTrue(deferred.descriptorBindings().isEmpty());
+        assertTrue(deferred.resourceUses().isEmpty());
+        assertTrue(deferred.sharedCompatibilityState().isPresent());
+        assertEquals(1, deferred.sharedCompatibilityState().get().programId());
+        assertEquals(2, deferred.sharedCompatibilityState().get().vaoId());
+        assertEquals(30, deferred.sharedCompatibilityState().get().textureUnitBindings().get(3));
+        assertEquals(eager.vertexInput(), deferred.vertexInput());
+        assertEquals("frontend-shared-compatibility-draw", deferred.source());
     }
 
     @Test

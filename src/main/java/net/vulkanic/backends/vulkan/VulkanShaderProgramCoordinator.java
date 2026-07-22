@@ -347,6 +347,7 @@ final class VulkanShaderProgramCoordinator {
                 initializeStandaloneUniformDefaults(program.standaloneFieldsByLocation, program.standaloneBackingData);
             }
             program.standaloneDirty = backingSize > 0;
+            program.standalonePayloadVersion++;
             program.closeStandaloneUniformBacking();
         }
     }
@@ -474,8 +475,11 @@ final class VulkanShaderProgramCoordinator {
                 return false;
             }
 
-            writeIntUniform(field, backingData, values);
-            program.standaloneDirty = true;
+            boolean changed = writeIntUniformIfChanged(program, field, backingData, values);
+            if (changed) {
+                program.standaloneDirty = true;
+                program.standalonePayloadVersion++;
+            }
             return true;
         }
     }
@@ -492,10 +496,59 @@ final class VulkanShaderProgramCoordinator {
                 return false;
             }
 
-            writeFloatUniform(field, backingData, values);
-            program.standaloneDirty = true;
+            boolean changed = writeFloatUniformIfChanged(program, field, backingData, values);
+            if (changed) {
+                program.standaloneDirty = true;
+                program.standalonePayloadVersion++;
+            }
             return true;
         }
+    }
+
+    private static boolean writeIntUniformIfChanged(
+        VirtualProgram program,
+        StandaloneUniformField field,
+        ByteBuffer backingData,
+        int[] values
+    ) {
+        byte[] before = copyStandaloneBacking(backingData, program.standaloneBackingSize);
+        writeIntUniform(field, backingData, values);
+        return !standaloneBackingEquals(backingData, before);
+    }
+
+    private static boolean writeFloatUniformIfChanged(
+        VirtualProgram program,
+        StandaloneUniformField field,
+        ByteBuffer backingData,
+        float[] values
+    ) {
+        byte[] before = copyStandaloneBacking(backingData, program.standaloneBackingSize);
+        writeFloatUniform(field, backingData, values);
+        return !standaloneBackingEquals(backingData, before);
+    }
+
+    private static byte[] copyStandaloneBacking(ByteBuffer backingData, int size) {
+        int safeSize = Math.max(0, size);
+        byte[] bytes = new byte[safeSize];
+        ByteBuffer duplicate = backingData.duplicate();
+        duplicate.clear();
+        duplicate.limit(Math.min(safeSize, duplicate.capacity()));
+        duplicate.get(bytes, 0, duplicate.remaining());
+        return bytes;
+    }
+
+    private static boolean standaloneBackingEquals(ByteBuffer backingData, byte[] before) {
+        ByteBuffer duplicate = backingData.duplicate();
+        duplicate.clear();
+        if (duplicate.capacity() < before.length) {
+            return false;
+        }
+        for (int i = 0; i < before.length; i++) {
+            if (duplicate.get(i) != before[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     static int standaloneUniformBlockBindingIndex(VirtualProgram program) {
@@ -905,6 +958,7 @@ final class VulkanShaderProgramCoordinator {
         @Nullable
         volatile VulkanBuffer standaloneGpuBuffer;
         volatile boolean standaloneDirty;
+        volatile long standalonePayloadVersion;
         volatile boolean linkStatus;
         volatile String infoLog = "";
         @Nullable

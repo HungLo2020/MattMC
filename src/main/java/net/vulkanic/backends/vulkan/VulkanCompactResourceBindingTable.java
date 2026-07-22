@@ -8,6 +8,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -80,6 +81,37 @@ final class VulkanCompactResourceBindingTable {
         return missingResourceCount == 0;
     }
 
+    VulkanCompactResourceBindingTable withUniformBufferBindings(Map<String, VulkanicBufferSlice> replacements) {
+        Objects.requireNonNull(replacements, "replacements");
+        if (replacements.isEmpty()) {
+            return this;
+        }
+        Object[] replaced = resourceBindings.clone();
+        int bound = 0;
+        int missing = 0;
+        for (int index = 0; index < layoutBindings.length; index++) {
+            PipelineDescriptor.ResourceBinding binding = layoutBindings[index];
+            VulkanicBufferSlice replacement = binding.type() == PipelineDescriptor.ResourceType.UNIFORM_BUFFER
+                ? replacements.get(binding.name())
+                : null;
+            if (replacement != null) {
+                replaced[index] = replacement;
+            }
+            if (replaced[index] == null) {
+                missing++;
+            } else {
+                bound++;
+            }
+        }
+        return new VulkanCompactResourceBindingTable(
+            descriptor,
+            layoutBindings,
+            replaced,
+            bound,
+            missing
+        );
+    }
+
     PipelineDescriptor.ResourceBinding layoutBinding(int index) {
         return layoutBindings[index];
     }
@@ -94,6 +126,12 @@ final class VulkanCompactResourceBindingTable {
     VulkanicBufferSlice uniformBufferBinding(int index) {
         Object resource = resourceBindings[index];
         return resource instanceof VulkanicBufferSlice binding ? binding : null;
+    }
+
+    @Nullable
+    VulkanStandaloneUniformBinding standaloneUniformBinding(int index) {
+        Object resource = resourceBindings[index];
+        return resource instanceof VulkanStandaloneUniformBinding binding ? binding : null;
     }
 
     @Nullable
@@ -132,6 +170,12 @@ final class VulkanCompactResourceBindingTable {
     VulkanicBufferSlice uniformBufferBinding(String name) {
         int index = indexOf(name);
         return index < 0 ? null : uniformBufferBinding(index);
+    }
+
+    @Nullable
+    VulkanStandaloneUniformBinding standaloneUniformBinding(String name) {
+        int index = indexOf(name);
+        return index < 0 ? null : standaloneUniformBinding(index);
     }
 
     @Nullable
@@ -184,7 +228,8 @@ final class VulkanCompactResourceBindingTable {
         }
         boolean valid = switch (layoutBinding.type()) {
             case SAMPLER, COMPARISON_SAMPLER -> resource instanceof PipelineResourceBindings.SamplerBinding;
-            case UNIFORM_BUFFER -> resource instanceof VulkanicBufferSlice;
+            case UNIFORM_BUFFER -> resource instanceof VulkanicBufferSlice
+                || resource instanceof VulkanStandaloneUniformBinding;
             case STORAGE_IMAGE -> resource instanceof PipelineResourceBindings.StorageImageBinding;
             case TEXEL_BUFFER -> resource instanceof PipelineResourceBindings.TexelBufferBinding;
         };

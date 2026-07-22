@@ -404,6 +404,7 @@ final class VulkanicGalSubmissionBoundaryTest {
         VulkanicGalV2.clearForTests();
         VulkanicCompatibilityState state = new VulkanicCompatibilityState();
         state.bindProgram(11);
+        state.setUniformFloat(-1, 0.25f);
         state.setUniformInt(3, 7);
 
         VulkanicGalExecutionRequest.GraphicsDrawRequest draft =
@@ -435,11 +436,219 @@ final class VulkanicGalSubmissionBoundaryTest {
 
         assertEquals(firstV2.graphicsObjects(), changedV2.graphicsObjects());
         assertEquals(1, VulkanicGalV2.graphicsObjectCountForTests());
-        assertEquals(8, changedV2.compatibilitySnapshot()
+        assertEquals(firstV2.resourceSet(), changedV2.resourceSet());
+        VulkanicGalV2.ResourceSet resourceSet = VulkanicGalV2.requireResourceSet(firstV2.resourceSet());
+        VulkanicGalV2.ResourceBinding standalone =
+            resourceSet.uniformBinding(VulkanicAPI.generatedStandaloneUniformBlockName()).orElseThrow();
+        VulkanicGalV2.UniformBinding uniformBinding =
+            VulkanicGalV2.requireUniformBinding(standalone.uniformBinding().orElseThrow());
+        assertEquals(11, uniformBinding.programId());
+        assertEquals(VulkanicAPI.generatedStandaloneUniformBlockName(), uniformBinding.bindingName());
+        assertEquals(1, VulkanicGalV2.uniformBindingCountForTests());
+        assertEquals(7, v2Seed(changedV2)
             .program()
             .uniformsByLocation()
             .get(3)
             .ints()[0]);
+        assertEquals(0.25f, v2Seed(changedV2)
+            .program()
+            .uniformsByLocation()
+            .get(-1)
+            .floats()[0]);
+    }
+
+    @Test
+    void galV2LegacyProgramSupportRemainsBoundedToMigratedSlice() {
+        assertTrue(VulkanicGalV2.supportsLegacyProgramId(11));
+        assertTrue(VulkanicGalV2.supportsLegacyProgramId(9));
+        assertFalse(VulkanicGalV2.supportsLegacyProgramId(0));
+        assertFalse(VulkanicGalV2.supportsLegacyProgramId(147));
+    }
+
+    @Test
+    void galV2OpenGlNonEagerCaptureDoesNotDependOnVulkanProgramIds() {
+        VulkanicGalV2.clearForTests();
+        VulkanicCompatibilityState state = new VulkanicCompatibilityState();
+        state.bindProgram(147);
+        state.bindTexture(3, VulkanicAPI.GL_TEXTURE_2D, 41);
+        state.bindBufferRange(VulkanicAPI.GL_UNIFORM_BUFFER, 2, 52, 16L, 32L);
+
+        VulkanicGalExecutionRequest.GraphicsDrawRequest draft =
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
+                "opengl-legacy-program-id-regression",
+                VulkanicPrimitiveMode.TRIANGLES,
+                0,
+                3,
+                1
+            );
+        VulkanicCompatibilityState.GraphicsSnapshot snapshot = state.captureGraphics(draft);
+
+        VulkanicGalV2.ExplicitGraphicsDrawRequest first =
+            VulkanicGalV2.tryCaptureLegacyProgramSlice(snapshot, draft, false).orElseThrow();
+        assertTrue(VulkanicGalV2.tryCaptureLegacyProgramSlice(snapshot, draft, true).isEmpty());
+        VulkanicGalV2.ResourceSet firstResources = VulkanicGalV2.requireResourceSet(first.resourceSet());
+        assertTrue(firstResources.sampledTextureBinding(3).isPresent());
+        assertTrue(firstResources.bufferRangeBinding(2).isPresent());
+
+        state.bindTexture(3, VulkanicAPI.GL_TEXTURE_2D, 42);
+        VulkanicGalV2.ExplicitGraphicsDrawRequest changed =
+            VulkanicGalV2.tryCaptureLegacyProgramSlice(state.captureGraphics(draft), draft, false).orElseThrow();
+        assertEquals(first.graphicsObjects(), changed.graphicsObjects());
+        assertFalse(first.resourceSet().equals(changed.resourceSet()));
+        VulkanicGalV2.ResourceSet changedResources = VulkanicGalV2.requireResourceSet(changed.resourceSet());
+        assertEquals(42, changedResources.sampledTextureBinding(3)
+            .orElseThrow()
+            .resourceReference()
+            .orElseThrow()
+            .legacyId()
+            .orElseThrow());
+    }
+
+    @Test
+    void galV2ResourceSetsReuseEquivalentBindingsAndTrackGenerations() {
+        VulkanicGalV2.clearForTests();
+        VulkanicCompatibilityState state = new VulkanicCompatibilityState();
+        state.bindProgram(11);
+        state.bindTexture(4, VulkanicAPI.GL_TEXTURE_2D, 91);
+        state.bindSampler(4, 7);
+        state.bindImageTexture(2, 92, 1, false, 0, VulkanicAPI.GL_READ_WRITE, VulkanicAPI.GL_RGBA8);
+        state.bindBufferRange(VulkanicAPI.GL_UNIFORM_BUFFER, 3, 81, 16L, 64L);
+
+        VulkanicGalExecutionRequest.GraphicsDrawRequest draft =
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
+                "drawArrays",
+                VulkanicPrimitiveMode.TRIANGLES,
+                0,
+                3,
+                1
+            );
+
+        VulkanicGalV2.ExplicitGraphicsDrawRequest first =
+            VulkanicGalV2.tryCaptureLegacyProgramSlice(
+                VulkanicGalSnapshotBuilder.captureGraphicsDraw(immediateContext(), new NoopGalExecutor(), state, draft)
+            ).orElseThrow();
+        VulkanicGalV2.ExplicitGraphicsDrawRequest second =
+            VulkanicGalV2.tryCaptureLegacyProgramSlice(
+                VulkanicGalSnapshotBuilder.captureGraphicsDraw(immediateContext(), new NoopGalExecutor(), state, draft)
+            ).orElseThrow();
+
+        assertEquals(first.resourceSet(), second.resourceSet());
+        assertEquals(1, VulkanicGalV2.resourceSetCountForTests());
+        VulkanicGalV2.ResourceSet resourceSet = VulkanicGalV2.requireResourceSet(first.resourceSet());
+        VulkanicGalV2.ResourceBinding sampler = resourceSet.sampledTextureBinding(4).orElseThrow();
+        assertEquals(91, sampler.resourceReference().orElseThrow().legacyId().orElseThrow());
+        assertEquals(VulkanicAPI.GL_TEXTURE_2D, sampler.resourceReference().orElseThrow().legacyTarget().orElseThrow());
+        assertEquals(7, sampler.resourceReference().orElseThrow().samplerObject().orElseThrow());
+        assertTrue(resourceSet.storageImageBinding(2).isPresent());
+        assertTrue(resourceSet.bufferRangeBinding(3).isPresent());
+
+        state.setActiveTextureUnitIndex(4);
+        state.markBoundTextureStorageReplaced(VulkanicAPI.GL_TEXTURE_2D);
+        VulkanicGalV2.ExplicitGraphicsDrawRequest replacedTexture =
+            VulkanicGalV2.tryCaptureLegacyProgramSlice(
+                VulkanicGalSnapshotBuilder.captureGraphicsDraw(immediateContext(), new NoopGalExecutor(), state, draft)
+            ).orElseThrow();
+        assertFalse(first.resourceSet().equals(replacedTexture.resourceSet()));
+        assertEquals(2, VulkanicGalV2.resourceSetCountForTests());
+    }
+
+    @Test
+    void galV2EagerResourceCaptureDoesNotDoubleDeclareStorageImageBindings() {
+        VulkanicGalV2.clearForTests();
+        VulkanicCompatibilityState state = new VulkanicCompatibilityState();
+        state.bindProgram(11);
+        state.bindBuffer(VulkanicBufferTarget.INDEX, 74);
+        state.bindImageTexture(0, 73, 0, false, 0, VulkanicAPI.GL_READ_WRITE, VulkanicAPI.GL_RGBA8);
+
+        VulkanicGalExecutionRequest.GraphicsDrawRequest draft =
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.indexed(
+                "dh-lod-image-unit-regression",
+                VulkanicPrimitiveMode.TRIANGLES,
+                6,
+                VulkanicIndexType.INT,
+                0L,
+                1,
+                0
+            );
+        VulkanicCompatibilityState.GraphicsSnapshot snapshot = state.captureGraphics(draft);
+
+        VulkanicGalV2.ExplicitGraphicsDrawRequest explicit =
+            VulkanicGalV2.tryCaptureLegacyProgramSlice(snapshot, draft, true).orElseThrow();
+
+        long storageImageUses = explicit.resourcePlan().orderedUses().stream()
+            .filter(use -> use.resource().stableKey().equals("legacy-texture:73"))
+            .filter(use -> use.kind() == VulkanicPassResourceModel.ResourceKind.STORAGE_TEXTURE)
+            .count();
+        assertEquals(1, storageImageUses);
+        assertTrue(VulkanicGalV2.requireResourceSet(explicit.resourceSet()).storageImageBinding(0).isPresent());
+    }
+
+    @Test
+    void galV2ResourceLayoutSurvivesResourceAndUniformContentChanges() {
+        VulkanicGalV2.clearForTests();
+        VulkanicCompatibilityState state = new VulkanicCompatibilityState();
+        state.bindProgram(9);
+        state.bindTexture(1, VulkanicAPI.GL_TEXTURE_2D, 101);
+        state.bindSampler(1, 3);
+        state.setUniformInt(5, 10);
+
+        VulkanicGalExecutionRequest.GraphicsDrawRequest draft =
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
+                "drawArrays",
+                VulkanicPrimitiveMode.TRIANGLES,
+                0,
+                3,
+                1
+            );
+
+        VulkanicGalV2.ExplicitGraphicsDrawRequest first =
+            VulkanicGalV2.tryCaptureLegacyProgramSlice(
+                VulkanicGalSnapshotBuilder.captureGraphicsDraw(immediateContext(), new NoopGalExecutor(), state, draft)
+            ).orElseThrow();
+        VulkanicGalV2.ExplicitGraphicsObjects firstObjects =
+            VulkanicGalV2.requireGraphicsObjects(first.graphicsObjects());
+
+        state.setUniformInt(5, 11);
+        state.bindTexture(1, VulkanicAPI.GL_TEXTURE_2D, 102);
+        VulkanicGalV2.ExplicitGraphicsDrawRequest changed =
+            VulkanicGalV2.tryCaptureLegacyProgramSlice(
+                VulkanicGalSnapshotBuilder.captureGraphicsDraw(immediateContext(), new NoopGalExecutor(), state, draft)
+            ).orElseThrow();
+        VulkanicGalV2.ExplicitGraphicsObjects changedObjects =
+            VulkanicGalV2.requireGraphicsObjects(changed.graphicsObjects());
+
+        assertEquals(firstObjects.resourceLayout(), changedObjects.resourceLayout());
+        assertFalse(first.resourceSet().equals(changed.resourceSet()));
+        assertEquals(11, v2Seed(changed)
+            .program()
+            .uniformsByLocation()
+            .get(5)
+            .ints()[0]);
+    }
+
+    @Test
+    void galV2StandaloneUniformPublicationDoesNotUsePerDrawSliceLookup() throws Exception {
+        String vulkanSource = Files.readString(PROJECT_ROOT.resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        int v2ResolveStart = vulkanSource.indexOf(
+            "private VulkanCompactResourceBindingTable resolveCompact(\n"
+                + "            CommandContext ctx,\n"
+                + "            long commandBufferHandle,\n"
+                + "            PipelineDescriptor descriptor,\n"
+                + "            VulkanDrawExecutionCoordinator.LegacyProgramSnapshot programSnapshot,\n"
+                + "            VulkanicGalV2.ResourceSet resourceSet");
+        assertTrue(v2ResolveStart >= 0);
+        int v2ResolveEnd = vulkanSource.indexOf("private VulkanStandaloneUniformBinding resolveTemplateStandaloneUniformBinding", v2ResolveStart);
+        assertTrue(v2ResolveEnd > v2ResolveStart);
+        String v2Resolve = vulkanSource.substring(v2ResolveStart, v2ResolveEnd);
+
+        assertTrue(v2Resolve.contains("resolveTemplateStandaloneUniformBinding(programSnapshot.programId(), binding.name(), resourceSet)"));
+        assertFalse(v2Resolve.contains("getStandaloneUniformBufferSlice("));
+        assertTrue(vulkanSource.contains("materializeStandaloneUniformArenaBinding(\n"
+            + "                                frameSlot,\n"
+            + "                                pipelineLocation,\n"
+            + "                                binding.name(),\n"
+            + "                                standaloneBinding"));
+        assertTrue(vulkanSource.contains("bindingTable.withUniformBufferBindings(dynamicUniformSlices(dynamicUniformStates))"));
     }
 
     @Test
@@ -541,6 +750,12 @@ final class VulkanicGalSubmissionBoundaryTest {
                 return "test-immediate";
             }
         };
+    }
+
+    private static VulkanicCompatibilityState.GraphicsSnapshot v2Seed(
+        VulkanicGalV2.ExplicitGraphicsDrawRequest request
+    ) {
+        return VulkanicGalV2.requireGraphicsObjects(request.graphicsObjects()).immutableCompatibilitySeed();
     }
 
     private static final class NoopGalExecutor implements VulkanicGalExecutor {
@@ -658,8 +873,25 @@ final class VulkanicGalSubmissionBoundaryTest {
             "Shared Vulkanic snapshot builder should own legacy graphics snapshot assembly");
         assertTrue(builderSource.contains("VulkanicCompatibilityState compatibilityState"),
             "Shared Vulkanic snapshot builder should accept frontend-owned compatibility state");
-        assertTrue(vulkanSource.contains("Objects.requireNonNull(capturedGalRequest, \"capturedGalRequest\")"),
-            "Vulkan graphics materialization should not accept unresolved/null GAL requests");
+        assertTrue(vulkanSource.contains("Objects.requireNonNull(capturedUses, \"capturedUses\")"),
+            "Vulkan graphics materialization should validate request-owned resource uses without requiring a v1 wrapper request");
+        assertTrue(vulkanSource.contains("VulkanicGalV2.requireResourceSet(explicitRequest.resourceSet())"),
+            "GAL v2 graphics lowering should resolve resources from the request-owned v2 resource set");
+        String galV2Source = Files.readString(PROJECT_ROOT.resolve("src/main/java/net/vulkanic/VulkanicGalV2.java"));
+        int explicitDrawStart = galV2Source.indexOf("public record ExplicitGraphicsDrawRequest(");
+        int explicitDrawEnd = galV2Source.indexOf(
+            "public static Optional<ExplicitGraphicsDrawRequest>",
+            explicitDrawStart
+        );
+        assertTrue(explicitDrawStart >= 0 && explicitDrawEnd > explicitDrawStart);
+        String explicitDrawRecord = galV2Source.substring(explicitDrawStart, explicitDrawEnd);
+        assertFalse(explicitDrawRecord.contains("GraphicsSnapshot compatibilitySnapshot"),
+            "Migrated GAL v2 draws must not carry a broad compatibility snapshot per command");
+        assertTrue(vulkanSource.contains("galV2ResourcePlanTemplate(descriptor, programSnapshot, resourceSet.layout())")
+                && vulkanSource.contains("record GalV2ResourcePlanTemplateKey("),
+            "GAL v2 graphics lowering should cache immutable resource-plan templates by v2 resource-layout semantics");
+        assertFalse(vulkanSource.contains("compatibilityRequestForExplicitV2Draw"));
+        assertFalse(vulkanSource.contains("gal-v2-explicit-compatibility-wrapper"));
         assertTrue(vulkanSource.contains("requestOwnedComputeResourceBindingPlan(")
                 && vulkanSource.contains("capturedRequest.compatibilitySnapshot().sharedCompatibilityState().isEmpty()"),
             "Compute GAL lowering should reject uncaptured requests and derive native bindings from request-owned snapshots");

@@ -31,7 +31,8 @@ final class VulkanTextureResourceManager {
     private final Map<Integer, VirtualSamplerState> virtualSamplerStates = new ConcurrentHashMap<>();
     private final Map<Integer, Integer> boundSamplerPerUnit = new ConcurrentHashMap<>();
 
-    private volatile int legacyFallbackSamplerTextureId;
+    private volatile int legacyFallbackSamplerTexture2DId;
+    private volatile int legacyFallbackSamplerTexture3DId;
 
     int createLegacyTexture(int target) {
         int id = nextLegacyTextureId.getAndIncrement();
@@ -115,21 +116,42 @@ final class VulkanTextureResourceManager {
     }
 
     int legacyFallbackSamplerTextureId() {
-        return legacyFallbackSamplerTextureId;
+        return legacyFallbackSamplerTextureId(VulkanicAPI.GL_TEXTURE_2D);
+    }
+
+    int legacyFallbackSamplerTextureId(int target) {
+        return target == VulkanicAPI.GL_TEXTURE_3D
+            ? legacyFallbackSamplerTexture3DId
+            : legacyFallbackSamplerTexture2DId;
     }
 
     LegacyTextureObject legacyFallbackSamplerTexture() {
-        int textureId = legacyFallbackSamplerTextureId;
+        return legacyFallbackSamplerTexture(VulkanicAPI.GL_TEXTURE_2D);
+    }
+
+    LegacyTextureObject legacyFallbackSamplerTexture(int target) {
+        int textureId = legacyFallbackSamplerTextureId(target);
         return textureId > 0 ? legacyTextures.get(textureId) : null;
     }
 
     void setLegacyFallbackSamplerTextureId(int textureId) {
-        legacyFallbackSamplerTextureId = textureId;
+        setLegacyFallbackSamplerTextureId(VulkanicAPI.GL_TEXTURE_2D, textureId);
+    }
+
+    void setLegacyFallbackSamplerTextureId(int target, int textureId) {
+        if (target == VulkanicAPI.GL_TEXTURE_3D) {
+            legacyFallbackSamplerTexture3DId = textureId;
+        } else {
+            legacyFallbackSamplerTexture2DId = textureId;
+        }
     }
 
     void clearLegacyFallbackSamplerTextureIdIfMatches(int textureId) {
-        if (legacyFallbackSamplerTextureId == textureId) {
-            legacyFallbackSamplerTextureId = 0;
+        if (legacyFallbackSamplerTexture2DId == textureId) {
+            legacyFallbackSamplerTexture2DId = 0;
+        }
+        if (legacyFallbackSamplerTexture3DId == textureId) {
+            legacyFallbackSamplerTexture3DId = 0;
         }
     }
 
@@ -368,7 +390,8 @@ final class VulkanTextureResourceManager {
         virtualSamplers.clear();
         virtualSamplerStates.clear();
         boundSamplerPerUnit.clear();
-        legacyFallbackSamplerTextureId = 0;
+        legacyFallbackSamplerTexture2DId = 0;
+        legacyFallbackSamplerTexture3DId = 0;
     }
 }
 

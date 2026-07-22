@@ -8,6 +8,10 @@ package net.vulkanic;
  * they do not receive raw GL-shaped execution arguments through this contract.</p>
  */
 public interface VulkanicGalExecutor {
+    default boolean requiresEagerGraphicsResourceDeclarations() {
+        return true;
+    }
+
     default VulkanicGalExecutionRequest.ExecutionResult executeGraphicsDraw(
         CommandContext ctx,
         VulkanicGalExecutionRequest.GraphicsDrawRequest request

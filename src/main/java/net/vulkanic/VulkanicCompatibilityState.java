@@ -63,6 +63,21 @@ public final class VulkanicCompatibilityState {
     private final Map<Integer, Long> bufferGenerations = new HashMap<>();
     private final FixedFunctionState fixedFunction = new FixedFunctionState();
     private final PixelStoreState pixelStore = new PixelStoreState();
+    private long programVersion;
+    private long vertexInputVersion;
+    private long framebufferVersion;
+    private long resourceBindingVersion;
+    private long fixedFunctionVersion;
+    private GraphicsSnapshot cachedGraphicsSnapshot;
+    private String cachedGraphicsSnapshotLabel;
+    private int cachedGraphicsSnapshotProgram;
+    private int cachedGraphicsSnapshotVao;
+    private int cachedGraphicsSnapshotDrawFramebuffer;
+    private long cachedGraphicsSnapshotProgramVersion = Long.MIN_VALUE;
+    private long cachedGraphicsSnapshotVertexInputVersion = Long.MIN_VALUE;
+    private long cachedGraphicsSnapshotFramebufferVersion = Long.MIN_VALUE;
+    private long cachedGraphicsSnapshotResourceBindingVersion = Long.MIN_VALUE;
+    private long cachedGraphicsSnapshotFixedFunctionVersion = Long.MIN_VALUE;
     private int currentProgram;
     private int currentVao;
     private int boundReadFramebuffer;
@@ -107,6 +122,7 @@ public final class VulkanicCompatibilityState {
             if (programId > 0) {
                 programs.computeIfAbsent(programId, ProgramState::new);
             }
+            programVersion++;
         }
     }
 
@@ -116,24 +132,28 @@ public final class VulkanicCompatibilityState {
             if (currentProgram == programId) {
                 currentProgram = 0;
             }
+            programVersion++;
         }
     }
 
     public void setUniformInt(int location, int... values) {
         synchronized (lock) {
             program(currentProgram).uniformsByLocation.put(location, UniformValue.ints(values));
+            programVersion++;
         }
     }
 
     public void setUniformFloat(int location, float... values) {
         synchronized (lock) {
             program(currentProgram).uniformsByLocation.put(location, UniformValue.floats(values));
+            programVersion++;
         }
     }
 
     public void setUniformMatrix(int location, int columns, int rows, boolean transpose, float[] values) {
         synchronized (lock) {
             program(currentProgram).uniformsByLocation.put(location, UniformValue.matrix(columns, rows, transpose, values));
+            programVersion++;
         }
     }
 
@@ -159,6 +179,7 @@ public final class VulkanicCompatibilityState {
             registerTexture(texture);
             textureUnitBindings.remove(activeTextureUnitIndex);
             textureBindings.put(new TextureBindingKey(activeTextureUnitIndex, target), texture);
+            resourceBindingVersion++;
         }
     }
 
@@ -168,6 +189,7 @@ public final class VulkanicCompatibilityState {
             registerTexture(texture);
             textureUnitBindings.remove(unit);
             textureBindings.put(new TextureBindingKey(unit, target), texture);
+            resourceBindingVersion++;
         }
     }
 
@@ -181,12 +203,14 @@ public final class VulkanicCompatibilityState {
             registerTexture(texture);
             textureBindings.keySet().removeIf(key -> key.unit() == unitIndex);
             textureUnitBindings.put(unitIndex, texture);
+            resourceBindingVersion++;
         }
     }
 
     public void bindSampler(int unit, int sampler) {
         synchronized (lock) {
             samplerBindings.put(Math.max(0, unit), sampler);
+            resourceBindingVersion++;
         }
     }
 
@@ -197,6 +221,7 @@ public final class VulkanicCompatibilityState {
                 Math.max(0, unit),
                 new ImageUnitBindingState(Math.max(0, unit), texture, level, layered, layer, access, format)
             );
+            resourceBindingVersion++;
         }
     }
 
@@ -206,6 +231,7 @@ public final class VulkanicCompatibilityState {
             for (int i = 0; i < samplers.length; i++) {
                 samplerBindings.put(Math.max(0, first + i), samplers[i]);
             }
+            resourceBindingVersion++;
         }
     }
 
@@ -214,6 +240,7 @@ public final class VulkanicCompatibilityState {
             textureBindings.values().removeIf(value -> value == texture);
             imageUnitBindings.values().removeIf(value -> value.texture() == texture);
             incrementTextureGeneration(texture);
+            resourceBindingVersion++;
         }
     }
 
@@ -223,6 +250,7 @@ public final class VulkanicCompatibilityState {
             bufferBindings.put(target, buffer);
             if (target == GL_ELEMENT_ARRAY_BUFFER) {
                 vao(currentVao).elementBuffer = buffer;
+                vertexInputVersion++;
             }
         }
     }
@@ -239,6 +267,7 @@ public final class VulkanicCompatibilityState {
         synchronized (lock) {
             registerBuffer(buffer);
             indexedBufferBindings.put(new IndexedBufferKey(target, index), new BufferRangeState(buffer, offset, size));
+            resourceBindingVersion++;
         }
     }
 
@@ -249,23 +278,32 @@ public final class VulkanicCompatibilityState {
             for (VaoState vao : vaos.values()) {
                 if (vao.elementBuffer == buffer) {
                     vao.elementBuffer = 0;
+                    vertexInputVersion++;
                 }
-                vao.vertexBindings.values().removeIf(binding -> binding.buffer() == buffer);
-                vao.attributes.values().removeIf(attribute -> attribute.capturedBuffer() == buffer);
+                if (vao.vertexBindings.values().removeIf(binding -> binding.buffer() == buffer)) {
+                    vertexInputVersion++;
+                }
+                if (vao.attributes.values().removeIf(attribute -> attribute.capturedBuffer() == buffer)) {
+                    vertexInputVersion++;
+                }
             }
             incrementBufferGeneration(buffer);
+            resourceBindingVersion++;
         }
     }
 
     public void markBufferStorageReplaced(int buffer) {
         synchronized (lock) {
             incrementBufferGeneration(buffer);
+            resourceBindingVersion++;
+            vertexInputVersion++;
         }
     }
 
     public void markTextureStorageReplaced(int texture) {
         synchronized (lock) {
             incrementTextureGeneration(texture);
+            resourceBindingVersion++;
         }
     }
 
@@ -276,12 +314,15 @@ public final class VulkanicCompatibilityState {
                 texture = textureUnitBindings.get(activeTextureUnitIndex);
             }
             incrementTextureGeneration(texture == null ? 0 : texture);
+            resourceBindingVersion++;
         }
     }
 
     public void markBoundBufferStorageReplaced(int target) {
         synchronized (lock) {
             incrementBufferGeneration(bufferBindings.getOrDefault(target, 0));
+            resourceBindingVersion++;
+            vertexInputVersion++;
         }
     }
 
@@ -333,6 +374,7 @@ public final class VulkanicCompatibilityState {
             if (vao > 0) {
                 vaos.computeIfAbsent(vao, VaoState::new);
             }
+            vertexInputVersion++;
         }
     }
 
@@ -342,18 +384,21 @@ public final class VulkanicCompatibilityState {
             if (currentVao == vao) {
                 currentVao = 0;
             }
+            vertexInputVersion++;
         }
     }
 
     public void enableVertexAttribArray(int index) {
         synchronized (lock) {
             vao(currentVao).enabledAttributes.add(index);
+            vertexInputVersion++;
         }
     }
 
     public void disableVertexAttribArray(int index) {
         synchronized (lock) {
             vao(currentVao).enabledAttributes.remove(Integer.valueOf(index));
+            vertexInputVersion++;
         }
     }
 
@@ -376,6 +421,7 @@ public final class VulkanicCompatibilityState {
                 capturedBuffer
             ));
             vao.vertexBindings.put(binding, new VertexBindingState(binding, capturedBuffer, 0L, stride, divisor));
+            vertexInputVersion++;
         }
     }
 
@@ -397,6 +443,7 @@ public final class VulkanicCompatibilityState {
                 divisor,
                 capturedBuffer
             ));
+            vertexInputVersion++;
         }
     }
 
@@ -406,9 +453,11 @@ public final class VulkanicCompatibilityState {
             VertexAttributeState previous = vao.attributes.get(index);
             if (previous == null) {
                 vao.attributes.put(index, new VertexAttributeState(index, binding, 4, 0x1406, false, false, 0, 0, 0));
+                vertexInputVersion++;
                 return;
             }
             vao.attributes.put(index, previous.withBinding(binding));
+            vertexInputVersion++;
         }
     }
 
@@ -418,6 +467,7 @@ public final class VulkanicCompatibilityState {
             VertexBindingState previous = vao.vertexBindings.get(binding);
             int divisor = previous == null ? 0 : previous.divisor();
             vao.vertexBindings.put(binding, new VertexBindingState(binding, buffer, offset, stride, divisor));
+            vertexInputVersion++;
         }
     }
 
@@ -427,6 +477,7 @@ public final class VulkanicCompatibilityState {
             VertexAttributeState previous = vao.attributes.get(index);
             if (previous == null) {
                 vao.attributes.put(index, new VertexAttributeState(index, index, 4, 0x1406, false, false, 0, divisor, 0));
+                vertexInputVersion++;
                 return;
             }
             vao.attributes.put(index, previous.withDivisor(divisor));
@@ -434,12 +485,14 @@ public final class VulkanicCompatibilityState {
             if (binding != null) {
                 vao.vertexBindings.put(previous.binding(), binding.withDivisor(divisor));
             }
+            vertexInputVersion++;
         }
     }
 
     public void setVertexAttribDefault(int index, float v0, float v1, float v2, float v3) {
         synchronized (lock) {
             vao(currentVao).defaultAttributes.put(index, new float[] {v0, v1, v2, v3});
+            vertexInputVersion++;
         }
     }
 
@@ -460,6 +513,7 @@ public final class VulkanicCompatibilityState {
             if (framebuffer > 0) {
                 framebuffers.computeIfAbsent(framebuffer, FramebufferState::new);
             }
+            framebufferVersion++;
         }
     }
 
@@ -478,6 +532,7 @@ public final class VulkanicCompatibilityState {
             if (boundDrawFramebuffer == framebuffer) {
                 boundDrawFramebuffer = 0;
             }
+            framebufferVersion++;
         }
     }
 
@@ -492,66 +547,77 @@ public final class VulkanicCompatibilityState {
         synchronized (lock) {
             FramebufferState state = framebuffers.computeIfAbsent(framebuffer, FramebufferState::new);
             state.attachments.put(attachment, new AttachmentState(attachment, texture, level));
+            framebufferVersion++;
         }
     }
 
     public void setDrawBuffer(int mode) {
         synchronized (lock) {
             framebuffer(boundDrawFramebuffer).drawBuffers = List.of(mode);
+            framebufferVersion++;
         }
     }
 
     public void setNamedDrawBuffers(int framebuffer, int[] buffers) {
         synchronized (lock) {
             framebuffer(framebuffer).drawBuffers = Arrays.stream(buffers).boxed().toList();
+            framebufferVersion++;
         }
     }
 
     public void setNamedReadBuffer(int framebuffer, int mode) {
         synchronized (lock) {
             framebuffer(framebuffer).readBuffer = mode;
+            framebufferVersion++;
         }
     }
 
     public void setReadBuffer(int mode) {
         synchronized (lock) {
             framebuffer(boundReadFramebuffer).readBuffer = mode;
+            framebufferVersion++;
         }
     }
 
     public void setDrawBuffers(int[] buffers) {
         synchronized (lock) {
             framebuffer(boundDrawFramebuffer).drawBuffers = Arrays.stream(buffers).boxed().toList();
+            framebufferVersion++;
         }
     }
 
     public void setViewport(int x, int y, int width, int height) {
         synchronized (lock) {
             fixedFunction.viewport = Optional.of(new VulkanicGalExecutionRequest.Viewport(x, y, width, height, 0.0F, 1.0F));
+            fixedFunctionVersion++;
         }
     }
 
     public void setScissor(int x, int y, int width, int height) {
         synchronized (lock) {
             fixedFunction.scissor = Optional.of(new VulkanicGalExecutionRequest.Scissor(x, y, width, height));
+            fixedFunctionVersion++;
         }
     }
 
     public void setScissorTestEnabled(boolean enabled) {
         synchronized (lock) {
             fixedFunction.scissorTestEnabled = enabled;
+            fixedFunctionVersion++;
         }
     }
 
     public void setStencilTestEnabled(boolean enabled) {
         synchronized (lock) {
             fixedFunction.stencilTestEnabled = enabled;
+            fixedFunctionVersion++;
         }
     }
 
     public void setBlendEnabled(boolean enabled) {
         synchronized (lock) {
             fixedFunction.blendEnabled = enabled;
+            fixedFunctionVersion++;
         }
     }
 
@@ -561,6 +627,7 @@ public final class VulkanicCompatibilityState {
             fixedFunction.blendDstRgb = dstRgb;
             fixedFunction.blendSrcAlpha = srcAlpha;
             fixedFunction.blendDstAlpha = dstAlpha;
+            fixedFunctionVersion++;
         }
     }
 
@@ -568,6 +635,7 @@ public final class VulkanicCompatibilityState {
         synchronized (lock) {
             fixedFunction.blendEquationRgb = rgb;
             fixedFunction.blendEquationAlpha = alpha;
+            fixedFunctionVersion++;
         }
     }
 
@@ -575,24 +643,28 @@ public final class VulkanicCompatibilityState {
         synchronized (lock) {
             fixedFunction.depthTestEnabled = enabled;
             fixedFunction.depthFunc = func;
+            fixedFunctionVersion++;
         }
     }
 
     public void setDepthTestEnabled(boolean enabled) {
         synchronized (lock) {
             fixedFunction.depthTestEnabled = enabled;
+            fixedFunctionVersion++;
         }
     }
 
     public void setDepthFunc(int func) {
         synchronized (lock) {
             fixedFunction.depthFunc = func;
+            fixedFunctionVersion++;
         }
     }
 
     public void setDepthWriteMask(boolean enabled) {
         synchronized (lock) {
             fixedFunction.depthWriteMask = enabled;
+            fixedFunctionVersion++;
         }
     }
 
@@ -600,18 +672,21 @@ public final class VulkanicCompatibilityState {
         synchronized (lock) {
             fixedFunction.cullEnabled = enabled;
             fixedFunction.cullFaceMode = mode;
+            fixedFunctionVersion++;
         }
     }
 
     public void setCullEnabled(boolean enabled) {
         synchronized (lock) {
             fixedFunction.cullEnabled = enabled;
+            fixedFunctionVersion++;
         }
     }
 
     public void setCullFaceMode(int mode) {
         synchronized (lock) {
             fixedFunction.cullFaceMode = mode;
+            fixedFunctionVersion++;
         }
     }
 
@@ -621,36 +696,42 @@ public final class VulkanicCompatibilityState {
             fixedFunction.colorMaskG = g;
             fixedFunction.colorMaskB = b;
             fixedFunction.colorMaskA = a;
+            fixedFunctionVersion++;
         }
     }
 
     public void setStencilFunc(int face, int func, int ref, int mask) {
         synchronized (lock) {
             fixedFunction.stencilFuncs.put(face, new StencilFuncState(face, func, ref, mask));
+            fixedFunctionVersion++;
         }
     }
 
     public void setStencilOp(int face, int sfail, int dpfail, int dppass) {
         synchronized (lock) {
             fixedFunction.stencilOps.put(face, new StencilOpState(face, sfail, dpfail, dppass));
+            fixedFunctionVersion++;
         }
     }
 
     public void setStencilWriteMask(int face, int mask) {
         synchronized (lock) {
             fixedFunction.stencilWriteMasks.put(face, mask);
+            fixedFunctionVersion++;
         }
     }
 
     public void setLogicOpEnabled(boolean enabled) {
         synchronized (lock) {
             fixedFunction.logicOpEnabled = enabled;
+            fixedFunctionVersion++;
         }
     }
 
     public void setLogicOp(int opcode) {
         synchronized (lock) {
             fixedFunction.logicOp = opcode;
+            fixedFunctionVersion++;
         }
     }
 
@@ -658,12 +739,14 @@ public final class VulkanicCompatibilityState {
         synchronized (lock) {
             fixedFunction.polygonFace = face;
             fixedFunction.polygonMode = mode;
+            fixedFunctionVersion++;
         }
     }
 
     public void setPolygonOffsetEnabled(boolean enabled) {
         synchronized (lock) {
             fixedFunction.polygonOffsetEnabled = enabled;
+            fixedFunctionVersion++;
         }
     }
 
@@ -671,11 +754,28 @@ public final class VulkanicCompatibilityState {
         synchronized (lock) {
             fixedFunction.polygonOffsetFactor = factor;
             fixedFunction.polygonOffsetUnits = units;
+            fixedFunctionVersion++;
         }
     }
 
     public GraphicsSnapshot captureGraphics(VulkanicGalExecutionRequest.GraphicsDrawRequest request) {
         synchronized (lock) {
+            String label = request.semanticIdentity().label();
+            if (cachedGraphicsSnapshot != null
+                && currentProgram == cachedGraphicsSnapshotProgram
+                && currentVao == cachedGraphicsSnapshotVao
+                && boundDrawFramebuffer == cachedGraphicsSnapshotDrawFramebuffer
+                && programVersion == cachedGraphicsSnapshotProgramVersion
+                && vertexInputVersion == cachedGraphicsSnapshotVertexInputVersion
+                && framebufferVersion == cachedGraphicsSnapshotFramebufferVersion
+                && resourceBindingVersion == cachedGraphicsSnapshotResourceBindingVersion
+                && fixedFunctionVersion == cachedGraphicsSnapshotFixedFunctionVersion) {
+                if (!Objects.equals(label, cachedGraphicsSnapshotLabel)) {
+                    cachedGraphicsSnapshot = cachedGraphicsSnapshot.withSemanticIdentity(label);
+                    cachedGraphicsSnapshotLabel = label;
+                }
+                return cachedGraphicsSnapshot;
+            }
             VaoSnapshot vao = vao(currentVao).copy();
             FramebufferSnapshot framebuffer = framebuffer(boundDrawFramebuffer).copy();
             Map<Integer, Integer> texture2DByUnit = new LinkedHashMap<>();
@@ -684,7 +784,7 @@ public final class VulkanicCompatibilityState {
                     texture2DByUnit.put(entry.getKey().unit(), entry.getValue());
                 }
             }
-            return new GraphicsSnapshot(
+            GraphicsSnapshot snapshot = new GraphicsSnapshot(
                 currentProgram,
                 program(currentProgram).copy(),
                 currentVao,
@@ -701,8 +801,24 @@ public final class VulkanicCompatibilityState {
                 Map.copyOf(textureGenerations),
                 Map.copyOf(bufferGenerations),
                 fixedFunction.copy(),
-                request.semanticIdentity().label()
+                request.semanticIdentity().label(),
+                programVersion,
+                vertexInputVersion,
+                framebufferVersion,
+                resourceBindingVersion,
+                fixedFunctionVersion
             );
+            cachedGraphicsSnapshot = snapshot;
+            cachedGraphicsSnapshotLabel = label;
+            cachedGraphicsSnapshotProgram = currentProgram;
+            cachedGraphicsSnapshotVao = currentVao;
+            cachedGraphicsSnapshotDrawFramebuffer = boundDrawFramebuffer;
+            cachedGraphicsSnapshotProgramVersion = programVersion;
+            cachedGraphicsSnapshotVertexInputVersion = vertexInputVersion;
+            cachedGraphicsSnapshotFramebufferVersion = framebufferVersion;
+            cachedGraphicsSnapshotResourceBindingVersion = resourceBindingVersion;
+            cachedGraphicsSnapshotFixedFunctionVersion = fixedFunctionVersion;
+            return snapshot;
         }
     }
 
@@ -734,24 +850,55 @@ public final class VulkanicCompatibilityState {
     public VulkanicGalExecutionRequest.GraphicsCompatibilitySnapshot compatibilitySnapshotFor(
         VulkanicGalExecutionRequest.GraphicsDrawRequest request
     ) {
+        return compatibilitySnapshotFor(request, true);
+    }
+
+    public VulkanicGalExecutionRequest.GraphicsCompatibilitySnapshot compatibilitySnapshotFor(
+        VulkanicGalExecutionRequest.GraphicsDrawRequest request,
+        boolean eagerResourceDeclarations
+    ) {
+        boolean audit = VulkanPerfAudit.isEnabled();
+        long start = audit ? System.nanoTime() : 0L;
         GraphicsSnapshot snapshot = captureGraphics(request);
+        recordCapturePhase(audit, "gal.graphics.capture.state", start);
+
+        start = audit ? System.nanoTime() : 0L;
         VulkanicGalExecutionRequest.VertexInputSnapshot vertexInput = snapshot.vertexInputSnapshot(request);
-        List<VulkanicPassResourceModel.BindingSnapshot> bindings = snapshot.bindingSnapshots();
-        VulkanicPassResourceModel.PassExecutionPlan vertexPlan =
-            VulkanicLegacyCompatibilityAdapter.planDraw(new VulkanicLegacyCompatibilityAdapter.DrawSnapshot(
-                request.semanticIdentity().label(),
-                vertexInput.vertexBuffers(),
-                vertexInput.indexBuffer(),
-                List.of(),
-                List.of(),
-                drawCommandSnapshot(request.command()),
-                false,
-                false
-            ));
-        List<VulkanicPassResourceModel.ResourceUse> resourceUses = new ArrayList<>(vertexPlan.orderedUses());
-        for (VulkanicPassResourceModel.BindingSnapshot binding : bindings) {
-            resourceUses.add(binding.resourceUse());
+        recordCapturePhase(audit, "gal.graphics.capture.vertex", start);
+
+        start = audit ? System.nanoTime() : 0L;
+        List<VulkanicPassResourceModel.BindingSnapshot> bindings = eagerResourceDeclarations
+            ? snapshot.bindingSnapshots()
+            : List.of();
+        recordCapturePhase(audit, "gal.graphics.capture.bindings", start);
+
+        start = audit ? System.nanoTime() : 0L;
+        List<VulkanicPassResourceModel.ResourceUse> resourceUses;
+        if (eagerResourceDeclarations) {
+            VulkanicPassResourceModel.PassExecutionPlan vertexPlan =
+                VulkanicLegacyCompatibilityAdapter.planDraw(new VulkanicLegacyCompatibilityAdapter.DrawSnapshot(
+                    request.semanticIdentity().label(),
+                    vertexInput.vertexBuffers(),
+                    vertexInput.indexBuffer(),
+                    List.of(),
+                    List.of(),
+                    drawCommandSnapshot(request.command()),
+                    false,
+                    false
+                ));
+            resourceUses = new ArrayList<>(vertexPlan.orderedUses());
+        } else {
+            resourceUses = List.of();
         }
+        recordCapturePhase(audit, "gal.graphics.capture.vertex_resources", start);
+
+        start = audit ? System.nanoTime() : 0L;
+        if (eagerResourceDeclarations) {
+            for (VulkanicPassResourceModel.BindingSnapshot binding : bindings) {
+                resourceUses.add(binding.resourceUse());
+            }
+        }
+        recordCapturePhase(audit, "gal.graphics.capture.resources", start);
         return new VulkanicGalExecutionRequest.GraphicsCompatibilitySnapshot(
             Optional.empty(),
             vertexInput,
@@ -761,6 +908,12 @@ public final class VulkanicCompatibilityState {
             Optional.of(snapshot),
             "frontend-shared-compatibility-draw"
         );
+    }
+
+    private static void recordCapturePhase(boolean audit, String name, long startNanos) {
+        if (audit) {
+            VulkanPerfAudit.recordPhase(name, System.nanoTime() - startNanos);
+        }
     }
 
     public void validateResourceGenerations(VulkanicGalExecutionRequest.GraphicsCompatibilitySnapshot snapshot) {
@@ -977,6 +1130,18 @@ public final class VulkanicCompatibilityState {
     private void validateResourceGenerations(List<VulkanicPassResourceModel.BindingSnapshot> bindings) {
         synchronized (lock) {
             for (VulkanicPassResourceModel.BindingSnapshot binding : bindings) {
+                if (binding.resourceReference().isEmpty()) {
+                    continue;
+                }
+                validateResourceGeneration(binding.resourceReference().get());
+            }
+        }
+    }
+
+    public void validateResourceGenerations(VulkanicGalV2.ResourceSet resourceSet) {
+        Objects.requireNonNull(resourceSet, "resourceSet");
+        synchronized (lock) {
+            for (VulkanicGalV2.ResourceBinding binding : resourceSet.bindings()) {
                 if (binding.resourceReference().isEmpty()) {
                     continue;
                 }
@@ -1214,7 +1379,12 @@ public final class VulkanicCompatibilityState {
         Map<Integer, Long> textureGenerations,
         Map<Integer, Long> bufferGenerations,
         FixedFunctionSnapshot fixedFunction,
-        String semanticIdentity
+        String semanticIdentity,
+        long programVersion,
+        long vertexInputVersion,
+        long framebufferVersion,
+        long resourceBindingVersion,
+        long fixedFunctionVersion
     ) {
         public GraphicsSnapshot {
             program = Objects.requireNonNull(program, "program");
@@ -1231,6 +1401,36 @@ public final class VulkanicCompatibilityState {
             bufferGenerations = Map.copyOf(bufferGenerations);
             fixedFunction = Objects.requireNonNull(fixedFunction, "fixedFunction");
             semanticIdentity = Objects.requireNonNull(semanticIdentity, "semanticIdentity");
+        }
+
+        GraphicsSnapshot withSemanticIdentity(String semanticIdentity) {
+            if (Objects.equals(this.semanticIdentity, semanticIdentity)) {
+                return this;
+            }
+            return new GraphicsSnapshot(
+                programId,
+                program,
+                vaoId,
+                vao,
+                drawFramebuffer,
+                framebuffer,
+                bufferBindings,
+                indexedBufferBindings,
+                texture2DByUnit,
+                textureUnitBindings,
+                textureBindingsByKey,
+                samplerBindings,
+                imageUnitBindings,
+                textureGenerations,
+                bufferGenerations,
+                fixedFunction,
+                semanticIdentity,
+                programVersion,
+                vertexInputVersion,
+                framebufferVersion,
+                resourceBindingVersion,
+                fixedFunctionVersion
+            );
         }
 
         VulkanicGalExecutionRequest.VertexInputSnapshot vertexInputSnapshot(

@@ -278,14 +278,19 @@ public class CachedRegion {
     }
 
     public boolean isSurroundedByLoaded(LevelChunk chunk) {
+        if (this.closed || chunk.getLevel() == null) {
+            return false;
+        }
+
         int chunkX = chunk.getPos().x;
         int chunkZ = chunk.getPos().z;
-        boolean neighborsLoaded = !chunk.isEmpty() && VoxelConstants.getPlayer().level().hasChunk(chunkX, chunkZ);
+        net.minecraft.world.level.Level level = chunk.getLevel();
+        boolean neighborsLoaded = !chunk.isEmpty() && level.hasChunk(chunkX, chunkZ);
 
         for (int t = chunkX - 1; t <= chunkX + 1 && neighborsLoaded; ++t) {
             for (int s = chunkZ - 1; s <= chunkZ + 1 && neighborsLoaded; ++s) {
-                LevelChunk neighborChunk = VoxelConstants.getPlayer().level().getChunk(t, s);
-                neighborsLoaded = neighborChunk != null && !neighborChunk.isEmpty() && VoxelConstants.getPlayer().level().hasChunk(t, s);
+                ChunkAccess neighborChunk = level.getChunk(t, s);
+                neighborsLoaded = neighborChunk instanceof LevelChunk levelChunk && !levelChunk.isEmpty() && level.hasChunk(t, s);
             }
         }
 

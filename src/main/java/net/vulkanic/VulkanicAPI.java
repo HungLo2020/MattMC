@@ -2643,30 +2643,49 @@ public class VulkanicAPI {
     ) {
         GraphicsBackend backend = getBackend();
         long captureStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
-        VulkanicGalExecutionRequest.GraphicsDrawRequest capturedRequest =
-            VulkanicGalSnapshotBuilder.captureGraphicsDraw(ctx, backend, compatibilityState, request);
-        if (captureStartNanos != 0L) {
-            VulkanPerfAudit.recordPhase("gal.graphics.capture", System.nanoTime() - captureStartNanos);
-        }
-        long validationStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
-        requireGalExecutionAccepted(VulkanicGalExecutionRequest.validateGraphicsDraw(capturedRequest));
-        if (validationStartNanos != 0L) {
-            VulkanPerfAudit.recordPhase("gal.graphics.validation", System.nanoTime() - validationStartNanos);
-        }
-        long backendStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
-        VulkanPerfAudit.recordGraphicsDraw();
+        VulkanicCompatibilityState.GraphicsSnapshot graphicsSnapshot = compatibilityState.captureGraphics(request);
         java.util.Optional<VulkanicGalV2.ExplicitGraphicsDrawRequest> explicitV2Request =
-            VulkanicGalV2.tryCaptureLegacyProgramSlice(capturedRequest);
+            VulkanicGalV2.tryCaptureLegacyProgramSlice(
+                graphicsSnapshot,
+                request,
+                backend.requiresEagerGraphicsResourceDeclarations());
+        VulkanicGalExecutionRequest.GraphicsDrawRequest capturedRequest = null;
         if (explicitV2Request.isPresent()) {
+            compatibilityState.validateResourceGenerations(
+                VulkanicGalV2.requireResourceSet(explicitV2Request.get().resourceSet()));
+            if (captureStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("gal.graphics.capture", System.nanoTime() - captureStartNanos);
+            }
+            long validationStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
+            requireGalExecutionAccepted(VulkanicGalExecutionRequest.success(explicitV2Request.get().semanticIdentity()));
+            if (validationStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("gal.graphics.validation", System.nanoTime() - validationStartNanos);
+            }
+            long backendStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
+            VulkanPerfAudit.recordGraphicsDraw();
             VulkanPerfAudit.recordGalV2GraphicsDraw(true);
             requireGalExecutionAccepted(backend.executeGraphicsDrawV2(ctx, explicitV2Request.get()));
+            if (backendStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("gal.graphics.backend", System.nanoTime() - backendStartNanos);
+            }
         } else {
+            capturedRequest = VulkanicGalSnapshotBuilder.captureGraphicsDraw(ctx, backend, compatibilityState, request);
+            if (captureStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("gal.graphics.capture", System.nanoTime() - captureStartNanos);
+            }
+            long validationStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
+            requireGalExecutionAccepted(VulkanicGalExecutionRequest.validateGraphicsDraw(capturedRequest));
+            if (validationStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("gal.graphics.validation", System.nanoTime() - validationStartNanos);
+            }
+            long backendStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
+            VulkanPerfAudit.recordGraphicsDraw();
             VulkanPerfAudit.recordGalV2GraphicsDraw(false);
             VulkanPerfAudit.recordGalV2FallbackReason(VulkanicGalV2.fallbackReasonFor(capturedRequest));
             requireGalExecutionAccepted(backend.executeGraphicsDraw(ctx, capturedRequest));
-        }
-        if (backendStartNanos != 0L) {
-            VulkanPerfAudit.recordPhase("gal.graphics.backend", System.nanoTime() - backendStartNanos);
+            if (backendStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("gal.graphics.backend", System.nanoTime() - backendStartNanos);
+            }
         }
     }
 

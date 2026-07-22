@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -109,6 +110,11 @@ class CaptureRunner:
         self.run_id = time.strftime("%Y%m%d_%H%M%S")
         self.start_epoch = int(time.time())
         self.git_commit = command_text(["git", "rev-parse", "HEAD"], cwd=self.root).strip() or "unknown"
+        self.repository_identity = os.environ.get("MATTMC_BENCHMARK_REPOSITORY_IDENTITY", "").strip()
+        if not self.repository_identity:
+            self.repository_identity = "frozen-java" if "JavaPerfTesting" in str(self.root) else "current"
+        self.worktree_fingerprint = git_worktree_fingerprint(self.root)
+        self.jvm_fingerprint = benchmark_jvm_fingerprint()
 
         self.run_log = self.artifact_dir / f"runClient_{self.run_id}.log"
         self.meta_log = self.artifact_dir / f"meta_{self.run_id}.txt"
@@ -721,6 +727,11 @@ class CaptureRunner:
                 f"-Dmattmc.dev.deterministicCameraCapture.shaderEnabled={self.effective_enable_shaders or 'unknown'}",
                 f"-Dmattmc.dev.deterministicCameraCapture.shaderPack={self.effective_shader_pack or 'unknown'}",
                 f"-Dmattmc.dev.deterministicCameraCapture.gitCommit={self.git_commit}",
+                f"-Dmattmc.dev.deterministicCameraCapture.repositoryIdentity={self.repository_identity}",
+                f"-Dmattmc.dev.deterministicCameraCapture.repositoryWorktree={self.worktree_fingerprint}",
+                f"-Dmattmc.dev.deterministicCameraCapture.jvmFingerprint={self.jvm_fingerprint}",
+                f"-Dmattmc.dev.deterministicCameraCapture.graphicsSettingsFingerprint={settings_fingerprint([self.options_file, self.run_dir / 'config' / 'iris.properties'])}",
+                f"-Dmattmc.dev.deterministicCameraCapture.dhConfigFingerprint={distant_horizons_config_fingerprint(self.run_dir)}",
                 f"-Dmattmc.dev.deterministicCameraCapture.world={self.config.world}",
                 f"-Dmattmc.dev.deterministicCameraCapture.fixedX={benchmark_pose['x']}",
                 f"-Dmattmc.dev.deterministicCameraCapture.fixedY={benchmark_pose['y']}",
@@ -754,6 +765,9 @@ class CaptureRunner:
                 f"x={benchmark_pose['x']},y={benchmark_pose['y']},z={benchmark_pose['z']},"
                 f"yaw={benchmark_pose['yaw']},pitch={benchmark_pose['pitch']},cameraPath={benchmark_pose['camera_path']}"
             )
+            self.append_meta(f"benchmark_repository_identity={self.repository_identity}")
+            self.append_meta(f"benchmark_worktree_fingerprint={self.worktree_fingerprint}")
+            self.append_meta(f"benchmark_jvm_fingerprint={self.jvm_fingerprint}")
             self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
 
         if self.config.audio_validation:
@@ -1904,6 +1918,55 @@ def command_text(command: list[str], *, cwd: Path) -> str:
     except OSError as exc:
         return str(exc)
     return result.stdout or ""
+
+
+def sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8", errors="replace")).hexdigest()
+
+
+def git_worktree_fingerprint(root: Path) -> str:
+    status = command_text(["git", "status", "--porcelain=v1", "-uno"], cwd=root)
+    diff = command_text(["git", "diff", "--stat"], cwd=root)
+    return sha256_text("status:\n" + status + "\ndiff-stat:\n" + diff)
+
+
+def benchmark_jvm_fingerprint() -> str:
+    material = "\n".join(
+        [
+            f"JAVA_TOOL_OPTIONS={os.environ.get('JAVA_TOOL_OPTIONS', '')}",
+            f"GRADLE_OPTS={os.environ.get('GRADLE_OPTS', '')}",
+            f"JAVA_HOME={os.environ.get('JAVA_HOME', '')}",
+            f"platform={py_platform.platform()}",
+            f"machine={py_platform.machine()}",
+        ]
+    )
+    return sha256_text(material)
+
+
+def settings_fingerprint(paths: list[Path]) -> str:
+    digest = hashlib.sha256()
+    for path in sorted(paths, key=lambda item: str(item)):
+        digest.update(str(path.name).encode("utf-8", errors="replace"))
+        digest.update(b"\0")
+        if path.is_file():
+            digest.update(path.read_bytes())
+        else:
+            digest.update(b"<missing>")
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def distant_horizons_config_fingerprint(run_dir: Path) -> str:
+    config_dir = run_dir / "config"
+    candidates: list[Path] = []
+    if config_dir.is_dir():
+        for path in config_dir.rglob("*"):
+            if not path.is_file():
+                continue
+            lower_name = path.name.lower()
+            if "distanthorizons" in lower_name or "distant_horizons" in lower_name or lower_name.startswith("dh"):
+                candidates.append(path)
+    return settings_fingerprint(candidates)
 
 
 def write_command(path: Path, command: list[str], *, cwd: Path) -> None:

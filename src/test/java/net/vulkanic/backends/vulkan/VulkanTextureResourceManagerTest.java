@@ -148,17 +148,28 @@ final class VulkanTextureResourceManagerTest {
     @Test
     void fallbackTextureTracksRegisteredObjectAndClearsOnDeletion() {
         VulkanTextureResourceManager manager = new VulkanTextureResourceManager();
-        int texture = manager.createLegacyTexture(VulkanicAPI.GL_TEXTURE_2D);
+        int texture2d = manager.createLegacyTexture(VulkanicAPI.GL_TEXTURE_2D);
+        int texture3d = manager.createLegacyTexture(VulkanicAPI.GL_TEXTURE_3D);
 
-        manager.setLegacyFallbackSamplerTextureId(texture);
+        manager.setLegacyFallbackSamplerTextureId(texture2d);
+        manager.setLegacyFallbackSamplerTextureId(VulkanicAPI.GL_TEXTURE_3D, texture3d);
 
-        assertEquals(texture, manager.legacyFallbackSamplerTextureId());
-        assertSame(manager.getLegacyTexture(texture), manager.legacyFallbackSamplerTexture());
+        assertEquals(texture2d, manager.legacyFallbackSamplerTextureId());
+        assertEquals(texture2d, manager.legacyFallbackSamplerTextureId(VulkanicAPI.GL_TEXTURE_2D));
+        assertEquals(texture3d, manager.legacyFallbackSamplerTextureId(VulkanicAPI.GL_TEXTURE_3D));
+        assertSame(manager.getLegacyTexture(texture2d), manager.legacyFallbackSamplerTexture());
+        assertSame(manager.getLegacyTexture(texture3d), manager.legacyFallbackSamplerTexture(VulkanicAPI.GL_TEXTURE_3D));
 
-        manager.clearLegacyFallbackSamplerTextureIdIfMatches(texture);
+        manager.clearLegacyFallbackSamplerTextureIdIfMatches(texture2d);
 
         assertEquals(0, manager.legacyFallbackSamplerTextureId());
         assertNull(manager.legacyFallbackSamplerTexture());
+        assertEquals(texture3d, manager.legacyFallbackSamplerTextureId(VulkanicAPI.GL_TEXTURE_3D));
+
+        manager.clearLegacyFallbackSamplerTextureIdIfMatches(texture3d);
+
+        assertEquals(0, manager.legacyFallbackSamplerTextureId(VulkanicAPI.GL_TEXTURE_3D));
+        assertNull(manager.legacyFallbackSamplerTexture(VulkanicAPI.GL_TEXTURE_3D));
     }
 
     @Test
@@ -230,6 +241,7 @@ final class VulkanTextureResourceManagerTest {
         assertEquals(0, manager.virtualSamplerCountForTests());
         assertEquals(0, manager.boundSamplerCountForTests());
         assertEquals(0, manager.legacyFallbackSamplerTextureId());
+        assertEquals(0, manager.legacyFallbackSamplerTextureId(VulkanicAPI.GL_TEXTURE_3D));
     }
 
     @Test

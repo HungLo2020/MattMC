@@ -2108,6 +2108,10 @@ public class VulkanBackendSpirvPathTest {
             "Legacy Vulkan sampler resolution should bind a backend fallback texture instead of dropping reflected sampler bindings");
         assertTrue(source.contains("createLegacyFallbackSamplerTexture"),
             "The backend fallback sampler texture should be a real Vulkan resource owned by the native spine");
+        assertTrue(source.contains("fallbackSamplerTarget(binding)")
+                && source.contains("knownIris3DSampler(binding.name())")
+                && source.contains("ensureLegacyFallbackSamplerTexture(commandBufferHandle, VulkanicAPI.GL_TEXTURE_3D)"),
+            "Fallback sampler materialization must preserve 3D sampler declarations such as Iris floodfill samplers");
     }
 
     @Test

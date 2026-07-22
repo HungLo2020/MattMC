@@ -37,7 +37,7 @@ public final class VulkanicGalSnapshotBuilder {
     ) {
         Objects.requireNonNull(compatibilityState, "compatibilityState");
         VulkanicGalExecutionRequest.GraphicsCompatibilitySnapshot snapshot =
-            compatibilityState.compatibilitySnapshotFor(request);
+            compatibilityState.compatibilitySnapshotFor(request, executor.requiresEagerGraphicsResourceDeclarations());
         compatibilityState.validateResourceGenerations(snapshot);
         return request.withCompatibilitySnapshot(snapshot);
     }
