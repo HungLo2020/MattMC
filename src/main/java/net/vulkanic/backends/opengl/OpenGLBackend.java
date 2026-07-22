@@ -965,59 +965,99 @@ public class OpenGLBackend implements GraphicsBackend {
         CommandContext ctx,
         net.vulkanic.VulkanicGalV2.ExplicitGraphicsDrawRequest request
     ) {
+        return executeGraphicsPassCommandBufferV2(
+            ctx,
+            new VulkanicGalV2.GraphicsPassCommandBuffer(java.util.List.of(request))
+        );
+    }
+
+    @Override
+    public VulkanicGalExecutionRequest.ExecutionResult executeGraphicsPassCommandBufferV2(
+        CommandContext ctx,
+        VulkanicGalV2.GraphicsPassCommandBuffer commandBuffer
+    ) {
         long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         try {
             if (!ctx.isImmediate()) {
                 throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
             }
-            consumeResourceUsagePlan(request.resourcePlan());
-            VulkanicGalV2.ExplicitGraphicsObjects objects =
-                VulkanicGalV2.requireGraphicsObjects(request.graphicsObjects());
-            String family = request.semanticIdentity().label();
-            VulkanicGalExecutionRequest.GraphicsDrawCommand command = request.command();
-            VulkanPerfAudit.recordOpenGlGalV2RequestedDraw(
-                family,
-                command.kind().name(),
-                command.kind() == VulkanicGalExecutionRequest.DrawCommandKind.MULTI_INDEXED_BASE_VERTEX
-                    ? command.indexedDraws().size()
-                    : 1
-            );
-            VulkanicGalV2.ResourceSet resourceSet = VulkanicGalV2.requireResourceSet(request.resourceSet());
-            boolean vertexInputDirty = false;
-            boolean uniformPayloadDirty = false;
-            for (VulkanicGalV2.GraphicsCommand streamCommand : request.commandStream().commands()) {
-                switch (streamCommand.kind()) {
-                    case BIND_RENDER_TARGET -> applyRenderTargetStateV2(request, objects.renderTargetState());
-                    case BIND_GRAPHICS_PIPELINE -> applyProgramStateV2(request, objects.programState());
-                    case BIND_RESOURCE_SET -> {
-                        applyV2ResourceSetBindings(ctx, resourceSet);
-                        uniformPayloadDirty = true;
-                    }
-                    case BIND_VERTEX_STREAMS, BIND_INDEX_STREAM -> vertexInputDirty = true;
-                    case SET_DYNAMIC_STATE -> applyFixedFunctionStateV2(request, objects.pipelineState());
-                    case SET_DYNAMIC_OFFSETS, PUSH_CONSTANTS, BEGIN_RENDER_PASS, END_RENDER_PASS -> {
-                        // The current migrated slice has no backend-neutral dynamic offset or push-constant payloads.
-                    }
-                    case DRAW -> {
-                        if (vertexInputDirty) {
-                            applyVertexInputV2(request, objects);
-                            vertexInputDirty = false;
-                        }
-                        if (uniformPayloadDirty) {
-                            applyUniformPayloadV2(request.uniformPayload());
-                            uniformPayloadDirty = false;
-                        }
-                        executeGalV2DrawCommand(family, request.semanticIdentity().phase(), command);
-                    }
-                }
+            for (VulkanicGalV2.ExplicitGraphicsDrawRequest request : commandBuffer.draws()) {
+                executeGraphicsDrawV2InCurrentPass(ctx, request);
             }
-            return VulkanicGalExecutionRequest.success(request.semanticIdentity());
+            return VulkanicGalExecutionRequest.success(commandBuffer.semanticIdentity());
         } catch (RuntimeException exception) {
             invalidateAppliedDrawState();
-            return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), exception.getMessage());
+            return VulkanicGalExecutionRequest.backendFailure(commandBuffer.semanticIdentity(), exception.getMessage());
         } finally {
             if (auditStartNanos != 0L) {
                 VulkanPerfAudit.recordPhase("backend.opengl.graphics.v2", System.nanoTime() - auditStartNanos);
+            }
+        }
+    }
+
+    private void executeGraphicsDrawV2InCurrentPass(
+        CommandContext ctx,
+        VulkanicGalV2.ExplicitGraphicsDrawRequest request
+    ) {
+        consumeResourceUsagePlan(request.resourcePlan());
+        String family = request.semanticIdentity().label();
+        VulkanicGalExecutionRequest.GraphicsDrawCommand command = request.command();
+        VulkanPerfAudit.recordOpenGlGalV2RequestedDraw(
+            family,
+            command.kind().name(),
+            command.kind() == VulkanicGalExecutionRequest.DrawCommandKind.MULTI_INDEXED_BASE_VERTEX
+                ? command.indexedDraws().size()
+                : 1
+        );
+        VulkanicGalV2.ExplicitGraphicsObjects objects = null;
+        VulkanicGalV2.ResourceSet resourceSet = null;
+        boolean vertexInputDirty = false;
+        boolean uniformPayloadDirty = false;
+        for (VulkanicGalV2.GraphicsCommand streamCommand : request.commandStream().commands()) {
+            switch (streamCommand.kind()) {
+                case BIND_RENDER_TARGET -> {
+                    if (objects == null) {
+                        objects = VulkanicGalV2.requireGraphicsObjects(request.graphicsObjects());
+                    }
+                    applyRenderTargetStateV2(request, objects.renderTargetState());
+                }
+                case BIND_GRAPHICS_PIPELINE -> {
+                    if (objects == null) {
+                        objects = VulkanicGalV2.requireGraphicsObjects(request.graphicsObjects());
+                    }
+                    applyProgramStateV2(request, objects.programState());
+                }
+                case BIND_RESOURCE_SET -> {
+                    if (resourceSet == null) {
+                        resourceSet = VulkanicGalV2.requireResourceSet(request.resourceSet());
+                    }
+                    applyV2ResourceSetBindings(ctx, resourceSet);
+                    uniformPayloadDirty = true;
+                }
+                case BIND_VERTEX_STREAMS, BIND_INDEX_STREAM -> vertexInputDirty = true;
+                case SET_DYNAMIC_STATE -> {
+                    if (objects == null) {
+                        objects = VulkanicGalV2.requireGraphicsObjects(request.graphicsObjects());
+                    }
+                    applyFixedFunctionStateV2(request, objects.pipelineState());
+                }
+                case SET_DYNAMIC_OFFSETS, PUSH_CONSTANTS, BEGIN_RENDER_PASS, END_RENDER_PASS -> {
+                    // The current migrated slice has no backend-neutral dynamic offset or push-constant payloads.
+                }
+                case DRAW -> {
+                    if (vertexInputDirty) {
+                        if (objects == null) {
+                            objects = VulkanicGalV2.requireGraphicsObjects(request.graphicsObjects());
+                        }
+                        applyVertexInputV2(request, objects);
+                        vertexInputDirty = false;
+                    }
+                    if (uniformPayloadDirty) {
+                        applyUniformPayloadV2(request.uniformPayload());
+                        uniformPayloadDirty = false;
+                    }
+                    executeGalV2DrawCommand(family, request.semanticIdentity().phase(), command);
+                }
             }
         }
     }

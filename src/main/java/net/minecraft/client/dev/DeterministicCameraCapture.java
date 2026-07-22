@@ -56,8 +56,8 @@ public final class DeterministicCameraCapture {
 		1,
 		Integer.getInteger("mattmc.dev.deterministicCameraCapture.settledReadyEvidenceTimeoutFrames", 180)
 	);
-	private static final Set<String> SETTLED_READY_FAMILIES = parseSettledReadyFamilies();
 	private static final Map<String, Integer> SETTLED_READY_MINIMUM_COUNTS = parseSettledReadyMinimumCounts();
+	private static final Set<String> SETTLED_READY_FAMILIES = parseSettledReadyFamilies();
 	private static final String FORCED_CAMERA_TYPE = System.getProperty("mattmc.dev.deterministicCameraCapture.cameraType", "").trim();
 	private static final int FORCED_SELECTED_HOTBAR_SLOT = Integer.getInteger("mattmc.dev.deterministicCameraCapture.selectedHotbarSlot", 0);
 	private static final String WORLD_NAME = System.getProperty("mattmc.dev.deterministicCameraCapture.world", "Origin");
@@ -98,6 +98,8 @@ public final class DeterministicCameraCapture {
 	private static int windowWidth;
 	private static int windowHeight;
 	private static boolean settledReadyGateSatisfied;
+	private static String settledReadyGateSummary = "";
+	private static String settledReadyGateFingerprint = "";
 	private static int framesWaitingForSettledReady;
 	private static CameraType originalCameraType;
 	private static int originalSelectedHotbarSlot;
@@ -232,6 +234,15 @@ public final class DeterministicCameraCapture {
 		return !ENABLED || !initialized || SETTLED_READY_FRAMES <= 0 || settledReadyGateSatisfied || poseIndex > 0;
 	}
 
+	public static boolean shouldRecordSubmittedWorkIdentities() {
+		return ENABLED
+			&& initialized
+			&& !complete
+			&& !failed
+			&& SETTLED_READY_FRAMES > 0
+			&& !settledReadyGateSatisfied;
+	}
+
 	public static String currentPoseNameForDiagnostics() {
 		if (!ENABLED || !initialized || poses == null) {
 			return "none";
@@ -269,7 +280,7 @@ public final class DeterministicCameraCapture {
 	}
 
 	public static void recordSubmittedWorkIdentity(String family, String identity) {
-		if (!ENABLED || !initialized || complete || failed || SETTLED_READY_FRAMES <= 0 || family == null || identity == null) {
+		if (!shouldRecordSubmittedWorkIdentities() || family == null || identity == null) {
 			return;
 		}
 		String normalizedFamily = family.trim();
@@ -427,14 +438,28 @@ public final class DeterministicCameraCapture {
 			}
 		}
 
+		settledReadyGateSummary = settledReadySummary();
+		settledReadyGateFingerprint = settledReadyFingerprint();
 		settledReadyGateSatisfied = true;
 		writeMetadata(minecraft, "settled_ready_work");
 		LOGGER.info(
 			"Deterministic camera capture settled submitted work after {} frames: {}",
 			framesWaitingForSettledReady,
-			settledReadySummary()
+			settledReadyGateSummary
 		);
 		return true;
+	}
+
+	private static String settledReadyMetadataSummary() {
+		return settledReadyGateSatisfied && !settledReadyGateSummary.isBlank()
+			? settledReadyGateSummary
+			: settledReadySummary();
+	}
+
+	private static String settledReadyMetadataFingerprint() {
+		return settledReadyGateSatisfied && !settledReadyGateFingerprint.isBlank()
+			? settledReadyGateFingerprint
+			: settledReadyFingerprint();
 	}
 
 	private static void pruneSubmittedWorkFrames() {
@@ -520,6 +545,7 @@ public final class DeterministicCameraCapture {
 			.map(String::trim)
 			.filter(value -> !value.isEmpty())
 			.forEach(families::add);
+		families.addAll(SETTLED_READY_MINIMUM_COUNTS.keySet());
 		if (families.isEmpty()) {
 			families.add("sodium-terrain");
 		}
@@ -860,9 +886,9 @@ public final class DeterministicCameraCapture {
 		json.append("  \"settledReadyMaxWaitFrames\": ").append(SETTLED_READY_MAX_WAIT_FRAMES).append(",\n");
 		json.append("  \"settledReadyEvidenceTimeoutFrames\": ").append(SETTLED_READY_EVIDENCE_TIMEOUT_FRAMES).append(",\n");
 		json.append("  \"settledReadyGateSatisfied\": ").append(settledReadyGateSatisfied).append(",\n");
-		appendField(json, "settledReadySummary", settledReadySummary()).append(",\n");
+		appendField(json, "settledReadySummary", settledReadyMetadataSummary()).append(",\n");
 		appendField(json, "settledReadyMinimumCounts", settledReadyMinimumCountsFingerprintValue()).append(",\n");
-		appendField(json, "settledReadyFingerprint", settledReadyFingerprint()).append(",\n");
+		appendField(json, "settledReadyFingerprint", settledReadyMetadataFingerprint()).append(",\n");
 		json.append("  \"ackTimeoutFrames\": ").append(ACK_TIMEOUT_FRAMES).append(",\n");
 			json.append("  \"poseCount\": ").append(poses == null ? POSE_COUNT : poses.length).append(",\n");
 			json.append("  \"poseSequence\": [");
@@ -957,6 +983,14 @@ public final class DeterministicCameraCapture {
 		json.append("  \"warmupFramesRecorded\": ").append(Math.min(performanceFrames, PERFORMANCE_WARMUP_FRAMES)).append(",\n");
 		json.append("  \"measureFramesRecorded\": ").append(measuredFrames).append(",\n");
 		json.append("  \"totalFramesRecorded\": ").append(performanceFrames).append(",\n");
+		json.append("  \"settledReadyFrames\": ").append(SETTLED_READY_FRAMES).append(",\n");
+		json.append("  \"settledReadyMaxWaitFrames\": ").append(SETTLED_READY_MAX_WAIT_FRAMES).append(",\n");
+		json.append("  \"settledReadyEvidenceTimeoutFrames\": ").append(SETTLED_READY_EVIDENCE_TIMEOUT_FRAMES).append(",\n");
+		json.append("  \"settledReadyGateSatisfied\": ").append(settledReadyGateSatisfied).append(",\n");
+		appendField(json, "settledReadyFamilies", String.join(",", SETTLED_READY_FAMILIES)).append(",\n");
+		appendField(json, "settledReadyMinimumCounts", settledReadyMinimumCountsFingerprintValue()).append(",\n");
+		appendField(json, "settledReadySummary", settledReadyMetadataSummary()).append(",\n");
+		appendField(json, "settledReadyFingerprint", settledReadyMetadataFingerprint()).append(",\n");
 		appendBenchmarkFingerprint(
 			json,
 			level == null ? "missing" : level.dimension().location().toString(),

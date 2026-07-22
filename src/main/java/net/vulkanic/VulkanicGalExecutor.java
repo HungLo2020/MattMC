@@ -26,6 +26,20 @@ public interface VulkanicGalExecutor {
         return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), "backend does not implement explicit GAL v2 graphics draw execution");
     }
 
+    default VulkanicGalExecutionRequest.ExecutionResult executeGraphicsPassCommandBufferV2(
+        CommandContext ctx,
+        VulkanicGalV2.GraphicsPassCommandBuffer commandBuffer
+    ) {
+        VulkanicGalExecutionRequest.ExecutionResult last = VulkanicGalExecutionRequest.success(commandBuffer.semanticIdentity());
+        for (VulkanicGalV2.ExplicitGraphicsDrawRequest draw : commandBuffer.draws()) {
+            last = executeGraphicsDrawV2(ctx, draw);
+            if (!last.successful()) {
+                return last;
+            }
+        }
+        return last;
+    }
+
     default VulkanicGalExecutionRequest.ExecutionResult executeComputeDispatch(
         CommandContext ctx,
         VulkanicGalExecutionRequest.ComputeDispatchRequest request

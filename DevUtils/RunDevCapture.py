@@ -747,6 +747,14 @@ class CaptureRunner:
             if self.config.performance_capture:
                 settled_frames = int_env("MATTMC_BENCHMARK_SETTLED_READY_FRAMES", 0)
                 settled_minimum_counts = os.environ.get("MATTMC_BENCHMARK_SETTLED_READY_MINIMUM_COUNTS", "").strip()
+                settled_families = os.environ.get("MATTMC_BENCHMARK_SETTLED_READY_FAMILIES", "").strip()
+                if not settled_families and settled_minimum_counts:
+                    families: list[str] = []
+                    for entry in re.split(r"[,;]", settled_minimum_counts):
+                        name = entry.split("=", 1)[0].strip()
+                        if name and name not in families:
+                            families.append(name)
+                    settled_families = ",".join(families)
                 deterministic_options.extend(
                     [
                         "-Dmattmc.dev.deterministicCameraCapture.performanceMode=true",
@@ -754,6 +762,7 @@ class CaptureRunner:
                         f"-Dmattmc.dev.deterministicCameraCapture.performanceMeasureFrames={self.config.perf_measure_frames}",
                         f"-Dmattmc.dev.deterministicCameraCapture.performanceStatus={self.performance_status}",
                         f"-Dmattmc.dev.deterministicCameraCapture.settledReadyFrames={settled_frames}",
+                        f"-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies={settled_families}",
                         f"-Dmattmc.dev.deterministicCameraCapture.settledReadyMinimumCounts={settled_minimum_counts}",
                         "-Dmattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames=2400",
                         "-Dmattmc.perfAudit=true",

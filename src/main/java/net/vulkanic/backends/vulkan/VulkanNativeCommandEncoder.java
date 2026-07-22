@@ -1428,6 +1428,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             PipelineDescriptor selectedDescriptor = this.selectDescriptor(pipeline, baseDescriptor);
             GlProgram irisProgram = resolveIrisOverrideProgram(pipeline);
             if (irisProgram != null) {
+                recordIrisSubmittedWorkIdentity(pipeline, irisProgram);
                 this.setupIrisProgramStateIfNeeded(irisProgram);
                 PipelineDescriptor liveDescriptor = createIrisProgramLiveDescriptor(this.ctx, pipeline, selectedDescriptor, irisProgram);
                 if (liveDescriptor != null) {
@@ -1500,6 +1501,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             }
 
             PipelineResourcePlanner.Plan submission = this.buildCustomPassResourceBindings(customDescriptor, pass.program());
+            recordIrisSubmittedWorkIdentity(pipeline, pass.program());
             if (DEBUG_DESCRIPTOR_BINDINGS && debugCustomPassLogs < 160) {
                 debugCustomPassLogs++;
                 Program program = pass.program();
@@ -1567,6 +1569,48 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             );
             this.cacheSubmittedResources(handle, submission, true);
             return true;
+        }
+
+        private static void recordIrisSubmittedWorkIdentity(RenderPipeline pipeline, GlProgram program) {
+            if (!net.minecraft.client.dev.DeterministicCameraCapture.shouldRecordSubmittedWorkIdentities()) {
+                return;
+            }
+            if (program == null || program == GlProgram.INVALID_PROGRAM) {
+                return;
+            }
+            String programLabel = program.getDebugLabel();
+            if (programLabel == null || programLabel.isBlank()) {
+                programLabel = program.toString();
+            }
+            recordIrisSubmittedWorkIdentity(pipeline, programLabel);
+        }
+
+        private static void recordIrisSubmittedWorkIdentity(RenderPipeline pipeline, @Nullable Program program) {
+            if (!net.minecraft.client.dev.DeterministicCameraCapture.shouldRecordSubmittedWorkIdentities()) {
+                return;
+            }
+            if (program == null) {
+                return;
+            }
+            recordIrisSubmittedWorkIdentity(pipeline, "program:" + program.getProgramId());
+        }
+
+        private static void recordIrisSubmittedWorkIdentity(RenderPipeline pipeline, String programLabel) {
+            String pipelineLocation = pipeline == null ? "unknown" : String.valueOf(pipeline.getLocation());
+            String normalized = (pipelineLocation + "|" + programLabel).toLowerCase(java.util.Locale.ROOT);
+            if (!normalized.contains("iris")
+                && !normalized.contains("gbuffers")
+                && !normalized.contains("composite")
+                && !normalized.contains("deferred")
+                && !normalized.contains("shadow")
+                && !normalized.contains("prepare")
+                && !normalized.contains("final")) {
+                return;
+            }
+            VulkanicAPI.recordShaderInputParitySubmittedWorkIdentity(
+                "iris",
+                "vulkan-iris-program:" + pipelineLocation + ":" + programLabel
+            );
         }
 
         private boolean isCachedResourceSubmission(

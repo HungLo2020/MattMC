@@ -148,6 +148,10 @@ public final class VulkanPerfAudit {
     private static final LongAdder galV2CommandStreamBindCount = new LongAdder();
     private static final LongAdder galV2CommandStreamDrawCount = new LongAdder();
     private static final LongAdder galV2CommandStreamSuppressedBindCount = new LongAdder();
+    private static final LongAdder galV2PassCommandBufferCount = new LongAdder();
+    private static final LongAdder galV2PassCommandBufferDrawCount = new LongAdder();
+    private static final LongAdder galV2PassCommandBufferCommandCount = new LongAdder();
+    private static final LongAdder galV2PassCommandBufferEliminatedExecutorCalls = new LongAdder();
     private static final LongAdder galV2RegistryPruneCount = new LongAdder();
     private static final AtomicLong galV2RegistryPrunedEntryCount = new AtomicLong();
     private static final AtomicLong galV2RegistryEntryCount = new AtomicLong();
@@ -768,7 +772,7 @@ public final class VulkanPerfAudit {
     }
 
     public static void recordPhase(String name, long nanos) {
-        if (!isEnabled() || name == null || name.isBlank()) {
+        if (!descriptorEventsEnabled() || name == null || name.isBlank()) {
             return;
         }
         phases.computeIfAbsent(name, ignored -> new PhaseCounters()).add(Math.max(0L, nanos));
@@ -803,7 +807,7 @@ public final class VulkanPerfAudit {
     }
 
     public static void recordGalV2ResourceLayoutLookup(boolean created, int cacheSize) {
-        if (!isEnabled()) {
+        if (!descriptorEventsEnabled()) {
             return;
         }
         galV2ResourceLayoutLookupCount.increment();
@@ -814,7 +818,7 @@ public final class VulkanPerfAudit {
     }
 
     public static void recordGalV2ResourceSetLookup(boolean created, int cacheSize) {
-        if (!isEnabled()) {
+        if (!descriptorEventsEnabled()) {
             return;
         }
         galV2ResourceSetLookupCount.increment();
@@ -825,7 +829,7 @@ public final class VulkanPerfAudit {
     }
 
     public static void recordGalV2DrawTemplateLookup(boolean created, int cacheSize) {
-        if (!isEnabled()) {
+        if (!descriptorEventsEnabled()) {
             return;
         }
         galV2DrawTemplateLookupCount.increment();
@@ -836,7 +840,7 @@ public final class VulkanPerfAudit {
     }
 
     public static void recordGalV2CommandStream(int commandCount, int bindCount, int drawCount, int suppressedBindCount) {
-        if (!isEnabled()) {
+        if (!descriptorEventsEnabled()) {
             return;
         }
         galV2CommandStreamCount.increment();
@@ -844,6 +848,19 @@ public final class VulkanPerfAudit {
         galV2CommandStreamBindCount.add(Math.max(0, bindCount));
         galV2CommandStreamDrawCount.add(Math.max(0, drawCount));
         galV2CommandStreamSuppressedBindCount.add(Math.max(0, suppressedBindCount));
+    }
+
+    public static void recordGalV2PassCommandBuffer(int drawCount, int commandCount) {
+        if (!descriptorEventsEnabled()) {
+            return;
+        }
+        int safeDrawCount = Math.max(0, drawCount);
+        galV2PassCommandBufferCount.increment();
+        galV2PassCommandBufferDrawCount.add(safeDrawCount);
+        galV2PassCommandBufferCommandCount.add(Math.max(0, commandCount));
+        if (safeDrawCount > 1) {
+            galV2PassCommandBufferEliminatedExecutorCalls.add(safeDrawCount - 1L);
+        }
     }
 
     public static void recordGalV2RegistryPrune(int entryCount) {
@@ -1097,6 +1114,12 @@ public final class VulkanPerfAudit {
         builder.append("gal_v2_command_stream_bind_count=").append(galV2CommandStreamBindCount.sum()).append('\n');
         builder.append("gal_v2_command_stream_draw_count=").append(galV2CommandStreamDrawCount.sum()).append('\n');
         builder.append("gal_v2_command_stream_suppressed_bind_count=").append(galV2CommandStreamSuppressedBindCount.sum()).append('\n');
+        builder.append("gal_v2_pass_command_buffer_count=").append(galV2PassCommandBufferCount.sum()).append('\n');
+        builder.append("gal_v2_pass_command_buffer_draw_count=").append(galV2PassCommandBufferDrawCount.sum()).append('\n');
+        builder.append("gal_v2_pass_command_buffer_command_count=").append(galV2PassCommandBufferCommandCount.sum()).append('\n');
+        builder.append("gal_v2_pass_command_buffer_eliminated_executor_calls=")
+            .append(galV2PassCommandBufferEliminatedExecutorCalls.sum())
+            .append('\n');
         builder.append("gal_v2_registry_prune_count=").append(galV2RegistryPruneCount.sum()).append('\n');
         builder.append("gal_v2_registry_pruned_entry_count=").append(galV2RegistryPrunedEntryCount.get()).append('\n');
         builder.append("gal_v2_registry_entry_count=").append(galV2RegistryEntryCount.get()).append('\n');

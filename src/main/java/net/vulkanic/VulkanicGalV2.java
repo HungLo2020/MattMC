@@ -51,6 +51,7 @@ public final class VulkanicGalV2 {
         "UniformBinding(layout,bindingName,programId)",
         "PersistentDrawTemplate(objects,resourceSet,commandShape)",
         "GraphicsCommandStream(commands)",
+        "GraphicsPassCommandBuffer(draws,commands)",
         "ProgramState(programId,shaderShape)",
         "PipelineState(program,fixedFunction,topologyShape)",
         "RenderTargetState(framebuffer,drawBuffers,attachments)",
@@ -75,6 +76,7 @@ public final class VulkanicGalV2 {
         Math.max(1024, Integer.getInteger("mattmc.gal.v2.maxGlobalRegistryEntries", 16384));
 
     private static final AtomicInteger NEXT_HANDLE_ID = new AtomicInteger(1);
+    private static final AtomicInteger ACTIVE_PASS_COMMAND_BUFFER_REFERENCES = new AtomicInteger();
     private static final Map<String, Handle> HANDLES_BY_SEMANTIC_KEY = new ConcurrentHashMap<>();
     private static final Map<ExplicitGraphicsObjectKey, ExplicitGraphicsObjects> GRAPHICS_OBJECTS_BY_KEY =
         new ConcurrentHashMap<>();
@@ -84,6 +86,7 @@ public final class VulkanicGalV2 {
     private static final Map<Handle, ResourceLayout> RESOURCE_LAYOUTS_BY_HANDLE = new ConcurrentHashMap<>();
     private static final Map<String, ResourceSet> RESOURCE_SETS_BY_KEY = new ConcurrentHashMap<>();
     private static final Map<Handle, ResourceSet> RESOURCE_SETS_BY_HANDLE = new ConcurrentHashMap<>();
+    private static final Map<String, ResourceSet> RESOURCE_SETS_BY_MUTATION_STATE_KEY = new ConcurrentHashMap<>();
     private static final Map<String, UniformLayout> UNIFORM_LAYOUTS_BY_KEY = new ConcurrentHashMap<>();
     private static final Map<Handle, UniformLayout> UNIFORM_LAYOUTS_BY_HANDLE = new ConcurrentHashMap<>();
     private static final Map<String, UniformBinding> UNIFORM_BINDINGS_BY_KEY = new ConcurrentHashMap<>();
@@ -764,6 +767,39 @@ public final class VulkanicGalV2 {
         }
     }
 
+    public record GraphicsPassCommandBuffer(List<ExplicitGraphicsDrawRequest> draws) {
+        public GraphicsPassCommandBuffer {
+            draws = List.copyOf(Objects.requireNonNull(draws, "draws"));
+            if (draws.isEmpty()) {
+                throw new IllegalArgumentException("GAL v2 pass command buffer requires at least one draw");
+            }
+        }
+
+        public int commandCount() {
+            int total = 0;
+            for (ExplicitGraphicsDrawRequest draw : draws) {
+                total += draw.commandStream().commands().size();
+            }
+            return total;
+        }
+
+        public VulkanicGalExecutionRequest.SemanticIdentity semanticIdentity() {
+            if (draws.size() == 1) {
+                return draws.getFirst().semanticIdentity();
+            }
+            VulkanicGalExecutionRequest.SemanticIdentity first = draws.getFirst().semanticIdentity();
+            return new VulkanicGalExecutionRequest.SemanticIdentity(
+                first.subsystem(),
+                first.phase(),
+                "gal-v2-pass-buffer:" + first.pipeline(),
+                first.material(),
+                first.outputTarget(),
+                first.frameContext(),
+                first.ordinal()
+            );
+        }
+    }
+
     public static Optional<ExplicitGraphicsDrawRequest> tryCaptureLegacyProgramSlice(
         VulkanicGalExecutionRequest.GraphicsDrawRequest capturedV1Request
     ) {
@@ -997,6 +1033,21 @@ public final class VulkanicGalV2 {
         clearGlobalRegistries();
     }
 
+    static void beginPassCommandBufferRetention() {
+        ACTIVE_PASS_COMMAND_BUFFER_REFERENCES.incrementAndGet();
+    }
+
+    static void endPassCommandBufferRetention() {
+        int remaining = ACTIVE_PASS_COMMAND_BUFFER_REFERENCES.decrementAndGet();
+        if (remaining < 0) {
+            ACTIVE_PASS_COMMAND_BUFFER_REFERENCES.set(0);
+            throw new IllegalStateException("GAL v2 pass command-buffer retention underflow");
+        }
+        if (remaining == 0) {
+            pruneGlobalRegistriesIfNeeded();
+        }
+    }
+
     private static void clearGlobalRegistries() {
         GRAPHICS_OBJECTS_BY_KEY.clear();
         GRAPHICS_OBJECTS_BY_HANDLE.clear();
@@ -1004,12 +1055,14 @@ public final class VulkanicGalV2 {
         RESOURCE_LAYOUTS_BY_HANDLE.clear();
         RESOURCE_SETS_BY_KEY.clear();
         RESOURCE_SETS_BY_HANDLE.clear();
+        RESOURCE_SETS_BY_MUTATION_STATE_KEY.clear();
         UNIFORM_LAYOUTS_BY_KEY.clear();
         UNIFORM_LAYOUTS_BY_HANDLE.clear();
         UNIFORM_BINDINGS_BY_KEY.clear();
         UNIFORM_BINDINGS_BY_HANDLE.clear();
         DRAW_TEMPLATES_BY_KEY.clear();
         HANDLES_BY_SEMANTIC_KEY.clear();
+        ACTIVE_PASS_COMMAND_BUFFER_REFERENCES.set(0);
         NEXT_HANDLE_ID.set(1);
     }
 
@@ -1017,6 +1070,9 @@ public final class VulkanicGalV2 {
         int totalEntries = registryEntryCount();
         recordRegistrySnapshot(totalEntries);
         if (totalEntries <= MAX_GLOBAL_REGISTRY_ENTRIES) {
+            return;
+        }
+        if (ACTIVE_PASS_COMMAND_BUFFER_REFERENCES.get() > 0) {
             return;
         }
         clearGlobalRegistries();
@@ -1032,6 +1088,7 @@ public final class VulkanicGalV2 {
             + RESOURCE_LAYOUTS_BY_HANDLE.size()
             + RESOURCE_SETS_BY_KEY.size()
             + RESOURCE_SETS_BY_HANDLE.size()
+            + RESOURCE_SETS_BY_MUTATION_STATE_KEY.size()
             + UNIFORM_LAYOUTS_BY_KEY.size()
             + UNIFORM_LAYOUTS_BY_HANDLE.size()
             + UNIFORM_BINDINGS_BY_KEY.size()
@@ -1045,7 +1102,7 @@ public final class VulkanicGalV2 {
             HANDLES_BY_SEMANTIC_KEY.size(),
             GRAPHICS_OBJECTS_BY_KEY.size() + GRAPHICS_OBJECTS_BY_HANDLE.size(),
             RESOURCE_LAYOUTS_BY_KEY.size() + RESOURCE_LAYOUTS_BY_HANDLE.size(),
-            RESOURCE_SETS_BY_KEY.size() + RESOURCE_SETS_BY_HANDLE.size(),
+            RESOURCE_SETS_BY_KEY.size() + RESOURCE_SETS_BY_HANDLE.size() + RESOURCE_SETS_BY_MUTATION_STATE_KEY.size(),
             UNIFORM_LAYOUTS_BY_KEY.size() + UNIFORM_LAYOUTS_BY_HANDLE.size(),
             UNIFORM_BINDINGS_BY_KEY.size() + UNIFORM_BINDINGS_BY_HANDLE.size(),
             DRAW_TEMPLATES_BY_KEY.size()
@@ -1296,6 +1353,12 @@ public final class VulkanicGalV2 {
     }
 
     public static ResourceSet currentResourceSetForMutationState(VulkanicCompatibilityState.GraphicsStateView snapshot) {
+        String mutationStateKey = currentResourceSetMutationStateKey(snapshot);
+        ResourceSet cached = RESOURCE_SETS_BY_MUTATION_STATE_KEY.get(mutationStateKey);
+        if (cached != null) {
+            VulkanPerfAudit.recordGalV2ResourceSetLookup(false, RESOURCE_SETS_BY_KEY.size());
+            return cached;
+        }
         List<ResourceLayoutBinding> layoutBindings = v2ResourceLayoutBindings(snapshot);
         List<ResourceBinding> resourceBindings = v2ResourceBindings(snapshot);
         String layoutKey = "resource-layout:" + sha256Hex(resourceLayoutShapeKey(layoutBindings));
@@ -1304,7 +1367,18 @@ public final class VulkanicGalV2 {
             + ":uniform-shape=" + snapshot.program().shapeKey()
             + ":bindings=" + sha256Hex(resourceSetSemanticKey(resourceBindings));
         ResourceLayout resourceLayout = resourceLayoutFor(layoutKey, layoutBindings);
-        return resourceSetFor(resourceLayout.handle(), resourceSetKey, resourceBindings);
+        ResourceSet resourceSet = resourceSetFor(resourceLayout.handle(), resourceSetKey, resourceBindings);
+        RESOURCE_SETS_BY_MUTATION_STATE_KEY.put(mutationStateKey, resourceSet);
+        return resourceSet;
+    }
+
+    private static String currentResourceSetMutationStateKey(VulkanicCompatibilityState.GraphicsStateView snapshot) {
+        return "program=" + snapshot.programId()
+            + ":programVersion=" + snapshot.programVersion()
+            + ":programShape=" + snapshot.program().shapeKey()
+            + ":resourceBindingVersion=" + snapshot.resourceBindingVersion()
+            + ":textureGenerations=" + snapshot.textureGenerations().hashCode()
+            + ":bufferGenerations=" + snapshot.bufferGenerations().hashCode();
     }
 
     private static ResourceLayoutBinding resourceLayoutBindingFor(VulkanicPassResourceModel.BindingSnapshot binding) {

@@ -7499,23 +7499,43 @@ void main() {
         CommandContext ctx,
         VulkanicGalV2.ExplicitGraphicsDrawRequest request
     ) {
+        return executeGraphicsPassCommandBufferV2(
+            ctx,
+            new VulkanicGalV2.GraphicsPassCommandBuffer(java.util.List.of(request))
+        );
+    }
+
+    public VulkanicGalExecutionRequest.ExecutionResult executeGraphicsPassCommandBufferV2(
+        CommandContext ctx,
+        VulkanicGalV2.GraphicsPassCommandBuffer commandBuffer
+    ) {
         long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         try {
-            Objects.requireNonNull(request, "request");
-            consumeResourceUsagePlan(request.resourcePlan());
-            for (VulkanicGalV2.GraphicsCommand streamCommand : request.commandStream().commands()) {
-                if (streamCommand.kind() != VulkanicGalV2.GraphicsCommandKind.DRAW) {
-                    continue;
-                }
-                executeExplicitV2DrawCommand(ctx, ((VulkanicGalV2.DrawCommand) streamCommand).command(), request);
+            Objects.requireNonNull(commandBuffer, "commandBuffer");
+            for (VulkanicGalV2.ExplicitGraphicsDrawRequest request : commandBuffer.draws()) {
+                executeGraphicsDrawV2InCurrentCommandBuffer(ctx, request);
             }
-            return VulkanicGalExecutionRequest.success(request.semanticIdentity());
+            return VulkanicGalExecutionRequest.success(commandBuffer.semanticIdentity());
         } catch (RuntimeException exception) {
-            return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), exception.getMessage());
+            return VulkanicGalExecutionRequest.backendFailure(commandBuffer.semanticIdentity(), exception.getMessage());
         } finally {
             if (auditStartNanos != 0L) {
                 VulkanPerfAudit.recordPhase("backend.vulkan.graphics.v2", System.nanoTime() - auditStartNanos);
             }
+        }
+    }
+
+    private void executeGraphicsDrawV2InCurrentCommandBuffer(
+        CommandContext ctx,
+        VulkanicGalV2.ExplicitGraphicsDrawRequest request
+    ) {
+        Objects.requireNonNull(request, "request");
+        consumeResourceUsagePlan(request.resourcePlan());
+        for (VulkanicGalV2.GraphicsCommand streamCommand : request.commandStream().commands()) {
+            if (streamCommand.kind() != VulkanicGalV2.GraphicsCommandKind.DRAW) {
+                continue;
+            }
+            executeExplicitV2DrawCommand(ctx, ((VulkanicGalV2.DrawCommand) streamCommand).command(), request);
         }
     }
 

@@ -64,6 +64,18 @@ public class VulkanicAPI {
     @Nullable
     private static VulkanBackend rawVulkanBackend;
     private static final VulkanicCompatibilityState compatibilityState = new VulkanicCompatibilityState();
+    private static final Object GAL_V2_PASS_COMMAND_BUFFER_LOCK = new Object();
+    /*
+     * Keep default command buffers draw-scoped until every OpenGL v2 lowering
+     * path can safely replay suppressed binds from retained encoder state.
+     * Larger buffers remain opt-in for targeted diagnostics.
+     */
+    private static final int GAL_V2_PASS_COMMAND_BUFFER_MAX_DRAWS =
+        Math.max(1, Integer.getInteger("mattmc.gal.v2.passCommandBufferMaxDraws", 1));
+    private static final java.util.ArrayList<VulkanicGalV2.ExplicitGraphicsDrawRequest> pendingGalV2PassDraws =
+        new java.util.ArrayList<>(GAL_V2_PASS_COMMAND_BUFFER_MAX_DRAWS);
+    @Nullable
+    private static CommandContext pendingGalV2PassCommandContext;
 
     private static final boolean IS_MACOS = System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("mac");
     @Nullable
@@ -2659,14 +2671,12 @@ public class VulkanicAPI {
             if (validationStartNanos != 0L) {
                 VulkanPerfAudit.recordPhase("gal.graphics.validation", System.nanoTime() - validationStartNanos);
             }
-            long backendStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
             VulkanPerfAudit.recordGraphicsDraw();
             VulkanPerfAudit.recordGalV2GraphicsDraw(true);
-            requireGalExecutionAccepted(backend.executeGraphicsDrawV2(ctx, explicitV2Request.get()));
-            if (backendStartNanos != 0L) {
-                VulkanPerfAudit.recordPhase("gal.graphics.backend", System.nanoTime() - backendStartNanos);
-            }
+            recordDeterministicShaderSubmittedWorkIdentity(explicitV2Request.get());
+            enqueueGalV2GraphicsDraw(ctx, backend, explicitV2Request.get());
         } else {
+            flushGalV2GraphicsCommandBuffer(ctx, backend, true);
             compatibilityState.resetGalV2CommandEncoder();
             capturedRequest = VulkanicGalSnapshotBuilder.captureGraphicsDraw(ctx, backend, compatibilityState, request);
             if (captureStartNanos != 0L) {
@@ -2681,7 +2691,190 @@ public class VulkanicAPI {
             VulkanPerfAudit.recordGraphicsDraw();
             VulkanPerfAudit.recordGalV2GraphicsDraw(false);
             VulkanPerfAudit.recordGalV2FallbackReason(VulkanicGalV2.fallbackReasonFor(capturedRequest));
+            recordDeterministicShaderSubmittedWorkIdentity(capturedRequest);
             requireGalExecutionAccepted(backend.executeGraphicsDraw(ctx, capturedRequest));
+            if (backendStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("gal.graphics.backend", System.nanoTime() - backendStartNanos);
+            }
+        }
+    }
+
+    private static void recordDeterministicShaderSubmittedWorkIdentity(
+        VulkanicGalV2.ExplicitGraphicsDrawRequest request
+    ) {
+        if (!DeterministicCameraCapture.shouldRecordSubmittedWorkIdentities()) {
+            return;
+        }
+        String identity = deterministicIrisSubmittedWorkIdentity(request.graphicsObjects().semanticKey());
+        if (identity == null) {
+            identity = deterministicIrisSubmittedWorkIdentity(request.resourceSet().semanticKey());
+        }
+        if (identity == null) {
+            identity = deterministicIrisSubmittedWorkIdentity(request.semanticIdentity().label());
+        }
+        if (identity != null) {
+            recordShaderInputParitySubmittedWorkIdentity("iris", identity);
+        }
+    }
+
+    private static void recordDeterministicShaderSubmittedWorkIdentity(
+        VulkanicGalExecutionRequest.GraphicsDrawRequest request
+    ) {
+        if (!DeterministicCameraCapture.shouldRecordSubmittedWorkIdentities()) {
+            return;
+        }
+        String identity = deterministicIrisSubmittedWorkIdentity(request.semanticIdentity().label());
+        if (identity != null) {
+            recordShaderInputParitySubmittedWorkIdentity("iris", identity);
+        }
+    }
+
+    @Nullable
+    private static String deterministicIrisSubmittedWorkIdentity(String label) {
+        if (label == null || label.isBlank()) {
+            return null;
+        }
+        String normalized = label.toLowerCase(Locale.ROOT);
+        int program = legacyProgramIdFromLabel(normalized);
+        if (program > 0) {
+            String programName = VulkanicDiagnostics.SHADER_INPUT_PARITY_PROGRAM_NAMES.get(program);
+            if (programName != null && !programName.isBlank() && looksLikeIrisSubmittedWork(programName.toLowerCase(Locale.ROOT))) {
+                return "program:" + shaderInputParitySanitizeLabel(programName);
+            }
+        }
+        if (normalized.contains("gbuffers")) {
+            return "phase:gbuffers";
+        }
+        if (normalized.contains("shadow")) {
+            return "phase:shadow";
+        }
+        if (normalized.contains("deferred")) {
+            return "phase:deferred";
+        }
+        if (normalized.contains("composite")) {
+            return "phase:composite";
+        }
+        if (normalized.contains("prepare")) {
+            return "phase:prepare";
+        }
+        if (normalized.contains("final")) {
+            return "phase:final";
+        }
+        if (normalized.contains("iris")) {
+            return "phase:iris";
+        }
+        return null;
+    }
+
+    private static boolean looksLikeIrisSubmittedWork(String normalizedLabel) {
+        if (normalizedLabel.contains("iris")) {
+            return true;
+        }
+        if (normalizedLabel.contains("gbuffers")
+            || normalizedLabel.contains("composite")
+            || normalizedLabel.contains("deferred")
+            || normalizedLabel.contains("shadow")
+            || normalizedLabel.contains("final")
+            || normalizedLabel.contains("prepare")) {
+            return true;
+        }
+        return false;
+    }
+
+    private static int legacyProgramIdFromLabel(String normalizedLabel) {
+        String marker = "legacy-program:";
+        int start = normalizedLabel.indexOf(marker);
+        if (start < 0) {
+            return 0;
+        }
+        start += marker.length();
+        int end = start;
+        while (end < normalizedLabel.length() && Character.isDigit(normalizedLabel.charAt(end))) {
+            end++;
+        }
+        if (end == start) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(normalizedLabel.substring(start, end));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    private static void enqueueGalV2GraphicsDraw(
+        CommandContext ctx,
+        GraphicsBackend backend,
+        VulkanicGalV2.ExplicitGraphicsDrawRequest request
+    ) {
+        VulkanicGalV2.GraphicsPassCommandBuffer commandBufferToFlush = null;
+        CommandContext contextToFlush = null;
+        synchronized (GAL_V2_PASS_COMMAND_BUFFER_LOCK) {
+            if (pendingGalV2PassCommandContext != null && pendingGalV2PassCommandContext != ctx) {
+                contextToFlush = pendingGalV2PassCommandContext;
+                commandBufferToFlush = drainGalV2GraphicsCommandBufferLocked(true);
+            }
+            if (pendingGalV2PassDraws.isEmpty()) {
+                VulkanicGalV2.beginPassCommandBufferRetention();
+            }
+            pendingGalV2PassCommandContext = ctx;
+            pendingGalV2PassDraws.add(request);
+            if (backend.getBackendType() == GraphicsBackendType.VULKAN) {
+                commandBufferToFlush = drainGalV2GraphicsCommandBufferLocked(false);
+                contextToFlush = ctx;
+            } else if (pendingGalV2PassDraws.size() >= GAL_V2_PASS_COMMAND_BUFFER_MAX_DRAWS) {
+                commandBufferToFlush = drainGalV2GraphicsCommandBufferLocked(false);
+                contextToFlush = ctx;
+            }
+        }
+        if (commandBufferToFlush != null) {
+            executeGalV2GraphicsCommandBuffer(contextToFlush == null ? ctx : contextToFlush, backend, commandBufferToFlush);
+        }
+    }
+
+    private static void flushGalV2GraphicsCommandBuffer(
+        CommandContext ctx,
+        GraphicsBackend backend,
+        boolean resetEncoderAfter
+    ) {
+        VulkanicGalV2.GraphicsPassCommandBuffer commandBuffer;
+        synchronized (GAL_V2_PASS_COMMAND_BUFFER_LOCK) {
+            commandBuffer = drainGalV2GraphicsCommandBufferLocked(resetEncoderAfter);
+        }
+        if (commandBuffer != null) {
+            executeGalV2GraphicsCommandBuffer(ctx, backend, commandBuffer);
+        }
+    }
+
+    @Nullable
+    private static VulkanicGalV2.GraphicsPassCommandBuffer drainGalV2GraphicsCommandBufferLocked(boolean resetEncoderAfter) {
+        if (pendingGalV2PassDraws.isEmpty()) {
+            if (resetEncoderAfter) {
+                compatibilityState.resetGalV2CommandEncoder();
+            }
+            return null;
+        }
+        VulkanicGalV2.GraphicsPassCommandBuffer commandBuffer =
+            new VulkanicGalV2.GraphicsPassCommandBuffer(new java.util.ArrayList<>(pendingGalV2PassDraws));
+        pendingGalV2PassDraws.clear();
+        pendingGalV2PassCommandContext = null;
+        if (resetEncoderAfter) {
+            compatibilityState.resetGalV2CommandEncoder();
+        }
+        return commandBuffer;
+    }
+
+    private static void executeGalV2GraphicsCommandBuffer(
+        CommandContext ctx,
+        GraphicsBackend backend,
+        VulkanicGalV2.GraphicsPassCommandBuffer commandBuffer
+    ) {
+        VulkanPerfAudit.recordGalV2PassCommandBuffer(commandBuffer.draws().size(), commandBuffer.commandCount());
+        long backendStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
+        try {
+            requireGalExecutionAccepted(backend.executeGraphicsPassCommandBufferV2(ctx, commandBuffer));
+        } finally {
+            VulkanicGalV2.endPassCommandBufferRetention();
             if (backendStartNanos != 0L) {
                 VulkanPerfAudit.recordPhase("gal.graphics.backend", System.nanoTime() - backendStartNanos);
             }
@@ -2693,6 +2886,7 @@ public class VulkanicAPI {
         VulkanicGalExecutionRequest.ComputeDispatchRequest request
     ) {
         GraphicsBackend backend = getBackend();
+        flushGalV2GraphicsCommandBuffer(ctx, backend, true);
         String operation = request.semanticIdentity().phase();
         long passCaptureStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         VulkanicGalExecutionRequest.ComputePassBeginRequest beginRequest =
@@ -2748,6 +2942,7 @@ public class VulkanicAPI {
         VulkanicGalExecutionRequest.ClearRequest request
     ) {
         GraphicsBackend backend = getBackend();
+        flushGalV2GraphicsCommandBuffer(ctx, backend, true);
         long captureStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         VulkanicGalExecutionRequest.ClearRequest capturedRequest =
             VulkanicGalSnapshotBuilder.captureClear(ctx, backend, compatibilityState, request);
@@ -2774,6 +2969,7 @@ public class VulkanicAPI {
         VulkanicGalExecutionRequest.TransferRequest request
     ) {
         GraphicsBackend backend = getBackend();
+        flushGalV2GraphicsCommandBuffer(ctx, backend, true);
         long captureStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         VulkanicGalExecutionRequest.TransferRequest capturedRequest =
             VulkanicGalSnapshotBuilder.captureTransfer(ctx, backend, compatibilityState, request);
@@ -2800,6 +2996,7 @@ public class VulkanicAPI {
         VulkanicGalExecutionRequest.RenderPassBeginRequest request
     ) {
         GraphicsBackend backend = getBackend();
+        flushGalV2GraphicsCommandBuffer(ctx, backend, true);
         long captureStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
         VulkanicGalExecutionRequest.RenderPassBeginRequest capturedRequest =
             VulkanicGalSnapshotBuilder.captureRenderPassBegin(ctx, backend, request);
@@ -10983,6 +11180,7 @@ public class VulkanicAPI {
      * In Vulkan this acquires the next swapchain image and returns its index.
      */
     public static int beginFrame() {
+        flushGalV2GraphicsCommandBuffer(getCommandContext(), getBackend(), true);
         compatibilityState.resetGalV2CommandEncoder();
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         if (directVulkanBackend != null) {
@@ -10998,6 +11196,7 @@ public class VulkanicAPI {
      * In Vulkan this presents the currently acquired swapchain image.
      */
     public static void endFrame() {
+        flushGalV2GraphicsCommandBuffer(getCommandContext(), getBackend(), true);
         compatibilityState.resetGalV2CommandEncoder();
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         if (directVulkanBackend != null) {

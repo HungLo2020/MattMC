@@ -2,6 +2,7 @@ package net.vulkanic;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -57,6 +58,10 @@ final class OpenGLGalV2LoweringContractTest {
     void openglGalV2ResourceSetLoweringIsGenerationKeyed() throws IOException {
         String source = Files.readString(REPO.resolve(
             "src/main/java/net/vulkanic/backends/opengl/OpenGLBackend.java"));
+        String v2DrawHelper = source.substring(
+            source.indexOf("private void executeGraphicsDrawV2InCurrentPass"),
+            source.indexOf("private void executeGalV2DrawCommand")
+        );
 
         assertTrue(source.contains("appliedGalV2ResourceSetKey"),
             "OpenGL v2 resource lowering should track the applied resource-set semantic key");
@@ -64,6 +69,10 @@ final class OpenGLGalV2LoweringContractTest {
             "Equivalent v2 resource sets should skip redundant GL binding replay");
         assertTrue(source.contains("appliedGalV2ResourceCoverage"),
             "Skipping v2 resource-set replay must still preserve legacy-missing-binding coverage");
+        assertTrue(v2DrawHelper.contains("VulkanicGalV2.ExplicitGraphicsObjects objects = null"),
+            "Draw-only commands should not eagerly resolve persistent graphics objects");
+        assertTrue(v2DrawHelper.contains("VulkanicGalV2.ResourceSet resourceSet = null"),
+            "Draw-only commands should not eagerly resolve persistent resource sets");
     }
 
     @Test
@@ -161,6 +170,36 @@ final class OpenGLGalV2LoweringContractTest {
     }
 
     @Test
+    void normalGalV2FrontendQueuesPassScopedCommandBuffersInsteadOfPerDrawBackendExecution() throws IOException {
+        String apiSource = Files.readString(REPO.resolve("src/main/java/net/vulkanic/VulkanicAPI.java"));
+        String normalV2Branch = apiSource.substring(
+            apiSource.indexOf("if (explicitV2Request.isPresent())"),
+            apiSource.indexOf("} else {\n            flushGalV2GraphicsCommandBuffer")
+        );
+
+        assertTrue(apiSource.contains("pendingGalV2PassDraws"),
+            "The frontend should retain a pass-scoped GAL v2 draw queue");
+        assertTrue(apiSource.contains("Integer.getInteger(\"mattmc.gal.v2.passCommandBufferMaxDraws\", 1)"),
+            "GAL v2 command buffers should remain draw-scoped by default until suppressed OpenGL binds are safe to batch");
+        assertTrue(apiSource.contains("new VulkanicGalV2.GraphicsPassCommandBuffer"),
+            "Queued v2 draws should be drained as an explicit pass command buffer");
+        assertTrue(normalV2Branch.contains("enqueueGalV2GraphicsDraw(ctx, backend, explicitV2Request.get())"),
+            "Normal migrated v2 draws should append to the active pass command buffer");
+        assertFalse(normalV2Branch.contains("backend.executeGraphicsDrawV2("),
+            "Normal migrated v2 draws must not enter the backend executor one draw at a time");
+        assertTrue(apiSource.contains("executeGraphicsPassCommandBuffer"),
+            "Drained v2 command buffers should cross the backend boundary as one batch");
+        assertTrue(apiSource.contains("drainGalV2GraphicsCommandBufferLocked")
+                && apiSource.contains("executeGalV2GraphicsCommandBuffer"),
+            "The queue should be drained under the lock and lowered outside the queue monitor");
+        assertTrue(apiSource.contains("VulkanicGalV2.beginPassCommandBufferRetention()")
+                && apiSource.contains("VulkanicGalV2.endPassCommandBufferRetention()"),
+            "Queued command buffers must retain referenced GAL v2 handles until backend lowering completes");
+        assertTrue(apiSource.contains("backend.getBackendType() == GraphicsBackendType.VULKAN"),
+            "Vulkan GL-style v2 draws currently flush immediately because native render-pass lifetime is backend-scoped");
+    }
+
+    @Test
     void normalGalV2DrawsEncodeRedundantBindsOnlyWhenSemanticStateChanges() {
         VulkanicGalV2.clearForTests();
         VulkanicCompatibilityState state = new VulkanicCompatibilityState();
@@ -199,6 +238,54 @@ final class OpenGLGalV2LoweringContractTest {
         assertTrue(afterReset.commandStream().commands().stream()
                 .anyMatch(command -> command.kind() == VulkanicGalV2.GraphicsCommandKind.BIND_GRAPHICS_PIPELINE),
             "Resetting the command encoder must force persistent state to be rebound");
+    }
+
+    @Test
+    void galV2PassCommandBufferIsImmutableAndPreservesCompactCommandOrder() {
+        VulkanicGalV2.clearForTests();
+        VulkanicCompatibilityState state = new VulkanicCompatibilityState();
+        state.bindProgram(11);
+        state.bindVertexArray(3);
+        state.bindBuffer(0x8892, 7);
+        state.setVertexAttribPointer(0, 3, VulkanicAPI.GL_FLOAT, false, false, 12, 0L);
+        state.enableVertexAttribArray(0);
+
+        VulkanicGalExecutionRequest.GraphicsDrawRequest request =
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
+                "terrain:v2-pass-buffer",
+                VulkanicPrimitiveMode.TRIANGLES,
+                0,
+                3,
+                1
+            );
+
+        VulkanicGalV2.ExplicitGraphicsDrawRequest first =
+            state.tryCaptureGalV2GraphicsDraw(request, false).orElseThrow();
+        VulkanicGalV2.ExplicitGraphicsDrawRequest second =
+            state.tryCaptureGalV2GraphicsDraw(request, false).orElseThrow();
+        List<VulkanicGalV2.ExplicitGraphicsDrawRequest> mutableDraws =
+            new java.util.ArrayList<>(List.of(first, second));
+        VulkanicGalV2.GraphicsPassCommandBuffer commandBuffer =
+            new VulkanicGalV2.GraphicsPassCommandBuffer(mutableDraws);
+        mutableDraws.clear();
+
+        assertEquals(2, commandBuffer.draws().size());
+        assertThrows(UnsupportedOperationException.class, () -> commandBuffer.draws().clear());
+        assertEquals(
+            first.commandStream().commands().size() + second.commandStream().commands().size(),
+            commandBuffer.commandCount()
+        );
+        assertTrue(commandBuffer.semanticIdentity().pipeline().startsWith("gal-v2-pass-buffer:"));
+        assertTrue(commandBuffer.draws().get(0).commandStream().commands().stream()
+                .anyMatch(command -> command.kind() == VulkanicGalV2.GraphicsCommandKind.BIND_GRAPHICS_PIPELINE),
+            "The first queued draw should carry the required persistent binds");
+        assertEquals(
+            List.of(VulkanicGalV2.GraphicsCommandKind.DRAW),
+            commandBuffer.draws().get(1).commandStream().commands().stream()
+                .map(VulkanicGalV2.GraphicsCommand::kind)
+                .toList(),
+            "Subsequent equivalent draws should remain compact draw-only commands inside the pass buffer"
+        );
     }
 
     @Test
