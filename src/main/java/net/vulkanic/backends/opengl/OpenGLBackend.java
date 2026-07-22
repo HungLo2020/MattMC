@@ -904,7 +904,7 @@ public class OpenGLBackend implements GraphicsBackend {
             VulkanicGalV2.ResourceSet resourceSet = VulkanicGalV2.requireResourceSet(request.resourceSet());
             applyResourceBindingsSnapshot(ctx, snapshot, resourceSet, request.resourceSet().equals(objects.resourceSet()));
             applyVertexInputV2(request, objects);
-            applyUniformSnapshot(snapshot);
+            applyUniformSnapshot(request.programUniforms(), request.programVersion());
 
             VulkanicGalExecutionRequest.GraphicsDrawCommand command = request.command();
             switch (command.kind()) {
@@ -1410,10 +1410,13 @@ public class OpenGLBackend implements GraphicsBackend {
     }
 
     private void applyUniformSnapshot(VulkanicCompatibilityState.GraphicsSnapshot snapshot) {
-        if (appliedUniformVersion == snapshot.programVersion()) {
+        applyUniformSnapshot(snapshot.program(), snapshot.programVersion());
+    }
+
+    private void applyUniformSnapshot(VulkanicCompatibilityState.ProgramSnapshot program, long programVersion) {
+        if (appliedUniformVersion == programVersion) {
             return;
         }
-        VulkanicCompatibilityState.ProgramSnapshot program = snapshot.program();
         if (program.programId() <= 0) {
             return;
         }
@@ -1433,7 +1436,7 @@ public class OpenGLBackend implements GraphicsBackend {
                 applyFloatUniform(location, floats);
             }
         }
-        appliedUniformVersion = snapshot.programVersion();
+        appliedUniformVersion = programVersion;
     }
 
     private static void applyIntegerUniform(int location, int[] values) {

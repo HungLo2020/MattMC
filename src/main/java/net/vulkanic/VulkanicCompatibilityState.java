@@ -264,9 +264,20 @@ public final class VulkanicCompatibilityState {
     }
 
     public void bindBufferRange(int target, int index, int buffer, long offset, long size) {
+        bindBufferRange(target, index, buffer, offset, size, null);
+    }
+
+    public void bindNamedBufferRange(int target, int index, int buffer, long offset, long size, String semanticName) {
+        bindBufferRange(target, index, buffer, offset, size, semanticName);
+    }
+
+    private void bindBufferRange(int target, int index, int buffer, long offset, long size, String semanticName) {
         synchronized (lock) {
             registerBuffer(buffer);
-            indexedBufferBindings.put(new IndexedBufferKey(target, index), new BufferRangeState(buffer, offset, size));
+            indexedBufferBindings.put(
+                new IndexedBufferKey(target, index),
+                new BufferRangeState(buffer, offset, size, semanticName)
+            );
             resourceBindingVersion++;
         }
     }
@@ -1547,6 +1558,7 @@ public final class VulkanicCompatibilityState {
                 if (range.buffer() <= 0) {
                     continue;
                 }
+                String bindingName = range.semanticNameOrDefault("Buffer" + entry.getKey().index());
                 VulkanicPassResourceModel.ResourceUse use = VulkanicLegacyCompatibilityAdapter.uniformBufferUse(
                     "buffer-binding-" + entry.getKey().target() + "-" + entry.getKey().index(),
                     "legacy-buffer:" + range.buffer(),
@@ -1556,7 +1568,7 @@ public final class VulkanicCompatibilityState {
                     order++
                 );
                 bindings.add(new VulkanicPassResourceModel.BindingSnapshot(
-                    "Buffer" + entry.getKey().index(),
+                    bindingName,
                     use,
                     OptionalInt.of(entry.getKey().index()),
                     OptionalInt.empty(),
@@ -1697,6 +1709,7 @@ public final class VulkanicCompatibilityState {
                 if (range.buffer() <= 0) {
                     continue;
                 }
+                String bindingName = range.semanticNameOrDefault("Buffer" + entry.getKey().index());
                 VulkanicPassResourceModel.ResourceUse use = VulkanicLegacyCompatibilityAdapter.uniformBufferUse(
                     "compute-buffer-binding-" + entry.getKey().target() + "-" + entry.getKey().index(),
                     "legacy-buffer:" + range.buffer(),
@@ -1706,7 +1719,7 @@ public final class VulkanicCompatibilityState {
                     order++
                 );
                 bindings.add(new VulkanicPassResourceModel.BindingSnapshot(
-                    "Buffer" + entry.getKey().index(),
+                    bindingName,
                     use,
                     OptionalInt.of(entry.getKey().index()),
                     OptionalInt.empty(),
@@ -1955,7 +1968,14 @@ public final class VulkanicCompatibilityState {
     public record AttachmentState(int attachment, int texture, int level) {
     }
 
-    public record BufferRangeState(int buffer, long offset, long size) {
+    public record BufferRangeState(int buffer, long offset, long size, String semanticName) {
+        public BufferRangeState(int buffer, long offset, long size) {
+            this(buffer, offset, size, null);
+        }
+
+        String semanticNameOrDefault(String fallback) {
+            return semanticName == null || semanticName.isBlank() ? fallback : semanticName;
+        }
     }
 
     public record ImageUnitBindingState(

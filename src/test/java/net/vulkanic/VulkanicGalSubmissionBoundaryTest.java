@@ -452,6 +452,11 @@ final class VulkanicGalSubmissionBoundaryTest {
             .uniformsByLocation()
             .get(3)
             .ints()[0]);
+        assertEquals(8, changedV2
+            .programUniforms()
+            .uniformsByLocation()
+            .get(3)
+            .ints()[0]);
         assertEquals(0.25f, v2Seed(changedV2)
             .program()
             .uniformsByLocation()
@@ -504,6 +509,56 @@ final class VulkanicGalSubmissionBoundaryTest {
             .orElseThrow()
             .legacyId()
             .orElseThrow());
+    }
+
+    @Test
+    void galV2OpenGlNonEagerCapturePreservesDynamicTransformsBindingName() {
+        VulkanicGalV2.clearForTests();
+        VulkanicCompatibilityState state = new VulkanicCompatibilityState();
+        state.bindProgram(11);
+        state.bindNamedBufferRange(
+            VulkanicAPI.GL_UNIFORM_BUFFER,
+            0,
+            52,
+            16L,
+            164L,
+            "DynamicTransforms"
+        );
+
+        VulkanicGalExecutionRequest.GraphicsDrawRequest draft =
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
+                "dynamic-transform-draw",
+                VulkanicPrimitiveMode.TRIANGLES,
+                0,
+                3,
+                1
+            );
+
+        VulkanicGalV2.ExplicitGraphicsDrawRequest first =
+            VulkanicGalV2.tryCaptureLegacyProgramSlice(state.captureGraphics(draft), draft, false).orElseThrow();
+        VulkanicGalV2.ResourceSet firstResources = VulkanicGalV2.requireResourceSet(first.resourceSet());
+        VulkanicGalV2.ResourceBinding dynamicTransforms = firstResources.bufferRangeBinding(0).orElseThrow();
+        assertEquals("DynamicTransforms", dynamicTransforms.name());
+        assertEquals(52, dynamicTransforms.resourceReference().orElseThrow().legacyId().orElseThrow());
+        assertEquals(16, dynamicTransforms.resourceReference().orElseThrow().subresource().baseMipLevel());
+        assertEquals(164, dynamicTransforms.resourceReference().orElseThrow().subresource().levelCount());
+
+        state.bindNamedBufferRange(
+            VulkanicAPI.GL_UNIFORM_BUFFER,
+            0,
+            52,
+            180L,
+            164L,
+            "DynamicTransforms"
+        );
+        VulkanicGalV2.ExplicitGraphicsDrawRequest offsetChanged =
+            VulkanicGalV2.tryCaptureLegacyProgramSlice(state.captureGraphics(draft), draft, false).orElseThrow();
+        assertEquals(first.graphicsObjects(), offsetChanged.graphicsObjects());
+        assertFalse(first.resourceSet().equals(offsetChanged.resourceSet()));
+        VulkanicGalV2.ResourceBinding changedDynamicTransforms =
+            VulkanicGalV2.requireResourceSet(offsetChanged.resourceSet()).bufferRangeBinding(0).orElseThrow();
+        assertEquals("DynamicTransforms", changedDynamicTransforms.name());
+        assertEquals(180, changedDynamicTransforms.resourceReference().orElseThrow().subresource().baseMipLevel());
     }
 
     @Test
@@ -895,6 +950,11 @@ final class VulkanicGalSubmissionBoundaryTest {
         String explicitDrawRecord = galV2Source.substring(explicitDrawStart, explicitDrawEnd);
         assertFalse(explicitDrawRecord.contains("GraphicsSnapshot compatibilitySnapshot"),
             "Migrated GAL v2 draws must not carry a broad compatibility snapshot per command");
+        assertTrue(explicitDrawRecord.contains("ProgramSnapshot programUniforms"),
+            "GAL v2 draws should carry current immutable uniform payloads separately from reusable graphics-object shape");
+        String openGlSource = Files.readString(PROJECT_ROOT.resolve("src/main/java/net/vulkanic/backends/opengl/OpenGLBackend.java"));
+        assertTrue(openGlSource.contains("applyUniformSnapshot(request.programUniforms(), request.programVersion())"),
+            "OpenGL GAL v2 lowering must apply the draw request's current uniform payload, not the cached graphics-object seed");
         assertTrue(vulkanSource.contains("galV2ResourcePlanTemplate(descriptor, programSnapshot, resourceSet.layout())")
                 && vulkanSource.contains("record GalV2ResourcePlanTemplateKey("),
             "GAL v2 graphics lowering should cache immutable resource-plan templates by v2 resource-layout semantics");

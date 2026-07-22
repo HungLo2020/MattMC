@@ -50,7 +50,7 @@ public final class VulkanicGalV2 {
         "UniformLayout(bindingName,set,binding,members)",
         "UniformBinding(layout,bindingName,programId)",
         "ExplicitGraphicsObjects(program,pipeline,vertexLayout,resourceLayout,resourceSet,renderTarget)",
-        "ExplicitGraphicsDrawRequest(identity,objects,resourceSet,drawCommand,vertexStreams,resourcePlanFingerprint)"
+        "ExplicitGraphicsDrawRequest(identity,objects,resourceSet,programUniforms,programVersion,drawCommand,vertexStreams,resourcePlanFingerprint)"
     );
     public static final String CONTRACT_SCHEMA_FINGERPRINT = sha256Hex(CONTRACT_SCHEMA);
 
@@ -422,6 +422,8 @@ public final class VulkanicGalV2 {
         VulkanicGalExecutionRequest.SemanticIdentity semanticIdentity,
         Handle graphicsObjects,
         Handle resourceSet,
+        VulkanicCompatibilityState.ProgramSnapshot programUniforms,
+        long programVersion,
         VulkanicGalExecutionRequest.GraphicsDrawCommand command,
         VertexStreamBindings vertexStreams,
         VulkanicPassResourceModel.PassExecutionPlan resourcePlan,
@@ -431,6 +433,7 @@ public final class VulkanicGalV2 {
             semanticIdentity = Objects.requireNonNull(semanticIdentity, "semanticIdentity");
             graphicsObjects = Objects.requireNonNull(graphicsObjects, "graphicsObjects");
             resourceSet = Objects.requireNonNull(resourceSet, "resourceSet");
+            programUniforms = Objects.requireNonNull(programUniforms, "programUniforms");
             command = Objects.requireNonNull(command, "command");
             vertexStreams = Objects.requireNonNull(vertexStreams, "vertexStreams");
             resourcePlan = Objects.requireNonNull(resourcePlan, "resourcePlan");
@@ -459,6 +462,8 @@ public final class VulkanicGalV2 {
             capturedV1Request.semanticIdentity(),
             objects.handle(),
             objects.resourceSet(),
+            shared.get().program(),
+            shared.get().programVersion(),
             capturedV1Request.command(),
             vertexStreamsFor(shared.get(), capturedV1Request.command()),
             capturedV1Request.resourcePlan(),
@@ -512,6 +517,8 @@ public final class VulkanicGalV2 {
             draftRequest.semanticIdentity(),
             objects.handle(),
             requestResourceSet.handle(),
+            snapshot.program(),
+            snapshot.programVersion(),
             draftRequest.command(),
             vertexStreamsFor(snapshot, draftRequest.command()),
             resourcePlan,

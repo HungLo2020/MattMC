@@ -122,6 +122,43 @@ final class VulkanicCompatibilityStateTest {
     }
 
     @Test
+    void namedBufferRangesPreserveDescriptorBindingIdentity() {
+        VulkanicCompatibilityState state = new VulkanicCompatibilityState();
+        state.bindNamedBufferRange(
+            VulkanicAPI.GL_UNIFORM_BUFFER,
+            2,
+            606,
+            32L,
+            64L,
+            "DynamicTransforms"
+        );
+
+        VulkanicCompatibilityState.GraphicsSnapshot snapshot = state.captureGraphics(
+            VulkanicGalExecutionRequest.GraphicsDrawRequest.arrays(
+                "named-ubo",
+                VulkanicPrimitiveMode.TRIANGLES,
+                0,
+                3,
+                1
+            )
+        );
+
+        VulkanicPassResourceModel.BindingSnapshot binding = snapshot.bindingSnapshots().stream()
+            .filter(candidate -> candidate.resourceReference().isPresent())
+            .filter(candidate -> candidate.resourceReference().orElseThrow().bindingUnit().orElse(-1) == 2)
+            .findFirst()
+            .orElseThrow();
+
+        assertEquals("DynamicTransforms", binding.name());
+        VulkanicPassResourceModel.CanonicalResourceReference reference =
+            binding.resourceReference().orElseThrow();
+        assertEquals(VulkanicPassResourceModel.BindingKind.BUFFER_RANGE, reference.bindingKind());
+        assertEquals(606, reference.legacyId().orElseThrow());
+        assertEquals(32, reference.subresource().baseMipLevel());
+        assertEquals(64, reference.subresource().levelCount());
+    }
+
+    @Test
     void defaultFramebufferUsesBackBufferRouting() {
         VulkanicCompatibilityState state = new VulkanicCompatibilityState();
 

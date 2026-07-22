@@ -7856,12 +7856,13 @@ public class VulkanicAPI {
             }
             int bufferHandle = legacyBufferHandleForCompatibilitySnapshot(slice.buffer());
             if (bufferHandle > 0) {
-                compatibilityState.bindBufferRange(
+                compatibilityState.bindNamedBufferRange(
                     GL_UNIFORM_BUFFER,
                     resourceBinding.binding(),
                     bufferHandle,
                     slice.offset(),
-                    slice.length()
+                    slice.length(),
+                    resourceBinding.name()
                 );
             }
         }
