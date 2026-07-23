@@ -374,6 +374,11 @@ fn ffi_rejects_malformed_inputs() {
         unsafe { mattmc_nbt_parse_fingerprint(std::ptr::null(), 1, 0, 0, 0, 0, &mut result) };
     assert_eq!(status, STATUS_INVALID_ARGUMENT);
 
+    let status =
+        unsafe { mattmc_nbt_parse_fingerprint(std::ptr::null(), 0, 0, 0, 0, 0, &mut result) };
+    assert_eq!(status, STATUS_PARSE_ERROR);
+    assert_eq!(result.error_kind, NbtErrorKind::UnexpectedEof as i32);
+
     let malformed = [10, 0];
     let status = unsafe {
         mattmc_nbt_parse_fingerprint(
