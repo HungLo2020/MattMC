@@ -16,6 +16,8 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.SharedConstants;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicGalExecutionRequest;
+import net.vulkanic.VulkanicGalV2;
 import net.vulkanic.VulkanicRenderTargetDescriptor;
 import net.vulkanic.VulkanicTextureView;
 import org.jetbrains.annotations.Nullable;
@@ -362,6 +364,24 @@ public class GlRenderPass implements RenderPass {
 		} else {
 			this.encoder.executeDraw(this, i, 0, j, null, 1);
 		}
+	}
+
+	@Override
+	public boolean supportsExplicitGalV2GraphicsDraw() {
+		return true;
+	}
+
+	@Override
+	public int explicitGalV2FramebufferId() {
+		return this.framebuffer;
+	}
+
+	@Override
+	public VulkanicGalExecutionRequest.ExecutionResult executeExplicitGalV2GraphicsDraw(VulkanicGalV2.ExplicitGraphicsDrawRequest request) {
+		if (this.closed) {
+			return VulkanicGalExecutionRequest.backendFailure(request.semanticIdentity(), "render pass is closed");
+		}
+		return VulkanicAPI.submitExplicitGalV2GraphicsDraw(VulkanicAPI.getCommandContext(), request);
 	}
 
 	@Override

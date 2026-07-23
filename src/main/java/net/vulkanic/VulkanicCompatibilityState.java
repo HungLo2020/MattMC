@@ -501,6 +501,18 @@ public final class VulkanicCompatibilityState {
         }
     }
 
+    public VulkanicGalV2.UniformPayload captureExplicitGalV2UniformPayload(int programId, String semanticKey) {
+        synchronized (lock) {
+            ProgramState program = program(programId);
+            return VulkanicGalV2.uniformPayloadForExplicitProgram(
+                programId,
+                program.uniformPayloadVersion,
+                program.uniformsByLocation,
+                semanticKey
+            );
+        }
+    }
+
     public void setPixelStore(int pname, int value) {
         if (value < 0) {
             throw new IllegalArgumentException("Pixel-store value must be >= 0, got: " + value);

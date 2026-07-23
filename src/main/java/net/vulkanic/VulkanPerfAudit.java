@@ -34,6 +34,8 @@ public final class VulkanPerfAudit {
         Boolean.getBoolean("mattmc.perfAudit.openGlStateDetails");
     private static final boolean DETERMINISTIC_PERFORMANCE_CAPTURE =
         Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.performanceMode");
+    private static final boolean MEMORY_SAMPLES_ENABLED =
+        Boolean.getBoolean("mattmc.perfAudit.memorySamples");
     private static final long SNAPSHOT_INTERVAL_NANOS = 5_000_000_000L;
     private static final int MAX_FRAME_SAMPLES = Math.max(1, Integer.getInteger("mattmc.perfAudit.maxFrameSamples", 4096));
 
@@ -180,6 +182,18 @@ public final class VulkanPerfAudit {
     private static final Object measuredFrameLock = new Object();
     private static int measuredFrameSampleCount;
     private static long measuredFrameOverflowCount;
+    private static final LongAdder memorySampleCount = new LongAdder();
+    private static final AtomicLong memoryLatestHeapUsedBytes = new AtomicLong(-1L);
+    private static final AtomicLong memoryLatestHeapCommittedBytes = new AtomicLong(-1L);
+    private static final AtomicLong memoryLatestHeapMaxBytes = new AtomicLong(-1L);
+    private static final AtomicLong memoryLatestProcessRssKb = new AtomicLong(-1L);
+    private static final AtomicLong memoryLatestRssAnonKb = new AtomicLong(-1L);
+    private static final AtomicLong memoryLatestRssFileKb = new AtomicLong(-1L);
+    private static final AtomicLong memoryLatestRssShmemKb = new AtomicLong(-1L);
+    private static final AtomicLong memoryPeakHeapCommittedBytes = new AtomicLong(-1L);
+    private static final AtomicLong memoryPeakProcessRssKb = new AtomicLong(-1L);
+    private static final AtomicLong memoryPeakRssAnonKb = new AtomicLong(-1L);
+    private static final AtomicLong memoryPeakRssShmemKb = new AtomicLong(-1L);
     private static final long initialGcCount = gcCollectionCount();
     private static final long initialGcTimeMillis = gcCollectionTimeMillis();
 
@@ -757,6 +771,7 @@ public final class VulkanPerfAudit {
             deterministicMeasuredFrameCount.increment();
             deterministicMeasuredFrameTotalNanos.add(clampedNanos);
             addMeasuredFrameSample(clampedNanos);
+            recordMemorySample();
         } else {
             deterministicWarmupFrameCount.increment();
         }
@@ -1044,6 +1059,7 @@ public final class VulkanPerfAudit {
         String diagnosticIssue = dominantIssue(primarySubmitMs, descriptorBindMs, bindingBuildMs, frameStartWaitMs);
         Runtime runtime = Runtime.getRuntime();
         long heapUsedBytes = Math.max(0L, runtime.totalMemory() - runtime.freeMemory());
+        ProcessMemorySnapshot processMemory = processMemorySnapshot();
 
         StringBuilder builder = new StringBuilder(1024);
         builder.append("timestamp_utc=").append(Instant.now()).append('\n');
@@ -1164,6 +1180,22 @@ public final class VulkanPerfAudit {
         builder.append("java_heap_used_bytes=").append(heapUsedBytes).append('\n');
         builder.append("java_heap_committed_bytes=").append(runtime.totalMemory()).append('\n');
         builder.append("java_heap_max_bytes=").append(runtime.maxMemory()).append('\n');
+        builder.append("process_rss_kb=").append(processMemory.rssKb()).append('\n');
+        builder.append("process_rss_anon_kb=").append(processMemory.rssAnonKb()).append('\n');
+        builder.append("process_rss_file_kb=").append(processMemory.rssFileKb()).append('\n');
+        builder.append("process_rss_shmem_kb=").append(processMemory.rssShmemKb()).append('\n');
+        builder.append("perf_memory_sample_count=").append(memorySampleCount.sum()).append('\n');
+        builder.append("perf_memory_latest_heap_used_bytes=").append(memoryLatestHeapUsedBytes.get()).append('\n');
+        builder.append("perf_memory_latest_heap_committed_bytes=").append(memoryLatestHeapCommittedBytes.get()).append('\n');
+        builder.append("perf_memory_latest_heap_max_bytes=").append(memoryLatestHeapMaxBytes.get()).append('\n');
+        builder.append("perf_memory_latest_process_rss_kb=").append(memoryLatestProcessRssKb.get()).append('\n');
+        builder.append("perf_memory_latest_rss_anon_kb=").append(memoryLatestRssAnonKb.get()).append('\n');
+        builder.append("perf_memory_latest_rss_file_kb=").append(memoryLatestRssFileKb.get()).append('\n');
+        builder.append("perf_memory_latest_rss_shmem_kb=").append(memoryLatestRssShmemKb.get()).append('\n');
+        builder.append("perf_memory_peak_heap_committed_bytes=").append(memoryPeakHeapCommittedBytes.get()).append('\n');
+        builder.append("perf_memory_peak_process_rss_kb=").append(memoryPeakProcessRssKb.get()).append('\n');
+        builder.append("perf_memory_peak_rss_anon_kb=").append(memoryPeakRssAnonKb.get()).append('\n');
+        builder.append("perf_memory_peak_rss_shmem_kb=").append(memoryPeakRssShmemKb.get()).append('\n');
         appendSubmitSummary(builder, presentedFrames);
         appendLegacyGraphicsLoweringSummary(builder, presentedFrames);
         appendPhaseSummary(builder);
@@ -1447,6 +1479,68 @@ public final class VulkanPerfAudit {
             } else {
                 measuredFrameOverflowCount++;
             }
+        }
+    }
+
+    private static void recordMemorySample() {
+        if (!MEMORY_SAMPLES_ENABLED) {
+            return;
+        }
+        Runtime runtime = Runtime.getRuntime();
+        long heapUsedBytes = Math.max(0L, runtime.totalMemory() - runtime.freeMemory());
+        long heapCommittedBytes = Math.max(0L, runtime.totalMemory());
+        long heapMaxBytes = Math.max(0L, runtime.maxMemory());
+        ProcessMemorySnapshot process = processMemorySnapshot();
+        memorySampleCount.increment();
+        memoryLatestHeapUsedBytes.set(heapUsedBytes);
+        memoryLatestHeapCommittedBytes.set(heapCommittedBytes);
+        memoryLatestHeapMaxBytes.set(heapMaxBytes);
+        memoryLatestProcessRssKb.set(process.rssKb());
+        memoryLatestRssAnonKb.set(process.rssAnonKb());
+        memoryLatestRssFileKb.set(process.rssFileKb());
+        memoryLatestRssShmemKb.set(process.rssShmemKb());
+        updateMax(memoryPeakHeapCommittedBytes, heapCommittedBytes);
+        updateMax(memoryPeakProcessRssKb, process.rssKb());
+        updateMax(memoryPeakRssAnonKb, process.rssAnonKb());
+        updateMax(memoryPeakRssShmemKb, process.rssShmemKb());
+    }
+
+    private static ProcessMemorySnapshot processMemorySnapshot() {
+        Path status = Path.of("/proc/self/status");
+        if (!Files.isRegularFile(status)) {
+            return ProcessMemorySnapshot.UNAVAILABLE;
+        }
+        long rssKb = -1L;
+        long rssAnonKb = -1L;
+        long rssFileKb = -1L;
+        long rssShmemKb = -1L;
+        try {
+            for (String line : Files.readAllLines(status, StandardCharsets.UTF_8)) {
+                if (line.startsWith("VmRSS:")) {
+                    rssKb = parseStatusKilobytes(line);
+                } else if (line.startsWith("RssAnon:")) {
+                    rssAnonKb = parseStatusKilobytes(line);
+                } else if (line.startsWith("RssFile:")) {
+                    rssFileKb = parseStatusKilobytes(line);
+                } else if (line.startsWith("RssShmem:")) {
+                    rssShmemKb = parseStatusKilobytes(line);
+                }
+            }
+        } catch (IOException ignored) {
+            return ProcessMemorySnapshot.UNAVAILABLE;
+        }
+        return new ProcessMemorySnapshot(rssKb, rssAnonKb, rssFileKb, rssShmemKb);
+    }
+
+    private static long parseStatusKilobytes(String line) {
+        String[] pieces = line.trim().split("\\s+");
+        if (pieces.length < 2) {
+            return -1L;
+        }
+        try {
+            return Math.max(-1L, Long.parseLong(pieces[1]));
+        } catch (NumberFormatException ignored) {
+            return -1L;
         }
     }
 
@@ -2089,5 +2183,9 @@ public final class VulkanPerfAudit {
     }
 
     private record FrameStats(int count, long medianNanos, long p95Nanos, long p99Nanos, long worstNanos) {
+    }
+
+    private record ProcessMemorySnapshot(long rssKb, long rssAnonKb, long rssFileKb, long rssShmemKb) {
+        private static final ProcessMemorySnapshot UNAVAILABLE = new ProcessMemorySnapshot(-1L, -1L, -1L, -1L);
     }
 }

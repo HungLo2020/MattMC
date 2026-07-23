@@ -1,6 +1,7 @@
 package net.vulkanic.backends.opengl;
 
 import net.blaze3d.opengl.GlDevice;
+import net.blaze3d.opengl.GlRenderPipeline;
 import net.blaze3d.pipeline.CompiledRenderPipeline;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.shaders.ShaderType;
@@ -14,6 +15,7 @@ import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackend;
 import net.vulkanic.GraphicsBackendType;
 import net.vulkanic.GraphicsCapabilities;
+import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicBlendEquation;
 import net.vulkanic.VulkanicBlendFactor;
@@ -428,6 +430,24 @@ public class OpenGLBackend implements GraphicsBackend {
         if (device != null) {
             device.clearPipelineCache();
         }
+    }
+
+    @Override
+    public @Nullable PipelineDescriptor resolvePrecompiledPipelineDescriptor(RenderPipeline renderPipeline) {
+        if (renderPipeline == null || this.glDevice == null) {
+            return null;
+        }
+        GlRenderPipeline pipeline = this.glDevice.precompilePipeline(renderPipeline, null);
+        return pipeline.isValid() ? pipeline.descriptor() : null;
+    }
+
+    @Override
+    public int resolvePrecompiledPipelineProgramId(RenderPipeline renderPipeline) {
+        if (renderPipeline == null || this.glDevice == null) {
+            return 0;
+        }
+        GlRenderPipeline pipeline = this.glDevice.precompilePipeline(renderPipeline, null);
+        return pipeline.isValid() ? pipeline.program().getProgramId() : 0;
     }
     
     /**
@@ -2692,6 +2712,17 @@ public class OpenGLBackend implements GraphicsBackend {
         GL20.glUniform1i(location, value);
         traceStandaloneUniformInts(location, "int", new int[] {value});
     }
+
+    private void setProgramUniform1i(CommandContext ctx, int program, int location, int value) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        if (location < 0) {
+            return;
+        }
+        org.lwjgl.opengl.GL41C.glProgramUniform1i(program, location, value);
+        traceStandaloneUniformInts(program, location, "int", new int[] {value});
+    }
     
     @Override
     public void setUniform1f(CommandContext ctx, int location, float value) {
@@ -3201,6 +3232,13 @@ public class OpenGLBackend implements GraphicsBackend {
             return;
         }
         int program = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
+        traceStandaloneUniformInts(program, location, valueKind, values);
+    }
+
+    private void traceStandaloneUniformInts(int program, int location, String valueKind, int[] values) {
+        if (program <= 0 || location < 0 || values == null || values.length == 0 || !VulkanicAPI.isShaderInputParityTracingEnabled()) {
+            return;
+        }
         VulkanicAPI.traceShaderInputParityStandaloneUniformInts(
             "opengl-setUniform",
             program,
@@ -5020,7 +5058,7 @@ public class OpenGLBackend implements GraphicsBackend {
 
                         int location = getUniformLocation(ctx, program, resource.name());
                         if (location >= 0) {
-                            setUniform1i(ctx, location, samplerBinding.textureUnit());
+                            setProgramUniform1i(ctx, program, location, samplerBinding.textureUnit());
                         }
 
                         net.vulkanic.VulkanicTextureView textureView = samplerBinding.textureView();
@@ -5101,7 +5139,7 @@ public class OpenGLBackend implements GraphicsBackend {
 
                         int location = getUniformLocation(ctx, program, resource.name());
                         if (location >= 0) {
-                            setUniform1i(ctx, location, imageBinding.imageUnit());
+                            setProgramUniform1i(ctx, program, location, imageBinding.imageUnit());
                         }
                         bindImageTexture(
                             ctx,
@@ -5122,7 +5160,7 @@ public class OpenGLBackend implements GraphicsBackend {
 
                         int location = getUniformLocation(ctx, program, resource.name());
                         if (location >= 0) {
-                            setUniform1i(ctx, location, texelBufferBinding.textureUnit());
+                            setProgramUniform1i(ctx, program, location, texelBufferBinding.textureUnit());
                         }
                     }
                 }

@@ -2881,6 +2881,28 @@ public class VulkanicAPI {
         }
     }
 
+    public static VulkanicGalExecutionRequest.ExecutionResult submitExplicitGalV2GraphicsDraw(
+        CommandContext ctx,
+        VulkanicGalV2.ExplicitGraphicsDrawRequest request
+    ) {
+        Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(request, "request");
+        GraphicsBackend backend = getBackend();
+        try {
+            compatibilityState.validateResourceGenerations(VulkanicGalV2.requireResourceSet(request.resourceSet()));
+        } catch (RuntimeException exception) {
+            return VulkanicGalExecutionRequest.staleResource(request.semanticIdentity(), exception.getMessage());
+        }
+        long backendStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
+        try {
+            return backend.executeGraphicsDrawV2(ctx, request);
+        } finally {
+            if (backendStartNanos != 0L) {
+                VulkanPerfAudit.recordPhase("gal.graphics.backend", System.nanoTime() - backendStartNanos);
+            }
+        }
+    }
+
     private static void executeGalComputeDispatch(
         CommandContext ctx,
         VulkanicGalExecutionRequest.ComputeDispatchRequest request
@@ -4992,6 +5014,18 @@ public class VulkanicAPI {
         return directVulkanBackend != null
             ? directVulkanBackend.resolveBufferHandle(ctx, buffer)
             : getBackend().resolveBufferHandle(ctx, buffer);
+    }
+
+    public static long textureGeneration(int texture) {
+        return compatibilityState.textureGeneration(texture);
+    }
+
+    public static long bufferGeneration(int buffer) {
+        return compatibilityState.bufferGeneration(buffer);
+    }
+
+    public static VulkanicGalV2.UniformPayload captureExplicitGalV2UniformPayload(int programId, String semanticKey) {
+        return compatibilityState.captureExplicitGalV2UniformPayload(programId, semanticKey);
     }
 
     /**
@@ -7820,6 +7854,15 @@ public class VulkanicAPI {
         getBackend().clearPrecompiledPipelineCache();
     }
 
+    @Nullable
+    public static PipelineDescriptor resolvePrecompiledPipelineDescriptor(RenderPipeline pipeline) {
+        return getBackend().resolvePrecompiledPipelineDescriptor(pipeline);
+    }
+
+    public static int resolvePrecompiledPipelineProgramId(RenderPipeline pipeline) {
+        return getBackend().resolvePrecompiledPipelineProgramId(pipeline);
+    }
+
     /**
      * Creates (or retrieves a cached) compiled render pipeline.
      *
@@ -8080,6 +8123,65 @@ public class VulkanicAPI {
     private static int legacyBufferHandleForCompatibilitySnapshot(VulkanicBuffer buffer) {
         if (buffer instanceof net.vulkanic.backends.opengl.OpenGLBuffer openGLBuffer) {
             return openGLBuffer.getGlHandle();
+        }
+        return 0;
+    }
+
+    public static int legacyBufferHandleForExplicitGalV2(GpuBuffer buffer) {
+        if (buffer == null || buffer.isClosed()) {
+            return 0;
+        }
+        try {
+            java.lang.reflect.Method accessor = buffer.getClass().getMethod("getHandle");
+            if (accessor.getReturnType() == int.class) {
+                Object result = accessor.invoke(buffer);
+                if (result instanceof Integer handle && handle > 0) {
+                    return handle;
+                }
+            }
+        } catch (ReflectiveOperationException | SecurityException ignored) {
+        }
+        try {
+            return legacyBufferHandleForCompatibilitySnapshot(resolveVulkanicBuffer(buffer));
+        } catch (RuntimeException ignored) {
+            return 0;
+        }
+    }
+
+    public static int legacyTextureHandleForExplicitGalV2(@Nullable GpuTextureView view) {
+        return view == null || view.isClosed() ? 0 : legacyTextureHandleForExplicitGalV2(view.texture());
+    }
+
+    public static int legacyTextureHandleForExplicitGalV2(@Nullable GpuTexture texture) {
+        if (texture == null || texture.isClosed()) {
+            return 0;
+        }
+        try {
+            java.lang.reflect.Method accessor = texture.getClass().getMethod("getGlHandle");
+            if (accessor.getReturnType() == int.class) {
+                Object result = accessor.invoke(texture);
+                if (result instanceof Integer handle && handle > 0) {
+                    return handle;
+                }
+            }
+        } catch (ReflectiveOperationException | SecurityException ignored) {
+        }
+
+        Class<?> currentType = texture.getClass();
+        while (currentType != null) {
+            try {
+                java.lang.reflect.Field idField = currentType.getDeclaredField("id");
+                if (idField.getType() != int.class) {
+                    return 0;
+                }
+                idField.setAccessible(true);
+                int handle = idField.getInt(texture);
+                return handle > 0 ? handle : 0;
+            } catch (NoSuchFieldException ignored) {
+                currentType = currentType.getSuperclass();
+            } catch (IllegalAccessException | SecurityException ignored) {
+                return 0;
+            }
         }
         return 0;
     }

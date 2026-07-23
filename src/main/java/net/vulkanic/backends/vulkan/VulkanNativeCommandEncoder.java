@@ -42,6 +42,7 @@ import net.vulkanic.VulkanicDrawStateSnapshot;
 import net.vulkanic.VulkanicIndexType;
 import net.vulkanic.VulkanicPipelineResourceResolver;
 import net.vulkanic.VulkanicGalExecutionRequest;
+import net.vulkanic.VulkanicGalV2;
 import net.vulkanic.VulkanicRenderPass;
 import net.vulkanic.VulkanicRenderPassDescriptor;
 import net.vulkanic.VulkanicRenderTargetDescriptor;
@@ -1273,6 +1274,22 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             );
             this.pass.drawIndexed(firstIndex, indexCount, baseVertex, instanceCount);
             }
+        }
+
+        @Override
+        public boolean supportsExplicitGalV2GraphicsDraw() {
+            return true;
+        }
+
+        @Override
+        public int explicitGalV2FramebufferId() {
+            return this.framebuffer;
+        }
+
+        @Override
+        public VulkanicGalExecutionRequest.ExecutionResult executeExplicitGalV2GraphicsDraw(VulkanicGalV2.ExplicitGraphicsDrawRequest request) {
+            this.checkOpen();
+            return VulkanicAPI.submitExplicitGalV2GraphicsDraw(this.ctx, request);
         }
 
         @Override

@@ -93,6 +93,8 @@ public final class VulkanicGalV2 {
     private static final Map<Handle, UniformBinding> UNIFORM_BINDINGS_BY_HANDLE = new ConcurrentHashMap<>();
     private static final Map<PersistentDrawTemplateKey, PersistentDrawTemplate> DRAW_TEMPLATES_BY_KEY =
         new ConcurrentHashMap<>();
+    private static final Map<RetainedHandleKey, AtomicInteger> RETAINED_HANDLES =
+        new ConcurrentHashMap<>();
 
     public static String contractSchema() {
         return CONTRACT_SCHEMA;
@@ -125,6 +127,42 @@ public final class VulkanicGalV2 {
                 throw new IllegalArgumentException("handle generation must be >= 0");
             }
             semanticKey = requireNonBlank(semanticKey, "semanticKey");
+        }
+    }
+
+    private record RetainedHandleKey(Handle handle, String owner) {
+        private RetainedHandleKey {
+            handle = Objects.requireNonNull(handle, "handle");
+            owner = requireNonBlank(owner, "owner");
+        }
+    }
+
+    public static final class RetainedHandle implements AutoCloseable {
+        private final RetainedHandleKey key;
+        private boolean closed;
+
+        private RetainedHandle(Handle handle, String owner) {
+            this.key = new RetainedHandleKey(handle, owner);
+        }
+
+        private RetainedHandleKey key() {
+            return key;
+        }
+
+        public Handle handle() {
+            return key.handle();
+        }
+
+        public String owner() {
+            return key.owner();
+        }
+
+        @Override
+        public void close() {
+            if (!closed) {
+                closed = true;
+                release(key.handle(), key.owner());
+            }
         }
     }
 
@@ -170,14 +208,112 @@ public final class VulkanicGalV2 {
         }
     }
 
+    public record ExplicitGraphicsDescriptor(
+        int programId,
+        long shaderGeneration,
+        String programKey,
+        @Nullable PipelineDescriptor pipelineDescriptor,
+        VulkanicCompatibilityState.FixedFunctionSnapshot fixedFunction,
+        String fixedFunctionKey,
+        String topologyShapeKey,
+        String pipelineKey,
+        int framebuffer,
+        VulkanicCompatibilityState.FramebufferSnapshot framebufferState,
+        String renderTargetKey,
+        VertexLayout vertexLayout,
+        String vertexLayoutKey,
+        List<ResourceLayoutBinding> resourceLayoutBindings,
+        String resourceLayoutKey,
+        List<ResourceBinding> resourceBindings,
+        String resourceSetKey,
+        String semanticKey
+    ) {
+        public ExplicitGraphicsDescriptor(
+            int programId,
+            long shaderGeneration,
+            String programKey,
+            VulkanicCompatibilityState.FixedFunctionSnapshot fixedFunction,
+            String fixedFunctionKey,
+            String topologyShapeKey,
+            String pipelineKey,
+            int framebuffer,
+            VulkanicCompatibilityState.FramebufferSnapshot framebufferState,
+            String renderTargetKey,
+            VertexLayout vertexLayout,
+            String vertexLayoutKey,
+            List<ResourceLayoutBinding> resourceLayoutBindings,
+            String resourceLayoutKey,
+            List<ResourceBinding> resourceBindings,
+            String resourceSetKey,
+            String semanticKey
+        ) {
+            this(
+                programId,
+                shaderGeneration,
+                programKey,
+                null,
+                fixedFunction,
+                fixedFunctionKey,
+                topologyShapeKey,
+                pipelineKey,
+                framebuffer,
+                framebufferState,
+                renderTargetKey,
+                vertexLayout,
+                vertexLayoutKey,
+                resourceLayoutBindings,
+                resourceLayoutKey,
+                resourceBindings,
+                resourceSetKey,
+                semanticKey
+            );
+        }
+
+        public ExplicitGraphicsDescriptor {
+            if (programId <= 0) {
+                if (pipelineDescriptor == null) {
+                    throw new IllegalArgumentException("programId must be positive when no pipeline descriptor is supplied");
+                }
+            }
+            if (shaderGeneration < 0L) {
+                throw new IllegalArgumentException("shaderGeneration must be >= 0");
+            }
+            programKey = requireNonBlank(programKey, "programKey");
+            fixedFunction = Objects.requireNonNull(fixedFunction, "fixedFunction");
+            fixedFunctionKey = requireNonBlank(fixedFunctionKey, "fixedFunctionKey");
+            topologyShapeKey = requireNonBlank(topologyShapeKey, "topologyShapeKey");
+            pipelineKey = requireNonBlank(pipelineKey, "pipelineKey");
+            if (framebuffer < 0) {
+                throw new IllegalArgumentException("framebuffer must be >= 0");
+            }
+            framebufferState = Objects.requireNonNull(framebufferState, "framebufferState");
+            renderTargetKey = requireNonBlank(renderTargetKey, "renderTargetKey");
+            vertexLayout = Objects.requireNonNull(vertexLayout, "vertexLayout");
+            vertexLayoutKey = requireNonBlank(vertexLayoutKey, "vertexLayoutKey");
+            resourceLayoutBindings = List.copyOf(Objects.requireNonNull(resourceLayoutBindings, "resourceLayoutBindings"));
+            resourceLayoutKey = requireNonBlank(resourceLayoutKey, "resourceLayoutKey");
+            resourceBindings = List.copyOf(Objects.requireNonNull(resourceBindings, "resourceBindings"));
+            resourceSetKey = requireNonBlank(resourceSetKey, "resourceSetKey");
+            semanticKey = requireNonBlank(semanticKey, "semanticKey");
+        }
+    }
+
     public record ProgramState(
         int programId,
         long shaderGeneration,
+        @Nullable PipelineDescriptor pipelineDescriptor,
         String semanticKey
     ) {
+        public ProgramState(int programId, long shaderGeneration, String semanticKey) {
+            this(programId, shaderGeneration, null, semanticKey);
+        }
+
         public ProgramState {
             if (programId < 0) {
                 throw new IllegalArgumentException("programId must be >= 0");
+            }
+            if (programId == 0 && pipelineDescriptor == null) {
+                throw new IllegalArgumentException("descriptor-backed program state requires a pipeline descriptor");
             }
             if (shaderGeneration < 0L) {
                 throw new IllegalArgumentException("shaderGeneration must be >= 0");
@@ -355,6 +491,10 @@ public final class VulkanicGalV2 {
             return Optional.ofNullable(uniformBindingOrNull(bindingName));
         }
 
+        public Optional<ResourceBinding> resourceBinding(String bindingName) {
+            return Optional.ofNullable(resourceBindingOrNull(bindingName));
+        }
+
         @Nullable
         public ResourceBinding sampledTextureBindingOrNull(int textureUnit) {
             for (ResourceBinding binding : bindings) {
@@ -403,6 +543,26 @@ public final class VulkanicGalV2 {
                 if (canonicalReference.bindingKind() == VulkanicPassResourceModel.BindingKind.BUFFER_RANGE
                     && bindingUnit.isPresent()
                     && bindingUnit.getAsInt() == bindingIndex) {
+                    return binding;
+                }
+            }
+            return null;
+        }
+
+        @Nullable
+        public ResourceBinding bufferRangeBindingOrNull(String bindingName) {
+            ResourceBinding binding = resourceBindingOrNull(bindingName);
+            if (binding == null || binding.resourceReference().isEmpty()) {
+                return null;
+            }
+            VulkanicPassResourceModel.CanonicalResourceReference reference = binding.resourceReference().orElseThrow();
+            return reference.bindingKind() == VulkanicPassResourceModel.BindingKind.BUFFER_RANGE ? binding : null;
+        }
+
+        @Nullable
+        public ResourceBinding resourceBindingOrNull(String bindingName) {
+            for (ResourceBinding binding : bindings) {
+                if (binding.name().equals(bindingName)) {
                     return binding;
                 }
             }
@@ -479,8 +639,8 @@ public final class VulkanicGalV2 {
         public UniformBinding {
             handle = Objects.requireNonNull(handle, "handle");
             layout = Objects.requireNonNull(layout, "layout");
-            if (programId <= 0) {
-                throw new IllegalArgumentException("programId must be positive");
+            if (programId < 0) {
+                throw new IllegalArgumentException("programId must be >= 0");
             }
             bindingName = requireNonBlank(bindingName, "bindingName");
             semanticKey = requireNonBlank(semanticKey, "semanticKey");
@@ -496,13 +656,16 @@ public final class VulkanicGalV2 {
     ) {
         public UniformPayload {
             binding = Objects.requireNonNull(binding, "binding");
-            if (programId <= 0) {
-                throw new IllegalArgumentException("programId must be positive");
+            if (programId < 0) {
+                throw new IllegalArgumentException("programId must be >= 0");
             }
             if (payloadVersion < 0L) {
                 throw new IllegalArgumentException("payloadVersion must be >= 0");
             }
             uniformsByLocation = java.util.Map.copyOf(Objects.requireNonNull(uniformsByLocation, "uniformsByLocation"));
+            if (programId == 0 && !uniformsByLocation.isEmpty()) {
+                throw new IllegalArgumentException("descriptor-backed no-op uniform payloads must not carry standalone values");
+            }
             semanticKey = requireNonBlank(semanticKey, "semanticKey");
         }
     }
@@ -1033,6 +1196,186 @@ public final class VulkanicGalV2 {
         clearGlobalRegistries();
     }
 
+    public static RetainedHandle retain(Handle handle, String owner) {
+        RetainedHandle retained = new RetainedHandle(handle, owner);
+        RETAINED_HANDLES.computeIfAbsent(retained.key(), ignored -> new AtomicInteger()).incrementAndGet();
+        return retained;
+    }
+
+    public static void release(Handle handle, String owner) {
+        RetainedHandleKey key = new RetainedHandleKey(
+            Objects.requireNonNull(handle, "handle"),
+            requireNonBlank(owner, "owner")
+        );
+        AtomicInteger count = RETAINED_HANDLES.get(key);
+        if (count == null) {
+            return;
+        }
+        int remaining = count.decrementAndGet();
+        if (remaining <= 0) {
+            RETAINED_HANDLES.remove(key, count);
+        }
+    }
+
+    public static void invalidate(Handle handle, String reason) {
+        Objects.requireNonNull(handle, "handle");
+        requireNonBlank(reason, "reason");
+        removeHandle(handle);
+        RETAINED_HANDLES.keySet().removeIf(key -> key.handle().equals(handle));
+    }
+
+    public static void invalidateAllForDeviceLossOrShutdown() {
+        clearGlobalRegistries();
+    }
+
+    public static int retainedHandleCountForTests() {
+        return RETAINED_HANDLES.size();
+    }
+
+    static void pruneGlobalRegistriesForTests(int maxEntries) {
+        pruneGlobalRegistries(maxEntries);
+    }
+
+    public static ExplicitGraphicsObjects registerExplicitGraphicsObjects(ExplicitGraphicsDescriptor descriptor) {
+        Objects.requireNonNull(descriptor, "descriptor");
+        pruneGlobalRegistriesIfNeeded();
+        ResourceLayout resourceLayout = resourceLayoutFor(descriptor.resourceLayoutKey(), descriptor.resourceLayoutBindings());
+        ResourceSet resourceSet = resourceSetFor(resourceLayout.handle(), descriptor.resourceSetKey(), descriptor.resourceBindings());
+        ExplicitGraphicsObjectKey key = new ExplicitGraphicsObjectKey(
+            descriptor.programKey(),
+            descriptor.pipelineKey(),
+            descriptor.vertexLayoutKey(),
+            descriptor.resourceLayoutKey(),
+            descriptor.resourceSetKey(),
+            descriptor.renderTargetKey(),
+            descriptor.semanticKey(),
+            Integer.toUnsignedLong(descriptor.semanticKey().hashCode())
+        );
+        return GRAPHICS_OBJECTS_BY_KEY.computeIfAbsent(key, createdKey -> {
+            Handle handle = new Handle(
+                ObjectKind.GRAPHICS_OBJECT_SET,
+                NEXT_HANDLE_ID.getAndIncrement(),
+                createdKey.generation(),
+                createdKey.semanticKey()
+            );
+            ExplicitGraphicsObjects objects = new ExplicitGraphicsObjects(
+                handle,
+                handleFor(ObjectKind.PROGRAM, createdKey.programKey()),
+                handleFor(ObjectKind.PIPELINE, createdKey.pipelineKey()),
+                handleFor(ObjectKind.VERTEX_LAYOUT, createdKey.vertexInputKey()),
+                resourceLayout.handle(),
+                resourceSet.handle(),
+                handleFor(ObjectKind.RENDER_TARGET, createdKey.renderTargetKey()),
+                createdKey.programKey(),
+                createdKey.pipelineKey(),
+                createdKey.vertexInputKey(),
+                createdKey.resourceLayoutKey(),
+                createdKey.resourceSetKey(),
+                createdKey.renderTargetKey(),
+                new ProgramState(
+                    descriptor.programId(),
+                    descriptor.shaderGeneration(),
+                    descriptor.pipelineDescriptor(),
+                    createdKey.programKey()
+                ),
+                new PipelineState(
+                    handleFor(ObjectKind.PROGRAM, createdKey.programKey()),
+                    descriptor.fixedFunction(),
+                    descriptor.fixedFunctionKey(),
+                    descriptor.topologyShapeKey(),
+                    createdKey.pipelineKey()
+                ),
+                new RenderTargetState(descriptor.framebuffer(), descriptor.framebufferState(), createdKey.renderTargetKey()),
+                descriptor.vertexLayout(),
+                createdKey.semanticKey()
+            );
+            GRAPHICS_OBJECTS_BY_HANDLE.put(handle, objects);
+            return objects;
+        });
+    }
+
+    public static UniformPayload uniformPayloadForExplicitProgram(
+        int programId,
+        long payloadVersion,
+        Map<Integer, VulkanicCompatibilityState.UniformValue> uniformsByLocation,
+        String semanticKey
+    ) {
+        if (programId <= 0) {
+            throw new IllegalArgumentException("programId must be positive");
+        }
+        if (payloadVersion < 0L) {
+            throw new IllegalArgumentException("payloadVersion must be >= 0");
+        }
+        Map<Integer, VulkanicCompatibilityState.UniformValue> uniforms = Map.copyOf(
+            Objects.requireNonNull(uniformsByLocation, "uniformsByLocation")
+        );
+        String bindingName = VulkanicAPI.generatedStandaloneUniformBlockName();
+        String layoutKey = "explicit-uniform-layout:program="
+            + programId
+            + ":shape="
+            + sha256Hex(explicitUniformShapeKey(programId, uniforms));
+        UniformLayout layout = UNIFORM_LAYOUTS_BY_KEY.computeIfAbsent(layoutKey, key -> {
+            Handle handle = handleFor(ObjectKind.UNIFORM_LAYOUT, key);
+            UniformLayout created = new UniformLayout(
+                handle,
+                bindingName,
+                OptionalInt.empty(),
+                OptionalInt.empty(),
+                explicitUniformMembers(uniforms),
+                key
+            );
+            UNIFORM_LAYOUTS_BY_HANDLE.put(handle, created);
+            return created;
+        });
+        String bindingKey = "explicit-uniform-binding:program="
+            + programId
+            + ":name="
+            + bindingName
+            + ":layout="
+            + layout.handle().semanticKey();
+        UniformBinding binding = UNIFORM_BINDINGS_BY_KEY.computeIfAbsent(bindingKey, key -> {
+            Handle handle = handleFor(ObjectKind.UNIFORM_BINDING, key);
+            UniformBinding created = new UniformBinding(handle, layout.handle(), programId, bindingName, key);
+            UNIFORM_BINDINGS_BY_HANDLE.put(handle, created);
+            return created;
+        });
+        String payloadKey = "explicit-uniform-payload:"
+            + requireNonBlank(semanticKey, "semanticKey")
+            + ":program="
+            + programId
+            + ":binding="
+            + binding.handle().semanticKey()
+            + ":version="
+            + payloadVersion;
+        return new UniformPayload(binding.handle(), programId, payloadVersion, uniforms, payloadKey);
+    }
+
+    public static UniformPayload emptyUniformPayload(String semanticKey) {
+        String safeKey = requireNonBlank(semanticKey, "semanticKey");
+        String layoutKey = "explicit-uniform-layout:empty";
+        UniformLayout layout = UNIFORM_LAYOUTS_BY_KEY.computeIfAbsent(layoutKey, key -> {
+            Handle handle = handleFor(ObjectKind.UNIFORM_LAYOUT, key);
+            UniformLayout created = new UniformLayout(
+                handle,
+                "empty",
+                OptionalInt.empty(),
+                OptionalInt.empty(),
+                List.of(),
+                key
+            );
+            UNIFORM_LAYOUTS_BY_HANDLE.put(handle, created);
+            return created;
+        });
+        String bindingKey = "explicit-uniform-binding:empty";
+        UniformBinding binding = UNIFORM_BINDINGS_BY_KEY.computeIfAbsent(bindingKey, key -> {
+            Handle handle = handleFor(ObjectKind.UNIFORM_BINDING, key);
+            UniformBinding created = new UniformBinding(handle, layout.handle(), 0, "empty", key);
+            UNIFORM_BINDINGS_BY_HANDLE.put(handle, created);
+            return created;
+        });
+        return new UniformPayload(binding.handle(), 0, 0L, Map.of(), "explicit-uniform-payload:" + safeKey + ":empty");
+    }
+
     static void beginPassCommandBufferRetention() {
         ACTIVE_PASS_COMMAND_BUFFER_REFERENCES.incrementAndGet();
     }
@@ -1062,22 +1405,31 @@ public final class VulkanicGalV2 {
         UNIFORM_BINDINGS_BY_HANDLE.clear();
         DRAW_TEMPLATES_BY_KEY.clear();
         HANDLES_BY_SEMANTIC_KEY.clear();
+        RETAINED_HANDLES.clear();
         ACTIVE_PASS_COMMAND_BUFFER_REFERENCES.set(0);
         NEXT_HANDLE_ID.set(1);
     }
 
     private static void pruneGlobalRegistriesIfNeeded() {
+        pruneGlobalRegistries(MAX_GLOBAL_REGISTRY_ENTRIES);
+    }
+
+    private static void pruneGlobalRegistries(int maxEntries) {
         int totalEntries = registryEntryCount();
         recordRegistrySnapshot(totalEntries);
-        if (totalEntries <= MAX_GLOBAL_REGISTRY_ENTRIES) {
+        if (totalEntries <= maxEntries) {
             return;
         }
         if (ACTIVE_PASS_COMMAND_BUFFER_REFERENCES.get() > 0) {
             return;
         }
-        clearGlobalRegistries();
+        if (RETAINED_HANDLES.isEmpty()) {
+            clearGlobalRegistries();
+        } else {
+            pruneUnretainedGlobalRegistries();
+        }
         VulkanPerfAudit.recordGalV2RegistryPrune(totalEntries);
-        recordRegistrySnapshot(0);
+        recordRegistrySnapshot(registryEntryCount());
     }
 
     private static int registryEntryCount() {
@@ -1093,7 +1445,8 @@ public final class VulkanicGalV2 {
             + UNIFORM_LAYOUTS_BY_HANDLE.size()
             + UNIFORM_BINDINGS_BY_KEY.size()
             + UNIFORM_BINDINGS_BY_HANDLE.size()
-            + DRAW_TEMPLATES_BY_KEY.size();
+            + DRAW_TEMPLATES_BY_KEY.size()
+            + RETAINED_HANDLES.size();
     }
 
     private static void recordRegistrySnapshot(int totalEntries) {
@@ -1107,6 +1460,81 @@ public final class VulkanicGalV2 {
             UNIFORM_BINDINGS_BY_KEY.size() + UNIFORM_BINDINGS_BY_HANDLE.size(),
             DRAW_TEMPLATES_BY_KEY.size()
         );
+    }
+
+    private static void pruneUnretainedGlobalRegistries() {
+        java.util.Set<Handle> live = retainedHandleClosure();
+        GRAPHICS_OBJECTS_BY_KEY.entrySet().removeIf(entry -> !live.contains(entry.getValue().handle()));
+        GRAPHICS_OBJECTS_BY_HANDLE.entrySet().removeIf(entry -> !live.contains(entry.getKey()));
+        RESOURCE_LAYOUTS_BY_KEY.entrySet().removeIf(entry -> !live.contains(entry.getValue().handle()));
+        RESOURCE_LAYOUTS_BY_HANDLE.entrySet().removeIf(entry -> !live.contains(entry.getKey()));
+        RESOURCE_SETS_BY_KEY.entrySet().removeIf(entry -> !live.contains(entry.getValue().handle()));
+        RESOURCE_SETS_BY_HANDLE.entrySet().removeIf(entry -> !live.contains(entry.getKey()));
+        RESOURCE_SETS_BY_MUTATION_STATE_KEY.entrySet().removeIf(entry -> !live.contains(entry.getValue().handle()));
+        UNIFORM_LAYOUTS_BY_KEY.entrySet().removeIf(entry -> !live.contains(entry.getValue().handle()));
+        UNIFORM_LAYOUTS_BY_HANDLE.entrySet().removeIf(entry -> !live.contains(entry.getKey()));
+        UNIFORM_BINDINGS_BY_KEY.entrySet().removeIf(entry -> !live.contains(entry.getValue().handle()));
+        UNIFORM_BINDINGS_BY_HANDLE.entrySet().removeIf(entry -> !live.contains(entry.getKey()));
+        DRAW_TEMPLATES_BY_KEY.entrySet().removeIf(entry -> !live.contains(entry.getValue().handle()));
+        HANDLES_BY_SEMANTIC_KEY.entrySet().removeIf(entry -> !live.contains(entry.getValue()));
+    }
+
+    private static java.util.Set<Handle> retainedHandleClosure() {
+        java.util.Set<Handle> live = ConcurrentHashMap.newKeySet();
+        for (RetainedHandleKey key : RETAINED_HANDLES.keySet()) {
+            addHandleClosure(live, key.handle());
+        }
+        return live;
+    }
+
+    private static void addHandleClosure(java.util.Set<Handle> live, Handle handle) {
+        if (!live.add(handle)) {
+            return;
+        }
+        ExplicitGraphicsObjects objects = GRAPHICS_OBJECTS_BY_HANDLE.get(handle);
+        if (objects != null) {
+            addHandleClosure(live, objects.program());
+            addHandleClosure(live, objects.pipeline());
+            addHandleClosure(live, objects.vertexLayoutHandle());
+            addHandleClosure(live, objects.resourceLayout());
+            addHandleClosure(live, objects.resourceSet());
+            addHandleClosure(live, objects.renderTarget());
+        }
+        ResourceSet resourceSet = RESOURCE_SETS_BY_HANDLE.get(handle);
+        if (resourceSet != null) {
+            addHandleClosure(live, resourceSet.layout());
+            for (ResourceBinding binding : resourceSet.bindings()) {
+                binding.uniformBinding().ifPresent(uniform -> addHandleClosure(live, uniform));
+            }
+        }
+        UniformBinding uniformBinding = UNIFORM_BINDINGS_BY_HANDLE.get(handle);
+        if (uniformBinding != null) {
+            addHandleClosure(live, uniformBinding.layout());
+        }
+        PersistentDrawTemplate template = DRAW_TEMPLATES_BY_KEY.values().stream()
+            .filter(candidate -> candidate.handle().equals(handle))
+            .findFirst()
+            .orElse(null);
+        if (template != null) {
+            addHandleClosure(live, template.graphicsObjects());
+            addHandleClosure(live, template.resourceSet());
+        }
+    }
+
+    private static void removeHandle(Handle handle) {
+        GRAPHICS_OBJECTS_BY_KEY.entrySet().removeIf(entry -> entry.getValue().handle().equals(handle));
+        GRAPHICS_OBJECTS_BY_HANDLE.remove(handle);
+        RESOURCE_LAYOUTS_BY_KEY.entrySet().removeIf(entry -> entry.getValue().handle().equals(handle));
+        RESOURCE_LAYOUTS_BY_HANDLE.remove(handle);
+        RESOURCE_SETS_BY_KEY.entrySet().removeIf(entry -> entry.getValue().handle().equals(handle));
+        RESOURCE_SETS_BY_HANDLE.remove(handle);
+        RESOURCE_SETS_BY_MUTATION_STATE_KEY.entrySet().removeIf(entry -> entry.getValue().handle().equals(handle));
+        UNIFORM_LAYOUTS_BY_KEY.entrySet().removeIf(entry -> entry.getValue().handle().equals(handle));
+        UNIFORM_LAYOUTS_BY_HANDLE.remove(handle);
+        UNIFORM_BINDINGS_BY_KEY.entrySet().removeIf(entry -> entry.getValue().handle().equals(handle));
+        UNIFORM_BINDINGS_BY_HANDLE.remove(handle);
+        DRAW_TEMPLATES_BY_KEY.entrySet().removeIf(entry -> entry.getValue().handle().equals(handle));
+        HANDLES_BY_SEMANTIC_KEY.entrySet().removeIf(entry -> entry.getValue().equals(handle));
     }
 
     private static PersistentDrawTemplate persistentDrawTemplateFor(
@@ -1522,6 +1950,36 @@ public final class VulkanicGalV2 {
                 Math.max(entry.getValue().ints().length, entry.getValue().floats().length)
             )));
         return List.copyOf(members);
+    }
+
+    private static List<UniformMember> explicitUniformMembers(Map<Integer, VulkanicCompatibilityState.UniformValue> uniforms) {
+        ArrayList<UniformMember> members = new ArrayList<>(uniforms.size());
+        int[] ordinal = {0};
+        uniforms.entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .forEach(entry -> members.add(new UniformMember(
+                "location-" + entry.getKey(),
+                ordinal[0]++,
+                entry.getValue().type(),
+                Math.max(entry.getValue().ints().length, entry.getValue().floats().length)
+            )));
+        return List.copyOf(members);
+    }
+
+    private static String explicitUniformShapeKey(
+        int programId,
+        Map<Integer, VulkanicCompatibilityState.UniformValue> uniforms
+    ) {
+        StringBuilder builder = new StringBuilder(128);
+        builder.append("program=").append(programId).append(';');
+        uniforms.entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .forEach(entry -> builder.append("uniform[")
+                .append(entry.getKey())
+                .append("]=")
+                .append(uniformShapeKey(entry.getValue()))
+                .append(';'));
+        return builder.toString();
     }
 
     private static String programUniformShapeKey(VulkanicCompatibilityState.ProgramStateView program) {

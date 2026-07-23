@@ -812,8 +812,7 @@ void main() {
         return new VulkanNativeTerrainCommandEncoder(this);
     }
 
-    @Nullable
-    PipelineDescriptor resolvePrecompiledPipelineDescriptor(RenderPipeline renderPipeline) {
+    public @Nullable PipelineDescriptor resolvePrecompiledPipelineDescriptor(RenderPipeline renderPipeline) {
         PrecompiledPipelineState state = pipelineLifecycle.getPrecompiled(
             renderPipeline,
             PrecompiledPipelineState.class
@@ -3946,9 +3945,9 @@ void main() {
                         }
                     }
                     case UNIFORM_BUFFER -> {
-                        VulkanStandaloneUniformBinding uniformBinding = template.generatedStandaloneUniformBlock()
+                        Object uniformBinding = template.generatedStandaloneUniformBlock()
                             ? resolveTemplateStandaloneUniformBinding(programSnapshot.programId(), binding.name(), resourceSet)
-                            : null;
+                            : resolveTemplateUniformBufferBinding(binding.name(), resourceSet);
                         if (uniformBinding != null) {
                             resourceBinding = uniformBinding;
                             boundResourceCount++;
@@ -4026,6 +4025,34 @@ void main() {
                         + uniformBinding);
             }
             return new VulkanStandaloneUniformBinding(programId, bindingName, handle);
+        }
+
+        @Nullable
+        private VulkanicBufferSlice resolveTemplateUniformBufferBinding(
+            String bindingName,
+            VulkanicGalV2.ResourceSet resourceSet
+        ) {
+            VulkanicGalV2.ResourceBinding requestBinding = resourceSet.bufferRangeBindingOrNull(bindingName);
+            if (requestBinding == null || requestBinding.resourceReference().isEmpty()) {
+                return null;
+            }
+            VulkanicPassResourceModel.CanonicalResourceReference reference =
+                requestBinding.resourceReference().orElseThrow();
+            if (reference.resource().kind() != VulkanicPassResourceModel.ResourceKind.UNIFORM_BUFFER
+                || reference.legacyId().isEmpty()) {
+                return null;
+            }
+            VulkanBuffer buffer = nativeSpine.resolveLegacyVulkanBuffer(reference.legacyId().getAsInt());
+            if (buffer == null) {
+                return null;
+            }
+            long offset = reference.subresource().baseMipLevel();
+            long size = reference.subresource().levelCount();
+            if (offset < 0L || size < 0L || offset > Integer.MAX_VALUE || size > Integer.MAX_VALUE) {
+                throw new IllegalArgumentException("Unsupported GAL v2 uniform buffer range for " + bindingName
+                    + ": offset=" + offset + " size=" + size);
+            }
+            return new VulkanicBufferSlice(buffer, (int) offset, (int) size);
         }
 
         @Nullable
@@ -4858,7 +4885,7 @@ void main() {
             );
         }
         int programId = drawPlan.programId();
-        if (programId <= 0 || drawPlan.descriptor() == null) {
+        if (drawPlan.descriptor() == null) {
             return null;
         }
         PipelineDescriptor descriptor = drawPlan.descriptor();
@@ -7985,7 +8012,7 @@ void main() {
         VulkanicGalV2.ResourceSet resourceSet =
             VulkanicGalV2.requireResourceSet(explicitRequest.resourceSet());
         VulkanCompactResourceBindingTable resourceBindingTable =
-            currentPlan.programId() <= 0 || currentPlan.descriptor() == null
+            currentPlan.descriptor() == null
                 ? null
                 : timedBuildExplicitV2ProgramResourceTable(
                     pipelineLocation,
@@ -8001,7 +8028,8 @@ void main() {
             currentPlan,
             drawResources,
             resourceBindingTable,
-            explicitRequest.resourcePlan().orderedUses()
+            explicitRequest.resourcePlan().orderedUses(),
+            spine.explicitV2DynamicStateRequirements(explicitRequest)
         );
     }
 
@@ -8143,7 +8171,7 @@ void main() {
         long programStartNanos = VulkanPerfAudit.shouldTraceLegacyGraphicsLowering() ? System.nanoTime() : 0L;
         VulkanDrawExecutionCoordinator.LegacyProgramSnapshot program =
             programState.programId() <= 0
-                ? null
+                ? descriptorBackedProgramSnapshot(programState)
                 : requestProgramExecutionSnapshot(ctx, programState.programId());
         recordLegacyGraphicsLoweringStep(pipelineLocation, "program_snapshot_resolve", programStartNanos);
 
@@ -8167,6 +8195,47 @@ void main() {
             plan.programId(),
             plan.descriptor(),
             program
+        );
+    }
+
+    @Nullable
+    private VulkanDrawExecutionCoordinator.LegacyProgramSnapshot descriptorBackedProgramSnapshot(
+        VulkanicGalV2.ProgramState programState
+    ) {
+        PipelineDescriptor descriptor = programState.pipelineDescriptor();
+        if (descriptor == null || descriptor.getSpirvModules().isEmpty()) {
+            return null;
+        }
+        PipelineDescriptor.ResourceLayout resourceLayout = descriptor.getResourceLayout();
+        java.util.ArrayList<VulkanDrawExecutionCoordinator.ReflectedVertexInputSnapshot> inputs =
+            new java.util.ArrayList<>();
+        PipelineDescriptor.VertexInputState vertexInput = descriptor.getVertexInputState();
+        if (vertexInput != null) {
+            for (PipelineDescriptor.VertexInputAttribute attribute : vertexInput.attributes()) {
+                inputs.add(new VulkanDrawExecutionCoordinator.ReflectedVertexInputSnapshot(
+                    attribute.location(),
+                    "float"
+                ));
+            }
+        }
+        java.util.ArrayList<String> activeUniforms = new java.util.ArrayList<>();
+        java.util.HashMap<Integer, Integer> opaqueResourceUnits = new java.util.HashMap<>();
+        int ordinal = 0;
+        for (PipelineDescriptor.ResourceBinding binding : resourceLayout.bindings()) {
+            activeUniforms.add(binding.name());
+            opaqueResourceUnits.put(ordinal, binding.binding());
+            ordinal++;
+        }
+        return new VulkanDrawExecutionCoordinator.LegacyProgramSnapshot(
+            0,
+            true,
+            programState.semanticKey(),
+            descriptor.getSpirvModules(),
+            inputs,
+            java.util.Map.of(),
+            resourceLayout,
+            activeUniforms,
+            opaqueResourceUnits
         );
     }
 
@@ -8294,7 +8363,8 @@ void main() {
             capturedDraw.plan(),
             capturedDraw.drawResources(),
             capturedDraw.resourceBindingTable(),
-            galRequest.resourcePlan().orderedUses()
+            galRequest.resourcePlan().orderedUses(),
+            List.of()
         );
     }
 
@@ -16064,12 +16134,14 @@ void main() {
             VulkanDrawExecutionCoordinator.DrawExecutionPlan plan,
             VulkanDrawExecutionCoordinator.DrawResourceSnapshot drawResources,
             @Nullable VulkanCompactResourceBindingTable resourceBindingTable,
-            List<VulkanicPassResourceModel.ResourceUse> capturedUses
+            List<VulkanicPassResourceModel.ResourceUse> capturedUses,
+            List<VulkanGraphicsCommandExecutionCoordinator.DynamicStateRequirement> dynamicStates
         ) {
             Objects.requireNonNull(request, "request");
             Objects.requireNonNull(plan, "plan");
             Objects.requireNonNull(drawResources, "drawResources");
             Objects.requireNonNull(capturedUses, "capturedUses");
+            Objects.requireNonNull(dynamicStates, "dynamicStates");
             if (debugLegacyDrawLogCount < 120) {
                 debugLegacyDrawLogCount++;
                 if (request.indexed()) {
@@ -16150,7 +16222,7 @@ void main() {
                 graphicsDescriptorRequirement(materialized),
                 vertexBuffers,
                 indexRequirement,
-                List.of(),
+                dynamicStates,
                 List.of(),
                 materialized.descriptorResourceUses(),
                 request.indexed()
@@ -19475,6 +19547,99 @@ void main() {
             );
         }
 
+        private List<VulkanGraphicsCommandExecutionCoordinator.DynamicStateRequirement> explicitV2DynamicStateRequirements(
+            VulkanicGalV2.ExplicitGraphicsDrawRequest explicitRequest
+        ) {
+            VulkanicGalV2.ExplicitGraphicsObjects objects =
+                VulkanicGalV2.requireGraphicsObjects(explicitRequest.graphicsObjects());
+            VulkanicCompatibilityState.FixedFunctionSnapshot fixed = objects.pipelineState().fixedFunction();
+            VulkanGraphicsCommandExecutionCoordinator.RenderTargetContext context = renderTargetContext();
+            int activeWidth = context.activeWidth() > 0 ? context.activeWidth() : context.swapchainWidth();
+            int activeHeight = context.activeHeight() > 0 ? context.activeHeight() : context.swapchainHeight();
+            VulkanicGalExecutionRequest.Viewport viewport = fixed.viewport().orElse(
+                new VulkanicGalExecutionRequest.Viewport(0, 0, activeWidth, activeHeight, 0.0f, 1.0f)
+            );
+            VulkanicGalExecutionRequest.Scissor scissor =
+                fixed.scissorTestEnabled() && fixed.scissor().isPresent()
+                    ? fixed.scissor().orElseThrow()
+                    : new VulkanicGalExecutionRequest.Scissor(0, 0, activeWidth, activeHeight);
+            return List.of(
+                VulkanGraphicsCommandExecutionCoordinator.DynamicStateRequirement.viewport(
+                    normalizeExplicitV2Viewport(context, viewport)
+                ),
+                VulkanGraphicsCommandExecutionCoordinator.DynamicStateRequirement.scissor(
+                    normalizeExplicitV2Scissor(context, scissor)
+                )
+            );
+        }
+
+        private VulkanGraphicsCommandExecutionCoordinator.NormalizedViewport normalizeExplicitV2Viewport(
+            VulkanGraphicsCommandExecutionCoordinator.RenderTargetContext context,
+            VulkanicGalExecutionRequest.Viewport request
+        ) {
+            int x = request.x();
+            int y = request.y();
+            int width = request.width();
+            int height = request.height();
+            if (context.renderPassRecording()
+                && context.targetsSwapchain()
+                && context.activeWidth() > 0
+                && context.activeHeight() > 0) {
+                x = 0;
+                y = 0;
+                width = context.activeWidth();
+                height = context.activeHeight();
+            }
+            int viewportWidth = Math.max(width, 1);
+            int viewportHeight = Math.max(height, 1);
+            int framebufferHeight = context.activeHeight() > 0
+                ? context.activeHeight()
+                : Math.max(context.swapchainHeight(), viewportHeight);
+            if (context.renderPassRecording() && context.targetsSwapchain()) {
+                return new VulkanGraphicsCommandExecutionCoordinator.NormalizedViewport(
+                    x,
+                    y,
+                    viewportWidth,
+                    viewportHeight,
+                    request.minDepth(),
+                    request.maxDepth()
+                );
+            }
+            return new VulkanGraphicsCommandExecutionCoordinator.NormalizedViewport(
+                x,
+                framebufferHeight - y,
+                viewportWidth,
+                -viewportHeight,
+                request.minDepth(),
+                request.maxDepth()
+            );
+        }
+
+        private VulkanGraphicsCommandExecutionCoordinator.NormalizedScissor normalizeExplicitV2Scissor(
+            VulkanGraphicsCommandExecutionCoordinator.RenderTargetContext context,
+            VulkanicGalExecutionRequest.Scissor request
+        ) {
+            int scissorWidth = Math.max(request.width(), 0);
+            int scissorHeight = Math.max(request.height(), 0);
+            int framebufferWidth = context.activeWidth() > 0
+                ? context.activeWidth()
+                : Math.max(context.swapchainWidth(), scissorWidth);
+            int framebufferHeight = context.activeHeight() > 0
+                ? context.activeHeight()
+                : Math.max(context.swapchainHeight(), scissorHeight);
+            int translatedY = framebufferHeight - (request.y() + scissorHeight);
+            int clampedX = Math.max(0, Math.min(request.x(), framebufferWidth));
+            int clampedY = Math.max(0, Math.min(translatedY, framebufferHeight));
+            int maxWidth = Math.max(0, framebufferWidth - clampedX);
+            int maxHeight = Math.max(0, framebufferHeight - clampedY);
+            return new VulkanGraphicsCommandExecutionCoordinator.NormalizedScissor(
+                clampedX,
+                clampedY,
+                Math.min(scissorWidth, maxWidth),
+                Math.min(scissorHeight, maxHeight)
+            );
+        }
+
         private void emitDefaultRenderPassDynamicState(
             long commandBufferHandle,
             boolean targetsSwapchain,
@@ -21453,6 +21618,7 @@ void main() {
         }
 
         private void close() {
+            net.vulkanic.VulkanicGalV2.invalidateAllForDeviceLossOrShutdown();
             if (logicalDevice() != null) {
                 try {
                     VK10.vkDeviceWaitIdle(logicalDevice());

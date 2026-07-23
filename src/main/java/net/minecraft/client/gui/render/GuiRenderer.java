@@ -5,9 +5,13 @@ import com.google.common.collect.ImmutableMap.Builder;
 import net.blaze3d.ProjectionType;
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuBufferSlice;
+import net.blaze3d.opengl.GlConst;
+import net.blaze3d.pipeline.BlendFunction;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.pipeline.RenderTarget;
+import net.blaze3d.platform.DepthTestFunction;
 import net.blaze3d.platform.Lighting;
+import net.blaze3d.platform.LogicOp;
 import net.blaze3d.platform.Window;
 import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.RenderPass;
@@ -21,6 +25,7 @@ import net.blaze3d.vertex.ByteBufferBuilder;
 import net.blaze3d.vertex.MeshData;
 import net.blaze3d.vertex.PoseStack;
 import net.blaze3d.vertex.VertexFormat;
+import net.blaze3d.vertex.VertexFormatElement;
 import net.logging.LogUtils;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
@@ -28,9 +33,12 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.Set;
@@ -62,8 +70,17 @@ import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
 import net.minecraft.client.renderer.item.TrackingItemStackRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.util.Mth;
+import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicCompatibilityState;
+import net.vulkanic.VulkanicGalExecutionRequest;
+import net.vulkanic.VulkanicGalV2;
+import net.vulkanic.VulkanicIndexType;
+import net.vulkanic.VulkanicPassResourceModel;
+import net.vulkanic.VulkanicPassResourcePlanner;
+import net.vulkanic.VulkanicPrimitiveMode;
 import net.vulkanic.VulkanicResourceBarriers;
+import net.vulkanic.VulkanicResourceUsage;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
@@ -79,6 +96,8 @@ public class GuiRenderer implements AutoCloseable {
 	private static final VulkanicResourceBarriers OFFSCREEN_COLOR_WRITES_VISIBLE_TO_TEXTURE_FETCH = VulkanicResourceBarriers.of(
 		VulkanicResourceBarriers.Barrier.TEXTURE_FETCH
 	);
+	private static final boolean EXPLICIT_GAL_V2_GUI_TEXT = Boolean.parseBoolean(System.getProperty("mattmc.gal.v2.guiTextExplicit", "true"));
+	private static final int MAX_RETAINED_EXPLICIT_GAL_V2_GUI_OBJECTS = 256;
 	private static final float MAX_GUI_Z = 10000.0F;
 	public static final float MIN_GUI_Z = 0.0F;
 	private static final float GUI_Z_NEAR = 1000.0F;
@@ -98,6 +117,8 @@ public class GuiRenderer implements AutoCloseable {
 	private final Map<Object, GuiRenderer.AtlasPosition> atlasPositions = new Object2ObjectOpenHashMap<>();
 	private final Map<Object, OversizedItemRenderer> oversizedItemRenderers = new Object2ObjectOpenHashMap<>();
 	private final Map<Object, Standard3dItemRenderer> standard3dItemRenderers = new Object2ObjectOpenHashMap<>();
+	private final Map<String, VulkanicGalV2.RetainedHandle> explicitGalV2GuiObjects = new HashMap<>();
+	private final Map<VertexFormat, VulkanicGalV2.VertexLayout> explicitGalV2GuiVertexLayouts = new Object2ObjectOpenHashMap<>();
 	final GuiRenderState renderState;
 	private final List<GuiRenderer.Draw> draws = new ArrayList();
 	private final List<GuiRenderer.MeshToDraw> meshesToDraw = new ArrayList();
@@ -286,13 +307,9 @@ public class GuiRenderer implements AutoCloseable {
 					renderTarget.useDepth ? renderTarget.getDepthTextureView() : null,
 					OptionalDouble.empty()
 				)) {
-			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
-			renderPass.setUniform("Fog", gpuBufferSlice);
-			renderPass.setUniform("DynamicTransforms", gpuBufferSlice2);
-
 			for (int k = i; k < j; k++) {
 				GuiRenderer.Draw draw = (GuiRenderer.Draw)this.draws.get(k);
-				this.executeDraw(draw, renderPass, gpuBuffer, indexType);
+				this.executeDraw(draw, renderPass, renderTarget, gpuBufferSlice, gpuBufferSlice2, gpuBuffer, indexType, k);
 			}
 		}
 	}
@@ -718,7 +735,21 @@ public class GuiRenderer implements AutoCloseable {
 		return object2IntMap;
 	}
 
-	private void executeDraw(GuiRenderer.Draw draw, RenderPass renderPass, GpuBuffer gpuBuffer, VertexFormat.IndexType indexType) {
+	private void executeDraw(
+		GuiRenderer.Draw draw,
+		RenderPass renderPass,
+		RenderTarget renderTarget,
+		GpuBufferSlice fogSlice,
+		GpuBufferSlice dynamicTransformsSlice,
+		GpuBuffer gpuBuffer,
+		VertexFormat.IndexType indexType,
+		int drawOrdinal
+	) {
+		if (this.tryExecuteExplicitGalV2GuiDraw(draw, renderPass, renderTarget, fogSlice, dynamicTransformsSlice, gpuBuffer, indexType, drawOrdinal)) {
+			return;
+		}
+
+		bindLegacyGuiUniforms(renderPass, fogSlice, dynamicTransformsSlice);
 		RenderPipeline renderPipeline = draw.pipeline();
 		renderPass.setPipeline(renderPipeline);
 		renderPass.setVertexBuffer(0, draw.vertexBuffer);
@@ -745,6 +776,449 @@ public class GuiRenderer implements AutoCloseable {
 		try (VulkanicAPI.ShaderInputParityScope ignored = VulkanicAPI.pushShaderInputParitySemanticContext("gui:" + draw.shaderInputParityGeometryContext())) {
 			renderPass.drawIndexed(draw.baseVertex, 0, draw.indexCount, 1);
 		}
+	}
+
+	private static void bindLegacyGuiUniforms(RenderPass renderPass, GpuBufferSlice fogSlice, GpuBufferSlice dynamicTransformsSlice) {
+		net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
+		renderPass.setUniform("Fog", fogSlice);
+		renderPass.setUniform("DynamicTransforms", dynamicTransformsSlice);
+	}
+
+	private boolean tryExecuteExplicitGalV2GuiDraw(
+		GuiRenderer.Draw draw,
+		RenderPass renderPass,
+		RenderTarget renderTarget,
+		GpuBufferSlice fogSlice,
+		GpuBufferSlice dynamicTransformsSlice,
+		GpuBuffer indexBuffer,
+		VertexFormat.IndexType indexType,
+		int drawOrdinal
+	) {
+		if (!EXPLICIT_GAL_V2_GUI_TEXT
+			|| !VulkanicAPI.isVulkanBackendSelected()
+			|| !renderPass.supportsExplicitGalV2GraphicsDraw()
+			|| draw.indexCount <= 0) {
+			return false;
+		}
+
+		RenderPipeline pipeline = draw.pipeline();
+		PipelineDescriptor descriptor = VulkanicAPI.resolvePrecompiledPipelineDescriptor(pipeline);
+		if (descriptor == null) {
+			return false;
+		}
+		int programId = VulkanicAPI.resolvePrecompiledPipelineProgramId(pipeline);
+		int vertexBufferHandle = VulkanicAPI.legacyBufferHandleForExplicitGalV2(draw.vertexBuffer);
+		int indexBufferHandle = VulkanicAPI.legacyBufferHandleForExplicitGalV2(indexBuffer);
+		if (vertexBufferHandle <= 0 || indexBufferHandle <= 0) {
+			return false;
+		}
+
+		int framebuffer = renderPass.explicitGalV2FramebufferId();
+		int colorTexture = VulkanicAPI.legacyTextureHandleForExplicitGalV2(renderTarget.getColorTextureView());
+		int depthTexture = renderTarget.useDepth
+			? VulkanicAPI.legacyTextureHandleForExplicitGalV2(renderTarget.getDepthTextureView())
+			: 0;
+		VulkanicGalExecutionRequest.SemanticIdentity identity = new VulkanicGalExecutionRequest.SemanticIdentity(
+			"gui",
+			"main",
+			pipeline.getLocation().toString(),
+			pipeline.getVertexFormat().toString(),
+			"framebuffer:" + framebuffer,
+			"current-frame",
+			Math.max(0, drawOrdinal)
+		);
+
+		List<VulkanicGalV2.ResourceLayoutBinding> layoutBindings = new ArrayList<>();
+		List<VulkanicGalV2.ResourceBinding> resourceBindings = new ArrayList<>();
+		List<VulkanicPassResourceModel.ResourceUse> resourceUses = new ArrayList<>();
+		if (!this.addGuiDescriptorBindings(
+			descriptor,
+			draw.textureSetup,
+			fogSlice,
+			dynamicTransformsSlice,
+			layoutBindings,
+			resourceBindings,
+			resourceUses
+		)) {
+			return false;
+		}
+		addGuiBufferUse(resourceUses, "gui-vertices", VulkanicPassResourceModel.ResourceKind.VERTEX_BUFFER, vertexBufferHandle);
+		addGuiBufferUse(resourceUses, "gui-indices", VulkanicPassResourceModel.ResourceKind.INDEX_BUFFER, indexBufferHandle);
+
+		VulkanicGalV2.VertexLayout vertexLayout = this.explicitGuiVertexLayout(pipeline.getVertexFormat());
+		VulkanicCompatibilityState.FramebufferSnapshot framebufferState =
+			explicitGuiFramebufferState(framebuffer, colorTexture, depthTexture);
+		VulkanicCompatibilityState.FixedFunctionSnapshot fixedFunction =
+			explicitGuiFixedFunction(pipeline, draw.scissorArea());
+		String pipelineDescriptorKey = descriptor.getStableCacheKey();
+		String programKey = programId > 0
+			? "gui-program:" + programId + ":" + pipelineDescriptorKey
+			: "gui-descriptor-program:" + pipelineDescriptorKey;
+		String vertexLayoutKey = "gui-vertex-layout:" + pipeline.getVertexFormat();
+		String resourceLayoutKey = "gui-resource-layout:" + pipelineDescriptorKey;
+		String resourceSetKey = "gui-resource-set:" + pipelineDescriptorKey + ":bindings=" + resourceBindings.hashCode();
+		String renderTargetKey = "gui-render-target:" + framebufferState.shapeKey();
+		String pipelineKey = "gui-pipeline:" + pipelineDescriptorKey + ":fixed=" + fixedFunction.shapeKey();
+		String semanticKey = String.join("|", programKey, pipelineKey, vertexLayoutKey, resourceSetKey, renderTargetKey);
+		VulkanicGalV2.ExplicitGraphicsObjects objects = VulkanicGalV2.registerExplicitGraphicsObjects(
+			new VulkanicGalV2.ExplicitGraphicsDescriptor(
+				programId,
+				Integer.toUnsignedLong(pipelineDescriptorKey.hashCode()),
+				programKey,
+				descriptor,
+				fixedFunction,
+				"fixed:" + fixedFunction.shapeKey(),
+				"topology:TRIANGLES:indexType=" + indexType,
+				pipelineKey,
+				framebuffer,
+				framebufferState,
+				renderTargetKey,
+				vertexLayout,
+				vertexLayoutKey,
+				layoutBindings,
+				resourceLayoutKey,
+				resourceBindings,
+				resourceSetKey,
+				semanticKey
+			)
+		);
+		this.retainExplicitGalV2GuiObjects(objects);
+
+		VulkanicIndexType explicitIndexType = indexType == VertexFormat.IndexType.INT ? VulkanicIndexType.INT : VulkanicIndexType.SHORT;
+		VulkanicGalV2.VertexStreamBindings streams = new VulkanicGalV2.VertexStreamBindings(
+			List.of(new VulkanicGalV2.VertexStream(0, vertexBufferHandle, 0L, false)),
+			Optional.of(new VulkanicGalV2.IndexStream(indexBufferHandle, explicitIndexType, 0L))
+		);
+		VulkanicGalExecutionRequest.GraphicsDrawCommand command =
+			VulkanicGalExecutionRequest.GraphicsDrawCommand.indexed(
+				VulkanicPrimitiveMode.TRIANGLES,
+				draw.indexCount,
+				explicitIndexType,
+				0L,
+				1,
+				draw.baseVertex
+			);
+		VulkanicGalV2.ExplicitGraphicsDrawRequest request = new VulkanicGalV2.ExplicitGraphicsDrawRequest(
+			identity,
+			objects.handle(),
+			objects.resourceSet(),
+			VulkanicGalV2.emptyUniformPayload("gui:" + pipeline.getLocation()),
+			new VulkanicGalV2.GraphicsCommandStream(List.of(
+				new VulkanicGalV2.BindRenderTargetCommand(objects.renderTarget()),
+				new VulkanicGalV2.BindGraphicsPipelineCommand(objects.pipeline()),
+				new VulkanicGalV2.BindResourceSetCommand(objects.resourceSet()),
+				new VulkanicGalV2.BindVertexStreamsCommand(objects.vertexLayoutHandle(), streams),
+				new VulkanicGalV2.BindIndexStreamCommand(streams.indexStream()),
+				new VulkanicGalV2.SetDynamicStateCommand(objects.pipelineState().fixedFunctionKey()),
+				new VulkanicGalV2.DrawCommand(command)
+			)),
+			command,
+			streams,
+			VulkanicPassResourcePlanner.plan(new VulkanicPassResourceModel.PassRequest(
+				VulkanicPassResourceModel.PassKind.RENDER,
+				identity.label(),
+				List.of(),
+				resourceUses,
+				List.of(),
+				List.of(new VulkanicPassResourceModel.Command("gui-explicit-indexed-draw", OptionalInt.of(1), OptionalInt.empty())),
+				List.of("gui-producer-issued-explicit-command"),
+				false,
+				false
+			)),
+			"gui-explicit-plan:" + identity.label() + ":resources=" + resourceUses.size()
+		);
+		try (VulkanicAPI.ShaderInputParityScope ignored = VulkanicAPI.pushShaderInputParitySemanticContext("gui:" + draw.shaderInputParityGeometryContext())) {
+			return renderPass.executeExplicitGalV2GraphicsDraw(request).successful();
+		}
+	}
+
+	private boolean addGuiDescriptorBindings(
+		PipelineDescriptor descriptor,
+		TextureSetup textureSetup,
+		GpuBufferSlice fogSlice,
+		GpuBufferSlice dynamicTransformsSlice,
+		List<VulkanicGalV2.ResourceLayoutBinding> layoutBindings,
+		List<VulkanicGalV2.ResourceBinding> resourceBindings,
+		List<VulkanicPassResourceModel.ResourceUse> resourceUses
+	) {
+		for (PipelineDescriptor.ResourceBinding binding : descriptor.getResourceLayout().bindings()) {
+			boolean added = switch (binding.type()) {
+				case SAMPLER, COMPARISON_SAMPLER -> this.addGuiSampledTextureBinding(layoutBindings, resourceBindings, resourceUses, binding, textureSetup);
+				case UNIFORM_BUFFER -> this.addGuiUniformBufferBinding(layoutBindings, resourceBindings, resourceUses, binding, fogSlice, dynamicTransformsSlice);
+				case STORAGE_IMAGE, TEXEL_BUFFER -> false;
+			};
+			if (!added) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private boolean addGuiSampledTextureBinding(
+		List<VulkanicGalV2.ResourceLayoutBinding> layoutBindings,
+		List<VulkanicGalV2.ResourceBinding> resourceBindings,
+		List<VulkanicPassResourceModel.ResourceUse> resourceUses,
+		PipelineDescriptor.ResourceBinding binding,
+		TextureSetup textureSetup
+	) {
+		GpuTextureView view = switch (binding.name()) {
+			case "Sampler0" -> textureSetup.texure0();
+			case "Sampler1" -> textureSetup.texure1();
+			case "Sampler2" -> textureSetup.texure2();
+			default -> null;
+		};
+		if (view == null || view.isClosed()) {
+			return false;
+		}
+		int texture = VulkanicAPI.legacyTextureHandleForExplicitGalV2(view);
+		if (texture <= 0) {
+			return false;
+		}
+		VulkanicPassResourceModel.CanonicalResourceReference reference =
+			VulkanicPassResourceModel.CanonicalResourceReference.sampledTexture(
+				binding.name(),
+				"gui:" + binding.name() + ":texture=" + texture + ":mip=" + view.baseMipLevel(),
+				texture,
+				OptionalInt.of(VulkanicAPI.GL_TEXTURE_2D),
+				VulkanicPassResourceModel.TargetClass.TEXTURE_2D,
+				VulkanicPassResourceModel.Subresource.color(view.baseMipLevel(), Math.max(1, view.mipLevels()), 0, 1),
+				OptionalInt.of(binding.binding()),
+				OptionalInt.empty(),
+				VulkanicAPI.textureGeneration(texture)
+			);
+		VulkanicPassResourceModel.ResourceUse use = reference.asResourceUse("gui:" + binding.name(), false, resourceUses.size());
+		layoutBindings.add(new VulkanicGalV2.ResourceLayoutBinding(
+			binding.name(),
+			VulkanicPassResourceModel.BindingKind.SAMPLED_TEXTURE,
+			VulkanicPassResourceModel.ResourceKind.SAMPLED_TEXTURE,
+			OptionalInt.of(binding.set()),
+			OptionalInt.of(binding.binding()),
+			OptionalInt.of(binding.binding())
+		));
+		resourceBindings.add(new VulkanicGalV2.ResourceBinding(
+			binding.name(),
+			use,
+			OptionalInt.of(binding.set()),
+			OptionalInt.of(binding.binding()),
+			Optional.of(reference),
+			Optional.empty()
+		));
+		resourceUses.add(use);
+		return true;
+	}
+
+	private boolean addGuiUniformBufferBinding(
+		List<VulkanicGalV2.ResourceLayoutBinding> layoutBindings,
+		List<VulkanicGalV2.ResourceBinding> resourceBindings,
+		List<VulkanicPassResourceModel.ResourceUse> resourceUses,
+		PipelineDescriptor.ResourceBinding binding,
+		GpuBufferSlice fogSlice,
+		GpuBufferSlice dynamicTransformsSlice
+	) {
+		GpuBufferSlice slice = switch (binding.name()) {
+			case "Projection" -> VulkanicAPI.getProjectionMatrixBuffer();
+			case "Fog" -> fogSlice;
+			case "DynamicTransforms" -> dynamicTransformsSlice;
+			case "Lighting" -> VulkanicAPI.getShaderLights();
+			case "Globals" -> {
+				GpuBuffer globals = VulkanicAPI.getGlobalSettingsUniform();
+				yield globals == null ? null : globals.slice();
+			}
+			default -> null;
+		};
+		if (slice == null || slice.length() <= 0 || slice.buffer().isClosed()) {
+			return false;
+		}
+		int buffer = VulkanicAPI.legacyBufferHandleForExplicitGalV2(slice.buffer());
+		if (buffer <= 0) {
+			return false;
+		}
+		VulkanicPassResourceModel.CanonicalResourceReference reference =
+			VulkanicPassResourceModel.CanonicalResourceReference.bufferRange(
+				binding.name(),
+				VulkanicPassResourceModel.ResourceKind.UNIFORM_BUFFER,
+				"gui:" + binding.name() + ":buffer=" + buffer + ":offset=" + slice.offset() + ":size=" + slice.length(),
+				slice.offset(),
+				slice.length(),
+				VulkanicPassResourceModel.Access.READ,
+				VulkanicResourceUsage.INFERRED,
+				OptionalInt.of(binding.binding()),
+				OptionalInt.of(buffer),
+				VulkanicAPI.bufferGeneration(buffer)
+			);
+		VulkanicPassResourceModel.ResourceUse use = reference.asResourceUse("gui:" + binding.name(), false, resourceUses.size());
+		layoutBindings.add(new VulkanicGalV2.ResourceLayoutBinding(
+			binding.name(),
+			VulkanicPassResourceModel.BindingKind.BUFFER_RANGE,
+			VulkanicPassResourceModel.ResourceKind.UNIFORM_BUFFER,
+			OptionalInt.of(binding.set()),
+			OptionalInt.of(binding.binding()),
+			OptionalInt.of(binding.binding())
+		));
+		resourceBindings.add(new VulkanicGalV2.ResourceBinding(
+			binding.name(),
+			use,
+			OptionalInt.of(binding.set()),
+			OptionalInt.of(binding.binding()),
+			Optional.of(reference),
+			Optional.empty()
+		));
+		resourceUses.add(use);
+		return true;
+	}
+
+	private VulkanicGalV2.VertexLayout explicitGuiVertexLayout(VertexFormat vertexFormat) {
+		return this.explicitGalV2GuiVertexLayouts.computeIfAbsent(vertexFormat, format -> {
+			List<VulkanicGalV2.VertexBindingLayout> bindings = List.of(
+				new VulkanicGalV2.VertexBindingLayout(0, format.getVertexSize(), 0)
+			);
+			List<VulkanicGalV2.VertexAttributeLayout> attributes = new ArrayList<>();
+			List<VertexFormatElement> elements = format.getElements();
+			for (int ordinal = 0; ordinal < elements.size(); ordinal++) {
+				VertexFormatElement element = elements.get(ordinal);
+				attributes.add(new VulkanicGalV2.VertexAttributeLayout(
+					format.getShaderAttributeLocation(ordinal),
+					0,
+					element.count(),
+					GlConst.toGl(element.type()),
+					explicitGuiAttributeNormalized(element),
+					false,
+					format.getOffset(element),
+					0
+				));
+			}
+			return new VulkanicGalV2.VertexLayout(bindings, attributes, Map.of(), false);
+		});
+	}
+
+	private static boolean explicitGuiAttributeNormalized(VertexFormatElement element) {
+		return element.usage() == VertexFormatElement.Usage.COLOR || element.usage() == VertexFormatElement.Usage.NORMAL;
+	}
+
+	private static void addGuiBufferUse(
+		List<VulkanicPassResourceModel.ResourceUse> resourceUses,
+		String name,
+		VulkanicPassResourceModel.ResourceKind kind,
+		int buffer
+	) {
+		VulkanicPassResourceModel.CanonicalResourceReference reference =
+			VulkanicPassResourceModel.CanonicalResourceReference.bufferRange(
+				name,
+				kind,
+				"gui:" + name + ":buffer=" + buffer,
+				0L,
+				1L,
+				VulkanicPassResourceModel.Access.READ,
+				VulkanicResourceUsage.INFERRED,
+				OptionalInt.empty(),
+				OptionalInt.of(buffer),
+				VulkanicAPI.bufferGeneration(buffer)
+			);
+		resourceUses.add(reference.asResourceUse(name, false, resourceUses.size()));
+	}
+
+	private static VulkanicCompatibilityState.FramebufferSnapshot explicitGuiFramebufferState(int framebuffer, int colorTexture, int depthTexture) {
+		Map<Integer, VulkanicCompatibilityState.AttachmentState> attachments = new LinkedHashMap<>();
+		if (colorTexture > 0) {
+			attachments.put(
+				VulkanicAPI.GL_COLOR_ATTACHMENT0,
+				new VulkanicCompatibilityState.AttachmentState(VulkanicAPI.GL_COLOR_ATTACHMENT0, colorTexture, 0)
+			);
+		}
+		if (depthTexture > 0) {
+			attachments.put(
+				VulkanicAPI.GL_DEPTH_ATTACHMENT,
+				new VulkanicCompatibilityState.AttachmentState(VulkanicAPI.GL_DEPTH_ATTACHMENT, depthTexture, 0)
+			);
+		}
+		return new VulkanicCompatibilityState.FramebufferSnapshot(
+			framebuffer,
+			attachments,
+			List.of(VulkanicAPI.GL_COLOR_ATTACHMENT0),
+			VulkanicAPI.GL_COLOR_ATTACHMENT0,
+			"framebuffer=" + framebuffer + ":color0=" + colorTexture + ":depth=" + depthTexture
+		);
+	}
+
+	private static VulkanicCompatibilityState.FixedFunctionSnapshot explicitGuiFixedFunction(RenderPipeline pipeline, @Nullable ScreenRectangle scissor) {
+		BlendFunction blend = pipeline.getBlendFunction().orElse(new BlendFunction(
+			net.blaze3d.platform.SourceFactor.ONE,
+			net.blaze3d.platform.DestFactor.ZERO
+		));
+		Optional<VulkanicGalExecutionRequest.Scissor> scissorState = explicitGuiScissor(scissor);
+		String shapeKey = "gui-fixed:"
+			+ pipeline.getLocation()
+			+ ":blend=" + pipeline.getBlendFunction().isPresent()
+			+ ":depth=" + pipeline.getDepthTestFunction()
+			+ ":cull=" + pipeline.isCull()
+			+ ":scissor=" + scissorState
+			+ ":poly=" + pipeline.getPolygonMode()
+			+ ":write=" + pipeline.isWriteColor() + pipeline.isWriteAlpha() + pipeline.isWriteDepth();
+		return new VulkanicCompatibilityState.FixedFunctionSnapshot(
+			Optional.empty(),
+			scissorState,
+			pipeline.getBlendFunction().isPresent(),
+			GlConst.toGl(blend.sourceColor()),
+			GlConst.toGl(blend.destColor()),
+			GlConst.toGl(blend.sourceAlpha()),
+			GlConst.toGl(blend.destAlpha()),
+			VulkanicAPI.GL_FUNC_ADD,
+			VulkanicAPI.GL_FUNC_ADD,
+			pipeline.getDepthTestFunction() != DepthTestFunction.NO_DEPTH_TEST,
+			GlConst.toGl(pipeline.getDepthTestFunction()),
+			pipeline.isWriteDepth(),
+			pipeline.isCull(),
+			VulkanicAPI.GL_BACK,
+			scissorState.isPresent(),
+			false,
+			pipeline.getColorLogic() != LogicOp.NONE,
+			0,
+			VulkanicAPI.GL_FRONT_AND_BACK,
+			GlConst.toGl(pipeline.getPolygonMode()),
+			pipeline.getDepthBiasScaleFactor() != 0.0F || pipeline.getDepthBiasConstant() != 0.0F,
+			pipeline.getDepthBiasScaleFactor(),
+			pipeline.getDepthBiasConstant(),
+			pipeline.isWriteColor(),
+			pipeline.isWriteColor(),
+			pipeline.isWriteColor(),
+			pipeline.isWriteAlpha(),
+			Map.of(),
+			Map.of(),
+			Map.of(),
+			shapeKey
+		);
+	}
+
+	private static Optional<VulkanicGalExecutionRequest.Scissor> explicitGuiScissor(@Nullable ScreenRectangle screenRectangle) {
+		if (screenRectangle == null) {
+			return Optional.empty();
+		}
+		Window window = Minecraft.getInstance().getWindow();
+		int scale = window.getGuiScale();
+		int x = (int)(screenRectangle.left() * scale);
+		int y = (int)(window.getHeight() - screenRectangle.bottom() * scale);
+		int width = Math.max(0, (int)(screenRectangle.width() * scale));
+		int height = Math.max(0, (int)(screenRectangle.height() * scale));
+		return Optional.of(new VulkanicGalExecutionRequest.Scissor(x, y, width, height));
+	}
+
+	private void retainExplicitGalV2GuiObjects(VulkanicGalV2.ExplicitGraphicsObjects objects) {
+		String owner = "gui-text:" + objects.semanticKey();
+		VulkanicGalV2.RetainedHandle previous = this.explicitGalV2GuiObjects.get(objects.semanticKey());
+		if (previous != null) {
+			previous.close();
+		}
+		while (!this.explicitGalV2GuiObjects.containsKey(objects.semanticKey())
+			&& this.explicitGalV2GuiObjects.size() >= MAX_RETAINED_EXPLICIT_GAL_V2_GUI_OBJECTS) {
+			Iterator<Map.Entry<String, VulkanicGalV2.RetainedHandle>> iterator = this.explicitGalV2GuiObjects.entrySet().iterator();
+			if (!iterator.hasNext()) {
+				break;
+			}
+			Map.Entry<String, VulkanicGalV2.RetainedHandle> evicted = iterator.next();
+			evicted.getValue().close();
+			iterator.remove();
+		}
+		this.explicitGalV2GuiObjects.put(objects.semanticKey(), VulkanicGalV2.retain(objects.handle(), owner));
 	}
 
 	private BufferBuilder getBufferBuilder(RenderPipeline renderPipeline) {
@@ -789,6 +1263,9 @@ public class GuiRenderer implements AutoCloseable {
 		}
 
 		this.pictureInPictureRenderers.values().forEach(PictureInPictureRenderer::close);
+		this.explicitGalV2GuiObjects.values().forEach(VulkanicGalV2.RetainedHandle::close);
+		this.explicitGalV2GuiObjects.clear();
+		this.explicitGalV2GuiVertexLayouts.clear();
 		this.guiProjectionMatrixBuffer.close();
 		this.itemsProjectionMatrixBuffer.close();
 

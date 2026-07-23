@@ -4,6 +4,8 @@ import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuBufferSlice;
 import net.blaze3d.buffers.Std140Builder;
 import net.blaze3d.buffers.Std140SizeCalculator;
+import net.blaze3d.opengl.GlConst;
+import net.blaze3d.pipeline.BlendFunction;
 import net.blaze3d.pipeline.RenderTarget;
 import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.RenderPass;
@@ -14,6 +16,7 @@ import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
 import net.irisshaders.iris.pbr.TextureTracker;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
 import net.sodium.client.SodiumClientMod;
+import net.sodium.client.gl.attribute.GlVertexAttributeBinding;
 import net.sodium.client.gl.buffer.GlBuffer;
 import net.sodium.client.gl.device.CommandList;
 import net.sodium.client.gl.device.DrawCommandList;
@@ -37,8 +40,14 @@ import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import net.sodium.client.render.viewport.CameraTransform;
 import net.sodium.client.util.FogParameters;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicCompatibilityState;
+import net.vulkanic.VulkanicGalExecutionRequest;
+import net.vulkanic.VulkanicGalV2;
 import net.vulkanic.VulkanicIndexType;
+import net.vulkanic.VulkanicPassResourceModel;
+import net.vulkanic.VulkanicPassResourcePlanner;
 import net.vulkanic.VulkanicPrimitiveMode;
+import net.vulkanic.VulkanicResourceUsage;
 import net.vulkanic.VulkanicRenderTargetDescriptor;
 import org.joml.Matrix4fc;
 import org.joml.Vector3f;
@@ -48,10 +57,14 @@ import org.lwjgl.system.Pointer;
 import org.lwjgl.system.MemoryStack;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Iterator;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
@@ -68,11 +81,16 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
     private static final boolean TRACE_VULKAN_TERRAIN_RENDER_TARGETS = Boolean.getBoolean("mattmc.vulkan.traceTerrainRenderTargets");
     private static final boolean USE_DESCRIPTOR_TERRAIN_RENDER_PASS =
         Boolean.parseBoolean(System.getProperty("mattmc.vulkan.useDescriptorTerrainRenderPass", "true"));
+    private static final boolean USE_EXPLICIT_GAL_V2_SODIUM_TERRAIN =
+        Boolean.parseBoolean(System.getProperty("mattmc.gal.v2.sodiumTerrainExplicit", "true"));
 
     private static int vulkanRenderProbeCount;
 
     private final SharedQuadIndexBuffer sharedIndexBuffer;
     private final GpuBuffer sodiumChunkParamsBuffer;
+    @Nullable
+    private VulkanicGalV2.VertexLayout explicitSodiumTerrainVertexLayout;
+
     public DefaultChunkRenderer(RenderDevice device, ChunkVertexType vertexType) {
         super(device, vertexType);
 
@@ -166,7 +184,9 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
             )) {
                 traceOpenGlSodiumTerrainResources(renderPass, renderPassShader);
                 traceOpenGlSodiumTerrainGeometry(renderPass, shader, tessellation, batch);
-                executeDrawBatch(commandList, tessellation, batch);
+                if (!trySubmitExplicitOpenGlSodiumTerrainDraw(renderPass, tessellation, batch)) {
+                    executeDrawBatch(commandList, tessellation, batch);
+                }
             }
         }
 
@@ -321,19 +341,45 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                     preparedDraw.terrainState(),
                     preparedDraw.batch()
                 )) {
-                    for (int drawIndex = 0; drawIndex < preparedDraw.batch().size; drawIndex++) {
-                        int indexCount = MemoryUtil.memGetInt(preparedDraw.batch().pElementCount + ((long) drawIndex << 2));
-                        if (indexCount <= 0) {
-                            continue;
+                    Optional<VulkanicGalV2.ExplicitGraphicsDrawRequest> explicitRequest =
+                        tryBuildExplicitSodiumTerrainDraw(
+                            terrainPass,
+                            preparedDraw.batch(),
+                            VulkanicAPI.getBufferHandle(preparedDraw.vertexBuffer()),
+                            VulkanicAPI.getBufferHandle(preparedDraw.indexBuffer()),
+                            colorTargetView,
+                            depthTargetView,
+                            chunkParams,
+                            preparedDraw.transforms()
+                        );
+                    if (renderPass.supportsExplicitGalV2GraphicsDraw() && explicitRequest.isPresent()) {
+                        VulkanicGalExecutionRequest.ExecutionResult result =
+                            renderPass.executeExplicitGalV2GraphicsDraw(explicitRequest.orElseThrow());
+                        if (!result.successful()) {
+                            throw new IllegalStateException(
+                                "Explicit Sodium terrain GAL v2 draw failed: "
+                                    + result.status()
+                                    + " "
+                                    + result.detail()
+                            );
                         }
+                        submittedDrawCommands += submittedDrawCount(preparedDraw.batch());
+                        submittedIndexCount += sodiumTerrainIndexCount(preparedDraw.batch());
+                    } else {
+                        for (int drawIndex = 0; drawIndex < preparedDraw.batch().size; drawIndex++) {
+                            int indexCount = MemoryUtil.memGetInt(preparedDraw.batch().pElementCount + ((long) drawIndex << 2));
+                            if (indexCount <= 0) {
+                                continue;
+                            }
 
-                        int baseVertex = MemoryUtil.memGetInt(preparedDraw.batch().pBaseVertex + ((long) drawIndex << 2));
-                        long rawIndexOffsetBytes = MemoryUtil.memGetAddress(preparedDraw.batch().pElementPointer + ((long) drawIndex << Pointer.POINTER_SHIFT));
-                        int firstIndex = Math.toIntExact(rawIndexOffsetBytes / Integer.BYTES);
+                            int baseVertex = MemoryUtil.memGetInt(preparedDraw.batch().pBaseVertex + ((long) drawIndex << 2));
+                            long rawIndexOffsetBytes = MemoryUtil.memGetAddress(preparedDraw.batch().pElementPointer + ((long) drawIndex << Pointer.POINTER_SHIFT));
+                            int firstIndex = Math.toIntExact(rawIndexOffsetBytes / Integer.BYTES);
 
-                        renderPass.drawIndexed(baseVertex, firstIndex, indexCount, 1);
-                        submittedDrawCommands++;
-                        submittedIndexCount += indexCount;
+                            renderPass.drawIndexed(baseVertex, firstIndex, indexCount, 1);
+                            submittedDrawCommands++;
+                            submittedIndexCount += indexCount;
+                        }
                     }
                 }
             }
@@ -917,6 +963,462 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         });
     }
 
+    private boolean trySubmitExplicitOpenGlSodiumTerrainDraw(
+        TerrainRenderPass terrainPass,
+        RenderTessellation tessellation,
+        MultiDrawBatch batch
+    ) {
+        if (!(tessellation instanceof GlAbstractTessellation glTessellation)) {
+            return false;
+        }
+        GlBuffer vertexBuffer = glTessellation.getDiagnosticVertexBuffer();
+        GlBuffer indexBuffer = glTessellation.getDiagnosticIndexBuffer();
+        if (vertexBuffer == null || indexBuffer == null) {
+            return false;
+        }
+        Optional<VulkanicGalV2.ExplicitGraphicsDrawRequest> request = tryBuildExplicitSodiumTerrainDraw(
+            terrainPass,
+            batch,
+            vertexBuffer.handle(),
+            indexBuffer.handle(),
+            terrainPass.getTarget().getColorTextureView(),
+            terrainPass.getTarget().getDepthTextureView(),
+            null,
+            null
+        );
+        if (request.isEmpty()) {
+            return false;
+        }
+        VulkanicGalExecutionRequest.ExecutionResult result =
+            VulkanicAPI.submitExplicitGalV2GraphicsDraw(VulkanicAPI.getCommandContext(), request.orElseThrow());
+        if (!result.successful()) {
+            throw new IllegalStateException(
+                "Explicit Sodium terrain GAL v2 draw failed: " + result.status() + " " + result.detail()
+            );
+        }
+        return true;
+    }
+
+    private Optional<VulkanicGalV2.ExplicitGraphicsDrawRequest> tryBuildExplicitSodiumTerrainDraw(
+        TerrainRenderPass terrainPass,
+        MultiDrawBatch batch,
+        int vertexBufferHandle,
+        int indexBufferHandle,
+        GpuTextureView colorTargetView,
+        GpuTextureView depthTargetView,
+        @Nullable GpuBufferSlice chunkParams,
+        @Nullable GpuBufferSlice dynamicTransforms
+    ) {
+        if (!USE_EXPLICIT_GAL_V2_SODIUM_TERRAIN
+            || Iris.getIrisConfig().areShadersEnabled()
+            || this.activeProgram == null
+            || batch.isEmpty()
+            || vertexBufferHandle <= 0
+            || indexBufferHandle <= 0
+            || colorTargetView == null) {
+            return Optional.empty();
+        }
+        int programId = this.activeProgram.handle();
+        if (programId <= 0) {
+            return Optional.empty();
+        }
+        List<VulkanicGalExecutionRequest.IndexedDraw> draws = explicitIndexedDraws(batch);
+        if (draws.isEmpty()) {
+            return Optional.empty();
+        }
+
+        int framebuffer = VulkanicAPI.resolveFramebufferForTextures(
+            colorTargetView.texture(),
+            depthTargetView == null ? null : depthTargetView.texture()
+        );
+        int colorTexture = VulkanicAPI.getTextureHandle(colorTargetView.texture());
+        int depthTexture = depthTargetView == null ? 0 : VulkanicAPI.getTextureHandle(depthTargetView.texture());
+        if (colorTexture <= 0) {
+            return Optional.empty();
+        }
+
+        String passKey = sodiumTerrainMaterial(terrainPass) + ":" + sodiumTerrainOutput(terrainPass);
+        VulkanicGalExecutionRequest.SemanticIdentity identity = new VulkanicGalExecutionRequest.SemanticIdentity(
+            "sodium-terrain",
+            terrainPass.isTranslucent() ? "translucent" : "solid",
+            terrainPass.getPipeline().getLocation().toString(),
+            sodiumTerrainMaterial(terrainPass),
+            sodiumTerrainOutput(terrainPass),
+            "current-frame",
+            0
+        );
+        VulkanicGalExecutionRequest.GraphicsDrawCommand command =
+            VulkanicGalExecutionRequest.GraphicsDrawCommand.multiIndexedBaseVertex(
+                VulkanicPrimitiveMode.TRIANGLES,
+                VulkanicIndexType.INT,
+                draws
+            );
+
+        List<VulkanicGalV2.ResourceLayoutBinding> layoutBindings = new ArrayList<>();
+        List<VulkanicGalV2.ResourceBinding> resourceBindings = new ArrayList<>();
+        List<VulkanicPassResourceModel.ResourceUse> resourceUses = new ArrayList<>();
+        addSampledTextureBinding(layoutBindings, resourceBindings, resourceUses, "Sampler0", 0, terrainPass.getAtlas());
+        addSampledTextureBinding(
+            layoutBindings,
+            resourceBindings,
+            resourceUses,
+            "Sampler2",
+            2,
+            net.minecraft.client.Minecraft.getInstance().gameRenderer.lightTexture().getTextureView()
+        );
+        addSampledTextureBinding(layoutBindings, resourceBindings, resourceUses, "u_BlockTex", 0, terrainPass.getAtlas());
+        addSampledTextureBinding(
+            layoutBindings,
+            resourceBindings,
+            resourceUses,
+            "u_LightTex",
+            1,
+            net.minecraft.client.Minecraft.getInstance().gameRenderer.lightTexture().getTextureView()
+        );
+        if (chunkParams != null) {
+            addUniformBufferBinding(layoutBindings, resourceBindings, resourceUses, "SodiumChunkParams", chunkParams);
+        }
+        if (dynamicTransforms != null) {
+            addUniformBufferBinding(layoutBindings, resourceBindings, resourceUses, "DynamicTransforms", dynamicTransforms);
+        }
+        addVertexBufferUse(resourceUses, "sodium-terrain-vertices", vertexBufferHandle);
+        addIndexBufferUse(resourceUses, "sodium-terrain-indices", indexBufferHandle);
+
+        VulkanicGalV2.VertexLayout vertexLayout = explicitSodiumVertexLayout();
+        VulkanicCompatibilityState.FramebufferSnapshot framebufferState =
+            explicitFramebufferState(framebuffer, colorTexture, depthTexture);
+        VulkanicCompatibilityState.FixedFunctionSnapshot fixedFunction =
+            explicitTerrainFixedFunction(terrainPass);
+        String vertexLayoutKey = "sodium-terrain-vertex-layout:" + this.vertexFormat;
+        String resourceLayoutKey = "sodium-terrain-resource-layout:" + passKey;
+        String resourceSetKey = "sodium-terrain-resource-set:" + passKey + ":bindings=" + resourceBindings.hashCode();
+        String programKey = "sodium-terrain-program:" + programId + ":" + this.activeProgram.toString();
+        String pipelineKey = "sodium-terrain-pipeline:" + passKey + ":program=" + programId + ":fixed=" + fixedFunction.shapeKey();
+        String renderTargetKey = "sodium-terrain-render-target:" + framebufferState.shapeKey();
+        String semanticKey = String.join("|", programKey, pipelineKey, vertexLayoutKey, resourceSetKey, renderTargetKey);
+        VulkanicGalV2.ExplicitGraphicsObjects objects = VulkanicGalV2.registerExplicitGraphicsObjects(
+            new VulkanicGalV2.ExplicitGraphicsDescriptor(
+                programId,
+                Integer.toUnsignedLong(programKey.hashCode()),
+                programKey,
+                fixedFunction,
+                "fixed:" + fixedFunction.shapeKey(),
+                "topology:TRIANGLES:indexType=INT",
+                pipelineKey,
+                framebuffer,
+                framebufferState,
+                renderTargetKey,
+                vertexLayout,
+                vertexLayoutKey,
+                layoutBindings,
+                resourceLayoutKey,
+                resourceBindings,
+                resourceSetKey,
+                semanticKey
+            )
+        );
+        VulkanicGalV2.UniformPayload uniformPayload =
+            VulkanicAPI.captureExplicitGalV2UniformPayload(programId, "sodium-terrain:" + passKey);
+        VulkanicGalV2.VertexStreamBindings streams = new VulkanicGalV2.VertexStreamBindings(
+            List.of(new VulkanicGalV2.VertexStream(0, vertexBufferHandle, 0L, false)),
+            Optional.of(new VulkanicGalV2.IndexStream(indexBufferHandle, VulkanicIndexType.INT, 0L))
+        );
+        VulkanicGalV2.GraphicsCommandStream commandStream = new VulkanicGalV2.GraphicsCommandStream(List.of(
+            new VulkanicGalV2.BindRenderTargetCommand(objects.renderTarget()),
+            new VulkanicGalV2.BindGraphicsPipelineCommand(objects.pipeline()),
+            new VulkanicGalV2.BindResourceSetCommand(objects.resourceSet()),
+            new VulkanicGalV2.BindVertexStreamsCommand(objects.vertexLayoutHandle(), streams),
+            new VulkanicGalV2.BindIndexStreamCommand(streams.indexStream()),
+            new VulkanicGalV2.SetDynamicStateCommand(objects.pipelineState().fixedFunctionKey()),
+            new VulkanicGalV2.DrawCommand(command)
+        ));
+        VulkanicPassResourceModel.PassRequest passRequest = new VulkanicPassResourceModel.PassRequest(
+            VulkanicPassResourceModel.PassKind.RENDER,
+            identity.label(),
+            List.of(),
+            resourceUses,
+            List.of(),
+            List.of(new VulkanicPassResourceModel.Command(
+                "sodium-terrain-multidraw",
+                OptionalInt.of(draws.size()),
+                OptionalInt.empty()
+            )),
+            List.of("terrain-producer-issued-explicit-command"),
+            false,
+            false
+        );
+        VulkanicPassResourceModel.PassExecutionPlan plan =
+            VulkanicPassResourcePlanner.plan(passRequest);
+        return Optional.of(new VulkanicGalV2.ExplicitGraphicsDrawRequest(
+            identity,
+            objects.handle(),
+            objects.resourceSet(),
+            uniformPayload,
+            commandStream,
+            command,
+            streams,
+            plan,
+            "sodium-terrain-explicit-plan:" + identity.label() + ":resources=" + resourceUses.size()
+        ));
+    }
+
+    private VulkanicGalV2.VertexLayout explicitSodiumVertexLayout() {
+        if (this.explicitSodiumTerrainVertexLayout != null) {
+            return this.explicitSodiumTerrainVertexLayout;
+        }
+        List<VulkanicGalV2.VertexBindingLayout> bindings = List.of(
+            new VulkanicGalV2.VertexBindingLayout(0, this.vertexFormat.getStride(), 0)
+        );
+        List<VulkanicGalV2.VertexAttributeLayout> attributes = new ArrayList<>();
+        for (GlVertexAttributeBinding binding : this.vertexFormat.getShaderBindings()) {
+            attributes.add(new VulkanicGalV2.VertexAttributeLayout(
+                binding.getIndex(),
+                0,
+                binding.getCount(),
+                binding.getFormat(),
+                binding.isNormalized(),
+                binding.isIntType(),
+                binding.getPointer(),
+                0
+            ));
+        }
+        this.explicitSodiumTerrainVertexLayout = new VulkanicGalV2.VertexLayout(bindings, attributes, Map.of(), false);
+        return this.explicitSodiumTerrainVertexLayout;
+    }
+
+    private static List<VulkanicGalExecutionRequest.IndexedDraw> explicitIndexedDraws(MultiDrawBatch batch) {
+        List<VulkanicGalExecutionRequest.IndexedDraw> draws = new ArrayList<>(batch.size);
+        for (int drawIndex = 0; drawIndex < batch.size; drawIndex++) {
+            int indexCount = MemoryUtil.memGetInt(batch.pElementCount + ((long) drawIndex << 2));
+            if (indexCount <= 0) {
+                continue;
+            }
+            int baseVertex = MemoryUtil.memGetInt(batch.pBaseVertex + ((long) drawIndex << 2));
+            long rawIndexOffsetBytes = MemoryUtil.memGetAddress(batch.pElementPointer + ((long) drawIndex << Pointer.POINTER_SHIFT));
+            int firstIndex = Math.toIntExact(rawIndexOffsetBytes / Integer.BYTES);
+            draws.add(new VulkanicGalExecutionRequest.IndexedDraw(firstIndex, indexCount, baseVertex));
+        }
+        return List.copyOf(draws);
+    }
+
+    private static void addSampledTextureBinding(
+        List<VulkanicGalV2.ResourceLayoutBinding> layoutBindings,
+        List<VulkanicGalV2.ResourceBinding> resourceBindings,
+        List<VulkanicPassResourceModel.ResourceUse> resourceUses,
+        String name,
+        int textureUnit,
+        GpuTextureView view
+    ) {
+        if (view == null) {
+            return;
+        }
+        int texture = VulkanicAPI.getTextureHandle(view.texture());
+        if (texture <= 0) {
+            return;
+        }
+        VulkanicPassResourceModel.CanonicalResourceReference reference =
+            VulkanicPassResourceModel.CanonicalResourceReference.sampledTexture(
+                name,
+                "sodium-terrain:" + name + ":texture=" + texture,
+                texture,
+                OptionalInt.of(VulkanicAPI.GL_TEXTURE_2D),
+                VulkanicPassResourceModel.TargetClass.TEXTURE_2D,
+                VulkanicPassResourceModel.Subresource.color(view.baseMipLevel(), Math.max(1, view.mipLevels()), 0, 1),
+                OptionalInt.of(textureUnit),
+                OptionalInt.empty(),
+                VulkanicAPI.textureGeneration(texture)
+            );
+        VulkanicPassResourceModel.ResourceUse use =
+            reference.asResourceUse("sodium-terrain:" + name, false, resourceUses.size());
+        layoutBindings.add(new VulkanicGalV2.ResourceLayoutBinding(
+            name,
+            VulkanicPassResourceModel.BindingKind.SAMPLED_TEXTURE,
+            VulkanicPassResourceModel.ResourceKind.SAMPLED_TEXTURE,
+            OptionalInt.empty(),
+            OptionalInt.empty(),
+            OptionalInt.of(textureUnit)
+        ));
+        resourceBindings.add(new VulkanicGalV2.ResourceBinding(
+            name,
+            use,
+            OptionalInt.empty(),
+            OptionalInt.empty(),
+            Optional.of(reference),
+            Optional.empty()
+        ));
+        resourceUses.add(use);
+    }
+
+    private static void addUniformBufferBinding(
+        List<VulkanicGalV2.ResourceLayoutBinding> layoutBindings,
+        List<VulkanicGalV2.ResourceBinding> resourceBindings,
+        List<VulkanicPassResourceModel.ResourceUse> resourceUses,
+        String name,
+        GpuBufferSlice slice
+    ) {
+        int buffer = VulkanicAPI.getBufferHandle(slice.buffer());
+        if (buffer <= 0 || slice.length() <= 0) {
+            return;
+        }
+        VulkanicPassResourceModel.CanonicalResourceReference reference =
+            VulkanicPassResourceModel.CanonicalResourceReference.bufferRange(
+                name,
+                VulkanicPassResourceModel.ResourceKind.UNIFORM_BUFFER,
+                "sodium-terrain:" + name + ":buffer=" + buffer,
+                slice.offset(),
+                slice.length(),
+                VulkanicPassResourceModel.Access.READ,
+                VulkanicResourceUsage.INFERRED,
+                OptionalInt.empty(),
+                OptionalInt.of(buffer),
+                VulkanicAPI.bufferGeneration(buffer)
+            );
+        VulkanicPassResourceModel.ResourceUse use =
+            reference.asResourceUse("sodium-terrain:" + name, false, resourceUses.size());
+        layoutBindings.add(new VulkanicGalV2.ResourceLayoutBinding(
+            name,
+            VulkanicPassResourceModel.BindingKind.BUFFER_RANGE,
+            VulkanicPassResourceModel.ResourceKind.UNIFORM_BUFFER,
+            OptionalInt.empty(),
+            OptionalInt.empty(),
+            OptionalInt.empty()
+        ));
+        resourceBindings.add(new VulkanicGalV2.ResourceBinding(
+            name,
+            use,
+            OptionalInt.empty(),
+            OptionalInt.empty(),
+            Optional.of(reference),
+            Optional.empty()
+        ));
+        resourceUses.add(use);
+    }
+
+    private static void addVertexBufferUse(
+        List<VulkanicPassResourceModel.ResourceUse> resourceUses,
+        String name,
+        int buffer
+    ) {
+        VulkanicPassResourceModel.CanonicalResourceReference reference =
+            VulkanicPassResourceModel.CanonicalResourceReference.bufferRange(
+                name,
+                VulkanicPassResourceModel.ResourceKind.VERTEX_BUFFER,
+                "sodium-terrain:" + name + ":buffer=" + buffer,
+                0L,
+                1L,
+                VulkanicPassResourceModel.Access.READ,
+                VulkanicResourceUsage.INFERRED,
+                OptionalInt.empty(),
+                OptionalInt.of(buffer),
+                VulkanicAPI.bufferGeneration(buffer)
+            );
+        resourceUses.add(reference.asResourceUse(name, false, resourceUses.size()));
+    }
+
+    private static void addIndexBufferUse(
+        List<VulkanicPassResourceModel.ResourceUse> resourceUses,
+        String name,
+        int buffer
+    ) {
+        VulkanicPassResourceModel.CanonicalResourceReference reference =
+            VulkanicPassResourceModel.CanonicalResourceReference.bufferRange(
+                name,
+                VulkanicPassResourceModel.ResourceKind.INDEX_BUFFER,
+                "sodium-terrain:" + name + ":buffer=" + buffer,
+                0L,
+                1L,
+                VulkanicPassResourceModel.Access.READ,
+                VulkanicResourceUsage.INFERRED,
+                OptionalInt.empty(),
+                OptionalInt.of(buffer),
+                VulkanicAPI.bufferGeneration(buffer)
+            );
+        resourceUses.add(reference.asResourceUse(name, false, resourceUses.size()));
+    }
+
+    private static VulkanicCompatibilityState.FramebufferSnapshot explicitFramebufferState(
+        int framebuffer,
+        int colorTexture,
+        int depthTexture
+    ) {
+        Map<Integer, VulkanicCompatibilityState.AttachmentState> attachments = new LinkedHashMap<>();
+        attachments.put(
+            VulkanicAPI.GL_COLOR_ATTACHMENT0,
+            new VulkanicCompatibilityState.AttachmentState(VulkanicAPI.GL_COLOR_ATTACHMENT0, colorTexture, 0)
+        );
+        if (depthTexture > 0) {
+            attachments.put(
+                VulkanicAPI.GL_DEPTH_ATTACHMENT,
+                new VulkanicCompatibilityState.AttachmentState(VulkanicAPI.GL_DEPTH_ATTACHMENT, depthTexture, 0)
+            );
+        }
+        return new VulkanicCompatibilityState.FramebufferSnapshot(
+            framebuffer,
+            attachments,
+            List.of(VulkanicAPI.GL_COLOR_ATTACHMENT0),
+            VulkanicAPI.GL_COLOR_ATTACHMENT0,
+            "framebuffer=" + framebuffer + ":color0=" + colorTexture + ":depth=" + depthTexture
+        );
+    }
+
+    private static VulkanicCompatibilityState.FixedFunctionSnapshot explicitTerrainFixedFunction(TerrainRenderPass terrainPass) {
+        var pipeline = terrainPass.getPipeline();
+        BlendFunction blend = pipeline.getBlendFunction().orElse(new BlendFunction(
+            net.blaze3d.platform.SourceFactor.ONE,
+            net.blaze3d.platform.DestFactor.ZERO
+        ));
+        String shapeKey = "sodium-terrain-fixed:"
+            + pipeline.getLocation()
+            + ":blend=" + pipeline.getBlendFunction().isPresent()
+            + ":depth=" + pipeline.getDepthTestFunction()
+            + ":cull=" + pipeline.isCull()
+            + ":poly=" + pipeline.getPolygonMode()
+            + ":write=" + pipeline.isWriteColor() + pipeline.isWriteAlpha() + pipeline.isWriteDepth();
+        return new VulkanicCompatibilityState.FixedFunctionSnapshot(
+            Optional.empty(),
+            Optional.empty(),
+            pipeline.getBlendFunction().isPresent(),
+            GlConst.toGl(blend.sourceColor()),
+            GlConst.toGl(blend.destColor()),
+            GlConst.toGl(blend.sourceAlpha()),
+            GlConst.toGl(blend.destAlpha()),
+            VulkanicAPI.GL_FUNC_ADD,
+            VulkanicAPI.GL_FUNC_ADD,
+            pipeline.getDepthTestFunction() != net.blaze3d.platform.DepthTestFunction.NO_DEPTH_TEST,
+            GlConst.toGl(pipeline.getDepthTestFunction()),
+            pipeline.isWriteDepth(),
+            pipeline.isCull(),
+            VulkanicAPI.GL_BACK,
+            false,
+            false,
+            pipeline.getColorLogic() != net.blaze3d.platform.LogicOp.NONE,
+            0,
+            VulkanicAPI.GL_FRONT_AND_BACK,
+            GlConst.toGl(pipeline.getPolygonMode()),
+            pipeline.getDepthBiasScaleFactor() != 0.0F || pipeline.getDepthBiasConstant() != 0.0F,
+            pipeline.getDepthBiasScaleFactor(),
+            pipeline.getDepthBiasConstant(),
+            pipeline.isWriteColor(),
+            pipeline.isWriteColor(),
+            pipeline.isWriteColor(),
+            pipeline.isWriteAlpha(),
+            Map.of(),
+            Map.of(),
+            Map.of(),
+            shapeKey
+        );
+    }
+
+    private static int submittedDrawCount(MultiDrawBatch batch) {
+        int count = 0;
+        for (int drawIndex = 0; drawIndex < batch.size; drawIndex++) {
+            if (MemoryUtil.memGetInt(batch.pElementCount + ((long) drawIndex << 2)) > 0) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     private static void executeDrawBatch(CommandList commandList, RenderTessellation tessellation, MultiDrawBatch batch) {
         try (DrawCommandList drawCommandList = commandList.beginTessellating(tessellation)) {
             drawCommandList.multiDrawElementsBaseVertex(batch, VulkanicIndexType.INT);
@@ -929,5 +1431,6 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
 
         this.sharedIndexBuffer.delete(commandList);
         this.sodiumChunkParamsBuffer.close();
+        this.explicitSodiumTerrainVertexLayout = null;
     }
 }

@@ -367,6 +367,7 @@ public class GlDevice implements GpuDevice {
 
 	@Override
 	public void clearPipelineCache() {
+		net.vulkanic.VulkanicGalV2.invalidateAllForDeviceLossOrShutdown();
 		for (GlRenderPipeline glRenderPipeline : this.pipelineCache.values()) {
 			if (glRenderPipeline.program() != GlProgram.INVALID_PROGRAM) {
 				glRenderPipeline.program().close();

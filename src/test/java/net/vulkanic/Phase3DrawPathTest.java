@@ -1304,6 +1304,21 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testExplicitV2VulkanDrawsPublishRequestOwnedDynamicState() throws IOException {
+        String backendSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+
+        assertTrue(backendSource.contains("spine.explicitV2DynamicStateRequirements(explicitRequest)"),
+            "Explicit GAL v2 Vulkan draws must derive viewport/scissor from request-owned fixed-function state");
+        assertTrue(backendSource.contains("List<VulkanGraphicsCommandExecutionCoordinator.DynamicStateRequirement> dynamicStates")
+                && backendSource.contains("Objects.requireNonNull(dynamicStates, \"dynamicStates\")")
+                && backendSource.contains("dynamicStates,\n                List.of(),"),
+            "Captured Vulkan draw execution must feed request-owned dynamic states into the graphics command coordinator");
+        assertTrue(backendSource.contains("normalizeExplicitV2Viewport(")
+                && backendSource.contains("normalizeExplicitV2Scissor("),
+            "Explicit GAL v2 dynamic state should be normalized before Vulkan command lowering");
+    }
+
+    @Test
     public void testSodiumVulkanChunkTerrainUsesNativeTerrainCommandEncoder() throws IOException {
         Path rendererFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/DefaultChunkRenderer.java");
         Path apiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
@@ -5901,5 +5916,32 @@ public class Phase3DrawPathTest {
             "Compatibility command encoder should not construct descriptor sampler bindings through a private resolver");
         assertFalse(nativeCommandEncoderSource.contains("new PipelineResourceBindings.SamplerBinding"),
             "Native Vulkan command encoder should not construct descriptor sampler bindings through a private resolver");
+    }
+
+    @Test
+    public void testExplicitV2DescriptorBackedDrawsDoNotRequireLegacyProgramId() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+
+        assertTrue(source.contains("programState.programId() <= 0\n                ? descriptorBackedProgramSnapshot(programState)"),
+            "Descriptor-backed explicit GAL v2 programs should synthesize a request-owned resource snapshot instead of requiring a legacy program id");
+        assertTrue(source.contains("currentPlan.descriptor() == null\n                ? null\n                : timedBuildExplicitV2ProgramResourceTable"),
+            "Explicit GAL v2 descriptor-backed draws must build descriptor resource tables from request-owned resource sets even when programId is zero");
+        assertTrue(source.contains("if (drawPlan.descriptor() == null) {\n            return null;\n        }"),
+            "Vulkan materialization should reject only missing descriptors, not descriptor-backed explicit draws with programId zero");
+        assertFalse(source.contains("currentPlan.programId() <= 0 || currentPlan.descriptor() == null"),
+            "Program id zero is valid for descriptor-backed explicit producer slices such as title/loading GUI");
+        assertFalse(source.contains("if (programId <= 0 || drawPlan.descriptor() == null)"),
+            "Materialization must not skip descriptor-backed explicit producer slices before native draw emission");
+    }
+
+    @Test
+    public void testGuiExplicitV2DoesNotBypassOpenGlLegacyTitleRendering() throws IOException {
+        String source = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/GuiRenderer.java"));
+
+        assertTrue(source.contains("|| !VulkanicAPI.isVulkanBackendSelected()\n\t\t\t|| !renderPass.supportsExplicitGalV2GraphicsDraw()"),
+            "OpenGL GUI/title draws must keep using the proven legacy renderer until OpenGL explicit GUI lowering is complete");
+        assertTrue(source.contains("VulkanicAPI.resolvePrecompiledPipelineProgramId(pipeline)")
+                && source.contains("renderPass.executeExplicitGalV2GraphicsDraw(request).successful()"),
+            "Vulkan GUI explicit v2 should remain available for descriptor-backed loading/title draws");
     }
 }

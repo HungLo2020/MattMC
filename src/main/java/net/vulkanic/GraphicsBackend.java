@@ -183,6 +183,22 @@ public interface GraphicsBackend extends VulkanicGalExecutor {
     }
 
     /**
+     * Returns backend-neutral metadata for an already precompiled render pipeline,
+     * or {@code null} when it is unavailable without normal pipeline setup.
+     */
+    default @Nullable PipelineDescriptor resolvePrecompiledPipelineDescriptor(RenderPipeline renderPipeline) {
+        return null;
+    }
+
+    /**
+     * Returns a backend-visible legacy program id for a precompiled render pipeline
+     * when one exists. Descriptor-backed pipelines return {@code 0}.
+     */
+    default int resolvePrecompiledPipelineProgramId(RenderPipeline renderPipeline) {
+        return 0;
+    }
+
+    /**
      * Creates (or retrieves) the backend-owned command encoder used by shared
      * rendering callsites.
      */

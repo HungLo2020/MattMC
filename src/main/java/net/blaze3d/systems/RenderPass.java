@@ -10,6 +10,8 @@ import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.vulkanic.VulkanicGalExecutionRequest;
+import net.vulkanic.VulkanicGalV2;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -45,6 +47,21 @@ public interface RenderPass extends AutoCloseable, net.irisshaders.iris.mixinter
 	);
 
 	void draw(int i, int j);
+
+	default boolean supportsExplicitGalV2GraphicsDraw() {
+		return false;
+	}
+
+	default int explicitGalV2FramebufferId() {
+		return 0;
+	}
+
+	default VulkanicGalExecutionRequest.ExecutionResult executeExplicitGalV2GraphicsDraw(VulkanicGalV2.ExplicitGraphicsDrawRequest request) {
+		return VulkanicGalExecutionRequest.backendFailure(
+			request.semanticIdentity(),
+			"render pass does not support explicit GAL v2 graphics draws"
+		);
+	}
 
 	void close();
 

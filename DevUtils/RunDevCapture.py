@@ -67,6 +67,8 @@ class CaptureConfig:
     performance_capture: bool
     perf_warmup_frames: int
     perf_measure_frames: int
+    client_xmx: str
+    client_xms: str
     audio_validation: bool
     capture_meshing_corpus: bool
     meshing_corpus_output: str
@@ -114,8 +116,20 @@ class CaptureRunner:
         self.repository_identity = os.environ.get("MATTMC_BENCHMARK_REPOSITORY_IDENTITY", "").strip()
         if not self.repository_identity:
             self.repository_identity = "frozen-java" if "JavaPerfTesting" in str(self.root) else "current"
+        self.client_heap_xmx = self.resolve_client_heap_override(
+            config.client_xmx,
+            "MATTMC_CLIENT_XMX",
+            "MATTMC_PERF_CAPTURE_CLIENT_XMX",
+            "6G",
+        )
+        self.client_heap_xms = self.resolve_client_heap_override(
+            config.client_xms,
+            "MATTMC_CLIENT_XMS",
+            "MATTMC_PERF_CAPTURE_CLIENT_XMS",
+            "2G",
+        )
         self.worktree_fingerprint = git_worktree_fingerprint(self.root)
-        self.jvm_fingerprint = benchmark_jvm_fingerprint()
+        self.jvm_fingerprint = benchmark_jvm_fingerprint(self.client_heap_xmx, self.client_heap_xms)
 
         self.run_log = self.artifact_dir / f"runClient_{self.run_id}.log"
         self.meta_log = self.artifact_dir / f"meta_{self.run_id}.txt"
@@ -310,6 +324,8 @@ class CaptureRunner:
             f"performance_capture={str(self.config.performance_capture).lower()}",
             f"perf_warmup_frames={self.config.perf_warmup_frames}",
             f"perf_measure_frames={self.config.perf_measure_frames}",
+            f"client_heap_xmx_effective={self.client_heap_xmx or 'default'}",
+            f"client_heap_xms_effective={self.client_heap_xms or 'default'}",
             f"capture_meshing_corpus={str(self.config.capture_meshing_corpus).lower()}",
             f"meshing_corpus_output={self.config.meshing_corpus_output or self.meshing_corpus_replay}",
             f"meshing_corpus_fixture={self.config.meshing_corpus_fixture or 'all'}",
@@ -603,6 +619,10 @@ class CaptureRunner:
         print(f"Starting bounded runClient capture (run_id={self.run_id}, backend={self.config.backend})")
         gradle_cmd = [*self.gradle]
         gradle_cmd.append(f"-PmattmcRunGameDir={self.run_dir}")
+        if self.client_heap_xmx:
+            gradle_cmd.append(f"-Pmattmc.clientXmx={self.client_heap_xmx}")
+        if self.client_heap_xms:
+            gradle_cmd.append(f"-Pmattmc.clientXms={self.client_heap_xms}")
         if self.config.skip_tests:
             gradle_cmd.extend(["-x", "test"])
         if self.config.capture_meshing_corpus:
@@ -657,6 +677,8 @@ class CaptureRunner:
         log_handle.close()
         self.run_client_active = True
         self.append_meta(f"gradle_pid={self.gradle_process.pid}")
+        self.append_meta(f"client_heap_xmx_override={self.client_heap_xmx or 'default'}")
+        self.append_meta(f"client_heap_xms_override={self.client_heap_xms or 'default'}")
 
     def configure_validation_environment(self) -> None:
         if not self.validation_enabled:
@@ -767,6 +789,7 @@ class CaptureRunner:
                         "-Dmattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames=2400",
                         "-Dmattmc.perfAudit=true",
                         "-Dmattmc.perfAudit.legacyGraphicsLowering=true",
+                        "-Dmattmc.perfAudit.memorySamples=true",
                         f"-Dmattmc.perfAudit.backend={self.config.backend}",
                         f"-Dmattmc.perfAuditReportDir={self.performance_audit_dir}",
                     ]
@@ -899,6 +922,22 @@ class CaptureRunner:
         current = self.env.get("JAVA_TOOL_OPTIONS", "")
         joined = " ".join(options)
         self.env["JAVA_TOOL_OPTIONS"] = f"{current} {joined}".strip() if current else joined
+
+    def resolve_client_heap_override(
+        self,
+        configured: str,
+        normal_env_name: str,
+        perf_env_name: str,
+        perf_default: str,
+    ) -> str:
+        configured = configured.strip()
+        if configured:
+            return configured
+        if not self.config.performance_capture:
+            return ""
+        if os.environ.get(normal_env_name, "").strip():
+            return ""
+        return os.environ.get(perf_env_name, perf_default).strip()
 
     def monitor_gradle(self) -> int:
         assert self.gradle_process is not None
@@ -1953,12 +1992,14 @@ def git_worktree_fingerprint(root: Path) -> str:
     return sha256_text("status:\n" + status + "\ndiff-stat:\n" + diff)
 
 
-def benchmark_jvm_fingerprint() -> str:
+def benchmark_jvm_fingerprint(client_heap_xmx: str = "", client_heap_xms: str = "") -> str:
     material = "\n".join(
         [
             f"JAVA_TOOL_OPTIONS={os.environ.get('JAVA_TOOL_OPTIONS', '')}",
             f"GRADLE_OPTS={os.environ.get('GRADLE_OPTS', '')}",
             f"JAVA_HOME={os.environ.get('JAVA_HOME', '')}",
+            f"clientHeapXmx={client_heap_xmx or os.environ.get('MATTMC_CLIENT_XMX', 'build-default')}",
+            f"clientHeapXms={client_heap_xms or os.environ.get('MATTMC_CLIENT_XMS', 'build-default')}",
             f"platform={py_platform.platform()}",
             f"machine={py_platform.machine()}",
         ]
@@ -2617,6 +2658,23 @@ def parse_args() -> CaptureConfig:
     )
     parser.add_argument("--perf-warmup-frames", type=int, default=int_env("MATTMC_PERF_WARMUP_FRAMES", 120))
     parser.add_argument("--perf-measure-frames", type=int, default=int_env("MATTMC_PERF_MEASURE_FRAMES", 300))
+    parser.add_argument(
+        "--client-xmx",
+        default=os.environ.get("MATTMC_CAPTURE_CLIENT_XMX", ""),
+        help=(
+            "Override the Gradle runClient heap maximum for this capture. Performance captures "
+            "default to MATTMC_PERF_CAPTURE_CLIENT_XMX or 6G so ZGC committed heap does not consume "
+            "the client RSS guard; normal captures keep the build default unless set."
+        ),
+    )
+    parser.add_argument(
+        "--client-xms",
+        default=os.environ.get("MATTMC_CAPTURE_CLIENT_XMS", ""),
+        help=(
+            "Override the Gradle runClient initial heap for this capture. Performance captures "
+            "default to MATTMC_PERF_CAPTURE_CLIENT_XMS or 2G; normal captures keep the build default unless set."
+        ),
+    )
     parser.add_argument("--audio-validation", action="store_true")
     parser.add_argument("--capture-meshing-corpus", action="store_true")
     parser.add_argument("--meshing-corpus-output", default=os.environ.get("MATTMC_MESHING_CORPUS_OUTPUT", ""))
@@ -2684,6 +2742,8 @@ def parse_args() -> CaptureConfig:
         performance_capture=bool(args.performance_capture),
         perf_warmup_frames=args.perf_warmup_frames,
         perf_measure_frames=args.perf_measure_frames,
+        client_xmx=args.client_xmx,
+        client_xms=args.client_xms,
         audio_validation=bool(args.audio_validation),
         capture_meshing_corpus=bool(args.capture_meshing_corpus),
         meshing_corpus_output=args.meshing_corpus_output,
