@@ -13,8 +13,9 @@ pub mod resources;
 pub mod sync;
 
 pub use commands::{
-    AttachmentLoadOp, AttachmentStoreOp, ClearColor, CommandList, CommandListDesc, CommandOp,
-    PassAttachment, ResourceBarrier, SubmissionBatch, TextureUsageState,
+    AttachmentLoadOp, AttachmentStoreOp, BufferImageCopyRegion, ClearColor, CommandList,
+    CommandListDesc, CommandOp, PassAttachment, ResourceBarrier, SubmissionBatch, TextureOrigin3d,
+    TextureUsageState,
 };
 pub use error::{GalError, GalResult, StatusCode};
 pub use gal::VulkanicGal;
@@ -23,10 +24,11 @@ pub use metrics::{Metrics, TracyZone};
 pub use resources::{
     AccessFlags, BlendMode, BufferDesc, BufferUsage, ColorFormat, CompareOp, ComputePipelineDesc,
     CullMode, Extent3d, GraphicsPipelineDesc, IndexType, MemoryDomain, PipelineLayoutDesc,
-    PipelineStageFlags, PrimitiveTopology, RenderPassDesc, RenderTargetDesc, ResourceBinding,
-    ResourceBindingDesc, ResourceBindingKind, ResourceLayoutDesc, ResourceSetDesc,
+    PipelineStageFlags, PrimitiveTopology, QueueClass, RenderPassDesc, RenderTargetDesc,
+    ResourceBinding, ResourceBindingDesc, ResourceBindingKind, ResourceLayoutDesc, ResourceSetDesc,
     SamplerAddressMode, SamplerDesc, SamplerFilter, ShaderCodeFormat, ShaderModuleDesc,
-    ShaderStage, TextureDesc, TextureDimension, TextureFormat, TextureUsage, TextureViewDesc,
+    ShaderStage, TextureDesc, TextureDimension, TextureFormat, TextureSubresourceRange,
+    TextureUsage, TextureViewDesc,
 };
 pub use sync::{RetirementQueue, SubmissionId, SyncToken};
 

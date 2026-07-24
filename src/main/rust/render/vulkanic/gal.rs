@@ -1,7 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::backends::{Backend, BackendCreateDesc, BackendToken};
-use super::commands::{CommandList, CommandListDesc, CommandOp, SubmissionBatch};
+use super::commands::{
+    BufferImageCopyRegion, CommandList, CommandListDesc, CommandOp, ResourceBarrier,
+    SubmissionBatch, ValidatedSubmissionBatch,
+};
 use super::error::{GalError, GalResult, StatusCode};
 use super::handles::{Handle, HandleKind, MAX_GENERATION};
 use super::metrics::Metrics;
@@ -33,10 +36,22 @@ impl<T> Arena<T> {
     fn next_handle(&self) -> GalResult<Handle> {
         for (index, slot) in self.slots.iter().enumerate() {
             if slot.value.is_none() {
-                return Handle::new(self.kind, index as u32, slot.generation);
+                let index = u32::try_from(index).map_err(|_| {
+                    GalError::handle(
+                        StatusCode::GenerationExhausted,
+                        "handle index space exhausted",
+                    )
+                })?;
+                return Handle::new(self.kind, index, slot.generation);
             }
         }
-        Handle::new(self.kind, self.slots.len() as u32, 1)
+        let index = u32::try_from(self.slots.len()).map_err(|_| {
+            GalError::handle(
+                StatusCode::GenerationExhausted,
+                "handle index space exhausted",
+            )
+        })?;
+        Handle::new(self.kind, index, 1)
     }
 
     fn insert_at(&mut self, handle: Handle, value: T) -> GalResult<Handle> {
@@ -139,6 +154,55 @@ struct ResourceRecord<T> {
 struct PendingDestroy {
     kind: HandleKind,
     token: BackendToken,
+}
+
+#[derive(Clone, Debug)]
+struct TextureViewInfo {
+    texture: Handle,
+    format: TextureFormat,
+    extent: Extent3d,
+    range: TextureSubresourceRange,
+    usages: Vec<TextureUsage>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum AccessMode {
+    Read,
+    Write,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum AccessFamily {
+    Vertex,
+    Index,
+    Uniform,
+    Storage,
+    Sampled,
+    Transfer,
+    Attachment,
+    Host,
+    Present,
+    Indirect,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum AccessTarget {
+    Buffer {
+        handle: Handle,
+        offset: u64,
+        size: u64,
+    },
+    Texture {
+        texture: Handle,
+        range: TextureSubresourceRange,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct AccessEvent {
+    target: AccessTarget,
+    mode: AccessMode,
+    family: AccessFamily,
 }
 
 pub struct VulkanicGal {
@@ -246,18 +310,40 @@ impl VulkanicGal {
     }
 
     pub fn create_texture_view(&mut self, desc: TextureViewDesc) -> GalResult<Handle> {
-        let (texture_mip_levels, texture_array_layers) = {
+        let (texture_mip_levels, texture_array_layers, texture_format) = {
             let texture = self.textures.get(desc.texture)?;
-            (texture.desc.mip_levels, texture.desc.array_layers)
+            (
+                texture.desc.mip_levels,
+                texture.desc.array_layers,
+                texture.desc.format,
+            )
+        };
+        let Some(mip_end) = desc.base_mip.checked_add(desc.mip_count) else {
+            return self.validation_error(GalError::resource(
+                StatusCode::InvalidArgument,
+                "texture view mip range overflows",
+            ));
+        };
+        let Some(layer_end) = desc.base_layer.checked_add(desc.layer_count) else {
+            return self.validation_error(GalError::resource(
+                StatusCode::InvalidArgument,
+                "texture view layer range overflows",
+            ));
         };
         if desc.mip_count == 0
             || desc.layer_count == 0
-            || desc.base_mip + desc.mip_count > texture_mip_levels
-            || desc.base_layer + desc.layer_count > texture_array_layers
+            || mip_end > texture_mip_levels
+            || layer_end > texture_array_layers
         {
             return self.validation_error(GalError::resource(
                 StatusCode::InvalidArgument,
                 "texture view range is outside the texture",
+            ));
+        }
+        if desc.format != texture_format {
+            return self.validation_error(GalError::resource(
+                StatusCode::InvalidArgument,
+                "texture view format reinterpretation is not modeled",
             ));
         }
         let handle = self.texture_views.next_handle()?;
@@ -323,6 +409,32 @@ impl VulkanicGal {
                     format!("duplicate resource binding {}", binding.binding),
                 ));
             }
+            if binding.array_count == 0 {
+                return self.validation_error(GalError::resource(
+                    StatusCode::InvalidArgument,
+                    format!("binding {} array count must be non-zero", binding.binding),
+                ));
+            }
+            if binding.stages == PipelineStageFlags::NONE {
+                return self.validation_error(GalError::resource(
+                    StatusCode::InvalidArgument,
+                    format!("binding {} must declare shader stages", binding.binding),
+                ));
+            }
+            if binding.dynamic_offset_count > 0
+                && !matches!(
+                    binding.kind,
+                    ResourceBindingKind::UniformBuffer | ResourceBindingKind::StorageBuffer
+                )
+            {
+                return self.validation_error(GalError::resource(
+                    StatusCode::InvalidArgument,
+                    format!(
+                        "binding {} dynamic offsets are only valid for buffer bindings",
+                        binding.binding
+                    ),
+                ));
+            }
         }
         let handle = self.resource_layouts.next_handle()?;
         let token = self
@@ -346,7 +458,18 @@ impl VulkanicGal {
             .desc
             .bindings
             .clone();
+        let mut seen = BTreeSet::new();
+        let mut populated = BTreeSet::new();
         for binding in &desc.bindings {
+            if !seen.insert((binding.binding, binding.array_index)) {
+                return self.validation_error(GalError::resource(
+                    StatusCode::InvalidArgument,
+                    format!(
+                        "duplicate resource set binding {}[{}]",
+                        binding.binding, binding.array_index
+                    ),
+                ));
+            }
             let Some(expected) = layout_bindings
                 .iter()
                 .find(|item| item.binding == binding.binding)
@@ -359,18 +482,50 @@ impl VulkanicGal {
                     ),
                 ));
             };
+            if binding.array_index >= expected.array_count {
+                return self.validation_error(GalError::resource(
+                    StatusCode::InvalidArgument,
+                    format!(
+                        "binding {} array index {} is outside declared count {}",
+                        binding.binding, binding.array_index, expected.array_count
+                    ),
+                ));
+            }
             if expected.kind != binding.kind {
                 return self.validation_error(GalError::resource(
                     StatusCode::InvalidArgument,
                     format!("binding {} kind mismatch", binding.binding),
                 ));
             }
-            self.validate_binding_resource(binding.kind, binding.resource)?;
+            if binding.dynamic_offsets.len() != expected.dynamic_offset_count as usize {
+                return self.validation_error(GalError::resource(
+                    StatusCode::InvalidArgument,
+                    format!("binding {} dynamic offset count mismatch", binding.binding),
+                ));
+            }
+            self.validate_binding_resource(binding)?;
             if !binding.access.reads() && !binding.access.writes() {
                 return self.validation_error(GalError::resource(
                     StatusCode::InvalidArgument,
                     "resource binding must declare read or write access",
                 ));
+            }
+            populated.insert((binding.binding, binding.array_index));
+        }
+        for expected in &layout_bindings {
+            if expected.optional {
+                continue;
+            }
+            for array_index in 0..expected.array_count {
+                if !populated.contains(&(expected.binding, array_index)) {
+                    return self.validation_error(GalError::resource(
+                        StatusCode::InvalidArgument,
+                        format!(
+                            "required binding {}[{}] is missing from resource set",
+                            expected.binding, array_index
+                        ),
+                    ));
+                }
             }
         }
         let handle = self.resource_sets.next_handle()?;
@@ -469,11 +624,53 @@ impl VulkanicGal {
                 "render target requires at least one attachment",
             ));
         }
+        if desc.extent.width == 0 || desc.extent.height == 0 || desc.extent.depth == 0 {
+            return self.validation_error(GalError::resource(
+                StatusCode::InvalidArgument,
+                "render target extent must be non-empty",
+            ));
+        }
         for view in &desc.color_views {
-            self.texture_views.get(*view)?;
+            let info = self.texture_view_info(*view)?;
+            if is_depth_stencil_format(info.format) {
+                return self.validation_error(GalError::resource(
+                    StatusCode::InvalidArgument,
+                    "color attachment view uses a depth/stencil format",
+                ));
+            }
+            if !info.usages.contains(&TextureUsage::ColorAttachment) {
+                return self.validation_error(GalError::resource(
+                    StatusCode::InvalidArgument,
+                    "color attachment texture lacks color attachment usage",
+                ));
+            }
+            if info.extent != desc.extent {
+                return self.validation_error(GalError::resource(
+                    StatusCode::InvalidArgument,
+                    "color attachment extent does not match render target",
+                ));
+            }
         }
         if let Some(view) = desc.depth_stencil_view {
-            self.texture_views.get(view)?;
+            let info = self.texture_view_info(view)?;
+            if !is_depth_stencil_format(info.format) {
+                return self.validation_error(GalError::resource(
+                    StatusCode::InvalidArgument,
+                    "depth attachment view does not use a depth/stencil format",
+                ));
+            }
+            if !info.usages.contains(&TextureUsage::DepthStencilAttachment) {
+                return self.validation_error(GalError::resource(
+                    StatusCode::InvalidArgument,
+                    "depth attachment texture lacks depth/stencil attachment usage",
+                ));
+            }
+            if info.extent != desc.extent {
+                return self.validation_error(GalError::resource(
+                    StatusCode::InvalidArgument,
+                    "depth attachment extent does not match render target",
+                ));
+            }
         }
         let handle = self.render_targets.next_handle()?;
         let token = self
@@ -497,23 +694,29 @@ impl VulkanicGal {
     }
 
     pub fn create_render_pass(&mut self, desc: RenderPassDesc) -> GalResult<Handle> {
-        let (target_color_count, target_has_depth) = {
+        let (target_color_formats, target_depth_format) = {
             let target = self.render_targets.get(desc.target)?;
-            (
-                target.desc.color_views.len(),
-                target.desc.depth_stencil_view.is_some(),
-            )
+            let color_views = target.desc.color_views.clone();
+            let depth_view = target.desc.depth_stencil_view;
+            let color_formats = color_views
+                .iter()
+                .map(|view| self.texture_view_info(*view).map(|info| info.format))
+                .collect::<GalResult<Vec<_>>>()?;
+            let depth_format = depth_view
+                .map(|view| self.texture_view_info(view).map(|info| info.format))
+                .transpose()?;
+            (color_formats, depth_format)
         };
-        if desc.color_formats.len() != target_color_count {
+        if desc.color_formats != target_color_formats {
             return self.validation_error(GalError::resource(
                 StatusCode::InvalidArgument,
-                "render pass color format count does not match target",
+                "render pass color formats do not match target",
             ));
         }
-        if desc.depth_format.is_some() != target_has_depth {
+        if desc.depth_format != target_depth_format {
             return self.validation_error(GalError::resource(
                 StatusCode::InvalidArgument,
-                "render pass depth format presence does not match target",
+                "render pass depth format does not match target",
             ));
         }
         let handle = self.render_passes.next_handle()?;
@@ -596,12 +799,18 @@ impl VulkanicGal {
         for list in &batch.command_lists {
             self.validate_command_ops(&list.operations)?;
         }
+        let referenced = referenced_handles(&batch);
+        for handle in &referenced {
+            self.validate_any_resource(*handle)?;
+        }
+        self.validate_submission_hazards(&batch)?;
+        let validated = ValidatedSubmissionBatch::from(batch);
         let id = SubmissionId(self.next_submission);
         self.next_submission += 1;
-        self.backend.encode_passes(&batch)?;
-        self.backend.submit(id, &batch)?;
+        self.backend.encode_passes(&validated)?;
+        self.backend.submit(id, &validated)?;
         self.metrics.submissions += 1;
-        for handle in referenced_handles(&batch) {
+        for handle in referenced {
             self.mark_in_flight(handle, id)?;
         }
         Ok(SyncToken { submission: id })
@@ -666,20 +875,64 @@ impl VulkanicGal {
         Ok(())
     }
 
-    fn validate_binding_resource(
-        &self,
-        kind: ResourceBindingKind,
-        resource: Handle,
-    ) -> GalResult<()> {
-        match kind {
-            ResourceBindingKind::UniformBuffer | ResourceBindingKind::StorageBuffer => {
-                self.buffers.get(resource)?;
+    fn validate_binding_resource(&mut self, binding: &ResourceBinding) -> GalResult<()> {
+        match binding.kind {
+            ResourceBindingKind::UniformBuffer => {
+                let record = self.buffers.get(binding.resource)?;
+                if !record.desc.usages.contains(&BufferUsage::Uniform) {
+                    return self.validation_error(GalError::resource(
+                        StatusCode::InvalidArgument,
+                        "uniform buffer binding requires uniform buffer usage",
+                    ));
+                }
+                if binding.access.writes() {
+                    return self.validation_error(GalError::resource(
+                        StatusCode::InvalidArgument,
+                        "uniform buffer binding cannot declare write access",
+                    ));
+                }
             }
-            ResourceBindingKind::SampledTexture | ResourceBindingKind::StorageTexture => {
-                self.texture_views.get(resource)?;
+            ResourceBindingKind::StorageBuffer => {
+                let record = self.buffers.get(binding.resource)?;
+                if !record.desc.usages.contains(&BufferUsage::Storage) {
+                    return self.validation_error(GalError::resource(
+                        StatusCode::InvalidArgument,
+                        "storage buffer binding requires storage buffer usage",
+                    ));
+                }
+            }
+            ResourceBindingKind::SampledTexture => {
+                let info = self.texture_view_info(binding.resource)?;
+                if !info.usages.contains(&TextureUsage::Sampled) {
+                    return self.validation_error(GalError::resource(
+                        StatusCode::InvalidArgument,
+                        "sampled texture binding requires sampled texture usage",
+                    ));
+                }
+                if binding.access.writes() {
+                    return self.validation_error(GalError::resource(
+                        StatusCode::InvalidArgument,
+                        "sampled texture binding cannot declare write access",
+                    ));
+                }
+            }
+            ResourceBindingKind::StorageTexture => {
+                let info = self.texture_view_info(binding.resource)?;
+                if !info.usages.contains(&TextureUsage::Storage) {
+                    return self.validation_error(GalError::resource(
+                        StatusCode::InvalidArgument,
+                        "storage texture binding requires storage texture usage",
+                    ));
+                }
             }
             ResourceBindingKind::Sampler => {
-                self.samplers.get(resource)?;
+                self.samplers.get(binding.resource)?;
+                if binding.access.writes() {
+                    return self.validation_error(GalError::resource(
+                        StatusCode::InvalidArgument,
+                        "sampler binding cannot declare write access",
+                    ));
+                }
             }
         }
         Ok(())
@@ -704,6 +957,7 @@ impl VulkanicGal {
         let mut active_pass = None;
         let mut graphics_pipeline = None;
         let mut compute_pipeline = None;
+        let mut active_pipeline_layout = None;
         let mut index_buffer = None;
         for op in ops {
             match op {
@@ -719,45 +973,83 @@ impl VulkanicGal {
                             "nested passes are invalid",
                         ));
                     }
-                    let pass_record = self.render_pass_desc(*pass)?;
-                    let target_record = self.render_targets.get(*target)?;
-                    if pass_record.target != *target {
+                    let pass_target = self.render_pass_desc(*pass)?.target;
+                    let (expected_colors, expected_depth) = {
+                        let target_record = self.render_targets.get(*target)?;
+                        (
+                            target_record.desc.color_views.clone(),
+                            target_record.desc.depth_stencil_view,
+                        )
+                    };
+                    if pass_target != *target {
                         return self.validation_error(GalError::command(
                             StatusCode::InvalidArgument,
                             "pass target does not match command target",
                         ));
                     }
-                    if colors.len() != target_record.desc.color_views.len() {
+                    if colors.len() != expected_colors.len() {
                         return self.validation_error(GalError::command(
                             StatusCode::InvalidArgument,
                             "pass color attachment count does not match target",
                         ));
                     }
-                    if depth_stencil.is_some() != target_record.desc.depth_stencil_view.is_some() {
+                    for (index, color) in colors.iter().enumerate() {
+                        if color.view != expected_colors[index] {
+                            return self.validation_error(GalError::command(
+                                StatusCode::InvalidArgument,
+                                "pass color attachment view does not match target",
+                            ));
+                        }
+                    }
+                    if depth_stencil.is_some() != expected_depth.is_some() {
                         return self.validation_error(GalError::command(
                             StatusCode::InvalidArgument,
                             "pass depth attachment presence does not match target",
                         ));
                     }
+                    if let (Some(depth), Some(expected_depth)) = (depth_stencil, expected_depth) {
+                        if depth.view != expected_depth {
+                            return self.validation_error(GalError::command(
+                                StatusCode::InvalidArgument,
+                                "pass depth attachment view does not match target",
+                            ));
+                        }
+                    }
                     in_pass = true;
                     active_pass = Some(*pass);
                 }
                 CommandOp::BindGraphicsPipeline(handle) => {
-                    self.graphics_pipelines.get(*handle)?;
+                    let layout = self.graphics_pipelines.get(*handle)?.desc.layout;
                     if let Some(pass) = active_pass {
                         self.validate_pipeline_pass_compatibility(*handle, pass)?;
                     }
                     graphics_pipeline = Some(*handle);
+                    compute_pipeline = None;
+                    active_pipeline_layout = Some(layout);
                 }
                 CommandOp::BindComputePipeline(handle) => {
-                    self.compute_pipelines.get(*handle)?;
+                    if in_pass {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "compute pipeline cannot be bound inside a render pass",
+                        ));
+                    }
+                    let layout = self.compute_pipelines.get(*handle)?.desc.layout;
                     compute_pipeline = Some(*handle);
+                    graphics_pipeline = None;
+                    active_pipeline_layout = Some(layout);
                 }
                 CommandOp::BindResourceSet {
                     pipeline_layout,
                     set_index,
                     set,
                 } => {
+                    if active_pipeline_layout != Some(*pipeline_layout) {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "resource set pipeline layout does not match active pipeline",
+                        ));
+                    }
                     let layout = self.pipeline_layouts.get(*pipeline_layout)?;
                     let set_record = self.resource_sets.get(*set)?;
                     let Some(expected_layout) =
@@ -776,10 +1068,22 @@ impl VulkanicGal {
                     }
                 }
                 CommandOp::SetVertexBuffer { buffer, .. } => {
-                    self.buffers.get(*buffer)?;
+                    let record = self.buffers.get(*buffer)?;
+                    if !record.desc.usages.contains(&BufferUsage::Vertex) {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "vertex buffer binding requires vertex buffer usage",
+                        ));
+                    }
                 }
                 CommandOp::SetIndexBuffer { buffer, .. } => {
-                    self.buffers.get(*buffer)?;
+                    let record = self.buffers.get(*buffer)?;
+                    if !record.desc.usages.contains(&BufferUsage::Index) {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "index buffer binding requires index buffer usage",
+                        ));
+                    }
                     index_buffer = Some(*buffer);
                 }
                 CommandOp::Draw {
@@ -804,6 +1108,19 @@ impl VulkanicGal {
                         return self.validation_error(GalError::command(StatusCode::InvalidArgument, "indexed draw requires active pass, pipeline, index buffer, and non-zero counts"));
                     }
                 }
+                CommandOp::DrawIndirect {
+                    buffer,
+                    offset,
+                    draw_count,
+                } => {
+                    if !in_pass || graphics_pipeline.is_none() || *draw_count == 0 {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "indirect draw requires active pass, graphics pipeline, and non-zero draw count",
+                        ));
+                    }
+                    self.validate_buffer_range(*buffer, *offset, 1, BufferUsage::Indirect)?;
+                }
                 CommandOp::Dispatch {
                     groups_x,
                     groups_y,
@@ -818,18 +1135,118 @@ impl VulkanicGal {
                         return self.validation_error(GalError::command(StatusCode::InvalidArgument, "dispatch requires compute pipeline outside render pass and non-zero groups"));
                     }
                 }
+                CommandOp::DispatchIndirect { buffer, offset } => {
+                    if in_pass || compute_pipeline.is_none() {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "indirect dispatch requires compute pipeline outside render pass",
+                        ));
+                    }
+                    self.validate_buffer_range(*buffer, *offset, 1, BufferUsage::Indirect)?;
+                }
                 CommandOp::CopyBuffer { src, dst, size } => {
-                    self.buffers.get(*src)?;
-                    self.buffers.get(*dst)?;
+                    let src_record = self.buffers.get(*src)?;
+                    let src_ok = src_record.desc.usages.contains(&BufferUsage::TransferSrc);
+                    let dst_record = self.buffers.get(*dst)?;
+                    let dst_ok = dst_record.desc.usages.contains(&BufferUsage::TransferDst);
                     if src == dst || *size == 0 {
                         return self.validation_error(GalError::command(
                             StatusCode::InvalidArgument,
                             "buffer copy requires distinct buffers and non-zero size",
                         ));
                     }
+                    if !src_ok || !dst_ok {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "buffer copy requires transfer source and destination usages",
+                        ));
+                    }
+                }
+                CommandOp::CopyBufferToTexture(region) => {
+                    self.validate_buffer_texture_copy_region(
+                        region,
+                        BufferUsage::TransferSrc,
+                        TextureUsage::TransferDst,
+                    )?;
+                }
+                CommandOp::CopyTextureToBuffer(region) => {
+                    self.validate_buffer_texture_copy_region(
+                        region,
+                        BufferUsage::TransferDst,
+                        TextureUsage::TransferSrc,
+                    )?;
+                }
+                CommandOp::HostWriteBuffer {
+                    buffer,
+                    offset,
+                    data,
+                } => {
+                    self.validate_buffer_range(
+                        *buffer,
+                        *offset,
+                        data.len() as u64,
+                        BufferUsage::HostWrite,
+                    )?;
+                    let record = self.buffers.get(*buffer)?;
+                    if record.desc.memory != MemoryDomain::Upload {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "host writes require upload memory",
+                        ));
+                    }
+                }
+                CommandOp::HostReadBuffer {
+                    buffer,
+                    offset,
+                    size,
+                } => {
+                    self.validate_buffer_range(*buffer, *offset, *size, BufferUsage::HostRead)?;
+                    let record = self.buffers.get(*buffer)?;
+                    if record.desc.memory != MemoryDomain::Readback {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "host reads require readback memory",
+                        ));
+                    }
+                }
+                CommandOp::Present {
+                    texture,
+                    subresources,
+                } => {
+                    let record = self.textures.get(*texture)?;
+                    if !record.desc.usages.contains(&TextureUsage::Present) {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "presentation requires present texture usage",
+                        ));
+                    }
+                    self.validate_texture_subresource_range(*texture, *subresources)?;
                 }
                 CommandOp::Barrier(barrier) => {
                     self.validate_any_resource(barrier.resource)?;
+                    if let Some(range) = barrier.subresources {
+                        match barrier.resource.kind() {
+                            Some(HandleKind::Texture) => {
+                                self.validate_texture_subresource_range(barrier.resource, range)?;
+                            }
+                            Some(HandleKind::TextureView) => {
+                                let info = self.texture_view_info(barrier.resource)?;
+                                self.validate_texture_subresource_range(info.texture, range)?;
+                                if !texture_range_contains(info.range, range) {
+                                    return self.validation_error(GalError::command(
+                                        StatusCode::InvalidArgument,
+                                        "barrier subresource range is outside the texture view",
+                                    ));
+                                }
+                            }
+                            _ => {
+                                return self.validation_error(GalError::command(
+                                    StatusCode::InvalidArgument,
+                                    "barrier subresource ranges are only valid for textures",
+                                ));
+                            }
+                        }
+                    }
                     if barrier.access == AccessFlags::NONE
                         || barrier.stages == PipelineStageFlags::NONE
                         || barrier.before == barrier.after
@@ -838,6 +1255,17 @@ impl VulkanicGal {
                             StatusCode::InvalidArgument,
                             "barrier must declare access, stages, and a state change",
                         ));
+                    }
+                    if barrier.src_queue == QueueClass::Present
+                        || barrier.dst_queue == QueueClass::Present
+                    {
+                        let texture = self.textures.get(barrier.resource)?;
+                        if !texture.desc.usages.contains(&TextureUsage::Present) {
+                            return self.validation_error(GalError::command(
+                                StatusCode::InvalidArgument,
+                                "queue ownership transfer involving presentation requires present texture usage",
+                            ));
+                        }
                     }
                 }
                 CommandOp::EndPass => {
@@ -850,6 +1278,7 @@ impl VulkanicGal {
                     in_pass = false;
                     active_pass = None;
                     graphics_pipeline = None;
+                    active_pipeline_layout = None;
                     index_buffer = None;
                 }
             }
@@ -906,6 +1335,529 @@ impl VulkanicGal {
 
     fn render_pass_desc(&self, pass: Handle) -> GalResult<&RenderPassDesc> {
         self.render_passes.get(pass).map(|record| &record.desc)
+    }
+
+    fn validate_submission_hazards(&mut self, batch: &SubmissionBatch) -> GalResult<()> {
+        let mut accesses = Vec::new();
+        for list in &batch.command_lists {
+            for op in &list.operations {
+                match op {
+                    CommandOp::BeginPass {
+                        colors,
+                        depth_stencil,
+                        ..
+                    } => {
+                        for color in colors {
+                            let info = self.texture_view_info(color.view)?;
+                            let event = AccessEvent {
+                                target: AccessTarget::Texture {
+                                    texture: info.texture,
+                                    range: info.range,
+                                },
+                                mode: AccessMode::Write,
+                                family: AccessFamily::Attachment,
+                            };
+                            self.record_access(&mut accesses, event)?;
+                        }
+                        if let Some(depth) = depth_stencil {
+                            let info = self.texture_view_info(depth.view)?;
+                            let event = AccessEvent {
+                                target: AccessTarget::Texture {
+                                    texture: info.texture,
+                                    range: info.range,
+                                },
+                                mode: AccessMode::Write,
+                                family: AccessFamily::Attachment,
+                            };
+                            self.record_access(&mut accesses, event)?;
+                        }
+                    }
+                    CommandOp::BindResourceSet { set, .. } => {
+                        let bindings = self.resource_sets.get(*set)?.desc.bindings.clone();
+                        for binding in &bindings {
+                            let event = self.resource_binding_access(binding)?;
+                            self.record_access(&mut accesses, event)?;
+                        }
+                    }
+                    CommandOp::SetVertexBuffer { buffer, offset, .. } => {
+                        let target = self.buffer_access_target(*buffer, *offset, None)?;
+                        self.record_access(
+                            &mut accesses,
+                            AccessEvent {
+                                target,
+                                mode: AccessMode::Read,
+                                family: AccessFamily::Vertex,
+                            },
+                        )?;
+                    }
+                    CommandOp::SetIndexBuffer { buffer, offset } => {
+                        let target = self.buffer_access_target(*buffer, *offset, None)?;
+                        self.record_access(
+                            &mut accesses,
+                            AccessEvent {
+                                target,
+                                mode: AccessMode::Read,
+                                family: AccessFamily::Index,
+                            },
+                        )?;
+                    }
+                    CommandOp::DrawIndirect {
+                        buffer,
+                        offset,
+                        draw_count: _,
+                    }
+                    | CommandOp::DispatchIndirect { buffer, offset } => {
+                        let target = self.buffer_access_target(*buffer, *offset, None)?;
+                        self.record_access(
+                            &mut accesses,
+                            AccessEvent {
+                                target,
+                                mode: AccessMode::Read,
+                                family: AccessFamily::Indirect,
+                            },
+                        )?;
+                    }
+                    CommandOp::CopyBuffer { src, dst, size } => {
+                        let src_target = self.buffer_access_target(*src, 0, Some(*size))?;
+                        let dst_target = self.buffer_access_target(*dst, 0, Some(*size))?;
+                        self.record_access(
+                            &mut accesses,
+                            AccessEvent {
+                                target: src_target,
+                                mode: AccessMode::Read,
+                                family: AccessFamily::Transfer,
+                            },
+                        )?;
+                        self.record_access(
+                            &mut accesses,
+                            AccessEvent {
+                                target: dst_target,
+                                mode: AccessMode::Write,
+                                family: AccessFamily::Transfer,
+                            },
+                        )?;
+                    }
+                    CommandOp::CopyBufferToTexture(region) => {
+                        let buffer_target = self.buffer_access_target(
+                            region.buffer,
+                            region.buffer_offset,
+                            Some(self.buffer_texture_copy_size(region)?),
+                        )?;
+                        self.record_access(
+                            &mut accesses,
+                            AccessEvent {
+                                target: buffer_target,
+                                mode: AccessMode::Read,
+                                family: AccessFamily::Transfer,
+                            },
+                        )?;
+                        self.record_access(
+                            &mut accesses,
+                            AccessEvent {
+                                target: self.texture_copy_target(region)?,
+                                mode: AccessMode::Write,
+                                family: AccessFamily::Transfer,
+                            },
+                        )?;
+                    }
+                    CommandOp::CopyTextureToBuffer(region) => {
+                        self.record_access(
+                            &mut accesses,
+                            AccessEvent {
+                                target: self.texture_copy_target(region)?,
+                                mode: AccessMode::Read,
+                                family: AccessFamily::Transfer,
+                            },
+                        )?;
+                        let buffer_target = self.buffer_access_target(
+                            region.buffer,
+                            region.buffer_offset,
+                            Some(self.buffer_texture_copy_size(region)?),
+                        )?;
+                        self.record_access(
+                            &mut accesses,
+                            AccessEvent {
+                                target: buffer_target,
+                                mode: AccessMode::Write,
+                                family: AccessFamily::Transfer,
+                            },
+                        )?;
+                    }
+                    CommandOp::HostWriteBuffer {
+                        buffer,
+                        offset,
+                        data,
+                    } => {
+                        let target =
+                            self.buffer_access_target(*buffer, *offset, Some(data.len() as u64))?;
+                        self.record_access(
+                            &mut accesses,
+                            AccessEvent {
+                                target,
+                                mode: AccessMode::Write,
+                                family: AccessFamily::Host,
+                            },
+                        )?;
+                    }
+                    CommandOp::HostReadBuffer {
+                        buffer,
+                        offset,
+                        size,
+                    } => {
+                        let target = self.buffer_access_target(*buffer, *offset, Some(*size))?;
+                        self.record_access(
+                            &mut accesses,
+                            AccessEvent {
+                                target,
+                                mode: AccessMode::Read,
+                                family: AccessFamily::Host,
+                            },
+                        )?;
+                    }
+                    CommandOp::Present {
+                        texture,
+                        subresources,
+                    } => {
+                        self.record_access(
+                            &mut accesses,
+                            AccessEvent {
+                                target: AccessTarget::Texture {
+                                    texture: *texture,
+                                    range: *subresources,
+                                },
+                                mode: AccessMode::Read,
+                                family: AccessFamily::Present,
+                            },
+                        )?;
+                    }
+                    CommandOp::Barrier(barrier) => {
+                        let barrier_target = self.barrier_target(barrier)?;
+                        accesses.retain(|access| !targets_overlap(access.target, barrier_target));
+                    }
+                    CommandOp::BindGraphicsPipeline(_)
+                    | CommandOp::BindComputePipeline(_)
+                    | CommandOp::Draw { .. }
+                    | CommandOp::DrawIndexed { .. }
+                    | CommandOp::Dispatch { .. }
+                    | CommandOp::EndPass => {}
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn resource_binding_access(&self, binding: &ResourceBinding) -> GalResult<AccessEvent> {
+        let mode = if binding.access.writes() {
+            AccessMode::Write
+        } else {
+            AccessMode::Read
+        };
+        match binding.kind {
+            ResourceBindingKind::UniformBuffer => Ok(AccessEvent {
+                target: self.buffer_access_target(binding.resource, 0, None)?,
+                mode: AccessMode::Read,
+                family: AccessFamily::Uniform,
+            }),
+            ResourceBindingKind::StorageBuffer => Ok(AccessEvent {
+                target: self.buffer_access_target(binding.resource, 0, None)?,
+                mode,
+                family: AccessFamily::Storage,
+            }),
+            ResourceBindingKind::SampledTexture => {
+                let info = self.texture_view_info(binding.resource)?;
+                Ok(AccessEvent {
+                    target: AccessTarget::Texture {
+                        texture: info.texture,
+                        range: info.range,
+                    },
+                    mode: AccessMode::Read,
+                    family: AccessFamily::Sampled,
+                })
+            }
+            ResourceBindingKind::StorageTexture => {
+                let info = self.texture_view_info(binding.resource)?;
+                Ok(AccessEvent {
+                    target: AccessTarget::Texture {
+                        texture: info.texture,
+                        range: info.range,
+                    },
+                    mode,
+                    family: AccessFamily::Storage,
+                })
+            }
+            ResourceBindingKind::Sampler => Ok(AccessEvent {
+                target: AccessTarget::Buffer {
+                    handle: binding.resource,
+                    offset: 0,
+                    size: 0,
+                },
+                mode: AccessMode::Read,
+                family: AccessFamily::Sampled,
+            }),
+        }
+    }
+
+    fn record_access(
+        &mut self,
+        accesses: &mut Vec<AccessEvent>,
+        event: AccessEvent,
+    ) -> GalResult<()> {
+        if event.target.is_zero_sized_sampler_marker() {
+            return Ok(());
+        }
+        for previous in accesses.iter().copied() {
+            if targets_overlap(previous.target, event.target)
+                && (previous.mode == AccessMode::Write || event.mode == AccessMode::Write)
+            {
+                return self.validation_error(GalError::submission(
+                    StatusCode::InvalidArgument,
+                    format!(
+                        "overlapping {:?} {:?} access conflicts with prior {:?} {:?} access",
+                        event.family, event.mode, previous.family, previous.mode
+                    ),
+                ));
+            }
+        }
+        accesses.push(event);
+        Ok(())
+    }
+
+    fn buffer_access_target(
+        &self,
+        buffer: Handle,
+        offset: u64,
+        size: Option<u64>,
+    ) -> GalResult<AccessTarget> {
+        let record = self.buffers.get(buffer)?;
+        let size = size.unwrap_or_else(|| record.desc.size.saturating_sub(offset));
+        Ok(AccessTarget::Buffer {
+            handle: buffer,
+            offset,
+            size,
+        })
+    }
+
+    fn barrier_target(&self, barrier: &ResourceBarrier) -> GalResult<AccessTarget> {
+        match barrier.resource.kind() {
+            Some(HandleKind::Buffer) => self.buffer_access_target(barrier.resource, 0, None),
+            Some(HandleKind::Texture) => {
+                let record = self.textures.get(barrier.resource)?;
+                Ok(AccessTarget::Texture {
+                    texture: barrier.resource,
+                    range: barrier.subresources.unwrap_or(TextureSubresourceRange {
+                        base_mip: 0,
+                        mip_count: record.desc.mip_levels,
+                        base_layer: 0,
+                        layer_count: record.desc.array_layers,
+                    }),
+                })
+            }
+            Some(HandleKind::TextureView) => {
+                let info = self.texture_view_info(barrier.resource)?;
+                Ok(AccessTarget::Texture {
+                    texture: info.texture,
+                    range: barrier.subresources.unwrap_or(info.range),
+                })
+            }
+            _ => Err(GalError::command(
+                StatusCode::InvalidArgument,
+                "barrier resource must be a buffer, texture, or texture view",
+            )),
+        }
+    }
+
+    fn texture_view_info(&self, view: Handle) -> GalResult<TextureViewInfo> {
+        let view_record = self.texture_views.get(view)?;
+        let texture_record = self.textures.get(view_record.desc.texture)?;
+        Ok(TextureViewInfo {
+            texture: view_record.desc.texture,
+            format: view_record.desc.format,
+            extent: texture_record.desc.extent,
+            range: TextureSubresourceRange {
+                base_mip: view_record.desc.base_mip,
+                mip_count: view_record.desc.mip_count,
+                base_layer: view_record.desc.base_layer,
+                layer_count: view_record.desc.layer_count,
+            },
+            usages: texture_record.desc.usages.clone(),
+        })
+    }
+
+    fn validate_buffer_range(
+        &mut self,
+        buffer: Handle,
+        offset: u64,
+        size: u64,
+        usage: BufferUsage,
+    ) -> GalResult<()> {
+        let record = self.buffers.get(buffer)?;
+        let has_usage = record.desc.usages.contains(&usage);
+        let buffer_size = record.desc.size;
+        if size == 0 {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                "buffer range size must be non-zero",
+            ));
+        }
+        let Some(end) = offset.checked_add(size) else {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                "buffer range overflows",
+            ));
+        };
+        if end > buffer_size {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                "buffer range is outside the buffer",
+            ));
+        }
+        if !has_usage {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                format!("buffer range requires {usage:?} usage"),
+            ));
+        }
+        Ok(())
+    }
+
+    fn validate_buffer_texture_copy_region(
+        &mut self,
+        region: &BufferImageCopyRegion,
+        buffer_usage: BufferUsage,
+        texture_usage: TextureUsage,
+    ) -> GalResult<()> {
+        let size = self.buffer_texture_copy_size(region)?;
+        self.validate_buffer_range(region.buffer, region.buffer_offset, size, buffer_usage)?;
+        let (texture_usages, texture_extent) = {
+            let texture = self.textures.get(region.texture)?;
+            (texture.desc.usages.clone(), texture.desc.extent)
+        };
+        if !texture_usages.contains(&texture_usage) {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                format!("texture copy requires {texture_usage:?} usage"),
+            ));
+        }
+        if region.extent.width == 0 || region.extent.height == 0 || region.extent.depth == 0 {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                "texture copy extent must be non-zero",
+            ));
+        }
+        if region.bytes_per_row == 0 || region.rows_per_image == 0 || region.bytes_per_row % 4 != 0
+        {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                "texture copy row layout is malformed",
+            ));
+        }
+        self.validate_texture_subresource_range(
+            region.texture,
+            TextureSubresourceRange {
+                base_mip: region.texture_mip,
+                mip_count: 1,
+                base_layer: region.texture_layer,
+                layer_count: 1,
+            },
+        )?;
+        let Some(x_end) = region.texture_origin.x.checked_add(region.extent.width) else {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                "texture copy x range overflows",
+            ));
+        };
+        let Some(y_end) = region.texture_origin.y.checked_add(region.extent.height) else {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                "texture copy y range overflows",
+            ));
+        };
+        let Some(z_end) = region.texture_origin.z.checked_add(region.extent.depth) else {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                "texture copy z range overflows",
+            ));
+        };
+        if x_end > texture_extent.width
+            || y_end > texture_extent.height
+            || z_end > texture_extent.depth
+        {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                "texture copy region is outside texture extent",
+            ));
+        }
+        Ok(())
+    }
+
+    fn buffer_texture_copy_size(&self, region: &BufferImageCopyRegion) -> GalResult<u64> {
+        if region.extent.width == 0 || region.extent.height == 0 || region.extent.depth == 0 {
+            return Err(GalError::command(
+                StatusCode::InvalidArgument,
+                "texture copy extent must be non-zero",
+            ));
+        }
+        let bytes_per_row = u64::from(region.bytes_per_row);
+        let rows_per_image = u64::from(region.rows_per_image);
+        let layers = u64::from(region.extent.depth);
+        rows_per_image
+            .checked_mul(layers.saturating_sub(1))
+            .and_then(|rows_before_last| {
+                rows_before_last.checked_add(u64::from(region.extent.height))
+            })
+            .and_then(|rows| rows.checked_mul(bytes_per_row))
+            .ok_or_else(|| {
+                GalError::command(
+                    StatusCode::InvalidArgument,
+                    "texture copy buffer size overflows",
+                )
+            })
+    }
+
+    fn texture_copy_target(&self, region: &BufferImageCopyRegion) -> GalResult<AccessTarget> {
+        self.textures.get(region.texture)?;
+        Ok(AccessTarget::Texture {
+            texture: region.texture,
+            range: TextureSubresourceRange {
+                base_mip: region.texture_mip,
+                mip_count: 1,
+                base_layer: region.texture_layer,
+                layer_count: 1,
+            },
+        })
+    }
+
+    fn validate_texture_subresource_range(
+        &mut self,
+        texture: Handle,
+        range: TextureSubresourceRange,
+    ) -> GalResult<()> {
+        let record = self.textures.get(texture)?;
+        let mip_levels = record.desc.mip_levels;
+        let array_layers = record.desc.array_layers;
+        let Some(mip_end) = range.base_mip.checked_add(range.mip_count) else {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                "texture subresource mip range overflows",
+            ));
+        };
+        let Some(layer_end) = range.base_layer.checked_add(range.layer_count) else {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                "texture subresource layer range overflows",
+            ));
+        };
+        if range.mip_count == 0
+            || range.layer_count == 0
+            || mip_end > mip_levels
+            || layer_end > array_layers
+        {
+            return self.validation_error(GalError::command(
+                StatusCode::InvalidArgument,
+                "texture subresource range is outside the texture",
+            ));
+        }
+        Ok(())
     }
 
     fn mark_in_flight(&mut self, handle: Handle, id: SubmissionId) -> GalResult<()> {
@@ -1011,6 +1963,29 @@ impl VulkanicGal {
     pub(super) fn mock_backend_mut(&mut self) -> Option<&mut super::backends::mock::MockBackend> {
         self.backend.as_any_mut().downcast_mut()
     }
+
+    #[cfg(test)]
+    pub(super) fn vulkan_backend(&self) -> Option<&super::backends::vulkan::VulkanBackend> {
+        self.backend.as_any().downcast_ref()
+    }
+
+    #[cfg(test)]
+    pub(super) fn retire_through_for_test(&mut self, id: SubmissionId) -> GalResult<Vec<Handle>> {
+        self.backend.retire(id)?;
+        if id > self.completed_submission {
+            self.completed_submission = id;
+        }
+        let mut retired = Vec::new();
+        for entry in self.retirement.drain_completed(self.completed_submission) {
+            if let Some(pending) = self.pending_destroys.remove(&entry.handle) {
+                self.backend
+                    .destroy(entry.handle, pending.kind, pending.token)?;
+                self.metrics.resource_destroys += 1;
+                retired.push(entry.handle);
+            }
+        }
+        Ok(retired)
+    }
 }
 
 trait ArenaRecordExt<T> {
@@ -1060,10 +2035,23 @@ fn referenced_handles(batch: &SubmissionBatch) -> BTreeSet<Handle> {
                 }
                 CommandOp::BindGraphicsPipeline(handle)
                 | CommandOp::BindComputePipeline(handle)
+                | CommandOp::DrawIndirect { buffer: handle, .. }
+                | CommandOp::DispatchIndirect { buffer: handle, .. }
                 | CommandOp::SetIndexBuffer { buffer: handle, .. }
+                | CommandOp::HostWriteBuffer { buffer: handle, .. }
+                | CommandOp::HostReadBuffer { buffer: handle, .. }
                 | CommandOp::Barrier(super::commands::ResourceBarrier {
                     resource: handle, ..
                 }) => {
+                    handles.insert(*handle);
+                }
+                CommandOp::CopyBufferToTexture(region) | CommandOp::CopyTextureToBuffer(region) => {
+                    handles.insert(region.buffer);
+                    handles.insert(region.texture);
+                }
+                CommandOp::Present {
+                    texture: handle, ..
+                } => {
                     handles.insert(*handle);
                 }
                 CommandOp::BindResourceSet {
@@ -1089,4 +2077,81 @@ fn referenced_handles(batch: &SubmissionBatch) -> BTreeSet<Handle> {
         }
     }
     handles
+}
+
+fn is_depth_stencil_format(format: TextureFormat) -> bool {
+    matches!(
+        format,
+        TextureFormat::Depth24Stencil8 | TextureFormat::Depth32Float
+    )
+}
+
+impl AccessTarget {
+    fn is_zero_sized_sampler_marker(self) -> bool {
+        matches!(self, AccessTarget::Buffer { size: 0, .. })
+    }
+}
+
+fn targets_overlap(left: AccessTarget, right: AccessTarget) -> bool {
+    match (left, right) {
+        (
+            AccessTarget::Buffer {
+                handle: left_handle,
+                offset: left_offset,
+                size: left_size,
+            },
+            AccessTarget::Buffer {
+                handle: right_handle,
+                offset: right_offset,
+                size: right_size,
+            },
+        ) => {
+            if left_handle != right_handle || left_size == 0 || right_size == 0 {
+                return false;
+            }
+            ranges_overlap(left_offset, left_size, right_offset, right_size)
+        }
+        (
+            AccessTarget::Texture {
+                texture: left_texture,
+                range: left_range,
+            },
+            AccessTarget::Texture {
+                texture: right_texture,
+                range: right_range,
+            },
+        ) => left_texture == right_texture && texture_ranges_overlap(left_range, right_range),
+        _ => false,
+    }
+}
+
+fn ranges_overlap(left_offset: u64, left_size: u64, right_offset: u64, right_size: u64) -> bool {
+    let left_end = left_offset.saturating_add(left_size);
+    let right_end = right_offset.saturating_add(right_size);
+    left_offset < right_end && right_offset < left_end
+}
+
+fn texture_ranges_overlap(left: TextureSubresourceRange, right: TextureSubresourceRange) -> bool {
+    ranges_overlap(
+        left.base_mip as u64,
+        left.mip_count as u64,
+        right.base_mip as u64,
+        right.mip_count as u64,
+    ) && ranges_overlap(
+        left.base_layer as u64,
+        left.layer_count as u64,
+        right.base_layer as u64,
+        right.layer_count as u64,
+    )
+}
+
+fn texture_range_contains(outer: TextureSubresourceRange, inner: TextureSubresourceRange) -> bool {
+    let outer_mip_end = outer.base_mip.saturating_add(outer.mip_count);
+    let inner_mip_end = inner.base_mip.saturating_add(inner.mip_count);
+    let outer_layer_end = outer.base_layer.saturating_add(outer.layer_count);
+    let inner_layer_end = inner.base_layer.saturating_add(inner.layer_count);
+    outer.base_mip <= inner.base_mip
+        && inner_mip_end <= outer_mip_end
+        && outer.base_layer <= inner.base_layer
+        && inner_layer_end <= outer_layer_end
 }

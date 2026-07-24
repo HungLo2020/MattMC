@@ -18,6 +18,8 @@ pub enum BufferUsage {
     TransferSrc = 5,
     TransferDst = 6,
     Indirect = 7,
+    HostRead = 8,
+    HostWrite = 9,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -57,6 +59,8 @@ pub enum TextureUsage {
     TransferSrc = 5,
     TransferDst = 6,
     Present = 7,
+    HostRead = 8,
+    HostWrite = 9,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -82,6 +86,14 @@ pub struct TextureViewDesc {
     pub label: String,
     pub texture: Handle,
     pub format: TextureFormat,
+    pub base_mip: u32,
+    pub mip_count: u32,
+    pub base_layer: u32,
+    pub layer_count: u32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TextureSubresourceRange {
     pub base_mip: u32,
     pub mip_count: u32,
     pub base_layer: u32,
@@ -191,6 +203,9 @@ pub struct ResourceBindingDesc {
     pub binding: u32,
     pub kind: ResourceBindingKind,
     pub stages: PipelineStageFlags,
+    pub array_count: u32,
+    pub optional: bool,
+    pub dynamic_offset_count: u32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -209,9 +224,11 @@ pub struct ResourceSetDesc {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ResourceBinding {
     pub binding: u32,
+    pub array_index: u32,
     pub resource: Handle,
     pub kind: ResourceBindingKind,
     pub access: AccessFlags,
+    pub dynamic_offsets: Vec<u64>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -297,4 +314,14 @@ pub struct RenderPassDesc {
     pub target: Handle,
     pub color_formats: Vec<ColorFormat>,
     pub depth_format: Option<TextureFormat>,
+}
+
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum QueueClass {
+    Graphics = 1,
+    Compute = 2,
+    Transfer = 3,
+    Present = 4,
+    External = 5,
 }

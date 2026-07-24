@@ -73,6 +73,37 @@ fn sampler(label: &str) -> SamplerDesc {
     }
 }
 
+fn layout_binding(
+    binding: u32,
+    kind: ResourceBindingKind,
+    stages: PipelineStageFlags,
+) -> ResourceBindingDesc {
+    ResourceBindingDesc {
+        binding,
+        kind,
+        stages,
+        array_count: 1,
+        optional: false,
+        dynamic_offset_count: 0,
+    }
+}
+
+fn resource_binding(
+    binding: u32,
+    resource: Handle,
+    kind: ResourceBindingKind,
+    access: AccessFlags,
+) -> ResourceBinding {
+    ResourceBinding {
+        binding,
+        array_index: 0,
+        resource,
+        kind,
+        access,
+        dynamic_offsets: vec![],
+    }
+}
+
 fn shader(label: &str, stage: ShaderStage) -> ShaderModuleDesc {
     ShaderModuleDesc {
         label: label.to_owned(),
@@ -98,7 +129,7 @@ fn color_attachment(view: Handle) -> PassAttachment {
 }
 
 fn simple_graphics_scene(gal: &mut VulkanicGal) -> (Handle, Handle, Handle, Handle, Handle) {
-    let texture = gal
+    let color_texture = gal
         .create_texture(texture(
             "color",
             TextureFormat::Rgba8Unorm,
@@ -106,7 +137,7 @@ fn simple_graphics_scene(gal: &mut VulkanicGal) -> (Handle, Handle, Handle, Hand
         ))
         .unwrap();
     let color_view = gal
-        .create_texture_view(view("color-view", texture, TextureFormat::Rgba8Unorm))
+        .create_texture_view(view("color-view", color_texture, TextureFormat::Rgba8Unorm))
         .unwrap();
     let target = gal
         .create_render_target(RenderTargetDesc {
@@ -213,16 +244,12 @@ fn resource_sets_validate_layout_binding_kind_resource_type_and_access() {
         .create_resource_layout(ResourceLayoutDesc {
             label: "layout".to_owned(),
             bindings: vec![
-                ResourceBindingDesc {
-                    binding: 0,
-                    kind: ResourceBindingKind::UniformBuffer,
-                    stages: PipelineStageFlags::DRAW,
-                },
-                ResourceBindingDesc {
-                    binding: 1,
-                    kind: ResourceBindingKind::Sampler,
-                    stages: PipelineStageFlags::DRAW,
-                },
+                layout_binding(
+                    0,
+                    ResourceBindingKind::UniformBuffer,
+                    PipelineStageFlags::DRAW,
+                ),
+                layout_binding(1, ResourceBindingKind::Sampler, PipelineStageFlags::DRAW),
             ],
         })
         .unwrap();
@@ -231,18 +258,13 @@ fn resource_sets_validate_layout_binding_kind_resource_type_and_access() {
         label: "set".to_owned(),
         layout,
         bindings: vec![
-            ResourceBinding {
-                binding: 0,
-                resource: buffer,
-                kind: ResourceBindingKind::UniformBuffer,
-                access: AccessFlags::READ,
-            },
-            ResourceBinding {
-                binding: 1,
-                resource: sampler,
-                kind: ResourceBindingKind::Sampler,
-                access: AccessFlags::READ,
-            },
+            resource_binding(
+                0,
+                buffer,
+                ResourceBindingKind::UniformBuffer,
+                AccessFlags::READ,
+            ),
+            resource_binding(1, sampler, ResourceBindingKind::Sampler, AccessFlags::READ),
         ],
     })
     .unwrap();
@@ -251,12 +273,12 @@ fn resource_sets_validate_layout_binding_kind_resource_type_and_access() {
         gal.create_resource_set(ResourceSetDesc {
             label: "wrong-kind".to_owned(),
             layout,
-            bindings: vec![ResourceBinding {
-                binding: 0,
-                resource: buffer,
-                kind: ResourceBindingKind::Sampler,
-                access: AccessFlags::READ,
-            }],
+            bindings: vec![resource_binding(
+                0,
+                buffer,
+                ResourceBindingKind::Sampler,
+                AccessFlags::READ,
+            )],
         }),
         super::StatusCode::InvalidArgument,
     );
@@ -264,12 +286,12 @@ fn resource_sets_validate_layout_binding_kind_resource_type_and_access() {
         gal.create_resource_set(ResourceSetDesc {
             label: "wrong-type".to_owned(),
             layout,
-            bindings: vec![ResourceBinding {
-                binding: 1,
-                resource: buffer,
-                kind: ResourceBindingKind::Sampler,
-                access: AccessFlags::READ,
-            }],
+            bindings: vec![resource_binding(
+                1,
+                buffer,
+                ResourceBindingKind::Sampler,
+                AccessFlags::READ,
+            )],
         }),
         super::StatusCode::WrongHandleType,
     );
@@ -277,21 +299,173 @@ fn resource_sets_validate_layout_binding_kind_resource_type_and_access() {
         gal.create_resource_set(ResourceSetDesc {
             label: "no-access".to_owned(),
             layout,
-            bindings: vec![ResourceBinding {
-                binding: 0,
-                resource: buffer,
-                kind: ResourceBindingKind::UniformBuffer,
-                access: AccessFlags::NONE,
-            }],
+            bindings: vec![resource_binding(
+                0,
+                buffer,
+                ResourceBindingKind::UniformBuffer,
+                AccessFlags::NONE,
+            )],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+    assert_code(
+        gal.create_resource_layout(ResourceLayoutDesc {
+            label: "no-stage-layout".to_owned(),
+            bindings: vec![layout_binding(
+                0,
+                ResourceBindingKind::UniformBuffer,
+                PipelineStageFlags::NONE,
+            )],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+    assert_code(
+        gal.create_resource_set(ResourceSetDesc {
+            label: "duplicate-set-binding".to_owned(),
+            layout,
+            bindings: vec![
+                resource_binding(
+                    0,
+                    buffer,
+                    ResourceBindingKind::UniformBuffer,
+                    AccessFlags::READ,
+                ),
+                resource_binding(
+                    0,
+                    buffer,
+                    ResourceBindingKind::UniformBuffer,
+                    AccessFlags::READ,
+                ),
+            ],
         }),
         super::StatusCode::InvalidArgument,
     );
 }
 
 #[test]
+fn resource_sets_require_complete_arrays_and_explicit_optionality() {
+    let mut gal = gal();
+    let first = gal
+        .create_buffer(buffer("first-ubo", vec![BufferUsage::Uniform]))
+        .unwrap();
+    let second = gal
+        .create_buffer(buffer("second-ubo", vec![BufferUsage::Uniform]))
+        .unwrap();
+    let array_layout = gal
+        .create_resource_layout(ResourceLayoutDesc {
+            label: "array-layout".to_owned(),
+            bindings: vec![ResourceBindingDesc {
+                binding: 0,
+                kind: ResourceBindingKind::UniformBuffer,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 2,
+                optional: false,
+                dynamic_offset_count: 0,
+            }],
+        })
+        .unwrap();
+
+    assert_code(
+        gal.create_resource_set(ResourceSetDesc {
+            label: "incomplete-array".to_owned(),
+            layout: array_layout,
+            bindings: vec![resource_binding(
+                0,
+                first,
+                ResourceBindingKind::UniformBuffer,
+                AccessFlags::READ,
+            )],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+
+    gal.create_resource_set(ResourceSetDesc {
+        label: "complete-array".to_owned(),
+        layout: array_layout,
+        bindings: vec![
+            resource_binding(
+                0,
+                first,
+                ResourceBindingKind::UniformBuffer,
+                AccessFlags::READ,
+            ),
+            ResourceBinding {
+                binding: 0,
+                array_index: 1,
+                resource: second,
+                kind: ResourceBindingKind::UniformBuffer,
+                access: AccessFlags::READ,
+                dynamic_offsets: vec![],
+            },
+        ],
+    })
+    .unwrap();
+
+    let optional_layout = gal
+        .create_resource_layout(ResourceLayoutDesc {
+            label: "optional-layout".to_owned(),
+            bindings: vec![ResourceBindingDesc {
+                binding: 0,
+                kind: ResourceBindingKind::UniformBuffer,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 2,
+                optional: true,
+                dynamic_offset_count: 0,
+            }],
+        })
+        .unwrap();
+    gal.create_resource_set(ResourceSetDesc {
+        label: "explicitly-partial".to_owned(),
+        layout: optional_layout,
+        bindings: vec![],
+    })
+    .unwrap();
+
+    let dynamic_layout = gal
+        .create_resource_layout(ResourceLayoutDesc {
+            label: "dynamic-layout".to_owned(),
+            bindings: vec![ResourceBindingDesc {
+                binding: 0,
+                kind: ResourceBindingKind::UniformBuffer,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 1,
+                optional: false,
+                dynamic_offset_count: 1,
+            }],
+        })
+        .unwrap();
+    assert_code(
+        gal.create_resource_set(ResourceSetDesc {
+            label: "missing-dynamic-offset".to_owned(),
+            layout: dynamic_layout,
+            bindings: vec![resource_binding(
+                0,
+                first,
+                ResourceBindingKind::UniformBuffer,
+                AccessFlags::READ,
+            )],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+    gal.create_resource_set(ResourceSetDesc {
+        label: "dynamic-offset".to_owned(),
+        layout: dynamic_layout,
+        bindings: vec![ResourceBinding {
+            binding: 0,
+            array_index: 0,
+            resource: first,
+            kind: ResourceBindingKind::UniformBuffer,
+            access: AccessFlags::READ,
+            dynamic_offsets: vec![64],
+        }],
+    })
+    .unwrap();
+}
+
+#[test]
 fn pipeline_and_pass_compatibility_is_validated() {
     let mut gal = gal();
-    let (color_view, target, pass, _layout, pipeline) = simple_graphics_scene(&mut gal);
+    let (color_view, target, pass, layout, pipeline) = simple_graphics_scene(&mut gal);
     let good_ops = vec![
         CommandOp::BeginPass {
             pass,
@@ -312,10 +486,22 @@ fn pipeline_and_pass_compatibility_is_validated() {
     })
     .unwrap();
 
-    let bad_pass = gal
-        .create_render_pass(RenderPassDesc {
-            label: "bad-pass".to_owned(),
-            target,
+    let vertex_shader = gal
+        .create_shader_module(shader("second-vertex", ShaderStage::Vertex))
+        .unwrap();
+    let fragment_shader = gal
+        .create_shader_module(shader("second-fragment", ShaderStage::Fragment))
+        .unwrap();
+    let bad_pipeline = gal
+        .create_graphics_pipeline(GraphicsPipelineDesc {
+            label: "bad-pipeline".to_owned(),
+            layout,
+            vertex_shader,
+            fragment_shader,
+            topology: PrimitiveTopology::Triangles,
+            cull_mode: CullMode::Back,
+            blend: BlendMode::Disabled,
+            depth_compare: None,
             color_formats: vec![TextureFormat::Bgra8Unorm],
             depth_format: None,
         })
@@ -325,17 +511,300 @@ fn pipeline_and_pass_compatibility_is_validated() {
             label: "bad".to_owned(),
             operations: vec![
                 CommandOp::BeginPass {
-                    pass: bad_pass,
+                    pass,
                     target,
                     colors: vec![color_attachment(color_view)],
                     depth_stencil: None,
                 },
-                CommandOp::BindGraphicsPipeline(pipeline),
+                CommandOp::BindGraphicsPipeline(bad_pipeline),
                 CommandOp::EndPass,
             ],
         }),
         super::StatusCode::InvalidArgument,
     );
+}
+
+#[test]
+fn render_target_pass_and_attachment_views_match_their_textures() {
+    let mut gal = gal();
+    let color_texture = gal
+        .create_texture(texture(
+            "color",
+            TextureFormat::Rgba8Unorm,
+            vec![TextureUsage::ColorAttachment],
+        ))
+        .unwrap();
+    assert_code(
+        gal.create_texture_view(view(
+            "reinterpret",
+            color_texture,
+            TextureFormat::Bgra8Unorm,
+        )),
+        super::StatusCode::InvalidArgument,
+    );
+    let color_view = gal
+        .create_texture_view(view("color-view", color_texture, TextureFormat::Rgba8Unorm))
+        .unwrap();
+    assert_code(
+        gal.create_render_target(RenderTargetDesc {
+            label: "wrong-extent".to_owned(),
+            color_views: vec![color_view],
+            depth_stencil_view: None,
+            extent: Extent3d {
+                width: 64,
+                height: 128,
+                depth: 1,
+            },
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+    let target = gal
+        .create_render_target(RenderTargetDesc {
+            label: "target".to_owned(),
+            color_views: vec![color_view],
+            depth_stencil_view: None,
+            extent: Extent3d {
+                width: 128,
+                height: 128,
+                depth: 1,
+            },
+        })
+        .unwrap();
+    assert_code(
+        gal.create_render_pass(RenderPassDesc {
+            label: "wrong-format-pass".to_owned(),
+            target,
+            color_formats: vec![TextureFormat::Bgra8Unorm],
+            depth_format: None,
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+    let pass = gal
+        .create_render_pass(RenderPassDesc {
+            label: "pass".to_owned(),
+            target,
+            color_formats: vec![TextureFormat::Rgba8Unorm],
+            depth_format: None,
+        })
+        .unwrap();
+    let other_texture = gal
+        .create_texture(texture(
+            "other",
+            TextureFormat::Rgba8Unorm,
+            vec![TextureUsage::ColorAttachment],
+        ))
+        .unwrap();
+    let other_view = gal
+        .create_texture_view(view("other-view", other_texture, TextureFormat::Rgba8Unorm))
+        .unwrap();
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "wrong-attachment".to_owned(),
+            operations: vec![CommandOp::BeginPass {
+                pass,
+                target,
+                colors: vec![color_attachment(other_view)],
+                depth_stencil: None,
+            }],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+}
+
+#[test]
+fn attachment_and_presentation_hazards_require_semantic_separation() {
+    let mut gal = gal();
+    let texture = gal
+        .create_texture(texture(
+            "attachment",
+            TextureFormat::Rgba8Unorm,
+            vec![TextureUsage::ColorAttachment, TextureUsage::Present],
+        ))
+        .unwrap();
+    let first_view = gal
+        .create_texture_view(view("first-view", texture, TextureFormat::Rgba8Unorm))
+        .unwrap();
+    let second_view = gal
+        .create_texture_view(view("second-view", texture, TextureFormat::Rgba8Unorm))
+        .unwrap();
+    let overlapping_target = gal
+        .create_render_target(RenderTargetDesc {
+            label: "overlapping-target".to_owned(),
+            color_views: vec![first_view, second_view],
+            depth_stencil_view: None,
+            extent: Extent3d {
+                width: 128,
+                height: 128,
+                depth: 1,
+            },
+        })
+        .unwrap();
+    let overlapping_pass = gal
+        .create_render_pass(RenderPassDesc {
+            label: "overlapping-pass".to_owned(),
+            target: overlapping_target,
+            color_formats: vec![TextureFormat::Rgba8Unorm, TextureFormat::Rgba8Unorm],
+            depth_format: None,
+        })
+        .unwrap();
+    let layout = gal
+        .create_pipeline_layout(PipelineLayoutDesc {
+            label: "attachment-layout".to_owned(),
+            resource_layouts: vec![],
+        })
+        .unwrap();
+    let vertex_shader = gal
+        .create_shader_module(shader("attachment-vertex", ShaderStage::Vertex))
+        .unwrap();
+    let fragment_shader = gal
+        .create_shader_module(shader("attachment-fragment", ShaderStage::Fragment))
+        .unwrap();
+    let overlapping_pipeline = gal
+        .create_graphics_pipeline(GraphicsPipelineDesc {
+            label: "overlapping-pipeline".to_owned(),
+            layout,
+            vertex_shader,
+            fragment_shader,
+            topology: PrimitiveTopology::Triangles,
+            cull_mode: CullMode::Back,
+            blend: BlendMode::Disabled,
+            depth_compare: None,
+            color_formats: vec![TextureFormat::Rgba8Unorm, TextureFormat::Rgba8Unorm],
+            depth_format: None,
+        })
+        .unwrap();
+    let overlapping_list = gal
+        .create_command_list(CommandListDesc {
+            label: "overlapping-attachments".to_owned(),
+            operations: vec![
+                CommandOp::BeginPass {
+                    pass: overlapping_pass,
+                    target: overlapping_target,
+                    colors: vec![color_attachment(first_view), color_attachment(second_view)],
+                    depth_stencil: None,
+                },
+                CommandOp::BindGraphicsPipeline(overlapping_pipeline),
+                CommandOp::EndPass,
+            ],
+        })
+        .unwrap();
+    assert_code(
+        gal.submit(SubmissionBatch {
+            label: "attachment-overlap".to_owned(),
+            command_lists: vec![overlapping_list],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+
+    let target = gal
+        .create_render_target(RenderTargetDesc {
+            label: "single-target".to_owned(),
+            color_views: vec![first_view],
+            depth_stencil_view: None,
+            extent: Extent3d {
+                width: 128,
+                height: 128,
+                depth: 1,
+            },
+        })
+        .unwrap();
+    let pass = gal
+        .create_render_pass(RenderPassDesc {
+            label: "single-pass".to_owned(),
+            target,
+            color_formats: vec![TextureFormat::Rgba8Unorm],
+            depth_format: None,
+        })
+        .unwrap();
+    let vertex_shader = gal
+        .create_shader_module(shader("present-vertex", ShaderStage::Vertex))
+        .unwrap();
+    let fragment_shader = gal
+        .create_shader_module(shader("present-fragment", ShaderStage::Fragment))
+        .unwrap();
+    let pipeline = gal
+        .create_graphics_pipeline(GraphicsPipelineDesc {
+            label: "present-pipeline".to_owned(),
+            layout,
+            vertex_shader,
+            fragment_shader,
+            topology: PrimitiveTopology::Triangles,
+            cull_mode: CullMode::Back,
+            blend: BlendMode::Disabled,
+            depth_compare: None,
+            color_formats: vec![TextureFormat::Rgba8Unorm],
+            depth_format: None,
+        })
+        .unwrap();
+    let full_range = TextureSubresourceRange {
+        base_mip: 0,
+        mip_count: 1,
+        base_layer: 0,
+        layer_count: 1,
+    };
+    let present_without_barrier = gal
+        .create_command_list(CommandListDesc {
+            label: "present-without-barrier".to_owned(),
+            operations: vec![
+                CommandOp::BeginPass {
+                    pass,
+                    target,
+                    colors: vec![color_attachment(first_view)],
+                    depth_stencil: None,
+                },
+                CommandOp::BindGraphicsPipeline(pipeline),
+                CommandOp::EndPass,
+                CommandOp::Present {
+                    texture,
+                    subresources: full_range,
+                },
+            ],
+        })
+        .unwrap();
+    assert_code(
+        gal.submit(SubmissionBatch {
+            label: "present-hazard".to_owned(),
+            command_lists: vec![present_without_barrier],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+
+    let present_with_barrier = gal
+        .create_command_list(CommandListDesc {
+            label: "present-with-barrier".to_owned(),
+            operations: vec![
+                CommandOp::BeginPass {
+                    pass,
+                    target,
+                    colors: vec![color_attachment(first_view)],
+                    depth_stencil: None,
+                },
+                CommandOp::BindGraphicsPipeline(pipeline),
+                CommandOp::EndPass,
+                CommandOp::Barrier(ResourceBarrier {
+                    resource: texture,
+                    subresources: Some(full_range),
+                    before: TextureUsageState::ColorAttachment,
+                    after: TextureUsageState::Present,
+                    stages: PipelineStageFlags(
+                        PipelineStageFlags::DRAW.0 | PipelineStageFlags::PRESENT.0,
+                    ),
+                    access: AccessFlags(AccessFlags::COLOR_ATTACHMENT.0 | AccessFlags::READ.0),
+                    src_queue: QueueClass::Graphics,
+                    dst_queue: QueueClass::Present,
+                }),
+                CommandOp::Present {
+                    texture,
+                    subresources: full_range,
+                },
+            ],
+        })
+        .unwrap();
+    gal.submit(SubmissionBatch {
+        label: "present-separated".to_owned(),
+        command_lists: vec![present_with_barrier],
+    })
+    .unwrap();
 }
 
 #[test]
@@ -360,6 +829,9 @@ fn malformed_commands_and_usage_declarations_are_rejected() {
         .unwrap();
     let src = gal
         .create_buffer(buffer("src", vec![BufferUsage::TransferSrc]))
+        .unwrap();
+    let not_transfer_dst = gal
+        .create_buffer(buffer("not-dst", vec![BufferUsage::Vertex]))
         .unwrap();
 
     assert_code(
@@ -401,10 +873,13 @@ fn malformed_commands_and_usage_declarations_are_rejected() {
             label: "bad-barrier".to_owned(),
             operations: vec![CommandOp::Barrier(ResourceBarrier {
                 resource: src,
+                subresources: None,
                 before: TextureUsageState::TransferSrc,
                 after: TextureUsageState::TransferDst,
                 stages: PipelineStageFlags::NONE,
                 access: AccessFlags::TRANSFER,
+                src_queue: QueueClass::Transfer,
+                dst_queue: QueueClass::Transfer,
             })],
         }),
         super::StatusCode::InvalidArgument,
@@ -417,6 +892,609 @@ fn malformed_commands_and_usage_declarations_are_rejected() {
                 dst: src,
                 size: 16,
             }],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "copy-without-dst-usage".to_owned(),
+            operations: vec![CommandOp::CopyBuffer {
+                src,
+                dst: not_transfer_dst,
+                size: 16,
+            }],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "index-without-index-usage".to_owned(),
+            operations: vec![
+                CommandOp::BeginPass {
+                    pass,
+                    target,
+                    colors: vec![color_attachment(color_view)],
+                    depth_stencil: None,
+                },
+                CommandOp::BindGraphicsPipeline(pipeline),
+                CommandOp::SetIndexBuffer {
+                    buffer: not_transfer_dst,
+                    offset: 0,
+                },
+                CommandOp::EndPass,
+            ],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+}
+
+#[test]
+fn buffer_texture_copy_commands_validate_usage_ranges_and_hazards() {
+    let mut gal = gal();
+    let upload = gal
+        .create_buffer(buffer("texture-upload", vec![BufferUsage::TransferSrc]))
+        .unwrap();
+    let readback = gal
+        .create_buffer(buffer("texture-readback", vec![BufferUsage::TransferDst]))
+        .unwrap();
+    let texture_handle = gal
+        .create_texture(texture(
+            "copy-texture",
+            TextureFormat::Rgba8Unorm,
+            vec![TextureUsage::TransferDst, TextureUsage::TransferSrc],
+        ))
+        .unwrap();
+    let full_range = TextureSubresourceRange {
+        base_mip: 0,
+        mip_count: 1,
+        base_layer: 0,
+        layer_count: 1,
+    };
+    let region = BufferImageCopyRegion {
+        buffer: upload,
+        buffer_offset: 0,
+        bytes_per_row: 16,
+        rows_per_image: 4,
+        texture: texture_handle,
+        texture_mip: 0,
+        texture_layer: 0,
+        texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+        extent: Extent3d {
+            width: 4,
+            height: 4,
+            depth: 1,
+        },
+    };
+
+    let read_region = BufferImageCopyRegion {
+        buffer: readback,
+        ..region.clone()
+    };
+    gal.create_command_list(CommandListDesc {
+        label: "buffer-texture-transfer-with-barrier".to_owned(),
+        operations: vec![
+            CommandOp::CopyBufferToTexture(region.clone()),
+            CommandOp::Barrier(ResourceBarrier {
+                resource: texture_handle,
+                subresources: Some(full_range),
+                before: TextureUsageState::TransferDst,
+                after: TextureUsageState::TransferSrc,
+                stages: PipelineStageFlags::TRANSFER,
+                access: AccessFlags::TRANSFER,
+                src_queue: QueueClass::Transfer,
+                dst_queue: QueueClass::Transfer,
+            }),
+            CommandOp::CopyTextureToBuffer(read_region.clone()),
+        ],
+    })
+    .unwrap();
+
+    let no_barrier = gal
+        .create_command_list(CommandListDesc {
+            label: "buffer-texture-transfer-without-barrier".to_owned(),
+            operations: vec![
+                CommandOp::CopyBufferToTexture(region.clone()),
+                CommandOp::CopyTextureToBuffer(read_region.clone()),
+            ],
+        })
+        .unwrap();
+    assert_code(
+        gal.submit(SubmissionBatch {
+            label: "buffer-texture-hazard".to_owned(),
+            command_lists: vec![no_barrier],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+
+    let transfer_src_only = gal
+        .create_texture(texture(
+            "transfer-src-only-texture",
+            TextureFormat::Rgba8Unorm,
+            vec![TextureUsage::TransferSrc],
+        ))
+        .unwrap();
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "copy-to-texture-without-dst-usage".to_owned(),
+            operations: vec![CommandOp::CopyBufferToTexture(BufferImageCopyRegion {
+                texture: transfer_src_only,
+                ..region.clone()
+            })],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "copy-to-texture-bad-row-layout".to_owned(),
+            operations: vec![CommandOp::CopyBufferToTexture(BufferImageCopyRegion {
+                bytes_per_row: 18,
+                ..region.clone()
+            })],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "copy-to-texture-outside-extent".to_owned(),
+            operations: vec![CommandOp::CopyBufferToTexture(BufferImageCopyRegion {
+                texture_origin: TextureOrigin3d { x: 127, y: 0, z: 0 },
+                ..region
+            })],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+}
+
+#[test]
+fn indirect_host_and_malformed_ranges_are_validated_semantically() {
+    let mut gal = gal();
+    let (color_view, target, pass, _layout, pipeline) = simple_graphics_scene(&mut gal);
+    let not_indirect = gal
+        .create_buffer(buffer("not-indirect", vec![BufferUsage::Vertex]))
+        .unwrap();
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "draw-indirect-without-usage".to_owned(),
+            operations: vec![
+                CommandOp::BeginPass {
+                    pass,
+                    target,
+                    colors: vec![color_attachment(color_view)],
+                    depth_stencil: None,
+                },
+                CommandOp::BindGraphicsPipeline(pipeline),
+                CommandOp::DrawIndirect {
+                    buffer: not_indirect,
+                    offset: 0,
+                    draw_count: 1,
+                },
+                CommandOp::EndPass,
+            ],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+
+    let indirect = gal
+        .create_buffer(buffer("indirect", vec![BufferUsage::Indirect]))
+        .unwrap();
+    gal.create_command_list(CommandListDesc {
+        label: "draw-indirect".to_owned(),
+        operations: vec![
+            CommandOp::BeginPass {
+                pass,
+                target,
+                colors: vec![color_attachment(color_view)],
+                depth_stencil: None,
+            },
+            CommandOp::BindGraphicsPipeline(pipeline),
+            CommandOp::DrawIndirect {
+                buffer: indirect,
+                offset: 0,
+                draw_count: 1,
+            },
+            CommandOp::EndPass,
+        ],
+    })
+    .unwrap();
+
+    let host_wrong_memory = gal
+        .create_buffer(buffer("host-wrong-memory", vec![BufferUsage::HostWrite]))
+        .unwrap();
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "host-write-wrong-memory".to_owned(),
+            operations: vec![CommandOp::HostWriteBuffer {
+                buffer: host_wrong_memory,
+                offset: 0,
+                data: vec![0; 16],
+            }],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+
+    let upload = gal
+        .create_buffer(BufferDesc {
+            label: "upload".to_owned(),
+            size: 64,
+            memory: MemoryDomain::Upload,
+            usages: vec![BufferUsage::HostWrite],
+        })
+        .unwrap();
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "host-write-overflow".to_owned(),
+            operations: vec![CommandOp::HostWriteBuffer {
+                buffer: upload,
+                offset: u64::MAX,
+                data: vec![0; 16],
+            }],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "host-write-outside".to_owned(),
+            operations: vec![CommandOp::HostWriteBuffer {
+                buffer: upload,
+                offset: 32,
+                data: vec![0; 64],
+            }],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+
+    let not_present = gal
+        .create_texture(texture(
+            "not-present",
+            TextureFormat::Rgba8Unorm,
+            vec![TextureUsage::Sampled],
+        ))
+        .unwrap();
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "present-without-usage".to_owned(),
+            operations: vec![CommandOp::Present {
+                texture: not_present,
+                subresources: TextureSubresourceRange {
+                    base_mip: 0,
+                    mip_count: 1,
+                    base_layer: 0,
+                    layer_count: 1,
+                },
+            }],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+    let present_texture = gal
+        .create_texture(texture(
+            "present",
+            TextureFormat::Rgba8Unorm,
+            vec![TextureUsage::Present],
+        ))
+        .unwrap();
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "present-bad-range".to_owned(),
+            operations: vec![CommandOp::Present {
+                texture: present_texture,
+                subresources: TextureSubresourceRange {
+                    base_mip: 0,
+                    mip_count: 0,
+                    base_layer: 0,
+                    layer_count: 1,
+                },
+            }],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+}
+
+#[test]
+fn storage_and_subresource_hazards_are_conservative() {
+    let mut gal = gal();
+    let storage = gal
+        .create_buffer(BufferDesc {
+            label: "storage".to_owned(),
+            size: 128,
+            memory: MemoryDomain::Readback,
+            usages: vec![
+                BufferUsage::Storage,
+                BufferUsage::HostRead,
+                BufferUsage::TransferDst,
+            ],
+        })
+        .unwrap();
+    let layout = gal
+        .create_resource_layout(ResourceLayoutDesc {
+            label: "storage-layout".to_owned(),
+            bindings: vec![layout_binding(
+                0,
+                ResourceBindingKind::StorageBuffer,
+                PipelineStageFlags::COMPUTE,
+            )],
+        })
+        .unwrap();
+    let set = gal
+        .create_resource_set(ResourceSetDesc {
+            label: "storage-set".to_owned(),
+            layout,
+            bindings: vec![resource_binding(
+                0,
+                storage,
+                ResourceBindingKind::StorageBuffer,
+                AccessFlags::WRITE,
+            )],
+        })
+        .unwrap();
+    let pipeline_layout = gal
+        .create_pipeline_layout(PipelineLayoutDesc {
+            label: "storage-pipeline-layout".to_owned(),
+            resource_layouts: vec![layout],
+        })
+        .unwrap();
+    let shader = gal
+        .create_shader_module(shader("storage-compute", ShaderStage::Compute))
+        .unwrap();
+    let pipeline = gal
+        .create_compute_pipeline(ComputePipelineDesc {
+            label: "storage-pipeline".to_owned(),
+            layout: pipeline_layout,
+            shader,
+        })
+        .unwrap();
+    let list = gal
+        .create_command_list(CommandListDesc {
+            label: "storage-write-then-host-read".to_owned(),
+            operations: vec![
+                CommandOp::BindComputePipeline(pipeline),
+                CommandOp::BindResourceSet {
+                    pipeline_layout,
+                    set_index: 0,
+                    set,
+                },
+                CommandOp::Dispatch {
+                    groups_x: 1,
+                    groups_y: 1,
+                    groups_z: 1,
+                },
+                CommandOp::HostReadBuffer {
+                    buffer: storage,
+                    offset: 0,
+                    size: 16,
+                },
+            ],
+        })
+        .unwrap();
+    assert_code(
+        gal.submit(SubmissionBatch {
+            label: "storage-hazard".to_owned(),
+            command_lists: vec![list],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+}
+
+#[test]
+fn texture_subresource_hazards_respect_non_overlapping_ranges() {
+    let mut gal = gal();
+    let texture = gal
+        .create_texture(TextureDesc {
+            label: "storage-texture".to_owned(),
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Rgba8Unorm,
+            extent: Extent3d {
+                width: 64,
+                height: 64,
+                depth: 1,
+            },
+            mip_levels: 2,
+            array_layers: 1,
+            usages: vec![TextureUsage::Storage],
+        })
+        .unwrap();
+    let mip0 = gal
+        .create_texture_view(TextureViewDesc {
+            label: "mip0".to_owned(),
+            texture,
+            format: TextureFormat::Rgba8Unorm,
+            base_mip: 0,
+            mip_count: 1,
+            base_layer: 0,
+            layer_count: 1,
+        })
+        .unwrap();
+    let mip1 = gal
+        .create_texture_view(TextureViewDesc {
+            label: "mip1".to_owned(),
+            texture,
+            format: TextureFormat::Rgba8Unorm,
+            base_mip: 1,
+            mip_count: 1,
+            base_layer: 0,
+            layer_count: 1,
+        })
+        .unwrap();
+    let layout = gal
+        .create_resource_layout(ResourceLayoutDesc {
+            label: "texture-storage-layout".to_owned(),
+            bindings: vec![
+                layout_binding(
+                    0,
+                    ResourceBindingKind::StorageTexture,
+                    PipelineStageFlags::COMPUTE,
+                ),
+                layout_binding(
+                    1,
+                    ResourceBindingKind::StorageTexture,
+                    PipelineStageFlags::COMPUTE,
+                ),
+            ],
+        })
+        .unwrap();
+    let pipeline_layout = gal
+        .create_pipeline_layout(PipelineLayoutDesc {
+            label: "texture-storage-pipeline-layout".to_owned(),
+            resource_layouts: vec![layout],
+        })
+        .unwrap();
+    let shader = gal
+        .create_shader_module(shader("texture-compute", ShaderStage::Compute))
+        .unwrap();
+    let pipeline = gal
+        .create_compute_pipeline(ComputePipelineDesc {
+            label: "texture-compute".to_owned(),
+            layout: pipeline_layout,
+            shader,
+        })
+        .unwrap();
+
+    let disjoint = gal
+        .create_resource_set(ResourceSetDesc {
+            label: "disjoint-textures".to_owned(),
+            layout,
+            bindings: vec![
+                resource_binding(
+                    0,
+                    mip0,
+                    ResourceBindingKind::StorageTexture,
+                    AccessFlags::WRITE,
+                ),
+                resource_binding(
+                    1,
+                    mip1,
+                    ResourceBindingKind::StorageTexture,
+                    AccessFlags::WRITE,
+                ),
+            ],
+        })
+        .unwrap();
+    let disjoint_list = gal
+        .create_command_list(CommandListDesc {
+            label: "disjoint".to_owned(),
+            operations: vec![
+                CommandOp::BindComputePipeline(pipeline),
+                CommandOp::BindResourceSet {
+                    pipeline_layout,
+                    set_index: 0,
+                    set: disjoint,
+                },
+                CommandOp::Dispatch {
+                    groups_x: 1,
+                    groups_y: 1,
+                    groups_z: 1,
+                },
+            ],
+        })
+        .unwrap();
+    gal.submit(SubmissionBatch {
+        label: "disjoint-subresources".to_owned(),
+        command_lists: vec![disjoint_list],
+    })
+    .unwrap();
+
+    let overlapping = gal
+        .create_resource_set(ResourceSetDesc {
+            label: "overlapping-textures".to_owned(),
+            layout,
+            bindings: vec![
+                resource_binding(
+                    0,
+                    mip0,
+                    ResourceBindingKind::StorageTexture,
+                    AccessFlags::WRITE,
+                ),
+                resource_binding(
+                    1,
+                    mip0,
+                    ResourceBindingKind::StorageTexture,
+                    AccessFlags::WRITE,
+                ),
+            ],
+        })
+        .unwrap();
+    let overlapping_list = gal
+        .create_command_list(CommandListDesc {
+            label: "overlapping".to_owned(),
+            operations: vec![
+                CommandOp::BindComputePipeline(pipeline),
+                CommandOp::BindResourceSet {
+                    pipeline_layout,
+                    set_index: 0,
+                    set: overlapping,
+                },
+                CommandOp::Dispatch {
+                    groups_x: 1,
+                    groups_y: 1,
+                    groups_z: 1,
+                },
+            ],
+        })
+        .unwrap();
+    assert_code(
+        gal.submit(SubmissionBatch {
+            label: "overlapping-subresources".to_owned(),
+            command_lists: vec![overlapping_list],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+}
+
+#[test]
+fn resource_set_binding_requires_the_active_pipeline_layout() {
+    let mut gal = gal();
+    let (color_view, target, pass, _empty_layout, empty_pipeline) = simple_graphics_scene(&mut gal);
+    let uniform = gal
+        .create_buffer(buffer("uniform", vec![BufferUsage::Uniform]))
+        .unwrap();
+    let set_layout = gal
+        .create_resource_layout(ResourceLayoutDesc {
+            label: "set-layout".to_owned(),
+            bindings: vec![layout_binding(
+                0,
+                ResourceBindingKind::UniformBuffer,
+                PipelineStageFlags::DRAW,
+            )],
+        })
+        .unwrap();
+    let set = gal
+        .create_resource_set(ResourceSetDesc {
+            label: "set".to_owned(),
+            layout: set_layout,
+            bindings: vec![resource_binding(
+                0,
+                uniform,
+                ResourceBindingKind::UniformBuffer,
+                AccessFlags::READ,
+            )],
+        })
+        .unwrap();
+    let pipeline_layout = gal
+        .create_pipeline_layout(PipelineLayoutDesc {
+            label: "set-pipeline-layout".to_owned(),
+            resource_layouts: vec![set_layout],
+        })
+        .unwrap();
+
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "bind-set-without-matching-active-layout".to_owned(),
+            operations: vec![
+                CommandOp::BeginPass {
+                    pass,
+                    target,
+                    colors: vec![color_attachment(color_view)],
+                    depth_stencil: None,
+                },
+                CommandOp::BindGraphicsPipeline(empty_pipeline),
+                CommandOp::BindResourceSet {
+                    pipeline_layout,
+                    set_index: 0,
+                    set,
+                },
+                CommandOp::EndPass,
+            ],
         }),
         super::StatusCode::InvalidArgument,
     );
@@ -436,12 +1514,14 @@ fn command_order_submission_ids_and_deferred_retirement_are_deterministic() {
         dst,
         size: 256,
     }];
+    let mut caller_ops = ops.clone();
     let list = gal
         .create_command_list(CommandListDesc {
             label: "copy-list".to_owned(),
-            operations: ops.clone(),
+            operations: caller_ops.clone(),
         })
         .unwrap();
+    caller_ops.clear();
     assert_eq!(list.operations, ops);
 
     let token = gal
@@ -474,6 +1554,49 @@ fn command_order_submission_ids_and_deferred_retirement_are_deterministic() {
         .complete_through(token.submission);
     assert_eq!(gal.retire_completed().unwrap(), vec![src]);
     assert_eq!(gal.metrics().resource_destroys, 1);
+}
+
+#[test]
+fn malformed_submission_is_rejected_before_backend_encoding() {
+    let mut gal = gal();
+    let (color_view, target, pass, _layout, _pipeline) = simple_graphics_scene(&mut gal);
+    let stale_view = {
+        let texture = gal
+            .create_texture(texture(
+                "temporary",
+                TextureFormat::Rgba8Unorm,
+                vec![TextureUsage::ColorAttachment],
+            ))
+            .unwrap();
+        let view = gal
+            .create_texture_view(view("temporary-view", texture, TextureFormat::Rgba8Unorm))
+            .unwrap();
+        gal.destroy(view).unwrap();
+        gal.destroy(texture).unwrap();
+        view
+    };
+    let list = CommandList {
+        label: "bad-direct-list".to_owned(),
+        operations: vec![
+            CommandOp::BeginPass {
+                pass,
+                target,
+                colors: vec![color_attachment(stale_view)],
+                depth_stencil: None,
+            },
+            CommandOp::EndPass,
+        ],
+    };
+    assert_code(
+        gal.submit(SubmissionBatch {
+            label: "bad-batch".to_owned(),
+            command_lists: vec![list],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+    assert_eq!(gal.mock_backend().unwrap().encoded_batches, 0);
+    assert!(gal.mock_backend().unwrap().submissions.is_empty());
+    assert_ne!(stale_view, color_view);
 }
 
 #[test]

@@ -96,6 +96,35 @@ unsafe fn compile_inner(
     Ok(spirv)
 }
 
+#[cfg(test)]
+pub(super) fn compile_glsl_for_backend_test(
+    stage: shaderc::ShaderKind,
+    source: &str,
+    source_name: &str,
+) -> Result<Vec<u8>, String> {
+    let stage = match stage {
+        shaderc::ShaderKind::Vertex => 0,
+        shaderc::ShaderKind::Fragment => 1,
+        shaderc::ShaderKind::Geometry => 2,
+        shaderc::ShaderKind::Compute => 3,
+        shaderc::ShaderKind::TessControl => 4,
+        shaderc::ShaderKind::TessEvaluation => 5,
+        _ => return Err(format!("unsupported Shaderc kind for {source_name}")),
+    };
+    let entry = "main";
+    unsafe {
+        compile_inner(
+            stage,
+            source.as_ptr(),
+            source.len() as u64,
+            source_name.as_ptr(),
+            source_name.len() as u64,
+            entry.as_ptr(),
+            entry.len() as u64,
+        )
+    }
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_vulkan_shaderc_compile_glsl_to_spirv(
     stage: i32,

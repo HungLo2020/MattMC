@@ -32,7 +32,8 @@ fn backends_module_is_private_to_vulkanic() {
         relative(&backends_mod)
     );
     assert!(
-        contains_module_declaration(&backends_source, "mod vulkan;"),
+        contains_module_declaration(&backends_source, "mod vulkan;")
+            || contains_module_declaration(&backends_source, "pub(super) mod vulkan;"),
         "{} must keep the Rust Vulkan backend module present behind the private backend boundary",
         relative(&backends_mod)
     );

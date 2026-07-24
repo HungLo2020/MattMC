@@ -387,11 +387,22 @@ PY
 
 ensure_tracy() {
 	local tracy_root="$DEVUTILS_CACHE_ROOT/tools/tracy"
+	local tracy_version="v0.13.1"
 	local tracy_capture="$tracy_root/bin/tracy-capture"
 	local tracy_csvexport="$tracy_root/bin/tracy-csvexport"
 	local tracy_profiler="$tracy_root/bin/tracy-profiler"
+	local tracy_needs_build=false
 
 	if { ! command -v tracy-capture >/dev/null 2>&1 && [ ! -x "$tracy_capture" ]; } || { ! command -v tracy-csvexport >/dev/null 2>&1 && [ ! -x "$tracy_csvexport" ]; }; then
+		tracy_needs_build=true
+	fi
+	if [ ! -d "$tracy_root/src/.git" ]; then
+		tracy_needs_build=true
+	elif [ "$(git -C "$tracy_root/src" describe --tags --always 2>/dev/null || true)" != "$tracy_version" ]; then
+		tracy_needs_build=true
+	fi
+
+	if [ "$tracy_needs_build" = true ]; then
 		echo "Provisioning Tracy capture tooling under $tracy_root"
 		local missing_commands=()
 		for command_name in git cmake make g++ pkg-config; do
@@ -407,7 +418,10 @@ ensure_tracy() {
 		fi
 		mkdir -p "$tracy_root"
 		if [ ! -d "$tracy_root/src/.git" ]; then
-			git clone --depth 1 --branch v0.11.1 https://github.com/wolfpld/tracy.git "$tracy_root/src"
+			git clone --depth 1 --branch "$tracy_version" https://github.com/wolfpld/tracy.git "$tracy_root/src"
+		else
+			git -C "$tracy_root/src" fetch --depth 1 origin "refs/tags/$tracy_version:refs/tags/$tracy_version"
+			git -C "$tracy_root/src" checkout --detach "$tracy_version"
 		fi
 		remove_stale_cmake_cache "$tracy_root/build-capture" "$tracy_root/src/capture"
 		remove_stale_cmake_cache "$tracy_root/build-csvexport" "$tracy_root/src/csvexport"

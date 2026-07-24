@@ -2,9 +2,9 @@
 // implementations must stay behind the Vulkanic frontend boundary, matching the
 // Java rule that non-Vulkanic code cannot import net.vulkanic.backends.*.
 mod opengl;
-mod vulkan;
+pub(super) mod vulkan;
 
-use super::commands::SubmissionBatch;
+use super::commands::ValidatedSubmissionBatch;
 use super::error::GalResult;
 use super::handles::{Handle, HandleKind};
 use super::resources::{
@@ -36,8 +36,8 @@ pub(super) enum BackendCreateDesc<'a> {
 pub(super) trait Backend {
     fn create(&mut self, handle: Handle, desc: BackendCreateDesc<'_>) -> GalResult<BackendToken>;
     fn destroy(&mut self, handle: Handle, kind: HandleKind, token: BackendToken) -> GalResult<()>;
-    fn encode_passes(&mut self, batch: &SubmissionBatch) -> GalResult<()>;
-    fn submit(&mut self, id: SubmissionId, batch: &SubmissionBatch) -> GalResult<()>;
+    fn encode_passes(&mut self, batch: &ValidatedSubmissionBatch) -> GalResult<()>;
+    fn submit(&mut self, id: SubmissionId, batch: &ValidatedSubmissionBatch) -> GalResult<()>;
     fn completed_submission(&self) -> SubmissionId;
     fn retire(&mut self, completed: SubmissionId) -> GalResult<()>;
 
@@ -122,12 +122,12 @@ pub(super) mod mock {
             Ok(())
         }
 
-        fn encode_passes(&mut self, batch: &SubmissionBatch) -> GalResult<()> {
+        fn encode_passes(&mut self, batch: &ValidatedSubmissionBatch) -> GalResult<()> {
             self.encoded_batches += batch.command_lists.len();
             Ok(())
         }
 
-        fn submit(&mut self, id: SubmissionId, batch: &SubmissionBatch) -> GalResult<()> {
+        fn submit(&mut self, id: SubmissionId, batch: &ValidatedSubmissionBatch) -> GalResult<()> {
             self.submissions.push(id);
             self.submitted_labels.push_back(batch.label.clone());
             Ok(())
