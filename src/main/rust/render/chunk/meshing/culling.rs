@@ -35,12 +35,14 @@ fn same_skip_group_culls_face(
     state: NativeMeshingState,
     neighbor: NativeMeshingState,
 ) -> bool {
-    if !(0..6).contains(&face) || neighbor.skip_group == 0 || neighbor.skip_group != state.skip_group {
+    if !(0..6).contains(&face)
+        || neighbor.skip_group == 0
+        || neighbor.skip_group != state.skip_group
+    {
         return false;
     }
 
-    ((state.skip_mask >> face) & 1) != 0
-        && ((neighbor.skip_mask >> opposite_face(face)) & 1) != 0
+    ((state.skip_mask >> face) & 1) != 0 && ((neighbor.skip_mask >> opposite_face(face)) & 1) != 0
 }
 
 #[inline(always)]

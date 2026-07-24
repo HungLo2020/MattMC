@@ -179,6 +179,79 @@ def local_renderdoc_layer_manifest_path() -> Path | None:
     return None
 
 
+RUST_OPENGL_CONFORMANCE_TEST = (
+    "render::vulkanic::backends::opengl::conformance::"
+    "isolated_opengl_conformance_renders_indexed_textured_draw"
+)
+
+
+def rust_test_binary_candidates(root: Path) -> list[Path]:
+    deps = root / "src" / "main" / "rust" / "target" / "debug" / "deps"
+    if not deps.is_dir():
+        return []
+    candidates = [
+        path
+        for path in deps.glob("mattmc_rust-*")
+        if path.is_file() and os.access(path, os.X_OK) and path.suffix not in {".d", ".rlib", ".rmeta"}
+    ]
+    return sorted(candidates, key=lambda path: path.stat().st_mtime, reverse=True)
+
+
+def resolve_rust_test_binary(root: Path, *, build_if_missing: bool = True) -> Path:
+    candidates = rust_test_binary_candidates(root)
+    if candidates:
+        return candidates[0]
+    if build_if_missing:
+        result = subprocess.run(
+            [
+                "cargo",
+                "test",
+                "--manifest-path",
+                str(root / "src" / "main" / "rust" / "Cargo.toml"),
+                RUST_OPENGL_CONFORMANCE_TEST,
+                "--no-run",
+            ],
+            cwd=root,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=120,
+            check=False,
+        )
+        if result.returncode == 0:
+            candidates = rust_test_binary_candidates(root)
+            if candidates:
+                return candidates[0]
+        raise RuntimeError(f"failed to build Rust test binary for RenderDoc:\n{result.stdout}")
+    raise FileNotFoundError("compiled mattmc_rust test binary was not found")
+
+
+def build_rust_opengl_renderdoc_command(root: Path, capture_template: Path) -> tuple[list[str], dict[str, str]]:
+    renderdoc = local_renderdoccmd_path()
+    if not renderdoc:
+        raise FileNotFoundError("renderdoccmd is not installed")
+    binary = resolve_rust_test_binary(root)
+    env = os.environ.copy()
+    env["MATTMC_RENDERDOC_CAPTURE"] = "1"
+    env["MATTMC_OPENGL_STRICT"] = "1"
+    env["MATTMC_GRAPHICS_RUN_TYPE"] = "renderdoc-capture"
+    return (
+        [
+            renderdoc,
+            "capture",
+            "-w",
+            "-d",
+            str(root),
+            "-c",
+            str(capture_template),
+            str(binary),
+            RUST_OPENGL_CONFORMANCE_TEST,
+            "--nocapture",
+        ],
+        env,
+    )
+
+
 def find_validation_layer_manifest_path() -> Path | None:
     candidates: list[Path] = []
     vulkan_sdk = os.environ.get("VULKAN_SDK")

@@ -7,12 +7,13 @@ pub mod shaderc_spirv_compiler;
 mod swapchain;
 mod trace;
 
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 
-use super::{Backend, BackendCreateDesc, BackendToken};
+use super::{graphics_backend_lock, vulkan_capabilities, Backend, BackendCreateDesc, BackendToken};
 use crate::render::vulkanic::commands::ValidatedSubmissionBatch;
 use crate::render::vulkanic::error::GalResult;
 use crate::render::vulkanic::handles::{Handle, HandleKind};
+use crate::render::vulkanic::resources::BackendCapabilities;
 use crate::render::vulkanic::sync::SubmissionId;
 
 use self::device::{ValidationMode, VulkanContext};
@@ -23,16 +24,23 @@ pub(in crate::render::vulkanic) struct VulkanBackend {
     context: Arc<VulkanContext>,
     objects: VulkanObjects,
     lowerer: Mutex<SubmissionLowerer>,
+    _global_lock: MutexGuard<'static, ()>,
 }
 
 #[allow(dead_code)]
 impl VulkanBackend {
     pub(super) fn new(label: &str) -> GalResult<Self> {
+        let global_lock = graphics_backend_lock().lock().map_err(|_| {
+            crate::render::vulkanic::error::GalError::backend(
+                "graphics backend global lock poisoned",
+            )
+        })?;
         let context = VulkanContext::new(label, ValidationMode::from_env())?;
         Ok(Self {
             objects: VulkanObjects::new(context.clone()),
             lowerer: Mutex::new(SubmissionLowerer::new(context.clone())),
             context,
+            _global_lock: global_lock,
         })
     }
 
@@ -46,6 +54,10 @@ impl VulkanBackend {
 }
 
 impl Backend for VulkanBackend {
+    fn capabilities(&self) -> BackendCapabilities {
+        vulkan_capabilities()
+    }
+
     fn create(&mut self, handle: Handle, desc: BackendCreateDesc<'_>) -> GalResult<BackendToken> {
         let _zone = trace::Zone::new("vulkan.backend.resource.create");
         self.objects.create(handle, desc)
@@ -111,7 +123,7 @@ impl Drop for VulkanBackend {
 }
 
 #[cfg(test)]
-mod conformance;
+pub(super) mod conformance;
 
 #[cfg(test)]
 mod tests {

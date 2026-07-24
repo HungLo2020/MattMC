@@ -220,10 +220,7 @@ fn fetch_pulseaudio_dev_headers() -> Option<PathBuf> {
         });
 
     run(
-        Command::new("dpkg-deb")
-            .arg("-x")
-            .arg(&package)
-            .arg(&root),
+        Command::new("dpkg-deb").arg("-x").arg(&package).arg(&root),
         "Failed to extract PulseAudio development headers",
     );
     let _ = fs::remove_dir_all(root.join("usr/share"));
@@ -241,12 +238,13 @@ fn fetch_pulseaudio_dev_headers() -> Option<PathBuf> {
 
 fn validate_openal_soft_build(dst: &Path, target: &str) {
     if target.contains("linux") {
-        let config = fs::read_to_string(dst.join("build/config_backends.h")).unwrap_or_else(|error| {
-            panic!(
-                "Failed to inspect OpenAL Soft backend configuration under {}: {error}",
-                dst.display()
-            )
-        });
+        let config =
+            fs::read_to_string(dst.join("build/config_backends.h")).unwrap_or_else(|error| {
+                panic!(
+                    "Failed to inspect OpenAL Soft backend configuration under {}: {error}",
+                    dst.display()
+                )
+            });
         let has_pipewire = config_define_enabled(&config, "HAVE_PIPEWIRE");
         let has_pulseaudio = config_define_enabled(&config, "HAVE_PULSEAUDIO");
         if !has_pipewire && !has_pulseaudio {

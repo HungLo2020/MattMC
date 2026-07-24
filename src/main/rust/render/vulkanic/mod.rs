@@ -22,8 +22,9 @@ pub use gal::VulkanicGal;
 pub use handles::{Handle, HandleKind};
 pub use metrics::{Metrics, TracyZone};
 pub use resources::{
-    AccessFlags, BlendMode, BufferDesc, BufferUsage, ColorFormat, CompareOp, ComputePipelineDesc,
-    CullMode, Extent3d, GraphicsPipelineDesc, IndexType, MemoryDomain, PipelineLayoutDesc,
+    AccessFlags, BackendCapabilities, BackendFeature, BackendFeatureFlags, BackendLimits,
+    BlendMode, BufferDesc, BufferUsage, ColorFormat, CompareOp, ComputePipelineDesc, CullMode,
+    Extent3d, GraphicsPipelineDesc, IndexType, MemoryDomain, PipelineLayoutDesc,
     PipelineStageFlags, PrimitiveTopology, QueueClass, RenderPassDesc, RenderTargetDesc,
     ResourceBinding, ResourceBindingDesc, ResourceBindingKind, ResourceLayoutDesc, ResourceSetDesc,
     SamplerAddressMode, SamplerDesc, SamplerFilter, ShaderCodeFormat, ShaderModuleDesc,

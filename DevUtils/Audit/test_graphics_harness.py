@@ -544,6 +544,31 @@ with open(os.environ["MATTMC_RENDERDOC_REPLAY_OUTPUT"], "w", encoding="utf-8") a
                 harness.local_qrenderdoc_path = original_q  # type: ignore[assignment]
                 harness.local_renderdoccmd_path = original_cmd  # type: ignore[assignment]
 
+    def test_rust_opengl_renderdoc_command_uses_concrete_test_binary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            binary_dir = root / "src" / "main" / "rust" / "target" / "debug" / "deps"
+            binary_dir.mkdir(parents=True)
+            binary = binary_dir / "mattmc_rust-testhash"
+            binary.write_text("#!/usr/bin/env sh\nexit 0\n", encoding="utf-8")
+            binary.chmod(0o755)
+            renderdoccmd = root / "renderdoccmd"
+            renderdoccmd.write_text("#!/usr/bin/env sh\nexit 0\n", encoding="utf-8")
+            renderdoccmd.chmod(0o755)
+            original = harness.local_renderdoccmd_path
+            try:
+                harness.local_renderdoccmd_path = lambda: str(renderdoccmd)  # type: ignore[assignment]
+                command, env = harness.build_rust_opengl_renderdoc_command(root, root / "capture")
+                joined = " ".join(command)
+                self.assertIn(str(binary), command)
+                self.assertIn(harness.RUST_OPENGL_CONFORMANCE_TEST, command)
+                self.assertIn("renderdoccmd capture", joined)
+                self.assertEqual(env["MATTMC_RENDERDOC_CAPTURE"], "1")
+                self.assertEqual(env["MATTMC_OPENGL_STRICT"], "1")
+                self.assertEqual(env["MATTMC_GRAPHICS_RUN_TYPE"], "renderdoc-capture")
+            finally:
+                harness.local_renderdoccmd_path = original  # type: ignore[assignment]
+
     def test_instrumentation_fingerprint_mismatch_rejects_comparison(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)

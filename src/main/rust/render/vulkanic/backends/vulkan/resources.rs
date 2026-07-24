@@ -450,7 +450,11 @@ impl VulkanObjects {
         })?;
         self.context
             .set_object_name(layout, &debug_name("resource-layout", handle, &desc.label));
-        Ok(ResourceLayoutObject { token, layout })
+        Ok(ResourceLayoutObject {
+            token,
+            layout,
+            bindings: desc.bindings.clone(),
+        })
     }
 
     fn create_resource_set(
@@ -459,15 +463,18 @@ impl VulkanObjects {
         desc: &ResourceSetDesc,
         token: BackendToken,
     ) -> GalResult<ResourceSetObject> {
-        let layout = match self.objects.get(&desc.layout) {
-            Some(VulkanObject::ResourceLayout(layout)) => layout.layout,
+        let layout_object = match self.objects.get(&desc.layout) {
+            Some(VulkanObject::ResourceLayout(layout)) => layout,
             _ => return Err(GalError::backend("resource set references missing layout")),
         };
         let mut sizes: BTreeMap<vk::DescriptorType, u32> = BTreeMap::new();
-        for binding in &desc.bindings {
+        for binding in &layout_object.bindings {
             *sizes
-                .entry(descriptor_type_for_resource_binding(binding))
-                .or_default() += 1;
+                .entry(descriptor_type_for_binding(
+                    binding.kind,
+                    binding.dynamic_offset_count,
+                ))
+                .or_default() += binding.array_count;
         }
         let pool_sizes = sizes
             .into_iter()
@@ -488,7 +495,7 @@ impl VulkanObjects {
             })?;
         self.context
             .set_object_name(pool, &debug_name("resource-set-pool", handle, &desc.label));
-        let layouts = [layout];
+        let layouts = [layout_object.layout];
         let allocate_info = vk::DescriptorSetAllocateInfo::default()
             .descriptor_pool(pool)
             .set_layouts(&layouts);
@@ -678,7 +685,7 @@ impl VulkanObjects {
             .polygon_mode(vk::PolygonMode::FILL)
             .line_width(1.0)
             .cull_mode(cull_mode(desc.cull_mode))
-            .front_face(vk::FrontFace::COUNTER_CLOCKWISE);
+            .front_face(vk::FrontFace::CLOCKWISE);
         let multisample = vk::PipelineMultisampleStateCreateInfo::default()
             .rasterization_samples(vk::SampleCountFlags::TYPE_1);
         let color_blend_attachments = desc
@@ -949,6 +956,7 @@ pub(super) struct ShaderModuleObject {
 pub(super) struct ResourceLayoutObject {
     pub(super) token: BackendToken,
     pub(super) layout: vk::DescriptorSetLayout,
+    pub(super) bindings: Vec<ResourceBindingDesc>,
 }
 
 pub(super) struct ResourceSetObject {

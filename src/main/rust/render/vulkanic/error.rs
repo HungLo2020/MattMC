@@ -16,6 +16,7 @@ pub enum StatusCode {
     InFlight = -10,
     BackendFailure = -11,
     GenerationExhausted = -12,
+    UnsupportedFeature = -13,
 }
 
 #[repr(u32)]
@@ -74,6 +75,14 @@ impl GalError {
 
     pub fn backend(message: impl Into<String>) -> Self {
         Self::new(ErrorDomain::Backend, StatusCode::BackendFailure, message)
+    }
+
+    pub fn unsupported_feature(message: impl Into<String>) -> Self {
+        Self::new(
+            ErrorDomain::Resource,
+            StatusCode::UnsupportedFeature,
+            message,
+        )
     }
 }
 

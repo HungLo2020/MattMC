@@ -486,7 +486,10 @@ tasks.register('testRustNative', Exec) {
     // real hardware output, so force OpenAL Soft's deterministic null backend
     // for tests only. Runtime/client launches are unaffected.
     environment 'ALSOFT_DRIVERS', 'null'
-    commandLine 'cargo', 'test', '--manifest-path', rustManifest.absolutePath, '--locked'
+    // The Rust suite includes native OpenAL/EGL/Vulkan tests with process-global
+    // driver state. Keep the full launch/check gate, but run the native test
+    // binary serially so those subsystems cannot race each other.
+    commandLine 'cargo', 'test', '--manifest-path', rustManifest.absolutePath, '--locked', '--', '--test-threads=1'
     doFirst {
         configureRustBuildPython(delegate)
     }

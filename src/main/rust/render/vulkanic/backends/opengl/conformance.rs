@@ -2,10 +2,7 @@ use std::path::PathBuf;
 
 use xxhash_rust::xxh32::xxh32;
 
-use super::device::{ValidationMode, VulkanContext};
-use super::shaderc_spirv_compiler::compile_glsl_for_backend_test;
-use super::trace;
-use super::VulkanBackend;
+use super::{OpenGlBackend, StateCacheSnapshot};
 use crate::render::vulkanic::commands::{
     AttachmentLoadOp, AttachmentStoreOp, BufferImageCopyRegion, ClearColor, CommandListDesc,
     CommandOp, PassAttachment, ResourceBarrier, SubmissionBatch, TextureOrigin3d,
@@ -19,7 +16,7 @@ const WIDTH: u32 = 96;
 const HEIGHT: u32 = 64;
 
 #[test]
-fn isolated_vulkan_conformance_renders_indexed_textured_draw() {
+fn isolated_opengl_conformance_renders_indexed_textured_draw() {
     let result = run_conformance(
         "standard",
         Extent3d {
@@ -32,21 +29,21 @@ fn isolated_vulkan_conformance_renders_indexed_textured_draw() {
         Ok(report) => {
             assert_ne!(report.pixel_hash, 0);
             assert!(report.non_zero_pixels > 0);
+            assert!(report.state_cache.program_binds > 0);
+            assert!(report.state_cache.framebuffer_binds > 0);
         }
         Err(error) => {
             let text = error.to_string();
             assert!(
-                text.contains("Vulkan")
-                    || text.contains("vulkan")
-                    || text.contains("physical device"),
-                "unexpected conformance failure: {text}"
+                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                "unexpected OpenGL conformance failure: {text}"
             );
         }
     }
 }
 
 #[test]
-fn isolated_vulkan_conformance_pins_gal_coordinate_and_state_conventions() {
+fn isolated_opengl_conformance_pins_gal_coordinate_and_state_conventions() {
     match run_conformance(
         "conventions",
         Extent3d {
@@ -55,21 +52,24 @@ fn isolated_vulkan_conformance_pins_gal_coordinate_and_state_conventions() {
             depth: 1,
         },
     ) {
-        Ok(report) => assert_conformance_conventions(&report),
+        Ok(report) => {
+            assert_conformance_conventions(&report);
+            assert!(report.state_cache.program_binds > 0);
+            assert!(report.state_cache.framebuffer_binds > 0);
+            assert!(report.gl_errors.is_empty());
+        }
         Err(error) => {
             let text = error.to_string();
             assert!(
-                text.contains("Vulkan")
-                    || text.contains("vulkan")
-                    || text.contains("physical device"),
-                "unexpected convention conformance failure: {text}"
+                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                "unexpected OpenGL convention conformance failure: {text}"
             );
         }
     }
 }
 
 #[test]
-fn isolated_vulkan_conformance_supports_resize_recreation() {
+fn isolated_opengl_conformance_supports_resize_recreation() {
     if let Err(error) = run_conformance(
         "resize-small",
         Extent3d {
@@ -79,7 +79,7 @@ fn isolated_vulkan_conformance_supports_resize_recreation() {
         },
     ) {
         assert!(
-            error.to_string().contains("Vulkan") || error.to_string().contains("physical device"),
+            error.to_string().contains("OpenGL") || error.to_string().contains("EGL"),
             "unexpected resize failure: {error}"
         );
         return;
@@ -92,31 +92,40 @@ fn isolated_vulkan_conformance_supports_resize_recreation() {
             depth: 1,
         },
     )
-    .expect("second conformance run should recreate resources cleanly");
+    .expect("second OpenGL conformance run should recreate resources cleanly");
     assert_ne!(report.pixel_hash, 0);
 }
 
 #[test]
-fn isolated_vulkan_conformance_rejects_partial_failure_cleanly() {
-    let context = match VulkanContext::new("MattMC partial failure test", ValidationMode::Off) {
-        Ok(context) => context,
+fn isolated_opengl_conformance_rejects_partial_failure_cleanly() {
+    let backend = match OpenGlBackend::new("MattMC OpenGL partial failure") {
+        Ok(backend) => backend,
         Err(error) => {
             assert!(
-                error.to_string().contains("Vulkan")
-                    || error.to_string().contains("physical device")
+                error.to_string().contains("OpenGL") || error.to_string().contains("EGL"),
+                "unexpected bootstrap failure: {error}"
             );
             return;
         }
     };
-    let impossible = ash::vk::MemoryRequirements {
-        size: u64::MAX / 2,
-        alignment: 4096,
-        memory_type_bits: u32::MAX,
-    };
-    assert!(context
-        .allocate_memory(impossible, ash::vk::MemoryPropertyFlags::DEVICE_LOCAL)
-        .is_err());
-    context.wait_idle().expect("device should remain usable");
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let error = gal
+        .create_texture(TextureDesc {
+            label: "unsupported-format".to_string(),
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Bgra8Unorm,
+            extent: Extent3d {
+                width: 4,
+                height: 4,
+                depth: 1,
+            },
+            mip_levels: 1,
+            array_layers: 1,
+            usages: vec![TextureUsage::Sampled],
+        })
+        .expect_err("unsupported OpenGL texture format should fail cleanly");
+    assert!(error.to_string().contains("OpenGL texture format"));
+    let _ = gal.retire_completed().expect("device should remain usable");
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -128,6 +137,8 @@ pub(in crate::render::vulkanic::backends) struct ConformanceReport {
     pub(in crate::render::vulkanic::backends) non_zero_pixels: usize,
     pub(in crate::render::vulkanic::backends) evidence_json: String,
     pub(in crate::render::vulkanic::backends) capabilities_json: String,
+    pub(in crate::render::vulkanic::backends) gl_errors: Vec<String>,
+    pub(in crate::render::vulkanic::backends) state_cache: StateCacheSnapshot,
 }
 
 fn assert_conformance_conventions(report: &ConformanceReport) {
@@ -152,9 +163,8 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
     mode: &str,
     extent: Extent3d,
 ) -> GalResult<ConformanceReport> {
-    trace::message("rust-vulkan-conformance-start");
-    let validation = ValidationMode::from_env();
-    let backend = VulkanBackend::new("MattMC VulkanicGAL conformance")?;
+    super::trace::message("rust-opengl-conformance-start");
+    let backend = OpenGlBackend::new("MattMC VulkanicGAL OpenGL conformance")?;
     let mut gal = VulkanicGal::new_with_backend(Box::new(backend), tracy_enabled_from_env());
     let capabilities_json = gal.capabilities().fingerprint_json();
     let _renderdoc_frame = super::renderdoc::RenderDocFrame::start_if_requested();
@@ -348,20 +358,16 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
         label: "conformance.pipeline-layout".to_string(),
         resource_layouts: vec![resource_layout],
     })?;
-    let vertex_shader = shader_module(
+    let vertex_shader = gal.create_shader_module(shader_module(
         "conformance.vertex",
         ShaderStage::Vertex,
-        shaderc::ShaderKind::Vertex,
         VERTEX_SHADER,
-    )?;
-    let fragment_shader = shader_module(
+    ))?;
+    let fragment_shader = gal.create_shader_module(shader_module(
         "conformance.fragment",
         ShaderStage::Fragment,
-        shaderc::ShaderKind::Fragment,
         FRAGMENT_SHADER,
-    )?;
-    let vertex_shader = gal.create_shader_module(vertex_shader)?;
-    let fragment_shader = gal.create_shader_module(fragment_shader)?;
+    ))?;
     let pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
         label: "conformance.pipeline".to_string(),
         layout: pipeline_layout,
@@ -386,7 +392,6 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
         color_formats: vec![TextureFormat::Rgba8Unorm],
         depth_format: Some(TextureFormat::Depth32Float),
     })?;
-
     let command_list = gal.create_command_list(CommandListDesc {
         label: "conformance.commands".to_string(),
         operations: conformance_ops(
@@ -413,16 +418,24 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
         command_lists: vec![command_list],
     })?;
     gal.retire_through_for_test(token.submission)?;
-    let reads = gal
-        .vulkan_backend()
-        .ok_or_else(|| GalError::backend("conformance backend was not Vulkan"))?
-        .completed_host_reads_for_test();
+    let backend = gal
+        .opengl_backend()
+        .ok_or_else(|| GalError::backend("conformance backend was not OpenGL"))?;
+    let reads = backend.completed_host_reads_for_test();
     let pixels = reads
         .iter()
         .rev()
         .find(|read| read.buffer == readback)
         .map(|read| read.bytes.clone())
-        .ok_or_else(|| GalError::backend("conformance readback command produced no bytes"))?;
+        .ok_or_else(|| GalError::backend("OpenGL conformance readback produced no bytes"))?;
+    let gl_errors = backend.gl_errors_for_test();
+    let state_cache = backend.state_cache_for_test();
+    if !gl_errors.is_empty() {
+        return Err(GalError::backend(format!(
+            "OpenGL conformance produced errors: {}",
+            gl_errors.join("; ")
+        )));
+    }
     let pixel_hash = xxh32(&pixels, 0x4d_43_47_41);
     let non_zero_pixels = pixels.iter().filter(|byte| **byte != 0).count();
     let evidence_json = pixel_evidence_json(&pixels, extent);
@@ -434,9 +447,11 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
         non_zero_pixels,
         evidence_json,
         capabilities_json,
+        gl_errors,
+        state_cache,
     };
-    write_report(&report, validation)?;
-    trace::message("rust-vulkan-conformance-complete");
+    write_report(&report)?;
+    super::trace::message("rust-opengl-conformance-complete");
     Ok(report)
 }
 
@@ -637,20 +652,14 @@ fn view(
     }
 }
 
-fn shader_module(
-    label: &str,
-    stage: ShaderStage,
-    kind: shaderc::ShaderKind,
-    source: &str,
-) -> GalResult<ShaderModuleDesc> {
-    let code = compile_glsl_for_backend_test(kind, source, label).map_err(GalError::backend)?;
-    Ok(ShaderModuleDesc {
+fn shader_module(label: &str, stage: ShaderStage, source: &str) -> ShaderModuleDesc {
+    ShaderModuleDesc {
         label: label.to_string(),
         stage,
-        code_format: ShaderCodeFormat::Spirv,
-        code,
+        code_format: ShaderCodeFormat::Glsl,
+        code: source.as_bytes().to_vec(),
         entry_point: "main".to_string(),
-    })
+    }
 }
 
 fn texture_bytes() -> Vec<u8> {
@@ -675,25 +684,29 @@ fn tracy_enabled_from_env() -> bool {
         .unwrap_or(false)
 }
 
-fn write_report(report: &ConformanceReport, validation: ValidationMode) -> GalResult<()> {
+fn write_report(report: &ConformanceReport) -> GalResult<()> {
     let path = report_path()?;
     std::fs::create_dir_all(path.parent().expect("report path has parent")).map_err(|error| {
-        GalError::backend(format!("failed to create conformance log dir: {error}"))
+        GalError::backend(format!(
+            "failed to create OpenGL conformance log dir: {error}"
+        ))
     })?;
     let json = format!(
-        "{{\n  \"artifact_class\": \"rust_vulkan_conformance\",\n  \"backend\": \"Rust Vulkan\",\n  \"mode\": \"{}\",\n  \"validation\": \"{:?}\",\n  \"validation_features\": [{}],\n  \"instrumentation\": \"clean-conformance\",\n  \"width\": {},\n  \"height\": {},\n  \"pixel_hash_xxh32\": \"{:08x}\",\n  \"non_zero_pixels\": {},\n  \"pixel_evidence\": {},\n  \"backend_capabilities\": {}\n}}\n",
+        "{{\n  \"artifact_class\": \"rust_opengl_conformance\",\n  \"backend\": \"Rust OpenGL\",\n  \"mode\": \"{}\",\n  \"instrumentation\": \"clean-conformance\",\n  \"width\": {},\n  \"height\": {},\n  \"pixel_hash_xxh32\": \"{:08x}\",\n  \"non_zero_pixels\": {},\n  \"pixel_evidence\": {},\n  \"backend_capabilities\": {},\n  \"gl_error_count\": {}\n}}\n",
         report.mode,
-        validation,
-        validation_features_json(validation),
         report.width,
         report.height,
         report.pixel_hash,
         report.non_zero_pixels,
         report.evidence_json,
-        report.capabilities_json
+        report.capabilities_json,
+        report.gl_errors.len()
     );
-    std::fs::write(&path, json)
-        .map_err(|error| GalError::backend(format!("failed to write conformance report: {error}")))
+    std::fs::write(&path, json).map_err(|error| {
+        GalError::backend(format!(
+            "failed to write OpenGL conformance report: {error}"
+        ))
+    })
 }
 
 fn pixel_evidence_json(pixels: &[u8], extent: Extent3d) -> String {
@@ -744,47 +757,36 @@ fn report_path() -> GalResult<PathBuf> {
         .and_then(|path| path.parent())
         .map(PathBuf::from)
         .ok_or_else(|| GalError::backend("failed to locate repository root from Cargo manifest"))?;
-    Ok(root.join("logs/rust-vulkanic/conformance/latest.json"))
-}
-
-fn validation_features_json(validation: ValidationMode) -> &'static str {
-    match validation {
-        ValidationMode::Off => "",
-        ValidationMode::Routine => "\"synchronization_validation\", \"best_practices\"",
-        ValidationMode::Deep => {
-            "\"gpu_assisted\", \"gpu_assisted_reserve_binding_slot\", \"synchronization_validation\", \"best_practices\""
-        }
-    }
+    Ok(root.join("logs/rust-opengl/conformance/latest.json"))
 }
 
 const VERTEX_SHADER: &str = r#"
-#version 450
-layout(location = 0) out vec2 v_uv;
-vec2 pos[4] = vec2[](
+#version 330 core
+out vec2 v_uv;
+const vec2 pos[4] = vec2[4](
     vec2(-0.85, -0.85),
     vec2( 0.85, -0.85),
     vec2( 0.85,  0.85),
     vec2(-0.85,  0.85)
 );
-vec2 uv[4] = vec2[](
+const vec2 uv[4] = vec2[4](
     vec2(0.0, 0.0),
     vec2(1.0, 0.0),
     vec2(1.0, 1.0),
     vec2(0.0, 1.0)
 );
 void main() {
-    gl_Position = vec4(pos[gl_VertexIndex], 0.5, 1.0);
-    v_uv = uv[gl_VertexIndex];
+    gl_Position = vec4(pos[gl_VertexID], 0.5, 1.0);
+    v_uv = uv[gl_VertexID];
 }
 "#;
 
 const FRAGMENT_SHADER: &str = r#"
-#version 450
-layout(set = 0, binding = 0) uniform texture2D tex0;
-layout(set = 0, binding = 1) uniform sampler samp0;
-layout(location = 0) in vec2 v_uv;
-layout(location = 0) out vec4 out_color;
+#version 330 core
+uniform sampler2D tex0;
+in vec2 v_uv;
+out vec4 out_color;
 void main() {
-    out_color = texture(sampler2D(tex0, samp0), v_uv) * vec4(1.0, 1.0, 1.0, 0.75);
+    out_color = texture(tex0, v_uv) * vec4(1.0, 1.0, 1.0, 0.75);
 }
 "#;

@@ -151,6 +151,7 @@ pub struct ShaderModuleDesc {
 pub enum ShaderCodeFormat {
     Spirv = 1,
     BackendPortableIr = 2,
+    Glsl = 3,
 }
 
 #[repr(transparent)]
@@ -275,6 +276,150 @@ pub enum CompareOp {
 pub enum IndexType {
     U16 = 1,
     U32 = 2,
+}
+
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BackendFeature {
+    Graphics = 1,
+    Compute = 2,
+    DescriptorArrays = 3,
+    OptionalBindings = 4,
+    DynamicBufferOffsets = 5,
+    UniformBuffers = 6,
+    StorageBuffers = 7,
+    StorageTextures = 8,
+    IndirectDraw = 9,
+    IndirectDispatch = 10,
+    MultipleColorAttachments = 11,
+    DepthOnlyPass = 12,
+    BlendedPass = 13,
+    TextureSubresourceCopies = 14,
+    TextureMipLevels = 15,
+    TextureArrayLayers = 16,
+    HostBufferAccess = 17,
+    Presentation = 18,
+    RenderDocCapture = 19,
+    TracyZones = 20,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct BackendFeatureFlags {
+    pub graphics: bool,
+    pub compute: bool,
+    pub descriptor_arrays: bool,
+    pub optional_bindings: bool,
+    pub dynamic_buffer_offsets: bool,
+    pub uniform_buffers: bool,
+    pub storage_buffers: bool,
+    pub storage_textures: bool,
+    pub indirect_draw: bool,
+    pub indirect_dispatch: bool,
+    pub multiple_color_attachments: bool,
+    pub depth_only_pass: bool,
+    pub blended_pass: bool,
+    pub texture_subresource_copies: bool,
+    pub texture_mip_levels: bool,
+    pub texture_array_layers: bool,
+    pub host_buffer_access: bool,
+    pub presentation: bool,
+    pub renderdoc_capture: bool,
+    pub tracy_zones: bool,
+}
+
+impl BackendFeatureFlags {
+    pub fn supports(self, feature: BackendFeature) -> bool {
+        match feature {
+            BackendFeature::Graphics => self.graphics,
+            BackendFeature::Compute => self.compute,
+            BackendFeature::DescriptorArrays => self.descriptor_arrays,
+            BackendFeature::OptionalBindings => self.optional_bindings,
+            BackendFeature::DynamicBufferOffsets => self.dynamic_buffer_offsets,
+            BackendFeature::UniformBuffers => self.uniform_buffers,
+            BackendFeature::StorageBuffers => self.storage_buffers,
+            BackendFeature::StorageTextures => self.storage_textures,
+            BackendFeature::IndirectDraw => self.indirect_draw,
+            BackendFeature::IndirectDispatch => self.indirect_dispatch,
+            BackendFeature::MultipleColorAttachments => self.multiple_color_attachments,
+            BackendFeature::DepthOnlyPass => self.depth_only_pass,
+            BackendFeature::BlendedPass => self.blended_pass,
+            BackendFeature::TextureSubresourceCopies => self.texture_subresource_copies,
+            BackendFeature::TextureMipLevels => self.texture_mip_levels,
+            BackendFeature::TextureArrayLayers => self.texture_array_layers,
+            BackendFeature::HostBufferAccess => self.host_buffer_access,
+            BackendFeature::Presentation => self.presentation,
+            BackendFeature::RenderDocCapture => self.renderdoc_capture,
+            BackendFeature::TracyZones => self.tracy_zones,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BackendLimits {
+    pub max_buffer_size: u64,
+    pub max_texture_extent_2d: u32,
+    pub max_texture_mip_levels: u32,
+    pub max_texture_array_layers: u32,
+    pub max_resource_layout_bindings: u32,
+    pub max_binding_array_count: u32,
+    pub max_color_attachments: u32,
+    pub max_dynamic_offsets_per_binding: u32,
+    pub max_command_lists_per_submission: u32,
+    pub max_commands_per_list: u32,
+    pub max_draw_count: u32,
+    pub max_dispatch_groups_per_axis: u32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BackendCapabilities {
+    pub name: &'static str,
+    pub features: BackendFeatureFlags,
+    pub limits: BackendLimits,
+}
+
+impl BackendCapabilities {
+    pub fn supports(self, feature: BackendFeature) -> bool {
+        self.features.supports(feature)
+    }
+
+    pub fn fingerprint_json(self) -> String {
+        format!(
+            "{{\"name\":\"{}\",\"features\":{{\"graphics\":{},\"compute\":{},\"descriptor_arrays\":{},\"optional_bindings\":{},\"dynamic_buffer_offsets\":{},\"uniform_buffers\":{},\"storage_buffers\":{},\"storage_textures\":{},\"indirect_draw\":{},\"indirect_dispatch\":{},\"multiple_color_attachments\":{},\"depth_only_pass\":{},\"blended_pass\":{},\"texture_subresource_copies\":{},\"texture_mip_levels\":{},\"texture_array_layers\":{},\"host_buffer_access\":{},\"presentation\":{},\"renderdoc_capture\":{},\"tracy_zones\":{}}},\"limits\":{{\"max_buffer_size\":{},\"max_texture_extent_2d\":{},\"max_texture_mip_levels\":{},\"max_texture_array_layers\":{},\"max_resource_layout_bindings\":{},\"max_binding_array_count\":{},\"max_color_attachments\":{},\"max_dynamic_offsets_per_binding\":{},\"max_command_lists_per_submission\":{},\"max_commands_per_list\":{},\"max_draw_count\":{},\"max_dispatch_groups_per_axis\":{}}}}}",
+            self.name,
+            self.features.graphics,
+            self.features.compute,
+            self.features.descriptor_arrays,
+            self.features.optional_bindings,
+            self.features.dynamic_buffer_offsets,
+            self.features.uniform_buffers,
+            self.features.storage_buffers,
+            self.features.storage_textures,
+            self.features.indirect_draw,
+            self.features.indirect_dispatch,
+            self.features.multiple_color_attachments,
+            self.features.depth_only_pass,
+            self.features.blended_pass,
+            self.features.texture_subresource_copies,
+            self.features.texture_mip_levels,
+            self.features.texture_array_layers,
+            self.features.host_buffer_access,
+            self.features.presentation,
+            self.features.renderdoc_capture,
+            self.features.tracy_zones,
+            self.limits.max_buffer_size,
+            self.limits.max_texture_extent_2d,
+            self.limits.max_texture_mip_levels,
+            self.limits.max_texture_array_layers,
+            self.limits.max_resource_layout_bindings,
+            self.limits.max_binding_array_count,
+            self.limits.max_color_attachments,
+            self.limits.max_dynamic_offsets_per_binding,
+            self.limits.max_command_lists_per_submission,
+            self.limits.max_commands_per_list,
+            self.limits.max_draw_count,
+            self.limits.max_dispatch_groups_per_axis
+        )
+    }
 }
 
 pub type ColorFormat = TextureFormat;

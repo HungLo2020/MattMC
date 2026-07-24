@@ -3,7 +3,7 @@ use std::mem::{align_of, size_of};
 use std::path::Path;
 use std::ptr::NonNull;
 
-use super::backends::mock::MockBackend;
+use super::backends::{mock::MockBackend, opengl_capabilities, vulkan_capabilities};
 use super::commands::*;
 use super::error::{ErrorDomain, GalError};
 use super::ffi::*;
@@ -11,9 +11,23 @@ use super::gal::VulkanicGal;
 use super::handles::{Handle, HandleKind, MAX_GENERATION};
 use super::metrics::Metrics;
 use super::resources::*;
+use super::sync::SubmissionId;
 
 fn gal() -> VulkanicGal {
     VulkanicGal::new_with_backend(Box::new(MockBackend::default()), false)
+}
+
+fn gal_with_capabilities(capabilities: BackendCapabilities) -> VulkanicGal {
+    VulkanicGal::new_with_backend(
+        Box::new(MockBackend::with_capabilities(capabilities)),
+        false,
+    )
+}
+
+fn presentation_capabilities() -> BackendCapabilities {
+    let mut capabilities = vulkan_capabilities();
+    capabilities.features.presentation = true;
+    capabilities
 }
 
 fn assert_code<T>(result: Result<T, GalError>, code: super::StatusCode) {
@@ -22,6 +36,18 @@ fn assert_code<T>(result: Result<T, GalError>, code: super::StatusCode) {
         Err(error) => error,
     };
     assert_eq!(error.code, code, "{error}");
+}
+
+fn assert_unsupported<T>(result: Result<T, GalError>, needle: &str) {
+    let error = match result {
+        Ok(_) => panic!("operation unexpectedly succeeded"),
+        Err(error) => error,
+    };
+    assert_eq!(error.code, super::StatusCode::UnsupportedFeature, "{error}");
+    assert!(
+        error.message.contains(needle),
+        "unsupported error '{error}' did not contain '{needle}'"
+    );
 }
 
 fn buffer(label: &str, usages: Vec<BufferUsage>) -> BufferDesc {
@@ -186,6 +212,394 @@ fn simple_graphics_scene(gal: &mut VulkanicGal) -> (Handle, Handle, Handle, Hand
         })
         .unwrap();
     (color_view, target, pass, layout, pipeline)
+}
+
+#[test]
+fn backend_capabilities_are_queryable_and_fingerprinted_without_api_tokens() {
+    let gal = gal_with_capabilities(opengl_capabilities());
+    let capabilities = gal.capabilities();
+    assert_eq!("Rust OpenGL", capabilities.name);
+    assert!(capabilities.supports(BackendFeature::Graphics));
+    assert!(capabilities.supports(BackendFeature::DescriptorArrays));
+    assert!(!capabilities.supports(BackendFeature::Compute));
+    assert!(!capabilities.supports(BackendFeature::StorageTextures));
+    let fingerprint = capabilities.fingerprint_json();
+    assert!(fingerprint.contains("\"name\":\"Rust OpenGL\""));
+    assert!(fingerprint.contains("\"compute\":false"));
+    assert!(fingerprint.contains("\"max_color_attachments\":4"));
+    for forbidden in [
+        concat!("glow", "::"),
+        concat!("ash", "::"),
+        concat!("vk", "::"),
+        concat!("GL", "_"),
+        concat!("VK", "_"),
+    ] {
+        assert!(!fingerprint.contains(forbidden));
+    }
+}
+
+#[test]
+fn backend_capability_rejection_is_deterministic_before_native_creation() {
+    let mut gal = gal_with_capabilities(opengl_capabilities());
+    assert_unsupported(
+        gal.create_texture(TextureDesc {
+            mip_levels: 2,
+            ..texture(
+                "mipped",
+                TextureFormat::Rgba8Unorm,
+                vec![TextureUsage::Sampled],
+            )
+        }),
+        "mip count",
+    );
+    assert_unsupported(
+        gal.create_texture(TextureDesc {
+            usages: vec![TextureUsage::Storage],
+            ..texture(
+                "storage-image",
+                TextureFormat::Rgba8Unorm,
+                vec![TextureUsage::Storage],
+            )
+        }),
+        "storage textures",
+    );
+    assert_unsupported(
+        gal.create_compute_pipeline(ComputePipelineDesc {
+            label: "compute".to_owned(),
+            layout: Handle::from_raw(0),
+            shader: Handle::from_raw(0),
+        }),
+        "compute pipelines",
+    );
+    assert_eq!(0, gal.metrics().resource_creates);
+    assert_eq!(3, gal.metrics().validation_failures);
+}
+
+#[test]
+fn capability_limits_reject_descriptor_and_attachment_overflows() {
+    let mut gal = gal_with_capabilities(opengl_capabilities());
+    assert_unsupported(
+        gal.create_resource_layout(ResourceLayoutDesc {
+            label: "too-many-bindings".to_owned(),
+            bindings: (0..17)
+                .map(|binding| {
+                    layout_binding(
+                        binding,
+                        ResourceBindingKind::UniformBuffer,
+                        PipelineStageFlags::DRAW,
+                    )
+                })
+                .collect(),
+        }),
+        "binding count",
+    );
+    assert_unsupported(
+        gal.create_resource_layout(ResourceLayoutDesc {
+            label: "too-wide-array".to_owned(),
+            bindings: vec![ResourceBindingDesc {
+                binding: 0,
+                kind: ResourceBindingKind::UniformBuffer,
+                stages: PipelineStageFlags::DRAW,
+                array_count: 9,
+                optional: false,
+                dynamic_offset_count: 0,
+            }],
+        }),
+        "array count",
+    );
+    let vertex_shader = gal
+        .create_shader_module(shader("vertex", ShaderStage::Vertex))
+        .unwrap();
+    let fragment_shader = gal
+        .create_shader_module(shader("fragment", ShaderStage::Fragment))
+        .unwrap();
+    let layout = gal
+        .create_pipeline_layout(PipelineLayoutDesc {
+            label: "empty".to_owned(),
+            resource_layouts: vec![],
+        })
+        .unwrap();
+    assert_unsupported(
+        gal.create_graphics_pipeline(GraphicsPipelineDesc {
+            label: "too-many-attachments".to_owned(),
+            layout,
+            vertex_shader,
+            fragment_shader,
+            topology: PrimitiveTopology::Triangles,
+            cull_mode: CullMode::None,
+            blend: BlendMode::Disabled,
+            depth_compare: None,
+            color_formats: vec![TextureFormat::Rgba8Unorm; 5],
+            depth_format: None,
+        }),
+        "color attachment count",
+    );
+}
+
+#[test]
+fn unsupported_indirect_and_presentation_commands_reject_before_backend_encoding() {
+    let mut gal = gal_with_capabilities(opengl_capabilities());
+    let (_color_view, target, pass, _layout, pipeline) = simple_graphics_scene(&mut gal);
+    let indirect = gal
+        .create_buffer(buffer("indirect", vec![BufferUsage::Indirect]))
+        .unwrap();
+    assert_unsupported(
+        gal.create_command_list(CommandListDesc {
+            label: "unsupported-indirect".to_owned(),
+            operations: vec![
+                CommandOp::BeginPass {
+                    pass,
+                    target,
+                    colors: vec![color_attachment(_color_view)],
+                    depth_stencil: None,
+                },
+                CommandOp::BindGraphicsPipeline(pipeline),
+                CommandOp::DrawIndirect {
+                    buffer: indirect,
+                    offset: 0,
+                    draw_count: 1,
+                },
+                CommandOp::EndPass,
+            ],
+        }),
+        "indirect draw",
+    );
+    let present_texture = gal
+        .create_texture(texture(
+            "ordinary-color",
+            TextureFormat::Rgba8Unorm,
+            vec![TextureUsage::ColorAttachment],
+        ))
+        .unwrap();
+    assert_unsupported(
+        gal.create_command_list(CommandListDesc {
+            label: "unsupported-present".to_owned(),
+            operations: vec![CommandOp::Present {
+                texture: present_texture,
+                subresources: TextureSubresourceRange {
+                    base_mip: 0,
+                    mip_count: 1,
+                    base_layer: 0,
+                    layer_count: 1,
+                },
+            }],
+        }),
+        "presentation commands",
+    );
+}
+
+#[test]
+fn large_supported_batches_validate_with_backend_limits() {
+    let mut gal = gal_with_capabilities(vulkan_capabilities());
+    let src = gal
+        .create_buffer(BufferDesc {
+            label: "large-src".to_owned(),
+            size: 4096,
+            memory: MemoryDomain::Upload,
+            usages: vec![BufferUsage::HostWrite, BufferUsage::TransferSrc],
+        })
+        .unwrap();
+    let dst = gal
+        .create_buffer(BufferDesc {
+            label: "large-dst".to_owned(),
+            size: 4096,
+            memory: MemoryDomain::Readback,
+            usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
+        })
+        .unwrap();
+    let mut lists = Vec::new();
+    for index in 0..8 {
+        lists.push(
+            gal.create_command_list(CommandListDesc {
+                label: format!("large-list-{index}"),
+                operations: vec![
+                    CommandOp::CopyBuffer { src, dst, size: 16 },
+                    CommandOp::Barrier(ResourceBarrier {
+                        resource: dst,
+                        subresources: None,
+                        before: TextureUsageState::TransferDst,
+                        after: TextureUsageState::ShaderRead,
+                        stages: PipelineStageFlags::TRANSFER,
+                        access: AccessFlags::TRANSFER,
+                        src_queue: QueueClass::Graphics,
+                        dst_queue: QueueClass::Graphics,
+                    }),
+                ],
+            })
+            .unwrap(),
+        );
+    }
+    let token = gal
+        .submit(SubmissionBatch {
+            label: "large-submit".to_owned(),
+            command_lists: lists,
+        })
+        .unwrap();
+    assert_eq!(SubmissionId(1), token.submission);
+    assert_eq!(1, gal.metrics().submissions);
+}
+
+#[test]
+fn vulkan_capabilities_accept_mip_layer_copy_and_indirect_commands() {
+    let mut gal = gal_with_capabilities(vulkan_capabilities());
+    let upload = gal
+        .create_buffer(BufferDesc {
+            label: "mip-layer-upload".to_owned(),
+            size: 64,
+            memory: MemoryDomain::Upload,
+            usages: vec![BufferUsage::TransferSrc, BufferUsage::HostWrite],
+        })
+        .unwrap();
+    let readback = gal
+        .create_buffer(BufferDesc {
+            label: "mip-layer-readback".to_owned(),
+            size: 64,
+            memory: MemoryDomain::Readback,
+            usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
+        })
+        .unwrap();
+    let texture = gal
+        .create_texture(TextureDesc {
+            label: "mip-layer-texture".to_owned(),
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Rgba8Unorm,
+            extent: Extent3d {
+                width: 8,
+                height: 8,
+                depth: 1,
+            },
+            mip_levels: 2,
+            array_layers: 2,
+            usages: vec![TextureUsage::TransferDst, TextureUsage::TransferSrc],
+        })
+        .unwrap();
+    let region = BufferImageCopyRegion {
+        buffer: upload,
+        buffer_offset: 0,
+        bytes_per_row: 16,
+        rows_per_image: 4,
+        texture,
+        texture_mip: 1,
+        texture_layer: 1,
+        texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+        extent: Extent3d {
+            width: 4,
+            height: 4,
+            depth: 1,
+        },
+    };
+    gal.create_command_list(CommandListDesc {
+        label: "mip-layer-copy".to_owned(),
+        operations: vec![CommandOp::CopyBufferToTexture(region)],
+    })
+    .unwrap();
+    let region = BufferImageCopyRegion {
+        buffer: readback,
+        buffer_offset: 0,
+        bytes_per_row: 16,
+        rows_per_image: 4,
+        texture,
+        texture_mip: 1,
+        texture_layer: 1,
+        texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+        extent: Extent3d {
+            width: 4,
+            height: 4,
+            depth: 1,
+        },
+    };
+    gal.create_command_list(CommandListDesc {
+        label: "mip-layer-readback".to_owned(),
+        operations: vec![CommandOp::CopyTextureToBuffer(region)],
+    })
+    .unwrap();
+
+    let indirect = gal
+        .create_buffer(buffer("indirect", vec![BufferUsage::Indirect]))
+        .unwrap();
+    let (_color_view, target, pass, _layout, graphics) = simple_graphics_scene(&mut gal);
+    gal.create_command_list(CommandListDesc {
+        label: "indirect-draw".to_owned(),
+        operations: vec![
+            CommandOp::BeginPass {
+                pass,
+                target,
+                colors: vec![color_attachment(_color_view)],
+                depth_stencil: None,
+            },
+            CommandOp::BindGraphicsPipeline(graphics),
+            CommandOp::DrawIndirect {
+                buffer: indirect,
+                offset: 0,
+                draw_count: 1,
+            },
+            CommandOp::EndPass,
+        ],
+    })
+    .unwrap();
+
+    let layout = gal
+        .create_pipeline_layout(PipelineLayoutDesc {
+            label: "compute-layout".to_owned(),
+            resource_layouts: vec![],
+        })
+        .unwrap();
+    let shader = gal
+        .create_shader_module(shader("compute", ShaderStage::Compute))
+        .unwrap();
+    let compute = gal
+        .create_compute_pipeline(ComputePipelineDesc {
+            label: "compute".to_owned(),
+            layout,
+            shader,
+        })
+        .unwrap();
+    gal.create_command_list(CommandListDesc {
+        label: "indirect-dispatch".to_owned(),
+        operations: vec![
+            CommandOp::BindComputePipeline(compute),
+            CommandOp::DispatchIndirect {
+                buffer: indirect,
+                offset: 0,
+            },
+        ],
+    })
+    .unwrap();
+}
+
+#[test]
+fn opengl_capabilities_reject_storage_images_and_layered_copies() {
+    let mut gal = gal_with_capabilities(opengl_capabilities());
+    assert_unsupported(
+        gal.create_texture(TextureDesc {
+            label: "layered".to_owned(),
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Rgba8Unorm,
+            extent: Extent3d {
+                width: 8,
+                height: 8,
+                depth: 1,
+            },
+            mip_levels: 1,
+            array_layers: 2,
+            usages: vec![TextureUsage::Sampled],
+        }),
+        "layer count",
+    );
+    assert_unsupported(
+        gal.create_resource_layout(ResourceLayoutDesc {
+            label: "storage-image-layout".to_owned(),
+            bindings: vec![ResourceBindingDesc {
+                binding: 0,
+                kind: ResourceBindingKind::StorageTexture,
+                stages: PipelineStageFlags::COMPUTE,
+                array_count: 1,
+                optional: false,
+                dynamic_offset_count: 0,
+            }],
+        }),
+        "storage texture bindings",
+    );
 }
 
 #[test]
@@ -613,7 +1027,7 @@ fn render_target_pass_and_attachment_views_match_their_textures() {
 
 #[test]
 fn attachment_and_presentation_hazards_require_semantic_separation() {
-    let mut gal = gal();
+    let mut gal = gal_with_capabilities(presentation_capabilities());
     let texture = gal
         .create_texture(texture(
             "attachment",
@@ -1049,7 +1463,7 @@ fn buffer_texture_copy_commands_validate_usage_ranges_and_hazards() {
 
 #[test]
 fn indirect_host_and_malformed_ranges_are_validated_semantically() {
-    let mut gal = gal();
+    let mut gal = gal_with_capabilities(presentation_capabilities());
     let (color_view, target, pass, _layout, pipeline) = simple_graphics_scene(&mut gal);
     let not_indirect = gal
         .create_buffer(buffer("not-indirect", vec![BufferUsage::Vertex]))

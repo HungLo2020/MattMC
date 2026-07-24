@@ -259,11 +259,30 @@ impl VulkanicGal {
         &self.metrics
     }
 
+    pub fn capabilities(&self) -> BackendCapabilities {
+        self.backend.capabilities()
+    }
+
     pub fn create_buffer(&mut self, desc: BufferDesc) -> GalResult<Handle> {
         if desc.size == 0 || desc.usages.is_empty() {
             return self.validation_error(GalError::resource(
                 StatusCode::InvalidArgument,
                 "buffer size and usages must be non-empty",
+            ));
+        }
+        let capabilities = self.capabilities();
+        if desc.size > capabilities.limits.max_buffer_size {
+            return self.unsupported(format!(
+                "buffer '{}' size {} exceeds backend '{}' limit {}",
+                desc.label, desc.size, capabilities.name, capabilities.limits.max_buffer_size
+            ));
+        }
+        if desc.usages.contains(&BufferUsage::Storage)
+            && !capabilities.supports(BackendFeature::StorageBuffers)
+        {
+            return self.unsupported(format!(
+                "backend '{}' does not support storage buffers",
+                capabilities.name
             ));
         }
         let handle = self.buffers.next_handle()?;
@@ -292,6 +311,71 @@ impl VulkanicGal {
             return self.validation_error(GalError::resource(
                 StatusCode::InvalidArgument,
                 "texture extent, levels, layers, and usages must be non-empty",
+            ));
+        }
+        let capabilities = self.capabilities();
+        if desc.dimension != TextureDimension::D2 {
+            return self.unsupported(format!(
+                "backend '{}' currently supports D2 textures only",
+                capabilities.name
+            ));
+        }
+        if desc.extent.width > capabilities.limits.max_texture_extent_2d
+            || desc.extent.height > capabilities.limits.max_texture_extent_2d
+        {
+            return self.unsupported(format!(
+                "texture '{}' extent {}x{} exceeds backend '{}' 2D extent limit {}",
+                desc.label,
+                desc.extent.width,
+                desc.extent.height,
+                capabilities.name,
+                capabilities.limits.max_texture_extent_2d
+            ));
+        }
+        if desc.mip_levels > capabilities.limits.max_texture_mip_levels {
+            return self.unsupported(format!(
+                "texture '{}' mip count {} exceeds backend '{}' limit {}",
+                desc.label,
+                desc.mip_levels,
+                capabilities.name,
+                capabilities.limits.max_texture_mip_levels
+            ));
+        }
+        if desc.mip_levels > 1 && !capabilities.supports(BackendFeature::TextureMipLevels) {
+            return self.unsupported(format!(
+                "backend '{}' does not support multi-mip textures",
+                capabilities.name
+            ));
+        }
+        if desc.array_layers > capabilities.limits.max_texture_array_layers {
+            return self.unsupported(format!(
+                "texture '{}' layer count {} exceeds backend '{}' limit {}",
+                desc.label,
+                desc.array_layers,
+                capabilities.name,
+                capabilities.limits.max_texture_array_layers
+            ));
+        }
+        if desc.array_layers > 1 && !capabilities.supports(BackendFeature::TextureArrayLayers) {
+            return self.unsupported(format!(
+                "backend '{}' does not support texture arrays",
+                capabilities.name
+            ));
+        }
+        if desc.usages.contains(&TextureUsage::Storage)
+            && !capabilities.supports(BackendFeature::StorageTextures)
+        {
+            return self.unsupported(format!(
+                "backend '{}' does not support storage textures",
+                capabilities.name
+            ));
+        }
+        if desc.usages.contains(&TextureUsage::Present)
+            && !capabilities.supports(BackendFeature::Presentation)
+        {
+            return self.unsupported(format!(
+                "backend '{}' does not support presentation textures in the isolated path",
+                capabilities.name
             ));
         }
         let handle = self.textures.next_handle()?;
@@ -401,6 +485,16 @@ impl VulkanicGal {
     }
 
     pub fn create_resource_layout(&mut self, desc: ResourceLayoutDesc) -> GalResult<Handle> {
+        let capabilities = self.capabilities();
+        if desc.bindings.len() > capabilities.limits.max_resource_layout_bindings as usize {
+            return self.unsupported(format!(
+                "resource layout '{}' binding count {} exceeds backend '{}' limit {}",
+                desc.label,
+                desc.bindings.len(),
+                capabilities.name,
+                capabilities.limits.max_resource_layout_bindings
+            ));
+        }
         let mut seen = BTreeSet::new();
         for binding in &desc.bindings {
             if !seen.insert(binding.binding) {
@@ -413,6 +507,27 @@ impl VulkanicGal {
                 return self.validation_error(GalError::resource(
                     StatusCode::InvalidArgument,
                     format!("binding {} array count must be non-zero", binding.binding),
+                ));
+            }
+            if binding.array_count > 1 && !capabilities.supports(BackendFeature::DescriptorArrays) {
+                return self.unsupported(format!(
+                    "backend '{}' does not support descriptor arrays",
+                    capabilities.name
+                ));
+            }
+            if binding.array_count > capabilities.limits.max_binding_array_count {
+                return self.unsupported(format!(
+                    "binding {} array count {} exceeds backend '{}' limit {}",
+                    binding.binding,
+                    binding.array_count,
+                    capabilities.name,
+                    capabilities.limits.max_binding_array_count
+                ));
+            }
+            if binding.optional && !capabilities.supports(BackendFeature::OptionalBindings) {
+                return self.unsupported(format!(
+                    "backend '{}' does not support optional bindings",
+                    capabilities.name
                 ));
             }
             if binding.stages == PipelineStageFlags::NONE {
@@ -433,6 +548,31 @@ impl VulkanicGal {
                         "binding {} dynamic offsets are only valid for buffer bindings",
                         binding.binding
                     ),
+                ));
+            }
+            if binding.dynamic_offset_count > 0
+                && !capabilities.supports(BackendFeature::DynamicBufferOffsets)
+            {
+                return self.unsupported(format!(
+                    "backend '{}' does not support dynamic buffer offsets",
+                    capabilities.name
+                ));
+            }
+            if binding.dynamic_offset_count > capabilities.limits.max_dynamic_offsets_per_binding {
+                return self.unsupported(format!(
+                    "binding {} dynamic offset count {} exceeds backend '{}' limit {}",
+                    binding.binding,
+                    binding.dynamic_offset_count,
+                    capabilities.name,
+                    capabilities.limits.max_dynamic_offsets_per_binding
+                ));
+            }
+            if binding.kind == ResourceBindingKind::StorageTexture
+                && !capabilities.supports(BackendFeature::StorageTextures)
+            {
+                return self.unsupported(format!(
+                    "backend '{}' does not support storage texture bindings",
+                    capabilities.name
                 ));
             }
         }
@@ -579,6 +719,37 @@ impl VulkanicGal {
                 "graphics pipeline needs at least one color or depth format",
             ));
         }
+        let capabilities = self.capabilities();
+        if desc.color_formats.len() > capabilities.limits.max_color_attachments as usize {
+            return self.unsupported(format!(
+                "graphics pipeline '{}' color attachment count {} exceeds backend '{}' limit {}",
+                desc.label,
+                desc.color_formats.len(),
+                capabilities.name,
+                capabilities.limits.max_color_attachments
+            ));
+        }
+        if desc.color_formats.len() > 1
+            && !capabilities.supports(BackendFeature::MultipleColorAttachments)
+        {
+            return self.unsupported(format!(
+                "backend '{}' does not support multiple color attachments",
+                capabilities.name
+            ));
+        }
+        if desc.color_formats.is_empty() && !capabilities.supports(BackendFeature::DepthOnlyPass) {
+            return self.unsupported(format!(
+                "backend '{}' does not support depth-only graphics passes",
+                capabilities.name
+            ));
+        }
+        if desc.blend != BlendMode::Disabled && !capabilities.supports(BackendFeature::BlendedPass)
+        {
+            return self.unsupported(format!(
+                "backend '{}' does not support blended graphics passes",
+                capabilities.name
+            ));
+        }
         let handle = self.graphics_pipelines.next_handle()?;
         let token = self
             .backend
@@ -598,6 +769,13 @@ impl VulkanicGal {
     }
 
     pub fn create_compute_pipeline(&mut self, desc: ComputePipelineDesc) -> GalResult<Handle> {
+        let capabilities = self.capabilities();
+        if !capabilities.supports(BackendFeature::Compute) {
+            return self.unsupported(format!(
+                "backend '{}' does not support compute pipelines",
+                capabilities.name
+            ));
+        }
         self.pipeline_layouts.get(desc.layout)?;
         self.require_shader_stage(desc.shader, ShaderStage::Compute)?;
         let handle = self.compute_pipelines.next_handle()?;
@@ -628,6 +806,30 @@ impl VulkanicGal {
             return self.validation_error(GalError::resource(
                 StatusCode::InvalidArgument,
                 "render target extent must be non-empty",
+            ));
+        }
+        let capabilities = self.capabilities();
+        if desc.color_views.len() > capabilities.limits.max_color_attachments as usize {
+            return self.unsupported(format!(
+                "render target '{}' color attachment count {} exceeds backend '{}' limit {}",
+                desc.label,
+                desc.color_views.len(),
+                capabilities.name,
+                capabilities.limits.max_color_attachments
+            ));
+        }
+        if desc.color_views.len() > 1
+            && !capabilities.supports(BackendFeature::MultipleColorAttachments)
+        {
+            return self.unsupported(format!(
+                "backend '{}' does not support multiple color attachments",
+                capabilities.name
+            ));
+        }
+        if desc.color_views.is_empty() && !capabilities.supports(BackendFeature::DepthOnlyPass) {
+            return self.unsupported(format!(
+                "backend '{}' does not support depth-only render targets",
+                capabilities.name
             ));
         }
         for view in &desc.color_views {
@@ -785,6 +987,16 @@ impl VulkanicGal {
     }
 
     pub fn create_command_list(&mut self, desc: CommandListDesc) -> GalResult<CommandList> {
+        let capabilities = self.capabilities();
+        if desc.operations.len() > capabilities.limits.max_commands_per_list as usize {
+            return self.unsupported(format!(
+                "command list '{}' operation count {} exceeds backend '{}' limit {}",
+                desc.label,
+                desc.operations.len(),
+                capabilities.name,
+                capabilities.limits.max_commands_per_list
+            ));
+        }
         self.validate_command_ops(&desc.operations)?;
         Ok(desc.into())
     }
@@ -796,7 +1008,27 @@ impl VulkanicGal {
                 "submission batch must contain command lists",
             ));
         }
+        let capabilities = self.capabilities();
+        if batch.command_lists.len() > capabilities.limits.max_command_lists_per_submission as usize
+        {
+            return self.unsupported(format!(
+                "submission '{}' command list count {} exceeds backend '{}' limit {}",
+                batch.label,
+                batch.command_lists.len(),
+                capabilities.name,
+                capabilities.limits.max_command_lists_per_submission
+            ));
+        }
         for list in &batch.command_lists {
+            if list.operations.len() > capabilities.limits.max_commands_per_list as usize {
+                return self.unsupported(format!(
+                    "command list '{}' operation count {} exceeds backend '{}' limit {}",
+                    list.label,
+                    list.operations.len(),
+                    capabilities.name,
+                    capabilities.limits.max_commands_per_list
+                ));
+            }
             self.validate_command_ops(&list.operations)?;
         }
         let referenced = referenced_handles(&batch);
@@ -837,6 +1069,10 @@ impl VulkanicGal {
     fn validation_error<T>(&mut self, error: GalError) -> GalResult<T> {
         self.metrics.validation_failures += 1;
         Err(error)
+    }
+
+    fn unsupported<T>(&mut self, message: impl Into<String>) -> GalResult<T> {
+        self.validation_error(GalError::unsupported_feature(message))
     }
 
     fn add_dependency(&mut self, resource: Handle, dependent: Handle) {
@@ -953,6 +1189,7 @@ impl VulkanicGal {
     }
 
     fn validate_command_ops(&mut self, ops: &[CommandOp]) -> GalResult<()> {
+        let capabilities = self.capabilities();
         let mut in_pass = false;
         let mut active_pass = None;
         let mut graphics_pipeline = None;
@@ -1113,10 +1350,22 @@ impl VulkanicGal {
                     offset,
                     draw_count,
                 } => {
+                    if !capabilities.supports(BackendFeature::IndirectDraw) {
+                        return self.unsupported(format!(
+                            "backend '{}' does not support indirect draw commands",
+                            capabilities.name
+                        ));
+                    }
                     if !in_pass || graphics_pipeline.is_none() || *draw_count == 0 {
                         return self.validation_error(GalError::command(
                             StatusCode::InvalidArgument,
                             "indirect draw requires active pass, graphics pipeline, and non-zero draw count",
+                        ));
+                    }
+                    if *draw_count > capabilities.limits.max_draw_count {
+                        return self.unsupported(format!(
+                            "indirect draw count {} exceeds backend '{}' limit {}",
+                            draw_count, capabilities.name, capabilities.limits.max_draw_count
                         ));
                     }
                     self.validate_buffer_range(*buffer, *offset, 1, BufferUsage::Indirect)?;
@@ -1126,6 +1375,12 @@ impl VulkanicGal {
                     groups_y,
                     groups_z,
                 } => {
+                    if !capabilities.supports(BackendFeature::Compute) {
+                        return self.unsupported(format!(
+                            "backend '{}' does not support dispatch commands",
+                            capabilities.name
+                        ));
+                    }
                     if in_pass
                         || compute_pipeline.is_none()
                         || *groups_x == 0
@@ -1134,8 +1389,23 @@ impl VulkanicGal {
                     {
                         return self.validation_error(GalError::command(StatusCode::InvalidArgument, "dispatch requires compute pipeline outside render pass and non-zero groups"));
                     }
+                    if *groups_x > capabilities.limits.max_dispatch_groups_per_axis
+                        || *groups_y > capabilities.limits.max_dispatch_groups_per_axis
+                        || *groups_z > capabilities.limits.max_dispatch_groups_per_axis
+                    {
+                        return self.unsupported(format!(
+                            "dispatch group count exceeds backend '{}' limit {}",
+                            capabilities.name, capabilities.limits.max_dispatch_groups_per_axis
+                        ));
+                    }
                 }
                 CommandOp::DispatchIndirect { buffer, offset } => {
+                    if !capabilities.supports(BackendFeature::IndirectDispatch) {
+                        return self.unsupported(format!(
+                            "backend '{}' does not support indirect dispatch commands",
+                            capabilities.name
+                        ));
+                    }
                     if in_pass || compute_pipeline.is_none() {
                         return self.validation_error(GalError::command(
                             StatusCode::InvalidArgument,
@@ -1163,6 +1433,14 @@ impl VulkanicGal {
                     }
                 }
                 CommandOp::CopyBufferToTexture(region) => {
+                    if (region.texture_mip > 0 || region.texture_layer > 0)
+                        && !capabilities.supports(BackendFeature::TextureSubresourceCopies)
+                    {
+                        return self.unsupported(format!(
+                            "backend '{}' does not support texture subresource copies",
+                            capabilities.name
+                        ));
+                    }
                     self.validate_buffer_texture_copy_region(
                         region,
                         BufferUsage::TransferSrc,
@@ -1170,6 +1448,14 @@ impl VulkanicGal {
                     )?;
                 }
                 CommandOp::CopyTextureToBuffer(region) => {
+                    if (region.texture_mip > 0 || region.texture_layer > 0)
+                        && !capabilities.supports(BackendFeature::TextureSubresourceCopies)
+                    {
+                        return self.unsupported(format!(
+                            "backend '{}' does not support texture subresource copies",
+                            capabilities.name
+                        ));
+                    }
                     self.validate_buffer_texture_copy_region(
                         region,
                         BufferUsage::TransferDst,
@@ -1181,6 +1467,12 @@ impl VulkanicGal {
                     offset,
                     data,
                 } => {
+                    if !capabilities.supports(BackendFeature::HostBufferAccess) {
+                        return self.unsupported(format!(
+                            "backend '{}' does not support host buffer writes",
+                            capabilities.name
+                        ));
+                    }
                     self.validate_buffer_range(
                         *buffer,
                         *offset,
@@ -1200,6 +1492,12 @@ impl VulkanicGal {
                     offset,
                     size,
                 } => {
+                    if !capabilities.supports(BackendFeature::HostBufferAccess) {
+                        return self.unsupported(format!(
+                            "backend '{}' does not support host buffer reads",
+                            capabilities.name
+                        ));
+                    }
                     self.validate_buffer_range(*buffer, *offset, *size, BufferUsage::HostRead)?;
                     let record = self.buffers.get(*buffer)?;
                     if record.desc.memory != MemoryDomain::Readback {
@@ -1213,6 +1511,12 @@ impl VulkanicGal {
                     texture,
                     subresources,
                 } => {
+                    if !capabilities.supports(BackendFeature::Presentation) {
+                        return self.unsupported(format!(
+                            "backend '{}' does not support presentation commands in the isolated path",
+                            capabilities.name
+                        ));
+                    }
                     let record = self.textures.get(*texture)?;
                     if !record.desc.usages.contains(&TextureUsage::Present) {
                         return self.validation_error(GalError::command(
@@ -1966,6 +2270,11 @@ impl VulkanicGal {
 
     #[cfg(test)]
     pub(super) fn vulkan_backend(&self) -> Option<&super::backends::vulkan::VulkanBackend> {
+        self.backend.as_any().downcast_ref()
+    }
+
+    #[cfg(test)]
+    pub(super) fn opengl_backend(&self) -> Option<&super::backends::opengl::OpenGlBackend> {
         self.backend.as_any().downcast_ref()
     }
 

@@ -27,7 +27,8 @@ fn backends_module_is_private_to_vulkanic() {
     assert_no_public_backend_exposure(&backends_mod, &backends_source);
 
     assert!(
-        contains_module_declaration(&backends_source, "mod opengl;"),
+        contains_module_declaration(&backends_source, "mod opengl;")
+            || contains_module_declaration(&backends_source, "pub(super) mod opengl;"),
         "{} must keep the Rust OpenGL backend module present behind the private backend boundary",
         relative(&backends_mod)
     );
