@@ -1578,6 +1578,65 @@ tasks.named('runClient') {
     dependsOn test
 }
 
+def classpathContainsEntry = { FileCollection launchClasspath, String relativePath ->
+    launchClasspath.files.any { File entry ->
+        if (entry.isDirectory()) {
+            return new File(entry, relativePath).isFile()
+        }
+        if (entry.isFile() && entry.name.endsWith('.jar')) {
+            try {
+                return new java.util.zip.ZipFile(entry).withCloseable { zip ->
+                    zip.getEntry(relativePath) != null
+                }
+            } catch (java.util.zip.ZipException ignored) {
+                return false
+            }
+        }
+        return false
+    }
+}
+
+def verifyJavaExecMainClassOnClasspath = { JavaExec task ->
+    def mainClassName = task.mainClass.orNull
+    if (!mainClassName) {
+        throw new GradleException("${task.name} has no mainClass configured")
+    }
+    def relativePath = mainClassName.replace('.', '/') + '.class'
+    if (!classpathContainsEntry(task.classpath, relativePath)) {
+        def classpathPreview = task.classpath.files.collect { it.absolutePath }.join(System.lineSeparator() + "  ")
+        throw new GradleException(
+                "${task.name} launch classpath does not contain ${relativePath}." +
+                System.lineSeparator() +
+                "Classpath was:" + System.lineSeparator() + "  " + classpathPreview)
+    }
+}
+
+tasks.register('verifyRunClientClasspath') {
+    group = 'verification'
+    description = 'Verifies that the runClient launch classpath contains Fabric KnotClient.'
+    dependsOn 'jar'
+    doLast {
+        verifyJavaExecMainClassOnClasspath(tasks.named('runClient', JavaExec).get())
+    }
+}
+
+tasks.named('runClient') {
+    dependsOn 'verifyRunClientClasspath'
+}
+
+tasks.register('verifyRunRealChunkMeshingReplayClasspath') {
+    group = 'verification'
+    description = 'Verifies that the real chunk meshing replay launch classpath contains Fabric KnotClient.'
+    dependsOn 'jar'
+    doLast {
+        verifyJavaExecMainClassOnClasspath(tasks.named('runRealChunkMeshingReplay', JavaExec).get())
+    }
+}
+
+tasks.named('runRealChunkMeshingReplay') {
+    dependsOn 'verifyRunRealChunkMeshingReplayClasspath'
+}
+
 // Task to run all tests (both misc and performance)
 tasks.register('testAll', Test) {
     group = 'verification'

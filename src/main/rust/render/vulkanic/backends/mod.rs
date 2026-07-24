@@ -10,7 +10,11 @@ mod conformance_matrix;
 use std::sync::{Mutex, OnceLock};
 
 use super::commands::ValidatedSubmissionBatch;
-use super::error::GalResult;
+use super::error::{GalError, GalResult};
+use super::frame::{
+    AcquiredFrame, FrameAcquireDesc, FrameResizeDesc, FrameResizeResult, FrameSurfaceDesc,
+    PresentFrameDesc, PresentedFrame,
+};
 use super::handles::{Handle, HandleKind};
 use super::resources::{
     BackendCapabilities, BackendFeatureFlags, BackendLimits, BufferDesc, ComputePipelineDesc,
@@ -78,6 +82,29 @@ pub(super) trait Backend {
     fn completed_host_reads(&self) -> Vec<CompletedHostRead> {
         Vec::new()
     }
+    fn configure_frame_surface(&mut self, _desc: &FrameSurfaceDesc) -> GalResult<()> {
+        Err(GalError::unsupported_feature(
+            "backend was not created with a presentation surface",
+        ))
+    }
+    fn acquire_frame(&mut self, _desc: &FrameAcquireDesc) -> GalResult<AcquiredFrame> {
+        Err(GalError::unsupported_feature(
+            "backend was not created with a presentation surface",
+        ))
+    }
+    fn resize_frame_surface(&mut self, _desc: &FrameResizeDesc) -> GalResult<FrameResizeResult> {
+        Err(GalError::unsupported_feature(
+            "backend was not created with a presentation surface",
+        ))
+    }
+    fn present_frame(&mut self, _desc: &PresentFrameDesc) -> GalResult<PresentedFrame> {
+        Err(GalError::unsupported_feature(
+            "backend was not created with a presentation surface",
+        ))
+    }
+    fn shutdown_frame_surface(&mut self) -> GalResult<()> {
+        Ok(())
+    }
 
     #[cfg(test)]
     fn as_any(&self) -> &dyn std::any::Any;
@@ -128,6 +155,13 @@ pub(super) fn vulkan_capabilities() -> BackendCapabilities {
     }
 }
 
+pub(super) fn presentation_capabilities(
+    mut capabilities: BackendCapabilities,
+) -> BackendCapabilities {
+    capabilities.features.presentation = true;
+    capabilities
+}
+
 pub(super) fn opengl_capabilities() -> BackendCapabilities {
     BackendCapabilities {
         name: "Rust OpenGL",
@@ -176,6 +210,9 @@ pub(super) mod mock {
 
     use super::*;
     use crate::render::vulkanic::error::GalError;
+    use crate::render::vulkanic::frame::{
+        FrameAcquireStatus, FrameId, FramePresentStatus, FrameRenderTargetId,
+    };
 
     #[derive(Default)]
     pub(in crate::render::vulkanic) struct MockBackend {
@@ -189,6 +226,11 @@ pub(super) mod mock {
         pub(in crate::render::vulkanic) live: BTreeMap<Handle, BackendToken>,
         next_token: u64,
         pub(in crate::render::vulkanic) submitted_labels: VecDeque<String>,
+        pub(in crate::render::vulkanic) frame_surface: Option<FrameSurfaceDesc>,
+        pub(in crate::render::vulkanic) acquired_frames: Vec<FrameId>,
+        pub(in crate::render::vulkanic) presented_frames: Vec<FrameId>,
+        pub(in crate::render::vulkanic) next_frame: u64,
+        pub(in crate::render::vulkanic) minimized: bool,
     }
 
     impl MockBackend {
@@ -274,6 +316,79 @@ pub(super) mod mock {
         }
 
         fn retire(&mut self, _completed: SubmissionId) -> GalResult<()> {
+            Ok(())
+        }
+
+        fn configure_frame_surface(&mut self, desc: &FrameSurfaceDesc) -> GalResult<()> {
+            self.frame_surface = Some(desc.clone());
+            Ok(())
+        }
+
+        fn acquire_frame(&mut self, desc: &FrameAcquireDesc) -> GalResult<AcquiredFrame> {
+            let surface = self.frame_surface.as_ref().ok_or_else(|| {
+                GalError::unsupported_feature("mock backend has no configured frame surface")
+            })?;
+            self.next_frame += 1;
+            let frame = FrameId(self.next_frame);
+            if self.minimized || desc.expected_extent.width == 0 || desc.expected_extent.height == 0
+            {
+                return Ok(AcquiredFrame {
+                    frame,
+                    correlation_id: desc.correlation_id,
+                    status: FrameAcquireStatus::Minimized,
+                    render_target: FrameRenderTargetId(0),
+                    extent: desc.expected_extent,
+                    color_format: surface.color_format,
+                });
+            }
+            self.acquired_frames.push(frame);
+            Ok(AcquiredFrame {
+                frame,
+                correlation_id: desc.correlation_id,
+                status: if desc.expected_extent == surface.extent {
+                    FrameAcquireStatus::Ready
+                } else {
+                    FrameAcquireStatus::Suboptimal
+                },
+                render_target: FrameRenderTargetId(frame.0),
+                extent: surface.extent,
+                color_format: surface.color_format,
+            })
+        }
+
+        fn resize_frame_surface(&mut self, desc: &FrameResizeDesc) -> GalResult<FrameResizeResult> {
+            let surface = self.frame_surface.as_mut().ok_or_else(|| {
+                GalError::unsupported_feature("mock backend has no configured frame surface")
+            })?;
+            surface.extent = desc.extent;
+            Ok(FrameResizeResult {
+                status: if desc.extent.width == 0 || desc.extent.height == 0 {
+                    FrameAcquireStatus::Minimized
+                } else {
+                    FrameAcquireStatus::Resized
+                },
+                extent: desc.extent,
+            })
+        }
+
+        fn present_frame(&mut self, desc: &PresentFrameDesc) -> GalResult<PresentedFrame> {
+            if !self.acquired_frames.contains(&desc.frame) {
+                return Err(GalError::submission(
+                    crate::render::vulkanic::StatusCode::InvalidArgument,
+                    "presented frame was not acquired",
+                ));
+            }
+            self.presented_frames.push(desc.frame);
+            Ok(PresentedFrame {
+                frame: desc.frame,
+                correlation_id: desc.correlation_id,
+                status: FramePresentStatus::Presented,
+                completed_submission: desc.wait_for,
+            })
+        }
+
+        fn shutdown_frame_surface(&mut self) -> GalResult<()> {
+            self.frame_surface = None;
             Ok(())
         }
 

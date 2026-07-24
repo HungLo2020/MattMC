@@ -465,6 +465,9 @@ import sys
 if "--messages" in sys.argv:
     print("MessageName,total_ns")
     print("ffi.shaderc.compile source=test bytes=32,100")
+    print("gal.submission producer=java-subsystem backend=rust-vulkan iteration=2 id=17,100")
+    print("gal.frame.acquire backend=vulkan correlation=41 frame=5 image=1 window=99,100")
+    print("gal.frame.present backend=vulkan correlation=41 frame=5 submission=17 status=Presented window=99,100")
 elif "--self" in sys.argv:
     print("name,src_file,src_line,total_ns,total_perc,counts,mean_ns,min_ns,max_ns,std_ns")
     print("java.frame.render-production,GraphicsFrameBenchmark.java,1,600,6,2,300,200,400,10")
@@ -486,6 +489,11 @@ else:
                 self.assertEqual(summary["zone_count"], 2)
                 self.assertIn("java.frame.render-production", summary["major_zones"])
                 self.assertEqual(summary["ffi"]["shaderc_message_count"], 1)
+                self.assertEqual(summary["call_counts"]["submission_correlations"], 1)
+                self.assertEqual(summary["call_counts"]["frame_correlations"], 2)
+                self.assertEqual(summary["correlations"]["submissions"][0]["submission"], 17)
+                self.assertEqual(summary["correlations"]["frames"][0]["correlation"], 41)
+                self.assertEqual(summary["correlations"]["frames"][1]["submission"], 17)
                 empty_path = temp / "empty.tracy"
                 empty_path.write_bytes(b"")
                 failed = json.loads(harness.extract_tracy_summary(temp, empty_path).read_text(encoding="utf-8"))
@@ -783,6 +791,14 @@ with open(os.environ["MATTMC_RENDERDOC_REPLAY_OUTPUT"], "w", encoding="utf-8") a
         )
         self.assertEqual(result.returncode, 2)
         self.assertIn("internal capture engine", result.stderr)
+
+    def test_gradle_knot_launchers_have_classpath_verifiers(self) -> None:
+        build_gradle = (Path(__file__).resolve().parents[2] / "build.gradle").read_text(encoding="utf-8")
+        self.assertIn("verifyRunClientClasspath", build_gradle)
+        self.assertIn("verifyRunRealChunkMeshingReplayClasspath", build_gradle)
+        self.assertIn("verifyJavaExecMainClassOnClasspath", build_gradle)
+        self.assertIn("task.classpath", build_gradle)
+        self.assertIn("net.fabricmc.loader.impl.launch.knot.KnotClient", build_gradle)
 
     def test_supported_smoke_clis_launch_in_dry_run(self) -> None:
         repo = Path(__file__).resolve().parents[2]

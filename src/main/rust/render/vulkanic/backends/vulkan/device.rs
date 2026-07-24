@@ -5,6 +5,8 @@ use ash::vk;
 
 use crate::render::vulkanic::error::{GalError, GalResult};
 
+use super::swapchain::SurfaceOwner;
+
 #[allow(dead_code)]
 pub(super) struct VulkanContext {
     #[allow(dead_code)]
@@ -18,10 +20,21 @@ pub(super) struct VulkanContext {
     pub(super) memory_properties: vk::PhysicalDeviceMemoryProperties,
     pub(super) command_pool: vk::CommandPool,
     pub(super) timeline: vk::Semaphore,
+    pub(super) surface_loader: Option<ash::khr::surface::Instance>,
+    pub(super) surface: Option<vk::SurfaceKHR>,
+    pub(super) swapchain_loader: Option<ash::khr::swapchain::Device>,
 }
 
 impl VulkanContext {
     pub(super) fn new(label: &str, validation: ValidationMode) -> GalResult<Arc<Self>> {
+        Self::new_with_surface(label, validation, None)
+    }
+
+    pub(super) fn new_with_surface(
+        label: &str,
+        validation: ValidationMode,
+        surface_owner: Option<&dyn SurfaceOwner>,
+    ) -> GalResult<Arc<Self>> {
         let entry = unsafe { ash::Entry::load() }
             .map_err(|error| GalError::backend(format!("failed to load Vulkan entry: {error}")))?;
         let app_name = CString::new(label)
@@ -51,11 +64,23 @@ impl VulkanContext {
             .engine_name(&engine_name)
             .engine_version(1)
             .api_version(vk::make_api_version(0, 1, 3, 0));
-        let extension_names = if has_extension(&available_extensions, ash::ext::debug_utils::NAME) {
-            vec![ash::ext::debug_utils::NAME.as_ptr()]
-        } else {
-            Vec::new()
-        };
+        let mut extension_names = Vec::new();
+        let enable_debug_utils_extension =
+            has_extension(&available_extensions, ash::ext::debug_utils::NAME);
+        if enable_debug_utils_extension {
+            extension_names.push(ash::ext::debug_utils::NAME.as_ptr());
+        }
+        if let Some(surface_owner) = surface_owner {
+            for extension in surface_owner.required_instance_extensions() {
+                if !has_extension(&available_extensions, extension) {
+                    return Err(GalError::backend(format!(
+                        "Vulkan presentation requires unavailable instance extension {}",
+                        extension.to_string_lossy()
+                    )));
+                }
+                extension_names.push(extension.as_ptr());
+            }
+        }
         let validation_feature_enables = match validation {
             ValidationMode::Off => Vec::new(),
             ValidationMode::Routine => vec![
@@ -82,14 +107,25 @@ impl VulkanContext {
             GalError::backend(format!("failed to create Vulkan instance: {error:?}"))
         })?;
 
+        let surface_loader =
+            surface_owner.map(|_| ash::khr::surface::Instance::new(&entry, &instance));
+        let surface = match (surface_owner, surface_loader.as_ref()) {
+            (Some(owner), Some(_)) => Some(owner.create_surface(&entry, &instance)?),
+            _ => None,
+        };
+
         let physical_devices =
             unsafe { instance.enumerate_physical_devices() }.map_err(|error| {
                 GalError::backend(format!(
                     "failed to enumerate Vulkan physical devices: {error:?}"
                 ))
             })?;
-        let (physical_device, queue_family_index) =
-            select_graphics_device(&instance, &physical_devices)?;
+        let (physical_device, queue_family_index) = select_graphics_device(
+            &instance,
+            &physical_devices,
+            surface_loader.as_ref(),
+            surface,
+        )?;
         let memory_properties =
             unsafe { instance.get_physical_device_memory_properties(physical_device) };
 
@@ -104,20 +140,32 @@ impl VulkanContext {
         let mut timeline_features =
             vk::PhysicalDeviceTimelineSemaphoreFeatures::default().timeline_semaphore(true);
         let queue_infos = [queue_info];
+        let device_extension_names = if surface.is_some() {
+            vec![ash::khr::swapchain::NAME.as_ptr()]
+        } else {
+            Vec::new()
+        };
         let device_info = vk::DeviceCreateInfo::default()
             .queue_create_infos(&queue_infos)
+            .enabled_extension_names(&device_extension_names)
             .push_next(&mut dynamic_rendering)
             .push_next(&mut synchronization2)
             .push_next(&mut timeline_features);
         let device = unsafe { instance.create_device(physical_device, &device_info, None) }
             .map_err(|error| {
+                if let (Some(surface_loader), Some(surface)) = (&surface_loader, surface) {
+                    unsafe { surface_loader.destroy_surface(surface, None) };
+                }
+                unsafe { instance.destroy_instance(None) };
                 GalError::backend(format!("failed to create Vulkan device: {error:?}"))
             })?;
-        let debug_utils = if extension_names.is_empty() {
-            None
-        } else {
+        let debug_utils = if enable_debug_utils_extension {
             Some(ash::ext::debug_utils::Device::new(&instance, &device))
+        } else {
+            None
         };
+        let swapchain_loader =
+            surface.map(|_| ash::khr::swapchain::Device::new(&instance, &device));
         let queue = unsafe { device.get_device_queue(queue_family_index, 0) };
         let command_pool_info = vk::CommandPoolCreateInfo::default()
             .queue_family_index(queue_family_index)
@@ -146,6 +194,9 @@ impl VulkanContext {
             memory_properties,
             command_pool,
             timeline,
+            surface_loader,
+            surface,
+            swapchain_loader,
         });
         context.set_object_name(context.timeline, "gal.timeline.graphics");
         Ok(context)
@@ -273,6 +324,9 @@ impl Drop for VulkanContext {
             self.device.destroy_semaphore(self.timeline, None);
             self.device.destroy_command_pool(self.command_pool, None);
             self.device.destroy_device(None);
+            if let (Some(surface_loader), Some(surface)) = (&self.surface_loader, self.surface) {
+                surface_loader.destroy_surface(surface, None);
+            }
             self.instance.destroy_instance(None);
         }
     }
@@ -318,16 +372,32 @@ fn has_extension(extensions: &[vk::ExtensionProperties], wanted: &CStr) -> bool 
 fn select_graphics_device(
     instance: &ash::Instance,
     physical_devices: &[vk::PhysicalDevice],
+    surface_loader: Option<&ash::khr::surface::Instance>,
+    surface: Option<vk::SurfaceKHR>,
 ) -> GalResult<(vk::PhysicalDevice, u32)> {
     let mut best = None;
     for physical_device in physical_devices {
         let properties = unsafe { instance.get_physical_device_properties(*physical_device) };
         let queue_families =
             unsafe { instance.get_physical_device_queue_family_properties(*physical_device) };
-        let Some((queue_family_index, _)) = queue_families
-            .iter()
-            .enumerate()
-            .find(|(_, family)| family.queue_flags.contains(vk::QueueFlags::GRAPHICS))
+        let Some((queue_family_index, _)) =
+            queue_families.iter().enumerate().find(|(index, family)| {
+                if !family.queue_flags.contains(vk::QueueFlags::GRAPHICS) {
+                    return false;
+                }
+                let (Some(surface_loader), Some(surface)) = (surface_loader, surface) else {
+                    return true;
+                };
+                unsafe {
+                    surface_loader
+                        .get_physical_device_surface_support(
+                            *physical_device,
+                            *index as u32,
+                            surface,
+                        )
+                        .unwrap_or(false)
+                }
+            })
         else {
             continue;
         };
@@ -345,5 +415,11 @@ fn select_graphics_device(
         }
     }
     best.map(|(device, queue, _)| (device, queue))
-        .ok_or_else(|| GalError::backend("no Vulkan physical device exposes a graphics queue"))
+        .ok_or_else(|| {
+            if surface.is_some() {
+                GalError::backend("no Vulkan physical device exposes a graphics+present queue")
+            } else {
+                GalError::backend("no Vulkan physical device exposes a graphics queue")
+            }
+        })
 }

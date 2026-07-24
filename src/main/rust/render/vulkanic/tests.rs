@@ -7,6 +7,7 @@ use super::backends::{mock::MockBackend, opengl_capabilities, vulkan_capabilitie
 use super::commands::*;
 use super::error::{ErrorDomain, GalError};
 use super::ffi::*;
+use super::frame::*;
 use super::gal::VulkanicGal;
 use super::handles::{Handle, HandleKind, MAX_GENERATION};
 use super::metrics::Metrics;
@@ -28,6 +29,20 @@ fn presentation_capabilities() -> BackendCapabilities {
     let mut capabilities = vulkan_capabilities();
     capabilities.features.presentation = true;
     capabilities
+}
+
+fn frame_surface(label: &str) -> FrameSurfaceDesc {
+    FrameSurfaceDesc {
+        label: label.to_owned(),
+        extent: Extent3d {
+            width: 128,
+            height: 72,
+            depth: 1,
+        },
+        color_format: TextureFormat::Rgba8Unorm,
+        present_mode: PresentMode::Fifo,
+        max_frames_in_flight: 2,
+    }
 }
 
 fn assert_code<T>(result: Result<T, GalError>, code: super::StatusCode) {
@@ -385,6 +400,117 @@ fn unsupported_indirect_and_presentation_commands_reject_before_backend_encoding
             }],
         }),
         "presentation commands",
+    );
+}
+
+#[test]
+fn frame_lifecycle_requires_presentation_capability() {
+    let mut gal = gal();
+    assert_unsupported(
+        gal.configure_frame_surface(frame_surface("headless")),
+        "presentation support",
+    );
+    assert_unsupported(
+        gal.acquire_frame(FrameAcquireDesc {
+            correlation_id: FrameCorrelationId(1),
+            expected_extent: Extent3d {
+                width: 128,
+                height: 72,
+                depth: 1,
+            },
+        }),
+        "presentation support",
+    );
+}
+
+#[test]
+fn frame_lifecycle_preserves_correlation_and_submission_ids() {
+    let mut gal = gal_with_capabilities(presentation_capabilities());
+    gal.configure_frame_surface(frame_surface("window"))
+        .unwrap();
+    let acquired = gal
+        .acquire_frame(FrameAcquireDesc {
+            correlation_id: FrameCorrelationId(77),
+            expected_extent: Extent3d {
+                width: 128,
+                height: 72,
+                depth: 1,
+            },
+        })
+        .unwrap();
+    assert_eq!(acquired.status, FrameAcquireStatus::Ready);
+    assert_eq!(acquired.correlation_id, FrameCorrelationId(77));
+    assert_eq!(
+        acquired.render_target,
+        FrameRenderTargetId(acquired.frame.0)
+    );
+    let presented = gal
+        .present_frame(PresentFrameDesc {
+            frame: acquired.frame,
+            correlation_id: acquired.correlation_id,
+            wait_for: SubmissionId(9),
+        })
+        .unwrap();
+    assert_eq!(presented.status, FramePresentStatus::Presented);
+    assert_eq!(presented.completed_submission, SubmissionId(9));
+    assert_eq!(gal.poll_completed(), SubmissionId(9));
+}
+
+#[test]
+fn frame_lifecycle_models_resize_and_minimized_windows() {
+    let mut gal = gal_with_capabilities(presentation_capabilities());
+    gal.configure_frame_surface(frame_surface("resize"))
+        .unwrap();
+    let resize = gal
+        .resize_frame_surface(FrameResizeDesc {
+            correlation_id: FrameCorrelationId(2),
+            extent: Extent3d {
+                width: 256,
+                height: 144,
+                depth: 1,
+            },
+        })
+        .unwrap();
+    assert_eq!(resize.status, FrameAcquireStatus::Resized);
+    let acquired = gal
+        .acquire_frame(FrameAcquireDesc {
+            correlation_id: FrameCorrelationId(3),
+            expected_extent: resize.extent,
+        })
+        .unwrap();
+    assert_eq!(acquired.extent, resize.extent);
+    let minimized = gal
+        .resize_frame_surface(FrameResizeDesc {
+            correlation_id: FrameCorrelationId(4),
+            extent: Extent3d {
+                width: 0,
+                height: 0,
+                depth: 1,
+            },
+        })
+        .unwrap();
+    assert_eq!(minimized.status, FrameAcquireStatus::Minimized);
+    let acquired = gal
+        .acquire_frame(FrameAcquireDesc {
+            correlation_id: FrameCorrelationId(5),
+            expected_extent: minimized.extent,
+        })
+        .unwrap();
+    assert_eq!(acquired.status, FrameAcquireStatus::Minimized);
+}
+
+#[test]
+fn frame_lifecycle_rejects_present_without_acquire() {
+    let mut gal = gal_with_capabilities(presentation_capabilities());
+    gal.configure_frame_surface(frame_surface("bad-present"))
+        .unwrap();
+    assert_code(
+        gal.present_frame(PresentFrameDesc {
+            frame: FrameId(99),
+            correlation_id: FrameCorrelationId(6),
+            wait_for: SubmissionId(1),
+        }),
+        super::StatusCode::InvalidArgument,
     );
 }
 
@@ -3053,6 +3179,7 @@ fn backend_specific_api_tokens_do_not_leak_into_gal_core() {
         "commands.rs",
         "error.rs",
         "ffi.rs",
+        "frame.rs",
         "gal.rs",
         "handles.rs",
         "metrics.rs",

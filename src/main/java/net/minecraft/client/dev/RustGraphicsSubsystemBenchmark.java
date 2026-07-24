@@ -1,6 +1,7 @@
 package net.minecraft.client.dev;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.util.profiling.TracyCompat;
 import net.vulkanic.bridge.VulkanicGalBridge;
 
 import java.io.IOException;
@@ -82,6 +83,7 @@ final class RustGraphicsSubsystemBenchmark {
 					.build();
 				VulkanicGalBridge.Status submitStatus = bridge.submit(submit);
 				submission = submitStatus.submissionId();
+				TracyCompat.message("gal.submission producer=java-subsystem backend=" + backend + " iteration=" + i + " id=" + submission);
 				VulkanicGalBridge.Completion completion = pollCompletion(bridge, submission);
 				completionPolls++;
 				if (!completion.complete()) {
@@ -91,6 +93,7 @@ final class RustGraphicsSubsystemBenchmark {
 				hash = xxh32(pixels, 0x4d434741);
 				nonZero = nonZero(pixels);
 				VulkanicGalBridge.Status retireStatus = bridge.retire(submission);
+				TracyCompat.message("gal.submission.retire producer=java-subsystem backend=" + backend + " iteration=" + i + " id=" + submission);
 				ffiCalls = retireStatus.ffiCalls();
 				ffiBytes = retireStatus.ffiInputBytes();
 			}

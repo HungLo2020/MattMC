@@ -7,17 +7,24 @@ mod trace;
 
 use std::sync::{Mutex, MutexGuard};
 
+use glow::HasContext;
+
 use super::{
-    graphics_backend_lock, opengl_capabilities, Backend, BackendCreateDesc, BackendToken,
-    CompletedHostRead,
+    graphics_backend_lock, opengl_capabilities, presentation_capabilities, Backend,
+    BackendCreateDesc, BackendToken, CompletedHostRead,
 };
 use crate::render::vulkanic::commands::ValidatedSubmissionBatch;
 use crate::render::vulkanic::error::{GalError, GalResult};
+use crate::render::vulkanic::frame::{
+    AcquiredFrame, FrameAcquireDesc, FrameAcquireStatus, FrameId, FramePresentStatus,
+    FrameRenderTargetId, FrameResizeDesc, FrameResizeResult, FrameSurfaceDesc, PresentFrameDesc,
+    PresentedFrame,
+};
 use crate::render::vulkanic::handles::{Handle, HandleKind};
 use crate::render::vulkanic::resources::BackendCapabilities;
 use crate::render::vulkanic::sync::SubmissionId;
 
-use self::context::OpenGlContext;
+use self::context::{ExistingOpenGlContextDesc, OpenGlContext};
 use self::lowering::OpenGlLowerer;
 #[cfg(test)]
 use self::lowering::StateCacheSnapshot;
@@ -27,7 +34,14 @@ pub(in crate::render::vulkanic) struct OpenGlBackend {
     context: OpenGlContext,
     objects: OpenGlObjects,
     lowerer: Mutex<OpenGlLowerer>,
+    presentation: Option<OpenGlPresentationState>,
     _global_lock: MutexGuard<'static, ()>,
+}
+
+struct OpenGlPresentationState {
+    desc: FrameSurfaceDesc,
+    next_frame: u64,
+    acquired: Vec<FrameId>,
 }
 
 #[allow(dead_code)]
@@ -43,6 +57,39 @@ impl OpenGlBackend {
             lowerer: Mutex::new(OpenGlLowerer::new(context.gl().clone())),
             context,
             objects,
+            presentation: None,
+            _global_lock: global_lock,
+        })
+    }
+
+    pub(in crate::render::vulkanic::backends) fn from_existing_context(
+        desc: ExistingOpenGlContextDesc,
+    ) -> GalResult<Self> {
+        let _zone = trace::Zone::new("opengl.backend.borrow-existing-context");
+        let global_lock = graphics_backend_lock()
+            .lock()
+            .map_err(|_| GalError::backend("OpenGL backend global lock poisoned"))?;
+        let context = OpenGlContext::from_existing_context(desc)?;
+        let objects = OpenGlObjects::new(context.gl().clone());
+        Ok(Self {
+            lowerer: Mutex::new(OpenGlLowerer::new(context.gl().clone())),
+            context,
+            objects,
+            presentation: Some(OpenGlPresentationState {
+                desc: FrameSurfaceDesc {
+                    label: "unconfigured-existing-opengl-surface".to_string(),
+                    extent: crate::render::vulkanic::resources::Extent3d {
+                        width: 1,
+                        height: 1,
+                        depth: 1,
+                    },
+                    color_format: crate::render::vulkanic::resources::TextureFormat::Rgba8Unorm,
+                    present_mode: crate::render::vulkanic::frame::PresentMode::Fifo,
+                    max_frames_in_flight: 1,
+                },
+                next_frame: 0,
+                acquired: Vec::new(),
+            }),
             _global_lock: global_lock,
         })
     }
@@ -78,7 +125,11 @@ impl OpenGlBackend {
 
 impl Backend for OpenGlBackend {
     fn capabilities(&self) -> BackendCapabilities {
-        opengl_capabilities()
+        if self.presentation.is_some() {
+            presentation_capabilities(opengl_capabilities())
+        } else {
+            opengl_capabilities()
+        }
     }
 
     fn create(&mut self, handle: Handle, desc: BackendCreateDesc<'_>) -> GalResult<BackendToken> {
@@ -104,6 +155,7 @@ impl Backend for OpenGlBackend {
 
     fn submit(&mut self, id: SubmissionId, _batch: &ValidatedSubmissionBatch) -> GalResult<()> {
         let _zone = trace::Zone::new("opengl.backend.submit");
+        trace::message(&format!("gal.submission backend=opengl id={}", id.0));
         self.context.make_current()?;
         self.lowerer
             .lock()
@@ -137,6 +189,107 @@ impl Backend for OpenGlBackend {
                 bytes: read.bytes,
             })
             .collect()
+    }
+
+    fn configure_frame_surface(&mut self, desc: &FrameSurfaceDesc) -> GalResult<()> {
+        let Some(presentation) = &mut self.presentation else {
+            return Err(GalError::unsupported_feature(
+                "OpenGL presentation requires an explicit borrowed Minecraft context",
+            ));
+        };
+        self.context.make_current()?;
+        presentation.desc = desc.clone();
+        Ok(())
+    }
+
+    fn acquire_frame(&mut self, desc: &FrameAcquireDesc) -> GalResult<AcquiredFrame> {
+        let Some(presentation) = &mut self.presentation else {
+            return Err(GalError::unsupported_feature(
+                "OpenGL presentation requires an explicit borrowed Minecraft context",
+            ));
+        };
+        self.context.make_current()?;
+        presentation.next_frame += 1;
+        let frame = FrameId(presentation.next_frame);
+        if desc.expected_extent.width == 0 || desc.expected_extent.height == 0 {
+            return Ok(AcquiredFrame {
+                frame,
+                correlation_id: desc.correlation_id,
+                status: FrameAcquireStatus::Minimized,
+                render_target: FrameRenderTargetId(0),
+                extent: desc.expected_extent,
+                color_format: presentation.desc.color_format,
+            });
+        }
+        presentation.acquired.push(frame);
+        trace::message(&format!(
+            "gal.frame.acquire backend=opengl correlation={} frame={}",
+            desc.correlation_id.0, frame.0
+        ));
+        Ok(AcquiredFrame {
+            frame,
+            correlation_id: desc.correlation_id,
+            status: if desc.expected_extent == presentation.desc.extent {
+                FrameAcquireStatus::Ready
+            } else {
+                FrameAcquireStatus::Suboptimal
+            },
+            render_target: FrameRenderTargetId(frame.0),
+            extent: presentation.desc.extent,
+            color_format: presentation.desc.color_format,
+        })
+    }
+
+    fn resize_frame_surface(&mut self, desc: &FrameResizeDesc) -> GalResult<FrameResizeResult> {
+        let Some(presentation) = &mut self.presentation else {
+            return Err(GalError::unsupported_feature(
+                "OpenGL presentation requires an explicit borrowed Minecraft context",
+            ));
+        };
+        presentation.desc.extent = desc.extent;
+        Ok(FrameResizeResult {
+            status: if desc.extent.width == 0 || desc.extent.height == 0 {
+                FrameAcquireStatus::Minimized
+            } else {
+                FrameAcquireStatus::Resized
+            },
+            extent: desc.extent,
+        })
+    }
+
+    fn present_frame(&mut self, desc: &PresentFrameDesc) -> GalResult<PresentedFrame> {
+        let Some(presentation) = &mut self.presentation else {
+            return Err(GalError::unsupported_feature(
+                "OpenGL presentation requires an explicit borrowed Minecraft context",
+            ));
+        };
+        if !presentation.acquired.contains(&desc.frame) {
+            return Err(GalError::submission(
+                crate::render::vulkanic::StatusCode::InvalidArgument,
+                "OpenGL frame was not acquired before present",
+            ));
+        }
+        self.context.make_current()?;
+        unsafe {
+            self.context.gl().flush();
+        }
+        trace::message(&format!(
+            "gal.frame.present backend=opengl correlation={} frame={} submission={}",
+            desc.correlation_id.0, desc.frame.0, desc.wait_for.0
+        ));
+        Ok(PresentedFrame {
+            frame: desc.frame,
+            correlation_id: desc.correlation_id,
+            status: FramePresentStatus::Presented,
+            completed_submission: desc.wait_for,
+        })
+    }
+
+    fn shutdown_frame_surface(&mut self) -> GalResult<()> {
+        if let Some(presentation) = &mut self.presentation {
+            presentation.acquired.clear();
+        }
+        Ok(())
     }
 
     #[cfg(test)]
@@ -184,6 +337,101 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn opengl_existing_context_contract_rejects_wrong_render_thread() {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        std::thread::spawn(move || sender.send(std::thread::current().id()).unwrap())
+            .join()
+            .unwrap();
+        let other_thread = receiver.recv().unwrap();
+        let result = OpenGlBackend::from_existing_context(ExistingOpenGlContextDesc {
+            label: "borrowed-context-test".to_string(),
+            stable_window_id: 42,
+            render_thread: other_thread,
+        });
+        let error = match result {
+            Ok(_) => panic!("wrong-thread borrowed context must be rejected"),
+            Err(error) => error,
+        };
+        assert!(
+            error.to_string().contains("render thread"),
+            "unexpected wrong-thread error: {error}"
+        );
+    }
+
+    #[test]
+    fn opengl_existing_context_contract_accepts_same_render_thread() {
+        let owner = match OpenGlContext::new("borrowed-context-owner") {
+            Ok(owner) => owner,
+            Err(error) => {
+                assert!(
+                    error.to_string().contains("OpenGL")
+                        || error.to_string().contains("EGL")
+                        || error.to_string().contains("GLX"),
+                    "unexpected OpenGL bootstrap failure: {error}"
+                );
+                return;
+            }
+        };
+        owner
+            .make_current()
+            .expect("isolated owner context should be current for borrowed-context test");
+        let backend = match OpenGlBackend::from_existing_context(ExistingOpenGlContextDesc {
+            label: "borrowed-context-same-thread".to_string(),
+            stable_window_id: 84,
+            render_thread: std::thread::current().id(),
+        }) {
+            Ok(backend) => backend,
+            Err(error) => {
+                assert!(
+                    error.to_string().contains("OpenGL")
+                        || error.to_string().contains("GL")
+                        || error.to_string().contains("context"),
+                    "unexpected same-thread borrowed-context failure: {error}"
+                );
+                return;
+            }
+        };
+        let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+        let surface = crate::render::vulkanic::frame::FrameSurfaceDesc {
+            label: "borrowed-opengl-window".to_string(),
+            extent: crate::render::vulkanic::resources::Extent3d {
+                width: 64,
+                height: 48,
+                depth: 1,
+            },
+            color_format: crate::render::vulkanic::resources::TextureFormat::Rgba8Unorm,
+            present_mode: crate::render::vulkanic::frame::PresentMode::Fifo,
+            max_frames_in_flight: 2,
+        };
+        gal.configure_frame_surface(surface)
+            .expect("borrowed OpenGL frame surface should configure");
+        let acquired = gal
+            .acquire_frame(crate::render::vulkanic::frame::FrameAcquireDesc {
+                correlation_id: crate::render::vulkanic::frame::FrameCorrelationId(1),
+                expected_extent: crate::render::vulkanic::resources::Extent3d {
+                    width: 64,
+                    height: 48,
+                    depth: 1,
+                },
+            })
+            .expect("borrowed OpenGL frame should acquire");
+        assert_eq!(
+            acquired.status,
+            crate::render::vulkanic::frame::FrameAcquireStatus::Ready
+        );
+        gal.present_frame(crate::render::vulkanic::frame::PresentFrameDesc {
+            frame: acquired.frame,
+            correlation_id: acquired.correlation_id,
+            wait_for: SubmissionId(0),
+        })
+        .expect("borrowed OpenGL frame should present");
+        gal.shutdown_frame_surface()
+            .expect("borrowed OpenGL shutdown should not own the external context");
+        drop(gal);
+        drop(owner);
     }
 
     #[test]

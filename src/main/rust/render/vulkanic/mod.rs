@@ -6,6 +6,7 @@ mod backends;
 pub mod commands;
 pub mod error;
 pub mod ffi;
+pub mod frame;
 pub mod gal;
 pub mod handles;
 pub mod metrics;
@@ -18,6 +19,11 @@ pub use commands::{
     TextureUsageState,
 };
 pub use error::{GalError, GalResult, StatusCode};
+pub use frame::{
+    AcquiredFrame, FrameAcquireDesc, FrameAcquireStatus, FrameCorrelationId, FrameId,
+    FramePresentStatus, FrameRenderTargetId, FrameResizeDesc, FrameResizeResult, FrameSurfaceDesc,
+    PresentFrameDesc, PresentMode, PresentedFrame,
+};
 pub use gal::VulkanicGal;
 pub use handles::{Handle, HandleKind};
 pub use metrics::{Metrics, TracyZone};

@@ -1899,6 +1899,13 @@ def first_number(text: str, pattern: str) -> float | None:
     return parse_number(match.group(1))
 
 
+def first_text(text: str, pattern: str) -> str | None:
+    match = re.search(pattern, text, re.IGNORECASE)
+    if not match:
+        return None
+    return match.group(1)
+
+
 def incomplete_run_diagnosis(
     tool_kind: str,
     failed_phase: str | None,
@@ -2194,9 +2201,34 @@ def extract_tracy_summary(
         if value is not None
     )
     messages = [row.get("MessageName", "") for row in message_rows if row.get("MessageName")]
+    frame_correlations = [
+        {
+            "message": message,
+            "backend": first_text(message, r"backend=([A-Za-z0-9_-]+)"),
+            "correlation": first_number(message, r"correlation=(\d+)"),
+            "frame": first_number(message, r"frame=(\d+)"),
+            "submission": first_number(message, r"submission=(\d+)"),
+            "status": first_text(message, r"status=([A-Za-z0-9_]+)"),
+        }
+        for message in messages
+        if "gal.frame." in message
+    ]
+    submission_correlations = [
+        {
+            "message": message,
+            "backend": first_text(message, r"backend=([A-Za-z0-9_-]+)"),
+            "producer": first_text(message, r"producer=([A-Za-z0-9_-]+)"),
+            "iteration": first_number(message, r"iteration=(\d+)"),
+            "submission": first_number(message, r"(?:id|submission)=(\d+)"),
+        }
+        for message in messages
+        if "gal.submission" in message
+    ]
     call_counts = {
         "ffi": sum(1 for message in messages if "ffi" in message.lower()),
         "shaderc": sum(1 for message in messages if "shaderc" in message.lower()),
+        "frame_correlations": len(frame_correlations),
+        "submission_correlations": len(submission_correlations),
         "messages": len(messages),
     }
     summary = {
@@ -2209,6 +2241,10 @@ def extract_tracy_summary(
         "major_zones": major_zones,
         "zone_count": len(zones),
         "call_counts": call_counts,
+        "correlations": {
+            "frames": frame_correlations,
+            "submissions": submission_correlations,
+        },
         "ffi": {
             "message_count": call_counts["ffi"],
             "shaderc_message_count": call_counts["shaderc"],

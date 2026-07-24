@@ -20,6 +20,10 @@ shaderc = { version = "0.10.1", features = ["build-from-source"] }
 tracy-client = { version = "0.18.4", default-features = false, features = ["enable", "manual-lifetime", "only-localhost"], optional = true }
 xxhash-rust = { version = "0.8", features = ["xxh32"] }
 
+[dev-dependencies]
+raw-window-handle = "0.6.2"
+winit = "0.30.13"
+
 [features]
 tracy = ["dep:tracy-client"]
 

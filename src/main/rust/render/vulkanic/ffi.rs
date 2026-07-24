@@ -1,5 +1,5 @@
-use std::collections::BTreeMap;
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::mem::{align_of, size_of, MaybeUninit};
 use std::ptr;
 use std::slice;
@@ -11,6 +11,7 @@ use super::commands::{
     TextureUsageState,
 };
 use super::error::{ErrorDomain, GalError, GalResult, StatusCode};
+use super::gal::VulkanicGal;
 use super::handles::{Handle, HandleKind};
 use super::metrics::Metrics;
 use super::resources::{
@@ -23,7 +24,6 @@ use super::resources::{
     TextureFormat, TextureSubresourceRange, TextureUsage, TextureViewDesc,
 };
 use super::sync::SubmissionId;
-use super::gal::VulkanicGal;
 
 pub const FFI_ABI_VERSION: u32 = 1;
 pub const FFI_ABI_NAME: &str = "MattMC VulkanicGAL Java-Rust batch ABI";
@@ -1833,32 +1833,142 @@ fn output_bytes_for_resource_results(capacity: u64) -> u64 {
 
 fn input_bytes_for_resource_batch(batch: &FfiResourceBatch) -> u64 {
     (size_of::<FfiResourceBatch>() as u64)
-        .saturating_add(batch.buffers.count.saturating_mul(size_of::<FfiBufferDescAbi>() as u64))
-        .saturating_add(batch.textures.count.saturating_mul(size_of::<FfiTextureDescAbi>() as u64))
-        .saturating_add(batch.texture_views.count.saturating_mul(size_of::<FfiTextureViewDescAbi>() as u64))
-        .saturating_add(batch.samplers.count.saturating_mul(size_of::<FfiSamplerDescAbi>() as u64))
-        .saturating_add(batch.shaders.count.saturating_mul(size_of::<FfiShaderModuleDescAbi>() as u64))
-        .saturating_add(batch.resource_layouts.count.saturating_mul(size_of::<FfiResourceLayoutDescAbi>() as u64))
-        .saturating_add(batch.resource_layout_bindings.count.saturating_mul(size_of::<FfiResourceBindingDescAbi>() as u64))
-        .saturating_add(batch.resource_sets.count.saturating_mul(size_of::<FfiResourceSetDescAbi>() as u64))
-        .saturating_add(batch.resource_set_bindings.count.saturating_mul(size_of::<FfiResourceBindingAbi>() as u64))
-        .saturating_add(batch.pipeline_layouts.count.saturating_mul(size_of::<FfiPipelineLayoutDescAbi>() as u64))
-        .saturating_add(batch.graphics_pipelines.count.saturating_mul(size_of::<FfiGraphicsPipelineDescAbi>() as u64))
-        .saturating_add(batch.compute_pipelines.count.saturating_mul(size_of::<FfiComputePipelineDescAbi>() as u64))
-        .saturating_add(batch.render_targets.count.saturating_mul(size_of::<FfiRenderTargetDescAbi>() as u64))
-        .saturating_add(batch.render_passes.count.saturating_mul(size_of::<FfiRenderPassDescAbi>() as u64))
-        .saturating_add(batch.buffer_updates.count.saturating_mul(size_of::<FfiBufferUpdateAbi>() as u64))
-        .saturating_add(batch.texture_updates.count.saturating_mul(size_of::<FfiTextureUpdateAbi>() as u64))
-        .saturating_add(batch.destroys.count.saturating_mul(size_of::<FfiDestroyDescAbi>() as u64))
+        .saturating_add(
+            batch
+                .buffers
+                .count
+                .saturating_mul(size_of::<FfiBufferDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .textures
+                .count
+                .saturating_mul(size_of::<FfiTextureDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .texture_views
+                .count
+                .saturating_mul(size_of::<FfiTextureViewDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .samplers
+                .count
+                .saturating_mul(size_of::<FfiSamplerDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .shaders
+                .count
+                .saturating_mul(size_of::<FfiShaderModuleDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .resource_layouts
+                .count
+                .saturating_mul(size_of::<FfiResourceLayoutDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .resource_layout_bindings
+                .count
+                .saturating_mul(size_of::<FfiResourceBindingDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .resource_sets
+                .count
+                .saturating_mul(size_of::<FfiResourceSetDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .resource_set_bindings
+                .count
+                .saturating_mul(size_of::<FfiResourceBindingAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .pipeline_layouts
+                .count
+                .saturating_mul(size_of::<FfiPipelineLayoutDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .graphics_pipelines
+                .count
+                .saturating_mul(size_of::<FfiGraphicsPipelineDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .compute_pipelines
+                .count
+                .saturating_mul(size_of::<FfiComputePipelineDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .render_targets
+                .count
+                .saturating_mul(size_of::<FfiRenderTargetDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .render_passes
+                .count
+                .saturating_mul(size_of::<FfiRenderPassDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .buffer_updates
+                .count
+                .saturating_mul(size_of::<FfiBufferUpdateAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .texture_updates
+                .count
+                .saturating_mul(size_of::<FfiTextureUpdateAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .destroys
+                .count
+                .saturating_mul(size_of::<FfiDestroyDescAbi>() as u64),
+        )
 }
 
 fn input_bytes_for_submission(batch: &FfiSubmissionBatchAbi) -> u64 {
     (size_of::<FfiSubmissionBatchAbi>() as u64)
-        .saturating_add(batch.command_lists.count.saturating_mul(size_of::<FfiCommandListAbi>() as u64))
-        .saturating_add(batch.operations.count.saturating_mul(size_of::<FfiCommandOpAbi>() as u64))
-        .saturating_add(batch.pass_attachments.count.saturating_mul(size_of::<FfiPassAttachmentAbi>() as u64))
-        .saturating_add(batch.copy_regions.count.saturating_mul(size_of::<FfiBufferImageCopyAbi>() as u64))
-        .saturating_add(batch.barriers.count.saturating_mul(size_of::<FfiResourceBarrierAbi>() as u64))
+        .saturating_add(
+            batch
+                .command_lists
+                .count
+                .saturating_mul(size_of::<FfiCommandListAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .operations
+                .count
+                .saturating_mul(size_of::<FfiCommandOpAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .pass_attachments
+                .count
+                .saturating_mul(size_of::<FfiPassAttachmentAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .copy_regions
+                .count
+                .saturating_mul(size_of::<FfiBufferImageCopyAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .barriers
+                .count
+                .saturating_mul(size_of::<FfiResourceBarrierAbi>() as u64),
+        )
 }
 
 unsafe fn write_out<T>(out: *mut T, value: T, label: &str) -> GalResult<()> {
@@ -1943,10 +2053,14 @@ fn execute_resource_batch(
     }
     let mut results = Vec::with_capacity(create_result_capacity_required(&batch));
     for item in &batch.buffers {
-        execute_create(&mut results, item, || context.gal.create_buffer(item.desc.clone()))?;
+        execute_create(&mut results, item, || {
+            context.gal.create_buffer(item.desc.clone())
+        })?;
     }
     for item in &batch.textures {
-        execute_create(&mut results, item, || context.gal.create_texture(item.desc.clone()))?;
+        execute_create(&mut results, item, || {
+            context.gal.create_texture(item.desc.clone())
+        })?;
     }
     for item in &batch.texture_views {
         execute_create(&mut results, item, || {
@@ -1954,7 +2068,9 @@ fn execute_resource_batch(
         })?;
     }
     for item in &batch.samplers {
-        execute_create(&mut results, item, || context.gal.create_sampler(item.desc.clone()))?;
+        execute_create(&mut results, item, || {
+            context.gal.create_sampler(item.desc.clone())
+        })?;
     }
     for item in &batch.shaders {
         execute_create(&mut results, item, || {
@@ -2053,37 +2169,355 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
         1 => layout!(1, FfiHeader, [version, byte_size]),
         2 => layout!(2, FfiBytes, [ptr, len]),
         3 => layout!(3, FfiHandle, [raw]),
-        4 => layout!(4, FfiContextCreateRequest, [header, backend_kind, tracy_enabled, label]),
-        5 => layout!(5, FfiContextResult, [header, status, error_domain, context_id, supported_feature_bits, limits, metrics]),
-        6 => layout!(6, FfiCapabilityQueryRequest, [header, requested_feature_bits, reserved0]),
-        7 => layout!(7, FfiCapabilityResult, [header, status, error_domain, supported_feature_bits, negotiated_feature_bits, limits, initial_presentation_supported]),
-        8 => layout!(8, FfiStatusResult, [header, status, error_domain, unsupported_feature, primary_handle, submission_id, required_bytes, metrics]),
-        9 => layout!(9, FfiCreateResultEntry, [request_id, handle, status, error_domain]),
-        10 => layout!(10, FfiBufferDescAbi, [byte_size, request_id, label, size, memory_domain, usage_bits]),
-        11 => layout!(11, FfiTextureDescAbi, [byte_size, request_id, label, dimension, format, extent, mip_levels, array_layers, usage_bits]),
-        12 => layout!(12, FfiTextureViewDescAbi, [byte_size, request_id, label, texture, format, base_mip, mip_count, base_layer, layer_count]),
-        13 => layout!(13, FfiSamplerDescAbi, [byte_size, request_id, label, min_filter, mag_filter, mip_filter, address_u, address_v, address_w]),
-        14 => layout!(14, FfiShaderModuleDescAbi, [byte_size, request_id, label, stage, code_format, code, entry_point]),
-        15 => layout!(15, FfiResourceBindingDescAbi, [byte_size, binding, kind, stage_bits, array_count, optional, dynamic_offset_count]),
-        16 => layout!(16, FfiResourceLayoutDescAbi, [byte_size, request_id, label, bindings]),
-        17 => layout!(17, FfiResourceBindingAbi, [byte_size, binding, array_index, resource, kind, access_bits, dynamic_offsets]),
-        18 => layout!(18, FfiResourceSetDescAbi, [byte_size, request_id, label, layout, bindings]),
-        19 => layout!(19, FfiPipelineLayoutDescAbi, [byte_size, request_id, label, resource_layouts]),
-        20 => layout!(20, FfiGraphicsPipelineDescAbi, [byte_size, request_id, label, layout, vertex_shader, fragment_shader, topology, cull_mode, blend, depth_compare, color_formats, depth_format]),
-        21 => layout!(21, FfiRenderTargetDescAbi, [byte_size, request_id, label, color_views, depth_stencil_view, extent]),
-        22 => layout!(22, FfiRenderPassDescAbi, [byte_size, request_id, label, target, color_formats, depth_format]),
-        23 => layout!(23, FfiResourceBatch, [header, buffers, textures, texture_views, samplers, shaders, resource_layouts, resource_layout_bindings, resource_sets, resource_set_bindings, dynamic_offsets, pipeline_layouts, pipeline_layout_resource_layouts, graphics_pipelines, compute_pipelines, render_targets, render_target_color_views, render_passes, render_pass_color_formats, buffer_updates, texture_updates, destroys, negotiated_feature_bits]),
-        24 => layout!(24, FfiPassAttachmentAbi, [byte_size, view, load_op, store_op, has_clear_color, clear_color]),
-        25 => layout!(25, FfiBufferImageCopyAbi, [byte_size, buffer, buffer_offset, bytes_per_row, rows_per_image, texture, texture_mip, texture_layer, texture_origin, extent]),
-        26 => layout!(26, FfiResourceBarrierAbi, [byte_size, resource, has_subresources, subresources, before, after, stage_bits, access_bits, src_queue, dst_queue]),
-        27 => layout!(27, FfiCommandOpAbi, [byte_size, op_kind, primary, secondary, tertiary, set_index, slot, offset, size, count0, count1, count2, colors, depth_stencil, copy_region, barrier, inline_bytes, subresources]),
+        4 => layout!(
+            4,
+            FfiContextCreateRequest,
+            [header, backend_kind, tracy_enabled, label]
+        ),
+        5 => layout!(
+            5,
+            FfiContextResult,
+            [
+                header,
+                status,
+                error_domain,
+                context_id,
+                supported_feature_bits,
+                limits,
+                metrics
+            ]
+        ),
+        6 => layout!(
+            6,
+            FfiCapabilityQueryRequest,
+            [header, requested_feature_bits, reserved0]
+        ),
+        7 => layout!(
+            7,
+            FfiCapabilityResult,
+            [
+                header,
+                status,
+                error_domain,
+                supported_feature_bits,
+                negotiated_feature_bits,
+                limits,
+                initial_presentation_supported
+            ]
+        ),
+        8 => layout!(
+            8,
+            FfiStatusResult,
+            [
+                header,
+                status,
+                error_domain,
+                unsupported_feature,
+                primary_handle,
+                submission_id,
+                required_bytes,
+                metrics
+            ]
+        ),
+        9 => layout!(
+            9,
+            FfiCreateResultEntry,
+            [request_id, handle, status, error_domain]
+        ),
+        10 => layout!(
+            10,
+            FfiBufferDescAbi,
+            [
+                byte_size,
+                request_id,
+                label,
+                size,
+                memory_domain,
+                usage_bits
+            ]
+        ),
+        11 => layout!(
+            11,
+            FfiTextureDescAbi,
+            [
+                byte_size,
+                request_id,
+                label,
+                dimension,
+                format,
+                extent,
+                mip_levels,
+                array_layers,
+                usage_bits
+            ]
+        ),
+        12 => layout!(
+            12,
+            FfiTextureViewDescAbi,
+            [
+                byte_size,
+                request_id,
+                label,
+                texture,
+                format,
+                base_mip,
+                mip_count,
+                base_layer,
+                layer_count
+            ]
+        ),
+        13 => layout!(
+            13,
+            FfiSamplerDescAbi,
+            [
+                byte_size, request_id, label, min_filter, mag_filter, mip_filter, address_u,
+                address_v, address_w
+            ]
+        ),
+        14 => layout!(
+            14,
+            FfiShaderModuleDescAbi,
+            [
+                byte_size,
+                request_id,
+                label,
+                stage,
+                code_format,
+                code,
+                entry_point
+            ]
+        ),
+        15 => layout!(
+            15,
+            FfiResourceBindingDescAbi,
+            [
+                byte_size,
+                binding,
+                kind,
+                stage_bits,
+                array_count,
+                optional,
+                dynamic_offset_count
+            ]
+        ),
+        16 => layout!(
+            16,
+            FfiResourceLayoutDescAbi,
+            [byte_size, request_id, label, bindings]
+        ),
+        17 => layout!(
+            17,
+            FfiResourceBindingAbi,
+            [
+                byte_size,
+                binding,
+                array_index,
+                resource,
+                kind,
+                access_bits,
+                dynamic_offsets
+            ]
+        ),
+        18 => layout!(
+            18,
+            FfiResourceSetDescAbi,
+            [byte_size, request_id, label, layout, bindings]
+        ),
+        19 => layout!(
+            19,
+            FfiPipelineLayoutDescAbi,
+            [byte_size, request_id, label, resource_layouts]
+        ),
+        20 => layout!(
+            20,
+            FfiGraphicsPipelineDescAbi,
+            [
+                byte_size,
+                request_id,
+                label,
+                layout,
+                vertex_shader,
+                fragment_shader,
+                topology,
+                cull_mode,
+                blend,
+                depth_compare,
+                color_formats,
+                depth_format
+            ]
+        ),
+        21 => layout!(
+            21,
+            FfiRenderTargetDescAbi,
+            [
+                byte_size,
+                request_id,
+                label,
+                color_views,
+                depth_stencil_view,
+                extent
+            ]
+        ),
+        22 => layout!(
+            22,
+            FfiRenderPassDescAbi,
+            [
+                byte_size,
+                request_id,
+                label,
+                target,
+                color_formats,
+                depth_format
+            ]
+        ),
+        23 => layout!(
+            23,
+            FfiResourceBatch,
+            [
+                header,
+                buffers,
+                textures,
+                texture_views,
+                samplers,
+                shaders,
+                resource_layouts,
+                resource_layout_bindings,
+                resource_sets,
+                resource_set_bindings,
+                dynamic_offsets,
+                pipeline_layouts,
+                pipeline_layout_resource_layouts,
+                graphics_pipelines,
+                compute_pipelines,
+                render_targets,
+                render_target_color_views,
+                render_passes,
+                render_pass_color_formats,
+                buffer_updates,
+                texture_updates,
+                destroys,
+                negotiated_feature_bits
+            ]
+        ),
+        24 => layout!(
+            24,
+            FfiPassAttachmentAbi,
+            [
+                byte_size,
+                view,
+                load_op,
+                store_op,
+                has_clear_color,
+                clear_color
+            ]
+        ),
+        25 => layout!(
+            25,
+            FfiBufferImageCopyAbi,
+            [
+                byte_size,
+                buffer,
+                buffer_offset,
+                bytes_per_row,
+                rows_per_image,
+                texture,
+                texture_mip,
+                texture_layer,
+                texture_origin,
+                extent
+            ]
+        ),
+        26 => layout!(
+            26,
+            FfiResourceBarrierAbi,
+            [
+                byte_size,
+                resource,
+                has_subresources,
+                subresources,
+                before,
+                after,
+                stage_bits,
+                access_bits,
+                src_queue,
+                dst_queue
+            ]
+        ),
+        27 => layout!(
+            27,
+            FfiCommandOpAbi,
+            [
+                byte_size,
+                op_kind,
+                primary,
+                secondary,
+                tertiary,
+                set_index,
+                slot,
+                offset,
+                size,
+                count0,
+                count1,
+                count2,
+                colors,
+                depth_stencil,
+                copy_region,
+                barrier,
+                inline_bytes,
+                subresources
+            ]
+        ),
         28 => layout!(28, FfiCommandListAbi, [byte_size, label, operations]),
-        29 => layout!(29, FfiSubmissionBatchAbi, [header, label, command_lists, operations, pass_attachments, copy_regions, barriers, negotiated_feature_bits]),
+        29 => layout!(
+            29,
+            FfiSubmissionBatchAbi,
+            [
+                header,
+                label,
+                command_lists,
+                operations,
+                pass_attachments,
+                copy_regions,
+                barriers,
+                negotiated_feature_bits
+            ]
+        ),
         30 => layout!(30, FfiCompletionQueryRequest, [header, submission_id]),
-        31 => layout!(31, FfiCompletionResult, [header, status, error_domain, requested_submission_id, completed_submission_id, is_complete]),
-        32 => layout!(32, FfiRetirementBatch, [header, completed_submission_id, handles]),
-        33 => layout!(33, FfiReadbackRequest, [header, submission_id, buffer, offset, size]),
-        34 => layout!(34, FfiReadbackResult, [header, status, error_domain, submission_id, required_bytes, written_bytes, metrics]),
+        31 => layout!(
+            31,
+            FfiCompletionResult,
+            [
+                header,
+                status,
+                error_domain,
+                requested_submission_id,
+                completed_submission_id,
+                is_complete
+            ]
+        ),
+        32 => layout!(
+            32,
+            FfiRetirementBatch,
+            [header, completed_submission_id, handles]
+        ),
+        33 => layout!(
+            33,
+            FfiReadbackRequest,
+            [header, submission_id, buffer, offset, size]
+        ),
+        34 => layout!(
+            34,
+            FfiReadbackResult,
+            [
+                header,
+                status,
+                error_domain,
+                submission_id,
+                required_bytes,
+                written_bytes,
+                metrics
+            ]
+        ),
         _ => {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,
@@ -2115,13 +2549,20 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create(
         let kind = backend_kind(request.backend_kind)?;
         let label = read_label(request.label, "context label")?;
         let backend = create_backend(kind, &label)?;
-        let gal = VulkanicGal::new_with_backend(backend, bool_flag(request.tracy_enabled, "tracy enabled")?);
+        let gal = VulkanicGal::new_with_backend(
+            backend,
+            bool_flag(request.tracy_enabled, "tracy enabled")?,
+        );
         let capabilities = gal.capabilities();
         let context_id = with_registry_mut(|registry| -> GalResult<u64> {
             let context_id = registry.next_context_id;
-            registry.next_context_id = registry.next_context_id.checked_add(1).ok_or_else(|| {
-                GalError::ffi(StatusCode::GenerationExhausted, "context id space exhausted")
-            })?;
+            registry.next_context_id =
+                registry.next_context_id.checked_add(1).ok_or_else(|| {
+                    GalError::ffi(
+                        StatusCode::GenerationExhausted,
+                        "context id space exhausted",
+                    )
+                })?;
             registry.contexts.insert(
                 context_id,
                 BridgeContext {
@@ -2176,13 +2617,19 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_destroy(
 ) -> i32 {
     with_registry_mut(|registry| {
         let Some(context) = registry.contexts.remove(&context_id) else {
-            let error = GalError::ffi(StatusCode::StaleHandle, format!("unknown context id {context_id}"));
+            let error = GalError::ffi(
+                StatusCode::StaleHandle,
+                format!("unknown context id {context_id}"),
+            );
             write_status_out(out, status_result_from_error(&error));
             return error.code as i32;
         };
         let mut status = status_ok(&context);
         status.metrics.ffi_calls = status.metrics.ffi_calls.saturating_add(1);
-        status.metrics.ffi_output_bytes = status.metrics.ffi_output_bytes.saturating_add(size_of::<FfiStatusResult>() as u64);
+        status.metrics.ffi_output_bytes = status
+            .metrics
+            .ffi_output_bytes
+            .saturating_add(size_of::<FfiStatusResult>() as u64);
         write_status_out(out, status);
         StatusCode::Ok as i32
     })
@@ -2198,42 +2645,46 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_capabilities(
         let Some(context) = registry.contexts.get_mut(&context_id) else {
             return StatusCode::StaleHandle as i32;
         };
-    context.ffi_calls += 1;
-    context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(size_of::<FfiCapabilityQueryRequest>() as u64);
-    context.ffi_output_bytes = context.ffi_output_bytes.saturating_add(size_of::<FfiCapabilityResult>() as u64);
-    match answer_capability_query(request, context.gal.capabilities()) {
-        Ok(mut result) => {
-            result.status = StatusCode::Ok as i32;
-            let _ = write_out(out, result, "capability result");
-            StatusCode::Ok as i32
-        }
-        Err(error) => {
-            set_last_error(context, &error);
-            let _ = write_out(
-                out,
-                FfiCapabilityResult {
-                    status: error.code as i32,
-                    error_domain: error.domain as u32,
-                    supported_feature_bits: capability_feature_bits(context.gal.capabilities()),
-                    limits: context.gal.capabilities().limits.into(),
-                    ..FfiCapabilityResult {
-                        header: FfiHeader {
-                            version: FFI_ABI_VERSION,
-                            byte_size: size_of::<FfiCapabilityResult>() as u32,
-                        },
+        context.ffi_calls += 1;
+        context.ffi_input_bytes = context
+            .ffi_input_bytes
+            .saturating_add(size_of::<FfiCapabilityQueryRequest>() as u64);
+        context.ffi_output_bytes = context
+            .ffi_output_bytes
+            .saturating_add(size_of::<FfiCapabilityResult>() as u64);
+        match answer_capability_query(request, context.gal.capabilities()) {
+            Ok(mut result) => {
+                result.status = StatusCode::Ok as i32;
+                let _ = write_out(out, result, "capability result");
+                StatusCode::Ok as i32
+            }
+            Err(error) => {
+                set_last_error(context, &error);
+                let _ = write_out(
+                    out,
+                    FfiCapabilityResult {
                         status: error.code as i32,
                         error_domain: error.domain as u32,
-                        supported_feature_bits: 0,
-                        negotiated_feature_bits: 0,
-                        limits: FfiBackendLimits::default(),
-                        initial_presentation_supported: 0,
-                    }
-                },
-                "capability result",
-            );
-            error.code as i32
+                        supported_feature_bits: capability_feature_bits(context.gal.capabilities()),
+                        limits: context.gal.capabilities().limits.into(),
+                        ..FfiCapabilityResult {
+                            header: FfiHeader {
+                                version: FFI_ABI_VERSION,
+                                byte_size: size_of::<FfiCapabilityResult>() as u32,
+                            },
+                            status: error.code as i32,
+                            error_domain: error.domain as u32,
+                            supported_feature_bits: 0,
+                            negotiated_feature_bits: 0,
+                            limits: FfiBackendLimits::default(),
+                            initial_presentation_supported: 0,
+                        }
+                    },
+                    "capability result",
+                );
+                error.code as i32
+            }
         }
-    }
     })
 }
 
@@ -2247,18 +2698,25 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_resource_batch(
 ) -> i32 {
     with_registry_mut(|registry| {
         let Some(context) = registry.contexts.get_mut(&context_id) else {
-            let error = GalError::ffi(StatusCode::StaleHandle, format!("unknown context id {context_id}"));
+            let error = GalError::ffi(
+                StatusCode::StaleHandle,
+                format!("unknown context id {context_id}"),
+            );
             write_status_out(status_out, status_result_from_error(&error));
             return error.code as i32;
         };
-    let input_bytes = if batch.is_null() { 0 } else { input_bytes_for_resource_batch(&*batch) };
-    context.ffi_calls += 1;
-    context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);
-    context.ffi_output_bytes = context
-        .ffi_output_bytes
-        .saturating_add(size_of::<FfiStatusResult>() as u64)
-        .saturating_add(output_bytes_for_resource_results(results_capacity));
-    let result = match decode_resource_batch(batch, context.gal.capabilities()).and_then(|owned| {
+        let input_bytes = if batch.is_null() {
+            0
+        } else {
+            input_bytes_for_resource_batch(&*batch)
+        };
+        context.ffi_calls += 1;
+        context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);
+        context.ffi_output_bytes = context
+            .ffi_output_bytes
+            .saturating_add(size_of::<FfiStatusResult>() as u64)
+            .saturating_add(output_bytes_for_resource_results(results_capacity));
+        let result = match decode_resource_batch(batch, context.gal.capabilities()).and_then(|owned| {
         let required = create_result_capacity_required(&owned);
         if required > 0 && results_out.is_null() {
             return Err(GalError::ffi(StatusCode::NullPointer, "create results pointer is null"));
@@ -2293,27 +2751,38 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_submit_batch(
 ) -> i32 {
     with_registry_mut(|registry| {
         let Some(context) = registry.contexts.get_mut(&context_id) else {
-            let error = GalError::ffi(StatusCode::StaleHandle, format!("unknown context id {context_id}"));
+            let error = GalError::ffi(
+                StatusCode::StaleHandle,
+                format!("unknown context id {context_id}"),
+            );
             write_status_out(status_out, status_result_from_error(&error));
             return error.code as i32;
         };
-    let input_bytes = if batch.is_null() { 0 } else { input_bytes_for_submission(&*batch) };
-    context.ffi_calls += 1;
-    context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);
-    context.ffi_output_bytes = context.ffi_output_bytes.saturating_add(size_of::<FfiStatusResult>() as u64);
-    let result = match decode_submission_batch(batch, context.gal.capabilities()).and_then(|batch| context.gal.submit(batch)) {
-        Ok(token) => {
-            let mut status = status_ok(context);
-            status.submission_id = token.submission.0;
-            write_status_out(status_out, status);
-            StatusCode::Ok as i32
-        }
-        Err(error) => {
-            set_last_error(context, &error);
-            write_status_out(status_out, status_error(Some(context), &error));
-            error.code as i32
-        }
-    };
+        let input_bytes = if batch.is_null() {
+            0
+        } else {
+            input_bytes_for_submission(&*batch)
+        };
+        context.ffi_calls += 1;
+        context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);
+        context.ffi_output_bytes = context
+            .ffi_output_bytes
+            .saturating_add(size_of::<FfiStatusResult>() as u64);
+        let result = match decode_submission_batch(batch, context.gal.capabilities())
+            .and_then(|batch| context.gal.submit(batch))
+        {
+            Ok(token) => {
+                let mut status = status_ok(context);
+                status.submission_id = token.submission.0;
+                write_status_out(status_out, status);
+                StatusCode::Ok as i32
+            }
+            Err(error) => {
+                set_last_error(context, &error);
+                write_status_out(status_out, status_error(Some(context), &error));
+                error.code as i32
+            }
+        };
         result
     })
 }
@@ -2328,21 +2797,49 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_completion_query(
         let Some(context) = registry.contexts.get_mut(&context_id) else {
             return StatusCode::StaleHandle as i32;
         };
-    context.ffi_calls += 1;
-    context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(size_of::<FfiCompletionQueryRequest>() as u64);
-    context.ffi_output_bytes = context.ffi_output_bytes.saturating_add(size_of::<FfiCompletionResult>() as u64);
-    let result = match validate_completion_query(request) {
-        Ok(request) => {
-            let requested = SubmissionId(request.submission_id);
-            let latest = context.gal.latest_submission_id();
-            if requested > latest {
-                let error = GalError::submission(
-                    StatusCode::InvalidArgument,
-                    format!(
-                        "completion query requested submission {} but latest submitted is {}",
-                        requested.0, latest.0
-                    ),
-                );
+        context.ffi_calls += 1;
+        context.ffi_input_bytes = context
+            .ffi_input_bytes
+            .saturating_add(size_of::<FfiCompletionQueryRequest>() as u64);
+        context.ffi_output_bytes = context
+            .ffi_output_bytes
+            .saturating_add(size_of::<FfiCompletionResult>() as u64);
+        let result = match validate_completion_query(request) {
+            Ok(request) => {
+                let requested = SubmissionId(request.submission_id);
+                let latest = context.gal.latest_submission_id();
+                if requested > latest {
+                    let error = GalError::submission(
+                        StatusCode::InvalidArgument,
+                        format!(
+                            "completion query requested submission {} but latest submitted is {}",
+                            requested.0, latest.0
+                        ),
+                    );
+                    set_last_error(context, &error);
+                    let _ = write_out(
+                        out,
+                        FfiCompletionResult {
+                            header: FfiHeader {
+                                version: FFI_ABI_VERSION,
+                                byte_size: size_of::<FfiCompletionResult>() as u32,
+                            },
+                            status: error.code as i32,
+                            error_domain: error.domain as u32,
+                            requested_submission_id: requested.0,
+                            completed_submission_id: context.gal.poll_completed().0,
+                            is_complete: 0,
+                        },
+                        "completion result",
+                    );
+                    return error.code as i32;
+                }
+                let completed = context.gal.poll_completed();
+                let result = completion_result_for(requested, completed);
+                let _ = write_out(out, result, "completion result");
+                StatusCode::Ok as i32
+            }
+            Err(error) => {
                 set_last_error(context, &error);
                 let _ = write_out(
                     out,
@@ -2353,39 +2850,15 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_completion_query(
                         },
                         status: error.code as i32,
                         error_domain: error.domain as u32,
-                        requested_submission_id: requested.0,
-                        completed_submission_id: context.gal.poll_completed().0,
+                        requested_submission_id: 0,
+                        completed_submission_id: 0,
                         is_complete: 0,
                     },
                     "completion result",
                 );
-                return error.code as i32;
+                error.code as i32
             }
-            let completed = context.gal.poll_completed();
-            let result = completion_result_for(requested, completed);
-            let _ = write_out(out, result, "completion result");
-            StatusCode::Ok as i32
-        }
-        Err(error) => {
-            set_last_error(context, &error);
-            let _ = write_out(
-                out,
-                FfiCompletionResult {
-                    header: FfiHeader {
-                        version: FFI_ABI_VERSION,
-                        byte_size: size_of::<FfiCompletionResult>() as u32,
-                    },
-                    status: error.code as i32,
-                    error_domain: error.domain as u32,
-                    requested_submission_id: 0,
-                    completed_submission_id: 0,
-                    is_complete: 0,
-                },
-                "completion result",
-            );
-            error.code as i32
-        }
-    };
+        };
         result
     })
 }
@@ -2398,26 +2871,35 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_retire(
 ) -> i32 {
     with_registry_mut(|registry| {
         let Some(context) = registry.contexts.get_mut(&context_id) else {
-            let error = GalError::ffi(StatusCode::StaleHandle, format!("unknown context id {context_id}"));
+            let error = GalError::ffi(
+                StatusCode::StaleHandle,
+                format!("unknown context id {context_id}"),
+            );
             write_status_out(status_out, status_result_from_error(&error));
             return error.code as i32;
         };
-    context.ffi_calls += 1;
-    context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(size_of::<FfiRetirementBatch>() as u64);
-    context.ffi_output_bytes = context.ffi_output_bytes.saturating_add(size_of::<FfiStatusResult>() as u64);
-    let result = match decode_retirement_batch(batch).and_then(|(id, _handles)| context.gal.retire_through(id)) {
-        Ok(retired) => {
-            let mut status = status_ok(context);
-            status.metrics.retired_resources = retired.len() as u64;
-            write_status_out(status_out, status);
-            StatusCode::Ok as i32
-        }
-        Err(error) => {
-            set_last_error(context, &error);
-            write_status_out(status_out, status_error(Some(context), &error));
-            error.code as i32
-        }
-    };
+        context.ffi_calls += 1;
+        context.ffi_input_bytes = context
+            .ffi_input_bytes
+            .saturating_add(size_of::<FfiRetirementBatch>() as u64);
+        context.ffi_output_bytes = context
+            .ffi_output_bytes
+            .saturating_add(size_of::<FfiStatusResult>() as u64);
+        let result = match decode_retirement_batch(batch)
+            .and_then(|(id, _handles)| context.gal.retire_through(id))
+        {
+            Ok(retired) => {
+                let mut status = status_ok(context);
+                status.metrics.retired_resources = retired.len() as u64;
+                write_status_out(status_out, status);
+                StatusCode::Ok as i32
+            }
+            Err(error) => {
+                set_last_error(context, &error);
+                write_status_out(status_out, status_error(Some(context), &error));
+                error.code as i32
+            }
+        };
         result
     })
 }
@@ -2434,69 +2916,91 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_readback(
         let Some(context) = registry.contexts.get_mut(&context_id) else {
             return StatusCode::StaleHandle as i32;
         };
-    context.ffi_calls += 1;
-    context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(size_of::<FfiReadbackRequest>() as u64);
-    context.ffi_output_bytes = context
-        .ffi_output_bytes
-        .saturating_add(size_of::<FfiReadbackResult>() as u64)
-        .saturating_add(out_capacity);
-    let result = (|| -> GalResult<FfiReadbackResult> {
-        let request = read_struct(request, "readback request")?;
-        validate_header::<FfiReadbackRequest>(request.header)?;
-        let buffer = require_handle(request.buffer, HandleKind::Buffer, "readback buffer")?;
-        context.gal.retire_through(SubmissionId(request.submission_id))?;
-        let reads = context.gal.completed_host_reads();
-        let Some(read) = reads.iter().rev().find(|read| {
-            read.submission == SubmissionId(request.submission_id)
-                && read.buffer == buffer
-                && read.offset == request.offset
-        }) else {
-            return Err(GalError::submission(StatusCode::InvalidArgument, "requested readback was not produced by this submission"));
-        };
-        let requested_size = usize::try_from(request.size).map_err(|_| {
-            GalError::ffi(StatusCode::LengthOverflow, "readback size does not fit usize")
-        })?;
-        let bytes = &read.bytes[..read.bytes.len().min(requested_size)];
-        if out_capacity < bytes.len() as u64 {
-            return Err(GalError::ffi(StatusCode::LengthOverflow, format!("readback output capacity {out_capacity} is less than required {}", bytes.len())));
-        }
-        if !bytes.is_empty() {
-            if out_bytes.is_null() {
-                return Err(GalError::ffi(StatusCode::NullPointer, "readback output pointer is null"));
+        context.ffi_calls += 1;
+        context.ffi_input_bytes = context
+            .ffi_input_bytes
+            .saturating_add(size_of::<FfiReadbackRequest>() as u64);
+        context.ffi_output_bytes = context
+            .ffi_output_bytes
+            .saturating_add(size_of::<FfiReadbackResult>() as u64)
+            .saturating_add(out_capacity);
+        let result = (|| -> GalResult<FfiReadbackResult> {
+            let request = read_struct(request, "readback request")?;
+            validate_header::<FfiReadbackRequest>(request.header)?;
+            let buffer = require_handle(request.buffer, HandleKind::Buffer, "readback buffer")?;
+            context
+                .gal
+                .retire_through(SubmissionId(request.submission_id))?;
+            let reads = context.gal.completed_host_reads();
+            let Some(read) = reads.iter().rev().find(|read| {
+                read.submission == SubmissionId(request.submission_id)
+                    && read.buffer == buffer
+                    && read.offset == request.offset
+            }) else {
+                return Err(GalError::submission(
+                    StatusCode::InvalidArgument,
+                    "requested readback was not produced by this submission",
+                ));
+            };
+            let requested_size = usize::try_from(request.size).map_err(|_| {
+                GalError::ffi(
+                    StatusCode::LengthOverflow,
+                    "readback size does not fit usize",
+                )
+            })?;
+            let bytes = &read.bytes[..read.bytes.len().min(requested_size)];
+            if out_capacity < bytes.len() as u64 {
+                return Err(GalError::ffi(
+                    StatusCode::LengthOverflow,
+                    format!(
+                        "readback output capacity {out_capacity} is less than required {}",
+                        bytes.len()
+                    ),
+                ));
             }
-            ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, bytes.len());
-        }
-        let mut result = FfiReadbackResult {
-            submission_id: request.submission_id,
-            required_bytes: bytes.len() as u64,
-            written_bytes: bytes.len() as u64,
-            metrics: context_metrics(context),
-            ..FfiReadbackResult::default()
-        };
-        result.metrics.ffi_output_bytes = result.metrics.ffi_output_bytes.saturating_add(bytes.len() as u64);
-        Ok(result)
-    })();
-    let status = match result {
-        Ok(result) => {
-            let _ = write_out(out, result, "readback result");
-            StatusCode::Ok as i32
-        }
-        Err(error) => {
-            set_last_error(context, &error);
+            if !bytes.is_empty() {
+                if out_bytes.is_null() {
+                    return Err(GalError::ffi(
+                        StatusCode::NullPointer,
+                        "readback output pointer is null",
+                    ));
+                }
+                ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, bytes.len());
+            }
             let mut result = FfiReadbackResult {
-                status: error.code as i32,
-                error_domain: error.domain as u32,
+                submission_id: request.submission_id,
+                required_bytes: bytes.len() as u64,
+                written_bytes: bytes.len() as u64,
                 metrics: context_metrics(context),
                 ..FfiReadbackResult::default()
             };
-            if let Ok(request) = read_struct(request, "readback request") {
-                result.submission_id = request.submission_id;
-                result.required_bytes = request.size;
+            result.metrics.ffi_output_bytes = result
+                .metrics
+                .ffi_output_bytes
+                .saturating_add(bytes.len() as u64);
+            Ok(result)
+        })();
+        let status = match result {
+            Ok(result) => {
+                let _ = write_out(out, result, "readback result");
+                StatusCode::Ok as i32
             }
-            let _ = write_out(out, result, "readback result");
-            error.code as i32
-        }
-    };
+            Err(error) => {
+                set_last_error(context, &error);
+                let mut result = FfiReadbackResult {
+                    status: error.code as i32,
+                    error_domain: error.domain as u32,
+                    metrics: context_metrics(context),
+                    ..FfiReadbackResult::default()
+                };
+                if let Ok(request) = read_struct(request, "readback request") {
+                    result.submission_id = request.submission_id;
+                    result.required_bytes = request.size;
+                }
+                let _ = write_out(out, result, "readback result");
+                error.code as i32
+            }
+        };
         status
     })
 }

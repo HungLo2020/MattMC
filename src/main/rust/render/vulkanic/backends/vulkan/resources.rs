@@ -391,7 +391,10 @@ impl VulkanObjects {
     ) -> GalResult<ShaderModuleObject> {
         let code = if desc.code_format == ShaderCodeFormat::Glsl {
             let source = std::str::from_utf8(&desc.code).map_err(|error| {
-                GalError::backend(format!("GLSL shader '{}' is not UTF-8: {error}", desc.label))
+                GalError::backend(format!(
+                    "GLSL shader '{}' is not UTF-8: {error}",
+                    desc.label
+                ))
             })?;
             compile_glsl_for_backend(
                 shaderc_kind(desc.stage)?,

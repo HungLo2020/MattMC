@@ -1,6 +1,7 @@
 use std::ffi::{c_char, c_int, c_ulong, c_void, CString};
 use std::ptr;
 use std::rc::Rc;
+use std::thread::ThreadId;
 
 use glow::HasContext;
 use libloading::Library;
@@ -64,7 +65,8 @@ type EglTerminate = unsafe extern "C" fn(EglDisplay) -> EglBoolean;
 type EglGetProcAddress = unsafe extern "C" fn(*const c_char) -> *const c_void;
 type EglGetError = unsafe extern "C" fn() -> EglInt;
 type EglQueryString = unsafe extern "C" fn(EglDisplay, EglInt) -> *const c_char;
-type EglGetPlatformDisplayExt = unsafe extern "C" fn(EglInt, *mut c_void, *const EglInt) -> EglDisplay;
+type EglGetPlatformDisplayExt =
+    unsafe extern "C" fn(EglInt, *mut c_void, *const EglInt) -> EglDisplay;
 
 const GLX_RGBA_BIT: c_int = 0x0000_0001;
 const GLX_PBUFFER_BIT: c_int = 0x0000_0004;
@@ -126,6 +128,13 @@ pub(super) struct OpenGlContext {
     _gl_library: Option<Library>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::render::vulkanic::backends) struct ExistingOpenGlContextDesc {
+    pub(super) label: String,
+    pub(super) stable_window_id: u64,
+    pub(super) render_thread: ThreadId,
+}
+
 enum NativeOpenGlContext {
     Egl {
         egl: EglFns,
@@ -134,6 +143,10 @@ enum NativeOpenGlContext {
         context: EglContextHandle,
     },
     Glx(GlxContextState),
+    Existing {
+        _stable_window_id: u64,
+        render_thread: ThreadId,
+    },
 }
 
 impl OpenGlContext {
@@ -177,6 +190,62 @@ impl OpenGlContext {
         })
     }
 
+    pub(super) fn from_existing_context(desc: ExistingOpenGlContextDesc) -> GalResult<Self> {
+        if std::thread::current().id() != desc.render_thread {
+            return Err(GalError::backend(
+                "existing OpenGL context must be registered on the render thread",
+            ));
+        }
+        let gl_library = unsafe { Library::new("libGL.so.1") }
+            .map_err(|error| GalError::backend(format!("failed to load libGL.so.1: {error}")))?;
+        let get_proc_address = unsafe {
+            gl_library
+                .get::<GlxGetProcAddress>(b"glXGetProcAddress\0")
+                .ok()
+                .map(|symbol| *symbol)
+        };
+        let gl = unsafe {
+            glow::Context::from_loader_function(|name| {
+                let cname = CString::new(name).expect("GL symbol names do not contain NUL");
+                if let Some(get_proc_address) = get_proc_address {
+                    let ptr = get_proc_address(cname.as_ptr().cast::<u8>());
+                    if !ptr.is_null() {
+                        return ptr.cast();
+                    }
+                }
+                gl_library
+                    .get::<*const c_void>(cname.as_bytes_with_nul())
+                    .ok()
+                    .map(|symbol| *symbol)
+                    .unwrap_or(ptr::null())
+                    .cast()
+            })
+        };
+        let gl = Rc::new(gl);
+        unsafe {
+            if gl.supports_debug() {
+                gl.debug_message_insert(
+                    glow::DEBUG_SOURCE_APPLICATION,
+                    glow::DEBUG_TYPE_MARKER,
+                    2,
+                    glow::DEBUG_SEVERITY_NOTIFICATION,
+                    &format!(
+                        "MattMC OpenGL VulkanicGAL borrowed context: {} window={}",
+                        desc.label, desc.stable_window_id
+                    ),
+                );
+            }
+        }
+        Ok(Self {
+            native: NativeOpenGlContext::Existing {
+                _stable_window_id: desc.stable_window_id,
+                render_thread: desc.render_thread,
+            },
+            gl,
+            _gl_library: Some(gl_library),
+        })
+    }
+
     pub(super) fn gl(&self) -> &Rc<glow::Context> {
         &self.gl
     }
@@ -209,6 +278,14 @@ impl NativeOpenGlContext {
                 Ok(())
             }
             NativeOpenGlContext::Glx(state) => state.make_current(),
+            NativeOpenGlContext::Existing { render_thread, .. } => {
+                if std::thread::current().id() != *render_thread {
+                    return Err(GalError::backend(
+                        "borrowed OpenGL context used from a non-render thread",
+                    ));
+                }
+                Ok(())
+            }
         }
     }
 
@@ -218,6 +295,7 @@ impl NativeOpenGlContext {
             NativeOpenGlContext::Glx(state) => unsafe {
                 (state.fns.get_proc_address)(name.cast::<u8>())
             },
+            NativeOpenGlContext::Existing { .. } => ptr::null(),
         }
     }
 
@@ -237,6 +315,7 @@ impl NativeOpenGlContext {
                 (egl.terminate)(*display);
             },
             NativeOpenGlContext::Glx(state) => state.destroy(),
+            NativeOpenGlContext::Existing { .. } => {}
         }
     }
 }
@@ -297,11 +376,17 @@ fn create_context_attempt(
     let mut major = 0;
     let mut minor = 0;
     if unsafe { (egl.initialize)(display, &mut major, &mut minor) } == EGL_FALSE {
-        return Err(GalError::backend(egl_error(egl, "EGL initialization failed")));
+        return Err(GalError::backend(egl_error(
+            egl,
+            "EGL initialization failed",
+        )));
     }
     if unsafe { (egl.bind_api)(EGL_OPENGL_API) } == EGL_FALSE {
         unsafe { (egl.terminate)(display) };
-        return Err(GalError::backend(egl_error(egl, "EGL OpenGL API binding failed")));
+        return Err(GalError::backend(egl_error(
+            egl,
+            "EGL OpenGL API binding failed",
+        )));
     }
     if surfaceless && !display_supports(egl, display, "EGL_KHR_surfaceless_context") {
         unsafe { (egl.terminate)(display) };
@@ -440,7 +525,8 @@ fn create_context(
             3,
             EGL_NONE,
         ];
-        context = unsafe { (egl.create_context)(display, config, EGL_NO_CONTEXT, fallback.as_ptr()) };
+        context =
+            unsafe { (egl.create_context)(display, config, EGL_NO_CONTEXT, fallback.as_ptr()) };
     }
     if context.is_null() {
         return Err(GalError::backend(egl_error(
@@ -572,12 +658,7 @@ impl GlxContextState {
 
     fn make_current(&self) -> GalResult<()> {
         let ok = unsafe {
-            (self.fns.make_context_current)(
-                self.display,
-                self.pbuffer,
-                self.pbuffer,
-                self.context,
-            )
+            (self.fns.make_context_current)(self.display, self.pbuffer, self.pbuffer, self.context)
         };
         if ok == 0 {
             return Err(GalError::backend(

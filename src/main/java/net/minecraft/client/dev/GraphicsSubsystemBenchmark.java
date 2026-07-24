@@ -46,12 +46,13 @@ public final class GraphicsSubsystemBenchmark {
 			}
 			return;
 		}
-		if (minecraft.getMainRenderTarget() == null || VulkanicAPI.getDevice() == null) {
+		String backend = System.getProperty("mattmc.dev.graphicsSubsystemBenchmark.backend", "unknown");
+		boolean rustBackend = backend.equalsIgnoreCase("rust-vulkan") || backend.equalsIgnoreCase("rust-opengl");
+		if (minecraft.getMainRenderTarget() == null || (!rustBackend && VulkanicAPI.getDevice() == null)) {
 			return;
 		}
 		ran = true;
-		String backend = System.getProperty("mattmc.dev.graphicsSubsystemBenchmark.backend", "unknown");
-		if (backend.equalsIgnoreCase("rust-vulkan") || backend.equalsIgnoreCase("rust-opengl")) {
+		if (rustBackend) {
 			RustGraphicsSubsystemBenchmark.run(minecraft, STATUS_PATH, ITERATIONS, backend);
 			if (!stopIssued) {
 				stopIssued = true;

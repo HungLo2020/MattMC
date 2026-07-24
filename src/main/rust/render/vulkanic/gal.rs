@@ -6,6 +6,10 @@ use super::commands::{
     SubmissionBatch, ValidatedSubmissionBatch,
 };
 use super::error::{GalError, GalResult, StatusCode};
+use super::frame::{
+    AcquiredFrame, FrameAcquireDesc, FrameResizeDesc, FrameResizeResult, FrameSurfaceDesc,
+    PresentFrameDesc, PresentedFrame,
+};
 use super::handles::{Handle, HandleKind, MAX_GENERATION};
 use super::metrics::Metrics;
 use super::resources::*;
@@ -264,6 +268,82 @@ impl VulkanicGal {
 
     pub fn capabilities(&self) -> BackendCapabilities {
         self.backend.capabilities()
+    }
+
+    pub fn configure_frame_surface(&mut self, desc: FrameSurfaceDesc) -> GalResult<()> {
+        if desc.extent.width == 0 || desc.extent.height == 0 || desc.extent.depth == 0 {
+            return self.validation_error(GalError::resource(
+                StatusCode::InvalidArgument,
+                "frame surface extent must be non-zero",
+            ));
+        }
+        if desc.max_frames_in_flight == 0 {
+            return self.validation_error(GalError::resource(
+                StatusCode::InvalidArgument,
+                "frame surface must allow at least one frame in flight",
+            ));
+        }
+        let capabilities = self.capabilities();
+        if !capabilities.supports(BackendFeature::Presentation) {
+            return self.unsupported(format!(
+                "backend '{}' was not created with presentation support",
+                capabilities.name
+            ));
+        }
+        self.backend.configure_frame_surface(&desc)
+    }
+
+    pub fn acquire_frame(&mut self, desc: FrameAcquireDesc) -> GalResult<AcquiredFrame> {
+        if desc.expected_extent.depth == 0 {
+            return self.validation_error(GalError::resource(
+                StatusCode::InvalidArgument,
+                "frame acquire extent depth must be non-zero",
+            ));
+        }
+        let capabilities = self.capabilities();
+        if !capabilities.supports(BackendFeature::Presentation) {
+            return self.unsupported(format!(
+                "backend '{}' was not created with presentation support",
+                capabilities.name
+            ));
+        }
+        self.backend.acquire_frame(&desc)
+    }
+
+    pub fn resize_frame_surface(&mut self, desc: FrameResizeDesc) -> GalResult<FrameResizeResult> {
+        if desc.extent.depth == 0 {
+            return self.validation_error(GalError::resource(
+                StatusCode::InvalidArgument,
+                "frame resize extent depth must be non-zero",
+            ));
+        }
+        let capabilities = self.capabilities();
+        if !capabilities.supports(BackendFeature::Presentation) {
+            return self.unsupported(format!(
+                "backend '{}' was not created with presentation support",
+                capabilities.name
+            ));
+        }
+        self.backend.resize_frame_surface(&desc)
+    }
+
+    pub fn present_frame(&mut self, desc: PresentFrameDesc) -> GalResult<PresentedFrame> {
+        let capabilities = self.capabilities();
+        if !capabilities.supports(BackendFeature::Presentation) {
+            return self.unsupported(format!(
+                "backend '{}' was not created with presentation support",
+                capabilities.name
+            ));
+        }
+        let presented = self.backend.present_frame(&desc)?;
+        if presented.completed_submission > self.completed_submission {
+            self.completed_submission = presented.completed_submission;
+        }
+        Ok(presented)
+    }
+
+    pub fn shutdown_frame_surface(&mut self) -> GalResult<()> {
+        self.backend.shutdown_frame_surface()
     }
 
     pub fn create_buffer(&mut self, desc: BufferDesc) -> GalResult<Handle> {
@@ -2307,6 +2387,13 @@ impl VulkanicGal {
     #[cfg(test)]
     pub(super) fn vulkan_backend(&self) -> Option<&super::backends::vulkan::VulkanBackend> {
         self.backend.as_any().downcast_ref()
+    }
+
+    #[cfg(test)]
+    pub(super) fn vulkan_backend_mut(
+        &mut self,
+    ) -> Option<&mut super::backends::vulkan::VulkanBackend> {
+        self.backend.as_any_mut().downcast_mut()
     }
 
     #[cfg(test)]
