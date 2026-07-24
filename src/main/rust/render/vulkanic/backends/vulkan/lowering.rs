@@ -153,8 +153,7 @@ impl SubmissionLowerer {
         Ok(())
     }
 
-    #[cfg(test)]
-    pub(super) fn completed_host_reads_for_test(&self) -> &[CompletedHostRead] {
+    pub(super) fn completed_host_reads_snapshot(&self) -> &[CompletedHostRead] {
         &self.completed_host_reads
     }
 

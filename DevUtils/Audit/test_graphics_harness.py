@@ -834,7 +834,8 @@ with open(os.environ["MATTMC_RENDERDOC_REPLAY_OUTPUT"], "w", encoding="utf-8") a
     def test_cross_repository_artifact_loading(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            artifact = artifact_for(root, harness.MATRIX_MODES[4])
+            frozen_mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "frozen-opengl-shaders-off")
+            artifact = artifact_for(root, frozen_mode)
             path = root / "foreign" / harness.ARTIFACT_NAME
             harness.write_artifact(path, artifact)
             loaded = harness.load_cross_repo_artifact(path)

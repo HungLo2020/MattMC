@@ -9,7 +9,10 @@ mod trace;
 
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use super::{graphics_backend_lock, vulkan_capabilities, Backend, BackendCreateDesc, BackendToken};
+use super::{
+    graphics_backend_lock, vulkan_capabilities, Backend, BackendCreateDesc, BackendToken,
+    CompletedHostRead,
+};
 use crate::render::vulkanic::commands::ValidatedSubmissionBatch;
 use crate::render::vulkanic::error::GalResult;
 use crate::render::vulkanic::handles::{Handle, HandleKind};
@@ -29,7 +32,7 @@ pub(in crate::render::vulkanic) struct VulkanBackend {
 
 #[allow(dead_code)]
 impl VulkanBackend {
-    pub(super) fn new(label: &str) -> GalResult<Self> {
+    pub(in crate::render::vulkanic) fn new(label: &str) -> GalResult<Self> {
         let global_lock = graphics_backend_lock().lock().map_err(|_| {
             crate::render::vulkanic::error::GalError::backend(
                 "graphics backend global lock poisoned",
@@ -44,12 +47,16 @@ impl VulkanBackend {
         })
     }
 
-    #[cfg(test)]
-    pub(super) fn completed_host_reads_for_test(&self) -> Vec<lowering::CompletedHostRead> {
+    pub(super) fn completed_host_reads_snapshot(&self) -> Vec<lowering::CompletedHostRead> {
         self.lowerer
             .lock()
-            .map(|lowerer| lowerer.completed_host_reads_for_test().to_vec())
+            .map(|lowerer| lowerer.completed_host_reads_snapshot().to_vec())
             .unwrap_or_default()
+    }
+
+    #[cfg(test)]
+    pub(super) fn completed_host_reads_for_test(&self) -> Vec<lowering::CompletedHostRead> {
+        self.completed_host_reads_snapshot()
     }
 }
 
@@ -102,6 +109,18 @@ impl Backend for VulkanBackend {
         })?;
         let polled = lowerer.completed_submission();
         lowerer.retire(std::cmp::max(completed, polled))
+    }
+
+    fn completed_host_reads(&self) -> Vec<CompletedHostRead> {
+        self.completed_host_reads_snapshot()
+            .into_iter()
+            .map(|read| CompletedHostRead {
+                submission: read.submission,
+                buffer: read.buffer,
+                offset: read.offset,
+                bytes: read.bytes,
+            })
+            .collect()
     }
 
     #[cfg(test)]

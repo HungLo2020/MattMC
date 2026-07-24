@@ -96,11 +96,11 @@ unsafe fn compile_inner(
     Ok(spirv)
 }
 
-#[cfg(test)]
-pub(super) fn compile_glsl_for_backend_test(
+pub(super) fn compile_glsl_for_backend(
     stage: shaderc::ShaderKind,
     source: &str,
     source_name: &str,
+    entry: &str,
 ) -> Result<Vec<u8>, String> {
     let stage = match stage {
         shaderc::ShaderKind::Vertex => 0,
@@ -111,7 +111,6 @@ pub(super) fn compile_glsl_for_backend_test(
         shaderc::ShaderKind::TessEvaluation => 5,
         _ => return Err(format!("unsupported Shaderc kind for {source_name}")),
     };
-    let entry = "main";
     unsafe {
         compile_inner(
             stage,
@@ -123,6 +122,15 @@ pub(super) fn compile_glsl_for_backend_test(
             entry.len() as u64,
         )
     }
+}
+
+#[cfg(test)]
+pub(super) fn compile_glsl_for_backend_test(
+    stage: shaderc::ShaderKind,
+    source: &str,
+    source_name: &str,
+) -> Result<Vec<u8>, String> {
+    compile_glsl_for_backend(stage, source, source_name, "main")
 }
 
 #[no_mangle]

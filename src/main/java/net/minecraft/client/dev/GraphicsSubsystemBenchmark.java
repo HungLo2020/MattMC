@@ -50,6 +50,11 @@ public final class GraphicsSubsystemBenchmark {
 			return;
 		}
 		ran = true;
+		String backend = System.getProperty("mattmc.dev.graphicsSubsystemBenchmark.backend", "unknown");
+		if (backend.equalsIgnoreCase("rust-vulkan") || backend.equalsIgnoreCase("rust-opengl")) {
+			RustGraphicsSubsystemBenchmark.run(minecraft, STATUS_PATH, ITERATIONS, backend);
+			return;
+		}
 		List<Result> results = new ArrayList<>();
 		results.add(measure("resources.buffers", GraphicsSubsystemBenchmark::resourcesBuffers));
 		results.add(measure("transfers.uploads", GraphicsSubsystemBenchmark::transfersUploads));

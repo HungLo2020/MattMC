@@ -22,9 +22,33 @@ use super::sync::SubmissionId;
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(super) struct BackendToken(pub u64);
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::render::vulkanic) enum BackendKind {
+    Vulkan,
+    OpenGl,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::render::vulkanic) struct CompletedHostRead {
+    pub(in crate::render::vulkanic) submission: SubmissionId,
+    pub(in crate::render::vulkanic) buffer: Handle,
+    pub(in crate::render::vulkanic) offset: u64,
+    pub(in crate::render::vulkanic) bytes: Vec<u8>,
+}
+
 pub(super) fn graphics_backend_lock() -> &'static Mutex<()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
     LOCK.get_or_init(|| Mutex::new(()))
+}
+
+pub(in crate::render::vulkanic) fn create_backend(
+    kind: BackendKind,
+    label: &str,
+) -> GalResult<Box<dyn Backend>> {
+    match kind {
+        BackendKind::Vulkan => Ok(Box::new(vulkan::VulkanBackend::new(label)?)),
+        BackendKind::OpenGl => Ok(Box::new(opengl::OpenGlBackend::new(label)?)),
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -51,6 +75,9 @@ pub(super) trait Backend {
     fn submit(&mut self, id: SubmissionId, batch: &ValidatedSubmissionBatch) -> GalResult<()>;
     fn completed_submission(&self) -> SubmissionId;
     fn retire(&mut self, completed: SubmissionId) -> GalResult<()>;
+    fn completed_host_reads(&self) -> Vec<CompletedHostRead> {
+        Vec::new()
+    }
 
     #[cfg(test)]
     fn as_any(&self) -> &dyn std::any::Any;

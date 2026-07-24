@@ -97,6 +97,10 @@ MATRIX_MODES = (
     ModeSpec("current-opengl-shaders-on", "current", "opengl", "on", "java-opengl", False),
     ModeSpec("current-java-vulkan-shaders-off", "current", "vulkan", "off", "java-vulkan", True),
     ModeSpec("current-java-vulkan-shaders-on", "current", "vulkan", "on", "java-vulkan", True),
+    ModeSpec("current-rust-opengl-shaders-off", "current", "rust-opengl", "off", "rust-opengl", False),
+    ModeSpec("current-rust-opengl-shaders-on", "current", "rust-opengl", "on", "rust-opengl", False),
+    ModeSpec("current-rust-vulkan-shaders-off", "current", "rust-vulkan", "off", "rust-vulkan", True),
+    ModeSpec("current-rust-vulkan-shaders-on", "current", "rust-vulkan", "on", "rust-vulkan", True),
     ModeSpec("frozen-opengl-shaders-off", "frozen", "opengl", "off", "java-opengl", False),
     ModeSpec("frozen-opengl-shaders-on", "frozen", "opengl", "on", "java-opengl", False),
 )
@@ -977,8 +981,10 @@ def detect_attribution(mode: ModeSpec, meta: dict[str, str], logs: str) -> str:
     explicit = meta.get("implementation_attribution") or meta.get("render_implementation")
     if explicit:
         return explicit
-    if re.search(r"Rust Vulkan|rust-vulkan|mattmc_rust.*vulkan", logs, re.IGNORECASE):
+    if mode.backend == "rust-vulkan" or re.search(r"Rust Vulkan|rust-vulkan|mattmc_rust.*vulkan", logs, re.IGNORECASE):
         return "rust-vulkan"
+    if mode.backend == "rust-opengl" or re.search(r"Rust OpenGL|rust-opengl|Rust VulkanicGAL bridge", logs, re.IGNORECASE):
+        return "rust-opengl"
     if mode.backend == "vulkan":
         java_vulkan_evidence = re.search(
             r"Sodium Vulkan|Vulkan beginFramebufferRenderPass|vk[A-Z][A-Za-z0-9_]+|VK_LAYER_KHRONOS_validation|Vulkanic",
@@ -1599,11 +1605,12 @@ def normalize_capture_artifact(
         and frame_doc.get("worldEntered") is not False
         and len(frame_nanos) > 0
     )
+    subsystem_min_workloads = 1 if mode.backend.startswith("rust-") else 7
     subsystem_complete = tool_kind != "subsystem" or (
         isinstance(subsystem_doc, dict)
         and subsystem_doc.get("status") == "complete"
         and isinstance(subsystem_doc.get("workloads"), list)
-        and len(subsystem_doc.get("workloads")) >= 7
+        and len(subsystem_doc.get("workloads")) >= subsystem_min_workloads
         and all(isinstance(workload, dict) and workload.get("status") == "ok" for workload in subsystem_doc.get("workloads"))
     )
     deterministic_complete = tool_kind != "capture" or (

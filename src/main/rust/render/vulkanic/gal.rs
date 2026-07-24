@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::backends::{Backend, BackendCreateDesc, BackendToken};
+use super::backends::{Backend, BackendCreateDesc, BackendToken, CompletedHostRead};
 use super::commands::{
     BufferImageCopyRegion, CommandList, CommandListDesc, CommandOp, ResourceBarrier,
     SubmissionBatch, ValidatedSubmissionBatch,
@@ -230,7 +230,10 @@ pub struct VulkanicGal {
 
 impl VulkanicGal {
     #[allow(dead_code)]
-    pub(super) fn new_with_backend(backend: Box<dyn Backend>, tracy_enabled: bool) -> Self {
+    pub(in crate::render::vulkanic) fn new_with_backend(
+        backend: Box<dyn Backend>,
+        tracy_enabled: bool,
+    ) -> Self {
         Self {
             backend,
             buffers: Arena::new(HandleKind::Buffer),
@@ -1064,6 +1067,30 @@ impl VulkanicGal {
             }
         }
         Ok(retired)
+    }
+
+    pub(in crate::render::vulkanic) fn retire_through(
+        &mut self,
+        id: SubmissionId,
+    ) -> GalResult<Vec<Handle>> {
+        self.backend.retire(id)?;
+        if id > self.completed_submission {
+            self.completed_submission = id;
+        }
+        let mut retired = Vec::new();
+        for entry in self.retirement.drain_completed(self.completed_submission) {
+            if let Some(pending) = self.pending_destroys.remove(&entry.handle) {
+                self.backend
+                    .destroy(entry.handle, pending.kind, pending.token)?;
+                self.metrics.resource_destroys += 1;
+                retired.push(entry.handle);
+            }
+        }
+        Ok(retired)
+    }
+
+    pub(in crate::render::vulkanic) fn completed_host_reads(&self) -> Vec<CompletedHostRead> {
+        self.backend.completed_host_reads()
     }
 
     fn validation_error<T>(&mut self, error: GalError) -> GalResult<T> {
@@ -2280,20 +2307,7 @@ impl VulkanicGal {
 
     #[cfg(test)]
     pub(super) fn retire_through_for_test(&mut self, id: SubmissionId) -> GalResult<Vec<Handle>> {
-        self.backend.retire(id)?;
-        if id > self.completed_submission {
-            self.completed_submission = id;
-        }
-        let mut retired = Vec::new();
-        for entry in self.retirement.drain_completed(self.completed_submission) {
-            if let Some(pending) = self.pending_destroys.remove(&entry.handle) {
-                self.backend
-                    .destroy(entry.handle, pending.kind, pending.token)?;
-                self.metrics.resource_destroys += 1;
-                retired.push(entry.handle);
-            }
-        }
-        Ok(retired)
+        self.retire_through(id)
     }
 }
 

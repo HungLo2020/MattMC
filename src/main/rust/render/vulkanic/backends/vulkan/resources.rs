@@ -6,6 +6,7 @@ use std::sync::Arc;
 use ash::vk;
 
 use super::device::VulkanContext;
+use super::shaderc_spirv_compiler::compile_glsl_for_backend;
 use super::trace;
 use crate::render::vulkanic::backends::{BackendCreateDesc, BackendToken};
 use crate::render::vulkanic::error::{GalError, GalResult};
@@ -388,12 +389,33 @@ impl VulkanObjects {
         desc: &ShaderModuleDesc,
         token: BackendToken,
     ) -> GalResult<ShaderModuleObject> {
-        if desc.code_format != ShaderCodeFormat::Spirv || desc.code.len() % 4 != 0 {
+        let code = if desc.code_format == ShaderCodeFormat::Glsl {
+            let source = std::str::from_utf8(&desc.code).map_err(|error| {
+                GalError::backend(format!("GLSL shader '{}' is not UTF-8: {error}", desc.label))
+            })?;
+            compile_glsl_for_backend(
+                shaderc_kind(desc.stage)?,
+                source,
+                &desc.label,
+                &desc.entry_point,
+            )
+            .map_err(|error| {
+                GalError::backend(format!(
+                    "failed to compile GLSL shader '{}' for Vulkan backend: {error}",
+                    desc.label
+                ))
+            })?
+        } else {
+            desc.code.clone()
+        };
+        if desc.code_format != ShaderCodeFormat::Spirv && desc.code_format != ShaderCodeFormat::Glsl
+            || code.len() % 4 != 0
+        {
             return Err(GalError::backend(
                 "Vulkan backend requires 4-byte aligned SPIR-V shader code",
             ));
         }
-        let words = ash::util::read_spv(&mut Cursor::new(&desc.code)).map_err(|error| {
+        let words = ash::util::read_spv(&mut Cursor::new(&code)).map_err(|error| {
             GalError::backend(format!("failed to read SPIR-V '{}': {error}", desc.label))
         })?;
         let create_info = vk::ShaderModuleCreateInfo::default().code(&words);
@@ -1092,6 +1114,17 @@ pub(super) fn shader_stage(stage: ShaderStage) -> vk::ShaderStageFlags {
         ShaderStage::Geometry => vk::ShaderStageFlags::GEOMETRY,
         ShaderStage::TessControl => vk::ShaderStageFlags::TESSELLATION_CONTROL,
         ShaderStage::TessEvaluation => vk::ShaderStageFlags::TESSELLATION_EVALUATION,
+    }
+}
+
+fn shaderc_kind(stage: ShaderStage) -> GalResult<shaderc::ShaderKind> {
+    match stage {
+        ShaderStage::Vertex => Ok(shaderc::ShaderKind::Vertex),
+        ShaderStage::Fragment => Ok(shaderc::ShaderKind::Fragment),
+        ShaderStage::Compute => Ok(shaderc::ShaderKind::Compute),
+        ShaderStage::Geometry => Ok(shaderc::ShaderKind::Geometry),
+        ShaderStage::TessControl => Ok(shaderc::ShaderKind::TessControl),
+        ShaderStage::TessEvaluation => Ok(shaderc::ShaderKind::TessEvaluation),
     }
 }
 

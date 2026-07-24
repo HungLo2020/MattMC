@@ -413,7 +413,8 @@ class CaptureRunner:
             self.append_meta("screenshot_interval_secs_effective=0")
 
     def configure_backend_and_validation(self) -> None:
-        upsert_property(self.options_file, "graphics_backend", self.config.backend)
+        launch_backend = "opengl" if self.config.backend.startswith("rust-") else self.config.backend
+        upsert_property(self.options_file, "graphics_backend", launch_backend)
         forced_options = {
             "renderDistance": "10",
             "simulationDistance": "12",
@@ -2032,7 +2033,7 @@ def parse_args() -> CaptureConfig:
             "and self-terminates so no manual kill is required."
         )
     )
-    parser.add_argument("--backend", choices=("vulkan", "opengl"), required=True)
+    parser.add_argument("--backend", choices=("vulkan", "opengl", "rust-vulkan", "rust-opengl"), required=True)
     parser.add_argument("--shaders", choices=("on", "off"), required=True)
     parser.add_argument("--max-secs", type=int, default=int_env("MAX_SECS", 120))
     parser.add_argument("--dump-secs", type=int, default=int_env("DUMP_SECS", 45))

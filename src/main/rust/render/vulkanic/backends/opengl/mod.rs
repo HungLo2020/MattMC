@@ -7,7 +7,10 @@ mod trace;
 
 use std::sync::{Mutex, MutexGuard};
 
-use super::{graphics_backend_lock, opengl_capabilities, Backend, BackendCreateDesc, BackendToken};
+use super::{
+    graphics_backend_lock, opengl_capabilities, Backend, BackendCreateDesc, BackendToken,
+    CompletedHostRead,
+};
 use crate::render::vulkanic::commands::ValidatedSubmissionBatch;
 use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::handles::{Handle, HandleKind};
@@ -17,7 +20,7 @@ use crate::render::vulkanic::sync::SubmissionId;
 use self::context::OpenGlContext;
 use self::lowering::OpenGlLowerer;
 #[cfg(test)]
-use self::lowering::{CompletedHostRead, StateCacheSnapshot};
+use self::lowering::StateCacheSnapshot;
 use self::resources::OpenGlObjects;
 
 pub(in crate::render::vulkanic) struct OpenGlBackend {
@@ -29,7 +32,7 @@ pub(in crate::render::vulkanic) struct OpenGlBackend {
 
 #[allow(dead_code)]
 impl OpenGlBackend {
-    pub(super) fn new(label: &str) -> GalResult<Self> {
+    pub(in crate::render::vulkanic) fn new(label: &str) -> GalResult<Self> {
         let _zone = trace::Zone::new("opengl.backend.create");
         let global_lock = graphics_backend_lock()
             .lock()
@@ -44,12 +47,16 @@ impl OpenGlBackend {
         })
     }
 
-    #[cfg(test)]
-    pub(super) fn completed_host_reads_for_test(&self) -> Vec<CompletedHostRead> {
+    pub(super) fn completed_host_reads_snapshot(&self) -> Vec<self::lowering::CompletedHostRead> {
         self.lowerer
             .lock()
-            .map(|lowerer| lowerer.completed_host_reads_for_test().to_vec())
+            .map(|lowerer| lowerer.completed_host_reads_snapshot().to_vec())
             .unwrap_or_default()
+    }
+
+    #[cfg(test)]
+    pub(super) fn completed_host_reads_for_test(&self) -> Vec<self::lowering::CompletedHostRead> {
+        self.completed_host_reads_snapshot()
     }
 
     #[cfg(test)]
@@ -118,6 +125,18 @@ impl Backend for OpenGlBackend {
             .lock()
             .map_err(|_| GalError::backend("OpenGL lowerer lock poisoned"))?
             .retire(completed)
+    }
+
+    fn completed_host_reads(&self) -> Vec<CompletedHostRead> {
+        self.completed_host_reads_snapshot()
+            .into_iter()
+            .map(|read| CompletedHostRead {
+                submission: read.submission,
+                buffer: read.buffer,
+                offset: read.offset,
+                bytes: read.bytes,
+            })
+            .collect()
     }
 
     #[cfg(test)]
