@@ -12,8 +12,8 @@ import unittest
 from argparse import Namespace
 from pathlib import Path
 
-import rust_migration_harness as harness
-import meshing_corpus
+import RustMigration as harness
+import MeshingCorpus
 
 
 def write_fake_gradle(root: Path, *, sleep_seconds: int = 0, exit_code: int = 0) -> None:
@@ -370,7 +370,7 @@ class RustMigrationHarnessTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            summary = meshing_corpus.write_corpus_from_real_replay(replay, corpus)
+            summary = MeshingCorpus.write_corpus_from_real_replay(replay, corpus)
             self.assertEqual(summary["schema_version"], 2)
             self.assertEqual(summary["sections"][0]["classification"], "replayable-raw-input-v2")
             payload = summary["sections"][0]["payload"]
@@ -401,8 +401,8 @@ class RustMigrationHarnessTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            summary = meshing_corpus.write_corpus_from_real_replay(replay, corpus)
-            filtered = meshing_corpus.filtered_summary(summary, category="fluid-heavy")
+            summary = MeshingCorpus.write_corpus_from_real_replay(replay, corpus)
+            filtered = MeshingCorpus.filtered_summary(summary, category="fluid-heavy")
             self.assertEqual(filtered["section_count"], 1)
             self.assertEqual(filtered["sections"][0]["name"], "fluid_heavy")
 
@@ -455,7 +455,7 @@ class RustMigrationHarnessTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            comparison = meshing_corpus.compare_replay_outputs(current, frozen)
+            comparison = MeshingCorpus.compare_replay_outputs(current, frozen)
             rows = {row["fixture"]: row for row in comparison["rows"]}
             self.assertEqual(rows["ordinary_terrain_m1"]["comparison"], "byte-identical")
             self.assertEqual(rows["fluid_heavy"]["comparison"], "semantic-mismatch")

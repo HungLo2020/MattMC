@@ -163,9 +163,14 @@ public final class DeterministicCameraCapture {
 		}
 
 		renderedFramesAtPose++;
+		if (renderedFramesAtPose == Math.max(1, FRAMES_PER_POSE - 1)) {
+			RenderDocCaptureHook.beginFrameCaptureOnce(minecraft.getWindow(), poses[poseIndex].name() + "#" + renderedFrameIndex);
+			RenderDocCaptureHook.triggerNextFrameOnce(poses[poseIndex].name() + "#" + renderedFrameIndex);
+		}
 		if (renderedFramesAtPose < FRAMES_PER_POSE) {
 			return;
 		}
+		RenderDocCaptureHook.endFrameCaptureOnce(minecraft.getWindow(), poses[poseIndex].name() + "#" + renderedFrameIndex);
 
 		VulkanicAPI.traceScopedCompositeColortex0PoseBoundary();
 		if (INTERNAL_SCREENSHOTS) {

@@ -71,7 +71,7 @@ This is the baseline all future comparisons should be judged against unless it i
 ### Standard Performance Harness
 
 ```bash
-PERF_MODE=stat ./DevUtils/RunBackendPerfCompare.sh --world Origin --warmup-secs 45 --sample-secs 30
+python3 DevUtils/PerfAudit/Matrix.py --profile standard --modes current-opengl-shaders-off current-java-vulkan-shaders-off --world Origin
 ```
 
 ## Summary of the Structural Problem

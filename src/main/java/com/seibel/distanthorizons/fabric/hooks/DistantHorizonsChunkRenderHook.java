@@ -22,19 +22,25 @@ public class DistantHorizonsChunkRenderHook implements ChunkRenderLayerHooks {
             Minecraft.getInstance().levelRenderer.level
         );
 
-        if (layerGroup == ChunkSectionLayerGroup.TRANSLUCENT) {
-            try {
-                ClientApi.INSTANCE.renderFadeTransparent();
-                ClientApi.INSTANCE.renderDeferredLodsForShaders();
-            } catch (Exception e) {
-                LOGGER.error("[DH-RENDER-LAYER] Error rendering translucent: " + e.getMessage(), e);
-            }
-        } else if (layerGroup == ChunkSectionLayerGroup.TRIPWIRE) {
-            try {
-                ClientApi.INSTANCE.renderFadeOpaque();
-            } catch (Exception e) {
-                LOGGER.error("[DH-RENDER-LAYER] Error rendering tripwire: " + e.getMessage(), e);
-            }
-        }
+	        if (layerGroup == ChunkSectionLayerGroup.TRANSLUCENT) {
+	            try {
+	                net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("distant-horizons.translucent-fade");
+	                ClientApi.INSTANCE.renderFadeTransparent();
+	                ClientApi.INSTANCE.renderDeferredLodsForShaders();
+	            } catch (Exception e) {
+	                LOGGER.error("[DH-RENDER-LAYER] Error rendering translucent: " + e.getMessage(), e);
+	            } finally {
+	                net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("distant-horizons.translucent-fade");
+	            }
+	        } else if (layerGroup == ChunkSectionLayerGroup.TRIPWIRE) {
+	            try {
+	                net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("distant-horizons.opaque-fade");
+	                ClientApi.INSTANCE.renderFadeOpaque();
+	            } catch (Exception e) {
+	                LOGGER.error("[DH-RENDER-LAYER] Error rendering tripwire: " + e.getMessage(), e);
+	            } finally {
+	                net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("distant-horizons.opaque-fade");
+	            }
+	        }
     }
 }

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -94,7 +95,7 @@ class CaptureRunner:
         if not self.artifact_dir.is_absolute():
             self.artifact_dir = self.root / self.artifact_dir
         self.artifact_dir.mkdir(parents=True, exist_ok=True)
-        self.lock_file = self.artifact_dir / ".RunDevCapture.lock"
+        self.lock_file = self.artifact_dir / ".capture_runner.lock"
         self.lock_handle = None
 
         self.run_id = time.strftime("%Y%m%d_%H%M%S")
@@ -158,12 +159,15 @@ class CaptureRunner:
         self.region_validation_result = "not_requested"
         self.poi_validation_result = "not_requested"
         self.env = os.environ.copy()
+        self.isolated_game_source: Path | None = None
+        self.isolated_game_dir: Path | None = None
 
     def run(self) -> int:
         self.acquire_lock()
-        self.write_initial_meta()
         self.preflight_existing_clients()
+        self.prepare_isolated_game_dir()
         self.prepare_region_validation_game_dir()
+        self.write_initial_meta()
         self.configure_screenshots()
         self.configure_backend_and_validation()
         self.configure_client_args()
@@ -250,12 +254,17 @@ class CaptureRunner:
             self.lock_handle = None
 
     def write_initial_meta(self) -> None:
+        save_fingerprint = save_state_fingerprint(self.run_dir, self.config.world)
         lines = [
             f"run_id={self.run_id}",
             f"start_epoch={self.start_epoch}",
             f"backend={self.config.backend}",
             f"shaders={self.config.shaders}",
             f"world={self.config.world}",
+            f"world_save_state_hash={save_fingerprint['hash']}",
+            f"world_save_state_file_count={save_fingerprint['file_count']}",
+            f"world_save_state_total_bytes={save_fingerprint['total_bytes']}",
+            f"world_save_state_truncated={str(save_fingerprint['truncated']).lower()}",
             f"game_dir_initial={self.run_dir}",
             f"region_validation={str(self.config.region_validation).lower()}",
             f"region_validation_copy_world={str(self.config.region_validation_copy_world).lower()}",
@@ -264,6 +273,15 @@ class CaptureRunner:
             f"dump_secs={self.config.dump_secs}",
             f"client_rss_limit_mb={self.config.client_rss_limit_mb}",
             f"validation_mode={self.config.validation_mode}",
+            f"graphics_run_type={os.environ.get('MATTMC_GRAPHICS_RUN_TYPE', 'clean-performance')}",
+            f"validation_profile={os.environ.get('MATTMC_GRAPHICS_VALIDATION_PROFILE', self.config.validation_mode)}",
+            f"validation_fail_severity={os.environ.get('MATTMC_GRAPHICS_VALIDATION_FAIL_SEVERITY', 'warning')}",
+            f"renderdoc_capture={os.environ.get('MATTMC_RENDERDOC_CAPTURE', 'false')}",
+            f"renderdoc_frame={os.environ.get('MATTMC_RENDERDOC_FRAME', '0')}",
+            f"renderdoc_capture_path={os.environ.get('MATTMC_RENDERDOC_CAPTURE_PATH', '')}",
+            f"tracy_capture={os.environ.get('MATTMC_TRACY_CAPTURE', 'false')}",
+            f"tracy_duration_seconds={os.environ.get('MATTMC_TRACY_DURATION_SECONDS', '0')}",
+            f"tracy_max_size_mb={os.environ.get('MATTMC_TRACY_MAX_SIZE_MB', '0')}",
             f"shader_input_parity={self.config.shader_input_parity}",
             f"shader_input_parity_max_logs={self.config.shader_input_parity_max_logs}",
             f"lightmap_info_parity_max_logs={self.config.lightmap_info_parity_max_logs}",
@@ -277,11 +295,49 @@ class CaptureRunner:
             f"meshing_corpus_measure={self.config.meshing_corpus_measure}",
             f"client_args_initial={self.config.client_args}",
         ]
+        if self.isolated_game_source is not None and self.isolated_game_dir is not None:
+            lines.extend(
+                [
+                    f"isolated_game_source={self.isolated_game_source}",
+                    f"isolated_game_dir={self.isolated_game_dir}",
+                    f"isolated_world_source={os.environ.get('MATTMC_CAPTURE_WORLD_SOURCE') or self.isolated_game_source / 'saves' / self.config.world}",
+                    f"isolated_world_copy={self.isolated_game_dir / 'saves' / self.config.world}",
+                ]
+            )
         self.meta_log.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     def append_meta(self, text: str) -> None:
         with self.meta_log.open("a", encoding="utf-8") as handle:
             handle.write(text.rstrip("\n") + "\n")
+
+    def prepare_isolated_game_dir(self) -> None:
+        if self.config.game_dir or self.config.region_validation_copy_world:
+            return
+        source_run = self.root / "run"
+        source_world = Path(os.environ["MATTMC_CAPTURE_WORLD_SOURCE"]) if os.environ.get("MATTMC_CAPTURE_WORLD_SOURCE") else source_run / "saves" / self.config.world
+        if not source_world.is_dir():
+            raise SystemExit(f"Cannot copy missing benchmark world: {source_world}")
+        isolated_game_dir = self.artifact_dir / f"game_dir_{self.run_id}"
+        if isolated_game_dir.exists():
+            raise SystemExit(f"Refusing to reuse existing isolated game dir: {isolated_game_dir}")
+
+        isolated_game_dir.mkdir(parents=True)
+        for name in (
+            "options.txt",
+            "config",
+            "resourcepacks",
+            "shaderpacks",
+            "Distant_Horizons_server_data",
+            "voxelmap",
+        ):
+            self.copy_optional_path(source_run / name, isolated_game_dir / name)
+        (isolated_game_dir / "saves").mkdir(parents=True)
+        shutil.copytree(source_world, isolated_game_dir / "saves" / self.config.world)
+
+        self.run_dir = isolated_game_dir
+        self.options_file = self.run_dir / "options.txt"
+        self.isolated_game_source = source_run
+        self.isolated_game_dir = isolated_game_dir
 
     def prepare_region_validation_game_dir(self) -> None:
         if not self.config.region_validation_copy_world:
@@ -326,7 +382,7 @@ class CaptureRunner:
         self.append_meta("preflight_existing_clients=true")
         for client in clients:
             self.append_meta(f"preflight_existing_client={client}")
-        print("Refusing to start RunDevCapture because a MattMC client is already running:", file=sys.stderr)
+        print("Refusing to start the graphics capture runner because a MattMC client is already running:", file=sys.stderr)
         print("\n".join(clients), file=sys.stderr)
         print("Stop the existing client first; concurrent runs can lock Origin and corrupt capture results.", file=sys.stderr)
         raise SystemExit(1)
@@ -357,6 +413,26 @@ class CaptureRunner:
 
     def configure_backend_and_validation(self) -> None:
         upsert_property(self.options_file, "graphics_backend", self.config.backend)
+        forced_options = {
+            "renderDistance": "10",
+            "simulationDistance": "12",
+            "guiScale": "3",
+            "fullscreen": "false",
+            "hideGui": "false",
+            "maxFps": "120",
+            "enableVsync": "false",
+            "tutorialStep": "none",
+        }
+        for key, value in forced_options.items():
+            upsert_option(self.options_file, key, value)
+        voxelmap_file = self.run_dir / "config" / "voxelmap.properties"
+        if voxelmap_file.is_file():
+            upsert_option(voxelmap_file, "Welcome Message", "false")
+            self.append_meta("forced_voxelmap_welcome=false")
+        self.append_meta("forced_window_width=1280")
+        self.append_meta("forced_window_height=720")
+        for key, value in forced_options.items():
+            self.append_meta(f"forced_option_{key}={value}")
 
         manifest = find_validation_layer_manifest(self.platform_name)
         if manifest:
@@ -378,8 +454,12 @@ class CaptureRunner:
     def configure_client_args(self) -> None:
         shaders_enabled = "true" if self.config.shaders == "on" else "false"
         self.config.client_args = remove_client_arg_option(self.config.client_args, "--quickPlaySingleplayer")
+        self.config.client_args = remove_client_arg_option(self.config.client_args, "--width")
+        self.config.client_args = remove_client_arg_option(self.config.client_args, "--height")
         self.config.client_args = remove_client_arg_assignment(self.config.client_args, "enableShaders")
         self.config.client_args = append_client_arg(self.config.client_args, f"--quickPlaySingleplayer={self.config.world}")
+        self.config.client_args = append_client_arg(self.config.client_args, "--width 1280")
+        self.config.client_args = append_client_arg(self.config.client_args, "--height 720")
         self.config.client_args = append_client_arg(self.config.client_args, f"enableShaders={shaders_enabled}")
         self.append_meta(f"forced_quick_play_singleplayer={self.config.world}")
         self.append_meta(f"forced_enable_shaders={shaders_enabled}")
@@ -393,10 +473,6 @@ class CaptureRunner:
             ])
             self.append_meta("deterministic_static_camera_capture=true")
         configured_shader_pack = extract_property_value(self.run_dir / "config" / "iris.properties", "shaderPack")
-        if not client_args_contains_option(self.config.client_args, "--width"):
-            self.config.client_args = append_client_arg(self.config.client_args, "--width 1280")
-        if not client_args_contains_option(self.config.client_args, "--height"):
-            self.config.client_args = append_client_arg(self.config.client_args, "--height 720")
         if not client_args_contains_assignment(self.config.client_args, "shaderPack"):
             if self.config.shaders == "on" and not configured_shader_pack:
                 raise SystemExit(
@@ -614,9 +690,18 @@ class CaptureRunner:
             else:
                 self.env["VK_ADD_LAYER_PATH"] = self.validation_layer_dir
         self.env.setdefault("VK_LOADER_DEBUG", "error,warn,layer")
+        validation_profile = os.environ.get("MATTMC_GRAPHICS_VALIDATION_PROFILE", self.config.validation_mode)
+        if validation_profile in {"standard", "routine"}:
+            self.env.setdefault("VK_LAYER_SETTINGS", "validate_sync=true,validate_best_practices=true")
+        elif validation_profile == "deep":
+            self.env.setdefault(
+                "VK_LAYER_SETTINGS",
+                "validate_sync=true,validate_best_practices=true,gpuav_enable=true,printf_enable=true",
+            )
         self.append_meta(f"vk_instance_layers={self.env.get('VK_INSTANCE_LAYERS', '')}")
         self.append_meta(f"vk_add_layer_path={self.env.get('VK_ADD_LAYER_PATH', 'unset')}")
         self.append_meta(f"vk_loader_debug={self.env.get('VK_LOADER_DEBUG', '')}")
+        self.append_meta(f"vk_layer_settings={self.env.get('VK_LAYER_SETTINGS', '')}")
 
     def configure_java_tool_options(self) -> None:
         options = [f"-Dmattmc.dev.runCaptureId={self.run_id}"]
@@ -1368,7 +1453,7 @@ def script_dir() -> Path:
 
 
 def common_platform_dir() -> Path:
-    return script_dir() / "Common" / "platform"
+    return repo_root() / "DevUtils" / "Common" / "platform"
 
 
 def load_platform_detection():
@@ -1404,7 +1489,7 @@ def gradle_command(root: Path, platform_name: str) -> list[str]:
 
 def lock_refusal_message() -> str:
     return (
-        "Refusing to start RunDevCapture because another RunDevCapture instance is already running.\n"
+        "Refusing to start the graphics capture runner because another capture instance is already running.\n"
         "Concurrent captures can lock Origin and corrupt capture results."
     )
 
@@ -1646,6 +1731,22 @@ def upsert_property(file_path: Path, key: str, value: str) -> bool:
     return True
 
 
+def upsert_option(file_path: Path, key: str, value: str) -> bool:
+    if not file_path.is_file():
+        return False
+    lines = file_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    changed = False
+    for index, line in enumerate(lines):
+        if line.startswith(f"{key}:"):
+            lines[index] = f"{key}:{value}"
+            changed = True
+            break
+    if not changed:
+        lines.append(f"{key}:{value}")
+    file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return True
+
+
 def resolve_shader_pack_path(run_dir: Path, root: Path, shader_pack_name: str) -> Path | None:
     if not shader_pack_name:
         return None
@@ -1681,6 +1782,42 @@ def file_sha256_text(path: Path) -> str:
     if not path.is_file():
         return f"not a file: {path}"
     return f"{file_sha256(path)}  {path}"
+
+
+def save_state_fingerprint(run_dir: Path, world: str) -> dict[str, object]:
+    save_dir = run_dir / "saves" / world
+    if not save_dir.is_dir():
+        return {"hash": "missing", "file_count": 0, "total_bytes": 0, "truncated": False}
+    digest = hashlib.sha256()
+    file_count = 0
+    total_bytes = 0
+    truncated = False
+    allowed_suffixes = {".mca"}
+    for path in sorted(candidate for candidate in save_dir.rglob("*") if candidate.is_file()):
+        rel = path.relative_to(save_dir).as_posix()
+        if rel == "session.lock" or path.suffix not in allowed_suffixes:
+            continue
+        file_count += 1
+        if file_count > 5000:
+            truncated = True
+            break
+        try:
+            data = path.read_bytes()
+        except OSError:
+            data = b""
+        total_bytes += len(data)
+        digest.update(rel.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(str(len(data)).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(hashlib.sha256(data).hexdigest().encode("ascii"))
+        digest.update(b"\n")
+    return {
+        "hash": digest.hexdigest(),
+        "file_count": file_count,
+        "total_bytes": total_bytes,
+        "truncated": truncated,
+    }
 
 
 def copy_recent_files_since_start(source_dir: Path, dest_dir: Path, list_file: Path, start_epoch: int) -> None:
@@ -1924,7 +2061,7 @@ def parse_args() -> CaptureConfig:
         "--skip-tests",
         action="store_true",
         help=(
-            "Skip the Gradle test task before runClient. By default RunDevCapture runs tests, "
+            "Skip the Gradle test task before runClient. By default the graphics capture runner runs tests, "
             "matching RunDev.py/build-gate behavior; use this only for fast local capture loops "
             "when the current test status is already known."
         ),
@@ -1984,6 +2121,14 @@ def parse_args() -> CaptureConfig:
 
 
 def main() -> int:
+    if os.environ.get("MATTMC_GRAPHICS_TOOL_INTERNAL") != "1":
+        print(
+            "capture_runner.py is an internal capture engine for graphics testing. "
+            "Use DevUtils/Audit/Capture.py, DevUtils/PerfAudit/Gameplay.py, "
+            "DevUtils/PerfAudit/Subsystem.py, or DevUtils/PerfAudit/Matrix.py.",
+            file=sys.stderr,
+        )
+        return 2
     runner = CaptureRunner(parse_args())
 
     def handle_signal(signum, _frame) -> None:

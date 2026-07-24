@@ -1123,7 +1123,9 @@ def count_values(values: Iterable[object]) -> dict[str, int]:
 
 
 def run_benchmark(args: argparse.Namespace) -> dict[str, object]:
-    artifact_dir = args.artifact_dir or (repo_root() / "build" / "meshing-corpus" / ("benchmark-" + datetime.now().strftime("%Y%m%d-%H%M%S")))
+    artifact_dir = args.artifact_dir or (
+        repo_root() / "logs" / "perf-audit" / "meshing-corpus" / ("benchmark-" + datetime.now().strftime("%Y%m%d-%H%M%S"))
+    )
     artifact_dir.mkdir(parents=True, exist_ok=True)
     corpus = corpus_identity(args.input.resolve(), args.expected_sha256)
     preflight = {
@@ -1290,9 +1292,9 @@ def terminate_process_tree(process: subprocess.Popen[str]) -> None:
         pass
 
 
-def run_command(command: Sequence[str], cwd: Path, timeout_seconds: int) -> None:
+def run_command(command: Sequence[str], cwd: Path, timeout_seconds: int, env: dict[str, str] | None = None) -> None:
     started = time.time()
-    completed = subprocess.run(command, cwd=cwd, text=True, timeout=timeout_seconds, check=False)
+    completed = subprocess.run(command, cwd=cwd, text=True, timeout=timeout_seconds, env=env, check=False)
     if completed.returncode != 0:
         raise RuntimeError(f"Command failed with exit code {completed.returncode}: {' '.join(command)}")
     if time.time() - started > timeout_seconds:
@@ -1429,7 +1431,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     create.add_argument("--input", required=True, type=Path)
     create.add_argument("--output", required=True, type=Path)
     create.add_argument("--summary", type=Path)
-    capture = sub.add_parser("capture", help="Capture a corpus through RunDevCapture.py and convert it to .mmcm")
+    capture = sub.add_parser("capture", help="Capture a corpus through the internal graphics capture engine and convert it to .mmcm")
     capture.add_argument("--output", required=True, type=Path)
     capture.add_argument("--summary", type=Path)
     capture.add_argument("--fixture", default="", help="fixture name; empty captures the runner's full fixture set")
@@ -1497,7 +1499,7 @@ def main(argv: Iterable[str] | None = None) -> int:
             replay_json = args.keep_replay_json or args.output.with_suffix(".real_replay.json")
             command = [
                 sys.executable,
-                str(repo_root() / "DevUtils" / "RunDevCapture.py"),
+                str(repo_root() / "DevUtils" / "Common" / "capture_runner.py"),
                 "--backend",
                 "opengl",
                 "--shaders",
@@ -1517,7 +1519,9 @@ def main(argv: Iterable[str] | None = None) -> int:
                 command.extend(["--meshing-corpus-fixture", args.fixture])
             if args.artifact_dir:
                 command.extend(["--artifact-dir", str(args.artifact_dir)])
-            run_command(command, repo_root(), args.timeout_seconds + 120)
+            env = os.environ.copy()
+            env["MATTMC_GRAPHICS_TOOL_INTERNAL"] = "1"
+            run_command(command, repo_root(), args.timeout_seconds + 120, env=env)
             summary = write_corpus_from_real_replay(replay_json, args.output)
             if args.summary:
                 write_summary(summary, args.summary)

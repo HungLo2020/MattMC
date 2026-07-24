@@ -1264,7 +1264,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     artifact_root = (
         args.artifact_dir.resolve()
         if args.artifact_dir
-        else repo_root() / "build" / "perf" / "rust-migration-harness" / timestamp()
+        else repo_root() / "logs" / "perf-audit" / "rust-migration-harness" / timestamp()
     )
     artifact_root.mkdir(parents=True, exist_ok=True)
 

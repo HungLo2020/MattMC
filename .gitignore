@@ -74,6 +74,7 @@ jmh-result.*
 
 # DevUtils generated files
 /DevUtils/EggBuilder/spawn_egg.png
+/DevUtils/.cache/
 
 # Test coverage
 .jacoco/

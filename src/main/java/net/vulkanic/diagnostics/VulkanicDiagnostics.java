@@ -2,6 +2,7 @@ package net.vulkanic.diagnostics;
 
 import net.blaze3d.pipeline.RenderPipeline;
 import net.minecraft.client.dev.DeterministicCameraCapture;
+import net.minecraft.client.dev.GraphicsFrameBenchmark;
 import net.vulkanic.PipelineDescriptor;
 import org.jetbrains.annotations.Nullable;
 
@@ -515,11 +516,12 @@ public final class VulkanicDiagnostics {
             || TRACE_SHADER_INPUT_PARITY_GEOMETRY_DETAIL_PIPELINES.contains(pipeline);
     }
 
-    public static void recordSubmittedWorkIdentity(String family, String identity) {
-        if (TRACE_SHADER_INPUT_PARITY) {
-            DeterministicCameraCapture.recordSubmittedWorkIdentity(family, identity);
-        }
-    }
+	public static void recordSubmittedWorkIdentity(String family, String identity) {
+		if (TRACE_SHADER_INPUT_PARITY) {
+			DeterministicCameraCapture.recordSubmittedWorkIdentity(family, identity);
+		}
+		GraphicsFrameBenchmark.recordSubmittedWorkIdentity(family, identity);
+	}
 
     public static boolean defaultDiagnosticsDisabledForTests() {
         return !TRACE_STANDALONE_UNIFORMS

@@ -753,7 +753,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--timeout", type=int, default=1800)
     parser.add_argument("--max-region-chunks", type=int, default=96)
     parser.add_argument("--max-nbt-docs", type=int, default=160)
-    parser.add_argument("--output-dir", type=Path, default=repo_root() / "build" / "storage-replay")
+    parser.add_argument("--output-dir", type=Path, default=repo_root() / "logs" / "perf-audit" / "storage-replay")
     parser.add_argument("--trace", type=Path, help="reuse an existing deterministic storage trace instead of capturing a new one")
     return parser.parse_args()
 
