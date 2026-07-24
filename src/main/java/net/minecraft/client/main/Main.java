@@ -162,6 +162,9 @@ public class Main {
 			}
 
 			SharedConstants.tryDetectVersion();
+			if (!optionSet.has(optionSpec3) && Boolean.getBoolean("mattmc.dev.tracyCapture")) {
+				TracyBootstrap.setup();
+			}
 			TracyClient.reportAppInfo("Minecraft Java Edition " + SharedConstants.getCurrentVersion().name());
 			CompletableFuture<?> completableFuture = DataFixers.optimize(DataFixTypes.TYPES_FOR_LEVEL_LIST);
 			CrashReport.preload();

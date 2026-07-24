@@ -279,6 +279,7 @@ class CaptureRunner:
             f"renderdoc_capture={os.environ.get('MATTMC_RENDERDOC_CAPTURE', 'false')}",
             f"renderdoc_frame={os.environ.get('MATTMC_RENDERDOC_FRAME', '0')}",
             f"renderdoc_capture_path={os.environ.get('MATTMC_RENDERDOC_CAPTURE_PATH', '')}",
+            f"renderdoc_vulkan_layer_manifest={os.environ.get('MATTMC_RENDERDOC_VULKAN_LAYER_MANIFEST', '')}",
             f"tracy_capture={os.environ.get('MATTMC_TRACY_CAPTURE', 'false')}",
             f"tracy_duration_seconds={os.environ.get('MATTMC_TRACY_DURATION_SECONDS', '0')}",
             f"tracy_max_size_mb={os.environ.get('MATTMC_TRACY_MAX_SIZE_MB', '0')}",

@@ -1,6 +1,7 @@
 package net.vulkanic.backends.vulkan;
 
 import net.minecraft.util.NativeLibraryLoader;
+import net.minecraft.client.dev.GraphicsFrameBenchmark;
 import net.vulkanic.VulkanicShaderStage;
 
 import java.lang.foreign.Arena;
@@ -47,19 +48,23 @@ final class NativeShadercCompiler {
             MemorySegment errorPtrSegment = arena.allocate(ValueLayout.JAVA_LONG);
             MemorySegment errorLenSegment = arena.allocate(ValueLayout.JAVA_LONG);
 
-            int status = invokeCompile(
-                stage.ordinal(),
-                sourceSegment,
-                sourceBytes.length,
-                sourceNameSegment,
-                sourceNameBytes.length,
-                entryPointSegment,
-                entryPointBytes.length,
-                spirvPtrSegment,
-                spirvLenSegment,
-                errorPtrSegment,
-                errorLenSegment
-            );
+            int status;
+            try (var zone = GraphicsFrameBenchmark.beginTracyZone("ffi.rust.shaderc.compile")) {
+                GraphicsFrameBenchmark.tracyMessage("ffi.shaderc.compile source=" + sourceName + " bytes=" + sourceBytes.length);
+                status = invokeCompile(
+                    stage.ordinal(),
+                    sourceSegment,
+                    sourceBytes.length,
+                    sourceNameSegment,
+                    sourceNameBytes.length,
+                    entryPointSegment,
+                    entryPointBytes.length,
+                    spirvPtrSegment,
+                    spirvLenSegment,
+                    errorPtrSegment,
+                    errorLenSegment
+                );
+            }
 
             long spirvPtr = spirvPtrSegment.get(ValueLayout.JAVA_LONG, 0);
             long spirvLen = spirvLenSegment.get(ValueLayout.JAVA_LONG, 0);

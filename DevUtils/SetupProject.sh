@@ -237,6 +237,19 @@ download_url() {
 	fi
 }
 
+remove_stale_cmake_cache() {
+	local build_dir="$1"
+	local expected_source="$2"
+	local cache="$build_dir/CMakeCache.txt"
+	if [ ! -f "$cache" ]; then
+		return
+	fi
+	if ! grep -F "CMAKE_HOME_DIRECTORY:INTERNAL=$expected_source" "$cache" >/dev/null 2>&1; then
+		echo "Removing stale CMake cache: $build_dir"
+		rm -rf "$build_dir"
+	fi
+}
+
 require_command() {
 	local name="$1"
 	local purpose="$2"
@@ -277,13 +290,7 @@ ensure_vulkan_validation_tools() {
 	fi
 
 	require_command vulkaninfo "Vulkan runtime/device inspection"
-	if command -v glslangValidator >/dev/null 2>&1; then
-		echo "glslangValidator: $(command -v glslangValidator)"
-	elif [ -x "$PROJECT_ROOT/libraries/deps/glslangValidator" ]; then
-		echo "glslangValidator: $PROJECT_ROOT/libraries/deps/glslangValidator"
-	else
-		echo "glslangValidator: unavailable (project Gradle tests may use a bundled compiler in comparison repos)"
-	fi
+	report_shader_compiler
 	local manifest
 	if ! manifest="$(find_validation_layer_manifest)"; then
 		echo "ERROR: VK_LAYER_KHRONOS_validation manifest was not found."
@@ -291,6 +298,22 @@ ensure_vulkan_validation_tools() {
 	fi
 	echo "VK_LAYER_KHRONOS_validation manifest: $manifest"
 	vulkaninfo --summary >/dev/null
+}
+
+report_shader_compiler() {
+	local cargo_toml="$PROJECT_ROOT/src/main/rust/Cargo.toml"
+	local compiler_source="$PROJECT_ROOT/src/main/rust/render/vulkanic/backends/vulkan/shaderc_spirv_compiler.rs"
+	if [ -f "$cargo_toml" ]; then
+		local version
+		version="$(sed -n 's/.*shaderc *=.*version *= *"\([^"]*\)".*/\1/p' "$cargo_toml" | head -n 1)"
+		echo "shader compiler: mattmc_rust:shaderc${version:+ crate version $version}"
+	else
+		echo "shader compiler: mattmc_rust:shaderc (Cargo.toml unavailable)"
+	fi
+	if [ -f "$compiler_source" ]; then
+		echo "shader compiler source: $compiler_source"
+	fi
+	echo "glslangValidator: not required by MattMC shader compilation; RenderDoc may bundle its own copy for replay tooling"
 }
 
 ensure_renderdoc() {
@@ -365,9 +388,10 @@ PY
 ensure_tracy() {
 	local tracy_root="$DEVUTILS_CACHE_ROOT/tools/tracy"
 	local tracy_capture="$tracy_root/bin/tracy-capture"
+	local tracy_csvexport="$tracy_root/bin/tracy-csvexport"
 	local tracy_profiler="$tracy_root/bin/tracy-profiler"
 
-	if ! command -v tracy-capture >/dev/null 2>&1 && [ ! -x "$tracy_capture" ]; then
+	if { ! command -v tracy-capture >/dev/null 2>&1 && [ ! -x "$tracy_capture" ]; } || { ! command -v tracy-csvexport >/dev/null 2>&1 && [ ! -x "$tracy_csvexport" ]; }; then
 		echo "Provisioning Tracy capture tooling under $tracy_root"
 		local missing_commands=()
 		for command_name in git cmake make g++ pkg-config; do
@@ -385,6 +409,8 @@ ensure_tracy() {
 		if [ ! -d "$tracy_root/src/.git" ]; then
 			git clone --depth 1 --branch v0.11.1 https://github.com/wolfpld/tracy.git "$tracy_root/src"
 		fi
+		remove_stale_cmake_cache "$tracy_root/build-capture" "$tracy_root/src/capture"
+		remove_stale_cmake_cache "$tracy_root/build-csvexport" "$tracy_root/src/csvexport"
 		if ! cmake \
 			-S "$tracy_root/src/capture" \
 			-B "$tracy_root/build-capture" \
@@ -397,15 +423,33 @@ ensure_tracy() {
 			record_setup_failure "Tracy capture build failed. Install Tracy build dependencies and rerun setup."
 			return
 		fi
+		if ! cmake \
+			-S "$tracy_root/src/csvexport" \
+			-B "$tracy_root/build-csvexport" \
+			-DCMAKE_BUILD_TYPE=Release \
+			-DCMAKE_CXX_FLAGS="-Wno-error=stringop-overflow"; then
+			record_setup_failure "Tracy csvexport configure failed. Install Tracy build dependencies and rerun setup."
+			return
+		fi
+		if ! cmake --build "$tracy_root/build-csvexport" --parallel; then
+			record_setup_failure "Tracy csvexport build failed. Install Tracy build dependencies and rerun setup."
+			return
+		fi
 		mkdir -p "$tracy_root/bin"
 		find "$tracy_root/build-capture" -type f -perm -111 -name 'tracy-capture*' -exec cp {} "$tracy_capture" \; -quit
+		find "$tracy_root/build-csvexport" -type f -perm -111 -name 'tracy-csvexport*' -exec cp {} "$tracy_csvexport" \; -quit
 	fi
 
 	if [ ! -x "$tracy_capture" ] && ! command -v tracy-capture >/dev/null 2>&1; then
 		record_setup_failure "Tracy capture tool could not be provisioned."
 		return
 	fi
+	if [ ! -x "$tracy_csvexport" ] && ! command -v tracy-csvexport >/dev/null 2>&1; then
+		record_setup_failure "Tracy csvexport tool could not be provisioned."
+		return
+	fi
 	echo "tracy-capture: $(command -v tracy-capture || printf '%s' "$tracy_capture")"
+	echo "tracy-csvexport: $(command -v tracy-csvexport || printf '%s' "$tracy_csvexport")"
 	if [ -x "$tracy_profiler" ] || command -v tracy-profiler >/dev/null 2>&1; then
 		echo "tracy-profiler: $(command -v tracy-profiler || printf '%s' "$tracy_profiler")"
 	else

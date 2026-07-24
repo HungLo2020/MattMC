@@ -190,6 +190,55 @@ def write_subsystem_benchmark(capture_dir: Path, status: str = "complete") -> No
     )
 
 
+def make_validation_capture(capture_dir: Path, *, workload: bool = True, run_id: str = "20260101_000000", log_run_id: str | None = None) -> None:
+    write_capture(capture_dir, backend="vulkan", shaders="off")
+    meta = capture_dir / "meta_20260101_000000.txt"
+    meta.write_text(
+        meta.read_text(encoding="utf-8")
+        .replace("validation_mode=off", "validation_mode=standard")
+        .replace("graphics_run_type=clean-performance", "graphics_run_type=vulkan-validation")
+        .replace("validation_profile=off", "validation_profile=routine")
+        + "\n".join(
+            [
+                f"run_id={run_id}",
+                "validation_enabled=true",
+                "validation_layer_available=true",
+                "validation_layer_manifest=/usr/share/vulkan/explicit_layer.d/VkLayer_khronos_validation.json",
+                "vk_instance_layers=VK_LAYER_KHRONOS_validation",
+                "vk_add_layer_path=/usr/share/vulkan/explicit_layer.d",
+                "vk_loader_debug=error,warn,layer",
+                "vk_layer_settings=validate_sync=true,validate_best_practices=true",
+                "gradle_pid=11",
+                "client_pid=12",
+                "exit_code=0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    for stale in capture_dir.glob("runClient_*.log"):
+        stale.unlink()
+    for stale in capture_dir.glob("validation_events_*.log"):
+        stale.unlink()
+    actual_log_id = log_run_id or run_id
+    workload_text = (
+        "Sodium Vulkan chunk render probe#1 pass=minecraft:pipeline/solid batchDraws=4 submittedDraws=4 submittedIndices=24\n"
+        "Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true renderPass=0x1\n"
+        "drawIndexed descriptor pipeline vkQueueSubmit\n"
+        if workload
+        else ""
+    )
+    (capture_dir / f"runClient_{actual_log_id}.log").write_text(
+        "[Vulkan Loader] INFO | LAYER:   Insert instance layer \"VK_LAYER_KHRONOS_validation\" (libVkLayer_khronos_validation.so)\n"
+        + workload_text,
+        encoding="utf-8",
+    )
+    (capture_dir / f"validation_events_{actual_log_id}.log").write_text(
+        "[Vulkan Loader] WARNING | LAYER: env var 'VK_INSTANCE_LAYERS' defined and adding layers \"VK_LAYER_KHRONOS_validation\"\n",
+        encoding="utf-8",
+    )
+
+
 def artifact_for(temp: Path, mode: harness.ModeSpec, *, world: str = "Origin") -> dict[str, object]:
     target = fake_repo(temp, mode.target)
     capture = temp / f"capture-{mode.name}"
@@ -232,6 +281,14 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
         self.assertIn("ensure_renderdoc", text)
         self.assertIn("ensure_tracy", text)
         self.assertIn("VK_LAYER_KHRONOS_validation", text)
+        self.assertIn("report_shader_compiler", text)
+        self.assertIn("tracy-csvexport", text)
+
+    def test_required_tool_fingerprint_uses_shaderc_not_glslang(self) -> None:
+        fingerprint = harness.tool_fingerprint()
+        self.assertIn("shader_compiler", fingerprint)
+        self.assertEqual(fingerprint["shader_compiler"]["crate"], "shaderc")
+        self.assertNotIn("glslangValidator", fingerprint)
 
     def test_structured_vuid_parsing_deduplicates_counts(self) -> None:
         text = "\n".join(
@@ -244,8 +301,248 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
         findings = harness.parse_validation_findings(text)
         by_vuid = {finding["vuid"]: finding for finding in findings}
         self.assertEqual(by_vuid["VUID-vkQueueSubmit-pSubmits-00074"]["count"], 2)
+        self.assertEqual(by_vuid["VUID-vkQueueSubmit-pSubmits-00074"]["first_occurrence"], 1)
+        self.assertEqual(by_vuid["VUID-vkQueueSubmit-pSubmits-00074"]["last_occurrence"], 2)
         self.assertEqual(by_vuid["VUID-vkCmdDraw-None-08600"]["draw"], 12)
         self.assertEqual(by_vuid["VUID-vkQueueSubmit-pSubmits-00074"]["semantic_operation"], "queue.submit")
+        self.assertEqual(len(by_vuid["VUID-vkQueueSubmit-pSubmits-00074"]["objects"]), 2)
+
+    def test_old_and_new_validation_formats_parse_consistently_and_keep_full_text(self) -> None:
+        long_tail = "pipeline-context=" + ("terrain/" * 120)
+        text = "\n".join(
+            [
+                f"Validation Error: [ VUID-VkGraphicsPipelineCreateInfo-layout-07988 ] Object 0: handle = 0xabc, type = VK_OBJECT_TYPE_PIPELINE_LAYOUT, name = terrain-layout {long_tail}",
+                "WARNING VALIDATION VUID-vkCmdDrawIndexed-None-08600 MessageID=DrawIndexed frame=3 pass=2 draw=9 operation=sodium.terrain.draw",
+            ]
+        )
+        findings = harness.parse_validation_findings(text)
+        by_vuid = {finding["vuid"]: finding for finding in findings}
+        self.assertIn("VUID-VkGraphicsPipelineCreateInfo-layout-07988", by_vuid)
+        self.assertIn("VUID-vkCmdDrawIndexed-None-08600", by_vuid)
+        self.assertIn(long_tail, by_vuid["VUID-VkGraphicsPipelineCreateInfo-layout-07988"]["message"])
+        self.assertEqual(by_vuid["VUID-VkGraphicsPipelineCreateInfo-layout-07988"]["category"], "concrete_api_vuid")
+        self.assertEqual(by_vuid["VUID-vkCmdDrawIndexed-None-08600"]["semantic_operation"], "sodium.terrain.draw")
+
+    def test_multiline_validation_context_parsing(self) -> None:
+        text = "\n".join(
+            [
+                "Validation Error: [ VUID-vkCmdPipelineBarrier-srcStageMask-03937 ] MessageID = 0x1234",
+                "\tObjects: 1",
+                "\tObject 0: handle = 0xabc, type = VK_OBJECT_TYPE_COMMAND_BUFFER, name = terrain-main",
+                "\tframe=9 pass=2 draw=40 operation=gal.pass.barrier",
+            ]
+        )
+        finding = harness.parse_validation_findings(text)[0]
+        self.assertEqual(finding["vuid"], "VUID-vkCmdPipelineBarrier-srcStageMask-03937")
+        self.assertEqual(finding["message_id"], "0x1234")
+        self.assertEqual(finding["objects"][0]["type"], "VK_OBJECT_TYPE_COMMAND_BUFFER")
+        self.assertEqual(finding["objects"][0]["debug_name"], "terrain-main")
+        self.assertIn("Object 0", finding["message"])
+
+    def test_loader_only_validation_is_not_labeled_clean_but_records_workload_proof(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            make_validation_capture(capture, workload=True)
+            artifact = harness.normalize_capture_artifact(
+                target,
+                harness.MATRIX_MODES[2],
+                capture,
+                "correctness",
+                True,
+                ["fake"],
+                0,
+                False,
+            )
+            findings = artifact["metrics"]["validation_findings"]
+            self.assertEqual(findings["concrete_vuid_count"], 0)
+            self.assertEqual(findings["categories"]["loader_environment_notice"], 2)
+            self.assertTrue(findings["proof"]["layer_loaded"])
+            self.assertTrue(findings["proof"]["meaningful_vulkan_workload"])
+            self.assertFalse(artifact["validation"]["vulkan_validation_clean"])
+
+    def test_zero_vuid_validation_without_workload_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            make_validation_capture(capture, workload=False)
+            artifact = harness.normalize_capture_artifact(
+                target,
+                harness.MATRIX_MODES[2],
+                capture,
+                "correctness",
+                True,
+                ["fake"],
+                0,
+                False,
+            )
+            self.assertFalse(artifact["metrics"]["validation_findings"]["proof"]["meaningful_vulkan_workload"])
+            self.assertFalse(artifact["validation"]["complete"])
+            self.assertIn("meaningful Java Vulkan workload", " ".join(artifact["validation"]["messages"]))
+
+    def test_validation_artifact_rejects_logs_from_another_run(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            make_validation_capture(capture, workload=True, run_id="20260101_000000", log_run_id="20260101_111111")
+            artifact = harness.normalize_capture_artifact(
+                target,
+                harness.MATRIX_MODES[2],
+                capture,
+                "correctness",
+                True,
+                ["fake"],
+                0,
+                False,
+            )
+            proof = artifact["metrics"]["validation_findings"]["proof"]
+            self.assertFalse(proof["artifact_log_association"]["all_named_logs_match_run"])
+            self.assertFalse(artifact["validation"]["complete"])
+
+    def test_tracy_summary_extraction_and_empty_rejection(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            capture = temp / "trace.tracy"
+            capture.write_bytes(b"not-empty")
+            exporter = temp / "tracy-csvexport"
+            exporter.write_text(
+                """#!/usr/bin/env python3
+import sys
+if "--messages" in sys.argv:
+    print("MessageName,total_ns")
+    print("ffi.shaderc.compile source=test bytes=32,100")
+elif "--self" in sys.argv:
+    print("name,src_file,src_line,total_ns,total_perc,counts,mean_ns,min_ns,max_ns,std_ns")
+    print("java.frame.render-production,GraphicsFrameBenchmark.java,1,600,6,2,300,200,400,10")
+    print("ffi.rust.shaderc.compile,NativeShadercCompiler.java,1,120,1.2,1,120,120,120,0")
+else:
+    print("name,src_file,src_line,total_ns,total_perc,counts,mean_ns,min_ns,max_ns,std_ns")
+    print("java.frame.render-production,GraphicsFrameBenchmark.java,1,1000,10,2,500,400,600,20")
+    print("ffi.rust.shaderc.compile,NativeShadercCompiler.java,1,150,1.5,1,150,150,150,0")
+""",
+                encoding="utf-8",
+            )
+            exporter.chmod(0o755)
+            original = harness.local_tracy_csvexport_path
+            try:
+                harness.local_tracy_csvexport_path = lambda: str(exporter)  # type: ignore[assignment]
+                summary_path = harness.extract_tracy_summary(temp, capture)
+                summary = json.loads(summary_path.read_text(encoding="utf-8"))
+                self.assertEqual(summary["status"], "complete")
+                self.assertEqual(summary["zone_count"], 2)
+                self.assertIn("java.frame.render-production", summary["major_zones"])
+                self.assertEqual(summary["ffi"]["shaderc_message_count"], 1)
+                empty_path = temp / "empty.tracy"
+                empty_path.write_bytes(b"")
+                failed = json.loads(harness.extract_tracy_summary(temp, empty_path).read_text(encoding="utf-8"))
+                self.assertEqual(failed["status"], "failed")
+            finally:
+                harness.local_tracy_csvexport_path = original  # type: ignore[assignment]
+
+    def test_renderdoc_ordered_summary_extraction_with_fake_replay(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            capture = temp / "capture.rdc"
+            capture.write_bytes(b"rdc")
+            qrenderdoc = temp / "qrenderdoc"
+            qrenderdoc.write_text(
+                """#!/usr/bin/env python3
+import json
+import os
+summary = {
+  "schema": "mattmc-renderdoc-summary-v1",
+  "status": "complete",
+  "capture_path": os.environ["MATTMC_RENDERDOC_REPLAY_CAPTURE"],
+  "replay_status": "complete",
+  "api": "OpenGL",
+  "event_count": 2,
+  "draw_count": 1,
+  "dispatch_count": 0,
+  "pass_count": 1,
+  "ordered_actions": [{"event_id": 1, "kind": "pass"}, {"event_id": 2, "kind": "draw"}],
+  "pipelines": [{"graphics_pipeline_object": "1"}],
+  "shader_identities": [{"stage": "Vertex", "resource_id": "2"}],
+  "vertex_index_inputs": [{"topology": "TriangleList"}],
+  "resource_bindings": [],
+  "framebuffer_attachments": [{"color_outputs": "main"}],
+  "viewport_scissor": [{"viewport": "1280x720"}],
+  "fixed_function_state": [{"depthState": "enabled"}],
+  "resource_formats": [{"width": 1280, "height": 720, "format": "RGBA8"}],
+  "attachments": [],
+  "resource_hashes": [],
+  "diagnosis": {},
+  "failure": None,
+}
+with open(os.environ["MATTMC_RENDERDOC_REPLAY_OUTPUT"], "w", encoding="utf-8") as handle:
+    json.dump(summary, handle)
+""",
+                encoding="utf-8",
+            )
+            qrenderdoc.chmod(0o755)
+            original_q = harness.local_qrenderdoc_path
+            original_cmd = harness.local_renderdoccmd_path
+            try:
+                harness.local_qrenderdoc_path = lambda: str(qrenderdoc)  # type: ignore[assignment]
+                harness.local_renderdoccmd_path = lambda: None  # type: ignore[assignment]
+                summary_path = harness.replay_renderdoc_summary(temp, capture)
+                summary = json.loads(summary_path.read_text(encoding="utf-8"))
+                self.assertEqual(summary["status"], "complete")
+                self.assertEqual(summary["ordered_actions"][1]["kind"], "draw")
+                self.assertEqual(summary["resource_formats"][0]["format"], "RGBA8")
+            finally:
+                harness.local_qrenderdoc_path = original_q  # type: ignore[assignment]
+                harness.local_renderdoccmd_path = original_cmd  # type: ignore[assignment]
+
+    def test_renderdoc_layer_failure_diagnosis(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            renderdoccmd = temp / "renderdoccmd"
+            renderdoccmd.write_text(
+                "#!/usr/bin/env sh\nprintf '%s\\n' 'Warning: Vulkan layer not correctly registered.'\n",
+                encoding="utf-8",
+            )
+            renderdoccmd.chmod(0o755)
+            original = harness.local_renderdoccmd_path
+            try:
+                harness.local_renderdoccmd_path = lambda: str(renderdoccmd)  # type: ignore[assignment]
+                diagnosis = harness.renderdoc_vulkan_layer_diagnosis()
+                self.assertFalse(diagnosis["registered"])
+                self.assertIn("not correctly registered", diagnosis["explain"])
+            finally:
+                harness.local_renderdoccmd_path = original  # type: ignore[assignment]
+
+    def test_renderdoc_python_failure_falls_back_to_cli_replay(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            capture = temp / "capture.rdc"
+            capture.write_bytes(b"rdc")
+            qrenderdoc = temp / "qrenderdoc"
+            qrenderdoc.write_text("#!/usr/bin/env sh\nexit 3\n", encoding="utf-8")
+            qrenderdoc.chmod(0o755)
+            renderdoccmd = temp / "renderdoccmd"
+            renderdoccmd.write_text(
+                "#!/usr/bin/env sh\n"
+                "if [ \"$1\" = vulkanlayer ]; then printf '%s\\n' 'RenderDoc layer correctly registered.'; exit 0; fi\n"
+                "printf '%s\\n' 'Replaying capture locally.'\n",
+                encoding="utf-8",
+            )
+            renderdoccmd.chmod(0o755)
+            original_q = harness.local_qrenderdoc_path
+            original_cmd = harness.local_renderdoccmd_path
+            try:
+                harness.local_qrenderdoc_path = lambda: str(qrenderdoc)  # type: ignore[assignment]
+                harness.local_renderdoccmd_path = lambda: str(renderdoccmd)  # type: ignore[assignment]
+                summary_path = harness.replay_renderdoc_summary(temp, capture)
+                summary = json.loads(summary_path.read_text(encoding="utf-8"))
+                self.assertEqual(summary["status"], "complete")
+                self.assertTrue(summary["diagnosis"]["fallback_text_replay"])
+                self.assertIn("qrenderdoc exited 3", summary["diagnosis"]["python_replay"]["failure"])
+            finally:
+                harness.local_qrenderdoc_path = original_q  # type: ignore[assignment]
+                harness.local_renderdoccmd_path = original_cmd  # type: ignore[assignment]
 
     def test_instrumentation_fingerprint_mismatch_rejects_comparison(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -758,6 +1055,34 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             command, _ = harness.build_capture_command(target, harness.MATRIX_MODES[4], root / "capture", "gameplay", args, "gameplay")
             joined = " ".join(command)
             self.assertIn("--quickPlaySingleplayer=Origin", joined)
+
+    def test_tracy_capture_uses_java_property_not_client_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            args = Namespace(
+                profile="smoke",
+                validation="off",
+                client_args="",
+                world="Origin",
+                max_secs=1,
+                dump_secs=1,
+                client_rss_limit_mb=128,
+                diagnostic=False,
+                warmup_frames=0,
+                measure_frames=1,
+                settle_frames=0,
+                max_settle_frames=1,
+                subsystem_iterations=1,
+                tracy_capture=True,
+                tracy_duration_seconds=1,
+                tracy_max_size_mb=8,
+                renderdoc_capture=False,
+                renderdoc_frame=8,
+            )
+            command, env = harness.build_capture_command(target, harness.MATRIX_MODES[0], root / "capture", "gameplay", args, "gameplay")
+            self.assertNotIn("--tracy", command)
+            self.assertIn("-Dmattmc.dev.tracyCapture=true", env["JAVA_TOOL_OPTIONS"])
 
     def test_warmup_exclusion_is_represented_by_measured_samples_only(self) -> None:
         samples_after_warmup = [25_000_000, 25_000_000, 50_000_000]

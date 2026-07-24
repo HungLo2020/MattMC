@@ -1,5 +1,7 @@
 package net.minecraft.client.dev;
 
+import com.mojang.jtracy.TracyClient;
+import com.mojang.jtracy.Zone;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.player.Input;
@@ -27,6 +29,7 @@ import java.util.Set;
  */
 public final class GraphicsFrameBenchmark {
 	private static final boolean ENABLED = Boolean.getBoolean("mattmc.dev.graphicsFrameBenchmark");
+	private static final boolean TRACY_ENABLED = Boolean.getBoolean("mattmc.dev.tracyCapture");
 	private static final int SETTLE_FRAMES = Math.max(0, Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.settleFrames", 240));
 	private static final int MAX_SETTLE_FRAMES = Math.max(1, Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.maxSettleFrames", 2400));
 	private static final int WARMUP_FRAMES = Math.max(0, Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.warmupFrames", 600));
@@ -97,6 +100,7 @@ public final class GraphicsFrameBenchmark {
 		if (!frameActive) {
 			return;
 		}
+		beginPhase("java.frame.render-production");
 		holdPlayerStillAndApplyCameraPath(minecraft);
 		if (settledFrameIndex < 0L) {
 			if (frameIndex >= SETTLE_FRAMES) {
@@ -115,6 +119,9 @@ public final class GraphicsFrameBenchmark {
 			gcCountAtStart = totalGcCount();
 			gcTimeAtStart = totalGcTimeMillis();
 			usedMemoryAtStart = usedMemoryBytes();
+			if (tracyAvailable()) {
+				TracyClient.message("MattMC graphics gameplay measurement start");
+			}
 		}
 	}
 
@@ -130,9 +137,16 @@ public final class GraphicsFrameBenchmark {
 			gcTimeAtEnd = totalGcTimeMillis();
 			usedMemoryAtEnd = usedMemoryBytes();
 		}
+		endPhase("java.frame.render-production");
+		if (tracyAvailable()) {
+			TracyClient.markFrame();
+		}
 		frameIndex++;
 		if (FRAME_NANOS.size() >= MEASURE_FRAMES) {
 			complete = true;
+			if (tracyAvailable()) {
+				TracyClient.message("MattMC graphics gameplay measurement complete");
+			}
 			writeStatus(minecraft, "complete");
 			if (STOP_AFTER_COMPLETE && !stopIssued) {
 				stopIssued = true;
@@ -150,7 +164,7 @@ public final class GraphicsFrameBenchmark {
 		if (!ENABLED || !frameActive) {
 			return;
 		}
-		PHASE_STACK.push(new OpenPhase(name, System.nanoTime()));
+		PHASE_STACK.push(new OpenPhase(name, System.nanoTime(), beginTracyZone(name)));
 	}
 
 	public static void endPhase(String name) {
@@ -159,6 +173,7 @@ public final class GraphicsFrameBenchmark {
 		}
 		long now = System.nanoTime();
 		OpenPhase phase = PHASE_STACK.pop();
+		phase.closeTracyZone();
 		long inclusive = Math.max(0L, now - phase.startNanos());
 		long exclusive = Math.max(0L, inclusive - phase.childNanos());
 		if (!PHASE_STACK.isEmpty()) {
@@ -188,6 +203,29 @@ public final class GraphicsFrameBenchmark {
 			.add(normalizedIdentity);
 		long minimumFrame = Math.max(0L, frameIndex - 512L);
 		SUBMITTED_WORK_BY_FRAME.keySet().removeIf(frame -> frame < minimumFrame);
+	}
+
+	public static Zone beginTracyZone(String name) {
+		if (!tracyAvailable()) {
+			return null;
+		}
+		return TracyClient.beginZone(name, false);
+	}
+
+	public static void closeTracyZone(Zone zone) {
+		if (zone != null) {
+			zone.close();
+		}
+	}
+
+	public static void tracyMessage(String message) {
+		if (tracyAvailable()) {
+			TracyClient.message(message);
+		}
+	}
+
+	private static boolean tracyAvailable() {
+		return TRACY_ENABLED && TracyClient.isAvailable();
 	}
 
 	private static boolean ensureInitialized(Minecraft minecraft) {
@@ -502,13 +540,21 @@ public final class GraphicsFrameBenchmark {
 		return String.format(Locale.ROOT, "%.6f", value);
 	}
 
-	private record OpenPhase(String name, long startNanos, long childNanos) {
+	private record OpenPhase(String name, long startNanos, long childNanos, Zone tracyZone) {
 		OpenPhase(String name, long startNanos) {
-			this(name, startNanos, 0L);
+			this(name, startNanos, 0L, null);
+		}
+
+		OpenPhase(String name, long startNanos, Zone tracyZone) {
+			this(name, startNanos, 0L, tracyZone);
 		}
 
 		OpenPhase withAdditionalChild(long nanos) {
-			return new OpenPhase(this.name, this.startNanos, this.childNanos + Math.max(0L, nanos));
+			return new OpenPhase(this.name, this.startNanos, this.childNanos + Math.max(0L, nanos), this.tracyZone);
+		}
+
+		void closeTracyZone() {
+			GraphicsFrameBenchmark.closeTracyZone(this.tracyZone);
 		}
 	}
 

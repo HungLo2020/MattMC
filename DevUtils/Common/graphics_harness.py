@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
+import io
 import json
 import os
 import platform
@@ -138,6 +140,13 @@ def local_tracy_capture_path() -> str | None:
     return shutil.which("tracy-capture")
 
 
+def local_tracy_csvexport_path() -> str | None:
+    candidate = DEVUTILS_CACHE_ROOT / "tools" / "tracy" / "bin" / "tracy-csvexport"
+    if candidate.is_file() and os.access(candidate, os.X_OK):
+        return str(candidate)
+    return shutil.which("tracy-csvexport")
+
+
 def local_renderdoccmd_path() -> str | None:
     candidate = DEVUTILS_CACHE_ROOT / "tools" / "renderdoc" / "bin" / "renderdoccmd"
     if candidate.is_file() and os.access(candidate, os.X_OK):
@@ -161,6 +170,15 @@ def local_renderdoc_library_path() -> str | None:
     return None
 
 
+def local_renderdoc_layer_manifest_path() -> Path | None:
+    root = DEVUTILS_CACHE_ROOT / "tools" / "renderdoc"
+    candidates = sorted(root.glob("extracted/**/renderdoc_capture.json"))
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def find_validation_layer_manifest_path() -> Path | None:
     candidates: list[Path] = []
     vulkan_sdk = os.environ.get("VULKAN_SDK")
@@ -180,6 +198,36 @@ def find_validation_layer_manifest_path() -> Path | None:
     return None
 
 
+def shaderc_compiler_fingerprint() -> dict[str, object]:
+    cargo_toml = CURRENT_REPO_ROOT / "src" / "main" / "rust" / "Cargo.toml"
+    cargo_lock = CURRENT_REPO_ROOT / "src" / "main" / "rust" / "Cargo.lock"
+    source = CURRENT_REPO_ROOT / "src" / "main" / "rust" / "render" / "vulkanic" / "backends" / "vulkan" / "shaderc_spirv_compiler.rs"
+    version = None
+    features: list[str] = []
+    if cargo_toml.is_file():
+        text = cargo_toml.read_text(encoding="utf-8", errors="replace")
+        match = re.search(r"shaderc\s*=\s*\{[^}]*version\s*=\s*\"([^\"]+)\"", text)
+        if match:
+            version = match.group(1)
+        features_match = re.search(r"shaderc\s*=\s*\{[^}]*features\s*=\s*\[([^\]]*)\]", text)
+        if features_match:
+            features = [part.strip().strip("\"'") for part in features_match.group(1).split(",") if part.strip()]
+    if version is None and cargo_lock.is_file():
+        text = cargo_lock.read_text(encoding="utf-8", errors="replace")
+        match = re.search(r'name = "shaderc"\s+version = "([^"]+)"', text)
+        if match:
+            version = match.group(1)
+    return {
+        "name": "mattmc_rust:shaderc",
+        "crate": "shaderc",
+        "version": version,
+        "features": features,
+        "source": str(source) if source.is_file() else None,
+        "cargo_toml": str(cargo_toml) if cargo_toml.is_file() else None,
+        "cargo_lock": str(cargo_lock) if cargo_lock.is_file() else None,
+    }
+
+
 def tool_fingerprint() -> dict[str, object]:
     validation_manifest = find_validation_layer_manifest_path()
     renderdoc_path = local_renderdoccmd_path()
@@ -194,14 +242,18 @@ def tool_fingerprint() -> dict[str, object]:
             tracy["version"] = f"version-unavailable: {exc}"
     return {
         "vulkaninfo": executable_version("vulkaninfo"),
-        "glslangValidator": executable_version("glslangValidator"),
+        "shader_compiler": shaderc_compiler_fingerprint(),
         "khronos_validation": {
             "available": validation_manifest is not None,
             "manifest": str(validation_manifest) if validation_manifest else None,
         },
+        "renderdoc_vulkan_layer": {
+            "local_manifest": str(local_renderdoc_layer_manifest_path()) if local_renderdoc_layer_manifest_path() else None,
+        },
         "renderdoccmd": executable_version(renderdoc_path) if renderdoc_path else executable_version("renderdoccmd"),
         "qrenderdoc": executable_version(qrenderdoc_path) if qrenderdoc_path else executable_version("qrenderdoc"),
         "tracy_capture": tracy,
+        "tracy_csvexport": executable_version(local_tracy_csvexport_path()) if local_tracy_csvexport_path() else executable_version("tracy-csvexport"),
         "tracy_profiler": executable_version("tracy-profiler"),
     }
 
@@ -247,47 +299,277 @@ VALIDATION_LINE_RE = re.compile(
     r"(?:(?:MessageID|message id|msgNum|Message Id Name)\\s*[=: ]\\s*(?P<message_id>[A-Za-z0-9_./:-]+))?",
     re.IGNORECASE,
 )
+VALIDATION_OBJECT_RE = re.compile(
+    r"(?:Object\s*\d*:\s*|object\s+|handle\s*=\s*)"
+    r"(?P<handle>0x[0-9a-fA-F]+)"
+    r"(?:[^,\n]*,\s*(?:type\s*=\s*)?(?P<type>VK_OBJECT_TYPE_[A-Z0-9_]+|[A-Za-z][A-Za-z0-9_]*))?"
+    r"(?:[^,\n]*,\s*(?:name|debug name)\s*=\s*(?P<name>[^,\]\n]+))?",
+    re.IGNORECASE,
+)
+VALIDATION_HANDLE_TYPE_RE = re.compile(
+    r"handle\s*=\s*(?P<handle>0x[0-9a-fA-F]+)"
+    r"\s*,\s*type\s*=\s*(?P<type>VK_OBJECT_TYPE_[A-Z0-9_]+|[A-Za-z][A-Za-z0-9_]*)"
+    r"(?:\s*,\s*(?:name|debug name)\s*=\s*(?P<name>[^,\]\n]+))?",
+    re.IGNORECASE,
+)
+VALIDATION_INDEXED_OBJECT_RE = re.compile(
+    r"^\s*\[\d+\]\s+(?P<type>Vk[A-Za-z0-9_]+)\s+(?P<handle>0x[0-9a-fA-F]+)"
+    r"(?:\s+(?:name|debug name)\s*=\s*(?P<name>[^,\]\n]+))?",
+    re.MULTILINE,
+)
+
+
+def validation_message_blocks(text: str) -> list[str]:
+    blocks: list[list[str]] = []
+    current: list[str] = []
+    trigger = re.compile(
+        r"^\s*(?:Validation (?:Error|Warning)|(?:ERROR|WARNING|INFO|VERBOSE)\s+(?:VALIDATION|PERFORMANCE|GENERAL)|"
+        r"\[Vulkan Loader\]|UNASSIGNED-)",
+        re.IGNORECASE,
+    )
+    for line in text.splitlines():
+        if trigger.search(line):
+            if current:
+                blocks.append(current)
+            if re.search(r"^\s*\[Vulkan Loader\]", line, re.IGNORECASE):
+                blocks.append([line])
+                current = []
+            else:
+                current = [line]
+        elif current and not line.strip():
+            blocks.append(current)
+            current = []
+        elif current:
+            current.append(line)
+    if current:
+        blocks.append(current)
+    return ["\n".join(block).strip() for block in blocks if block]
+
+
+def parse_validation_objects(message: str) -> list[dict[str, object]]:
+    objects: dict[str, dict[str, object]] = {}
+    for match in VALIDATION_HANDLE_TYPE_RE.finditer(message):
+        handle = match.group("handle")
+        entry = objects.setdefault(
+            handle.lower(),
+            {
+                "handle": handle,
+                "type": None,
+                "debug_name": None,
+            },
+        )
+        entry["type"] = match.group("type")
+        debug_name = match.group("name")
+        if debug_name:
+            entry["debug_name"] = debug_name.strip().strip("'\"")
+    for match in VALIDATION_OBJECT_RE.finditer(message):
+        handle = match.group("handle")
+        if not handle:
+            continue
+        entry = objects.setdefault(
+            handle.lower(),
+            {
+                "handle": handle,
+                "type": None,
+                "debug_name": None,
+            },
+        )
+        object_type = match.group("type")
+        debug_name = match.group("name")
+        if object_type:
+            entry["type"] = object_type
+        if debug_name:
+            entry["debug_name"] = debug_name.strip().strip("'\"")
+    for match in VALIDATION_INDEXED_OBJECT_RE.finditer(message):
+        handle = match.group("handle")
+        entry = objects.setdefault(
+            handle.lower(),
+            {
+                "handle": handle,
+                "type": None,
+                "debug_name": None,
+            },
+        )
+        entry["type"] = match.group("type")
+        debug_name = match.group("name")
+        if debug_name:
+            entry["debug_name"] = debug_name.strip().strip("'\"")
+    return list(objects.values())
+
+
+def validation_finding_category(message: str, vuid: str, message_type: str) -> str:
+    lowered = message.lower()
+    if "device lost" in lowered or "vk_error_device_lost" in lowered:
+        return "device_loss"
+    if "[vulkan loader]" in lowered or "env var 'vk_instance_layers'" in lowered or "insert instance layer" in lowered:
+        return "loader_environment_notice"
+    if "vk_layer_khronos_validation" in lowered and vuid == "UNASSIGNED":
+        return "validation_configuration_notice"
+    if "gpu-assisted" in lowered or "gpuav" in lowered:
+        return "gpu_assisted"
+    if "sync" in lowered or "synchronization" in lowered:
+        return "synchronization"
+    if vuid != "UNASSIGNED" or message_type in {"validation", "performance"}:
+        return "concrete_api_vuid"
+    return "validation_configuration_notice"
 
 
 def parse_validation_findings(text: str) -> list[dict[str, object]]:
     findings: dict[tuple[object, ...], dict[str, object]] = {}
-    for line in text.splitlines():
-        if not re.search(r"VUID-|Validation (?:Error|Warning)|UNASSIGNED-|VK_LAYER_KHRONOS_validation", line, re.IGNORECASE):
-            continue
-        match = VALIDATION_LINE_RE.search(line)
-        vuid_match = re.search(r"VUID-[A-Za-z0-9_./:-]+", line)
-        severity_match = re.search(r"\b(ERROR|WARNING|INFO|VERBOSE)\b", line, re.IGNORECASE)
-        message_id_match = re.search(r"(?:MessageID|message id|msgNum|Message Id Name)\s*[=: ]\s*([A-Za-z0-9_./:-]+)", line, re.IGNORECASE)
-        object_handles = sorted(set(re.findall(r"0x[0-9a-fA-F]+", line)))
-        semantic_match = re.search(r"(?:GAL|callsite|operation)[=: ]+([A-Za-z0-9_./:-]+)", line)
+    occurrence = 0
+    for message in validation_message_blocks(text):
+        match = VALIDATION_LINE_RE.search(message)
+        vuid_match = re.search(r"VUID-[A-Za-z0-9_./:-]+", message)
+        severity_match = re.search(r"\b(ERROR|WARNING|INFO|VERBOSE)\b", message, re.IGNORECASE)
+        type_match = re.search(r"\b(VALIDATION|PERFORMANCE|GENERAL)\b", message, re.IGNORECASE)
+        message_id_match = re.search(
+            r"(?:MessageID|message id|msgNum|Message Id Name|MessageIDName)\s*[=: ]\s*([A-Za-z0-9_./:-]+|0x[0-9a-fA-F]+)",
+            message,
+            re.IGNORECASE,
+        )
+        objects = parse_validation_objects(message)
+        semantic_match = re.search(r"(?:GAL|callsite|operation|semantic_operation)[=: ]+([A-Za-z0-9_./:-]+)", message)
+        vuid = vuid_match.group(0) if vuid_match else "UNASSIGNED"
+        message_type = type_match.group(1).lower() if type_match else (match.group("type").lower() if match and match.group("type") else "unknown")
+        normalized_message = re.sub(r"0x[0-9a-fA-F]+", "0x*", message.strip())
+        occurrence += 1
         key = (
-            vuid_match.group(0) if vuid_match else "UNASSIGNED",
+            vuid,
             message_id_match.group(1) if message_id_match else None,
-            re.sub(r"0x[0-9a-fA-F]+", "0x*", line.strip())[:300],
+            hashlib.sha256(normalized_message.encode("utf-8")).hexdigest(),
         )
         finding = findings.setdefault(
             key,
             {
                 "vuid": key[0],
                 "severity": severity_match.group(1).lower() if severity_match else "unknown",
-                "message_type": match.group("type").lower() if match and match.group("type") else "unknown",
+                "message_type": message_type,
                 "message_id": key[1],
-                "message": line.strip(),
-                "first_occurrence": len(findings) + 1,
+                "message": message.strip(),
+                "category": validation_finding_category(message, vuid, message_type),
+                "first_occurrence": occurrence,
+                "last_occurrence": occurrence,
                 "count": 0,
-                "objects": object_handles,
-                "frame": first_number(line, r"frame[=: ]+(\d+)"),
-                "pass": first_number(line, r"pass[=: ]+(\d+)"),
-                "draw": first_number(line, r"draw[=: ]+(\d+)"),
-                "queue": first_number(line, r"queue[=: ]+(\d+)"),
-                "submission": first_number(line, r"submission[=: ]+(\d+)"),
+                "objects": objects,
+                "object_handles": sorted({str(obj["handle"]) for obj in objects}),
+                "frame": first_number(message, r"frame[=: ]+(\d+)"),
+                "pass": first_number(message, r"pass[=: ]+(\d+)"),
+                "draw": first_number(message, r"draw[=: ]+(\d+)"),
+                "queue": first_number(message, r"queue[=: ]+(\d+)"),
+                "submission": first_number(message, r"submission[=: ]+(\d+)"),
                 "semantic_operation": semantic_match.group(1) if semantic_match else None,
             },
         )
         finding["count"] = int(finding["count"]) + 1
-        if object_handles:
-            finding["objects"] = sorted(set([*finding.get("objects", []), *object_handles]))
+        finding["last_occurrence"] = occurrence
+        if objects:
+            merged = {str(obj["handle"]).lower(): obj for obj in finding.get("objects", []) if isinstance(obj, dict) and obj.get("handle")}
+            for obj in objects:
+                merged[str(obj["handle"]).lower()] = obj
+            finding["objects"] = list(merged.values())
+            finding["object_handles"] = sorted({str(obj.get("handle")) for obj in finding["objects"] if isinstance(obj, dict) and obj.get("handle")})
     return list(findings.values())
+
+
+def validation_category_counts(findings: Sequence[dict[str, object]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for finding in findings:
+        category = str(finding.get("category") or "unknown")
+        counts[category] = counts.get(category, 0) + int(finding.get("count") or 0)
+    return counts
+
+
+def concrete_validation_finding_count(findings: Sequence[dict[str, object]]) -> int:
+    concrete_categories = {"concrete_api_vuid", "synchronization", "gpu_assisted", "device_loss"}
+    return sum(int(finding.get("count") or 0) for finding in findings if finding.get("category") in concrete_categories)
+
+
+def validation_proof(
+    meta: Mapping[str, str],
+    combined_logs: str,
+    files: Mapping[str, Path | None],
+    tool_kind: str,
+    mode: ModeSpec,
+    work_counts: Mapping[str, object],
+    creation_counts: Mapping[str, object],
+    deterministic_complete: bool,
+    subsystem_complete: bool,
+    frame_sample_window_complete: bool,
+) -> dict[str, object]:
+    profile = meta.get("validation_profile") or meta.get("validation_mode", "off")
+    requested_details = validation_profile_details(str(profile))
+    vk_layer_settings = meta.get("vk_layer_settings", "")
+    requested_features = requested_details.get("features", [])
+    applied_settings = [part.strip() for part in vk_layer_settings.split(",") if part.strip()]
+    layer_loaded = (
+        meta.get("validation_enabled", "").lower() == "true"
+        and "VK_LAYER_KHRONOS_validation" in meta.get("vk_instance_layers", "")
+        and (
+            "VK_LAYER_KHRONOS_validation" in combined_logs
+            or "libVkLayer_khronos_validation" in combined_logs
+            or "Insert instance layer" in combined_logs
+        )
+    )
+    no_filtering = not any(
+        meta.get(name)
+        for name in (
+            "vk_validation_features_disabled",
+            "vk_validation_message_filter",
+            "vk_validation_mute",
+        )
+    )
+    meaningful_workload = mode.backend != "vulkan" or (
+        (tool_kind == "capture" and deterministic_complete and (int(work_counts.get("draw") or 0) > 0 or int(creation_counts.get("descriptor") or 0) > 0))
+        or (
+            tool_kind == "subsystem"
+            and (
+                subsystem_complete
+                or int(work_counts.get("draw") or 0) > 0
+                or int(work_counts.get("pass") or 0) > 0
+                or int(creation_counts.get("pipeline") or 0) > 0
+                or int(creation_counts.get("descriptor") or 0) > 0
+            )
+        )
+        or (tool_kind == "gameplay" and frame_sample_window_complete and int(work_counts.get("draw") or 0) > 0)
+    )
+    run_id = meta.get("run_id", "")
+    associated_files: dict[str, bool] = {}
+    if run_id:
+        for name, path in files.items():
+            if path is None:
+                continue
+            if name in {"meta", "renderdoc_summary", "tracy_summary", "deterministic", "frame_benchmark", "subsystem_benchmark"}:
+                continue
+            associated_files[name] = run_id in path.name
+    return {
+        "profile": profile,
+        "layer_loaded": layer_loaded,
+        "validation_layer_manifest": meta.get("validation_layer_manifest"),
+        "vk_instance_layers": meta.get("vk_instance_layers", ""),
+        "vk_add_layer_path": meta.get("vk_add_layer_path", ""),
+        "vk_loader_debug": meta.get("vk_loader_debug", ""),
+        "requested_features": requested_features,
+        "applied_layer_settings": applied_settings,
+        "core_requested": profile not in {"off", ""},
+        "synchronization_requested": any("validate_sync=true" == item for item in applied_settings),
+        "best_practices_requested": any("validate_best_practices=true" == item for item in applied_settings),
+        "gpu_assisted_requested": any(item.startswith("gpuav_enable=true") for item in applied_settings),
+        "debug_printf_requested": any(item.startswith("printf_enable=true") for item in applied_settings),
+        "no_message_filtering": no_filtering,
+        "meaningful_vulkan_workload": meaningful_workload,
+        "run_id": run_id,
+        "process": {
+            "gradle_pid": parse_number(meta.get("gradle_pid")),
+            "client_pid": parse_number(meta.get("client_pid")),
+            "exit_code": parse_number(meta.get("exit_code")),
+        },
+        "artifact_log_association": {
+            "all_named_logs_match_run": all(associated_files.values()) if associated_files else False,
+            "files": associated_files,
+        },
+        "workload_counts": dict(work_counts),
+        "creation_counts": dict(creation_counts),
+    }
 
 
 def utc_now() -> str:
@@ -625,6 +907,13 @@ def detect_attribution(mode: ModeSpec, meta: dict[str, str], logs: str) -> str:
     if re.search(r"Rust Vulkan|rust-vulkan|mattmc_rust.*vulkan", logs, re.IGNORECASE):
         return "rust-vulkan"
     if mode.backend == "vulkan":
+        java_vulkan_evidence = re.search(
+            r"Sodium Vulkan|Vulkan beginFramebufferRenderPass|vk[A-Z][A-Za-z0-9_]+|VK_LAYER_KHRONOS_validation|Vulkanic",
+            logs,
+            re.IGNORECASE,
+        )
+        if java_vulkan_evidence:
+            return "java-vulkan"
         if re.search(r"fallback|compatibility OpenGL|delegated to OpenGL", logs, re.IGNORECASE):
             return "fallback"
         return "java-vulkan"
@@ -871,6 +1160,7 @@ def instrumentation_signature(meta: dict[str, str], command: Sequence[str]) -> d
             "enabled": meta.get("renderdoc_capture", "false").lower() == "true",
             "frame": parse_number(meta.get("renderdoc_frame")),
             "capture_path": meta.get("renderdoc_capture_path") or None,
+            "vulkan_layer_manifest": meta.get("renderdoc_vulkan_layer_manifest") or None,
         },
         "tracy": {
             "enabled": meta.get("tracy_capture", "false").lower() == "true",
@@ -1079,12 +1369,23 @@ def summarize_renderdoc_capture(summary: dict[str, object] | None) -> dict[str, 
         "status": summary.get("status", "unknown"),
         "capture_path": summary.get("capture_path"),
         "replay_status": summary.get("replay_status"),
+        "api": summary.get("api"),
         "event_count": summary.get("event_count"),
         "draw_count": summary.get("draw_count"),
         "dispatch_count": summary.get("dispatch_count"),
         "pass_count": summary.get("pass_count"),
+        "ordered_actions": summary.get("ordered_actions", []),
+        "pipelines": summary.get("pipelines", []),
+        "shader_identities": summary.get("shader_identities", []),
+        "vertex_index_inputs": summary.get("vertex_index_inputs", []),
+        "resource_bindings": summary.get("resource_bindings", []),
+        "framebuffer_attachments": summary.get("framebuffer_attachments", []),
+        "viewport_scissor": summary.get("viewport_scissor", []),
+        "fixed_function_state": summary.get("fixed_function_state", []),
+        "resource_formats": summary.get("resource_formats", []),
         "attachments": summary.get("attachments", []),
         "resource_hashes": summary.get("resource_hashes", []),
+        "diagnosis": summary.get("diagnosis", {}),
         "failure": summary.get("failure"),
     }
 
@@ -1099,10 +1400,15 @@ def summarize_tracy_capture(summary: dict[str, object] | None) -> dict[str, obje
         "duration_seconds": summary.get("duration_seconds"),
         "size_bytes": summary.get("size_bytes"),
         "zones": summary.get("zones", {}),
+        "major_zones": summary.get("major_zones", {}),
+        "zone_count": summary.get("zone_count"),
+        "call_counts": summary.get("call_counts", {}),
         "ffi": summary.get("ffi", {}),
         "allocations": summary.get("allocations", {}),
         "cache_misses": summary.get("cache_misses", {}),
+        "capture_complete": summary.get("capture_complete"),
         "unattributed_time": summary.get("unattributed_time"),
+        "diagnosis": summary.get("diagnosis", {}),
         "failure": summary.get("failure"),
     }
 
@@ -1144,10 +1450,9 @@ def normalize_capture_artifact(
     failed_phase = timed_out_phase or timeout_phase_for_artifact(
         tool_kind, timed_out, exit_code, frame_doc, subsystem_doc, deterministic_doc
     )
+    primary_client_log = files["run_log"] or files["latest_log"] or files["latest_tail"]
     log_paths = [
-        files["run_log"],
-        files["latest_log"],
-        files["latest_tail"],
+        primary_client_log,
         files["shader_events"],
         files["validation_events"],
         files["crash_reports"],
@@ -1268,15 +1573,62 @@ def normalize_capture_artifact(
     hard_errors_absent = (
         error_counts["crash"] == 0
         and error_counts["gl_error"] == 0
-        and error_counts["vuid"] == 0
+        and concrete_validation_finding_count(validation_findings) == 0
         and error_counts["device_loss"] == 0
         and not memory_guard_triggered
         and error_counts["orphan_process"] == 0
     )
     renderdoc_complete = not (isinstance(instrumentation, dict) and instrumentation.get("renderdoc", {}).get("enabled")) or renderdoc_summary.get("status") == "complete"
     tracy_complete = not (isinstance(instrumentation, dict) and instrumentation.get("tracy", {}).get("enabled")) or tracy_summary.get("status") == "complete"
+    work_counts = {
+        "draw": len(re.findall(r"\bdraw(?:Indexed|Arrays)?\b", combined_logs)),
+        "dispatch": len(re.findall(r"\bdispatchCompute\b|\bdispatch\b", combined_logs)),
+        "pass": len(re.findall(r"render pass|RenderPass|render_pass", combined_logs, re.IGNORECASE)),
+        "transfer": len(re.findall(r"copyBuffer|copyImage|blit|transfer", combined_logs, re.IGNORECASE)),
+        "vulkan_submission": len(re.findall(r"vkQueueSubmit|queue submit|submission", combined_logs, re.IGNORECASE)),
+    }
+    creation_counts = {
+        "pipeline": len(re.findall(r"create.*pipeline|Creating .*pipeline", combined_logs, re.IGNORECASE)),
+        "descriptor": len(re.findall(r"descriptor", combined_logs, re.IGNORECASE)),
+        "resource": len(re.findall(r"create.*(?:buffer|texture|image|sampler)", combined_logs, re.IGNORECASE)),
+    }
+    validation_categories = validation_category_counts(validation_findings)
+    concrete_validation_count = concrete_validation_finding_count(validation_findings)
+    validation_run = run_type == "vulkan-validation"
+    proof = validation_proof(
+        meta,
+        combined_logs,
+        files,
+        tool_kind,
+        mode,
+        work_counts,
+        creation_counts,
+        deterministic_complete,
+        subsystem_complete,
+        frame_sample_window_complete,
+    )
+    validation_layer_exercised = (
+        not validation_run
+        or (
+            bool(proof.get("layer_loaded"))
+            and bool(proof.get("meaningful_vulkan_workload"))
+            and bool(proof.get("no_message_filtering"))
+            and bool(proof.get("artifact_log_association", {}).get("all_named_logs_match_run"))
+        )
+    )
+    loader_only_validation = validation_run and bool(validation_findings) and concrete_validation_count == 0
     if not hard_errors_absent:
         validation_messages.append("strict error scan found crash, GL/Vulkan validation, device-loss, RSS, or orphan-process evidence")
+    if validation_run and not proof.get("layer_loaded"):
+        validation_messages.append("Vulkan validation layer load was not proven")
+    if validation_run and not proof.get("meaningful_vulkan_workload"):
+        validation_messages.append("Vulkan validation run did not prove meaningful Java Vulkan workload execution")
+    if validation_run and not proof.get("no_message_filtering"):
+        validation_messages.append("Vulkan validation message filtering state is not clean")
+    if validation_run and not proof.get("artifact_log_association", {}).get("all_named_logs_match_run"):
+        validation_messages.append("Vulkan validation artifact/log association is incomplete")
+    if loader_only_validation:
+        validation_messages.append("Vulkan validation emitted only loader/configuration notices; no concrete API VUIDs were observed")
     complete = (
         bool(files["meta"])
         and (success or reused_baseline)
@@ -1284,6 +1636,7 @@ def normalize_capture_artifact(
         and world_entered
         and subsystem_complete
         and deterministic_complete
+        and validation_layer_exercised
         and renderdoc_complete
         and tracy_complete
         and hard_errors_absent
@@ -1341,22 +1694,17 @@ def normalize_capture_artifact(
                 "call_count": first_number(combined_logs, r"ffi(?:_call)?_count[=: ]+(\d+)"),
                 "bytes": first_number(combined_logs, r"ffi(?:_bytes| bytes)[=: ]+(\d+)"),
             },
-            "work_counts": {
-                "draw": len(re.findall(r"\bdraw(?:Indexed|Arrays)?\b", combined_logs)),
-                "dispatch": len(re.findall(r"\bdispatchCompute\b|\bdispatch\b", combined_logs)),
-                "pass": len(re.findall(r"render pass|RenderPass|render_pass", combined_logs, re.IGNORECASE)),
-                "transfer": len(re.findall(r"copyBuffer|copyImage|blit|transfer", combined_logs, re.IGNORECASE)),
-            },
-            "creation_counts": {
-                "pipeline": len(re.findall(r"create.*pipeline|Creating .*pipeline", combined_logs, re.IGNORECASE)),
-                "descriptor": len(re.findall(r"descriptor", combined_logs, re.IGNORECASE)),
-                "resource": len(re.findall(r"create.*(?:buffer|texture|image|sampler)", combined_logs, re.IGNORECASE)),
-            },
+            "work_counts": work_counts,
+            "creation_counts": creation_counts,
             "vulkan": vulkan_perf,
             "validation_findings": {
                 "profile": meta.get("validation_profile") or meta.get("validation_mode", "off"),
                 "finding_count": len(validation_findings),
+                "occurrence_count": sum(int(finding.get("count") or 0) for finding in validation_findings),
+                "concrete_vuid_count": concrete_validation_count,
+                "categories": validation_categories,
                 "findings": validation_findings,
+                "proof": proof,
             },
             "renderdoc": renderdoc_summary,
             "tracy": tracy_summary,
@@ -1369,7 +1717,9 @@ def normalize_capture_artifact(
         },
         "validation": {
             "strict_gl_error_scan_passed": error_counts["gl_error"] == 0,
-            "vulkan_validation_passed": error_counts["vuid"] == 0,
+            "vulkan_validation_passed": concrete_validation_count == 0,
+            "vulkan_validation_clean": validation_run and validation_layer_exercised and concrete_validation_count == 0 and not loader_only_validation,
+            "validation_layer_exercised": validation_layer_exercised,
             "crash_free": error_counts["crash"] == 0,
             "device_loss_free": error_counts["device_loss"] == 0,
             "rss_guard_triggered": memory_guard_triggered,
@@ -1486,6 +1836,7 @@ def write_preflight_meta(capture_dir: Path, mode: ModeSpec, args: argparse.Names
         f"renderdoc_capture={env.get('MATTMC_RENDERDOC_CAPTURE', 'false')}",
         f"renderdoc_frame={env.get('MATTMC_RENDERDOC_FRAME', '0')}",
         f"renderdoc_capture_path={env.get('MATTMC_RENDERDOC_CAPTURE_PATH', '')}",
+        f"renderdoc_vulkan_layer_manifest={env.get('MATTMC_RENDERDOC_VULKAN_LAYER_MANIFEST', '')}",
         f"tracy_capture={env.get('MATTMC_TRACY_CAPTURE', 'false')}",
         f"tracy_duration_seconds={env.get('MATTMC_TRACY_DURATION_SECONDS', '0')}",
         f"tracy_max_size_mb={env.get('MATTMC_TRACY_MAX_SIZE_MB', '0')}",
@@ -1497,18 +1848,67 @@ def write_preflight_meta(capture_dir: Path, mode: ModeSpec, args: argparse.Names
     return path
 
 
+def diagnose_renderdoc_capture_failure(capture_dir: Path, capture_path: Path | None = None) -> dict[str, Any]:
+    log_text = ""
+    for _ in range(100):
+        for pattern in ("latest_tail_*.log", "latest_*.log", "runClient_*.log"):
+            for path in sorted(capture_dir.glob(pattern))[-2:]:
+                try:
+                    log_text += "\n" + path.read_text(encoding="utf-8", errors="replace")[-200000:]
+                except OSError:
+                    pass
+        if log_text:
+            break
+        time.sleep(0.2)
+    end_results = re.findall(r"Ended RenderDoc frame capture \(([^)]+)\) result=([0-9-]+)", log_text)
+    triggered = re.findall(r"Triggered RenderDoc capture for next deterministic frame \(([^)]+)\)", log_text)
+    started = re.findall(r"Started RenderDoc frame capture \(([^)]+)\)", log_text)
+    initialized = "RenderDoc API initialized" in log_text
+    present = bool(capture_path and capture_path.exists())
+    likely_cause = None
+    if initialized and started and end_results and not present:
+        likely_cause = "RenderDoc API was reached and the deterministic workload ran, but no .rdc was persisted."
+    elif not initialized:
+        likely_cause = "RenderDoc API did not initialize before the run ended."
+    elif not started:
+        likely_cause = "RenderDoc API initialized, but no frame capture start was observed."
+    return {
+        "capture_file_present": present,
+        "renderdoc_api_initialized": initialized,
+        "frame_capture_started": bool(started),
+        "frame_capture_triggered": bool(triggered),
+        "frame_capture_ended": bool(end_results),
+        "capture_labels_started": started[:8],
+        "capture_labels_triggered": triggered[:8],
+        "end_results": [{"label": label, "result": result} for label, result in end_results[:8]],
+        "likely_cause": likely_cause,
+        "vulkan_layer": renderdoc_vulkan_layer_diagnosis(),
+    }
+
+
 def write_renderdoc_summary(capture_dir: Path, status: str, capture_path: Path | None = None, failure: str | None = None) -> Path:
     summary = {
         "schema": "mattmc-renderdoc-summary-v1",
         "status": status,
         "capture_path": str(capture_path) if capture_path else None,
         "replay_status": "not_run" if status != "complete" else "complete",
+        "api": None,
         "event_count": None,
         "draw_count": None,
         "dispatch_count": None,
         "pass_count": None,
+        "ordered_actions": [],
+        "pipelines": [],
+        "shader_identities": [],
+        "vertex_index_inputs": [],
+        "resource_bindings": [],
+        "framebuffer_attachments": [],
+        "viewport_scissor": [],
+        "fixed_function_state": [],
+        "resource_formats": [],
         "attachments": [],
         "resource_hashes": [],
+        "diagnosis": diagnose_renderdoc_capture_failure(capture_dir, capture_path) if status != "complete" else {},
         "failure": failure,
     }
     path = capture_dir / f"renderdoc_summary_{timestamp()}.json"
@@ -1525,15 +1925,459 @@ def write_tracy_summary(capture_dir: Path, status: str, capture_path: Path | Non
         "duration_seconds": (time.monotonic() - started_at) if started_at else None,
         "size_bytes": size_bytes,
         "zones": {},
+        "major_zones": {},
+        "zone_count": 0,
+        "call_counts": {},
         "ffi": {},
         "allocations": {},
         "cache_misses": {},
+        "capture_complete": status == "complete" and size_bytes > 0,
         "unattributed_time": None,
         "failure": failure,
     }
     path = capture_dir / f"tracy_summary_{timestamp()}.json"
     path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
+
+
+MAJOR_TRACY_ZONE_TERMS = (
+    "java.frame",
+    "game.",
+    "sodium.",
+    "iris.",
+    "distant-horizons.",
+    "gal.",
+    "backend.",
+    "uploads",
+    "transfers",
+    "command.",
+    "submission",
+    "present",
+    "wait",
+    "sync.",
+    "ffi.",
+    "shaderc",
+)
+
+
+def run_tracy_csvexport(capture_path: Path, *, self_time: bool = False, messages: bool = False) -> tuple[list[dict[str, str]], str | None]:
+    exporter = local_tracy_csvexport_path()
+    if not exporter:
+        return [], "tracy-csvexport is not installed"
+    command = [exporter]
+    if self_time:
+        command.append("--self")
+    if messages:
+        command.append("--messages")
+    command.append(str(capture_path))
+    try:
+        result = subprocess.run(
+            command,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=45,
+            check=False,
+        )
+    except Exception as exc:
+        return [], f"tracy-csvexport failed to start: {exc}"
+    if result.returncode != 0:
+        return [], f"tracy-csvexport exited {result.returncode}: {result.stdout.strip()[:500]}"
+    if not result.stdout.strip() or result.stdout.startswith("There are currently no"):
+        return [], None
+    try:
+        return list(csv.DictReader(io.StringIO(result.stdout))), None
+    except Exception as exc:
+        return [], f"tracy-csvexport output could not be parsed: {exc}"
+
+
+def tracy_zone_row(row: Mapping[str, str], self_row: Mapping[str, str] | None) -> dict[str, object]:
+    total_ns = parse_number(row.get("total_ns"))
+    self_ns = parse_number(self_row.get("total_ns")) if self_row else None
+    return {
+        "count": parse_number(row.get("counts")),
+        "inclusive_total_ns": total_ns,
+        "exclusive_total_ns": self_ns,
+        "inclusive_total_ms": None if total_ns is None else total_ns / 1_000_000.0,
+        "exclusive_total_ms": None if self_ns is None else self_ns / 1_000_000.0,
+        "inclusive_mean_ns": parse_number(row.get("mean_ns")),
+        "inclusive_min_ns": parse_number(row.get("min_ns")),
+        "inclusive_max_ns": parse_number(row.get("max_ns")),
+        "inclusive_std_ns": parse_number(row.get("std_ns")),
+        "total_percent": parse_number(row.get("total_perc")),
+        "source_file": row.get("src_file"),
+        "source_line": parse_number(row.get("src_line")),
+    }
+
+
+def extract_tracy_summary(
+    capture_dir: Path,
+    capture_path: Path,
+    *,
+    started_at: float | None = None,
+    duration_seconds: float | None = None,
+    failure: str | None = None,
+) -> Path:
+    size_bytes = capture_path.stat().st_size if capture_path.exists() else 0
+    if not capture_path.exists() or size_bytes <= 0:
+        return write_tracy_summary(capture_dir, "failed", capture_path, failure or "Tracy capture missing or empty", started_at)
+    inclusive_rows, inclusive_error = run_tracy_csvexport(capture_path)
+    exclusive_rows, exclusive_error = run_tracy_csvexport(capture_path, self_time=True)
+    message_rows, message_error = run_tracy_csvexport(capture_path, messages=True)
+    if inclusive_error or exclusive_error:
+        return write_tracy_summary(capture_dir, "failed", capture_path, inclusive_error or exclusive_error, started_at)
+
+    exclusive_by_name = {row.get("name", ""): row for row in exclusive_rows}
+    zones = {
+        row.get("name", ""): tracy_zone_row(row, exclusive_by_name.get(row.get("name", "")))
+        for row in inclusive_rows
+        if row.get("name")
+    }
+    major_zones = {
+        name: value
+        for name, value in zones.items()
+        if any(term.lower() in name.lower() for term in MAJOR_TRACY_ZONE_TERMS)
+    }
+    total_percent = sum(
+        value
+        for value in (parse_number(zone.get("total_percent")) for zone in major_zones.values())
+        if value is not None
+    )
+    messages = [row.get("MessageName", "") for row in message_rows if row.get("MessageName")]
+    call_counts = {
+        "ffi": sum(1 for message in messages if "ffi" in message.lower()),
+        "shaderc": sum(1 for message in messages if "shaderc" in message.lower()),
+        "messages": len(messages),
+    }
+    summary = {
+        "schema": "mattmc-tracy-summary-v1",
+        "status": "complete" if zones else "failed",
+        "capture_path": str(capture_path),
+        "duration_seconds": duration_seconds if duration_seconds is not None else ((time.monotonic() - started_at) if started_at else None),
+        "size_bytes": size_bytes,
+        "zones": zones,
+        "major_zones": major_zones,
+        "zone_count": len(zones),
+        "call_counts": call_counts,
+        "ffi": {
+            "message_count": call_counts["ffi"],
+            "shaderc_message_count": call_counts["shaderc"],
+            "zones": {name: zone for name, zone in zones.items() if "ffi" in name.lower() or "shaderc" in name.lower()},
+        },
+        "allocations": {
+            "available": False,
+            "reason": "tracy-csvexport zone/message export does not expose memory-pool allocation totals",
+        },
+        "cache_misses": {
+            "available": False,
+            "reason": "hardware counter export is not enabled for bounded automated captures",
+        },
+        "capture_complete": bool(zones),
+        "unattributed_time": max(0.0, 100.0 - total_percent) if major_zones else None,
+        "diagnosis": {
+            "csvexport_messages_error": message_error,
+            "major_zone_terms": MAJOR_TRACY_ZONE_TERMS,
+        },
+        "failure": None if zones else "Tracy capture contained no exportable zones",
+    }
+    path = capture_dir / f"tracy_summary_{timestamp()}.json"
+    path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return path
+
+
+def write_renderdoc_python_extractor(script_path: Path) -> None:
+    script_path.write_text(
+        r'''
+import json
+import os
+import sys
+import traceback
+
+import renderdoc as rd
+
+
+def safe_str(value):
+    try:
+        return str(value)
+    except Exception:
+        return "<unprintable>"
+
+
+def get_attr(obj, name):
+    try:
+        return getattr(obj, name)
+    except Exception:
+        return None
+
+
+def resource_id(value):
+    if value is None:
+        return None
+    try:
+        if value == rd.ResourceId.Null():
+            return None
+    except Exception:
+        pass
+    return safe_str(value)
+
+
+def resource_name(resource_map, value):
+    rid = resource_id(value)
+    if rid is None:
+        return None
+    desc = resource_map.get(rid)
+    return get_attr(desc, "name") if desc is not None else None
+
+
+def flag_names(flags):
+    names = []
+    for name in (
+        "Drawcall", "Dispatch", "MeshDispatch", "Clear", "Copy", "Resolve", "GenMips",
+        "BeginPass", "EndPass", "PassBoundary", "SetMarker", "PushMarker", "PopMarker",
+        "Present", "Indexed", "Instanced", "Indirect", "CommandBufferBoundary",
+    ):
+        value = getattr(rd.ActionFlags, name, None)
+        if value is not None:
+            try:
+                if flags & value:
+                    names.append(name)
+            except Exception:
+                pass
+    return names
+
+
+def action_kind(flags):
+    names = set(flag_names(flags))
+    if "Drawcall" in names:
+        return "draw"
+    if "Dispatch" in names or "MeshDispatch" in names:
+        return "dispatch"
+    if "BeginPass" in names or "EndPass" in names or "PassBoundary" in names:
+        return "pass"
+    if "SetMarker" in names or "PushMarker" in names or "PopMarker" in names:
+        return "marker"
+    if "Present" in names:
+        return "present"
+    if "Copy" in names or "Resolve" in names or "GenMips" in names:
+        return "transfer"
+    return "event"
+
+
+def shader_summary(state, stage):
+    try:
+        reflection = state.GetShaderReflection(stage)
+    except Exception:
+        reflection = None
+    if reflection is None:
+        return None
+    return {
+        "stage": safe_str(stage),
+        "resource_id": resource_id(get_attr(reflection, "resourceId")),
+        "entry_point": get_attr(reflection, "entryPoint"),
+        "encoding": safe_str(get_attr(reflection, "encoding")),
+        "input_count": len(get_attr(reflection, "inputSignature") or []),
+        "output_count": len(get_attr(reflection, "outputSignature") or []),
+        "constant_blocks": [get_attr(block, "name") for block in (get_attr(reflection, "constantBlocks") or [])[:32]],
+        "read_only_resources": [get_attr(res, "name") for res in (get_attr(reflection, "readOnlyResources") or [])[:64]],
+        "read_write_resources": [get_attr(res, "name") for res in (get_attr(reflection, "readWriteResources") or [])[:64]],
+        "samplers": [get_attr(res, "name") for res in (get_attr(reflection, "samplers") or [])[:64]],
+    }
+
+
+def describe_state(controller, resource_map, action):
+    entry = {
+        "event_id": action.eventId,
+        "pipeline": None,
+        "shaders": [],
+        "vertex_index_inputs": {},
+        "resource_bindings": {},
+        "framebuffer_attachments": {},
+        "viewport_scissor": {},
+        "fixed_function_state": {},
+    }
+    try:
+        controller.SetFrameEvent(action.eventId, False)
+        state = controller.GetPipelineState()
+    except Exception as exc:
+        entry["error"] = "pipeline-state-unavailable: " + str(exc)
+        return entry
+
+    try:
+        pipeline = state.GetGraphicsPipelineObject()
+        entry["pipeline"] = {
+            "graphics_pipeline_object": resource_id(pipeline),
+            "name": resource_name(resource_map, pipeline),
+        }
+    except Exception:
+        pass
+
+    for stage_name in ("Vertex", "Tess_Control", "Tess_Eval", "Geometry", "Pixel", "Compute"):
+        stage = getattr(rd.ShaderStage, stage_name, None)
+        if stage is None:
+            continue
+        shader = shader_summary(state, stage)
+        if shader:
+            entry["shaders"].append(shader)
+
+    for method_name, target in (
+        ("GetVertexInputs", "vertex_inputs"),
+        ("GetIndexBuffer", "index_buffer"),
+        ("GetOutputTargets", "color_outputs"),
+        ("GetDepthTarget", "depth_output"),
+        ("GetViewport", "viewport"),
+        ("GetScissor", "scissor"),
+        ("GetPrimitiveTopology", "topology"),
+    ):
+        try:
+            if method_name in ("GetViewport", "GetScissor"):
+                value = getattr(state, method_name)(0)
+            else:
+                value = getattr(state, method_name)()
+            if target in ("vertex_inputs", "index_buffer"):
+                entry["vertex_index_inputs"][target] = safe_str(value)
+            elif target in ("color_outputs", "depth_output"):
+                entry["framebuffer_attachments"][target] = safe_str(value)
+            elif target in ("viewport", "scissor"):
+                entry["viewport_scissor"][target] = safe_str(value)
+            else:
+                entry["fixed_function_state"][target] = safe_str(value)
+        except Exception:
+            pass
+
+    for field in ("depthState", "blendState", "rasterizer", "inputAssembly", "vertexInput"):
+        value = get_attr(state, field)
+        if value is not None:
+            entry["fixed_function_state"][field] = safe_str(value)
+    return entry
+
+
+def walk(actions, depth, rows, counts, limit):
+    for action in actions:
+        if len(rows) >= limit:
+            counts["truncated"] = True
+            return
+        names = flag_names(action.flags)
+        kind = action_kind(action.flags)
+        counts[kind] = counts.get(kind, 0) + 1
+        rows.append({
+            "event_id": action.eventId,
+            "drawcall_id": action.drawcallId,
+            "name": action.GetName(None) if hasattr(action, "GetName") else get_attr(action, "customName") or get_attr(action, "name"),
+            "kind": kind,
+            "flags": names,
+            "depth": depth,
+            "marker": kind == "marker",
+            "children": len(get_attr(action, "children") or []),
+        })
+        children = get_attr(action, "children") or []
+        if children:
+            walk(children, depth + 1, rows, counts, limit)
+
+
+def main():
+    capture_path = os.environ["MATTMC_RENDERDOC_REPLAY_CAPTURE"]
+    output_path = os.environ["MATTMC_RENDERDOC_REPLAY_OUTPUT"]
+    limit = int(os.environ.get("MATTMC_RENDERDOC_REPLAY_ACTION_LIMIT", "2500"))
+    summary = {
+        "schema": "mattmc-renderdoc-summary-v1",
+        "status": "failed",
+        "capture_path": capture_path,
+        "replay_status": "failed",
+        "api": None,
+        "event_count": 0,
+        "draw_count": 0,
+        "dispatch_count": 0,
+        "pass_count": 0,
+        "ordered_actions": [],
+        "pipelines": [],
+        "shader_identities": [],
+        "vertex_index_inputs": [],
+        "resource_bindings": [],
+        "framebuffer_attachments": [],
+        "viewport_scissor": [],
+        "fixed_function_state": [],
+        "resource_formats": [],
+        "attachments": [],
+        "resource_hashes": [],
+        "diagnosis": {},
+        "failure": None,
+    }
+    cap = None
+    controller = None
+    try:
+        rd.InitialiseReplay(rd.GlobalEnvironment(), [])
+        cap = rd.OpenCaptureFile()
+        result = cap.OpenFile(capture_path, "", None)
+        if result != rd.ResultCode.Succeeded:
+            raise RuntimeError("open-file " + safe_str(result))
+        if not cap.LocalReplaySupport():
+            raise RuntimeError("local replay unsupported")
+        result, controller = cap.OpenCapture(rd.ReplayOptions(), None)
+        if result != rd.ResultCode.Succeeded:
+            raise RuntimeError("open-capture " + safe_str(result))
+
+        resources = {safe_str(res.resourceId): res for res in controller.GetResources()}
+        textures = controller.GetTextures()
+        summary["api"] = safe_str(controller.GetAPIProperties().pipelineType)
+        actions = []
+        counts = {}
+        walk(controller.GetRootActions(), 0, actions, counts, limit)
+        summary["ordered_actions"] = actions
+        summary["event_count"] = len(actions)
+        summary["draw_count"] = counts.get("draw", 0)
+        summary["dispatch_count"] = counts.get("dispatch", 0)
+        summary["pass_count"] = counts.get("pass", 0)
+        summary["diagnosis"] = {"action_limit": limit, "truncated": bool(counts.get("truncated"))}
+
+        interesting = [row for row in actions if row["kind"] in ("draw", "dispatch", "pass", "transfer")][:256]
+        state_rows = []
+        for row in interesting:
+            action = controller.GetAction(row["event_id"])
+            if action:
+                state_rows.append(describe_state(controller, resources, action))
+        summary["pipelines"] = [row.get("pipeline") for row in state_rows if row.get("pipeline")]
+        summary["shader_identities"] = [shader for row in state_rows for shader in row.get("shaders", [])]
+        summary["vertex_index_inputs"] = [row.get("vertex_index_inputs") for row in state_rows if row.get("vertex_index_inputs")]
+        summary["resource_bindings"] = [row.get("resource_bindings") for row in state_rows if row.get("resource_bindings")]
+        summary["framebuffer_attachments"] = [row.get("framebuffer_attachments") for row in state_rows if row.get("framebuffer_attachments")]
+        summary["viewport_scissor"] = [row.get("viewport_scissor") for row in state_rows if row.get("viewport_scissor")]
+        summary["fixed_function_state"] = [row.get("fixed_function_state") for row in state_rows if row.get("fixed_function_state")]
+        summary["resource_formats"] = [
+            {
+                "resource_id": resource_id(tex.resourceId),
+                "name": resource_name(resources, tex.resourceId),
+                "width": get_attr(tex, "width"),
+                "height": get_attr(tex, "height"),
+                "depth": get_attr(tex, "depth"),
+                "mips": get_attr(tex, "mips"),
+                "arraysize": get_attr(tex, "arraysize"),
+                "format": safe_str(get_attr(tex, "format")),
+            }
+            for tex in textures[:512]
+        ]
+        summary["status"] = "complete"
+        summary["replay_status"] = "complete"
+    except Exception as exc:
+        summary["failure"] = str(exc)
+        summary["diagnosis"] = {"traceback": traceback.format_exc(limit=8)}
+    finally:
+        if controller is not None:
+            controller.Shutdown()
+        if cap is not None:
+            cap.Shutdown()
+        try:
+            rd.ShutdownReplay()
+        except Exception:
+            pass
+        with open(output_path, "w", encoding="utf-8") as handle:
+            json.dump(summary, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+
+
+main()
+'''.lstrip(),
+        encoding="utf-8",
+    )
 
 
 def renderdoc_capture_path_from_env(env: dict[str, str], capture_dir: Path) -> Path:
@@ -1548,15 +2392,105 @@ def resolve_renderdoc_capture_path(capture_dir: Path, requested: Path) -> Path:
     return captures[-1] if captures else requested
 
 
+def renderdoc_vulkan_layer_diagnosis() -> dict[str, object]:
+    renderdoc = local_renderdoccmd_path()
+    if not renderdoc:
+        return {"available": False, "explain": "renderdoccmd is not available"}
+    try:
+        result = subprocess.run(
+            [renderdoc, "vulkanlayer", "--explain"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=15,
+            check=False,
+        )
+        output = result.stdout.strip()
+    except Exception as exc:
+        return {"available": True, "error": str(exc)}
+    return {
+        "available": True,
+        "registered": "not correctly registered" not in output,
+        "local_manifest": str(local_renderdoc_layer_manifest_path()) if local_renderdoc_layer_manifest_path() else None,
+        "explain": output,
+    }
+
+
 def replay_renderdoc_summary(capture_dir: Path, capture_path: Path) -> Path:
     capture_path = resolve_renderdoc_capture_path(capture_dir, capture_path)
     if not capture_path.exists():
         return write_renderdoc_summary(capture_dir, "failed", capture_path, "RenderDoc did not produce an .rdc file")
+    qrenderdoc = local_qrenderdoc_path()
+    python_failure: dict[str, Any] | None = None
+    if qrenderdoc:
+        script_path = capture_dir / "renderdoc_summary_extractor.py"
+        output_path = capture_dir / f"renderdoc_summary_{timestamp()}.json"
+        write_renderdoc_python_extractor(script_path)
+        env = os.environ.copy()
+        env["MATTMC_RENDERDOC_REPLAY_CAPTURE"] = str(capture_path)
+        env["MATTMC_RENDERDOC_REPLAY_OUTPUT"] = str(output_path)
+        if not env.get("DISPLAY") and not env.get("WAYLAND_DISPLAY"):
+            env.setdefault("QT_QPA_PLATFORM", "offscreen")
+        replay_process = None
+        try:
+            replay_process = subprocess.Popen(
+                [qrenderdoc, "--python", str(script_path), str(capture_path)],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                env=env,
+                **popen_kwargs(),
+            )
+            try:
+                stdout, _ = replay_process.communicate(timeout=60)
+            except subprocess.TimeoutExpired:
+                terminate_process_tree(replay_process)
+                stdout, _ = replay_process.communicate(timeout=5)
+        except Exception as exc:
+            stdout = ""
+            python_failure = {
+                "status": "failed",
+                "failure": f"RenderDoc Python replay failed to start: {exc}",
+            }
+        if replay_process is not None and output_path.is_file():
+            output_path.with_suffix(".log").write_text(stdout or "", encoding="utf-8", errors="replace")
+            summary = read_json(output_path) or {}
+            if replay_process.returncode != 0 and summary.get("status") != "complete":
+                summary["failure"] = summary.get("failure") or f"qrenderdoc exited {replay_process.returncode}"
+            summary.setdefault("diagnosis", {})
+            if isinstance(summary["diagnosis"], dict):
+                summary["diagnosis"]["qrenderdoc_exit_code"] = replay_process.returncode
+                summary["diagnosis"]["vulkan_layer"] = renderdoc_vulkan_layer_diagnosis()
+            output_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            return output_path
+        if replay_process is not None and replay_process.returncode != 0:
+            python_failure = {
+                "status": "failed",
+                "failure": f"qrenderdoc exited {replay_process.returncode} without summary output",
+                "exit_code": replay_process.returncode,
+                "log_path": str(output_path.with_suffix(".log")),
+            }
+            output_path.with_suffix(".log").write_text(stdout or "", encoding="utf-8", errors="replace")
+        if replay_process is not None and python_failure is None:
+            python_failure = {
+                "status": "failed",
+                "failure": "qrenderdoc exited without summary output",
+                "exit_code": replay_process.returncode,
+                "log_path": str(output_path.with_suffix(".log")),
+            }
+            output_path.with_suffix(".log").write_text(stdout or "", encoding="utf-8", errors="replace")
+
     renderdoc = local_renderdoccmd_path()
     if not renderdoc:
-        return write_renderdoc_summary(capture_dir, "failed", capture_path, "renderdoccmd is not available for replay")
-    # Keep replay bounded and conservative. Not every RenderDoc build exposes the same JSON export flags,
-    # so the permanent artifact records capture presence and fails loudly when replay cannot be invoked.
+        summary_path = write_renderdoc_summary(capture_dir, "failed", capture_path, "renderdoccmd/qrenderdoc is not available for replay")
+        if python_failure:
+            summary = read_json(summary_path) or {}
+            summary["diagnosis"] = {
+                "python_replay": python_failure,
+                "vulkan_layer": renderdoc_vulkan_layer_diagnosis(),
+            }
+            summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        return summary_path
     try:
         result = subprocess.run(
             [renderdoc, "replay", "-l", "1", str(capture_path)],
@@ -1571,6 +2505,13 @@ def replay_renderdoc_summary(capture_dir: Path, capture_path: Path) -> Path:
     if result.returncode != 0:
         summary_path = write_renderdoc_summary(capture_dir, "failed", capture_path, f"RenderDoc replay exited {result.returncode}")
         summary_path.with_suffix(".log").write_text(result.stdout, encoding="utf-8", errors="replace")
+        if python_failure:
+            summary = read_json(summary_path) or {}
+            summary["diagnosis"] = {
+                "python_replay": python_failure,
+                "vulkan_layer": renderdoc_vulkan_layer_diagnosis(),
+            }
+            summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return summary_path
     event_count = len(re.findall(r"\bEID\b|Event", result.stdout))
     draw_count = len(re.findall(r"\bDraw(?:Indexed|Instanced)?\b", result.stdout))
@@ -1581,12 +2522,27 @@ def replay_renderdoc_summary(capture_dir: Path, capture_path: Path) -> Path:
         "status": "complete",
         "capture_path": str(capture_path),
         "replay_status": "complete",
+        "api": None,
         "event_count": event_count,
         "draw_count": draw_count,
         "dispatch_count": dispatch_count,
         "pass_count": pass_count,
+        "ordered_actions": [],
+        "pipelines": [],
+        "shader_identities": [],
+        "vertex_index_inputs": [],
+        "resource_bindings": [],
+        "framebuffer_attachments": [],
+        "viewport_scissor": [],
+        "fixed_function_state": [],
+        "resource_formats": [],
         "attachments": [],
         "resource_hashes": [],
+        "diagnosis": {
+            "fallback_text_replay": True,
+            "python_replay": python_failure,
+            "vulkan_layer": renderdoc_vulkan_layer_diagnosis(),
+        },
         "failure": None,
     }
     path = capture_dir / f"renderdoc_summary_{timestamp()}.json"
@@ -1749,6 +2705,15 @@ def build_capture_command(
             java_options.append(f"-Dmattmc.dev.renderdocCapture.library={renderdoc_library}")
             existing_preload = env.get("LD_PRELOAD", "").strip()
             env["LD_PRELOAD"] = f"{renderdoc_library} {existing_preload}".strip()
+            existing_library_path = env.get("LD_LIBRARY_PATH", "").strip()
+            env["LD_LIBRARY_PATH"] = f"{Path(renderdoc_library).parent} {existing_library_path}".strip().replace(" ", ":")
+        renderdoc_layer = local_renderdoc_layer_manifest_path()
+        if renderdoc_layer and mode.backend == "vulkan":
+            layer_dir = str(renderdoc_layer.parent)
+            existing_implicit = env.get("VK_ADD_IMPLICIT_LAYER_PATH", "").strip()
+            env["VK_ADD_IMPLICIT_LAYER_PATH"] = f"{layer_dir}:{existing_implicit}".strip(":")
+            env["VK_LOADER_LAYERS_ENABLE"] = "VK_LAYER_RENDERDOC_Capture"
+            env["MATTMC_RENDERDOC_VULKAN_LAYER_MANIFEST"] = str(renderdoc_layer)
         if renderdoc:
             command = [
                 renderdoc,
@@ -1955,7 +2920,7 @@ def run_mode(
             return MatrixResult(mode.name, False, False, False, "tracy-capture is not installed", 127, str(output_path), str(capture_dir), command)
         try:
             tracy_process = subprocess.Popen(
-                [tracy_tool, "-o", str(tracy_capture_path), "-s", str(getattr(args, "tracy_duration_seconds", 20))],
+                [tracy_tool, "-f", "-o", str(tracy_capture_path), "-s", str(getattr(args, "tracy_duration_seconds", 20))],
                 cwd=target.root,
                 text=True,
                 stdout=subprocess.PIPE,
@@ -2012,7 +2977,7 @@ def run_mode(
             if tracy_process.returncode not in (0, None) and tracy_failure is None:
                 tracy_failure = f"tracy-capture exited {tracy_process.returncode}"
         if tracy_capture_path and tracy_capture_path.exists() and tracy_capture_path.stat().st_size <= getattr(args, "tracy_max_size_mb", 256) * 1024 * 1024 and tracy_failure is None:
-            write_tracy_summary(capture_dir, "complete", tracy_capture_path, None, tracy_started_at)
+            extract_tracy_summary(capture_dir, tracy_capture_path, started_at=tracy_started_at)
         else:
             if tracy_failure is None:
                 tracy_failure = "Tracy capture missing, empty, or exceeded size limit"
