@@ -16,6 +16,7 @@ import signal
 import statistics
 import subprocess
 import sys
+import threading
 import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -181,6 +182,28 @@ def local_renderdoc_layer_manifest_path() -> Path | None:
         if candidate.is_file():
             return candidate
     return None
+
+
+def listening_tcp_ports(start_port: int, end_port: int) -> list[int]:
+    ports = {f"{port:04X}": port for port in range(start_port, end_port + 1)}
+    found: set[int] = set()
+    for table in (Path("/proc/net/tcp"), Path("/proc/net/tcp6")):
+        try:
+            lines = table.read_text(encoding="utf-8").splitlines()[1:]
+        except OSError:
+            continue
+        for line in lines:
+            columns = line.split()
+            if len(columns) < 4:
+                continue
+            local_address = columns[1]
+            state = columns[3]
+            if state != "0A":
+                continue
+            port_hex = local_address.rsplit(":", 1)[-1].upper()
+            if port_hex in ports:
+                found.add(ports[port_hex])
+    return sorted(found)
 
 
 RUST_OPENGL_CONFORMANCE_TEST = (
@@ -595,7 +618,8 @@ def validation_proof(
             "vk_validation_mute",
         )
     )
-    meaningful_workload = mode.backend != "vulkan" or (
+    is_vulkan_validation_backend = mode.backend in {"vulkan", "rust-vulkan"}
+    meaningful_workload = not is_vulkan_validation_backend or (
         (tool_kind == "capture" and deterministic_complete and (int(work_counts.get("draw") or 0) > 0 or int(creation_counts.get("descriptor") or 0) > 0))
         or (
             tool_kind == "subsystem"
@@ -647,6 +671,39 @@ def validation_proof(
         "workload_counts": dict(work_counts),
         "creation_counts": dict(creation_counts),
     }
+
+
+def subsystem_workload_counts(subsystem_doc: dict[str, object] | None) -> tuple[dict[str, int], dict[str, int]]:
+    work_counts = {"draw": 0, "dispatch": 0, "pass": 0, "transfer": 0, "vulkan_submission": 0}
+    creation_counts = {"pipeline": 0, "descriptor": 0, "resource": 0}
+    if not isinstance(subsystem_doc, dict):
+        return work_counts, creation_counts
+    workloads = subsystem_doc.get("workloads")
+    if not isinstance(workloads, list):
+        return work_counts, creation_counts
+    max_submission = 0
+    for workload in workloads:
+        if not isinstance(workload, dict):
+            continue
+        counts = workload.get("counts")
+        if isinstance(counts, dict):
+            for key in ("draw", "dispatch", "pass", "transfer"):
+                value = counts.get(key)
+                if isinstance(value, (int, float)):
+                    work_counts[key] += int(value)
+            for key in ("pipeline", "descriptor", "resource"):
+                value = counts.get(key)
+                if isinstance(value, (int, float)):
+                    creation_counts[key] += int(value)
+            value = counts.get("submission")
+            if isinstance(value, (int, float)):
+                work_counts["vulkan_submission"] += int(value)
+        last_submission = workload.get("lastSubmission")
+        if isinstance(last_submission, (int, float)):
+            max_submission = max(max_submission, int(last_submission))
+    if work_counts["vulkan_submission"] == 0:
+        work_counts["vulkan_submission"] = max_submission
+    return work_counts, creation_counts
 
 
 def utc_now() -> str:
@@ -1672,6 +1729,11 @@ def normalize_capture_artifact(
         "descriptor": len(re.findall(r"descriptor", combined_logs, re.IGNORECASE)),
         "resource": len(re.findall(r"create.*(?:buffer|texture|image|sampler)", combined_logs, re.IGNORECASE)),
     }
+    subsystem_work_counts, subsystem_creation_counts = subsystem_workload_counts(subsystem_doc)
+    for key, value in subsystem_work_counts.items():
+        work_counts[key] = int(work_counts.get(key) or 0) + value
+    for key, value in subsystem_creation_counts.items():
+        creation_counts[key] = int(creation_counts.get(key) or 0) + value
     validation_categories = validation_category_counts(validation_findings)
     concrete_validation_count = concrete_validation_finding_count(validation_findings)
     validation_run = run_type == "vulkan-validation"
@@ -1996,7 +2058,14 @@ def write_renderdoc_summary(capture_dir: Path, status: str, capture_path: Path |
     return path
 
 
-def write_tracy_summary(capture_dir: Path, status: str, capture_path: Path | None = None, failure: str | None = None, started_at: float | None = None) -> Path:
+def write_tracy_summary(
+    capture_dir: Path,
+    status: str,
+    capture_path: Path | None = None,
+    failure: str | None = None,
+    started_at: float | None = None,
+    tool_output: str | None = None,
+) -> Path:
     size_bytes = capture_path.stat().st_size if capture_path and capture_path.exists() else 0
     summary = {
         "schema": "mattmc-tracy-summary-v1",
@@ -2014,6 +2083,7 @@ def write_tracy_summary(capture_dir: Path, status: str, capture_path: Path | Non
         "capture_complete": status == "complete" and size_bytes > 0,
         "unattributed_time": None,
         "failure": failure,
+        "tool_output": tool_output,
     }
     path = capture_dir / f"tracy_summary_{timestamp()}.json"
     path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -2704,6 +2774,7 @@ def build_capture_command(
     env["MATTMC_RENDERDOC_CAPTURE"] = "true" if getattr(args, "renderdoc_capture", False) else "false"
     env["MATTMC_RENDERDOC_FRAME"] = str(getattr(args, "renderdoc_frame", 8))
     env["MATTMC_TRACY_CAPTURE"] = "true" if getattr(args, "tracy_capture", False) else "false"
+    env["MATTMC_RUST_TRACY"] = "true" if getattr(args, "tracy_capture", False) else "false"
     env["MATTMC_TRACY_DURATION_SECONDS"] = str(getattr(args, "tracy_duration_seconds", 20))
     env["MATTMC_TRACY_MAX_SIZE_MB"] = str(getattr(args, "tracy_max_size_mb", 256))
     env["MATTMC_CAPTURE_WORLD"] = args.world
@@ -2977,7 +3048,10 @@ def run_mode(
         return MatrixResult(mode.name, False, False, False, "renderdoccmd is not installed", 127, str(output_path), str(capture_dir), command)
     tracy_capture_path: Path | None = None
     tracy_started_at: float | None = None
-    tracy_process: subprocess.Popen[str] | None = None
+    tracy_tool: str | None = None
+    tracy_result: dict[str, object] = {}
+    tracy_thread: threading.Thread | None = None
+    tracy_active_process: list[subprocess.Popen[str] | None] = [None]
     if getattr(args, "tracy_capture", False):
         tracy_tool = local_tracy_capture_path()
         tracy_capture_path = capture_dir / f"tracy_{timestamp()}.tracy"
@@ -2998,19 +3072,6 @@ def run_mode(
             )
             write_artifact(output_path, artifact)
             return MatrixResult(mode.name, False, False, False, "tracy-capture is not installed", 127, str(output_path), str(capture_dir), command)
-        try:
-            tracy_process = subprocess.Popen(
-                [tracy_tool, "-f", "-o", str(tracy_capture_path), "-s", str(getattr(args, "tracy_duration_seconds", 20))],
-                cwd=target.root,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                **popen_kwargs(),
-            )
-            tracy_started_at = time.monotonic()
-        except Exception as exc:
-            write_tracy_summary(capture_dir, "failed", tracy_capture_path, f"failed to launch tracy-capture: {exc}")
-            tracy_process = None
     stdout_path = artifact_root / mode.name / tool_kind / run_dir / "stdout.log"
     stderr_path = artifact_root / mode.name / tool_kind / run_dir / "stderr.log"
     timed_out = False
@@ -3030,6 +3091,65 @@ def run_mode(
             env=env,
             **popen_kwargs(),
         )
+        if getattr(args, "tracy_capture", False) and tracy_tool and tracy_capture_path:
+            def capture_tracy_while_running() -> None:
+                nonlocal tracy_started_at
+                outputs: list[str] = []
+                deadline = time.monotonic() + min(timeout_seconds, max(5, getattr(args, "tracy_duration_seconds", 20) + 20))
+                attempt = 0
+                while process.poll() is None and time.monotonic() < deadline:
+                    candidate_ports = listening_tcp_ports(8086, 8095)
+                    if not candidate_ports:
+                        time.sleep(0.1)
+                        continue
+                    for port in candidate_ports:
+                        attempt += 1
+                        try:
+                            tracy_started_at = time.monotonic()
+                            capture_process = subprocess.Popen(
+                                [
+                                    tracy_tool,
+                                    "-f",
+                                    "-a",
+                                    "127.0.0.1",
+                                    "-p",
+                                    str(port),
+                                    "-o",
+                                    str(tracy_capture_path),
+                                    "-s",
+                                    str(getattr(args, "tracy_duration_seconds", 20)),
+                                ],
+                                cwd=target.root,
+                                text=True,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT,
+                                **popen_kwargs(),
+                            )
+                            tracy_active_process[0] = capture_process
+                            output, _ = capture_process.communicate(timeout=max(1, min(getattr(args, "tracy_duration_seconds", 20) + 5, 60)))
+                            if output:
+                                outputs.append(f"attempt {attempt} port {port}:\n{output}")
+                            if capture_process.returncode == 0 and tracy_capture_path.exists() and tracy_capture_path.stat().st_size > 0:
+                                tracy_result.update({"returncode": 0, "output": "\n".join(outputs), "attempts": attempt, "port": port})
+                                return
+                            tracy_result.update({"returncode": capture_process.returncode, "output": "\n".join(outputs), "attempts": attempt, "port": port})
+                        except subprocess.TimeoutExpired:
+                            active = tracy_active_process[0]
+                            if active is not None:
+                                terminate_process_tree(active)
+                            tracy_result.update({"returncode": -9, "output": "\n".join(outputs), "attempts": attempt, "port": port, "failure": "tracy-capture timed out"})
+                            return
+                        except Exception as exc:
+                            tracy_result.update({"returncode": -1, "output": "\n".join(outputs), "attempts": attempt, "port": port, "failure": f"failed to launch tracy-capture: {exc}"})
+                            return
+                        finally:
+                            tracy_active_process[0] = None
+                    time.sleep(0.25)
+                if "returncode" not in tracy_result:
+                    tracy_result.update({"returncode": None, "output": "\n".join(outputs), "attempts": attempt, "failure": "tracy-capture did not attach before workload process exited"})
+
+            tracy_thread = threading.Thread(target=capture_tracy_while_running, name="mattmc-tracy-capture", daemon=True)
+            tracy_thread.start()
         try:
             exit_code = process.wait(timeout=timeout_seconds)
         except subprocess.TimeoutExpired:
@@ -3048,20 +3168,24 @@ def run_mode(
         replay_renderdoc_summary(capture_dir, renderdoc_capture_path_from_env(env, capture_dir))
     if getattr(args, "tracy_capture", False):
         tracy_failure = None
-        if tracy_process is not None:
-            try:
-                tracy_process.wait(timeout=max(1, min(getattr(args, "tracy_duration_seconds", 20) + 10, 60)))
-            except subprocess.TimeoutExpired:
-                terminate_process_tree(tracy_process)
-                tracy_failure = "tracy-capture timed out"
-            if tracy_process.returncode not in (0, None) and tracy_failure is None:
-                tracy_failure = f"tracy-capture exited {tracy_process.returncode}"
+        tracy_tool_output = tracy_result.get("output") if isinstance(tracy_result.get("output"), str) else None
+        if tracy_thread is not None:
+            tracy_thread.join(timeout=max(1, min(getattr(args, "tracy_duration_seconds", 20) + 5, 60)))
+            if tracy_thread.is_alive():
+                active = tracy_active_process[0]
+                if active is not None:
+                    terminate_process_tree(active)
+                tracy_failure = "tracy-capture worker timed out"
+        if tracy_failure is None and tracy_result.get("failure"):
+            tracy_failure = str(tracy_result["failure"])
+        if tracy_failure is None and tracy_result.get("returncode") not in (0, None):
+            tracy_failure = f"tracy-capture exited {tracy_result.get('returncode')} after {tracy_result.get('attempts', 0)} attempts"
         if tracy_capture_path and tracy_capture_path.exists() and tracy_capture_path.stat().st_size <= getattr(args, "tracy_max_size_mb", 256) * 1024 * 1024 and tracy_failure is None:
             extract_tracy_summary(capture_dir, tracy_capture_path, started_at=tracy_started_at)
         else:
             if tracy_failure is None:
                 tracy_failure = "Tracy capture missing, empty, or exceeded size limit"
-            write_tracy_summary(capture_dir, "failed", tracy_capture_path, tracy_failure, tracy_started_at)
+            write_tracy_summary(capture_dir, "failed", tracy_capture_path, tracy_failure, tracy_started_at, tracy_tool_output)
     success = exit_code == 0 and not timed_out
     artifact = normalize_capture_artifact(
         target,

@@ -1971,6 +1971,51 @@ fn command_order_submission_ids_and_deferred_retirement_are_deterministic() {
 }
 
 #[test]
+fn completion_poll_reports_backend_progress_without_implicit_wait() {
+    let mut gal = gal();
+    let buffer = gal
+        .create_buffer(BufferDesc {
+            label: "completion-buffer".to_string(),
+            size: 16,
+            memory: MemoryDomain::Upload,
+            usages: vec![BufferUsage::HostWrite],
+        })
+        .unwrap();
+    let list = gal
+        .create_command_list(CommandListDesc {
+            label: "completion-list".to_string(),
+            operations: vec![CommandOp::HostWriteBuffer {
+                buffer,
+                offset: 0,
+                data: vec![1; 16],
+            }],
+        })
+        .unwrap();
+    let token = gal
+        .submit(SubmissionBatch {
+            label: "completion-batch".to_string(),
+            command_lists: vec![list],
+        })
+        .unwrap();
+
+    assert_eq!(gal.latest_submission_id(), token.submission);
+    assert_eq!(gal.poll_completed(), SubmissionId(0));
+    assert_eq!(
+        completion_result_for(token.submission, gal.poll_completed()).is_complete,
+        0
+    );
+
+    gal.mock_backend_mut()
+        .unwrap()
+        .complete_through(token.submission);
+    assert_eq!(gal.poll_completed(), token.submission);
+    assert_eq!(
+        completion_result_for(token.submission, gal.poll_completed()).is_complete,
+        1
+    );
+}
+
+#[test]
 fn malformed_submission_is_rejected_before_backend_encoding() {
     let mut gal = gal();
     let (color_view, target, pass, _layout, _pipeline) = simple_graphics_scene(&mut gal);

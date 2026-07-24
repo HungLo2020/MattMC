@@ -2333,12 +2333,36 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_completion_query(
     context.ffi_output_bytes = context.ffi_output_bytes.saturating_add(size_of::<FfiCompletionResult>() as u64);
     let result = match validate_completion_query(request) {
         Ok(request) => {
-            let completed = context.gal.retire_completed().map(|_| context.gal.completed_host_reads()).map(|_| {
-                let reads = context.gal.completed_host_reads();
-                reads.iter().map(|read| read.submission).max().unwrap_or(SubmissionId(0))
-            });
-            let polled = completed.unwrap_or(SubmissionId(0));
-            let result = completion_result_for(SubmissionId(request.submission_id), std::cmp::max(polled, SubmissionId(request.submission_id)));
+            let requested = SubmissionId(request.submission_id);
+            let latest = context.gal.latest_submission_id();
+            if requested > latest {
+                let error = GalError::submission(
+                    StatusCode::InvalidArgument,
+                    format!(
+                        "completion query requested submission {} but latest submitted is {}",
+                        requested.0, latest.0
+                    ),
+                );
+                set_last_error(context, &error);
+                let _ = write_out(
+                    out,
+                    FfiCompletionResult {
+                        header: FfiHeader {
+                            version: FFI_ABI_VERSION,
+                            byte_size: size_of::<FfiCompletionResult>() as u32,
+                        },
+                        status: error.code as i32,
+                        error_domain: error.domain as u32,
+                        requested_submission_id: requested.0,
+                        completed_submission_id: context.gal.poll_completed().0,
+                        is_complete: 0,
+                    },
+                    "completion result",
+                );
+                return error.code as i32;
+            }
+            let completed = context.gal.poll_completed();
+            let result = completion_result_for(requested, completed);
             let _ = write_out(out, result, "completion result");
             StatusCode::Ok as i32
         }

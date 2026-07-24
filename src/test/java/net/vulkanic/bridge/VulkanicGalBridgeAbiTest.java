@@ -48,4 +48,26 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(subsystem.contains("rust-vulkan") && subsystem.contains("rust-opengl"));
 		assertTrue(bridge.contains("Rust VulkanicGAL bridge"));
 	}
+
+	@Test
+	void bridgePollsCompletionBeforeReadbackAndReportsFinalFfiMetrics() throws Exception {
+		String bridge = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java"));
+		String benchmark = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/RustGraphicsSubsystemBenchmark.java"));
+
+		assertTrue(bridge.contains("mattmc_vulkanic_gal_completion_query"));
+		assertTrue(benchmark.indexOf("pollCompletion(bridge, submission)") < benchmark.indexOf("bridge.readback(submission"));
+		assertTrue(benchmark.contains("VulkanicGalBridge.Status retireStatus = bridge.retire(submission)"));
+		assertTrue(benchmark.contains("\\\"completionPolls\\\""));
+	}
+
+	@Test
+	void rustOpenGlContextFallbackIsExplicitAndDoesNotUseProductionCallsites() throws Exception {
+		String context = Files.readString(Path.of("src/main/rust/render/vulkanic/backends/opengl/context.rs"));
+		String subsystem = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/GraphicsSubsystemBenchmark.java"));
+
+		assertTrue(context.contains("EGL:") && context.contains("GLX:"));
+		assertTrue(context.contains("glXCreatePbuffer"));
+		assertTrue(subsystem.contains("RustGraphicsSubsystemBenchmark.run"));
+		assertTrue(subsystem.contains("minecraft.stop()"));
+	}
 }

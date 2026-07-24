@@ -1052,10 +1052,7 @@ impl VulkanicGal {
     }
 
     pub fn retire_completed(&mut self) -> GalResult<Vec<Handle>> {
-        let completed = self.backend.completed_submission();
-        if completed > self.completed_submission {
-            self.completed_submission = completed;
-        }
+        self.poll_completed();
         self.backend.retire(self.completed_submission)?;
         let mut retired = Vec::new();
         for entry in self.retirement.drain_completed(self.completed_submission) {
@@ -1067,6 +1064,18 @@ impl VulkanicGal {
             }
         }
         Ok(retired)
+    }
+
+    pub(in crate::render::vulkanic) fn poll_completed(&mut self) -> SubmissionId {
+        let completed = self.backend.completed_submission();
+        if completed > self.completed_submission {
+            self.completed_submission = completed;
+        }
+        self.completed_submission
+    }
+
+    pub(in crate::render::vulkanic) fn latest_submission_id(&self) -> SubmissionId {
+        SubmissionId(self.next_submission.saturating_sub(1))
     }
 
     pub(in crate::render::vulkanic) fn retire_through(

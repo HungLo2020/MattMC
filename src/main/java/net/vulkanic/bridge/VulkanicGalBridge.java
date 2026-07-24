@@ -104,7 +104,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			MemorySegment request = Struct.CONTEXT_CREATE.allocate(arena);
 			Abi.writeHeader(request, Struct.CONTEXT_CREATE);
 			Struct.CONTEXT_CREATE.setInt(request, 1, backend);
-			Struct.CONTEXT_CREATE.setInt(request, 2, Boolean.getBoolean("mattmc.dev.graphicsSubsystemBenchmark.rustTracy") ? 1 : 0);
+			boolean rustTracy = Boolean.getBoolean("mattmc.dev.tracyCapture") || Boolean.getBoolean("mattmc.dev.graphicsSubsystemBenchmark.rustTracy");
+			Struct.CONTEXT_CREATE.setInt(request, 2, rustTracy ? 1 : 0);
 			Abi.writeBytes(arena, request, Struct.CONTEXT_CREATE, 3, "java-subsystem-" + backendName);
 			MemorySegment result = Struct.CONTEXT_RESULT.allocate(arena);
 			int status = Native.contextCreate(request, result);
@@ -159,6 +160,19 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status));
 	}
 
+	public Completion completion(long submission) {
+		MemorySegment request = Struct.COMPLETION_QUERY.allocate(arena);
+		Abi.writeHeader(request, Struct.COMPLETION_QUERY);
+		Struct.COMPLETION_QUERY.setLong(request, 1, submission);
+		MemorySegment result = Struct.COMPLETION_RESULT.allocate(arena);
+		int code = Native.completion(contextId, request, result);
+		checkStatus(code, "completion query");
+		return new Completion(
+			Struct.COMPLETION_RESULT.getLong(result, 3),
+			Struct.COMPLETION_RESULT.getLong(result, 4),
+			Struct.COMPLETION_RESULT.getInt(result, 5) != 0);
+	}
+
 	public byte[] readback(long submission, long buffer, long offset, int size) {
 		MemorySegment request = Struct.READBACK_REQUEST.allocate(arena);
 		Abi.writeHeader(request, Struct.READBACK_REQUEST);
@@ -174,13 +188,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		return output.asSlice(0, written).toArray(ValueLayout.JAVA_BYTE);
 	}
 
-	public void retire(long submission) {
+	public Status retire(long submission) {
 		MemorySegment request = Struct.RETIREMENT_BATCH.allocate(arena);
 		Abi.writeHeader(request, Struct.RETIREMENT_BATCH);
 		Struct.RETIREMENT_BATCH.setLong(request, 1, submission);
 		Abi.writeSlice(request, Struct.RETIREMENT_BATCH, 2, MemorySegment.NULL, 0);
 		MemorySegment status = Struct.STATUS.allocate(arena);
 		checkStatus(Native.retire(contextId, request, status), "retirement");
+		return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status));
 	}
 
 	@Override
@@ -215,6 +230,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	public record Status(long submissionId, long ffiCalls, long ffiInputBytes) {
 	}
 
+	public record Completion(long requestedSubmissionId, long completedSubmissionId, boolean complete) {
+	}
+
 	public record ResourceResults(MemorySegment segment, int count) {
 		public long handle(int index) {
 			return Struct.CREATE_RESULT.getLong(segment.asSlice((long)index * Struct.CREATE_RESULT.byteSize(), Struct.CREATE_RESULT.byteSize()), 1);
@@ -228,6 +246,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		private static final MethodHandle CAPABILITIES = downcall("mattmc_vulkanic_gal_capabilities", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle RESOURCE_BATCH = downcall("mattmc_vulkanic_gal_resource_batch", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
 		private static final MethodHandle SUBMIT = downcall("mattmc_vulkanic_gal_submit_batch", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+		private static final MethodHandle COMPLETION = downcall("mattmc_vulkanic_gal_completion_query", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle RETIRE = downcall("mattmc_vulkanic_gal_retire", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle READBACK = downcall("mattmc_vulkanic_gal_readback", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
 		private static final MethodHandle LAST_ERROR = downcall("mattmc_vulkanic_gal_last_error", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
@@ -281,6 +300,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				return (int) SUBMIT.invokeExact(contextId, batch, status);
 			} catch (Throwable throwable) {
 				throw new IllegalStateException("Failed to submit Rust VulkanicGAL command batch", throwable);
+			}
+		}
+
+		static int completion(long contextId, MemorySegment request, MemorySegment result) {
+			try {
+				return (int) COMPLETION.invokeExact(contextId, request, result);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to query Rust VulkanicGAL completion", throwable);
 			}
 		}
 
@@ -783,6 +810,17 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			MemorySegment op = op(18);
 			writeRange(op, Struct.COMMAND_OP, 15, index, 1);
 			ops.add(op);
+			return this;
+		}
+
+		public SubmissionBatchBuilder largeBarrierBatch(long resource, int count) {
+			for (int i = 0; i < count; i++) {
+				if ((i & 1) == 0) {
+					barrier(resource, USAGE_TRANSFER_SRC, USAGE_TRANSFER_DST, false);
+				} else {
+					barrier(resource, USAGE_TRANSFER_DST, USAGE_TRANSFER_SRC, false);
+				}
+			}
 			return this;
 		}
 

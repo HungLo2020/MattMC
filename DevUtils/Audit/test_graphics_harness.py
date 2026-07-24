@@ -362,6 +362,57 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             self.assertTrue(findings["proof"]["meaningful_vulkan_workload"])
             self.assertFalse(artifact["validation"]["vulkan_validation_clean"])
 
+    def test_validation_proof_uses_subsystem_workload_counts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            make_validation_capture(capture, workload=False)
+            (capture / "graphics_subsystem_benchmark_20260101_000000.json").write_text(
+                json.dumps(
+                    {
+                        "schema": "mattmc-graphics-subsystem-benchmark-v1",
+                        "status": "complete",
+                        "backend": "rust-vulkan",
+                        "workloads": [
+                            {
+                                "name": "rust-bridge.indexed-textured-depth-blend-resource-sets-transfer-readback",
+                                "status": "ok",
+                                "counts": {
+                                    "draw": 2,
+                                    "dispatch": 0,
+                                    "pass": 2,
+                                    "transfer": 14,
+                                    "pipeline": 1,
+                                    "resource": 22,
+                                    "descriptor": 1,
+                                },
+                                "lastSubmission": 2,
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(
+                target,
+                harness.MATRIX_MODES[6],
+                capture,
+                "subsystem",
+                True,
+                ["fake"],
+                0,
+                False,
+            )
+
+            proof = artifact["metrics"]["validation_findings"]["proof"]
+            self.assertTrue(proof["meaningful_vulkan_workload"])
+            self.assertEqual(2, proof["workload_counts"]["draw"])
+            self.assertEqual(14, proof["workload_counts"]["transfer"])
+            self.assertEqual(2, proof["workload_counts"]["vulkan_submission"])
+            self.assertEqual(22, proof["creation_counts"]["resource"])
+
     def test_zero_vuid_validation_without_workload_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

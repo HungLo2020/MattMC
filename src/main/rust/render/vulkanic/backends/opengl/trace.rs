@@ -23,6 +23,7 @@ impl Zone {
         {
             let client = CLIENT.get_or_init(|| {
                 let client = tracy_client::Client::start();
+                eprintln!("MattMC Rust VulkanicGAL OpenGL Tracy client start requested");
                 client.set_thread_name("MattMC Rust VulkanicGAL OpenGL");
                 client.message("MattMC Rust VulkanicGAL OpenGL Tracy client started", 0);
                 client

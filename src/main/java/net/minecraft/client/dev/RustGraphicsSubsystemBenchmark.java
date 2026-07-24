@@ -13,6 +13,7 @@ final class RustGraphicsSubsystemBenchmark {
 	private static final int WIDTH = 32;
 	private static final int HEIGHT = 32;
 	private static final int PIXEL_BYTES = WIDTH * HEIGHT * 4;
+	private static final int LARGE_BATCH_BARRIER_COUNT = 96;
 
 	private RustGraphicsSubsystemBenchmark() {
 	}
@@ -44,6 +45,7 @@ final class RustGraphicsSubsystemBenchmark {
 		long submission = 0;
 		long ffiCalls = 0;
 		long ffiBytes = 0;
+		int completionPolls = 0;
 		int hash = 0;
 		int nonZero = 0;
 
@@ -55,6 +57,12 @@ final class RustGraphicsSubsystemBenchmark {
 					.barrier(handles.uploadTexture, VulkanicGalBridge.USAGE_TRANSFER_DST, VulkanicGalBridge.USAGE_TRANSFER_SRC, false)
 					.hostWrite(handles.index, 0, indexBytes())
 					.barrier(handles.index, VulkanicGalBridge.USAGE_TRANSFER_DST, VulkanicGalBridge.USAGE_SHADER_READ, false)
+					.hostWrite(handles.uniformA, 0, uniformBytes(i, 1))
+					.barrier(handles.uniformA, VulkanicGalBridge.USAGE_TRANSFER_DST, VulkanicGalBridge.USAGE_SHADER_READ, false)
+					.hostWrite(handles.uniformB, 0, uniformBytes(i, 2))
+					.barrier(handles.uniformB, VulkanicGalBridge.USAGE_TRANSFER_DST, VulkanicGalBridge.USAGE_SHADER_READ, false)
+					.hostWrite(handles.storage, 0, uniformBytes(i, 3))
+					.barrier(handles.storage, VulkanicGalBridge.USAGE_TRANSFER_DST, VulkanicGalBridge.USAGE_SHADER_READ, false)
 					.barrier(handles.sampledTexture, VulkanicGalBridge.USAGE_UNDEFINED, VulkanicGalBridge.USAGE_TRANSFER_DST, true)
 					.copyBufferToTexture(handles.uploadTexture, handles.sampledTexture, 4, 4)
 					.barrier(handles.sampledTexture, VulkanicGalBridge.USAGE_TRANSFER_DST, VulkanicGalBridge.USAGE_SHADER_READ, true)
@@ -70,25 +78,42 @@ final class RustGraphicsSubsystemBenchmark {
 					.copyTextureToBuffer(handles.colorTexture, handles.readback, WIDTH, HEIGHT)
 					.barrier(handles.readback, VulkanicGalBridge.USAGE_TRANSFER_DST, VulkanicGalBridge.USAGE_SHADER_READ, false)
 					.hostRead(handles.readback, PIXEL_BYTES)
+					.largeBarrierBatch(handles.uploadTexture, LARGE_BATCH_BARRIER_COUNT)
 					.build();
 				VulkanicGalBridge.Status submitStatus = bridge.submit(submit);
 				submission = submitStatus.submissionId();
-				ffiCalls = submitStatus.ffiCalls();
-				ffiBytes = submitStatus.ffiInputBytes();
+				VulkanicGalBridge.Completion completion = pollCompletion(bridge, submission);
+				completionPolls++;
+				if (!completion.complete()) {
+					throw new IllegalStateException("Rust VulkanicGAL submission " + submission + " did not complete; backend completed " + completion.completedSubmissionId());
+				}
 				byte[] pixels = bridge.readback(submission, handles.readback, 0, PIXEL_BYTES);
 				hash = xxh32(pixels, 0x4d434741);
 				nonZero = nonZero(pixels);
-				bridge.retire(submission);
+				VulkanicGalBridge.Status retireStatus = bridge.retire(submission);
+				ffiCalls = retireStatus.ffiCalls();
+				ffiBytes = retireStatus.ffiInputBytes();
 			}
 		} catch (Throwable throwable) {
 			status = "failed";
 			error = throwable.getClass().getSimpleName() + ": " + throwable.getMessage();
 		}
-		return new BenchmarkResult(status, error, System.nanoTime() - started, submission, ffiCalls, ffiBytes, hash, nonZero);
+		return new BenchmarkResult(status, error, System.nanoTime() - started, submission, ffiCalls, ffiBytes, completionPolls, hash, nonZero);
+	}
+
+	private static VulkanicGalBridge.Completion pollCompletion(VulkanicGalBridge bridge, long submission) {
+		long deadline = System.nanoTime() + 2_000_000_000L;
+		VulkanicGalBridge.Completion completion = bridge.completion(submission);
+		while (!completion.complete() && System.nanoTime() < deadline) {
+			Thread.onSpinWait();
+			completion = bridge.completion(submission);
+		}
+		return completion;
 	}
 
 	private static Handles createResources(VulkanicGalBridge bridge, String backend) {
 		String vertexShader = backend.equalsIgnoreCase("rust-vulkan") ? VERTEX_SHADER_VULKAN : VERTEX_SHADER_OPENGL;
+		String fragmentShader = backend.equalsIgnoreCase("rust-vulkan") ? FRAGMENT_SHADER_VULKAN : FRAGMENT_SHADER_OPENGL;
 		VulkanicGalBridge.ResourceResults base = bridge.resourceBatch(
 			bridge.resourceBatchBuilder()
 				.buffer(1, "java.upload.texture", 64, VulkanicGalBridge.MEMORY_UPLOAD, VulkanicGalBridge.BUFFER_TRANSFER_SRC | VulkanicGalBridge.BUFFER_TRANSFER_DST | VulkanicGalBridge.BUFFER_HOST_WRITE)
@@ -102,7 +127,7 @@ final class RustGraphicsSubsystemBenchmark {
 				.texture(9, "java.depth", VulkanicGalBridge.FORMAT_DEPTH32, WIDTH, HEIGHT, VulkanicGalBridge.TEXTURE_DEPTH_STENCIL_ATTACHMENT)
 				.sampler(10, "java.sampler")
 				.shader(11, "java.vertex", VulkanicGalBridge.SHADER_VERTEX, vertexShader)
-				.shader(12, "java.fragment", VulkanicGalBridge.SHADER_FRAGMENT, FRAGMENT_SHADER)
+				.shader(12, "java.fragment", VulkanicGalBridge.SHADER_FRAGMENT, fragmentShader)
 				.build());
 		long uploadTexture = base.handle(0);
 		long index = base.handle(1);
@@ -164,7 +189,15 @@ final class RustGraphicsSubsystemBenchmark {
 		VulkanicGalBridge.ResourceResults pass = bridge.resourceBatch(
 			bridge.resourceBatchBuilder().renderPass(43, "java.pass", target).build());
 
-		return new Handles(uploadTexture, index, readback, sampledTexture, colorTexture, depthTexture, colorView, depthView, pipeline, pipelineLayoutHandle, resourceSet, target, pass.handle(0));
+		return new Handles(uploadTexture, index, uniformA, uniformB, storage, readback, sampledTexture, colorTexture, depthTexture, colorView, depthView, pipeline, pipelineLayoutHandle, resourceSet, target, pass.handle(0));
+	}
+
+	private static byte[] uniformBytes(int iteration, int salt) {
+		byte[] bytes = new byte[64];
+		for (int i = 0; i < bytes.length; i++) {
+			bytes[i] = (byte)(iteration * 17 + salt * 31 + i);
+		}
+		return bytes;
 	}
 
 	private static byte[] textureBytes() {
@@ -242,8 +275,9 @@ final class RustGraphicsSubsystemBenchmark {
 				+ "    \"nonZeroPixelBytes\": " + result.nonZero() + ",\n"
 				+ "    \"ffiCalls\": " + result.ffiCalls() + ",\n"
 				+ "    \"ffiInputBytes\": " + result.ffiBytes() + ",\n"
+				+ "    \"completionPolls\": " + result.completionPolls() + ",\n"
 				+ "    \"lastSubmission\": " + result.submission() + ",\n"
-				+ "    \"counts\": { \"draw\": " + iterations + ", \"dispatch\": 0, \"pass\": " + iterations + ", \"transfer\": " + (iterations * 4) + ", \"pipeline\": 1, \"resource\": 22, \"descriptor\": 1, \"apiCall\": " + result.ffiCalls() + " }\n"
+				+ "    \"counts\": { \"draw\": " + iterations + ", \"dispatch\": 0, \"pass\": " + iterations + ", \"transfer\": " + (iterations * 7) + ", \"pipeline\": 1, \"resource\": 22, \"descriptor\": 1, \"command\": " + (iterations * (25 + LARGE_BATCH_BARRIER_COUNT)) + ", \"apiCall\": " + result.ffiCalls() + " }\n"
 				+ "  }]\n"
 				+ "}\n", StandardCharsets.UTF_8);
 		} catch (IOException ignored) {
@@ -257,6 +291,9 @@ final class RustGraphicsSubsystemBenchmark {
 	private record Handles(
 		long uploadTexture,
 		long index,
+		long uniformA,
+		long uniformB,
+		long storage,
 		long readback,
 		long sampledTexture,
 		long colorTexture,
@@ -271,9 +308,9 @@ final class RustGraphicsSubsystemBenchmark {
 	) {
 	}
 
-	private record BenchmarkResult(String status, String error, long nanos, long submission, long ffiCalls, long ffiBytes, int hash, int nonZero) {
+	private record BenchmarkResult(String status, String error, long nanos, long submission, long ffiCalls, long ffiBytes, int completionPolls, int hash, int nonZero) {
 		static BenchmarkResult failed(String error) {
-			return new BenchmarkResult("failed", error, 0, 0, 0, 0, 0, 0);
+			return new BenchmarkResult("failed", error, 0, 0, 0, 0, 0, 0, 0);
 		}
 	}
 
@@ -319,13 +356,24 @@ final class RustGraphicsSubsystemBenchmark {
 		}
 		""";
 
-	private static final String FRAGMENT_SHADER = """
+	private static final String FRAGMENT_SHADER_OPENGL = """
 		#version 330 core
 		uniform sampler2D tex0;
 		in vec2 v_uv;
 		out vec4 out_color;
 		void main() {
 		    out_color = texture(tex0, v_uv) * vec4(1.0, 1.0, 1.0, 0.75);
+		}
+		""";
+
+	private static final String FRAGMENT_SHADER_VULKAN = """
+		#version 450
+		layout(set = 0, binding = 0) uniform texture2D tex0;
+		layout(set = 0, binding = 1) uniform sampler samp0;
+		layout(location = 0) in vec2 v_uv;
+		layout(location = 0) out vec4 out_color;
+		void main() {
+		    out_color = texture(sampler2D(tex0, samp0), v_uv) * vec4(1.0, 1.0, 1.0, 0.75);
 		}
 		""";
 }

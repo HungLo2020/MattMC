@@ -281,6 +281,7 @@ class CaptureRunner:
             f"renderdoc_capture_path={os.environ.get('MATTMC_RENDERDOC_CAPTURE_PATH', '')}",
             f"renderdoc_vulkan_layer_manifest={os.environ.get('MATTMC_RENDERDOC_VULKAN_LAYER_MANIFEST', '')}",
             f"tracy_capture={os.environ.get('MATTMC_TRACY_CAPTURE', 'false')}",
+            f"rust_tracy={os.environ.get('MATTMC_RUST_TRACY', 'false')}",
             f"tracy_duration_seconds={os.environ.get('MATTMC_TRACY_DURATION_SECONDS', '0')}",
             f"tracy_max_size_mb={os.environ.get('MATTMC_TRACY_MAX_SIZE_MB', '0')}",
             f"shader_input_parity={self.config.shader_input_parity}",
@@ -441,14 +442,15 @@ class CaptureRunner:
             self.validation_layer_manifest = str(manifest)
             self.validation_layer_dir = str(manifest.parent)
             self.validation_layer_available = True
+        is_vulkan_validation_backend = self.config.backend in {"vulkan", "rust-vulkan"}
         if (
-            self.config.backend == "vulkan"
+            is_vulkan_validation_backend
             and self.config.validation_mode == "standard"
             and self.validation_layer_available
         ):
             self.validation_enabled = True
 
-        if self.config.validation_mode != "off" and self.config.backend != "vulkan":
+        if self.config.validation_mode != "off" and not is_vulkan_validation_backend:
             self.append_meta("validation_note=ignored_for_non_vulkan_backend")
         elif self.config.validation_mode != "off" and not self.validation_enabled:
             self.append_meta("validation_note=requested_but_khronos_layer_unavailable")
