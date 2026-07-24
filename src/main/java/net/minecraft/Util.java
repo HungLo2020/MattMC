@@ -12,8 +12,8 @@ import com.mojang.datafixers.Typed;
 import com.mojang.datafixers.DSL.TypeReference;
 import com.mojang.datafixers.types.Type;
 import com.mojang.datafixers.util.Pair;
-import com.mojang.jtracy.TracyClient;
-import com.mojang.jtracy.Zone;
+import net.minecraft.util.profiling.TracyCompat;
+import net.minecraft.util.profiling.TracyCompat.Zone;
 import net.logging.LogUtils;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.Dynamic;
@@ -156,7 +156,7 @@ public class Util {
 				final String string2 = "Worker-" + string + "-" + atomicInteger.getAndIncrement();
 				ForkJoinWorkerThread forkJoinWorkerThread = new ForkJoinWorkerThread(forkJoinPool) {
 					protected void onStart() {
-						TracyClient.setThreadName(string2, string.hashCode());
+						TracyCompat.setThreadName(string2, string.hashCode());
 						super.onStart();
 					}
 
@@ -225,7 +225,7 @@ public class Util {
 		return new TracingExecutor(Executors.newCachedThreadPool(runnable -> {
 			Thread thread = new Thread(runnable);
 			String string2 = string + atomicInteger.getAndIncrement();
-			TracyClient.setThreadName(string2, string.hashCode());
+			TracyCompat.setThreadName(string2, string.hashCode());
 			thread.setName(string2);
 			thread.setDaemon(bl);
 			thread.setUncaughtExceptionHandler(Util::onThreadException);
@@ -280,13 +280,13 @@ public class Util {
 			String string2 = thread.getName();
 			thread.setName(string);
 
-			try (Zone zone = TracyClient.beginZone(string, SharedConstants.IS_RUNNING_IN_IDE)) {
+			try (Zone zone = TracyCompat.beginZone(string, SharedConstants.IS_RUNNING_IN_IDE)) {
 				runnable.run();
 			} finally {
 				thread.setName(string2);
 			}
 		} else {
-			try (Zone zone2 = TracyClient.beginZone(string, SharedConstants.IS_RUNNING_IN_IDE)) {
+			try (Zone zone2 = TracyCompat.beginZone(string, SharedConstants.IS_RUNNING_IN_IDE)) {
 				runnable.run();
 			}
 		}

@@ -3,7 +3,7 @@ package net.minecraft.client.main;
 import net.blaze3d.TracyBootstrap;
 import net.blaze3d.platform.DisplayData;
 import net.vulkanic.VulkanicAPI;
-import com.mojang.jtracy.TracyClient;
+import net.minecraft.util.profiling.TracyCompat;
 import net.logging.LogUtils;
 import net.minecraft.util.UndashedUuid;
 import java.io.File;
@@ -165,7 +165,7 @@ public class Main {
 			if (!optionSet.has(optionSpec3) && Boolean.getBoolean("mattmc.dev.tracyCapture")) {
 				TracyBootstrap.setup();
 			}
-			TracyClient.reportAppInfo("Minecraft Java Edition " + SharedConstants.getCurrentVersion().name());
+			TracyCompat.reportAppInfo("Minecraft Java Edition " + SharedConstants.getCurrentVersion().name());
 			CompletableFuture<?> completableFuture = DataFixers.optimize(DataFixTypes.TYPES_FOR_LEVEL_LIST);
 			CrashReport.preload();
 			logger = LogUtils.getLogger();

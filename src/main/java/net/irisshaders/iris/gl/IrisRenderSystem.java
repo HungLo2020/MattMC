@@ -1,7 +1,7 @@
 package net.irisshaders.iris.gl;
 
-import com.mojang.jtracy.Plot;
-import com.mojang.jtracy.TracyClient;
+import net.minecraft.util.profiling.TracyCompat.Plot;
+import net.minecraft.util.profiling.TracyCompat;
 import net.blaze3d.ProjectionType;
 import net.blaze3d.buffers.GpuBufferSlice;
 import net.blaze3d.systems.RenderSystem;
@@ -57,9 +57,9 @@ public class IrisRenderSystem {
 	private static final int TEXTURE_UNIT_COUNT = 128;
 	private static int activeTextureUnitIndex;
 	private static final int[] textureBindings = new int[TEXTURE_UNIT_COUNT];
-	private static final Plot PLOT_BUFFERS = TracyClient.createPlot("GPU Buffers");
+	private static final Plot PLOT_BUFFERS = TracyCompat.createPlot("GPU Buffers");
 	private static int numBuffers = 0;
-	private static final Plot PLOT_TEXTURES = TracyClient.createPlot("GPU Textures");
+	private static final Plot PLOT_TEXTURES = TracyCompat.createPlot("GPU Textures");
 	private static int numTextures = 0;
 	private static final VulkanicResourceBarriers COMPUTE_WRITES_VISIBLE_TO_TEXTURE_SAMPLING =
 		VulkanicResourceBarriers.computeWritesVisibleToTextureSampling();

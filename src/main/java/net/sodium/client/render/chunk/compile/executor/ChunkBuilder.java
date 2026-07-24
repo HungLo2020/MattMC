@@ -1,7 +1,7 @@
 package net.sodium.client.render.chunk.compile.executor;
 
-import com.mojang.jtracy.TracyClient;
-import com.mojang.jtracy.Zone;
+import net.minecraft.util.profiling.TracyCompat;
+import net.minecraft.util.profiling.TracyCompat.Zone;
 import net.sodium.client.SodiumClientMod;
 import net.sodium.client.render.chunk.compile.BuilderTaskOutput;
 import net.sodium.client.render.chunk.compile.ChunkBuildContext;
@@ -188,7 +188,7 @@ public class ChunkBuilder {
 
                     ChunkBuilder.this.busyThreadCount.getAndIncrement();
 
-                    Zone zone = TracyClient.beginZone(name, SharedConstants.IS_RUNNING_IN_IDE);
+                    Zone zone = TracyCompat.beginZone(name, SharedConstants.IS_RUNNING_IN_IDE);
 
                     try {
                         job.execute(this.context);

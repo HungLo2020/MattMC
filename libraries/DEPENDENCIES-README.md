@@ -33,8 +33,11 @@ This downloads all required dependencies (~30+ JARs total):
 - brigadier-1.3.10.jar
 - datafixerupper-8.0.16.jar
 - logging-1.2.7.jar
-- jtracy-1.0.29.jar
-- jtracy-1.0.29-natives-linux.jar
+
+**Dev observability note:** jtracy is intentionally not bundled here. Tracy Java
+client/native artifacts are resolved through Gradle's normal external cache only
+for explicitly instrumented dev launches, and are excluded from production
+runtime/export classpaths.
 
 **Fabric Loader Dependencies (for integrated Fabric source):**
 - mapping-io-0.7.1.jar (net.fabricmc.mappingio.* - mapping I/O with built-in Tiny v1/v2 support)

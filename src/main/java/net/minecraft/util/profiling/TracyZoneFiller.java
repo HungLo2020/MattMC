@@ -1,7 +1,7 @@
 package net.minecraft.util.profiling;
 
-import com.mojang.jtracy.Plot;
-import com.mojang.jtracy.TracyClient;
+import net.minecraft.util.profiling.TracyCompat.Plot;
+import net.minecraft.util.profiling.TracyCompat;
 import net.logging.LogUtils;
 import java.lang.StackWalker.Option;
 import java.lang.StackWalker.StackFrame;
@@ -19,7 +19,7 @@ import org.slf4j.Logger;
 public class TracyZoneFiller implements ProfilerFiller {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final StackWalker STACK_WALKER = StackWalker.getInstance(Set.of(Option.RETAIN_CLASS_REFERENCE), 5);
-	private final List<com.mojang.jtracy.Zone> activeZones = new ArrayList();
+	private final List<TracyCompat.Zone> activeZones = new ArrayList();
 	private final Map<String, TracyZoneFiller.PlotAndValue> plots = new HashMap();
 	private final String name = Thread.currentThread().getName();
 
@@ -54,7 +54,7 @@ public class TracyZoneFiller implements ProfilerFiller {
 			}
 		}
 
-		com.mojang.jtracy.Zone zone = TracyClient.beginZone(string, string2, string3, i);
+		TracyCompat.Zone zone = TracyCompat.beginZone(string, string2, string3, i);
 		this.activeZones.add(zone);
 	}
 
@@ -68,7 +68,7 @@ public class TracyZoneFiller implements ProfilerFiller {
 		if (this.activeZones.isEmpty()) {
 			LOGGER.error("Tried to pop one too many times! Mismatched push() and pop()?");
 		} else {
-			com.mojang.jtracy.Zone zone = (com.mojang.jtracy.Zone)this.activeZones.removeLast();
+			TracyCompat.Zone zone = (TracyCompat.Zone)this.activeZones.removeLast();
 			zone.close();
 		}
 	}
@@ -99,8 +99,8 @@ public class TracyZoneFiller implements ProfilerFiller {
 		this.incrementCounter((String)supplier.get(), i);
 	}
 
-	private com.mojang.jtracy.Zone activeZone() {
-		return (com.mojang.jtracy.Zone)this.activeZones.getLast();
+	private TracyCompat.Zone activeZone() {
+		return (TracyCompat.Zone)this.activeZones.getLast();
 	}
 
 	@Override
@@ -123,7 +123,7 @@ public class TracyZoneFiller implements ProfilerFiller {
 		private int value;
 
 		PlotAndValue(String string) {
-			this.plot = TracyClient.createPlot(string);
+			this.plot = TracyCompat.createPlot(string);
 			this.value = 0;
 		}
 

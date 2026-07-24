@@ -1,6 +1,6 @@
 package net.blaze3d;
 
-import com.mojang.jtracy.TracyClient;
+import net.minecraft.util.profiling.TracyCompat;
 import net.logging.LogListeners;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
@@ -12,9 +12,9 @@ public class TracyBootstrap {
 
 	public static void setup() {
 		if (!setup) {
-			TracyClient.load();
-			if (TracyClient.isAvailable()) {
-				LogListeners.addListener("Tracy", (string, level) -> TracyClient.message(string, messageColor(level)));
+			TracyCompat.load();
+			if (TracyCompat.isAvailable()) {
+				LogListeners.addListener("Tracy", (string, level) -> TracyCompat.message(string, messageColor(level)));
 				setup = true;
 			}
 		}

@@ -1,8 +1,8 @@
 package net.blaze3d.opengl;
 
 import net.blaze3d.buffers.GpuBuffer;
-import com.mojang.jtracy.MemoryPool;
-import com.mojang.jtracy.TracyClient;
+import net.minecraft.util.profiling.TracyCompat.MemoryPool;
+import net.minecraft.util.profiling.TracyCompat;
 import java.nio.ByteBuffer;
 import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
@@ -12,7 +12,7 @@ import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public class GlBuffer extends GpuBuffer {
-	protected static final MemoryPool MEMORY_POOl = TracyClient.createMemoryPool("GPU Buffers");
+	protected static final MemoryPool MEMORY_POOl = TracyCompat.createMemoryPool("GPU Buffers");
 	protected boolean closed;
 	@Nullable
 	protected final Supplier<String> label;

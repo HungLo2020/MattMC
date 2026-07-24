@@ -2,8 +2,8 @@ package net.minecraft.util.thread;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Queues;
-import com.mojang.jtracy.TracyClient;
-import com.mojang.jtracy.Zone;
+import net.minecraft.util.profiling.TracyCompat;
+import net.minecraft.util.profiling.TracyCompat.Zone;
 import net.logging.LogUtils;
 import java.util.List;
 import java.util.Queue;
@@ -146,7 +146,7 @@ public abstract class BlockableEventLoop<R extends Runnable> implements Profiler
 	}
 
 	protected void doRunTask(R runnable) {
-		try (Zone zone = TracyClient.beginZone("Task", SharedConstants.IS_RUNNING_IN_IDE)) {
+		try (Zone zone = TracyCompat.beginZone("Task", SharedConstants.IS_RUNNING_IN_IDE)) {
 			runnable.run();
 		} catch (Exception var7) {
 			LOGGER.error(LogUtils.FATAL_MARKER, "Error executing task on {}", this.name(), var7);

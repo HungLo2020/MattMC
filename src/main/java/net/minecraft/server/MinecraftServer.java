@@ -8,8 +8,8 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.datafixers.DataFixer;
-import com.mojang.jtracy.DiscontinuousFrame;
-import com.mojang.jtracy.TracyClient;
+import net.minecraft.util.profiling.TracyCompat.DiscontinuousFrame;
+import net.minecraft.util.profiling.TracyCompat;
 import net.logging.LogUtils;
 import com.mojang.serialization.Lifecycle;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -338,7 +338,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 			this.potionBrewing = PotionBrewing.bootstrap(this.worldData.enabledFeatures());
 			this.resources.managers.getRecipeManager().finalizeRecipeLoading(this.worldData.enabledFeatures());
 			this.fuelValues = FuelValues.vanillaBurnTimes(this.registries.compositeAccess(), this.worldData.enabledFeatures());
-			this.tickFrame = TracyClient.createDiscontinuousFrame("Server Tick");
+			this.tickFrame = TracyCompat.createDiscontinuousFrame("Server Tick");
 			this.notificationManager = new NotificationManager();
 			this.packetProcessor = new PacketProcessor(thread);
 		}

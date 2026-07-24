@@ -1,7 +1,7 @@
 package net.blaze3d.platform;
 
-import com.mojang.jtracy.MemoryPool;
-import com.mojang.jtracy.TracyClient;
+import net.minecraft.util.profiling.TracyCompat.MemoryPool;
+import net.minecraft.util.profiling.TracyCompat;
 import net.logging.LogUtils;
 import java.io.File;
 import java.io.IOException;
@@ -39,7 +39,7 @@ import org.slf4j.Logger;
 @Environment(EnvType.CLIENT)
 public final class NativeImage implements AutoCloseable {
 	private static final Logger LOGGER = LogUtils.getLogger();
-	private static final MemoryPool MEMORY_POOL = TracyClient.createMemoryPool("NativeImage");
+	private static final MemoryPool MEMORY_POOL = TracyCompat.createMemoryPool("NativeImage");
 	private static final Set<StandardOpenOption> OPEN_OPTIONS = EnumSet.of(
 		StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING
 	);

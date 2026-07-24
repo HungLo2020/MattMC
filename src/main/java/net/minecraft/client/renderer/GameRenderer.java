@@ -11,7 +11,7 @@ import net.blaze3d.shaders.ShaderType;
 import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.vertex.PoseStack;
-import com.mojang.jtracy.TracyClient;
+import net.minecraft.util.profiling.TracyCompat;
 import net.logging.LogUtils;
 import net.math.Axis;
 import java.io.IOException;
@@ -356,7 +356,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		};
 		VulkanicAPI.precompileRenderPipeline(RenderPipelines.GUI, biFunction);
 		VulkanicAPI.precompileRenderPipeline(RenderPipelines.GUI_TEXTURED, biFunction);
-		if (TracyClient.isAvailable()) {
+		if (TracyCompat.isAvailable()) {
 			VulkanicAPI.precompileRenderPipeline(RenderPipelines.TRACY_BLIT, biFunction);
 		}
 	}

@@ -7,7 +7,7 @@ import net.blaze3d.systems.RenderPass;
 import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.textures.TextureFormat;
-import com.mojang.jtracy.TracyClient;
+import net.minecraft.util.profiling.TracyCompat;
 import java.util.OptionalInt;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
@@ -91,7 +91,7 @@ public class TracyFrameCapture implements AutoCloseable {
 			this.status = TracyFrameCapture.Status.WAITING_FOR_CAPTURE;
 
 			try (GpuBuffer.MappedView mappedView = net.vulkanic.VulkanicAPI.createCommandEncoder().mapBuffer(this.pixelbuffer, true, false)) {
-				TracyClient.frameImage(mappedView.data(), this.width, this.height, this.lastCaptureDelay, true);
+				TracyCompat.frameImage(mappedView.data(), this.width, this.height, this.lastCaptureDelay, true);
 			}
 		}
 	}
@@ -99,7 +99,7 @@ public class TracyFrameCapture implements AutoCloseable {
 	public void endFrame() {
 		this.lastCaptureDelay++;
 		this.capturedThisFrame = false;
-		TracyClient.markFrame();
+		TracyCompat.markFrame();
 	}
 
 	public void close() {

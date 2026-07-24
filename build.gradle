@@ -15,6 +15,14 @@ def lwjglNatives = System.getProperty('os.name').toLowerCase().contains('mac')
         : (System.getProperty('os.arch').contains('arm') || System.getProperty('os.arch').contains('aarch64')) 
             ? 'natives-linux-arm64' 
             : 'natives-linux'
+def jtracyVersion = '1.0.29'
+def jtracyNatives = System.getProperty('os.name').toLowerCase().contains('mac')
+    ? (System.getProperty('os.arch').contains('aarch64') || System.getProperty('os.arch').contains('arm64') ? 'natives-macos-arm64' : 'natives-macos')
+    : System.getProperty('os.name').toLowerCase().contains('win')
+        ? (System.getProperty('os.arch').contains('64') ? 'natives-windows' : 'natives-windows-x86')
+        : (System.getProperty('os.arch').contains('arm') || System.getProperty('os.arch').contains('aarch64'))
+            ? 'natives-linux-arm64'
+            : 'natives-linux'
 
 // Read Java version from gradle.properties and make it available throughout the build script
 ext.targetJavaVersion = project.hasProperty('java_version') ? Integer.parseInt(project.property('java_version').toString()) : 25
@@ -46,6 +54,16 @@ repositories {
     // Maven Central (for most dependencies not in bundled set)
     mavenCentral()
     
+    // Mojang libraries are resolved through Gradle's normal cache. Dev-only
+    // observability tools such as jtracy must not be vendored into libraries/deps.
+    maven {
+        url = 'https://libraries.minecraft.net'
+        content {
+            includeGroup 'com.mojang'
+            includeGroup 'net.minecraft'
+        }
+    }
+
     // Only add specialized remote repositories if bundled dependencies are NOT available
     if (!useBundledDeps) {
         println "⚠ Bundled dependencies not found. Using remote repositories."
@@ -56,14 +74,6 @@ repositories {
             url = 'https://maven.fabricmc.net/'
         }
         
-        // Minecraft libraries (primary source for Mojang dependencies)
-        maven { 
-            url = 'https://libraries.minecraft.net'
-            content {
-                includeGroup 'com.mojang'
-                includeGroup 'net.minecraft'
-            }
-        }
         // JitPack for open-source Mojang libraries
         maven { 
             url = 'https://jitpack.io'
@@ -71,6 +81,14 @@ repositories {
                 includeGroup 'com.github.Mojang'
             }
         }
+    }
+}
+
+configurations {
+    tracyDevRuntime {
+        canBeConsumed = false
+        canBeResolved = true
+        description = 'Dev-only Tracy Java client and platform natives. Never part of production runtimeClasspath or exports.'
     }
 }
 
@@ -101,14 +119,13 @@ dependencies {
     if (useBundledDeps) {
         implementation files('libraries/deps/brigadier-1.3.10.jar')
         implementation files('libraries/deps/datafixerupper-8.0.16.jar')
-        implementation files('libraries/deps/jtracy-1.0.29.jar')
-        runtimeOnly files('libraries/deps/jtracy-1.0.29-natives-linux.jar')
     } else {
         implementation 'com.mojang:brigadier:1.3.10'
         implementation 'com.mojang:datafixerupper:8.0.16'
-        implementation 'com.mojang:jtracy:1.0.29'
-        runtimeOnly 'com.mojang:jtracy:1.0.29:natives-linux'
     }
+
+    tracyDevRuntime "com.mojang:jtracy:${jtracyVersion}"
+    tracyDevRuntime "com.mojang:jtracy:${jtracyVersion}:${jtracyNatives}"
     
     // Google libraries
     implementation 'com.google.guava:guava:32.1.2-jre'
@@ -515,10 +532,28 @@ tasks.withType(Test).configureEach {
     }
 }
 
+def devTracyRequested = {
+    if (providers.gradleProperty('mattmcDevTracy').orElse('false').get().toBoolean()) {
+        return true
+    }
+    if (System.getProperty('mattmc.dev.tracyCapture', 'false').toBoolean()) {
+        return true
+    }
+    if (System.getenv('MATTMC_TRACY_CAPTURE') == 'true') {
+        return true
+    }
+    def javaToolOptions = System.getenv('JAVA_TOOL_OPTIONS') ?: ''
+    return javaToolOptions.contains('-Dmattmc.dev.tracyCapture=true')
+}
+
 tasks.withType(JavaExec).configureEach {
     dependsOn 'buildRustNative'
     doFirst {
         jvmArgs rustNativeJvmArgs
+        if (devTracyRequested()) {
+            classpath += configurations.tracyDevRuntime
+            logger.lifecycle("✓ Added dev-only jtracy runtime for this JavaExec launch (${jtracyNatives})")
+        }
     }
 }
 

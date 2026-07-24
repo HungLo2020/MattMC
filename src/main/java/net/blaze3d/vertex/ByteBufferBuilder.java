@@ -1,7 +1,7 @@
 package net.blaze3d.vertex;
 
-import com.mojang.jtracy.MemoryPool;
-import com.mojang.jtracy.TracyClient;
+import net.minecraft.util.profiling.TracyCompat.MemoryPool;
+import net.minecraft.util.profiling.TracyCompat;
 import net.logging.LogUtils;
 import java.nio.ByteBuffer;
 import net.minecraft.api.EnvType;
@@ -14,7 +14,7 @@ import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
 public class ByteBufferBuilder implements AutoCloseable, net.irisshaders.iris.vertices.MojangBufferAccessor {
-	private static final MemoryPool MEMORY_POOL = TracyClient.createMemoryPool("ByteBufferBuilder");
+	private static final MemoryPool MEMORY_POOL = TracyCompat.createMemoryPool("ByteBufferBuilder");
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final MemoryAllocator ALLOCATOR = MemoryUtil.getAllocator(false);
 	private static final long DEFAULT_MAX_CAPACITY = 4294967295L;

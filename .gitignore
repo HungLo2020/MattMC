@@ -43,6 +43,10 @@ __pycache__/
 # JDK (too large to commit)
 /libraries/jdk/
 
+# Tracy Java/native artifacts are dev-only and must resolve through Gradle's
+# external cache, not the repo-local offline dependency bundle.
+/libraries/deps/jtracy-*.jar
+
 # Data generation output
 generated/
 

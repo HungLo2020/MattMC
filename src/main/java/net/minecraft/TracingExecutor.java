@@ -1,7 +1,7 @@
 package net.minecraft;
 
-import com.mojang.jtracy.TracyClient;
-import com.mojang.jtracy.Zone;
+import net.minecraft.util.profiling.TracyCompat;
+import net.minecraft.util.profiling.TracyCompat.Zone;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -19,15 +19,15 @@ public record TracingExecutor(ExecutorService service) implements Executor {
 				String string2 = thread.getName();
 				thread.setName(string);
 
-				try (Zone zone = TracyClient.beginZone(string, SharedConstants.IS_RUNNING_IN_IDE)) {
+				try (Zone zone = TracyCompat.beginZone(string, SharedConstants.IS_RUNNING_IN_IDE)) {
 					runnable.run();
 				} finally {
 					thread.setName(string2);
 				}
 			});
 		} else {
-			return TracyClient.isAvailable() ? (Executor)(runnable -> this.service.execute(() -> {
-				try (Zone zone = TracyClient.beginZone(string, SharedConstants.IS_RUNNING_IN_IDE)) {
+			return TracyCompat.isAvailable() ? (Executor)(runnable -> this.service.execute(() -> {
+				try (Zone zone = TracyCompat.beginZone(string, SharedConstants.IS_RUNNING_IN_IDE)) {
 					runnable.run();
 				}
 			})) : this.service;
@@ -54,8 +54,8 @@ public record TracingExecutor(ExecutorService service) implements Executor {
 	}
 
 	private static Runnable wrapUnnamed(Runnable runnable) {
-		return !TracyClient.isAvailable() ? runnable : () -> {
-			try (Zone zone = TracyClient.beginZone("task", SharedConstants.IS_RUNNING_IN_IDE)) {
+		return !TracyCompat.isAvailable() ? runnable : () -> {
+			try (Zone zone = TracyCompat.beginZone("task", SharedConstants.IS_RUNNING_IN_IDE)) {
 				runnable.run();
 			}
 		};

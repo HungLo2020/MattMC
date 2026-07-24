@@ -30,8 +30,8 @@ import net.blaze3d.systems.TimerQuery;
 import net.blaze3d.vertex.Tesselator;
 import net.vulkanic.VulkanicAPI;
 import com.mojang.datafixers.DataFixer;
-import com.mojang.jtracy.DiscontinuousFrame;
-import com.mojang.jtracy.TracyClient;
+import net.minecraft.util.profiling.TracyCompat.DiscontinuousFrame;
+import net.minecraft.util.profiling.TracyCompat;
 import net.logging.LogUtils;
 import java.io.File;
 import java.io.IOException;
@@ -695,7 +695,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.quickPlayLog = QuickPlayLog.of(gameConfig.quickPlay.logPath());
 		this.framerateLimitTracker = new FramerateLimitTracker(this.options, this);
 		this.fpsPieProfiler = new ContinuousProfiler(Util.timeSource, () -> this.fpsPieRenderTicks, this.framerateLimitTracker::isHeavilyThrottled);
-		if (TracyClient.isAvailable() && gameConfig.game.captureTracyImages) {
+		if (TracyCompat.isAvailable() && gameConfig.game.captureTracyImages) {
 			this.tracyFrameCapture = new TracyFrameCapture();
 		} else {
 			this.tracyFrameCapture = null;
@@ -908,7 +908,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			this.gameThread.setPriority(10);
 		}
 
-		DiscontinuousFrame discontinuousFrame = TracyClient.createDiscontinuousFrame("Client Tick");
+		DiscontinuousFrame discontinuousFrame = TracyCompat.createDiscontinuousFrame("Client Tick");
 
 		try {
 			boolean bl = false;

@@ -1,7 +1,7 @@
 package net.minecraft.client.dev;
 
-import com.mojang.jtracy.TracyClient;
-import com.mojang.jtracy.Zone;
+import net.minecraft.util.profiling.TracyCompat;
+import net.minecraft.util.profiling.TracyCompat.Zone;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.player.Input;
@@ -120,7 +120,7 @@ public final class GraphicsFrameBenchmark {
 			gcTimeAtStart = totalGcTimeMillis();
 			usedMemoryAtStart = usedMemoryBytes();
 			if (tracyAvailable()) {
-				TracyClient.message("MattMC graphics gameplay measurement start");
+				TracyCompat.message("MattMC graphics gameplay measurement start");
 			}
 		}
 	}
@@ -139,13 +139,13 @@ public final class GraphicsFrameBenchmark {
 		}
 		endPhase("java.frame.render-production");
 		if (tracyAvailable()) {
-			TracyClient.markFrame();
+			TracyCompat.markFrame();
 		}
 		frameIndex++;
 		if (FRAME_NANOS.size() >= MEASURE_FRAMES) {
 			complete = true;
 			if (tracyAvailable()) {
-				TracyClient.message("MattMC graphics gameplay measurement complete");
+				TracyCompat.message("MattMC graphics gameplay measurement complete");
 			}
 			writeStatus(minecraft, "complete");
 			if (STOP_AFTER_COMPLETE && !stopIssued) {
@@ -209,7 +209,7 @@ public final class GraphicsFrameBenchmark {
 		if (!tracyAvailable()) {
 			return null;
 		}
-		return TracyClient.beginZone(name, false);
+		return TracyCompat.beginZone(name, false);
 	}
 
 	public static void closeTracyZone(Zone zone) {
@@ -220,12 +220,12 @@ public final class GraphicsFrameBenchmark {
 
 	public static void tracyMessage(String message) {
 		if (tracyAvailable()) {
-			TracyClient.message(message);
+			TracyCompat.message(message);
 		}
 	}
 
 	private static boolean tracyAvailable() {
-		return TRACY_ENABLED && TracyClient.isAvailable();
+		return TRACY_ENABLED && TracyCompat.isAvailable();
 	}
 
 	private static boolean ensureInitialized(Minecraft minecraft) {
