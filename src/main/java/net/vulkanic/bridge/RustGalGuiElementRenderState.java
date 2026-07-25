@@ -16,6 +16,7 @@ public record RustGalGuiElementRenderState(
 	String producerId,
 	int selectedSlot,
 	float progressFraction,
+	RustGalFrameQueue.FillDirection fillDirection,
 	int sourceX,
 	int sourceY,
 	int sourceWidth,
@@ -62,6 +63,9 @@ public record RustGalGuiElementRenderState(
 		}
 		if (this.progressFraction >= 0.0F) {
 			context += ":progress=" + this.progressFraction;
+		}
+		if (this.fillDirection != RustGalFrameQueue.FillDirection.NONE) {
+			context += ":fill=" + this.fillDirection.id();
 		}
 		return context;
 	}

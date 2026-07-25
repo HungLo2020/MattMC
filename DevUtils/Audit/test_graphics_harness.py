@@ -27,6 +27,10 @@ def fake_repo(root: Path, name: str) -> harness.RepoTarget:
     return harness.RepoTarget(name, repo, "current" if name == "current" else "frozen-java-reference")
 
 
+def fake_repo_path(root: Path, name: str) -> Path:
+    return fake_repo(root, name).root
+
+
 def write_capture(capture_dir: Path, *, backend: str = "opengl", shaders: str = "off", world: str = "Origin") -> None:
     capture_dir.mkdir(parents=True, exist_ok=True)
     (capture_dir / "meta_20260101_000000.txt").write_text(
@@ -87,7 +91,7 @@ def write_capture(capture_dir: Path, *, backend: str = "opengl", shaders: str = 
     )
 
 
-def write_frame_benchmark(capture_dir: Path, samples: list[int]) -> None:
+def write_frame_benchmark(capture_dir: Path, samples: list[int], rust_gal_line: str | None = None) -> None:
     (capture_dir / "graphics_frame_benchmark_20260101_000000.json").write_text(
         json.dumps(
             {
@@ -149,6 +153,7 @@ def write_frame_benchmark(capture_dir: Path, samples: list[int]) -> None:
                     "distant-horizons.lod-render": {"count": len(samples), "total": 4_000_000, "worst": 2_000_000},
                     "iris.composite-final": {"count": 2, "total": 6_000_000, "worst": 4_000_000},
                 },
+                "rustGalSliceMetricsLine": rust_gal_line,
                 "nestedPhaseNanos": {
                     "game.rendering": {"count": 2, "total": 30_000_000, "worst": 18_000_000},
                     "sodium.terrain.setup": {"count": len(samples), "total": 8_000_000, "worst": 4_000_000},
@@ -796,8 +801,7 @@ else:
         repo = Path(__file__).resolve().parents[2]
         with tempfile.TemporaryDirectory() as temp:
             temp_path = Path(temp)
-            frozen = temp_path / "frozen"
-            frozen.mkdir()
+            frozen = fake_repo_path(temp_path, "frozen")
             commands = (
                 repo / "DevUtils" / "PerfAudit" / "Gameplay.py",
                 repo / "DevUtils" / "PerfAudit" / "Subsystem.py",
@@ -829,6 +833,48 @@ else:
                 )
                 self.assertEqual(result.returncode, 0, f"{script}: {result.stderr}\n{result.stdout}")
                 self.assertTrue((artifact_dir / harness.MANIFEST_NAME).is_file(), script)
+
+    def test_configured_frozen_repo_path_exists_and_is_used(self) -> None:
+        repo = Path(__file__).resolve().parents[2]
+        frozen = harness.resolve_named_directory(repo, "java_perf_repo")
+        self.assertEqual(frozen, Path("/home/matt/Documents/Repos/MattMC_JavaPerfTesting/MattMC"))
+        self.assertEqual(harness.find_frozen_repo(repo), frozen)
+        self.assertTrue(frozen.is_dir(), frozen)
+        self.assertTrue((frozen / ".git").is_dir(), frozen)
+        self.assertTrue((frozen / "gradlew").is_file() or (frozen / "gradlew.bat").is_file(), frozen)
+
+    def test_dry_run_manifest_records_resolved_current_and_frozen_paths(self) -> None:
+        repo = Path(__file__).resolve().parents[2]
+        frozen = harness.find_frozen_repo(repo)
+        with tempfile.TemporaryDirectory() as temp:
+            artifact_dir = Path(temp) / "dry-run"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(repo / "DevUtils" / "Audit" / "Capture.py"),
+                    "--profile",
+                    "smoke",
+                    "--mode",
+                    "frozen-opengl-shaders-off",
+                    "--artifact-dir",
+                    str(artifact_dir),
+                    "--dry-run",
+                ],
+                cwd=repo,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+                timeout=20,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            manifest = json.loads((artifact_dir / harness.MANIFEST_NAME).read_text(encoding="utf-8"))
+            self.assertEqual(manifest["repository_resolution"]["current"], str(repo.resolve()))
+            self.assertEqual(manifest["repository_resolution"]["frozen"], str(frozen))
+            artifact_path = Path(manifest["results"][0]["artifact_path"])
+            artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+            self.assertEqual(artifact["repository_resolution"]["current"], str(repo.resolve()))
+            self.assertEqual(artifact["repository_resolution"]["frozen"], str(frozen))
 
     def test_legacy_artifact_without_runtime_profile_loads(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -1213,6 +1259,42 @@ else:
             self.assertNotIn("mattmc.rustGal.guiCrosshair.enabled", " ".join(command))
             self.assertIn("-Dmattmc.rustGal.guiCrosshair.enabled=true", env["JAVA_TOOL_OPTIONS"])
 
+    def test_gameplay_passes_armor_controls_without_per_frame_slice_logging(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            args = Namespace(
+                profile="smoke",
+                validation="off",
+                client_args="",
+                jvm_arg=[],
+                rust_gal_gui_control="legacy",
+                armor_value=19,
+                game_mode="survival",
+                world="Origin",
+                max_secs=1,
+                dump_secs=1,
+                client_rss_limit_mb=128,
+                diagnostic=False,
+                warmup_frames=0,
+                measure_frames=1,
+                settle_frames=0,
+                max_settle_frames=1,
+                subsystem_iterations=1,
+                tracy_capture=False,
+                tracy_duration_seconds=1,
+                tracy_max_size_mb=8,
+                renderdoc_capture=False,
+                renderdoc_frame=8,
+            )
+            command, env = harness.build_capture_command(target, harness.MATRIX_MODES[0], root / "capture", "gameplay", args, "gameplay")
+
+            self.assertNotIn("mattmc.dev.graphicsAuditSliceMetrics", " ".join(command))
+            self.assertNotIn("-Dmattmc.dev.graphicsAuditSliceMetrics=true", env["JAVA_TOOL_OPTIONS"])
+            self.assertIn("-Dmattmc.dev.rustGalGui.armor.legacyControl=true", env["JAVA_TOOL_OPTIONS"])
+            self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.armorValue=19", env["JAVA_TOOL_OPTIONS"])
+            self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.gameMode=survival", env["JAVA_TOOL_OPTIONS"])
+
     def test_rust_opengl_attribution_is_not_confused_by_vulkanicgal_name(self) -> None:
         mode = harness.ModeSpec("current-opengl-shaders-on", "current", "opengl", "on", "java-opengl", False)
         logs = "Rust VulkanicGAL bridge created borrowed OpenGL context"
@@ -1295,6 +1377,49 @@ else:
             self.assertEqual(0, artifact["metrics"]["rust_gal_slice"]["backend_sync"]["gl_fences_waited"])
             self.assertEqual(18, artifact["metrics"]["ffi"]["call_count"])
             self.assertEqual(8192, artifact["metrics"]["ffi"]["bytes"])
+
+    def test_rust_gal_slice_metrics_are_extracted_from_gameplay_status(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture)
+            write_frame_benchmark(
+                capture,
+                [16_000_000, 17_000_000],
+                "Rust OpenGL VulkanicGAL GUI frame executed producer=gui.frame "
+                "stratum=gui.frame frame_batch_count=17 frame=20 submission=22 rust_gal_cache_hits=18 "
+                "rust_gal_cache_misses=2 rust_gal_queue_depth=0 rust_gal_frames_executed=20 "
+                "rust_gal_batches_executed=340 rust_gal_sprite_batches_executed=160 "
+                "rust_gal_packed_sprites_executed=340 rust_gal_batches_cancelled=0 "
+                "rust_gal_completion_polls=0 rust_gal_completion_timeouts=0 "
+                "rust_gal_ffi_context_create_calls=1 rust_gal_ffi_capability_calls=1 "
+                "rust_gal_ffi_frame_configure_calls=1 rust_gal_ffi_frame_acquire_calls=20 "
+                "rust_gal_ffi_frame_resize_calls=0 rust_gal_ffi_frame_present_calls=20 "
+                "rust_gal_ffi_resource_batch_calls=9 rust_gal_ffi_submit_calls=22 "
+                "rust_gal_ffi_completion_query_calls=0 rust_gal_ffi_retire_calls=0 "
+                "rust_gal_ffi_context_create_bytes=40 rust_gal_ffi_capability_bytes=24 "
+                "rust_gal_ffi_frame_configure_bytes=48 rust_gal_ffi_frame_acquire_bytes=640 "
+                "rust_gal_ffi_frame_resize_bytes=0 rust_gal_ffi_frame_present_bytes=640 "
+                "rust_gal_ffi_resource_batch_bytes=5192 rust_gal_ffi_submit_bytes=260000 "
+                "rust_gal_ffi_completion_query_bytes=0 rust_gal_ffi_retire_bytes=0 "
+                "rust_gal_enqueue_nanos=100 rust_gal_resource_lookup_nanos=200 "
+                "rust_gal_resource_create_nanos=300 rust_gal_abi_packing_nanos=400 "
+                "rust_gal_frame_acquire_nanos=500 rust_gal_submit_nanos=600 "
+                "rust_gal_frame_present_nanos=700 rust_gal_retire_nanos=0 "
+                "rust_gal_completion_query_nanos=0 rust_gal_execute_nanos=800 "
+                "rust_gal_command_lists=22 rust_gal_command_ops=1584 rust_gal_backend_submissions=22 "
+                "rust_gal_backend_waits=0 rust_gal_gl_calls=1584 rust_gal_gl_flushes=0 "
+                "rust_gal_gl_finishes=0 rust_gal_gl_fences_inserted=22 rust_gal_gl_fences_polled=22 "
+                "rust_gal_gl_fences_waited=0 rust_gal_gl_fences_deleted=0 ffi_call_count=74 ffi_bytes=266584"
+            )
+
+            artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[0], capture, "gameplay", True, [], 0, False, tool_kind="gameplay")
+
+            self.assertEqual(20, artifact["metrics"]["rust_gal_slice"]["frames_executed"])
+            self.assertEqual(340, artifact["metrics"]["rust_gal_slice"]["packed_sprites_executed"])
+            self.assertEqual(3.7, artifact["metrics"]["rust_gal_slice"]["ffi_calls_per_frame"])
+            self.assertEqual(13329.2, artifact["metrics"]["rust_gal_slice"]["ffi_bytes_per_frame"])
 
     def test_warmup_exclusion_is_represented_by_measured_samples_only(self) -> None:
         samples_after_warmup = [25_000_000, 25_000_000, 50_000_000]

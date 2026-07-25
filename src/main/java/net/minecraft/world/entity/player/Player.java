@@ -167,6 +167,8 @@ public abstract class Player extends Avatar implements ContainerUser {
 	private final PlayerProfile playerProfile;
 	private boolean reducedDebugInfo;
 	private ItemStack lastItemInMainHand = ItemStack.EMPTY;
+	private float attackStrengthDelayForDeterministicCapture = Float.NaN;
+	private int armorValueForDeterministicCapture = -1;
 	private final ItemCooldowns cooldowns = this.createItemCooldowns();
 	private Optional<GlobalPos> lastDeathLocation = Optional.empty();
 	@Nullable
@@ -1710,6 +1712,9 @@ public abstract class Player extends Avatar implements ContainerUser {
 	}
 
 	public float getCurrentItemAttackStrengthDelay() {
+		if (Float.isFinite(this.attackStrengthDelayForDeterministicCapture)) {
+			return this.attackStrengthDelayForDeterministicCapture;
+		}
 		return (float)(1.0 / this.getAttributeValue(Attributes.ATTACK_SPEED) * 20.0);
 	}
 
@@ -1719,6 +1724,34 @@ public abstract class Player extends Avatar implements ContainerUser {
 
 	public void resetAttackStrengthTicker() {
 		this.attackStrengthTicker = 0;
+	}
+
+	public int getAttackStrengthTickerForDeterministicCapture() {
+		return this.attackStrengthTicker;
+	}
+
+	public void setAttackStrengthTickerForDeterministicCapture(int ticks) {
+		this.attackStrengthTicker = Math.max(0, ticks);
+	}
+
+	public void setAttackStrengthDelayForDeterministicCapture(float delay) {
+		this.attackStrengthDelayForDeterministicCapture = delay > 0.0F && Float.isFinite(delay) ? delay : Float.NaN;
+	}
+
+	@Override
+	public int getArmorValue() {
+		if (this.armorValueForDeterministicCapture >= 0) {
+			return this.armorValueForDeterministicCapture;
+		}
+		return super.getArmorValue();
+	}
+
+	public int getArmorValueForDeterministicCapture() {
+		return this.armorValueForDeterministicCapture;
+	}
+
+	public void setArmorValueForDeterministicCapture(int armorValue) {
+		this.armorValueForDeterministicCapture = armorValue >= 0 ? Math.min(20, armorValue) : -1;
 	}
 
 	public ItemCooldowns getCooldowns() {

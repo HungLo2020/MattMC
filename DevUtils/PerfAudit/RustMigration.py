@@ -118,9 +118,6 @@ def resolve_named_directory(root: Path, name: str, requested_platform: str | Non
 def find_frozen_repo(current_root: Path, explicit: str | None = None) -> Path:
     if explicit:
         return Path(explicit).expanduser().resolve()
-    env_path = os.environ.get("MATTMC_JAVA_PERF_REPO") or os.environ.get("MATTMC_FROZEN_JAVA_REPO")
-    if env_path:
-        return Path(env_path).expanduser().resolve()
     return resolve_named_directory(current_root, "java_perf_repo")
 
 

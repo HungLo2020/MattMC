@@ -18,6 +18,7 @@ import net.minecraft.client.AttackIndicatorStatus;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
+import net.minecraft.client.dev.DeterministicCameraCapture;
 import net.minecraft.client.gui.components.BossHealthOverlay;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.gui.components.DebugScreenOverlay;
@@ -485,24 +486,37 @@ public class Gui {
 					} else {
 						RustGalFrameQueue.enqueueCrosshair(this.minecraft, guiGraphics, (guiGraphics.guiWidth() - i) / 2, (guiGraphics.guiHeight() - i) / 2, i, i);
 					}
-					if (this.minecraft.options.attackIndicator().get() == AttackIndicatorStatus.CROSSHAIR) {
-						float f = this.minecraft.player.getAttackStrengthScale(0.0F);
-						boolean bl = false;
+						if (this.minecraft.options.attackIndicator().get() == AttackIndicatorStatus.CROSSHAIR) {
+							DeterministicCameraCapture.forceCrosshairAttackTargetForDiagnostics(this.minecraft);
+							float f = this.minecraft.player.getAttackStrengthScale(0.0F);
+							boolean bl = false;
 						if (this.minecraft.crosshairPickEntity != null && this.minecraft.crosshairPickEntity instanceof LivingEntity && f >= 1.0F) {
 							bl = this.minecraft.player.getCurrentItemAttackStrengthDelay() > 5.0F;
 							bl &= this.minecraft.crosshairPickEntity.isAlive();
 						}
 
-						int j = guiGraphics.guiHeight() / 2 - 7 + 16;
-						int k = guiGraphics.guiWidth() / 2 - 8;
-						if (bl) {
-							guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_ATTACK_INDICATOR_FULL_SPRITE, k, j, 16, 16);
-						} else if (f < 1.0F) {
-							int l = (int)(f * 17.0F);
-							guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_ATTACK_INDICATOR_BACKGROUND_SPRITE, k, j, 16, 4);
-							guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_ATTACK_INDICATOR_PROGRESS_SPRITE, 16, 4, 0, 0, k, j, l, 4);
+							int j = guiGraphics.guiHeight() / 2 - 7 + 16;
+							int k = guiGraphics.guiWidth() / 2 - 8;
+							if (bl) {
+								if (RustGalFrameQueue.isMigratedGuiDisabledForDiagnostics()) {
+									// Dev-only measurement control: no migrated or legacy attack indicator draw.
+								} else if (RustGalFrameQueue.isMigratedGuiLegacyControl()) {
+									guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_ATTACK_INDICATOR_FULL_SPRITE, k, j, 16, 16);
+								} else {
+									RustGalFrameQueue.enqueueCrosshairAttackIndicator(this.minecraft, guiGraphics, k, j, f, 16, true);
+								}
+							} else if (f < 1.0F) {
+								int l = crosshairAttackIndicatorFilledWidth(f);
+								if (RustGalFrameQueue.isMigratedGuiDisabledForDiagnostics()) {
+									// Dev-only measurement control: no migrated or legacy attack indicator draw.
+								} else if (RustGalFrameQueue.isMigratedGuiLegacyControl()) {
+									guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_ATTACK_INDICATOR_BACKGROUND_SPRITE, k, j, 16, 4);
+									guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_ATTACK_INDICATOR_PROGRESS_SPRITE, 16, 4, 0, 0, k, j, l, 4);
+								} else {
+									RustGalFrameQueue.enqueueCrosshairAttackIndicator(this.minecraft, guiGraphics, k, j, f, l, false);
+								}
+							}
 						}
-					}
 				}
 			}
 		}
@@ -667,9 +681,15 @@ public class Gui {
 						o = i - 91 - 22;
 					}
 
-					int p = (int)(f * 19.0F);
-					guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_ATTACK_INDICATOR_BACKGROUND_SPRITE, o, n, 18, 18);
-					guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_ATTACK_INDICATOR_PROGRESS_SPRITE, 18, 18, 0, 18 - p, o, n + 18 - p, 18, p);
+					int p = hotbarAttackIndicatorFilledHeight(f);
+					if (RustGalFrameQueue.isMigratedGuiDisabledForDiagnostics()) {
+						// Dev-only measurement control: no migrated or legacy attack indicator draw.
+					} else if (RustGalFrameQueue.isMigratedGuiLegacyControl()) {
+						guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_ATTACK_INDICATOR_BACKGROUND_SPRITE, o, n, 18, 18);
+						guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_ATTACK_INDICATOR_PROGRESS_SPRITE, 18, 18, 0, 18 - p, o, n + 18 - p, 18, p);
+					} else {
+						RustGalFrameQueue.enqueueHotbarAttackIndicator(this.minecraft, guiGraphics, o, n, f, p);
+					}
 				}
 			}
 		}
@@ -681,6 +701,14 @@ public class Gui {
 
 	public static int selectedHotbarHighlightY(int guiHeight) {
 		return guiHeight - 22 - 1;
+	}
+
+	public static int crosshairAttackIndicatorFilledWidth(float progress) {
+		return (int)(progress * 17.0F);
+	}
+
+	public static int hotbarAttackIndicatorFilledHeight(float progress) {
+		return (int)(progress * 19.0F);
 	}
 
 	private void renderSelectedItemName(GuiGraphics guiGraphics) {
@@ -865,7 +893,7 @@ public class Gui {
 			}
 
 			Profiler.get().push("armor");
-			renderArmor(guiGraphics, player, n, p, q, k);
+			this.renderArmor(guiGraphics, player, n, p, q, k);
 			Profiler.get().popPush("health");
 			this.renderHearts(guiGraphics, player, k, n, q, s, f, i, j, o, bl);
 			LivingEntity livingEntity = this.getPlayerVehicleWithHealth();
@@ -882,24 +910,30 @@ public class Gui {
 		}
 	}
 
-	private static void renderArmor(GuiGraphics guiGraphics, Player player, int i, int j, int k, int l) {
+	private void renderArmor(GuiGraphics guiGraphics, Player player, int i, int j, int k, int l) {
 		int m = player.getArmorValue();
 		if (m > 0) {
 			int n = i - (j - 1) * k - 10;
 
-			for (int o = 0; o < 10; o++) {
-				int p = l + o * 8;
-				if (o * 2 + 1 < m) {
-					guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, ARMOR_FULL_SPRITE, p, n, 9, 9);
-				}
+			if (RustGalFrameQueue.isMigratedGuiDisabledForDiagnostics() || RustGalFrameQueue.isArmorDisabledForDiagnostics()) {
+				// Dev-only measurement control: no migrated or legacy armor icon draw.
+			} else if (RustGalFrameQueue.isMigratedGuiLegacyControl() || RustGalFrameQueue.isArmorLegacyControl()) {
+				for (int o = 0; o < 10; o++) {
+					int p = l + o * 8;
+					if (o * 2 + 1 < m) {
+						guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, ARMOR_FULL_SPRITE, p, n, 9, 9);
+					}
 
-				if (o * 2 + 1 == m) {
-					guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, ARMOR_HALF_SPRITE, p, n, 9, 9);
-				}
+					if (o * 2 + 1 == m) {
+						guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, ARMOR_HALF_SPRITE, p, n, 9, 9);
+					}
 
-				if (o * 2 + 1 > m) {
-					guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, ARMOR_EMPTY_SPRITE, p, n, 9, 9);
+					if (o * 2 + 1 > m) {
+						guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, ARMOR_EMPTY_SPRITE, p, n, 9, 9);
+					}
 				}
+			} else {
+				RustGalFrameQueue.enqueueArmorIcons(this.minecraft, guiGraphics, m, l, n);
 			}
 		}
 	}

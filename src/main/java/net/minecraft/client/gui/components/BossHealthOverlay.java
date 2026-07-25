@@ -1,11 +1,13 @@
 package net.minecraft.client.gui.components;
 
 import com.google.common.collect.Maps;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.dev.DeterministicCameraCapture;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
@@ -18,6 +20,7 @@ import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.BossEvent;
 import net.minecraft.world.BossEvent.BossBarColor;
 import net.minecraft.world.BossEvent.BossBarOverlay;
+import net.vulkanic.bridge.RustGalFrameQueue;
 
 @Environment(EnvType.CLIENT)
 public class BossHealthOverlay {
@@ -61,6 +64,7 @@ public class BossHealthOverlay {
 	}
 
 	public void render(GuiGraphics guiGraphics) {
+		DeterministicCameraCapture.applyBossBarOverridesForDiagnostics(this);
 		if (!this.events.isEmpty()) {
 			guiGraphics.nextStratum();
 			ProfilerFiller profilerFiller = Profiler.get();
@@ -87,10 +91,17 @@ public class BossHealthOverlay {
 	}
 
 	private void drawBar(GuiGraphics guiGraphics, int i, int j, BossEvent bossEvent) {
-		this.drawBar(guiGraphics, i, j, bossEvent, 182, BAR_BACKGROUND_SPRITES, OVERLAY_BACKGROUND_SPRITES);
 		int k = Mth.lerpDiscrete(bossEvent.getProgress(), 0, 182);
-		if (k > 0) {
-			this.drawBar(guiGraphics, i, j, bossEvent, k, BAR_PROGRESS_SPRITES, OVERLAY_PROGRESS_SPRITES);
+		if (RustGalFrameQueue.isMigratedGuiDisabledForDiagnostics()) {
+			return;
+		}
+		if (RustGalFrameQueue.isMigratedGuiLegacyControl()) {
+			this.drawBar(guiGraphics, i, j, bossEvent, 182, BAR_BACKGROUND_SPRITES, OVERLAY_BACKGROUND_SPRITES);
+			if (k > 0) {
+				this.drawBar(guiGraphics, i, j, bossEvent, k, BAR_PROGRESS_SPRITES, OVERLAY_PROGRESS_SPRITES);
+			}
+		} else {
+			RustGalFrameQueue.enqueueBossBar(this.minecraft, guiGraphics, i, j, 182, 5, bossEvent.getProgress(), k, bossEvent.getColor(), bossEvent.getOverlay());
 		}
 	}
 
@@ -138,6 +149,29 @@ public class BossHealthOverlay {
 
 	public void reset() {
 		this.events.clear();
+	}
+
+	public void replaceEventsForDeterministicCapture(int count, float[] progresses, BossBarOverlay[] overlays) {
+		this.events.clear();
+		BossBarColor[] colors = BossBarColor.values();
+		for (int i = 0; i < count; i++) {
+			float progress = progresses.length == 0 ? 1.0F : progresses[i % progresses.length];
+			BossBarOverlay overlay = overlays.length == 0 ? BossBarOverlay.PROGRESS : overlays[i % overlays.length];
+			UUID id = UUID.nameUUIDFromBytes(("mattmc-deterministic-boss-bar-" + i).getBytes(StandardCharsets.UTF_8));
+			this.events.put(
+				id,
+				new LerpingBossEvent(
+					id,
+					Component.literal("Boss Bar " + (i + 1)),
+					Mth.clamp(progress, 0.0F, 1.0F),
+					colors[i % colors.length],
+					overlay,
+					false,
+					false,
+					false
+				)
+			);
+		}
 	}
 
 	public boolean shouldPlayMusic() {

@@ -119,6 +119,15 @@ class RustMigrationHarnessTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 harness.find_frozen_repo(root)
 
+    def test_configured_frozen_repo_path_exists_and_is_used(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        frozen = harness.resolve_named_directory(root, "java_perf_repo")
+        self.assertEqual(frozen, Path("/home/matt/Documents/Repos/MattMC_JavaPerfTesting/MattMC"))
+        self.assertEqual(harness.find_frozen_repo(root), frozen)
+        self.assertTrue(frozen.is_dir(), frozen)
+        self.assertTrue((frozen / ".git").is_dir(), frozen)
+        self.assertTrue((frozen / "gradlew").is_file() or (frozen / "gradlew.bat").is_file(), frozen)
+
     def test_chunk_meshing_command_uses_argument_list_and_output_path_with_spaces(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = fake_repo(Path(temp), "Repo With Spaces")

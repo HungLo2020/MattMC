@@ -1,14 +1,19 @@
 package net.minecraft.client.dev;
 
 import net.minecraft.client.CameraType;
+import net.minecraft.client.AttackIndicatorStatus;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
+import net.minecraft.client.gui.components.BossHealthOverlay;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.irisshaders.iris.uniforms.SystemTimeUniforms;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.ChatVisiblity;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.BossEvent.BossBarOverlay;
 import net.minecraft.world.phys.Vec3;
 import net.vulkanic.VulkanicAPI;
 import org.slf4j.Logger;
@@ -54,6 +59,24 @@ public final class DeterministicCameraCapture {
 		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.experienceProgress", "NaN"));
 	private static final int FORCED_EXPERIENCE_LEVEL =
 		Integer.getInteger("mattmc.dev.deterministicCameraCapture.experienceLevel", -1);
+	private static final String FORCED_ATTACK_INDICATOR =
+		System.getProperty("mattmc.dev.deterministicCameraCapture.attackIndicator", "").trim();
+	private static final float FORCED_ATTACK_PROGRESS =
+		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.attackProgress", "NaN"));
+	private static final float FORCED_ATTACK_DELAY =
+		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.attackDelay", "NaN"));
+	private static final boolean FORCE_ATTACK_TARGET =
+		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.attackTarget");
+	private static final int FORCED_ARMOR_VALUE =
+		Integer.getInteger("mattmc.dev.deterministicCameraCapture.armorValue", -1);
+	private static final boolean HIDE_CHAT =
+		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.hideChat");
+	private static final int FORCED_BOSS_BAR_COUNT =
+		Integer.getInteger("mattmc.dev.deterministicCameraCapture.bossBars", -1);
+	private static final String FORCED_BOSS_BAR_PROGRESS =
+		System.getProperty("mattmc.dev.deterministicCameraCapture.bossProgress", "").trim();
+	private static final String FORCED_BOSS_BAR_OVERLAY =
+		System.getProperty("mattmc.dev.deterministicCameraCapture.bossOverlay", "").trim();
 	private static final float FIXED_VIGNETTE_BRIGHTNESS =
 		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.vignetteBrightness", "1.0"));
 	private static final boolean RUST_GAL_GUI_SCREEN_CYCLE =
@@ -89,10 +112,15 @@ public final class DeterministicCameraCapture {
 	private static CameraType originalCameraType;
 	private static GameType originalGameMode;
 	private static GameType originalPreviousGameMode;
+	private static AttackIndicatorStatus originalAttackIndicator;
+	private static ChatVisiblity originalChatVisibility;
 	private static int originalSelectedHotbarSlot;
 	private static float originalExperienceProgress;
 	private static int originalExperienceLevel;
 	private static int originalExperienceDisplayStartTick;
+	private static int originalAttackStrengthTicker;
+	private static int originalArmorValueOverride;
+	private static Entity originalCrosshairPickEntity;
 	private static final Map<Long, Map<String, Set<String>>> SUBMITTED_WORK_BY_FRAME = new LinkedHashMap<>();
 	private static int rustGalGuiScreenCycleStage;
 	private static int rustGalGuiScreenCycleFramesInStage;
@@ -137,6 +165,7 @@ public final class DeterministicCameraCapture {
 		if (!ensureInitialized(minecraft)) {
 			return;
 		}
+		applyRuntimeOverrides(minecraft, minecraft.player);
 		if (poseIndex >= poses.length) {
 			stabilizeGuiState(minecraft);
 			applyPose(minecraft.player, initialPose);
@@ -208,6 +237,20 @@ public final class DeterministicCameraCapture {
 
 	public static boolean isEnabledForDiagnostics() {
 		return ENABLED && initialized && !failed;
+	}
+
+	public static void forceCrosshairAttackTargetForDiagnostics(Minecraft minecraft) {
+		if (ENABLED && FORCE_ATTACK_TARGET && minecraft.player != null) {
+			minecraft.crosshairPickEntity = minecraft.player;
+		}
+	}
+
+	public static void applyBossBarOverridesForDiagnostics(BossHealthOverlay overlay) {
+		if (!ENABLED || !hasBossBarOverride()) {
+			return;
+		}
+		int count = forcedBossBarCount();
+		overlay.replaceEventsForDeterministicCapture(count, forcedBossBarProgresses(count), forcedBossBarOverlays(count));
 	}
 
 	public static boolean isReadyForShaderInputParityPoseDiagnostics() {
@@ -308,13 +351,18 @@ public final class DeterministicCameraCapture {
 		initialPosition = player.position();
 		initialDimension = level.dimension().location().toString();
 		originalCameraType = minecraft.options.getCameraType();
-		originalGameMode = minecraft.gameMode == null ? null : minecraft.gameMode.getPlayerMode();
-		originalPreviousGameMode = minecraft.gameMode == null ? null : minecraft.gameMode.getPreviousPlayerMode();
-		originalSelectedHotbarSlot = player.getInventory().getSelectedSlot();
+			originalGameMode = minecraft.gameMode == null ? null : minecraft.gameMode.getPlayerMode();
+			originalPreviousGameMode = minecraft.gameMode == null ? null : minecraft.gameMode.getPreviousPlayerMode();
+			originalAttackIndicator = minecraft.options.attackIndicator().get();
+			originalChatVisibility = minecraft.options.chatVisibility().get();
+			originalSelectedHotbarSlot = player.getInventory().getSelectedSlot();
 		originalExperienceProgress = player.experienceProgress;
-		originalExperienceLevel = player.experienceLevel;
-		originalExperienceDisplayStartTick = player.experienceDisplayStartTick;
-		applyRuntimeOverrides(minecraft, player);
+			originalExperienceLevel = player.experienceLevel;
+				originalExperienceDisplayStartTick = player.experienceDisplayStartTick;
+				originalAttackStrengthTicker = player.getAttackStrengthTickerForDeterministicCapture();
+				originalArmorValueOverride = player.getArmorValueForDeterministicCapture();
+				originalCrosshairPickEntity = minecraft.crosshairPickEntity;
+				applyRuntimeOverrides(minecraft, player);
 		initialPose = new Pose("initial", player.getYRot(), player.getXRot());
 		stabilizeGuiState(minecraft);
 		Pose[] fullSequence = new Pose[] {
@@ -699,6 +747,10 @@ public final class DeterministicCameraCapture {
 		if (gameType != null && minecraft.gameMode != null && minecraft.gameMode.getPlayerMode() != gameType) {
 			minecraft.gameMode.setLocalMode(gameType, minecraft.gameMode.getPreviousPlayerMode());
 		}
+		AttackIndicatorStatus attackIndicator = forcedAttackIndicator();
+		if (attackIndicator != null && minecraft.options.attackIndicator().get() != attackIndicator) {
+			minecraft.options.attackIndicator().set(attackIndicator);
+		}
 		if (FORCED_SELECTED_HOTBAR_SLOT > 0) {
 			int selectedSlot = Math.max(1, Math.min(9, FORCED_SELECTED_HOTBAR_SLOT)) - 1;
 			if (player.getInventory().getSelectedSlot() != selectedSlot) {
@@ -716,7 +768,22 @@ public final class DeterministicCameraCapture {
 			}
 			player.experienceDisplayStartTick = player.tickCount;
 		}
-	}
+			if (!Float.isNaN(FORCED_ATTACK_PROGRESS)) {
+				float progress = Math.max(0.0F, Math.min(1.0F, FORCED_ATTACK_PROGRESS));
+				player.setAttackStrengthDelayForDeterministicCapture(FORCED_ATTACK_DELAY);
+				int ticks = Math.round(progress * player.getCurrentItemAttackStrengthDelay());
+				player.setAttackStrengthTickerForDeterministicCapture(ticks);
+			}
+			if (FORCE_ATTACK_TARGET) {
+				minecraft.crosshairPickEntity = player;
+			}
+			if (FORCED_ARMOR_VALUE >= 0) {
+				player.setArmorValueForDeterministicCapture(Math.min(20, FORCED_ARMOR_VALUE));
+			}
+			if (HIDE_CHAT && minecraft.options.chatVisibility().get() != ChatVisiblity.HIDDEN) {
+				minecraft.options.chatVisibility().set(ChatVisiblity.HIDDEN);
+			}
+		}
 
 	private static void restoreRuntimeOverrides(Minecraft minecraft) {
 		if (minecraft.player != null && FORCED_SELECTED_HOTBAR_SLOT > 0 && originalSelectedHotbarSlot >= 0 && originalSelectedHotbarSlot < 9) {
@@ -727,13 +794,76 @@ public final class DeterministicCameraCapture {
 			minecraft.player.experienceLevel = originalExperienceLevel;
 			minecraft.player.experienceDisplayStartTick = originalExperienceDisplayStartTick;
 		}
-		if (!FORCED_GAME_MODE.isBlank() && minecraft.gameMode != null && originalGameMode != null) {
-			minecraft.gameMode.setLocalMode(originalGameMode, originalPreviousGameMode);
-		}
+			if (minecraft.player != null && !Float.isNaN(FORCED_ATTACK_PROGRESS)) {
+				minecraft.player.setAttackStrengthDelayForDeterministicCapture(Float.NaN);
+				minecraft.player.setAttackStrengthTickerForDeterministicCapture(originalAttackStrengthTicker);
+			}
+				if (FORCE_ATTACK_TARGET) {
+					minecraft.crosshairPickEntity = originalCrosshairPickEntity;
+				}
+				if (minecraft.player != null && FORCED_ARMOR_VALUE >= 0) {
+					minecraft.player.setArmorValueForDeterministicCapture(originalArmorValueOverride);
+				}
+			if (!FORCED_ATTACK_INDICATOR.isBlank() && originalAttackIndicator != null) {
+				minecraft.options.attackIndicator().set(originalAttackIndicator);
+			}
+			if (HIDE_CHAT && originalChatVisibility != null) {
+				minecraft.options.chatVisibility().set(originalChatVisibility);
+			}
+			if (!FORCED_GAME_MODE.isBlank() && minecraft.gameMode != null && originalGameMode != null) {
+				minecraft.gameMode.setLocalMode(originalGameMode, originalPreviousGameMode);
+			}
 		if (!FORCED_CAMERA_TYPE.isBlank() && originalCameraType != null && minecraft.options.getCameraType() != originalCameraType) {
 			minecraft.options.setCameraType(originalCameraType);
 			minecraft.gameRenderer.checkEntityPostEffect(originalCameraType.isFirstPerson() ? minecraft.getCameraEntity() : null);
 		}
+	}
+
+	private static boolean hasBossBarOverride() {
+		return FORCED_BOSS_BAR_COUNT >= 0 || !FORCED_BOSS_BAR_PROGRESS.isBlank() || !FORCED_BOSS_BAR_OVERLAY.isBlank();
+	}
+
+	private static int forcedBossBarCount() {
+		if (FORCED_BOSS_BAR_COUNT >= 0) {
+			return Math.max(0, FORCED_BOSS_BAR_COUNT);
+		}
+		if ("all".equalsIgnoreCase(FORCED_BOSS_BAR_OVERLAY)) {
+			return BossBarOverlay.values().length;
+		}
+		return 1;
+	}
+
+	private static float[] forcedBossBarProgresses(int count) {
+		String source = FORCED_BOSS_BAR_PROGRESS.isBlank() ? "0.5" : FORCED_BOSS_BAR_PROGRESS;
+		String[] tokens = source.split(",");
+		float[] values = new float[Math.max(1, tokens.length)];
+		for (int i = 0; i < values.length; i++) {
+			String token = tokens[i].trim();
+			values[i] = token.isBlank() ? 0.5F : Math.max(0.0F, Math.min(1.0F, Float.parseFloat(token)));
+		}
+		return values;
+	}
+
+	private static BossBarOverlay[] forcedBossBarOverlays(int count) {
+		if ("all".equalsIgnoreCase(FORCED_BOSS_BAR_OVERLAY)) {
+			return BossBarOverlay.values();
+		}
+		String source = FORCED_BOSS_BAR_OVERLAY.isBlank() ? BossBarOverlay.PROGRESS.getSerializedName() : FORCED_BOSS_BAR_OVERLAY;
+		String[] tokens = source.split(",");
+		BossBarOverlay[] values = new BossBarOverlay[Math.max(1, tokens.length)];
+		for (int i = 0; i < values.length; i++) {
+			values[i] = parseBossBarOverlay(tokens[i].trim());
+		}
+		return values;
+	}
+
+	private static BossBarOverlay parseBossBarOverlay(String value) {
+		for (BossBarOverlay overlay : BossBarOverlay.values()) {
+			if (overlay.name().equalsIgnoreCase(value) || overlay.getSerializedName().equalsIgnoreCase(value)) {
+				return overlay;
+			}
+		}
+		throw new IllegalArgumentException("unknown deterministic capture boss bar overlay: " + value);
 	}
 
 	private static GameType forcedGameMode() {
@@ -745,6 +875,18 @@ public final class DeterministicCameraCapture {
 			throw new IllegalArgumentException("unknown deterministic capture game mode: " + FORCED_GAME_MODE);
 		}
 		return gameType;
+	}
+
+	private static AttackIndicatorStatus forcedAttackIndicator() {
+		if (FORCED_ATTACK_INDICATOR.isBlank()) {
+			return null;
+		}
+		for (AttackIndicatorStatus status : AttackIndicatorStatus.values()) {
+			if (status.name().equalsIgnoreCase(FORCED_ATTACK_INDICATOR)) {
+				return status;
+			}
+		}
+		throw new IllegalArgumentException("unknown deterministic capture attack indicator: " + FORCED_ATTACK_INDICATOR);
 	}
 
 	private static CameraType forcedCameraType() {
@@ -807,7 +949,19 @@ public final class DeterministicCameraCapture {
 		json.append("  \"distantHorizonsActive\": ").append(isDistantHorizonsActive()).append(",\n");
 		appendField(json, "cameraType", minecraft.options.getCameraType().name()).append(",\n");
 		appendField(json, "gameMode", minecraft.gameMode == null ? "unknown" : minecraft.gameMode.getPlayerMode().getName()).append(",\n");
-		json.append("  \"selectedHotbarSlot\": ").append(player == null ? -1 : currentSelectedHotbarSlot(player)).append(",\n");
+			appendField(json, "attackIndicator", minecraft.options.attackIndicator().get().name()).append(",\n");
+			json.append("  \"attackProgress\": ").append(player == null ? -1.0F : player.getAttackStrengthScale(0.0F)).append(",\n");
+				json.append("  \"attackDelay\": ").append(player == null ? -1.0F : player.getCurrentItemAttackStrengthDelay()).append(",\n");
+				json.append("  \"attackTargetForced\": ").append(FORCE_ATTACK_TARGET).append(",\n");
+				appendField(json, "attackTargetEntity", minecraft.crosshairPickEntity == null ? "none" : minecraft.crosshairPickEntity.getType().toShortString()).append(",\n");
+			json.append("  \"armorValue\": ").append(player == null ? -1 : player.getArmorValue()).append(",\n");
+			json.append("  \"armorValueOverride\": ").append(FORCED_ARMOR_VALUE).append(",\n");
+			json.append("  \"hideChat\": ").append(HIDE_CHAT).append(",\n");
+			json.append("  \"bossBarOverride\": ").append(hasBossBarOverride()).append(",\n");
+			json.append("  \"bossBarCount\": ").append(hasBossBarOverride() ? forcedBossBarCount() : -1).append(",\n");
+			appendField(json, "bossBarProgress", FORCED_BOSS_BAR_PROGRESS).append(",\n");
+			appendField(json, "bossBarOverlay", FORCED_BOSS_BAR_OVERLAY).append(",\n");
+			json.append("  \"selectedHotbarSlot\": ").append(player == null ? -1 : currentSelectedHotbarSlot(player)).append(",\n");
 		json.append("  \"experienceProgress\": ").append(player == null ? -1.0F : player.experienceProgress).append(",\n");
 		json.append("  \"experienceLevel\": ").append(player == null ? -1 : player.experienceLevel).append(",\n");
 		json.append("  \"framesPerPose\": ").append(FRAMES_PER_POSE).append(",\n");

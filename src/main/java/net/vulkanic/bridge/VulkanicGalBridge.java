@@ -1198,9 +1198,13 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 
 		public SubmissionBatchBuilder drawIndexed(int indices) {
+			return drawIndexed(indices, 1);
+		}
+
+		public SubmissionBatchBuilder drawIndexed(int indices, int instances) {
 			MemorySegment op = op(8);
 			Struct.COMMAND_OP.setInt(op, 9, indices);
-			Struct.COMMAND_OP.setInt(op, 10, 1);
+			Struct.COMMAND_OP.setInt(op, 10, instances);
 			ops.add(op);
 			return this;
 		}

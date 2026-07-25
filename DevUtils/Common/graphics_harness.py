@@ -792,15 +792,35 @@ def resolve_named_directory(root: Path, name: str) -> Path:
 
 def find_frozen_repo(current_root: Path, explicit: str | None = None) -> Path:
     if explicit:
-        return Path(explicit).expanduser().resolve()
-    env_path = os.environ.get("MATTMC_JAVA_PERF_REPO") or os.environ.get("MATTMC_FROZEN_JAVA_REPO")
-    if env_path:
-        return Path(env_path).expanduser().resolve()
-    return resolve_named_directory(current_root, "java_perf_repo")
+        frozen = Path(explicit).expanduser().resolve()
+        source = "--frozen-repo"
+    else:
+        frozen = resolve_named_directory(current_root, "java_perf_repo")
+        source = "DevUtils/Common/platform/directory/directories.json:java_perf_repo"
+    validate_repository_root(frozen, "Frozen Java", source)
+    return frozen
+
+
+def validate_repository_root(root: Path, label: str, source: str) -> None:
+    if not root.is_dir():
+        raise SystemExit(f"{label} repository path from {source} does not exist: {root}")
+    if not ((root / "gradlew").is_file() or (root / "gradlew.bat").is_file()):
+        raise SystemExit(f"{label} repository path from {source} is missing a Gradle wrapper: {root}")
+    if not (root / ".git").is_dir():
+        raise SystemExit(f"{label} repository path from {source} is missing .git: {root}")
+
+
+def repository_resolution(current: Path, frozen: Path, explicit: str | None = None) -> dict[str, object]:
+    return {
+        "current": str(current.resolve()),
+        "frozen": str(frozen.resolve()),
+        "frozen_source": "--frozen-repo" if explicit else "DevUtils/Common/platform/directory/directories.json:java_perf_repo",
+    }
 
 
 def select_targets(args: argparse.Namespace) -> dict[str, RepoTarget]:
     current = repo_root()
+    validate_repository_root(current, "Current", "repository root")
     frozen = find_frozen_repo(current, args.frozen_repo)
     return {
         "current": RepoTarget("current", current, "current"),
@@ -1743,6 +1763,7 @@ def normalize_capture_artifact(
     reused_baseline: bool = False,
     tool_kind: str = "capture",
     runtime_profile: dict[str, object] | None = None,
+    repository_paths: dict[str, object] | None = None,
 ) -> dict[str, object]:
     files = load_capture_files(capture_dir)
     meta = read_key_values(files["meta"])
@@ -1776,6 +1797,8 @@ def normalize_capture_artifact(
         files["hs_err"],
     ]
     combined_logs = "\n".join(file_text(path) for path in log_paths)
+    if isinstance(frame_doc, dict) and isinstance(frame_doc.get("rustGalSliceMetricsLine"), str):
+        combined_logs = f"{combined_logs}\n{frame_doc['rustGalSliceMetricsLine']}"
     attribution = detect_attribution(mode, meta, combined_logs)
     shaderpack_text = file_text(files["shaderpack"])
     signature = workload_signature(
@@ -1957,6 +1980,8 @@ def normalize_capture_artifact(
         validation_messages.append("Vulkan validation emitted only loader/configuration notices; no concrete API VUIDs were observed")
     rust_gal_frames = last_number(combined_logs, r"rust_gal_frames_executed[=: ]+(\d+)")
     rust_gal_batches = last_number(combined_logs, r"rust_gal_batches_executed[=: ]+(\d+)")
+    rust_gal_sprite_batches = last_number(combined_logs, r"rust_gal_sprite_batches_executed[=: ]+(\d+)")
+    rust_gal_packed_sprites = last_number(combined_logs, r"rust_gal_packed_sprites_executed[=: ]+(\d+)")
     rust_gal_ffi_calls = last_number(combined_logs, r"ffi(?:_call)?_count[=: ]+(\d+)")
     rust_gal_ffi_bytes = last_number(combined_logs, r"ffi(?:_bytes| bytes)[=: ]+(\d+)")
     rust_gal_operations = {
@@ -2065,6 +2090,7 @@ def normalize_capture_artifact(
         "tool": tool_kind,
         "mode": asdict(mode),
         "repository": repository_metadata(target),
+        "repository_resolution": repository_paths or {},
         "capture": {
             "directory": str(capture_dir),
             "command": list(command),
@@ -2119,6 +2145,8 @@ def normalize_capture_artifact(
                 "queue_depth": last_number(combined_logs, r"rust_gal_queue_depth[=: ]+(\d+)"),
                 "frames_executed": rust_gal_frames,
                 "batches_executed": rust_gal_batches,
+                "sprite_batches_executed": rust_gal_sprite_batches,
+                "packed_sprites_executed": rust_gal_packed_sprites,
                 "batches_cancelled": last_number(combined_logs, r"rust_gal_batches_cancelled[=: ]+(\d+)"),
                 "completion_polls": last_number(combined_logs, r"rust_gal_completion_polls[=: ]+(\d+)"),
                 "completion_timeouts": last_number(combined_logs, r"rust_gal_completion_timeouts[=: ]+(\d+)"),
@@ -3085,6 +3113,17 @@ def build_capture_command(
     env["CLIENT_RSS_LIMIT_MB"] = str(args.client_rss_limit_mb)
     java_options = [env.get("JAVA_TOOL_OPTIONS", "")]
     java_options.extend(getattr(args, "jvm_arg", []) or [])
+    if getattr(args, "armor_value", None) is not None:
+        java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.armorValue={args.armor_value}")
+        java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.armorValue={args.armor_value}")
+    if getattr(args, "game_mode", None):
+        java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.gameMode={args.game_mode}")
+        java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.gameMode={args.game_mode}")
+    rust_gal_gui_control = getattr(args, "rust_gal_gui_control", "rust")
+    if rust_gal_gui_control == "disabled":
+        java_options.append("-Dmattmc.dev.rustGalGui.armor.disabled=true")
+    elif rust_gal_gui_control == "legacy":
+        java_options.append("-Dmattmc.dev.rustGalGui.armor.legacyControl=true")
     if tool_kind == "gameplay":
         frame_status = capture_dir / f"graphics_frame_benchmark_{timestamp()}.json"
         java_options.extend(
@@ -3319,6 +3358,9 @@ def run_mode(
     capture_dir = artifact_root / mode.name / tool_kind / run_dir / "capture"
     output_path = artifact_root / mode.name / tool_kind / run_dir / ARTIFACT_NAME
     command, env = build_capture_command(target, mode, capture_dir, effective_workload_profile, args, tool_kind)
+    current_root = repo_root()
+    explicit_frozen_repo = getattr(args, "frozen_repo", None)
+    repository_paths = repository_resolution(current_root, find_frozen_repo(current_root, explicit_frozen_repo), explicit_frozen_repo)
     if args.dry_run:
         artifact = normalize_capture_artifact(
             target,
@@ -3331,6 +3373,7 @@ def run_mode(
             False,
             tool_kind=tool_kind,
             runtime_profile=runtime_profile_dict(args),
+            repository_paths=repository_paths,
         )
         write_artifact(output_path, artifact)
         return MatrixResult(mode.name, True, False, False, None, 0, str(output_path), str(capture_dir), command)
@@ -3353,6 +3396,7 @@ def run_mode(
             False,
             tool_kind=tool_kind,
             runtime_profile=runtime_profile_dict(args),
+            repository_paths=repository_paths,
         )
         write_artifact(output_path, artifact)
         return MatrixResult(mode.name, False, False, False, "renderdoccmd is not installed", 127, str(output_path), str(capture_dir), command)
@@ -3379,6 +3423,7 @@ def run_mode(
                 False,
                 tool_kind=tool_kind,
                 runtime_profile=runtime_profile_dict(args),
+                repository_paths=repository_paths,
             )
             write_artifact(output_path, artifact)
             return MatrixResult(mode.name, False, False, False, "tracy-capture is not installed", 127, str(output_path), str(capture_dir), command)
@@ -3509,6 +3554,7 @@ def run_mode(
         timed_out_phase=timed_out_phase,
         tool_kind=tool_kind,
         runtime_profile=runtime_profile_dict(args),
+        repository_paths=repository_paths,
     )
     validation = artifact.get("validation") if isinstance(artifact.get("validation"), dict) else {}
     if not validation.get("complete"):
@@ -3786,6 +3832,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         subparser.add_argument("--world", default=os.environ.get("MATTMC_CAPTURE_WORLD", "Origin"))
         subparser.add_argument("--client-args", default=os.environ.get("CLIENT_ARGS", ""))
         subparser.add_argument("--jvm-arg", action="append", default=[], help="Extra JVM option appended to JAVA_TOOL_OPTIONS for launched clients.")
+        subparser.add_argument(
+            "--rust-gal-gui-control",
+            choices=("rust", "disabled", "legacy"),
+            default="rust",
+            help="Diagnostic control for migrated Rust-GAL GUI sprites; 'disabled' suppresses migrated armor and 'legacy' restores Java armor for controls.",
+        )
+        subparser.add_argument("--armor-value", type=int, help="Force a deterministic player armor value for gameplay/capture controls.")
+        subparser.add_argument("--game-mode", choices=("survival", "creative", "adventure", "spectator"), help="Force a deterministic player game mode for gameplay/capture controls.")
         subparser.add_argument("--timeout-seconds", type=int)
         subparser.add_argument("--startup-timeout-seconds", type=int)
         subparser.add_argument("--readiness-timeout-seconds", type=int)
@@ -3875,6 +3929,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         raise SystemExit("warmup frames must be non-negative and measure frames must be positive")
     if args.settle_frames < 0 or args.max_settle_frames <= 0 or args.subsystem_iterations <= 0 or args.repetitions <= 0:
         raise SystemExit("settle/max-settle/subsystem iterations/repetitions must be positive where applicable")
+    if args.armor_value is not None and not 0 <= args.armor_value <= 20:
+        raise SystemExit("--armor-value must be in 0..20")
     return args
 
 
@@ -3909,6 +3965,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "schema": "mattmc-cross-graphics-audit-manifest-v1",
         "created_at": utc_now(),
         "artifact_dir": str(artifact_root),
+        "repository_resolution": repository_resolution(targets["current"].root, targets["frozen"].root, args.frozen_repo),
         "runtime_profile": runtime_profile_dict(args),
         "workload_profile": args.workload_profile,
         "tool": args.tool,

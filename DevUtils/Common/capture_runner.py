@@ -418,10 +418,13 @@ class CaptureRunner:
     def configure_backend_and_validation(self) -> None:
         launch_backend = "opengl" if self.config.backend.startswith("rust-") else self.config.backend
         upsert_property(self.options_file, "graphics_backend", launch_backend)
+        gui_scale = os.environ.get("MATTMC_CAPTURE_GUI_SCALE", "3")
+        if not gui_scale.isdigit() or int(gui_scale) <= 0:
+            raise SystemExit(f"MATTMC_CAPTURE_GUI_SCALE must be a positive integer, got {gui_scale!r}")
         forced_options = {
             "renderDistance": "10",
             "simulationDistance": "12",
-            "guiScale": "3",
+            "guiScale": gui_scale,
             "fullscreen": "false",
             "hideGui": "false",
             "maxFps": "120",

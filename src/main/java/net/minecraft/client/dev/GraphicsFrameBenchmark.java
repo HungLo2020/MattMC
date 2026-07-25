@@ -5,7 +5,9 @@ import net.minecraft.util.profiling.TracyCompat.Zone;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.player.Input;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.phys.Vec3;
+import net.vulkanic.bridge.RustGalFrameQueue;
 
 import java.io.IOException;
 import java.lang.management.GarbageCollectorMXBean;
@@ -47,6 +49,8 @@ public final class GraphicsFrameBenchmark {
 	private static final long DISPLAY_FPS_MIN_NANOS = Math.max(1L, Long.getLong("mattmc.dev.graphicsFrameBenchmark.displayFpsMinNanos", 2_000_000_000L));
 	private static final long READINESS_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(Math.max(1L, Long.getLong("mattmc.dev.graphicsFrameBenchmark.readinessTimeoutSeconds", 120L)));
 	private static final boolean STOP_AFTER_COMPLETE = Boolean.parseBoolean(System.getProperty("mattmc.dev.graphicsFrameBenchmark.stopAfterComplete", "true"));
+	private static final int FORCED_ARMOR_VALUE = Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.armorValue", -1);
+	private static final String FORCED_GAME_MODE = System.getProperty("mattmc.dev.graphicsFrameBenchmark.gameMode", "").trim();
 	private static final Path STATUS_PATH = Path.of(System.getProperty("mattmc.dev.graphicsFrameBenchmark.status", "run/graphics_frame_benchmark.json"));
 	private static final String WORKLOAD_COUNTER_DEFINITION_VERSION = "phase-family-v2";
 
@@ -82,6 +86,11 @@ public final class GraphicsFrameBenchmark {
 	private static String dimension = "missing";
 	private static String failureReason = "";
 	private static String lastReadinessBlocker = "not checked";
+	private static int originalArmorValueOverride = -1;
+	private static boolean armorOverrideApplied;
+	private static GameType originalGameMode;
+	private static GameType originalPreviousGameMode;
+	private static boolean gameModeOverrideApplied;
 
 	private GraphicsFrameBenchmark() {
 	}
@@ -152,6 +161,7 @@ public final class GraphicsFrameBenchmark {
 				TracyCompat.message("MattMC graphics gameplay measurement complete");
 			}
 			writeStatus(minecraft, "complete");
+			restoreArmorOverride(minecraft);
 			if (STOP_AFTER_COMPLETE && !stopIssued) {
 				stopIssued = true;
 				minecraft.stop();
@@ -248,6 +258,8 @@ public final class GraphicsFrameBenchmark {
 			return false;
 		}
 		initialized = true;
+		applyGameModeOverride(minecraft);
+		applyArmorOverride(player);
 		initialPosition = new Vec3(CAMERA_X, CAMERA_Y, CAMERA_Z);
 		initialYaw = CAMERA_YAW;
 		initialPitch = CAMERA_PITCH;
@@ -312,6 +324,8 @@ public final class GraphicsFrameBenchmark {
 		if (player == null) {
 			return;
 		}
+		applyArmorOverride(player);
+		applyGameModeOverride(minecraft);
 		player.input.keyPresses = Input.EMPTY;
 		player.xxa = 0.0F;
 		player.zza = 0.0F;
@@ -338,6 +352,7 @@ public final class GraphicsFrameBenchmark {
 		failed = true;
 		failureReason = reason;
 		writeStatus(minecraft, "failed");
+		restoreArmorOverride(minecraft);
 	}
 
 	private static void writeStatus(Minecraft minecraft, String status) {
@@ -367,10 +382,10 @@ public final class GraphicsFrameBenchmark {
 		field(json, "shaders", System.getProperty("mattmc.dev.graphicsFrameBenchmark.shaders", "unknown"), 2, true);
 		json.append("  \"worldEntered\": ").append(minecraft.level != null && minecraft.player != null).append(",\n");
 		json.append("  \"settleFramesRequested\": ").append(SETTLE_FRAMES).append(",\n");
-			json.append("  \"warmupFramesRequested\": ").append(WARMUP_FRAMES).append(",\n");
-			json.append("  \"measureFramesRequested\": ").append(MEASURE_FRAMES).append(",\n");
-			json.append("  \"readinessTimeoutNanos\": ").append(READINESS_TIMEOUT_NANOS).append(",\n");
-			json.append("  \"initializationWaitFrames\": ").append(initializationWaitFrames).append(",\n");
+		json.append("  \"warmupFramesRequested\": ").append(WARMUP_FRAMES).append(",\n");
+		json.append("  \"measureFramesRequested\": ").append(MEASURE_FRAMES).append(",\n");
+		json.append("  \"readinessTimeoutNanos\": ").append(READINESS_TIMEOUT_NANOS).append(",\n");
+		json.append("  \"initializationWaitFrames\": ").append(initializationWaitFrames).append(",\n");
 		field(json, "lastReadinessBlocker", lastReadinessBlocker, 2, true);
 		json.append("  \"framesSeenIncludingSettleWarmup\": ").append(frameIndex).append(",\n");
 		json.append("  \"settledFrameIndex\": ").append(settledFrameIndex).append(",\n");
@@ -394,6 +409,7 @@ public final class GraphicsFrameBenchmark {
 		json.append("  },\n");
 		writeSamples(json);
 		json.append(",\n");
+		field(json, "rustGalSliceMetricsLine", RustGalFrameQueue.currentAuditMetricsLine(), 2, true);
 		writeStringIntMap(json, "submittedWorkCounts", SUBMITTED_WORK_COUNTS);
 		json.append(",\n");
 		writePhaseMap(json, "exclusivePhaseNanos", EXCLUSIVE_PHASES);
@@ -407,6 +423,8 @@ public final class GraphicsFrameBenchmark {
 		int loadedChunks = minecraft.level == null ? -1 : minecraft.level.getChunkSource().getLoadedChunksCount();
 		int entityCount = minecraft.level == null ? -1 : minecraft.level.getEntityCount();
 		int playerCount = minecraft.level == null ? -1 : minecraft.level.players().size();
+		int armorValue = minecraft.player == null ? -1 : minecraft.player.getArmorValue();
+		String gameMode = minecraft.gameMode == null ? "missing" : String.valueOf(minecraft.gameMode.getPlayerMode());
 		String screen = minecraft.screen == null ? "none" : minecraft.screen.getClass().getSimpleName();
 		String overlay = minecraft.getOverlay() == null ? "none" : minecraft.getOverlay().getClass().getSimpleName();
 		json.append("  \"runtimeState\": {\n");
@@ -424,6 +442,11 @@ public final class GraphicsFrameBenchmark {
 		json.append("    \"simulationDistance\": ").append(minecraft.options.simulationDistance().get()).append(",\n");
 		json.append("    \"entityDistanceScaling\": ").append(format(minecraft.options.entityDistanceScaling().get())).append(",\n");
 		json.append("    \"guiScale\": ").append(minecraft.options.guiScale().get()).append(",\n");
+		json.append("    \"armorValue\": ").append(armorValue).append(",\n");
+		json.append("    \"armorValueOverride\": ").append(FORCED_ARMOR_VALUE).append(",\n");
+		field(json, "gameMode", gameMode, 4, true);
+		field(json, "gameModeOverride", FORCED_GAME_MODE, 4, true);
+		field(json, "rustGalGuiControl", rustGalGuiControl(), 4, true);
 		json.append("    \"maxFps\": ").append(minecraft.options.framerateLimit().get()).append(",\n");
 		json.append("    \"enableVsync\": ").append(minecraft.options.enableVsync().get()).append(",\n");
 		field(json, "graphicsMode", String.valueOf(minecraft.options.graphicsMode().get()), 4, false);
@@ -548,6 +571,70 @@ public final class GraphicsFrameBenchmark {
 
 	private static String format(double value) {
 		return String.format(Locale.ROOT, "%.6f", value);
+	}
+
+	private static void applyArmorOverride(LocalPlayer player) {
+		if (FORCED_ARMOR_VALUE < 0) {
+			return;
+		}
+		if (!armorOverrideApplied) {
+			originalArmorValueOverride = player.getArmorValueForDeterministicCapture();
+			armorOverrideApplied = true;
+		}
+		player.setArmorValueForDeterministicCapture(Math.min(20, FORCED_ARMOR_VALUE));
+	}
+
+	private static void applyGameModeOverride(Minecraft minecraft) {
+		GameType gameType = forcedGameMode();
+		if (gameType == null || minecraft.gameMode == null) {
+			return;
+		}
+		if (!gameModeOverrideApplied) {
+			originalGameMode = minecraft.gameMode.getPlayerMode();
+			originalPreviousGameMode = minecraft.gameMode.getPreviousPlayerMode();
+			gameModeOverrideApplied = true;
+		}
+		if (minecraft.gameMode.getPlayerMode() != gameType) {
+			minecraft.gameMode.setLocalMode(gameType, minecraft.gameMode.getPreviousPlayerMode());
+		}
+	}
+
+	private static void restoreArmorOverride(Minecraft minecraft) {
+		if (armorOverrideApplied && minecraft.player != null) {
+			minecraft.player.setArmorValueForDeterministicCapture(originalArmorValueOverride);
+			armorOverrideApplied = false;
+		}
+		if (gameModeOverrideApplied && minecraft.gameMode != null && originalGameMode != null) {
+			minecraft.gameMode.setLocalMode(originalGameMode, originalPreviousGameMode);
+			gameModeOverrideApplied = false;
+		}
+	}
+
+	private static GameType forcedGameMode() {
+		if (FORCED_GAME_MODE.isBlank()) {
+			return null;
+		}
+		GameType gameType = GameType.byName(FORCED_GAME_MODE, null);
+		if (gameType == null) {
+			throw new IllegalArgumentException("unknown graphics frame benchmark game mode: " + FORCED_GAME_MODE);
+		}
+		return gameType;
+	}
+
+	private static String rustGalGuiControl() {
+		if (Boolean.getBoolean("mattmc.dev.rustGalGui.armor.disabled")) {
+			return "armor-disabled";
+		}
+		if (Boolean.getBoolean("mattmc.dev.rustGalGui.armor.legacyControl")) {
+			return "armor-legacy";
+		}
+		if (Boolean.getBoolean("mattmc.dev.rustGalGui.disabled")) {
+			return "all-disabled";
+		}
+		if (Boolean.getBoolean("mattmc.dev.rustGalGui.legacyControl")) {
+			return "all-legacy";
+		}
+		return "rust";
 	}
 
 	private record OpenPhase(String name, long startNanos, long childNanos, Zone tracyZone) {
