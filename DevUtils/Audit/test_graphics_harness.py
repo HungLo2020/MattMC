@@ -92,6 +92,7 @@ def write_frame_benchmark(capture_dir: Path, samples: list[int]) -> None:
         json.dumps(
             {
                 "schema": "mattmc-graphics-frame-benchmark-v1",
+                "workloadCounterDefinitionVersion": "phase-family-v2",
                 "status": "complete",
                 "warmupFramesRequested": 2,
                 "measureFramesRequested": len(samples),
@@ -143,11 +144,17 @@ def write_frame_benchmark(capture_dir: Path, samples: list[int]) -> None:
                 },
                 "exclusivePhaseNanos": {
                     "game.rendering": {"count": 2, "total": 20_000_000, "worst": 12_000_000},
-                    "iris.composite": {"count": 2, "total": 6_000_000, "worst": 4_000_000},
+                    "sodium.terrain.setup": {"count": len(samples), "total": 8_000_000, "worst": 4_000_000},
+                    "sodium.terrain.draw": {"count": len(samples) * 2, "total": 10_000_000, "worst": 5_000_000},
+                    "distant-horizons.lod-render": {"count": len(samples), "total": 4_000_000, "worst": 2_000_000},
+                    "iris.composite-final": {"count": 2, "total": 6_000_000, "worst": 4_000_000},
                 },
                 "nestedPhaseNanos": {
                     "game.rendering": {"count": 2, "total": 30_000_000, "worst": 18_000_000},
-                    "iris.composite": {"count": 2, "total": 6_000_000, "worst": 4_000_000},
+                    "sodium.terrain.setup": {"count": len(samples), "total": 8_000_000, "worst": 4_000_000},
+                    "sodium.terrain.draw": {"count": len(samples) * 2, "total": 10_000_000, "worst": 5_000_000},
+                    "distant-horizons.lod-render": {"count": len(samples), "total": 4_000_000, "worst": 2_000_000},
+                    "iris.composite-final": {"count": 2, "total": 6_000_000, "worst": 4_000_000},
                 },
             }
         ),
@@ -856,11 +863,24 @@ else:
             root = Path(temp)
             left = gameplay_artifact_for(root, harness.MATRIX_MODES[0])
             right = gameplay_artifact_for(root, harness.MATRIX_MODES[4])
+            left["benchmark_fingerprint"]["workload_signature"]["runtime"]["entity_count"] = 178
             signature = right["benchmark_fingerprint"]["workload_signature"]
             signature["runtime"]["loaded_chunks"] = 124
-            signature["workload_families"]["terrain"]["calls_per_frame"] = 31.0
+            signature["runtime"]["entity_count"] = 190
+            signature["workload_families"]["sodium-terrain-draw"]["calls_per_frame"] = 2.1
             comparison = harness.compare_workloads(left, right)
             self.assertTrue(comparison["comparable"], comparison)
+
+    def test_fingerprint_rejects_material_entity_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            left = gameplay_artifact_for(root, harness.MATRIX_MODES[0])
+            right = gameplay_artifact_for(root, harness.MATRIX_MODES[4])
+            signature = right["benchmark_fingerprint"]["workload_signature"]
+            signature["runtime"]["entity_count"] = 240
+            comparison = harness.compare_workloads(left, right)
+            self.assertFalse(comparison["comparable"])
+            self.assertTrue(any(diff["path"] == "runtime.entity_count" for diff in comparison["differences"]))
 
     def test_fingerprint_rejects_material_workload_family_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -868,11 +888,11 @@ else:
             left = gameplay_artifact_for(root, harness.MATRIX_MODES[0])
             right = gameplay_artifact_for(root, harness.MATRIX_MODES[4])
             signature = right["benchmark_fingerprint"]["workload_signature"]
-            signature["workload_families"]["terrain"]["present"] = False
-            signature["workload_families"]["terrain"]["bucket"] = "zero"
+            signature["workload_families"]["sodium-terrain-draw"]["present"] = False
+            signature["workload_families"]["sodium-terrain-draw"]["bucket"] = "zero"
             comparison = harness.compare_workloads(left, right)
             self.assertFalse(comparison["comparable"])
-            self.assertTrue(any(diff["path"].startswith("workload_families.terrain") for diff in comparison["differences"]))
+            self.assertTrue(any(diff["path"].startswith("workload_families.sodium-terrain-draw") for diff in comparison["differences"]))
 
     def test_deterministic_camera_metadata_is_in_fingerprint(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -1133,6 +1153,8 @@ else:
             command, _ = harness.build_capture_command(target, harness.MATRIX_MODES[4], root / "capture", "gameplay", args, "gameplay")
             joined = " ".join(command)
             self.assertIn("--quickPlaySingleplayer=Origin", joined)
+            self.assertIn("--artifact-dir " + str(root / "capture"), joined)
+            self.assertIn("--shaders off", joined)
 
     def test_tracy_capture_uses_java_property_not_client_flag(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -1225,18 +1247,27 @@ else:
                 "rust_gal_ffi_frame_present_bytes=40 rust_gal_ffi_resource_batch_bytes=3000 "
                 "rust_gal_ffi_submit_bytes=720 rust_gal_ffi_completion_query_bytes=32 rust_gal_ffi_retire_bytes=128 "
                 "ffi_call_count=11 ffi_bytes=4096\n"
-                "[MattMC graphics audit] Rust OpenGL VulkanicGAL GUI batch executed producer=minecraft.gui.crosshair "
-                "stratum=gui.crosshair batch=3 frame=4 submission=5 rust_gal_cache_hits=8 "
+                "[MattMC graphics audit] Rust OpenGL VulkanicGAL GUI frame executed producer=gui.frame "
+                "stratum=gui.frame frame_batch_count=1 frame=4 submission=5 rust_gal_cache_hits=8 "
                 "rust_gal_cache_misses=1 rust_gal_queue_depth=0 rust_gal_batches_executed=2 "
-                "rust_gal_batches_cancelled=0 rust_gal_completion_polls=2 rust_gal_completion_timeouts=0 "
+                "rust_gal_batches_cancelled=0 rust_gal_completion_polls=0 rust_gal_completion_timeouts=0 "
                 "rust_gal_ffi_context_create_calls=1 rust_gal_ffi_capability_calls=1 "
                 "rust_gal_ffi_frame_configure_calls=1 rust_gal_ffi_frame_acquire_calls=2 "
                 "rust_gal_ffi_frame_present_calls=2 rust_gal_ffi_resource_batch_calls=5 "
-                "rust_gal_ffi_submit_calls=3 rust_gal_ffi_completion_query_calls=2 rust_gal_ffi_retire_calls=3 "
+                "rust_gal_ffi_submit_calls=3 rust_gal_ffi_completion_query_calls=0 rust_gal_ffi_retire_calls=1 "
                 "rust_gal_ffi_context_create_bytes=40 rust_gal_ffi_capability_bytes=24 "
                 "rust_gal_ffi_frame_configure_bytes=64 rust_gal_ffi_frame_acquire_bytes=96 "
                 "rust_gal_ffi_frame_present_bytes=80 rust_gal_ffi_resource_batch_bytes=3200 "
-                "rust_gal_ffi_submit_bytes=1080 rust_gal_ffi_completion_query_bytes=64 rust_gal_ffi_retire_bytes=192 "
+                "rust_gal_ffi_submit_bytes=1080 rust_gal_ffi_completion_query_bytes=0 rust_gal_ffi_retire_bytes=64 "
+                "rust_gal_enqueue_nanos=4000 rust_gal_resource_lookup_nanos=6000 "
+                "rust_gal_resource_create_nanos=1000 rust_gal_abi_packing_nanos=8000 "
+                "rust_gal_frame_acquire_nanos=10000 rust_gal_submit_nanos=12000 "
+                "rust_gal_frame_present_nanos=14000 rust_gal_retire_nanos=16000 "
+                "rust_gal_completion_query_nanos=18000 rust_gal_execute_nanos=20000 "
+                "rust_gal_command_lists=3 rust_gal_command_ops=12 rust_gal_backend_submissions=3 "
+                "rust_gal_backend_waits=0 rust_gal_gl_calls=17 rust_gal_gl_flushes=0 rust_gal_gl_finishes=0 "
+                "rust_gal_gl_fences_inserted=3 rust_gal_gl_fences_polled=3 rust_gal_gl_fences_waited=0 "
+                "rust_gal_gl_fences_deleted=1 "
                 "ffi_call_count=18 ffi_bytes=8192\n",
                 encoding="utf-8",
             )
@@ -1244,18 +1275,24 @@ else:
             artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[0], capture, "capture", True, [], 0, False, tool_kind="capture")
 
             self.assertEqual("rust-opengl", artifact["implementation_attribution"])
-            self.assertEqual("minecraft.gui.crosshair", artifact["metrics"]["rust_gal_slice"]["producer"])
+            self.assertEqual("gui.frame", artifact["metrics"]["rust_gal_slice"]["producer"])
             self.assertEqual(8, artifact["metrics"]["rust_gal_slice"]["cache_hits"])
             self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["cache_misses"])
             self.assertEqual(0, artifact["metrics"]["rust_gal_slice"]["queue_depth"])
             self.assertEqual(2, artifact["metrics"]["rust_gal_slice"]["batches_executed"])
             self.assertEqual(0, artifact["metrics"]["rust_gal_slice"]["batches_cancelled"])
-            self.assertEqual(2, artifact["metrics"]["rust_gal_slice"]["completion_polls"])
+            self.assertEqual(0, artifact["metrics"]["rust_gal_slice"]["completion_polls"])
             self.assertEqual(0, artifact["metrics"]["rust_gal_slice"]["completion_timeouts"])
             self.assertEqual(5, artifact["metrics"]["rust_gal_slice"]["ffi_operations"]["resource_batch"]["calls"])
             self.assertEqual(3200, artifact["metrics"]["rust_gal_slice"]["ffi_operations"]["resource_batch"]["bytes"])
             self.assertEqual(9, artifact["metrics"]["rust_gal_slice"]["ffi_calls_per_executed_batch"])
             self.assertEqual(4096, artifact["metrics"]["rust_gal_slice"]["ffi_bytes_per_executed_batch"])
+            self.assertEqual(8000, artifact["metrics"]["rust_gal_slice"]["timing_totals_nanos"]["abi_packing_nanos"])
+            self.assertEqual(10000, artifact["metrics"]["rust_gal_slice"]["timing_per_executed_batch_nanos"]["execute_nanos"])
+            self.assertEqual(0, artifact["metrics"]["rust_gal_slice"]["backend_sync"]["gl_flushes"])
+            self.assertEqual(0, artifact["metrics"]["rust_gal_slice"]["backend_sync"]["gl_finishes"])
+            self.assertEqual(3, artifact["metrics"]["rust_gal_slice"]["backend_sync"]["gl_fences_inserted"])
+            self.assertEqual(0, artifact["metrics"]["rust_gal_slice"]["backend_sync"]["gl_fences_waited"])
             self.assertEqual(18, artifact["metrics"]["ffi"]["call_count"])
             self.assertEqual(8192, artifact["metrics"]["ffi"]["bytes"])
 
@@ -1313,7 +1350,7 @@ else:
             self.assertTrue(report["passed"])
             self.assertAlmostEqual(report["rows"][0]["relative_overhead"], 0.10)
 
-    def test_stable_workload_family_summaries_bucket_raw_counts(self) -> None:
+    def test_stable_workload_family_summaries_use_phase_counters_not_log_counts(self) -> None:
         frame_doc = {
             "measuredFrameCount": 10,
             "submittedWorkCounts": {
@@ -1321,11 +1358,43 @@ else:
                 "DistantHorizons": 20,
                 "pipeline-cache": 1,
             },
+            "runtimeState": {
+                "entityCount": 7,
+                "loadedChunks": 121,
+                "hideGui": False,
+            },
+            "exclusivePhaseNanos": {
+                "sodium.terrain.setup": {"count": 10, "total": 100, "worst": 10},
+                "sodium.terrain.draw": {"count": 20, "total": 100, "worst": 10},
+                "distant-horizons.lod-render": {"count": 5, "total": 100, "worst": 10},
+            },
         }
-        summary = harness.stable_workload_family_summary(frame_doc, "")
-        self.assertEqual(summary["terrain"]["bucket"], "high")
-        self.assertEqual(summary["distant-horizons"]["calls_per_frame"], 2.0)
-        self.assertTrue(summary["pipelines-resources"]["present"])
+        summary = harness.stable_workload_family_summary(frame_doc, "Sodium Sodium Sodium")
+        self.assertEqual(summary["sodium-terrain-setup"]["calls_per_frame"], 1.0)
+        self.assertEqual(summary["sodium-terrain-draw"]["calls_per_frame"], 2.0)
+        self.assertEqual(summary["dh-lod"]["calls_per_frame"], 0.5)
+        self.assertEqual(summary["entities"]["count"], 7)
+        self.assertEqual(summary["gui"]["calls_per_frame"], 1.0)
+
+    def test_backend_work_counters_are_diagnostic_only(self) -> None:
+        frame_doc = {
+            "measuredFrameCount": 10,
+            "submittedWorkCounts": {
+                "pipeline-cache": 1,
+                "draw-indexed": 20,
+                "transfer-upload": 3,
+            },
+        }
+        summary = harness.backend_work_counter_summary(frame_doc)
+        self.assertFalse(summary["families"]["draws"]["comparable"])
+        self.assertEqual(summary["families"]["draws"]["calls_per_frame"], 2.0)
+        self.assertEqual(summary["families"]["uploads"]["count"], 3)
+
+    def test_graphics_diagnostic_hooks_are_not_publishable_performance(self) -> None:
+        signature = harness.instrumentation_signature({"graphics_audit_enabled": "true"}, ["gradlew"])
+        self.assertTrue(signature["diagnostics_enabled"])
+        self.assertTrue(signature["diagnostic_hooks"])
+        self.assertFalse(signature["performance_comparable"])
 
     def test_incomplete_vulkan_run_diagnosis(self) -> None:
         diagnosis = harness.incomplete_run_diagnosis(

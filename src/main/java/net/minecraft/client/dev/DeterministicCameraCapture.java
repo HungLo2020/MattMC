@@ -3,6 +3,7 @@ package net.minecraft.client.dev;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.irisshaders.iris.uniforms.SystemTimeUniforms;
@@ -49,6 +50,12 @@ public final class DeterministicCameraCapture {
 	private static final int FORCED_SELECTED_HOTBAR_SLOT = Integer.getInteger("mattmc.dev.deterministicCameraCapture.selectedHotbarSlot", 0);
 	private static final float FIXED_VIGNETTE_BRIGHTNESS =
 		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.vignetteBrightness", "1.0"));
+	private static final boolean RUST_GAL_GUI_SCREEN_CYCLE =
+		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.rustGalGuiScreenCycle");
+	private static final int RUST_GAL_GUI_SCREEN_CYCLE_REPEATS =
+		Math.max(1, Integer.getInteger("mattmc.dev.deterministicCameraCapture.rustGalGuiScreenCycleRepeats", 2));
+	private static final int RUST_GAL_GUI_SCREEN_CYCLE_HOLD_FRAMES =
+		Math.max(1, Integer.getInteger("mattmc.dev.deterministicCameraCapture.rustGalGuiScreenCycleHoldFrames", 4));
 	private static final Path METADATA_PATH = Path.of(System.getProperty("mattmc.dev.deterministicCameraCapture.metadata", "run/deterministic_camera_capture.json"));
 	private static final Path SCREENSHOT_DIR = Path.of(System.getProperty("mattmc.dev.deterministicCameraCapture.screenshotDir", "run/deterministic_camera_capture"));
 
@@ -76,6 +83,10 @@ public final class DeterministicCameraCapture {
 	private static CameraType originalCameraType;
 	private static int originalSelectedHotbarSlot;
 	private static final Map<Long, Map<String, Set<String>>> SUBMITTED_WORK_BY_FRAME = new LinkedHashMap<>();
+	private static int rustGalGuiScreenCycleStage;
+	private static int rustGalGuiScreenCycleFramesInStage;
+	private static int rustGalGuiScreenCyclesCompleted;
+	private static boolean rustGalGuiScreenCycleComplete = !RUST_GAL_GUI_SCREEN_CYCLE;
 
 	private DeterministicCameraCapture() {
 	}
@@ -159,6 +170,9 @@ public final class DeterministicCameraCapture {
 			if (framesAwaitingAck > ACK_TIMEOUT_FRAMES) {
 				fail("timed out waiting for deterministic screenshot ack: " + currentAckPath);
 			}
+			return;
+		}
+		if (!advanceRustGalGuiScreenCycle(minecraft)) {
 			return;
 		}
 
@@ -411,6 +425,69 @@ public final class DeterministicCameraCapture {
 
 	private static void stabilizeGuiState(Minecraft minecraft) {
 		minecraft.gui.vignetteBrightness = FIXED_VIGNETTE_BRIGHTNESS;
+	}
+
+	private static boolean advanceRustGalGuiScreenCycle(Minecraft minecraft) {
+		if (rustGalGuiScreenCycleComplete) {
+			return true;
+		}
+		if (minecraft.player == null) {
+			return false;
+		}
+		rustGalGuiScreenCycleFramesInStage++;
+		switch (rustGalGuiScreenCycleStage) {
+			case 0 -> {
+				if (minecraft.screen != null) {
+					fail("Rust GAL GUI screen-cycle expected gameplay HUD before inventory but screen was " + minecraft.screen.getClass().getSimpleName());
+					return false;
+				}
+				if (rustGalGuiScreenCycleFramesInStage == 1) {
+					writeMetadata(minecraft, "rust_gal_gui_screen_cycle_hud_before");
+				}
+				if (rustGalGuiScreenCycleFramesInStage >= RUST_GAL_GUI_SCREEN_CYCLE_HOLD_FRAMES) {
+					minecraft.setScreen(new InventoryScreen(minecraft.player));
+					rustGalGuiScreenCycleStage = 1;
+					rustGalGuiScreenCycleFramesInStage = 0;
+					writeMetadata(minecraft, "rust_gal_gui_screen_cycle_inventory_open");
+				}
+				return false;
+			}
+			case 1 -> {
+				if (!(minecraft.screen instanceof InventoryScreen)) {
+					fail("Rust GAL GUI screen-cycle expected InventoryScreen but screen was "
+						+ (minecraft.screen == null ? "none" : minecraft.screen.getClass().getSimpleName()));
+					return false;
+				}
+				if (rustGalGuiScreenCycleFramesInStage >= RUST_GAL_GUI_SCREEN_CYCLE_HOLD_FRAMES) {
+					minecraft.setScreen(null);
+					rustGalGuiScreenCycleStage = 2;
+					rustGalGuiScreenCycleFramesInStage = 0;
+					writeMetadata(minecraft, "rust_gal_gui_screen_cycle_inventory_closed");
+				}
+				return false;
+			}
+			case 2 -> {
+				if (minecraft.screen != null) {
+					fail("Rust GAL GUI screen-cycle expected HUD recovery after inventory but screen was " + minecraft.screen.getClass().getSimpleName());
+					return false;
+				}
+				if (rustGalGuiScreenCycleFramesInStage >= RUST_GAL_GUI_SCREEN_CYCLE_HOLD_FRAMES) {
+					rustGalGuiScreenCyclesCompleted++;
+					if (rustGalGuiScreenCyclesCompleted >= RUST_GAL_GUI_SCREEN_CYCLE_REPEATS) {
+						rustGalGuiScreenCycleComplete = true;
+						writeMetadata(minecraft, "rust_gal_gui_screen_cycle_complete");
+						return true;
+					}
+					rustGalGuiScreenCycleStage = 0;
+					rustGalGuiScreenCycleFramesInStage = 0;
+				}
+				return false;
+			}
+			default -> {
+				fail("invalid Rust GAL GUI screen-cycle stage: " + rustGalGuiScreenCycleStage);
+				return false;
+			}
+		}
 	}
 
 	private static void requestCurrentPoseScreenshot(Minecraft minecraft) {
@@ -685,6 +762,13 @@ public final class DeterministicCameraCapture {
 		json.append("  \"settledReadyMaxWaitFrames\": ").append(SETTLED_READY_MAX_WAIT_FRAMES).append(",\n");
 		json.append("  \"settledReadyGateSatisfied\": ").append(settledReadyGateSatisfied).append(",\n");
 		appendField(json, "settledReadySummary", settledReadySummary()).append(",\n");
+		json.append("  \"rustGalGuiScreenCycle\": { \"enabled\": ").append(RUST_GAL_GUI_SCREEN_CYCLE)
+			.append(", \"complete\": ").append(rustGalGuiScreenCycleComplete)
+			.append(", \"stage\": ").append(rustGalGuiScreenCycleStage)
+			.append(", \"framesInStage\": ").append(rustGalGuiScreenCycleFramesInStage)
+			.append(", \"cyclesCompleted\": ").append(rustGalGuiScreenCyclesCompleted)
+			.append(", \"repeatCount\": ").append(RUST_GAL_GUI_SCREEN_CYCLE_REPEATS)
+			.append(" },\n");
 		json.append("  \"ackTimeoutFrames\": ").append(ACK_TIMEOUT_FRAMES).append(",\n");
 			json.append("  \"poseCount\": ").append(poses == null ? POSE_COUNT : poses.length).append(",\n");
 			json.append("  \"poseSequence\": [");

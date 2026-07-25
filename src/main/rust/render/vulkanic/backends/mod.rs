@@ -41,6 +41,20 @@ pub(in crate::render::vulkanic) struct CompletedHostRead {
     pub(in crate::render::vulkanic) bytes: Vec<u8>,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(in crate::render::vulkanic) struct BackendRuntimeMetrics {
+    pub(in crate::render::vulkanic) command_batches: u64,
+    pub(in crate::render::vulkanic) command_lists: u64,
+    pub(in crate::render::vulkanic) command_ops: u64,
+    pub(in crate::render::vulkanic) gl_calls: u64,
+    pub(in crate::render::vulkanic) gl_flushes: u64,
+    pub(in crate::render::vulkanic) gl_finishes: u64,
+    pub(in crate::render::vulkanic) gl_fences_inserted: u64,
+    pub(in crate::render::vulkanic) gl_fences_polled: u64,
+    pub(in crate::render::vulkanic) gl_fences_waited: u64,
+    pub(in crate::render::vulkanic) gl_fences_deleted: u64,
+}
+
 pub(super) fn graphics_backend_lock() -> &'static Mutex<()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
     LOCK.get_or_init(|| Mutex::new(()))
@@ -93,6 +107,9 @@ pub(super) trait Backend {
     fn retire(&mut self, completed: SubmissionId) -> GalResult<()>;
     fn completed_host_reads(&self) -> Vec<CompletedHostRead> {
         Vec::new()
+    }
+    fn runtime_metrics(&self) -> BackendRuntimeMetrics {
+        BackendRuntimeMetrics::default()
     }
     fn configure_frame_surface(&mut self, _desc: &FrameSurfaceDesc) -> GalResult<()> {
         Err(GalError::unsupported_feature(

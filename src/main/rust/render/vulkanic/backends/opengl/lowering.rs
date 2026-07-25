@@ -24,10 +24,12 @@ pub(in crate::render::vulkanic) struct CompletedHostRead {
 pub(super) struct OpenGlLowerer {
     gl: Rc<glow::Context>,
     pending: VecDeque<ValidatedSubmissionBatch>,
+    submitted: VecDeque<PendingFence>,
     completed: SubmissionId,
     completed_host_reads: Vec<CompletedHostRead>,
     gl_errors: Vec<String>,
     cache: StateCache,
+    sync_stats: OpenGlSyncStats,
 }
 
 impl OpenGlLowerer {
@@ -35,10 +37,12 @@ impl OpenGlLowerer {
         Self {
             gl,
             pending: VecDeque::new(),
+            submitted: VecDeque::new(),
             completed: SubmissionId(0),
             completed_host_reads: Vec::new(),
             gl_errors: Vec::new(),
             cache: StateCache::default(),
+            sync_stats: OpenGlSyncStats::default(),
         }
     }
 
@@ -59,6 +63,18 @@ impl OpenGlLowerer {
                 "OpenGL submit called without encoded commands",
             ));
         };
+        self.sync_stats.command_batches = self.sync_stats.command_batches.saturating_add(1);
+        self.sync_stats.command_lists = self
+            .sync_stats
+            .command_lists
+            .saturating_add(batch.command_lists.len() as u64);
+        self.sync_stats.command_ops = self.sync_stats.command_ops.saturating_add(
+            batch
+                .command_lists
+                .iter()
+                .map(|list| list.operations.len() as u64)
+                .sum::<u64>(),
+        );
         let mut state = ExecutionState::default();
         for list in &batch.command_lists {
             for op in &list.operations {
@@ -67,11 +83,21 @@ impl OpenGlLowerer {
             }
         }
         unsafe {
-            let _zone = trace::Zone::new("opengl.backend.flush-finish");
-            self.gl.flush();
-            self.gl.finish();
+            let _zone = trace::Zone::new("opengl.backend.fence-insert");
+            self.record_gl_call();
+            let fence = self
+                .gl
+                .fence_sync(glow::SYNC_GPU_COMMANDS_COMPLETE, 0)
+                .map_err(|error| {
+                    GalError::backend(format!("failed to insert OpenGL fence: {error}"))
+                })?;
+            self.sync_stats.fences_inserted += 1;
+            self.submitted.push_back(PendingFence {
+                submission: id,
+                fence,
+            });
         }
-        self.completed = id;
+        self.poll_fences(false);
         Ok(())
     }
 
@@ -79,16 +105,36 @@ impl OpenGlLowerer {
         self.cache = StateCache::default();
     }
 
-    pub(super) fn completed_submission(&self) -> SubmissionId {
-        self.completed
-    }
-
     pub(super) fn retire(&mut self, completed: SubmissionId) -> GalResult<()> {
         let _zone = trace::Zone::new("opengl.backend.retirement");
         if completed > self.completed {
-            self.completed = completed;
+            self.wait_through(completed)?;
         }
         Ok(())
+    }
+
+    pub(super) fn poll_completed_submission(&mut self) -> SubmissionId {
+        self.poll_fences(false);
+        self.completed
+    }
+
+    pub(super) fn delete_all_fences(&mut self) {
+        unsafe {
+            while let Some(pending) = self.submitted.pop_front() {
+                self.record_gl_call();
+                self.gl.delete_sync(pending.fence);
+                self.sync_stats.fences_deleted += 1;
+            }
+        }
+    }
+
+    pub(super) fn sync_stats_snapshot(&self) -> OpenGlSyncStats {
+        self.sync_stats
+    }
+
+    #[cfg(test)]
+    pub(super) fn sync_stats_for_test(&self) -> OpenGlSyncStats {
+        self.sync_stats_snapshot()
     }
 
     pub(super) fn completed_host_reads_snapshot(&self) -> &[CompletedHostRead] {
@@ -110,6 +156,67 @@ impl OpenGlLowerer {
             sampler_binds: self.cache.sampler_binds,
             state_changes: self.cache.state_changes,
         }
+    }
+
+    fn poll_fences(&mut self, flush_commands: bool) {
+        let _zone = trace::Zone::new("opengl.backend.fence-poll");
+        let flags = if flush_commands {
+            glow::SYNC_FLUSH_COMMANDS_BIT
+        } else {
+            0
+        };
+        unsafe {
+            while let Some(pending) = self.submitted.front().copied() {
+                self.sync_stats.fences_polled += 1;
+                self.record_gl_call();
+                let status = self.gl.client_wait_sync(pending.fence, flags, 0);
+                if status == glow::ALREADY_SIGNALED || status == glow::CONDITION_SATISFIED {
+                    let pending = self.submitted.pop_front().expect("front fence exists");
+                    self.record_gl_call();
+                    self.gl.delete_sync(pending.fence);
+                    self.sync_stats.fences_deleted += 1;
+                    self.completed = self.completed.max(pending.submission);
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+
+    fn wait_through(&mut self, completed: SubmissionId) -> GalResult<()> {
+        let _zone = trace::Zone::new("opengl.backend.fence-wait");
+        unsafe {
+            while let Some(pending) = self.submitted.front().copied() {
+                if pending.submission > completed {
+                    break;
+                }
+                self.sync_stats.fences_waited += 1;
+                loop {
+                    self.record_gl_call();
+                    let status = self.gl.client_wait_sync(
+                        pending.fence,
+                        glow::SYNC_FLUSH_COMMANDS_BIT,
+                        1_000_000,
+                    );
+                    if status == glow::ALREADY_SIGNALED || status == glow::CONDITION_SATISFIED {
+                        let pending = self.submitted.pop_front().expect("front fence exists");
+                        self.record_gl_call();
+                        self.gl.delete_sync(pending.fence);
+                        self.sync_stats.fences_deleted += 1;
+                        self.completed = self.completed.max(pending.submission);
+                        break;
+                    }
+                    if status == glow::WAIT_FAILED {
+                        return Err(GalError::backend("OpenGL fence wait failed"));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn record_gl_call(&mut self) {
+        self.sync_stats.gl_calls = self.sync_stats.gl_calls.saturating_add(1);
     }
 
     fn execute_op(
@@ -517,8 +624,12 @@ impl OpenGlLowerer {
                     self.bind_sampler_unit(unit, None);
                     unsafe {
                         if let Some(program) = self.cache.program {
-                            if let Some(location) = self.gl.get_uniform_location(program, "tex0") {
-                                self.gl.uniform_1_i32(Some(&location), unit as i32);
+                            for sampler_name in ["Sampler0", "tex0"] {
+                                if let Some(location) =
+                                    self.gl.get_uniform_location(program, sampler_name)
+                                {
+                                    self.gl.uniform_1_i32(Some(&location), unit as i32);
+                                }
                             }
                         }
                     }
@@ -751,6 +862,26 @@ struct StateCache {
     texture_binds: usize,
     sampler_binds: usize,
     state_changes: usize,
+}
+
+#[derive(Copy, Clone)]
+struct PendingFence {
+    submission: SubmissionId,
+    fence: glow::Fence,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(in crate::render::vulkanic) struct OpenGlSyncStats {
+    pub(in crate::render::vulkanic) command_batches: u64,
+    pub(in crate::render::vulkanic) command_lists: u64,
+    pub(in crate::render::vulkanic) command_ops: u64,
+    pub(in crate::render::vulkanic) gl_calls: u64,
+    pub(in crate::render::vulkanic) flushes: usize,
+    pub(in crate::render::vulkanic) finishes: usize,
+    pub(in crate::render::vulkanic) fences_inserted: usize,
+    pub(in crate::render::vulkanic) fences_polled: usize,
+    pub(in crate::render::vulkanic) fences_waited: usize,
+    pub(in crate::render::vulkanic) fences_deleted: usize,
 }
 
 #[cfg(test)]

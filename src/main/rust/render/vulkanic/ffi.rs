@@ -1960,6 +1960,11 @@ fn backend_kind(raw: u32) -> GalResult<BackendKind> {
 
 fn context_metrics(context: &BridgeContext) -> FfiMetricsSnapshot {
     let mut metrics = FfiMetricsSnapshot::from(context.gal.metrics());
+    let backend = context.gal.backend_runtime_metrics();
+    metrics.command_lists = backend.command_lists;
+    metrics.command_ops = backend.command_ops;
+    metrics.backend_submissions = backend.command_batches;
+    metrics.backend_waits = backend.gl_fences_waited;
     metrics.ffi_calls = context.ffi_calls;
     metrics.ffi_input_bytes = context.ffi_input_bytes;
     metrics.ffi_output_bytes = context.ffi_output_bytes;
@@ -3387,7 +3392,8 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_acquire(
             let frame_target = if acquired.status == FrameAcquireStatus::Minimized {
                 Handle::NULL
             } else if let Some(cached) = context.cached_frame_target {
-                if cached.extent == acquired.extent && cached.color_format == acquired.color_format {
+                if cached.extent == acquired.extent && cached.color_format == acquired.color_format
+                {
                     cached.handle
                 } else {
                     let handle = context.gal.create_frame_target(FrameTargetDesc {

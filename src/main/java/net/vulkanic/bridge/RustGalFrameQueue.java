@@ -3,6 +3,7 @@ package net.vulkanic.bridge;
 import net.blaze3d.platform.Window;
 import net.logging.LogUtils;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.dev.GraphicsFrameBenchmark;
 import net.minecraft.util.profiling.TracyCompat;
 import net.vulkanic.VulkanicAPI;
 import org.lwjgl.glfw.GLFW;
@@ -21,17 +22,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
-import java.util.concurrent.TimeUnit;
 
 public final class RustGalFrameQueue {
 	private static final Logger LOGGER = LogUtils.getLogger();
-	private static final int CROSSHAIR_SIZE = 15;
-	private static final int CROSSHAIR_TEXTURE_BYTES = CROSSHAIR_SIZE * CROSSHAIR_SIZE * 4;
-	private static final int CROSSHAIR_UNIFORM_BYTES = 32;
+	private static final int GUI_UNIFORM_BYTES = 32;
 	private static final String CROSSHAIR_PRODUCER = "minecraft.gui.crosshair";
-	private static final String CROSSHAIR_TEXTURE_RESOURCE = "/assets/minecraft/textures/gui/sprites/hud/crosshair.png";
-	private static final long COMPLETION_TIMEOUT_NANOS = TimeUnit.MILLISECONDS.toNanos(100);
-	private static final long RETIRE_INTERVAL_FRAMES = 60;
+	private static final String HOTBAR_BASE_PRODUCER = "minecraft.gui.hotbar.base";
 	private static final Object LOCK = new Object();
 	private static VulkanicGalBridge bridge;
 	private static Thread renderThread;
@@ -54,39 +50,81 @@ public final class RustGalFrameQueue {
 		return Boolean.parseBoolean(System.getProperty("mattmc.rustGal.guiCrosshair.enabled", "true"));
 	}
 
+	public static boolean isMigratedGuiDisabledForDiagnostics() {
+		return Boolean.getBoolean("mattmc.dev.guiCrosshair.disabled") || Boolean.getBoolean("mattmc.dev.rustGalGui.disabled");
+	}
+
+	public static boolean isMigratedGuiLegacyControl() {
+		return Boolean.getBoolean("mattmc.dev.guiCrosshair.legacyControl") || Boolean.getBoolean("mattmc.dev.rustGalGui.legacyControl");
+	}
+
 	public static void enqueueCrosshair(Minecraft minecraft, net.minecraft.client.gui.GuiGraphics guiGraphics, int x, int y, int width, int height) {
 		if (!isCrosshairEnabled()) {
 			return;
 		}
-		if (VulkanicAPI.isVulkanBackendSelected()) {
-			throw new IllegalStateException("Rust VulkanicGAL partial-frame GUI crosshair is unsupported for Vulkan; whole-frame Rust presentation is required");
+		enqueueGuiSprite(minecraft, guiGraphics, GuiSprite.CROSSHAIR, CROSSHAIR_PRODUCER, x, y, width, height);
+	}
+
+	public static void enqueueHotbarBase(Minecraft minecraft, net.minecraft.client.gui.GuiGraphics guiGraphics, int x, int y, int width, int height) {
+		if (!isCrosshairEnabled()) {
+			return;
 		}
-		synchronized (LOCK) {
-			guiGraphics.guiRenderState.submitGuiElement(
-				SCHEDULER.enqueueCrosshair(
-					CROSSHAIR_PRODUCER,
-					x,
-					y,
-					width,
-					height,
-					guiGraphics.guiWidth(),
-					guiGraphics.guiHeight(),
-					generation
-				)
-			);
+		enqueueGuiSprite(minecraft, guiGraphics, GuiSprite.HOTBAR_BASE, HOTBAR_BASE_PRODUCER, x, y, width, height);
+	}
+
+	private static void enqueueGuiSprite(
+		Minecraft minecraft,
+		net.minecraft.client.gui.GuiGraphics guiGraphics,
+		GuiSprite sprite,
+		String producerId,
+		int x,
+		int y,
+		int width,
+		int height
+	) {
+		long started = System.nanoTime();
+		GraphicsFrameBenchmark.beginPhase("rust-gal." + sprite.phaseName + ".java-producer");
+		if (VulkanicAPI.isVulkanBackendSelected()) {
+			GraphicsFrameBenchmark.endPhase("rust-gal." + sprite.phaseName + ".java-producer");
+			throw new IllegalStateException("Rust VulkanicGAL partial-frame GUI sprite is unsupported for Vulkan; whole-frame Rust presentation is required");
+		}
+		try {
+			synchronized (LOCK) {
+				guiGraphics.guiRenderState.submitGuiElement(
+					SCHEDULER.enqueue(
+						sprite,
+						producerId,
+						x,
+						y,
+						width,
+						height,
+						guiGraphics.guiWidth(),
+						guiGraphics.guiHeight(),
+						generation
+					)
+				);
+				METRICS.enqueueNanos += elapsedSince(started);
+			}
+		} finally {
+			GraphicsFrameBenchmark.endPhase("rust-gal." + sprite.phaseName + ".java-producer");
 		}
 	}
 
-	public static void execute(Minecraft minecraft, RustGalGuiElementRenderState element) {
-		if (element.stratum() != RenderStratum.GUI_CROSSHAIR) {
-			throw new IllegalArgumentException("unsupported Rust GAL GUI stratum: " + element.stratum().id());
+	public static void executeFrame(Minecraft minecraft, List<RustGalGuiElementRenderState> elements) {
+		if (elements.isEmpty()) {
+			return;
+		}
+		for (RustGalGuiElementRenderState element : elements) {
+			if (!element.stratum().supportedForPartialFrame()) {
+				throw new IllegalArgumentException("unsupported Rust GAL GUI stratum: " + element.stratum().id());
+			}
 		}
 		ensureRenderThreadAndContext(minecraft);
 		Window window = minecraft.getWindow();
 		ensureConfigured(window);
 		synchronized (LOCK) {
-			DeferredGuiBatch batch = SCHEDULER.take(element);
-			executeBatch(window, batch);
+			List<DeferredGuiBatch> batches = SCHEDULER.takeAll(elements);
+			executeFrameBatches(window, batches);
 		}
 	}
 
@@ -187,123 +225,211 @@ public final class RustGalFrameQueue {
 				METRICS.resourceBatchBytes,
 				METRICS.submitBytes,
 				METRICS.completionQueryBytes,
-				METRICS.retireBytes
+				METRICS.retireBytes,
+				METRICS.enqueueNanos,
+				METRICS.resourceLookupNanos,
+				METRICS.resourceCreateNanos,
+				METRICS.abiPackingNanos,
+				METRICS.frameAcquireNanos,
+				METRICS.submitNanos,
+				METRICS.framePresentNanos,
+				METRICS.retireNanos,
+				METRICS.completionQueryNanos,
+				METRICS.executeNanos,
+				METRICS.commandLists,
+				METRICS.commandOps,
+				METRICS.backendSubmissions,
+				METRICS.backendWaits,
+				METRICS.glCalls,
+				METRICS.glFlushes,
+				METRICS.glFinishes,
+				METRICS.glFencesInserted,
+				METRICS.glFencesPolled,
+				METRICS.glFencesWaited,
+				METRICS.glFencesDeleted
 			);
 		}
 	}
 
-	private static void executeBatch(Window window, DeferredGuiBatch batch) {
-		CachedResources resources = resourcesFor(batch);
+	private static void executeFrameBatches(Window window, List<DeferredGuiBatch> batches) {
+		if (batches.isEmpty()) {
+			return;
+		}
+		long executeStarted = System.nanoTime();
+		GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.execute");
 		long correlationId = nextCorrelationId++;
 		long frameId = 0L;
 		long submissionId = 0L;
-		recordFixedOperation(Operation.FRAME_ACQUIRE, VulkanicGalBridge.Struct.FRAME_ACQUIRE.byteSize());
+		boolean executeCounted = false;
+		try {
+			GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.resource-cache");
+			long resourceStarted = System.nanoTime();
+			List<FrameDraw> frameDraws = new ArrayList<>(batches.size());
+			try {
+				for (DeferredGuiBatch batch : batches) {
+					frameDraws.add(new FrameDraw(batch, resourcesFor(batch)));
+				}
+			} finally {
+				METRICS.resourceLookupNanos += elapsedSince(resourceStarted);
+				GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.resource-cache");
+			}
+			GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.ffi.acquire");
+			long acquireStarted = System.nanoTime();
+			recordFixedOperation(Operation.FRAME_ACQUIRE, VulkanicGalBridge.Struct.FRAME_ACQUIRE.byteSize());
 			VulkanicGalBridge.AcquiredFrame frame = bridge.acquireFrame(correlationId, window.getWidth(), window.getHeight());
+			METRICS.frameAcquireNanos += elapsedSince(acquireStarted);
+			GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.ffi.acquire");
 			frameId = frame.frameId();
 			if (frame.status() == 4 || frame.frameTarget() == 0L) {
-					int cancelled = SCHEDULER.cancelFrame(frameId, "acquire-skipped");
-						METRICS.cancellations++;
-						METRICS.batchesCancelled += cancelled;
+				int cancelled = SCHEDULER.cancelFrame(frameId, "acquire-skipped");
+				METRICS.cancellations++;
+				METRICS.batchesCancelled += cancelled;
 				return;
 			}
-			FrameResources frameResources = frameResourcesFor(batch, frame.frameTarget());
-			VulkanicGalBridge.SubmissionBatch submit = bridge.submissionBatchBuilder(batch.producerId() + ".frame")
-				.hostWrite(resources.uniformBuffer, 0, uniformBytes(batch))
-				.barrier(resources.uniformBuffer, VulkanicGalBridge.USAGE_TRANSFER_DST, VulkanicGalBridge.USAGE_SHADER_READ, false)
-				.beginFramePass(frameResources.pass(), frameResources.target())
-				.bindGraphicsPipeline(resources.pipeline)
-				.bindResourceSet(resources.pipelineLayout, resources.resourceSet)
-				.setIndexBuffer(resources.indexBuffer)
-				.drawIndexed(6)
-				.endPass()
-				.build();
-				VulkanicGalBridge.Status status = bridge.submit(submit);
-				recordStatus(Operation.SUBMIT, status);
-				submissionId = status.submissionId();
-				lastSubmitted = Math.max(lastSubmitted, submissionId);
-				TracyCompat.message("gal.frame.deferred producer=" + batch.producerId() + " stratum=" + batch.stratum().id()
-					+ " frame=" + frameId + " submission=" + submissionId + " batch=" + batch.batchId());
-				recordFixedOperation(Operation.FRAME_PRESENT, VulkanicGalBridge.Struct.FRAME_PRESENT.byteSize());
-				bridge.presentFrame(frameId, correlationId, submissionId);
-				METRICS.frames++;
-				METRICS.submissions++;
-				METRICS.batchesExecuted++;
-				retireOutstanding(false);
-			LOGGER.info(
-				"Rust VulkanicGAL GUI batch executed: producer={}, stratum={}, batch={}, frame={}, submission={}, cacheHits={}, cacheMisses={}, ffiCalls={}, ffiBytes={}",
-				batch.producerId(),
-				batch.stratum().id(),
-				batch.batchId(),
-				frameId,
-				submissionId,
-				METRICS.cacheHits,
-				METRICS.cacheMisses,
-				METRICS.ffiCalls,
-				METRICS.ffiBytes
-			);
-		auditMessage(
-				"Rust OpenGL VulkanicGAL GUI batch executed producer=" + batch.producerId()
-					+ " stratum=" + batch.stratum().id()
-					+ " batch=" + batch.batchId()
+			FrameResources frameResources = frameResourcesFor(batches.get(0), frame.frameTarget());
+			GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.abi-packing");
+			long packingStarted = System.nanoTime();
+			VulkanicGalBridge.SubmissionBatchBuilder builder = bridge.submissionBatchBuilder("minecraft.gui.frame");
+			for (FrameDraw draw : frameDraws) {
+				builder.hostWrite(draw.resources().uniformBuffer, 0, uniformBytes(draw.batch()))
+					.barrier(draw.resources().uniformBuffer, VulkanicGalBridge.USAGE_TRANSFER_DST, VulkanicGalBridge.USAGE_SHADER_READ, false);
+			}
+			builder.beginFramePass(frameResources.pass(), frameResources.target());
+			for (FrameDraw draw : frameDraws) {
+				builder.bindGraphicsPipeline(draw.resources().pipeline)
+					.bindResourceSet(draw.resources().pipelineLayout, draw.resources().resourceSet)
+					.setIndexBuffer(draw.resources().indexBuffer)
+					.drawIndexed(6);
+			}
+			VulkanicGalBridge.SubmissionBatch submit = builder.endPass().build();
+			METRICS.abiPackingNanos += elapsedSince(packingStarted);
+			GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.abi-packing");
+			GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.ffi.submit");
+			long submitStarted = System.nanoTime();
+			VulkanicGalBridge.Status status = bridge.submit(submit);
+			recordStatus(Operation.SUBMIT, status);
+			METRICS.submitNanos += elapsedSince(submitStarted);
+			GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.ffi.submit");
+			submissionId = status.submissionId();
+			lastSubmitted = Math.max(lastSubmitted, submissionId);
+			TracyCompat.message("gal.frame.deferred producer=gui.frame stratum=gui.frame"
+				+ " frame=" + frameId + " submission=" + submissionId + " batches=" + batches.size());
+			GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.ffi.present");
+			long presentStarted = System.nanoTime();
+			recordFixedOperation(Operation.FRAME_PRESENT, VulkanicGalBridge.Struct.FRAME_PRESENT.byteSize());
+			bridge.presentFrame(frameId, correlationId, submissionId);
+			METRICS.framePresentNanos += elapsedSince(presentStarted);
+			GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.ffi.present");
+			METRICS.frames++;
+			METRICS.submissions++;
+			METRICS.batchesExecuted += batches.size();
+			retireOutstanding(false);
+			METRICS.executeNanos += elapsedSince(executeStarted);
+			executeCounted = true;
+			if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
+				LOGGER.info(
+					"Rust VulkanicGAL GUI frame executed: batches={}, frame={}, submission={}, cacheHits={}, cacheMisses={}, ffiCalls={}, ffiBytes={}",
+					batches.size(),
+					frameId,
+					submissionId,
+					METRICS.cacheHits,
+					METRICS.cacheMisses,
+					METRICS.ffiCalls,
+					METRICS.ffiBytes
+				);
+			}
+			auditMessage(
+				"Rust OpenGL VulkanicGAL GUI frame executed producer=gui.frame"
+					+ " stratum=gui.frame"
+					+ " frame_batch_count=" + batches.size()
 					+ " frame=" + frameId
-						+ " submission=" + submissionId
-						+ " rust_gal_cache_hits=" + METRICS.cacheHits
-						+ " rust_gal_cache_misses=" + METRICS.cacheMisses
-						+ " rust_gal_queue_depth=" + SCHEDULER.pendingCount()
-						+ " rust_gal_batches_executed=" + METRICS.batchesExecuted
-						+ " rust_gal_batches_cancelled=" + METRICS.batchesCancelled
-						+ " rust_gal_completion_polls=" + METRICS.completionPolls
-						+ " rust_gal_completion_timeouts=" + METRICS.completionTimeouts
-						+ " rust_gal_ffi_context_create_calls=" + METRICS.contextCreateCalls
-						+ " rust_gal_ffi_capability_calls=" + METRICS.capabilityCalls
-						+ " rust_gal_ffi_frame_configure_calls=" + METRICS.frameConfigureCalls
-						+ " rust_gal_ffi_frame_acquire_calls=" + METRICS.frameAcquireCalls
-						+ " rust_gal_ffi_frame_resize_calls=" + METRICS.frameResizeCalls
-						+ " rust_gal_ffi_frame_present_calls=" + METRICS.framePresentCalls
-						+ " rust_gal_ffi_resource_batch_calls=" + METRICS.resourceBatchCalls
-						+ " rust_gal_ffi_submit_calls=" + METRICS.submitCalls
-						+ " rust_gal_ffi_completion_query_calls=" + METRICS.completionQueryCalls
-						+ " rust_gal_ffi_retire_calls=" + METRICS.retireCalls
-						+ " rust_gal_ffi_context_create_bytes=" + METRICS.contextCreateBytes
-						+ " rust_gal_ffi_capability_bytes=" + METRICS.capabilityBytes
-						+ " rust_gal_ffi_frame_configure_bytes=" + METRICS.frameConfigureBytes
-						+ " rust_gal_ffi_frame_acquire_bytes=" + METRICS.frameAcquireBytes
-						+ " rust_gal_ffi_frame_resize_bytes=" + METRICS.frameResizeBytes
-						+ " rust_gal_ffi_frame_present_bytes=" + METRICS.framePresentBytes
-						+ " rust_gal_ffi_resource_batch_bytes=" + METRICS.resourceBatchBytes
-						+ " rust_gal_ffi_submit_bytes=" + METRICS.submitBytes
-						+ " rust_gal_ffi_completion_query_bytes=" + METRICS.completionQueryBytes
-						+ " rust_gal_ffi_retire_bytes=" + METRICS.retireBytes
-						+ " ffi_call_count=" + METRICS.ffiCalls
-						+ " ffi_bytes=" + METRICS.ffiBytes
+					+ " submission=" + submissionId
+					+ " rust_gal_cache_hits=" + METRICS.cacheHits
+					+ " rust_gal_cache_misses=" + METRICS.cacheMisses
+					+ " rust_gal_queue_depth=" + SCHEDULER.pendingCount()
+					+ " rust_gal_frames_executed=" + METRICS.frames
+					+ " rust_gal_batches_executed=" + METRICS.batchesExecuted
+					+ " rust_gal_batches_cancelled=" + METRICS.batchesCancelled
+					+ " rust_gal_completion_polls=" + METRICS.completionPolls
+					+ " rust_gal_completion_timeouts=" + METRICS.completionTimeouts
+					+ " rust_gal_ffi_context_create_calls=" + METRICS.contextCreateCalls
+					+ " rust_gal_ffi_capability_calls=" + METRICS.capabilityCalls
+					+ " rust_gal_ffi_frame_configure_calls=" + METRICS.frameConfigureCalls
+					+ " rust_gal_ffi_frame_acquire_calls=" + METRICS.frameAcquireCalls
+					+ " rust_gal_ffi_frame_resize_calls=" + METRICS.frameResizeCalls
+					+ " rust_gal_ffi_frame_present_calls=" + METRICS.framePresentCalls
+					+ " rust_gal_ffi_resource_batch_calls=" + METRICS.resourceBatchCalls
+					+ " rust_gal_ffi_submit_calls=" + METRICS.submitCalls
+					+ " rust_gal_ffi_completion_query_calls=" + METRICS.completionQueryCalls
+					+ " rust_gal_ffi_retire_calls=" + METRICS.retireCalls
+					+ " rust_gal_ffi_context_create_bytes=" + METRICS.contextCreateBytes
+					+ " rust_gal_ffi_capability_bytes=" + METRICS.capabilityBytes
+					+ " rust_gal_ffi_frame_configure_bytes=" + METRICS.frameConfigureBytes
+					+ " rust_gal_ffi_frame_acquire_bytes=" + METRICS.frameAcquireBytes
+					+ " rust_gal_ffi_frame_resize_bytes=" + METRICS.frameResizeBytes
+					+ " rust_gal_ffi_frame_present_bytes=" + METRICS.framePresentBytes
+					+ " rust_gal_ffi_resource_batch_bytes=" + METRICS.resourceBatchBytes
+					+ " rust_gal_ffi_submit_bytes=" + METRICS.submitBytes
+					+ " rust_gal_ffi_completion_query_bytes=" + METRICS.completionQueryBytes
+					+ " rust_gal_ffi_retire_bytes=" + METRICS.retireBytes
+					+ " rust_gal_enqueue_nanos=" + METRICS.enqueueNanos
+					+ " rust_gal_resource_lookup_nanos=" + METRICS.resourceLookupNanos
+					+ " rust_gal_resource_create_nanos=" + METRICS.resourceCreateNanos
+					+ " rust_gal_abi_packing_nanos=" + METRICS.abiPackingNanos
+					+ " rust_gal_frame_acquire_nanos=" + METRICS.frameAcquireNanos
+					+ " rust_gal_submit_nanos=" + METRICS.submitNanos
+					+ " rust_gal_frame_present_nanos=" + METRICS.framePresentNanos
+					+ " rust_gal_retire_nanos=" + METRICS.retireNanos
+					+ " rust_gal_completion_query_nanos=" + METRICS.completionQueryNanos
+					+ " rust_gal_execute_nanos=" + METRICS.executeNanos
+					+ " rust_gal_command_lists=" + METRICS.commandLists
+					+ " rust_gal_command_ops=" + METRICS.commandOps
+					+ " rust_gal_backend_submissions=" + METRICS.backendSubmissions
+					+ " rust_gal_backend_waits=" + METRICS.backendWaits
+					+ " rust_gal_gl_calls=" + METRICS.glCalls
+					+ " rust_gal_gl_flushes=" + METRICS.glFlushes
+					+ " rust_gal_gl_finishes=" + METRICS.glFinishes
+					+ " rust_gal_gl_fences_inserted=" + METRICS.glFencesInserted
+					+ " rust_gal_gl_fences_polled=" + METRICS.glFencesPolled
+					+ " rust_gal_gl_fences_waited=" + METRICS.glFencesWaited
+					+ " rust_gal_gl_fences_deleted=" + METRICS.glFencesDeleted
+					+ " ffi_call_count=" + METRICS.ffiCalls
+					+ " ffi_bytes=" + METRICS.ffiBytes
 			);
+		} finally {
+			if (!executeCounted) {
+				METRICS.executeNanos += elapsedSince(executeStarted);
+			}
+			GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.execute");
+		}
 	}
 
 	private static CachedResources resourcesFor(DeferredGuiBatch batch) {
-		CacheKey key = new CacheKey("gui-textured-invert-crosshair", batch.producerId(), generation);
+		CacheKey key = new CacheKey(batch.sprite().cacheKind, batch.producerId(), generation);
 		CachedResources resources = CACHES.get(key);
 		if (resources != null) {
 			METRICS.cacheHits++;
 			return resources;
 		}
 		METRICS.cacheMisses++;
-		CachedResources created = createCrosshairResources(key);
+		CachedResources created = createGuiSpriteResources(batch.sprite(), key);
 		CACHES.put(key, created);
 		return created;
 	}
 
-	private static CachedResources createCrosshairResources(CacheKey key) {
+	private static CachedResources createGuiSpriteResources(GuiSprite sprite, CacheKey key) {
+		long createStarted = System.nanoTime();
 		List<HandleToDestroy> created = new ArrayList<>();
 		try {
 				VulkanicGalBridge.ResourceResults base = bridge.resourceBatch(
 					bridge.resourceBatchBuilder()
-						.buffer(1, key.label("texture-upload"), CROSSHAIR_TEXTURE_BYTES, VulkanicGalBridge.MEMORY_UPLOAD,
+						.buffer(1, key.label("texture-upload"), sprite.textureBytes(), VulkanicGalBridge.MEMORY_UPLOAD,
 							VulkanicGalBridge.BUFFER_TRANSFER_SRC | VulkanicGalBridge.BUFFER_TRANSFER_DST | VulkanicGalBridge.BUFFER_HOST_WRITE)
 					.buffer(2, key.label("index"), 24, VulkanicGalBridge.MEMORY_UPLOAD,
 						VulkanicGalBridge.BUFFER_INDEX | VulkanicGalBridge.BUFFER_TRANSFER_DST | VulkanicGalBridge.BUFFER_HOST_WRITE)
-					.buffer(3, key.label("uniform"), CROSSHAIR_UNIFORM_BYTES, VulkanicGalBridge.MEMORY_UPLOAD,
+					.buffer(3, key.label("uniform"), GUI_UNIFORM_BYTES, VulkanicGalBridge.MEMORY_UPLOAD,
 						VulkanicGalBridge.BUFFER_UNIFORM | VulkanicGalBridge.BUFFER_TRANSFER_DST | VulkanicGalBridge.BUFFER_HOST_WRITE)
-					.texture(4, key.label("texture"), VulkanicGalBridge.FORMAT_RGBA8, CROSSHAIR_SIZE, CROSSHAIR_SIZE,
+					.texture(4, key.label("texture"), VulkanicGalBridge.FORMAT_RGBA8, sprite.width, sprite.height,
 						VulkanicGalBridge.TEXTURE_SAMPLED | VulkanicGalBridge.TEXTURE_TRANSFER_DST)
 						.sampler(5, key.label("sampler"))
 						.shader(6, key.label("vertex"), VulkanicGalBridge.SHADER_VERTEX, VERTEX_SHADER_OPENGL)
@@ -351,8 +477,7 @@ public final class RustGalFrameQueue {
 			created.add(new HandleToDestroy(resourceSet, VulkanicGalBridge.HANDLE_RESOURCE_SET));
 			created.add(new HandleToDestroy(pipelineLayout, VulkanicGalBridge.HANDLE_PIPELINE_LAYOUT));
 				VulkanicGalBridge.ResourceResults pipeline = bridge.resourceBatch(
-				bridge.resourceBatchBuilder()
-						.guiInvertPipeline(31, key.label("pipeline"), pipelineLayout, vertex, fragment)
+				sprite.pipeline(bridge.resourceBatchBuilder(), 31, key.label("pipeline"), pipelineLayout, vertex, fragment)
 						.build());
 				recordResourceBatch(pipeline);
 			long graphicsPipeline = pipeline.handle(0);
@@ -372,7 +497,7 @@ public final class RustGalFrameQueue {
 				pipelineLayout,
 				graphicsPipeline
 			);
-			uploadPersistentResources(resources);
+			uploadPersistentResources(sprite, resources);
 			METRICS.resourceCreates += resources.handlesInDestroyOrder().size();
 			return resources;
 		} catch (RuntimeException error) {
@@ -382,31 +507,27 @@ public final class RustGalFrameQueue {
 				error.addSuppressed(cleanupError);
 			}
 			throw error;
+		} finally {
+			METRICS.resourceCreateNanos += elapsedSince(createStarted);
 		}
 	}
 
-	private static void uploadPersistentResources(CachedResources resources) {
-			VulkanicGalBridge.Status upload = bridge.submit(
-				bridge.submissionBatchBuilder(resources.key().label("upload"))
-				.hostWrite(resources.uploadBuffer, 0, crosshairTextureBytes())
+	private static void uploadPersistentResources(GuiSprite sprite, CachedResources resources) {
+		VulkanicGalBridge.Status upload = bridge.submit(
+			bridge.submissionBatchBuilder(resources.key().label("upload"))
+				.hostWrite(resources.uploadBuffer, 0, spriteTextureBytes(sprite))
 				.barrier(resources.uploadBuffer, VulkanicGalBridge.USAGE_TRANSFER_DST, VulkanicGalBridge.USAGE_TRANSFER_SRC, false)
 				.hostWrite(resources.indexBuffer, 0, indexBytes())
 				.barrier(resources.indexBuffer, VulkanicGalBridge.USAGE_TRANSFER_DST, VulkanicGalBridge.USAGE_SHADER_READ, false)
 				.barrier(resources.texture, VulkanicGalBridge.USAGE_UNDEFINED, VulkanicGalBridge.USAGE_TRANSFER_DST, true)
-					.copyBufferToTexture(resources.uploadBuffer, resources.texture, CROSSHAIR_SIZE, CROSSHAIR_SIZE)
-					.barrier(resources.texture, VulkanicGalBridge.USAGE_TRANSFER_DST, VulkanicGalBridge.USAGE_SHADER_READ, true)
-					.build());
-				recordStatus(Operation.SUBMIT, upload);
-				lastSubmitted = Math.max(lastSubmitted, upload.submissionId());
-				VulkanicGalBridge.Completion completion = pollCompletion(upload.submissionId(), resources.key().label("upload"));
-			if (!completion.complete()) {
-				throw new IllegalStateException("Rust VulkanicGAL persistent GUI upload did not complete: " + upload.submissionId());
-			}
-				recordStatus(Operation.RETIRE, bridge.retire(upload.submissionId()));
-				lastRetiredSubmission = Math.max(lastRetiredSubmission, upload.submissionId());
-			}
+				.copyBufferToTexture(resources.uploadBuffer, resources.texture, sprite.width, sprite.height)
+				.barrier(resources.texture, VulkanicGalBridge.USAGE_TRANSFER_DST, VulkanicGalBridge.USAGE_SHADER_READ, true)
+				.build());
+		recordStatus(Operation.SUBMIT, upload);
+		lastSubmitted = Math.max(lastSubmitted, upload.submissionId());
+	}
 
-		private static void destroyCachedResources() {
+	private static void destroyCachedResources() {
 		if (bridge == null || CACHES.isEmpty()) {
 			return;
 		}
@@ -418,30 +539,30 @@ public final class RustGalFrameQueue {
 				destroy.destroy(handle.handle(), handle.kind());
 				METRICS.resourceDestroys++;
 			}
-				recordResourceBatch(bridge.resourceBatch(destroy.build()));
-			}
+			recordResourceBatch(bridge.resourceBatch(destroy.build()));
 		}
+	}
 
-		private static FrameResources frameResourcesFor(DeferredGuiBatch batch, long acquiredFrameTarget) {
-			if (cachedFramePass != 0L && cachedFrameTarget != 0L && cachedFrameTarget == acquiredFrameTarget) {
-				return new FrameResources(cachedFrameTarget, cachedFramePass);
-			}
-			destroyTransientFrameResources(cachedFramePass, cachedFrameTarget);
-			VulkanicGalBridge.ResourceResults frameResources = bridge.resourceBatch(
-				bridge.resourceBatchBuilder()
-					.frameRenderPass(9000, batch.producerId() + ".pass", acquiredFrameTarget)
-					.build());
-			recordResourceBatch(frameResources);
-			cachedFrameTarget = acquiredFrameTarget;
-			cachedFramePass = frameResources.handle(0);
+	private static FrameResources frameResourcesFor(DeferredGuiBatch batch, long acquiredFrameTarget) {
+		if (cachedFramePass != 0L && cachedFrameTarget != 0L && cachedFrameTarget == acquiredFrameTarget) {
 			return new FrameResources(cachedFrameTarget, cachedFramePass);
 		}
+		destroyTransientFrameResources(cachedFramePass, cachedFrameTarget);
+		VulkanicGalBridge.ResourceResults frameResources = bridge.resourceBatch(
+			bridge.resourceBatchBuilder()
+				.frameRenderPass(9000, batch.producerId() + ".pass", acquiredFrameTarget)
+				.build());
+		recordResourceBatch(frameResources);
+		cachedFrameTarget = acquiredFrameTarget;
+		cachedFramePass = frameResources.handle(0);
+		return new FrameResources(cachedFrameTarget, cachedFramePass);
+	}
 
-			private static void destroyTransientFrameResources(long pass, long frameTarget) {
-				if (bridge == null) {
-					return;
-				}
-				VulkanicGalBridge.ResourceBatchBuilder destroy = bridge.resourceBatchBuilder();
+	private static void destroyTransientFrameResources(long pass, long frameTarget) {
+		if (bridge == null) {
+			return;
+		}
+		VulkanicGalBridge.ResourceBatchBuilder destroy = bridge.resourceBatchBuilder();
 		boolean hasDestroy = false;
 		if (pass != 0L) {
 			destroy.destroy(pass, VulkanicGalBridge.HANDLE_RENDER_PASS);
@@ -453,20 +574,20 @@ public final class RustGalFrameQueue {
 		}
 		if (!hasDestroy) {
 			return;
+		}
+		try {
+			recordResourceBatch(bridge.resourceBatch(destroy.build()));
+		} catch (RuntimeException cleanupError) {
+			LOGGER.error("Rust VulkanicGAL transient frame resource cleanup failed", cleanupError);
+		} finally {
+			if (pass == cachedFramePass) {
+				cachedFramePass = 0L;
 			}
-			try {
-				recordResourceBatch(bridge.resourceBatch(destroy.build()));
-			} catch (RuntimeException cleanupError) {
-				LOGGER.error("Rust VulkanicGAL transient frame resource cleanup failed", cleanupError);
-			} finally {
-				if (pass == cachedFramePass) {
-					cachedFramePass = 0L;
-				}
-				if (frameTarget == cachedFrameTarget) {
-					cachedFrameTarget = 0L;
-				}
+			if (frameTarget == cachedFrameTarget) {
+				cachedFrameTarget = 0L;
 			}
 		}
+	}
 
 	private static void destroyHandles(List<HandleToDestroy> handles) {
 		if (bridge == null || handles.isEmpty()) {
@@ -478,36 +599,25 @@ public final class RustGalFrameQueue {
 			destroy.destroy(handle.handle(), handle.kind());
 			METRICS.resourceDestroys++;
 		}
-			recordResourceBatch(bridge.resourceBatch(destroy.build()));
-		}
+		recordResourceBatch(bridge.resourceBatch(destroy.build()));
+	}
 
-			private static VulkanicGalBridge.Completion pollCompletion(long submission, String operation) {
-			long deadline = System.nanoTime() + COMPLETION_TIMEOUT_NANOS;
-			recordFixedOperation(Operation.COMPLETION_QUERY, VulkanicGalBridge.Struct.COMPLETION_QUERY.byteSize());
-			VulkanicGalBridge.Completion completion = bridge.completion(submission);
-			while (!completion.complete() && System.nanoTime() < deadline) {
-				METRICS.completionPolls++;
-				Thread.yield();
-				recordFixedOperation(Operation.COMPLETION_QUERY, VulkanicGalBridge.Struct.COMPLETION_QUERY.byteSize());
-				completion = bridge.completion(submission);
+	private static void retireOutstanding(boolean force) {
+		if (bridge == null || lastSubmitted == 0L || lastSubmitted <= lastRetiredSubmission) {
+			return;
 		}
-		if (!completion.complete()) {
-			METRICS.completionTimeouts++;
-			LOGGER.error("Rust VulkanicGAL completion timeout: operation={}, requested={}, completed={}", operation, completion.requestedSubmissionId(), completion.completedSubmissionId());
+		if (!force) {
+			return;
 		}
-			return completion;
-		}
+		long started = System.nanoTime();
+		recordStatus(Operation.RETIRE, bridge.retire(lastSubmitted));
+		METRICS.retireNanos += elapsedSince(started);
+		lastRetiredSubmission = lastSubmitted;
+	}
 
-		private static void retireOutstanding(boolean force) {
-			if (bridge == null || lastSubmitted == 0L || lastSubmitted <= lastRetiredSubmission) {
-				return;
-			}
-			if (!force && METRICS.frames % RETIRE_INTERVAL_FRAMES != 0L) {
-				return;
-			}
-			recordStatus(Operation.RETIRE, bridge.retire(lastSubmitted));
-			lastRetiredSubmission = lastSubmitted;
-		}
+	private static long elapsedSince(long started) {
+		return Math.max(0L, System.nanoTime() - started);
+	}
 
 	private static void ensureRenderThreadAndContext(Minecraft minecraft) {
 		Thread current = Thread.currentThread();
@@ -546,10 +656,11 @@ public final class RustGalFrameQueue {
 			configuredHeight = height;
 		}
 
-		private static void recordStatus(Operation operation, VulkanicGalBridge.Status status) {
-			long ffiCalls = status.ffiCalls();
-			long ffiBytes = status.ffiInputBytes();
-			long deltaCalls = 0L;
+	private static void recordStatus(Operation operation, VulkanicGalBridge.Status status) {
+		long ffiCalls = status.ffiCalls();
+		long ffiBytes = status.ffiInputBytes();
+		recordBackendMetrics(status.backendMetrics());
+		long deltaCalls = 0L;
 			long deltaBytes = 0L;
 			if (ffiCalls >= METRICS.lastContextFfiCalls) {
 				deltaCalls = ffiCalls - METRICS.lastContextFfiCalls;
@@ -564,9 +675,26 @@ public final class RustGalFrameQueue {
 			METRICS.lastContextFfiBytes = ffiBytes;
 		}
 
-		private static void recordResourceBatch(VulkanicGalBridge.ResourceResults results) {
-			recordStatus(Operation.RESOURCE_BATCH, new VulkanicGalBridge.Status(results.submissionId(), results.ffiCalls(), results.ffiInputBytes()));
+	private static void recordResourceBatch(VulkanicGalBridge.ResourceResults results) {
+		recordStatus(Operation.RESOURCE_BATCH, new VulkanicGalBridge.Status(results.submissionId(), results.ffiCalls(), results.ffiInputBytes(), results.backendMetrics()));
+	}
+
+	private static void recordBackendMetrics(VulkanicGalBridge.BackendMetrics metrics) {
+		if (metrics == null) {
+			return;
 		}
+		METRICS.commandLists = Math.max(METRICS.commandLists, metrics.commandLists());
+		METRICS.commandOps = Math.max(METRICS.commandOps, metrics.commandOps());
+		METRICS.backendSubmissions = Math.max(METRICS.backendSubmissions, metrics.backendSubmissions());
+		METRICS.backendWaits = Math.max(METRICS.backendWaits, metrics.backendWaits());
+		METRICS.glCalls = Math.max(METRICS.glCalls, metrics.glCalls());
+		METRICS.glFlushes = Math.max(METRICS.glFlushes, metrics.glFlushes());
+		METRICS.glFinishes = Math.max(METRICS.glFinishes, metrics.glFinishes());
+		METRICS.glFencesInserted = Math.max(METRICS.glFencesInserted, metrics.glFencesInserted());
+		METRICS.glFencesPolled = Math.max(METRICS.glFencesPolled, metrics.glFencesPolled());
+		METRICS.glFencesWaited = Math.max(METRICS.glFencesWaited, metrics.glFencesWaited());
+		METRICS.glFencesDeleted = Math.max(METRICS.glFencesDeleted, metrics.glFencesDeleted());
+	}
 
 		private static void recordFixedOperation(Operation operation, long inputBytes) {
 			METRICS.ffiCalls++;
@@ -628,7 +756,7 @@ public final class RustGalFrameQueue {
 	}
 
 	private static byte[] uniformBytes(DeferredGuiBatch batch) {
-		ByteBuffer buffer = ByteBuffer.allocate(CROSSHAIR_UNIFORM_BYTES).order(ByteOrder.nativeOrder());
+		ByteBuffer buffer = ByteBuffer.allocate(GUI_UNIFORM_BYTES).order(ByteOrder.nativeOrder());
 		buffer.putFloat(batch.x());
 		buffer.putFloat(batch.y());
 		buffer.putFloat(batch.width());
@@ -640,19 +768,19 @@ public final class RustGalFrameQueue {
 		return buffer.array();
 	}
 
-	private static byte[] crosshairTextureBytes() {
-		try (InputStream input = RustGalFrameQueue.class.getResourceAsStream(CROSSHAIR_TEXTURE_RESOURCE)) {
+	private static byte[] spriteTextureBytes(GuiSprite sprite) {
+		try (InputStream input = RustGalFrameQueue.class.getResourceAsStream(sprite.textureResource)) {
 			if (input == null) {
-				throw new IllegalStateException("missing crosshair texture resource: " + CROSSHAIR_TEXTURE_RESOURCE);
+				throw new IllegalStateException("missing GUI texture resource: " + sprite.textureResource);
 			}
 			BufferedImage image = ImageIO.read(input);
-			if (image == null || image.getWidth() != CROSSHAIR_SIZE || image.getHeight() != CROSSHAIR_SIZE) {
-				throw new IllegalStateException("unexpected crosshair texture dimensions");
+			if (image == null || image.getWidth() != sprite.width || image.getHeight() != sprite.height) {
+				throw new IllegalStateException("unexpected GUI texture dimensions for " + sprite.textureResource);
 			}
-			byte[] bytes = new byte[CROSSHAIR_TEXTURE_BYTES];
+			byte[] bytes = new byte[sprite.textureBytes()];
 			int offset = 0;
-			for (int y = 0; y < CROSSHAIR_SIZE; y++) {
-				for (int x = 0; x < CROSSHAIR_SIZE; x++) {
+			for (int y = 0; y < sprite.height; y++) {
+				for (int x = 0; x < sprite.width; x++) {
 					int argb = image.getRGB(x, y);
 					bytes[offset++] = (byte)((argb >>> 16) & 0xFF);
 					bytes[offset++] = (byte)((argb >>> 8) & 0xFF);
@@ -662,7 +790,7 @@ public final class RustGalFrameQueue {
 			}
 			return bytes;
 		} catch (IOException error) {
-			throw new IllegalStateException("failed to load crosshair texture", error);
+			throw new IllegalStateException("failed to load GUI texture " + sprite.textureResource, error);
 		}
 	}
 
@@ -681,7 +809,8 @@ public final class RustGalFrameQueue {
 	}
 
 	public enum RenderStratum {
-		GUI_CROSSHAIR("gui.crosshair", 200);
+		GUI_CROSSHAIR("gui.crosshair", 200),
+		GUI_HOTBAR_BASE("gui.hotbar.base", 300);
 
 		private final String id;
 		private final int order;
@@ -698,6 +827,10 @@ public final class RustGalFrameQueue {
 		public int order() {
 			return order;
 		}
+
+		boolean supportedForPartialFrame() {
+			return this == GUI_CROSSHAIR || this == GUI_HOTBAR_BASE;
+		}
 	}
 
 	private static final class DeferredBatchScheduler {
@@ -706,7 +839,8 @@ public final class RustGalFrameQueue {
 		private long nextSequence = 1L;
 		private int lastExecutedOrder = Integer.MIN_VALUE;
 
-		RustGalGuiElementRenderState enqueueCrosshair(
+		RustGalGuiElementRenderState enqueue(
+			GuiSprite sprite,
 			String producerId,
 			int x,
 			int y,
@@ -722,7 +856,8 @@ public final class RustGalFrameQueue {
 				batchId,
 				sequence,
 				generation,
-				RenderStratum.GUI_CROSSHAIR,
+				sprite.stratum,
+				sprite,
 				producerId,
 				x,
 				y,
@@ -735,7 +870,24 @@ public final class RustGalFrameQueue {
 			return new RustGalGuiElementRenderState(batchId, sequence, generation, batch.stratum(), producerId, x, y, width, height, guiWidth, guiHeight);
 		}
 
-		DeferredGuiBatch take(RustGalGuiElementRenderState element) {
+		List<DeferredGuiBatch> takeAll(List<RustGalGuiElementRenderState> elements) {
+			List<RustGalGuiElementRenderState> ordered = new ArrayList<>(elements);
+			ordered.sort(Comparator.comparingInt((RustGalGuiElementRenderState element) -> element.stratum().order()).thenComparingLong(RustGalGuiElementRenderState::sequence));
+			List<DeferredGuiBatch> batches = new ArrayList<>(ordered.size());
+			int lastOrder = Integer.MIN_VALUE;
+			for (RustGalGuiElementRenderState element : ordered) {
+				DeferredGuiBatch batch = this.take(element);
+				if (batch.stratum().order() < lastOrder) {
+					throw new IllegalStateException("Rust VulkanicGAL deferred batch executed out of stratum order: stratum=" + batch.stratum().id());
+				}
+				lastOrder = batch.stratum().order();
+				batches.add(batch);
+			}
+			this.lastExecutedOrder = Integer.MIN_VALUE;
+			return batches;
+		}
+
+		private DeferredGuiBatch take(RustGalGuiElementRenderState element) {
 			DeferredGuiBatch batch = this.pending.remove(element.batchId());
 			if (batch == null) {
 				throw new IllegalStateException("Rust VulkanicGAL deferred batch is no longer pending: batch=" + element.batchId());
@@ -780,6 +932,7 @@ public final class RustGalFrameQueue {
 		long sequence,
 		long generation,
 		RenderStratum stratum,
+		GuiSprite sprite,
 		String producerId,
 		int x,
 		int y,
@@ -788,6 +941,9 @@ public final class RustGalFrameQueue {
 		int guiWidth,
 		int guiHeight
 	) {
+	}
+
+	private record FrameDraw(DeferredGuiBatch batch, CachedResources resources) {
 	}
 
 	private record CacheKey(String kind, String semanticId, long generation) {
@@ -833,6 +989,63 @@ public final class RustGalFrameQueue {
 	}
 
 	private record FrameResources(long target, long pass) {
+	}
+
+	private enum GuiSprite {
+		CROSSHAIR(
+			RenderStratum.GUI_CROSSHAIR,
+			"crosshair",
+			"gui-textured-invert-crosshair",
+			"/assets/minecraft/textures/gui/sprites/hud/crosshair.png",
+			15,
+			15,
+			true
+		),
+		HOTBAR_BASE(
+			RenderStratum.GUI_HOTBAR_BASE,
+			"hotbar-base",
+			"gui-textured-alpha-hotbar-base",
+			"/assets/minecraft/textures/gui/sprites/hud/hotbar.png",
+			182,
+			22,
+			false
+		);
+
+		private final RenderStratum stratum;
+		private final String phaseName;
+		private final String cacheKind;
+		private final String textureResource;
+		private final int width;
+		private final int height;
+		private final boolean invertBlend;
+
+		GuiSprite(RenderStratum stratum, String phaseName, String cacheKind, String textureResource, int width, int height, boolean invertBlend) {
+			this.stratum = stratum;
+			this.phaseName = phaseName;
+			this.cacheKind = cacheKind;
+			this.textureResource = textureResource;
+			this.width = width;
+			this.height = height;
+			this.invertBlend = invertBlend;
+		}
+
+		private int textureBytes() {
+			return this.width * this.height * 4;
+		}
+
+		private VulkanicGalBridge.ResourceBatchBuilder pipeline(
+			VulkanicGalBridge.ResourceBatchBuilder builder,
+			long id,
+			String label,
+			long pipelineLayout,
+			long vertex,
+			long fragment
+		) {
+			if (this.invertBlend) {
+				return builder.guiInvertPipeline(id, label, pipelineLayout, vertex, fragment);
+			}
+			return builder.guiAlphaPipeline(id, label, pipelineLayout, vertex, fragment);
+		}
 	}
 
 	private enum Operation {
@@ -885,6 +1098,27 @@ public final class RustGalFrameQueue {
 		long submitBytes;
 		long completionQueryBytes;
 		long retireBytes;
+		long enqueueNanos;
+		long resourceLookupNanos;
+		long resourceCreateNanos;
+		long abiPackingNanos;
+		long frameAcquireNanos;
+		long submitNanos;
+		long framePresentNanos;
+		long retireNanos;
+		long completionQueryNanos;
+		long executeNanos;
+		long commandLists;
+		long commandOps;
+		long backendSubmissions;
+		long backendWaits;
+		long glCalls;
+		long glFlushes;
+		long glFinishes;
+		long glFencesInserted;
+		long glFencesPolled;
+		long glFencesWaited;
+		long glFencesDeleted;
 	}
 
 	public record MetricsSnapshot(
@@ -922,7 +1156,28 @@ public final class RustGalFrameQueue {
 		long resourceBatchBytes,
 		long submitBytes,
 		long completionQueryBytes,
-		long retireBytes
+		long retireBytes,
+		long enqueueNanos,
+		long resourceLookupNanos,
+		long resourceCreateNanos,
+		long abiPackingNanos,
+		long frameAcquireNanos,
+		long submitNanos,
+		long framePresentNanos,
+		long retireNanos,
+		long completionQueryNanos,
+		long executeNanos,
+		long commandLists,
+		long commandOps,
+		long backendSubmissions,
+		long backendWaits,
+		long glCalls,
+		long glFlushes,
+		long glFinishes,
+		long glFencesInserted,
+		long glFencesPolled,
+		long glFencesWaited,
+		long glFencesDeleted
 	) {
 	}
 
@@ -964,7 +1219,8 @@ public final class RustGalFrameQueue {
 		in vec2 v_uv;
 		out vec4 out_color;
 		void main() {
-		    ivec2 texel = clamp(ivec2(floor(v_uv * 15.0)), ivec2(0), ivec2(14));
+		    ivec2 texture_size = textureSize(Sampler0, 0);
+		    ivec2 texel = clamp(ivec2(floor(v_uv * vec2(texture_size))), ivec2(0), texture_size - ivec2(1));
 		    vec4 color = texelFetch(Sampler0, texel, 0);
 		    if (color.a <= 0.0) {
 		        discard;

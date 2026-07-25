@@ -13,6 +13,7 @@ pub(super) struct OpenGlObjects {
     gl: Rc<glow::Context>,
     objects: BTreeMap<Handle, OpenGlObject>,
     frame_target_framebuffers: BTreeMap<u64, Option<glow::Framebuffer>>,
+    current_frame_target_framebuffer: Option<Option<glow::Framebuffer>>,
     next_token: u64,
 }
 
@@ -22,6 +23,7 @@ impl OpenGlObjects {
             gl,
             objects: BTreeMap::new(),
             frame_target_framebuffers: BTreeMap::new(),
+            current_frame_target_framebuffer: None,
             next_token: 1,
         }
     }
@@ -31,6 +33,7 @@ impl OpenGlObjects {
         frame_id: u64,
         framebuffer: Option<glow::Framebuffer>,
     ) {
+        self.current_frame_target_framebuffer = Some(framebuffer);
         self.frame_target_framebuffers.insert(frame_id, framebuffer);
     }
 
@@ -96,6 +99,7 @@ impl OpenGlObjects {
                 framebuffer: self
                     .frame_target_framebuffers
                     .remove(&desc.frame_id)
+                    .or(self.current_frame_target_framebuffer)
                     .unwrap_or(None),
                 extent: desc.extent,
                 color_format: desc.color_format,
@@ -199,7 +203,14 @@ impl OpenGlObjects {
                 extent: object.extent,
             }),
             Some(OpenGlObject::FrameTarget(object)) => Ok(PassTargetObject {
-                framebuffer: object.framebuffer,
+                // ABI v2 intentionally reuses the same GAL frame-target handle
+                // across steady-state borrowed-context frames. Refresh the
+                // native OpenGL draw framebuffer on acquire so screen
+                // transitions cannot leave the persistent GAL handle pointing
+                // at a stale Java framebuffer.
+                framebuffer: self
+                    .current_frame_target_framebuffer
+                    .unwrap_or(object.framebuffer),
                 extent: object.extent,
             }),
             _ => Err(expected("render target or frame target", handle)),
@@ -699,6 +710,69 @@ pub(super) struct FrameTargetObject {
 pub(super) struct PassTargetObject {
     pub(super) framebuffer: Option<glow::Framebuffer>,
     pub(super) extent: Extent3d,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use super::super::OpenGlBackend;
+    use std::num::NonZeroU32;
+
+    fn fake_framebuffer(id: u32) -> glow::Framebuffer {
+        glow::NativeFramebuffer(NonZeroU32::new(id).unwrap())
+    }
+
+    fn frame_target_desc(frame_id: u64) -> FrameTargetDesc {
+        FrameTargetDesc {
+            label: format!("test-frame-target-{frame_id}"),
+            frame_id,
+            extent: Extent3d {
+                width: 64,
+                height: 48,
+                depth: 1,
+            },
+            color_format: TextureFormat::Rgba8Unorm,
+        }
+    }
+
+    #[test]
+    fn borrowed_frame_targets_follow_latest_acquired_framebuffer() {
+        let mut backend = match OpenGlBackend::new("MattMC OpenGL frame-target refresh test") {
+            Ok(backend) => backend,
+            Err(error) => {
+                assert!(
+                    error.to_string().contains("OpenGL") || error.to_string().contains("EGL"),
+                    "unexpected OpenGL bootstrap failure: {error}"
+                );
+                return;
+            }
+        };
+        let objects = &mut backend.objects;
+        let handle = Handle::new(HandleKind::FrameTarget, 1, 1).unwrap();
+        let first_framebuffer = fake_framebuffer(101);
+        let second_framebuffer = fake_framebuffer(202);
+
+        objects.set_frame_target_framebuffer(1, Some(first_framebuffer));
+        objects
+            .create(
+                handle,
+                BackendCreateDesc::FrameTarget(&frame_target_desc(1)),
+            )
+            .unwrap();
+        assert_eq!(
+            objects.pass_target(handle).unwrap().framebuffer,
+            Some(first_framebuffer)
+        );
+
+        objects.set_frame_target_framebuffer(2, Some(second_framebuffer));
+        assert_eq!(
+            objects.pass_target(handle).unwrap().framebuffer,
+            Some(second_framebuffer)
+        );
+
+        objects.set_frame_target_framebuffer(3, None);
+        assert_eq!(objects.pass_target(handle).unwrap().framebuffer, None);
+    }
 }
 
 #[allow(dead_code)]

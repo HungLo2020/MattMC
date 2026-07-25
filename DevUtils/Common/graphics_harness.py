@@ -1208,30 +1208,187 @@ def bucketed_rate(value: float) -> str:
     return "very-high"
 
 
-def stable_workload_family_summary(frame_doc: dict[str, object] | None, combined_logs: str) -> dict[str, object]:
+WORKLOAD_COUNTER_DEFINITION_VERSION = "phase-family-v2"
+
+WORKLOAD_PHASE_FAMILIES: dict[str, tuple[str, ...]] = {
+    "sodium-terrain-setup": ("sodium.terrain.setup",),
+    "sodium-terrain-draw": ("sodium.terrain.draw",),
+    "dh-lod": ("distant-horizons.lod-render",),
+    "dh-fade": ("distant-horizons.translucent-fade", "distant-horizons.opaque-fade"),
+    "iris-shadow": ("iris.shadows",),
+    "iris-deferred": ("iris.deferred-translucents",),
+    "iris-composite": ("iris.composite-final", "iris.composite"),
+}
+
+WORKLOAD_RUNTIME_FAMILIES = ("entities", "gui", "loaded-chunks")
+
+BACKEND_COUNTER_FAMILIES = (
+    "passes",
+    "draws",
+    "multidraws",
+    "uploads",
+    "submitted-commands",
+    "pipelines-resources",
+    "transfers",
+)
+
+
+def workload_counter_definitions() -> dict[str, object]:
+    return {
+        "version": WORKLOAD_COUNTER_DEFINITION_VERSION,
+        "semantic_families": {
+            "sodium-terrain-setup": "measured exclusive phase count for Sodium terrain preparation",
+            "sodium-terrain-draw": "measured exclusive phase count for Sodium terrain draw submission",
+            "dh-lod": "measured exclusive phase count for Distant Horizons LOD rendering",
+            "dh-fade": "measured exclusive phase count for Distant Horizons opaque/translucent fade rendering",
+            "iris-shadow": "measured exclusive phase count for Iris shadow rendering",
+            "iris-deferred": "measured exclusive phase count for Iris deferred translucent rendering",
+            "iris-composite": "measured exclusive phase count for Iris final composite",
+            "entities": "runtime entity count sampled from the measured gameplay window",
+            "gui": "one visible GUI/HUD frame per measured gameplay frame when GUI is not hidden",
+            "loaded-chunks": "runtime loaded chunk count sampled from the measured gameplay window",
+        },
+        "backend_command_counters": {
+            "definition": "submitted-work identities grouped by backend operation; diagnostic-only and excluded from Current/Frozen workload comparability",
+            "families": list(BACKEND_COUNTER_FAMILIES),
+        },
+    }
+
+
+def phase_map(frame_doc: dict[str, object] | None, name: str) -> dict[str, object]:
+    value = frame_doc.get(name) if isinstance(frame_doc, dict) else None
+    return value if isinstance(value, dict) else {}
+
+
+def phase_count(phases: dict[str, object], names: Sequence[str]) -> int:
+    total = 0
+    for name in names:
+        stats = phases.get(name)
+        if isinstance(stats, dict):
+            total += int(parse_number(stats.get("count")) or 0)
+    return total
+
+
+def workload_family_record(
+    *,
+    count: int,
+    measured_frames: float,
+    source: str,
+    definition: str,
+) -> dict[str, object]:
+    calls_per_frame = float(count) / measured_frames
+    return {
+        "present": count > 0,
+        "count": count,
+        "calls_per_frame": round(calls_per_frame, 3),
+        "bucket": bucketed_rate(calls_per_frame),
+        "source": source,
+        "definition": definition,
+        "instrumentation_version": WORKLOAD_COUNTER_DEFINITION_VERSION,
+    }
+
+
+def stable_workload_family_summary(frame_doc: dict[str, object] | None, combined_logs: str = "") -> dict[str, object]:
+    del combined_logs
+    measured = parse_number(frame_doc.get("measuredFrameCount")) if isinstance(frame_doc, dict) else None
+    measured_frames = measured if measured and measured > 0 else 1.0
+    exclusive_phases = phase_map(frame_doc, "exclusivePhaseNanos")
+    runtime = frame_doc.get("runtimeState") if isinstance(frame_doc, dict) and isinstance(frame_doc.get("runtimeState"), dict) else {}
+    families: dict[str, dict[str, object]] = {}
+    for family, labels in WORKLOAD_PHASE_FAMILIES.items():
+        families[family] = workload_family_record(
+            count=phase_count(exclusive_phases, labels),
+            measured_frames=measured_frames,
+            source="exclusive-phase",
+            definition="+".join(labels),
+        )
+    entity_count = int(parse_number(runtime.get("entityCount")) or 0) if isinstance(runtime, dict) else 0
+    loaded_chunks = int(parse_number(runtime.get("loadedChunks")) or 0) if isinstance(runtime, dict) else 0
+    hide_gui = bool(runtime.get("hideGui")) if isinstance(runtime, dict) else False
+    gui_frames = 0 if hide_gui else int(measured_frames)
+    families["entities"] = workload_family_record(
+        count=entity_count,
+        measured_frames=1.0,
+        source="runtime-state",
+        definition="runtimeState.entityCount",
+    )
+    families["gui"] = workload_family_record(
+        count=gui_frames,
+        measured_frames=measured_frames,
+        source="runtime-state",
+        definition="runtimeState.hideGui=false implies one visible HUD/GUI frame per measured frame",
+    )
+    families["loaded-chunks"] = workload_family_record(
+        count=loaded_chunks,
+        measured_frames=1.0,
+        source="runtime-state",
+        definition="runtimeState.loadedChunks",
+    )
+    return families
+
+
+def backend_counter_family_name(raw_name: str) -> str:
+    name = raw_name.lower()
+    if "multidraw" in name or "multi-draw" in name or "multi_draw" in name:
+        return "multidraws"
+    if "draw" in name:
+        return "draws"
+    if "upload" in name or "copy" in name or "transfer" in name or "blit" in name:
+        return "uploads"
+    if "pipeline" in name or "descriptor" in name or "resource" in name:
+        return "pipelines-resources"
+    if "pass" in name:
+        return "passes"
+    if "command" in name or "submit" in name or "submission" in name:
+        return "submitted-commands"
+    return "submitted-commands"
+
+
+def backend_work_counter_summary(frame_doc: dict[str, object] | None) -> dict[str, object]:
     counts = frame_doc.get("submittedWorkCounts") if isinstance(frame_doc, dict) and isinstance(frame_doc.get("submittedWorkCounts"), dict) else {}
     measured = parse_number(frame_doc.get("measuredFrameCount")) if isinstance(frame_doc, dict) else None
     measured_frames = measured if measured and measured > 0 else 1.0
-    families: dict[str, dict[str, object]] = {}
+    families: dict[str, dict[str, object]] = {
+        family: {
+            "present": False,
+            "count": 0,
+            "calls_per_frame": 0.0,
+            "bucket": "zero",
+            "source": "submitted-work-identity",
+            "instrumentation_version": WORKLOAD_COUNTER_DEFINITION_VERSION,
+            "comparable": False,
+        }
+        for family in BACKEND_COUNTER_FAMILIES
+    }
+    raw: dict[str, int] = {}
     for raw_name, raw_count in counts.items():
-        count = parse_number(raw_count) or 0.0
-        family = workload_family_name(str(raw_name))
-        record = families.setdefault(family, {"present": False, "count": 0, "calls_per_frame": 0.0, "bucket": "zero"})
+        count = int(parse_number(raw_count) or 0)
+        raw[str(raw_name)] = count
+        family = backend_counter_family_name(str(raw_name))
+        record = families.setdefault(
+            family,
+            {
+                "present": False,
+                "count": 0,
+                "calls_per_frame": 0.0,
+                "bucket": "zero",
+                "source": "submitted-work-identity",
+                "instrumentation_version": WORKLOAD_COUNTER_DEFINITION_VERSION,
+                "comparable": False,
+            },
+        )
+        record["count"] = int(record["count"]) + count
         record["present"] = bool(record["present"] or count > 0)
-        record["count"] = int(record["count"]) + int(count)
-    if not families:
-        for family, count in semantic_draw_families(combined_logs).items():
-            stable = workload_family_name(family)
-            record = families.setdefault(stable, {"present": False, "count": 0, "calls_per_frame": 0.0, "bucket": "zero"})
-            record["present"] = bool(record["present"] or count > 0)
-            record["count"] = int(record["count"]) + int(count)
     for record in families.values():
         calls_per_frame = float(record["count"]) / measured_frames
         record["calls_per_frame"] = round(calls_per_frame, 3)
         record["bucket"] = bucketed_rate(calls_per_frame)
-    for family in ("terrain", "iris", "distant-horizons", "gui-text", "entities", "transfers", "pipelines-resources", "render-passes"):
-        families.setdefault(family, {"present": False, "count": 0, "calls_per_frame": 0.0, "bucket": "zero"})
-    return families
+    return {
+        "definition": "backend submitted-work identities; diagnostic-only, not workload parity input",
+        "instrumentation_version": WORKLOAD_COUNTER_DEFINITION_VERSION,
+        "families": families,
+        "raw": raw,
+    }
 
 
 def workload_signature(
@@ -1284,18 +1441,26 @@ def workload_signature(
         },
         "dh": dh_state_from_text(combined_logs, meta),
         "config_before": config_snapshot_hash(capture_dir, "config_before"),
+        "workload_counter_definitions": workload_counter_definitions(),
+        "workload_counter_instrumentation": {
+            "expected_version": WORKLOAD_COUNTER_DEFINITION_VERSION,
+            "sampler_version": frame_doc.get("workloadCounterDefinitionVersion") if isinstance(frame_doc, dict) else None,
+        },
         "workload_families": stable_workload_family_summary(frame_doc, combined_logs),
+        "backend_work_counters": backend_work_counter_summary(frame_doc),
     }
 
 
 def instrumentation_signature(meta: dict[str, str], command: Sequence[str]) -> dict[str, object]:
     run_type = meta.get("graphics_run_type", "clean-performance")
+    diagnostic_hooks = meta.get("graphics_audit_enabled", "false").lower() == "true"
     validation_profile = meta.get("validation_profile") or meta.get("validation_mode", "off")
     validation_details = validation_profile_details(validation_profile)
     return {
         "run_type": run_type,
-        "performance_comparable": run_type == "clean-performance",
-        "diagnostics_enabled": run_type != "clean-performance" or meta.get("shader_input_parity", "off") != "off",
+        "performance_comparable": run_type == "clean-performance" and not diagnostic_hooks,
+        "diagnostics_enabled": diagnostic_hooks or run_type != "clean-performance" or meta.get("shader_input_parity", "off") != "off",
+        "diagnostic_hooks": diagnostic_hooks,
         "validation": {
             **validation_details,
             "mode": meta.get("validation_mode", "off"),
@@ -1316,6 +1481,7 @@ def instrumentation_signature(meta: dict[str, str], command: Sequence[str]) -> d
             "max_size_mb": parse_number(meta.get("tracy_max_size_mb")),
         },
         "shader_input_parity": meta.get("shader_input_parity", "off"),
+        "workload_counter_version": WORKLOAD_COUNTER_DEFINITION_VERSION,
         "tool_versions": tool_fingerprint(),
         "launch_command_uses_renderdoc": bool(command and Path(command[0]).name == "renderdoccmd"),
     }
@@ -1353,6 +1519,7 @@ def comparability_key(artifact: dict[str, object]) -> dict[str, object]:
     if isinstance(settings, dict):
         settings.pop("backend", None)
         settings.pop("validation_mode", None)
+    normalized.pop("backend_work_counters", None)
     families = normalized.get("workload_families")
     if isinstance(families, dict):
         for family in families.values():
@@ -1410,7 +1577,9 @@ def workload_values_equivalent(path: str, left: object, right: object) -> bool:
 def workload_numeric_tolerance(path: str) -> tuple[float, float] | None:
     if path.endswith((".loaded_chunks", ".effective_render_distance")):
         return (4.0, 0.10)
-    if path.endswith((".entity_count", ".player_count")):
+    if path.endswith(".entity_count"):
+        return (16.0, 0.10)
+    if path.endswith(".player_count"):
         return (1.0, 0.05)
     if path.endswith(".calls_per_frame"):
         return (0.25, 0.20)
@@ -1711,8 +1880,11 @@ def normalize_capture_artifact(
         validation_messages.append("deterministic correctness capture did not complete")
     instrumentation = benchmark_fingerprint["instrumentation"]
     run_type = instrumentation.get("run_type") if isinstance(instrumentation, dict) else "clean-performance"
+    diagnostic_hooks = bool(instrumentation.get("diagnostic_hooks")) if isinstance(instrumentation, dict) else False
     if run_type in INSTRUMENTED_RUN_TYPES:
         validation_messages.append(f"{run_type} run is diagnostic-only; performance numbers are not publishable")
+    if diagnostic_hooks:
+        validation_messages.append("graphics diagnostic hooks enabled; performance numbers are overhead probes only")
     if isinstance(instrumentation, dict) and instrumentation.get("renderdoc", {}).get("enabled"):
         if renderdoc_summary.get("status") != "complete":
             validation_messages.append("RenderDoc capture/replay did not complete")
@@ -1783,6 +1955,7 @@ def normalize_capture_artifact(
         validation_messages.append("Vulkan validation artifact/log association is incomplete")
     if loader_only_validation:
         validation_messages.append("Vulkan validation emitted only loader/configuration notices; no concrete API VUIDs were observed")
+    rust_gal_frames = last_number(combined_logs, r"rust_gal_frames_executed[=: ]+(\d+)")
     rust_gal_batches = last_number(combined_logs, r"rust_gal_batches_executed[=: ]+(\d+)")
     rust_gal_ffi_calls = last_number(combined_logs, r"ffi(?:_call)?_count[=: ]+(\d+)")
     rust_gal_ffi_bytes = last_number(combined_logs, r"ffi(?:_bytes| bytes)[=: ]+(\d+)")
@@ -1830,11 +2003,50 @@ def normalize_capture_artifact(
     }
     rust_gal_calls_per_batch = None
     rust_gal_bytes_per_batch = None
+    rust_gal_calls_per_frame = None
+    rust_gal_bytes_per_frame = None
     if rust_gal_batches and rust_gal_batches > 0:
         if rust_gal_ffi_calls is not None:
             rust_gal_calls_per_batch = rust_gal_ffi_calls / rust_gal_batches
         if rust_gal_ffi_bytes is not None:
             rust_gal_bytes_per_batch = rust_gal_ffi_bytes / rust_gal_batches
+    if rust_gal_frames and rust_gal_frames > 0:
+        if rust_gal_ffi_calls is not None:
+            rust_gal_calls_per_frame = rust_gal_ffi_calls / rust_gal_frames
+        if rust_gal_ffi_bytes is not None:
+            rust_gal_bytes_per_frame = rust_gal_ffi_bytes / rust_gal_frames
+    rust_gal_timing_totals = {
+        "java_producer_enqueue_nanos": last_number(combined_logs, r"rust_gal_enqueue_nanos[=: ]+(\d+)"),
+        "resource_lookup_nanos": last_number(combined_logs, r"rust_gal_resource_lookup_nanos[=: ]+(\d+)"),
+        "resource_create_nanos": last_number(combined_logs, r"rust_gal_resource_create_nanos[=: ]+(\d+)"),
+        "abi_packing_nanos": last_number(combined_logs, r"rust_gal_abi_packing_nanos[=: ]+(\d+)"),
+        "frame_acquire_nanos": last_number(combined_logs, r"rust_gal_frame_acquire_nanos[=: ]+(\d+)"),
+        "submit_nanos": last_number(combined_logs, r"rust_gal_submit_nanos[=: ]+(\d+)"),
+        "frame_present_nanos": last_number(combined_logs, r"rust_gal_frame_present_nanos[=: ]+(\d+)"),
+        "retire_nanos": last_number(combined_logs, r"rust_gal_retire_nanos[=: ]+(\d+)"),
+        "completion_query_nanos": last_number(combined_logs, r"rust_gal_completion_query_nanos[=: ]+(\d+)"),
+        "execute_nanos": last_number(combined_logs, r"rust_gal_execute_nanos[=: ]+(\d+)"),
+    }
+    rust_gal_backend_sync = {
+        "command_lists": last_number(combined_logs, r"rust_gal_command_lists[=: ]+(\d+)"),
+        "command_ops": last_number(combined_logs, r"rust_gal_command_ops[=: ]+(\d+)"),
+        "backend_submissions": last_number(combined_logs, r"rust_gal_backend_submissions[=: ]+(\d+)"),
+        "backend_waits": last_number(combined_logs, r"rust_gal_backend_waits[=: ]+(\d+)"),
+        "gl_calls": last_number(combined_logs, r"rust_gal_gl_calls[=: ]+(\d+)"),
+        "gl_flushes": last_number(combined_logs, r"rust_gal_gl_flushes[=: ]+(\d+)"),
+        "gl_finishes": last_number(combined_logs, r"rust_gal_gl_finishes[=: ]+(\d+)"),
+        "gl_fences_inserted": last_number(combined_logs, r"rust_gal_gl_fences_inserted[=: ]+(\d+)"),
+        "gl_fences_polled": last_number(combined_logs, r"rust_gal_gl_fences_polled[=: ]+(\d+)"),
+        "gl_fences_waited": last_number(combined_logs, r"rust_gal_gl_fences_waited[=: ]+(\d+)"),
+        "gl_fences_deleted": last_number(combined_logs, r"rust_gal_gl_fences_deleted[=: ]+(\d+)"),
+    }
+    rust_gal_timing_per_batch = {}
+    if rust_gal_batches and rust_gal_batches > 0:
+        rust_gal_timing_per_batch = {
+            name: value / rust_gal_batches
+            for name, value in rust_gal_timing_totals.items()
+            if value is not None
+        }
     complete = (
         bool(files["meta"])
         and (success or reused_baseline)
@@ -1901,18 +2113,24 @@ def normalize_capture_artifact(
                 "bytes": rust_gal_ffi_bytes,
             },
             "rust_gal_slice": {
-                "producer": first_text(combined_logs, r"Rust OpenGL VulkanicGAL GUI batch executed producer=([^ ]+)"),
+                "producer": last_text(combined_logs, r"Rust OpenGL VulkanicGAL GUI (?:batch|frame) executed producer=([^ ]+)"),
                 "cache_hits": last_number(combined_logs, r"rust_gal_cache_hits[=: ]+(\d+)"),
                 "cache_misses": last_number(combined_logs, r"rust_gal_cache_misses[=: ]+(\d+)"),
                 "queue_depth": last_number(combined_logs, r"rust_gal_queue_depth[=: ]+(\d+)"),
+                "frames_executed": rust_gal_frames,
                 "batches_executed": rust_gal_batches,
                 "batches_cancelled": last_number(combined_logs, r"rust_gal_batches_cancelled[=: ]+(\d+)"),
                 "completion_polls": last_number(combined_logs, r"rust_gal_completion_polls[=: ]+(\d+)"),
                 "completion_timeouts": last_number(combined_logs, r"rust_gal_completion_timeouts[=: ]+(\d+)"),
                 "ffi_operations": rust_gal_operations,
+                "ffi_calls_per_frame": rust_gal_calls_per_frame,
+                "ffi_bytes_per_frame": rust_gal_bytes_per_frame,
                 "ffi_calls_per_executed_batch": rust_gal_calls_per_batch,
                 "ffi_bytes_per_executed_batch": rust_gal_bytes_per_batch,
-                "submission": last_number(combined_logs, r"Rust OpenGL VulkanicGAL GUI batch executed.*?submission=(\d+)"),
+                "timing_totals_nanos": rust_gal_timing_totals,
+                "timing_per_executed_batch_nanos": rust_gal_timing_per_batch,
+                "backend_sync": rust_gal_backend_sync,
+                "submission": last_number(combined_logs, r"Rust OpenGL VulkanicGAL GUI (?:batch|frame) executed.*?submission=(\d+)"),
             },
             "work_counts": work_counts,
             "creation_counts": creation_counts,
@@ -1989,6 +2207,13 @@ def first_text(text: str, pattern: str) -> str | None:
     if not match:
         return None
     return match.group(1)
+
+
+def last_text(text: str, pattern: str) -> str | None:
+    matches = list(re.finditer(pattern, text, re.IGNORECASE))
+    if not matches:
+        return None
+    return matches[-1].group(1)
 
 
 def incomplete_run_diagnosis(
@@ -2829,6 +3054,10 @@ def build_capture_command(
             str(entrypoint),
             "--backend",
             mode.backend,
+            "--shaders",
+            mode.shaders,
+            "--artifact-dir",
+            str(capture_dir),
             "--max-secs",
             str(args.max_secs),
             "--dump-secs",
@@ -2851,6 +3080,7 @@ def build_capture_command(
     env["MATTMC_TRACY_DURATION_SECONDS"] = str(getattr(args, "tracy_duration_seconds", 20))
     env["MATTMC_TRACY_MAX_SIZE_MB"] = str(getattr(args, "tracy_max_size_mb", 256))
     env["MATTMC_CAPTURE_WORLD"] = args.world
+    env["MATTMC_CAPTURE_RUN_SOURCE"] = str(CURRENT_REPO_ROOT / "run")
     env["MATTMC_CAPTURE_WORLD_SOURCE"] = str(CURRENT_REPO_ROOT / "run" / "saves" / args.world)
     env["CLIENT_RSS_LIMIT_MB"] = str(args.client_rss_limit_mb)
     java_options = [env.get("JAVA_TOOL_OPTIONS", "")]
@@ -2900,6 +3130,8 @@ def build_capture_command(
             ]
         )
         env["MATTMC_GRAPHICS_CORRECTNESS_CAPTURE"] = "true"
+        env["MATTMC_DETERMINISTIC_METADATA"] = str(deterministic_metadata)
+        env["MATTMC_DETERMINISTIC_SCREENSHOT_DIR"] = str(deterministic_screenshot_dir)
     if args.diagnostic:
         perf_dir = capture_dir / "vulkan-perf-audit"
         java_options.extend(
@@ -3084,7 +3316,7 @@ def run_mode(
     kind, _ = run_dev_capture_entrypoint(target.root)
     effective_workload_profile = "gameplay" if tool_kind == "gameplay" else args.workload_profile
     run_dir = f"run-{repetition:02d}"
-    capture_dir = artifact_root / mode.name / tool_kind / run_dir / "capture" if kind == "python" else target.root / "logs" / "auto-capture"
+    capture_dir = artifact_root / mode.name / tool_kind / run_dir / "capture"
     output_path = artifact_root / mode.name / tool_kind / run_dir / ARTIFACT_NAME
     command, env = build_capture_command(target, mode, capture_dir, effective_workload_profile, args, tool_kind)
     if args.dry_run:

@@ -87,6 +87,7 @@ import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public class Gui {
+	private static final ResourceLocation CROSSHAIR_SPRITE = ResourceLocation.withDefaultNamespace("hud/crosshair");
 	private static final ResourceLocation CROSSHAIR_ATTACK_INDICATOR_FULL_SPRITE = ResourceLocation.withDefaultNamespace("hud/crosshair_attack_indicator_full");
 	private static final ResourceLocation CROSSHAIR_ATTACK_INDICATOR_BACKGROUND_SPRITE = ResourceLocation.withDefaultNamespace(
 		"hud/crosshair_attack_indicator_background"
@@ -477,7 +478,13 @@ public class Gui {
 				if (!this.minecraft.debugEntries.isCurrentlyEnabled(DebugScreenEntries.THREE_DIMENSIONAL_CROSSHAIR)) {
 					guiGraphics.nextStratum();
 					int i = 15;
-					RustGalFrameQueue.enqueueCrosshair(this.minecraft, guiGraphics, (guiGraphics.guiWidth() - i) / 2, (guiGraphics.guiHeight() - i) / 2, i, i);
+					if (RustGalFrameQueue.isMigratedGuiDisabledForDiagnostics()) {
+						// Dev-only measurement control: no migrated or legacy crosshair draw.
+					} else if (RustGalFrameQueue.isMigratedGuiLegacyControl()) {
+						guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_SPRITE, (guiGraphics.guiWidth() - i) / 2, (guiGraphics.guiHeight() - i) / 2, i, i);
+					} else {
+						RustGalFrameQueue.enqueueCrosshair(this.minecraft, guiGraphics, (guiGraphics.guiWidth() - i) / 2, (guiGraphics.guiHeight() - i) / 2, i, i);
+					}
 					if (this.minecraft.options.attackIndicator().get() == AttackIndicatorStatus.CROSSHAIR) {
 						float f = this.minecraft.player.getAttackStrengthScale(0.0F);
 						boolean bl = false;
@@ -609,7 +616,13 @@ public class Gui {
 			int i = guiGraphics.guiWidth() / 2;
 			int j = 182;
 			int k = 91;
-			guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_SPRITE, i - 91, guiGraphics.guiHeight() - 22, 182, 22);
+			if (RustGalFrameQueue.isMigratedGuiDisabledForDiagnostics()) {
+				// Dev-only measurement control: no migrated or legacy hotbar base draw.
+			} else if (RustGalFrameQueue.isMigratedGuiLegacyControl()) {
+				guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_SPRITE, i - 91, guiGraphics.guiHeight() - 22, 182, 22);
+			} else {
+				RustGalFrameQueue.enqueueHotbarBase(this.minecraft, guiGraphics, i - 91, guiGraphics.guiHeight() - 22, 182, 22);
+			}
 			guiGraphics.blitSprite(
 				RenderPipelines.GUI_TEXTURED, HOTBAR_SELECTION_SPRITE, i - 91 - 1 + player.getInventory().getSelectedSlot() * 20, guiGraphics.guiHeight() - 22 - 1, 24, 23
 			);

@@ -268,6 +268,12 @@ impl VulkanicGal {
         &self.metrics
     }
 
+    pub(in crate::render::vulkanic) fn backend_runtime_metrics(
+        &self,
+    ) -> super::backends::BackendRuntimeMetrics {
+        self.backend.runtime_metrics()
+    }
+
     pub fn capabilities(&self) -> BackendCapabilities {
         self.backend.capabilities()
     }

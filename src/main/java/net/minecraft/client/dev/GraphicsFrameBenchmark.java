@@ -48,6 +48,7 @@ public final class GraphicsFrameBenchmark {
 	private static final long READINESS_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(Math.max(1L, Long.getLong("mattmc.dev.graphicsFrameBenchmark.readinessTimeoutSeconds", 120L)));
 	private static final boolean STOP_AFTER_COMPLETE = Boolean.parseBoolean(System.getProperty("mattmc.dev.graphicsFrameBenchmark.stopAfterComplete", "true"));
 	private static final Path STATUS_PATH = Path.of(System.getProperty("mattmc.dev.graphicsFrameBenchmark.status", "run/graphics_frame_benchmark.json"));
+	private static final String WORKLOAD_COUNTER_DEFINITION_VERSION = "phase-family-v2";
 
 	private static final ArrayDeque<OpenPhase> PHASE_STACK = new ArrayDeque<>();
 	private static final Map<String, PhaseStats> EXCLUSIVE_PHASES = new LinkedHashMap<>();
@@ -355,6 +356,7 @@ public final class GraphicsFrameBenchmark {
 		StringBuilder json = new StringBuilder(12288);
 		json.append("{\n");
 		field(json, "schema", "mattmc-graphics-frame-benchmark-v2", 2, true);
+		field(json, "workloadCounterDefinitionVersion", WORKLOAD_COUNTER_DEFINITION_VERSION, 2, true);
 		field(json, "status", status, 2, true);
 		field(json, "failureReason", failureReason, 2, true);
 		field(json, "implementationAttribution", System.getProperty("mattmc.dev.graphicsFrameBenchmark.implementation", "unknown"), 2, true);

@@ -275,6 +275,7 @@ class CaptureRunner:
             f"client_rss_limit_mb={self.config.client_rss_limit_mb}",
             f"validation_mode={self.config.validation_mode}",
             f"graphics_run_type={os.environ.get('MATTMC_GRAPHICS_RUN_TYPE', 'clean-performance')}",
+            f"graphics_audit_enabled={os.environ.get('MATTMC_GRAPHICS_AUDIT', 'false')}",
             f"validation_profile={os.environ.get('MATTMC_GRAPHICS_VALIDATION_PROFILE', self.config.validation_mode)}",
             f"validation_fail_severity={os.environ.get('MATTMC_GRAPHICS_VALIDATION_FAIL_SEVERITY', 'warning')}",
             f"renderdoc_capture={os.environ.get('MATTMC_RENDERDOC_CAPTURE', 'false')}",
@@ -316,7 +317,7 @@ class CaptureRunner:
     def prepare_isolated_game_dir(self) -> None:
         if self.config.game_dir or self.config.region_validation_copy_world:
             return
-        source_run = self.root / "run"
+        source_run = Path(os.environ["MATTMC_CAPTURE_RUN_SOURCE"]) if os.environ.get("MATTMC_CAPTURE_RUN_SOURCE") else self.root / "run"
         source_world = Path(os.environ["MATTMC_CAPTURE_WORLD_SOURCE"]) if os.environ.get("MATTMC_CAPTURE_WORLD_SOURCE") else source_run / "saves" / self.config.world
         if not source_world.is_dir():
             raise SystemExit(f"Cannot copy missing benchmark world: {source_world}")

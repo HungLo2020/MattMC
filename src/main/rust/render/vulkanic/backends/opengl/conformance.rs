@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use xxhash_rust::xxh32::xxh32;
 
-use super::{OpenGlBackend, StateCacheSnapshot};
+use super::{OpenGlBackend, OpenGlSyncStats, StateCacheSnapshot};
 use crate::render::vulkanic::commands::{
     AttachmentLoadOp, AttachmentStoreOp, BufferImageCopyRegion, ClearColor, CommandListDesc,
     CommandOp, PassAttachment, ResourceBarrier, SubmissionBatch, TextureOrigin3d,
@@ -31,6 +31,11 @@ fn isolated_opengl_conformance_renders_indexed_textured_draw() {
             assert!(report.non_zero_pixels > 0);
             assert!(report.state_cache.program_binds > 0);
             assert!(report.state_cache.framebuffer_binds > 0);
+            assert_eq!(report.sync_stats.finishes, 0);
+            assert_eq!(report.sync_stats.flushes, 0);
+            assert!(report.sync_stats.fences_inserted > 0);
+            assert!(report.sync_stats.command_ops > 0);
+            assert!(report.sync_stats.gl_calls > 0);
         }
         Err(error) => {
             let text = error.to_string();
@@ -139,6 +144,7 @@ pub(in crate::render::vulkanic::backends) struct ConformanceReport {
     pub(in crate::render::vulkanic::backends) capabilities_json: String,
     pub(in crate::render::vulkanic::backends) gl_errors: Vec<String>,
     pub(in crate::render::vulkanic::backends) state_cache: StateCacheSnapshot,
+    pub(in crate::render::vulkanic::backends) sync_stats: OpenGlSyncStats,
 }
 
 fn assert_conformance_conventions(report: &ConformanceReport) {
@@ -430,6 +436,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
         .ok_or_else(|| GalError::backend("OpenGL conformance readback produced no bytes"))?;
     let gl_errors = backend.gl_errors_for_test();
     let state_cache = backend.state_cache_for_test();
+    let sync_stats = backend.sync_stats_for_test();
     if !gl_errors.is_empty() {
         return Err(GalError::backend(format!(
             "OpenGL conformance produced errors: {}",
@@ -449,6 +456,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
         capabilities_json,
         gl_errors,
         state_cache,
+        sync_stats,
     };
     write_report(&report)?;
     super::trace::message("rust-opengl-conformance-complete");
@@ -692,7 +700,7 @@ fn write_report(report: &ConformanceReport) -> GalResult<()> {
         ))
     })?;
     let json = format!(
-        "{{\n  \"artifact_class\": \"rust_opengl_conformance\",\n  \"backend\": \"Rust OpenGL\",\n  \"mode\": \"{}\",\n  \"instrumentation\": \"clean-conformance\",\n  \"width\": {},\n  \"height\": {},\n  \"pixel_hash_xxh32\": \"{:08x}\",\n  \"non_zero_pixels\": {},\n  \"pixel_evidence\": {},\n  \"backend_capabilities\": {},\n  \"gl_error_count\": {}\n}}\n",
+        "{{\n  \"artifact_class\": \"rust_opengl_conformance\",\n  \"backend\": \"Rust OpenGL\",\n  \"mode\": \"{}\",\n  \"instrumentation\": \"clean-conformance\",\n  \"width\": {},\n  \"height\": {},\n  \"pixel_hash_xxh32\": \"{:08x}\",\n  \"non_zero_pixels\": {},\n  \"pixel_evidence\": {},\n  \"backend_capabilities\": {},\n  \"gl_error_count\": {},\n  \"sync\": {{\"command_batches\": {}, \"command_lists\": {}, \"command_ops\": {}, \"gl_calls\": {}, \"flushes\": {}, \"finishes\": {}, \"fences_inserted\": {}, \"fences_polled\": {}, \"fences_waited\": {}, \"fences_deleted\": {}}}\n}}\n",
         report.mode,
         report.width,
         report.height,
@@ -700,7 +708,17 @@ fn write_report(report: &ConformanceReport) -> GalResult<()> {
         report.non_zero_pixels,
         report.evidence_json,
         report.capabilities_json,
-        report.gl_errors.len()
+        report.gl_errors.len(),
+        report.sync_stats.command_batches,
+        report.sync_stats.command_lists,
+        report.sync_stats.command_ops,
+        report.sync_stats.gl_calls,
+        report.sync_stats.flushes,
+        report.sync_stats.finishes,
+        report.sync_stats.fences_inserted,
+        report.sync_stats.fences_polled,
+        report.sync_stats.fences_waited,
+        report.sync_stats.fences_deleted
     );
     std::fs::write(&path, json).map_err(|error| {
         GalError::backend(format!(

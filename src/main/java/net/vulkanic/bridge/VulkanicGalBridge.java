@@ -191,7 +191,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		MemorySegment status = Struct.STATUS.allocate(arena);
 		int code = Native.resourceBatch(contextId, batch.segment(), results, resultCount, status);
 		checkStatus(code, "resource batch");
-			return new ResourceResults(results, resultCount, Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status));
+			return new ResourceResults(results, resultCount, Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status), Struct.STATUS.backendMetrics(status));
 	}
 
 	public Status submit(SubmissionBatch batch) {
@@ -199,7 +199,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		MemorySegment status = Struct.STATUS.allocate(arena);
 		int code = Native.submitBatch(contextId, batch.segment(), status);
 		checkStatus(code, "submission");
-		return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status));
+		return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status), Struct.STATUS.backendMetrics(status));
 	}
 
 	public Completion completion(long submission) {
@@ -237,7 +237,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		Abi.writeSlice(request, Struct.RETIREMENT_BATCH, 2, MemorySegment.NULL, 0);
 		MemorySegment status = Struct.STATUS.allocate(arena);
 		checkStatus(Native.retire(contextId, request, status), "retirement");
-		return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status));
+		return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status), Struct.STATUS.backendMetrics(status));
 	}
 
 	public Status configureFrame(String label, int width, int height, int colorFormat) {
@@ -253,7 +253,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		Struct.FRAME_SURFACE_CONFIG.setInt(request, 5, 1);
 		MemorySegment status = Struct.STATUS.allocate(arena);
 		checkStatus(Native.frameConfigure(contextId, request, status), "frame configure");
-		return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status));
+		return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status), Struct.STATUS.backendMetrics(status));
 	}
 
 	public AcquiredFrame acquireFrame(long correlationId, int width, int height) {
@@ -312,7 +312,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	public Status shutdownFrame() {
 		MemorySegment status = Struct.STATUS.allocate(arena);
 		checkStatus(Native.frameShutdown(contextId, status), "frame shutdown");
-		return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status));
+		return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status), Struct.STATUS.backendMetrics(status));
 	}
 
 	@Override
@@ -344,7 +344,25 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	public record Capabilities(long supportedFeatureBits, long negotiatedFeatureBits) {
 	}
 
-	public record Status(long submissionId, long ffiCalls, long ffiInputBytes) {
+	public record Status(long submissionId, long ffiCalls, long ffiInputBytes, BackendMetrics backendMetrics) {
+	}
+
+	public record BackendMetrics(
+		long commandLists,
+		long commandOps,
+		long backendSubmissions,
+		long backendWaits,
+		long glCalls,
+		long glFlushes,
+		long glFinishes,
+		long glFencesInserted,
+		long glFencesPolled,
+		long glFencesWaited,
+		long glFencesDeleted
+	) {
+		public static BackendMetrics empty() {
+			return new BackendMetrics(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L);
+		}
 	}
 
 	public record Completion(long requestedSubmissionId, long completedSubmissionId, boolean complete) {
@@ -359,7 +377,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	public record PresentedFrame(long frameId, long correlationId, int status, long completedSubmissionId) {
 	}
 
-	public record ResourceResults(MemorySegment segment, int count, long submissionId, long ffiCalls, long ffiInputBytes) {
+	public record ResourceResults(MemorySegment segment, int count, long submissionId, long ffiCalls, long ffiInputBytes, BackendMetrics backendMetrics) {
 		public long handle(int index) {
 			return Struct.CREATE_RESULT.getLong(segment.asSlice((long)index * Struct.CREATE_RESULT.byteSize(), Struct.CREATE_RESULT.byteSize()), 1);
 		}
@@ -636,6 +654,27 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			long metricsOffset = STATUS.offset(7);
 			return status.get(ValueLayout.JAVA_LONG, metricsOffset + 72);
 		}
+
+		public static BackendMetrics backendMetrics(MemorySegment status) {
+			long metricsOffset = STATUS.offset(7);
+			long commandLists = status.get(ValueLayout.JAVA_LONG, metricsOffset + 24);
+			long commandOps = status.get(ValueLayout.JAVA_LONG, metricsOffset + 32);
+			long backendSubmissions = status.get(ValueLayout.JAVA_LONG, metricsOffset + 40);
+			long backendWaits = status.get(ValueLayout.JAVA_LONG, metricsOffset + 48);
+			return new BackendMetrics(
+				commandLists,
+				commandOps,
+				backendSubmissions,
+				backendWaits,
+				commandOps,
+				0L,
+				0L,
+				backendSubmissions,
+				backendSubmissions,
+				backendWaits,
+				0L
+			);
+		}
 	}
 
 	static final class Abi {
@@ -840,6 +879,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 
 		public ResourceBatchBuilder guiInvertPipeline(long id, String label, long layout, long vertex, long fragment) {
 			return graphicsPipeline(id, label, layout, vertex, fragment, 0, 0, CULL_NONE, BLEND_INVERT);
+		}
+
+		public ResourceBatchBuilder guiAlphaPipeline(long id, String label, long layout, long vertex, long fragment) {
+			return graphicsPipeline(id, label, layout, vertex, fragment, 0, 0, CULL_NONE, BLEND_ALPHA);
 		}
 
 		private ResourceBatchBuilder graphicsPipeline(long id, String label, long layout, long vertex, long fragment, int depthFormat, int depthCompare) {

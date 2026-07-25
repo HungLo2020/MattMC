@@ -7,11 +7,9 @@ mod trace;
 
 use std::sync::{Mutex, MutexGuard};
 
-use glow::HasContext;
-
 use super::{
     graphics_backend_lock, opengl_capabilities, presentation_capabilities, Backend,
-    BackendCreateDesc, BackendToken, CompletedHostRead,
+    BackendCreateDesc, BackendRuntimeMetrics, BackendToken, CompletedHostRead,
 };
 use crate::render::vulkanic::commands::ValidatedSubmissionBatch;
 use crate::render::vulkanic::error::{GalError, GalResult};
@@ -26,6 +24,8 @@ use crate::render::vulkanic::sync::SubmissionId;
 
 use self::context::{ExistingOpenGlContextDesc, OpenGlContext};
 use self::lowering::OpenGlLowerer;
+#[cfg(test)]
+use self::lowering::OpenGlSyncStats;
 #[cfg(test)]
 use self::lowering::StateCacheSnapshot;
 use self::resources::OpenGlObjects;
@@ -132,6 +132,14 @@ impl OpenGlBackend {
             .map(|lowerer| lowerer.state_cache_for_test())
             .unwrap_or_default()
     }
+
+    #[cfg(test)]
+    pub(super) fn sync_stats_for_test(&self) -> OpenGlSyncStats {
+        self.lowerer
+            .lock()
+            .map(|lowerer| lowerer.sync_stats_for_test())
+            .unwrap_or_default()
+    }
 }
 
 impl Backend for OpenGlBackend {
@@ -183,7 +191,7 @@ impl Backend for OpenGlBackend {
     fn completed_submission(&self) -> SubmissionId {
         self.lowerer
             .lock()
-            .map(|lowerer| lowerer.completed_submission())
+            .map(|mut lowerer| lowerer.poll_completed_submission())
             .unwrap_or(SubmissionId(0))
     }
 
@@ -207,6 +215,26 @@ impl Backend for OpenGlBackend {
                 bytes: read.bytes,
             })
             .collect()
+    }
+
+    fn runtime_metrics(&self) -> BackendRuntimeMetrics {
+        let sync = self
+            .lowerer
+            .lock()
+            .map(|lowerer| lowerer.sync_stats_snapshot())
+            .unwrap_or_default();
+        BackendRuntimeMetrics {
+            command_batches: sync.command_batches,
+            command_lists: sync.command_lists,
+            command_ops: sync.command_ops,
+            gl_calls: sync.gl_calls,
+            gl_flushes: sync.flushes as u64,
+            gl_finishes: sync.finishes as u64,
+            gl_fences_inserted: sync.fences_inserted as u64,
+            gl_fences_polled: sync.fences_polled as u64,
+            gl_fences_waited: sync.fences_waited as u64,
+            gl_fences_deleted: sync.fences_deleted as u64,
+        }
     }
 
     fn configure_frame_surface(&mut self, desc: &FrameSurfaceDesc) -> GalResult<()> {
@@ -296,9 +324,11 @@ impl Backend for OpenGlBackend {
         }
         self.context.make_current()?;
         let _state_guard = self.context.borrowed_state_guard();
-        unsafe {
-            self.context.gl().flush();
-        }
+        let completed_submission = self
+            .lowerer
+            .lock()
+            .map_err(|_| GalError::backend("OpenGL lowerer lock poisoned"))?
+            .poll_completed_submission();
         trace::message(&format!(
             "gal.frame.present backend=opengl correlation={} frame={} submission={}",
             desc.correlation_id.0, desc.frame.0, desc.wait_for.0
@@ -307,7 +337,7 @@ impl Backend for OpenGlBackend {
             frame: desc.frame,
             correlation_id: desc.correlation_id,
             status: FramePresentStatus::Presented,
-            completed_submission: desc.wait_for,
+            completed_submission,
         })
     }
 
@@ -334,6 +364,9 @@ impl Drop for OpenGlBackend {
         let _zone = trace::Zone::new("opengl.backend.drop");
         let _ = self.context.make_current();
         let _state_guard = self.context.borrowed_state_guard();
+        if let Ok(mut lowerer) = self.lowerer.lock() {
+            lowerer.delete_all_fences();
+        }
         self.objects.destroy_all();
     }
 }

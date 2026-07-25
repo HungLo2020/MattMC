@@ -7,6 +7,7 @@ use std::thread::ThreadId;
 use glow::HasContext;
 use libloading::Library;
 
+use super::trace;
 use crate::render::vulkanic::error::{GalError, GalResult};
 
 const EGL_FALSE: c_int = 0;
@@ -388,6 +389,7 @@ struct TextureUnitState {
 
 impl BorrowedOpenGlStateGuard {
     fn capture(gl: Rc<glow::Context>) -> Self {
+        let _zone = trace::Zone::new("opengl.borrowed-state.capture");
         unsafe {
             let active_texture = gl.get_parameter_i32(glow::ACTIVE_TEXTURE);
             let mut texture_units = Vec::new();
@@ -466,6 +468,7 @@ impl BorrowedOpenGlStateGuard {
 
 impl Drop for BorrowedOpenGlStateGuard {
     fn drop(&mut self) {
+        let _zone = trace::Zone::new("opengl.borrowed-state.restore");
         unsafe {
             self.gl.use_program(self.program);
             self.gl.bind_vertex_array(self.vertex_array);
