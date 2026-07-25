@@ -28,6 +28,7 @@ public final class RustGalFrameQueue {
 	private static final int GUI_UNIFORM_BYTES = 32;
 	private static final String CROSSHAIR_PRODUCER = "minecraft.gui.crosshair";
 	private static final String HOTBAR_BASE_PRODUCER = "minecraft.gui.hotbar.base";
+	private static final String HOTBAR_SELECTION_PRODUCER = "minecraft.gui.hotbar.selection";
 	private static final Object LOCK = new Object();
 	private static VulkanicGalBridge bridge;
 	private static Thread renderThread;
@@ -62,14 +63,32 @@ public final class RustGalFrameQueue {
 		if (!isCrosshairEnabled()) {
 			return;
 		}
-		enqueueGuiSprite(minecraft, guiGraphics, GuiSprite.CROSSHAIR, CROSSHAIR_PRODUCER, x, y, width, height);
+		enqueueGuiSprite(minecraft, guiGraphics, GuiSprite.CROSSHAIR, CROSSHAIR_PRODUCER, -1, x, y, width, height);
 	}
 
 	public static void enqueueHotbarBase(Minecraft minecraft, net.minecraft.client.gui.GuiGraphics guiGraphics, int x, int y, int width, int height) {
 		if (!isCrosshairEnabled()) {
 			return;
 		}
-		enqueueGuiSprite(minecraft, guiGraphics, GuiSprite.HOTBAR_BASE, HOTBAR_BASE_PRODUCER, x, y, width, height);
+		enqueueGuiSprite(minecraft, guiGraphics, GuiSprite.HOTBAR_BASE, HOTBAR_BASE_PRODUCER, -1, x, y, width, height);
+	}
+
+	public static void enqueueHotbarSelection(
+		Minecraft minecraft,
+		net.minecraft.client.gui.GuiGraphics guiGraphics,
+		int selectedSlot,
+		int x,
+		int y,
+		int width,
+		int height
+	) {
+		if (!isCrosshairEnabled()) {
+			return;
+		}
+		if (selectedSlot < 0 || selectedSlot > 8) {
+			throw new IllegalArgumentException("selected hotbar slot must be in 0..8: " + selectedSlot);
+		}
+		enqueueGuiSprite(minecraft, guiGraphics, GuiSprite.HOTBAR_SELECTION, HOTBAR_SELECTION_PRODUCER, selectedSlot, x, y, width, height);
 	}
 
 	private static void enqueueGuiSprite(
@@ -77,6 +96,7 @@ public final class RustGalFrameQueue {
 		net.minecraft.client.gui.GuiGraphics guiGraphics,
 		GuiSprite sprite,
 		String producerId,
+		int selectedSlot,
 		int x,
 		int y,
 		int width,
@@ -94,6 +114,7 @@ public final class RustGalFrameQueue {
 					SCHEDULER.enqueue(
 						sprite,
 						producerId,
+						selectedSlot,
 						x,
 						y,
 						width,
@@ -810,7 +831,8 @@ public final class RustGalFrameQueue {
 
 	public enum RenderStratum {
 		GUI_CROSSHAIR("gui.crosshair", 200),
-		GUI_HOTBAR_BASE("gui.hotbar.base", 300);
+		GUI_HOTBAR_BASE("gui.hotbar.base", 300),
+		GUI_HOTBAR_SELECTION("gui.hotbar.selection", 310);
 
 		private final String id;
 		private final int order;
@@ -829,7 +851,7 @@ public final class RustGalFrameQueue {
 		}
 
 		boolean supportedForPartialFrame() {
-			return this == GUI_CROSSHAIR || this == GUI_HOTBAR_BASE;
+			return this == GUI_CROSSHAIR || this == GUI_HOTBAR_BASE || this == GUI_HOTBAR_SELECTION;
 		}
 	}
 
@@ -842,6 +864,7 @@ public final class RustGalFrameQueue {
 		RustGalGuiElementRenderState enqueue(
 			GuiSprite sprite,
 			String producerId,
+			int selectedSlot,
 			int x,
 			int y,
 			int width,
@@ -859,6 +882,7 @@ public final class RustGalFrameQueue {
 				sprite.stratum,
 				sprite,
 				producerId,
+				selectedSlot,
 				x,
 				y,
 				width,
@@ -867,7 +891,7 @@ public final class RustGalFrameQueue {
 				guiHeight
 			);
 			this.pending.put(batchId, batch);
-			return new RustGalGuiElementRenderState(batchId, sequence, generation, batch.stratum(), producerId, x, y, width, height, guiWidth, guiHeight);
+			return new RustGalGuiElementRenderState(batchId, sequence, generation, batch.stratum(), producerId, selectedSlot, x, y, width, height, guiWidth, guiHeight);
 		}
 
 		List<DeferredGuiBatch> takeAll(List<RustGalGuiElementRenderState> elements) {
@@ -934,6 +958,7 @@ public final class RustGalFrameQueue {
 		RenderStratum stratum,
 		GuiSprite sprite,
 		String producerId,
+		int selectedSlot,
 		int x,
 		int y,
 		int width,
@@ -1008,6 +1033,15 @@ public final class RustGalFrameQueue {
 			"/assets/minecraft/textures/gui/sprites/hud/hotbar.png",
 			182,
 			22,
+			false
+		),
+		HOTBAR_SELECTION(
+			RenderStratum.GUI_HOTBAR_SELECTION,
+			"hotbar-selection",
+			"gui-textured-alpha-hotbar-selection",
+			"/assets/minecraft/textures/gui/sprites/hud/hotbar_selection.png",
+			24,
+			23,
 			false
 		);
 

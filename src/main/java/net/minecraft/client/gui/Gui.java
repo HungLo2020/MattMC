@@ -623,9 +623,16 @@ public class Gui {
 			} else {
 				RustGalFrameQueue.enqueueHotbarBase(this.minecraft, guiGraphics, i - 91, guiGraphics.guiHeight() - 22, 182, 22);
 			}
-			guiGraphics.blitSprite(
-				RenderPipelines.GUI_TEXTURED, HOTBAR_SELECTION_SPRITE, i - 91 - 1 + player.getInventory().getSelectedSlot() * 20, guiGraphics.guiHeight() - 22 - 1, 24, 23
-			);
+			int selectedSlot = player.getInventory().getSelectedSlot();
+			int selectedSlotX = selectedHotbarHighlightX(guiGraphics.guiWidth(), selectedSlot);
+			int selectedSlotY = selectedHotbarHighlightY(guiGraphics.guiHeight());
+			if (RustGalFrameQueue.isMigratedGuiDisabledForDiagnostics()) {
+				// Dev-only measurement control: no migrated or legacy selected-slot highlight draw.
+			} else if (RustGalFrameQueue.isMigratedGuiLegacyControl()) {
+				guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_SELECTION_SPRITE, selectedSlotX, selectedSlotY, 24, 23);
+			} else {
+				RustGalFrameQueue.enqueueHotbarSelection(this.minecraft, guiGraphics, selectedSlot, selectedSlotX, selectedSlotY, 24, 23);
+			}
 			if (!itemStack.isEmpty()) {
 				if (humanoidArm == HumanoidArm.LEFT) {
 					guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_OFFHAND_LEFT_SPRITE, i - 91 - 29, guiGraphics.guiHeight() - 23, 29, 24);
@@ -666,6 +673,14 @@ public class Gui {
 				}
 			}
 		}
+	}
+
+	public static int selectedHotbarHighlightX(int guiWidth, int selectedSlot) {
+		return guiWidth / 2 - 91 - 1 + selectedSlot * 20;
+	}
+
+	public static int selectedHotbarHighlightY(int guiHeight) {
+		return guiHeight - 22 - 1;
 	}
 
 	private void renderSelectedItemName(GuiGraphics guiGraphics) {

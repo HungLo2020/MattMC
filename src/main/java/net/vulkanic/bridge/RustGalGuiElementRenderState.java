@@ -14,6 +14,7 @@ public record RustGalGuiElementRenderState(
 	long generation,
 	RustGalFrameQueue.RenderStratum stratum,
 	String producerId,
+	int selectedSlot,
 	int x,
 	int y,
 	int width,
@@ -49,6 +50,9 @@ public record RustGalGuiElementRenderState(
 
 	@Override
 	public String shaderInputParityGeometryContext() {
+		if (this.selectedSlot >= 0) {
+			return "rust-gal:" + this.producerId + ":" + this.stratum.id() + ":slot=" + this.selectedSlot;
+		}
 		return "rust-gal:" + this.producerId + ":" + this.stratum.id();
 	}
 }

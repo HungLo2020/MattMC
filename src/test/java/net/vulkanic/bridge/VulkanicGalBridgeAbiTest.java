@@ -96,8 +96,11 @@ class VulkanicGalBridgeAbiTest {
 		assertEquals(13, VulkanicGalBridge.HANDLE_FRAME_TARGET);
 		assertTrue(queue.contains("GUI_CROSSHAIR"));
 		assertTrue(queue.contains("GUI_HOTBAR_BASE"));
+		assertTrue(queue.contains("GUI_HOTBAR_SELECTION"));
 		assertTrue(queue.contains("HOTBAR_BASE"));
+		assertTrue(queue.contains("HOTBAR_SELECTION"));
 		assertTrue(queue.contains("enqueueHotbarBase"));
+		assertTrue(queue.contains("enqueueHotbarSelection"));
 		assertTrue(bridge.contains("guiAlphaPipeline"));
 		assertTrue(queue.contains("builder.guiAlphaPipeline"));
 		assertTrue(queue.contains("DeferredBatchScheduler"));
@@ -151,11 +154,20 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(queue.contains("mattmc.dev.guiCrosshair.legacyControl"));
 		assertTrue(queue.contains("mattmc.dev.rustGalGui.disabled"));
 		assertTrue(queue.contains("mattmc.dev.rustGalGui.legacyControl"));
+		assertTrue(queue.contains("HOTBAR_SELECTION_PRODUCER"));
+		assertTrue(queue.contains("selected hotbar slot must be in 0..8"));
+		assertTrue(queue.indexOf("GUI_HOTBAR_BASE(\"gui.hotbar.base\", 300)") < queue.indexOf("GUI_HOTBAR_SELECTION(\"gui.hotbar.selection\", 310)"));
+		assertTrue(queue.contains("GuiSprite.HOTBAR_SELECTION"));
+		assertTrue(queue.contains("selectedSlot"));
 		assertTrue(gui.indexOf("RustGalFrameQueue.isMigratedGuiLegacyControl()") < gui.indexOf("blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_SPRITE"));
 		assertTrue(gui.indexOf("blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_SPRITE") < gui.indexOf("RustGalFrameQueue.enqueueCrosshair"));
 		assertTrue(gui.indexOf("RustGalFrameQueue.isMigratedGuiLegacyControl()", gui.indexOf("renderItemHotbar")) < gui.indexOf("blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_SPRITE"));
 		int hotbarMethod = gui.indexOf("renderItemHotbar");
 		assertTrue(gui.indexOf("RustGalFrameQueue.enqueueHotbarBase", hotbarMethod) < gui.indexOf("HOTBAR_SELECTION_SPRITE", hotbarMethod));
+		assertTrue(gui.indexOf("HOTBAR_SELECTION_SPRITE", hotbarMethod) < gui.indexOf("RustGalFrameQueue.enqueueHotbarSelection", hotbarMethod));
+		assertTrue(gui.indexOf("RustGalFrameQueue.enqueueHotbarSelection", hotbarMethod) < gui.indexOf("HOTBAR_OFFHAND_LEFT_SPRITE", hotbarMethod));
+		assertTrue(gui.contains("selectedHotbarHighlightX"));
+		assertTrue(gui.contains("selectedHotbarHighlightY"));
 		assertTrue(context.contains("MAX_COMBINED_TEXTURE_IMAGE_UNITS"));
 		assertTrue(openGlResources.contains("current_frame_target_framebuffer"),
 			"persistent borrowed frame-target handles must refresh the native OpenGL framebuffer after screen transitions");
