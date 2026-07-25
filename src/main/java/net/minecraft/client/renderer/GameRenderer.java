@@ -407,6 +407,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 
 	public void resize(int i, int j) {
 		this.resourcePool.clear();
+		net.vulkanic.bridge.RustGalFrameQueue.resize(i, j);
 		this.minecraft.levelRenderer.resize(i, j);
 	}
 
@@ -813,10 +814,8 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 				for (net.minecraft.hooks.GuiRenderHooks hook : net.minecraft.hooks.HookRegistry.getGuiRenderHooks()) {
 					hook.onBeforeGuiRender(this.minecraft, this.guiRenderState, this.renderBuffers, deltaTracker, bl);
 				}
-				net.vulkanic.bridge.RustGalFrameQueue.enqueueTestGuiBatchIfRequested(this.minecraft);
 
 				this.guiRenderer.render(this.fogRenderer.getBuffer(FogRenderer.FogMode.NONE));
-				net.vulkanic.bridge.RustGalFrameQueue.executeGuiStratum(this.minecraft);
 				this.guiRenderer.incrementFrameNumber();
 				profilerFiller.pop();
 

@@ -64,6 +64,8 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.util.Mth;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicResourceBarriers;
+import net.vulkanic.bridge.RustGalFrameQueue;
+import net.vulkanic.bridge.RustGalGuiElementRenderState;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
@@ -99,8 +101,8 @@ public class GuiRenderer implements AutoCloseable {
 	private final Map<Object, OversizedItemRenderer> oversizedItemRenderers = new Object2ObjectOpenHashMap<>();
 	private final Map<Object, Standard3dItemRenderer> standard3dItemRenderers = new Object2ObjectOpenHashMap<>();
 	final GuiRenderState renderState;
-	private final List<GuiRenderer.Draw> draws = new ArrayList();
-	private final List<GuiRenderer.MeshToDraw> meshesToDraw = new ArrayList();
+	private final List<GuiRenderer.DrawStep> draws = new ArrayList();
+	private final List<GuiRenderer.PreparedStep> meshesToDraw = new ArrayList();
 	private final ByteBufferBuilder byteBufferBuilder = new ByteBufferBuilder(786432);
 	private final Map<VertexFormat, MappableRingBuffer> vertexBuffers = new Object2ObjectOpenHashMap<>();
 	private int firstDrawIndexAfterBlur = Integer.MAX_VALUE;
@@ -242,8 +244,8 @@ public class GuiRenderer implements AutoCloseable {
 			RenderTarget renderTarget = minecraft.getMainRenderTarget();
 			int i = 0;
 
-			for (GuiRenderer.Draw draw : this.draws) {
-				if (draw.indexCount > i) {
+			for (GuiRenderer.DrawStep step : this.draws) {
+				if (step instanceof GuiRenderer.Draw draw && draw.indexCount > i) {
 					i = draw.indexCount;
 				}
 			}
@@ -279,25 +281,61 @@ public class GuiRenderer implements AutoCloseable {
 		int i,
 		int j
 	) {
-		try (RenderPass renderPass = VulkanicAPI.createRenderPass(
-					supplier,
-					renderTarget.getColorTextureView(),
-					OptionalInt.empty(),
-					renderTarget.useDepth ? renderTarget.getDepthTextureView() : null,
-					OptionalDouble.empty()
-				)) {
-			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
-			renderPass.setUniform("Fog", gpuBufferSlice);
-			renderPass.setUniform("DynamicTransforms", gpuBufferSlice2);
+		Minecraft minecraft = Minecraft.getInstance();
+		int k = i;
+		while (k < j) {
+			GuiRenderer.DrawStep step = this.draws.get(k);
+			if (step instanceof GuiRenderer.RustGalDraw rustGalDraw) {
+				try (RenderPass ignored = VulkanicAPI.createRenderPass(
+							supplier,
+							renderTarget.getColorTextureView(),
+							OptionalInt.empty(),
+							renderTarget.useDepth ? renderTarget.getDepthTextureView() : null,
+							OptionalDouble.empty()
+						)) {
+					RustGalFrameQueue.execute(minecraft, rustGalDraw.element);
+				}
+				k++;
+				continue;
+			}
 
-			for (int k = i; k < j; k++) {
-				GuiRenderer.Draw draw = (GuiRenderer.Draw)this.draws.get(k);
-				this.executeDraw(draw, renderPass, gpuBuffer, indexType);
+			int start = k;
+			while (k < j && this.draws.get(k) instanceof GuiRenderer.Draw) {
+				k++;
+			}
+			try (RenderPass renderPass = VulkanicAPI.createRenderPass(
+						supplier,
+						renderTarget.getColorTextureView(),
+						OptionalInt.empty(),
+						renderTarget.useDepth ? renderTarget.getDepthTextureView() : null,
+						OptionalDouble.empty()
+					)) {
+				net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
+				renderPass.setUniform("Fog", gpuBufferSlice);
+				renderPass.setUniform("DynamicTransforms", gpuBufferSlice2);
+
+				for (int drawIndex = start; drawIndex < k; drawIndex++) {
+					GuiRenderer.Draw draw = (GuiRenderer.Draw)this.draws.get(drawIndex);
+					this.executeDraw(draw, renderPass, gpuBuffer, indexType);
+				}
 			}
 		}
 	}
 
 	private void addElementToMesh(GuiElementRenderState guiElementRenderState) {
+		if (guiElementRenderState instanceof RustGalGuiElementRenderState rustGalElement) {
+			if (this.bufferBuilder != null) {
+				this.recordMesh(this.bufferBuilder, this.previousPipeline, this.previousTextureSetup, this.previousScissorArea, this.previousShaderInputParityGeometryContext);
+				this.bufferBuilder = null;
+			}
+
+			this.previousPipeline = null;
+			this.previousTextureSetup = null;
+			this.previousScissorArea = null;
+			this.previousShaderInputParityGeometryContext = null;
+			this.meshesToDraw.add(new GuiRenderer.RustGalDraw(rustGalElement));
+			return;
+		}
 		RenderPipeline renderPipeline = guiElementRenderState.pipeline();
 		TextureSetup textureSetup = guiElementRenderState.textureSetup();
 		ScreenRectangle screenRectangle = guiElementRenderState.scissorArea();
@@ -650,7 +688,12 @@ public class GuiRenderer implements AutoCloseable {
 		CommandEncoder commandEncoder = VulkanicAPI.createCommandEncoder();
 		Object2IntMap<VertexFormat> object2IntMap = new Object2IntOpenHashMap<>();
 
-		for (GuiRenderer.MeshToDraw meshToDraw : this.meshesToDraw) {
+		for (GuiRenderer.PreparedStep step : this.meshesToDraw) {
+			if (step instanceof GuiRenderer.RustGalDraw rustGalDraw) {
+				this.draws.add(rustGalDraw);
+				continue;
+			}
+			GuiRenderer.MeshToDraw meshToDraw = (GuiRenderer.MeshToDraw)step;
 			MeshData meshData = meshToDraw.mesh;
 			MeshData.DrawState drawState = meshData.drawState();
 			VertexFormat vertexFormat = drawState.format();
@@ -705,7 +748,10 @@ public class GuiRenderer implements AutoCloseable {
 	private Object2IntMap<VertexFormat> calculatedRequiredVertexBufferSizes() {
 		Object2IntMap<VertexFormat> object2IntMap = new Object2IntOpenHashMap<>();
 
-		for (GuiRenderer.MeshToDraw meshToDraw : this.meshesToDraw) {
+		for (GuiRenderer.PreparedStep step : this.meshesToDraw) {
+			if (!(step instanceof GuiRenderer.MeshToDraw meshToDraw)) {
+				continue;
+			}
 			MeshData.DrawState drawState = meshToDraw.mesh.drawState();
 			VertexFormat vertexFormat = drawState.format();
 			if (!object2IntMap.containsKey(vertexFormat)) {
@@ -827,7 +873,22 @@ public class GuiRenderer implements AutoCloseable {
 		TextureSetup textureSetup,
 		@Nullable ScreenRectangle scissorArea,
 		String shaderInputParityGeometryContext
-	) {
+	) implements DrawStep {
+	}
+
+	@Environment(EnvType.CLIENT)
+	interface DrawStep {
+	}
+
+	@Environment(EnvType.CLIENT)
+	interface PreparedStep extends AutoCloseable {
+		@Override
+		default void close() {
+		}
+	}
+
+	@Environment(EnvType.CLIENT)
+	record RustGalDraw(RustGalGuiElementRenderState element) implements DrawStep, PreparedStep {
 	}
 
 	@Environment(EnvType.CLIENT)
@@ -837,8 +898,9 @@ public class GuiRenderer implements AutoCloseable {
 		TextureSetup textureSetup,
 		@Nullable ScreenRectangle scissorArea,
 		@Nullable String shaderInputParityGeometryContext
-	) implements AutoCloseable {
+	) implements PreparedStep {
 
+		@Override
 		public void close() {
 			this.mesh.close();
 		}

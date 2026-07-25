@@ -159,13 +159,6 @@ def local_renderdoccmd_path() -> str | None:
     return shutil.which("renderdoccmd")
 
 
-def local_qrenderdoc_path() -> str | None:
-    candidate = DEVUTILS_CACHE_ROOT / "tools" / "renderdoc" / "bin" / "qrenderdoc"
-    if candidate.is_file() and os.access(candidate, os.X_OK):
-        return str(candidate)
-    return shutil.which("qrenderdoc")
-
-
 def local_renderdoc_library_path() -> str | None:
     root = DEVUTILS_CACHE_ROOT / "tools" / "renderdoc"
     candidates = sorted(root.glob("extracted/**/librenderdoc.so"))
@@ -173,6 +166,21 @@ def local_renderdoc_library_path() -> str | None:
         if candidate.is_file():
             return str(candidate)
     return None
+
+
+def renderdoc_python_module_available() -> bool:
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", "import renderdoc"],
+            text=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+            **popen_kwargs(),
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
 
 
 def local_renderdoc_layer_manifest_path() -> Path | None:
@@ -331,7 +339,6 @@ def shaderc_compiler_fingerprint() -> dict[str, object]:
 def tool_fingerprint() -> dict[str, object]:
     validation_manifest = find_validation_layer_manifest_path()
     renderdoc_path = local_renderdoccmd_path()
-    qrenderdoc_path = local_qrenderdoc_path()
     tracy_path = local_tracy_capture_path()
     tracy = {"available": bool(tracy_path), "path": tracy_path, "version": None}
     if tracy_path:
@@ -351,7 +358,6 @@ def tool_fingerprint() -> dict[str, object]:
             "local_manifest": str(local_renderdoc_layer_manifest_path()) if local_renderdoc_layer_manifest_path() else None,
         },
         "renderdoccmd": executable_version(renderdoc_path) if renderdoc_path else executable_version("renderdoccmd"),
-        "qrenderdoc": executable_version(qrenderdoc_path) if qrenderdoc_path else executable_version("qrenderdoc"),
         "tracy_capture": tracy,
         "tracy_csvexport": executable_version(local_tracy_csvexport_path()) if local_tracy_csvexport_path() else executable_version("tracy-csvexport"),
         "tracy_profiler": executable_version("tracy-profiler"),
@@ -1036,12 +1042,18 @@ def listed_failure_file_count(path: Path | None) -> int:
 
 def detect_attribution(mode: ModeSpec, meta: dict[str, str], logs: str) -> str:
     explicit = meta.get("implementation_attribution") or meta.get("render_implementation")
+    rust_opengl_evidence = mode.backend == "rust-opengl" or re.search(r"Rust OpenGL|rust-opengl|Rust VulkanicGAL bridge", logs, re.IGNORECASE)
+    rust_vulkan_evidence = mode.backend == "rust-vulkan" or re.search(r"Rust Vulkan(?!icGAL)|rust-vulkan|mattmc_rust.*vulkan", logs, re.IGNORECASE)
+    if explicit == "rust-vulkan" and rust_opengl_evidence and not rust_vulkan_evidence:
+        return "rust-opengl"
+    if explicit == "rust-opengl" and rust_vulkan_evidence and not rust_opengl_evidence:
+        return "rust-vulkan"
     if explicit:
         return explicit
-    if mode.backend == "rust-vulkan" or re.search(r"Rust Vulkan|rust-vulkan|mattmc_rust.*vulkan", logs, re.IGNORECASE):
-        return "rust-vulkan"
-    if mode.backend == "rust-opengl" or re.search(r"Rust OpenGL|rust-opengl|Rust VulkanicGAL bridge", logs, re.IGNORECASE):
+    if rust_opengl_evidence:
         return "rust-opengl"
+    if rust_vulkan_evidence:
+        return "rust-vulkan"
     if mode.backend == "vulkan":
         java_vulkan_evidence = re.search(
             r"Sodium Vulkan|Vulkan beginFramebufferRenderPass|vk[A-Z][A-Za-z0-9_]+|VK_LAYER_KHRONOS_validation|Vulkanic",
@@ -1771,6 +1783,58 @@ def normalize_capture_artifact(
         validation_messages.append("Vulkan validation artifact/log association is incomplete")
     if loader_only_validation:
         validation_messages.append("Vulkan validation emitted only loader/configuration notices; no concrete API VUIDs were observed")
+    rust_gal_batches = last_number(combined_logs, r"rust_gal_batches_executed[=: ]+(\d+)")
+    rust_gal_ffi_calls = last_number(combined_logs, r"ffi(?:_call)?_count[=: ]+(\d+)")
+    rust_gal_ffi_bytes = last_number(combined_logs, r"ffi(?:_bytes| bytes)[=: ]+(\d+)")
+    rust_gal_operations = {
+        "context_create": {
+            "calls": last_number(combined_logs, r"rust_gal_ffi_context_create_calls[=: ]+(\d+)"),
+            "bytes": last_number(combined_logs, r"rust_gal_ffi_context_create_bytes[=: ]+(\d+)"),
+        },
+        "capability_query": {
+            "calls": last_number(combined_logs, r"rust_gal_ffi_capability_calls[=: ]+(\d+)"),
+            "bytes": last_number(combined_logs, r"rust_gal_ffi_capability_bytes[=: ]+(\d+)"),
+        },
+        "frame_configure": {
+            "calls": last_number(combined_logs, r"rust_gal_ffi_frame_configure_calls[=: ]+(\d+)"),
+            "bytes": last_number(combined_logs, r"rust_gal_ffi_frame_configure_bytes[=: ]+(\d+)"),
+        },
+        "frame_acquire": {
+            "calls": last_number(combined_logs, r"rust_gal_ffi_frame_acquire_calls[=: ]+(\d+)"),
+            "bytes": last_number(combined_logs, r"rust_gal_ffi_frame_acquire_bytes[=: ]+(\d+)"),
+        },
+        "frame_resize": {
+            "calls": last_number(combined_logs, r"rust_gal_ffi_frame_resize_calls[=: ]+(\d+)"),
+            "bytes": last_number(combined_logs, r"rust_gal_ffi_frame_resize_bytes[=: ]+(\d+)"),
+        },
+        "frame_present": {
+            "calls": last_number(combined_logs, r"rust_gal_ffi_frame_present_calls[=: ]+(\d+)"),
+            "bytes": last_number(combined_logs, r"rust_gal_ffi_frame_present_bytes[=: ]+(\d+)"),
+        },
+        "resource_batch": {
+            "calls": last_number(combined_logs, r"rust_gal_ffi_resource_batch_calls[=: ]+(\d+)"),
+            "bytes": last_number(combined_logs, r"rust_gal_ffi_resource_batch_bytes[=: ]+(\d+)"),
+        },
+        "submit": {
+            "calls": last_number(combined_logs, r"rust_gal_ffi_submit_calls[=: ]+(\d+)"),
+            "bytes": last_number(combined_logs, r"rust_gal_ffi_submit_bytes[=: ]+(\d+)"),
+        },
+        "completion_query": {
+            "calls": last_number(combined_logs, r"rust_gal_ffi_completion_query_calls[=: ]+(\d+)"),
+            "bytes": last_number(combined_logs, r"rust_gal_ffi_completion_query_bytes[=: ]+(\d+)"),
+        },
+        "retire": {
+            "calls": last_number(combined_logs, r"rust_gal_ffi_retire_calls[=: ]+(\d+)"),
+            "bytes": last_number(combined_logs, r"rust_gal_ffi_retire_bytes[=: ]+(\d+)"),
+        },
+    }
+    rust_gal_calls_per_batch = None
+    rust_gal_bytes_per_batch = None
+    if rust_gal_batches and rust_gal_batches > 0:
+        if rust_gal_ffi_calls is not None:
+            rust_gal_calls_per_batch = rust_gal_ffi_calls / rust_gal_batches
+        if rust_gal_ffi_bytes is not None:
+            rust_gal_bytes_per_batch = rust_gal_ffi_bytes / rust_gal_batches
     complete = (
         bool(files["meta"])
         and (success or reused_baseline)
@@ -1833,8 +1897,22 @@ def normalize_capture_artifact(
                 "native_or_vulkan_memory_bytes": first_number(combined_logs, r"(?:native|vulkan).*memory.*?(\d+)"),
             },
             "ffi": {
-                "call_count": first_number(combined_logs, r"ffi(?:_call)?_count[=: ]+(\d+)"),
-                "bytes": first_number(combined_logs, r"ffi(?:_bytes| bytes)[=: ]+(\d+)"),
+                "call_count": rust_gal_ffi_calls,
+                "bytes": rust_gal_ffi_bytes,
+            },
+            "rust_gal_slice": {
+                "producer": first_text(combined_logs, r"Rust OpenGL VulkanicGAL GUI batch executed producer=([^ ]+)"),
+                "cache_hits": last_number(combined_logs, r"rust_gal_cache_hits[=: ]+(\d+)"),
+                "cache_misses": last_number(combined_logs, r"rust_gal_cache_misses[=: ]+(\d+)"),
+                "queue_depth": last_number(combined_logs, r"rust_gal_queue_depth[=: ]+(\d+)"),
+                "batches_executed": rust_gal_batches,
+                "batches_cancelled": last_number(combined_logs, r"rust_gal_batches_cancelled[=: ]+(\d+)"),
+                "completion_polls": last_number(combined_logs, r"rust_gal_completion_polls[=: ]+(\d+)"),
+                "completion_timeouts": last_number(combined_logs, r"rust_gal_completion_timeouts[=: ]+(\d+)"),
+                "ffi_operations": rust_gal_operations,
+                "ffi_calls_per_executed_batch": rust_gal_calls_per_batch,
+                "ffi_bytes_per_executed_batch": rust_gal_bytes_per_batch,
+                "submission": last_number(combined_logs, r"Rust OpenGL VulkanicGAL GUI batch executed.*?submission=(\d+)"),
             },
             "work_counts": work_counts,
             "creation_counts": creation_counts,
@@ -1897,6 +1975,13 @@ def first_number(text: str, pattern: str) -> float | None:
     if not match:
         return None
     return parse_number(match.group(1))
+
+
+def last_number(text: str, pattern: str) -> float | None:
+    matches = list(re.finditer(pattern, text, re.IGNORECASE))
+    if not matches:
+        return None
+    return parse_number(matches[-1].group(1))
 
 
 def first_text(text: str, pattern: str) -> str | None:
@@ -2296,6 +2381,25 @@ def get_attr(obj, name):
         return None
 
 
+def action_drawcall_id(action):
+    for name in ("drawcallId", "drawcallID", "drawcall_id"):
+        value = get_attr(action, name)
+        if value is not None:
+            return value
+    return get_attr(action, "eventId")
+
+
+def action_name(action):
+    for name in ("customName", "name"):
+        value = get_attr(action, name)
+        if value:
+            return value
+    try:
+        return action.GetName(None) if hasattr(action, "GetName") else None
+    except Exception:
+        return None
+
+
 def resource_id(value):
     if value is None:
         return None
@@ -2447,8 +2551,8 @@ def walk(actions, depth, rows, counts, limit):
         counts[kind] = counts.get(kind, 0) + 1
         rows.append({
             "event_id": action.eventId,
-            "drawcall_id": action.drawcallId,
-            "name": action.GetName(None) if hasattr(action, "GetName") else get_attr(action, "customName") or get_attr(action, "name"),
+            "drawcall_id": action_drawcall_id(action),
+            "name": action_name(action),
             "kind": kind,
             "flags": names,
             "depth": depth,
@@ -2606,77 +2710,9 @@ def replay_renderdoc_summary(capture_dir: Path, capture_path: Path) -> Path:
     capture_path = resolve_renderdoc_capture_path(capture_dir, capture_path)
     if not capture_path.exists():
         return write_renderdoc_summary(capture_dir, "failed", capture_path, "RenderDoc did not produce an .rdc file")
-    qrenderdoc = local_qrenderdoc_path()
-    python_failure: dict[str, Any] | None = None
-    if qrenderdoc:
-        script_path = capture_dir / "renderdoc_summary_extractor.py"
-        output_path = capture_dir / f"renderdoc_summary_{timestamp()}.json"
-        write_renderdoc_python_extractor(script_path)
-        env = os.environ.copy()
-        env["MATTMC_RENDERDOC_REPLAY_CAPTURE"] = str(capture_path)
-        env["MATTMC_RENDERDOC_REPLAY_OUTPUT"] = str(output_path)
-        if not env.get("DISPLAY") and not env.get("WAYLAND_DISPLAY"):
-            env.setdefault("QT_QPA_PLATFORM", "offscreen")
-        replay_process = None
-        try:
-            replay_process = subprocess.Popen(
-                [qrenderdoc, "--python", str(script_path), str(capture_path)],
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                env=env,
-                **popen_kwargs(),
-            )
-            try:
-                stdout, _ = replay_process.communicate(timeout=60)
-            except subprocess.TimeoutExpired:
-                terminate_process_tree(replay_process)
-                stdout, _ = replay_process.communicate(timeout=5)
-        except Exception as exc:
-            stdout = ""
-            python_failure = {
-                "status": "failed",
-                "failure": f"RenderDoc Python replay failed to start: {exc}",
-            }
-        if replay_process is not None and output_path.is_file():
-            output_path.with_suffix(".log").write_text(stdout or "", encoding="utf-8", errors="replace")
-            summary = read_json(output_path) or {}
-            if replay_process.returncode != 0 and summary.get("status") != "complete":
-                summary["failure"] = summary.get("failure") or f"qrenderdoc exited {replay_process.returncode}"
-            summary.setdefault("diagnosis", {})
-            if isinstance(summary["diagnosis"], dict):
-                summary["diagnosis"]["qrenderdoc_exit_code"] = replay_process.returncode
-                summary["diagnosis"]["vulkan_layer"] = renderdoc_vulkan_layer_diagnosis()
-            output_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-            return output_path
-        if replay_process is not None and replay_process.returncode != 0:
-            python_failure = {
-                "status": "failed",
-                "failure": f"qrenderdoc exited {replay_process.returncode} without summary output",
-                "exit_code": replay_process.returncode,
-                "log_path": str(output_path.with_suffix(".log")),
-            }
-            output_path.with_suffix(".log").write_text(stdout or "", encoding="utf-8", errors="replace")
-        if replay_process is not None and python_failure is None:
-            python_failure = {
-                "status": "failed",
-                "failure": "qrenderdoc exited without summary output",
-                "exit_code": replay_process.returncode,
-                "log_path": str(output_path.with_suffix(".log")),
-            }
-            output_path.with_suffix(".log").write_text(stdout or "", encoding="utf-8", errors="replace")
-
     renderdoc = local_renderdoccmd_path()
     if not renderdoc:
-        summary_path = write_renderdoc_summary(capture_dir, "failed", capture_path, "renderdoccmd/qrenderdoc is not available for replay")
-        if python_failure:
-            summary = read_json(summary_path) or {}
-            summary["diagnosis"] = {
-                "python_replay": python_failure,
-                "vulkan_layer": renderdoc_vulkan_layer_diagnosis(),
-            }
-            summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        return summary_path
+        return write_renderdoc_summary(capture_dir, "failed", capture_path, "renderdoccmd is not available for replay")
     try:
         result = subprocess.run(
             [renderdoc, "replay", "-l", "1", str(capture_path)],
@@ -2691,13 +2727,6 @@ def replay_renderdoc_summary(capture_dir: Path, capture_path: Path) -> Path:
     if result.returncode != 0:
         summary_path = write_renderdoc_summary(capture_dir, "failed", capture_path, f"RenderDoc replay exited {result.returncode}")
         summary_path.with_suffix(".log").write_text(result.stdout, encoding="utf-8", errors="replace")
-        if python_failure:
-            summary = read_json(summary_path) or {}
-            summary["diagnosis"] = {
-                "python_replay": python_failure,
-                "vulkan_layer": renderdoc_vulkan_layer_diagnosis(),
-            }
-            summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return summary_path
     event_count = len(re.findall(r"\bEID\b|Event", result.stdout))
     draw_count = len(re.findall(r"\bDraw(?:Indexed|Instanced)?\b", result.stdout))
@@ -2725,8 +2754,16 @@ def replay_renderdoc_summary(capture_dir: Path, capture_path: Path) -> Path:
         "attachments": [],
         "resource_hashes": [],
         "diagnosis": {
+            "cli_only_replay": True,
             "fallback_text_replay": True,
-            "python_replay": python_failure,
+            "machine_readable_cli_extraction": False,
+            "renderdoc_python_module_available": renderdoc_python_module_available(),
+            "explanation": (
+                "This local RenderDoc installation can capture and run renderdoccmd replay, "
+                "but renderdoccmd replay does not expose an ordered action/state export here. "
+                "qrenderdoc GUI/Python replay is intentionally not launched by the harness."
+            ),
+            "best_available_alternative": "Use deterministic screenshots, strict GL logs, Tracy zones, and Rust GAL audit counters for ordering/cadence evidence.",
             "vulkan_layer": renderdoc_vulkan_layer_diagnosis(),
         },
         "failure": None,
@@ -2817,6 +2854,7 @@ def build_capture_command(
     env["MATTMC_CAPTURE_WORLD_SOURCE"] = str(CURRENT_REPO_ROOT / "run" / "saves" / args.world)
     env["CLIENT_RSS_LIMIT_MB"] = str(args.client_rss_limit_mb)
     java_options = [env.get("JAVA_TOOL_OPTIONS", "")]
+    java_options.extend(getattr(args, "jvm_arg", []) or [])
     if tool_kind == "gameplay":
         frame_status = capture_dir / f"graphics_frame_benchmark_{timestamp()}.json"
         java_options.extend(
@@ -2827,6 +2865,7 @@ def build_capture_command(
                 f"-Dmattmc.dev.graphicsFrameBenchmark.maxSettleFrames={args.max_settle_frames}",
                 f"-Dmattmc.dev.graphicsFrameBenchmark.warmupFrames={args.warmup_frames}",
                 f"-Dmattmc.dev.graphicsFrameBenchmark.measureFrames={args.measure_frames}",
+                f"-Dmattmc.dev.graphicsFrameBenchmark.readinessTimeoutSeconds={getattr(args, 'readiness_timeout_seconds', RUNTIME_PROFILES['standard'].readiness_timeout_seconds)}",
                 f"-Dmattmc.dev.graphicsFrameBenchmark.workloadProfile={workload_profile}",
                 f"-Dmattmc.dev.graphicsFrameBenchmark.world={args.world}",
                 f"-Dmattmc.dev.graphicsFrameBenchmark.backend={mode.backend}",
@@ -2852,6 +2891,7 @@ def build_capture_command(
         deterministic_screenshot_dir = capture_dir / deterministic_metadata.stem
         java_options.extend(
             [
+                "-Dmattmc.dev.graphicsAuditSliceMetrics=true",
                 "-Dmattmc.dev.deterministicCameraCapture=true",
                 f"-Dmattmc.dev.deterministicCameraCapture.metadata={deterministic_metadata}",
                 f"-Dmattmc.dev.deterministicCameraCapture.screenshotDir={deterministic_screenshot_dir}",
@@ -2877,12 +2917,14 @@ def build_capture_command(
     if getattr(args, "tracy_capture", False):
         env["MATTMC_GRAPHICS_AUDIT"] = "true"
         java_options.append("-Dmattmc.dev.tracyCapture=true")
+        java_options.append("-Dmattmc.dev.graphicsAuditSliceMetrics=true")
     if getattr(args, "renderdoc_capture", False):
         renderdoc = local_renderdoccmd_path()
         renderdoc_capture = capture_dir / f"renderdoc_{timestamp()}.rdc"
         renderdoc_template = capture_dir / f"renderdoc_{timestamp()}"
         java_options.extend(
             [
+                "-Dmattmc.dev.graphicsAuditSliceMetrics=true",
                 "-Dmattmc.dev.renderdocCapture=true",
                 f"-Dmattmc.dev.renderdocCapture.pathTemplate={renderdoc_template}",
             ]
@@ -3511,6 +3553,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         subparser.add_argument("--workload-profile", choices=WORKLOAD_PROFILES, default="correctness")
         subparser.add_argument("--world", default=os.environ.get("MATTMC_CAPTURE_WORLD", "Origin"))
         subparser.add_argument("--client-args", default=os.environ.get("CLIENT_ARGS", ""))
+        subparser.add_argument("--jvm-arg", action="append", default=[], help="Extra JVM option appended to JAVA_TOOL_OPTIONS for launched clients.")
         subparser.add_argument("--timeout-seconds", type=int)
         subparser.add_argument("--startup-timeout-seconds", type=int)
         subparser.add_argument("--readiness-timeout-seconds", type=int)

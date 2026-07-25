@@ -72,6 +72,7 @@ class CaptureConfig:
     platform_name: str | None
     world: str
     game_dir: str
+    jvm_args: list[str]
     region_validation: bool
     region_validation_copy_world: bool
     poi_validation: bool
@@ -709,6 +710,9 @@ class CaptureRunner:
 
     def configure_java_tool_options(self) -> None:
         options = [f"-Dmattmc.dev.runCaptureId={self.run_id}"]
+        if self.config.jvm_args:
+            self.append_java_tool_options(self.config.jvm_args)
+            self.append_meta(f"user_java_options={' '.join(self.config.jvm_args)}")
         self.append_java_tool_options(options)
         self.append_meta(f"run_capture_java_options={' '.join(options)}")
         self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
@@ -2071,6 +2075,7 @@ def parse_args() -> CaptureConfig:
         ),
     )
     parser.add_argument("--client-args", default=os.environ.get("CLIENT_ARGS", ""))
+    parser.add_argument("--jvm-arg", action="append", default=[], help="Extra JVM option appended to JAVA_TOOL_OPTIONS.")
     parser.add_argument("--world", default=os.environ.get("MATTMC_CAPTURE_WORLD", "Origin"))
     parser.add_argument("--game-dir", default=os.environ.get("MATTMC_CAPTURE_GAME_DIR", ""))
     parser.add_argument("--region-validation", action="store_true")
@@ -2118,6 +2123,7 @@ def parse_args() -> CaptureConfig:
         platform_name=args.platform,
         world=args.world,
         game_dir=args.game_dir,
+        jvm_args=args.jvm_arg,
         region_validation=bool(args.region_validation),
         region_validation_copy_world=bool(args.region_validation_copy_world),
         poi_validation=bool(args.poi_validation),

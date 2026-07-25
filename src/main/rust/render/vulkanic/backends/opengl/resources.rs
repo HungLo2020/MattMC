@@ -12,6 +12,7 @@ use crate::render::vulkanic::resources::*;
 pub(super) struct OpenGlObjects {
     gl: Rc<glow::Context>,
     objects: BTreeMap<Handle, OpenGlObject>,
+    frame_target_framebuffers: BTreeMap<u64, Option<glow::Framebuffer>>,
     next_token: u64,
 }
 
@@ -20,8 +21,17 @@ impl OpenGlObjects {
         Self {
             gl,
             objects: BTreeMap::new(),
+            frame_target_framebuffers: BTreeMap::new(),
             next_token: 1,
         }
+    }
+
+    pub(super) fn set_frame_target_framebuffer(
+        &mut self,
+        frame_id: u64,
+        framebuffer: Option<glow::Framebuffer>,
+    ) {
+        self.frame_target_framebuffers.insert(frame_id, framebuffer);
     }
 
     pub(super) fn create(
@@ -83,6 +93,10 @@ impl OpenGlObjects {
             BackendCreateDesc::FrameTarget(desc) => OpenGlObject::FrameTarget(FrameTargetObject {
                 token,
                 frame_id: desc.frame_id,
+                framebuffer: self
+                    .frame_target_framebuffers
+                    .remove(&desc.frame_id)
+                    .unwrap_or(None),
                 extent: desc.extent,
                 color_format: desc.color_format,
             }),
@@ -157,6 +171,13 @@ impl OpenGlObjects {
         }
     }
 
+    pub(super) fn resource_layout(&self, handle: Handle) -> GalResult<&ResourceLayoutObject> {
+        match self.objects.get(&handle) {
+            Some(OpenGlObject::ResourceLayout(object)) => Ok(object),
+            _ => Err(expected("resource layout", handle)),
+        }
+    }
+
     pub(super) fn pipeline_layout(&self, handle: Handle) -> GalResult<&PipelineLayoutObject> {
         match self.objects.get(&handle) {
             Some(OpenGlObject::PipelineLayout(object)) => Ok(object),
@@ -178,7 +199,7 @@ impl OpenGlObjects {
                 extent: object.extent,
             }),
             Some(OpenGlObject::FrameTarget(object)) => Ok(PassTargetObject {
-                framebuffer: None,
+                framebuffer: object.framebuffer,
                 extent: object.extent,
             }),
             _ => Err(expected("render target or frame target", handle)),
@@ -357,6 +378,7 @@ impl OpenGlObjects {
                     desc.label
                 )));
             }
+            self.bind_program_interfaces(program, desc.layout)?;
         }
         let vao = unsafe { self.gl.create_vertex_array() }.map_err(|error| {
             unsafe { self.gl.delete_program(program) };
@@ -453,6 +475,60 @@ impl OpenGlObjects {
             Some(OpenGlObject::ShaderModule(shader)) => Ok(shader),
             _ => Err(expected("shader", handle)),
         }
+    }
+
+    fn bind_program_interfaces(&self, program: glow::Program, layout: Handle) -> GalResult<()> {
+        let pipeline_layout = self.pipeline_layout(layout)?;
+        for resource_layout in &pipeline_layout.resource_layouts {
+            let resource_layout = self.resource_layout(*resource_layout)?;
+            for binding in &resource_layout.bindings {
+                unsafe {
+                    match binding.kind {
+                        ResourceBindingKind::UniformBuffer => {
+                            for name in uniform_block_names(binding.binding) {
+                                if let Some(index) = self.gl.get_uniform_block_index(program, &name)
+                                {
+                                    self.gl
+                                        .uniform_block_binding(program, index, binding.binding);
+                                }
+                            }
+                        }
+                        ResourceBindingKind::StorageBuffer => {
+                            for name in storage_block_names(binding.binding) {
+                                if let Some(index) =
+                                    self.gl.get_shader_storage_block_index(program, &name)
+                                {
+                                    self.gl.shader_storage_block_binding(
+                                        program,
+                                        index,
+                                        binding.binding,
+                                    );
+                                }
+                            }
+                        }
+                        ResourceBindingKind::SampledTexture => {
+                            for name in sampler_uniform_names(binding.binding) {
+                                if let Some(location) = self.gl.get_uniform_location(program, &name)
+                                {
+                                    self.gl.use_program(Some(program));
+                                    self.gl.uniform_1_i32(
+                                        Some(&location),
+                                        i32::try_from(binding.binding).map_err(|_| {
+                                            GalError::backend("OpenGL sampler binding exceeds i32")
+                                        })?,
+                                    );
+                                }
+                            }
+                        }
+                        ResourceBindingKind::Sampler | ResourceBindingKind::StorageTexture => {}
+                    }
+                }
+            }
+        }
+        unsafe {
+            self.gl.use_program(None);
+        }
+        Ok(())
     }
 
     fn destroy_object(&self, object: OpenGlObject) {
@@ -614,6 +690,7 @@ pub(super) struct RenderTargetObject {
 pub(super) struct FrameTargetObject {
     pub(super) token: BackendToken,
     pub(super) frame_id: u64,
+    pub(super) framebuffer: Option<glow::Framebuffer>,
     pub(super) extent: Extent3d,
     pub(super) color_format: TextureFormat,
 }
@@ -685,6 +762,34 @@ pub(super) fn topology(topology: PrimitiveTopology) -> u32 {
         PrimitiveTopology::Points => glow::POINTS,
         PrimitiveTopology::Lines => glow::LINES,
         PrimitiveTopology::Triangles => glow::TRIANGLES,
+    }
+}
+
+fn uniform_block_names(binding: u32) -> Vec<String> {
+    match binding {
+        0 => vec![
+            "GuiRect".to_string(),
+            "DynamicTransforms".to_string(),
+            "Projection".to_string(),
+        ],
+        1 => vec!["Uniforms1".to_string()],
+        _ => vec![format!("Uniforms{binding}")],
+    }
+}
+
+fn storage_block_names(binding: u32) -> Vec<String> {
+    vec![format!("Storage{binding}")]
+}
+
+fn sampler_uniform_names(binding: u32) -> Vec<String> {
+    match binding {
+        0 | 1 => vec![
+            "Sampler0".to_string(),
+            "tex0".to_string(),
+            format!("Sampler{binding}"),
+            format!("tex{binding}"),
+        ],
+        _ => vec![format!("Sampler{binding}"), format!("tex{binding}")],
     }
 }
 

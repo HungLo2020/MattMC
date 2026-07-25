@@ -260,6 +260,10 @@ impl OpenGlContext {
     pub(super) fn make_current(&self) -> GalResult<()> {
         self.native.make_current()
     }
+
+    pub(super) fn current_draw_framebuffer(&self) -> Option<glow::Framebuffer> {
+        unsafe { framebuffer_name(self.gl.get_parameter_i32(glow::DRAW_FRAMEBUFFER_BINDING)) }
+    }
 }
 
 impl Drop for OpenGlContext {
@@ -356,8 +360,24 @@ pub(super) struct BorrowedOpenGlStateGuard {
     blend_dst_rgb: i32,
     blend_src_alpha: i32,
     blend_dst_alpha: i32,
+    blend_equation_rgb: i32,
+    blend_equation_alpha: i32,
+    color_writemask: [bool; 4],
+    front_face: i32,
+    stencil_enabled: bool,
+    unpack_alignment: i32,
+    unpack_row_length: i32,
+    unpack_skip_rows: i32,
+    unpack_skip_pixels: i32,
+    unpack_image_height: i32,
+    pack_alignment: i32,
+    pack_row_length: i32,
+    pack_skip_rows: i32,
+    pack_skip_pixels: i32,
+    pack_image_height: i32,
     depth_enabled: bool,
     depth_func: i32,
+    depth_writemask: bool,
 }
 
 struct TextureUnitState {
@@ -371,7 +391,10 @@ impl BorrowedOpenGlStateGuard {
         unsafe {
             let active_texture = gl.get_parameter_i32(glow::ACTIVE_TEXTURE);
             let mut texture_units = Vec::new();
-            for unit in 0..8 {
+            let texture_unit_count = gl
+                .get_parameter_i32(glow::MAX_COMBINED_TEXTURE_IMAGE_UNITS)
+                .max(1);
+            for unit in 0..u32::try_from(texture_unit_count).unwrap_or(1) {
                 gl.active_texture(glow::TEXTURE0 + unit);
                 texture_units.push(TextureUnitState {
                     unit,
@@ -417,8 +440,24 @@ impl BorrowedOpenGlStateGuard {
                 blend_dst_rgb: gl.get_parameter_i32(glow::BLEND_DST_RGB),
                 blend_src_alpha: gl.get_parameter_i32(glow::BLEND_SRC_ALPHA),
                 blend_dst_alpha: gl.get_parameter_i32(glow::BLEND_DST_ALPHA),
+                blend_equation_rgb: gl.get_parameter_i32(glow::BLEND_EQUATION_RGB),
+                blend_equation_alpha: gl.get_parameter_i32(glow::BLEND_EQUATION_ALPHA),
+                color_writemask: parameter_boolx4(&gl, glow::COLOR_WRITEMASK),
+                front_face: gl.get_parameter_i32(glow::FRONT_FACE),
+                stencil_enabled: gl.is_enabled(glow::STENCIL_TEST),
+                unpack_alignment: gl.get_parameter_i32(glow::UNPACK_ALIGNMENT),
+                unpack_row_length: gl.get_parameter_i32(glow::UNPACK_ROW_LENGTH),
+                unpack_skip_rows: gl.get_parameter_i32(glow::UNPACK_SKIP_ROWS),
+                unpack_skip_pixels: gl.get_parameter_i32(glow::UNPACK_SKIP_PIXELS),
+                unpack_image_height: gl.get_parameter_i32(glow::UNPACK_IMAGE_HEIGHT),
+                pack_alignment: gl.get_parameter_i32(glow::PACK_ALIGNMENT),
+                pack_row_length: gl.get_parameter_i32(glow::PACK_ROW_LENGTH),
+                pack_skip_rows: gl.get_parameter_i32(glow::PACK_SKIP_ROWS),
+                pack_skip_pixels: gl.get_parameter_i32(glow::PACK_SKIP_PIXELS),
+                pack_image_height: gl.get_parameter_i32(glow::PACK_IMAGE_HEIGHT),
                 depth_enabled: gl.is_enabled(glow::DEPTH_TEST),
                 depth_func: gl.get_parameter_i32(glow::DEPTH_FUNC),
+                depth_writemask: gl.get_parameter_i32(glow::DEPTH_WRITEMASK) != 0,
                 gl,
             }
         }
@@ -475,8 +514,41 @@ impl Drop for BorrowedOpenGlStateGuard {
                 self.blend_src_alpha as u32,
                 self.blend_dst_alpha as u32,
             );
+            self.gl.blend_equation_separate(
+                self.blend_equation_rgb as u32,
+                self.blend_equation_alpha as u32,
+            );
+            self.gl.color_mask(
+                self.color_writemask[0],
+                self.color_writemask[1],
+                self.color_writemask[2],
+                self.color_writemask[3],
+            );
+            self.gl.front_face(self.front_face as u32);
+            set_enabled(&self.gl, glow::STENCIL_TEST, self.stencil_enabled);
+            self.gl
+                .pixel_store_i32(glow::UNPACK_ALIGNMENT, self.unpack_alignment);
+            self.gl
+                .pixel_store_i32(glow::UNPACK_ROW_LENGTH, self.unpack_row_length);
+            self.gl
+                .pixel_store_i32(glow::UNPACK_SKIP_ROWS, self.unpack_skip_rows);
+            self.gl
+                .pixel_store_i32(glow::UNPACK_SKIP_PIXELS, self.unpack_skip_pixels);
+            self.gl
+                .pixel_store_i32(glow::UNPACK_IMAGE_HEIGHT, self.unpack_image_height);
+            self.gl
+                .pixel_store_i32(glow::PACK_ALIGNMENT, self.pack_alignment);
+            self.gl
+                .pixel_store_i32(glow::PACK_ROW_LENGTH, self.pack_row_length);
+            self.gl
+                .pixel_store_i32(glow::PACK_SKIP_ROWS, self.pack_skip_rows);
+            self.gl
+                .pixel_store_i32(glow::PACK_SKIP_PIXELS, self.pack_skip_pixels);
+            self.gl
+                .pixel_store_i32(glow::PACK_IMAGE_HEIGHT, self.pack_image_height);
             set_enabled(&self.gl, glow::DEPTH_TEST, self.depth_enabled);
             self.gl.depth_func(self.depth_func as u32);
+            self.gl.depth_mask(self.depth_writemask);
         }
     }
 }
@@ -487,6 +559,16 @@ fn parameter_i32x4(gl: &glow::Context, parameter: u32) -> [i32; 4] {
         gl.get_parameter_i32_slice(parameter, &mut values);
     }
     values
+}
+
+fn parameter_boolx4(gl: &glow::Context, parameter: u32) -> [bool; 4] {
+    let values = parameter_i32x4(gl, parameter);
+    [
+        values[0] != 0,
+        values[1] != 0,
+        values[2] != 0,
+        values[3] != 0,
+    ]
 }
 
 fn set_enabled(gl: &glow::Context, flag: u32, enabled: bool) {

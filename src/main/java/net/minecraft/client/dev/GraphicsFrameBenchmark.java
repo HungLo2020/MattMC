@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Dev-only frame sampler for graphics migration audits.
@@ -44,6 +45,7 @@ public final class GraphicsFrameBenchmark {
 	private static final double DISPLAY_FPS_TOLERANCE = Double.parseDouble(System.getProperty("mattmc.dev.graphicsFrameBenchmark.displayFpsTolerance", "0.40"));
 	private static final int DISPLAY_FPS_MIN_FRAMES = Math.max(1, Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.displayFpsMinFrames", 240));
 	private static final long DISPLAY_FPS_MIN_NANOS = Math.max(1L, Long.getLong("mattmc.dev.graphicsFrameBenchmark.displayFpsMinNanos", 2_000_000_000L));
+	private static final long READINESS_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(Math.max(1L, Long.getLong("mattmc.dev.graphicsFrameBenchmark.readinessTimeoutSeconds", 120L)));
 	private static final boolean STOP_AFTER_COMPLETE = Boolean.parseBoolean(System.getProperty("mattmc.dev.graphicsFrameBenchmark.stopAfterComplete", "true"));
 	private static final Path STATUS_PATH = Path.of(System.getProperty("mattmc.dev.graphicsFrameBenchmark.status", "run/graphics_frame_benchmark.json"));
 
@@ -64,6 +66,7 @@ public final class GraphicsFrameBenchmark {
 	private static long settledFrameIndex = -1L;
 	private static long measurementStartNanos = -1L;
 	private static long measurementEndNanos = -1L;
+	private static long readinessStartNanos = -1L;
 	private static long gcCountAtStart = -1L;
 	private static long gcTimeAtStart = -1L;
 	private static long gcCountAtEnd = -1L;
@@ -280,9 +283,13 @@ public final class GraphicsFrameBenchmark {
 	}
 
 	private static void recordInitializationBlocker(Minecraft minecraft) {
+		long now = System.nanoTime();
+		if (readinessStartNanos < 0L) {
+			readinessStartNanos = now;
+		}
 		initializationWaitFrames++;
 		lastReadinessBlocker = readinessSummary(minecraft);
-		if (initializationWaitFrames >= MAX_SETTLE_FRAMES) {
+		if (now - readinessStartNanos >= READINESS_TIMEOUT_NANOS) {
 			fail(minecraft, "timed out waiting for gameplay entry: " + lastReadinessBlocker);
 		} else if ((initializationWaitFrames % 60L) == 0L || initializationWaitFrames == 1L) {
 			writeStatus(minecraft, "waiting_for_gameplay");
@@ -358,9 +365,10 @@ public final class GraphicsFrameBenchmark {
 		field(json, "shaders", System.getProperty("mattmc.dev.graphicsFrameBenchmark.shaders", "unknown"), 2, true);
 		json.append("  \"worldEntered\": ").append(minecraft.level != null && minecraft.player != null).append(",\n");
 		json.append("  \"settleFramesRequested\": ").append(SETTLE_FRAMES).append(",\n");
-		json.append("  \"warmupFramesRequested\": ").append(WARMUP_FRAMES).append(",\n");
-		json.append("  \"measureFramesRequested\": ").append(MEASURE_FRAMES).append(",\n");
-		json.append("  \"initializationWaitFrames\": ").append(initializationWaitFrames).append(",\n");
+			json.append("  \"warmupFramesRequested\": ").append(WARMUP_FRAMES).append(",\n");
+			json.append("  \"measureFramesRequested\": ").append(MEASURE_FRAMES).append(",\n");
+			json.append("  \"readinessTimeoutNanos\": ").append(READINESS_TIMEOUT_NANOS).append(",\n");
+			json.append("  \"initializationWaitFrames\": ").append(initializationWaitFrames).append(",\n");
 		field(json, "lastReadinessBlocker", lastReadinessBlocker, 2, true);
 		json.append("  \"framesSeenIncludingSettleWarmup\": ").append(frameIndex).append(",\n");
 		json.append("  \"settledFrameIndex\": ").append(settledFrameIndex).append(",\n");

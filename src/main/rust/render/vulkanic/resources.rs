@@ -260,6 +260,7 @@ pub enum BlendMode {
     Disabled = 1,
     Alpha = 2,
     Additive = 3,
+    Invert = 4,
 }
 
 #[repr(u32)]

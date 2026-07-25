@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class VulkanicGalBridgeAbiTest {
@@ -72,20 +73,62 @@ class VulkanicGalBridgeAbiTest {
 	}
 
 	@Test
-	void frameAbiV2AddsBorrowedOpenGlAndDeferredGuiHooksWithoutMigratingProducers() throws Exception {
+	void frameAbiV2AddsBorrowedOpenGlAndProductionGuiCrosshairContract() throws Exception {
 		String bridge = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java"));
 		String queue = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/RustGalFrameQueue.java"));
 		String gameRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
+		String gui = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/Gui.java"));
+		String guiRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/render/GuiRenderer.java"));
 
 		assertEquals(2, VulkanicGalBridge.ABI_VERSION);
 		assertTrue(bridge.contains("mattmc_vulkanic_gal_context_create_borrowed_opengl"));
 		assertTrue(bridge.contains("mattmc_vulkanic_gal_frame_acquire"));
 		assertTrue(bridge.contains("mattmc_vulkanic_gal_frame_present"));
+		assertEquals(1, VulkanicGalBridge.HANDLE_BUFFER);
+		assertEquals(2, VulkanicGalBridge.HANDLE_TEXTURE);
+		assertEquals(3, VulkanicGalBridge.HANDLE_TEXTURE_VIEW);
+		assertEquals(4, VulkanicGalBridge.HANDLE_SAMPLER);
+		assertEquals(5, VulkanicGalBridge.HANDLE_SHADER_MODULE);
+		assertEquals(6, VulkanicGalBridge.HANDLE_RESOURCE_LAYOUT);
+		assertEquals(7, VulkanicGalBridge.HANDLE_RESOURCE_SET);
+		assertEquals(8, VulkanicGalBridge.HANDLE_PIPELINE_LAYOUT);
+		assertEquals(9, VulkanicGalBridge.HANDLE_GRAPHICS_PIPELINE);
 		assertEquals(13, VulkanicGalBridge.HANDLE_FRAME_TARGET);
-		assertTrue(queue.contains("mattmc.dev.rustGalDeferredGuiTest"));
+		assertTrue(queue.contains("GUI_CROSSHAIR"));
+		assertTrue(queue.contains("DeferredBatchScheduler"));
+		assertTrue(queue.contains("CacheKey"));
+		assertTrue(queue.contains("cacheHits"));
+		assertTrue(queue.contains("completionTimeouts"));
+		assertTrue(queue.contains("destroyHandles(created)"));
 		assertTrue(queue.contains("GLFW.glfwGetCurrentContext()"));
-		assertTrue(queue.contains("beginFramePass(pass, frame.frameTarget())"));
-		assertTrue(gameRenderer.contains("RustGalFrameQueue.enqueueTestGuiBatchIfRequested"));
-		assertTrue(gameRenderer.contains("RustGalFrameQueue.executeGuiStratum"));
+		assertTrue(queue.contains("beginFramePass(frameResources.pass(), frameResources.target())"));
+		assertTrue(queue.contains("Rust VulkanicGAL partial-frame GUI crosshair is unsupported for Vulkan"));
+		assertTrue(gameRenderer.contains("RustGalFrameQueue.resize"));
+		assertTrue(gameRenderer.contains("RustGalFrameQueue.shutdown"));
+		assertTrue(gui.contains("RustGalFrameQueue.enqueueCrosshair"));
+		assertTrue(guiRenderer.contains("RustGalGuiElementRenderState"));
+		assertTrue(guiRenderer.contains("RustGalFrameQueue.execute"));
+	}
+
+	@Test
+	void productionCrosshairSliceHasLifecycleInvalidationAndNoJavaFallback() throws Exception {
+		String minecraft = Files.readString(Path.of("src/main/java/net/minecraft/client/Minecraft.java"));
+		String gui = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/Gui.java"));
+		String queue = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/RustGalFrameQueue.java"));
+		String context = Files.readString(Path.of("src/main/rust/render/vulkanic/backends/opengl/context.rs"));
+
+		assertTrue(minecraft.contains("ResourceManagerReloadListener") && minecraft.contains("RustGalFrameQueue.reload()"));
+		assertTrue(minecraft.contains("RustGalFrameQueue.cancelPending(\"world-disconnect\")"));
+		assertTrue(minecraft.contains("RustGalFrameQueue.cancelPending(\"world-unload\")"));
+		assertTrue(queue.contains("SCHEDULER.cancelAll(\"resource-reload\")"));
+		assertTrue(queue.contains("SCHEDULER.cancelAll(\"resize\")"));
+		assertTrue(queue.contains("SCHEDULER.cancelAll(\"shutdown\")"));
+		assertTrue(queue.contains("mattmc.rustGal.guiCrosshair.enabled"));
+		assertTrue(queue.contains("rust_gal_ffi_resource_batch_calls"));
+		assertTrue(queue.contains("rust_gal_ffi_completion_query_calls"));
+		assertTrue(queue.contains("rust_gal_queue_depth"));
+		assertTrue(queue.contains("rust_gal_batches_executed"));
+		assertFalse(gui.contains("blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_SPRITE"));
+		assertTrue(context.contains("MAX_COMBINED_TEXTURE_IMAGE_UNITS"));
 	}
 }

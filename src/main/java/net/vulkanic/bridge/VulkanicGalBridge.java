@@ -69,8 +69,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	public static final int ACCESS_READ = 1;
 	public static final int ACCESS_TRANSFER = 16;
 	public static final int TOPOLOGY_TRIANGLES = 3;
+	public static final int CULL_NONE = 1;
 	public static final int CULL_BACK = 3;
 	public static final int BLEND_ALPHA = 2;
+	public static final int BLEND_INVERT = 4;
 	public static final int COMPARE_LEQUAL = 3;
 	public static final int LOAD_CLEAR = 2;
 	public static final int STORE_STORE = 1;
@@ -82,6 +84,15 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	public static final int USAGE_TRANSFER_SRC = 6;
 	public static final int USAGE_TRANSFER_DST = 7;
 	public static final int QUEUE_GRAPHICS = 1;
+	public static final int HANDLE_BUFFER = 1;
+	public static final int HANDLE_TEXTURE = 2;
+	public static final int HANDLE_TEXTURE_VIEW = 3;
+	public static final int HANDLE_SAMPLER = 4;
+	public static final int HANDLE_SHADER_MODULE = 5;
+	public static final int HANDLE_RESOURCE_LAYOUT = 6;
+	public static final int HANDLE_RESOURCE_SET = 7;
+	public static final int HANDLE_PIPELINE_LAYOUT = 8;
+	public static final int HANDLE_GRAPHICS_PIPELINE = 9;
 	public static final int HANDLE_RENDER_PASS = 12;
 	public static final int HANDLE_FRAME_TARGET = 13;
 
@@ -180,7 +191,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		MemorySegment status = Struct.STATUS.allocate(arena);
 		int code = Native.resourceBatch(contextId, batch.segment(), results, resultCount, status);
 		checkStatus(code, "resource batch");
-		return new ResourceResults(results, resultCount);
+			return new ResourceResults(results, resultCount, Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status));
 	}
 
 	public Status submit(SubmissionBatch batch) {
@@ -348,7 +359,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	public record PresentedFrame(long frameId, long correlationId, int status, long completedSubmissionId) {
 	}
 
-	public record ResourceResults(MemorySegment segment, int count) {
+	public record ResourceResults(MemorySegment segment, int count, long submissionId, long ffiCalls, long ffiInputBytes) {
 		public long handle(int index) {
 			return Struct.CREATE_RESULT.getLong(segment.asSlice((long)index * Struct.CREATE_RESULT.byteSize(), Struct.CREATE_RESULT.byteSize()), 1);
 		}
@@ -827,7 +838,25 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			return graphicsPipeline(id, label, layout, vertex, fragment, 0, 0);
 		}
 
+		public ResourceBatchBuilder guiInvertPipeline(long id, String label, long layout, long vertex, long fragment) {
+			return graphicsPipeline(id, label, layout, vertex, fragment, 0, 0, CULL_NONE, BLEND_INVERT);
+		}
+
 		private ResourceBatchBuilder graphicsPipeline(long id, String label, long layout, long vertex, long fragment, int depthFormat, int depthCompare) {
+			return graphicsPipeline(id, label, layout, vertex, fragment, depthFormat, depthCompare, CULL_BACK, BLEND_ALPHA);
+		}
+
+		private ResourceBatchBuilder graphicsPipeline(
+			long id,
+			String label,
+			long layout,
+			long vertex,
+			long fragment,
+			int depthFormat,
+			int depthCompare,
+			int cullMode,
+			int blendMode
+		) {
 			long start = passFormats.size();
 			passFormats.add(FORMAT_RGBA8);
 			MemorySegment item = Struct.GRAPHICS_PIPELINE_DESC.allocate(arena);
@@ -838,8 +867,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.GRAPHICS_PIPELINE_DESC.setLong(item, 4, vertex);
 			Struct.GRAPHICS_PIPELINE_DESC.setLong(item, 5, fragment);
 			Struct.GRAPHICS_PIPELINE_DESC.setInt(item, 6, TOPOLOGY_TRIANGLES);
-			Struct.GRAPHICS_PIPELINE_DESC.setInt(item, 7, CULL_BACK);
-			Struct.GRAPHICS_PIPELINE_DESC.setInt(item, 8, BLEND_ALPHA);
+			Struct.GRAPHICS_PIPELINE_DESC.setInt(item, 7, cullMode);
+			Struct.GRAPHICS_PIPELINE_DESC.setInt(item, 8, blendMode);
 			Struct.GRAPHICS_PIPELINE_DESC.setInt(item, 9, depthCompare);
 			writeRange(item, Struct.GRAPHICS_PIPELINE_DESC, 10, start, 1);
 			Struct.GRAPHICS_PIPELINE_DESC.setInt(item, 11, depthFormat);

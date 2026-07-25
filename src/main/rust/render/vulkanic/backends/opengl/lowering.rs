@@ -75,6 +75,10 @@ impl OpenGlLowerer {
         Ok(())
     }
 
+    pub(super) fn reset_state_cache(&mut self) {
+        self.cache = StateCache::default();
+    }
+
     pub(super) fn completed_submission(&self) -> SubmissionId {
         self.completed
     }
@@ -389,6 +393,10 @@ impl OpenGlLowerer {
         let gl_y = gl_y_for_top_left_region(texture, region)?;
         unsafe {
             self.gl.pixel_store_i32(glow::UNPACK_ALIGNMENT, 1);
+            self.gl.pixel_store_i32(glow::UNPACK_ROW_LENGTH, 0);
+            self.gl.pixel_store_i32(glow::UNPACK_SKIP_ROWS, 0);
+            self.gl.pixel_store_i32(glow::UNPACK_SKIP_PIXELS, 0);
+            self.gl.pixel_store_i32(glow::UNPACK_IMAGE_HEIGHT, 0);
             self.gl
                 .bind_texture(glow::TEXTURE_2D, Some(texture.texture));
             self.gl.tex_sub_image_2d(
@@ -448,6 +456,10 @@ impl OpenGlLowerer {
             );
             self.gl.read_buffer(glow::COLOR_ATTACHMENT0);
             self.gl.pixel_store_i32(glow::PACK_ALIGNMENT, 1);
+            self.gl.pixel_store_i32(glow::PACK_ROW_LENGTH, 0);
+            self.gl.pixel_store_i32(glow::PACK_SKIP_ROWS, 0);
+            self.gl.pixel_store_i32(glow::PACK_SKIP_PIXELS, 0);
+            self.gl.pixel_store_i32(glow::PACK_IMAGE_HEIGHT, 0);
             self.gl.read_pixels(
                 i32::try_from(region.texture_origin.x)
                     .map_err(|_| GalError::backend("texture origin x exceeds i32"))?,
@@ -492,6 +504,7 @@ impl OpenGlLowerer {
         objects: &OpenGlObjects,
         set: &ResourceSetObject,
     ) -> GalResult<()> {
+        let mut sampled_texture_units = Vec::new();
         let mut sampler_bindings = Vec::new();
         for binding in &set.bindings {
             match binding.kind {
@@ -499,6 +512,7 @@ impl OpenGlLowerer {
                     let view = objects.texture_view(binding.resource)?;
                     let texture = objects.texture(view.texture)?;
                     let unit = binding.binding;
+                    sampled_texture_units.push(unit);
                     self.bind_texture_unit(unit, Some(texture.texture));
                     self.bind_sampler_unit(unit, None);
                     unsafe {
@@ -539,9 +553,17 @@ impl OpenGlLowerer {
                 }
             }
         }
-        for sampler in sampler_bindings {
+        for (index, sampler) in sampler_bindings.iter().copied().enumerate() {
             let sampler = objects.sampler(sampler)?;
-            self.bind_sampler_unit(0, Some(sampler.sampler));
+            if let Some(unit) = sampled_texture_units.get(index).copied() {
+                self.bind_sampler_unit(unit, Some(sampler.sampler));
+            }
+        }
+        if sampler_bindings.len() == 1 {
+            let sampler = objects.sampler(sampler_bindings[0])?;
+            for unit in sampled_texture_units {
+                self.bind_sampler_unit(unit, Some(sampler.sampler));
+            }
         }
         Ok(())
     }
@@ -570,9 +592,15 @@ impl OpenGlLowerer {
             }
             if self.cache.blend != Some(blend) {
                 match blend {
-                    BlendMode::Disabled => self.gl.disable(glow::BLEND),
+                    BlendMode::Disabled => {
+                        self.gl.disable(glow::BLEND);
+                        self.gl
+                            .blend_equation_separate(glow::FUNC_ADD, glow::FUNC_ADD);
+                    }
                     BlendMode::Alpha => {
                         self.gl.enable(glow::BLEND);
+                        self.gl
+                            .blend_equation_separate(glow::FUNC_ADD, glow::FUNC_ADD);
                         self.gl.blend_func_separate(
                             glow::SRC_ALPHA,
                             glow::ONE_MINUS_SRC_ALPHA,
@@ -583,7 +611,20 @@ impl OpenGlLowerer {
                     BlendMode::Additive => {
                         self.gl.enable(glow::BLEND);
                         self.gl
+                            .blend_equation_separate(glow::FUNC_ADD, glow::FUNC_ADD);
+                        self.gl
                             .blend_func_separate(glow::ONE, glow::ONE, glow::ONE, glow::ONE);
+                    }
+                    BlendMode::Invert => {
+                        self.gl.enable(glow::BLEND);
+                        self.gl
+                            .blend_equation_separate(glow::FUNC_ADD, glow::FUNC_ADD);
+                        self.gl.blend_func_separate(
+                            glow::ONE_MINUS_DST_COLOR,
+                            glow::ONE_MINUS_SRC_COLOR,
+                            glow::ONE,
+                            glow::ZERO,
+                        );
                     }
                 }
                 self.cache.blend = Some(blend);

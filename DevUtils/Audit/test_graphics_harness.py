@@ -501,59 +501,46 @@ else:
             finally:
                 harness.local_tracy_csvexport_path = original  # type: ignore[assignment]
 
-    def test_renderdoc_ordered_summary_extraction_with_fake_replay(self) -> None:
+    def test_renderdoc_summary_replay_uses_renderdoccmd_not_qrenderdoc(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)
             capture = temp / "capture.rdc"
             capture.write_bytes(b"rdc")
             qrenderdoc = temp / "qrenderdoc"
-            qrenderdoc.write_text(
-                """#!/usr/bin/env python3
-import json
-import os
-summary = {
-  "schema": "mattmc-renderdoc-summary-v1",
-  "status": "complete",
-  "capture_path": os.environ["MATTMC_RENDERDOC_REPLAY_CAPTURE"],
-  "replay_status": "complete",
-  "api": "OpenGL",
-  "event_count": 2,
-  "draw_count": 1,
-  "dispatch_count": 0,
-  "pass_count": 1,
-  "ordered_actions": [{"event_id": 1, "kind": "pass"}, {"event_id": 2, "kind": "draw"}],
-  "pipelines": [{"graphics_pipeline_object": "1"}],
-  "shader_identities": [{"stage": "Vertex", "resource_id": "2"}],
-  "vertex_index_inputs": [{"topology": "TriangleList"}],
-  "resource_bindings": [],
-  "framebuffer_attachments": [{"color_outputs": "main"}],
-  "viewport_scissor": [{"viewport": "1280x720"}],
-  "fixed_function_state": [{"depthState": "enabled"}],
-  "resource_formats": [{"width": 1280, "height": 720, "format": "RGBA8"}],
-  "attachments": [],
-  "resource_hashes": [],
-  "diagnosis": {},
-  "failure": None,
-}
-with open(os.environ["MATTMC_RENDERDOC_REPLAY_OUTPUT"], "w", encoding="utf-8") as handle:
-    json.dump(summary, handle)
-""",
+            qrenderdoc.write_text("#!/usr/bin/env sh\nprintf 'qrenderdoc must not run\\n' >&2\nexit 99\n", encoding="utf-8")
+            qrenderdoc.chmod(0o755)
+            renderdoccmd = temp / "renderdoccmd"
+            renderdoccmd.write_text(
+                "#!/usr/bin/env sh\n"
+                "if [ \"$1\" = vulkanlayer ]; then printf '%s\\n' 'RenderDoc layer correctly registered.'; exit 0; fi\n"
+                "printf '%s\\n' 'EID 1 BeginPass'\n"
+                "printf '%s\\n' 'EID 2 DrawIndexed'\n",
                 encoding="utf-8",
             )
-            qrenderdoc.chmod(0o755)
-            original_q = harness.local_qrenderdoc_path
+            renderdoccmd.chmod(0o755)
             original_cmd = harness.local_renderdoccmd_path
             try:
-                harness.local_qrenderdoc_path = lambda: str(qrenderdoc)  # type: ignore[assignment]
-                harness.local_renderdoccmd_path = lambda: None  # type: ignore[assignment]
+                harness.local_renderdoccmd_path = lambda: str(renderdoccmd)  # type: ignore[assignment]
                 summary_path = harness.replay_renderdoc_summary(temp, capture)
                 summary = json.loads(summary_path.read_text(encoding="utf-8"))
                 self.assertEqual(summary["status"], "complete")
-                self.assertEqual(summary["ordered_actions"][1]["kind"], "draw")
-                self.assertEqual(summary["resource_formats"][0]["format"], "RGBA8")
+                self.assertTrue(summary["diagnosis"]["cli_only_replay"])
+                self.assertTrue(summary["diagnosis"]["fallback_text_replay"])
+                self.assertEqual(summary["draw_count"], 1)
             finally:
-                harness.local_qrenderdoc_path = original_q  # type: ignore[assignment]
                 harness.local_renderdoccmd_path = original_cmd  # type: ignore[assignment]
+
+    def test_renderdoc_extractor_handles_drawcall_id_api_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            script = Path(temp_dir) / "extract.py"
+            harness.write_renderdoc_python_extractor(script)
+            text = script.read_text(encoding="utf-8")
+
+            self.assertIn("def action_drawcall_id(action):", text)
+            self.assertIn('"drawcallId", "drawcallID", "drawcall_id"', text)
+            self.assertIn('"drawcall_id": action_drawcall_id(action)', text)
+            self.assertIn("def action_name(action):", text)
+            self.assertIn('"name": action_name(action)', text)
 
     def test_renderdoc_layer_failure_diagnosis(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -573,13 +560,13 @@ with open(os.environ["MATTMC_RENDERDOC_REPLAY_OUTPUT"], "w", encoding="utf-8") a
             finally:
                 harness.local_renderdoccmd_path = original  # type: ignore[assignment]
 
-    def test_renderdoc_python_failure_falls_back_to_cli_replay(self) -> None:
+    def test_renderdoc_cli_replay_does_not_require_qrenderdoc(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)
             capture = temp / "capture.rdc"
             capture.write_bytes(b"rdc")
             qrenderdoc = temp / "qrenderdoc"
-            qrenderdoc.write_text("#!/usr/bin/env sh\nexit 3\n", encoding="utf-8")
+            qrenderdoc.write_text("#!/usr/bin/env sh\nprintf 'qrenderdoc must not run\\n' >&2\nexit 3\n", encoding="utf-8")
             qrenderdoc.chmod(0o755)
             renderdoccmd = temp / "renderdoccmd"
             renderdoccmd.write_text(
@@ -589,18 +576,16 @@ with open(os.environ["MATTMC_RENDERDOC_REPLAY_OUTPUT"], "w", encoding="utf-8") a
                 encoding="utf-8",
             )
             renderdoccmd.chmod(0o755)
-            original_q = harness.local_qrenderdoc_path
             original_cmd = harness.local_renderdoccmd_path
             try:
-                harness.local_qrenderdoc_path = lambda: str(qrenderdoc)  # type: ignore[assignment]
                 harness.local_renderdoccmd_path = lambda: str(renderdoccmd)  # type: ignore[assignment]
                 summary_path = harness.replay_renderdoc_summary(temp, capture)
                 summary = json.loads(summary_path.read_text(encoding="utf-8"))
                 self.assertEqual(summary["status"], "complete")
+                self.assertTrue(summary["diagnosis"]["cli_only_replay"])
                 self.assertTrue(summary["diagnosis"]["fallback_text_replay"])
-                self.assertIn("qrenderdoc exited 3", summary["diagnosis"]["python_replay"]["failure"])
+                self.assertNotIn("python_replay", summary["diagnosis"])
             finally:
-                harness.local_qrenderdoc_path = original_q  # type: ignore[assignment]
                 harness.local_renderdoccmd_path = original_cmd  # type: ignore[assignment]
 
     def test_rust_opengl_renderdoc_command_uses_concrete_test_binary(self) -> None:
@@ -1176,6 +1161,103 @@ with open(os.environ["MATTMC_RENDERDOC_REPLAY_OUTPUT"], "w", encoding="utf-8") a
             command, env = harness.build_capture_command(target, harness.MATRIX_MODES[0], root / "capture", "gameplay", args, "gameplay")
             self.assertNotIn("--tracy", command)
             self.assertIn("-Dmattmc.dev.tracyCapture=true", env["JAVA_TOOL_OPTIONS"])
+
+    def test_explicit_jvm_args_are_java_tool_options_not_client_args(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            args = Namespace(
+                profile="smoke",
+                validation="off",
+                client_args="",
+                jvm_arg=["-Dmattmc.rustGal.guiCrosshair.enabled=true"],
+                world="Origin",
+                max_secs=1,
+                dump_secs=1,
+                client_rss_limit_mb=128,
+                diagnostic=False,
+                warmup_frames=0,
+                measure_frames=1,
+                settle_frames=0,
+                max_settle_frames=1,
+                subsystem_iterations=1,
+                tracy_capture=False,
+                tracy_duration_seconds=1,
+                tracy_max_size_mb=8,
+                renderdoc_capture=False,
+                renderdoc_frame=8,
+            )
+            command, env = harness.build_capture_command(target, harness.MATRIX_MODES[0], root / "capture", "correctness", args, "capture")
+            self.assertNotIn("mattmc.rustGal.guiCrosshair.enabled", " ".join(command))
+            self.assertIn("-Dmattmc.rustGal.guiCrosshair.enabled=true", env["JAVA_TOOL_OPTIONS"])
+
+    def test_rust_opengl_attribution_is_not_confused_by_vulkanicgal_name(self) -> None:
+        mode = harness.ModeSpec("current-opengl-shaders-on", "current", "opengl", "on", "java-opengl", False)
+        logs = "Rust VulkanicGAL bridge created borrowed OpenGL context"
+
+        self.assertEqual("rust-opengl", harness.detect_attribution(mode, {}, logs))
+        self.assertEqual("rust-opengl", harness.detect_attribution(mode, {"render_implementation": "rust-vulkan"}, logs))
+
+    def test_rust_vulkan_attribution_still_detects_specific_vulkan_backend(self) -> None:
+        mode = harness.ModeSpec("current-rust-vulkan-shaders-off", "current", "rust-vulkan", "off", "rust-vulkan", True)
+        logs = "Rust Vulkan backend submitted frame"
+
+        self.assertEqual("rust-vulkan", harness.detect_attribution(mode, {}, logs))
+
+    def test_rust_gal_slice_metrics_are_extracted_from_capture_logs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture)
+            (capture / "runClient_20260101_000000.log").write_text(
+                "Creating shared Sodium chunk pipeline\n"
+                "[MattMC graphics audit] Rust OpenGL VulkanicGAL GUI batch executed producer=minecraft.gui.crosshair "
+                "stratum=gui.crosshair batch=2 frame=3 submission=4 rust_gal_cache_hits=7 "
+                "rust_gal_cache_misses=1 rust_gal_queue_depth=0 rust_gal_batches_executed=1 "
+                "rust_gal_batches_cancelled=0 rust_gal_completion_polls=1 rust_gal_completion_timeouts=0 "
+                "rust_gal_ffi_context_create_calls=1 rust_gal_ffi_capability_calls=1 "
+                "rust_gal_ffi_frame_configure_calls=1 rust_gal_ffi_frame_acquire_calls=1 "
+                "rust_gal_ffi_frame_present_calls=1 rust_gal_ffi_resource_batch_calls=4 "
+                "rust_gal_ffi_submit_calls=2 rust_gal_ffi_completion_query_calls=1 rust_gal_ffi_retire_calls=2 "
+                "rust_gal_ffi_context_create_bytes=40 rust_gal_ffi_capability_bytes=24 "
+                "rust_gal_ffi_frame_configure_bytes=64 rust_gal_ffi_frame_acquire_bytes=48 "
+                "rust_gal_ffi_frame_present_bytes=40 rust_gal_ffi_resource_batch_bytes=3000 "
+                "rust_gal_ffi_submit_bytes=720 rust_gal_ffi_completion_query_bytes=32 rust_gal_ffi_retire_bytes=128 "
+                "ffi_call_count=11 ffi_bytes=4096\n"
+                "[MattMC graphics audit] Rust OpenGL VulkanicGAL GUI batch executed producer=minecraft.gui.crosshair "
+                "stratum=gui.crosshair batch=3 frame=4 submission=5 rust_gal_cache_hits=8 "
+                "rust_gal_cache_misses=1 rust_gal_queue_depth=0 rust_gal_batches_executed=2 "
+                "rust_gal_batches_cancelled=0 rust_gal_completion_polls=2 rust_gal_completion_timeouts=0 "
+                "rust_gal_ffi_context_create_calls=1 rust_gal_ffi_capability_calls=1 "
+                "rust_gal_ffi_frame_configure_calls=1 rust_gal_ffi_frame_acquire_calls=2 "
+                "rust_gal_ffi_frame_present_calls=2 rust_gal_ffi_resource_batch_calls=5 "
+                "rust_gal_ffi_submit_calls=3 rust_gal_ffi_completion_query_calls=2 rust_gal_ffi_retire_calls=3 "
+                "rust_gal_ffi_context_create_bytes=40 rust_gal_ffi_capability_bytes=24 "
+                "rust_gal_ffi_frame_configure_bytes=64 rust_gal_ffi_frame_acquire_bytes=96 "
+                "rust_gal_ffi_frame_present_bytes=80 rust_gal_ffi_resource_batch_bytes=3200 "
+                "rust_gal_ffi_submit_bytes=1080 rust_gal_ffi_completion_query_bytes=64 rust_gal_ffi_retire_bytes=192 "
+                "ffi_call_count=18 ffi_bytes=8192\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[0], capture, "capture", True, [], 0, False, tool_kind="capture")
+
+            self.assertEqual("rust-opengl", artifact["implementation_attribution"])
+            self.assertEqual("minecraft.gui.crosshair", artifact["metrics"]["rust_gal_slice"]["producer"])
+            self.assertEqual(8, artifact["metrics"]["rust_gal_slice"]["cache_hits"])
+            self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["cache_misses"])
+            self.assertEqual(0, artifact["metrics"]["rust_gal_slice"]["queue_depth"])
+            self.assertEqual(2, artifact["metrics"]["rust_gal_slice"]["batches_executed"])
+            self.assertEqual(0, artifact["metrics"]["rust_gal_slice"]["batches_cancelled"])
+            self.assertEqual(2, artifact["metrics"]["rust_gal_slice"]["completion_polls"])
+            self.assertEqual(0, artifact["metrics"]["rust_gal_slice"]["completion_timeouts"])
+            self.assertEqual(5, artifact["metrics"]["rust_gal_slice"]["ffi_operations"]["resource_batch"]["calls"])
+            self.assertEqual(3200, artifact["metrics"]["rust_gal_slice"]["ffi_operations"]["resource_batch"]["bytes"])
+            self.assertEqual(9, artifact["metrics"]["rust_gal_slice"]["ffi_calls_per_executed_batch"])
+            self.assertEqual(4096, artifact["metrics"]["rust_gal_slice"]["ffi_bytes_per_executed_batch"])
+            self.assertEqual(18, artifact["metrics"]["ffi"]["call_count"])
+            self.assertEqual(8192, artifact["metrics"]["ffi"]["bytes"])
 
     def test_warmup_exclusion_is_represented_by_measured_samples_only(self) -> None:
         samples_after_warmup = [25_000_000, 25_000_000, 50_000_000]

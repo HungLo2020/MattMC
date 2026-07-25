@@ -172,10 +172,12 @@ impl Backend for OpenGlBackend {
         trace::message(&format!("gal.submission backend=opengl id={}", id.0));
         self.context.make_current()?;
         let _state_guard = self.context.borrowed_state_guard();
-        self.lowerer
+        let mut lowerer = self
+            .lowerer
             .lock()
-            .map_err(|_| GalError::backend("OpenGL lowerer lock poisoned"))?
-            .submit(id, &mut self.objects)
+            .map_err(|_| GalError::backend("OpenGL lowerer lock poisoned"))?;
+        lowerer.reset_state_cache();
+        lowerer.submit(id, &mut self.objects)
     }
 
     fn completed_submission(&self) -> SubmissionId {
@@ -239,7 +241,10 @@ impl Backend for OpenGlBackend {
                 color_format: presentation.desc.color_format,
             });
         }
+        let framebuffer = self.context.current_draw_framebuffer();
         presentation.acquired.push(frame);
+        self.objects
+            .set_frame_target_framebuffer(frame.0, framebuffer);
         trace::message(&format!(
             "gal.frame.acquire backend=opengl correlation={} frame={}",
             desc.correlation_id.0, frame.0

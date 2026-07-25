@@ -1914,6 +1914,14 @@ struct BridgeContext {
     ffi_input_bytes: u64,
     ffi_output_bytes: u64,
     last_error: String,
+    cached_frame_target: Option<CachedFrameTarget>,
+}
+
+#[derive(Clone, Copy)]
+struct CachedFrameTarget {
+    handle: Handle,
+    extent: Extent3d,
+    color_format: TextureFormat,
 }
 
 #[derive(Default)]
@@ -2283,6 +2291,12 @@ fn execute_resource_batch(
         context.gal.retire_completed()?;
     }
     for (handle, _kind) in batch.destroys {
+        if context
+            .cached_frame_target
+            .is_some_and(|cached| cached.handle == handle)
+        {
+            context.cached_frame_target = None;
+        }
         context.gal.destroy(handle)?;
     }
     Ok(results)
@@ -2784,6 +2798,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create(
                     ffi_input_bytes: size_of::<FfiContextCreateRequest>() as u64,
                     ffi_output_bytes: size_of::<FfiContextResult>() as u64,
                     last_error: String::new(),
+                    cached_frame_target: None,
                 },
             );
             Ok(context_id)
@@ -2861,6 +2876,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_borrowed_opengl(
                     ffi_input_bytes: size_of::<FfiBorrowedOpenGlContextCreateRequest>() as u64,
                     ffi_output_bytes: size_of::<FfiContextResult>() as u64,
                     last_error: String::new(),
+                    cached_frame_target: None,
                 },
             );
             Ok(context_id)
@@ -3327,6 +3343,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_configure(
                 present_mode: present_mode(request.present_mode)?,
                 max_frames_in_flight: request.max_frames_in_flight,
             };
+            context.cached_frame_target = None;
             context.gal.configure_frame_surface(desc)
         })();
         match result {
@@ -3369,13 +3386,36 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_acquire(
             })?;
             let frame_target = if acquired.status == FrameAcquireStatus::Minimized {
                 Handle::NULL
+            } else if let Some(cached) = context.cached_frame_target {
+                if cached.extent == acquired.extent && cached.color_format == acquired.color_format {
+                    cached.handle
+                } else {
+                    let handle = context.gal.create_frame_target(FrameTargetDesc {
+                        label: format!("ffi.frame-target.{}", acquired.frame.0),
+                        frame_id: acquired.frame.0,
+                        extent: acquired.extent,
+                        color_format: acquired.color_format,
+                    })?;
+                    context.cached_frame_target = Some(CachedFrameTarget {
+                        handle,
+                        extent: acquired.extent,
+                        color_format: acquired.color_format,
+                    });
+                    handle
+                }
             } else {
-                context.gal.create_frame_target(FrameTargetDesc {
+                let handle = context.gal.create_frame_target(FrameTargetDesc {
                     label: format!("ffi.frame-target.{}", acquired.frame.0),
                     frame_id: acquired.frame.0,
                     extent: acquired.extent,
                     color_format: acquired.color_format,
-                })?
+                })?;
+                context.cached_frame_target = Some(CachedFrameTarget {
+                    handle,
+                    extent: acquired.extent,
+                    color_format: acquired.color_format,
+                });
+                handle
             };
             Ok(FfiFrameAcquireResult {
                 status: StatusCode::Ok as i32,
@@ -3433,6 +3473,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_resize(
         let result = (|| -> GalResult<FfiFrameResizeResult> {
             let request = read_struct(request, "frame resize request")?;
             validate_header::<FfiFrameResizeRequest>(request.header)?;
+            context.cached_frame_target = None;
             let resized = context.gal.resize_frame_surface(FrameResizeDesc {
                 correlation_id: FrameCorrelationId(request.correlation_id),
                 extent: request.extent.into(),
@@ -3540,6 +3581,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_shutdown(
         context.ffi_output_bytes = context
             .ffi_output_bytes
             .saturating_add(size_of::<FfiStatusResult>() as u64);
+        context.cached_frame_target = None;
         match context.gal.shutdown_frame_surface() {
             Ok(()) => {
                 write_status_out(status_out, status_ok(context));
@@ -3977,6 +4019,7 @@ fn blend_mode(raw: u32) -> GalResult<BlendMode> {
         1 => Ok(BlendMode::Disabled),
         2 => Ok(BlendMode::Alpha),
         3 => Ok(BlendMode::Additive),
+        4 => Ok(BlendMode::Invert),
         _ => Err(GalError::ffi(
             StatusCode::UnknownEnum,
             format!("unknown blend mode {raw}"),

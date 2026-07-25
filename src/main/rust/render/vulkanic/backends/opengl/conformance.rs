@@ -267,7 +267,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
         label: "conformance.resource-layout".to_string(),
         bindings: vec![
             ResourceBindingDesc {
-                binding: 0,
+                binding: 1,
                 kind: ResourceBindingKind::SampledTexture,
                 stages: PipelineStageFlags::DRAW,
                 array_count: 1,
@@ -275,7 +275,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
                 dynamic_offset_count: 0,
             },
             ResourceBindingDesc {
-                binding: 1,
+                binding: 2,
                 kind: ResourceBindingKind::Sampler,
                 stages: PipelineStageFlags::DRAW,
                 array_count: 1,
@@ -283,7 +283,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
                 dynamic_offset_count: 0,
             },
             ResourceBindingDesc {
-                binding: 2,
+                binding: 3,
                 kind: ResourceBindingKind::UniformBuffer,
                 stages: PipelineStageFlags::DRAW,
                 array_count: 2,
@@ -291,7 +291,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
                 dynamic_offset_count: 0,
             },
             ResourceBindingDesc {
-                binding: 3,
+                binding: 4,
                 kind: ResourceBindingKind::StorageBuffer,
                 stages: PipelineStageFlags::DRAW,
                 array_count: 1,
@@ -299,7 +299,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
                 dynamic_offset_count: 0,
             },
             ResourceBindingDesc {
-                binding: 4,
+                binding: 5,
                 kind: ResourceBindingKind::Sampler,
                 stages: PipelineStageFlags::DRAW,
                 array_count: 1,
@@ -313,7 +313,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
         layout: resource_layout,
         bindings: vec![
             ResourceBinding {
-                binding: 0,
+                binding: 1,
                 array_index: 0,
                 resource: sampled_view,
                 kind: ResourceBindingKind::SampledTexture,
@@ -321,7 +321,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
                 dynamic_offsets: Vec::new(),
             },
             ResourceBinding {
-                binding: 1,
+                binding: 2,
                 array_index: 0,
                 resource: sampler,
                 kind: ResourceBindingKind::Sampler,
@@ -329,7 +329,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
                 dynamic_offsets: Vec::new(),
             },
             ResourceBinding {
-                binding: 2,
+                binding: 3,
                 array_index: 0,
                 resource: uniform_a,
                 kind: ResourceBindingKind::UniformBuffer,
@@ -337,7 +337,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
                 dynamic_offsets: Vec::new(),
             },
             ResourceBinding {
-                binding: 2,
+                binding: 3,
                 array_index: 1,
                 resource: uniform_b,
                 kind: ResourceBindingKind::UniformBuffer,
@@ -345,7 +345,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
                 dynamic_offsets: Vec::new(),
             },
             ResourceBinding {
-                binding: 3,
+                binding: 4,
                 array_index: 0,
                 resource: storage,
                 kind: ResourceBindingKind::StorageBuffer,
