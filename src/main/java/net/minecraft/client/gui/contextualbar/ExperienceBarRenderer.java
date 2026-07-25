@@ -8,6 +8,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.bridge.RustGalFrameQueue;
 
 @Environment(EnvType.CLIENT)
 public class ExperienceBarRenderer implements ContextualBarRenderer {
@@ -26,12 +27,22 @@ public class ExperienceBarRenderer implements ContextualBarRenderer {
 		int j = this.top(this.minecraft.getWindow());
 		int k = localPlayer.getXpNeededForNextLevel();
 		if (k > 0) {
-			int l = (int)(localPlayer.experienceProgress * 183.0F);
-			guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, EXPERIENCE_BAR_BACKGROUND_SPRITE, i, j, 182, 5);
-			if (l > 0) {
-				guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, EXPERIENCE_BAR_PROGRESS_SPRITE, 182, 5, 0, 0, i, j, l, 5);
+			int l = filledWidth(localPlayer.experienceProgress);
+			if (RustGalFrameQueue.isMigratedGuiDisabledForDiagnostics()) {
+				// Dev-only measurement control: no migrated or legacy experience bar draw.
+			} else if (RustGalFrameQueue.isMigratedGuiLegacyControl()) {
+				guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, EXPERIENCE_BAR_BACKGROUND_SPRITE, i, j, 182, 5);
+				if (l > 0) {
+					guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, EXPERIENCE_BAR_PROGRESS_SPRITE, 182, 5, 0, 0, i, j, l, 5);
+				}
+			} else {
+				RustGalFrameQueue.enqueueExperienceBar(this.minecraft, guiGraphics, i, j, 182, 5, localPlayer.experienceProgress, l);
 			}
 		}
+	}
+
+	public static int filledWidth(float progressFraction) {
+		return (int)(progressFraction * 183.0F);
 	}
 
 	@Override

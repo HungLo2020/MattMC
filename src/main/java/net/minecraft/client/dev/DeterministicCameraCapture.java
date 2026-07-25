@@ -8,6 +8,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.irisshaders.iris.uniforms.SystemTimeUniforms;
 import net.minecraft.world.entity.player.Input;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.phys.Vec3;
 import net.vulkanic.VulkanicAPI;
 import org.slf4j.Logger;
@@ -47,7 +48,12 @@ public final class DeterministicCameraCapture {
 	private static final int SETTLED_READY_MAX_WAIT_FRAMES = Math.max(1, Integer.getInteger("mattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames", 900));
 	private static final Set<String> SETTLED_READY_FAMILIES = parseSettledReadyFamilies();
 	private static final String FORCED_CAMERA_TYPE = System.getProperty("mattmc.dev.deterministicCameraCapture.cameraType", "").trim();
+	private static final String FORCED_GAME_MODE = System.getProperty("mattmc.dev.deterministicCameraCapture.gameMode", "").trim();
 	private static final int FORCED_SELECTED_HOTBAR_SLOT = Integer.getInteger("mattmc.dev.deterministicCameraCapture.selectedHotbarSlot", 0);
+	private static final float FORCED_EXPERIENCE_PROGRESS =
+		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.experienceProgress", "NaN"));
+	private static final int FORCED_EXPERIENCE_LEVEL =
+		Integer.getInteger("mattmc.dev.deterministicCameraCapture.experienceLevel", -1);
 	private static final float FIXED_VIGNETTE_BRIGHTNESS =
 		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.vignetteBrightness", "1.0"));
 	private static final boolean RUST_GAL_GUI_SCREEN_CYCLE =
@@ -81,7 +87,12 @@ public final class DeterministicCameraCapture {
 	private static boolean settledReadyGateSatisfied;
 	private static int framesWaitingForSettledReady;
 	private static CameraType originalCameraType;
+	private static GameType originalGameMode;
+	private static GameType originalPreviousGameMode;
 	private static int originalSelectedHotbarSlot;
+	private static float originalExperienceProgress;
+	private static int originalExperienceLevel;
+	private static int originalExperienceDisplayStartTick;
 	private static final Map<Long, Map<String, Set<String>>> SUBMITTED_WORK_BY_FRAME = new LinkedHashMap<>();
 	private static int rustGalGuiScreenCycleStage;
 	private static int rustGalGuiScreenCycleFramesInStage;
@@ -297,7 +308,12 @@ public final class DeterministicCameraCapture {
 		initialPosition = player.position();
 		initialDimension = level.dimension().location().toString();
 		originalCameraType = minecraft.options.getCameraType();
+		originalGameMode = minecraft.gameMode == null ? null : minecraft.gameMode.getPlayerMode();
+		originalPreviousGameMode = minecraft.gameMode == null ? null : minecraft.gameMode.getPreviousPlayerMode();
 		originalSelectedHotbarSlot = player.getInventory().getSelectedSlot();
+		originalExperienceProgress = player.experienceProgress;
+		originalExperienceLevel = player.experienceLevel;
+		originalExperienceDisplayStartTick = player.experienceDisplayStartTick;
 		applyRuntimeOverrides(minecraft, player);
 		initialPose = new Pose("initial", player.getYRot(), player.getXRot());
 		stabilizeGuiState(minecraft);
@@ -679,11 +695,26 @@ public final class DeterministicCameraCapture {
 			minecraft.options.setCameraType(cameraType);
 			minecraft.gameRenderer.checkEntityPostEffect(cameraType.isFirstPerson() ? minecraft.getCameraEntity() : null);
 		}
+		GameType gameType = forcedGameMode();
+		if (gameType != null && minecraft.gameMode != null && minecraft.gameMode.getPlayerMode() != gameType) {
+			minecraft.gameMode.setLocalMode(gameType, minecraft.gameMode.getPreviousPlayerMode());
+		}
 		if (FORCED_SELECTED_HOTBAR_SLOT > 0) {
 			int selectedSlot = Math.max(1, Math.min(9, FORCED_SELECTED_HOTBAR_SLOT)) - 1;
 			if (player.getInventory().getSelectedSlot() != selectedSlot) {
 				player.getInventory().setSelectedSlot(selectedSlot);
 			}
+		}
+		if (!Float.isNaN(FORCED_EXPERIENCE_PROGRESS)) {
+			float progress = Math.max(0.0F, Math.min(1.0F, FORCED_EXPERIENCE_PROGRESS));
+			if (player.experienceProgress != progress) {
+				player.experienceProgress = progress;
+			}
+			int level = FORCED_EXPERIENCE_LEVEL > 0 ? FORCED_EXPERIENCE_LEVEL : Math.max(1, player.experienceLevel);
+			if (player.experienceLevel != level) {
+				player.experienceLevel = level;
+			}
+			player.experienceDisplayStartTick = player.tickCount;
 		}
 	}
 
@@ -691,10 +722,29 @@ public final class DeterministicCameraCapture {
 		if (minecraft.player != null && FORCED_SELECTED_HOTBAR_SLOT > 0 && originalSelectedHotbarSlot >= 0 && originalSelectedHotbarSlot < 9) {
 			minecraft.player.getInventory().setSelectedSlot(originalSelectedHotbarSlot);
 		}
+		if (minecraft.player != null && !Float.isNaN(FORCED_EXPERIENCE_PROGRESS)) {
+			minecraft.player.experienceProgress = originalExperienceProgress;
+			minecraft.player.experienceLevel = originalExperienceLevel;
+			minecraft.player.experienceDisplayStartTick = originalExperienceDisplayStartTick;
+		}
+		if (!FORCED_GAME_MODE.isBlank() && minecraft.gameMode != null && originalGameMode != null) {
+			minecraft.gameMode.setLocalMode(originalGameMode, originalPreviousGameMode);
+		}
 		if (!FORCED_CAMERA_TYPE.isBlank() && originalCameraType != null && minecraft.options.getCameraType() != originalCameraType) {
 			minecraft.options.setCameraType(originalCameraType);
 			minecraft.gameRenderer.checkEntityPostEffect(originalCameraType.isFirstPerson() ? minecraft.getCameraEntity() : null);
 		}
+	}
+
+	private static GameType forcedGameMode() {
+		if (FORCED_GAME_MODE.isBlank()) {
+			return null;
+		}
+		GameType gameType = GameType.byName(FORCED_GAME_MODE, null);
+		if (gameType == null) {
+			throw new IllegalArgumentException("unknown deterministic capture game mode: " + FORCED_GAME_MODE);
+		}
+		return gameType;
 	}
 
 	private static CameraType forcedCameraType() {
@@ -756,7 +806,10 @@ public final class DeterministicCameraCapture {
 		appendField(json, "gitCommit", gitCommit()).append(",\n");
 		json.append("  \"distantHorizonsActive\": ").append(isDistantHorizonsActive()).append(",\n");
 		appendField(json, "cameraType", minecraft.options.getCameraType().name()).append(",\n");
+		appendField(json, "gameMode", minecraft.gameMode == null ? "unknown" : minecraft.gameMode.getPlayerMode().getName()).append(",\n");
 		json.append("  \"selectedHotbarSlot\": ").append(player == null ? -1 : currentSelectedHotbarSlot(player)).append(",\n");
+		json.append("  \"experienceProgress\": ").append(player == null ? -1.0F : player.experienceProgress).append(",\n");
+		json.append("  \"experienceLevel\": ").append(player == null ? -1 : player.experienceLevel).append(",\n");
 		json.append("  \"framesPerPose\": ").append(FRAMES_PER_POSE).append(",\n");
 		json.append("  \"settledReadyFrames\": ").append(SETTLED_READY_FRAMES).append(",\n");
 		json.append("  \"settledReadyMaxWaitFrames\": ").append(SETTLED_READY_MAX_WAIT_FRAMES).append(",\n");

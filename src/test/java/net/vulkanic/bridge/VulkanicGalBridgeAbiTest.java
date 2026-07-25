@@ -79,6 +79,7 @@ class VulkanicGalBridgeAbiTest {
 		String gameRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
 		String gui = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/Gui.java"));
 		String guiRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/render/GuiRenderer.java"));
+		String experienceBar = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/contextualbar/ExperienceBarRenderer.java"));
 
 		assertEquals(2, VulkanicGalBridge.ABI_VERSION);
 		assertTrue(bridge.contains("mattmc_vulkanic_gal_context_create_borrowed_opengl"));
@@ -97,10 +98,15 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(queue.contains("GUI_CROSSHAIR"));
 		assertTrue(queue.contains("GUI_HOTBAR_BASE"));
 		assertTrue(queue.contains("GUI_HOTBAR_SELECTION"));
+		assertTrue(queue.contains("GUI_EXPERIENCE_BAR_BACKGROUND"));
+		assertTrue(queue.contains("GUI_EXPERIENCE_BAR_PROGRESS"));
 		assertTrue(queue.contains("HOTBAR_BASE"));
 		assertTrue(queue.contains("HOTBAR_SELECTION"));
+		assertTrue(queue.contains("EXPERIENCE_BAR_BACKGROUND"));
+		assertTrue(queue.contains("EXPERIENCE_BAR_PROGRESS"));
 		assertTrue(queue.contains("enqueueHotbarBase"));
 		assertTrue(queue.contains("enqueueHotbarSelection"));
+		assertTrue(queue.contains("enqueueExperienceBar"));
 		assertTrue(bridge.contains("guiAlphaPipeline"));
 		assertTrue(queue.contains("builder.guiAlphaPipeline"));
 		assertTrue(queue.contains("DeferredBatchScheduler"));
@@ -118,6 +124,7 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(gameRenderer.contains("RustGalFrameQueue.shutdown"));
 		assertTrue(gui.contains("RustGalFrameQueue.enqueueCrosshair"));
 		assertTrue(gui.contains("RustGalFrameQueue.enqueueHotbarBase"));
+		assertTrue(experienceBar.contains("RustGalFrameQueue.enqueueExperienceBar"));
 		assertTrue(guiRenderer.contains("RustGalGuiElementRenderState"));
 		assertTrue(guiRenderer.contains("RustGalFrameQueue.executeFrame"));
 		assertTrue(guiRenderer.contains("try (RenderPass ignored = VulkanicAPI.createRenderPass("));
@@ -136,6 +143,7 @@ class VulkanicGalBridgeAbiTest {
 		String minecraft = Files.readString(Path.of("src/main/java/net/minecraft/client/Minecraft.java"));
 		String gui = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/Gui.java"));
 		String queue = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/RustGalFrameQueue.java"));
+		String experienceBar = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/contextualbar/ExperienceBarRenderer.java"));
 		String context = Files.readString(Path.of("src/main/rust/render/vulkanic/backends/opengl/context.rs"));
 		String openGlResources = Files.readString(Path.of("src/main/rust/render/vulkanic/backends/opengl/resources.rs"));
 
@@ -155,10 +163,20 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(queue.contains("mattmc.dev.rustGalGui.disabled"));
 		assertTrue(queue.contains("mattmc.dev.rustGalGui.legacyControl"));
 		assertTrue(queue.contains("HOTBAR_SELECTION_PRODUCER"));
+		assertTrue(queue.contains("EXPERIENCE_BACKGROUND_PRODUCER"));
+		assertTrue(queue.contains("EXPERIENCE_PROGRESS_PRODUCER"));
 		assertTrue(queue.contains("selected hotbar slot must be in 0..8"));
+		assertTrue(queue.contains("experience progress fraction must be finite"));
+		assertTrue(queue.contains("experience bar filled width is outside the vanilla range"));
 		assertTrue(queue.indexOf("GUI_HOTBAR_BASE(\"gui.hotbar.base\", 300)") < queue.indexOf("GUI_HOTBAR_SELECTION(\"gui.hotbar.selection\", 310)"));
+		assertTrue(queue.indexOf("GUI_HOTBAR_SELECTION(\"gui.hotbar.selection\", 310)") < queue.indexOf("GUI_EXPERIENCE_BAR_BACKGROUND(\"gui.experience.background\", 400)"));
+		assertTrue(queue.indexOf("GUI_EXPERIENCE_BAR_BACKGROUND(\"gui.experience.background\", 400)") < queue.indexOf("GUI_EXPERIENCE_BAR_PROGRESS(\"gui.experience.progress\", 410)"));
 		assertTrue(queue.contains("GuiSprite.HOTBAR_SELECTION"));
+		assertTrue(queue.contains("GuiSprite.EXPERIENCE_BAR_BACKGROUND"));
+		assertTrue(queue.contains("GuiSprite.EXPERIENCE_BAR_PROGRESS"));
+		assertTrue(queue.contains("uv_region"));
 		assertTrue(queue.contains("selectedSlot"));
+		assertTrue(queue.contains("progressFraction"));
 		assertTrue(gui.indexOf("RustGalFrameQueue.isMigratedGuiLegacyControl()") < gui.indexOf("blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_SPRITE"));
 		assertTrue(gui.indexOf("blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_SPRITE") < gui.indexOf("RustGalFrameQueue.enqueueCrosshair"));
 		assertTrue(gui.indexOf("RustGalFrameQueue.isMigratedGuiLegacyControl()", gui.indexOf("renderItemHotbar")) < gui.indexOf("blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_SPRITE"));
@@ -168,6 +186,13 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(gui.indexOf("RustGalFrameQueue.enqueueHotbarSelection", hotbarMethod) < gui.indexOf("HOTBAR_OFFHAND_LEFT_SPRITE", hotbarMethod));
 		assertTrue(gui.contains("selectedHotbarHighlightX"));
 		assertTrue(gui.contains("selectedHotbarHighlightY"));
+		int experienceMethod = experienceBar.indexOf("renderBackground");
+		assertTrue(experienceBar.indexOf("RustGalFrameQueue.isMigratedGuiLegacyControl()", experienceMethod)
+			< experienceBar.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, EXPERIENCE_BAR_BACKGROUND_SPRITE", experienceMethod));
+		assertTrue(experienceBar.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, EXPERIENCE_BAR_BACKGROUND_SPRITE", experienceMethod)
+			< experienceBar.indexOf("RustGalFrameQueue.enqueueExperienceBar", experienceMethod));
+		assertTrue(experienceBar.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, EXPERIENCE_BAR_PROGRESS_SPRITE", experienceMethod)
+			< experienceBar.indexOf("RustGalFrameQueue.enqueueExperienceBar", experienceMethod));
 		assertTrue(context.contains("MAX_COMBINED_TEXTURE_IMAGE_UNITS"));
 		assertTrue(openGlResources.contains("current_frame_target_framebuffer"),
 			"persistent borrowed frame-target handles must refresh the native OpenGL framebuffer after screen transitions");

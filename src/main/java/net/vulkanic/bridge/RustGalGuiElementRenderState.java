@@ -15,6 +15,11 @@ public record RustGalGuiElementRenderState(
 	RustGalFrameQueue.RenderStratum stratum,
 	String producerId,
 	int selectedSlot,
+	float progressFraction,
+	int sourceX,
+	int sourceY,
+	int sourceWidth,
+	int sourceHeight,
 	int x,
 	int y,
 	int width,
@@ -50,9 +55,14 @@ public record RustGalGuiElementRenderState(
 
 	@Override
 	public String shaderInputParityGeometryContext() {
+		String context = "rust-gal:" + this.producerId + ":" + this.stratum.id()
+			+ ":src=" + this.sourceX + "," + this.sourceY + "," + this.sourceWidth + "," + this.sourceHeight;
 		if (this.selectedSlot >= 0) {
-			return "rust-gal:" + this.producerId + ":" + this.stratum.id() + ":slot=" + this.selectedSlot;
+			context += ":slot=" + this.selectedSlot;
 		}
-		return "rust-gal:" + this.producerId + ":" + this.stratum.id();
+		if (this.progressFraction >= 0.0F) {
+			context += ":progress=" + this.progressFraction;
+		}
+		return context;
 	}
 }

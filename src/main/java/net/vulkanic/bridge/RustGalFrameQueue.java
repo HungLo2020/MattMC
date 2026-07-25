@@ -25,10 +25,12 @@ import java.util.TreeMap;
 
 public final class RustGalFrameQueue {
 	private static final Logger LOGGER = LogUtils.getLogger();
-	private static final int GUI_UNIFORM_BYTES = 32;
+	private static final int GUI_UNIFORM_BYTES = 48;
 	private static final String CROSSHAIR_PRODUCER = "minecraft.gui.crosshair";
 	private static final String HOTBAR_BASE_PRODUCER = "minecraft.gui.hotbar.base";
 	private static final String HOTBAR_SELECTION_PRODUCER = "minecraft.gui.hotbar.selection";
+	private static final String EXPERIENCE_BACKGROUND_PRODUCER = "minecraft.gui.experience.background";
+	private static final String EXPERIENCE_PROGRESS_PRODUCER = "minecraft.gui.experience.progress";
 	private static final Object LOCK = new Object();
 	private static VulkanicGalBridge bridge;
 	private static Thread renderThread;
@@ -91,6 +93,64 @@ public final class RustGalFrameQueue {
 		enqueueGuiSprite(minecraft, guiGraphics, GuiSprite.HOTBAR_SELECTION, HOTBAR_SELECTION_PRODUCER, selectedSlot, x, y, width, height);
 	}
 
+	public static void enqueueExperienceBar(
+		Minecraft minecraft,
+		net.minecraft.client.gui.GuiGraphics guiGraphics,
+		int x,
+		int y,
+		int width,
+		int height,
+		float progressFraction,
+		int filledWidth
+	) {
+		if (!isCrosshairEnabled()) {
+			return;
+		}
+		if (!Float.isFinite(progressFraction)) {
+			throw new IllegalArgumentException("experience progress fraction must be finite: " + progressFraction);
+		}
+		if (width <= 0 || height <= 0) {
+			throw new IllegalArgumentException("experience bar dimensions must be positive: " + width + "x" + height);
+		}
+		if (filledWidth < 0 || filledWidth > width + 1) {
+			throw new IllegalArgumentException("experience bar filled width is outside the vanilla range: " + filledWidth);
+		}
+		enqueueGuiSprite(
+			minecraft,
+			guiGraphics,
+			GuiSprite.EXPERIENCE_BAR_BACKGROUND,
+			EXPERIENCE_BACKGROUND_PRODUCER,
+			-1,
+			progressFraction,
+			x,
+			y,
+			width,
+			height,
+			0,
+			0,
+			width,
+			height
+		);
+		if (filledWidth > 0) {
+			enqueueGuiSprite(
+				minecraft,
+				guiGraphics,
+				GuiSprite.EXPERIENCE_BAR_PROGRESS,
+				EXPERIENCE_PROGRESS_PRODUCER,
+				-1,
+				progressFraction,
+				x,
+				y,
+				filledWidth,
+				height,
+				0,
+				0,
+				filledWidth,
+				height
+			);
+		}
+	}
+
 	private static void enqueueGuiSprite(
 		Minecraft minecraft,
 		net.minecraft.client.gui.GuiGraphics guiGraphics,
@@ -101,6 +161,25 @@ public final class RustGalFrameQueue {
 		int y,
 		int width,
 		int height
+	) {
+		enqueueGuiSprite(minecraft, guiGraphics, sprite, producerId, selectedSlot, -1.0F, x, y, width, height, 0, 0, width, height);
+	}
+
+	private static void enqueueGuiSprite(
+		Minecraft minecraft,
+		net.minecraft.client.gui.GuiGraphics guiGraphics,
+		GuiSprite sprite,
+		String producerId,
+		int selectedSlot,
+		float progressFraction,
+		int x,
+		int y,
+		int width,
+		int height,
+		int sourceX,
+		int sourceY,
+		int sourceWidth,
+		int sourceHeight
 	) {
 		long started = System.nanoTime();
 		GraphicsFrameBenchmark.beginPhase("rust-gal." + sprite.phaseName + ".java-producer");
@@ -115,10 +194,15 @@ public final class RustGalFrameQueue {
 						sprite,
 						producerId,
 						selectedSlot,
+						progressFraction,
 						x,
 						y,
 						width,
 						height,
+						sourceX,
+						sourceY,
+						sourceWidth,
+						sourceHeight,
 						guiGraphics.guiWidth(),
 						guiGraphics.guiHeight(),
 						generation
@@ -784,8 +868,12 @@ public final class RustGalFrameQueue {
 		buffer.putFloat(batch.height());
 		buffer.putFloat(batch.guiWidth());
 		buffer.putFloat(batch.guiHeight());
+		buffer.putFloat(batch.progressFraction());
 		buffer.putFloat(0.0F);
-		buffer.putFloat(0.0F);
+		buffer.putFloat(batch.sourceX() / (float)batch.sprite().width);
+		buffer.putFloat(batch.sourceY() / (float)batch.sprite().height);
+		buffer.putFloat(batch.sourceWidth() / (float)batch.sprite().width);
+		buffer.putFloat(batch.sourceHeight() / (float)batch.sprite().height);
 		return buffer.array();
 	}
 
@@ -832,7 +920,9 @@ public final class RustGalFrameQueue {
 	public enum RenderStratum {
 		GUI_CROSSHAIR("gui.crosshair", 200),
 		GUI_HOTBAR_BASE("gui.hotbar.base", 300),
-		GUI_HOTBAR_SELECTION("gui.hotbar.selection", 310);
+		GUI_HOTBAR_SELECTION("gui.hotbar.selection", 310),
+		GUI_EXPERIENCE_BAR_BACKGROUND("gui.experience.background", 400),
+		GUI_EXPERIENCE_BAR_PROGRESS("gui.experience.progress", 410);
 
 		private final String id;
 		private final int order;
@@ -851,7 +941,11 @@ public final class RustGalFrameQueue {
 		}
 
 		boolean supportedForPartialFrame() {
-			return this == GUI_CROSSHAIR || this == GUI_HOTBAR_BASE || this == GUI_HOTBAR_SELECTION;
+			return this == GUI_CROSSHAIR
+				|| this == GUI_HOTBAR_BASE
+				|| this == GUI_HOTBAR_SELECTION
+				|| this == GUI_EXPERIENCE_BAR_BACKGROUND
+				|| this == GUI_EXPERIENCE_BAR_PROGRESS;
 		}
 	}
 
@@ -865,10 +959,15 @@ public final class RustGalFrameQueue {
 			GuiSprite sprite,
 			String producerId,
 			int selectedSlot,
+			float progressFraction,
 			int x,
 			int y,
 			int width,
 			int height,
+			int sourceX,
+			int sourceY,
+			int sourceWidth,
+			int sourceHeight,
 			int guiWidth,
 			int guiHeight,
 			long generation
@@ -876,13 +975,38 @@ public final class RustGalFrameQueue {
 			long batchId = this.nextBatchId++;
 			long sequence = this.nextSequence++;
 			DeferredGuiBatch batch = new DeferredGuiBatch(
+					batchId,
+					sequence,
+					generation,
+					sprite.stratum,
+					sprite,
+					producerId,
+					selectedSlot,
+					progressFraction,
+					x,
+					y,
+					width,
+					height,
+					sourceX,
+					sourceY,
+					sourceWidth,
+					sourceHeight,
+					guiWidth,
+					guiHeight
+				);
+			this.pending.put(batchId, batch);
+			return new RustGalGuiElementRenderState(
 				batchId,
 				sequence,
 				generation,
-				sprite.stratum,
-				sprite,
+				batch.stratum(),
 				producerId,
 				selectedSlot,
+				progressFraction,
+				sourceX,
+				sourceY,
+				sourceWidth,
+				sourceHeight,
 				x,
 				y,
 				width,
@@ -890,8 +1014,6 @@ public final class RustGalFrameQueue {
 				guiWidth,
 				guiHeight
 			);
-			this.pending.put(batchId, batch);
-			return new RustGalGuiElementRenderState(batchId, sequence, generation, batch.stratum(), producerId, selectedSlot, x, y, width, height, guiWidth, guiHeight);
 		}
 
 		List<DeferredGuiBatch> takeAll(List<RustGalGuiElementRenderState> elements) {
@@ -959,10 +1081,15 @@ public final class RustGalFrameQueue {
 		GuiSprite sprite,
 		String producerId,
 		int selectedSlot,
+		float progressFraction,
 		int x,
 		int y,
 		int width,
 		int height,
+		int sourceX,
+		int sourceY,
+		int sourceWidth,
+		int sourceHeight,
 		int guiWidth,
 		int guiHeight
 	) {
@@ -1042,6 +1169,24 @@ public final class RustGalFrameQueue {
 			"/assets/minecraft/textures/gui/sprites/hud/hotbar_selection.png",
 			24,
 			23,
+			false
+		),
+		EXPERIENCE_BAR_BACKGROUND(
+			RenderStratum.GUI_EXPERIENCE_BAR_BACKGROUND,
+			"experience-background",
+			"gui-textured-alpha-experience-background",
+			"/assets/minecraft/textures/gui/sprites/hud/experience_bar_background.png",
+			182,
+			5,
+			false
+		),
+		EXPERIENCE_BAR_PROGRESS(
+			RenderStratum.GUI_EXPERIENCE_BAR_PROGRESS,
+			"experience-progress",
+			"gui-textured-alpha-experience-progress",
+			"/assets/minecraft/textures/gui/sprites/hud/experience_bar_progress.png",
+			182,
+			5,
 			false
 		);
 
@@ -1220,17 +1365,10 @@ public final class RustGalFrameQueue {
 		layout(std140) uniform GuiRect {
 		    vec4 rect;
 		    vec4 viewport;
+		    vec4 uv_region;
 		};
 		out vec2 v_uv;
 		const vec2 corner[6] = vec2[6](
-		    vec2(0.0, 0.0),
-		    vec2(1.0, 0.0),
-		    vec2(1.0, 1.0),
-		    vec2(1.0, 1.0),
-		    vec2(0.0, 1.0),
-		    vec2(0.0, 0.0)
-		);
-		const vec2 uv[6] = vec2[6](
 		    vec2(0.0, 0.0),
 		    vec2(1.0, 0.0),
 		    vec2(1.0, 1.0),
@@ -1243,7 +1381,7 @@ public final class RustGalFrameQueue {
 		    vec2 pixel = rect.xy + corner[vertex] * rect.zw;
 		    vec2 ndc = vec2((pixel.x / viewport.x) * 2.0 - 1.0, 1.0 - (pixel.y / viewport.y) * 2.0);
 		    gl_Position = vec4(ndc, 0.0, 1.0);
-		    v_uv = uv[vertex];
+		    v_uv = uv_region.xy + corner[vertex] * uv_region.zw;
 		}
 		""";
 
