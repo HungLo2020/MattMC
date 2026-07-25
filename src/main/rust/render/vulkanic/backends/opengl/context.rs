@@ -1,4 +1,5 @@
 use std::ffi::{c_char, c_int, c_ulong, c_void, CString};
+use std::num::NonZeroU32;
 use std::ptr;
 use std::rc::Rc;
 use std::thread::ThreadId;
@@ -250,6 +251,12 @@ impl OpenGlContext {
         &self.gl
     }
 
+    pub(super) fn borrowed_state_guard(&self) -> Option<BorrowedOpenGlStateGuard> {
+        self.native
+            .is_existing()
+            .then(|| BorrowedOpenGlStateGuard::capture(self.gl.clone()))
+    }
+
     pub(super) fn make_current(&self) -> GalResult<()> {
         self.native.make_current()
     }
@@ -289,6 +296,10 @@ impl NativeOpenGlContext {
         }
     }
 
+    fn is_existing(&self) -> bool {
+        matches!(self, NativeOpenGlContext::Existing { .. })
+    }
+
     fn get_proc_address(&self, name: *const c_char) -> *const c_void {
         match self {
             NativeOpenGlContext::Egl { egl, .. } => unsafe { (egl.get_proc_address)(name) },
@@ -318,6 +329,202 @@ impl NativeOpenGlContext {
             NativeOpenGlContext::Existing { .. } => {}
         }
     }
+}
+
+pub(super) struct BorrowedOpenGlStateGuard {
+    gl: Rc<glow::Context>,
+    program: Option<glow::NativeProgram>,
+    vertex_array: Option<glow::NativeVertexArray>,
+    array_buffer: Option<glow::NativeBuffer>,
+    copy_read_buffer: Option<glow::NativeBuffer>,
+    copy_write_buffer: Option<glow::NativeBuffer>,
+    pixel_unpack_buffer: Option<glow::NativeBuffer>,
+    pixel_pack_buffer: Option<glow::NativeBuffer>,
+    uniform_buffer: Option<glow::NativeBuffer>,
+    storage_buffer: Option<glow::NativeBuffer>,
+    draw_framebuffer: Option<glow::NativeFramebuffer>,
+    read_framebuffer: Option<glow::NativeFramebuffer>,
+    active_texture: i32,
+    texture_units: Vec<TextureUnitState>,
+    viewport: [i32; 4],
+    scissor_box: [i32; 4],
+    scissor_enabled: bool,
+    cull_enabled: bool,
+    cull_face: i32,
+    blend_enabled: bool,
+    blend_src_rgb: i32,
+    blend_dst_rgb: i32,
+    blend_src_alpha: i32,
+    blend_dst_alpha: i32,
+    depth_enabled: bool,
+    depth_func: i32,
+}
+
+struct TextureUnitState {
+    unit: u32,
+    texture_2d: Option<glow::NativeTexture>,
+    sampler: Option<glow::NativeSampler>,
+}
+
+impl BorrowedOpenGlStateGuard {
+    fn capture(gl: Rc<glow::Context>) -> Self {
+        unsafe {
+            let active_texture = gl.get_parameter_i32(glow::ACTIVE_TEXTURE);
+            let mut texture_units = Vec::new();
+            for unit in 0..8 {
+                gl.active_texture(glow::TEXTURE0 + unit);
+                texture_units.push(TextureUnitState {
+                    unit,
+                    texture_2d: texture_name(gl.get_parameter_i32(glow::TEXTURE_BINDING_2D)),
+                    sampler: sampler_name(gl.get_parameter_i32(glow::SAMPLER_BINDING)),
+                });
+            }
+            gl.active_texture(active_texture as u32);
+
+            Self {
+                program: program_name(gl.get_parameter_i32(glow::CURRENT_PROGRAM)),
+                vertex_array: vertex_array_name(gl.get_parameter_i32(glow::VERTEX_ARRAY_BINDING)),
+                array_buffer: buffer_name(gl.get_parameter_i32(glow::ARRAY_BUFFER_BINDING)),
+                copy_read_buffer: buffer_name(gl.get_parameter_i32(glow::COPY_READ_BUFFER_BINDING)),
+                copy_write_buffer: buffer_name(
+                    gl.get_parameter_i32(glow::COPY_WRITE_BUFFER_BINDING),
+                ),
+                pixel_unpack_buffer: buffer_name(
+                    gl.get_parameter_i32(glow::PIXEL_UNPACK_BUFFER_BINDING),
+                ),
+                pixel_pack_buffer: buffer_name(
+                    gl.get_parameter_i32(glow::PIXEL_PACK_BUFFER_BINDING),
+                ),
+                uniform_buffer: buffer_name(gl.get_parameter_i32(glow::UNIFORM_BUFFER_BINDING)),
+                storage_buffer: buffer_name(
+                    gl.get_parameter_i32(glow::SHADER_STORAGE_BUFFER_BINDING),
+                ),
+                draw_framebuffer: framebuffer_name(
+                    gl.get_parameter_i32(glow::DRAW_FRAMEBUFFER_BINDING),
+                ),
+                read_framebuffer: framebuffer_name(
+                    gl.get_parameter_i32(glow::READ_FRAMEBUFFER_BINDING),
+                ),
+                active_texture,
+                texture_units,
+                viewport: parameter_i32x4(&gl, glow::VIEWPORT),
+                scissor_box: parameter_i32x4(&gl, glow::SCISSOR_BOX),
+                scissor_enabled: gl.is_enabled(glow::SCISSOR_TEST),
+                cull_enabled: gl.is_enabled(glow::CULL_FACE),
+                cull_face: gl.get_parameter_i32(glow::CULL_FACE_MODE),
+                blend_enabled: gl.is_enabled(glow::BLEND),
+                blend_src_rgb: gl.get_parameter_i32(glow::BLEND_SRC_RGB),
+                blend_dst_rgb: gl.get_parameter_i32(glow::BLEND_DST_RGB),
+                blend_src_alpha: gl.get_parameter_i32(glow::BLEND_SRC_ALPHA),
+                blend_dst_alpha: gl.get_parameter_i32(glow::BLEND_DST_ALPHA),
+                depth_enabled: gl.is_enabled(glow::DEPTH_TEST),
+                depth_func: gl.get_parameter_i32(glow::DEPTH_FUNC),
+                gl,
+            }
+        }
+    }
+}
+
+impl Drop for BorrowedOpenGlStateGuard {
+    fn drop(&mut self) {
+        unsafe {
+            self.gl.use_program(self.program);
+            self.gl.bind_vertex_array(self.vertex_array);
+            self.gl.bind_buffer(glow::ARRAY_BUFFER, self.array_buffer);
+            self.gl
+                .bind_buffer(glow::COPY_READ_BUFFER, self.copy_read_buffer);
+            self.gl
+                .bind_buffer(glow::COPY_WRITE_BUFFER, self.copy_write_buffer);
+            self.gl
+                .bind_buffer(glow::PIXEL_UNPACK_BUFFER, self.pixel_unpack_buffer);
+            self.gl
+                .bind_buffer(glow::PIXEL_PACK_BUFFER, self.pixel_pack_buffer);
+            self.gl
+                .bind_buffer(glow::UNIFORM_BUFFER, self.uniform_buffer);
+            self.gl
+                .bind_buffer(glow::SHADER_STORAGE_BUFFER, self.storage_buffer);
+            self.gl
+                .bind_framebuffer(glow::DRAW_FRAMEBUFFER, self.draw_framebuffer);
+            self.gl
+                .bind_framebuffer(glow::READ_FRAMEBUFFER, self.read_framebuffer);
+            for state in &self.texture_units {
+                self.gl.active_texture(glow::TEXTURE0 + state.unit);
+                self.gl.bind_texture(glow::TEXTURE_2D, state.texture_2d);
+                self.gl.bind_sampler(state.unit, state.sampler);
+            }
+            self.gl.active_texture(self.active_texture as u32);
+            self.gl.viewport(
+                self.viewport[0],
+                self.viewport[1],
+                self.viewport[2],
+                self.viewport[3],
+            );
+            self.gl.scissor(
+                self.scissor_box[0],
+                self.scissor_box[1],
+                self.scissor_box[2],
+                self.scissor_box[3],
+            );
+            set_enabled(&self.gl, glow::SCISSOR_TEST, self.scissor_enabled);
+            set_enabled(&self.gl, glow::CULL_FACE, self.cull_enabled);
+            self.gl.cull_face(self.cull_face as u32);
+            set_enabled(&self.gl, glow::BLEND, self.blend_enabled);
+            self.gl.blend_func_separate(
+                self.blend_src_rgb as u32,
+                self.blend_dst_rgb as u32,
+                self.blend_src_alpha as u32,
+                self.blend_dst_alpha as u32,
+            );
+            set_enabled(&self.gl, glow::DEPTH_TEST, self.depth_enabled);
+            self.gl.depth_func(self.depth_func as u32);
+        }
+    }
+}
+
+fn parameter_i32x4(gl: &glow::Context, parameter: u32) -> [i32; 4] {
+    let mut values = [0; 4];
+    unsafe {
+        gl.get_parameter_i32_slice(parameter, &mut values);
+    }
+    values
+}
+
+fn set_enabled(gl: &glow::Context, flag: u32, enabled: bool) {
+    unsafe {
+        if enabled {
+            gl.enable(flag);
+        } else {
+            gl.disable(flag);
+        }
+    }
+}
+
+fn non_zero_name(value: i32) -> Option<NonZeroU32> {
+    u32::try_from(value).ok().and_then(NonZeroU32::new)
+}
+
+fn program_name(value: i32) -> Option<glow::NativeProgram> {
+    non_zero_name(value).map(glow::NativeProgram)
+}
+
+fn buffer_name(value: i32) -> Option<glow::NativeBuffer> {
+    non_zero_name(value).map(glow::NativeBuffer)
+}
+
+fn vertex_array_name(value: i32) -> Option<glow::NativeVertexArray> {
+    non_zero_name(value).map(glow::NativeVertexArray)
+}
+
+fn texture_name(value: i32) -> Option<glow::NativeTexture> {
+    non_zero_name(value).map(glow::NativeTexture)
+}
+
+fn sampler_name(value: i32) -> Option<glow::NativeSampler> {
+    non_zero_name(value).map(glow::NativeSampler)
+}
+
+fn framebuffer_name(value: i32) -> Option<glow::NativeFramebuffer> {
+    non_zero_name(value).map(glow::NativeFramebuffer)
 }
 
 fn create_native_context() -> GalResult<NativeOpenGlContext> {

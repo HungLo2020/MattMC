@@ -207,6 +207,13 @@ impl SubmissionLowerer {
                     depth_stencil,
                 } => {
                     let pass_object = objects.render_pass(*pass)?;
+                    if target.kind()
+                        == Some(crate::render::vulkanic::handles::HandleKind::FrameTarget)
+                    {
+                        return Err(GalError::unsupported_feature(
+                            "Vulkan frame targets require whole-frame Rust presentation cutover",
+                        ));
+                    }
                     let target_object = objects.render_target(*target)?;
                     self.context
                         .begin_label(command_buffer, &format!("gal.pass.0x{:016x}", pass.raw()));

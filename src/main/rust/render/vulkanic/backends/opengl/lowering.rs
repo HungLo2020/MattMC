@@ -184,13 +184,13 @@ impl OpenGlLowerer {
             } => {
                 let _zone = trace::Zone::new("opengl.lowering.begin-pass");
                 let pass_object = objects.render_pass(*pass)?;
-                let target_object = objects.render_target(*target)?;
+                let target_object = objects.pass_target(*target)?;
                 if pass_object.target != *target {
                     return Err(GalError::backend(
                         "OpenGL render pass target mismatch during lowering",
                     ));
                 }
-                self.bind_framebuffer(Some(target_object.framebuffer));
+                self.bind_framebuffer(target_object.framebuffer);
                 unsafe {
                     self.gl.viewport(
                         0,

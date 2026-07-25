@@ -743,10 +743,7 @@ mod tests {
 
         let mut builder = EventLoop::builder();
         winit::platform::x11::EventLoopBuilderExtX11::with_any_thread(&mut builder, true);
-        winit::platform::wayland::EventLoopBuilderExtWayland::with_any_thread(
-            &mut builder,
-            true,
-        );
+        winit::platform::wayland::EventLoopBuilderExtWayland::with_any_thread(&mut builder, true);
         builder.build().map_err(|error| {
             crate::render::vulkanic::error::GalError::backend(format!(
                 "failed to create winit event loop for windowed conformance: {error}"

@@ -454,6 +454,14 @@ pub struct RenderTargetDesc {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FrameTargetDesc {
+    pub label: String,
+    pub frame_id: u64,
+    pub extent: Extent3d,
+    pub color_format: TextureFormat,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RenderPassDesc {
     pub label: String,
     pub target: Handle,

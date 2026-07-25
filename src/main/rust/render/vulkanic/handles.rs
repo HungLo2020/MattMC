@@ -22,6 +22,7 @@ pub enum HandleKind {
     ComputePipeline = 10,
     RenderTarget = 11,
     RenderPass = 12,
+    FrameTarget = 13,
 }
 
 impl HandleKind {
@@ -39,6 +40,7 @@ impl HandleKind {
             10 => Some(Self::ComputePipeline),
             11 => Some(Self::RenderTarget),
             12 => Some(Self::RenderPass),
+            13 => Some(Self::FrameTarget),
             _ => None,
         }
     }

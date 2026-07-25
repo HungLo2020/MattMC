@@ -94,6 +94,17 @@ impl OpenGlBackend {
         })
     }
 
+    pub(in crate::render::vulkanic::backends) fn borrowed_minecraft_context(
+        label: &str,
+        stable_window_id: u64,
+    ) -> GalResult<Self> {
+        Self::from_existing_context(ExistingOpenGlContextDesc {
+            label: label.to_string(),
+            stable_window_id,
+            render_thread: std::thread::current().id(),
+        })
+    }
+
     pub(super) fn completed_host_reads_snapshot(&self) -> Vec<self::lowering::CompletedHostRead> {
         self.lowerer
             .lock()
@@ -135,18 +146,21 @@ impl Backend for OpenGlBackend {
     fn create(&mut self, handle: Handle, desc: BackendCreateDesc<'_>) -> GalResult<BackendToken> {
         let _zone = trace::Zone::new("opengl.backend.resource.create");
         self.context.make_current()?;
+        let _state_guard = self.context.borrowed_state_guard();
         self.objects.create(handle, desc)
     }
 
     fn destroy(&mut self, handle: Handle, kind: HandleKind, token: BackendToken) -> GalResult<()> {
         let _zone = trace::Zone::new("opengl.backend.resource.destroy");
         self.context.make_current()?;
+        let _state_guard = self.context.borrowed_state_guard();
         self.objects.destroy(handle, kind, token)
     }
 
     fn encode_passes(&mut self, batch: &ValidatedSubmissionBatch) -> GalResult<()> {
         let _zone = trace::Zone::new("opengl.backend.lowering.encode");
         self.context.make_current()?;
+        let _state_guard = self.context.borrowed_state_guard();
         self.lowerer
             .lock()
             .map_err(|_| GalError::backend("OpenGL lowerer lock poisoned"))?
@@ -157,6 +171,7 @@ impl Backend for OpenGlBackend {
         let _zone = trace::Zone::new("opengl.backend.submit");
         trace::message(&format!("gal.submission backend=opengl id={}", id.0));
         self.context.make_current()?;
+        let _state_guard = self.context.borrowed_state_guard();
         self.lowerer
             .lock()
             .map_err(|_| GalError::backend("OpenGL lowerer lock poisoned"))?
@@ -173,6 +188,7 @@ impl Backend for OpenGlBackend {
     fn retire(&mut self, completed: SubmissionId) -> GalResult<()> {
         let _zone = trace::Zone::new("opengl.backend.retire");
         self.context.make_current()?;
+        let _state_guard = self.context.borrowed_state_guard();
         self.lowerer
             .lock()
             .map_err(|_| GalError::backend("OpenGL lowerer lock poisoned"))?
@@ -198,6 +214,7 @@ impl Backend for OpenGlBackend {
             ));
         };
         self.context.make_current()?;
+        let _state_guard = self.context.borrowed_state_guard();
         presentation.desc = desc.clone();
         Ok(())
     }
@@ -209,6 +226,7 @@ impl Backend for OpenGlBackend {
             ));
         };
         self.context.make_current()?;
+        let _state_guard = self.context.borrowed_state_guard();
         presentation.next_frame += 1;
         let frame = FrameId(presentation.next_frame);
         if desc.expected_extent.width == 0 || desc.expected_extent.height == 0 {
@@ -246,6 +264,8 @@ impl Backend for OpenGlBackend {
                 "OpenGL presentation requires an explicit borrowed Minecraft context",
             ));
         };
+        self.context.make_current()?;
+        let _state_guard = self.context.borrowed_state_guard();
         presentation.desc.extent = desc.extent;
         Ok(FrameResizeResult {
             status: if desc.extent.width == 0 || desc.extent.height == 0 {
@@ -270,6 +290,7 @@ impl Backend for OpenGlBackend {
             ));
         }
         self.context.make_current()?;
+        let _state_guard = self.context.borrowed_state_guard();
         unsafe {
             self.context.gl().flush();
         }
@@ -307,6 +328,7 @@ impl Drop for OpenGlBackend {
     fn drop(&mut self) {
         let _zone = trace::Zone::new("opengl.backend.drop");
         let _ = self.context.make_current();
+        let _state_guard = self.context.borrowed_state_guard();
         self.objects.destroy_all();
     }
 }

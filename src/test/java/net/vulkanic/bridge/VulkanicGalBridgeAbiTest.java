@@ -70,4 +70,22 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(subsystem.contains("RustGraphicsSubsystemBenchmark.run"));
 		assertTrue(subsystem.contains("minecraft.stop()"));
 	}
+
+	@Test
+	void frameAbiV2AddsBorrowedOpenGlAndDeferredGuiHooksWithoutMigratingProducers() throws Exception {
+		String bridge = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java"));
+		String queue = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/RustGalFrameQueue.java"));
+		String gameRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
+
+		assertEquals(2, VulkanicGalBridge.ABI_VERSION);
+		assertTrue(bridge.contains("mattmc_vulkanic_gal_context_create_borrowed_opengl"));
+		assertTrue(bridge.contains("mattmc_vulkanic_gal_frame_acquire"));
+		assertTrue(bridge.contains("mattmc_vulkanic_gal_frame_present"));
+		assertEquals(13, VulkanicGalBridge.HANDLE_FRAME_TARGET);
+		assertTrue(queue.contains("mattmc.dev.rustGalDeferredGuiTest"));
+		assertTrue(queue.contains("GLFW.glfwGetCurrentContext()"));
+		assertTrue(queue.contains("beginFramePass(pass, frame.frameTarget())"));
+		assertTrue(gameRenderer.contains("RustGalFrameQueue.enqueueTestGuiBatchIfRequested"));
+		assertTrue(gameRenderer.contains("RustGalFrameQueue.executeGuiStratum"));
+	}
 }

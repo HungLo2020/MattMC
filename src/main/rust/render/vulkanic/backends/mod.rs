@@ -18,8 +18,9 @@ use super::frame::{
 use super::handles::{Handle, HandleKind};
 use super::resources::{
     BackendCapabilities, BackendFeatureFlags, BackendLimits, BufferDesc, ComputePipelineDesc,
-    GraphicsPipelineDesc, PipelineLayoutDesc, RenderPassDesc, RenderTargetDesc, ResourceLayoutDesc,
-    ResourceSetDesc, SamplerDesc, ShaderModuleDesc, TextureDesc, TextureViewDesc,
+    FrameTargetDesc, GraphicsPipelineDesc, PipelineLayoutDesc, RenderPassDesc, RenderTargetDesc,
+    ResourceLayoutDesc, ResourceSetDesc, SamplerDesc, ShaderModuleDesc, TextureDesc,
+    TextureViewDesc,
 };
 use super::sync::SubmissionId;
 
@@ -55,6 +56,16 @@ pub(in crate::render::vulkanic) fn create_backend(
     }
 }
 
+pub(in crate::render::vulkanic) fn create_borrowed_opengl_backend(
+    label: &str,
+    stable_window_id: u64,
+) -> GalResult<Box<dyn Backend>> {
+    Ok(Box::new(opengl::OpenGlBackend::borrowed_minecraft_context(
+        label,
+        stable_window_id,
+    )?))
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) enum BackendCreateDesc<'a> {
     Buffer(&'a BufferDesc),
@@ -68,6 +79,7 @@ pub(super) enum BackendCreateDesc<'a> {
     GraphicsPipeline(&'a GraphicsPipelineDesc),
     ComputePipeline(&'a ComputePipelineDesc),
     RenderTarget(&'a RenderTargetDesc),
+    FrameTarget(&'a FrameTargetDesc),
     RenderPass(&'a RenderPassDesc),
 }
 
@@ -278,6 +290,7 @@ pub(super) mod mock {
                 BackendCreateDesc::GraphicsPipeline(_) => HandleKind::GraphicsPipeline,
                 BackendCreateDesc::ComputePipeline(_) => HandleKind::ComputePipeline,
                 BackendCreateDesc::RenderTarget(_) => HandleKind::RenderTarget,
+                BackendCreateDesc::FrameTarget(_) => HandleKind::FrameTarget,
                 BackendCreateDesc::RenderPass(_) => HandleKind::RenderPass,
             };
             self.next_token += 1;

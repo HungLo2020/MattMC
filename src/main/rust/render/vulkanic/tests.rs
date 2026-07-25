@@ -515,6 +515,95 @@ fn frame_lifecycle_rejects_present_without_acquire() {
 }
 
 #[test]
+fn acquired_frame_targets_are_normal_pass_targets_without_attachment_borrows() {
+    let mut gal = gal_with_capabilities(presentation_capabilities());
+    gal.configure_frame_surface(frame_surface("borrowed-default-framebuffer"))
+        .unwrap();
+    let acquired = gal
+        .acquire_frame(FrameAcquireDesc {
+            correlation_id: FrameCorrelationId(101),
+            expected_extent: Extent3d {
+                width: 128,
+                height: 72,
+                depth: 1,
+            },
+        })
+        .unwrap();
+    let frame_target = gal
+        .create_frame_target(FrameTargetDesc {
+            label: "minecraft-default-framebuffer".to_owned(),
+            frame_id: acquired.frame.0,
+            extent: acquired.extent,
+            color_format: TextureFormat::Rgba8Unorm,
+        })
+        .unwrap();
+    assert_eq!(frame_target.kind(), Some(HandleKind::FrameTarget));
+    let pass = gal
+        .create_render_pass(RenderPassDesc {
+            label: "gui-frame-pass".to_owned(),
+            target: frame_target,
+            color_formats: vec![TextureFormat::Rgba8Unorm],
+            depth_format: None,
+        })
+        .unwrap();
+    let layout = gal
+        .create_pipeline_layout(PipelineLayoutDesc {
+            label: "gui-frame-pipeline-layout".to_owned(),
+            resource_layouts: vec![],
+        })
+        .unwrap();
+    let vertex_shader = gal
+        .create_shader_module(shader("gui-frame-vertex", ShaderStage::Vertex))
+        .unwrap();
+    let fragment_shader = gal
+        .create_shader_module(shader("gui-frame-fragment", ShaderStage::Fragment))
+        .unwrap();
+    let pipeline = gal
+        .create_graphics_pipeline(GraphicsPipelineDesc {
+            label: "gui-frame-pipeline".to_owned(),
+            layout,
+            vertex_shader,
+            fragment_shader,
+            topology: PrimitiveTopology::Triangles,
+            cull_mode: CullMode::Back,
+            blend: BlendMode::Alpha,
+            depth_compare: None,
+            color_formats: vec![TextureFormat::Rgba8Unorm],
+            depth_format: None,
+        })
+        .unwrap();
+    let list = gal
+        .create_command_list(CommandListDesc {
+            label: "gui-frame-list".to_owned(),
+            operations: vec![
+                CommandOp::BeginPass {
+                    pass,
+                    target: frame_target,
+                    colors: vec![],
+                    depth_stencil: None,
+                },
+                CommandOp::BindGraphicsPipeline(pipeline),
+                CommandOp::EndPass,
+            ],
+        })
+        .unwrap();
+    let submission = gal
+        .submit(SubmissionBatch {
+            label: "gui-frame-submit".to_owned(),
+            command_lists: vec![list],
+        })
+        .unwrap();
+    let presented = gal
+        .present_frame(PresentFrameDesc {
+            frame: acquired.frame,
+            correlation_id: acquired.correlation_id,
+            wait_for: submission.submission,
+        })
+        .unwrap();
+    assert_eq!(presented.completed_submission, submission.submission);
+}
+
+#[test]
 fn large_supported_batches_validate_with_backend_limits() {
     let mut gal = gal_with_capabilities(vulkan_capabilities());
     let src = gal
@@ -2395,7 +2484,8 @@ fn empty_resource_batch() -> FfiResourceBatch {
 
 #[test]
 fn frozen_ffi_abi_sizes_and_capability_negotiation_are_stable() {
-    assert_eq!(FFI_ABI_VERSION, 1);
+    assert_eq!(FFI_ABI_V1_VERSION, 1);
+    assert_eq!(FFI_ABI_VERSION, 2);
     assert!(!FFI_INITIAL_PRESENTATION_SUPPORTED);
     assert_eq!(size_of::<FfiHeader>(), 8);
     assert_eq!(size_of::<FfiHandle>(), 8);
@@ -3071,7 +3161,7 @@ fn ffi_abi_fuzz_rejects_unknown_versions_enums_and_lengths() {
         requested_feature_bits: FfiFeatureBits::GRAPHICS,
         reserved0: 0,
     };
-    for version in [0, 2, u32::MAX] {
+    for version in [0, FFI_ABI_VERSION + 1, u32::MAX] {
         let mut request = base;
         request.header.version = version;
         assert_code(
@@ -3079,6 +3169,9 @@ fn ffi_abi_fuzz_rejects_unknown_versions_enums_and_lengths() {
             super::StatusCode::InvalidArgument,
         );
     }
+    let mut v1_request = base;
+    v1_request.header.version = FFI_ABI_V1_VERSION;
+    assert!(unsafe { answer_capability_query(&v1_request, vulkan_capabilities()) }.is_ok());
 
     let tiny_label = [b'a'; FFI_MAX_LABEL_BYTES + 1];
     let buffer = FfiBufferDescAbi {

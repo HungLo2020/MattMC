@@ -4,19 +4,23 @@ use std::mem::{align_of, size_of, MaybeUninit};
 use std::ptr;
 use std::slice;
 
-use super::backends::{create_backend, BackendKind};
+use super::backends::{create_backend, create_borrowed_opengl_backend, BackendKind};
 use super::commands::{
     AttachmentLoadOp, AttachmentStoreOp, BufferImageCopyRegion, ClearColor, CommandList,
     CommandListDesc, CommandOp, PassAttachment, ResourceBarrier, SubmissionBatch, TextureOrigin3d,
     TextureUsageState,
 };
 use super::error::{ErrorDomain, GalError, GalResult, StatusCode};
+use super::frame::{
+    FrameAcquireDesc, FrameAcquireStatus, FrameCorrelationId, FramePresentStatus, FrameResizeDesc,
+    FrameSurfaceDesc, PresentFrameDesc, PresentMode,
+};
 use super::gal::VulkanicGal;
 use super::handles::{Handle, HandleKind};
 use super::metrics::Metrics;
 use super::resources::{
     AccessFlags, BackendCapabilities, BackendFeature, BackendLimits, BlendMode, BufferDesc,
-    BufferUsage, ColorFormat, CompareOp, ComputePipelineDesc, CullMode, Extent3d,
+    BufferUsage, ColorFormat, CompareOp, ComputePipelineDesc, CullMode, Extent3d, FrameTargetDesc,
     GraphicsPipelineDesc, MemoryDomain, PipelineLayoutDesc, PipelineStageFlags, PrimitiveTopology,
     QueueClass, RenderPassDesc, RenderTargetDesc, ResourceBinding, ResourceBindingDesc,
     ResourceBindingKind, ResourceLayoutDesc, ResourceSetDesc, SamplerAddressMode, SamplerDesc,
@@ -25,13 +29,14 @@ use super::resources::{
 };
 use super::sync::SubmissionId;
 
-pub const FFI_ABI_VERSION: u32 = 1;
+pub const FFI_ABI_V1_VERSION: u32 = 1;
+pub const FFI_ABI_VERSION: u32 = 2;
+pub const FFI_INITIAL_PRESENTATION_SUPPORTED: bool = false;
 pub const FFI_ABI_NAME: &str = "MattMC VulkanicGAL Java-Rust batch ABI";
 pub const FFI_MAX_LABEL_BYTES: usize = 1024;
 pub const FFI_MAX_SHADER_BYTES: usize = 16 * 1024 * 1024;
 pub const FFI_MAX_INLINE_BYTES: usize = 64 * 1024 * 1024;
 pub const FFI_MAX_BATCH_ITEMS: usize = 65_536;
-pub const FFI_INITIAL_PRESENTATION_SUPPORTED: bool = false;
 
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -85,6 +90,141 @@ impl Default for FfiContextResult {
             supported_feature_bits: 0,
             limits: FfiBackendLimits::default(),
             metrics: FfiMetricsSnapshot::default(),
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiBorrowedOpenGlContextCreateRequest {
+    pub header: FfiHeader,
+    pub stable_window_id: u64,
+    pub tracy_enabled: u32,
+    pub reserved0: u32,
+    pub label: FfiBytes,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiFrameSurfaceConfigRequest {
+    pub header: FfiHeader,
+    pub label: FfiBytes,
+    pub extent: FfiExtent3d,
+    pub color_format: u32,
+    pub present_mode: u32,
+    pub max_frames_in_flight: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiFrameAcquireRequest {
+    pub header: FfiHeader,
+    pub correlation_id: u64,
+    pub expected_extent: FfiExtent3d,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiFrameAcquireResult {
+    pub header: FfiHeader,
+    pub status: i32,
+    pub error_domain: u32,
+    pub frame_id: u64,
+    pub correlation_id: u64,
+    pub acquire_status: u32,
+    pub frame_target: FfiHandle,
+    pub extent: FfiExtent3d,
+    pub color_format: u32,
+    pub metrics: FfiMetricsSnapshot,
+}
+
+impl Default for FfiFrameAcquireResult {
+    fn default() -> Self {
+        Self {
+            header: FfiHeader {
+                version: FFI_ABI_VERSION,
+                byte_size: size_of::<Self>() as u32,
+            },
+            status: StatusCode::Ok as i32,
+            error_domain: 0,
+            frame_id: 0,
+            correlation_id: 0,
+            acquire_status: 0,
+            frame_target: FfiHandle::default(),
+            extent: FfiExtent3d::default(),
+            color_format: 0,
+            metrics: FfiMetricsSnapshot::default(),
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiFrameResizeRequest {
+    pub header: FfiHeader,
+    pub correlation_id: u64,
+    pub extent: FfiExtent3d,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiFrameResizeResult {
+    pub header: FfiHeader,
+    pub status: i32,
+    pub error_domain: u32,
+    pub resize_status: u32,
+    pub extent: FfiExtent3d,
+}
+
+impl Default for FfiFrameResizeResult {
+    fn default() -> Self {
+        Self {
+            header: FfiHeader {
+                version: FFI_ABI_VERSION,
+                byte_size: size_of::<Self>() as u32,
+            },
+            status: StatusCode::Ok as i32,
+            error_domain: 0,
+            resize_status: 0,
+            extent: FfiExtent3d::default(),
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiFramePresentRequest {
+    pub header: FfiHeader,
+    pub frame_id: u64,
+    pub correlation_id: u64,
+    pub wait_submission_id: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiFramePresentResult {
+    pub header: FfiHeader,
+    pub status: i32,
+    pub error_domain: u32,
+    pub frame_id: u64,
+    pub correlation_id: u64,
+    pub present_status: u32,
+    pub completed_submission_id: u64,
+}
+
+impl Default for FfiFramePresentResult {
+    fn default() -> Self {
+        Self {
+            header: FfiHeader {
+                version: FFI_ABI_VERSION,
+                byte_size: size_of::<Self>() as u32,
+            },
+            status: StatusCode::Ok as i32,
+            error_domain: 0,
+            frame_id: 0,
+            correlation_id: 0,
+            present_status: 0,
+            completed_submission_id: 0,
         }
     }
 }
@@ -252,7 +392,7 @@ pub struct FfiSubmissionRequest {
 }
 
 pub fn validate_header<T>(header: FfiHeader) -> GalResult<()> {
-    if header.version != FFI_ABI_VERSION {
+    if header.version != FFI_ABI_VERSION && header.version != FFI_ABI_V1_VERSION {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
             format!("unsupported VulkanicGAL FFI version {}", header.version),
@@ -429,6 +569,16 @@ pub struct FfiExtent3d {
 
 impl From<FfiExtent3d> for Extent3d {
     fn from(extent: FfiExtent3d) -> Self {
+        Self {
+            width: extent.width,
+            height: extent.height,
+            depth: extent.depth,
+        }
+    }
+}
+
+impl From<Extent3d> for FfiExtent3d {
+    fn from(extent: Extent3d) -> Self {
         Self {
             width: extent.width,
             height: extent.height,
@@ -1195,7 +1345,7 @@ pub unsafe fn answer_capability_query(
         supported_feature_bits: supported,
         negotiated_feature_bits: request.requested_feature_bits,
         limits: FfiBackendLimits::from(capabilities.limits),
-        initial_presentation_supported: u32::from(FFI_INITIAL_PRESENTATION_SUPPORTED),
+        initial_presentation_supported: u32::from(capabilities.features.presentation),
     })
 }
 
@@ -1536,9 +1686,9 @@ pub unsafe fn decode_resource_batch(
             request_id: item.request_id,
             desc: RenderPassDesc {
                 label: read_label(item.label, "render pass label")?,
-                target: require_handle(
+                target: require_handle_any(
                     item.target,
-                    HandleKind::RenderTarget,
+                    &[HandleKind::RenderTarget, HandleKind::FrameTarget],
                     "render pass target",
                 )?,
                 color_formats,
@@ -2518,6 +2668,69 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 metrics
             ]
         ),
+        35 => layout!(
+            35,
+            FfiBorrowedOpenGlContextCreateRequest,
+            [header, stable_window_id, tracy_enabled, reserved0, label]
+        ),
+        36 => layout!(
+            36,
+            FfiFrameSurfaceConfigRequest,
+            [
+                header,
+                label,
+                extent,
+                color_format,
+                present_mode,
+                max_frames_in_flight
+            ]
+        ),
+        37 => layout!(
+            37,
+            FfiFrameAcquireRequest,
+            [header, correlation_id, expected_extent]
+        ),
+        38 => layout!(
+            38,
+            FfiFrameAcquireResult,
+            [
+                header,
+                status,
+                error_domain,
+                frame_id,
+                correlation_id,
+                acquire_status,
+                frame_target,
+                extent,
+                color_format,
+                metrics
+            ]
+        ),
+        39 => layout!(39, FfiFrameResizeRequest, [header, correlation_id, extent]),
+        40 => layout!(
+            40,
+            FfiFrameResizeResult,
+            [header, status, error_domain, resize_status, extent]
+        ),
+        41 => layout!(
+            41,
+            FfiFramePresentRequest,
+            [header, frame_id, correlation_id, wait_submission_id]
+        ),
+        42 => layout!(
+            42,
+            FfiFramePresentResult,
+            [
+                header,
+                status,
+                error_domain,
+                frame_id,
+                correlation_id,
+                present_status,
+                completed_submission_id
+            ]
+        ),
+        43 => layout!(43, FfiDestroyDescAbi, [byte_size, handle, expected_kind]),
         _ => {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,
@@ -2582,6 +2795,83 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create(
             metrics: FfiMetricsSnapshot {
                 ffi_calls: 1,
                 ffi_input_bytes: size_of::<FfiContextCreateRequest>() as u64,
+                ffi_output_bytes: size_of::<FfiContextResult>() as u64,
+                ..FfiMetricsSnapshot::default()
+            },
+            ..FfiContextResult::default()
+        })
+    })();
+    match result {
+        Ok(value) => {
+            write_context_out(out, value);
+            StatusCode::Ok as i32
+        }
+        Err(error) => {
+            with_registry_mut(|registry| {
+                registry.last_error = error.to_string();
+            });
+            write_context_out(
+                out,
+                FfiContextResult {
+                    status: error.code as i32,
+                    error_domain: error.domain as u32,
+                    ..FfiContextResult::default()
+                },
+            );
+            error.code as i32
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_borrowed_opengl(
+    request: *const FfiBorrowedOpenGlContextCreateRequest,
+    out: *mut FfiContextResult,
+) -> i32 {
+    let result = (|| -> GalResult<FfiContextResult> {
+        let request = read_struct(request, "borrowed OpenGL context create request")?;
+        validate_header::<FfiBorrowedOpenGlContextCreateRequest>(request.header)?;
+        if request.stable_window_id == 0 {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "borrowed OpenGL context requires a stable non-zero window id",
+            ));
+        }
+        let label = read_label(request.label, "borrowed OpenGL context label")?;
+        let backend = create_borrowed_opengl_backend(&label, request.stable_window_id)?;
+        let gal = VulkanicGal::new_with_backend(
+            backend,
+            bool_flag(request.tracy_enabled, "tracy enabled")?,
+        );
+        let capabilities = gal.capabilities();
+        let context_id = with_registry_mut(|registry| -> GalResult<u64> {
+            let context_id = registry.next_context_id;
+            registry.next_context_id =
+                registry.next_context_id.checked_add(1).ok_or_else(|| {
+                    GalError::ffi(
+                        StatusCode::GenerationExhausted,
+                        "context id space exhausted",
+                    )
+                })?;
+            registry.contexts.insert(
+                context_id,
+                BridgeContext {
+                    gal,
+                    ffi_calls: 1,
+                    ffi_input_bytes: size_of::<FfiBorrowedOpenGlContextCreateRequest>() as u64,
+                    ffi_output_bytes: size_of::<FfiContextResult>() as u64,
+                    last_error: String::new(),
+                },
+            );
+            Ok(context_id)
+        })?;
+        Ok(FfiContextResult {
+            context_id,
+            supported_feature_bits: capability_feature_bits(capabilities),
+            limits: capabilities.limits.into(),
+            metrics: FfiMetricsSnapshot {
+                ffi_calls: 1,
+                ffi_input_bytes: size_of::<FfiBorrowedOpenGlContextCreateRequest>() as u64,
                 ffi_output_bytes: size_of::<FfiContextResult>() as u64,
                 ..FfiMetricsSnapshot::default()
             },
@@ -3006,6 +3296,265 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_readback(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_configure(
+    context_id: u64,
+    request: *const FfiFrameSurfaceConfigRequest,
+    status_out: *mut FfiStatusResult,
+) -> i32 {
+    with_registry_mut(|registry| {
+        let Some(context) = registry.contexts.get_mut(&context_id) else {
+            let error = GalError::ffi(
+                StatusCode::StaleHandle,
+                format!("unknown context id {context_id}"),
+            );
+            write_status_out(status_out, status_result_from_error(&error));
+            return error.code as i32;
+        };
+        context.ffi_calls += 1;
+        context.ffi_input_bytes = context
+            .ffi_input_bytes
+            .saturating_add(size_of::<FfiFrameSurfaceConfigRequest>() as u64);
+        context.ffi_output_bytes = context
+            .ffi_output_bytes
+            .saturating_add(size_of::<FfiStatusResult>() as u64);
+        let result = (|| -> GalResult<()> {
+            let request = read_struct(request, "frame configure request")?;
+            validate_header::<FfiFrameSurfaceConfigRequest>(request.header)?;
+            let desc = FrameSurfaceDesc {
+                label: read_label(request.label, "frame surface label")?,
+                extent: request.extent.into(),
+                color_format: texture_format(request.color_format)?,
+                present_mode: present_mode(request.present_mode)?,
+                max_frames_in_flight: request.max_frames_in_flight,
+            };
+            context.gal.configure_frame_surface(desc)
+        })();
+        match result {
+            Ok(()) => {
+                write_status_out(status_out, status_ok(context));
+                StatusCode::Ok as i32
+            }
+            Err(error) => {
+                set_last_error(context, &error);
+                write_status_out(status_out, status_error(Some(context), &error));
+                error.code as i32
+            }
+        }
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_acquire(
+    context_id: u64,
+    request: *const FfiFrameAcquireRequest,
+    out: *mut FfiFrameAcquireResult,
+) -> i32 {
+    with_registry_mut(|registry| {
+        let Some(context) = registry.contexts.get_mut(&context_id) else {
+            return StatusCode::StaleHandle as i32;
+        };
+        context.ffi_calls += 1;
+        context.ffi_input_bytes = context
+            .ffi_input_bytes
+            .saturating_add(size_of::<FfiFrameAcquireRequest>() as u64);
+        context.ffi_output_bytes = context
+            .ffi_output_bytes
+            .saturating_add(size_of::<FfiFrameAcquireResult>() as u64);
+        let result = (|| -> GalResult<FfiFrameAcquireResult> {
+            let request = read_struct(request, "frame acquire request")?;
+            validate_header::<FfiFrameAcquireRequest>(request.header)?;
+            let acquired = context.gal.acquire_frame(FrameAcquireDesc {
+                correlation_id: FrameCorrelationId(request.correlation_id),
+                expected_extent: request.expected_extent.into(),
+            })?;
+            let frame_target = if acquired.status == FrameAcquireStatus::Minimized {
+                Handle::NULL
+            } else {
+                context.gal.create_frame_target(FrameTargetDesc {
+                    label: format!("ffi.frame-target.{}", acquired.frame.0),
+                    frame_id: acquired.frame.0,
+                    extent: acquired.extent,
+                    color_format: acquired.color_format,
+                })?
+            };
+            Ok(FfiFrameAcquireResult {
+                status: StatusCode::Ok as i32,
+                error_domain: 0,
+                frame_id: acquired.frame.0,
+                correlation_id: acquired.correlation_id.0,
+                acquire_status: acquire_status_raw(acquired.status),
+                frame_target: FfiHandle::from(frame_target),
+                extent: acquired.extent.into(),
+                color_format: acquired.color_format as u32,
+                metrics: context_metrics(context),
+                ..FfiFrameAcquireResult::default()
+            })
+        })();
+        match result {
+            Ok(value) => {
+                let _ = write_out(out, value, "frame acquire result");
+                StatusCode::Ok as i32
+            }
+            Err(error) => {
+                set_last_error(context, &error);
+                let _ = write_out(
+                    out,
+                    FfiFrameAcquireResult {
+                        status: error.code as i32,
+                        error_domain: error.domain as u32,
+                        metrics: context_metrics(context),
+                        ..FfiFrameAcquireResult::default()
+                    },
+                    "frame acquire result",
+                );
+                error.code as i32
+            }
+        }
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_resize(
+    context_id: u64,
+    request: *const FfiFrameResizeRequest,
+    out: *mut FfiFrameResizeResult,
+) -> i32 {
+    with_registry_mut(|registry| {
+        let Some(context) = registry.contexts.get_mut(&context_id) else {
+            return StatusCode::StaleHandle as i32;
+        };
+        context.ffi_calls += 1;
+        context.ffi_input_bytes = context
+            .ffi_input_bytes
+            .saturating_add(size_of::<FfiFrameResizeRequest>() as u64);
+        context.ffi_output_bytes = context
+            .ffi_output_bytes
+            .saturating_add(size_of::<FfiFrameResizeResult>() as u64);
+        let result = (|| -> GalResult<FfiFrameResizeResult> {
+            let request = read_struct(request, "frame resize request")?;
+            validate_header::<FfiFrameResizeRequest>(request.header)?;
+            let resized = context.gal.resize_frame_surface(FrameResizeDesc {
+                correlation_id: FrameCorrelationId(request.correlation_id),
+                extent: request.extent.into(),
+            })?;
+            Ok(FfiFrameResizeResult {
+                status: StatusCode::Ok as i32,
+                resize_status: acquire_status_raw(resized.status),
+                extent: resized.extent.into(),
+                ..FfiFrameResizeResult::default()
+            })
+        })();
+        match result {
+            Ok(value) => {
+                let _ = write_out(out, value, "frame resize result");
+                StatusCode::Ok as i32
+            }
+            Err(error) => {
+                set_last_error(context, &error);
+                let _ = write_out(
+                    out,
+                    FfiFrameResizeResult {
+                        status: error.code as i32,
+                        error_domain: error.domain as u32,
+                        ..FfiFrameResizeResult::default()
+                    },
+                    "frame resize result",
+                );
+                error.code as i32
+            }
+        }
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_present(
+    context_id: u64,
+    request: *const FfiFramePresentRequest,
+    out: *mut FfiFramePresentResult,
+) -> i32 {
+    with_registry_mut(|registry| {
+        let Some(context) = registry.contexts.get_mut(&context_id) else {
+            return StatusCode::StaleHandle as i32;
+        };
+        context.ffi_calls += 1;
+        context.ffi_input_bytes = context
+            .ffi_input_bytes
+            .saturating_add(size_of::<FfiFramePresentRequest>() as u64);
+        context.ffi_output_bytes = context
+            .ffi_output_bytes
+            .saturating_add(size_of::<FfiFramePresentResult>() as u64);
+        let result = (|| -> GalResult<FfiFramePresentResult> {
+            let request = read_struct(request, "frame present request")?;
+            validate_header::<FfiFramePresentRequest>(request.header)?;
+            let presented = context.gal.present_frame(PresentFrameDesc {
+                frame: super::frame::FrameId(request.frame_id),
+                correlation_id: FrameCorrelationId(request.correlation_id),
+                wait_for: SubmissionId(request.wait_submission_id),
+            })?;
+            Ok(FfiFramePresentResult {
+                status: StatusCode::Ok as i32,
+                frame_id: presented.frame.0,
+                correlation_id: presented.correlation_id.0,
+                present_status: present_status_raw(presented.status),
+                completed_submission_id: presented.completed_submission.0,
+                ..FfiFramePresentResult::default()
+            })
+        })();
+        match result {
+            Ok(value) => {
+                let _ = write_out(out, value, "frame present result");
+                StatusCode::Ok as i32
+            }
+            Err(error) => {
+                set_last_error(context, &error);
+                let _ = write_out(
+                    out,
+                    FfiFramePresentResult {
+                        status: error.code as i32,
+                        error_domain: error.domain as u32,
+                        ..FfiFramePresentResult::default()
+                    },
+                    "frame present result",
+                );
+                error.code as i32
+            }
+        }
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_shutdown(
+    context_id: u64,
+    status_out: *mut FfiStatusResult,
+) -> i32 {
+    with_registry_mut(|registry| {
+        let Some(context) = registry.contexts.get_mut(&context_id) else {
+            let error = GalError::ffi(
+                StatusCode::StaleHandle,
+                format!("unknown context id {context_id}"),
+            );
+            write_status_out(status_out, status_result_from_error(&error));
+            return error.code as i32;
+        };
+        context.ffi_calls += 1;
+        context.ffi_output_bytes = context
+            .ffi_output_bytes
+            .saturating_add(size_of::<FfiStatusResult>() as u64);
+        match context.gal.shutdown_frame_surface() {
+            Ok(()) => {
+                write_status_out(status_out, status_ok(context));
+                StatusCode::Ok as i32
+            }
+            Err(error) => {
+                set_last_error(context, &error);
+                write_status_out(status_out, status_error(Some(context), &error));
+                error.code as i32
+            }
+        }
+    })
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn mattmc_vulkanic_gal_last_error(
     context_id: u64,
     out_bytes: *mut u8,
@@ -3093,11 +3642,6 @@ fn require_negotiated_features(bits: u64, capabilities: BackendCapabilities) -> 
                 feature, capabilities.name
             )));
         }
-    }
-    if bits & FfiFeatureBits::PRESENTATION != 0 && !FFI_INITIAL_PRESENTATION_SUPPORTED {
-        return Err(GalError::unsupported_feature(
-            "presentation/windowing is excluded from ABI version 1",
-        ));
     }
     Ok(())
 }
@@ -3234,6 +3778,29 @@ fn require_handle(handle: FfiHandle, kind: HandleKind, label: &str) -> GalResult
     Ok(handle)
 }
 
+fn require_handle_any(handle: FfiHandle, kinds: &[HandleKind], label: &str) -> GalResult<Handle> {
+    let handle = Handle::from(handle);
+    if handle.is_null() {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!("{label} handle is null"),
+        ));
+    }
+    let Some(actual) = handle.kind() else {
+        return Err(GalError::ffi(
+            StatusCode::WrongHandleType,
+            format!("{label} has unknown handle kind"),
+        ));
+    };
+    if !kinds.contains(&actual) {
+        return Err(GalError::ffi(
+            StatusCode::WrongHandleType,
+            format!("{label} has kind {actual:?}, expected one of {kinds:?}"),
+        ));
+    }
+    Ok(handle)
+}
+
 fn optional_handle(handle: FfiHandle, kind: HandleKind, label: &str) -> GalResult<Option<Handle>> {
     if handle.raw == 0 {
         return Ok(None);
@@ -3295,6 +3862,26 @@ fn optional_texture_format(raw: u32) -> GalResult<Option<TextureFormat>> {
     } else {
         texture_format(raw).map(Some)
     }
+}
+
+fn present_mode(raw: u32) -> GalResult<PresentMode> {
+    match raw {
+        1 => Ok(PresentMode::Immediate),
+        2 => Ok(PresentMode::Mailbox),
+        3 => Ok(PresentMode::Fifo),
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown present mode {raw}"),
+        )),
+    }
+}
+
+fn acquire_status_raw(status: FrameAcquireStatus) -> u32 {
+    status as u32
+}
+
+fn present_status_raw(status: FramePresentStatus) -> u32 {
+    status as u32
 }
 
 fn sampler_filter(raw: u32) -> GalResult<SamplerFilter> {
@@ -3637,7 +4224,7 @@ fn check_texture_capabilities(
             "presentation texture",
         )?;
         return Err(GalError::unsupported_feature(
-            "presentation/windowing is excluded from ABI version 1",
+            "presentation texture creation is outside the batch ABI; use ABI v2 frame targets",
         ));
     }
     Ok(())
@@ -3744,9 +4331,9 @@ fn decode_command_op(
             check_attachment_count(colors.len(), !depth_items.is_empty(), capabilities)?;
             Ok(CommandOp::BeginPass {
                 pass: require_handle(op.primary, HandleKind::RenderPass, "begin pass pass")?,
-                target: require_handle(
+                target: require_handle_any(
                     op.secondary,
-                    HandleKind::RenderTarget,
+                    &[HandleKind::RenderTarget, HandleKind::FrameTarget],
                     "begin pass target",
                 )?,
                 colors,
@@ -3884,7 +4471,7 @@ fn decode_command_op(
             })
         }
         17 => Err(GalError::unsupported_feature(
-            "presentation/windowing is excluded from ABI version 1",
+            "present commands are outside submission batches; use ABI v2 frame present",
         )),
         18 => Ok(CommandOp::Barrier(decode_barrier(single_range_item(
             barriers, op.barrier, "barrier",

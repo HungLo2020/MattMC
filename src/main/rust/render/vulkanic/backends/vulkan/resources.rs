@@ -75,6 +75,12 @@ impl VulkanObjects {
                     extent: desc.extent,
                 })
             }
+            BackendCreateDesc::FrameTarget(desc) => VulkanObject::FrameTarget(FrameTargetObject {
+                token,
+                frame_id: desc.frame_id,
+                extent: desc.extent,
+                color_format: desc.color_format,
+            }),
             BackendCreateDesc::RenderPass(desc) => VulkanObject::RenderPass(RenderPassObject {
                 token,
                 target: desc.target,
@@ -873,7 +879,9 @@ impl VulkanObjects {
                 VulkanObject::ComputePipeline(object) => {
                     self.context.device.destroy_pipeline(object.pipeline, None);
                 }
-                VulkanObject::RenderTarget(_) | VulkanObject::RenderPass(_) => {}
+                VulkanObject::RenderTarget(_)
+                | VulkanObject::FrameTarget(_)
+                | VulkanObject::RenderPass(_) => {}
             }
         }
     }
@@ -897,6 +905,7 @@ pub(super) enum VulkanObject {
     GraphicsPipeline(GraphicsPipelineObject),
     ComputePipeline(ComputePipelineObject),
     RenderTarget(RenderTargetObject),
+    FrameTarget(FrameTargetObject),
     RenderPass(RenderPassObject),
 }
 
@@ -914,6 +923,7 @@ impl VulkanObject {
             Self::GraphicsPipeline(object) => object.token,
             Self::ComputePipeline(object) => object.token,
             Self::RenderTarget(object) => object.token,
+            Self::FrameTarget(object) => object.token,
             Self::RenderPass(object) => object.token,
         }
     }
@@ -931,6 +941,7 @@ impl VulkanObject {
             Self::GraphicsPipeline(_) => HandleKind::GraphicsPipeline,
             Self::ComputePipeline(_) => HandleKind::ComputePipeline,
             Self::RenderTarget(_) => HandleKind::RenderTarget,
+            Self::FrameTarget(_) => HandleKind::FrameTarget,
             Self::RenderPass(_) => HandleKind::RenderPass,
         }
     }
@@ -1014,6 +1025,14 @@ pub(super) struct RenderTargetObject {
     pub(super) color_views: Vec<Handle>,
     pub(super) depth_stencil_view: Option<Handle>,
     pub(super) extent: Extent3d,
+}
+
+#[allow(dead_code)]
+pub(super) struct FrameTargetObject {
+    pub(super) token: BackendToken,
+    pub(super) frame_id: u64,
+    pub(super) extent: Extent3d,
+    pub(super) color_format: TextureFormat,
 }
 
 #[allow(dead_code)]

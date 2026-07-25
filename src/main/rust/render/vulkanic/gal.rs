@@ -222,6 +222,7 @@ pub struct VulkanicGal {
     graphics_pipelines: Arena<ResourceRecord<GraphicsPipelineDesc>>,
     compute_pipelines: Arena<ResourceRecord<ComputePipelineDesc>>,
     render_targets: Arena<ResourceRecord<RenderTargetDesc>>,
+    frame_targets: Arena<ResourceRecord<FrameTargetDesc>>,
     render_passes: Arena<ResourceRecord<RenderPassDesc>>,
     dependencies: BTreeMap<Handle, BTreeSet<Handle>>,
     reverse_dependencies: BTreeMap<Handle, BTreeSet<Handle>>,
@@ -251,6 +252,7 @@ impl VulkanicGal {
             graphics_pipelines: Arena::new(HandleKind::GraphicsPipeline),
             compute_pipelines: Arena::new(HandleKind::ComputePipeline),
             render_targets: Arena::new(HandleKind::RenderTarget),
+            frame_targets: Arena::new(HandleKind::FrameTarget),
             render_passes: Arena::new(HandleKind::RenderPass),
             dependencies: BTreeMap::new(),
             reverse_dependencies: BTreeMap::new(),
@@ -344,6 +346,35 @@ impl VulkanicGal {
 
     pub fn shutdown_frame_surface(&mut self) -> GalResult<()> {
         self.backend.shutdown_frame_surface()
+    }
+
+    pub fn create_frame_target(&mut self, desc: FrameTargetDesc) -> GalResult<Handle> {
+        if desc.extent.width == 0 || desc.extent.height == 0 || desc.extent.depth == 0 {
+            return self.validation_error(GalError::resource(
+                StatusCode::InvalidArgument,
+                "frame target extent must be non-empty",
+            ));
+        }
+        let capabilities = self.capabilities();
+        if !capabilities.supports(BackendFeature::Presentation) {
+            return self.unsupported(format!(
+                "backend '{}' was not created with presentation support",
+                capabilities.name
+            ));
+        }
+        let handle = self.frame_targets.next_handle()?;
+        let token = self
+            .backend
+            .create(handle, BackendCreateDesc::FrameTarget(&desc))?;
+        self.metrics.resource_creates += 1;
+        self.frame_targets.insert_at(
+            handle,
+            ResourceRecord {
+                desc,
+                token,
+                last_submission: None,
+            },
+        )
     }
 
     pub fn create_buffer(&mut self, desc: BufferDesc) -> GalResult<Handle> {
@@ -980,17 +1011,31 @@ impl VulkanicGal {
 
     pub fn create_render_pass(&mut self, desc: RenderPassDesc) -> GalResult<Handle> {
         let (target_color_formats, target_depth_format) = {
-            let target = self.render_targets.get(desc.target)?;
-            let color_views = target.desc.color_views.clone();
-            let depth_view = target.desc.depth_stencil_view;
-            let color_formats = color_views
-                .iter()
-                .map(|view| self.texture_view_info(*view).map(|info| info.format))
-                .collect::<GalResult<Vec<_>>>()?;
-            let depth_format = depth_view
-                .map(|view| self.texture_view_info(view).map(|info| info.format))
-                .transpose()?;
-            (color_formats, depth_format)
+            match desc.target.kind() {
+                Some(HandleKind::RenderTarget) => {
+                    let target = self.render_targets.get(desc.target)?;
+                    let color_views = target.desc.color_views.clone();
+                    let depth_view = target.desc.depth_stencil_view;
+                    let color_formats = color_views
+                        .iter()
+                        .map(|view| self.texture_view_info(*view).map(|info| info.format))
+                        .collect::<GalResult<Vec<_>>>()?;
+                    let depth_format = depth_view
+                        .map(|view| self.texture_view_info(view).map(|info| info.format))
+                        .transpose()?;
+                    (color_formats, depth_format)
+                }
+                Some(HandleKind::FrameTarget) => {
+                    let target = self.frame_targets.get(desc.target)?;
+                    (vec![target.desc.color_format], None)
+                }
+                _ => {
+                    return self.validation_error(GalError::resource(
+                        StatusCode::WrongHandleType,
+                        "render pass target must be a render target or frame target",
+                    ))
+                }
+            }
         };
         if desc.color_formats != target_color_formats {
             return self.validation_error(GalError::resource(
@@ -1046,6 +1091,7 @@ impl VulkanicGal {
             Some(HandleKind::RenderTarget) => {
                 self.remove_record(handle, HandleKind::RenderTarget)?
             }
+            Some(HandleKind::FrameTarget) => self.remove_record(handle, HandleKind::FrameTarget)?,
             Some(HandleKind::RenderPass) => self.remove_record(handle, HandleKind::RenderPass)?,
             None => {
                 return Err(GalError::handle(
@@ -1327,7 +1373,22 @@ impl VulkanicGal {
                         ));
                     }
                     let pass_target = self.render_pass_desc(*pass)?.target;
-                    let (expected_colors, expected_depth) = {
+                    let frame_target = match target.kind() {
+                        Some(HandleKind::FrameTarget) => {
+                            self.frame_targets.get(*target)?;
+                            true
+                        }
+                        Some(HandleKind::RenderTarget) => false,
+                        _ => {
+                            return self.validation_error(GalError::command(
+                                StatusCode::WrongHandleType,
+                                "pass target must be a render target or frame target",
+                            ))
+                        }
+                    };
+                    let (expected_colors, expected_depth) = if frame_target {
+                        (Vec::new(), None)
+                    } else {
                         let target_record = self.render_targets.get(*target)?;
                         (
                             target_record.desc.color_views.clone(),
@@ -1745,6 +1806,7 @@ impl VulkanicGal {
             Some(HandleKind::GraphicsPipeline) => self.graphics_pipelines.get(handle).map(|_| ()),
             Some(HandleKind::ComputePipeline) => self.compute_pipelines.get(handle).map(|_| ()),
             Some(HandleKind::RenderTarget) => self.render_targets.get(handle).map(|_| ()),
+            Some(HandleKind::FrameTarget) => self.frame_targets.get(handle).map(|_| ()),
             Some(HandleKind::RenderPass) => self.render_passes.get(handle).map(|_| ()),
             None => Err(GalError::handle(
                 StatusCode::WrongHandleType,
@@ -2323,6 +2385,9 @@ impl VulkanicGal {
             Some(HandleKind::RenderTarget) => {
                 self.render_targets.get_mut_record(handle)?.last_submission = Some(id)
             }
+            Some(HandleKind::FrameTarget) => {
+                self.frame_targets.get_mut_record(handle)?.last_submission = Some(id)
+            }
             Some(HandleKind::RenderPass) => {
                 self.render_passes.get_mut_record(handle)?.last_submission = Some(id)
             }
@@ -2365,6 +2430,7 @@ impl VulkanicGal {
             HandleKind::GraphicsPipeline => remove_from!(self.graphics_pipelines),
             HandleKind::ComputePipeline => remove_from!(self.compute_pipelines),
             HandleKind::RenderTarget => remove_from!(self.render_targets),
+            HandleKind::FrameTarget => remove_from!(self.frame_targets),
             HandleKind::RenderPass => remove_from!(self.render_passes),
         })
     }

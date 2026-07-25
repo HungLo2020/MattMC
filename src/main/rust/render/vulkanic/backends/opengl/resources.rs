@@ -80,6 +80,12 @@ impl OpenGlObjects {
             BackendCreateDesc::RenderTarget(desc) => {
                 OpenGlObject::RenderTarget(self.create_render_target(desc, token)?)
             }
+            BackendCreateDesc::FrameTarget(desc) => OpenGlObject::FrameTarget(FrameTargetObject {
+                token,
+                frame_id: desc.frame_id,
+                extent: desc.extent,
+                color_format: desc.color_format,
+            }),
             BackendCreateDesc::RenderPass(desc) => OpenGlObject::RenderPass(RenderPassObject {
                 token,
                 target: desc.target,
@@ -165,10 +171,17 @@ impl OpenGlObjects {
         }
     }
 
-    pub(super) fn render_target(&self, handle: Handle) -> GalResult<&RenderTargetObject> {
+    pub(super) fn pass_target(&self, handle: Handle) -> GalResult<PassTargetObject> {
         match self.objects.get(&handle) {
-            Some(OpenGlObject::RenderTarget(object)) => Ok(object),
-            _ => Err(expected("render target", handle)),
+            Some(OpenGlObject::RenderTarget(object)) => Ok(PassTargetObject {
+                framebuffer: Some(object.framebuffer),
+                extent: object.extent,
+            }),
+            Some(OpenGlObject::FrameTarget(object)) => Ok(PassTargetObject {
+                framebuffer: None,
+                extent: object.extent,
+            }),
+            _ => Err(expected("render target or frame target", handle)),
         }
     }
 
@@ -460,6 +473,7 @@ impl OpenGlObjects {
                 OpenGlObject::RenderTarget(object) => {
                     self.gl.delete_framebuffer(object.framebuffer)
                 }
+                OpenGlObject::FrameTarget(_) => {}
                 OpenGlObject::RenderPass(_) => {}
             }
         }
@@ -483,6 +497,7 @@ enum OpenGlObject {
     PipelineLayout(PipelineLayoutObject),
     GraphicsPipeline(GraphicsPipelineObject),
     RenderTarget(RenderTargetObject),
+    FrameTarget(FrameTargetObject),
     RenderPass(RenderPassObject),
 }
 
@@ -499,6 +514,7 @@ impl OpenGlObject {
             Self::PipelineLayout(object) => object.token,
             Self::GraphicsPipeline(object) => object.token,
             Self::RenderTarget(object) => object.token,
+            Self::FrameTarget(object) => object.token,
             Self::RenderPass(object) => object.token,
         }
     }
@@ -515,6 +531,7 @@ impl OpenGlObject {
             Self::PipelineLayout(_) => HandleKind::PipelineLayout,
             Self::GraphicsPipeline(_) => HandleKind::GraphicsPipeline,
             Self::RenderTarget(_) => HandleKind::RenderTarget,
+            Self::FrameTarget(_) => HandleKind::FrameTarget,
             Self::RenderPass(_) => HandleKind::RenderPass,
         }
     }
@@ -590,6 +607,20 @@ pub(super) struct RenderTargetObject {
     pub(super) framebuffer: glow::Framebuffer,
     pub(super) color_views: Vec<Handle>,
     pub(super) depth_stencil_view: Option<Handle>,
+    pub(super) extent: Extent3d,
+}
+
+#[allow(dead_code)]
+pub(super) struct FrameTargetObject {
+    pub(super) token: BackendToken,
+    pub(super) frame_id: u64,
+    pub(super) extent: Extent3d,
+    pub(super) color_format: TextureFormat,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct PassTargetObject {
+    pub(super) framebuffer: Option<glow::Framebuffer>,
     pub(super) extent: Extent3d,
 }
 

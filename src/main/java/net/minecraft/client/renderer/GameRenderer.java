@@ -241,6 +241,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	}
 
 	public void close() {
+		net.vulkanic.bridge.RustGalFrameQueue.shutdown();
 		this.globalSettingsUniform.close();
 		this.lightTexture.close();
 		this.overlayTexture.close();
@@ -805,19 +806,21 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 				this.minecraft.gui.renderDebugOverlay(guiGraphics);
 			}
 
-			this.minecraft.gui.renderDeferredSubtitles();
-			profilerFiller.popPush("guiRendering");
-			
-			// Call GUI render hooks to allow mods to render custom overlays
-			for (net.minecraft.hooks.GuiRenderHooks hook : net.minecraft.hooks.HookRegistry.getGuiRenderHooks()) {
-				hook.onBeforeGuiRender(this.minecraft, this.guiRenderState, this.renderBuffers, deltaTracker, bl);
-			}
-			
-			this.guiRenderer.render(this.fogRenderer.getBuffer(FogRenderer.FogMode.NONE));
-			this.guiRenderer.incrementFrameNumber();
-			profilerFiller.pop();
-			
-			guiGraphics.applyCursor(this.minecraft.getWindow());
+				this.minecraft.gui.renderDeferredSubtitles();
+				profilerFiller.popPush("guiRendering");
+
+				// Call GUI render hooks to allow mods to render custom overlays
+				for (net.minecraft.hooks.GuiRenderHooks hook : net.minecraft.hooks.HookRegistry.getGuiRenderHooks()) {
+					hook.onBeforeGuiRender(this.minecraft, this.guiRenderState, this.renderBuffers, deltaTracker, bl);
+				}
+				net.vulkanic.bridge.RustGalFrameQueue.enqueueTestGuiBatchIfRequested(this.minecraft);
+
+				this.guiRenderer.render(this.fogRenderer.getBuffer(FogRenderer.FogMode.NONE));
+				net.vulkanic.bridge.RustGalFrameQueue.executeGuiStratum(this.minecraft);
+				this.guiRenderer.incrementFrameNumber();
+				profilerFiller.pop();
+
+				guiGraphics.applyCursor(this.minecraft.getWindow());
 			this.submitNodeStorage.endFrame();
 			this.featureRenderDispatcher.endFrame();
 			this.resourcePool.endFrame();

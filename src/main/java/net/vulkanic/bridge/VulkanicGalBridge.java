@@ -16,7 +16,7 @@ import java.util.Locale;
 import java.util.Objects;
 
 public final class VulkanicGalBridge implements AutoCloseable {
-	public static final int ABI_VERSION = 1;
+	public static final int ABI_VERSION = 2;
 	public static final int STATUS_OK = 0;
 
 	public static final int BACKEND_VULKAN = 1;
@@ -29,14 +29,15 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	public static final long FEATURE_STORAGE_BUFFERS = 1L << 6;
 	public static final long FEATURE_TEXTURE_SUBRESOURCE_COPIES = 1L << 13;
 	public static final long FEATURE_HOST_BUFFER_ACCESS = 1L << 16;
+	public static final long FEATURE_PRESENTATION = 1L << 17;
 
 	public static final long BRIDGE_FEATURES = FEATURE_GRAPHICS
 		| FEATURE_DESCRIPTOR_ARRAYS
 		| FEATURE_OPTIONAL_BINDINGS
 		| FEATURE_UNIFORM_BUFFERS
-		| FEATURE_STORAGE_BUFFERS
-		| FEATURE_TEXTURE_SUBRESOURCE_COPIES
-		| FEATURE_HOST_BUFFER_ACCESS;
+			| FEATURE_STORAGE_BUFFERS
+			| FEATURE_TEXTURE_SUBRESOURCE_COPIES
+			| FEATURE_HOST_BUFFER_ACCESS;
 
 	public static final int MEMORY_DEVICE_LOCAL = 1;
 	public static final int MEMORY_UPLOAD = 2;
@@ -81,6 +82,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	public static final int USAGE_TRANSFER_SRC = 6;
 	public static final int USAGE_TRANSFER_DST = 7;
 	public static final int QUEUE_GRAPHICS = 1;
+	public static final int HANDLE_RENDER_PASS = 12;
+	public static final int HANDLE_FRAME_TARGET = 13;
 
 	private final Arena arena;
 	private final long contextId;
@@ -91,6 +94,34 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		this.arena = arena;
 		this.contextId = contextId;
 		this.negotiatedFeatures = negotiatedFeatures;
+	}
+
+	public static VulkanicGalBridge createBorrowedOpenGl(long stableWindowId) {
+		if (stableWindowId == 0L) {
+			throw new IllegalArgumentException("borrowed OpenGL context requires a non-zero window id");
+		}
+		Arena arena = Arena.ofConfined();
+		try {
+			MemorySegment request = Struct.BORROWED_OPENGL_CONTEXT_CREATE.allocate(arena);
+			Abi.writeHeader(request, Struct.BORROWED_OPENGL_CONTEXT_CREATE);
+			Struct.BORROWED_OPENGL_CONTEXT_CREATE.setLong(request, 1, stableWindowId);
+			boolean rustTracy = Boolean.getBoolean("mattmc.dev.tracyCapture") || Boolean.getBoolean("mattmc.dev.rustGalFrame.tracy");
+			Struct.BORROWED_OPENGL_CONTEXT_CREATE.setInt(request, 2, rustTracy ? 1 : 0);
+			Struct.BORROWED_OPENGL_CONTEXT_CREATE.setInt(request, 3, 0);
+			Abi.writeBytes(arena, request, Struct.BORROWED_OPENGL_CONTEXT_CREATE, 4, "java-frame-borrowed-opengl");
+			MemorySegment result = Struct.CONTEXT_RESULT.allocate(arena);
+			int status = Native.contextCreateBorrowedOpenGl(request, result);
+			if (status != STATUS_OK) {
+				throw new IllegalStateException("Rust VulkanicGAL borrowed OpenGL context creation failed: status=" + status + ": " + Native.lastError(0));
+			}
+			long contextId = Struct.CONTEXT_RESULT.getLong(result, 3);
+			VulkanicGalBridge bridge = new VulkanicGalBridge(arena, contextId, BRIDGE_FEATURES | FEATURE_PRESENTATION);
+			bridge.queryCapabilities();
+			return bridge;
+		} catch (RuntimeException error) {
+			arena.close();
+			throw error;
+		}
 	}
 
 	public static VulkanicGalBridge create(String backendName) {
@@ -198,6 +229,81 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status));
 	}
 
+	public Status configureFrame(String label, int width, int height, int colorFormat) {
+		MemorySegment request = Struct.FRAME_SURFACE_CONFIG.allocate(arena);
+		Abi.writeHeader(request, Struct.FRAME_SURFACE_CONFIG);
+		Abi.writeBytes(arena, request, Struct.FRAME_SURFACE_CONFIG, 1, label);
+		long extent = Struct.FRAME_SURFACE_CONFIG.offset(2);
+		request.set(ValueLayout.JAVA_INT, extent, width);
+		request.set(ValueLayout.JAVA_INT, extent + 4, height);
+		request.set(ValueLayout.JAVA_INT, extent + 8, 1);
+		Struct.FRAME_SURFACE_CONFIG.setInt(request, 3, colorFormat);
+		Struct.FRAME_SURFACE_CONFIG.setInt(request, 4, 3);
+		Struct.FRAME_SURFACE_CONFIG.setInt(request, 5, 1);
+		MemorySegment status = Struct.STATUS.allocate(arena);
+		checkStatus(Native.frameConfigure(contextId, request, status), "frame configure");
+		return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status));
+	}
+
+	public AcquiredFrame acquireFrame(long correlationId, int width, int height) {
+		MemorySegment request = Struct.FRAME_ACQUIRE.allocate(arena);
+		Abi.writeHeader(request, Struct.FRAME_ACQUIRE);
+		Struct.FRAME_ACQUIRE.setLong(request, 1, correlationId);
+		long extent = Struct.FRAME_ACQUIRE.offset(2);
+		request.set(ValueLayout.JAVA_INT, extent, width);
+		request.set(ValueLayout.JAVA_INT, extent + 4, height);
+		request.set(ValueLayout.JAVA_INT, extent + 8, 1);
+		MemorySegment result = Struct.FRAME_ACQUIRE_RESULT.allocate(arena);
+		checkStatus(Native.frameAcquire(contextId, request, result), "frame acquire");
+		long resultExtent = Struct.FRAME_ACQUIRE_RESULT.offset(7);
+		return new AcquiredFrame(
+			Struct.FRAME_ACQUIRE_RESULT.getLong(result, 3),
+			Struct.FRAME_ACQUIRE_RESULT.getLong(result, 4),
+			Struct.FRAME_ACQUIRE_RESULT.getInt(result, 5),
+			Struct.FRAME_ACQUIRE_RESULT.getLong(result, 6),
+			result.get(ValueLayout.JAVA_INT, resultExtent),
+			result.get(ValueLayout.JAVA_INT, resultExtent + 4),
+			Struct.FRAME_ACQUIRE_RESULT.getInt(result, 8));
+	}
+
+	public FrameResize resizeFrame(long correlationId, int width, int height) {
+		MemorySegment request = Struct.FRAME_RESIZE.allocate(arena);
+		Abi.writeHeader(request, Struct.FRAME_RESIZE);
+		Struct.FRAME_RESIZE.setLong(request, 1, correlationId);
+		long extent = Struct.FRAME_RESIZE.offset(2);
+		request.set(ValueLayout.JAVA_INT, extent, width);
+		request.set(ValueLayout.JAVA_INT, extent + 4, height);
+		request.set(ValueLayout.JAVA_INT, extent + 8, 1);
+		MemorySegment result = Struct.FRAME_RESIZE_RESULT.allocate(arena);
+		checkStatus(Native.frameResize(contextId, request, result), "frame resize");
+		long resultExtent = Struct.FRAME_RESIZE_RESULT.offset(4);
+		return new FrameResize(
+			Struct.FRAME_RESIZE_RESULT.getInt(result, 3),
+			result.get(ValueLayout.JAVA_INT, resultExtent),
+			result.get(ValueLayout.JAVA_INT, resultExtent + 4));
+	}
+
+	public PresentedFrame presentFrame(long frameId, long correlationId, long waitSubmissionId) {
+		MemorySegment request = Struct.FRAME_PRESENT.allocate(arena);
+		Abi.writeHeader(request, Struct.FRAME_PRESENT);
+		Struct.FRAME_PRESENT.setLong(request, 1, frameId);
+		Struct.FRAME_PRESENT.setLong(request, 2, correlationId);
+		Struct.FRAME_PRESENT.setLong(request, 3, waitSubmissionId);
+		MemorySegment result = Struct.FRAME_PRESENT_RESULT.allocate(arena);
+		checkStatus(Native.framePresent(contextId, request, result), "frame present");
+		return new PresentedFrame(
+			Struct.FRAME_PRESENT_RESULT.getLong(result, 3),
+			Struct.FRAME_PRESENT_RESULT.getLong(result, 4),
+			Struct.FRAME_PRESENT_RESULT.getInt(result, 5),
+			Struct.FRAME_PRESENT_RESULT.getLong(result, 6));
+	}
+
+	public Status shutdownFrame() {
+		MemorySegment status = Struct.STATUS.allocate(arena);
+		checkStatus(Native.frameShutdown(contextId, status), "frame shutdown");
+		return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status));
+	}
+
 	@Override
 	public void close() {
 		if (closed) {
@@ -233,6 +339,15 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	public record Completion(long requestedSubmissionId, long completedSubmissionId, boolean complete) {
 	}
 
+	public record AcquiredFrame(long frameId, long correlationId, int status, long frameTarget, int width, int height, int colorFormat) {
+	}
+
+	public record FrameResize(int status, int width, int height) {
+	}
+
+	public record PresentedFrame(long frameId, long correlationId, int status, long completedSubmissionId) {
+	}
+
 	public record ResourceResults(MemorySegment segment, int count) {
 		public long handle(int index) {
 			return Struct.CREATE_RESULT.getLong(segment.asSlice((long)index * Struct.CREATE_RESULT.byteSize(), Struct.CREATE_RESULT.byteSize()), 1);
@@ -242,6 +357,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	static final class Native {
 		private static final MethodHandle LAYOUT = downcall("mattmc_vulkanic_gal_abi_struct_layout", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
 		private static final MethodHandle CONTEXT_CREATE = downcall("mattmc_vulkanic_gal_context_create", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+		private static final MethodHandle CONTEXT_CREATE_BORROWED_OPENGL = downcall("mattmc_vulkanic_gal_context_create_borrowed_opengl", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle CONTEXT_DESTROY = downcall("mattmc_vulkanic_gal_context_destroy", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
 		private static final MethodHandle CAPABILITIES = downcall("mattmc_vulkanic_gal_capabilities", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle RESOURCE_BATCH = downcall("mattmc_vulkanic_gal_resource_batch", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
@@ -249,6 +365,11 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		private static final MethodHandle COMPLETION = downcall("mattmc_vulkanic_gal_completion_query", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle RETIRE = downcall("mattmc_vulkanic_gal_retire", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle READBACK = downcall("mattmc_vulkanic_gal_readback", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
+		private static final MethodHandle FRAME_CONFIGURE = downcall("mattmc_vulkanic_gal_frame_configure", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+		private static final MethodHandle FRAME_ACQUIRE = downcall("mattmc_vulkanic_gal_frame_acquire", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+		private static final MethodHandle FRAME_RESIZE = downcall("mattmc_vulkanic_gal_frame_resize", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+		private static final MethodHandle FRAME_PRESENT = downcall("mattmc_vulkanic_gal_frame_present", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+		private static final MethodHandle FRAME_SHUTDOWN = downcall("mattmc_vulkanic_gal_frame_shutdown", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
 		private static final MethodHandle LAST_ERROR = downcall("mattmc_vulkanic_gal_last_error", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
 
 		private static MethodHandle downcall(String symbol, FunctionDescriptor descriptor) {
@@ -268,6 +389,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				return (int) CONTEXT_CREATE.invokeExact(request, out);
 			} catch (Throwable throwable) {
 				throw new IllegalStateException("Failed to create Rust VulkanicGAL context", throwable);
+			}
+		}
+
+		static int contextCreateBorrowedOpenGl(MemorySegment request, MemorySegment out) {
+			try {
+				return (int) CONTEXT_CREATE_BORROWED_OPENGL.invokeExact(request, out);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to create borrowed Rust VulkanicGAL OpenGL context", throwable);
 			}
 		}
 
@@ -327,6 +456,46 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			}
 		}
 
+		static int frameConfigure(long contextId, MemorySegment request, MemorySegment status) {
+			try {
+				return (int) FRAME_CONFIGURE.invokeExact(contextId, request, status);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to configure Rust VulkanicGAL frame", throwable);
+			}
+		}
+
+		static int frameAcquire(long contextId, MemorySegment request, MemorySegment result) {
+			try {
+				return (int) FRAME_ACQUIRE.invokeExact(contextId, request, result);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to acquire Rust VulkanicGAL frame", throwable);
+			}
+		}
+
+		static int frameResize(long contextId, MemorySegment request, MemorySegment result) {
+			try {
+				return (int) FRAME_RESIZE.invokeExact(contextId, request, result);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to resize Rust VulkanicGAL frame", throwable);
+			}
+		}
+
+		static int framePresent(long contextId, MemorySegment request, MemorySegment result) {
+			try {
+				return (int) FRAME_PRESENT.invokeExact(contextId, request, result);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to present Rust VulkanicGAL frame", throwable);
+			}
+		}
+
+		static int frameShutdown(long contextId, MemorySegment status) {
+			try {
+				return (int) FRAME_SHUTDOWN.invokeExact(contextId, status);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to shutdown Rust VulkanicGAL frame", throwable);
+			}
+		}
+
 		static String lastError(long contextId) {
 			try (Arena arena = Arena.ofConfined()) {
 				MemorySegment bytes = arena.allocate(4096, 1);
@@ -371,9 +540,18 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		SUBMISSION_BATCH(29),
 		COMPLETION_QUERY(30),
 		COMPLETION_RESULT(31),
-		RETIREMENT_BATCH(32),
-		READBACK_REQUEST(33),
-		READBACK_RESULT(34);
+			RETIREMENT_BATCH(32),
+			READBACK_REQUEST(33),
+			READBACK_RESULT(34),
+			BORROWED_OPENGL_CONTEXT_CREATE(35),
+			FRAME_SURFACE_CONFIG(36),
+			FRAME_ACQUIRE(37),
+			FRAME_ACQUIRE_RESULT(38),
+			FRAME_RESIZE(39),
+			FRAME_RESIZE_RESULT(40),
+			FRAME_PRESENT(41),
+			FRAME_PRESENT_RESULT(42),
+			DESTROY_DESC(43);
 
 		private final int id;
 		private final int byteSize;
@@ -504,9 +682,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		private final List<Long> pipelineLayoutSets = new ArrayList<>();
 		private final List<MemorySegment> graphicsPipelines = new ArrayList<>();
 		private final List<Integer> passFormats = new ArrayList<>();
-		private final List<MemorySegment> renderTargets = new ArrayList<>();
-		private final List<Long> targetColorViews = new ArrayList<>();
-		private final List<MemorySegment> renderPasses = new ArrayList<>();
+			private final List<MemorySegment> renderTargets = new ArrayList<>();
+			private final List<Long> targetColorViews = new ArrayList<>();
+			private final List<MemorySegment> renderPasses = new ArrayList<>();
+			private final List<MemorySegment> destroys = new ArrayList<>();
 
 		ResourceBatchBuilder(Arena arena, long features) {
 			this.arena = arena;
@@ -641,6 +820,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 
 		public ResourceBatchBuilder graphicsPipeline(long id, String label, long layout, long vertex, long fragment) {
+			return graphicsPipeline(id, label, layout, vertex, fragment, FORMAT_DEPTH32, COMPARE_LEQUAL);
+		}
+
+		public ResourceBatchBuilder graphicsPipelineNoDepth(long id, String label, long layout, long vertex, long fragment) {
+			return graphicsPipeline(id, label, layout, vertex, fragment, 0, 0);
+		}
+
+		private ResourceBatchBuilder graphicsPipeline(long id, String label, long layout, long vertex, long fragment, int depthFormat, int depthCompare) {
 			long start = passFormats.size();
 			passFormats.add(FORMAT_RGBA8);
 			MemorySegment item = Struct.GRAPHICS_PIPELINE_DESC.allocate(arena);
@@ -653,9 +840,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.GRAPHICS_PIPELINE_DESC.setInt(item, 6, TOPOLOGY_TRIANGLES);
 			Struct.GRAPHICS_PIPELINE_DESC.setInt(item, 7, CULL_BACK);
 			Struct.GRAPHICS_PIPELINE_DESC.setInt(item, 8, BLEND_ALPHA);
-			Struct.GRAPHICS_PIPELINE_DESC.setInt(item, 9, COMPARE_LEQUAL);
+			Struct.GRAPHICS_PIPELINE_DESC.setInt(item, 9, depthCompare);
 			writeRange(item, Struct.GRAPHICS_PIPELINE_DESC, 10, start, 1);
-			Struct.GRAPHICS_PIPELINE_DESC.setInt(item, 11, FORMAT_DEPTH32);
+			Struct.GRAPHICS_PIPELINE_DESC.setInt(item, 11, depthFormat);
 			graphicsPipelines.add(item);
 			return this;
 		}
@@ -677,19 +864,36 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			return this;
 		}
 
-		public ResourceBatchBuilder renderPass(long id, String label, long target) {
-			long start = passFormats.size();
-			passFormats.add(FORMAT_RGBA8);
-			MemorySegment item = Struct.RENDER_PASS_DESC.allocate(arena);
-			item.set(ValueLayout.JAVA_INT, Struct.RENDER_PASS_DESC.offset(0), Struct.RENDER_PASS_DESC.byteSize());
+			public ResourceBatchBuilder renderPass(long id, String label, long target) {
+				return renderPass(id, label, target, FORMAT_DEPTH32);
+			}
+
+			public ResourceBatchBuilder frameRenderPass(long id, String label, long frameTarget) {
+				return renderPass(id, label, frameTarget, 0);
+			}
+
+			private ResourceBatchBuilder renderPass(long id, String label, long target, int depthFormat) {
+				long start = passFormats.size();
+				passFormats.add(FORMAT_RGBA8);
+				MemorySegment item = Struct.RENDER_PASS_DESC.allocate(arena);
+				item.set(ValueLayout.JAVA_INT, Struct.RENDER_PASS_DESC.offset(0), Struct.RENDER_PASS_DESC.byteSize());
 			Struct.RENDER_PASS_DESC.setLong(item, 1, id);
 			Abi.writeBytes(arena, item, Struct.RENDER_PASS_DESC, 2, label);
-			Struct.RENDER_PASS_DESC.setLong(item, 3, target);
-			writeRange(item, Struct.RENDER_PASS_DESC, 4, start, 1);
-			Struct.RENDER_PASS_DESC.setInt(item, 5, FORMAT_DEPTH32);
-			renderPasses.add(item);
-			return this;
-		}
+				Struct.RENDER_PASS_DESC.setLong(item, 3, target);
+				writeRange(item, Struct.RENDER_PASS_DESC, 4, start, 1);
+				Struct.RENDER_PASS_DESC.setInt(item, 5, depthFormat);
+				renderPasses.add(item);
+				return this;
+			}
+
+			public ResourceBatchBuilder destroy(long handle, int expectedKind) {
+				MemorySegment item = Struct.DESTROY_DESC.allocate(arena);
+				item.set(ValueLayout.JAVA_INT, Struct.DESTROY_DESC.offset(0), Struct.DESTROY_DESC.byteSize());
+				Struct.DESTROY_DESC.setLong(item, 1, handle);
+				Struct.DESTROY_DESC.setInt(item, 2, expectedKind);
+				destroys.add(item);
+				return this;
+			}
 
 		public ResourceBatch build() {
 			MemorySegment batch = Struct.RESOURCE_BATCH.allocate(arena);
@@ -712,12 +916,12 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Abi.writeSlice(batch, Struct.RESOURCE_BATCH, 16, copyLongArray(targetColorViews), targetColorViews.size());
 			Abi.writeSlice(batch, Struct.RESOURCE_BATCH, 17, copyStructArray(Struct.RENDER_PASS_DESC, renderPasses), renderPasses.size());
 			Abi.writeSlice(batch, Struct.RESOURCE_BATCH, 18, copyIntArray(passFormats), passFormats.size());
-			Abi.writeSlice(batch, Struct.RESOURCE_BATCH, 19, MemorySegment.NULL, 0);
-			Abi.writeSlice(batch, Struct.RESOURCE_BATCH, 20, MemorySegment.NULL, 0);
-			Abi.writeSlice(batch, Struct.RESOURCE_BATCH, 21, MemorySegment.NULL, 0);
-			Struct.RESOURCE_BATCH.setLong(batch, 22, features);
-			return new ResourceBatch(batch, createCount());
-		}
+				Abi.writeSlice(batch, Struct.RESOURCE_BATCH, 19, MemorySegment.NULL, 0);
+				Abi.writeSlice(batch, Struct.RESOURCE_BATCH, 20, MemorySegment.NULL, 0);
+				Abi.writeSlice(batch, Struct.RESOURCE_BATCH, 21, copyStructArray(Struct.DESTROY_DESC, destroys), destroys.size());
+				Struct.RESOURCE_BATCH.setLong(batch, 22, features);
+				return new ResourceBatch(batch, createCount());
+			}
 
 		private int createCount() {
 			return buffers.size() + textures.size() + textureViews.size() + samplers.size() + shaders.size()
@@ -859,19 +1063,29 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			ops.add(op);
 		}
 
-		public SubmissionBatchBuilder beginPass(long pass, long target, long colorView, long depthView) {
-			long colorIndex = attachments.size();
-			attachments.add(attachment(colorView, LOAD_CLEAR, STORE_STORE, true));
-			long depthIndex = attachments.size();
-			attachments.add(attachment(depthView, LOAD_CLEAR, STORE_DONT_CARE, false));
+			public SubmissionBatchBuilder beginPass(long pass, long target, long colorView, long depthView) {
+				long colorIndex = attachments.size();
+				attachments.add(attachment(colorView, LOAD_CLEAR, STORE_STORE, true));
+				long depthIndex = attachments.size();
+				attachments.add(attachment(depthView, LOAD_CLEAR, STORE_DONT_CARE, false));
 			MemorySegment op = op(1);
 			Struct.COMMAND_OP.setLong(op, 2, pass);
 			Struct.COMMAND_OP.setLong(op, 3, target);
 			writeRange(op, Struct.COMMAND_OP, 12, colorIndex, 1);
 			writeRange(op, Struct.COMMAND_OP, 13, depthIndex, 1);
-			ops.add(op);
-			return this;
-		}
+				ops.add(op);
+				return this;
+			}
+
+			public SubmissionBatchBuilder beginFramePass(long pass, long frameTarget) {
+				MemorySegment op = op(1);
+				Struct.COMMAND_OP.setLong(op, 2, pass);
+				Struct.COMMAND_OP.setLong(op, 3, frameTarget);
+				writeRange(op, Struct.COMMAND_OP, 12, 0, 0);
+				writeRange(op, Struct.COMMAND_OP, 13, 0, 0);
+				ops.add(op);
+				return this;
+			}
 
 		private MemorySegment attachment(long view, int load, int store, boolean clearColor) {
 			MemorySegment item = Struct.PASS_ATTACHMENT.allocate(arena);
