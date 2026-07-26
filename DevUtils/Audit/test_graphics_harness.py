@@ -1295,12 +1295,67 @@ else:
             self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.armorValue=19", env["JAVA_TOOL_OPTIONS"])
             self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.gameMode=survival", env["JAVA_TOOL_OPTIONS"])
 
+    def test_capture_passes_player_heart_controls(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            args = Namespace(
+                profile="smoke",
+                validation="off",
+                client_args="",
+                jvm_arg=[],
+                rust_gal_gui_control="rust",
+                armor_value=None,
+                player_health=19.0,
+                player_max_health=40.0,
+                player_heart_variant="poisoned",
+                player_heart_flash=True,
+                player_heart_hardcore=True,
+                player_heart_regeneration=True,
+                game_mode="survival",
+                world="Origin",
+                max_secs=1,
+                dump_secs=1,
+                client_rss_limit_mb=128,
+                diagnostic=False,
+                warmup_frames=0,
+                measure_frames=1,
+                settle_frames=0,
+                max_settle_frames=1,
+                subsystem_iterations=1,
+                tracy_capture=False,
+                tracy_duration_seconds=1,
+                tracy_max_size_mb=8,
+                renderdoc_capture=False,
+                renderdoc_frame=8,
+            )
+            command, env = harness.build_capture_command(target, harness.MATRIX_MODES[0], root / "capture", "correctness", args, "capture")
+            options = env["JAVA_TOOL_OPTIONS"]
+
+            self.assertNotIn("mattmc.dev.deterministicCameraCapture.playerHealth", " ".join(command))
+            self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.playerHealth=19.0", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerHealth=19.0", options)
+            self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.playerMaxHealth=40.0", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerMaxHealth=40.0", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerHeartVariant=poisoned", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerHealthFlash=true", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerHealthHardcore=true", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerHealthRegeneration=true", options)
+            self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.gameMode=survival", options)
+
     def test_rust_opengl_attribution_is_not_confused_by_vulkanicgal_name(self) -> None:
         mode = harness.ModeSpec("current-opengl-shaders-on", "current", "opengl", "on", "java-opengl", False)
         logs = "Rust VulkanicGAL bridge created borrowed OpenGL context"
 
-        self.assertEqual("rust-opengl", harness.detect_attribution(mode, {}, logs))
-        self.assertEqual("rust-opengl", harness.detect_attribution(mode, {"render_implementation": "rust-vulkan"}, logs))
+        self.assertEqual("mixed-java-opengl-rust-opengl", harness.detect_attribution(mode, {}, logs))
+        self.assertEqual(
+            "mixed-java-opengl-rust-opengl",
+            harness.detect_attribution(mode, {"render_implementation": "rust-vulkan"}, logs),
+        )
+        self.assertEqual(
+            {"frame.base": "java-opengl", "gui.migrated": "rust-opengl"},
+            harness.implementation_attribution_families(mode, "mixed-java-opengl-rust-opengl", logs),
+        )
 
     def test_rust_vulkan_attribution_still_detects_specific_vulkan_backend(self) -> None:
         mode = harness.ModeSpec("current-rust-vulkan-shaders-off", "current", "rust-vulkan", "off", "rust-vulkan", True)
@@ -1356,7 +1411,16 @@ else:
 
             artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[0], capture, "capture", True, [], 0, False, tool_kind="capture")
 
-            self.assertEqual("rust-opengl", artifact["implementation_attribution"])
+            self.assertEqual("mixed-java-opengl-rust-opengl", artifact["implementation_attribution"])
+            self.assertEqual("java-opengl", artifact["expected_base_backend"])
+            self.assertEqual(
+                {"frame.base": "java-opengl", "gui.migrated": "rust-opengl"},
+                artifact["implementation_attribution_families"],
+            )
+            self.assertEqual(
+                {"frame.base": "java-opengl", "gui.migrated": "rust-opengl"},
+                artifact["benchmark_fingerprint"]["implementation"]["families"],
+            )
             self.assertEqual("gui.frame", artifact["metrics"]["rust_gal_slice"]["producer"])
             self.assertEqual(8, artifact["metrics"]["rust_gal_slice"]["cache_hits"])
             self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["cache_misses"])

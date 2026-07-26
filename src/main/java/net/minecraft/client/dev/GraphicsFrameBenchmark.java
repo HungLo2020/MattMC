@@ -7,7 +7,7 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.phys.Vec3;
-import net.vulkanic.bridge.RustGalFrameQueue;
+import net.vulkanic.gui.RustGalGuiRenderer;
 
 import java.io.IOException;
 import java.lang.management.GarbageCollectorMXBean;
@@ -50,6 +50,10 @@ public final class GraphicsFrameBenchmark {
 	private static final long READINESS_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(Math.max(1L, Long.getLong("mattmc.dev.graphicsFrameBenchmark.readinessTimeoutSeconds", 120L)));
 	private static final boolean STOP_AFTER_COMPLETE = Boolean.parseBoolean(System.getProperty("mattmc.dev.graphicsFrameBenchmark.stopAfterComplete", "true"));
 	private static final int FORCED_ARMOR_VALUE = Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.armorValue", -1);
+	private static final float FORCED_PLAYER_HEALTH =
+		Float.parseFloat(System.getProperty("mattmc.dev.graphicsFrameBenchmark.playerHealth", "NaN"));
+	private static final float FORCED_PLAYER_MAX_HEALTH =
+		Float.parseFloat(System.getProperty("mattmc.dev.graphicsFrameBenchmark.playerMaxHealth", "NaN"));
 	private static final String FORCED_GAME_MODE = System.getProperty("mattmc.dev.graphicsFrameBenchmark.gameMode", "").trim();
 	private static final Path STATUS_PATH = Path.of(System.getProperty("mattmc.dev.graphicsFrameBenchmark.status", "run/graphics_frame_benchmark.json"));
 	private static final String WORKLOAD_COUNTER_DEFINITION_VERSION = "phase-family-v2";
@@ -87,7 +91,10 @@ public final class GraphicsFrameBenchmark {
 	private static String failureReason = "";
 	private static String lastReadinessBlocker = "not checked";
 	private static int originalArmorValueOverride = -1;
+	private static float originalHealthOverride = Float.NaN;
+	private static float originalMaxHealthOverride = Float.NaN;
 	private static boolean armorOverrideApplied;
+	private static boolean healthOverrideApplied;
 	private static GameType originalGameMode;
 	private static GameType originalPreviousGameMode;
 	private static boolean gameModeOverrideApplied;
@@ -257,9 +264,10 @@ public final class GraphicsFrameBenchmark {
 			recordInitializationBlocker(minecraft);
 			return false;
 		}
-		initialized = true;
-		applyGameModeOverride(minecraft);
-		applyArmorOverride(player);
+			initialized = true;
+			applyGameModeOverride(minecraft);
+			applyArmorOverride(player);
+			applyHealthOverride(player);
 		initialPosition = new Vec3(CAMERA_X, CAMERA_Y, CAMERA_Z);
 		initialYaw = CAMERA_YAW;
 		initialPitch = CAMERA_PITCH;
@@ -324,8 +332,9 @@ public final class GraphicsFrameBenchmark {
 		if (player == null) {
 			return;
 		}
-		applyArmorOverride(player);
-		applyGameModeOverride(minecraft);
+			applyArmorOverride(player);
+			applyHealthOverride(player);
+			applyGameModeOverride(minecraft);
 		player.input.keyPresses = Input.EMPTY;
 		player.xxa = 0.0F;
 		player.zza = 0.0F;
@@ -409,7 +418,7 @@ public final class GraphicsFrameBenchmark {
 		json.append("  },\n");
 		writeSamples(json);
 		json.append(",\n");
-		field(json, "rustGalSliceMetricsLine", RustGalFrameQueue.currentAuditMetricsLine(), 2, true);
+		field(json, "rustGalSliceMetricsLine", RustGalGuiRenderer.currentAuditMetricsLine(), 2, true);
 		writeStringIntMap(json, "submittedWorkCounts", SUBMITTED_WORK_COUNTS);
 		json.append(",\n");
 		writePhaseMap(json, "exclusivePhaseNanos", EXCLUSIVE_PHASES);
@@ -584,6 +593,10 @@ public final class GraphicsFrameBenchmark {
 		player.setArmorValueForDeterministicCapture(Math.min(20, FORCED_ARMOR_VALUE));
 	}
 
+	private static void applyHealthOverride(LocalPlayer player) {
+		// Player health diagnostics are HUD-only. Mutating actual health can trip death/readiness paths.
+	}
+
 	private static void applyGameModeOverride(Minecraft minecraft) {
 		GameType gameType = forcedGameMode();
 		if (gameType == null || minecraft.gameMode == null) {
@@ -604,6 +617,11 @@ public final class GraphicsFrameBenchmark {
 			minecraft.player.setArmorValueForDeterministicCapture(originalArmorValueOverride);
 			armorOverrideApplied = false;
 		}
+		if (healthOverrideApplied && minecraft.player != null) {
+			minecraft.player.setHealthForDeterministicCapture(originalHealthOverride);
+			minecraft.player.setMaxHealthForDeterministicCapture(originalMaxHealthOverride);
+			healthOverrideApplied = false;
+		}
 		if (gameModeOverrideApplied && minecraft.gameMode != null && originalGameMode != null) {
 			minecraft.gameMode.setLocalMode(originalGameMode, originalPreviousGameMode);
 			gameModeOverrideApplied = false;
@@ -622,6 +640,12 @@ public final class GraphicsFrameBenchmark {
 	}
 
 	private static String rustGalGuiControl() {
+		if (Boolean.getBoolean("mattmc.dev.rustGalGui.playerHealth.disabled")) {
+			return "player-health-disabled";
+		}
+		if (Boolean.getBoolean("mattmc.dev.rustGalGui.playerHealth.legacyControl")) {
+			return "player-health-legacy";
+		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalGui.armor.disabled")) {
 			return "armor-disabled";
 		}

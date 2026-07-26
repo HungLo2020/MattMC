@@ -8,7 +8,11 @@ import net.minecraft.client.gui.components.BossHealthOverlay;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.Holder;
 import net.irisshaders.iris.uniforms.SystemTimeUniforms;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.ChatVisiblity;
 import net.minecraft.world.entity.player.Input;
@@ -69,6 +73,14 @@ public final class DeterministicCameraCapture {
 		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.attackTarget");
 	private static final int FORCED_ARMOR_VALUE =
 		Integer.getInteger("mattmc.dev.deterministicCameraCapture.armorValue", -1);
+	private static final float FORCED_PLAYER_HEALTH =
+		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.playerHealth", "NaN"));
+	private static final float FORCED_PLAYER_MAX_HEALTH =
+		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.playerMaxHealth", "NaN"));
+	private static final String FORCED_PLAYER_HEART_VARIANT =
+		System.getProperty("mattmc.dev.deterministicCameraCapture.playerHeartVariant", "").trim();
+	private static final boolean FORCE_PLAYER_HEALTH_REGEN =
+		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.playerHealthRegeneration");
 	private static final boolean HIDE_CHAT =
 		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.hideChat");
 	private static final int FORCED_BOSS_BAR_COUNT =
@@ -120,6 +132,12 @@ public final class DeterministicCameraCapture {
 	private static int originalExperienceDisplayStartTick;
 	private static int originalAttackStrengthTicker;
 	private static int originalArmorValueOverride;
+	private static float originalHealthOverride;
+	private static float originalMaxHealthOverride;
+	private static int originalTicksFrozen;
+	private static MobEffectInstance originalPoisonEffect;
+	private static MobEffectInstance originalWitherEffect;
+	private static MobEffectInstance originalRegenerationEffect;
 	private static Entity originalCrosshairPickEntity;
 	private static final Map<Long, Map<String, Set<String>>> SUBMITTED_WORK_BY_FRAME = new LinkedHashMap<>();
 	private static int rustGalGuiScreenCycleStage;
@@ -358,10 +376,16 @@ public final class DeterministicCameraCapture {
 			originalSelectedHotbarSlot = player.getInventory().getSelectedSlot();
 		originalExperienceProgress = player.experienceProgress;
 			originalExperienceLevel = player.experienceLevel;
-				originalExperienceDisplayStartTick = player.experienceDisplayStartTick;
-				originalAttackStrengthTicker = player.getAttackStrengthTickerForDeterministicCapture();
-				originalArmorValueOverride = player.getArmorValueForDeterministicCapture();
-				originalCrosshairPickEntity = minecraft.crosshairPickEntity;
+					originalExperienceDisplayStartTick = player.experienceDisplayStartTick;
+					originalAttackStrengthTicker = player.getAttackStrengthTickerForDeterministicCapture();
+					originalArmorValueOverride = player.getArmorValueForDeterministicCapture();
+					originalHealthOverride = player.getHealthForDeterministicCapture();
+					originalMaxHealthOverride = player.getMaxHealthForDeterministicCapture();
+					originalTicksFrozen = player.getTicksFrozen();
+					originalPoisonEffect = copyEffect(player.getEffect(MobEffects.POISON));
+					originalWitherEffect = copyEffect(player.getEffect(MobEffects.WITHER));
+					originalRegenerationEffect = copyEffect(player.getEffect(MobEffects.REGENERATION));
+					originalCrosshairPickEntity = minecraft.crosshairPickEntity;
 				applyRuntimeOverrides(minecraft, player);
 		initialPose = new Pose("initial", player.getYRot(), player.getXRot());
 		stabilizeGuiState(minecraft);
@@ -777,13 +801,17 @@ public final class DeterministicCameraCapture {
 			if (FORCE_ATTACK_TARGET) {
 				minecraft.crosshairPickEntity = player;
 			}
-			if (FORCED_ARMOR_VALUE >= 0) {
-				player.setArmorValueForDeterministicCapture(Math.min(20, FORCED_ARMOR_VALUE));
+				if (FORCED_ARMOR_VALUE >= 0) {
+					player.setArmorValueForDeterministicCapture(Math.min(20, FORCED_ARMOR_VALUE));
+				}
+			applyHeartVariantOverride(player);
+			if (FORCE_PLAYER_HEALTH_REGEN) {
+				player.forceAddEffect(new MobEffectInstance(MobEffects.REGENERATION, 20_000, 0, false, false, false), null);
+				}
+				if (HIDE_CHAT && minecraft.options.chatVisibility().get() != ChatVisiblity.HIDDEN) {
+					minecraft.options.chatVisibility().set(ChatVisiblity.HIDDEN);
+				}
 			}
-			if (HIDE_CHAT && minecraft.options.chatVisibility().get() != ChatVisiblity.HIDDEN) {
-				minecraft.options.chatVisibility().set(ChatVisiblity.HIDDEN);
-			}
-		}
 
 	private static void restoreRuntimeOverrides(Minecraft minecraft) {
 		if (minecraft.player != null && FORCED_SELECTED_HOTBAR_SLOT > 0 && originalSelectedHotbarSlot >= 0 && originalSelectedHotbarSlot < 9) {
@@ -801,12 +829,22 @@ public final class DeterministicCameraCapture {
 				if (FORCE_ATTACK_TARGET) {
 					minecraft.crosshairPickEntity = originalCrosshairPickEntity;
 				}
-				if (minecraft.player != null && FORCED_ARMOR_VALUE >= 0) {
-					minecraft.player.setArmorValueForDeterministicCapture(originalArmorValueOverride);
+					if (minecraft.player != null && FORCED_ARMOR_VALUE >= 0) {
+						minecraft.player.setArmorValueForDeterministicCapture(originalArmorValueOverride);
+					}
+					if (minecraft.player != null && (!Float.isNaN(FORCED_PLAYER_HEALTH) || !Float.isNaN(FORCED_PLAYER_MAX_HEALTH))) {
+						minecraft.player.setHealthForDeterministicCapture(originalHealthOverride);
+						minecraft.player.setMaxHealthForDeterministicCapture(originalMaxHealthOverride);
+					}
+					if (minecraft.player != null && (!FORCED_PLAYER_HEART_VARIANT.isBlank() || FORCE_PLAYER_HEALTH_REGEN)) {
+						restoreEffect(minecraft.player, MobEffects.POISON, originalPoisonEffect);
+						restoreEffect(minecraft.player, MobEffects.WITHER, originalWitherEffect);
+						restoreEffect(minecraft.player, MobEffects.REGENERATION, originalRegenerationEffect);
+						minecraft.player.setTicksFrozen(originalTicksFrozen);
+					}
+				if (!FORCED_ATTACK_INDICATOR.isBlank() && originalAttackIndicator != null) {
+					minecraft.options.attackIndicator().set(originalAttackIndicator);
 				}
-			if (!FORCED_ATTACK_INDICATOR.isBlank() && originalAttackIndicator != null) {
-				minecraft.options.attackIndicator().set(originalAttackIndicator);
-			}
 			if (HIDE_CHAT && originalChatVisibility != null) {
 				minecraft.options.chatVisibility().set(originalChatVisibility);
 			}
@@ -864,6 +902,34 @@ public final class DeterministicCameraCapture {
 			}
 		}
 		throw new IllegalArgumentException("unknown deterministic capture boss bar overlay: " + value);
+	}
+
+	private static void applyHeartVariantOverride(LocalPlayer player) {
+		if (FORCED_PLAYER_HEART_VARIANT.isBlank()) {
+			return;
+		}
+		player.removeEffect(MobEffects.POISON);
+		player.removeEffect(MobEffects.WITHER);
+		player.setTicksFrozen(0);
+		switch (FORCED_PLAYER_HEART_VARIANT.toLowerCase(Locale.ROOT)) {
+			case "normal" -> {
+			}
+			case "poison", "poisoned" -> player.forceAddEffect(new MobEffectInstance(MobEffects.POISON, 20_000, 0, false, false, false), null);
+			case "wither", "withered" -> player.forceAddEffect(new MobEffectInstance(MobEffects.WITHER, 20_000, 0, false, false, false), null);
+			case "frozen" -> player.setTicksFrozen(player.getTicksRequiredToFreeze());
+			default -> throw new IllegalArgumentException("unknown deterministic capture player heart variant: " + FORCED_PLAYER_HEART_VARIANT);
+		}
+	}
+
+	private static MobEffectInstance copyEffect(MobEffectInstance effect) {
+		return effect == null ? null : new MobEffectInstance(effect);
+	}
+
+	private static void restoreEffect(LocalPlayer player, Holder<MobEffect> effect, MobEffectInstance original) {
+		player.removeEffect(effect);
+		if (original != null) {
+			player.forceAddEffect(new MobEffectInstance(original), null);
+		}
 	}
 
 	private static GameType forcedGameMode() {

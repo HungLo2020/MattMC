@@ -877,11 +877,11 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			return graphicsPipeline(id, label, layout, vertex, fragment, 0, 0);
 		}
 
-		public ResourceBatchBuilder guiInvertPipeline(long id, String label, long layout, long vertex, long fragment) {
+		public ResourceBatchBuilder graphicsPipelineInvertBlend(long id, String label, long layout, long vertex, long fragment) {
 			return graphicsPipeline(id, label, layout, vertex, fragment, 0, 0, CULL_NONE, BLEND_INVERT);
 		}
 
-		public ResourceBatchBuilder guiAlphaPipeline(long id, String label, long layout, long vertex, long fragment) {
+		public ResourceBatchBuilder graphicsPipelineAlphaBlend(long id, String label, long layout, long vertex, long fragment) {
 			return graphicsPipeline(id, label, layout, vertex, fragment, 0, 0, CULL_NONE, BLEND_ALPHA);
 		}
 

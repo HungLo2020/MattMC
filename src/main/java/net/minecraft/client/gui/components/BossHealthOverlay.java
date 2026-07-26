@@ -20,7 +20,7 @@ import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.BossEvent;
 import net.minecraft.world.BossEvent.BossBarColor;
 import net.minecraft.world.BossEvent.BossBarOverlay;
-import net.vulkanic.bridge.RustGalFrameQueue;
+import net.vulkanic.gui.RustGalGuiRenderer;
 
 @Environment(EnvType.CLIENT)
 public class BossHealthOverlay {
@@ -92,16 +92,16 @@ public class BossHealthOverlay {
 
 	private void drawBar(GuiGraphics guiGraphics, int i, int j, BossEvent bossEvent) {
 		int k = Mth.lerpDiscrete(bossEvent.getProgress(), 0, 182);
-		if (RustGalFrameQueue.isMigratedGuiDisabledForDiagnostics()) {
+		if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
 			return;
 		}
-		if (RustGalFrameQueue.isMigratedGuiLegacyControl()) {
+		if (RustGalGuiRenderer.isMigratedGuiLegacyControl()) {
 			this.drawBar(guiGraphics, i, j, bossEvent, 182, BAR_BACKGROUND_SPRITES, OVERLAY_BACKGROUND_SPRITES);
 			if (k > 0) {
 				this.drawBar(guiGraphics, i, j, bossEvent, k, BAR_PROGRESS_SPRITES, OVERLAY_PROGRESS_SPRITES);
 			}
 		} else {
-			RustGalFrameQueue.enqueueBossBar(this.minecraft, guiGraphics, i, j, 182, 5, bossEvent.getProgress(), k, bossEvent.getColor(), bossEvent.getOverlay());
+			RustGalGuiRenderer.enqueueBossBar(this.minecraft, guiGraphics, i, j, 182, 5, bossEvent.getProgress(), k, bossEvent.getColor(), bossEvent.getOverlay());
 		}
 	}
 

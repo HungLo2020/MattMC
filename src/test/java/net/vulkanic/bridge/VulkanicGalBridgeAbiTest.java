@@ -1,5 +1,7 @@
 package net.vulkanic.bridge;
 
+import net.vulkanic.gui.GuiRenderStratum;
+import net.vulkanic.gui.RustGalGuiRenderer;
 import org.junit.jupiter.api.Test;
 
 import java.lang.foreign.Arena;
@@ -12,6 +14,7 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class VulkanicGalBridgeAbiTest {
@@ -77,19 +80,19 @@ class VulkanicGalBridgeAbiTest {
 
 	@Test
 	void guiSpriteBatchingPreservesIncompatibleStratumAndStateBoundaries() {
-		assertEquals(RustGalFrameQueue.ArmorIconState.EMPTY, RustGalFrameQueue.armorIconStateForTests(0, 0));
-		assertEquals(RustGalFrameQueue.ArmorIconState.HALF, RustGalFrameQueue.armorIconStateForTests(1, 0));
-		assertEquals(RustGalFrameQueue.ArmorIconState.FULL, RustGalFrameQueue.armorIconStateForTests(2, 0));
-		assertEquals(RustGalFrameQueue.ArmorIconState.EMPTY, RustGalFrameQueue.armorIconStateForTests(18, 9));
-		assertEquals(RustGalFrameQueue.ArmorIconState.HALF, RustGalFrameQueue.armorIconStateForTests(19, 9));
-		assertEquals(RustGalFrameQueue.ArmorIconState.FULL, RustGalFrameQueue.armorIconStateForTests(20, 9));
-		for (RustGalFrameQueue.ArmorIconState state : RustGalFrameQueue.ArmorIconState.values()) {
-			float[] uvY = RustGalFrameQueue.debugArmorOpenGlUvYRangeForTests(state);
+		assertEquals(RustGalGuiRenderer.ArmorIconState.EMPTY, RustGalGuiRenderer.armorIconStateForTests(0, 0));
+		assertEquals(RustGalGuiRenderer.ArmorIconState.HALF, RustGalGuiRenderer.armorIconStateForTests(1, 0));
+		assertEquals(RustGalGuiRenderer.ArmorIconState.FULL, RustGalGuiRenderer.armorIconStateForTests(2, 0));
+		assertEquals(RustGalGuiRenderer.ArmorIconState.EMPTY, RustGalGuiRenderer.armorIconStateForTests(18, 9));
+		assertEquals(RustGalGuiRenderer.ArmorIconState.HALF, RustGalGuiRenderer.armorIconStateForTests(19, 9));
+		assertEquals(RustGalGuiRenderer.ArmorIconState.FULL, RustGalGuiRenderer.armorIconStateForTests(20, 9));
+		for (RustGalGuiRenderer.ArmorIconState state : RustGalGuiRenderer.ArmorIconState.values()) {
+			float[] uvY = RustGalGuiRenderer.debugArmorOpenGlUvYRangeForTests(state);
 			assertTrue(uvY[0] > uvY[1], "top GUI vertex must sample above bottom vertex for " + state);
 		}
-		for (RustGalFrameQueue.ArmorIconState state : RustGalFrameQueue.ArmorIconState.values()) {
+		for (RustGalGuiRenderer.ArmorIconState state : RustGalGuiRenderer.ArmorIconState.values()) {
 			for (int guiScale = 1; guiScale <= 4; guiScale++) {
-				int[] sampledRows = RustGalFrameQueue.debugArmorOpenGlSampledLocalRowsForTests(state, guiScale);
+				int[] sampledRows = RustGalGuiRenderer.debugArmorOpenGlSampledLocalRowsForTests(state, guiScale);
 				assertEquals(9 * guiScale, sampledRows.length, "armor row coverage length for " + state + " scale=" + guiScale);
 				for (int row = 0; row < 9; row++) {
 					for (int repeat = 0; repeat < guiScale; repeat++) {
@@ -105,47 +108,100 @@ class VulkanicGalBridgeAbiTest {
 			}
 		}
 		assertTrue(
-			RustGalFrameQueue.debugOpenGlPackedSpriteVertexShaderForTests().contains("(1.0 - corner[vertex].y)"),
+			RustGalGuiRenderer.debugOpenGlPackedSpriteVertexShaderForTests().contains("(1.0 - corner[vertex].y)"),
 			"OpenGL packed GUI shader must translate top-left GUI corners to bottom-left texture storage"
 		);
 		assertTrue(
-			RustGalFrameQueue.debugOpenGlPackedSpriteFragmentShaderForTests().contains("texelFetch(Sampler0, texel, 0)"),
+			RustGalGuiRenderer.debugOpenGlPackedSpriteFragmentShaderForTests().contains("texelFetch(Sampler0, texel, 0)"),
 			"packed GUI shader must use exact source-rectangle texel coverage"
 		);
 		for (int armor = 0; armor <= 20; armor++) {
 			for (int icon = 0; icon < 10; icon++) {
 				int threshold = icon * 2 + 1;
-				RustGalFrameQueue.ArmorIconState expected = threshold < armor
-					? RustGalFrameQueue.ArmorIconState.FULL
-					: threshold == armor ? RustGalFrameQueue.ArmorIconState.HALF : RustGalFrameQueue.ArmorIconState.EMPTY;
-				assertEquals(expected, RustGalFrameQueue.armorIconStateForTests(armor, icon), "armor=" + armor + " icon=" + icon);
+				RustGalGuiRenderer.ArmorIconState expected = threshold < armor
+					? RustGalGuiRenderer.ArmorIconState.FULL
+					: threshold == armor ? RustGalGuiRenderer.ArmorIconState.HALF : RustGalGuiRenderer.ArmorIconState.EMPTY;
+				assertEquals(expected, RustGalGuiRenderer.armorIconStateForTests(armor, icon), "armor=" + armor + " icon=" + icon);
 			}
 		}
+		assertThrows(IllegalArgumentException.class, () -> new RustGalGuiRenderer.PlayerHeartRequest(
+			RustGalGuiRenderer.PlayerHeartVariant.NORMAL,
+			RustGalGuiRenderer.PlayerHeartState.CONTAINER,
+			false,
+			false,
+			0,
+			0,
+			0
+		));
+		assertThrows(IllegalArgumentException.class, () -> new RustGalGuiRenderer.PlayerHeartRequest(
+			RustGalGuiRenderer.PlayerHeartVariant.CONTAINER,
+			RustGalGuiRenderer.PlayerHeartState.FULL,
+			false,
+			false,
+			0,
+			0,
+			0
+		));
+		assertThrows(IllegalArgumentException.class, () -> new RustGalGuiRenderer.PlayerHeartRequest(
+			RustGalGuiRenderer.PlayerHeartVariant.NORMAL,
+			RustGalGuiRenderer.PlayerHeartState.FULL,
+			false,
+			false,
+			-1,
+			0,
+			0
+		));
+		for (RustGalGuiRenderer.PlayerHeartVariant variant : List.of(
+			RustGalGuiRenderer.PlayerHeartVariant.NORMAL,
+			RustGalGuiRenderer.PlayerHeartVariant.POISONED,
+			RustGalGuiRenderer.PlayerHeartVariant.WITHERED,
+			RustGalGuiRenderer.PlayerHeartVariant.FROZEN
+		)) {
+			for (RustGalGuiRenderer.PlayerHeartState state : List.of(
+				RustGalGuiRenderer.PlayerHeartState.HALF,
+				RustGalGuiRenderer.PlayerHeartState.FULL
+			)) {
+				for (boolean hardcore : List.of(false, true)) {
+					for (boolean flashing : List.of(false, true)) {
+						new RustGalGuiRenderer.PlayerHeartRequest(variant, state, hardcore, flashing, 1, 2, 3);
+					}
+				}
+			}
+		}
+		new RustGalGuiRenderer.PlayerHeartRequest(
+			RustGalGuiRenderer.PlayerHeartVariant.CONTAINER,
+			RustGalGuiRenderer.PlayerHeartState.CONTAINER,
+			true,
+			true,
+			0,
+			2,
+			3
+		);
 
-		assertEquals(
+			assertEquals(
 			List.of(2, 1, 1, 2),
-			RustGalFrameQueue.debugPackCompatibleRunLengthsForTests(
+			RustGalGuiRenderer.debugPackCompatibleRunLengthsForTests(
 				List.of(
-					RustGalFrameQueue.RenderStratum.GUI_BOSS_BAR_BACKGROUND,
-					RustGalFrameQueue.RenderStratum.GUI_BOSS_BAR_BACKGROUND,
-					RustGalFrameQueue.RenderStratum.GUI_BOSS_BAR_BACKGROUND,
-					RustGalFrameQueue.RenderStratum.GUI_BOSS_BAR_PROGRESS,
-					RustGalFrameQueue.RenderStratum.GUI_BOSS_BAR_PROGRESS,
-					RustGalFrameQueue.RenderStratum.GUI_BOSS_BAR_PROGRESS
+					GuiRenderStratum.GUI_BOSS_BAR_BACKGROUND,
+					GuiRenderStratum.GUI_BOSS_BAR_BACKGROUND,
+					GuiRenderStratum.GUI_BOSS_BAR_BACKGROUND,
+					GuiRenderStratum.GUI_BOSS_BAR_PROGRESS,
+					GuiRenderStratum.GUI_BOSS_BAR_PROGRESS,
+					GuiRenderStratum.GUI_BOSS_BAR_PROGRESS
 				),
 				List.of("alpha-atlas", "alpha-atlas", "other-texture", "alpha-atlas", "other-texture", "other-texture")
 			)
 		);
 
-		List<RustGalFrameQueue.RenderStratum> strata = new ArrayList<>(Collections.nCopies(257, RustGalFrameQueue.RenderStratum.GUI_BOSS_BAR_BACKGROUND));
+		List<GuiRenderStratum> strata = new ArrayList<>(Collections.nCopies(257, GuiRenderStratum.GUI_BOSS_BAR_BACKGROUND));
 		List<String> resources = new ArrayList<>(Collections.nCopies(257, "alpha-atlas"));
-		assertEquals(List.of(256, 1), RustGalFrameQueue.debugPackCompatibleRunLengthsForTests(strata, resources));
+		assertEquals(List.of(256, 1), RustGalGuiRenderer.debugPackCompatibleRunLengthsForTests(strata, resources));
 
-		List<String> uniformSequence = RustGalFrameQueue.debugPackedUniformCommandSequenceForTests(
+		List<String> uniformSequence = RustGalGuiRenderer.debugPackedUniformCommandSequenceForTests(
 			List.of(
-				RustGalFrameQueue.RenderStratum.GUI_HOTBAR_BASE,
-				RustGalFrameQueue.RenderStratum.GUI_HOTBAR_BASE,
-				RustGalFrameQueue.RenderStratum.GUI_ARMOR
+				GuiRenderStratum.GUI_HOTBAR_BASE,
+				GuiRenderStratum.GUI_HOTBAR_BASE,
+				GuiRenderStratum.GUI_ARMOR
 			),
 			List.of("alpha-atlas", "alpha-atlas", "alpha-atlas")
 		);
@@ -162,7 +218,10 @@ class VulkanicGalBridgeAbiTest {
 	@Test
 	void frameAbiV2AddsBorrowedOpenGlAndProductionGuiCrosshairContract() throws Exception {
 		String bridge = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java"));
-		String queue = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/RustGalFrameQueue.java"));
+		String queue = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
+		String batchBuilder = Files.readString(Path.of("src/main/java/net/vulkanic/gui/GuiBatchBuilder.java"));
+		String resourceCache = Files.readString(Path.of("src/main/java/net/vulkanic/gui/GuiResourceCache.java"));
+		String pipelineLibrary = Files.readString(Path.of("src/main/java/net/vulkanic/gui/GuiPipelineLibrary.java"));
 		String gameRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
 		String gui = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/Gui.java"));
 		String guiRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/render/GuiRenderer.java"));
@@ -191,49 +250,58 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(queue.contains("GUI_EXPERIENCE_BAR_PROGRESS"));
 		assertTrue(queue.contains("GUI_BOSS_BAR_BACKGROUND"));
 		assertTrue(queue.contains("GUI_BOSS_BAR_PROGRESS"));
+		assertTrue(queue.contains("GUI_PLAYER_HEALTH"));
 		assertTrue(queue.contains("HOTBAR_BASE"));
 		assertTrue(queue.contains("HOTBAR_SELECTION"));
 		assertTrue(queue.contains("EXPERIENCE_BAR_BACKGROUND"));
 		assertTrue(queue.contains("EXPERIENCE_BAR_PROGRESS"));
+		assertTrue(queue.contains("enqueuePlayerHearts"));
 			assertTrue(queue.contains("enqueueHotbarBase"));
 			assertTrue(queue.contains("enqueueHotbarSelection"));
 			assertTrue(queue.contains("enqueueArmorIcons"));
 			assertTrue(queue.contains("enqueueExperienceBar"));
 		assertTrue(queue.contains("enqueueBossBar"));
-		assertTrue(bridge.contains("guiAlphaPipeline"));
-		assertTrue(queue.contains("builder.guiAlphaPipeline"));
-		assertTrue(queue.contains("DeferredBatchScheduler"));
-		assertTrue(queue.contains("CacheKey"));
+		assertFalse(bridge.contains("guiAlphaPipeline"));
+		assertFalse(bridge.contains("guiInvertPipeline"));
+		assertTrue(pipelineLibrary.contains("graphicsPipelineAlphaBlend"));
+		assertFalse(queue.contains("DeferredBatchScheduler"));
+		assertTrue(queue.contains("RustGalFrameScheduler<GuiBatchBuilder.GuiSpriteRequest>"));
+		assertFalse(queue.contains("record CachedResources"));
+		assertFalse(queue.contains("record CacheKey"));
+		assertTrue(resourceCache.contains("record CacheKey"));
+		assertTrue(batchBuilder.contains("record FrameSpriteBatch"));
 		assertTrue(queue.contains("cacheHits"));
 		assertTrue(queue.contains("completionTimeouts"));
 		assertFalse(queue.contains("RETIRE_INTERVAL_FRAMES"));
 		assertTrue(queue.contains("if (!force)"));
 		assertTrue(queue.contains("rust_gal_frames_executed"));
-		assertTrue(queue.contains("destroyHandles(created)"));
+		assertFalse(queue.contains("destroyHandles(created)"));
+		assertTrue(resourceCache.contains("destroyHandles(bridge, created"));
 		assertTrue(queue.contains("GLFW.glfwGetCurrentContext()"));
-			assertTrue(queue.contains("beginFramePass(frameResources.pass(), frameResources.target())"));
+			assertFalse(queue.contains("beginFramePass(frameResources.pass(), frameResources.target())"));
+			assertTrue(batchBuilder.contains("beginFramePass(framePass, frameTarget)"));
 			assertTrue(queue.contains("packCompatibleSpriteBatches"));
-			assertTrue(queue.contains("drawIndexed(6, spriteBatch.sprites().size())"));
+			assertTrue(batchBuilder.contains("drawIndexed(6, spriteBatch.sprites().size())"));
 			assertTrue(queue.contains("TextureGroup.GUI_ALPHA"));
 			assertTrue(queue.contains("rust_gal_sprite_batches_executed"));
 			assertTrue(queue.contains("Rust VulkanicGAL partial-frame GUI sprite is unsupported for Vulkan"));
-		assertTrue(gameRenderer.contains("RustGalFrameQueue.resize"));
-		assertTrue(gameRenderer.contains("RustGalFrameQueue.shutdown"));
-		assertTrue(gui.contains("RustGalFrameQueue.enqueueCrosshair"));
-			assertTrue(gui.contains("RustGalFrameQueue.enqueueHotbarBase"));
-			assertTrue(gui.contains("RustGalFrameQueue.enqueueArmorIcons"));
-			assertTrue(experienceBar.contains("RustGalFrameQueue.enqueueExperienceBar"));
-		assertTrue(bossOverlay.contains("RustGalFrameQueue.enqueueBossBar"));
+		assertTrue(gameRenderer.contains("RustGalGuiRenderer.resize"));
+		assertTrue(gameRenderer.contains("RustGalGuiRenderer.shutdown"));
+		assertTrue(gui.contains("RustGalGuiRenderer.enqueueCrosshair"));
+			assertTrue(gui.contains("RustGalGuiRenderer.enqueueHotbarBase"));
+			assertTrue(gui.contains("RustGalGuiRenderer.enqueueArmorIcons"));
+			assertTrue(experienceBar.contains("RustGalGuiRenderer.enqueueExperienceBar"));
+		assertTrue(bossOverlay.contains("RustGalGuiRenderer.enqueueBossBar"));
 		assertTrue(bossOverlay.contains("drawString(this.minecraft.font"));
 		assertTrue(guiRenderer.contains("RustGalGuiElementRenderState"));
-		assertTrue(guiRenderer.contains("RustGalFrameQueue.executeFrame"));
+		assertTrue(guiRenderer.contains("RustGalGuiRenderer.executeFrame"));
 		assertTrue(guiRenderer.contains("try (RenderPass ignored = VulkanicAPI.createRenderPass("));
 		assertTrue(
-			guiRenderer.indexOf("try (RenderPass ignored = VulkanicAPI.createRenderPass(") < guiRenderer.indexOf("RustGalFrameQueue.executeFrame"),
+			guiRenderer.indexOf("try (RenderPass ignored = VulkanicAPI.createRenderPass(") < guiRenderer.indexOf("RustGalGuiRenderer.executeFrame"),
 			"Rust OpenGL must execute while the Java GUI render target is bound so frame_acquire captures the visible framebuffer"
 		);
 		assertTrue(
-			guiRenderer.indexOf("RustGalFrameQueue.executeFrame") < guiRenderer.indexOf("rustGalFrameExecuted.setTrue()"),
+			guiRenderer.indexOf("RustGalGuiRenderer.executeFrame") < guiRenderer.indexOf("rustGalFrameExecuted.setTrue()"),
 			"the combined Rust GUI frame should be marked executed only after the scoped render-pass submission"
 		);
 	}
@@ -242,15 +310,17 @@ class VulkanicGalBridgeAbiTest {
 	void productionCrosshairSliceHasLifecycleInvalidationAndNoJavaFallback() throws Exception {
 		String minecraft = Files.readString(Path.of("src/main/java/net/minecraft/client/Minecraft.java"));
 		String gui = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/Gui.java"));
-		String queue = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/RustGalFrameQueue.java"));
+		String queue = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
+		String stratum = Files.readString(Path.of("src/main/java/net/vulkanic/gui/GuiRenderStratum.java"));
+		String pipelineLibrary = Files.readString(Path.of("src/main/java/net/vulkanic/gui/GuiPipelineLibrary.java"));
 		String experienceBar = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/contextualbar/ExperienceBarRenderer.java"));
 		String bossOverlay = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/components/BossHealthOverlay.java"));
 		String context = Files.readString(Path.of("src/main/rust/render/vulkanic/backends/opengl/context.rs"));
 		String openGlResources = Files.readString(Path.of("src/main/rust/render/vulkanic/backends/opengl/resources.rs"));
 
-		assertTrue(minecraft.contains("ResourceManagerReloadListener") && minecraft.contains("RustGalFrameQueue.reload()"));
-		assertTrue(minecraft.contains("RustGalFrameQueue.cancelPending(\"world-disconnect\")"));
-		assertTrue(minecraft.contains("RustGalFrameQueue.cancelPending(\"world-unload\")"));
+		assertTrue(minecraft.contains("ResourceManagerReloadListener") && minecraft.contains("RustGalGuiRenderer.reload()"));
+		assertTrue(minecraft.contains("RustGalGuiRenderer.cancelPending(\"world-disconnect\")"));
+		assertTrue(minecraft.contains("RustGalGuiRenderer.cancelPending(\"world-unload\")"));
 		assertTrue(queue.contains("SCHEDULER.cancelAll(\"resource-reload\")"));
 		assertTrue(queue.contains("SCHEDULER.cancelAll(\"resize\")"));
 		assertTrue(queue.contains("SCHEDULER.cancelAll(\"shutdown\")"));
@@ -265,6 +335,8 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(queue.contains("mattmc.dev.rustGalGui.legacyControl"));
 		assertTrue(queue.contains("mattmc.dev.rustGalGui.armor.disabled"));
 		assertTrue(queue.contains("mattmc.dev.rustGalGui.armor.legacyControl"));
+		assertTrue(queue.contains("mattmc.dev.rustGalGui.playerHealth.disabled"));
+		assertTrue(queue.contains("mattmc.dev.rustGalGui.playerHealth.legacyControl"));
 		assertTrue(queue.contains("HOTBAR_SELECTION_PRODUCER"));
 		assertTrue(queue.contains("EXPERIENCE_BACKGROUND_PRODUCER"));
 		assertTrue(queue.contains("EXPERIENCE_PROGRESS_PRODUCER"));
@@ -275,28 +347,40 @@ class VulkanicGalBridgeAbiTest {
 			assertTrue(queue.contains("BOSS_BAR_BACKGROUND_PRODUCER"));
 			assertTrue(queue.contains("BOSS_BAR_PROGRESS_PRODUCER"));
 			assertTrue(queue.contains("ARMOR_ICON_PRODUCER"));
+			assertTrue(queue.contains("PLAYER_HEART_PRODUCER"));
 			assertTrue(queue.contains("selected hotbar slot must be in 0..8"));
 			assertTrue(queue.contains("armor value must be in 0..20"));
+			assertTrue(queue.contains("PlayerHeartRequest"));
+			assertFalse(queue.contains("getHealth()"));
+			assertFalse(queue.contains("getMaxHealth()"));
+			assertFalse(queue.contains("getAbsorptionAmount()"));
+			assertFalse(queue.contains("HEART_ABSORBING"));
 			assertTrue(queue.contains("experience progress fraction must be finite"));
 		assertTrue(queue.contains("experience bar filled width is outside the vanilla range"));
 		assertTrue(queue.contains("crosshair attack indicator filled width must be in 0..16"));
 		assertTrue(queue.contains("hotbar attack indicator filled height must be in 0..18"));
 		assertTrue(queue.contains("boss bar progress fraction must be finite"));
 		assertTrue(queue.contains("boss bar filled width must be in 0.."));
-			assertTrue(queue.indexOf("GUI_HOTBAR_BASE(\"gui.hotbar.base\", 300)") < queue.indexOf("GUI_HOTBAR_SELECTION(\"gui.hotbar.selection\", 310)"));
-			assertTrue(queue.indexOf("GUI_HOTBAR_SELECTION(\"gui.hotbar.selection\", 310)") < queue.indexOf("GUI_ARMOR(\"gui.armor\", 350)"));
-			assertTrue(queue.indexOf("GUI_ARMOR(\"gui.armor\", 350)") < queue.indexOf("GUI_EXPERIENCE_BAR_BACKGROUND(\"gui.experience.background\", 400)"));
-			assertTrue(queue.indexOf("GUI_EXPERIENCE_BAR_BACKGROUND(\"gui.experience.background\", 400)") < queue.indexOf("GUI_EXPERIENCE_BAR_PROGRESS(\"gui.experience.progress\", 410)"));
-		assertTrue(queue.indexOf("GUI_EXPERIENCE_BAR_PROGRESS(\"gui.experience.progress\", 410)") < queue.indexOf("GUI_ATTACK_CROSSHAIR_BACKGROUND(\"gui.attack.crosshair.background\", 500)"));
-		assertTrue(queue.indexOf("GUI_ATTACK_CROSSHAIR_BACKGROUND(\"gui.attack.crosshair.background\", 500)") < queue.indexOf("GUI_ATTACK_CROSSHAIR_PROGRESS(\"gui.attack.crosshair.progress\", 510)"));
-		assertTrue(queue.indexOf("GUI_ATTACK_CROSSHAIR_PROGRESS(\"gui.attack.crosshair.progress\", 510)") < queue.indexOf("GUI_ATTACK_HOTBAR_BACKGROUND(\"gui.attack.hotbar.background\", 520)"));
-		assertTrue(queue.indexOf("GUI_ATTACK_HOTBAR_BACKGROUND(\"gui.attack.hotbar.background\", 520)") < queue.indexOf("GUI_ATTACK_HOTBAR_PROGRESS(\"gui.attack.hotbar.progress\", 530)"));
-		assertTrue(queue.indexOf("GUI_ATTACK_HOTBAR_PROGRESS(\"gui.attack.hotbar.progress\", 530)") < queue.indexOf("GUI_BOSS_BAR_BACKGROUND(\"gui.boss.background\", 600)"));
-		assertTrue(queue.indexOf("GUI_BOSS_BAR_BACKGROUND(\"gui.boss.background\", 600)") < queue.indexOf("GUI_BOSS_BAR_PROGRESS(\"gui.boss.progress\", 610)"));
+			assertTrue(stratum.indexOf("GUI_HOTBAR_BASE(\"gui.hotbar.base\", 300)") < stratum.indexOf("GUI_HOTBAR_SELECTION(\"gui.hotbar.selection\", 310)"));
+			assertTrue(stratum.indexOf("GUI_HOTBAR_SELECTION(\"gui.hotbar.selection\", 310)") < stratum.indexOf("GUI_ARMOR(\"gui.armor\", 350)"));
+			assertTrue(stratum.indexOf("GUI_ARMOR(\"gui.armor\", 350)") < stratum.indexOf("GUI_PLAYER_HEALTH(\"gui.player-health\", 360)"));
+			assertTrue(stratum.indexOf("GUI_PLAYER_HEALTH(\"gui.player-health\", 360)") < stratum.indexOf("GUI_EXPERIENCE_BAR_BACKGROUND(\"gui.experience.background\", 400)"));
+			assertTrue(stratum.indexOf("GUI_EXPERIENCE_BAR_BACKGROUND(\"gui.experience.background\", 400)") < stratum.indexOf("GUI_EXPERIENCE_BAR_PROGRESS(\"gui.experience.progress\", 410)"));
+		assertTrue(stratum.indexOf("GUI_EXPERIENCE_BAR_PROGRESS(\"gui.experience.progress\", 410)") < stratum.indexOf("GUI_ATTACK_CROSSHAIR_BACKGROUND(\"gui.attack.crosshair.background\", 500)"));
+		assertTrue(stratum.indexOf("GUI_ATTACK_CROSSHAIR_BACKGROUND(\"gui.attack.crosshair.background\", 500)") < stratum.indexOf("GUI_ATTACK_CROSSHAIR_PROGRESS(\"gui.attack.crosshair.progress\", 510)"));
+		assertTrue(stratum.indexOf("GUI_ATTACK_CROSSHAIR_PROGRESS(\"gui.attack.crosshair.progress\", 510)") < stratum.indexOf("GUI_ATTACK_HOTBAR_BACKGROUND(\"gui.attack.hotbar.background\", 520)"));
+		assertTrue(stratum.indexOf("GUI_ATTACK_HOTBAR_BACKGROUND(\"gui.attack.hotbar.background\", 520)") < stratum.indexOf("GUI_ATTACK_HOTBAR_PROGRESS(\"gui.attack.hotbar.progress\", 530)"));
+		assertTrue(stratum.indexOf("GUI_ATTACK_HOTBAR_PROGRESS(\"gui.attack.hotbar.progress\", 530)") < stratum.indexOf("GUI_BOSS_BAR_BACKGROUND(\"gui.boss.background\", 600)"));
+		assertTrue(stratum.indexOf("GUI_BOSS_BAR_BACKGROUND(\"gui.boss.background\", 600)") < stratum.indexOf("GUI_BOSS_BAR_PROGRESS(\"gui.boss.progress\", 610)"));
 			assertTrue(queue.contains("GuiSprite.HOTBAR_SELECTION"));
 			assertTrue(queue.contains("GuiSprite.ARMOR_FULL"));
 			assertTrue(queue.contains("GuiSprite.ARMOR_HALF"));
 			assertTrue(queue.contains("GuiSprite.ARMOR_EMPTY"));
+			assertTrue(queue.contains("GuiSprite.HEART_NORMAL_FULL"));
+			assertTrue(queue.contains("GuiSprite.HEART_NORMAL_HALF"));
+			assertTrue(queue.contains("GuiSprite.HEART_POISONED_FULL"));
+			assertTrue(queue.contains("GuiSprite.HEART_WITHERED_FULL"));
+			assertTrue(queue.contains("GuiSprite.HEART_FROZEN_FULL"));
 			assertTrue(queue.contains("GuiSprite.EXPERIENCE_BAR_BACKGROUND"));
 		assertTrue(queue.contains("GuiSprite.EXPERIENCE_BAR_PROGRESS"));
 		assertTrue(queue.contains("GuiSprite.CROSSHAIR_ATTACK_BACKGROUND"));
@@ -307,52 +391,118 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(queue.contains("BOSS_BAR_WHITE_PROGRESS"));
 		assertTrue(queue.contains("BOSS_BAR_NOTCHED_20_BACKGROUND"));
 		assertTrue(queue.contains("BOSS_BAR_NOTCHED_20_PROGRESS"));
-		assertTrue(queue.contains("FillDirection.HORIZONTAL_LEFT_TO_RIGHT"));
-		assertTrue(queue.contains("FillDirection.VERTICAL_BOTTOM_TO_TOP"));
-		assertTrue(queue.contains("uv_region"));
+		assertTrue(queue.contains("GuiFillDirection.HORIZONTAL_LEFT_TO_RIGHT"));
+		assertTrue(queue.contains("GuiFillDirection.VERTICAL_BOTTOM_TO_TOP"));
+		assertTrue(pipelineLibrary.contains("uv_region"));
 		assertTrue(queue.contains("selectedSlot"));
 		assertTrue(queue.contains("progressFraction"));
-		assertTrue(gui.indexOf("RustGalFrameQueue.isMigratedGuiLegacyControl()") < gui.indexOf("blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_SPRITE"));
-		assertTrue(gui.indexOf("blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_SPRITE") < gui.indexOf("RustGalFrameQueue.enqueueCrosshair"));
-		assertTrue(gui.indexOf("RustGalFrameQueue.isMigratedGuiLegacyControl()", gui.indexOf("renderItemHotbar")) < gui.indexOf("blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_SPRITE"));
+		assertTrue(gui.indexOf("RustGalGuiRenderer.isMigratedGuiLegacyControl()") < gui.indexOf("blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_SPRITE"));
+		assertTrue(gui.indexOf("blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_SPRITE") < gui.indexOf("RustGalGuiRenderer.enqueueCrosshair"));
+		assertTrue(gui.indexOf("RustGalGuiRenderer.isMigratedGuiLegacyControl()", gui.indexOf("renderItemHotbar")) < gui.indexOf("blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_SPRITE"));
 			int hotbarMethod = gui.indexOf("renderItemHotbar");
-			assertTrue(gui.indexOf("RustGalFrameQueue.enqueueHotbarBase", hotbarMethod) < gui.indexOf("HOTBAR_SELECTION_SPRITE", hotbarMethod));
-		assertTrue(gui.indexOf("HOTBAR_SELECTION_SPRITE", hotbarMethod) < gui.indexOf("RustGalFrameQueue.enqueueHotbarSelection", hotbarMethod));
-		assertTrue(gui.indexOf("RustGalFrameQueue.enqueueHotbarSelection", hotbarMethod) < gui.indexOf("HOTBAR_OFFHAND_LEFT_SPRITE", hotbarMethod));
+			assertTrue(gui.indexOf("RustGalGuiRenderer.enqueueHotbarBase", hotbarMethod) < gui.indexOf("HOTBAR_SELECTION_SPRITE", hotbarMethod));
+		assertTrue(gui.indexOf("HOTBAR_SELECTION_SPRITE", hotbarMethod) < gui.indexOf("RustGalGuiRenderer.enqueueHotbarSelection", hotbarMethod));
+		assertTrue(gui.indexOf("RustGalGuiRenderer.enqueueHotbarSelection", hotbarMethod) < gui.indexOf("HOTBAR_OFFHAND_LEFT_SPRITE", hotbarMethod));
 			assertTrue(gui.contains("selectedHotbarHighlightX"));
 			assertTrue(gui.contains("selectedHotbarHighlightY"));
 			int armorMethod = gui.indexOf("renderArmor");
-			assertTrue(gui.indexOf("RustGalFrameQueue.isMigratedGuiLegacyControl()", armorMethod)
+			assertTrue(gui.indexOf("RustGalGuiRenderer.isMigratedGuiLegacyControl()", armorMethod)
 				< gui.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, ARMOR_FULL_SPRITE", armorMethod));
 			assertTrue(gui.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, ARMOR_EMPTY_SPRITE", armorMethod)
-				< gui.indexOf("RustGalFrameQueue.enqueueArmorIcons", armorMethod));
+				< gui.indexOf("RustGalGuiRenderer.enqueueArmorIcons", armorMethod));
+			int healthMethod = gui.indexOf("private void renderHearts");
+			assertTrue(gui.indexOf("rustPlayerHearts.add(new RustGalGuiRenderer.PlayerHeartRequest", healthMethod)
+				< gui.indexOf("RustGalGuiRenderer.enqueuePlayerHearts", healthMethod));
+			assertTrue(gui.indexOf("rustHeartVariant(heartType)", healthMethod)
+				< gui.indexOf("RustGalGuiRenderer.enqueuePlayerHearts", healthMethod));
+			assertTrue(gui.indexOf("HEART_ABSORBING", healthMethod)
+				< gui.indexOf("RustGalGuiRenderer.enqueuePlayerHearts", healthMethod));
 			int experienceMethod = experienceBar.indexOf("renderBackground");
-		assertTrue(experienceBar.indexOf("RustGalFrameQueue.isMigratedGuiLegacyControl()", experienceMethod)
+		assertTrue(experienceBar.indexOf("RustGalGuiRenderer.isMigratedGuiLegacyControl()", experienceMethod)
 			< experienceBar.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, EXPERIENCE_BAR_BACKGROUND_SPRITE", experienceMethod));
 		assertTrue(experienceBar.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, EXPERIENCE_BAR_BACKGROUND_SPRITE", experienceMethod)
-			< experienceBar.indexOf("RustGalFrameQueue.enqueueExperienceBar", experienceMethod));
+			< experienceBar.indexOf("RustGalGuiRenderer.enqueueExperienceBar", experienceMethod));
 		assertTrue(experienceBar.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, EXPERIENCE_BAR_PROGRESS_SPRITE", experienceMethod)
-			< experienceBar.indexOf("RustGalFrameQueue.enqueueExperienceBar", experienceMethod));
+			< experienceBar.indexOf("RustGalGuiRenderer.enqueueExperienceBar", experienceMethod));
 		int crosshairAttack = gui.indexOf("CROSSHAIR_ATTACK_INDICATOR_BACKGROUND_SPRITE");
-		assertTrue(gui.indexOf("RustGalFrameQueue.isMigratedGuiLegacyControl()", gui.indexOf("renderCrosshair"))
+		assertTrue(gui.indexOf("RustGalGuiRenderer.isMigratedGuiLegacyControl()", gui.indexOf("renderCrosshair"))
 			< gui.indexOf("guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_ATTACK_INDICATOR_BACKGROUND_SPRITE", crosshairAttack));
 		int crosshairProgressBlit = gui.indexOf("guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_ATTACK_INDICATOR_PROGRESS_SPRITE", crosshairAttack);
-		assertTrue(crosshairProgressBlit < gui.indexOf("RustGalFrameQueue.enqueueCrosshairAttackIndicator", crosshairProgressBlit));
+		assertTrue(crosshairProgressBlit < gui.indexOf("RustGalGuiRenderer.enqueueCrosshairAttackIndicator", crosshairProgressBlit));
 		int hotbarAttack = gui.indexOf("HOTBAR_ATTACK_INDICATOR_BACKGROUND_SPRITE");
-		assertTrue(gui.indexOf("RustGalFrameQueue.isMigratedGuiLegacyControl()", gui.indexOf("AttackIndicatorStatus.HOTBAR"))
+		assertTrue(gui.indexOf("RustGalGuiRenderer.isMigratedGuiLegacyControl()", gui.indexOf("AttackIndicatorStatus.HOTBAR"))
 			< gui.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_ATTACK_INDICATOR_BACKGROUND_SPRITE", hotbarAttack));
 		assertTrue(gui.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_ATTACK_INDICATOR_PROGRESS_SPRITE", hotbarAttack)
-			< gui.indexOf("RustGalFrameQueue.enqueueHotbarAttackIndicator", hotbarAttack));
+			< gui.indexOf("RustGalGuiRenderer.enqueueHotbarAttackIndicator", hotbarAttack));
 		assertTrue(bossOverlay.contains("DeterministicCameraCapture.applyBossBarOverridesForDiagnostics"));
-		assertTrue(bossOverlay.contains("RustGalFrameQueue.enqueueBossBar"));
-		assertTrue(bossOverlay.indexOf("RustGalFrameQueue.isMigratedGuiLegacyControl()") < bossOverlay.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, resourceLocations"));
-		assertTrue(bossOverlay.indexOf("RustGalFrameQueue.isMigratedGuiLegacyControl()") < bossOverlay.indexOf("RustGalFrameQueue.enqueueBossBar"));
-		assertTrue(bossOverlay.indexOf("RustGalFrameQueue.enqueueBossBar")
+		assertTrue(bossOverlay.contains("RustGalGuiRenderer.enqueueBossBar"));
+		assertTrue(bossOverlay.indexOf("RustGalGuiRenderer.isMigratedGuiLegacyControl()") < bossOverlay.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, resourceLocations"));
+		assertTrue(bossOverlay.indexOf("RustGalGuiRenderer.isMigratedGuiLegacyControl()") < bossOverlay.indexOf("RustGalGuiRenderer.enqueueBossBar"));
+		assertTrue(bossOverlay.indexOf("RustGalGuiRenderer.enqueueBossBar")
 			< bossOverlay.indexOf("private void drawBar(\n\t\tGuiGraphics guiGraphics"));
 		assertTrue(bossOverlay.contains("drawString(this.minecraft.font"));
 		assertTrue(context.contains("MAX_COMBINED_TEXTURE_IMAGE_UNITS"));
 		assertTrue(openGlResources.contains("current_frame_target_framebuffer"),
 			"persistent borrowed frame-target handles must refresh the native OpenGL framebuffer after screen transitions");
 		assertTrue(openGlResources.contains("borrowed_frame_targets_follow_latest_acquired_framebuffer"));
+	}
+
+	@Test
+	void rustGalGuiIntegrationHasCleanBridgeSchedulerAndGuiDomainBoundary() throws Exception {
+		String bridge = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java"));
+		String scheduler = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/RustGalFrameScheduler.java"));
+		String guiRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
+		String guiElement = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiElementRenderState.java"));
+		String batchBuilder = Files.readString(Path.of("src/main/java/net/vulkanic/gui/GuiBatchBuilder.java"));
+		String resourceCache = Files.readString(Path.of("src/main/java/net/vulkanic/gui/GuiResourceCache.java"));
+		String atlas = Files.readString(Path.of("src/main/java/net/vulkanic/gui/GuiSpriteAtlas.java"));
+		String pipelineLibrary = Files.readString(Path.of("src/main/java/net/vulkanic/gui/GuiPipelineLibrary.java"));
+		String gui = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/Gui.java"));
+		String bossOverlay = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/components/BossHealthOverlay.java"));
+		String experienceBar = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/contextualbar/ExperienceBarRenderer.java"));
+
+		assertTrue(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiSpriteAtlas.java")));
+		assertTrue(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiResourceCache.java")));
+		assertTrue(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiBatchBuilder.java")));
+		assertTrue(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiPipelineLibrary.java")));
+		assertFalse(bridge.contains("guiAlphaPipeline"));
+		assertFalse(bridge.contains("guiInvertPipeline"));
+		assertFalse(bridge.contains("CROSSHAIR_PRODUCER"));
+		assertFalse(bridge.contains("HOTBAR_SELECTION_PRODUCER"));
+		assertFalse(bridge.contains("ARMOR_ICON_PRODUCER"));
+		assertFalse(scheduler.contains("GuiSprite"));
+		assertFalse(scheduler.contains("VulkanicGalBridge"));
+		assertFalse(scheduler.contains("shader"));
+		assertFalse(scheduler.contains("atlas"));
+		assertFalse(scheduler.contains("pipeline"));
+		assertTrue(guiRenderer.contains("RustGalFrameScheduler<GuiBatchBuilder.GuiSpriteRequest>"));
+		assertFalse(guiRenderer.contains("record CachedResources"));
+		assertFalse(guiRenderer.contains("record TextureAtlas"));
+		assertFalse(guiRenderer.contains("record FrameSpriteBatch"));
+		assertFalse(guiRenderer.contains("class FrameSpriteBatchBuilder"));
+		assertTrue(batchBuilder.contains("record GuiSpriteRequest"));
+		assertTrue(batchBuilder.contains("record FrameSpriteBatch"));
+		assertTrue(resourceCache.contains("record CachedResources"));
+		assertTrue(atlas.contains("record TextureAtlas"));
+		assertTrue(pipelineLibrary.contains("graphicsPipelineAlphaBlend"));
+		assertFalse(guiRenderer.contains("layout(std140) uniform GuiSpriteBatch"));
+		assertTrue(pipelineLibrary.contains("layout(std140) uniform GuiSpriteBatch"));
+		assertTrue(guiElement.contains("RustGalFrameScheduler.Token token"));
+		assertFalse(gui.contains("VulkanicGalBridge"));
+		assertFalse(gui.contains("MemorySegment"));
+		assertFalse(gui.contains("HANDLE_"));
+		assertFalse(bossOverlay.contains("VulkanicGalBridge"));
+		assertFalse(experienceBar.contains("VulkanicGalBridge"));
+		assertTrue(gui.contains("RustGalGuiRenderer.enqueueCrosshair"));
+		assertTrue(gui.contains("RustGalGuiRenderer.enqueueArmorIcons"));
+		assertTrue(gui.contains("RustGalGuiRenderer.enqueuePlayerHearts"));
+		assertTrue(gui.contains("List<RustGalGuiRenderer.PlayerHeartRequest> rustPlayerHearts"));
+		assertTrue(gui.contains("rustHeartVariant(heartType)"));
+		assertTrue(gui.contains("diagnosticPlayerHealth(player.getHealth())"));
+		assertTrue(gui.contains("diagnosticPlayerMaxHealth((float)player.getAttributeValue(Attributes.MAX_HEALTH))"));
+		assertTrue(bossOverlay.contains("RustGalGuiRenderer.enqueueBossBar"));
+		assertTrue(experienceBar.contains("RustGalGuiRenderer.enqueueExperienceBar"));
+		assertFalse(guiRenderer.contains("GL_TEXTURE"));
+		assertFalse(guiRenderer.contains("VK_"));
 	}
 }

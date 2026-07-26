@@ -241,7 +241,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	}
 
 	public void close() {
-		net.vulkanic.bridge.RustGalFrameQueue.shutdown();
+		net.vulkanic.gui.RustGalGuiRenderer.shutdown();
 		this.globalSettingsUniform.close();
 		this.lightTexture.close();
 		this.overlayTexture.close();
@@ -407,7 +407,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 
 	public void resize(int i, int j) {
 		this.resourcePool.clear();
-		net.vulkanic.bridge.RustGalFrameQueue.resize(i, j);
+		net.vulkanic.gui.RustGalGuiRenderer.resize(i, j);
 		this.minecraft.levelRenderer.resize(i, j);
 	}
 

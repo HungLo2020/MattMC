@@ -3,8 +3,10 @@ package net.minecraft.client.gui;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Ordering;
 import net.blaze3d.platform.Window;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
@@ -82,7 +84,7 @@ import net.minecraft.world.scores.PlayerScoreEntry;
 import net.minecraft.world.scores.PlayerTeam;
 import net.minecraft.world.scores.Scoreboard;
 import net.voxelmap.VoxelConstants;
-import net.vulkanic.bridge.RustGalFrameQueue;
+import net.vulkanic.gui.RustGalGuiRenderer;
 import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.Nullable;
 
@@ -479,12 +481,12 @@ public class Gui {
 				if (!this.minecraft.debugEntries.isCurrentlyEnabled(DebugScreenEntries.THREE_DIMENSIONAL_CROSSHAIR)) {
 					guiGraphics.nextStratum();
 					int i = 15;
-					if (RustGalFrameQueue.isMigratedGuiDisabledForDiagnostics()) {
+					if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
 						// Dev-only measurement control: no migrated or legacy crosshair draw.
-					} else if (RustGalFrameQueue.isMigratedGuiLegacyControl()) {
+					} else if (RustGalGuiRenderer.isMigratedGuiLegacyControl()) {
 						guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_SPRITE, (guiGraphics.guiWidth() - i) / 2, (guiGraphics.guiHeight() - i) / 2, i, i);
 					} else {
-						RustGalFrameQueue.enqueueCrosshair(this.minecraft, guiGraphics, (guiGraphics.guiWidth() - i) / 2, (guiGraphics.guiHeight() - i) / 2, i, i);
+						RustGalGuiRenderer.enqueueCrosshair(this.minecraft, guiGraphics, (guiGraphics.guiWidth() - i) / 2, (guiGraphics.guiHeight() - i) / 2, i, i);
 					}
 						if (this.minecraft.options.attackIndicator().get() == AttackIndicatorStatus.CROSSHAIR) {
 							DeterministicCameraCapture.forceCrosshairAttackTargetForDiagnostics(this.minecraft);
@@ -498,22 +500,22 @@ public class Gui {
 							int j = guiGraphics.guiHeight() / 2 - 7 + 16;
 							int k = guiGraphics.guiWidth() / 2 - 8;
 							if (bl) {
-								if (RustGalFrameQueue.isMigratedGuiDisabledForDiagnostics()) {
+								if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
 									// Dev-only measurement control: no migrated or legacy attack indicator draw.
-								} else if (RustGalFrameQueue.isMigratedGuiLegacyControl()) {
+								} else if (RustGalGuiRenderer.isMigratedGuiLegacyControl()) {
 									guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_ATTACK_INDICATOR_FULL_SPRITE, k, j, 16, 16);
 								} else {
-									RustGalFrameQueue.enqueueCrosshairAttackIndicator(this.minecraft, guiGraphics, k, j, f, 16, true);
+									RustGalGuiRenderer.enqueueCrosshairAttackIndicator(this.minecraft, guiGraphics, k, j, f, 16, true);
 								}
 							} else if (f < 1.0F) {
 								int l = crosshairAttackIndicatorFilledWidth(f);
-								if (RustGalFrameQueue.isMigratedGuiDisabledForDiagnostics()) {
+								if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
 									// Dev-only measurement control: no migrated or legacy attack indicator draw.
-								} else if (RustGalFrameQueue.isMigratedGuiLegacyControl()) {
+								} else if (RustGalGuiRenderer.isMigratedGuiLegacyControl()) {
 									guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_ATTACK_INDICATOR_BACKGROUND_SPRITE, k, j, 16, 4);
 									guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_ATTACK_INDICATOR_PROGRESS_SPRITE, 16, 4, 0, 0, k, j, l, 4);
 								} else {
-									RustGalFrameQueue.enqueueCrosshairAttackIndicator(this.minecraft, guiGraphics, k, j, f, l, false);
+									RustGalGuiRenderer.enqueueCrosshairAttackIndicator(this.minecraft, guiGraphics, k, j, f, l, false);
 								}
 							}
 						}
@@ -630,22 +632,22 @@ public class Gui {
 			int i = guiGraphics.guiWidth() / 2;
 			int j = 182;
 			int k = 91;
-			if (RustGalFrameQueue.isMigratedGuiDisabledForDiagnostics()) {
+			if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
 				// Dev-only measurement control: no migrated or legacy hotbar base draw.
-			} else if (RustGalFrameQueue.isMigratedGuiLegacyControl()) {
+			} else if (RustGalGuiRenderer.isMigratedGuiLegacyControl()) {
 				guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_SPRITE, i - 91, guiGraphics.guiHeight() - 22, 182, 22);
 			} else {
-				RustGalFrameQueue.enqueueHotbarBase(this.minecraft, guiGraphics, i - 91, guiGraphics.guiHeight() - 22, 182, 22);
+				RustGalGuiRenderer.enqueueHotbarBase(this.minecraft, guiGraphics, i - 91, guiGraphics.guiHeight() - 22, 182, 22);
 			}
 			int selectedSlot = player.getInventory().getSelectedSlot();
 			int selectedSlotX = selectedHotbarHighlightX(guiGraphics.guiWidth(), selectedSlot);
 			int selectedSlotY = selectedHotbarHighlightY(guiGraphics.guiHeight());
-			if (RustGalFrameQueue.isMigratedGuiDisabledForDiagnostics()) {
+			if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
 				// Dev-only measurement control: no migrated or legacy selected-slot highlight draw.
-			} else if (RustGalFrameQueue.isMigratedGuiLegacyControl()) {
+			} else if (RustGalGuiRenderer.isMigratedGuiLegacyControl()) {
 				guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_SELECTION_SPRITE, selectedSlotX, selectedSlotY, 24, 23);
 			} else {
-				RustGalFrameQueue.enqueueHotbarSelection(this.minecraft, guiGraphics, selectedSlot, selectedSlotX, selectedSlotY, 24, 23);
+				RustGalGuiRenderer.enqueueHotbarSelection(this.minecraft, guiGraphics, selectedSlot, selectedSlotX, selectedSlotY, 24, 23);
 			}
 			if (!itemStack.isEmpty()) {
 				if (humanoidArm == HumanoidArm.LEFT) {
@@ -682,13 +684,13 @@ public class Gui {
 					}
 
 					int p = hotbarAttackIndicatorFilledHeight(f);
-					if (RustGalFrameQueue.isMigratedGuiDisabledForDiagnostics()) {
+					if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
 						// Dev-only measurement control: no migrated or legacy attack indicator draw.
-					} else if (RustGalFrameQueue.isMigratedGuiLegacyControl()) {
+					} else if (RustGalGuiRenderer.isMigratedGuiLegacyControl()) {
 						guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_ATTACK_INDICATOR_BACKGROUND_SPRITE, o, n, 18, 18);
 						guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_ATTACK_INDICATOR_PROGRESS_SPRITE, 18, 18, 0, 18 - p, o, n + 18 - p, 18, p);
 					} else {
-						RustGalFrameQueue.enqueueHotbarAttackIndicator(this.minecraft, guiGraphics, o, n, f, p);
+						RustGalGuiRenderer.enqueueHotbarAttackIndicator(this.minecraft, guiGraphics, o, n, f, p);
 					}
 				}
 			}
@@ -860,7 +862,8 @@ public class Gui {
 	private void renderPlayerHealth(GuiGraphics guiGraphics) {
 		Player player = this.getCameraPlayer();
 		if (player != null) {
-			int i = Mth.ceil(player.getHealth());
+			float renderedHealth = diagnosticPlayerHealth(player.getHealth());
+			int i = Mth.ceil(renderedHealth);
 			boolean bl = this.healthBlinkTime > this.tickCount && (this.healthBlinkTime - this.tickCount) / 3L % 2L == 1L;
 			long l = Util.getMillis();
 			if (i < this.lastHealth && player.invulnerableTime > 0) {
@@ -882,7 +885,7 @@ public class Gui {
 			int k = guiGraphics.guiWidth() / 2 - 91;
 			int m = guiGraphics.guiWidth() / 2 + 91;
 			int n = guiGraphics.guiHeight() - 39;
-			float f = Math.max((float)player.getAttributeValue(Attributes.MAX_HEALTH), Math.max(j, i));
+			float f = Math.max(diagnosticPlayerMaxHealth((float)player.getAttributeValue(Attributes.MAX_HEALTH)), Math.max(j, i));
 			int o = Mth.ceil(player.getAbsorptionAmount());
 			int p = Mth.ceil((f + o) / 2.0F / 10.0F);
 			int q = Math.max(10 - (p - 2), 3);
@@ -910,14 +913,34 @@ public class Gui {
 		}
 	}
 
+	private static float diagnosticPlayerHealth(float fallback) {
+		return Math.max(0.0F, diagnosticPlayerFloat("mattmc.dev.deterministicCameraCapture.playerHealth", "mattmc.dev.graphicsFrameBenchmark.playerHealth", fallback));
+	}
+
+	private static float diagnosticPlayerMaxHealth(float fallback) {
+		return Math.max(1.0F, diagnosticPlayerFloat("mattmc.dev.deterministicCameraCapture.playerMaxHealth", "mattmc.dev.graphicsFrameBenchmark.playerMaxHealth", fallback));
+	}
+
+	private static float diagnosticPlayerFloat(String primaryProperty, String secondaryProperty, float fallback) {
+		String value = System.getProperty(primaryProperty);
+		if (value == null || value.isBlank()) {
+			value = System.getProperty(secondaryProperty);
+		}
+		if (value == null || value.isBlank()) {
+			return fallback;
+		}
+		float parsed = Float.parseFloat(value);
+		return Float.isFinite(parsed) ? parsed : fallback;
+	}
+
 	private void renderArmor(GuiGraphics guiGraphics, Player player, int i, int j, int k, int l) {
 		int m = player.getArmorValue();
 		if (m > 0) {
 			int n = i - (j - 1) * k - 10;
 
-			if (RustGalFrameQueue.isMigratedGuiDisabledForDiagnostics() || RustGalFrameQueue.isArmorDisabledForDiagnostics()) {
+			if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() || RustGalGuiRenderer.isArmorDisabledForDiagnostics()) {
 				// Dev-only measurement control: no migrated or legacy armor icon draw.
-			} else if (RustGalFrameQueue.isMigratedGuiLegacyControl() || RustGalFrameQueue.isArmorLegacyControl()) {
+			} else if (RustGalGuiRenderer.isMigratedGuiLegacyControl() || RustGalGuiRenderer.isArmorLegacyControl()) {
 				for (int o = 0; o < 10; o++) {
 					int p = l + o * 8;
 					if (o * 2 + 1 < m) {
@@ -933,17 +956,24 @@ public class Gui {
 					}
 				}
 			} else {
-				RustGalFrameQueue.enqueueArmorIcons(this.minecraft, guiGraphics, m, l, n);
+				RustGalGuiRenderer.enqueueArmorIcons(this.minecraft, guiGraphics, m, l, n);
 			}
 		}
 	}
 
 	private void renderHearts(GuiGraphics guiGraphics, Player player, int i, int j, int k, int l, float f, int m, int n, int o, boolean bl) {
 		Gui.HeartType heartType = Gui.HeartType.forPlayer(player);
-		boolean bl2 = player.level().getLevelData().isHardcore();
+		boolean bl2 = player.level().getLevelData().isHardcore()
+			|| Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.playerHealthHardcore");
+		boolean heartFlash = bl || Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.playerHealthFlash");
 		int p = Mth.ceil(f / 2.0);
 		int q = Mth.ceil(o / 2.0);
 		int r = p * 2;
+		boolean migratePlayerHearts = !RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()
+			&& !RustGalGuiRenderer.isPlayerHealthDisabledForDiagnostics()
+			&& !RustGalGuiRenderer.isMigratedGuiLegacyControl()
+			&& !RustGalGuiRenderer.isPlayerHealthLegacyControl();
+		List<RustGalGuiRenderer.PlayerHeartRequest> rustPlayerHearts = migratePlayerHearts ? new ArrayList<>() : List.of();
 
 		for (int s = p + q - 1; s >= 0; s--) {
 			int t = s / 10;
@@ -958,7 +988,19 @@ public class Gui {
 				w -= 2;
 			}
 
-			this.renderHeart(guiGraphics, Gui.HeartType.CONTAINER, v, w, bl2, bl, false);
+			if (migratePlayerHearts && s < p) {
+				rustPlayerHearts.add(new RustGalGuiRenderer.PlayerHeartRequest(
+					RustGalGuiRenderer.PlayerHeartVariant.CONTAINER,
+					RustGalGuiRenderer.PlayerHeartState.CONTAINER,
+					bl2,
+					heartFlash,
+					rustPlayerHearts.size(),
+					v,
+					w
+				));
+			} else if (s >= p || (!RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() && !RustGalGuiRenderer.isPlayerHealthDisabledForDiagnostics())) {
+				this.renderHeart(guiGraphics, Gui.HeartType.CONTAINER, v, w, bl2, heartFlash, false);
+			}
 			int x = s * 2;
 			boolean bl3 = s >= p;
 			if (bl3) {
@@ -969,16 +1011,54 @@ public class Gui {
 				}
 			}
 
-			if (bl && x < n) {
+			if (heartFlash && x < n) {
 				boolean bl5 = x + 1 == n;
-				this.renderHeart(guiGraphics, heartType, v, w, bl2, true, bl5);
+				if (migratePlayerHearts && s < p) {
+					rustPlayerHearts.add(new RustGalGuiRenderer.PlayerHeartRequest(
+						rustHeartVariant(heartType),
+						bl5 ? RustGalGuiRenderer.PlayerHeartState.HALF : RustGalGuiRenderer.PlayerHeartState.FULL,
+						bl2,
+						true,
+						rustPlayerHearts.size(),
+						v,
+						w
+					));
+				} else if (!RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() && !RustGalGuiRenderer.isPlayerHealthDisabledForDiagnostics()) {
+					this.renderHeart(guiGraphics, heartType, v, w, bl2, true, bl5);
+				}
 			}
 
 			if (x < m) {
 				boolean bl5 = x + 1 == m;
-				this.renderHeart(guiGraphics, heartType, v, w, bl2, false, bl5);
+				if (migratePlayerHearts && s < p) {
+					rustPlayerHearts.add(new RustGalGuiRenderer.PlayerHeartRequest(
+						rustHeartVariant(heartType),
+						bl5 ? RustGalGuiRenderer.PlayerHeartState.HALF : RustGalGuiRenderer.PlayerHeartState.FULL,
+						bl2,
+						false,
+						rustPlayerHearts.size(),
+						v,
+						w
+					));
+				} else if (!RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() && !RustGalGuiRenderer.isPlayerHealthDisabledForDiagnostics()) {
+					this.renderHeart(guiGraphics, heartType, v, w, bl2, false, bl5);
+				}
 			}
 		}
+
+		if (migratePlayerHearts) {
+			RustGalGuiRenderer.enqueuePlayerHearts(this.minecraft, guiGraphics, rustPlayerHearts);
+		}
+	}
+
+	private static RustGalGuiRenderer.PlayerHeartVariant rustHeartVariant(Gui.HeartType heartType) {
+		return switch (heartType) {
+			case NORMAL -> RustGalGuiRenderer.PlayerHeartVariant.NORMAL;
+			case POISIONED -> RustGalGuiRenderer.PlayerHeartVariant.POISONED;
+			case WITHERED -> RustGalGuiRenderer.PlayerHeartVariant.WITHERED;
+			case FROZEN -> RustGalGuiRenderer.PlayerHeartVariant.FROZEN;
+			case CONTAINER, ABSORBING -> throw new IllegalArgumentException("not a migrated player-health heart variant: " + heartType);
+		};
 	}
 
 	private void renderHeart(GuiGraphics guiGraphics, Gui.HeartType heartType, int i, int j, boolean bl, boolean bl2, boolean bl3) {

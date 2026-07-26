@@ -1,4 +1,7 @@
-package net.vulkanic.bridge;
+package net.vulkanic.gui;
+
+import net.vulkanic.bridge.RustGalFrameScheduler;
+import net.vulkanic.bridge.VulkanicGalBridge;
 
 import net.blaze3d.platform.Window;
 import net.logging.LogUtils;
@@ -10,27 +13,11 @@ import net.vulkanic.VulkanicAPI;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.EnumMap;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.NavigableMap;
-import java.util.TreeMap;
 
-public final class RustGalFrameQueue {
+public final class RustGalGuiRenderer {
 	private static final Logger LOGGER = LogUtils.getLogger();
-	private static final int GUI_UNIFORM_BYTES = 64;
-	private static final int GUI_MAX_PACKED_SPRITES = 256;
-	private static final int GUI_PACKED_UNIFORM_BYTES = GUI_UNIFORM_BYTES * GUI_MAX_PACKED_SPRITES;
-	private static final int GUI_ATLAS_MAX_EXTENT = 4096;
 	private static final String CROSSHAIR_PRODUCER = "minecraft.gui.crosshair";
 	private static final String HOTBAR_BASE_PRODUCER = "minecraft.gui.hotbar.base";
 	private static final String HOTBAR_SELECTION_PRODUCER = "minecraft.gui.hotbar.selection";
@@ -43,6 +30,7 @@ public final class RustGalFrameQueue {
 	private static final String BOSS_BAR_BACKGROUND_PRODUCER = "minecraft.gui.boss.background";
 	private static final String BOSS_BAR_PROGRESS_PRODUCER = "minecraft.gui.boss.progress";
 	private static final String ARMOR_ICON_PRODUCER = "minecraft.gui.armor";
+	private static final String PLAYER_HEART_PRODUCER = "minecraft.gui.player-heart";
 	private static final Object LOCK = new Object();
 	private static VulkanicGalBridge bridge;
 	private static Thread renderThread;
@@ -54,12 +42,34 @@ public final class RustGalFrameQueue {
 	private static long generation = 1L;
 	private static long lastSubmitted;
 	private static long lastRetiredSubmission;
-	private static final DeferredBatchScheduler SCHEDULER = new DeferredBatchScheduler();
-	private static final Map<CacheKey, CachedResources> CACHES = new HashMap<>();
-	private static final Map<TextureGroup, TextureAtlas> ATLASES = new EnumMap<>(TextureGroup.class);
+	private static final RustGalFrameScheduler<GuiBatchBuilder.GuiSpriteRequest> SCHEDULER =
+		new RustGalFrameScheduler<>("Rust VulkanicGAL deferred GUI");
+	private static final GuiResourceCache RESOURCE_CACHE = new GuiResourceCache();
+	private static final GuiResourceCache.Recorder RESOURCE_RECORDER = new GuiResourceCache.Recorder() {
+		@Override
+		public void recordResourceBatch(VulkanicGalBridge.ResourceResults results) {
+			RustGalGuiRenderer.recordResourceBatch(results);
+		}
+
+		@Override
+		public void recordUploadStatus(VulkanicGalBridge.Status status) {
+			RustGalGuiRenderer.recordStatus(Operation.SUBMIT, status);
+			lastSubmitted = Math.max(lastSubmitted, status.submissionId());
+		}
+
+		@Override
+		public void resourcesCreated(int count) {
+			METRICS.resourceCreates += count;
+		}
+
+		@Override
+		public void resourceDestroyed() {
+			METRICS.resourceDestroys++;
+		}
+	};
 	private static final Metrics METRICS = new Metrics();
 
-	private RustGalFrameQueue() {
+	private RustGalGuiRenderer() {
 	}
 
 	public static boolean isCrosshairEnabled() {
@@ -80,6 +90,14 @@ public final class RustGalFrameQueue {
 
 	public static boolean isArmorLegacyControl() {
 		return Boolean.getBoolean("mattmc.dev.rustGalGui.armor.legacyControl");
+	}
+
+	public static boolean isPlayerHealthDisabledForDiagnostics() {
+		return Boolean.getBoolean("mattmc.dev.rustGalGui.playerHealth.disabled");
+	}
+
+	public static boolean isPlayerHealthLegacyControl() {
+		return Boolean.getBoolean("mattmc.dev.rustGalGui.playerHealth.legacyControl");
 	}
 
 	public static void enqueueCrosshair(Minecraft minecraft, net.minecraft.client.gui.GuiGraphics guiGraphics, int x, int y, int width, int height) {
@@ -143,7 +161,7 @@ public final class RustGalFrameQueue {
 			EXPERIENCE_BACKGROUND_PRODUCER,
 			-1,
 			progressFraction,
-			FillDirection.NONE,
+			GuiFillDirection.NONE,
 			x,
 			y,
 			width,
@@ -161,7 +179,7 @@ public final class RustGalFrameQueue {
 				EXPERIENCE_PROGRESS_PRODUCER,
 				-1,
 				progressFraction,
-				FillDirection.HORIZONTAL_LEFT_TO_RIGHT,
+				GuiFillDirection.HORIZONTAL_LEFT_TO_RIGHT,
 				x,
 				y,
 				filledWidth,
@@ -197,7 +215,7 @@ public final class RustGalFrameQueue {
 				ATTACK_CROSSHAIR_PROGRESS_PRODUCER,
 				-1,
 				Math.max(0.0F, Math.min(1.0F, cooldownProgress)),
-				FillDirection.NONE,
+				GuiFillDirection.NONE,
 				x,
 				y,
 				16,
@@ -219,7 +237,7 @@ public final class RustGalFrameQueue {
 			ATTACK_CROSSHAIR_BACKGROUND_PRODUCER,
 			-1,
 			cooldownProgress,
-			FillDirection.HORIZONTAL_LEFT_TO_RIGHT,
+			GuiFillDirection.HORIZONTAL_LEFT_TO_RIGHT,
 			x,
 			y,
 			16,
@@ -237,7 +255,7 @@ public final class RustGalFrameQueue {
 				ATTACK_CROSSHAIR_PROGRESS_PRODUCER,
 				-1,
 				cooldownProgress,
-				FillDirection.HORIZONTAL_LEFT_TO_RIGHT,
+				GuiFillDirection.HORIZONTAL_LEFT_TO_RIGHT,
 				x,
 				y,
 				filledWidth,
@@ -274,7 +292,7 @@ public final class RustGalFrameQueue {
 			ATTACK_HOTBAR_BACKGROUND_PRODUCER,
 			-1,
 			cooldownProgress,
-			FillDirection.VERTICAL_BOTTOM_TO_TOP,
+			GuiFillDirection.VERTICAL_BOTTOM_TO_TOP,
 			x,
 			y,
 			18,
@@ -292,7 +310,7 @@ public final class RustGalFrameQueue {
 				ATTACK_HOTBAR_PROGRESS_PRODUCER,
 				-1,
 				cooldownProgress,
-				FillDirection.VERTICAL_BOTTOM_TO_TOP,
+				GuiFillDirection.VERTICAL_BOTTOM_TO_TOP,
 				x,
 				y + 18 - filledHeight,
 				18,
@@ -324,7 +342,7 @@ public final class RustGalFrameQueue {
 				ARMOR_ICON_PRODUCER + "." + state.id() + ".slot" + icon,
 				icon,
 				armorValue / 20.0F,
-				FillDirection.NONE,
+				GuiFillDirection.NONE,
 				x + icon * 8,
 				y,
 				9,
@@ -339,6 +357,35 @@ public final class RustGalFrameQueue {
 
 	public static ArmorIconState armorIconStateForTests(int armorValue, int iconIndex) {
 		return armorIconState(armorValue, iconIndex);
+	}
+
+	public static void enqueuePlayerHearts(
+		Minecraft minecraft,
+		net.minecraft.client.gui.GuiGraphics guiGraphics,
+		List<PlayerHeartRequest> hearts
+	) {
+		if (!isCrosshairEnabled() || hearts.isEmpty()) {
+			return;
+		}
+		for (PlayerHeartRequest heart : hearts) {
+			enqueueGuiSprite(
+				minecraft,
+				guiGraphics,
+				heart.sprite(),
+				PLAYER_HEART_PRODUCER + "." + heart.variant().id() + "." + heart.state().id() + ".order" + heart.order(),
+				heart.order(),
+				heart.state().progressValue(),
+				GuiFillDirection.NONE,
+				heart.x(),
+				heart.y(),
+				9,
+				9,
+				0,
+				0,
+				9,
+				9
+			);
+		}
 	}
 
 	private static ArmorIconState armorIconState(int armorValue, int iconIndex) {
@@ -369,7 +416,7 @@ public final class RustGalFrameQueue {
 		int width,
 		int height
 	) {
-		enqueueGuiSprite(minecraft, guiGraphics, sprite, producerId, selectedSlot, -1.0F, FillDirection.NONE, x, y, width, height, 0, 0, width, height);
+		enqueueGuiSprite(minecraft, guiGraphics, sprite, producerId, selectedSlot, -1.0F, GuiFillDirection.NONE, x, y, width, height, 0, 0, width, height);
 	}
 
 	private static void enqueueGuiSprite(
@@ -379,7 +426,7 @@ public final class RustGalFrameQueue {
 		String producerId,
 		int selectedSlot,
 		float progressFraction,
-		FillDirection fillDirection,
+		GuiFillDirection fillDirection,
 		int x,
 		int y,
 		int width,
@@ -403,24 +450,43 @@ public final class RustGalFrameQueue {
 		}
 		try {
 			synchronized (LOCK) {
+				GuiBatchBuilder.GuiSpriteRequest request = new GuiBatchBuilder.GuiSpriteRequest(
+					sprite.stratum,
+					sprite,
+					producerId,
+					selectedSlot,
+					progressFraction,
+					fillDirection,
+					x,
+					y,
+					width,
+					height,
+					sourceX,
+					sourceY,
+					sourceWidth,
+					sourceHeight,
+					guiGraphics.guiWidth(),
+					guiGraphics.guiHeight()
+				);
+				RustGalFrameScheduler.Token token = SCHEDULER.enqueue(generation, sprite.stratum.id(), sprite.stratum.order(), request);
 				guiGraphics.guiRenderState.submitGuiElement(
-					SCHEDULER.enqueue(
-						sprite,
-							producerId,
-							selectedSlot,
-							progressFraction,
-							fillDirection,
-							x,
-							y,
-						width,
-						height,
+					new RustGalGuiElementRenderState(
+						token,
+						sprite.stratum,
+						producerId,
+						selectedSlot,
+						progressFraction,
+						fillDirection,
 						sourceX,
 						sourceY,
 						sourceWidth,
 						sourceHeight,
+						x,
+						y,
+						width,
+						height,
 						guiGraphics.guiWidth(),
-						guiGraphics.guiHeight(),
-						generation
+						guiGraphics.guiHeight()
 					)
 				);
 				METRICS.enqueueNanos += elapsedSince(started);
@@ -443,8 +509,9 @@ public final class RustGalFrameQueue {
 		Window window = minecraft.getWindow();
 		ensureConfigured(window);
 		synchronized (LOCK) {
-			List<DeferredGuiBatch> batches = SCHEDULER.takeAll(elements);
-			executeFrameBatches(window, batches);
+			List<RustGalFrameScheduler.Token> tokens = elements.stream().map(RustGalGuiElementRenderState::token).toList();
+			List<GuiBatchBuilder.GuiSpriteRequest> requests = SCHEDULER.takeAll(tokens, generation);
+			executeFrameBatches(window, requests);
 		}
 	}
 
@@ -515,7 +582,7 @@ public final class RustGalFrameQueue {
 			producerPrefix + "." + color.getSerializedName() + "." + overlay.getSerializedName() + "." + sprite.semanticSuffix,
 			-1,
 			progressFraction,
-			FillDirection.HORIZONTAL_LEFT_TO_RIGHT,
+			GuiFillDirection.HORIZONTAL_LEFT_TO_RIGHT,
 			x,
 			y,
 			width,
@@ -548,7 +615,7 @@ public final class RustGalFrameQueue {
 					retireOutstanding(true);
 					destroyTransientFrameResources(cachedFramePass, cachedFrameTarget);
 				destroyCachedResources();
-				CACHES.clear();
+				RESOURCE_CACHE.clearAtlasesAndCaches();
 		}
 	}
 
@@ -566,9 +633,9 @@ public final class RustGalFrameQueue {
 					int cancelled = SCHEDULER.cancelAll("shutdown");
 					existing = bridge;
 					retireOutstanding(true);
-					destroyTransientFrameResources(cachedFramePass, cachedFrameTarget);
+				destroyTransientFrameResources(cachedFramePass, cachedFrameTarget);
 				destroyCachedResources();
-				CACHES.clear();
+				RESOURCE_CACHE.clearCachesOnly();
 				bridge = null;
 				renderThread = null;
 					lastSubmitted = 0L;
@@ -652,8 +719,8 @@ public final class RustGalFrameQueue {
 		}
 	}
 
-	private static void executeFrameBatches(Window window, List<DeferredGuiBatch> batches) {
-		if (batches.isEmpty()) {
+	private static void executeFrameBatches(Window window, List<GuiBatchBuilder.GuiSpriteRequest> requests) {
+		if (requests.isEmpty()) {
 			return;
 		}
 		long executeStarted = System.nanoTime();
@@ -665,9 +732,9 @@ public final class RustGalFrameQueue {
 		try {
 				GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.resource-cache");
 				long resourceStarted = System.nanoTime();
-				List<FrameSpriteBatch> spriteBatches;
+				List<GuiBatchBuilder.FrameSpriteBatch> spriteBatches;
 				try {
-					spriteBatches = packCompatibleSpriteBatches(batches);
+					spriteBatches = GuiBatchBuilder.packCompatibleSpriteBatches(requests, RustGalGuiRenderer::resourcesFor);
 				} finally {
 					METRICS.resourceLookupNanos += elapsedSince(resourceStarted);
 					GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.resource-cache");
@@ -688,19 +755,7 @@ public final class RustGalFrameQueue {
 				FrameResources frameResources = frameResourcesFor(frame.frameTarget());
 				GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.abi-packing");
 				long packingStarted = System.nanoTime();
-					VulkanicGalBridge.SubmissionBatchBuilder builder = bridge.submissionBatchBuilder("minecraft.gui.frame");
-					for (FrameSpriteBatch spriteBatch : spriteBatches) {
-						builder.barrier(spriteBatch.resources().uniformBuffer, VulkanicGalBridge.USAGE_SHADER_READ, VulkanicGalBridge.USAGE_TRANSFER_DST, false)
-							.hostWrite(spriteBatch.resources().uniformBuffer, 0, packedUniformBytes(spriteBatch.sprites()))
-							.barrier(spriteBatch.resources().uniformBuffer, VulkanicGalBridge.USAGE_TRANSFER_DST, VulkanicGalBridge.USAGE_SHADER_READ, false)
-							.beginFramePass(frameResources.pass(), frameResources.target())
-							.bindGraphicsPipeline(spriteBatch.resources().pipeline)
-							.bindResourceSet(spriteBatch.resources().pipelineLayout, spriteBatch.resources().resourceSet)
-							.setIndexBuffer(spriteBatch.resources().indexBuffer)
-							.drawIndexed(6, spriteBatch.sprites().size())
-							.endPass();
-					}
-				VulkanicGalBridge.SubmissionBatch submit = builder.build();
+				VulkanicGalBridge.SubmissionBatch submit = GuiBatchBuilder.buildSubmission(bridge, frameResources.pass(), frameResources.target(), spriteBatches);
 			METRICS.abiPackingNanos += elapsedSince(packingStarted);
 			GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.abi-packing");
 			GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.ffi.submit");
@@ -712,7 +767,7 @@ public final class RustGalFrameQueue {
 			submissionId = status.submissionId();
 			lastSubmitted = Math.max(lastSubmitted, submissionId);
 			TracyCompat.message("gal.frame.deferred producer=gui.frame stratum=gui.frame"
-				+ " frame=" + frameId + " submission=" + submissionId + " batches=" + batches.size());
+				+ " frame=" + frameId + " submission=" + submissionId + " batches=" + requests.size());
 			GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.ffi.present");
 			long presentStarted = System.nanoTime();
 			recordFixedOperation(Operation.FRAME_PRESENT, VulkanicGalBridge.Struct.FRAME_PRESENT.byteSize());
@@ -721,16 +776,16 @@ public final class RustGalFrameQueue {
 			GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.ffi.present");
 				METRICS.frames++;
 				METRICS.submissions++;
-				METRICS.batchesExecuted += batches.size();
+				METRICS.batchesExecuted += requests.size();
 				METRICS.spriteBatchesExecuted += spriteBatches.size();
-				METRICS.packedSpritesExecuted += batches.size();
+				METRICS.packedSpritesExecuted += requests.size();
 				retireOutstanding(false);
 			METRICS.executeNanos += elapsedSince(executeStarted);
 			executeCounted = true;
 			if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
 					LOGGER.info(
 						"Rust VulkanicGAL GUI frame executed: batches={}, spriteBatches={}, frame={}, submission={}, cacheHits={}, cacheMisses={}, ffiCalls={}, ffiBytes={}",
-						batches.size(),
+						requests.size(),
 						spriteBatches.size(),
 						frameId,
 						submissionId,
@@ -740,7 +795,7 @@ public final class RustGalFrameQueue {
 					METRICS.ffiBytes
 				);
 			}
-				auditMessage(metricsAuditLine(batches.size(), frameId, submissionId));
+				auditMessage(metricsAuditLine(requests.size(), frameId, submissionId));
 		} finally {
 			if (!executeCounted) {
 				METRICS.executeNanos += elapsedSince(executeStarted);
@@ -749,287 +804,45 @@ public final class RustGalFrameQueue {
 		}
 	}
 
-	private static List<FrameSpriteBatch> packCompatibleSpriteBatches(List<DeferredGuiBatch> batches) {
-		List<FrameSpriteBatch> packed = new ArrayList<>();
-		FrameSpriteBatchBuilder current = null;
-		for (DeferredGuiBatch batch : batches) {
-			CachedResources resources = resourcesFor(batch);
-			PackedSprite sprite = PackedSprite.from(batch);
-			if (current == null || !current.canAppend(batch, resources)) {
-				if (current != null) {
-					packed.add(current.build());
-				}
-				current = new FrameSpriteBatchBuilder(batch, resources);
-			}
-			current.add(sprite);
-		}
-		if (current != null) {
-			packed.add(current.build());
-		}
-		return packed;
+	public static List<Integer> debugPackCompatibleRunLengthsForTests(List<GuiRenderStratum> strata, List<String> resourceKeys) {
+		return GuiBatchBuilder.debugPackCompatibleRunLengthsForTests(strata, resourceKeys);
 	}
 
-	static List<Integer> debugPackCompatibleRunLengthsForTests(List<RenderStratum> strata, List<String> resourceKeys) {
-		if (strata.size() != resourceKeys.size()) {
-			throw new IllegalArgumentException("strata and resource key test inputs must have matching sizes");
-		}
-		List<Integer> runs = new ArrayList<>();
-		RenderStratum currentStratum = null;
-		String currentKey = null;
-		int currentSize = 0;
-		for (int i = 0; i < strata.size(); i++) {
-			RenderStratum stratum = strata.get(i);
-			String resourceKey = resourceKeys.get(i);
-			if (currentSize == 0
-				|| currentSize >= GUI_MAX_PACKED_SPRITES
-				|| stratum != currentStratum
-				|| !resourceKey.equals(currentKey)) {
-				if (currentSize > 0) {
-					runs.add(currentSize);
-				}
-				currentStratum = stratum;
-				currentKey = resourceKey;
-				currentSize = 1;
-			} else {
-				currentSize++;
-			}
-		}
-		if (currentSize > 0) {
-			runs.add(currentSize);
-		}
-		return runs;
+	public static List<String> debugPackedUniformCommandSequenceForTests(List<GuiRenderStratum> strata, List<String> resourceKeys) {
+		return GuiBatchBuilder.debugPackedUniformCommandSequenceForTests(strata, resourceKeys);
 	}
 
-	static List<String> debugPackedUniformCommandSequenceForTests(List<RenderStratum> strata, List<String> resourceKeys) {
-		List<Integer> runs = debugPackCompatibleRunLengthsForTests(strata, resourceKeys);
-		List<String> sequence = new ArrayList<>(runs.size() * 9);
-		for (int index = 0; index < runs.size(); index++) {
-			sequence.add("batch-" + index + ":barrier-uniform-read-to-transfer");
-			sequence.add("batch-" + index + ":host-write-uniforms");
-			sequence.add("batch-" + index + ":barrier-uniform-transfer-to-read");
-			sequence.add("batch-" + index + ":begin-frame-pass");
-			sequence.add("batch-" + index + ":bind-pipeline");
-			sequence.add("batch-" + index + ":bind-resource-set");
-			sequence.add("batch-" + index + ":set-index-buffer");
-			sequence.add("batch-" + index + ":draw-indexed");
-			sequence.add("batch-" + index + ":end-pass");
-		}
-		return sequence;
+	public static float[] debugArmorOpenGlUvYRangeForTests(ArmorIconState state) {
+		return GuiBatchBuilder.debugArmorOpenGlUvYRangeForTests(state);
 	}
 
-	static float[] debugArmorOpenGlUvYRangeForTests(ArmorIconState state) {
-		PackedSprite sprite = new PackedSprite(
-			state.sprite(),
-			ARMOR_ICON_PRODUCER + "." + state.id(),
-			0,
-			1.0F,
-			FillDirection.NONE,
-			0xFFFFFFFF,
-			0,
-			0,
-			9,
-			9,
-			0,
-			0,
-			9,
-			9,
-			320,
-			180
-		);
-		ByteBuffer uniforms = ByteBuffer.wrap(packedUniformBytes(List.of(sprite))).order(ByteOrder.nativeOrder());
-		float originY = uniforms.getFloat(36);
-		float height = uniforms.getFloat(44);
-		return new float[] {originY + height, originY};
+	public static int[] debugArmorOpenGlSampledLocalRowsForTests(ArmorIconState state, int guiScale) {
+		return GuiBatchBuilder.debugArmorOpenGlSampledLocalRowsForTests(state, guiScale);
 	}
 
-	static int[] debugArmorOpenGlSampledLocalRowsForTests(ArmorIconState state, int guiScale) {
-		if (guiScale <= 0) {
-			throw new IllegalArgumentException("GUI scale must be positive: " + guiScale);
-		}
-		GuiSprite guiSprite = state.sprite();
-		PackedSprite sprite = new PackedSprite(
-			guiSprite,
-			ARMOR_ICON_PRODUCER + "." + state.id(),
-			0,
-			1.0F,
-			FillDirection.NONE,
-			0xFFFFFFFF,
-			0,
-			0,
-			9,
-			9,
-			0,
-			0,
-			9,
-			9,
-			320,
-			180
-		);
-		TextureAtlas atlas = atlasFor(guiSprite.textureGroup);
-		AtlasRegion region = atlas.region(guiSprite);
-		ByteBuffer uniforms = ByteBuffer.wrap(packedUniformBytes(List.of(sprite))).order(ByteOrder.nativeOrder());
-		int originY = Math.round(uniforms.getFloat(36) * atlas.height());
-		int extentY = Math.round(uniforms.getFloat(44) * atlas.height());
-		int[] rows = new int[sprite.height() * guiScale];
-		for (int y = 0; y < rows.length; y++) {
-			float cornerY = (y + 0.5F) / rows.length;
-			int sourceY = Math.min(extentY - 1, Math.max(0, (int)Math.floor(cornerY * extentY)));
-			int glY = originY + extentY - 1 - sourceY;
-			int atlasTopY = atlas.height() - 1 - glY;
-			rows[y] = atlasTopY - region.y() - sprite.sourceY();
-		}
-		return rows;
+	public static String debugOpenGlPackedSpriteVertexShaderForTests() {
+		return GuiPipelineLibrary.VERTEX_SHADER_OPENGL;
 	}
 
-	static String debugOpenGlPackedSpriteVertexShaderForTests() {
-		return VERTEX_SHADER_OPENGL;
+	public static String debugOpenGlPackedSpriteFragmentShaderForTests() {
+		return GuiPipelineLibrary.FRAGMENT_SHADER_OPENGL;
 	}
 
-	static String debugOpenGlPackedSpriteFragmentShaderForTests() {
-		return FRAGMENT_SHADER_OPENGL;
-	}
-
-	private static CachedResources resourcesFor(DeferredGuiBatch batch) {
-		TextureGroup textureGroup = batch.sprite().textureGroup;
-		CacheKey key = new CacheKey(textureGroup.cacheKind, textureGroup.semanticId, generation);
-		CachedResources resources = CACHES.get(key);
-		if (resources != null) {
+	private static GuiResourceCache.CachedResources resourcesFor(GuiBatchBuilder.GuiSpriteRequest request) {
+		GuiResourceCache.Lookup lookup = RESOURCE_CACHE.resourcesFor(bridge, generation, request.sprite().textureGroup, RESOURCE_RECORDER);
+		if (lookup.cacheHit()) {
 			METRICS.cacheHits++;
-			return resources;
+		} else {
+			METRICS.cacheMisses++;
+			METRICS.resourceCreateNanos += lookup.createNanos();
 		}
-		METRICS.cacheMisses++;
-		CachedResources created = createGuiSpriteResources(textureGroup, key);
-		CACHES.put(key, created);
-		return created;
-	}
-
-	private static CachedResources createGuiSpriteResources(TextureGroup textureGroup, CacheKey key) {
-		long createStarted = System.nanoTime();
-		List<HandleToDestroy> created = new ArrayList<>();
-		try {
-			TextureAtlas atlas = atlasFor(textureGroup);
-				VulkanicGalBridge.ResourceResults base = bridge.resourceBatch(
-					bridge.resourceBatchBuilder()
-						.buffer(1, key.label("texture-upload"), atlas.bytes().length, VulkanicGalBridge.MEMORY_UPLOAD,
-							VulkanicGalBridge.BUFFER_TRANSFER_SRC | VulkanicGalBridge.BUFFER_TRANSFER_DST | VulkanicGalBridge.BUFFER_HOST_WRITE)
-						.buffer(2, key.label("index"), 24, VulkanicGalBridge.MEMORY_UPLOAD,
-							VulkanicGalBridge.BUFFER_INDEX | VulkanicGalBridge.BUFFER_TRANSFER_DST | VulkanicGalBridge.BUFFER_HOST_WRITE)
-						.buffer(3, key.label("uniform"), GUI_PACKED_UNIFORM_BYTES, VulkanicGalBridge.MEMORY_UPLOAD,
-							VulkanicGalBridge.BUFFER_UNIFORM | VulkanicGalBridge.BUFFER_TRANSFER_DST | VulkanicGalBridge.BUFFER_HOST_WRITE)
-						.texture(4, key.label("texture"), VulkanicGalBridge.FORMAT_RGBA8, atlas.width(), atlas.height(),
-							VulkanicGalBridge.TEXTURE_SAMPLED | VulkanicGalBridge.TEXTURE_TRANSFER_DST)
-						.sampler(5, key.label("sampler"))
-						.shader(6, key.label("vertex"), VulkanicGalBridge.SHADER_VERTEX, VERTEX_SHADER_OPENGL)
-						.shader(7, key.label("fragment"), VulkanicGalBridge.SHADER_FRAGMENT, FRAGMENT_SHADER_OPENGL)
-						.build());
-				recordResourceBatch(base);
-			long uploadBuffer = base.handle(0);
-			long indexBuffer = base.handle(1);
-			long uniformBuffer = base.handle(2);
-			long texture = base.handle(3);
-			long sampler = base.handle(4);
-			long vertex = base.handle(5);
-			long fragment = base.handle(6);
-			created.add(new HandleToDestroy(uploadBuffer, VulkanicGalBridge.HANDLE_BUFFER));
-			created.add(new HandleToDestroy(indexBuffer, VulkanicGalBridge.HANDLE_BUFFER));
-			created.add(new HandleToDestroy(uniformBuffer, VulkanicGalBridge.HANDLE_BUFFER));
-			created.add(new HandleToDestroy(texture, VulkanicGalBridge.HANDLE_TEXTURE));
-			created.add(new HandleToDestroy(sampler, VulkanicGalBridge.HANDLE_SAMPLER));
-			created.add(new HandleToDestroy(vertex, VulkanicGalBridge.HANDLE_SHADER_MODULE));
-			created.add(new HandleToDestroy(fragment, VulkanicGalBridge.HANDLE_SHADER_MODULE));
-				VulkanicGalBridge.ResourceResults dependent = bridge.resourceBatch(
-				bridge.resourceBatchBuilder()
-					.textureView(10, key.label("texture-view"), texture, VulkanicGalBridge.FORMAT_RGBA8)
-						.resourceLayout(20, key.label("resource-layout"),
-							new VulkanicGalBridge.BindingDesc(0, VulkanicGalBridge.BINDING_UNIFORM_BUFFER, 1, false),
-							new VulkanicGalBridge.BindingDesc(1, VulkanicGalBridge.BINDING_SAMPLED_TEXTURE, 1, false),
-							new VulkanicGalBridge.BindingDesc(2, VulkanicGalBridge.BINDING_SAMPLER, 1, false))
-						.build());
-				recordResourceBatch(dependent);
-			long textureView = dependent.handle(0);
-			long resourceLayout = dependent.handle(1);
-			created.add(new HandleToDestroy(textureView, VulkanicGalBridge.HANDLE_TEXTURE_VIEW));
-			created.add(new HandleToDestroy(resourceLayout, VulkanicGalBridge.HANDLE_RESOURCE_LAYOUT));
-				VulkanicGalBridge.ResourceResults set = bridge.resourceBatch(
-				bridge.resourceBatchBuilder()
-					.resourceSet(21, key.label("resource-set"), resourceLayout,
-						new VulkanicGalBridge.Binding(0, 0, uniformBuffer, VulkanicGalBridge.BINDING_UNIFORM_BUFFER),
-						new VulkanicGalBridge.Binding(1, 0, textureView, VulkanicGalBridge.BINDING_SAMPLED_TEXTURE),
-						new VulkanicGalBridge.Binding(2, 0, sampler, VulkanicGalBridge.BINDING_SAMPLER))
-						.pipelineLayout(30, key.label("pipeline-layout"), resourceLayout)
-						.build());
-				recordResourceBatch(set);
-			long resourceSet = set.handle(0);
-			long pipelineLayout = set.handle(1);
-			created.add(new HandleToDestroy(resourceSet, VulkanicGalBridge.HANDLE_RESOURCE_SET));
-			created.add(new HandleToDestroy(pipelineLayout, VulkanicGalBridge.HANDLE_PIPELINE_LAYOUT));
-				VulkanicGalBridge.ResourceResults pipeline = bridge.resourceBatch(
-					textureGroup.pipeline(bridge.resourceBatchBuilder(), 31, key.label("pipeline"), pipelineLayout, vertex, fragment)
-						.build());
-				recordResourceBatch(pipeline);
-			long graphicsPipeline = pipeline.handle(0);
-			created.add(new HandleToDestroy(graphicsPipeline, VulkanicGalBridge.HANDLE_GRAPHICS_PIPELINE));
-			CachedResources resources = new CachedResources(
-				key,
-				uploadBuffer,
-				indexBuffer,
-				uniformBuffer,
-				texture,
-				sampler,
-				vertex,
-				fragment,
-				textureView,
-				resourceLayout,
-				resourceSet,
-				pipelineLayout,
-				graphicsPipeline
-			);
-			uploadPersistentResources(textureGroup, resources);
-			METRICS.resourceCreates += resources.handlesInDestroyOrder().size();
-			return resources;
-		} catch (RuntimeException error) {
-			try {
-				destroyHandles(created);
-			} catch (RuntimeException cleanupError) {
-				error.addSuppressed(cleanupError);
-			}
-			throw error;
-		} finally {
-			METRICS.resourceCreateNanos += elapsedSince(createStarted);
-		}
-	}
-
-	private static void uploadPersistentResources(TextureGroup textureGroup, CachedResources resources) {
-		TextureAtlas atlas = atlasFor(textureGroup);
-		VulkanicGalBridge.Status upload = bridge.submit(
-			bridge.submissionBatchBuilder(resources.key().label("upload"))
-				.hostWrite(resources.uploadBuffer, 0, atlas.bytes())
-				.barrier(resources.uploadBuffer, VulkanicGalBridge.USAGE_TRANSFER_DST, VulkanicGalBridge.USAGE_TRANSFER_SRC, false)
-				.hostWrite(resources.indexBuffer, 0, indexBytes())
-				.barrier(resources.indexBuffer, VulkanicGalBridge.USAGE_TRANSFER_DST, VulkanicGalBridge.USAGE_SHADER_READ, false)
-				.barrier(resources.texture, VulkanicGalBridge.USAGE_UNDEFINED, VulkanicGalBridge.USAGE_TRANSFER_DST, true)
-				.copyBufferToTexture(resources.uploadBuffer, resources.texture, atlas.width(), atlas.height())
-				.barrier(resources.texture, VulkanicGalBridge.USAGE_TRANSFER_DST, VulkanicGalBridge.USAGE_SHADER_READ, true)
-				.build());
-		recordStatus(Operation.SUBMIT, upload);
-		lastSubmitted = Math.max(lastSubmitted, upload.submissionId());
+		return lookup.resources();
 	}
 
 	private static void destroyCachedResources() {
-		if (bridge == null || CACHES.isEmpty()) {
-			return;
-		}
-		List<CachedResources> resources = new ArrayList<>(CACHES.values());
-		resources.sort(Comparator.comparing(resource -> resource.key().semanticId()));
-		for (CachedResources resource : resources) {
-			VulkanicGalBridge.ResourceBatchBuilder destroy = bridge.resourceBatchBuilder();
-			for (HandleToDestroy handle : resource.handlesInDestroyOrder()) {
-				destroy.destroy(handle.handle(), handle.kind());
-				METRICS.resourceDestroys++;
-			}
-			recordResourceBatch(bridge.resourceBatch(destroy.build()));
-		}
+		RESOURCE_CACHE.destroyCachedResources(bridge, RESOURCE_RECORDER);
 	}
+
 
 	private static FrameResources frameResourcesFor(long acquiredFrameTarget) {
 		if (cachedFramePass != 0L && cachedFrameTarget != 0L && cachedFrameTarget == acquiredFrameTarget) {
@@ -1075,19 +888,6 @@ public final class RustGalFrameQueue {
 				cachedFrameTarget = 0L;
 			}
 		}
-	}
-
-	private static void destroyHandles(List<HandleToDestroy> handles) {
-		if (bridge == null || handles.isEmpty()) {
-			return;
-		}
-		VulkanicGalBridge.ResourceBatchBuilder destroy = bridge.resourceBatchBuilder();
-		for (int i = handles.size() - 1; i >= 0; i--) {
-			HandleToDestroy handle = handles.get(i);
-			destroy.destroy(handle.handle(), handle.kind());
-			METRICS.resourceDestroys++;
-		}
-		recordResourceBatch(bridge.resourceBatch(destroy.build()));
 	}
 
 	private static void retireOutstanding(boolean force) {
@@ -1354,202 +1154,6 @@ public final class RustGalFrameQueue {
 		};
 	}
 
-	private static byte[] packedUniformBytes(List<PackedSprite> sprites) {
-		if (sprites.isEmpty() || sprites.size() > GUI_MAX_PACKED_SPRITES) {
-			throw new IllegalArgumentException("packed GUI sprite count must be in 1.." + GUI_MAX_PACKED_SPRITES + ": " + sprites.size());
-		}
-		ByteBuffer buffer = ByteBuffer.allocate(GUI_UNIFORM_BYTES * sprites.size()).order(ByteOrder.nativeOrder());
-		for (PackedSprite sprite : sprites) {
-			TextureAtlas atlas = atlasFor(sprite.sprite().textureGroup);
-			AtlasRegion region = atlas.region(sprite.sprite());
-			buffer.putFloat(sprite.x());
-			buffer.putFloat(sprite.y());
-			buffer.putFloat(sprite.width());
-			buffer.putFloat(sprite.height());
-			buffer.putFloat(sprite.guiWidth());
-			buffer.putFloat(sprite.guiHeight());
-			buffer.putFloat(sprite.progressFraction());
-			buffer.putFloat(sprite.fillDirection().ordinal());
-			buffer.putFloat((region.x() + sprite.sourceX()) / (float)atlas.width());
-			buffer.putFloat((atlas.height() - (region.y() + sprite.sourceY() + sprite.sourceHeight())) / (float)atlas.height());
-			buffer.putFloat(sprite.sourceWidth() / (float)atlas.width());
-			buffer.putFloat(sprite.sourceHeight() / (float)atlas.height());
-			buffer.putFloat(((sprite.colorArgb() >>> 16) & 0xFF) / 255.0F);
-			buffer.putFloat(((sprite.colorArgb() >>> 8) & 0xFF) / 255.0F);
-			buffer.putFloat((sprite.colorArgb() & 0xFF) / 255.0F);
-			buffer.putFloat(((sprite.colorArgb() >>> 24) & 0xFF) / 255.0F);
-		}
-		return buffer.array();
-	}
-
-	private static TextureAtlas atlasFor(TextureGroup group) {
-		TextureAtlas atlas = ATLASES.get(group);
-		if (atlas != null) {
-			return atlas;
-		}
-		TextureAtlas created = buildAtlas(group);
-		ATLASES.put(group, created);
-		return created;
-	}
-
-	private static TextureAtlas buildAtlas(TextureGroup group) {
-		List<GuiSprite> sprites = new ArrayList<>();
-		for (GuiSprite sprite : GuiSprite.values()) {
-			if (sprite.textureGroup == group) {
-				sprites.add(sprite);
-			}
-		}
-		if (sprites.isEmpty()) {
-			throw new IllegalStateException("no GUI sprites are assigned to texture group " + group.semanticId);
-		}
-		int width = 1;
-		int height = 0;
-		int rowWidth = 0;
-		int rowHeight = 0;
-		for (GuiSprite sprite : sprites) {
-			if (sprite.width > GUI_ATLAS_MAX_EXTENT || sprite.height > GUI_ATLAS_MAX_EXTENT) {
-				throw new IllegalStateException("GUI sprite " + sprite.name() + " exceeds atlas extent " + GUI_ATLAS_MAX_EXTENT);
-			}
-			if (rowWidth > 0 && rowWidth + sprite.width > GUI_ATLAS_MAX_EXTENT) {
-				width = Math.max(width, rowWidth);
-				height += rowHeight;
-				rowWidth = 0;
-				rowHeight = 0;
-			}
-			rowWidth += sprite.width;
-			rowHeight = Math.max(rowHeight, sprite.height);
-		}
-		width = Math.max(width, rowWidth);
-		height += rowHeight;
-		if (height > GUI_ATLAS_MAX_EXTENT) {
-			throw new IllegalStateException("GUI sprite atlas " + group.semanticId + " exceeds atlas extent " + GUI_ATLAS_MAX_EXTENT);
-		}
-		byte[] bytes = new byte[width * height * 4];
-		Map<GuiSprite, AtlasRegion> regions = new EnumMap<>(GuiSprite.class);
-		int xOffset = 0;
-		int yOffset = 0;
-		rowHeight = 0;
-		for (GuiSprite sprite : sprites) {
-			if (xOffset > 0 && xOffset + sprite.width > GUI_ATLAS_MAX_EXTENT) {
-				xOffset = 0;
-				yOffset += rowHeight;
-				rowHeight = 0;
-			}
-			byte[] spriteBytes = spriteTextureBytes(sprite);
-			for (int y = 0; y < sprite.height; y++) {
-				int src = y * sprite.width * 4;
-				int dst = ((yOffset + y) * width + xOffset) * 4;
-				System.arraycopy(spriteBytes, src, bytes, dst, sprite.width * 4);
-			}
-			regions.put(sprite, new AtlasRegion(xOffset, yOffset, sprite.width, sprite.height));
-			xOffset += sprite.width;
-			rowHeight = Math.max(rowHeight, sprite.height);
-		}
-		return new TextureAtlas(group, width, height, bytes, regions);
-	}
-
-	private static byte[] spriteTextureBytes(GuiSprite sprite) {
-		try (InputStream input = RustGalFrameQueue.class.getResourceAsStream(sprite.textureResource)) {
-			if (input == null) {
-				throw new IllegalStateException("missing GUI texture resource: " + sprite.textureResource);
-			}
-			BufferedImage image = ImageIO.read(input);
-			if (image == null || image.getWidth() != sprite.width || image.getHeight() != sprite.height) {
-				throw new IllegalStateException("unexpected GUI texture dimensions for " + sprite.textureResource);
-			}
-			byte[] bytes = new byte[sprite.textureBytes()];
-			int offset = 0;
-			for (int y = 0; y < sprite.height; y++) {
-				for (int x = 0; x < sprite.width; x++) {
-					int argb = image.getRGB(x, y);
-					bytes[offset++] = (byte)((argb >>> 16) & 0xFF);
-					bytes[offset++] = (byte)((argb >>> 8) & 0xFF);
-					bytes[offset++] = (byte)(argb & 0xFF);
-					bytes[offset++] = (byte)((argb >>> 24) & 0xFF);
-				}
-			}
-			return bytes;
-		} catch (IOException error) {
-			throw new IllegalStateException("failed to load GUI texture " + sprite.textureResource, error);
-		}
-	}
-
-	private static byte[] indexBytes() {
-		byte[] bytes = new byte[24];
-		int[] values = {0, 1, 2, 3, 4, 5};
-		for (int i = 0; i < values.length; i++) {
-			int value = values[i];
-			int offset = i * 4;
-			bytes[offset] = (byte)value;
-			bytes[offset + 1] = (byte)(value >>> 8);
-			bytes[offset + 2] = (byte)(value >>> 16);
-			bytes[offset + 3] = (byte)(value >>> 24);
-		}
-		return bytes;
-	}
-
-	public enum RenderStratum {
-		GUI_CROSSHAIR("gui.crosshair", 200),
-		GUI_HOTBAR_BASE("gui.hotbar.base", 300),
-		GUI_HOTBAR_SELECTION("gui.hotbar.selection", 310),
-		GUI_ARMOR("gui.armor", 350),
-		GUI_EXPERIENCE_BAR_BACKGROUND("gui.experience.background", 400),
-		GUI_EXPERIENCE_BAR_PROGRESS("gui.experience.progress", 410),
-		GUI_ATTACK_CROSSHAIR_BACKGROUND("gui.attack.crosshair.background", 500),
-		GUI_ATTACK_CROSSHAIR_PROGRESS("gui.attack.crosshair.progress", 510),
-		GUI_ATTACK_HOTBAR_BACKGROUND("gui.attack.hotbar.background", 520),
-		GUI_ATTACK_HOTBAR_PROGRESS("gui.attack.hotbar.progress", 530),
-		GUI_BOSS_BAR_BACKGROUND("gui.boss.background", 600),
-		GUI_BOSS_BAR_PROGRESS("gui.boss.progress", 610);
-
-		private final String id;
-		private final int order;
-
-		RenderStratum(String id, int order) {
-			this.id = id;
-			this.order = order;
-		}
-
-		public String id() {
-			return id;
-		}
-
-		public int order() {
-			return order;
-		}
-
-		boolean supportedForPartialFrame() {
-			return this == GUI_CROSSHAIR
-				|| this == GUI_HOTBAR_BASE
-				|| this == GUI_HOTBAR_SELECTION
-				|| this == GUI_ARMOR
-				|| this == GUI_EXPERIENCE_BAR_BACKGROUND
-				|| this == GUI_EXPERIENCE_BAR_PROGRESS
-				|| this == GUI_ATTACK_CROSSHAIR_BACKGROUND
-				|| this == GUI_ATTACK_CROSSHAIR_PROGRESS
-				|| this == GUI_ATTACK_HOTBAR_BACKGROUND
-				|| this == GUI_ATTACK_HOTBAR_PROGRESS
-				|| this == GUI_BOSS_BAR_BACKGROUND
-				|| this == GUI_BOSS_BAR_PROGRESS;
-			}
-		}
-
-	public enum FillDirection {
-		NONE("none"),
-		HORIZONTAL_LEFT_TO_RIGHT("horizontal-left-to-right"),
-		VERTICAL_BOTTOM_TO_TOP("vertical-bottom-to-top");
-
-		private final String id;
-
-		FillDirection(String id) {
-			this.id = id;
-		}
-
-		public String id() {
-			return id;
-		}
-	}
-
 	public enum ArmorIconState {
 		EMPTY("empty", GuiSprite.ARMOR_EMPTY),
 		HALF("half", GuiSprite.ARMOR_HALF),
@@ -1563,331 +1167,178 @@ public final class RustGalFrameQueue {
 			this.sprite = sprite;
 		}
 
-		private String id() {
+		String id() {
 			return this.id;
 		}
 
-		private GuiSprite sprite() {
+		GuiSprite sprite() {
 			return this.sprite;
 		}
 	}
 
-	private static final class DeferredBatchScheduler {
-		private final NavigableMap<Long, DeferredGuiBatch> pending = new TreeMap<>();
-		private long nextBatchId = 1L;
-		private long nextSequence = 1L;
-		private int lastExecutedOrder = Integer.MIN_VALUE;
+	public record PlayerHeartRequest(
+		PlayerHeartVariant variant,
+		PlayerHeartState state,
+		boolean hardcore,
+		boolean flashing,
+		int order,
+		int x,
+		int y
+	) {
+		public PlayerHeartRequest {
+			if (variant == null) {
+				throw new IllegalArgumentException("player heart variant must be provided");
+			}
+			if (state == null) {
+				throw new IllegalArgumentException("player heart state must be provided");
+			}
+			if (order < 0) {
+				throw new IllegalArgumentException("player heart order must be non-negative: " + order);
+			}
+			if (state == PlayerHeartState.CONTAINER && variant != PlayerHeartVariant.CONTAINER) {
+				throw new IllegalArgumentException("container player hearts must use the container variant");
+			}
+			if (state != PlayerHeartState.CONTAINER && variant == PlayerHeartVariant.CONTAINER) {
+				throw new IllegalArgumentException("filled player hearts must use a non-container variant");
+			}
+		}
 
-		RustGalGuiElementRenderState enqueue(
-			GuiSprite sprite,
-			String producerId,
-				int selectedSlot,
-				float progressFraction,
-				FillDirection fillDirection,
-				int x,
-				int y,
-			int width,
-			int height,
-			int sourceX,
-			int sourceY,
-			int sourceWidth,
-			int sourceHeight,
-			int guiWidth,
-			int guiHeight,
-			long generation
+		GuiSprite sprite() {
+			return variant.sprite(state, hardcore, flashing);
+		}
+	}
+
+	public enum PlayerHeartState {
+		CONTAINER("container", 0.0F),
+		HALF("half", 0.5F),
+		FULL("full", 1.0F);
+
+		private final String id;
+		private final float progressValue;
+
+		PlayerHeartState(String id, float progressValue) {
+			this.id = id;
+			this.progressValue = progressValue;
+		}
+
+		String id() {
+			return this.id;
+		}
+
+		float progressValue() {
+			return this.progressValue;
+		}
+	}
+
+	public enum PlayerHeartVariant {
+		CONTAINER("container"),
+		NORMAL("normal"),
+		POISONED("poisoned"),
+		WITHERED("withered"),
+		FROZEN("frozen");
+
+		private final String id;
+
+		PlayerHeartVariant(String id) {
+			this.id = id;
+		}
+
+		String id() {
+			return this.id;
+		}
+
+		GuiSprite sprite(PlayerHeartState state, boolean hardcore, boolean flashing) {
+			return switch (this) {
+				case CONTAINER -> {
+					if (state != PlayerHeartState.CONTAINER) {
+						throw new IllegalArgumentException("container heart variant cannot render " + state);
+					}
+					if (hardcore) {
+						yield flashing ? GuiSprite.HEART_CONTAINER_HARDCORE_FLASHING : GuiSprite.HEART_CONTAINER_HARDCORE;
+					}
+					yield flashing ? GuiSprite.HEART_CONTAINER_FLASHING : GuiSprite.HEART_CONTAINER;
+				}
+				case NORMAL -> filledSprite(state, hardcore, flashing,
+					GuiSprite.HEART_NORMAL_FULL,
+					GuiSprite.HEART_NORMAL_FULL_FLASHING,
+					GuiSprite.HEART_NORMAL_HALF,
+					GuiSprite.HEART_NORMAL_HALF_FLASHING,
+					GuiSprite.HEART_NORMAL_HARDCORE_FULL,
+					GuiSprite.HEART_NORMAL_HARDCORE_FULL_FLASHING,
+					GuiSprite.HEART_NORMAL_HARDCORE_HALF,
+					GuiSprite.HEART_NORMAL_HARDCORE_HALF_FLASHING);
+				case POISONED -> filledSprite(state, hardcore, flashing,
+					GuiSprite.HEART_POISONED_FULL,
+					GuiSprite.HEART_POISONED_FULL_FLASHING,
+					GuiSprite.HEART_POISONED_HALF,
+					GuiSprite.HEART_POISONED_HALF_FLASHING,
+					GuiSprite.HEART_POISONED_HARDCORE_FULL,
+					GuiSprite.HEART_POISONED_HARDCORE_FULL_FLASHING,
+					GuiSprite.HEART_POISONED_HARDCORE_HALF,
+					GuiSprite.HEART_POISONED_HARDCORE_HALF_FLASHING);
+				case WITHERED -> filledSprite(state, hardcore, flashing,
+					GuiSprite.HEART_WITHERED_FULL,
+					GuiSprite.HEART_WITHERED_FULL_FLASHING,
+					GuiSprite.HEART_WITHERED_HALF,
+					GuiSprite.HEART_WITHERED_HALF_FLASHING,
+					GuiSprite.HEART_WITHERED_HARDCORE_FULL,
+					GuiSprite.HEART_WITHERED_HARDCORE_FULL_FLASHING,
+					GuiSprite.HEART_WITHERED_HARDCORE_HALF,
+					GuiSprite.HEART_WITHERED_HARDCORE_HALF_FLASHING);
+				case FROZEN -> filledSprite(state, hardcore, flashing,
+					GuiSprite.HEART_FROZEN_FULL,
+					GuiSprite.HEART_FROZEN_FULL_FLASHING,
+					GuiSprite.HEART_FROZEN_HALF,
+					GuiSprite.HEART_FROZEN_HALF_FLASHING,
+					GuiSprite.HEART_FROZEN_HARDCORE_FULL,
+					GuiSprite.HEART_FROZEN_HARDCORE_FULL_FLASHING,
+					GuiSprite.HEART_FROZEN_HARDCORE_HALF,
+					GuiSprite.HEART_FROZEN_HARDCORE_HALF_FLASHING);
+			};
+		}
+
+		private static GuiSprite filledSprite(
+			PlayerHeartState state,
+			boolean hardcore,
+			boolean flashing,
+			GuiSprite full,
+			GuiSprite fullFlashing,
+			GuiSprite half,
+			GuiSprite halfFlashing,
+			GuiSprite hardcoreFull,
+			GuiSprite hardcoreFullFlashing,
+			GuiSprite hardcoreHalf,
+			GuiSprite hardcoreHalfFlashing
 		) {
-			long batchId = this.nextBatchId++;
-			long sequence = this.nextSequence++;
-			DeferredGuiBatch batch = new DeferredGuiBatch(
-					batchId,
-					sequence,
-					generation,
-					sprite.stratum,
-					sprite,
-					producerId,
-						selectedSlot,
-						progressFraction,
-						fillDirection,
-						x,
-					y,
-					width,
-					height,
-					sourceX,
-					sourceY,
-					sourceWidth,
-					sourceHeight,
-					guiWidth,
-					guiHeight
-				);
-			this.pending.put(batchId, batch);
-			return new RustGalGuiElementRenderState(
-				batchId,
-				sequence,
-				generation,
-				batch.stratum(),
-				producerId,
-					selectedSlot,
-					progressFraction,
-					fillDirection,
-					sourceX,
-				sourceY,
-				sourceWidth,
-				sourceHeight,
-				x,
-				y,
-				width,
-				height,
-				guiWidth,
-				guiHeight
-			);
+			return switch (state) {
+				case CONTAINER -> throw new IllegalArgumentException("filled player heart variant cannot render a container");
+				case FULL -> hardcore ? (flashing ? hardcoreFullFlashing : hardcoreFull) : (flashing ? fullFlashing : full);
+				case HALF -> hardcore ? (flashing ? hardcoreHalfFlashing : hardcoreHalf) : (flashing ? halfFlashing : half);
+			};
 		}
-
-		List<DeferredGuiBatch> takeAll(List<RustGalGuiElementRenderState> elements) {
-			List<RustGalGuiElementRenderState> ordered = new ArrayList<>(elements);
-			ordered.sort(Comparator.comparingInt((RustGalGuiElementRenderState element) -> element.stratum().order()).thenComparingLong(RustGalGuiElementRenderState::sequence));
-			List<DeferredGuiBatch> batches = new ArrayList<>(ordered.size());
-			int lastOrder = Integer.MIN_VALUE;
-			for (RustGalGuiElementRenderState element : ordered) {
-				DeferredGuiBatch batch = this.take(element);
-				if (batch.stratum().order() < lastOrder) {
-					throw new IllegalStateException("Rust VulkanicGAL deferred batch executed out of stratum order: stratum=" + batch.stratum().id());
-				}
-				lastOrder = batch.stratum().order();
-				batches.add(batch);
-			}
-			this.lastExecutedOrder = Integer.MIN_VALUE;
-			return batches;
-		}
-
-		private DeferredGuiBatch take(RustGalGuiElementRenderState element) {
-			DeferredGuiBatch batch = this.pending.remove(element.batchId());
-			if (batch == null) {
-				throw new IllegalStateException("Rust VulkanicGAL deferred batch is no longer pending: batch=" + element.batchId());
-			}
-			if (batch.generation() != element.generation() || batch.generation() != generation) {
-				throw new IllegalStateException("Rust VulkanicGAL deferred batch generation is stale: batch=" + element.batchId());
-			}
-			if (batch.sequence() != element.sequence() || batch.stratum() != element.stratum()) {
-				throw new IllegalStateException("Rust VulkanicGAL deferred batch token does not match scheduled work: batch=" + element.batchId());
-			}
-			if (batch.stratum().order() < this.lastExecutedOrder) {
-				throw new IllegalStateException("Rust VulkanicGAL deferred batch executed out of stratum order: stratum=" + batch.stratum().id());
-			}
-			this.lastExecutedOrder = batch.stratum().order();
-			return batch;
-		}
-
-			int cancelFrame(long frameId, String reason) {
-				if (frameId == 0L || this.pending.isEmpty()) {
-					return 0;
-				}
-				return cancelAll(reason + ":frame=" + frameId);
-			}
-
-			int cancelAll(String reason) {
-				int cancelled = this.pending.size();
-				if (!this.pending.isEmpty()) {
-					LOGGER.info("Cancelling {} Rust VulkanicGAL deferred GUI batch(es): {}", this.pending.size(), reason);
-					this.pending.clear();
-				}
-				this.lastExecutedOrder = Integer.MIN_VALUE;
-				return cancelled;
-			}
-
-		int pendingCount() {
-			return this.pending.size();
-		}
-	}
-
-	private record DeferredGuiBatch(
-		long batchId,
-		long sequence,
-		long generation,
-		RenderStratum stratum,
-		GuiSprite sprite,
-		String producerId,
-		int selectedSlot,
-		float progressFraction,
-		FillDirection fillDirection,
-		int x,
-		int y,
-		int width,
-		int height,
-		int sourceX,
-		int sourceY,
-		int sourceWidth,
-		int sourceHeight,
-		int guiWidth,
-		int guiHeight
-	) {
-	}
-
-	private static final class FrameSpriteBatchBuilder {
-		private final RenderStratum stratum;
-		private final CachedResources resources;
-		private final List<PackedSprite> sprites = new ArrayList<>();
-
-		FrameSpriteBatchBuilder(DeferredGuiBatch first, CachedResources resources) {
-			this.stratum = first.stratum();
-			this.resources = resources;
-		}
-
-		boolean canAppend(DeferredGuiBatch batch, CachedResources resources) {
-			return this.sprites.size() < GUI_MAX_PACKED_SPRITES
-				&& batch.stratum() == this.stratum
-				&& resources.sameBindingsAs(this.resources);
-		}
-
-		void add(PackedSprite sprite) {
-			this.sprites.add(sprite);
-		}
-
-		FrameSpriteBatch build() {
-			return new FrameSpriteBatch(this.stratum, this.resources, List.copyOf(this.sprites));
-		}
-	}
-
-	private record FrameSpriteBatch(RenderStratum stratum, CachedResources resources, List<PackedSprite> sprites) {
-	}
-
-	private record PackedSprite(
-		GuiSprite sprite,
-		String producerId,
-		int selectedSlot,
-		float progressFraction,
-		FillDirection fillDirection,
-		int colorArgb,
-		int x,
-		int y,
-		int width,
-		int height,
-		int sourceX,
-		int sourceY,
-		int sourceWidth,
-		int sourceHeight,
-		int guiWidth,
-		int guiHeight
-	) {
-		static PackedSprite from(DeferredGuiBatch batch) {
-			return new PackedSprite(
-				batch.sprite(),
-				batch.producerId(),
-				batch.selectedSlot(),
-				batch.progressFraction(),
-				batch.fillDirection(),
-				0xFFFFFFFF,
-				batch.x(),
-				batch.y(),
-				batch.width(),
-				batch.height(),
-				batch.sourceX(),
-				batch.sourceY(),
-				batch.sourceWidth(),
-				batch.sourceHeight(),
-				batch.guiWidth(),
-				batch.guiHeight()
-			);
-		}
-	}
-
-	private record CacheKey(String kind, String semanticId, long generation) {
-		String label(String suffix) {
-			return kind + "." + semanticId + ".gen" + generation + "." + suffix;
-		}
-	}
-
-	private record CachedResources(
-		CacheKey key,
-		long uploadBuffer,
-		long indexBuffer,
-		long uniformBuffer,
-		long texture,
-		long sampler,
-		long vertexShader,
-		long fragmentShader,
-		long textureView,
-		long resourceLayout,
-		long resourceSet,
-		long pipelineLayout,
-			long pipeline
-	) {
-		boolean sameBindingsAs(CachedResources other) {
-			return this.pipeline == other.pipeline
-				&& this.pipelineLayout == other.pipelineLayout
-				&& this.resourceSet == other.resourceSet
-				&& this.indexBuffer == other.indexBuffer
-				&& this.uniformBuffer == other.uniformBuffer;
-		}
-
-		List<HandleToDestroy> handlesInDestroyOrder() {
-			return List.of(
-				new HandleToDestroy(pipeline, VulkanicGalBridge.HANDLE_GRAPHICS_PIPELINE),
-				new HandleToDestroy(pipelineLayout, VulkanicGalBridge.HANDLE_PIPELINE_LAYOUT),
-				new HandleToDestroy(resourceSet, VulkanicGalBridge.HANDLE_RESOURCE_SET),
-				new HandleToDestroy(resourceLayout, VulkanicGalBridge.HANDLE_RESOURCE_LAYOUT),
-				new HandleToDestroy(textureView, VulkanicGalBridge.HANDLE_TEXTURE_VIEW),
-				new HandleToDestroy(fragmentShader, VulkanicGalBridge.HANDLE_SHADER_MODULE),
-				new HandleToDestroy(vertexShader, VulkanicGalBridge.HANDLE_SHADER_MODULE),
-				new HandleToDestroy(sampler, VulkanicGalBridge.HANDLE_SAMPLER),
-				new HandleToDestroy(texture, VulkanicGalBridge.HANDLE_TEXTURE),
-				new HandleToDestroy(uniformBuffer, VulkanicGalBridge.HANDLE_BUFFER),
-				new HandleToDestroy(indexBuffer, VulkanicGalBridge.HANDLE_BUFFER),
-				new HandleToDestroy(uploadBuffer, VulkanicGalBridge.HANDLE_BUFFER)
-			);
-		}
-	}
-
-	private record HandleToDestroy(long handle, int kind) {
 	}
 
 	private record FrameResources(long target, long pass) {
 	}
 
-	private record AtlasRegion(int x, int y, int width, int height) {
-	}
-
-	private record TextureAtlas(TextureGroup group, int width, int height, byte[] bytes, Map<GuiSprite, AtlasRegion> regions) {
-		AtlasRegion region(GuiSprite sprite) {
-			AtlasRegion region = this.regions.get(sprite);
-			if (region == null) {
-				throw new IllegalArgumentException("sprite " + sprite.name() + " is not in atlas " + this.group.semanticId);
-			}
-			return region;
-		}
-	}
-
-	private enum TextureGroup {
+	enum TextureGroup {
 		GUI_ALPHA("gui-textured-alpha-atlas", "gui-alpha", false),
 		GUI_INVERT("gui-textured-invert-atlas", "gui-invert", true);
 
-		private final String cacheKind;
-		private final String semanticId;
-		private final boolean invertBlend;
+		final String cacheKind;
+		final String semanticId;
+		final boolean invertBlend;
 
 		TextureGroup(String cacheKind, String semanticId, boolean invertBlend) {
 			this.cacheKind = cacheKind;
 			this.semanticId = semanticId;
 			this.invertBlend = invertBlend;
 		}
-
-		private VulkanicGalBridge.ResourceBatchBuilder pipeline(
-			VulkanicGalBridge.ResourceBatchBuilder builder,
-			long id,
-			String label,
-			long pipelineLayout,
-			long vertex,
-			long fragment
-		) {
-			if (this.invertBlend) {
-				return builder.guiInvertPipeline(id, label, pipelineLayout, vertex, fragment);
-			}
-			return builder.guiAlphaPipeline(id, label, pipelineLayout, vertex, fragment);
-		}
 	}
 
-	private enum GuiSprite {
+	enum GuiSprite {
 		CROSSHAIR(
-			RenderStratum.GUI_CROSSHAIR,
+			GuiRenderStratum.GUI_CROSSHAIR,
 			"crosshair",
 			"gui-textured-invert-crosshair",
 			"/assets/minecraft/textures/gui/sprites/hud/crosshair.png",
@@ -1896,7 +1347,7 @@ public final class RustGalFrameQueue {
 			true
 		),
 		HOTBAR_BASE(
-			RenderStratum.GUI_HOTBAR_BASE,
+			GuiRenderStratum.GUI_HOTBAR_BASE,
 			"hotbar-base",
 			"gui-textured-alpha-hotbar-base",
 			"/assets/minecraft/textures/gui/sprites/hud/hotbar.png",
@@ -1905,7 +1356,7 @@ public final class RustGalFrameQueue {
 			false
 		),
 			HOTBAR_SELECTION(
-				RenderStratum.GUI_HOTBAR_SELECTION,
+				GuiRenderStratum.GUI_HOTBAR_SELECTION,
 				"hotbar-selection",
 				"gui-textured-alpha-hotbar-selection",
 				"/assets/minecraft/textures/gui/sprites/hud/hotbar_selection.png",
@@ -1914,7 +1365,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			ARMOR_EMPTY(
-				RenderStratum.GUI_ARMOR,
+				GuiRenderStratum.GUI_ARMOR,
 				"armor-empty",
 				"gui-textured-alpha-armor-empty",
 				"/assets/minecraft/textures/gui/sprites/hud/armor_empty.png",
@@ -1923,7 +1374,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			ARMOR_HALF(
-				RenderStratum.GUI_ARMOR,
+				GuiRenderStratum.GUI_ARMOR,
 				"armor-half",
 				"gui-textured-alpha-armor-half",
 				"/assets/minecraft/textures/gui/sprites/hud/armor_half.png",
@@ -1931,17 +1382,341 @@ public final class RustGalFrameQueue {
 				9,
 				false
 			),
-			ARMOR_FULL(
-				RenderStratum.GUI_ARMOR,
-				"armor-full",
-				"gui-textured-alpha-armor-full",
-				"/assets/minecraft/textures/gui/sprites/hud/armor_full.png",
-				9,
-				9,
-				false
-			),
-			EXPERIENCE_BAR_BACKGROUND(
-			RenderStratum.GUI_EXPERIENCE_BAR_BACKGROUND,
+				ARMOR_FULL(
+					GuiRenderStratum.GUI_ARMOR,
+					"armor-full",
+					"gui-textured-alpha-armor-full",
+					"/assets/minecraft/textures/gui/sprites/hud/armor_full.png",
+					9,
+					9,
+					false
+				),
+				HEART_CONTAINER(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-container",
+					"gui-textured-alpha-heart-container",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/container.png",
+					9,
+					9,
+					false
+				),
+				HEART_CONTAINER_FLASHING(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-container",
+					"gui-textured-alpha-heart-container-flashing",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/container_blinking.png",
+					9,
+					9,
+					false
+				),
+				HEART_CONTAINER_HARDCORE(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-container",
+					"gui-textured-alpha-heart-container-hardcore",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/container_hardcore.png",
+					9,
+					9,
+					false
+				),
+				HEART_CONTAINER_HARDCORE_FLASHING(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-container",
+					"gui-textured-alpha-heart-container-hardcore-flashing",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/container_hardcore_blinking.png",
+					9,
+					9,
+					false
+				),
+				HEART_NORMAL_FULL(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-normal",
+					"gui-textured-alpha-heart-normal-full",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/full.png",
+					9,
+					9,
+					false
+				),
+				HEART_NORMAL_FULL_FLASHING(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-normal",
+					"gui-textured-alpha-heart-normal-full-flashing",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/full_blinking.png",
+					9,
+					9,
+					false
+				),
+				HEART_NORMAL_HALF(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-normal",
+					"gui-textured-alpha-heart-normal-half",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/half.png",
+					9,
+					9,
+					false
+				),
+				HEART_NORMAL_HALF_FLASHING(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-normal",
+					"gui-textured-alpha-heart-normal-half-flashing",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/half_blinking.png",
+					9,
+					9,
+					false
+				),
+				HEART_NORMAL_HARDCORE_FULL(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-normal",
+					"gui-textured-alpha-heart-normal-hardcore-full",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/hardcore_full.png",
+					9,
+					9,
+					false
+				),
+				HEART_NORMAL_HARDCORE_FULL_FLASHING(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-normal",
+					"gui-textured-alpha-heart-normal-hardcore-full-flashing",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/hardcore_full_blinking.png",
+					9,
+					9,
+					false
+				),
+				HEART_NORMAL_HARDCORE_HALF(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-normal",
+					"gui-textured-alpha-heart-normal-hardcore-half",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/hardcore_half.png",
+					9,
+					9,
+					false
+				),
+				HEART_NORMAL_HARDCORE_HALF_FLASHING(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-normal",
+					"gui-textured-alpha-heart-normal-hardcore-half-flashing",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/hardcore_half_blinking.png",
+					9,
+					9,
+					false
+				),
+				HEART_POISONED_FULL(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-poisoned",
+					"gui-textured-alpha-heart-poisoned-full",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/poisoned_full.png",
+					9,
+					9,
+					false
+				),
+				HEART_POISONED_FULL_FLASHING(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-poisoned",
+					"gui-textured-alpha-heart-poisoned-full-flashing",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/poisoned_full_blinking.png",
+					9,
+					9,
+					false
+				),
+				HEART_POISONED_HALF(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-poisoned",
+					"gui-textured-alpha-heart-poisoned-half",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/poisoned_half.png",
+					9,
+					9,
+					false
+				),
+				HEART_POISONED_HALF_FLASHING(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-poisoned",
+					"gui-textured-alpha-heart-poisoned-half-flashing",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/poisoned_half_blinking.png",
+					9,
+					9,
+					false
+				),
+				HEART_POISONED_HARDCORE_FULL(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-poisoned",
+					"gui-textured-alpha-heart-poisoned-hardcore-full",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/poisoned_hardcore_full.png",
+					9,
+					9,
+					false
+				),
+				HEART_POISONED_HARDCORE_FULL_FLASHING(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-poisoned",
+					"gui-textured-alpha-heart-poisoned-hardcore-full-flashing",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/poisoned_hardcore_full_blinking.png",
+					9,
+					9,
+					false
+				),
+				HEART_POISONED_HARDCORE_HALF(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-poisoned",
+					"gui-textured-alpha-heart-poisoned-hardcore-half",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/poisoned_hardcore_half.png",
+					9,
+					9,
+					false
+				),
+				HEART_POISONED_HARDCORE_HALF_FLASHING(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-poisoned",
+					"gui-textured-alpha-heart-poisoned-hardcore-half-flashing",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/poisoned_hardcore_half_blinking.png",
+					9,
+					9,
+					false
+				),
+				HEART_WITHERED_FULL(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-withered",
+					"gui-textured-alpha-heart-withered-full",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/withered_full.png",
+					9,
+					9,
+					false
+				),
+				HEART_WITHERED_FULL_FLASHING(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-withered",
+					"gui-textured-alpha-heart-withered-full-flashing",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/withered_full_blinking.png",
+					9,
+					9,
+					false
+				),
+				HEART_WITHERED_HALF(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-withered",
+					"gui-textured-alpha-heart-withered-half",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/withered_half.png",
+					9,
+					9,
+					false
+				),
+				HEART_WITHERED_HALF_FLASHING(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-withered",
+					"gui-textured-alpha-heart-withered-half-flashing",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/withered_half_blinking.png",
+					9,
+					9,
+					false
+				),
+				HEART_WITHERED_HARDCORE_FULL(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-withered",
+					"gui-textured-alpha-heart-withered-hardcore-full",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/withered_hardcore_full.png",
+					9,
+					9,
+					false
+				),
+				HEART_WITHERED_HARDCORE_FULL_FLASHING(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-withered",
+					"gui-textured-alpha-heart-withered-hardcore-full-flashing",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/withered_hardcore_full_blinking.png",
+					9,
+					9,
+					false
+				),
+				HEART_WITHERED_HARDCORE_HALF(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-withered",
+					"gui-textured-alpha-heart-withered-hardcore-half",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/withered_hardcore_half.png",
+					9,
+					9,
+					false
+				),
+				HEART_WITHERED_HARDCORE_HALF_FLASHING(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-withered",
+					"gui-textured-alpha-heart-withered-hardcore-half-flashing",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/withered_hardcore_half_blinking.png",
+					9,
+					9,
+					false
+				),
+				HEART_FROZEN_FULL(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-frozen",
+					"gui-textured-alpha-heart-frozen-full",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/frozen_full.png",
+					9,
+					9,
+					false
+				),
+				HEART_FROZEN_FULL_FLASHING(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-frozen",
+					"gui-textured-alpha-heart-frozen-full-flashing",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/frozen_full_blinking.png",
+					9,
+					9,
+					false
+				),
+				HEART_FROZEN_HALF(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-frozen",
+					"gui-textured-alpha-heart-frozen-half",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/frozen_half.png",
+					9,
+					9,
+					false
+				),
+				HEART_FROZEN_HALF_FLASHING(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-frozen",
+					"gui-textured-alpha-heart-frozen-half-flashing",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/frozen_half_blinking.png",
+					9,
+					9,
+					false
+				),
+				HEART_FROZEN_HARDCORE_FULL(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-frozen",
+					"gui-textured-alpha-heart-frozen-hardcore-full",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/frozen_hardcore_full.png",
+					9,
+					9,
+					false
+				),
+				HEART_FROZEN_HARDCORE_FULL_FLASHING(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-frozen",
+					"gui-textured-alpha-heart-frozen-hardcore-full-flashing",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/frozen_hardcore_full_blinking.png",
+					9,
+					9,
+					false
+				),
+				HEART_FROZEN_HARDCORE_HALF(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-frozen",
+					"gui-textured-alpha-heart-frozen-hardcore-half",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/frozen_hardcore_half.png",
+					9,
+					9,
+					false
+				),
+				HEART_FROZEN_HARDCORE_HALF_FLASHING(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"player-heart-frozen",
+					"gui-textured-alpha-heart-frozen-hardcore-half-flashing",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/frozen_hardcore_half_blinking.png",
+					9,
+					9,
+					false
+				),
+				EXPERIENCE_BAR_BACKGROUND(
+			GuiRenderStratum.GUI_EXPERIENCE_BAR_BACKGROUND,
 			"experience-background",
 			"gui-textured-alpha-experience-background",
 			"/assets/minecraft/textures/gui/sprites/hud/experience_bar_background.png",
@@ -1950,7 +1725,7 @@ public final class RustGalFrameQueue {
 			false
 		),
 			EXPERIENCE_BAR_PROGRESS(
-				RenderStratum.GUI_EXPERIENCE_BAR_PROGRESS,
+				GuiRenderStratum.GUI_EXPERIENCE_BAR_PROGRESS,
 				"experience-progress",
 			"gui-textured-alpha-experience-progress",
 			"/assets/minecraft/textures/gui/sprites/hud/experience_bar_progress.png",
@@ -1959,7 +1734,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			CROSSHAIR_ATTACK_FULL(
-				RenderStratum.GUI_ATTACK_CROSSHAIR_PROGRESS,
+				GuiRenderStratum.GUI_ATTACK_CROSSHAIR_PROGRESS,
 				"attack-crosshair-full",
 				"gui-textured-alpha-attack-crosshair-full",
 				"/assets/minecraft/textures/gui/sprites/hud/crosshair_attack_indicator_full.png",
@@ -1968,7 +1743,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			CROSSHAIR_ATTACK_BACKGROUND(
-				RenderStratum.GUI_ATTACK_CROSSHAIR_BACKGROUND,
+				GuiRenderStratum.GUI_ATTACK_CROSSHAIR_BACKGROUND,
 				"attack-crosshair-background",
 				"gui-textured-alpha-attack-crosshair-background",
 				"/assets/minecraft/textures/gui/sprites/hud/crosshair_attack_indicator_background.png",
@@ -1977,7 +1752,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			CROSSHAIR_ATTACK_PROGRESS(
-				RenderStratum.GUI_ATTACK_CROSSHAIR_PROGRESS,
+				GuiRenderStratum.GUI_ATTACK_CROSSHAIR_PROGRESS,
 				"attack-crosshair-progress",
 				"gui-textured-alpha-attack-crosshair-progress",
 				"/assets/minecraft/textures/gui/sprites/hud/crosshair_attack_indicator_progress.png",
@@ -1986,7 +1761,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			HOTBAR_ATTACK_BACKGROUND(
-				RenderStratum.GUI_ATTACK_HOTBAR_BACKGROUND,
+				GuiRenderStratum.GUI_ATTACK_HOTBAR_BACKGROUND,
 				"attack-hotbar-background",
 				"gui-textured-alpha-attack-hotbar-background",
 				"/assets/minecraft/textures/gui/sprites/hud/hotbar_attack_indicator_background.png",
@@ -1995,7 +1770,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			HOTBAR_ATTACK_PROGRESS(
-				RenderStratum.GUI_ATTACK_HOTBAR_PROGRESS,
+				GuiRenderStratum.GUI_ATTACK_HOTBAR_PROGRESS,
 				"attack-hotbar-progress",
 				"gui-textured-alpha-attack-hotbar-progress",
 				"/assets/minecraft/textures/gui/sprites/hud/hotbar_attack_indicator_progress.png",
@@ -2004,7 +1779,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			BOSS_BAR_PINK_BACKGROUND(
-				RenderStratum.GUI_BOSS_BAR_BACKGROUND,
+				GuiRenderStratum.GUI_BOSS_BAR_BACKGROUND,
 				"boss-bar-background",
 				"gui-textured-alpha-boss-bar-pink-background",
 				"/assets/minecraft/textures/gui/sprites/boss_bar/pink_background.png",
@@ -2013,7 +1788,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			BOSS_BAR_BLUE_BACKGROUND(
-				RenderStratum.GUI_BOSS_BAR_BACKGROUND,
+				GuiRenderStratum.GUI_BOSS_BAR_BACKGROUND,
 				"boss-bar-background",
 				"gui-textured-alpha-boss-bar-blue-background",
 				"/assets/minecraft/textures/gui/sprites/boss_bar/blue_background.png",
@@ -2022,7 +1797,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			BOSS_BAR_RED_BACKGROUND(
-				RenderStratum.GUI_BOSS_BAR_BACKGROUND,
+				GuiRenderStratum.GUI_BOSS_BAR_BACKGROUND,
 				"boss-bar-background",
 				"gui-textured-alpha-boss-bar-red-background",
 				"/assets/minecraft/textures/gui/sprites/boss_bar/red_background.png",
@@ -2031,7 +1806,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			BOSS_BAR_GREEN_BACKGROUND(
-				RenderStratum.GUI_BOSS_BAR_BACKGROUND,
+				GuiRenderStratum.GUI_BOSS_BAR_BACKGROUND,
 				"boss-bar-background",
 				"gui-textured-alpha-boss-bar-green-background",
 				"/assets/minecraft/textures/gui/sprites/boss_bar/green_background.png",
@@ -2040,7 +1815,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			BOSS_BAR_YELLOW_BACKGROUND(
-				RenderStratum.GUI_BOSS_BAR_BACKGROUND,
+				GuiRenderStratum.GUI_BOSS_BAR_BACKGROUND,
 				"boss-bar-background",
 				"gui-textured-alpha-boss-bar-yellow-background",
 				"/assets/minecraft/textures/gui/sprites/boss_bar/yellow_background.png",
@@ -2049,7 +1824,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			BOSS_BAR_PURPLE_BACKGROUND(
-				RenderStratum.GUI_BOSS_BAR_BACKGROUND,
+				GuiRenderStratum.GUI_BOSS_BAR_BACKGROUND,
 				"boss-bar-background",
 				"gui-textured-alpha-boss-bar-purple-background",
 				"/assets/minecraft/textures/gui/sprites/boss_bar/purple_background.png",
@@ -2058,7 +1833,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			BOSS_BAR_WHITE_BACKGROUND(
-				RenderStratum.GUI_BOSS_BAR_BACKGROUND,
+				GuiRenderStratum.GUI_BOSS_BAR_BACKGROUND,
 				"boss-bar-background",
 				"gui-textured-alpha-boss-bar-white-background",
 				"/assets/minecraft/textures/gui/sprites/boss_bar/white_background.png",
@@ -2067,7 +1842,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			BOSS_BAR_PINK_PROGRESS(
-				RenderStratum.GUI_BOSS_BAR_PROGRESS,
+				GuiRenderStratum.GUI_BOSS_BAR_PROGRESS,
 				"boss-bar-progress",
 				"gui-textured-alpha-boss-bar-pink-progress",
 				"/assets/minecraft/textures/gui/sprites/boss_bar/pink_progress.png",
@@ -2076,7 +1851,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			BOSS_BAR_BLUE_PROGRESS(
-				RenderStratum.GUI_BOSS_BAR_PROGRESS,
+				GuiRenderStratum.GUI_BOSS_BAR_PROGRESS,
 				"boss-bar-progress",
 				"gui-textured-alpha-boss-bar-blue-progress",
 				"/assets/minecraft/textures/gui/sprites/boss_bar/blue_progress.png",
@@ -2085,7 +1860,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			BOSS_BAR_RED_PROGRESS(
-				RenderStratum.GUI_BOSS_BAR_PROGRESS,
+				GuiRenderStratum.GUI_BOSS_BAR_PROGRESS,
 				"boss-bar-progress",
 				"gui-textured-alpha-boss-bar-red-progress",
 				"/assets/minecraft/textures/gui/sprites/boss_bar/red_progress.png",
@@ -2094,7 +1869,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			BOSS_BAR_GREEN_PROGRESS(
-				RenderStratum.GUI_BOSS_BAR_PROGRESS,
+				GuiRenderStratum.GUI_BOSS_BAR_PROGRESS,
 				"boss-bar-progress",
 				"gui-textured-alpha-boss-bar-green-progress",
 				"/assets/minecraft/textures/gui/sprites/boss_bar/green_progress.png",
@@ -2103,7 +1878,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			BOSS_BAR_YELLOW_PROGRESS(
-				RenderStratum.GUI_BOSS_BAR_PROGRESS,
+				GuiRenderStratum.GUI_BOSS_BAR_PROGRESS,
 				"boss-bar-progress",
 				"gui-textured-alpha-boss-bar-yellow-progress",
 				"/assets/minecraft/textures/gui/sprites/boss_bar/yellow_progress.png",
@@ -2112,7 +1887,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			BOSS_BAR_PURPLE_PROGRESS(
-				RenderStratum.GUI_BOSS_BAR_PROGRESS,
+				GuiRenderStratum.GUI_BOSS_BAR_PROGRESS,
 				"boss-bar-progress",
 				"gui-textured-alpha-boss-bar-purple-progress",
 				"/assets/minecraft/textures/gui/sprites/boss_bar/purple_progress.png",
@@ -2121,7 +1896,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			BOSS_BAR_WHITE_PROGRESS(
-				RenderStratum.GUI_BOSS_BAR_PROGRESS,
+				GuiRenderStratum.GUI_BOSS_BAR_PROGRESS,
 				"boss-bar-progress",
 				"gui-textured-alpha-boss-bar-white-progress",
 				"/assets/minecraft/textures/gui/sprites/boss_bar/white_progress.png",
@@ -2130,7 +1905,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			BOSS_BAR_NOTCHED_6_BACKGROUND(
-				RenderStratum.GUI_BOSS_BAR_BACKGROUND,
+				GuiRenderStratum.GUI_BOSS_BAR_BACKGROUND,
 				"boss-bar-overlay-background",
 				"gui-textured-alpha-boss-bar-notched-6-background",
 				"/assets/minecraft/textures/gui/sprites/boss_bar/notched_6_background.png",
@@ -2139,7 +1914,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			BOSS_BAR_NOTCHED_10_BACKGROUND(
-				RenderStratum.GUI_BOSS_BAR_BACKGROUND,
+				GuiRenderStratum.GUI_BOSS_BAR_BACKGROUND,
 				"boss-bar-overlay-background",
 				"gui-textured-alpha-boss-bar-notched-10-background",
 				"/assets/minecraft/textures/gui/sprites/boss_bar/notched_10_background.png",
@@ -2148,7 +1923,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			BOSS_BAR_NOTCHED_12_BACKGROUND(
-				RenderStratum.GUI_BOSS_BAR_BACKGROUND,
+				GuiRenderStratum.GUI_BOSS_BAR_BACKGROUND,
 				"boss-bar-overlay-background",
 				"gui-textured-alpha-boss-bar-notched-12-background",
 				"/assets/minecraft/textures/gui/sprites/boss_bar/notched_12_background.png",
@@ -2157,7 +1932,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			BOSS_BAR_NOTCHED_20_BACKGROUND(
-				RenderStratum.GUI_BOSS_BAR_BACKGROUND,
+				GuiRenderStratum.GUI_BOSS_BAR_BACKGROUND,
 				"boss-bar-overlay-background",
 				"gui-textured-alpha-boss-bar-notched-20-background",
 				"/assets/minecraft/textures/gui/sprites/boss_bar/notched_20_background.png",
@@ -2166,7 +1941,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			BOSS_BAR_NOTCHED_6_PROGRESS(
-				RenderStratum.GUI_BOSS_BAR_PROGRESS,
+				GuiRenderStratum.GUI_BOSS_BAR_PROGRESS,
 				"boss-bar-overlay-progress",
 				"gui-textured-alpha-boss-bar-notched-6-progress",
 				"/assets/minecraft/textures/gui/sprites/boss_bar/notched_6_progress.png",
@@ -2175,7 +1950,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			BOSS_BAR_NOTCHED_10_PROGRESS(
-				RenderStratum.GUI_BOSS_BAR_PROGRESS,
+				GuiRenderStratum.GUI_BOSS_BAR_PROGRESS,
 				"boss-bar-overlay-progress",
 				"gui-textured-alpha-boss-bar-notched-10-progress",
 				"/assets/minecraft/textures/gui/sprites/boss_bar/notched_10_progress.png",
@@ -2184,7 +1959,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			BOSS_BAR_NOTCHED_12_PROGRESS(
-				RenderStratum.GUI_BOSS_BAR_PROGRESS,
+				GuiRenderStratum.GUI_BOSS_BAR_PROGRESS,
 				"boss-bar-overlay-progress",
 				"gui-textured-alpha-boss-bar-notched-12-progress",
 				"/assets/minecraft/textures/gui/sprites/boss_bar/notched_12_progress.png",
@@ -2193,7 +1968,7 @@ public final class RustGalFrameQueue {
 				false
 			),
 			BOSS_BAR_NOTCHED_20_PROGRESS(
-				RenderStratum.GUI_BOSS_BAR_PROGRESS,
+				GuiRenderStratum.GUI_BOSS_BAR_PROGRESS,
 				"boss-bar-overlay-progress",
 				"gui-textured-alpha-boss-bar-notched-20-progress",
 				"/assets/minecraft/textures/gui/sprites/boss_bar/notched_20_progress.png",
@@ -2202,16 +1977,16 @@ public final class RustGalFrameQueue {
 				false
 			);
 
-		private final RenderStratum stratum;
-		private final String phaseName;
-		private final String cacheKind;
-		private final String semanticSuffix;
-		private final String textureResource;
-		private final int width;
-		private final int height;
-		private final TextureGroup textureGroup;
+		final GuiRenderStratum stratum;
+		final String phaseName;
+		final String cacheKind;
+		final String semanticSuffix;
+		final String textureResource;
+		final int width;
+		final int height;
+		final TextureGroup textureGroup;
 
-		GuiSprite(RenderStratum stratum, String phaseName, String cacheKind, String textureResource, int width, int height, boolean invertBlend) {
+		GuiSprite(GuiRenderStratum stratum, String phaseName, String cacheKind, String textureResource, int width, int height, boolean invertBlend) {
 			this.stratum = stratum;
 			this.phaseName = phaseName;
 			this.cacheKind = cacheKind;
@@ -2222,7 +1997,7 @@ public final class RustGalFrameQueue {
 			this.textureGroup = invertBlend ? TextureGroup.GUI_INVERT : TextureGroup.GUI_ALPHA;
 		}
 
-		private int textureBytes() {
+		int textureBytes() {
 			return this.width * this.height * 4;
 		}
 
@@ -2374,65 +2149,4 @@ public final class RustGalFrameQueue {
 	) {
 	}
 
-		private static final String VERTEX_SHADER_OPENGL = """
-			#version 330 core
-		struct PackedGuiSprite {
-		    vec4 rect;
-		    vec4 viewport;
-		    vec4 uv_region;
-		    vec4 color;
-		};
-		layout(std140) uniform GuiSpriteBatch {
-		    PackedGuiSprite sprites[256];
-		};
-			out vec2 v_uv;
-			out vec2 v_sprite_corner;
-			out vec4 v_color;
-			flat out vec4 v_uv_region;
-		const vec2 corner[6] = vec2[6](
-		    vec2(0.0, 0.0),
-		    vec2(1.0, 0.0),
-		    vec2(1.0, 1.0),
-		    vec2(1.0, 1.0),
-		    vec2(0.0, 1.0),
-		    vec2(0.0, 0.0)
-		);
-		void main() {
-		    int vertex = gl_VertexID;
-		    PackedGuiSprite sprite = sprites[gl_InstanceID];
-		    vec2 pixel = sprite.rect.xy + corner[vertex] * sprite.rect.zw;
-		    vec2 ndc = vec2((pixel.x / sprite.viewport.x) * 2.0 - 1.0, 1.0 - (pixel.y / sprite.viewport.y) * 2.0);
-			    gl_Position = vec4(ndc, 0.0, 1.0);
-			    v_uv_region = sprite.uv_region;
-			    v_sprite_corner = corner[vertex];
-			    v_uv = vec2(
-			        sprite.uv_region.x + corner[vertex].x * sprite.uv_region.z,
-			        sprite.uv_region.y + (1.0 - corner[vertex].y) * sprite.uv_region.w
-		    );
-		    v_color = sprite.color;
-		}
-		""";
-
-	private static final String FRAGMENT_SHADER_OPENGL = """
-			#version 330 core
-			uniform sampler2D Sampler0;
-			in vec2 v_uv;
-			in vec2 v_sprite_corner;
-			in vec4 v_color;
-			flat in vec4 v_uv_region;
-			out vec4 out_color;
-			void main() {
-			    ivec2 texture_size = textureSize(Sampler0, 0);
-			    ivec2 origin = ivec2(round(v_uv_region.xy * vec2(texture_size)));
-			    ivec2 extent = max(ivec2(round(v_uv_region.zw * vec2(texture_size))), ivec2(1));
-			    ivec2 local = clamp(ivec2(floor(v_sprite_corner * vec2(extent))), ivec2(0), extent - ivec2(1));
-			    ivec2 texel = ivec2(origin.x + local.x, origin.y + extent.y - 1 - local.y);
-			    texel = clamp(texel, ivec2(0), texture_size - ivec2(1));
-			    vec4 color = texelFetch(Sampler0, texel, 0) * v_color;
-			    if (color.a <= 0.0) {
-			        discard;
-		    }
-		    out_color = color;
-		}
-		""";
 }

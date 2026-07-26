@@ -1060,10 +1060,24 @@ def listed_failure_file_count(path: Path | None) -> int:
     return count
 
 
+def has_rust_opengl_evidence(mode: ModeSpec, logs: str) -> bool:
+    return mode.backend == "rust-opengl" or bool(
+        re.search(r"Rust OpenGL|rust-opengl|Rust VulkanicGAL bridge", logs, re.IGNORECASE)
+    )
+
+
+def has_rust_vulkan_evidence(mode: ModeSpec, logs: str) -> bool:
+    return mode.backend == "rust-vulkan" or bool(
+        re.search(r"Rust Vulkan(?!icGAL)|rust-vulkan|mattmc_rust.*vulkan", logs, re.IGNORECASE)
+    )
+
+
 def detect_attribution(mode: ModeSpec, meta: dict[str, str], logs: str) -> str:
     explicit = meta.get("implementation_attribution") or meta.get("render_implementation")
-    rust_opengl_evidence = mode.backend == "rust-opengl" or re.search(r"Rust OpenGL|rust-opengl|Rust VulkanicGAL bridge", logs, re.IGNORECASE)
-    rust_vulkan_evidence = mode.backend == "rust-vulkan" or re.search(r"Rust Vulkan(?!icGAL)|rust-vulkan|mattmc_rust.*vulkan", logs, re.IGNORECASE)
+    rust_opengl_evidence = has_rust_opengl_evidence(mode, logs)
+    rust_vulkan_evidence = has_rust_vulkan_evidence(mode, logs)
+    if mode.target == "current" and mode.backend == "opengl" and rust_opengl_evidence:
+        return "mixed-java-opengl-rust-opengl"
     if explicit == "rust-vulkan" and rust_opengl_evidence and not rust_vulkan_evidence:
         return "rust-opengl"
     if explicit == "rust-opengl" and rust_vulkan_evidence and not rust_opengl_evidence:
@@ -1086,6 +1100,17 @@ def detect_attribution(mode: ModeSpec, meta: dict[str, str], logs: str) -> str:
             return "fallback"
         return "java-vulkan"
     return "java-opengl"
+
+
+def implementation_attribution_families(mode: ModeSpec, attribution: str, logs: str) -> dict[str, str]:
+    families = {"frame.base": mode.expected_attribution}
+    if attribution == "mixed-java-opengl-rust-opengl" or (
+        mode.target == "current" and mode.backend == "opengl" and has_rust_opengl_evidence(mode, logs)
+    ):
+        families["gui.migrated"] = "rust-opengl"
+    elif mode.backend.startswith("rust-"):
+        families["frame.base"] = attribution
+    return families
 
 
 def deterministic_camera_signature(doc: dict[str, object] | None) -> dict[str, object]:
@@ -1800,6 +1825,7 @@ def normalize_capture_artifact(
     if isinstance(frame_doc, dict) and isinstance(frame_doc.get("rustGalSliceMetricsLine"), str):
         combined_logs = f"{combined_logs}\n{frame_doc['rustGalSliceMetricsLine']}"
     attribution = detect_attribution(mode, meta, combined_logs)
+    attribution_families = implementation_attribution_families(mode, attribution, combined_logs)
     shaderpack_text = file_text(files["shaderpack"])
     signature = workload_signature(
         target,
@@ -1818,6 +1844,11 @@ def normalize_capture_artifact(
         "workload_signature": signature,
         "instrumentation": instrumentation_signature(effective_meta, command),
         "capture_script": str(run_dev_capture_script(target.root)),
+        "implementation": {
+            "expected_base_backend": mode.expected_attribution,
+            "observed_attribution": attribution,
+            "families": attribution_families,
+        },
     }
     frame_nanos = []
     if isinstance(frame_doc, dict) and isinstance(frame_doc.get("frameNanosSamples"), list):
@@ -2106,6 +2137,8 @@ def normalize_capture_artifact(
         "benchmark_fingerprint": benchmark_fingerprint,
         "implementation_attribution": attribution,
         "expected_attribution": mode.expected_attribution,
+        "expected_base_backend": mode.expected_attribution,
+        "implementation_attribution_families": attribution_families,
         "metrics": {
             "source": {
                 "frame_samples": str(files["frame_benchmark"]) if files["frame_benchmark"] else None,
@@ -3116,6 +3149,20 @@ def build_capture_command(
     if getattr(args, "armor_value", None) is not None:
         java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.armorValue={args.armor_value}")
         java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.armorValue={args.armor_value}")
+    if getattr(args, "player_health", None) is not None:
+        java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.playerHealth={args.player_health}")
+        java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.playerHealth={args.player_health}")
+    if getattr(args, "player_max_health", None) is not None:
+        java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.playerMaxHealth={args.player_max_health}")
+        java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.playerMaxHealth={args.player_max_health}")
+    if getattr(args, "player_heart_variant", None):
+        java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.playerHeartVariant={args.player_heart_variant}")
+    if getattr(args, "player_heart_flash", False):
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.playerHealthFlash=true")
+    if getattr(args, "player_heart_hardcore", False):
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.playerHealthHardcore=true")
+    if getattr(args, "player_heart_regeneration", False):
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.playerHealthRegeneration=true")
     if getattr(args, "game_mode", None):
         java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.gameMode={args.game_mode}")
         java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.gameMode={args.game_mode}")
@@ -3839,6 +3886,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             help="Diagnostic control for migrated Rust-GAL GUI sprites; 'disabled' suppresses migrated armor and 'legacy' restores Java armor for controls.",
         )
         subparser.add_argument("--armor-value", type=int, help="Force a deterministic player armor value for gameplay/capture controls.")
+        subparser.add_argument("--player-health", type=float, help="Force deterministic player health for gameplay/capture controls.")
+        subparser.add_argument("--player-max-health", type=float, help="Force deterministic player max health for gameplay/capture controls.")
+        subparser.add_argument("--player-heart-variant", choices=("normal", "poisoned", "withered", "frozen"),
+                               help="Force deterministic player heart variant for correctness captures.")
+        subparser.add_argument("--player-heart-flash", action="store_true", help="Force blinking player-heart sprites for correctness captures.")
+        subparser.add_argument("--player-heart-hardcore", action="store_true", help="Force hardcore player-heart sprites for correctness captures.")
+        subparser.add_argument("--player-heart-regeneration", action="store_true", help="Force regeneration bounce state for correctness captures.")
         subparser.add_argument("--game-mode", choices=("survival", "creative", "adventure", "spectator"), help="Force a deterministic player game mode for gameplay/capture controls.")
         subparser.add_argument("--timeout-seconds", type=int)
         subparser.add_argument("--startup-timeout-seconds", type=int)
@@ -3931,6 +3985,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         raise SystemExit("settle/max-settle/subsystem iterations/repetitions must be positive where applicable")
     if args.armor_value is not None and not 0 <= args.armor_value <= 20:
         raise SystemExit("--armor-value must be in 0..20")
+    if args.player_health is not None and args.player_health < 0:
+        raise SystemExit("--player-health must be non-negative")
+    if args.player_max_health is not None and args.player_max_health <= 0:
+        raise SystemExit("--player-max-health must be positive")
     return args
 
 

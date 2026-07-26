@@ -68,6 +68,7 @@ import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.SlotAccess;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.animal.Parrot;
 import net.minecraft.world.entity.animal.horse.AbstractHorse;
@@ -169,6 +170,8 @@ public abstract class Player extends Avatar implements ContainerUser {
 	private ItemStack lastItemInMainHand = ItemStack.EMPTY;
 	private float attackStrengthDelayForDeterministicCapture = Float.NaN;
 	private int armorValueForDeterministicCapture = -1;
+	private float healthForDeterministicCapture = Float.NaN;
+	private float maxHealthForDeterministicCapture = Float.NaN;
 	private final ItemCooldowns cooldowns = this.createItemCooldowns();
 	private Optional<GlobalPos> lastDeathLocation = Optional.empty();
 	@Nullable
@@ -1746,12 +1749,44 @@ public abstract class Player extends Avatar implements ContainerUser {
 		return super.getArmorValue();
 	}
 
+	@Override
+	public float getHealth() {
+		if (Float.isFinite(this.healthForDeterministicCapture)) {
+			return this.healthForDeterministicCapture;
+		}
+		return super.getHealth();
+	}
+
+	@Override
+	public double getAttributeValue(Holder<Attribute> holder) {
+		if (holder.is(Attributes.MAX_HEALTH) && Float.isFinite(this.maxHealthForDeterministicCapture)) {
+			return this.maxHealthForDeterministicCapture;
+		}
+		return super.getAttributeValue(holder);
+	}
+
 	public int getArmorValueForDeterministicCapture() {
 		return this.armorValueForDeterministicCapture;
 	}
 
 	public void setArmorValueForDeterministicCapture(int armorValue) {
 		this.armorValueForDeterministicCapture = armorValue >= 0 ? Math.min(20, armorValue) : -1;
+	}
+
+	public float getHealthForDeterministicCapture() {
+		return this.healthForDeterministicCapture;
+	}
+
+	public void setHealthForDeterministicCapture(float health) {
+		this.healthForDeterministicCapture = Float.isFinite(health) && health >= 0.0F ? health : Float.NaN;
+	}
+
+	public float getMaxHealthForDeterministicCapture() {
+		return this.maxHealthForDeterministicCapture;
+	}
+
+	public void setMaxHealthForDeterministicCapture(float maxHealth) {
+		this.maxHealthForDeterministicCapture = Float.isFinite(maxHealth) && maxHealth > 0.0F ? maxHealth : Float.NaN;
 	}
 
 	public ItemCooldowns getCooldowns() {

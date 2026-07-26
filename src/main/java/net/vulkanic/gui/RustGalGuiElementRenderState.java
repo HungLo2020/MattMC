@@ -1,4 +1,4 @@
-package net.vulkanic.bridge;
+package net.vulkanic.gui;
 
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.vertex.VertexConsumer;
@@ -6,17 +6,16 @@ import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.gui.render.state.GuiElementRenderState;
 import net.minecraft.client.renderer.RenderPipelines;
+import net.vulkanic.bridge.RustGalFrameScheduler;
 import org.jetbrains.annotations.Nullable;
 
 public record RustGalGuiElementRenderState(
-	long batchId,
-	long sequence,
-	long generation,
-	RustGalFrameQueue.RenderStratum stratum,
+	RustGalFrameScheduler.Token token,
+	GuiRenderStratum stratum,
 	String producerId,
 	int selectedSlot,
 	float progressFraction,
-	RustGalFrameQueue.FillDirection fillDirection,
+	GuiFillDirection fillDirection,
 	int sourceX,
 	int sourceY,
 	int sourceWidth,
@@ -28,6 +27,18 @@ public record RustGalGuiElementRenderState(
 	int guiWidth,
 	int guiHeight
 ) implements GuiElementRenderState {
+	public long batchId() {
+		return this.token.batchId();
+	}
+
+	public long sequence() {
+		return this.token.sequence();
+	}
+
+	public long generation() {
+		return this.token.generation();
+	}
+
 	@Override
 	public void buildVertices(VertexConsumer vertexConsumer) {
 	}
@@ -64,7 +75,7 @@ public record RustGalGuiElementRenderState(
 		if (this.progressFraction >= 0.0F) {
 			context += ":progress=" + this.progressFraction;
 		}
-		if (this.fillDirection != RustGalFrameQueue.FillDirection.NONE) {
+		if (this.fillDirection != GuiFillDirection.NONE) {
 			context += ":fill=" + this.fillDirection.id();
 		}
 		return context;

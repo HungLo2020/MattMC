@@ -525,7 +525,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.textureManager = new TextureManager(this.resourceManager);
 		this.resourceManager.registerReloadListener(this.textureManager);
 		this.resourceManager.registerReloadListener(
-			(net.minecraft.server.packs.resources.ResourceManagerReloadListener)resourceManager -> net.vulkanic.bridge.RustGalFrameQueue.reload()
+			(net.minecraft.server.packs.resources.ResourceManagerReloadListener)resourceManager -> net.vulkanic.gui.RustGalGuiRenderer.reload()
 		);
 		this.shaderManager = new ShaderManager(this.textureManager, this::triggerResourcePackRecovery);
 		this.resourceManager.registerReloadListener(this.shaderManager);
@@ -2240,7 +2240,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	public void disconnect(Screen screen, boolean bl) {
-		net.vulkanic.bridge.RustGalFrameQueue.cancelPending("world-disconnect");
+		net.vulkanic.gui.RustGalGuiRenderer.cancelPending("world-disconnect");
 		ClientPacketListener clientPacketListener = this.getConnection();
 		if (clientPacketListener != null) {
 			this.dropAllTasks();
@@ -2294,7 +2294,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	public void clearClientLevel(Screen screen) {
-		net.vulkanic.bridge.RustGalFrameQueue.cancelPending("world-unload");
+		net.vulkanic.gui.RustGalGuiRenderer.cancelPending("world-unload");
 		// Iris: From MixinMinecraft_PipelineManagement - track last dimension on leave
 		net.irisshaders.iris.Iris.lastDimension = net.irisshaders.iris.Iris.getCurrentDimension();
 		

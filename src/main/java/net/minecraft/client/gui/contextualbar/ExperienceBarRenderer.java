@@ -8,7 +8,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.ResourceLocation;
-import net.vulkanic.bridge.RustGalFrameQueue;
+import net.vulkanic.gui.RustGalGuiRenderer;
 
 @Environment(EnvType.CLIENT)
 public class ExperienceBarRenderer implements ContextualBarRenderer {
@@ -28,15 +28,15 @@ public class ExperienceBarRenderer implements ContextualBarRenderer {
 		int k = localPlayer.getXpNeededForNextLevel();
 		if (k > 0) {
 			int l = filledWidth(localPlayer.experienceProgress);
-			if (RustGalFrameQueue.isMigratedGuiDisabledForDiagnostics()) {
+			if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
 				// Dev-only measurement control: no migrated or legacy experience bar draw.
-			} else if (RustGalFrameQueue.isMigratedGuiLegacyControl()) {
+			} else if (RustGalGuiRenderer.isMigratedGuiLegacyControl()) {
 				guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, EXPERIENCE_BAR_BACKGROUND_SPRITE, i, j, 182, 5);
 				if (l > 0) {
 					guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, EXPERIENCE_BAR_PROGRESS_SPRITE, 182, 5, 0, 0, i, j, l, 5);
 				}
 			} else {
-				RustGalFrameQueue.enqueueExperienceBar(this.minecraft, guiGraphics, i, j, 182, 5, localPlayer.experienceProgress, l);
+				RustGalGuiRenderer.enqueueExperienceBar(this.minecraft, guiGraphics, i, j, 182, 5, localPlayer.experienceProgress, l);
 			}
 		}
 	}
