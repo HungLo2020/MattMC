@@ -61,6 +61,12 @@ public final class GraphicsFrameBenchmark {
 		Float.parseFloat(System.getProperty("mattmc.dev.graphicsFrameBenchmark.playerFoodSaturation", "NaN"));
 	private static final int FORCED_PLAYER_AIR_SUPPLY = Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.playerAirSupply", -1);
 	private static final int FORCED_PLAYER_MAX_AIR_SUPPLY = Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.playerMaxAirSupply", -1);
+	private static final boolean FORCE_MOUNT_PRESENT = Boolean.getBoolean("mattmc.dev.graphicsFrameBenchmark.mountPresent");
+	private static final float FORCED_MOUNT_HEALTH =
+		Float.parseFloat(System.getProperty("mattmc.dev.graphicsFrameBenchmark.mountHealth", "NaN"));
+	private static final float FORCED_MOUNT_MAX_HEALTH =
+		Float.parseFloat(System.getProperty("mattmc.dev.graphicsFrameBenchmark.mountMaxHealth", "NaN"));
+	private static final int FORCED_MOUNT_HEALTH_ROWS = Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.mountHealthRows", -1);
 	private static final String FORCED_GAME_MODE = System.getProperty("mattmc.dev.graphicsFrameBenchmark.gameMode", "").trim();
 	private static final Path STATUS_PATH = Path.of(System.getProperty("mattmc.dev.graphicsFrameBenchmark.status", "run/graphics_frame_benchmark.json"));
 	private static final String WORKLOAD_COUNTER_DEFINITION_VERSION = "phase-family-v2";
@@ -481,6 +487,10 @@ public final class GraphicsFrameBenchmark {
 		json.append("    \"playerMaxAirSupplyOverride\": ").append(FORCED_PLAYER_MAX_AIR_SUPPLY).append(",\n");
 		json.append("    \"playerUnderwaterOverride\": ").append(Boolean.getBoolean("mattmc.dev.graphicsFrameBenchmark.playerUnderwater")).append(",\n");
 		json.append("    \"playerAirPopOverride\": ").append(Boolean.getBoolean("mattmc.dev.graphicsFrameBenchmark.playerAirPop")).append(",\n");
+		json.append("    \"mountPresentOverride\": ").append(FORCE_MOUNT_PRESENT).append(",\n");
+		json.append("    \"mountHealthOverride\": ").append(format(FORCED_MOUNT_HEALTH)).append(",\n");
+		json.append("    \"mountMaxHealthOverride\": ").append(format(FORCED_MOUNT_MAX_HEALTH)).append(",\n");
+		json.append("    \"mountHealthRowsOverride\": ").append(FORCED_MOUNT_HEALTH_ROWS).append(",\n");
 		field(json, "gameMode", gameMode, 4, true);
 		field(json, "gameModeOverride", FORCED_GAME_MODE, 4, true);
 		field(json, "rustGalGuiControl", rustGalGuiControl(), 4, true);
@@ -668,6 +678,12 @@ public final class GraphicsFrameBenchmark {
 	}
 
 	private static String rustGalGuiControl() {
+		if (Boolean.getBoolean("mattmc.dev.rustGalGui.mountHealth.disabled")) {
+			return "mount-health-disabled";
+		}
+		if (Boolean.getBoolean("mattmc.dev.rustGalGui.mountHealth.legacyControl")) {
+			return "mount-health-legacy";
+		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalGui.air.disabled")) {
 			return "air-disabled";
 		}

@@ -43,6 +43,7 @@ public final class RustGalGuiRenderer {
 	private static final String ABSORPTION_HEART_PRODUCER = "minecraft.gui.absorption-heart";
 	private static final String HUNGER_ICON_PRODUCER = "minecraft.gui.hunger";
 	private static final String AIR_BUBBLE_PRODUCER = "minecraft.gui.air";
+	private static final String MOUNT_HEART_PRODUCER = "minecraft.gui.mount-heart";
 	private static final boolean ASSET_UPDATES_DISABLED =
 		Boolean.getBoolean("mattmc.dev.rustGalGui.assetUpdates.disabled");
 	private static final Object LOCK = new Object();
@@ -118,6 +119,14 @@ public final class RustGalGuiRenderer {
 
 	public static boolean isAirLegacyControl() {
 		return Boolean.getBoolean("mattmc.dev.rustGalGui.air.legacyControl");
+	}
+
+	public static boolean isMountHealthDisabledForDiagnostics() {
+		return Boolean.getBoolean("mattmc.dev.rustGalGui.mountHealth.disabled");
+	}
+
+	public static boolean isMountHealthLegacyControl() {
+		return Boolean.getBoolean("mattmc.dev.rustGalGui.mountHealth.legacyControl");
 	}
 
 	public static void enqueueCrosshair(Minecraft minecraft, net.minecraft.client.gui.GuiGraphics guiGraphics, int x, int y, int width, int height) {
@@ -450,6 +459,34 @@ public final class RustGalGuiRenderer {
 		}
 	}
 
+	public static void enqueueMountHearts(
+		Minecraft minecraft,
+		net.minecraft.client.gui.GuiGraphics guiGraphics,
+		List<MountHeartRequest> hearts
+	) {
+		if (!isCrosshairEnabled() || hearts.isEmpty()) {
+			return;
+		}
+		for (MountHeartRequest heart : hearts) {
+			if (!heart.visible()) {
+				continue;
+			}
+			enqueueGuiSprite(
+				minecraft,
+				guiGraphics,
+				mountHeartSprite(heart),
+				MOUNT_HEART_PRODUCER + "." + heart.variant().id() + "." + heart.state().id() + ".row" + heart.row() + ".order" + heart.order(),
+				heart.order(),
+				heart.state().progressValue(),
+				GuiFillDirection.NONE,
+				heart.x(),
+				heart.y(),
+				9,
+				9
+			);
+		}
+	}
+
 	private static ArmorIconState armorIconState(int armorValue, int iconIndex) {
 		if (armorValue < 0 || armorValue > 20) {
 			throw new IllegalArgumentException("armor value must be in 0..20: " + armorValue);
@@ -561,6 +598,14 @@ public final class RustGalGuiRenderer {
 			case FULL -> GuiSprite.AIR_FULL;
 			case PARTIAL -> request.popping() ? GuiSprite.AIR_POPPING : GuiSprite.AIR_FULL;
 			case EMPTY -> GuiSprite.AIR_EMPTY;
+		};
+	}
+
+	private static GuiSprite mountHeartSprite(MountHeartRequest request) {
+		return switch (request.state()) {
+			case EMPTY -> GuiSprite.HEART_VEHICLE_CONTAINER;
+			case HALF -> GuiSprite.HEART_VEHICLE_HALF;
+			case FULL -> GuiSprite.HEART_VEHICLE_FULL;
 		};
 	}
 
@@ -2121,6 +2166,33 @@ public final class RustGalGuiRenderer {
 				"air",
 				"gui-textured-alpha-air-empty",
 				"/assets/minecraft/textures/gui/sprites/hud/air_empty.png",
+				9,
+				9,
+				false
+			),
+			HEART_VEHICLE_CONTAINER(
+				GuiRenderStratum.GUI_MOUNT_HEALTH,
+				"mount-health",
+				"gui-textured-alpha-heart-vehicle-container",
+				"/assets/minecraft/textures/gui/sprites/hud/heart/vehicle_container.png",
+				9,
+				9,
+				false
+			),
+			HEART_VEHICLE_FULL(
+				GuiRenderStratum.GUI_MOUNT_HEALTH,
+				"mount-health",
+				"gui-textured-alpha-heart-vehicle-full",
+				"/assets/minecraft/textures/gui/sprites/hud/heart/vehicle_full.png",
+				9,
+				9,
+				false
+			),
+			HEART_VEHICLE_HALF(
+				GuiRenderStratum.GUI_MOUNT_HEALTH,
+				"mount-health",
+				"gui-textured-alpha-heart-vehicle-half",
+				"/assets/minecraft/textures/gui/sprites/hud/heart/vehicle_half.png",
 				9,
 				9,
 				false

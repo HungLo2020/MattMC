@@ -9,6 +9,9 @@ import net.vulkanic.gui.GuiHeartState;
 import net.vulkanic.gui.HungerIconRequest;
 import net.vulkanic.gui.HungerIconState;
 import net.vulkanic.gui.HungerIconVariant;
+import net.vulkanic.gui.MountHeartRequest;
+import net.vulkanic.gui.MountHeartState;
+import net.vulkanic.gui.MountHeartVariant;
 import net.vulkanic.gui.PlayerHeartRequest;
 import net.vulkanic.gui.PlayerHeartVariant;
 import net.vulkanic.gui.RustGalGuiRenderer;
@@ -228,6 +231,27 @@ class VulkanicGalBridgeAbiTest {
 		new AirBubbleRequest(AirBubbleState.FULL, false, true, 0, 1, 2);
 		new AirBubbleRequest(AirBubbleState.PARTIAL, true, true, 1, 1, 2);
 		new AirBubbleRequest(AirBubbleState.EMPTY, false, true, 2, 1, 2);
+		assertThrows(IllegalArgumentException.class, () -> new MountHeartRequest(
+			MountHeartVariant.VEHICLE,
+			MountHeartState.FULL,
+			true,
+			-1,
+			0,
+			0,
+			0
+		));
+		assertThrows(IllegalArgumentException.class, () -> new MountHeartRequest(
+			MountHeartVariant.VEHICLE,
+			MountHeartState.FULL,
+			true,
+			0,
+			-1,
+			0,
+			0
+		));
+		for (MountHeartState state : MountHeartState.values()) {
+			new MountHeartRequest(MountHeartVariant.VEHICLE, state, true, 1, 2, 3, 4);
+		}
 		new AirBubbleRequest(AirBubbleState.EMPTY, false, false, 3, 1, 2);
 		assertTrue(rustGuiFrontend.contains("GUI_MAX_PACKED_SPRITES"));
 		assertTrue(rustGuiFrontend.contains("CommandOp::CopyBufferToTexture"));
@@ -552,10 +576,12 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(gui.contains("RustGalGuiRenderer.enqueueAbsorptionHearts"));
 		assertTrue(gui.contains("RustGalGuiRenderer.enqueueHungerIcons"));
 		assertTrue(gui.contains("RustGalGuiRenderer.enqueueAirBubbles"));
+		assertTrue(gui.contains("RustGalGuiRenderer.enqueueMountHearts"));
 		assertTrue(gui.contains("List<PlayerHeartRequest> rustPlayerHearts"));
 		assertTrue(gui.contains("List<AbsorptionHeartRequest> rustAbsorptionHearts"));
 		assertTrue(gui.contains("List<HungerIconRequest> rustHungerIcons"));
 		assertTrue(gui.contains("List<AirBubbleRequest> rustAirBubbles"));
+		assertTrue(gui.contains("List<MountHeartRequest> rustMountHearts"));
 		assertTrue(gui.contains("rustHeartVariant(heartType)"));
 		assertTrue(gui.contains("rustAbsorptionHeartVariant(heartType)"));
 		assertTrue(gui.contains("diagnosticPlayerHealth(player.getHealth())"));
@@ -568,6 +594,7 @@ class VulkanicGalBridgeAbiTest {
 		assertFalse(guiRenderer.contains("public enum ArmorIconState"));
 		assertTrue(Files.exists(Path.of("src/main/java/net/vulkanic/gui/PlayerHeartRequest.java")));
 		assertTrue(Files.exists(Path.of("src/main/java/net/vulkanic/gui/AbsorptionHeartRequest.java")));
+		assertTrue(Files.exists(Path.of("src/main/java/net/vulkanic/gui/MountHeartRequest.java")));
 		assertTrue(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiHeartState.java")));
 		assertTrue(Files.exists(Path.of("src/main/java/net/vulkanic/gui/ArmorIconState.java")));
 		assertTrue(bossOverlay.contains("RustGalGuiRenderer.enqueueBossBar"));

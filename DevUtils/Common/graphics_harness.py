@@ -3667,6 +3667,18 @@ def build_capture_command(
     if getattr(args, "player_air_pop", False):
         java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.playerAirPop=true")
         java_options.append("-Dmattmc.dev.deterministicCameraCapture.playerAirPop=true")
+    if getattr(args, "mount_present", False):
+        java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.mountPresent=true")
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.mountPresent=true")
+    if getattr(args, "mount_health", None) is not None:
+        java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.mountHealth={args.mount_health}")
+        java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.mountHealth={args.mount_health}")
+    if getattr(args, "mount_max_health", None) is not None:
+        java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.mountMaxHealth={args.mount_max_health}")
+        java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.mountMaxHealth={args.mount_max_health}")
+    if getattr(args, "mount_health_rows", None) is not None:
+        java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.mountHealthRows={args.mount_health_rows}")
+        java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.mountHealthRows={args.mount_health_rows}")
     if getattr(args, "player_heart_variant", None):
         java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.playerHeartVariant={args.player_heart_variant}")
     if getattr(args, "player_heart_flash", False):
@@ -3703,6 +3715,10 @@ def build_capture_command(
         java_options.append("-Dmattmc.dev.rustGalGui.air.disabled=true")
     elif rust_gal_gui_control == "air-legacy":
         java_options.append("-Dmattmc.dev.rustGalGui.air.legacyControl=true")
+    elif rust_gal_gui_control == "mount-health-disabled":
+        java_options.append("-Dmattmc.dev.rustGalGui.mountHealth.disabled=true")
+    elif rust_gal_gui_control == "mount-health-legacy":
+        java_options.append("-Dmattmc.dev.rustGalGui.mountHealth.legacyControl=true")
     if tool_kind == "gameplay":
         frame_status = capture_dir / f"graphics_frame_benchmark_{timestamp()}.json"
         java_options.extend(
@@ -4587,6 +4603,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
                 "hunger-legacy",
                 "air-disabled",
                 "air-legacy",
+                "mount-health-disabled",
+                "mount-health-legacy",
             ),
             default="rust",
             help="Diagnostic control for migrated Rust-GAL GUI sprites; bare disabled/legacy retain the armor-control aliases.",
@@ -4603,6 +4621,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         subparser.add_argument("--player-max-air-supply", type=int, help="Force deterministic player max air supply for air-bubble gameplay/capture controls.")
         subparser.add_argument("--player-underwater", action="store_true", help="Force air bubbles visible as if the player eye is underwater.")
         subparser.add_argument("--player-air-pop", action="store_true", help="Force air-bubble popping animation state for correctness captures.")
+        subparser.add_argument("--mount-present", action="store_true", help="Force mount-health hearts visible for gameplay/capture controls.")
+        subparser.add_argument("--mount-health", type=float, help="Force deterministic current mount health for mount-heart controls.")
+        subparser.add_argument("--mount-max-health", type=float, help="Force deterministic max mount health for mount-heart controls.")
+        subparser.add_argument("--mount-health-rows", type=int, help="Force deterministic visible mount-heart rows for layout/capture controls.")
         subparser.add_argument("--player-heart-variant", choices=("normal", "poisoned", "withered", "frozen"),
                                help="Force deterministic player heart variant for correctness captures.")
         subparser.add_argument("--player-heart-flash", action="store_true", help="Force blinking player-heart sprites for correctness captures.")
@@ -4726,6 +4748,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         raise SystemExit("--player-air-supply must be non-negative")
     if args.player_max_air_supply is not None and args.player_max_air_supply <= 0:
         raise SystemExit("--player-max-air-supply must be positive")
+    if args.mount_health is not None and args.mount_health < 0:
+        raise SystemExit("--mount-health must be non-negative")
+    if args.mount_max_health is not None and args.mount_max_health <= 0:
+        raise SystemExit("--mount-max-health must be positive")
+    if args.mount_health_rows is not None and not 0 <= args.mount_health_rows <= 3:
+        raise SystemExit("--mount-health-rows must be in 0..3")
     return args
 
 

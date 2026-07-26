@@ -92,6 +92,9 @@ import net.vulkanic.gui.GuiHeartState;
 import net.vulkanic.gui.HungerIconRequest;
 import net.vulkanic.gui.HungerIconState;
 import net.vulkanic.gui.HungerIconVariant;
+import net.vulkanic.gui.MountHeartRequest;
+import net.vulkanic.gui.MountHeartState;
+import net.vulkanic.gui.MountHeartVariant;
 import net.vulkanic.gui.PlayerHeartRequest;
 import net.vulkanic.gui.PlayerHeartVariant;
 import net.vulkanic.gui.RustGalGuiRenderer;
@@ -910,7 +913,7 @@ public class Gui {
 			Profiler.get().popPush("health");
 			this.renderHearts(guiGraphics, player, k, n, q, s, f, i, j, o, bl);
 			LivingEntity livingEntity = this.getPlayerVehicleWithHealth();
-			int t = this.getVehicleMaxHearts(livingEntity);
+			int t = diagnosticMountPresent(livingEntity) ? diagnosticMountMaxHearts(livingEntity) : 0;
 			if (t == 0) {
 				Profiler.get().popPush("food");
 				this.renderFood(guiGraphics, player, n, m);
@@ -970,6 +973,31 @@ public class Gui {
 	private static boolean diagnosticAirPopAnimation() {
 		return Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.playerAirPop")
 			|| Boolean.getBoolean("mattmc.dev.graphicsFrameBenchmark.playerAirPop");
+	}
+
+	private static boolean diagnosticMountPresent(@Nullable LivingEntity livingEntity) {
+		String value = System.getProperty("mattmc.dev.deterministicCameraCapture.mountPresent");
+		if (value == null || value.isBlank()) {
+			value = System.getProperty("mattmc.dev.graphicsFrameBenchmark.mountPresent");
+		}
+		return value == null || value.isBlank() ? livingEntity != null : Boolean.parseBoolean(value);
+	}
+
+	private static int diagnosticMountMaxHearts(@Nullable LivingEntity livingEntity) {
+		int forcedRows = diagnosticPlayerInt("mattmc.dev.deterministicCameraCapture.mountHealthRows", "mattmc.dev.graphicsFrameBenchmark.mountHealthRows", -1);
+		if (forcedRows >= 0) {
+			return Math.clamp(forcedRows, 0, 3) * NUM_HEARTS_PER_ROW;
+		}
+		float fallback = livingEntity == null ? 0.0F : livingEntity.getMaxHealth();
+		float maxHealth = Math.max(0.0F, diagnosticPlayerFloat("mattmc.dev.deterministicCameraCapture.mountMaxHealth", "mattmc.dev.graphicsFrameBenchmark.mountMaxHealth", fallback));
+		int hearts = (int)(maxHealth + 0.5F) / 2;
+		return Math.min(hearts, 30);
+	}
+
+	private static int diagnosticMountHealth(@Nullable LivingEntity livingEntity) {
+		float fallback = livingEntity == null ? 0.0F : livingEntity.getHealth();
+		float health = Math.max(0.0F, diagnosticPlayerFloat("mattmc.dev.deterministicCameraCapture.mountHealth", "mattmc.dev.graphicsFrameBenchmark.mountHealth", fallback));
+		return Mth.ceil(health);
 	}
 
 	private static float diagnosticPlayerFloat(String primaryProperty, String secondaryProperty, float fallback) {
@@ -1326,33 +1354,79 @@ public class Gui {
 
 	private void renderVehicleHealth(GuiGraphics guiGraphics) {
 		LivingEntity livingEntity = this.getPlayerVehicleWithHealth();
-		if (livingEntity != null) {
-			int i = this.getVehicleMaxHearts(livingEntity);
-			if (i != 0) {
-				int j = (int)Math.ceil(livingEntity.getHealth());
-				Profiler.get().popPush("mountHealth");
-				int k = guiGraphics.guiHeight() - 39;
-				int l = guiGraphics.guiWidth() / 2 + 91;
-				int m = k;
+		if (!diagnosticMountPresent(livingEntity)) {
+			return;
+		}
+		int i = diagnosticMountMaxHearts(livingEntity);
+		if (i != 0) {
+			int j = diagnosticMountHealth(livingEntity);
+			Profiler.get().popPush("mountHealth");
+			int k = guiGraphics.guiHeight() - 39;
+			int l = guiGraphics.guiWidth() / 2 + 91;
+			int m = k;
+			boolean mountHealthDisabled = RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() || RustGalGuiRenderer.isMountHealthDisabledForDiagnostics();
+			boolean mountHealthLegacy = RustGalGuiRenderer.isMigratedGuiLegacyControl() || RustGalGuiRenderer.isMountHealthLegacyControl();
+			boolean migrateMountHealth = !mountHealthDisabled && !mountHealthLegacy;
+			List<MountHeartRequest> rustMountHearts = migrateMountHealth ? new ArrayList<>() : List.of();
+			int rustMountHeartOrder = 0;
 
-				for (int n = 0; i > 0; n += 20) {
-					int o = Math.min(i, 10);
-					i -= o;
+			for (int n = 0; i > 0; n += 20) {
+				int row = n / 20;
+				int o = Math.min(i, 10);
+				i -= o;
 
-					for (int p = 0; p < o; p++) {
-						int q = l - p * 8 - 9;
+				for (int p = 0; p < o; p++) {
+					int q = l - p * 8 - 9;
+					if (migrateMountHealth) {
+						rustMountHearts.add(new MountHeartRequest(
+							MountHeartVariant.VEHICLE,
+							MountHeartState.EMPTY,
+							true,
+							row,
+							rustMountHeartOrder++,
+							q,
+							m
+						));
+					} else if (!mountHealthDisabled) {
 						guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HEART_VEHICLE_CONTAINER_SPRITE, q, m, 9, 9);
-						if (p * 2 + 1 + n < j) {
+					}
+					if (p * 2 + 1 + n < j) {
+						if (migrateMountHealth) {
+							rustMountHearts.add(new MountHeartRequest(
+								MountHeartVariant.VEHICLE,
+								MountHeartState.FULL,
+								true,
+								row,
+								rustMountHeartOrder++,
+								q,
+								m
+							));
+						} else if (!mountHealthDisabled) {
 							guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HEART_VEHICLE_FULL_SPRITE, q, m, 9, 9);
-						}
-
-						if (p * 2 + 1 + n == j) {
-							guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HEART_VEHICLE_HALF_SPRITE, q, m, 9, 9);
 						}
 					}
 
-					m -= 10;
+					if (p * 2 + 1 + n == j) {
+						if (migrateMountHealth) {
+							rustMountHearts.add(new MountHeartRequest(
+								MountHeartVariant.VEHICLE,
+								MountHeartState.HALF,
+								true,
+								row,
+								rustMountHeartOrder++,
+								q,
+								m
+							));
+						} else if (!mountHealthDisabled) {
+							guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HEART_VEHICLE_HALF_SPRITE, q, m, 9, 9);
+						}
+					}
 				}
+
+				m -= 10;
+			}
+			if (migrateMountHealth) {
+				RustGalGuiRenderer.enqueueMountHearts(this.minecraft, guiGraphics, rustMountHearts);
 			}
 		}
 	}

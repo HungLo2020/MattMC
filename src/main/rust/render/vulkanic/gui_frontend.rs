@@ -1063,6 +1063,9 @@ fn bundled_sprite_bytes(path: &str) -> Option<&'static [u8]> {
         "/assets/minecraft/textures/gui/sprites/hud/heart/withered_hardcore_full_blinking.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/heart/withered_hardcore_full_blinking.png").as_slice()),
         "/assets/minecraft/textures/gui/sprites/hud/heart/withered_hardcore_half.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/heart/withered_hardcore_half.png").as_slice()),
         "/assets/minecraft/textures/gui/sprites/hud/heart/withered_hardcore_half_blinking.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/heart/withered_hardcore_half_blinking.png").as_slice()),
+        "/assets/minecraft/textures/gui/sprites/hud/heart/vehicle_container.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/heart/vehicle_container.png").as_slice()),
+        "/assets/minecraft/textures/gui/sprites/hud/heart/vehicle_full.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/heart/vehicle_full.png").as_slice()),
+        "/assets/minecraft/textures/gui/sprites/hud/heart/vehicle_half.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/heart/vehicle_half.png").as_slice()),
         "/assets/minecraft/textures/gui/sprites/hud/hotbar.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/hotbar.png").as_slice()),
         "/assets/minecraft/textures/gui/sprites/hud/hotbar_attack_indicator_background.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/hotbar_attack_indicator_background.png").as_slice()),
         "/assets/minecraft/textures/gui/sprites/hud/hotbar_attack_indicator_progress.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/hotbar_attack_indicator_progress.png").as_slice()),
@@ -1905,6 +1908,33 @@ const SPRITES: &[SpriteDef] = &[
         height: 9,
         group: group(false),
     },
+    SpriteDef {
+        id: 89,
+        stratum: 390,
+        name: "mount-heart-container",
+        path: "/assets/minecraft/textures/gui/sprites/hud/heart/vehicle_container.png",
+        width: 9,
+        height: 9,
+        group: group(false),
+    },
+    SpriteDef {
+        id: 90,
+        stratum: 390,
+        name: "mount-heart-full",
+        path: "/assets/minecraft/textures/gui/sprites/hud/heart/vehicle_full.png",
+        width: 9,
+        height: 9,
+        group: group(false),
+    },
+    SpriteDef {
+        id: 91,
+        stratum: 390,
+        name: "mount-heart-half",
+        path: "/assets/minecraft/textures/gui/sprites/hud/heart/vehicle_half.png",
+        width: 9,
+        height: 9,
+        group: group(false),
+    },
 ];
 
 #[cfg(test)]
@@ -1969,14 +1999,17 @@ mod tests {
 
     #[test]
     fn sprite_registry_ids_are_stable() {
-        assert_eq!(88, SPRITES.len());
+        assert_eq!(91, SPRITES.len());
         assert_eq!("crosshair", sprite_def(1).unwrap().name);
         assert_eq!("boss-bar-overlay-progress", sprite_def(79).unwrap().name);
         assert_eq!("hunger-effect-full", sprite_def(85).unwrap().name);
         assert_eq!("air-full", sprite_def(86).unwrap().name);
         assert_eq!("air-popping", sprite_def(87).unwrap().name);
         assert_eq!("air-empty", sprite_def(88).unwrap().name);
-        assert!(sprite_def(89).is_err());
+        assert_eq!("mount-heart-container", sprite_def(89).unwrap().name);
+        assert_eq!("mount-heart-full", sprite_def(90).unwrap().name);
+        assert_eq!("mount-heart-half", sprite_def(91).unwrap().name);
+        assert!(sprite_def(92).is_err());
     }
 
     #[test]

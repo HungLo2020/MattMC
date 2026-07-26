@@ -95,6 +95,14 @@ public final class DeterministicCameraCapture {
 		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.playerUnderwater");
 	private static final boolean FORCE_PLAYER_AIR_POP =
 		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.playerAirPop");
+	private static final boolean FORCE_MOUNT_PRESENT =
+		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.mountPresent");
+	private static final float FORCED_MOUNT_HEALTH =
+		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.mountHealth", "NaN"));
+	private static final float FORCED_MOUNT_MAX_HEALTH =
+		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.mountMaxHealth", "NaN"));
+	private static final int FORCED_MOUNT_HEALTH_ROWS =
+		Integer.getInteger("mattmc.dev.deterministicCameraCapture.mountHealthRows", -1);
 	private static final String FORCED_PLAYER_HEART_VARIANT =
 		System.getProperty("mattmc.dev.deterministicCameraCapture.playerHeartVariant", "").trim();
 	private static final boolean FORCE_PLAYER_HEALTH_REGEN =
@@ -1056,6 +1064,10 @@ public final class DeterministicCameraCapture {
 			json.append("  \"playerMaxAirSupplyOverride\": ").append(FORCED_PLAYER_MAX_AIR_SUPPLY).append(",\n");
 			json.append("  \"playerUnderwaterOverride\": ").append(FORCE_PLAYER_UNDERWATER).append(",\n");
 			json.append("  \"playerAirPopOverride\": ").append(FORCE_PLAYER_AIR_POP).append(",\n");
+			json.append("  \"mountPresentOverride\": ").append(FORCE_MOUNT_PRESENT).append(",\n");
+			json.append("  \"mountHealthOverride\": ").append(format(FORCED_MOUNT_HEALTH)).append(",\n");
+			json.append("  \"mountMaxHealthOverride\": ").append(format(FORCED_MOUNT_MAX_HEALTH)).append(",\n");
+			json.append("  \"mountHealthRowsOverride\": ").append(FORCED_MOUNT_HEALTH_ROWS).append(",\n");
 			json.append("  \"hideChat\": ").append(HIDE_CHAT).append(",\n");
 			json.append("  \"bossBarOverride\": ").append(hasBossBarOverride()).append(",\n");
 			json.append("  \"bossBarCount\": ").append(hasBossBarOverride() ? forcedBossBarCount() : -1).append(",\n");

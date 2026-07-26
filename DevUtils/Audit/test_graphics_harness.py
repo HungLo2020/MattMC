@@ -1701,6 +1701,18 @@ else:
             )
             self.assertIn("-Dmattmc.dev.rustGalGui.air.legacyControl=true", air_legacy_env["JAVA_TOOL_OPTIONS"])
 
+            mount_disabled = Namespace(**base, rust_gal_gui_control="mount-health-disabled")
+            _, mount_disabled_env = harness.build_capture_command(
+                target, harness.MATRIX_MODES[0], root / "capture-mount-disabled", "correctness", mount_disabled, "capture"
+            )
+            self.assertIn("-Dmattmc.dev.rustGalGui.mountHealth.disabled=true", mount_disabled_env["JAVA_TOOL_OPTIONS"])
+
+            mount_legacy = Namespace(**base, rust_gal_gui_control="mount-health-legacy")
+            _, mount_legacy_env = harness.build_capture_command(
+                target, harness.MATRIX_MODES[0], root / "capture-mount-legacy", "correctness", mount_legacy, "capture"
+            )
+            self.assertIn("-Dmattmc.dev.rustGalGui.mountHealth.legacyControl=true", mount_legacy_env["JAVA_TOOL_OPTIONS"])
+
     def test_world_profiles_select_world_and_deterministic_readiness_policy(self) -> None:
         migration = harness.parse_args(["capture", "--profile", "smoke", "--world-profile", "migration-gate"])
         self.assertEqual("Origin", migration.world)
@@ -1762,6 +1774,10 @@ else:
                 player_max_air_supply=300,
                 player_underwater=True,
                 player_air_pop=True,
+                mount_present=True,
+                mount_health=7.0,
+                mount_max_health=40.0,
+                mount_health_rows=2,
                 player_heart_variant="poisoned",
                 player_heart_flash=True,
                 player_heart_hardcore=True,
@@ -1807,6 +1823,14 @@ else:
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerUnderwater=true", options)
             self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.playerAirPop=true", options)
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerAirPop=true", options)
+            self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.mountPresent=true", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.mountPresent=true", options)
+            self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.mountHealth=7.0", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.mountHealth=7.0", options)
+            self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.mountMaxHealth=40.0", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.mountMaxHealth=40.0", options)
+            self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.mountHealthRows=2", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.mountHealthRows=2", options)
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerHeartVariant=poisoned", options)
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerHealthFlash=true", options)
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerHealthHardcore=true", options)
