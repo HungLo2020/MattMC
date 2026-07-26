@@ -2,8 +2,13 @@ package net.vulkanic.bridge;
 
 import net.vulkanic.gui.AbsorptionHeartRequest;
 import net.vulkanic.gui.AbsorptionHeartVariant;
+import net.vulkanic.gui.AirBubbleRequest;
+import net.vulkanic.gui.AirBubbleState;
 import net.vulkanic.gui.ArmorIconState;
 import net.vulkanic.gui.GuiHeartState;
+import net.vulkanic.gui.HungerIconRequest;
+import net.vulkanic.gui.HungerIconState;
+import net.vulkanic.gui.HungerIconVariant;
 import net.vulkanic.gui.PlayerHeartRequest;
 import net.vulkanic.gui.PlayerHeartVariant;
 import net.vulkanic.gui.RustGalGuiRenderer;
@@ -179,6 +184,51 @@ class VulkanicGalBridgeAbiTest {
 			}
 		}
 		new AbsorptionHeartRequest(AbsorptionHeartVariant.CONTAINER, GuiHeartState.CONTAINER, true, true, 0, 2, 3);
+		assertThrows(IllegalArgumentException.class, () -> new HungerIconRequest(
+			HungerIconVariant.NORMAL,
+			HungerIconState.FULL,
+			false,
+			2,
+			0,
+			0,
+			0
+		));
+		assertThrows(IllegalArgumentException.class, () -> new HungerIconRequest(
+			HungerIconVariant.NORMAL,
+			HungerIconState.FULL,
+			false,
+			0,
+			-1,
+			0,
+			0
+		));
+		for (HungerIconVariant variant : HungerIconVariant.values()) {
+			for (HungerIconState state : HungerIconState.values()) {
+				new HungerIconRequest(variant, state, true, -1, 1, 2, 3);
+				new HungerIconRequest(variant, state, false, 0, 1, 2, 3);
+				new HungerIconRequest(variant, state, true, 1, 1, 2, 3);
+			}
+		}
+		assertThrows(IllegalArgumentException.class, () -> new AirBubbleRequest(
+			AirBubbleState.FULL,
+			true,
+			true,
+			0,
+			0,
+			0
+		));
+		assertThrows(IllegalArgumentException.class, () -> new AirBubbleRequest(
+			AirBubbleState.EMPTY,
+			false,
+			true,
+			-1,
+			0,
+			0
+		));
+		new AirBubbleRequest(AirBubbleState.FULL, false, true, 0, 1, 2);
+		new AirBubbleRequest(AirBubbleState.PARTIAL, true, true, 1, 1, 2);
+		new AirBubbleRequest(AirBubbleState.EMPTY, false, true, 2, 1, 2);
+		new AirBubbleRequest(AirBubbleState.EMPTY, false, false, 3, 1, 2);
 		assertTrue(rustGuiFrontend.contains("GUI_MAX_PACKED_SPRITES"));
 		assertTrue(rustGuiFrontend.contains("CommandOp::CopyBufferToTexture"));
 	}
@@ -317,6 +367,8 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(queue.contains("mattmc.dev.rustGalGui.playerHealth.legacyControl"));
 		assertTrue(queue.contains("mattmc.dev.rustGalGui.absorption.disabled"));
 		assertTrue(queue.contains("mattmc.dev.rustGalGui.absorption.legacyControl"));
+		assertTrue(queue.contains("mattmc.dev.rustGalGui.hunger.disabled"));
+		assertTrue(queue.contains("mattmc.dev.rustGalGui.hunger.legacyControl"));
 		assertTrue(queue.contains("HOTBAR_SELECTION_PRODUCER"));
 		assertTrue(queue.contains("EXPERIENCE_BACKGROUND_PRODUCER"));
 		assertTrue(queue.contains("EXPERIENCE_PROGRESS_PRODUCER"));
@@ -328,6 +380,7 @@ class VulkanicGalBridgeAbiTest {
 			assertTrue(queue.contains("BOSS_BAR_PROGRESS_PRODUCER"));
 			assertTrue(queue.contains("ARMOR_ICON_PRODUCER"));
 			assertTrue(queue.contains("PLAYER_HEART_PRODUCER"));
+			assertTrue(queue.contains("HUNGER_ICON_PRODUCER"));
 			assertTrue(queue.contains("ABSORPTION_HEART_PRODUCER"));
 			assertTrue(queue.contains("selected hotbar slot must be in 0..8"));
 			assertTrue(queue.contains("armor value must be in 0..20"));
@@ -404,6 +457,20 @@ class VulkanicGalBridgeAbiTest {
 				< gui.indexOf("RustGalGuiRenderer.enqueuePlayerHearts", healthMethod));
 			assertTrue(gui.indexOf("rustAbsorptionHeartVariant(heartType)", healthMethod)
 				< gui.indexOf("RustGalGuiRenderer.enqueueAbsorptionHearts", healthMethod));
+			int foodMethod = gui.indexOf("private void renderFood");
+			assertTrue(gui.indexOf("RustGalGuiRenderer.isHungerLegacyControl()", foodMethod)
+				< gui.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, resourceLocation", foodMethod));
+			assertTrue(gui.indexOf("rustHungerIcons.add(new HungerIconRequest", foodMethod)
+				< gui.indexOf("RustGalGuiRenderer.enqueueHungerIcons", foodMethod));
+			assertTrue(gui.indexOf("diagnosticFoodLevel(foodData.getFoodLevel())", foodMethod)
+				< gui.indexOf("RustGalGuiRenderer.enqueueHungerIcons", foodMethod));
+			int airMethod = gui.indexOf("private void renderAirBubbles");
+			assertTrue(gui.indexOf("RustGalGuiRenderer.isAirLegacyControl()", airMethod)
+				< gui.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, AIR_SPRITE", airMethod));
+			assertTrue(gui.indexOf("rustAirBubbles.add(new AirBubbleRequest", airMethod)
+				< gui.indexOf("RustGalGuiRenderer.enqueueAirBubbles", airMethod));
+			assertTrue(gui.indexOf("diagnosticAirSupply(player.getAirSupply(), l)", airMethod)
+				< gui.indexOf("RustGalGuiRenderer.enqueueAirBubbles", airMethod));
 			int experienceMethod = experienceBar.indexOf("renderBackground");
 		assertTrue(experienceBar.indexOf("RustGalGuiRenderer.isMigratedGuiLegacyControl()", experienceMethod)
 			< experienceBar.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, EXPERIENCE_BAR_BACKGROUND_SPRITE", experienceMethod));
@@ -483,13 +550,18 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(gui.contains("RustGalGuiRenderer.enqueueArmorIcons"));
 		assertTrue(gui.contains("RustGalGuiRenderer.enqueuePlayerHearts"));
 		assertTrue(gui.contains("RustGalGuiRenderer.enqueueAbsorptionHearts"));
+		assertTrue(gui.contains("RustGalGuiRenderer.enqueueHungerIcons"));
+		assertTrue(gui.contains("RustGalGuiRenderer.enqueueAirBubbles"));
 		assertTrue(gui.contains("List<PlayerHeartRequest> rustPlayerHearts"));
 		assertTrue(gui.contains("List<AbsorptionHeartRequest> rustAbsorptionHearts"));
+		assertTrue(gui.contains("List<HungerIconRequest> rustHungerIcons"));
+		assertTrue(gui.contains("List<AirBubbleRequest> rustAirBubbles"));
 		assertTrue(gui.contains("rustHeartVariant(heartType)"));
 		assertTrue(gui.contains("rustAbsorptionHeartVariant(heartType)"));
 		assertTrue(gui.contains("diagnosticPlayerHealth(player.getHealth())"));
 		assertTrue(gui.contains("diagnosticPlayerMaxHealth((float)player.getAttributeValue(Attributes.MAX_HEALTH))"));
 		assertTrue(gui.contains("diagnosticPlayerAbsorption(player.getAbsorptionAmount())"));
+		assertTrue(gui.contains("diagnosticFoodLevel(foodData.getFoodLevel())"));
 		assertFalse(guiRenderer.contains("public record PlayerHeartRequest"));
 		assertFalse(guiRenderer.contains("public enum PlayerHeartVariant"));
 		assertFalse(guiRenderer.contains("public enum PlayerHeartState"));

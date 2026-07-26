@@ -3645,6 +3645,28 @@ def build_capture_command(
     if getattr(args, "player_absorption", None) is not None:
         java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.playerAbsorption={args.player_absorption}")
         java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.playerAbsorption={args.player_absorption}")
+    if getattr(args, "player_food_level", None) is not None:
+        java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.playerFoodLevel={args.player_food_level}")
+        java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.playerFoodLevel={args.player_food_level}")
+    if getattr(args, "player_food_saturation", None) is not None:
+        java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.playerFoodSaturation={args.player_food_saturation}")
+        java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.playerFoodSaturation={args.player_food_saturation}")
+    if getattr(args, "player_food_hunger_effect", False):
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.playerFoodHungerEffect=true")
+    if getattr(args, "player_food_jitter", False):
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.playerFoodJitter=true")
+    if getattr(args, "player_air_supply", None) is not None:
+        java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.playerAirSupply={args.player_air_supply}")
+        java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.playerAirSupply={args.player_air_supply}")
+    if getattr(args, "player_max_air_supply", None) is not None:
+        java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.playerMaxAirSupply={args.player_max_air_supply}")
+        java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.playerMaxAirSupply={args.player_max_air_supply}")
+    if getattr(args, "player_underwater", False):
+        java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.playerUnderwater=true")
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.playerUnderwater=true")
+    if getattr(args, "player_air_pop", False):
+        java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.playerAirPop=true")
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.playerAirPop=true")
     if getattr(args, "player_heart_variant", None):
         java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.playerHeartVariant={args.player_heart_variant}")
     if getattr(args, "player_heart_flash", False):
@@ -3673,6 +3695,14 @@ def build_capture_command(
         java_options.append("-Dmattmc.dev.rustGalGui.absorption.disabled=true")
     elif rust_gal_gui_control == "absorption-legacy":
         java_options.append("-Dmattmc.dev.rustGalGui.absorption.legacyControl=true")
+    elif rust_gal_gui_control == "hunger-disabled":
+        java_options.append("-Dmattmc.dev.rustGalGui.hunger.disabled=true")
+    elif rust_gal_gui_control == "hunger-legacy":
+        java_options.append("-Dmattmc.dev.rustGalGui.hunger.legacyControl=true")
+    elif rust_gal_gui_control == "air-disabled":
+        java_options.append("-Dmattmc.dev.rustGalGui.air.disabled=true")
+    elif rust_gal_gui_control == "air-legacy":
+        java_options.append("-Dmattmc.dev.rustGalGui.air.legacyControl=true")
     if tool_kind == "gameplay":
         frame_status = capture_dir / f"graphics_frame_benchmark_{timestamp()}.json"
         java_options.extend(
@@ -4553,6 +4583,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
                 "player-health-legacy",
                 "absorption-disabled",
                 "absorption-legacy",
+                "hunger-disabled",
+                "hunger-legacy",
+                "air-disabled",
+                "air-legacy",
             ),
             default="rust",
             help="Diagnostic control for migrated Rust-GAL GUI sprites; bare disabled/legacy retain the armor-control aliases.",
@@ -4561,6 +4595,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         subparser.add_argument("--player-health", type=float, help="Force deterministic player health for gameplay/capture controls.")
         subparser.add_argument("--player-max-health", type=float, help="Force deterministic player max health for gameplay/capture controls.")
         subparser.add_argument("--player-absorption", type=float, help="Force deterministic absorption hearts for gameplay/capture controls.")
+        subparser.add_argument("--player-food-level", type=int, help="Force deterministic player food level for hunger-icon gameplay/capture controls.")
+        subparser.add_argument("--player-food-saturation", type=float, help="Force deterministic player food saturation for hunger jitter controls.")
+        subparser.add_argument("--player-food-hunger-effect", action="store_true", help="Force hunger-effect food icon variant for correctness captures.")
+        subparser.add_argument("--player-food-jitter", action="store_true", help="Force low-saturation hunger icon jitter for correctness captures.")
+        subparser.add_argument("--player-air-supply", type=int, help="Force deterministic player air supply for air-bubble gameplay/capture controls.")
+        subparser.add_argument("--player-max-air-supply", type=int, help="Force deterministic player max air supply for air-bubble gameplay/capture controls.")
+        subparser.add_argument("--player-underwater", action="store_true", help="Force air bubbles visible as if the player eye is underwater.")
+        subparser.add_argument("--player-air-pop", action="store_true", help="Force air-bubble popping animation state for correctness captures.")
         subparser.add_argument("--player-heart-variant", choices=("normal", "poisoned", "withered", "frozen"),
                                help="Force deterministic player heart variant for correctness captures.")
         subparser.add_argument("--player-heart-flash", action="store_true", help="Force blinking player-heart sprites for correctness captures.")
@@ -4680,6 +4722,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         raise SystemExit("--player-max-health must be positive")
     if args.player_absorption is not None and args.player_absorption < 0:
         raise SystemExit("--player-absorption must be non-negative")
+    if args.player_air_supply is not None and args.player_air_supply < 0:
+        raise SystemExit("--player-air-supply must be non-negative")
+    if args.player_max_air_supply is not None and args.player_max_air_supply <= 0:
+        raise SystemExit("--player-max-air-supply must be positive")
     return args
 
 

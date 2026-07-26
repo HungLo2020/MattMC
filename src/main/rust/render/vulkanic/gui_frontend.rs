@@ -1010,6 +1010,9 @@ fn bundled_sprite_bytes(path: &str) -> Option<&'static [u8]> {
         "/assets/minecraft/textures/gui/sprites/hud/armor_empty.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/armor_empty.png").as_slice()),
         "/assets/minecraft/textures/gui/sprites/hud/armor_full.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/armor_full.png").as_slice()),
         "/assets/minecraft/textures/gui/sprites/hud/armor_half.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/armor_half.png").as_slice()),
+        "/assets/minecraft/textures/gui/sprites/hud/air.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/air.png").as_slice()),
+        "/assets/minecraft/textures/gui/sprites/hud/air_bursting.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/air_bursting.png").as_slice()),
+        "/assets/minecraft/textures/gui/sprites/hud/air_empty.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/air_empty.png").as_slice()),
         "/assets/minecraft/textures/gui/sprites/hud/crosshair.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/crosshair.png").as_slice()),
         "/assets/minecraft/textures/gui/sprites/hud/crosshair_attack_indicator_background.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/crosshair_attack_indicator_background.png").as_slice()),
         "/assets/minecraft/textures/gui/sprites/hud/crosshair_attack_indicator_full.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/crosshair_attack_indicator_full.png").as_slice()),
@@ -1064,6 +1067,12 @@ fn bundled_sprite_bytes(path: &str) -> Option<&'static [u8]> {
         "/assets/minecraft/textures/gui/sprites/hud/hotbar_attack_indicator_background.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/hotbar_attack_indicator_background.png").as_slice()),
         "/assets/minecraft/textures/gui/sprites/hud/hotbar_attack_indicator_progress.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/hotbar_attack_indicator_progress.png").as_slice()),
         "/assets/minecraft/textures/gui/sprites/hud/hotbar_selection.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/hotbar_selection.png").as_slice()),
+        "/assets/minecraft/textures/gui/sprites/hud/food_empty.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/food_empty.png").as_slice()),
+        "/assets/minecraft/textures/gui/sprites/hud/food_half.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/food_half.png").as_slice()),
+        "/assets/minecraft/textures/gui/sprites/hud/food_full.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/food_full.png").as_slice()),
+        "/assets/minecraft/textures/gui/sprites/hud/food_empty_hunger.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/food_empty_hunger.png").as_slice()),
+        "/assets/minecraft/textures/gui/sprites/hud/food_half_hunger.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/food_half_hunger.png").as_slice()),
+        "/assets/minecraft/textures/gui/sprites/hud/food_full_hunger.png" => Some(include_bytes!("../../../resources/assets/minecraft/textures/gui/sprites/hud/food_full_hunger.png").as_slice()),
         _ => None,
     }
 }
@@ -1815,6 +1824,87 @@ const SPRITES: &[SpriteDef] = &[
         height: 5,
         group: group(false),
     },
+    SpriteDef {
+        id: 80,
+        stratum: 370,
+        name: "hunger-empty",
+        path: "/assets/minecraft/textures/gui/sprites/hud/food_empty.png",
+        width: 9,
+        height: 9,
+        group: group(false),
+    },
+    SpriteDef {
+        id: 81,
+        stratum: 370,
+        name: "hunger-half",
+        path: "/assets/minecraft/textures/gui/sprites/hud/food_half.png",
+        width: 9,
+        height: 9,
+        group: group(false),
+    },
+    SpriteDef {
+        id: 82,
+        stratum: 370,
+        name: "hunger-full",
+        path: "/assets/minecraft/textures/gui/sprites/hud/food_full.png",
+        width: 9,
+        height: 9,
+        group: group(false),
+    },
+    SpriteDef {
+        id: 83,
+        stratum: 370,
+        name: "hunger-effect-empty",
+        path: "/assets/minecraft/textures/gui/sprites/hud/food_empty_hunger.png",
+        width: 9,
+        height: 9,
+        group: group(false),
+    },
+    SpriteDef {
+        id: 84,
+        stratum: 370,
+        name: "hunger-effect-half",
+        path: "/assets/minecraft/textures/gui/sprites/hud/food_half_hunger.png",
+        width: 9,
+        height: 9,
+        group: group(false),
+    },
+    SpriteDef {
+        id: 85,
+        stratum: 370,
+        name: "hunger-effect-full",
+        path: "/assets/minecraft/textures/gui/sprites/hud/food_full_hunger.png",
+        width: 9,
+        height: 9,
+        group: group(false),
+    },
+    SpriteDef {
+        id: 86,
+        stratum: 380,
+        name: "air-full",
+        path: "/assets/minecraft/textures/gui/sprites/hud/air.png",
+        width: 9,
+        height: 9,
+        group: group(false),
+    },
+    SpriteDef {
+        id: 87,
+        stratum: 380,
+        name: "air-popping",
+        path: "/assets/minecraft/textures/gui/sprites/hud/air_bursting.png",
+        width: 9,
+        height: 9,
+        group: group(false),
+    },
+    SpriteDef {
+        id: 88,
+        stratum: 380,
+        name: "air-empty",
+        path: "/assets/minecraft/textures/gui/sprites/hud/air_empty.png",
+        width: 9,
+        height: 9,
+        group: group(false),
+    },
 ];
 
 #[cfg(test)]
@@ -1879,10 +1969,14 @@ mod tests {
 
     #[test]
     fn sprite_registry_ids_are_stable() {
-        assert_eq!(79, SPRITES.len());
+        assert_eq!(88, SPRITES.len());
         assert_eq!("crosshair", sprite_def(1).unwrap().name);
         assert_eq!("boss-bar-overlay-progress", sprite_def(79).unwrap().name);
-        assert!(sprite_def(80).is_err());
+        assert_eq!("hunger-effect-full", sprite_def(85).unwrap().name);
+        assert_eq!("air-full", sprite_def(86).unwrap().name);
+        assert_eq!("air-popping", sprite_def(87).unwrap().name);
+        assert_eq!("air-empty", sprite_def(88).unwrap().name);
+        assert!(sprite_def(89).is_err());
     }
 
     #[test]

@@ -6,6 +6,8 @@ public enum GuiRenderStratum {
 	GUI_HOTBAR_SELECTION("gui.hotbar.selection", 310),
 	GUI_ARMOR("gui.armor", 350),
 	GUI_PLAYER_HEALTH("gui.player-health", 360),
+	GUI_HUNGER("gui.hunger", 370),
+	GUI_AIR("gui.air", 380),
 	GUI_EXPERIENCE_BAR_BACKGROUND("gui.experience.background", 400),
 	GUI_EXPERIENCE_BAR_PROGRESS("gui.experience.progress", 410),
 	GUI_ATTACK_CROSSHAIR_BACKGROUND("gui.attack.crosshair.background", 500),

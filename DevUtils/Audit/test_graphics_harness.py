@@ -1677,6 +1677,30 @@ else:
             self.assertIn("-Dmattmc.dev.rustGalGui.legacyControl=true", legacy_env["JAVA_TOOL_OPTIONS"])
             self.assertNotIn("-Dmattmc.dev.rustGalGui.armor.legacyControl=true", legacy_env["JAVA_TOOL_OPTIONS"])
 
+            hunger_disabled = Namespace(**base, rust_gal_gui_control="hunger-disabled")
+            _, hunger_disabled_env = harness.build_capture_command(
+                target, harness.MATRIX_MODES[0], root / "capture-hunger-disabled", "correctness", hunger_disabled, "capture"
+            )
+            self.assertIn("-Dmattmc.dev.rustGalGui.hunger.disabled=true", hunger_disabled_env["JAVA_TOOL_OPTIONS"])
+
+            hunger_legacy = Namespace(**base, rust_gal_gui_control="hunger-legacy")
+            _, hunger_legacy_env = harness.build_capture_command(
+                target, harness.MATRIX_MODES[0], root / "capture-hunger-legacy", "correctness", hunger_legacy, "capture"
+            )
+            self.assertIn("-Dmattmc.dev.rustGalGui.hunger.legacyControl=true", hunger_legacy_env["JAVA_TOOL_OPTIONS"])
+
+            air_disabled = Namespace(**base, rust_gal_gui_control="air-disabled")
+            _, air_disabled_env = harness.build_capture_command(
+                target, harness.MATRIX_MODES[0], root / "capture-air-disabled", "correctness", air_disabled, "capture"
+            )
+            self.assertIn("-Dmattmc.dev.rustGalGui.air.disabled=true", air_disabled_env["JAVA_TOOL_OPTIONS"])
+
+            air_legacy = Namespace(**base, rust_gal_gui_control="air-legacy")
+            _, air_legacy_env = harness.build_capture_command(
+                target, harness.MATRIX_MODES[0], root / "capture-air-legacy", "correctness", air_legacy, "capture"
+            )
+            self.assertIn("-Dmattmc.dev.rustGalGui.air.legacyControl=true", air_legacy_env["JAVA_TOOL_OPTIONS"])
+
     def test_world_profiles_select_world_and_deterministic_readiness_policy(self) -> None:
         migration = harness.parse_args(["capture", "--profile", "smoke", "--world-profile", "migration-gate"])
         self.assertEqual("Origin", migration.world)
@@ -1730,6 +1754,14 @@ else:
                 player_health=19.0,
                 player_max_health=40.0,
                 player_absorption=3.0,
+                player_food_level=19,
+                player_food_saturation=0.0,
+                player_food_hunger_effect=True,
+                player_food_jitter=True,
+                player_air_supply=42,
+                player_max_air_supply=300,
+                player_underwater=True,
+                player_air_pop=True,
                 player_heart_variant="poisoned",
                 player_heart_flash=True,
                 player_heart_hardcore=True,
@@ -1761,6 +1793,20 @@ else:
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerMaxHealth=40.0", options)
             self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.playerAbsorption=3.0", options)
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerAbsorption=3.0", options)
+            self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.playerFoodLevel=19", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerFoodLevel=19", options)
+            self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.playerFoodSaturation=0.0", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerFoodSaturation=0.0", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerFoodHungerEffect=true", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerFoodJitter=true", options)
+            self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.playerAirSupply=42", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerAirSupply=42", options)
+            self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.playerMaxAirSupply=300", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerMaxAirSupply=300", options)
+            self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.playerUnderwater=true", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerUnderwater=true", options)
+            self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.playerAirPop=true", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerAirPop=true", options)
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerHeartVariant=poisoned", options)
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerHealthFlash=true", options)
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerHealthHardcore=true", options)

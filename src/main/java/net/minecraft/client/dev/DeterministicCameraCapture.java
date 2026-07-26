@@ -79,6 +79,22 @@ public final class DeterministicCameraCapture {
 		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.playerMaxHealth", "NaN"));
 	private static final float FORCED_PLAYER_ABSORPTION =
 		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.playerAbsorption", "NaN"));
+	private static final int FORCED_PLAYER_FOOD_LEVEL =
+		Integer.getInteger("mattmc.dev.deterministicCameraCapture.playerFoodLevel", -1);
+	private static final float FORCED_PLAYER_FOOD_SATURATION =
+		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.playerFoodSaturation", "NaN"));
+	private static final boolean FORCE_PLAYER_FOOD_HUNGER_EFFECT =
+		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.playerFoodHungerEffect");
+	private static final boolean FORCE_PLAYER_FOOD_JITTER =
+		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.playerFoodJitter");
+	private static final int FORCED_PLAYER_AIR_SUPPLY =
+		Integer.getInteger("mattmc.dev.deterministicCameraCapture.playerAirSupply", -1);
+	private static final int FORCED_PLAYER_MAX_AIR_SUPPLY =
+		Integer.getInteger("mattmc.dev.deterministicCameraCapture.playerMaxAirSupply", -1);
+	private static final boolean FORCE_PLAYER_UNDERWATER =
+		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.playerUnderwater");
+	private static final boolean FORCE_PLAYER_AIR_POP =
+		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.playerAirPop");
 	private static final String FORCED_PLAYER_HEART_VARIANT =
 		System.getProperty("mattmc.dev.deterministicCameraCapture.playerHeartVariant", "").trim();
 	private static final boolean FORCE_PLAYER_HEALTH_REGEN =
@@ -1028,6 +1044,18 @@ public final class DeterministicCameraCapture {
 			json.append("  \"playerMaxHealthOverride\": ").append(format(FORCED_PLAYER_MAX_HEALTH)).append(",\n");
 			json.append("  \"playerAbsorption\": ").append(player == null ? -1.0F : player.getAbsorptionAmount()).append(",\n");
 			json.append("  \"playerAbsorptionOverride\": ").append(format(FORCED_PLAYER_ABSORPTION)).append(",\n");
+			json.append("  \"playerFoodLevel\": ").append(player == null ? -1 : player.getFoodData().getFoodLevel()).append(",\n");
+			json.append("  \"playerFoodLevelOverride\": ").append(FORCED_PLAYER_FOOD_LEVEL).append(",\n");
+			json.append("  \"playerFoodSaturation\": ").append(player == null ? -1.0F : player.getFoodData().getSaturationLevel()).append(",\n");
+			json.append("  \"playerFoodSaturationOverride\": ").append(format(FORCED_PLAYER_FOOD_SATURATION)).append(",\n");
+			json.append("  \"playerFoodHungerEffectOverride\": ").append(FORCE_PLAYER_FOOD_HUNGER_EFFECT).append(",\n");
+			json.append("  \"playerFoodJitterOverride\": ").append(FORCE_PLAYER_FOOD_JITTER).append(",\n");
+			json.append("  \"playerAirSupply\": ").append(player == null ? -1 : player.getAirSupply()).append(",\n");
+			json.append("  \"playerAirSupplyOverride\": ").append(FORCED_PLAYER_AIR_SUPPLY).append(",\n");
+			json.append("  \"playerMaxAirSupply\": ").append(player == null ? -1 : player.getMaxAirSupply()).append(",\n");
+			json.append("  \"playerMaxAirSupplyOverride\": ").append(FORCED_PLAYER_MAX_AIR_SUPPLY).append(",\n");
+			json.append("  \"playerUnderwaterOverride\": ").append(FORCE_PLAYER_UNDERWATER).append(",\n");
+			json.append("  \"playerAirPopOverride\": ").append(FORCE_PLAYER_AIR_POP).append(",\n");
 			json.append("  \"hideChat\": ").append(HIDE_CHAT).append(",\n");
 			json.append("  \"bossBarOverride\": ").append(hasBossBarOverride()).append(",\n");
 			json.append("  \"bossBarCount\": ").append(hasBossBarOverride() ? forcedBossBarCount() : -1).append(",\n");

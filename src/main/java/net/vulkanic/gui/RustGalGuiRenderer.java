@@ -41,6 +41,8 @@ public final class RustGalGuiRenderer {
 	private static final String ARMOR_ICON_PRODUCER = "minecraft.gui.armor";
 	private static final String PLAYER_HEART_PRODUCER = "minecraft.gui.player-heart";
 	private static final String ABSORPTION_HEART_PRODUCER = "minecraft.gui.absorption-heart";
+	private static final String HUNGER_ICON_PRODUCER = "minecraft.gui.hunger";
+	private static final String AIR_BUBBLE_PRODUCER = "minecraft.gui.air";
 	private static final boolean ASSET_UPDATES_DISABLED =
 		Boolean.getBoolean("mattmc.dev.rustGalGui.assetUpdates.disabled");
 	private static final Object LOCK = new Object();
@@ -100,6 +102,22 @@ public final class RustGalGuiRenderer {
 
 	public static boolean isAbsorptionHealthLegacyControl() {
 		return Boolean.getBoolean("mattmc.dev.rustGalGui.absorption.legacyControl");
+	}
+
+	public static boolean isHungerDisabledForDiagnostics() {
+		return Boolean.getBoolean("mattmc.dev.rustGalGui.hunger.disabled");
+	}
+
+	public static boolean isHungerLegacyControl() {
+		return Boolean.getBoolean("mattmc.dev.rustGalGui.hunger.legacyControl");
+	}
+
+	public static boolean isAirDisabledForDiagnostics() {
+		return Boolean.getBoolean("mattmc.dev.rustGalGui.air.disabled");
+	}
+
+	public static boolean isAirLegacyControl() {
+		return Boolean.getBoolean("mattmc.dev.rustGalGui.air.legacyControl");
 	}
 
 	public static void enqueueCrosshair(Minecraft minecraft, net.minecraft.client.gui.GuiGraphics guiGraphics, int x, int y, int width, int height) {
@@ -379,6 +397,59 @@ public final class RustGalGuiRenderer {
 		}
 	}
 
+	public static void enqueueHungerIcons(
+		Minecraft minecraft,
+		net.minecraft.client.gui.GuiGraphics guiGraphics,
+		List<HungerIconRequest> icons
+	) {
+		if (!isCrosshairEnabled() || icons.isEmpty()) {
+			return;
+		}
+		for (HungerIconRequest icon : icons) {
+			enqueueGuiSprite(
+				minecraft,
+				guiGraphics,
+				hungerIconSprite(icon),
+				HUNGER_ICON_PRODUCER + "." + icon.variant().id() + "." + icon.state().id() + ".order" + icon.order(),
+				icon.order(),
+				icon.state().progressValue(),
+				GuiFillDirection.NONE,
+				icon.x(),
+				icon.y(),
+				9,
+				9
+			);
+		}
+	}
+
+	public static void enqueueAirBubbles(
+		Minecraft minecraft,
+		net.minecraft.client.gui.GuiGraphics guiGraphics,
+		List<AirBubbleRequest> bubbles
+	) {
+		if (!isCrosshairEnabled() || bubbles.isEmpty()) {
+			return;
+		}
+		for (AirBubbleRequest bubble : bubbles) {
+			if (!bubble.visible()) {
+				continue;
+			}
+			enqueueGuiSprite(
+				minecraft,
+				guiGraphics,
+				airBubbleSprite(bubble),
+				AIR_BUBBLE_PRODUCER + "." + bubble.state().id() + (bubble.popping() ? ".popping" : "") + ".order" + bubble.order(),
+				bubble.order(),
+				bubble.state().progressValue(),
+				GuiFillDirection.NONE,
+				bubble.x(),
+				bubble.y(),
+				9,
+				9
+			);
+		}
+	}
+
 	private static ArmorIconState armorIconState(int armorValue, int iconIndex) {
 		if (armorValue < 0 || armorValue > 20) {
 			throw new IllegalArgumentException("armor value must be in 0..20: " + armorValue);
@@ -467,6 +538,29 @@ public final class RustGalGuiRenderer {
 				GuiSprite.HEART_WITHERED_HARDCORE_FULL_FLASHING,
 				GuiSprite.HEART_WITHERED_HARDCORE_HALF,
 				GuiSprite.HEART_WITHERED_HARDCORE_HALF_FLASHING);
+		};
+	}
+
+	private static GuiSprite hungerIconSprite(HungerIconRequest request) {
+		return switch (request.variant()) {
+			case NORMAL -> switch (request.state()) {
+				case EMPTY -> GuiSprite.HUNGER_EMPTY;
+				case HALF -> GuiSprite.HUNGER_HALF;
+				case FULL -> GuiSprite.HUNGER_FULL;
+			};
+			case HUNGER_EFFECT -> switch (request.state()) {
+				case EMPTY -> GuiSprite.HUNGER_EFFECT_EMPTY;
+				case HALF -> GuiSprite.HUNGER_EFFECT_HALF;
+				case FULL -> GuiSprite.HUNGER_EFFECT_FULL;
+			};
+		};
+	}
+
+	private static GuiSprite airBubbleSprite(AirBubbleRequest request) {
+		return switch (request.state()) {
+			case FULL -> GuiSprite.AIR_FULL;
+			case PARTIAL -> request.popping() ? GuiSprite.AIR_POPPING : GuiSprite.AIR_FULL;
+			case EMPTY -> GuiSprite.AIR_EMPTY;
 		};
 	}
 
@@ -1948,6 +2042,87 @@ public final class RustGalGuiRenderer {
 				"/assets/minecraft/textures/gui/sprites/boss_bar/notched_20_progress.png",
 				182,
 				5,
+				false
+			),
+			HUNGER_EMPTY(
+				GuiRenderStratum.GUI_HUNGER,
+				"hunger",
+				"gui-textured-alpha-hunger-empty",
+				"/assets/minecraft/textures/gui/sprites/hud/food_empty.png",
+				9,
+				9,
+				false
+			),
+			HUNGER_HALF(
+				GuiRenderStratum.GUI_HUNGER,
+				"hunger",
+				"gui-textured-alpha-hunger-half",
+				"/assets/minecraft/textures/gui/sprites/hud/food_half.png",
+				9,
+				9,
+				false
+			),
+			HUNGER_FULL(
+				GuiRenderStratum.GUI_HUNGER,
+				"hunger",
+				"gui-textured-alpha-hunger-full",
+				"/assets/minecraft/textures/gui/sprites/hud/food_full.png",
+				9,
+				9,
+				false
+			),
+			HUNGER_EFFECT_EMPTY(
+				GuiRenderStratum.GUI_HUNGER,
+				"hunger",
+				"gui-textured-alpha-hunger-effect-empty",
+				"/assets/minecraft/textures/gui/sprites/hud/food_empty_hunger.png",
+				9,
+				9,
+				false
+			),
+			HUNGER_EFFECT_HALF(
+				GuiRenderStratum.GUI_HUNGER,
+				"hunger",
+				"gui-textured-alpha-hunger-effect-half",
+				"/assets/minecraft/textures/gui/sprites/hud/food_half_hunger.png",
+				9,
+				9,
+				false
+			),
+			HUNGER_EFFECT_FULL(
+				GuiRenderStratum.GUI_HUNGER,
+				"hunger",
+				"gui-textured-alpha-hunger-effect-full",
+				"/assets/minecraft/textures/gui/sprites/hud/food_full_hunger.png",
+				9,
+				9,
+				false
+			),
+			AIR_FULL(
+				GuiRenderStratum.GUI_AIR,
+				"air",
+				"gui-textured-alpha-air-full",
+				"/assets/minecraft/textures/gui/sprites/hud/air.png",
+				9,
+				9,
+				false
+			),
+			AIR_POPPING(
+				GuiRenderStratum.GUI_AIR,
+				"air",
+				"gui-textured-alpha-air-popping",
+				"/assets/minecraft/textures/gui/sprites/hud/air_bursting.png",
+				9,
+				9,
+				false
+			),
+			AIR_EMPTY(
+				GuiRenderStratum.GUI_AIR,
+				"air",
+				"gui-textured-alpha-air-empty",
+				"/assets/minecraft/textures/gui/sprites/hud/air_empty.png",
+				9,
+				9,
 				false
 			);
 

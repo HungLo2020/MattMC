@@ -56,6 +56,11 @@ public final class GraphicsFrameBenchmark {
 		Float.parseFloat(System.getProperty("mattmc.dev.graphicsFrameBenchmark.playerMaxHealth", "NaN"));
 	private static final float FORCED_PLAYER_ABSORPTION =
 		Float.parseFloat(System.getProperty("mattmc.dev.graphicsFrameBenchmark.playerAbsorption", "NaN"));
+	private static final int FORCED_PLAYER_FOOD_LEVEL = Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.playerFoodLevel", -1);
+	private static final float FORCED_PLAYER_FOOD_SATURATION =
+		Float.parseFloat(System.getProperty("mattmc.dev.graphicsFrameBenchmark.playerFoodSaturation", "NaN"));
+	private static final int FORCED_PLAYER_AIR_SUPPLY = Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.playerAirSupply", -1);
+	private static final int FORCED_PLAYER_MAX_AIR_SUPPLY = Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.playerMaxAirSupply", -1);
 	private static final String FORCED_GAME_MODE = System.getProperty("mattmc.dev.graphicsFrameBenchmark.gameMode", "").trim();
 	private static final Path STATUS_PATH = Path.of(System.getProperty("mattmc.dev.graphicsFrameBenchmark.status", "run/graphics_frame_benchmark.json"));
 	private static final String WORKLOAD_COUNTER_DEFINITION_VERSION = "phase-family-v2";
@@ -436,6 +441,10 @@ public final class GraphicsFrameBenchmark {
 		int playerCount = minecraft.level == null ? -1 : minecraft.level.players().size();
 		int armorValue = minecraft.player == null ? -1 : minecraft.player.getArmorValue();
 		float absorptionValue = minecraft.player == null ? -1.0F : minecraft.player.getAbsorptionAmount();
+		int foodLevel = minecraft.player == null ? -1 : minecraft.player.getFoodData().getFoodLevel();
+		float foodSaturation = minecraft.player == null ? -1.0F : minecraft.player.getFoodData().getSaturationLevel();
+		int airSupply = minecraft.player == null ? -1 : minecraft.player.getAirSupply();
+		int maxAirSupply = minecraft.player == null ? -1 : minecraft.player.getMaxAirSupply();
 		String gameMode = minecraft.gameMode == null ? "missing" : String.valueOf(minecraft.gameMode.getPlayerMode());
 		String screen = minecraft.screen == null ? "none" : minecraft.screen.getClass().getSimpleName();
 		String overlay = minecraft.getOverlay() == null ? "none" : minecraft.getOverlay().getClass().getSimpleName();
@@ -460,6 +469,18 @@ public final class GraphicsFrameBenchmark {
 		json.append("    \"playerMaxHealthOverride\": ").append(format(FORCED_PLAYER_MAX_HEALTH)).append(",\n");
 		json.append("    \"playerAbsorption\": ").append(format(absorptionValue)).append(",\n");
 		json.append("    \"playerAbsorptionOverride\": ").append(format(FORCED_PLAYER_ABSORPTION)).append(",\n");
+		json.append("    \"playerFoodLevel\": ").append(foodLevel).append(",\n");
+		json.append("    \"playerFoodLevelOverride\": ").append(FORCED_PLAYER_FOOD_LEVEL).append(",\n");
+		json.append("    \"playerFoodSaturation\": ").append(format(foodSaturation)).append(",\n");
+		json.append("    \"playerFoodSaturationOverride\": ").append(format(FORCED_PLAYER_FOOD_SATURATION)).append(",\n");
+		json.append("    \"playerFoodHungerEffectOverride\": ").append(Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.playerFoodHungerEffect")).append(",\n");
+		json.append("    \"playerFoodJitterOverride\": ").append(Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.playerFoodJitter")).append(",\n");
+		json.append("    \"playerAirSupply\": ").append(airSupply).append(",\n");
+		json.append("    \"playerAirSupplyOverride\": ").append(FORCED_PLAYER_AIR_SUPPLY).append(",\n");
+		json.append("    \"playerMaxAirSupply\": ").append(maxAirSupply).append(",\n");
+		json.append("    \"playerMaxAirSupplyOverride\": ").append(FORCED_PLAYER_MAX_AIR_SUPPLY).append(",\n");
+		json.append("    \"playerUnderwaterOverride\": ").append(Boolean.getBoolean("mattmc.dev.graphicsFrameBenchmark.playerUnderwater")).append(",\n");
+		json.append("    \"playerAirPopOverride\": ").append(Boolean.getBoolean("mattmc.dev.graphicsFrameBenchmark.playerAirPop")).append(",\n");
 		field(json, "gameMode", gameMode, 4, true);
 		field(json, "gameModeOverride", FORCED_GAME_MODE, 4, true);
 		field(json, "rustGalGuiControl", rustGalGuiControl(), 4, true);
@@ -647,6 +668,18 @@ public final class GraphicsFrameBenchmark {
 	}
 
 	private static String rustGalGuiControl() {
+		if (Boolean.getBoolean("mattmc.dev.rustGalGui.air.disabled")) {
+			return "air-disabled";
+		}
+		if (Boolean.getBoolean("mattmc.dev.rustGalGui.air.legacyControl")) {
+			return "air-legacy";
+		}
+		if (Boolean.getBoolean("mattmc.dev.rustGalGui.hunger.disabled")) {
+			return "hunger-disabled";
+		}
+		if (Boolean.getBoolean("mattmc.dev.rustGalGui.hunger.legacyControl")) {
+			return "hunger-legacy";
+		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalGui.absorption.disabled")) {
 			return "absorption-disabled";
 		}

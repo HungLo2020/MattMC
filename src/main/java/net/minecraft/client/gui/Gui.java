@@ -84,12 +84,17 @@ import net.minecraft.world.scores.PlayerScoreEntry;
 import net.minecraft.world.scores.PlayerTeam;
 import net.minecraft.world.scores.Scoreboard;
 import net.voxelmap.VoxelConstants;
-import net.vulkanic.gui.RustGalGuiRenderer;
 import net.vulkanic.gui.AbsorptionHeartRequest;
 import net.vulkanic.gui.AbsorptionHeartVariant;
+import net.vulkanic.gui.AirBubbleRequest;
+import net.vulkanic.gui.AirBubbleState;
 import net.vulkanic.gui.GuiHeartState;
+import net.vulkanic.gui.HungerIconRequest;
+import net.vulkanic.gui.HungerIconState;
+import net.vulkanic.gui.HungerIconVariant;
 import net.vulkanic.gui.PlayerHeartRequest;
 import net.vulkanic.gui.PlayerHeartVariant;
+import net.vulkanic.gui.RustGalGuiRenderer;
 import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.Nullable;
 
@@ -930,6 +935,43 @@ public class Gui {
 		return Math.max(0.0F, diagnosticPlayerFloat("mattmc.dev.deterministicCameraCapture.playerAbsorption", "mattmc.dev.graphicsFrameBenchmark.playerAbsorption", fallback));
 	}
 
+	private static int diagnosticFoodLevel(int fallback) {
+		return Mth.clamp(diagnosticPlayerInt("mattmc.dev.deterministicCameraCapture.playerFoodLevel", "mattmc.dev.graphicsFrameBenchmark.playerFoodLevel", fallback), 0, 20);
+	}
+
+	private static float diagnosticFoodSaturation(float fallback) {
+		return Math.max(0.0F, diagnosticPlayerFloat("mattmc.dev.deterministicCameraCapture.playerFoodSaturation", "mattmc.dev.graphicsFrameBenchmark.playerFoodSaturation", fallback));
+	}
+
+	private static boolean diagnosticFoodHungerEffect(Player player) {
+		return player.hasEffect(MobEffects.HUNGER) || Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.playerFoodHungerEffect");
+	}
+
+	private static boolean diagnosticFoodJitter() {
+		return Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.playerFoodJitter");
+	}
+
+	private static int diagnosticMaxAirSupply(int fallback) {
+		return Math.max(1, diagnosticPlayerInt("mattmc.dev.deterministicCameraCapture.playerMaxAirSupply", "mattmc.dev.graphicsFrameBenchmark.playerMaxAirSupply", fallback));
+	}
+
+	private static int diagnosticAirSupply(int fallback, int maxAirSupply) {
+		return Math.clamp(diagnosticPlayerInt("mattmc.dev.deterministicCameraCapture.playerAirSupply", "mattmc.dev.graphicsFrameBenchmark.playerAirSupply", fallback), 0, maxAirSupply);
+	}
+
+	private static boolean diagnosticAirUnderwater(Player player) {
+		String value = System.getProperty("mattmc.dev.deterministicCameraCapture.playerUnderwater");
+		if (value == null || value.isBlank()) {
+			value = System.getProperty("mattmc.dev.graphicsFrameBenchmark.playerUnderwater");
+		}
+		return value == null || value.isBlank() ? player.isEyeInFluid(FluidTags.WATER) : Boolean.parseBoolean(value);
+	}
+
+	private static boolean diagnosticAirPopAnimation() {
+		return Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.playerAirPop")
+			|| Boolean.getBoolean("mattmc.dev.graphicsFrameBenchmark.playerAirPop");
+	}
+
 	private static float diagnosticPlayerFloat(String primaryProperty, String secondaryProperty, float fallback) {
 		String value = System.getProperty(primaryProperty);
 		if (value == null || value.isBlank()) {
@@ -940,6 +982,17 @@ public class Gui {
 		}
 		float parsed = Float.parseFloat(value);
 		return Float.isFinite(parsed) ? parsed : fallback;
+	}
+
+	private static int diagnosticPlayerInt(String primaryProperty, String secondaryProperty, int fallback) {
+		String value = System.getProperty(primaryProperty);
+		if (value == null || value.isBlank()) {
+			value = System.getProperty(secondaryProperty);
+		}
+		if (value == null || value.isBlank()) {
+			return fallback;
+		}
+		return Integer.parseInt(value);
 	}
 
 	private void renderArmor(GuiGraphics guiGraphics, Player player, int i, int j, int k, int l) {
@@ -1114,30 +1167,50 @@ public class Gui {
 	}
 
 	private void renderAirBubbles(GuiGraphics guiGraphics, Player player, int i, int j, int k) {
-		int l = player.getMaxAirSupply();
-		int m = Math.clamp(player.getAirSupply(), 0, l);
-		boolean bl = player.isEyeInFluid(FluidTags.WATER);
+		int l = diagnosticMaxAirSupply(player.getMaxAirSupply());
+		int m = diagnosticAirSupply(player.getAirSupply(), l);
+		boolean bl = diagnosticAirUnderwater(player);
 		if (bl || m < l) {
 			j = this.getAirBubbleYLine(i, j);
 			int n = getCurrentAirSupplyBubble(m, l, -2);
 			int o = getCurrentAirSupplyBubble(m, l, 0);
 			int p = 10 - getCurrentAirSupplyBubble(m, l, getEmptyBubbleDelayDuration(m, bl));
-			boolean bl2 = n != o;
+			boolean bl2 = n != o || diagnosticAirPopAnimation();
 			if (!bl) {
 				this.lastBubblePopSoundPlayed = 0;
 			}
 
+			boolean airDisabled = RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() || RustGalGuiRenderer.isAirDisabledForDiagnostics();
+			boolean airLegacy = RustGalGuiRenderer.isMigratedGuiLegacyControl() || RustGalGuiRenderer.isAirLegacyControl();
+			boolean migrateAir = !airDisabled && !airLegacy;
+			List<AirBubbleRequest> rustAirBubbles = migrateAir ? new ArrayList<>() : List.of();
+			int airOrder = 0;
 			for (int q = 1; q <= 10; q++) {
 				int r = k - (q - 1) * 8 - 9;
 				if (q <= n) {
-					guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, AIR_SPRITE, r, j, 9, 9);
+					if (migrateAir) {
+						rustAirBubbles.add(new AirBubbleRequest(AirBubbleState.FULL, false, true, airOrder++, r, j));
+					} else if (!airDisabled) {
+						guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, AIR_SPRITE, r, j, 9, 9);
+					}
 				} else if (bl2 && q == o && bl) {
-					guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, AIR_POPPING_SPRITE, r, j, 9, 9);
+					if (migrateAir) {
+						rustAirBubbles.add(new AirBubbleRequest(AirBubbleState.PARTIAL, true, true, airOrder++, r, j));
+					} else if (!airDisabled) {
+						guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, AIR_POPPING_SPRITE, r, j, 9, 9);
+					}
 					this.playAirBubblePoppedSound(q, player, p);
 				} else if (q > 10 - p) {
 					int s = p == 10 && this.tickCount % 2 == 0 ? this.random.nextInt(2) : 0;
-					guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, AIR_EMPTY_SPRITE, r, j + s, 9, 9);
+					if (migrateAir) {
+						rustAirBubbles.add(new AirBubbleRequest(AirBubbleState.EMPTY, false, true, airOrder++, r, j + s));
+					} else if (!airDisabled) {
+						guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, AIR_EMPTY_SPRITE, r, j + s, 9, 9);
+					}
 				}
+			}
+			if (migrateAir) {
+				RustGalGuiRenderer.enqueueAirBubbles(this.minecraft, guiGraphics, rustAirBubbles);
 			}
 		}
 	}
@@ -1166,14 +1239,22 @@ public class Gui {
 
 	private void renderFood(GuiGraphics guiGraphics, Player player, int i, int j) {
 		FoodData foodData = player.getFoodData();
-		int k = foodData.getFoodLevel();
+		int k = diagnosticFoodLevel(foodData.getFoodLevel());
+		float saturation = diagnosticFoodSaturation(foodData.getSaturationLevel());
+		boolean hungerEffect = diagnosticFoodHungerEffect(player);
+		boolean forceJitter = diagnosticFoodJitter();
+		boolean hungerDisabled = RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() || RustGalGuiRenderer.isHungerDisabledForDiagnostics();
+		boolean hungerLegacy = RustGalGuiRenderer.isMigratedGuiLegacyControl() || RustGalGuiRenderer.isHungerLegacyControl();
+		boolean migrateHunger = !hungerDisabled && !hungerLegacy;
+		List<HungerIconRequest> rustHungerIcons = migrateHunger ? new ArrayList<>() : List.of();
+		int rustHungerOrder = 0;
 
 		for (int l = 0; l < 10; l++) {
 			int m = i;
 			ResourceLocation resourceLocation;
 			ResourceLocation resourceLocation2;
 			ResourceLocation resourceLocation3;
-			if (player.hasEffect(MobEffects.HUNGER)) {
+			if (hungerEffect) {
 				resourceLocation = FOOD_EMPTY_HUNGER_SPRITE;
 				resourceLocation2 = FOOD_HALF_HUNGER_SPRITE;
 				resourceLocation3 = FOOD_FULL_HUNGER_SPRITE;
@@ -1183,19 +1264,63 @@ public class Gui {
 				resourceLocation3 = FOOD_FULL_SPRITE;
 			}
 
-			if (player.getFoodData().getSaturationLevel() <= 0.0F && this.tickCount % (k * 3 + 1) == 0) {
-				m = i + (this.random.nextInt(3) - 1);
+			boolean jitterActive = (saturation <= 0.0F && this.tickCount % (k * 3 + 1) == 0) || forceJitter;
+			int jitterOffset = 0;
+			if (jitterActive) {
+				jitterOffset = this.random.nextInt(3) - 1;
+				m = i + jitterOffset;
 			}
 
 			int n = j - l * 8 - 9;
-			guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, resourceLocation, n, m, 9, 9);
+			HungerIconVariant variant = hungerEffect ? HungerIconVariant.HUNGER_EFFECT : HungerIconVariant.NORMAL;
+			if (migrateHunger) {
+				rustHungerIcons.add(new HungerIconRequest(
+					variant,
+					HungerIconState.EMPTY,
+					jitterActive,
+					jitterOffset,
+					rustHungerOrder++,
+					n,
+					m
+				));
+			} else if (!hungerDisabled) {
+				guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, resourceLocation, n, m, 9, 9);
+			}
 			if (l * 2 + 1 < k) {
-				guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, resourceLocation3, n, m, 9, 9);
+				if (migrateHunger) {
+					rustHungerIcons.add(new HungerIconRequest(
+						variant,
+						HungerIconState.FULL,
+						jitterActive,
+						jitterOffset,
+						rustHungerOrder++,
+						n,
+						m
+					));
+				} else if (!hungerDisabled) {
+					guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, resourceLocation3, n, m, 9, 9);
+				}
 			}
 
 			if (l * 2 + 1 == k) {
-				guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, resourceLocation2, n, m, 9, 9);
+				if (migrateHunger) {
+					rustHungerIcons.add(new HungerIconRequest(
+						variant,
+						HungerIconState.HALF,
+						jitterActive,
+						jitterOffset,
+						rustHungerOrder++,
+						n,
+						m
+					));
+				} else if (!hungerDisabled) {
+					guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, resourceLocation2, n, m, 9, 9);
+				}
 			}
+		}
+
+		if (migrateHunger) {
+			RustGalGuiRenderer.enqueueHungerIcons(this.minecraft, guiGraphics, rustHungerIcons);
 		}
 	}
 
