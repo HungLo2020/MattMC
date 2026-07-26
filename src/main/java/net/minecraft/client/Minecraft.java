@@ -525,7 +525,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.textureManager = new TextureManager(this.resourceManager);
 		this.resourceManager.registerReloadListener(this.textureManager);
 		this.resourceManager.registerReloadListener(
-			(net.minecraft.server.packs.resources.ResourceManagerReloadListener)resourceManager -> net.vulkanic.gui.RustGalGuiRenderer.reload()
+			(net.minecraft.server.packs.resources.ResourceManagerReloadListener)resourceManager -> net.vulkanic.gui.RustGalGuiRenderer.reload(resourceManager)
 		);
 		this.shaderManager = new ShaderManager(this.textureManager, this::triggerResourcePackRecovery);
 		this.resourceManager.registerReloadListener(this.shaderManager);

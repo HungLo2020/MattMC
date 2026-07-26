@@ -309,6 +309,94 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.FRAME_PRESENT_RESULT.getLong(result, 6));
 	}
 
+	public GuiFrameSubmitResult submitGuiFrame(
+		long generation,
+		long frameId,
+		long frameTarget,
+		int guiWidth,
+		int guiHeight,
+		List<GuiSpriteRecord> sprites
+	) {
+		Objects.requireNonNull(sprites, "sprites");
+		if (sprites.isEmpty()) {
+			throw new IllegalArgumentException("GUI frame submission requires at least one sprite");
+		}
+		MemorySegment spriteArray = Struct.GUI_SPRITE_REQUEST.array(arena, sprites.size());
+		for (int i = 0; i < sprites.size(); i++) {
+			GuiSpriteRecord sprite = sprites.get(i);
+			MemorySegment item = Abi.item(spriteArray, Struct.GUI_SPRITE_REQUEST, i);
+			item.set(ValueLayout.JAVA_INT, Struct.GUI_SPRITE_REQUEST.offset(0), Struct.GUI_SPRITE_REQUEST.byteSize());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 1, sprite.stratum());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 2, sprite.spriteId());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 3, sprite.selectedSlot());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_SPRITE_REQUEST.offset(4), sprite.progressFraction());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 5, sprite.fillDirection());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 6, sprite.colorArgb());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 7, sprite.x());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 8, sprite.y());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 9, sprite.width());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 10, sprite.height());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 11, sprite.guiWidth());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 12, sprite.guiHeight());
+		}
+		MemorySegment request = Struct.GUI_FRAME_SUBMIT.allocate(arena);
+		Abi.writeHeader(request, Struct.GUI_FRAME_SUBMIT);
+		Struct.GUI_FRAME_SUBMIT.setLong(request, 1, generation);
+		Struct.GUI_FRAME_SUBMIT.setLong(request, 2, frameId);
+		Struct.GUI_FRAME_SUBMIT.setLong(request, 3, frameTarget);
+		Struct.GUI_FRAME_SUBMIT.setInt(request, 4, guiWidth);
+		Struct.GUI_FRAME_SUBMIT.setInt(request, 5, guiHeight);
+		Abi.writeSlice(request, Struct.GUI_FRAME_SUBMIT, 6, spriteArray, sprites.size());
+		Struct.GUI_FRAME_SUBMIT.setLong(request, 7, negotiatedFeatures);
+		MemorySegment result = Struct.GUI_FRAME_SUBMIT_RESULT.allocate(arena);
+		checkStatus(Native.guiSubmitFrame(contextId, request, result), "GUI frame submission");
+		long metricsOffset = Struct.GUI_FRAME_SUBMIT_RESULT.offset(11);
+		BackendMetrics metrics = backendMetricsAt(result, metricsOffset);
+		long ffiCalls = result.get(ValueLayout.JAVA_LONG, metricsOffset + 64);
+		long ffiInputBytes = result.get(ValueLayout.JAVA_LONG, metricsOffset + 72);
+		return new GuiFrameSubmitResult(
+			Struct.GUI_FRAME_SUBMIT_RESULT.getLong(result, 3),
+			Struct.GUI_FRAME_SUBMIT_RESULT.getLong(result, 4),
+			Struct.GUI_FRAME_SUBMIT_RESULT.getLong(result, 5),
+			Struct.GUI_FRAME_SUBMIT_RESULT.getLong(result, 6),
+			Struct.GUI_FRAME_SUBMIT_RESULT.getLong(result, 7),
+			Struct.GUI_FRAME_SUBMIT_RESULT.getLong(result, 8),
+			Struct.GUI_FRAME_SUBMIT_RESULT.getLong(result, 9),
+			Struct.GUI_FRAME_SUBMIT_RESULT.getLong(result, 10),
+			ffiCalls,
+			ffiInputBytes,
+			metrics
+		);
+	}
+
+	public Status updateGuiAssets(long generation, List<GuiAssetRecord> assets) {
+		Objects.requireNonNull(assets, "assets");
+		try (Arena updateArena = Arena.ofConfined()) {
+			MemorySegment assetArray = Struct.GUI_ASSET_PAYLOAD.array(updateArena, assets.size());
+			for (int i = 0; i < assets.size(); i++) {
+				GuiAssetRecord asset = assets.get(i);
+				MemorySegment item = Abi.item(assetArray, Struct.GUI_ASSET_PAYLOAD, i);
+				item.set(ValueLayout.JAVA_INT, Struct.GUI_ASSET_PAYLOAD.offset(0), Struct.GUI_ASSET_PAYLOAD.byteSize());
+				Struct.GUI_ASSET_PAYLOAD.setInt(item, 1, asset.spriteId());
+				Abi.writeBytes(updateArena, item, Struct.GUI_ASSET_PAYLOAD, 2, asset.pngBytes());
+			}
+			MemorySegment request = Struct.GUI_ASSET_UPDATE.allocate(updateArena);
+			Abi.writeHeader(request, Struct.GUI_ASSET_UPDATE);
+			Struct.GUI_ASSET_UPDATE.setLong(request, 1, generation);
+			Abi.writeSlice(request, Struct.GUI_ASSET_UPDATE, 2, assetArray, assets.size());
+			Struct.GUI_ASSET_UPDATE.setLong(request, 3, negotiatedFeatures);
+			MemorySegment status = Struct.STATUS.allocate(updateArena);
+			checkStatus(Native.guiUpdateAssets(contextId, request, status), "GUI asset update");
+			return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status), Struct.STATUS.backendMetrics(status));
+		}
+	}
+
+	public record GuiAssetRecord(int spriteId, byte[] pngBytes) {
+		public GuiAssetRecord {
+			Objects.requireNonNull(pngBytes, "pngBytes");
+		}
+	}
+
 	public Status shutdownFrame() {
 		MemorySegment status = Struct.STATUS.allocate(arena);
 		checkStatus(Native.frameShutdown(contextId, status), "frame shutdown");
@@ -331,6 +419,26 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			return;
 		}
 		throw new IllegalStateException("Rust VulkanicGAL " + operation + " failed with status " + status + ": " + Native.lastError(contextId));
+	}
+
+	private static BackendMetrics backendMetricsAt(MemorySegment segment, long metricsOffset) {
+		long commandLists = segment.get(ValueLayout.JAVA_LONG, metricsOffset + 24);
+		long commandOps = segment.get(ValueLayout.JAVA_LONG, metricsOffset + 32);
+		long backendSubmissions = segment.get(ValueLayout.JAVA_LONG, metricsOffset + 40);
+		long backendWaits = segment.get(ValueLayout.JAVA_LONG, metricsOffset + 48);
+		return new BackendMetrics(
+			commandLists,
+			commandOps,
+			backendSubmissions,
+			backendWaits,
+			commandOps,
+			0L,
+			0L,
+			backendSubmissions,
+			backendSubmissions,
+			backendWaits,
+			0L
+		);
 	}
 
 	public ResourceBatchBuilder resourceBatchBuilder() {
@@ -377,6 +485,40 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	public record PresentedFrame(long frameId, long correlationId, int status, long completedSubmissionId) {
 	}
 
+	public record GuiSpriteRecord(
+		int stratum,
+		int spriteId,
+		int selectedSlot,
+		float progressFraction,
+		int fillDirection,
+		int colorArgb,
+		int x,
+		int y,
+		int width,
+		int height,
+		int guiWidth,
+		int guiHeight
+	) {
+	}
+
+	public record GuiFrameSubmitResult(
+		long submissionId,
+		long spriteCount,
+		long spriteBatchCount,
+		long cacheHits,
+		long cacheMisses,
+		long resourceCreates,
+		long commandLists,
+		long commandOps,
+		long ffiCalls,
+		long ffiInputBytes,
+		BackendMetrics backendMetrics
+	) {
+		public Status asStatus() {
+			return new Status(submissionId, ffiCalls, ffiInputBytes, backendMetrics);
+		}
+	}
+
 	public record ResourceResults(MemorySegment segment, int count, long submissionId, long ffiCalls, long ffiInputBytes, BackendMetrics backendMetrics) {
 		public long handle(int index) {
 			return Struct.CREATE_RESULT.getLong(segment.asSlice((long)index * Struct.CREATE_RESULT.byteSize(), Struct.CREATE_RESULT.byteSize()), 1);
@@ -399,6 +541,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		private static final MethodHandle FRAME_RESIZE = downcall("mattmc_vulkanic_gal_frame_resize", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle FRAME_PRESENT = downcall("mattmc_vulkanic_gal_frame_present", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle FRAME_SHUTDOWN = downcall("mattmc_vulkanic_gal_frame_shutdown", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
+		private static final MethodHandle GUI_SUBMIT_FRAME = downcall("mattmc_vulkanic_gal_gui_submit_frame", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+		private static final MethodHandle GUI_UPDATE_ASSETS = downcall("mattmc_vulkanic_gal_gui_update_assets", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle LAST_ERROR = downcall("mattmc_vulkanic_gal_last_error", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
 
 		private static MethodHandle downcall(String symbol, FunctionDescriptor descriptor) {
@@ -525,6 +669,22 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			}
 		}
 
+		static int guiSubmitFrame(long contextId, MemorySegment request, MemorySegment result) {
+			try {
+				return (int) GUI_SUBMIT_FRAME.invokeExact(contextId, request, result);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to submit Rust VulkanicGAL GUI frame", throwable);
+			}
+		}
+
+		static int guiUpdateAssets(long contextId, MemorySegment request, MemorySegment result) {
+			try {
+				return (int) GUI_UPDATE_ASSETS.invokeExact(contextId, request, result);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to update Rust VulkanicGAL GUI assets", throwable);
+			}
+		}
+
 		static String lastError(long contextId) {
 			try (Arena arena = Arena.ofConfined()) {
 				MemorySegment bytes = arena.allocate(4096, 1);
@@ -580,7 +740,12 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			FRAME_RESIZE_RESULT(40),
 			FRAME_PRESENT(41),
 			FRAME_PRESENT_RESULT(42),
-			DESTROY_DESC(43);
+			DESTROY_DESC(43),
+			GUI_SPRITE_REQUEST(44),
+			GUI_FRAME_SUBMIT(45),
+			GUI_FRAME_SUBMIT_RESULT(46),
+			GUI_ASSET_PAYLOAD(47),
+			GUI_ASSET_UPDATE(48);
 
 		private final int id;
 		private final int byteSize;

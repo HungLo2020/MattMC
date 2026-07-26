@@ -8,6 +8,7 @@ pub mod error;
 pub mod ffi;
 pub mod frame;
 pub mod gal;
+pub mod gui_frontend;
 pub mod handles;
 pub mod metrics;
 pub mod resources;

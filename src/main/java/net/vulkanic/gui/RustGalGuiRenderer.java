@@ -7,14 +7,23 @@ import net.blaze3d.platform.Window;
 import net.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.dev.GraphicsFrameBenchmark;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.util.profiling.TracyCompat;
 import net.minecraft.world.BossEvent;
 import net.vulkanic.VulkanicAPI;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public final class RustGalGuiRenderer {
 	private static final Logger LOGGER = LogUtils.getLogger();
@@ -32,42 +41,26 @@ public final class RustGalGuiRenderer {
 	private static final String ARMOR_ICON_PRODUCER = "minecraft.gui.armor";
 	private static final String PLAYER_HEART_PRODUCER = "minecraft.gui.player-heart";
 	private static final String ABSORPTION_HEART_PRODUCER = "minecraft.gui.absorption-heart";
+	private static final boolean ASSET_UPDATES_DISABLED =
+		Boolean.getBoolean("mattmc.dev.rustGalGui.assetUpdates.disabled");
 	private static final Object LOCK = new Object();
 	private static VulkanicGalBridge bridge;
 	private static Thread renderThread;
 	private static int configuredWidth;
 	private static int configuredHeight;
-	private static long cachedFramePass;
-	private static long cachedFrameTarget;
 	private static long nextCorrelationId = 1L;
 	private static long generation = 1L;
+	private static long assetGeneration = 1L;
+	private static long uploadedAssetGeneration;
+	private static long attemptedAssetGeneration;
+	private static long lastAssetPayloadCount;
+	private static long lastAssetPayloadBytes;
+	private static long assetUpdateFailures;
 	private static long lastSubmitted;
 	private static long lastRetiredSubmission;
-	private static final RustGalFrameScheduler<GuiBatchBuilder.GuiSpriteRequest> SCHEDULER =
+	private static List<VulkanicGalBridge.GuiAssetRecord> pendingAssets = List.of();
+	private static final RustGalFrameScheduler<VulkanicGalBridge.GuiSpriteRecord> SCHEDULER =
 		new RustGalFrameScheduler<>("Rust VulkanicGAL deferred GUI");
-	private static final GuiResourceCache RESOURCE_CACHE = new GuiResourceCache();
-	private static final GuiResourceCache.Recorder RESOURCE_RECORDER = new GuiResourceCache.Recorder() {
-		@Override
-		public void recordResourceBatch(VulkanicGalBridge.ResourceResults results) {
-			RustGalGuiRenderer.recordResourceBatch(results);
-		}
-
-		@Override
-		public void recordUploadStatus(VulkanicGalBridge.Status status) {
-			RustGalGuiRenderer.recordStatus(Operation.SUBMIT, status);
-			lastSubmitted = Math.max(lastSubmitted, status.submissionId());
-		}
-
-		@Override
-		public void resourcesCreated(int count) {
-			METRICS.resourceCreates += count;
-		}
-
-		@Override
-		public void resourceDestroyed() {
-			METRICS.resourceDestroys++;
-		}
-	};
 	private static final Metrics METRICS = new Metrics();
 
 	private RustGalGuiRenderer() {
@@ -174,10 +167,6 @@ public final class RustGalGuiRenderer {
 			x,
 			y,
 			width,
-			height,
-			0,
-			0,
-			width,
 			height
 		);
 		if (filledWidth > 0) {
@@ -192,10 +181,6 @@ public final class RustGalGuiRenderer {
 				x,
 				y,
 				filledWidth,
-				height,
-				0,
-				0,
-				Math.min(filledWidth, width),
 				height
 			);
 		}
@@ -228,10 +213,6 @@ public final class RustGalGuiRenderer {
 				x,
 				y,
 				16,
-				16,
-				0,
-				0,
-				16,
 				16
 			);
 			return;
@@ -250,10 +231,6 @@ public final class RustGalGuiRenderer {
 			x,
 			y,
 			16,
-			4,
-			0,
-			0,
-			16,
 			4
 		);
 		if (filledWidth > 0) {
@@ -267,10 +244,6 @@ public final class RustGalGuiRenderer {
 				GuiFillDirection.HORIZONTAL_LEFT_TO_RIGHT,
 				x,
 				y,
-				filledWidth,
-				4,
-				0,
-				0,
 				filledWidth,
 				4
 			);
@@ -305,10 +278,6 @@ public final class RustGalGuiRenderer {
 			x,
 			y,
 			18,
-			18,
-			0,
-			0,
-			18,
 			18
 		);
 		if (filledHeight > 0) {
@@ -322,10 +291,6 @@ public final class RustGalGuiRenderer {
 				GuiFillDirection.VERTICAL_BOTTOM_TO_TOP,
 				x,
 				y + 18 - filledHeight,
-				18,
-				filledHeight,
-				0,
-				18 - filledHeight,
 				18,
 				filledHeight
 			);
@@ -354,10 +319,6 @@ public final class RustGalGuiRenderer {
 				GuiFillDirection.NONE,
 				x + icon * 8,
 				y,
-				9,
-				9,
-				0,
-				0,
 				9,
 				9
 			);
@@ -388,10 +349,6 @@ public final class RustGalGuiRenderer {
 				heart.x(),
 				heart.y(),
 				9,
-				9,
-				0,
-				0,
-				9,
 				9
 			);
 		}
@@ -416,10 +373,6 @@ public final class RustGalGuiRenderer {
 				GuiFillDirection.NONE,
 				heart.x(),
 				heart.y(),
-				9,
-				9,
-				0,
-				0,
 				9,
 				9
 			);
@@ -558,7 +511,7 @@ public final class RustGalGuiRenderer {
 		int width,
 		int height
 	) {
-		enqueueGuiSprite(minecraft, guiGraphics, sprite, producerId, selectedSlot, -1.0F, GuiFillDirection.NONE, x, y, width, height, 0, 0, width, height);
+		enqueueGuiSprite(minecraft, guiGraphics, sprite, producerId, selectedSlot, -1.0F, GuiFillDirection.NONE, x, y, width, height);
 	}
 
 	private static void enqueueGuiSprite(
@@ -572,11 +525,7 @@ public final class RustGalGuiRenderer {
 		int x,
 		int y,
 		int width,
-		int height,
-		int sourceX,
-		int sourceY,
-		int sourceWidth,
-		int sourceHeight
+		int height
 	) {
 		long started = System.nanoTime();
 		GraphicsFrameBenchmark.beginPhase("rust-gal." + sprite.phaseName + ".java-producer");
@@ -584,52 +533,42 @@ public final class RustGalGuiRenderer {
 			GraphicsFrameBenchmark.endPhase("rust-gal." + sprite.phaseName + ".java-producer");
 			throw new IllegalStateException("Rust VulkanicGAL partial-frame GUI sprite is unsupported for Vulkan; whole-frame Rust presentation is required");
 		}
-		if (sourceX < 0 || sourceY < 0 || sourceWidth <= 0 || sourceHeight <= 0
-			|| sourceX + sourceWidth > sprite.width || sourceY + sourceHeight > sprite.height) {
+		if (width <= 0 || height <= 0 || width > sprite.width || height > sprite.height) {
 			GraphicsFrameBenchmark.endPhase("rust-gal." + sprite.phaseName + ".java-producer");
-			throw new IllegalArgumentException("GUI sprite source region is outside " + sprite.name() + ": "
-				+ sourceX + "," + sourceY + " " + sourceWidth + "x" + sourceHeight);
+			throw new IllegalArgumentException("GUI sprite destination extent is outside " + sprite.name() + ": " + width + "x" + height);
 		}
 		try {
 			synchronized (LOCK) {
-				GuiBatchBuilder.GuiSpriteRequest request = new GuiBatchBuilder.GuiSpriteRequest(
-					sprite.stratum,
-					sprite,
-					producerId,
+				VulkanicGalBridge.GuiSpriteRecord request = new VulkanicGalBridge.GuiSpriteRecord(
+					sprite.stratum.order(),
+					sprite.semanticId(),
 					selectedSlot,
 					progressFraction,
-					fillDirection,
+					fillDirection.ordinal(),
+					0xFFFFFFFF,
 					x,
 					y,
 					width,
 					height,
-					sourceX,
-					sourceY,
-					sourceWidth,
-					sourceHeight,
 					guiGraphics.guiWidth(),
 					guiGraphics.guiHeight()
-				);
-				RustGalFrameScheduler.Token token = SCHEDULER.enqueue(generation, sprite.stratum.id(), sprite.stratum.order(), request);
-				guiGraphics.guiRenderState.submitGuiElement(
-					new RustGalGuiElementRenderState(
-						token,
-						sprite.stratum,
-						producerId,
-						selectedSlot,
-						progressFraction,
-						fillDirection,
-						sourceX,
-						sourceY,
-						sourceWidth,
-						sourceHeight,
-						x,
-						y,
-						width,
-						height,
-						guiGraphics.guiWidth(),
-						guiGraphics.guiHeight()
-					)
+					);
+					RustGalFrameScheduler.Token token = SCHEDULER.enqueue(generation, sprite.stratum.id(), sprite.stratum.order(), request);
+					guiGraphics.guiRenderState.submitGuiElement(
+						new RustGalGuiElementRenderState(
+							token,
+							sprite.stratum,
+							producerId,
+							selectedSlot,
+							progressFraction,
+							fillDirection,
+							x,
+							y,
+							width,
+							height,
+							guiGraphics.guiWidth(),
+							guiGraphics.guiHeight()
+						)
 				);
 				METRICS.enqueueNanos += elapsedSince(started);
 			}
@@ -646,15 +585,15 @@ public final class RustGalGuiRenderer {
 			if (!element.stratum().supportedForPartialFrame()) {
 				throw new IllegalArgumentException("unsupported Rust GAL GUI stratum: " + element.stratum().id());
 			}
-		}
-		ensureRenderThreadAndContext(minecraft);
-		Window window = minecraft.getWindow();
-		ensureConfigured(window);
-		synchronized (LOCK) {
-			List<RustGalFrameScheduler.Token> tokens = elements.stream().map(RustGalGuiElementRenderState::token).toList();
-			List<GuiBatchBuilder.GuiSpriteRequest> requests = SCHEDULER.takeAll(tokens, generation);
-			executeFrameBatches(window, requests);
-		}
+			}
+			ensureRenderThreadAndContext(minecraft);
+			Window window = minecraft.getWindow();
+			ensureConfigured(window);
+			synchronized (LOCK) {
+				List<RustGalFrameScheduler.Token> tokens = elements.stream().map(RustGalGuiElementRenderState::token).toList();
+				List<VulkanicGalBridge.GuiSpriteRecord> requests = SCHEDULER.takeAll(tokens, generation);
+				executeFrameBatches(window, requests);
+			}
 	}
 
 	public static void enqueueBossBar(
@@ -685,17 +624,17 @@ public final class RustGalGuiRenderer {
 			throw new IllegalArgumentException("boss bar filled width must be in 0.." + width + ": " + filledWidth);
 		}
 		enqueueBossBarSprite(minecraft, guiGraphics, bossBarColorBackground(color), BOSS_BAR_BACKGROUND_PRODUCER, color, overlay,
-			progressFraction, x, y, width, height, 0, 0, width, height);
+			progressFraction, x, y, width, height);
 		if (overlay != BossEvent.BossBarOverlay.PROGRESS) {
 			enqueueBossBarSprite(minecraft, guiGraphics, bossBarOverlayBackground(overlay), BOSS_BAR_BACKGROUND_PRODUCER, color, overlay,
-				progressFraction, x, y, width, height, 0, 0, width, height);
+				progressFraction, x, y, width, height);
 		}
 		if (filledWidth > 0) {
 			enqueueBossBarSprite(minecraft, guiGraphics, bossBarColorProgress(color), BOSS_BAR_PROGRESS_PRODUCER, color, overlay,
-				progressFraction, x, y, filledWidth, height, 0, 0, filledWidth, height);
+				progressFraction, x, y, filledWidth, height);
 			if (overlay != BossEvent.BossBarOverlay.PROGRESS) {
 				enqueueBossBarSprite(minecraft, guiGraphics, bossBarOverlayProgress(overlay), BOSS_BAR_PROGRESS_PRODUCER, color, overlay,
-					progressFraction, x, y, filledWidth, height, 0, 0, filledWidth, height);
+					progressFraction, x, y, filledWidth, height);
 			}
 		}
 	}
@@ -711,53 +650,129 @@ public final class RustGalGuiRenderer {
 		int x,
 		int y,
 		int width,
-		int height,
-		int sourceX,
-		int sourceY,
-		int sourceWidth,
-		int sourceHeight
+		int height
 	) {
 		enqueueGuiSprite(
 			minecraft,
 			guiGraphics,
-			sprite,
-			producerPrefix + "." + color.getSerializedName() + "." + overlay.getSerializedName() + "." + sprite.semanticSuffix,
-			-1,
-			progressFraction,
-			GuiFillDirection.HORIZONTAL_LEFT_TO_RIGHT,
-			x,
-			y,
-			width,
-			height,
-				sourceX,
-				sourceY,
-				sourceWidth,
-				sourceHeight
-		);
+				sprite,
+				producerPrefix + "." + color.getSerializedName() + "." + overlay.getSerializedName() + "." + sprite.semanticSuffix,
+				-1,
+				progressFraction,
+				GuiFillDirection.HORIZONTAL_LEFT_TO_RIGHT,
+				x,
+				y,
+				width,
+				height
+			);
 	}
 
 	public static void resize(int width, int height) {
-			synchronized (LOCK) {
-					configuredWidth = 0;
-					configuredHeight = 0;
-					int cancelled = SCHEDULER.cancelAll("resize");
-					retireOutstanding(true);
-					destroyTransientFrameResources(cachedFramePass, cachedFrameTarget);
-					METRICS.cancellations++;
-					METRICS.batchesCancelled += cancelled;
+		synchronized (LOCK) {
+			configuredWidth = 0;
+			configuredHeight = 0;
+			int cancelled = SCHEDULER.cancelAll("resize");
+			retireOutstanding(true);
+			METRICS.cancellations++;
+			METRICS.batchesCancelled += cancelled;
+		}
+	}
+
+	public static void reload(ResourceManager resourceManager) {
+		if (ASSET_UPDATES_DISABLED) {
+			auditMessage("Rust VulkanicGAL GUI asset update skipped reason=diagnostic-disabled");
+			return;
+		}
+		List<VulkanicGalBridge.GuiAssetRecord> assets = collectResolvedAssets(resourceManager);
+		synchronized (LOCK) {
+			generation++;
+			assetGeneration++;
+			pendingAssets = assets;
+			attemptedAssetGeneration = Math.min(attemptedAssetGeneration, uploadedAssetGeneration);
+			int cancelled = SCHEDULER.cancelAll("resource-reload");
+			METRICS.reloadInvalidations++;
+			METRICS.batchesCancelled += cancelled;
+			retireOutstanding(true);
+			flushPendingAssetsLocked();
+		}
+	}
+
+	private static List<VulkanicGalBridge.GuiAssetRecord> collectResolvedAssets(ResourceManager resourceManager) {
+		if (resourceManager == null) {
+			return List.of();
+		}
+		List<VulkanicGalBridge.GuiAssetRecord> assets = new ArrayList<>();
+		for (GuiSprite sprite : GuiSprite.values()) {
+			ResourceLocation location = sprite.resourceLocation();
+			Optional<Resource> resource = resourceManager.getResource(location);
+			if (resource.isEmpty()) {
+				auditMessage(
+					"Rust VulkanicGAL GUI asset missing"
+						+ " sprite=" + sprite.name()
+						+ " sprite_id=" + sprite.semanticId()
+						+ " path=" + location
+						+ " fallback=vanilla"
+				);
+				continue;
+			}
+			try (InputStream input = resource.get().open()) {
+				byte[] bytes = input.readAllBytes();
+				assets.add(new VulkanicGalBridge.GuiAssetRecord(sprite.semanticId(), bytes));
+				auditMessage(
+					"Rust VulkanicGAL GUI asset resolved"
+						+ " sprite=" + sprite.name()
+						+ " sprite_id=" + sprite.semanticId()
+						+ " path=" + location
+						+ " source_pack=" + resource.get().sourcePackId()
+						+ " bytes=" + bytes.length
+						+ " sha256=" + sha256Hex(bytes)
+				);
+			} catch (IOException error) {
+				LOGGER.warn("Failed to read Rust VulkanicGAL GUI sprite override {}; vanilla fallback remains active for this reload", location, error);
 			}
 		}
+		return assets;
+	}
 
-	public static void reload() {
-		synchronized (LOCK) {
-					generation++;
-					int cancelled = SCHEDULER.cancelAll("resource-reload");
-					METRICS.reloadInvalidations++;
-					METRICS.batchesCancelled += cancelled;
-					retireOutstanding(true);
-					destroyTransientFrameResources(cachedFramePass, cachedFrameTarget);
-				destroyCachedResources();
-				RESOURCE_CACHE.clearAtlasesAndCaches();
+	private static void flushPendingAssetsLocked() {
+		if (bridge == null || uploadedAssetGeneration >= assetGeneration || attemptedAssetGeneration >= assetGeneration) {
+			return;
+		}
+		attemptedAssetGeneration = assetGeneration;
+		try {
+			recordStatus(Operation.GUI_ASSET_UPDATE, bridge.updateGuiAssets(assetGeneration, pendingAssets));
+			lastAssetPayloadCount = pendingAssets.size();
+			lastAssetPayloadBytes = pendingAssets.stream().mapToLong(asset -> asset.pngBytes().length).sum();
+			uploadedAssetGeneration = assetGeneration;
+			auditMessage(
+				"Rust VulkanicGAL GUI asset update accepted"
+					+ " generation=" + assetGeneration
+					+ " payloads=" + lastAssetPayloadCount
+					+ " payload_bytes=" + lastAssetPayloadBytes
+					+ " uploaded_generation=" + uploadedAssetGeneration
+			);
+		} catch (RuntimeException error) {
+			assetUpdateFailures++;
+			LOGGER.error(
+				"Rust VulkanicGAL GUI asset update failed for generation {}; preserving last valid atlas",
+				assetGeneration,
+				error
+			);
+			auditMessage(
+				"Rust VulkanicGAL GUI asset update failed"
+					+ " generation=" + assetGeneration
+					+ " uploaded_generation=" + uploadedAssetGeneration
+					+ " failures=" + assetUpdateFailures
+					+ " preserve_last_valid=true"
+			);
+		}
+	}
+
+	private static String sha256Hex(byte[] bytes) {
+		try {
+			return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+		} catch (NoSuchAlgorithmException error) {
+			throw new IllegalStateException("SHA-256 digest is unavailable", error);
 		}
 	}
 
@@ -772,14 +787,12 @@ public final class RustGalGuiRenderer {
 	public static void shutdown() {
 		VulkanicGalBridge existing;
 		synchronized (LOCK) {
-					int cancelled = SCHEDULER.cancelAll("shutdown");
-					existing = bridge;
-					retireOutstanding(true);
-				destroyTransientFrameResources(cachedFramePass, cachedFrameTarget);
-				destroyCachedResources();
-				RESOURCE_CACHE.clearCachesOnly();
-				bridge = null;
-				renderThread = null;
+						int cancelled = SCHEDULER.cancelAll("shutdown");
+						existing = bridge;
+						retireOutstanding(true);
+						auditMessage(metricsAuditLine(0L, METRICS.frames, lastSubmitted));
+					bridge = null;
+					renderThread = null;
 					lastSubmitted = 0L;
 					lastRetiredSubmission = 0L;
 					configuredWidth = 0;
@@ -861,7 +874,7 @@ public final class RustGalGuiRenderer {
 		}
 	}
 
-	private static void executeFrameBatches(Window window, List<GuiBatchBuilder.GuiSpriteRequest> requests) {
+	private static void executeFrameBatches(Window window, List<VulkanicGalBridge.GuiSpriteRecord> requests) {
 		if (requests.isEmpty()) {
 			return;
 		}
@@ -872,15 +885,6 @@ public final class RustGalGuiRenderer {
 		long submissionId = 0L;
 		boolean executeCounted = false;
 		try {
-				GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.resource-cache");
-				long resourceStarted = System.nanoTime();
-				List<GuiBatchBuilder.FrameSpriteBatch> spriteBatches;
-				try {
-					spriteBatches = GuiBatchBuilder.packCompatibleSpriteBatches(requests, RustGalGuiRenderer::resourcesFor);
-				} finally {
-					METRICS.resourceLookupNanos += elapsedSince(resourceStarted);
-					GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.resource-cache");
-			}
 			GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.ffi.acquire");
 			long acquireStarted = System.nanoTime();
 			recordFixedOperation(Operation.FRAME_ACQUIRE, VulkanicGalBridge.Struct.FRAME_ACQUIRE.byteSize());
@@ -894,19 +898,20 @@ public final class RustGalGuiRenderer {
 				METRICS.batchesCancelled += cancelled;
 				return;
 			}
-				FrameResources frameResources = frameResourcesFor(frame.frameTarget());
 				GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.abi-packing");
 				long packingStarted = System.nanoTime();
-				VulkanicGalBridge.SubmissionBatch submit = GuiBatchBuilder.buildSubmission(bridge, frameResources.pass(), frameResources.target(), spriteBatches);
+				VulkanicGalBridge.GuiFrameSubmitResult result = bridge.submitGuiFrame(
+					generation,
+					frameId,
+					frame.frameTarget(),
+					requests.get(0).guiWidth(),
+					requests.get(0).guiHeight(),
+					requests
+				);
 			METRICS.abiPackingNanos += elapsedSince(packingStarted);
 			GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.abi-packing");
-			GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.ffi.submit");
-			long submitStarted = System.nanoTime();
-			VulkanicGalBridge.Status status = bridge.submit(submit);
-			recordStatus(Operation.SUBMIT, status);
-			METRICS.submitNanos += elapsedSince(submitStarted);
-			GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.ffi.submit");
-			submissionId = status.submissionId();
+			recordStatus(Operation.SUBMIT, result.asStatus());
+			submissionId = result.submissionId();
 			lastSubmitted = Math.max(lastSubmitted, submissionId);
 			TracyCompat.message("gal.frame.deferred producer=gui.frame stratum=gui.frame"
 				+ " frame=" + frameId + " submission=" + submissionId + " batches=" + requests.size());
@@ -919,25 +924,21 @@ public final class RustGalGuiRenderer {
 				METRICS.frames++;
 				METRICS.submissions++;
 				METRICS.batchesExecuted += requests.size();
-				METRICS.spriteBatchesExecuted += spriteBatches.size();
-				METRICS.packedSpritesExecuted += requests.size();
+				METRICS.spriteBatchesExecuted += result.spriteBatchCount();
+				METRICS.packedSpritesExecuted += result.spriteCount();
+				METRICS.cacheHits += result.cacheHits();
+				METRICS.cacheMisses += result.cacheMisses();
+				METRICS.resourceCreates += result.resourceCreates();
 				retireOutstanding(false);
 			METRICS.executeNanos += elapsedSince(executeStarted);
 			executeCounted = true;
-			if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
-					LOGGER.info(
-						"Rust VulkanicGAL GUI frame executed: batches={}, spriteBatches={}, frame={}, submission={}, cacheHits={}, cacheMisses={}, ffiCalls={}, ffiBytes={}",
-						requests.size(),
-						spriteBatches.size(),
-						frameId,
-						submissionId,
-						METRICS.cacheHits,
-					METRICS.cacheMisses,
-					METRICS.ffiCalls,
-					METRICS.ffiBytes
-				);
-			}
-				auditMessage(metricsAuditLine(requests.size(), frameId, submissionId));
+				if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
+					TracyCompat.message("Rust VulkanicGAL GUI frame executed"
+						+ " batches=" + requests.size()
+						+ " spriteBatches=" + result.spriteBatchCount()
+						+ " frame=" + frameId
+						+ " submission=" + submissionId);
+				}
 		} finally {
 			if (!executeCounted) {
 				METRICS.executeNanos += elapsedSince(executeStarted);
@@ -946,94 +947,8 @@ public final class RustGalGuiRenderer {
 		}
 	}
 
-	public static List<Integer> debugPackCompatibleRunLengthsForTests(List<GuiRenderStratum> strata, List<String> resourceKeys) {
-		return GuiBatchBuilder.debugPackCompatibleRunLengthsForTests(strata, resourceKeys);
-	}
-
-	public static List<String> debugPackedUniformCommandSequenceForTests(List<GuiRenderStratum> strata, List<String> resourceKeys) {
-		return GuiBatchBuilder.debugPackedUniformCommandSequenceForTests(strata, resourceKeys);
-	}
-
 	public static GuiSprite debugArmorSpriteForTests(ArmorIconState state) {
 		return armorIconSprite(state);
-	}
-
-	public static float[] debugArmorOpenGlUvYRangeForTests(ArmorIconState state) {
-		return GuiBatchBuilder.debugArmorOpenGlUvYRangeForTests(state);
-	}
-
-	public static int[] debugArmorOpenGlSampledLocalRowsForTests(ArmorIconState state, int guiScale) {
-		return GuiBatchBuilder.debugArmorOpenGlSampledLocalRowsForTests(state, guiScale);
-	}
-
-	public static String debugOpenGlPackedSpriteVertexShaderForTests() {
-		return GuiPipelineLibrary.VERTEX_SHADER_OPENGL;
-	}
-
-	public static String debugOpenGlPackedSpriteFragmentShaderForTests() {
-		return GuiPipelineLibrary.FRAGMENT_SHADER_OPENGL;
-	}
-
-	private static GuiResourceCache.CachedResources resourcesFor(GuiBatchBuilder.GuiSpriteRequest request) {
-		GuiResourceCache.Lookup lookup = RESOURCE_CACHE.resourcesFor(bridge, generation, request.sprite().textureGroup, RESOURCE_RECORDER);
-		if (lookup.cacheHit()) {
-			METRICS.cacheHits++;
-		} else {
-			METRICS.cacheMisses++;
-			METRICS.resourceCreateNanos += lookup.createNanos();
-		}
-		return lookup.resources();
-	}
-
-	private static void destroyCachedResources() {
-		RESOURCE_CACHE.destroyCachedResources(bridge, RESOURCE_RECORDER);
-	}
-
-
-	private static FrameResources frameResourcesFor(long acquiredFrameTarget) {
-		if (cachedFramePass != 0L && cachedFrameTarget != 0L && cachedFrameTarget == acquiredFrameTarget) {
-			return new FrameResources(cachedFrameTarget, cachedFramePass);
-		}
-		destroyTransientFrameResources(cachedFramePass, cachedFrameTarget);
-		VulkanicGalBridge.ResourceResults frameResources = bridge.resourceBatch(
-			bridge.resourceBatchBuilder()
-				.frameRenderPass(9000, "minecraft.gui.frame.pass", acquiredFrameTarget)
-				.build());
-		recordResourceBatch(frameResources);
-		cachedFrameTarget = acquiredFrameTarget;
-		cachedFramePass = frameResources.handle(0);
-		return new FrameResources(cachedFrameTarget, cachedFramePass);
-	}
-
-	private static void destroyTransientFrameResources(long pass, long frameTarget) {
-		if (bridge == null) {
-			return;
-		}
-		VulkanicGalBridge.ResourceBatchBuilder destroy = bridge.resourceBatchBuilder();
-		boolean hasDestroy = false;
-		if (pass != 0L) {
-			destroy.destroy(pass, VulkanicGalBridge.HANDLE_RENDER_PASS);
-			hasDestroy = true;
-		}
-		if (frameTarget != 0L) {
-			destroy.destroy(frameTarget, VulkanicGalBridge.HANDLE_FRAME_TARGET);
-			hasDestroy = true;
-		}
-		if (!hasDestroy) {
-			return;
-		}
-		try {
-			recordResourceBatch(bridge.resourceBatch(destroy.build()));
-		} catch (RuntimeException cleanupError) {
-			LOGGER.error("Rust VulkanicGAL transient frame resource cleanup failed", cleanupError);
-		} finally {
-			if (pass == cachedFramePass) {
-				cachedFramePass = 0L;
-			}
-			if (frameTarget == cachedFrameTarget) {
-				cachedFrameTarget = 0L;
-			}
-		}
 	}
 
 	private static void retireOutstanding(boolean force) {
@@ -1065,13 +980,14 @@ public final class RustGalGuiRenderer {
 		if (currentContext == 0L || currentContext != window.handle()) {
 			throw new IllegalStateException("Rust VulkanicGAL deferred OpenGL execution requires Minecraft's current GL context");
 		}
-			if (bridge == null) {
-				bridge = VulkanicGalBridge.createBorrowedOpenGl(window.handle());
-				recordFixedOperation(Operation.CONTEXT_CREATE, VulkanicGalBridge.Struct.BORROWED_OPENGL_CONTEXT_CREATE.byteSize());
-				recordFixedOperation(Operation.CAPABILITY_QUERY, VulkanicGalBridge.Struct.CAPABILITY_QUERY.byteSize());
-				configuredWidth = 0;
-				configuredHeight = 0;
-			}
+		if (bridge == null) {
+			bridge = VulkanicGalBridge.createBorrowedOpenGl(window.handle());
+			recordFixedOperation(Operation.CONTEXT_CREATE, VulkanicGalBridge.Struct.BORROWED_OPENGL_CONTEXT_CREATE.byteSize());
+			recordFixedOperation(Operation.CAPABILITY_QUERY, VulkanicGalBridge.Struct.CAPABILITY_QUERY.byteSize());
+			flushPendingAssetsLocked();
+			configuredWidth = 0;
+			configuredHeight = 0;
+		}
 	}
 
 	private static void ensureConfigured(Window window) {
@@ -1080,37 +996,33 @@ public final class RustGalGuiRenderer {
 		if (configuredWidth == width && configuredHeight == height) {
 			return;
 		}
-			if (configuredWidth == 0 || configuredHeight == 0) {
-				recordStatus(Operation.FRAME_CONFIGURE, bridge.configureFrame("minecraft.borrowed.opengl.default", width, height, VulkanicGalBridge.FORMAT_RGBA8));
-			} else {
-				recordFixedOperation(Operation.FRAME_RESIZE, VulkanicGalBridge.Struct.FRAME_RESIZE.byteSize());
-				bridge.resizeFrame(nextCorrelationId++, width, height);
-			}
-			configuredWidth = width;
-			configuredHeight = height;
+		if (configuredWidth == 0 || configuredHeight == 0) {
+			recordStatus(Operation.FRAME_CONFIGURE, bridge.configureFrame("minecraft.borrowed.opengl.default", width, height, VulkanicGalBridge.FORMAT_RGBA8));
+		} else {
+			recordFixedOperation(Operation.FRAME_RESIZE, VulkanicGalBridge.Struct.FRAME_RESIZE.byteSize());
+			bridge.resizeFrame(nextCorrelationId++, width, height);
 		}
+		configuredWidth = width;
+		configuredHeight = height;
+	}
 
 	private static void recordStatus(Operation operation, VulkanicGalBridge.Status status) {
 		long ffiCalls = status.ffiCalls();
 		long ffiBytes = status.ffiInputBytes();
 		recordBackendMetrics(status.backendMetrics());
 		long deltaCalls = 0L;
-			long deltaBytes = 0L;
-			if (ffiCalls >= METRICS.lastContextFfiCalls) {
-				deltaCalls = ffiCalls - METRICS.lastContextFfiCalls;
-				METRICS.ffiCalls += deltaCalls;
-			}
-			if (ffiBytes >= METRICS.lastContextFfiBytes) {
-				deltaBytes = ffiBytes - METRICS.lastContextFfiBytes;
-				METRICS.ffiBytes += deltaBytes;
-			}
-			addOperation(operation, deltaCalls, deltaBytes);
-			METRICS.lastContextFfiCalls = ffiCalls;
-			METRICS.lastContextFfiBytes = ffiBytes;
+		long deltaBytes = 0L;
+		if (ffiCalls >= METRICS.lastContextFfiCalls) {
+			deltaCalls = ffiCalls - METRICS.lastContextFfiCalls;
+			METRICS.ffiCalls += deltaCalls;
 		}
-
-	private static void recordResourceBatch(VulkanicGalBridge.ResourceResults results) {
-		recordStatus(Operation.RESOURCE_BATCH, new VulkanicGalBridge.Status(results.submissionId(), results.ffiCalls(), results.ffiInputBytes(), results.backendMetrics()));
+		if (ffiBytes >= METRICS.lastContextFfiBytes) {
+			deltaBytes = ffiBytes - METRICS.lastContextFfiBytes;
+			METRICS.ffiBytes += deltaBytes;
+		}
+		addOperation(operation, deltaCalls, deltaBytes);
+		METRICS.lastContextFfiCalls = ffiCalls;
+		METRICS.lastContextFfiBytes = ffiBytes;
 	}
 
 	private static void recordBackendMetrics(VulkanicGalBridge.BackendMetrics metrics) {
@@ -1130,58 +1042,62 @@ public final class RustGalGuiRenderer {
 		METRICS.glFencesDeleted = Math.max(METRICS.glFencesDeleted, metrics.glFencesDeleted());
 	}
 
-		private static void recordFixedOperation(Operation operation, long inputBytes) {
-			METRICS.ffiCalls++;
-			METRICS.ffiBytes += inputBytes;
-			METRICS.lastContextFfiCalls++;
-			METRICS.lastContextFfiBytes += inputBytes;
-			addOperation(operation, 1L, inputBytes);
-		}
+	private static void recordFixedOperation(Operation operation, long inputBytes) {
+		METRICS.ffiCalls++;
+		METRICS.ffiBytes += inputBytes;
+		METRICS.lastContextFfiCalls++;
+		METRICS.lastContextFfiBytes += inputBytes;
+		addOperation(operation, 1L, inputBytes);
+	}
 
-		private static void addOperation(Operation operation, long calls, long bytes) {
-			switch (operation) {
-				case CONTEXT_CREATE -> {
-					METRICS.contextCreateCalls += calls;
-					METRICS.contextCreateBytes += bytes;
-				}
-				case CAPABILITY_QUERY -> {
-					METRICS.capabilityCalls += calls;
-					METRICS.capabilityBytes += bytes;
-				}
-				case FRAME_CONFIGURE -> {
-					METRICS.frameConfigureCalls += calls;
-					METRICS.frameConfigureBytes += bytes;
-				}
-				case FRAME_ACQUIRE -> {
-					METRICS.frameAcquireCalls += calls;
-					METRICS.frameAcquireBytes += bytes;
-				}
-				case FRAME_RESIZE -> {
-					METRICS.frameResizeCalls += calls;
-					METRICS.frameResizeBytes += bytes;
-				}
-				case FRAME_PRESENT -> {
-					METRICS.framePresentCalls += calls;
-					METRICS.framePresentBytes += bytes;
-				}
-				case RESOURCE_BATCH -> {
-					METRICS.resourceBatchCalls += calls;
-					METRICS.resourceBatchBytes += bytes;
-				}
-				case SUBMIT -> {
-					METRICS.submitCalls += calls;
-					METRICS.submitBytes += bytes;
-				}
-				case COMPLETION_QUERY -> {
-					METRICS.completionQueryCalls += calls;
-					METRICS.completionQueryBytes += bytes;
-				}
-				case RETIRE -> {
-					METRICS.retireCalls += calls;
-					METRICS.retireBytes += bytes;
-				}
+	private static void addOperation(Operation operation, long calls, long bytes) {
+		switch (operation) {
+			case CONTEXT_CREATE -> {
+				METRICS.contextCreateCalls += calls;
+				METRICS.contextCreateBytes += bytes;
+			}
+			case CAPABILITY_QUERY -> {
+				METRICS.capabilityCalls += calls;
+				METRICS.capabilityBytes += bytes;
+			}
+			case FRAME_CONFIGURE -> {
+				METRICS.frameConfigureCalls += calls;
+				METRICS.frameConfigureBytes += bytes;
+			}
+			case FRAME_ACQUIRE -> {
+				METRICS.frameAcquireCalls += calls;
+				METRICS.frameAcquireBytes += bytes;
+			}
+			case FRAME_RESIZE -> {
+				METRICS.frameResizeCalls += calls;
+				METRICS.frameResizeBytes += bytes;
+			}
+			case FRAME_PRESENT -> {
+				METRICS.framePresentCalls += calls;
+				METRICS.framePresentBytes += bytes;
+			}
+			case RESOURCE_BATCH -> {
+				METRICS.resourceBatchCalls += calls;
+				METRICS.resourceBatchBytes += bytes;
+			}
+			case SUBMIT -> {
+				METRICS.submitCalls += calls;
+				METRICS.submitBytes += bytes;
+			}
+			case COMPLETION_QUERY -> {
+				METRICS.completionQueryCalls += calls;
+				METRICS.completionQueryBytes += bytes;
+			}
+			case RETIRE -> {
+				METRICS.retireCalls += calls;
+				METRICS.retireBytes += bytes;
+			}
+			case GUI_ASSET_UPDATE -> {
+				METRICS.guiAssetUpdateCalls += calls;
+				METRICS.guiAssetUpdateBytes += bytes;
 			}
 		}
+	}
 
 	private static void auditMessage(String message) {
 		if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
@@ -1211,6 +1127,11 @@ public final class RustGalGuiRenderer {
 			+ " rust_gal_batches_cancelled=" + METRICS.batchesCancelled
 			+ " rust_gal_completion_polls=" + METRICS.completionPolls
 			+ " rust_gal_completion_timeouts=" + METRICS.completionTimeouts
+			+ " rust_gal_asset_generation=" + assetGeneration
+			+ " rust_gal_uploaded_asset_generation=" + uploadedAssetGeneration
+			+ " rust_gal_asset_payload_count=" + lastAssetPayloadCount
+			+ " rust_gal_asset_payload_bytes=" + lastAssetPayloadBytes
+			+ " rust_gal_asset_update_failures=" + assetUpdateFailures
 			+ " rust_gal_ffi_context_create_calls=" + METRICS.contextCreateCalls
 			+ " rust_gal_ffi_capability_calls=" + METRICS.capabilityCalls
 			+ " rust_gal_ffi_frame_configure_calls=" + METRICS.frameConfigureCalls
@@ -1221,6 +1142,7 @@ public final class RustGalGuiRenderer {
 			+ " rust_gal_ffi_submit_calls=" + METRICS.submitCalls
 			+ " rust_gal_ffi_completion_query_calls=" + METRICS.completionQueryCalls
 			+ " rust_gal_ffi_retire_calls=" + METRICS.retireCalls
+			+ " rust_gal_ffi_asset_update_calls=" + METRICS.guiAssetUpdateCalls
 			+ " rust_gal_ffi_context_create_bytes=" + METRICS.contextCreateBytes
 			+ " rust_gal_ffi_capability_bytes=" + METRICS.capabilityBytes
 			+ " rust_gal_ffi_frame_configure_bytes=" + METRICS.frameConfigureBytes
@@ -1231,6 +1153,7 @@ public final class RustGalGuiRenderer {
 			+ " rust_gal_ffi_submit_bytes=" + METRICS.submitBytes
 			+ " rust_gal_ffi_completion_query_bytes=" + METRICS.completionQueryBytes
 			+ " rust_gal_ffi_retire_bytes=" + METRICS.retireBytes
+			+ " rust_gal_ffi_asset_update_bytes=" + METRICS.guiAssetUpdateBytes
 			+ " rust_gal_enqueue_nanos=" + METRICS.enqueueNanos
 			+ " rust_gal_resource_lookup_nanos=" + METRICS.resourceLookupNanos
 			+ " rust_gal_resource_create_nanos=" + METRICS.resourceCreateNanos
@@ -1298,9 +1221,6 @@ public final class RustGalGuiRenderer {
 			case NOTCHED_12 -> GuiSprite.BOSS_BAR_NOTCHED_12_PROGRESS;
 			case NOTCHED_20 -> GuiSprite.BOSS_BAR_NOTCHED_20_PROGRESS;
 		};
-	}
-
-	private record FrameResources(long target, long pass) {
 	}
 
 	enum TextureGroup {
@@ -2055,6 +1975,18 @@ public final class RustGalGuiRenderer {
 			return this.width * this.height * 4;
 		}
 
+		int semanticId() {
+			return ordinal() + 1;
+		}
+
+		ResourceLocation resourceLocation() {
+			String prefix = "/assets/minecraft/";
+			if (!this.textureResource.startsWith(prefix)) {
+				throw new IllegalStateException("unexpected GUI sprite resource path: " + this.textureResource);
+			}
+			return ResourceLocation.withDefaultNamespace(this.textureResource.substring(prefix.length()));
+		}
+
 		private static String semanticSuffix(String cacheKind) {
 			if (cacheKind.startsWith("gui-textured-alpha-")) {
 				return cacheKind.substring("gui-textured-alpha-".length()).replace('_', '-');
@@ -2076,7 +2008,8 @@ public final class RustGalGuiRenderer {
 		RESOURCE_BATCH,
 		SUBMIT,
 		COMPLETION_QUERY,
-		RETIRE
+		RETIRE,
+		GUI_ASSET_UPDATE
 	}
 
 	private static final class Metrics {
@@ -2108,6 +2041,7 @@ public final class RustGalGuiRenderer {
 		long submitCalls;
 		long completionQueryCalls;
 		long retireCalls;
+		long guiAssetUpdateCalls;
 		long contextCreateBytes;
 		long capabilityBytes;
 		long frameConfigureBytes;
@@ -2118,6 +2052,7 @@ public final class RustGalGuiRenderer {
 		long submitBytes;
 		long completionQueryBytes;
 		long retireBytes;
+		long guiAssetUpdateBytes;
 		long enqueueNanos;
 		long resourceLookupNanos;
 		long resourceCreateNanos;

@@ -796,7 +796,8 @@ public class RenderSectionManager {
                 this.meshTaskSizeEstimator.addData(this.meshTaskSizeEstimator.resultForSection(result.render, resultSize));
 
                 if (chunkBuildOutput.translucentData != null) {
-                    this.sortTriggering.integrateTranslucentData(oldData, chunkBuildOutput.translucentData, this.cameraPosition, this::scheduleSort);
+                    this.sortTriggering.integrateTranslucentData(oldData, chunkBuildOutput.translucentData,
+                            this.cameraPosition, result.submitTime, this.lastUpdatedFrame, this::scheduleSort);
 
                     // a rebuild always generates new translucent data which means applyTriggerChanges isn't necessary
                     result.render.setTranslucentData(chunkBuildOutput.translucentData);

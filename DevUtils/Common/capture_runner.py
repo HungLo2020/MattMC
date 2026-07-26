@@ -10,14 +10,19 @@ import math
 import os
 import platform as py_platform
 import re
+import shlex
 import shutil
 import signal
 import stat
+import struct
 import subprocess
 import sys
 import time
+import zlib
 from dataclasses import dataclass
 from pathlib import Path
+
+import artifact_retention
 
 
 SHADER_EVENT_PATTERN = (
@@ -73,6 +78,7 @@ class CaptureConfig:
     world: str
     game_dir: str
     jvm_args: list[str]
+    gui_resource_pack_scenario: str
     region_validation: bool
     region_validation_copy_world: bool
     poi_validation: bool
@@ -162,6 +168,8 @@ class CaptureRunner:
         self.env = os.environ.copy()
         self.isolated_game_source: Path | None = None
         self.isolated_game_dir: Path | None = None
+        self.region_validation_game_dir: Path | None = None
+        self.generated_gui_resource_packs: list[str] = []
 
     def run(self) -> int:
         self.acquire_lock()
@@ -169,6 +177,7 @@ class CaptureRunner:
         self.prepare_isolated_game_dir()
         self.prepare_region_validation_game_dir()
         self.write_initial_meta()
+        self.configure_gui_resource_pack_scenario()
         self.configure_screenshots()
         self.configure_backend_and_validation()
         self.configure_client_args()
@@ -193,6 +202,7 @@ class CaptureRunner:
         self.validate_audio_status()
         self.validate_region_status()
         self.validate_poi_status()
+        self.cleanup_generated_game_dirs()
         self.print_summary(exit_code)
         self.release_lock()
 
@@ -254,6 +264,27 @@ class CaptureRunner:
             self.lock_handle.close()
             self.lock_handle = None
 
+    def cleanup_generated_game_dirs(self) -> None:
+        marker_root = artifact_retention.nearest_marked_root(self.artifact_dir)
+        if marker_root is None:
+            self.append_meta("artifact_retention_game_dir_cleanup=skipped_no_marker")
+            return
+        removed: list[Path] = []
+        for path in (self.isolated_game_dir, self.region_validation_game_dir):
+            if path is None or not path.exists():
+                continue
+            try:
+                artifact_retention.remove_path(marker_root, path)
+                removed.append(path)
+                parent = path.parent
+                if parent.name == self.run_id and parent.parent.name == ".tmp" and parent.exists() and not any(parent.iterdir()):
+                    artifact_retention.remove_path(marker_root, parent)
+            except Exception as exc:
+                self.append_meta(f"artifact_retention_game_dir_cleanup_error={exc}")
+        self.append_meta(f"artifact_retention_game_dirs_removed={len(removed)}")
+        for path in removed:
+            self.append_meta(f"artifact_retention_removed_game_dir={path}")
+
     def write_initial_meta(self) -> None:
         save_fingerprint = save_state_fingerprint(self.run_dir, self.config.world)
         lines = [
@@ -262,6 +293,9 @@ class CaptureRunner:
             f"backend={self.config.backend}",
             f"shaders={self.config.shaders}",
             f"world={self.config.world}",
+            f"world_profile={os.environ.get('MATTMC_GRAPHICS_WORLD_PROFILE', 'migration-gate')}",
+            f"world_profile_role={os.environ.get('MATTMC_GRAPHICS_WORLD_PROFILE_ROLE', '')}",
+            f"migration_gate_blocking={os.environ.get('MATTMC_GRAPHICS_MIGRATION_GATE_BLOCKING', 'true')}",
             f"world_save_state_hash={save_fingerprint['hash']}",
             f"world_save_state_file_count={save_fingerprint['file_count']}",
             f"world_save_state_total_bytes={save_fingerprint['total_bytes']}",
@@ -314,6 +348,14 @@ class CaptureRunner:
         with self.meta_log.open("a", encoding="utf-8") as handle:
             handle.write(text.rstrip("\n") + "\n")
 
+    def generated_game_temp_root(self) -> Path:
+        marker_root = artifact_retention.nearest_marked_root(self.artifact_dir)
+        if marker_root is None:
+            return self.artifact_dir
+        temp_root = marker_root / ".tmp" / self.run_id
+        temp_root.mkdir(parents=True, exist_ok=True)
+        return temp_root
+
     def prepare_isolated_game_dir(self) -> None:
         if self.config.game_dir or self.config.region_validation_copy_world:
             return
@@ -321,7 +363,7 @@ class CaptureRunner:
         source_world = Path(os.environ["MATTMC_CAPTURE_WORLD_SOURCE"]) if os.environ.get("MATTMC_CAPTURE_WORLD_SOURCE") else source_run / "saves" / self.config.world
         if not source_world.is_dir():
             raise SystemExit(f"Cannot copy missing benchmark world: {source_world}")
-        isolated_game_dir = self.artifact_dir / f"game_dir_{self.run_id}"
+        isolated_game_dir = self.generated_game_temp_root() / f"game_dir_{self.run_id}"
         if isolated_game_dir.exists():
             raise SystemExit(f"Refusing to reuse existing isolated game dir: {isolated_game_dir}")
 
@@ -351,7 +393,7 @@ class CaptureRunner:
         source_world = self.root / "run" / "saves" / self.config.world
         if not source_world.is_dir():
             raise SystemExit(f"Cannot copy missing validation world: {source_world}")
-        validation_game_dir = self.artifact_dir / f"region_validation_game_{self.run_id}"
+        validation_game_dir = self.generated_game_temp_root() / f"region_validation_game_{self.run_id}"
         if validation_game_dir.exists():
             raise SystemExit(f"Refusing to reuse existing validation game dir: {validation_game_dir}")
 
@@ -365,10 +407,41 @@ class CaptureRunner:
             fixture_path = write_poi_validation_fixture(validation_game_dir / "saves" / self.config.world)
             self.append_meta(f"poi_validation_fixture={fixture_path}")
         self.run_dir = validation_game_dir
+        self.region_validation_game_dir = validation_game_dir
         self.options_file = self.run_dir / "options.txt"
         self.append_meta(f"validation_world_source={source_world}")
         self.append_meta(f"validation_game_dir={self.run_dir}")
         self.append_meta(f"validation_world_copy={self.run_dir / 'saves' / self.config.world}")
+
+    def configure_gui_resource_pack_scenario(self) -> None:
+        scenario = (self.config.gui_resource_pack_scenario or "").strip().lower()
+        if not scenario:
+            return
+        if self.config.game_dir:
+            raise SystemExit("--gui-resource-pack-scenario requires the isolated game directory path")
+        if scenario in {"none", "vanilla"}:
+            upsert_option(self.options_file, "resourcePacks", "[]")
+            upsert_option(self.options_file, "incompatibleResourcePacks", "[]")
+            self.append_meta(f"gui_resource_pack_scenario={scenario}")
+            self.append_meta("gui_resource_pack_selected=[]")
+            return
+
+        pack_root = self.run_dir / "resourcepacks"
+        pack_root.mkdir(parents=True, exist_ok=True)
+        specs = gui_resource_pack_specs(scenario)
+        selected: list[str] = []
+        for spec in specs:
+            pack_dir = pack_root / spec["name"]
+            write_gui_resource_pack(pack_dir, spec)
+            pack_id = f"file/{spec['name']}"
+            selected.append(pack_id)
+            self.generated_gui_resource_packs.append(pack_id)
+            self.append_meta(f"gui_resource_pack_generated={pack_id}")
+            self.append_meta(f"gui_resource_pack_{spec['name']}_sha256={directory_digest(pack_dir)}")
+        upsert_option(self.options_file, "resourcePacks", json.dumps(selected, separators=(",", ":")))
+        upsert_option(self.options_file, "incompatibleResourcePacks", "[]")
+        self.append_meta(f"gui_resource_pack_scenario={scenario}")
+        self.append_meta(f"gui_resource_pack_selected={json.dumps(selected, separators=(',', ':'))}")
 
     def copy_optional_path(self, source: Path, target: Path) -> None:
         if not source.exists():
@@ -758,6 +831,7 @@ class CaptureRunner:
                 f"-Dmattmc.dev.deterministicCameraCapture.shaderEnabled={self.effective_enable_shaders or 'unknown'}",
                 f"-Dmattmc.dev.deterministicCameraCapture.shaderPack={self.effective_shader_pack or 'unknown'}",
                 f"-Dmattmc.dev.deterministicCameraCapture.gitCommit={self.git_commit}",
+                f"-Dmattmc.dev.deterministicCameraCapture.world={self.config.world}",
                 "-Dmattmc.dev.deterministicCameraCapture.stopAfterComplete=true",
                 "-Dmattmc.dev.deterministicCameraCapture.ackTimeoutFrames=12000",
                 "-Dmattmc.vulkan.traceShaderInputParity.poseOnly=true",
@@ -833,9 +907,10 @@ class CaptureRunner:
         return output if output.is_absolute() else (self.root / output)
 
     def append_java_tool_options(self, options: list[str]) -> None:
-        current = self.env.get("JAVA_TOOL_OPTIONS", "")
-        joined = " ".join(options)
-        self.env["JAVA_TOOL_OPTIONS"] = f"{current} {joined}".strip() if current else joined
+        current = shlex.split(self.env.get("JAVA_TOOL_OPTIONS", ""))
+        joined = current + list(options)
+        joined_text = " ".join(shlex.quote(option) for option in joined if option)
+        self.env["JAVA_TOOL_OPTIONS"] = joined_text
 
     def monitor_gradle(self) -> int:
         assert self.gradle_process is not None
@@ -1008,6 +1083,7 @@ class CaptureRunner:
             self.intentional_deterministic_shutdown = True
             self.append_meta(f"deterministic_capture_complete_elapsed={elapsed}")
             self.append_meta(f"deterministic_capture_complete_rss_kb={rss_kb}")
+            self.collect_client_memory_snapshot("deterministic_complete", client_pid)
             self.terminate_run_processes("deterministic_complete")
             return False
         self.memory_guard_triggered = True
@@ -1018,6 +1094,7 @@ class CaptureRunner:
         )
         self.append_meta(message)
         append_text(self.run_log, message + "\n")
+        self.collect_client_memory_snapshot("rss_guard", client_pid)
         print(message, file=sys.stderr)
         self.terminate_run_processes("client_rss_limit")
         return False
@@ -1046,11 +1123,32 @@ class CaptureRunner:
             text = f"===== jcmd Thread.print (pid={client_pid}) =====\n"
             text += command_text(["jcmd", str(client_pid), "Thread.print"], cwd=self.root)
             self.thread_dump.write_text(text, encoding="utf-8", errors="replace")
+            self.collect_client_memory_snapshot(f"dump_elapsed_{elapsed}", client_pid)
         else:
             self.thread_dump.write_text("No Minecraft Java PID found at dump point.\n", encoding="utf-8")
         if not self.config.deterministic_camera_capture:
             self.capture_root_screenshot("dump", elapsed, client_pid)
         self.dump_taken = True
+
+    def collect_client_memory_snapshot(self, label: str, client_pid: int) -> None:
+        lines = [
+            "",
+            f"===== client memory snapshot: {label} pid={client_pid} =====",
+            f"rss_kb={process_rss_kb(client_pid, self.platform_name)}",
+        ]
+        if shutil.which("jcmd"):
+            lines.extend([
+                "",
+                "===== jcmd GC.heap_info =====",
+                command_text(["jcmd", str(client_pid), "GC.heap_info"], cwd=self.root),
+                "",
+                "===== jcmd VM.native_memory summary =====",
+                command_text(["jcmd", str(client_pid), "VM.native_memory", "summary"], cwd=self.root),
+            ])
+        if self.platform_name == "linux":
+            lines.extend(read_proc_memory_summary(client_pid))
+        append_text(self.process_snapshot, "\n".join(lines) + "\n")
+        self.append_meta(f"client_memory_snapshot_{label}={self.process_snapshot}")
 
     def terminate_run_processes(self, reason: str) -> None:
         if not self.gradle_process:
@@ -1759,6 +1857,151 @@ def upsert_option(file_path: Path, key: str, value: str) -> bool:
     return True
 
 
+GUI_RESOURCE_PACK_SPRITES = (
+    ("assets/minecraft/textures/gui/sprites/hud/crosshair.png", 15, 15),
+    ("assets/minecraft/textures/gui/sprites/hud/hotbar.png", 182, 22),
+    ("assets/minecraft/textures/gui/sprites/hud/hotbar_selection.png", 24, 23),
+    ("assets/minecraft/textures/gui/sprites/hud/armor_empty.png", 9, 9),
+    ("assets/minecraft/textures/gui/sprites/hud/armor_half.png", 9, 9),
+    ("assets/minecraft/textures/gui/sprites/hud/armor_full.png", 9, 9),
+    ("assets/minecraft/textures/gui/sprites/hud/heart/container.png", 9, 9),
+    ("assets/minecraft/textures/gui/sprites/hud/heart/full.png", 9, 9),
+    ("assets/minecraft/textures/gui/sprites/hud/heart/half.png", 9, 9),
+    ("assets/minecraft/textures/gui/sprites/hud/heart/absorbing_full.png", 9, 9),
+    ("assets/minecraft/textures/gui/sprites/hud/heart/absorbing_half.png", 9, 9),
+    ("assets/minecraft/textures/gui/sprites/hud/experience_bar_background.png", 182, 5),
+    ("assets/minecraft/textures/gui/sprites/hud/experience_bar_progress.png", 182, 5),
+    ("assets/minecraft/textures/gui/sprites/boss_bar/pink_background.png", 182, 5),
+    ("assets/minecraft/textures/gui/sprites/boss_bar/pink_progress.png", 182, 5),
+)
+
+
+GUI_PACK_COLORS = {
+    "a": (238, 37, 67, 255),
+    "b": (35, 212, 98, 255),
+}
+
+
+def gui_resource_pack_specs(scenario: str) -> list[dict[str, object]]:
+    base = {"sprites": GUI_RESOURCE_PACK_SPRITES, "malformed": (), "wrong_size": ()}
+    if scenario == "pack-a":
+        return [{**base, "name": "mattmc-rust-gui-pack-a", "variant": "a"}]
+    if scenario == "pack-b":
+        return [{**base, "name": "mattmc-rust-gui-pack-b", "variant": "b"}]
+    if scenario == "priority-a-b":
+        return [
+            {**base, "name": "mattmc-rust-gui-pack-a", "variant": "a"},
+            {**base, "name": "mattmc-rust-gui-pack-b", "variant": "b"},
+        ]
+    if scenario == "priority-b-a":
+        return [
+            {**base, "name": "mattmc-rust-gui-pack-b", "variant": "b"},
+            {**base, "name": "mattmc-rust-gui-pack-a", "variant": "a"},
+        ]
+    if scenario == "missing":
+        return [
+            {
+                **base,
+                "name": "mattmc-rust-gui-pack-missing",
+                "variant": "a",
+                "sprites": GUI_RESOURCE_PACK_SPRITES[:6],
+            }
+        ]
+    if scenario == "malformed":
+        return [
+            {
+                **base,
+                "name": "mattmc-rust-gui-pack-malformed",
+                "variant": "a",
+                "malformed": ("assets/minecraft/textures/gui/sprites/hud/crosshair.png",),
+            }
+        ]
+    if scenario == "unsupported":
+        return [
+            {
+                **base,
+                "name": "mattmc-rust-gui-pack-unsupported",
+                "variant": "a",
+                "wrong_size": ("assets/minecraft/textures/gui/sprites/hud/armor_full.png",),
+            }
+        ]
+    raise SystemExit(
+        "--gui-resource-pack-scenario must be one of: vanilla, pack-a, pack-b, "
+        "priority-a-b, priority-b-a, missing, malformed, unsupported"
+    )
+
+
+def write_gui_resource_pack(pack_dir: Path, spec: dict[str, object]) -> None:
+    if pack_dir.exists():
+        shutil.rmtree(pack_dir)
+    pack_dir.mkdir(parents=True)
+    (pack_dir / "pack.mcmeta").write_text(
+        json.dumps(
+            {
+                "pack": {
+                    "pack_format": 69,
+                    "min_format": [69, 0],
+                    "max_format": [69, 0],
+                    "description": f"MattMC {spec['name']}",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    variant = str(spec["variant"])
+    malformed = set(spec.get("malformed", ()))
+    wrong_size = set(spec.get("wrong_size", ()))
+    for resource_path, width, height in spec["sprites"]:  # type: ignore[index]
+        target = pack_dir / resource_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if resource_path in malformed:
+            target.write_bytes(b"not a png")
+            continue
+        actual_width = width + 1 if resource_path in wrong_size else width
+        target.write_bytes(asymmetric_png(actual_width, height, GUI_PACK_COLORS[variant], variant))
+
+
+def asymmetric_png(width: int, height: int, base: tuple[int, int, int, int], variant: str) -> bytes:
+    marker = (255, 255, 255, 255) if variant == "a" else (0, 0, 0, 255)
+    edge = (0, 70, 255, 255) if variant == "a" else (255, 212, 0, 255)
+    rows = bytearray()
+    for y in range(height):
+        rows.append(0)
+        for x in range(width):
+            pixel = base
+            if y == 0:
+                pixel = marker
+            elif x == 0:
+                pixel = edge
+            elif x == width - 1 or y == height - 1:
+                pixel = (base[0] // 2, base[1] // 2, base[2] // 2, base[3])
+            rows.extend(pixel)
+    raw = zlib.compress(bytes(rows))
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + png_chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
+        + png_chunk(b"IDAT", raw)
+        + png_chunk(b"IEND", b"")
+    )
+
+
+def png_chunk(kind: bytes, data: bytes) -> bytes:
+    checksum = zlib.crc32(kind)
+    checksum = zlib.crc32(data, checksum) & 0xFFFFFFFF
+    return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", checksum)
+
+
+def directory_digest(path: Path) -> str:
+    digest = hashlib.sha256()
+    for item in sorted(path.rglob("*")):
+        if item.is_file():
+            digest.update(str(item.relative_to(path)).encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(item.read_bytes())
+            digest.update(b"\0")
+    return digest.hexdigest()
+
+
 def resolve_shader_pack_path(run_dir: Path, root: Path, shader_pack_name: str) -> Path | None:
     if not shader_pack_name:
         return None
@@ -1904,6 +2147,26 @@ def process_rss_kb(pid: int, platform_name: str) -> int:
         return int(output.split()[0])
     except (IndexError, ValueError):
         return 0
+
+
+def read_proc_memory_summary(pid: int) -> list[str]:
+    root = Path("/proc") / str(pid)
+    lines: list[str] = []
+    for name in ("status", "smaps_rollup"):
+        path = root / name
+        if not path.is_file():
+            continue
+        lines.extend(["", f"===== /proc/{pid}/{name} memory fields ====="])
+        try:
+            for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+                if name == "status":
+                    if line.startswith(("Vm", "Rss", "HugetlbPages", "Threads", "voluntary_ctxt_switches", "nonvoluntary_ctxt_switches")):
+                        lines.append(line)
+                elif re.match(r"^(Rss|Pss|Shared_|Private_|Referenced|Anonymous|AnonHugePages|Swap|SwapPss|Locked):", line):
+                    lines.append(line)
+        except OSError as exc:
+            lines.append(f"unavailable: {exc}")
+    return lines
 
 
 def process_exists(pid: int, platform_name: str) -> bool:
@@ -2082,6 +2345,14 @@ def parse_args() -> CaptureConfig:
     parser.add_argument("--jvm-arg", action="append", default=[], help="Extra JVM option appended to JAVA_TOOL_OPTIONS.")
     parser.add_argument("--world", default=os.environ.get("MATTMC_CAPTURE_WORLD", "Origin"))
     parser.add_argument("--game-dir", default=os.environ.get("MATTMC_CAPTURE_GAME_DIR", ""))
+    parser.add_argument(
+        "--gui-resource-pack-scenario",
+        default=os.environ.get("MATTMC_GUI_RESOURCE_PACK_SCENARIO", ""),
+        help=(
+            "Generate and select diagnostic GUI resource packs in the isolated game dir. "
+            "Supported: vanilla, pack-a, pack-b, priority-a-b, priority-b-a, missing, malformed, unsupported."
+        ),
+    )
     parser.add_argument("--region-validation", action="store_true")
     parser.add_argument("--region-validation-copy-world", action="store_true")
     parser.add_argument("--poi-validation", action="store_true")
@@ -2128,6 +2399,7 @@ def parse_args() -> CaptureConfig:
         world=args.world,
         game_dir=args.game_dir,
         jvm_args=args.jvm_arg,
+        gui_resource_pack_scenario=args.gui_resource_pack_scenario,
         region_validation=bool(args.region_validation),
         region_validation_copy_world=bool(args.region_validation_copy_world),
         poi_validation=bool(args.poi_validation),
@@ -2148,6 +2420,7 @@ def main() -> int:
     def handle_signal(signum, _frame) -> None:
         signal_name = signal.Signals(signum).name
         runner.terminate_run_processes(f"signal_{signal_name}")
+        runner.cleanup_generated_game_dirs()
         runner.release_lock()
         raise SystemExit(128)
 
@@ -2159,14 +2432,17 @@ def main() -> int:
         return runner.run()
     except KeyboardInterrupt:
         runner.terminate_run_processes("signal_INT")
+        runner.cleanup_generated_game_dirs()
         runner.release_lock()
         return 128
     except SystemExit:
+        runner.cleanup_generated_game_dirs()
         runner.release_lock()
         raise
     except Exception:
         if runner.run_client_active:
             runner.terminate_run_processes("script_exit_1")
+        runner.cleanup_generated_game_dirs()
         runner.release_lock()
         raise
 

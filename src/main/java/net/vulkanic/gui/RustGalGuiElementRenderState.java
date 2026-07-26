@@ -16,10 +16,6 @@ public record RustGalGuiElementRenderState(
 	int selectedSlot,
 	float progressFraction,
 	GuiFillDirection fillDirection,
-	int sourceX,
-	int sourceY,
-	int sourceWidth,
-	int sourceHeight,
 	int x,
 	int y,
 	int width,
@@ -68,7 +64,7 @@ public record RustGalGuiElementRenderState(
 	@Override
 	public String shaderInputParityGeometryContext() {
 		String context = "rust-gal:" + this.producerId + ":" + this.stratum.id()
-			+ ":src=" + this.sourceX + "," + this.sourceY + "," + this.sourceWidth + "," + this.sourceHeight;
+			+ ":rect=" + this.x + "," + this.y + "," + this.width + "," + this.height;
 		if (this.selectedSlot >= 0) {
 			context += ":slot=" + this.selectedSlot;
 		}

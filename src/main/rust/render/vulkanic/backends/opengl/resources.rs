@@ -714,8 +714,8 @@ pub(super) struct PassTargetObject {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::OpenGlBackend;
+    use super::*;
     use std::num::NonZeroU32;
 
     fn fake_framebuffer(id: u32) -> glow::Framebuffer {

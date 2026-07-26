@@ -58,6 +58,29 @@ class NativeDirectTriggersTest {
     }
 
     @Test
+    void nativeDirectTriggerCatchupFromSectionCenterStaysFinite() {
+        try (NativeDirectTriggers triggers = NativeDirectTriggers.create()) {
+            assertTrue(triggers.integrateSection(SectionPos.of(0, 0, 0),
+                    movement(8.0, 8.0, 8.0, 24.0, 8.0, 8.0)));
+            assertEquals(1, triggers.getDirectTriggerCount());
+        }
+    }
+
+    @Test
+    void nativeDirectTriggerStatsReportCatchupAndFallbacks() {
+        try (NativeDirectTriggers triggers = NativeDirectTriggers.create()) {
+            assertTrue(triggers.integrateSection(SectionPos.of(0, 0, 0),
+                    movement(8.0, 8.0, 8.0, 24.0, 8.0, 8.0)));
+
+            NativeDirectTriggers.Stats stats = triggers.statsSnapshot();
+            assertEquals(1, stats.integrateCalls());
+            assertEquals(1, stats.catchupIntegrations());
+            assertEquals(1, stats.invalidAngleInputFallbacks());
+            assertTrue(stats.maxMovementDistance() >= 16.0);
+        }
+    }
+
+    @Test
     void directTriggersClassWasRemovedFromJava() {
         assertFalse(Files.exists(Path.of(
                 "src/main/java/net/sodium/client/render/chunk/translucent_sorting/trigger/DirectTriggers.java")));

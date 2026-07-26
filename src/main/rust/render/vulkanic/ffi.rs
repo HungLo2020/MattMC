@@ -16,6 +16,7 @@ use super::frame::{
     FrameSurfaceDesc, PresentFrameDesc, PresentMode,
 };
 use super::gal::VulkanicGal;
+use super::gui_frontend::{GuiAssetPayload, GuiFrontend, GuiSpriteRequest, GuiSubmitStats};
 use super::handles::{Handle, HandleKind};
 use super::metrics::Metrics;
 use super::resources::{
@@ -36,6 +37,7 @@ pub const FFI_ABI_NAME: &str = "MattMC VulkanicGAL Java-Rust batch ABI";
 pub const FFI_MAX_LABEL_BYTES: usize = 1024;
 pub const FFI_MAX_SHADER_BYTES: usize = 16 * 1024 * 1024;
 pub const FFI_MAX_INLINE_BYTES: usize = 64 * 1024 * 1024;
+pub const FFI_MAX_GUI_ASSET_BYTES: usize = 4 * 1024 * 1024;
 pub const FFI_MAX_BATCH_ITEMS: usize = 65_536;
 
 #[repr(u32)]
@@ -389,6 +391,93 @@ pub struct FfiSubmissionRequest {
     pub header: FfiHeader,
     pub label: FfiBytes,
     pub command_lists: FfiSlice<FfiCommandListRequest>,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiGuiSpriteRequest {
+    pub byte_size: u32,
+    pub stratum: u32,
+    pub sprite_id: u32,
+    pub selected_slot: i32,
+    pub progress_fraction: f32,
+    pub fill_direction: u32,
+    pub color_argb: u32,
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+    pub gui_width: i32,
+    pub gui_height: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiGuiFrameSubmitRequest {
+    pub header: FfiHeader,
+    pub generation: u64,
+    pub frame_id: u64,
+    pub frame_target: FfiHandle,
+    pub gui_width: i32,
+    pub gui_height: i32,
+    pub sprites: FfiSlice<FfiGuiSpriteRequest>,
+    pub negotiated_feature_bits: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiGuiFrameSubmitResult {
+    pub header: FfiHeader,
+    pub status: i32,
+    pub error_domain: u32,
+    pub submission_id: u64,
+    pub sprite_count: u64,
+    pub sprite_batch_count: u64,
+    pub cache_hits: u64,
+    pub cache_misses: u64,
+    pub resource_creates: u64,
+    pub command_lists: u64,
+    pub command_ops: u64,
+    pub metrics: FfiMetricsSnapshot,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiGuiAssetPayload {
+    pub byte_size: u32,
+    pub sprite_id: u32,
+    pub png_bytes: FfiBytes,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiGuiAssetUpdateRequest {
+    pub header: FfiHeader,
+    pub generation: u64,
+    pub assets: FfiSlice<FfiGuiAssetPayload>,
+    pub negotiated_feature_bits: u64,
+}
+
+impl Default for FfiGuiFrameSubmitResult {
+    fn default() -> Self {
+        Self {
+            header: FfiHeader {
+                version: FFI_ABI_VERSION,
+                byte_size: size_of::<Self>() as u32,
+            },
+            status: StatusCode::Ok as i32,
+            error_domain: 0,
+            submission_id: 0,
+            sprite_count: 0,
+            sprite_batch_count: 0,
+            cache_hits: 0,
+            cache_misses: 0,
+            resource_creates: 0,
+            command_lists: 0,
+            command_ops: 0,
+            metrics: FfiMetricsSnapshot::default(),
+        }
+    }
 }
 
 pub fn validate_header<T>(header: FfiHeader) -> GalResult<()> {
@@ -1910,6 +1999,7 @@ pub fn serialize_submission_batch_canonical(batch: &SubmissionBatch) -> Vec<u8> 
 
 struct BridgeContext {
     gal: VulkanicGal,
+    gui_frontend: GuiFrontend,
     ffi_calls: u64,
     ffi_input_bytes: u64,
     ffi_output_bytes: u64,
@@ -1975,6 +2065,21 @@ fn status_ok(context: &BridgeContext) -> FfiStatusResult {
     FfiStatusResult {
         metrics: context_metrics(context),
         ..FfiStatusResult::default()
+    }
+}
+
+fn gui_frame_result_ok(context: &BridgeContext, stats: GuiSubmitStats) -> FfiGuiFrameSubmitResult {
+    FfiGuiFrameSubmitResult {
+        submission_id: stats.submission_id,
+        sprite_count: stats.sprite_count,
+        sprite_batch_count: stats.sprite_batch_count,
+        cache_hits: stats.cache_hits,
+        cache_misses: stats.cache_misses,
+        resource_creates: stats.resource_creates,
+        command_lists: stats.command_lists,
+        command_ops: stats.command_ops,
+        metrics: context_metrics(context),
+        ..FfiGuiFrameSubmitResult::default()
     }
 }
 
@@ -2132,6 +2237,177 @@ fn input_bytes_for_submission(batch: &FfiSubmissionBatchAbi) -> u64 {
                 .count
                 .saturating_mul(size_of::<FfiResourceBarrierAbi>() as u64),
         )
+}
+
+fn input_bytes_for_gui_frame(request: &FfiGuiFrameSubmitRequest) -> u64 {
+    (size_of::<FfiGuiFrameSubmitRequest>() as u64).saturating_add(
+        request
+            .sprites
+            .count
+            .saturating_mul(size_of::<FfiGuiSpriteRequest>() as u64),
+    )
+}
+
+fn input_bytes_for_gui_asset_update(request: &FfiGuiAssetUpdateRequest) -> u64 {
+    let payload_headers = request
+        .assets
+        .count
+        .saturating_mul(size_of::<FfiGuiAssetPayload>() as u64);
+    let payload_bytes = unsafe { read_slice(request.assets, true, "GUI asset payloads") }
+        .map(|items| {
+            items
+                .iter()
+                .fold(0u64, |sum, item| sum.saturating_add(item.png_bytes.len))
+        })
+        .unwrap_or(0);
+    (size_of::<FfiGuiAssetUpdateRequest>() as u64)
+        .saturating_add(payload_headers)
+        .saturating_add(payload_bytes)
+}
+
+unsafe fn decode_gui_frame_submit(
+    request: *const FfiGuiFrameSubmitRequest,
+    capabilities: BackendCapabilities,
+) -> GalResult<(u64, Handle, Vec<GuiSpriteRequest>)> {
+    let request = read_struct(request, "GUI frame submit request")?;
+    validate_header::<FfiGuiFrameSubmitRequest>(request.header)?;
+    reject_unknown_feature_bits(request.negotiated_feature_bits)?;
+    let supported = capability_feature_bits(capabilities);
+    if request.negotiated_feature_bits & !supported != 0 {
+        return Err(GalError::unsupported_feature(format!(
+            "requested unsupported GUI feature bits 0x{:x}",
+            request.negotiated_feature_bits & !supported
+        )));
+    }
+    if request.generation == 0 || request.frame_id == 0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "GUI frame submit requires non-zero generation and frame id",
+        ));
+    }
+    if request.gui_width <= 0 || request.gui_height <= 0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "GUI frame submit requires positive GUI dimensions, got {}x{}",
+                request.gui_width, request.gui_height
+            ),
+        ));
+    }
+    let frame_target = Handle::from(request.frame_target);
+    if frame_target.is_null() || frame_target.kind() != Some(HandleKind::FrameTarget) {
+        return Err(GalError::ffi(
+            StatusCode::WrongHandleType,
+            "GUI frame submit requires a frame-target handle",
+        ));
+    }
+    let sprites = read_slice(request.sprites, false, "GUI sprite requests")?;
+    if sprites.is_empty() {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "GUI frame submit requires at least one sprite",
+        ));
+    }
+    if sprites.len() > FFI_MAX_BATCH_ITEMS {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "GUI frame submit sprite count {} exceeds max {}",
+                sprites.len(),
+                FFI_MAX_BATCH_ITEMS
+            ),
+        ));
+    }
+    let mut owned = Vec::with_capacity(sprites.len());
+    for sprite in sprites {
+        if sprite.byte_size as usize != size_of::<FfiGuiSpriteRequest>() {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "GUI sprite byte size mismatch: got {}, expected {}",
+                    sprite.byte_size,
+                    size_of::<FfiGuiSpriteRequest>()
+                ),
+            ));
+        }
+        if sprite.gui_width != request.gui_width || sprite.gui_height != request.gui_height {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "GUI sprite dimensions must match frame GUI dimensions",
+            ));
+        }
+        let to_u32 = |value: i32, field: &str| -> GalResult<u32> {
+            u32::try_from(value).map_err(|_| {
+                GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    format!("GUI sprite {field} must be non-negative, got {value}"),
+                )
+            })
+        };
+        owned.push(GuiSpriteRequest {
+            stratum: sprite.stratum,
+            sprite_id: sprite.sprite_id,
+            selected_slot: sprite.selected_slot,
+            progress_fraction: sprite.progress_fraction,
+            fill_direction: sprite.fill_direction,
+            color_argb: sprite.color_argb,
+            x: sprite.x,
+            y: sprite.y,
+            width: to_u32(sprite.width, "width")?,
+            height: to_u32(sprite.height, "height")?,
+            gui_width: to_u32(sprite.gui_width, "gui_width")?,
+            gui_height: to_u32(sprite.gui_height, "gui_height")?,
+        });
+    }
+    Ok((request.generation, frame_target, owned))
+}
+
+unsafe fn decode_gui_asset_update(
+    request: *const FfiGuiAssetUpdateRequest,
+    capabilities: BackendCapabilities,
+) -> GalResult<(u64, Vec<GuiAssetPayload>)> {
+    let request = read_struct(request, "GUI asset update request")?;
+    validate_header::<FfiGuiAssetUpdateRequest>(request.header)?;
+    reject_unknown_feature_bits(request.negotiated_feature_bits)?;
+    let supported = capability_feature_bits(capabilities);
+    if request.negotiated_feature_bits & !supported != 0 {
+        return Err(GalError::unsupported_feature(format!(
+            "requested unsupported GUI asset feature bits 0x{:x}",
+            request.negotiated_feature_bits & !supported
+        )));
+    }
+    if request.generation == 0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "GUI asset generation must be non-zero",
+        ));
+    }
+    let assets = read_limited_slice(request.assets, true, "GUI asset payloads")?;
+    let mut seen = BTreeMap::new();
+    let mut owned = Vec::with_capacity(assets.len());
+    for asset in assets {
+        validate_item_size::<FfiGuiAssetPayload>(asset.byte_size, "GUI asset payload")?;
+        if seen.insert(asset.sprite_id, ()).is_some() {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "duplicate GUI asset payload for sprite id {}",
+                    asset.sprite_id
+                ),
+            ));
+        }
+        let png_bytes = read_bounded_bytes(
+            asset.png_bytes,
+            true,
+            FFI_MAX_GUI_ASSET_BYTES,
+            "GUI asset PNG bytes",
+        )?;
+        owned.push(GuiAssetPayload {
+            sprite_id: asset.sprite_id,
+            png_bytes,
+        });
+    }
+    Ok((request.generation, owned))
 }
 
 unsafe fn write_out<T>(out: *mut T, value: T, label: &str) -> GalResult<()> {
@@ -2750,6 +3026,63 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
             ]
         ),
         43 => layout!(43, FfiDestroyDescAbi, [byte_size, handle, expected_kind]),
+        44 => layout!(
+            44,
+            FfiGuiSpriteRequest,
+            [
+                byte_size,
+                stratum,
+                sprite_id,
+                selected_slot,
+                progress_fraction,
+                fill_direction,
+                color_argb,
+                x,
+                y,
+                width,
+                height,
+                gui_width,
+                gui_height
+            ]
+        ),
+        45 => layout!(
+            45,
+            FfiGuiFrameSubmitRequest,
+            [
+                header,
+                generation,
+                frame_id,
+                frame_target,
+                gui_width,
+                gui_height,
+                sprites,
+                negotiated_feature_bits
+            ]
+        ),
+        46 => layout!(
+            46,
+            FfiGuiFrameSubmitResult,
+            [
+                header,
+                status,
+                error_domain,
+                submission_id,
+                sprite_count,
+                sprite_batch_count,
+                cache_hits,
+                cache_misses,
+                resource_creates,
+                command_lists,
+                command_ops,
+                metrics
+            ]
+        ),
+        47 => layout!(47, FfiGuiAssetPayload, [byte_size, sprite_id, png_bytes]),
+        48 => layout!(
+            48,
+            FfiGuiAssetUpdateRequest,
+            [header, generation, assets, negotiated_feature_bits]
+        ),
         _ => {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,
@@ -2799,6 +3132,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create(
                 context_id,
                 BridgeContext {
                     gal,
+                    gui_frontend: GuiFrontend::default(),
                     ffi_calls: 1,
                     ffi_input_bytes: size_of::<FfiContextCreateRequest>() as u64,
                     ffi_output_bytes: size_of::<FfiContextResult>() as u64,
@@ -2877,6 +3211,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_borrowed_opengl(
                 context_id,
                 BridgeContext {
                     gal,
+                    gui_frontend: GuiFrontend::default(),
                     ffi_calls: 1,
                     ffi_input_bytes: size_of::<FfiBorrowedOpenGlContextCreateRequest>() as u64,
                     ffi_output_bytes: size_of::<FfiContextResult>() as u64,
@@ -2927,7 +3262,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_destroy(
     out: *mut FfiStatusResult,
 ) -> i32 {
     with_registry_mut(|registry| {
-        let Some(context) = registry.contexts.remove(&context_id) else {
+        let Some(mut context) = registry.contexts.remove(&context_id) else {
             let error = GalError::ffi(
                 StatusCode::StaleHandle,
                 format!("unknown context id {context_id}"),
@@ -2935,6 +3270,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_destroy(
             write_status_out(out, status_result_from_error(&error));
             return error.code as i32;
         };
+        context.gui_frontend.reset(&mut context.gal);
         let mut status = status_ok(&context);
         status.metrics.ffi_calls = status.metrics.ffi_calls.saturating_add(1);
         status.metrics.ffi_output_bytes = status
@@ -3095,6 +3431,119 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_submit_batch(
             }
         };
         result
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_vulkanic_gal_gui_submit_frame(
+    context_id: u64,
+    request: *const FfiGuiFrameSubmitRequest,
+    out: *mut FfiGuiFrameSubmitResult,
+) -> i32 {
+    with_registry_mut(|registry| {
+        let Some(context) = registry.contexts.get_mut(&context_id) else {
+            let error = GalError::ffi(
+                StatusCode::StaleHandle,
+                format!("unknown context id {context_id}"),
+            );
+            let _ = write_out(
+                out,
+                FfiGuiFrameSubmitResult {
+                    status: error.code as i32,
+                    error_domain: error.domain as u32,
+                    ..FfiGuiFrameSubmitResult::default()
+                },
+                "GUI frame submit result",
+            );
+            return error.code as i32;
+        };
+        let input_bytes = if request.is_null() {
+            0
+        } else {
+            input_bytes_for_gui_frame(&*request)
+        };
+        context.ffi_calls += 1;
+        context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);
+        context.ffi_output_bytes = context
+            .ffi_output_bytes
+            .saturating_add(size_of::<FfiGuiFrameSubmitResult>() as u64);
+        let result = decode_gui_frame_submit(request, context.gal.capabilities()).and_then(
+            |(generation, frame_target, sprites)| {
+                context.gui_frontend.submit_frame(
+                    &mut context.gal,
+                    generation,
+                    frame_target,
+                    sprites,
+                )
+            },
+        );
+        match result {
+            Ok(stats) => {
+                let value = gui_frame_result_ok(context, stats);
+                let _ = write_out(out, value, "GUI frame submit result");
+                StatusCode::Ok as i32
+            }
+            Err(error) => {
+                set_last_error(context, &error);
+                let _ = write_out(
+                    out,
+                    FfiGuiFrameSubmitResult {
+                        status: error.code as i32,
+                        error_domain: error.domain as u32,
+                        metrics: context_metrics(context),
+                        ..FfiGuiFrameSubmitResult::default()
+                    },
+                    "GUI frame submit result",
+                );
+                error.code as i32
+            }
+        }
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_vulkanic_gal_gui_update_assets(
+    context_id: u64,
+    request: *const FfiGuiAssetUpdateRequest,
+    status_out: *mut FfiStatusResult,
+) -> i32 {
+    with_registry_mut(|registry| {
+        let Some(context) = registry.contexts.get_mut(&context_id) else {
+            let error = GalError::ffi(
+                StatusCode::StaleHandle,
+                format!("unknown context id {context_id}"),
+            );
+            write_status_out(status_out, status_result_from_error(&error));
+            return error.code as i32;
+        };
+        let input_bytes = if request.is_null() {
+            0
+        } else {
+            input_bytes_for_gui_asset_update(&*request)
+        };
+        context.ffi_calls += 1;
+        context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);
+        context.ffi_output_bytes = context
+            .ffi_output_bytes
+            .saturating_add(size_of::<FfiStatusResult>() as u64);
+        let result = decode_gui_asset_update(request, context.gal.capabilities()).and_then(
+            |(generation, assets)| {
+                context
+                    .gui_frontend
+                    .apply_asset_update(&mut context.gal, generation, assets)
+            },
+        );
+        match result {
+            Ok(()) => {
+                write_status_out(status_out, status_ok(context));
+                StatusCode::Ok as i32
+            }
+            Err(error) => {
+                set_last_error(context, &error);
+                write_status_out(status_out, status_error(Some(context), &error));
+                error.code as i32
+            }
+        }
     })
 }
 
@@ -3480,6 +3929,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_resize(
             let request = read_struct(request, "frame resize request")?;
             validate_header::<FfiFrameResizeRequest>(request.header)?;
             context.cached_frame_target = None;
+            context.gui_frontend.clear_frame_pass(&mut context.gal);
             let resized = context.gal.resize_frame_surface(FrameResizeDesc {
                 correlation_id: FrameCorrelationId(request.correlation_id),
                 extent: request.extent.into(),
@@ -3588,6 +4038,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_shutdown(
             .ffi_output_bytes
             .saturating_add(size_of::<FfiStatusResult>() as u64);
         context.cached_frame_target = None;
+        context.gui_frontend.reset(&mut context.gal);
         match context.gal.shutdown_frame_surface() {
             Ok(()) => {
                 write_status_out(status_out, status_ok(context));
@@ -4863,4 +5314,194 @@ fn push_f32(out: &mut Vec<u8>, value: f32) {
 #[allow(dead_code)]
 fn _abi_status_domain_value(domain: ErrorDomain) -> u32 {
     domain as u32
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::render::vulkanic::resources::{BackendFeatureFlags, BackendLimits};
+
+    fn test_capabilities() -> BackendCapabilities {
+        BackendCapabilities {
+            name: "ffi-test",
+            features: BackendFeatureFlags {
+                graphics: true,
+                descriptor_arrays: true,
+                optional_bindings: true,
+                uniform_buffers: true,
+                storage_buffers: true,
+                texture_subresource_copies: true,
+                host_buffer_access: true,
+                presentation: true,
+                ..BackendFeatureFlags::default()
+            },
+            limits: BackendLimits {
+                max_buffer_size: 1024 * 1024,
+                max_texture_extent_2d: 4096,
+                max_texture_mip_levels: 1,
+                max_texture_array_layers: 1,
+                max_resource_layout_bindings: 16,
+                max_binding_array_count: 16,
+                max_color_attachments: 1,
+                max_dynamic_offsets_per_binding: 0,
+                max_command_lists_per_submission: 16,
+                max_commands_per_list: 1024,
+                max_draw_count: 1024,
+                max_dispatch_groups_per_axis: 1,
+            },
+        }
+    }
+
+    fn sprite_request() -> FfiGuiSpriteRequest {
+        FfiGuiSpriteRequest {
+            byte_size: size_of::<FfiGuiSpriteRequest>() as u32,
+            stratum: 50,
+            sprite_id: 1,
+            selected_slot: -1,
+            progress_fraction: 1.0,
+            fill_direction: 0,
+            color_argb: 0xffff_ffff,
+            x: 10,
+            y: 20,
+            width: 15,
+            height: 15,
+            gui_width: 320,
+            gui_height: 180,
+        }
+    }
+
+    fn frame_request(sprites: &[FfiGuiSpriteRequest]) -> FfiGuiFrameSubmitRequest {
+        FfiGuiFrameSubmitRequest {
+            header: FfiHeader {
+                version: FFI_ABI_VERSION,
+                byte_size: size_of::<FfiGuiFrameSubmitRequest>() as u32,
+            },
+            generation: 7,
+            frame_id: 11,
+            frame_target: FfiHandle::from(
+                Handle::new(HandleKind::FrameTarget, 3, 1).expect("test handle"),
+            ),
+            gui_width: 320,
+            gui_height: 180,
+            sprites: FfiSlice {
+                ptr: sprites.as_ptr(),
+                count: sprites.len() as u64,
+            },
+            negotiated_feature_bits: FfiFeatureBits::GRAPHICS
+                | FfiFeatureBits::DESCRIPTOR_ARRAYS
+                | FfiFeatureBits::OPTIONAL_BINDINGS
+                | FfiFeatureBits::UNIFORM_BUFFERS
+                | FfiFeatureBits::STORAGE_BUFFERS
+                | FfiFeatureBits::TEXTURE_SUBRESOURCE_COPIES
+                | FfiFeatureBits::HOST_BUFFER_ACCESS
+                | FfiFeatureBits::PRESENTATION,
+        }
+    }
+
+    fn asset_update_request(assets: &[FfiGuiAssetPayload]) -> FfiGuiAssetUpdateRequest {
+        FfiGuiAssetUpdateRequest {
+            header: FfiHeader {
+                version: FFI_ABI_VERSION,
+                byte_size: size_of::<FfiGuiAssetUpdateRequest>() as u32,
+            },
+            generation: 9,
+            assets: FfiSlice {
+                ptr: assets.as_ptr(),
+                count: assets.len() as u64,
+            },
+            negotiated_feature_bits: FfiFeatureBits::GRAPHICS
+                | FfiFeatureBits::DESCRIPTOR_ARRAYS
+                | FfiFeatureBits::OPTIONAL_BINDINGS
+                | FfiFeatureBits::UNIFORM_BUFFERS
+                | FfiFeatureBits::STORAGE_BUFFERS
+                | FfiFeatureBits::TEXTURE_SUBRESOURCE_COPIES
+                | FfiFeatureBits::HOST_BUFFER_ACCESS
+                | FfiFeatureBits::PRESENTATION,
+        }
+    }
+
+    #[test]
+    fn semantic_gui_ffi_decode_copies_caller_memory() {
+        let mut sprites = vec![sprite_request()];
+        let request = frame_request(&sprites);
+        let (_generation, _target, owned) =
+            unsafe { decode_gui_frame_submit(&request, test_capabilities()).unwrap() };
+        sprites[0].x = 99;
+        assert_eq!(owned[0].x, 10);
+        assert_eq!(owned[0].sprite_id, 1);
+        assert_eq!(owned[0].gui_width, 320);
+    }
+
+    #[test]
+    fn semantic_gui_ffi_rejects_malformed_sprite_records() {
+        let mut sprites = vec![sprite_request()];
+        sprites[0].byte_size -= 4;
+        let request = frame_request(&sprites);
+        let error = unsafe { decode_gui_frame_submit(&request, test_capabilities()) }
+            .expect_err("malformed sprite must fail");
+        assert_eq!(error.code, StatusCode::InvalidArgument);
+        assert!(error.message.contains("GUI sprite byte size mismatch"));
+    }
+
+    #[test]
+    fn semantic_gui_ffi_rejects_wrong_frame_target_kind() {
+        let sprites = vec![sprite_request()];
+        let mut request = frame_request(&sprites);
+        request.frame_target =
+            FfiHandle::from(Handle::new(HandleKind::Texture, 3, 1).expect("test handle"));
+        let error = unsafe { decode_gui_frame_submit(&request, test_capabilities()) }
+            .expect_err("wrong frame target kind must fail");
+        assert_eq!(error.code, StatusCode::WrongHandleType);
+    }
+
+    #[test]
+    fn semantic_gui_asset_ffi_copies_payload_memory() {
+        let mut bytes = vec![7u8, 8, 9, 10];
+        let assets = vec![FfiGuiAssetPayload {
+            byte_size: size_of::<FfiGuiAssetPayload>() as u32,
+            sprite_id: 1,
+            png_bytes: FfiBytes {
+                ptr: bytes.as_ptr(),
+                len: bytes.len() as u64,
+            },
+        }];
+        let request = asset_update_request(&assets);
+        let (_generation, owned) =
+            unsafe { decode_gui_asset_update(&request, test_capabilities()).unwrap() };
+        bytes.fill(0);
+        assert_eq!(vec![7u8, 8, 9, 10], owned[0].png_bytes);
+    }
+
+    #[test]
+    fn semantic_gui_asset_ffi_rejects_duplicates_and_bad_item_size() {
+        let bytes = [1u8, 2, 3];
+        let mut assets = vec![
+            FfiGuiAssetPayload {
+                byte_size: size_of::<FfiGuiAssetPayload>() as u32,
+                sprite_id: 1,
+                png_bytes: FfiBytes {
+                    ptr: bytes.as_ptr(),
+                    len: bytes.len() as u64,
+                },
+            },
+            FfiGuiAssetPayload {
+                byte_size: size_of::<FfiGuiAssetPayload>() as u32,
+                sprite_id: 1,
+                png_bytes: FfiBytes {
+                    ptr: bytes.as_ptr(),
+                    len: bytes.len() as u64,
+                },
+            },
+        ];
+        let duplicate =
+            unsafe { decode_gui_asset_update(&asset_update_request(&assets), test_capabilities()) }
+                .unwrap_err();
+        assert_eq!(StatusCode::InvalidArgument, duplicate.code);
+        assets[1].sprite_id = 2;
+        assets[1].byte_size -= 4;
+        let malformed =
+            unsafe { decode_gui_asset_update(&asset_update_request(&assets), test_capabilities()) }
+                .unwrap_err();
+        assert_eq!(StatusCode::InvalidArgument, malformed.code);
+    }
 }

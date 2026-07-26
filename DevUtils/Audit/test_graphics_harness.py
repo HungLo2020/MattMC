@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import json
+import os
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -14,6 +16,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "Common"))
 
 import graphics_harness as harness
+import artifact_retention
+import capture_runner
 
 
 def fake_repo(root: Path, name: str) -> harness.RepoTarget:
@@ -87,6 +91,20 @@ def write_capture(capture_dir: Path, *, backend: str = "opengl", shaders: str = 
                 ],
             }
         ),
+        encoding="utf-8",
+    )
+
+
+def write_retention_manifest(path: Path, *, success: bool, profile: str = "smoke") -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    (path / harness.MANIFEST_NAME).write_text(
+        json.dumps(
+            {
+                "success": success,
+                "runtime_profile": {"name": profile},
+            }
+        )
+        + "\n",
         encoding="utf-8",
     )
 
@@ -786,6 +804,145 @@ else:
         with self.assertRaises(SystemExit):
             harness.parse_args(["gameplay", "--profile", "extended", "--timeout-seconds", "301"])
 
+    def test_artifact_retention_safe_root_boundaries(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            root = temp / "artifacts"
+            artifact_retention.ensure_marker(root)
+            inside = root / "run"
+            inside.mkdir()
+            outside = temp / "source-world"
+            outside.mkdir()
+            artifact_retention.remove_path(root, inside)
+            self.assertFalse(inside.exists())
+            with self.assertRaises(RuntimeError):
+                artifact_retention.remove_path(root, outside)
+            with self.assertRaises(RuntimeError):
+                artifact_retention.remove_path(temp / "unmarked", temp / "unmarked" / "run")
+
+    def test_artifact_retention_ordering_success_failure_and_preserve(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "artifacts"
+            artifact_retention.ensure_marker(root)
+            runs = []
+            for index in range(4):
+                run = root / f"success-{index}"
+                write_retention_manifest(run, success=True)
+                os.utime(run, (1000 + index, 1000 + index))
+                runs.append(run)
+            failed_old = root / "failed-old"
+            failed_new = root / "failed-new"
+            write_retention_manifest(failed_old, success=False)
+            write_retention_manifest(failed_new, success=False)
+            os.utime(failed_old, (900, 900))
+            os.utime(failed_new, (1100, 1100))
+            preserved = root / "preserved"
+            write_retention_manifest(preserved, success=True)
+            (preserved / ".preserve").write_text("keep\n", encoding="utf-8")
+            policy = artifact_retention.policy_for("standard", root, keep_success=2, keep_failed=1, global_limit_mb=0)
+            result = artifact_retention.cleanup(policy)
+            removed = {Path(path).name for path in result["removed"]}
+            self.assertEqual({"success-0", "success-1", "failed-old"}, removed)
+            self.assertTrue((root / "success-2").exists())
+            self.assertTrue((root / "success-3").exists())
+            self.assertTrue(failed_new.exists())
+            self.assertTrue(preserved.exists())
+
+    def test_artifact_retention_preflight_free_space_rejection(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "artifacts"
+            policy = artifact_retention.policy_for("smoke", root, reserve_mb=10**9)
+            with self.assertRaises(RuntimeError):
+                artifact_retention.preflight_disk_budget(policy, estimated_bytes=1)
+
+    def test_artifact_retention_live_quota_failure_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "artifacts"
+            artifact_retention.ensure_marker(root)
+            run = root / "capture-run"
+            run.mkdir()
+            (run / "large.bin").write_bytes(b"x" * 2048)
+            policy = artifact_retention.RetentionPolicy(
+                "smoke",
+                root.resolve(),
+                global_limit_bytes=0,
+                run_limit_bytes=1024,
+                reserve_bytes=0,
+                keep_success=1,
+                keep_failed=1,
+                heavy_keep=0,
+            )
+            with self.assertRaises(RuntimeError):
+                artifact_retention.run_size_check(policy, run)
+            self.assertTrue((run / "quota_failure_manifest.json").is_file())
+
+    def test_artifact_retention_removes_copied_game_dirs_only_inside_marked_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            root = temp / "artifacts"
+            artifact_retention.ensure_marker(root)
+            copied = root / "capture" / "run-01" / "game_dir_20260101_000000" / "saves" / "Origin"
+            copied.mkdir(parents=True)
+            (copied / "level.dat").write_text("copy\n", encoding="utf-8")
+            source_world = temp / "run" / "saves" / "Origin"
+            source_world.mkdir(parents=True)
+            (source_world / "level.dat").write_text("source\n", encoding="utf-8")
+            removed = artifact_retention.remove_copied_game_dirs(root)
+            self.assertEqual(len(removed), 1)
+            self.assertFalse((root / "capture" / "run-01" / "game_dir_20260101_000000").exists())
+            self.assertTrue(source_world.exists())
+
+    def test_artifact_retention_renderdoc_tracy_heavy_runs_are_strict(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "artifacts"
+            artifact_retention.ensure_marker(root)
+            heavy_old = root / "heavy-old"
+            heavy_new = root / "heavy-new"
+            write_retention_manifest(heavy_old, success=True)
+            write_retention_manifest(heavy_new, success=True)
+            (heavy_old / "capture.rdc").write_bytes(b"rdc")
+            (heavy_new / "capture.tracy").write_bytes(b"tracy")
+            os.utime(heavy_old, (1000, 1000))
+            os.utime(heavy_new, (1100, 1100))
+            policy = artifact_retention.policy_for("diagnostic", root, keep_success=10, global_limit_mb=0)
+            result = artifact_retention.cleanup(policy)
+            removed = {Path(path).name for path in result["removed"]}
+            self.assertIn("heavy-old", removed)
+            self.assertTrue(heavy_new.exists())
+
+    def test_artifact_retention_compresses_large_sidecars_but_not_manifests(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "artifacts"
+            artifact_retention.ensure_marker(root)
+            run = root / "run"
+            write_retention_manifest(run, success=True)
+            sidecar = run / "runClient.log"
+            sidecar.write_text("x" * 2048, encoding="utf-8")
+            manifest = run / harness.MANIFEST_NAME
+
+            compressed = artifact_retention.compress_large_text_artifacts(root, run, threshold_bytes=1024)
+
+            self.assertEqual([sidecar.with_name("runClient.log.gz")], compressed)
+            self.assertFalse(sidecar.exists())
+            self.assertTrue(sidecar.with_name("runClient.log.gz").is_file())
+            self.assertTrue(manifest.is_file())
+
+    def test_artifact_retention_concurrent_preserved_runs_are_not_deleted(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "artifacts"
+            artifact_retention.ensure_marker(root)
+            active = root / "active-run"
+            old = root / "old-run"
+            write_retention_manifest(active, success=False)
+            write_retention_manifest(old, success=False)
+            (active / ".preserve").write_text("in-progress\n", encoding="utf-8")
+            os.utime(active, (1000, 1000))
+            os.utime(old, (900, 900))
+            policy = artifact_retention.policy_for("smoke", root, keep_failed=0, global_limit_mb=0)
+            artifact_retention.cleanup(policy)
+            self.assertTrue(active.exists())
+            self.assertFalse(old.exists())
+
     def test_stuck_phase_classification(self) -> None:
         self.assertEqual(harness.timeout_phase_for_artifact("gameplay", True, None, None, None, None), "startup")
         self.assertEqual(
@@ -1169,6 +1326,38 @@ else:
             self.assertTrue(artifact["metrics"]["rss_and_native_memory"]["rss_guard_triggered"])
             self.assertTrue(artifact["validation"]["rss_guard_triggered"])
 
+    def test_direct_trigger_and_proc_memory_metrics_are_normalized(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture)
+            (capture / "runClient_20260101_000000.log").write_text(
+                "direct_trigger_diagnostics summary integrations=7 catchup_integrations=3 "
+                "average_delay_frames=2.5 max_delay_frames=5 average_catchup_movement=1.25 "
+                "max_catchup_movement=8.0 native_process_calls=9 native_integrate_calls=7 "
+                "native_catchup_integrations=3 native_angle_path_integrations=2 "
+                "native_distance_path_integrations=5 native_invalid_angle_input_fallbacks=1\n",
+                encoding="utf-8",
+            )
+            (capture / "process_snapshot_20260101_000000.txt").write_text(
+                "===== /proc/123/smaps_rollup memory fields =====\n"
+                "Rss:             9000 kB\n"
+                "Pss:             8000 kB\n"
+                "Private_Dirty:   7000 kB\n"
+                "Swap:             256 kB\n",
+                encoding="utf-8",
+            )
+            artifact = harness.normalize_capture_artifact(
+                target, harness.MATRIX_MODES[0], capture, "correctness", False, [], 0, False
+            )
+            direct = artifact["metrics"]["native_direct_triggers"]
+            memory = artifact["metrics"]["rss_and_native_memory"]
+            self.assertEqual(3, direct["catchup_integrations"])
+            self.assertEqual(1, direct["native_invalid_angle_input_fallbacks"])
+            self.assertEqual(9000, memory["last_proc_rss_kb"])
+            self.assertEqual(256, memory["last_proc_swap_kb"])
+
     def test_malformed_incomplete_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "bad.json"
@@ -1362,6 +1551,48 @@ else:
             self.assertNotIn("mattmc.rustGal.guiCrosshair.enabled", " ".join(command))
             self.assertIn("-Dmattmc.rustGal.guiCrosshair.enabled=true", env["JAVA_TOOL_OPTIONS"])
 
+    def test_java_tool_options_preserve_world_names_with_spaces(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            args = Namespace(
+                profile="smoke",
+                validation="off",
+                client_args="",
+                jvm_arg=[],
+                rust_gal_gui_control="rust",
+                armor_value=None,
+                player_health=None,
+                player_max_health=None,
+                player_absorption=None,
+                player_heart_variant=None,
+                player_heart_flash=False,
+                player_heart_hardcore=False,
+                player_heart_regeneration=False,
+                game_mode=None,
+                world="Origin Prime City 3",
+                max_secs=1,
+                dump_secs=1,
+                client_rss_limit_mb=128,
+                diagnostic=False,
+                warmup_frames=0,
+                measure_frames=1,
+                settle_frames=0,
+                max_settle_frames=1,
+                subsystem_iterations=1,
+                tracy_capture=False,
+                tracy_duration_seconds=1,
+                tracy_max_size_mb=8,
+                renderdoc_capture=False,
+                renderdoc_frame=8,
+            )
+            command, env = harness.build_capture_command(target, harness.MATRIX_MODES[0], root / "capture", "correctness", args, "capture")
+            parsed = shlex.split(env["JAVA_TOOL_OPTIONS"])
+            self.assertIn("--world", command)
+            self.assertEqual("Origin Prime City 3", command[command.index("--world") + 1])
+            self.assertNotIn("-Dmattmc.dev.deterministicCameraCapture.world=Origin Prime City 3", parsed)
+            self.assertNotIn("Prime", parsed)
+
     def test_gameplay_passes_armor_controls_without_per_frame_slice_logging(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -1394,9 +1625,96 @@ else:
 
             self.assertNotIn("mattmc.dev.graphicsAuditSliceMetrics", " ".join(command))
             self.assertNotIn("-Dmattmc.dev.graphicsAuditSliceMetrics=true", env["JAVA_TOOL_OPTIONS"])
-            self.assertIn("-Dmattmc.dev.rustGalGui.armor.legacyControl=true", env["JAVA_TOOL_OPTIONS"])
+            self.assertIn("-Dmattmc.dev.rustGalGui.legacyControl=true", env["JAVA_TOOL_OPTIONS"])
             self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.armorValue=19", env["JAVA_TOOL_OPTIONS"])
             self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.gameMode=survival", env["JAVA_TOOL_OPTIONS"])
+
+    def test_rust_gal_gui_global_controls_do_not_only_toggle_armor(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            base = dict(
+                profile="smoke",
+                validation="off",
+                client_args="",
+                jvm_arg=[],
+                armor_value=None,
+                player_health=None,
+                player_max_health=None,
+                player_absorption=None,
+                player_heart_variant=None,
+                player_heart_flash=False,
+                player_heart_hardcore=False,
+                player_heart_regeneration=False,
+                game_mode=None,
+                world="Origin",
+                max_secs=1,
+                dump_secs=1,
+                client_rss_limit_mb=128,
+                diagnostic=False,
+                warmup_frames=0,
+                measure_frames=1,
+                settle_frames=0,
+                max_settle_frames=1,
+                subsystem_iterations=1,
+                tracy_capture=False,
+                tracy_duration_seconds=1,
+                tracy_max_size_mb=8,
+                renderdoc_capture=False,
+                renderdoc_frame=8,
+            )
+            disabled = Namespace(**base, rust_gal_gui_control="disabled")
+            _, disabled_env = harness.build_capture_command(
+                target, harness.MATRIX_MODES[0], root / "capture-disabled", "correctness", disabled, "capture"
+            )
+            self.assertIn("-Dmattmc.dev.rustGalGui.disabled=true", disabled_env["JAVA_TOOL_OPTIONS"])
+            self.assertNotIn("-Dmattmc.dev.rustGalGui.armor.disabled=true", disabled_env["JAVA_TOOL_OPTIONS"])
+
+            legacy = Namespace(**base, rust_gal_gui_control="legacy")
+            _, legacy_env = harness.build_capture_command(
+                target, harness.MATRIX_MODES[0], root / "capture-legacy", "correctness", legacy, "capture"
+            )
+            self.assertIn("-Dmattmc.dev.rustGalGui.legacyControl=true", legacy_env["JAVA_TOOL_OPTIONS"])
+            self.assertNotIn("-Dmattmc.dev.rustGalGui.armor.legacyControl=true", legacy_env["JAVA_TOOL_OPTIONS"])
+
+    def test_world_profiles_select_world_and_deterministic_readiness_policy(self) -> None:
+        migration = harness.parse_args(["capture", "--profile", "smoke", "--world-profile", "migration-gate"])
+        self.assertEqual("Origin", migration.world)
+        self.assertTrue(harness.world_profile_dict(migration)["migration_gate_blocking"])
+
+        stress = harness.parse_args(["capture", "--profile", "smoke", "--world-profile", "stress-diagnostic"])
+        self.assertEqual("Origin Prime City 3", stress.world)
+        self.assertFalse(harness.world_profile_dict(stress)["migration_gate_blocking"])
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            command, env = harness.build_capture_command(
+                target, harness.MATRIX_MODES[0], root / "capture", "correctness", stress, "capture"
+            )
+            self.assertIn("--world", command)
+            self.assertEqual("Origin Prime City 3", command[command.index("--world") + 1])
+            self.assertEqual("stress-diagnostic", env["MATTMC_GRAPHICS_WORLD_PROFILE"])
+            self.assertEqual("false", env["MATTMC_GRAPHICS_MIGRATION_GATE_BLOCKING"])
+            options = shlex.split(env["JAVA_TOOL_OPTIONS"])
+            self.assertIn("-Dmattmc.dev.directTriggerDiagnostics=true", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=sodium-terrain,distant-horizons", options)
+
+    def test_readiness_state_classifies_affected_world_dh_generation_timeout(self) -> None:
+        text = "\n".join(
+            [
+                "HungLo joined the game",
+                "Loaded [0] waiting chunk wrappers.",
+                "screen=LevelLoadingScreen overlay=LoadingOverlay",
+                '"DH-World Gen Thread[1]" #1 prio=5 runnable',
+            ]
+        )
+        state = harness.readiness_state_from_text("capture", "startup", None, None, text, {"world_profile": "stress-diagnostic"})
+        self.assertTrue(state["world_entered"])
+        self.assertTrue(state["required_chunks_loaded"])
+        self.assertEqual("dh-generation", state["timeout_classification"])
+        self.assertFalse(state["player_alive_and_controllable"])
+        self.assertEqual("generating", state["dh"]["state"])
 
     def test_capture_passes_player_heart_controls(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -1449,6 +1767,64 @@ else:
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerHealthRegeneration=true", options)
             self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.gameMode=survival", options)
 
+    def test_capture_passes_gui_resource_pack_scenario(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            args = Namespace(
+                profile="smoke",
+                validation="off",
+                client_args="",
+                jvm_arg=[],
+                rust_gal_gui_control="rust",
+                armor_value=20,
+                player_health=20.0,
+                player_max_health=20.0,
+                player_absorption=4.0,
+                player_heart_variant=None,
+                player_heart_flash=False,
+                player_heart_hardcore=False,
+                player_heart_regeneration=False,
+                game_mode="survival",
+                gui_resource_pack_scenario="priority-a-b",
+                world="Origin",
+                max_secs=1,
+                dump_secs=1,
+                client_rss_limit_mb=128,
+                diagnostic=True,
+                warmup_frames=0,
+                measure_frames=1,
+                settle_frames=0,
+                max_settle_frames=1,
+                subsystem_iterations=1,
+                tracy_capture=False,
+                tracy_duration_seconds=1,
+                tracy_max_size_mb=8,
+                renderdoc_capture=False,
+                renderdoc_frame=8,
+            )
+            command, _ = harness.build_capture_command(target, harness.MATRIX_MODES[0], root / "capture", "correctness", args, "capture")
+
+            self.assertIn("--gui-resource-pack-scenario", command)
+            self.assertIn("priority-a-b", command)
+
+    def test_generated_gui_resource_pack_priority_order_is_encoded_in_options(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            game_dir = Path(temp)
+            (game_dir / "resourcepacks").mkdir()
+            options = game_dir / "options.txt"
+            options.write_text("resourcePacks:[]\nincompatibleResourcePacks:[]\n", encoding="utf-8")
+            specs = capture_runner.gui_resource_pack_specs("priority-a-b")
+            selected = []
+            for spec in specs:
+                capture_runner.write_gui_resource_pack(game_dir / "resourcepacks" / str(spec["name"]), spec)
+                selected.append(f"file/{spec['name']}")
+            capture_runner.upsert_option(options, "resourcePacks", json.dumps(selected, separators=(",", ":")))
+
+            text = options.read_text(encoding="utf-8")
+            self.assertIn('resourcePacks:["file/mattmc-rust-gui-pack-a","file/mattmc-rust-gui-pack-b"]', text)
+            self.assertTrue((game_dir / "resourcepacks" / "mattmc-rust-gui-pack-b" / "assets/minecraft/textures/gui/sprites/hud/armor_full.png").is_file())
+
     def test_rust_opengl_attribution_is_not_confused_by_vulkanicgal_name(self) -> None:
         mode = harness.ModeSpec("current-opengl-shaders-on", "current", "opengl", "on", "java-opengl", False)
         logs = "Rust VulkanicGAL bridge created borrowed OpenGL context"
@@ -1485,10 +1861,12 @@ else:
                 "rust_gal_ffi_frame_configure_calls=1 rust_gal_ffi_frame_acquire_calls=1 "
                 "rust_gal_ffi_frame_present_calls=1 rust_gal_ffi_resource_batch_calls=4 "
                 "rust_gal_ffi_submit_calls=2 rust_gal_ffi_completion_query_calls=1 rust_gal_ffi_retire_calls=2 "
+                "rust_gal_ffi_asset_update_calls=1 "
                 "rust_gal_ffi_context_create_bytes=40 rust_gal_ffi_capability_bytes=24 "
                 "rust_gal_ffi_frame_configure_bytes=64 rust_gal_ffi_frame_acquire_bytes=48 "
                 "rust_gal_ffi_frame_present_bytes=40 rust_gal_ffi_resource_batch_bytes=3000 "
                 "rust_gal_ffi_submit_bytes=720 rust_gal_ffi_completion_query_bytes=32 rust_gal_ffi_retire_bytes=128 "
+                "rust_gal_ffi_asset_update_bytes=2048 "
                 "ffi_call_count=11 ffi_bytes=4096\n"
                 "[MattMC graphics audit] Rust OpenGL VulkanicGAL GUI frame executed producer=gui.frame "
                 "stratum=gui.frame frame_batch_count=1 frame=4 submission=5 rust_gal_cache_hits=8 "
@@ -1498,10 +1876,12 @@ else:
                 "rust_gal_ffi_frame_configure_calls=1 rust_gal_ffi_frame_acquire_calls=2 "
                 "rust_gal_ffi_frame_present_calls=2 rust_gal_ffi_resource_batch_calls=5 "
                 "rust_gal_ffi_submit_calls=3 rust_gal_ffi_completion_query_calls=0 rust_gal_ffi_retire_calls=1 "
+                "rust_gal_ffi_asset_update_calls=2 "
                 "rust_gal_ffi_context_create_bytes=40 rust_gal_ffi_capability_bytes=24 "
                 "rust_gal_ffi_frame_configure_bytes=64 rust_gal_ffi_frame_acquire_bytes=96 "
                 "rust_gal_ffi_frame_present_bytes=80 rust_gal_ffi_resource_batch_bytes=3200 "
                 "rust_gal_ffi_submit_bytes=1080 rust_gal_ffi_completion_query_bytes=0 rust_gal_ffi_retire_bytes=64 "
+                "rust_gal_ffi_asset_update_bytes=4096 "
                 "rust_gal_enqueue_nanos=4000 rust_gal_resource_lookup_nanos=6000 "
                 "rust_gal_resource_create_nanos=1000 rust_gal_abi_packing_nanos=8000 "
                 "rust_gal_frame_acquire_nanos=10000 rust_gal_submit_nanos=12000 "
@@ -1511,7 +1891,13 @@ else:
                 "rust_gal_backend_waits=0 rust_gal_gl_calls=17 rust_gal_gl_flushes=0 rust_gal_gl_finishes=0 "
                 "rust_gal_gl_fences_inserted=3 rust_gal_gl_fences_polled=3 rust_gal_gl_fences_waited=0 "
                 "rust_gal_gl_fences_deleted=1 "
-                "ffi_call_count=18 ffi_bytes=8192\n",
+                "ffi_call_count=18 ffi_bytes=8192\n"
+                "[MattMC graphics audit] Rust VulkanicGAL GUI asset resolved sprite=ARMOR_FULL "
+                "sprite_id=6 path=minecraft:textures/gui/sprites/hud/armor_full.png "
+                "source_pack=file/mattmc-rust-gui-pack-b bytes=345 sha256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n"
+                "[MattMC graphics audit] Rust VulkanicGAL GUI asset missing sprite=HEART_NORMAL_FULL "
+                "sprite_id=11 path=minecraft:textures/gui/sprites/hud/heart/full.png fallback=vanilla\n"
+                "[MattMC graphics audit] Rust VulkanicGAL GUI asset update accepted generation=3 payloads=15 payload_bytes=8192 uploaded_generation=3\n",
                 encoding="utf-8",
             )
 
@@ -1537,6 +1923,8 @@ else:
             self.assertEqual(0, artifact["metrics"]["rust_gal_slice"]["completion_timeouts"])
             self.assertEqual(5, artifact["metrics"]["rust_gal_slice"]["ffi_operations"]["resource_batch"]["calls"])
             self.assertEqual(3200, artifact["metrics"]["rust_gal_slice"]["ffi_operations"]["resource_batch"]["bytes"])
+            self.assertEqual(2, artifact["metrics"]["rust_gal_slice"]["ffi_operations"]["asset_update"]["calls"])
+            self.assertEqual(4096, artifact["metrics"]["rust_gal_slice"]["ffi_operations"]["asset_update"]["bytes"])
             self.assertEqual(9, artifact["metrics"]["rust_gal_slice"]["ffi_calls_per_executed_batch"])
             self.assertEqual(4096, artifact["metrics"]["rust_gal_slice"]["ffi_bytes_per_executed_batch"])
             self.assertEqual(8000, artifact["metrics"]["rust_gal_slice"]["timing_totals_nanos"]["abi_packing_nanos"])
@@ -1545,6 +1933,9 @@ else:
             self.assertEqual(0, artifact["metrics"]["rust_gal_slice"]["backend_sync"]["gl_finishes"])
             self.assertEqual(3, artifact["metrics"]["rust_gal_slice"]["backend_sync"]["gl_fences_inserted"])
             self.assertEqual(0, artifact["metrics"]["rust_gal_slice"]["backend_sync"]["gl_fences_waited"])
+            self.assertEqual("file/mattmc-rust-gui-pack-b", artifact["metrics"]["rust_gal_slice"]["asset_resolutions"][0]["source_pack"])
+            self.assertEqual("ARMOR_FULL", artifact["metrics"]["rust_gal_slice"]["asset_resolutions"][0]["sprite"])
+            self.assertEqual("HEART_NORMAL_FULL", artifact["metrics"]["rust_gal_slice"]["asset_missing_fallbacks"][0]["sprite"])
             self.assertEqual(18, artifact["metrics"]["ffi"]["call_count"])
             self.assertEqual(8192, artifact["metrics"]["ffi"]["bytes"])
 
@@ -1568,11 +1959,13 @@ else:
                 "rust_gal_ffi_frame_resize_calls=0 rust_gal_ffi_frame_present_calls=20 "
                 "rust_gal_ffi_resource_batch_calls=9 rust_gal_ffi_submit_calls=22 "
                 "rust_gal_ffi_completion_query_calls=0 rust_gal_ffi_retire_calls=0 "
+                "rust_gal_ffi_asset_update_calls=1 "
                 "rust_gal_ffi_context_create_bytes=40 rust_gal_ffi_capability_bytes=24 "
                 "rust_gal_ffi_frame_configure_bytes=48 rust_gal_ffi_frame_acquire_bytes=640 "
                 "rust_gal_ffi_frame_resize_bytes=0 rust_gal_ffi_frame_present_bytes=640 "
                 "rust_gal_ffi_resource_batch_bytes=5192 rust_gal_ffi_submit_bytes=260000 "
                 "rust_gal_ffi_completion_query_bytes=0 rust_gal_ffi_retire_bytes=0 "
+                "rust_gal_ffi_asset_update_bytes=4096 "
                 "rust_gal_enqueue_nanos=100 rust_gal_resource_lookup_nanos=200 "
                 "rust_gal_resource_create_nanos=300 rust_gal_abi_packing_nanos=400 "
                 "rust_gal_frame_acquire_nanos=500 rust_gal_submit_nanos=600 "

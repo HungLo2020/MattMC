@@ -23,6 +23,10 @@ import java.util.function.BiConsumer;
  * @author douira (the translucent_sorting package)
  */
 public class SortTriggering implements AutoCloseable {
+    private static final boolean DIRECT_TRIGGER_DIAGNOSTICS =
+            Boolean.getBoolean("mattmc.dev.directTriggerDiagnostics");
+    private static final int MAX_DIAGNOSTIC_SAMPLES = 8;
+
     /**
      * To avoid generating a collection of the triggered sections, this callback is
      * used to process the triggered sections directly as they are queried from the
@@ -55,6 +59,15 @@ public class SortTriggering implements AutoCloseable {
 
     private final NativeGfniTriggers gfni = NativeGfniTriggers.create();
     private final NativeDirectTriggers direct = NativeDirectTriggers.create();
+
+    private long diagnosticIntegrations;
+    private long diagnosticCatchupIntegrations;
+    private long diagnosticTotalIntegrationDelayFrames;
+    private int diagnosticMaxIntegrationDelayFrames;
+    private double diagnosticTotalCatchupMovement;
+    private double diagnosticMaxCatchupMovement;
+    private final String[] diagnosticCatchupSamples = new String[MAX_DIAGNOSTIC_SAMPLES];
+    private int diagnosticCatchupSampleCount;
 
     /**
      * Triggers the sections that the given camera movement crosses face planes of.
@@ -181,11 +194,18 @@ public class SortTriggering implements AutoCloseable {
      */
     public void integrateTranslucentData(TranslucentData oldData, TranslucentData newData, Vector3dc cameraPos,
                                          BiConsumer<Long, Boolean> triggerSectionCallback) {
+        this.integrateTranslucentData(oldData, newData, cameraPos, -1, -1, triggerSectionCallback);
+    }
+
+    public void integrateTranslucentData(TranslucentData oldData, TranslucentData newData, Vector3dc cameraPos,
+                                         int submitFrame, int integrateFrame,
+                                         BiConsumer<Long, Boolean> triggerSectionCallback) {
         if (oldData == newData) {
             return;
         }
 
         var pos = newData.sectionPos;
+        this.recordIntegrationDiagnostic(pos, newData, cameraPos, submitFrame, integrateFrame);
 
         this.incrementSortTypeCounter(newData);
 
@@ -241,6 +261,86 @@ public class SortTriggering implements AutoCloseable {
                 this.direct.getDirectTriggerCount()));
     }
 
+    private void recordIntegrationDiagnostic(SectionPos pos, TranslucentData newData, Vector3dc cameraPos,
+                                             int submitFrame, int integrateFrame) {
+        if (!DIRECT_TRIGGER_DIAGNOSTICS) {
+            return;
+        }
+        this.diagnosticIntegrations++;
+        if (!(newData instanceof DynamicData dynamicData)) {
+            return;
+        }
+
+        var movement = new CameraMovement(dynamicData.getInitialCameraPos(), cameraPos);
+        if (!movement.hasChanged()) {
+            return;
+        }
+
+        this.diagnosticCatchupIntegrations++;
+        int delay = submitFrame >= 0 && integrateFrame >= 0 ? Math.max(0, integrateFrame - submitFrame) : -1;
+        if (delay >= 0) {
+            this.diagnosticTotalIntegrationDelayFrames += delay;
+            this.diagnosticMaxIntegrationDelayFrames = Math.max(this.diagnosticMaxIntegrationDelayFrames, delay);
+        }
+
+        double movementDistance = distance(movement.start(), movement.end());
+        if (Double.isFinite(movementDistance)) {
+            this.diagnosticTotalCatchupMovement += movementDistance;
+            this.diagnosticMaxCatchupMovement = Math.max(this.diagnosticMaxCatchupMovement, movementDistance);
+        }
+
+        if (this.diagnosticCatchupSampleCount < this.diagnosticCatchupSamples.length) {
+            this.diagnosticCatchupSamples[this.diagnosticCatchupSampleCount++] =
+                    "sample" + this.diagnosticCatchupSampleCount
+                            + " sectionPos=" + pos.asLong()
+                            + " section=(" + pos.getX() + "," + pos.getY() + "," + pos.getZ() + ")"
+                            + " submitFrame=" + submitFrame
+                            + " integrateFrame=" + integrateFrame
+                            + " delayFrames=" + delay
+                            + " movement=" + movementDistance
+                            + " start=(" + movement.start().x() + "," + movement.start().y() + "," + movement.start().z() + ")"
+                            + " end=(" + movement.end().x() + "," + movement.end().y() + "," + movement.end().z() + ")";
+        }
+    }
+
+    private static double distance(Vector3dc start, Vector3dc end) {
+        double dx = end.x() - start.x();
+        double dy = end.y() - start.y();
+        double dz = end.z() - start.z();
+        return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    private void reportDiagnosticSummary() {
+        if (!DIRECT_TRIGGER_DIAGNOSTICS) {
+            return;
+        }
+        var nativeStats = this.direct.statsSnapshot();
+        double averageDelay = this.diagnosticCatchupIntegrations == 0
+                ? 0.0
+                : (double) this.diagnosticTotalIntegrationDelayFrames / (double) this.diagnosticCatchupIntegrations;
+        double averageMovement = this.diagnosticCatchupIntegrations == 0
+                ? 0.0
+                : this.diagnosticTotalCatchupMovement / (double) this.diagnosticCatchupIntegrations;
+        System.out.println("direct_trigger_diagnostics summary"
+                + " integrations=" + this.diagnosticIntegrations
+                + " catchup_integrations=" + this.diagnosticCatchupIntegrations
+                + " average_delay_frames=" + averageDelay
+                + " max_delay_frames=" + this.diagnosticMaxIntegrationDelayFrames
+                + " average_catchup_movement=" + averageMovement
+                + " max_catchup_movement=" + this.diagnosticMaxCatchupMovement
+                + " native_process_calls=" + nativeStats.processCalls()
+                + " native_integrate_calls=" + nativeStats.integrateCalls()
+                + " native_catchup_integrations=" + nativeStats.catchupIntegrations()
+                + " native_angle_path_integrations=" + nativeStats.anglePathIntegrations()
+                + " native_distance_path_integrations=" + nativeStats.distancePathIntegrations()
+                + " native_invalid_angle_input_fallbacks=" + nativeStats.invalidAngleInputFallbacks()
+                + " native_total_movement=" + nativeStats.totalMovementDistance()
+                + " native_max_movement=" + nativeStats.maxMovementDistance());
+        for (int index = 0; index < this.diagnosticCatchupSampleCount; index++) {
+            System.out.println("direct_trigger_diagnostics " + this.diagnosticCatchupSamples[index]);
+        }
+    }
+
     private void integrateDirectSection(SectionPos sectionPos, CameraMovement movement) {
         if (this.direct.integrateSection(sectionPos, movement)) {
             this.triggerSectionDirect(sectionPos.asLong());
@@ -256,6 +356,7 @@ public class SortTriggering implements AutoCloseable {
 
     @Override
     public void close() {
+        this.reportDiagnosticSummary();
         this.gfni.close();
         this.direct.close();
     }

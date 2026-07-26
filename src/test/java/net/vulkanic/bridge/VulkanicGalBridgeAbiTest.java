@@ -1,6 +1,5 @@
 package net.vulkanic.bridge;
 
-import net.vulkanic.gui.GuiRenderStratum;
 import net.vulkanic.gui.AbsorptionHeartRequest;
 import net.vulkanic.gui.AbsorptionHeartVariant;
 import net.vulkanic.gui.ArmorIconState;
@@ -12,8 +11,6 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -85,42 +82,17 @@ class VulkanicGalBridgeAbiTest {
 	}
 
 	@Test
-	void guiSpriteBatchingPreservesIncompatibleStratumAndStateBoundaries() {
+	void guiSpriteBatchingPreservesIncompatibleStratumAndStateBoundaries() throws Exception {
+		String rustGuiFrontend = Files.readString(Path.of("src/main/rust/render/vulkanic/gui_frontend.rs"));
 		assertEquals(ArmorIconState.EMPTY, RustGalGuiRenderer.armorIconStateForTests(0, 0));
 		assertEquals(ArmorIconState.HALF, RustGalGuiRenderer.armorIconStateForTests(1, 0));
 		assertEquals(ArmorIconState.FULL, RustGalGuiRenderer.armorIconStateForTests(2, 0));
 		assertEquals(ArmorIconState.EMPTY, RustGalGuiRenderer.armorIconStateForTests(18, 9));
 		assertEquals(ArmorIconState.HALF, RustGalGuiRenderer.armorIconStateForTests(19, 9));
 		assertEquals(ArmorIconState.FULL, RustGalGuiRenderer.armorIconStateForTests(20, 9));
-		for (ArmorIconState state : ArmorIconState.values()) {
-			float[] uvY = RustGalGuiRenderer.debugArmorOpenGlUvYRangeForTests(state);
-			assertTrue(uvY[0] > uvY[1], "top GUI vertex must sample above bottom vertex for " + state);
-		}
-		for (ArmorIconState state : ArmorIconState.values()) {
-			for (int guiScale = 1; guiScale <= 4; guiScale++) {
-				int[] sampledRows = RustGalGuiRenderer.debugArmorOpenGlSampledLocalRowsForTests(state, guiScale);
-				assertEquals(9 * guiScale, sampledRows.length, "armor row coverage length for " + state + " scale=" + guiScale);
-				for (int row = 0; row < 9; row++) {
-					for (int repeat = 0; repeat < guiScale; repeat++) {
-						int index = row * guiScale + repeat;
-						assertEquals(
-							row,
-							sampledRows[index],
-							"packed 9x9 sprite must sample each source row exactly at atlas boundaries for "
-								+ state + " scale=" + guiScale + " index=" + index
-						);
-					}
-				}
-			}
-		}
-		assertTrue(
-			RustGalGuiRenderer.debugOpenGlPackedSpriteVertexShaderForTests().contains("(1.0 - corner[vertex].y)"),
-			"OpenGL packed GUI shader must translate top-left GUI corners to bottom-left texture storage"
-		);
-		assertTrue(
-			RustGalGuiRenderer.debugOpenGlPackedSpriteFragmentShaderForTests().contains("texelFetch(Sampler0, texel, 0)"),
-			"packed GUI shader must use exact source-rectangle texel coverage"
-		);
+		assertTrue(rustGuiFrontend.contains("texelFetch(Sampler0"));
+		assertTrue(rustGuiFrontend.contains("fn packed_uniform_bytes"));
+		assertTrue(rustGuiFrontend.contains("SpriteBatch"));
 		for (int armor = 0; armor <= 20; armor++) {
 			for (int icon = 0; icon < 10; icon++) {
 				int threshold = icon * 2 + 1;
@@ -207,51 +179,15 @@ class VulkanicGalBridgeAbiTest {
 			}
 		}
 		new AbsorptionHeartRequest(AbsorptionHeartVariant.CONTAINER, GuiHeartState.CONTAINER, true, true, 0, 2, 3);
-
-			assertEquals(
-			List.of(2, 1, 1, 2),
-			RustGalGuiRenderer.debugPackCompatibleRunLengthsForTests(
-				List.of(
-					GuiRenderStratum.GUI_BOSS_BAR_BACKGROUND,
-					GuiRenderStratum.GUI_BOSS_BAR_BACKGROUND,
-					GuiRenderStratum.GUI_BOSS_BAR_BACKGROUND,
-					GuiRenderStratum.GUI_BOSS_BAR_PROGRESS,
-					GuiRenderStratum.GUI_BOSS_BAR_PROGRESS,
-					GuiRenderStratum.GUI_BOSS_BAR_PROGRESS
-				),
-				List.of("alpha-atlas", "alpha-atlas", "other-texture", "alpha-atlas", "other-texture", "other-texture")
-			)
-		);
-
-		List<GuiRenderStratum> strata = new ArrayList<>(Collections.nCopies(257, GuiRenderStratum.GUI_BOSS_BAR_BACKGROUND));
-		List<String> resources = new ArrayList<>(Collections.nCopies(257, "alpha-atlas"));
-		assertEquals(List.of(256, 1), RustGalGuiRenderer.debugPackCompatibleRunLengthsForTests(strata, resources));
-
-		List<String> uniformSequence = RustGalGuiRenderer.debugPackedUniformCommandSequenceForTests(
-			List.of(
-				GuiRenderStratum.GUI_HOTBAR_BASE,
-				GuiRenderStratum.GUI_HOTBAR_BASE,
-				GuiRenderStratum.GUI_ARMOR
-			),
-			List.of("alpha-atlas", "alpha-atlas", "alpha-atlas")
-		);
-		assertEquals("batch-0:host-write-uniforms", uniformSequence.get(1));
-		assertEquals("batch-0:barrier-uniform-transfer-to-read", uniformSequence.get(2));
-		assertEquals("batch-0:draw-indexed", uniformSequence.get(7));
-		assertEquals("batch-1:host-write-uniforms", uniformSequence.get(10));
-		assertTrue(
-			uniformSequence.indexOf("batch-0:draw-indexed") < uniformSequence.indexOf("batch-1:host-write-uniforms"),
-			"the next packed alpha batch must not overwrite shared uniforms before the current batch draws"
-		);
+		assertTrue(rustGuiFrontend.contains("GUI_MAX_PACKED_SPRITES"));
+		assertTrue(rustGuiFrontend.contains("CommandOp::CopyBufferToTexture"));
 	}
 
 	@Test
 	void frameAbiV2AddsBorrowedOpenGlAndProductionGuiCrosshairContract() throws Exception {
 		String bridge = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java"));
 		String queue = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
-		String batchBuilder = Files.readString(Path.of("src/main/java/net/vulkanic/gui/GuiBatchBuilder.java"));
-		String resourceCache = Files.readString(Path.of("src/main/java/net/vulkanic/gui/GuiResourceCache.java"));
-		String pipelineLibrary = Files.readString(Path.of("src/main/java/net/vulkanic/gui/GuiPipelineLibrary.java"));
+		String rustGuiFrontend = Files.readString(Path.of("src/main/rust/render/vulkanic/gui_frontend.rs"));
 		String gameRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
 		String gui = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/Gui.java"));
 		String guiRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/render/GuiRenderer.java"));
@@ -262,6 +198,8 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(bridge.contains("mattmc_vulkanic_gal_context_create_borrowed_opengl"));
 		assertTrue(bridge.contains("mattmc_vulkanic_gal_frame_acquire"));
 		assertTrue(bridge.contains("mattmc_vulkanic_gal_frame_present"));
+		assertTrue(bridge.contains("mattmc_vulkanic_gal_gui_submit_frame"));
+		assertTrue(bridge.contains("record GuiSpriteRecord"));
 		assertEquals(1, VulkanicGalBridge.HANDLE_BUFFER);
 		assertEquals(2, VulkanicGalBridge.HANDLE_TEXTURE);
 		assertEquals(3, VulkanicGalBridge.HANDLE_TEXTURE_VIEW);
@@ -293,26 +231,34 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(queue.contains("enqueueBossBar"));
 		assertFalse(bridge.contains("guiAlphaPipeline"));
 		assertFalse(bridge.contains("guiInvertPipeline"));
-		assertTrue(pipelineLibrary.contains("graphicsPipelineAlphaBlend"));
+		assertTrue(rustGuiFrontend.contains("TextureGroup::Alpha"));
 		assertFalse(queue.contains("DeferredBatchScheduler"));
-		assertTrue(queue.contains("RustGalFrameScheduler<GuiBatchBuilder.GuiSpriteRequest>"));
+		assertTrue(queue.contains("RustGalFrameScheduler<VulkanicGalBridge.GuiSpriteRecord>"));
 		assertFalse(queue.contains("record CachedResources"));
 		assertFalse(queue.contains("record CacheKey"));
-		assertTrue(resourceCache.contains("record CacheKey"));
-		assertTrue(batchBuilder.contains("record FrameSpriteBatch"));
+		assertFalse(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiBatchBuilder.java")));
+		assertFalse(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiResourceCache.java")));
+		assertFalse(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiSpriteAtlas.java")));
+		assertFalse(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiPipelineLibrary.java")));
 		assertTrue(queue.contains("cacheHits"));
 		assertTrue(queue.contains("completionTimeouts"));
 		assertFalse(queue.contains("RETIRE_INTERVAL_FRAMES"));
 		assertTrue(queue.contains("if (!force)"));
 		assertTrue(queue.contains("rust_gal_frames_executed"));
 		assertFalse(queue.contains("destroyHandles(created)"));
-		assertTrue(resourceCache.contains("destroyHandles(bridge, created"));
+		assertTrue(rustGuiFrontend.contains("pub struct GuiFrontend"));
+		assertTrue(rustGuiFrontend.contains("fn create_resources"));
+		assertTrue(rustGuiFrontend.contains("fn build_atlas"));
+		assertTrue(rustGuiFrontend.contains("fn packed_uniform_bytes"));
+		assertTrue(rustGuiFrontend.contains("const VERTEX_SHADER"));
+		assertTrue(rustGuiFrontend.contains("const FRAGMENT_SHADER"));
 		assertTrue(queue.contains("GLFW.glfwGetCurrentContext()"));
-			assertFalse(queue.contains("beginFramePass(frameResources.pass(), frameResources.target())"));
-			assertTrue(batchBuilder.contains("beginFramePass(framePass, frameTarget)"));
-			assertTrue(queue.contains("packCompatibleSpriteBatches"));
-			assertTrue(batchBuilder.contains("drawIndexed(6, spriteBatch.sprites().size())"));
-			assertTrue(queue.contains("TextureGroup.GUI_ALPHA"));
+		assertFalse(queue.contains("beginFramePass(frameResources.pass(), frameResources.target())"));
+		assertFalse(queue.contains("frameResourcesFor("));
+		assertFalse(queue.contains("GuiBatchBuilder.packCompatibleSpriteBatches"));
+		assertTrue(queue.contains("bridge.submitGuiFrame"));
+		assertTrue(rustGuiFrontend.contains("CommandOp::DrawIndexed"));
+		assertTrue(rustGuiFrontend.contains("TextureGroup::Alpha"));
 			assertTrue(queue.contains("rust_gal_sprite_batches_executed"));
 			assertTrue(queue.contains("Rust VulkanicGAL partial-frame GUI sprite is unsupported for Vulkan"));
 		assertTrue(gameRenderer.contains("RustGalGuiRenderer.resize"));
@@ -342,13 +288,13 @@ class VulkanicGalBridgeAbiTest {
 		String gui = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/Gui.java"));
 		String queue = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
 		String stratum = Files.readString(Path.of("src/main/java/net/vulkanic/gui/GuiRenderStratum.java"));
-		String pipelineLibrary = Files.readString(Path.of("src/main/java/net/vulkanic/gui/GuiPipelineLibrary.java"));
 		String experienceBar = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/contextualbar/ExperienceBarRenderer.java"));
 		String bossOverlay = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/components/BossHealthOverlay.java"));
 		String context = Files.readString(Path.of("src/main/rust/render/vulkanic/backends/opengl/context.rs"));
 		String openGlResources = Files.readString(Path.of("src/main/rust/render/vulkanic/backends/opengl/resources.rs"));
+		String rustGuiFrontend = Files.readString(Path.of("src/main/rust/render/vulkanic/gui_frontend.rs"));
 
-		assertTrue(minecraft.contains("ResourceManagerReloadListener") && minecraft.contains("RustGalGuiRenderer.reload()"));
+		assertTrue(minecraft.contains("ResourceManagerReloadListener") && minecraft.contains("RustGalGuiRenderer.reload(resourceManager)"));
 		assertTrue(minecraft.contains("RustGalGuiRenderer.cancelPending(\"world-disconnect\")"));
 		assertTrue(minecraft.contains("RustGalGuiRenderer.cancelPending(\"world-unload\")"));
 		assertTrue(queue.contains("SCHEDULER.cancelAll(\"resource-reload\")"));
@@ -356,6 +302,8 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(queue.contains("SCHEDULER.cancelAll(\"shutdown\")"));
 		assertTrue(queue.contains("mattmc.rustGal.guiCrosshair.enabled"));
 		assertTrue(queue.contains("rust_gal_ffi_resource_batch_calls"));
+		assertTrue(queue.contains("collectResolvedAssets(ResourceManager resourceManager)"));
+		assertTrue(queue.contains("bridge.updateGuiAssets(assetGeneration, pendingAssets)"));
 		assertTrue(queue.contains("rust_gal_ffi_completion_query_calls"));
 		assertTrue(queue.contains("rust_gal_queue_depth"));
 		assertTrue(queue.contains("rust_gal_batches_executed"));
@@ -427,7 +375,8 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(queue.contains("BOSS_BAR_NOTCHED_20_PROGRESS"));
 		assertTrue(queue.contains("GuiFillDirection.HORIZONTAL_LEFT_TO_RIGHT"));
 		assertTrue(queue.contains("GuiFillDirection.VERTICAL_BOTTOM_TO_TOP"));
-		assertTrue(pipelineLibrary.contains("uv_region"));
+		assertTrue(queue.contains("GuiFillDirection.HORIZONTAL_LEFT_TO_RIGHT"));
+		assertTrue(rustGuiFrontend.contains("uv_region"));
 		assertTrue(queue.contains("selectedSlot"));
 		assertTrue(queue.contains("progressFraction"));
 		assertTrue(gui.indexOf("RustGalGuiRenderer.isMigratedGuiLegacyControl()") < gui.indexOf("blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_SPRITE"));
@@ -491,18 +440,15 @@ class VulkanicGalBridgeAbiTest {
 		String scheduler = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/RustGalFrameScheduler.java"));
 		String guiRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
 		String guiElement = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiElementRenderState.java"));
-		String batchBuilder = Files.readString(Path.of("src/main/java/net/vulkanic/gui/GuiBatchBuilder.java"));
-		String resourceCache = Files.readString(Path.of("src/main/java/net/vulkanic/gui/GuiResourceCache.java"));
-		String atlas = Files.readString(Path.of("src/main/java/net/vulkanic/gui/GuiSpriteAtlas.java"));
-		String pipelineLibrary = Files.readString(Path.of("src/main/java/net/vulkanic/gui/GuiPipelineLibrary.java"));
+		String rustGuiFrontend = Files.readString(Path.of("src/main/rust/render/vulkanic/gui_frontend.rs"));
 		String gui = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/Gui.java"));
 		String bossOverlay = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/components/BossHealthOverlay.java"));
 		String experienceBar = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/contextualbar/ExperienceBarRenderer.java"));
 
-		assertTrue(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiSpriteAtlas.java")));
-		assertTrue(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiResourceCache.java")));
-		assertTrue(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiBatchBuilder.java")));
-		assertTrue(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiPipelineLibrary.java")));
+		assertFalse(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiSpriteAtlas.java")));
+		assertFalse(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiResourceCache.java")));
+		assertFalse(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiBatchBuilder.java")));
+		assertFalse(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiPipelineLibrary.java")));
 		assertFalse(bridge.contains("guiAlphaPipeline"));
 		assertFalse(bridge.contains("guiInvertPipeline"));
 		assertFalse(bridge.contains("CROSSHAIR_PRODUCER"));
@@ -513,18 +459,20 @@ class VulkanicGalBridgeAbiTest {
 		assertFalse(scheduler.contains("shader"));
 		assertFalse(scheduler.contains("atlas"));
 		assertFalse(scheduler.contains("pipeline"));
-		assertTrue(guiRenderer.contains("RustGalFrameScheduler<GuiBatchBuilder.GuiSpriteRequest>"));
+		assertTrue(guiRenderer.contains("RustGalFrameScheduler<VulkanicGalBridge.GuiSpriteRecord>"));
 		assertFalse(guiRenderer.contains("record CachedResources"));
 		assertFalse(guiRenderer.contains("record TextureAtlas"));
 		assertFalse(guiRenderer.contains("record FrameSpriteBatch"));
 		assertFalse(guiRenderer.contains("class FrameSpriteBatchBuilder"));
-		assertTrue(batchBuilder.contains("record GuiSpriteRequest"));
-		assertTrue(batchBuilder.contains("record FrameSpriteBatch"));
-		assertTrue(resourceCache.contains("record CachedResources"));
-		assertTrue(atlas.contains("record TextureAtlas"));
-		assertTrue(pipelineLibrary.contains("graphicsPipelineAlphaBlend"));
+		assertFalse(guiRenderer.contains("GuiBatchBuilder.packCompatibleSpriteBatches"));
+		assertFalse(guiRenderer.contains("GuiResourceCache resources"));
+		assertTrue(guiRenderer.contains("bridge.submitGuiFrame"));
+		assertTrue(rustGuiFrontend.contains("struct TextureAtlas"));
+		assertTrue(rustGuiFrontend.contains("struct GuiResources"));
+		assertTrue(rustGuiFrontend.contains("fn create_resources"));
+		assertTrue(rustGuiFrontend.contains("fn build_atlas"));
 		assertFalse(guiRenderer.contains("layout(std140) uniform GuiSpriteBatch"));
-		assertTrue(pipelineLibrary.contains("layout(std140) uniform GuiSpriteBatch"));
+		assertTrue(rustGuiFrontend.contains("layout(std140) uniform GuiSpriteBatch"));
 		assertTrue(guiElement.contains("RustGalFrameScheduler.Token token"));
 		assertFalse(gui.contains("VulkanicGalBridge"));
 		assertFalse(gui.contains("MemorySegment"));

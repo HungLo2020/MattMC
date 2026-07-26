@@ -11,6 +11,7 @@ import json
 import os
 import platform
 import re
+import shlex
 import shutil
 import signal
 import statistics
@@ -23,6 +24,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
+import artifact_retention
+
 
 SCHEMA = "mattmc-cross-graphics-audit-v2"
 ARTIFACT_NAME = "graphics_audit_artifact.json"
@@ -34,6 +37,7 @@ DEVUTILS_CACHE_ROOT = CURRENT_REPO_ROOT / "DevUtils" / ".cache"
 WORKLOAD_PROFILES = ("correctness", "moving-camera", "settled-static", "gameplay")
 TOOL_KINDS = ("gameplay", "subsystem", "capture", "matrix")
 RUNTIME_PROFILE_NAMES = ("smoke", "standard", "extended")
+WORLD_PROFILE_NAMES = ("migration-gate", "stress-diagnostic")
 
 
 @dataclass(frozen=True)
@@ -94,10 +98,47 @@ class RuntimeProfile:
     subsystem_iterations: int
 
 
+@dataclass(frozen=True)
+class WorldProfile:
+    name: str
+    world: str
+    role: str
+    migration_gate_blocking: bool
+    description: str
+    deterministic_ready_families: str
+    deterministic_ready_frames: int
+    deterministic_ready_max_wait_frames: int
+    diagnostic_jvm_args: tuple[str, ...] = ()
+
+
 RUNTIME_PROFILES = {
     "smoke": RuntimeProfile("smoke", 60, 15, 15, 10, 20, 5, 5, 50, 15, 20, 60, 60, 600, 20),
     "standard": RuntimeProfile("standard", 180, 30, 40, 25, 75, 10, 10, 160, 45, 120, 300, 240, 1800, 120),
     "extended": RuntimeProfile("extended", 300, 55, 65, 40, 125, 15, 15, 270, 60, 240, 600, 360, 3000, 200),
+}
+
+WORLD_PROFILES = {
+    "migration-gate": WorldProfile(
+        "migration-gate",
+        "Origin",
+        "routine-migration-gate",
+        True,
+        "Small stable pre-generated world for every producer migration.",
+        "sodium-terrain",
+        0,
+        180,
+    ),
+    "stress-diagnostic": WorldProfile(
+        "stress-diagnostic",
+        "Origin Prime City 3",
+        "affected-world-stress",
+        False,
+        "Affected-world stress profile preserving DH/world-generation pressure.",
+        "sodium-terrain,distant-horizons",
+        8,
+        900,
+        ("-Dmattmc.dev.directTriggerDiagnostics=true",),
+    ),
 }
 
 
@@ -1221,10 +1262,84 @@ def deterministic_camera_signature(doc: dict[str, object] | None) -> dict[str, o
 
 def dh_state_from_text(text: str, meta: dict[str, str]) -> dict[str, object]:
     dh_enabled = bool(re.search(r"DistantHorizons|\[DH-|DH Ready|renderLods|renderDeferredLods", text, re.IGNORECASE))
+    world_gen_threads = len(re.findall(r"DH-World Gen Thread\[\d+\]", text))
+    runnable_world_gen_threads = len(re.findall(r"DH-World Gen Thread\[\d+\].*?\brunnable\b", text, re.IGNORECASE))
+    generating = bool(
+        re.search(r"Batch Chunk Generator initialized|Set world gen queue|WorldGen requiring|DH-World Gen Thread", text)
+    )
     return {
         "present_or_logged": dh_enabled,
         "render_distance": meta.get("dh_render_distance") or meta.get("distant_horizons_render_distance"),
-        "state": meta.get("dh_state") or ("logged" if dh_enabled else "unknown"),
+        "state": meta.get("dh_state") or ("generating" if generating else ("logged" if dh_enabled else "unknown")),
+        "generating": generating,
+        "world_gen_thread_mentions": world_gen_threads,
+        "runnable_world_gen_thread_mentions": runnable_world_gen_threads,
+    }
+
+
+def readiness_state_from_text(
+    tool_kind: str,
+    failed_phase: str | None,
+    frame_doc: dict[str, object] | None,
+    deterministic_doc: dict[str, object] | None,
+    combined_logs: str,
+    meta: dict[str, str],
+) -> dict[str, object]:
+    screen_matches = re.findall(r"screen=([A-Za-z0-9_.$-]+)", combined_logs)
+    overlay_matches = re.findall(r"overlay=([A-Za-z0-9_.$-]+)", combined_logs)
+    last_screen = screen_matches[-1] if screen_matches else None
+    last_overlay = overlay_matches[-1] if overlay_matches else None
+    world_entered_log = bool(
+        re.search(r"\bjoined the game\b|Loaded \[\d+\] waiting chunk wrappers|DH-CLIENT-CONNECT", combined_logs)
+    )
+    waiting_chunk_counts = [
+        int(match.group(1))
+        for match in re.finditer(r"Loaded \[(\d+)\] waiting chunk wrappers", combined_logs)
+    ]
+    deterministic_status = deterministic_doc.get("status") if isinstance(deterministic_doc, dict) else None
+    dh_state = dh_state_from_text(combined_logs, meta)
+    death_screen = bool(re.search(r"DeathScreen", combined_logs))
+    invalid_player_state = death_screen or (
+        isinstance(frame_doc, dict)
+        and isinstance(frame_doc.get("lastReadinessBlocker"), str)
+        and "DeathScreen" in str(frame_doc.get("lastReadinessBlocker"))
+    )
+    player_alive_controllable = deterministic_status == "complete" or (
+        bool(world_entered_log or deterministic_status or (isinstance(frame_doc, dict) and frame_doc.get("worldEntered")))
+        and not invalid_player_state
+        and last_overlay not in {"LoadingOverlay"}
+        and last_screen not in {"DeathScreen", "LevelLoadingScreen", "ProgressScreen", "GenericMessageScreen"}
+    )
+    required_chunks_loaded = bool(waiting_chunk_counts and waiting_chunk_counts[-1] == 0)
+    deterministic_hook_reached = isinstance(deterministic_doc, dict)
+    deterministic_ready = deterministic_status == "complete"
+    timeout_classification = None
+    if failed_phase:
+        if invalid_player_state:
+            timeout_classification = "invalid-player-state"
+        elif not world_entered_log and not (isinstance(frame_doc, dict) and frame_doc.get("worldEntered")):
+            timeout_classification = "loading"
+        elif dh_state.get("generating") and not deterministic_ready:
+            timeout_classification = "dh-generation"
+        elif tool_kind == "capture" and not deterministic_hook_reached:
+            timeout_classification = "capture-hook-not-reached"
+        elif tool_kind == "capture" and deterministic_status not in {None, "complete"}:
+            timeout_classification = "capture-hook-incomplete"
+        else:
+            timeout_classification = f"{failed_phase}-timeout"
+    return {
+        "world_entered": bool(world_entered_log or (isinstance(frame_doc, dict) and frame_doc.get("worldEntered"))),
+        "player_alive_and_controllable": player_alive_controllable,
+        "required_chunks_loaded": required_chunks_loaded,
+        "last_waiting_chunk_count": waiting_chunk_counts[-1] if waiting_chunk_counts else None,
+        "dh": dh_state,
+        "deterministic_capture_hook_reached": deterministic_hook_reached,
+        "deterministic_capture_ready": deterministic_ready,
+        "deterministic_status": deterministic_status,
+        "last_screen": last_screen,
+        "last_overlay": last_overlay,
+        "invalid_player_state": invalid_player_state,
+        "timeout_classification": timeout_classification,
     }
 
 
@@ -1726,6 +1841,24 @@ def runtime_profile_dict(args: argparse.Namespace) -> dict[str, int | str]:
     return asdict(RUNTIME_PROFILES[args.profile])
 
 
+def world_profile_for_args(args: argparse.Namespace) -> WorldProfile:
+    return WORLD_PROFILES[getattr(args, "world_profile", "migration-gate")]
+
+
+def world_profile_dict(args: argparse.Namespace) -> dict[str, object]:
+    profile = world_profile_for_args(args)
+    return {
+        "name": profile.name,
+        "world": profile.world,
+        "role": profile.role,
+        "migration_gate_blocking": profile.migration_gate_blocking,
+        "description": profile.description,
+        "deterministic_ready_families": profile.deterministic_ready_families,
+        "deterministic_ready_frames": profile.deterministic_ready_frames,
+        "deterministic_ready_max_wait_frames": profile.deterministic_ready_max_wait_frames,
+    }
+
+
 def phase_timeout_seconds(args: argparse.Namespace, phase: str) -> int:
     value = getattr(args, f"{phase}_timeout_seconds", None)
     if isinstance(value, int):
@@ -1893,6 +2026,7 @@ def normalize_capture_artifact(
         files["validation_events"],
         files["crash_reports"],
         files["hs_err"],
+        files["process_snapshot"],
     ]
     combined_logs = "\n".join(file_text(path) for path in log_paths)
     if isinstance(frame_doc, dict) and isinstance(frame_doc.get("rustGalSliceMetricsLine"), str):
@@ -1914,6 +2048,11 @@ def normalize_capture_artifact(
     benchmark_fingerprint = {
         "schema": "mattmc-graphics-workload-fingerprint-v1",
         "mode": mode.name,
+        "world_profile": {
+            "name": effective_meta.get("world_profile") or "migration-gate",
+            "role": effective_meta.get("world_profile_role") or "",
+            "migration_gate_blocking": effective_meta.get("migration_gate_blocking", "true").lower() == "true",
+        },
         "workload_signature": signature,
         "instrumentation": instrumentation_signature(effective_meta, command),
         "capture_script": str(run_dev_capture_script(target.root)),
@@ -1921,6 +2060,11 @@ def normalize_capture_artifact(
             "expected_base_backend": mode.expected_attribution,
             "observed_attribution": attribution,
             "families": attribution_families,
+        },
+        "resource_packs": {
+            "scenario": meta.get("gui_resource_pack_scenario", "unset"),
+            "selected": meta.get("gui_resource_pack_selected", "unset"),
+            "generated": sorted(value for key, value in meta.items() if key == "gui_resource_pack_generated"),
         },
     }
     frame_nanos = []
@@ -2018,6 +2162,8 @@ def normalize_capture_artifact(
     if isinstance(instrumentation, dict) and instrumentation.get("tracy", {}).get("enabled"):
         if tracy_summary.get("status") != "complete":
             validation_messages.append("Tracy capture did not complete")
+    if meta.get("migration_gate_blocking", "true").lower() != "true":
+        validation_messages.append("stress-diagnostic artifact is non-blocking for routine producer migration gates")
     hard_errors_absent = (
         error_counts["crash"] == 0
         and error_counts["gl_error"] == 0
@@ -2088,6 +2234,34 @@ def normalize_capture_artifact(
     rust_gal_packed_sprites = last_number(combined_logs, r"rust_gal_packed_sprites_executed[=: ]+(\d+)")
     rust_gal_ffi_calls = last_number(combined_logs, r"ffi(?:_call)?_count[=: ]+(\d+)")
     rust_gal_ffi_bytes = last_number(combined_logs, r"ffi(?:_bytes| bytes)[=: ]+(\d+)")
+    gui_asset_resolutions = [
+        {
+            "sprite": match.group(1),
+            "sprite_id": int(match.group(2)),
+            "path": match.group(3),
+            "source_pack": match.group(4),
+            "bytes": int(match.group(5)),
+            "sha256": match.group(6),
+        }
+        for match in re.finditer(
+            r"Rust VulkanicGAL GUI asset resolved sprite=([^ ]+) sprite_id=(\d+) path=([^ ]+) source_pack=([^ ]+) bytes=(\d+) sha256=([0-9a-f]+)",
+            combined_logs,
+        )
+    ]
+    gui_asset_missing = [
+        {
+            "sprite": match.group(1),
+            "sprite_id": int(match.group(2)),
+            "path": match.group(3),
+        }
+        for match in re.finditer(
+            r"Rust VulkanicGAL GUI asset missing sprite=([^ ]+) sprite_id=(\d+) path=([^ ]+) fallback=vanilla",
+            combined_logs,
+        )
+    ]
+    gui_asset_update_failure_events = len(
+        re.findall(r"Rust VulkanicGAL GUI asset update failed .*?preserve_last_valid=true", combined_logs)
+    )
     rust_gal_operations = {
         "context_create": {
             "calls": last_number(combined_logs, r"rust_gal_ffi_context_create_calls[=: ]+(\d+)"),
@@ -2128,6 +2302,10 @@ def normalize_capture_artifact(
         "retire": {
             "calls": last_number(combined_logs, r"rust_gal_ffi_retire_calls[=: ]+(\d+)"),
             "bytes": last_number(combined_logs, r"rust_gal_ffi_retire_bytes[=: ]+(\d+)"),
+        },
+        "asset_update": {
+            "calls": last_number(combined_logs, r"rust_gal_ffi_asset_update_calls[=: ]+(\d+)"),
+            "bytes": last_number(combined_logs, r"rust_gal_ffi_asset_update_bytes[=: ]+(\d+)"),
         },
     }
     rust_gal_calls_per_batch = None
@@ -2176,6 +2354,22 @@ def normalize_capture_artifact(
             for name, value in rust_gal_timing_totals.items()
             if value is not None
         }
+    world_profile_name = meta.get("world_profile") or "migration-gate"
+    world_profile_meta = {
+        "name": world_profile_name,
+        "role": meta.get("world_profile_role") or WORLD_PROFILES.get(world_profile_name, WORLD_PROFILES["migration-gate"]).role,
+        "configured_world": WORLD_PROFILES.get(world_profile_name, WORLD_PROFILES["migration-gate"]).world,
+        "actual_world": meta.get("world") or signature.get("world"),
+        "migration_gate_blocking": (meta.get("migration_gate_blocking", "true").lower() == "true"),
+    }
+    readiness_state = readiness_state_from_text(
+        tool_kind,
+        failed_phase,
+        frame_doc,
+        deterministic_doc,
+        combined_logs,
+        meta,
+    )
     complete = (
         bool(files["meta"])
         and (success or reused_baseline)
@@ -2193,6 +2387,7 @@ def normalize_capture_artifact(
         "created_at": utc_now(),
         "tool": tool_kind,
         "mode": asdict(mode),
+        "world_profile": world_profile_meta,
         "repository": repository_metadata(target),
         "repository_resolution": repository_paths or {},
         "capture": {
@@ -2239,6 +2434,10 @@ def normalize_capture_artifact(
                 "peak_rss_kb": parse_number(meta.get("memory_guard_peak_rss_kb")),
                 "rss_guard_triggered": memory_guard_triggered,
                 "native_or_vulkan_memory_bytes": first_number(combined_logs, r"(?:native|vulkan).*memory.*?(\d+)"),
+                "last_proc_rss_kb": last_number(combined_logs, r"(?m)^Rss:\s+(\d+) kB"),
+                "last_proc_pss_kb": last_number(combined_logs, r"(?m)^Pss:\s+(\d+) kB"),
+                "last_proc_private_dirty_kb": last_number(combined_logs, r"(?m)^Private_Dirty:\s+(\d+) kB"),
+                "last_proc_swap_kb": last_number(combined_logs, r"(?m)^Swap:\s+(\d+) kB"),
             },
             "ffi": {
                 "call_count": rust_gal_ffi_calls,
@@ -2256,6 +2455,14 @@ def normalize_capture_artifact(
                 "batches_cancelled": last_number(combined_logs, r"rust_gal_batches_cancelled[=: ]+(\d+)"),
                 "completion_polls": last_number(combined_logs, r"rust_gal_completion_polls[=: ]+(\d+)"),
                 "completion_timeouts": last_number(combined_logs, r"rust_gal_completion_timeouts[=: ]+(\d+)"),
+                "asset_generation": last_number(combined_logs, r"rust_gal_asset_generation[=: ]+(\d+)"),
+                "uploaded_asset_generation": last_number(combined_logs, r"rust_gal_uploaded_asset_generation[=: ]+(\d+)"),
+                "asset_payload_count": last_number(combined_logs, r"rust_gal_asset_payload_count[=: ]+(\d+)"),
+                "asset_payload_bytes": last_number(combined_logs, r"rust_gal_asset_payload_bytes[=: ]+(\d+)"),
+                "asset_update_failures": last_number(combined_logs, r"rust_gal_asset_update_failures[=: ]+(\d+)"),
+                "asset_resolutions": gui_asset_resolutions,
+                "asset_missing_fallbacks": gui_asset_missing,
+                "asset_update_failure_events": gui_asset_update_failure_events,
                 "ffi_operations": rust_gal_operations,
                 "ffi_calls_per_frame": rust_gal_calls_per_frame,
                 "ffi_bytes_per_frame": rust_gal_bytes_per_frame,
@@ -2265,6 +2472,20 @@ def normalize_capture_artifact(
                 "timing_per_executed_batch_nanos": rust_gal_timing_per_batch,
                 "backend_sync": rust_gal_backend_sync,
                 "submission": last_number(combined_logs, r"Rust OpenGL VulkanicGAL GUI (?:batch|frame) executed.*?submission=(\d+)"),
+            },
+            "native_direct_triggers": {
+                "integrations": last_number(combined_logs, r"direct_trigger_diagnostics summary.*? integrations=(\d+)"),
+                "catchup_integrations": last_number(combined_logs, r"direct_trigger_diagnostics summary.*? catchup_integrations=(\d+)"),
+                "average_delay_frames": last_number(combined_logs, r"direct_trigger_diagnostics summary.*? average_delay_frames=([0-9.]+)"),
+                "max_delay_frames": last_number(combined_logs, r"direct_trigger_diagnostics summary.*? max_delay_frames=(\d+)"),
+                "average_catchup_movement": last_number(combined_logs, r"direct_trigger_diagnostics summary.*? average_catchup_movement=([0-9.]+)"),
+                "max_catchup_movement": last_number(combined_logs, r"direct_trigger_diagnostics summary.*? max_catchup_movement=([0-9.]+)"),
+                "native_process_calls": last_number(combined_logs, r"direct_trigger_diagnostics summary.*? native_process_calls=(\d+)"),
+                "native_integrate_calls": last_number(combined_logs, r"direct_trigger_diagnostics summary.*? native_integrate_calls=(\d+)"),
+                "native_catchup_integrations": last_number(combined_logs, r"direct_trigger_diagnostics summary.*? native_catchup_integrations=(\d+)"),
+                "native_angle_path_integrations": last_number(combined_logs, r"direct_trigger_diagnostics summary.*? native_angle_path_integrations=(\d+)"),
+                "native_distance_path_integrations": last_number(combined_logs, r"direct_trigger_diagnostics summary.*? native_distance_path_integrations=(\d+)"),
+                "native_invalid_angle_input_fallbacks": last_number(combined_logs, r"direct_trigger_diagnostics summary.*? native_invalid_angle_input_fallbacks=(\d+)"),
             },
             "work_counts": work_counts,
             "creation_counts": creation_counts,
@@ -2306,6 +2527,8 @@ def normalize_capture_artifact(
             "renderdoc_complete": renderdoc_complete,
             "tracy_complete": tracy_complete,
             "messages": validation_messages,
+            "readiness_state": readiness_state,
+            "migration_gate_blocking": world_profile_meta["migration_gate_blocking"],
         },
         "diagnosis": incomplete_run_diagnosis(
             tool_kind,
@@ -2316,6 +2539,7 @@ def normalize_capture_artifact(
             error_counts,
             memory_guard_triggered,
             attribution,
+            readiness_state,
         ),
     }
     artifact["benchmark_fingerprint"]["hash"] = stable_json_hash(artifact["benchmark_fingerprint"])
@@ -2359,6 +2583,7 @@ def incomplete_run_diagnosis(
     error_counts: dict[str, int],
     memory_guard_triggered: bool,
     attribution: str,
+    readiness_state: dict[str, object] | None = None,
 ) -> dict[str, object]:
     evidence: list[str] = []
     if isinstance(frame_doc, dict):
@@ -2387,6 +2612,17 @@ def incomplete_run_diagnosis(
         evidence.append("rss_guard_triggered=true")
     if attribution == "fallback":
         evidence.append("implementation_attribution=fallback")
+    if isinstance(readiness_state, dict):
+        if readiness_state.get("timeout_classification"):
+            evidence.append(f"readiness_timeout_classification={readiness_state.get('timeout_classification')}")
+        if readiness_state.get("last_screen"):
+            evidence.append(f"last_screen={readiness_state.get('last_screen')}")
+        if readiness_state.get("last_overlay"):
+            evidence.append(f"last_overlay={readiness_state.get('last_overlay')}")
+        dh = readiness_state.get("dh")
+        if isinstance(dh, dict):
+            evidence.append(f"dh_state={dh.get('state')}")
+            evidence.append(f"dh_world_gen_threads={dh.get('world_gen_thread_mentions')}")
     root_cause = "complete"
     if failed_phase:
         root_cause = f"{failed_phase}-phase"
@@ -2404,6 +2640,8 @@ def incomplete_run_diagnosis(
         root_cause = "world-readiness"
     elif tool_kind == "subsystem" and isinstance(subsystem_doc, dict) and subsystem_doc.get("status") != "complete":
         root_cause = "subsystem-measurement"
+    if isinstance(readiness_state, dict) and readiness_state.get("timeout_classification"):
+        root_cause = str(readiness_state["timeout_classification"])
     return {
         "root_cause": root_cause,
         "blocking_phase": failed_phase,
@@ -2422,6 +2660,9 @@ def write_preflight_meta(capture_dir: Path, mode: ModeSpec, args: argparse.Names
         f"backend={mode.backend}",
         f"shaders={mode.shaders}",
         f"world={getattr(args, 'world', DEFAULT_WORLD)}",
+        f"world_profile={env.get('MATTMC_GRAPHICS_WORLD_PROFILE', getattr(args, 'world_profile', 'migration-gate'))}",
+        f"world_profile_role={env.get('MATTMC_GRAPHICS_WORLD_PROFILE_ROLE', '')}",
+        f"migration_gate_blocking={env.get('MATTMC_GRAPHICS_MIGRATION_GATE_BLOCKING', 'true')}",
         f"validation_mode={getattr(args, 'validation', 'off')}",
         f"graphics_run_type={env.get('MATTMC_GRAPHICS_RUN_TYPE', run_type_for_args(args))}",
         f"validation_profile={env.get('MATTMC_GRAPHICS_VALIDATION_PROFILE', getattr(args, 'validation', 'off'))}",
@@ -3324,6 +3565,8 @@ def build_capture_command(
             command.append("--deterministic-camera-capture")
         if tool_kind == "capture" and workload_profile == "settled-static":
             command.append("--deterministic-static-camera-capture")
+        if getattr(args, "gui_resource_pack_scenario", ""):
+            command.extend(["--gui-resource-pack-scenario", args.gui_resource_pack_scenario])
     else:
         shell = "bash" if platform_name() != "windows" else "bash"
         command = [
@@ -3344,10 +3587,16 @@ def build_capture_command(
         ]
         if client_args:
             command.extend(["--client-args", client_args])
+        if getattr(args, "gui_resource_pack_scenario", ""):
+            command.extend(["--gui-resource-pack-scenario", args.gui_resource_pack_scenario])
     env = os.environ.copy()
     run_type = run_type_for_args(args)
     env["MATTMC_GRAPHICS_TOOL_INTERNAL"] = "1"
     env["MATTMC_GRAPHICS_RUN_TYPE"] = run_type
+    world_profile = world_profile_for_args(args)
+    env["MATTMC_GRAPHICS_WORLD_PROFILE"] = world_profile.name
+    env["MATTMC_GRAPHICS_WORLD_PROFILE_ROLE"] = world_profile.role
+    env["MATTMC_GRAPHICS_MIGRATION_GATE_BLOCKING"] = "true" if world_profile.migration_gate_blocking else "false"
     env["MATTMC_GRAPHICS_VALIDATION_PROFILE"] = requested_validation
     env["MATTMC_GRAPHICS_VALIDATION_FAIL_SEVERITY"] = getattr(args, "validation_fail_severity", "warning")
     env["MATTMC_RENDERDOC_CAPTURE"] = "true" if getattr(args, "renderdoc_capture", False) else "false"
@@ -3360,8 +3609,30 @@ def build_capture_command(
     env["MATTMC_CAPTURE_RUN_SOURCE"] = str(CURRENT_REPO_ROOT / "run")
     env["MATTMC_CAPTURE_WORLD_SOURCE"] = str(CURRENT_REPO_ROOT / "run" / "saves" / args.world)
     env["CLIENT_RSS_LIMIT_MB"] = str(args.client_rss_limit_mb)
-    java_options = [env.get("JAVA_TOOL_OPTIONS", "")]
+    screenshot_limits = {
+        "smoke": ("0", "0"),
+        "standard": ("30", "2"),
+        "extended": ("45", "3"),
+    }
+    screenshot_interval, screenshot_count = screenshot_limits.get(args.profile, ("30", "2"))
+    if getattr(args, "diagnostic", False) or getattr(args, "renderdoc_capture", False) or getattr(args, "tracy_capture", False):
+        screenshot_interval, screenshot_count = ("45", "1")
+    if tool_kind == "capture" and workload_profile == "correctness":
+        screenshot_interval, screenshot_count = ("1", "4")
+    env.setdefault("SCREENSHOT_INTERVAL_SECS", screenshot_interval)
+    env.setdefault("SCREENSHOT_MAX_COUNT", screenshot_count)
+    env.setdefault("SCREENSHOT_START_DELAY_SECS", "10")
+    java_options = shlex.split(env.get("JAVA_TOOL_OPTIONS", ""))
     java_options.extend(getattr(args, "jvm_arg", []) or [])
+    java_options.extend(world_profile.diagnostic_jvm_args)
+    java_options.extend(
+        [
+            f"-Dmattmc.dev.graphicsWorldProfile={world_profile.name}",
+            f"-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies={world_profile.deterministic_ready_families}",
+            f"-Dmattmc.dev.deterministicCameraCapture.settledReadyFrames={world_profile.deterministic_ready_frames}",
+            f"-Dmattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames={world_profile.deterministic_ready_max_wait_frames}",
+        ]
+    )
     if getattr(args, "armor_value", None) is not None:
         java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.armorValue={args.armor_value}")
         java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.armorValue={args.armor_value}")
@@ -3387,9 +3658,9 @@ def build_capture_command(
         java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.gameMode={args.game_mode}")
     rust_gal_gui_control = getattr(args, "rust_gal_gui_control", "rust")
     if rust_gal_gui_control == "disabled":
-        java_options.append("-Dmattmc.dev.rustGalGui.armor.disabled=true")
+        java_options.append("-Dmattmc.dev.rustGalGui.disabled=true")
     elif rust_gal_gui_control == "legacy":
-        java_options.append("-Dmattmc.dev.rustGalGui.armor.legacyControl=true")
+        java_options.append("-Dmattmc.dev.rustGalGui.legacyControl=true")
     elif rust_gal_gui_control == "armor-disabled":
         java_options.append("-Dmattmc.dev.rustGalGui.armor.disabled=true")
     elif rust_gal_gui_control == "armor-legacy":
@@ -3434,21 +3705,12 @@ def build_capture_command(
         )
         env["MATTMC_GRAPHICS_SUBSYSTEM_BENCHMARK"] = "true"
     if tool_kind == "capture":
-        deterministic_metadata = capture_dir / f"deterministic_camera_capture_{timestamp()}.json"
-        deterministic_screenshot_dir = capture_dir / deterministic_metadata.stem
         java_options.extend(
             [
                 "-Dmattmc.dev.graphicsAuditSliceMetrics=true",
-                "-Dmattmc.dev.deterministicCameraCapture=true",
-                f"-Dmattmc.dev.deterministicCameraCapture.metadata={deterministic_metadata}",
-                f"-Dmattmc.dev.deterministicCameraCapture.screenshotDir={deterministic_screenshot_dir}",
-                f"-Dmattmc.dev.deterministicCameraCapture.world={args.world}",
-                "-Dmattmc.dev.deterministicCameraCapture.stopAfterComplete=true",
             ]
         )
         env["MATTMC_GRAPHICS_CORRECTNESS_CAPTURE"] = "true"
-        env["MATTMC_DETERMINISTIC_METADATA"] = str(deterministic_metadata)
-        env["MATTMC_DETERMINISTIC_SCREENSHOT_DIR"] = str(deterministic_screenshot_dir)
     if args.diagnostic:
         perf_dir = capture_dir / "vulkan-perf-audit"
         java_options.extend(
@@ -3508,7 +3770,7 @@ def build_capture_command(
             env["MATTMC_RENDERDOC_CAPTURE_PATH"] = str(renderdoc_capture)
         else:
             env["MATTMC_RENDERDOC_CAPTURE_PATH"] = str(renderdoc_capture)
-    env["JAVA_TOOL_OPTIONS"] = " ".join(part for part in java_options if part).strip()
+    env["JAVA_TOOL_OPTIONS"] = " ".join(shlex.quote(part) for part in java_options if part).strip()
     return command, env
 
 
@@ -3635,6 +3897,18 @@ def run_mode(
     run_dir = f"run-{repetition:02d}"
     capture_dir = artifact_root / mode.name / tool_kind / run_dir / "capture"
     output_path = artifact_root / mode.name / tool_kind / run_dir / ARTIFACT_NAME
+    managed_run_root = output_path.parent
+    retention_policy = getattr(args, "_retention_policy", None)
+    if retention_policy is not None and not args.dry_run:
+        artifact_retention.preflight_disk_budget(
+            retention_policy,
+            artifact_retention.estimated_run_bytes(
+                args.profile,
+                diagnostic=args.diagnostic,
+                renderdoc=getattr(args, "renderdoc_capture", False),
+                tracy=getattr(args, "tracy_capture", False),
+            ),
+        )
     command, env = build_capture_command(target, mode, capture_dir, effective_workload_profile, args, tool_kind)
     current_root = repo_root()
     explicit_frozen_repo = getattr(args, "frozen_repo", None)
@@ -3843,7 +4117,35 @@ def run_mode(
             tracy_thread = threading.Thread(target=capture_tracy_while_running, name="mattmc-tracy-capture", daemon=True)
             tracy_thread.start()
         try:
-            exit_code = process.wait(timeout=timeout_seconds)
+            last_quota_check = 0.0
+            while True:
+                exit_code = process.poll()
+                if exit_code is not None:
+                    break
+                now = time.monotonic()
+                if now - started > timeout_seconds:
+                    timed_out = True
+                    terminate_process_tree(process)
+                    cleanup_killed_processes = cleanup_repo_processes(target.root)
+                    cleanup_timeout = max(1, phase_timeout_seconds(args, "cleanup"))
+                    exit_code = process.wait(timeout=cleanup_timeout)
+                    error = f"Timed out after {timeout_seconds}s; profile hard cap is {hard_timeout_seconds}s"
+                    break
+                if retention_policy is not None and now - last_quota_check >= 2.0:
+                    last_quota_check = now
+                    try:
+                        artifact_retention.run_size_check(retention_policy, managed_run_root)
+                    except RuntimeError as quota_error:
+                        timed_out = True
+                        timed_out_phase = "artifact-quota"
+                        error = str(quota_error)
+                        artifact_retention.write_quota_failure(retention_policy.root, managed_run_root, error)
+                        terminate_process_tree(process)
+                        cleanup_killed_processes = cleanup_repo_processes(target.root)
+                        cleanup_timeout = max(1, phase_timeout_seconds(args, "cleanup"))
+                        exit_code = process.wait(timeout=cleanup_timeout)
+                        break
+                time.sleep(0.25)
         except subprocess.TimeoutExpired:
             timed_out = True
             terminate_process_tree(process)
@@ -3854,6 +4156,9 @@ def run_mode(
         except KeyboardInterrupt:
             terminate_process_tree(process)
             cleanup_repo_processes(target.root)
+            if retention_policy is not None:
+                artifact_retention.write_quota_failure(retention_policy.root, managed_run_root, "interrupted before completion")
+                artifact_retention.cleanup(retention_policy, after_run=managed_run_root)
             raise
     cleanup_killed_processes = sorted(set(cleanup_killed_processes + cleanup_repo_processes(target.root)))
     if getattr(args, "renderdoc_capture", False):
@@ -3955,6 +4260,13 @@ def run_mode(
     artifact["capture"]["duration_seconds"] = time.monotonic() - started
     artifact["capture"]["cleanup_killed_processes"] = cleanup_killed_processes
     write_artifact(output_path, artifact)
+    if retention_policy is not None:
+        try:
+            artifact_retention.run_size_check(retention_policy, managed_run_root)
+        except RuntimeError as quota_error:
+            error = error or str(quota_error)
+            artifact_retention.write_quota_failure(retention_policy.root, managed_run_root, str(quota_error))
+        artifact_retention.cleanup(retention_policy, after_run=managed_run_root)
     capture_meta = artifact.get("capture") if isinstance(artifact.get("capture"), dict) else {}
     failed_phase = capture_meta.get("failed_phase") if isinstance(capture_meta.get("failed_phase"), str) else timed_out_phase
     if timed_out and failed_phase and "during" not in error:
@@ -4215,10 +4527,18 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     def add_common(subparser: argparse.ArgumentParser) -> None:
         subparser.add_argument("--profile", choices=RUNTIME_PROFILE_NAMES, default="smoke")
         subparser.add_argument("--frozen-repo")
+        subparser.add_argument("--artifact-root", type=Path, help="Managed root for generated graphics-audit artifacts.")
         subparser.add_argument("--artifact-dir", type=Path)
+        subparser.add_argument("--artifact-preserve", action="store_true", help="Opt out of automatic retention cleanup for this run.")
+        subparser.add_argument("--artifact-global-limit-mb", type=int)
+        subparser.add_argument("--artifact-run-limit-mb", type=int)
+        subparser.add_argument("--artifact-reserve-mb", type=int)
+        subparser.add_argument("--retain-successful-runs", type=int)
+        subparser.add_argument("--retain-failed-runs", type=int)
         subparser.add_argument("--mode", action="append", choices=[mode.name for mode in MATRIX_MODES])
         subparser.add_argument("--workload-profile", choices=WORKLOAD_PROFILES, default="correctness")
-        subparser.add_argument("--world", default=os.environ.get("MATTMC_CAPTURE_WORLD", "Origin"))
+        subparser.add_argument("--world-profile", choices=WORLD_PROFILE_NAMES, default=os.environ.get("MATTMC_GRAPHICS_WORLD_PROFILE", "migration-gate"))
+        subparser.add_argument("--world", default=os.environ.get("MATTMC_CAPTURE_WORLD"))
         subparser.add_argument("--client-args", default=os.environ.get("CLIENT_ARGS", ""))
         subparser.add_argument("--jvm-arg", action="append", default=[], help="Extra JVM option appended to JAVA_TOOL_OPTIONS for launched clients.")
         subparser.add_argument(
@@ -4247,6 +4567,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         subparser.add_argument("--player-heart-hardcore", action="store_true", help="Force hardcore player-heart sprites for correctness captures.")
         subparser.add_argument("--player-heart-regeneration", action="store_true", help="Force regeneration bounce state for correctness captures.")
         subparser.add_argument("--game-mode", choices=("survival", "creative", "adventure", "spectator"), help="Force a deterministic player game mode for gameplay/capture controls.")
+        subparser.add_argument(
+            "--gui-resource-pack-scenario",
+            choices=("vanilla", "pack-a", "pack-b", "priority-a-b", "priority-b-a", "missing", "malformed", "unsupported"),
+            default=os.environ.get("MATTMC_GUI_RESOURCE_PACK_SCENARIO", ""),
+            help="Generate/select diagnostic GUI resource-pack scenarios in the isolated game dir.",
+        )
         subparser.add_argument("--timeout-seconds", type=int)
         subparser.add_argument("--startup-timeout-seconds", type=int)
         subparser.add_argument("--readiness-timeout-seconds", type=int)
@@ -4277,6 +4603,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     for tool in TOOL_KINDS:
         add_common(subparsers.add_parser(tool))
     args = parser.parse_args(incoming)
+    if not args.world:
+        args.world = WORLD_PROFILES[args.world_profile].world
     profile = RUNTIME_PROFILES[args.profile]
     profile_defaults = {
         "--timeout-seconds": ("timeout_seconds", profile.hard_timeout_seconds),
@@ -4327,6 +4655,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             raise SystemExit(f"{field.replace('_', '-')} must be positive")
     if args.client_rss_limit_mb <= 0:
         raise SystemExit("client RSS limit must be positive")
+    for field in ("artifact_global_limit_mb", "artifact_run_limit_mb", "artifact_reserve_mb"):
+        value = getattr(args, field)
+        if value is not None and value < 0:
+            raise SystemExit(f"{field.replace('_', '-')} must be non-negative")
+    for field in ("retain_successful_runs", "retain_failed_runs"):
+        value = getattr(args, field)
+        if value is not None and value < 0:
+            raise SystemExit(f"{field.replace('_', '-')} must be non-negative")
     run_type_for_args(args)
     if args.renderdoc_capture and args.tool not in {"capture", "matrix"}:
         raise SystemExit("RenderDoc capture is a correctness/audit mode; use DevUtils/Audit/Capture.py or Matrix.py")
@@ -4350,11 +4686,43 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     targets = select_targets(args)
-    artifact_root = (
+    retention_root = (
         args.artifact_dir.resolve()
         if args.artifact_dir
-        else repo_root() / "logs" / "graphics-audit" / args.tool / timestamp()
+        else (args.artifact_root.resolve() if args.artifact_root else artifact_retention.default_artifact_base(repo_root()))
     )
+    retention_policy = artifact_retention.policy_for(
+        args.profile,
+        retention_root,
+        diagnostic=args.diagnostic or args.renderdoc_capture or args.tracy_capture,
+        preserve=args.artifact_preserve,
+        global_limit_mb=args.artifact_global_limit_mb,
+        run_limit_mb=args.artifact_run_limit_mb,
+        reserve_mb=args.artifact_reserve_mb,
+        keep_success=args.retain_successful_runs,
+        keep_failed=args.retain_failed_runs,
+    )
+    artifact_retention.ensure_marker(retention_policy.root)
+    if args.dry_run:
+        preflight_cleanup = {"removed": [], "removed_game_dirs": [], "dry_run": True}
+        disk_preflight = {
+            "artifact_root": str(retention_policy.root),
+            "dry_run": True,
+            "artifact_root_usage_bytes": artifact_retention.directory_size(retention_policy.root),
+        }
+    else:
+        preflight_cleanup = artifact_retention.cleanup(retention_policy) if not args.artifact_preserve else {"removed": [], "removed_game_dirs": []}
+        disk_preflight = artifact_retention.preflight_disk_budget(
+            retention_policy,
+            artifact_retention.estimated_run_bytes(
+                args.profile,
+                diagnostic=args.diagnostic,
+                renderdoc=args.renderdoc_capture,
+                tracy=args.tracy_capture,
+            ),
+        )
+    args._retention_policy = retention_policy
+    artifact_root = args.artifact_dir.resolve() if args.artifact_dir else retention_policy.root / args.tool / timestamp()
     artifact_root.mkdir(parents=True, exist_ok=True)
     results: list[MatrixResult] = []
     tools_to_run = ("gameplay", "capture", "subsystem") if args.tool == "matrix" else (args.tool,)
@@ -4384,12 +4752,34 @@ def main(argv: Sequence[str] | None = None) -> int:
         "tool": args.tool,
         "invoked_tools": list(tools_to_run),
         "diagnostic": args.diagnostic,
+        "artifact_retention": {
+            "policy": {
+                "profile": retention_policy.profile,
+                "root": str(retention_policy.root),
+                "global_limit_bytes": retention_policy.global_limit_bytes,
+                "run_limit_bytes": retention_policy.run_limit_bytes,
+                "reserve_bytes": retention_policy.reserve_bytes,
+                "keep_success": retention_policy.keep_success,
+                "keep_failed": retention_policy.keep_failed,
+                "heavy_keep": retention_policy.heavy_keep,
+                "preserve": retention_policy.preserve,
+            },
+            "preflight": disk_preflight,
+            "pre_run_cleanup": preflight_cleanup,
+        },
         "repeatability": repeatability,
         "success": all(result.success for result in results) and repeatability["passed"],
         "aggregate": str(aggregate_path) if aggregate else None,
         "results": [asdict(result) for result in results],
     }
     manifest_path = artifact_root / MANIFEST_NAME
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    post_cleanup = (
+        {"removed": [], "removed_game_dirs": [], "dry_run": True}
+        if args.dry_run
+        else (artifact_retention.cleanup(retention_policy, after_run=artifact_root) if not args.artifact_preserve else {"removed": [], "removed_game_dirs": []})
+    )
+    manifest["artifact_retention"]["post_run_cleanup"] = post_cleanup
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"Wrote graphics audit manifest: {manifest_path}")
     if aggregate:
