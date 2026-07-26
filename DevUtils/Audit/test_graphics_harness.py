@@ -513,6 +513,109 @@ else:
             finally:
                 harness.local_tracy_csvexport_path = original  # type: ignore[assignment]
 
+    def test_tracy_listener_discovery_parses_port_conflicts(self) -> None:
+        output = (
+            'LISTEN 0 4096 127.0.0.1:8086 0.0.0.0:* users:(("java",pid=111,fd=42))\n'
+            'LISTEN 0 4096 127.0.0.1:8087 0.0.0.0:* users:(("java",pid=111,fd=43))\n'
+            'LISTEN 0 4096 127.0.0.1:9000 0.0.0.0:* users:(("java",pid=111,fd=44))\n'
+        )
+        listeners = harness.parse_ss_tracy_listeners(output, 8086, 8110)
+        self.assertEqual([listener.port for listener in listeners], [8086, 8087])
+        self.assertEqual(listeners[0].process, "java")
+        self.assertEqual(listeners[0].pid, 111)
+
+    def test_tracy_role_detection_distinguishes_java_and_rust(self) -> None:
+        rust_roles = harness.tracy_role_detection(
+            {"opengl.backend.submit": {}, "opengl.lowering.draw-indexed": {}},
+            ["MattMC Rust VulkanicGAL OpenGL Tracy client started", "gal.submission backend=opengl id=7"],
+        )
+        java_roles = harness.tracy_role_detection(
+            {"java.frame.render-production": {}, "rust-gal.gui-frame.abi-packing": {}},
+            ["gal.frame.deferred producer=gui.frame frame=2 submission=7 batches=3"],
+        )
+        self.assertTrue(rust_roles["rust"])
+        self.assertFalse(rust_roles["java"])
+        self.assertTrue(java_roles["java"])
+        self.assertFalse(java_roles["rust"])
+
+    def test_tracy_summary_rejects_java_only_when_rust_required(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            capture = temp / "trace.tracy"
+            capture.write_bytes(b"not-empty")
+            exporter = temp / "tracy-csvexport"
+            exporter.write_text(
+                """#!/usr/bin/env python3
+import sys
+if "--messages" in sys.argv:
+    print("MessageName,total_ns")
+    print("gal.frame.deferred producer=gui.frame frame=2 submission=7 batches=3,100")
+elif "--self" in sys.argv:
+    print("name,src_file,src_line,total_ns,total_perc,counts,mean_ns,min_ns,max_ns,std_ns")
+    print("rust-gal.gui-frame.abi-packing,RustGalGuiRenderer.java,1,80,8,1,80,80,80,0")
+else:
+    print("name,src_file,src_line,total_ns,total_perc,counts,mean_ns,min_ns,max_ns,std_ns")
+    print("rust-gal.gui-frame.abi-packing,RustGalGuiRenderer.java,1,100,10,1,100,100,100,0")
+""",
+                encoding="utf-8",
+            )
+            exporter.chmod(0o755)
+            original = harness.local_tracy_csvexport_path
+            try:
+                harness.local_tracy_csvexport_path = lambda: str(exporter)  # type: ignore[assignment]
+                summary_path = harness.extract_tracy_summary(temp, capture, require_rust_zones=True)
+                summary = json.loads(summary_path.read_text(encoding="utf-8"))
+                self.assertEqual(summary["status"], "failed")
+                self.assertTrue(summary["role_detection"]["java"])
+                self.assertFalse(summary["role_detection"]["rust"])
+                self.assertIn("Rust VulkanicGAL", summary["failure"])
+            finally:
+                harness.local_tracy_csvexport_path = original  # type: ignore[assignment]
+
+    def test_tracy_collection_rejects_zero_byte_and_accepts_rust_zone(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            rust_capture = temp / "rust.tracy"
+            rust_capture.write_bytes(b"rust")
+            empty_capture = temp / "empty.tracy"
+            empty_capture.write_bytes(b"")
+            rust_summary = {
+                "status": "complete",
+                "capture_path": str(rust_capture),
+                "size_bytes": rust_capture.stat().st_size,
+                "zone_count": 3,
+                "zones": {"opengl.backend.submit": {}},
+                "major_zones": {"opengl.backend.submit": {}},
+                "role_detection": {"rust": True, "java": False},
+            }
+            empty_summary = {
+                "status": "failed",
+                "capture_path": str(empty_capture),
+                "size_bytes": 0,
+                "zone_count": 0,
+                "role_detection": {"rust": False, "java": False},
+            }
+            accepted = json.loads(
+                harness.write_tracy_collection_summary(
+                    temp,
+                    [empty_summary, rust_summary],
+                    require_rust_zones=True,
+                    require_java_zones=False,
+                ).read_text(encoding="utf-8")
+            )
+            self.assertEqual(accepted["status"], "complete")
+            self.assertTrue(accepted["role_detection"]["rust"])
+            rejected = json.loads(
+                harness.write_tracy_collection_summary(
+                    temp,
+                    [empty_summary],
+                    require_rust_zones=True,
+                    require_java_zones=False,
+                ).read_text(encoding="utf-8")
+            )
+            self.assertEqual(rejected["status"], "failed")
+            self.assertIn("Rust VulkanicGAL", rejected["failure"])
+
     def test_renderdoc_summary_replay_uses_renderdoccmd_not_qrenderdoc(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)
@@ -1308,6 +1411,7 @@ else:
                 armor_value=None,
                 player_health=19.0,
                 player_max_health=40.0,
+                player_absorption=3.0,
                 player_heart_variant="poisoned",
                 player_heart_flash=True,
                 player_heart_hardcore=True,
@@ -1337,6 +1441,8 @@ else:
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerHealth=19.0", options)
             self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.playerMaxHealth=40.0", options)
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerMaxHealth=40.0", options)
+            self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.playerAbsorption=3.0", options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerAbsorption=3.0", options)
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerHeartVariant=poisoned", options)
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerHealthFlash=true", options)
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.playerHealthHardcore=true", options)

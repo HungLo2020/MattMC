@@ -85,6 +85,11 @@ import net.minecraft.world.scores.PlayerTeam;
 import net.minecraft.world.scores.Scoreboard;
 import net.voxelmap.VoxelConstants;
 import net.vulkanic.gui.RustGalGuiRenderer;
+import net.vulkanic.gui.AbsorptionHeartRequest;
+import net.vulkanic.gui.AbsorptionHeartVariant;
+import net.vulkanic.gui.GuiHeartState;
+import net.vulkanic.gui.PlayerHeartRequest;
+import net.vulkanic.gui.PlayerHeartVariant;
 import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.Nullable;
 
@@ -886,7 +891,7 @@ public class Gui {
 			int m = guiGraphics.guiWidth() / 2 + 91;
 			int n = guiGraphics.guiHeight() - 39;
 			float f = Math.max(diagnosticPlayerMaxHealth((float)player.getAttributeValue(Attributes.MAX_HEALTH)), Math.max(j, i));
-			int o = Mth.ceil(player.getAbsorptionAmount());
+			int o = Mth.ceil(diagnosticPlayerAbsorption(player.getAbsorptionAmount()));
 			int p = Mth.ceil((f + o) / 2.0F / 10.0F);
 			int q = Math.max(10 - (p - 2), 3);
 			int r = n - 10;
@@ -919,6 +924,10 @@ public class Gui {
 
 	private static float diagnosticPlayerMaxHealth(float fallback) {
 		return Math.max(1.0F, diagnosticPlayerFloat("mattmc.dev.deterministicCameraCapture.playerMaxHealth", "mattmc.dev.graphicsFrameBenchmark.playerMaxHealth", fallback));
+	}
+
+	private static float diagnosticPlayerAbsorption(float fallback) {
+		return Math.max(0.0F, diagnosticPlayerFloat("mattmc.dev.deterministicCameraCapture.playerAbsorption", "mattmc.dev.graphicsFrameBenchmark.playerAbsorption", fallback));
 	}
 
 	private static float diagnosticPlayerFloat(String primaryProperty, String secondaryProperty, float fallback) {
@@ -969,11 +978,15 @@ public class Gui {
 		int p = Mth.ceil(f / 2.0);
 		int q = Mth.ceil(o / 2.0);
 		int r = p * 2;
-		boolean migratePlayerHearts = !RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()
-			&& !RustGalGuiRenderer.isPlayerHealthDisabledForDiagnostics()
-			&& !RustGalGuiRenderer.isMigratedGuiLegacyControl()
-			&& !RustGalGuiRenderer.isPlayerHealthLegacyControl();
-		List<RustGalGuiRenderer.PlayerHeartRequest> rustPlayerHearts = migratePlayerHearts ? new ArrayList<>() : List.of();
+		boolean playerHeartsDisabled = RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() || RustGalGuiRenderer.isPlayerHealthDisabledForDiagnostics();
+		boolean playerHeartsLegacy = RustGalGuiRenderer.isMigratedGuiLegacyControl() || RustGalGuiRenderer.isPlayerHealthLegacyControl();
+		boolean absorptionHeartsDisabled = RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() || RustGalGuiRenderer.isAbsorptionHealthDisabledForDiagnostics();
+		boolean absorptionHeartsLegacy = RustGalGuiRenderer.isMigratedGuiLegacyControl() || RustGalGuiRenderer.isAbsorptionHealthLegacyControl();
+		boolean migratePlayerHearts = !playerHeartsDisabled && !playerHeartsLegacy;
+		boolean migrateAbsorptionHearts = !absorptionHeartsDisabled && !absorptionHeartsLegacy;
+		List<PlayerHeartRequest> rustPlayerHearts = migratePlayerHearts ? new ArrayList<>() : List.of();
+		List<AbsorptionHeartRequest> rustAbsorptionHearts = migrateAbsorptionHearts ? new ArrayList<>() : List.of();
+		int rustHeartOrder = 0;
 
 		for (int s = p + q - 1; s >= 0; s--) {
 			int t = s / 10;
@@ -988,18 +1001,34 @@ public class Gui {
 				w -= 2;
 			}
 
-			if (migratePlayerHearts && s < p) {
-				rustPlayerHearts.add(new RustGalGuiRenderer.PlayerHeartRequest(
-					RustGalGuiRenderer.PlayerHeartVariant.CONTAINER,
-					RustGalGuiRenderer.PlayerHeartState.CONTAINER,
-					bl2,
-					heartFlash,
-					rustPlayerHearts.size(),
-					v,
-					w
-				));
-			} else if (s >= p || (!RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() && !RustGalGuiRenderer.isPlayerHealthDisabledForDiagnostics())) {
-				this.renderHeart(guiGraphics, Gui.HeartType.CONTAINER, v, w, bl2, heartFlash, false);
+			if (s < p) {
+				if (migratePlayerHearts) {
+					rustPlayerHearts.add(new PlayerHeartRequest(
+						PlayerHeartVariant.CONTAINER,
+						GuiHeartState.CONTAINER,
+						bl2,
+						heartFlash,
+						rustHeartOrder++,
+						v,
+						w
+					));
+				} else if (!playerHeartsDisabled) {
+					this.renderHeart(guiGraphics, Gui.HeartType.CONTAINER, v, w, bl2, heartFlash, false);
+				}
+			} else {
+				if (migrateAbsorptionHearts) {
+					rustAbsorptionHearts.add(new AbsorptionHeartRequest(
+						AbsorptionHeartVariant.CONTAINER,
+						GuiHeartState.CONTAINER,
+						bl2,
+						heartFlash,
+						rustHeartOrder++,
+						v,
+						w
+					));
+				} else if (!absorptionHeartsDisabled) {
+					this.renderHeart(guiGraphics, Gui.HeartType.CONTAINER, v, w, bl2, heartFlash, false);
+				}
 			}
 			int x = s * 2;
 			boolean bl3 = s >= p;
@@ -1007,23 +1036,35 @@ public class Gui {
 				int y = x - r;
 				if (y < o) {
 					boolean bl4 = y + 1 == o;
-					this.renderHeart(guiGraphics, heartType == Gui.HeartType.WITHERED ? heartType : Gui.HeartType.ABSORBING, v, w, bl2, false, bl4);
+					if (migrateAbsorptionHearts) {
+						rustAbsorptionHearts.add(new AbsorptionHeartRequest(
+							rustAbsorptionHeartVariant(heartType),
+							bl4 ? GuiHeartState.HALF : GuiHeartState.FULL,
+							bl2,
+							false,
+							rustHeartOrder++,
+							v,
+							w
+						));
+					} else if (!absorptionHeartsDisabled) {
+						this.renderHeart(guiGraphics, heartType == Gui.HeartType.WITHERED ? heartType : Gui.HeartType.ABSORBING, v, w, bl2, false, bl4);
+					}
 				}
 			}
 
 			if (heartFlash && x < n) {
 				boolean bl5 = x + 1 == n;
 				if (migratePlayerHearts && s < p) {
-					rustPlayerHearts.add(new RustGalGuiRenderer.PlayerHeartRequest(
+					rustPlayerHearts.add(new PlayerHeartRequest(
 						rustHeartVariant(heartType),
-						bl5 ? RustGalGuiRenderer.PlayerHeartState.HALF : RustGalGuiRenderer.PlayerHeartState.FULL,
+						bl5 ? GuiHeartState.HALF : GuiHeartState.FULL,
 						bl2,
 						true,
-						rustPlayerHearts.size(),
+						rustHeartOrder++,
 						v,
 						w
 					));
-				} else if (!RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() && !RustGalGuiRenderer.isPlayerHealthDisabledForDiagnostics()) {
+				} else if (!playerHeartsDisabled) {
 					this.renderHeart(guiGraphics, heartType, v, w, bl2, true, bl5);
 				}
 			}
@@ -1031,34 +1072,41 @@ public class Gui {
 			if (x < m) {
 				boolean bl5 = x + 1 == m;
 				if (migratePlayerHearts && s < p) {
-					rustPlayerHearts.add(new RustGalGuiRenderer.PlayerHeartRequest(
+					rustPlayerHearts.add(new PlayerHeartRequest(
 						rustHeartVariant(heartType),
-						bl5 ? RustGalGuiRenderer.PlayerHeartState.HALF : RustGalGuiRenderer.PlayerHeartState.FULL,
+						bl5 ? GuiHeartState.HALF : GuiHeartState.FULL,
 						bl2,
 						false,
-						rustPlayerHearts.size(),
+						rustHeartOrder++,
 						v,
 						w
 					));
-				} else if (!RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() && !RustGalGuiRenderer.isPlayerHealthDisabledForDiagnostics()) {
+				} else if (!playerHeartsDisabled) {
 					this.renderHeart(guiGraphics, heartType, v, w, bl2, false, bl5);
 				}
 			}
 		}
 
+		if (migrateAbsorptionHearts) {
+			RustGalGuiRenderer.enqueueAbsorptionHearts(this.minecraft, guiGraphics, rustAbsorptionHearts);
+		}
 		if (migratePlayerHearts) {
 			RustGalGuiRenderer.enqueuePlayerHearts(this.minecraft, guiGraphics, rustPlayerHearts);
 		}
 	}
 
-	private static RustGalGuiRenderer.PlayerHeartVariant rustHeartVariant(Gui.HeartType heartType) {
+	private static PlayerHeartVariant rustHeartVariant(Gui.HeartType heartType) {
 		return switch (heartType) {
-			case NORMAL -> RustGalGuiRenderer.PlayerHeartVariant.NORMAL;
-			case POISIONED -> RustGalGuiRenderer.PlayerHeartVariant.POISONED;
-			case WITHERED -> RustGalGuiRenderer.PlayerHeartVariant.WITHERED;
-			case FROZEN -> RustGalGuiRenderer.PlayerHeartVariant.FROZEN;
+			case NORMAL -> PlayerHeartVariant.NORMAL;
+			case POISIONED -> PlayerHeartVariant.POISONED;
+			case WITHERED -> PlayerHeartVariant.WITHERED;
+			case FROZEN -> PlayerHeartVariant.FROZEN;
 			case CONTAINER, ABSORBING -> throw new IllegalArgumentException("not a migrated player-health heart variant: " + heartType);
 		};
+	}
+
+	private static AbsorptionHeartVariant rustAbsorptionHeartVariant(Gui.HeartType heartType) {
+		return heartType == Gui.HeartType.WITHERED ? AbsorptionHeartVariant.WITHERED : AbsorptionHeartVariant.ABSORBING;
 	}
 
 	private void renderHeart(GuiGraphics guiGraphics, Gui.HeartType heartType, int i, int j, boolean bl, boolean bl2, boolean bl3) {

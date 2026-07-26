@@ -31,6 +31,7 @@ public final class RustGalGuiRenderer {
 	private static final String BOSS_BAR_PROGRESS_PRODUCER = "minecraft.gui.boss.progress";
 	private static final String ARMOR_ICON_PRODUCER = "minecraft.gui.armor";
 	private static final String PLAYER_HEART_PRODUCER = "minecraft.gui.player-heart";
+	private static final String ABSORPTION_HEART_PRODUCER = "minecraft.gui.absorption-heart";
 	private static final Object LOCK = new Object();
 	private static VulkanicGalBridge bridge;
 	private static Thread renderThread;
@@ -98,6 +99,14 @@ public final class RustGalGuiRenderer {
 
 	public static boolean isPlayerHealthLegacyControl() {
 		return Boolean.getBoolean("mattmc.dev.rustGalGui.playerHealth.legacyControl");
+	}
+
+	public static boolean isAbsorptionHealthDisabledForDiagnostics() {
+		return Boolean.getBoolean("mattmc.dev.rustGalGui.absorption.disabled");
+	}
+
+	public static boolean isAbsorptionHealthLegacyControl() {
+		return Boolean.getBoolean("mattmc.dev.rustGalGui.absorption.legacyControl");
 	}
 
 	public static void enqueueCrosshair(Minecraft minecraft, net.minecraft.client.gui.GuiGraphics guiGraphics, int x, int y, int width, int height) {
@@ -338,7 +347,7 @@ public final class RustGalGuiRenderer {
 			enqueueGuiSprite(
 				minecraft,
 				guiGraphics,
-				state.sprite(),
+				armorIconSprite(state),
 				ARMOR_ICON_PRODUCER + "." + state.id() + ".slot" + icon,
 				icon,
 				armorValue / 20.0F,
@@ -371,8 +380,37 @@ public final class RustGalGuiRenderer {
 			enqueueGuiSprite(
 				minecraft,
 				guiGraphics,
-				heart.sprite(),
+				playerHeartSprite(heart),
 				PLAYER_HEART_PRODUCER + "." + heart.variant().id() + "." + heart.state().id() + ".order" + heart.order(),
+				heart.order(),
+				heart.state().progressValue(),
+				GuiFillDirection.NONE,
+				heart.x(),
+				heart.y(),
+				9,
+				9,
+				0,
+				0,
+				9,
+				9
+			);
+		}
+	}
+
+	public static void enqueueAbsorptionHearts(
+		Minecraft minecraft,
+		net.minecraft.client.gui.GuiGraphics guiGraphics,
+		List<AbsorptionHeartRequest> hearts
+	) {
+		if (!isCrosshairEnabled() || hearts.isEmpty()) {
+			return;
+		}
+		for (AbsorptionHeartRequest heart : hearts) {
+			enqueueGuiSprite(
+				minecraft,
+				guiGraphics,
+				absorptionHeartSprite(heart),
+				ABSORPTION_HEART_PRODUCER + "." + heart.variant().id() + "." + heart.state().id() + ".order" + heart.order(),
 				heart.order(),
 				heart.state().progressValue(),
 				GuiFillDirection.NONE,
@@ -403,6 +441,110 @@ public final class RustGalGuiRenderer {
 			return ArmorIconState.HALF;
 		}
 		return ArmorIconState.EMPTY;
+	}
+
+	private static GuiSprite armorIconSprite(ArmorIconState state) {
+		return switch (state) {
+			case EMPTY -> GuiSprite.ARMOR_EMPTY;
+			case HALF -> GuiSprite.ARMOR_HALF;
+			case FULL -> GuiSprite.ARMOR_FULL;
+		};
+	}
+
+	private static GuiSprite playerHeartSprite(PlayerHeartRequest request) {
+		return switch (request.variant()) {
+			case CONTAINER -> containerHeartSprite(request.state(), request.hardcore(), request.flashing());
+			case NORMAL -> filledHeartSprite(request.state(), request.hardcore(), request.flashing(),
+				GuiSprite.HEART_NORMAL_FULL,
+				GuiSprite.HEART_NORMAL_FULL_FLASHING,
+				GuiSprite.HEART_NORMAL_HALF,
+				GuiSprite.HEART_NORMAL_HALF_FLASHING,
+				GuiSprite.HEART_NORMAL_HARDCORE_FULL,
+				GuiSprite.HEART_NORMAL_HARDCORE_FULL_FLASHING,
+				GuiSprite.HEART_NORMAL_HARDCORE_HALF,
+				GuiSprite.HEART_NORMAL_HARDCORE_HALF_FLASHING);
+			case POISONED -> filledHeartSprite(request.state(), request.hardcore(), request.flashing(),
+				GuiSprite.HEART_POISONED_FULL,
+				GuiSprite.HEART_POISONED_FULL_FLASHING,
+				GuiSprite.HEART_POISONED_HALF,
+				GuiSprite.HEART_POISONED_HALF_FLASHING,
+				GuiSprite.HEART_POISONED_HARDCORE_FULL,
+				GuiSprite.HEART_POISONED_HARDCORE_FULL_FLASHING,
+				GuiSprite.HEART_POISONED_HARDCORE_HALF,
+				GuiSprite.HEART_POISONED_HARDCORE_HALF_FLASHING);
+			case WITHERED -> filledHeartSprite(request.state(), request.hardcore(), request.flashing(),
+				GuiSprite.HEART_WITHERED_FULL,
+				GuiSprite.HEART_WITHERED_FULL_FLASHING,
+				GuiSprite.HEART_WITHERED_HALF,
+				GuiSprite.HEART_WITHERED_HALF_FLASHING,
+				GuiSprite.HEART_WITHERED_HARDCORE_FULL,
+				GuiSprite.HEART_WITHERED_HARDCORE_FULL_FLASHING,
+				GuiSprite.HEART_WITHERED_HARDCORE_HALF,
+				GuiSprite.HEART_WITHERED_HARDCORE_HALF_FLASHING);
+			case FROZEN -> filledHeartSprite(request.state(), request.hardcore(), request.flashing(),
+				GuiSprite.HEART_FROZEN_FULL,
+				GuiSprite.HEART_FROZEN_FULL_FLASHING,
+				GuiSprite.HEART_FROZEN_HALF,
+				GuiSprite.HEART_FROZEN_HALF_FLASHING,
+				GuiSprite.HEART_FROZEN_HARDCORE_FULL,
+				GuiSprite.HEART_FROZEN_HARDCORE_FULL_FLASHING,
+				GuiSprite.HEART_FROZEN_HARDCORE_HALF,
+				GuiSprite.HEART_FROZEN_HARDCORE_HALF_FLASHING);
+		};
+	}
+
+	private static GuiSprite absorptionHeartSprite(AbsorptionHeartRequest request) {
+		return switch (request.variant()) {
+			case CONTAINER -> containerHeartSprite(request.state(), request.hardcore(), request.flashing());
+			case ABSORBING -> filledHeartSprite(request.state(), request.hardcore(), request.flashing(),
+				GuiSprite.HEART_ABSORBING_FULL,
+				GuiSprite.HEART_ABSORBING_FULL_FLASHING,
+				GuiSprite.HEART_ABSORBING_HALF,
+				GuiSprite.HEART_ABSORBING_HALF_FLASHING,
+				GuiSprite.HEART_ABSORBING_HARDCORE_FULL,
+				GuiSprite.HEART_ABSORBING_HARDCORE_FULL_FLASHING,
+				GuiSprite.HEART_ABSORBING_HARDCORE_HALF,
+				GuiSprite.HEART_ABSORBING_HARDCORE_HALF_FLASHING);
+			case WITHERED -> filledHeartSprite(request.state(), request.hardcore(), request.flashing(),
+				GuiSprite.HEART_WITHERED_FULL,
+				GuiSprite.HEART_WITHERED_FULL_FLASHING,
+				GuiSprite.HEART_WITHERED_HALF,
+				GuiSprite.HEART_WITHERED_HALF_FLASHING,
+				GuiSprite.HEART_WITHERED_HARDCORE_FULL,
+				GuiSprite.HEART_WITHERED_HARDCORE_FULL_FLASHING,
+				GuiSprite.HEART_WITHERED_HARDCORE_HALF,
+				GuiSprite.HEART_WITHERED_HARDCORE_HALF_FLASHING);
+		};
+	}
+
+	private static GuiSprite containerHeartSprite(GuiHeartState state, boolean hardcore, boolean flashing) {
+		if (state != GuiHeartState.CONTAINER) {
+			throw new IllegalArgumentException("container heart variant cannot render " + state);
+		}
+		if (hardcore) {
+			return flashing ? GuiSprite.HEART_CONTAINER_HARDCORE_FLASHING : GuiSprite.HEART_CONTAINER_HARDCORE;
+		}
+		return flashing ? GuiSprite.HEART_CONTAINER_FLASHING : GuiSprite.HEART_CONTAINER;
+	}
+
+	private static GuiSprite filledHeartSprite(
+		GuiHeartState state,
+		boolean hardcore,
+		boolean flashing,
+		GuiSprite full,
+		GuiSprite fullFlashing,
+		GuiSprite half,
+		GuiSprite halfFlashing,
+		GuiSprite hardcoreFull,
+		GuiSprite hardcoreFullFlashing,
+		GuiSprite hardcoreHalf,
+		GuiSprite hardcoreHalfFlashing
+	) {
+		return switch (state) {
+			case CONTAINER -> throw new IllegalArgumentException("filled heart variant cannot render a container");
+			case FULL -> hardcore ? (flashing ? hardcoreFullFlashing : hardcoreFull) : (flashing ? fullFlashing : full);
+			case HALF -> hardcore ? (flashing ? hardcoreHalfFlashing : hardcoreHalf) : (flashing ? halfFlashing : half);
+		};
 	}
 
 	private static void enqueueGuiSprite(
@@ -812,6 +954,10 @@ public final class RustGalGuiRenderer {
 		return GuiBatchBuilder.debugPackedUniformCommandSequenceForTests(strata, resourceKeys);
 	}
 
+	public static GuiSprite debugArmorSpriteForTests(ArmorIconState state) {
+		return armorIconSprite(state);
+	}
+
 	public static float[] debugArmorOpenGlUvYRangeForTests(ArmorIconState state) {
 		return GuiBatchBuilder.debugArmorOpenGlUvYRangeForTests(state);
 	}
@@ -1152,170 +1298,6 @@ public final class RustGalGuiRenderer {
 			case NOTCHED_12 -> GuiSprite.BOSS_BAR_NOTCHED_12_PROGRESS;
 			case NOTCHED_20 -> GuiSprite.BOSS_BAR_NOTCHED_20_PROGRESS;
 		};
-	}
-
-	public enum ArmorIconState {
-		EMPTY("empty", GuiSprite.ARMOR_EMPTY),
-		HALF("half", GuiSprite.ARMOR_HALF),
-		FULL("full", GuiSprite.ARMOR_FULL);
-
-		private final String id;
-		private final GuiSprite sprite;
-
-		ArmorIconState(String id, GuiSprite sprite) {
-			this.id = id;
-			this.sprite = sprite;
-		}
-
-		String id() {
-			return this.id;
-		}
-
-		GuiSprite sprite() {
-			return this.sprite;
-		}
-	}
-
-	public record PlayerHeartRequest(
-		PlayerHeartVariant variant,
-		PlayerHeartState state,
-		boolean hardcore,
-		boolean flashing,
-		int order,
-		int x,
-		int y
-	) {
-		public PlayerHeartRequest {
-			if (variant == null) {
-				throw new IllegalArgumentException("player heart variant must be provided");
-			}
-			if (state == null) {
-				throw new IllegalArgumentException("player heart state must be provided");
-			}
-			if (order < 0) {
-				throw new IllegalArgumentException("player heart order must be non-negative: " + order);
-			}
-			if (state == PlayerHeartState.CONTAINER && variant != PlayerHeartVariant.CONTAINER) {
-				throw new IllegalArgumentException("container player hearts must use the container variant");
-			}
-			if (state != PlayerHeartState.CONTAINER && variant == PlayerHeartVariant.CONTAINER) {
-				throw new IllegalArgumentException("filled player hearts must use a non-container variant");
-			}
-		}
-
-		GuiSprite sprite() {
-			return variant.sprite(state, hardcore, flashing);
-		}
-	}
-
-	public enum PlayerHeartState {
-		CONTAINER("container", 0.0F),
-		HALF("half", 0.5F),
-		FULL("full", 1.0F);
-
-		private final String id;
-		private final float progressValue;
-
-		PlayerHeartState(String id, float progressValue) {
-			this.id = id;
-			this.progressValue = progressValue;
-		}
-
-		String id() {
-			return this.id;
-		}
-
-		float progressValue() {
-			return this.progressValue;
-		}
-	}
-
-	public enum PlayerHeartVariant {
-		CONTAINER("container"),
-		NORMAL("normal"),
-		POISONED("poisoned"),
-		WITHERED("withered"),
-		FROZEN("frozen");
-
-		private final String id;
-
-		PlayerHeartVariant(String id) {
-			this.id = id;
-		}
-
-		String id() {
-			return this.id;
-		}
-
-		GuiSprite sprite(PlayerHeartState state, boolean hardcore, boolean flashing) {
-			return switch (this) {
-				case CONTAINER -> {
-					if (state != PlayerHeartState.CONTAINER) {
-						throw new IllegalArgumentException("container heart variant cannot render " + state);
-					}
-					if (hardcore) {
-						yield flashing ? GuiSprite.HEART_CONTAINER_HARDCORE_FLASHING : GuiSprite.HEART_CONTAINER_HARDCORE;
-					}
-					yield flashing ? GuiSprite.HEART_CONTAINER_FLASHING : GuiSprite.HEART_CONTAINER;
-				}
-				case NORMAL -> filledSprite(state, hardcore, flashing,
-					GuiSprite.HEART_NORMAL_FULL,
-					GuiSprite.HEART_NORMAL_FULL_FLASHING,
-					GuiSprite.HEART_NORMAL_HALF,
-					GuiSprite.HEART_NORMAL_HALF_FLASHING,
-					GuiSprite.HEART_NORMAL_HARDCORE_FULL,
-					GuiSprite.HEART_NORMAL_HARDCORE_FULL_FLASHING,
-					GuiSprite.HEART_NORMAL_HARDCORE_HALF,
-					GuiSprite.HEART_NORMAL_HARDCORE_HALF_FLASHING);
-				case POISONED -> filledSprite(state, hardcore, flashing,
-					GuiSprite.HEART_POISONED_FULL,
-					GuiSprite.HEART_POISONED_FULL_FLASHING,
-					GuiSprite.HEART_POISONED_HALF,
-					GuiSprite.HEART_POISONED_HALF_FLASHING,
-					GuiSprite.HEART_POISONED_HARDCORE_FULL,
-					GuiSprite.HEART_POISONED_HARDCORE_FULL_FLASHING,
-					GuiSprite.HEART_POISONED_HARDCORE_HALF,
-					GuiSprite.HEART_POISONED_HARDCORE_HALF_FLASHING);
-				case WITHERED -> filledSprite(state, hardcore, flashing,
-					GuiSprite.HEART_WITHERED_FULL,
-					GuiSprite.HEART_WITHERED_FULL_FLASHING,
-					GuiSprite.HEART_WITHERED_HALF,
-					GuiSprite.HEART_WITHERED_HALF_FLASHING,
-					GuiSprite.HEART_WITHERED_HARDCORE_FULL,
-					GuiSprite.HEART_WITHERED_HARDCORE_FULL_FLASHING,
-					GuiSprite.HEART_WITHERED_HARDCORE_HALF,
-					GuiSprite.HEART_WITHERED_HARDCORE_HALF_FLASHING);
-				case FROZEN -> filledSprite(state, hardcore, flashing,
-					GuiSprite.HEART_FROZEN_FULL,
-					GuiSprite.HEART_FROZEN_FULL_FLASHING,
-					GuiSprite.HEART_FROZEN_HALF,
-					GuiSprite.HEART_FROZEN_HALF_FLASHING,
-					GuiSprite.HEART_FROZEN_HARDCORE_FULL,
-					GuiSprite.HEART_FROZEN_HARDCORE_FULL_FLASHING,
-					GuiSprite.HEART_FROZEN_HARDCORE_HALF,
-					GuiSprite.HEART_FROZEN_HARDCORE_HALF_FLASHING);
-			};
-		}
-
-		private static GuiSprite filledSprite(
-			PlayerHeartState state,
-			boolean hardcore,
-			boolean flashing,
-			GuiSprite full,
-			GuiSprite fullFlashing,
-			GuiSprite half,
-			GuiSprite halfFlashing,
-			GuiSprite hardcoreFull,
-			GuiSprite hardcoreFullFlashing,
-			GuiSprite hardcoreHalf,
-			GuiSprite hardcoreHalfFlashing
-		) {
-			return switch (state) {
-				case CONTAINER -> throw new IllegalArgumentException("filled player heart variant cannot render a container");
-				case FULL -> hardcore ? (flashing ? hardcoreFullFlashing : hardcoreFull) : (flashing ? fullFlashing : full);
-				case HALF -> hardcore ? (flashing ? hardcoreHalfFlashing : hardcoreHalf) : (flashing ? halfFlashing : half);
-			};
-		}
 	}
 
 	private record FrameResources(long target, long pass) {
@@ -1711,6 +1693,78 @@ public final class RustGalGuiRenderer {
 					"player-heart-frozen",
 					"gui-textured-alpha-heart-frozen-hardcore-half-flashing",
 					"/assets/minecraft/textures/gui/sprites/hud/heart/frozen_hardcore_half_blinking.png",
+					9,
+					9,
+					false
+				),
+				HEART_ABSORBING_FULL(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"absorption-heart",
+					"gui-textured-alpha-heart-absorbing-full",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/absorbing_full.png",
+					9,
+					9,
+					false
+				),
+				HEART_ABSORBING_FULL_FLASHING(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"absorption-heart",
+					"gui-textured-alpha-heart-absorbing-full-flashing",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/absorbing_full_blinking.png",
+					9,
+					9,
+					false
+				),
+				HEART_ABSORBING_HALF(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"absorption-heart",
+					"gui-textured-alpha-heart-absorbing-half",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/absorbing_half.png",
+					9,
+					9,
+					false
+				),
+				HEART_ABSORBING_HALF_FLASHING(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"absorption-heart",
+					"gui-textured-alpha-heart-absorbing-half-flashing",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/absorbing_half_blinking.png",
+					9,
+					9,
+					false
+				),
+				HEART_ABSORBING_HARDCORE_FULL(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"absorption-heart",
+					"gui-textured-alpha-heart-absorbing-hardcore-full",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/absorbing_hardcore_full.png",
+					9,
+					9,
+					false
+				),
+				HEART_ABSORBING_HARDCORE_FULL_FLASHING(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"absorption-heart",
+					"gui-textured-alpha-heart-absorbing-hardcore-full-flashing",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/absorbing_hardcore_full_blinking.png",
+					9,
+					9,
+					false
+				),
+				HEART_ABSORBING_HARDCORE_HALF(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"absorption-heart",
+					"gui-textured-alpha-heart-absorbing-hardcore-half",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/absorbing_hardcore_half.png",
+					9,
+					9,
+					false
+				),
+				HEART_ABSORBING_HARDCORE_HALF_FLASHING(
+					GuiRenderStratum.GUI_PLAYER_HEALTH,
+					"absorption-heart",
+					"gui-textured-alpha-heart-absorbing-hardcore-half-flashing",
+					"/assets/minecraft/textures/gui/sprites/hud/heart/absorbing_hardcore_half_blinking.png",
 					9,
 					9,
 					false

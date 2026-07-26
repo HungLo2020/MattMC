@@ -110,9 +110,10 @@ public final class GuiBatchBuilder {
 		return sequence;
 	}
 
-	static float[] debugArmorOpenGlUvYRangeForTests(RustGalGuiRenderer.ArmorIconState state) {
+	static float[] debugArmorOpenGlUvYRangeForTests(ArmorIconState state) {
+		RustGalGuiRenderer.GuiSprite guiSprite = RustGalGuiRenderer.debugArmorSpriteForTests(state);
 		PackedSprite sprite = new PackedSprite(
-			state.sprite(),
+			guiSprite,
 			"minecraft.gui.armor." + state.id(),
 			0,
 			1.0F,
@@ -135,11 +136,11 @@ public final class GuiBatchBuilder {
 		return new float[] {originY + height, originY};
 	}
 
-	static int[] debugArmorOpenGlSampledLocalRowsForTests(RustGalGuiRenderer.ArmorIconState state, int guiScale) {
+	static int[] debugArmorOpenGlSampledLocalRowsForTests(ArmorIconState state, int guiScale) {
 		if (guiScale <= 0) {
 			throw new IllegalArgumentException("GUI scale must be positive: " + guiScale);
 		}
-		RustGalGuiRenderer.GuiSprite guiSprite = state.sprite();
+		RustGalGuiRenderer.GuiSprite guiSprite = RustGalGuiRenderer.debugArmorSpriteForTests(state);
 		PackedSprite sprite = new PackedSprite(
 			guiSprite,
 			"minecraft.gui.armor." + state.id(),

@@ -77,6 +77,8 @@ public final class DeterministicCameraCapture {
 		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.playerHealth", "NaN"));
 	private static final float FORCED_PLAYER_MAX_HEALTH =
 		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.playerMaxHealth", "NaN"));
+	private static final float FORCED_PLAYER_ABSORPTION =
+		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.playerAbsorption", "NaN"));
 	private static final String FORCED_PLAYER_HEART_VARIANT =
 		System.getProperty("mattmc.dev.deterministicCameraCapture.playerHeartVariant", "").trim();
 	private static final boolean FORCE_PLAYER_HEALTH_REGEN =
@@ -1022,6 +1024,10 @@ public final class DeterministicCameraCapture {
 				appendField(json, "attackTargetEntity", minecraft.crosshairPickEntity == null ? "none" : minecraft.crosshairPickEntity.getType().toShortString()).append(",\n");
 			json.append("  \"armorValue\": ").append(player == null ? -1 : player.getArmorValue()).append(",\n");
 			json.append("  \"armorValueOverride\": ").append(FORCED_ARMOR_VALUE).append(",\n");
+			json.append("  \"playerHealthOverride\": ").append(format(FORCED_PLAYER_HEALTH)).append(",\n");
+			json.append("  \"playerMaxHealthOverride\": ").append(format(FORCED_PLAYER_MAX_HEALTH)).append(",\n");
+			json.append("  \"playerAbsorption\": ").append(player == null ? -1.0F : player.getAbsorptionAmount()).append(",\n");
+			json.append("  \"playerAbsorptionOverride\": ").append(format(FORCED_PLAYER_ABSORPTION)).append(",\n");
 			json.append("  \"hideChat\": ").append(HIDE_CHAT).append(",\n");
 			json.append("  \"bossBarOverride\": ").append(hasBossBarOverride()).append(",\n");
 			json.append("  \"bossBarCount\": ").append(hasBossBarOverride() ? forcedBossBarCount() : -1).append(",\n");

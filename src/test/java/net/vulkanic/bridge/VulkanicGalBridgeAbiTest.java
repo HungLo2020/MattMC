@@ -1,6 +1,12 @@
 package net.vulkanic.bridge;
 
 import net.vulkanic.gui.GuiRenderStratum;
+import net.vulkanic.gui.AbsorptionHeartRequest;
+import net.vulkanic.gui.AbsorptionHeartVariant;
+import net.vulkanic.gui.ArmorIconState;
+import net.vulkanic.gui.GuiHeartState;
+import net.vulkanic.gui.PlayerHeartRequest;
+import net.vulkanic.gui.PlayerHeartVariant;
 import net.vulkanic.gui.RustGalGuiRenderer;
 import org.junit.jupiter.api.Test;
 
@@ -80,17 +86,17 @@ class VulkanicGalBridgeAbiTest {
 
 	@Test
 	void guiSpriteBatchingPreservesIncompatibleStratumAndStateBoundaries() {
-		assertEquals(RustGalGuiRenderer.ArmorIconState.EMPTY, RustGalGuiRenderer.armorIconStateForTests(0, 0));
-		assertEquals(RustGalGuiRenderer.ArmorIconState.HALF, RustGalGuiRenderer.armorIconStateForTests(1, 0));
-		assertEquals(RustGalGuiRenderer.ArmorIconState.FULL, RustGalGuiRenderer.armorIconStateForTests(2, 0));
-		assertEquals(RustGalGuiRenderer.ArmorIconState.EMPTY, RustGalGuiRenderer.armorIconStateForTests(18, 9));
-		assertEquals(RustGalGuiRenderer.ArmorIconState.HALF, RustGalGuiRenderer.armorIconStateForTests(19, 9));
-		assertEquals(RustGalGuiRenderer.ArmorIconState.FULL, RustGalGuiRenderer.armorIconStateForTests(20, 9));
-		for (RustGalGuiRenderer.ArmorIconState state : RustGalGuiRenderer.ArmorIconState.values()) {
+		assertEquals(ArmorIconState.EMPTY, RustGalGuiRenderer.armorIconStateForTests(0, 0));
+		assertEquals(ArmorIconState.HALF, RustGalGuiRenderer.armorIconStateForTests(1, 0));
+		assertEquals(ArmorIconState.FULL, RustGalGuiRenderer.armorIconStateForTests(2, 0));
+		assertEquals(ArmorIconState.EMPTY, RustGalGuiRenderer.armorIconStateForTests(18, 9));
+		assertEquals(ArmorIconState.HALF, RustGalGuiRenderer.armorIconStateForTests(19, 9));
+		assertEquals(ArmorIconState.FULL, RustGalGuiRenderer.armorIconStateForTests(20, 9));
+		for (ArmorIconState state : ArmorIconState.values()) {
 			float[] uvY = RustGalGuiRenderer.debugArmorOpenGlUvYRangeForTests(state);
 			assertTrue(uvY[0] > uvY[1], "top GUI vertex must sample above bottom vertex for " + state);
 		}
-		for (RustGalGuiRenderer.ArmorIconState state : RustGalGuiRenderer.ArmorIconState.values()) {
+		for (ArmorIconState state : ArmorIconState.values()) {
 			for (int guiScale = 1; guiScale <= 4; guiScale++) {
 				int[] sampledRows = RustGalGuiRenderer.debugArmorOpenGlSampledLocalRowsForTests(state, guiScale);
 				assertEquals(9 * guiScale, sampledRows.length, "armor row coverage length for " + state + " scale=" + guiScale);
@@ -118,65 +124,89 @@ class VulkanicGalBridgeAbiTest {
 		for (int armor = 0; armor <= 20; armor++) {
 			for (int icon = 0; icon < 10; icon++) {
 				int threshold = icon * 2 + 1;
-				RustGalGuiRenderer.ArmorIconState expected = threshold < armor
-					? RustGalGuiRenderer.ArmorIconState.FULL
-					: threshold == armor ? RustGalGuiRenderer.ArmorIconState.HALF : RustGalGuiRenderer.ArmorIconState.EMPTY;
+				ArmorIconState expected = threshold < armor
+					? ArmorIconState.FULL
+					: threshold == armor ? ArmorIconState.HALF : ArmorIconState.EMPTY;
 				assertEquals(expected, RustGalGuiRenderer.armorIconStateForTests(armor, icon), "armor=" + armor + " icon=" + icon);
 			}
 		}
-		assertThrows(IllegalArgumentException.class, () -> new RustGalGuiRenderer.PlayerHeartRequest(
-			RustGalGuiRenderer.PlayerHeartVariant.NORMAL,
-			RustGalGuiRenderer.PlayerHeartState.CONTAINER,
+		assertThrows(IllegalArgumentException.class, () -> new PlayerHeartRequest(
+			PlayerHeartVariant.NORMAL,
+			GuiHeartState.CONTAINER,
 			false,
 			false,
 			0,
 			0,
 			0
 		));
-		assertThrows(IllegalArgumentException.class, () -> new RustGalGuiRenderer.PlayerHeartRequest(
-			RustGalGuiRenderer.PlayerHeartVariant.CONTAINER,
-			RustGalGuiRenderer.PlayerHeartState.FULL,
+		assertThrows(IllegalArgumentException.class, () -> new PlayerHeartRequest(
+			PlayerHeartVariant.CONTAINER,
+			GuiHeartState.FULL,
 			false,
 			false,
 			0,
 			0,
 			0
 		));
-		assertThrows(IllegalArgumentException.class, () -> new RustGalGuiRenderer.PlayerHeartRequest(
-			RustGalGuiRenderer.PlayerHeartVariant.NORMAL,
-			RustGalGuiRenderer.PlayerHeartState.FULL,
+		assertThrows(IllegalArgumentException.class, () -> new PlayerHeartRequest(
+			PlayerHeartVariant.NORMAL,
+			GuiHeartState.FULL,
 			false,
 			false,
 			-1,
 			0,
 			0
 		));
-		for (RustGalGuiRenderer.PlayerHeartVariant variant : List.of(
-			RustGalGuiRenderer.PlayerHeartVariant.NORMAL,
-			RustGalGuiRenderer.PlayerHeartVariant.POISONED,
-			RustGalGuiRenderer.PlayerHeartVariant.WITHERED,
-			RustGalGuiRenderer.PlayerHeartVariant.FROZEN
+		for (PlayerHeartVariant variant : List.of(
+			PlayerHeartVariant.NORMAL,
+			PlayerHeartVariant.POISONED,
+			PlayerHeartVariant.WITHERED,
+			PlayerHeartVariant.FROZEN
 		)) {
-			for (RustGalGuiRenderer.PlayerHeartState state : List.of(
-				RustGalGuiRenderer.PlayerHeartState.HALF,
-				RustGalGuiRenderer.PlayerHeartState.FULL
+			for (GuiHeartState state : List.of(
+				GuiHeartState.HALF,
+				GuiHeartState.FULL
 			)) {
 				for (boolean hardcore : List.of(false, true)) {
 					for (boolean flashing : List.of(false, true)) {
-						new RustGalGuiRenderer.PlayerHeartRequest(variant, state, hardcore, flashing, 1, 2, 3);
+						new PlayerHeartRequest(variant, state, hardcore, flashing, 1, 2, 3);
 					}
 				}
 			}
 		}
-		new RustGalGuiRenderer.PlayerHeartRequest(
-			RustGalGuiRenderer.PlayerHeartVariant.CONTAINER,
-			RustGalGuiRenderer.PlayerHeartState.CONTAINER,
+		new PlayerHeartRequest(
+			PlayerHeartVariant.CONTAINER,
+			GuiHeartState.CONTAINER,
 			true,
 			true,
 			0,
 			2,
 			3
 		);
+		assertThrows(IllegalArgumentException.class, () -> new AbsorptionHeartRequest(
+			AbsorptionHeartVariant.ABSORBING,
+			GuiHeartState.CONTAINER,
+			false,
+			false,
+			0,
+			0,
+			0
+		));
+		assertThrows(IllegalArgumentException.class, () -> new AbsorptionHeartRequest(
+			AbsorptionHeartVariant.CONTAINER,
+			GuiHeartState.FULL,
+			false,
+			false,
+			0,
+			0,
+			0
+		));
+		for (AbsorptionHeartVariant variant : List.of(AbsorptionHeartVariant.ABSORBING, AbsorptionHeartVariant.WITHERED)) {
+			for (GuiHeartState state : List.of(GuiHeartState.HALF, GuiHeartState.FULL)) {
+				new AbsorptionHeartRequest(variant, state, true, false, 1, 2, 3);
+			}
+		}
+		new AbsorptionHeartRequest(AbsorptionHeartVariant.CONTAINER, GuiHeartState.CONTAINER, true, true, 0, 2, 3);
 
 			assertEquals(
 			List.of(2, 1, 1, 2),
@@ -337,6 +367,8 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(queue.contains("mattmc.dev.rustGalGui.armor.legacyControl"));
 		assertTrue(queue.contains("mattmc.dev.rustGalGui.playerHealth.disabled"));
 		assertTrue(queue.contains("mattmc.dev.rustGalGui.playerHealth.legacyControl"));
+		assertTrue(queue.contains("mattmc.dev.rustGalGui.absorption.disabled"));
+		assertTrue(queue.contains("mattmc.dev.rustGalGui.absorption.legacyControl"));
 		assertTrue(queue.contains("HOTBAR_SELECTION_PRODUCER"));
 		assertTrue(queue.contains("EXPERIENCE_BACKGROUND_PRODUCER"));
 		assertTrue(queue.contains("EXPERIENCE_PROGRESS_PRODUCER"));
@@ -348,13 +380,14 @@ class VulkanicGalBridgeAbiTest {
 			assertTrue(queue.contains("BOSS_BAR_PROGRESS_PRODUCER"));
 			assertTrue(queue.contains("ARMOR_ICON_PRODUCER"));
 			assertTrue(queue.contains("PLAYER_HEART_PRODUCER"));
+			assertTrue(queue.contains("ABSORPTION_HEART_PRODUCER"));
 			assertTrue(queue.contains("selected hotbar slot must be in 0..8"));
 			assertTrue(queue.contains("armor value must be in 0..20"));
 			assertTrue(queue.contains("PlayerHeartRequest"));
+			assertTrue(queue.contains("AbsorptionHeartRequest"));
 			assertFalse(queue.contains("getHealth()"));
 			assertFalse(queue.contains("getMaxHealth()"));
 			assertFalse(queue.contains("getAbsorptionAmount()"));
-			assertFalse(queue.contains("HEART_ABSORBING"));
 			assertTrue(queue.contains("experience progress fraction must be finite"));
 		assertTrue(queue.contains("experience bar filled width is outside the vanilla range"));
 		assertTrue(queue.contains("crosshair attack indicator filled width must be in 0..16"));
@@ -381,6 +414,7 @@ class VulkanicGalBridgeAbiTest {
 			assertTrue(queue.contains("GuiSprite.HEART_POISONED_FULL"));
 			assertTrue(queue.contains("GuiSprite.HEART_WITHERED_FULL"));
 			assertTrue(queue.contains("GuiSprite.HEART_FROZEN_FULL"));
+			assertTrue(queue.contains("GuiSprite.HEART_ABSORBING_FULL"));
 			assertTrue(queue.contains("GuiSprite.EXPERIENCE_BAR_BACKGROUND"));
 		assertTrue(queue.contains("GuiSprite.EXPERIENCE_BAR_PROGRESS"));
 		assertTrue(queue.contains("GuiSprite.CROSSHAIR_ATTACK_BACKGROUND"));
@@ -411,12 +445,16 @@ class VulkanicGalBridgeAbiTest {
 			assertTrue(gui.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, ARMOR_EMPTY_SPRITE", armorMethod)
 				< gui.indexOf("RustGalGuiRenderer.enqueueArmorIcons", armorMethod));
 			int healthMethod = gui.indexOf("private void renderHearts");
-			assertTrue(gui.indexOf("rustPlayerHearts.add(new RustGalGuiRenderer.PlayerHeartRequest", healthMethod)
+			assertTrue(gui.indexOf("rustAbsorptionHearts.add(new AbsorptionHeartRequest", healthMethod)
+				< gui.indexOf("RustGalGuiRenderer.enqueueAbsorptionHearts", healthMethod));
+			assertTrue(gui.indexOf("rustPlayerHearts.add(new PlayerHeartRequest", healthMethod)
+				< gui.indexOf("RustGalGuiRenderer.enqueuePlayerHearts", healthMethod));
+			assertTrue(gui.indexOf("RustGalGuiRenderer.enqueueAbsorptionHearts", healthMethod)
 				< gui.indexOf("RustGalGuiRenderer.enqueuePlayerHearts", healthMethod));
 			assertTrue(gui.indexOf("rustHeartVariant(heartType)", healthMethod)
 				< gui.indexOf("RustGalGuiRenderer.enqueuePlayerHearts", healthMethod));
-			assertTrue(gui.indexOf("HEART_ABSORBING", healthMethod)
-				< gui.indexOf("RustGalGuiRenderer.enqueuePlayerHearts", healthMethod));
+			assertTrue(gui.indexOf("rustAbsorptionHeartVariant(heartType)", healthMethod)
+				< gui.indexOf("RustGalGuiRenderer.enqueueAbsorptionHearts", healthMethod));
 			int experienceMethod = experienceBar.indexOf("renderBackground");
 		assertTrue(experienceBar.indexOf("RustGalGuiRenderer.isMigratedGuiLegacyControl()", experienceMethod)
 			< experienceBar.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, EXPERIENCE_BAR_BACKGROUND_SPRITE", experienceMethod));
@@ -496,10 +534,22 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(gui.contains("RustGalGuiRenderer.enqueueCrosshair"));
 		assertTrue(gui.contains("RustGalGuiRenderer.enqueueArmorIcons"));
 		assertTrue(gui.contains("RustGalGuiRenderer.enqueuePlayerHearts"));
-		assertTrue(gui.contains("List<RustGalGuiRenderer.PlayerHeartRequest> rustPlayerHearts"));
+		assertTrue(gui.contains("RustGalGuiRenderer.enqueueAbsorptionHearts"));
+		assertTrue(gui.contains("List<PlayerHeartRequest> rustPlayerHearts"));
+		assertTrue(gui.contains("List<AbsorptionHeartRequest> rustAbsorptionHearts"));
 		assertTrue(gui.contains("rustHeartVariant(heartType)"));
+		assertTrue(gui.contains("rustAbsorptionHeartVariant(heartType)"));
 		assertTrue(gui.contains("diagnosticPlayerHealth(player.getHealth())"));
 		assertTrue(gui.contains("diagnosticPlayerMaxHealth((float)player.getAttributeValue(Attributes.MAX_HEALTH))"));
+		assertTrue(gui.contains("diagnosticPlayerAbsorption(player.getAbsorptionAmount())"));
+		assertFalse(guiRenderer.contains("public record PlayerHeartRequest"));
+		assertFalse(guiRenderer.contains("public enum PlayerHeartVariant"));
+		assertFalse(guiRenderer.contains("public enum PlayerHeartState"));
+		assertFalse(guiRenderer.contains("public enum ArmorIconState"));
+		assertTrue(Files.exists(Path.of("src/main/java/net/vulkanic/gui/PlayerHeartRequest.java")));
+		assertTrue(Files.exists(Path.of("src/main/java/net/vulkanic/gui/AbsorptionHeartRequest.java")));
+		assertTrue(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiHeartState.java")));
+		assertTrue(Files.exists(Path.of("src/main/java/net/vulkanic/gui/ArmorIconState.java")));
 		assertTrue(bossOverlay.contains("RustGalGuiRenderer.enqueueBossBar"));
 		assertTrue(experienceBar.contains("RustGalGuiRenderer.enqueueExperienceBar"));
 		assertFalse(guiRenderer.contains("GL_TEXTURE"));

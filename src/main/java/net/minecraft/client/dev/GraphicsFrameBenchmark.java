@@ -54,6 +54,8 @@ public final class GraphicsFrameBenchmark {
 		Float.parseFloat(System.getProperty("mattmc.dev.graphicsFrameBenchmark.playerHealth", "NaN"));
 	private static final float FORCED_PLAYER_MAX_HEALTH =
 		Float.parseFloat(System.getProperty("mattmc.dev.graphicsFrameBenchmark.playerMaxHealth", "NaN"));
+	private static final float FORCED_PLAYER_ABSORPTION =
+		Float.parseFloat(System.getProperty("mattmc.dev.graphicsFrameBenchmark.playerAbsorption", "NaN"));
 	private static final String FORCED_GAME_MODE = System.getProperty("mattmc.dev.graphicsFrameBenchmark.gameMode", "").trim();
 	private static final Path STATUS_PATH = Path.of(System.getProperty("mattmc.dev.graphicsFrameBenchmark.status", "run/graphics_frame_benchmark.json"));
 	private static final String WORKLOAD_COUNTER_DEFINITION_VERSION = "phase-family-v2";
@@ -433,6 +435,7 @@ public final class GraphicsFrameBenchmark {
 		int entityCount = minecraft.level == null ? -1 : minecraft.level.getEntityCount();
 		int playerCount = minecraft.level == null ? -1 : minecraft.level.players().size();
 		int armorValue = minecraft.player == null ? -1 : minecraft.player.getArmorValue();
+		float absorptionValue = minecraft.player == null ? -1.0F : minecraft.player.getAbsorptionAmount();
 		String gameMode = minecraft.gameMode == null ? "missing" : String.valueOf(minecraft.gameMode.getPlayerMode());
 		String screen = minecraft.screen == null ? "none" : minecraft.screen.getClass().getSimpleName();
 		String overlay = minecraft.getOverlay() == null ? "none" : minecraft.getOverlay().getClass().getSimpleName();
@@ -453,6 +456,10 @@ public final class GraphicsFrameBenchmark {
 		json.append("    \"guiScale\": ").append(minecraft.options.guiScale().get()).append(",\n");
 		json.append("    \"armorValue\": ").append(armorValue).append(",\n");
 		json.append("    \"armorValueOverride\": ").append(FORCED_ARMOR_VALUE).append(",\n");
+		json.append("    \"playerHealthOverride\": ").append(format(FORCED_PLAYER_HEALTH)).append(",\n");
+		json.append("    \"playerMaxHealthOverride\": ").append(format(FORCED_PLAYER_MAX_HEALTH)).append(",\n");
+		json.append("    \"playerAbsorption\": ").append(format(absorptionValue)).append(",\n");
+		json.append("    \"playerAbsorptionOverride\": ").append(format(FORCED_PLAYER_ABSORPTION)).append(",\n");
 		field(json, "gameMode", gameMode, 4, true);
 		field(json, "gameModeOverride", FORCED_GAME_MODE, 4, true);
 		field(json, "rustGalGuiControl", rustGalGuiControl(), 4, true);
@@ -640,6 +647,12 @@ public final class GraphicsFrameBenchmark {
 	}
 
 	private static String rustGalGuiControl() {
+		if (Boolean.getBoolean("mattmc.dev.rustGalGui.absorption.disabled")) {
+			return "absorption-disabled";
+		}
+		if (Boolean.getBoolean("mattmc.dev.rustGalGui.absorption.legacyControl")) {
+			return "absorption-legacy";
+		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalGui.playerHealth.disabled")) {
 			return "player-health-disabled";
 		}

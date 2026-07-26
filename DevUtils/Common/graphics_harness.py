@@ -68,6 +68,14 @@ class MatrixResult:
 
 
 @dataclass(frozen=True)
+class TracyListener:
+    port: int
+    pid: int | None = None
+    process: str | None = None
+    source: str = "proc"
+
+
+@dataclass(frozen=True)
 class RuntimeProfile:
     name: str
     hard_timeout_seconds: int
@@ -193,6 +201,9 @@ def local_renderdoc_layer_manifest_path() -> Path | None:
 
 
 def listening_tcp_ports(start_port: int, end_port: int) -> list[int]:
+    discovered = discover_tracy_listeners(start_port, end_port)
+    if discovered:
+        return sorted({listener.port for listener in discovered})
     ports = {f"{port:04X}": port for port in range(start_port, end_port + 1)}
     found: set[int] = set()
     for table in (Path("/proc/net/tcp"), Path("/proc/net/tcp6")):
@@ -212,6 +223,66 @@ def listening_tcp_ports(start_port: int, end_port: int) -> list[int]:
             if port_hex in ports:
                 found.add(ports[port_hex])
     return sorted(found)
+
+
+def parse_ss_tracy_listeners(output: str, start_port: int, end_port: int) -> list[TracyListener]:
+    listeners: list[TracyListener] = []
+    seen: set[int] = set()
+    for line in output.splitlines():
+        tokens = line.split()
+        local = next((token for token in tokens if re.search(r":\d+$", token) or re.search(r"\]:\d+$", token)), "")
+        match = re.search(r":(\d+)$", local)
+        if not match:
+            continue
+        port = int(match.group(1))
+        if port < start_port or port > end_port or port in seen:
+            continue
+        process_match = re.search(r'\("([^"]+)"', line)
+        pid_match = re.search(r"pid=(\d+)", line)
+        listeners.append(
+            TracyListener(
+                port=port,
+                pid=int(pid_match.group(1)) if pid_match else None,
+                process=process_match.group(1) if process_match else None,
+                source="ss",
+            )
+        )
+        seen.add(port)
+    return sorted(listeners, key=lambda listener: listener.port)
+
+
+def discover_tracy_listeners(start_port: int = 8086, end_port: int = 8110) -> list[TracyListener]:
+    listeners: dict[int, TracyListener] = {}
+    ss = shutil.which("ss")
+    if ss:
+        try:
+            result = subprocess.run(
+                [ss, "-H", "-ltnp"],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                timeout=2,
+                check=False,
+            )
+            if result.returncode == 0:
+                listeners.update({listener.port: listener for listener in parse_ss_tracy_listeners(result.stdout, start_port, end_port)})
+        except Exception:
+            pass
+    ports = {f"{port:04X}": port for port in range(start_port, end_port + 1)}
+    for table in (Path("/proc/net/tcp"), Path("/proc/net/tcp6")):
+        try:
+            lines = table.read_text(encoding="utf-8").splitlines()[1:]
+        except OSError:
+            continue
+        for line in lines:
+            columns = line.split()
+            if len(columns) < 4 or columns[3] != "0A":
+                continue
+            port_hex = columns[1].rsplit(":", 1)[-1].upper()
+            port = ports.get(port_hex)
+            if port is not None:
+                listeners.setdefault(port, TracyListener(port=port))
+    return [listeners[port] for port in sorted(listeners)]
 
 
 RUST_OPENGL_CONFORMANCE_TEST = (
@@ -1771,6 +1842,8 @@ def summarize_tracy_capture(summary: dict[str, object] | None) -> dict[str, obje
         "capture_complete": summary.get("capture_complete"),
         "unattributed_time": summary.get("unattributed_time"),
         "diagnosis": summary.get("diagnosis", {}),
+        "captures": summary.get("captures", []),
+        "role_detection": summary.get("role_detection", {}),
         "failure": summary.get("failure"),
     }
 
@@ -2443,6 +2516,9 @@ def write_tracy_summary(
     failure: str | None = None,
     started_at: float | None = None,
     tool_output: str | None = None,
+    attach_metadata: Mapping[str, object] | None = None,
+    role_detection: Mapping[str, object] | None = None,
+    summary_prefix: str = "tracy_summary",
 ) -> Path:
     size_bytes = capture_path.stat().st_size if capture_path and capture_path.exists() else 0
     summary = {
@@ -2462,10 +2538,48 @@ def write_tracy_summary(
         "unattributed_time": None,
         "failure": failure,
         "tool_output": tool_output,
+        "attach": dict(attach_metadata or {}),
+        "role_detection": dict(role_detection or {}),
     }
-    path = capture_dir / f"tracy_summary_{timestamp()}.json"
+    path = capture_dir / f"{summary_prefix}_{timestamp()}.json"
     path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
+
+
+RUST_TRACY_MARKERS = (
+    "MattMC Rust VulkanicGAL",
+    "opengl.backend.",
+    "opengl.lowering.",
+    "opengl.borrowed-state.",
+    "opengl.resources.",
+    "vulkan.backend.",
+    "vulkan.lowering.",
+    "vulkan.resources.",
+    "gal.submission backend=opengl",
+    "gal.submission backend=vulkan",
+    "gal.frame.acquire backend=opengl",
+    "gal.frame.present backend=opengl",
+)
+JAVA_TRACY_MARKERS = (
+    "java.frame.",
+    "rust-gal.",
+    "ffi.rust.",
+    "gal.frame.deferred",
+    "minecraft.gui.",
+    "shaderc.compile",
+)
+
+
+def tracy_role_detection(zones: Mapping[str, object], messages: Sequence[str]) -> dict[str, object]:
+    haystack = "\n".join([*zones.keys(), *messages])
+    rust_matches = [marker for marker in RUST_TRACY_MARKERS if marker in haystack]
+    java_matches = [marker for marker in JAVA_TRACY_MARKERS if marker in haystack]
+    return {
+        "rust": bool(rust_matches),
+        "java": bool(java_matches),
+        "rust_matches": rust_matches,
+        "java_matches": java_matches,
+    }
 
 
 MAJOR_TRACY_ZONE_TERMS = (
@@ -2545,10 +2659,22 @@ def extract_tracy_summary(
     started_at: float | None = None,
     duration_seconds: float | None = None,
     failure: str | None = None,
+    attach_metadata: Mapping[str, object] | None = None,
+    require_rust_zones: bool = False,
+    require_java_zones: bool = False,
+    summary_prefix: str = "tracy_summary",
 ) -> Path:
     size_bytes = capture_path.stat().st_size if capture_path.exists() else 0
     if not capture_path.exists() or size_bytes <= 0:
-        return write_tracy_summary(capture_dir, "failed", capture_path, failure or "Tracy capture missing or empty", started_at)
+        return write_tracy_summary(
+            capture_dir,
+            "failed",
+            capture_path,
+            failure or "Tracy capture missing or empty",
+            started_at,
+            attach_metadata=attach_metadata,
+            summary_prefix=summary_prefix,
+        )
     inclusive_rows, inclusive_error = run_tracy_csvexport(capture_path)
     exclusive_rows, exclusive_error = run_tracy_csvexport(capture_path, self_time=True)
     message_rows, message_error = run_tracy_csvexport(capture_path, messages=True)
@@ -2572,6 +2698,7 @@ def extract_tracy_summary(
         if value is not None
     )
     messages = [row.get("MessageName", "") for row in message_rows if row.get("MessageName")]
+    role_detection = tracy_role_detection(zones, messages)
     frame_correlations = [
         {
             "message": message,
@@ -2602,9 +2729,15 @@ def extract_tracy_summary(
         "submission_correlations": len(submission_correlations),
         "messages": len(messages),
     }
+    missing_roles: list[str] = []
+    if require_rust_zones and not role_detection["rust"]:
+        missing_roles.append("Rust VulkanicGAL")
+    if require_java_zones and not role_detection["java"]:
+        missing_roles.append("Java")
+    complete = bool(zones) and not missing_roles
     summary = {
         "schema": "mattmc-tracy-summary-v1",
-        "status": "complete" if zones else "failed",
+        "status": "complete" if complete else "failed",
         "capture_path": str(capture_path),
         "duration_seconds": duration_seconds if duration_seconds is not None else ((time.monotonic() - started_at) if started_at else None),
         "size_bytes": size_bytes,
@@ -2612,6 +2745,7 @@ def extract_tracy_summary(
         "major_zones": major_zones,
         "zone_count": len(zones),
         "call_counts": call_counts,
+        "messages_sample": messages[:128],
         "correlations": {
             "frames": frame_correlations,
             "submissions": submission_correlations,
@@ -2629,13 +2763,95 @@ def extract_tracy_summary(
             "available": False,
             "reason": "hardware counter export is not enabled for bounded automated captures",
         },
-        "capture_complete": bool(zones),
+        "capture_complete": complete,
         "unattributed_time": max(0.0, 100.0 - total_percent) if major_zones else None,
         "diagnosis": {
             "csvexport_messages_error": message_error,
             "major_zone_terms": MAJOR_TRACY_ZONE_TERMS,
+            "required_roles": {
+                "rust": require_rust_zones,
+                "java": require_java_zones,
+            },
         },
-        "failure": None if zones else "Tracy capture contained no exportable zones",
+        "attach": dict(attach_metadata or {}),
+        "role_detection": role_detection,
+        "failure": None if complete else (
+            f"Tracy capture missing required {' and '.join(missing_roles)} zones"
+            if missing_roles
+            else "Tracy capture contained no exportable zones"
+        ),
+    }
+    path = capture_dir / f"{summary_prefix}_{timestamp()}.json"
+    path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return path
+
+
+def write_tracy_collection_summary(
+    capture_dir: Path,
+    capture_summaries: Sequence[Mapping[str, object]],
+    *,
+    require_rust_zones: bool,
+    require_java_zones: bool,
+    failure: str | None = None,
+    tool_output: str | None = None,
+) -> Path:
+    complete_summaries = [summary for summary in capture_summaries if summary.get("status") == "complete"]
+    rust_summaries = [
+        summary
+        for summary in complete_summaries
+        if isinstance(summary.get("role_detection"), Mapping) and bool(summary["role_detection"].get("rust"))
+    ]
+    java_summaries = [
+        summary
+        for summary in complete_summaries
+        if isinstance(summary.get("role_detection"), Mapping) and bool(summary["role_detection"].get("java"))
+    ]
+    missing_roles: list[str] = []
+    if require_rust_zones and not rust_summaries:
+        missing_roles.append("Rust VulkanicGAL")
+    if require_java_zones and not java_summaries:
+        missing_roles.append("Java")
+    selected = rust_summaries[0] if rust_summaries else (complete_summaries[0] if complete_summaries else (capture_summaries[0] if capture_summaries else {}))
+    combined_zone_count = sum(int(summary.get("zone_count") or 0) for summary in capture_summaries)
+    combined_size = sum(int(summary.get("size_bytes") or 0) for summary in capture_summaries)
+    status = "complete" if complete_summaries and not missing_roles and failure is None else "failed"
+    summary = {
+        "schema": "mattmc-tracy-summary-v1",
+        "status": status,
+        "capture_path": selected.get("capture_path"),
+        "duration_seconds": selected.get("duration_seconds"),
+        "size_bytes": combined_size,
+        "zones": selected.get("zones", {}),
+        "major_zones": selected.get("major_zones", {}),
+        "zone_count": combined_zone_count,
+        "call_counts": selected.get("call_counts", {}),
+        "ffi": selected.get("ffi", {}),
+        "allocations": selected.get("allocations", {}),
+        "cache_misses": selected.get("cache_misses", {}),
+        "capture_complete": status == "complete",
+        "unattributed_time": selected.get("unattributed_time"),
+        "captures": list(capture_summaries),
+        "role_detection": {
+            "rust": bool(rust_summaries),
+            "java": bool(java_summaries),
+            "required": {
+                "rust": require_rust_zones,
+                "java": require_java_zones,
+            },
+            "selected_rust_capture": rust_summaries[0].get("capture_path") if rust_summaries else None,
+            "selected_java_capture": java_summaries[0].get("capture_path") if java_summaries else None,
+        },
+        "diagnosis": {
+            "capture_count": len(capture_summaries),
+            "complete_capture_count": len(complete_summaries),
+            "missing_roles": missing_roles,
+        },
+        "failure": failure or (
+            f"Tracy capture missing required {' and '.join(missing_roles)} zones"
+            if missing_roles
+            else (None if status == "complete" else "No complete Tracy captures were produced")
+        ),
+        "tool_output": tool_output,
     }
     path = capture_dir / f"tracy_summary_{timestamp()}.json"
     path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -3155,6 +3371,9 @@ def build_capture_command(
     if getattr(args, "player_max_health", None) is not None:
         java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.playerMaxHealth={args.player_max_health}")
         java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.playerMaxHealth={args.player_max_health}")
+    if getattr(args, "player_absorption", None) is not None:
+        java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.playerAbsorption={args.player_absorption}")
+        java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.playerAbsorption={args.player_absorption}")
     if getattr(args, "player_heart_variant", None):
         java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.playerHeartVariant={args.player_heart_variant}")
     if getattr(args, "player_heart_flash", False):
@@ -3171,6 +3390,18 @@ def build_capture_command(
         java_options.append("-Dmattmc.dev.rustGalGui.armor.disabled=true")
     elif rust_gal_gui_control == "legacy":
         java_options.append("-Dmattmc.dev.rustGalGui.armor.legacyControl=true")
+    elif rust_gal_gui_control == "armor-disabled":
+        java_options.append("-Dmattmc.dev.rustGalGui.armor.disabled=true")
+    elif rust_gal_gui_control == "armor-legacy":
+        java_options.append("-Dmattmc.dev.rustGalGui.armor.legacyControl=true")
+    elif rust_gal_gui_control == "player-health-disabled":
+        java_options.append("-Dmattmc.dev.rustGalGui.playerHealth.disabled=true")
+    elif rust_gal_gui_control == "player-health-legacy":
+        java_options.append("-Dmattmc.dev.rustGalGui.playerHealth.legacyControl=true")
+    elif rust_gal_gui_control == "absorption-disabled":
+        java_options.append("-Dmattmc.dev.rustGalGui.absorption.disabled=true")
+    elif rust_gal_gui_control == "absorption-legacy":
+        java_options.append("-Dmattmc.dev.rustGalGui.absorption.legacyControl=true")
     if tool_kind == "gameplay":
         frame_status = capture_dir / f"graphics_frame_benchmark_{timestamp()}.json"
         java_options.extend(
@@ -3448,14 +3679,14 @@ def run_mode(
         write_artifact(output_path, artifact)
         return MatrixResult(mode.name, False, False, False, "renderdoccmd is not installed", 127, str(output_path), str(capture_dir), command)
     tracy_capture_path: Path | None = None
-    tracy_started_at: float | None = None
     tracy_tool: str | None = None
     tracy_result: dict[str, object] = {}
     tracy_thread: threading.Thread | None = None
-    tracy_active_process: list[subprocess.Popen[str] | None] = [None]
+    tracy_active_processes: list[subprocess.Popen[str]] = []
+    tracy_capture_records: list[dict[str, object]] = []
     if getattr(args, "tracy_capture", False):
         tracy_tool = local_tracy_capture_path()
-        tracy_capture_path = capture_dir / f"tracy_{timestamp()}.tracy"
+        tracy_capture_path = capture_dir / f"tracy_unattached_{timestamp()}.tracy"
         if not tracy_tool:
             write_preflight_meta(capture_dir, mode, args, env)
             write_tracy_summary(capture_dir, "failed", tracy_capture_path, "tracy-capture is not installed")
@@ -3495,19 +3726,55 @@ def run_mode(
         )
         if getattr(args, "tracy_capture", False) and tracy_tool and tracy_capture_path:
             def capture_tracy_while_running() -> None:
-                nonlocal tracy_started_at
                 outputs: list[str] = []
-                deadline = time.monotonic() + min(timeout_seconds, max(5, getattr(args, "tracy_duration_seconds", 20) + 20))
+                duration = int(getattr(args, "tracy_duration_seconds", 20))
+                deadline = time.monotonic() + min(timeout_seconds, max(10, duration + 30))
                 attempt = 0
-                while process.poll() is None and time.monotonic() < deadline:
-                    candidate_ports = listening_tcp_ports(8086, 8095)
-                    if not candidate_ports:
-                        time.sleep(0.1)
-                        continue
-                    for port in candidate_ports:
-                        attempt += 1
+                seen_ports: set[int] = set()
+                active: list[dict[str, object]] = []
+
+                def collect_finished(*, force: bool = False) -> None:
+                    for record in list(active):
+                        capture_process = record.get("process")
+                        if not isinstance(capture_process, subprocess.Popen):
+                            active.remove(record)
+                            continue
+                        if not force and capture_process.poll() is None:
+                            continue
                         try:
-                            tracy_started_at = time.monotonic()
+                            output, _ = capture_process.communicate(timeout=0 if force else 1)
+                        except subprocess.TimeoutExpired:
+                            terminate_process_tree(capture_process)
+                            output, _ = capture_process.communicate(timeout=2)
+                            record["failure"] = "tracy-capture timed out"
+                        if output:
+                            outputs.append(f"attempt {record.get('attempt')} port {record.get('port')}:\n{output}")
+                        record["returncode"] = capture_process.returncode
+                        record["output"] = output or ""
+                        record.pop("process", None)
+                        tracy_capture_records.append(dict(record))
+                        if capture_process in tracy_active_processes:
+                            tracy_active_processes.remove(capture_process)
+                        active.remove(record)
+
+                while process.poll() is None and time.monotonic() < deadline:
+                    candidate_listeners = discover_tracy_listeners(8086, 8110)
+                    if candidate_listeners:
+                        tracy_result.setdefault("listener_snapshots", []).append(
+                            {
+                                "elapsed_seconds": time.monotonic() - started,
+                                "listeners": [asdict(listener) for listener in candidate_listeners],
+                            }
+                        )
+                    for listener in candidate_listeners:
+                        port = listener.port
+                        if port in seen_ports:
+                            continue
+                        seen_ports.add(port)
+                        attempt += 1
+                        port_capture_path = capture_dir / f"tracy_port{port}_{timestamp()}.tracy"
+                        try:
+                            started_at = time.monotonic()
                             capture_process = subprocess.Popen(
                                 [
                                     tracy_tool,
@@ -3517,9 +3784,9 @@ def run_mode(
                                     "-p",
                                     str(port),
                                     "-o",
-                                    str(tracy_capture_path),
+                                    str(port_capture_path),
                                     "-s",
-                                    str(getattr(args, "tracy_duration_seconds", 20)),
+                                    str(duration),
                                 ],
                                 cwd=target.root,
                                 text=True,
@@ -3527,28 +3794,51 @@ def run_mode(
                                 stderr=subprocess.STDOUT,
                                 **popen_kwargs(),
                             )
-                            tracy_active_process[0] = capture_process
-                            output, _ = capture_process.communicate(timeout=max(1, min(getattr(args, "tracy_duration_seconds", 20) + 5, 60)))
-                            if output:
-                                outputs.append(f"attempt {attempt} port {port}:\n{output}")
-                            if capture_process.returncode == 0 and tracy_capture_path.exists() and tracy_capture_path.stat().st_size > 0:
-                                tracy_result.update({"returncode": 0, "output": "\n".join(outputs), "attempts": attempt, "port": port})
-                                return
-                            tracy_result.update({"returncode": capture_process.returncode, "output": "\n".join(outputs), "attempts": attempt, "port": port})
-                        except subprocess.TimeoutExpired:
-                            active = tracy_active_process[0]
-                            if active is not None:
-                                terminate_process_tree(active)
-                            tracy_result.update({"returncode": -9, "output": "\n".join(outputs), "attempts": attempt, "port": port, "failure": "tracy-capture timed out"})
-                            return
+                            tracy_active_processes.append(capture_process)
+                            active.append(
+                                {
+                                    "attempt": attempt,
+                                    "port": port,
+                                    "capture_path": str(port_capture_path),
+                                    "started_at": started_at,
+                                    "attach_elapsed_seconds": started_at - started,
+                                    "listener": asdict(listener),
+                                    "process": capture_process,
+                                }
+                            )
                         except Exception as exc:
-                            tracy_result.update({"returncode": -1, "output": "\n".join(outputs), "attempts": attempt, "port": port, "failure": f"failed to launch tracy-capture: {exc}"})
-                            return
-                        finally:
-                            tracy_active_process[0] = None
+                            tracy_capture_records.append(
+                                {
+                                    "attempt": attempt,
+                                    "port": port,
+                                    "capture_path": str(port_capture_path),
+                                    "started_at": time.monotonic(),
+                                    "attach_elapsed_seconds": time.monotonic() - started,
+                                    "listener": asdict(listener),
+                                    "returncode": -1,
+                                    "failure": f"failed to launch tracy-capture: {exc}",
+                                }
+                            )
+                    collect_finished()
+                    if not candidate_listeners and not active:
+                        time.sleep(0.1)
+                        continue
                     time.sleep(0.25)
-                if "returncode" not in tracy_result:
-                    tracy_result.update({"returncode": None, "output": "\n".join(outputs), "attempts": attempt, "failure": "tracy-capture did not attach before workload process exited"})
+                collect_finished(force=True)
+                tracy_result.update(
+                    {
+                        "returncode": 0 if any(
+                            Path(str(record.get("capture_path", ""))).exists()
+                            and Path(str(record.get("capture_path", ""))).stat().st_size > 0
+                            for record in tracy_capture_records
+                        ) else None,
+                        "output": "\n".join(outputs),
+                        "attempts": attempt,
+                        "captures": list(tracy_capture_records),
+                    }
+                )
+                if not tracy_capture_records:
+                    tracy_result["failure"] = "tracy-capture did not discover any Tracy listener before workload process exited"
 
             tracy_thread = threading.Thread(target=capture_tracy_while_running, name="mattmc-tracy-capture", daemon=True)
             tracy_thread.start()
@@ -3574,20 +3864,72 @@ def run_mode(
         if tracy_thread is not None:
             tracy_thread.join(timeout=max(1, min(getattr(args, "tracy_duration_seconds", 20) + 5, 60)))
             if tracy_thread.is_alive():
-                active = tracy_active_process[0]
-                if active is not None:
+                for active in list(tracy_active_processes):
                     terminate_process_tree(active)
                 tracy_failure = "tracy-capture worker timed out"
         if tracy_failure is None and tracy_result.get("failure"):
             tracy_failure = str(tracy_result["failure"])
         if tracy_failure is None and tracy_result.get("returncode") not in (0, None):
             tracy_failure = f"tracy-capture exited {tracy_result.get('returncode')} after {tracy_result.get('attempts', 0)} attempts"
-        if tracy_capture_path and tracy_capture_path.exists() and tracy_capture_path.stat().st_size <= getattr(args, "tracy_max_size_mb", 256) * 1024 * 1024 and tracy_failure is None:
-            extract_tracy_summary(capture_dir, tracy_capture_path, started_at=tracy_started_at)
+        max_capture_size = getattr(args, "tracy_max_size_mb", 256) * 1024 * 1024
+        capture_summaries: list[dict[str, object]] = []
+        records = tracy_result.get("captures", tracy_capture_records)
+        if isinstance(records, list):
+            for index, record in enumerate(records):
+                if not isinstance(record, Mapping):
+                    continue
+                capture_path_text = record.get("capture_path")
+                capture_path = Path(str(capture_path_text)) if capture_path_text else tracy_capture_path
+                started_at_value = parse_number(record.get("started_at"))
+                if not capture_path or not capture_path.exists() or capture_path.stat().st_size <= 0:
+                    summary_path = write_tracy_summary(
+                        capture_dir,
+                        "failed",
+                        capture_path,
+                        str(record.get("failure") or "Tracy capture missing or empty"),
+                        started_at_value,
+                        record.get("output") if isinstance(record.get("output"), str) else None,
+                        attach_metadata=record,
+                        summary_prefix=f"tracy_capture_{index}_summary",
+                    )
+                elif capture_path.stat().st_size > max_capture_size:
+                    summary_path = write_tracy_summary(
+                        capture_dir,
+                        "failed",
+                        capture_path,
+                        "Tracy capture exceeded size limit",
+                        started_at_value,
+                        record.get("output") if isinstance(record.get("output"), str) else None,
+                        attach_metadata=record,
+                        summary_prefix=f"tracy_capture_{index}_summary",
+                    )
+                else:
+                    summary_path = extract_tracy_summary(
+                        capture_dir,
+                        capture_path,
+                        started_at=started_at_value,
+                        attach_metadata=record,
+                        summary_prefix=f"tracy_capture_{index}_summary",
+                    )
+                capture_summaries.append(read_json(summary_path) or {})
+        require_rust_tracy = env.get("MATTMC_RUST_TRACY") == "true" and mode.target == "current"
+        # Java jtracy and Rust tracy-client are independent Tracy clients. Mojang jtracy may
+        # speak a different capture protocol than the local Tracy CLI; record that listener
+        # diagnosis, but do not let a Java protocol mismatch mask a valid Rust-required trace.
+        require_java_tracy = False
+        if capture_summaries:
+            write_tracy_collection_summary(
+                capture_dir,
+                capture_summaries,
+                require_rust_zones=require_rust_tracy,
+                require_java_zones=require_java_tracy,
+                failure=tracy_failure,
+                tool_output=tracy_tool_output,
+            )
         else:
             if tracy_failure is None:
                 tracy_failure = "Tracy capture missing, empty, or exceeded size limit"
-            write_tracy_summary(capture_dir, "failed", tracy_capture_path, tracy_failure, tracy_started_at, tracy_tool_output)
+            write_tracy_summary(capture_dir, "failed", tracy_capture_path, tracy_failure, tool_output=tracy_tool_output)
     success = exit_code == 0 and not timed_out
     artifact = normalize_capture_artifact(
         target,
@@ -3881,13 +4223,24 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         subparser.add_argument("--jvm-arg", action="append", default=[], help="Extra JVM option appended to JAVA_TOOL_OPTIONS for launched clients.")
         subparser.add_argument(
             "--rust-gal-gui-control",
-            choices=("rust", "disabled", "legacy"),
+            choices=(
+                "rust",
+                "disabled",
+                "legacy",
+                "armor-disabled",
+                "armor-legacy",
+                "player-health-disabled",
+                "player-health-legacy",
+                "absorption-disabled",
+                "absorption-legacy",
+            ),
             default="rust",
-            help="Diagnostic control for migrated Rust-GAL GUI sprites; 'disabled' suppresses migrated armor and 'legacy' restores Java armor for controls.",
+            help="Diagnostic control for migrated Rust-GAL GUI sprites; bare disabled/legacy retain the armor-control aliases.",
         )
         subparser.add_argument("--armor-value", type=int, help="Force a deterministic player armor value for gameplay/capture controls.")
         subparser.add_argument("--player-health", type=float, help="Force deterministic player health for gameplay/capture controls.")
         subparser.add_argument("--player-max-health", type=float, help="Force deterministic player max health for gameplay/capture controls.")
+        subparser.add_argument("--player-absorption", type=float, help="Force deterministic absorption hearts for gameplay/capture controls.")
         subparser.add_argument("--player-heart-variant", choices=("normal", "poisoned", "withered", "frozen"),
                                help="Force deterministic player heart variant for correctness captures.")
         subparser.add_argument("--player-heart-flash", action="store_true", help="Force blinking player-heart sprites for correctness captures.")
@@ -3989,6 +4342,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         raise SystemExit("--player-health must be non-negative")
     if args.player_max_health is not None and args.player_max_health <= 0:
         raise SystemExit("--player-max-health must be positive")
+    if args.player_absorption is not None and args.player_absorption < 0:
+        raise SystemExit("--player-absorption must be non-negative")
     return args
 
 
