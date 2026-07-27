@@ -1356,7 +1356,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		}
 
 			RenderTarget renderTarget = this.getMainRenderTarget();
-			boolean rustWholeFrameShell = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+			boolean rustWholeFrameShell = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabledForBackend(VulkanicAPI.isVulkanBackendSelected());
 			if (rustWholeFrameShell) {
 				profilerFiller.push("rustVulkanWholeFrame");
 				startTime = Util.getNanos();

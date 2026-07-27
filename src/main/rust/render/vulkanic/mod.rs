@@ -13,6 +13,7 @@ pub mod handles;
 pub mod metrics;
 pub mod resources;
 pub mod sync;
+pub mod world_primitive_frontend;
 
 pub use commands::{
     AttachmentLoadOp, AttachmentStoreOp, BufferImageCopyRegion, ClearColor, CommandList,

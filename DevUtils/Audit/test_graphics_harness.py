@@ -95,6 +95,21 @@ def write_capture(capture_dir: Path, *, backend: str = "opengl", shaders: str = 
     )
 
 
+def write_outline_probe_image(path: Path, *, visible: bool) -> None:
+    from PIL import Image
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image = Image.new("RGB", (1280, 720), (8, 8, 8))
+    if visible:
+        for x in range(548, 733):
+            for y in (280, 456):
+                image.putpixel((x, y), (80, 217, 199))
+        for y in range(280, 457):
+            for x in (548, 732):
+                image.putpixel((x, y), (80, 217, 199))
+    image.save(path)
+
+
 def write_retention_manifest(path: Path, *, success: bool, profile: str = "smoke") -> None:
     path.mkdir(parents=True, exist_ok=True)
     (path / harness.MANIFEST_NAME).write_text(
@@ -693,6 +708,39 @@ else:
             finally:
                 harness.local_renderdoccmd_path = original  # type: ignore[assignment]
 
+    def test_renderdoc_trigger_only_failure_reports_reached_api(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            capture = Path(temp_dir)
+            log = capture / "runClient_20260101_000000.log"
+            log.write_text(
+                "\n".join(
+                    [
+                        "RenderDoc API initialized pathTemplate=/tmp/capture",
+                        "Triggered RenderDoc capture for next deterministic frame (initial#7)",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            diagnosis = harness.diagnose_renderdoc_capture_failure(capture, capture / "missing.rdc")
+            self.assertTrue(diagnosis["renderdoc_api_initialized"])
+            self.assertTrue(diagnosis["frame_capture_triggered"])
+            self.assertIn("no .rdc was persisted", diagnosis["likely_cause"])
+
+    def test_renderdoc_end_result_parser_accepts_backend_and_window_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            capture = Path(temp_dir)
+            log = capture / "runClient_20260101_000000.log"
+            log.write_text(
+                "RenderDoc API initialized pathTemplate=/tmp/capture\n"
+                "Started RenderDoc frame capture (rust-vulkan#1) backend=vulkan windowPointer=123\n"
+                "Ended RenderDoc frame capture (rust-vulkan#1) backend=vulkan windowPointer=123 result=0\n",
+                encoding="utf-8",
+            )
+            diagnosis = harness.diagnose_renderdoc_capture_failure(capture, capture / "missing.rdc")
+            self.assertTrue(diagnosis["frame_capture_started"])
+            self.assertTrue(diagnosis["frame_capture_ended"])
+            self.assertEqual(diagnosis["end_results"][0]["result"], "0")
+
     def test_renderdoc_cli_replay_does_not_require_qrenderdoc(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)
@@ -745,6 +793,118 @@ else:
                 self.assertEqual(env["MATTMC_GRAPHICS_RUN_TYPE"], "renderdoc-capture")
             finally:
                 harness.local_renderdoccmd_path = original  # type: ignore[assignment]
+
+    def test_renderdoc_game_capture_is_wrapped_inside_capture_runner(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            renderdoccmd = root / "renderdoccmd"
+            renderdoccmd.write_text("#!/usr/bin/env sh\nexit 0\n", encoding="utf-8")
+            renderdoccmd.chmod(0o755)
+            original = harness.local_renderdoccmd_path
+            try:
+                harness.local_renderdoccmd_path = lambda: str(renderdoccmd)  # type: ignore[assignment]
+                args = Namespace(
+                    profile="smoke",
+                    validation="off",
+                    client_args="",
+                    jvm_arg=[],
+                    rust_gal_gui_control="rust",
+                    armor_value=None,
+                    player_health=None,
+                    player_max_health=None,
+                    player_absorption=None,
+                    player_food_level=None,
+                    player_food_saturation=None,
+                    player_food_hunger_effect=False,
+                    player_food_jitter=False,
+                    player_air_supply=None,
+                    player_max_air_supply=None,
+                    player_underwater=False,
+                    player_air_pop=False,
+                    mount_present=False,
+                    mount_health=None,
+                    mount_max_health=None,
+                    mount_health_rows=None,
+                    player_heart_variant=None,
+                    player_heart_flash=False,
+                    player_heart_hardcore=False,
+                    player_heart_regeneration=False,
+                    game_mode=None,
+                    world_outline_scenario="full-cube",
+                    world_outline_style="normal",
+                    world_outline_depth_policy="test-write",
+                    world_outline_depth_probe=True,
+                    gui_resource_pack_scenario="",
+                    world="Origin",
+                    max_secs=1,
+                    dump_secs=1,
+                    client_rss_limit_mb=128,
+                    diagnostic=True,
+                    warmup_frames=0,
+                    measure_frames=1,
+                    settle_frames=0,
+                    max_settle_frames=1,
+                    subsystem_iterations=1,
+                    tracy_capture=False,
+                    tracy_duration_seconds=1,
+                    tracy_max_size_mb=8,
+                    renderdoc_capture=True,
+                    renderdoc_frame=8,
+                )
+                command, env = harness.build_capture_command(target, harness.MATRIX_MODES[6], root / "capture", "correctness", args, "capture")
+                self.assertNotEqual(Path(command[0]).name, "renderdoccmd")
+                self.assertEqual(env["MATTMC_RENDERDOC_CMD"], str(renderdoccmd))
+                self.assertEqual(env["MATTMC_RENDERDOC_CAPTURE"], "true")
+                self.assertIn("mattmc.dev.renderdocCapture=true", env["JAVA_TOOL_OPTIONS"])
+            finally:
+                harness.local_renderdoccmd_path = original  # type: ignore[assignment]
+
+    def test_capture_runner_wraps_actual_gradle_command_for_renderdoc(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            renderdoccmd = root / "renderdoccmd"
+            renderdoccmd.write_text("#!/usr/bin/env sh\nexit 0\n", encoding="utf-8")
+            renderdoccmd.chmod(0o755)
+            runner = capture_runner.CaptureRunner.__new__(capture_runner.CaptureRunner)
+            runner.env = {
+                "MATTMC_RENDERDOC_CAPTURE": "true",
+                "MATTMC_RENDERDOC_CMD": str(renderdoccmd),
+                "MATTMC_RENDERDOC_CAPTURE_TEMPLATE": str(root / "outline-capture"),
+            }
+            runner.root = root
+            runner.artifact_dir = root
+            runner.run_id = "test"
+            meta_lines: list[str] = []
+            runner.append_meta = meta_lines.append  # type: ignore[method-assign]
+            wrapped = runner.renderdoc_wrapped_command(["./gradlew", "runClient"])
+            self.assertEqual(wrapped[:2], [str(renderdoccmd), "capture"])
+            self.assertEqual(wrapped[-3:], ["./gradlew", "--no-daemon", "runClient"])
+            self.assertTrue(any("renderdoc_forced_gradle_no_daemon=true" in line for line in meta_lines))
+            self.assertTrue(any("renderdoc_wrapped_actual_game_command=" in line for line in meta_lines))
+
+    def test_renderdoc_workload_proof_checks_outline_and_image_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            capture = Path(temp_dir)
+            (capture / "latest_20260101_000000.log").write_text(
+                "\n".join(
+                    [
+                        "gal.frame.acquire backend=vulkan correlation=9 frame=7 image=2 window=42",
+                        "gal.frame.target.begin backend=vulkan frame=7 image=2 view=0x000000000000abcd extent=1280x720 layout=0 load=1 clear=0.080,0.310,0.740,1.000",
+                        "gal.frame.target.present-ready backend=vulkan frame=7 image=2",
+                        "gal.frame.present backend=vulkan correlation=9 frame=7 image=2 submission=11 status=Presented window=42",
+                        "minecraft.world.block-outline.pass",
+                        "[MattMC graphics audit] Rust VulkanicGAL GUI frame executed rust_gal_world_primitive_batches_executed=1 rust_gal_world_line_segments_executed=12 rust_gal_world_line_vertices_executed=24 rust_gal_world_primitive_draws_executed=1 rust_gal_world_depth_attachment_creates=1 rust_gal_world_depth_attachment_reuses=0",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            proof = harness.renderdoc_workload_proof(capture)
+            self.assertTrue(proof["non_zero_outline_workload"])
+            self.assertTrue(proof["acquired_rendered_presented_image_identity_matches"])
+            self.assertTrue(proof["depth_attachment_evidence"])
+            self.assertTrue(proof["outline_marker_evidence"])
+            self.assertTrue(proof["blue_diagnostic_shell_clear_expected"])
 
     def test_instrumentation_fingerprint_mismatch_rejects_comparison(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -804,6 +964,56 @@ else:
         with self.assertRaises(SystemExit):
             harness.parse_args(["gameplay", "--profile", "extended", "--timeout-seconds", "301"])
 
+    def test_migration_gate_gameplay_defaults_do_not_wait_for_long_settle(self) -> None:
+        args = harness.parse_args(["gameplay", "--profile", "standard", "--world-profile", "migration-gate", "--dry-run"])
+        self.assertEqual(0, args.settle_frames)
+        self.assertLessEqual(args.max_settle_frames, 120)
+
+        explicit = harness.parse_args([
+            "gameplay",
+            "--profile",
+            "standard",
+            "--world-profile",
+            "migration-gate",
+            "--settle-frames",
+            "12",
+            "--max-settle-frames",
+            "240",
+            "--dry-run",
+        ])
+        self.assertEqual(12, explicit.settle_frames)
+        self.assertEqual(240, explicit.max_settle_frames)
+
+    def test_java_vulkan_defaults_use_bounded_frame_counts(self) -> None:
+        args = harness.parse_args(["gameplay", "--profile", "standard", "--dry-run"])
+        java_vulkan = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-java-vulkan-shaders-off")
+        opengl = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-opengl-shaders-off")
+        self.assertEqual(20, harness.mode_frame_count(args.warmup_frames, java_vulkan, args, "--warmup-frames"))
+        self.assertEqual(60, harness.mode_frame_count(args.measure_frames, java_vulkan, args, "--measure-frames"))
+        self.assertEqual(args.measure_frames, harness.mode_frame_count(args.measure_frames, opengl, args, "--measure-frames"))
+
+        explicit = harness.parse_args(["gameplay", "--profile", "standard", "--warmup-frames", "77", "--measure-frames", "88", "--dry-run"])
+        self.assertEqual(77, harness.mode_frame_count(explicit.warmup_frames, java_vulkan, explicit, "--warmup-frames"))
+        self.assertEqual(88, harness.mode_frame_count(explicit.measure_frames, java_vulkan, explicit, "--measure-frames"))
+
+    def test_readiness_state_uses_incomplete_frame_runtime_state(self) -> None:
+        state = harness.readiness_state_from_text(
+            "gameplay",
+            "warmup",
+            {
+                "status": "warming_or_settling",
+                "worldEntered": True,
+                "runtimeState": {"screen": "none", "overlay": "none"},
+                "lastReadinessBlocker": "auto-dismissed screen=LevelLoadingScreen",
+            },
+            None,
+            "Loaded [0] waiting chunk wrappers\n",
+            {"world_profile": "migration-gate"},
+        )
+        self.assertTrue(state["player_alive_and_controllable"])
+        self.assertEqual("none", state["last_screen"])
+        self.assertEqual("none", state["last_overlay"])
+
     def test_artifact_retention_safe_root_boundaries(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)
@@ -848,6 +1058,23 @@ else:
             self.assertTrue(failed_new.exists())
             self.assertTrue(preserved.exists())
 
+    def test_preserve_current_run_marker_does_not_disable_temp_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "artifacts"
+            artifact_retention.ensure_marker(root)
+            current = root / "matrix" / "20260101-000000"
+            current.mkdir(parents=True)
+            (current / ".preserve").write_text("evidence\n", encoding="utf-8")
+            copied = current / "mode" / "capture" / "run-01" / "capture" / "game_dir_20260101_000000"
+            copied.mkdir(parents=True)
+            (copied / "copy.bin").write_bytes(b"x")
+            write_retention_manifest(current, success=True)
+            policy = artifact_retention.policy_for("smoke", root, keep_success=0, keep_failed=0, global_limit_mb=0)
+            result = artifact_retention.cleanup(policy, after_run=current)
+            self.assertTrue(current.exists())
+            self.assertFalse(copied.exists())
+            self.assertIn(str(copied), result["removed_game_dirs"])
+
     def test_artifact_retention_preflight_free_space_rejection(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "artifacts"
@@ -876,6 +1103,28 @@ else:
                 artifact_retention.run_size_check(policy, run)
             self.assertTrue((run / "quota_failure_manifest.json").is_file())
 
+    def test_artifact_retention_live_quota_excludes_copied_game_dirs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "artifacts"
+            artifact_retention.ensure_marker(root)
+            run = root / "capture-run"
+            copied_game_dir = run / "capture" / "game_dir_20260101_000000"
+            copied_game_dir.mkdir(parents=True)
+            (copied_game_dir / "huge-copy.bin").write_bytes(b"x" * 2048)
+            (run / "graphics_audit_artifact.json").write_text("{}\n", encoding="utf-8")
+            policy = artifact_retention.RetentionPolicy(
+                "smoke",
+                root.resolve(),
+                global_limit_bytes=0,
+                run_limit_bytes=1024,
+                reserve_bytes=0,
+                keep_success=1,
+                keep_failed=1,
+                heavy_keep=0,
+            )
+            artifact_retention.run_size_check(policy, run)
+            self.assertFalse((run / "quota_failure_manifest.json").exists())
+
     def test_artifact_retention_removes_copied_game_dirs_only_inside_marked_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)
@@ -891,6 +1140,22 @@ else:
             self.assertEqual(len(removed), 1)
             self.assertFalse((root / "capture" / "run-01" / "game_dir_20260101_000000").exists())
             self.assertTrue(source_world.exists())
+
+    def test_artifact_retention_removes_generated_tmp_for_capture_run(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "artifacts"
+            artifact_retention.ensure_marker(root)
+            capture = root / "capture" / "run-01" / "capture"
+            capture.mkdir(parents=True)
+            (capture / "meta_20260101_000000.txt").write_text("run_id=20260101_000000\n", encoding="utf-8")
+            stale_tmp = root / ".tmp" / "20260101_000000" / "game_dir_20260101_000000"
+            stale_tmp.mkdir(parents=True)
+            unrelated_tmp = root / ".tmp" / "20260101_000001" / "game_dir_20260101_000001"
+            unrelated_tmp.mkdir(parents=True)
+            removed = artifact_retention.remove_generated_temp_dirs_for_capture(root, capture)
+            self.assertEqual([root / ".tmp" / "20260101_000000"], removed)
+            self.assertFalse((root / ".tmp" / "20260101_000000").exists())
+            self.assertTrue(unrelated_tmp.exists())
 
     def test_artifact_retention_renderdoc_tracy_heavy_runs_are_strict(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1494,6 +1759,71 @@ else:
             self.assertIn("--artifact-dir " + str(root / "capture"), joined)
             self.assertIn("--shaders off", joined)
 
+    def test_shell_capture_command_preserves_quickplay_world_names_with_spaces(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "frozen")
+            (target.root / "DevUtils" / "Common" / "capture_runner.py").unlink()
+            (target.root / "DevUtils" / "Common" / "capture_runner.sh").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            args = Namespace(
+                profile="smoke",
+                validation="off",
+                client_args="--quickPlaySingleplayer=OldWorld --width 640 --height 360",
+                world="Origin Prime City 3",
+                max_secs=1,
+                dump_secs=1,
+                client_rss_limit_mb=128,
+                diagnostic=False,
+                warmup_frames=0,
+                measure_frames=1,
+                settle_frames=0,
+                max_settle_frames=1,
+                subsystem_iterations=1,
+            )
+            command, _ = harness.build_capture_command(target, harness.MATRIX_MODES[4], root / "capture", "gameplay", args, "gameplay")
+            joined = " ".join(command)
+            self.assertIn("--quickPlaySingleplayer='Origin Prime City 3'", joined)
+            self.assertNotIn("OldWorld", joined)
+            self.assertNotIn("Prime City 3 --quickPlaySingleplayer", joined)
+
+    def test_shell_capture_command_supplies_deterministic_capture_handshake(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "frozen")
+            (target.root / "DevUtils" / "Common" / "capture_runner.py").unlink()
+            (target.root / "DevUtils" / "Common" / "capture_runner.sh").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            args = Namespace(
+                profile="smoke",
+                validation="off",
+                client_args="",
+                jvm_arg=[],
+                world="Origin",
+                world_profile="migration-gate",
+                max_secs=1,
+                dump_secs=1,
+                client_rss_limit_mb=128,
+                diagnostic=False,
+                warmup_frames=0,
+                measure_frames=1,
+                settle_frames=0,
+                max_settle_frames=1,
+                subsystem_iterations=1,
+                tracy_capture=False,
+                tracy_duration_seconds=1,
+                tracy_max_size_mb=8,
+                renderdoc_capture=False,
+                renderdoc_frame=8,
+            )
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "frozen-opengl-shaders-off")
+            _, env = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
+            java_options = env["JAVA_TOOL_OPTIONS"]
+            self.assertIn("MATTMC_DETERMINISTIC_METADATA", env)
+            self.assertIn("MATTMC_DETERMINISTIC_SCREENSHOT_DIR", env)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture=true", java_options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.metadata=", java_options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.screenshotDir=", java_options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.stopAfterComplete=true", java_options)
+
     def test_tracy_capture_uses_java_property_not_client_flag(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -1550,6 +1880,124 @@ else:
             command, env = harness.build_capture_command(target, harness.MATRIX_MODES[0], root / "capture", "correctness", args, "capture")
             self.assertNotIn("mattmc.rustGal.guiCrosshair.enabled", " ".join(command))
             self.assertIn("-Dmattmc.rustGal.guiCrosshair.enabled=true", env["JAVA_TOOL_OPTIONS"])
+
+    def test_capture_runner_rust_vulkan_uses_vulkan_backend_and_whole_frame_property(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            game_dir = root / "game"
+            game_dir.mkdir()
+            (game_dir / "options.txt").write_text("graphics_backend=opengl\n", encoding="utf-8")
+            config = capture_runner.CaptureConfig(
+                backend="rust-vulkan",
+                shaders="off",
+                max_secs=1,
+                dump_secs=1,
+                client_rss_limit_mb=128,
+                screenshot_interval_secs=0,
+                screenshot_max_count=0,
+                screenshot_start_delay_secs=0,
+                validation_mode="off",
+                shader_input_parity="off",
+                shader_input_parity_max_logs=0,
+                lightmap_info_parity_max_logs=0,
+                skip_tests=True,
+                client_args="",
+                deterministic_camera_capture=False,
+                deterministic_static_camera_capture=False,
+                deterministic_pose_tolerance=0.001,
+                audio_validation=False,
+                capture_meshing_corpus=False,
+                meshing_corpus_output="",
+                meshing_corpus_fixture="all",
+                meshing_corpus_warmup=0,
+                meshing_corpus_measure=0,
+                artifact_dir=str(root / "artifacts"),
+                platform_name="linux",
+                world="Origin",
+                game_dir=str(game_dir),
+                jvm_args=[],
+                gui_resource_pack_scenario="vanilla",
+                region_validation=False,
+                region_validation_copy_world=False,
+                poi_validation=False,
+            )
+            runner = capture_runner.CaptureRunner(config)
+            runner.configure_backend_and_validation()
+            runner.configure_java_tool_options()
+            self.assertIn("graphics_backend=vulkan", (game_dir / "options.txt").read_text(encoding="utf-8"))
+            self.assertIn("-Dmattmc.dev.rustGalVulkanWholeFrame=true", runner.env["JAVA_TOOL_OPTIONS"])
+
+    def test_world_outline_controls_are_forwarded_as_java_properties(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            args = Namespace(
+                profile="smoke",
+                validation="off",
+                client_args="",
+                jvm_arg=[],
+                rust_gal_gui_control="rust",
+                armor_value=None,
+                player_health=None,
+                player_max_health=None,
+                player_absorption=None,
+                player_food_level=None,
+                player_food_saturation=None,
+                player_food_hunger_effect=False,
+                player_food_jitter=False,
+                player_air_supply=None,
+                player_max_air_supply=None,
+                player_underwater=False,
+                player_air_pop=False,
+                mount_present=False,
+                mount_health=None,
+                mount_max_health=None,
+                mount_health_rows=None,
+                player_heart_variant=None,
+                player_heart_flash=False,
+                player_heart_hardcore=False,
+                player_heart_regeneration=False,
+                game_mode=None,
+                world_outline_scenario="full-cube",
+                world_outline_style="high-contrast",
+                world_outline_depth_policy="test-write",
+                world_outline_depth_probe=True,
+                world_outline_real_target=True,
+                world_outline_aim_real_target=True,
+                block_outline_pick_diagnostics=True,
+                gui_resource_pack_scenario="",
+                world="Origin",
+                max_secs=1,
+                dump_secs=1,
+                client_rss_limit_mb=128,
+                diagnostic=False,
+                warmup_frames=0,
+                measure_frames=1,
+                settle_frames=0,
+                max_settle_frames=1,
+                subsystem_iterations=1,
+                tracy_capture=False,
+                tracy_duration_seconds=1,
+                tracy_max_size_mb=8,
+                renderdoc_capture=False,
+                renderdoc_frame=8,
+            )
+            _, env = harness.build_capture_command(target, harness.MATRIX_MODES[6], root / "capture", "correctness", args, "capture")
+            parsed = shlex.split(env["JAVA_TOOL_OPTIONS"])
+            self.assertIn("-Dmattmc.dev.blockOutlineDiagnostics=true", parsed)
+            self.assertIn("-Dmattmc.dev.rustGalWorldOutline.scenario=full-cube", parsed)
+            self.assertIn("-Dmattmc.dev.rustGalWorldOutline.style=high-contrast", parsed)
+            self.assertIn("-Dmattmc.dev.rustGalWorldOutline.depthPolicy=test-write", parsed)
+            self.assertIn("-Dmattmc.dev.rustGalWorldOutline.depthProbe=true", parsed)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.blockOutlineTarget=true", parsed)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.blockOutlineAimTarget=true", parsed)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.blockOutlineHighContrast=true", parsed)
+            self.assertIn("-Dmattmc.dev.blockOutlinePickDiagnostics=true", parsed)
+
+            self.assertIn("-Dmattmc.dev.rustGalWorldOutline.scenario=full-cube", parsed)
+            self.assertIn("-Dmattmc.dev.rustGalWorldOutline.style=high-contrast", parsed)
+            self.assertIn("-Dmattmc.dev.rustGalWorldOutline.depthPolicy=test-write", parsed)
+            self.assertIn("-Dmattmc.dev.rustGalWorldOutline.depthProbe=true", parsed)
 
     def test_java_tool_options_preserve_world_names_with_spaces(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -1986,6 +2434,9 @@ else:
                 "[MattMC graphics audit] Rust OpenGL VulkanicGAL GUI frame executed producer=gui.frame "
                 "stratum=gui.frame frame_batch_count=1 frame=4 submission=5 rust_gal_cache_hits=8 "
                 "rust_gal_cache_misses=1 rust_gal_queue_depth=0 rust_gal_batches_executed=2 "
+                "rust_gal_world_primitive_batches_executed=1 rust_gal_world_line_segments_executed=12 "
+                "rust_gal_world_line_vertices_executed=24 rust_gal_world_primitive_draws_executed=1 "
+                "rust_gal_world_depth_attachment_creates=1 rust_gal_world_depth_attachment_reuses=7 "
                 "rust_gal_batches_cancelled=0 rust_gal_completion_polls=0 rust_gal_completion_timeouts=0 "
                 "rust_gal_ffi_context_create_calls=1 rust_gal_ffi_capability_calls=1 "
                 "rust_gal_ffi_frame_configure_calls=1 rust_gal_ffi_frame_acquire_calls=2 "
@@ -2033,6 +2484,12 @@ else:
             self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["cache_misses"])
             self.assertEqual(0, artifact["metrics"]["rust_gal_slice"]["queue_depth"])
             self.assertEqual(2, artifact["metrics"]["rust_gal_slice"]["batches_executed"])
+            self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["world_primitive_batches_executed"])
+            self.assertEqual(12, artifact["metrics"]["rust_gal_slice"]["world_line_segments_executed"])
+            self.assertEqual(24, artifact["metrics"]["rust_gal_slice"]["world_line_vertices_executed"])
+            self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["world_primitive_draws_executed"])
+            self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["world_depth_attachment_creates"])
+            self.assertEqual(7, artifact["metrics"]["rust_gal_slice"]["world_depth_attachment_reuses"])
             self.assertEqual(0, artifact["metrics"]["rust_gal_slice"]["batches_cancelled"])
             self.assertEqual(0, artifact["metrics"]["rust_gal_slice"]["completion_polls"])
             self.assertEqual(0, artifact["metrics"]["rust_gal_slice"]["completion_timeouts"])
@@ -2053,6 +2510,247 @@ else:
             self.assertEqual("HEART_NORMAL_FULL", artifact["metrics"]["rust_gal_slice"]["asset_missing_fallbacks"][0]["sprite"])
             self.assertEqual(18, artifact["metrics"]["ffi"]["call_count"])
             self.assertEqual(8192, artifact["metrics"]["ffi"]["bytes"])
+
+    def test_requested_world_outline_capture_rejects_zero_work(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend="vulkan")
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            doc = json.loads(deterministic.read_text(encoding="utf-8"))
+            doc["rustGalWorldOutlineScenario"] = "full-cube"
+            doc["rustGalWorldOutlineStyle"] = "normal"
+            doc["rustGalWorldOutlineDepthPolicy"] = "test-write"
+            deterministic.write_text(json.dumps(doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "[MattMC graphics audit] Rust VulkanicGAL GUI frame executed producer=gui.frame "
+                "frame=4 submission=5 rust_gal_world_primitive_batches_executed=0 "
+                "rust_gal_world_line_segments_executed=0 rust_gal_world_line_vertices_executed=0 "
+                "rust_gal_world_primitive_draws_executed=0 rust_gal_world_depth_attachment_creates=0 "
+                "rust_gal_world_depth_attachment_reuses=0 rust_gal_backend_submissions=1 ffi_call_count=3 ffi_bytes=256\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[6], capture, "capture", True, [], 0, False, tool_kind="capture")
+
+            self.assertFalse(artifact["validation"]["complete"])
+            self.assertEqual("full-cube", artifact["metrics"]["rust_gal_slice"]["world_outline_scenario"])
+            self.assertTrue(any("world-outline target requested" in message for message in artifact["validation"]["messages"]))
+
+    def test_java_opengl_world_outline_capture_uses_java_route_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend="opengl")
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            doc = json.loads(deterministic.read_text(encoding="utf-8"))
+            doc["rustGalWorldOutlineScenario"] = "full-cube"
+            deterministic.write_text(json.dumps(doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "[MattMC graphics-audit] block-outline extract route=java-opengl target=true diagnostic=full-cube pos=1, 2, 3 highContrast=false shapeEmpty=false\n"
+                "[MattMC graphics-audit] block-outline draw route=java-opengl retained=true translucentPass=false pos=1, 2, 3 highContrast=false\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[0], capture, "capture", True, [], 0, False, tool_kind="capture")
+
+            self.assertFalse(any("world-outline scenario requested" in message for message in artifact["validation"]["messages"]))
+            self.assertFalse(any("deterministic Java block-outline scenario requested" in message for message in artifact["validation"]["messages"]))
+
+    def test_java_vulkan_world_outline_capture_uses_java_route_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend="vulkan")
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            doc = json.loads(deterministic.read_text(encoding="utf-8"))
+            doc["rustGalWorldOutlineScenario"] = "full-cube"
+            deterministic.write_text(json.dumps(doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "[MattMC graphics-audit] block-outline extract route=java-vulkan target=true diagnostic=full-cube pos=1, 2, 3 highContrast=false shapeEmpty=false\n"
+                "[MattMC graphics-audit] block-outline draw route=java-vulkan retained=true translucentPass=false pos=1, 2, 3 highContrast=false\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[2], capture, "capture", True, [], 0, False, tool_kind="capture")
+
+            self.assertFalse(any("world-outline scenario requested" in message for message in artifact["validation"]["messages"]))
+            self.assertFalse(any("deterministic Java block-outline scenario requested" in message for message in artifact["validation"]["messages"]))
+
+    def test_java_world_outline_capture_rejects_missing_draw_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend="opengl")
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            doc = json.loads(deterministic.read_text(encoding="utf-8"))
+            doc["rustGalWorldOutlineScenario"] = "full-cube"
+            deterministic.write_text(json.dumps(doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "[MattMC graphics-audit] block-outline extract route=java-opengl target=true diagnostic=full-cube pos=1, 2, 3 highContrast=false shapeEmpty=false\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[0], capture, "capture", True, [], 0, False, tool_kind="capture")
+
+            self.assertFalse(artifact["validation"]["complete"])
+            self.assertTrue(any("missing outline draw evidence" in message for message in artifact["validation"]["messages"]))
+
+    def test_real_target_high_contrast_outline_requires_visible_pixels(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend="opengl")
+            screenshot = capture / "outline_probe_missing.png"
+            write_outline_probe_image(screenshot, visible=False)
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            doc = json.loads(deterministic.read_text(encoding="utf-8"))
+            doc["blockOutlineRealTargetForced"] = True
+            doc["rustGalWorldOutlineStyle"] = "high-contrast"
+            doc["captures"][0]["screenshot"] = str(screenshot)
+            deterministic.write_text(json.dumps(doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "[MattMC graphics-audit] block-outline extract route=java-opengl target=true pos=1, 2, 3 highContrast=true shapeEmpty=false\n"
+                "[MattMC graphics-audit] block-outline draw route=java-opengl retained=true translucentPass=false pos=1, 2, 3 highContrast=true\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[0], capture, "capture", True, [], 0, False, tool_kind="capture")
+
+            self.assertFalse(artifact["validation"]["complete"])
+            evidence = artifact["metrics"]["rust_gal_slice"]["world_outline_pixel_evidence"]
+            self.assertEqual("absent", evidence["status"])
+            self.assertTrue(any("visible outline-colored pixels" in message for message in artifact["validation"]["messages"]))
+
+    def test_real_target_high_contrast_outline_accepts_visible_pixels(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend="opengl")
+            screenshot = capture / "outline_probe_visible.png"
+            write_outline_probe_image(screenshot, visible=True)
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            doc = json.loads(deterministic.read_text(encoding="utf-8"))
+            doc["blockOutlineRealTargetForced"] = True
+            doc["rustGalWorldOutlineStyle"] = "high-contrast"
+            doc["captures"][0]["screenshot"] = str(screenshot)
+            deterministic.write_text(json.dumps(doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "[MattMC graphics-audit] block-outline extract route=java-opengl target=true pos=1, 2, 3 highContrast=true shapeEmpty=false\n"
+                "[MattMC graphics-audit] block-outline draw route=java-opengl retained=true translucentPass=false pos=1, 2, 3 highContrast=true\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[0], capture, "capture", True, [], 0, False, tool_kind="capture")
+
+            self.assertTrue(artifact["validation"]["complete"])
+            evidence = artifact["metrics"]["rust_gal_slice"]["world_outline_pixel_evidence"]
+            self.assertEqual("present", evidence["status"])
+            self.assertGreaterEqual(evidence["matching_pixels"], evidence["threshold"])
+
+    def test_aimed_real_target_high_contrast_outline_uses_pixel_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend="opengl")
+            screenshot = capture / "outline_probe_visible.png"
+            write_outline_probe_image(screenshot, visible=True)
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            doc = json.loads(deterministic.read_text(encoding="utf-8"))
+            doc["blockOutlineRealTargetForced"] = False
+            doc["blockOutlineRealTargetAimed"] = True
+            doc["rustGalWorldOutlineStyle"] = ""
+            doc["captures"][0]["screenshot"] = str(screenshot)
+            deterministic.write_text(json.dumps(doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "-Dmattmc.dev.deterministicCameraCapture.blockOutlineHighContrast=true\n"
+                "[MattMC graphics-audit] block-outline pick type=BLOCK blockPos=1, 2, 3 face=north distance=2.0 blockRange=5.0 entityRange=5.0 shouldRender=true highContrast=true hideGui=false screen=none overlay=none\n"
+                "[MattMC graphics-audit] block-outline extract route=java-opengl target=true pos=1, 2, 3 highContrast=true shapeEmpty=false\n"
+                "[MattMC graphics-audit] block-outline draw route=java-opengl retained=true translucentPass=false pos=1, 2, 3 highContrast=true\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[0], capture, "capture", True, [], 0, False, tool_kind="capture")
+
+            self.assertTrue(artifact["validation"]["complete"])
+            metrics = artifact["metrics"]["rust_gal_slice"]
+            self.assertTrue(metrics["world_outline_aim_real_target"])
+            self.assertEqual("high-contrast", metrics["world_outline_style"])
+            self.assertEqual("present", metrics["world_outline_pixel_evidence"]["status"])
+
+    def test_saved_view_block_outline_requires_real_block_pick(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend="opengl")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "Picked up JAVA_TOOL_OPTIONS: -Dmattmc.dev.blockOutlineSavedViewTargetRequired=true\n"
+                "[MattMC graphics-audit] block-outline pick type=MISS blockPos=353, 83, -58 face=down "
+                "distance=5.0000 blockRange=5.0000 entityRange=5.0000 eye=(353.7000, 88.6040, -57.2364) "
+                "yaw=0.0000 pitch=90.0000 shouldRender=true highContrast=false hideGui=false screen=none overlay=none\n"
+                "[MattMC graphics-audit] block-outline extract route=java-opengl target=false\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[0], capture, "capture", True, [], 0, False, tool_kind="capture")
+
+            self.assertFalse(artifact["validation"]["complete"])
+            self.assertTrue(
+                any("saved-view Java block-outline target required" in message for message in artifact["validation"]["messages"])
+            )
+
+    def test_java_no_target_world_outline_capture_rejects_unexpected_draw(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend="opengl")
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            doc = json.loads(deterministic.read_text(encoding="utf-8"))
+            doc["rustGalWorldOutlineScenario"] = "no-target"
+            deterministic.write_text(json.dumps(doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "[MattMC graphics-audit] block-outline extract route=java-opengl target=false diagnostic=no-target\n"
+                "[MattMC graphics-audit] block-outline draw route=java-opengl retained=true translucentPass=false pos=1, 2, 3 highContrast=false\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[0], capture, "capture", True, [], 0, False, tool_kind="capture")
+
+            self.assertFalse(artifact["validation"]["complete"])
+            self.assertTrue(any("unexpected java-opengl draw" in message for message in artifact["validation"]["messages"]))
+
+    def test_requested_no_target_outline_capture_accepts_zero_segments(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend="vulkan")
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            doc = json.loads(deterministic.read_text(encoding="utf-8"))
+            doc["rustGalWorldOutlineScenario"] = "no-target"
+            deterministic.write_text(json.dumps(doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "[MattMC graphics audit] Rust VulkanicGAL GUI frame executed producer=gui.frame "
+                "frame=4 submission=5 rust_gal_world_primitive_batches_executed=0 "
+                "rust_gal_world_line_segments_executed=0 rust_gal_world_line_vertices_executed=0 "
+                "rust_gal_world_primitive_draws_executed=0 rust_gal_world_depth_attachment_creates=0 "
+                "rust_gal_backend_submissions=1 ffi_call_count=3 ffi_bytes=256\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[6], capture, "capture", True, [], 0, False, tool_kind="capture")
+
+            self.assertFalse(any("world-outline scenario requested" in message for message in artifact["validation"]["messages"]))
+            self.assertEqual("no-target", artifact["metrics"]["rust_gal_slice"]["world_outline_scenario"])
 
     def test_rust_gal_slice_metrics_are_extracted_from_gameplay_status(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

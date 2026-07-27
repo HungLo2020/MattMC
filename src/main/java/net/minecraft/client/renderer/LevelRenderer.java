@@ -28,6 +28,7 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.EnumMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
@@ -91,6 +92,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.HitResult.Type;
 import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.sodium.client.gl.device.RenderDevice;
 import net.sodium.client.render.SodiumWorldRenderer;
@@ -117,6 +119,16 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	public static final int HALF_SECTION_SIZE = 8;
 	public static final int NEARBY_SECTION_DISTANCE_IN_BLOCKS = 32;
 	private static final int MINIMUM_TRANSPARENT_SORT_COUNT = 15;
+	private static final boolean BLOCK_OUTLINE_DIAGNOSTICS = Boolean.getBoolean("mattmc.dev.blockOutlineDiagnostics");
+	private static final String BLOCK_OUTLINE_DIAGNOSTIC_SCENARIO = System.getProperty("mattmc.dev.rustGalWorldOutline.scenario", "").trim();
+	private static final String BLOCK_OUTLINE_DIAGNOSTIC_STYLE = System.getProperty("mattmc.dev.rustGalWorldOutline.style", "").trim();
+	private static int blockOutlineDiagnosticLogs;
+	private static final boolean BLOCK_OUTLINE_FRAMEBUFFER_DIAGNOSTICS = Boolean.getBoolean("mattmc.dev.blockOutlineFramebufferDiagnostics");
+	private static final int BLOCK_OUTLINE_FRAMEBUFFER_DIAGNOSTIC_LIMIT = Math.max(
+		0,
+		Integer.getInteger("mattmc.dev.blockOutlineFramebufferDiagnostics.maxFrames", 24)
+	);
+	private static int blockOutlineFramebufferDiagnosticLogs;
 	private final Minecraft minecraft;
 	public final EntityRenderDispatcher entityRenderDispatcher; // Made public for Iris shadow rendering
 	private final BlockEntityRenderDispatcher blockEntityRenderDispatcher;
@@ -171,6 +183,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	private net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline;
 	private boolean disableFrustumCulling;
 	private boolean warned;
+	@Nullable
+	private BlockOutlineFramebufferProbe pendingBlockOutlineFramebufferProbe;
+	private final Matrix4f blockOutlineProbeProjection = new Matrix4f();
 	
 	// Sodium: From LevelRendererMixin - fields for Sodium world renderer integration
 	private static final EnumMap<ChunkSectionLayer, List<RenderPass.Draw<GpuBufferSlice[]>>> SODIUM_STATIC_MAP = new EnumMap<>(ChunkSectionLayer.class);
@@ -460,6 +475,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		net.irisshaders.iris.uniforms.IrisTimeUniforms.updateTime();
 		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setGbufferModelView(matrix4f);
 		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setGbufferProjection(matrix4f2);
+		this.blockOutlineProbeProjection.set(matrix4f2);
 		float fakeTickDelta = net.irisshaders.iris.uniforms.SystemTimeUniforms.isDeterministicTemporalParityEnabled()
 			? net.irisshaders.iris.uniforms.SystemTimeUniforms.deterministicTemporalPartialTick()
 			: deltaTracker.getGameTimeDeltaPartialTick(false);
@@ -635,6 +651,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			net.irisshaders.iris.gl.IrisRenderSystem.setPolygonMode(net.vulkanic.VulkanicPolygonMode.FILL);
 		}
 		this.pipeline.finalizeLevelRendering();
+		this.auditPendingBlockOutlineFramebufferProbe("after-iris-final");
 		
 		// Show beta warning once
 		if (!this.warned) {
@@ -1022,6 +1039,9 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 	private void extractBlockOutline(Camera camera, LevelRenderState levelRenderState) {
 		levelRenderState.blockOutlineRenderState = null;
+		if (extractDiagnosticBlockOutline(camera, levelRenderState)) {
+			return;
+		}
 		if (this.minecraft.hitResult instanceof BlockHitResult blockHitResult) {
 			if (blockHitResult.getType() != Type.MISS) {
 				BlockPos blockPos = blockHitResult.getBlockPos();
@@ -1039,9 +1059,64 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 					} else {
 						levelRenderState.blockOutlineRenderState = new BlockOutlineRenderState(blockPos, bl, bl2, voxelShape);
 					}
+					auditBlockOutline("extract route=" + javaBlockOutlineRoute()
+						+ " target=true pos=" + blockPos.toShortString()
+						+ " translucent=" + bl
+						+ " highContrast=" + bl2
+						+ " shapeEmpty=" + voxelShape.isEmpty());
 				}
 			}
 		}
+		if (levelRenderState.blockOutlineRenderState == null) {
+			auditBlockOutline("extract route=" + javaBlockOutlineRoute() + " target=false");
+		}
+	}
+
+	private static boolean extractDiagnosticBlockOutline(Camera camera, LevelRenderState levelRenderState) {
+		if (!BLOCK_OUTLINE_DIAGNOSTICS || BLOCK_OUTLINE_DIAGNOSTIC_SCENARIO.isBlank()) {
+			return false;
+		}
+		if ("no-target".equalsIgnoreCase(BLOCK_OUTLINE_DIAGNOSTIC_SCENARIO)) {
+			auditBlockOutline("extract route=" + javaBlockOutlineRoute() + " target=false diagnostic=no-target");
+			return true;
+		}
+		VoxelShape shape = diagnosticBlockOutlineShape();
+		if (shape.isEmpty()) {
+			auditBlockOutline("extract route=" + javaBlockOutlineRoute() + " target=false diagnostic=empty-shape");
+			return true;
+		}
+		BlockPos blockPos = diagnosticBlockOutlinePos(camera);
+		boolean highContrast = "high-contrast".equalsIgnoreCase(BLOCK_OUTLINE_DIAGNOSTIC_STYLE);
+		levelRenderState.blockOutlineRenderState = new BlockOutlineRenderState(blockPos, false, highContrast, shape);
+		auditBlockOutline("extract route=" + javaBlockOutlineRoute()
+			+ " target=true diagnostic=" + BLOCK_OUTLINE_DIAGNOSTIC_SCENARIO
+			+ " pos=" + blockPos.toShortString()
+			+ " highContrast=" + highContrast
+			+ " shapeEmpty=false");
+		return true;
+	}
+
+	private static VoxelShape diagnosticBlockOutlineShape() {
+		return switch (BLOCK_OUTLINE_DIAGNOSTIC_SCENARIO.toLowerCase(java.util.Locale.ROOT)) {
+			case "full-cube", "cube" -> Shapes.block();
+			case "partial-shape", "partial" -> Shapes.box(0.0, 0.0, 0.0, 1.0, 0.5, 1.0);
+			case "disconnected-shape", "disconnected" -> Shapes.or(
+				Shapes.box(0.0, 0.0, 0.0, 0.375, 0.375, 0.375),
+				Shapes.box(0.625, 0.625, 0.625, 1.0, 1.0, 1.0)
+			);
+			default -> Shapes.empty();
+		};
+	}
+
+	private static BlockPos diagnosticBlockOutlinePos(Camera camera) {
+		org.joml.Vector3f look = camera.getLookVector();
+		Vec3 cameraPos = camera.getPosition();
+		double distance = 4.0;
+		return BlockPos.containing(
+			cameraPos.x() + look.x() * distance - 0.5,
+			cameraPos.y() + look.y() * distance - 0.5,
+			cameraPos.z() + look.z() * distance - 0.5
+		);
 	}
 
 	private void renderBlockOutline(MultiBufferSource.BufferSource bufferSource, PoseStack poseStack, boolean bl, LevelRenderState levelRenderState) {
@@ -1049,6 +1124,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		if (blockOutlineRenderState != null) {
 			if (blockOutlineRenderState.isTranslucent() == bl) {
 				Vec3 vec3 = levelRenderState.cameraRenderState.pos;
+				BlockOutlineFramebufferProbe framebufferProbe = this.createBlockOutlineFramebufferProbe(blockOutlineRenderState, poseStack, vec3, bl);
 				if (blockOutlineRenderState.highContrast()) {
 					// Iris: Wrap with outline render state shard
 					RenderType wrappedType = new net.irisshaders.iris.layer.OuterWrappedRenderType(
@@ -1070,8 +1146,317 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 				int i = blockOutlineRenderState.highContrast() ? -11010079 : ARGB.color(102, -16777216);
 				this.renderHitOutline(poseStack, vertexConsumer, vec3.x, vec3.y, vec3.z, blockOutlineRenderState, i);
 				bufferSource.endLastBatch();
+				this.completeBlockOutlineFramebufferProbe(framebufferProbe);
+				auditBlockOutline("draw route=" + javaBlockOutlineRoute()
+					+ " retained=true translucentPass=" + bl
+					+ " pos=" + blockOutlineRenderState.pos().toShortString()
+					+ " highContrast=" + blockOutlineRenderState.highContrast());
 			}
 		}
+	}
+
+	private static String javaBlockOutlineRoute() {
+		return VulkanicAPI.isVulkanBackendSelected() ? "java-vulkan" : "java-opengl";
+	}
+
+	private static void auditBlockOutline(String message) {
+		if (BLOCK_OUTLINE_DIAGNOSTICS && blockOutlineDiagnosticLogs < 128) {
+			blockOutlineDiagnosticLogs++;
+			LOGGER.info("[MattMC graphics-audit] block-outline {}", message);
+		}
+	}
+
+	@Nullable
+	private BlockOutlineFramebufferProbe createBlockOutlineFramebufferProbe(
+		BlockOutlineRenderState blockOutlineRenderState,
+		PoseStack poseStack,
+		Vec3 cameraPos,
+		boolean translucentPass
+	) {
+		if (!BLOCK_OUTLINE_FRAMEBUFFER_DIAGNOSTICS
+			|| VulkanicAPI.isVulkanBackendSelected()
+			|| blockOutlineFramebufferDiagnosticLogs >= BLOCK_OUTLINE_FRAMEBUFFER_DIAGNOSTIC_LIMIT) {
+			return null;
+		}
+		FramebufferProbeCrop crop = this.projectedBlockOutlineProbeCrop(blockOutlineRenderState, poseStack, cameraPos);
+		FramebufferProbeSample before = this.readBlockOutlineProbeSample(crop);
+		if (before == null) {
+			return null;
+		}
+		return new BlockOutlineFramebufferProbe(
+			blockOutlineRenderState.pos().toShortString(),
+			blockOutlineRenderState.highContrast(),
+			translucentPass,
+			crop,
+			before
+		);
+	}
+
+	private void completeBlockOutlineFramebufferProbe(@Nullable BlockOutlineFramebufferProbe probe) {
+		if (probe == null) {
+			return;
+		}
+		FramebufferProbeSample afterDraw = this.readBlockOutlineProbeSample(probe.crop());
+		if (afterDraw == null) {
+			return;
+		}
+		this.pendingBlockOutlineFramebufferProbe = probe.withAfterDraw(afterDraw);
+		this.logBlockOutlineFramebufferProbe("after-draw", this.pendingBlockOutlineFramebufferProbe, afterDraw);
+	}
+
+	private void auditPendingBlockOutlineFramebufferProbe(String stage) {
+		BlockOutlineFramebufferProbe probe = this.pendingBlockOutlineFramebufferProbe;
+		if (probe == null || blockOutlineFramebufferDiagnosticLogs >= BLOCK_OUTLINE_FRAMEBUFFER_DIAGNOSTIC_LIMIT) {
+			return;
+		}
+		FramebufferProbeSample finalSample = this.readBlockOutlineProbeSample(probe.crop());
+		if (finalSample != null) {
+			this.logBlockOutlineFramebufferProbe(stage, probe, finalSample);
+			blockOutlineFramebufferDiagnosticLogs++;
+		}
+		this.pendingBlockOutlineFramebufferProbe = null;
+	}
+
+	private void logBlockOutlineFramebufferProbe(String stage, BlockOutlineFramebufferProbe probe, FramebufferProbeSample sample) {
+		FramebufferProbeDelta beforeDelta = sample.deltaFrom(probe.beforeDraw());
+		FramebufferProbeDelta afterDelta = probe.afterDraw() == null
+			? new FramebufferProbeDelta(0, 0, 0L)
+			: sample.deltaFrom(probe.afterDraw());
+		LOGGER.info(
+			"[MattMC graphics-audit] block-outline framebuffer stage={} route={} pos={} highContrast={} translucentPass={} crop={} "
+				+ "drawFb={} readFb={} program={} viewport={} depthTest={} blend={} scissor={} "
+				+ "changedFromBefore={} maxDeltaFromBefore={} sumDeltaFromBefore={} changedFromAfterDraw={} maxDeltaFromAfterDraw={} sumDeltaFromAfterDraw={} "
+				+ "avgRgba={} minRgb={} maxRgb={}",
+			stage,
+			javaBlockOutlineRoute(),
+			probe.blockPos(),
+			probe.highContrast(),
+			probe.translucentPass(),
+			probe.crop().describe(),
+			sample.drawFramebuffer(),
+			sample.readFramebuffer(),
+			sample.currentProgram(),
+			sample.viewport(),
+			sample.depthTest(),
+			sample.blend(),
+			sample.scissor(),
+			beforeDelta.changedPixels(),
+			beforeDelta.maxChannelDelta(),
+			beforeDelta.sumChannelDelta(),
+			afterDelta.changedPixels(),
+			afterDelta.maxChannelDelta(),
+			afterDelta.sumChannelDelta(),
+			sample.averageRgba(),
+			sample.minRgb(),
+			sample.maxRgb()
+		);
+	}
+
+	private FramebufferProbeCrop projectedBlockOutlineProbeCrop(BlockOutlineRenderState blockOutlineRenderState, PoseStack poseStack, Vec3 cameraPos) {
+		int width = Math.max(1, this.minecraft.getMainRenderTarget().width);
+		int height = Math.max(1, this.minecraft.getMainRenderTarget().height);
+		Matrix4fc modelView = poseStack.last().pose();
+		Matrix4fc projection = this.blockOutlineProbeProjection;
+		BlockPos blockPos = blockOutlineRenderState.pos();
+		double baseX = blockPos.getX() - cameraPos.x();
+		double baseY = blockPos.getY() - cameraPos.y();
+		double baseZ = blockPos.getZ() - cameraPos.z();
+		ProjectedBounds bounds = new ProjectedBounds();
+		blockOutlineRenderState.shape().forAllBoxes((minX, minY, minZ, maxX, maxY, maxZ) -> {
+			for (double x : new double[] { minX, maxX }) {
+				for (double y : new double[] { minY, maxY }) {
+					for (double z : new double[] { minZ, maxZ }) {
+						this.includeProjectedBlockOutlinePoint(bounds, modelView, projection, width, height, baseX + x, baseY + y, baseZ + z);
+					}
+				}
+			}
+		});
+		if (!bounds.valid()) {
+			return this.centerBlockOutlineProbeCrop();
+		}
+		int padding = 48;
+		int minX = Mth.clamp((int)Math.floor(bounds.minX) - padding, 0, width - 1);
+		int maxX = Mth.clamp((int)Math.ceil(bounds.maxX) + padding, 0, width - 1);
+		int minY = Mth.clamp((int)Math.floor(bounds.minY) - padding, 0, height - 1);
+		int maxY = Mth.clamp((int)Math.ceil(bounds.maxY) + padding, 0, height - 1);
+		if (maxX <= minX || maxY <= minY) {
+			return this.centerBlockOutlineProbeCrop();
+		}
+		return new FramebufferProbeCrop(minX, minY, maxX - minX + 1, maxY - minY + 1, "projected-outline");
+	}
+
+	private void includeProjectedBlockOutlinePoint(
+		ProjectedBounds bounds,
+		Matrix4fc modelView,
+		Matrix4fc projection,
+		int width,
+		int height,
+		double x,
+		double y,
+		double z
+	) {
+		Vector4f clip = new Vector4f((float)x, (float)y, (float)z, 1.0F).mul(modelView).mul(projection);
+		if (!Float.isFinite(clip.x()) || !Float.isFinite(clip.y()) || !Float.isFinite(clip.w()) || Math.abs(clip.w()) < 1.0E-5F) {
+			return;
+		}
+		float ndcX = clip.x() / clip.w();
+		float ndcY = clip.y() / clip.w();
+		if (!Float.isFinite(ndcX) || !Float.isFinite(ndcY)) {
+			return;
+		}
+		float screenX = (ndcX * 0.5F + 0.5F) * width;
+		float screenY = (ndcY * 0.5F + 0.5F) * height;
+		bounds.include(screenX, screenY);
+	}
+
+	private FramebufferProbeCrop centerBlockOutlineProbeCrop() {
+		int width = Math.max(1, this.minecraft.getMainRenderTarget().width);
+		int height = Math.max(1, this.minecraft.getMainRenderTarget().height);
+		int cropWidth = Math.min(width, Math.max(96, width / 4));
+		int cropHeight = Math.min(height, Math.max(96, height / 4));
+		int x = Math.max(0, (width - cropWidth) / 2);
+		int y = Math.max(0, (height - cropHeight) / 2);
+		return new FramebufferProbeCrop(x, y, cropWidth, cropHeight, "center-fallback");
+	}
+
+	@Nullable
+	private FramebufferProbeSample readBlockOutlineProbeSample(FramebufferProbeCrop crop) {
+		try {
+			VulkanicAPI.FramebufferProbeSnapshot snapshot = VulkanicAPI.readDrawFramebufferProbe(
+				crop.x(),
+				crop.y(),
+				crop.width(),
+				crop.height()
+			);
+			return new FramebufferProbeSample(
+				snapshot.rgba(),
+				snapshot.readFramebuffer(),
+				snapshot.drawFramebuffer(),
+				snapshot.currentProgram(),
+				snapshot.viewport(),
+				snapshot.depthTest(),
+				snapshot.blend(),
+				snapshot.scissor()
+			);
+		} catch (Throwable throwable) {
+			LOGGER.warn("[MattMC graphics-audit] block-outline framebuffer probe failed: {}", throwable.toString());
+			return null;
+		}
+	}
+
+	private static final class ProjectedBounds {
+		private float minX = Float.POSITIVE_INFINITY;
+		private float minY = Float.POSITIVE_INFINITY;
+		private float maxX = Float.NEGATIVE_INFINITY;
+		private float maxY = Float.NEGATIVE_INFINITY;
+
+		void include(float x, float y) {
+			this.minX = Math.min(this.minX, x);
+			this.minY = Math.min(this.minY, y);
+			this.maxX = Math.max(this.maxX, x);
+			this.maxY = Math.max(this.maxY, y);
+		}
+
+		boolean valid() {
+			return Float.isFinite(this.minX) && Float.isFinite(this.minY) && Float.isFinite(this.maxX) && Float.isFinite(this.maxY);
+		}
+	}
+
+	private record FramebufferProbeCrop(int x, int y, int width, int height, String source) {
+		String describe() {
+			return this.x + "," + this.y + "," + this.width + "x" + this.height + ":" + this.source;
+		}
+	}
+
+	private record BlockOutlineFramebufferProbe(
+		String blockPos,
+		boolean highContrast,
+		boolean translucentPass,
+		FramebufferProbeCrop crop,
+		FramebufferProbeSample beforeDraw,
+		@Nullable FramebufferProbeSample afterDraw
+	) {
+		BlockOutlineFramebufferProbe(String blockPos, boolean highContrast, boolean translucentPass, FramebufferProbeCrop crop, FramebufferProbeSample beforeDraw) {
+			this(blockPos, highContrast, translucentPass, crop, beforeDraw, null);
+		}
+
+		BlockOutlineFramebufferProbe withAfterDraw(FramebufferProbeSample afterDraw) {
+			return new BlockOutlineFramebufferProbe(this.blockPos, this.highContrast, this.translucentPass, this.crop, this.beforeDraw, afterDraw);
+		}
+	}
+
+	private record FramebufferProbeSample(
+		byte[] rgba,
+		int readFramebuffer,
+		int drawFramebuffer,
+		int currentProgram,
+		String viewport,
+		boolean depthTest,
+		boolean blend,
+		boolean scissor
+	) {
+		FramebufferProbeDelta deltaFrom(FramebufferProbeSample before) {
+			int changedPixels = 0;
+			int maxChannelDelta = 0;
+			long sumChannelDelta = 0L;
+			for (int i = 0; i < Math.min(this.rgba.length, before.rgba.length); i += 4) {
+				boolean changed = false;
+				for (int channel = 0; channel < 4; channel++) {
+					int delta = Math.abs((this.rgba[i + channel] & 0xFF) - (before.rgba[i + channel] & 0xFF));
+					if (delta != 0) {
+						changed = true;
+					}
+					maxChannelDelta = Math.max(maxChannelDelta, delta);
+					sumChannelDelta += delta;
+				}
+				if (changed) {
+					changedPixels++;
+				}
+			}
+			return new FramebufferProbeDelta(changedPixels, maxChannelDelta, sumChannelDelta);
+		}
+
+		String averageRgba() {
+			long r = 0L;
+			long g = 0L;
+			long b = 0L;
+			long a = 0L;
+			int pixels = Math.max(1, this.rgba.length / 4);
+			for (int i = 0; i < this.rgba.length; i += 4) {
+				r += this.rgba[i] & 0xFF;
+				g += this.rgba[i + 1] & 0xFF;
+				b += this.rgba[i + 2] & 0xFF;
+				a += this.rgba[i + 3] & 0xFF;
+			}
+			return String.format(Locale.ROOT, "%d,%d,%d,%d", r / pixels, g / pixels, b / pixels, a / pixels);
+		}
+
+		String minRgb() {
+			int minR = 255;
+			int minG = 255;
+			int minB = 255;
+			for (int i = 0; i < this.rgba.length; i += 4) {
+				minR = Math.min(minR, this.rgba[i] & 0xFF);
+				minG = Math.min(minG, this.rgba[i + 1] & 0xFF);
+				minB = Math.min(minB, this.rgba[i + 2] & 0xFF);
+			}
+			return minR + "," + minG + "," + minB;
+		}
+
+		String maxRgb() {
+			int maxR = 0;
+			int maxG = 0;
+			int maxB = 0;
+			for (int i = 0; i < this.rgba.length; i += 4) {
+				maxR = Math.max(maxR, this.rgba[i] & 0xFF);
+				maxG = Math.max(maxG, this.rgba[i + 1] & 0xFF);
+				maxB = Math.max(maxB, this.rgba[i + 2] & 0xFF);
+			}
+			return maxR + "," + maxG + "," + maxB;
+		}
+	}
+
+	private record FramebufferProbeDelta(int changedPixels, int maxChannelDelta, long sumChannelDelta) {
 	}
 
 	private void checkPoseStack(PoseStack poseStack) {

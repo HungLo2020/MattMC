@@ -50,7 +50,7 @@ public class RenderSystem {
 			net.vulkanic.VulkanicAPI.pollEvents();
 		}
 
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabledForBackend(net.vulkanic.VulkanicAPI.isVulkanBackendSelected())) {
 			Tesselator.getInstance().clear();
 			if (tracyFrameCapture != null) {
 				tracyFrameCapture.endFrame();

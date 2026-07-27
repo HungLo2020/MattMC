@@ -430,6 +430,7 @@ pub(super) mod mock {
             Ok(PresentedFrame {
                 frame: desc.frame,
                 correlation_id: desc.correlation_id,
+                render_target: FrameRenderTargetId(desc.frame.0),
                 status: FramePresentStatus::Presented,
                 completed_submission: desc.wait_for,
             })

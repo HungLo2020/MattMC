@@ -32,6 +32,9 @@ use super::resources::{
     TextureFormat, TextureSubresourceRange, TextureUsage, TextureViewDesc,
 };
 use super::sync::SubmissionId;
+use super::world_primitive_frontend::{
+    WorldLineSegmentRequest, WorldPrimitiveFrame, WorldPrimitiveFrontend, WorldPrimitiveSubmitStats,
+};
 
 pub const FFI_ABI_V1_VERSION: u32 = 1;
 pub const FFI_ABI_VERSION: u32 = 2;
@@ -155,6 +158,7 @@ pub struct FfiFrameAcquireResult {
     pub correlation_id: u64,
     pub acquire_status: u32,
     pub frame_target: FfiHandle,
+    pub frame_target_identity: u64,
     pub extent: FfiExtent3d,
     pub color_format: u32,
     pub metrics: FfiMetricsSnapshot,
@@ -173,6 +177,7 @@ impl Default for FfiFrameAcquireResult {
             correlation_id: 0,
             acquire_status: 0,
             frame_target: FfiHandle::default(),
+            frame_target_identity: 0,
             extent: FfiExtent3d::default(),
             color_format: 0,
             metrics: FfiMetricsSnapshot::default(),
@@ -232,6 +237,7 @@ pub struct FfiFramePresentResult {
     pub correlation_id: u64,
     pub present_status: u32,
     pub completed_submission_id: u64,
+    pub frame_target_identity: u64,
 }
 
 impl Default for FfiFramePresentResult {
@@ -247,6 +253,7 @@ impl Default for FfiFramePresentResult {
             correlation_id: 0,
             present_status: 0,
             completed_submission_id: 0,
+            frame_target_identity: 0,
         }
     }
 }
@@ -478,6 +485,67 @@ pub struct FfiGuiAssetUpdateRequest {
     pub negotiated_feature_bits: u64,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiWorldLineSegmentRequest {
+    pub byte_size: u32,
+    pub stratum: u32,
+    pub style: u32,
+    pub depth_policy: u32,
+    pub color_argb: u32,
+    pub line_width: f32,
+    pub start_x: f32,
+    pub start_y: f32,
+    pub start_z: f32,
+    pub end_x: f32,
+    pub end_y: f32,
+    pub end_z: f32,
+    pub viewport_width: i32,
+    pub viewport_height: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiWholeFrameSubmitRequest {
+    pub header: FfiHeader,
+    pub generation: u64,
+    pub frame_id: u64,
+    pub correlation_id: u64,
+    pub frame_target: FfiHandle,
+    pub gui_width: i32,
+    pub gui_height: i32,
+    pub viewport_width: i32,
+    pub viewport_height: i32,
+    pub view_matrix: [f32; 16],
+    pub projection_matrix: [f32; 16],
+    pub world_segments: FfiSlice<FfiWorldLineSegmentRequest>,
+    pub gui_sprites: FfiSlice<FfiGuiSpriteRequest>,
+    pub negotiated_feature_bits: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiWholeFrameSubmitResult {
+    pub header: FfiHeader,
+    pub status: i32,
+    pub error_domain: u32,
+    pub submission_id: u64,
+    pub world_segment_count: u64,
+    pub world_vertex_count: u64,
+    pub world_batch_count: u64,
+    pub world_draw_count: u64,
+    pub depth_attachment_creates: u64,
+    pub depth_attachment_reuses: u64,
+    pub sprite_count: u64,
+    pub sprite_batch_count: u64,
+    pub cache_hits: u64,
+    pub cache_misses: u64,
+    pub resource_creates: u64,
+    pub command_lists: u64,
+    pub command_ops: u64,
+    pub metrics: FfiMetricsSnapshot,
+}
+
 impl Default for FfiGuiFrameSubmitResult {
     fn default() -> Self {
         Self {
@@ -488,6 +556,34 @@ impl Default for FfiGuiFrameSubmitResult {
             status: StatusCode::Ok as i32,
             error_domain: 0,
             submission_id: 0,
+            sprite_count: 0,
+            sprite_batch_count: 0,
+            cache_hits: 0,
+            cache_misses: 0,
+            resource_creates: 0,
+            command_lists: 0,
+            command_ops: 0,
+            metrics: FfiMetricsSnapshot::default(),
+        }
+    }
+}
+
+impl Default for FfiWholeFrameSubmitResult {
+    fn default() -> Self {
+        Self {
+            header: FfiHeader {
+                version: FFI_ABI_VERSION,
+                byte_size: size_of::<Self>() as u32,
+            },
+            status: StatusCode::Ok as i32,
+            error_domain: 0,
+            submission_id: 0,
+            world_segment_count: 0,
+            world_vertex_count: 0,
+            world_batch_count: 0,
+            world_draw_count: 0,
+            depth_attachment_creates: 0,
+            depth_attachment_reuses: 0,
             sprite_count: 0,
             sprite_batch_count: 0,
             cache_hits: 0,
@@ -2020,6 +2116,7 @@ pub fn serialize_submission_batch_canonical(batch: &SubmissionBatch) -> Vec<u8> 
 struct BridgeContext {
     gal: VulkanicGal,
     gui_frontend: GuiFrontend,
+    world_primitive_frontend: WorldPrimitiveFrontend,
     ffi_calls: u64,
     ffi_input_bytes: u64,
     ffi_output_bytes: u64,
@@ -2114,6 +2211,31 @@ fn gui_frame_result_ok(context: &BridgeContext, stats: GuiSubmitStats) -> FfiGui
         command_ops: stats.command_ops,
         metrics: context_metrics(context),
         ..FfiGuiFrameSubmitResult::default()
+    }
+}
+
+fn whole_frame_result_ok(
+    context: &BridgeContext,
+    world: WorldPrimitiveSubmitStats,
+    gui: GuiSubmitStats,
+) -> FfiWholeFrameSubmitResult {
+    FfiWholeFrameSubmitResult {
+        submission_id: world.submission_id,
+        world_segment_count: world.segment_count,
+        world_vertex_count: world.vertex_count,
+        world_batch_count: world.primitive_batch_count,
+        world_draw_count: world.world_draws,
+        depth_attachment_creates: world.depth_attachment_creates,
+        depth_attachment_reuses: world.depth_attachment_reuses,
+        sprite_count: gui.sprite_count,
+        sprite_batch_count: gui.sprite_batch_count,
+        cache_hits: world.cache_hits.saturating_add(gui.cache_hits),
+        cache_misses: world.cache_misses.saturating_add(gui.cache_misses),
+        resource_creates: world.resource_creates.saturating_add(gui.resource_creates),
+        command_lists: world.command_lists.max(gui.command_lists),
+        command_ops: world.command_ops,
+        metrics: context_metrics(context),
+        ..FfiWholeFrameSubmitResult::default()
     }
 }
 
@@ -2282,6 +2404,22 @@ fn input_bytes_for_gui_frame(request: &FfiGuiFrameSubmitRequest) -> u64 {
     )
 }
 
+fn input_bytes_for_whole_frame(request: &FfiWholeFrameSubmitRequest) -> u64 {
+    (size_of::<FfiWholeFrameSubmitRequest>() as u64)
+        .saturating_add(
+            request
+                .world_segments
+                .count
+                .saturating_mul(size_of::<FfiWorldLineSegmentRequest>() as u64),
+        )
+        .saturating_add(
+            request
+                .gui_sprites
+                .count
+                .saturating_mul(size_of::<FfiGuiSpriteRequest>() as u64),
+        )
+}
+
 fn input_bytes_for_gui_asset_update(request: &FfiGuiAssetUpdateRequest) -> u64 {
     let payload_headers = request
         .assets
@@ -2388,6 +2526,159 @@ unsafe fn decode_gui_frame_submit(
         });
     }
     Ok((request.generation, frame_target, owned))
+}
+
+unsafe fn decode_whole_frame_submit(
+    request: *const FfiWholeFrameSubmitRequest,
+    capabilities: BackendCapabilities,
+) -> GalResult<(u64, Handle, WorldPrimitiveFrame, Vec<GuiSpriteRequest>)> {
+    let request = read_struct(request, "whole-frame submit request")?;
+    validate_header::<FfiWholeFrameSubmitRequest>(request.header)?;
+    reject_unknown_feature_bits(request.negotiated_feature_bits)?;
+    let supported = capability_feature_bits(capabilities);
+    if request.negotiated_feature_bits & !supported != 0 {
+        return Err(GalError::unsupported_feature(format!(
+            "requested unsupported whole-frame feature bits 0x{:x}",
+            request.negotiated_feature_bits & !supported
+        )));
+    }
+    if !capabilities.name.to_ascii_lowercase().contains("vulkan") {
+        return Err(GalError::unsupported_feature(
+            "whole-frame world primitive submit requires the Rust Vulkan backend",
+        ));
+    }
+    if request.generation == 0 || request.frame_id == 0 || request.correlation_id == 0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "whole-frame submit requires non-zero generation, frame id, and correlation id",
+        ));
+    }
+    if request.gui_width <= 0
+        || request.gui_height <= 0
+        || request.viewport_width <= 0
+        || request.viewport_height <= 0
+    {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "whole-frame submit requires positive GUI and viewport dimensions",
+        ));
+    }
+    let frame_target = Handle::from(request.frame_target);
+    if frame_target.is_null() || frame_target.kind() != Some(HandleKind::FrameTarget) {
+        return Err(GalError::ffi(
+            StatusCode::WrongHandleType,
+            "whole-frame submit requires a frame-target handle",
+        ));
+    }
+    for value in request
+        .view_matrix
+        .iter()
+        .chain(request.projection_matrix.iter())
+    {
+        if !value.is_finite() {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "whole-frame matrices must contain finite values",
+            ));
+        }
+    }
+    let raw_segments = read_slice(
+        request.world_segments,
+        true,
+        "world primitive line segments",
+    )?;
+    if raw_segments.len() > FFI_MAX_BATCH_ITEMS {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "world primitive segment count {} exceeds max {}",
+                raw_segments.len(),
+                FFI_MAX_BATCH_ITEMS
+            ),
+        ));
+    }
+    let mut segments = Vec::with_capacity(raw_segments.len());
+    for segment in raw_segments {
+        validate_item_size::<FfiWorldLineSegmentRequest>(
+            segment.byte_size,
+            "world primitive line segment",
+        )?;
+        let viewport_width = u32::try_from(segment.viewport_width).map_err(|_| {
+            GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "world primitive segment viewport width must be non-negative, got {}",
+                    segment.viewport_width
+                ),
+            )
+        })?;
+        let viewport_height = u32::try_from(segment.viewport_height).map_err(|_| {
+            GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "world primitive segment viewport height must be non-negative, got {}",
+                    segment.viewport_height
+                ),
+            )
+        })?;
+        segments.push(WorldLineSegmentRequest {
+            stratum: segment.stratum,
+            style: segment.style,
+            depth_policy: segment.depth_policy,
+            color_argb: segment.color_argb,
+            line_width: segment.line_width,
+            start: [segment.start_x, segment.start_y, segment.start_z],
+            end: [segment.end_x, segment.end_y, segment.end_z],
+            viewport_width,
+            viewport_height,
+        });
+    }
+    let raw_gui = FfiGuiFrameSubmitRequest {
+        header: FfiHeader {
+            version: request.header.version,
+            byte_size: size_of::<FfiGuiFrameSubmitRequest>() as u32,
+        },
+        generation: request.generation,
+        frame_id: request.frame_id,
+        frame_target: request.frame_target,
+        gui_width: request.gui_width,
+        gui_height: request.gui_height,
+        sprites: request.gui_sprites,
+        negotiated_feature_bits: request.negotiated_feature_bits,
+    };
+    let (_, _, gui_sprites) = decode_gui_frame_submit(&raw_gui, capabilities)?;
+    let viewport_width = u32::try_from(request.viewport_width).map_err(|_| {
+        GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "whole-frame viewport width must be non-negative, got {}",
+                request.viewport_width
+            ),
+        )
+    })?;
+    let viewport_height = u32::try_from(request.viewport_height).map_err(|_| {
+        GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "whole-frame viewport height must be non-negative, got {}",
+                request.viewport_height
+            ),
+        )
+    })?;
+    Ok((
+        request.generation,
+        frame_target,
+        WorldPrimitiveFrame {
+            frame_id: request.frame_id,
+            correlation_id: request.correlation_id,
+            viewport_width,
+            viewport_height,
+            view_matrix: request.view_matrix,
+            projection_matrix: request.projection_matrix,
+            segments,
+        },
+        gui_sprites,
+    ))
 }
 
 unsafe fn decode_gui_asset_update(
@@ -3025,6 +3316,7 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 correlation_id,
                 acquire_status,
                 frame_target,
+                frame_target_identity,
                 extent,
                 color_format,
                 metrics
@@ -3051,7 +3343,8 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 frame_id,
                 correlation_id,
                 present_status,
-                completed_submission_id
+                completed_submission_id,
+                frame_target_identity
             ]
         ),
         43 => layout!(43, FfiDestroyDescAbi, [byte_size, handle, expected_kind]),
@@ -3130,6 +3423,70 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 max_frames_in_flight
             ]
         ),
+        50 => layout!(
+            50,
+            FfiWorldLineSegmentRequest,
+            [
+                byte_size,
+                stratum,
+                style,
+                depth_policy,
+                color_argb,
+                line_width,
+                start_x,
+                start_y,
+                start_z,
+                end_x,
+                end_y,
+                end_z,
+                viewport_width,
+                viewport_height
+            ]
+        ),
+        51 => layout!(
+            51,
+            FfiWholeFrameSubmitRequest,
+            [
+                header,
+                generation,
+                frame_id,
+                correlation_id,
+                frame_target,
+                gui_width,
+                gui_height,
+                viewport_width,
+                viewport_height,
+                view_matrix,
+                projection_matrix,
+                world_segments,
+                gui_sprites,
+                negotiated_feature_bits
+            ]
+        ),
+        52 => layout!(
+            52,
+            FfiWholeFrameSubmitResult,
+            [
+                header,
+                status,
+                error_domain,
+                submission_id,
+                world_segment_count,
+                world_vertex_count,
+                world_batch_count,
+                world_draw_count,
+                depth_attachment_creates,
+                depth_attachment_reuses,
+                sprite_count,
+                sprite_batch_count,
+                cache_hits,
+                cache_misses,
+                resource_creates,
+                command_lists,
+                command_ops,
+                metrics
+            ]
+        ),
         _ => {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,
@@ -3180,6 +3537,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create(
                 BridgeContext {
                     gal,
                     gui_frontend: GuiFrontend::default(),
+                    world_primitive_frontend: WorldPrimitiveFrontend::default(),
                     ffi_calls: 1,
                     ffi_input_bytes: size_of::<FfiContextCreateRequest>() as u64,
                     ffi_output_bytes: size_of::<FfiContextResult>() as u64,
@@ -3260,6 +3618,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_borrowed_opengl(
                 BridgeContext {
                     gal,
                     gui_frontend: GuiFrontend::default(),
+                    world_primitive_frontend: WorldPrimitiveFrontend::default(),
                     ffi_calls: 1,
                     ffi_input_bytes: size_of::<FfiBorrowedOpenGlContextCreateRequest>() as u64,
                     ffi_output_bytes: size_of::<FfiContextResult>() as u64,
@@ -3355,6 +3714,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_windowed_vulkan(
                 BridgeContext {
                     gal,
                     gui_frontend: GuiFrontend::default(),
+                    world_primitive_frontend: WorldPrimitiveFrontend::default(),
                     ffi_calls: 1,
                     ffi_input_bytes: size_of::<FfiWindowedVulkanContextCreateRequest>() as u64,
                     ffi_output_bytes: size_of::<FfiContextResult>() as u64,
@@ -3415,6 +3775,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_destroy(
             return error.code as i32;
         };
         context.gui_frontend.reset(&mut context.gal);
+        context.world_primitive_frontend.reset(&mut context.gal);
         let mut status = status_ok(&context);
         status.metrics.ffi_calls = status.metrics.ffi_calls.saturating_add(1);
         status.metrics.ffi_output_bytes = status
@@ -3640,6 +4001,83 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_gui_submit_frame(
                         ..FfiGuiFrameSubmitResult::default()
                     },
                     "GUI frame submit result",
+                );
+                error.code as i32
+            }
+        }
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
+    context_id: u64,
+    request: *const FfiWholeFrameSubmitRequest,
+    out: *mut FfiWholeFrameSubmitResult,
+) -> i32 {
+    with_registry_mut(|registry| {
+        let Some(context) = registry.contexts.get_mut(&context_id) else {
+            let error = GalError::ffi(
+                StatusCode::StaleHandle,
+                format!("unknown context id {context_id}"),
+            );
+            let _ = write_out(
+                out,
+                FfiWholeFrameSubmitResult {
+                    status: error.code as i32,
+                    error_domain: error.domain as u32,
+                    ..FfiWholeFrameSubmitResult::default()
+                },
+                "whole-frame submit result",
+            );
+            return error.code as i32;
+        };
+        let input_bytes = if request.is_null() {
+            0
+        } else {
+            input_bytes_for_whole_frame(&*request)
+        };
+        context.ffi_calls += 1;
+        context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);
+        context.ffi_output_bytes = context
+            .ffi_output_bytes
+            .saturating_add(size_of::<FfiWholeFrameSubmitResult>() as u64);
+        let result = decode_whole_frame_submit(request, context.gal.capabilities()).and_then(
+            |(generation, frame_target, world_frame, gui_sprites)| {
+                let (gui_ops, gui_stats) = context.gui_frontend.append_frame_ops(
+                    &mut context.gal,
+                    generation,
+                    frame_target,
+                    gui_sprites,
+                )?;
+                let mut world_stats = context.world_primitive_frontend.submit_whole_frame(
+                    &mut context.gal,
+                    generation,
+                    frame_target,
+                    world_frame,
+                    gui_ops,
+                )?;
+                destroy_stale_frame_targets(context)?;
+                world_stats.command_lists = 1;
+                Ok((world_stats, gui_stats))
+            },
+        );
+        match result {
+            Ok((world_stats, gui_stats)) => {
+                let value = whole_frame_result_ok(context, world_stats, gui_stats);
+                let _ = write_out(out, value, "whole-frame submit result");
+                StatusCode::Ok as i32
+            }
+            Err(error) => {
+                set_last_error(context, &error);
+                let _ = write_out(
+                    out,
+                    FfiWholeFrameSubmitResult {
+                        status: error.code as i32,
+                        error_domain: error.domain as u32,
+                        metrics: context_metrics(context),
+                        ..FfiWholeFrameSubmitResult::default()
+                    },
+                    "whole-frame submit result",
                 );
                 error.code as i32
             }
@@ -3944,6 +4382,9 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_configure(
                 max_frames_in_flight: request.max_frames_in_flight,
             };
             context.gui_frontend.clear_frame_pass(&mut context.gal);
+            context
+                .world_primitive_frontend
+                .clear_frame_pass(&mut context.gal);
             destroy_all_frame_targets(context)?;
             context.gal.configure_frame_surface(desc)
         })();
@@ -4009,6 +4450,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_acquire(
                 correlation_id: acquired.correlation_id.0,
                 acquire_status: acquire_status_raw(acquired.status),
                 frame_target: FfiHandle::from(frame_target),
+                frame_target_identity: acquired.render_target.0,
                 extent: acquired.extent.into(),
                 color_format: acquired.color_format as u32,
                 metrics: context_metrics(context),
@@ -4059,6 +4501,9 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_resize(
             let request = read_struct(request, "frame resize request")?;
             validate_header::<FfiFrameResizeRequest>(request.header)?;
             context.gui_frontend.clear_frame_pass(&mut context.gal);
+            context
+                .world_primitive_frontend
+                .clear_frame_pass(&mut context.gal);
             destroy_all_frame_targets(context)?;
             let resized = context.gal.resize_frame_surface(FrameResizeDesc {
                 correlation_id: FrameCorrelationId(request.correlation_id),
@@ -4124,6 +4569,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_present(
                 correlation_id: presented.correlation_id.0,
                 present_status: present_status_raw(presented.status),
                 completed_submission_id: presented.completed_submission.0,
+                frame_target_identity: presented.render_target.0,
                 ..FfiFramePresentResult::default()
             })
         })();
@@ -4168,6 +4614,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_shutdown(
             .ffi_output_bytes
             .saturating_add(size_of::<FfiStatusResult>() as u64);
         context.gui_frontend.reset(&mut context.gal);
+        context.world_primitive_frontend.reset(&mut context.gal);
         if let Err(error) = destroy_all_frame_targets(context) {
             set_last_error(context, &error);
             write_status_out(status_out, status_error(Some(context), &error));
@@ -5486,6 +5933,13 @@ mod tests {
         }
     }
 
+    fn test_vulkan_capabilities() -> BackendCapabilities {
+        BackendCapabilities {
+            name: "ffi-test-vulkan",
+            ..test_capabilities()
+        }
+    }
+
     fn sprite_request() -> FfiGuiSpriteRequest {
         FfiGuiSpriteRequest {
             byte_size: size_of::<FfiGuiSpriteRequest>() as u32,
@@ -5518,6 +5972,75 @@ mod tests {
             gui_width: 320,
             gui_height: 180,
             sprites: FfiSlice {
+                ptr: sprites.as_ptr(),
+                count: sprites.len() as u64,
+            },
+            negotiated_feature_bits: FfiFeatureBits::GRAPHICS
+                | FfiFeatureBits::DESCRIPTOR_ARRAYS
+                | FfiFeatureBits::OPTIONAL_BINDINGS
+                | FfiFeatureBits::UNIFORM_BUFFERS
+                | FfiFeatureBits::STORAGE_BUFFERS
+                | FfiFeatureBits::TEXTURE_SUBRESOURCE_COPIES
+                | FfiFeatureBits::HOST_BUFFER_ACCESS
+                | FfiFeatureBits::PRESENTATION,
+        }
+    }
+
+    fn line_segment_request() -> FfiWorldLineSegmentRequest {
+        FfiWorldLineSegmentRequest {
+            byte_size: size_of::<FfiWorldLineSegmentRequest>() as u32,
+            stratum: 100,
+            style: 1,
+            depth_policy: 0,
+            color_argb: 0x6600_0000,
+            line_width: 1.0,
+            start_x: 1.0,
+            start_y: 2.0,
+            start_z: 3.0,
+            end_x: 4.0,
+            end_y: 5.0,
+            end_z: 6.0,
+            viewport_width: 854,
+            viewport_height: 480,
+        }
+    }
+
+    fn whole_frame_request(
+        segments: &[FfiWorldLineSegmentRequest],
+        sprites: &[FfiGuiSpriteRequest],
+    ) -> FfiWholeFrameSubmitRequest {
+        let mut view_matrix = [0.0; 16];
+        let mut projection_matrix = [0.0; 16];
+        view_matrix[0] = 1.0;
+        view_matrix[5] = 1.0;
+        view_matrix[10] = 1.0;
+        view_matrix[15] = 1.0;
+        projection_matrix[0] = 1.0;
+        projection_matrix[5] = 1.0;
+        projection_matrix[10] = 1.0;
+        projection_matrix[15] = 1.0;
+        FfiWholeFrameSubmitRequest {
+            header: FfiHeader {
+                version: FFI_ABI_VERSION,
+                byte_size: size_of::<FfiWholeFrameSubmitRequest>() as u32,
+            },
+            generation: 7,
+            frame_id: 11,
+            correlation_id: 13,
+            frame_target: FfiHandle::from(
+                Handle::new(HandleKind::FrameTarget, 3, 1).expect("test handle"),
+            ),
+            gui_width: 320,
+            gui_height: 180,
+            viewport_width: 854,
+            viewport_height: 480,
+            view_matrix,
+            projection_matrix,
+            world_segments: FfiSlice {
+                ptr: segments.as_ptr(),
+                count: segments.len() as u64,
+            },
+            gui_sprites: FfiSlice {
                 ptr: sprites.as_ptr(),
                 count: sprites.len() as u64,
             },
@@ -5586,6 +6109,36 @@ mod tests {
         let error = unsafe { decode_gui_frame_submit(&request, test_capabilities()) }
             .expect_err("wrong frame target kind must fail");
         assert_eq!(error.code, StatusCode::WrongHandleType);
+    }
+
+    #[test]
+    fn whole_frame_world_primitive_ffi_decode_copies_caller_memory() {
+        let mut segments = vec![line_segment_request()];
+        let sprites = vec![sprite_request()];
+        let request = whole_frame_request(&segments, &sprites);
+        let (_generation, _target, frame, gui) =
+            unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap() };
+        segments[0].start_x = 99.0;
+        assert_eq!(frame.frame_id, 11);
+        assert_eq!(frame.correlation_id, 13);
+        assert_eq!(frame.segments[0].start[0], 1.0);
+        assert_eq!(frame.segments[0].end[2], 6.0);
+        assert_eq!(gui.len(), 1);
+    }
+
+    #[test]
+    fn whole_frame_world_primitive_ffi_rejects_bad_segment_size_and_non_vulkan() {
+        let mut segments = vec![line_segment_request()];
+        let sprites = vec![sprite_request()];
+        let request = whole_frame_request(&segments, &sprites);
+        let error = unsafe { decode_whole_frame_submit(&request, test_capabilities()) }
+            .expect_err("non-Vulkan whole-frame submit must fail");
+        assert_eq!(error.code, StatusCode::UnsupportedFeature);
+        segments[0].byte_size -= 4;
+        let request = whole_frame_request(&segments, &sprites);
+        let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+            .expect_err("malformed world line segment must fail");
+        assert_eq!(error.code, StatusCode::InvalidArgument);
     }
 
     #[test]

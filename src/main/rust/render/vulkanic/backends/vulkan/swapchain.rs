@@ -232,6 +232,7 @@ impl VulkanSwapchain {
         Ok(PresentedFrame {
             frame: desc.frame,
             correlation_id: desc.correlation_id,
+            render_target: FrameRenderTargetId(u64::from(acquired.image_index) + 1),
             status,
             completed_submission: desc.wait_for,
         })

@@ -39,8 +39,10 @@ import net.vulkanic.VulkanSwapchainSurfaceInfo;
 import net.minecraft.Util;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.*;
 
+import java.nio.ByteBuffer;
 import java.util.function.BiFunction;
 
 /**
@@ -2564,6 +2566,34 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         org.lwjgl.opengl.GL32C.glReadPixels(x, y, width, height, format, type, pixels);
+    }
+
+    public VulkanicAPI.FramebufferProbeSnapshot readDrawFramebufferProbe(int x, int y, int width, int height) {
+        int previousReadFramebuffer = GL11.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING);
+        int drawFramebuffer = GL11.glGetInteger(GL30.GL_DRAW_FRAMEBUFFER_BINDING);
+        int currentProgram = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
+        int[] viewport = new int[4];
+        GL11.glGetIntegerv(GL11.GL_VIEWPORT, viewport);
+        boolean depthTest = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
+        boolean blend = GL11.glIsEnabled(GL11.GL_BLEND);
+        boolean scissor = GL11.glIsEnabled(GL11.GL_SCISSOR_TEST);
+        ByteBuffer pixels = BufferUtils.createByteBuffer(width * height * 4);
+        GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, drawFramebuffer);
+        GL11.glReadPixels(x, y, width, height, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixels);
+        GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, previousReadFramebuffer);
+        byte[] bytes = new byte[pixels.capacity()];
+        pixels.rewind();
+        pixels.get(bytes);
+        return new VulkanicAPI.FramebufferProbeSnapshot(
+            bytes,
+            previousReadFramebuffer,
+            drawFramebuffer,
+            currentProgram,
+            viewport[0] + "," + viewport[1] + "," + viewport[2] + "," + viewport[3],
+            depthTest,
+            blend,
+            scissor
+        );
     }
     
     @Override

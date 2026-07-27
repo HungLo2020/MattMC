@@ -1,6 +1,10 @@
 package net.vulkanic.bridge;
 
+import net.blaze3d.platform.Window;
 import net.minecraft.util.NativeLibraryLoader;
+import org.lwjgl.glfw.GLFW;
+import org.lwjgl.glfw.GLFWNativeWayland;
+import org.lwjgl.glfw.GLFWNativeX11;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
@@ -37,9 +41,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		| FEATURE_DESCRIPTOR_ARRAYS
 		| FEATURE_OPTIONAL_BINDINGS
 		| FEATURE_UNIFORM_BUFFERS
-			| FEATURE_STORAGE_BUFFERS
-			| FEATURE_TEXTURE_SUBRESOURCE_COPIES
-			| FEATURE_HOST_BUFFER_ACCESS;
+		| FEATURE_STORAGE_BUFFERS
+		| FEATURE_TEXTURE_SUBRESOURCE_COPIES
+		| FEATURE_HOST_BUFFER_ACCESS;
 
 	public static final int MEMORY_DEVICE_LOCAL = 1;
 	public static final int MEMORY_UPLOAD = 2;
@@ -109,6 +113,15 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		this.negotiatedFeatures = negotiatedFeatures;
 	}
 
+	public static boolean isBorrowedOpenGlContextCurrent(Window window) {
+		long currentContext = GLFW.glfwGetCurrentContext();
+		return currentContext != 0L && currentContext == window.handle();
+	}
+
+	public static VulkanicGalBridge createBorrowedOpenGl(Window window) {
+		return createBorrowedOpenGl(window.handle());
+	}
+
 	public static VulkanicGalBridge createBorrowedOpenGl(long stableWindowId) {
 		if (stableWindowId == 0L) {
 			throw new IllegalArgumentException("borrowed OpenGL context requires a non-zero window id");
@@ -135,6 +148,18 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			arena.close();
 			throw error;
 		}
+	}
+
+	public static VulkanicGalBridge createWindowedVulkan(Window window, int width, int height) {
+		NativeWindowInfo windowInfo = nativeWindowInfo(window);
+		return createWindowedVulkan(
+			window.handle(),
+			windowInfo.platform,
+			windowInfo.nativeDisplay,
+			windowInfo.nativeWindow,
+			width,
+			height
+		);
 	}
 
 	public static VulkanicGalBridge createWindowedVulkan(
@@ -180,6 +205,28 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			arena.close();
 			throw error;
 		}
+	}
+
+	private static NativeWindowInfo nativeWindowInfo(Window window) {
+		int glfwPlatform = GLFW.glfwGetPlatform();
+		if (glfwPlatform == GLFW.GLFW_PLATFORM_X11) {
+			return new NativeWindowInfo(
+				WINDOW_PLATFORM_X11,
+				GLFWNativeX11.glfwGetX11Display(),
+				GLFWNativeX11.glfwGetX11Window(window.handle())
+			);
+		}
+		if (glfwPlatform == GLFW.GLFW_PLATFORM_WAYLAND) {
+			return new NativeWindowInfo(
+				WINDOW_PLATFORM_WAYLAND,
+				GLFWNativeWayland.glfwGetWaylandDisplay(),
+				GLFWNativeWayland.glfwGetWaylandWindow(window.handle())
+			);
+		}
+		throw new IllegalStateException("Rust Vulkan whole-frame shell only supports GLFW X11/Wayland windows; platform=" + glfwPlatform);
+	}
+
+	private record NativeWindowInfo(int platform, long nativeDisplay, long nativeWindow) {
 	}
 
 	public static VulkanicGalBridge create(String backendName) {
@@ -313,15 +360,16 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		request.set(ValueLayout.JAVA_INT, extent + 8, 1);
 		MemorySegment result = Struct.FRAME_ACQUIRE_RESULT.allocate(arena);
 		checkStatus(Native.frameAcquire(contextId, request, result), "frame acquire");
-		long resultExtent = Struct.FRAME_ACQUIRE_RESULT.offset(7);
+		long resultExtent = Struct.FRAME_ACQUIRE_RESULT.offset(8);
 		return new AcquiredFrame(
 			Struct.FRAME_ACQUIRE_RESULT.getLong(result, 3),
 			Struct.FRAME_ACQUIRE_RESULT.getLong(result, 4),
 			Struct.FRAME_ACQUIRE_RESULT.getInt(result, 5),
 			Struct.FRAME_ACQUIRE_RESULT.getLong(result, 6),
+			Struct.FRAME_ACQUIRE_RESULT.getLong(result, 7),
 			result.get(ValueLayout.JAVA_INT, resultExtent),
 			result.get(ValueLayout.JAVA_INT, resultExtent + 4),
-			Struct.FRAME_ACQUIRE_RESULT.getInt(result, 8));
+			Struct.FRAME_ACQUIRE_RESULT.getInt(result, 9));
 	}
 
 	public FrameResize resizeFrame(long correlationId, int width, int height) {
@@ -353,7 +401,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.FRAME_PRESENT_RESULT.getLong(result, 3),
 			Struct.FRAME_PRESENT_RESULT.getLong(result, 4),
 			Struct.FRAME_PRESENT_RESULT.getInt(result, 5),
-			Struct.FRAME_PRESENT_RESULT.getLong(result, 6));
+			Struct.FRAME_PRESENT_RESULT.getLong(result, 6),
+			Struct.FRAME_PRESENT_RESULT.getLong(result, 7));
 	}
 
 	public GuiFrameSubmitResult submitGuiFrame(
@@ -407,6 +456,110 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.GUI_FRAME_SUBMIT_RESULT.getLong(result, 8),
 			Struct.GUI_FRAME_SUBMIT_RESULT.getLong(result, 9),
 			Struct.GUI_FRAME_SUBMIT_RESULT.getLong(result, 10),
+			ffiCalls,
+			ffiInputBytes,
+			metrics
+		);
+	}
+
+	public WholeFrameSubmitResult submitWholeFrame(
+		long generation,
+		long frameId,
+		long correlationId,
+		long frameTarget,
+		int guiWidth,
+		int guiHeight,
+		int viewportWidth,
+		int viewportHeight,
+		float[] viewMatrix,
+		float[] projectionMatrix,
+		List<WorldLineSegmentRecord> worldSegments,
+		List<GuiSpriteRecord> guiSprites
+	) {
+		Objects.requireNonNull(viewMatrix, "viewMatrix");
+		Objects.requireNonNull(projectionMatrix, "projectionMatrix");
+		Objects.requireNonNull(worldSegments, "worldSegments");
+		Objects.requireNonNull(guiSprites, "guiSprites");
+		if (viewMatrix.length != 16 || projectionMatrix.length != 16) {
+			throw new IllegalArgumentException("whole-frame matrices must contain 16 floats");
+		}
+		MemorySegment segmentArray = Struct.WORLD_LINE_SEGMENT_REQUEST.array(arena, worldSegments.size());
+		for (int i = 0; i < worldSegments.size(); i++) {
+			WorldLineSegmentRecord segment = worldSegments.get(i);
+			MemorySegment item = Abi.item(segmentArray, Struct.WORLD_LINE_SEGMENT_REQUEST, i);
+			item.set(ValueLayout.JAVA_INT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(0), Struct.WORLD_LINE_SEGMENT_REQUEST.byteSize());
+			Struct.WORLD_LINE_SEGMENT_REQUEST.setInt(item, 1, segment.stratum());
+			Struct.WORLD_LINE_SEGMENT_REQUEST.setInt(item, 2, segment.style());
+			Struct.WORLD_LINE_SEGMENT_REQUEST.setInt(item, 3, segment.depthPolicy());
+			Struct.WORLD_LINE_SEGMENT_REQUEST.setInt(item, 4, segment.colorArgb());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(5), segment.lineWidth());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(6), segment.startX());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(7), segment.startY());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(8), segment.startZ());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(9), segment.endX());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(10), segment.endY());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(11), segment.endZ());
+			Struct.WORLD_LINE_SEGMENT_REQUEST.setInt(item, 12, segment.viewportWidth());
+			Struct.WORLD_LINE_SEGMENT_REQUEST.setInt(item, 13, segment.viewportHeight());
+		}
+		MemorySegment spriteArray = Struct.GUI_SPRITE_REQUEST.array(arena, guiSprites.size());
+		for (int i = 0; i < guiSprites.size(); i++) {
+			GuiSpriteRecord sprite = guiSprites.get(i);
+			MemorySegment item = Abi.item(spriteArray, Struct.GUI_SPRITE_REQUEST, i);
+			item.set(ValueLayout.JAVA_INT, Struct.GUI_SPRITE_REQUEST.offset(0), Struct.GUI_SPRITE_REQUEST.byteSize());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 1, sprite.stratum());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 2, sprite.spriteId());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 3, sprite.selectedSlot());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_SPRITE_REQUEST.offset(4), sprite.progressFraction());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 5, sprite.fillDirection());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 6, sprite.colorArgb());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 7, sprite.x());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 8, sprite.y());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 9, sprite.width());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 10, sprite.height());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 11, sprite.guiWidth());
+			Struct.GUI_SPRITE_REQUEST.setInt(item, 12, sprite.guiHeight());
+		}
+		MemorySegment request = Struct.WHOLE_FRAME_SUBMIT.allocate(arena);
+		Abi.writeHeader(request, Struct.WHOLE_FRAME_SUBMIT);
+		Struct.WHOLE_FRAME_SUBMIT.setLong(request, 1, generation);
+		Struct.WHOLE_FRAME_SUBMIT.setLong(request, 2, frameId);
+		Struct.WHOLE_FRAME_SUBMIT.setLong(request, 3, correlationId);
+		Struct.WHOLE_FRAME_SUBMIT.setLong(request, 4, frameTarget);
+		Struct.WHOLE_FRAME_SUBMIT.setInt(request, 5, guiWidth);
+		Struct.WHOLE_FRAME_SUBMIT.setInt(request, 6, guiHeight);
+		Struct.WHOLE_FRAME_SUBMIT.setInt(request, 7, viewportWidth);
+		Struct.WHOLE_FRAME_SUBMIT.setInt(request, 8, viewportHeight);
+		long viewOffset = Struct.WHOLE_FRAME_SUBMIT.offset(9);
+		long projectionOffset = Struct.WHOLE_FRAME_SUBMIT.offset(10);
+		for (int i = 0; i < 16; i++) {
+			request.set(ValueLayout.JAVA_FLOAT, viewOffset + i * 4L, viewMatrix[i]);
+			request.set(ValueLayout.JAVA_FLOAT, projectionOffset + i * 4L, projectionMatrix[i]);
+		}
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 11, segmentArray, worldSegments.size());
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 12, spriteArray, guiSprites.size());
+		Struct.WHOLE_FRAME_SUBMIT.setLong(request, 13, negotiatedFeatures);
+		MemorySegment result = Struct.WHOLE_FRAME_SUBMIT_RESULT.allocate(arena);
+		checkStatus(Native.wholeFrameSubmit(contextId, request, result), "whole-frame submission");
+		long metricsOffset = Struct.WHOLE_FRAME_SUBMIT_RESULT.offset(17);
+		BackendMetrics metrics = backendMetricsAt(result, metricsOffset);
+		long ffiCalls = result.get(ValueLayout.JAVA_LONG, metricsOffset + 64);
+		long ffiInputBytes = result.get(ValueLayout.JAVA_LONG, metricsOffset + 72);
+		return new WholeFrameSubmitResult(
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 3),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 4),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 5),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 6),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 7),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 8),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 9),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 10),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 11),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 12),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 13),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 14),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 15),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 16),
 			ffiCalls,
 			ffiInputBytes,
 			metrics
@@ -520,13 +673,13 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	public record Completion(long requestedSubmissionId, long completedSubmissionId, boolean complete) {
 	}
 
-	public record AcquiredFrame(long frameId, long correlationId, int status, long frameTarget, int width, int height, int colorFormat) {
+	public record AcquiredFrame(long frameId, long correlationId, int status, long frameTarget, long frameTargetIdentity, int width, int height, int colorFormat) {
 	}
 
 	public record FrameResize(int status, int width, int height) {
 	}
 
-	public record PresentedFrame(long frameId, long correlationId, int status, long completedSubmissionId) {
+	public record PresentedFrame(long frameId, long correlationId, int status, long completedSubmissionId, long frameTargetIdentity) {
 	}
 
 	public record GuiSpriteRecord(
@@ -545,8 +698,49 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	) {
 	}
 
+	public record WorldLineSegmentRecord(
+		int stratum,
+		int style,
+		int depthPolicy,
+		int colorArgb,
+		float lineWidth,
+		float startX,
+		float startY,
+		float startZ,
+		float endX,
+		float endY,
+		float endZ,
+		int viewportWidth,
+		int viewportHeight
+	) {
+	}
+
 	public record GuiFrameSubmitResult(
 		long submissionId,
+		long spriteCount,
+		long spriteBatchCount,
+		long cacheHits,
+		long cacheMisses,
+		long resourceCreates,
+		long commandLists,
+		long commandOps,
+		long ffiCalls,
+		long ffiInputBytes,
+		BackendMetrics backendMetrics
+	) {
+		public Status asStatus() {
+			return new Status(submissionId, ffiCalls, ffiInputBytes, backendMetrics);
+		}
+	}
+
+	public record WholeFrameSubmitResult(
+		long submissionId,
+		long worldSegmentCount,
+		long worldVertexCount,
+		long worldBatchCount,
+		long worldDrawCount,
+		long depthAttachmentCreates,
+		long depthAttachmentReuses,
 		long spriteCount,
 		long spriteBatchCount,
 		long cacheHits,
@@ -587,6 +781,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		private static final MethodHandle FRAME_PRESENT = downcall("mattmc_vulkanic_gal_frame_present", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle FRAME_SHUTDOWN = downcall("mattmc_vulkanic_gal_frame_shutdown", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
 		private static final MethodHandle GUI_SUBMIT_FRAME = downcall("mattmc_vulkanic_gal_gui_submit_frame", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+		private static final MethodHandle WHOLE_FRAME_SUBMIT = downcall("mattmc_vulkanic_gal_whole_frame_submit", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle GUI_UPDATE_ASSETS = downcall("mattmc_vulkanic_gal_gui_update_assets", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle LAST_ERROR = downcall("mattmc_vulkanic_gal_last_error", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
 
@@ -730,6 +925,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			}
 		}
 
+		static int wholeFrameSubmit(long contextId, MemorySegment request, MemorySegment result) {
+			try {
+				return (int) WHOLE_FRAME_SUBMIT.invokeExact(contextId, request, result);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to submit Rust VulkanicGAL whole frame", throwable);
+			}
+		}
+
 		static int guiUpdateAssets(long contextId, MemorySegment request, MemorySegment result) {
 			try {
 				return (int) GUI_UPDATE_ASSETS.invokeExact(contextId, request, result);
@@ -799,7 +1002,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			GUI_FRAME_SUBMIT_RESULT(46),
 			GUI_ASSET_PAYLOAD(47),
 			GUI_ASSET_UPDATE(48),
-			WINDOWED_VULKAN_CONTEXT_CREATE(49);
+			WINDOWED_VULKAN_CONTEXT_CREATE(49),
+			WORLD_LINE_SEGMENT_REQUEST(50),
+			WHOLE_FRAME_SUBMIT(51),
+			WHOLE_FRAME_SUBMIT_RESULT(52);
 
 		private final int id;
 		private final int byteSize;

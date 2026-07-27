@@ -8,6 +8,7 @@ import net.blaze3d.platform.Window;
 import net.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.dev.GraphicsFrameBenchmark;
+import net.minecraft.client.dev.RenderDocCaptureHook;
 import net.minecraft.client.gui.render.state.GuiRenderState;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
@@ -15,9 +16,7 @@ import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.util.profiling.TracyCompat;
 import net.minecraft.world.BossEvent;
 import net.vulkanic.VulkanicAPI;
-import org.lwjgl.glfw.GLFW;
-import org.lwjgl.glfw.GLFWNativeWayland;
-import org.lwjgl.glfw.GLFWNativeX11;
+import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -96,12 +95,17 @@ public final class RustGalGuiRenderer {
 		}
 	}
 
-	public static boolean isCrosshairEnabled() {
-		return Boolean.parseBoolean(System.getProperty("mattmc.rustGal.guiCrosshair.enabled", "true"));
+	public static boolean isMigratedGuiEnabled() {
+		String legacyCrosshairFlag = System.getProperty("mattmc.rustGal.guiCrosshair.enabled", "true");
+		return Boolean.parseBoolean(System.getProperty("mattmc.rustGal.gui.enabled", legacyCrosshairFlag));
 	}
 
 	public static boolean isWholeFrameVulkanEnabled() {
 		return RustGalVulkanWholeFrameMode.enabled();
+	}
+
+	public static boolean isWholeFrameVulkanActive() {
+		return RustGalVulkanWholeFrameMode.enabledForBackend(VulkanicAPI.isVulkanBackendSelected());
 	}
 
 	public static boolean isMigratedGuiDisabledForDiagnostics() {
@@ -163,7 +167,7 @@ public final class RustGalGuiRenderer {
 	public static GuiExecutionRoute currentExecutionRoute() {
 		return selectExecutionRoute(
 			VulkanicAPI.isVulkanBackendSelected(),
-			isWholeFrameVulkanEnabled(),
+			isWholeFrameVulkanActive(),
 			isMigratedGuiDisabledForDiagnostics(),
 			isMigratedGuiLegacyControl()
 		);
@@ -203,14 +207,14 @@ public final class RustGalGuiRenderer {
 	}
 
 	public static void enqueueCrosshair(Minecraft minecraft, net.minecraft.client.gui.GuiGraphics guiGraphics, int x, int y, int width, int height) {
-		if (!isCrosshairEnabled()) {
+		if (!isMigratedGuiEnabled()) {
 			return;
 		}
 		enqueueGuiSprite(minecraft, guiGraphics, GuiSprite.CROSSHAIR, CROSSHAIR_PRODUCER, -1, x, y, width, height);
 	}
 
 	public static void enqueueHotbarBase(Minecraft minecraft, net.minecraft.client.gui.GuiGraphics guiGraphics, int x, int y, int width, int height) {
-		if (!isCrosshairEnabled()) {
+		if (!isMigratedGuiEnabled()) {
 			return;
 		}
 		enqueueGuiSprite(minecraft, guiGraphics, GuiSprite.HOTBAR_BASE, HOTBAR_BASE_PRODUCER, -1, x, y, width, height);
@@ -225,7 +229,7 @@ public final class RustGalGuiRenderer {
 		int width,
 		int height
 	) {
-		if (!isCrosshairEnabled()) {
+		if (!isMigratedGuiEnabled()) {
 			return;
 		}
 		if (selectedSlot < 0 || selectedSlot > 8) {
@@ -244,7 +248,7 @@ public final class RustGalGuiRenderer {
 		float progressFraction,
 		int filledWidth
 	) {
-		if (!isCrosshairEnabled()) {
+		if (!isMigratedGuiEnabled()) {
 			return;
 		}
 		if (!Float.isFinite(progressFraction)) {
@@ -295,7 +299,7 @@ public final class RustGalGuiRenderer {
 		int filledWidth,
 		boolean fullIndicator
 	) {
-		if (!isCrosshairEnabled()) {
+		if (!isMigratedGuiEnabled()) {
 			return;
 		}
 		if (!Float.isFinite(cooldownProgress)) {
@@ -358,7 +362,7 @@ public final class RustGalGuiRenderer {
 		float cooldownProgress,
 		int filledHeight
 	) {
-		if (!isCrosshairEnabled()) {
+		if (!isMigratedGuiEnabled()) {
 			return;
 		}
 		if (!Float.isFinite(cooldownProgress)) {
@@ -398,7 +402,7 @@ public final class RustGalGuiRenderer {
 	}
 
 	public static void enqueueArmorIcons(Minecraft minecraft, net.minecraft.client.gui.GuiGraphics guiGraphics, int armorValue, int x, int y) {
-		if (!isCrosshairEnabled()) {
+		if (!isMigratedGuiEnabled()) {
 			return;
 		}
 		if (armorValue < 0 || armorValue > 20) {
@@ -434,7 +438,7 @@ public final class RustGalGuiRenderer {
 		net.minecraft.client.gui.GuiGraphics guiGraphics,
 		List<PlayerHeartRequest> hearts
 	) {
-		if (!isCrosshairEnabled() || hearts.isEmpty()) {
+		if (!isMigratedGuiEnabled() || hearts.isEmpty()) {
 			return;
 		}
 		for (PlayerHeartRequest heart : hearts) {
@@ -459,7 +463,7 @@ public final class RustGalGuiRenderer {
 		net.minecraft.client.gui.GuiGraphics guiGraphics,
 		List<AbsorptionHeartRequest> hearts
 	) {
-		if (!isCrosshairEnabled() || hearts.isEmpty()) {
+		if (!isMigratedGuiEnabled() || hearts.isEmpty()) {
 			return;
 		}
 		for (AbsorptionHeartRequest heart : hearts) {
@@ -484,7 +488,7 @@ public final class RustGalGuiRenderer {
 		net.minecraft.client.gui.GuiGraphics guiGraphics,
 		List<HungerIconRequest> icons
 	) {
-		if (!isCrosshairEnabled() || icons.isEmpty()) {
+		if (!isMigratedGuiEnabled() || icons.isEmpty()) {
 			return;
 		}
 		for (HungerIconRequest icon : icons) {
@@ -509,7 +513,7 @@ public final class RustGalGuiRenderer {
 		net.minecraft.client.gui.GuiGraphics guiGraphics,
 		List<AirBubbleRequest> bubbles
 	) {
-		if (!isCrosshairEnabled() || bubbles.isEmpty()) {
+		if (!isMigratedGuiEnabled() || bubbles.isEmpty()) {
 			return;
 		}
 		for (AirBubbleRequest bubble : bubbles) {
@@ -537,7 +541,7 @@ public final class RustGalGuiRenderer {
 		net.minecraft.client.gui.GuiGraphics guiGraphics,
 		List<MountHeartRequest> hearts
 	) {
-		if (!isCrosshairEnabled() || hearts.isEmpty()) {
+		if (!isMigratedGuiEnabled() || hearts.isEmpty()) {
 			return;
 		}
 		for (MountHeartRequest heart : hearts) {
@@ -762,9 +766,9 @@ public final class RustGalGuiRenderer {
 					x,
 					y,
 					width,
-					height,
-					guiGraphics.guiWidth(),
-					guiGraphics.guiHeight()
+						height,
+						guiGraphics.guiWidth(),
+						guiGraphics.guiHeight()
 					);
 					RustGalFrameScheduler.Token token = SCHEDULER.enqueue(generation, sprite.stratum.id(), sprite.stratum.order(), request);
 					guiGraphics.guiRenderState.submitGuiElement(
@@ -782,8 +786,8 @@ public final class RustGalGuiRenderer {
 							guiGraphics.guiWidth(),
 							guiGraphics.guiHeight()
 						)
-				);
-				METRICS.enqueueNanos += elapsedSince(started);
+					);
+					METRICS.enqueueNanos += elapsedSince(started);
 			}
 		} finally {
 			GraphicsFrameBenchmark.endPhase("rust-gal." + sprite.phaseName + ".java-producer");
@@ -802,20 +806,20 @@ public final class RustGalGuiRenderer {
 			if (!element.stratum().supportedForPartialFrame()) {
 				throw new IllegalArgumentException("unsupported Rust GAL GUI stratum: " + element.stratum().id());
 			}
-			}
-			ensureRenderThreadAndContext(minecraft);
-			Window window = minecraft.getWindow();
-			ensureConfigured(window);
-			synchronized (LOCK) {
-				List<RustGalFrameScheduler.Token> tokens = elements.stream().map(RustGalGuiElementRenderState::token).toList();
-				List<VulkanicGalBridge.GuiSpriteRecord> requests = SCHEDULER.takeAll(tokens, generation);
-				executeFrameBatches(window, requests, false, window.getGuiScaledWidth(), window.getGuiScaledHeight());
-			}
+		}
+		ensureRenderThreadAndContext(minecraft);
+		Window window = minecraft.getWindow();
+		ensureConfigured(window);
+		synchronized (LOCK) {
+			List<RustGalFrameScheduler.Token> tokens = elements.stream().map(RustGalGuiElementRenderState::token).toList();
+			List<VulkanicGalBridge.GuiSpriteRecord> requests = SCHEDULER.takeAll(tokens, generation);
+			executeFrameBatches(window, requests, false, window.getGuiScaledWidth(), window.getGuiScaledHeight());
+		}
 	}
 
 	public static void executeWholeFrameVulkan(Minecraft minecraft, GuiRenderState renderState) {
-		if (!isWholeFrameVulkanEnabled()) {
-			throw new IllegalStateException("Rust Vulkan whole-frame shell is disabled; set " + RustGalVulkanWholeFrameMode.propertyName() + "=true");
+		if (!isWholeFrameVulkanActive()) {
+			throw new IllegalStateException("Rust Vulkan whole-frame shell requires " + RustGalVulkanWholeFrameMode.propertyName() + "=true and Vulkan backend selection");
 		}
 		if (!VulkanicAPI.isVulkanBackendSelected()) {
 			throw new IllegalStateException("Rust Vulkan whole-frame shell requires the Java Vulkan backend selection at startup");
@@ -847,7 +851,7 @@ public final class RustGalGuiRenderer {
 		BossEvent.BossBarColor color,
 		BossEvent.BossBarOverlay overlay
 	) {
-		if (!isCrosshairEnabled()) {
+		if (!isMigratedGuiEnabled()) {
 			return;
 		}
 		if (!Float.isFinite(progressFraction)) {
@@ -894,16 +898,16 @@ public final class RustGalGuiRenderer {
 		enqueueGuiSprite(
 			minecraft,
 			guiGraphics,
-				sprite,
-				producerPrefix + "." + color.getSerializedName() + "." + overlay.getSerializedName() + "." + sprite.semanticSuffix,
-				-1,
-				progressFraction,
-				GuiFillDirection.HORIZONTAL_LEFT_TO_RIGHT,
-				x,
-				y,
-				width,
-				height
-			);
+			sprite,
+			producerPrefix + "." + color.getSerializedName() + "." + overlay.getSerializedName() + "." + sprite.semanticSuffix,
+			-1,
+			progressFraction,
+			GuiFillDirection.HORIZONTAL_LEFT_TO_RIGHT,
+			x,
+			y,
+			width,
+			height
+		);
 	}
 
 	public static void resize(int width, int height) {
@@ -1017,28 +1021,28 @@ public final class RustGalGuiRenderer {
 
 	public static void cancelPending(String reason) {
 		synchronized (LOCK) {
-					int cancelled = SCHEDULER.cancelAll(reason);
-					METRICS.cancellations++;
-					METRICS.batchesCancelled += cancelled;
-			}
+			int cancelled = SCHEDULER.cancelAll(reason);
+			METRICS.cancellations++;
+			METRICS.batchesCancelled += cancelled;
 		}
+	}
 
 	public static void shutdown() {
 		VulkanicGalBridge existing;
 		synchronized (LOCK) {
-						int cancelled = SCHEDULER.cancelAll("shutdown");
-						existing = bridge;
-						retireOutstanding(true);
-						auditMessage(metricsAuditLine(0L, METRICS.frames, lastSubmitted));
-					bridge = null;
-					renderThread = null;
-					lastSubmitted = 0L;
-					lastRetiredSubmission = 0L;
-					configuredWidth = 0;
-					configuredHeight = 0;
-					METRICS.cancellations++;
-					METRICS.batchesCancelled += cancelled;
-			}
+			int cancelled = SCHEDULER.cancelAll("shutdown");
+			existing = bridge;
+			retireOutstanding(true);
+			auditMessage(metricsAuditLine(0L, METRICS.frames, lastSubmitted, isWholeFrameVulkanEnabled()));
+			bridge = null;
+			renderThread = null;
+			lastSubmitted = 0L;
+			lastRetiredSubmission = 0L;
+			configuredWidth = 0;
+			configuredHeight = 0;
+			METRICS.cancellations++;
+			METRICS.batchesCancelled += cancelled;
+		}
 		if (existing != null) {
 			try {
 				existing.shutdownFrame();
@@ -1062,12 +1066,12 @@ public final class RustGalGuiRenderer {
 				METRICS.cancellations,
 				METRICS.reloadInvalidations,
 				METRICS.completionPolls,
-					METRICS.completionTimeouts,
-					SCHEDULER.pendingCount(),
-					METRICS.batchesExecuted,
-					METRICS.spriteBatchesExecuted,
-					METRICS.packedSpritesExecuted,
-					METRICS.batchesCancelled,
+				METRICS.completionTimeouts,
+				SCHEDULER.pendingCount(),
+				METRICS.batchesExecuted,
+				METRICS.spriteBatchesExecuted,
+				METRICS.packedSpritesExecuted,
+				METRICS.batchesCancelled,
 				METRICS.contextCreateCalls,
 				METRICS.capabilityCalls,
 				METRICS.frameConfigureCalls,
@@ -1123,7 +1127,19 @@ public final class RustGalGuiRenderer {
 		long frameId = 0L;
 		long submissionId = 0L;
 		boolean executeCounted = false;
+		RustGalWorldPrimitiveRenderer.PrimitiveFrame primitiveFrame = null;
+		boolean wholeFrameVulkan = allowEmpty && isWholeFrameVulkanActive();
+		boolean renderdocFrameCaptureStarted = false;
 		try {
+			if (wholeFrameVulkan) {
+				primitiveFrame = RustGalWorldPrimitiveRenderer.consumeFrame();
+				if (!primitiveFrame.segments().isEmpty()) {
+					renderdocFrameCaptureStarted = RenderDocCaptureHook.beginFrameCaptureOnce(
+						window,
+						"rust-vulkan-whole-frame-outline#" + correlationId + "-segments=" + primitiveFrame.segments().size()
+					);
+				}
+			}
 			GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.ffi.acquire");
 			long acquireStarted = System.nanoTime();
 			recordFixedOperation(Operation.FRAME_ACQUIRE, VulkanicGalBridge.Struct.FRAME_ACQUIRE.byteSize());
@@ -1131,54 +1147,114 @@ public final class RustGalGuiRenderer {
 			METRICS.frameAcquireNanos += elapsedSince(acquireStarted);
 			GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.ffi.acquire");
 			frameId = frame.frameId();
-			if (frame.status() == 4 || frame.frameTarget() == 0L) {
-				int cancelled = SCHEDULER.cancelFrame(frameId, "acquire-skipped");
-				METRICS.cancellations++;
-				METRICS.batchesCancelled += cancelled;
-				return;
+			if (wholeFrameVulkan) {
+				auditMessage("gal.frame.acquire backend=vulkan correlation=" + correlationId
+					+ " frame=" + frameId
+					+ " image=" + frame.frameTargetIdentity()
+					+ " target=0x" + Long.toUnsignedString(frame.frameTarget(), 16)
+					+ " extent=" + frame.width() + "x" + frame.height());
 			}
+				if (frame.status() == 4 || frame.frameTarget() == 0L) {
+					int cancelled = SCHEDULER.cancelFrame(frameId, "acquire-skipped");
+					METRICS.cancellations++;
+					METRICS.batchesCancelled += cancelled;
+					return;
+				}
 				GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.abi-packing");
 				long packingStarted = System.nanoTime();
-				VulkanicGalBridge.GuiFrameSubmitResult result = bridge.submitGuiFrame(
-					generation,
-					frameId,
-					frame.frameTarget(),
-					requests.isEmpty() ? guiWidth : requests.get(0).guiWidth(),
-					requests.isEmpty() ? guiHeight : requests.get(0).guiHeight(),
-					requests
-				);
+				int frameGuiWidth = requests.isEmpty() ? guiWidth : requests.get(0).guiWidth();
+				int frameGuiHeight = requests.isEmpty() ? guiHeight : requests.get(0).guiHeight();
+				VulkanicGalBridge.WholeFrameSubmitResult wholeFrameResult = null;
+				VulkanicGalBridge.GuiFrameSubmitResult guiResult = null;
+				if (wholeFrameVulkan) {
+					if (primitiveFrame == null) {
+						primitiveFrame = RustGalWorldPrimitiveRenderer.consumeFrame();
+					}
+					wholeFrameResult = bridge.submitWholeFrame(
+						generation,
+						frameId,
+						correlationId,
+						frame.frameTarget(),
+						frameGuiWidth,
+						frameGuiHeight,
+						primitiveFrame.viewportWidth() <= 0 ? window.getWidth() : primitiveFrame.viewportWidth(),
+						primitiveFrame.viewportHeight() <= 0 ? window.getHeight() : primitiveFrame.viewportHeight(),
+						primitiveFrame.viewMatrix(),
+						primitiveFrame.projectionMatrix(),
+						primitiveFrame.segments(),
+						requests
+					);
+				} else {
+					guiResult = bridge.submitGuiFrame(
+						generation,
+						frameId,
+						frame.frameTarget(),
+						frameGuiWidth,
+						frameGuiHeight,
+						requests
+					);
+				}
 			METRICS.abiPackingNanos += elapsedSince(packingStarted);
 			GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.abi-packing");
-			recordStatus(Operation.SUBMIT, result.asStatus());
-			submissionId = result.submissionId();
+			recordStatus(Operation.SUBMIT, wholeFrameResult != null ? wholeFrameResult.asStatus() : guiResult.asStatus());
+			submissionId = wholeFrameResult != null ? wholeFrameResult.submissionId() : guiResult.submissionId();
+			if (wholeFrameVulkan) {
+				auditMessage("gal.frame.target.begin backend=vulkan frame=" + frameId
+					+ " image=" + frame.frameTargetIdentity()
+					+ " extent=" + frame.width() + "x" + frame.height()
+					+ " clear=0.063,0.157,0.855,1.000 expected=blue-diagnostic-shell");
+				auditMessage("gal.frame.target.present-ready backend=vulkan frame=" + frameId
+					+ " image=" + frame.frameTargetIdentity());
+			}
 			lastSubmitted = Math.max(lastSubmitted, submissionId);
 			TracyCompat.message("gal.frame.deferred producer=gui.frame stratum=gui.frame"
 				+ " frame=" + frameId + " submission=" + submissionId + " batches=" + requests.size());
 			GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.ffi.present");
 			long presentStarted = System.nanoTime();
 			recordFixedOperation(Operation.FRAME_PRESENT, VulkanicGalBridge.Struct.FRAME_PRESENT.byteSize());
-			bridge.presentFrame(frameId, correlationId, submissionId);
+			VulkanicGalBridge.PresentedFrame presented = bridge.presentFrame(frameId, correlationId, submissionId);
+			if (wholeFrameVulkan) {
+				auditMessage("gal.frame.present backend=vulkan correlation=" + correlationId
+					+ " frame=" + presented.frameId()
+					+ " image=" + presented.frameTargetIdentity()
+					+ " submission=" + submissionId
+					+ " status=" + presented.status());
+			}
 			METRICS.framePresentNanos += elapsedSince(presentStarted);
 			GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.ffi.present");
+				if (renderdocFrameCaptureStarted) {
+					RenderDocCaptureHook.endFrameCaptureOnce(window, "rust-vulkan-whole-frame-outline#" + frameId + "-submission=" + submissionId);
+					renderdocFrameCaptureStarted = false;
+				}
 				METRICS.frames++;
 				METRICS.submissions++;
 				METRICS.batchesExecuted += requests.size();
-				METRICS.spriteBatchesExecuted += result.spriteBatchCount();
-				METRICS.packedSpritesExecuted += result.spriteCount();
-				METRICS.cacheHits += result.cacheHits();
-				METRICS.cacheMisses += result.cacheMisses();
-				METRICS.resourceCreates += result.resourceCreates();
+				METRICS.spriteBatchesExecuted += wholeFrameResult != null ? wholeFrameResult.spriteBatchCount() : guiResult.spriteBatchCount();
+				METRICS.packedSpritesExecuted += wholeFrameResult != null ? wholeFrameResult.spriteCount() : guiResult.spriteCount();
+				METRICS.worldPrimitiveBatchesExecuted += wholeFrameResult != null ? wholeFrameResult.worldBatchCount() : 0L;
+				METRICS.worldLineSegmentsExecuted += wholeFrameResult != null ? wholeFrameResult.worldSegmentCount() : 0L;
+				METRICS.worldLineVerticesExecuted += wholeFrameResult != null ? wholeFrameResult.worldVertexCount() : 0L;
+				METRICS.worldPrimitiveDrawsExecuted += wholeFrameResult != null ? wholeFrameResult.worldDrawCount() : 0L;
+				METRICS.worldDepthAttachmentCreates += wholeFrameResult != null ? wholeFrameResult.depthAttachmentCreates() : 0L;
+				METRICS.worldDepthAttachmentReuses += wholeFrameResult != null ? wholeFrameResult.depthAttachmentReuses() : 0L;
+				METRICS.cacheHits += wholeFrameResult != null ? wholeFrameResult.cacheHits() : guiResult.cacheHits();
+				METRICS.cacheMisses += wholeFrameResult != null ? wholeFrameResult.cacheMisses() : guiResult.cacheMisses();
+				METRICS.resourceCreates += wholeFrameResult != null ? wholeFrameResult.resourceCreates() : guiResult.resourceCreates();
 				retireOutstanding(false);
-			METRICS.executeNanos += elapsedSince(executeStarted);
-			executeCounted = true;
+				auditMessage(metricsAuditLine(requests.size(), frameId, submissionId, wholeFrameResult != null));
+				METRICS.executeNanos += elapsedSince(executeStarted);
+				executeCounted = true;
 				if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
 					TracyCompat.message("Rust VulkanicGAL GUI frame executed"
 						+ " batches=" + requests.size()
-						+ " spriteBatches=" + result.spriteBatchCount()
+						+ " spriteBatches=" + (wholeFrameResult != null ? wholeFrameResult.spriteBatchCount() : guiResult.spriteBatchCount())
 						+ " frame=" + frameId
 						+ " submission=" + submissionId);
 				}
 		} finally {
+			if (renderdocFrameCaptureStarted) {
+				RenderDocCaptureHook.endFrameCaptureOnce(window, "rust-vulkan-whole-frame-outline#aborted");
+			}
 			if (!executeCounted) {
 				METRICS.executeNanos += elapsedSince(executeStarted);
 			}
@@ -1215,12 +1291,11 @@ public final class RustGalGuiRenderer {
 			throw new IllegalStateException("Rust VulkanicGAL deferred frame queue used from the wrong render thread");
 		}
 		Window window = minecraft.getWindow();
-		long currentContext = GLFW.glfwGetCurrentContext();
-		if (currentContext == 0L || currentContext != window.handle()) {
+		if (!VulkanicGalBridge.isBorrowedOpenGlContextCurrent(window)) {
 			throw new IllegalStateException("Rust VulkanicGAL deferred OpenGL execution requires Minecraft's current GL context");
 		}
 		if (bridge == null) {
-			bridge = VulkanicGalBridge.createBorrowedOpenGl(window.handle());
+			bridge = VulkanicGalBridge.createBorrowedOpenGl(window);
 			recordFixedOperation(Operation.CONTEXT_CREATE, VulkanicGalBridge.Struct.BORROWED_OPENGL_CONTEXT_CREATE.byteSize());
 			recordFixedOperation(Operation.CAPABILITY_QUERY, VulkanicGalBridge.Struct.CAPABILITY_QUERY.byteSize());
 			flushPendingAssetsLocked();
@@ -1238,12 +1313,8 @@ public final class RustGalGuiRenderer {
 		}
 		Window window = minecraft.getWindow();
 		if (bridge == null) {
-			NativeWindowInfo windowInfo = nativeWindowInfo(window);
 			bridge = VulkanicGalBridge.createWindowedVulkan(
-				window.handle(),
-				windowInfo.platform,
-				windowInfo.nativeDisplay,
-				windowInfo.nativeWindow,
+				window,
 				Math.max(1, window.getWidth()),
 				Math.max(1, window.getHeight())
 			);
@@ -1253,28 +1324,6 @@ public final class RustGalGuiRenderer {
 			configuredWidth = 0;
 			configuredHeight = 0;
 		}
-	}
-
-	private static NativeWindowInfo nativeWindowInfo(Window window) {
-		int glfwPlatform = GLFW.glfwGetPlatform();
-		if (glfwPlatform == GLFW.GLFW_PLATFORM_X11) {
-			return new NativeWindowInfo(
-				VulkanicGalBridge.WINDOW_PLATFORM_X11,
-				GLFWNativeX11.glfwGetX11Display(),
-				GLFWNativeX11.glfwGetX11Window(window.handle())
-			);
-		}
-		if (glfwPlatform == GLFW.GLFW_PLATFORM_WAYLAND) {
-			return new NativeWindowInfo(
-				VulkanicGalBridge.WINDOW_PLATFORM_WAYLAND,
-				GLFWNativeWayland.glfwGetWaylandDisplay(),
-				GLFWNativeWayland.glfwGetWaylandWindow(window.handle())
-			);
-		}
-		throw new IllegalStateException("Rust Vulkan whole-frame shell only supports GLFW X11/Wayland windows; platform=" + glfwPlatform);
-	}
-
-	private record NativeWindowInfo(int platform, long nativeDisplay, long nativeWindow) {
 	}
 
 	private static void ensureConfigured(Window window) {
@@ -1397,12 +1446,12 @@ public final class RustGalGuiRenderer {
 
 	public static String currentAuditMetricsLine() {
 		synchronized (LOCK) {
-			return metricsAuditLine(0L, METRICS.frames, lastSubmitted);
+			return metricsAuditLine(0L, METRICS.frames, lastSubmitted, isWholeFrameVulkanEnabled());
 		}
 	}
 
-	private static String metricsAuditLine(long frameBatchCount, long frameId, long submissionId) {
-		return auditBackendPrefix() + " GUI frame executed producer=gui.frame"
+	private static String metricsAuditLine(long frameBatchCount, long frameId, long submissionId, boolean wholeFrameVulkan) {
+		return auditBackendPrefix(wholeFrameVulkan) + " GUI frame executed producer=gui.frame"
 			+ " stratum=gui.frame"
 			+ " frame_batch_count=" + frameBatchCount
 			+ " frame=" + frameId
@@ -1414,6 +1463,12 @@ public final class RustGalGuiRenderer {
 			+ " rust_gal_batches_executed=" + METRICS.batchesExecuted
 			+ " rust_gal_sprite_batches_executed=" + METRICS.spriteBatchesExecuted
 			+ " rust_gal_packed_sprites_executed=" + METRICS.packedSpritesExecuted
+			+ " rust_gal_world_primitive_batches_executed=" + METRICS.worldPrimitiveBatchesExecuted
+			+ " rust_gal_world_line_segments_executed=" + METRICS.worldLineSegmentsExecuted
+			+ " rust_gal_world_line_vertices_executed=" + METRICS.worldLineVerticesExecuted
+			+ " rust_gal_world_primitive_draws_executed=" + METRICS.worldPrimitiveDrawsExecuted
+			+ " rust_gal_world_depth_attachment_creates=" + METRICS.worldDepthAttachmentCreates
+			+ " rust_gal_world_depth_attachment_reuses=" + METRICS.worldDepthAttachmentReuses
 			+ " rust_gal_batches_cancelled=" + METRICS.batchesCancelled
 			+ " rust_gal_completion_polls=" + METRICS.completionPolls
 			+ " rust_gal_completion_timeouts=" + METRICS.completionTimeouts
@@ -1469,8 +1524,8 @@ public final class RustGalGuiRenderer {
 			+ " ffi_bytes=" + METRICS.ffiBytes;
 	}
 
-	private static String auditBackendPrefix() {
-		return isWholeFrameVulkanEnabled()
+	private static String auditBackendPrefix(boolean wholeFrameVulkan) {
+		return wholeFrameVulkan
 			? "Rust VulkanicGAL"
 			: "Rust OpenGL VulkanicGAL";
 	}
@@ -2431,10 +2486,16 @@ public final class RustGalGuiRenderer {
 		long reloadInvalidations;
 			long completionPolls;
 			long completionTimeouts;
-			long batchesExecuted;
-			long spriteBatchesExecuted;
-			long packedSpritesExecuted;
-			long batchesCancelled;
+		long batchesExecuted;
+		long spriteBatchesExecuted;
+		long packedSpritesExecuted;
+		long worldPrimitiveBatchesExecuted;
+		long worldLineSegmentsExecuted;
+		long worldLineVerticesExecuted;
+		long worldPrimitiveDrawsExecuted;
+		long worldDepthAttachmentCreates;
+		long worldDepthAttachmentReuses;
+		long batchesCancelled;
 		long contextCreateCalls;
 		long capabilityCalls;
 		long frameConfigureCalls;

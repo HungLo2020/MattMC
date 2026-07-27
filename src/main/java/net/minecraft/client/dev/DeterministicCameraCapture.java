@@ -8,6 +8,8 @@ import net.minecraft.client.gui.components.BossHealthOverlay;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
 import net.irisshaders.iris.uniforms.SystemTimeUniforms;
 import net.minecraft.world.effect.MobEffect;
@@ -18,7 +20,10 @@ import net.minecraft.world.entity.player.ChatVisiblity;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.BossEvent.BossBarOverlay;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.CollisionContext;
 import net.vulkanic.VulkanicAPI;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +76,12 @@ public final class DeterministicCameraCapture {
 		Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.attackDelay", "NaN"));
 	private static final boolean FORCE_ATTACK_TARGET =
 		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.attackTarget");
+	private static final boolean FORCE_BLOCK_OUTLINE_TARGET =
+		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.blockOutlineTarget");
+	private static final boolean AIM_BLOCK_OUTLINE_TARGET =
+		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.blockOutlineAimTarget");
+	private static final boolean FORCE_BLOCK_OUTLINE_HIGH_CONTRAST =
+		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.blockOutlineHighContrast");
 	private static final int FORCED_ARMOR_VALUE =
 		Integer.getInteger("mattmc.dev.deterministicCameraCapture.armorValue", -1);
 	private static final float FORCED_PLAYER_HEALTH =
@@ -152,6 +163,7 @@ public final class DeterministicCameraCapture {
 	private static GameType originalPreviousGameMode;
 	private static AttackIndicatorStatus originalAttackIndicator;
 	private static ChatVisiblity originalChatVisibility;
+	private static boolean originalHighContrastBlockOutline;
 	private static int originalSelectedHotbarSlot;
 	private static float originalExperienceProgress;
 	private static int originalExperienceLevel;
@@ -165,6 +177,7 @@ public final class DeterministicCameraCapture {
 	private static MobEffectInstance originalWitherEffect;
 	private static MobEffectInstance originalRegenerationEffect;
 	private static Entity originalCrosshairPickEntity;
+	private static ForcedBlockOutlineTarget forcedBlockOutlineTarget;
 	private static final Map<Long, Map<String, Set<String>>> SUBMITTED_WORK_BY_FRAME = new LinkedHashMap<>();
 	private static int rustGalGuiScreenCycleStage;
 	private static int rustGalGuiScreenCycleFramesInStage;
@@ -289,6 +302,18 @@ public final class DeterministicCameraCapture {
 		}
 	}
 
+	public static void forceBlockOutlineTargetForDiagnostics(Minecraft minecraft) {
+		if (!ENABLED || !FORCE_BLOCK_OUTLINE_TARGET || !initialized || forcedBlockOutlineTarget == null) {
+			return;
+		}
+		minecraft.hitResult = new BlockHitResult(
+			forcedBlockOutlineTarget.hitLocation(),
+			forcedBlockOutlineTarget.face(),
+			forcedBlockOutlineTarget.blockPos(),
+			false
+		);
+	}
+
 	public static void applyBossBarOverridesForDiagnostics(BossHealthOverlay overlay) {
 		if (!ENABLED || !hasBossBarOverride()) {
 			return;
@@ -399,6 +424,7 @@ public final class DeterministicCameraCapture {
 			originalPreviousGameMode = minecraft.gameMode == null ? null : minecraft.gameMode.getPreviousPlayerMode();
 			originalAttackIndicator = minecraft.options.attackIndicator().get();
 			originalChatVisibility = minecraft.options.chatVisibility().get();
+			originalHighContrastBlockOutline = minecraft.options.highContrastBlockOutline().get();
 			originalSelectedHotbarSlot = player.getInventory().getSelectedSlot();
 		originalExperienceProgress = player.experienceProgress;
 			originalExperienceLevel = player.experienceLevel;
@@ -412,8 +438,19 @@ public final class DeterministicCameraCapture {
 					originalWitherEffect = copyEffect(player.getEffect(MobEffects.WITHER));
 					originalRegenerationEffect = copyEffect(player.getEffect(MobEffects.REGENERATION));
 					originalCrosshairPickEntity = minecraft.crosshairPickEntity;
+				if (FORCE_BLOCK_OUTLINE_TARGET || AIM_BLOCK_OUTLINE_TARGET) {
+					forcedBlockOutlineTarget = findForcedBlockOutlineTarget(level, player);
+					if (forcedBlockOutlineTarget == null) {
+						return false;
+					}
+					initialPosition = forcedBlockOutlineTarget.playerPosition();
+				}
 				applyRuntimeOverrides(minecraft, player);
 		initialPose = new Pose("initial", player.getYRot(), player.getXRot());
+		if (forcedBlockOutlineTarget != null) {
+			initialPose = forcedBlockOutlineTarget.pose();
+			applyPose(player, initialPose);
+		}
 		stabilizeGuiState(minecraft);
 		Pose[] fullSequence = new Pose[] {
 			initialPose,
@@ -440,6 +477,23 @@ public final class DeterministicCameraCapture {
 			currentSelectedHotbarSlot(player),
 			SCREENSHOT_DIR
 		);
+		if (forcedBlockOutlineTarget != null) {
+			LOGGER.info(
+				"Deterministic block-outline real target pos={} face={} playerPos=({}, {}, {}) yaw={} pitch={} hit=({}, {}, {}) forceHitResult={} aimOnly={}",
+				forcedBlockOutlineTarget.blockPos().toShortString(),
+				forcedBlockOutlineTarget.face(),
+				forcedBlockOutlineTarget.playerPosition().x,
+				forcedBlockOutlineTarget.playerPosition().y,
+				forcedBlockOutlineTarget.playerPosition().z,
+				forcedBlockOutlineTarget.pose().yaw(),
+				forcedBlockOutlineTarget.pose().pitch(),
+				forcedBlockOutlineTarget.hitLocation().x,
+				forcedBlockOutlineTarget.hitLocation().y,
+				forcedBlockOutlineTarget.hitLocation().z,
+				FORCE_BLOCK_OUTLINE_TARGET,
+				AIM_BLOCK_OUTLINE_TARGET
+			);
+		}
 		writeMetadata(minecraft, "running");
 		return true;
 	}
@@ -787,6 +841,52 @@ public final class DeterministicCameraCapture {
 		player.yBodyRotO = pose.yaw();
 	}
 
+	private static ForcedBlockOutlineTarget findForcedBlockOutlineTarget(ClientLevel level, LocalPlayer player) {
+		BlockPos origin = player.blockPosition();
+		Direction[] faces = new Direction[] { Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST };
+		ForcedBlockOutlineTarget best = null;
+		double bestDistance = Double.MAX_VALUE;
+		for (int y = -96; y <= 48; y++) {
+			for (int radius = 0; radius <= 48; radius++) {
+				for (int x = -radius; x <= radius; x++) {
+					for (int z = -radius; z <= radius; z++) {
+						if (Math.max(Math.abs(x), Math.abs(z)) != radius) {
+							continue;
+						}
+						BlockPos blockPos = origin.offset(x, y, z);
+						BlockState blockState = level.getBlockState(blockPos);
+						if (blockState.isAir()
+							|| blockState.getShape(level, blockPos, CollisionContext.of(player)).isEmpty()
+							|| !level.getWorldBorder().isWithinBounds(blockPos)) {
+							continue;
+						}
+						Vec3 target = Vec3.atCenterOf(blockPos);
+						for (Direction face : faces) {
+							Vec3 eye = target.add(face.getStepX() * 3.0, 0.35, face.getStepZ() * 3.0);
+							Vec3 feet = eye.subtract(0.0, player.getEyeHeight(), 0.0);
+							Vec3 delta = target.subtract(eye);
+							double horizontal = Math.sqrt(delta.x * delta.x + delta.z * delta.z);
+							if (horizontal < 0.001) {
+								continue;
+							}
+							float yaw = (float)(Math.toDegrees(Math.atan2(delta.z, delta.x)) - 90.0);
+							float pitch = (float)(-Math.toDegrees(Math.atan2(delta.y, horizontal)));
+							double distance = player.position().distanceToSqr(feet);
+							if (distance < bestDistance) {
+								bestDistance = distance;
+								best = new ForcedBlockOutlineTarget(blockPos, face, target, feet, new Pose("initial", yaw, pitch));
+							}
+						}
+					}
+				}
+				if (best != null) {
+					return best;
+				}
+			}
+		}
+		return best;
+	}
+
 	private static void applyRuntimeOverrides(Minecraft minecraft, LocalPlayer player) {
 		CameraType cameraType = forcedCameraType();
 		if (cameraType != null && minecraft.options.getCameraType() != cameraType) {
@@ -824,8 +924,16 @@ public final class DeterministicCameraCapture {
 				int ticks = Math.round(progress * player.getCurrentItemAttackStrengthDelay());
 				player.setAttackStrengthTickerForDeterministicCapture(ticks);
 			}
-			if (FORCE_ATTACK_TARGET) {
-				minecraft.crosshairPickEntity = player;
+		if (FORCE_ATTACK_TARGET) {
+			minecraft.crosshairPickEntity = player;
+		}
+			if (forcedBlockOutlineTarget != null) {
+				player.setPos(initialPosition);
+				player.setOldPosAndRot(initialPosition, forcedBlockOutlineTarget.pose().yaw(), forcedBlockOutlineTarget.pose().pitch());
+				applyPose(player, forcedBlockOutlineTarget.pose());
+				if (FORCE_BLOCK_OUTLINE_HIGH_CONTRAST && !minecraft.options.highContrastBlockOutline().get()) {
+					minecraft.options.highContrastBlockOutline().set(true);
+				}
 			}
 				if (FORCED_ARMOR_VALUE >= 0) {
 					player.setArmorValueForDeterministicCapture(Math.min(20, FORCED_ARMOR_VALUE));
@@ -873,6 +981,9 @@ public final class DeterministicCameraCapture {
 				}
 			if (HIDE_CHAT && originalChatVisibility != null) {
 				minecraft.options.chatVisibility().set(originalChatVisibility);
+			}
+			if (FORCE_BLOCK_OUTLINE_HIGH_CONTRAST && minecraft.options.highContrastBlockOutline().get() != originalHighContrastBlockOutline) {
+				minecraft.options.highContrastBlockOutline().set(originalHighContrastBlockOutline);
 			}
 			if (!FORCED_GAME_MODE.isBlank() && minecraft.gameMode != null && originalGameMode != null) {
 				minecraft.gameMode.setLocalMode(originalGameMode, originalPreviousGameMode);
@@ -1041,7 +1152,14 @@ public final class DeterministicCameraCapture {
 		json.append("  \"distantHorizonsActive\": ").append(isDistantHorizonsActive()).append(",\n");
 		appendField(json, "cameraType", minecraft.options.getCameraType().name()).append(",\n");
 		appendField(json, "gameMode", minecraft.gameMode == null ? "unknown" : minecraft.gameMode.getPlayerMode().getName()).append(",\n");
-			appendField(json, "attackIndicator", minecraft.options.attackIndicator().get().name()).append(",\n");
+		appendField(json, "rustGalWorldOutlineScenario", System.getProperty("mattmc.dev.rustGalWorldOutline.scenario", "")).append(",\n");
+		appendField(json, "rustGalWorldOutlineStyle", System.getProperty("mattmc.dev.rustGalWorldOutline.style", "")).append(",\n");
+		appendField(json, "rustGalWorldOutlineDepthPolicy", System.getProperty("mattmc.dev.rustGalWorldOutline.depthPolicy", "")).append(",\n");
+		json.append("  \"rustGalWorldOutlineDepthProbe\": ").append(Boolean.getBoolean("mattmc.dev.rustGalWorldOutline.depthProbe")).append(",\n");
+		json.append("  \"blockOutlineRealTargetForced\": ").append(FORCE_BLOCK_OUTLINE_TARGET).append(",\n");
+		json.append("  \"blockOutlineRealTargetAimed\": ").append(AIM_BLOCK_OUTLINE_TARGET).append(",\n");
+		appendForcedBlockOutlineTarget(json).append(",\n");
+		appendField(json, "attackIndicator", minecraft.options.attackIndicator().get().name()).append(",\n");
 			json.append("  \"attackProgress\": ").append(player == null ? -1.0F : player.getAttackStrengthScale(0.0F)).append(",\n");
 				json.append("  \"attackDelay\": ").append(player == null ? -1.0F : player.getCurrentItemAttackStrengthDelay()).append(",\n");
 				json.append("  \"attackTargetForced\": ").append(FORCE_ATTACK_TARGET).append(",\n");
@@ -1205,6 +1323,21 @@ public final class DeterministicCameraCapture {
 		return json;
 	}
 
+	private static StringBuilder appendForcedBlockOutlineTarget(StringBuilder json) {
+		json.append("  \"blockOutlineTarget\": ");
+		if (forcedBlockOutlineTarget == null) {
+			return json.append("null");
+		}
+		json.append("{ ");
+		appendField(json, "blockPos", forcedBlockOutlineTarget.blockPos().toShortString(), 0).append(", ");
+		appendField(json, "face", forcedBlockOutlineTarget.face().name(), 0).append(", ");
+		appendVec3(json, "hitLocation", forcedBlockOutlineTarget.hitLocation(), 0).append(", ");
+		appendVec3(json, "playerPosition", forcedBlockOutlineTarget.playerPosition(), 0).append(", ");
+		appendPoseObject(json, "pose", forcedBlockOutlineTarget.pose());
+		json.append(" }");
+		return json;
+	}
+
 	private static StringBuilder appendPoseObject(StringBuilder json, String key, Pose pose) {
 		json.append("  \"").append(key).append("\": { \"yaw\": ")
 			.append(format(pose.yaw())).append(", \"pitch\": ")
@@ -1225,6 +1358,15 @@ public final class DeterministicCameraCapture {
 	}
 
 	private record Pose(String name, float yaw, float pitch) {
+	}
+
+	private record ForcedBlockOutlineTarget(
+		BlockPos blockPos,
+		Direction face,
+		Vec3 hitLocation,
+		Vec3 playerPosition,
+		Pose pose
+	) {
 	}
 
 	private record PoseCapture(

@@ -75,6 +75,7 @@ pub struct PresentFrameDesc {
 pub struct PresentedFrame {
     pub frame: FrameId,
     pub correlation_id: FrameCorrelationId,
+    pub render_target: FrameRenderTargetId,
     pub status: FramePresentStatus,
     pub completed_submission: SubmissionId,
 }

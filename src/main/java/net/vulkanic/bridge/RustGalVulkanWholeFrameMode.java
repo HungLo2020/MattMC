@@ -10,6 +10,10 @@ public final class RustGalVulkanWholeFrameMode {
 		return Boolean.getBoolean(PROPERTY);
 	}
 
+	public static boolean enabledForBackend(boolean vulkanBackendSelected) {
+		return enabled() && vulkanBackendSelected;
+	}
+
 	public static String propertyName() {
 		return PROPERTY;
 	}

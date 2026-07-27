@@ -277,6 +277,23 @@ impl SubmissionLowerer {
                                 clear[3]
                             ));
                         state.frame_target_touched = true;
+                        let depth_attachment = depth_stencil
+                            .as_ref()
+                            .map(|attachment| {
+                                let view = objects.texture_view(attachment.view)?;
+                                Ok(vk::RenderingAttachmentInfo::default()
+                                    .image_view(view.view)
+                                    .image_layout(vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL)
+                                    .load_op(load_op(attachment.load_op))
+                                    .store_op(store_op(attachment.store_op))
+                                    .clear_value(vk::ClearValue {
+                                        depth_stencil: vk::ClearDepthStencilValue {
+                                            depth: 1.0,
+                                            stencil: 0,
+                                        },
+                                    }))
+                            })
+                            .transpose()?;
                         (
                             vec![vk::RenderingAttachmentInfo::default()
                                 .image_view(frame.image_view)
@@ -290,7 +307,7 @@ impl SubmissionLowerer {
                                 .clear_value(vk::ClearValue {
                                     color: vk::ClearColorValue { float32: clear },
                                 })],
-                            None,
+                            depth_attachment,
                             frame.extent,
                             Some(FramePresentTransition {
                                 image: frame.image,

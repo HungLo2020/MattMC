@@ -8,6 +8,7 @@ import os
 import shutil
 import time
 import gzip
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -24,6 +25,7 @@ PROFILE_LIMITS = {
 }
 HEAVY_SUFFIXES = {".rdc", ".tracy"}
 COPIED_GAME_DIR_PREFIXES = ("game_dir_", "region_validation_game_")
+CAPTURE_RUN_ID_PATTERN = re.compile(r"_(20[0-9]{6}_[0-9]{6})(?:[_.]|$)")
 COMPRESSIBLE_SUFFIXES = {".log", ".txt", ".csv", ".json"}
 NEVER_COMPRESS_NAMES = {
     "graphics_audit_artifact.json",
@@ -72,6 +74,23 @@ def directory_size(path: Path) -> int:
     total = 0
     for item in path.rglob("*"):
         try:
+            if item.is_file() or item.is_symlink():
+                total += item.stat().st_size
+        except FileNotFoundError:
+            continue
+    return total
+
+
+def artifact_size_excluding_copied_game_dirs(path: Path) -> int:
+    if not path.exists():
+        return 0
+    if path.is_file():
+        return path.stat().st_size
+    total = 0
+    for item in path.rglob("*"):
+        try:
+            if any(parent.name.startswith(COPIED_GAME_DIR_PREFIXES) for parent in (item, *item.parents)):
+                continue
             if item.is_file() or item.is_symlink():
                 total += item.stat().st_size
         except FileNotFoundError:
@@ -214,7 +233,7 @@ def run_size_check(policy: RetentionPolicy, run_root: Path) -> None:
     if policy.preserve or policy.run_limit_bytes <= 0:
         return
     run_root = assert_inside_marked_root(policy.root, run_root)
-    size = directory_size(run_root)
+    size = artifact_size_excluding_copied_game_dirs(run_root)
     if size > policy.run_limit_bytes:
         manifest = run_root / "quota_failure_manifest.json"
         manifest.write_text(
@@ -325,6 +344,34 @@ def remove_copied_game_dirs(root: Path, scope: Path | None = None) -> list[Path]
         path = assert_inside_marked_root(root, path)
         shutil.rmtree(path)
         removed.append(path)
+    return removed
+
+
+def capture_run_ids(scope: Path) -> set[str]:
+    if not scope.exists():
+        return set()
+    ids: set[str] = set()
+    for path in scope.rglob("*"):
+        match = CAPTURE_RUN_ID_PATTERN.search(path.name)
+        if match:
+            ids.add(match.group(1))
+    return ids
+
+
+def remove_generated_temp_dirs_for_capture(root: Path, capture_scope: Path) -> list[Path]:
+    root = assert_marked_root(root)
+    capture_scope = assert_inside_marked_root(root, capture_scope)
+    temp_root = root / ".tmp"
+    removed: list[Path] = []
+    for run_id in sorted(capture_run_ids(capture_scope)):
+        candidate = temp_root / run_id
+        if not candidate.exists():
+            continue
+        candidate = assert_inside_marked_root(root, candidate)
+        if candidate.parent != temp_root:
+            raise RuntimeError(f"refusing unexpected generated temp path: {candidate}")
+        shutil.rmtree(candidate)
+        removed.append(candidate)
     return removed
 
 

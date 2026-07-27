@@ -341,12 +341,15 @@ pub(super) struct BorrowedOpenGlStateGuard {
     program: Option<glow::NativeProgram>,
     vertex_array: Option<glow::NativeVertexArray>,
     array_buffer: Option<glow::NativeBuffer>,
+    element_array_buffer: Option<glow::NativeBuffer>,
     copy_read_buffer: Option<glow::NativeBuffer>,
     copy_write_buffer: Option<glow::NativeBuffer>,
     pixel_unpack_buffer: Option<glow::NativeBuffer>,
     pixel_pack_buffer: Option<glow::NativeBuffer>,
     uniform_buffer: Option<glow::NativeBuffer>,
     storage_buffer: Option<glow::NativeBuffer>,
+    indexed_uniform_buffers: Vec<IndexedBufferBinding>,
+    indexed_storage_buffers: Vec<IndexedBufferBinding>,
     draw_framebuffer: Option<glow::NativeFramebuffer>,
     read_framebuffer: Option<glow::NativeFramebuffer>,
     active_texture: i32,
@@ -363,9 +366,12 @@ pub(super) struct BorrowedOpenGlStateGuard {
     blend_dst_alpha: i32,
     blend_equation_rgb: i32,
     blend_equation_alpha: i32,
+    blend_color: [f32; 4],
     color_writemask: [bool; 4],
     front_face: i32,
     stencil_enabled: bool,
+    stencil_front: StencilFaceState,
+    stencil_back: StencilFaceState,
     unpack_alignment: i32,
     unpack_row_length: i32,
     unpack_skip_rows: i32,
@@ -379,12 +385,39 @@ pub(super) struct BorrowedOpenGlStateGuard {
     depth_enabled: bool,
     depth_func: i32,
     depth_writemask: bool,
+    depth_range: [f32; 2],
+    line_width: f32,
+    polygon_mode: [i32; 2],
+    polygon_offset_fill_enabled: bool,
+    polygon_offset_factor: f32,
+    polygon_offset_units: f32,
+    primitive_restart_enabled: bool,
+    rasterizer_discard_enabled: bool,
+    dither_enabled: bool,
+    multisample_enabled: bool,
 }
 
 struct TextureUnitState {
     unit: u32,
     texture_2d: Option<glow::NativeTexture>,
     sampler: Option<glow::NativeSampler>,
+}
+
+struct IndexedBufferBinding {
+    index: u32,
+    buffer: Option<glow::NativeBuffer>,
+    start: i64,
+    size: i64,
+}
+
+struct StencilFaceState {
+    func: i32,
+    reference: i32,
+    value_mask: i32,
+    write_mask: i32,
+    fail: i32,
+    pass_depth_fail: i32,
+    pass_depth_pass: i32,
 }
 
 impl BorrowedOpenGlStateGuard {
@@ -410,6 +443,9 @@ impl BorrowedOpenGlStateGuard {
                 program: program_name(gl.get_parameter_i32(glow::CURRENT_PROGRAM)),
                 vertex_array: vertex_array_name(gl.get_parameter_i32(glow::VERTEX_ARRAY_BINDING)),
                 array_buffer: buffer_name(gl.get_parameter_i32(glow::ARRAY_BUFFER_BINDING)),
+                element_array_buffer: buffer_name(
+                    gl.get_parameter_i32(glow::ELEMENT_ARRAY_BUFFER_BINDING),
+                ),
                 copy_read_buffer: buffer_name(gl.get_parameter_i32(glow::COPY_READ_BUFFER_BINDING)),
                 copy_write_buffer: buffer_name(
                     gl.get_parameter_i32(glow::COPY_WRITE_BUFFER_BINDING),
@@ -423,6 +459,20 @@ impl BorrowedOpenGlStateGuard {
                 uniform_buffer: buffer_name(gl.get_parameter_i32(glow::UNIFORM_BUFFER_BINDING)),
                 storage_buffer: buffer_name(
                     gl.get_parameter_i32(glow::SHADER_STORAGE_BUFFER_BINDING),
+                ),
+                indexed_uniform_buffers: indexed_buffer_bindings(
+                    &gl,
+                    glow::MAX_UNIFORM_BUFFER_BINDINGS,
+                    glow::UNIFORM_BUFFER_BINDING,
+                    glow::UNIFORM_BUFFER_START,
+                    glow::UNIFORM_BUFFER_SIZE,
+                ),
+                indexed_storage_buffers: indexed_buffer_bindings(
+                    &gl,
+                    glow::MAX_SHADER_STORAGE_BUFFER_BINDINGS,
+                    glow::SHADER_STORAGE_BUFFER_BINDING,
+                    glow::SHADER_STORAGE_BUFFER_START,
+                    glow::SHADER_STORAGE_BUFFER_SIZE,
                 ),
                 draw_framebuffer: framebuffer_name(
                     gl.get_parameter_i32(glow::DRAW_FRAMEBUFFER_BINDING),
@@ -444,9 +494,28 @@ impl BorrowedOpenGlStateGuard {
                 blend_dst_alpha: gl.get_parameter_i32(glow::BLEND_DST_ALPHA),
                 blend_equation_rgb: gl.get_parameter_i32(glow::BLEND_EQUATION_RGB),
                 blend_equation_alpha: gl.get_parameter_i32(glow::BLEND_EQUATION_ALPHA),
+                blend_color: parameter_f32x4(&gl, glow::BLEND_COLOR),
                 color_writemask: parameter_boolx4(&gl, glow::COLOR_WRITEMASK),
                 front_face: gl.get_parameter_i32(glow::FRONT_FACE),
                 stencil_enabled: gl.is_enabled(glow::STENCIL_TEST),
+                stencil_front: StencilFaceState {
+                    func: gl.get_parameter_i32(glow::STENCIL_FUNC),
+                    reference: gl.get_parameter_i32(glow::STENCIL_REF),
+                    value_mask: gl.get_parameter_i32(glow::STENCIL_VALUE_MASK),
+                    write_mask: gl.get_parameter_i32(glow::STENCIL_WRITEMASK),
+                    fail: gl.get_parameter_i32(glow::STENCIL_FAIL),
+                    pass_depth_fail: gl.get_parameter_i32(glow::STENCIL_PASS_DEPTH_FAIL),
+                    pass_depth_pass: gl.get_parameter_i32(glow::STENCIL_PASS_DEPTH_PASS),
+                },
+                stencil_back: StencilFaceState {
+                    func: gl.get_parameter_i32(glow::STENCIL_BACK_FUNC),
+                    reference: gl.get_parameter_i32(glow::STENCIL_BACK_REF),
+                    value_mask: gl.get_parameter_i32(glow::STENCIL_BACK_VALUE_MASK),
+                    write_mask: gl.get_parameter_i32(glow::STENCIL_BACK_WRITEMASK),
+                    fail: gl.get_parameter_i32(glow::STENCIL_BACK_FAIL),
+                    pass_depth_fail: gl.get_parameter_i32(glow::STENCIL_BACK_PASS_DEPTH_FAIL),
+                    pass_depth_pass: gl.get_parameter_i32(glow::STENCIL_BACK_PASS_DEPTH_PASS),
+                },
                 unpack_alignment: gl.get_parameter_i32(glow::UNPACK_ALIGNMENT),
                 unpack_row_length: gl.get_parameter_i32(glow::UNPACK_ROW_LENGTH),
                 unpack_skip_rows: gl.get_parameter_i32(glow::UNPACK_SKIP_ROWS),
@@ -460,6 +529,16 @@ impl BorrowedOpenGlStateGuard {
                 depth_enabled: gl.is_enabled(glow::DEPTH_TEST),
                 depth_func: gl.get_parameter_i32(glow::DEPTH_FUNC),
                 depth_writemask: gl.get_parameter_i32(glow::DEPTH_WRITEMASK) != 0,
+                depth_range: parameter_f32x2(&gl, glow::DEPTH_RANGE),
+                line_width: gl.get_parameter_f32(glow::LINE_WIDTH),
+                polygon_mode: polygon_mode_state(&gl),
+                polygon_offset_fill_enabled: gl.is_enabled(glow::POLYGON_OFFSET_FILL),
+                polygon_offset_factor: gl.get_parameter_f32(glow::POLYGON_OFFSET_FACTOR),
+                polygon_offset_units: gl.get_parameter_f32(glow::POLYGON_OFFSET_UNITS),
+                primitive_restart_enabled: gl.is_enabled(glow::PRIMITIVE_RESTART),
+                rasterizer_discard_enabled: gl.is_enabled(glow::RASTERIZER_DISCARD),
+                dither_enabled: gl.is_enabled(glow::DITHER),
+                multisample_enabled: gl.is_enabled(glow::MULTISAMPLE),
                 gl,
             }
         }
@@ -473,6 +552,10 @@ impl Drop for BorrowedOpenGlStateGuard {
             self.gl.use_program(self.program);
             self.gl.bind_vertex_array(self.vertex_array);
             self.gl.bind_buffer(glow::ARRAY_BUFFER, self.array_buffer);
+            if self.vertex_array.is_some() {
+                self.gl
+                    .bind_buffer(glow::ELEMENT_ARRAY_BUFFER, self.element_array_buffer);
+            }
             self.gl
                 .bind_buffer(glow::COPY_READ_BUFFER, self.copy_read_buffer);
             self.gl
@@ -481,6 +564,16 @@ impl Drop for BorrowedOpenGlStateGuard {
                 .bind_buffer(glow::PIXEL_UNPACK_BUFFER, self.pixel_unpack_buffer);
             self.gl
                 .bind_buffer(glow::PIXEL_PACK_BUFFER, self.pixel_pack_buffer);
+            restore_indexed_buffer_bindings(
+                &self.gl,
+                glow::UNIFORM_BUFFER,
+                &self.indexed_uniform_buffers,
+            );
+            restore_indexed_buffer_bindings(
+                &self.gl,
+                glow::SHADER_STORAGE_BUFFER,
+                &self.indexed_storage_buffers,
+            );
             self.gl
                 .bind_buffer(glow::UNIFORM_BUFFER, self.uniform_buffer);
             self.gl
@@ -521,6 +614,12 @@ impl Drop for BorrowedOpenGlStateGuard {
                 self.blend_equation_rgb as u32,
                 self.blend_equation_alpha as u32,
             );
+            self.gl.blend_color(
+                self.blend_color[0],
+                self.blend_color[1],
+                self.blend_color[2],
+                self.blend_color[3],
+            );
             self.gl.color_mask(
                 self.color_writemask[0],
                 self.color_writemask[1],
@@ -529,6 +628,8 @@ impl Drop for BorrowedOpenGlStateGuard {
             );
             self.gl.front_face(self.front_face as u32);
             set_enabled(&self.gl, glow::STENCIL_TEST, self.stencil_enabled);
+            restore_stencil_face(&self.gl, glow::FRONT, &self.stencil_front);
+            restore_stencil_face(&self.gl, glow::BACK, &self.stencil_back);
             self.gl
                 .pixel_store_i32(glow::UNPACK_ALIGNMENT, self.unpack_alignment);
             self.gl
@@ -552,14 +653,69 @@ impl Drop for BorrowedOpenGlStateGuard {
             set_enabled(&self.gl, glow::DEPTH_TEST, self.depth_enabled);
             self.gl.depth_func(self.depth_func as u32);
             self.gl.depth_mask(self.depth_writemask);
+            self.gl
+                .depth_range_f32(self.depth_range[0], self.depth_range[1]);
+            self.gl.line_width(self.line_width);
+            restore_polygon_mode(&self.gl, self.polygon_mode);
+            set_enabled(
+                &self.gl,
+                glow::POLYGON_OFFSET_FILL,
+                self.polygon_offset_fill_enabled,
+            );
+            self.gl
+                .polygon_offset(self.polygon_offset_factor, self.polygon_offset_units);
+            set_enabled(
+                &self.gl,
+                glow::PRIMITIVE_RESTART,
+                self.primitive_restart_enabled,
+            );
+            set_enabled(
+                &self.gl,
+                glow::RASTERIZER_DISCARD,
+                self.rasterizer_discard_enabled,
+            );
+            set_enabled(&self.gl, glow::DITHER, self.dither_enabled);
+            set_enabled(&self.gl, glow::MULTISAMPLE, self.multisample_enabled);
         }
     }
+}
+
+fn parameter_i32x2(gl: &glow::Context, parameter: u32) -> [i32; 2] {
+    let mut values = [0; 2];
+    unsafe {
+        gl.get_parameter_i32_slice(parameter, &mut values);
+    }
+    values
 }
 
 fn parameter_i32x4(gl: &glow::Context, parameter: u32) -> [i32; 4] {
     let mut values = [0; 4];
     unsafe {
         gl.get_parameter_i32_slice(parameter, &mut values);
+    }
+    values
+}
+
+fn polygon_mode_state(gl: &glow::Context) -> [i32; 2] {
+    let mut mode = parameter_i32x2(gl, glow::POLYGON_MODE);
+    if mode[1] == 0 {
+        mode[1] = mode[0];
+    }
+    mode
+}
+
+fn parameter_f32x2(gl: &glow::Context, parameter: u32) -> [f32; 2] {
+    let mut values = [0.0; 2];
+    unsafe {
+        gl.get_parameter_f32_slice(parameter, &mut values);
+    }
+    values
+}
+
+fn parameter_f32x4(gl: &glow::Context, parameter: u32) -> [f32; 4] {
+    let mut values = [0.0; 4];
+    unsafe {
+        gl.get_parameter_f32_slice(parameter, &mut values);
     }
     values
 }
@@ -572,6 +728,75 @@ fn parameter_boolx4(gl: &glow::Context, parameter: u32) -> [bool; 4] {
         values[2] != 0,
         values[3] != 0,
     ]
+}
+
+fn restore_stencil_face(gl: &glow::Context, face: u32, state: &StencilFaceState) {
+    unsafe {
+        gl.stencil_func_separate(
+            face,
+            state.func as u32,
+            state.reference,
+            state.value_mask as u32,
+        );
+        gl.stencil_mask_separate(face, state.write_mask as u32);
+        gl.stencil_op_separate(
+            face,
+            state.fail as u32,
+            state.pass_depth_fail as u32,
+            state.pass_depth_pass as u32,
+        );
+    }
+}
+
+fn restore_polygon_mode(gl: &glow::Context, mode: [i32; 2]) {
+    unsafe {
+        if mode[0] == mode[1] {
+            gl.polygon_mode(glow::FRONT_AND_BACK, mode[0] as u32);
+        } else {
+            gl.polygon_mode(glow::FRONT, mode[0] as u32);
+            gl.polygon_mode(glow::BACK, mode[1] as u32);
+        }
+    }
+}
+
+fn indexed_buffer_bindings(
+    gl: &glow::Context,
+    max_parameter: u32,
+    binding_parameter: u32,
+    start_parameter: u32,
+    size_parameter: u32,
+) -> Vec<IndexedBufferBinding> {
+    let count = unsafe { gl.get_parameter_i32(max_parameter) }.clamp(0, 256);
+    (0..u32::try_from(count).unwrap_or_default())
+        .map(|index| IndexedBufferBinding {
+            index,
+            buffer: buffer_name(unsafe { gl.get_parameter_indexed_i32(binding_parameter, index) }),
+            start: unsafe { gl.get_parameter_indexed_i64(start_parameter, index) },
+            size: unsafe { gl.get_parameter_indexed_i64(size_parameter, index) },
+        })
+        .collect()
+}
+
+fn restore_indexed_buffer_bindings(
+    gl: &glow::Context,
+    target: u32,
+    bindings: &[IndexedBufferBinding],
+) {
+    unsafe {
+        for binding in bindings {
+            if let (Some(buffer), Ok(start), Ok(size)) = (
+                binding.buffer,
+                i32::try_from(binding.start),
+                i32::try_from(binding.size),
+            ) {
+                if binding.size > 0 {
+                    gl.bind_buffer_range(target, binding.index, Some(buffer), start, size);
+                    continue;
+                }
+            }
+            gl.bind_buffer_base(target, binding.index, binding.buffer);
+        }
+    }
 }
 
 fn set_enabled(gl: &glow::Context, flag: u32, enabled: bool) {
@@ -635,6 +860,283 @@ fn create_native_context() -> GalResult<NativeOpenGlContext> {
                 errors.join("; ")
             )))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use glow::HasContext;
+
+    #[test]
+    fn borrowed_state_guard_restores_indexed_buffer_bindings() {
+        let context = match OpenGlContext::new("borrowed-state-indexed-bindings-test") {
+            Ok(context) => context,
+            Err(error) => {
+                assert!(
+                    error.to_string().contains("OpenGL")
+                        || error.to_string().contains("EGL")
+                        || error.to_string().contains("GLX"),
+                    "unexpected OpenGL bootstrap failure: {error}"
+                );
+                return;
+            }
+        };
+        context
+            .make_current()
+            .expect("test OpenGL context should become current");
+        let gl = context.gl().clone();
+        unsafe {
+            let max_ubo = gl.get_parameter_i32(glow::MAX_UNIFORM_BUFFER_BINDINGS);
+            let max_ssbo = gl.get_parameter_i32(glow::MAX_SHADER_STORAGE_BUFFER_BINDINGS);
+            if max_ubo <= 0 || max_ssbo <= 0 {
+                return;
+            }
+            let original_ubo = gl.create_buffer().expect("create original UBO");
+            let replacement_ubo = gl.create_buffer().expect("create replacement UBO");
+            let original_ssbo = gl.create_buffer().expect("create original SSBO");
+            let replacement_ssbo = gl.create_buffer().expect("create replacement SSBO");
+            for (target, buffer) in [
+                (glow::UNIFORM_BUFFER, original_ubo),
+                (glow::UNIFORM_BUFFER, replacement_ubo),
+                (glow::SHADER_STORAGE_BUFFER, original_ssbo),
+                (glow::SHADER_STORAGE_BUFFER, replacement_ssbo),
+            ] {
+                gl.bind_buffer(target, Some(buffer));
+                gl.buffer_data_size(target, 64, glow::DYNAMIC_DRAW);
+            }
+            gl.bind_buffer_range(glow::UNIFORM_BUFFER, 0, Some(original_ubo), 16, 32);
+            gl.bind_buffer_range(glow::SHADER_STORAGE_BUFFER, 0, Some(original_ssbo), 8, 40);
+            let original_generic_ubo = gl.get_parameter_i32(glow::UNIFORM_BUFFER_BINDING);
+            let original_generic_ssbo = gl.get_parameter_i32(glow::SHADER_STORAGE_BUFFER_BINDING);
+            let original_ubo_binding =
+                gl.get_parameter_indexed_i32(glow::UNIFORM_BUFFER_BINDING, 0);
+            let original_ubo_start = gl.get_parameter_indexed_i64(glow::UNIFORM_BUFFER_START, 0);
+            let original_ubo_size = gl.get_parameter_indexed_i64(glow::UNIFORM_BUFFER_SIZE, 0);
+            let original_ssbo_binding =
+                gl.get_parameter_indexed_i32(glow::SHADER_STORAGE_BUFFER_BINDING, 0);
+            let original_ssbo_start =
+                gl.get_parameter_indexed_i64(glow::SHADER_STORAGE_BUFFER_START, 0);
+            let original_ssbo_size =
+                gl.get_parameter_indexed_i64(glow::SHADER_STORAGE_BUFFER_SIZE, 0);
+            {
+                let _guard = BorrowedOpenGlStateGuard::capture(gl.clone());
+                gl.bind_buffer_range(glow::UNIFORM_BUFFER, 0, Some(replacement_ubo), 0, 64);
+                gl.bind_buffer_range(
+                    glow::SHADER_STORAGE_BUFFER,
+                    0,
+                    Some(replacement_ssbo),
+                    0,
+                    64,
+                );
+            }
+            assert_eq!(
+                original_generic_ubo,
+                gl.get_parameter_i32(glow::UNIFORM_BUFFER_BINDING),
+                "borrowed OpenGL guard must restore generic UBO binding after indexed ranges"
+            );
+            assert_eq!(
+                original_generic_ssbo,
+                gl.get_parameter_i32(glow::SHADER_STORAGE_BUFFER_BINDING),
+                "borrowed OpenGL guard must restore generic SSBO binding after indexed ranges"
+            );
+            assert_eq!(
+                original_ubo_binding,
+                gl.get_parameter_indexed_i32(glow::UNIFORM_BUFFER_BINDING, 0),
+                "borrowed OpenGL guard must restore indexed UBO binding"
+            );
+            assert_eq!(
+                original_ubo_start,
+                gl.get_parameter_indexed_i64(glow::UNIFORM_BUFFER_START, 0),
+                "borrowed OpenGL guard must restore indexed UBO range offset"
+            );
+            assert_eq!(
+                original_ubo_size,
+                gl.get_parameter_indexed_i64(glow::UNIFORM_BUFFER_SIZE, 0),
+                "borrowed OpenGL guard must restore indexed UBO range size"
+            );
+            assert_eq!(
+                original_ssbo_binding,
+                gl.get_parameter_indexed_i32(glow::SHADER_STORAGE_BUFFER_BINDING, 0),
+                "borrowed OpenGL guard must restore indexed SSBO binding"
+            );
+            assert_eq!(
+                original_ssbo_start,
+                gl.get_parameter_indexed_i64(glow::SHADER_STORAGE_BUFFER_START, 0),
+                "borrowed OpenGL guard must restore indexed SSBO range offset"
+            );
+            assert_eq!(
+                original_ssbo_size,
+                gl.get_parameter_indexed_i64(glow::SHADER_STORAGE_BUFFER_SIZE, 0),
+                "borrowed OpenGL guard must restore indexed SSBO range size"
+            );
+            gl.bind_buffer_base(glow::UNIFORM_BUFFER, 0, None);
+            gl.bind_buffer_base(glow::SHADER_STORAGE_BUFFER, 0, None);
+            gl.delete_buffer(original_ubo);
+            gl.delete_buffer(replacement_ubo);
+            gl.delete_buffer(original_ssbo);
+            gl.delete_buffer(replacement_ssbo);
+        }
+    }
+
+    #[test]
+    fn borrowed_state_guard_restores_outline_sensitive_pipeline_state() {
+        let context = match OpenGlContext::new("borrowed-state-outline-pipeline-test") {
+            Ok(context) => context,
+            Err(error) => {
+                assert!(
+                    error.to_string().contains("OpenGL")
+                        || error.to_string().contains("EGL")
+                        || error.to_string().contains("GLX"),
+                    "unexpected OpenGL bootstrap failure: {error}"
+                );
+                return;
+            }
+        };
+        context
+            .make_current()
+            .expect("test OpenGL context should become current");
+        let gl = context.gl().clone();
+        unsafe {
+            drain_gl_errors(&gl);
+
+            let original_vao = gl.create_vertex_array().expect("create original VAO");
+            let replacement_vao = gl.create_vertex_array().expect("create replacement VAO");
+            let original_indices = gl.create_buffer().expect("create original index buffer");
+            let replacement_indices = gl.create_buffer().expect("create replacement index buffer");
+            gl.bind_vertex_array(Some(original_vao));
+            gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, Some(original_indices));
+            gl.buffer_data_u8_slice(glow::ELEMENT_ARRAY_BUFFER, &[0, 0, 0, 0], glow::STATIC_DRAW);
+            gl.bind_vertex_array(Some(replacement_vao));
+            gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, Some(replacement_indices));
+            gl.buffer_data_u8_slice(glow::ELEMENT_ARRAY_BUFFER, &[0, 0, 0, 0], glow::STATIC_DRAW);
+            gl.bind_vertex_array(Some(original_vao));
+            gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, Some(original_indices));
+            gl.line_width(1.0);
+            gl.blend_color(0.125, 0.25, 0.375, 0.5);
+            gl.depth_range_f32(0.125, 0.875);
+            gl.polygon_mode(glow::FRONT_AND_BACK, glow::LINE);
+            gl.enable(glow::POLYGON_OFFSET_FILL);
+            gl.polygon_offset(1.25, 2.5);
+            gl.enable(glow::PRIMITIVE_RESTART);
+            gl.disable(glow::RASTERIZER_DISCARD);
+            gl.enable(glow::DITHER);
+            gl.enable(glow::MULTISAMPLE);
+            gl.stencil_func_separate(glow::FRONT, glow::ALWAYS, 3, 0x7f);
+            gl.stencil_mask_separate(glow::FRONT, 0x3f);
+            gl.stencil_op_separate(glow::FRONT, glow::KEEP, glow::REPLACE, glow::INCR_WRAP);
+            gl.stencil_func_separate(glow::BACK, glow::NOTEQUAL, 5, 0xef);
+            gl.stencil_mask_separate(glow::BACK, 0xcf);
+            gl.stencil_op_separate(glow::BACK, glow::ZERO, glow::INVERT, glow::DECR_WRAP);
+
+            {
+                let _guard = BorrowedOpenGlStateGuard::capture(gl.clone());
+                gl.bind_vertex_array(Some(replacement_vao));
+                gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, Some(replacement_indices));
+                gl.line_width(1.0);
+                gl.blend_color(0.625, 0.5, 0.375, 0.25);
+                gl.depth_range_f32(0.0, 1.0);
+                gl.polygon_mode(glow::FRONT_AND_BACK, glow::FILL);
+                gl.disable(glow::POLYGON_OFFSET_FILL);
+                gl.polygon_offset(0.0, 0.0);
+                gl.disable(glow::PRIMITIVE_RESTART);
+                gl.enable(glow::RASTERIZER_DISCARD);
+                gl.disable(glow::DITHER);
+                gl.disable(glow::MULTISAMPLE);
+                gl.stencil_func_separate(glow::FRONT, glow::NEVER, 0, 0);
+                gl.stencil_mask_separate(glow::FRONT, 0);
+                gl.stencil_op_separate(glow::FRONT, glow::ZERO, glow::ZERO, glow::ZERO);
+                gl.stencil_func_separate(glow::BACK, glow::ALWAYS, 0, 0);
+                gl.stencil_mask_separate(glow::BACK, 0);
+                gl.stencil_op_separate(glow::BACK, glow::KEEP, glow::KEEP, glow::KEEP);
+            }
+
+            assert_eq!(
+                Some(original_vao),
+                vertex_array_name(gl.get_parameter_i32(glow::VERTEX_ARRAY_BINDING)),
+                "borrowed OpenGL guard must restore Java VAO before later outline draws"
+            );
+            assert_eq!(
+                Some(original_indices),
+                buffer_name(gl.get_parameter_i32(glow::ELEMENT_ARRAY_BUFFER_BINDING)),
+                "borrowed OpenGL guard must restore VAO-scoped index buffer"
+            );
+            assert_f32_eq(0.125, gl.get_parameter_f32(glow::BLEND_COLOR));
+            let blend_color = parameter_f32x4(&gl, glow::BLEND_COLOR);
+            assert_f32_eq(0.125, blend_color[0]);
+            assert_f32_eq(0.25, blend_color[1]);
+            assert_f32_eq(0.375, blend_color[2]);
+            assert_f32_eq(0.5, blend_color[3]);
+            let depth_range = parameter_f32x2(&gl, glow::DEPTH_RANGE);
+            assert_f32_eq(0.125, depth_range[0]);
+            assert_f32_eq(0.875, depth_range[1]);
+            assert_eq!(
+                [glow::LINE as i32, glow::LINE as i32],
+                polygon_mode_state(&gl),
+                "borrowed OpenGL guard must restore polygon mode"
+            );
+            assert!(gl.is_enabled(glow::POLYGON_OFFSET_FILL));
+            assert_f32_eq(1.25, gl.get_parameter_f32(glow::POLYGON_OFFSET_FACTOR));
+            assert_f32_eq(2.5, gl.get_parameter_f32(glow::POLYGON_OFFSET_UNITS));
+            assert!(gl.is_enabled(glow::PRIMITIVE_RESTART));
+            assert!(!gl.is_enabled(glow::RASTERIZER_DISCARD));
+            assert!(gl.is_enabled(glow::DITHER));
+            assert!(gl.is_enabled(glow::MULTISAMPLE));
+            assert_eq!(glow::ALWAYS as i32, gl.get_parameter_i32(glow::STENCIL_FUNC));
+            assert_eq!(3, gl.get_parameter_i32(glow::STENCIL_REF));
+            assert_eq!(0x7f, gl.get_parameter_i32(glow::STENCIL_VALUE_MASK));
+            assert_eq!(0x3f, gl.get_parameter_i32(glow::STENCIL_WRITEMASK));
+            assert_eq!(glow::KEEP as i32, gl.get_parameter_i32(glow::STENCIL_FAIL));
+            assert_eq!(
+                glow::REPLACE as i32,
+                gl.get_parameter_i32(glow::STENCIL_PASS_DEPTH_FAIL)
+            );
+            assert_eq!(
+                glow::INCR_WRAP as i32,
+                gl.get_parameter_i32(glow::STENCIL_PASS_DEPTH_PASS)
+            );
+            assert_eq!(
+                glow::NOTEQUAL as i32,
+                gl.get_parameter_i32(glow::STENCIL_BACK_FUNC)
+            );
+            assert_eq!(5, gl.get_parameter_i32(glow::STENCIL_BACK_REF));
+            assert_eq!(0xef, gl.get_parameter_i32(glow::STENCIL_BACK_VALUE_MASK));
+            assert_eq!(0xcf, gl.get_parameter_i32(glow::STENCIL_BACK_WRITEMASK));
+            assert_eq!(glow::ZERO as i32, gl.get_parameter_i32(glow::STENCIL_BACK_FAIL));
+            assert_eq!(
+                glow::INVERT as i32,
+                gl.get_parameter_i32(glow::STENCIL_BACK_PASS_DEPTH_FAIL)
+            );
+            assert_eq!(
+                glow::DECR_WRAP as i32,
+                gl.get_parameter_i32(glow::STENCIL_BACK_PASS_DEPTH_PASS)
+            );
+            assert_eq!(
+                glow::NO_ERROR,
+                gl.get_error(),
+                "borrowed OpenGL state restore produced GL errors"
+            );
+
+            gl.disable(glow::PRIMITIVE_RESTART);
+            gl.disable(glow::POLYGON_OFFSET_FILL);
+            gl.polygon_mode(glow::FRONT_AND_BACK, glow::FILL);
+            gl.bind_vertex_array(None);
+            gl.delete_buffer(original_indices);
+            gl.delete_buffer(replacement_indices);
+            gl.delete_vertex_array(original_vao);
+            gl.delete_vertex_array(replacement_vao);
+        }
+    }
+
+    unsafe fn drain_gl_errors(gl: &glow::Context) {
+        while gl.get_error() != glow::NO_ERROR {}
+    }
+
+    fn assert_f32_eq(expected: f32, actual: f32) {
+        assert!(
+            (expected - actual).abs() <= 0.0001,
+            "expected {expected}, got {actual}"
+        );
     }
 }
 

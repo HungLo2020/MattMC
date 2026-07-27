@@ -19,6 +19,7 @@ public final class RenderDocCaptureHook {
 	private static final boolean ENABLED = Boolean.getBoolean("mattmc.dev.renderdocCapture");
 	private static final String LIBRARY_PATH = System.getProperty("mattmc.dev.renderdocCapture.library", "").trim();
 	private static final String PATH_TEMPLATE = System.getProperty("mattmc.dev.renderdocCapture.pathTemplate", "").trim();
+	private static final String BACKEND = System.getProperty("mattmc.dev.renderdocCapture.backend", "").trim();
 	private static final int API_VERSION_1_6_0 = 10600;
 	private static final int FN_SET_CAPTURE_FILE_PATH_TEMPLATE = 11;
 	private static final int FN_TRIGGER_CAPTURE = 15;
@@ -36,74 +37,85 @@ public final class RenderDocCaptureHook {
 	private RenderDocCaptureHook() {
 	}
 
-	public static void triggerNextFrameOnce(String context) {
+	public static boolean triggerNextFrameOnce(String context) {
 		if (!ENABLED || triggered || unavailable) {
-			return;
+			return false;
 		}
 		if (!ensureInitialized()) {
-			return;
+			return false;
 		}
 		Function triggerCapture = functionAt(FN_TRIGGER_CAPTURE);
 		if (triggerCapture == null) {
 			unavailable = true;
 			LOGGER.warn("RenderDoc API TriggerCapture function is unavailable");
-			return;
+			return false;
 		}
 		try {
 			triggerCapture.invokeVoid(new Object[0]);
 			triggered = true;
 			LOGGER.info("Triggered RenderDoc capture for next deterministic frame ({})", context);
+			return true;
 		} catch (Throwable throwable) {
 			unavailable = true;
 			LOGGER.warn("Unable to trigger RenderDoc capture", throwable);
+			return false;
 		}
 	}
 
-	public static void beginFrameCaptureOnce(Window window, String context) {
+	public static boolean beginFrameCaptureOnce(Window window, String context) {
 		if (!ENABLED || frameCaptureStarted || unavailable) {
-			return;
+			return false;
+		}
+		if ("opengl".equalsIgnoreCase(BACKEND)) {
+			LOGGER.info("Skipping manual RenderDoc frame capture for OpenGL; using trigger-only capture ({})", context);
+			return false;
 		}
 		if (!ensureInitialized()) {
-			return;
+			return false;
 		}
 		Function startFrameCapture = functionAt(FN_START_FRAME_CAPTURE);
 		if (startFrameCapture == null) {
 			unavailable = true;
 			LOGGER.warn("RenderDoc API StartFrameCapture function is unavailable");
-			return;
+			return false;
 		}
-		try {
-			Pointer windowPointer = windowPointer(window);
-			Function setActiveWindow = functionAt(FN_SET_ACTIVE_WINDOW);
-			if (setActiveWindow != null) {
-				setActiveWindow.invokeVoid(new Object[] {Pointer.NULL, windowPointer});
-			}
-			startFrameCapture.invokeVoid(new Object[] {Pointer.NULL, windowPointer});
-			frameCaptureStarted = true;
-			LOGGER.info("Started RenderDoc frame capture ({})", context);
+			try {
+				Pointer windowPointer = captureWindowPointer(window);
+				Function setActiveWindow = functionAt(FN_SET_ACTIVE_WINDOW);
+				if (setActiveWindow != null) {
+					setActiveWindow.invokeVoid(new Object[] {Pointer.NULL, windowPointer});
+				}
+				startFrameCapture.invokeVoid(new Object[] {Pointer.NULL, windowPointer});
+				frameCaptureStarted = true;
+				LOGGER.info("Started RenderDoc frame capture ({}) backend={} windowPointer={}", context, BACKEND, Pointer.nativeValue(windowPointer));
+				return true;
 		} catch (Throwable throwable) {
 			unavailable = true;
 			LOGGER.warn("Unable to start RenderDoc frame capture", throwable);
+			return false;
 		}
 	}
 
-	public static void endFrameCaptureOnce(Window window, String context) {
+	public static boolean endFrameCaptureOnce(Window window, String context) {
 		if (!ENABLED || !frameCaptureStarted || frameCaptureEnded || unavailable) {
-			return;
+			return false;
 		}
 		Function endFrameCapture = functionAt(FN_END_FRAME_CAPTURE);
 		if (endFrameCapture == null) {
 			unavailable = true;
 			LOGGER.warn("RenderDoc API EndFrameCapture function is unavailable");
-			return;
+			return false;
 		}
-		try {
-			int result = endFrameCapture.invokeInt(new Object[] {Pointer.NULL, windowPointer(window)});
-			frameCaptureEnded = true;
-			LOGGER.info("Ended RenderDoc frame capture ({}) result={}", context, result);
+			try {
+				Pointer windowPointer = captureWindowPointer(window);
+				int result = endFrameCapture.invokeInt(new Object[] {Pointer.NULL, windowPointer});
+				frameCaptureEnded = true;
+				LOGGER.info("Ended RenderDoc frame capture ({}) backend={} windowPointer={} result={}", context, BACKEND, Pointer.nativeValue(windowPointer), result);
+				return result != 0;
 		} catch (Throwable throwable) {
 			unavailable = true;
 			LOGGER.warn("Unable to end RenderDoc frame capture", throwable);
+			return false;
 		}
 	}
 
@@ -156,5 +168,12 @@ public final class RenderDocCaptureHook {
 		handle.setAccessible(true);
 		long value = handle.getLong(window);
 		return Pointer.createConstant(value);
+	}
+
+	private static Pointer captureWindowPointer(Window window) throws ReflectiveOperationException {
+		if ("opengl".equalsIgnoreCase(BACKEND)) {
+			return Pointer.NULL;
+		}
+		return windowPointer(window);
 	}
 }

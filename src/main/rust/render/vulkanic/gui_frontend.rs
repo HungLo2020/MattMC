@@ -403,6 +403,25 @@ impl GuiFrontend {
         frame_target: Handle,
         requests: Vec<GuiSpriteRequest>,
     ) -> GalResult<GuiSubmitStats> {
+        let (ops, mut stats) = self.append_frame_ops(gal, generation, frame_target, requests)?;
+        let token = gal.submit(SubmissionBatch {
+            label: "minecraft.gui.frame".to_string(),
+            command_lists: vec![CommandList::from(CommandListDesc {
+                label: "minecraft.gui.frame.commands".to_string(),
+                operations: ops,
+            })],
+        })?;
+        stats.submission_id = token.submission.0;
+        Ok(stats)
+    }
+
+    pub fn append_frame_ops(
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+        frame_target: Handle,
+        requests: Vec<GuiSpriteRequest>,
+    ) -> GalResult<(Vec<CommandOp>, GuiSubmitStats)> {
         if generation != self.generation {
             self.destroy_render_resources(gal);
             self.generation = generation;
@@ -522,15 +541,7 @@ impl GuiFrontend {
         }
         stats.command_lists = 1;
         stats.command_ops = ops.len() as u64;
-        let token = gal.submit(SubmissionBatch {
-            label: "minecraft.gui.frame".to_string(),
-            command_lists: vec![CommandList::from(CommandListDesc {
-                label: "minecraft.gui.frame.commands".to_string(),
-                operations: ops,
-            })],
-        })?;
-        stats.submission_id = token.submission.0;
-        Ok(stats)
+        Ok((ops, stats))
     }
 
     fn frame_pass(&mut self, gal: &mut VulkanicGal, frame_target: Handle) -> GalResult<Handle> {

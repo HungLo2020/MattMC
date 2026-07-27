@@ -489,7 +489,12 @@ class CaptureRunner:
             self.append_meta("screenshot_interval_secs_effective=0")
 
     def configure_backend_and_validation(self) -> None:
-        launch_backend = "opengl" if self.config.backend.startswith("rust-") else self.config.backend
+        if self.config.backend == "rust-vulkan":
+            launch_backend = "vulkan"
+        elif self.config.backend == "rust-opengl":
+            launch_backend = "opengl"
+        else:
+            launch_backend = self.config.backend
         upsert_property(self.options_file, "graphics_backend", launch_backend)
         gui_scale = os.environ.get("MATTMC_CAPTURE_GUI_SCALE", "3")
         if not gui_scale.isdigit() or int(gui_scale) <= 0:
@@ -539,7 +544,7 @@ class CaptureRunner:
         self.config.client_args = remove_client_arg_option(self.config.client_args, "--width")
         self.config.client_args = remove_client_arg_option(self.config.client_args, "--height")
         self.config.client_args = remove_client_arg_assignment(self.config.client_args, "enableShaders")
-        self.config.client_args = append_client_arg(self.config.client_args, f"--quickPlaySingleplayer={self.config.world}")
+        self.config.client_args = append_client_arg(self.config.client_args, f"--quickPlaySingleplayer={shlex.quote(self.config.world)}")
         self.config.client_args = append_client_arg(self.config.client_args, "--width 1280")
         self.config.client_args = append_client_arg(self.config.client_args, "--height 720")
         self.config.client_args = append_client_arg(self.config.client_args, f"enableShaders={shaders_enabled}")
@@ -721,6 +726,7 @@ class CaptureRunner:
 
         self.configure_validation_environment()
         self.configure_java_tool_options()
+        gradle_cmd = self.renderdoc_wrapped_command(gradle_cmd)
 
         log_handle = self.run_log.open("wb")
         try:
@@ -749,6 +755,45 @@ class CaptureRunner:
         log_handle.close()
         self.run_client_active = True
         self.append_meta(f"gradle_pid={self.gradle_process.pid}")
+
+    def renderdoc_wrapped_command(self, command: list[str]) -> list[str]:
+        if self.env.get("MATTMC_RENDERDOC_CAPTURE", "").lower() not in {"1", "true", "yes"}:
+            return command
+        renderdoc = self.env.get("MATTMC_RENDERDOC_CMD") or shutil.which("renderdoccmd")
+        if not renderdoc:
+            self.append_meta("renderdoc_launch_error=renderdoccmd unavailable in capture runner")
+            return command
+        command = self.renderdoc_launch_command(command)
+        capture_template = self.env.get("MATTMC_RENDERDOC_CAPTURE_TEMPLATE", "").strip()
+        capture_path = self.env.get("MATTMC_RENDERDOC_CAPTURE_PATH", "").strip()
+        if not capture_template and capture_path:
+            capture_template = str(Path(capture_path).with_suffix(""))
+        if not capture_template:
+            capture_template = str(self.artifact_dir / f"renderdoc_{self.run_id}")
+        wrapped = [
+            renderdoc,
+            "capture",
+            "-d",
+            str(self.root),
+            "-w",
+            "--opt-hook-children",
+            "--opt-api-validation",
+            "-c",
+            capture_template,
+            *command,
+        ]
+        self.append_meta(f"renderdoc_wrapped_actual_game_command={' '.join(shlex.quote(part) for part in wrapped)}")
+        self.append_meta(f"renderdoc_capture_template={capture_template}")
+        return wrapped
+
+    def renderdoc_launch_command(self, command: list[str]) -> list[str]:
+        if not command:
+            return command
+        launcher = Path(command[0]).name
+        if launcher in {"gradlew", "gradlew.bat"} and "--no-daemon" not in command:
+            self.append_meta("renderdoc_forced_gradle_no_daemon=true")
+            return [command[0], "--no-daemon", *command[1:]]
+        return command
 
     def configure_validation_environment(self) -> None:
         if not self.validation_enabled:
@@ -787,6 +832,8 @@ class CaptureRunner:
 
     def configure_java_tool_options(self) -> None:
         options = [f"-Dmattmc.dev.runCaptureId={self.run_id}"]
+        if self.config.backend == "rust-vulkan":
+            options.append("-Dmattmc.dev.rustGalVulkanWholeFrame=true")
         if self.config.jvm_args:
             self.append_java_tool_options(self.config.jvm_args)
             self.append_meta(f"user_java_options={' '.join(self.config.jvm_args)}")
@@ -1795,8 +1842,14 @@ def extract_property_value(file_path: Path, key: str) -> str:
 def extract_client_arg_assignment(client_args: str, key: str) -> str:
     if not client_args:
         return ""
-    match = re.search(rf"(^|\s){re.escape(key)}=([^\s]+)", client_args)
-    return match.group(2) if match else ""
+    try:
+        for token in shlex.split(client_args):
+            if token.startswith(f"{key}="):
+                return token.split("=", 1)[1]
+    except ValueError:
+        pass
+    match = re.search(rf"(^|\s){re.escape(key)}=((?:'[^']*')|(?:\"[^\"]*\")|[^\s]+)", client_args)
+    return match.group(2).strip("'\"") if match else ""
 
 
 def append_client_arg(client_args: str, arg: str) -> str:
@@ -1806,6 +1859,23 @@ def append_client_arg(client_args: str, arg: str) -> str:
 def remove_client_arg_option(client_args: str, option: str) -> str:
     if not client_args:
         return ""
+    try:
+        tokens = shlex.split(client_args)
+        filtered: list[str] = []
+        skip_next = False
+        for token in tokens:
+            if skip_next:
+                skip_next = False
+                continue
+            if token == option:
+                skip_next = True
+                continue
+            if token.startswith(f"{option}="):
+                continue
+            filtered.append(token)
+        return shlex.join(filtered)
+    except ValueError:
+        pass
     pattern = rf"(^|\s){re.escape(option)}(=[^\s]+|\s+[^\s]+)?"
     return re.sub(pattern, " ", client_args).strip()
 
@@ -1813,16 +1883,27 @@ def remove_client_arg_option(client_args: str, option: str) -> str:
 def remove_client_arg_assignment(client_args: str, key: str) -> str:
     if not client_args:
         return ""
+    try:
+        return shlex.join(token for token in shlex.split(client_args) if not token.startswith(f"{key}="))
+    except ValueError:
+        pass
     pattern = rf"(^|\s){re.escape(key)}=[^\s]+"
     return re.sub(pattern, " ", client_args).strip()
 
 
 def client_args_contains_option(client_args: str, option: str) -> bool:
-    return f" {option}" in f" {client_args} "
+    try:
+        tokens = shlex.split(client_args)
+        return option in tokens or any(token.startswith(f"{option}=") for token in tokens)
+    except ValueError:
+        return f" {option}" in f" {client_args} "
 
 
 def client_args_contains_assignment(client_args: str, key: str) -> bool:
-    return f" {key}=" in f" {client_args} "
+    try:
+        return any(token.startswith(f"{key}=") for token in shlex.split(client_args))
+    except ValueError:
+        return f" {key}=" in f" {client_args} "
 
 
 def upsert_property(file_path: Path, key: str, value: str) -> bool:

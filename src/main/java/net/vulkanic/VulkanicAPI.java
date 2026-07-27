@@ -58,6 +58,21 @@ import java.util.function.Supplier;
  * Provides a unified API for graphics operations that can be backed by different graphics APIs.
  */
 public class VulkanicAPI {
+    public record FramebufferProbeSnapshot(
+        byte[] rgba,
+        int readFramebuffer,
+        int drawFramebuffer,
+        int currentProgram,
+        String viewport,
+        boolean depthTest,
+        boolean blend,
+        boolean scissor
+    ) {
+        public FramebufferProbeSnapshot {
+            rgba = java.util.Arrays.copyOf(rgba, rgba.length);
+        }
+    }
+
     private static final String LWJGL_STACK_SIZE_PROPERTY = "org.lwjgl.system.stackSize";
     private static final org.slf4j.Logger LOGGER = net.logging.LogUtils.getLogger();
     private static final int VULKAN_LWJGL_STACK_SIZE_KB = 512;
@@ -6118,6 +6133,14 @@ public class VulkanicAPI {
     
     public static void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, float[] pixels) {
         getBackend().readPixels(ctx, x, y, width, height, format, type, pixels);
+    }
+
+    public static FramebufferProbeSnapshot readDrawFramebufferProbe(int x, int y, int width, int height) {
+        GraphicsBackend backend = getBackend();
+        if (backend instanceof net.vulkanic.backends.opengl.OpenGLBackend openGLBackend) {
+            return openGLBackend.readDrawFramebufferProbe(x, y, width, height);
+        }
+        throw new UnsupportedOperationException("draw framebuffer probe is only available on the OpenGL backend");
     }
     
     public static void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels) {

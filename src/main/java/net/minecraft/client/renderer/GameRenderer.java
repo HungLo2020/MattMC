@@ -36,6 +36,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import net.minecraft.client.PanoramaTheme;
 import net.minecraft.client.Screenshot;
+import net.minecraft.client.dev.DeterministicCameraCapture;
 import net.minecraft.client.entity.ClientAvatarState;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.debug.DebugScreenEntries;
@@ -115,6 +116,9 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	private static final ResourceLocation BLUR_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("blur");
 	public static final int MAX_BLUR_RADIUS = 10;
 	private static final Logger LOGGER = LogUtils.getLogger();
+	private static final boolean BLOCK_OUTLINE_PICK_DIAGNOSTICS = Boolean.getBoolean("mattmc.dev.blockOutlinePickDiagnostics");
+	private static final int BLOCK_OUTLINE_PICK_DIAGNOSTIC_LIMIT = Math.max(0, Integer.getInteger("mattmc.dev.blockOutlinePickDiagnostics.maxLogs", 160));
+	private static int blockOutlinePickDiagnosticLogs;
 	public static final float PROJECTION_Z_NEAR = 0.05F;
 	public static final float PROJECTION_3D_HUD_Z_FAR = 100.0F;
 	private static final float HAND_DEPTH_SCALE = 0.125F;
@@ -421,9 +425,46 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 				HitResult hitResult = this.pick(entity, d, e, f);
 				this.minecraft.hitResult = hitResult;
 				this.minecraft.crosshairPickEntity = hitResult instanceof EntityHitResult entityHitResult ? entityHitResult.getEntity() : null;
+				this.auditBlockOutlinePick(entity, hitResult, d, e, f);
 				Profiler.get().pop();
 			}
 		}
+	}
+
+	private void auditBlockOutlinePick(Entity entity, HitResult hitResult, double blockRange, double entityRange, float partialTick) {
+		if (!BLOCK_OUTLINE_PICK_DIAGNOSTICS || blockOutlinePickDiagnosticLogs >= BLOCK_OUTLINE_PICK_DIAGNOSTIC_LIMIT) {
+			return;
+		}
+		blockOutlinePickDiagnosticLogs++;
+		Vec3 eye = entity.getEyePosition(partialTick);
+		Vec3 location = hitResult == null ? eye : hitResult.getLocation();
+		double distance = location.distanceTo(eye);
+		String blockPos = "none";
+		String face = "none";
+		if (hitResult instanceof BlockHitResult blockHitResult) {
+			blockPos = blockHitResult.getBlockPos().toShortString();
+			face = blockHitResult.getDirection().getSerializedName();
+		}
+		LOGGER.info(
+			"[MattMC graphics-audit] block-outline pick type={} blockPos={} face={} distance={} blockRange={} entityRange={} "
+				+ "eye=({}, {}, {}) yaw={} pitch={} shouldRender={} highContrast={} hideGui={} screen={} overlay={}",
+			hitResult == null ? "null" : hitResult.getType(),
+			blockPos,
+			face,
+			String.format(java.util.Locale.ROOT, "%.4f", distance),
+			String.format(java.util.Locale.ROOT, "%.4f", blockRange),
+			String.format(java.util.Locale.ROOT, "%.4f", entityRange),
+			String.format(java.util.Locale.ROOT, "%.4f", eye.x),
+			String.format(java.util.Locale.ROOT, "%.4f", eye.y),
+			String.format(java.util.Locale.ROOT, "%.4f", eye.z),
+			String.format(java.util.Locale.ROOT, "%.4f", entity.getYRot()),
+			String.format(java.util.Locale.ROOT, "%.4f", entity.getXRot()),
+			this.shouldRenderBlockOutline(),
+			this.minecraft.options.highContrastBlockOutline().get(),
+			this.minecraft.options.hideGui,
+			this.minecraft.screen == null ? "none" : this.minecraft.screen.getClass().getSimpleName(),
+			this.minecraft.getOverlay() == null ? "none" : this.minecraft.getOverlay().getClass().getSimpleName()
+		);
 	}
 
 	private HitResult pick(Entity entity, double d, double e, float f) {
@@ -827,7 +868,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	}
 
 	public boolean renderRustVulkanWholeFrameShell(DeltaTracker deltaTracker, boolean bl) {
-		if (!net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanEnabled()) {
+		if (!net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()) {
 			return false;
 		}
 		if (!VulkanicAPI.isVulkanBackendSelected()) {
@@ -836,6 +877,61 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		ProfilerFiller profilerFiller = Profiler.get();
 		boolean gameLoadFinished = this.minecraft.isGameLoadFinished();
 		this.guiRenderState.reset();
+		net.vulkanic.world.RustGalWorldPrimitiveRenderer.clearFrame();
+		float f = SystemTimeUniforms.isDeterministicTemporalParityEnabled()
+			? SystemTimeUniforms.deterministicTemporalPartialTick()
+			: deltaTracker.getGameTimeDeltaPartialTick(true);
+		if (gameLoadFinished && bl && this.minecraft.level != null && this.minecraft.player != null) {
+			LocalPlayer localPlayer = this.minecraft.player;
+			if (this.minecraft.getCameraEntity() == null) {
+				this.minecraft.setCameraEntity(localPlayer);
+			}
+			this.pick(f);
+			DeterministicCameraCapture.forceBlockOutlineTargetForDiagnostics(this.minecraft);
+			Entity entity = (Entity)(this.minecraft.getCameraEntity() == null ? localPlayer : this.minecraft.getCameraEntity());
+			float g = this.minecraft.level.tickRateManager().isEntityFrozen(entity) ? 1.0F : f;
+			TaczCameraRecoil.apply(this.minecraft);
+			this.mainCamera
+				.setup(this.minecraft.level, entity, !this.minecraft.options.getCameraType().isFirstPerson(), this.minecraft.options.getCameraType().isMirrored(), g);
+			this.extractCamera(f);
+			float h = this.getFov(this.mainCamera, f, true);
+			Matrix4f projection = this.getProjectionMatrix(h);
+			PoseStack poseStack = new PoseStack();
+			areShadersOn = net.irisshaders.iris.Iris.isPackInUseQuick();
+			if (areShadersOn) {
+				poseStack.pushPose();
+				poseStack.last().pose().identity();
+			}
+			this.bobHurt(poseStack, this.mainCamera.getPartialTickTime());
+			if (this.minecraft.options.bobView().get() && !areShadersOn) {
+				this.bobView(poseStack, this.mainCamera.getPartialTickTime());
+			}
+			this.applyScreenShake(poseStack, this.mainCamera.getPartialTickTime());
+			projection.mul(poseStack.last().pose());
+			Quaternionf cameraRotation = this.mainCamera.rotation().conjugate(new Quaternionf());
+			Matrix4f view = new Matrix4f();
+			if (areShadersOn) {
+				PoseStack stack = new PoseStack();
+				stack.last().pose().set(view);
+				float tickDelta = this.mainCamera.getPartialTickTime();
+				this.bobHurt(stack, tickDelta);
+				if (this.minecraft.options.bobView().get()) {
+					this.bobView(stack, tickDelta);
+				}
+				this.applyScreenShake(stack, tickDelta);
+				view.set(stack.last().pose());
+				view.rotate(cameraRotation);
+			} else {
+				view.rotation(cameraRotation);
+			}
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginFrame(
+				view,
+				projection,
+				this.minecraft.getWindow().getWidth(),
+				this.minecraft.getWindow().getHeight()
+			);
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueBlockOutline(this.minecraft, this, this.mainCamera);
+		}
 		profilerFiller.push("rustVulkanWholeFrameGuiExtraction");
 		GuiGraphics guiGraphics = new GuiGraphics(this.minecraft, this.guiRenderState);
 		if (gameLoadFinished && bl && this.minecraft.level != null) {
@@ -938,6 +1034,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		}
 
 		this.pick(f);
+		DeterministicCameraCapture.forceBlockOutlineTargetForDiagnostics(this.minecraft);
 		ProfilerFiller profilerFiller = Profiler.get();
 		profilerFiller.push("center");
 		boolean bl = this.shouldRenderBlockOutline();

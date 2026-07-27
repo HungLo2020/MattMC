@@ -22,7 +22,7 @@ import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 import artifact_retention
 
@@ -976,6 +976,23 @@ def run_dev_capture_script(root: Path) -> Path:
 def remove_client_arg_option(client_args: str, option: str) -> str:
     if not client_args:
         return ""
+    try:
+        tokens = shlex.split(client_args)
+        filtered: list[str] = []
+        skip_next = False
+        for token in tokens:
+            if skip_next:
+                skip_next = False
+                continue
+            if token == option:
+                skip_next = True
+                continue
+            if token.startswith(f"{option}="):
+                continue
+            filtered.append(token)
+        return shlex.join(filtered)
+    except ValueError:
+        pass
     pattern = rf"(^|\s){re.escape(option)}(=[^\s]+|\s+[^\s]+)?"
     return re.sub(pattern, " ", client_args).strip()
 
@@ -983,6 +1000,10 @@ def remove_client_arg_option(client_args: str, option: str) -> str:
 def remove_client_arg_assignment(client_args: str, key: str) -> str:
     if not client_args:
         return ""
+    try:
+        return shlex.join(token for token in shlex.split(client_args) if not token.startswith(f"{key}="))
+    except ValueError:
+        pass
     pattern = rf"(^|\s){re.escape(key)}=[^\s]+"
     return re.sub(pattern, " ", client_args).strip()
 
@@ -1211,6 +1232,12 @@ def has_rust_vulkan_evidence(mode: ModeSpec, logs: str) -> bool:
     )
 
 
+def parse_java_property(text: str, key: str) -> str | None:
+    pattern = re.compile(rf"-D{re.escape(key)}=([^\s'\"\\]+)")
+    match = pattern.search(text)
+    return match.group(1) if match else None
+
+
 def detect_attribution(mode: ModeSpec, meta: dict[str, str], logs: str) -> str:
     explicit = meta.get("implementation_attribution") or meta.get("render_implementation")
     rust_opengl_evidence = has_rust_opengl_evidence(mode, logs)
@@ -1287,6 +1314,66 @@ def deterministic_camera_signature(doc: dict[str, object] | None) -> dict[str, o
     }
 
 
+def deterministic_block_outline_pixel_evidence(doc: dict[str, object] | None, style: object) -> dict[str, object]:
+    evidence: dict[str, object] = {
+        "checked": False,
+        "status": "not_requested",
+        "screenshot": None,
+        "crop": None,
+        "matching_pixels": 0,
+        "threshold": 64,
+    }
+    if not isinstance(doc, dict) or not (
+        doc.get("blockOutlineRealTargetForced") or doc.get("blockOutlineRealTargetAimed")
+    ):
+        return evidence
+    if str(style or "").strip() != "high-contrast":
+        evidence["status"] = "not_high_contrast"
+        return evidence
+    captures = doc.get("captures")
+    if not isinstance(captures, list) or not captures:
+        evidence["status"] = "missing_capture"
+        return evidence
+    first = captures[0]
+    if not isinstance(first, dict) or not first.get("screenshot"):
+        evidence["status"] = "missing_screenshot"
+        return evidence
+    screenshot = Path(str(first["screenshot"]))
+    evidence["screenshot"] = str(screenshot)
+    if not screenshot.is_file():
+        evidence["status"] = "missing_screenshot_file"
+        return evidence
+    try:
+        from PIL import Image
+    except Exception as exc:  # pragma: no cover - depends on local test environment packaging.
+        evidence["status"] = f"pillow_unavailable:{exc}"
+        return evidence
+    try:
+        with Image.open(screenshot) as image:
+            rgb = image.convert("RGB")
+            width, height = rgb.size
+            left = max(0, width // 2 - 160)
+            top = max(0, height // 2 - 140)
+            right = min(width, width // 2 + 160)
+            bottom = min(height, height // 2 + 140)
+            crop = rgb.crop((left, top, right, bottom))
+            matching = 0
+            for red, green, blue in crop.getdata():
+                if red <= 120 and green >= 120 and blue >= 100 and green >= red + 45 and blue >= red + 35:
+                    matching += 1
+            evidence.update(
+                {
+                    "checked": True,
+                    "status": "present" if matching >= int(evidence["threshold"]) else "absent",
+                    "crop": {"left": left, "top": top, "right": right, "bottom": bottom},
+                    "matching_pixels": matching,
+                }
+            )
+    except Exception as exc:
+        evidence["status"] = f"read_failed:{exc}"
+    return evidence
+
+
 def dh_state_from_text(text: str, meta: dict[str, str]) -> dict[str, object]:
     dh_enabled = bool(re.search(r"DistantHorizons|\[DH-|DH Ready|renderLods|renderDeferredLods", text, re.IGNORECASE))
     world_gen_threads = len(re.findall(r"DH-World Gen Thread\[\d+\]", text))
@@ -1317,7 +1404,7 @@ def readiness_state_from_text(
     last_screen = screen_matches[-1] if screen_matches else None
     last_overlay = overlay_matches[-1] if overlay_matches else None
     frame_runtime = frame_doc.get("runtimeState") if isinstance(frame_doc, dict) else None
-    if isinstance(frame_runtime, dict) and frame_doc.get("status") == "complete":
+    if isinstance(frame_runtime, dict):
         runtime_screen = frame_runtime.get("screen")
         runtime_overlay = frame_runtime.get("overlay")
         if isinstance(runtime_screen, str) and runtime_screen:
@@ -1349,13 +1436,15 @@ def readiness_state_from_text(
     required_chunks_loaded = bool(waiting_chunk_counts and waiting_chunk_counts[-1] == 0)
     deterministic_hook_reached = isinstance(deterministic_doc, dict)
     deterministic_ready = deterministic_status == "complete"
+    profile_name = meta.get("world_profile") or "migration-gate"
+    dh_required_for_readiness = profile_name == "stress-diagnostic" or "distant-horizons" in meta.get("deterministic_ready_families", "")
     timeout_classification = None
     if failed_phase:
         if invalid_player_state:
             timeout_classification = "invalid-player-state"
         elif not world_entered_log and not (isinstance(frame_doc, dict) and frame_doc.get("worldEntered")):
             timeout_classification = "loading"
-        elif dh_state.get("generating") and not deterministic_ready:
+        elif dh_required_for_readiness and dh_state.get("generating") and not deterministic_ready:
             timeout_classification = "dh-generation"
         elif tool_kind == "capture" and not deterministic_hook_reached:
             timeout_classification = "capture-hook-not-reached"
@@ -1750,7 +1839,8 @@ def instrumentation_signature(meta: dict[str, str], command: Sequence[str]) -> d
         "shader_input_parity": meta.get("shader_input_parity", "off"),
         "workload_counter_version": WORKLOAD_COUNTER_DEFINITION_VERSION,
         "tool_versions": tool_fingerprint(),
-        "launch_command_uses_renderdoc": bool(command and Path(command[0]).name == "renderdoccmd"),
+        "launch_command_uses_renderdoc": bool(command and Path(command[0]).name == "renderdoccmd")
+        or bool(meta.get("renderdoc_wrapped_actual_game_command")),
     }
 
 
@@ -1912,6 +2002,19 @@ def child_process_timeout_seconds(args: argparse.Namespace) -> int:
     return max(1, per_mode_timeout_seconds(args) - cleanup_budget - 1)
 
 
+def mode_frame_count(value: int, mode: ModeSpec, args: argparse.Namespace, option_name: str) -> int:
+    if option_name in getattr(args, "_provided_options", set()):
+        return value
+    if mode.expected_attribution == "java-vulkan":
+        if option_name == "--warmup-frames":
+            return min(value, 20)
+        if option_name == "--measure-frames":
+            return min(value, 60)
+        if option_name == "--subsystem-iterations":
+            return min(value, 20)
+    return value
+
+
 def timeout_phase_for_artifact(
     tool_kind: str,
     timed_out: bool,
@@ -1987,6 +2090,7 @@ def summarize_renderdoc_capture(summary: dict[str, object] | None) -> dict[str, 
         "resource_formats": summary.get("resource_formats", []),
         "attachments": summary.get("attachments", []),
         "resource_hashes": summary.get("resource_hashes", []),
+        "workload_proof": summary.get("workload_proof", {}),
         "diagnosis": summary.get("diagnosis", {}),
         "failure": summary.get("failure"),
     }
@@ -2041,7 +2145,9 @@ def normalize_capture_artifact(
     renderdoc_doc = read_json(files["renderdoc_summary"]) if files["renderdoc_summary"] else None
     tracy_doc = read_json(files["tracy_summary"]) if files["tracy_summary"] else None
     effective_meta = {**shader_summary, **meta}
-    launch_uses_renderdoc = bool(command and Path(command[0]).name == "renderdoccmd")
+    launch_uses_renderdoc = bool(command and Path(command[0]).name == "renderdoccmd") or bool(
+        effective_meta.get("renderdoc_wrapped_actual_game_command")
+    )
     if isinstance(renderdoc_doc, dict) or launch_uses_renderdoc:
         effective_meta.setdefault("graphics_run_type", "renderdoc-capture")
         effective_meta["renderdoc_capture"] = "true"
@@ -2162,6 +2268,57 @@ def normalize_capture_artifact(
         isinstance(deterministic_doc, dict)
         and deterministic_doc.get("status") == "complete"
     )
+    requested_world_outline_scenario = ""
+    if isinstance(deterministic_doc, dict):
+        requested_world_outline_scenario = str(deterministic_doc.get("rustGalWorldOutlineScenario") or "")
+    if not requested_world_outline_scenario:
+        requested_world_outline_scenario = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldOutline.scenario") or ""
+    requested_world_outline_scenario = requested_world_outline_scenario.strip()
+    requested_world_outline_real_target = False
+    requested_world_outline_aim_real_target = False
+    if isinstance(deterministic_doc, dict):
+        requested_world_outline_real_target = bool(deterministic_doc.get("blockOutlineRealTargetForced"))
+        requested_world_outline_aim_real_target = bool(deterministic_doc.get("blockOutlineRealTargetAimed"))
+    if not requested_world_outline_real_target:
+        requested_world_outline_real_target = (
+            parse_java_property(combined_logs, "mattmc.dev.deterministicCameraCapture.blockOutlineTarget") == "true"
+        )
+    if not requested_world_outline_aim_real_target:
+        requested_world_outline_aim_real_target = (
+            parse_java_property(combined_logs, "mattmc.dev.deterministicCameraCapture.blockOutlineAimTarget") == "true"
+        )
+    requested_world_outline_style = (
+        (deterministic_doc or {}).get("rustGalWorldOutlineStyle") if isinstance(deterministic_doc, dict) else None
+    )
+    if not requested_world_outline_style and (requested_world_outline_real_target or requested_world_outline_aim_real_target):
+        requested_world_outline_style = "high-contrast" if (
+            parse_java_property(combined_logs, "mattmc.dev.deterministicCameraCapture.blockOutlineHighContrast") == "true"
+        ) else "normal"
+    saved_view_outline_target_required = (
+        parse_java_property(combined_logs, "mattmc.dev.blockOutlineSavedViewTargetRequired") == "true"
+    )
+    world_outline_pixel_evidence = deterministic_block_outline_pixel_evidence(
+        deterministic_doc,
+        requested_world_outline_style,
+    )
+    rust_gal_world_batches_for_validation = last_number(
+        combined_logs, r"rust_gal_world_primitive_batches_executed[=: ]+(\d+)"
+    )
+    rust_gal_world_segments_for_validation = last_number(
+        combined_logs, r"rust_gal_world_line_segments_executed[=: ]+(\d+)"
+    )
+    rust_gal_world_vertices_for_validation = last_number(
+        combined_logs, r"rust_gal_world_line_vertices_executed[=: ]+(\d+)"
+    )
+    rust_gal_world_draws_for_validation = last_number(
+        combined_logs, r"rust_gal_world_primitive_draws_executed[=: ]+(\d+)"
+    )
+    rust_gal_world_depth_creates_for_validation = last_number(
+        combined_logs, r"rust_gal_world_depth_attachment_creates[=: ]+(\d+)"
+    )
+    rust_gal_world_depth_reuses_for_validation = last_number(
+        combined_logs, r"rust_gal_world_depth_attachment_reuses[=: ]+(\d+)"
+    )
     validation_messages: list[str] = []
     if not files["meta"]:
         validation_messages.append("capture metadata is missing")
@@ -2185,6 +2342,83 @@ def normalize_capture_artifact(
         validation_messages.append("isolated subsystem benchmark did not complete all required workloads")
     if tool_kind == "capture" and not deterministic_complete:
         validation_messages.append("deterministic correctness capture did not complete")
+    world_outline_workload_complete = True
+    rust_shell_outline_mode = mode.backend == "rust-vulkan"
+    java_outline_route = None
+    if mode.backend in {"opengl", "rust-opengl"}:
+        java_outline_route = "java-opengl"
+    elif mode.backend == "vulkan":
+        java_outline_route = "java-vulkan"
+    outline_target_requested = requested_world_outline_real_target or requested_world_outline_aim_real_target or (
+        bool(requested_world_outline_scenario) and requested_world_outline_scenario != "no-target"
+    )
+    if outline_target_requested and rust_shell_outline_mode:
+        required_outline_counts = {
+            "primitive batches": rust_gal_world_batches_for_validation,
+            "line segments": rust_gal_world_segments_for_validation,
+            "line vertices": rust_gal_world_vertices_for_validation,
+            "world draws": rust_gal_world_draws_for_validation,
+            "depth attachment creates": rust_gal_world_depth_creates_for_validation,
+        }
+        missing_outline_counts = [
+            name for name, value in required_outline_counts.items() if int(value or 0) <= 0
+        ]
+        if missing_outline_counts:
+            world_outline_workload_complete = False
+            validation_messages.append(
+                "deterministic Rust-GAL world-outline target requested but no non-zero "
+                + ", ".join(missing_outline_counts)
+                + " evidence was captured"
+            )
+    elif outline_target_requested and java_outline_route:
+        java_extract_seen = f"block-outline extract route={java_outline_route} target=true" in combined_logs
+        java_draw_seen = f"block-outline draw route={java_outline_route} retained=true" in combined_logs
+        if not java_extract_seen or not java_draw_seen:
+            world_outline_workload_complete = False
+            missing = []
+            if not java_extract_seen:
+                missing.append("target extraction")
+            if not java_draw_seen:
+                missing.append("outline draw")
+            validation_messages.append(
+                f"deterministic Java block-outline target requested for {java_outline_route} but missing "
+                + ", ".join(missing)
+                + " evidence"
+            )
+    elif saved_view_outline_target_required and java_outline_route:
+        java_pick_seen = "block-outline pick type=BLOCK" in combined_logs
+        java_extract_seen = f"block-outline extract route={java_outline_route} target=true" in combined_logs
+        java_draw_seen = f"block-outline draw route={java_outline_route} retained=true" in combined_logs
+        if not java_pick_seen or not java_extract_seen or not java_draw_seen:
+            world_outline_workload_complete = False
+            missing = []
+            if not java_pick_seen:
+                missing.append("real BLOCK pick")
+            if not java_extract_seen:
+                missing.append("target extraction")
+            if not java_draw_seen:
+                missing.append("outline draw")
+            validation_messages.append(
+                f"saved-view Java block-outline target required for {java_outline_route} but missing "
+                + ", ".join(missing)
+                + " evidence"
+            )
+    elif requested_world_outline_scenario == "no-target" and int(rust_gal_world_segments_for_validation or 0) != 0:
+        world_outline_workload_complete = False
+        validation_messages.append("deterministic no-target outline scenario emitted unexpected world line segments")
+    elif requested_world_outline_scenario == "no-target" and java_outline_route:
+        java_draw_seen = f"block-outline draw route={java_outline_route} retained=true" in combined_logs
+        if java_draw_seen:
+            world_outline_workload_complete = False
+            validation_messages.append(f"deterministic no-target outline scenario emitted unexpected {java_outline_route} draw")
+    if (requested_world_outline_real_target or requested_world_outline_aim_real_target) and requested_world_outline_style == "high-contrast":
+        if world_outline_pixel_evidence.get("status") != "present":
+            world_outline_workload_complete = False
+            validation_messages.append(
+                "deterministic real-target high-contrast block outline did not produce visible outline-colored pixels "
+                f"(pixel evidence status={world_outline_pixel_evidence.get('status')}, "
+                f"matching_pixels={world_outline_pixel_evidence.get('matching_pixels')})"
+            )
     instrumentation = benchmark_fingerprint["instrumentation"]
     run_type = instrumentation.get("run_type") if isinstance(instrumentation, dict) else "clean-performance"
     diagnostic_hooks = bool(instrumentation.get("diagnostic_hooks")) if isinstance(instrumentation, dict) else False
@@ -2195,9 +2429,45 @@ def normalize_capture_artifact(
     if isinstance(instrumentation, dict) and instrumentation.get("renderdoc", {}).get("enabled"):
         if renderdoc_summary.get("status") != "complete":
             validation_messages.append("RenderDoc capture/replay did not complete")
+        proof = renderdoc_summary.get("workload_proof") if isinstance(renderdoc_summary, dict) else {}
+        if requested_world_outline_scenario and requested_world_outline_scenario != "no-target":
+            if not isinstance(proof, dict) or not proof.get("non_zero_outline_workload"):
+                validation_messages.append("RenderDoc capture did not prove non-zero Rust-GAL outline workload")
+            if not isinstance(proof, dict) or not proof.get("acquired_rendered_presented_image_identity_matches"):
+                validation_messages.append("RenderDoc capture did not prove acquired/rendered/presented image identity")
+            if not isinstance(proof, dict) or not proof.get("depth_attachment_evidence"):
+                validation_messages.append("RenderDoc capture did not prove depth attachment use")
+            if not isinstance(proof, dict) or not proof.get("outline_marker_evidence"):
+                validation_messages.append("RenderDoc capture did not prove outline marker/work evidence")
+            if isinstance(proof, dict) and proof.get("blue_diagnostic_shell_clear_expected"):
+                validation_messages.append("Rust Vulkan shell blue diagnostic clear is expected; this is not full world rendering")
     if isinstance(instrumentation, dict) and instrumentation.get("tracy", {}).get("enabled"):
         if tracy_summary.get("status") != "complete":
             validation_messages.append("Tracy capture did not complete")
+    java_vulkan_has_rust_shell = mode.expected_attribution == "java-vulkan" and (
+        "mattmc.dev.rustGalVulkanWholeFrame=true" in combined_logs
+        or "Rust VulkanicGAL whole-frame" in combined_logs
+        or "gal.frame.acquire backend=vulkan" in combined_logs
+    )
+    rust_shell_has_java_vulkan_frame = mode.expected_attribution == "rust-vulkan" and bool(
+        re.search(r"Vulkan beginFramebufferRenderPass|Java Vulkan beginFrame|Java Vulkan endFrame|presentTextureToScreen", combined_logs)
+    )
+    if java_vulkan_has_rust_shell:
+        validation_messages.append("normal Java Vulkan control launched Rust whole-frame shell")
+    if rust_shell_has_java_vulkan_frame:
+        validation_messages.append("Rust whole-frame shell executed Java Vulkan frame/present work")
+    renderdoc_workload_assertions_complete = True
+    if isinstance(instrumentation, dict) and instrumentation.get("renderdoc", {}).get("enabled") and requested_world_outline_scenario and requested_world_outline_scenario != "no-target":
+        proof = renderdoc_summary.get("workload_proof") if isinstance(renderdoc_summary, dict) else {}
+        renderdoc_workload_assertions_complete = isinstance(proof, dict) and all(
+            bool(proof.get(key))
+            for key in (
+                "non_zero_outline_workload",
+                "acquired_rendered_presented_image_identity_matches",
+                "depth_attachment_evidence",
+                "outline_marker_evidence",
+            )
+        )
     if meta.get("migration_gate_blocking", "true").lower() != "true":
         validation_messages.append("stress-diagnostic artifact is non-blocking for routine producer migration gates")
     hard_errors_absent = (
@@ -2268,6 +2538,12 @@ def normalize_capture_artifact(
     rust_gal_batches = last_number(combined_logs, r"rust_gal_batches_executed[=: ]+(\d+)")
     rust_gal_sprite_batches = last_number(combined_logs, r"rust_gal_sprite_batches_executed[=: ]+(\d+)")
     rust_gal_packed_sprites = last_number(combined_logs, r"rust_gal_packed_sprites_executed[=: ]+(\d+)")
+    rust_gal_world_batches = last_number(combined_logs, r"rust_gal_world_primitive_batches_executed[=: ]+(\d+)")
+    rust_gal_world_segments = last_number(combined_logs, r"rust_gal_world_line_segments_executed[=: ]+(\d+)")
+    rust_gal_world_vertices = last_number(combined_logs, r"rust_gal_world_line_vertices_executed[=: ]+(\d+)")
+    rust_gal_world_draws = last_number(combined_logs, r"rust_gal_world_primitive_draws_executed[=: ]+(\d+)")
+    rust_gal_world_depth_creates = last_number(combined_logs, r"rust_gal_world_depth_attachment_creates[=: ]+(\d+)")
+    rust_gal_world_depth_reuses = last_number(combined_logs, r"rust_gal_world_depth_attachment_reuses[=: ]+(\d+)")
     rust_gal_ffi_calls = last_number(combined_logs, r"ffi(?:_call)?_count[=: ]+(\d+)")
     rust_gal_ffi_bytes = last_number(combined_logs, r"ffi(?:_bytes| bytes)[=: ]+(\d+)")
     gui_asset_resolutions = [
@@ -2413,9 +2689,13 @@ def normalize_capture_artifact(
         and world_entered
         and subsystem_complete
         and deterministic_complete
+        and world_outline_workload_complete
         and validation_layer_exercised
         and renderdoc_complete
+        and renderdoc_workload_assertions_complete
         and tracy_complete
+        and not java_vulkan_has_rust_shell
+        and not rust_shell_has_java_vulkan_frame
         and hard_errors_absent
     )
     artifact = {
@@ -2481,6 +2761,12 @@ def normalize_capture_artifact(
             },
             "rust_gal_slice": {
                 "producer": last_text(combined_logs, r"Rust (?:OpenGL )?VulkanicGAL GUI (?:batch|frame) executed producer=([^ ]+)"),
+                "world_outline_scenario": requested_world_outline_scenario or None,
+                "world_outline_real_target": requested_world_outline_real_target,
+                "world_outline_aim_real_target": requested_world_outline_aim_real_target,
+                "world_outline_style": requested_world_outline_style,
+                "world_outline_depth_policy": (deterministic_doc or {}).get("rustGalWorldOutlineDepthPolicy") if isinstance(deterministic_doc, dict) else None,
+                "world_outline_pixel_evidence": world_outline_pixel_evidence,
                 "cache_hits": last_number(combined_logs, r"rust_gal_cache_hits[=: ]+(\d+)"),
                 "cache_misses": last_number(combined_logs, r"rust_gal_cache_misses[=: ]+(\d+)"),
                 "queue_depth": last_number(combined_logs, r"rust_gal_queue_depth[=: ]+(\d+)"),
@@ -2488,6 +2774,12 @@ def normalize_capture_artifact(
                 "batches_executed": rust_gal_batches,
                 "sprite_batches_executed": rust_gal_sprite_batches,
                 "packed_sprites_executed": rust_gal_packed_sprites,
+                "world_primitive_batches_executed": rust_gal_world_batches,
+                "world_line_segments_executed": rust_gal_world_segments,
+                "world_line_vertices_executed": rust_gal_world_vertices,
+                "world_primitive_draws_executed": rust_gal_world_draws,
+                "world_depth_attachment_creates": rust_gal_world_depth_creates,
+                "world_depth_attachment_reuses": rust_gal_world_depth_reuses,
                 "batches_cancelled": last_number(combined_logs, r"rust_gal_batches_cancelled[=: ]+(\d+)"),
                 "completion_polls": last_number(combined_logs, r"rust_gal_completion_polls[=: ]+(\d+)"),
                 "completion_timeouts": last_number(combined_logs, r"rust_gal_completion_timeouts[=: ]+(\d+)"),
@@ -2724,19 +3016,19 @@ def diagnose_renderdoc_capture_failure(capture_dir: Path, capture_path: Path | N
         for pattern in ("latest_tail_*.log", "latest_*.log", "runClient_*.log"):
             for path in sorted(capture_dir.glob(pattern))[-2:]:
                 try:
-                    log_text += "\n" + path.read_text(encoding="utf-8", errors="replace")[-200000:]
+                    log_text += "\n" + path.read_text(encoding="utf-8", errors="replace")[-2_000_000:]
                 except OSError:
                     pass
         if log_text:
             break
         time.sleep(0.2)
-    end_results = re.findall(r"Ended RenderDoc frame capture \(([^)]+)\) result=([0-9-]+)", log_text)
+    end_results = re.findall(r"Ended RenderDoc frame capture \(([^)]+)\).*?result=([0-9-]+)", log_text)
     triggered = re.findall(r"Triggered RenderDoc capture for next deterministic frame \(([^)]+)\)", log_text)
     started = re.findall(r"Started RenderDoc frame capture \(([^)]+)\)", log_text)
     initialized = "RenderDoc API initialized" in log_text
     present = bool(capture_path and capture_path.exists())
     likely_cause = None
-    if initialized and started and end_results and not present:
+    if initialized and (triggered or started or end_results) and not present:
         likely_cause = "RenderDoc API was reached and the deterministic workload ran, but no .rdc was persisted."
     elif not initialized:
         likely_cause = "RenderDoc API did not initialize before the run ended."
@@ -2756,7 +3048,132 @@ def diagnose_renderdoc_capture_failure(capture_dir: Path, capture_path: Path | N
     }
 
 
+def renderdoc_workload_proof(capture_dir: Path) -> dict[str, object]:
+    log_text = ""
+    for pattern in ("latest_tail_*.log", "latest_*.log", "runClient_*.log"):
+        for path in sorted(capture_dir.glob(pattern))[-2:]:
+            try:
+                log_text += "\n" + path.read_text(encoding="utf-8", errors="replace")[-400000:]
+            except OSError:
+                pass
+    outline_counts = {
+        "primitive_batches": last_number(log_text, r"rust_gal_world_primitive_batches_executed[=: ]+(\d+)"),
+        "line_segments": last_number(log_text, r"rust_gal_world_line_segments_executed[=: ]+(\d+)"),
+        "line_vertices": last_number(log_text, r"rust_gal_world_line_vertices_executed[=: ]+(\d+)"),
+        "world_draws": last_number(log_text, r"rust_gal_world_primitive_draws_executed[=: ]+(\d+)"),
+        "depth_attachment_creates": last_number(log_text, r"rust_gal_world_depth_attachment_creates[=: ]+(\d+)"),
+        "depth_attachment_reuses": last_number(log_text, r"rust_gal_world_depth_attachment_reuses[=: ]+(\d+)"),
+    }
+    acquired = [
+        {
+            "correlation": int(correlation),
+            "frame": int(frame),
+            "image": int(image),
+        }
+        for correlation, frame, image in re.findall(
+            r"gal\.frame\.acquire backend=vulkan correlation=(\d+) frame=(\d+) image=(\d+)",
+            log_text,
+        )
+    ]
+    begun = [
+        {
+            "frame": int(frame),
+            "image": int(image),
+            "view": view,
+            "width": int(width),
+            "height": int(height),
+            "clear": [float(red), float(green), float(blue), float(alpha)],
+        }
+        for frame, image, view, width, height, red, green, blue, alpha in re.findall(
+            r"gal\.frame\.target\.begin backend=vulkan frame=(\d+) image=(\d+) view=0x([0-9a-fA-F]+) extent=(\d+)x(\d+) "
+            r"layout=-?\d+ load=-?\d+ clear=([0-9.\\-]+),([0-9.\\-]+),([0-9.\\-]+),([0-9.\\-]+)",
+            log_text,
+        )
+    ]
+    begun.extend(
+        {
+            "frame": int(frame),
+            "image": int(image),
+            "view": None,
+            "width": int(width),
+            "height": int(height),
+            "clear": [float(red), float(green), float(blue), float(alpha)],
+        }
+        for frame, image, width, height, red, green, blue, alpha in re.findall(
+            r"gal\.frame\.target\.begin backend=vulkan frame=(\d+) image=(\d+) extent=(\d+)x(\d+) "
+            r"clear=([0-9.\\-]+),([0-9.\\-]+),([0-9.\\-]+),([0-9.\\-]+)",
+            log_text,
+        )
+    )
+    present_ready = [
+        {"frame": int(frame), "image": int(image)}
+        for frame, image in re.findall(
+            r"gal\.frame\.target\.present-ready backend=vulkan frame=(\d+) image=(\d+)",
+            log_text,
+        )
+    ]
+    presented = [
+        {
+            "correlation": int(correlation),
+            "frame": int(frame),
+            "image": int(image),
+            "submission": int(submission),
+            "status": status,
+        }
+        for correlation, frame, image, submission, status in re.findall(
+            r"gal\.frame\.present backend=vulkan correlation=(\d+) frame=(\d+) image=(\d+) submission=(\d+) status=([A-Za-z0-9_]+)",
+            log_text,
+        )
+    ]
+    identity_matches = False
+    if acquired and begun and present_ready and presented:
+        acquired_by_frame = {item["frame"]: item["image"] for item in acquired}
+        begun_by_frame = {item["frame"]: item["image"] for item in begun}
+        ready_by_frame = {item["frame"]: item["image"] for item in present_ready}
+        presented_by_frame = {item["frame"]: item["image"] for item in presented}
+        common = set(acquired_by_frame) & set(begun_by_frame) & set(ready_by_frame) & set(presented_by_frame)
+        identity_matches = any(
+            acquired_by_frame[frame] == begun_by_frame[frame] == ready_by_frame[frame] == presented_by_frame[frame]
+            for frame in common
+        )
+    blue_clear_expected = "expected=blue-diagnostic-shell" in log_text or any(
+        abs(item["clear"][0] - 0.08) < 0.01
+        and abs(item["clear"][1] - 0.31) < 0.01
+        and abs(item["clear"][2] - 0.74) < 0.01
+        or abs(item["clear"][0] - 0.063) < 0.01
+        and abs(item["clear"][1] - 0.157) < 0.01
+        and abs(item["clear"][2] - 0.855) < 0.01
+        for item in begun
+    )
+    java_vulkan_frame_markers = len(
+        re.findall(r"Vulkan beginFramebufferRenderPass|begin_frame_call_count|Java Vulkan beginFrame|Java Vulkan endFrame|presentTextureToScreen", log_text)
+    )
+    rust_shell_markers = len(
+        re.findall(r"mattmc\.dev\.rustGalVulkanWholeFrame=true|Rust VulkanicGAL whole-frame|backend=rust-vulkan|gal\.frame\.acquire backend=vulkan", log_text)
+    )
+    return {
+        "outline": outline_counts,
+        "non_zero_outline_workload": all(
+            int(outline_counts[key] or 0) > 0
+            for key in ("primitive_batches", "line_segments", "line_vertices", "world_draws", "depth_attachment_creates")
+        ),
+        "depth_attachment_evidence": int(outline_counts["depth_attachment_creates"] or 0) > 0
+        or int(outline_counts["depth_attachment_reuses"] or 0) > 0,
+        "outline_marker_evidence": "minecraft.world.block-outline" in log_text
+        or int(outline_counts["world_draws"] or 0) > 0,
+        "acquired_images": acquired[-5:],
+        "rendered_images": begun[-5:],
+        "present_ready_images": present_ready[-5:],
+        "presented_images": presented[-5:],
+        "acquired_rendered_presented_image_identity_matches": identity_matches,
+        "blue_diagnostic_shell_clear_expected": blue_clear_expected,
+        "java_vulkan_frame_marker_count": java_vulkan_frame_markers,
+        "rust_shell_marker_count": rust_shell_markers,
+    }
+
+
 def write_renderdoc_summary(capture_dir: Path, status: str, capture_path: Path | None = None, failure: str | None = None) -> Path:
+    workload_proof = renderdoc_workload_proof(capture_dir)
     summary = {
         "schema": "mattmc-renderdoc-summary-v1",
         "status": status,
@@ -2778,6 +3195,7 @@ def write_renderdoc_summary(capture_dir: Path, status: str, capture_path: Path |
         "resource_formats": [],
         "attachments": [],
         "resource_hashes": [],
+        "workload_proof": workload_proof,
         "diagnosis": diagnose_renderdoc_capture_failure(capture_dir, capture_path) if status != "complete" else {},
         "failure": failure,
     }
@@ -3511,6 +3929,7 @@ def replay_renderdoc_summary(capture_dir: Path, capture_path: Path) -> Path:
     draw_count = len(re.findall(r"\bDraw(?:Indexed|Instanced)?\b", result.stdout))
     dispatch_count = len(re.findall(r"\bDispatch\b", result.stdout))
     pass_count = len(re.findall(r"RenderPass|render pass|BeginPass", result.stdout, re.IGNORECASE))
+    workload_proof = renderdoc_workload_proof(capture_dir)
     summary = {
         "schema": "mattmc-renderdoc-summary-v1",
         "status": "complete",
@@ -3532,6 +3951,7 @@ def replay_renderdoc_summary(capture_dir: Path, capture_path: Path) -> Path:
         "resource_formats": [],
         "attachments": [],
         "resource_hashes": [],
+        "workload_proof": workload_proof,
         "diagnosis": {
             "cli_only_replay": True,
             "fallback_text_replay": True,
@@ -3570,7 +3990,7 @@ def build_capture_command(
     base_client_args = remove_client_arg_assignment(base_client_args, "enableShaders")
     client_arg_parts = [base_client_args]
     if run_dev_capture_entrypoint(target.root)[0] == "shell":
-        client_arg_parts.append(f"--quickPlaySingleplayer={args.world}")
+        client_arg_parts.append(f"--quickPlaySingleplayer={shlex.quote(args.world)}")
         client_arg_parts.append("--width 1280")
         client_arg_parts.append("--height 720")
     client_arg_parts.append(f"enableShaders={'true' if mode.shaders == 'on' else 'false'}")
@@ -3715,6 +4135,26 @@ def build_capture_command(
     if getattr(args, "mount_health_rows", None) is not None:
         java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.mountHealthRows={args.mount_health_rows}")
         java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.mountHealthRows={args.mount_health_rows}")
+    if kind == "shell" and tool_kind == "capture" and workload_profile in {"correctness", "moving-camera", "settled-static"}:
+        deterministic_stamp = timestamp()
+        deterministic_metadata = capture_dir / f"deterministic_camera_capture_{deterministic_stamp}.json"
+        deterministic_screenshot_dir = capture_dir / f"deterministic_camera_capture_{deterministic_stamp}"
+        target_git_commit = command_text(["git", "rev-parse", "HEAD"], cwd=target.root).strip() or "unknown"
+        env["MATTMC_DETERMINISTIC_METADATA"] = str(deterministic_metadata)
+        env["MATTMC_DETERMINISTIC_SCREENSHOT_DIR"] = str(deterministic_screenshot_dir)
+        java_options.extend(
+            [
+                "-Dmattmc.dev.deterministicCameraCapture=true",
+                f"-Dmattmc.dev.deterministicCameraCapture.metadata={deterministic_metadata}",
+                f"-Dmattmc.dev.deterministicCameraCapture.screenshotDir={deterministic_screenshot_dir}",
+                f"-Dmattmc.dev.deterministicCameraCapture.shaderEnabled={'true' if mode.shaders == 'on' else 'false'}",
+                "-Dmattmc.dev.deterministicCameraCapture.shaderPack=ComplementaryHungLoIfied.zip",
+                f"-Dmattmc.dev.deterministicCameraCapture.gitCommit={target_git_commit}",
+                f"-Dmattmc.dev.deterministicCameraCapture.world={args.world}",
+                "-Dmattmc.dev.deterministicCameraCapture.stopAfterComplete=true",
+                "-Dmattmc.dev.deterministicCameraCapture.ackTimeoutFrames=12000",
+            ]
+        )
     if getattr(args, "player_heart_variant", None):
         java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.playerHeartVariant={args.player_heart_variant}")
     if getattr(args, "player_heart_flash", False):
@@ -3726,6 +4166,26 @@ def build_capture_command(
     if getattr(args, "game_mode", None):
         java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.gameMode={args.game_mode}")
         java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.gameMode={args.game_mode}")
+    if getattr(args, "world_outline_scenario", ""):
+        java_options.append("-Dmattmc.dev.blockOutlineDiagnostics=true")
+        java_options.append(f"-Dmattmc.dev.rustGalWorldOutline.scenario={args.world_outline_scenario}")
+        java_options.append(f"-Dmattmc.dev.rustGalWorldOutline.style={args.world_outline_style}")
+        java_options.append(f"-Dmattmc.dev.rustGalWorldOutline.depthPolicy={args.world_outline_depth_policy}")
+        if getattr(args, "world_outline_depth_probe", False):
+            java_options.append("-Dmattmc.dev.rustGalWorldOutline.depthProbe=true")
+    if getattr(args, "world_outline_real_target", False):
+        java_options.append("-Dmattmc.dev.blockOutlineDiagnostics=true")
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.blockOutlineTarget=true")
+        if getattr(args, "world_outline_style", "normal") == "high-contrast":
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.blockOutlineHighContrast=true")
+    if getattr(args, "world_outline_aim_real_target", False):
+        java_options.append("-Dmattmc.dev.blockOutlineDiagnostics=true")
+        java_options.append("-Dmattmc.dev.blockOutlinePickDiagnostics=true")
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.blockOutlineAimTarget=true")
+        if getattr(args, "world_outline_style", "normal") == "high-contrast":
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.blockOutlineHighContrast=true")
+    if getattr(args, "block_outline_pick_diagnostics", False):
+        java_options.append("-Dmattmc.dev.blockOutlinePickDiagnostics=true")
     rust_gal_gui_control = getattr(args, "rust_gal_gui_control", "rust")
     if rust_gal_gui_control == "disabled":
         java_options.append("-Dmattmc.dev.rustGalGui.disabled=true")
@@ -3757,14 +4217,16 @@ def build_capture_command(
         java_options.append("-Dmattmc.dev.rustGalGui.mountHealth.legacyControl=true")
     if tool_kind == "gameplay":
         frame_status = capture_dir / f"graphics_frame_benchmark_{timestamp()}.json"
+        warmup_frames = mode_frame_count(args.warmup_frames, mode, args, "--warmup-frames")
+        measure_frames = mode_frame_count(args.measure_frames, mode, args, "--measure-frames")
         java_options.extend(
             [
                 "-Dmattmc.dev.graphicsFrameBenchmark=true",
                 f"-Dmattmc.dev.graphicsFrameBenchmark.status={frame_status}",
                 f"-Dmattmc.dev.graphicsFrameBenchmark.settleFrames={args.settle_frames}",
                 f"-Dmattmc.dev.graphicsFrameBenchmark.maxSettleFrames={args.max_settle_frames}",
-                f"-Dmattmc.dev.graphicsFrameBenchmark.warmupFrames={args.warmup_frames}",
-                f"-Dmattmc.dev.graphicsFrameBenchmark.measureFrames={args.measure_frames}",
+                f"-Dmattmc.dev.graphicsFrameBenchmark.warmupFrames={warmup_frames}",
+                f"-Dmattmc.dev.graphicsFrameBenchmark.measureFrames={measure_frames}",
                 f"-Dmattmc.dev.graphicsFrameBenchmark.readinessTimeoutSeconds={getattr(args, 'readiness_timeout_seconds', RUNTIME_PROFILES['standard'].readiness_timeout_seconds)}",
                 f"-Dmattmc.dev.graphicsFrameBenchmark.workloadProfile={workload_profile}",
                 f"-Dmattmc.dev.graphicsFrameBenchmark.world={args.world}",
@@ -3776,11 +4238,12 @@ def build_capture_command(
         env["MATTMC_GRAPHICS_GAMEPLAY_BENCHMARK"] = "true"
     if tool_kind == "subsystem":
         subsystem_status = capture_dir / f"graphics_subsystem_benchmark_{timestamp()}.json"
+        subsystem_iterations = mode_frame_count(args.subsystem_iterations, mode, args, "--subsystem-iterations")
         java_options.extend(
             [
                 "-Dmattmc.dev.graphicsSubsystemBenchmark=true",
                 f"-Dmattmc.dev.graphicsSubsystemBenchmark.status={subsystem_status}",
-                f"-Dmattmc.dev.graphicsSubsystemBenchmark.iterations={args.subsystem_iterations}",
+                f"-Dmattmc.dev.graphicsSubsystemBenchmark.iterations={subsystem_iterations}",
                 f"-Dmattmc.dev.graphicsSubsystemBenchmark.backend={mode.backend}",
                 f"-Dmattmc.dev.graphicsSubsystemBenchmark.shaders={mode.shaders}",
             ]
@@ -3819,6 +4282,7 @@ def build_capture_command(
             [
                 "-Dmattmc.dev.graphicsAuditSliceMetrics=true",
                 "-Dmattmc.dev.renderdocCapture=true",
+                f"-Dmattmc.dev.renderdocCapture.backend={mode.backend}",
                 f"-Dmattmc.dev.renderdocCapture.pathTemplate={renderdoc_template}",
             ]
         )
@@ -3837,18 +4301,8 @@ def build_capture_command(
             env["VK_LOADER_LAYERS_ENABLE"] = "VK_LAYER_RENDERDOC_Capture"
             env["MATTMC_RENDERDOC_VULKAN_LAYER_MANIFEST"] = str(renderdoc_layer)
         if renderdoc:
-            command = [
-                renderdoc,
-                "capture",
-                "-d",
-                str(target.root),
-                "-w",
-                "--opt-hook-children",
-                "--opt-api-validation",
-                "-c",
-                str(renderdoc_template),
-                *command,
-            ]
+            env["MATTMC_RENDERDOC_CMD"] = renderdoc
+            env["MATTMC_RENDERDOC_CAPTURE_TEMPLATE"] = str(renderdoc_template)
             env["MATTMC_RENDERDOC_CAPTURE_PATH"] = str(renderdoc_capture)
         else:
             env["MATTMC_RENDERDOC_CAPTURE_PATH"] = str(renderdoc_capture)
@@ -3982,6 +4436,8 @@ def run_mode(
     managed_run_root = output_path.parent
     retention_policy = getattr(args, "_retention_policy", None)
     if retention_policy is not None and not args.dry_run:
+        if not args.artifact_preserve:
+            artifact_retention.remove_copied_game_dirs(retention_policy.root)
         artifact_retention.preflight_disk_budget(
             retention_policy,
             artifact_retention.estimated_run_bytes(
@@ -4348,6 +4804,7 @@ def run_mode(
         except RuntimeError as quota_error:
             error = error or str(quota_error)
             artifact_retention.write_quota_failure(retention_policy.root, managed_run_root, str(quota_error))
+        artifact_retention.remove_generated_temp_dirs_for_capture(retention_policy.root, capture_dir)
         artifact_retention.cleanup(retention_policy, after_run=managed_run_root)
     capture_meta = artifact.get("capture") if isinstance(artifact.get("capture"), dict) else {}
     failed_phase = capture_meta.get("failed_phase") if isinstance(capture_meta.get("failed_phase"), str) else timed_out_phase
@@ -4612,6 +5069,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         subparser.add_argument("--artifact-root", type=Path, help="Managed root for generated graphics-audit artifacts.")
         subparser.add_argument("--artifact-dir", type=Path)
         subparser.add_argument("--artifact-preserve", action="store_true", help="Opt out of automatic retention cleanup for this run.")
+        subparser.add_argument("--artifact-preserve-current-run", action="store_true", help="Keep this run's extracted evidence while still cleaning managed temporary game dirs.")
         subparser.add_argument("--artifact-global-limit-mb", type=int)
         subparser.add_argument("--artifact-run-limit-mb", type=int)
         subparser.add_argument("--artifact-reserve-mb", type=int)
@@ -4668,6 +5126,44 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         subparser.add_argument("--player-heart-regeneration", action="store_true", help="Force regeneration bounce state for correctness captures.")
         subparser.add_argument("--game-mode", choices=("survival", "creative", "adventure", "spectator"), help="Force a deterministic player game mode for gameplay/capture controls.")
         subparser.add_argument(
+            "--world-outline-scenario",
+            choices=("full-cube", "partial-shape", "disconnected-shape", "no-target"),
+            default=os.environ.get("MATTMC_WORLD_OUTLINE_SCENARIO", ""),
+            help="Force a deterministic Rust-GAL block-outline world primitive scenario for whole-frame Vulkan captures.",
+        )
+        subparser.add_argument(
+            "--world-outline-style",
+            choices=("normal", "high-contrast"),
+            default=os.environ.get("MATTMC_WORLD_OUTLINE_STYLE", "normal"),
+            help="Select the deterministic block-outline style.",
+        )
+        subparser.add_argument(
+            "--world-outline-depth-policy",
+            choices=("disabled", "test-write"),
+            default=os.environ.get("MATTMC_WORLD_OUTLINE_DEPTH_POLICY", "test-write"),
+            help="Select the semantic depth policy for deterministic block-outline captures.",
+        )
+        subparser.add_argument(
+            "--world-outline-depth-probe",
+            action="store_true",
+            help="Add deterministic overlapping line probes to prove visible/occluded depth behavior.",
+        )
+        subparser.add_argument(
+            "--world-outline-real-target",
+            action="store_true",
+            help="Force Minecraft's real hit-result path to target a deterministic block for Java/Rust outline visibility captures.",
+        )
+        subparser.add_argument(
+            "--world-outline-aim-real-target",
+            action="store_true",
+            help="Aim the deterministic camera at a real block while leaving GameRenderer.pick() to produce the hit result.",
+        )
+        subparser.add_argument(
+            "--block-outline-pick-diagnostics",
+            action="store_true",
+            help="Enable bounded normal GameRenderer.pick() diagnostics for interactive block-outline investigation.",
+        )
+        subparser.add_argument(
             "--gui-resource-pack-scenario",
             choices=("vanilla", "pack-a", "pack-b", "priority-a-b", "priority-b-a", "missing", "malformed", "unsupported"),
             default=os.environ.get("MATTMC_GUI_RESOURCE_PACK_SCENARIO", ""),
@@ -4703,6 +5199,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     for tool in TOOL_KINDS:
         add_common(subparsers.add_parser(tool))
     args = parser.parse_args(incoming)
+    args._provided_options = provided_options
     if not args.world:
         args.world = WORLD_PROFILES[args.world_profile].world
     profile = RUNTIME_PROFILES[args.profile]
@@ -4725,6 +5222,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     for option, (field, default_value) in profile_defaults.items():
         if option not in provided_options or getattr(args, field) is None:
             setattr(args, field, default_value)
+    if args.tool == "gameplay" and args.world_profile == "migration-gate":
+        if "--settle-frames" not in provided_options:
+            args.settle_frames = 0
+        if "--max-settle-frames" not in provided_options:
+            args.max_settle_frames = min(args.max_settle_frames, 120)
     if args.timeout_seconds > profile.hard_timeout_seconds:
         raise SystemExit(
             f"{args.profile} profile hard limit is {profile.hard_timeout_seconds}s per mode; "
@@ -4834,6 +5336,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args._retention_policy = retention_policy
     artifact_root = args.artifact_dir.resolve() if args.artifact_dir else retention_policy.root / args.tool / timestamp()
     artifact_root.mkdir(parents=True, exist_ok=True)
+    if args.artifact_preserve_current_run and not args.dry_run:
+        (artifact_root / ".preserve").write_text("current validation evidence\n", encoding="utf-8")
     results: list[MatrixResult] = []
     tools_to_run = ("gameplay", "capture", "subsystem") if args.tool == "matrix" else (args.tool,)
     for mode in selected_modes(args):

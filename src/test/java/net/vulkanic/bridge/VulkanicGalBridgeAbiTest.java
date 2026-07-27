@@ -15,6 +15,7 @@ import net.vulkanic.gui.MountHeartVariant;
 import net.vulkanic.gui.PlayerHeartRequest;
 import net.vulkanic.gui.PlayerHeartVariant;
 import net.vulkanic.gui.RustGalGuiRenderer;
+import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 import org.junit.jupiter.api.Test;
 
 import java.lang.foreign.Arena;
@@ -80,6 +81,57 @@ class VulkanicGalBridgeAbiTest {
 			RustGalGuiRenderer.GuiExecutionRoute.DISABLED,
 			RustGalGuiRenderer.selectExecutionRouteForTests(true, true, true, false)
 		);
+	}
+
+	@Test
+	void blockOutlineRouteKeepsJavaPathsOutsideRustVulkanShell() {
+		assertEquals(
+			RustGalWorldPrimitiveRenderer.BlockOutlineRoute.JAVA_COMPATIBILITY,
+			RustGalWorldPrimitiveRenderer.selectBlockOutlineRouteForTests(false, false)
+		);
+		assertEquals(
+			RustGalWorldPrimitiveRenderer.BlockOutlineRoute.JAVA_COMPATIBILITY,
+			RustGalWorldPrimitiveRenderer.selectBlockOutlineRouteForTests(false, true)
+		);
+		assertEquals(
+			RustGalWorldPrimitiveRenderer.BlockOutlineRoute.JAVA_COMPATIBILITY,
+			RustGalWorldPrimitiveRenderer.selectBlockOutlineRouteForTests(true, false)
+		);
+		assertEquals(
+			RustGalWorldPrimitiveRenderer.BlockOutlineRoute.RUST_VULKAN_WHOLE_FRAME,
+			RustGalWorldPrimitiveRenderer.selectBlockOutlineRouteForTests(true, true)
+		);
+	}
+
+	@Test
+	void wholeFrameWorldPrimitiveRouteIsVulkanShellOnlyAndCoarse() throws Exception {
+		String bridge = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java"));
+		String guiRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
+		String worldRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+		String gameRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
+		String rustFfi = Files.readString(Path.of("src/main/rust/render/vulkanic/ffi.rs"));
+		String rustWorldFrontend = Files.readString(Path.of("src/main/rust/render/vulkanic/world_primitive_frontend.rs"));
+
+		assertTrue(bridge.contains("mattmc_vulkanic_gal_whole_frame_submit"));
+		assertTrue(bridge.contains("record WorldLineSegmentRecord"));
+		assertTrue(bridge.contains("List<WorldLineSegmentRecord> worldSegments"));
+		assertTrue(guiRenderer.contains("bridge.submitWholeFrame"));
+		assertTrue(guiRenderer.contains("isWholeFrameVulkanActive()"));
+		assertTrue(gameRenderer.contains("renderRustVulkanWholeFrameShell"));
+		assertTrue(gameRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueBlockOutline"));
+		assertTrue(worldRenderer.contains("BlockOutlineRoute.JAVA_COMPATIBILITY"));
+		assertTrue(worldRenderer.contains("BlockOutlineRoute.RUST_VULKAN_WHOLE_FRAME"));
+		assertTrue(worldRenderer.contains("shape.forAllEdges"));
+		assertFalse(worldRenderer.contains("CommandOp"));
+		assertFalse(worldRenderer.contains("Vk"));
+		assertFalse(worldRenderer.contains("GL_"));
+		assertTrue(rustFfi.contains("FfiWorldLineSegmentRequest"));
+		assertTrue(rustFfi.contains("decode_whole_frame_submit"));
+		assertTrue(rustFfi.contains("context.world_primitive_frontend"));
+		assertTrue(rustWorldFrontend.contains("PrimitiveTopology::Lines"));
+		assertTrue(rustWorldFrontend.contains("WorldPrimitiveFrontend"));
+		assertTrue(rustWorldFrontend.contains("submit_whole_frame"));
+		assertTrue(rustWorldFrontend.contains("unsupported_feature"));
 	}
 
 	@Test
@@ -309,10 +361,10 @@ class VulkanicGalBridgeAbiTest {
 		assertEquals(9, VulkanicGalBridge.HANDLE_GRAPHICS_PIPELINE);
 		assertEquals(13, VulkanicGalBridge.HANDLE_FRAME_TARGET);
 		assertTrue(queue.contains("GUI_CROSSHAIR"));
-			assertTrue(queue.contains("GUI_HOTBAR_BASE"));
-			assertTrue(queue.contains("GUI_HOTBAR_SELECTION"));
-			assertTrue(queue.contains("GUI_ARMOR"));
-			assertTrue(queue.contains("GUI_EXPERIENCE_BAR_BACKGROUND"));
+		assertTrue(queue.contains("GUI_HOTBAR_BASE"));
+		assertTrue(queue.contains("GUI_HOTBAR_SELECTION"));
+		assertTrue(queue.contains("GUI_ARMOR"));
+		assertTrue(queue.contains("GUI_EXPERIENCE_BAR_BACKGROUND"));
 		assertTrue(queue.contains("GUI_EXPERIENCE_BAR_PROGRESS"));
 		assertTrue(queue.contains("GUI_BOSS_BAR_BACKGROUND"));
 		assertTrue(queue.contains("GUI_BOSS_BAR_PROGRESS"));
@@ -322,10 +374,10 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(queue.contains("EXPERIENCE_BAR_BACKGROUND"));
 		assertTrue(queue.contains("EXPERIENCE_BAR_PROGRESS"));
 		assertTrue(queue.contains("enqueuePlayerHearts"));
-			assertTrue(queue.contains("enqueueHotbarBase"));
-			assertTrue(queue.contains("enqueueHotbarSelection"));
-			assertTrue(queue.contains("enqueueArmorIcons"));
-			assertTrue(queue.contains("enqueueExperienceBar"));
+		assertTrue(queue.contains("enqueueHotbarBase"));
+		assertTrue(queue.contains("enqueueHotbarSelection"));
+		assertTrue(queue.contains("enqueueArmorIcons"));
+		assertTrue(queue.contains("enqueueExperienceBar"));
 		assertTrue(queue.contains("enqueueBossBar"));
 		assertFalse(bridge.contains("guiAlphaPipeline"));
 		assertFalse(bridge.contains("guiInvertPipeline"));
@@ -350,22 +402,23 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(rustGuiFrontend.contains("fn packed_uniform_bytes"));
 		assertTrue(rustGuiFrontend.contains("const VERTEX_SHADER"));
 		assertTrue(rustGuiFrontend.contains("const FRAGMENT_SHADER"));
-		assertTrue(queue.contains("GLFW.glfwGetCurrentContext()"));
+		assertTrue(queue.contains("VulkanicGalBridge.isBorrowedOpenGlContextCurrent"));
+		assertTrue(bridge.contains("GLFW.glfwGetCurrentContext()"));
 		assertFalse(queue.contains("beginFramePass(frameResources.pass(), frameResources.target())"));
 		assertFalse(queue.contains("frameResourcesFor("));
 		assertFalse(queue.contains("GuiBatchBuilder.packCompatibleSpriteBatches"));
 		assertTrue(queue.contains("bridge.submitGuiFrame"));
 		assertTrue(rustGuiFrontend.contains("CommandOp::DrawIndexed"));
 		assertTrue(rustGuiFrontend.contains("TextureGroup::Alpha"));
-			assertTrue(queue.contains("rust_gal_sprite_batches_executed"));
-			assertTrue(queue.contains("GuiExecutionRoute.JAVA_COMPATIBILITY"));
-			assertTrue(queue.contains("Rust VulkanicGAL GUI enqueue requested while route is"));
+		assertTrue(queue.contains("rust_gal_sprite_batches_executed"));
+		assertTrue(queue.contains("GuiExecutionRoute.JAVA_COMPATIBILITY"));
+		assertTrue(queue.contains("Rust VulkanicGAL GUI enqueue requested while route is"));
 		assertTrue(gameRenderer.contains("RustGalGuiRenderer.resize"));
 		assertTrue(gameRenderer.contains("RustGalGuiRenderer.shutdown"));
 		assertTrue(gui.contains("RustGalGuiRenderer.enqueueCrosshair"));
-			assertTrue(gui.contains("RustGalGuiRenderer.enqueueHotbarBase"));
-			assertTrue(gui.contains("RustGalGuiRenderer.enqueueArmorIcons"));
-			assertTrue(experienceBar.contains("RustGalGuiRenderer.enqueueExperienceBar"));
+		assertTrue(gui.contains("RustGalGuiRenderer.enqueueHotbarBase"));
+		assertTrue(gui.contains("RustGalGuiRenderer.enqueueArmorIcons"));
+		assertTrue(experienceBar.contains("RustGalGuiRenderer.enqueueExperienceBar"));
 		assertTrue(bossOverlay.contains("RustGalGuiRenderer.enqueueBossBar"));
 		assertTrue(bossOverlay.contains("drawString(this.minecraft.font"));
 		assertTrue(guiRenderer.contains("RustGalGuiElementRenderState"));
@@ -399,6 +452,7 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(queue.contains("SCHEDULER.cancelAll(\"resource-reload\")"));
 		assertTrue(queue.contains("SCHEDULER.cancelAll(\"resize\")"));
 		assertTrue(queue.contains("SCHEDULER.cancelAll(\"shutdown\")"));
+		assertTrue(queue.contains("mattmc.rustGal.gui.enabled"));
 		assertTrue(queue.contains("mattmc.rustGal.guiCrosshair.enabled"));
 		assertTrue(queue.contains("rust_gal_ffi_resource_batch_calls"));
 		assertTrue(queue.contains("collectResolvedAssets(ResourceManager resourceManager)"));
@@ -425,20 +479,20 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(queue.contains("ATTACK_CROSSHAIR_PROGRESS_PRODUCER"));
 		assertTrue(queue.contains("ATTACK_HOTBAR_BACKGROUND_PRODUCER"));
 		assertTrue(queue.contains("ATTACK_HOTBAR_PROGRESS_PRODUCER"));
-			assertTrue(queue.contains("BOSS_BAR_BACKGROUND_PRODUCER"));
-			assertTrue(queue.contains("BOSS_BAR_PROGRESS_PRODUCER"));
-			assertTrue(queue.contains("ARMOR_ICON_PRODUCER"));
-			assertTrue(queue.contains("PLAYER_HEART_PRODUCER"));
-			assertTrue(queue.contains("HUNGER_ICON_PRODUCER"));
-			assertTrue(queue.contains("ABSORPTION_HEART_PRODUCER"));
-			assertTrue(queue.contains("selected hotbar slot must be in 0..8"));
-			assertTrue(queue.contains("armor value must be in 0..20"));
-			assertTrue(queue.contains("PlayerHeartRequest"));
-			assertTrue(queue.contains("AbsorptionHeartRequest"));
-			assertFalse(queue.contains("getHealth()"));
-			assertFalse(queue.contains("getMaxHealth()"));
-			assertFalse(queue.contains("getAbsorptionAmount()"));
-			assertTrue(queue.contains("experience progress fraction must be finite"));
+		assertTrue(queue.contains("BOSS_BAR_BACKGROUND_PRODUCER"));
+		assertTrue(queue.contains("BOSS_BAR_PROGRESS_PRODUCER"));
+		assertTrue(queue.contains("ARMOR_ICON_PRODUCER"));
+		assertTrue(queue.contains("PLAYER_HEART_PRODUCER"));
+		assertTrue(queue.contains("HUNGER_ICON_PRODUCER"));
+		assertTrue(queue.contains("ABSORPTION_HEART_PRODUCER"));
+		assertTrue(queue.contains("selected hotbar slot must be in 0..8"));
+		assertTrue(queue.contains("armor value must be in 0..20"));
+		assertTrue(queue.contains("PlayerHeartRequest"));
+		assertTrue(queue.contains("AbsorptionHeartRequest"));
+		assertFalse(queue.contains("getHealth()"));
+		assertFalse(queue.contains("getMaxHealth()"));
+		assertFalse(queue.contains("getAbsorptionAmount()"));
+		assertTrue(queue.contains("experience progress fraction must be finite"));
 		assertTrue(queue.contains("experience bar filled width is outside the vanilla range"));
 		assertTrue(queue.contains("crosshair attack indicator filled width must be in 0..16"));
 		assertTrue(queue.contains("hotbar attack indicator filled height must be in 0..18"));
@@ -570,8 +624,10 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(bridge.contains("WINDOWED_VULKAN_CONTEXT_CREATE(49)"));
 		assertTrue(queue.contains("createWindowedVulkan"));
 		assertTrue(queue.contains("executeWholeFrameVulkan"));
-		assertTrue(queue.contains("GLFWNativeX11.glfwGetX11Window"));
-		assertTrue(queue.contains("GLFWNativeWayland.glfwGetWaylandWindow"));
+		assertFalse(queue.contains("GLFWNativeX11.glfwGetX11Window"));
+		assertFalse(queue.contains("GLFWNativeWayland.glfwGetWaylandWindow"));
+		assertTrue(bridge.contains("GLFWNativeX11.glfwGetX11Window"));
+		assertTrue(bridge.contains("GLFWNativeWayland.glfwGetWaylandWindow"));
 		assertTrue(minecraft.contains("renderRustVulkanWholeFrameShell"));
 		assertTrue(minecraft.contains("game.rendering.rust-vulkan-whole-frame"));
 		assertTrue(gameRenderer.contains("rustVulkanWholeFrameGuiExtraction"));
@@ -579,8 +635,8 @@ class VulkanicGalBridgeAbiTest {
 		int shellStart = gameRenderer.indexOf("renderRustVulkanWholeFrameShell");
 		int shellEnd = gameRenderer.indexOf("private void tryTakeScreenshotIfNeeded", shellStart);
 		assertFalse(gameRenderer.substring(shellStart, shellEnd).contains("renderLevel(deltaTracker)"));
-		assertTrue(renderSystem.contains("RustGalVulkanWholeFrameMode.enabled()"));
-		assertTrue(renderSystem.indexOf("RustGalVulkanWholeFrameMode.enabled()") < renderSystem.indexOf("VulkanicAPI.beginFrame()"));
+		assertTrue(renderSystem.contains("RustGalVulkanWholeFrameMode.enabledForBackend"));
+		assertTrue(renderSystem.indexOf("RustGalVulkanWholeFrameMode.enabledForBackend") < renderSystem.indexOf("VulkanicAPI.beginFrame()"));
 		assertTrue(window.contains("RustGalVulkanWholeFrameMode.enabled()"));
 		assertTrue(vulkanicApi.contains("Java Vulkan beginFrame is disabled while Rust owns whole-frame Vulkan presentation"));
 		assertTrue(vulkanicApi.contains("Java Vulkan presentTextureToScreen is disabled while Rust owns whole-frame Vulkan presentation"));

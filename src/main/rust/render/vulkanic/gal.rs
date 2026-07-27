@@ -1040,7 +1040,7 @@ impl VulkanicGal {
                 }
                 Some(HandleKind::FrameTarget) => {
                     let target = self.frame_targets.get(desc.target)?;
-                    (vec![target.desc.color_format], None)
+                    (vec![target.desc.color_format], desc.depth_format)
                 }
                 _ => {
                     return self.validation_error(GalError::resource(
@@ -1400,7 +1400,25 @@ impl VulkanicGal {
                         }
                     };
                     let (expected_colors, expected_depth) = if frame_target {
-                        (Vec::new(), None)
+                        let pass_depth = self.render_pass_desc(*pass)?.depth_format;
+                        if let Some(format) = pass_depth {
+                            let attachment = depth_stencil.as_ref().ok_or_else(|| {
+                                GalError::command(
+                                    StatusCode::InvalidArgument,
+                                    "frame-target pass with depth format requires a depth attachment",
+                                )
+                            })?;
+                            let info = self.texture_view_info(attachment.view)?;
+                            if info.format != format {
+                                return self.validation_error(GalError::command(
+                                    StatusCode::InvalidArgument,
+                                    "frame-target pass depth attachment format does not match render pass",
+                                ));
+                            }
+                            (Vec::new(), Some(attachment.view))
+                        } else {
+                            (Vec::new(), None)
+                        }
                     } else {
                         let target_record = self.render_targets.get(*target)?;
                         (
