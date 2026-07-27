@@ -496,7 +496,7 @@ public class Gui {
 					int i = 15;
 					if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
 						// Dev-only measurement control: no migrated or legacy crosshair draw.
-					} else if (RustGalGuiRenderer.isMigratedGuiLegacyControl()) {
+					} else if (RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()) {
 						guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_SPRITE, (guiGraphics.guiWidth() - i) / 2, (guiGraphics.guiHeight() - i) / 2, i, i);
 					} else {
 						RustGalGuiRenderer.enqueueCrosshair(this.minecraft, guiGraphics, (guiGraphics.guiWidth() - i) / 2, (guiGraphics.guiHeight() - i) / 2, i, i);
@@ -515,7 +515,7 @@ public class Gui {
 							if (bl) {
 								if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
 									// Dev-only measurement control: no migrated or legacy attack indicator draw.
-								} else if (RustGalGuiRenderer.isMigratedGuiLegacyControl()) {
+								} else if (RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()) {
 									guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_ATTACK_INDICATOR_FULL_SPRITE, k, j, 16, 16);
 								} else {
 									RustGalGuiRenderer.enqueueCrosshairAttackIndicator(this.minecraft, guiGraphics, k, j, f, 16, true);
@@ -524,7 +524,7 @@ public class Gui {
 								int l = crosshairAttackIndicatorFilledWidth(f);
 								if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
 									// Dev-only measurement control: no migrated or legacy attack indicator draw.
-								} else if (RustGalGuiRenderer.isMigratedGuiLegacyControl()) {
+								} else if (RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()) {
 									guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_ATTACK_INDICATOR_BACKGROUND_SPRITE, k, j, 16, 4);
 									guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_ATTACK_INDICATOR_PROGRESS_SPRITE, 16, 4, 0, 0, k, j, l, 4);
 								} else {
@@ -647,7 +647,7 @@ public class Gui {
 			int k = 91;
 			if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
 				// Dev-only measurement control: no migrated or legacy hotbar base draw.
-			} else if (RustGalGuiRenderer.isMigratedGuiLegacyControl()) {
+			} else if (RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()) {
 				guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_SPRITE, i - 91, guiGraphics.guiHeight() - 22, 182, 22);
 			} else {
 				RustGalGuiRenderer.enqueueHotbarBase(this.minecraft, guiGraphics, i - 91, guiGraphics.guiHeight() - 22, 182, 22);
@@ -657,7 +657,7 @@ public class Gui {
 			int selectedSlotY = selectedHotbarHighlightY(guiGraphics.guiHeight());
 			if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
 				// Dev-only measurement control: no migrated or legacy selected-slot highlight draw.
-			} else if (RustGalGuiRenderer.isMigratedGuiLegacyControl()) {
+			} else if (RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()) {
 				guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_SELECTION_SPRITE, selectedSlotX, selectedSlotY, 24, 23);
 			} else {
 				RustGalGuiRenderer.enqueueHotbarSelection(this.minecraft, guiGraphics, selectedSlot, selectedSlotX, selectedSlotY, 24, 23);
@@ -699,7 +699,7 @@ public class Gui {
 					int p = hotbarAttackIndicatorFilledHeight(f);
 					if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
 						// Dev-only measurement control: no migrated or legacy attack indicator draw.
-					} else if (RustGalGuiRenderer.isMigratedGuiLegacyControl()) {
+					} else if (RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()) {
 						guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_ATTACK_INDICATOR_BACKGROUND_SPRITE, o, n, 18, 18);
 						guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_ATTACK_INDICATOR_PROGRESS_SPRITE, 18, 18, 0, 18 - p, o, n + 18 - p, 18, p);
 					} else {
@@ -1030,7 +1030,7 @@ public class Gui {
 
 			if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() || RustGalGuiRenderer.isArmorDisabledForDiagnostics()) {
 				// Dev-only measurement control: no migrated or legacy armor icon draw.
-			} else if (RustGalGuiRenderer.isMigratedGuiLegacyControl() || RustGalGuiRenderer.isArmorLegacyControl()) {
+			} else if (RustGalGuiRenderer.shouldDrawJavaCompatibilityGui() || RustGalGuiRenderer.isArmorLegacyControl()) {
 				for (int o = 0; o < 10; o++) {
 					int p = l + o * 8;
 					if (o * 2 + 1 < m) {
@@ -1060,9 +1060,9 @@ public class Gui {
 		int q = Mth.ceil(o / 2.0);
 		int r = p * 2;
 		boolean playerHeartsDisabled = RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() || RustGalGuiRenderer.isPlayerHealthDisabledForDiagnostics();
-		boolean playerHeartsLegacy = RustGalGuiRenderer.isMigratedGuiLegacyControl() || RustGalGuiRenderer.isPlayerHealthLegacyControl();
+		boolean playerHeartsLegacy = RustGalGuiRenderer.shouldDrawJavaCompatibilityGui() || RustGalGuiRenderer.isPlayerHealthLegacyControl();
 		boolean absorptionHeartsDisabled = RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() || RustGalGuiRenderer.isAbsorptionHealthDisabledForDiagnostics();
-		boolean absorptionHeartsLegacy = RustGalGuiRenderer.isMigratedGuiLegacyControl() || RustGalGuiRenderer.isAbsorptionHealthLegacyControl();
+		boolean absorptionHeartsLegacy = RustGalGuiRenderer.shouldDrawJavaCompatibilityGui() || RustGalGuiRenderer.isAbsorptionHealthLegacyControl();
 		boolean migratePlayerHearts = !playerHeartsDisabled && !playerHeartsLegacy;
 		boolean migrateAbsorptionHearts = !absorptionHeartsDisabled && !absorptionHeartsLegacy;
 		List<PlayerHeartRequest> rustPlayerHearts = migratePlayerHearts ? new ArrayList<>() : List.of();
@@ -1209,7 +1209,7 @@ public class Gui {
 			}
 
 			boolean airDisabled = RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() || RustGalGuiRenderer.isAirDisabledForDiagnostics();
-			boolean airLegacy = RustGalGuiRenderer.isMigratedGuiLegacyControl() || RustGalGuiRenderer.isAirLegacyControl();
+			boolean airLegacy = RustGalGuiRenderer.shouldDrawJavaCompatibilityGui() || RustGalGuiRenderer.isAirLegacyControl();
 			boolean migrateAir = !airDisabled && !airLegacy;
 			List<AirBubbleRequest> rustAirBubbles = migrateAir ? new ArrayList<>() : List.of();
 			int airOrder = 0;
@@ -1272,7 +1272,7 @@ public class Gui {
 		boolean hungerEffect = diagnosticFoodHungerEffect(player);
 		boolean forceJitter = diagnosticFoodJitter();
 		boolean hungerDisabled = RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() || RustGalGuiRenderer.isHungerDisabledForDiagnostics();
-		boolean hungerLegacy = RustGalGuiRenderer.isMigratedGuiLegacyControl() || RustGalGuiRenderer.isHungerLegacyControl();
+		boolean hungerLegacy = RustGalGuiRenderer.shouldDrawJavaCompatibilityGui() || RustGalGuiRenderer.isHungerLegacyControl();
 		boolean migrateHunger = !hungerDisabled && !hungerLegacy;
 		List<HungerIconRequest> rustHungerIcons = migrateHunger ? new ArrayList<>() : List.of();
 		int rustHungerOrder = 0;
@@ -1365,7 +1365,7 @@ public class Gui {
 			int l = guiGraphics.guiWidth() / 2 + 91;
 			int m = k;
 			boolean mountHealthDisabled = RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() || RustGalGuiRenderer.isMountHealthDisabledForDiagnostics();
-			boolean mountHealthLegacy = RustGalGuiRenderer.isMigratedGuiLegacyControl() || RustGalGuiRenderer.isMountHealthLegacyControl();
+			boolean mountHealthLegacy = RustGalGuiRenderer.shouldDrawJavaCompatibilityGui() || RustGalGuiRenderer.isMountHealthLegacyControl();
 			boolean migrateMountHealth = !mountHealthDisabled && !mountHealthLegacy;
 			List<MountHeartRequest> rustMountHearts = migrateMountHealth ? new ArrayList<>() : List.of();
 			int rustMountHeartOrder = 0;

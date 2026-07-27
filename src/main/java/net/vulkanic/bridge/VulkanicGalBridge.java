@@ -21,6 +21,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 
 	public static final int BACKEND_VULKAN = 1;
 	public static final int BACKEND_OPENGL = 2;
+	public static final int WINDOW_PLATFORM_X11 = 1;
+	public static final int WINDOW_PLATFORM_WAYLAND = 2;
 
 	public static final long FEATURE_GRAPHICS = 1L << 0;
 	public static final long FEATURE_DESCRIPTOR_ARRAYS = 1L << 2;
@@ -124,6 +126,51 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			int status = Native.contextCreateBorrowedOpenGl(request, result);
 			if (status != STATUS_OK) {
 				throw new IllegalStateException("Rust VulkanicGAL borrowed OpenGL context creation failed: status=" + status + ": " + Native.lastError(0));
+			}
+			long contextId = Struct.CONTEXT_RESULT.getLong(result, 3);
+			VulkanicGalBridge bridge = new VulkanicGalBridge(arena, contextId, BRIDGE_FEATURES | FEATURE_PRESENTATION);
+			bridge.queryCapabilities();
+			return bridge;
+		} catch (RuntimeException error) {
+			arena.close();
+			throw error;
+		}
+	}
+
+	public static VulkanicGalBridge createWindowedVulkan(
+		long stableWindowId,
+		int windowPlatform,
+		long nativeDisplay,
+		long nativeWindow,
+		int width,
+		int height
+	) {
+		if (stableWindowId == 0L || nativeDisplay == 0L || nativeWindow == 0L) {
+			throw new IllegalArgumentException("windowed Vulkan context requires non-zero window handles");
+		}
+		Arena arena = Arena.ofConfined();
+		try {
+			MemorySegment request = Struct.WINDOWED_VULKAN_CONTEXT_CREATE.allocate(arena);
+			Abi.writeHeader(request, Struct.WINDOWED_VULKAN_CONTEXT_CREATE);
+			Struct.WINDOWED_VULKAN_CONTEXT_CREATE.setInt(request, 1, windowPlatform);
+			boolean rustTracy = Boolean.getBoolean("mattmc.dev.tracyCapture") || Boolean.getBoolean("mattmc.dev.rustGalVulkanWholeFrame.tracy");
+			Struct.WINDOWED_VULKAN_CONTEXT_CREATE.setInt(request, 2, rustTracy ? 1 : 0);
+			Struct.WINDOWED_VULKAN_CONTEXT_CREATE.setLong(request, 3, stableWindowId);
+			Struct.WINDOWED_VULKAN_CONTEXT_CREATE.setLong(request, 4, nativeDisplay);
+			Struct.WINDOWED_VULKAN_CONTEXT_CREATE.setLong(request, 5, nativeWindow);
+			Abi.writeBytes(arena, request, Struct.WINDOWED_VULKAN_CONTEXT_CREATE, 6, "java-frame-rust-vulkan-windowed");
+			Abi.writeBytes(arena, request, Struct.WINDOWED_VULKAN_CONTEXT_CREATE, 7, "minecraft.rust-vulkan.whole-frame");
+			long extent = Struct.WINDOWED_VULKAN_CONTEXT_CREATE.offset(8);
+			request.set(ValueLayout.JAVA_INT, extent, width);
+			request.set(ValueLayout.JAVA_INT, extent + 4, height);
+			request.set(ValueLayout.JAVA_INT, extent + 8, 1);
+			Struct.WINDOWED_VULKAN_CONTEXT_CREATE.setInt(request, 9, FORMAT_RGBA8);
+			Struct.WINDOWED_VULKAN_CONTEXT_CREATE.setInt(request, 10, 3);
+			Struct.WINDOWED_VULKAN_CONTEXT_CREATE.setInt(request, 11, 2);
+			MemorySegment result = Struct.CONTEXT_RESULT.allocate(arena);
+			int status = Native.contextCreateWindowedVulkan(request, result);
+			if (status != STATUS_OK) {
+				throw new IllegalStateException("Rust VulkanicGAL windowed Vulkan context creation failed: status=" + status + ": " + Native.lastError(0));
 			}
 			long contextId = Struct.CONTEXT_RESULT.getLong(result, 3);
 			VulkanicGalBridge bridge = new VulkanicGalBridge(arena, contextId, BRIDGE_FEATURES | FEATURE_PRESENTATION);
@@ -318,9 +365,6 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		List<GuiSpriteRecord> sprites
 	) {
 		Objects.requireNonNull(sprites, "sprites");
-		if (sprites.isEmpty()) {
-			throw new IllegalArgumentException("GUI frame submission requires at least one sprite");
-		}
 		MemorySegment spriteArray = Struct.GUI_SPRITE_REQUEST.array(arena, sprites.size());
 		for (int i = 0; i < sprites.size(); i++) {
 			GuiSpriteRecord sprite = sprites.get(i);
@@ -529,6 +573,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		private static final MethodHandle LAYOUT = downcall("mattmc_vulkanic_gal_abi_struct_layout", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
 		private static final MethodHandle CONTEXT_CREATE = downcall("mattmc_vulkanic_gal_context_create", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle CONTEXT_CREATE_BORROWED_OPENGL = downcall("mattmc_vulkanic_gal_context_create_borrowed_opengl", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+		private static final MethodHandle CONTEXT_CREATE_WINDOWED_VULKAN = downcall("mattmc_vulkanic_gal_context_create_windowed_vulkan", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle CONTEXT_DESTROY = downcall("mattmc_vulkanic_gal_context_destroy", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
 		private static final MethodHandle CAPABILITIES = downcall("mattmc_vulkanic_gal_capabilities", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle RESOURCE_BATCH = downcall("mattmc_vulkanic_gal_resource_batch", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
@@ -570,6 +615,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				return (int) CONTEXT_CREATE_BORROWED_OPENGL.invokeExact(request, out);
 			} catch (Throwable throwable) {
 				throw new IllegalStateException("Failed to create borrowed Rust VulkanicGAL OpenGL context", throwable);
+			}
+		}
+
+		static int contextCreateWindowedVulkan(MemorySegment request, MemorySegment out) {
+			try {
+				return (int) CONTEXT_CREATE_WINDOWED_VULKAN.invokeExact(request, out);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to call VulkanicGAL windowed Vulkan context create ABI", throwable);
 			}
 		}
 
@@ -745,7 +798,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			GUI_FRAME_SUBMIT(45),
 			GUI_FRAME_SUBMIT_RESULT(46),
 			GUI_ASSET_PAYLOAD(47),
-			GUI_ASSET_UPDATE(48);
+			GUI_ASSET_UPDATE(48),
+			WINDOWED_VULKAN_CONTEXT_CREATE(49);
 
 		private final int id;
 		private final int byteSize;

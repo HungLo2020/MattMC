@@ -50,6 +50,17 @@ public class RenderSystem {
 			net.vulkanic.VulkanicAPI.pollEvents();
 		}
 
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			Tesselator.getInstance().clear();
+			if (tracyFrameCapture != null) {
+				tracyFrameCapture.endFrame();
+			}
+			net.vulkanic.VulkanicAPI.resetDynamicUniforms();
+			Minecraft.getInstance().levelRenderer.endFrame();
+			net.vulkanic.VulkanicAPI.pollEvents();
+			return;
+		}
+
 		boolean vulkanBackendSelected = net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
 		boolean vulkanFrameAcquired = false;
 		if (vulkanBackendSelected) {

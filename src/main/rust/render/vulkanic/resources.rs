@@ -40,7 +40,7 @@ pub enum TextureDimension {
 }
 
 #[repr(u32)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum TextureFormat {
     Rgba8Unorm = 1,
     Bgra8Unorm = 2,

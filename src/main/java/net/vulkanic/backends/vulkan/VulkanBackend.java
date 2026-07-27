@@ -18,6 +18,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.sodium.client.render.chunk.shader.SharedChunkProgramOverrides;
 import net.vulkanic.CommandContext;
+import net.vulkanic.GraphicsBackend;
 import net.vulkanic.GraphicsBackendType;
 import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.PipelineHandle;
@@ -225,6 +226,7 @@ public class VulkanBackend {
     private volatile CommandContext currentCommandContext;
     private volatile long auxiliaryOpenGlContextWindow = MemoryUtil.NULL;
     private volatile net.blaze3d.opengl.GlDevice compatibilityDevice;
+    private volatile GraphicsBackend compatibilityBackend;
     private volatile boolean rendererDebuggingEnabled;
 
     private final SpirvCompiler spirvCompiler;
@@ -718,16 +720,47 @@ void main() {
         BiFunction<net.minecraft.resources.ResourceLocation, ShaderType, String> defaultShaderSource,
         boolean debugLabelsEnabled
     ) {
-        net.blaze3d.opengl.GlDevice compatibilityDevice = new net.blaze3d.opengl.GlDevice(
-            rendererBootstrapWindowHandle,
-            debugVerbosity,
-            debugEnabled,
-            defaultShaderSource,
-            debugLabelsEnabled
-        );
+        boolean compatibilityOnly = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+        GraphicsBackend compatibilityBackend = compatibilityOnly
+            ? net.vulkanic.VulkanicAPI.createOpenGlCompatibilityBackendForVulkanShell()
+            : null;
+        net.blaze3d.opengl.GlDevice compatibilityDevice = compatibilityOnly
+            ? net.vulkanic.VulkanicAPI.withScopedBackendOverride(
+                compatibilityBackend,
+                () -> new net.blaze3d.opengl.GlDevice(
+                    rendererBootstrapWindowHandle,
+                    debugVerbosity,
+                    debugEnabled,
+                    defaultShaderSource,
+                    debugLabelsEnabled
+                )
+            )
+            : new net.blaze3d.opengl.GlDevice(
+                rendererBootstrapWindowHandle,
+                debugVerbosity,
+                debugEnabled,
+                defaultShaderSource,
+                debugLabelsEnabled
+            );
         this.compatibilityDevice = compatibilityDevice;
+        this.compatibilityBackend = compatibilityBackend;
         this.rendererDebuggingEnabled = debugEnabled;
-        return new VulkanCompatibilityGpuDevice(this, compatibilityDevice);
+        return compatibilityOnly
+            ? new VulkanCompatibilityGpuDevice(this, compatibilityDevice, compatibilityBackend, true)
+            : new VulkanCompatibilityGpuDevice(this, compatibilityDevice);
+    }
+
+    public <T> T withCompatibilityBackend(java.util.function.Supplier<T> action) {
+        GraphicsBackend backend = this.compatibilityBackend;
+        if (backend == null) {
+            return action.get();
+        }
+        return net.vulkanic.VulkanicAPI.withScopedBackendOverride(backend, action);
+    }
+
+    @Nullable
+    public GraphicsBackend shellCompatibilityBackend() {
+        return this.compatibilityBackend;
     }
 
     public CommandEncoder createCommandEncoder() {
@@ -761,6 +794,7 @@ void main() {
     void releaseCompatibilityDevice(net.blaze3d.opengl.GlDevice device) {
         if (this.compatibilityDevice == device) {
             this.compatibilityDevice = null;
+            this.compatibilityBackend = null;
             this.rendererDebuggingEnabled = false;
         }
     }
@@ -1051,6 +1085,12 @@ void main() {
     }
 
     public void onRendererDeviceInitialized(long mainWindowHandle, GpuDevice gpuDevice) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            LOGGER.info("Rust Vulkan whole-frame shell enabled; skipping Java Vulkan renderer swapchain startup.");
+            initializeVulkanCompatibilityHooks(mainWindowHandle);
+            return;
+        }
+
         LOGGER.info("Vulkan renderer startup now uses backend-owned device creation instead of shared GlDevice construction");
         LOGGER.info("Vulkan readiness: {}", getReadinessReport().summaryLine());
         LOGGER.info("Vulkan execution context: {}", getVulkanExecutionContextInfo().summaryLine());
@@ -1075,6 +1115,28 @@ void main() {
         }
 
         cleanupRendererBootstrapResources();
+    }
+
+    private void initializeVulkanCompatibilityHooks(long mainWindowHandle) {
+        withCompatibilityBackend(() -> {
+            // Iris subsystems must be initialized on the Vulkan path exactly as they are on the OpenGL path.
+            // The whole-frame Rust shell still needs these Java-side capability hooks, but Java Vulkan must not
+            // create or own the Minecraft window surface/swapchain in this mode.
+            net.irisshaders.iris.Iris.duringRenderSystemInit();
+            net.irisshaders.iris.gl.GLDebug.reloadDebugState();
+            net.irisshaders.iris.gl.IrisRenderSystem.initRenderer();
+            net.irisshaders.iris.samplers.IrisSamplers.initRenderer();
+            net.irisshaders.iris.Iris.onRenderSystemInit();
+
+            if (mainWindowHandle != MemoryUtil.NULL) {
+                LOGGER.info("Reasserting GLFW main window visibility/focus after Vulkan renderer startup: 0x{}",
+                    Long.toHexString(mainWindowHandle));
+                GLFW.glfwShowWindow(mainWindowHandle);
+                GLFW.glfwFocusWindow(mainWindowHandle);
+            }
+
+            return null;
+        });
     }
 
     public void cleanupRendererBootstrapResources() {
@@ -1339,6 +1401,13 @@ void main() {
     }
 
     private void attemptNativeBringUp() {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            nativeBringUpAttempted = true;
+            nativeBringUpFailure = "Java Vulkan native bring-up is disabled while Rust owns whole-frame Vulkan presentation.";
+            nativeSpine = null;
+            cachedReadinessReport = null;
+            return;
+        }
         if (nativeSpine != null || nativeBringUpAttempted) {
             return;
         }

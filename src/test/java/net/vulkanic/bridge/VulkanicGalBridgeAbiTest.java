@@ -59,6 +59,30 @@ class VulkanicGalBridgeAbiTest {
 	}
 
 	@Test
+	void rustGalGuiRoutePolicySeparatesOpenGlJavaVulkanAndWholeFrameVulkan() {
+		assertEquals(
+			RustGalGuiRenderer.GuiExecutionRoute.RUST_OPENGL_BORROWED_CONTEXT,
+			RustGalGuiRenderer.selectExecutionRouteForTests(false, false, false, false)
+		);
+		assertEquals(
+			RustGalGuiRenderer.GuiExecutionRoute.JAVA_COMPATIBILITY,
+			RustGalGuiRenderer.selectExecutionRouteForTests(true, false, false, false)
+		);
+		assertEquals(
+			RustGalGuiRenderer.GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME,
+			RustGalGuiRenderer.selectExecutionRouteForTests(true, true, false, false)
+		);
+		assertEquals(
+			RustGalGuiRenderer.GuiExecutionRoute.JAVA_COMPATIBILITY,
+			RustGalGuiRenderer.selectExecutionRouteForTests(false, false, false, true)
+		);
+		assertEquals(
+			RustGalGuiRenderer.GuiExecutionRoute.DISABLED,
+			RustGalGuiRenderer.selectExecutionRouteForTests(true, true, true, false)
+		);
+	}
+
+	@Test
 	void rustBridgeIsOnlyRoutedFromSubsystemBenchmarkControls() throws Exception {
 		String subsystem = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/GraphicsSubsystemBenchmark.java"));
 		String bridge = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/RustGraphicsSubsystemBenchmark.java"));
@@ -334,7 +358,8 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(rustGuiFrontend.contains("CommandOp::DrawIndexed"));
 		assertTrue(rustGuiFrontend.contains("TextureGroup::Alpha"));
 			assertTrue(queue.contains("rust_gal_sprite_batches_executed"));
-			assertTrue(queue.contains("Rust VulkanicGAL partial-frame GUI sprite is unsupported for Vulkan"));
+			assertTrue(queue.contains("GuiExecutionRoute.JAVA_COMPATIBILITY"));
+			assertTrue(queue.contains("Rust VulkanicGAL GUI enqueue requested while route is"));
 		assertTrue(gameRenderer.contains("RustGalGuiRenderer.resize"));
 		assertTrue(gameRenderer.contains("RustGalGuiRenderer.shutdown"));
 		assertTrue(gui.contains("RustGalGuiRenderer.enqueueCrosshair"));
@@ -456,9 +481,9 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(rustGuiFrontend.contains("uv_region"));
 		assertTrue(queue.contains("selectedSlot"));
 		assertTrue(queue.contains("progressFraction"));
-		assertTrue(gui.indexOf("RustGalGuiRenderer.isMigratedGuiLegacyControl()") < gui.indexOf("blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_SPRITE"));
+		assertTrue(gui.indexOf("RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()") < gui.indexOf("blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_SPRITE"));
 		assertTrue(gui.indexOf("blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_SPRITE") < gui.indexOf("RustGalGuiRenderer.enqueueCrosshair"));
-		assertTrue(gui.indexOf("RustGalGuiRenderer.isMigratedGuiLegacyControl()", gui.indexOf("renderItemHotbar")) < gui.indexOf("blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_SPRITE"));
+		assertTrue(gui.indexOf("RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()", gui.indexOf("renderItemHotbar")) < gui.indexOf("blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_SPRITE"));
 			int hotbarMethod = gui.indexOf("renderItemHotbar");
 			assertTrue(gui.indexOf("RustGalGuiRenderer.enqueueHotbarBase", hotbarMethod) < gui.indexOf("HOTBAR_SELECTION_SPRITE", hotbarMethod));
 		assertTrue(gui.indexOf("HOTBAR_SELECTION_SPRITE", hotbarMethod) < gui.indexOf("RustGalGuiRenderer.enqueueHotbarSelection", hotbarMethod));
@@ -466,7 +491,7 @@ class VulkanicGalBridgeAbiTest {
 			assertTrue(gui.contains("selectedHotbarHighlightX"));
 			assertTrue(gui.contains("selectedHotbarHighlightY"));
 			int armorMethod = gui.indexOf("renderArmor");
-			assertTrue(gui.indexOf("RustGalGuiRenderer.isMigratedGuiLegacyControl()", armorMethod)
+			assertTrue(gui.indexOf("RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()", armorMethod)
 				< gui.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, ARMOR_FULL_SPRITE", armorMethod));
 			assertTrue(gui.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, ARMOR_EMPTY_SPRITE", armorMethod)
 				< gui.indexOf("RustGalGuiRenderer.enqueueArmorIcons", armorMethod));
@@ -496,26 +521,26 @@ class VulkanicGalBridgeAbiTest {
 			assertTrue(gui.indexOf("diagnosticAirSupply(player.getAirSupply(), l)", airMethod)
 				< gui.indexOf("RustGalGuiRenderer.enqueueAirBubbles", airMethod));
 			int experienceMethod = experienceBar.indexOf("renderBackground");
-		assertTrue(experienceBar.indexOf("RustGalGuiRenderer.isMigratedGuiLegacyControl()", experienceMethod)
+		assertTrue(experienceBar.indexOf("RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()", experienceMethod)
 			< experienceBar.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, EXPERIENCE_BAR_BACKGROUND_SPRITE", experienceMethod));
 		assertTrue(experienceBar.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, EXPERIENCE_BAR_BACKGROUND_SPRITE", experienceMethod)
 			< experienceBar.indexOf("RustGalGuiRenderer.enqueueExperienceBar", experienceMethod));
 		assertTrue(experienceBar.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, EXPERIENCE_BAR_PROGRESS_SPRITE", experienceMethod)
 			< experienceBar.indexOf("RustGalGuiRenderer.enqueueExperienceBar", experienceMethod));
 		int crosshairAttack = gui.indexOf("CROSSHAIR_ATTACK_INDICATOR_BACKGROUND_SPRITE");
-		assertTrue(gui.indexOf("RustGalGuiRenderer.isMigratedGuiLegacyControl()", gui.indexOf("renderCrosshair"))
+		assertTrue(gui.indexOf("RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()", gui.indexOf("renderCrosshair"))
 			< gui.indexOf("guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_ATTACK_INDICATOR_BACKGROUND_SPRITE", crosshairAttack));
 		int crosshairProgressBlit = gui.indexOf("guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_ATTACK_INDICATOR_PROGRESS_SPRITE", crosshairAttack);
 		assertTrue(crosshairProgressBlit < gui.indexOf("RustGalGuiRenderer.enqueueCrosshairAttackIndicator", crosshairProgressBlit));
 		int hotbarAttack = gui.indexOf("HOTBAR_ATTACK_INDICATOR_BACKGROUND_SPRITE");
-		assertTrue(gui.indexOf("RustGalGuiRenderer.isMigratedGuiLegacyControl()", gui.indexOf("AttackIndicatorStatus.HOTBAR"))
+		assertTrue(gui.indexOf("RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()", gui.indexOf("AttackIndicatorStatus.HOTBAR"))
 			< gui.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_ATTACK_INDICATOR_BACKGROUND_SPRITE", hotbarAttack));
 		assertTrue(gui.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_ATTACK_INDICATOR_PROGRESS_SPRITE", hotbarAttack)
 			< gui.indexOf("RustGalGuiRenderer.enqueueHotbarAttackIndicator", hotbarAttack));
 		assertTrue(bossOverlay.contains("DeterministicCameraCapture.applyBossBarOverridesForDiagnostics"));
 		assertTrue(bossOverlay.contains("RustGalGuiRenderer.enqueueBossBar"));
-		assertTrue(bossOverlay.indexOf("RustGalGuiRenderer.isMigratedGuiLegacyControl()") < bossOverlay.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, resourceLocations"));
-		assertTrue(bossOverlay.indexOf("RustGalGuiRenderer.isMigratedGuiLegacyControl()") < bossOverlay.indexOf("RustGalGuiRenderer.enqueueBossBar"));
+		assertTrue(bossOverlay.indexOf("RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()") < bossOverlay.indexOf("guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, resourceLocations"));
+		assertTrue(bossOverlay.indexOf("RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()") < bossOverlay.indexOf("RustGalGuiRenderer.enqueueBossBar"));
 		assertTrue(bossOverlay.indexOf("RustGalGuiRenderer.enqueueBossBar")
 			< bossOverlay.indexOf("private void drawBar(\n\t\tGuiGraphics guiGraphics"));
 		assertTrue(bossOverlay.contains("drawString(this.minecraft.font"));
@@ -523,6 +548,51 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(openGlResources.contains("current_frame_target_framebuffer"),
 			"persistent borrowed frame-target handles must refresh the native OpenGL framebuffer after screen transitions");
 		assertTrue(openGlResources.contains("borrowed_frame_targets_follow_latest_acquired_framebuffer"));
+	}
+
+	@Test
+	void devOnlyRustVulkanWholeFrameShellOwnsPresentationWithoutJavaVulkanExecution() throws Exception {
+		String bridge = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java"));
+		String mode = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/RustGalVulkanWholeFrameMode.java"));
+		String queue = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
+		String minecraft = Files.readString(Path.of("src/main/java/net/minecraft/client/Minecraft.java"));
+		String gameRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
+		String renderSystem = Files.readString(Path.of("src/main/java/net/blaze3d/systems/RenderSystem.java"));
+		String window = Files.readString(Path.of("src/main/java/net/blaze3d/platform/Window.java"));
+		String vulkanicApi = Files.readString(Path.of("src/main/java/net/vulkanic/VulkanicAPI.java"));
+		String rustBackends = Files.readString(Path.of("src/main/rust/render/vulkanic/backends/mod.rs"));
+		String rustVulkan = Files.readString(Path.of("src/main/rust/render/vulkanic/backends/vulkan/mod.rs"));
+		String rustGuiFrontend = Files.readString(Path.of("src/main/rust/render/vulkanic/gui_frontend.rs"));
+		String rustFfi = Files.readString(Path.of("src/main/rust/render/vulkanic/ffi.rs"));
+
+		assertTrue(mode.contains("mattmc.dev.rustGalVulkanWholeFrame"));
+		assertTrue(bridge.contains("mattmc_vulkanic_gal_context_create_windowed_vulkan"));
+		assertTrue(bridge.contains("WINDOWED_VULKAN_CONTEXT_CREATE(49)"));
+		assertTrue(queue.contains("createWindowedVulkan"));
+		assertTrue(queue.contains("executeWholeFrameVulkan"));
+		assertTrue(queue.contains("GLFWNativeX11.glfwGetX11Window"));
+		assertTrue(queue.contains("GLFWNativeWayland.glfwGetWaylandWindow"));
+		assertTrue(minecraft.contains("renderRustVulkanWholeFrameShell"));
+		assertTrue(minecraft.contains("game.rendering.rust-vulkan-whole-frame"));
+		assertTrue(gameRenderer.contains("rustVulkanWholeFrameGuiExtraction"));
+		assertTrue(gameRenderer.contains("RustGalGuiRenderer.executeWholeFrameVulkan"));
+		int shellStart = gameRenderer.indexOf("renderRustVulkanWholeFrameShell");
+		int shellEnd = gameRenderer.indexOf("private void tryTakeScreenshotIfNeeded", shellStart);
+		assertFalse(gameRenderer.substring(shellStart, shellEnd).contains("renderLevel(deltaTracker)"));
+		assertTrue(renderSystem.contains("RustGalVulkanWholeFrameMode.enabled()"));
+		assertTrue(renderSystem.indexOf("RustGalVulkanWholeFrameMode.enabled()") < renderSystem.indexOf("VulkanicAPI.beginFrame()"));
+		assertTrue(window.contains("RustGalVulkanWholeFrameMode.enabled()"));
+		assertTrue(vulkanicApi.contains("Java Vulkan beginFrame is disabled while Rust owns whole-frame Vulkan presentation"));
+		assertTrue(vulkanicApi.contains("Java Vulkan presentTextureToScreen is disabled while Rust owns whole-frame Vulkan presentation"));
+		assertTrue(vulkanicApi.contains("RustGalVulkanWholeFrameMode.enabled()"));
+		assertTrue(vulkanicApi.indexOf("RustGalVulkanWholeFrameMode.enabled()") < vulkanicApi.indexOf("if (configuredValue == null)"));
+		assertTrue(rustBackends.contains("create_native_windowed_vulkan_backend"));
+		assertTrue(rustVulkan.contains("struct NativeWindowSurface"));
+		assertTrue(rustVulkan.contains("WINDOW_PLATFORM_X11"));
+		assertTrue(rustVulkan.contains("WINDOW_PLATFORM_WAYLAND"));
+		assertTrue(rustGuiFrontend.contains("if batches.is_empty()"));
+		assertTrue(rustGuiFrontend.contains("frame_target_color_format(frame_target)"));
+		assertFalse(rustFfi.contains("ash::"));
 	}
 
 	@Test

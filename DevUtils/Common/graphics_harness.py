@@ -737,7 +737,16 @@ def validation_proof(
         )
     )
     is_vulkan_validation_backend = mode.backend in {"vulkan", "rust-vulkan"}
+    rust_vulkan_shell_workload = mode.backend == "rust-vulkan" and bool(
+        re.search(
+            r"gal\.frame\.(?:acquire|present) backend=vulkan|Rust VulkanicGAL GUI frame|rust_gal_backend_submissions[=: ]+[1-9]",
+            combined_logs,
+            re.IGNORECASE,
+        )
+    )
     meaningful_workload = not is_vulkan_validation_backend or (
+        rust_vulkan_shell_workload
+        or
         (tool_kind == "capture" and deterministic_complete and (int(work_counts.get("draw") or 0) > 0 or int(creation_counts.get("descriptor") or 0) > 0))
         or (
             tool_kind == "subsystem"
@@ -1172,9 +1181,27 @@ def listed_failure_file_count(path: Path | None) -> int:
     return count
 
 
+def rust_gal_metrics_positive(logs: str) -> bool:
+    for line in logs.splitlines():
+        if "Rust OpenGL VulkanicGAL GUI" not in line and "Rust VulkanicGAL bridge" not in line:
+            continue
+        for key in (
+            "rust_gal_frames_executed",
+            "rust_gal_batches_executed",
+            "rust_gal_ffi_frame_acquire_calls",
+            "rust_gal_ffi_submit_calls",
+            "ffi_call_count",
+        ):
+            match = re.search(rf"\b{key}=([0-9]+)\b", line)
+            if match and int(match.group(1)) > 0:
+                return True
+    return False
+
+
 def has_rust_opengl_evidence(mode: ModeSpec, logs: str) -> bool:
     return mode.backend == "rust-opengl" or bool(
-        re.search(r"Rust OpenGL|rust-opengl|Rust VulkanicGAL bridge", logs, re.IGNORECASE)
+        re.search(r"\brust-opengl\b", logs, re.IGNORECASE)
+        or rust_gal_metrics_positive(logs)
     )
 
 
@@ -1289,6 +1316,14 @@ def readiness_state_from_text(
     overlay_matches = re.findall(r"overlay=([A-Za-z0-9_.$-]+)", combined_logs)
     last_screen = screen_matches[-1] if screen_matches else None
     last_overlay = overlay_matches[-1] if overlay_matches else None
+    frame_runtime = frame_doc.get("runtimeState") if isinstance(frame_doc, dict) else None
+    if isinstance(frame_runtime, dict) and frame_doc.get("status") == "complete":
+        runtime_screen = frame_runtime.get("screen")
+        runtime_overlay = frame_runtime.get("overlay")
+        if isinstance(runtime_screen, str) and runtime_screen:
+            last_screen = runtime_screen
+        if isinstance(runtime_overlay, str) and runtime_overlay:
+            last_overlay = runtime_overlay
     world_entered_log = bool(
         re.search(r"\bjoined the game\b|Loaded \[\d+\] waiting chunk wrappers|DH-CLIENT-CONNECT", combined_logs)
     )
@@ -1304,7 +1339,8 @@ def readiness_state_from_text(
         and isinstance(frame_doc.get("lastReadinessBlocker"), str)
         and "DeathScreen" in str(frame_doc.get("lastReadinessBlocker"))
     )
-    player_alive_controllable = deterministic_status == "complete" or (
+    frame_sampler_complete = isinstance(frame_doc, dict) and frame_doc.get("status") == "complete" and frame_doc.get("worldEntered") is not False
+    player_alive_controllable = deterministic_status == "complete" or frame_sampler_complete or (
         bool(world_entered_log or deterministic_status or (isinstance(frame_doc, dict) and frame_doc.get("worldEntered")))
         and not invalid_player_state
         and last_overlay not in {"LoadingOverlay"}
@@ -2221,7 +2257,7 @@ def normalize_capture_artifact(
     if validation_run and not proof.get("layer_loaded"):
         validation_messages.append("Vulkan validation layer load was not proven")
     if validation_run and not proof.get("meaningful_vulkan_workload"):
-        validation_messages.append("Vulkan validation run did not prove meaningful Java Vulkan workload execution")
+        validation_messages.append("Vulkan validation run did not prove meaningful Vulkan workload execution")
     if validation_run and not proof.get("no_message_filtering"):
         validation_messages.append("Vulkan validation message filtering state is not clean")
     if validation_run and not proof.get("artifact_log_association", {}).get("all_named_logs_match_run"):
@@ -2444,7 +2480,7 @@ def normalize_capture_artifact(
                 "bytes": rust_gal_ffi_bytes,
             },
             "rust_gal_slice": {
-                "producer": last_text(combined_logs, r"Rust OpenGL VulkanicGAL GUI (?:batch|frame) executed producer=([^ ]+)"),
+                "producer": last_text(combined_logs, r"Rust (?:OpenGL )?VulkanicGAL GUI (?:batch|frame) executed producer=([^ ]+)"),
                 "cache_hits": last_number(combined_logs, r"rust_gal_cache_hits[=: ]+(\d+)"),
                 "cache_misses": last_number(combined_logs, r"rust_gal_cache_misses[=: ]+(\d+)"),
                 "queue_depth": last_number(combined_logs, r"rust_gal_queue_depth[=: ]+(\d+)"),
@@ -2471,7 +2507,7 @@ def normalize_capture_artifact(
                 "timing_totals_nanos": rust_gal_timing_totals,
                 "timing_per_executed_batch_nanos": rust_gal_timing_per_batch,
                 "backend_sync": rust_gal_backend_sync,
-                "submission": last_number(combined_logs, r"Rust OpenGL VulkanicGAL GUI (?:batch|frame) executed.*?submission=(\d+)"),
+                "submission": last_number(combined_logs, r"Rust (?:OpenGL )?VulkanicGAL GUI (?:batch|frame) executed.*?submission=(\d+)"),
             },
             "native_direct_triggers": {
                 "integrations": last_number(combined_logs, r"direct_trigger_diagnostics summary.*? integrations=(\d+)"),

@@ -6,6 +6,8 @@ use ash::vk;
 use super::device::VulkanContext;
 use super::resources::{aspect_for_format, texture_format};
 use super::trace;
+use crate::render::vulkanic::backends::vulkan::resources::FrameTargetObject;
+use crate::render::vulkanic::backends::BackendToken;
 use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::frame::{
     AcquiredFrame, FrameAcquireDesc, FrameAcquireStatus, FrameId, FramePresentStatus,
@@ -15,7 +17,7 @@ use crate::render::vulkanic::frame::{
 use crate::render::vulkanic::resources::{Extent3d, TextureFormat};
 use crate::render::vulkanic::sync::SubmissionId;
 
-pub(in crate::render::vulkanic::backends) trait SurfaceOwner {
+pub(in crate::render::vulkanic) trait SurfaceOwner {
     fn required_instance_extensions(&self) -> Vec<&'static CStr>;
     fn create_surface(
         &self,
@@ -215,9 +217,17 @@ impl VulkanSwapchain {
                 )))
             }
         };
+        if let Some(layout) = self.image_layouts.get_mut(acquired.image_index as usize) {
+            *layout = vk::ImageLayout::PRESENT_SRC_KHR;
+        }
         trace::message(&format!(
-            "gal.frame.present backend=vulkan correlation={} frame={} submission={} status={:?} window={}",
-            desc.correlation_id.0, desc.frame.0, desc.wait_for.0, status, self.stable_window_id
+            "gal.frame.present backend=vulkan correlation={} frame={} image={} submission={} status={:?} window={}",
+            desc.correlation_id.0,
+            desc.frame.0,
+            acquired.image_index,
+            desc.wait_for.0,
+            status,
+            self.stable_window_id
         ));
         Ok(PresentedFrame {
             frame: desc.frame,
@@ -233,6 +243,41 @@ impl VulkanSwapchain {
 
     pub(super) fn stable_window_id(&self) -> u64 {
         self.stable_window_id
+    }
+
+    pub(super) fn frame_target_object(
+        &self,
+        desc: &crate::render::vulkanic::resources::FrameTargetDesc,
+        token: BackendToken,
+    ) -> GalResult<FrameTargetObject> {
+        let acquired = self
+            .acquired
+            .iter()
+            .find(|acquired| acquired.frame.0 == desc.frame_id)
+            .ok_or_else(|| {
+                GalError::backend("frame target was created for a non-acquired frame")
+            })?;
+        let index = acquired.image_index as usize;
+        let image = *self
+            .images
+            .get(index)
+            .ok_or_else(|| GalError::backend("acquired swapchain image index is out of range"))?;
+        let image_view = *self.image_views.get(index).ok_or_else(|| {
+            GalError::backend("acquired swapchain image view index is out of range")
+        })?;
+        let image_layout = *self.image_layouts.get(index).ok_or_else(|| {
+            GalError::backend("acquired swapchain image layout index is out of range")
+        })?;
+        Ok(FrameTargetObject {
+            token,
+            frame_id: desc.frame_id,
+            extent: desc.extent,
+            color_format: desc.color_format,
+            image_index: acquired.image_index,
+            image,
+            image_view,
+            image_layout,
+        })
     }
 
     fn recreate(&mut self, old_swapchain: vk::SwapchainKHR) -> GalResult<()> {

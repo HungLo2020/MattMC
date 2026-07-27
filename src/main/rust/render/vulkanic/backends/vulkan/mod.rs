@@ -26,7 +26,77 @@ use crate::render::vulkanic::sync::SubmissionId;
 use self::device::{ValidationMode, VulkanContext};
 use self::lowering::SubmissionLowerer;
 use self::resources::VulkanObjects;
-use self::swapchain::{SurfaceOwner, VulkanSwapchain};
+pub(in crate::render::vulkanic) use self::swapchain::SurfaceOwner;
+use self::swapchain::VulkanSwapchain;
+
+pub(in crate::render::vulkanic) const WINDOW_PLATFORM_X11: u32 = 1;
+pub(in crate::render::vulkanic) const WINDOW_PLATFORM_WAYLAND: u32 = 2;
+
+struct NativeWindowSurface {
+    platform: u32,
+    native_display: u64,
+    native_window: u64,
+    stable_window_id: u64,
+}
+
+impl SurfaceOwner for NativeWindowSurface {
+    fn required_instance_extensions(&self) -> Vec<&'static std::ffi::CStr> {
+        match self.platform {
+            WINDOW_PLATFORM_X11 => vec![ash::khr::surface::NAME, ash::khr::xlib_surface::NAME],
+            WINDOW_PLATFORM_WAYLAND => {
+                vec![ash::khr::surface::NAME, ash::khr::wayland_surface::NAME]
+            }
+            _ => vec![ash::khr::surface::NAME],
+        }
+    }
+
+    fn create_surface(
+        &self,
+        entry: &ash::Entry,
+        instance: &ash::Instance,
+    ) -> GalResult<ash::vk::SurfaceKHR> {
+        use crate::render::vulkanic::error::{GalError, StatusCode};
+
+        if self.native_display == 0 || self.native_window == 0 {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "windowed Vulkan context requires non-zero native display and window handles",
+            ));
+        }
+        match self.platform {
+            WINDOW_PLATFORM_X11 => {
+                let loader = ash::khr::xlib_surface::Instance::new(entry, instance);
+                let info = ash::vk::XlibSurfaceCreateInfoKHR::default()
+                    .dpy((self.native_display as usize as *mut ash::vk::Display).cast())
+                    .window(self.native_window);
+                unsafe { loader.create_xlib_surface(&info, None) }.map_err(|error| {
+                    GalError::backend(format!(
+                        "failed to create Rust-owned X11 Vulkan surface: {error:?}"
+                    ))
+                })
+            }
+            WINDOW_PLATFORM_WAYLAND => {
+                let loader = ash::khr::wayland_surface::Instance::new(entry, instance);
+                let info = ash::vk::WaylandSurfaceCreateInfoKHR::default()
+                    .display(self.native_display as usize as *mut std::ffi::c_void)
+                    .surface(self.native_window as usize as *mut std::ffi::c_void);
+                unsafe { loader.create_wayland_surface(&info, None) }.map_err(|error| {
+                    GalError::backend(format!(
+                        "failed to create Rust-owned Wayland Vulkan surface: {error:?}"
+                    ))
+                })
+            }
+            other => Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unsupported window platform {other} for Rust Vulkan presentation"),
+            )),
+        }
+    }
+
+    fn stable_window_id(&self) -> u64 {
+        self.stable_window_id
+    }
+}
 
 pub(in crate::render::vulkanic) struct VulkanBackend {
     context: Arc<VulkanContext>,
@@ -84,6 +154,23 @@ impl VulkanBackend {
         })
     }
 
+    pub(in crate::render::vulkanic) fn new_native_windowed(
+        label: &str,
+        platform: u32,
+        stable_window_id: u64,
+        native_display: u64,
+        native_window: u64,
+        surface_desc: FrameSurfaceDesc,
+    ) -> GalResult<Self> {
+        let surface = NativeWindowSurface {
+            platform,
+            native_display,
+            native_window,
+            stable_window_id,
+        };
+        Self::new_windowed(label, &surface, surface_desc)
+    }
+
     pub(super) fn completed_host_reads_snapshot(&self) -> Vec<lowering::CompletedHostRead> {
         self.lowerer
             .lock()
@@ -122,6 +209,20 @@ impl Backend for VulkanBackend {
 
     fn create(&mut self, handle: Handle, desc: BackendCreateDesc<'_>) -> GalResult<BackendToken> {
         let _zone = trace::Zone::new("vulkan.backend.resource.create");
+        if let BackendCreateDesc::FrameTarget(frame_target) = desc {
+            let Some(swapchain) = &self.swapchain else {
+                return Err(
+                    crate::render::vulkanic::error::GalError::unsupported_feature(
+                        "Vulkan frame targets require a presentation-capable backend",
+                    ),
+                );
+            };
+            return self.objects.create_frame_target_from_swapchain(
+                handle,
+                frame_target,
+                |token| swapchain.frame_target_object(frame_target, token),
+            );
+        }
         self.objects.create(handle, desc)
     }
 

@@ -80,6 +80,10 @@ impl VulkanObjects {
                 frame_id: desc.frame_id,
                 extent: desc.extent,
                 color_format: desc.color_format,
+                image_index: u32::MAX,
+                image: vk::Image::null(),
+                image_view: vk::ImageView::null(),
+                image_layout: vk::ImageLayout::UNDEFINED,
             }),
             BackendCreateDesc::RenderPass(desc) => VulkanObject::RenderPass(RenderPassObject {
                 token,
@@ -89,6 +93,29 @@ impl VulkanObjects {
             }),
         };
         self.objects.insert(handle, object);
+        Ok(token)
+    }
+
+    pub(super) fn create_frame_target_from_swapchain(
+        &mut self,
+        handle: Handle,
+        desc: &FrameTargetDesc,
+        make_object: impl FnOnce(BackendToken) -> GalResult<FrameTargetObject>,
+    ) -> GalResult<BackendToken> {
+        let _zone = trace::Zone::new("vulkan.resources.create-frame-target");
+        let token = BackendToken(self.next_token);
+        self.next_token += 1;
+        let object = make_object(token)?;
+        if object.frame_id != desc.frame_id
+            || object.extent != desc.extent
+            || object.color_format != desc.color_format
+        {
+            return Err(GalError::backend(
+                "swapchain frame target metadata does not match GAL frame target",
+            ));
+        }
+        self.objects
+            .insert(handle, VulkanObject::FrameTarget(object));
         Ok(token)
     }
 
@@ -184,6 +211,16 @@ impl VulkanObjects {
             Some(VulkanObject::RenderTarget(object)) => Ok(object),
             _ => Err(GalError::backend(format!(
                 "expected Vulkan render target for handle 0x{:016x}",
+                handle.raw()
+            ))),
+        }
+    }
+
+    pub(super) fn frame_target(&self, handle: Handle) -> GalResult<&FrameTargetObject> {
+        match self.objects.get(&handle) {
+            Some(VulkanObject::FrameTarget(object)) => Ok(object),
+            _ => Err(GalError::backend(format!(
+                "expected Vulkan frame target for handle 0x{:016x}",
                 handle.raw()
             ))),
         }
@@ -1033,6 +1070,10 @@ pub(super) struct FrameTargetObject {
     pub(super) frame_id: u64,
     pub(super) extent: Extent3d,
     pub(super) color_format: TextureFormat,
+    pub(super) image_index: u32,
+    pub(super) image: vk::Image,
+    pub(super) image_view: vk::ImageView,
+    pub(super) image_layout: vk::ImageLayout,
 }
 
 #[allow(dead_code)]

@@ -826,6 +826,32 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		}
 	}
 
+	public boolean renderRustVulkanWholeFrameShell(DeltaTracker deltaTracker, boolean bl) {
+		if (!net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanEnabled()) {
+			return false;
+		}
+		if (!VulkanicAPI.isVulkanBackendSelected()) {
+			throw new IllegalStateException("Rust Vulkan whole-frame shell requires Vulkan backend selection");
+		}
+		ProfilerFiller profilerFiller = Profiler.get();
+		boolean gameLoadFinished = this.minecraft.isGameLoadFinished();
+		this.guiRenderState.reset();
+		profilerFiller.push("rustVulkanWholeFrameGuiExtraction");
+		GuiGraphics guiGraphics = new GuiGraphics(this.minecraft, this.guiRenderState);
+		if (gameLoadFinished && bl && this.minecraft.level != null) {
+			this.minecraft.gui.render(guiGraphics, deltaTracker);
+			this.minecraft.gui.renderSavingIndicator(guiGraphics, deltaTracker);
+		}
+		profilerFiller.popPush("rustVulkanWholeFramePresent");
+		net.vulkanic.gui.RustGalGuiRenderer.executeWholeFrameVulkan(this.minecraft, this.guiRenderState);
+		profilerFiller.pop();
+		guiGraphics.applyCursor(this.minecraft.getWindow());
+		this.submitNodeStorage.endFrame();
+		this.featureRenderDispatcher.endFrame();
+		this.resourcePool.endFrame();
+		return true;
+	}
+
 	private void tryTakeScreenshotIfNeeded() {
 		if (!this.hasWorldScreenshot && this.minecraft.isLocalServer()) {
 			long l = Util.getMillis();

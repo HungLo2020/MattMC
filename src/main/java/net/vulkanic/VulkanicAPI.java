@@ -51,6 +51,7 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
+import java.util.function.Supplier;
 
 /**
  * Main entry point for the Vulkanic Graphics Abstraction Layer.
@@ -63,6 +64,7 @@ public class VulkanicAPI {
     private static GraphicsBackend backend;
     @Nullable
     private static VulkanBackend rawVulkanBackend;
+    private static final ThreadLocal<GraphicsBackend> SCOPED_BACKEND_OVERRIDE = new ThreadLocal<>();
     private static final VulkanicCompatibilityState compatibilityState = new VulkanicCompatibilityState();
 
     private static final boolean IS_MACOS = System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("mac");
@@ -709,6 +711,9 @@ public class VulkanicAPI {
      * Any missing/unknown value falls back to {@code opengl}.
      */
     public static String normalizeBackendOptionValue(@Nullable String configuredValue) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            return "vulkan";
+        }
         if (configuredValue == null) {
             return "opengl";
         }
@@ -759,14 +764,50 @@ public class VulkanicAPI {
      * Get the current graphics backend.
      */
     public static GraphicsBackend getBackend() {
+        GraphicsBackend scopedBackend = SCOPED_BACKEND_OVERRIDE.get();
+        if (scopedBackend != null) {
+            return scopedBackend;
+        }
         if (backend == null) {
             initialize();
+        }
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
+            GraphicsBackend compatibilityBackend = rawVulkanBackend.shellCompatibilityBackend();
+            if (compatibilityBackend != null) {
+                return compatibilityBackend;
+            }
         }
         return backend;
     }
 
+    public static <T> T withScopedBackendOverride(GraphicsBackend scopedBackend, Supplier<T> action) {
+        Objects.requireNonNull(scopedBackend, "scopedBackend");
+        Objects.requireNonNull(action, "action");
+        GraphicsBackend previous = SCOPED_BACKEND_OVERRIDE.get();
+        SCOPED_BACKEND_OVERRIDE.set(scopedBackend);
+        try {
+            return action.get();
+        } finally {
+            if (previous == null) {
+                SCOPED_BACKEND_OVERRIDE.remove();
+            } else {
+                SCOPED_BACKEND_OVERRIDE.set(previous);
+            }
+        }
+    }
+
+    public static GraphicsBackend createOpenGlCompatibilityBackendForVulkanShell() {
+        return new OpenGLBackend();
+    }
+
     @Nullable
     private static VulkanBackend directVulkanBackendForImplementedMethods() {
+        if (SCOPED_BACKEND_OVERRIDE.get() != null) {
+            return null;
+        }
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            return null;
+        }
         if (backend == null) {
             initialize();
         }
@@ -802,6 +843,11 @@ public class VulkanicAPI {
      * Gets the currently active backend identity.
      */
     public static GraphicsBackendType getActiveBackendType() {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+            && backend != null
+            && backend.getBackendType() == GraphicsBackendType.VULKAN) {
+            return GraphicsBackendType.VULKAN;
+        }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         if (directVulkanBackend != null) {
             return directVulkanBackend.getBackendType();
@@ -815,6 +861,9 @@ public class VulkanicAPI {
      * <p>Note: this may still be running in OpenGL-delegated bootstrap mode.</p>
      */
     public static boolean isVulkanBackendSelected() {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            return backend != null && backend.getBackendType() == GraphicsBackendType.VULKAN;
+        }
         return getActiveBackendType() == GraphicsBackendType.VULKAN;
     }
 
@@ -931,6 +980,9 @@ public class VulkanicAPI {
         if (framebufferWidth <= 0 || framebufferHeight <= 0) {
             return false;
         }
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            return false;
+        }
 
         GraphicsBackend activeBackend = backend;
         if (activeBackend == null || activeBackend.getBackendType() != GraphicsBackendType.VULKAN) {
@@ -968,6 +1020,10 @@ public class VulkanicAPI {
      * an {@link IllegalStateException} containing initialization diagnostics.</p>
      */
     public static void initializeNativeVulkanRuntimeOnRendererStartupIfSelected() {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            return;
+        }
+
         GraphicsBackend activeBackend = backend;
         if (activeBackend == null || activeBackend.getBackendType() != GraphicsBackendType.VULKAN) {
             return;
@@ -3873,6 +3929,9 @@ public class VulkanicAPI {
      * callsites.
      */
     public static CommandEncoder createCommandEncoder() {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
+            return rawVulkanBackend.withCompatibilityBackend(() -> getBackend().createCommandEncoder());
+        }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         return directVulkanBackend != null
             ? directVulkanBackend.createCommandEncoder()
@@ -4000,6 +4059,11 @@ public class VulkanicAPI {
         int depthOrLayers,
         int mipLevels
     ) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
+            return rawVulkanBackend.withCompatibilityBackend(
+                () -> getBackend().createTexture(supplier, usage, format, width, height, depthOrLayers, mipLevels)
+            );
+        }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         return directVulkanBackend != null
             ? directVulkanBackend.createTexture(supplier, usage, format, width, height, depthOrLayers, mipLevels)
@@ -4018,6 +4082,11 @@ public class VulkanicAPI {
         int depthOrLayers,
         int mipLevels
     ) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
+            return rawVulkanBackend.withCompatibilityBackend(
+                () -> getBackend().createTexture(label, usage, format, width, height, depthOrLayers, mipLevels)
+            );
+        }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         return directVulkanBackend != null
             ? directVulkanBackend.createTexture(label, usage, format, width, height, depthOrLayers, mipLevels)
@@ -4028,6 +4097,9 @@ public class VulkanicAPI {
      * Creates a backend-owned GPU buffer with size allocation.
      */
     public static GpuBuffer createBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, int size) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
+            return rawVulkanBackend.withCompatibilityBackend(() -> getBackend().createBuffer(supplier, usage, size));
+        }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         return directVulkanBackend != null
             ? directVulkanBackend.createBuffer(supplier, usage, size)
@@ -4038,6 +4110,9 @@ public class VulkanicAPI {
      * Creates a backend-owned GPU buffer initialized from byte data.
      */
     public static GpuBuffer createBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, ByteBuffer data) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
+            return rawVulkanBackend.withCompatibilityBackend(() -> getBackend().createBuffer(supplier, usage, data));
+        }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         return directVulkanBackend != null
             ? directVulkanBackend.createBuffer(supplier, usage, data)
@@ -4048,6 +4123,9 @@ public class VulkanicAPI {
      * Creates a backend-owned texture view for a full texture range.
      */
     public static GpuTextureView createTextureView(GpuTexture texture) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
+            return rawVulkanBackend.withCompatibilityBackend(() -> getBackend().createTextureView(texture));
+        }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         return directVulkanBackend != null
             ? directVulkanBackend.createTextureView(texture)
@@ -4058,6 +4136,9 @@ public class VulkanicAPI {
      * Creates a backend-owned texture view for an explicit mip range.
      */
     public static GpuTextureView createTextureView(GpuTexture texture, int baseMipLevel, int mipLevelCount) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
+            return rawVulkanBackend.withCompatibilityBackend(() -> getBackend().createTextureView(texture, baseMipLevel, mipLevelCount));
+        }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         return directVulkanBackend != null
             ? directVulkanBackend.createTextureView(texture, baseMipLevel, mipLevelCount)
@@ -4138,6 +4219,10 @@ public class VulkanicAPI {
 
     public static void initializeDynamicUniforms() {
         assertOnRenderThread();
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
+            dynamicUniforms = rawVulkanBackend.withCompatibilityBackend(DynamicUniforms::new);
+            return;
+        }
         dynamicUniforms = new DynamicUniforms();
     }
 
@@ -4151,6 +4236,13 @@ public class VulkanicAPI {
     }
 
     public static void resetDynamicUniforms() {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && rawVulkanBackend != null) {
+            rawVulkanBackend.withCompatibilityBackend(() -> {
+                getDynamicUniforms().reset();
+                return null;
+            });
+            return;
+        }
         getDynamicUniforms().reset();
     }
 
@@ -10583,6 +10675,9 @@ public class VulkanicAPI {
      * In Vulkan this acquires the next swapchain image and returns its index.
      */
     public static int beginFrame() {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("Java Vulkan beginFrame is disabled while Rust owns whole-frame Vulkan presentation");
+        }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         if (directVulkanBackend != null) {
             return directVulkanBackend.beginFrame();
@@ -10597,6 +10692,9 @@ public class VulkanicAPI {
      * In Vulkan this presents the currently acquired swapchain image.
      */
     public static void endFrame() {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("Java Vulkan endFrame is disabled while Rust owns whole-frame Vulkan presentation");
+        }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         if (directVulkanBackend != null) {
             directVulkanBackend.endFrame();
@@ -10609,6 +10707,9 @@ public class VulkanicAPI {
      * Presents a color render target view to the active backend's screen/swapchain.
      */
     public static void presentTextureToScreen(CommandContext ctx, GpuTextureView textureView) {
+        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+            throw new IllegalStateException("Java Vulkan presentTextureToScreen is disabled while Rust owns whole-frame Vulkan presentation");
+        }
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         if (directVulkanBackend != null) {
             directVulkanBackend.presentTextureToScreen(ctx, textureView);

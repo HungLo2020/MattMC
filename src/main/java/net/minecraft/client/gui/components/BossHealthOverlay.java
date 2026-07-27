@@ -95,7 +95,7 @@ public class BossHealthOverlay {
 		if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
 			return;
 		}
-		if (RustGalGuiRenderer.isMigratedGuiLegacyControl()) {
+		if (RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()) {
 			this.drawBar(guiGraphics, i, j, bossEvent, 182, BAR_BACKGROUND_SPRITES, OVERLAY_BACKGROUND_SPRITES);
 			if (k > 0) {
 				this.drawBar(guiGraphics, i, j, bossEvent, k, BAR_PROGRESS_SPRITES, OVERLAY_PROGRESS_SPRITES);

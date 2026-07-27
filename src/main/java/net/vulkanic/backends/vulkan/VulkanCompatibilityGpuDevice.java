@@ -12,6 +12,7 @@ import net.blaze3d.textures.TextureFormat;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.GraphicsBackend;
 import org.jetbrains.annotations.Nullable;
 
 import java.nio.ByteBuffer;
@@ -23,49 +24,89 @@ import java.util.function.Supplier;
 final class VulkanCompatibilityGpuDevice implements GpuDevice {
 	private final VulkanBackend backend;
 	private final net.blaze3d.opengl.GlDevice compatibilityDevice;
+	private final GraphicsBackend compatibilityBackend;
+	private final boolean compatibilityOnly;
 
-	VulkanCompatibilityGpuDevice(VulkanBackend backend, net.blaze3d.opengl.GlDevice compatibilityDevice) {
+	VulkanCompatibilityGpuDevice(
+		VulkanBackend backend,
+		net.blaze3d.opengl.GlDevice compatibilityDevice
+	) {
+		this(backend, compatibilityDevice, null, false);
+	}
+
+	VulkanCompatibilityGpuDevice(
+		VulkanBackend backend,
+		net.blaze3d.opengl.GlDevice compatibilityDevice,
+		@Nullable GraphicsBackend compatibilityBackend,
+		boolean compatibilityOnly
+	) {
 		this.backend = backend;
 		this.compatibilityDevice = compatibilityDevice;
+		this.compatibilityBackend = compatibilityBackend;
+		this.compatibilityOnly = compatibilityOnly;
 	}
 
 	@Override
 	public CommandEncoder createCommandEncoder() {
+		if (this.compatibilityOnly) {
+			return this.withCompatibilityBackend(this.compatibilityDevice::createCommandEncoder);
+		}
 		return this.backend.createCommandEncoder();
 	}
 
 	@Override
 	public GpuTexture createTexture(@Nullable Supplier<String> supplier, int i, TextureFormat textureFormat, int j, int k, int l, int m) {
+		if (this.compatibilityOnly) {
+			return this.withCompatibilityBackend(() -> this.compatibilityDevice.createTexture(supplier, i, textureFormat, j, k, l, m));
+		}
 		return this.backend.createTexture(supplier, i, textureFormat, j, k, l, m);
 	}
 
 	@Override
 	public GpuTexture createTexture(@Nullable String string, int i, TextureFormat textureFormat, int j, int k, int l, int m) {
+		if (this.compatibilityOnly) {
+			return this.withCompatibilityBackend(() -> this.compatibilityDevice.createTexture(string, i, textureFormat, j, k, l, m));
+		}
 		return this.backend.createTexture(string, i, textureFormat, j, k, l, m);
 	}
 
 	@Override
 	public GpuTextureView createTextureView(GpuTexture gpuTexture) {
+		if (this.compatibilityOnly) {
+			return this.withCompatibilityBackend(() -> this.compatibilityDevice.createTextureView(gpuTexture));
+		}
 		return this.backend.createTextureView(gpuTexture);
 	}
 
 	@Override
 	public GpuTextureView createTextureView(GpuTexture gpuTexture, int i, int j) {
+		if (this.compatibilityOnly) {
+			return this.withCompatibilityBackend(() -> this.compatibilityDevice.createTextureView(gpuTexture, i, j));
+		}
 		return this.backend.createTextureView(gpuTexture, i, j);
 	}
 
 	@Override
 	public GpuBuffer createBuffer(@Nullable Supplier<String> supplier, int i, int j) {
+		if (this.compatibilityOnly) {
+			return this.withCompatibilityBackend(() -> this.compatibilityDevice.createBuffer(supplier, i, j));
+		}
 		return this.backend.createBuffer(supplier, i, j);
 	}
 
 	@Override
 	public GpuBuffer createBuffer(@Nullable Supplier<String> supplier, int i, ByteBuffer byteBuffer) {
+		if (this.compatibilityOnly) {
+			return this.withCompatibilityBackend(() -> this.compatibilityDevice.createBuffer(supplier, i, byteBuffer));
+		}
 		return this.backend.createBuffer(supplier, i, byteBuffer);
 	}
 
 	@Override
 	public String getImplementationInformation() {
+		if (this.compatibilityOnly) {
+			return "Rust Vulkan whole-frame shell selected (Java compatibility device isolated on hidden OpenGL context)";
+		}
 		return this.backend.isNativeVulkanReady()
 			? "Vulkan backend selected (backend-owned compatibility device, native runtime ready)"
 			: "Vulkan backend selected (backend-owned compatibility device, native runtime not yet ready)";
@@ -139,9 +180,24 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 	@Override
 	public void close() {
 		try {
-			this.compatibilityDevice.close();
+			this.withCompatibilityBackend(() -> {
+				this.compatibilityDevice.close();
+				return null;
+			});
 		} finally {
-			this.backend.releaseCompatibilityDevice(this.compatibilityDevice);
+			try {
+				this.backend.releaseCompatibilityDevice(this.compatibilityDevice);
+			} finally {
+				if (this.compatibilityOnly) {
+					this.backend.cleanupRendererBootstrapResources();
+				}
+			}
 		}
+	}
+
+	private <T> T withCompatibilityBackend(Supplier<T> action) {
+		return this.compatibilityOnly && this.compatibilityBackend != null
+			? net.vulkanic.VulkanicAPI.withScopedBackendOverride(this.compatibilityBackend, action)
+			: action.get();
 	}
 }

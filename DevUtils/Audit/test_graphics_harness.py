@@ -461,7 +461,7 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             )
             self.assertFalse(artifact["metrics"]["validation_findings"]["proof"]["meaningful_vulkan_workload"])
             self.assertFalse(artifact["validation"]["complete"])
-            self.assertIn("meaningful Java Vulkan workload", " ".join(artifact["validation"]["messages"]))
+            self.assertIn("meaningful Vulkan workload", " ".join(artifact["validation"]["messages"]))
 
     def test_validation_artifact_rejects_logs_from_another_run(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1752,6 +1752,27 @@ else:
         self.assertFalse(state["player_alive_and_controllable"])
         self.assertEqual("generating", state["dh"]["state"])
 
+    def test_gameplay_complete_status_overrides_stale_startup_screen_logs(self) -> None:
+        text = "\n".join(
+            [
+                "HungLo joined the game",
+                "Loaded [0] waiting chunk wrappers.",
+                "screen=LevelLoadingScreen overlay=LoadingOverlay",
+            ]
+        )
+        frame_doc = {
+            "status": "complete",
+            "worldEntered": True,
+            "runtimeState": {"screen": "none", "overlay": "none", "loadedChunks": 473},
+        }
+
+        state = harness.readiness_state_from_text("gameplay", None, frame_doc, None, text, {"world_profile": "migration-gate"})
+
+        self.assertTrue(state["world_entered"])
+        self.assertTrue(state["player_alive_and_controllable"])
+        self.assertEqual("none", state["last_screen"])
+        self.assertEqual("none", state["last_overlay"])
+
     def test_capture_passes_player_heart_controls(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -1897,7 +1918,7 @@ else:
 
     def test_rust_opengl_attribution_is_not_confused_by_vulkanicgal_name(self) -> None:
         mode = harness.ModeSpec("current-opengl-shaders-on", "current", "opengl", "on", "java-opengl", False)
-        logs = "Rust VulkanicGAL bridge created borrowed OpenGL context"
+        logs = "Rust OpenGL VulkanicGAL GUI frame executed rust_gal_frames_executed=1 rust_gal_ffi_submit_calls=1 ffi_call_count=3"
 
         self.assertEqual("mixed-java-opengl-rust-opengl", harness.detect_attribution(mode, {}, logs))
         self.assertEqual(
@@ -1909,11 +1930,35 @@ else:
             harness.implementation_attribution_families(mode, "mixed-java-opengl-rust-opengl", logs),
         )
 
+    def test_zero_work_rust_gal_metrics_do_not_relabel_java_vulkan(self) -> None:
+        mode = harness.ModeSpec("current-java-vulkan-shaders-off", "current", "vulkan", "off", "java-vulkan", True)
+        logs = (
+            "Rust OpenGL VulkanicGAL GUI frame executed producer=gui.frame "
+            "rust_gal_frames_executed=0 rust_gal_batches_executed=0 "
+            "rust_gal_ffi_frame_acquire_calls=0 rust_gal_ffi_submit_calls=0 ffi_call_count=0"
+        )
+
+        self.assertEqual("java-vulkan", harness.detect_attribution(mode, {}, logs))
+        self.assertEqual(
+            {"frame.base": "java-vulkan"},
+            harness.implementation_attribution_families(mode, "java-vulkan", logs),
+        )
+
     def test_rust_vulkan_attribution_still_detects_specific_vulkan_backend(self) -> None:
         mode = harness.ModeSpec("current-rust-vulkan-shaders-off", "current", "rust-vulkan", "off", "rust-vulkan", True)
         logs = "Rust Vulkan backend submitted frame"
 
         self.assertEqual("rust-vulkan", harness.detect_attribution(mode, {}, logs))
+
+    def test_rust_vulkanic_gal_whole_frame_metrics_do_not_look_like_opengl(self) -> None:
+        mode = harness.ModeSpec("current-rust-vulkan-shaders-off", "current", "rust-vulkan", "off", "rust-vulkan", True)
+        logs = "Rust VulkanicGAL GUI frame executed producer=gui.frame frame=9 submission=10"
+
+        self.assertEqual("rust-vulkan", harness.detect_attribution(mode, {}, logs))
+        self.assertEqual(
+            {"frame.base": "rust-vulkan"},
+            harness.implementation_attribution_families(mode, "rust-vulkan", logs),
+        )
 
     def test_rust_gal_slice_metrics_are_extracted_from_capture_logs(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

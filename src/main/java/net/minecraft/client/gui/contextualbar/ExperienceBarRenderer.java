@@ -30,7 +30,7 @@ public class ExperienceBarRenderer implements ContextualBarRenderer {
 			int l = filledWidth(localPlayer.experienceProgress);
 			if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
 				// Dev-only measurement control: no migrated or legacy experience bar draw.
-			} else if (RustGalGuiRenderer.isMigratedGuiLegacyControl()) {
+			} else if (RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()) {
 				guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, EXPERIENCE_BAR_BACKGROUND_SPRITE, i, j, 182, 5);
 				if (l > 0) {
 					guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, EXPERIENCE_BAR_PROGRESS_SPRITE, 182, 5, 0, 0, i, j, l, 5);

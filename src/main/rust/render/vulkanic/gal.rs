@@ -420,6 +420,13 @@ impl VulkanicGal {
         )
     }
 
+    pub(in crate::render::vulkanic) fn frame_target_color_format(
+        &self,
+        handle: Handle,
+    ) -> GalResult<ColorFormat> {
+        Ok(self.frame_targets.get(handle)?.desc.color_format)
+    }
+
     pub fn create_texture(&mut self, desc: TextureDesc) -> GalResult<Handle> {
         if desc.extent.width == 0
             || desc.extent.height == 0

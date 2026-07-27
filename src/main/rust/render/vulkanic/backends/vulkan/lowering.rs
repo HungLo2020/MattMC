@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 
 use ash::vk;
+use ash::vk::Handle as _;
 
 use super::device::VulkanContext;
 use super::resources::VulkanObjects;
@@ -11,7 +12,7 @@ use crate::render::vulkanic::commands::{
     ValidatedSubmissionBatch,
 };
 use crate::render::vulkanic::error::{GalError, GalResult};
-use crate::render::vulkanic::handles::Handle;
+use crate::render::vulkanic::handles::{Handle, HandleKind};
 use crate::render::vulkanic::sync::SubmissionId;
 
 pub(super) struct SubmissionLowerer {
@@ -207,14 +208,6 @@ impl SubmissionLowerer {
                     depth_stencil,
                 } => {
                     let pass_object = objects.render_pass(*pass)?;
-                    if target.kind()
-                        == Some(crate::render::vulkanic::handles::HandleKind::FrameTarget)
-                    {
-                        return Err(GalError::unsupported_feature(
-                            "Vulkan frame targets require whole-frame Rust presentation cutover",
-                        ));
-                    }
-                    let target_object = objects.render_target(*target)?;
                     self.context
                         .begin_label(command_buffer, &format!("gal.pass.0x{:016x}", pass.raw()));
                     if pass_object.target != *target {
@@ -222,43 +215,135 @@ impl SubmissionLowerer {
                             "render pass target mismatch during lowering",
                         ));
                     }
-                    let color_attachments = colors
-                        .iter()
-                        .map(|attachment| {
-                            let view = objects.texture_view(attachment.view)?;
-                            Ok(vk::RenderingAttachmentInfo::default()
-                                .image_view(view.view)
+                    let (color_attachments, depth_attachment, extent, frame_present) = if target
+                        .kind()
+                        == Some(HandleKind::FrameTarget)
+                    {
+                        let frame = objects.frame_target(*target)?;
+                        let clear_frame = !state.frame_target_touched;
+                        let range = vk::ImageSubresourceRange {
+                            aspect_mask: vk::ImageAspectFlags::COLOR,
+                            base_mip_level: 0,
+                            level_count: 1,
+                            base_array_layer: 0,
+                            layer_count: 1,
+                        };
+                        let to_attachment = vk::ImageMemoryBarrier2::default()
+                            .src_stage_mask(
+                                if frame.image_layout == vk::ImageLayout::PRESENT_SRC_KHR {
+                                    vk::PipelineStageFlags2::BOTTOM_OF_PIPE
+                                } else {
+                                    vk::PipelineStageFlags2::TOP_OF_PIPE
+                                },
+                            )
+                            .dst_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
+                            .dst_access_mask(
+                                vk::AccessFlags2::COLOR_ATTACHMENT_READ
+                                    | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
+                            )
+                            .old_layout(frame.image_layout)
+                            .new_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                            .image(frame.image)
+                            .subresource_range(range);
+                        self.context.device.cmd_pipeline_barrier2(
+                            command_buffer,
+                            &vk::DependencyInfo::default()
+                                .image_memory_barriers(std::slice::from_ref(&to_attachment)),
+                        );
+                        let clear = colors
+                            .first()
+                            .and_then(|attachment| attachment.clear_color)
+                            .map(|color| [color.r, color.g, color.b, color.a])
+                            .unwrap_or([0.08, 0.31, 0.74, 1.0]);
+                        let load = if clear_frame {
+                            vk::AttachmentLoadOp::CLEAR
+                        } else if colors.is_empty() {
+                            vk::AttachmentLoadOp::LOAD
+                        } else {
+                            load_op(colors[0].load_op)
+                        };
+                        trace::message(&format!(
+                                "gal.frame.target.begin backend=vulkan frame={} image={} view=0x{:016x} extent={}x{} layout={} load={} clear={:.3},{:.3},{:.3},{:.3}",
+                                frame.frame_id,
+                                frame.image_index,
+                                frame.image_view.as_raw(),
+                                frame.extent.width,
+                                frame.extent.height,
+                                frame.image_layout.as_raw(),
+                                load.as_raw(),
+                                clear[0],
+                                clear[1],
+                                clear[2],
+                                clear[3]
+                            ));
+                        state.frame_target_touched = true;
+                        (
+                            vec![vk::RenderingAttachmentInfo::default()
+                                .image_view(frame.image_view)
                                 .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                                .load_op(load_op(attachment.load_op))
-                                .store_op(store_op(attachment.store_op))
+                                .load_op(load)
+                                .store_op(if colors.is_empty() {
+                                    vk::AttachmentStoreOp::STORE
+                                } else {
+                                    store_op(colors[0].store_op)
+                                })
                                 .clear_value(vk::ClearValue {
-                                    color: vk::ClearColorValue {
-                                        float32: attachment
-                                            .clear_color
-                                            .map(|color| [color.r, color.g, color.b, color.a])
-                                            .unwrap_or([0.0, 0.0, 0.0, 0.0]),
-                                    },
-                                }))
-                        })
-                        .collect::<GalResult<Vec<_>>>()?;
-                    let depth_attachment = depth_stencil
-                        .as_ref()
-                        .map(|attachment| {
-                            let view = objects.texture_view(attachment.view)?;
-                            Ok(vk::RenderingAttachmentInfo::default()
-                                .image_view(view.view)
-                                .image_layout(vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL)
-                                .load_op(load_op(attachment.load_op))
-                                .store_op(store_op(attachment.store_op))
-                                .clear_value(vk::ClearValue {
-                                    depth_stencil: vk::ClearDepthStencilValue {
-                                        depth: 1.0,
-                                        stencil: 0,
-                                    },
-                                }))
-                        })
-                        .transpose()?;
-                    let extent = target_object.extent;
+                                    color: vk::ClearColorValue { float32: clear },
+                                })],
+                            None,
+                            frame.extent,
+                            Some(FramePresentTransition {
+                                image: frame.image,
+                                image_index: frame.image_index,
+                                frame_id: frame.frame_id,
+                                range,
+                            }),
+                        )
+                    } else {
+                        let target_object = objects.render_target(*target)?;
+                        let color_attachments = colors
+                            .iter()
+                            .map(|attachment| {
+                                let view = objects.texture_view(attachment.view)?;
+                                Ok(vk::RenderingAttachmentInfo::default()
+                                    .image_view(view.view)
+                                    .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                                    .load_op(load_op(attachment.load_op))
+                                    .store_op(store_op(attachment.store_op))
+                                    .clear_value(vk::ClearValue {
+                                        color: vk::ClearColorValue {
+                                            float32: attachment
+                                                .clear_color
+                                                .map(|color| [color.r, color.g, color.b, color.a])
+                                                .unwrap_or([0.0, 0.0, 0.0, 0.0]),
+                                        },
+                                    }))
+                            })
+                            .collect::<GalResult<Vec<_>>>()?;
+                        let depth_attachment = depth_stencil
+                            .as_ref()
+                            .map(|attachment| {
+                                let view = objects.texture_view(attachment.view)?;
+                                Ok(vk::RenderingAttachmentInfo::default()
+                                    .image_view(view.view)
+                                    .image_layout(vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL)
+                                    .load_op(load_op(attachment.load_op))
+                                    .store_op(store_op(attachment.store_op))
+                                    .clear_value(vk::ClearValue {
+                                        depth_stencil: vk::ClearDepthStencilValue {
+                                            depth: 1.0,
+                                            stencil: 0,
+                                        },
+                                    }))
+                            })
+                            .transpose()?;
+                        (
+                            color_attachments,
+                            depth_attachment,
+                            target_object.extent,
+                            None,
+                        )
+                    };
                     let mut rendering = vk::RenderingInfo::default()
                         .render_area(vk::Rect2D {
                             offset: vk::Offset2D { x: 0, y: 0 },
@@ -297,9 +382,32 @@ impl SubmissionLowerer {
                         .device
                         .cmd_set_scissor(command_buffer, 0, &[scissor]);
                     state.in_pass = true;
+                    state.frame_present = frame_present;
                 }
                 CommandOp::EndPass => {
                     self.context.device.cmd_end_rendering(command_buffer);
+                    if let Some(present) = state.frame_present.take() {
+                        let to_present = vk::ImageMemoryBarrier2::default()
+                            .src_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
+                            .src_access_mask(
+                                vk::AccessFlags2::COLOR_ATTACHMENT_READ
+                                    | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
+                            )
+                            .dst_stage_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE)
+                            .old_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                            .new_layout(vk::ImageLayout::PRESENT_SRC_KHR)
+                            .image(present.image)
+                            .subresource_range(present.range);
+                        self.context.device.cmd_pipeline_barrier2(
+                            command_buffer,
+                            &vk::DependencyInfo::default()
+                                .image_memory_barriers(std::slice::from_ref(&to_present)),
+                        );
+                        trace::message(&format!(
+                            "gal.frame.target.present-ready backend=vulkan frame={} image={}",
+                            present.frame_id, present.image_index
+                        ));
+                    }
                     self.context.end_label(command_buffer);
                     state.in_pass = false;
                     state.graphics_pipeline = None;
@@ -597,7 +705,16 @@ struct EncodingState {
     graphics_pipeline: Option<crate::render::vulkanic::handles::Handle>,
     compute_pipeline: Option<crate::render::vulkanic::handles::Handle>,
     pipeline_layout: Option<crate::render::vulkanic::handles::Handle>,
+    frame_target_touched: bool,
+    frame_present: Option<FramePresentTransition>,
     host_reads: Vec<HostReadRequest>,
+}
+
+struct FramePresentTransition {
+    image: vk::Image,
+    image_index: u32,
+    frame_id: u64,
+    range: vk::ImageSubresourceRange,
 }
 
 struct EncodedSubmission {

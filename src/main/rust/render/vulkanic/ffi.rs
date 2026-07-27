@@ -4,7 +4,10 @@ use std::mem::{align_of, size_of, MaybeUninit};
 use std::ptr;
 use std::slice;
 
-use super::backends::{create_backend, create_borrowed_opengl_backend, BackendKind};
+use super::backends::{
+    create_backend, create_borrowed_opengl_backend, create_native_windowed_vulkan_backend,
+    BackendKind,
+};
 use super::commands::{
     AttachmentLoadOp, AttachmentStoreOp, BufferImageCopyRegion, ClearColor, CommandList,
     CommandListDesc, CommandOp, PassAttachment, ResourceBarrier, SubmissionBatch, TextureOrigin3d,
@@ -104,6 +107,23 @@ pub struct FfiBorrowedOpenGlContextCreateRequest {
     pub tracy_enabled: u32,
     pub reserved0: u32,
     pub label: FfiBytes,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiWindowedVulkanContextCreateRequest {
+    pub header: FfiHeader,
+    pub platform: u32,
+    pub tracy_enabled: u32,
+    pub stable_window_id: u64,
+    pub native_display: u64,
+    pub native_window: u64,
+    pub label: FfiBytes,
+    pub surface_label: FfiBytes,
+    pub extent: FfiExtent3d,
+    pub color_format: u32,
+    pub present_mode: u32,
+    pub max_frames_in_flight: u32,
 }
 
 #[repr(C)]
@@ -2005,13 +2025,27 @@ struct BridgeContext {
     ffi_output_bytes: u64,
     last_error: String,
     cached_frame_target: Option<CachedFrameTarget>,
+    stale_frame_targets: Vec<Handle>,
 }
 
 #[derive(Clone, Copy)]
 struct CachedFrameTarget {
     handle: Handle,
-    extent: Extent3d,
-    color_format: TextureFormat,
+}
+
+fn destroy_stale_frame_targets(context: &mut BridgeContext) -> GalResult<()> {
+    for handle in std::mem::take(&mut context.stale_frame_targets) {
+        context.gal.destroy(handle)?;
+    }
+    Ok(())
+}
+
+fn destroy_all_frame_targets(context: &mut BridgeContext) -> GalResult<()> {
+    destroy_stale_frame_targets(context)?;
+    if let Some(cached) = context.cached_frame_target.take() {
+        context.gal.destroy(cached.handle)?;
+    }
+    Ok(())
 }
 
 #[derive(Default)]
@@ -2301,13 +2335,7 @@ unsafe fn decode_gui_frame_submit(
             "GUI frame submit requires a frame-target handle",
         ));
     }
-    let sprites = read_slice(request.sprites, false, "GUI sprite requests")?;
-    if sprites.is_empty() {
-        return Err(GalError::ffi(
-            StatusCode::InvalidArgument,
-            "GUI frame submit requires at least one sprite",
-        ));
-    }
+    let sprites = read_slice(request.sprites, true, "GUI sprite requests")?;
     if sprites.len() > FFI_MAX_BATCH_ITEMS {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
@@ -2578,6 +2606,7 @@ fn execute_resource_batch(
         {
             context.cached_frame_target = None;
         }
+        context.stale_frame_targets.retain(|stale| *stale != handle);
         context.gal.destroy(handle)?;
     }
     Ok(results)
@@ -3083,6 +3112,24 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
             FfiGuiAssetUpdateRequest,
             [header, generation, assets, negotiated_feature_bits]
         ),
+        49 => layout!(
+            49,
+            FfiWindowedVulkanContextCreateRequest,
+            [
+                header,
+                platform,
+                tracy_enabled,
+                stable_window_id,
+                native_display,
+                native_window,
+                label,
+                surface_label,
+                extent,
+                color_format,
+                present_mode,
+                max_frames_in_flight
+            ]
+        ),
         _ => {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,
@@ -3138,6 +3185,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create(
                     ffi_output_bytes: size_of::<FfiContextResult>() as u64,
                     last_error: String::new(),
                     cached_frame_target: None,
+                    stale_frame_targets: Vec::new(),
                 },
             );
             Ok(context_id)
@@ -3217,6 +3265,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_borrowed_opengl(
                     ffi_output_bytes: size_of::<FfiContextResult>() as u64,
                     last_error: String::new(),
                     cached_frame_target: None,
+                    stale_frame_targets: Vec::new(),
                 },
             );
             Ok(context_id)
@@ -3228,6 +3277,101 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_borrowed_opengl(
             metrics: FfiMetricsSnapshot {
                 ffi_calls: 1,
                 ffi_input_bytes: size_of::<FfiBorrowedOpenGlContextCreateRequest>() as u64,
+                ffi_output_bytes: size_of::<FfiContextResult>() as u64,
+                ..FfiMetricsSnapshot::default()
+            },
+            ..FfiContextResult::default()
+        })
+    })();
+    match result {
+        Ok(value) => {
+            write_context_out(out, value);
+            StatusCode::Ok as i32
+        }
+        Err(error) => {
+            with_registry_mut(|registry| {
+                registry.last_error = error.to_string();
+            });
+            write_context_out(
+                out,
+                FfiContextResult {
+                    status: error.code as i32,
+                    error_domain: error.domain as u32,
+                    ..FfiContextResult::default()
+                },
+            );
+            error.code as i32
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_windowed_vulkan(
+    request: *const FfiWindowedVulkanContextCreateRequest,
+    out: *mut FfiContextResult,
+) -> i32 {
+    let result = (|| -> GalResult<FfiContextResult> {
+        let request = read_struct(request, "windowed Vulkan context create request")?;
+        validate_header::<FfiWindowedVulkanContextCreateRequest>(request.header)?;
+        if request.stable_window_id == 0 {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "windowed Vulkan context requires a stable non-zero window id",
+            ));
+        }
+        let label = read_label(request.label, "windowed Vulkan context label")?;
+        let surface_label = read_label(request.surface_label, "windowed Vulkan surface label")?;
+        let surface_desc = FrameSurfaceDesc {
+            label: surface_label,
+            extent: request.extent.into(),
+            color_format: texture_format(request.color_format)?,
+            present_mode: present_mode(request.present_mode)?,
+            max_frames_in_flight: request.max_frames_in_flight,
+        };
+        let backend = create_native_windowed_vulkan_backend(
+            &label,
+            request.platform,
+            request.stable_window_id,
+            request.native_display,
+            request.native_window,
+            surface_desc,
+        )?;
+        let gal = VulkanicGal::new_with_backend(
+            backend,
+            bool_flag(request.tracy_enabled, "tracy enabled")?,
+        );
+        let capabilities = gal.capabilities();
+        let context_id = with_registry_mut(|registry| -> GalResult<u64> {
+            let context_id = registry.next_context_id;
+            registry.next_context_id =
+                registry.next_context_id.checked_add(1).ok_or_else(|| {
+                    GalError::ffi(
+                        StatusCode::GenerationExhausted,
+                        "context id space exhausted",
+                    )
+                })?;
+            registry.contexts.insert(
+                context_id,
+                BridgeContext {
+                    gal,
+                    gui_frontend: GuiFrontend::default(),
+                    ffi_calls: 1,
+                    ffi_input_bytes: size_of::<FfiWindowedVulkanContextCreateRequest>() as u64,
+                    ffi_output_bytes: size_of::<FfiContextResult>() as u64,
+                    last_error: String::new(),
+                    cached_frame_target: None,
+                    stale_frame_targets: Vec::new(),
+                },
+            );
+            Ok(context_id)
+        })?;
+        Ok(FfiContextResult {
+            context_id,
+            supported_feature_bits: capability_feature_bits(capabilities),
+            limits: capabilities.limits.into(),
+            metrics: FfiMetricsSnapshot {
+                ffi_calls: 1,
+                ffi_input_bytes: size_of::<FfiWindowedVulkanContextCreateRequest>() as u64,
                 ffi_output_bytes: size_of::<FfiContextResult>() as u64,
                 ..FfiMetricsSnapshot::default()
             },
@@ -3469,12 +3613,14 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_gui_submit_frame(
             .saturating_add(size_of::<FfiGuiFrameSubmitResult>() as u64);
         let result = decode_gui_frame_submit(request, context.gal.capabilities()).and_then(
             |(generation, frame_target, sprites)| {
-                context.gui_frontend.submit_frame(
+                let stats = context.gui_frontend.submit_frame(
                     &mut context.gal,
                     generation,
                     frame_target,
                     sprites,
-                )
+                )?;
+                destroy_stale_frame_targets(context)?;
+                Ok(stats)
             },
         );
         match result {
@@ -3797,7 +3943,8 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_configure(
                 present_mode: present_mode(request.present_mode)?,
                 max_frames_in_flight: request.max_frames_in_flight,
             };
-            context.cached_frame_target = None;
+            context.gui_frontend.clear_frame_pass(&mut context.gal);
+            destroy_all_frame_targets(context)?;
             context.gal.configure_frame_surface(desc)
         })();
         match result {
@@ -3840,24 +3987,6 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_acquire(
             })?;
             let frame_target = if acquired.status == FrameAcquireStatus::Minimized {
                 Handle::NULL
-            } else if let Some(cached) = context.cached_frame_target {
-                if cached.extent == acquired.extent && cached.color_format == acquired.color_format
-                {
-                    cached.handle
-                } else {
-                    let handle = context.gal.create_frame_target(FrameTargetDesc {
-                        label: format!("ffi.frame-target.{}", acquired.frame.0),
-                        frame_id: acquired.frame.0,
-                        extent: acquired.extent,
-                        color_format: acquired.color_format,
-                    })?;
-                    context.cached_frame_target = Some(CachedFrameTarget {
-                        handle,
-                        extent: acquired.extent,
-                        color_format: acquired.color_format,
-                    });
-                    handle
-                }
             } else {
                 let handle = context.gal.create_frame_target(FrameTargetDesc {
                     label: format!("ffi.frame-target.{}", acquired.frame.0),
@@ -3865,11 +3994,12 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_acquire(
                     extent: acquired.extent,
                     color_format: acquired.color_format,
                 })?;
-                context.cached_frame_target = Some(CachedFrameTarget {
-                    handle,
-                    extent: acquired.extent,
-                    color_format: acquired.color_format,
-                });
+                if let Some(previous) = context
+                    .cached_frame_target
+                    .replace(CachedFrameTarget { handle })
+                {
+                    context.stale_frame_targets.push(previous.handle);
+                }
                 handle
             };
             Ok(FfiFrameAcquireResult {
@@ -3928,8 +4058,8 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_resize(
         let result = (|| -> GalResult<FfiFrameResizeResult> {
             let request = read_struct(request, "frame resize request")?;
             validate_header::<FfiFrameResizeRequest>(request.header)?;
-            context.cached_frame_target = None;
             context.gui_frontend.clear_frame_pass(&mut context.gal);
+            destroy_all_frame_targets(context)?;
             let resized = context.gal.resize_frame_surface(FrameResizeDesc {
                 correlation_id: FrameCorrelationId(request.correlation_id),
                 extent: request.extent.into(),
@@ -4037,8 +4167,12 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_shutdown(
         context.ffi_output_bytes = context
             .ffi_output_bytes
             .saturating_add(size_of::<FfiStatusResult>() as u64);
-        context.cached_frame_target = None;
         context.gui_frontend.reset(&mut context.gal);
+        if let Err(error) = destroy_all_frame_targets(context) {
+            set_last_error(context, &error);
+            write_status_out(status_out, status_error(Some(context), &error));
+            return error.code as i32;
+        }
         match context.gal.shutdown_frame_surface() {
             Ok(()) => {
                 write_status_out(status_out, status_ok(context));

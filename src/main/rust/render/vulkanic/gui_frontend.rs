@@ -59,6 +59,44 @@ void main() {
 }
 "#;
 
+const VERTEX_SHADER_VULKAN: &[u8] = br#"#version 450
+struct PackedGuiSprite {
+    vec4 rect;
+    vec4 viewport;
+    vec4 uv_region;
+    vec4 color;
+};
+layout(set = 0, binding = 0, std140) uniform GuiSpriteBatch {
+    PackedGuiSprite sprites[256];
+};
+layout(location = 0) out vec2 v_uv;
+layout(location = 1) out vec2 v_sprite_corner;
+layout(location = 2) out vec4 v_color;
+layout(location = 3) flat out vec4 v_uv_region;
+const vec2 corner[6] = vec2[6](
+    vec2(0.0, 0.0),
+    vec2(1.0, 0.0),
+    vec2(1.0, 1.0),
+    vec2(1.0, 1.0),
+    vec2(0.0, 1.0),
+    vec2(0.0, 0.0)
+);
+void main() {
+    int vertex = gl_VertexIndex;
+    PackedGuiSprite sprite = sprites[gl_InstanceIndex];
+    vec2 pixel = sprite.rect.xy + corner[vertex] * sprite.rect.zw;
+    vec2 ndc = vec2((pixel.x / sprite.viewport.x) * 2.0 - 1.0, 1.0 - (pixel.y / sprite.viewport.y) * 2.0);
+    gl_Position = vec4(ndc, 0.0, 1.0);
+    v_uv_region = sprite.uv_region;
+    v_sprite_corner = corner[vertex];
+    v_uv = vec2(
+        sprite.uv_region.x + corner[vertex].x * sprite.uv_region.z,
+        sprite.uv_region.y + (1.0 - corner[vertex].y) * sprite.uv_region.w
+    );
+    v_color = sprite.color;
+}
+"#;
+
 const FRAGMENT_SHADER_OPENGL: &[u8] = br#"#version 330 core
 uniform sampler2D Sampler0;
 in vec2 v_uv;
@@ -74,6 +112,29 @@ void main() {
     ivec2 texel = ivec2(origin.x + local.x, origin.y + extent.y - 1 - local.y);
     texel = clamp(texel, ivec2(0), texture_size - ivec2(1));
     vec4 color = texelFetch(Sampler0, texel, 0) * v_color;
+    if (color.a <= 0.0) {
+        discard;
+    }
+    out_color = color;
+}
+"#;
+
+const FRAGMENT_SHADER_VULKAN: &[u8] = br#"#version 450
+layout(set = 0, binding = 1) uniform texture2D Tex0;
+layout(set = 0, binding = 2) uniform sampler Samp0;
+layout(location = 0) in vec2 v_uv;
+layout(location = 1) in vec2 v_sprite_corner;
+layout(location = 2) in vec4 v_color;
+layout(location = 3) flat in vec4 v_uv_region;
+layout(location = 0) out vec4 out_color;
+void main() {
+    ivec2 texture_size = textureSize(sampler2D(Tex0, Samp0), 0);
+    ivec2 origin = ivec2(round(v_uv_region.xy * vec2(texture_size)));
+    ivec2 extent = max(ivec2(round(v_uv_region.zw * vec2(texture_size))), ivec2(1));
+    ivec2 local = clamp(ivec2(floor(v_sprite_corner * vec2(extent))), ivec2(0), extent - ivec2(1));
+    ivec2 texel = ivec2(origin.x + local.x, origin.y + extent.y - 1 - local.y);
+    texel = clamp(texel, ivec2(0), texture_size - ivec2(1));
+    vec4 color = texelFetch(sampler2D(Tex0, Samp0), texel, 0) * v_color;
     if (color.a <= 0.0) {
         discard;
     }
@@ -174,7 +235,7 @@ pub struct GuiFrontend {
     asset_generation: u64,
     asset_overrides: BTreeMap<u32, Vec<u8>>,
     atlases: BTreeMap<TextureGroupKey, TextureAtlas>,
-    resources: BTreeMap<TextureGroupKey, GuiResources>,
+    resources: BTreeMap<ResourceKey, GuiResources>,
     cached_pass: Option<CachedPass>,
 }
 
@@ -189,6 +250,21 @@ impl From<TextureGroup> for TextureGroupKey {
         match value {
             TextureGroup::Alpha => Self::Alpha,
             TextureGroup::Invert => Self::Invert,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct ResourceKey {
+    group: TextureGroupKey,
+    color_format: ColorFormat,
+}
+
+impl ResourceKey {
+    fn new(group: TextureGroup, color_format: ColorFormat) -> Self {
+        Self {
+            group: TextureGroupKey::from(group),
+            color_format,
         }
     }
 }
@@ -327,16 +403,11 @@ impl GuiFrontend {
         frame_target: Handle,
         requests: Vec<GuiSpriteRequest>,
     ) -> GalResult<GuiSubmitStats> {
-        if requests.is_empty() {
-            return Err(GalError::ffi(
-                StatusCode::InvalidArgument,
-                "GUI frame submission requires at least one sprite",
-            ));
-        }
         if generation != self.generation {
             self.destroy_render_resources(gal);
             self.generation = generation;
         }
+        let color_format = gal.frame_target_color_format(frame_target)?;
         let frame_pass = self.frame_pass(gal, frame_target)?;
         let mut batches: Vec<SpriteBatch> = Vec::new();
         let mut stats = GuiSubmitStats {
@@ -356,11 +427,11 @@ impl GuiFrontend {
             }
             validate_request(&request, def)?;
             let group = def.group;
-            let key = TextureGroupKey::from(group);
+            let key = ResourceKey::new(group, color_format);
             if self.resources.contains_key(&key) {
                 stats.cache_hits += 1;
             } else {
-                let resources = self.create_resources(gal, group)?;
+                let resources = self.create_resources(gal, group, color_format)?;
                 self.resources.insert(key, resources);
                 stats.cache_misses += 1;
                 stats.resource_creates += 12;
@@ -384,10 +455,32 @@ impl GuiFrontend {
         }
         stats.sprite_batch_count = batches.len() as u64;
         let mut ops = Vec::new();
+        let whole_frame_vulkan = gal
+            .capabilities()
+            .name
+            .to_ascii_lowercase()
+            .contains("vulkan");
+        if whole_frame_vulkan {
+            ops.push(CommandOp::BeginPass {
+                pass: frame_pass,
+                target: frame_target,
+                colors: Vec::new(),
+                depth_stencil: None,
+            });
+            ops.push(CommandOp::EndPass);
+        } else if batches.is_empty() {
+            ops.push(CommandOp::BeginPass {
+                pass: frame_pass,
+                target: frame_target,
+                colors: Vec::new(),
+                depth_stencil: None,
+            });
+            ops.push(CommandOp::EndPass);
+        }
         for batch in &batches {
             let resources = self
                 .resources
-                .get(&TextureGroupKey::from(batch.group))
+                .get(&ResourceKey::new(batch.group, color_format))
                 .ok_or_else(|| GalError::backend("GUI resources vanished before submit"))?;
             let uniforms = self.packed_uniform_bytes(batch)?;
             ops.push(CommandOp::Barrier(buffer_barrier(
@@ -451,7 +544,7 @@ impl GuiFrontend {
         let pass = gal.create_render_pass(RenderPassDesc {
             label: "minecraft.gui.frame.pass".to_string(),
             target: frame_target,
-            color_formats: vec![ColorFormat::Rgba8Unorm],
+            color_formats: vec![gal.frame_target_color_format(frame_target)?],
             depth_format: None,
         })?;
         self.cached_pass = Some(CachedPass { frame_target, pass });
@@ -462,9 +555,25 @@ impl GuiFrontend {
         &mut self,
         gal: &mut VulkanicGal,
         group: TextureGroup,
+        color_format: ColorFormat,
     ) -> GalResult<GuiResources> {
         let label = format!("gui-textured-{}-gen{}", group.label(), self.generation);
         let atlas = self.atlas_for(group)?.clone();
+        let vulkan_shader_syntax = gal
+            .capabilities()
+            .name
+            .to_ascii_lowercase()
+            .contains("vulkan");
+        let vertex_shader_code = if vulkan_shader_syntax {
+            VERTEX_SHADER_VULKAN
+        } else {
+            VERTEX_SHADER_OPENGL
+        };
+        let fragment_shader_code = if vulkan_shader_syntax {
+            FRAGMENT_SHADER_VULKAN
+        } else {
+            FRAGMENT_SHADER_OPENGL
+        };
         let mut created = Vec::new();
         let result = (|| -> GalResult<GuiResources> {
             let upload_buffer = gal.create_buffer(BufferDesc {
@@ -528,7 +637,7 @@ impl GuiFrontend {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
-                code: VERTEX_SHADER_OPENGL.to_vec(),
+                code: vertex_shader_code.to_vec(),
                 entry_point: "main".to_string(),
             })?;
             created.push(vertex_shader);
@@ -536,7 +645,7 @@ impl GuiFrontend {
                 label: format!("{label}.fragment"),
                 stage: ShaderStage::Fragment,
                 code_format: ShaderCodeFormat::Glsl,
-                code: FRAGMENT_SHADER_OPENGL.to_vec(),
+                code: fragment_shader_code.to_vec(),
                 entry_point: "main".to_string(),
             })?;
             created.push(fragment_shader);
@@ -625,7 +734,7 @@ impl GuiFrontend {
                 cull_mode: CullMode::None,
                 blend: group.blend(),
                 depth_compare: None,
-                color_formats: vec![ColorFormat::Rgba8Unorm],
+                color_formats: vec![color_format],
                 depth_format: None,
             })?;
             created.push(pipeline);
@@ -2161,6 +2270,21 @@ mod tests {
         assert_eq!(0, second.resource_creates);
         assert!(second.cache_hits > 0);
         assert_eq!(0, second.cache_misses);
+    }
+
+    #[test]
+    fn vulkan_whole_frame_gui_submission_clears_once_before_batches() {
+        let mut gal = mock_gal();
+        let mut frontend = GuiFrontend::default();
+        let target = frame_target(&mut gal);
+
+        let stats = frontend
+            .submit_frame(&mut gal, 10, target, vec![request(2), request(3)])
+            .unwrap();
+
+        assert_eq!(2, stats.sprite_batch_count);
+        assert_eq!(1, stats.command_lists);
+        assert_eq!(20, stats.command_ops);
     }
 
     #[test]

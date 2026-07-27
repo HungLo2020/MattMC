@@ -265,22 +265,22 @@ public final class GraphicsFrameBenchmark {
 	private static boolean ensureInitialized(Minecraft minecraft) {
 		if (initialized) {
 			dismissKnownGameplayScreen(minecraft);
-			boolean ready = minecraft.level != null && minecraft.player != null && minecraft.getConnection() != null && minecraft.screen == null && minecraft.getOverlay() == null;
+			boolean ready = isBenchmarkWorldReady(minecraft);
 			if (!ready) {
 				recordInitializationBlocker(minecraft);
 			}
 			return ready;
 		}
-		LocalPlayer player = minecraft.player;
 		dismissKnownGameplayScreen(minecraft);
-		if (minecraft.level == null || player == null || minecraft.getConnection() == null || minecraft.screen != null || minecraft.getOverlay() != null) {
+		LocalPlayer player = minecraft.player;
+		if (!isBenchmarkWorldReady(minecraft) || player == null) {
 			recordInitializationBlocker(minecraft);
 			return false;
 		}
-			initialized = true;
-			applyGameModeOverride(minecraft);
-			applyArmorOverride(player);
-			applyHealthOverride(player);
+		initialized = true;
+		applyGameModeOverride(minecraft);
+		applyArmorOverride(player);
+		applyHealthOverride(player);
 		initialPosition = new Vec3(CAMERA_X, CAMERA_Y, CAMERA_Z);
 		initialYaw = CAMERA_YAW;
 		initialPitch = CAMERA_PITCH;
@@ -298,11 +298,36 @@ public final class GraphicsFrameBenchmark {
 			return;
 		}
 		String screen = minecraft.screen.getClass().getSimpleName();
-		if ("PauseScreen".equals(screen) || "GuiWelcomeScreen".equals(screen)) {
+		if ("PauseScreen".equals(screen) || "GuiWelcomeScreen".equals(screen) || isStaleStartupScreen(minecraft)) {
 			lastReadinessBlocker = "auto-dismissed screen=" + screen;
 			minecraft.setScreen(null);
 			writeStatus(minecraft, "dismissed_gameplay_screen");
 		}
+	}
+
+	private static boolean isBenchmarkWorldReady(Minecraft minecraft) {
+		return minecraft.level != null
+			&& minecraft.player != null
+			&& minecraft.getConnection() != null
+			&& minecraft.getOverlay() == null
+			&& (minecraft.screen == null || isStaleStartupScreen(minecraft))
+			&& minecraft.level.getChunkSource().getLoadedChunksCount() > 0;
+	}
+
+	private static boolean isStaleStartupScreen(Minecraft minecraft) {
+		if (minecraft.screen == null || minecraft.level == null || minecraft.player == null || minecraft.getConnection() == null || minecraft.getOverlay() != null) {
+			return false;
+		}
+		String screen = minecraft.screen.getClass().getSimpleName();
+		if ("LevelLoadingScreen".equals(screen)) {
+			return minecraft.level.getChunkSource().getLoadedChunksCount() > 0;
+		}
+		if (!"GenericMessageScreen".equals(screen)) {
+			return false;
+		}
+		String title = screenTitle(minecraft).toLowerCase(Locale.ROOT);
+		return minecraft.level.getChunkSource().getLoadedChunksCount() > 0
+			&& (title.contains("downloading terrain") || title.contains("loading terrain") || title.contains("joining world"));
 	}
 
 	private static void disableVoxelMapWelcomeScreen() {
@@ -333,11 +358,19 @@ public final class GraphicsFrameBenchmark {
 	private static String readinessSummary(Minecraft minecraft) {
 		String screen = minecraft.screen == null ? "none" : minecraft.screen.getClass().getSimpleName();
 		String overlay = minecraft.getOverlay() == null ? "none" : minecraft.getOverlay().getClass().getSimpleName();
+		int loadedChunks = minecraft.level == null ? -1 : minecraft.level.getChunkSource().getLoadedChunksCount();
 		return "level=" + (minecraft.level != null)
 			+ ", player=" + (minecraft.player != null)
 			+ ", connection=" + (minecraft.getConnection() != null)
 			+ ", screen=" + screen
-			+ ", overlay=" + overlay;
+			+ ", screenTitle=" + screenTitle(minecraft)
+			+ ", overlay=" + overlay
+			+ ", loadedChunks=" + loadedChunks
+			+ ", staleStartupScreen=" + isStaleStartupScreen(minecraft);
+	}
+
+	private static String screenTitle(Minecraft minecraft) {
+		return minecraft.screen == null ? "none" : minecraft.screen.getTitle().getString();
 	}
 
 	private static void holdPlayerStillAndApplyCameraPath(Minecraft minecraft) {
@@ -345,9 +378,9 @@ public final class GraphicsFrameBenchmark {
 		if (player == null) {
 			return;
 		}
-			applyArmorOverride(player);
-			applyHealthOverride(player);
-			applyGameModeOverride(minecraft);
+		applyArmorOverride(player);
+		applyHealthOverride(player);
+		applyGameModeOverride(minecraft);
 		player.input.keyPresses = Input.EMPTY;
 		player.xxa = 0.0F;
 		player.zza = 0.0F;

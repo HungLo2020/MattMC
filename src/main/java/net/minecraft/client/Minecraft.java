@@ -1356,25 +1356,40 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		}
 
 			RenderTarget renderTarget = this.getMainRenderTarget();
-			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("command.recording.clear");
-			VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
-			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("command.recording.clear");
-			profilerFiller.push("gameRenderer");
-			startTime = Util.getNanos();
-			if (!this.noRender) {
-				net.minecraft.client.dev.DeterministicCameraCapture.beforeRender(this);
-				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rendering");
-				this.gameRenderer.render(this.deltaTracker, bl);
-				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rendering");
-				net.minecraft.client.dev.DeterministicCameraCapture.afterRender(this);
-			}
-		net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadOperation("frame.gameRenderer", Util.getNanos() - startTime);
+			boolean rustWholeFrameShell = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+			if (rustWholeFrameShell) {
+				profilerFiller.push("rustVulkanWholeFrame");
+				startTime = Util.getNanos();
+				if (!this.noRender) {
+					net.minecraft.client.dev.DeterministicCameraCapture.beforeRender(this);
+					net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rendering.rust-vulkan-whole-frame");
+					this.gameRenderer.renderRustVulkanWholeFrameShell(this.deltaTracker, bl);
+					net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rendering.rust-vulkan-whole-frame");
+					net.minecraft.client.dev.DeterministicCameraCapture.afterRender(this);
+				}
+				net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadOperation("frame.rustVulkanWholeFrame", Util.getNanos() - startTime);
+				profilerFiller.popPush("blit");
+			} else {
+				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("command.recording.clear");
+				VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
+				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("command.recording.clear");
+				profilerFiller.push("gameRenderer");
+				startTime = Util.getNanos();
+				if (!this.noRender) {
+					net.minecraft.client.dev.DeterministicCameraCapture.beforeRender(this);
+					net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rendering");
+					this.gameRenderer.render(this.deltaTracker, bl);
+					net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rendering");
+					net.minecraft.client.dev.DeterministicCameraCapture.afterRender(this);
+				}
+				net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadOperation("frame.gameRenderer", Util.getNanos() - startTime);
 
-			profilerFiller.popPush("blit");
-			if (!this.window.isMinimized()) {
-				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("api.present.blit");
-				renderTarget.blitToScreen();
-				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("api.present.blit");
+				profilerFiller.popPush("blit");
+				if (!this.window.isMinimized()) {
+					net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("api.present.blit");
+					renderTarget.blitToScreen();
+					net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("api.present.blit");
+				}
 			}
 
 		this.frameTimeNs = Util.getNanos() - l;

@@ -80,6 +80,24 @@ pub(in crate::render::vulkanic) fn create_borrowed_opengl_backend(
     )?))
 }
 
+pub(in crate::render::vulkanic) fn create_native_windowed_vulkan_backend(
+    label: &str,
+    platform: u32,
+    stable_window_id: u64,
+    native_display: u64,
+    native_window: u64,
+    surface_desc: FrameSurfaceDesc,
+) -> GalResult<Box<dyn Backend>> {
+    Ok(Box::new(vulkan::VulkanBackend::new_native_windowed(
+        label,
+        platform,
+        stable_window_id,
+        native_display,
+        native_window,
+        surface_desc,
+    )?))
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) enum BackendCreateDesc<'a> {
     Buffer(&'a BufferDesc),
