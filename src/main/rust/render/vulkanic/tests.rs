@@ -1371,6 +1371,81 @@ fn attachment_and_presentation_hazards_require_semantic_separation() {
         base_layer: 0,
         layer_count: 1,
     };
+    let repeated_attachment_writes = gal
+        .create_command_list(CommandListDesc {
+            label: "repeated-attachment-writes".to_owned(),
+            operations: vec![
+                CommandOp::BeginPass {
+                    pass,
+                    target,
+                    colors: vec![color_attachment(first_view)],
+                    depth_stencil: None,
+                },
+                CommandOp::BindGraphicsPipeline(pipeline),
+                CommandOp::EndPass,
+                CommandOp::BeginPass {
+                    pass,
+                    target,
+                    colors: vec![PassAttachment {
+                        view: first_view,
+                        load_op: AttachmentLoadOp::Load,
+                        store_op: AttachmentStoreOp::Store,
+                        clear_color: None,
+                    }],
+                    depth_stencil: None,
+                },
+                CommandOp::BindGraphicsPipeline(pipeline),
+                CommandOp::EndPass,
+            ],
+        })
+        .unwrap();
+    gal.submit(SubmissionBatch {
+        label: "ordered-repeated-attachment-writes".to_owned(),
+        command_lists: vec![repeated_attachment_writes],
+    })
+    .unwrap();
+
+    let load_after_dont_care_store = gal
+        .create_command_list(CommandListDesc {
+            label: "load-after-dont-care-store".to_owned(),
+            operations: vec![
+                CommandOp::BeginPass {
+                    pass,
+                    target,
+                    colors: vec![PassAttachment {
+                        view: first_view,
+                        load_op: AttachmentLoadOp::Clear,
+                        store_op: AttachmentStoreOp::DontCare,
+                        clear_color: None,
+                    }],
+                    depth_stencil: None,
+                },
+                CommandOp::BindGraphicsPipeline(pipeline),
+                CommandOp::EndPass,
+                CommandOp::BeginPass {
+                    pass,
+                    target,
+                    colors: vec![PassAttachment {
+                        view: first_view,
+                        load_op: AttachmentLoadOp::Load,
+                        store_op: AttachmentStoreOp::Store,
+                        clear_color: None,
+                    }],
+                    depth_stencil: None,
+                },
+                CommandOp::BindGraphicsPipeline(pipeline),
+                CommandOp::EndPass,
+            ],
+        })
+        .unwrap();
+    assert_code(
+        gal.submit(SubmissionBatch {
+            label: "attachment-load-after-dont-care-store".to_owned(),
+            command_lists: vec![load_after_dont_care_store],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+
     let present_without_barrier = gal
         .create_command_list(CommandListDesc {
             label: "present-without-barrier".to_owned(),

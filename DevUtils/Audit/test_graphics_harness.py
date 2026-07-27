@@ -894,13 +894,14 @@ else:
                         "gal.frame.target.present-ready backend=vulkan frame=7 image=2",
                         "gal.frame.present backend=vulkan correlation=9 frame=7 image=2 submission=11 status=Presented window=42",
                         "minecraft.world.block-outline.pass",
-                        "[MattMC graphics audit] Rust VulkanicGAL GUI frame executed rust_gal_world_primitive_batches_executed=1 rust_gal_world_line_segments_executed=12 rust_gal_world_line_vertices_executed=24 rust_gal_world_primitive_draws_executed=1 rust_gal_world_depth_attachment_creates=1 rust_gal_world_depth_attachment_reuses=0",
+                        "[MattMC graphics audit] Rust VulkanicGAL GUI frame executed rust_gal_world_primitive_batches_executed=1 rust_gal_world_line_segments_executed=12 rust_gal_world_line_vertices_executed=24 rust_gal_world_primitive_draws_executed=1 rust_gal_world_crack_quads_executed=6 rust_gal_world_crack_batches_executed=1 rust_gal_world_crack_draws_executed=1 rust_gal_world_depth_attachment_creates=1 rust_gal_world_depth_attachment_reuses=0",
                     ]
                 ),
                 encoding="utf-8",
             )
             proof = harness.renderdoc_workload_proof(capture)
             self.assertTrue(proof["non_zero_outline_workload"])
+            self.assertTrue(proof["non_zero_crack_workload"])
             self.assertTrue(proof["acquired_rendered_presented_image_identity_matches"])
             self.assertTrue(proof["depth_attachment_evidence"])
             self.assertTrue(proof["outline_marker_evidence"])
@@ -2436,7 +2437,14 @@ else:
                 "rust_gal_cache_misses=1 rust_gal_queue_depth=0 rust_gal_batches_executed=2 "
                 "rust_gal_world_primitive_batches_executed=1 rust_gal_world_line_segments_executed=12 "
                 "rust_gal_world_line_vertices_executed=24 rust_gal_world_primitive_draws_executed=1 "
+                "rust_gal_world_crack_quads_executed=6 rust_gal_world_crack_batches_executed=1 "
+                "rust_gal_world_crack_draws_executed=1 "
                 "rust_gal_world_depth_attachment_creates=1 rust_gal_world_depth_attachment_reuses=7 "
+                "rust_gal_world_depth_attachment_retires=2 "
+                "rust_gal_world_outline_cache_hits=3 rust_gal_world_outline_cache_misses=1 "
+                "rust_gal_world_crack_cache_hits=4 rust_gal_world_crack_cache_misses=1 "
+                "rust_gal_frame_target_generations=8 rust_gal_frame_target_identity_changes=7 "
+                "rust_gal_last_frame_target_generation=9 rust_gal_last_frame_target_identity=2 "
                 "rust_gal_batches_cancelled=0 rust_gal_completion_polls=0 rust_gal_completion_timeouts=0 "
                 "rust_gal_ffi_context_create_calls=1 rust_gal_ffi_capability_calls=1 "
                 "rust_gal_ffi_frame_configure_calls=1 rust_gal_ffi_frame_acquire_calls=2 "
@@ -2488,8 +2496,20 @@ else:
             self.assertEqual(12, artifact["metrics"]["rust_gal_slice"]["world_line_segments_executed"])
             self.assertEqual(24, artifact["metrics"]["rust_gal_slice"]["world_line_vertices_executed"])
             self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["world_primitive_draws_executed"])
+            self.assertEqual(6, artifact["metrics"]["rust_gal_slice"]["world_crack_quads_executed"])
+            self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["world_crack_batches_executed"])
+            self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["world_crack_draws_executed"])
             self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["world_depth_attachment_creates"])
             self.assertEqual(7, artifact["metrics"]["rust_gal_slice"]["world_depth_attachment_reuses"])
+            self.assertEqual(2, artifact["metrics"]["rust_gal_slice"]["world_depth_attachment_retires"])
+            self.assertEqual(3, artifact["metrics"]["rust_gal_slice"]["world_outline_cache_hits"])
+            self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["world_outline_cache_misses"])
+            self.assertEqual(4, artifact["metrics"]["rust_gal_slice"]["world_crack_cache_hits"])
+            self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["world_crack_cache_misses"])
+            self.assertEqual(8, artifact["metrics"]["rust_gal_slice"]["frame_target_generations"])
+            self.assertEqual(7, artifact["metrics"]["rust_gal_slice"]["frame_target_identity_changes"])
+            self.assertEqual(9, artifact["metrics"]["rust_gal_slice"]["last_frame_target_generation"])
+            self.assertEqual(2, artifact["metrics"]["rust_gal_slice"]["last_frame_target_identity"])
             self.assertEqual(0, artifact["metrics"]["rust_gal_slice"]["batches_cancelled"])
             self.assertEqual(0, artifact["metrics"]["rust_gal_slice"]["completion_polls"])
             self.assertEqual(0, artifact["metrics"]["rust_gal_slice"]["completion_timeouts"])

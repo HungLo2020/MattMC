@@ -474,11 +474,13 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		float[] viewMatrix,
 		float[] projectionMatrix,
 		List<WorldLineSegmentRecord> worldSegments,
+		List<WorldCrackQuadRecord> worldCrackQuads,
 		List<GuiSpriteRecord> guiSprites
 	) {
 		Objects.requireNonNull(viewMatrix, "viewMatrix");
 		Objects.requireNonNull(projectionMatrix, "projectionMatrix");
 		Objects.requireNonNull(worldSegments, "worldSegments");
+		Objects.requireNonNull(worldCrackQuads, "worldCrackQuads");
 		Objects.requireNonNull(guiSprites, "guiSprites");
 		if (viewMatrix.length != 16 || projectionMatrix.length != 16) {
 			throw new IllegalArgumentException("whole-frame matrices must contain 16 floats");
@@ -501,6 +503,25 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_LINE_SEGMENT_REQUEST.offset(11), segment.endZ());
 			Struct.WORLD_LINE_SEGMENT_REQUEST.setInt(item, 12, segment.viewportWidth());
 			Struct.WORLD_LINE_SEGMENT_REQUEST.setInt(item, 13, segment.viewportHeight());
+		}
+		MemorySegment crackArray = Struct.WORLD_CRACK_QUAD_REQUEST.array(arena, worldCrackQuads.size());
+		for (int i = 0; i < worldCrackQuads.size(); i++) {
+			WorldCrackQuadRecord quad = worldCrackQuads.get(i);
+			MemorySegment item = Abi.item(crackArray, Struct.WORLD_CRACK_QUAD_REQUEST, i);
+			item.set(ValueLayout.JAVA_INT, Struct.WORLD_CRACK_QUAD_REQUEST.offset(0), Struct.WORLD_CRACK_QUAD_REQUEST.byteSize());
+			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 1, quad.stratum());
+			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 2, quad.stage());
+			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 3, quad.depthPolicy());
+			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 4, quad.blendPolicy());
+			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 5, quad.cullPolicy());
+			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 6, quad.colorArgb());
+			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 7, 0);
+			float[] vertices = quad.vertices();
+			for (int field = 0; field < 12; field++) {
+				item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_CRACK_QUAD_REQUEST.offset(8 + field), vertices[field]);
+			}
+			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 20, quad.viewportWidth());
+			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 21, quad.viewportHeight());
 		}
 		MemorySegment spriteArray = Struct.GUI_SPRITE_REQUEST.array(arena, guiSprites.size());
 		for (int i = 0; i < guiSprites.size(); i++) {
@@ -537,11 +558,12 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			request.set(ValueLayout.JAVA_FLOAT, projectionOffset + i * 4L, projectionMatrix[i]);
 		}
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 11, segmentArray, worldSegments.size());
-		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 12, spriteArray, guiSprites.size());
-		Struct.WHOLE_FRAME_SUBMIT.setLong(request, 13, negotiatedFeatures);
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 12, crackArray, worldCrackQuads.size());
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 13, spriteArray, guiSprites.size());
+		Struct.WHOLE_FRAME_SUBMIT.setLong(request, 14, negotiatedFeatures);
 		MemorySegment result = Struct.WHOLE_FRAME_SUBMIT_RESULT.allocate(arena);
 		checkStatus(Native.wholeFrameSubmit(contextId, request, result), "whole-frame submission");
-		long metricsOffset = Struct.WHOLE_FRAME_SUBMIT_RESULT.offset(17);
+		long metricsOffset = Struct.WHOLE_FRAME_SUBMIT_RESULT.offset(25);
 		BackendMetrics metrics = backendMetricsAt(result, metricsOffset);
 		long ffiCalls = result.get(ValueLayout.JAVA_LONG, metricsOffset + 64);
 		long ffiInputBytes = result.get(ValueLayout.JAVA_LONG, metricsOffset + 72);
@@ -560,6 +582,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 14),
 			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 15),
 			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 16),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 17),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 18),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 19),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 20),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 21),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 22),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 23),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 24),
 			ffiCalls,
 			ffiInputBytes,
 			metrics
@@ -715,6 +745,25 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	) {
 	}
 
+	public record WorldCrackQuadRecord(
+		int stratum,
+		int stage,
+		int depthPolicy,
+		int blendPolicy,
+		int cullPolicy,
+		int colorArgb,
+		float[] vertices,
+		int viewportWidth,
+		int viewportHeight
+	) {
+		public WorldCrackQuadRecord {
+			Objects.requireNonNull(vertices, "vertices");
+			if (vertices.length != 12) {
+				throw new IllegalArgumentException("world crack quad requires four xyz vertices");
+			}
+		}
+	}
+
 	public record GuiFrameSubmitResult(
 		long submissionId,
 		long spriteCount,
@@ -739,8 +788,16 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		long worldVertexCount,
 		long worldBatchCount,
 		long worldDrawCount,
+		long worldCrackQuadCount,
+		long worldCrackBatchCount,
+		long worldCrackDrawCount,
 		long depthAttachmentCreates,
 		long depthAttachmentReuses,
+		long depthAttachmentRetires,
+		long outlineCacheHits,
+		long outlineCacheMisses,
+		long crackCacheHits,
+		long crackCacheMisses,
 		long spriteCount,
 		long spriteBatchCount,
 		long cacheHits,
@@ -1004,8 +1061,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			GUI_ASSET_UPDATE(48),
 			WINDOWED_VULKAN_CONTEXT_CREATE(49),
 			WORLD_LINE_SEGMENT_REQUEST(50),
-			WHOLE_FRAME_SUBMIT(51),
-			WHOLE_FRAME_SUBMIT_RESULT(52);
+			WORLD_CRACK_QUAD_REQUEST(51),
+			WHOLE_FRAME_SUBMIT(52),
+			WHOLE_FRAME_SUBMIT_RESULT(53);
 
 		private final int id;
 		private final int byteSize;

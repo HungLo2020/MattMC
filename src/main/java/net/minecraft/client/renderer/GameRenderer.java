@@ -931,6 +931,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 				this.minecraft.getWindow().getHeight()
 			);
 			net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueBlockOutline(this.minecraft, this, this.mainCamera);
+			this.minecraft.levelRenderer.enqueueRustGalBlockBreakingCracks(this.mainCamera);
 		}
 		profilerFiller.push("rustVulkanWholeFrameGuiExtraction");
 		GuiGraphics guiGraphics = new GuiGraphics(this.minecraft, this.guiRenderState);

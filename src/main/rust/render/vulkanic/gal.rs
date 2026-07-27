@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::backends::{Backend, BackendCreateDesc, BackendToken, CompletedHostRead};
 use super::commands::{
-    BufferImageCopyRegion, CommandList, CommandListDesc, CommandOp, ResourceBarrier,
-    SubmissionBatch, ValidatedSubmissionBatch,
+    AttachmentLoadOp, AttachmentStoreOp, BufferImageCopyRegion, CommandList, CommandListDesc,
+    CommandOp, ResourceBarrier, SubmissionBatch, ValidatedSubmissionBatch,
 };
 use super::error::{GalError, GalResult, StatusCode};
 use super::frame::{
@@ -207,6 +207,8 @@ struct AccessEvent {
     target: AccessTarget,
     mode: AccessMode,
     family: AccessFamily,
+    attachment_load_op: Option<AttachmentLoadOp>,
+    attachment_store_op: Option<AttachmentStoreOp>,
 }
 
 pub struct VulkanicGal {
@@ -1860,27 +1862,53 @@ impl VulkanicGal {
                         depth_stencil,
                         ..
                     } => {
+                        let mut pass_attachment_targets = Vec::new();
                         for color in colors {
                             let info = self.texture_view_info(color.view)?;
+                            let target = AccessTarget::Texture {
+                                texture: info.texture,
+                                range: info.range,
+                            };
+                            if pass_attachment_targets
+                                .iter()
+                                .any(|previous| targets_overlap(*previous, target))
+                            {
+                                return self.validation_error(GalError::submission(
+                                    StatusCode::InvalidArgument,
+                                    "overlapping attachments in the same pass are invalid",
+                                ));
+                            }
+                            pass_attachment_targets.push(target);
                             let event = AccessEvent {
-                                target: AccessTarget::Texture {
-                                    texture: info.texture,
-                                    range: info.range,
-                                },
+                                target,
                                 mode: AccessMode::Write,
                                 family: AccessFamily::Attachment,
+                                attachment_load_op: Some(color.load_op),
+                                attachment_store_op: Some(color.store_op),
                             };
                             self.record_access(&mut accesses, event)?;
                         }
                         if let Some(depth) = depth_stencil {
                             let info = self.texture_view_info(depth.view)?;
+                            let target = AccessTarget::Texture {
+                                texture: info.texture,
+                                range: info.range,
+                            };
+                            if pass_attachment_targets
+                                .iter()
+                                .any(|previous| targets_overlap(*previous, target))
+                            {
+                                return self.validation_error(GalError::submission(
+                                    StatusCode::InvalidArgument,
+                                    "overlapping attachments in the same pass are invalid",
+                                ));
+                            }
                             let event = AccessEvent {
-                                target: AccessTarget::Texture {
-                                    texture: info.texture,
-                                    range: info.range,
-                                },
+                                target,
                                 mode: AccessMode::Write,
                                 family: AccessFamily::Attachment,
+                                attachment_load_op: Some(depth.load_op),
+                                attachment_store_op: Some(depth.store_op),
                             };
                             self.record_access(&mut accesses, event)?;
                         }
@@ -1900,6 +1928,8 @@ impl VulkanicGal {
                                 target,
                                 mode: AccessMode::Read,
                                 family: AccessFamily::Vertex,
+                                attachment_load_op: None,
+                                attachment_store_op: None,
                             },
                         )?;
                     }
@@ -1911,6 +1941,8 @@ impl VulkanicGal {
                                 target,
                                 mode: AccessMode::Read,
                                 family: AccessFamily::Index,
+                                attachment_load_op: None,
+                                attachment_store_op: None,
                             },
                         )?;
                     }
@@ -1927,6 +1959,8 @@ impl VulkanicGal {
                                 target,
                                 mode: AccessMode::Read,
                                 family: AccessFamily::Indirect,
+                                attachment_load_op: None,
+                                attachment_store_op: None,
                             },
                         )?;
                     }
@@ -1939,6 +1973,8 @@ impl VulkanicGal {
                                 target: src_target,
                                 mode: AccessMode::Read,
                                 family: AccessFamily::Transfer,
+                                attachment_load_op: None,
+                                attachment_store_op: None,
                             },
                         )?;
                         self.record_access(
@@ -1947,6 +1983,8 @@ impl VulkanicGal {
                                 target: dst_target,
                                 mode: AccessMode::Write,
                                 family: AccessFamily::Transfer,
+                                attachment_load_op: None,
+                                attachment_store_op: None,
                             },
                         )?;
                     }
@@ -1962,6 +2000,8 @@ impl VulkanicGal {
                                 target: buffer_target,
                                 mode: AccessMode::Read,
                                 family: AccessFamily::Transfer,
+                                attachment_load_op: None,
+                                attachment_store_op: None,
                             },
                         )?;
                         self.record_access(
@@ -1970,6 +2010,8 @@ impl VulkanicGal {
                                 target: self.texture_copy_target(region)?,
                                 mode: AccessMode::Write,
                                 family: AccessFamily::Transfer,
+                                attachment_load_op: None,
+                                attachment_store_op: None,
                             },
                         )?;
                     }
@@ -1980,6 +2022,8 @@ impl VulkanicGal {
                                 target: self.texture_copy_target(region)?,
                                 mode: AccessMode::Read,
                                 family: AccessFamily::Transfer,
+                                attachment_load_op: None,
+                                attachment_store_op: None,
                             },
                         )?;
                         let buffer_target = self.buffer_access_target(
@@ -1993,6 +2037,8 @@ impl VulkanicGal {
                                 target: buffer_target,
                                 mode: AccessMode::Write,
                                 family: AccessFamily::Transfer,
+                                attachment_load_op: None,
+                                attachment_store_op: None,
                             },
                         )?;
                     }
@@ -2009,6 +2055,8 @@ impl VulkanicGal {
                                 target,
                                 mode: AccessMode::Write,
                                 family: AccessFamily::Host,
+                                attachment_load_op: None,
+                                attachment_store_op: None,
                             },
                         )?;
                     }
@@ -2024,6 +2072,8 @@ impl VulkanicGal {
                                 target,
                                 mode: AccessMode::Read,
                                 family: AccessFamily::Host,
+                                attachment_load_op: None,
+                                attachment_store_op: None,
                             },
                         )?;
                     }
@@ -2040,6 +2090,8 @@ impl VulkanicGal {
                                 },
                                 mode: AccessMode::Read,
                                 family: AccessFamily::Present,
+                                attachment_load_op: None,
+                                attachment_store_op: None,
                             },
                         )?;
                     }
@@ -2070,11 +2122,15 @@ impl VulkanicGal {
                 target: self.buffer_access_target(binding.resource, 0, None)?,
                 mode: AccessMode::Read,
                 family: AccessFamily::Uniform,
+                attachment_load_op: None,
+                attachment_store_op: None,
             }),
             ResourceBindingKind::StorageBuffer => Ok(AccessEvent {
                 target: self.buffer_access_target(binding.resource, 0, None)?,
                 mode,
                 family: AccessFamily::Storage,
+                attachment_load_op: None,
+                attachment_store_op: None,
             }),
             ResourceBindingKind::SampledTexture => {
                 let info = self.texture_view_info(binding.resource)?;
@@ -2085,6 +2141,8 @@ impl VulkanicGal {
                     },
                     mode: AccessMode::Read,
                     family: AccessFamily::Sampled,
+                    attachment_load_op: None,
+                    attachment_store_op: None,
                 })
             }
             ResourceBindingKind::StorageTexture => {
@@ -2096,6 +2154,8 @@ impl VulkanicGal {
                     },
                     mode,
                     family: AccessFamily::Storage,
+                    attachment_load_op: None,
+                    attachment_store_op: None,
                 })
             }
             ResourceBindingKind::Sampler => Ok(AccessEvent {
@@ -2106,6 +2166,8 @@ impl VulkanicGal {
                 },
                 mode: AccessMode::Read,
                 family: AccessFamily::Sampled,
+                attachment_load_op: None,
+                attachment_store_op: None,
             }),
         }
     }
@@ -2122,6 +2184,21 @@ impl VulkanicGal {
             if targets_overlap(previous.target, event.target)
                 && (previous.mode == AccessMode::Write || event.mode == AccessMode::Write)
             {
+                if previous.family == AccessFamily::Attachment
+                    && event.family == AccessFamily::Attachment
+                    && previous.mode == AccessMode::Write
+                    && event.mode == AccessMode::Write
+                {
+                    if event.attachment_load_op == Some(AttachmentLoadOp::Load)
+                        && previous.attachment_store_op != Some(AttachmentStoreOp::Store)
+                    {
+                        return self.validation_error(GalError::submission(
+                            StatusCode::InvalidArgument,
+                            "attachment load depends on a prior pass that did not store",
+                        ));
+                    }
+                    continue;
+                }
                 return self.validation_error(GalError::submission(
                     StatusCode::InvalidArgument,
                     format!(

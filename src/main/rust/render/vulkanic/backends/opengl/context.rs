@@ -1082,7 +1082,10 @@ mod tests {
             assert!(!gl.is_enabled(glow::RASTERIZER_DISCARD));
             assert!(gl.is_enabled(glow::DITHER));
             assert!(gl.is_enabled(glow::MULTISAMPLE));
-            assert_eq!(glow::ALWAYS as i32, gl.get_parameter_i32(glow::STENCIL_FUNC));
+            assert_eq!(
+                glow::ALWAYS as i32,
+                gl.get_parameter_i32(glow::STENCIL_FUNC)
+            );
             assert_eq!(3, gl.get_parameter_i32(glow::STENCIL_REF));
             assert_eq!(0x7f, gl.get_parameter_i32(glow::STENCIL_VALUE_MASK));
             assert_eq!(0x3f, gl.get_parameter_i32(glow::STENCIL_WRITEMASK));
@@ -1102,7 +1105,10 @@ mod tests {
             assert_eq!(5, gl.get_parameter_i32(glow::STENCIL_BACK_REF));
             assert_eq!(0xef, gl.get_parameter_i32(glow::STENCIL_BACK_VALUE_MASK));
             assert_eq!(0xcf, gl.get_parameter_i32(glow::STENCIL_BACK_WRITEMASK));
-            assert_eq!(glow::ZERO as i32, gl.get_parameter_i32(glow::STENCIL_BACK_FAIL));
+            assert_eq!(
+                glow::ZERO as i32,
+                gl.get_parameter_i32(glow::STENCIL_BACK_FAIL)
+            );
             assert_eq!(
                 glow::INVERT as i32,
                 gl.get_parameter_i32(glow::STENCIL_BACK_PASS_DEPTH_FAIL)

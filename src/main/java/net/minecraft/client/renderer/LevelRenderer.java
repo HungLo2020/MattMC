@@ -1000,6 +1000,16 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 
 	private void extractBlockDestroyAnimation(Camera camera, LevelRenderState levelRenderState) {
+		this.collectBlockDestroyAnimation(camera, levelRenderState);
+		net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueBlockBreakingCracks(levelRenderState.blockBreakingRenderStates, camera);
+	}
+
+	public void enqueueRustGalBlockBreakingCracks(Camera camera) {
+		this.collectBlockDestroyAnimation(camera, this.levelRenderState);
+		net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueBlockBreakingCracks(this.levelRenderState.blockBreakingRenderStates, camera);
+	}
+
+	private void collectBlockDestroyAnimation(Camera camera, LevelRenderState levelRenderState) {
 		Vec3 vec3 = camera.getPosition();
 		double d = vec3.x();
 		double e = vec3.y();

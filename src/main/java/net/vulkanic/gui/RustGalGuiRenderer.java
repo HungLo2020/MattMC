@@ -1133,10 +1133,12 @@ public final class RustGalGuiRenderer {
 		try {
 			if (wholeFrameVulkan) {
 				primitiveFrame = RustGalWorldPrimitiveRenderer.consumeFrame();
-				if (!primitiveFrame.segments().isEmpty()) {
+				if (!primitiveFrame.segments().isEmpty() || !primitiveFrame.crackQuads().isEmpty()) {
 					renderdocFrameCaptureStarted = RenderDocCaptureHook.beginFrameCaptureOnce(
 						window,
-						"rust-vulkan-whole-frame-outline#" + correlationId + "-segments=" + primitiveFrame.segments().size()
+						"rust-vulkan-whole-frame-world#" + correlationId
+							+ "-segments=" + primitiveFrame.segments().size()
+							+ "-crackQuads=" + primitiveFrame.crackQuads().size()
 					);
 				}
 			}
@@ -1148,6 +1150,14 @@ public final class RustGalGuiRenderer {
 			GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.ffi.acquire");
 			frameId = frame.frameId();
 			if (wholeFrameVulkan) {
+				if (frame.frameTarget() != 0L) {
+					METRICS.frameTargetGenerations++;
+					if (METRICS.lastFrameTargetIdentity != 0L && METRICS.lastFrameTargetIdentity != frame.frameTargetIdentity()) {
+						METRICS.frameTargetIdentityChanges++;
+					}
+					METRICS.lastFrameTargetGeneration = frame.frameId();
+					METRICS.lastFrameTargetIdentity = frame.frameTargetIdentity();
+				}
 				auditMessage("gal.frame.acquire backend=vulkan correlation=" + correlationId
 					+ " frame=" + frameId
 					+ " image=" + frame.frameTargetIdentity()
@@ -1182,6 +1192,7 @@ public final class RustGalGuiRenderer {
 						primitiveFrame.viewMatrix(),
 						primitiveFrame.projectionMatrix(),
 						primitiveFrame.segments(),
+						primitiveFrame.crackQuads(),
 						requests
 					);
 				} else {
@@ -1235,8 +1246,16 @@ public final class RustGalGuiRenderer {
 				METRICS.worldLineSegmentsExecuted += wholeFrameResult != null ? wholeFrameResult.worldSegmentCount() : 0L;
 				METRICS.worldLineVerticesExecuted += wholeFrameResult != null ? wholeFrameResult.worldVertexCount() : 0L;
 				METRICS.worldPrimitiveDrawsExecuted += wholeFrameResult != null ? wholeFrameResult.worldDrawCount() : 0L;
+				METRICS.worldCrackQuadsExecuted += wholeFrameResult != null ? wholeFrameResult.worldCrackQuadCount() : 0L;
+				METRICS.worldCrackBatchesExecuted += wholeFrameResult != null ? wholeFrameResult.worldCrackBatchCount() : 0L;
+				METRICS.worldCrackDrawsExecuted += wholeFrameResult != null ? wholeFrameResult.worldCrackDrawCount() : 0L;
 				METRICS.worldDepthAttachmentCreates += wholeFrameResult != null ? wholeFrameResult.depthAttachmentCreates() : 0L;
 				METRICS.worldDepthAttachmentReuses += wholeFrameResult != null ? wholeFrameResult.depthAttachmentReuses() : 0L;
+				METRICS.worldDepthAttachmentRetires += wholeFrameResult != null ? wholeFrameResult.depthAttachmentRetires() : 0L;
+				METRICS.worldOutlineCacheHits += wholeFrameResult != null ? wholeFrameResult.outlineCacheHits() : 0L;
+				METRICS.worldOutlineCacheMisses += wholeFrameResult != null ? wholeFrameResult.outlineCacheMisses() : 0L;
+				METRICS.worldCrackCacheHits += wholeFrameResult != null ? wholeFrameResult.crackCacheHits() : 0L;
+				METRICS.worldCrackCacheMisses += wholeFrameResult != null ? wholeFrameResult.crackCacheMisses() : 0L;
 				METRICS.cacheHits += wholeFrameResult != null ? wholeFrameResult.cacheHits() : guiResult.cacheHits();
 				METRICS.cacheMisses += wholeFrameResult != null ? wholeFrameResult.cacheMisses() : guiResult.cacheMisses();
 				METRICS.resourceCreates += wholeFrameResult != null ? wholeFrameResult.resourceCreates() : guiResult.resourceCreates();
@@ -1467,8 +1486,20 @@ public final class RustGalGuiRenderer {
 			+ " rust_gal_world_line_segments_executed=" + METRICS.worldLineSegmentsExecuted
 			+ " rust_gal_world_line_vertices_executed=" + METRICS.worldLineVerticesExecuted
 			+ " rust_gal_world_primitive_draws_executed=" + METRICS.worldPrimitiveDrawsExecuted
+			+ " rust_gal_world_crack_quads_executed=" + METRICS.worldCrackQuadsExecuted
+			+ " rust_gal_world_crack_batches_executed=" + METRICS.worldCrackBatchesExecuted
+			+ " rust_gal_world_crack_draws_executed=" + METRICS.worldCrackDrawsExecuted
 			+ " rust_gal_world_depth_attachment_creates=" + METRICS.worldDepthAttachmentCreates
 			+ " rust_gal_world_depth_attachment_reuses=" + METRICS.worldDepthAttachmentReuses
+			+ " rust_gal_world_depth_attachment_retires=" + METRICS.worldDepthAttachmentRetires
+			+ " rust_gal_world_outline_cache_hits=" + METRICS.worldOutlineCacheHits
+			+ " rust_gal_world_outline_cache_misses=" + METRICS.worldOutlineCacheMisses
+			+ " rust_gal_world_crack_cache_hits=" + METRICS.worldCrackCacheHits
+			+ " rust_gal_world_crack_cache_misses=" + METRICS.worldCrackCacheMisses
+			+ " rust_gal_frame_target_generations=" + METRICS.frameTargetGenerations
+			+ " rust_gal_frame_target_identity_changes=" + METRICS.frameTargetIdentityChanges
+			+ " rust_gal_last_frame_target_generation=" + METRICS.lastFrameTargetGeneration
+			+ " rust_gal_last_frame_target_identity=" + METRICS.lastFrameTargetIdentity
 			+ " rust_gal_batches_cancelled=" + METRICS.batchesCancelled
 			+ " rust_gal_completion_polls=" + METRICS.completionPolls
 			+ " rust_gal_completion_timeouts=" + METRICS.completionTimeouts
@@ -2484,8 +2515,8 @@ public final class RustGalGuiRenderer {
 		long lastContextFfiBytes;
 		long cancellations;
 		long reloadInvalidations;
-			long completionPolls;
-			long completionTimeouts;
+		long completionPolls;
+		long completionTimeouts;
 		long batchesExecuted;
 		long spriteBatchesExecuted;
 		long packedSpritesExecuted;
@@ -2493,8 +2524,20 @@ public final class RustGalGuiRenderer {
 		long worldLineSegmentsExecuted;
 		long worldLineVerticesExecuted;
 		long worldPrimitiveDrawsExecuted;
+		long worldCrackQuadsExecuted;
+		long worldCrackBatchesExecuted;
+		long worldCrackDrawsExecuted;
 		long worldDepthAttachmentCreates;
 		long worldDepthAttachmentReuses;
+		long worldDepthAttachmentRetires;
+		long worldOutlineCacheHits;
+		long worldOutlineCacheMisses;
+		long worldCrackCacheHits;
+		long worldCrackCacheMisses;
+		long frameTargetGenerations;
+		long frameTargetIdentityChanges;
+		long lastFrameTargetGeneration;
+		long lastFrameTargetIdentity;
 		long batchesCancelled;
 		long contextCreateCalls;
 		long capabilityCalls;

@@ -2297,6 +2297,8 @@ def normalize_capture_artifact(
     saved_view_outline_target_required = (
         parse_java_property(combined_logs, "mattmc.dev.blockOutlineSavedViewTargetRequired") == "true"
     )
+    requested_world_crack_scenario = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldCrack.scenario")
+    requested_world_crack_stage = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldCrack.stage")
     world_outline_pixel_evidence = deterministic_block_outline_pixel_evidence(
         deterministic_doc,
         requested_world_outline_style,
@@ -2312,6 +2314,15 @@ def normalize_capture_artifact(
     )
     rust_gal_world_draws_for_validation = last_number(
         combined_logs, r"rust_gal_world_primitive_draws_executed[=: ]+(\d+)"
+    )
+    rust_gal_world_crack_quads_for_validation = last_number(
+        combined_logs, r"rust_gal_world_crack_quads_executed[=: ]+(\d+)"
+    )
+    rust_gal_world_crack_batches_for_validation = last_number(
+        combined_logs, r"rust_gal_world_crack_batches_executed[=: ]+(\d+)"
+    )
+    rust_gal_world_crack_draws_for_validation = last_number(
+        combined_logs, r"rust_gal_world_crack_draws_executed[=: ]+(\d+)"
     )
     rust_gal_world_depth_creates_for_validation = last_number(
         combined_logs, r"rust_gal_world_depth_attachment_creates[=: ]+(\d+)"
@@ -2419,6 +2430,30 @@ def normalize_capture_artifact(
                 f"(pixel evidence status={world_outline_pixel_evidence.get('status')}, "
                 f"matching_pixels={world_outline_pixel_evidence.get('matching_pixels')})"
             )
+    world_crack_workload_complete = True
+    crack_scenario = (requested_world_crack_scenario or "").strip().lower()
+    if crack_scenario and rust_shell_outline_mode:
+        if crack_scenario in {"hidden", "no-target"}:
+            if int(rust_gal_world_crack_quads_for_validation or 0) != 0:
+                world_crack_workload_complete = False
+                validation_messages.append("deterministic hidden/no-target crack scenario emitted unexpected crack quads")
+        else:
+            required_crack_counts = {
+                "crack quads": rust_gal_world_crack_quads_for_validation,
+                "crack batches": rust_gal_world_crack_batches_for_validation,
+                "crack draws": rust_gal_world_crack_draws_for_validation,
+                "depth attachment creates": rust_gal_world_depth_creates_for_validation,
+            }
+            missing_crack_counts = [
+                name for name, value in required_crack_counts.items() if int(value or 0) <= 0
+            ]
+            if missing_crack_counts:
+                world_crack_workload_complete = False
+                validation_messages.append(
+                    "deterministic Rust-GAL block-breaking crack scenario requested but no non-zero "
+                    + ", ".join(missing_crack_counts)
+                    + " evidence was captured"
+                )
     instrumentation = benchmark_fingerprint["instrumentation"]
     run_type = instrumentation.get("run_type") if isinstance(instrumentation, dict) else "clean-performance"
     diagnostic_hooks = bool(instrumentation.get("diagnostic_hooks")) if isinstance(instrumentation, dict) else False
@@ -2439,6 +2474,9 @@ def normalize_capture_artifact(
                 validation_messages.append("RenderDoc capture did not prove depth attachment use")
             if not isinstance(proof, dict) or not proof.get("outline_marker_evidence"):
                 validation_messages.append("RenderDoc capture did not prove outline marker/work evidence")
+            if crack_scenario and crack_scenario not in {"hidden", "no-target"}:
+                if not isinstance(proof, dict) or not proof.get("non_zero_crack_workload"):
+                    validation_messages.append("RenderDoc capture did not prove non-zero Rust-GAL crack workload")
             if isinstance(proof, dict) and proof.get("blue_diagnostic_shell_clear_expected"):
                 validation_messages.append("Rust Vulkan shell blue diagnostic clear is expected; this is not full world rendering")
     if isinstance(instrumentation, dict) and instrumentation.get("tracy", {}).get("enabled"):
@@ -2468,6 +2506,10 @@ def normalize_capture_artifact(
                 "outline_marker_evidence",
             )
         )
+        if crack_scenario and crack_scenario not in {"hidden", "no-target"}:
+            renderdoc_workload_assertions_complete = renderdoc_workload_assertions_complete and bool(
+                proof.get("non_zero_crack_workload") if isinstance(proof, dict) else False
+            )
     if meta.get("migration_gate_blocking", "true").lower() != "true":
         validation_messages.append("stress-diagnostic artifact is non-blocking for routine producer migration gates")
     hard_errors_absent = (
@@ -2542,8 +2584,17 @@ def normalize_capture_artifact(
     rust_gal_world_segments = last_number(combined_logs, r"rust_gal_world_line_segments_executed[=: ]+(\d+)")
     rust_gal_world_vertices = last_number(combined_logs, r"rust_gal_world_line_vertices_executed[=: ]+(\d+)")
     rust_gal_world_draws = last_number(combined_logs, r"rust_gal_world_primitive_draws_executed[=: ]+(\d+)")
+    rust_gal_world_crack_quads = last_number(combined_logs, r"rust_gal_world_crack_quads_executed[=: ]+(\d+)")
+    rust_gal_world_crack_batches = last_number(combined_logs, r"rust_gal_world_crack_batches_executed[=: ]+(\d+)")
+    rust_gal_world_crack_draws = last_number(combined_logs, r"rust_gal_world_crack_draws_executed[=: ]+(\d+)")
     rust_gal_world_depth_creates = last_number(combined_logs, r"rust_gal_world_depth_attachment_creates[=: ]+(\d+)")
     rust_gal_world_depth_reuses = last_number(combined_logs, r"rust_gal_world_depth_attachment_reuses[=: ]+(\d+)")
+    rust_gal_world_depth_retires = last_number(combined_logs, r"rust_gal_world_depth_attachment_retires[=: ]+(\d+)")
+    rust_gal_world_outline_cache_hits = last_number(combined_logs, r"rust_gal_world_outline_cache_hits[=: ]+(\d+)")
+    rust_gal_world_outline_cache_misses = last_number(combined_logs, r"rust_gal_world_outline_cache_misses[=: ]+(\d+)")
+    rust_gal_world_crack_cache_hits = last_number(combined_logs, r"rust_gal_world_crack_cache_hits[=: ]+(\d+)")
+    rust_gal_world_crack_cache_misses = last_number(combined_logs, r"rust_gal_world_crack_cache_misses[=: ]+(\d+)")
+    rust_gal_swapchain_recreations = len(re.findall(r"gal\.swapchain\.recreate backend=vulkan", combined_logs))
     rust_gal_ffi_calls = last_number(combined_logs, r"ffi(?:_call)?_count[=: ]+(\d+)")
     rust_gal_ffi_bytes = last_number(combined_logs, r"ffi(?:_bytes| bytes)[=: ]+(\d+)")
     gui_asset_resolutions = [
@@ -2690,6 +2741,7 @@ def normalize_capture_artifact(
         and subsystem_complete
         and deterministic_complete
         and world_outline_workload_complete
+        and world_crack_workload_complete
         and validation_layer_exercised
         and renderdoc_complete
         and renderdoc_workload_assertions_complete
@@ -2767,6 +2819,8 @@ def normalize_capture_artifact(
                 "world_outline_style": requested_world_outline_style,
                 "world_outline_depth_policy": (deterministic_doc or {}).get("rustGalWorldOutlineDepthPolicy") if isinstance(deterministic_doc, dict) else None,
                 "world_outline_pixel_evidence": world_outline_pixel_evidence,
+                "world_crack_scenario": requested_world_crack_scenario or None,
+                "world_crack_stage": parse_number(requested_world_crack_stage),
                 "cache_hits": last_number(combined_logs, r"rust_gal_cache_hits[=: ]+(\d+)"),
                 "cache_misses": last_number(combined_logs, r"rust_gal_cache_misses[=: ]+(\d+)"),
                 "queue_depth": last_number(combined_logs, r"rust_gal_queue_depth[=: ]+(\d+)"),
@@ -2778,8 +2832,21 @@ def normalize_capture_artifact(
                 "world_line_segments_executed": rust_gal_world_segments,
                 "world_line_vertices_executed": rust_gal_world_vertices,
                 "world_primitive_draws_executed": rust_gal_world_draws,
+                "world_crack_quads_executed": rust_gal_world_crack_quads,
+                "world_crack_batches_executed": rust_gal_world_crack_batches,
+                "world_crack_draws_executed": rust_gal_world_crack_draws,
                 "world_depth_attachment_creates": rust_gal_world_depth_creates,
                 "world_depth_attachment_reuses": rust_gal_world_depth_reuses,
+                "world_depth_attachment_retires": rust_gal_world_depth_retires,
+                "world_outline_cache_hits": rust_gal_world_outline_cache_hits,
+                "world_outline_cache_misses": rust_gal_world_outline_cache_misses,
+                "world_crack_cache_hits": rust_gal_world_crack_cache_hits,
+                "world_crack_cache_misses": rust_gal_world_crack_cache_misses,
+                "swapchain_recreations": rust_gal_swapchain_recreations,
+                "frame_target_generations": last_number(combined_logs, r"rust_gal_frame_target_generations[=: ]+(\d+)"),
+                "frame_target_identity_changes": last_number(combined_logs, r"rust_gal_frame_target_identity_changes[=: ]+(\d+)"),
+                "last_frame_target_generation": last_number(combined_logs, r"rust_gal_last_frame_target_generation[=: ]+(\d+)"),
+                "last_frame_target_identity": last_number(combined_logs, r"rust_gal_last_frame_target_identity[=: ]+(\d+)"),
                 "batches_cancelled": last_number(combined_logs, r"rust_gal_batches_cancelled[=: ]+(\d+)"),
                 "completion_polls": last_number(combined_logs, r"rust_gal_completion_polls[=: ]+(\d+)"),
                 "completion_timeouts": last_number(combined_logs, r"rust_gal_completion_timeouts[=: ]+(\d+)"),
@@ -3064,6 +3131,11 @@ def renderdoc_workload_proof(capture_dir: Path) -> dict[str, object]:
         "depth_attachment_creates": last_number(log_text, r"rust_gal_world_depth_attachment_creates[=: ]+(\d+)"),
         "depth_attachment_reuses": last_number(log_text, r"rust_gal_world_depth_attachment_reuses[=: ]+(\d+)"),
     }
+    crack_counts = {
+        "crack_quads": last_number(log_text, r"rust_gal_world_crack_quads_executed[=: ]+(\d+)"),
+        "crack_batches": last_number(log_text, r"rust_gal_world_crack_batches_executed[=: ]+(\d+)"),
+        "crack_draws": last_number(log_text, r"rust_gal_world_crack_draws_executed[=: ]+(\d+)"),
+    }
     acquired = [
         {
             "correlation": int(correlation),
@@ -3153,9 +3225,14 @@ def renderdoc_workload_proof(capture_dir: Path) -> dict[str, object]:
     )
     return {
         "outline": outline_counts,
+        "crack": crack_counts,
         "non_zero_outline_workload": all(
             int(outline_counts[key] or 0) > 0
             for key in ("primitive_batches", "line_segments", "line_vertices", "world_draws", "depth_attachment_creates")
+        ),
+        "non_zero_crack_workload": all(
+            int(crack_counts[key] or 0) > 0
+            for key in ("crack_quads", "crack_batches", "crack_draws")
         ),
         "depth_attachment_evidence": int(outline_counts["depth_attachment_creates"] or 0) > 0
         or int(outline_counts["depth_attachment_reuses"] or 0) > 0,

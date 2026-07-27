@@ -114,11 +114,18 @@ class VulkanicGalBridgeAbiTest {
 
 		assertTrue(bridge.contains("mattmc_vulkanic_gal_whole_frame_submit"));
 		assertTrue(bridge.contains("record WorldLineSegmentRecord"));
+		assertTrue(bridge.contains("record WorldCrackQuadRecord"));
 		assertTrue(bridge.contains("List<WorldLineSegmentRecord> worldSegments"));
+		assertTrue(bridge.contains("List<WorldCrackQuadRecord> worldCrackQuads"));
 		assertTrue(guiRenderer.contains("bridge.submitWholeFrame"));
 		assertTrue(guiRenderer.contains("isWholeFrameVulkanActive()"));
 		assertTrue(gameRenderer.contains("renderRustVulkanWholeFrameShell"));
 		assertTrue(gameRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueBlockOutline"));
+		assertTrue(gameRenderer.contains("levelRenderer.enqueueRustGalBlockBreakingCracks"));
+		assertTrue(worldRenderer.contains("enqueueBlockBreakingCracks"));
+		assertTrue(worldRenderer.contains("WorldCrackQuadRecord"));
+		assertTrue(worldRenderer.contains("STRATUM_WORLD_BLOCK_BREAKING_CRACK"));
+		assertTrue(worldRenderer.contains("CRACK_BLEND_MULTIPLY"));
 		assertTrue(worldRenderer.contains("BlockOutlineRoute.JAVA_COMPATIBILITY"));
 		assertTrue(worldRenderer.contains("BlockOutlineRoute.RUST_VULKAN_WHOLE_FRAME"));
 		assertTrue(worldRenderer.contains("shape.forAllEdges"));
@@ -126,9 +133,13 @@ class VulkanicGalBridgeAbiTest {
 		assertFalse(worldRenderer.contains("Vk"));
 		assertFalse(worldRenderer.contains("GL_"));
 		assertTrue(rustFfi.contains("FfiWorldLineSegmentRequest"));
+		assertTrue(rustFfi.contains("FfiWorldCrackQuadRequest"));
 		assertTrue(rustFfi.contains("decode_whole_frame_submit"));
 		assertTrue(rustFfi.contains("context.world_primitive_frontend"));
 		assertTrue(rustWorldFrontend.contains("PrimitiveTopology::Lines"));
+		assertTrue(rustWorldFrontend.contains("PrimitiveTopology::Triangles"));
+		assertTrue(rustWorldFrontend.contains("WorldCrackQuadRequest"));
+		assertTrue(rustWorldFrontend.contains("BlendMode::Multiply"));
 		assertTrue(rustWorldFrontend.contains("WorldPrimitiveFrontend"));
 		assertTrue(rustWorldFrontend.contains("submit_whole_frame"));
 		assertTrue(rustWorldFrontend.contains("unsupported_feature"));

@@ -737,6 +737,17 @@ impl OpenGlLowerer {
                             glow::ZERO,
                         );
                     }
+                    BlendMode::Multiply => {
+                        self.gl.enable(glow::BLEND);
+                        self.gl
+                            .blend_equation_separate(glow::FUNC_ADD, glow::FUNC_ADD);
+                        self.gl.blend_func_separate(
+                            glow::DST_COLOR,
+                            glow::SRC_COLOR,
+                            glow::ONE,
+                            glow::ZERO,
+                        );
+                    }
                 }
                 self.cache.blend = Some(blend);
                 self.cache.state_changes += 1;

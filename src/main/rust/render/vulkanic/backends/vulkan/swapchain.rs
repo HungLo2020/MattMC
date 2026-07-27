@@ -41,6 +41,7 @@ pub(super) struct VulkanSwapchain {
     acquired: Vec<AcquiredImage>,
     next_frame: u64,
     stable_window_id: u64,
+    recreate_count: u64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -77,6 +78,7 @@ impl VulkanSwapchain {
             acquired: Vec::new(),
             next_frame: 0,
             stable_window_id,
+            recreate_count: 0,
         };
         owner.recreate(vk::SwapchainKHR::null())?;
         Ok(owner)
@@ -364,6 +366,16 @@ impl VulkanSwapchain {
         self.image_layouts = vec![vk::ImageLayout::UNDEFINED; self.images.len()];
         self.image_views = image_views;
         self.acquired.clear();
+        self.recreate_count += 1;
+        trace::message(&format!(
+            "gal.swapchain.recreate backend=vulkan count={} extent={}x{} images={} format={} window={}",
+            self.recreate_count,
+            self.extent.width,
+            self.extent.height,
+            self.images.len(),
+            self.format.as_raw(),
+            self.stable_window_id
+        ));
         Ok(())
     }
 

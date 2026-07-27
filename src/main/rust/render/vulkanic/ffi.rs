@@ -33,7 +33,8 @@ use super::resources::{
 };
 use super::sync::SubmissionId;
 use super::world_primitive_frontend::{
-    WorldLineSegmentRequest, WorldPrimitiveFrame, WorldPrimitiveFrontend, WorldPrimitiveSubmitStats,
+    WorldCrackQuadRequest, WorldLineSegmentRequest, WorldPrimitiveFrame, WorldPrimitiveFrontend,
+    WorldPrimitiveSubmitStats,
 };
 
 pub const FFI_ABI_V1_VERSION: u32 = 1;
@@ -506,6 +507,33 @@ pub struct FfiWorldLineSegmentRequest {
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiWorldCrackQuadRequest {
+    pub byte_size: u32,
+    pub stratum: u32,
+    pub stage: u32,
+    pub depth_policy: u32,
+    pub blend_policy: u32,
+    pub cull_policy: u32,
+    pub color_argb: u32,
+    pub reserved0: u32,
+    pub p0_x: f32,
+    pub p0_y: f32,
+    pub p0_z: f32,
+    pub p1_x: f32,
+    pub p1_y: f32,
+    pub p1_z: f32,
+    pub p2_x: f32,
+    pub p2_y: f32,
+    pub p2_z: f32,
+    pub p3_x: f32,
+    pub p3_y: f32,
+    pub p3_z: f32,
+    pub viewport_width: i32,
+    pub viewport_height: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FfiWholeFrameSubmitRequest {
     pub header: FfiHeader,
     pub generation: u64,
@@ -519,6 +547,7 @@ pub struct FfiWholeFrameSubmitRequest {
     pub view_matrix: [f32; 16],
     pub projection_matrix: [f32; 16],
     pub world_segments: FfiSlice<FfiWorldLineSegmentRequest>,
+    pub world_crack_quads: FfiSlice<FfiWorldCrackQuadRequest>,
     pub gui_sprites: FfiSlice<FfiGuiSpriteRequest>,
     pub negotiated_feature_bits: u64,
 }
@@ -534,8 +563,16 @@ pub struct FfiWholeFrameSubmitResult {
     pub world_vertex_count: u64,
     pub world_batch_count: u64,
     pub world_draw_count: u64,
+    pub world_crack_quad_count: u64,
+    pub world_crack_batch_count: u64,
+    pub world_crack_draw_count: u64,
     pub depth_attachment_creates: u64,
     pub depth_attachment_reuses: u64,
+    pub depth_attachment_retires: u64,
+    pub outline_cache_hits: u64,
+    pub outline_cache_misses: u64,
+    pub crack_cache_hits: u64,
+    pub crack_cache_misses: u64,
     pub sprite_count: u64,
     pub sprite_batch_count: u64,
     pub cache_hits: u64,
@@ -582,8 +619,16 @@ impl Default for FfiWholeFrameSubmitResult {
             world_vertex_count: 0,
             world_batch_count: 0,
             world_draw_count: 0,
+            world_crack_quad_count: 0,
+            world_crack_batch_count: 0,
+            world_crack_draw_count: 0,
             depth_attachment_creates: 0,
             depth_attachment_reuses: 0,
+            depth_attachment_retires: 0,
+            outline_cache_hits: 0,
+            outline_cache_misses: 0,
+            crack_cache_hits: 0,
+            crack_cache_misses: 0,
             sprite_count: 0,
             sprite_batch_count: 0,
             cache_hits: 0,
@@ -2225,8 +2270,16 @@ fn whole_frame_result_ok(
         world_vertex_count: world.vertex_count,
         world_batch_count: world.primitive_batch_count,
         world_draw_count: world.world_draws,
+        world_crack_quad_count: world.crack_quad_count,
+        world_crack_batch_count: world.crack_batch_count,
+        world_crack_draw_count: world.crack_draw_count,
         depth_attachment_creates: world.depth_attachment_creates,
         depth_attachment_reuses: world.depth_attachment_reuses,
+        depth_attachment_retires: world.depth_attachment_retires,
+        outline_cache_hits: world.outline_cache_hits,
+        outline_cache_misses: world.outline_cache_misses,
+        crack_cache_hits: world.crack_cache_hits,
+        crack_cache_misses: world.crack_cache_misses,
         sprite_count: gui.sprite_count,
         sprite_batch_count: gui.sprite_batch_count,
         cache_hits: world.cache_hits.saturating_add(gui.cache_hits),
@@ -2411,6 +2464,12 @@ fn input_bytes_for_whole_frame(request: &FfiWholeFrameSubmitRequest) -> u64 {
                 .world_segments
                 .count
                 .saturating_mul(size_of::<FfiWorldLineSegmentRequest>() as u64),
+        )
+        .saturating_add(
+            request
+                .world_crack_quads
+                .count
+                .saturating_mul(size_of::<FfiWorldCrackQuadRequest>() as u64),
         )
         .saturating_add(
             request
@@ -2633,6 +2692,72 @@ unsafe fn decode_whole_frame_submit(
             viewport_height,
         });
     }
+    let raw_cracks = read_slice(
+        request.world_crack_quads,
+        true,
+        "world primitive crack quads",
+    )?;
+    if raw_cracks.len() > FFI_MAX_BATCH_ITEMS {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "world primitive crack quad count {} exceeds max {}",
+                raw_cracks.len(),
+                FFI_MAX_BATCH_ITEMS
+            ),
+        ));
+    }
+    let mut crack_quads = Vec::with_capacity(raw_cracks.len());
+    for quad in raw_cracks {
+        validate_item_size::<FfiWorldCrackQuadRequest>(
+            quad.byte_size,
+            "world primitive crack quad",
+        )?;
+        if quad.blend_policy != 1 {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown world crack blend policy {}", quad.blend_policy),
+            ));
+        }
+        if quad.cull_policy != 0 {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown world crack cull policy {}", quad.cull_policy),
+            ));
+        }
+        let viewport_width = u32::try_from(quad.viewport_width).map_err(|_| {
+            GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "world crack quad viewport width must be non-negative, got {}",
+                    quad.viewport_width
+                ),
+            )
+        })?;
+        let viewport_height = u32::try_from(quad.viewport_height).map_err(|_| {
+            GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "world crack quad viewport height must be non-negative, got {}",
+                    quad.viewport_height
+                ),
+            )
+        })?;
+        crack_quads.push(WorldCrackQuadRequest {
+            stratum: quad.stratum,
+            stage: quad.stage,
+            depth_policy: quad.depth_policy,
+            color_argb: quad.color_argb,
+            vertices: [
+                [quad.p0_x, quad.p0_y, quad.p0_z],
+                [quad.p1_x, quad.p1_y, quad.p1_z],
+                [quad.p2_x, quad.p2_y, quad.p2_z],
+                [quad.p3_x, quad.p3_y, quad.p3_z],
+            ],
+            viewport_width,
+            viewport_height,
+        });
+    }
     let raw_gui = FfiGuiFrameSubmitRequest {
         header: FfiHeader {
             version: request.header.version,
@@ -2676,6 +2801,7 @@ unsafe fn decode_whole_frame_submit(
             view_matrix: request.view_matrix,
             projection_matrix: request.projection_matrix,
             segments,
+            crack_quads,
         },
         gui_sprites,
     ))
@@ -3445,6 +3571,34 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
         ),
         51 => layout!(
             51,
+            FfiWorldCrackQuadRequest,
+            [
+                byte_size,
+                stratum,
+                stage,
+                depth_policy,
+                blend_policy,
+                cull_policy,
+                color_argb,
+                reserved0,
+                p0_x,
+                p0_y,
+                p0_z,
+                p1_x,
+                p1_y,
+                p1_z,
+                p2_x,
+                p2_y,
+                p2_z,
+                p3_x,
+                p3_y,
+                p3_z,
+                viewport_width,
+                viewport_height
+            ]
+        ),
+        52 => layout!(
+            52,
             FfiWholeFrameSubmitRequest,
             [
                 header,
@@ -3459,12 +3613,13 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 view_matrix,
                 projection_matrix,
                 world_segments,
+                world_crack_quads,
                 gui_sprites,
                 negotiated_feature_bits
             ]
         ),
-        52 => layout!(
-            52,
+        53 => layout!(
+            53,
             FfiWholeFrameSubmitResult,
             [
                 header,
@@ -3475,8 +3630,16 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 world_vertex_count,
                 world_batch_count,
                 world_draw_count,
+                world_crack_quad_count,
+                world_crack_batch_count,
+                world_crack_draw_count,
                 depth_attachment_creates,
                 depth_attachment_reuses,
+                depth_attachment_retires,
+                outline_cache_hits,
+                outline_cache_misses,
+                crack_cache_hits,
+                crack_cache_misses,
                 sprite_count,
                 sprite_batch_count,
                 cache_hits,
@@ -6005,6 +6168,33 @@ mod tests {
         }
     }
 
+    fn crack_quad_request() -> FfiWorldCrackQuadRequest {
+        FfiWorldCrackQuadRequest {
+            byte_size: size_of::<FfiWorldCrackQuadRequest>() as u32,
+            stratum: 90,
+            stage: 4,
+            depth_policy: 1,
+            blend_policy: 1,
+            cull_policy: 0,
+            color_argb: 0xffff_ffff,
+            reserved0: 0,
+            p0_x: 1.0,
+            p0_y: 2.0,
+            p0_z: 3.0,
+            p1_x: 4.0,
+            p1_y: 5.0,
+            p1_z: 6.0,
+            p2_x: 7.0,
+            p2_y: 8.0,
+            p2_z: 9.0,
+            p3_x: 10.0,
+            p3_y: 11.0,
+            p3_z: 12.0,
+            viewport_width: 854,
+            viewport_height: 480,
+        }
+    }
+
     fn whole_frame_request(
         segments: &[FfiWorldLineSegmentRequest],
         sprites: &[FfiGuiSpriteRequest],
@@ -6040,6 +6230,10 @@ mod tests {
                 ptr: segments.as_ptr(),
                 count: segments.len() as u64,
             },
+            world_crack_quads: FfiSlice {
+                ptr: std::ptr::null(),
+                count: 0,
+            },
             gui_sprites: FfiSlice {
                 ptr: sprites.as_ptr(),
                 count: sprites.len() as u64,
@@ -6053,6 +6247,19 @@ mod tests {
                 | FfiFeatureBits::HOST_BUFFER_ACCESS
                 | FfiFeatureBits::PRESENTATION,
         }
+    }
+
+    fn whole_frame_request_with_cracks(
+        segments: &[FfiWorldLineSegmentRequest],
+        cracks: &[FfiWorldCrackQuadRequest],
+        sprites: &[FfiGuiSpriteRequest],
+    ) -> FfiWholeFrameSubmitRequest {
+        let mut request = whole_frame_request(segments, sprites);
+        request.world_crack_quads = FfiSlice {
+            ptr: cracks.as_ptr(),
+            count: cracks.len() as u64,
+        };
+        request
     }
 
     fn asset_update_request(assets: &[FfiGuiAssetPayload]) -> FfiGuiAssetUpdateRequest {
@@ -6138,6 +6345,33 @@ mod tests {
         let request = whole_frame_request(&segments, &sprites);
         let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
             .expect_err("malformed world line segment must fail");
+        assert_eq!(error.code, StatusCode::InvalidArgument);
+    }
+
+    #[test]
+    fn whole_frame_world_crack_ffi_copies_and_rejects_malformed_payloads() {
+        let mut cracks = vec![crack_quad_request()];
+        let request = whole_frame_request_with_cracks(&[], &cracks, &[]);
+        let (_generation, _target, frame, gui) =
+            unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap() };
+        cracks[0].p0_x = 99.0;
+        assert_eq!(frame.crack_quads.len(), 1);
+        assert_eq!(frame.crack_quads[0].vertices[0][0], 1.0);
+        assert_eq!(frame.crack_quads[0].stage, 4);
+        assert!(gui.is_empty());
+
+        cracks[0] = crack_quad_request();
+        cracks[0].blend_policy = 99;
+        let request = whole_frame_request_with_cracks(&[], &cracks, &[]);
+        let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+            .expect_err("unknown crack blend policy must fail");
+        assert_eq!(error.code, StatusCode::UnknownEnum);
+
+        cracks[0] = crack_quad_request();
+        cracks[0].byte_size -= 4;
+        let request = whole_frame_request_with_cracks(&[], &cracks, &[]);
+        let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+            .expect_err("malformed crack quad must fail");
         assert_eq!(error.code, StatusCode::InvalidArgument);
     }
 

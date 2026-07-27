@@ -261,6 +261,7 @@ pub enum BlendMode {
     Alpha = 2,
     Additive = 3,
     Invert = 4,
+    Multiply = 5,
 }
 
 #[repr(u32)]
