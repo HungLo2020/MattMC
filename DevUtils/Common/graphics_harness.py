@@ -1374,6 +1374,116 @@ def deterministic_block_outline_pixel_evidence(doc: dict[str, object] | None, st
     return evidence
 
 
+def deterministic_world_border_pixel_evidence(doc: dict[str, object] | None, scenario: object) -> dict[str, object]:
+    scenario_name = str(scenario or "").strip().lower()
+    evidence: dict[str, object] = {
+        "checked": False,
+        "status": "not_requested",
+        "scenario": scenario_name or None,
+        "screenshot": None,
+        "crop": None,
+        "crop_path": None,
+        "matching_pixels": 0,
+        "pack_a_signature_pixels": 0,
+        "pack_b_signature_pixels": 0,
+        "vanilla_like_pixels": 0,
+        "texture_signature": "unknown",
+        "threshold": 128,
+    }
+    if not scenario_name:
+        return evidence
+    expected_visible = scenario_name not in {"hidden", "far", "no-target"}
+    captures = doc.get("captures") if isinstance(doc, dict) else None
+    if not isinstance(captures, list) or not captures:
+        evidence["status"] = "missing_capture"
+        return evidence
+    first = captures[0]
+    if not isinstance(first, dict) or not first.get("screenshot"):
+        evidence["status"] = "missing_screenshot"
+        return evidence
+    screenshot = Path(str(first["screenshot"]))
+    evidence["screenshot"] = str(screenshot)
+    if not screenshot.is_file():
+        evidence["status"] = "missing_screenshot_file"
+        return evidence
+    try:
+        from PIL import Image
+    except Exception as exc:  # pragma: no cover - depends on local test environment packaging.
+        evidence["status"] = f"pillow_unavailable:{exc}"
+        return evidence
+    try:
+        with Image.open(screenshot) as image:
+            rgb = image.convert("RGB")
+            matching = 0
+            pack_a_signature = 0
+            pack_b_signature = 0
+            vanilla_like = 0
+            min_x = rgb.width
+            min_y = rgb.height
+            max_x = -1
+            max_y = -1
+            for y in range(rgb.height):
+                for x in range(rgb.width):
+                    red, green, blue = rgb.getpixel((x, y))
+                    green_border = green >= 110 and green >= red + 30 and green >= blue + 15
+                    forcefield_border = blue >= 120 and green >= 80 and blue >= red + 60 and green >= red + 20
+                    pack_a_border = red >= 90 and red >= green + 25 and red >= blue + 10
+                    pack_b_border = green >= 120 and green >= red + 35 and green >= blue + 25
+                    world_region = y < int(rgb.height * 0.72)
+                    if world_region and pack_a_border:
+                        pack_a_signature += 1
+                    if world_region and pack_b_border:
+                        pack_b_signature += 1
+                    if forcefield_border:
+                        vanilla_like += 1
+                    if green_border or forcefield_border or (expected_visible and (pack_a_border or pack_b_border)):
+                        matching += 1
+                        min_x = min(min_x, x)
+                        min_y = min(min_y, y)
+                        max_x = max(max_x, x)
+                        max_y = max(max_y, y)
+            crop_info = None
+            crop_path = None
+            if matching:
+                pad = 12
+                left = max(0, min_x - pad)
+                top = max(0, min_y - pad)
+                right = min(rgb.width, max_x + pad + 1)
+                bottom = min(rgb.height, max_y + pad + 1)
+                crop_info = {"left": left, "top": top, "right": right, "bottom": bottom}
+                crop_path_candidate = screenshot.with_name(f"world_border_pixel_crop_{scenario_name}.png")
+                rgb.crop((left, top, right, bottom)).save(crop_path_candidate)
+                crop_path = str(crop_path_candidate)
+            present = matching >= int(evidence["threshold"])
+            if expected_visible:
+                status = "present" if present else "absent"
+            else:
+                status = "unexpected_present" if present else "absent_expected"
+            texture_signature = "unknown"
+            threshold = int(evidence["threshold"])
+            pack_threshold = max(threshold, 512)
+            if pack_a_signature >= pack_threshold or pack_b_signature >= pack_threshold:
+                texture_signature = "pack-a" if pack_a_signature >= pack_b_signature else "pack-b"
+            elif vanilla_like >= threshold:
+                texture_signature = "vanilla-like"
+            evidence.update(
+                {
+                    "checked": True,
+                    "status": status,
+                    "crop": crop_info,
+                    "crop_path": crop_path,
+                    "matching_pixels": matching,
+                    "pack_a_signature_pixels": pack_a_signature,
+                    "pack_b_signature_pixels": pack_b_signature,
+                    "vanilla_like_pixels": vanilla_like,
+                    "texture_signature": texture_signature,
+                }
+            )
+    except Exception as exc:
+        evidence["status"] = f"read_failed:{exc}"
+    return evidence
+
+
 def dh_state_from_text(text: str, meta: dict[str, str]) -> dict[str, object]:
     dh_enabled = bool(re.search(r"DistantHorizons|\[DH-|DH Ready|renderLods|renderDeferredLods", text, re.IGNORECASE))
     world_gen_threads = len(re.findall(r"DH-World Gen Thread\[\d+\]", text))
@@ -2299,9 +2409,14 @@ def normalize_capture_artifact(
     )
     requested_world_crack_scenario = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldCrack.scenario")
     requested_world_crack_stage = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldCrack.stage")
+    requested_world_border_scenario = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldBorder.scenario")
     world_outline_pixel_evidence = deterministic_block_outline_pixel_evidence(
         deterministic_doc,
         requested_world_outline_style,
+    )
+    world_border_pixel_evidence = deterministic_world_border_pixel_evidence(
+        deterministic_doc,
+        requested_world_border_scenario,
     )
     rust_gal_world_batches_for_validation = last_number(
         combined_logs, r"rust_gal_world_primitive_batches_executed[=: ]+(\d+)"
@@ -2323,6 +2438,15 @@ def normalize_capture_artifact(
     )
     rust_gal_world_crack_draws_for_validation = last_number(
         combined_logs, r"rust_gal_world_crack_draws_executed[=: ]+(\d+)"
+    )
+    rust_gal_world_border_quads_for_validation = last_number(
+        combined_logs, r"rust_gal_world_border_quads_executed[=: ]+(\d+)"
+    )
+    rust_gal_world_border_batches_for_validation = last_number(
+        combined_logs, r"rust_gal_world_border_batches_executed[=: ]+(\d+)"
+    )
+    rust_gal_world_border_draws_for_validation = last_number(
+        combined_logs, r"rust_gal_world_border_draws_executed[=: ]+(\d+)"
     )
     rust_gal_world_depth_creates_for_validation = last_number(
         combined_logs, r"rust_gal_world_depth_attachment_creates[=: ]+(\d+)"
@@ -2454,6 +2578,45 @@ def normalize_capture_artifact(
                     + ", ".join(missing_crack_counts)
                     + " evidence was captured"
                 )
+    world_border_workload_complete = True
+    border_scenario = (requested_world_border_scenario or "").strip().lower()
+    if border_scenario and rust_shell_outline_mode:
+        if border_scenario in {"hidden", "far", "no-target"}:
+            if int(rust_gal_world_border_quads_for_validation or 0) != 0:
+                world_border_workload_complete = False
+                validation_messages.append("deterministic hidden/far world-border scenario emitted unexpected border quads")
+        else:
+            required_border_counts = {
+                "border quads": rust_gal_world_border_quads_for_validation,
+                "border batches": rust_gal_world_border_batches_for_validation,
+                "border draws": rust_gal_world_border_draws_for_validation,
+                "depth attachment creates": rust_gal_world_depth_creates_for_validation,
+            }
+            missing_border_counts = [
+                name for name, value in required_border_counts.items() if int(value or 0) <= 0
+            ]
+            if missing_border_counts:
+                world_border_workload_complete = False
+                validation_messages.append(
+                    "deterministic Rust-GAL world-border scenario requested but no non-zero "
+                    + ", ".join(missing_border_counts)
+                    + " evidence was captured"
+                )
+    if border_scenario:
+        if border_scenario in {"hidden", "far", "no-target"}:
+            if world_border_pixel_evidence.get("status") == "unexpected_present":
+                world_border_workload_complete = False
+                validation_messages.append(
+                    "deterministic hidden/far world-border scenario produced visible border-colored pixels "
+                    f"(matching_pixels={world_border_pixel_evidence.get('matching_pixels')})"
+                )
+        elif world_border_pixel_evidence.get("status") != "present":
+            world_border_workload_complete = False
+            validation_messages.append(
+                "deterministic world-border scenario did not produce visible border-colored pixels "
+                f"(pixel evidence status={world_border_pixel_evidence.get('status')}, "
+                f"matching_pixels={world_border_pixel_evidence.get('matching_pixels')})"
+            )
     instrumentation = benchmark_fingerprint["instrumentation"]
     run_type = instrumentation.get("run_type") if isinstance(instrumentation, dict) else "clean-performance"
     diagnostic_hooks = bool(instrumentation.get("diagnostic_hooks")) if isinstance(instrumentation, dict) else False
@@ -2477,6 +2640,9 @@ def normalize_capture_artifact(
             if crack_scenario and crack_scenario not in {"hidden", "no-target"}:
                 if not isinstance(proof, dict) or not proof.get("non_zero_crack_workload"):
                     validation_messages.append("RenderDoc capture did not prove non-zero Rust-GAL crack workload")
+            if border_scenario and border_scenario not in {"hidden", "far", "no-target"}:
+                if not isinstance(proof, dict) or not proof.get("non_zero_border_workload"):
+                    validation_messages.append("RenderDoc capture did not prove non-zero Rust-GAL world-border workload")
             if isinstance(proof, dict) and proof.get("blue_diagnostic_shell_clear_expected"):
                 validation_messages.append("Rust Vulkan shell blue diagnostic clear is expected; this is not full world rendering")
     if isinstance(instrumentation, dict) and instrumentation.get("tracy", {}).get("enabled"):
@@ -2495,16 +2661,25 @@ def normalize_capture_artifact(
     if rust_shell_has_java_vulkan_frame:
         validation_messages.append("Rust whole-frame shell executed Java Vulkan frame/present work")
     renderdoc_workload_assertions_complete = True
-    if isinstance(instrumentation, dict) and instrumentation.get("renderdoc", {}).get("enabled") and requested_world_outline_scenario and requested_world_outline_scenario != "no-target":
+    if (
+        isinstance(instrumentation, dict)
+        and instrumentation.get("renderdoc", {}).get("enabled")
+        and (
+            (requested_world_outline_scenario and requested_world_outline_scenario != "no-target")
+            or (border_scenario and border_scenario not in {"hidden", "far", "no-target"})
+        )
+    ):
         proof = renderdoc_summary.get("workload_proof") if isinstance(renderdoc_summary, dict) else {}
+        required_workload_keys = [
+            "acquired_rendered_presented_image_identity_matches",
+            "depth_attachment_evidence",
+        ]
+        if requested_world_outline_scenario and requested_world_outline_scenario != "no-target":
+            required_workload_keys.extend(["non_zero_outline_workload", "outline_marker_evidence"])
+        if border_scenario and border_scenario not in {"hidden", "far", "no-target"}:
+            required_workload_keys.extend(["non_zero_border_workload", "border_marker_evidence"])
         renderdoc_workload_assertions_complete = isinstance(proof, dict) and all(
-            bool(proof.get(key))
-            for key in (
-                "non_zero_outline_workload",
-                "acquired_rendered_presented_image_identity_matches",
-                "depth_attachment_evidence",
-                "outline_marker_evidence",
-            )
+            bool(proof.get(key)) for key in required_workload_keys
         )
         if crack_scenario and crack_scenario not in {"hidden", "no-target"}:
             renderdoc_workload_assertions_complete = renderdoc_workload_assertions_complete and bool(
@@ -2587,6 +2762,9 @@ def normalize_capture_artifact(
     rust_gal_world_crack_quads = last_number(combined_logs, r"rust_gal_world_crack_quads_executed[=: ]+(\d+)")
     rust_gal_world_crack_batches = last_number(combined_logs, r"rust_gal_world_crack_batches_executed[=: ]+(\d+)")
     rust_gal_world_crack_draws = last_number(combined_logs, r"rust_gal_world_crack_draws_executed[=: ]+(\d+)")
+    rust_gal_world_border_quads = last_number(combined_logs, r"rust_gal_world_border_quads_executed[=: ]+(\d+)")
+    rust_gal_world_border_batches = last_number(combined_logs, r"rust_gal_world_border_batches_executed[=: ]+(\d+)")
+    rust_gal_world_border_draws = last_number(combined_logs, r"rust_gal_world_border_draws_executed[=: ]+(\d+)")
     rust_gal_world_depth_creates = last_number(combined_logs, r"rust_gal_world_depth_attachment_creates[=: ]+(\d+)")
     rust_gal_world_depth_reuses = last_number(combined_logs, r"rust_gal_world_depth_attachment_reuses[=: ]+(\d+)")
     rust_gal_world_depth_retires = last_number(combined_logs, r"rust_gal_world_depth_attachment_retires[=: ]+(\d+)")
@@ -2594,6 +2772,8 @@ def normalize_capture_artifact(
     rust_gal_world_outline_cache_misses = last_number(combined_logs, r"rust_gal_world_outline_cache_misses[=: ]+(\d+)")
     rust_gal_world_crack_cache_hits = last_number(combined_logs, r"rust_gal_world_crack_cache_hits[=: ]+(\d+)")
     rust_gal_world_crack_cache_misses = last_number(combined_logs, r"rust_gal_world_crack_cache_misses[=: ]+(\d+)")
+    rust_gal_world_border_cache_hits = last_number(combined_logs, r"rust_gal_world_border_cache_hits[=: ]+(\d+)")
+    rust_gal_world_border_cache_misses = last_number(combined_logs, r"rust_gal_world_border_cache_misses[=: ]+(\d+)")
     rust_gal_swapchain_recreations = len(re.findall(r"gal\.swapchain\.recreate backend=vulkan", combined_logs))
     rust_gal_ffi_calls = last_number(combined_logs, r"ffi(?:_call)?_count[=: ]+(\d+)")
     rust_gal_ffi_bytes = last_number(combined_logs, r"ffi(?:_bytes| bytes)[=: ]+(\d+)")
@@ -2624,6 +2804,27 @@ def normalize_capture_artifact(
     ]
     gui_asset_update_failure_events = len(
         re.findall(r"Rust VulkanicGAL GUI asset update failed .*?preserve_last_valid=true", combined_logs)
+    )
+    world_border_asset_resolutions = [
+        {
+            "generation": int(match.group(1)),
+            "texture_id": int(match.group(2)),
+            "path": match.group(3),
+            "source_pack": match.group(4),
+            "payloads": int(match.group(5)),
+            "payload_bytes": int(match.group(6)),
+            "fallback": match.group(7) == "true",
+            "sha256": match.group(8),
+        }
+        for match in re.finditer(
+            r"Rust VulkanicGAL world-border asset resolved generation=(\d+) texture_id=(\d+) path=([^ ]+) source_pack=([^ ]+) payloads=(\d+) payload_bytes=(\d+) fallback=(true|false) sha256=(\S+)",
+            combined_logs,
+        )
+    ]
+    world_border_asset_update_failure_events = len(
+        re.findall(r"Rust VulkanicGAL world-border asset update failed .*?preserve_last_valid=true", combined_logs)
+    ) + len(
+        re.findall(r"Rust VulkanicGAL world-border asset update skipped .*?preserve_last_valid=true", combined_logs)
     )
     rust_gal_operations = {
         "context_create": {
@@ -2669,6 +2870,10 @@ def normalize_capture_artifact(
         "asset_update": {
             "calls": last_number(combined_logs, r"rust_gal_ffi_asset_update_calls[=: ]+(\d+)"),
             "bytes": last_number(combined_logs, r"rust_gal_ffi_asset_update_bytes[=: ]+(\d+)"),
+        },
+        "world_border_asset_update": {
+            "calls": last_number(combined_logs, r"rust_gal_ffi_world_border_asset_update_calls[=: ]+(\d+)"),
+            "bytes": last_number(combined_logs, r"rust_gal_ffi_world_border_asset_update_bytes[=: ]+(\d+)"),
         },
     }
     rust_gal_calls_per_batch = None
@@ -2742,6 +2947,7 @@ def normalize_capture_artifact(
         and deterministic_complete
         and world_outline_workload_complete
         and world_crack_workload_complete
+        and world_border_workload_complete
         and validation_layer_exercised
         and renderdoc_complete
         and renderdoc_workload_assertions_complete
@@ -2821,6 +3027,8 @@ def normalize_capture_artifact(
                 "world_outline_pixel_evidence": world_outline_pixel_evidence,
                 "world_crack_scenario": requested_world_crack_scenario or None,
                 "world_crack_stage": parse_number(requested_world_crack_stage),
+                "world_border_scenario": requested_world_border_scenario or None,
+                "world_border_pixel_evidence": world_border_pixel_evidence,
                 "cache_hits": last_number(combined_logs, r"rust_gal_cache_hits[=: ]+(\d+)"),
                 "cache_misses": last_number(combined_logs, r"rust_gal_cache_misses[=: ]+(\d+)"),
                 "queue_depth": last_number(combined_logs, r"rust_gal_queue_depth[=: ]+(\d+)"),
@@ -2835,6 +3043,9 @@ def normalize_capture_artifact(
                 "world_crack_quads_executed": rust_gal_world_crack_quads,
                 "world_crack_batches_executed": rust_gal_world_crack_batches,
                 "world_crack_draws_executed": rust_gal_world_crack_draws,
+                "world_border_quads_executed": rust_gal_world_border_quads,
+                "world_border_batches_executed": rust_gal_world_border_batches,
+                "world_border_draws_executed": rust_gal_world_border_draws,
                 "world_depth_attachment_creates": rust_gal_world_depth_creates,
                 "world_depth_attachment_reuses": rust_gal_world_depth_reuses,
                 "world_depth_attachment_retires": rust_gal_world_depth_retires,
@@ -2842,6 +3053,18 @@ def normalize_capture_artifact(
                 "world_outline_cache_misses": rust_gal_world_outline_cache_misses,
                 "world_crack_cache_hits": rust_gal_world_crack_cache_hits,
                 "world_crack_cache_misses": rust_gal_world_crack_cache_misses,
+                "world_border_cache_hits": rust_gal_world_border_cache_hits,
+                "world_border_cache_misses": rust_gal_world_border_cache_misses,
+                "world_border_asset_generation": last_number(combined_logs, r"rust_gal_world_border_asset_generation[=: ]+(\d+)"),
+                "world_border_uploaded_asset_generation": last_number(combined_logs, r"rust_gal_world_border_uploaded_asset_generation[=: ]+(\d+)"),
+                "world_border_asset_payload_count": last_number(combined_logs, r"rust_gal_world_border_asset_payload_count[=: ]+(\d+)"),
+                "world_border_asset_payload_bytes": last_number(combined_logs, r"rust_gal_world_border_asset_payload_bytes[=: ]+(\d+)"),
+                "world_border_asset_update_failures": last_number(combined_logs, r"rust_gal_world_border_asset_update_failures[=: ]+(\d+)"),
+                "world_border_asset_source_pack": last_text(combined_logs, r"rust_gal_world_border_asset_source_pack[=: ]+(\S+)"),
+                "world_border_asset_sha256": last_text(combined_logs, r"rust_gal_world_border_asset_sha256[=: ]+(\S+)"),
+                "world_border_asset_fallback": last_text(combined_logs, r"rust_gal_world_border_asset_fallback[=: ]+(\S+)"),
+                "world_border_asset_resolutions": world_border_asset_resolutions,
+                "world_border_asset_update_failure_events": world_border_asset_update_failure_events,
                 "swapchain_recreations": rust_gal_swapchain_recreations,
                 "frame_target_generations": last_number(combined_logs, r"rust_gal_frame_target_generations[=: ]+(\d+)"),
                 "frame_target_identity_changes": last_number(combined_logs, r"rust_gal_frame_target_identity_changes[=: ]+(\d+)"),
@@ -3136,6 +3359,11 @@ def renderdoc_workload_proof(capture_dir: Path) -> dict[str, object]:
         "crack_batches": last_number(log_text, r"rust_gal_world_crack_batches_executed[=: ]+(\d+)"),
         "crack_draws": last_number(log_text, r"rust_gal_world_crack_draws_executed[=: ]+(\d+)"),
     }
+    border_counts = {
+        "border_quads": last_number(log_text, r"rust_gal_world_border_quads_executed[=: ]+(\d+)"),
+        "border_batches": last_number(log_text, r"rust_gal_world_border_batches_executed[=: ]+(\d+)"),
+        "border_draws": last_number(log_text, r"rust_gal_world_border_draws_executed[=: ]+(\d+)"),
+    }
     acquired = [
         {
             "correlation": int(correlation),
@@ -3226,6 +3454,7 @@ def renderdoc_workload_proof(capture_dir: Path) -> dict[str, object]:
     return {
         "outline": outline_counts,
         "crack": crack_counts,
+        "border": border_counts,
         "non_zero_outline_workload": all(
             int(outline_counts[key] or 0) > 0
             for key in ("primitive_batches", "line_segments", "line_vertices", "world_draws", "depth_attachment_creates")
@@ -3234,10 +3463,17 @@ def renderdoc_workload_proof(capture_dir: Path) -> dict[str, object]:
             int(crack_counts[key] or 0) > 0
             for key in ("crack_quads", "crack_batches", "crack_draws")
         ),
+        "non_zero_border_workload": all(
+            int(border_counts[key] or 0) > 0
+            for key in ("border_quads", "border_batches", "border_draws")
+        ),
         "depth_attachment_evidence": int(outline_counts["depth_attachment_creates"] or 0) > 0
         or int(outline_counts["depth_attachment_reuses"] or 0) > 0,
         "outline_marker_evidence": "minecraft.world.block-outline" in log_text
         or int(outline_counts["world_draws"] or 0) > 0,
+        "border_marker_evidence": "minecraft.world-border" in log_text
+        or "world-border" in log_text
+        or int(border_counts["border_draws"] or 0) > 0,
         "acquired_images": acquired[-5:],
         "rendered_images": begun[-5:],
         "present_ready_images": present_ready[-5:],
@@ -4263,6 +4499,10 @@ def build_capture_command(
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.blockOutlineHighContrast=true")
     if getattr(args, "block_outline_pick_diagnostics", False):
         java_options.append("-Dmattmc.dev.blockOutlinePickDiagnostics=true")
+    if getattr(args, "world_border_scenario", ""):
+        java_options.append(f"-Dmattmc.dev.rustGalWorldBorder.scenario={args.world_border_scenario}")
+        if getattr(args, "world_border_scroll_phase", ""):
+            java_options.append(f"-Dmattmc.dev.rustGalWorldBorder.scrollPhase={args.world_border_scroll_phase}")
     rust_gal_gui_control = getattr(args, "rust_gal_gui_control", "rust")
     if rust_gal_gui_control == "disabled":
         java_options.append("-Dmattmc.dev.rustGalGui.disabled=true")
@@ -5239,6 +5479,17 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             "--block-outline-pick-diagnostics",
             action="store_true",
             help="Enable bounded normal GameRenderer.pick() diagnostics for interactive block-outline investigation.",
+        )
+        subparser.add_argument(
+            "--world-border-scenario",
+            choices=("hidden", "far", "near", "all-sides", "corner"),
+            default=os.environ.get("MATTMC_WORLD_BORDER_SCENARIO", ""),
+            help="Force a deterministic Rust-GAL world-border scenario for whole-frame Vulkan captures.",
+        )
+        subparser.add_argument(
+            "--world-border-scroll-phase",
+            default=os.environ.get("MATTMC_WORLD_BORDER_SCROLL_PHASE", ""),
+            help="Freeze the deterministic world-border texture scroll phase.",
         )
         subparser.add_argument(
             "--gui-resource-pack-scenario",

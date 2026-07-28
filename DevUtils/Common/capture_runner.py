@@ -1956,6 +1956,8 @@ GUI_RESOURCE_PACK_SPRITES = (
     ("assets/minecraft/textures/gui/sprites/boss_bar/pink_progress.png", 182, 5),
 )
 
+WORLD_BORDER_RESOURCE_PACK_TEXTURE = "assets/minecraft/textures/misc/forcefield.png"
+
 
 GUI_PACK_COLORS = {
     "a": (238, 37, 67, 255),
@@ -1964,7 +1966,12 @@ GUI_PACK_COLORS = {
 
 
 def gui_resource_pack_specs(scenario: str) -> list[dict[str, object]]:
-    base = {"sprites": GUI_RESOURCE_PACK_SPRITES, "malformed": (), "wrong_size": ()}
+    base = {
+        "sprites": GUI_RESOURCE_PACK_SPRITES,
+        "world_border_texture": WORLD_BORDER_RESOURCE_PACK_TEXTURE,
+        "malformed": (),
+        "wrong_size": (),
+    }
     if scenario == "pack-a":
         return [{**base, "name": "mattmc-rust-gui-pack-a", "variant": "a"}]
     if scenario == "pack-b":
@@ -1986,6 +1993,7 @@ def gui_resource_pack_specs(scenario: str) -> list[dict[str, object]]:
                 "name": "mattmc-rust-gui-pack-missing",
                 "variant": "a",
                 "sprites": GUI_RESOURCE_PACK_SPRITES[:6],
+                "world_border_texture": "",
             }
         ]
     if scenario == "malformed":
@@ -1994,7 +2002,10 @@ def gui_resource_pack_specs(scenario: str) -> list[dict[str, object]]:
                 **base,
                 "name": "mattmc-rust-gui-pack-malformed",
                 "variant": "a",
-                "malformed": ("assets/minecraft/textures/gui/sprites/hud/crosshair.png",),
+                "malformed": (
+                    "assets/minecraft/textures/gui/sprites/hud/crosshair.png",
+                    WORLD_BORDER_RESOURCE_PACK_TEXTURE,
+                ),
             }
         ]
     if scenario == "unsupported":
@@ -2040,6 +2051,14 @@ def write_gui_resource_pack(pack_dir: Path, spec: dict[str, object]) -> None:
             continue
         actual_width = width + 1 if resource_path in wrong_size else width
         target.write_bytes(asymmetric_png(actual_width, height, GUI_PACK_COLORS[variant], variant))
+    world_border_texture = str(spec.get("world_border_texture", ""))
+    if world_border_texture:
+        target = pack_dir / world_border_texture
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if world_border_texture in malformed:
+            target.write_bytes(b"not a png")
+        else:
+            target.write_bytes(asymmetric_png(16, 16, GUI_PACK_COLORS[variant], variant))
 
 
 def asymmetric_png(width: int, height: int, base: tuple[int, int, int, int], variant: str) -> bytes:

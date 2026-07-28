@@ -110,6 +110,18 @@ def write_outline_probe_image(path: Path, *, visible: bool) -> None:
     image.save(path)
 
 
+def write_world_border_probe_image(path: Path, *, visible: bool) -> None:
+    from PIL import Image
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image = Image.new("RGB", (1280, 720), (18, 36, 72))
+    if visible:
+        for x in range(180, 1100):
+            for y in range(260, 320):
+                image.putpixel((x, y), (84, 220, 86))
+    image.save(path)
+
+
 def write_retention_manifest(path: Path, *, success: bool, profile: str = "smoke") -> None:
     path.mkdir(parents=True, exist_ok=True)
     (path / harness.MANIFEST_NAME).write_text(
@@ -1966,6 +1978,8 @@ else:
                 world_outline_real_target=True,
                 world_outline_aim_real_target=True,
                 block_outline_pick_diagnostics=True,
+                world_border_scenario="near",
+                world_border_scroll_phase="0.25",
                 gui_resource_pack_scenario="",
                 world="Origin",
                 max_secs=1,
@@ -1994,6 +2008,8 @@ else:
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.blockOutlineAimTarget=true", parsed)
             self.assertIn("-Dmattmc.dev.deterministicCameraCapture.blockOutlineHighContrast=true", parsed)
             self.assertIn("-Dmattmc.dev.blockOutlinePickDiagnostics=true", parsed)
+            self.assertIn("-Dmattmc.dev.rustGalWorldBorder.scenario=near", parsed)
+            self.assertIn("-Dmattmc.dev.rustGalWorldBorder.scrollPhase=0.25", parsed)
 
             self.assertIn("-Dmattmc.dev.rustGalWorldOutline.scenario=full-cube", parsed)
             self.assertIn("-Dmattmc.dev.rustGalWorldOutline.style=high-contrast", parsed)
@@ -2364,6 +2380,7 @@ else:
             text = options.read_text(encoding="utf-8")
             self.assertIn('resourcePacks:["file/mattmc-rust-gui-pack-a","file/mattmc-rust-gui-pack-b"]', text)
             self.assertTrue((game_dir / "resourcepacks" / "mattmc-rust-gui-pack-b" / "assets/minecraft/textures/gui/sprites/hud/armor_full.png").is_file())
+            self.assertTrue((game_dir / "resourcepacks" / "mattmc-rust-gui-pack-b" / "assets/minecraft/textures/misc/forcefield.png").is_file())
 
     def test_rust_opengl_attribution_is_not_confused_by_vulkanicgal_name(self) -> None:
         mode = harness.ModeSpec("current-opengl-shaders-on", "current", "opengl", "on", "java-opengl", False)
@@ -2439,10 +2456,19 @@ else:
                 "rust_gal_world_line_vertices_executed=24 rust_gal_world_primitive_draws_executed=1 "
                 "rust_gal_world_crack_quads_executed=6 rust_gal_world_crack_batches_executed=1 "
                 "rust_gal_world_crack_draws_executed=1 "
+                "rust_gal_world_border_quads_executed=2 rust_gal_world_border_batches_executed=1 "
+                "rust_gal_world_border_draws_executed=1 "
                 "rust_gal_world_depth_attachment_creates=1 rust_gal_world_depth_attachment_reuses=7 "
                 "rust_gal_world_depth_attachment_retires=2 "
                 "rust_gal_world_outline_cache_hits=3 rust_gal_world_outline_cache_misses=1 "
                 "rust_gal_world_crack_cache_hits=4 rust_gal_world_crack_cache_misses=1 "
+                "rust_gal_world_border_cache_hits=5 rust_gal_world_border_cache_misses=1 "
+                "rust_gal_world_border_asset_generation=4 rust_gal_world_border_uploaded_asset_generation=4 "
+                "rust_gal_world_border_asset_payload_count=1 rust_gal_world_border_asset_payload_bytes=512 "
+                "rust_gal_world_border_asset_update_failures=0 "
+                "rust_gal_world_border_asset_source_pack=file/mattmc-rust-gui-pack-b "
+                "rust_gal_world_border_asset_sha256=abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd "
+                "rust_gal_world_border_asset_fallback=false "
                 "rust_gal_frame_target_generations=8 rust_gal_frame_target_identity_changes=7 "
                 "rust_gal_last_frame_target_generation=9 rust_gal_last_frame_target_identity=2 "
                 "rust_gal_batches_cancelled=0 rust_gal_completion_polls=0 rust_gal_completion_timeouts=0 "
@@ -2450,12 +2476,12 @@ else:
                 "rust_gal_ffi_frame_configure_calls=1 rust_gal_ffi_frame_acquire_calls=2 "
                 "rust_gal_ffi_frame_present_calls=2 rust_gal_ffi_resource_batch_calls=5 "
                 "rust_gal_ffi_submit_calls=3 rust_gal_ffi_completion_query_calls=0 rust_gal_ffi_retire_calls=1 "
-                "rust_gal_ffi_asset_update_calls=2 "
+                "rust_gal_ffi_asset_update_calls=2 rust_gal_ffi_world_border_asset_update_calls=1 "
                 "rust_gal_ffi_context_create_bytes=40 rust_gal_ffi_capability_bytes=24 "
                 "rust_gal_ffi_frame_configure_bytes=64 rust_gal_ffi_frame_acquire_bytes=96 "
                 "rust_gal_ffi_frame_present_bytes=80 rust_gal_ffi_resource_batch_bytes=3200 "
                 "rust_gal_ffi_submit_bytes=1080 rust_gal_ffi_completion_query_bytes=0 rust_gal_ffi_retire_bytes=64 "
-                "rust_gal_ffi_asset_update_bytes=4096 "
+                "rust_gal_ffi_asset_update_bytes=4096 rust_gal_ffi_world_border_asset_update_bytes=576 "
                 "rust_gal_enqueue_nanos=4000 rust_gal_resource_lookup_nanos=6000 "
                 "rust_gal_resource_create_nanos=1000 rust_gal_abi_packing_nanos=8000 "
                 "rust_gal_frame_acquire_nanos=10000 rust_gal_submit_nanos=12000 "
@@ -2468,12 +2494,19 @@ else:
                 "ffi_call_count=18 ffi_bytes=8192\n"
                 "[MattMC graphics audit] Rust VulkanicGAL GUI asset resolved sprite=ARMOR_FULL "
                 "sprite_id=6 path=minecraft:textures/gui/sprites/hud/armor_full.png "
-                "source_pack=file/mattmc-rust-gui-pack-b bytes=345 sha256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n"
-                "[MattMC graphics audit] Rust VulkanicGAL GUI asset missing sprite=HEART_NORMAL_FULL "
-                "sprite_id=11 path=minecraft:textures/gui/sprites/hud/heart/full.png fallback=vanilla\n"
-                "[MattMC graphics audit] Rust VulkanicGAL GUI asset update accepted generation=3 payloads=15 payload_bytes=8192 uploaded_generation=3\n",
-                encoding="utf-8",
-            )
+	                "source_pack=file/mattmc-rust-gui-pack-b bytes=345 sha256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n"
+	                "[MattMC graphics audit] Rust VulkanicGAL GUI asset missing sprite=HEART_NORMAL_FULL "
+	                "sprite_id=11 path=minecraft:textures/gui/sprites/hud/heart/full.png fallback=vanilla\n"
+	                "[MattMC graphics audit] Rust VulkanicGAL GUI asset update accepted generation=3 payloads=15 payload_bytes=8192 uploaded_generation=3\n"
+	                "[MattMC graphics audit] Rust VulkanicGAL world-border asset resolved generation=4 texture_id=1 "
+	                "path=minecraft:textures/misc/forcefield.png source_pack=file/mattmc-rust-gui-pack-b "
+	                "payloads=1 payload_bytes=512 fallback=false "
+	                "sha256=abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd\n"
+	                "[MattMC graphics audit] Rust VulkanicGAL world-border asset update accepted generation=4 "
+	                "texture_id=1 payloads=1 payload_bytes=512 source_pack=file/mattmc-rust-gui-pack-b "
+	                "fallback=false uploaded_generation=4\n",
+	                encoding="utf-8",
+	            )
 
             artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[0], capture, "capture", True, [], 0, False, tool_kind="capture")
 
@@ -2499,6 +2532,9 @@ else:
             self.assertEqual(6, artifact["metrics"]["rust_gal_slice"]["world_crack_quads_executed"])
             self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["world_crack_batches_executed"])
             self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["world_crack_draws_executed"])
+            self.assertEqual(2, artifact["metrics"]["rust_gal_slice"]["world_border_quads_executed"])
+            self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["world_border_batches_executed"])
+            self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["world_border_draws_executed"])
             self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["world_depth_attachment_creates"])
             self.assertEqual(7, artifact["metrics"]["rust_gal_slice"]["world_depth_attachment_reuses"])
             self.assertEqual(2, artifact["metrics"]["rust_gal_slice"]["world_depth_attachment_retires"])
@@ -2506,6 +2542,14 @@ else:
             self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["world_outline_cache_misses"])
             self.assertEqual(4, artifact["metrics"]["rust_gal_slice"]["world_crack_cache_hits"])
             self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["world_crack_cache_misses"])
+            self.assertEqual(5, artifact["metrics"]["rust_gal_slice"]["world_border_cache_hits"])
+            self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["world_border_cache_misses"])
+            self.assertEqual(4, artifact["metrics"]["rust_gal_slice"]["world_border_asset_generation"])
+            self.assertEqual(4, artifact["metrics"]["rust_gal_slice"]["world_border_uploaded_asset_generation"])
+            self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["world_border_asset_payload_count"])
+            self.assertEqual(512, artifact["metrics"]["rust_gal_slice"]["world_border_asset_payload_bytes"])
+            self.assertEqual("file/mattmc-rust-gui-pack-b", artifact["metrics"]["rust_gal_slice"]["world_border_asset_source_pack"])
+            self.assertEqual("false", artifact["metrics"]["rust_gal_slice"]["world_border_asset_fallback"])
             self.assertEqual(8, artifact["metrics"]["rust_gal_slice"]["frame_target_generations"])
             self.assertEqual(7, artifact["metrics"]["rust_gal_slice"]["frame_target_identity_changes"])
             self.assertEqual(9, artifact["metrics"]["rust_gal_slice"]["last_frame_target_generation"])
@@ -2517,6 +2561,8 @@ else:
             self.assertEqual(3200, artifact["metrics"]["rust_gal_slice"]["ffi_operations"]["resource_batch"]["bytes"])
             self.assertEqual(2, artifact["metrics"]["rust_gal_slice"]["ffi_operations"]["asset_update"]["calls"])
             self.assertEqual(4096, artifact["metrics"]["rust_gal_slice"]["ffi_operations"]["asset_update"]["bytes"])
+            self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["ffi_operations"]["world_border_asset_update"]["calls"])
+            self.assertEqual(576, artifact["metrics"]["rust_gal_slice"]["ffi_operations"]["world_border_asset_update"]["bytes"])
             self.assertEqual(9, artifact["metrics"]["rust_gal_slice"]["ffi_calls_per_executed_batch"])
             self.assertEqual(4096, artifact["metrics"]["rust_gal_slice"]["ffi_bytes_per_executed_batch"])
             self.assertEqual(8000, artifact["metrics"]["rust_gal_slice"]["timing_totals_nanos"]["abi_packing_nanos"])
@@ -2528,6 +2574,10 @@ else:
             self.assertEqual("file/mattmc-rust-gui-pack-b", artifact["metrics"]["rust_gal_slice"]["asset_resolutions"][0]["source_pack"])
             self.assertEqual("ARMOR_FULL", artifact["metrics"]["rust_gal_slice"]["asset_resolutions"][0]["sprite"])
             self.assertEqual("HEART_NORMAL_FULL", artifact["metrics"]["rust_gal_slice"]["asset_missing_fallbacks"][0]["sprite"])
+            self.assertEqual(
+                "file/mattmc-rust-gui-pack-b",
+                artifact["metrics"]["rust_gal_slice"]["world_border_asset_resolutions"][0]["source_pack"],
+            )
             self.assertEqual(18, artifact["metrics"]["ffi"]["call_count"])
             self.assertEqual(8192, artifact["metrics"]["ffi"]["bytes"])
 
@@ -2557,6 +2607,116 @@ else:
             self.assertFalse(artifact["validation"]["complete"])
             self.assertEqual("full-cube", artifact["metrics"]["rust_gal_slice"]["world_outline_scenario"])
             self.assertTrue(any("world-outline target requested" in message for message in artifact["validation"]["messages"]))
+
+    def test_requested_world_border_capture_rejects_zero_work(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend="vulkan")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "Picked up JAVA_TOOL_OPTIONS: -Dmattmc.dev.rustGalWorldBorder.scenario=near\n"
+                "[MattMC graphics audit] Rust VulkanicGAL GUI frame executed producer=gui.frame "
+                "frame=4 submission=5 rust_gal_world_border_quads_executed=0 "
+                "rust_gal_world_border_batches_executed=0 rust_gal_world_border_draws_executed=0 "
+                "rust_gal_world_depth_attachment_creates=0 rust_gal_backend_submissions=1 "
+                "ffi_call_count=3 ffi_bytes=256\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[6], capture, "capture", True, [], 0, False, tool_kind="capture")
+
+            self.assertFalse(artifact["validation"]["complete"])
+            self.assertEqual("near", artifact["metrics"]["rust_gal_slice"]["world_border_scenario"])
+            self.assertTrue(any("world-border scenario requested" in message for message in artifact["validation"]["messages"]))
+
+    def test_requested_world_border_capture_requires_visible_pixels(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend="vulkan")
+            screenshot = capture / "world_border_missing.png"
+            write_world_border_probe_image(screenshot, visible=False)
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            doc = json.loads(deterministic.read_text(encoding="utf-8"))
+            doc["captures"][0]["screenshot"] = str(screenshot)
+            deterministic.write_text(json.dumps(doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "Picked up JAVA_TOOL_OPTIONS: -Dmattmc.dev.rustGalWorldBorder.scenario=near\n"
+                "[MattMC graphics audit] Rust VulkanicGAL GUI frame executed producer=gui.frame "
+                "frame=4 submission=5 rust_gal_world_border_quads_executed=1 "
+                "rust_gal_world_border_batches_executed=1 rust_gal_world_border_draws_executed=1 "
+                "rust_gal_world_depth_attachment_creates=1 rust_gal_backend_submissions=1 "
+                "ffi_call_count=3 ffi_bytes=256\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[6], capture, "capture", True, [], 0, False, tool_kind="capture")
+
+            self.assertFalse(artifact["validation"]["complete"])
+            evidence = artifact["metrics"]["rust_gal_slice"]["world_border_pixel_evidence"]
+            self.assertEqual("absent", evidence["status"])
+            self.assertTrue(any("world-border scenario did not produce visible" in message for message in artifact["validation"]["messages"]))
+
+    def test_requested_world_border_capture_accepts_visible_pixels(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend="vulkan")
+            screenshot = capture / "world_border_visible.png"
+            write_world_border_probe_image(screenshot, visible=True)
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            doc = json.loads(deterministic.read_text(encoding="utf-8"))
+            doc["captures"][0]["screenshot"] = str(screenshot)
+            deterministic.write_text(json.dumps(doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "Picked up JAVA_TOOL_OPTIONS: -Dmattmc.dev.rustGalWorldBorder.scenario=near\n"
+                "[MattMC graphics audit] Rust VulkanicGAL GUI frame executed producer=gui.frame "
+                "frame=4 submission=5 rust_gal_world_border_quads_executed=1 "
+                "rust_gal_world_border_batches_executed=1 rust_gal_world_border_draws_executed=1 "
+                "rust_gal_world_depth_attachment_creates=1 rust_gal_backend_submissions=1 "
+                "ffi_call_count=3 ffi_bytes=256\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[6], capture, "capture", True, [], 0, False, tool_kind="capture")
+
+            self.assertTrue(artifact["validation"]["complete"])
+            evidence = artifact["metrics"]["rust_gal_slice"]["world_border_pixel_evidence"]
+            self.assertEqual("present", evidence["status"])
+            self.assertGreaterEqual(evidence["matching_pixels"], evidence["threshold"])
+            self.assertTrue(Path(str(evidence["crop_path"])).is_file())
+
+    def test_hidden_world_border_capture_rejects_visible_pixels(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend="vulkan")
+            screenshot = capture / "world_border_visible.png"
+            write_world_border_probe_image(screenshot, visible=True)
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            doc = json.loads(deterministic.read_text(encoding="utf-8"))
+            doc["captures"][0]["screenshot"] = str(screenshot)
+            deterministic.write_text(json.dumps(doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "Picked up JAVA_TOOL_OPTIONS: -Dmattmc.dev.rustGalWorldBorder.scenario=hidden\n"
+                "[MattMC graphics audit] Rust VulkanicGAL GUI frame executed producer=gui.frame "
+                "frame=4 submission=5 rust_gal_world_border_quads_executed=0 "
+                "rust_gal_world_border_batches_executed=0 rust_gal_world_border_draws_executed=0 "
+                "rust_gal_world_depth_attachment_creates=1 rust_gal_backend_submissions=1 "
+                "ffi_call_count=3 ffi_bytes=256\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[6], capture, "capture", True, [], 0, False, tool_kind="capture")
+
+            self.assertFalse(artifact["validation"]["complete"])
+            evidence = artifact["metrics"]["rust_gal_slice"]["world_border_pixel_evidence"]
+            self.assertEqual("unexpected_present", evidence["status"])
+            self.assertTrue(any("hidden/far world-border scenario produced visible" in message for message in artifact["validation"]["messages"]))
 
     def test_java_opengl_world_outline_capture_uses_java_route_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

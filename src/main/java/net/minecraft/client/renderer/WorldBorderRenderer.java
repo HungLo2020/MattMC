@@ -29,6 +29,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.level.border.WorldBorder;
 import net.minecraft.world.phys.Vec3;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
@@ -116,9 +117,13 @@ public class WorldBorderRenderer {
 		} else {
 			worldBorderRenderState.alpha = 0.0;
 		}
+		RustGalWorldPrimitiveRenderer.applyDiagnosticWorldBorderState(worldBorderRenderState, vec3, d);
 	}
 
 	public void render(WorldBorderRenderState worldBorderRenderState, Vec3 vec3, double d, double e) {
+		if (RustGalWorldPrimitiveRenderer.enqueueWorldBorder(worldBorderRenderState, vec3, d, e)) {
+			return;
+		}
 		if (!(worldBorderRenderState.alpha <= 0.0)) {
 			double f = vec3.x;
 			double g = vec3.z;
@@ -126,7 +131,7 @@ public class WorldBorderRenderer {
 			float i = ARGB.red(worldBorderRenderState.tint) / 255.0F;
 			float j = ARGB.green(worldBorderRenderState.tint) / 255.0F;
 			float k = ARGB.blue(worldBorderRenderState.tint) / 255.0F;
-			float l = (float)(Util.getMillis() % 3000L) / 3000.0F;
+			float l = RustGalWorldPrimitiveRenderer.diagnosticWorldBorderScroll((float)(Util.getMillis() % 3000L) / 3000.0F);
 			float m = (float)(-Mth.frac(vec3.y * 0.5));
 			float n = m + h;
 			if (this.shouldRebuildWorldBorderBuffer(worldBorderRenderState)) {

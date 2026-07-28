@@ -33,7 +33,8 @@ use super::resources::{
 };
 use super::sync::SubmissionId;
 use super::world_primitive_frontend::{
-    WorldCrackQuadRequest, WorldLineSegmentRequest, WorldPrimitiveFrame, WorldPrimitiveFrontend,
+    WorldBorderAssetPayload, WorldBorderQuadRequest, WorldCrackQuadRequest,
+    WorldLineSegmentRequest, WorldPrimitiveFrame, WorldPrimitiveFrontend,
     WorldPrimitiveSubmitStats,
 };
 
@@ -45,6 +46,7 @@ pub const FFI_MAX_LABEL_BYTES: usize = 1024;
 pub const FFI_MAX_SHADER_BYTES: usize = 16 * 1024 * 1024;
 pub const FFI_MAX_INLINE_BYTES: usize = 64 * 1024 * 1024;
 pub const FFI_MAX_GUI_ASSET_BYTES: usize = 4 * 1024 * 1024;
+pub const FFI_MAX_WORLD_BORDER_ASSET_BYTES: usize = 2 * 1024 * 1024;
 pub const FFI_MAX_BATCH_ITEMS: usize = 65_536;
 
 #[repr(u32)]
@@ -487,6 +489,17 @@ pub struct FfiGuiAssetUpdateRequest {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiWorldBorderAssetUpdateRequest {
+    pub header: FfiHeader,
+    pub generation: u64,
+    pub texture_id: u32,
+    pub reserved0: u32,
+    pub png_bytes: FfiBytes,
+    pub negotiated_feature_bits: u64,
+}
+
+#[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FfiWorldLineSegmentRequest {
     pub byte_size: u32,
@@ -534,6 +547,41 @@ pub struct FfiWorldCrackQuadRequest {
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiWorldBorderQuadRequest {
+    pub byte_size: u32,
+    pub stratum: u32,
+    pub texture_id: u32,
+    pub depth_policy: u32,
+    pub blend_policy: u32,
+    pub cull_policy: u32,
+    pub color_argb: u32,
+    pub reserved0: u32,
+    pub border_size: f32,
+    pub distance_to_border: f32,
+    pub scroll_u: f32,
+    pub scroll_v: f32,
+    pub uv_u: f32,
+    pub uv_v: f32,
+    pub uv_width: f32,
+    pub uv_height: f32,
+    pub p0_x: f32,
+    pub p0_y: f32,
+    pub p0_z: f32,
+    pub p1_x: f32,
+    pub p1_y: f32,
+    pub p1_z: f32,
+    pub p2_x: f32,
+    pub p2_y: f32,
+    pub p2_z: f32,
+    pub p3_x: f32,
+    pub p3_y: f32,
+    pub p3_z: f32,
+    pub viewport_width: i32,
+    pub viewport_height: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FfiWholeFrameSubmitRequest {
     pub header: FfiHeader,
     pub generation: u64,
@@ -548,6 +596,7 @@ pub struct FfiWholeFrameSubmitRequest {
     pub projection_matrix: [f32; 16],
     pub world_segments: FfiSlice<FfiWorldLineSegmentRequest>,
     pub world_crack_quads: FfiSlice<FfiWorldCrackQuadRequest>,
+    pub world_border_quads: FfiSlice<FfiWorldBorderQuadRequest>,
     pub gui_sprites: FfiSlice<FfiGuiSpriteRequest>,
     pub negotiated_feature_bits: u64,
 }
@@ -566,6 +615,9 @@ pub struct FfiWholeFrameSubmitResult {
     pub world_crack_quad_count: u64,
     pub world_crack_batch_count: u64,
     pub world_crack_draw_count: u64,
+    pub world_border_quad_count: u64,
+    pub world_border_batch_count: u64,
+    pub world_border_draw_count: u64,
     pub depth_attachment_creates: u64,
     pub depth_attachment_reuses: u64,
     pub depth_attachment_retires: u64,
@@ -573,6 +625,8 @@ pub struct FfiWholeFrameSubmitResult {
     pub outline_cache_misses: u64,
     pub crack_cache_hits: u64,
     pub crack_cache_misses: u64,
+    pub border_cache_hits: u64,
+    pub border_cache_misses: u64,
     pub sprite_count: u64,
     pub sprite_batch_count: u64,
     pub cache_hits: u64,
@@ -622,6 +676,9 @@ impl Default for FfiWholeFrameSubmitResult {
             world_crack_quad_count: 0,
             world_crack_batch_count: 0,
             world_crack_draw_count: 0,
+            world_border_quad_count: 0,
+            world_border_batch_count: 0,
+            world_border_draw_count: 0,
             depth_attachment_creates: 0,
             depth_attachment_reuses: 0,
             depth_attachment_retires: 0,
@@ -629,6 +686,8 @@ impl Default for FfiWholeFrameSubmitResult {
             outline_cache_misses: 0,
             crack_cache_hits: 0,
             crack_cache_misses: 0,
+            border_cache_hits: 0,
+            border_cache_misses: 0,
             sprite_count: 0,
             sprite_batch_count: 0,
             cache_hits: 0,
@@ -2273,6 +2332,9 @@ fn whole_frame_result_ok(
         world_crack_quad_count: world.crack_quad_count,
         world_crack_batch_count: world.crack_batch_count,
         world_crack_draw_count: world.crack_draw_count,
+        world_border_quad_count: world.border_quad_count,
+        world_border_batch_count: world.border_batch_count,
+        world_border_draw_count: world.border_draw_count,
         depth_attachment_creates: world.depth_attachment_creates,
         depth_attachment_reuses: world.depth_attachment_reuses,
         depth_attachment_retires: world.depth_attachment_retires,
@@ -2280,6 +2342,8 @@ fn whole_frame_result_ok(
         outline_cache_misses: world.outline_cache_misses,
         crack_cache_hits: world.crack_cache_hits,
         crack_cache_misses: world.crack_cache_misses,
+        border_cache_hits: world.border_cache_hits,
+        border_cache_misses: world.border_cache_misses,
         sprite_count: gui.sprite_count,
         sprite_batch_count: gui.sprite_batch_count,
         cache_hits: world.cache_hits.saturating_add(gui.cache_hits),
@@ -2473,6 +2537,12 @@ fn input_bytes_for_whole_frame(request: &FfiWholeFrameSubmitRequest) -> u64 {
         )
         .saturating_add(
             request
+                .world_border_quads
+                .count
+                .saturating_mul(size_of::<FfiWorldBorderQuadRequest>() as u64),
+        )
+        .saturating_add(
+            request
                 .gui_sprites
                 .count
                 .saturating_mul(size_of::<FfiGuiSpriteRequest>() as u64),
@@ -2494,6 +2564,10 @@ fn input_bytes_for_gui_asset_update(request: &FfiGuiAssetUpdateRequest) -> u64 {
     (size_of::<FfiGuiAssetUpdateRequest>() as u64)
         .saturating_add(payload_headers)
         .saturating_add(payload_bytes)
+}
+
+fn input_bytes_for_world_border_asset_update(request: &FfiWorldBorderAssetUpdateRequest) -> u64 {
+    (size_of::<FfiWorldBorderAssetUpdateRequest>() as u64).saturating_add(request.png_bytes.len)
 }
 
 unsafe fn decode_gui_frame_submit(
@@ -2758,6 +2832,84 @@ unsafe fn decode_whole_frame_submit(
             viewport_height,
         });
     }
+    let raw_borders = read_slice(
+        request.world_border_quads,
+        true,
+        "world primitive border quads",
+    )?;
+    if raw_borders.len() > FFI_MAX_BATCH_ITEMS {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "world primitive border quad count {} exceeds max {}",
+                raw_borders.len(),
+                FFI_MAX_BATCH_ITEMS
+            ),
+        ));
+    }
+    let mut border_quads = Vec::with_capacity(raw_borders.len());
+    for quad in raw_borders {
+        validate_item_size::<FfiWorldBorderQuadRequest>(
+            quad.byte_size,
+            "world primitive border quad",
+        )?;
+        if quad.texture_id != 1 {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown world border texture id {}", quad.texture_id),
+            ));
+        }
+        if quad.blend_policy != 1 {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown world border blend policy {}", quad.blend_policy),
+            ));
+        }
+        if quad.cull_policy != 0 {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown world border cull policy {}", quad.cull_policy),
+            ));
+        }
+        let viewport_width = u32::try_from(quad.viewport_width).map_err(|_| {
+            GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "world border quad viewport width must be non-negative, got {}",
+                    quad.viewport_width
+                ),
+            )
+        })?;
+        let viewport_height = u32::try_from(quad.viewport_height).map_err(|_| {
+            GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "world border quad viewport height must be non-negative, got {}",
+                    quad.viewport_height
+                ),
+            )
+        })?;
+        border_quads.push(WorldBorderQuadRequest {
+            stratum: quad.stratum,
+            texture_id: quad.texture_id,
+            depth_policy: quad.depth_policy,
+            blend_policy: quad.blend_policy,
+            cull_policy: quad.cull_policy,
+            color_argb: quad.color_argb,
+            border_size: quad.border_size,
+            distance_to_border: quad.distance_to_border,
+            scroll: [quad.scroll_u, quad.scroll_v],
+            uv_region: [quad.uv_u, quad.uv_v, quad.uv_width, quad.uv_height],
+            vertices: [
+                [quad.p0_x, quad.p0_y, quad.p0_z],
+                [quad.p1_x, quad.p1_y, quad.p1_z],
+                [quad.p2_x, quad.p2_y, quad.p2_z],
+                [quad.p3_x, quad.p3_y, quad.p3_z],
+            ],
+            viewport_width,
+            viewport_height,
+        });
+    }
     let raw_gui = FfiGuiFrameSubmitRequest {
         header: FfiHeader {
             version: request.header.version,
@@ -2802,6 +2954,7 @@ unsafe fn decode_whole_frame_submit(
             projection_matrix: request.projection_matrix,
             segments,
             crack_quads,
+            border_quads,
         },
         gui_sprites,
     ))
@@ -2853,6 +3006,41 @@ unsafe fn decode_gui_asset_update(
         });
     }
     Ok((request.generation, owned))
+}
+
+unsafe fn decode_world_border_asset_update(
+    request: *const FfiWorldBorderAssetUpdateRequest,
+    capabilities: BackendCapabilities,
+) -> GalResult<(u64, WorldBorderAssetPayload)> {
+    let request = read_struct(request, "world-border asset update request")?;
+    validate_header::<FfiWorldBorderAssetUpdateRequest>(request.header)?;
+    reject_unknown_feature_bits(request.negotiated_feature_bits)?;
+    let supported = capability_feature_bits(capabilities);
+    if request.negotiated_feature_bits & !supported != 0 {
+        return Err(GalError::unsupported_feature(format!(
+            "requested unsupported world-border asset feature bits 0x{:x}",
+            request.negotiated_feature_bits & !supported
+        )));
+    }
+    if request.generation == 0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "world-border asset generation must be non-zero",
+        ));
+    }
+    let png_bytes = read_bounded_bytes(
+        request.png_bytes,
+        true,
+        FFI_MAX_WORLD_BORDER_ASSET_BYTES,
+        "world-border texture PNG bytes",
+    )?;
+    Ok((
+        request.generation,
+        WorldBorderAssetPayload {
+            texture_id: request.texture_id,
+            png_bytes,
+        },
+    ))
 }
 
 unsafe fn write_out<T>(out: *mut T, value: T, label: &str) -> GalResult<()> {
@@ -3599,6 +3787,42 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
         ),
         52 => layout!(
             52,
+            FfiWorldBorderQuadRequest,
+            [
+                byte_size,
+                stratum,
+                texture_id,
+                depth_policy,
+                blend_policy,
+                cull_policy,
+                color_argb,
+                reserved0,
+                border_size,
+                distance_to_border,
+                scroll_u,
+                scroll_v,
+                uv_u,
+                uv_v,
+                uv_width,
+                uv_height,
+                p0_x,
+                p0_y,
+                p0_z,
+                p1_x,
+                p1_y,
+                p1_z,
+                p2_x,
+                p2_y,
+                p2_z,
+                p3_x,
+                p3_y,
+                p3_z,
+                viewport_width,
+                viewport_height
+            ]
+        ),
+        53 => layout!(
+            53,
             FfiWholeFrameSubmitRequest,
             [
                 header,
@@ -3614,12 +3838,13 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 projection_matrix,
                 world_segments,
                 world_crack_quads,
+                world_border_quads,
                 gui_sprites,
                 negotiated_feature_bits
             ]
         ),
-        53 => layout!(
-            53,
+        54 => layout!(
+            54,
             FfiWholeFrameSubmitResult,
             [
                 header,
@@ -3633,6 +3858,9 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 world_crack_quad_count,
                 world_crack_batch_count,
                 world_crack_draw_count,
+                world_border_quad_count,
+                world_border_batch_count,
+                world_border_draw_count,
                 depth_attachment_creates,
                 depth_attachment_reuses,
                 depth_attachment_retires,
@@ -3640,6 +3868,8 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 outline_cache_misses,
                 crack_cache_hits,
                 crack_cache_misses,
+                border_cache_hits,
+                border_cache_misses,
                 sprite_count,
                 sprite_batch_count,
                 cache_hits,
@@ -3648,6 +3878,18 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 command_lists,
                 command_ops,
                 metrics
+            ]
+        ),
+        55 => layout!(
+            55,
+            FfiWorldBorderAssetUpdateRequest,
+            [
+                header,
+                generation,
+                texture_id,
+                reserved0,
+                png_bytes,
+                negotiated_feature_bits
             ]
         ),
         _ => {
@@ -4280,6 +4522,51 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_gui_update_assets(
                     .apply_asset_update(&mut context.gal, generation, assets)
             },
         );
+        match result {
+            Ok(()) => {
+                write_status_out(status_out, status_ok(context));
+                StatusCode::Ok as i32
+            }
+            Err(error) => {
+                set_last_error(context, &error);
+                write_status_out(status_out, status_error(Some(context), &error));
+                error.code as i32
+            }
+        }
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_vulkanic_gal_world_border_update_asset(
+    context_id: u64,
+    request: *const FfiWorldBorderAssetUpdateRequest,
+    status_out: *mut FfiStatusResult,
+) -> i32 {
+    with_registry_mut(|registry| {
+        let Some(context) = registry.contexts.get_mut(&context_id) else {
+            let error = GalError::ffi(
+                StatusCode::StaleHandle,
+                format!("unknown context id {context_id}"),
+            );
+            write_status_out(status_out, status_result_from_error(&error));
+            return error.code as i32;
+        };
+        let input_bytes = if request.is_null() {
+            0
+        } else {
+            input_bytes_for_world_border_asset_update(&*request)
+        };
+        context.ffi_calls += 1;
+        context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);
+        context.ffi_output_bytes = context
+            .ffi_output_bytes
+            .saturating_add(size_of::<FfiStatusResult>() as u64);
+        let result = decode_world_border_asset_update(request, context.gal.capabilities())
+            .and_then(|(generation, payload)| {
+                context
+                    .world_primitive_frontend
+                    .apply_world_border_asset_update(&mut context.gal, generation, payload)
+            });
         match result {
             Ok(()) => {
                 write_status_out(status_out, status_ok(context));
@@ -5221,6 +5508,8 @@ fn blend_mode(raw: u32) -> GalResult<BlendMode> {
         2 => Ok(BlendMode::Alpha),
         3 => Ok(BlendMode::Additive),
         4 => Ok(BlendMode::Invert),
+        5 => Ok(BlendMode::Multiply),
+        6 => Ok(BlendMode::Overlay),
         _ => Err(GalError::ffi(
             StatusCode::UnknownEnum,
             format!("unknown blend mode {raw}"),
@@ -6195,6 +6484,41 @@ mod tests {
         }
     }
 
+    fn border_quad_request() -> FfiWorldBorderQuadRequest {
+        FfiWorldBorderQuadRequest {
+            byte_size: size_of::<FfiWorldBorderQuadRequest>() as u32,
+            stratum: 80,
+            texture_id: 1,
+            depth_policy: 1,
+            blend_policy: 1,
+            cull_policy: 0,
+            color_argb: 0xdd55_ff55,
+            reserved0: 0,
+            border_size: 8.0,
+            distance_to_border: 2.0,
+            scroll_u: 0.25,
+            scroll_v: 0.25,
+            uv_u: 0.0,
+            uv_v: 0.0,
+            uv_width: 1.0,
+            uv_height: -4.0,
+            p0_x: -1.0,
+            p0_y: -2.0,
+            p0_z: -3.0,
+            p1_x: 1.0,
+            p1_y: -2.0,
+            p1_z: -3.0,
+            p2_x: 1.0,
+            p2_y: 2.0,
+            p2_z: -3.0,
+            p3_x: -1.0,
+            p3_y: 2.0,
+            p3_z: -3.0,
+            viewport_width: 854,
+            viewport_height: 480,
+        }
+    }
+
     fn whole_frame_request(
         segments: &[FfiWorldLineSegmentRequest],
         sprites: &[FfiGuiSpriteRequest],
@@ -6234,6 +6558,10 @@ mod tests {
                 ptr: std::ptr::null(),
                 count: 0,
             },
+            world_border_quads: FfiSlice {
+                ptr: std::ptr::null(),
+                count: 0,
+            },
             gui_sprites: FfiSlice {
                 ptr: sprites.as_ptr(),
                 count: sprites.len() as u64,
@@ -6247,6 +6575,18 @@ mod tests {
                 | FfiFeatureBits::HOST_BUFFER_ACCESS
                 | FfiFeatureBits::PRESENTATION,
         }
+    }
+
+    fn whole_frame_request_with_borders(
+        borders: &[FfiWorldBorderQuadRequest],
+        sprites: &[FfiGuiSpriteRequest],
+    ) -> FfiWholeFrameSubmitRequest {
+        let mut request = whole_frame_request(&[], sprites);
+        request.world_border_quads = FfiSlice {
+            ptr: borders.as_ptr(),
+            count: borders.len() as u64,
+        };
+        request
     }
 
     fn whole_frame_request_with_cracks(
@@ -6272,6 +6612,30 @@ mod tests {
             assets: FfiSlice {
                 ptr: assets.as_ptr(),
                 count: assets.len() as u64,
+            },
+            negotiated_feature_bits: FfiFeatureBits::GRAPHICS
+                | FfiFeatureBits::DESCRIPTOR_ARRAYS
+                | FfiFeatureBits::OPTIONAL_BINDINGS
+                | FfiFeatureBits::UNIFORM_BUFFERS
+                | FfiFeatureBits::STORAGE_BUFFERS
+                | FfiFeatureBits::TEXTURE_SUBRESOURCE_COPIES
+                | FfiFeatureBits::HOST_BUFFER_ACCESS
+                | FfiFeatureBits::PRESENTATION,
+        }
+    }
+
+    fn world_border_asset_update_request(bytes: &[u8]) -> FfiWorldBorderAssetUpdateRequest {
+        FfiWorldBorderAssetUpdateRequest {
+            header: FfiHeader {
+                version: FFI_ABI_VERSION,
+                byte_size: size_of::<FfiWorldBorderAssetUpdateRequest>() as u32,
+            },
+            generation: 9,
+            texture_id: 1,
+            reserved0: 0,
+            png_bytes: FfiBytes {
+                ptr: bytes.as_ptr(),
+                len: bytes.len() as u64,
             },
             negotiated_feature_bits: FfiFeatureBits::GRAPHICS
                 | FfiFeatureBits::DESCRIPTOR_ARRAYS
@@ -6376,6 +6740,34 @@ mod tests {
     }
 
     #[test]
+    fn whole_frame_world_border_ffi_copies_and_rejects_malformed_payloads() {
+        let mut borders = vec![border_quad_request()];
+        let request = whole_frame_request_with_borders(&borders, &[]);
+        let (_generation, _target, frame, gui) =
+            unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap() };
+        borders[0].p0_x = 99.0;
+        assert_eq!(frame.border_quads.len(), 1);
+        assert_eq!(frame.border_quads[0].vertices[0][0], -1.0);
+        assert_eq!(frame.border_quads[0].texture_id, 1);
+        assert_eq!(frame.border_quads[0].uv_region[3], -4.0);
+        assert!(gui.is_empty());
+
+        borders[0] = border_quad_request();
+        borders[0].texture_id = 99;
+        let request = whole_frame_request_with_borders(&borders, &[]);
+        let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+            .expect_err("unknown border texture must fail");
+        assert_eq!(error.code, StatusCode::UnknownEnum);
+
+        borders[0] = border_quad_request();
+        borders[0].byte_size -= 4;
+        let request = whole_frame_request_with_borders(&borders, &[]);
+        let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+            .expect_err("malformed border quad must fail");
+        assert_eq!(error.code, StatusCode::InvalidArgument);
+    }
+
+    #[test]
     fn semantic_gui_asset_ffi_copies_payload_memory() {
         let mut bytes = vec![7u8, 8, 9, 10];
         let assets = vec![FfiGuiAssetPayload {
@@ -6424,5 +6816,33 @@ mod tests {
             unsafe { decode_gui_asset_update(&asset_update_request(&assets), test_capabilities()) }
                 .unwrap_err();
         assert_eq!(StatusCode::InvalidArgument, malformed.code);
+    }
+
+    #[test]
+    fn world_border_asset_ffi_copies_payload_memory() {
+        let mut bytes = vec![11u8, 12, 13, 14];
+        let request = world_border_asset_update_request(&bytes);
+        let (generation, owned) =
+            unsafe { decode_world_border_asset_update(&request, test_capabilities()).unwrap() };
+        bytes.fill(0);
+        assert_eq!(9, generation);
+        assert_eq!(1, owned.texture_id);
+        assert_eq!(vec![11u8, 12, 13, 14], owned.png_bytes);
+    }
+
+    #[test]
+    fn world_border_asset_ffi_rejects_bad_generation_and_size() {
+        let bytes = [1u8, 2, 3];
+        let mut request = world_border_asset_update_request(&bytes);
+        request.generation = 0;
+        let bad_generation =
+            unsafe { decode_world_border_asset_update(&request, test_capabilities()) }.unwrap_err();
+        assert_eq!(StatusCode::InvalidArgument, bad_generation.code);
+
+        request = world_border_asset_update_request(&bytes);
+        request.header.byte_size -= 4;
+        let bad_size =
+            unsafe { decode_world_border_asset_update(&request, test_capabilities()) }.unwrap_err();
+        assert_eq!(StatusCode::InvalidArgument, bad_size.code);
     }
 }

@@ -1,10 +1,17 @@
 package net.vulkanic.world;
 
+import net.minecraft.Util;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.state.WorldBorderRenderState;
 import net.minecraft.client.renderer.state.BlockBreakingRenderState;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.state.BlockState;
@@ -18,19 +25,31 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 import net.vulkanic.bridge.VulkanicGalBridge;
+import net.logging.LogUtils;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+import org.slf4j.Logger;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public final class RustGalWorldPrimitiveRenderer {
+	private static final Logger LOGGER = LogUtils.getLogger();
+	public static final int STRATUM_WORLD_BORDER = 80;
 	public static final int STRATUM_WORLD_BLOCK_BREAKING_CRACK = 90;
 	public static final int STRATUM_WORLD_BLOCK_OUTLINE = 100;
 	public static final int STYLE_NORMAL = 1;
 	public static final int STYLE_HIGH_CONTRAST = 2;
 	public static final int DEPTH_POLICY_DISABLED = 0;
 	public static final int DEPTH_POLICY_TEST_WRITE = 1;
+	public static final int BORDER_TEXTURE_FORCEFIELD = 1;
+	public static final int BORDER_BLEND_OVERLAY = 1;
 	public static final int CRACK_BLEND_MULTIPLY = 1;
 	public static final int CULL_NONE = 0;
 	private static final float CRACK_FACE_OFFSET = 0.002F;
@@ -40,11 +59,26 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final boolean DIAGNOSTIC_DEPTH_PROBE = Boolean.getBoolean("mattmc.dev.rustGalWorldOutline.depthProbe");
 	private static final String DIAGNOSTIC_CRACK_SCENARIO = System.getProperty("mattmc.dev.rustGalWorldCrack.scenario", "").trim();
 	private static final String DIAGNOSTIC_CRACK_STAGE = System.getProperty("mattmc.dev.rustGalWorldCrack.stage", "0").trim();
+	private static final String DIAGNOSTIC_BORDER_SCENARIO = System.getProperty("mattmc.dev.rustGalWorldBorder.scenario", "").trim();
+	private static final String DIAGNOSTIC_BORDER_SCROLL = System.getProperty("mattmc.dev.rustGalWorldBorder.scrollPhase", "").trim();
+	private static final ResourceLocation FORCEFIELD_LOCATION = ResourceLocation.withDefaultNamespace("textures/misc/forcefield.png");
 	private static final Object LOCK = new Object();
 	private static final List<VulkanicGalBridge.WorldLineSegmentRecord> PENDING_SEGMENTS = new ArrayList<>();
 	private static final List<VulkanicGalBridge.WorldCrackQuadRecord> PENDING_CRACK_QUADS = new ArrayList<>();
+	private static final List<VulkanicGalBridge.WorldBorderQuadRecord> PENDING_BORDER_QUADS = new ArrayList<>();
 	private static final float[] PENDING_VIEW = new float[16];
 	private static final float[] PENDING_PROJECTION = new float[16];
+	private static VulkanicGalBridge.WorldBorderAssetRecord pendingWorldBorderAsset =
+		new VulkanicGalBridge.WorldBorderAssetRecord(BORDER_TEXTURE_FORCEFIELD, new byte[0]);
+	private static long worldBorderAssetGeneration = 1L;
+	private static long uploadedWorldBorderAssetGeneration;
+	private static long attemptedWorldBorderAssetGeneration;
+	private static long lastWorldBorderAssetPayloadCount;
+	private static long lastWorldBorderAssetPayloadBytes;
+	private static long worldBorderAssetUpdateFailures;
+	private static String lastWorldBorderAssetSourcePack = "vanilla";
+	private static String lastWorldBorderAssetSha256 = "fallback";
+	private static boolean lastWorldBorderAssetFallback = true;
 	private static int pendingViewportWidth;
 	private static int pendingViewportHeight;
 
@@ -72,16 +106,135 @@ public final class RustGalWorldPrimitiveRenderer {
 		return currentBlockOutlineRoute() == BlockOutlineRoute.RUST_VULKAN_WHOLE_FRAME;
 	}
 
+	public static void reloadWorldAssets(ResourceManager resourceManager) {
+		WorldBorderAssetResolution resolution = resolveWorldBorderAsset(resourceManager);
+		synchronized (LOCK) {
+			if (resolution.preserveLastValid()) {
+				worldBorderAssetUpdateFailures++;
+				auditMessage(
+					"Rust VulkanicGAL world-border asset update skipped"
+						+ " reason=java-read-failure"
+						+ " generation=" + worldBorderAssetGeneration
+						+ " uploaded_generation=" + uploadedWorldBorderAssetGeneration
+						+ " failures=" + worldBorderAssetUpdateFailures
+						+ " preserve_last_valid=true"
+				);
+				return;
+			}
+			worldBorderAssetGeneration++;
+			pendingWorldBorderAsset = new VulkanicGalBridge.WorldBorderAssetRecord(BORDER_TEXTURE_FORCEFIELD, resolution.payload());
+			attemptedWorldBorderAssetGeneration = Math.min(attemptedWorldBorderAssetGeneration, uploadedWorldBorderAssetGeneration);
+			lastWorldBorderAssetPayloadCount = resolution.payload().length == 0 ? 0L : 1L;
+			lastWorldBorderAssetPayloadBytes = resolution.payload().length;
+			lastWorldBorderAssetSourcePack = resolution.sourcePack();
+			lastWorldBorderAssetSha256 = resolution.sha256();
+			lastWorldBorderAssetFallback = resolution.fallback();
+			auditMessage(
+				"Rust VulkanicGAL world-border asset resolved"
+					+ " generation=" + worldBorderAssetGeneration
+					+ " texture_id=" + BORDER_TEXTURE_FORCEFIELD
+					+ " path=" + FORCEFIELD_LOCATION
+					+ " source_pack=" + metricValue(lastWorldBorderAssetSourcePack)
+					+ " payloads=" + lastWorldBorderAssetPayloadCount
+					+ " payload_bytes=" + lastWorldBorderAssetPayloadBytes
+					+ " fallback=" + lastWorldBorderAssetFallback
+					+ " sha256=" + lastWorldBorderAssetSha256
+			);
+		}
+	}
+
+	public static VulkanicGalBridge.Status flushPendingWorldBorderAssets(VulkanicGalBridge bridge) {
+		synchronized (LOCK) {
+			if (bridge == null || uploadedWorldBorderAssetGeneration >= worldBorderAssetGeneration || attemptedWorldBorderAssetGeneration >= worldBorderAssetGeneration) {
+				return null;
+			}
+			attemptedWorldBorderAssetGeneration = worldBorderAssetGeneration;
+			try {
+				VulkanicGalBridge.Status status = bridge.updateWorldBorderAsset(worldBorderAssetGeneration, pendingWorldBorderAsset);
+				uploadedWorldBorderAssetGeneration = worldBorderAssetGeneration;
+				auditMessage(
+					"Rust VulkanicGAL world-border asset update accepted"
+						+ " generation=" + worldBorderAssetGeneration
+						+ " texture_id=" + pendingWorldBorderAsset.textureId()
+						+ " payloads=" + lastWorldBorderAssetPayloadCount
+						+ " payload_bytes=" + lastWorldBorderAssetPayloadBytes
+						+ " source_pack=" + metricValue(lastWorldBorderAssetSourcePack)
+						+ " fallback=" + lastWorldBorderAssetFallback
+						+ " uploaded_generation=" + uploadedWorldBorderAssetGeneration
+				);
+				return status;
+			} catch (RuntimeException error) {
+				worldBorderAssetUpdateFailures++;
+				LOGGER.error(
+					"Rust VulkanicGAL world-border asset update failed for generation {}; preserving last valid texture",
+					worldBorderAssetGeneration,
+					error
+				);
+				auditMessage(
+					"Rust VulkanicGAL world-border asset update failed"
+						+ " generation=" + worldBorderAssetGeneration
+						+ " texture_id=" + pendingWorldBorderAsset.textureId()
+						+ " uploaded_generation=" + uploadedWorldBorderAssetGeneration
+						+ " failures=" + worldBorderAssetUpdateFailures
+						+ " preserve_last_valid=true"
+				);
+				return null;
+			}
+		}
+	}
+
+	public static WorldBorderAssetMetrics worldBorderAssetMetrics() {
+		synchronized (LOCK) {
+			return new WorldBorderAssetMetrics(
+				worldBorderAssetGeneration,
+				uploadedWorldBorderAssetGeneration,
+				lastWorldBorderAssetPayloadCount,
+				lastWorldBorderAssetPayloadBytes,
+				worldBorderAssetUpdateFailures,
+				lastWorldBorderAssetSourcePack,
+				lastWorldBorderAssetSha256,
+				lastWorldBorderAssetFallback
+			);
+		}
+	}
+
+	private static WorldBorderAssetResolution resolveWorldBorderAsset(ResourceManager resourceManager) {
+		if (resourceManager == null) {
+			return WorldBorderAssetResolution.fallback("missing-resource-manager");
+		}
+		Optional<Resource> resource = resourceManager.getResource(FORCEFIELD_LOCATION);
+		if (resource.isEmpty()) {
+			return WorldBorderAssetResolution.fallback("missing");
+		}
+		String sourcePack = resource.get().sourcePackId();
+		if ("vanilla".equals(sourcePack)) {
+			return WorldBorderAssetResolution.fallback("vanilla");
+		}
+		try (InputStream input = resource.get().open()) {
+			byte[] bytes = input.readAllBytes();
+			return new WorldBorderAssetResolution(bytes, sourcePack, sha256Hex(bytes), false, false);
+		} catch (IOException error) {
+			LOGGER.warn(
+				"Failed to read Rust VulkanicGAL world-border texture {}; preserving last valid texture",
+				FORCEFIELD_LOCATION,
+				error
+			);
+			return WorldBorderAssetResolution.preserve("read-error");
+		}
+	}
+
 	public static void beginFrame(Matrix4f viewMatrix, Matrix4f projectionMatrix, int viewportWidth, int viewportHeight) {
 		synchronized (LOCK) {
 			PENDING_SEGMENTS.clear();
 			PENDING_CRACK_QUADS.clear();
+			PENDING_BORDER_QUADS.clear();
 			viewMatrix.get(PENDING_VIEW);
 			projectionMatrix.get(PENDING_PROJECTION);
 			if (!isFinite(PENDING_VIEW) || !isFinite(PENDING_PROJECTION)) {
 				new Matrix4f().get(PENDING_VIEW);
 				new Matrix4f().get(PENDING_PROJECTION);
 				PENDING_CRACK_QUADS.clear();
+				PENDING_BORDER_QUADS.clear();
 				pendingViewportWidth = 0;
 				pendingViewportHeight = 0;
 				return;
@@ -95,6 +248,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		synchronized (LOCK) {
 			PENDING_SEGMENTS.clear();
 			PENDING_CRACK_QUADS.clear();
+			PENDING_BORDER_QUADS.clear();
 			new Matrix4f().get(PENDING_VIEW);
 			new Matrix4f().get(PENDING_PROJECTION);
 			pendingViewportWidth = 0;
@@ -155,6 +309,284 @@ public final class RustGalWorldPrimitiveRenderer {
 			appendCrackShape(shape, blockPos, cameraPos, stage, viewportWidth, viewportHeight);
 		}
 		return true;
+	}
+
+	public static boolean enqueueWorldBorder(WorldBorderRenderState state, Vec3 cameraPosition, double renderDistance, double depthFar) {
+		if (!shouldUseRustWholeFrameOutline()) {
+			return false;
+		}
+		synchronized (LOCK) {
+			int viewportWidth = pendingViewportWidth;
+			int viewportHeight = pendingViewportHeight;
+			if (viewportWidth <= 0 || viewportHeight <= 0) {
+				return true;
+			}
+			if (enqueueDiagnosticWorldBorder(cameraPosition, renderDistance, depthFar, viewportWidth, viewportHeight)) {
+				return true;
+			}
+			if (state.alpha <= 0.0) {
+				return true;
+			}
+			appendVisibleWorldBorderSides(
+				state.minX,
+				state.maxX,
+				state.minZ,
+				state.maxZ,
+				state.alpha,
+				state.tint,
+				cameraPosition,
+				renderDistance,
+				depthFar,
+				viewportWidth,
+				viewportHeight,
+				false
+			);
+		}
+		return true;
+	}
+
+	private static boolean enqueueDiagnosticWorldBorder(Vec3 cameraPosition, double renderDistance, double depthFar, int viewportWidth, int viewportHeight) {
+		if (DIAGNOSTIC_BORDER_SCENARIO.isBlank()) {
+			return false;
+		}
+		DiagnosticBorderBounds bounds = diagnosticBorderBounds(cameraPosition, renderDistance);
+		if (bounds.alpha <= 0.0) {
+			return true;
+		}
+		appendVisibleWorldBorderSides(
+			bounds.minX,
+			bounds.maxX,
+			bounds.minZ,
+			bounds.maxZ,
+			bounds.alpha,
+			bounds.tint,
+			cameraPosition,
+			renderDistance,
+			depthFar,
+			viewportWidth,
+			viewportHeight,
+			bounds.forceAllSides
+		);
+		return true;
+	}
+
+	public static boolean applyDiagnosticWorldBorderState(WorldBorderRenderState state, Vec3 cameraPosition, double renderDistance) {
+		if (DIAGNOSTIC_BORDER_SCENARIO.isBlank()) {
+			return false;
+		}
+		DiagnosticBorderBounds bounds = diagnosticBorderBounds(cameraPosition, renderDistance);
+		state.minX = bounds.minX;
+		state.maxX = bounds.maxX;
+		state.minZ = bounds.minZ;
+		state.maxZ = bounds.maxZ;
+		state.alpha = bounds.alpha;
+		state.tint = bounds.tint;
+		return true;
+	}
+
+	private static DiagnosticBorderBounds diagnosticBorderBounds(Vec3 cameraPosition, double renderDistance) {
+		String scenario = DIAGNOSTIC_BORDER_SCENARIO.toLowerCase(java.util.Locale.ROOT);
+		double near = "corner".equals(scenario) ? 2.0 : 4.0;
+		double far = Math.max(renderDistance * 4.0, 512.0);
+		if ("hidden".equals(scenario) || "far".equals(scenario) || "no-target".equals(scenario)) {
+			return new DiagnosticBorderBounds(
+				cameraPosition.x - far,
+				cameraPosition.x + far,
+				cameraPosition.z - far,
+				cameraPosition.z + far,
+				0.0,
+				0x55ff55,
+				false
+			);
+		}
+		if ("corner".equals(scenario)) {
+			return new DiagnosticBorderBounds(
+				cameraPosition.x - near,
+				cameraPosition.x + far,
+				cameraPosition.z - near,
+				cameraPosition.z + far,
+				0.85,
+				0x55ff55,
+				false
+			);
+		}
+		if ("all-sides".equals(scenario)) {
+			return new DiagnosticBorderBounds(
+				cameraPosition.x - near,
+				cameraPosition.x + near,
+				cameraPosition.z - near,
+				cameraPosition.z + near,
+				0.85,
+				0x55ff55,
+				true
+			);
+		}
+		return new DiagnosticBorderBounds(
+			cameraPosition.x - far,
+			cameraPosition.x + far,
+			cameraPosition.z - near,
+			cameraPosition.z + far,
+			0.85,
+			0x55ff55,
+			false
+		);
+	}
+
+	private static void appendVisibleWorldBorderSides(
+		double minX,
+		double maxX,
+		double minZ,
+		double maxZ,
+		double alpha,
+		int tint,
+		Vec3 cameraPosition,
+		double renderDistance,
+		double depthFar,
+		int viewportWidth,
+		int viewportHeight,
+		boolean forceAllSides
+	) {
+		double cameraX = cameraPosition.x;
+		double cameraZ = cameraPosition.z;
+		List<WorldBorderRenderState.DistancePerDirection> sides = new ArrayList<>();
+		sides.add(new WorldBorderRenderState.DistancePerDirection(Direction.NORTH, cameraZ - minZ));
+		sides.add(new WorldBorderRenderState.DistancePerDirection(Direction.SOUTH, maxZ - cameraZ));
+		sides.add(new WorldBorderRenderState.DistancePerDirection(Direction.WEST, cameraX - minX));
+		sides.add(new WorldBorderRenderState.DistancePerDirection(Direction.EAST, maxX - cameraX));
+		sides.sort(java.util.Comparator.comparingDouble(WorldBorderRenderState.DistancePerDirection::distance));
+		for (WorldBorderRenderState.DistancePerDirection side : sides) {
+			if (forceAllSides || side.distance() < renderDistance) {
+				appendWorldBorderSide(
+					side.direction(),
+					minX,
+					maxX,
+					minZ,
+					maxZ,
+					alpha,
+					tint,
+					cameraPosition,
+					renderDistance,
+					depthFar,
+					(float)side.distance(),
+					viewportWidth,
+					viewportHeight
+				);
+			}
+		}
+	}
+
+	private static void appendWorldBorderSide(
+		Direction direction,
+		double minX,
+		double maxX,
+		double minZ,
+		double maxZ,
+		double alpha,
+		int tint,
+		Vec3 cameraPosition,
+		double renderDistance,
+		double depthFar,
+		float distanceToBorder,
+		int viewportWidth,
+		int viewportHeight
+	) {
+		double clippedMinZ = Math.max(Mth.floor(cameraPosition.z - renderDistance), minZ);
+		double clippedMaxZ = Math.min(Mth.ceil(cameraPosition.z + renderDistance), maxZ);
+		float zUvStart = (Mth.floor(clippedMinZ) & 1) * 0.5F;
+		float zUvWidth = (float)(clippedMaxZ - clippedMinZ) / 2.0F;
+		double clippedMinX = Math.max(Mth.floor(cameraPosition.x - renderDistance), minX);
+		double clippedMaxX = Math.min(Mth.ceil(cameraPosition.x + renderDistance), maxX);
+		float xUvStart = (Mth.floor(clippedMinX) & 1) * 0.5F;
+		float xUvWidth = (float)(clippedMaxX - clippedMinX) / 2.0F;
+		float y0 = (float)-depthFar;
+		float y1 = (float)depthFar;
+		float topV = (float)(-Mth.frac(cameraPosition.y * 0.5));
+		float bottomV = topV + (float)depthFar;
+		float scroll = diagnosticWorldBorderScroll((float)(Util.getMillis() % 3000L) / 3000.0F);
+		int color = (Mth.clamp((int)Math.round(alpha * 255.0), 0, 255) << 24) | (tint & 0x00ffffff);
+		float borderSize = (float)Math.max(maxX - minX, maxZ - minZ);
+		switch (direction) {
+			case SOUTH -> appendWorldBorderQuad(
+				color,
+				borderSize,
+				distanceToBorder,
+				scroll,
+				xUvStart,
+				bottomV,
+				xUvWidth,
+				topV - bottomV,
+				(float)(clippedMinX - cameraPosition.x), y0, (float)(maxZ - cameraPosition.z),
+				(float)(clippedMaxX - cameraPosition.x), y0, (float)(maxZ - cameraPosition.z),
+				(float)(clippedMaxX - cameraPosition.x), y1, (float)(maxZ - cameraPosition.z),
+				(float)(clippedMinX - cameraPosition.x), y1, (float)(maxZ - cameraPosition.z),
+				viewportWidth,
+				viewportHeight
+			);
+			case WEST -> appendWorldBorderQuad(
+				color,
+				borderSize,
+				distanceToBorder,
+				scroll,
+				zUvStart,
+				bottomV,
+				zUvWidth,
+				topV - bottomV,
+				(float)(minX - cameraPosition.x), y0, (float)(clippedMinZ - cameraPosition.z),
+				(float)(minX - cameraPosition.x), y0, (float)(clippedMaxZ - cameraPosition.z),
+				(float)(minX - cameraPosition.x), y1, (float)(clippedMaxZ - cameraPosition.z),
+				(float)(minX - cameraPosition.x), y1, (float)(clippedMinZ - cameraPosition.z),
+				viewportWidth,
+				viewportHeight
+			);
+			case NORTH -> appendWorldBorderQuad(
+				color,
+				borderSize,
+				distanceToBorder,
+				scroll,
+				xUvStart,
+				bottomV,
+				xUvWidth,
+				topV - bottomV,
+				(float)(clippedMaxX - cameraPosition.x), y0, (float)(minZ - cameraPosition.z),
+				(float)(clippedMinX - cameraPosition.x), y0, (float)(minZ - cameraPosition.z),
+				(float)(clippedMinX - cameraPosition.x), y1, (float)(minZ - cameraPosition.z),
+				(float)(clippedMaxX - cameraPosition.x), y1, (float)(minZ - cameraPosition.z),
+				viewportWidth,
+				viewportHeight
+			);
+			case EAST -> appendWorldBorderQuad(
+				color,
+				borderSize,
+				distanceToBorder,
+				scroll,
+				zUvStart,
+				bottomV,
+				zUvWidth,
+				topV - bottomV,
+				(float)(maxX - cameraPosition.x), y0, (float)(clippedMaxZ - cameraPosition.z),
+				(float)(maxX - cameraPosition.x), y0, (float)(clippedMinZ - cameraPosition.z),
+				(float)(maxX - cameraPosition.x), y1, (float)(clippedMinZ - cameraPosition.z),
+				(float)(maxX - cameraPosition.x), y1, (float)(clippedMaxZ - cameraPosition.z),
+				viewportWidth,
+				viewportHeight
+			);
+			default -> {
+			}
+		}
+	}
+
+	public static float diagnosticWorldBorderScroll(float fallback) {
+		if (!DIAGNOSTIC_BORDER_SCROLL.isBlank()) {
+			try {
+				return Float.parseFloat(DIAGNOSTIC_BORDER_SCROLL);
+			} catch (NumberFormatException exception) {
+				throw new IllegalArgumentException("Rust GAL world-border diagnostic scroll phase must be a float: " + DIAGNOSTIC_BORDER_SCROLL, exception);
+			}
+		}
+		return fallback;
+	}
+
+	private record DiagnosticBorderBounds(double minX, double maxX, double minZ, double maxZ, double alpha, int tint, boolean forceAllSides) {
 	}
 
 	public static void enqueueBlockOutline(Minecraft minecraft, GameRenderer gameRenderer, Camera camera) {
@@ -440,6 +872,56 @@ public final class RustGalWorldPrimitiveRenderer {
 				p3x, p3y, p3z
 			},
 			viewportWidth,
+				viewportHeight
+			));
+	}
+
+	private static void appendWorldBorderQuad(
+		int color,
+		float borderSize,
+		float distanceToBorder,
+		float scroll,
+		float uvU,
+		float uvV,
+		float uvWidth,
+		float uvHeight,
+		float p0x,
+		float p0y,
+		float p0z,
+		float p1x,
+		float p1y,
+		float p1z,
+		float p2x,
+		float p2y,
+		float p2z,
+		float p3x,
+		float p3y,
+		float p3z,
+		int viewportWidth,
+		int viewportHeight
+	) {
+		PENDING_BORDER_QUADS.add(new VulkanicGalBridge.WorldBorderQuadRecord(
+			STRATUM_WORLD_BORDER,
+			BORDER_TEXTURE_FORCEFIELD,
+			DEPTH_POLICY_TEST_WRITE,
+			BORDER_BLEND_OVERLAY,
+			CULL_NONE,
+			color,
+			borderSize,
+			Math.max(distanceToBorder, 0.0F),
+			scroll,
+			scroll,
+			uvU,
+			uvV,
+			uvWidth,
+			uvHeight,
+			new float[] {
+				p0x, p0y, p0z,
+				p1x, p1y, p1z,
+				p2x, p2y, p2z,
+				p3x, p3y, p3z
+			},
+			viewportWidth,
 			viewportHeight
 		));
 	}
@@ -453,21 +935,41 @@ public final class RustGalWorldPrimitiveRenderer {
 		return true;
 	}
 
+	private static String sha256Hex(byte[] bytes) {
+		try {
+			return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+		} catch (NoSuchAlgorithmException error) {
+			throw new IllegalStateException("SHA-256 digest is unavailable", error);
+		}
+	}
+
+	private static String metricValue(String value) {
+		return value == null || value.isBlank() ? "unset" : value.replaceAll("\\s+", "_");
+	}
+
+	private static void auditMessage(String message) {
+		if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
+			System.out.println("[MattMC graphics audit] " + message);
+		}
+	}
+
 	public static PrimitiveFrame consumeFrame() {
 		synchronized (LOCK) {
 			PrimitiveFrame frame = new PrimitiveFrame(
 				pendingViewportWidth,
 				pendingViewportHeight,
-				PENDING_VIEW.clone(),
-				PENDING_PROJECTION.clone(),
-				List.copyOf(PENDING_SEGMENTS),
-				List.copyOf(PENDING_CRACK_QUADS)
-			);
-			PENDING_SEGMENTS.clear();
-			PENDING_CRACK_QUADS.clear();
-			return frame;
+					PENDING_VIEW.clone(),
+					PENDING_PROJECTION.clone(),
+					List.copyOf(PENDING_SEGMENTS),
+					List.copyOf(PENDING_CRACK_QUADS),
+					List.copyOf(PENDING_BORDER_QUADS)
+				);
+				PENDING_SEGMENTS.clear();
+				PENDING_CRACK_QUADS.clear();
+				PENDING_BORDER_QUADS.clear();
+				return frame;
+			}
 		}
-	}
 
 	private static boolean mayRenderForPlayer(Minecraft minecraft, BlockPos blockPos, BlockState blockState) {
 		if (minecraft.player.getAbilities().mayBuild) {
@@ -486,9 +988,32 @@ public final class RustGalWorldPrimitiveRenderer {
 		int viewportWidth,
 		int viewportHeight,
 		float[] viewMatrix,
-		float[] projectionMatrix,
-		List<VulkanicGalBridge.WorldLineSegmentRecord> segments,
-		List<VulkanicGalBridge.WorldCrackQuadRecord> crackQuads
+			float[] projectionMatrix,
+			List<VulkanicGalBridge.WorldLineSegmentRecord> segments,
+			List<VulkanicGalBridge.WorldCrackQuadRecord> crackQuads,
+			List<VulkanicGalBridge.WorldBorderQuadRecord> borderQuads
+		) {
+		}
+
+	public record WorldBorderAssetMetrics(
+		long generation,
+		long uploadedGeneration,
+		long payloadCount,
+		long payloadBytes,
+		long failures,
+		String sourcePack,
+		String sha256,
+		boolean fallback
 	) {
 	}
-}
+
+	private record WorldBorderAssetResolution(byte[] payload, String sourcePack, String sha256, boolean fallback, boolean preserveLastValid) {
+		private static WorldBorderAssetResolution fallback(String sourcePack) {
+			return new WorldBorderAssetResolution(new byte[0], sourcePack, "fallback", true, false);
+		}
+
+		private static WorldBorderAssetResolution preserve(String sourcePack) {
+			return new WorldBorderAssetResolution(new byte[0], sourcePack, "preserve-last-valid", true, true);
+		}
+	}
+	}

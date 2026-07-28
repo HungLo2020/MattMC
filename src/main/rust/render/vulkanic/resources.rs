@@ -262,6 +262,9 @@ pub enum BlendMode {
     Additive = 3,
     Invert = 4,
     Multiply = 5,
+    /// Additive overlay tint: `out.rgb = src.rgb * src.a + dst.rgb`, `out.a = src.a`.
+    /// This is the backend-neutral semantic used by forcefield-style world overlays.
+    Overlay = 6,
 }
 
 #[repr(u32)]

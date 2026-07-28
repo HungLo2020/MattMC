@@ -1009,6 +1009,17 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueBlockBreakingCracks(this.levelRenderState.blockBreakingRenderStates, camera);
 	}
 
+	public void enqueueRustGalWorldBorder(Camera camera) {
+		if (this.level == null) {
+			return;
+		}
+		Vec3 vec3 = camera.getPosition();
+		int renderDistance = this.minecraft.options.getEffectiveRenderDistance() * 16;
+		float depthFar = this.minecraft.gameRenderer.getDepthFar();
+		this.worldBorderRenderer.extract(this.level.getWorldBorder(), vec3, renderDistance, this.levelRenderState.worldBorderRenderState);
+		net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueWorldBorder(this.levelRenderState.worldBorderRenderState, vec3, renderDistance, depthFar);
+	}
+
 	private void collectBlockDestroyAnimation(Camera camera, LevelRenderState levelRenderState) {
 		Vec3 vec3 = camera.getPosition();
 		double d = vec3.x();

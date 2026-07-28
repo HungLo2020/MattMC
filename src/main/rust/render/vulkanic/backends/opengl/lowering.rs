@@ -702,52 +702,21 @@ impl OpenGlLowerer {
                 self.cache.state_changes += 1;
             }
             if self.cache.blend != Some(blend) {
-                match blend {
-                    BlendMode::Disabled => {
-                        self.gl.disable(glow::BLEND);
-                        self.gl
-                            .blend_equation_separate(glow::FUNC_ADD, glow::FUNC_ADD);
-                    }
-                    BlendMode::Alpha => {
-                        self.gl.enable(glow::BLEND);
-                        self.gl
-                            .blend_equation_separate(glow::FUNC_ADD, glow::FUNC_ADD);
-                        self.gl.blend_func_separate(
-                            glow::SRC_ALPHA,
-                            glow::ONE_MINUS_SRC_ALPHA,
-                            glow::ONE,
-                            glow::ONE_MINUS_SRC_ALPHA,
-                        );
-                    }
-                    BlendMode::Additive => {
-                        self.gl.enable(glow::BLEND);
-                        self.gl
-                            .blend_equation_separate(glow::FUNC_ADD, glow::FUNC_ADD);
-                        self.gl
-                            .blend_func_separate(glow::ONE, glow::ONE, glow::ONE, glow::ONE);
-                    }
-                    BlendMode::Invert => {
-                        self.gl.enable(glow::BLEND);
-                        self.gl
-                            .blend_equation_separate(glow::FUNC_ADD, glow::FUNC_ADD);
-                        self.gl.blend_func_separate(
-                            glow::ONE_MINUS_DST_COLOR,
-                            glow::ONE_MINUS_SRC_COLOR,
-                            glow::ONE,
-                            glow::ZERO,
-                        );
-                    }
-                    BlendMode::Multiply => {
-                        self.gl.enable(glow::BLEND);
-                        self.gl
-                            .blend_equation_separate(glow::FUNC_ADD, glow::FUNC_ADD);
-                        self.gl.blend_func_separate(
-                            glow::DST_COLOR,
-                            glow::SRC_COLOR,
-                            glow::ONE,
-                            glow::ZERO,
-                        );
-                    }
+                let blend_state = opengl_blend_state(blend);
+                if blend_state.enabled {
+                    self.gl.enable(glow::BLEND);
+                } else {
+                    self.gl.disable(glow::BLEND);
+                }
+                self.gl
+                    .blend_equation_separate(blend_state.color_op, blend_state.alpha_op);
+                if let Some(factors) = blend_state.factors {
+                    self.gl.blend_func_separate(
+                        factors.src_color,
+                        factors.dst_color,
+                        factors.src_alpha,
+                        factors.dst_alpha,
+                    );
                 }
                 self.cache.blend = Some(blend);
                 self.cache.state_changes += 1;
@@ -915,6 +884,64 @@ fn compare_op(compare: CompareOp) -> u32 {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct OpenGlBlendFactors {
+    src_color: u32,
+    dst_color: u32,
+    src_alpha: u32,
+    dst_alpha: u32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct OpenGlBlendState {
+    enabled: bool,
+    color_op: u32,
+    alpha_op: u32,
+    factors: Option<OpenGlBlendFactors>,
+}
+
+fn opengl_blend_state(blend: BlendMode) -> OpenGlBlendState {
+    let factors = match blend {
+        BlendMode::Disabled => None,
+        BlendMode::Alpha => Some(OpenGlBlendFactors {
+            src_color: glow::SRC_ALPHA,
+            dst_color: glow::ONE_MINUS_SRC_ALPHA,
+            src_alpha: glow::ONE,
+            dst_alpha: glow::ONE_MINUS_SRC_ALPHA,
+        }),
+        BlendMode::Additive => Some(OpenGlBlendFactors {
+            src_color: glow::ONE,
+            dst_color: glow::ONE,
+            src_alpha: glow::ONE,
+            dst_alpha: glow::ONE,
+        }),
+        BlendMode::Invert => Some(OpenGlBlendFactors {
+            src_color: glow::ONE_MINUS_DST_COLOR,
+            dst_color: glow::ONE_MINUS_SRC_COLOR,
+            src_alpha: glow::ONE,
+            dst_alpha: glow::ZERO,
+        }),
+        BlendMode::Multiply => Some(OpenGlBlendFactors {
+            src_color: glow::DST_COLOR,
+            dst_color: glow::SRC_COLOR,
+            src_alpha: glow::ONE,
+            dst_alpha: glow::ZERO,
+        }),
+        BlendMode::Overlay => Some(OpenGlBlendFactors {
+            src_color: glow::SRC_ALPHA,
+            dst_color: glow::ONE,
+            src_alpha: glow::ONE,
+            dst_alpha: glow::ZERO,
+        }),
+    };
+    OpenGlBlendState {
+        enabled: factors.is_some(),
+        color_op: glow::FUNC_ADD,
+        alpha_op: glow::FUNC_ADD,
+        factors,
+    }
+}
+
 fn flip_rows_in_place(bytes: &mut [u8], row_bytes: usize, rows: usize) {
     for y in 0..rows / 2 {
         let top = y * row_bytes;
@@ -937,4 +964,26 @@ fn gl_y_for_top_left_region(
         .and_then(|value| value.checked_sub(copy_height))
         .ok_or_else(|| GalError::backend("top-left texture region is outside GL image bounds"))?;
     i32::try_from(gl_y).map_err(|_| GalError::backend("translated GL y exceeds i32"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn overlay_blend_lowers_to_source_alpha_additive_equation() {
+        let state = opengl_blend_state(BlendMode::Overlay);
+        assert!(state.enabled);
+        assert_eq!(glow::FUNC_ADD, state.color_op);
+        assert_eq!(glow::FUNC_ADD, state.alpha_op);
+        assert_eq!(
+            Some(OpenGlBlendFactors {
+                src_color: glow::SRC_ALPHA,
+                dst_color: glow::ONE,
+                src_alpha: glow::ONE,
+                dst_alpha: glow::ZERO,
+            }),
+            state.factors
+        );
+    }
 }
