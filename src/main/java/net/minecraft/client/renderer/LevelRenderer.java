@@ -525,10 +525,10 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		
 		// Sodium: Store matrices for setupTerrain (from LevelRendererMixin @Inject at="INVOKE cullTerrain")
 		this.matrices = new ChunkRenderMatrices(matrix4f2, matrix4f);
-		if (net.vulkanic.world.RustGalWorldPrimitiveRenderer.shouldUseRustOpenGlOutline()) {
-			net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginFrame(
-				matrix4f,
-				matrix4f2,
+			if (net.vulkanic.world.RustGalWorldPrimitiveRenderer.shouldUseRustOpenGlWorldPrimitives()) {
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginFrame(
+					matrix4f,
+					matrix4f2,
 				this.minecraft.getWindow().getWidth(),
 				this.minecraft.getWindow().getHeight()
 			);
@@ -1056,6 +1056,18 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 
 	private void renderBlockDestroyAnimation(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource, LevelRenderState levelRenderState) {
+		if (net.vulkanic.world.RustGalWorldPrimitiveRenderer.crackDisabledForDiagnostics()) {
+			auditBlockOutline("crack draw route=disabled retained=false states="
+				+ levelRenderState.blockBreakingRenderStates.size());
+			return;
+		}
+		if (net.vulkanic.world.RustGalWorldPrimitiveRenderer.shouldUseRustOpenGlCrack()
+			&& this.minecraft.isGameLoadFinished()
+			&& this.minecraft.screen == null
+			&& this.minecraft.getOverlay() == null) {
+			this.renderRustOpenGlBlockBreakingCracks(levelRenderState);
+			return;
+		}
 		Vec3 vec3 = levelRenderState.cameraRenderState.pos;
 		double d = vec3.x();
 		double e = vec3.y();
@@ -1225,6 +1237,50 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 						+ " highContrast=" + blockOutlineRenderState.highContrast());
 			}
 		}
+	}
+
+	private void renderRustOpenGlBlockBreakingCracks(LevelRenderState levelRenderState) {
+		RenderType crumblingType = (RenderType)ModelBakery.DESTROY_TYPES.get(0);
+		int drawFramebuffer = VulkanicAPI.getDrawFramebufferBinding();
+		if (drawFramebuffer != 0) {
+			try (RenderPass crackPass = VulkanicAPI.createRenderPass(
+				() -> "Rust GAL block-breaking crack overlay",
+				drawFramebuffer,
+				this.minecraft.getMainRenderTarget().useDepth
+			)) {
+				crackPass.setPipeline(crumblingType.pipeline());
+				this.renderRustOpenGlBlockBreakingCracksInCurrentScope(levelRenderState);
+			}
+			return;
+		}
+		RenderTarget target = this.minecraft.getMainRenderTarget();
+		try (RenderPass crackPass = VulkanicAPI.createRenderPass(
+			() -> "Rust GAL block-breaking crack overlay",
+			target.getColorTextureView(),
+			OptionalInt.empty(),
+			target.useDepth ? target.getDepthTextureView() : null,
+			OptionalDouble.empty()
+		)) {
+			crackPass.setPipeline(crumblingType.pipeline());
+			this.renderRustOpenGlBlockBreakingCracksInCurrentScope(levelRenderState);
+		}
+	}
+
+	private void renderRustOpenGlBlockBreakingCracksInCurrentScope(LevelRenderState levelRenderState) {
+		net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginFrame(
+			new Matrix4f(this.matrices.modelView()),
+			new Matrix4f(this.matrices.projection()),
+			this.minecraft.getWindow().getWidth(),
+			this.minecraft.getWindow().getHeight()
+		);
+		boolean rendered = net.vulkanic.world.RustGalWorldPrimitiveRenderer.renderOpenGlBlockBreakingCracks(
+			this.minecraft,
+			levelRenderState.blockBreakingRenderStates,
+			this.minecraft.gameRenderer.getMainCamera()
+		);
+		auditBlockOutline("crack draw route=rust-opengl retained=false states="
+			+ levelRenderState.blockBreakingRenderStates.size()
+			+ " rendered=" + rendered);
 	}
 
 	private void renderPendingRustOpenGlPostIrisBlockOutline() {

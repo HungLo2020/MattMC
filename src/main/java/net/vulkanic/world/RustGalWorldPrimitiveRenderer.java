@@ -77,7 +77,21 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final String DIAGNOSTIC_BACKGROUND_SCENARIO = System.getProperty("mattmc.dev.rustGalWorldBackground.scenario", "auto").trim();
 	private static final boolean BLOCK_OUTLINE_DIAGNOSTICS = Boolean.getBoolean("mattmc.dev.blockOutlineDiagnostics");
 	private static final boolean BLOCK_OUTLINE_LEGACY_CONTROL = Boolean.getBoolean("mattmc.dev.rustGalWorldOutline.legacyControl");
+	private static final boolean CRACK_DISABLED_CONTROL = Boolean.getBoolean("mattmc.dev.rustGalWorldCrack.disabled");
+	private static final boolean CRACK_LEGACY_CONTROL = Boolean.getBoolean("mattmc.dev.rustGalWorldCrack.legacyControl");
 	private static final ResourceLocation FORCEFIELD_LOCATION = ResourceLocation.withDefaultNamespace("textures/misc/forcefield.png");
+	private static final ResourceLocation[] CRACK_STAGE_LOCATIONS = new ResourceLocation[] {
+		ResourceLocation.withDefaultNamespace("textures/block/destroy_stage_0.png"),
+		ResourceLocation.withDefaultNamespace("textures/block/destroy_stage_1.png"),
+		ResourceLocation.withDefaultNamespace("textures/block/destroy_stage_2.png"),
+		ResourceLocation.withDefaultNamespace("textures/block/destroy_stage_3.png"),
+		ResourceLocation.withDefaultNamespace("textures/block/destroy_stage_4.png"),
+		ResourceLocation.withDefaultNamespace("textures/block/destroy_stage_5.png"),
+		ResourceLocation.withDefaultNamespace("textures/block/destroy_stage_6.png"),
+		ResourceLocation.withDefaultNamespace("textures/block/destroy_stage_7.png"),
+		ResourceLocation.withDefaultNamespace("textures/block/destroy_stage_8.png"),
+		ResourceLocation.withDefaultNamespace("textures/block/destroy_stage_9.png")
+	};
 	private static final Object LOCK = new Object();
 	private static final List<VulkanicGalBridge.WorldLineSegmentRecord> PENDING_SEGMENTS = new ArrayList<>();
 	private static final List<VulkanicGalBridge.WorldCrackQuadRecord> PENDING_CRACK_QUADS = new ArrayList<>();
@@ -96,6 +110,16 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static String lastWorldBorderAssetSourcePack = "vanilla";
 	private static String lastWorldBorderAssetSha256 = "fallback";
 	private static boolean lastWorldBorderAssetFallback = true;
+	private static List<VulkanicGalBridge.WorldCrackAssetRecord> pendingWorldCrackAssets = List.of();
+	private static long worldCrackAssetGeneration = 1L;
+	private static long uploadedWorldCrackAssetGeneration;
+	private static long attemptedWorldCrackAssetGeneration;
+	private static long lastWorldCrackAssetPayloadCount;
+	private static long lastWorldCrackAssetPayloadBytes;
+	private static long worldCrackAssetUpdateFailures;
+	private static String lastWorldCrackAssetSourcePack = "vanilla";
+	private static String lastWorldCrackAssetSha256 = "fallback";
+	private static boolean lastWorldCrackAssetFallback = true;
 	private static int pendingViewportWidth;
 	private static int pendingViewportHeight;
 	private static int blockOutlineProjectionDiagnosticLogs;
@@ -128,6 +152,16 @@ public final class RustGalWorldPrimitiveRenderer {
 		);
 	}
 
+	public static BlockOutlineRoute currentCrackRoute() {
+		if (CRACK_DISABLED_CONTROL || CRACK_LEGACY_CONTROL) {
+			return BlockOutlineRoute.JAVA_COMPATIBILITY;
+		}
+		return selectBlockOutlineRouteForTests(
+			VulkanicAPI.isVulkanBackendSelected(),
+			RustGalVulkanWholeFrameMode.enabledForBackend(VulkanicAPI.isVulkanBackendSelected())
+		);
+	}
+
 	public static boolean shouldUseRustWholeFrameOutline() {
 		return currentBlockOutlineRoute() == BlockOutlineRoute.RUST_VULKAN_WHOLE_FRAME;
 	}
@@ -136,8 +170,25 @@ public final class RustGalWorldPrimitiveRenderer {
 		return currentBlockOutlineRoute() == BlockOutlineRoute.RUST_OPENGL_BORROWED_CONTEXT;
 	}
 
+	public static boolean shouldUseRustWholeFrameCrack() {
+		return currentCrackRoute() == BlockOutlineRoute.RUST_VULKAN_WHOLE_FRAME;
+	}
+
+	public static boolean shouldUseRustOpenGlCrack() {
+		return currentCrackRoute() == BlockOutlineRoute.RUST_OPENGL_BORROWED_CONTEXT;
+	}
+
+	public static boolean shouldUseRustOpenGlWorldPrimitives() {
+		return shouldUseRustOpenGlOutline() || shouldUseRustOpenGlCrack();
+	}
+
+	public static boolean crackDisabledForDiagnostics() {
+		return CRACK_DISABLED_CONTROL;
+	}
+
 	public static void reloadWorldAssets(ResourceManager resourceManager) {
 		WorldBorderAssetResolution resolution = resolveWorldBorderAsset(resourceManager);
+		WorldCrackAssetResolution crackResolution = resolveWorldCrackAssets(resourceManager);
 		synchronized (LOCK) {
 			if (resolution.preserveLastValid()) {
 				worldBorderAssetUpdateFailures++;
@@ -149,27 +200,56 @@ public final class RustGalWorldPrimitiveRenderer {
 						+ " failures=" + worldBorderAssetUpdateFailures
 						+ " preserve_last_valid=true"
 				);
-				return;
+			} else {
+				worldBorderAssetGeneration++;
+				pendingWorldBorderAsset = new VulkanicGalBridge.WorldBorderAssetRecord(BORDER_TEXTURE_FORCEFIELD, resolution.payload());
+				attemptedWorldBorderAssetGeneration = Math.min(attemptedWorldBorderAssetGeneration, uploadedWorldBorderAssetGeneration);
+				lastWorldBorderAssetPayloadCount = resolution.payload().length == 0 ? 0L : 1L;
+				lastWorldBorderAssetPayloadBytes = resolution.payload().length;
+				lastWorldBorderAssetSourcePack = resolution.sourcePack();
+				lastWorldBorderAssetSha256 = resolution.sha256();
+				lastWorldBorderAssetFallback = resolution.fallback();
+				auditMessage(
+					"Rust VulkanicGAL world-border asset resolved"
+						+ " generation=" + worldBorderAssetGeneration
+						+ " texture_id=" + BORDER_TEXTURE_FORCEFIELD
+						+ " path=" + FORCEFIELD_LOCATION
+						+ " source_pack=" + metricValue(lastWorldBorderAssetSourcePack)
+						+ " payloads=" + lastWorldBorderAssetPayloadCount
+						+ " payload_bytes=" + lastWorldBorderAssetPayloadBytes
+						+ " fallback=" + lastWorldBorderAssetFallback
+						+ " sha256=" + lastWorldBorderAssetSha256
+				);
 			}
-			worldBorderAssetGeneration++;
-			pendingWorldBorderAsset = new VulkanicGalBridge.WorldBorderAssetRecord(BORDER_TEXTURE_FORCEFIELD, resolution.payload());
-			attemptedWorldBorderAssetGeneration = Math.min(attemptedWorldBorderAssetGeneration, uploadedWorldBorderAssetGeneration);
-			lastWorldBorderAssetPayloadCount = resolution.payload().length == 0 ? 0L : 1L;
-			lastWorldBorderAssetPayloadBytes = resolution.payload().length;
-			lastWorldBorderAssetSourcePack = resolution.sourcePack();
-			lastWorldBorderAssetSha256 = resolution.sha256();
-			lastWorldBorderAssetFallback = resolution.fallback();
-			auditMessage(
-				"Rust VulkanicGAL world-border asset resolved"
-					+ " generation=" + worldBorderAssetGeneration
-					+ " texture_id=" + BORDER_TEXTURE_FORCEFIELD
-					+ " path=" + FORCEFIELD_LOCATION
-					+ " source_pack=" + metricValue(lastWorldBorderAssetSourcePack)
-					+ " payloads=" + lastWorldBorderAssetPayloadCount
-					+ " payload_bytes=" + lastWorldBorderAssetPayloadBytes
-					+ " fallback=" + lastWorldBorderAssetFallback
-					+ " sha256=" + lastWorldBorderAssetSha256
-			);
+			if (crackResolution.preserveLastValid()) {
+				worldCrackAssetUpdateFailures++;
+				auditMessage(
+					"Rust VulkanicGAL world crack asset update skipped"
+						+ " reason=java-read-failure"
+						+ " generation=" + worldCrackAssetGeneration
+						+ " uploaded_generation=" + uploadedWorldCrackAssetGeneration
+						+ " failures=" + worldCrackAssetUpdateFailures
+						+ " preserve_last_valid=true"
+				);
+			} else {
+				worldCrackAssetGeneration++;
+				pendingWorldCrackAssets = List.copyOf(crackResolution.assets());
+				attemptedWorldCrackAssetGeneration = Math.min(attemptedWorldCrackAssetGeneration, uploadedWorldCrackAssetGeneration);
+				lastWorldCrackAssetPayloadCount = crackResolution.assets().size();
+				lastWorldCrackAssetPayloadBytes = crackResolution.payloadBytes();
+				lastWorldCrackAssetSourcePack = crackResolution.sourcePack();
+				lastWorldCrackAssetSha256 = crackResolution.sha256();
+				lastWorldCrackAssetFallback = crackResolution.fallback();
+				auditMessage(
+					"Rust VulkanicGAL world crack asset resolved"
+						+ " generation=" + worldCrackAssetGeneration
+						+ " payloads=" + lastWorldCrackAssetPayloadCount
+						+ " payload_bytes=" + lastWorldCrackAssetPayloadBytes
+						+ " source_pack=" + metricValue(lastWorldCrackAssetSourcePack)
+						+ " fallback=" + lastWorldCrackAssetFallback
+						+ " sha256=" + lastWorldCrackAssetSha256
+				);
+			}
 		}
 	}
 
@@ -213,6 +293,44 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
+	public static VulkanicGalBridge.Status flushPendingWorldCrackAssets(VulkanicGalBridge bridge) {
+		synchronized (LOCK) {
+			if (bridge == null || uploadedWorldCrackAssetGeneration >= worldCrackAssetGeneration || attemptedWorldCrackAssetGeneration >= worldCrackAssetGeneration) {
+				return null;
+			}
+			attemptedWorldCrackAssetGeneration = worldCrackAssetGeneration;
+			try {
+				VulkanicGalBridge.Status status = bridge.updateWorldCrackAssets(worldCrackAssetGeneration, pendingWorldCrackAssets);
+				uploadedWorldCrackAssetGeneration = worldCrackAssetGeneration;
+				auditMessage(
+					"Rust VulkanicGAL world crack asset update accepted"
+						+ " generation=" + worldCrackAssetGeneration
+						+ " payloads=" + lastWorldCrackAssetPayloadCount
+						+ " payload_bytes=" + lastWorldCrackAssetPayloadBytes
+						+ " source_pack=" + metricValue(lastWorldCrackAssetSourcePack)
+						+ " fallback=" + lastWorldCrackAssetFallback
+						+ " uploaded_generation=" + uploadedWorldCrackAssetGeneration
+				);
+				return status;
+			} catch (RuntimeException error) {
+				worldCrackAssetUpdateFailures++;
+				LOGGER.error(
+					"Rust VulkanicGAL world crack asset update failed for generation {}; preserving last valid atlas",
+					worldCrackAssetGeneration,
+					error
+				);
+				auditMessage(
+					"Rust VulkanicGAL world crack asset update failed"
+						+ " generation=" + worldCrackAssetGeneration
+						+ " uploaded_generation=" + uploadedWorldCrackAssetGeneration
+						+ " failures=" + worldCrackAssetUpdateFailures
+						+ " preserve_last_valid=true"
+				);
+				return null;
+			}
+		}
+	}
+
 	public static WorldBorderAssetMetrics worldBorderAssetMetrics() {
 		synchronized (LOCK) {
 			return new WorldBorderAssetMetrics(
@@ -224,6 +342,21 @@ public final class RustGalWorldPrimitiveRenderer {
 				lastWorldBorderAssetSourcePack,
 				lastWorldBorderAssetSha256,
 				lastWorldBorderAssetFallback
+			);
+		}
+	}
+
+	public static WorldCrackAssetMetrics worldCrackAssetMetrics() {
+		synchronized (LOCK) {
+			return new WorldCrackAssetMetrics(
+				worldCrackAssetGeneration,
+				uploadedWorldCrackAssetGeneration,
+				lastWorldCrackAssetPayloadCount,
+				lastWorldCrackAssetPayloadBytes,
+				worldCrackAssetUpdateFailures,
+				lastWorldCrackAssetSourcePack,
+				lastWorldCrackAssetSha256,
+				lastWorldCrackAssetFallback
 			);
 		}
 	}
@@ -250,6 +383,61 @@ public final class RustGalWorldPrimitiveRenderer {
 				error
 			);
 			return WorldBorderAssetResolution.preserve("read-error");
+		}
+	}
+
+	private static WorldCrackAssetResolution resolveWorldCrackAssets(ResourceManager resourceManager) {
+		if (resourceManager == null) {
+			return WorldCrackAssetResolution.fallback("missing-resource-manager");
+		}
+		List<VulkanicGalBridge.WorldCrackAssetRecord> assets = new ArrayList<>();
+		long payloadBytes = 0L;
+		List<String> sourcePacks = new ArrayList<>();
+		MessageDigest digest = sha256Digest();
+		for (int stage = 0; stage < CRACK_STAGE_LOCATIONS.length; stage++) {
+			ResourceLocation location = CRACK_STAGE_LOCATIONS[stage];
+			Optional<Resource> resource = resourceManager.getResource(location);
+			if (resource.isEmpty()) {
+				continue;
+			}
+			String sourcePack = resource.get().sourcePackId();
+			if ("vanilla".equals(sourcePack)) {
+				continue;
+			}
+			try (InputStream input = resource.get().open()) {
+				byte[] bytes = input.readAllBytes();
+				assets.add(new VulkanicGalBridge.WorldCrackAssetRecord(stage, bytes));
+				payloadBytes += bytes.length;
+				sourcePacks.add(stage + ":" + sourcePack);
+				digest.update((byte)stage);
+				digest.update(bytes);
+			} catch (IOException error) {
+				LOGGER.warn(
+					"Failed to read Rust VulkanicGAL world crack texture {}; preserving last valid atlas",
+					location,
+					error
+				);
+				return WorldCrackAssetResolution.preserve("read-error");
+			}
+		}
+		if (assets.isEmpty()) {
+			return WorldCrackAssetResolution.fallback("vanilla");
+		}
+		return new WorldCrackAssetResolution(
+			assets,
+			payloadBytes,
+			String.join(",", sourcePacks),
+			HexFormat.of().formatHex(digest.digest()),
+			false,
+			false
+		);
+	}
+
+	private static MessageDigest sha256Digest() {
+		try {
+			return MessageDigest.getInstance("SHA-256");
+		} catch (NoSuchAlgorithmException error) {
+			throw new IllegalStateException("SHA-256 digest is unavailable", error);
 		}
 	}
 
@@ -319,7 +507,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	public static void enqueueBlockBreakingCracks(List<BlockBreakingRenderState> states, Camera camera) {
-		if (!shouldUseRustWholeFrameOutline()) {
+		if (!shouldUseRustWholeFrameCrack()) {
 			return;
 		}
 		if (enqueueDiagnosticBlockBreakingCrack(camera)) {
@@ -346,6 +534,58 @@ public final class RustGalWorldPrimitiveRenderer {
 				appendCrackShape(shape, state.blockPos, cameraPos, state.progress, viewportWidth, viewportHeight);
 			}
 		}
+	}
+
+	public static boolean renderOpenGlBlockBreakingCracks(
+		Minecraft minecraft,
+		List<BlockBreakingRenderState> states,
+		Camera camera
+	) {
+		if (!shouldUseRustOpenGlCrack()) {
+			return false;
+		}
+		if (minecraft == null || camera == null || states == null || (states.isEmpty() && DIAGNOSTIC_CRACK_SCENARIO.isBlank())) {
+			return false;
+		}
+		PrimitiveFrame frame;
+		Vec3 cameraPos = camera.getPosition();
+		synchronized (LOCK) {
+			int viewportWidth = pendingViewportWidth;
+			int viewportHeight = pendingViewportHeight;
+			if (viewportWidth <= 0 || viewportHeight <= 0) {
+				throw new IllegalStateException("Rust OpenGL block-breaking crack overlay requires a seeded world primitive frame");
+			}
+			PENDING_CRACK_QUADS.clear();
+			if (enqueueDiagnosticBlockBreakingCrack(camera)) {
+				// Diagnostic path wrote the requested quads or deliberately left the frame empty.
+			} else {
+				for (BlockBreakingRenderState state : states) {
+					if (state.progress < 0 || state.progress >= 10) {
+						continue;
+					}
+					VoxelShape shape = state.blockState.getShape(state.level, state.blockPos, CollisionContext.of(camera.getEntity()));
+					if (shape.isEmpty()) {
+						shape = Shapes.block();
+					}
+					appendCrackShape(shape, state.blockPos, cameraPos, state.progress, viewportWidth, viewportHeight);
+				}
+			}
+			if (PENDING_CRACK_QUADS.isEmpty()) {
+				return false;
+			}
+			frame = new PrimitiveFrame(
+				viewportWidth,
+				viewportHeight,
+				PENDING_VIEW.clone(),
+				PENDING_PROJECTION.clone(),
+				VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback(),
+				List.of(),
+				List.copyOf(PENDING_CRACK_QUADS),
+				List.of()
+			);
+			PENDING_CRACK_QUADS.clear();
+		}
+		return RustGalGuiRenderer.executeWorldPrimitiveFrame(minecraft, frame, "minecraft.world.block-breaking-crack");
 	}
 
 	private static boolean enqueueDiagnosticBlockBreakingCrack(Camera camera) {
@@ -1266,6 +1506,18 @@ public final class RustGalWorldPrimitiveRenderer {
 	) {
 	}
 
+	public record WorldCrackAssetMetrics(
+		long generation,
+		long uploadedGeneration,
+		long payloadCount,
+		long payloadBytes,
+		long failures,
+		String sourcePack,
+		String sha256,
+		boolean fallback
+	) {
+	}
+
 	private record WorldBorderAssetResolution(byte[] payload, String sourcePack, String sha256, boolean fallback, boolean preserveLastValid) {
 		private static WorldBorderAssetResolution fallback(String sourcePack) {
 			return new WorldBorderAssetResolution(new byte[0], sourcePack, "fallback", true, false);
@@ -1275,4 +1527,21 @@ public final class RustGalWorldPrimitiveRenderer {
 			return new WorldBorderAssetResolution(new byte[0], sourcePack, "preserve-last-valid", true, true);
 		}
 	}
+
+	private record WorldCrackAssetResolution(
+		List<VulkanicGalBridge.WorldCrackAssetRecord> assets,
+		long payloadBytes,
+		String sourcePack,
+		String sha256,
+		boolean fallback,
+		boolean preserveLastValid
+	) {
+		private static WorldCrackAssetResolution fallback(String sourcePack) {
+			return new WorldCrackAssetResolution(List.of(), 0L, sourcePack, "fallback", true, false);
+		}
+
+		private static WorldCrackAssetResolution preserve(String sourcePack) {
+			return new WorldCrackAssetResolution(List.of(), 0L, sourcePack, "preserve-last-valid", true, true);
+		}
 	}
+}

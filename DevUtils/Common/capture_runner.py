@@ -1957,6 +1957,9 @@ GUI_RESOURCE_PACK_SPRITES = (
 )
 
 WORLD_BORDER_RESOURCE_PACK_TEXTURE = "assets/minecraft/textures/misc/forcefield.png"
+WORLD_CRACK_RESOURCE_PACK_TEXTURES = tuple(
+    f"assets/minecraft/textures/block/destroy_stage_{stage}.png" for stage in range(10)
+)
 
 
 GUI_PACK_COLORS = {
@@ -1969,6 +1972,7 @@ def gui_resource_pack_specs(scenario: str) -> list[dict[str, object]]:
     base = {
         "sprites": GUI_RESOURCE_PACK_SPRITES,
         "world_border_texture": WORLD_BORDER_RESOURCE_PACK_TEXTURE,
+        "world_crack_textures": WORLD_CRACK_RESOURCE_PACK_TEXTURES,
         "malformed": (),
         "wrong_size": (),
     }
@@ -1994,6 +1998,7 @@ def gui_resource_pack_specs(scenario: str) -> list[dict[str, object]]:
                 "variant": "a",
                 "sprites": GUI_RESOURCE_PACK_SPRITES[:6],
                 "world_border_texture": "",
+                "world_crack_textures": (),
             }
         ]
     if scenario == "malformed":
@@ -2005,6 +2010,7 @@ def gui_resource_pack_specs(scenario: str) -> list[dict[str, object]]:
                 "malformed": (
                     "assets/minecraft/textures/gui/sprites/hud/crosshair.png",
                     WORLD_BORDER_RESOURCE_PACK_TEXTURE,
+                    "assets/minecraft/textures/block/destroy_stage_4.png",
                 ),
             }
         ]
@@ -2014,7 +2020,10 @@ def gui_resource_pack_specs(scenario: str) -> list[dict[str, object]]:
                 **base,
                 "name": "mattmc-rust-gui-pack-unsupported",
                 "variant": "a",
-                "wrong_size": ("assets/minecraft/textures/gui/sprites/hud/armor_full.png",),
+                "wrong_size": (
+                    "assets/minecraft/textures/gui/sprites/hud/armor_full.png",
+                    "assets/minecraft/textures/block/destroy_stage_4.png",
+                ),
             }
         ]
     raise SystemExit(
@@ -2059,6 +2068,15 @@ def write_gui_resource_pack(pack_dir: Path, spec: dict[str, object]) -> None:
             target.write_bytes(b"not a png")
         else:
             target.write_bytes(asymmetric_png(16, 16, GUI_PACK_COLORS[variant], variant))
+    for crack_texture in spec.get("world_crack_textures", ()):  # type: ignore[assignment]
+        resource_path = str(crack_texture)
+        target = pack_dir / resource_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if resource_path in malformed:
+            target.write_bytes(b"not a png")
+            continue
+        actual_width = 17 if resource_path in wrong_size else 16
+        target.write_bytes(asymmetric_png(actual_width, 16, GUI_PACK_COLORS[variant], variant))
 
 
 def asymmetric_png(width: int, height: int, base: tuple[int, int, int, int], variant: str) -> bytes:

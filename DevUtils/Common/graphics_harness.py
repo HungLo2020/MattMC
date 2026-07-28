@@ -1484,6 +1484,106 @@ def deterministic_world_border_pixel_evidence(doc: dict[str, object] | None, sce
     return evidence
 
 
+def deterministic_world_crack_pixel_evidence(doc: dict[str, object] | None, scenario: object) -> dict[str, object]:
+    scenario_name = str(scenario or "").strip().lower()
+    evidence: dict[str, object] = {
+        "checked": False,
+        "status": "not_requested",
+        "scenario": scenario_name or None,
+        "screenshot": None,
+        "crop": None,
+        "crop_path": None,
+        "matching_pixels": 0,
+        "vanilla_like_pixels": 0,
+        "bright_target_pixels": 0,
+        "pack_a_signature_pixels": 0,
+        "pack_b_signature_pixels": 0,
+        "texture_signature": "unknown",
+        "threshold": 256,
+    }
+    if not scenario_name:
+        return evidence
+    expected_visible = scenario_name not in {"hidden", "no-target"}
+    captures = doc.get("captures") if isinstance(doc, dict) else None
+    if not isinstance(captures, list) or not captures:
+        evidence["status"] = "missing_capture"
+        return evidence
+    first = captures[0]
+    if not isinstance(first, dict) or not first.get("screenshot"):
+        evidence["status"] = "missing_screenshot"
+        return evidence
+    screenshot = Path(str(first["screenshot"]))
+    evidence["screenshot"] = str(screenshot)
+    if not screenshot.is_file():
+        evidence["status"] = "missing_screenshot_file"
+        return evidence
+    try:
+        from PIL import Image
+    except Exception as exc:  # pragma: no cover - depends on local test environment packaging.
+        evidence["status"] = f"pillow_unavailable:{exc}"
+        return evidence
+    try:
+        with Image.open(screenshot) as image:
+            rgb = image.convert("RGB")
+            width, height = rgb.size
+            left = max(0, int(width * 0.42))
+            top = max(0, int(height * 0.28))
+            right = min(width, int(width * 0.62))
+            bottom = min(height, int(height * 0.70))
+            crop = rgb.crop((left, top, right, bottom))
+            vanilla_like = 0
+            bright_target = 0
+            pack_a_signature = 0
+            pack_b_signature = 0
+            pack_colored_signature = 0
+            for red, green, blue in crop.getdata():
+                if red >= 180 and green >= 180 and blue >= 180:
+                    bright_target += 1
+                dark_crack = red <= 120 and green <= 130 and blue <= 150
+                if dark_crack:
+                    vanilla_like += 1
+                if red >= 145 and green <= 95 and blue <= 145:
+                    pack_a_signature += 1
+                if green >= 145 and red <= 130 and blue <= 155:
+                    pack_b_signature += 1
+                red_pack = red >= 145 and green <= 120 and blue <= 155
+                green_pack = green >= 145 and red <= 130 and blue <= 155
+                magenta_pack = red >= 130 and blue >= 120 and green <= 120
+                if red_pack or green_pack or magenta_pack:
+                    pack_colored_signature += 1
+            matching = pack_colored_signature
+            vanilla_present = vanilla_like >= int(evidence["threshold"])
+            pack_present = matching >= 512
+            if expected_visible:
+                status = "present" if vanilla_present or pack_present else "absent"
+            else:
+                status = "not_checked_hidden"
+            texture_signature = "unknown"
+            if pack_present:
+                texture_signature = "pack-colored"
+            elif vanilla_present:
+                texture_signature = "vanilla-like"
+            crop_path = screenshot.with_name(f"world_crack_pixel_crop_{scenario_name}.png")
+            crop.save(crop_path)
+            evidence.update(
+                {
+                    "checked": True,
+                    "status": status,
+                    "crop": {"left": left, "top": top, "right": right, "bottom": bottom},
+                    "crop_path": str(crop_path),
+                    "matching_pixels": max(matching, vanilla_like if vanilla_present else 0),
+                    "vanilla_like_pixels": vanilla_like,
+                    "bright_target_pixels": bright_target,
+                    "pack_a_signature_pixels": pack_a_signature,
+                    "pack_b_signature_pixels": pack_b_signature,
+                    "texture_signature": texture_signature,
+                }
+            )
+    except Exception as exc:
+        evidence["status"] = f"read_failed:{exc}"
+    return evidence
+
+
 def deterministic_rust_vulkan_shell_scene_evidence(
     doc: dict[str, object] | None,
     background_scenario: object,
@@ -2545,6 +2645,8 @@ def normalize_capture_artifact(
     )
     requested_world_crack_scenario = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldCrack.scenario")
     requested_world_crack_stage = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldCrack.stage")
+    requested_world_crack_disabled = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldCrack.disabled") == "true"
+    requested_world_crack_legacy = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldCrack.legacyControl") == "true"
     requested_world_background_scenario = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldBackground.scenario")
     requested_world_border_scenario = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldBorder.scenario")
     world_outline_pixel_evidence = deterministic_block_outline_pixel_evidence(
@@ -2554,6 +2656,10 @@ def normalize_capture_artifact(
     world_border_pixel_evidence = deterministic_world_border_pixel_evidence(
         deterministic_doc,
         requested_world_border_scenario,
+    )
+    world_crack_pixel_evidence = deterministic_world_crack_pixel_evidence(
+        deterministic_doc,
+        requested_world_crack_scenario,
     )
     rust_vulkan_shell_scene_evidence = deterministic_rust_vulkan_shell_scene_evidence(
         deterministic_doc,
@@ -2718,7 +2824,10 @@ def normalize_capture_artifact(
             )
     world_crack_workload_complete = True
     crack_scenario = (requested_world_crack_scenario or "").strip().lower()
-    if crack_scenario and rust_shell_outline_mode:
+    rust_crack_mode = (rust_shell_outline_mode or rust_opengl_outline_mode) and not (
+        requested_world_crack_disabled or requested_world_crack_legacy
+    )
+    if crack_scenario and rust_crack_mode:
         if crack_scenario in {"hidden", "no-target"}:
             if int(rust_gal_world_crack_quads_for_validation or 0) != 0:
                 world_crack_workload_complete = False
@@ -2740,6 +2849,19 @@ def normalize_capture_artifact(
                     + ", ".join(missing_crack_counts)
                     + " evidence was captured"
                 )
+            if tool_kind == "capture" and world_crack_pixel_evidence.get("status") != "present":
+                world_crack_workload_complete = False
+                validation_messages.append(
+                    "deterministic Rust-GAL block-breaking crack scenario did not produce visible crack pixels "
+                    f"(pixel evidence status={world_crack_pixel_evidence.get('status')}, "
+                    f"matching_pixels={world_crack_pixel_evidence.get('matching_pixels')}, "
+                    f"texture_signature={world_crack_pixel_evidence.get('texture_signature')})"
+                )
+        if rust_opengl_outline_mode:
+            unexpected_java_crack_draw_seen = "crack draw route=java-opengl retained=true" in combined_logs
+            if unexpected_java_crack_draw_seen:
+                world_crack_workload_complete = False
+                validation_messages.append("deterministic Rust-GAL OpenGL crack scenario emitted unexpected java-opengl draw")
     world_border_workload_complete = True
     border_scenario = (requested_world_border_scenario or "").strip().lower()
     if border_scenario and rust_shell_outline_mode:
@@ -3058,6 +3180,10 @@ def normalize_capture_artifact(
             "calls": last_number(combined_logs, r"rust_gal_ffi_world_border_asset_update_calls[=: ]+(\d+)"),
             "bytes": last_number(combined_logs, r"rust_gal_ffi_world_border_asset_update_bytes[=: ]+(\d+)"),
         },
+        "world_crack_asset_update": {
+            "calls": last_number(combined_logs, r"rust_gal_ffi_world_crack_asset_update_calls[=: ]+(\d+)"),
+            "bytes": last_number(combined_logs, r"rust_gal_ffi_world_crack_asset_update_bytes[=: ]+(\d+)"),
+        },
     }
     rust_gal_calls_per_batch = None
     rust_gal_bytes_per_batch = None
@@ -3210,6 +3336,9 @@ def normalize_capture_artifact(
                 "world_outline_pixel_evidence": world_outline_pixel_evidence,
                 "world_crack_scenario": requested_world_crack_scenario or None,
                 "world_crack_stage": parse_number(requested_world_crack_stage),
+                "world_crack_disabled_control": requested_world_crack_disabled,
+                "world_crack_legacy_control": requested_world_crack_legacy,
+                "world_crack_pixel_evidence": world_crack_pixel_evidence,
                 "world_border_scenario": requested_world_border_scenario or None,
                 "world_border_pixel_evidence": world_border_pixel_evidence,
                 "world_background_scenario": requested_world_background_scenario or None,
@@ -3242,6 +3371,14 @@ def normalize_capture_artifact(
                 "world_outline_cache_misses": rust_gal_world_outline_cache_misses,
                 "world_crack_cache_hits": rust_gal_world_crack_cache_hits,
                 "world_crack_cache_misses": rust_gal_world_crack_cache_misses,
+                "world_crack_asset_generation": last_number(combined_logs, r"rust_gal_world_crack_asset_generation[=: ]+(\d+)"),
+                "world_crack_uploaded_asset_generation": last_number(combined_logs, r"rust_gal_world_crack_uploaded_asset_generation[=: ]+(\d+)"),
+                "world_crack_asset_payload_count": last_number(combined_logs, r"rust_gal_world_crack_asset_payload_count[=: ]+(\d+)"),
+                "world_crack_asset_payload_bytes": last_number(combined_logs, r"rust_gal_world_crack_asset_payload_bytes[=: ]+(\d+)"),
+                "world_crack_asset_update_failures": last_number(combined_logs, r"rust_gal_world_crack_asset_update_failures[=: ]+(\d+)"),
+                "world_crack_asset_source_pack": last_text(combined_logs, r"rust_gal_world_crack_asset_source_pack[=: ]+(\S+)"),
+                "world_crack_asset_sha256": last_text(combined_logs, r"rust_gal_world_crack_asset_sha256[=: ]+(\S+)"),
+                "world_crack_asset_fallback": last_text(combined_logs, r"rust_gal_world_crack_asset_fallback[=: ]+(\S+)"),
                 "world_border_cache_hits": rust_gal_world_border_cache_hits,
                 "world_border_cache_misses": rust_gal_world_border_cache_misses,
                 "world_border_asset_generation": last_number(combined_logs, r"rust_gal_world_border_asset_generation[=: ]+(\d+)"),
@@ -4707,6 +4844,14 @@ def build_capture_command(
         java_options.append(f"-Dmattmc.dev.rustGalWorldBorder.scenario={args.world_border_scenario}")
         if getattr(args, "world_border_scroll_phase", ""):
             java_options.append(f"-Dmattmc.dev.rustGalWorldBorder.scrollPhase={args.world_border_scroll_phase}")
+    if getattr(args, "world_crack_scenario", ""):
+        java_options.append(f"-Dmattmc.dev.rustGalWorldCrack.scenario={args.world_crack_scenario}")
+        java_options.append(f"-Dmattmc.dev.rustGalWorldCrack.stage={getattr(args, 'world_crack_stage', 0)}")
+    world_crack_control = getattr(args, "world_crack_control", "rust")
+    if world_crack_control == "disabled":
+        java_options.append("-Dmattmc.dev.rustGalWorldCrack.disabled=true")
+    elif world_crack_control == "legacy":
+        java_options.append("-Dmattmc.dev.rustGalWorldCrack.legacyControl=true")
     if getattr(args, "world_background_scenario", ""):
         java_options.append(f"-Dmattmc.dev.rustGalWorldBackground.scenario={args.world_background_scenario}")
     rust_gal_gui_control = getattr(args, "rust_gal_gui_control", "rust")
@@ -5693,6 +5838,24 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             help="Force a deterministic Rust-GAL world-border scenario for whole-frame Vulkan captures.",
         )
         subparser.add_argument(
+            "--world-crack-scenario",
+            choices=("hidden", "no-target", "full-cube", "partial-shape", "disconnected-shape"),
+            default=os.environ.get("MATTMC_WORLD_CRACK_SCENARIO", ""),
+            help="Force a deterministic Rust-GAL block-breaking crack-overlay scenario.",
+        )
+        subparser.add_argument(
+            "--world-crack-stage",
+            type=int,
+            default=int(os.environ.get("MATTMC_WORLD_CRACK_STAGE", "0")),
+            help="Force the deterministic crack texture stage, in the vanilla 0..9 range.",
+        )
+        subparser.add_argument(
+            "--world-crack-control",
+            choices=("rust", "disabled", "legacy"),
+            default=os.environ.get("MATTMC_WORLD_CRACK_CONTROL", "rust"),
+            help="Select a diagnostic crack route control without changing production routing.",
+        )
+        subparser.add_argument(
             "--world-border-scroll-phase",
             default=os.environ.get("MATTMC_WORLD_BORDER_SCROLL_PHASE", ""),
             help="Freeze the deterministic world-border texture scroll phase.",
@@ -5814,6 +5977,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         raise SystemExit("warmup frames must be non-negative and measure frames must be positive")
     if args.settle_frames < 0 or args.max_settle_frames <= 0 or args.subsystem_iterations <= 0 or args.repetitions <= 0:
         raise SystemExit("settle/max-settle/subsystem iterations/repetitions must be positive where applicable")
+    if not 0 <= args.world_crack_stage <= 9:
+        raise SystemExit("--world-crack-stage must be in 0..9")
     if args.armor_value is not None and not 0 <= args.armor_value <= 20:
         raise SystemExit("--armor-value must be in 0..20")
     if args.player_health is not None and args.player_health < 0:

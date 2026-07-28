@@ -122,6 +122,30 @@ def write_world_border_probe_image(path: Path, *, visible: bool) -> None:
     image.save(path)
 
 
+def write_world_crack_probe_image(path: Path, *, variant: str) -> None:
+    from PIL import Image
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image = Image.new("RGB", (1280, 720), (120, 167, 255))
+    left, top, right, bottom = int(1280 * 0.46), int(720 * 0.47), int(1280 * 0.57), int(720 * 0.67)
+    if variant == "vanilla":
+        for x in range(left + 14, right - 14):
+            for y in range(top + 12, bottom - 12):
+                image.putpixel((x, y), (235, 235, 235))
+        for x in range(left + 30, right - 30, 3):
+            for y in range(top + 20, bottom - 20, 5):
+                image.putpixel((x, y), (42, 48, 55))
+    elif variant == "pack-a":
+        for x in range(left + 10, right - 10):
+            for y in range(top + 10, bottom - 10):
+                image.putpixel((x, y), (238, 37, 67))
+    elif variant == "pack-b":
+        for x in range(left + 10, right - 10):
+            for y in range(top + 10, bottom - 10):
+                image.putpixel((x, y), (35, 212, 98))
+    image.save(path)
+
+
 def write_rust_shell_scene_image(path: Path) -> None:
     from PIL import Image
 
@@ -2808,6 +2832,68 @@ else:
             self.assertEqual("present", evidence["status"])
             self.assertGreaterEqual(evidence["matching_pixels"], evidence["threshold"])
             self.assertTrue(Path(str(evidence["crop_path"])).is_file())
+
+    def test_requested_world_crack_capture_requires_visible_pixels(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend="opengl")
+            screenshot = capture / "world_crack_missing.png"
+            write_world_crack_probe_image(screenshot, variant="missing")
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            doc = json.loads(deterministic.read_text(encoding="utf-8"))
+            doc["captures"][0]["screenshot"] = str(screenshot)
+            deterministic.write_text(json.dumps(doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "Picked up JAVA_TOOL_OPTIONS: -Dmattmc.dev.rustGalWorldCrack.scenario=full-cube "
+                "-Dmattmc.dev.rustGalWorldCrack.stage=4\n"
+                "[MattMC graphics audit] Rust OpenGL VulkanicGAL GUI frame executed producer=gui.frame "
+                "frame=4 submission=5 rust_gal_world_crack_quads_executed=6 "
+                "rust_gal_world_crack_batches_executed=1 rust_gal_world_crack_draws_executed=1 "
+                "rust_gal_world_depth_attachment_creates=1 rust_gal_backend_submissions=1 "
+                "ffi_call_count=3 ffi_bytes=256\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[0], capture, "capture", True, [], 0, False, tool_kind="capture")
+
+            self.assertFalse(artifact["validation"]["complete"])
+            evidence = artifact["metrics"]["rust_gal_slice"]["world_crack_pixel_evidence"]
+            self.assertEqual("absent", evidence["status"])
+            self.assertTrue(any("crack scenario did not produce visible crack pixels" in message for message in artifact["validation"]["messages"]))
+
+    def test_requested_world_crack_capture_accepts_vanilla_and_pack_pixels(self) -> None:
+        for variant, signature in (("vanilla", "vanilla-like"), ("pack-b", "pack-colored")):
+            with self.subTest(variant=variant), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                target = fake_repo(root, "current")
+                capture = root / "capture"
+                write_capture(capture, backend="opengl")
+                screenshot = capture / f"world_crack_{variant}.png"
+                write_world_crack_probe_image(screenshot, variant=variant)
+                deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+                doc = json.loads(deterministic.read_text(encoding="utf-8"))
+                doc["captures"][0]["screenshot"] = str(screenshot)
+                deterministic.write_text(json.dumps(doc), encoding="utf-8")
+                (capture / "runClient_20260101_000000.log").write_text(
+                    "Picked up JAVA_TOOL_OPTIONS: -Dmattmc.dev.rustGalWorldCrack.scenario=full-cube "
+                    "-Dmattmc.dev.rustGalWorldCrack.stage=4\n"
+                    "[MattMC graphics audit] Rust OpenGL VulkanicGAL GUI frame executed producer=gui.frame "
+                    "frame=4 submission=5 rust_gal_world_crack_quads_executed=6 "
+                    "rust_gal_world_crack_batches_executed=1 rust_gal_world_crack_draws_executed=1 "
+                    "rust_gal_world_depth_attachment_creates=1 rust_gal_backend_submissions=1 "
+                    "ffi_call_count=3 ffi_bytes=256\n",
+                    encoding="utf-8",
+                )
+
+                artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[0], capture, "capture", True, [], 0, False, tool_kind="capture")
+
+                self.assertTrue(artifact["validation"]["complete"])
+                evidence = artifact["metrics"]["rust_gal_slice"]["world_crack_pixel_evidence"]
+                self.assertEqual("present", evidence["status"])
+                self.assertEqual(signature, evidence["texture_signature"])
+                self.assertTrue(Path(str(evidence["crop_path"])).is_file())
 
     def test_rust_vulkan_shell_scene_evidence_writes_named_crops(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

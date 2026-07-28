@@ -508,7 +508,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int viewportHeight,
 		float[] viewMatrix,
 		float[] projectionMatrix,
-		List<WorldLineSegmentRecord> worldSegments
+		List<WorldLineSegmentRecord> worldSegments,
+		List<WorldCrackQuadRecord> worldCrackQuads,
+		List<WorldBorderQuadRecord> worldBorderQuads
 	) {
 		return submitWorldFrame(
 			generation,
@@ -523,8 +525,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			projectionMatrix,
 			WorldBackgroundRecord.diagnosticFallback(),
 			worldSegments,
-			List.of(),
-			List.of(),
+			worldCrackQuads,
+			worldBorderQuads,
 			List.of(),
 			false
 		);
@@ -761,6 +763,28 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 	}
 
+	public Status updateWorldCrackAssets(long generation, List<WorldCrackAssetRecord> assets) {
+		Objects.requireNonNull(assets, "assets");
+		try (Arena updateArena = Arena.ofConfined()) {
+			MemorySegment assetArray = Struct.WORLD_CRACK_ASSET_PAYLOAD.array(updateArena, assets.size());
+			for (int i = 0; i < assets.size(); i++) {
+				WorldCrackAssetRecord asset = assets.get(i);
+				MemorySegment item = Abi.item(assetArray, Struct.WORLD_CRACK_ASSET_PAYLOAD, i);
+				item.set(ValueLayout.JAVA_INT, Struct.WORLD_CRACK_ASSET_PAYLOAD.offset(0), Struct.WORLD_CRACK_ASSET_PAYLOAD.byteSize());
+				Struct.WORLD_CRACK_ASSET_PAYLOAD.setInt(item, 1, asset.stage());
+				Abi.writeBytes(updateArena, item, Struct.WORLD_CRACK_ASSET_PAYLOAD, 2, asset.pngBytes());
+			}
+			MemorySegment request = Struct.WORLD_CRACK_ASSET_UPDATE.allocate(updateArena);
+			Abi.writeHeader(request, Struct.WORLD_CRACK_ASSET_UPDATE);
+			Struct.WORLD_CRACK_ASSET_UPDATE.setLong(request, 1, generation);
+			Abi.writeSlice(request, Struct.WORLD_CRACK_ASSET_UPDATE, 2, assetArray, assets.size());
+			Struct.WORLD_CRACK_ASSET_UPDATE.setLong(request, 3, negotiatedFeatures);
+			MemorySegment status = Struct.STATUS.allocate(updateArena);
+			checkStatus(Native.worldCrackUpdateAssets(contextId, request, status), "world crack asset update");
+			return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status), Struct.STATUS.backendMetrics(status));
+		}
+	}
+
 	public record GuiAssetRecord(int spriteId, byte[] pngBytes) {
 		public GuiAssetRecord {
 			Objects.requireNonNull(pngBytes, "pngBytes");
@@ -769,6 +793,12 @@ public final class VulkanicGalBridge implements AutoCloseable {
 
 	public record WorldBorderAssetRecord(int textureId, byte[] pngBytes) {
 		public WorldBorderAssetRecord {
+			Objects.requireNonNull(pngBytes, "pngBytes");
+		}
+	}
+
+	public record WorldCrackAssetRecord(int stage, byte[] pngBytes) {
+		public WorldCrackAssetRecord {
 			Objects.requireNonNull(pngBytes, "pngBytes");
 		}
 	}
@@ -1041,6 +1071,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		private static final MethodHandle WORLD_PRIMITIVES_SUBMIT = downcall("mattmc_vulkanic_gal_world_primitives_submit", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle GUI_UPDATE_ASSETS = downcall("mattmc_vulkanic_gal_gui_update_assets", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle WORLD_BORDER_UPDATE_ASSET = downcall("mattmc_vulkanic_gal_world_border_update_asset", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+		private static final MethodHandle WORLD_CRACK_UPDATE_ASSETS = downcall("mattmc_vulkanic_gal_world_crack_update_assets", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle LAST_ERROR = downcall("mattmc_vulkanic_gal_last_error", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
 
 		private static MethodHandle downcall(String symbol, FunctionDescriptor descriptor) {
@@ -1215,6 +1246,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			}
 		}
 
+		static int worldCrackUpdateAssets(long contextId, MemorySegment request, MemorySegment result) {
+			try {
+				return (int) WORLD_CRACK_UPDATE_ASSETS.invokeExact(contextId, request, result);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to update Rust VulkanicGAL world crack assets", throwable);
+			}
+		}
+
 		static String lastError(long contextId) {
 			try (Arena arena = Arena.ofConfined()) {
 				MemorySegment bytes = arena.allocate(4096, 1);
@@ -1283,7 +1322,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			WHOLE_FRAME_SUBMIT(53),
 			WHOLE_FRAME_SUBMIT_RESULT(54),
 			WORLD_BORDER_ASSET_UPDATE(55),
-			WORLD_BACKGROUND_REQUEST(56);
+			WORLD_BACKGROUND_REQUEST(56),
+			WORLD_CRACK_ASSET_PAYLOAD(57),
+			WORLD_CRACK_ASSET_UPDATE(58);
 
 		private final int id;
 		private final int byteSize;

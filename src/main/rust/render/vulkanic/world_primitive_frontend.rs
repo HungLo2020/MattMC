@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use super::commands::{
     AttachmentLoadOp, AttachmentStoreOp, CommandOp, PassAttachment, ResourceBarrier,
     SubmissionBatch, TextureOrigin3d, TextureUsageState,
@@ -252,6 +254,12 @@ pub struct WorldBorderAssetPayload {
     pub png_bytes: Vec<u8>,
 }
 
+#[derive(Clone, Debug)]
+pub struct WorldCrackAssetPayload {
+    pub stage: u32,
+    pub png_bytes: Vec<u8>,
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct WorldBackgroundRequest {
     pub enabled: bool,
@@ -307,6 +315,9 @@ pub struct WorldPrimitiveSubmitStats {
     pub border_asset_generation: u64,
     pub border_asset_payload_bytes: u64,
     pub border_asset_update_failures: u64,
+    pub crack_asset_generation: u64,
+    pub crack_asset_payload_bytes: u64,
+    pub crack_asset_update_failures: u64,
     pub background_clear_count: u64,
     pub background_diagnostic_fallback_count: u64,
     pub background_sky_type: u64,
@@ -435,6 +446,10 @@ pub struct WorldPrimitiveFrontend {
     border_asset_override: Option<WorldBorderTextureAsset>,
     border_asset_payload_bytes: u64,
     border_asset_update_failures: u64,
+    crack_asset_generation: u64,
+    crack_asset_overrides: BTreeMap<u32, WorldCrackTextureAsset>,
+    crack_asset_payload_bytes: u64,
+    crack_asset_update_failures: u64,
     resources: Option<WorldLineResources>,
     resource_format: Option<ColorFormat>,
     crack_resources: Option<CrackResources>,
@@ -453,6 +468,11 @@ struct WorldBorderTextureAsset {
     height: u32,
 }
 
+#[derive(Clone, Debug)]
+struct WorldCrackTextureAsset {
+    rgba: Vec<u8>,
+}
+
 impl WorldPrimitiveFrontend {
     pub fn reset(&mut self, gal: &mut VulkanicGal) {
         self.destroy_resources(gal);
@@ -461,6 +481,10 @@ impl WorldPrimitiveFrontend {
         self.border_asset_override = None;
         self.border_asset_payload_bytes = 0;
         self.border_asset_update_failures = 0;
+        self.crack_asset_generation = 0;
+        self.crack_asset_overrides.clear();
+        self.crack_asset_payload_bytes = 0;
+        self.crack_asset_update_failures = 0;
         self.pending_depth_attachment_retires = 0;
     }
 
@@ -520,6 +544,81 @@ impl WorldPrimitiveFrontend {
         self.border_asset_payload_bytes = payload.png_bytes.len() as u64;
         self.border_asset_override = replacement;
         self.destroy_border_resources(gal);
+        Ok(())
+    }
+
+    pub fn apply_world_crack_asset_update(
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+        payloads: Vec<WorldCrackAssetPayload>,
+    ) -> GalResult<()> {
+        let result = self.apply_world_crack_asset_update_inner(gal, generation, payloads);
+        if result.is_err() {
+            self.crack_asset_update_failures = self.crack_asset_update_failures.saturating_add(1);
+        }
+        result
+    }
+
+    fn apply_world_crack_asset_update_inner(
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+        payloads: Vec<WorldCrackAssetPayload>,
+    ) -> GalResult<()> {
+        if generation == 0 {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "world crack asset generation must be non-zero",
+            ));
+        }
+        if generation <= self.crack_asset_generation {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "stale world crack asset generation {generation}; current generation is {}",
+                    self.crack_asset_generation
+                ),
+            ));
+        }
+        let mut overrides = BTreeMap::new();
+        let mut payload_bytes = 0u64;
+        for payload in payloads {
+            if payload.stage >= CRACK_STAGE_COUNT {
+                return Err(GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!("unknown world crack stage {}", payload.stage),
+                ));
+            }
+            if overrides.contains_key(&payload.stage) {
+                return Err(GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    format!("duplicate world crack asset payload for stage {}", payload.stage),
+                ));
+            }
+            if payload.png_bytes.is_empty() {
+                continue;
+            }
+            payload_bytes = payload_bytes.saturating_add(payload.png_bytes.len() as u64);
+            let (rgba, width, height) = decode_png_rgba(
+                &payload.png_bytes,
+                &format!("world crack destroy_stage_{} override", payload.stage),
+            )?;
+            if width != CRACK_STAGE_SIZE || height != CRACK_STAGE_SIZE {
+                return Err(GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    format!(
+                        "world crack destroy_stage_{} must be {}x{}, got {}x{}",
+                        payload.stage, CRACK_STAGE_SIZE, CRACK_STAGE_SIZE, width, height
+                    ),
+                ));
+            }
+            overrides.insert(payload.stage, WorldCrackTextureAsset { rgba });
+        }
+        self.crack_asset_generation = generation;
+        self.crack_asset_payload_bytes = payload_bytes;
+        self.crack_asset_overrides = overrides;
+        self.destroy_crack_resources(gal);
         Ok(())
     }
 
@@ -611,11 +710,10 @@ impl WorldPrimitiveFrontend {
         if !vulkan_backend
             && (clear_background
                 || frame.background.enabled
-                || !frame.crack_quads.is_empty()
                 || !frame.border_quads.is_empty())
         {
             return Err(GalError::unsupported_feature(
-                "OpenGL partial world primitive submit supports line segments only",
+                "OpenGL partial world primitive submit supports line and crack primitives only",
             ));
         }
         if self.generation == 0 {
@@ -655,6 +753,9 @@ impl WorldPrimitiveFrontend {
             border_asset_generation: self.border_asset_generation,
             border_asset_payload_bytes: self.border_asset_payload_bytes,
             border_asset_update_failures: self.border_asset_update_failures,
+            crack_asset_generation: self.crack_asset_generation,
+            crack_asset_payload_bytes: self.crack_asset_payload_bytes,
+            crack_asset_update_failures: self.crack_asset_update_failures,
             background_clear_count: u64::from(frame.background.enabled),
             background_diagnostic_fallback_count: u64::from(!frame.background.enabled),
             background_sky_type: frame.background.sky_type as u64,
@@ -1034,7 +1135,7 @@ impl WorldPrimitiveFrontend {
         }
         self.destroy_crack_resources(gal);
         let label = format!("world-block-breaking-crack-gen{}", self.generation);
-        let atlas = crack_atlas_bytes();
+        let atlas = crack_atlas_bytes(&self.crack_asset_overrides)?;
         let mut created = Vec::new();
         let result = (|| -> GalResult<CrackResources> {
             let upload_buffer = gal.create_buffer(BufferDesc {
@@ -2223,57 +2324,45 @@ fn sampled_texture_barrier(
     }
 }
 
-fn crack_atlas_bytes() -> Vec<u8> {
+fn crack_atlas_bytes(overrides: &BTreeMap<u32, WorldCrackTextureAsset>) -> GalResult<Vec<u8>> {
     let mut out =
         Vec::with_capacity((CRACK_STAGE_COUNT * CRACK_STAGE_SIZE * CRACK_STAGE_SIZE * 4) as usize);
     for stage in 0..CRACK_STAGE_COUNT {
-        let bytes = match stage {
-            0 => include_bytes!(
-                "../../../resources/assets/minecraft/textures/block/destroy_stage_0.png"
-            )
-            .as_slice(),
-            1 => include_bytes!(
-                "../../../resources/assets/minecraft/textures/block/destroy_stage_1.png"
-            )
-            .as_slice(),
-            2 => include_bytes!(
-                "../../../resources/assets/minecraft/textures/block/destroy_stage_2.png"
-            )
-            .as_slice(),
-            3 => include_bytes!(
-                "../../../resources/assets/minecraft/textures/block/destroy_stage_3.png"
-            )
-            .as_slice(),
-            4 => include_bytes!(
-                "../../../resources/assets/minecraft/textures/block/destroy_stage_4.png"
-            )
-            .as_slice(),
-            5 => include_bytes!(
-                "../../../resources/assets/minecraft/textures/block/destroy_stage_5.png"
-            )
-            .as_slice(),
-            6 => include_bytes!(
-                "../../../resources/assets/minecraft/textures/block/destroy_stage_6.png"
-            )
-            .as_slice(),
-            7 => include_bytes!(
-                "../../../resources/assets/minecraft/textures/block/destroy_stage_7.png"
-            )
-            .as_slice(),
-            8 => include_bytes!(
-                "../../../resources/assets/minecraft/textures/block/destroy_stage_8.png"
-            )
-            .as_slice(),
-            9 => include_bytes!(
-                "../../../resources/assets/minecraft/textures/block/destroy_stage_9.png"
-            )
-            .as_slice(),
-            _ => unreachable!(),
-        };
-        let decoded = decode_crack_stage(bytes).expect("bundled crack stage texture is valid");
-        out.extend_from_slice(&decoded);
+        if let Some(asset) = overrides.get(&stage) {
+            out.extend_from_slice(&asset.rgba);
+        } else {
+            let bytes = bundled_crack_stage_png(stage);
+            let decoded = decode_crack_stage(bytes).expect("bundled crack stage texture is valid");
+            out.extend_from_slice(&decoded);
+        }
     }
-    out
+    Ok(out)
+}
+
+fn bundled_crack_stage_png(stage: u32) -> &'static [u8] {
+    match stage {
+        0 => include_bytes!("../../../resources/assets/minecraft/textures/block/destroy_stage_0.png")
+            .as_slice(),
+        1 => include_bytes!("../../../resources/assets/minecraft/textures/block/destroy_stage_1.png")
+            .as_slice(),
+        2 => include_bytes!("../../../resources/assets/minecraft/textures/block/destroy_stage_2.png")
+            .as_slice(),
+        3 => include_bytes!("../../../resources/assets/minecraft/textures/block/destroy_stage_3.png")
+            .as_slice(),
+        4 => include_bytes!("../../../resources/assets/minecraft/textures/block/destroy_stage_4.png")
+            .as_slice(),
+        5 => include_bytes!("../../../resources/assets/minecraft/textures/block/destroy_stage_5.png")
+            .as_slice(),
+        6 => include_bytes!("../../../resources/assets/minecraft/textures/block/destroy_stage_6.png")
+            .as_slice(),
+        7 => include_bytes!("../../../resources/assets/minecraft/textures/block/destroy_stage_7.png")
+            .as_slice(),
+        8 => include_bytes!("../../../resources/assets/minecraft/textures/block/destroy_stage_8.png")
+            .as_slice(),
+        9 => include_bytes!("../../../resources/assets/minecraft/textures/block/destroy_stage_9.png")
+            .as_slice(),
+        _ => unreachable!(),
+    }
 }
 
 fn forcefield_texture_bytes() -> GalResult<(Vec<u8>, u32, u32)> {

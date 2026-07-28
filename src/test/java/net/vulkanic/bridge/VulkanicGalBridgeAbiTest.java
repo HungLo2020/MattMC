@@ -84,7 +84,7 @@ class VulkanicGalBridgeAbiTest {
 	}
 
 	@Test
-	void blockOutlineRouteKeepsJavaPathsOutsideRustVulkanShell() {
+	void blockOutlineRouteKeepsJavaPathsOutsideRustVulkanShell() throws Exception {
 		assertEquals(
 			RustGalWorldPrimitiveRenderer.BlockOutlineRoute.RUST_OPENGL_BORROWED_CONTEXT,
 			RustGalWorldPrimitiveRenderer.selectBlockOutlineRouteForTests(false, false)
@@ -100,6 +100,10 @@ class VulkanicGalBridgeAbiTest {
 		assertEquals(
 			RustGalWorldPrimitiveRenderer.BlockOutlineRoute.RUST_VULKAN_WHOLE_FRAME,
 			RustGalWorldPrimitiveRenderer.selectBlockOutlineRouteForTests(true, true)
+		);
+		assertTrue(
+			Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"))
+				.contains("shouldUseRustOpenGlCrack()")
 		);
 	}
 
@@ -124,8 +128,11 @@ class VulkanicGalBridgeAbiTest {
 			assertTrue(bridge.contains("List<WorldLineSegmentRecord> worldSegments"));
 			assertTrue(bridge.contains("List<WorldCrackQuadRecord> worldCrackQuads"));
 			assertTrue(bridge.contains("List<WorldBorderQuadRecord> worldBorderQuads"));
-		assertTrue(guiRenderer.contains("bridge.submitWholeFrame"));
-		assertTrue(guiRenderer.contains("isWholeFrameVulkanActive()"));
+			assertTrue(bridge.contains("submitWorldPrimitives("));
+			assertTrue(bridge.contains("worldCrackQuads,"));
+			assertTrue(guiRenderer.contains("bridge.submitWholeFrame"));
+			assertTrue(guiRenderer.contains("primitiveFrame.crackQuads()"));
+			assertTrue(guiRenderer.contains("isWholeFrameVulkanActive()"));
 		assertTrue(gameRenderer.contains("renderRustVulkanWholeFrameShell"));
 			assertTrue(gameRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueBlockOutline"));
 			assertTrue(gameRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueWorldBackground"));
@@ -135,6 +142,7 @@ class VulkanicGalBridgeAbiTest {
 		String borderRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/WorldBorderRenderer.java"));
 		assertTrue(borderRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueWorldBorder"));
 			assertTrue(worldRenderer.contains("enqueueBlockBreakingCracks"));
+			assertTrue(worldRenderer.contains("renderOpenGlBlockBreakingCracks"));
 			assertTrue(worldRenderer.contains("enqueueWorldBorder"));
 			assertTrue(worldRenderer.contains("enqueueWorldBackground"));
 			assertTrue(worldRenderer.contains("reloadWorldAssets"));

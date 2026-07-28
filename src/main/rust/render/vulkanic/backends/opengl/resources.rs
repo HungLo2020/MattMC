@@ -805,6 +805,19 @@ mod tests {
         assert!(!normalized.contains("gl_VertexIndex"));
         assert!(!normalized.contains("gl_InstanceIndex"));
     }
+
+    #[test]
+    fn opengl_shader_source_maps_separate_texture_sampler_pair() {
+        let source = "\
+layout(set = 0, binding = 1) uniform texture2D Tex0;
+layout(set = 0, binding = 2) uniform sampler Samp0;
+void main() { vec4 color = texture(sampler2D(Tex0, Samp0), vec2(0.5)); }";
+        let normalized = opengl_shader_source(source);
+        assert!(normalized.contains("layout(binding = 1) uniform sampler2D Tex0;"));
+        assert!(!normalized.contains("uniform sampler Samp0"));
+        assert!(!normalized.contains("sampler2D(Tex0, Samp0)"));
+        assert!(normalized.contains("texture(Tex0, vec2(0.5))"));
+    }
 }
 
 #[allow(dead_code)]
@@ -855,6 +868,14 @@ fn opengl_shader_source(source: &str) -> String {
     source
         .replace("layout(set = 0, binding =", "layout(binding =")
         .replace("layout(set=0,binding=", "layout(binding=")
+        .replace("uniform texture2D Tex0;", "uniform sampler2D Tex0;")
+        .replace("uniform texture2D tex0;", "uniform sampler2D tex0;")
+        .replace("layout(binding = 2) uniform sampler Samp0;\n", "")
+        .replace("layout(binding=2) uniform sampler Samp0;\n", "")
+        .replace("layout(binding = 1) uniform sampler samp0;\n", "")
+        .replace("layout(binding=1) uniform sampler samp0;\n", "")
+        .replace("sampler2D(Tex0, Samp0)", "Tex0")
+        .replace("sampler2D(tex0, samp0)", "tex0")
         .replace("gl_VertexIndex", "gl_VertexID")
         .replace("gl_InstanceIndex", "gl_InstanceID")
 }

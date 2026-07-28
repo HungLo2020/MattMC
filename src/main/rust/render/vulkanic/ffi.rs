@@ -33,8 +33,9 @@ use super::resources::{
 };
 use super::sync::SubmissionId;
 use super::world_primitive_frontend::{
-    WorldBackgroundRequest, WorldBorderAssetPayload, WorldBorderQuadRequest, WorldCrackQuadRequest,
-    WorldLineSegmentRequest, WorldPrimitiveFrame, WorldPrimitiveFrontend,
+    WorldBackgroundRequest, WorldBorderAssetPayload, WorldBorderQuadRequest,
+    WorldCrackAssetPayload, WorldCrackQuadRequest, WorldLineSegmentRequest, WorldPrimitiveFrame,
+    WorldPrimitiveFrontend,
     WorldPrimitiveSubmitStats, WORLD_BACKGROUND_LOAD_CLEAR, WORLD_BACKGROUND_SKY_CUSTOM,
     WORLD_BACKGROUND_SKY_END, WORLD_BACKGROUND_SKY_NETHER, WORLD_BACKGROUND_SKY_OVERWORLD,
     WORLD_BACKGROUND_STORE_STORE,
@@ -49,6 +50,7 @@ pub const FFI_MAX_SHADER_BYTES: usize = 16 * 1024 * 1024;
 pub const FFI_MAX_INLINE_BYTES: usize = 64 * 1024 * 1024;
 pub const FFI_MAX_GUI_ASSET_BYTES: usize = 4 * 1024 * 1024;
 pub const FFI_MAX_WORLD_BORDER_ASSET_BYTES: usize = 2 * 1024 * 1024;
+pub const FFI_MAX_WORLD_CRACK_ASSET_BYTES: usize = 4 * 1024 * 1024;
 pub const FFI_MAX_BATCH_ITEMS: usize = 65_536;
 
 #[repr(u32)]
@@ -511,6 +513,23 @@ pub struct FfiWorldBorderAssetUpdateRequest {
     pub texture_id: u32,
     pub reserved0: u32,
     pub png_bytes: FfiBytes,
+    pub negotiated_feature_bits: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiWorldCrackAssetPayload {
+    pub byte_size: u32,
+    pub stage: u32,
+    pub png_bytes: FfiBytes,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiWorldCrackAssetUpdateRequest {
+    pub header: FfiHeader,
+    pub generation: u64,
+    pub assets: FfiSlice<FfiWorldCrackAssetPayload>,
     pub negotiated_feature_bits: u64,
 }
 
@@ -2625,6 +2644,23 @@ fn input_bytes_for_world_border_asset_update(request: &FfiWorldBorderAssetUpdate
     (size_of::<FfiWorldBorderAssetUpdateRequest>() as u64).saturating_add(request.png_bytes.len)
 }
 
+fn input_bytes_for_world_crack_asset_update(request: &FfiWorldCrackAssetUpdateRequest) -> u64 {
+    let payload_headers = request
+        .assets
+        .count
+        .saturating_mul(size_of::<FfiWorldCrackAssetPayload>() as u64);
+    let payload_bytes = unsafe { read_slice(request.assets, true, "world crack asset payloads") }
+        .map(|items| {
+            items
+                .iter()
+                .fold(0u64, |sum, item| sum.saturating_add(item.png_bytes.len))
+        })
+        .unwrap_or(0);
+    (size_of::<FfiWorldCrackAssetUpdateRequest>() as u64)
+        .saturating_add(payload_headers)
+        .saturating_add(payload_bytes)
+}
+
 unsafe fn decode_gui_frame_submit(
     request: *const FfiGuiFrameSubmitRequest,
     capabilities: BackendCapabilities,
@@ -3202,6 +3238,57 @@ unsafe fn decode_world_border_asset_update(
             png_bytes,
         },
     ))
+}
+
+unsafe fn decode_world_crack_asset_update(
+    request: *const FfiWorldCrackAssetUpdateRequest,
+    capabilities: BackendCapabilities,
+) -> GalResult<(u64, Vec<WorldCrackAssetPayload>)> {
+    let request = read_struct(request, "world crack asset update request")?;
+    validate_header::<FfiWorldCrackAssetUpdateRequest>(request.header)?;
+    reject_unknown_feature_bits(request.negotiated_feature_bits)?;
+    let supported = capability_feature_bits(capabilities);
+    if request.negotiated_feature_bits & !supported != 0 {
+        return Err(GalError::unsupported_feature(format!(
+            "requested unsupported world crack asset feature bits 0x{:x}",
+            request.negotiated_feature_bits & !supported
+        )));
+    }
+    if request.generation == 0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "world crack asset generation must be non-zero",
+        ));
+    }
+    let raw_assets = read_limited_slice(request.assets, true, "world crack asset payloads")?;
+    let mut seen = BTreeMap::new();
+    let mut assets = Vec::with_capacity(raw_assets.len());
+    for asset in raw_assets {
+        validate_item_size::<FfiWorldCrackAssetPayload>(asset.byte_size, "world crack asset payload")?;
+        if asset.stage >= 10 {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown world crack stage {}", asset.stage),
+            ));
+        }
+        if seen.insert(asset.stage, ()).is_some() {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!("duplicate world crack asset payload for stage {}", asset.stage),
+            ));
+        }
+        let png_bytes = read_bounded_bytes(
+            asset.png_bytes,
+            true,
+            FFI_MAX_WORLD_CRACK_ASSET_BYTES,
+            "world crack asset PNG bytes",
+        )?;
+        assets.push(WorldCrackAssetPayload {
+            stage: asset.stage,
+            png_bytes,
+        });
+    }
+    Ok((request.generation, assets))
 }
 
 unsafe fn write_out<T>(out: *mut T, value: T, label: &str) -> GalResult<()> {
@@ -4071,6 +4158,16 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 viewport_width,
                 viewport_height
             ]
+        ),
+        57 => layout!(
+            57,
+            FfiWorldCrackAssetPayload,
+            [byte_size, stage, png_bytes]
+        ),
+        58 => layout!(
+            58,
+            FfiWorldCrackAssetUpdateRequest,
+            [header, generation, assets, negotiated_feature_bits]
         ),
         _ => {
             return Err(GalError::ffi(
@@ -5320,6 +5417,51 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_shutdown(
             return error.code as i32;
         }
         match context.gal.shutdown_frame_surface() {
+            Ok(()) => {
+                write_status_out(status_out, status_ok(context));
+                StatusCode::Ok as i32
+            }
+            Err(error) => {
+                set_last_error(context, &error);
+                write_status_out(status_out, status_error(Some(context), &error));
+                error.code as i32
+            }
+        }
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_vulkanic_gal_world_crack_update_assets(
+    context_id: u64,
+    request: *const FfiWorldCrackAssetUpdateRequest,
+    status_out: *mut FfiStatusResult,
+) -> i32 {
+    with_registry_mut(|registry| {
+        let Some(context) = registry.contexts.get_mut(&context_id) else {
+            let error = GalError::ffi(
+                StatusCode::StaleHandle,
+                format!("unknown context id {context_id}"),
+            );
+            write_status_out(status_out, status_result_from_error(&error));
+            return error.code as i32;
+        };
+        let input_bytes = if request.is_null() {
+            0
+        } else {
+            input_bytes_for_world_crack_asset_update(&*request)
+        };
+        context.ffi_calls += 1;
+        context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);
+        context.ffi_output_bytes = context
+            .ffi_output_bytes
+            .saturating_add(size_of::<FfiStatusResult>() as u64);
+        let result = decode_world_crack_asset_update(request, context.gal.capabilities())
+            .and_then(|(generation, payloads)| {
+                context
+                    .world_primitive_frontend
+                    .apply_world_crack_asset_update(&mut context.gal, generation, payloads)
+            });
+        match result {
             Ok(()) => {
                 write_status_out(status_out, status_ok(context));
                 StatusCode::Ok as i32
@@ -6925,6 +7067,30 @@ mod tests {
         }
     }
 
+    fn world_crack_asset_update_request(
+        assets: &[FfiWorldCrackAssetPayload],
+    ) -> FfiWorldCrackAssetUpdateRequest {
+        FfiWorldCrackAssetUpdateRequest {
+            header: FfiHeader {
+                version: FFI_ABI_VERSION,
+                byte_size: size_of::<FfiWorldCrackAssetUpdateRequest>() as u32,
+            },
+            generation: 9,
+            assets: FfiSlice {
+                ptr: assets.as_ptr(),
+                count: assets.len() as u64,
+            },
+            negotiated_feature_bits: FfiFeatureBits::GRAPHICS
+                | FfiFeatureBits::DESCRIPTOR_ARRAYS
+                | FfiFeatureBits::OPTIONAL_BINDINGS
+                | FfiFeatureBits::UNIFORM_BUFFERS
+                | FfiFeatureBits::STORAGE_BUFFERS
+                | FfiFeatureBits::TEXTURE_SUBRESOURCE_COPIES
+                | FfiFeatureBits::HOST_BUFFER_ACCESS
+                | FfiFeatureBits::PRESENTATION,
+        }
+    }
+
     #[test]
     fn semantic_gui_ffi_decode_copies_caller_memory() {
         let mut sprites = vec![sprite_request()];
@@ -7139,5 +7305,77 @@ mod tests {
         let bad_size =
             unsafe { decode_world_border_asset_update(&request, test_capabilities()) }.unwrap_err();
         assert_eq!(StatusCode::InvalidArgument, bad_size.code);
+    }
+
+    #[test]
+    fn world_crack_asset_ffi_copies_payload_memory() {
+        let mut bytes = vec![21u8, 22, 23, 24];
+        let assets = vec![FfiWorldCrackAssetPayload {
+            byte_size: size_of::<FfiWorldCrackAssetPayload>() as u32,
+            stage: 4,
+            png_bytes: FfiBytes {
+                ptr: bytes.as_ptr(),
+                len: bytes.len() as u64,
+            },
+        }];
+        let request = world_crack_asset_update_request(&assets);
+        let (generation, owned) =
+            unsafe { decode_world_crack_asset_update(&request, test_capabilities()).unwrap() };
+        bytes.fill(0);
+        assert_eq!(9, generation);
+        assert_eq!(4, owned[0].stage);
+        assert_eq!(vec![21u8, 22, 23, 24], owned[0].png_bytes);
+    }
+
+    #[test]
+    fn world_crack_asset_ffi_rejects_duplicates_bad_stage_and_size() {
+        let bytes = [1u8, 2, 3];
+        let mut assets = vec![
+            FfiWorldCrackAssetPayload {
+                byte_size: size_of::<FfiWorldCrackAssetPayload>() as u32,
+                stage: 4,
+                png_bytes: FfiBytes {
+                    ptr: bytes.as_ptr(),
+                    len: bytes.len() as u64,
+                },
+            },
+            FfiWorldCrackAssetPayload {
+                byte_size: size_of::<FfiWorldCrackAssetPayload>() as u32,
+                stage: 4,
+                png_bytes: FfiBytes {
+                    ptr: bytes.as_ptr(),
+                    len: bytes.len() as u64,
+                },
+            },
+        ];
+        let duplicate = unsafe {
+            decode_world_crack_asset_update(
+                &world_crack_asset_update_request(&assets),
+                test_capabilities(),
+            )
+        }
+        .unwrap_err();
+        assert_eq!(StatusCode::InvalidArgument, duplicate.code);
+
+        assets[1].stage = 10;
+        let bad_stage = unsafe {
+            decode_world_crack_asset_update(
+                &world_crack_asset_update_request(&assets),
+                test_capabilities(),
+            )
+        }
+        .unwrap_err();
+        assert_eq!(StatusCode::UnknownEnum, bad_stage.code);
+
+        assets[1].stage = 5;
+        assets[1].byte_size -= 4;
+        let malformed = unsafe {
+            decode_world_crack_asset_update(
+                &world_crack_asset_update_request(&assets),
+                test_capabilities(),
+            )
+        }
+        .unwrap_err();
+        assert_eq!(StatusCode::InvalidArgument, malformed.code);
     }
 }
