@@ -769,7 +769,7 @@ impl VulkanObjects {
         let depth_state = desc.depth_format.map(|_| {
             vk::PipelineDepthStencilStateCreateInfo::default()
                 .depth_test_enable(true)
-                .depth_write_enable(true)
+                .depth_write_enable(desc.depth_write)
                 .depth_compare_op(compare_op(
                     desc.depth_compare.unwrap_or(CompareOp::LessOrEqual),
                 ))

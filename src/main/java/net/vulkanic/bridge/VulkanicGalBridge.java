@@ -473,13 +473,84 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int viewportHeight,
 		float[] viewMatrix,
 		float[] projectionMatrix,
+		WorldBackgroundRecord worldBackground,
 		List<WorldLineSegmentRecord> worldSegments,
 		List<WorldCrackQuadRecord> worldCrackQuads,
 		List<WorldBorderQuadRecord> worldBorderQuads,
 		List<GuiSpriteRecord> guiSprites
 	) {
+		return submitWorldFrame(
+			generation,
+			frameId,
+			correlationId,
+			frameTarget,
+			guiWidth,
+			guiHeight,
+			viewportWidth,
+			viewportHeight,
+			viewMatrix,
+			projectionMatrix,
+			worldBackground,
+			worldSegments,
+			worldCrackQuads,
+			worldBorderQuads,
+			guiSprites,
+			true
+		);
+	}
+
+	public WholeFrameSubmitResult submitWorldPrimitives(
+		long generation,
+		long frameId,
+		long correlationId,
+		long frameTarget,
+		int viewportWidth,
+		int viewportHeight,
+		float[] viewMatrix,
+		float[] projectionMatrix,
+		List<WorldLineSegmentRecord> worldSegments
+	) {
+		return submitWorldFrame(
+			generation,
+			frameId,
+			correlationId,
+			frameTarget,
+			viewportWidth,
+			viewportHeight,
+			viewportWidth,
+			viewportHeight,
+			viewMatrix,
+			projectionMatrix,
+			WorldBackgroundRecord.diagnosticFallback(),
+			worldSegments,
+			List.of(),
+			List.of(),
+			List.of(),
+			false
+		);
+	}
+
+	private WholeFrameSubmitResult submitWorldFrame(
+		long generation,
+		long frameId,
+		long correlationId,
+		long frameTarget,
+		int guiWidth,
+		int guiHeight,
+		int viewportWidth,
+		int viewportHeight,
+		float[] viewMatrix,
+		float[] projectionMatrix,
+		WorldBackgroundRecord worldBackground,
+		List<WorldLineSegmentRecord> worldSegments,
+		List<WorldCrackQuadRecord> worldCrackQuads,
+		List<WorldBorderQuadRecord> worldBorderQuads,
+		List<GuiSpriteRecord> guiSprites,
+		boolean wholeFrame
+	) {
 		Objects.requireNonNull(viewMatrix, "viewMatrix");
 		Objects.requireNonNull(projectionMatrix, "projectionMatrix");
+		Objects.requireNonNull(worldBackground, "worldBackground");
 		Objects.requireNonNull(worldSegments, "worldSegments");
 		Objects.requireNonNull(worldCrackQuads, "worldCrackQuads");
 		Objects.requireNonNull(worldBorderQuads, "worldBorderQuads");
@@ -522,37 +593,37 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			for (int field = 0; field < 12; field++) {
 				item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_CRACK_QUAD_REQUEST.offset(8 + field), vertices[field]);
 			}
-				Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 20, quad.viewportWidth());
-				Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 21, quad.viewportHeight());
+			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 20, quad.viewportWidth());
+			Struct.WORLD_CRACK_QUAD_REQUEST.setInt(item, 21, quad.viewportHeight());
+		}
+		MemorySegment borderArray = Struct.WORLD_BORDER_QUAD_REQUEST.array(arena, worldBorderQuads.size());
+		for (int i = 0; i < worldBorderQuads.size(); i++) {
+			WorldBorderQuadRecord quad = worldBorderQuads.get(i);
+			MemorySegment item = Abi.item(borderArray, Struct.WORLD_BORDER_QUAD_REQUEST, i);
+			item.set(ValueLayout.JAVA_INT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(0), Struct.WORLD_BORDER_QUAD_REQUEST.byteSize());
+			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 1, quad.stratum());
+			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 2, quad.textureId());
+			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 3, quad.depthPolicy());
+			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 4, quad.blendPolicy());
+			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 5, quad.cullPolicy());
+			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 6, quad.colorArgb());
+			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 7, 0);
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(8), quad.borderSize());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(9), quad.distanceToBorder());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(10), quad.scrollU());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(11), quad.scrollV());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(12), quad.uvU());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(13), quad.uvV());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(14), quad.uvWidth());
+			item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(15), quad.uvHeight());
+			float[] vertices = quad.vertices();
+			for (int field = 0; field < 12; field++) {
+				item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(16 + field), vertices[field]);
 			}
-			MemorySegment borderArray = Struct.WORLD_BORDER_QUAD_REQUEST.array(arena, worldBorderQuads.size());
-			for (int i = 0; i < worldBorderQuads.size(); i++) {
-				WorldBorderQuadRecord quad = worldBorderQuads.get(i);
-				MemorySegment item = Abi.item(borderArray, Struct.WORLD_BORDER_QUAD_REQUEST, i);
-				item.set(ValueLayout.JAVA_INT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(0), Struct.WORLD_BORDER_QUAD_REQUEST.byteSize());
-				Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 1, quad.stratum());
-				Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 2, quad.textureId());
-				Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 3, quad.depthPolicy());
-				Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 4, quad.blendPolicy());
-				Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 5, quad.cullPolicy());
-				Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 6, quad.colorArgb());
-				Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 7, 0);
-				item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(8), quad.borderSize());
-				item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(9), quad.distanceToBorder());
-				item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(10), quad.scrollU());
-				item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(11), quad.scrollV());
-				item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(12), quad.uvU());
-				item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(13), quad.uvV());
-				item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(14), quad.uvWidth());
-				item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(15), quad.uvHeight());
-				float[] vertices = quad.vertices();
-				for (int field = 0; field < 12; field++) {
-					item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_BORDER_QUAD_REQUEST.offset(16 + field), vertices[field]);
-				}
-				Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 28, quad.viewportWidth());
-				Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 29, quad.viewportHeight());
-			}
-			MemorySegment spriteArray = Struct.GUI_SPRITE_REQUEST.array(arena, guiSprites.size());
+			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 28, quad.viewportWidth());
+			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 29, quad.viewportHeight());
+		}
+		MemorySegment spriteArray = Struct.GUI_SPRITE_REQUEST.array(arena, guiSprites.size());
 		for (int i = 0; i < guiSprites.size(); i++) {
 			GuiSpriteRecord sprite = guiSprites.get(i);
 			MemorySegment item = Abi.item(spriteArray, Struct.GUI_SPRITE_REQUEST, i);
@@ -586,14 +657,31 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			request.set(ValueLayout.JAVA_FLOAT, viewOffset + i * 4L, viewMatrix[i]);
 			request.set(ValueLayout.JAVA_FLOAT, projectionOffset + i * 4L, projectionMatrix[i]);
 		}
-		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 11, segmentArray, worldSegments.size());
-		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 12, crackArray, worldCrackQuads.size());
-		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 13, borderArray, worldBorderQuads.size());
-		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 14, spriteArray, guiSprites.size());
-		Struct.WHOLE_FRAME_SUBMIT.setLong(request, 15, negotiatedFeatures);
+		MemorySegment background = request.asSlice(
+			Struct.WHOLE_FRAME_SUBMIT.offset(11),
+			Struct.WORLD_BACKGROUND_REQUEST.byteSize()
+		);
+		background.set(ValueLayout.JAVA_INT, Struct.WORLD_BACKGROUND_REQUEST.offset(0), Struct.WORLD_BACKGROUND_REQUEST.byteSize());
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 1, worldBackground.enabled() ? 1 : 0);
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 2, worldBackground.skyType());
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 3, worldBackground.loadIntent());
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 4, worldBackground.storeIntent());
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 5, worldBackground.colorArgb());
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 6, worldBackground.viewportWidth());
+		Struct.WORLD_BACKGROUND_REQUEST.setInt(background, 7, worldBackground.viewportHeight());
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 12, segmentArray, worldSegments.size());
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 13, crackArray, worldCrackQuads.size());
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 14, borderArray, worldBorderQuads.size());
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 15, spriteArray, guiSprites.size());
+		Struct.WHOLE_FRAME_SUBMIT.setLong(request, 16, negotiatedFeatures);
 		MemorySegment result = Struct.WHOLE_FRAME_SUBMIT_RESULT.allocate(arena);
-		checkStatus(Native.wholeFrameSubmit(contextId, request, result), "whole-frame submission");
-		long metricsOffset = Struct.WHOLE_FRAME_SUBMIT_RESULT.offset(30);
+		checkStatus(
+			wholeFrame
+				? Native.wholeFrameSubmit(contextId, request, result)
+				: Native.worldPrimitivesSubmit(contextId, request, result),
+			wholeFrame ? "whole-frame submission" : "world primitive submission"
+		);
+		long metricsOffset = Struct.WHOLE_FRAME_SUBMIT_RESULT.offset(34);
 		BackendMetrics metrics = backendMetricsAt(result, metricsOffset);
 		long ffiCalls = result.get(ValueLayout.JAVA_LONG, metricsOffset + 64);
 		long ffiInputBytes = result.get(ValueLayout.JAVA_LONG, metricsOffset + 72);
@@ -625,6 +713,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 27),
 			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 28),
 			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 29),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 30),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 31),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 32),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 33),
 			ffiCalls,
 			ffiInputBytes,
 			metrics
@@ -848,6 +940,20 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 	}
 
+	public record WorldBackgroundRecord(
+		boolean enabled,
+		int skyType,
+		int loadIntent,
+		int storeIntent,
+		int colorArgb,
+		int viewportWidth,
+		int viewportHeight
+	) {
+		public static WorldBackgroundRecord diagnosticFallback() {
+			return new WorldBackgroundRecord(false, 0, 0, 0, 0, 0, 0);
+		}
+	}
+
 	public record GuiFrameSubmitResult(
 		long submissionId,
 		long spriteCount,
@@ -878,6 +984,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		long worldBorderQuadCount,
 		long worldBorderBatchCount,
 		long worldBorderDrawCount,
+		long worldBackgroundClearCount,
+		long worldBackgroundDiagnosticFallbackCount,
+		long worldBackgroundSkyType,
+		long worldBackgroundColorArgb,
 		long depthAttachmentCreates,
 		long depthAttachmentReuses,
 		long depthAttachmentRetires,
@@ -928,6 +1038,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		private static final MethodHandle FRAME_SHUTDOWN = downcall("mattmc_vulkanic_gal_frame_shutdown", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
 		private static final MethodHandle GUI_SUBMIT_FRAME = downcall("mattmc_vulkanic_gal_gui_submit_frame", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle WHOLE_FRAME_SUBMIT = downcall("mattmc_vulkanic_gal_whole_frame_submit", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+		private static final MethodHandle WORLD_PRIMITIVES_SUBMIT = downcall("mattmc_vulkanic_gal_world_primitives_submit", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle GUI_UPDATE_ASSETS = downcall("mattmc_vulkanic_gal_gui_update_assets", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle WORLD_BORDER_UPDATE_ASSET = downcall("mattmc_vulkanic_gal_world_border_update_asset", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle LAST_ERROR = downcall("mattmc_vulkanic_gal_last_error", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
@@ -1080,6 +1191,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			}
 		}
 
+		static int worldPrimitivesSubmit(long contextId, MemorySegment request, MemorySegment result) {
+			try {
+				return (int) WORLD_PRIMITIVES_SUBMIT.invokeExact(contextId, request, result);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to submit Rust VulkanicGAL world primitives", throwable);
+			}
+		}
+
 		static int guiUpdateAssets(long contextId, MemorySegment request, MemorySegment result) {
 			try {
 				return (int) GUI_UPDATE_ASSETS.invokeExact(contextId, request, result);
@@ -1163,7 +1282,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			WORLD_BORDER_QUAD_REQUEST(52),
 			WHOLE_FRAME_SUBMIT(53),
 			WHOLE_FRAME_SUBMIT_RESULT(54),
-			WORLD_BORDER_ASSET_UPDATE(55);
+			WORLD_BORDER_ASSET_UPDATE(55),
+			WORLD_BACKGROUND_REQUEST(56);
 
 		private final int id;
 		private final int byteSize;
@@ -1173,7 +1293,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		Struct(int id) {
 			this.id = id;
 			try (Arena arena = Arena.ofConfined()) {
-				MemorySegment layout = arena.allocate(160, 8);
+				MemorySegment layout = arena.allocate(320, 8);
 				int status = Native.layout(id, layout);
 				if (status != STATUS_OK) {
 					throw new IllegalStateException("Rust ABI layout query failed for struct " + id + " with status " + status);

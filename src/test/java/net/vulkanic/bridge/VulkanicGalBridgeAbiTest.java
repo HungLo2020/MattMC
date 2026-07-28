@@ -86,11 +86,11 @@ class VulkanicGalBridgeAbiTest {
 	@Test
 	void blockOutlineRouteKeepsJavaPathsOutsideRustVulkanShell() {
 		assertEquals(
-			RustGalWorldPrimitiveRenderer.BlockOutlineRoute.JAVA_COMPATIBILITY,
+			RustGalWorldPrimitiveRenderer.BlockOutlineRoute.RUST_OPENGL_BORROWED_CONTEXT,
 			RustGalWorldPrimitiveRenderer.selectBlockOutlineRouteForTests(false, false)
 		);
 		assertEquals(
-			RustGalWorldPrimitiveRenderer.BlockOutlineRoute.JAVA_COMPATIBILITY,
+			RustGalWorldPrimitiveRenderer.BlockOutlineRoute.RUST_OPENGL_BORROWED_CONTEXT,
 			RustGalWorldPrimitiveRenderer.selectBlockOutlineRouteForTests(false, true)
 		);
 		assertEquals(
@@ -117,24 +117,27 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(bridge.contains("mattmc_vulkanic_gal_world_border_update_asset"));
 		assertTrue(bridge.contains("record WorldBorderAssetRecord"));
 		assertTrue(bridge.contains("updateWorldBorderAsset"));
-		assertTrue(bridge.contains("record WorldLineSegmentRecord"));
-		assertTrue(bridge.contains("record WorldCrackQuadRecord"));
-		assertTrue(bridge.contains("record WorldBorderQuadRecord"));
-		assertTrue(bridge.contains("List<WorldLineSegmentRecord> worldSegments"));
-		assertTrue(bridge.contains("List<WorldCrackQuadRecord> worldCrackQuads"));
-		assertTrue(bridge.contains("List<WorldBorderQuadRecord> worldBorderQuads"));
+			assertTrue(bridge.contains("record WorldLineSegmentRecord"));
+			assertTrue(bridge.contains("record WorldCrackQuadRecord"));
+			assertTrue(bridge.contains("record WorldBorderQuadRecord"));
+			assertTrue(bridge.contains("record WorldBackgroundRecord"));
+			assertTrue(bridge.contains("List<WorldLineSegmentRecord> worldSegments"));
+			assertTrue(bridge.contains("List<WorldCrackQuadRecord> worldCrackQuads"));
+			assertTrue(bridge.contains("List<WorldBorderQuadRecord> worldBorderQuads"));
 		assertTrue(guiRenderer.contains("bridge.submitWholeFrame"));
 		assertTrue(guiRenderer.contains("isWholeFrameVulkanActive()"));
 		assertTrue(gameRenderer.contains("renderRustVulkanWholeFrameShell"));
-		assertTrue(gameRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueBlockOutline"));
-		assertTrue(gameRenderer.contains("levelRenderer.enqueueRustGalBlockBreakingCracks"));
+			assertTrue(gameRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueBlockOutline"));
+			assertTrue(gameRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueWorldBackground"));
+			assertTrue(gameRenderer.contains("levelRenderer.enqueueRustGalBlockBreakingCracks"));
 		assertTrue(gameRenderer.contains("levelRenderer.enqueueRustGalWorldBorder"));
 		assertTrue(levelRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueWorldBorder"));
 		String borderRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/WorldBorderRenderer.java"));
 		assertTrue(borderRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueWorldBorder"));
-		assertTrue(worldRenderer.contains("enqueueBlockBreakingCracks"));
-		assertTrue(worldRenderer.contains("enqueueWorldBorder"));
-		assertTrue(worldRenderer.contains("reloadWorldAssets"));
+			assertTrue(worldRenderer.contains("enqueueBlockBreakingCracks"));
+			assertTrue(worldRenderer.contains("enqueueWorldBorder"));
+			assertTrue(worldRenderer.contains("enqueueWorldBackground"));
+			assertTrue(worldRenderer.contains("reloadWorldAssets"));
 		assertTrue(worldRenderer.contains("flushPendingWorldBorderAssets"));
 		assertTrue(worldRenderer.contains("textures/misc/forcefield.png"));
 		assertTrue(worldRenderer.contains("WorldCrackQuadRecord"));
@@ -144,20 +147,22 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(worldRenderer.contains("CRACK_BLEND_MULTIPLY"));
 		assertTrue(worldRenderer.contains("BORDER_BLEND_OVERLAY"));
 		assertTrue(worldRenderer.contains("BlockOutlineRoute.JAVA_COMPATIBILITY"));
+		assertTrue(worldRenderer.contains("BlockOutlineRoute.RUST_OPENGL_BORROWED_CONTEXT"));
 		assertTrue(worldRenderer.contains("BlockOutlineRoute.RUST_VULKAN_WHOLE_FRAME"));
 		assertTrue(worldRenderer.contains("shape.forAllEdges"));
 		assertFalse(worldRenderer.contains("CommandOp"));
 		assertFalse(worldRenderer.contains("Vk"));
-		assertFalse(worldRenderer.contains("GL_"));
-		assertTrue(rustFfi.contains("FfiWorldLineSegmentRequest"));
-		assertTrue(rustFfi.contains("FfiWorldCrackQuadRequest"));
-		assertTrue(rustFfi.contains("FfiWorldBorderQuadRequest"));
-		assertTrue(rustFfi.contains("FfiWorldBorderAssetUpdateRequest"));
+		assertFalse(worldRenderer.matches("(?s).*\\bGL_[A-Z0-9_]+.*"));
+			assertTrue(rustFfi.contains("FfiWorldLineSegmentRequest"));
+			assertTrue(rustFfi.contains("FfiWorldCrackQuadRequest"));
+			assertTrue(rustFfi.contains("FfiWorldBorderQuadRequest"));
+			assertTrue(rustFfi.contains("FfiWorldBackgroundRequest"));
+			assertTrue(rustFfi.contains("FfiWorldBorderAssetUpdateRequest"));
 		assertTrue(rustFfi.contains("decode_world_border_asset_update"));
 		assertTrue(rustFfi.contains("decode_whole_frame_submit"));
 		assertTrue(rustFfi.contains("context.world_primitive_frontend"));
-		assertTrue(rustWorldFrontend.contains("PrimitiveTopology::Lines"));
-		assertTrue(rustWorldFrontend.contains("PrimitiveTopology::Triangles"));
+			assertTrue(rustWorldFrontend.contains("WORLD_LINE_VERTEX_SHADER_VULKAN"));
+			assertTrue(rustWorldFrontend.contains("PrimitiveTopology::Triangles"));
 		assertTrue(rustWorldFrontend.contains("WorldCrackQuadRequest"));
 		assertTrue(rustWorldFrontend.contains("WorldBorderQuadRequest"));
 		assertTrue(rustWorldFrontend.contains("BlendMode::Multiply"));

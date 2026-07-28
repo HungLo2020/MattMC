@@ -337,6 +337,7 @@ impl OpenGlObjects {
         let ty = shader_stage(desc.stage)?;
         let source = std::str::from_utf8(&desc.code)
             .map_err(|_| GalError::backend("OpenGL GLSL shader source is not UTF-8"))?;
+        let source = opengl_shader_source(source);
         let shader = unsafe { self.gl.create_shader(ty) }.map_err(|error| {
             GalError::backend(format!(
                 "failed to create OpenGL shader '{}': {error}",
@@ -344,7 +345,7 @@ impl OpenGlObjects {
             ))
         })?;
         unsafe {
-            self.gl.shader_source(shader, source);
+            self.gl.shader_source(shader, &source);
             self.gl.compile_shader(shader);
             if !self.gl.get_shader_compile_status(shader) {
                 let log = self.gl.get_shader_info_log(shader);
@@ -407,6 +408,7 @@ impl OpenGlObjects {
             cull_mode: desc.cull_mode,
             blend: desc.blend,
             depth_compare: desc.depth_compare,
+            depth_write: desc.depth_write,
         })
     }
 
@@ -496,15 +498,24 @@ impl OpenGlObjects {
                 unsafe {
                     match binding.kind {
                         ResourceBindingKind::UniformBuffer => {
+                            let mut bound = false;
                             for name in uniform_block_names(binding.binding) {
                                 if let Some(index) = self.gl.get_uniform_block_index(program, &name)
                                 {
                                     self.gl
                                         .uniform_block_binding(program, index, binding.binding);
+                                    bound = true;
                                 }
+                            }
+                            if !bound {
+                                return Err(GalError::backend(format!(
+                                    "OpenGL program is missing uniform block for binding {}",
+                                    binding.binding
+                                )));
                             }
                         }
                         ResourceBindingKind::StorageBuffer => {
+                            let mut bound = false;
                             for name in storage_block_names(binding.binding) {
                                 if let Some(index) =
                                     self.gl.get_shader_storage_block_index(program, &name)
@@ -514,7 +525,14 @@ impl OpenGlObjects {
                                         index,
                                         binding.binding,
                                     );
+                                    bound = true;
                                 }
+                            }
+                            if !bound {
+                                return Err(GalError::backend(format!(
+                                    "OpenGL program is missing storage block for binding {}",
+                                    binding.binding
+                                )));
                             }
                         }
                         ResourceBindingKind::SampledTexture => {
@@ -686,6 +704,7 @@ pub(super) struct GraphicsPipelineObject {
     pub(super) cull_mode: CullMode,
     pub(super) blend: BlendMode,
     pub(super) depth_compare: Option<CompareOp>,
+    pub(super) depth_write: bool,
 }
 
 #[allow(dead_code)]
@@ -773,6 +792,19 @@ mod tests {
         objects.set_frame_target_framebuffer(3, None);
         assert_eq!(objects.pass_target(handle).unwrap().framebuffer, None);
     }
+
+    #[test]
+    fn opengl_shader_source_maps_vulkan_style_vertex_builtins() {
+        let source =
+            "layout(set = 0, binding = 0, std140) uniform U { mat4 m; }; int v = gl_VertexIndex; int i = gl_InstanceIndex;";
+        let normalized = opengl_shader_source(source);
+        assert!(normalized.contains("layout(binding = 0, std140)"));
+        assert!(!normalized.contains("set = 0"));
+        assert!(normalized.contains("gl_VertexID"));
+        assert!(normalized.contains("gl_InstanceID"));
+        assert!(!normalized.contains("gl_VertexIndex"));
+        assert!(!normalized.contains("gl_InstanceIndex"));
+    }
 }
 
 #[allow(dead_code)]
@@ -819,6 +851,14 @@ pub(super) fn filter(filter: SamplerFilter) -> i32 {
     }
 }
 
+fn opengl_shader_source(source: &str) -> String {
+    source
+        .replace("layout(set = 0, binding =", "layout(binding =")
+        .replace("layout(set=0,binding=", "layout(binding=")
+        .replace("gl_VertexIndex", "gl_VertexID")
+        .replace("gl_InstanceIndex", "gl_InstanceID")
+}
+
 pub(super) fn min_filter(desc: &SamplerDesc) -> i32 {
     filter(desc.min_filter)
 }
@@ -843,6 +883,10 @@ fn uniform_block_names(binding: u32) -> Vec<String> {
     match binding {
         0 => vec![
             "GuiRect".to_string(),
+            "GuiSpriteBatch".to_string(),
+            "WorldLineBatch".to_string(),
+            "CrackQuadBatch".to_string(),
+            "WorldBorderBatch".to_string(),
             "DynamicTransforms".to_string(),
             "Projection".to_string(),
         ],
@@ -855,13 +899,24 @@ fn storage_block_names(binding: u32) -> Vec<String> {
     vec![format!("Storage{binding}")]
 }
 
-fn sampler_uniform_names(binding: u32) -> Vec<String> {
+pub(super) fn sampler_uniform_names(binding: u32) -> Vec<String> {
     match binding {
-        0 | 1 => vec![
+        0 => vec![
             "Sampler0".to_string(),
             "tex0".to_string(),
-            format!("Sampler{binding}"),
-            format!("tex{binding}"),
+            "Tex0".to_string(),
+        ],
+        1 => vec![
+            "Sampler0".to_string(),
+            "tex0".to_string(),
+            "Tex0".to_string(),
+            "Sampler1".to_string(),
+            "tex1".to_string(),
+        ],
+        2 => vec![
+            "Samp0".to_string(),
+            "Sampler2".to_string(),
+            "tex2".to_string(),
         ],
         _ => vec![format!("Sampler{binding}"), format!("tex{binding}")],
     }

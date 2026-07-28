@@ -122,6 +122,29 @@ def write_world_border_probe_image(path: Path, *, visible: bool) -> None:
     image.save(path)
 
 
+def write_rust_shell_scene_image(path: Path) -> None:
+    from PIL import Image
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image = Image.new("RGB", (1280, 720), (120, 167, 255))
+    for x in range(160, 1120):
+        for y in range(180, 250):
+            image.putpixel((x, y), (80, 190, 255))
+    for x in range(500, 780):
+        for y in range(260, 470):
+            image.putpixel((x, y), (36, 28, 24))
+    for x in range(470, 810):
+        image.putpixel((x, 230), (80, 220, 86))
+        image.putpixel((x, 510), (80, 220, 86))
+    for y in range(230, 511):
+        image.putpixel((470, y), (80, 220, 86))
+        image.putpixel((810, y), (80, 220, 86))
+    for x in range(560, 720):
+        for y in range(20, 70):
+            image.putpixel((x, y), (240, 240, 240))
+    image.save(path)
+
+
 def write_retention_manifest(path: Path, *, success: bool, profile: str = "smoke") -> None:
     path.mkdir(parents=True, exist_ok=True)
     (path / harness.MANIFEST_NAME).write_text(
@@ -906,7 +929,7 @@ else:
                         "gal.frame.target.present-ready backend=vulkan frame=7 image=2",
                         "gal.frame.present backend=vulkan correlation=9 frame=7 image=2 submission=11 status=Presented window=42",
                         "minecraft.world.block-outline.pass",
-                        "[MattMC graphics audit] Rust VulkanicGAL GUI frame executed rust_gal_world_primitive_batches_executed=1 rust_gal_world_line_segments_executed=12 rust_gal_world_line_vertices_executed=24 rust_gal_world_primitive_draws_executed=1 rust_gal_world_crack_quads_executed=6 rust_gal_world_crack_batches_executed=1 rust_gal_world_crack_draws_executed=1 rust_gal_world_depth_attachment_creates=1 rust_gal_world_depth_attachment_reuses=0",
+                        "[MattMC graphics audit] Rust VulkanicGAL GUI frame executed rust_gal_world_primitive_batches_executed=1 rust_gal_world_line_segments_executed=12 rust_gal_world_line_vertices_executed=72 rust_gal_world_primitive_draws_executed=1 rust_gal_world_crack_quads_executed=6 rust_gal_world_crack_batches_executed=1 rust_gal_world_crack_draws_executed=1 rust_gal_world_background_clears_executed=1 rust_gal_world_background_diagnostic_fallbacks=0 rust_gal_world_background_sky_type=1 rust_gal_world_background_color_argb=ff78a7ff rust_gal_world_depth_attachment_creates=1 rust_gal_world_depth_attachment_reuses=0",
                     ]
                 ),
                 encoding="utf-8",
@@ -918,6 +941,9 @@ else:
             self.assertTrue(proof["depth_attachment_evidence"])
             self.assertTrue(proof["outline_marker_evidence"])
             self.assertTrue(proof["blue_diagnostic_shell_clear_expected"])
+            self.assertTrue(proof["non_zero_background_workload"])
+            self.assertTrue(proof["semantic_world_background_clear_expected"])
+            self.assertEqual(proof["background"]["color_argb"], "ff78a7ff")
 
     def test_instrumentation_fingerprint_mismatch_rejects_comparison(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1799,12 +1825,10 @@ else:
             self.assertNotIn("OldWorld", joined)
             self.assertNotIn("Prime City 3 --quickPlaySingleplayer", joined)
 
-    def test_shell_capture_command_supplies_deterministic_capture_handshake(self) -> None:
+    def test_capture_command_supplies_deterministic_capture_handshake(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             target = fake_repo(root, "frozen")
-            (target.root / "DevUtils" / "Common" / "capture_runner.py").unlink()
-            (target.root / "DevUtils" / "Common" / "capture_runner.sh").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
             args = Namespace(
                 profile="smoke",
                 validation="off",
@@ -1828,14 +1852,12 @@ else:
                 renderdoc_frame=8,
             )
             mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "frozen-opengl-shaders-off")
-            _, env = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
+            command, env = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
             java_options = env["JAVA_TOOL_OPTIONS"]
-            self.assertIn("MATTMC_DETERMINISTIC_METADATA", env)
-            self.assertIn("MATTMC_DETERMINISTIC_SCREENSHOT_DIR", env)
-            self.assertIn("-Dmattmc.dev.deterministicCameraCapture=true", java_options)
-            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.metadata=", java_options)
-            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.screenshotDir=", java_options)
-            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.stopAfterComplete=true", java_options)
+            self.assertIn("--deterministic-camera-capture", command)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=", java_options)
+            self.assertNotIn("-Dmattmc.dev.deterministicCameraCapture.metadata=", java_options)
+            self.assertNotIn("-Dmattmc.dev.deterministicCameraCapture.screenshotDir=", java_options)
 
     def test_tracy_capture_uses_java_property_not_client_flag(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -1939,6 +1961,71 @@ else:
             runner.configure_java_tool_options()
             self.assertIn("graphics_backend=vulkan", (game_dir / "options.txt").read_text(encoding="utf-8"))
             self.assertIn("-Dmattmc.dev.rustGalVulkanWholeFrame=true", runner.env["JAVA_TOOL_OPTIONS"])
+
+    def test_rust_vulkan_shell_correctness_capture_is_static_single_pose(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            args = Namespace(
+                profile="smoke",
+                validation="off",
+                client_args="",
+                jvm_arg=[],
+                rust_gal_gui_control="rust",
+                armor_value=None,
+                player_health=None,
+                player_max_health=None,
+                player_absorption=None,
+                player_food_level=None,
+                player_food_saturation=None,
+                player_food_hunger_effect=False,
+                player_food_jitter=False,
+                player_air_supply=None,
+                player_max_air_supply=None,
+                player_underwater=False,
+                player_air_pop=False,
+                mount_present=False,
+                mount_health=None,
+                mount_max_health=None,
+                mount_health_rows=None,
+                player_heart_variant=None,
+                player_heart_flash=False,
+                player_heart_hardcore=False,
+                player_heart_regeneration=False,
+                game_mode=None,
+                world="Origin",
+                world_profile="migration-gate",
+                max_secs=1,
+                dump_secs=1,
+                client_rss_limit_mb=128,
+                diagnostic=False,
+                warmup_frames=0,
+                measure_frames=1,
+                settle_frames=0,
+                max_settle_frames=1,
+                subsystem_iterations=1,
+                tracy_capture=False,
+                tracy_duration_seconds=1,
+                tracy_max_size_mb=8,
+                renderdoc_capture=False,
+                renderdoc_frame=8,
+                world_outline_scenario="full-cube",
+                world_outline_style="normal",
+                world_outline_depth_policy="test-write",
+                world_outline_depth_probe=True,
+                world_outline_real_target=False,
+                world_outline_aim_real_target=False,
+                block_outline_pick_diagnostics=False,
+                world_border_scenario="near",
+                world_border_scroll_phase="0.25",
+                world_background_scenario="overworld-day",
+                gui_resource_pack_scenario="vanilla",
+            )
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-off")
+            _, env = harness.build_capture_command(target, mode, root / "capture", "correctness", args, "capture")
+            java_options = env["JAVA_TOOL_OPTIONS"]
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.poseCount=1", java_options)
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.yawDelta=0.0", java_options)
 
     def test_world_outline_controls_are_forwarded_as_java_properties(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -2453,7 +2540,7 @@ else:
                 "stratum=gui.frame frame_batch_count=1 frame=4 submission=5 rust_gal_cache_hits=8 "
                 "rust_gal_cache_misses=1 rust_gal_queue_depth=0 rust_gal_batches_executed=2 "
                 "rust_gal_world_primitive_batches_executed=1 rust_gal_world_line_segments_executed=12 "
-                "rust_gal_world_line_vertices_executed=24 rust_gal_world_primitive_draws_executed=1 "
+                "rust_gal_world_line_vertices_executed=72 rust_gal_world_primitive_draws_executed=1 "
                 "rust_gal_world_crack_quads_executed=6 rust_gal_world_crack_batches_executed=1 "
                 "rust_gal_world_crack_draws_executed=1 "
                 "rust_gal_world_border_quads_executed=2 rust_gal_world_border_batches_executed=1 "
@@ -2527,7 +2614,7 @@ else:
             self.assertEqual(2, artifact["metrics"]["rust_gal_slice"]["batches_executed"])
             self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["world_primitive_batches_executed"])
             self.assertEqual(12, artifact["metrics"]["rust_gal_slice"]["world_line_segments_executed"])
-            self.assertEqual(24, artifact["metrics"]["rust_gal_slice"]["world_line_vertices_executed"])
+            self.assertEqual(72, artifact["metrics"]["rust_gal_slice"]["world_line_vertices_executed"])
             self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["world_primitive_draws_executed"])
             self.assertEqual(6, artifact["metrics"]["rust_gal_slice"]["world_crack_quads_executed"])
             self.assertEqual(1, artifact["metrics"]["rust_gal_slice"]["world_crack_batches_executed"])
@@ -2659,6 +2746,39 @@ else:
             self.assertEqual("absent", evidence["status"])
             self.assertTrue(any("world-border scenario did not produce visible" in message for message in artifact["validation"]["messages"]))
 
+    def test_hidden_world_border_uses_zero_work_not_sky_color_pixels(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend="vulkan")
+            screenshot = capture / "sky_only.png"
+            from PIL import Image
+
+            Image.new("RGB", (1280, 720), (120, 167, 255)).save(screenshot)
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            doc = json.loads(deterministic.read_text(encoding="utf-8"))
+            doc["captures"][0]["screenshot"] = str(screenshot)
+            deterministic.write_text(json.dumps(doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "Picked up JAVA_TOOL_OPTIONS: -Dmattmc.dev.rustGalWorldBorder.scenario=hidden "
+                "-Dmattmc.dev.rustGalWorldBackground.scenario=overworld-day\n"
+                "[MattMC graphics audit] Rust VulkanicGAL GUI frame executed producer=gui.frame "
+                "frame=4 submission=5 rust_gal_world_border_quads_executed=0 "
+                "rust_gal_world_border_batches_executed=0 rust_gal_world_border_draws_executed=0 "
+                "rust_gal_world_background_clears_executed=1 rust_gal_world_background_color_argb=ff78a7ff "
+                "rust_gal_world_depth_attachment_creates=1 rust_gal_backend_submissions=1 "
+                "ffi_call_count=3 ffi_bytes=256\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[6], capture, "capture", True, [], 0, False, tool_kind="capture")
+
+            self.assertTrue(artifact["validation"]["complete"])
+            evidence = artifact["metrics"]["rust_gal_slice"]["world_border_pixel_evidence"]
+            self.assertEqual("unexpected_present", evidence["status"])
+            self.assertFalse(any("hidden/far world-border scenario produced visible" in message for message in artifact["validation"]["messages"]))
+
     def test_requested_world_border_capture_accepts_visible_pixels(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -2689,6 +2809,48 @@ else:
             self.assertGreaterEqual(evidence["matching_pixels"], evidence["threshold"])
             self.assertTrue(Path(str(evidence["crop_path"])).is_file())
 
+    def test_rust_vulkan_shell_scene_evidence_writes_named_crops(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend="vulkan")
+            screenshot = capture / "rust_shell_scene.png"
+            write_rust_shell_scene_image(screenshot)
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            doc = json.loads(deterministic.read_text(encoding="utf-8"))
+            doc["captures"][0]["screenshot"] = str(screenshot)
+            deterministic.write_text(json.dumps(doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "Picked up JAVA_TOOL_OPTIONS: -Dmattmc.dev.rustGalWorldBackground.scenario=overworld-day\n"
+                "[MattMC graphics audit] Rust VulkanicGAL GUI frame executed producer=gui.frame "
+                "frame=4 submission=5 rust_gal_world_background_clears_executed=1 "
+                "rust_gal_world_background_color_argb=ff78a7ff rust_gal_backend_submissions=1 "
+                "ffi_call_count=3 ffi_bytes=256\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(
+                target,
+                harness.MATRIX_MODES[6],
+                capture,
+                "capture",
+                True,
+                [],
+                0,
+                False,
+                tool_kind="capture",
+            )
+
+            evidence = artifact["metrics"]["rust_gal_slice"]["rust_vulkan_shell_scene_evidence"]
+            self.assertEqual("complete", evidence["status"])
+            self.assertEqual([120, 167, 255], list(evidence["expected_background_rgb"]))
+            regions = evidence["regions"]
+            self.assertIn("background_color_field", regions)
+            self.assertIn("fixed_gui_sprite_group", regions)
+            self.assertTrue(Path(str(regions["background_color_field"]["crop_path"])).is_file())
+            self.assertGreater(regions["fixed_gui_sprite_group"]["bright_pixels"], 0)
+
     def test_hidden_world_border_capture_rejects_visible_pixels(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -2718,10 +2880,37 @@ else:
             self.assertEqual("unexpected_present", evidence["status"])
             self.assertTrue(any("hidden/far world-border scenario produced visible" in message for message in artifact["validation"]["messages"]))
 
-    def test_java_opengl_world_outline_capture_uses_java_route_evidence(self) -> None:
+    def test_current_opengl_world_outline_capture_uses_rust_route_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             target = fake_repo(root, "current")
+            capture = root / "capture"
+            write_capture(capture, backend="opengl")
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            doc = json.loads(deterministic.read_text(encoding="utf-8"))
+            doc["rustGalWorldOutlineScenario"] = "full-cube"
+            deterministic.write_text(json.dumps(doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "[MattMC graphics-audit] block-outline extract route=rust-opengl target=true diagnostic=full-cube pos=1, 2, 3 highContrast=false shapeEmpty=false\n"
+                "[MattMC graphics-audit] block-outline draw route=rust-opengl retained=false translucentPass=false pos=1, 2, 3 highContrast=false\n"
+                "[MattMC graphics audit] Rust VulkanicGAL GUI frame executed producer=gui.frame "
+                "frame=4 submission=5 rust_gal_world_primitive_batches_executed=1 "
+                "rust_gal_world_line_segments_executed=12 rust_gal_world_line_vertices_executed=72 "
+                "rust_gal_world_primitive_draws_executed=1 rust_gal_world_depth_attachment_creates=1 "
+                "rust_gal_backend_submissions=1 ffi_call_count=3 ffi_bytes=512\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[0], capture, "capture", True, [], 0, False, tool_kind="capture")
+
+            self.assertFalse(any("world-outline scenario requested" in message for message in artifact["validation"]["messages"]))
+            self.assertFalse(any("deterministic Java block-outline scenario requested" in message for message in artifact["validation"]["messages"]))
+            self.assertEqual(12, artifact["metrics"]["rust_gal_slice"]["world_line_segments_executed"])
+
+    def test_frozen_opengl_world_outline_capture_uses_java_route_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = fake_repo(root, "frozen")
             capture = root / "capture"
             write_capture(capture, backend="opengl")
             deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
@@ -2734,7 +2923,7 @@ else:
                 encoding="utf-8",
             )
 
-            artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[0], capture, "capture", True, [], 0, False, tool_kind="capture")
+            artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[8], capture, "capture", True, [], 0, False, tool_kind="capture")
 
             self.assertFalse(any("world-outline scenario requested" in message for message in artifact["validation"]["messages"]))
             self.assertFalse(any("deterministic Java block-outline scenario requested" in message for message in artifact["validation"]["messages"]))
@@ -2778,7 +2967,7 @@ else:
             artifact = harness.normalize_capture_artifact(target, harness.MATRIX_MODES[0], capture, "capture", True, [], 0, False, tool_kind="capture")
 
             self.assertFalse(artifact["validation"]["complete"])
-            self.assertTrue(any("missing outline draw evidence" in message for message in artifact["validation"]["messages"]))
+            self.assertTrue(any("world-outline target requested" in message for message in artifact["validation"]["messages"]))
 
     def test_real_target_high_contrast_outline_requires_visible_pixels(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -2795,8 +2984,13 @@ else:
             doc["captures"][0]["screenshot"] = str(screenshot)
             deterministic.write_text(json.dumps(doc), encoding="utf-8")
             (capture / "runClient_20260101_000000.log").write_text(
-                "[MattMC graphics-audit] block-outline extract route=java-opengl target=true pos=1, 2, 3 highContrast=true shapeEmpty=false\n"
-                "[MattMC graphics-audit] block-outline draw route=java-opengl retained=true translucentPass=false pos=1, 2, 3 highContrast=true\n",
+                "[MattMC graphics-audit] block-outline extract route=rust-opengl target=true pos=1, 2, 3 highContrast=true shapeEmpty=false\n"
+                "[MattMC graphics-audit] block-outline draw route=rust-opengl retained=false translucentPass=false pos=1, 2, 3 highContrast=true\n"
+                "[MattMC graphics audit] Rust VulkanicGAL GUI frame executed producer=gui.frame "
+                "frame=4 submission=5 rust_gal_world_primitive_batches_executed=2 "
+                "rust_gal_world_line_segments_executed=24 rust_gal_world_line_vertices_executed=144 "
+                "rust_gal_world_primitive_draws_executed=2 rust_gal_world_depth_attachment_creates=1 "
+                "rust_gal_backend_submissions=1 ffi_call_count=3 ffi_bytes=768\n",
                 encoding="utf-8",
             )
 
@@ -2822,8 +3016,13 @@ else:
             doc["captures"][0]["screenshot"] = str(screenshot)
             deterministic.write_text(json.dumps(doc), encoding="utf-8")
             (capture / "runClient_20260101_000000.log").write_text(
-                "[MattMC graphics-audit] block-outline extract route=java-opengl target=true pos=1, 2, 3 highContrast=true shapeEmpty=false\n"
-                "[MattMC graphics-audit] block-outline draw route=java-opengl retained=true translucentPass=false pos=1, 2, 3 highContrast=true\n",
+                "[MattMC graphics-audit] block-outline extract route=rust-opengl target=true pos=1, 2, 3 highContrast=true shapeEmpty=false\n"
+                "[MattMC graphics-audit] block-outline draw route=rust-opengl retained=false translucentPass=false pos=1, 2, 3 highContrast=true\n"
+                "[MattMC graphics audit] Rust VulkanicGAL GUI frame executed producer=gui.frame "
+                "frame=4 submission=5 rust_gal_world_primitive_batches_executed=2 "
+                "rust_gal_world_line_segments_executed=24 rust_gal_world_line_vertices_executed=144 "
+                "rust_gal_world_primitive_draws_executed=2 rust_gal_world_depth_attachment_creates=1 "
+                "rust_gal_backend_submissions=1 ffi_call_count=3 ffi_bytes=768\n",
                 encoding="utf-8",
             )
 
@@ -2852,8 +3051,13 @@ else:
             (capture / "runClient_20260101_000000.log").write_text(
                 "-Dmattmc.dev.deterministicCameraCapture.blockOutlineHighContrast=true\n"
                 "[MattMC graphics-audit] block-outline pick type=BLOCK blockPos=1, 2, 3 face=north distance=2.0 blockRange=5.0 entityRange=5.0 shouldRender=true highContrast=true hideGui=false screen=none overlay=none\n"
-                "[MattMC graphics-audit] block-outline extract route=java-opengl target=true pos=1, 2, 3 highContrast=true shapeEmpty=false\n"
-                "[MattMC graphics-audit] block-outline draw route=java-opengl retained=true translucentPass=false pos=1, 2, 3 highContrast=true\n",
+                "[MattMC graphics-audit] block-outline extract route=rust-opengl target=true pos=1, 2, 3 highContrast=true shapeEmpty=false\n"
+                "[MattMC graphics-audit] block-outline draw route=rust-opengl retained=false translucentPass=false pos=1, 2, 3 highContrast=true\n"
+                "[MattMC graphics audit] Rust VulkanicGAL GUI frame executed producer=gui.frame "
+                "frame=4 submission=5 rust_gal_world_primitive_batches_executed=2 "
+                "rust_gal_world_line_segments_executed=24 rust_gal_world_line_vertices_executed=144 "
+                "rust_gal_world_primitive_draws_executed=2 rust_gal_world_depth_attachment_creates=1 "
+                "rust_gal_backend_submissions=1 ffi_call_count=3 ffi_bytes=768\n",
                 encoding="utf-8",
             )
 
@@ -2884,7 +3088,7 @@ else:
 
             self.assertFalse(artifact["validation"]["complete"])
             self.assertTrue(
-                any("saved-view Java block-outline target required" in message for message in artifact["validation"]["messages"])
+                any("saved-view block-outline target required" in message for message in artifact["validation"]["messages"])
             )
 
     def test_java_no_target_world_outline_capture_rejects_unexpected_draw(self) -> None:

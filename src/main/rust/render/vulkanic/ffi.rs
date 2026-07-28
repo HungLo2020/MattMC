@@ -33,9 +33,11 @@ use super::resources::{
 };
 use super::sync::SubmissionId;
 use super::world_primitive_frontend::{
-    WorldBorderAssetPayload, WorldBorderQuadRequest, WorldCrackQuadRequest,
+    WorldBackgroundRequest, WorldBorderAssetPayload, WorldBorderQuadRequest, WorldCrackQuadRequest,
     WorldLineSegmentRequest, WorldPrimitiveFrame, WorldPrimitiveFrontend,
-    WorldPrimitiveSubmitStats,
+    WorldPrimitiveSubmitStats, WORLD_BACKGROUND_LOAD_CLEAR, WORLD_BACKGROUND_SKY_CUSTOM,
+    WORLD_BACKGROUND_SKY_END, WORLD_BACKGROUND_SKY_NETHER, WORLD_BACKGROUND_SKY_OVERWORLD,
+    WORLD_BACKGROUND_STORE_STORE,
 };
 
 pub const FFI_ABI_V1_VERSION: u32 = 1;
@@ -57,14 +59,27 @@ pub enum FfiBackendKind {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FfiStructLayout {
     pub header: FfiHeader,
     pub struct_id: u32,
     pub byte_size: u32,
     pub alignment: u32,
     pub field_count: u32,
-    pub field_offsets: [u32; 32],
+    pub field_offsets: [u32; 64],
+}
+
+impl Default for FfiStructLayout {
+    fn default() -> Self {
+        Self {
+            header: FfiHeader::default(),
+            struct_id: 0,
+            byte_size: 0,
+            alignment: 0,
+            field_count: 0,
+            field_offsets: [0; 64],
+        }
+    }
 }
 
 #[repr(C)]
@@ -581,6 +596,19 @@ pub struct FfiWorldBorderQuadRequest {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiWorldBackgroundRequest {
+    pub byte_size: u32,
+    pub enabled: u32,
+    pub sky_type: u32,
+    pub load_intent: u32,
+    pub store_intent: u32,
+    pub color_argb: u32,
+    pub viewport_width: i32,
+    pub viewport_height: i32,
+}
+
+#[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FfiWholeFrameSubmitRequest {
     pub header: FfiHeader,
@@ -594,6 +622,7 @@ pub struct FfiWholeFrameSubmitRequest {
     pub viewport_height: i32,
     pub view_matrix: [f32; 16],
     pub projection_matrix: [f32; 16],
+    pub world_background: FfiWorldBackgroundRequest,
     pub world_segments: FfiSlice<FfiWorldLineSegmentRequest>,
     pub world_crack_quads: FfiSlice<FfiWorldCrackQuadRequest>,
     pub world_border_quads: FfiSlice<FfiWorldBorderQuadRequest>,
@@ -618,6 +647,10 @@ pub struct FfiWholeFrameSubmitResult {
     pub world_border_quad_count: u64,
     pub world_border_batch_count: u64,
     pub world_border_draw_count: u64,
+    pub world_background_clear_count: u64,
+    pub world_background_diagnostic_fallback_count: u64,
+    pub world_background_sky_type: u64,
+    pub world_background_color_argb: u64,
     pub depth_attachment_creates: u64,
     pub depth_attachment_reuses: u64,
     pub depth_attachment_retires: u64,
@@ -679,6 +712,10 @@ impl Default for FfiWholeFrameSubmitResult {
             world_border_quad_count: 0,
             world_border_batch_count: 0,
             world_border_draw_count: 0,
+            world_background_clear_count: 0,
+            world_background_diagnostic_fallback_count: 0,
+            world_background_sky_type: 0,
+            world_background_color_argb: 0,
             depth_attachment_creates: 0,
             depth_attachment_reuses: 0,
             depth_attachment_retires: 0,
@@ -1905,6 +1942,7 @@ pub unsafe fn decode_resource_batch(
         .iter()
         .map(|format| texture_format(*format))
         .collect::<GalResult<Vec<_>>>()?;
+        let depth_compare = optional_compare_op(item.depth_compare)?;
         let desc = GraphicsPipelineDesc {
             label: read_label(item.label, "graphics pipeline label")?,
             layout: require_handle(
@@ -1925,7 +1963,8 @@ pub unsafe fn decode_resource_batch(
             topology: primitive_topology(item.topology)?,
             cull_mode: cull_mode(item.cull_mode)?,
             blend: blend_mode(item.blend)?,
-            depth_compare: optional_compare_op(item.depth_compare)?,
+            depth_compare,
+            depth_write: depth_compare.is_some(),
             color_formats,
             depth_format: optional_texture_format(item.depth_format)?,
         };
@@ -2235,6 +2274,14 @@ struct CachedFrameTarget {
 }
 
 fn destroy_stale_frame_targets(context: &mut BridgeContext) -> GalResult<()> {
+    if !context.stale_frame_targets.is_empty() {
+        context
+            .gui_frontend
+            .clear_frame_passes_for_targets(&mut context.gal, &context.stale_frame_targets);
+        context
+            .world_primitive_frontend
+            .clear_frame_passes_for_targets(&mut context.gal, &context.stale_frame_targets);
+    }
     for handle in std::mem::take(&mut context.stale_frame_targets) {
         context.gal.destroy(handle)?;
     }
@@ -2242,6 +2289,10 @@ fn destroy_stale_frame_targets(context: &mut BridgeContext) -> GalResult<()> {
 }
 
 fn destroy_all_frame_targets(context: &mut BridgeContext) -> GalResult<()> {
+    context.gui_frontend.clear_frame_pass(&mut context.gal);
+    context
+        .world_primitive_frontend
+        .clear_frame_pass(&mut context.gal);
     destroy_stale_frame_targets(context)?;
     if let Some(cached) = context.cached_frame_target.take() {
         context.gal.destroy(cached.handle)?;
@@ -2335,6 +2386,10 @@ fn whole_frame_result_ok(
         world_border_quad_count: world.border_quad_count,
         world_border_batch_count: world.border_batch_count,
         world_border_draw_count: world.border_draw_count,
+        world_background_clear_count: world.background_clear_count,
+        world_background_diagnostic_fallback_count: world.background_diagnostic_fallback_count,
+        world_background_sky_type: world.background_sky_type,
+        world_background_color_argb: world.background_color_argb,
         depth_attachment_creates: world.depth_attachment_creates,
         depth_attachment_reuses: world.depth_attachment_reuses,
         depth_attachment_retires: world.depth_attachment_retires,
@@ -2665,6 +2720,29 @@ unsafe fn decode_whole_frame_submit(
     request: *const FfiWholeFrameSubmitRequest,
     capabilities: BackendCapabilities,
 ) -> GalResult<(u64, Handle, WorldPrimitiveFrame, Vec<GuiSpriteRequest>)> {
+    decode_whole_frame_submit_with_backend_policy(request, capabilities, true)
+}
+
+unsafe fn decode_world_primitive_submit(
+    request: *const FfiWholeFrameSubmitRequest,
+    capabilities: BackendCapabilities,
+) -> GalResult<(u64, Handle, WorldPrimitiveFrame)> {
+    let (generation, frame_target, frame, gui_sprites) =
+        decode_whole_frame_submit_with_backend_policy(request, capabilities, false)?;
+    if !gui_sprites.is_empty() {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "world primitive submit does not accept GUI sprites",
+        ));
+    }
+    Ok((generation, frame_target, frame))
+}
+
+unsafe fn decode_whole_frame_submit_with_backend_policy(
+    request: *const FfiWholeFrameSubmitRequest,
+    capabilities: BackendCapabilities,
+    require_vulkan_whole_frame: bool,
+) -> GalResult<(u64, Handle, WorldPrimitiveFrame, Vec<GuiSpriteRequest>)> {
     let request = read_struct(request, "whole-frame submit request")?;
     validate_header::<FfiWholeFrameSubmitRequest>(request.header)?;
     reject_unknown_feature_bits(request.negotiated_feature_bits)?;
@@ -2675,7 +2753,7 @@ unsafe fn decode_whole_frame_submit(
             request.negotiated_feature_bits & !supported
         )));
     }
-    if !capabilities.name.to_ascii_lowercase().contains("vulkan") {
+    if require_vulkan_whole_frame && !capabilities.name.to_ascii_lowercase().contains("vulkan") {
         return Err(GalError::unsupported_feature(
             "whole-frame world primitive submit requires the Rust Vulkan backend",
         ));
@@ -2715,6 +2793,11 @@ unsafe fn decode_whole_frame_submit(
             ));
         }
     }
+    let background = decode_world_background_request(
+        request.world_background,
+        request.viewport_width,
+        request.viewport_height,
+    )?;
     let raw_segments = read_slice(
         request.world_segments,
         true,
@@ -2952,12 +3035,90 @@ unsafe fn decode_whole_frame_submit(
             viewport_height,
             view_matrix: request.view_matrix,
             projection_matrix: request.projection_matrix,
+            background,
             segments,
             crack_quads,
             border_quads,
         },
         gui_sprites,
     ))
+}
+
+fn decode_world_background_request(
+    request: FfiWorldBackgroundRequest,
+    frame_viewport_width: i32,
+    frame_viewport_height: i32,
+) -> GalResult<WorldBackgroundRequest> {
+    validate_item_size::<FfiWorldBackgroundRequest>(request.byte_size, "world background")?;
+    let enabled = bool_flag(request.enabled, "world background enabled")?;
+    if !enabled {
+        return Ok(WorldBackgroundRequest::default());
+    }
+    if !matches!(
+        request.sky_type,
+        WORLD_BACKGROUND_SKY_OVERWORLD
+            | WORLD_BACKGROUND_SKY_NETHER
+            | WORLD_BACKGROUND_SKY_END
+            | WORLD_BACKGROUND_SKY_CUSTOM
+    ) {
+        return Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown world background sky type {}", request.sky_type),
+        ));
+    }
+    if request.load_intent != WORLD_BACKGROUND_LOAD_CLEAR {
+        return Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!(
+                "unknown world background load intent {}",
+                request.load_intent
+            ),
+        ));
+    }
+    if request.store_intent != WORLD_BACKGROUND_STORE_STORE {
+        return Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!(
+                "unknown world background store intent {}",
+                request.store_intent
+            ),
+        ));
+    }
+    let viewport_width = u32::try_from(request.viewport_width).map_err(|_| {
+        GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "world background viewport width must be non-negative, got {}",
+                request.viewport_width
+            ),
+        )
+    })?;
+    let viewport_height = u32::try_from(request.viewport_height).map_err(|_| {
+        GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "world background viewport height must be non-negative, got {}",
+                request.viewport_height
+            ),
+        )
+    })?;
+    if request.viewport_width != frame_viewport_width
+        || request.viewport_height != frame_viewport_height
+    {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "world background viewport metadata must match whole-frame viewport",
+        ));
+    }
+    Ok(WorldBackgroundRequest {
+        enabled,
+        sky_type: request.sky_type,
+        color_argb: request.color_argb,
+        load_intent: request.load_intent,
+        store_intent: request.store_intent,
+        viewport_width,
+        viewport_height,
+    })
 }
 
 unsafe fn decode_gui_asset_update(
@@ -3228,7 +3389,7 @@ macro_rules! offset_of {
 fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
     macro_rules! layout {
         ($id:expr, $ty:ty, [$($field:tt),* $(,)?]) => {{
-            let mut offsets = [0_u32; 32];
+            let mut offsets = [0_u32; 64];
             let fields = [$(offset_of!($ty, $field) as u32),*];
             offsets[..fields.len()].copy_from_slice(&fields);
             FfiStructLayout {
@@ -3836,6 +3997,7 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 viewport_height,
                 view_matrix,
                 projection_matrix,
+                world_background,
                 world_segments,
                 world_crack_quads,
                 world_border_quads,
@@ -3861,6 +4023,10 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 world_border_quad_count,
                 world_border_batch_count,
                 world_border_draw_count,
+                world_background_clear_count,
+                world_background_diagnostic_fallback_count,
+                world_background_sky_type,
+                world_background_color_argb,
                 depth_attachment_creates,
                 depth_attachment_reuses,
                 depth_attachment_retires,
@@ -3890,6 +4056,20 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 reserved0,
                 png_bytes,
                 negotiated_feature_bits
+            ]
+        ),
+        56 => layout!(
+            56,
+            FfiWorldBackgroundRequest,
+            [
+                byte_size,
+                enabled,
+                sky_type,
+                load_intent,
+                store_intent,
+                color_argb,
+                viewport_width,
+                viewport_height
             ]
         ),
         _ => {
@@ -4483,6 +4663,75 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                         ..FfiWholeFrameSubmitResult::default()
                     },
                     "whole-frame submit result",
+                );
+                error.code as i32
+            }
+        }
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_vulkanic_gal_world_primitives_submit(
+    context_id: u64,
+    request: *const FfiWholeFrameSubmitRequest,
+    out: *mut FfiWholeFrameSubmitResult,
+) -> i32 {
+    with_registry_mut(|registry| {
+        let Some(context) = registry.contexts.get_mut(&context_id) else {
+            let error = GalError::ffi(
+                StatusCode::StaleHandle,
+                format!("unknown context id {context_id}"),
+            );
+            let _ = write_out(
+                out,
+                FfiWholeFrameSubmitResult {
+                    status: error.code as i32,
+                    error_domain: error.domain as u32,
+                    ..FfiWholeFrameSubmitResult::default()
+                },
+                "world primitive submit result",
+            );
+            return error.code as i32;
+        };
+        let input_bytes = if request.is_null() {
+            0
+        } else {
+            input_bytes_for_whole_frame(&*request)
+        };
+        context.ffi_calls += 1;
+        context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);
+        context.ffi_output_bytes = context
+            .ffi_output_bytes
+            .saturating_add(size_of::<FfiWholeFrameSubmitResult>() as u64);
+        let result = decode_world_primitive_submit(request, context.gal.capabilities()).and_then(
+            |(generation, frame_target, world_frame)| {
+                let world_stats = context.world_primitive_frontend.submit_partial_frame(
+                    &mut context.gal,
+                    generation,
+                    frame_target,
+                    world_frame,
+                )?;
+                destroy_stale_frame_targets(context)?;
+                Ok(world_stats)
+            },
+        );
+        match result {
+            Ok(world_stats) => {
+                let value = whole_frame_result_ok(context, world_stats, GuiSubmitStats::default());
+                let _ = write_out(out, value, "world primitive submit result");
+                StatusCode::Ok as i32
+            }
+            Err(error) => {
+                set_last_error(context, &error);
+                let _ = write_out(
+                    out,
+                    FfiWholeFrameSubmitResult {
+                        status: error.code as i32,
+                        error_domain: error.domain as u32,
+                        metrics: context_metrics(context),
+                        ..FfiWholeFrameSubmitResult::default()
+                    },
+                    "world primitive submit result",
                 );
                 error.code as i32
             }
@@ -5851,7 +6100,7 @@ fn decode_command_op(
             require_feature(capabilities, BackendFeature::Graphics, "render pass")?;
             let colors = range_slice(attachments, op.colors, "begin pass color attachments")?
                 .iter()
-                .map(decode_pass_attachment)
+                .map(decode_color_pass_attachment)
                 .collect::<GalResult<Vec<_>>>()?;
             let depth_items =
                 range_slice(attachments, op.depth_stencil, "begin pass depth attachment")?;
@@ -5872,7 +6121,7 @@ fn decode_command_op(
                 colors,
                 depth_stencil: depth_items
                     .first()
-                    .map(decode_pass_attachment)
+                    .map(decode_texture_view_pass_attachment)
                     .transpose()?,
             })
         }
@@ -6028,7 +6277,25 @@ fn single_range_item<'a, T>(items: &'a [T], range: FfiRange, label: &str) -> Gal
     Ok(&slice[0])
 }
 
-fn decode_pass_attachment(item: &FfiPassAttachmentAbi) -> GalResult<PassAttachment> {
+fn decode_color_pass_attachment(item: &FfiPassAttachmentAbi) -> GalResult<PassAttachment> {
+    validate_item_size::<FfiPassAttachmentAbi>(item.byte_size, "pass attachment")?;
+    Ok(PassAttachment {
+        view: require_handle_any(
+            item.view,
+            &[HandleKind::TextureView, HandleKind::FrameTarget],
+            "color pass attachment view",
+        )?,
+        load_op: load_op(item.load_op)?,
+        store_op: store_op(item.store_op)?,
+        clear_color: if bool_flag(item.has_clear_color, "attachment clear color presence")? {
+            Some(item.clear_color.into())
+        } else {
+            None
+        },
+    })
+}
+
+fn decode_texture_view_pass_attachment(item: &FfiPassAttachmentAbi) -> GalResult<PassAttachment> {
     validate_item_size::<FfiPassAttachmentAbi>(item.byte_size, "pass attachment")?;
     Ok(PassAttachment {
         view: require_handle(item.view, HandleKind::TextureView, "pass attachment view")?,
@@ -6550,6 +6817,16 @@ mod tests {
             viewport_height: 480,
             view_matrix,
             projection_matrix,
+            world_background: FfiWorldBackgroundRequest {
+                byte_size: size_of::<FfiWorldBackgroundRequest>() as u32,
+                enabled: 1,
+                sky_type: WORLD_BACKGROUND_SKY_OVERWORLD,
+                load_intent: WORLD_BACKGROUND_LOAD_CLEAR,
+                store_intent: WORLD_BACKGROUND_STORE_STORE,
+                color_argb: 0xff102844,
+                viewport_width: 854,
+                viewport_height: 480,
+            },
             world_segments: FfiSlice {
                 ptr: segments.as_ptr(),
                 count: segments.len() as u64,
@@ -6692,6 +6969,9 @@ mod tests {
         segments[0].start_x = 99.0;
         assert_eq!(frame.frame_id, 11);
         assert_eq!(frame.correlation_id, 13);
+        assert!(frame.background.enabled);
+        assert_eq!(WORLD_BACKGROUND_SKY_OVERWORLD, frame.background.sky_type);
+        assert_eq!(0xff102844, frame.background.color_argb);
         assert_eq!(frame.segments[0].start[0], 1.0);
         assert_eq!(frame.segments[0].end[2], 6.0);
         assert_eq!(gui.len(), 1);
@@ -6710,6 +6990,21 @@ mod tests {
         let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
             .expect_err("malformed world line segment must fail");
         assert_eq!(error.code, StatusCode::InvalidArgument);
+    }
+
+    #[test]
+    fn whole_frame_world_background_ffi_rejects_malformed_payloads() {
+        let mut request = whole_frame_request(&[], &[]);
+        request.world_background.byte_size -= 4;
+        let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+            .expect_err("malformed world background must fail");
+        assert_eq!(error.code, StatusCode::InvalidArgument);
+
+        request = whole_frame_request(&[], &[]);
+        request.world_background.sky_type = 99;
+        let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+            .expect_err("unknown sky type must fail validation");
+        assert_eq!(error.code, StatusCode::UnknownEnum);
     }
 
     #[test]

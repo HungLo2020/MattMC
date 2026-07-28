@@ -222,6 +222,7 @@ fn simple_graphics_scene(gal: &mut VulkanicGal) -> (Handle, Handle, Handle, Hand
             cull_mode: CullMode::Back,
             blend: BlendMode::Disabled,
             depth_compare: None,
+            depth_write: false,
             color_formats: vec![TextureFormat::Rgba8Unorm],
             depth_format: None,
         })
@@ -344,6 +345,7 @@ fn capability_limits_reject_descriptor_and_attachment_overflows() {
             cull_mode: CullMode::None,
             blend: BlendMode::Disabled,
             depth_compare: None,
+            depth_write: false,
             color_formats: vec![TextureFormat::Rgba8Unorm; 5],
             depth_format: None,
         }),
@@ -568,6 +570,7 @@ fn acquired_frame_targets_are_normal_pass_targets_without_attachment_borrows() {
             cull_mode: CullMode::Back,
             blend: BlendMode::Alpha,
             depth_compare: None,
+            depth_write: false,
             color_formats: vec![TextureFormat::Rgba8Unorm],
             depth_format: None,
         })
@@ -579,7 +582,17 @@ fn acquired_frame_targets_are_normal_pass_targets_without_attachment_borrows() {
                 CommandOp::BeginPass {
                     pass,
                     target: frame_target,
-                    colors: vec![],
+                    colors: vec![PassAttachment {
+                        view: frame_target,
+                        load_op: AttachmentLoadOp::Clear,
+                        store_op: AttachmentStoreOp::Store,
+                        clear_color: Some(ClearColor {
+                            r: 0.25,
+                            g: 0.5,
+                            b: 0.75,
+                            a: 1.0,
+                        }),
+                    }],
                     depth_stencil: None,
                 },
                 CommandOp::BindGraphicsPipeline(pipeline),
@@ -1131,6 +1144,7 @@ fn pipeline_and_pass_compatibility_is_validated() {
             cull_mode: CullMode::Back,
             blend: BlendMode::Disabled,
             depth_compare: None,
+            depth_write: false,
             color_formats: vec![TextureFormat::Bgra8Unorm],
             depth_format: None,
         })
@@ -1298,6 +1312,7 @@ fn attachment_and_presentation_hazards_require_semantic_separation() {
             cull_mode: CullMode::Back,
             blend: BlendMode::Disabled,
             depth_compare: None,
+            depth_write: false,
             color_formats: vec![TextureFormat::Rgba8Unorm, TextureFormat::Rgba8Unorm],
             depth_format: None,
         })
@@ -1361,6 +1376,7 @@ fn attachment_and_presentation_hazards_require_semantic_separation() {
             cull_mode: CullMode::Back,
             blend: BlendMode::Disabled,
             depth_compare: None,
+            depth_write: false,
             color_formats: vec![TextureFormat::Rgba8Unorm],
             depth_format: None,
         })

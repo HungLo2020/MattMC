@@ -200,6 +200,9 @@ enum AccessTarget {
         texture: Handle,
         range: TextureSubresourceRange,
     },
+    FrameTarget {
+        handle: Handle,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1402,7 +1405,13 @@ impl VulkanicGal {
                         }
                     };
                     let (expected_colors, expected_depth) = if frame_target {
-                        let pass_depth = self.render_pass_desc(*pass)?.depth_format;
+                        let pass_desc = self.render_pass_desc(*pass)?;
+                        let expected_colors = if pass_desc.color_formats.is_empty() {
+                            Vec::new()
+                        } else {
+                            vec![*target]
+                        };
+                        let pass_depth = pass_desc.depth_format;
                         if let Some(format) = pass_depth {
                             let attachment = depth_stencil.as_ref().ok_or_else(|| {
                                 GalError::command(
@@ -1417,9 +1426,9 @@ impl VulkanicGal {
                                     "frame-target pass depth attachment format does not match render pass",
                                 ));
                             }
-                            (Vec::new(), Some(attachment.view))
+                            (expected_colors, Some(attachment.view))
                         } else {
-                            (Vec::new(), None)
+                            (expected_colors, None)
                         }
                     } else {
                         let target_record = self.render_targets.get(*target)?;
@@ -1864,11 +1873,24 @@ impl VulkanicGal {
                     } => {
                         let mut pass_attachment_targets = Vec::new();
                         for color in colors {
-                            let info = self.texture_view_info(color.view)?;
-                            let target = AccessTarget::Texture {
-                                texture: info.texture,
-                                range: info.range,
-                            };
+                            let target =
+                                match color.view.kind() {
+                                    Some(HandleKind::FrameTarget) => {
+                                        self.frame_targets.get(color.view)?;
+                                        AccessTarget::FrameTarget { handle: color.view }
+                                    }
+                                    Some(HandleKind::TextureView) => {
+                                        let info = self.texture_view_info(color.view)?;
+                                        AccessTarget::Texture {
+                                            texture: info.texture,
+                                            range: info.range,
+                                        }
+                                    }
+                                    _ => return self.validation_error(GalError::submission(
+                                        StatusCode::WrongHandleType,
+                                        "color attachment must be a texture view or frame target",
+                                    )),
+                                };
                             if pass_attachment_targets
                                 .iter()
                                 .any(|previous| targets_overlap(*previous, target))
@@ -2714,6 +2736,14 @@ fn targets_overlap(left: AccessTarget, right: AccessTarget) -> bool {
                 range: right_range,
             },
         ) => left_texture == right_texture && texture_ranges_overlap(left_range, right_range),
+        (
+            AccessTarget::FrameTarget {
+                handle: left_handle,
+            },
+            AccessTarget::FrameTarget {
+                handle: right_handle,
+            },
+        ) => left_handle == right_handle,
         _ => false,
     }
 }

@@ -12,6 +12,8 @@ import unittest
 from argparse import Namespace
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 import RustMigration as harness
 import MeshingCorpus
 

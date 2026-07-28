@@ -817,6 +817,96 @@ public final class RustGalGuiRenderer {
 		}
 	}
 
+	public static boolean executeWorldPrimitiveFrame(
+		Minecraft minecraft,
+		RustGalWorldPrimitiveRenderer.PrimitiveFrame primitiveFrame,
+		String producerLabel
+	) {
+		if (primitiveFrame == null || primitiveFrame.segments().isEmpty()) {
+			return false;
+		}
+		GuiExecutionRoute route = currentExecutionRoute();
+		if (route != GuiExecutionRoute.RUST_OPENGL_BORROWED_CONTEXT) {
+			throw new IllegalStateException("Rust OpenGL borrowed-context world primitive execution requires route "
+				+ GuiExecutionRoute.RUST_OPENGL_BORROWED_CONTEXT + "; current route is " + route);
+		}
+		ensureRenderThreadAndContext(minecraft);
+		Window window = minecraft.getWindow();
+		ensureConfigured(window);
+		synchronized (LOCK) {
+			long executeStarted = System.nanoTime();
+			GraphicsFrameBenchmark.beginPhase("rust-gal.world-primitives.execute");
+			long correlationId = nextCorrelationId++;
+			long frameId = 0L;
+			long submissionId = 0L;
+			boolean executeCounted = false;
+			try {
+				GraphicsFrameBenchmark.beginPhase("rust-gal.world-primitives.ffi.acquire");
+				long acquireStarted = System.nanoTime();
+				recordFixedOperation(Operation.FRAME_ACQUIRE, VulkanicGalBridge.Struct.FRAME_ACQUIRE.byteSize());
+				VulkanicGalBridge.AcquiredFrame frame = bridge.acquireFrame(correlationId, window.getWidth(), window.getHeight());
+				METRICS.frameAcquireNanos += elapsedSince(acquireStarted);
+				GraphicsFrameBenchmark.endPhase("rust-gal.world-primitives.ffi.acquire");
+				frameId = frame.frameId();
+				if (frame.status() == 4 || frame.frameTarget() == 0L) {
+					METRICS.cancellations++;
+					return false;
+				}
+				GraphicsFrameBenchmark.beginPhase("rust-gal.world-primitives.abi-packing");
+				long packingStarted = System.nanoTime();
+				VulkanicGalBridge.WholeFrameSubmitResult result = bridge.submitWorldPrimitives(
+					generation,
+					frameId,
+					correlationId,
+					frame.frameTarget(),
+					primitiveFrame.viewportWidth() <= 0 ? window.getWidth() : primitiveFrame.viewportWidth(),
+					primitiveFrame.viewportHeight() <= 0 ? window.getHeight() : primitiveFrame.viewportHeight(),
+					primitiveFrame.viewMatrix(),
+					primitiveFrame.projectionMatrix(),
+					primitiveFrame.segments()
+				);
+				METRICS.abiPackingNanos += elapsedSince(packingStarted);
+				GraphicsFrameBenchmark.endPhase("rust-gal.world-primitives.abi-packing");
+				recordStatus(Operation.SUBMIT, result.asStatus());
+				submissionId = result.submissionId();
+				lastSubmitted = Math.max(lastSubmitted, submissionId);
+				GraphicsFrameBenchmark.beginPhase("rust-gal.world-primitives.ffi.present");
+				long presentStarted = System.nanoTime();
+				recordFixedOperation(Operation.FRAME_PRESENT, VulkanicGalBridge.Struct.FRAME_PRESENT.byteSize());
+				bridge.presentFrame(frameId, correlationId, submissionId);
+				METRICS.framePresentNanos += elapsedSince(presentStarted);
+				GraphicsFrameBenchmark.endPhase("rust-gal.world-primitives.ffi.present");
+				METRICS.frames++;
+				METRICS.submissions++;
+				METRICS.worldPrimitiveBatchesExecuted += result.worldBatchCount();
+				METRICS.worldLineSegmentsExecuted += result.worldSegmentCount();
+				METRICS.worldLineVerticesExecuted += result.worldVertexCount();
+				METRICS.worldPrimitiveDrawsExecuted += result.worldDrawCount();
+				METRICS.worldDepthAttachmentCreates += result.depthAttachmentCreates();
+				METRICS.worldDepthAttachmentReuses += result.depthAttachmentReuses();
+				METRICS.worldDepthAttachmentRetires += result.depthAttachmentRetires();
+				METRICS.worldOutlineCacheHits += result.outlineCacheHits();
+				METRICS.worldOutlineCacheMisses += result.outlineCacheMisses();
+				METRICS.cacheHits += result.cacheHits();
+				METRICS.cacheMisses += result.cacheMisses();
+				METRICS.resourceCreates += result.resourceCreates();
+				TracyCompat.message("gal.frame.deferred producer=" + producerLabel
+					+ " stratum=world.block-outline frame=" + frameId + " submission=" + submissionId
+					+ " segments=" + result.worldSegmentCount());
+				retireOutstanding(false);
+				auditMessage(metricsAuditLine(0, frameId, submissionId, false));
+				METRICS.executeNanos += elapsedSince(executeStarted);
+				executeCounted = true;
+				return true;
+			} finally {
+				if (!executeCounted) {
+					METRICS.executeNanos += elapsedSince(executeStarted);
+				}
+				GraphicsFrameBenchmark.endPhase("rust-gal.world-primitives.execute");
+			}
+		}
+	}
+
 	public static void executeWholeFrameVulkan(Minecraft minecraft, GuiRenderState renderState) {
 		if (!isWholeFrameVulkanActive()) {
 			throw new IllegalStateException("Rust Vulkan whole-frame shell requires " + RustGalVulkanWholeFrameMode.propertyName() + "=true and Vulkan backend selection");
@@ -1032,6 +1122,14 @@ public final class RustGalGuiRenderer {
 		return value == null || value.isBlank() ? "unset" : value.replaceAll("\\s+", "_");
 	}
 
+	private static String clearColorString(int colorArgb) {
+		float alpha = ((colorArgb >>> 24) & 0xFF) / 255.0F;
+		float red = ((colorArgb >>> 16) & 0xFF) / 255.0F;
+		float green = ((colorArgb >>> 8) & 0xFF) / 255.0F;
+		float blue = (colorArgb & 0xFF) / 255.0F;
+		return String.format(java.util.Locale.ROOT, "%.3f,%.3f,%.3f,%.3f", red, green, blue, alpha);
+	}
+
 	public static void cancelPending(String reason) {
 		synchronized (LOCK) {
 			int cancelled = SCHEDULER.cancelAll(reason);
@@ -1203,13 +1301,14 @@ public final class RustGalGuiRenderer {
 						frameGuiHeight,
 						primitiveFrame.viewportWidth() <= 0 ? window.getWidth() : primitiveFrame.viewportWidth(),
 						primitiveFrame.viewportHeight() <= 0 ? window.getHeight() : primitiveFrame.viewportHeight(),
-							primitiveFrame.viewMatrix(),
-							primitiveFrame.projectionMatrix(),
-							primitiveFrame.segments(),
-							primitiveFrame.crackQuads(),
-							primitiveFrame.borderQuads(),
-							requests
-						);
+						primitiveFrame.viewMatrix(),
+						primitiveFrame.projectionMatrix(),
+						primitiveFrame.background(),
+						primitiveFrame.segments(),
+						primitiveFrame.crackQuads(),
+						primitiveFrame.borderQuads(),
+						requests
+					);
 				} else {
 					guiResult = bridge.submitGuiFrame(
 						generation,
@@ -1220,18 +1319,26 @@ public final class RustGalGuiRenderer {
 						requests
 					);
 				}
-			METRICS.abiPackingNanos += elapsedSince(packingStarted);
-			GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.abi-packing");
-			recordStatus(Operation.SUBMIT, wholeFrameResult != null ? wholeFrameResult.asStatus() : guiResult.asStatus());
-			submissionId = wholeFrameResult != null ? wholeFrameResult.submissionId() : guiResult.submissionId();
-			if (wholeFrameVulkan) {
-				auditMessage("gal.frame.target.begin backend=vulkan frame=" + frameId
-					+ " image=" + frame.frameTargetIdentity()
-					+ " extent=" + frame.width() + "x" + frame.height()
-					+ " clear=0.063,0.157,0.855,1.000 expected=blue-diagnostic-shell");
-				auditMessage("gal.frame.target.present-ready backend=vulkan frame=" + frameId
-					+ " image=" + frame.frameTargetIdentity());
-			}
+				METRICS.abiPackingNanos += elapsedSince(packingStarted);
+				GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.abi-packing");
+				recordStatus(Operation.SUBMIT, wholeFrameResult != null ? wholeFrameResult.asStatus() : guiResult.asStatus());
+				submissionId = wholeFrameResult != null ? wholeFrameResult.submissionId() : guiResult.submissionId();
+				if (wholeFrameVulkan) {
+					VulkanicGalBridge.WorldBackgroundRecord background = primitiveFrame == null
+						? VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback()
+						: primitiveFrame.background();
+					String clearExpectation = background.enabled()
+						? "clear=" + clearColorString(background.colorArgb())
+							+ " expected=semantic-world-background sky_type=" + background.skyType()
+							+ " color_argb=0x" + Integer.toUnsignedString(background.colorArgb(), 16)
+						: "clear=0.063,0.157,0.855,1.000 expected=blue-diagnostic-shell";
+					auditMessage("gal.frame.target.begin backend=vulkan frame=" + frameId
+						+ " image=" + frame.frameTargetIdentity()
+						+ " extent=" + frame.width() + "x" + frame.height()
+						+ " " + clearExpectation);
+					auditMessage("gal.frame.target.present-ready backend=vulkan frame=" + frameId
+						+ " image=" + frame.frameTargetIdentity());
+				}
 			lastSubmitted = Math.max(lastSubmitted, submissionId);
 			TracyCompat.message("gal.frame.deferred producer=gui.frame stratum=gui.frame"
 				+ " frame=" + frameId + " submission=" + submissionId + " batches=" + requests.size());
@@ -1245,9 +1352,9 @@ public final class RustGalGuiRenderer {
 					+ " image=" + presented.frameTargetIdentity()
 					+ " submission=" + submissionId
 					+ " status=" + presented.status());
-			}
-			METRICS.framePresentNanos += elapsedSince(presentStarted);
-			GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.ffi.present");
+				}
+				METRICS.framePresentNanos += elapsedSince(presentStarted);
+				GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.ffi.present");
 				if (renderdocFrameCaptureStarted) {
 					RenderDocCaptureHook.endFrameCaptureOnce(window, "rust-vulkan-whole-frame-world#" + frameId + "-submission=" + submissionId);
 					renderdocFrameCaptureStarted = false;
@@ -1261,15 +1368,21 @@ public final class RustGalGuiRenderer {
 				METRICS.worldLineSegmentsExecuted += wholeFrameResult != null ? wholeFrameResult.worldSegmentCount() : 0L;
 				METRICS.worldLineVerticesExecuted += wholeFrameResult != null ? wholeFrameResult.worldVertexCount() : 0L;
 				METRICS.worldPrimitiveDrawsExecuted += wholeFrameResult != null ? wholeFrameResult.worldDrawCount() : 0L;
-					METRICS.worldCrackQuadsExecuted += wholeFrameResult != null ? wholeFrameResult.worldCrackQuadCount() : 0L;
-					METRICS.worldCrackBatchesExecuted += wholeFrameResult != null ? wholeFrameResult.worldCrackBatchCount() : 0L;
-					METRICS.worldCrackDrawsExecuted += wholeFrameResult != null ? wholeFrameResult.worldCrackDrawCount() : 0L;
-					METRICS.worldBorderQuadsExecuted += wholeFrameResult != null ? wholeFrameResult.worldBorderQuadCount() : 0L;
-					METRICS.worldBorderBatchesExecuted += wholeFrameResult != null ? wholeFrameResult.worldBorderBatchCount() : 0L;
-					METRICS.worldBorderDrawsExecuted += wholeFrameResult != null ? wholeFrameResult.worldBorderDrawCount() : 0L;
-					METRICS.worldDepthAttachmentCreates += wholeFrameResult != null ? wholeFrameResult.depthAttachmentCreates() : 0L;
-					METRICS.worldDepthAttachmentReuses += wholeFrameResult != null ? wholeFrameResult.depthAttachmentReuses() : 0L;
-					METRICS.worldDepthAttachmentRetires += wholeFrameResult != null ? wholeFrameResult.depthAttachmentRetires() : 0L;
+				METRICS.worldCrackQuadsExecuted += wholeFrameResult != null ? wholeFrameResult.worldCrackQuadCount() : 0L;
+				METRICS.worldCrackBatchesExecuted += wholeFrameResult != null ? wholeFrameResult.worldCrackBatchCount() : 0L;
+				METRICS.worldCrackDrawsExecuted += wholeFrameResult != null ? wholeFrameResult.worldCrackDrawCount() : 0L;
+				METRICS.worldBorderQuadsExecuted += wholeFrameResult != null ? wholeFrameResult.worldBorderQuadCount() : 0L;
+				METRICS.worldBorderBatchesExecuted += wholeFrameResult != null ? wholeFrameResult.worldBorderBatchCount() : 0L;
+				METRICS.worldBorderDrawsExecuted += wholeFrameResult != null ? wholeFrameResult.worldBorderDrawCount() : 0L;
+				METRICS.worldBackgroundClearsExecuted += wholeFrameResult != null ? wholeFrameResult.worldBackgroundClearCount() : 0L;
+				METRICS.worldBackgroundDiagnosticFallbacks += wholeFrameResult != null ? wholeFrameResult.worldBackgroundDiagnosticFallbackCount() : 0L;
+				if (wholeFrameResult != null && wholeFrameResult.worldBackgroundSkyType() != 0L) {
+					METRICS.lastWorldBackgroundSkyType = wholeFrameResult.worldBackgroundSkyType();
+					METRICS.lastWorldBackgroundColorArgb = wholeFrameResult.worldBackgroundColorArgb();
+				}
+				METRICS.worldDepthAttachmentCreates += wholeFrameResult != null ? wholeFrameResult.depthAttachmentCreates() : 0L;
+				METRICS.worldDepthAttachmentReuses += wholeFrameResult != null ? wholeFrameResult.depthAttachmentReuses() : 0L;
+				METRICS.worldDepthAttachmentRetires += wholeFrameResult != null ? wholeFrameResult.depthAttachmentRetires() : 0L;
 					METRICS.worldOutlineCacheHits += wholeFrameResult != null ? wholeFrameResult.outlineCacheHits() : 0L;
 					METRICS.worldOutlineCacheMisses += wholeFrameResult != null ? wholeFrameResult.outlineCacheMisses() : 0L;
 					METRICS.worldCrackCacheHits += wholeFrameResult != null ? wholeFrameResult.crackCacheHits() : 0L;
@@ -1517,10 +1630,14 @@ public final class RustGalGuiRenderer {
 				+ " rust_gal_world_crack_quads_executed=" + METRICS.worldCrackQuadsExecuted
 				+ " rust_gal_world_crack_batches_executed=" + METRICS.worldCrackBatchesExecuted
 				+ " rust_gal_world_crack_draws_executed=" + METRICS.worldCrackDrawsExecuted
-				+ " rust_gal_world_border_quads_executed=" + METRICS.worldBorderQuadsExecuted
-				+ " rust_gal_world_border_batches_executed=" + METRICS.worldBorderBatchesExecuted
-				+ " rust_gal_world_border_draws_executed=" + METRICS.worldBorderDrawsExecuted
-				+ " rust_gal_world_depth_attachment_creates=" + METRICS.worldDepthAttachmentCreates
+					+ " rust_gal_world_border_quads_executed=" + METRICS.worldBorderQuadsExecuted
+					+ " rust_gal_world_border_batches_executed=" + METRICS.worldBorderBatchesExecuted
+					+ " rust_gal_world_border_draws_executed=" + METRICS.worldBorderDrawsExecuted
+					+ " rust_gal_world_background_clears_executed=" + METRICS.worldBackgroundClearsExecuted
+					+ " rust_gal_world_background_diagnostic_fallbacks=" + METRICS.worldBackgroundDiagnosticFallbacks
+					+ " rust_gal_world_background_sky_type=" + METRICS.lastWorldBackgroundSkyType
+					+ " rust_gal_world_background_color_argb=" + Long.toUnsignedString(METRICS.lastWorldBackgroundColorArgb, 16)
+					+ " rust_gal_world_depth_attachment_creates=" + METRICS.worldDepthAttachmentCreates
 				+ " rust_gal_world_depth_attachment_reuses=" + METRICS.worldDepthAttachmentReuses
 				+ " rust_gal_world_depth_attachment_retires=" + METRICS.worldDepthAttachmentRetires
 				+ " rust_gal_world_outline_cache_hits=" + METRICS.worldOutlineCacheHits
@@ -2571,10 +2688,14 @@ public final class RustGalGuiRenderer {
 		long worldCrackQuadsExecuted;
 		long worldCrackBatchesExecuted;
 		long worldCrackDrawsExecuted;
-		long worldBorderQuadsExecuted;
-		long worldBorderBatchesExecuted;
-		long worldBorderDrawsExecuted;
-		long worldDepthAttachmentCreates;
+			long worldBorderQuadsExecuted;
+			long worldBorderBatchesExecuted;
+			long worldBorderDrawsExecuted;
+			long worldBackgroundClearsExecuted;
+			long worldBackgroundDiagnosticFallbacks;
+			long lastWorldBackgroundSkyType;
+			long lastWorldBackgroundColorArgb;
+			long worldDepthAttachmentCreates;
 		long worldDepthAttachmentReuses;
 		long worldDepthAttachmentRetires;
 		long worldOutlineCacheHits;

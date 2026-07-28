@@ -3,7 +3,9 @@ use std::rc::Rc;
 
 use glow::HasContext;
 
-use super::resources::{texture_format, topology, OpenGlObjects, ResourceSetObject};
+use super::resources::{
+    sampler_uniform_names, texture_format, topology, OpenGlObjects, ResourceSetObject,
+};
 use super::trace;
 use crate::render::vulkanic::commands::{
     AttachmentLoadOp, BufferImageCopyRegion, CommandOp, ValidatedSubmissionBatch,
@@ -303,6 +305,18 @@ impl OpenGlLowerer {
                 }
                 self.bind_framebuffer(target_object.framebuffer);
                 unsafe {
+                    if colors.is_empty() {
+                        self.gl.draw_buffer(glow::NONE);
+                    } else if target_object.framebuffer.is_some() {
+                        let draw_buffers = (0..colors.len())
+                            .map(|index| glow::COLOR_ATTACHMENT0 + index as u32)
+                            .collect::<Vec<_>>();
+                        self.gl.draw_buffers(&draw_buffers);
+                        self.gl.color_mask(true, true, true, true);
+                    } else {
+                        self.gl.draw_buffer(glow::BACK);
+                        self.gl.color_mask(true, true, true, true);
+                    }
                     self.gl.viewport(
                         0,
                         0,
@@ -366,7 +380,12 @@ impl OpenGlLowerer {
                 let pipeline = objects.graphics_pipeline(*handle)?;
                 self.bind_program(Some(pipeline.program));
                 self.bind_vao(Some(pipeline.vao));
-                self.apply_fixed_state(pipeline.cull_mode, pipeline.blend, pipeline.depth_compare);
+                self.apply_fixed_state(
+                    pipeline.cull_mode,
+                    pipeline.blend,
+                    pipeline.depth_compare,
+                    pipeline.depth_write,
+                );
                 state.pipeline = Some(*handle);
                 state.pipeline_layout = Some(pipeline.layout);
                 state.topology = topology(pipeline.topology);
@@ -424,11 +443,27 @@ impl OpenGlLowerer {
                 }
                 Ok(())
             }
+            CommandOp::Draw {
+                vertices,
+                instances,
+            } => {
+                let _zone = trace::Zone::new("opengl.lowering.draw");
+                unsafe {
+                    self.gl.draw_arrays_instanced(
+                        state.topology,
+                        0,
+                        i32::try_from(*vertices)
+                            .map_err(|_| GalError::backend("vertex count exceeds i32"))?,
+                        i32::try_from(*instances)
+                            .map_err(|_| GalError::backend("instance count exceeds i32"))?,
+                    );
+                }
+                Ok(())
+            }
             CommandOp::Barrier(_) => Ok(()),
             CommandOp::BindComputePipeline(_)
             | CommandOp::Dispatch { .. }
             | CommandOp::DispatchIndirect { .. }
-            | CommandOp::Draw { .. }
             | CommandOp::DrawIndirect { .. }
             | CommandOp::Present { .. }
             | CommandOp::SetVertexBuffer { .. } => Err(GalError::backend(format!(
@@ -624,9 +659,9 @@ impl OpenGlLowerer {
                     self.bind_sampler_unit(unit, None);
                     unsafe {
                         if let Some(program) = self.cache.program {
-                            for sampler_name in ["Sampler0", "tex0"] {
+                            for sampler_name in sampler_uniform_names(binding.binding) {
                                 if let Some(location) =
-                                    self.gl.get_uniform_location(program, sampler_name)
+                                    self.gl.get_uniform_location(program, &sampler_name)
                                 {
                                     self.gl.uniform_1_i32(Some(&location), unit as i32);
                                 }
@@ -684,6 +719,7 @@ impl OpenGlLowerer {
         cull_mode: CullMode,
         blend: BlendMode,
         depth_compare: Option<CompareOp>,
+        depth_write: bool,
     ) {
         unsafe {
             if self.cache.cull != Some(cull_mode) {
@@ -721,15 +757,17 @@ impl OpenGlLowerer {
                 self.cache.blend = Some(blend);
                 self.cache.state_changes += 1;
             }
-            if self.cache.depth_compare != depth_compare {
+            if self.cache.depth_compare != depth_compare || self.cache.depth_write != depth_write {
                 if let Some(compare) = depth_compare {
                     self.gl.enable(glow::DEPTH_TEST);
                     self.gl.depth_func(compare_op(compare));
-                    self.gl.depth_mask(true);
+                    self.gl.depth_mask(depth_write);
                 } else {
                     self.gl.disable(glow::DEPTH_TEST);
+                    self.gl.depth_mask(false);
                 }
                 self.cache.depth_compare = depth_compare;
+                self.cache.depth_write = depth_write;
                 self.cache.state_changes += 1;
             }
         }
@@ -834,6 +872,7 @@ struct StateCache {
     cull: Option<CullMode>,
     blend: Option<BlendMode>,
     depth_compare: Option<CompareOp>,
+    depth_write: bool,
     textures: BTreeMap<u32, Option<glow::Texture>>,
     samplers: BTreeMap<u32, Option<glow::Sampler>>,
     program_binds: usize,

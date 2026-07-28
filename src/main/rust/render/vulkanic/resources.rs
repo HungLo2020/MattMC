@@ -439,6 +439,7 @@ pub struct GraphicsPipelineDesc {
     pub cull_mode: CullMode,
     pub blend: BlendMode,
     pub depth_compare: Option<CompareOp>,
+    pub depth_write: bool,
     pub color_formats: Vec<ColorFormat>,
     pub depth_format: Option<TextureFormat>,
 }

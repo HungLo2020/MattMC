@@ -2,7 +2,8 @@ use std::collections::BTreeMap;
 use std::io::BufReader;
 
 use super::commands::{
-    CommandList, CommandOp, ResourceBarrier, SubmissionBatch, TextureOrigin3d, TextureUsageState,
+    AttachmentLoadOp, AttachmentStoreOp, CommandList, CommandOp, PassAttachment, ResourceBarrier,
+    SubmissionBatch, TextureOrigin3d, TextureUsageState,
 };
 use super::error::{GalError, GalResult, StatusCode};
 use super::gal::VulkanicGal;
@@ -396,6 +397,16 @@ impl GuiFrontend {
         }
     }
 
+    pub fn clear_frame_passes_for_targets(&mut self, gal: &mut VulkanicGal, targets: &[Handle]) {
+        let Some(pass) = self.cached_pass else {
+            return;
+        };
+        if targets.contains(&pass.frame_target) {
+            self.cached_pass = None;
+            let _ = gal.destroy(pass.pass);
+        }
+    }
+
     pub fn submit_frame(
         &mut self,
         gal: &mut VulkanicGal,
@@ -483,7 +494,7 @@ impl GuiFrontend {
             ops.push(CommandOp::BeginPass {
                 pass: frame_pass,
                 target: frame_target,
-                colors: Vec::new(),
+                colors: vec![loaded_frame_color_attachment(frame_target)],
                 depth_stencil: None,
             });
             ops.push(CommandOp::EndPass);
@@ -491,7 +502,7 @@ impl GuiFrontend {
             ops.push(CommandOp::BeginPass {
                 pass: frame_pass,
                 target: frame_target,
-                colors: Vec::new(),
+                colors: vec![loaded_frame_color_attachment(frame_target)],
                 depth_stencil: None,
             });
             ops.push(CommandOp::EndPass);
@@ -520,7 +531,7 @@ impl GuiFrontend {
             ops.push(CommandOp::BeginPass {
                 pass: frame_pass,
                 target: frame_target,
-                colors: Vec::new(),
+                colors: vec![loaded_frame_color_attachment(frame_target)],
                 depth_stencil: None,
             });
             ops.push(CommandOp::BindGraphicsPipeline(resources.pipeline));
@@ -745,6 +756,7 @@ impl GuiFrontend {
                 cull_mode: CullMode::None,
                 blend: group.blend(),
                 depth_compare: None,
+                depth_write: false,
                 color_formats: vec![color_format],
                 depth_format: None,
             })?;
@@ -2056,6 +2068,15 @@ const SPRITES: &[SpriteDef] = &[
         group: group(false),
     },
 ];
+
+fn loaded_frame_color_attachment(frame_target: Handle) -> PassAttachment {
+    PassAttachment {
+        view: frame_target,
+        load_op: AttachmentLoadOp::Load,
+        store_op: AttachmentStoreOp::Store,
+        clear_color: None,
+    }
+}
 
 #[cfg(test)]
 mod tests {

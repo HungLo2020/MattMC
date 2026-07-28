@@ -3,17 +3,22 @@ package net.vulkanic.world;
 import net.minecraft.Util;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.state.BlockOutlineRenderState;
 import net.minecraft.client.renderer.state.WorldBorderRenderState;
 import net.minecraft.client.renderer.state.BlockBreakingRenderState;
+import net.vulkanic.gui.RustGalGuiRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.pattern.BlockInWorld;
 import net.minecraft.world.phys.BlockHitResult;
@@ -28,6 +33,7 @@ import net.vulkanic.bridge.VulkanicGalBridge;
 import net.logging.LogUtils;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+import org.joml.Vector4f;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -48,10 +54,17 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static final int STYLE_HIGH_CONTRAST = 2;
 	public static final int DEPTH_POLICY_DISABLED = 0;
 	public static final int DEPTH_POLICY_TEST_WRITE = 1;
+	public static final int DEPTH_POLICY_TEST_NO_WRITE = 2;
 	public static final int BORDER_TEXTURE_FORCEFIELD = 1;
 	public static final int BORDER_BLEND_OVERLAY = 1;
 	public static final int CRACK_BLEND_MULTIPLY = 1;
 	public static final int CULL_NONE = 0;
+	public static final int BACKGROUND_SKY_OVERWORLD = 1;
+	public static final int BACKGROUND_SKY_NETHER = 2;
+	public static final int BACKGROUND_SKY_END = 3;
+	public static final int BACKGROUND_SKY_CUSTOM = 4;
+	public static final int BACKGROUND_LOAD_CLEAR = 1;
+	public static final int BACKGROUND_STORE_STORE = 1;
 	private static final float CRACK_FACE_OFFSET = 0.002F;
 	private static final String DIAGNOSTIC_SCENARIO = System.getProperty("mattmc.dev.rustGalWorldOutline.scenario", "").trim();
 	private static final String DIAGNOSTIC_STYLE = System.getProperty("mattmc.dev.rustGalWorldOutline.style", "").trim();
@@ -61,6 +74,9 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final String DIAGNOSTIC_CRACK_STAGE = System.getProperty("mattmc.dev.rustGalWorldCrack.stage", "0").trim();
 	private static final String DIAGNOSTIC_BORDER_SCENARIO = System.getProperty("mattmc.dev.rustGalWorldBorder.scenario", "").trim();
 	private static final String DIAGNOSTIC_BORDER_SCROLL = System.getProperty("mattmc.dev.rustGalWorldBorder.scrollPhase", "").trim();
+	private static final String DIAGNOSTIC_BACKGROUND_SCENARIO = System.getProperty("mattmc.dev.rustGalWorldBackground.scenario", "auto").trim();
+	private static final boolean BLOCK_OUTLINE_DIAGNOSTICS = Boolean.getBoolean("mattmc.dev.blockOutlineDiagnostics");
+	private static final boolean BLOCK_OUTLINE_LEGACY_CONTROL = Boolean.getBoolean("mattmc.dev.rustGalWorldOutline.legacyControl");
 	private static final ResourceLocation FORCEFIELD_LOCATION = ResourceLocation.withDefaultNamespace("textures/misc/forcefield.png");
 	private static final Object LOCK = new Object();
 	private static final List<VulkanicGalBridge.WorldLineSegmentRecord> PENDING_SEGMENTS = new ArrayList<>();
@@ -68,6 +84,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final List<VulkanicGalBridge.WorldBorderQuadRecord> PENDING_BORDER_QUADS = new ArrayList<>();
 	private static final float[] PENDING_VIEW = new float[16];
 	private static final float[] PENDING_PROJECTION = new float[16];
+	private static VulkanicGalBridge.WorldBackgroundRecord pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
 	private static VulkanicGalBridge.WorldBorderAssetRecord pendingWorldBorderAsset =
 		new VulkanicGalBridge.WorldBorderAssetRecord(BORDER_TEXTURE_FORCEFIELD, new byte[0]);
 	private static long worldBorderAssetGeneration = 1L;
@@ -81,29 +98,42 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static boolean lastWorldBorderAssetFallback = true;
 	private static int pendingViewportWidth;
 	private static int pendingViewportHeight;
+	private static int blockOutlineProjectionDiagnosticLogs;
 
 	private RustGalWorldPrimitiveRenderer() {
 	}
 
 	public enum BlockOutlineRoute {
 		JAVA_COMPATIBILITY,
+		RUST_OPENGL_BORROWED_CONTEXT,
 		RUST_VULKAN_WHOLE_FRAME
 	}
 
 	public static BlockOutlineRoute selectBlockOutlineRouteForTests(boolean vulkanBackendSelected, boolean wholeFrameVulkanEnabled) {
-		return vulkanBackendSelected && wholeFrameVulkanEnabled
-			? BlockOutlineRoute.RUST_VULKAN_WHOLE_FRAME
-			: BlockOutlineRoute.JAVA_COMPATIBILITY;
+		if (vulkanBackendSelected) {
+			return wholeFrameVulkanEnabled
+				? BlockOutlineRoute.RUST_VULKAN_WHOLE_FRAME
+				: BlockOutlineRoute.JAVA_COMPATIBILITY;
+		}
+		return BlockOutlineRoute.RUST_OPENGL_BORROWED_CONTEXT;
 	}
 
 	public static BlockOutlineRoute currentBlockOutlineRoute() {
-		return RustGalVulkanWholeFrameMode.enabledForBackend(VulkanicAPI.isVulkanBackendSelected())
-			? BlockOutlineRoute.RUST_VULKAN_WHOLE_FRAME
-			: BlockOutlineRoute.JAVA_COMPATIBILITY;
+		if (BLOCK_OUTLINE_LEGACY_CONTROL) {
+			return BlockOutlineRoute.JAVA_COMPATIBILITY;
+		}
+		return selectBlockOutlineRouteForTests(
+			VulkanicAPI.isVulkanBackendSelected(),
+			RustGalVulkanWholeFrameMode.enabledForBackend(VulkanicAPI.isVulkanBackendSelected())
+		);
 	}
 
 	public static boolean shouldUseRustWholeFrameOutline() {
 		return currentBlockOutlineRoute() == BlockOutlineRoute.RUST_VULKAN_WHOLE_FRAME;
+	}
+
+	public static boolean shouldUseRustOpenGlOutline() {
+		return currentBlockOutlineRoute() == BlockOutlineRoute.RUST_OPENGL_BORROWED_CONTEXT;
 	}
 
 	public static void reloadWorldAssets(ResourceManager resourceManager) {
@@ -228,6 +258,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			PENDING_SEGMENTS.clear();
 			PENDING_CRACK_QUADS.clear();
 			PENDING_BORDER_QUADS.clear();
+			pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
 			viewMatrix.get(PENDING_VIEW);
 			projectionMatrix.get(PENDING_PROJECTION);
 			if (!isFinite(PENDING_VIEW) || !isFinite(PENDING_PROJECTION)) {
@@ -235,6 +266,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				new Matrix4f().get(PENDING_PROJECTION);
 				PENDING_CRACK_QUADS.clear();
 				PENDING_BORDER_QUADS.clear();
+				pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
 				pendingViewportWidth = 0;
 				pendingViewportHeight = 0;
 				return;
@@ -249,10 +281,40 @@ public final class RustGalWorldPrimitiveRenderer {
 			PENDING_SEGMENTS.clear();
 			PENDING_CRACK_QUADS.clear();
 			PENDING_BORDER_QUADS.clear();
+			pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
 			new Matrix4f().get(PENDING_VIEW);
 			new Matrix4f().get(PENDING_PROJECTION);
 			pendingViewportWidth = 0;
 			pendingViewportHeight = 0;
+		}
+	}
+
+	public static void enqueueWorldBackground(ClientLevel level, Camera camera, float partialTick) {
+		if (!shouldUseRustWholeFrameOutline()) {
+			return;
+		}
+		synchronized (LOCK) {
+			int viewportWidth = pendingViewportWidth;
+			int viewportHeight = pendingViewportHeight;
+			if (viewportWidth <= 0 || viewportHeight <= 0 || level == null || camera == null) {
+				pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
+				return;
+			}
+			VulkanicGalBridge.WorldBackgroundRecord diagnostic = diagnosticBackground(viewportWidth, viewportHeight);
+			if (diagnostic.enabled() || isExplicitDiagnosticBackgroundFallback()) {
+				pendingBackground = diagnostic;
+				return;
+			}
+			int color = level.getSkyColor(camera.getPosition(), partialTick);
+			pendingBackground = new VulkanicGalBridge.WorldBackgroundRecord(
+				true,
+				backgroundSkyType(level),
+				BACKGROUND_LOAD_CLEAR,
+				BACKGROUND_STORE_STORE,
+				ARGB.color(255, ARGB.red(color), ARGB.green(color), ARGB.blue(color)),
+				viewportWidth,
+				viewportHeight
+			);
 		}
 	}
 
@@ -617,16 +679,158 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 		boolean highContrast = minecraft.options.highContrastBlockOutline().get();
 		Vec3 cameraPos = camera.getPosition();
+			synchronized (LOCK) {
+				int viewportWidth = pendingViewportWidth;
+				int viewportHeight = pendingViewportHeight;
+				if (highContrast) {
+					appendShapeEdges(shape, blockPos, cameraPos, viewportWidth, viewportHeight, STYLE_HIGH_CONTRAST, DEPTH_POLICY_TEST_NO_WRITE, -16777216, 7.0F);
+					appendShapeEdges(shape, blockPos, cameraPos, viewportWidth, viewportHeight, STYLE_HIGH_CONTRAST, DEPTH_POLICY_TEST_WRITE, -11010079, defaultOutlineLineWidth(viewportWidth));
+				} else {
+					appendShapeEdges(shape, blockPos, cameraPos, viewportWidth, viewportHeight, STYLE_NORMAL, DEPTH_POLICY_TEST_WRITE, 0x66000000, defaultOutlineLineWidth(viewportWidth));
+				}
+			}
+		}
+
+	public static boolean renderOpenGlBlockOutline(
+		Minecraft minecraft,
+		BlockOutlineRenderState blockOutlineRenderState,
+		Vec3 cameraPos
+	) {
+		if (!shouldUseRustOpenGlOutline()) {
+			return false;
+		}
+		if (minecraft == null || blockOutlineRenderState == null || blockOutlineRenderState.shape().isEmpty()) {
+			return false;
+		}
+		PrimitiveFrame frame;
 		synchronized (LOCK) {
 			int viewportWidth = pendingViewportWidth;
 			int viewportHeight = pendingViewportHeight;
-			if (highContrast) {
-				appendShapeEdges(shape, blockPos, cameraPos, viewportWidth, viewportHeight, STYLE_HIGH_CONTRAST, DEPTH_POLICY_TEST_WRITE, -16777216);
-				appendShapeEdges(shape, blockPos, cameraPos, viewportWidth, viewportHeight, STYLE_HIGH_CONTRAST, DEPTH_POLICY_TEST_WRITE, -11010079);
-			} else {
-				appendShapeEdges(shape, blockPos, cameraPos, viewportWidth, viewportHeight, STYLE_NORMAL, DEPTH_POLICY_TEST_WRITE, 0x66000000);
+			if (viewportWidth <= 0 || viewportHeight <= 0) {
+				throw new IllegalStateException("Rust OpenGL block outline requires a seeded world primitive frame");
 			}
+			PENDING_SEGMENTS.clear();
+			int depthPolicy = diagnosticDepthPolicy();
+			if (blockOutlineRenderState.highContrast()) {
+				appendShapeEdges(
+					blockOutlineRenderState.shape(),
+					blockOutlineRenderState.pos(),
+					cameraPos,
+					viewportWidth,
+					viewportHeight,
+						STYLE_HIGH_CONTRAST,
+						DEPTH_POLICY_TEST_NO_WRITE,
+						-16777216,
+						7.0F
+					);
+					appendShapeEdges(
+						blockOutlineRenderState.shape(),
+					blockOutlineRenderState.pos(),
+					cameraPos,
+					viewportWidth,
+					viewportHeight,
+						STYLE_HIGH_CONTRAST,
+						depthPolicy,
+						-11010079,
+						defaultOutlineLineWidth(viewportWidth)
+					);
+				} else {
+					appendShapeEdges(
+					blockOutlineRenderState.shape(),
+					blockOutlineRenderState.pos(),
+					cameraPos,
+					viewportWidth,
+					viewportHeight,
+						STYLE_NORMAL,
+						depthPolicy,
+						0x66000000,
+						defaultOutlineLineWidth(viewportWidth)
+					);
+				}
+			frame = new PrimitiveFrame(
+				viewportWidth,
+				viewportHeight,
+				PENDING_VIEW.clone(),
+				PENDING_PROJECTION.clone(),
+				VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback(),
+				List.copyOf(PENDING_SEGMENTS),
+				List.of(),
+				List.of()
+			);
+			logFirstProjectedLineForDiagnostics(frame);
+			PENDING_SEGMENTS.clear();
 		}
+		return RustGalGuiRenderer.executeWorldPrimitiveFrame(minecraft, frame, "minecraft.world.block-outline");
+	}
+
+	private static void logFirstProjectedLineForDiagnostics(PrimitiveFrame frame) {
+		if (!BLOCK_OUTLINE_DIAGNOSTICS || blockOutlineProjectionDiagnosticLogs >= 16 || frame.segments().isEmpty()) {
+			return;
+		}
+		VulkanicGalBridge.WorldLineSegmentRecord segment = frame.segments().get(0);
+		Matrix4f view = new Matrix4f().set(frame.viewMatrix());
+		Matrix4f projection = new Matrix4f().set(frame.projectionMatrix());
+		ProjectedEndpoint start = projectEndpoint(segment.startX(), segment.startY(), segment.startZ(), view, projection, frame.viewportWidth(), frame.viewportHeight());
+		ProjectedEndpoint end = projectEndpoint(segment.endX(), segment.endY(), segment.endZ(), view, projection, frame.viewportWidth(), frame.viewportHeight());
+		ProjectedEndpoint columnStart = projectEndpointColumnVector(segment.startX(), segment.startY(), segment.startZ(), view, projection, frame.viewportWidth(), frame.viewportHeight());
+		ProjectedEndpoint columnEnd = projectEndpointColumnVector(segment.endX(), segment.endY(), segment.endZ(), view, projection, frame.viewportWidth(), frame.viewportHeight());
+		LOGGER.info(
+			"[MattMC graphics-audit] rust-gal block-outline projected-first-segment viewport={}x{} color=0x{} depthPolicy={} rowStart={} rowEnd={} columnStart={} columnEnd={}",
+			frame.viewportWidth(),
+			frame.viewportHeight(),
+			Integer.toUnsignedString(segment.colorArgb(), 16),
+			segment.depthPolicy(),
+			start,
+			end,
+			columnStart,
+			columnEnd
+		);
+		blockOutlineProjectionDiagnosticLogs++;
+	}
+
+	private static ProjectedEndpoint projectEndpoint(
+		float x,
+		float y,
+		float z,
+		Matrix4f view,
+		Matrix4f projection,
+		int viewportWidth,
+		int viewportHeight
+	) {
+		Vector4f clip = new Vector4f(x, y, z, 1.0F).mul(view).mul(projection);
+		if (!Float.isFinite(clip.x()) || !Float.isFinite(clip.y()) || !Float.isFinite(clip.z()) || !Float.isFinite(clip.w()) || Math.abs(clip.w()) < 1.0E-5F) {
+			return new ProjectedEndpoint(clip.x(), clip.y(), clip.z(), clip.w(), Float.NaN, Float.NaN, false);
+		}
+		float ndcX = clip.x() / clip.w();
+		float ndcY = clip.y() / clip.w();
+		float screenX = (ndcX * 0.5F + 0.5F) * viewportWidth;
+		float screenY = (ndcY * 0.5F + 0.5F) * viewportHeight;
+		return new ProjectedEndpoint(clip.x(), clip.y(), clip.z(), clip.w(), screenX, screenY, Float.isFinite(screenX) && Float.isFinite(screenY));
+	}
+
+	private static ProjectedEndpoint projectEndpointColumnVector(
+		float x,
+		float y,
+		float z,
+		Matrix4f view,
+		Matrix4f projection,
+		int viewportWidth,
+		int viewportHeight
+	) {
+		Vector4f clip = new Vector4f(x, y, z, 1.0F);
+		view.transform(clip);
+		projection.transform(clip);
+		if (!Float.isFinite(clip.x()) || !Float.isFinite(clip.y()) || !Float.isFinite(clip.z()) || !Float.isFinite(clip.w()) || Math.abs(clip.w()) < 1.0E-5F) {
+			return new ProjectedEndpoint(clip.x(), clip.y(), clip.z(), clip.w(), Float.NaN, Float.NaN, false);
+		}
+		float ndcX = clip.x() / clip.w();
+		float ndcY = clip.y() / clip.w();
+		float screenX = (ndcX * 0.5F + 0.5F) * viewportWidth;
+		float screenY = (ndcY * 0.5F + 0.5F) * viewportHeight;
+		return new ProjectedEndpoint(clip.x(), clip.y(), clip.z(), clip.w(), screenX, screenY, Float.isFinite(screenX) && Float.isFinite(screenY));
+	}
+
+	private record ProjectedEndpoint(float clipX, float clipY, float clipZ, float clipW, float screenX, float screenY, boolean valid) {
 	}
 
 	private static boolean enqueueDiagnosticBlockOutline(Camera camera) {
@@ -650,12 +854,12 @@ public final class RustGalWorldPrimitiveRenderer {
 			if (viewportWidth <= 0 || viewportHeight <= 0) {
 				return true;
 			}
-			if (style == STYLE_HIGH_CONTRAST) {
-				appendShapeEdges(shape, blockPos, cameraPos, viewportWidth, viewportHeight, STYLE_HIGH_CONTRAST, depthPolicy, -16777216);
-				appendShapeEdges(shape, blockPos, cameraPos, viewportWidth, viewportHeight, STYLE_HIGH_CONTRAST, depthPolicy, -11010079);
-			} else {
-				appendShapeEdges(shape, blockPos, cameraPos, viewportWidth, viewportHeight, STYLE_NORMAL, depthPolicy, 0x66000000);
-			}
+				if (style == STYLE_HIGH_CONTRAST) {
+					appendShapeEdges(shape, blockPos, cameraPos, viewportWidth, viewportHeight, STYLE_HIGH_CONTRAST, depthPolicy, -16777216, 7.0F);
+					appendShapeEdges(shape, blockPos, cameraPos, viewportWidth, viewportHeight, STYLE_HIGH_CONTRAST, depthPolicy, -11010079, defaultOutlineLineWidth(viewportWidth));
+				} else {
+					appendShapeEdges(shape, blockPos, cameraPos, viewportWidth, viewportHeight, STYLE_NORMAL, depthPolicy, 0x66000000, defaultOutlineLineWidth(viewportWidth));
+				}
 			if (DIAGNOSTIC_DEPTH_PROBE) {
 				appendDepthProbe(camera, viewportWidth, viewportHeight, depthPolicy);
 			}
@@ -698,6 +902,9 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static int diagnosticDepthPolicy() {
 		if ("disabled".equalsIgnoreCase(DIAGNOSTIC_DEPTH_POLICY)) {
 			return DEPTH_POLICY_DISABLED;
+		}
+		if ("test-no-write".equalsIgnoreCase(DIAGNOSTIC_DEPTH_POLICY) || "no-write".equalsIgnoreCase(DIAGNOSTIC_DEPTH_POLICY)) {
+			return DEPTH_POLICY_TEST_NO_WRITE;
 		}
 		return DEPTH_POLICY_TEST_WRITE;
 	}
@@ -770,7 +977,8 @@ public final class RustGalWorldPrimitiveRenderer {
 		int viewportHeight,
 		int style,
 		int depthPolicy,
-		int color
+		int color,
+		float lineWidth
 	) {
 			shape.forAllEdges((x0, y0, z0, x1, y1, z1) -> PENDING_SEGMENTS.add(
 				new VulkanicGalBridge.WorldLineSegmentRecord(
@@ -778,7 +986,7 @@ public final class RustGalWorldPrimitiveRenderer {
 					style,
 					depthPolicy,
 					color,
-					1.0F,
+					lineWidth,
 					(float)(blockPos.getX() + x0 - cameraPos.x()),
 					(float)(blockPos.getY() + y0 - cameraPos.y()),
 					(float)(blockPos.getZ() + z0 - cameraPos.z()),
@@ -876,6 +1084,10 @@ public final class RustGalWorldPrimitiveRenderer {
 			));
 	}
 
+	private static float defaultOutlineLineWidth(int viewportWidth) {
+		return Math.max(2.5F, viewportWidth / 1920.0F * 2.5F);
+	}
+
 	private static void appendWorldBorderQuad(
 		int color,
 		float borderSize,
@@ -923,7 +1135,51 @@ public final class RustGalWorldPrimitiveRenderer {
 			},
 			viewportWidth,
 			viewportHeight
-		));
+			));
+	}
+
+	private static VulkanicGalBridge.WorldBackgroundRecord diagnosticBackground(int viewportWidth, int viewportHeight) {
+		return switch (DIAGNOSTIC_BACKGROUND_SCENARIO) {
+			case "hidden", "invalid", "diagnostic", "blue" -> VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
+			case "overworld-day" -> backgroundRecord(BACKGROUND_SKY_OVERWORLD, 0xFF78A7FF, viewportWidth, viewportHeight);
+			case "overworld-night" -> backgroundRecord(BACKGROUND_SKY_OVERWORLD, 0xFF060915, viewportWidth, viewportHeight);
+			case "nether" -> backgroundRecord(BACKGROUND_SKY_NETHER, 0xFF330808, viewportWidth, viewportHeight);
+			case "end" -> backgroundRecord(BACKGROUND_SKY_END, 0xFF0A0612, viewportWidth, viewportHeight);
+			case "custom" -> backgroundRecord(BACKGROUND_SKY_CUSTOM, 0xFF24402A, viewportWidth, viewportHeight);
+			default -> VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
+		};
+	}
+
+	private static boolean isExplicitDiagnosticBackgroundFallback() {
+		return switch (DIAGNOSTIC_BACKGROUND_SCENARIO) {
+			case "hidden", "invalid", "diagnostic", "blue" -> true;
+			default -> false;
+		};
+	}
+
+	private static VulkanicGalBridge.WorldBackgroundRecord backgroundRecord(int skyType, int colorArgb, int viewportWidth, int viewportHeight) {
+		return new VulkanicGalBridge.WorldBackgroundRecord(
+			true,
+			skyType,
+			BACKGROUND_LOAD_CLEAR,
+			BACKGROUND_STORE_STORE,
+			colorArgb,
+			viewportWidth,
+			viewportHeight
+		);
+	}
+
+	private static int backgroundSkyType(ClientLevel level) {
+		if (level.dimension() == Level.OVERWORLD) {
+			return BACKGROUND_SKY_OVERWORLD;
+		}
+		if (level.dimension() == Level.NETHER) {
+			return BACKGROUND_SKY_NETHER;
+		}
+		if (level.dimension() == Level.END) {
+			return BACKGROUND_SKY_END;
+		}
+		return BACKGROUND_SKY_CUSTOM;
 	}
 
 	private static boolean isFinite(float[] values) {
@@ -958,18 +1214,20 @@ public final class RustGalWorldPrimitiveRenderer {
 			PrimitiveFrame frame = new PrimitiveFrame(
 				pendingViewportWidth,
 				pendingViewportHeight,
-					PENDING_VIEW.clone(),
-					PENDING_PROJECTION.clone(),
-					List.copyOf(PENDING_SEGMENTS),
-					List.copyOf(PENDING_CRACK_QUADS),
-					List.copyOf(PENDING_BORDER_QUADS)
-				);
-				PENDING_SEGMENTS.clear();
-				PENDING_CRACK_QUADS.clear();
-				PENDING_BORDER_QUADS.clear();
-				return frame;
-			}
+				PENDING_VIEW.clone(),
+				PENDING_PROJECTION.clone(),
+				pendingBackground,
+				List.copyOf(PENDING_SEGMENTS),
+				List.copyOf(PENDING_CRACK_QUADS),
+				List.copyOf(PENDING_BORDER_QUADS)
+			);
+			PENDING_SEGMENTS.clear();
+			PENDING_CRACK_QUADS.clear();
+			PENDING_BORDER_QUADS.clear();
+			pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
+			return frame;
 		}
+	}
 
 	private static boolean mayRenderForPlayer(Minecraft minecraft, BlockPos blockPos, BlockState blockState) {
 		if (minecraft.player.getAbilities().mayBuild) {
@@ -988,12 +1246,13 @@ public final class RustGalWorldPrimitiveRenderer {
 		int viewportWidth,
 		int viewportHeight,
 		float[] viewMatrix,
-			float[] projectionMatrix,
-			List<VulkanicGalBridge.WorldLineSegmentRecord> segments,
-			List<VulkanicGalBridge.WorldCrackQuadRecord> crackQuads,
-			List<VulkanicGalBridge.WorldBorderQuadRecord> borderQuads
-		) {
-		}
+		float[] projectionMatrix,
+		VulkanicGalBridge.WorldBackgroundRecord background,
+		List<VulkanicGalBridge.WorldLineSegmentRecord> segments,
+		List<VulkanicGalBridge.WorldCrackQuadRecord> crackQuads,
+		List<VulkanicGalBridge.WorldBorderQuadRecord> borderQuads
+	) {
+	}
 
 	public record WorldBorderAssetMetrics(
 		long generation,

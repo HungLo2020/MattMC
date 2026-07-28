@@ -383,6 +383,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
         cull_mode: CullMode::Back,
         blend: BlendMode::Alpha,
         depth_compare: Some(CompareOp::LessOrEqual),
+        depth_write: true,
         color_formats: vec![TextureFormat::Rgba8Unorm],
         depth_format: Some(TextureFormat::Depth32Float),
     })?;

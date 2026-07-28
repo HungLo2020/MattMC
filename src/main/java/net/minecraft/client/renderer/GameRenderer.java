@@ -924,13 +924,14 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			} else {
 				view.rotation(cameraRotation);
 			}
-			net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginFrame(
-				view,
-				projection,
-				this.minecraft.getWindow().getWidth(),
-				this.minecraft.getWindow().getHeight()
-			);
-			net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueBlockOutline(this.minecraft, this, this.mainCamera);
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginFrame(
+					view,
+					projection,
+					this.minecraft.getWindow().getWidth(),
+					this.minecraft.getWindow().getHeight()
+				);
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueWorldBackground(this.minecraft.level, this.mainCamera, f);
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueBlockOutline(this.minecraft, this, this.mainCamera);
 			this.minecraft.levelRenderer.enqueueRustGalBlockBreakingCracks(this.mainCamera);
 			this.minecraft.levelRenderer.enqueueRustGalWorldBorder(this.mainCamera);
 		}

@@ -1484,6 +1484,142 @@ def deterministic_world_border_pixel_evidence(doc: dict[str, object] | None, sce
     return evidence
 
 
+def deterministic_rust_vulkan_shell_scene_evidence(
+    doc: dict[str, object] | None,
+    background_scenario: object,
+    background_color_argb: object,
+) -> dict[str, object]:
+    scenario_name = str(background_scenario or "").strip().lower()
+    evidence: dict[str, object] = {
+        "checked": False,
+        "status": "not_requested",
+        "scenario": scenario_name or None,
+        "screenshot": None,
+        "regions": {},
+    }
+    captures = doc.get("captures") if isinstance(doc, dict) else None
+    if not isinstance(captures, list) or not captures:
+        evidence["status"] = "missing_capture"
+        return evidence
+    first = captures[0]
+    if not isinstance(first, dict) or not first.get("screenshot"):
+        evidence["status"] = "missing_screenshot"
+        return evidence
+    screenshot = Path(str(first["screenshot"]))
+    evidence["screenshot"] = str(screenshot)
+    if not screenshot.is_file():
+        evidence["status"] = "missing_screenshot_file"
+        return evidence
+    try:
+        from PIL import Image
+    except Exception as exc:  # pragma: no cover - depends on local test environment packaging.
+        evidence["status"] = f"pillow_unavailable:{exc}"
+        return evidence
+
+    def expected_background_rgb() -> tuple[int, int, int] | None:
+        text = str(background_color_argb or "").strip()
+        if len(text) == 8:
+            try:
+                value = int(text, 16)
+                return ((value >> 16) & 0xFF, (value >> 8) & 0xFF, value & 0xFF)
+            except ValueError:
+                return None
+        if scenario_name in {"hidden", "invalid"}:
+            return (16, 40, 218)
+        return None
+
+    def clamp_crop(width: int, height: int, rect: tuple[float, float, float, float]) -> tuple[int, int, int, int]:
+        left = max(0, min(width - 1, int(width * rect[0])))
+        top = max(0, min(height - 1, int(height * rect[1])))
+        right = max(left + 1, min(width, int(width * rect[2])))
+        bottom = max(top + 1, min(height, int(height * rect[3])))
+        return left, top, right, bottom
+
+    def region_summary(image: object, expected_rgb: tuple[int, int, int] | None) -> dict[str, object]:
+        data = list(image.getdata())
+        total = max(1, len(data))
+        average = tuple(int(sum(pixel[channel] for pixel in data) / total) for channel in range(3))
+        non_background = 0
+        green_lines = 0
+        forcefield = 0
+        dark_texture = 0
+        bright_gui = 0
+        for red, green, blue in data:
+            if expected_rgb is not None and max(abs(red - expected_rgb[0]), abs(green - expected_rgb[1]), abs(blue - expected_rgb[2])) > 10:
+                non_background += 1
+            if green >= 120 and green >= red + 35 and green >= blue + 20:
+                green_lines += 1
+            if blue >= 120 and green >= 70 and blue >= red + 45:
+                forcefield += 1
+            if red < 70 and green < 70 and blue < 70:
+                dark_texture += 1
+            if red >= 160 or green >= 160 or blue >= 160:
+                bright_gui += 1
+        return {
+            "average_rgb": average,
+            "non_background_pixels": non_background if expected_rgb is not None else None,
+            "green_line_pixels": green_lines,
+            "forcefield_like_pixels": forcefield,
+            "dark_texture_pixels": dark_texture,
+            "bright_pixels": bright_gui,
+        }
+
+    regions = {
+        "background_color_field": {
+            "rect": (0.04, 0.78, 0.20, 0.93),
+            "expected": "requested semantic clear color, or diagnostic blue fallback when hidden",
+        },
+        "large_block_outline_depth_probe": {
+            "rect": (0.37, 0.30, 0.63, 0.70),
+            "expected": "large outline geometry with visible and depth-overlapped line regions",
+        },
+        "large_crack_textured_surface": {
+            "rect": (0.40, 0.34, 0.60, 0.63),
+            "expected": "crack texture multiply probe on the shell geometry",
+        },
+        "world_border_overlay_plane": {
+            "rect": (0.12, 0.24, 0.88, 0.48),
+            "expected": "visible forcefield/world-border overlay stripe when the border scenario is visible",
+        },
+        "fixed_gui_sprite_group": {
+            "rect": (0.34, 0.00, 0.66, 0.18),
+            "expected": "migrated GUI sprites rendered after world-shell probes",
+        },
+        "alpha_multiply_overlay_blend_probes": {
+            "rect": (0.28, 0.22, 0.72, 0.70),
+            "expected": "alpha GUI, multiply crack, and overlay border probes preserved in one presented frame",
+        },
+    }
+    expected_rgb = expected_background_rgb()
+    try:
+        with Image.open(screenshot) as image:
+            rgb = image.convert("RGB")
+            width, height = rgb.size
+            region_results: dict[str, object] = {}
+            for name, config in regions.items():
+                rect = clamp_crop(width, height, config["rect"])
+                crop = rgb.crop(rect)
+                crop_path = screenshot.with_name(f"rust_vulkan_shell_scene_crop_{name}.png")
+                crop.save(crop_path)
+                region_results[name] = {
+                    "crop": {"left": rect[0], "top": rect[1], "right": rect[2], "bottom": rect[3]},
+                    "crop_path": str(crop_path),
+                    "expected": config["expected"],
+                    **region_summary(crop, expected_rgb),
+                }
+            evidence.update(
+                {
+                    "checked": True,
+                    "status": "complete",
+                    "expected_background_rgb": expected_rgb,
+                    "regions": region_results,
+                }
+            )
+    except Exception as exc:
+        evidence["status"] = f"read_failed:{exc}"
+    return evidence
+
+
 def dh_state_from_text(text: str, meta: dict[str, str]) -> dict[str, object]:
     dh_enabled = bool(re.search(r"DistantHorizons|\[DH-|DH Ready|renderLods|renderDeferredLods", text, re.IGNORECASE))
     world_gen_threads = len(re.findall(r"DH-World Gen Thread\[\d+\]", text))
@@ -2409,6 +2545,7 @@ def normalize_capture_artifact(
     )
     requested_world_crack_scenario = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldCrack.scenario")
     requested_world_crack_stage = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldCrack.stage")
+    requested_world_background_scenario = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldBackground.scenario")
     requested_world_border_scenario = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldBorder.scenario")
     world_outline_pixel_evidence = deterministic_block_outline_pixel_evidence(
         deterministic_doc,
@@ -2417,6 +2554,11 @@ def normalize_capture_artifact(
     world_border_pixel_evidence = deterministic_world_border_pixel_evidence(
         deterministic_doc,
         requested_world_border_scenario,
+    )
+    rust_vulkan_shell_scene_evidence = deterministic_rust_vulkan_shell_scene_evidence(
+        deterministic_doc,
+        requested_world_background_scenario,
+        last_text(combined_logs, r"rust_gal_world_background_color_argb[=: ]+([0-9a-fA-F]+)"),
     )
     rust_gal_world_batches_for_validation = last_number(
         combined_logs, r"rust_gal_world_primitive_batches_executed[=: ]+(\d+)"
@@ -2447,6 +2589,9 @@ def normalize_capture_artifact(
     )
     rust_gal_world_border_draws_for_validation = last_number(
         combined_logs, r"rust_gal_world_border_draws_executed[=: ]+(\d+)"
+    )
+    rust_gal_world_background_clears_for_validation = last_number(
+        combined_logs, r"rust_gal_world_background_clears_executed[=: ]+(\d+)"
     )
     rust_gal_world_depth_creates_for_validation = last_number(
         combined_logs, r"rust_gal_world_depth_attachment_creates[=: ]+(\d+)"
@@ -2479,15 +2624,17 @@ def normalize_capture_artifact(
         validation_messages.append("deterministic correctness capture did not complete")
     world_outline_workload_complete = True
     rust_shell_outline_mode = mode.backend == "rust-vulkan"
+    rust_opengl_outline_mode = target.role == "current" and mode.backend in {"opengl", "rust-opengl"}
+    rust_outline_mode = rust_shell_outline_mode or rust_opengl_outline_mode
     java_outline_route = None
-    if mode.backend in {"opengl", "rust-opengl"}:
+    if not rust_opengl_outline_mode and mode.backend in {"opengl", "rust-opengl"}:
         java_outline_route = "java-opengl"
     elif mode.backend == "vulkan":
         java_outline_route = "java-vulkan"
     outline_target_requested = requested_world_outline_real_target or requested_world_outline_aim_real_target or (
         bool(requested_world_outline_scenario) and requested_world_outline_scenario != "no-target"
     )
-    if outline_target_requested and rust_shell_outline_mode:
+    if outline_target_requested and rust_outline_mode:
         required_outline_counts = {
             "primitive batches": rust_gal_world_batches_for_validation,
             "line segments": rust_gal_world_segments_for_validation,
@@ -2520,21 +2667,31 @@ def normalize_capture_artifact(
                 + ", ".join(missing)
                 + " evidence"
             )
-    elif saved_view_outline_target_required and java_outline_route:
-        java_pick_seen = "block-outline pick type=BLOCK" in combined_logs
-        java_extract_seen = f"block-outline extract route={java_outline_route} target=true" in combined_logs
-        java_draw_seen = f"block-outline draw route={java_outline_route} retained=true" in combined_logs
-        if not java_pick_seen or not java_extract_seen or not java_draw_seen:
+    elif saved_view_outline_target_required:
+        block_pick_seen = "block-outline pick type=BLOCK" in combined_logs
+        if rust_outline_mode:
+            route = "rust-opengl" if rust_opengl_outline_mode else "rust-vulkan"
+            extract_seen = f"block-outline extract route={route} target=true" in combined_logs
+            draw_seen = f"block-outline draw route={route} retained=false" in combined_logs
+        elif java_outline_route:
+            route = java_outline_route
+            extract_seen = f"block-outline extract route={route} target=true" in combined_logs
+            draw_seen = f"block-outline draw route={route} retained=true" in combined_logs
+        else:
+            route = "unknown"
+            extract_seen = False
+            draw_seen = False
+        if not block_pick_seen or not extract_seen or not draw_seen:
             world_outline_workload_complete = False
             missing = []
-            if not java_pick_seen:
+            if not block_pick_seen:
                 missing.append("real BLOCK pick")
-            if not java_extract_seen:
+            if not extract_seen:
                 missing.append("target extraction")
-            if not java_draw_seen:
+            if not draw_seen:
                 missing.append("outline draw")
             validation_messages.append(
-                f"saved-view Java block-outline target required for {java_outline_route} but missing "
+                f"saved-view block-outline target required for {route} but missing "
                 + ", ".join(missing)
                 + " evidence"
             )
@@ -2546,6 +2703,11 @@ def normalize_capture_artifact(
         if java_draw_seen:
             world_outline_workload_complete = False
             validation_messages.append(f"deterministic no-target outline scenario emitted unexpected {java_outline_route} draw")
+    if requested_world_outline_scenario == "no-target" and rust_opengl_outline_mode:
+        unexpected_java_draw_seen = "block-outline draw route=java-opengl retained=true" in combined_logs
+        if unexpected_java_draw_seen:
+            world_outline_workload_complete = False
+            validation_messages.append("deterministic no-target outline scenario emitted unexpected java-opengl draw")
     if (requested_world_outline_real_target or requested_world_outline_aim_real_target) and requested_world_outline_style == "high-contrast":
         if world_outline_pixel_evidence.get("status") != "present":
             world_outline_workload_complete = False
@@ -2604,7 +2766,17 @@ def normalize_capture_artifact(
                 )
     if border_scenario:
         if border_scenario in {"hidden", "far", "no-target"}:
-            if world_border_pixel_evidence.get("status") == "unexpected_present":
+            border_quads_seen = int(rust_gal_world_border_quads_for_validation or 0)
+            real_border_pixels = (
+                int(world_border_pixel_evidence.get("pack_a_signature_pixels") or 0)
+                + int(world_border_pixel_evidence.get("pack_b_signature_pixels") or 0)
+            )
+            if border_quads_seen > 0:
+                real_border_pixels += int(world_border_pixel_evidence.get("vanilla_like_pixels") or 0)
+            if (
+                world_border_pixel_evidence.get("status") == "unexpected_present"
+                and real_border_pixels >= int(world_border_pixel_evidence.get("threshold") or 0)
+            ):
                 world_border_workload_complete = False
                 validation_messages.append(
                     "deterministic hidden/far world-border scenario produced visible border-colored pixels "
@@ -2617,6 +2789,13 @@ def normalize_capture_artifact(
                 f"(pixel evidence status={world_border_pixel_evidence.get('status')}, "
                 f"matching_pixels={world_border_pixel_evidence.get('matching_pixels')})"
             )
+    background_scenario = (requested_world_background_scenario or "").strip().lower()
+    if background_scenario and rust_shell_outline_mode:
+        if background_scenario in {"hidden", "invalid"}:
+            if int(rust_gal_world_background_clears_for_validation or 0) != 0:
+                validation_messages.append("deterministic hidden/invalid world-background scenario emitted a semantic clear")
+        elif int(rust_gal_world_background_clears_for_validation or 0) <= 0:
+            validation_messages.append("deterministic Rust-GAL world-background scenario requested but no semantic background clear executed")
     instrumentation = benchmark_fingerprint["instrumentation"]
     run_type = instrumentation.get("run_type") if isinstance(instrumentation, dict) else "clean-performance"
     diagnostic_hooks = bool(instrumentation.get("diagnostic_hooks")) if isinstance(instrumentation, dict) else False
@@ -2765,6 +2944,10 @@ def normalize_capture_artifact(
     rust_gal_world_border_quads = last_number(combined_logs, r"rust_gal_world_border_quads_executed[=: ]+(\d+)")
     rust_gal_world_border_batches = last_number(combined_logs, r"rust_gal_world_border_batches_executed[=: ]+(\d+)")
     rust_gal_world_border_draws = last_number(combined_logs, r"rust_gal_world_border_draws_executed[=: ]+(\d+)")
+    rust_gal_world_background_clears = last_number(combined_logs, r"rust_gal_world_background_clears_executed[=: ]+(\d+)")
+    rust_gal_world_background_fallbacks = last_number(combined_logs, r"rust_gal_world_background_diagnostic_fallbacks[=: ]+(\d+)")
+    rust_gal_world_background_sky_type = last_number(combined_logs, r"rust_gal_world_background_sky_type[=: ]+(\d+)")
+    rust_gal_world_background_color_argb = last_text(combined_logs, r"rust_gal_world_background_color_argb[=: ]+([0-9a-fA-F]+)")
     rust_gal_world_depth_creates = last_number(combined_logs, r"rust_gal_world_depth_attachment_creates[=: ]+(\d+)")
     rust_gal_world_depth_reuses = last_number(combined_logs, r"rust_gal_world_depth_attachment_reuses[=: ]+(\d+)")
     rust_gal_world_depth_retires = last_number(combined_logs, r"rust_gal_world_depth_attachment_retires[=: ]+(\d+)")
@@ -3029,6 +3212,8 @@ def normalize_capture_artifact(
                 "world_crack_stage": parse_number(requested_world_crack_stage),
                 "world_border_scenario": requested_world_border_scenario or None,
                 "world_border_pixel_evidence": world_border_pixel_evidence,
+                "world_background_scenario": requested_world_background_scenario or None,
+                "rust_vulkan_shell_scene_evidence": rust_vulkan_shell_scene_evidence,
                 "cache_hits": last_number(combined_logs, r"rust_gal_cache_hits[=: ]+(\d+)"),
                 "cache_misses": last_number(combined_logs, r"rust_gal_cache_misses[=: ]+(\d+)"),
                 "queue_depth": last_number(combined_logs, r"rust_gal_queue_depth[=: ]+(\d+)"),
@@ -3046,6 +3231,10 @@ def normalize_capture_artifact(
                 "world_border_quads_executed": rust_gal_world_border_quads,
                 "world_border_batches_executed": rust_gal_world_border_batches,
                 "world_border_draws_executed": rust_gal_world_border_draws,
+                "world_background_clears_executed": rust_gal_world_background_clears,
+                "world_background_diagnostic_fallbacks": rust_gal_world_background_fallbacks,
+                "world_background_sky_type": rust_gal_world_background_sky_type,
+                "world_background_color_argb": rust_gal_world_background_color_argb,
                 "world_depth_attachment_creates": rust_gal_world_depth_creates,
                 "world_depth_attachment_reuses": rust_gal_world_depth_reuses,
                 "world_depth_attachment_retires": rust_gal_world_depth_retires,
@@ -3364,6 +3553,12 @@ def renderdoc_workload_proof(capture_dir: Path) -> dict[str, object]:
         "border_batches": last_number(log_text, r"rust_gal_world_border_batches_executed[=: ]+(\d+)"),
         "border_draws": last_number(log_text, r"rust_gal_world_border_draws_executed[=: ]+(\d+)"),
     }
+    background_counts = {
+        "background_clears": last_number(log_text, r"rust_gal_world_background_clears_executed[=: ]+(\d+)"),
+        "diagnostic_fallbacks": last_number(log_text, r"rust_gal_world_background_diagnostic_fallbacks[=: ]+(\d+)"),
+        "sky_type": last_number(log_text, r"rust_gal_world_background_sky_type[=: ]+(\d+)"),
+    }
+    background_colors = re.findall(r"rust_gal_world_background_color_argb[=: ]+([0-9a-fA-F]+)", log_text)
     acquired = [
         {
             "correlation": int(correlation),
@@ -3445,6 +3640,7 @@ def renderdoc_workload_proof(capture_dir: Path) -> dict[str, object]:
         and abs(item["clear"][2] - 0.855) < 0.01
         for item in begun
     )
+    semantic_background_expected = "expected=semantic-world-background" in log_text or int(background_counts["background_clears"] or 0) > 0
     java_vulkan_frame_markers = len(
         re.findall(r"Vulkan beginFramebufferRenderPass|begin_frame_call_count|Java Vulkan beginFrame|Java Vulkan endFrame|presentTextureToScreen", log_text)
     )
@@ -3455,6 +3651,10 @@ def renderdoc_workload_proof(capture_dir: Path) -> dict[str, object]:
         "outline": outline_counts,
         "crack": crack_counts,
         "border": border_counts,
+        "background": {
+            **background_counts,
+            "color_argb": background_colors[-1] if background_colors else None,
+        },
         "non_zero_outline_workload": all(
             int(outline_counts[key] or 0) > 0
             for key in ("primitive_batches", "line_segments", "line_vertices", "world_draws", "depth_attachment_creates")
@@ -3467,6 +3667,7 @@ def renderdoc_workload_proof(capture_dir: Path) -> dict[str, object]:
             int(border_counts[key] or 0) > 0
             for key in ("border_quads", "border_batches", "border_draws")
         ),
+        "non_zero_background_workload": int(background_counts["background_clears"] or 0) > 0,
         "depth_attachment_evidence": int(outline_counts["depth_attachment_creates"] or 0) > 0
         or int(outline_counts["depth_attachment_reuses"] or 0) > 0,
         "outline_marker_evidence": "minecraft.world.block-outline" in log_text
@@ -3480,6 +3681,7 @@ def renderdoc_workload_proof(capture_dir: Path) -> dict[str, object]:
         "presented_images": presented[-5:],
         "acquired_rendered_presented_image_identity_matches": identity_matches,
         "blue_diagnostic_shell_clear_expected": blue_clear_expected,
+        "semantic_world_background_clear_expected": semantic_background_expected,
         "java_vulkan_frame_marker_count": java_vulkan_frame_markers,
         "rust_shell_marker_count": rust_shell_markers,
     }
@@ -4448,7 +4650,7 @@ def build_capture_command(
     if getattr(args, "mount_health_rows", None) is not None:
         java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.mountHealthRows={args.mount_health_rows}")
         java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.mountHealthRows={args.mount_health_rows}")
-    if kind == "shell" and tool_kind == "capture" and workload_profile in {"correctness", "moving-camera", "settled-static"}:
+    if mode.backend == "rust-vulkan" and tool_kind == "capture" and workload_profile in {"correctness", "moving-camera", "settled-static"}:
         deterministic_stamp = timestamp()
         deterministic_metadata = capture_dir / f"deterministic_camera_capture_{deterministic_stamp}.json"
         deterministic_screenshot_dir = capture_dir / f"deterministic_camera_capture_{deterministic_stamp}"
@@ -4466,6 +4668,8 @@ def build_capture_command(
                 f"-Dmattmc.dev.deterministicCameraCapture.world={args.world}",
                 "-Dmattmc.dev.deterministicCameraCapture.stopAfterComplete=true",
                 "-Dmattmc.dev.deterministicCameraCapture.ackTimeoutFrames=12000",
+                "-Dmattmc.dev.deterministicCameraCapture.poseCount=1",
+                "-Dmattmc.dev.deterministicCameraCapture.yawDelta=0.0",
             ]
         )
     if getattr(args, "player_heart_variant", None):
@@ -4503,6 +4707,8 @@ def build_capture_command(
         java_options.append(f"-Dmattmc.dev.rustGalWorldBorder.scenario={args.world_border_scenario}")
         if getattr(args, "world_border_scroll_phase", ""):
             java_options.append(f"-Dmattmc.dev.rustGalWorldBorder.scrollPhase={args.world_border_scroll_phase}")
+    if getattr(args, "world_background_scenario", ""):
+        java_options.append(f"-Dmattmc.dev.rustGalWorldBackground.scenario={args.world_background_scenario}")
     rust_gal_gui_control = getattr(args, "rust_gal_gui_control", "rust")
     if rust_gal_gui_control == "disabled":
         java_options.append("-Dmattmc.dev.rustGalGui.disabled=true")
@@ -5490,6 +5696,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             "--world-border-scroll-phase",
             default=os.environ.get("MATTMC_WORLD_BORDER_SCROLL_PHASE", ""),
             help="Freeze the deterministic world-border texture scroll phase.",
+        )
+        subparser.add_argument(
+            "--world-background-scenario",
+            choices=("auto", "hidden", "overworld-day", "overworld-night", "nether", "end", "custom"),
+            default=os.environ.get("MATTMC_WORLD_BACKGROUND_SCENARIO", ""),
+            help="Force a deterministic Rust-GAL world-background clear scenario for whole-frame Vulkan captures.",
         )
         subparser.add_argument(
             "--gui-resource-pack-scenario",

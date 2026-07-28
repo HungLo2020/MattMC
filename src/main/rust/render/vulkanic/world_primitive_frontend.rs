@@ -20,12 +20,19 @@ pub const WORLD_MAX_CRACK_QUADS: usize = 512;
 pub const WORLD_MAX_BORDER_QUADS: usize = 64;
 pub const WORLD_DEPTH_POLICY_DISABLED: u32 = 0;
 pub const WORLD_DEPTH_POLICY_TEST_WRITE: u32 = 1;
+pub const WORLD_DEPTH_POLICY_TEST_NO_WRITE: u32 = 2;
 pub const WORLD_STRATUM_WORLD_BORDER: u32 = 80;
 pub const WORLD_STRATUM_BLOCK_OUTLINE: u32 = 100;
 pub const WORLD_STRATUM_BLOCK_BREAKING_CRACK: u32 = 90;
 pub const WORLD_BORDER_TEXTURE_FORCEFIELD: u32 = 1;
 pub const WORLD_BORDER_BLEND_OVERLAY: u32 = 1;
 pub const WORLD_BORDER_CULL_NONE: u32 = 0;
+pub const WORLD_BACKGROUND_SKY_OVERWORLD: u32 = 1;
+pub const WORLD_BACKGROUND_SKY_NETHER: u32 = 2;
+pub const WORLD_BACKGROUND_SKY_END: u32 = 3;
+pub const WORLD_BACKGROUND_SKY_CUSTOM: u32 = 4;
+pub const WORLD_BACKGROUND_LOAD_CLEAR: u32 = 1;
+pub const WORLD_BACKGROUND_STORE_STORE: u32 = 1;
 const WORLD_LINE_HEADER_BYTES: usize = 144;
 const WORLD_LINE_SEGMENT_BYTES: usize = 48;
 const WORLD_LINE_UNIFORM_BYTES: u64 =
@@ -55,10 +62,24 @@ layout(set = 0, binding = 0, std140) uniform WorldLineBatch {
 };
 layout(location = 0) flat out vec4 v_color;
 void main() {
-    int segment = gl_VertexIndex / 2;
-    int endpoint = gl_VertexIndex & 1;
-    vec3 position = endpoint == 0 ? segments[segment].start.xyz : segments[segment].end.xyz;
-    gl_Position = projection * view * vec4(position, 1.0);
+    int segment = gl_VertexIndex / 6;
+    int corner = gl_VertexIndex - segment * 6;
+    int endpoint = (corner == 0 || corner == 3 || corner == 5) ? 0 : 1;
+    float side = (corner == 0 || corner == 1 || corner == 5) ? -1.0 : 1.0;
+    vec3 start = segments[segment].start.xyz * (1.0 - (1.0 / 256.0));
+    vec3 end = segments[segment].end.xyz * (1.0 - (1.0 / 256.0));
+    vec4 start_clip = projection * view * vec4(start, 1.0);
+    vec4 end_clip = projection * view * vec4(end, 1.0);
+    vec2 start_ndc = start_clip.xy / start_clip.w;
+    vec2 end_ndc = end_clip.xy / end_clip.w;
+    vec2 screen_delta = (end_ndc - start_ndc) * viewport.xy;
+    float length_px = max(length(screen_delta), 0.0001);
+    vec2 normal = vec2(-screen_delta.y, screen_delta.x) / length_px;
+    float width_px = max(segments[segment].start.w, 1.0);
+    vec2 offset_ndc = normal * (width_px / viewport.xy) * side;
+    vec4 clip = endpoint == 0 ? start_clip : end_clip;
+    clip.xy += offset_ndc * clip.w;
+    gl_Position = clip;
     v_color = segments[segment].color;
 }
 "#;
@@ -231,6 +252,17 @@ pub struct WorldBorderAssetPayload {
     pub png_bytes: Vec<u8>,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct WorldBackgroundRequest {
+    pub enabled: bool,
+    pub sky_type: u32,
+    pub color_argb: u32,
+    pub load_intent: u32,
+    pub store_intent: u32,
+    pub viewport_width: u32,
+    pub viewport_height: u32,
+}
+
 #[derive(Clone, Debug)]
 pub struct WorldPrimitiveFrame {
     pub frame_id: u64,
@@ -239,6 +271,7 @@ pub struct WorldPrimitiveFrame {
     pub viewport_height: u32,
     pub view_matrix: [f32; 16],
     pub projection_matrix: [f32; 16],
+    pub background: WorldBackgroundRequest,
     pub segments: Vec<WorldLineSegmentRequest>,
     pub crack_quads: Vec<WorldCrackQuadRequest>,
     pub border_quads: Vec<WorldBorderQuadRequest>,
@@ -274,6 +307,10 @@ pub struct WorldPrimitiveSubmitStats {
     pub border_asset_generation: u64,
     pub border_asset_payload_bytes: u64,
     pub border_asset_update_failures: u64,
+    pub background_clear_count: u64,
+    pub background_diagnostic_fallback_count: u64,
+    pub background_sky_type: u64,
+    pub background_color_argb: u64,
 }
 
 struct WorldLineResources {
@@ -284,13 +321,15 @@ struct WorldLineResources {
     resource_set: Handle,
     pipeline_layout: Handle,
     pipeline_depth_disabled: Handle,
+    pipeline_depth_test_no_write: Handle,
     pipeline_depth_test_write: Handle,
 }
 
 impl WorldLineResources {
-    fn handles_in_destroy_order(&self) -> [Handle; 8] {
+    fn handles_in_destroy_order(&self) -> [Handle; 9] {
         [
             self.pipeline_depth_test_write,
+            self.pipeline_depth_test_no_write,
             self.pipeline_depth_disabled,
             self.pipeline_layout,
             self.resource_set,
@@ -490,6 +529,16 @@ impl WorldPrimitiveFrontend {
         }
     }
 
+    pub fn clear_frame_passes_for_targets(&mut self, gal: &mut VulkanicGal, targets: &[Handle]) {
+        let Some(pass) = self.cached_pass else {
+            return;
+        };
+        if targets.contains(&pass.frame_target) {
+            self.cached_pass = None;
+            let _ = gal.destroy(pass.pass);
+        }
+    }
+
     pub fn submit_whole_frame(
         &mut self,
         gal: &mut VulkanicGal,
@@ -498,7 +547,8 @@ impl WorldPrimitiveFrontend {
         frame: WorldPrimitiveFrame,
         gui_ops: Vec<CommandOp>,
     ) -> GalResult<WorldPrimitiveSubmitStats> {
-        let (mut ops, mut stats) = self.append_frame_ops(gal, generation, frame_target, frame)?;
+        let (mut ops, mut stats) =
+            self.append_frame_ops_inner(gal, generation, frame_target, frame, true)?;
         ops.extend(gui_ops);
         stats.command_lists = 1;
         stats.command_ops = ops.len() as u64;
@@ -513,6 +563,28 @@ impl WorldPrimitiveFrontend {
         Ok(stats)
     }
 
+    pub fn submit_partial_frame(
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+        frame_target: Handle,
+        frame: WorldPrimitiveFrame,
+    ) -> GalResult<WorldPrimitiveSubmitStats> {
+        let (ops, mut stats) =
+            self.append_frame_ops_inner(gal, generation, frame_target, frame, false)?;
+        stats.command_lists = 1;
+        stats.command_ops = ops.len() as u64;
+        let token = gal.submit(SubmissionBatch {
+            label: "minecraft.world-primitives.partial-frame".to_string(),
+            command_lists: vec![CommandList::from(CommandListDesc {
+                label: "minecraft.world-primitives.partial-frame.commands".to_string(),
+                operations: ops,
+            })],
+        })?;
+        stats.submission_id = token.submission.0;
+        Ok(stats)
+    }
+
     pub fn append_frame_ops(
         &mut self,
         gal: &mut VulkanicGal,
@@ -520,32 +592,36 @@ impl WorldPrimitiveFrontend {
         frame_target: Handle,
         frame: WorldPrimitiveFrame,
     ) -> GalResult<(Vec<CommandOp>, WorldPrimitiveSubmitStats)> {
-        if !gal
+        self.append_frame_ops_inner(gal, generation, frame_target, frame, true)
+    }
+
+    fn append_frame_ops_inner(
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+        frame_target: Handle,
+        frame: WorldPrimitiveFrame,
+        clear_background: bool,
+    ) -> GalResult<(Vec<CommandOp>, WorldPrimitiveSubmitStats)> {
+        let vulkan_backend = gal
             .capabilities()
             .name
             .to_ascii_lowercase()
-            .contains("vulkan")
+            .contains("vulkan");
+        if !vulkan_backend
+            && (clear_background
+                || frame.background.enabled
+                || !frame.crack_quads.is_empty()
+                || !frame.border_quads.is_empty())
         {
             return Err(GalError::unsupported_feature(
-                "world primitive frontend currently supports the Rust Vulkan whole-frame path only",
+                "OpenGL partial world primitive submit supports line segments only",
             ));
         }
         if self.generation == 0 {
             self.generation = generation;
         }
         validate_frame(&frame)?;
-        if frame.segments.is_empty()
-            && frame.crack_quads.is_empty()
-            && frame.border_quads.is_empty()
-        {
-            return Ok((
-                Vec::new(),
-                WorldPrimitiveSubmitStats {
-                    command_ops: 0,
-                    ..WorldPrimitiveSubmitStats::default()
-                },
-            ));
-        }
         let color_format = gal.frame_target_color_format(frame_target)?;
         let had_resources = self.resources.is_some() && self.resource_format == Some(color_format);
         let had_crack_resources =
@@ -567,7 +643,7 @@ impl WorldPrimitiveFrontend {
         let pass = self.frame_pass(gal, frame_target, depth_view)?;
         let mut stats = WorldPrimitiveSubmitStats {
             segment_count: frame.segments.len() as u64,
-            vertex_count: (frame.segments.len() * 2) as u64,
+            vertex_count: (frame.segments.len() * 6) as u64,
             primitive_batch_count: line_batches(&frame).len() as u64,
             crack_quad_count: frame.crack_quads.len() as u64,
             crack_batch_count: crack_batches(&frame).len() as u64,
@@ -579,6 +655,10 @@ impl WorldPrimitiveFrontend {
             border_asset_generation: self.border_asset_generation,
             border_asset_payload_bytes: self.border_asset_payload_bytes,
             border_asset_update_failures: self.border_asset_update_failures,
+            background_clear_count: u64::from(frame.background.enabled),
+            background_diagnostic_fallback_count: u64::from(!frame.background.enabled),
+            background_sky_type: frame.background.sky_type as u64,
+            background_color_argb: frame.background.color_argb as u64,
             ..WorldPrimitiveSubmitStats::default()
         };
         if !frame.segments.is_empty() && had_resources {
@@ -605,18 +685,38 @@ impl WorldPrimitiveFrontend {
             stats.border_cache_misses = 1;
             stats.resource_creates += 12;
         }
+        let background_color = background_clear_color(&frame.background);
         let batches = line_batches(&frame);
         let crack_batches = crack_batches(&frame);
         let border_batches = border_batches(&frame);
         let mut ops = Vec::with_capacity(
-            4 + batches.len() * 8 + crack_batches.len() * 8 + border_batches.len() * 8,
+            6 + batches.len() * 8 + crack_batches.len() * 8 + border_batches.len() * 8,
         );
-        ops.push(CommandOp::Barrier(texture_barrier(
-            depth_texture,
-            TextureUsageState::Undefined,
-            TextureUsageState::DepthStencilAttachment,
-        )));
-        let mut first_batch = true;
+        if clear_background {
+            ops.push(CommandOp::Barrier(texture_barrier(
+                depth_texture,
+                TextureUsageState::Undefined,
+                TextureUsageState::DepthStencilAttachment,
+            )));
+            ops.push(CommandOp::BeginPass {
+                pass,
+                target: frame_target,
+                colors: vec![PassAttachment {
+                    view: frame_target,
+                    load_op: AttachmentLoadOp::Clear,
+                    store_op: AttachmentStoreOp::Store,
+                    clear_color: Some(background_color),
+                }],
+                depth_stencil: Some(PassAttachment {
+                    view: depth_view,
+                    load_op: AttachmentLoadOp::Clear,
+                    store_op: AttachmentStoreOp::Store,
+                    clear_color: None,
+                }),
+            });
+            ops.push(CommandOp::EndPass);
+        }
+        let mut first_batch = false;
         if !border_batches.is_empty() {
             let resources = self.border_resources.as_ref().ok_or_else(|| {
                 GalError::backend("world border resources vanished before submit")
@@ -641,7 +741,7 @@ impl WorldPrimitiveFrontend {
                 ops.push(CommandOp::BeginPass {
                     pass,
                     target: frame_target,
-                    colors: Vec::new(),
+                    colors: vec![loaded_frame_color_attachment(frame_target)],
                     depth_stencil: Some(PassAttachment {
                         view: depth_view,
                         load_op: if first_batch {
@@ -698,7 +798,7 @@ impl WorldPrimitiveFrontend {
                 ops.push(CommandOp::BeginPass {
                     pass,
                     target: frame_target,
-                    colors: Vec::new(),
+                    colors: vec![loaded_frame_color_attachment(frame_target)],
                     depth_stencil: Some(PassAttachment {
                         view: depth_view,
                         load_op: if first_batch {
@@ -754,7 +854,7 @@ impl WorldPrimitiveFrontend {
             ops.push(CommandOp::BeginPass {
                 pass,
                 target: frame_target,
-                colors: Vec::new(),
+                colors: vec![loaded_frame_color_attachment(frame_target)],
                 depth_stencil: Some(PassAttachment {
                     view: depth_view,
                     load_op: if first_batch {
@@ -766,20 +866,18 @@ impl WorldPrimitiveFrontend {
                     clear_color: None,
                 }),
             });
-            ops.push(CommandOp::BindGraphicsPipeline(
-                if batch.depth_policy == WORLD_DEPTH_POLICY_TEST_WRITE {
-                    resources.pipeline_depth_test_write
-                } else {
-                    resources.pipeline_depth_disabled
-                },
-            ));
+            ops.push(CommandOp::BindGraphicsPipeline(match batch.depth_policy {
+                WORLD_DEPTH_POLICY_TEST_WRITE => resources.pipeline_depth_test_write,
+                WORLD_DEPTH_POLICY_TEST_NO_WRITE => resources.pipeline_depth_test_no_write,
+                _ => resources.pipeline_depth_disabled,
+            }));
             ops.push(CommandOp::BindResourceSet {
                 pipeline_layout: resources.pipeline_layout,
                 set_index: 0,
                 set: resources.resource_set,
             });
             ops.push(CommandOp::Draw {
-                vertices: (batch.count * 2) as u32,
+                vertices: (batch.count * 6) as u32,
                 instances: 1,
             });
             ops.push(CommandOp::EndPass);
@@ -866,23 +964,40 @@ impl WorldPrimitiveFrontend {
                 layout: pipeline_layout,
                 vertex_shader,
                 fragment_shader,
-                topology: PrimitiveTopology::Lines,
+                topology: PrimitiveTopology::Triangles,
                 cull_mode: CullMode::None,
                 blend: BlendMode::Alpha,
-                depth_compare: Some(CompareOp::Always),
+                depth_compare: None,
+                depth_write: false,
                 color_formats: vec![color_format],
                 depth_format: Some(TextureFormat::Depth32Float),
             })?;
             created.push(pipeline_depth_disabled);
+            let pipeline_depth_test_no_write =
+                gal.create_graphics_pipeline(GraphicsPipelineDesc {
+                    label: format!("{label}.pipeline.depth-test-no-write"),
+                    layout: pipeline_layout,
+                    vertex_shader,
+                    fragment_shader,
+                    topology: PrimitiveTopology::Triangles,
+                    cull_mode: CullMode::None,
+                    blend: BlendMode::Alpha,
+                    depth_compare: Some(CompareOp::LessOrEqual),
+                    depth_write: false,
+                    color_formats: vec![color_format],
+                    depth_format: Some(TextureFormat::Depth32Float),
+                })?;
+            created.push(pipeline_depth_test_no_write);
             let pipeline_depth_test_write = gal.create_graphics_pipeline(GraphicsPipelineDesc {
                 label: format!("{label}.pipeline.depth-test-write"),
                 layout: pipeline_layout,
                 vertex_shader,
                 fragment_shader,
-                topology: PrimitiveTopology::Lines,
+                topology: PrimitiveTopology::Triangles,
                 cull_mode: CullMode::None,
                 blend: BlendMode::Alpha,
                 depth_compare: Some(CompareOp::LessOrEqual),
+                depth_write: true,
                 color_formats: vec![color_format],
                 depth_format: Some(TextureFormat::Depth32Float),
             })?;
@@ -895,6 +1010,7 @@ impl WorldPrimitiveFrontend {
                 resource_set,
                 pipeline_layout,
                 pipeline_depth_disabled,
+                pipeline_depth_test_no_write,
                 pipeline_depth_test_write,
             })
         })();
@@ -1067,7 +1183,8 @@ impl WorldPrimitiveFrontend {
                 topology: PrimitiveTopology::Triangles,
                 cull_mode: CullMode::None,
                 blend: BlendMode::Multiply,
-                depth_compare: Some(CompareOp::Always),
+                depth_compare: None,
+                depth_write: false,
                 color_formats: vec![color_format],
                 depth_format: Some(TextureFormat::Depth32Float),
             })?;
@@ -1081,6 +1198,7 @@ impl WorldPrimitiveFrontend {
                 cull_mode: CullMode::None,
                 blend: BlendMode::Multiply,
                 depth_compare: Some(CompareOp::LessOrEqual),
+                depth_write: true,
                 color_formats: vec![color_format],
                 depth_format: Some(TextureFormat::Depth32Float),
             })?;
@@ -1323,7 +1441,8 @@ impl WorldPrimitiveFrontend {
                 topology: PrimitiveTopology::Triangles,
                 cull_mode: CullMode::None,
                 blend: BlendMode::Overlay,
-                depth_compare: Some(CompareOp::Always),
+                depth_compare: None,
+                depth_write: false,
                 color_formats: vec![color_format],
                 depth_format: Some(TextureFormat::Depth32Float),
             })?;
@@ -1337,6 +1456,7 @@ impl WorldPrimitiveFrontend {
                 cull_mode: CullMode::None,
                 blend: BlendMode::Overlay,
                 depth_compare: Some(CompareOp::LessOrEqual),
+                depth_write: true,
                 color_formats: vec![color_format],
                 depth_format: Some(TextureFormat::Depth32Float),
             })?;
@@ -1574,6 +1694,49 @@ fn validate_frame(frame: &WorldPrimitiveFrame) -> GalResult<()> {
             "world primitive viewport must be non-empty",
         ));
     }
+    if frame.background.enabled {
+        if !matches!(
+            frame.background.sky_type,
+            WORLD_BACKGROUND_SKY_OVERWORLD
+                | WORLD_BACKGROUND_SKY_NETHER
+                | WORLD_BACKGROUND_SKY_END
+                | WORLD_BACKGROUND_SKY_CUSTOM
+        ) {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!(
+                    "unknown world background sky type {}",
+                    frame.background.sky_type
+                ),
+            ));
+        }
+        if frame.background.load_intent != WORLD_BACKGROUND_LOAD_CLEAR {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!(
+                    "unknown world background load intent {}",
+                    frame.background.load_intent
+                ),
+            ));
+        }
+        if frame.background.store_intent != WORLD_BACKGROUND_STORE_STORE {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!(
+                    "unknown world background store intent {}",
+                    frame.background.store_intent
+                ),
+            ));
+        }
+        if frame.background.viewport_width != frame.viewport_width
+            || frame.background.viewport_height != frame.viewport_height
+        {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "world background viewport metadata must match the frame viewport",
+            ));
+        }
+    }
     if frame.segments.len() > WORLD_MAX_LINE_SEGMENTS {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
@@ -1629,7 +1792,7 @@ fn validate_frame(frame: &WorldPrimitiveFrame) -> GalResult<()> {
                 format!("unknown world primitive style {}", segment.style),
             ));
         }
-        if segment.depth_policy > WORLD_DEPTH_POLICY_TEST_WRITE {
+        if segment.depth_policy > WORLD_DEPTH_POLICY_TEST_NO_WRITE {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,
                 format!(
@@ -1764,6 +1927,36 @@ fn validate_frame(frame: &WorldPrimitiveFrame) -> GalResult<()> {
     Ok(())
 }
 
+fn background_clear_color(background: &WorldBackgroundRequest) -> super::commands::ClearColor {
+    if background.enabled {
+        argb_clear_color(background.color_argb)
+    } else {
+        super::commands::ClearColor {
+            r: 0.063,
+            g: 0.157,
+            b: 0.855,
+            a: 1.0,
+        }
+    }
+}
+
+fn argb_clear_color(color_argb: u32) -> super::commands::ClearColor {
+    let a = ((color_argb >> 24) & 0xff) as f32 / 255.0;
+    let r = ((color_argb >> 16) & 0xff) as f32 / 255.0;
+    let g = ((color_argb >> 8) & 0xff) as f32 / 255.0;
+    let b = (color_argb & 0xff) as f32 / 255.0;
+    super::commands::ClearColor { r, g, b, a }
+}
+
+fn loaded_frame_color_attachment(frame_target: Handle) -> PassAttachment {
+    PassAttachment {
+        view: frame_target,
+        load_op: AttachmentLoadOp::Load,
+        store_op: AttachmentStoreOp::Store,
+        clear_color: None,
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct LineBatch {
     start: usize,
@@ -1885,7 +2078,7 @@ fn packed_line_uniforms_for_batch(
         for value in segment.start {
             push_f32(&mut out, value);
         }
-        push_f32(&mut out, 1.0);
+        push_f32(&mut out, segment.line_width);
         for value in segment.end {
             push_f32(&mut out, value);
         }
@@ -2200,6 +2393,15 @@ mod tests {
             projection_matrix: [
                 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
             ],
+            background: WorldBackgroundRequest {
+                enabled: true,
+                sky_type: WORLD_BACKGROUND_SKY_OVERWORLD,
+                color_argb: 0xff102844,
+                load_intent: WORLD_BACKGROUND_LOAD_CLEAR,
+                store_intent: WORLD_BACKGROUND_STORE_STORE,
+                viewport_width: 128,
+                viewport_height: 128,
+            },
             segments,
             crack_quads: Vec::new(),
             border_quads: Vec::new(),
@@ -2250,6 +2452,8 @@ mod tests {
         let mut frame = frame(vec![segment(WORLD_DEPTH_POLICY_TEST_WRITE, 0xff000000)]);
         frame.viewport_width = width;
         frame.viewport_height = height;
+        frame.background.viewport_width = width;
+        frame.background.viewport_height = height;
         frame.segments[0].viewport_width = width;
         frame.segments[0].viewport_height = height;
         let mut crack = crack_quad(4, WORLD_DEPTH_POLICY_TEST_WRITE);
@@ -2263,6 +2467,8 @@ mod tests {
         let mut frame = frame(Vec::new());
         frame.viewport_width = width;
         frame.viewport_height = height;
+        frame.background.viewport_width = width;
+        frame.background.viewport_height = height;
         let mut border = border_quad(WORLD_DEPTH_POLICY_TEST_WRITE);
         border.viewport_width = width;
         border.viewport_height = height;
@@ -2297,6 +2503,73 @@ mod tests {
     fn validate_frame_rejects_unknown_depth_policy() {
         let error = validate_frame(&frame(vec![segment(99, 0xff000000)])).unwrap_err();
         assert_eq!(StatusCode::UnknownEnum, error.code);
+    }
+
+    #[test]
+    fn semantic_background_clear_is_first_frame_operation() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        let frame = frame(Vec::new());
+        let (ops, stats) = frontend
+            .append_frame_ops(&mut gal, 1, target, frame)
+            .unwrap();
+
+        assert_eq!(1, stats.background_clear_count);
+        assert_eq!(0, stats.background_diagnostic_fallback_count);
+        assert_eq!(
+            WORLD_BACKGROUND_SKY_OVERWORLD as u64,
+            stats.background_sky_type
+        );
+        assert_eq!(0xff102844, stats.background_color_argb);
+        assert!(matches!(ops.first(), Some(CommandOp::Barrier(_))));
+        let Some(CommandOp::BeginPass { colors, .. }) = ops.get(1) else {
+            panic!("background clear should begin the first pass after the depth barrier");
+        };
+        let clear = colors[0].clear_color.expect("background clear color");
+        assert!((clear.r - (0x10 as f32 / 255.0)).abs() < 0.001);
+        assert!((clear.g - (0x28 as f32 / 255.0)).abs() < 0.001);
+        assert!((clear.b - (0x44 as f32 / 255.0)).abs() < 0.001);
+    }
+
+    #[test]
+    fn diagnostic_background_fallback_remains_explicit() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        let mut frame = frame(Vec::new());
+        frame.background = WorldBackgroundRequest::default();
+
+        let (ops, stats) = frontend
+            .append_frame_ops(&mut gal, 1, target, frame)
+            .unwrap();
+
+        assert_eq!(0, stats.background_clear_count);
+        assert_eq!(1, stats.background_diagnostic_fallback_count);
+        let Some(CommandOp::BeginPass { colors, .. }) = ops.get(1) else {
+            panic!("diagnostic fallback should still clear the shell frame");
+        };
+        let clear = colors[0].clear_color.expect("diagnostic clear color");
+        assert!((clear.r - 0.063).abs() < 0.001);
+        assert!((clear.g - 0.157).abs() < 0.001);
+        assert!((clear.b - 0.855).abs() < 0.001);
+    }
+
+    #[test]
+    fn validate_frame_rejects_malformed_background_metadata() {
+        let mut bad_sky = frame(Vec::new());
+        bad_sky.background.sky_type = 99;
+        assert_eq!(
+            StatusCode::UnknownEnum,
+            validate_frame(&bad_sky).unwrap_err().code
+        );
+
+        let mut bad_viewport = frame(Vec::new());
+        bad_viewport.background.viewport_width = 127;
+        assert_eq!(
+            StatusCode::InvalidArgument,
+            validate_frame(&bad_viewport).unwrap_err().code
+        );
     }
 
     #[test]

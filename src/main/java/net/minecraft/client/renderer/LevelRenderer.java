@@ -30,6 +30,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.SortedSet;
 import net.minecraft.api.EnvType;
@@ -185,6 +187,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	private boolean warned;
 	@Nullable
 	private BlockOutlineFramebufferProbe pendingBlockOutlineFramebufferProbe;
+	@Nullable
+	private BlockOutlineRenderState pendingRustOpenGlPostIrisBlockOutline;
+	@Nullable
+	private Vec3 pendingRustOpenGlPostIrisBlockOutlineCamera;
+	private boolean pendingRustOpenGlPostIrisBlockOutlineTranslucentPass;
 	private final Matrix4f blockOutlineProbeProjection = new Matrix4f();
 	
 	// Sodium: From LevelRendererMixin - fields for Sodium world renderer integration
@@ -518,6 +525,14 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		
 		// Sodium: Store matrices for setupTerrain (from LevelRendererMixin @Inject at="INVOKE cullTerrain")
 		this.matrices = new ChunkRenderMatrices(matrix4f2, matrix4f);
+		if (net.vulkanic.world.RustGalWorldPrimitiveRenderer.shouldUseRustOpenGlOutline()) {
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginFrame(
+				matrix4f,
+				matrix4f2,
+				this.minecraft.getWindow().getWidth(),
+				this.minecraft.getWindow().getHeight()
+			);
+		}
 		
 		// Iris: From MixinLevelRenderer - Render shadow terrain after frustum preparation
 		this.pipeline.renderShadows(this, camera, this.levelRenderState.cameraRenderState);
@@ -651,6 +666,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			net.irisshaders.iris.gl.IrisRenderSystem.setPolygonMode(net.vulkanic.VulkanicPolygonMode.FILL);
 		}
 		this.pipeline.finalizeLevelRendering();
+		this.renderPendingRustOpenGlPostIrisBlockOutline();
 		this.auditPendingBlockOutlineFramebufferProbe("after-iris-final");
 		
 		// Show beta warning once
@@ -1144,7 +1160,39 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		BlockOutlineRenderState blockOutlineRenderState = levelRenderState.blockOutlineRenderState;
 		if (blockOutlineRenderState != null) {
 			if (blockOutlineRenderState.isTranslucent() == bl) {
-				Vec3 vec3 = levelRenderState.cameraRenderState.pos;
+					Vec3 vec3 = levelRenderState.cameraRenderState.pos;
+					if (net.vulkanic.world.RustGalWorldPrimitiveRenderer.shouldUseRustOpenGlOutline()
+						&& this.minecraft.isGameLoadFinished()
+						&& this.minecraft.screen == null
+						&& this.minecraft.getOverlay() == null) {
+						if (net.irisshaders.iris.Iris.isPackInUseQuick()) {
+							this.pendingRustOpenGlPostIrisBlockOutline = blockOutlineRenderState;
+							this.pendingRustOpenGlPostIrisBlockOutlineCamera = vec3;
+							this.pendingRustOpenGlPostIrisBlockOutlineTranslucentPass = bl;
+							auditBlockOutline("queue route=rust-opengl postIris=true translucentPass=" + bl
+								+ " pos=" + blockOutlineRenderState.pos().toShortString()
+								+ " highContrast=" + blockOutlineRenderState.highContrast());
+						} else {
+							RenderTarget rustOutlineTarget = RenderType.lines().iris$getRenderTarget();
+							if (rustOutlineTarget == null) {
+								rustOutlineTarget = this.minecraft.getMainRenderTarget();
+							}
+							try (RenderPass outlinePass = VulkanicAPI.createRenderPass(
+								() -> "Rust GAL block outline",
+								rustOutlineTarget.getColorTextureView(),
+								OptionalInt.empty(),
+								rustOutlineTarget.useDepth ? rustOutlineTarget.getDepthTextureView() : null,
+								OptionalDouble.empty()
+							)) {
+								outlinePass.setPipeline(RenderType.lines().pipeline());
+								this.renderRustOpenGlBlockOutline(blockOutlineRenderState, poseStack, vec3, bl);
+							}
+							auditBlockOutline("draw route=rust-opengl retained=false translucentPass=" + bl
+								+ " pos=" + blockOutlineRenderState.pos().toShortString()
+								+ " highContrast=" + blockOutlineRenderState.highContrast());
+						}
+					return;
+				}
 				BlockOutlineFramebufferProbe framebufferProbe = this.createBlockOutlineFramebufferProbe(blockOutlineRenderState, poseStack, vec3, bl);
 				if (blockOutlineRenderState.highContrast()) {
 					// Iris: Wrap with outline render state shard
@@ -1164,20 +1212,70 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 					net.irisshaders.iris.layer.IsOutlineRenderStateShard.INSTANCE
 				);
 				VertexConsumer vertexConsumer = bufferSource.getBuffer(wrappedType);
-				int i = blockOutlineRenderState.highContrast() ? -11010079 : ARGB.color(102, -16777216);
-				this.renderHitOutline(poseStack, vertexConsumer, vec3.x, vec3.y, vec3.z, blockOutlineRenderState, i);
-				bufferSource.endLastBatch();
-				this.completeBlockOutlineFramebufferProbe(framebufferProbe);
-				auditBlockOutline("draw route=" + javaBlockOutlineRoute()
-					+ " retained=true translucentPass=" + bl
-					+ " pos=" + blockOutlineRenderState.pos().toShortString()
-					+ " highContrast=" + blockOutlineRenderState.highContrast());
+					int i = blockOutlineRenderState.highContrast() ? -11010079 : ARGB.color(102, -16777216);
+					this.renderHitOutline(poseStack, vertexConsumer, vec3.x, vec3.y, vec3.z, blockOutlineRenderState, i);
+					bufferSource.endLastBatch();
+					this.completeBlockOutlineFramebufferProbe(framebufferProbe);
+					String retainedRoute = net.vulkanic.world.RustGalWorldPrimitiveRenderer.shouldUseRustOpenGlOutline()
+						? "java-opengl-pre-ready"
+						: javaBlockOutlineRoute();
+					auditBlockOutline("draw route=" + retainedRoute
+						+ " retained=true translucentPass=" + bl
+						+ " pos=" + blockOutlineRenderState.pos().toShortString()
+						+ " highContrast=" + blockOutlineRenderState.highContrast());
 			}
 		}
 	}
 
+	private void renderPendingRustOpenGlPostIrisBlockOutline() {
+		BlockOutlineRenderState blockOutlineRenderState = this.pendingRustOpenGlPostIrisBlockOutline;
+		Vec3 cameraPos = this.pendingRustOpenGlPostIrisBlockOutlineCamera;
+		boolean translucentPass = this.pendingRustOpenGlPostIrisBlockOutlineTranslucentPass;
+		this.pendingRustOpenGlPostIrisBlockOutline = null;
+		this.pendingRustOpenGlPostIrisBlockOutlineCamera = null;
+		this.pendingRustOpenGlPostIrisBlockOutlineTranslucentPass = false;
+		if (blockOutlineRenderState == null || cameraPos == null) {
+			return;
+		}
+		RenderTarget finalTarget = this.minecraft.getMainRenderTarget();
+		try (RenderPass outlinePass = VulkanicAPI.createRenderPass(
+			() -> "Rust GAL block outline after Iris final",
+			finalTarget.getColorTextureView(),
+			OptionalInt.empty(),
+			finalTarget.useDepth ? finalTarget.getDepthTextureView() : null,
+			OptionalDouble.empty()
+		)) {
+			outlinePass.setPipeline(RenderType.lines().pipeline());
+			this.renderRustOpenGlBlockOutline(blockOutlineRenderState, new PoseStack(), cameraPos, translucentPass);
+		}
+		auditBlockOutline("draw route=rust-opengl retained=false postIris=true translucentPass=" + translucentPass
+			+ " pos=" + blockOutlineRenderState.pos().toShortString()
+			+ " highContrast=" + blockOutlineRenderState.highContrast());
+	}
+
+	private void renderRustOpenGlBlockOutline(BlockOutlineRenderState blockOutlineRenderState, PoseStack poseStack, Vec3 cameraPos, boolean translucentPass) {
+		BlockOutlineFramebufferProbe framebufferProbe = this.createBlockOutlineFramebufferProbe(blockOutlineRenderState, poseStack, cameraPos, translucentPass);
+		net.irisshaders.iris.layer.GbufferPrograms.beginOutline();
+		try {
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginFrame(
+				new Matrix4f(this.matrices.modelView()),
+				new Matrix4f(this.matrices.projection()),
+				this.minecraft.getWindow().getWidth(),
+				this.minecraft.getWindow().getHeight()
+			);
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.renderOpenGlBlockOutline(this.minecraft, blockOutlineRenderState, cameraPos);
+			this.completeBlockOutlineFramebufferProbe(framebufferProbe);
+		} finally {
+			net.irisshaders.iris.layer.GbufferPrograms.endOutline();
+		}
+	}
+
 	private static String javaBlockOutlineRoute() {
-		return VulkanicAPI.isVulkanBackendSelected() ? "java-vulkan" : "java-opengl";
+		return switch (net.vulkanic.world.RustGalWorldPrimitiveRenderer.currentBlockOutlineRoute()) {
+			case RUST_OPENGL_BORROWED_CONTEXT -> "rust-opengl";
+			case RUST_VULKAN_WHOLE_FRAME -> "rust-vulkan";
+			case JAVA_COMPATIBILITY -> VulkanicAPI.isVulkanBackendSelected() ? "java-vulkan" : "java-opengl";
+		};
 	}
 
 	private static void auditBlockOutline(String message) {
@@ -1247,7 +1345,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			"[MattMC graphics-audit] block-outline framebuffer stage={} route={} pos={} highContrast={} translucentPass={} crop={} "
 				+ "drawFb={} readFb={} program={} viewport={} depthTest={} blend={} scissor={} "
 				+ "changedFromBefore={} maxDeltaFromBefore={} sumDeltaFromBefore={} changedFromAfterDraw={} maxDeltaFromAfterDraw={} sumDeltaFromAfterDraw={} "
-				+ "avgRgba={} minRgb={} maxRgb={}",
+				+ "avgRgba={} minRgb={} maxRgb={} outlinePixels={}",
 			stage,
 			javaBlockOutlineRoute(),
 			probe.blockPos(),
@@ -1269,14 +1367,17 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			afterDelta.sumChannelDelta(),
 			sample.averageRgba(),
 			sample.minRgb(),
-			sample.maxRgb()
+			sample.maxRgb(),
+			sample.outlinePixelSummary()
 		);
 	}
 
 	private FramebufferProbeCrop projectedBlockOutlineProbeCrop(BlockOutlineRenderState blockOutlineRenderState, PoseStack poseStack, Vec3 cameraPos) {
 		int width = Math.max(1, this.minecraft.getMainRenderTarget().width);
 		int height = Math.max(1, this.minecraft.getMainRenderTarget().height);
-		Matrix4fc modelView = poseStack.last().pose();
+		Matrix4fc modelView = this.matrices != null
+			? this.matrices.modelView()
+			: poseStack.last().pose();
 		Matrix4fc projection = this.blockOutlineProbeProjection;
 		BlockPos blockPos = blockOutlineRenderState.pos();
 		double baseX = blockPos.getX() - cameraPos.x();
@@ -1474,6 +1575,35 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 				maxB = Math.max(maxB, this.rgba[i + 2] & 0xFF);
 			}
 			return maxR + "," + maxG + "," + maxB;
+		}
+
+		String outlinePixelSummary() {
+			int highContrastCyan = 0;
+			int highContrastBlack = 0;
+			int normalDark = 0;
+			int saturatedGreenBlue = 0;
+			for (int i = 0; i < this.rgba.length; i += 4) {
+				int r = this.rgba[i] & 0xFF;
+				int g = this.rgba[i + 1] & 0xFF;
+				int b = this.rgba[i + 2] & 0xFF;
+				int a = this.rgba[i + 3] & 0xFF;
+				if (Math.abs(r - 87) <= 16 && Math.abs(g - 255) <= 16 && Math.abs(b - 225) <= 16) {
+					highContrastCyan++;
+				}
+				if (r <= 8 && g <= 8 && b <= 8 && a >= 192) {
+					highContrastBlack++;
+				}
+				if (r <= 24 && g <= 24 && b <= 24 && a >= 32) {
+					normalDark++;
+				}
+				if (r <= 128 && g >= 192 && b >= 176) {
+					saturatedGreenBlue++;
+				}
+			}
+			return "cyan=" + highContrastCyan
+				+ ",black=" + highContrastBlack
+				+ ",normalDark=" + normalDark
+				+ ",greenBlue=" + saturatedGreenBlue;
 		}
 	}
 
