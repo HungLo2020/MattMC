@@ -94,6 +94,8 @@ import net.minecraft.hooks.SkyColorHooks;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LightBlock;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.FuelValues;
@@ -128,6 +130,7 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 	public static final Component DEFAULT_QUIT_MESSAGE = Component.translatable("multiplayer.status.quitting");
 	private static final double FLUID_PARTICLE_SPAWN_OFFSET = 0.05;
 	private static final int NORMAL_LIGHT_UPDATES_PER_FRAME = 10;
+	private static int deterministicBlockMarkerSpawnLogs;
 	private static final int LIGHT_UPDATE_QUEUE_SIZE_THRESHOLD = 1000;
 	final EntityTickList tickingEntities = new EntityTickList();
 	private final TransientEntitySectionManager<Entity> entityStorage = new TransientEntitySectionManager(Entity.class, new ClientLevel.EntityCallbacks());
@@ -135,6 +138,7 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 	private final LevelRenderer levelRenderer;
 	private final LevelEventHandler levelEventHandler;
 	private final ClientLevel.ClientLevelData clientLevelData;
+	private String deterministicBlockMarkerSpawnedScenario = "";
 	private final DimensionSpecialEffects effects;
 	private final TickRateManager tickRateManager;
 	@Nullable
@@ -469,6 +473,7 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 			this.doAnimateTick(i, j, k, 16, randomSource, block, mutableBlockPos);
 			this.doAnimateTick(i, j, k, 32, randomSource, block, mutableBlockPos);
 		}
+		this.spawnDeterministicBlockMarkerParticles();
 	}
 
 	@Nullable
@@ -525,6 +530,65 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 					}
 				);
 		}
+	}
+
+	private void spawnDeterministicBlockMarkerParticles() {
+		String scenario = System.getProperty("mattmc.dev.rustGalWorldMaterial.blockMarkerScenario", "").trim();
+		if (scenario.isEmpty() || scenario.equals("hidden")) {
+			return;
+		}
+		if (scenario.equals(this.deterministicBlockMarkerSpawnedScenario)) {
+			return;
+		}
+		if (this.minecraft.player == null) {
+			return;
+		}
+		Vec3 eye = this.minecraft.player.getEyePosition();
+		Vec3 look = this.minecraft.player.getLookAngle();
+		double x = eye.x + look.x * 3.0;
+		double y = eye.y + look.y * 3.0;
+		double z = eye.z + look.z * 3.0;
+		if (scenario.equals("barrier")) {
+			this.addParticle(new BlockParticleOption(ParticleTypes.BLOCK_MARKER, Blocks.BARRIER.defaultBlockState()), x, y, z, 0.0, 0.0, 0.0);
+			this.auditDeterministicBlockMarkerSpawn(scenario, 100, x, y, z);
+			this.deterministicBlockMarkerSpawnedScenario = scenario;
+			return;
+		}
+		if (scenario.equals("lights-all")) {
+			for (int level = 0; level <= 15; level++) {
+				BlockState lightState = Blocks.LIGHT.defaultBlockState().setValue(LightBlock.LEVEL, level);
+				double offsetX = (level % 4 - 1.5) * 0.65;
+				double offsetY = (level / 4 - 1.5) * 0.65;
+				this.addParticle(new BlockParticleOption(ParticleTypes.BLOCK_MARKER, lightState), x + offsetX, y + offsetY, z, 0.0, 0.0, 0.0);
+				this.auditDeterministicBlockMarkerSpawn("light-" + level, 200 + level, x + offsetX, y + offsetY, z);
+			}
+			this.deterministicBlockMarkerSpawnedScenario = scenario;
+			return;
+		}
+		if (scenario.startsWith("light-")) {
+			try {
+				int level = Mth.clamp(Integer.parseInt(scenario.substring("light-".length())), 0, 15);
+				BlockState lightState = Blocks.LIGHT.defaultBlockState().setValue(LightBlock.LEVEL, level);
+				this.addParticle(new BlockParticleOption(ParticleTypes.BLOCK_MARKER, lightState), x, y, z, 0.0, 0.0, 0.0);
+				this.auditDeterministicBlockMarkerSpawn(scenario, 200 + level, x, y, z);
+				this.deterministicBlockMarkerSpawnedScenario = scenario;
+			} catch (NumberFormatException ignored) {
+			}
+		}
+	}
+
+	private void auditDeterministicBlockMarkerSpawn(String scenario, int textureId, double x, double y, double z) {
+		if (deterministicBlockMarkerSpawnLogs >= 16 || !Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
+			return;
+		}
+		deterministicBlockMarkerSpawnLogs++;
+		System.out.println(
+			"[MattMC graphics audit] BlockMarker deterministic particle"
+				+ " scenario=" + scenario
+				+ " texture_id=" + textureId
+				+ " position=" + x + "," + y + "," + z
+				+ " result=spawned"
+		);
 	}
 
 	private void trySpawnDripParticles(BlockPos blockPos, BlockState blockState, ParticleOptions particleOptions, boolean bl) {

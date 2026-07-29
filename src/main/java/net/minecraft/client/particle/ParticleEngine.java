@@ -131,6 +131,16 @@ public class ParticleEngine {
 		}
 	}
 
+	public int enqueueRustGalBlockMarkers(Camera camera, float f) {
+		int enqueued = 0;
+		for (ParticleGroup<?> particleGroup : this.particles.values()) {
+			if (particleGroup instanceof QuadParticleGroup quadParticleGroup) {
+				enqueued += quadParticleGroup.enqueueRustGalBlockMarkers(camera, f);
+			}
+		}
+		return enqueued;
+	}
+
 	public void setLevel(@Nullable ClientLevel clientLevel) {
 		this.level = clientLevel;
 		this.clearParticles();

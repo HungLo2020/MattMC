@@ -44,9 +44,17 @@ pub const WORLD_STRATUM_BLOCK_OUTLINE: u32 = 100;
 pub const WORLD_STRATUM_BLOCK_BREAKING_CRACK: u32 = 90;
 pub const WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY: u32 = 70;
 pub const WORLD_BORDER_TEXTURE_FORCEFIELD: u32 = 1;
-pub const WORLD_MATERIAL_TEXTURE_DEFAULT: u32 = 1;
-pub const WORLD_MATERIAL_ID_DEFAULT_OPAQUE: u32 = 1;
-pub const WORLD_MATERIAL_ID_DEFAULT_CUTOUT: u32 = 2;
+pub const WORLD_MATERIAL_TEXTURE_STONE: u32 = 1;
+pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER: u32 = 100;
+pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00: u32 = 200;
+pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15: u32 =
+    WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00 + 15;
+pub const WORLD_MATERIAL_TEXTURE_DEFAULT: u32 = WORLD_MATERIAL_TEXTURE_STONE;
+pub const WORLD_MATERIAL_ID_OPAQUE_TEXTURED: u32 = 1;
+pub const WORLD_MATERIAL_ID_CUTOUT_TEXTURED: u32 = 2;
+pub const WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT: u32 = 100;
+pub const WORLD_MATERIAL_ID_DEFAULT_OPAQUE: u32 = WORLD_MATERIAL_ID_OPAQUE_TEXTURED;
+pub const WORLD_MATERIAL_ID_DEFAULT_CUTOUT: u32 = WORLD_MATERIAL_ID_CUTOUT_TEXTURED;
 pub const WORLD_BORDER_BLEND_OVERLAY: u32 = 1;
 pub const WORLD_BORDER_CULL_NONE: u32 = 0;
 pub const WORLD_BACKGROUND_SKY_OVERWORLD: u32 = 1;
@@ -850,7 +858,7 @@ impl WorldPrimitiveFrontend {
         let mut overrides = BTreeMap::new();
         let mut payload_bytes = 0u64;
         for payload in payloads {
-            if payload.texture_id != WORLD_MATERIAL_TEXTURE_DEFAULT {
+            if !material::is_known_texture_id(payload.texture_id) {
                 return Err(GalError::ffi(
                     StatusCode::UnknownEnum,
                     format!("unknown world material texture id {}", payload.texture_id),
@@ -2252,7 +2260,7 @@ impl WorldPrimitiveFrontend {
     }
 
     fn world_material_texture_bytes(&self, texture_id: u32) -> GalResult<(Vec<u8>, u32, u32)> {
-        if texture_id != WORLD_MATERIAL_TEXTURE_DEFAULT {
+        if !material::is_known_texture_id(texture_id) {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,
                 format!("unknown world material texture id {texture_id}"),
@@ -2261,7 +2269,7 @@ impl WorldPrimitiveFrontend {
         if let Some(asset) = self.material_asset_overrides.get(&texture_id) {
             return Ok((asset.rgba.clone(), asset.width, asset.height));
         }
-        default_world_material_texture_bytes()
+        bundled_world_material_texture_bytes(texture_id)
     }
 
     fn upload_material_resources(
@@ -3057,11 +3065,101 @@ fn forcefield_texture_bytes() -> GalResult<(Vec<u8>, u32, u32)> {
     )
 }
 
-fn default_world_material_texture_bytes() -> GalResult<(Vec<u8>, u32, u32)> {
-    decode_png_rgba(
-        include_bytes!("../../../resources/assets/minecraft/textures/block/stone.png").as_slice(),
-        "world material default texture",
-    )
+fn bundled_world_material_texture_bytes(texture_id: u32) -> GalResult<(Vec<u8>, u32, u32)> {
+    let (bytes, label) = match texture_id {
+        WORLD_MATERIAL_TEXTURE_STONE => (
+            include_bytes!("../../../resources/assets/minecraft/textures/block/stone.png")
+                .as_slice(),
+            "world material stone texture",
+        ),
+        WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER => (
+            include_bytes!("../../../resources/assets/minecraft/textures/item/barrier.png")
+                .as_slice(),
+            "world material block marker barrier texture",
+        ),
+        WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00 => (
+            include_bytes!("../../../resources/assets/minecraft/textures/item/light_00.png")
+                .as_slice(),
+            "world material block marker light_00 texture",
+        ),
+        201 => (
+            include_bytes!("../../../resources/assets/minecraft/textures/item/light_01.png")
+                .as_slice(),
+            "world material block marker light_01 texture",
+        ),
+        202 => (
+            include_bytes!("../../../resources/assets/minecraft/textures/item/light_02.png")
+                .as_slice(),
+            "world material block marker light_02 texture",
+        ),
+        203 => (
+            include_bytes!("../../../resources/assets/minecraft/textures/item/light_03.png")
+                .as_slice(),
+            "world material block marker light_03 texture",
+        ),
+        204 => (
+            include_bytes!("../../../resources/assets/minecraft/textures/item/light_04.png")
+                .as_slice(),
+            "world material block marker light_04 texture",
+        ),
+        205 => (
+            include_bytes!("../../../resources/assets/minecraft/textures/item/light_05.png")
+                .as_slice(),
+            "world material block marker light_05 texture",
+        ),
+        206 => (
+            include_bytes!("../../../resources/assets/minecraft/textures/item/light_06.png")
+                .as_slice(),
+            "world material block marker light_06 texture",
+        ),
+        207 => (
+            include_bytes!("../../../resources/assets/minecraft/textures/item/light_07.png")
+                .as_slice(),
+            "world material block marker light_07 texture",
+        ),
+        208 => (
+            include_bytes!("../../../resources/assets/minecraft/textures/item/light_08.png")
+                .as_slice(),
+            "world material block marker light_08 texture",
+        ),
+        209 => (
+            include_bytes!("../../../resources/assets/minecraft/textures/item/light_09.png")
+                .as_slice(),
+            "world material block marker light_09 texture",
+        ),
+        210 => (
+            include_bytes!("../../../resources/assets/minecraft/textures/item/light_10.png")
+                .as_slice(),
+            "world material block marker light_10 texture",
+        ),
+        211 => (
+            include_bytes!("../../../resources/assets/minecraft/textures/item/light_11.png")
+                .as_slice(),
+            "world material block marker light_11 texture",
+        ),
+        212 => (
+            include_bytes!("../../../resources/assets/minecraft/textures/item/light_12.png")
+                .as_slice(),
+            "world material block marker light_12 texture",
+        ),
+        213 => (
+            include_bytes!("../../../resources/assets/minecraft/textures/item/light_13.png")
+                .as_slice(),
+            "world material block marker light_13 texture",
+        ),
+        214 => (
+            include_bytes!("../../../resources/assets/minecraft/textures/item/light_14.png")
+                .as_slice(),
+            "world material block marker light_14 texture",
+        ),
+        WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15 => (
+            include_bytes!("../../../resources/assets/minecraft/textures/item/light_15.png")
+                .as_slice(),
+            "world material block marker light_15 texture",
+        ),
+        _ => unreachable!("world material texture id was validated before loading bundled bytes"),
+    };
+    decode_png_rgba(bytes, label)
 }
 
 fn decode_crack_stage(bytes: &[u8]) -> GalResult<Vec<u8>> {

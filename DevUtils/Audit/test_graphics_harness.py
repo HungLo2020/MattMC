@@ -146,6 +146,30 @@ def write_world_crack_probe_image(path: Path, *, variant: str) -> None:
     image.save(path)
 
 
+def write_block_marker_probe_image(path: Path, *, texture_id: int = 100) -> None:
+    from PIL import Image
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image = Image.new("RGB", (1280, 720), (36, 48, 60))
+    left, top, right, bottom = 560, 300, 640, 380
+    if texture_id == 100:
+        for x in range(left, right):
+            for y in range(top, bottom):
+                if abs((x - left) - (y - top)) <= 5:
+                    image.putpixel((x, y), (225, 32, 38))
+                elif x in range(left, left + 8) or x in range(right - 8, right):
+                    image.putpixel((x, y), (225, 32, 38))
+                elif y in range(top, top + 8) or y in range(bottom - 8, bottom):
+                    image.putpixel((x, y), (225, 32, 38))
+                else:
+                    image.putpixel((x, y), (245, 245, 245))
+    else:
+        for x in range(left, right):
+            for y in range(top, bottom):
+                image.putpixel((x, y), (245, 235, 88) if (x + y) % 9 else (250, 250, 250))
+    image.save(path)
+
+
 def write_rust_shell_scene_image(path: Path) -> None:
     from PIL import Image
 
@@ -387,6 +411,64 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
         self.assertIn("VK_LAYER_KHRONOS_validation", text)
         self.assertIn("report_shader_compiler", text)
         self.assertIn("tracy-csvexport", text)
+
+    def test_block_marker_summary_uses_positive_frame_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = harness.MATRIX_MODES[6]
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            screenshot = capture / "block_marker_barrier.png"
+            write_block_marker_probe_image(screenshot, texture_id=100)
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            doc = json.loads(deterministic.read_text(encoding="utf-8"))
+            doc["captures"][0]["screenshot"] = str(screenshot)
+            doc["rustGalWorldMaterialMarkerScenario"] = "barrier"
+            doc["rustGalWorldMaterialMarkers"] = [
+                {
+                    "route": "rust-vulkan-whole-frame",
+                    "textureId": 100,
+                    "center": {"x": 1.5, "y": 80.5, "z": 2.5},
+                    "quadSize": 0.5,
+                    "colorArgb": 0xFFFFFFFF,
+                    "viewport": {"width": 1280, "height": 720},
+                    "projected": True,
+                    "screenBounds": {"left": 560.0, "top": 300.0, "right": 640.0, "bottom": 380.0},
+                }
+            ]
+            deterministic.write_text(json.dumps(doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "\n".join(
+                    [
+                        "-Dmattmc.dev.rustGalWorldMaterial.blockMarkerScenario=barrier",
+                        "Rust VulkanicGAL BlockMarker semantic request route=rust-vulkan-whole-frame texture_id=100 material_id=100 result=queued",
+                        "gal.frame.target.begin backend=vulkan frame=1 material_marker_barrier_quads=1 material_marker_light_quads=0 material_marker_light_level_mask=0 material_marker_last_light_level=-1 material_marker_last_texture_id=100",
+                        "rust_gal_world_material_quads_executed=1",
+                        "rust_gal_world_material_batches_executed=1",
+                        "rust_gal_world_material_draws_executed=1",
+                        "gal.frame.target.begin backend=vulkan frame=2 material_marker_barrier_quads=0 material_marker_light_quads=0 material_marker_light_level_mask=0 material_marker_last_light_level=-1 material_marker_last_texture_id=0",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            artifact = harness.normalize_capture_artifact(
+                target,
+                mode,
+                capture,
+                "correctness",
+                True,
+                ["fake"],
+                0,
+                False,
+            )
+            counters = artifact["metrics"]["rust_gal_slice"]
+            self.assertTrue(artifact["validation"]["complete"])
+            self.assertEqual(counters["world_material_marker_barrier_quads"], 1)
+            self.assertEqual(counters["world_material_marker_last_texture_id"], 100)
+            self.assertEqual("present", counters["world_material_marker_pixel_evidence"]["status"])
+            self.assertEqual([100], counters["world_material_marker_pixel_evidence"]["validated_texture_ids"])
 
     def test_required_tool_fingerprint_uses_shaderc_not_glslang(self) -> None:
         fingerprint = harness.tool_fingerprint()
@@ -929,13 +1011,14 @@ else:
                     player_heart_hardcore=False,
                     player_heart_regeneration=False,
                     game_mode=None,
-                    world_outline_scenario="full-cube",
-                    world_outline_style="normal",
-                    world_outline_depth_policy="test-write",
-                    world_outline_depth_probe=True,
-                    gui_resource_pack_scenario="",
-                    world="Origin",
-                    max_secs=1,
+                world_outline_scenario="full-cube",
+                world_outline_style="normal",
+                world_outline_depth_policy="test-write",
+                world_outline_depth_probe=True,
+                world_material_marker_scenario="light-15",
+                gui_resource_pack_scenario="",
+                world="Origin",
+                max_secs=1,
                     dump_secs=1,
                     client_rss_limit_mb=128,
                     diagnostic=True,
@@ -955,6 +1038,7 @@ else:
                 self.assertEqual(env["MATTMC_RENDERDOC_CMD"], str(renderdoccmd))
                 self.assertEqual(env["MATTMC_RENDERDOC_CAPTURE"], "true")
                 self.assertIn("mattmc.dev.renderdocCapture=true", env["JAVA_TOOL_OPTIONS"])
+                self.assertIn("mattmc.dev.rustGalWorldMaterial.blockMarkerScenario=light-15", env["JAVA_TOOL_OPTIONS"])
             finally:
                 harness.local_renderdoccmd_path = original  # type: ignore[assignment]
 

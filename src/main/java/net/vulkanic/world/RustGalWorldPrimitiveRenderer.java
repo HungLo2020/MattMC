@@ -3,6 +3,7 @@ package net.vulkanic.world;
 import net.minecraft.Util;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.dev.DeterministicCameraCapture;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.state.BlockOutlineRenderState;
@@ -19,6 +20,8 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LightBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.pattern.BlockInWorld;
 import net.minecraft.world.phys.BlockHitResult;
@@ -30,6 +33,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import net.vulkanic.bridge.VulkanicGalBridge;
 import net.logging.LogUtils;
 import org.joml.Matrix4f;
+import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.slf4j.Logger;
@@ -46,6 +50,7 @@ import java.util.Optional;
 public final class RustGalWorldPrimitiveRenderer {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	public static final int STRATUM_WORLD_BORDER = 80;
+	public static final int STRATUM_WORLD_MATERIAL = 70;
 	public static final int STRATUM_WORLD_BLOCK_BREAKING_CRACK = 90;
 	public static final int STRATUM_WORLD_BLOCK_OUTLINE = 100;
 	public static final int STYLE_NORMAL = 1;
@@ -54,6 +59,14 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static final int DEPTH_POLICY_TEST_WRITE = 1;
 	public static final int DEPTH_POLICY_TEST_NO_WRITE = 2;
 	public static final int BORDER_TEXTURE_FORCEFIELD = 1;
+	public static final int MATERIAL_TEXTURE_STONE = 1;
+	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER = 100;
+	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00 = 200;
+	public static final int MATERIAL_ID_BLOCK_MARKER_CUTOUT = 100;
+	public static final int MATERIAL_MODE_OPAQUE = 1;
+	public static final int MATERIAL_MODE_CUTOUT = 2;
+	public static final int WORLD_TOPOLOGY_TRIANGLES = 1;
+	public static final int WORLD_WINDING_CCW = 1;
 	public static final int BORDER_BLEND_OVERLAY = 1;
 	public static final int CRACK_BLEND_MULTIPLY = 1;
 	public static final int CULL_NONE = 0;
@@ -76,6 +89,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final boolean BLOCK_OUTLINE_DIAGNOSTICS = Boolean.getBoolean("mattmc.dev.blockOutlineDiagnostics");
 	private static final boolean CRACK_DISABLED_CONTROL = Boolean.getBoolean("mattmc.dev.rustGalWorldCrack.disabled");
 	private static final ResourceLocation FORCEFIELD_LOCATION = ResourceLocation.withDefaultNamespace("textures/misc/forcefield.png");
+	private static final ResourceLocation BARRIER_MARKER_LOCATION = ResourceLocation.withDefaultNamespace("textures/item/barrier.png");
 	private static final ResourceLocation[] CRACK_STAGE_LOCATIONS = new ResourceLocation[] {
 		ResourceLocation.withDefaultNamespace("textures/block/destroy_stage_0.png"),
 		ResourceLocation.withDefaultNamespace("textures/block/destroy_stage_1.png"),
@@ -88,10 +102,30 @@ public final class RustGalWorldPrimitiveRenderer {
 		ResourceLocation.withDefaultNamespace("textures/block/destroy_stage_8.png"),
 		ResourceLocation.withDefaultNamespace("textures/block/destroy_stage_9.png")
 	};
+	private static final ResourceLocation[] LIGHT_MARKER_LOCATIONS = new ResourceLocation[] {
+		ResourceLocation.withDefaultNamespace("textures/item/light_00.png"),
+		ResourceLocation.withDefaultNamespace("textures/item/light_01.png"),
+		ResourceLocation.withDefaultNamespace("textures/item/light_02.png"),
+		ResourceLocation.withDefaultNamespace("textures/item/light_03.png"),
+		ResourceLocation.withDefaultNamespace("textures/item/light_04.png"),
+		ResourceLocation.withDefaultNamespace("textures/item/light_05.png"),
+		ResourceLocation.withDefaultNamespace("textures/item/light_06.png"),
+		ResourceLocation.withDefaultNamespace("textures/item/light_07.png"),
+		ResourceLocation.withDefaultNamespace("textures/item/light_08.png"),
+		ResourceLocation.withDefaultNamespace("textures/item/light_09.png"),
+		ResourceLocation.withDefaultNamespace("textures/item/light_10.png"),
+		ResourceLocation.withDefaultNamespace("textures/item/light_11.png"),
+		ResourceLocation.withDefaultNamespace("textures/item/light_12.png"),
+		ResourceLocation.withDefaultNamespace("textures/item/light_13.png"),
+		ResourceLocation.withDefaultNamespace("textures/item/light_14.png"),
+		ResourceLocation.withDefaultNamespace("textures/item/light_15.png")
+	};
 	private static final Object LOCK = new Object();
 	private static final List<VulkanicGalBridge.WorldLineSegmentRecord> PENDING_SEGMENTS = new ArrayList<>();
 	private static final List<VulkanicGalBridge.WorldCrackQuadRecord> PENDING_CRACK_QUADS = new ArrayList<>();
 	private static final List<VulkanicGalBridge.WorldBorderQuadRecord> PENDING_BORDER_QUADS = new ArrayList<>();
+	private static final List<VulkanicGalBridge.WorldMaterialQuadRecord> PENDING_MATERIAL_QUADS = new ArrayList<>();
+	private static final List<BlockMarkerDiagnostic> BLOCK_MARKER_DIAGNOSTICS = new ArrayList<>();
 	private static final float[] PENDING_VIEW = new float[16];
 	private static final float[] PENDING_PROJECTION = new float[16];
 	private static VulkanicGalBridge.WorldBackgroundRecord pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
@@ -116,9 +150,20 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static String lastWorldCrackAssetSourcePack = "vanilla";
 	private static String lastWorldCrackAssetSha256 = "fallback";
 	private static boolean lastWorldCrackAssetFallback = true;
+	private static List<VulkanicGalBridge.WorldMaterialAssetRecord> pendingWorldMaterialAssets = List.of();
+	private static long worldMaterialAssetGeneration = 1L;
+	private static long uploadedWorldMaterialAssetGeneration;
+	private static long attemptedWorldMaterialAssetGeneration;
+	private static long lastWorldMaterialAssetPayloadCount;
+	private static long lastWorldMaterialAssetPayloadBytes;
+	private static long worldMaterialAssetUpdateFailures;
+	private static String lastWorldMaterialAssetSourcePack = "vanilla";
+	private static String lastWorldMaterialAssetSha256 = "fallback";
+	private static boolean lastWorldMaterialAssetFallback = true;
 	private static int pendingViewportWidth;
 	private static int pendingViewportHeight;
 	private static int blockOutlineProjectionDiagnosticLogs;
+	private static int blockMarkerEnqueueDiagnosticLogs;
 
 	private RustGalWorldPrimitiveRenderer() {
 	}
@@ -147,6 +192,14 @@ public final class RustGalWorldPrimitiveRenderer {
 		return WorldRenderRoutePolicy.currentCrackRoute().usesRustOpenGl();
 	}
 
+	public static boolean shouldUseRustWholeFrameMaterial() {
+		return WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan();
+	}
+
+	public static boolean shouldUseRustOpenGlMaterial() {
+		return WorldRenderRoutePolicy.currentMaterialRoute().usesRustOpenGl();
+	}
+
 	public static boolean shouldUseRustOpenGlWorldPrimitives() {
 		return shouldUseRustOpenGlOutline()
 			|| shouldUseRustOpenGlCrack()
@@ -160,6 +213,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static void reloadWorldAssets(ResourceManager resourceManager) {
 		WorldBorderAssetResolution resolution = resolveWorldBorderAsset(resourceManager);
 		WorldCrackAssetResolution crackResolution = resolveWorldCrackAssets(resourceManager);
+		WorldMaterialAssetResolution materialResolution = resolveWorldMaterialAssets(resourceManager);
 		synchronized (LOCK) {
 			if (resolution.preserveLastValid()) {
 				worldBorderAssetUpdateFailures++;
@@ -219,6 +273,35 @@ public final class RustGalWorldPrimitiveRenderer {
 						+ " source_pack=" + metricValue(lastWorldCrackAssetSourcePack)
 						+ " fallback=" + lastWorldCrackAssetFallback
 						+ " sha256=" + lastWorldCrackAssetSha256
+				);
+			}
+			if (materialResolution.preserveLastValid()) {
+				worldMaterialAssetUpdateFailures++;
+				auditMessage(
+					"Rust VulkanicGAL world material asset update skipped"
+						+ " reason=java-read-failure"
+						+ " generation=" + worldMaterialAssetGeneration
+						+ " uploaded_generation=" + uploadedWorldMaterialAssetGeneration
+						+ " failures=" + worldMaterialAssetUpdateFailures
+						+ " preserve_last_valid=true"
+				);
+			} else {
+				worldMaterialAssetGeneration++;
+				pendingWorldMaterialAssets = List.copyOf(materialResolution.assets());
+				attemptedWorldMaterialAssetGeneration = Math.min(attemptedWorldMaterialAssetGeneration, uploadedWorldMaterialAssetGeneration);
+				lastWorldMaterialAssetPayloadCount = materialResolution.assets().size();
+				lastWorldMaterialAssetPayloadBytes = materialResolution.payloadBytes();
+				lastWorldMaterialAssetSourcePack = materialResolution.sourcePack();
+				lastWorldMaterialAssetSha256 = materialResolution.sha256();
+				lastWorldMaterialAssetFallback = materialResolution.fallback();
+				auditMessage(
+					"Rust VulkanicGAL world material asset resolved"
+						+ " generation=" + worldMaterialAssetGeneration
+						+ " payloads=" + lastWorldMaterialAssetPayloadCount
+						+ " payload_bytes=" + lastWorldMaterialAssetPayloadBytes
+						+ " source_pack=" + metricValue(lastWorldMaterialAssetSourcePack)
+						+ " fallback=" + lastWorldMaterialAssetFallback
+						+ " sha256=" + lastWorldMaterialAssetSha256
 				);
 			}
 		}
@@ -302,6 +385,44 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
+	public static VulkanicGalBridge.Status flushPendingWorldMaterialAssets(VulkanicGalBridge bridge) {
+		synchronized (LOCK) {
+			if (bridge == null || uploadedWorldMaterialAssetGeneration >= worldMaterialAssetGeneration || attemptedWorldMaterialAssetGeneration >= worldMaterialAssetGeneration) {
+				return null;
+			}
+			attemptedWorldMaterialAssetGeneration = worldMaterialAssetGeneration;
+			try {
+				VulkanicGalBridge.Status status = bridge.updateWorldMaterialAssets(worldMaterialAssetGeneration, pendingWorldMaterialAssets);
+				uploadedWorldMaterialAssetGeneration = worldMaterialAssetGeneration;
+				auditMessage(
+					"Rust VulkanicGAL world material asset update accepted"
+						+ " generation=" + worldMaterialAssetGeneration
+						+ " payloads=" + lastWorldMaterialAssetPayloadCount
+						+ " payload_bytes=" + lastWorldMaterialAssetPayloadBytes
+						+ " source_pack=" + metricValue(lastWorldMaterialAssetSourcePack)
+						+ " fallback=" + lastWorldMaterialAssetFallback
+						+ " uploaded_generation=" + uploadedWorldMaterialAssetGeneration
+				);
+				return status;
+			} catch (RuntimeException error) {
+				worldMaterialAssetUpdateFailures++;
+				LOGGER.error(
+					"Rust VulkanicGAL world material asset update failed for generation {}; preserving last valid atlas",
+					worldMaterialAssetGeneration,
+					error
+				);
+				auditMessage(
+					"Rust VulkanicGAL world material asset update failed"
+						+ " generation=" + worldMaterialAssetGeneration
+						+ " uploaded_generation=" + uploadedWorldMaterialAssetGeneration
+						+ " failures=" + worldMaterialAssetUpdateFailures
+						+ " preserve_last_valid=true"
+				);
+				return null;
+			}
+		}
+	}
+
 	public static WorldBorderAssetMetrics worldBorderAssetMetrics() {
 		synchronized (LOCK) {
 			return new WorldBorderAssetMetrics(
@@ -328,6 +449,21 @@ public final class RustGalWorldPrimitiveRenderer {
 				lastWorldCrackAssetSourcePack,
 				lastWorldCrackAssetSha256,
 				lastWorldCrackAssetFallback
+			);
+		}
+	}
+
+	public static WorldMaterialAssetMetrics worldMaterialAssetMetrics() {
+		synchronized (LOCK) {
+			return new WorldMaterialAssetMetrics(
+				worldMaterialAssetGeneration,
+				uploadedWorldMaterialAssetGeneration,
+				lastWorldMaterialAssetPayloadCount,
+				lastWorldMaterialAssetPayloadBytes,
+				worldMaterialAssetUpdateFailures,
+				lastWorldMaterialAssetSourcePack,
+				lastWorldMaterialAssetSha256,
+				lastWorldMaterialAssetFallback
 			);
 		}
 	}
@@ -404,6 +540,65 @@ public final class RustGalWorldPrimitiveRenderer {
 		);
 	}
 
+	private static WorldMaterialAssetResolution resolveWorldMaterialAssets(ResourceManager resourceManager) {
+		if (resourceManager == null) {
+			return WorldMaterialAssetResolution.fallback("missing-resource-manager");
+		}
+		List<VulkanicGalBridge.WorldMaterialAssetRecord> assets = new ArrayList<>();
+		long payloadBytes = 0L;
+		List<String> sourcePacks = new ArrayList<>();
+		MessageDigest digest = sha256Digest();
+		WorldMaterialAssetCandidate[] candidates = worldMaterialAssetCandidates();
+		for (WorldMaterialAssetCandidate candidate : candidates) {
+			Optional<Resource> resource = resourceManager.getResource(candidate.location());
+			if (resource.isEmpty()) {
+				continue;
+			}
+			String sourcePack = resource.get().sourcePackId();
+			if ("vanilla".equals(sourcePack)) {
+				continue;
+			}
+			try (InputStream input = resource.get().open()) {
+				byte[] bytes = input.readAllBytes();
+				assets.add(new VulkanicGalBridge.WorldMaterialAssetRecord(candidate.textureId(), bytes));
+				payloadBytes += bytes.length;
+				sourcePacks.add(candidate.textureId() + ":" + sourcePack);
+				digest.update((byte)(candidate.textureId() >>> 24));
+				digest.update((byte)(candidate.textureId() >>> 16));
+				digest.update((byte)(candidate.textureId() >>> 8));
+				digest.update((byte)candidate.textureId());
+				digest.update(bytes);
+			} catch (IOException error) {
+				LOGGER.warn(
+					"Failed to read Rust VulkanicGAL world material texture {}; preserving last valid atlas",
+					candidate.location(),
+					error
+				);
+				return WorldMaterialAssetResolution.preserve("read-error");
+			}
+		}
+		if (assets.isEmpty()) {
+			return WorldMaterialAssetResolution.fallback("vanilla");
+		}
+		return new WorldMaterialAssetResolution(
+			assets,
+			payloadBytes,
+			String.join(",", sourcePacks),
+			HexFormat.of().formatHex(digest.digest()),
+			false,
+			false
+		);
+	}
+
+	private static WorldMaterialAssetCandidate[] worldMaterialAssetCandidates() {
+		WorldMaterialAssetCandidate[] candidates = new WorldMaterialAssetCandidate[1 + LIGHT_MARKER_LOCATIONS.length];
+		candidates[0] = new WorldMaterialAssetCandidate(MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER, BARRIER_MARKER_LOCATION);
+		for (int i = 0; i < LIGHT_MARKER_LOCATIONS.length; i++) {
+			candidates[i + 1] = new WorldMaterialAssetCandidate(MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00 + i, LIGHT_MARKER_LOCATIONS[i]);
+		}
+		return candidates;
+	}
+
 	private static MessageDigest sha256Digest() {
 		try {
 			return MessageDigest.getInstance("SHA-256");
@@ -417,22 +612,35 @@ public final class RustGalWorldPrimitiveRenderer {
 			PENDING_SEGMENTS.clear();
 			PENDING_CRACK_QUADS.clear();
 			PENDING_BORDER_QUADS.clear();
+			PENDING_MATERIAL_QUADS.clear();
 			pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
-			viewMatrix.get(PENDING_VIEW);
-			projectionMatrix.get(PENDING_PROJECTION);
-			if (!isFinite(PENDING_VIEW) || !isFinite(PENDING_PROJECTION)) {
-				new Matrix4f().get(PENDING_VIEW);
-				new Matrix4f().get(PENDING_PROJECTION);
-				PENDING_CRACK_QUADS.clear();
-				PENDING_BORDER_QUADS.clear();
-				pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
-				pendingViewportWidth = 0;
-				pendingViewportHeight = 0;
-				return;
-			}
-			pendingViewportWidth = viewportWidth;
-			pendingViewportHeight = viewportHeight;
+			seedFrameMatricesLocked(viewMatrix, projectionMatrix, viewportWidth, viewportHeight);
 		}
+	}
+
+	public static void reseedFrameMatrices(Matrix4f viewMatrix, Matrix4f projectionMatrix, int viewportWidth, int viewportHeight) {
+		synchronized (LOCK) {
+			seedFrameMatricesLocked(viewMatrix, projectionMatrix, viewportWidth, viewportHeight);
+		}
+	}
+
+	private static void seedFrameMatricesLocked(Matrix4f viewMatrix, Matrix4f projectionMatrix, int viewportWidth, int viewportHeight) {
+		viewMatrix.get(PENDING_VIEW);
+		projectionMatrix.get(PENDING_PROJECTION);
+		if (!isFinite(PENDING_VIEW) || !isFinite(PENDING_PROJECTION)) {
+			new Matrix4f().get(PENDING_VIEW);
+			new Matrix4f().get(PENDING_PROJECTION);
+			PENDING_SEGMENTS.clear();
+			PENDING_CRACK_QUADS.clear();
+			PENDING_BORDER_QUADS.clear();
+			PENDING_MATERIAL_QUADS.clear();
+			pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
+			pendingViewportWidth = 0;
+			pendingViewportHeight = 0;
+			return;
+		}
+		pendingViewportWidth = viewportWidth;
+		pendingViewportHeight = viewportHeight;
 	}
 
 	public static void clearFrame() {
@@ -440,6 +648,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			PENDING_SEGMENTS.clear();
 			PENDING_CRACK_QUADS.clear();
 			PENDING_BORDER_QUADS.clear();
+			PENDING_MATERIAL_QUADS.clear();
 			pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
 			new Matrix4f().get(PENDING_VIEW);
 			new Matrix4f().get(PENDING_PROJECTION);
@@ -510,6 +719,196 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
+	public static boolean enqueueBlockMarker(
+		BlockState blockState,
+		Camera camera,
+		double xo,
+		double x,
+		double yo,
+		double y,
+		double zo,
+		double z,
+		float partialTick,
+		float quadSize,
+		int colorArgb
+	) {
+		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentMaterialRoute();
+		if (!route.usesRustOpenGl() && !route.usesRustWholeFrameVulkan()) {
+			return false;
+		}
+		if (blockState == null || camera == null) {
+			throw new IllegalStateException("Rust VulkanicGAL BlockMarker route selected without block state or camera");
+		}
+		int textureId = blockMarkerTextureId(blockState);
+		if (textureId == 0) {
+			throw new IllegalStateException(
+				"Rust VulkanicGAL BlockMarker route selected for unsupported marker block "
+					+ blockState.getBlock().builtInRegistryHolder().key().location()
+			);
+		}
+		synchronized (LOCK) {
+			int viewportWidth = pendingViewportWidth;
+			int viewportHeight = pendingViewportHeight;
+			if (viewportWidth <= 0 || viewportHeight <= 0) {
+				throw new IllegalStateException("Rust VulkanicGAL BlockMarker requires a seeded world primitive frame");
+			}
+			Vec3 cameraPos = camera.getPosition();
+			float centerX = (float)(Mth.lerp(partialTick, xo, x) - cameraPos.x());
+			float centerY = (float)(Mth.lerp(partialTick, yo, y) - cameraPos.y());
+			float centerZ = (float)(Mth.lerp(partialTick, zo, z) - cameraPos.z());
+			float[] vertices = billboardVertices(camera.rotation(), centerX, centerY, centerZ, quadSize);
+			ProjectedBounds projectedBounds = projectBounds(vertices, viewportWidth, viewportHeight);
+			PENDING_MATERIAL_QUADS.add(new VulkanicGalBridge.WorldMaterialQuadRecord(
+				STRATUM_WORLD_MATERIAL,
+				MATERIAL_ID_BLOCK_MARKER_CUTOUT,
+				textureId,
+				MATERIAL_MODE_CUTOUT,
+				DEPTH_POLICY_TEST_WRITE,
+				CULL_NONE,
+				WORLD_TOPOLOGY_TRIANGLES,
+				WORLD_WINDING_CCW,
+				colorArgb,
+				vertices,
+				new float[] {1.0F, 1.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F},
+				viewportWidth,
+				viewportHeight
+			));
+			recordBlockMarkerDiagnostic(
+				route.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame" : "rust-opengl",
+				textureId,
+				centerX,
+				centerY,
+				centerZ,
+				quadSize,
+				colorArgb,
+				viewportWidth,
+				viewportHeight,
+				projectedBounds
+			);
+			if (blockMarkerEnqueueDiagnosticLogs < 16) {
+				blockMarkerEnqueueDiagnosticLogs++;
+				auditMessage("Rust VulkanicGAL BlockMarker semantic request"
+					+ " route=" + (route.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame" : "rust-opengl")
+					+ " texture_id=" + textureId
+					+ " material_id=" + MATERIAL_ID_BLOCK_MARKER_CUTOUT
+					+ " viewport=" + viewportWidth + "x" + viewportHeight
+					+ " center=" + centerX + "," + centerY + "," + centerZ
+					+ " quad_size=" + quadSize
+					+ " result=queued");
+			}
+		}
+		return true;
+	}
+
+	private static void recordBlockMarkerDiagnostic(
+		String route,
+		int textureId,
+		float centerX,
+		float centerY,
+		float centerZ,
+		float quadSize,
+		int colorArgb,
+		int viewportWidth,
+		int viewportHeight,
+		ProjectedBounds projectedBounds
+	) {
+		if (!Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
+			return;
+		}
+		if (BLOCK_MARKER_DIAGNOSTICS.size() >= 256) {
+			BLOCK_MARKER_DIAGNOSTICS.remove(0);
+		}
+		BLOCK_MARKER_DIAGNOSTICS.add(new BlockMarkerDiagnostic(
+			DeterministicCameraCapture.currentRenderedFrameIndex(),
+			route,
+			textureId,
+			centerX,
+			centerY,
+			centerZ,
+			quadSize,
+			colorArgb,
+			viewportWidth,
+			viewportHeight,
+			projectedBounds.valid(),
+			projectedBounds.left(),
+			projectedBounds.top(),
+			projectedBounds.right(),
+			projectedBounds.bottom()
+		));
+	}
+
+	public static List<BlockMarkerDiagnostic> blockMarkerDiagnostics() {
+		synchronized (LOCK) {
+			return List.copyOf(BLOCK_MARKER_DIAGNOSTICS);
+		}
+	}
+
+	public static boolean hasPendingMaterialQuads() {
+		synchronized (LOCK) {
+			return !PENDING_MATERIAL_QUADS.isEmpty();
+		}
+	}
+
+	public static boolean renderOpenGlPendingMaterialQuads(Minecraft minecraft, String producerLabel) {
+		if (!shouldUseRustOpenGlMaterial()) {
+			return false;
+		}
+		PrimitiveFrame frame;
+		synchronized (LOCK) {
+			if (PENDING_MATERIAL_QUADS.isEmpty()) {
+				return false;
+			}
+			int viewportWidth = pendingViewportWidth;
+			int viewportHeight = pendingViewportHeight;
+			if (viewportWidth <= 0 || viewportHeight <= 0) {
+				throw new IllegalStateException("Rust OpenGL world material quads require a seeded world primitive frame");
+			}
+			frame = new PrimitiveFrame(
+				viewportWidth,
+				viewportHeight,
+				PENDING_VIEW.clone(),
+				PENDING_PROJECTION.clone(),
+				VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback(),
+				List.of(),
+				List.of(),
+				List.of(),
+				List.copyOf(PENDING_MATERIAL_QUADS)
+			);
+			PENDING_MATERIAL_QUADS.clear();
+		}
+		auditMessage("Rust VulkanicGAL world material request"
+			+ " route=rust-opengl"
+			+ " producer=" + metricValue(producerLabel)
+			+ " quads=" + frame.materialQuads().size()
+			+ " " + materialMarkerSummary(frame.materialQuads())
+			+ " result=queued");
+		return RustGalFrameCoordinator.executeWorldPrimitiveFrame(minecraft, frame, producerLabel);
+	}
+
+	public static String materialMarkerSummary(List<VulkanicGalBridge.WorldMaterialQuadRecord> materialQuads) {
+		int barrier = 0;
+		int light = 0;
+		int lastTexture = 0;
+		int lastLightLevel = -1;
+		int lightLevelMask = 0;
+		for (VulkanicGalBridge.WorldMaterialQuadRecord quad : materialQuads) {
+			int texture = quad.textureId();
+			lastTexture = texture;
+			if (texture == MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER) {
+				barrier++;
+			} else if (texture >= MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00 && texture < MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00 + 16) {
+				light++;
+				lastLightLevel = texture - MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00;
+				lightLevelMask |= 1 << lastLightLevel;
+			}
+		}
+		return "material_marker_barrier_quads=" + barrier
+			+ " material_marker_light_quads=" + light
+			+ " material_marker_light_level_mask=" + lightLevelMask
+			+ " material_marker_last_light_level=" + lastLightLevel
+			+ " material_marker_last_texture_id=" + lastTexture;
+	}
+
 	public static boolean renderOpenGlBlockBreakingCracks(
 		Minecraft minecraft,
 		List<BlockBreakingRenderState> states,
@@ -576,6 +975,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback(),
 				List.of(),
 				List.copyOf(PENDING_CRACK_QUADS),
+				List.of(),
 				List.of()
 			);
 			PENDING_CRACK_QUADS.clear();
@@ -640,6 +1040,35 @@ public final class RustGalWorldPrimitiveRenderer {
 		String block = state.blockPos == null ? "unknown" : state.blockPos.toShortString();
 		String blockType = state.blockState == null ? "unknown" : state.blockState.getBlock().builtInRegistryHolder().key().location().toString();
 		return "block_" + block + "_stage_" + state.progress + "_type_" + blockType;
+	}
+
+	private static int blockMarkerTextureId(BlockState blockState) {
+		if (blockState.is(Blocks.BARRIER)) {
+			return MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER;
+		}
+		if (blockState.is(Blocks.LIGHT)) {
+			return MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00 + Mth.clamp(blockState.getValue(LightBlock.LEVEL), 0, 15);
+		}
+		return 0;
+	}
+
+	private static float[] billboardVertices(Quaternionf rotation, float centerX, float centerY, float centerZ, float quadSize) {
+		float[][] corners = new float[][] {
+			{1.0F, -1.0F},
+			{1.0F, 1.0F},
+			{-1.0F, 1.0F},
+			{-1.0F, -1.0F}
+		};
+		float[] vertices = new float[12];
+		Quaternionf billboardRotation = new Quaternionf(rotation);
+		for (int i = 0; i < corners.length; i++) {
+			Vector3f vertex = new Vector3f(corners[i][0] * quadSize, corners[i][1] * quadSize, 0.0F);
+			billboardRotation.transform(vertex);
+			vertices[i * 3] = centerX + vertex.x();
+			vertices[i * 3 + 1] = centerY + vertex.y();
+			vertices[i * 3 + 2] = centerZ + vertex.z();
+		}
+		return vertices;
 	}
 
 	public static boolean enqueueWorldBorder(WorldBorderRenderState state, Vec3 cameraPosition, double renderDistance, double depthFar) {
@@ -1024,6 +1453,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback(),
 				List.copyOf(PENDING_SEGMENTS),
 				List.of(),
+				List.of(),
 				List.of()
 			);
 			logFirstProjectedLineForDiagnostics(frame);
@@ -1099,7 +1529,67 @@ public final class RustGalWorldPrimitiveRenderer {
 		return new ProjectedEndpoint(clip.x(), clip.y(), clip.z(), clip.w(), screenX, screenY, Float.isFinite(screenX) && Float.isFinite(screenY));
 	}
 
+	private static ProjectedBounds projectBounds(float[] vertices, int viewportWidth, int viewportHeight) {
+		if (vertices.length < 12 || viewportWidth <= 0 || viewportHeight <= 0) {
+			return ProjectedBounds.invalid();
+		}
+		Matrix4f view = new Matrix4f().set(PENDING_VIEW);
+		Matrix4f projection = new Matrix4f().set(PENDING_PROJECTION);
+		float minX = Float.POSITIVE_INFINITY;
+		float minY = Float.POSITIVE_INFINITY;
+		float maxX = Float.NEGATIVE_INFINITY;
+		float maxY = Float.NEGATIVE_INFINITY;
+		for (int i = 0; i < 4; i++) {
+			ProjectedEndpoint projected = projectEndpointColumnVector(
+				vertices[i * 3],
+				vertices[i * 3 + 1],
+				vertices[i * 3 + 2],
+				view,
+				projection,
+				viewportWidth,
+				viewportHeight
+			);
+			if (!projected.valid()) {
+				return ProjectedBounds.invalid();
+			}
+			minX = Math.min(minX, projected.screenX());
+			minY = Math.min(minY, projected.screenY());
+			maxX = Math.max(maxX, projected.screenX());
+			maxY = Math.max(maxY, projected.screenY());
+		}
+		float left = Mth.clamp(Math.min(minX, maxX), 0.0F, viewportWidth);
+		float right = Mth.clamp(Math.max(minX, maxX), 0.0F, viewportWidth);
+		float top = Mth.clamp(Math.min(minY, maxY), 0.0F, viewportHeight);
+		float bottom = Mth.clamp(Math.max(minY, maxY), 0.0F, viewportHeight);
+		return new ProjectedBounds(left, top, right, bottom, right > left && bottom > top);
+	}
+
 	private record ProjectedEndpoint(float clipX, float clipY, float clipZ, float clipW, float screenX, float screenY, boolean valid) {
+	}
+
+	private record ProjectedBounds(float left, float top, float right, float bottom, boolean valid) {
+		private static ProjectedBounds invalid() {
+			return new ProjectedBounds(Float.NaN, Float.NaN, Float.NaN, Float.NaN, false);
+		}
+	}
+
+	public record BlockMarkerDiagnostic(
+		long frameIndex,
+		String route,
+		int textureId,
+		float centerX,
+		float centerY,
+		float centerZ,
+		float quadSize,
+		int colorArgb,
+		int viewportWidth,
+		int viewportHeight,
+		boolean projected,
+		float screenLeft,
+		float screenTop,
+		float screenRight,
+		float screenBottom
+	) {
 	}
 
 	private static boolean enqueueDiagnosticBlockOutline(Camera camera) {
@@ -1488,11 +1978,13 @@ public final class RustGalWorldPrimitiveRenderer {
 				pendingBackground,
 				List.copyOf(PENDING_SEGMENTS),
 				List.copyOf(PENDING_CRACK_QUADS),
-				List.copyOf(PENDING_BORDER_QUADS)
+				List.copyOf(PENDING_BORDER_QUADS),
+				List.copyOf(PENDING_MATERIAL_QUADS)
 			);
 			PENDING_SEGMENTS.clear();
 			PENDING_CRACK_QUADS.clear();
 			PENDING_BORDER_QUADS.clear();
+			PENDING_MATERIAL_QUADS.clear();
 			pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
 			return frame;
 		}
@@ -1519,7 +2011,8 @@ public final class RustGalWorldPrimitiveRenderer {
 		VulkanicGalBridge.WorldBackgroundRecord background,
 		List<VulkanicGalBridge.WorldLineSegmentRecord> segments,
 		List<VulkanicGalBridge.WorldCrackQuadRecord> crackQuads,
-		List<VulkanicGalBridge.WorldBorderQuadRecord> borderQuads
+		List<VulkanicGalBridge.WorldBorderQuadRecord> borderQuads,
+		List<VulkanicGalBridge.WorldMaterialQuadRecord> materialQuads
 	) {
 	}
 
@@ -1536,6 +2029,18 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	public record WorldCrackAssetMetrics(
+		long generation,
+		long uploadedGeneration,
+		long payloadCount,
+		long payloadBytes,
+		long failures,
+		String sourcePack,
+		String sha256,
+		boolean fallback
+	) {
+	}
+
+	public record WorldMaterialAssetMetrics(
 		long generation,
 		long uploadedGeneration,
 		long payloadCount,
@@ -1572,5 +2077,25 @@ public final class RustGalWorldPrimitiveRenderer {
 		private static WorldCrackAssetResolution preserve(String sourcePack) {
 			return new WorldCrackAssetResolution(List.of(), 0L, sourcePack, "preserve-last-valid", true, true);
 		}
+	}
+
+	private record WorldMaterialAssetResolution(
+		List<VulkanicGalBridge.WorldMaterialAssetRecord> assets,
+		long payloadBytes,
+		String sourcePack,
+		String sha256,
+		boolean fallback,
+		boolean preserveLastValid
+	) {
+		private static WorldMaterialAssetResolution fallback(String sourcePack) {
+			return new WorldMaterialAssetResolution(List.of(), 0L, sourcePack, "fallback", true, false);
+		}
+
+		private static WorldMaterialAssetResolution preserve(String sourcePack) {
+			return new WorldMaterialAssetResolution(List.of(), 0L, sourcePack, "preserve-last-valid", true, true);
+		}
+	}
+
+	private record WorldMaterialAssetCandidate(int textureId, ResourceLocation location) {
 	}
 }

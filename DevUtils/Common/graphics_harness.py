@@ -8,6 +8,7 @@ import csv
 import hashlib
 import io
 import json
+import math
 import os
 import platform
 import re
@@ -1402,6 +1403,7 @@ def deterministic_world_border_pixel_evidence(doc: dict[str, object] | None, sce
     if not isinstance(first, dict) or not first.get("screenshot"):
         evidence["status"] = "missing_screenshot"
         return evidence
+    capture_frame = parse_number(first.get("renderedFrameIndex"))
     screenshot = Path(str(first["screenshot"]))
     evidence["screenshot"] = str(screenshot)
     if not screenshot.is_file():
@@ -1513,6 +1515,7 @@ def deterministic_world_crack_pixel_evidence(doc: dict[str, object] | None, scen
     if not isinstance(first, dict) or not first.get("screenshot"):
         evidence["status"] = "missing_screenshot"
         return evidence
+    capture_frame = parse_number(first.get("renderedFrameIndex"))
     screenshot = Path(str(first["screenshot"]))
     evidence["screenshot"] = str(screenshot)
     if not screenshot.is_file():
@@ -1583,6 +1586,290 @@ def deterministic_world_crack_pixel_evidence(doc: dict[str, object] | None, scen
     except Exception as exc:
         evidence["status"] = f"read_failed:{exc}"
     return evidence
+
+
+def deterministic_world_material_marker_pixel_evidence(
+    doc: dict[str, object] | None,
+    scenario: object,
+) -> dict[str, object]:
+    scenario_name = str(scenario or "").strip().lower()
+    evidence: dict[str, object] = {
+        "checked": False,
+        "status": "not_requested",
+        "scenario": scenario_name or None,
+        "screenshot": None,
+        "markers_reported": 0,
+        "expected_texture_ids": [],
+        "validated_texture_ids": [],
+        "crops": [],
+        "matching_pixels": 0,
+        "texture_signature": "unknown",
+        "orientation_status": "not_checked",
+        "position_status": "not_checked",
+        "threshold": 96,
+    }
+    if not scenario_name:
+        return evidence
+    expected_texture_ids = expected_block_marker_texture_ids(scenario_name)
+    evidence["expected_texture_ids"] = expected_texture_ids
+    captures = doc.get("captures") if isinstance(doc, dict) else None
+    markers = doc.get("rustGalWorldMaterialMarkers") if isinstance(doc, dict) else None
+    if not isinstance(markers, list):
+        markers = []
+    evidence["markers_reported"] = len(markers)
+    if scenario_name == "hidden":
+        evidence.update(
+            {
+                "checked": True,
+                "status": "absent_expected" if not markers else "unexpected_marker_metadata",
+                "position_status": "absent_expected",
+                "orientation_status": "absent_expected",
+            }
+        )
+        return evidence
+    if not expected_texture_ids:
+        evidence["status"] = "unknown_scenario"
+        return evidence
+    if not isinstance(captures, list) or not captures:
+        evidence["status"] = "missing_capture"
+        return evidence
+    first = captures[0]
+    if not isinstance(first, dict) or not first.get("screenshot"):
+        evidence["status"] = "missing_screenshot"
+        return evidence
+    capture_frame = parse_number(first.get("renderedFrameIndex"))
+    screenshot = Path(str(first["screenshot"]))
+    evidence["screenshot"] = str(screenshot)
+    if not screenshot.is_file():
+        evidence["status"] = "missing_screenshot_file"
+        return evidence
+    try:
+        from PIL import Image
+    except Exception as exc:  # pragma: no cover - depends on local test environment packaging.
+        evidence["status"] = f"pillow_unavailable:{exc}"
+        return evidence
+    try:
+        with Image.open(screenshot) as image:
+            rgb = image.convert("RGB")
+            validated: list[int] = []
+            crops: list[dict[str, object]] = []
+            total_matching = 0
+            signatures = {"vanilla-barrier": 0, "vanilla-light": 0, "pack-a": 0, "pack-b": 0}
+            orientation_ok = True
+            for texture_id in expected_texture_ids:
+                frame_filtered_markers = markers
+                if capture_frame is not None:
+                    exact_or_near = [
+                        marker for marker in markers
+                        if isinstance(marker, dict)
+                        and marker.get("frameIndex") is not None
+                        and abs(int(marker.get("frameIndex") or -999999) - int(capture_frame)) <= 1
+                    ]
+                    if exact_or_near:
+                        frame_filtered_markers = exact_or_near
+                candidates = [
+                    marker for marker in frame_filtered_markers
+                    if isinstance(marker, dict)
+                    and int(marker.get("textureId") or -1) == texture_id
+                    and marker.get("projected") is True
+                    and isinstance(marker.get("screenBounds"), dict)
+                ]
+                best: dict[str, object] | None = None
+                for marker in candidates:
+                    bounds = marker["screenBounds"]
+                    assert isinstance(bounds, dict)
+                    for mirrored in (False, True):
+                        crop_box = marker_crop_box(bounds, rgb.width, rgb.height, mirrored_y=mirrored)
+                        if crop_box is None:
+                            continue
+                        crop = rgb.crop(crop_box)
+                        stats = marker_crop_stats(crop, texture_id)
+                        if best is None or int(stats["matching_pixels"]) > int(best["matching_pixels"]):
+                            crop_path = screenshot.with_name(
+                                f"world_material_marker_crop_{scenario_name}_{texture_id}_{'mirrored' if mirrored else 'projected'}.png"
+                            )
+                            crop.save(crop_path)
+                            best = {
+                                **stats,
+                                "texture_id": texture_id,
+                                "crop": {
+                                    "left": crop_box[0],
+                                    "top": crop_box[1],
+                                    "right": crop_box[2],
+                                    "bottom": crop_box[3],
+                                    "mirrored_y": mirrored,
+                                },
+                                "crop_path": str(crop_path),
+                                "route": marker.get("route"),
+                                "center": marker.get("center"),
+                                "quad_size": marker.get("quadSize"),
+                            }
+                if best is None:
+                    crops.append({"texture_id": texture_id, "status": "missing_projected_marker"})
+                    orientation_ok = False
+                    continue
+                crops.append(best)
+                matching = int(best["matching_pixels"])
+                total_matching += matching
+                signatures["vanilla-barrier"] += int(best.get("vanilla_barrier_pixels", 0))
+                signatures["vanilla-light"] += int(best.get("vanilla_light_pixels", 0))
+                signatures["pack-a"] += int(best.get("pack_a_pixels", 0))
+                signatures["pack-b"] += int(best.get("pack_b_pixels", 0))
+                if matching >= int(evidence["threshold"]):
+                    validated.append(texture_id)
+                else:
+                    orientation_ok = False
+                if best.get("orientation_status") == "failed":
+                    orientation_ok = False
+            evidence.update(
+                {
+                    "checked": True,
+                    "status": "present" if set(validated) == set(expected_texture_ids) else "absent",
+                    "validated_texture_ids": validated,
+                    "crops": crops,
+                    "matching_pixels": total_matching,
+                    "texture_signature": max(signatures.items(), key=lambda item: item[1])[0],
+                    "orientation_status": "passed" if orientation_ok and validated else "failed",
+                    "position_status": "projected_crop_hit" if validated else "missing_projected_crop_hit",
+                }
+            )
+    except Exception as exc:
+        evidence["status"] = f"read_failed:{exc}"
+    return evidence
+
+
+def expected_block_marker_texture_ids(scenario_name: str) -> list[int]:
+    if scenario_name == "barrier":
+        return [100]
+    if scenario_name == "lights-all":
+        return list(range(200, 216))
+    if scenario_name.startswith("light-"):
+        try:
+            level = int(scenario_name.removeprefix("light-"))
+        except ValueError:
+            return []
+        if 0 <= level <= 15:
+            return [200 + level]
+    return []
+
+
+def marker_crop_box(
+    bounds: dict[str, object],
+    width: int,
+    height: int,
+    *,
+    mirrored_y: bool,
+) -> tuple[int, int, int, int] | None:
+    try:
+        left = float(bounds.get("left"))
+        top = float(bounds.get("top"))
+        right = float(bounds.get("right"))
+        bottom = float(bounds.get("bottom"))
+    except (TypeError, ValueError):
+        return None
+    if not all(math.isfinite(value) for value in (left, top, right, bottom)):
+        return None
+    if mirrored_y:
+        top, bottom = height - bottom, height - top
+    min_x = max(0, int(math.floor(min(left, right))) - 10)
+    max_x = min(width, int(math.ceil(max(left, right))) + 10)
+    min_y = max(0, int(math.floor(min(top, bottom))) - 10)
+    max_y = min(height, int(math.ceil(max(top, bottom))) + 10)
+    if max_x - min_x < 8 or max_y - min_y < 8:
+        return None
+    return (min_x, min_y, max_x, max_y)
+
+
+def marker_crop_stats(crop: Any, texture_id: int) -> dict[str, object]:
+    width, height = crop.size
+    vanilla_barrier = 0
+    vanilla_light = 0
+    pack_a = 0
+    pack_b = 0
+    red_main_diagonal = 0
+    red_anti_diagonal = 0
+    pack_a_top = 0
+    pack_a_left = 0
+    pack_b_top = 0
+    pack_b_left = 0
+    pack_b_bottom = 0
+    pack_b_right = 0
+    colored_min_x = width
+    colored_min_y = height
+    colored_max_x = -1
+    colored_max_y = -1
+    for y in range(height):
+        for x in range(width):
+            red, green, blue = crop.getpixel((x, y))
+            barrier_red = red >= 150 and green <= 95 and blue <= 95
+            light_pixel = (red >= 170 and green >= 120 and blue <= 130) or (red >= 210 and green >= 195 and blue >= 145)
+            pack_a_pixel = red >= 165 and green <= 115 and blue <= 140
+            pack_a_edge = blue >= 170 and green <= 120 and red <= 90
+            pack_a_marker = red >= 230 and green >= 230 and blue >= 230
+            pack_b_pixel = green >= 145 and red <= 95 and blue <= 130
+            pack_b_edge = red >= 210 and green >= 165 and blue <= 70
+            pack_b_marker = red <= 35 and green <= 35 and blue <= 35
+            if barrier_red:
+                vanilla_barrier += 1
+                normalized_x = x / max(1, width - 1)
+                normalized_y = y / max(1, height - 1)
+                if abs(normalized_x - normalized_y) < 0.14:
+                    red_main_diagonal += 1
+                if abs(normalized_x - (1.0 - normalized_y)) < 0.14:
+                    red_anti_diagonal += 1
+            if light_pixel:
+                vanilla_light += 1
+            if pack_a_pixel or pack_a_edge or pack_a_marker:
+                pack_a += 1
+                if y < height // 3 and pack_a_marker:
+                    pack_a_top += 1
+                if x < width // 3 and pack_a_edge:
+                    pack_a_left += 1
+            if pack_b_pixel or pack_b_edge or pack_b_marker:
+                pack_b += 1
+                if y < height // 3 and pack_b_marker:
+                    pack_b_top += 1
+                if x < width // 3 and pack_b_edge:
+                    pack_b_left += 1
+                if y >= (height * 2) // 3 and pack_b_marker:
+                    pack_b_bottom += 1
+                if x >= (width * 2) // 3 and pack_b_marker:
+                    pack_b_right += 1
+            if barrier_red or light_pixel or pack_a_pixel or pack_a_edge or pack_a_marker or pack_b_pixel or pack_b_edge or pack_b_marker:
+                colored_min_x = min(colored_min_x, x)
+                colored_min_y = min(colored_min_y, y)
+                colored_max_x = max(colored_max_x, x)
+                colored_max_y = max(colored_max_y, y)
+    vanilla_expected = vanilla_barrier if texture_id == 100 else vanilla_light
+    pack_a_oriented = pack_a if pack_a_top > 0 and pack_a_left > 0 else 0
+    pack_b_orientation_seen = (pack_b_top > 0 and pack_b_left > 0) or (pack_b_bottom > 0 and pack_b_right > 0)
+    pack_b_oriented = pack_b if pack_b_orientation_seen else 0
+    pack_b_distinctive = pack_b if pack_b >= 96 and pack_b >= vanilla_expected * 2 else 0
+    matching = max(vanilla_expected, pack_a_oriented, pack_b_oriented, pack_b_distinctive)
+    coverage_ok = (
+        colored_max_x > colored_min_x
+        and colored_max_y > colored_min_y
+        and (colored_max_x - colored_min_x + 1) >= max(6, int(width * 0.35))
+        and (colored_max_y - colored_min_y + 1) >= max(6, int(height * 0.35))
+    )
+    orientation_status = "passed"
+    if pack_a_oriented >= matching and matching > 0:
+        orientation_status = "passed" if pack_a_top > 0 and pack_a_left > 0 else "failed"
+    elif (pack_b_oriented >= matching or pack_b_distinctive >= matching) and matching > 0:
+        orientation_status = "passed" if pack_b_orientation_seen else "failed"
+    elif texture_id == 100 and vanilla_barrier > 0:
+        orientation_status = "passed" if red_main_diagonal >= max(4, red_anti_diagonal // 2) else "failed"
+    if not coverage_ok:
+        orientation_status = "failed"
+    return {
+        "matching_pixels": matching,
+        "vanilla_barrier_pixels": vanilla_barrier,
+        "vanilla_light_pixels": vanilla_light,
+        "pack_a_pixels": pack_a,
+        "pack_b_pixels": pack_b,
+        "coverage_ok": coverage_ok,
+        "orientation_status": orientation_status,
+    }
 
 
 def world_crack_framebuffer_evidence(combined_logs: str) -> dict[str, object]:
@@ -2983,6 +3270,9 @@ def normalize_capture_artifact(
     requested_world_crack_legacy = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldCrack.legacyControl") == "true"
     requested_world_background_scenario = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldBackground.scenario")
     requested_world_border_scenario = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldBorder.scenario")
+    requested_world_material_marker_scenario = parse_java_property(
+        combined_logs, "mattmc.dev.rustGalWorldMaterial.blockMarkerScenario"
+    )
     world_outline_pixel_evidence = deterministic_block_outline_pixel_evidence(
         deterministic_doc,
         requested_world_outline_style,
@@ -2995,6 +3285,10 @@ def normalize_capture_artifact(
     world_crack_pixel_evidence = deterministic_world_crack_pixel_evidence(
         deterministic_doc,
         requested_world_crack_scenario or ("real-survival" if requested_world_crack_real_survival else ""),
+    )
+    world_material_marker_pixel_evidence = deterministic_world_material_marker_pixel_evidence(
+        deterministic_doc,
+        requested_world_material_marker_scenario,
     )
     world_crack_framebuffer = world_crack_framebuffer_evidence(combined_logs)
     rust_vulkan_shell_scene_evidence = deterministic_rust_vulkan_shell_scene_evidence(
@@ -3043,6 +3337,30 @@ def normalize_capture_artifact(
     )
     rust_gal_world_border_draws_for_validation = last_number(
         combined_logs, r"rust_gal_world_border_draws_executed[=: ]+(\d+)"
+    )
+    rust_gal_world_material_quads_for_validation = last_number(
+        combined_logs, r"rust_gal_world_material_quads_executed[=: ]+(\d+)"
+    )
+    rust_gal_world_material_batches_for_validation = last_number(
+        combined_logs, r"rust_gal_world_material_batches_executed[=: ]+(\d+)"
+    )
+    rust_gal_world_material_draws_for_validation = last_number(
+        combined_logs, r"rust_gal_world_material_draws_executed[=: ]+(\d+)"
+    )
+    rust_gal_world_material_marker_barrier_quads_for_validation = max_number(
+        combined_logs, r"material_marker_barrier_quads[=: ]+(\d+)"
+    )
+    rust_gal_world_material_marker_light_quads_for_validation = max_number(
+        combined_logs, r"material_marker_light_quads[=: ]+(\d+)"
+    )
+    rust_gal_world_material_marker_light_level_mask_for_validation = max_number(
+        combined_logs, r"material_marker_light_level_mask[=: ]+(\d+)"
+    )
+    rust_gal_world_material_marker_last_light_level_for_validation = max_number(
+        combined_logs, r"material_marker_last_light_level[=: ]+(-?\d+)"
+    )
+    rust_gal_world_material_marker_last_texture_id_for_validation = max_number(
+        combined_logs, r"material_marker_last_texture_id[=: ]+(\d+)"
     )
     rust_gal_world_background_clears_for_validation = last_number(
         combined_logs, r"rust_gal_world_background_clears_executed[=: ]+(\d+)"
@@ -3365,6 +3683,83 @@ def normalize_capture_artifact(
                 f"(pixel evidence status={world_border_pixel_evidence.get('status')}, "
                 f"matching_pixels={world_border_pixel_evidence.get('matching_pixels')})"
             )
+    world_material_marker_workload_complete = True
+    material_marker_scenario = (requested_world_material_marker_scenario or "").strip().lower()
+    if material_marker_scenario and rust_outline_mode:
+        if material_marker_scenario == "hidden":
+            if int(rust_gal_world_material_quads_for_validation or 0) != 0:
+                world_material_marker_workload_complete = False
+                validation_messages.append("deterministic hidden BlockMarker scenario emitted unexpected material quads")
+            if world_material_marker_pixel_evidence.get("status") != "absent_expected":
+                world_material_marker_workload_complete = False
+                validation_messages.append(
+                    "deterministic hidden BlockMarker scenario reported unexpected projected marker evidence "
+                    f"(status={world_material_marker_pixel_evidence.get('status')})"
+                )
+        else:
+            required_material_counts = {
+                "material quads": rust_gal_world_material_quads_for_validation,
+                "material batches": rust_gal_world_material_batches_for_validation,
+                "material draws": rust_gal_world_material_draws_for_validation,
+            }
+            missing_material_counts = [
+                name for name, value in required_material_counts.items() if int(value or 0) <= 0
+            ]
+            if missing_material_counts:
+                world_material_marker_workload_complete = False
+                validation_messages.append(
+                    "deterministic Rust-GAL BlockMarker scenario requested but no non-zero "
+                    + ", ".join(missing_material_counts)
+                    + " evidence was captured"
+                )
+            if material_marker_scenario == "barrier":
+                if int(rust_gal_world_material_marker_barrier_quads_for_validation or 0) <= 0:
+                    world_material_marker_workload_complete = False
+                    validation_messages.append("deterministic BlockMarker barrier scenario did not report barrier material quads")
+            elif material_marker_scenario == "lights-all":
+                if rust_gal_world_material_marker_light_level_mask_for_validation != 0xFFFF:
+                    world_material_marker_workload_complete = False
+                    validation_messages.append(
+                        "deterministic BlockMarker all-lights scenario did not report all light levels "
+                        f"(mask={rust_gal_world_material_marker_light_level_mask_for_validation})"
+                    )
+            elif material_marker_scenario.startswith("light-"):
+                expected_light_level = parse_number(material_marker_scenario.removeprefix("light-"))
+                if int(rust_gal_world_material_marker_light_quads_for_validation or 0) <= 0:
+                    world_material_marker_workload_complete = False
+                    validation_messages.append("deterministic BlockMarker light scenario did not report light material quads")
+                expected_light_mask = None
+                if expected_light_level is not None:
+                    expected_light_mask = 1 << int(expected_light_level)
+                if (
+                    expected_light_mask is not None
+                    and (
+                        int(rust_gal_world_material_marker_light_level_mask_for_validation or 0)
+                        & expected_light_mask
+                    )
+                    == 0
+                ):
+                    world_material_marker_workload_complete = False
+                    validation_messages.append(
+                        "deterministic BlockMarker light scenario reported the wrong light level "
+                        f"(expected={expected_light_level}, "
+                        f"mask={rust_gal_world_material_marker_light_level_mask_for_validation})"
+                    )
+            if world_material_marker_pixel_evidence.get("status") != "present":
+                world_material_marker_workload_complete = False
+                validation_messages.append(
+                    "deterministic BlockMarker scenario did not produce projected marker crop evidence "
+                    f"(status={world_material_marker_pixel_evidence.get('status')}, "
+                    f"validated={world_material_marker_pixel_evidence.get('validated_texture_ids')}, "
+                    f"expected={world_material_marker_pixel_evidence.get('expected_texture_ids')}, "
+                    f"matching_pixels={world_material_marker_pixel_evidence.get('matching_pixels')})"
+                )
+            elif world_material_marker_pixel_evidence.get("orientation_status") != "passed":
+                world_material_marker_workload_complete = False
+                validation_messages.append(
+                    "deterministic BlockMarker projected crop evidence did not prove orientation/coverage "
+                    f"(orientation={world_material_marker_pixel_evidence.get('orientation_status')})"
+                )
     background_scenario = (requested_world_background_scenario or "").strip().lower()
     if background_scenario and rust_shell_outline_mode:
         if background_scenario in {"hidden", "invalid"}:
@@ -3520,6 +3915,14 @@ def normalize_capture_artifact(
     rust_gal_world_border_quads = last_number(combined_logs, r"rust_gal_world_border_quads_executed[=: ]+(\d+)")
     rust_gal_world_border_batches = last_number(combined_logs, r"rust_gal_world_border_batches_executed[=: ]+(\d+)")
     rust_gal_world_border_draws = last_number(combined_logs, r"rust_gal_world_border_draws_executed[=: ]+(\d+)")
+    rust_gal_world_material_quads = last_number(combined_logs, r"rust_gal_world_material_quads_executed[=: ]+(\d+)")
+    rust_gal_world_material_batches = last_number(combined_logs, r"rust_gal_world_material_batches_executed[=: ]+(\d+)")
+    rust_gal_world_material_draws = last_number(combined_logs, r"rust_gal_world_material_draws_executed[=: ]+(\d+)")
+    rust_gal_world_material_marker_barrier_quads = max_number(combined_logs, r"material_marker_barrier_quads[=: ]+(\d+)")
+    rust_gal_world_material_marker_light_quads = max_number(combined_logs, r"material_marker_light_quads[=: ]+(\d+)")
+    rust_gal_world_material_marker_light_level_mask = max_number(combined_logs, r"material_marker_light_level_mask[=: ]+(\d+)")
+    rust_gal_world_material_marker_last_light_level = max_number(combined_logs, r"material_marker_last_light_level[=: ]+(-?\d+)")
+    rust_gal_world_material_marker_last_texture_id = max_number(combined_logs, r"material_marker_last_texture_id[=: ]+(\d+)")
     rust_gal_world_background_clears = last_number(combined_logs, r"rust_gal_world_background_clears_executed[=: ]+(\d+)")
     rust_gal_world_background_fallbacks = last_number(combined_logs, r"rust_gal_world_background_diagnostic_fallbacks[=: ]+(\d+)")
     rust_gal_world_background_sky_type = last_number(combined_logs, r"rust_gal_world_background_sky_type[=: ]+(\d+)")
@@ -3533,6 +3936,8 @@ def normalize_capture_artifact(
     rust_gal_world_crack_cache_misses = last_number(combined_logs, r"rust_gal_world_crack_cache_misses[=: ]+(\d+)")
     rust_gal_world_border_cache_hits = last_number(combined_logs, r"rust_gal_world_border_cache_hits[=: ]+(\d+)")
     rust_gal_world_border_cache_misses = last_number(combined_logs, r"rust_gal_world_border_cache_misses[=: ]+(\d+)")
+    rust_gal_world_material_cache_hits = last_number(combined_logs, r"rust_gal_world_material_cache_hits[=: ]+(\d+)")
+    rust_gal_world_material_cache_misses = last_number(combined_logs, r"rust_gal_world_material_cache_misses[=: ]+(\d+)")
     rust_gal_swapchain_recreations = len(re.findall(r"gal\.swapchain\.recreate backend=vulkan", combined_logs))
     rust_gal_ffi_calls = last_number(combined_logs, r"ffi(?:_call)?_count[=: ]+(\d+)")
     rust_gal_ffi_bytes = last_number(combined_logs, r"ffi(?:_bytes| bytes)[=: ]+(\d+)")
@@ -3638,6 +4043,10 @@ def normalize_capture_artifact(
             "calls": last_number(combined_logs, r"rust_gal_ffi_world_crack_asset_update_calls[=: ]+(\d+)"),
             "bytes": last_number(combined_logs, r"rust_gal_ffi_world_crack_asset_update_bytes[=: ]+(\d+)"),
         },
+        "world_material_asset_update": {
+            "calls": last_number(combined_logs, r"rust_gal_ffi_world_material_asset_update_calls[=: ]+(\d+)"),
+            "bytes": last_number(combined_logs, r"rust_gal_ffi_world_material_asset_update_bytes[=: ]+(\d+)"),
+        },
     }
     rust_gal_calls_per_batch = None
     rust_gal_bytes_per_batch = None
@@ -3711,6 +4120,7 @@ def normalize_capture_artifact(
         and world_outline_workload_complete
         and world_crack_workload_complete
         and world_border_workload_complete
+        and world_material_marker_workload_complete
         and validation_layer_exercised
         and renderdoc_complete
         and renderdoc_workload_assertions_complete
@@ -3819,6 +4229,7 @@ def normalize_capture_artifact(
                 "world_border_scenario": requested_world_border_scenario or None,
                 "world_border_pixel_evidence": world_border_pixel_evidence,
                 "world_background_scenario": requested_world_background_scenario or None,
+                "world_material_marker_pixel_evidence": world_material_marker_pixel_evidence,
                 "rust_vulkan_shell_scene_evidence": rust_vulkan_shell_scene_evidence,
                 "cache_hits": last_number(combined_logs, r"rust_gal_cache_hits[=: ]+(\d+)"),
                 "cache_misses": last_number(combined_logs, r"rust_gal_cache_misses[=: ]+(\d+)"),
@@ -3837,6 +4248,15 @@ def normalize_capture_artifact(
                 "world_border_quads_executed": rust_gal_world_border_quads,
                 "world_border_batches_executed": rust_gal_world_border_batches,
                 "world_border_draws_executed": rust_gal_world_border_draws,
+                "world_material_marker_scenario": requested_world_material_marker_scenario or None,
+                "world_material_quads_executed": rust_gal_world_material_quads,
+                "world_material_batches_executed": rust_gal_world_material_batches,
+                "world_material_draws_executed": rust_gal_world_material_draws,
+                "world_material_marker_barrier_quads": rust_gal_world_material_marker_barrier_quads,
+                "world_material_marker_light_quads": rust_gal_world_material_marker_light_quads,
+                "world_material_marker_light_level_mask": rust_gal_world_material_marker_light_level_mask,
+                "world_material_marker_last_light_level": rust_gal_world_material_marker_last_light_level,
+                "world_material_marker_last_texture_id": rust_gal_world_material_marker_last_texture_id,
                 "world_background_clears_executed": rust_gal_world_background_clears,
                 "world_background_diagnostic_fallbacks": rust_gal_world_background_fallbacks,
                 "world_background_sky_type": rust_gal_world_background_sky_type,
@@ -3868,6 +4288,16 @@ def normalize_capture_artifact(
                 "world_border_asset_fallback": last_text(combined_logs, r"rust_gal_world_border_asset_fallback[=: ]+(\S+)"),
                 "world_border_asset_resolutions": world_border_asset_resolutions,
                 "world_border_asset_update_failure_events": world_border_asset_update_failure_events,
+                "world_material_cache_hits": rust_gal_world_material_cache_hits,
+                "world_material_cache_misses": rust_gal_world_material_cache_misses,
+                "world_material_asset_generation": last_number(combined_logs, r"rust_gal_world_material_asset_generation[=: ]+(\d+)"),
+                "world_material_uploaded_asset_generation": last_number(combined_logs, r"rust_gal_world_material_uploaded_asset_generation[=: ]+(\d+)"),
+                "world_material_asset_payload_count": last_number(combined_logs, r"rust_gal_world_material_asset_payload_count[=: ]+(\d+)"),
+                "world_material_asset_payload_bytes": last_number(combined_logs, r"rust_gal_world_material_asset_payload_bytes[=: ]+(\d+)"),
+                "world_material_asset_update_failures": last_number(combined_logs, r"rust_gal_world_material_asset_update_failures[=: ]+(\d+)"),
+                "world_material_asset_source_pack": last_text(combined_logs, r"rust_gal_world_material_asset_source_pack[=: ]+(\S+)"),
+                "world_material_asset_sha256": last_text(combined_logs, r"rust_gal_world_material_asset_sha256[=: ]+(\S+)"),
+                "world_material_asset_fallback": last_text(combined_logs, r"rust_gal_world_material_asset_fallback[=: ]+(\S+)"),
                 "swapchain_recreations": rust_gal_swapchain_recreations,
                 "frame_target_generations": last_number(combined_logs, r"rust_gal_frame_target_generations[=: ]+(\d+)"),
                 "frame_target_identity_changes": last_number(combined_logs, r"rust_gal_frame_target_identity_changes[=: ]+(\d+)"),
@@ -3979,6 +4409,18 @@ def last_number(text: str, pattern: str) -> float | None:
     if not matches:
         return None
     return parse_number(matches[-1].group(1))
+
+
+def max_number(text: str, pattern: str) -> float | None:
+    values = [
+        parsed
+        for match in re.finditer(pattern, text, re.IGNORECASE)
+        for parsed in [parse_number(match.group(1))]
+        if parsed is not None
+    ]
+    if not values:
+        return None
+    return max(values)
 
 
 def first_text(text: str, pattern: str) -> str | None:
@@ -5348,6 +5790,10 @@ def build_capture_command(
         java_options.append("-Dmattmc.dev.rustGalWorldCrack.disabled=true")
     elif world_crack_control == "legacy":
         java_options.append("-Dmattmc.dev.rustGalWorldCrack.legacyControl=true")
+    if getattr(args, "world_material_marker_scenario", ""):
+        java_options.append(
+            f"-Dmattmc.dev.rustGalWorldMaterial.blockMarkerScenario={args.world_material_marker_scenario}"
+        )
     if getattr(args, "world_background_scenario", ""):
         java_options.append(f"-Dmattmc.dev.rustGalWorldBackground.scenario={args.world_background_scenario}")
     rust_gal_gui_control = getattr(args, "rust_gal_gui_control", "rust")
@@ -6536,6 +6982,32 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             choices=("rust", "disabled", "legacy"),
             default=os.environ.get("MATTMC_WORLD_CRACK_CONTROL", "rust"),
             help="Select a diagnostic crack route control without changing production routing.",
+        )
+        subparser.add_argument(
+            "--world-material-marker-scenario",
+            choices=(
+                "hidden",
+                "barrier",
+                "light-0",
+                "light-1",
+                "light-2",
+                "light-3",
+                "light-4",
+                "light-5",
+                "light-6",
+                "light-7",
+                "light-8",
+                "light-9",
+                "light-10",
+                "light-11",
+                "light-12",
+                "light-13",
+                "light-14",
+                "light-15",
+                "lights-all",
+            ),
+            default=os.environ.get("MATTMC_WORLD_MATERIAL_MARKER_SCENARIO", ""),
+            help="Spawn deterministic vanilla BLOCK_MARKER particles for BlockMarker material-route validation.",
         )
         subparser.add_argument(
             "--world-border-scroll-phase",

@@ -2,21 +2,29 @@ package net.minecraft.client.particle;
 
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.state.QuadParticleRenderState;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.state.BlockState;
+import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 
 @Environment(EnvType.CLIENT)
 public class BlockMarker extends SingleQuadParticle {
 	// Iris: Track whether particle is opaque (from MixinStationaryItemParticle)
 	private boolean isOpaque;
+	private final BlockState blockState;
 	
 	BlockMarker(ClientLevel clientLevel, double d, double e, double f, BlockState blockState) {
 		super(clientLevel, d, e, f, Minecraft.getInstance().getBlockRenderer().getBlockModelShaper().getParticleIcon(blockState));
+		this.blockState = blockState;
 		this.gravity = 0.0F;
 		this.lifetime = 80;
+		if (!System.getProperty("mattmc.dev.rustGalWorldMaterial.blockMarkerScenario", "").isBlank()) {
+			this.lifetime = 20_000;
+		}
 		this.hasPhysics = false;
 		
 		// Iris: Resolve translucency (from MixinStationaryItemParticle)
@@ -35,6 +43,30 @@ public class BlockMarker extends SingleQuadParticle {
 			return net.irisshaders.iris.fantastic.IrisParticleRenderTypes.TERRAIN_OPAQUE;
 		}
 		return SingleQuadParticle.Layer.TERRAIN;
+	}
+
+	@Override
+	public void extract(QuadParticleRenderState quadParticleRenderState, Camera camera, float f) {
+		if (this.enqueueRustGal(camera, f)) {
+			return;
+		}
+		super.extract(quadParticleRenderState, camera, f);
+	}
+
+	boolean enqueueRustGal(Camera camera, float f) {
+		return RustGalWorldPrimitiveRenderer.enqueueBlockMarker(
+			this.blockState,
+			camera,
+			this.xo,
+			this.x,
+			this.yo,
+			this.y,
+			this.zo,
+			this.z,
+			f,
+			this.getQuadSize(f),
+			0xFFFFFFFF
+		);
 	}
 
 	@Override

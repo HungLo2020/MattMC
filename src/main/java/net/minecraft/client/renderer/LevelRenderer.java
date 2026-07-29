@@ -677,6 +677,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			this.pipeline.finalizeLevelRendering();
 			this.renderPendingRustOpenGlPostIrisBlockOutline();
 			this.renderPendingRustOpenGlPostIrisBlockCracks();
+			this.renderPendingRustOpenGlPostIrisWorldMaterials();
 			this.auditPendingBlockOutlineFramebufferProbe("after-iris-final");
 			this.auditPendingBlockCrackFramebufferProbe("after-iris-final");
 		
@@ -1308,7 +1309,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 	private boolean renderRustOpenGlBlockBreakingCracksInCurrentScope(List<BlockBreakingRenderState> states, Camera camera) {
 		BlockCrackFramebufferProbe framebufferProbe = this.createBlockCrackFramebufferProbe(states);
-		net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginFrame(
+		net.vulkanic.world.RustGalWorldPrimitiveRenderer.reseedFrameMatrices(
 			new Matrix4f(this.matrices.modelView()),
 			new Matrix4f(this.matrices.projection()),
 			this.minecraft.getWindow().getWidth(),
@@ -1381,11 +1382,35 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		}
 	}
 
+	private void renderPendingRustOpenGlPostIrisWorldMaterials() {
+		if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasPendingMaterialQuads()) {
+			return;
+		}
+		RenderTarget finalTarget = this.minecraft.getMainRenderTarget();
+		try (RenderPass materialPass = VulkanicAPI.createRenderPass(
+			() -> "Rust GAL world material quads after Iris final",
+			finalTarget.getColorTextureView(),
+			OptionalInt.empty(),
+			finalTarget.useDepth ? finalTarget.getDepthTextureView() : null,
+			OptionalDouble.empty()
+		)) {
+			materialPass.setPipeline(RenderPipelines.OPAQUE_PARTICLE);
+			boolean rendered = net.vulkanic.world.RustGalWorldPrimitiveRenderer.renderOpenGlPendingMaterialQuads(
+				this.minecraft,
+				"minecraft.particle.block-marker.post-iris"
+			);
+			auditBlockOutline("world-material draw route=rust-opengl retained=false postIris=true rendered=" + rendered);
+			if (!rendered) {
+				throw new IllegalStateException("Rust OpenGL world material quads were selected post-Iris with valid semantic requests but submitted no work");
+			}
+		}
+	}
+
 	private void renderRustOpenGlBlockOutline(BlockOutlineRenderState blockOutlineRenderState, PoseStack poseStack, Vec3 cameraPos, boolean translucentPass) {
 		BlockOutlineFramebufferProbe framebufferProbe = this.createBlockOutlineFramebufferProbe(blockOutlineRenderState, poseStack, cameraPos, translucentPass);
 		net.irisshaders.iris.layer.GbufferPrograms.beginOutline();
 		try {
-			net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginFrame(
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.reseedFrameMatrices(
 				new Matrix4f(this.matrices.modelView()),
 				new Matrix4f(this.matrices.projection()),
 				this.minecraft.getWindow().getWidth(),

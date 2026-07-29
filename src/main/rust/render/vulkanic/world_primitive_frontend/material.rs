@@ -10,16 +10,13 @@ pub(super) fn validate_quad(
             format!("unsupported world material stratum {}", quad.stratum),
         ));
     }
-    if !matches!(
-        quad.material_id,
-        WORLD_MATERIAL_ID_DEFAULT_OPAQUE | WORLD_MATERIAL_ID_DEFAULT_CUTOUT
-    ) {
+    if !is_known_material_id(quad.material_id) {
         return Err(GalError::ffi(
             StatusCode::UnknownEnum,
             format!("unknown world material id {}", quad.material_id),
         ));
     }
-    if quad.texture_id != WORLD_MATERIAL_TEXTURE_DEFAULT {
+    if !is_known_texture_id(quad.texture_id) {
         return Err(GalError::ffi(
             StatusCode::UnknownEnum,
             format!("unknown world material texture id {}", quad.texture_id),
@@ -34,7 +31,7 @@ pub(super) fn validate_quad(
             format!("unknown world material mode {}", quad.material_mode),
         ));
     }
-    if quad.material_id == WORLD_MATERIAL_ID_DEFAULT_OPAQUE
+    if quad.material_id == WORLD_MATERIAL_ID_OPAQUE_TEXTURED
         && quad.material_mode != WORLD_MATERIAL_MODE_OPAQUE
     {
         return Err(GalError::ffi(
@@ -42,8 +39,10 @@ pub(super) fn validate_quad(
             "opaque world material id must use opaque material mode",
         ));
     }
-    if quad.material_id == WORLD_MATERIAL_ID_DEFAULT_CUTOUT
-        && quad.material_mode != WORLD_MATERIAL_MODE_CUTOUT
+    if matches!(
+        quad.material_id,
+        WORLD_MATERIAL_ID_CUTOUT_TEXTURED | WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT
+    ) && quad.material_mode != WORLD_MATERIAL_MODE_CUTOUT
     {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
@@ -92,4 +91,21 @@ pub(super) fn validate_quad(
         }
     }
     Ok(())
+}
+
+pub(super) fn is_known_material_id(material_id: u32) -> bool {
+    matches!(
+        material_id,
+        WORLD_MATERIAL_ID_OPAQUE_TEXTURED
+            | WORLD_MATERIAL_ID_CUTOUT_TEXTURED
+            | WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT
+    )
+}
+
+pub(super) fn is_known_texture_id(texture_id: u32) -> bool {
+    texture_id == WORLD_MATERIAL_TEXTURE_STONE
+        || texture_id == WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER
+        || (WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00
+            ..=WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15)
+            .contains(&texture_id)
 }

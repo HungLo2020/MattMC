@@ -41,8 +41,11 @@ use super::world_primitive_frontend::{
     WORLD_BACKGROUND_SKY_OVERWORLD, WORLD_BACKGROUND_STORE_STORE, WORLD_CULL_BACK,
     WORLD_CULL_FRONT, WORLD_CULL_NONE, WORLD_DEPTH_POLICY_DISABLED,
     WORLD_DEPTH_POLICY_TEST_NO_WRITE, WORLD_DEPTH_POLICY_TEST_WRITE,
-    WORLD_MATERIAL_ID_DEFAULT_CUTOUT, WORLD_MATERIAL_ID_DEFAULT_OPAQUE, WORLD_MATERIAL_MODE_CUTOUT,
-    WORLD_MATERIAL_MODE_OPAQUE, WORLD_MATERIAL_TEXTURE_DEFAULT,
+    WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT, WORLD_MATERIAL_ID_CUTOUT_TEXTURED,
+    WORLD_MATERIAL_ID_OPAQUE_TEXTURED,
+    WORLD_MATERIAL_MODE_CUTOUT, WORLD_MATERIAL_MODE_OPAQUE,
+    WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER, WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00,
+    WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15, WORLD_MATERIAL_TEXTURE_STONE,
     WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY, WORLD_TOPOLOGY_TRIANGLES, WORLD_WINDING_CCW,
     WORLD_WINDING_CW,
 };
@@ -3159,15 +3162,13 @@ unsafe fn decode_whole_frame_submit_with_backend_policy(
                 format!("unknown world material stratum {}", quad.stratum),
             ));
         }
-        if quad.material_id != WORLD_MATERIAL_ID_DEFAULT_OPAQUE
-            && quad.material_id != WORLD_MATERIAL_ID_DEFAULT_CUTOUT
-        {
+        if !is_known_world_material_id(quad.material_id) {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,
                 format!("unknown world material id {}", quad.material_id),
             ));
         }
-        if quad.texture_id != WORLD_MATERIAL_TEXTURE_DEFAULT {
+        if !is_known_world_material_texture_id(quad.texture_id) {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,
                 format!("unknown world material texture id {}", quad.texture_id),
@@ -3182,9 +3183,12 @@ unsafe fn decode_whole_frame_submit_with_backend_policy(
             ));
         }
         if (quad.material_mode == WORLD_MATERIAL_MODE_OPAQUE
-            && quad.material_id != WORLD_MATERIAL_ID_DEFAULT_OPAQUE)
+            && quad.material_id != WORLD_MATERIAL_ID_OPAQUE_TEXTURED)
             || (quad.material_mode == WORLD_MATERIAL_MODE_CUTOUT
-                && quad.material_id != WORLD_MATERIAL_ID_DEFAULT_CUTOUT)
+                && !matches!(
+                    quad.material_id,
+                    WORLD_MATERIAL_ID_CUTOUT_TEXTURED | WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT
+                ))
         {
             return Err(GalError::ffi(
                 StatusCode::InvalidArgument,
@@ -3323,6 +3327,23 @@ unsafe fn decode_whole_frame_submit_with_backend_policy(
         },
         gui_sprites,
     ))
+}
+
+fn is_known_world_material_id(material_id: u32) -> bool {
+    matches!(
+        material_id,
+        WORLD_MATERIAL_ID_OPAQUE_TEXTURED
+            | WORLD_MATERIAL_ID_CUTOUT_TEXTURED
+            | WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT
+    )
+}
+
+fn is_known_world_material_texture_id(texture_id: u32) -> bool {
+    texture_id == WORLD_MATERIAL_TEXTURE_STONE
+        || texture_id == WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER
+        || (WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00
+            ..=WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15)
+            .contains(&texture_id)
 }
 
 fn decode_world_background_request(
@@ -3570,6 +3591,12 @@ unsafe fn decode_world_material_asset_update(
             asset.byte_size,
             "world material asset payload",
         )?;
+        if !is_known_world_material_texture_id(asset.texture_id) {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown world material texture id {}", asset.texture_id),
+            ));
+        }
         if seen.insert(asset.texture_id, ()).is_some() {
             return Err(GalError::ffi(
                 StatusCode::InvalidArgument,
@@ -7331,8 +7358,8 @@ mod tests {
         FfiWorldMaterialQuadRequest {
             byte_size: size_of::<FfiWorldMaterialQuadRequest>() as u32,
             stratum: WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY,
-            material_id: WORLD_MATERIAL_ID_DEFAULT_OPAQUE,
-            texture_id: WORLD_MATERIAL_TEXTURE_DEFAULT,
+            material_id: WORLD_MATERIAL_ID_OPAQUE_TEXTURED,
+            texture_id: WORLD_MATERIAL_TEXTURE_STONE,
             material_mode: WORLD_MATERIAL_MODE_OPAQUE,
             depth_policy: WORLD_DEPTH_POLICY_TEST_WRITE,
             cull_policy: WORLD_CULL_BACK,
@@ -7715,7 +7742,7 @@ mod tests {
         assert_eq!(frame.material_quads[0].uvs[2], [1.0, 1.0]);
         assert_eq!(
             frame.material_quads[0].material_id,
-            WORLD_MATERIAL_ID_DEFAULT_OPAQUE
+            WORLD_MATERIAL_ID_OPAQUE_TEXTURED
         );
         assert!(gui.is_empty());
 
@@ -7890,7 +7917,7 @@ mod tests {
         let mut bytes = vec![31u8, 32, 33, 34];
         let assets = vec![FfiWorldMaterialAssetPayload {
             byte_size: size_of::<FfiWorldMaterialAssetPayload>() as u32,
-            texture_id: WORLD_MATERIAL_TEXTURE_DEFAULT,
+            texture_id: WORLD_MATERIAL_TEXTURE_STONE,
             png_bytes: FfiBytes {
                 ptr: bytes.as_ptr(),
                 len: bytes.len() as u64,
@@ -7901,7 +7928,7 @@ mod tests {
             unsafe { decode_world_material_asset_update(&request, test_capabilities()).unwrap() };
         bytes.fill(0);
         assert_eq!(9, generation);
-        assert_eq!(WORLD_MATERIAL_TEXTURE_DEFAULT, owned[0].texture_id);
+        assert_eq!(WORLD_MATERIAL_TEXTURE_STONE, owned[0].texture_id);
         assert_eq!(vec![31u8, 32, 33, 34], owned[0].png_bytes);
     }
 
@@ -7911,7 +7938,7 @@ mod tests {
         let mut assets = vec![
             FfiWorldMaterialAssetPayload {
                 byte_size: size_of::<FfiWorldMaterialAssetPayload>() as u32,
-                texture_id: WORLD_MATERIAL_TEXTURE_DEFAULT,
+                texture_id: WORLD_MATERIAL_TEXTURE_STONE,
                 png_bytes: FfiBytes {
                     ptr: bytes.as_ptr(),
                     len: bytes.len() as u64,
@@ -7919,7 +7946,7 @@ mod tests {
             },
             FfiWorldMaterialAssetPayload {
                 byte_size: size_of::<FfiWorldMaterialAssetPayload>() as u32,
-                texture_id: WORLD_MATERIAL_TEXTURE_DEFAULT,
+                texture_id: WORLD_MATERIAL_TEXTURE_STONE,
                 png_bytes: FfiBytes {
                     ptr: bytes.as_ptr(),
                     len: bytes.len() as u64,

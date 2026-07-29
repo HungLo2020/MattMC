@@ -85,7 +85,10 @@ public final class RustGalFrameCoordinator {
 		String producerLabel
 	) {
 		if (primitiveFrame == null
-			|| (primitiveFrame.segments().isEmpty() && primitiveFrame.crackQuads().isEmpty() && primitiveFrame.borderQuads().isEmpty())) {
+			|| (primitiveFrame.segments().isEmpty()
+				&& primitiveFrame.crackQuads().isEmpty()
+				&& primitiveFrame.borderQuads().isEmpty()
+				&& primitiveFrame.materialQuads().isEmpty())) {
 			return false;
 		}
 		RustGalGuiRenderer.GuiExecutionRoute route = RustGalGuiRenderer.currentExecutionRoute();
@@ -129,7 +132,8 @@ public final class RustGalFrameCoordinator {
 					primitiveFrame.projectionMatrix(),
 					primitiveFrame.segments(),
 					primitiveFrame.crackQuads(),
-					primitiveFrame.borderQuads()
+					primitiveFrame.borderQuads(),
+					primitiveFrame.materialQuads()
 				);
 				METRICS.abiPackingNanos += elapsedSince(packingStarted);
 				GraphicsFrameBenchmark.endPhase("rust-gal.world-primitives.abi-packing");
@@ -149,7 +153,8 @@ public final class RustGalFrameCoordinator {
 					+ " stratum=world.primitives frame=" + frameId + " submission=" + submissionId
 					+ " segments=" + result.worldSegmentCount()
 					+ " crackQuads=" + result.worldCrackQuadCount()
-					+ " borderQuads=" + result.worldBorderQuadCount());
+					+ " borderQuads=" + result.worldBorderQuadCount()
+					+ " materialQuads=" + result.worldMaterialQuadCount());
 				retireOutstanding(false);
 				auditMessage(metricsAuditLine(0, frameId, submissionId, false));
 				METRICS.executeNanos += elapsedSince(executeStarted);
@@ -345,13 +350,17 @@ public final class RustGalFrameCoordinator {
 		try {
 			if (wholeFrameVulkan) {
 				primitiveFrame = RustGalWorldPrimitiveRenderer.consumeFrame();
-				if (!primitiveFrame.segments().isEmpty() || !primitiveFrame.crackQuads().isEmpty() || !primitiveFrame.borderQuads().isEmpty()) {
+				if (!primitiveFrame.segments().isEmpty()
+					|| !primitiveFrame.crackQuads().isEmpty()
+					|| !primitiveFrame.borderQuads().isEmpty()
+					|| !primitiveFrame.materialQuads().isEmpty()) {
 					renderdocFrameCaptureStarted = RenderDocCaptureHook.beginFrameCaptureOnce(
 						window,
 						"rust-vulkan-whole-frame-world#" + correlationId
 							+ "-segments=" + primitiveFrame.segments().size()
 							+ "-crackQuads=" + primitiveFrame.crackQuads().size()
 							+ "-borderQuads=" + primitiveFrame.borderQuads().size()
+							+ "-materialQuads=" + primitiveFrame.materialQuads().size()
 					);
 				}
 			}
@@ -397,6 +406,7 @@ public final class RustGalFrameCoordinator {
 					primitiveFrame.segments(),
 					primitiveFrame.crackQuads(),
 					primitiveFrame.borderQuads(),
+					primitiveFrame.materialQuads(),
 					requests
 				);
 			} else {
@@ -496,6 +506,9 @@ public final class RustGalFrameCoordinator {
 		auditMessage("gal.frame.target.begin backend=vulkan frame=" + frame.frameId()
 			+ " image=" + frame.frameTargetIdentity()
 			+ " extent=" + frame.width() + "x" + frame.height()
+			+ " " + (primitiveFrame == null
+				? "material_marker_barrier_quads=0 material_marker_light_quads=0 material_marker_light_level_mask=0 material_marker_last_light_level=-1 material_marker_last_texture_id=0"
+				: RustGalWorldPrimitiveRenderer.materialMarkerSummary(primitiveFrame.materialQuads()))
 			+ " " + clearExpectation);
 		auditMessage("gal.frame.target.present-ready backend=vulkan frame=" + frame.frameId()
 			+ " image=" + frame.frameTargetIdentity());
@@ -532,6 +545,9 @@ public final class RustGalFrameCoordinator {
 		METRICS.worldBorderQuadsExecuted += result.worldBorderQuadCount();
 		METRICS.worldBorderBatchesExecuted += result.worldBorderBatchCount();
 		METRICS.worldBorderDrawsExecuted += result.worldBorderDrawCount();
+		METRICS.worldMaterialQuadsExecuted += result.worldMaterialQuadCount();
+		METRICS.worldMaterialBatchesExecuted += result.worldMaterialBatchCount();
+		METRICS.worldMaterialDrawsExecuted += result.worldMaterialDrawCount();
 		METRICS.worldDepthAttachmentCreates += result.depthAttachmentCreates();
 		METRICS.worldDepthAttachmentReuses += result.depthAttachmentReuses();
 		METRICS.worldDepthAttachmentRetires += result.depthAttachmentRetires();
@@ -541,6 +557,8 @@ public final class RustGalFrameCoordinator {
 		METRICS.worldCrackCacheMisses += result.crackCacheMisses();
 		METRICS.worldBorderCacheHits += result.borderCacheHits();
 		METRICS.worldBorderCacheMisses += result.borderCacheMisses();
+		METRICS.worldMaterialCacheHits += result.materialCacheHits();
+		METRICS.worldMaterialCacheMisses += result.materialCacheMisses();
 		METRICS.cacheHits += result.cacheHits();
 		METRICS.cacheMisses += result.cacheMisses();
 		METRICS.resourceCreates += result.resourceCreates();
@@ -666,6 +684,10 @@ public final class RustGalFrameCoordinator {
 		if (status != null) {
 			recordStatus(Operation.WORLD_CRACK_ASSET_UPDATE, status);
 		}
+		status = RustGalWorldPrimitiveRenderer.flushPendingWorldMaterialAssets(bridge);
+		if (status != null) {
+			recordStatus(Operation.WORLD_MATERIAL_ASSET_UPDATE, status);
+		}
 	}
 
 	private static void recordStatus(Operation operation, VulkanicGalBridge.Status status) {
@@ -766,6 +788,10 @@ public final class RustGalFrameCoordinator {
 				METRICS.worldCrackAssetUpdateCalls += calls;
 				METRICS.worldCrackAssetUpdateBytes += bytes;
 			}
+			case WORLD_MATERIAL_ASSET_UPDATE -> {
+				METRICS.worldMaterialAssetUpdateCalls += calls;
+				METRICS.worldMaterialAssetUpdateBytes += bytes;
+			}
 		}
 	}
 
@@ -774,6 +800,8 @@ public final class RustGalFrameCoordinator {
 			RustGalWorldPrimitiveRenderer.worldBorderAssetMetrics();
 		RustGalWorldPrimitiveRenderer.WorldCrackAssetMetrics worldCrackAssetMetrics =
 			RustGalWorldPrimitiveRenderer.worldCrackAssetMetrics();
+		RustGalWorldPrimitiveRenderer.WorldMaterialAssetMetrics worldMaterialAssetMetrics =
+			RustGalWorldPrimitiveRenderer.worldMaterialAssetMetrics();
 		return auditBackendPrefix(wholeFrameVulkan) + " GUI frame executed producer=gui.frame"
 			+ " stratum=gui.frame"
 			+ " frame_batch_count=" + frameBatchCount
@@ -796,6 +824,9 @@ public final class RustGalFrameCoordinator {
 			+ " rust_gal_world_border_quads_executed=" + METRICS.worldBorderQuadsExecuted
 			+ " rust_gal_world_border_batches_executed=" + METRICS.worldBorderBatchesExecuted
 			+ " rust_gal_world_border_draws_executed=" + METRICS.worldBorderDrawsExecuted
+			+ " rust_gal_world_material_quads_executed=" + METRICS.worldMaterialQuadsExecuted
+			+ " rust_gal_world_material_batches_executed=" + METRICS.worldMaterialBatchesExecuted
+			+ " rust_gal_world_material_draws_executed=" + METRICS.worldMaterialDrawsExecuted
 			+ " rust_gal_world_background_clears_executed=" + METRICS.worldBackgroundClearsExecuted
 			+ " rust_gal_world_background_diagnostic_fallbacks=" + METRICS.worldBackgroundDiagnosticFallbacks
 			+ " rust_gal_world_background_sky_type=" + METRICS.lastWorldBackgroundSkyType
@@ -817,6 +848,8 @@ public final class RustGalFrameCoordinator {
 			+ " rust_gal_world_crack_asset_fallback=" + worldCrackAssetMetrics.fallback()
 			+ " rust_gal_world_border_cache_hits=" + METRICS.worldBorderCacheHits
 			+ " rust_gal_world_border_cache_misses=" + METRICS.worldBorderCacheMisses
+			+ " rust_gal_world_material_cache_hits=" + METRICS.worldMaterialCacheHits
+			+ " rust_gal_world_material_cache_misses=" + METRICS.worldMaterialCacheMisses
 			+ " rust_gal_world_border_asset_generation=" + worldBorderAssetMetrics.generation()
 			+ " rust_gal_world_border_uploaded_asset_generation=" + worldBorderAssetMetrics.uploadedGeneration()
 			+ " rust_gal_world_border_asset_payload_count=" + worldBorderAssetMetrics.payloadCount()
@@ -825,6 +858,14 @@ public final class RustGalFrameCoordinator {
 			+ " rust_gal_world_border_asset_source_pack=" + metricValue(worldBorderAssetMetrics.sourcePack())
 			+ " rust_gal_world_border_asset_sha256=" + metricValue(worldBorderAssetMetrics.sha256())
 			+ " rust_gal_world_border_asset_fallback=" + worldBorderAssetMetrics.fallback()
+			+ " rust_gal_world_material_asset_generation=" + worldMaterialAssetMetrics.generation()
+			+ " rust_gal_world_material_uploaded_asset_generation=" + worldMaterialAssetMetrics.uploadedGeneration()
+			+ " rust_gal_world_material_asset_payload_count=" + worldMaterialAssetMetrics.payloadCount()
+			+ " rust_gal_world_material_asset_payload_bytes=" + worldMaterialAssetMetrics.payloadBytes()
+			+ " rust_gal_world_material_asset_update_failures=" + worldMaterialAssetMetrics.failures()
+			+ " rust_gal_world_material_asset_source_pack=" + metricValue(worldMaterialAssetMetrics.sourcePack())
+			+ " rust_gal_world_material_asset_sha256=" + metricValue(worldMaterialAssetMetrics.sha256())
+			+ " rust_gal_world_material_asset_fallback=" + worldMaterialAssetMetrics.fallback()
 			+ " rust_gal_frame_target_generations=" + METRICS.frameTargetGenerations
 			+ " rust_gal_frame_target_identity_changes=" + METRICS.frameTargetIdentityChanges
 			+ " rust_gal_last_frame_target_generation=" + METRICS.lastFrameTargetGeneration
@@ -850,6 +891,7 @@ public final class RustGalFrameCoordinator {
 			+ " rust_gal_ffi_asset_update_calls=" + METRICS.guiAssetUpdateCalls
 			+ " rust_gal_ffi_world_border_asset_update_calls=" + METRICS.worldBorderAssetUpdateCalls
 			+ " rust_gal_ffi_world_crack_asset_update_calls=" + METRICS.worldCrackAssetUpdateCalls
+			+ " rust_gal_ffi_world_material_asset_update_calls=" + METRICS.worldMaterialAssetUpdateCalls
 			+ " rust_gal_ffi_context_create_bytes=" + METRICS.contextCreateBytes
 			+ " rust_gal_ffi_capability_bytes=" + METRICS.capabilityBytes
 			+ " rust_gal_ffi_frame_configure_bytes=" + METRICS.frameConfigureBytes
@@ -863,6 +905,7 @@ public final class RustGalFrameCoordinator {
 			+ " rust_gal_ffi_asset_update_bytes=" + METRICS.guiAssetUpdateBytes
 			+ " rust_gal_ffi_world_border_asset_update_bytes=" + METRICS.worldBorderAssetUpdateBytes
 			+ " rust_gal_ffi_world_crack_asset_update_bytes=" + METRICS.worldCrackAssetUpdateBytes
+			+ " rust_gal_ffi_world_material_asset_update_bytes=" + METRICS.worldMaterialAssetUpdateBytes
 			+ " rust_gal_enqueue_nanos=" + METRICS.enqueueNanos
 			+ " rust_gal_resource_lookup_nanos=" + METRICS.resourceLookupNanos
 			+ " rust_gal_resource_create_nanos=" + METRICS.resourceCreateNanos
@@ -923,7 +966,8 @@ public final class RustGalFrameCoordinator {
 		RETIRE,
 		GUI_ASSET_UPDATE,
 		WORLD_BORDER_ASSET_UPDATE,
-		WORLD_CRACK_ASSET_UPDATE
+		WORLD_CRACK_ASSET_UPDATE,
+		WORLD_MATERIAL_ASSET_UPDATE
 	}
 
 	private static final class Metrics {
@@ -954,6 +998,9 @@ public final class RustGalFrameCoordinator {
 		long worldBorderQuadsExecuted;
 		long worldBorderBatchesExecuted;
 		long worldBorderDrawsExecuted;
+		long worldMaterialQuadsExecuted;
+		long worldMaterialBatchesExecuted;
+		long worldMaterialDrawsExecuted;
 		long worldBackgroundClearsExecuted;
 		long worldBackgroundDiagnosticFallbacks;
 		long lastWorldBackgroundSkyType;
@@ -967,6 +1014,8 @@ public final class RustGalFrameCoordinator {
 		long worldCrackCacheMisses;
 		long worldBorderCacheHits;
 		long worldBorderCacheMisses;
+		long worldMaterialCacheHits;
+		long worldMaterialCacheMisses;
 		long frameTargetGenerations;
 		long frameTargetIdentityChanges;
 		long lastFrameTargetGeneration;
@@ -985,6 +1034,7 @@ public final class RustGalFrameCoordinator {
 		long guiAssetUpdateCalls;
 		long worldBorderAssetUpdateCalls;
 		long worldCrackAssetUpdateCalls;
+		long worldMaterialAssetUpdateCalls;
 		long contextCreateBytes;
 		long capabilityBytes;
 		long frameConfigureBytes;
@@ -998,6 +1048,7 @@ public final class RustGalFrameCoordinator {
 		long guiAssetUpdateBytes;
 		long worldBorderAssetUpdateBytes;
 		long worldCrackAssetUpdateBytes;
+		long worldMaterialAssetUpdateBytes;
 		long enqueueNanos;
 		long resourceLookupNanos;
 		long resourceCreateNanos;

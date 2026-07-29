@@ -20,6 +20,7 @@ import net.minecraft.client.renderer.state.QuadParticleRenderState;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.logging.LogUtils;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -47,7 +48,7 @@ public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.i
 		});
 
 		try {
-			if (!submitNodeCollection.getParticleGroupRenderers().isEmpty()) {
+			if (!submitNodeCollection.getParticleGroupRenderers().isEmpty() || RustGalWorldPrimitiveRenderer.hasPendingMaterialQuads()) {
 				if (debugParticleFeatureLogCount < 24) {
 					debugParticleFeatureLogCount++;
 					LOGGER.info(
@@ -75,23 +76,32 @@ public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.i
 						this.usedBuffers.add(particleBufferCache);
 						// Iris: Override particle rendering code (merged from MixinParticleFeatureRenderer)
 						QuadParticleRenderState.PreparedBuffers preparedBuffers = particleGroupRenderer.prepare(particleBufferCache);
-						if (preparedBuffers != null) {
+						if (preparedBuffers != null || RustGalWorldPrimitiveRenderer.hasPendingMaterialQuads()) {
 							try (RenderPass renderPass = net.vulkanic.VulkanicAPI.createRenderPass(() -> "Particles - Main", renderTarget.getColorTextureView(), OptionalInt.empty(), renderTarget.getDepthTextureView(), OptionalDouble.empty())) {
 								this.prepareRenderPass(renderPass);
-								if (phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING || phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.OPAQUE) {
+								if (preparedBuffers != null && (phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING || phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.OPAQUE)) {
 									particleGroupRenderer.render(preparedBuffers, particleBufferCache, renderPass, textureManager, false);
 								}
-								if (renderTarget2 == null && (phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING || phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.TRANSLUCENT)) {
+								if (RustGalWorldPrimitiveRenderer.hasPendingMaterialQuads() && !net.irisshaders.iris.Iris.isPackInUseQuick()) {
+									RustGalWorldPrimitiveRenderer.renderOpenGlPendingMaterialQuads(minecraft, "minecraft.particle.block-marker");
+								}
+								if (preparedBuffers != null && renderTarget2 == null && (phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING || phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.TRANSLUCENT)) {
 									particleGroupRenderer.render(preparedBuffers, particleBufferCache, renderPass, textureManager, true);
 								}
 							}
 
-							if (renderTarget2 != null && (phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING || phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.TRANSLUCENT)) {
+							if (preparedBuffers != null && renderTarget2 != null && (phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING || phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.TRANSLUCENT)) {
 								try (RenderPass renderPass = net.vulkanic.VulkanicAPI.createRenderPass(() -> "Particles - Transparent", renderTarget2.getColorTextureView(), OptionalInt.empty(), renderTarget2.getDepthTextureView(), OptionalDouble.empty())) {
 									this.prepareRenderPass(renderPass);
 									particleGroupRenderer.render(preparedBuffers, particleBufferCache, renderPass, textureManager, true);
 								}
 							}
+						}
+					}
+					if (RustGalWorldPrimitiveRenderer.hasPendingMaterialQuads() && !net.irisshaders.iris.Iris.isPackInUseQuick()) {
+						try (RenderPass renderPass = net.vulkanic.VulkanicAPI.createRenderPass(() -> "Particles - Main", renderTarget.getColorTextureView(), OptionalInt.empty(), renderTarget.getDepthTextureView(), OptionalDouble.empty())) {
+							this.prepareRenderPass(renderPass);
+							RustGalWorldPrimitiveRenderer.renderOpenGlPendingMaterialQuads(minecraft, "minecraft.particle.block-marker");
 						}
 					}
 				} finally {

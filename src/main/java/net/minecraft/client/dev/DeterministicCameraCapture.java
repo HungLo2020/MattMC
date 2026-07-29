@@ -30,6 +30,7 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -224,6 +225,10 @@ public final class DeterministicCameraCapture {
 	private static boolean rustGalGuiScreenCycleComplete = !RUST_GAL_GUI_SCREEN_CYCLE;
 
 	private DeterministicCameraCapture() {
+	}
+
+	public static long currentRenderedFrameIndex() {
+		return renderedFrameIndex;
 	}
 
 	public static void beforeTick(Minecraft minecraft) {
@@ -1431,6 +1436,8 @@ public final class DeterministicCameraCapture {
 		appendField(json, "rustGalWorldOutlineScenario", System.getProperty("mattmc.dev.rustGalWorldOutline.scenario", "")).append(",\n");
 		appendField(json, "rustGalWorldOutlineStyle", System.getProperty("mattmc.dev.rustGalWorldOutline.style", "")).append(",\n");
 		appendField(json, "rustGalWorldOutlineDepthPolicy", System.getProperty("mattmc.dev.rustGalWorldOutline.depthPolicy", "")).append(",\n");
+		appendField(json, "rustGalWorldMaterialMarkerScenario", System.getProperty("mattmc.dev.rustGalWorldMaterial.blockMarkerScenario", "")).append(",\n");
+		appendBlockMarkerDiagnostics(json).append(",\n");
 		json.append("  \"rustGalWorldOutlineDepthProbe\": ").append(Boolean.getBoolean("mattmc.dev.rustGalWorldOutline.depthProbe")).append(",\n");
 		json.append("  \"blockOutlineRealTargetForced\": ").append(FORCE_BLOCK_OUTLINE_TARGET).append(",\n");
 		json.append("  \"blockOutlineRealTargetAimed\": ").append(AIM_BLOCK_OUTLINE_TARGET).append(",\n");
@@ -1637,6 +1644,40 @@ public final class DeterministicCameraCapture {
 		appendVec3(json, "playerPosition", forcedBlockOutlineTarget.playerPosition(), 0).append(", ");
 		appendPoseObject(json, "pose", forcedBlockOutlineTarget.pose());
 		json.append(" }");
+		return json;
+	}
+
+	private static StringBuilder appendBlockMarkerDiagnostics(StringBuilder json) {
+		List<RustGalWorldPrimitiveRenderer.BlockMarkerDiagnostic> diagnostics =
+			RustGalWorldPrimitiveRenderer.blockMarkerDiagnostics();
+		json.append("  \"rustGalWorldMaterialMarkers\": [");
+		for (int i = 0; i < diagnostics.size(); i++) {
+			RustGalWorldPrimitiveRenderer.BlockMarkerDiagnostic marker = diagnostics.get(i);
+			if (i > 0) {
+				json.append(",");
+			}
+			json.append("\n    { ");
+			json.append("\"frameIndex\": ").append(marker.frameIndex()).append(", ");
+			appendField(json, "route", marker.route(), 0).append(", ");
+			json.append("\"textureId\": ").append(marker.textureId()).append(", ");
+			json.append("\"center\": { \"x\": ").append(format(marker.centerX()))
+				.append(", \"y\": ").append(format(marker.centerY()))
+				.append(", \"z\": ").append(format(marker.centerZ())).append(" }, ");
+			json.append("\"quadSize\": ").append(format(marker.quadSize())).append(", ");
+			json.append("\"colorArgb\": ").append(Integer.toUnsignedLong(marker.colorArgb())).append(", ");
+			json.append("\"viewport\": { \"width\": ").append(marker.viewportWidth())
+				.append(", \"height\": ").append(marker.viewportHeight()).append(" }, ");
+			json.append("\"projected\": ").append(marker.projected()).append(", ");
+			json.append("\"screenBounds\": { \"left\": ").append(format(marker.screenLeft()))
+				.append(", \"top\": ").append(format(marker.screenTop()))
+				.append(", \"right\": ").append(format(marker.screenRight()))
+				.append(", \"bottom\": ").append(format(marker.screenBottom())).append(" }");
+			json.append(" }");
+		}
+		if (!diagnostics.isEmpty()) {
+			json.append("\n  ");
+		}
+		json.append("]");
 		return json;
 	}
 

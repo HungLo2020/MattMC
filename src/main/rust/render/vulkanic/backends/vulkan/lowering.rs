@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 use std::sync::Arc;
 
 use ash::vk;
@@ -71,6 +71,7 @@ impl SubmissionLowerer {
             }
             unsafe { self.context.end_label(command_buffer) };
         }
+        self.transition_pending_frame_targets_to_present(command_buffer, &mut state);
         unsafe { self.context.end_label(command_buffer) };
         unsafe { self.context.device.end_command_buffer(command_buffer) }.map_err(|error| {
             GalError::backend(format!("failed to end Vulkan command buffer: {error:?}"))
@@ -221,6 +222,11 @@ impl SubmissionLowerer {
                     {
                         let frame = objects.frame_target(*target)?;
                         let clear_frame = !state.frame_target_touched;
+                        let old_layout = state
+                            .frame_target_layouts
+                            .get(target)
+                            .copied()
+                            .unwrap_or(frame.image_layout);
                         let range = vk::ImageSubresourceRange {
                             aspect_mask: vk::ImageAspectFlags::COLOR,
                             base_mip_level: 0,
@@ -230,10 +236,18 @@ impl SubmissionLowerer {
                         };
                         let to_attachment = vk::ImageMemoryBarrier2::default()
                             .src_stage_mask(
-                                if frame.image_layout == vk::ImageLayout::PRESENT_SRC_KHR {
+                                if old_layout == vk::ImageLayout::PRESENT_SRC_KHR {
                                     vk::PipelineStageFlags2::BOTTOM_OF_PIPE
                                 } else {
-                                    vk::PipelineStageFlags2::TOP_OF_PIPE
+                                    vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT
+                                },
+                            )
+                            .src_access_mask(
+                                if old_layout == vk::ImageLayout::PRESENT_SRC_KHR {
+                                    vk::AccessFlags2::empty()
+                                } else {
+                                    vk::AccessFlags2::COLOR_ATTACHMENT_READ
+                                        | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE
                                 },
                             )
                             .dst_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
@@ -241,7 +255,7 @@ impl SubmissionLowerer {
                                 vk::AccessFlags2::COLOR_ATTACHMENT_READ
                                     | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
                             )
-                            .old_layout(frame.image_layout)
+                            .old_layout(old_layout)
                             .new_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
                             .image(frame.image)
                             .subresource_range(range);
@@ -250,6 +264,9 @@ impl SubmissionLowerer {
                             &vk::DependencyInfo::default()
                                 .image_memory_barriers(std::slice::from_ref(&to_attachment)),
                         );
+                        state
+                            .frame_target_layouts
+                            .insert(*target, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
                         let clear = colors
                             .first()
                             .and_then(|attachment| attachment.clear_color)
@@ -269,7 +286,7 @@ impl SubmissionLowerer {
                                 frame.image_view.as_raw(),
                                 frame.extent.width,
                                 frame.extent.height,
-                                frame.image_layout.as_raw(),
+                                old_layout.as_raw(),
                                 load.as_raw(),
                                 clear[0],
                                 clear[1],
@@ -310,6 +327,7 @@ impl SubmissionLowerer {
                             depth_attachment,
                             frame.extent,
                             Some(FramePresentTransition {
+                                target: *target,
                                 image: frame.image,
                                 image_index: frame.image_index,
                                 frame_id: frame.frame_id,
@@ -404,26 +422,7 @@ impl SubmissionLowerer {
                 CommandOp::EndPass => {
                     self.context.device.cmd_end_rendering(command_buffer);
                     if let Some(present) = state.frame_present.take() {
-                        let to_present = vk::ImageMemoryBarrier2::default()
-                            .src_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
-                            .src_access_mask(
-                                vk::AccessFlags2::COLOR_ATTACHMENT_READ
-                                    | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
-                            )
-                            .dst_stage_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE)
-                            .old_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                            .new_layout(vk::ImageLayout::PRESENT_SRC_KHR)
-                            .image(present.image)
-                            .subresource_range(present.range);
-                        self.context.device.cmd_pipeline_barrier2(
-                            command_buffer,
-                            &vk::DependencyInfo::default()
-                                .image_memory_barriers(std::slice::from_ref(&to_present)),
-                        );
-                        trace::message(&format!(
-                            "gal.frame.target.present-ready backend=vulkan frame={} image={}",
-                            present.frame_id, present.image_index
-                        ));
+                        state.pending_frame_presents.insert(present.target, present);
                     }
                     self.context.end_label(command_buffer);
                     state.in_pass = false;
@@ -686,6 +685,45 @@ impl SubmissionLowerer {
         Ok(())
     }
 
+    fn transition_pending_frame_targets_to_present(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        state: &mut EncodingState,
+    ) {
+        for (target, present) in std::mem::take(&mut state.pending_frame_presents) {
+            let old_layout = state
+                .frame_target_layouts
+                .get(&target)
+                .copied()
+                .unwrap_or(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
+            let to_present = vk::ImageMemoryBarrier2::default()
+                .src_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
+                .src_access_mask(
+                    vk::AccessFlags2::COLOR_ATTACHMENT_READ
+                        | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
+                )
+                .dst_stage_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE)
+                .old_layout(old_layout)
+                .new_layout(vk::ImageLayout::PRESENT_SRC_KHR)
+                .image(present.image)
+                .subresource_range(present.range);
+            unsafe {
+                self.context.device.cmd_pipeline_barrier2(
+                    command_buffer,
+                    &vk::DependencyInfo::default()
+                        .image_memory_barriers(std::slice::from_ref(&to_present)),
+                );
+            }
+            state
+                .frame_target_layouts
+                .insert(target, vk::ImageLayout::PRESENT_SRC_KHR);
+            trace::message(&format!(
+                "gal.frame.target.present-ready backend=vulkan frame={} image={}",
+                present.frame_id, present.image_index
+            ));
+        }
+    }
+
     fn complete_host_reads(&mut self, complete: &InFlightSubmission) {
         let _zone = trace::Zone::new("vulkan.backend.host-readback");
         for request in &complete.host_reads {
@@ -737,10 +775,13 @@ struct EncodingState {
     pipeline_layout: Option<crate::render::vulkanic::handles::Handle>,
     frame_target_touched: bool,
     frame_present: Option<FramePresentTransition>,
+    frame_target_layouts: BTreeMap<Handle, vk::ImageLayout>,
+    pending_frame_presents: BTreeMap<Handle, FramePresentTransition>,
     host_reads: Vec<HostReadRequest>,
 }
 
 struct FramePresentTransition {
+    target: Handle,
     image: vk::Image,
     image_index: u32,
     frame_id: u64,
