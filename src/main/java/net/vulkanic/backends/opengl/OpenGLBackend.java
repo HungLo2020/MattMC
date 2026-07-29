@@ -2570,6 +2570,7 @@ public class OpenGLBackend implements GraphicsBackend {
 
     public VulkanicAPI.FramebufferProbeSnapshot readDrawFramebufferProbe(int x, int y, int width, int height) {
         int previousReadFramebuffer = GL11.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING);
+        int previousReadBuffer = GL11.glGetInteger(GL11.GL_READ_BUFFER);
         int drawFramebuffer = GL11.glGetInteger(GL30.GL_DRAW_FRAMEBUFFER_BINDING);
         int currentProgram = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
         int[] viewport = new int[4];
@@ -2578,14 +2579,33 @@ public class OpenGLBackend implements GraphicsBackend {
         boolean blend = GL11.glIsEnabled(GL11.GL_BLEND);
         boolean scissor = GL11.glIsEnabled(GL11.GL_SCISSOR_TEST);
         ByteBuffer pixels = BufferUtils.createByteBuffer(width * height * 4);
+        java.nio.FloatBuffer depthPixels = BufferUtils.createFloatBuffer(width * height);
         GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, drawFramebuffer);
+        GL11.glReadBuffer(drawFramebuffer == 0 ? GL11.GL_BACK : GL30.GL_COLOR_ATTACHMENT0);
         GL11.glReadPixels(x, y, width, height, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixels);
+        boolean hasReadableDepth = drawFramebuffer == 0 || GL30.glGetFramebufferAttachmentParameteri(
+                GL30.GL_READ_FRAMEBUFFER,
+                GL30.GL_DEPTH_ATTACHMENT,
+                GL30.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE
+            ) != GL11.GL_NONE;
+        if (hasReadableDepth) {
+            GL11.glReadPixels(x, y, width, height, GL11.GL_DEPTH_COMPONENT, GL11.GL_FLOAT, depthPixels);
+        } else {
+            for (int index = 0; index < depthPixels.capacity(); index++) {
+                depthPixels.put(index, 1.0F);
+            }
+        }
         GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, previousReadFramebuffer);
+        GL11.glReadBuffer(previousReadBuffer);
         byte[] bytes = new byte[pixels.capacity()];
         pixels.rewind();
         pixels.get(bytes);
+        float[] depths = new float[depthPixels.capacity()];
+        depthPixels.rewind();
+        depthPixels.get(depths);
         return new VulkanicAPI.FramebufferProbeSnapshot(
             bytes,
+            depths,
             previousReadFramebuffer,
             drawFramebuffer,
             currentProgram,

@@ -7,7 +7,7 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.phys.Vec3;
-import net.vulkanic.gui.RustGalGuiRenderer;
+import net.vulkanic.gui.RustGalFrameCoordinator;
 
 import java.io.IOException;
 import java.lang.management.GarbageCollectorMXBean;
@@ -464,7 +464,7 @@ public final class GraphicsFrameBenchmark {
 		json.append("  },\n");
 		writeSamples(json);
 		json.append(",\n");
-		field(json, "rustGalSliceMetricsLine", RustGalGuiRenderer.currentAuditMetricsLine(), 2, true);
+		field(json, "rustGalSliceMetricsLine", RustGalFrameCoordinator.currentAuditMetricsLine(), 2, true);
 		writeStringIntMap(json, "submittedWorkCounts", SUBMITTED_WORK_COUNTS);
 		json.append(",\n");
 		writePhaseMap(json, "exclusivePhaseNanos", EXCLUSIVE_PHASES);

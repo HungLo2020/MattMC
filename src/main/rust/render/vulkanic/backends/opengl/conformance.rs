@@ -528,7 +528,7 @@ fn conformance_ops(
         buffer_barrier(
             index,
             TextureUsageState::TransferDst,
-            TextureUsageState::ShaderRead,
+            TextureUsageState::IndexRead,
         ),
         texture_barrier(
             sampled,

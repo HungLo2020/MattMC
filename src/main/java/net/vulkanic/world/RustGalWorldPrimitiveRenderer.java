@@ -8,7 +8,7 @@ import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.state.BlockOutlineRenderState;
 import net.minecraft.client.renderer.state.WorldBorderRenderState;
 import net.minecraft.client.renderer.state.BlockBreakingRenderState;
-import net.vulkanic.gui.RustGalGuiRenderer;
+import net.vulkanic.gui.RustGalFrameCoordinator;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
@@ -27,8 +27,6 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
-import net.vulkanic.VulkanicAPI;
-import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 import net.vulkanic.bridge.VulkanicGalBridge;
 import net.logging.LogUtils;
 import org.joml.Matrix4f;
@@ -76,9 +74,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final String DIAGNOSTIC_BORDER_SCROLL = System.getProperty("mattmc.dev.rustGalWorldBorder.scrollPhase", "").trim();
 	private static final String DIAGNOSTIC_BACKGROUND_SCENARIO = System.getProperty("mattmc.dev.rustGalWorldBackground.scenario", "auto").trim();
 	private static final boolean BLOCK_OUTLINE_DIAGNOSTICS = Boolean.getBoolean("mattmc.dev.blockOutlineDiagnostics");
-	private static final boolean BLOCK_OUTLINE_LEGACY_CONTROL = Boolean.getBoolean("mattmc.dev.rustGalWorldOutline.legacyControl");
 	private static final boolean CRACK_DISABLED_CONTROL = Boolean.getBoolean("mattmc.dev.rustGalWorldCrack.disabled");
-	private static final boolean CRACK_LEGACY_CONTROL = Boolean.getBoolean("mattmc.dev.rustGalWorldCrack.legacyControl");
 	private static final ResourceLocation FORCEFIELD_LOCATION = ResourceLocation.withDefaultNamespace("textures/misc/forcefield.png");
 	private static final ResourceLocation[] CRACK_STAGE_LOCATIONS = new ResourceLocation[] {
 		ResourceLocation.withDefaultNamespace("textures/block/destroy_stage_0.png"),
@@ -127,59 +123,34 @@ public final class RustGalWorldPrimitiveRenderer {
 	private RustGalWorldPrimitiveRenderer() {
 	}
 
-	public enum BlockOutlineRoute {
-		JAVA_COMPATIBILITY,
-		RUST_OPENGL_BORROWED_CONTEXT,
-		RUST_VULKAN_WHOLE_FRAME
+	public static WorldRenderRoutePolicy.Route currentBlockOutlineRoute() {
+		return WorldRenderRoutePolicy.currentBlockOutlineRoute();
 	}
 
-	public static BlockOutlineRoute selectBlockOutlineRouteForTests(boolean vulkanBackendSelected, boolean wholeFrameVulkanEnabled) {
-		if (vulkanBackendSelected) {
-			return wholeFrameVulkanEnabled
-				? BlockOutlineRoute.RUST_VULKAN_WHOLE_FRAME
-				: BlockOutlineRoute.JAVA_COMPATIBILITY;
-		}
-		return BlockOutlineRoute.RUST_OPENGL_BORROWED_CONTEXT;
-	}
-
-	public static BlockOutlineRoute currentBlockOutlineRoute() {
-		if (BLOCK_OUTLINE_LEGACY_CONTROL) {
-			return BlockOutlineRoute.JAVA_COMPATIBILITY;
-		}
-		return selectBlockOutlineRouteForTests(
-			VulkanicAPI.isVulkanBackendSelected(),
-			RustGalVulkanWholeFrameMode.enabledForBackend(VulkanicAPI.isVulkanBackendSelected())
-		);
-	}
-
-	public static BlockOutlineRoute currentCrackRoute() {
-		if (CRACK_DISABLED_CONTROL || CRACK_LEGACY_CONTROL) {
-			return BlockOutlineRoute.JAVA_COMPATIBILITY;
-		}
-		return selectBlockOutlineRouteForTests(
-			VulkanicAPI.isVulkanBackendSelected(),
-			RustGalVulkanWholeFrameMode.enabledForBackend(VulkanicAPI.isVulkanBackendSelected())
-		);
+	public static WorldRenderRoutePolicy.Route currentCrackRoute() {
+		return WorldRenderRoutePolicy.currentCrackRoute();
 	}
 
 	public static boolean shouldUseRustWholeFrameOutline() {
-		return currentBlockOutlineRoute() == BlockOutlineRoute.RUST_VULKAN_WHOLE_FRAME;
+		return WorldRenderRoutePolicy.currentBlockOutlineRoute().usesRustWholeFrameVulkan();
 	}
 
 	public static boolean shouldUseRustOpenGlOutline() {
-		return currentBlockOutlineRoute() == BlockOutlineRoute.RUST_OPENGL_BORROWED_CONTEXT;
+		return WorldRenderRoutePolicy.currentBlockOutlineRoute().usesRustOpenGl();
 	}
 
 	public static boolean shouldUseRustWholeFrameCrack() {
-		return currentCrackRoute() == BlockOutlineRoute.RUST_VULKAN_WHOLE_FRAME;
+		return WorldRenderRoutePolicy.currentCrackRoute().usesRustWholeFrameVulkan();
 	}
 
 	public static boolean shouldUseRustOpenGlCrack() {
-		return currentCrackRoute() == BlockOutlineRoute.RUST_OPENGL_BORROWED_CONTEXT;
+		return WorldRenderRoutePolicy.currentCrackRoute().usesRustOpenGl();
 	}
 
 	public static boolean shouldUseRustOpenGlWorldPrimitives() {
-		return shouldUseRustOpenGlOutline() || shouldUseRustOpenGlCrack();
+		return shouldUseRustOpenGlOutline()
+			|| shouldUseRustOpenGlCrack()
+			|| WorldRenderRoutePolicy.currentMaterialRoute().usesRustOpenGl();
 	}
 
 	public static boolean crackDisabledForDiagnostics() {
@@ -478,7 +449,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	public static void enqueueWorldBackground(ClientLevel level, Camera camera, float partialTick) {
-		if (!shouldUseRustWholeFrameOutline()) {
+		if (!WorldRenderRoutePolicy.currentBackgroundRoute().usesRustWholeFrameVulkan()) {
 			return;
 		}
 		synchronized (LOCK) {
@@ -527,6 +498,9 @@ public final class RustGalWorldPrimitiveRenderer {
 				if (state.progress < 0 || state.progress >= 10) {
 					continue;
 				}
+				if (state.blockState.isAir()) {
+					continue;
+				}
 				VoxelShape shape = state.blockState.getShape(state.level, state.blockPos, CollisionContext.of(camera.getEntity()));
 				if (shape.isEmpty()) {
 					shape = Shapes.block();
@@ -544,11 +518,22 @@ public final class RustGalWorldPrimitiveRenderer {
 		if (!shouldUseRustOpenGlCrack()) {
 			return false;
 		}
-		if (minecraft == null || camera == null || states == null || (states.isEmpty() && DIAGNOSTIC_CRACK_SCENARIO.isBlank())) {
+		if (minecraft == null || camera == null || states == null) {
+			return false;
+		}
+		if (states.isEmpty() && DIAGNOSTIC_CRACK_SCENARIO.isBlank()) {
+			auditMessage("Rust VulkanicGAL block-breaking crack request"
+				+ " route=rust-opengl"
+				+ " real_destroy_progress=true"
+				+ " states=0"
+				+ " quads=0"
+				+ " first=none"
+				+ " result=no-work");
 			return false;
 		}
 		PrimitiveFrame frame;
 		Vec3 cameraPos = camera.getPosition();
+		String firstStateSummary = firstCrackStateSummary(states);
 		synchronized (LOCK) {
 			int viewportWidth = pendingViewportWidth;
 			int viewportHeight = pendingViewportHeight;
@@ -563,6 +548,9 @@ public final class RustGalWorldPrimitiveRenderer {
 					if (state.progress < 0 || state.progress >= 10) {
 						continue;
 					}
+					if (state.blockState.isAir()) {
+						continue;
+					}
 					VoxelShape shape = state.blockState.getShape(state.level, state.blockPos, CollisionContext.of(camera.getEntity()));
 					if (shape.isEmpty()) {
 						shape = Shapes.block();
@@ -571,6 +559,13 @@ public final class RustGalWorldPrimitiveRenderer {
 				}
 			}
 			if (PENDING_CRACK_QUADS.isEmpty()) {
+				auditMessage("Rust VulkanicGAL block-breaking crack request"
+					+ " route=rust-opengl"
+					+ " real_destroy_progress=" + DIAGNOSTIC_CRACK_SCENARIO.isBlank()
+					+ " states=" + states.size()
+					+ " quads=0"
+					+ " first=" + metricValue(firstStateSummary)
+					+ " result=empty");
 				return false;
 			}
 			frame = new PrimitiveFrame(
@@ -585,7 +580,31 @@ public final class RustGalWorldPrimitiveRenderer {
 			);
 			PENDING_CRACK_QUADS.clear();
 		}
-		return RustGalGuiRenderer.executeWorldPrimitiveFrame(minecraft, frame, "minecraft.world.block-breaking-crack");
+		auditMessage("Rust VulkanicGAL block-breaking crack request"
+			+ " route=rust-opengl"
+			+ " real_destroy_progress=" + DIAGNOSTIC_CRACK_SCENARIO.isBlank()
+			+ " states=" + states.size()
+			+ " quads=" + frame.crackQuads().size()
+			+ " first=" + metricValue(firstStateSummary)
+			+ " result=queued");
+		return RustGalFrameCoordinator.executeWorldPrimitiveFrame(minecraft, frame, "minecraft.world.block-breaking-crack");
+	}
+
+	public static boolean hasValidOpenGlBlockBreakingCracks(List<BlockBreakingRenderState> states, Camera camera) {
+		if (!shouldUseRustOpenGlCrack() || states == null || camera == null) {
+			return false;
+		}
+		if (!DIAGNOSTIC_CRACK_SCENARIO.isBlank()) {
+			return !"hidden".equalsIgnoreCase(DIAGNOSTIC_CRACK_SCENARIO)
+				&& !"no-target".equalsIgnoreCase(DIAGNOSTIC_CRACK_SCENARIO);
+		}
+		for (BlockBreakingRenderState state : states) {
+			if (state.progress < 0 || state.progress >= 10 || state.blockState.isAir()) {
+				continue;
+			}
+			return true;
+		}
+		return false;
 	}
 
 	private static boolean enqueueDiagnosticBlockBreakingCrack(Camera camera) {
@@ -613,8 +632,18 @@ public final class RustGalWorldPrimitiveRenderer {
 		return true;
 	}
 
+	private static String firstCrackStateSummary(List<BlockBreakingRenderState> states) {
+		if (states == null || states.isEmpty()) {
+			return "none";
+		}
+		BlockBreakingRenderState state = states.get(0);
+		String block = state.blockPos == null ? "unknown" : state.blockPos.toShortString();
+		String blockType = state.blockState == null ? "unknown" : state.blockState.getBlock().builtInRegistryHolder().key().location().toString();
+		return "block_" + block + "_stage_" + state.progress + "_type_" + blockType;
+	}
+
 	public static boolean enqueueWorldBorder(WorldBorderRenderState state, Vec3 cameraPosition, double renderDistance, double depthFar) {
-		if (!shouldUseRustWholeFrameOutline()) {
+		if (!WorldRenderRoutePolicy.currentWorldBorderRoute().usesRustWholeFrameVulkan()) {
 			return false;
 		}
 		synchronized (LOCK) {
@@ -1000,7 +1029,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			logFirstProjectedLineForDiagnostics(frame);
 			PENDING_SEGMENTS.clear();
 		}
-		return RustGalGuiRenderer.executeWorldPrimitiveFrame(minecraft, frame, "minecraft.world.block-outline");
+		return RustGalFrameCoordinator.executeWorldPrimitiveFrame(minecraft, frame, "minecraft.world.block-outline");
 	}
 
 	private static void logFirstProjectedLineForDiagnostics(PrimitiveFrame frame) {

@@ -5,6 +5,7 @@ import net.minecraft.client.AttackIndicatorStatus;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.components.BossHealthOverlay;
+import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
@@ -12,6 +13,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
 import net.irisshaders.iris.uniforms.SystemTimeUniforms;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -20,8 +23,10 @@ import net.minecraft.world.entity.player.ChatVisiblity;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.BossEvent.BossBarOverlay;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.vulkanic.VulkanicAPI;
@@ -80,8 +85,14 @@ public final class DeterministicCameraCapture {
 		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.blockOutlineTarget");
 	private static final boolean AIM_BLOCK_OUTLINE_TARGET =
 		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.blockOutlineAimTarget");
+	private static final boolean BLOCK_OUTLINE_PAUSE_PARITY =
+		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.blockOutlinePauseParity");
 	private static final boolean FORCE_BLOCK_OUTLINE_HIGH_CONTRAST =
 		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.blockOutlineHighContrast");
+	private static final boolean FORCE_REAL_SURVIVAL_CRACK =
+		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.realSurvivalCrack");
+	private static final boolean FORCE_REAL_SURVIVAL_CRACK_SETUP_BLOCK =
+		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.realSurvivalCrackSetupBlock");
 	private static final int FORCED_ARMOR_VALUE =
 		Integer.getInteger("mattmc.dev.deterministicCameraCapture.armorValue", -1);
 	private static final float FORCED_PLAYER_HEALTH =
@@ -142,6 +153,26 @@ public final class DeterministicCameraCapture {
 	private static boolean complete;
 	private static boolean failed;
 	private static boolean stopIssued;
+	private static BlockPos realSurvivalCrackBlock;
+	private static Direction realSurvivalCrackDirection;
+	private static String realSurvivalCrackLastHitType = "unset";
+	private static String realSurvivalCrackLastTarget = "unset";
+	private static String realSurvivalCrackLastDirection = "unset";
+	private static String realSurvivalCrackLastStatus = "unset";
+	private static String realSurvivalCrackSetupTarget = "unset";
+	private static String realSurvivalCrackLastValidTarget = "unset";
+	private static String realSurvivalCrackLastValidBlockType = "unset";
+	private static String realSurvivalCrackLastRenderedTarget = "unset";
+	private static String realSurvivalCrackLastRenderedBlockType = "unset";
+	private static int realSurvivalCrackStartCalls;
+	private static int realSurvivalCrackContinueCalls;
+	private static int realSurvivalCrackStopCalls;
+	private static int realSurvivalCrackValidBlockHitCount;
+	private static int realSurvivalCrackRenderedStateCount;
+	private static int realSurvivalCrackMinRenderedStage = 10;
+	private static int realSurvivalCrackMaxRenderedStage = -1;
+	private static int realSurvivalCrackFramesWaitingForStage;
+	private static long realSurvivalCrackLastDriveGameTime = Long.MIN_VALUE;
 	private static Pose[] poses;
 	private static Pose initialPose;
 	private static Vec3 initialPosition;
@@ -164,6 +195,7 @@ public final class DeterministicCameraCapture {
 	private static AttackIndicatorStatus originalAttackIndicator;
 	private static ChatVisiblity originalChatVisibility;
 	private static boolean originalHighContrastBlockOutline;
+	private static boolean originalNoGravity;
 	private static int originalSelectedHotbarSlot;
 	private static float originalExperienceProgress;
 	private static int originalExperienceLevel;
@@ -177,6 +209,13 @@ public final class DeterministicCameraCapture {
 	private static MobEffectInstance originalWitherEffect;
 	private static MobEffectInstance originalRegenerationEffect;
 	private static Entity originalCrosshairPickEntity;
+	private static float initialHealth;
+	private static Vec3 lastSafetyPosition = Vec3.ZERO;
+	private static Vec3 lastSafetyVelocity = Vec3.ZERO;
+	private static float lastSafetyHealth;
+	private static double lastSafetyFallDistance;
+	private static String deterministicSupportBlock = "unset";
+	private static String deterministicSupportBlockType = "unset";
 	private static ForcedBlockOutlineTarget forcedBlockOutlineTarget;
 	private static final Map<Long, Map<String, Set<String>>> SUBMITTED_WORK_BY_FRAME = new LinkedHashMap<>();
 	private static int rustGalGuiScreenCycleStage;
@@ -207,7 +246,16 @@ public final class DeterministicCameraCapture {
 		player.zza = 0.0F;
 		player.setSprinting(false);
 		player.setShiftKeyDown(false);
+		recordPlayerSafetyState(player);
+		if (initialized && initialPosition != null && player.position().distanceToSqr(initialPosition) > 0.0004) {
+			fail("deterministic player moved unexpectedly before stabilization: initial="
+				+ formatVec(initialPosition)
+				+ " current="
+				+ formatVec(player.position()));
+			return;
+		}
 		player.setDeltaMovement(Vec3.ZERO);
+		player.fallDistance = 0.0F;
 		applyRuntimeOverrides(minecraft, player);
 		if (initialized && initialPosition != null && initialPose != null) {
 			player.setPos(initialPosition);
@@ -225,11 +273,13 @@ public final class DeterministicCameraCapture {
 		applyRuntimeOverrides(minecraft, minecraft.player);
 		if (poseIndex >= poses.length) {
 			stabilizeGuiState(minecraft);
+			applyPauseParityScreen(minecraft);
 			applyPose(minecraft.player, initialPose);
 			return;
 		}
 
 		stabilizeGuiState(minecraft);
+		applyPauseParityScreen(minecraft);
 		applyPose(minecraft.player, poses[poseIndex]);
 	}
 
@@ -242,11 +292,13 @@ public final class DeterministicCameraCapture {
 		}
 		if (poseIndex >= poses.length) {
 			stabilizeGuiState(minecraft);
+			applyPauseParityScreen(minecraft);
 			applyPose(minecraft.player, initialPose);
 			return;
 		}
 
 		stabilizeGuiState(minecraft);
+		applyPauseParityScreen(minecraft);
 		applyPose(minecraft.player, poses[poseIndex]);
 		renderedFrameIndex++;
 		if (!settledReadyGateSatisfied && !settledReadyGateSatisfied(minecraft)) {
@@ -281,12 +333,30 @@ public final class DeterministicCameraCapture {
 		if (renderedFramesAtPose < FRAMES_PER_POSE) {
 			return;
 		}
-		RenderDocCaptureHook.endFrameCaptureOnce(minecraft.getWindow(), poses[poseIndex].name() + "#" + renderedFrameIndex);
+			RenderDocCaptureHook.endFrameCaptureOnce(minecraft.getWindow(), poses[poseIndex].name() + "#" + renderedFrameIndex);
 
-		VulkanicAPI.traceScopedCompositeColortex0PoseBoundary();
-		if (INTERNAL_SCREENSHOTS) {
-			captureCurrentPoseInternally(minecraft);
-		} else {
+			VulkanicAPI.traceScopedCompositeColortex0PoseBoundary();
+			if (!realSurvivalCrackPoseReady()) {
+				renderedFramesAtPose = 0;
+				realSurvivalCrackFramesWaitingForStage++;
+				if (realSurvivalCrackFramesWaitingForStage > SETTLED_READY_MAX_WAIT_FRAMES) {
+					fail("timed out waiting for real survival crack pose " + poses[poseIndex].name()
+						+ " target stage: min=" + (realSurvivalCrackMinRenderedStage == 10 ? -1 : realSurvivalCrackMinRenderedStage)
+						+ " max=" + realSurvivalCrackMaxRenderedStage
+						+ " status=" + realSurvivalCrackLastStatus
+						+ " hit=" + realSurvivalCrackLastHitType
+						+ " target=" + realSurvivalCrackLastTarget
+						+ " validHits=" + realSurvivalCrackValidBlockHitCount
+						+ " renderedStates=" + realSurvivalCrackRenderedStateCount);
+				} else if ((realSurvivalCrackFramesWaitingForStage % 30) == 0) {
+					writeMetadata(minecraft, "waiting_for_real_survival_crack_stage");
+				}
+				return;
+			}
+			realSurvivalCrackFramesWaitingForStage = 0;
+			if (INTERNAL_SCREENSHOTS) {
+				captureCurrentPoseInternally(minecraft);
+			} else {
 			requestCurrentPoseScreenshot(minecraft);
 		}
 		renderedFramesAtPose = 0;
@@ -423,10 +493,11 @@ public final class DeterministicCameraCapture {
 			originalGameMode = minecraft.gameMode == null ? null : minecraft.gameMode.getPlayerMode();
 			originalPreviousGameMode = minecraft.gameMode == null ? null : minecraft.gameMode.getPreviousPlayerMode();
 			originalAttackIndicator = minecraft.options.attackIndicator().get();
-			originalChatVisibility = minecraft.options.chatVisibility().get();
-			originalHighContrastBlockOutline = minecraft.options.highContrastBlockOutline().get();
-			originalSelectedHotbarSlot = player.getInventory().getSelectedSlot();
-		originalExperienceProgress = player.experienceProgress;
+					originalChatVisibility = minecraft.options.chatVisibility().get();
+					originalHighContrastBlockOutline = minecraft.options.highContrastBlockOutline().get();
+					originalNoGravity = player.isNoGravity();
+					originalSelectedHotbarSlot = player.getInventory().getSelectedSlot();
+			originalExperienceProgress = player.experienceProgress;
 			originalExperienceLevel = player.experienceLevel;
 					originalExperienceDisplayStartTick = player.experienceDisplayStartTick;
 					originalAttackStrengthTicker = player.getAttackStrengthTickerForDeterministicCapture();
@@ -436,16 +507,19 @@ public final class DeterministicCameraCapture {
 					originalTicksFrozen = player.getTicksFrozen();
 					originalPoisonEffect = copyEffect(player.getEffect(MobEffects.POISON));
 					originalWitherEffect = copyEffect(player.getEffect(MobEffects.WITHER));
-					originalRegenerationEffect = copyEffect(player.getEffect(MobEffects.REGENERATION));
-					originalCrosshairPickEntity = minecraft.crosshairPickEntity;
-				if (FORCE_BLOCK_OUTLINE_TARGET || AIM_BLOCK_OUTLINE_TARGET) {
+						originalRegenerationEffect = copyEffect(player.getEffect(MobEffects.REGENERATION));
+						originalCrosshairPickEntity = minecraft.crosshairPickEntity;
+						initialHealth = player.getHealth();
+					if (FORCE_BLOCK_OUTLINE_TARGET || AIM_BLOCK_OUTLINE_TARGET) {
 					forcedBlockOutlineTarget = findForcedBlockOutlineTarget(level, player);
 					if (forcedBlockOutlineTarget == null) {
 						return false;
 					}
 					initialPosition = forcedBlockOutlineTarget.playerPosition();
 				}
-				applyRuntimeOverrides(minecraft, player);
+					applyRuntimeOverrides(minecraft, player);
+					setupDeterministicSupportPlatform(minecraft, player);
+					setupRealSurvivalCrackBlock(minecraft, player);
 		initialPose = new Pose("initial", player.getYRot(), player.getXRot());
 		if (forcedBlockOutlineTarget != null) {
 			initialPose = forcedBlockOutlineTarget.pose();
@@ -458,7 +532,20 @@ public final class DeterministicCameraCapture {
 			new Pose("left", initialPose.yaw() - YAW_DELTA, initialPose.pitch()),
 			new Pose("return", initialPose.yaw(), initialPose.pitch())
 		};
-		poses = java.util.Arrays.copyOf(fullSequence, POSE_COUNT);
+			if (BLOCK_OUTLINE_PAUSE_PARITY) {
+				fullSequence = new Pose[] {
+					new Pose("playing", initialPose.yaw(), initialPose.pitch()),
+					new Pose("paused", initialPose.yaw(), initialPose.pitch()),
+					new Pose("unpaused", initialPose.yaw(), initialPose.pitch())
+				};
+			} else if (FORCE_REAL_SURVIVAL_CRACK) {
+				fullSequence = new Pose[] {
+					new Pose("crack-early", initialPose.yaw(), initialPose.pitch()),
+					new Pose("crack-middle", initialPose.yaw(), initialPose.pitch()),
+					new Pose("crack-late", initialPose.yaw(), initialPose.pitch())
+				};
+			}
+			poses = java.util.Arrays.copyOf(fullSequence, Math.min(POSE_COUNT, fullSequence.length));
 		startedGameTime = level.getGameTime();
 		windowWidth = minecraft.getWindow().getWidth();
 		windowHeight = minecraft.getWindow().getHeight();
@@ -593,6 +680,22 @@ public final class DeterministicCameraCapture {
 
 	private static void stabilizeGuiState(Minecraft minecraft) {
 		minecraft.gui.vignetteBrightness = FIXED_VIGNETTE_BRIGHTNESS;
+	}
+
+	private static void applyPauseParityScreen(Minecraft minecraft) {
+		if (!BLOCK_OUTLINE_PAUSE_PARITY || poses == null || poseIndex < 0 || poseIndex >= poses.length) {
+			return;
+		}
+		boolean wantsPauseScreen = "paused".equals(poses[poseIndex].name());
+		if (wantsPauseScreen) {
+			if (minecraft.screen == null) {
+				minecraft.setScreen(new PauseScreen(false));
+			}
+			return;
+		}
+		if (minecraft.screen instanceof PauseScreen) {
+			minecraft.setScreen(null);
+		}
 	}
 
 	private static boolean advanceRustGalGuiScreenCycle(Minecraft minecraft) {
@@ -897,6 +1000,12 @@ public final class DeterministicCameraCapture {
 		if (gameType != null && minecraft.gameMode != null && minecraft.gameMode.getPlayerMode() != gameType) {
 			minecraft.gameMode.setLocalMode(gameType, minecraft.gameMode.getPreviousPlayerMode());
 		}
+		if (gameType != null && minecraft.getSingleplayerServer() != null) {
+			ServerPlayer serverPlayer = minecraft.getSingleplayerServer().getPlayerList().getPlayer(player.getUUID());
+			if (serverPlayer != null && serverPlayer.gameMode() != gameType) {
+				serverPlayer.setGameMode(gameType);
+			}
+		}
 		AttackIndicatorStatus attackIndicator = forcedAttackIndicator();
 		if (attackIndicator != null && minecraft.options.attackIndicator().get() != attackIndicator) {
 			minecraft.options.attackIndicator().set(attackIndicator);
@@ -924,17 +1033,29 @@ public final class DeterministicCameraCapture {
 				int ticks = Math.round(progress * player.getCurrentItemAttackStrengthDelay());
 				player.setAttackStrengthTickerForDeterministicCapture(ticks);
 			}
-		if (FORCE_ATTACK_TARGET) {
-			minecraft.crosshairPickEntity = player;
-		}
-			if (forcedBlockOutlineTarget != null) {
-				player.setPos(initialPosition);
+			if (FORCE_ATTACK_TARGET) {
+				minecraft.crosshairPickEntity = player;
+			}
+			player.setNoGravity(true);
+			player.setDeltaMovement(Vec3.ZERO);
+			player.fallDistance = 0.0F;
+			recordPlayerSafetyState(player);
+			if (initialized && player.getHealth() + 0.001F < initialHealth) {
+				fail("deterministic player took damage during capture: initialHealth="
+					+ format(initialHealth)
+					+ " currentHealth="
+					+ format(player.getHealth()));
+				return;
+			}
+				if (forcedBlockOutlineTarget != null) {
+					player.setPos(initialPosition);
 				player.setOldPosAndRot(initialPosition, forcedBlockOutlineTarget.pose().yaw(), forcedBlockOutlineTarget.pose().pitch());
 				applyPose(player, forcedBlockOutlineTarget.pose());
 				if (FORCE_BLOCK_OUTLINE_HIGH_CONTRAST && !minecraft.options.highContrastBlockOutline().get()) {
 					minecraft.options.highContrastBlockOutline().set(true);
 				}
 			}
+			driveRealSurvivalCrack(minecraft, player);
 				if (FORCED_ARMOR_VALUE >= 0) {
 					player.setArmorValueForDeterministicCapture(Math.min(20, FORCED_ARMOR_VALUE));
 				}
@@ -948,6 +1069,9 @@ public final class DeterministicCameraCapture {
 			}
 
 	private static void restoreRuntimeOverrides(Minecraft minecraft) {
+		if (BLOCK_OUTLINE_PAUSE_PARITY && minecraft.screen instanceof PauseScreen) {
+			minecraft.setScreen(null);
+		}
 		if (minecraft.player != null && FORCED_SELECTED_HOTBAR_SLOT > 0 && originalSelectedHotbarSlot >= 0 && originalSelectedHotbarSlot < 9) {
 			minecraft.player.getInventory().setSelectedSlot(originalSelectedHotbarSlot);
 		}
@@ -963,9 +1087,21 @@ public final class DeterministicCameraCapture {
 				if (FORCE_ATTACK_TARGET) {
 					minecraft.crosshairPickEntity = originalCrosshairPickEntity;
 				}
-					if (minecraft.player != null && FORCED_ARMOR_VALUE >= 0) {
-						minecraft.player.setArmorValueForDeterministicCapture(originalArmorValueOverride);
-					}
+					if (FORCE_REAL_SURVIVAL_CRACK) {
+						if (minecraft.gameMode != null) {
+							minecraft.gameMode.stopDestroyBlock();
+						}
+						realSurvivalCrackBlock = null;
+						realSurvivalCrackDirection = null;
+						realSurvivalCrackLastStatus = "restored";
+							realSurvivalCrackLastDriveGameTime = Long.MIN_VALUE;
+						}
+						if (minecraft.player != null && minecraft.player.isNoGravity() != originalNoGravity) {
+							minecraft.player.setNoGravity(originalNoGravity);
+						}
+						if (minecraft.player != null && FORCED_ARMOR_VALUE >= 0) {
+							minecraft.player.setArmorValueForDeterministicCapture(originalArmorValueOverride);
+						}
 					if (minecraft.player != null && (!Float.isNaN(FORCED_PLAYER_HEALTH) || !Float.isNaN(FORCED_PLAYER_MAX_HEALTH))) {
 						minecraft.player.setHealthForDeterministicCapture(originalHealthOverride);
 						minecraft.player.setMaxHealthForDeterministicCapture(originalMaxHealthOverride);
@@ -992,6 +1128,146 @@ public final class DeterministicCameraCapture {
 			minecraft.options.setCameraType(originalCameraType);
 			minecraft.gameRenderer.checkEntityPostEffect(originalCameraType.isFirstPerson() ? minecraft.getCameraEntity() : null);
 		}
+	}
+
+		public static void recordRealSurvivalCrackRenderState(net.minecraft.client.renderer.state.BlockBreakingRenderState state) {
+			if (!ENABLED || !FORCE_REAL_SURVIVAL_CRACK || state == null || state.blockState == null || state.blockState.isAir()) {
+				return;
+			}
+		realSurvivalCrackRenderedStateCount++;
+		realSurvivalCrackMinRenderedStage = Math.min(realSurvivalCrackMinRenderedStage, state.progress);
+		realSurvivalCrackMaxRenderedStage = Math.max(realSurvivalCrackMaxRenderedStage, state.progress);
+			realSurvivalCrackLastRenderedTarget = state.blockPos == null ? "unknown" : state.blockPos.toShortString();
+			realSurvivalCrackLastRenderedBlockType = state.blockState.getBlock().builtInRegistryHolder().key().location().toString();
+		}
+
+		private static boolean realSurvivalCrackPoseReady() {
+			if (!FORCE_REAL_SURVIVAL_CRACK || poses == null || poseIndex < 0 || poseIndex >= poses.length) {
+				return true;
+			}
+			return switch (poses[poseIndex].name()) {
+				case "crack-early" -> realSurvivalCrackMaxRenderedStage >= 0;
+				case "crack-middle" -> realSurvivalCrackMaxRenderedStage >= 4;
+				case "crack-late" -> realSurvivalCrackMaxRenderedStage >= 7;
+				default -> true;
+			};
+		}
+
+	private static void setupRealSurvivalCrackBlock(Minecraft minecraft, LocalPlayer player) {
+		if (!FORCE_REAL_SURVIVAL_CRACK || !FORCE_REAL_SURVIVAL_CRACK_SETUP_BLOCK || minecraft.level == null || !"unset".equals(realSurvivalCrackSetupTarget)) {
+			return;
+		}
+
+		Vec3 eye = player.getEyePosition(1.0F);
+		Vec3 look = player.getLookAngle();
+		BlockPos target = BlockPos.containing(eye.add(look.scale(1.5)));
+		BlockState setupState = Blocks.STONE.defaultBlockState();
+		minecraft.level.setBlock(target, setupState, 3);
+		if (minecraft.getSingleplayerServer() != null) {
+			ServerLevel serverLevel = minecraft.getSingleplayerServer().getLevel(minecraft.level.dimension());
+			if (serverLevel != null) {
+				serverLevel.setBlock(target, setupState, 3);
+			}
+		}
+		realSurvivalCrackSetupTarget = target.toShortString();
+		realSurvivalCrackLastStatus = "setup-block";
+		LOGGER.info(
+			"Deterministic real survival crack setup placed minecraft:stone at {} from saved view eye=({}, {}, {}) look=({}, {}, {})",
+			realSurvivalCrackSetupTarget,
+			eye.x,
+			eye.y,
+			eye.z,
+			look.x,
+			look.y,
+			look.z
+		);
+	}
+
+	private static void setupDeterministicSupportPlatform(Minecraft minecraft, LocalPlayer player) {
+		if (!FORCE_REAL_SURVIVAL_CRACK || !FORCE_REAL_SURVIVAL_CRACK_SETUP_BLOCK || minecraft.level == null || !"unset".equals(deterministicSupportBlock)) {
+			return;
+		}
+		BlockPos center = BlockPos.containing(player.getX(), player.getY() - 1.0, player.getZ());
+		BlockState setupState = Blocks.STONE.defaultBlockState();
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				BlockPos pos = center.offset(dx, 0, dz);
+				minecraft.level.setBlock(pos, setupState, 3);
+				if (minecraft.getSingleplayerServer() != null) {
+					ServerLevel serverLevel = minecraft.getSingleplayerServer().getLevel(minecraft.level.dimension());
+					if (serverLevel != null) {
+						serverLevel.setBlock(pos, setupState, 3);
+					}
+				}
+			}
+		}
+		deterministicSupportBlock = center.toShortString();
+		deterministicSupportBlockType = setupState.getBlock().builtInRegistryHolder().key().location().toString();
+		realSurvivalCrackLastStatus = "setup-support-platform";
+		LOGGER.info(
+			"Deterministic capture support platform placed {} centered at {}",
+			deterministicSupportBlockType,
+			deterministicSupportBlock
+		);
+	}
+
+	private static void recordPlayerSafetyState(LocalPlayer player) {
+		lastSafetyPosition = player.position();
+		lastSafetyVelocity = player.getDeltaMovement();
+		lastSafetyHealth = player.getHealth();
+		lastSafetyFallDistance = player.fallDistance;
+	}
+
+	private static void driveRealSurvivalCrack(Minecraft minecraft, LocalPlayer player) {
+		if (!FORCE_REAL_SURVIVAL_CRACK || minecraft.screen != null || minecraft.gameMode == null || player.isSpectator()) {
+			realSurvivalCrackLastStatus = "inactive";
+			return;
+		}
+		if (!(minecraft.hitResult instanceof BlockHitResult blockHitResult) || blockHitResult.getType() != HitResult.Type.BLOCK) {
+			minecraft.gameMode.stopDestroyBlock();
+			realSurvivalCrackBlock = null;
+			realSurvivalCrackDirection = null;
+			realSurvivalCrackStopCalls++;
+			realSurvivalCrackLastHitType = minecraft.hitResult == null ? "null" : minecraft.hitResult.getType().name();
+			realSurvivalCrackLastTarget = "none";
+			realSurvivalCrackLastDirection = "none";
+			realSurvivalCrackLastStatus = "no-block-hit";
+			return;
+		}
+		BlockPos blockPos = blockHitResult.getBlockPos();
+		BlockState state = minecraft.level == null ? null : minecraft.level.getBlockState(blockPos);
+		realSurvivalCrackLastHitType = blockHitResult.getType().name();
+		realSurvivalCrackLastTarget = blockPos.toShortString();
+		realSurvivalCrackLastDirection = blockHitResult.getDirection().name();
+		if (state == null || state.isAir()) {
+			minecraft.gameMode.stopDestroyBlock();
+			realSurvivalCrackBlock = null;
+			realSurvivalCrackDirection = null;
+			realSurvivalCrackStopCalls++;
+			realSurvivalCrackLastStatus = "air-or-no-level";
+			return;
+		}
+		long gameTime = minecraft.level.getGameTime();
+		if (realSurvivalCrackLastDriveGameTime == gameTime) {
+			realSurvivalCrackLastStatus = "already-drove-this-tick";
+			return;
+		}
+		realSurvivalCrackLastDriveGameTime = gameTime;
+		realSurvivalCrackValidBlockHitCount++;
+		realSurvivalCrackLastValidTarget = blockPos.toShortString();
+		realSurvivalCrackLastValidBlockType = state.getBlock().builtInRegistryHolder().key().location().toString();
+		Direction direction = blockHitResult.getDirection();
+		if (!blockPos.equals(realSurvivalCrackBlock) || direction != realSurvivalCrackDirection) {
+			minecraft.gameMode.startDestroyBlock(blockPos, direction);
+			realSurvivalCrackBlock = blockPos;
+			realSurvivalCrackDirection = direction;
+			realSurvivalCrackStartCalls++;
+			realSurvivalCrackLastStatus = "start";
+			return;
+		}
+		minecraft.gameMode.continueDestroyBlock(blockPos, direction);
+		realSurvivalCrackContinueCalls++;
+		realSurvivalCrackLastStatus = "continue";
 	}
 
 	private static boolean hasBossBarOverride() {
@@ -1158,6 +1434,32 @@ public final class DeterministicCameraCapture {
 		json.append("  \"rustGalWorldOutlineDepthProbe\": ").append(Boolean.getBoolean("mattmc.dev.rustGalWorldOutline.depthProbe")).append(",\n");
 		json.append("  \"blockOutlineRealTargetForced\": ").append(FORCE_BLOCK_OUTLINE_TARGET).append(",\n");
 		json.append("  \"blockOutlineRealTargetAimed\": ").append(AIM_BLOCK_OUTLINE_TARGET).append(",\n");
+		json.append("  \"blockOutlinePauseParity\": ").append(BLOCK_OUTLINE_PAUSE_PARITY).append(",\n");
+		json.append("  \"realSurvivalCrackCapture\": ").append(FORCE_REAL_SURVIVAL_CRACK).append(",\n");
+		json.append("  \"realSurvivalCrackSetupBlock\": ").append(FORCE_REAL_SURVIVAL_CRACK_SETUP_BLOCK).append(",\n");
+		appendField(json, "deterministicSupportBlock", deterministicSupportBlock).append(",\n");
+		appendField(json, "deterministicSupportBlockType", deterministicSupportBlockType).append(",\n");
+		appendVec3(json, "deterministicPlayerPosition", lastSafetyPosition).append(",\n");
+		appendVec3(json, "deterministicPlayerVelocity", lastSafetyVelocity).append(",\n");
+		json.append("  \"deterministicPlayerHealth\": ").append(format(lastSafetyHealth)).append(",\n");
+		json.append("  \"deterministicPlayerFallDistance\": ").append(format(lastSafetyFallDistance)).append(",\n");
+		json.append("  \"deterministicPlayerNoGravity\": ").append(player != null && player.isNoGravity()).append(",\n");
+		appendField(json, "realSurvivalCrackSetupTarget", realSurvivalCrackSetupTarget).append(",\n");
+		appendField(json, "realSurvivalCrackHitType", realSurvivalCrackLastHitType).append(",\n");
+		appendField(json, "realSurvivalCrackTarget", realSurvivalCrackLastTarget).append(",\n");
+		appendField(json, "realSurvivalCrackDirection", realSurvivalCrackLastDirection).append(",\n");
+		appendField(json, "realSurvivalCrackStatus", realSurvivalCrackLastStatus).append(",\n");
+		appendField(json, "realSurvivalCrackLastValidTarget", realSurvivalCrackLastValidTarget).append(",\n");
+		appendField(json, "realSurvivalCrackLastValidBlockType", realSurvivalCrackLastValidBlockType).append(",\n");
+		appendField(json, "realSurvivalCrackLastRenderedTarget", realSurvivalCrackLastRenderedTarget).append(",\n");
+		appendField(json, "realSurvivalCrackLastRenderedBlockType", realSurvivalCrackLastRenderedBlockType).append(",\n");
+		json.append("  \"realSurvivalCrackStartCalls\": ").append(realSurvivalCrackStartCalls).append(",\n");
+		json.append("  \"realSurvivalCrackContinueCalls\": ").append(realSurvivalCrackContinueCalls).append(",\n");
+		json.append("  \"realSurvivalCrackStopCalls\": ").append(realSurvivalCrackStopCalls).append(",\n");
+		json.append("  \"realSurvivalCrackValidBlockHitCount\": ").append(realSurvivalCrackValidBlockHitCount).append(",\n");
+		json.append("  \"realSurvivalCrackRenderedStateCount\": ").append(realSurvivalCrackRenderedStateCount).append(",\n");
+		json.append("  \"realSurvivalCrackMinRenderedStage\": ").append(realSurvivalCrackMinRenderedStage == 10 ? -1 : realSurvivalCrackMinRenderedStage).append(",\n");
+		json.append("  \"realSurvivalCrackMaxRenderedStage\": ").append(realSurvivalCrackMaxRenderedStage).append(",\n");
 		appendForcedBlockOutlineTarget(json).append(",\n");
 		appendField(json, "attackIndicator", minecraft.options.attackIndicator().get().name()).append(",\n");
 			json.append("  \"attackProgress\": ").append(player == null ? -1.0F : player.getAttackStrengthScale(0.0F)).append(",\n");
@@ -1355,6 +1657,10 @@ public final class DeterministicCameraCapture {
 
 	private static String format(double value) {
 		return String.format(Locale.ROOT, "%.6f", value);
+	}
+
+	private static String formatVec(Vec3 value) {
+		return "(" + format(value.x) + "," + format(value.y) + "," + format(value.z) + ")";
 	}
 
 	private record Pose(String name, float yaw, float pitch) {

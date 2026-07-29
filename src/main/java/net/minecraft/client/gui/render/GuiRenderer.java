@@ -64,7 +64,7 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.util.Mth;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicResourceBarriers;
-import net.vulkanic.gui.RustGalGuiRenderer;
+import net.vulkanic.gui.RustGalFrameCoordinator;
 import net.vulkanic.gui.RustGalGuiElementRenderState;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.jetbrains.annotations.Nullable;
@@ -343,7 +343,7 @@ public class GuiRenderer implements AutoCloseable {
 								renderTarget.useDepth ? renderTarget.getDepthTextureView() : null,
 								OptionalDouble.empty()
 							)) {
-						RustGalGuiRenderer.executeFrame(minecraft, rustGalFrameElements);
+						RustGalFrameCoordinator.executeGuiFrame(minecraft, rustGalFrameElements);
 					}
 					rustGalFrameExecuted.setTrue();
 				}

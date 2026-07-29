@@ -116,6 +116,7 @@ RUNTIME_PROFILES = {
     "standard": RuntimeProfile("standard", 180, 30, 40, 25, 75, 10, 10, 160, 45, 120, 300, 240, 1800, 120),
     "extended": RuntimeProfile("extended", 300, 55, 65, 40, 125, 15, 15, 270, 60, 240, 600, 360, 3000, 200),
 }
+PROFILE_RANK = {name: index for index, name in enumerate(RUNTIME_PROFILE_NAMES)}
 
 WORLD_PROFILES = {
     "migration-gate": WorldProfile(
@@ -1584,6 +1585,220 @@ def deterministic_world_crack_pixel_evidence(doc: dict[str, object] | None, scen
     return evidence
 
 
+def world_crack_framebuffer_evidence(combined_logs: str) -> dict[str, object]:
+    records: list[dict[str, object]] = []
+    pattern = re.compile(
+        r"block-crack framebuffer stage=([a-zA-Z0-9_.-]+) route=([a-zA-Z0-9_.-]+) pos=(.*?) "
+        r"stageIndex=(\d+) faceCount=(\d+) crop=([^ ]+) drawFb=(\d+) readFb=(\d+) program=(\d+) "
+        r"viewport=([^ ]+) depthTest=(true|false) blend=(true|false) scissor=(true|false) "
+        r"changedFromBefore=(\d+) maxDeltaFromBefore=(\d+) sumDeltaFromBefore=(\d+) "
+        r"changedFromAfterDraw=(\d+) maxDeltaFromAfterDraw=(\d+) sumDeltaFromAfterDraw=(\d+) "
+        r"darkenedFootprintPixels=(\d+) brightenedFootprintPixels=(\d+)"
+    )
+    for match in pattern.finditer(combined_logs):
+        (
+            stage,
+            route,
+            pos,
+            stage_index,
+            face_count,
+            crop,
+            draw_fb,
+            read_fb,
+            program,
+            viewport,
+            depth_test,
+            blend,
+            scissor,
+            changed_before,
+            max_before,
+            sum_before,
+            changed_after,
+            max_after,
+            sum_after,
+            darkened,
+            brightened,
+        ) = match.groups()
+        records.append(
+            {
+                "stage": stage,
+                "route": route,
+                "pos": pos,
+                "stage_index": int(stage_index),
+                "face_count": int(face_count),
+                "crop": crop,
+                "draw_framebuffer": int(draw_fb),
+                "read_framebuffer": int(read_fb),
+                "program": int(program),
+                "viewport": viewport,
+                "depth_test": depth_test == "true",
+                "blend": blend == "true",
+                "scissor": scissor == "true",
+                "changed_from_before": int(changed_before),
+                "max_delta_from_before": int(max_before),
+                "sum_delta_from_before": int(sum_before),
+                "changed_from_after_draw": int(changed_after),
+                "max_delta_from_after_draw": int(max_after),
+                "sum_delta_from_after_draw": int(sum_after),
+                "darkened_footprint_pixels": int(darkened),
+                "brightened_footprint_pixels": int(brightened),
+            }
+        )
+    after_draw = [record for record in records if record["stage"] == "after-draw"]
+    final = [record for record in records if record["stage"] in {"after-iris-final", "final"}]
+    darkened_after = max((int(record["darkened_footprint_pixels"]) for record in after_draw), default=0)
+    darkened_final = max((int(record["darkened_footprint_pixels"]) for record in final), default=0)
+    stages = sorted({int(record["stage_index"]) for record in after_draw})
+    status = "not_checked"
+    if not records:
+        status = "missing"
+    elif not after_draw:
+        status = "missing_after_draw"
+    elif darkened_after <= 0:
+        status = "no_projected_footprint_delta"
+    elif final and darkened_final <= 0:
+        status = "not_visible_final"
+    else:
+        status = "present"
+    return {
+        "checked": bool(records),
+        "status": status,
+        "records": records[:12],
+        "after_draw_records": len(after_draw),
+        "final_records": len(final),
+        "stages": stages,
+        "min_stage": min(stages) if stages else None,
+        "max_stage": max(stages) if stages else None,
+        "darkened_after_draw_pixels": darkened_after,
+        "darkened_final_pixels": darkened_final,
+        "depth_test_after_draw": any(bool(record["depth_test"]) for record in after_draw),
+        "blend_after_draw": any(bool(record["blend"]) for record in after_draw),
+    }
+
+
+def world_outline_framebuffer_evidence(combined_logs: str) -> dict[str, object]:
+    records: list[dict[str, object]] = []
+    pattern = re.compile(
+        r"block-outline framebuffer stage=([a-zA-Z0-9_.-]+) route=([a-zA-Z0-9_.-]+) pos=(.*?) "
+        r"highContrast=(true|false) translucentPass=(true|false) crop=([^ ]+) "
+        r"drawFb=(\d+) readFb=(\d+) program=(\d+) viewport=([^ ]+) depthTest=(true|false) "
+        r"blend=(true|false) scissor=(true|false) changedFromBefore=(\d+) maxDeltaFromBefore=(\d+) "
+        r"sumDeltaFromBefore=(\d+) changedFromAfterDraw=(\d+) maxDeltaFromAfterDraw=(\d+) "
+        r"sumDeltaFromAfterDraw=(\d+) "
+        r"(?:edgeSamples=visibleTotal=(\d+),visibleChanged=(\d+),hiddenTotal=(\d+),hiddenChanged=(\d+) )?"
+        r".*?outlinePixels=cyan=(\d+),black=(\d+),normalDark=(\d+),greenBlue=(\d+)"
+    )
+    for match in pattern.finditer(combined_logs):
+        (
+            stage,
+            route,
+            pos,
+            high_contrast,
+            translucent_pass,
+            crop,
+            draw_fb,
+            read_fb,
+            program,
+            viewport,
+            depth_test,
+            blend,
+            scissor,
+            changed_before,
+            max_before,
+            sum_before,
+            changed_after,
+            max_after,
+            sum_after,
+            visible_total,
+            visible_changed,
+            hidden_total,
+            hidden_changed,
+            cyan,
+            black,
+            normal_dark,
+            green_blue,
+        ) = match.groups()
+        records.append(
+            {
+                "stage": stage,
+                "route": route,
+                "pos": pos,
+                "high_contrast": high_contrast == "true",
+                "translucent_pass": translucent_pass == "true",
+                "crop": crop,
+                "draw_framebuffer": int(draw_fb),
+                "read_framebuffer": int(read_fb),
+                "program": int(program),
+                "viewport": viewport,
+                "depth_test": depth_test == "true",
+                "blend": blend == "true",
+                "scissor": scissor == "true",
+                "changed_from_before": int(changed_before),
+                "max_delta_from_before": int(max_before),
+                "sum_delta_from_before": int(sum_before),
+                "changed_from_after_draw": int(changed_after),
+                "max_delta_from_after_draw": int(max_after),
+                "sum_delta_from_after_draw": int(sum_after),
+                "edge_samples": {
+                    "visible_total": int(visible_total or 0),
+                    "visible_changed": int(visible_changed or 0),
+                    "hidden_total": int(hidden_total or 0),
+                    "hidden_changed": int(hidden_changed or 0),
+                    "available": visible_total is not None,
+                },
+                "outline_pixels": {
+                    "cyan": int(cyan),
+                    "black": int(black),
+                    "normal_dark": int(normal_dark),
+                    "green_blue": int(green_blue),
+                },
+            }
+        )
+    after_draw = [record for record in records if record["stage"] == "after-draw"]
+    final = [record for record in records if record["stage"] in {"after-iris-final", "final"}]
+    changed_after_draw = max((int(record["changed_from_before"]) for record in after_draw), default=0)
+    final_changed_from_after = max((int(record["changed_from_after_draw"]) for record in final), default=0)
+    visible_total = max((int(record["edge_samples"]["visible_total"]) for record in after_draw), default=0)
+    visible_changed = max((int(record["edge_samples"]["visible_changed"]) for record in after_draw), default=0)
+    hidden_total = max((int(record["edge_samples"]["hidden_total"]) for record in after_draw), default=0)
+    hidden_changed = max((int(record["edge_samples"]["hidden_changed"]) for record in after_draw), default=0)
+    final_visible_changed = max((int(record["edge_samples"]["visible_changed"]) for record in final), default=0)
+    final_hidden_changed = max((int(record["edge_samples"]["hidden_changed"]) for record in final), default=0)
+    edge_samples_available = any(bool(record["edge_samples"]["available"]) for record in records)
+    status = "not_checked"
+    if not records:
+        status = "missing"
+    elif not after_draw:
+        status = "missing_after_draw"
+    elif changed_after_draw <= 0:
+        status = "no_visible_edge_delta"
+    elif edge_samples_available and visible_total > 0 and visible_changed <= 0:
+        status = "no_projected_visible_edge_delta"
+    elif edge_samples_available and hidden_total > 0 and hidden_changed > 0:
+        status = "hidden_edge_depth_failed"
+    else:
+        status = "present_projected_edges" if edge_samples_available else "present"
+    return {
+        "checked": bool(records),
+        "status": status,
+        "records": records[:12],
+        "after_draw_records": len(after_draw),
+        "final_records": len(final),
+        "changed_after_draw_pixels": changed_after_draw,
+        "final_changed_from_after_draw_pixels": final_changed_from_after,
+        "edge_samples_available": edge_samples_available,
+        "visible_edge_samples": visible_total,
+        "visible_edge_changed_after_draw": visible_changed,
+        "hidden_edge_samples": hidden_total,
+        "hidden_edge_changed_after_draw": hidden_changed,
+        "visible_edge_changed_final": final_visible_changed,
+        "hidden_edge_changed_final": final_hidden_changed,
+        "depth_test_after_draw": any(bool(record["depth_test"]) for record in after_draw),
+        "draw_framebuffers": sorted({int(record["draw_framebuffer"]) for record in records}),
+        "read_framebuffers": sorted({int(record["read_framebuffer"]) for record in records}),
+    }
+
+
 def deterministic_rust_vulkan_shell_scene_evidence(
     doc: dict[str, object] | None,
     background_scenario: object,
@@ -2348,14 +2563,102 @@ def child_process_timeout_seconds(args: argparse.Namespace) -> int:
     return max(1, per_mode_timeout_seconds(args) - cleanup_budget - 1)
 
 
+def minimum_supported_profile(mode: ModeSpec, tool_kind: str) -> str:
+    if tool_kind == "gameplay" and mode.expected_attribution == "java-vulkan":
+        return "standard"
+    if tool_kind == "capture" and mode.backend == "rust-vulkan":
+        return "standard"
+    if tool_kind == "subsystem" and mode.expected_attribution == "java-vulkan":
+        return "standard"
+    if tool_kind == "subsystem" and mode.target == "frozen" and mode.shaders == "on":
+        return "standard"
+    return "smoke"
+
+
+def profile_not_supported_reason(profile: str, mode: ModeSpec, tool_kind: str) -> str | None:
+    minimum = minimum_supported_profile(mode, tool_kind)
+    if PROFILE_RANK[profile] >= PROFILE_RANK[minimum]:
+        return None
+    return (
+        f"profile-not-supported: {mode.name}/{tool_kind} requires at least {minimum} "
+        f"(requested {profile})"
+    )
+
+
+MATRIX_PROGRESS_INTERVAL_SECONDS = 5.0
+
+
+def matrix_progress_enabled(args: argparse.Namespace) -> bool:
+    return getattr(args, "tool", "") == "matrix"
+
+
+def matrix_row_label(mode: ModeSpec, tool_kind: str, repetition: int) -> str:
+    return f"{mode.name}/{tool_kind}/run-{repetition:02d}"
+
+
+def emit_matrix_progress(args: argparse.Namespace, row: str, phase: str, detail: str = "") -> None:
+    if not matrix_progress_enabled(args):
+        return
+    suffix = f" {detail}" if detail else ""
+    print(f"[graphics-matrix] {utc_now()} row={row} phase={phase}{suffix}", flush=True)
+
+
+def latest_capture_meta_path(capture_dir: Path) -> Path | None:
+    metas = sorted(capture_dir.glob("meta_*.txt"), key=lambda path: path.stat().st_mtime if path.exists() else 0.0)
+    return metas[-1] if metas else None
+
+
+def live_capture_phase(capture_dir: Path, tool_kind: str) -> tuple[str, str]:
+    meta_path = latest_capture_meta_path(capture_dir)
+    if meta_path is None:
+        return "startup", "waiting for capture metadata"
+    meta = read_key_values(meta_path)
+    if "exit_code" in meta:
+        return "artifact-finalization", f"exit_code={meta.get('exit_code')}"
+    if meta.get("deterministic_capture_complete_elapsed"):
+        return "shutdown", f"deterministic_complete_elapsed={meta.get('deterministic_capture_complete_elapsed')}s"
+    if meta.get("deterministic_capture_ack") or meta.get("deterministic_capture_screenshot"):
+        return "measurement/capture", "deterministic screenshot acknowledged"
+    if tool_kind == "gameplay":
+        for path in capture_dir.glob("graphics_frame_benchmark_*.json"):
+            data = read_json(path)
+            measured = parse_number(data.get("measuredFrameCount")) if isinstance(data, dict) else 0
+            if measured and measured > 0:
+                return "measurement/capture", f"measured_frames={int(measured)}"
+    if tool_kind == "subsystem" and any(capture_dir.glob("graphics_subsystem_benchmark_*.json")):
+        return "measurement/capture", "subsystem artifact present"
+    if meta.get("gradle_pid"):
+        if meta.get("client_pid") or meta.get("dump_epoch") or meta.get("window_tree_dump"):
+            return "readiness", f"client_pid={meta.get('client_pid', 'unknown')}"
+        return "process-launched", f"gradle_pid={meta.get('gradle_pid')}"
+    return "preflight", f"meta={meta_path.name}"
+
+
+def latest_subsystem_status(capture_dir: Path) -> tuple[str | None, Path | None]:
+    subsystem_paths = sorted(
+        capture_dir.glob("graphics_subsystem_benchmark_*.json"),
+        key=lambda path: path.stat().st_mtime if path.exists() else 0.0,
+    )
+    if not subsystem_paths:
+        return None, None
+    path = subsystem_paths[-1]
+    data = read_json(path)
+    status = data.get("status") if isinstance(data, dict) else None
+    return (status if isinstance(status, str) else None), path
+
+
 def mode_frame_count(value: int, mode: ModeSpec, args: argparse.Namespace, option_name: str) -> int:
     if option_name in getattr(args, "_provided_options", set()):
         return value
     if mode.expected_attribution == "java-vulkan":
+        if option_name == "--settle-frames":
+            return min(value, 40 if mode.shaders == "on" else 60)
+        if option_name == "--max-settle-frames":
+            return min(value, 600)
         if option_name == "--warmup-frames":
-            return min(value, 20)
+            return min(value, 10 if mode.shaders == "on" else 20)
         if option_name == "--measure-frames":
-            return min(value, 60)
+            return min(value, 40 if mode.shaders == "on" else 60)
         if option_name == "--subsystem-iterations":
             return min(value, 20)
     return value
@@ -2643,8 +2946,39 @@ def normalize_capture_artifact(
     saved_view_outline_target_required = (
         parse_java_property(combined_logs, "mattmc.dev.blockOutlineSavedViewTargetRequired") == "true"
     )
+    requested_world_outline_legacy = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWorldOutline.legacyControl") == "true"
+    )
+    requested_world_outline_pause_parity = False
+    if isinstance(deterministic_doc, dict):
+        requested_world_outline_pause_parity = bool(deterministic_doc.get("blockOutlinePauseParity"))
+    if not requested_world_outline_pause_parity:
+        requested_world_outline_pause_parity = (
+            parse_java_property(combined_logs, "mattmc.dev.deterministicCameraCapture.blockOutlinePauseParity") == "true"
+        )
     requested_world_crack_scenario = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldCrack.scenario")
     requested_world_crack_stage = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldCrack.stage")
+    requested_world_crack_real_survival = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWorldCrack.requireRealSurvivalCapture") == "true"
+    )
+    deterministic_real_crack = deterministic_doc if isinstance(deterministic_doc, dict) else {}
+    real_world_crack_hit_type = deterministic_real_crack.get("realSurvivalCrackHitType")
+    real_world_crack_target = deterministic_real_crack.get("realSurvivalCrackTarget")
+    real_world_crack_direction = deterministic_real_crack.get("realSurvivalCrackDirection")
+    real_world_crack_status = deterministic_real_crack.get("realSurvivalCrackStatus")
+    real_world_crack_setup_block = deterministic_real_crack.get("realSurvivalCrackSetupBlock")
+    real_world_crack_setup_target = deterministic_real_crack.get("realSurvivalCrackSetupTarget")
+    real_world_crack_last_valid_target = deterministic_real_crack.get("realSurvivalCrackLastValidTarget")
+    real_world_crack_last_valid_block_type = deterministic_real_crack.get("realSurvivalCrackLastValidBlockType")
+    real_world_crack_last_rendered_target = deterministic_real_crack.get("realSurvivalCrackLastRenderedTarget")
+    real_world_crack_last_rendered_block_type = deterministic_real_crack.get("realSurvivalCrackLastRenderedBlockType")
+    real_world_crack_start_calls = parse_number(deterministic_real_crack.get("realSurvivalCrackStartCalls"))
+    real_world_crack_continue_calls = parse_number(deterministic_real_crack.get("realSurvivalCrackContinueCalls"))
+    real_world_crack_stop_calls = parse_number(deterministic_real_crack.get("realSurvivalCrackStopCalls"))
+    real_world_crack_valid_block_hits = parse_number(deterministic_real_crack.get("realSurvivalCrackValidBlockHitCount"))
+    real_world_crack_rendered_state_count = parse_number(deterministic_real_crack.get("realSurvivalCrackRenderedStateCount"))
+    real_world_crack_min_rendered_stage = parse_number(deterministic_real_crack.get("realSurvivalCrackMinRenderedStage"))
+    real_world_crack_max_rendered_stage = parse_number(deterministic_real_crack.get("realSurvivalCrackMaxRenderedStage"))
     requested_world_crack_disabled = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldCrack.disabled") == "true"
     requested_world_crack_legacy = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldCrack.legacyControl") == "true"
     requested_world_background_scenario = parse_java_property(combined_logs, "mattmc.dev.rustGalWorldBackground.scenario")
@@ -2653,14 +2987,16 @@ def normalize_capture_artifact(
         deterministic_doc,
         requested_world_outline_style,
     )
+    world_outline_framebuffer = world_outline_framebuffer_evidence(combined_logs)
     world_border_pixel_evidence = deterministic_world_border_pixel_evidence(
         deterministic_doc,
         requested_world_border_scenario,
     )
     world_crack_pixel_evidence = deterministic_world_crack_pixel_evidence(
         deterministic_doc,
-        requested_world_crack_scenario,
+        requested_world_crack_scenario or ("real-survival" if requested_world_crack_real_survival else ""),
     )
+    world_crack_framebuffer = world_crack_framebuffer_evidence(combined_logs)
     rust_vulkan_shell_scene_evidence = deterministic_rust_vulkan_shell_scene_evidence(
         deterministic_doc,
         requested_world_background_scenario,
@@ -2686,6 +3022,18 @@ def normalize_capture_artifact(
     )
     rust_gal_world_crack_draws_for_validation = last_number(
         combined_logs, r"rust_gal_world_crack_draws_executed[=: ]+(\d+)"
+    )
+    real_world_crack_states_for_validation = last_number(
+        combined_logs,
+        r"block-breaking crack request .*real_destroy_progress=true .*states=(\d+)",
+    )
+    real_world_crack_quads_for_validation = last_number(
+        combined_logs,
+        r"block-breaking crack request .*real_destroy_progress=true .*quads=(\d+)",
+    )
+    real_world_crack_first_summary = last_text(
+        combined_logs,
+        r"block-breaking crack request .*real_destroy_progress=true .*first=([^ ]+)",
     )
     rust_gal_world_border_quads_for_validation = last_number(
         combined_logs, r"rust_gal_world_border_quads_executed[=: ]+(\d+)"
@@ -2730,7 +3078,11 @@ def normalize_capture_artifact(
         validation_messages.append("deterministic correctness capture did not complete")
     world_outline_workload_complete = True
     rust_shell_outline_mode = mode.backend == "rust-vulkan"
-    rust_opengl_outline_mode = target.role == "current" and mode.backend in {"opengl", "rust-opengl"}
+    rust_opengl_outline_mode = (
+        target.role == "current"
+        and mode.backend in {"opengl", "rust-opengl"}
+        and not requested_world_outline_legacy
+    )
     rust_outline_mode = rust_shell_outline_mode or rust_opengl_outline_mode
     java_outline_route = None
     if not rust_opengl_outline_mode and mode.backend in {"opengl", "rust-opengl"}:
@@ -2758,6 +3110,17 @@ def normalize_capture_artifact(
                 + ", ".join(missing_outline_counts)
                 + " evidence was captured"
             )
+        if tool_kind == "capture" and rust_opengl_outline_mode:
+            if world_outline_framebuffer.get("status") not in {"present", "present_projected_edges"}:
+                world_outline_workload_complete = False
+                validation_messages.append(
+                    "Rust OpenGL block-outline capture did not prove projected visible-edge output with hidden edges preserved "
+                    f"(framebuffer status={world_outline_framebuffer.get('status')}, "
+                    f"changed_after_draw={world_outline_framebuffer.get('changed_after_draw_pixels')}, "
+                    f"visible_edge_changed={world_outline_framebuffer.get('visible_edge_changed_after_draw')}, "
+                    f"hidden_edge_changed={world_outline_framebuffer.get('hidden_edge_changed_after_draw')}, "
+                    f"depth_test={world_outline_framebuffer.get('depth_test_after_draw')})"
+                )
     elif outline_target_requested and java_outline_route:
         java_extract_seen = f"block-outline extract route={java_outline_route} target=true" in combined_logs
         java_draw_seen = f"block-outline draw route={java_outline_route} retained=true" in combined_logs
@@ -2822,6 +3185,14 @@ def normalize_capture_artifact(
                 f"(pixel evidence status={world_outline_pixel_evidence.get('status')}, "
                 f"matching_pixels={world_outline_pixel_evidence.get('matching_pixels')})"
             )
+    if requested_world_outline_pause_parity:
+        pose_sequence = deterministic_doc.get("poseSequence") if isinstance(deterministic_doc, dict) else None
+        expected_pose_sequence = ["playing", "paused", "unpaused"]
+        if pose_sequence != expected_pose_sequence:
+            world_outline_workload_complete = False
+            validation_messages.append(
+                "block-outline pause parity requested but deterministic capture did not record playing/paused/unpaused poses"
+            )
     world_crack_workload_complete = True
     crack_scenario = (requested_world_crack_scenario or "").strip().lower()
     rust_crack_mode = (rust_shell_outline_mode or rust_opengl_outline_mode) and not (
@@ -2862,6 +3233,89 @@ def normalize_capture_artifact(
             if unexpected_java_crack_draw_seen:
                 world_crack_workload_complete = False
                 validation_messages.append("deterministic Rust-GAL OpenGL crack scenario emitted unexpected java-opengl draw")
+    if requested_world_crack_real_survival and rust_crack_mode:
+        if crack_scenario:
+            world_crack_workload_complete = False
+            validation_messages.append("real survival crack gate cannot be satisfied by a forced crack scenario")
+        required_real_crack_counts = {
+            "real BLOCK hits": real_world_crack_valid_block_hits,
+            "real non-air render states": real_world_crack_rendered_state_count,
+            "real destroy-progress states": real_world_crack_states_for_validation,
+            "real semantic crack quads": real_world_crack_quads_for_validation,
+            "executed crack quads": rust_gal_world_crack_quads_for_validation,
+            "executed crack batches": rust_gal_world_crack_batches_for_validation,
+            "executed crack draws": rust_gal_world_crack_draws_for_validation,
+        }
+        missing_real_crack_counts = [
+            name for name, value in required_real_crack_counts.items() if int(value or 0) <= 0
+        ]
+        if missing_real_crack_counts:
+            world_crack_workload_complete = False
+            target_detail = ""
+            if real_world_crack_status or real_world_crack_hit_type:
+                target_detail = (
+                    f"; last real target status={real_world_crack_status or 'unknown'}"
+                    f" hit={real_world_crack_hit_type or 'unknown'}"
+                    f" target={real_world_crack_target or 'unknown'}"
+                    f" direction={real_world_crack_direction or 'unknown'}"
+                    f" start_calls={int(real_world_crack_start_calls or 0)}"
+                    f" continue_calls={int(real_world_crack_continue_calls or 0)}"
+                )
+            validation_messages.append(
+                "real survival Rust-GAL block-breaking crack capture missing non-zero "
+                + ", ".join(missing_real_crack_counts)
+                + " evidence"
+                + target_detail
+            )
+        if real_world_crack_first_summary and "type_minecraft:air" in real_world_crack_first_summary:
+            world_crack_workload_complete = False
+            validation_messages.append(
+                "real survival Rust-GAL block-breaking crack capture used stale destroy-progress for air block "
+                f"({real_world_crack_first_summary})"
+            )
+        if real_world_crack_last_rendered_block_type == "minecraft:air" or real_world_crack_last_valid_block_type == "minecraft:air":
+            world_crack_workload_complete = False
+            validation_messages.append("real survival Rust-GAL block-breaking crack capture reported air as the valid/rendered block state")
+        if (
+            real_world_crack_min_rendered_stage is None
+            or real_world_crack_max_rendered_stage is None
+            or real_world_crack_min_rendered_stage > 2
+            or real_world_crack_max_rendered_stage < 7
+        ):
+            world_crack_workload_complete = False
+            validation_messages.append(
+                "real survival Rust-GAL block-breaking crack capture did not span early through late destroy stages "
+                f"(min_stage={real_world_crack_min_rendered_stage}, max_stage={real_world_crack_max_rendered_stage})"
+            )
+        if tool_kind == "capture" and world_crack_pixel_evidence.get("status") != "present":
+            world_crack_workload_complete = False
+            validation_messages.append(
+                "real survival Rust-GAL block-breaking crack capture did not produce visible crack pixels "
+                f"(pixel evidence status={world_crack_pixel_evidence.get('status')}, "
+                f"matching_pixels={world_crack_pixel_evidence.get('matching_pixels')}, "
+                f"texture_signature={world_crack_pixel_evidence.get('texture_signature')})"
+            )
+        if tool_kind == "capture" and rust_opengl_outline_mode:
+            if world_crack_framebuffer.get("status") != "present":
+                world_crack_workload_complete = False
+                validation_messages.append(
+                    "real survival Rust-GAL block-breaking crack capture did not prove projected-face framebuffer output "
+                    f"(framebuffer status={world_crack_framebuffer.get('status')}, "
+                    f"darkened_after_draw={world_crack_framebuffer.get('darkened_after_draw_pixels')}, "
+                    f"darkened_final={world_crack_framebuffer.get('darkened_final_pixels')}, "
+                    f"stages={world_crack_framebuffer.get('stages')})"
+                )
+            framebuffer_stages = [int(stage) for stage in world_crack_framebuffer.get("stages", [])]
+            if not (
+                any(stage <= 2 for stage in framebuffer_stages)
+                and any(3 <= stage <= 6 for stage in framebuffer_stages)
+                and any(stage >= 7 for stage in framebuffer_stages)
+            ):
+                world_crack_workload_complete = False
+                validation_messages.append(
+                    "real survival Rust-GAL block-breaking crack capture did not prove projected-face early, middle, and late stage output "
+                    f"(framebuffer stages={framebuffer_stages})"
+                )
     world_border_workload_complete = True
     border_scenario = (requested_world_border_scenario or "").strip().lower()
     if border_scenario and rust_shell_outline_mode:
@@ -3334,11 +3788,34 @@ def normalize_capture_artifact(
                 "world_outline_style": requested_world_outline_style,
                 "world_outline_depth_policy": (deterministic_doc or {}).get("rustGalWorldOutlineDepthPolicy") if isinstance(deterministic_doc, dict) else None,
                 "world_outline_pixel_evidence": world_outline_pixel_evidence,
+                "world_outline_framebuffer_evidence": world_outline_framebuffer,
                 "world_crack_scenario": requested_world_crack_scenario or None,
                 "world_crack_stage": parse_number(requested_world_crack_stage),
+                "world_crack_real_survival_required": requested_world_crack_real_survival,
+                "world_crack_real_hit_type": real_world_crack_hit_type,
+                "world_crack_real_setup_block": real_world_crack_setup_block,
+                "world_crack_real_setup_target": real_world_crack_setup_target,
+                "world_crack_real_target": real_world_crack_target,
+                "world_crack_real_direction": real_world_crack_direction,
+                "world_crack_real_status": real_world_crack_status,
+                "world_crack_real_last_valid_target": real_world_crack_last_valid_target,
+                "world_crack_real_last_valid_block_type": real_world_crack_last_valid_block_type,
+                "world_crack_real_last_rendered_target": real_world_crack_last_rendered_target,
+                "world_crack_real_last_rendered_block_type": real_world_crack_last_rendered_block_type,
+                "world_crack_real_start_calls": real_world_crack_start_calls,
+                "world_crack_real_continue_calls": real_world_crack_continue_calls,
+                "world_crack_real_stop_calls": real_world_crack_stop_calls,
+                "world_crack_real_valid_block_hits": real_world_crack_valid_block_hits,
+                "world_crack_real_rendered_state_count": real_world_crack_rendered_state_count,
+                "world_crack_real_min_rendered_stage": real_world_crack_min_rendered_stage,
+                "world_crack_real_max_rendered_stage": real_world_crack_max_rendered_stage,
+                "world_crack_real_first_summary": real_world_crack_first_summary,
+                "world_crack_real_destroy_progress_states": real_world_crack_states_for_validation,
+                "world_crack_real_semantic_quads": real_world_crack_quads_for_validation,
                 "world_crack_disabled_control": requested_world_crack_disabled,
                 "world_crack_legacy_control": requested_world_crack_legacy,
                 "world_crack_pixel_evidence": world_crack_pixel_evidence,
+                "world_crack_framebuffer_evidence": world_crack_framebuffer,
                 "world_border_scenario": requested_world_border_scenario or None,
                 "world_border_pixel_evidence": world_border_pixel_evidence,
                 "world_background_scenario": requested_world_background_scenario or None,
@@ -3603,7 +4080,7 @@ def write_preflight_meta(capture_dir: Path, mode: ModeSpec, args: argparse.Names
         f"run_id=preflight-{timestamp()}",
         f"backend={mode.backend}",
         f"shaders={mode.shaders}",
-        f"world={getattr(args, 'world', DEFAULT_WORLD)}",
+        f"world={getattr(args, 'world', 'Origin')}",
         f"world_profile={env.get('MATTMC_GRAPHICS_WORLD_PROFILE', getattr(args, 'world_profile', 'migration-gate'))}",
         f"world_profile_role={env.get('MATTMC_GRAPHICS_WORLD_PROFILE_ROLE', '')}",
         f"migration_gate_blocking={env.get('MATTMC_GRAPHICS_MIGRATION_GATE_BLOCKING', 'true')}",
@@ -4161,7 +4638,8 @@ def write_tracy_collection_summary(
     selected = rust_summaries[0] if rust_summaries else (complete_summaries[0] if complete_summaries else (capture_summaries[0] if capture_summaries else {}))
     combined_zone_count = sum(int(summary.get("zone_count") or 0) for summary in capture_summaries)
     combined_size = sum(int(summary.get("size_bytes") or 0) for summary in capture_summaries)
-    status = "complete" if complete_summaries and not missing_roles and failure is None else "failed"
+    blocking_failure = failure if (not complete_summaries or missing_roles) else None
+    status = "complete" if complete_summaries and not missing_roles and blocking_failure is None else "failed"
     summary = {
         "schema": "mattmc-tracy-summary-v1",
         "status": status,
@@ -4192,8 +4670,9 @@ def write_tracy_collection_summary(
             "capture_count": len(capture_summaries),
             "complete_capture_count": len(complete_summaries),
             "missing_roles": missing_roles,
+            "non_blocking_tool_failure": failure if blocking_failure is None else None,
         },
-        "failure": failure or (
+        "failure": blocking_failure or (
             f"Tracy capture missing required {' and '.join(missing_roles)} zones"
             if missing_roles
             else (None if status == "complete" else "No complete Tracy captures were produced")
@@ -4713,6 +5192,7 @@ def build_capture_command(
     env["MATTMC_RUST_TRACY"] = "true" if getattr(args, "tracy_capture", False) else "false"
     env["MATTMC_TRACY_DURATION_SECONDS"] = str(getattr(args, "tracy_duration_seconds", 20))
     env["MATTMC_TRACY_MAX_SIZE_MB"] = str(getattr(args, "tracy_max_size_mb", 256))
+    env["MATTMC_DETERMINISTIC_SHUTDOWN_GRACE_SECS"] = str(max(5, phase_timeout_seconds(args, "shutdown")))
     env["MATTMC_CAPTURE_WORLD"] = args.world
     env["MATTMC_CAPTURE_RUN_SOURCE"] = str(CURRENT_REPO_ROOT / "run")
     env["MATTMC_CAPTURE_WORLD_SOURCE"] = str(CURRENT_REPO_ROOT / "run" / "saves" / args.world)
@@ -4787,7 +5267,11 @@ def build_capture_command(
     if getattr(args, "mount_health_rows", None) is not None:
         java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.mountHealthRows={args.mount_health_rows}")
         java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.mountHealthRows={args.mount_health_rows}")
-    if mode.backend == "rust-vulkan" and tool_kind == "capture" and workload_profile in {"correctness", "moving-camera", "settled-static"}:
+    if (
+        tool_kind == "capture"
+        and workload_profile in {"correctness", "moving-camera", "settled-static"}
+        and (mode.backend == "rust-vulkan" or kind == "shell")
+    ):
         deterministic_stamp = timestamp()
         deterministic_metadata = capture_dir / f"deterministic_camera_capture_{deterministic_stamp}.json"
         deterministic_screenshot_dir = capture_dir / f"deterministic_camera_capture_{deterministic_stamp}"
@@ -4838,6 +5322,14 @@ def build_capture_command(
         java_options.append("-Dmattmc.dev.deterministicCameraCapture.blockOutlineAimTarget=true")
         if getattr(args, "world_outline_style", "normal") == "high-contrast":
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.blockOutlineHighContrast=true")
+    if getattr(args, "world_outline_pause_parity", False):
+        java_options.append("-Dmattmc.dev.blockOutlineDiagnostics=true")
+        java_options.append("-Dmattmc.dev.blockOutlinePickDiagnostics=true")
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.blockOutlinePauseParity=true")
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=3")
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.yawDelta=0.0")
+    if getattr(args, "world_outline_legacy_control", False):
+        java_options.append("-Dmattmc.dev.rustGalWorldOutline.legacyControl=true")
     if getattr(args, "block_outline_pick_diagnostics", False):
         java_options.append("-Dmattmc.dev.blockOutlinePickDiagnostics=true")
     if getattr(args, "world_border_scenario", ""):
@@ -4847,6 +5339,10 @@ def build_capture_command(
     if getattr(args, "world_crack_scenario", ""):
         java_options.append(f"-Dmattmc.dev.rustGalWorldCrack.scenario={args.world_crack_scenario}")
         java_options.append(f"-Dmattmc.dev.rustGalWorldCrack.stage={getattr(args, 'world_crack_stage', 0)}")
+    if getattr(args, "world_crack_real_survival", False):
+        java_options.append("-Dmattmc.dev.rustGalWorldCrack.requireRealSurvivalCapture=true")
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.realSurvivalCrack=true")
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.realSurvivalCrackSetupBlock=true")
     world_crack_control = getattr(args, "world_crack_control", "rust")
     if world_crack_control == "disabled":
         java_options.append("-Dmattmc.dev.rustGalWorldCrack.disabled=true")
@@ -4885,14 +5381,16 @@ def build_capture_command(
         java_options.append("-Dmattmc.dev.rustGalGui.mountHealth.legacyControl=true")
     if tool_kind == "gameplay":
         frame_status = capture_dir / f"graphics_frame_benchmark_{timestamp()}.json"
+        settle_frames = mode_frame_count(args.settle_frames, mode, args, "--settle-frames")
+        max_settle_frames = mode_frame_count(args.max_settle_frames, mode, args, "--max-settle-frames")
         warmup_frames = mode_frame_count(args.warmup_frames, mode, args, "--warmup-frames")
         measure_frames = mode_frame_count(args.measure_frames, mode, args, "--measure-frames")
         java_options.extend(
             [
                 "-Dmattmc.dev.graphicsFrameBenchmark=true",
                 f"-Dmattmc.dev.graphicsFrameBenchmark.status={frame_status}",
-                f"-Dmattmc.dev.graphicsFrameBenchmark.settleFrames={args.settle_frames}",
-                f"-Dmattmc.dev.graphicsFrameBenchmark.maxSettleFrames={args.max_settle_frames}",
+                f"-Dmattmc.dev.graphicsFrameBenchmark.settleFrames={settle_frames}",
+                f"-Dmattmc.dev.graphicsFrameBenchmark.maxSettleFrames={max_settle_frames}",
                 f"-Dmattmc.dev.graphicsFrameBenchmark.warmupFrames={warmup_frames}",
                 f"-Dmattmc.dev.graphicsFrameBenchmark.measureFrames={measure_frames}",
                 f"-Dmattmc.dev.graphicsFrameBenchmark.readinessTimeoutSeconds={getattr(args, 'readiness_timeout_seconds', RUNTIME_PROFILES['standard'].readiness_timeout_seconds)}",
@@ -4917,6 +5415,7 @@ def build_capture_command(
             ]
         )
         env["MATTMC_GRAPHICS_SUBSYSTEM_BENCHMARK"] = "true"
+        env["MATTMC_GRAPHICS_SUBSYSTEM_STATUS"] = str(subsystem_status)
     if tool_kind == "capture":
         java_options.extend(
             [
@@ -5099,12 +5598,14 @@ def run_mode(
     kind, _ = run_dev_capture_entrypoint(target.root)
     effective_workload_profile = "gameplay" if tool_kind == "gameplay" else args.workload_profile
     run_dir = f"run-{repetition:02d}"
+    row_label = matrix_row_label(mode, tool_kind, repetition)
     capture_dir = artifact_root / mode.name / tool_kind / run_dir / "capture"
     output_path = artifact_root / mode.name / tool_kind / run_dir / ARTIFACT_NAME
     managed_run_root = output_path.parent
     retention_policy = getattr(args, "_retention_policy", None)
+    emit_matrix_progress(args, row_label, "preflight-started", f"target={target.name}")
     if retention_policy is not None and not args.dry_run:
-        if not args.artifact_preserve:
+        if not getattr(args, "artifact_preserve", False):
             artifact_retention.remove_copied_game_dirs(retention_policy.root)
         artifact_retention.preflight_disk_budget(
             retention_policy,
@@ -5116,9 +5617,50 @@ def run_mode(
             ),
         )
     command, env = build_capture_command(target, mode, capture_dir, effective_workload_profile, args, tool_kind)
+    emit_matrix_progress(args, row_label, "preflight-completed", f"timeout={child_process_timeout_seconds(args)}s")
     current_root = repo_root()
     explicit_frozen_repo = getattr(args, "frozen_repo", None)
     repository_paths = repository_resolution(current_root, find_frozen_repo(current_root, explicit_frozen_repo), explicit_frozen_repo)
+    unsupported_profile_reason = profile_not_supported_reason(args.profile, mode, tool_kind)
+    if unsupported_profile_reason:
+        capture_dir.mkdir(parents=True, exist_ok=True)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        write_preflight_meta(capture_dir, mode, args, env)
+        artifact = normalize_capture_artifact(
+            target,
+            mode,
+            capture_dir,
+            effective_workload_profile,
+            True,
+            command,
+            0,
+            False,
+            tool_kind=tool_kind,
+            runtime_profile=runtime_profile_dict(args),
+            repository_paths=repository_paths,
+        )
+        artifact["capture"]["profile_not_supported"] = True
+        artifact["capture"]["minimum_supported_profile"] = minimum_supported_profile(mode, tool_kind)
+        artifact["capture"]["requested_profile"] = args.profile
+        artifact["capture"]["success"] = True
+        artifact["capture"]["failed_phase"] = "profile-not-supported"
+        artifact["validation"]["complete"] = True
+        artifact["validation"]["messages"] = [unsupported_profile_reason]
+        artifact["validation"]["performance_publishable"] = False
+        write_artifact(output_path, artifact)
+        emit_matrix_progress(args, row_label, "artifact-finalized", unsupported_profile_reason)
+        return MatrixResult(
+            mode.name,
+            True,
+            False,
+            False,
+            "profile-not-supported",
+            0,
+            str(output_path),
+            str(capture_dir),
+            command,
+            unsupported_profile_reason,
+        )
     if args.dry_run:
         artifact = normalize_capture_artifact(
             target,
@@ -5134,6 +5676,7 @@ def run_mode(
             repository_paths=repository_paths,
         )
         write_artifact(output_path, artifact)
+        emit_matrix_progress(args, row_label, "artifact-finalized", "dry_run=true")
         return MatrixResult(mode.name, True, False, False, None, 0, str(output_path), str(capture_dir), command)
 
     if kind == "shell" and capture_dir.exists():
@@ -5157,6 +5700,7 @@ def run_mode(
             repository_paths=repository_paths,
         )
         write_artifact(output_path, artifact)
+        emit_matrix_progress(args, row_label, "artifact-finalized", "renderdoccmd missing")
         return MatrixResult(mode.name, False, False, False, "renderdoccmd is not installed", 127, str(output_path), str(capture_dir), command)
     tracy_capture_path: Path | None = None
     tracy_tool: str | None = None
@@ -5184,6 +5728,7 @@ def run_mode(
                 repository_paths=repository_paths,
             )
             write_artifact(output_path, artifact)
+            emit_matrix_progress(args, row_label, "artifact-finalized", "tracy-capture missing")
             return MatrixResult(mode.name, False, False, False, "tracy-capture is not installed", 127, str(output_path), str(capture_dir), command)
     stdout_path = artifact_root / mode.name / tool_kind / run_dir / "stdout.log"
     stderr_path = artifact_root / mode.name / tool_kind / run_dir / "stderr.log"
@@ -5195,15 +5740,39 @@ def run_mode(
     timeout_seconds = child_process_timeout_seconds(args)
     hard_timeout_seconds = per_mode_timeout_seconds(args)
     with stdout_path.open("w", encoding="utf-8") as stdout, stderr_path.open("w", encoding="utf-8") as stderr:
-        process = subprocess.Popen(
-            command,
-            cwd=target.root,
-            text=True,
-            stdout=stdout,
-            stderr=stderr,
-            env=env,
-            **popen_kwargs(),
-        )
+        try:
+            process = subprocess.Popen(
+                command,
+                cwd=target.root,
+                text=True,
+                stdout=stdout,
+                stderr=stderr,
+                env=env,
+                **popen_kwargs(),
+            )
+        except Exception as exc:
+            write_preflight_meta(capture_dir, mode, args, env)
+            artifact = normalize_capture_artifact(
+                target,
+                mode,
+                capture_dir,
+                effective_workload_profile,
+                False,
+                command,
+                127,
+                False,
+                timed_out_phase="startup",
+                tool_kind=tool_kind,
+                runtime_profile=runtime_profile_dict(args),
+                repository_paths=repository_paths,
+            )
+            artifact["capture"]["stdout_path"] = str(stdout_path)
+            artifact["capture"]["stderr_path"] = str(stderr_path)
+            artifact["capture"]["duration_seconds"] = time.monotonic() - started
+            write_artifact(output_path, artifact)
+            emit_matrix_progress(args, row_label, "artifact-finalized", f"launch_error={exc}")
+            return MatrixResult(mode.name, False, False, False, "startup", 127, str(output_path), str(capture_dir), command, str(exc))
+        emit_matrix_progress(args, row_label, "process-launched", f"pid={process.pid}")
         if getattr(args, "tracy_capture", False) and tracy_tool and tracy_capture_path:
             def capture_tracy_while_running() -> None:
                 outputs: list[str] = []
@@ -5324,18 +5893,108 @@ def run_mode(
             tracy_thread.start()
         try:
             last_quota_check = 0.0
+            last_progress = 0.0
+            emitted_live_events: set[str] = set()
+            subsystem_terminal_started: float | None = None
+            artifact_finalization_started: float | None = None
             while True:
                 exit_code = process.poll()
                 if exit_code is not None:
                     break
                 now = time.monotonic()
+                if tool_kind == "subsystem":
+                    subsystem_status, subsystem_path = latest_subsystem_status(capture_dir)
+                    if subsystem_status in {"complete", "failed", "partial"}:
+                        if subsystem_terminal_started is None:
+                            subsystem_terminal_started = now
+                            emit_matrix_progress(
+                                args,
+                                row_label,
+                                "shutdown-started",
+                                f"subsystem_status={subsystem_status} artifact={subsystem_path}",
+                            )
+                        shutdown_budget = max(1, phase_timeout_seconds(args, "shutdown"))
+                        if now - subsystem_terminal_started > shutdown_budget:
+                            terminate_process_tree(process)
+                            cleanup_killed_processes = cleanup_repo_processes(target.root)
+                            cleanup_timeout = max(1, phase_timeout_seconds(args, "cleanup"))
+                            try:
+                                process.wait(timeout=cleanup_timeout)
+                            except subprocess.TimeoutExpired:
+                                terminate_process_tree(process)
+                                process.wait(timeout=cleanup_timeout)
+                            exit_code = 0 if subsystem_status == "complete" else 1
+                            error = (
+                                error
+                                or f"Subsystem artifact reached {subsystem_status}; parent bounded shutdown after {shutdown_budget}s"
+                            )
+                            break
+                live_phase, live_detail = live_capture_phase(capture_dir, tool_kind)
+                if live_phase == "artifact-finalization":
+                    if artifact_finalization_started is None:
+                        artifact_finalization_started = now
+                    cleanup_budget = max(1, phase_timeout_seconds(args, "cleanup"))
+                    if now - artifact_finalization_started > cleanup_budget:
+                        meta_path = latest_capture_meta_path(capture_dir)
+                        meta = read_key_values(meta_path) if meta_path else {}
+                        recorded_exit = parse_number(meta.get("exit_code"))
+                        terminate_process_tree(process)
+                        cleanup_killed_processes = cleanup_repo_processes(target.root)
+                        try:
+                            process.wait(timeout=cleanup_budget)
+                        except subprocess.TimeoutExpired:
+                            terminate_process_tree(process)
+                            process.wait(timeout=cleanup_budget)
+                        exit_code = int(recorded_exit) if recorded_exit is not None else 1
+                        error = (
+                            error
+                            or f"Capture wrote exit_code={exit_code}; parent bounded artifact finalization after {cleanup_budget}s"
+                        )
+                        break
+                if matrix_progress_enabled(args) and now - last_progress >= MATRIX_PROGRESS_INTERVAL_SECONDS:
+                    last_progress = now
+                    if live_phase == "readiness" and "readiness-reached" not in emitted_live_events:
+                        emit_matrix_progress(args, row_label, "readiness-reached", live_detail)
+                        emitted_live_events.add("readiness-reached")
+                    if live_phase == "measurement/capture" and "measurement-capture-started" not in emitted_live_events:
+                        if "readiness-reached" not in emitted_live_events:
+                            emit_matrix_progress(args, row_label, "readiness-reached", live_detail)
+                            emitted_live_events.add("readiness-reached")
+                        emit_matrix_progress(args, row_label, "measurement-capture-started", live_detail)
+                        emitted_live_events.add("measurement-capture-started")
+                    if live_phase == "shutdown" and "shutdown-started" not in emitted_live_events:
+                        emit_matrix_progress(args, row_label, "shutdown-started", live_detail)
+                        emitted_live_events.add("shutdown-started")
+                    emit_matrix_progress(args, row_label, "active", f"{live_phase}; elapsed={int(now - started)}s; {live_detail}")
                 if now - started > timeout_seconds:
+                    if live_phase == "artifact-finalization":
+                        meta_path = latest_capture_meta_path(capture_dir)
+                        meta = read_key_values(meta_path) if meta_path else {}
+                        recorded_exit = parse_number(meta.get("exit_code"))
+                        if recorded_exit is not None:
+                            terminate_process_tree(process)
+                            cleanup_killed_processes = cleanup_repo_processes(target.root)
+                            cleanup_timeout = max(1, phase_timeout_seconds(args, "cleanup"))
+                            try:
+                                process.wait(timeout=cleanup_timeout)
+                            except subprocess.TimeoutExpired:
+                                terminate_process_tree(process)
+                                process.wait(timeout=cleanup_timeout)
+                            exit_code = int(recorded_exit)
+                            error = (
+                                error
+                                or f"Capture wrote exit_code={exit_code}; parent bounded artifact finalization at mode timeout"
+                            )
+                            break
                     timed_out = True
+                    if not timed_out_phase:
+                        timed_out_phase, _ = live_capture_phase(capture_dir, tool_kind)
                     terminate_process_tree(process)
                     cleanup_killed_processes = cleanup_repo_processes(target.root)
                     cleanup_timeout = max(1, phase_timeout_seconds(args, "cleanup"))
                     exit_code = process.wait(timeout=cleanup_timeout)
                     error = f"Timed out after {timeout_seconds}s; profile hard cap is {hard_timeout_seconds}s"
+                    emit_matrix_progress(args, row_label, "shutdown-started", f"timeout_phase={timed_out_phase}")
                     break
                 if retention_policy is not None and now - last_quota_check >= 2.0:
                     last_quota_check = now
@@ -5350,6 +6009,7 @@ def run_mode(
                         cleanup_killed_processes = cleanup_repo_processes(target.root)
                         cleanup_timeout = max(1, phase_timeout_seconds(args, "cleanup"))
                         exit_code = process.wait(timeout=cleanup_timeout)
+                        emit_matrix_progress(args, row_label, "shutdown-started", "artifact quota exceeded")
                         break
                 time.sleep(0.25)
         except subprocess.TimeoutExpired:
@@ -5367,6 +6027,7 @@ def run_mode(
                 artifact_retention.cleanup(retention_policy, after_run=managed_run_root)
             raise
     cleanup_killed_processes = sorted(set(cleanup_killed_processes + cleanup_repo_processes(target.root)))
+    emit_matrix_progress(args, row_label, "shutdown-started", "process exited; finalizing artifact")
     if getattr(args, "renderdoc_capture", False):
         replay_renderdoc_summary(capture_dir, renderdoc_capture_path_from_env(env, capture_dir))
     if getattr(args, "tracy_capture", False):
@@ -5474,6 +6135,12 @@ def run_mode(
             artifact_retention.write_quota_failure(retention_policy.root, managed_run_root, str(quota_error))
         artifact_retention.remove_generated_temp_dirs_for_capture(retention_policy.root, capture_dir)
         artifact_retention.cleanup(retention_policy, after_run=managed_run_root)
+    emit_matrix_progress(
+        args,
+        row_label,
+        "artifact-finalized",
+        f"success={str(success).lower()} artifact={output_path}",
+    )
     capture_meta = artifact.get("capture") if isinstance(artifact.get("capture"), dict) else {}
     failed_phase = capture_meta.get("failed_phase") if isinstance(capture_meta.get("failed_phase"), str) else timed_out_phase
     if timed_out and failed_phase and "during" not in error:
@@ -5832,6 +6499,16 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             help="Enable bounded normal GameRenderer.pick() diagnostics for interactive block-outline investigation.",
         )
         subparser.add_argument(
+            "--world-outline-pause-parity",
+            action="store_true",
+            help="Capture playing, paused, and unpaused block-outline frames with the same target and camera.",
+        )
+        subparser.add_argument(
+            "--world-outline-legacy-control",
+            action="store_true",
+            help="Force the Java legacy block-outline route for matched diagnostic comparison captures.",
+        )
+        subparser.add_argument(
             "--world-border-scenario",
             choices=("hidden", "far", "near", "all-sides", "corner"),
             default=os.environ.get("MATTMC_WORLD_BORDER_SCENARIO", ""),
@@ -5848,6 +6525,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             type=int,
             default=int(os.environ.get("MATTMC_WORLD_CRACK_STAGE", "0")),
             help="Force the deterministic crack texture stage, in the vanilla 0..9 range.",
+        )
+        subparser.add_argument(
+            "--world-crack-real-survival",
+            action="store_true",
+            help="Require real survival destroy-progress crack evidence instead of accepting forced crack scenarios.",
         )
         subparser.add_argument(
             "--world-crack-control",
@@ -6020,6 +6702,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         keep_failed=args.retain_failed_runs,
     )
     artifact_retention.ensure_marker(retention_policy.root)
+    if matrix_progress_enabled(args):
+        emit_matrix_progress(args, "matrix", "preflight-started", f"artifact_root={retention_policy.root}")
     if args.dry_run:
         preflight_cleanup = {"removed": [], "removed_game_dirs": [], "dry_run": True}
         disk_preflight = {
@@ -6038,6 +6722,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 tracy=args.tracy_capture,
             ),
         )
+    if matrix_progress_enabled(args):
+        removed_tmp = preflight_cleanup.get("removed_stale_tmp") if isinstance(preflight_cleanup, dict) else None
+        detail = f"root_usage={disk_preflight.get('artifact_root_usage_bytes', 'unknown')} removed_stale_tmp={len(removed_tmp) if isinstance(removed_tmp, list) else 0}"
+        emit_matrix_progress(args, "matrix", "preflight-completed", detail)
     args._retention_policy = retention_policy
     artifact_root = args.artifact_dir.resolve() if args.artifact_dir else retention_policy.root / args.tool / timestamp()
     artifact_root.mkdir(parents=True, exist_ok=True)
@@ -6048,6 +6736,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     for mode in selected_modes(args):
         for tool_kind in tools_to_run:
             for repetition in range(1, args.repetitions + 1):
+                if matrix_progress_enabled(args):
+                    emit_matrix_progress(
+                        args,
+                        matrix_row_label(mode, tool_kind, repetition),
+                        "mode-selected",
+                        f"backend={mode.backend} shaders={mode.shaders}",
+                    )
                 result = run_mode(targets[mode.target], mode, artifact_root, args, tool_kind, repetition)
                 if args.tool == "matrix":
                     result.mode = f"{mode.name}/{tool_kind}/run-{repetition:02d}"

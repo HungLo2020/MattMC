@@ -14,6 +14,7 @@ pub enum TextureUsageState {
     TransferSrc = 6,
     TransferDst = 7,
     Present = 8,
+    IndexRead = 9,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

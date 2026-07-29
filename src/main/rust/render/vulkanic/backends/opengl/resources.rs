@@ -917,7 +917,10 @@ fn uniform_block_names(binding: u32) -> Vec<String> {
 }
 
 fn storage_block_names(binding: u32) -> Vec<String> {
-    vec![format!("Storage{binding}")]
+    match binding {
+        0 => vec!["WorldMaterialBatch".to_string(), "Storage0".to_string()],
+        _ => vec![format!("Storage{binding}")],
+    }
 }
 
 pub(super) fn sampler_uniform_names(binding: u32) -> Vec<String> {

@@ -360,12 +360,19 @@ final class RustGraphicsSubsystemBenchmark {
 		""";
 
 	private static final String FRAGMENT_SHADER_OPENGL = """
-		#version 330 core
+		#version 430 core
+		layout(std140, binding = 2) uniform Uniforms2 {
+		    uint uboSalt;
+		};
+		layout(std430, binding = 3) buffer Storage3 {
+		    uint ssboSalt;
+		};
 		uniform sampler2D tex0;
 		in vec2 v_uv;
 		out vec4 out_color;
 		void main() {
-		    out_color = texture(tex0, v_uv) * vec4(1.0, 1.0, 1.0, 0.75);
+		    float resourceSetProof = float((uboSalt ^ ssboSalt) & 1u) * 0.001;
+		    out_color = texture(tex0, v_uv) * vec4(1.0 + resourceSetProof, 1.0, 1.0, 0.75);
 		}
 		""";
 
@@ -373,10 +380,17 @@ final class RustGraphicsSubsystemBenchmark {
 		#version 450
 		layout(set = 0, binding = 0) uniform texture2D tex0;
 		layout(set = 0, binding = 1) uniform sampler samp0;
+		layout(set = 0, binding = 2, std140) uniform Uniforms2 {
+		    uint uboSalt;
+		};
+		layout(set = 0, binding = 3, std430) buffer Storage3 {
+		    uint ssboSalt;
+		};
 		layout(location = 0) in vec2 v_uv;
 		layout(location = 0) out vec4 out_color;
 		void main() {
-		    out_color = texture(sampler2D(tex0, samp0), v_uv) * vec4(1.0, 1.0, 1.0, 0.75);
+		    float resourceSetProof = float((uboSalt ^ ssboSalt) & 1u) * 0.001;
+		    out_color = texture(sampler2D(tex0, samp0), v_uv) * vec4(1.0 + resourceSetProof, 1.0, 1.0, 0.75);
 		}
 		""";
 }

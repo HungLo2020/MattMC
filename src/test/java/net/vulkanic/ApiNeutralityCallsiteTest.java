@@ -377,6 +377,8 @@ public class ApiNeutralityCallsiteTest {
             "GameRenderer should avoid direct getDevice().getDeviceInfo() logging callsites");
         assertTrue(gameRendererSource.contains("VulkanicAPI.precompileRenderPipeline("),
             "GameRenderer should precompile UI pipelines through VulkanicAPI backend-owned seam");
+        assertTrue(gameRendererSource.contains("VoxelMapPipelines.GUI_TEXTURED_LESS_OR_EQUAL_DEPTH_PIPELINE"),
+            "GameRenderer should precompile VoxelMap's depth-tested GUI pipeline before Java Vulkan waypoint rendering requests it");
         assertFalse(gameRendererSource.contains("precompilePipeline(RenderPipelines.GUI"),
             "GameRenderer should avoid direct GpuDevice.precompilePipeline usage in shared startup callsites");
         assertFalse(gameRendererSource.contains("Supports OpenGL"),

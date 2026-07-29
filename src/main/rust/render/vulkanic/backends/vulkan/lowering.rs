@@ -379,9 +379,9 @@ impl SubmissionLowerer {
                         .cmd_begin_rendering(command_buffer, &rendering);
                     let viewport = vk::Viewport {
                         x: 0.0,
-                        y: 0.0,
+                        y: extent.height as f32,
                         width: extent.width as f32,
-                        height: extent.height as f32,
+                        height: -(extent.height as f32),
                         min_depth: 0.0,
                         max_depth: 1.0,
                     };
@@ -650,8 +650,21 @@ impl SubmissionLowerer {
                 } => {
                     let _zone = trace::Zone::new("vulkan.lowering.host-write");
                     let buffer = objects.buffer(*buffer)?;
-                    self.context
-                        .write_mapped_memory(buffer.memory, *offset, data)?;
+                    if !data.is_empty()
+                        && *offset % 4 == 0
+                        && data.len() % 4 == 0
+                        && data.len() <= 65_536
+                    {
+                        self.context.device.cmd_update_buffer(
+                            command_buffer,
+                            buffer.buffer,
+                            *offset,
+                            data,
+                        );
+                    } else {
+                        self.context
+                            .write_mapped_memory(buffer.memory, *offset, data)?;
+                    }
                 }
                 CommandOp::HostReadBuffer {
                     buffer,
@@ -786,6 +799,7 @@ pub(super) fn image_layout(state: TextureUsageState) -> vk::ImageLayout {
         TextureUsageState::TransferSrc => vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
         TextureUsageState::TransferDst => vk::ImageLayout::TRANSFER_DST_OPTIMAL,
         TextureUsageState::Present => vk::ImageLayout::PRESENT_SRC_KHR,
+        TextureUsageState::IndexRead => vk::ImageLayout::UNDEFINED,
     }
 }
 
@@ -803,6 +817,7 @@ pub(super) fn stage_mask(state: TextureUsageState) -> vk::PipelineStageFlags2 {
         TextureUsageState::TransferSrc | TextureUsageState::TransferDst => {
             vk::PipelineStageFlags2::TRANSFER
         }
+        TextureUsageState::IndexRead => vk::PipelineStageFlags2::INDEX_INPUT,
         TextureUsageState::Present => vk::PipelineStageFlags2::BOTTOM_OF_PIPE,
     }
 }
@@ -821,6 +836,7 @@ pub(super) fn access_mask(state: TextureUsageState) -> vk::AccessFlags2 {
         }
         TextureUsageState::TransferSrc => vk::AccessFlags2::TRANSFER_READ,
         TextureUsageState::TransferDst => vk::AccessFlags2::TRANSFER_WRITE,
+        TextureUsageState::IndexRead => vk::AccessFlags2::INDEX_READ,
     }
 }
 

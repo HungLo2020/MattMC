@@ -82,6 +82,7 @@ class CaptureConfig:
     region_validation: bool
     region_validation_copy_world: bool
     poi_validation: bool
+    deterministic_shutdown_grace_secs: int = 20
 
 
 class CaptureRunner:
@@ -138,6 +139,11 @@ class CaptureRunner:
         self.region_validation_status = self.artifact_dir / f"region_validation_{self.run_id}.json"
         self.poi_validation_status = self.artifact_dir / f"poi_validation_{self.run_id}.json"
         self.meshing_corpus_replay = self.artifact_dir / f"real_meshing_replay_{self.run_id}.json"
+        self.subsystem_status_path = (
+            Path(os.environ["MATTMC_GRAPHICS_SUBSYSTEM_STATUS"])
+            if os.environ.get("MATTMC_GRAPHICS_SUBSYSTEM_STATUS")
+            else None
+        )
 
         self.validation_layer_manifest = ""
         self.validation_layer_dir = ""
@@ -161,6 +167,8 @@ class CaptureRunner:
         self.memory_guard_rss_kb = 0
         self.deterministic_completed = False
         self.intentional_deterministic_shutdown = False
+        self.subsystem_benchmark_completed = False
+        self.intentional_subsystem_shutdown = False
         self.deterministic_validation_status = "not_requested"
         self.audio_validation_result = "not_requested"
         self.region_validation_result = "not_requested"
@@ -193,6 +201,9 @@ class CaptureRunner:
                 self.intentional_deterministic_shutdown = True
 
         if self.intentional_deterministic_shutdown and exit_code != 0:
+            self.append_meta(f"raw_exit_code={exit_code}")
+            exit_code = 0
+        if self.intentional_subsystem_shutdown and exit_code != 0:
             self.append_meta(f"raw_exit_code={exit_code}")
             exit_code = 0
 
@@ -310,6 +321,8 @@ class CaptureRunner:
             f"validation_mode={self.config.validation_mode}",
             f"graphics_run_type={os.environ.get('MATTMC_GRAPHICS_RUN_TYPE', 'clean-performance')}",
             f"graphics_audit_enabled={os.environ.get('MATTMC_GRAPHICS_AUDIT', 'false')}",
+            f"graphics_subsystem_benchmark={os.environ.get('MATTMC_GRAPHICS_SUBSYSTEM_BENCHMARK', 'false')}",
+            f"graphics_subsystem_status={self.subsystem_status_path or ''}",
             f"validation_profile={os.environ.get('MATTMC_GRAPHICS_VALIDATION_PROFILE', self.config.validation_mode)}",
             f"validation_fail_severity={os.environ.get('MATTMC_GRAPHICS_VALIDATION_FAIL_SEVERITY', 'warning')}",
             f"renderdoc_capture={os.environ.get('MATTMC_RENDERDOC_CAPTURE', 'false')}",
@@ -320,6 +333,7 @@ class CaptureRunner:
             f"rust_tracy={os.environ.get('MATTMC_RUST_TRACY', 'false')}",
             f"tracy_duration_seconds={os.environ.get('MATTMC_TRACY_DURATION_SECONDS', '0')}",
             f"tracy_max_size_mb={os.environ.get('MATTMC_TRACY_MAX_SIZE_MB', '0')}",
+            f"deterministic_shutdown_grace_secs={self.config.deterministic_shutdown_grace_secs}",
             f"shader_input_parity={self.config.shader_input_parity}",
             f"shader_input_parity_max_logs={self.config.shader_input_parity_max_logs}",
             f"lightmap_info_parity_max_logs={self.config.lightmap_info_parity_max_logs}",
@@ -974,6 +988,18 @@ class CaptureRunner:
                 if not self.wait_for_deterministic_shutdown():
                     self.terminate_run_processes("deterministic_complete")
                 break
+            subsystem_status = self.subsystem_benchmark_status()
+            if subsystem_status in {"complete", "failed", "partial"}:
+                self.subsystem_benchmark_completed = subsystem_status == "complete"
+                self.intentional_subsystem_shutdown = True
+                self.append_meta(f"subsystem_benchmark_status={subsystem_status}")
+                self.append_meta(f"subsystem_benchmark_terminal_elapsed={elapsed}")
+                if not self.wait_for_process_shutdown(
+                    "subsystem_shutdown",
+                    self.config.deterministic_shutdown_grace_secs,
+                ):
+                    self.terminate_run_processes(f"subsystem_{subsystem_status}")
+                break
 
             if not self.check_client_memory_guard(client_pid, elapsed):
                 break
@@ -1009,19 +1035,35 @@ class CaptureRunner:
         return self.gradle_process.returncode or 0
 
     def wait_for_deterministic_shutdown(self, grace_secs: int | None = None) -> bool:
-        assert self.gradle_process is not None
         if grace_secs is None:
-            grace_secs = 180 if self.config.region_validation else 20
-        self.append_meta(f"deterministic_shutdown_grace_secs={grace_secs}")
+            grace_secs = self.config.deterministic_shutdown_grace_secs
+        return self.wait_for_process_shutdown("deterministic_shutdown", grace_secs)
+
+    def wait_for_process_shutdown(self, prefix: str, grace_secs: int) -> bool:
+        assert self.gradle_process is not None
+        self.append_meta(f"{prefix}_grace_secs={grace_secs}")
+        client_exit_elapsed: int | None = None
         for waited in range(grace_secs):
+            client_pid = self.find_client_pid()
+            if client_pid is None and client_exit_elapsed is None:
+                client_exit_elapsed = waited
+                self.append_meta(f"{prefix}_client_exit_elapsed={waited}")
             if self.gradle_process.poll() is not None:
-                self.append_meta(f"deterministic_shutdown_grace_elapsed={waited}")
+                self.append_meta(f"{prefix}_grace_elapsed={waited}")
+                if client_exit_elapsed is None:
+                    self.append_meta(f"{prefix}_client_exit_elapsed=with_gradle")
                 return True
             time.sleep(1)
         if self.gradle_process.poll() is not None:
-            self.append_meta(f"deterministic_shutdown_grace_elapsed={grace_secs}")
+            self.append_meta(f"{prefix}_grace_elapsed={grace_secs}")
+            if client_exit_elapsed is None:
+                self.append_meta(f"{prefix}_client_exit_elapsed=with_gradle")
             return True
-        self.append_meta("deterministic_shutdown_grace_expired=true")
+        if client_exit_elapsed is None:
+            self.append_meta(f"{prefix}_client_still_running=true")
+        else:
+            self.append_meta(f"{prefix}_gradle_wrapper_still_running=true")
+        self.append_meta(f"{prefix}_grace_expired=true")
         return False
 
     def find_client_pid(self) -> int | None:
@@ -1110,6 +1152,18 @@ class CaptureRunner:
             return None
         try:
             data = json.loads(self.deterministic_metadata.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+        status = data.get("status")
+        return status if isinstance(status, str) else None
+
+    def subsystem_benchmark_status(self) -> str | None:
+        if os.environ.get("MATTMC_GRAPHICS_SUBSYSTEM_BENCHMARK", "false").lower() != "true":
+            return None
+        if self.subsystem_status_path is None or not self.subsystem_status_path.is_file():
+            return None
+        try:
+            data = json.loads(self.subsystem_status_path.read_text(encoding="utf-8"))
         except Exception:
             return None
         status = data.get("status")
@@ -1242,6 +1296,8 @@ class CaptureRunner:
         self.append_meta(
             f"intentional_deterministic_shutdown={str(self.intentional_deterministic_shutdown).lower()}"
         )
+        self.append_meta(f"subsystem_benchmark_completed={str(self.subsystem_benchmark_completed).lower()}")
+        self.append_meta(f"intentional_subsystem_shutdown={str(self.intentional_subsystem_shutdown).lower()}")
         if self.memory_guard_triggered and self.deterministic_completed:
             self.append_meta("memory_guard_reclassified_after_complete=true")
             self.memory_guard_triggered = False
@@ -2341,6 +2397,12 @@ def validate_deterministic_metadata(metadata_path: Path, screenshot_dir: Path, t
         "right": (initial_yaw + yaw_delta, initial_pitch),
         "left": (initial_yaw - yaw_delta, initial_pitch),
         "return": (initial_yaw, initial_pitch),
+        "playing": (initial_yaw, initial_pitch),
+        "paused": (initial_yaw, initial_pitch),
+        "unpaused": (initial_yaw, initial_pitch),
+        "crack-early": (initial_yaw, initial_pitch),
+        "crack-middle": (initial_yaw, initial_pitch),
+        "crack-late": (initial_yaw, initial_pitch),
     }
     initial_position = data.get("initialPosition") or {}
     previous_frame = -1
@@ -2521,6 +2583,10 @@ def parse_args() -> CaptureConfig:
         region_validation=bool(args.region_validation),
         region_validation_copy_world=bool(args.region_validation_copy_world),
         poi_validation=bool(args.poi_validation),
+        deterministic_shutdown_grace_secs=int_env(
+            "MATTMC_DETERMINISTIC_SHUTDOWN_GRACE_SECS",
+            180 if args.region_validation else 20,
+        ),
     )
 
 

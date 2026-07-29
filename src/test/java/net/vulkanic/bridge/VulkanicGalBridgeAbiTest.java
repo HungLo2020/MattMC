@@ -14,8 +14,10 @@ import net.vulkanic.gui.MountHeartState;
 import net.vulkanic.gui.MountHeartVariant;
 import net.vulkanic.gui.PlayerHeartRequest;
 import net.vulkanic.gui.PlayerHeartVariant;
+import net.vulkanic.gui.RustGalFrameCoordinator;
 import net.vulkanic.gui.RustGalGuiRenderer;
 import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
+import net.vulkanic.world.WorldRenderRoutePolicy;
 import org.junit.jupiter.api.Test;
 
 import java.lang.foreign.Arena;
@@ -86,20 +88,24 @@ class VulkanicGalBridgeAbiTest {
 	@Test
 	void blockOutlineRouteKeepsJavaPathsOutsideRustVulkanShell() throws Exception {
 		assertEquals(
-			RustGalWorldPrimitiveRenderer.BlockOutlineRoute.RUST_OPENGL_BORROWED_CONTEXT,
-			RustGalWorldPrimitiveRenderer.selectBlockOutlineRouteForTests(false, false)
+			WorldRenderRoutePolicy.Route.RUST_OPENGL_BORROWED_CONTEXT,
+			WorldRenderRoutePolicy.selectRouteForTests(false, false, false, false)
 		);
 		assertEquals(
-			RustGalWorldPrimitiveRenderer.BlockOutlineRoute.RUST_OPENGL_BORROWED_CONTEXT,
-			RustGalWorldPrimitiveRenderer.selectBlockOutlineRouteForTests(false, true)
+			WorldRenderRoutePolicy.Route.RUST_OPENGL_BORROWED_CONTEXT,
+			WorldRenderRoutePolicy.selectRouteForTests(false, true, false, false)
 		);
 		assertEquals(
-			RustGalWorldPrimitiveRenderer.BlockOutlineRoute.JAVA_COMPATIBILITY,
-			RustGalWorldPrimitiveRenderer.selectBlockOutlineRouteForTests(true, false)
+			WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY,
+			WorldRenderRoutePolicy.selectRouteForTests(true, false, false, false)
 		);
 		assertEquals(
-			RustGalWorldPrimitiveRenderer.BlockOutlineRoute.RUST_VULKAN_WHOLE_FRAME,
-			RustGalWorldPrimitiveRenderer.selectBlockOutlineRouteForTests(true, true)
+			WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME,
+			WorldRenderRoutePolicy.selectRouteForTests(true, true, false, false)
+		);
+		assertEquals(
+			WorldRenderRoutePolicy.Route.DISABLED,
+			WorldRenderRoutePolicy.selectRouteForTests(false, false, true, false)
 		);
 		assertTrue(
 			Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"))
@@ -110,8 +116,10 @@ class VulkanicGalBridgeAbiTest {
 	@Test
 	void wholeFrameWorldPrimitiveRouteIsVulkanShellOnlyAndCoarse() throws Exception {
 		String bridge = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java"));
+		String frameCoordinator = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java"));
 		String guiRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
 		String worldRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+		String worldRoutePolicy = Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"));
 		String gameRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
 		String levelRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/LevelRenderer.java"));
 		String rustFfi = Files.readString(Path.of("src/main/rust/render/vulkanic/ffi.rs"));
@@ -130,19 +138,34 @@ class VulkanicGalBridgeAbiTest {
 			assertTrue(bridge.contains("List<WorldBorderQuadRecord> worldBorderQuads"));
 			assertTrue(bridge.contains("submitWorldPrimitives("));
 			assertTrue(bridge.contains("worldCrackQuads,"));
-			assertTrue(guiRenderer.contains("bridge.submitWholeFrame"));
-			assertTrue(guiRenderer.contains("primitiveFrame.crackQuads()"));
+			assertTrue(frameCoordinator.contains("executeWholeFrameVulkan"));
+			assertTrue(frameCoordinator.contains("executeWorldPrimitiveFrame"));
+			assertTrue(frameCoordinator.contains("bridge.submitWholeFrame"));
+			assertTrue(frameCoordinator.contains("primitiveFrame.crackQuads()"));
 			assertTrue(guiRenderer.contains("isWholeFrameVulkanActive()"));
+			int worldPrimitiveExecution = frameCoordinator.indexOf("public static boolean executeWorldPrimitiveFrame");
+			int worldCrackAssetFlush = frameCoordinator.indexOf("flushPendingWorldAssetsLocked();", worldPrimitiveExecution);
+			int worldPrimitiveSubmit = frameCoordinator.indexOf("bridge.submitWorldPrimitives", worldPrimitiveExecution);
+			assertTrue(worldCrackAssetFlush > worldPrimitiveExecution && worldCrackAssetFlush < worldPrimitiveSubmit,
+				"standalone world primitive execution must flush crack assets before submitting real crack work");
 		assertTrue(gameRenderer.contains("renderRustVulkanWholeFrameShell"));
 			assertTrue(gameRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueBlockOutline"));
 			assertTrue(gameRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueWorldBackground"));
 			assertTrue(gameRenderer.contains("levelRenderer.enqueueRustGalBlockBreakingCracks"));
 		assertTrue(gameRenderer.contains("levelRenderer.enqueueRustGalWorldBorder"));
 		assertTrue(levelRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueWorldBorder"));
+		assertTrue(levelRenderer.contains("reason=no-valid-destroy-progress"),
+			"normal OpenGL must draw nothing when no active valid destroy-progress state exists");
+		assertTrue(levelRenderer.contains("Rust OpenGL block-breaking crack overlay was selected with valid semantic requests but submitted no work"),
+			"Rust submission/validation failure must be explicit instead of falling back to Java in the same frame");
+		assertFalse(levelRenderer.contains("java-opengl-retained-after-empty-rust"),
+			"normal OpenGL must not use same-frame Java fallback after selecting the Rust crack route");
 		String borderRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/WorldBorderRenderer.java"));
 		assertTrue(borderRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueWorldBorder"));
 			assertTrue(worldRenderer.contains("enqueueBlockBreakingCracks"));
 			assertTrue(worldRenderer.contains("renderOpenGlBlockBreakingCracks"));
+			assertTrue(worldRenderer.contains("state.blockState.isAir()"),
+				"real crack extraction must not synthesize full-cube crack quads for stale air states");
 			assertTrue(worldRenderer.contains("enqueueWorldBorder"));
 			assertTrue(worldRenderer.contains("enqueueWorldBackground"));
 			assertTrue(worldRenderer.contains("reloadWorldAssets"));
@@ -154,9 +177,13 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(worldRenderer.contains("STRATUM_WORLD_BORDER"));
 		assertTrue(worldRenderer.contains("CRACK_BLEND_MULTIPLY"));
 		assertTrue(worldRenderer.contains("BORDER_BLEND_OVERLAY"));
-		assertTrue(worldRenderer.contains("BlockOutlineRoute.JAVA_COMPATIBILITY"));
-		assertTrue(worldRenderer.contains("BlockOutlineRoute.RUST_OPENGL_BORROWED_CONTEXT"));
-		assertTrue(worldRenderer.contains("BlockOutlineRoute.RUST_VULKAN_WHOLE_FRAME"));
+		assertTrue(worldRoutePolicy.contains("DISABLED"));
+		assertTrue(worldRoutePolicy.contains("JAVA_COMPATIBILITY"));
+		assertTrue(worldRoutePolicy.contains("RUST_OPENGL_BORROWED_CONTEXT"));
+		assertTrue(worldRoutePolicy.contains("RUST_VULKAN_WHOLE_FRAME"));
+		assertTrue(worldRenderer.contains("WorldRenderRoutePolicy.currentBackgroundRoute()"));
+		assertTrue(worldRenderer.contains("WorldRenderRoutePolicy.currentWorldBorderRoute()"));
+		assertFalse(worldRenderer.contains("CRACK_DISABLED_CONTROL ||"));
 		assertTrue(worldRenderer.contains("shape.forAllEdges"));
 		assertFalse(worldRenderer.contains("CommandOp"));
 		assertFalse(worldRenderer.contains("Vk"));
@@ -431,18 +458,20 @@ class VulkanicGalBridgeAbiTest {
 		assertFalse(bridge.contains("guiInvertPipeline"));
 		assertTrue(rustGuiFrontend.contains("TextureGroup::Alpha"));
 		assertFalse(queue.contains("DeferredBatchScheduler"));
-		assertTrue(queue.contains("RustGalFrameScheduler<VulkanicGalBridge.GuiSpriteRecord>"));
+		String frameCoordinator = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java"));
+		assertFalse(queue.contains("RustGalFrameScheduler<VulkanicGalBridge.GuiSpriteRecord>"));
+		assertTrue(frameCoordinator.contains("RustGalFrameScheduler<VulkanicGalBridge.GuiSpriteRecord>"));
 		assertFalse(queue.contains("record CachedResources"));
 		assertFalse(queue.contains("record CacheKey"));
 		assertFalse(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiBatchBuilder.java")));
 		assertFalse(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiResourceCache.java")));
 		assertFalse(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiSpriteAtlas.java")));
 		assertFalse(Files.exists(Path.of("src/main/java/net/vulkanic/gui/GuiPipelineLibrary.java")));
-		assertTrue(queue.contains("cacheHits"));
-		assertTrue(queue.contains("completionTimeouts"));
-		assertFalse(queue.contains("RETIRE_INTERVAL_FRAMES"));
-		assertTrue(queue.contains("if (!force)"));
-		assertTrue(queue.contains("rust_gal_frames_executed"));
+		assertTrue(frameCoordinator.contains("cacheHits"));
+		assertTrue(frameCoordinator.contains("completionTimeouts"));
+		assertFalse(frameCoordinator.contains("RETIRE_INTERVAL_FRAMES"));
+		assertTrue(frameCoordinator.contains("if (!force)"));
+		assertTrue(frameCoordinator.contains("rust_gal_frames_executed"));
 		assertFalse(queue.contains("destroyHandles(created)"));
 		assertTrue(rustGuiFrontend.contains("pub struct GuiFrontend"));
 		assertTrue(rustGuiFrontend.contains("fn create_resources"));
@@ -450,19 +479,19 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(rustGuiFrontend.contains("fn packed_uniform_bytes"));
 		assertTrue(rustGuiFrontend.contains("const VERTEX_SHADER"));
 		assertTrue(rustGuiFrontend.contains("const FRAGMENT_SHADER"));
-		assertTrue(queue.contains("VulkanicGalBridge.isBorrowedOpenGlContextCurrent"));
+		assertTrue(frameCoordinator.contains("VulkanicGalBridge.isBorrowedOpenGlContextCurrent"));
 		assertTrue(bridge.contains("GLFW.glfwGetCurrentContext()"));
 		assertFalse(queue.contains("beginFramePass(frameResources.pass(), frameResources.target())"));
 		assertFalse(queue.contains("frameResourcesFor("));
 		assertFalse(queue.contains("GuiBatchBuilder.packCompatibleSpriteBatches"));
-		assertTrue(queue.contains("bridge.submitGuiFrame"));
+		assertTrue(frameCoordinator.contains("bridge.submitGuiFrame"));
 		assertTrue(rustGuiFrontend.contains("CommandOp::DrawIndexed"));
 		assertTrue(rustGuiFrontend.contains("TextureGroup::Alpha"));
-		assertTrue(queue.contains("rust_gal_sprite_batches_executed"));
+		assertTrue(frameCoordinator.contains("rust_gal_sprite_batches_executed"));
 		assertTrue(queue.contains("GuiExecutionRoute.JAVA_COMPATIBILITY"));
 		assertTrue(queue.contains("Rust VulkanicGAL GUI enqueue requested while route is"));
-		assertTrue(gameRenderer.contains("RustGalGuiRenderer.resize"));
-		assertTrue(gameRenderer.contains("RustGalGuiRenderer.shutdown"));
+		assertTrue(gameRenderer.contains("RustGalFrameCoordinator.resize"));
+		assertTrue(gameRenderer.contains("RustGalFrameCoordinator.shutdown"));
 		assertTrue(gui.contains("RustGalGuiRenderer.enqueueCrosshair"));
 		assertTrue(gui.contains("RustGalGuiRenderer.enqueueHotbarBase"));
 		assertTrue(gui.contains("RustGalGuiRenderer.enqueueArmorIcons"));
@@ -470,14 +499,14 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(bossOverlay.contains("RustGalGuiRenderer.enqueueBossBar"));
 		assertTrue(bossOverlay.contains("drawString(this.minecraft.font"));
 		assertTrue(guiRenderer.contains("RustGalGuiElementRenderState"));
-		assertTrue(guiRenderer.contains("RustGalGuiRenderer.executeFrame"));
+		assertTrue(guiRenderer.contains("RustGalFrameCoordinator.executeGuiFrame"));
 		assertTrue(guiRenderer.contains("try (RenderPass ignored = VulkanicAPI.createRenderPass("));
 		assertTrue(
-			guiRenderer.indexOf("try (RenderPass ignored = VulkanicAPI.createRenderPass(") < guiRenderer.indexOf("RustGalGuiRenderer.executeFrame"),
+			guiRenderer.indexOf("try (RenderPass ignored = VulkanicAPI.createRenderPass(") < guiRenderer.indexOf("RustGalFrameCoordinator.executeGuiFrame"),
 			"Rust OpenGL must execute while the Java GUI render target is bound so frame_acquire captures the visible framebuffer"
 		);
 		assertTrue(
-			guiRenderer.indexOf("RustGalGuiRenderer.executeFrame") < guiRenderer.indexOf("rustGalFrameExecuted.setTrue()"),
+			guiRenderer.indexOf("RustGalFrameCoordinator.executeGuiFrame") < guiRenderer.indexOf("rustGalFrameExecuted.setTrue()"),
 			"the combined Rust GUI frame should be marked executed only after the scoped render-pass submission"
 		);
 	}
@@ -487,6 +516,7 @@ class VulkanicGalBridgeAbiTest {
 		String minecraft = Files.readString(Path.of("src/main/java/net/minecraft/client/Minecraft.java"));
 		String gui = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/Gui.java"));
 		String queue = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
+		String frameCoordinator = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java"));
 		String stratum = Files.readString(Path.of("src/main/java/net/vulkanic/gui/GuiRenderStratum.java"));
 		String experienceBar = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/contextualbar/ExperienceBarRenderer.java"));
 		String bossOverlay = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/components/BossHealthOverlay.java"));
@@ -494,20 +524,20 @@ class VulkanicGalBridgeAbiTest {
 		String openGlResources = Files.readString(Path.of("src/main/rust/render/vulkanic/backends/opengl/resources.rs"));
 		String rustGuiFrontend = Files.readString(Path.of("src/main/rust/render/vulkanic/gui_frontend.rs"));
 
-		assertTrue(minecraft.contains("ResourceManagerReloadListener") && minecraft.contains("RustGalGuiRenderer.reload(resourceManager)"));
-		assertTrue(minecraft.contains("RustGalGuiRenderer.cancelPending(\"world-disconnect\")"));
-		assertTrue(minecraft.contains("RustGalGuiRenderer.cancelPending(\"world-unload\")"));
-		assertTrue(queue.contains("SCHEDULER.cancelAll(\"resource-reload\")"));
-		assertTrue(queue.contains("SCHEDULER.cancelAll(\"resize\")"));
-		assertTrue(queue.contains("SCHEDULER.cancelAll(\"shutdown\")"));
+		assertTrue(minecraft.contains("ResourceManagerReloadListener") && minecraft.contains("RustGalFrameCoordinator.reload(resourceManager)"));
+		assertTrue(minecraft.contains("RustGalFrameCoordinator.cancelPending(\"world-disconnect\")"));
+		assertTrue(minecraft.contains("RustGalFrameCoordinator.cancelPending(\"world-unload\")"));
+		assertTrue(frameCoordinator.contains("SCHEDULER.cancelAll(\"resource-reload\")"));
+		assertTrue(frameCoordinator.contains("SCHEDULER.cancelAll(\"resize\")"));
+		assertTrue(frameCoordinator.contains("SCHEDULER.cancelAll(\"shutdown\")"));
 		assertTrue(queue.contains("mattmc.rustGal.gui.enabled"));
 		assertTrue(queue.contains("mattmc.rustGal.guiCrosshair.enabled"));
-		assertTrue(queue.contains("rust_gal_ffi_resource_batch_calls"));
+		assertTrue(frameCoordinator.contains("rust_gal_ffi_resource_batch_calls"));
 		assertTrue(queue.contains("collectResolvedAssets(ResourceManager resourceManager)"));
-		assertTrue(queue.contains("bridge.updateGuiAssets(assetGeneration, pendingAssets)"));
-		assertTrue(queue.contains("rust_gal_ffi_completion_query_calls"));
-		assertTrue(queue.contains("rust_gal_queue_depth"));
-		assertTrue(queue.contains("rust_gal_batches_executed"));
+		assertTrue(frameCoordinator.contains("bridge.updateGuiAssets(assetGeneration, pendingAssets)"));
+		assertTrue(frameCoordinator.contains("rust_gal_ffi_completion_query_calls"));
+		assertTrue(frameCoordinator.contains("rust_gal_queue_depth"));
+		assertTrue(frameCoordinator.contains("rust_gal_batches_executed"));
 		assertTrue(queue.contains("mattmc.dev.guiCrosshair.disabled"));
 		assertTrue(queue.contains("mattmc.dev.guiCrosshair.legacyControl"));
 		assertTrue(queue.contains("mattmc.dev.rustGalGui.disabled"));
@@ -656,7 +686,7 @@ class VulkanicGalBridgeAbiTest {
 	void devOnlyRustVulkanWholeFrameShellOwnsPresentationWithoutJavaVulkanExecution() throws Exception {
 		String bridge = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java"));
 		String mode = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/RustGalVulkanWholeFrameMode.java"));
-		String queue = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
+		String queue = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java"));
 		String minecraft = Files.readString(Path.of("src/main/java/net/minecraft/client/Minecraft.java"));
 		String gameRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
 		String renderSystem = Files.readString(Path.of("src/main/java/net/blaze3d/systems/RenderSystem.java"));
@@ -679,7 +709,7 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(minecraft.contains("renderRustVulkanWholeFrameShell"));
 		assertTrue(minecraft.contains("game.rendering.rust-vulkan-whole-frame"));
 		assertTrue(gameRenderer.contains("rustVulkanWholeFrameGuiExtraction"));
-		assertTrue(gameRenderer.contains("RustGalGuiRenderer.executeWholeFrameVulkan"));
+		assertTrue(gameRenderer.contains("RustGalFrameCoordinator.executeWholeFrameVulkan"));
 		int shellStart = gameRenderer.indexOf("renderRustVulkanWholeFrameShell");
 		int shellEnd = gameRenderer.indexOf("private void tryTakeScreenshotIfNeeded", shellStart);
 		assertFalse(gameRenderer.substring(shellStart, shellEnd).contains("renderLevel(deltaTracker)"));
@@ -704,6 +734,7 @@ class VulkanicGalBridgeAbiTest {
 		String bridge = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java"));
 		String scheduler = Files.readString(Path.of("src/main/java/net/vulkanic/bridge/RustGalFrameScheduler.java"));
 		String guiRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
+		String frameCoordinator = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java"));
 		String guiElement = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiElementRenderState.java"));
 		String rustGuiFrontend = Files.readString(Path.of("src/main/rust/render/vulkanic/gui_frontend.rs"));
 		String gui = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/Gui.java"));
@@ -724,14 +755,38 @@ class VulkanicGalBridgeAbiTest {
 		assertFalse(scheduler.contains("shader"));
 		assertFalse(scheduler.contains("atlas"));
 		assertFalse(scheduler.contains("pipeline"));
-		assertTrue(guiRenderer.contains("RustGalFrameScheduler<VulkanicGalBridge.GuiSpriteRecord>"));
+		assertFalse(guiRenderer.contains("RustGalFrameScheduler<VulkanicGalBridge.GuiSpriteRecord>"));
+		assertTrue(frameCoordinator.contains("RustGalFrameScheduler<VulkanicGalBridge.GuiSpriteRecord>"));
 		assertFalse(guiRenderer.contains("record CachedResources"));
 		assertFalse(guiRenderer.contains("record TextureAtlas"));
 		assertFalse(guiRenderer.contains("record FrameSpriteBatch"));
 		assertFalse(guiRenderer.contains("class FrameSpriteBatchBuilder"));
 		assertFalse(guiRenderer.contains("GuiBatchBuilder.packCompatibleSpriteBatches"));
 		assertFalse(guiRenderer.contains("GuiResourceCache resources"));
-		assertTrue(guiRenderer.contains("bridge.submitGuiFrame"));
+		assertFalse(guiRenderer.contains("bridge.submitGuiFrame"));
+		assertTrue(frameCoordinator.contains("bridge.submitGuiFrame"));
+		assertFalse(guiRenderer.contains("createBorrowedOpenGl"));
+		assertFalse(guiRenderer.contains("createWindowedVulkan"));
+		assertFalse(guiRenderer.contains("acquireFrame"));
+		assertFalse(guiRenderer.contains("presentFrame"));
+		assertFalse(guiRenderer.contains("submitWholeFrame"));
+		assertFalse(guiRenderer.contains("submitWorldPrimitives"));
+		assertFalse(guiRenderer.contains("executeWorldPrimitiveFrame"));
+		assertFalse(guiRenderer.contains("executeWholeFrameVulkan"));
+		assertFalse(guiRenderer.contains("currentAuditMetricsLine"));
+		assertFalse(guiRenderer.contains("MetricsSnapshot"));
+		assertFalse(guiRenderer.contains("RustGalWorldPrimitiveRenderer"));
+		assertTrue(frameCoordinator.contains("createBorrowedOpenGl"));
+		assertTrue(frameCoordinator.contains("createWindowedVulkan"));
+		assertTrue(frameCoordinator.contains("acquireFrame"));
+		assertTrue(frameCoordinator.contains("presentFrame"));
+		assertTrue(frameCoordinator.contains("submitWholeFrame"));
+		assertTrue(frameCoordinator.contains("submitWorldPrimitives"));
+		assertTrue(frameCoordinator.contains("executeWorldPrimitiveFrame"));
+		assertTrue(frameCoordinator.contains("executeWholeFrameVulkan"));
+		assertTrue(frameCoordinator.contains("currentAuditMetricsLine"));
+		assertTrue(frameCoordinator.contains("MetricsSnapshot"));
+		assertTrue(frameCoordinator.contains("RustGalWorldPrimitiveRenderer"));
 		assertTrue(rustGuiFrontend.contains("struct TextureAtlas"));
 		assertTrue(rustGuiFrontend.contains("struct GuiResources"));
 		assertTrue(rustGuiFrontend.contains("fn create_resources"));

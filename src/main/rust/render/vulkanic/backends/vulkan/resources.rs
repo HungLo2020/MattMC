@@ -753,7 +753,7 @@ impl VulkanObjects {
             .polygon_mode(vk::PolygonMode::FILL)
             .line_width(1.0)
             .cull_mode(cull_mode(desc.cull_mode))
-            .front_face(vk::FrontFace::CLOCKWISE);
+            .front_face(vk::FrontFace::COUNTER_CLOCKWISE);
         let multisample = vk::PipelineMultisampleStateCreateInfo::default()
             .rasterization_samples(vk::SampleCountFlags::TYPE_1);
         let color_blend_attachments = desc
@@ -1299,7 +1299,7 @@ pub(super) fn color_blend_attachment(blend: BlendMode) -> vk::PipelineColorBlend
         BlendMode::Multiply => vk::PipelineColorBlendAttachmentState::default()
             .blend_enable(true)
             .src_color_blend_factor(vk::BlendFactor::DST_COLOR)
-            .dst_color_blend_factor(vk::BlendFactor::SRC_COLOR)
+            .dst_color_blend_factor(vk::BlendFactor::ZERO)
             .color_blend_op(vk::BlendOp::ADD)
             .src_alpha_blend_factor(vk::BlendFactor::ONE)
             .dst_alpha_blend_factor(vk::BlendFactor::ZERO)
@@ -1331,6 +1331,19 @@ mod tests {
         assert_eq!(vk::TRUE, attachment.blend_enable);
         assert!(attachment.src_color_blend_factor == vk::BlendFactor::SRC_ALPHA);
         assert!(attachment.dst_color_blend_factor == vk::BlendFactor::ONE);
+        assert!(attachment.color_blend_op == vk::BlendOp::ADD);
+        assert!(attachment.src_alpha_blend_factor == vk::BlendFactor::ONE);
+        assert!(attachment.dst_alpha_blend_factor == vk::BlendFactor::ZERO);
+        assert!(attachment.alpha_blend_op == vk::BlendOp::ADD);
+        assert!(attachment.color_write_mask == vk::ColorComponentFlags::RGBA);
+    }
+
+    #[test]
+    fn multiply_blend_lowers_to_single_source_times_destination() {
+        let attachment = color_blend_attachment(BlendMode::Multiply);
+        assert_eq!(vk::TRUE, attachment.blend_enable);
+        assert!(attachment.src_color_blend_factor == vk::BlendFactor::DST_COLOR);
+        assert!(attachment.dst_color_blend_factor == vk::BlendFactor::ZERO);
         assert!(attachment.color_blend_op == vk::BlendOp::ADD);
         assert!(attachment.src_alpha_blend_factor == vk::BlendFactor::ONE);
         assert!(attachment.dst_alpha_blend_factor == vk::BlendFactor::ZERO);

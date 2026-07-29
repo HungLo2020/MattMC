@@ -26,6 +26,7 @@ PROFILE_LIMITS = {
 HEAVY_SUFFIXES = {".rdc", ".tracy"}
 COPIED_GAME_DIR_PREFIXES = ("game_dir_", "region_validation_game_")
 CAPTURE_RUN_ID_PATTERN = re.compile(r"_(20[0-9]{6}_[0-9]{6})(?:[_.]|$)")
+TEMP_RUN_ID_PATTERN = re.compile(r"^20[0-9]{6}_[0-9]{6}$")
 COMPRESSIBLE_SUFFIXES = {".log", ".txt", ".csv", ".json"}
 NEVER_COMPRESS_NAMES = {
     "graphics_audit_artifact.json",
@@ -375,6 +376,59 @@ def remove_generated_temp_dirs_for_capture(root: Path, capture_scope: Path) -> l
     return removed
 
 
+def _live_process_references(path: Path, run_id: str) -> bool:
+    """Return true when a live process appears to own a generated temp dir."""
+    proc_root = Path("/proc")
+    if not proc_root.is_dir():
+        return False
+    path_text = str(canonical(path))
+    for proc in proc_root.iterdir():
+        if not proc.name.isdigit():
+            continue
+        try:
+            command = (proc / "cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8", "replace")
+        except (FileNotFoundError, ProcessLookupError, PermissionError):
+            command = ""
+        if run_id in command or path_text in command:
+            return True
+        try:
+            cwd = (proc / "cwd").resolve()
+        except (FileNotFoundError, ProcessLookupError, PermissionError):
+            continue
+        try:
+            if cwd == path or path in cwd.parents:
+                return True
+        except RuntimeError:
+            continue
+    return False
+
+
+def remove_stale_generated_temp_dirs(root: Path, *, older_than_seconds: int = 3600) -> list[Path]:
+    root = assert_marked_root(root)
+    temp_root = root / ".tmp"
+    if not temp_root.is_dir():
+        return []
+    now = time.time()
+    removed: list[Path] = []
+    for candidate in sorted(temp_root.iterdir()):
+        if not candidate.is_dir() or not TEMP_RUN_ID_PATTERN.match(candidate.name):
+            continue
+        candidate = assert_inside_marked_root(root, candidate)
+        if candidate.parent != temp_root:
+            raise RuntimeError(f"refusing unexpected generated temp path: {candidate}")
+        try:
+            age_seconds = now - candidate.stat().st_mtime
+        except FileNotFoundError:
+            continue
+        if age_seconds < older_than_seconds:
+            continue
+        if _live_process_references(candidate, candidate.name):
+            continue
+        shutil.rmtree(candidate)
+        removed.append(candidate)
+    return removed
+
+
 def remove_path(root: Path, path: Path) -> None:
     path = assert_inside_marked_root(root, path)
     if path == assert_marked_root(root):
@@ -419,6 +473,7 @@ def cleanup(policy: RetentionPolicy, *, after_run: Path | None = None) -> dict[s
         return {"removed": [], "removed_game_dirs": [], "root_usage_bytes": directory_size(policy.root)}
     removed: list[str] = []
     removed_game_dirs = [str(path) for path in remove_copied_game_dirs(policy.root, after_run or policy.root)]
+    removed_stale_tmp = [str(path) for path in remove_stale_generated_temp_dirs(policy.root)]
     compressed = [str(path) for path in compress_large_text_artifacts(policy.root, after_run or policy.root)]
     runs = discover_runs(policy.root)
     protected: set[Path] = set()
@@ -453,6 +508,7 @@ def cleanup(policy: RetentionPolicy, *, after_run: Path | None = None) -> dict[s
     return {
         "removed": removed,
         "removed_game_dirs": removed_game_dirs,
+        "removed_stale_tmp": removed_stale_tmp,
         "compressed": compressed,
         "root_usage_bytes": directory_size(policy.root),
         "free_bytes": free_bytes(policy.root),

@@ -245,7 +245,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	}
 
 	public void close() {
-		net.vulkanic.gui.RustGalGuiRenderer.shutdown();
+		net.vulkanic.gui.RustGalFrameCoordinator.shutdown();
 		this.globalSettingsUniform.close();
 		this.lightTexture.close();
 		this.overlayTexture.close();
@@ -361,6 +361,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		};
 		VulkanicAPI.precompileRenderPipeline(RenderPipelines.GUI, biFunction);
 		VulkanicAPI.precompileRenderPipeline(RenderPipelines.GUI_TEXTURED, biFunction);
+		VulkanicAPI.precompileRenderPipeline(net.voxelmap.util.VoxelMapPipelines.GUI_TEXTURED_LESS_OR_EQUAL_DEPTH_PIPELINE, biFunction);
 		if (TracyCompat.isAvailable()) {
 			VulkanicAPI.precompileRenderPipeline(RenderPipelines.TRACY_BLIT, biFunction);
 		}
@@ -411,7 +412,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 
 	public void resize(int i, int j) {
 		this.resourcePool.clear();
-		net.vulkanic.gui.RustGalGuiRenderer.resize(i, j);
+		net.vulkanic.gui.RustGalFrameCoordinator.resize(i, j);
 		this.minecraft.levelRenderer.resize(i, j);
 	}
 
@@ -942,7 +943,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			this.minecraft.gui.renderSavingIndicator(guiGraphics, deltaTracker);
 		}
 		profilerFiller.popPush("rustVulkanWholeFramePresent");
-		net.vulkanic.gui.RustGalGuiRenderer.executeWholeFrameVulkan(this.minecraft, this.guiRenderState);
+		net.vulkanic.gui.RustGalFrameCoordinator.executeWholeFrameVulkan(this.minecraft, this.guiRenderState);
 		profilerFiller.pop();
 		guiGraphics.applyCursor(this.minecraft.getWindow());
 		this.submitNodeStorage.endFrame();

@@ -25,6 +25,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap.Entry;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.Iterator;
 import java.util.List;
@@ -131,6 +132,8 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		Integer.getInteger("mattmc.dev.blockOutlineFramebufferDiagnostics.maxFrames", 24)
 	);
 	private static int blockOutlineFramebufferDiagnosticLogs;
+	private static int blockCrackFramebufferDiagnosticLogs;
+	private static final boolean[] blockCrackFramebufferDiagnosticStages = new boolean[10];
 	private final Minecraft minecraft;
 	public final EntityRenderDispatcher entityRenderDispatcher; // Made public for Iris shadow rendering
 	private final BlockEntityRenderDispatcher blockEntityRenderDispatcher;
@@ -188,10 +191,16 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	@Nullable
 	private BlockOutlineFramebufferProbe pendingBlockOutlineFramebufferProbe;
 	@Nullable
+	private BlockCrackFramebufferProbe pendingBlockCrackFramebufferProbe;
+	@Nullable
 	private BlockOutlineRenderState pendingRustOpenGlPostIrisBlockOutline;
 	@Nullable
 	private Vec3 pendingRustOpenGlPostIrisBlockOutlineCamera;
 	private boolean pendingRustOpenGlPostIrisBlockOutlineTranslucentPass;
+	@Nullable
+	private List<BlockBreakingRenderState> pendingRustOpenGlPostIrisBlockCracks;
+	@Nullable
+	private Camera pendingRustOpenGlPostIrisBlockCracksCamera;
 	private final Matrix4f blockOutlineProbeProjection = new Matrix4f();
 	
 	// Sodium: From LevelRendererMixin - fields for Sodium world renderer integration
@@ -665,9 +674,11 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		if (net.irisshaders.iris.Iris.shouldActivateWireframe() && this.minecraft.isLocalServer()) {
 			net.irisshaders.iris.gl.IrisRenderSystem.setPolygonMode(net.vulkanic.VulkanicPolygonMode.FILL);
 		}
-		this.pipeline.finalizeLevelRendering();
-		this.renderPendingRustOpenGlPostIrisBlockOutline();
-		this.auditPendingBlockOutlineFramebufferProbe("after-iris-final");
+			this.pipeline.finalizeLevelRendering();
+			this.renderPendingRustOpenGlPostIrisBlockOutline();
+			this.renderPendingRustOpenGlPostIrisBlockCracks();
+			this.auditPendingBlockOutlineFramebufferProbe("after-iris-final");
+			this.auditPendingBlockCrackFramebufferProbe("after-iris-final");
 		
 		// Show beta warning once
 		if (!this.warned) {
@@ -1056,6 +1067,9 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 
 	private void renderBlockDestroyAnimation(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource, LevelRenderState levelRenderState) {
+		for (BlockBreakingRenderState blockBreakingRenderState : levelRenderState.blockBreakingRenderStates) {
+			net.minecraft.client.dev.DeterministicCameraCapture.recordRealSurvivalCrackRenderState(blockBreakingRenderState);
+		}
 		if (net.vulkanic.world.RustGalWorldPrimitiveRenderer.crackDisabledForDiagnostics()) {
 			auditBlockOutline("crack draw route=disabled retained=false states="
 				+ levelRenderState.blockBreakingRenderStates.size());
@@ -1065,7 +1079,27 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			&& this.minecraft.isGameLoadFinished()
 			&& this.minecraft.screen == null
 			&& this.minecraft.getOverlay() == null) {
-			this.renderRustOpenGlBlockBreakingCracks(levelRenderState);
+			Camera camera = this.minecraft.gameRenderer.getMainCamera();
+			if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasValidOpenGlBlockBreakingCracks(
+				levelRenderState.blockBreakingRenderStates,
+				camera
+			)) {
+				auditBlockOutline("crack draw route=rust-opengl retained=false states="
+					+ levelRenderState.blockBreakingRenderStates.size()
+					+ " selected=false reason=no-valid-destroy-progress");
+				return;
+			}
+			if (net.irisshaders.iris.Iris.isPackInUseQuick()) {
+				this.pendingRustOpenGlPostIrisBlockCracks = List.copyOf(levelRenderState.blockBreakingRenderStates);
+				this.pendingRustOpenGlPostIrisBlockCracksCamera = camera;
+				auditBlockOutline("crack queue route=rust-opengl retained=false postIris=true states="
+					+ levelRenderState.blockBreakingRenderStates.size());
+				return;
+			}
+			boolean rendered = this.renderRustOpenGlBlockBreakingCracks(levelRenderState);
+			if (!rendered) {
+				throw new IllegalStateException("Rust OpenGL block-breaking crack overlay was selected with valid semantic requests but submitted no work");
+			}
 			return;
 		}
 		Vec3 vec3 = levelRenderState.cameraRenderState.pos;
@@ -1173,18 +1207,19 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		if (blockOutlineRenderState != null) {
 			if (blockOutlineRenderState.isTranslucent() == bl) {
 					Vec3 vec3 = levelRenderState.cameraRenderState.pos;
-					if (net.vulkanic.world.RustGalWorldPrimitiveRenderer.shouldUseRustOpenGlOutline()
-						&& this.minecraft.isGameLoadFinished()
-						&& this.minecraft.screen == null
-						&& this.minecraft.getOverlay() == null) {
-						if (net.irisshaders.iris.Iris.isPackInUseQuick()) {
-							this.pendingRustOpenGlPostIrisBlockOutline = blockOutlineRenderState;
-							this.pendingRustOpenGlPostIrisBlockOutlineCamera = vec3;
-							this.pendingRustOpenGlPostIrisBlockOutlineTranslucentPass = bl;
-							auditBlockOutline("queue route=rust-opengl postIris=true translucentPass=" + bl
-								+ " pos=" + blockOutlineRenderState.pos().toShortString()
-								+ " highContrast=" + blockOutlineRenderState.highContrast());
-						} else {
+						if (net.vulkanic.world.RustGalWorldPrimitiveRenderer.shouldUseRustOpenGlOutline()
+							&& this.minecraft.isGameLoadFinished()
+							&& (this.minecraft.screen == null || this.minecraft.screen.isPauseScreen())
+							&& this.minecraft.getOverlay() == null) {
+							if (net.irisshaders.iris.Iris.isPackInUseQuick()) {
+								this.pendingRustOpenGlPostIrisBlockOutline = blockOutlineRenderState;
+								this.pendingRustOpenGlPostIrisBlockOutlineCamera = vec3;
+								this.pendingRustOpenGlPostIrisBlockOutlineTranslucentPass = bl;
+								auditBlockOutline("queue route=rust-opengl postIris=true translucentPass=" + bl
+									+ " pos=" + blockOutlineRenderState.pos().toShortString()
+									+ " highContrast=" + blockOutlineRenderState.highContrast());
+								return;
+							}
 							RenderTarget rustOutlineTarget = RenderType.lines().iris$getRenderTarget();
 							if (rustOutlineTarget == null) {
 								rustOutlineTarget = this.minecraft.getMainRenderTarget();
@@ -1202,9 +1237,8 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 							auditBlockOutline("draw route=rust-opengl retained=false translucentPass=" + bl
 								+ " pos=" + blockOutlineRenderState.pos().toShortString()
 								+ " highContrast=" + blockOutlineRenderState.highContrast());
-						}
-					return;
-				}
+						return;
+					}
 				BlockOutlineFramebufferProbe framebufferProbe = this.createBlockOutlineFramebufferProbe(blockOutlineRenderState, poseStack, vec3, bl);
 				if (blockOutlineRenderState.highContrast()) {
 					// Iris: Wrap with outline render state shard
@@ -1239,7 +1273,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		}
 	}
 
-	private void renderRustOpenGlBlockBreakingCracks(LevelRenderState levelRenderState) {
+	private boolean renderRustOpenGlBlockBreakingCracks(LevelRenderState levelRenderState) {
 		RenderType crumblingType = (RenderType)ModelBakery.DESTROY_TYPES.get(0);
 		int drawFramebuffer = VulkanicAPI.getDrawFramebufferBinding();
 		if (drawFramebuffer != 0) {
@@ -1249,9 +1283,8 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 				this.minecraft.getMainRenderTarget().useDepth
 			)) {
 				crackPass.setPipeline(crumblingType.pipeline());
-				this.renderRustOpenGlBlockBreakingCracksInCurrentScope(levelRenderState);
+				return this.renderRustOpenGlBlockBreakingCracksInCurrentScope(levelRenderState);
 			}
-			return;
 		}
 		RenderTarget target = this.minecraft.getMainRenderTarget();
 		try (RenderPass crackPass = VulkanicAPI.createRenderPass(
@@ -1262,11 +1295,19 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			OptionalDouble.empty()
 		)) {
 			crackPass.setPipeline(crumblingType.pipeline());
-			this.renderRustOpenGlBlockBreakingCracksInCurrentScope(levelRenderState);
+			return this.renderRustOpenGlBlockBreakingCracksInCurrentScope(levelRenderState);
 		}
 	}
 
-	private void renderRustOpenGlBlockBreakingCracksInCurrentScope(LevelRenderState levelRenderState) {
+	private boolean renderRustOpenGlBlockBreakingCracksInCurrentScope(LevelRenderState levelRenderState) {
+		return this.renderRustOpenGlBlockBreakingCracksInCurrentScope(
+			levelRenderState.blockBreakingRenderStates,
+			this.minecraft.gameRenderer.getMainCamera()
+		);
+	}
+
+	private boolean renderRustOpenGlBlockBreakingCracksInCurrentScope(List<BlockBreakingRenderState> states, Camera camera) {
+		BlockCrackFramebufferProbe framebufferProbe = this.createBlockCrackFramebufferProbe(states);
 		net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginFrame(
 			new Matrix4f(this.matrices.modelView()),
 			new Matrix4f(this.matrices.projection()),
@@ -1275,12 +1316,14 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		);
 		boolean rendered = net.vulkanic.world.RustGalWorldPrimitiveRenderer.renderOpenGlBlockBreakingCracks(
 			this.minecraft,
-			levelRenderState.blockBreakingRenderStates,
-			this.minecraft.gameRenderer.getMainCamera()
+			states,
+			camera
 		);
+		this.completeBlockCrackFramebufferProbe(framebufferProbe);
 		auditBlockOutline("crack draw route=rust-opengl retained=false states="
-			+ levelRenderState.blockBreakingRenderStates.size()
+			+ states.size()
 			+ " rendered=" + rendered);
+		return rendered;
 	}
 
 	private void renderPendingRustOpenGlPostIrisBlockOutline() {
@@ -1309,6 +1352,35 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			+ " highContrast=" + blockOutlineRenderState.highContrast());
 	}
 
+	private void renderPendingRustOpenGlPostIrisBlockCracks() {
+		List<BlockBreakingRenderState> states = this.pendingRustOpenGlPostIrisBlockCracks;
+		Camera camera = this.pendingRustOpenGlPostIrisBlockCracksCamera;
+		this.pendingRustOpenGlPostIrisBlockCracks = null;
+		this.pendingRustOpenGlPostIrisBlockCracksCamera = null;
+		if (states == null || states.isEmpty() || camera == null) {
+			return;
+		}
+		RenderTarget finalTarget = this.minecraft.getMainRenderTarget();
+		RenderType crumblingType = (RenderType)ModelBakery.DESTROY_TYPES.get(0);
+		boolean rendered;
+		try (RenderPass crackPass = VulkanicAPI.createRenderPass(
+			() -> "Rust GAL block-breaking crack overlay after Iris final",
+			finalTarget.getColorTextureView(),
+			OptionalInt.empty(),
+			finalTarget.useDepth ? finalTarget.getDepthTextureView() : null,
+			OptionalDouble.empty()
+		)) {
+			crackPass.setPipeline(crumblingType.pipeline());
+			rendered = this.renderRustOpenGlBlockBreakingCracksInCurrentScope(states, camera);
+		}
+		auditBlockOutline("crack draw route=rust-opengl retained=false postIris=true states="
+			+ states.size()
+			+ " rendered=" + rendered);
+		if (!rendered) {
+			throw new IllegalStateException("Rust OpenGL block-breaking crack overlay was selected post-Iris with valid semantic requests but submitted no work");
+		}
+	}
+
 	private void renderRustOpenGlBlockOutline(BlockOutlineRenderState blockOutlineRenderState, PoseStack poseStack, Vec3 cameraPos, boolean translucentPass) {
 		BlockOutlineFramebufferProbe framebufferProbe = this.createBlockOutlineFramebufferProbe(blockOutlineRenderState, poseStack, cameraPos, translucentPass);
 		net.irisshaders.iris.layer.GbufferPrograms.beginOutline();
@@ -1331,6 +1403,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			case RUST_OPENGL_BORROWED_CONTEXT -> "rust-opengl";
 			case RUST_VULKAN_WHOLE_FRAME -> "rust-vulkan";
 			case JAVA_COMPATIBILITY -> VulkanicAPI.isVulkanBackendSelected() ? "java-vulkan" : "java-opengl";
+			case DISABLED -> "disabled";
 		};
 	}
 
@@ -1353,18 +1426,82 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			|| blockOutlineFramebufferDiagnosticLogs >= BLOCK_OUTLINE_FRAMEBUFFER_DIAGNOSTIC_LIMIT) {
 			return null;
 		}
-		FramebufferProbeCrop crop = this.projectedBlockOutlineProbeCrop(blockOutlineRenderState, poseStack, cameraPos);
+		FramebufferProbeCrop crop = this.projectedBlockShapeProbeCrop(
+			blockOutlineRenderState.pos(),
+			blockOutlineRenderState.shape(),
+			this.matrices != null ? this.matrices.modelView() : poseStack.last().pose(),
+			this.blockOutlineProbeProjection,
+			cameraPos,
+			"projected-outline",
+			48
+		);
 		FramebufferProbeSample before = this.readBlockOutlineProbeSample(crop);
 		if (before == null) {
 			return null;
 		}
+		ProjectedOutlineEdgeSamples edgeSamples = this.projectedBlockShapeEdgeSamples(
+			blockOutlineRenderState.pos(),
+			blockOutlineRenderState.shape(),
+			this.matrices != null ? this.matrices.modelView() : poseStack.last().pose(),
+				this.blockOutlineProbeProjection,
+				cameraPos,
+				crop,
+				before
+			);
 		return new BlockOutlineFramebufferProbe(
 			blockOutlineRenderState.pos().toShortString(),
 			blockOutlineRenderState.highContrast(),
 			translucentPass,
 			crop,
+			edgeSamples,
 			before
 		);
+	}
+
+	@Nullable
+	private BlockCrackFramebufferProbe createBlockCrackFramebufferProbe(List<BlockBreakingRenderState> states) {
+		if (!BLOCK_OUTLINE_FRAMEBUFFER_DIAGNOSTICS
+			|| VulkanicAPI.isVulkanBackendSelected()
+			|| blockCrackFramebufferDiagnosticLogs >= BLOCK_OUTLINE_FRAMEBUFFER_DIAGNOSTIC_LIMIT
+			|| states == null
+			|| states.isEmpty()) {
+			return null;
+		}
+		Camera camera = this.minecraft.gameRenderer.getMainCamera();
+		Vec3 cameraPos = camera.getPosition();
+		for (BlockBreakingRenderState state : states) {
+			if (state.progress < 0 || state.progress >= 10 || state.blockState.isAir()) {
+				continue;
+			}
+			if (blockCrackFramebufferDiagnosticStages[state.progress]) {
+				continue;
+			}
+			VoxelShape shape = state.blockState.getShape(state.level, state.blockPos, CollisionContext.of(camera.getEntity()));
+			if (shape.isEmpty()) {
+				shape = Shapes.block();
+			}
+			FramebufferProbeCrop crop = this.projectedBlockShapeProbeCrop(
+				state.blockPos,
+				shape,
+				this.matrices.modelView(),
+				this.blockOutlineProbeProjection,
+				cameraPos,
+				"projected-crack-face",
+				16
+			);
+			FramebufferProbeSample before = this.readBlockOutlineProbeSample(crop);
+			if (before == null) {
+				return null;
+			}
+			return new BlockCrackFramebufferProbe(
+				state.blockPos.toShortString(),
+				state.progress,
+				shape.toAabbs().size(),
+				crop,
+				before
+			);
+		}
+		return null;
 	}
 
 	private void completeBlockOutlineFramebufferProbe(@Nullable BlockOutlineFramebufferProbe probe) {
@@ -1392,6 +1529,34 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		this.pendingBlockOutlineFramebufferProbe = null;
 	}
 
+	private void completeBlockCrackFramebufferProbe(@Nullable BlockCrackFramebufferProbe probe) {
+		if (probe == null) {
+			return;
+		}
+		FramebufferProbeSample afterDraw = this.readBlockOutlineProbeSample(probe.crop());
+		if (afterDraw == null) {
+			return;
+		}
+		this.pendingBlockCrackFramebufferProbe = probe.withAfterDraw(afterDraw);
+		this.logBlockCrackFramebufferProbe("after-draw", this.pendingBlockCrackFramebufferProbe, afterDraw);
+	}
+
+	private void auditPendingBlockCrackFramebufferProbe(String stage) {
+		BlockCrackFramebufferProbe probe = this.pendingBlockCrackFramebufferProbe;
+		if (probe == null || blockCrackFramebufferDiagnosticLogs >= BLOCK_OUTLINE_FRAMEBUFFER_DIAGNOSTIC_LIMIT) {
+			return;
+		}
+		FramebufferProbeSample finalSample = this.readBlockOutlineProbeSample(probe.crop());
+		if (finalSample != null) {
+			this.logBlockCrackFramebufferProbe(stage, probe, finalSample);
+			if (probe.stageIndex() >= 0 && probe.stageIndex() < blockCrackFramebufferDiagnosticStages.length) {
+				blockCrackFramebufferDiagnosticStages[probe.stageIndex()] = true;
+			}
+			blockCrackFramebufferDiagnosticLogs++;
+		}
+		this.pendingBlockCrackFramebufferProbe = null;
+	}
+
 	private void logBlockOutlineFramebufferProbe(String stage, BlockOutlineFramebufferProbe probe, FramebufferProbeSample sample) {
 		FramebufferProbeDelta beforeDelta = sample.deltaFrom(probe.beforeDraw());
 		FramebufferProbeDelta afterDelta = probe.afterDraw() == null
@@ -1401,7 +1566,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			"[MattMC graphics-audit] block-outline framebuffer stage={} route={} pos={} highContrast={} translucentPass={} crop={} "
 				+ "drawFb={} readFb={} program={} viewport={} depthTest={} blend={} scissor={} "
 				+ "changedFromBefore={} maxDeltaFromBefore={} sumDeltaFromBefore={} changedFromAfterDraw={} maxDeltaFromAfterDraw={} sumDeltaFromAfterDraw={} "
-				+ "avgRgba={} minRgb={} maxRgb={} outlinePixels={}",
+				+ "edgeSamples={} avgRgba={} minRgb={} maxRgb={} outlinePixels={}",
 			stage,
 			javaBlockOutlineRoute(),
 			probe.blockPos(),
@@ -1421,26 +1586,79 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			afterDelta.changedPixels(),
 			afterDelta.maxChannelDelta(),
 			afterDelta.sumChannelDelta(),
+			probe.edgeSamples().summary(sample, probe.beforeDraw()),
 			sample.averageRgba(),
 			sample.minRgb(),
 			sample.maxRgb(),
-			sample.outlinePixelSummary()
+				sample.outlinePixelSummary()
+			);
+		}
+
+	private void logBlockCrackFramebufferProbe(String stage, BlockCrackFramebufferProbe probe, FramebufferProbeSample sample) {
+		FramebufferProbeDelta beforeDelta = sample.deltaFrom(probe.beforeDraw());
+		FramebufferProbeDelta afterDelta = probe.afterDraw() == null
+			? new FramebufferProbeDelta(0, 0, 0L)
+			: sample.deltaFrom(probe.afterDraw());
+		LOGGER.info(
+			"[MattMC graphics-audit] block-crack framebuffer stage={} route={} pos={} stageIndex={} faceCount={} crop={} "
+				+ "drawFb={} readFb={} program={} viewport={} depthTest={} blend={} scissor={} "
+				+ "changedFromBefore={} maxDeltaFromBefore={} sumDeltaFromBefore={} changedFromAfterDraw={} maxDeltaFromAfterDraw={} sumDeltaFromAfterDraw={} "
+				+ "darkenedFootprintPixels={} brightenedFootprintPixels={} avgRgba={} minRgb={} maxRgb={}",
+			stage,
+			javaBlockOutlineRoute(),
+			probe.blockPos(),
+			probe.stageIndex(),
+			probe.faceCount(),
+			probe.crop().describe(),
+			sample.drawFramebuffer(),
+			sample.readFramebuffer(),
+			sample.currentProgram(),
+			sample.viewport(),
+			sample.depthTest(),
+			sample.blend(),
+			sample.scissor(),
+			beforeDelta.changedPixels(),
+			beforeDelta.maxChannelDelta(),
+			beforeDelta.sumChannelDelta(),
+			afterDelta.changedPixels(),
+			afterDelta.maxChannelDelta(),
+			afterDelta.sumChannelDelta(),
+			sample.darkenedPixelsFrom(probe.beforeDraw()),
+			sample.brightenedPixelsFrom(probe.beforeDraw()),
+			sample.averageRgba(),
+			sample.minRgb(),
+			sample.maxRgb()
 		);
 	}
 
 	private FramebufferProbeCrop projectedBlockOutlineProbeCrop(BlockOutlineRenderState blockOutlineRenderState, PoseStack poseStack, Vec3 cameraPos) {
+		return this.projectedBlockShapeProbeCrop(
+			blockOutlineRenderState.pos(),
+			blockOutlineRenderState.shape(),
+			this.matrices != null ? this.matrices.modelView() : poseStack.last().pose(),
+			this.blockOutlineProbeProjection,
+			cameraPos,
+			"projected-outline",
+			48
+		);
+	}
+
+	private FramebufferProbeCrop projectedBlockShapeProbeCrop(
+		BlockPos blockPos,
+		VoxelShape shape,
+		Matrix4fc modelView,
+		Matrix4fc projection,
+		Vec3 cameraPos,
+		String source,
+		int padding
+	) {
 		int width = Math.max(1, this.minecraft.getMainRenderTarget().width);
 		int height = Math.max(1, this.minecraft.getMainRenderTarget().height);
-		Matrix4fc modelView = this.matrices != null
-			? this.matrices.modelView()
-			: poseStack.last().pose();
-		Matrix4fc projection = this.blockOutlineProbeProjection;
-		BlockPos blockPos = blockOutlineRenderState.pos();
 		double baseX = blockPos.getX() - cameraPos.x();
 		double baseY = blockPos.getY() - cameraPos.y();
 		double baseZ = blockPos.getZ() - cameraPos.z();
 		ProjectedBounds bounds = new ProjectedBounds();
-		blockOutlineRenderState.shape().forAllBoxes((minX, minY, minZ, maxX, maxY, maxZ) -> {
+		shape.forAllBoxes((minX, minY, minZ, maxX, maxY, maxZ) -> {
 			for (double x : new double[] { minX, maxX }) {
 				for (double y : new double[] { minY, maxY }) {
 					for (double z : new double[] { minZ, maxZ }) {
@@ -1452,7 +1670,6 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		if (!bounds.valid()) {
 			return this.centerBlockOutlineProbeCrop();
 		}
-		int padding = 48;
 		int minX = Mth.clamp((int)Math.floor(bounds.minX) - padding, 0, width - 1);
 		int maxX = Mth.clamp((int)Math.ceil(bounds.maxX) + padding, 0, width - 1);
 		int minY = Mth.clamp((int)Math.floor(bounds.minY) - padding, 0, height - 1);
@@ -1460,7 +1677,122 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		if (maxX <= minX || maxY <= minY) {
 			return this.centerBlockOutlineProbeCrop();
 		}
-		return new FramebufferProbeCrop(minX, minY, maxX - minX + 1, maxY - minY + 1, "projected-outline");
+		return new FramebufferProbeCrop(minX, minY, maxX - minX + 1, maxY - minY + 1, source);
+	}
+
+	private ProjectedOutlineEdgeSamples projectedBlockShapeEdgeSamples(
+		BlockPos blockPos,
+		VoxelShape shape,
+		Matrix4fc modelView,
+		Matrix4fc projection,
+		Vec3 cameraPos,
+		FramebufferProbeCrop crop,
+		FramebufferProbeSample before
+	) {
+		int width = Math.max(1, this.minecraft.getMainRenderTarget().width);
+		int height = Math.max(1, this.minecraft.getMainRenderTarget().height);
+		double baseX = blockPos.getX() - cameraPos.x();
+		double baseY = blockPos.getY() - cameraPos.y();
+		double baseZ = blockPos.getZ() - cameraPos.z();
+			List<FramebufferProbePoint> visible = new ArrayList<>();
+		List<FramebufferProbePoint> hidden = new ArrayList<>();
+		Set<String> visibleKeys = Sets.newHashSet();
+		Set<String> hiddenKeys = Sets.newHashSet();
+		shape.forAllBoxes((minX, minY, minZ, maxX, maxY, maxZ) -> {
+				this.addProjectedBoxEdgeSamples(visible, hidden, visibleKeys, hiddenKeys, modelView, projection, width, height, crop, before, baseX, baseY, baseZ, minX, minY, minZ, maxX, maxY, maxZ, 0);
+				this.addProjectedBoxEdgeSamples(visible, hidden, visibleKeys, hiddenKeys, modelView, projection, width, height, crop, before, baseX, baseY, baseZ, minX, minY, minZ, maxX, maxY, maxZ, 1);
+				this.addProjectedBoxEdgeSamples(visible, hidden, visibleKeys, hiddenKeys, modelView, projection, width, height, crop, before, baseX, baseY, baseZ, minX, minY, minZ, maxX, maxY, maxZ, 2);
+			});
+		return new ProjectedOutlineEdgeSamples(visible, hidden);
+	}
+
+	private void addProjectedBoxEdgeSamples(
+		List<FramebufferProbePoint> visible,
+		List<FramebufferProbePoint> hidden,
+		Set<String> visibleKeys,
+		Set<String> hiddenKeys,
+		Matrix4fc modelView,
+		Matrix4fc projection,
+		int width,
+		int height,
+		FramebufferProbeCrop crop,
+		FramebufferProbeSample before,
+		double baseX,
+		double baseY,
+		double baseZ,
+		double minX,
+		double minY,
+		double minZ,
+		double maxX,
+		double maxY,
+		double maxZ,
+		int axis
+	) {
+		double[][] fixedPairs = axis == 0
+			? new double[][] { { minY, minZ }, { minY, maxZ }, { maxY, minZ }, { maxY, maxZ } }
+			: axis == 1
+				? new double[][] { { minX, minZ }, { minX, maxZ }, { maxX, minZ }, { maxX, maxZ } }
+				: new double[][] { { minX, minY }, { minX, maxY }, { maxX, minY }, { maxX, maxY } };
+		for (double[] fixed : fixedPairs) {
+				for (int sample = 1; sample <= 3; sample++) {
+				double t = sample / 4.0;
+				double x = axis == 0 ? Mth.lerp(t, minX, maxX) : fixed[0];
+				double y = axis == 1 ? Mth.lerp(t, minY, maxY) : axis == 0 ? fixed[0] : fixed[1];
+				double z = axis == 2 ? Mth.lerp(t, minZ, maxZ) : axis == 0 ? fixed[1] : fixed[1];
+				if (axis == 1) {
+					z = fixed[1];
+				} else if (axis == 2) {
+					x = fixed[0];
+					y = fixed[1];
+				}
+					FramebufferProbePoint point = this.projectBlockProbePoint(
+						modelView,
+						projection,
+						width,
+						height,
+						crop,
+						(baseX + x) * (1.0 - (1.0 / 256.0)),
+						(baseY + y) * (1.0 - (1.0 / 256.0)),
+						(baseZ + z) * (1.0 - (1.0 / 256.0))
+					);
+					if (point == null) {
+						continue;
+					}
+					String key = point.x() + "," + point.y();
+					boolean visibleEdge = point.depth() <= before.depthAt(point) + 0.0015F;
+					if (visibleEdge) {
+					if (visible.size() < 512 && visibleKeys.add(key)) {
+						visible.add(point);
+					}
+				} else if (hidden.size() < 512 && hiddenKeys.add(key)) {
+					hidden.add(point);
+				}
+			}
+		}
+	}
+
+	@Nullable
+	private FramebufferProbePoint projectBlockProbePoint(
+		Matrix4fc modelView,
+		Matrix4fc projection,
+		int width,
+		int height,
+		FramebufferProbeCrop crop,
+		double x,
+		double y,
+		double z
+	) {
+		Vector4f clip = new Vector4f((float)x, (float)y, (float)z, 1.0F).mul(modelView).mul(projection);
+		if (!Float.isFinite(clip.x()) || !Float.isFinite(clip.y()) || !Float.isFinite(clip.w()) || Math.abs(clip.w()) < 1.0E-5F) {
+			return null;
+		}
+		int screenX = Math.round((clip.x() / clip.w() * 0.5F + 0.5F) * width);
+		int screenY = Math.round((clip.y() / clip.w() * 0.5F + 0.5F) * height);
+		if (screenX < crop.x() || screenY < crop.y() || screenX >= crop.x() + crop.width() || screenY >= crop.y() + crop.height()) {
+			return null;
+		}
+		float depth = Mth.clamp(clip.z() / clip.w() * 0.5F + 0.5F, 0.0F, 1.0F);
+		return new FramebufferProbePoint(screenX - crop.x(), screenY - crop.y(), depth);
 	}
 
 	private void includeProjectedBlockOutlinePoint(
@@ -1506,15 +1838,18 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 				crop.width(),
 				crop.height()
 			);
-			return new FramebufferProbeSample(
-				snapshot.rgba(),
-				snapshot.readFramebuffer(),
-				snapshot.drawFramebuffer(),
+				return new FramebufferProbeSample(
+					snapshot.rgba(),
+					snapshot.depth(),
+					snapshot.readFramebuffer(),
+					snapshot.drawFramebuffer(),
 				snapshot.currentProgram(),
 				snapshot.viewport(),
 				snapshot.depthTest(),
 				snapshot.blend(),
-				snapshot.scissor()
+				snapshot.scissor(),
+				crop.width(),
+				crop.height()
 			);
 		} catch (Throwable throwable) {
 			LOGGER.warn("[MattMC graphics-audit] block-outline framebuffer probe failed: {}", throwable.toString());
@@ -1551,27 +1886,48 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		boolean highContrast,
 		boolean translucentPass,
 		FramebufferProbeCrop crop,
+		ProjectedOutlineEdgeSamples edgeSamples,
 		FramebufferProbeSample beforeDraw,
 		@Nullable FramebufferProbeSample afterDraw
 	) {
-		BlockOutlineFramebufferProbe(String blockPos, boolean highContrast, boolean translucentPass, FramebufferProbeCrop crop, FramebufferProbeSample beforeDraw) {
-			this(blockPos, highContrast, translucentPass, crop, beforeDraw, null);
+		BlockOutlineFramebufferProbe(String blockPos, boolean highContrast, boolean translucentPass, FramebufferProbeCrop crop, ProjectedOutlineEdgeSamples edgeSamples, FramebufferProbeSample beforeDraw) {
+			this(blockPos, highContrast, translucentPass, crop, edgeSamples, beforeDraw, null);
 		}
 
 		BlockOutlineFramebufferProbe withAfterDraw(FramebufferProbeSample afterDraw) {
-			return new BlockOutlineFramebufferProbe(this.blockPos, this.highContrast, this.translucentPass, this.crop, this.beforeDraw, afterDraw);
+			return new BlockOutlineFramebufferProbe(this.blockPos, this.highContrast, this.translucentPass, this.crop, this.edgeSamples, this.beforeDraw, afterDraw);
 		}
 	}
 
-	private record FramebufferProbeSample(
-		byte[] rgba,
-		int readFramebuffer,
+	private record BlockCrackFramebufferProbe(
+		String blockPos,
+		int stageIndex,
+		int faceCount,
+		FramebufferProbeCrop crop,
+		FramebufferProbeSample beforeDraw,
+		@Nullable FramebufferProbeSample afterDraw
+	) {
+		BlockCrackFramebufferProbe(String blockPos, int stageIndex, int faceCount, FramebufferProbeCrop crop, FramebufferProbeSample beforeDraw) {
+			this(blockPos, stageIndex, faceCount, crop, beforeDraw, null);
+		}
+
+		BlockCrackFramebufferProbe withAfterDraw(FramebufferProbeSample afterDraw) {
+			return new BlockCrackFramebufferProbe(this.blockPos, this.stageIndex, this.faceCount, this.crop, this.beforeDraw, afterDraw);
+		}
+	}
+
+		private record FramebufferProbeSample(
+			byte[] rgba,
+			float[] depth,
+			int readFramebuffer,
 		int drawFramebuffer,
 		int currentProgram,
 		String viewport,
 		boolean depthTest,
 		boolean blend,
-		boolean scissor
+		boolean scissor,
+		int sampleWidth,
+		int sampleHeight
 	) {
 		FramebufferProbeDelta deltaFrom(FramebufferProbeSample before) {
 			int changedPixels = 0;
@@ -1592,6 +1948,30 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 				}
 			}
 			return new FramebufferProbeDelta(changedPixels, maxChannelDelta, sumChannelDelta);
+		}
+
+		int darkenedPixelsFrom(FramebufferProbeSample before) {
+			int pixels = 0;
+			for (int i = 0; i < Math.min(this.rgba.length, before.rgba.length); i += 4) {
+				int beforeLum = (before.rgba[i] & 0xFF) + (before.rgba[i + 1] & 0xFF) + (before.rgba[i + 2] & 0xFF);
+				int afterLum = (this.rgba[i] & 0xFF) + (this.rgba[i + 1] & 0xFF) + (this.rgba[i + 2] & 0xFF);
+				if (beforeLum - afterLum >= 24) {
+					pixels++;
+				}
+			}
+			return pixels;
+		}
+
+		int brightenedPixelsFrom(FramebufferProbeSample before) {
+			int pixels = 0;
+			for (int i = 0; i < Math.min(this.rgba.length, before.rgba.length); i += 4) {
+				int beforeLum = (before.rgba[i] & 0xFF) + (before.rgba[i + 1] & 0xFF) + (before.rgba[i + 2] & 0xFF);
+				int afterLum = (this.rgba[i] & 0xFF) + (this.rgba[i + 1] & 0xFF) + (this.rgba[i + 2] & 0xFF);
+				if (afterLum - beforeLum >= 24) {
+					pixels++;
+				}
+			}
+			return pixels;
 		}
 
 		String averageRgba() {
@@ -1661,9 +2041,50 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 				+ ",normalDark=" + normalDark
 				+ ",greenBlue=" + saturatedGreenBlue;
 		}
-	}
+
+			int changedProbePointsFrom(FramebufferProbeSample before, List<FramebufferProbePoint> points) {
+				int changed = 0;
+				int width = Math.max(1, this.sampleWidth);
+			for (FramebufferProbePoint point : points) {
+				int index = (point.y() * width + point.x()) * 4;
+				if (index < 0 || index + 3 >= this.rgba.length || index + 3 >= before.rgba.length) {
+					continue;
+				}
+				int delta = 0;
+				for (int channel = 0; channel < 4; channel++) {
+					delta = Math.max(delta, Math.abs((this.rgba[index + channel] & 0xFF) - (before.rgba[index + channel] & 0xFF)));
+				}
+				if (delta >= 16) {
+					changed++;
+				}
+				}
+				return changed;
+			}
+
+			float depthAt(FramebufferProbePoint point) {
+				int width = Math.max(1, this.sampleWidth);
+				int index = point.y() * width + point.x();
+				if (index < 0 || index >= this.depth.length) {
+					return 1.0F;
+				}
+				float value = this.depth[index];
+				return Float.isFinite(value) ? value : 1.0F;
+			}
+		}
 
 	private record FramebufferProbeDelta(int changedPixels, int maxChannelDelta, long sumChannelDelta) {
+	}
+
+	private record FramebufferProbePoint(int x, int y, float depth) {
+	}
+
+	private record ProjectedOutlineEdgeSamples(List<FramebufferProbePoint> visible, List<FramebufferProbePoint> hidden) {
+		String summary(FramebufferProbeSample sample, FramebufferProbeSample before) {
+			return "visibleTotal=" + this.visible.size()
+				+ ",visibleChanged=" + sample.changedProbePointsFrom(before, this.visible)
+				+ ",hiddenTotal=" + this.hidden.size()
+				+ ",hiddenChanged=" + sample.changedProbePointsFrom(before, this.hidden);
+		}
 	}
 
 	private void checkPoseStack(PoseStack poseStack) {

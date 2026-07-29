@@ -432,6 +432,81 @@ impl VulkanicGal {
         Ok(self.frame_targets.get(handle)?.desc.color_format)
     }
 
+    pub(in crate::render::vulkanic) fn pass_target_color_format(
+        &self,
+        handle: Handle,
+    ) -> GalResult<ColorFormat> {
+        match handle.kind() {
+            Some(HandleKind::FrameTarget) => self.frame_target_color_format(handle),
+            Some(HandleKind::RenderTarget) => {
+                let target = self.render_targets.get(handle)?;
+                let Some(view) = target.desc.color_views.first().copied() else {
+                    return Err(GalError::resource(
+                        StatusCode::InvalidArgument,
+                        "render target must have a color attachment for world primitives",
+                    ));
+                };
+                self.texture_view_info(view).map(|info| info.format)
+            }
+            _ => Err(GalError::resource(
+                StatusCode::WrongHandleType,
+                "pass target must be a render target or frame target",
+            )),
+        }
+    }
+
+    pub(in crate::render::vulkanic) fn pass_target_color_attachment(
+        &self,
+        handle: Handle,
+    ) -> GalResult<Handle> {
+        match handle.kind() {
+            Some(HandleKind::FrameTarget) => {
+                self.frame_targets.get(handle)?;
+                Ok(handle)
+            }
+            Some(HandleKind::RenderTarget) => {
+                let target = self.render_targets.get(handle)?;
+                target.desc.color_views.first().copied().ok_or_else(|| {
+                    GalError::resource(
+                        StatusCode::InvalidArgument,
+                        "render target must have a color attachment for world primitives",
+                    )
+                })
+            }
+            _ => Err(GalError::resource(
+                StatusCode::WrongHandleType,
+                "pass target must be a render target or frame target",
+            )),
+        }
+    }
+
+    pub(in crate::render::vulkanic) fn pass_target_depth_attachment(
+        &self,
+        handle: Handle,
+    ) -> GalResult<Option<(Handle, Handle)>> {
+        match handle.kind() {
+            Some(HandleKind::FrameTarget) => {
+                self.frame_targets.get(handle)?;
+                Ok(None)
+            }
+            Some(HandleKind::RenderTarget) => {
+                let target = self.render_targets.get(handle)?;
+                target
+                    .desc
+                    .depth_stencil_view
+                    .map(|view| {
+                        self.texture_view_info(view)
+                            .map(|info| (info.texture, view))
+                    })
+                    .transpose()
+            }
+            _ => Err(GalError::resource(
+                StatusCode::WrongHandleType,
+                "pass target must be a render target or frame target",
+            )),
+        }
+    }
+
     pub fn create_texture(&mut self, desc: TextureDesc) -> GalResult<Handle> {
         if desc.extent.width == 0
             || desc.extent.height == 0

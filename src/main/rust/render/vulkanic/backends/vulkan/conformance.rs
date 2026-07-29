@@ -131,17 +131,17 @@ pub(in crate::render::vulkanic::backends) struct ConformanceReport {
 }
 
 fn assert_conformance_conventions(report: &ConformanceReport) {
-    assert_eq!(report.pixel_hash, 0xfc90_d68e);
+    assert_eq!(report.pixel_hash, 0x7212_13ca);
     assert_eq!(report.non_zero_pixels, 15_362);
     assert!(report.evidence_json.contains("\"top_left\":[0,0,0,255]"));
     assert!(report.evidence_json.contains("\"top_mid\":[0,0,0,255]"));
     assert!(report
         .evidence_json
-        .contains("\"upper_inner\":[191,0,191,255]"));
-    assert!(report.evidence_json.contains("\"center\":[96,0,191,255]"));
+        .contains("\"upper_inner\":[96,0,191,255]"));
+    assert!(report.evidence_json.contains("\"center\":[191,0,191,255]"));
     assert!(report
         .evidence_json
-        .contains("\"lower_inner\":[96,0,191,255]"));
+        .contains("\"lower_inner\":[191,0,191,255]"));
     assert!(report.evidence_json.contains("\"bottom_mid\":[0,0,0,255]"));
     assert!(report
         .evidence_json
@@ -505,7 +505,7 @@ fn conformance_ops(
         buffer_barrier(
             index,
             TextureUsageState::TransferDst,
-            TextureUsageState::ShaderRead,
+            TextureUsageState::IndexRead,
         ),
         texture_barrier(
             sampled,

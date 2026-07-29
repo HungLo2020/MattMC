@@ -351,6 +351,7 @@ impl OpenGlLowerer {
                     }
                     if let Some(depth) = depth_stencil {
                         if depth.load_op == AttachmentLoadOp::Clear {
+                            self.gl.depth_mask(true);
                             self.gl.clear_depth_f32(1.0);
                             mask |= glow::DEPTH_BUFFER_BIT;
                         }
@@ -962,7 +963,7 @@ fn opengl_blend_state(blend: BlendMode) -> OpenGlBlendState {
         }),
         BlendMode::Multiply => Some(OpenGlBlendFactors {
             src_color: glow::DST_COLOR,
-            dst_color: glow::SRC_COLOR,
+            dst_color: glow::ZERO,
             src_alpha: glow::ONE,
             dst_alpha: glow::ZERO,
         }),
@@ -1019,6 +1020,23 @@ mod tests {
             Some(OpenGlBlendFactors {
                 src_color: glow::SRC_ALPHA,
                 dst_color: glow::ONE,
+                src_alpha: glow::ONE,
+                dst_alpha: glow::ZERO,
+            }),
+            state.factors
+        );
+    }
+
+    #[test]
+    fn multiply_blend_lowers_to_single_source_times_destination() {
+        let state = opengl_blend_state(BlendMode::Multiply);
+        assert!(state.enabled);
+        assert_eq!(glow::FUNC_ADD, state.color_op);
+        assert_eq!(glow::FUNC_ADD, state.alpha_op);
+        assert_eq!(
+            Some(OpenGlBlendFactors {
+                src_color: glow::DST_COLOR,
+                dst_color: glow::ZERO,
                 src_alpha: glow::ONE,
                 dst_alpha: glow::ZERO,
             }),

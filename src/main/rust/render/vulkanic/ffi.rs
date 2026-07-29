@@ -34,11 +34,17 @@ use super::resources::{
 use super::sync::SubmissionId;
 use super::world_primitive_frontend::{
     WorldBackgroundRequest, WorldBorderAssetPayload, WorldBorderQuadRequest,
-    WorldCrackAssetPayload, WorldCrackQuadRequest, WorldLineSegmentRequest, WorldPrimitiveFrame,
-    WorldPrimitiveFrontend,
-    WorldPrimitiveSubmitStats, WORLD_BACKGROUND_LOAD_CLEAR, WORLD_BACKGROUND_SKY_CUSTOM,
-    WORLD_BACKGROUND_SKY_END, WORLD_BACKGROUND_SKY_NETHER, WORLD_BACKGROUND_SKY_OVERWORLD,
-    WORLD_BACKGROUND_STORE_STORE,
+    WorldCrackAssetPayload, WorldCrackQuadRequest, WorldLineSegmentRequest,
+    WorldMaterialAssetPayload, WorldMaterialQuadRequest, WorldPrimitiveFrame,
+    WorldPrimitiveFrontend, WorldPrimitiveSubmitStats, WORLD_BACKGROUND_LOAD_CLEAR,
+    WORLD_BACKGROUND_SKY_CUSTOM, WORLD_BACKGROUND_SKY_END, WORLD_BACKGROUND_SKY_NETHER,
+    WORLD_BACKGROUND_SKY_OVERWORLD, WORLD_BACKGROUND_STORE_STORE, WORLD_CULL_BACK,
+    WORLD_CULL_FRONT, WORLD_CULL_NONE, WORLD_DEPTH_POLICY_DISABLED,
+    WORLD_DEPTH_POLICY_TEST_NO_WRITE, WORLD_DEPTH_POLICY_TEST_WRITE,
+    WORLD_MATERIAL_ID_DEFAULT_CUTOUT, WORLD_MATERIAL_ID_DEFAULT_OPAQUE, WORLD_MATERIAL_MODE_CUTOUT,
+    WORLD_MATERIAL_MODE_OPAQUE, WORLD_MATERIAL_TEXTURE_DEFAULT,
+    WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY, WORLD_TOPOLOGY_TRIANGLES, WORLD_WINDING_CCW,
+    WORLD_WINDING_CW,
 };
 
 pub const FFI_ABI_V1_VERSION: u32 = 1;
@@ -51,6 +57,7 @@ pub const FFI_MAX_INLINE_BYTES: usize = 64 * 1024 * 1024;
 pub const FFI_MAX_GUI_ASSET_BYTES: usize = 4 * 1024 * 1024;
 pub const FFI_MAX_WORLD_BORDER_ASSET_BYTES: usize = 2 * 1024 * 1024;
 pub const FFI_MAX_WORLD_CRACK_ASSET_BYTES: usize = 4 * 1024 * 1024;
+pub const FFI_MAX_WORLD_MATERIAL_ASSET_BYTES: usize = 4 * 1024 * 1024;
 pub const FFI_MAX_BATCH_ITEMS: usize = 65_536;
 
 #[repr(u32)]
@@ -534,6 +541,23 @@ pub struct FfiWorldCrackAssetUpdateRequest {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiWorldMaterialAssetPayload {
+    pub byte_size: u32,
+    pub texture_id: u32,
+    pub png_bytes: FfiBytes,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiWorldMaterialAssetUpdateRequest {
+    pub header: FfiHeader,
+    pub generation: u64,
+    pub assets: FfiSlice<FfiWorldMaterialAssetPayload>,
+    pub negotiated_feature_bits: u64,
+}
+
+#[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FfiWorldLineSegmentRequest {
     pub byte_size: u32,
@@ -615,6 +639,43 @@ pub struct FfiWorldBorderQuadRequest {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiWorldMaterialQuadRequest {
+    pub byte_size: u32,
+    pub stratum: u32,
+    pub material_id: u32,
+    pub texture_id: u32,
+    pub material_mode: u32,
+    pub depth_policy: u32,
+    pub cull_policy: u32,
+    pub topology: u32,
+    pub color_argb: u32,
+    pub reserved0: u32,
+    pub p0_x: f32,
+    pub p0_y: f32,
+    pub p0_z: f32,
+    pub p1_x: f32,
+    pub p1_y: f32,
+    pub p1_z: f32,
+    pub p2_x: f32,
+    pub p2_y: f32,
+    pub p2_z: f32,
+    pub p3_x: f32,
+    pub p3_y: f32,
+    pub p3_z: f32,
+    pub uv0_u: f32,
+    pub uv0_v: f32,
+    pub uv1_u: f32,
+    pub uv1_v: f32,
+    pub uv2_u: f32,
+    pub uv2_v: f32,
+    pub uv3_u: f32,
+    pub uv3_v: f32,
+    pub viewport_width: i32,
+    pub viewport_height: i32,
+}
+
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FfiWorldBackgroundRequest {
     pub byte_size: u32,
@@ -645,6 +706,7 @@ pub struct FfiWholeFrameSubmitRequest {
     pub world_segments: FfiSlice<FfiWorldLineSegmentRequest>,
     pub world_crack_quads: FfiSlice<FfiWorldCrackQuadRequest>,
     pub world_border_quads: FfiSlice<FfiWorldBorderQuadRequest>,
+    pub world_material_quads: FfiSlice<FfiWorldMaterialQuadRequest>,
     pub gui_sprites: FfiSlice<FfiGuiSpriteRequest>,
     pub negotiated_feature_bits: u64,
 }
@@ -666,6 +728,9 @@ pub struct FfiWholeFrameSubmitResult {
     pub world_border_quad_count: u64,
     pub world_border_batch_count: u64,
     pub world_border_draw_count: u64,
+    pub world_material_quad_count: u64,
+    pub world_material_batch_count: u64,
+    pub world_material_draw_count: u64,
     pub world_background_clear_count: u64,
     pub world_background_diagnostic_fallback_count: u64,
     pub world_background_sky_type: u64,
@@ -679,6 +744,8 @@ pub struct FfiWholeFrameSubmitResult {
     pub crack_cache_misses: u64,
     pub border_cache_hits: u64,
     pub border_cache_misses: u64,
+    pub material_cache_hits: u64,
+    pub material_cache_misses: u64,
     pub sprite_count: u64,
     pub sprite_batch_count: u64,
     pub cache_hits: u64,
@@ -731,6 +798,9 @@ impl Default for FfiWholeFrameSubmitResult {
             world_border_quad_count: 0,
             world_border_batch_count: 0,
             world_border_draw_count: 0,
+            world_material_quad_count: 0,
+            world_material_batch_count: 0,
+            world_material_draw_count: 0,
             world_background_clear_count: 0,
             world_background_diagnostic_fallback_count: 0,
             world_background_sky_type: 0,
@@ -744,6 +814,8 @@ impl Default for FfiWholeFrameSubmitResult {
             crack_cache_misses: 0,
             border_cache_hits: 0,
             border_cache_misses: 0,
+            material_cache_hits: 0,
+            material_cache_misses: 0,
             sprite_count: 0,
             sprite_batch_count: 0,
             cache_hits: 0,
@@ -2405,6 +2477,9 @@ fn whole_frame_result_ok(
         world_border_quad_count: world.border_quad_count,
         world_border_batch_count: world.border_batch_count,
         world_border_draw_count: world.border_draw_count,
+        world_material_quad_count: world.material_quad_count,
+        world_material_batch_count: world.material_batch_count,
+        world_material_draw_count: world.material_draw_count,
         world_background_clear_count: world.background_clear_count,
         world_background_diagnostic_fallback_count: world.background_diagnostic_fallback_count,
         world_background_sky_type: world.background_sky_type,
@@ -2418,6 +2493,8 @@ fn whole_frame_result_ok(
         crack_cache_misses: world.crack_cache_misses,
         border_cache_hits: world.border_cache_hits,
         border_cache_misses: world.border_cache_misses,
+        material_cache_hits: world.material_cache_hits,
+        material_cache_misses: world.material_cache_misses,
         sprite_count: gui.sprite_count,
         sprite_batch_count: gui.sprite_batch_count,
         cache_hits: world.cache_hits.saturating_add(gui.cache_hits),
@@ -2617,6 +2694,12 @@ fn input_bytes_for_whole_frame(request: &FfiWholeFrameSubmitRequest) -> u64 {
         )
         .saturating_add(
             request
+                .world_material_quads
+                .count
+                .saturating_mul(size_of::<FfiWorldMaterialQuadRequest>() as u64),
+        )
+        .saturating_add(
+            request
                 .gui_sprites
                 .count
                 .saturating_mul(size_of::<FfiGuiSpriteRequest>() as u64),
@@ -2657,6 +2740,26 @@ fn input_bytes_for_world_crack_asset_update(request: &FfiWorldCrackAssetUpdateRe
         })
         .unwrap_or(0);
     (size_of::<FfiWorldCrackAssetUpdateRequest>() as u64)
+        .saturating_add(payload_headers)
+        .saturating_add(payload_bytes)
+}
+
+fn input_bytes_for_world_material_asset_update(
+    request: &FfiWorldMaterialAssetUpdateRequest,
+) -> u64 {
+    let payload_headers = request
+        .assets
+        .count
+        .saturating_mul(size_of::<FfiWorldMaterialAssetPayload>() as u64);
+    let payload_bytes =
+        unsafe { read_slice(request.assets, true, "world material asset payloads") }
+            .map(|items| {
+                items
+                    .iter()
+                    .fold(0u64, |sum, item| sum.saturating_add(item.png_bytes.len))
+            })
+            .unwrap_or(0);
+    (size_of::<FfiWorldMaterialAssetUpdateRequest>() as u64)
         .saturating_add(payload_headers)
         .saturating_add(payload_bytes)
 }
@@ -3029,6 +3132,147 @@ unsafe fn decode_whole_frame_submit_with_backend_policy(
             viewport_height,
         });
     }
+    let raw_materials = read_slice(
+        request.world_material_quads,
+        true,
+        "world primitive material quads",
+    )?;
+    if raw_materials.len() > FFI_MAX_BATCH_ITEMS {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "world primitive material quad count {} exceeds max {}",
+                raw_materials.len(),
+                FFI_MAX_BATCH_ITEMS
+            ),
+        ));
+    }
+    let mut material_quads = Vec::with_capacity(raw_materials.len());
+    for quad in raw_materials {
+        validate_item_size::<FfiWorldMaterialQuadRequest>(
+            quad.byte_size,
+            "world primitive material quad",
+        )?;
+        if quad.stratum != WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown world material stratum {}", quad.stratum),
+            ));
+        }
+        if quad.material_id != WORLD_MATERIAL_ID_DEFAULT_OPAQUE
+            && quad.material_id != WORLD_MATERIAL_ID_DEFAULT_CUTOUT
+        {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown world material id {}", quad.material_id),
+            ));
+        }
+        if quad.texture_id != WORLD_MATERIAL_TEXTURE_DEFAULT {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown world material texture id {}", quad.texture_id),
+            ));
+        }
+        if quad.material_mode != WORLD_MATERIAL_MODE_OPAQUE
+            && quad.material_mode != WORLD_MATERIAL_MODE_CUTOUT
+        {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown world material mode {}", quad.material_mode),
+            ));
+        }
+        if (quad.material_mode == WORLD_MATERIAL_MODE_OPAQUE
+            && quad.material_id != WORLD_MATERIAL_ID_DEFAULT_OPAQUE)
+            || (quad.material_mode == WORLD_MATERIAL_MODE_CUTOUT
+                && quad.material_id != WORLD_MATERIAL_ID_DEFAULT_CUTOUT)
+        {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "world material id {} is incompatible with mode {}",
+                    quad.material_id, quad.material_mode
+                ),
+            ));
+        }
+        if quad.depth_policy != WORLD_DEPTH_POLICY_DISABLED
+            && quad.depth_policy != WORLD_DEPTH_POLICY_TEST_WRITE
+            && quad.depth_policy != WORLD_DEPTH_POLICY_TEST_NO_WRITE
+        {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown world material depth policy {}", quad.depth_policy),
+            ));
+        }
+        if quad.cull_policy != WORLD_CULL_NONE
+            && quad.cull_policy != WORLD_CULL_BACK
+            && quad.cull_policy != WORLD_CULL_FRONT
+        {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown world material cull policy {}", quad.cull_policy),
+            ));
+        }
+        if quad.topology != WORLD_TOPOLOGY_TRIANGLES {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown world material topology {}", quad.topology),
+            ));
+        }
+        let winding = if quad.reserved0 == 0 {
+            WORLD_WINDING_CCW
+        } else {
+            quad.reserved0
+        };
+        if winding != WORLD_WINDING_CCW && winding != WORLD_WINDING_CW {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown world material winding {}", winding),
+            ));
+        }
+        let viewport_width = u32::try_from(quad.viewport_width).map_err(|_| {
+            GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "world material quad viewport width must be non-negative, got {}",
+                    quad.viewport_width
+                ),
+            )
+        })?;
+        let viewport_height = u32::try_from(quad.viewport_height).map_err(|_| {
+            GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "world material quad viewport height must be non-negative, got {}",
+                    quad.viewport_height
+                ),
+            )
+        })?;
+        material_quads.push(WorldMaterialQuadRequest {
+            stratum: quad.stratum,
+            material_id: quad.material_id,
+            texture_id: quad.texture_id,
+            material_mode: quad.material_mode,
+            depth_policy: quad.depth_policy,
+            cull_policy: quad.cull_policy,
+            topology: quad.topology,
+            winding,
+            color_argb: quad.color_argb,
+            vertices: [
+                [quad.p0_x, quad.p0_y, quad.p0_z],
+                [quad.p1_x, quad.p1_y, quad.p1_z],
+                [quad.p2_x, quad.p2_y, quad.p2_z],
+                [quad.p3_x, quad.p3_y, quad.p3_z],
+            ],
+            uvs: [
+                [quad.uv0_u, quad.uv0_v],
+                [quad.uv1_u, quad.uv1_v],
+                [quad.uv2_u, quad.uv2_v],
+                [quad.uv3_u, quad.uv3_v],
+            ],
+            viewport_width,
+            viewport_height,
+        });
+    }
     let raw_gui = FfiGuiFrameSubmitRequest {
         header: FfiHeader {
             version: request.header.version,
@@ -3075,6 +3319,7 @@ unsafe fn decode_whole_frame_submit_with_backend_policy(
             segments,
             crack_quads,
             border_quads,
+            material_quads,
         },
         gui_sprites,
     ))
@@ -3264,7 +3509,10 @@ unsafe fn decode_world_crack_asset_update(
     let mut seen = BTreeMap::new();
     let mut assets = Vec::with_capacity(raw_assets.len());
     for asset in raw_assets {
-        validate_item_size::<FfiWorldCrackAssetPayload>(asset.byte_size, "world crack asset payload")?;
+        validate_item_size::<FfiWorldCrackAssetPayload>(
+            asset.byte_size,
+            "world crack asset payload",
+        )?;
         if asset.stage >= 10 {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,
@@ -3274,7 +3522,10 @@ unsafe fn decode_world_crack_asset_update(
         if seen.insert(asset.stage, ()).is_some() {
             return Err(GalError::ffi(
                 StatusCode::InvalidArgument,
-                format!("duplicate world crack asset payload for stage {}", asset.stage),
+                format!(
+                    "duplicate world crack asset payload for stage {}",
+                    asset.stage
+                ),
             ));
         }
         let png_bytes = read_bounded_bytes(
@@ -3285,6 +3536,57 @@ unsafe fn decode_world_crack_asset_update(
         )?;
         assets.push(WorldCrackAssetPayload {
             stage: asset.stage,
+            png_bytes,
+        });
+    }
+    Ok((request.generation, assets))
+}
+
+unsafe fn decode_world_material_asset_update(
+    request: *const FfiWorldMaterialAssetUpdateRequest,
+    capabilities: BackendCapabilities,
+) -> GalResult<(u64, Vec<WorldMaterialAssetPayload>)> {
+    let request = read_struct(request, "world material asset update request")?;
+    validate_header::<FfiWorldMaterialAssetUpdateRequest>(request.header)?;
+    reject_unknown_feature_bits(request.negotiated_feature_bits)?;
+    let supported = capability_feature_bits(capabilities);
+    if request.negotiated_feature_bits & !supported != 0 {
+        return Err(GalError::unsupported_feature(format!(
+            "requested unsupported world material asset feature bits 0x{:x}",
+            request.negotiated_feature_bits & !supported
+        )));
+    }
+    if request.generation == 0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "world material asset generation must be non-zero",
+        ));
+    }
+    let raw_assets = read_limited_slice(request.assets, true, "world material asset payloads")?;
+    let mut seen = BTreeMap::new();
+    let mut assets = Vec::with_capacity(raw_assets.len());
+    for asset in raw_assets {
+        validate_item_size::<FfiWorldMaterialAssetPayload>(
+            asset.byte_size,
+            "world material asset payload",
+        )?;
+        if seen.insert(asset.texture_id, ()).is_some() {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "duplicate world material asset payload for texture {}",
+                    asset.texture_id
+                ),
+            ));
+        }
+        let png_bytes = read_bounded_bytes(
+            asset.png_bytes,
+            true,
+            FFI_MAX_WORLD_MATERIAL_ASSET_BYTES,
+            "world material asset PNG bytes",
+        )?;
+        assets.push(WorldMaterialAssetPayload {
+            texture_id: asset.texture_id,
             png_bytes,
         });
     }
@@ -4088,6 +4390,7 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 world_segments,
                 world_crack_quads,
                 world_border_quads,
+                world_material_quads,
                 gui_sprites,
                 negotiated_feature_bits
             ]
@@ -4110,6 +4413,9 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 world_border_quad_count,
                 world_border_batch_count,
                 world_border_draw_count,
+                world_material_quad_count,
+                world_material_batch_count,
+                world_material_draw_count,
                 world_background_clear_count,
                 world_background_diagnostic_fallback_count,
                 world_background_sky_type,
@@ -4123,6 +4429,8 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 crack_cache_misses,
                 border_cache_hits,
                 border_cache_misses,
+                material_cache_hits,
+                material_cache_misses,
                 sprite_count,
                 sprite_batch_count,
                 cache_hits,
@@ -4159,14 +4467,58 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 viewport_height
             ]
         ),
-        57 => layout!(
-            57,
-            FfiWorldCrackAssetPayload,
-            [byte_size, stage, png_bytes]
-        ),
+        57 => layout!(57, FfiWorldCrackAssetPayload, [byte_size, stage, png_bytes]),
         58 => layout!(
             58,
             FfiWorldCrackAssetUpdateRequest,
+            [header, generation, assets, negotiated_feature_bits]
+        ),
+        59 => layout!(
+            59,
+            FfiWorldMaterialQuadRequest,
+            [
+                byte_size,
+                stratum,
+                material_id,
+                texture_id,
+                material_mode,
+                depth_policy,
+                cull_policy,
+                topology,
+                color_argb,
+                reserved0,
+                p0_x,
+                p0_y,
+                p0_z,
+                p1_x,
+                p1_y,
+                p1_z,
+                p2_x,
+                p2_y,
+                p2_z,
+                p3_x,
+                p3_y,
+                p3_z,
+                uv0_u,
+                uv0_v,
+                uv1_u,
+                uv1_v,
+                uv2_u,
+                uv2_v,
+                uv3_u,
+                uv3_v,
+                viewport_width,
+                viewport_height
+            ]
+        ),
+        60 => layout!(
+            60,
+            FfiWorldMaterialAssetPayload,
+            [byte_size, texture_id, png_bytes]
+        ),
+        61 => layout!(
+            61,
+            FfiWorldMaterialAssetUpdateRequest,
             [header, generation, assets, negotiated_feature_bits]
         ),
         _ => {
@@ -5455,11 +5807,57 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_world_crack_update_assets(
         context.ffi_output_bytes = context
             .ffi_output_bytes
             .saturating_add(size_of::<FfiStatusResult>() as u64);
-        let result = decode_world_crack_asset_update(request, context.gal.capabilities())
-            .and_then(|(generation, payloads)| {
+        let result = decode_world_crack_asset_update(request, context.gal.capabilities()).and_then(
+            |(generation, payloads)| {
                 context
                     .world_primitive_frontend
                     .apply_world_crack_asset_update(&mut context.gal, generation, payloads)
+            },
+        );
+        match result {
+            Ok(()) => {
+                write_status_out(status_out, status_ok(context));
+                StatusCode::Ok as i32
+            }
+            Err(error) => {
+                set_last_error(context, &error);
+                write_status_out(status_out, status_error(Some(context), &error));
+                error.code as i32
+            }
+        }
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_vulkanic_gal_world_material_update_assets(
+    context_id: u64,
+    request: *const FfiWorldMaterialAssetUpdateRequest,
+    status_out: *mut FfiStatusResult,
+) -> i32 {
+    with_registry_mut(|registry| {
+        let Some(context) = registry.contexts.get_mut(&context_id) else {
+            let error = GalError::ffi(
+                StatusCode::StaleHandle,
+                format!("unknown context id {context_id}"),
+            );
+            write_status_out(status_out, status_result_from_error(&error));
+            return error.code as i32;
+        };
+        let input_bytes = if request.is_null() {
+            0
+        } else {
+            input_bytes_for_world_material_asset_update(&*request)
+        };
+        context.ffi_calls += 1;
+        context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);
+        context.ffi_output_bytes = context
+            .ffi_output_bytes
+            .saturating_add(size_of::<FfiStatusResult>() as u64);
+        let result = decode_world_material_asset_update(request, context.gal.capabilities())
+            .and_then(|(generation, payloads)| {
+                context
+                    .world_primitive_frontend
+                    .apply_world_material_asset_update(&mut context.gal, generation, payloads)
             });
         match result {
             Ok(()) => {
@@ -5962,6 +6360,7 @@ fn texture_usage_state(raw: u32) -> GalResult<TextureUsageState> {
         6 => Ok(TextureUsageState::TransferSrc),
         7 => Ok(TextureUsageState::TransferDst),
         8 => Ok(TextureUsageState::Present),
+        9 => Ok(TextureUsageState::IndexRead),
         _ => Err(GalError::ffi(
             StatusCode::UnknownEnum,
             format!("unknown texture usage state {raw}"),
@@ -6928,6 +7327,43 @@ mod tests {
         }
     }
 
+    fn material_quad_request() -> FfiWorldMaterialQuadRequest {
+        FfiWorldMaterialQuadRequest {
+            byte_size: size_of::<FfiWorldMaterialQuadRequest>() as u32,
+            stratum: WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY,
+            material_id: WORLD_MATERIAL_ID_DEFAULT_OPAQUE,
+            texture_id: WORLD_MATERIAL_TEXTURE_DEFAULT,
+            material_mode: WORLD_MATERIAL_MODE_OPAQUE,
+            depth_policy: WORLD_DEPTH_POLICY_TEST_WRITE,
+            cull_policy: WORLD_CULL_BACK,
+            topology: WORLD_TOPOLOGY_TRIANGLES,
+            color_argb: 0xffff_ffff,
+            reserved0: 0,
+            p0_x: -1.0,
+            p0_y: -1.0,
+            p0_z: -2.0,
+            p1_x: 1.0,
+            p1_y: -1.0,
+            p1_z: -2.0,
+            p2_x: 1.0,
+            p2_y: 1.0,
+            p2_z: -2.0,
+            p3_x: -1.0,
+            p3_y: 1.0,
+            p3_z: -2.0,
+            uv0_u: 0.0,
+            uv0_v: 0.0,
+            uv1_u: 1.0,
+            uv1_v: 0.0,
+            uv2_u: 1.0,
+            uv2_v: 1.0,
+            uv3_u: 0.0,
+            uv3_v: 1.0,
+            viewport_width: 854,
+            viewport_height: 480,
+        }
+    }
+
     fn whole_frame_request(
         segments: &[FfiWorldLineSegmentRequest],
         sprites: &[FfiGuiSpriteRequest],
@@ -6981,6 +7417,10 @@ mod tests {
                 ptr: std::ptr::null(),
                 count: 0,
             },
+            world_material_quads: FfiSlice {
+                ptr: std::ptr::null(),
+                count: 0,
+            },
             gui_sprites: FfiSlice {
                 ptr: sprites.as_ptr(),
                 count: sprites.len() as u64,
@@ -7017,6 +7457,17 @@ mod tests {
         request.world_crack_quads = FfiSlice {
             ptr: cracks.as_ptr(),
             count: cracks.len() as u64,
+        };
+        request
+    }
+
+    fn whole_frame_request_with_materials(
+        materials: &[FfiWorldMaterialQuadRequest],
+    ) -> FfiWholeFrameSubmitRequest {
+        let mut request = whole_frame_request(&[], &[]);
+        request.world_material_quads = FfiSlice {
+            ptr: materials.as_ptr(),
+            count: materials.len() as u64,
         };
         request
     }
@@ -7074,6 +7525,30 @@ mod tests {
             header: FfiHeader {
                 version: FFI_ABI_VERSION,
                 byte_size: size_of::<FfiWorldCrackAssetUpdateRequest>() as u32,
+            },
+            generation: 9,
+            assets: FfiSlice {
+                ptr: assets.as_ptr(),
+                count: assets.len() as u64,
+            },
+            negotiated_feature_bits: FfiFeatureBits::GRAPHICS
+                | FfiFeatureBits::DESCRIPTOR_ARRAYS
+                | FfiFeatureBits::OPTIONAL_BINDINGS
+                | FfiFeatureBits::UNIFORM_BUFFERS
+                | FfiFeatureBits::STORAGE_BUFFERS
+                | FfiFeatureBits::TEXTURE_SUBRESOURCE_COPIES
+                | FfiFeatureBits::HOST_BUFFER_ACCESS
+                | FfiFeatureBits::PRESENTATION,
+        }
+    }
+
+    fn world_material_asset_update_request(
+        assets: &[FfiWorldMaterialAssetPayload],
+    ) -> FfiWorldMaterialAssetUpdateRequest {
+        FfiWorldMaterialAssetUpdateRequest {
+            header: FfiHeader {
+                version: FFI_ABI_VERSION,
+                byte_size: size_of::<FfiWorldMaterialAssetUpdateRequest>() as u32,
             },
             generation: 9,
             assets: FfiSlice {
@@ -7229,6 +7704,37 @@ mod tests {
     }
 
     #[test]
+    fn whole_frame_world_material_ffi_copies_and_rejects_malformed_payloads() {
+        let mut materials = vec![material_quad_request()];
+        let request = whole_frame_request_with_materials(&materials);
+        let (_generation, _target, frame, gui) =
+            unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap() };
+        materials[0].p0_x = 99.0;
+        assert_eq!(frame.material_quads.len(), 1);
+        assert_eq!(frame.material_quads[0].vertices[0][0], -1.0);
+        assert_eq!(frame.material_quads[0].uvs[2], [1.0, 1.0]);
+        assert_eq!(
+            frame.material_quads[0].material_id,
+            WORLD_MATERIAL_ID_DEFAULT_OPAQUE
+        );
+        assert!(gui.is_empty());
+
+        materials[0] = material_quad_request();
+        materials[0].material_id = 99;
+        let request = whole_frame_request_with_materials(&materials);
+        let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+            .expect_err("unknown material id must fail validation");
+        assert_eq!(error.code, StatusCode::UnknownEnum);
+
+        materials[0] = material_quad_request();
+        materials[0].byte_size -= 4;
+        let request = whole_frame_request_with_materials(&materials);
+        let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+            .expect_err("malformed material quad must fail");
+        assert_eq!(error.code, StatusCode::InvalidArgument);
+    }
+
+    #[test]
     fn semantic_gui_asset_ffi_copies_payload_memory() {
         let mut bytes = vec![7u8, 8, 9, 10];
         let assets = vec![FfiGuiAssetPayload {
@@ -7372,6 +7878,68 @@ mod tests {
         let malformed = unsafe {
             decode_world_crack_asset_update(
                 &world_crack_asset_update_request(&assets),
+                test_capabilities(),
+            )
+        }
+        .unwrap_err();
+        assert_eq!(StatusCode::InvalidArgument, malformed.code);
+    }
+
+    #[test]
+    fn world_material_asset_ffi_copies_payload_memory() {
+        let mut bytes = vec![31u8, 32, 33, 34];
+        let assets = vec![FfiWorldMaterialAssetPayload {
+            byte_size: size_of::<FfiWorldMaterialAssetPayload>() as u32,
+            texture_id: WORLD_MATERIAL_TEXTURE_DEFAULT,
+            png_bytes: FfiBytes {
+                ptr: bytes.as_ptr(),
+                len: bytes.len() as u64,
+            },
+        }];
+        let request = world_material_asset_update_request(&assets);
+        let (generation, owned) =
+            unsafe { decode_world_material_asset_update(&request, test_capabilities()).unwrap() };
+        bytes.fill(0);
+        assert_eq!(9, generation);
+        assert_eq!(WORLD_MATERIAL_TEXTURE_DEFAULT, owned[0].texture_id);
+        assert_eq!(vec![31u8, 32, 33, 34], owned[0].png_bytes);
+    }
+
+    #[test]
+    fn world_material_asset_ffi_rejects_duplicates_and_bad_item_size() {
+        let bytes = [1u8, 2, 3];
+        let mut assets = vec![
+            FfiWorldMaterialAssetPayload {
+                byte_size: size_of::<FfiWorldMaterialAssetPayload>() as u32,
+                texture_id: WORLD_MATERIAL_TEXTURE_DEFAULT,
+                png_bytes: FfiBytes {
+                    ptr: bytes.as_ptr(),
+                    len: bytes.len() as u64,
+                },
+            },
+            FfiWorldMaterialAssetPayload {
+                byte_size: size_of::<FfiWorldMaterialAssetPayload>() as u32,
+                texture_id: WORLD_MATERIAL_TEXTURE_DEFAULT,
+                png_bytes: FfiBytes {
+                    ptr: bytes.as_ptr(),
+                    len: bytes.len() as u64,
+                },
+            },
+        ];
+        let duplicate = unsafe {
+            decode_world_material_asset_update(
+                &world_material_asset_update_request(&assets),
+                test_capabilities(),
+            )
+        }
+        .unwrap_err();
+        assert_eq!(StatusCode::InvalidArgument, duplicate.code);
+
+        assets[1].texture_id = 2;
+        assets[1].byte_size -= 4;
+        let malformed = unsafe {
+            decode_world_material_asset_update(
+                &world_material_asset_update_request(&assets),
                 test_capabilities(),
             )
         }

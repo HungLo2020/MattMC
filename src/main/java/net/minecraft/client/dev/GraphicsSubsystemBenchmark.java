@@ -2,12 +2,16 @@ package net.minecraft.client.dev;
 
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.pipeline.RenderTarget;
+import net.blaze3d.shaders.ShaderType;
 import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.RenderPass;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.VulkanicAPI;
 
+import java.io.IOException;
+import java.io.Reader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -60,6 +64,9 @@ public final class GraphicsSubsystemBenchmark {
 			}
 			return;
 		}
+		if (backend.equalsIgnoreCase("vulkan")) {
+			precompileVulkanSubsystemPipelines(minecraft);
+		}
 		List<Result> results = new ArrayList<>();
 		results.add(measure("resources.buffers", GraphicsSubsystemBenchmark::resourcesBuffers));
 		results.add(measure("transfers.uploads", GraphicsSubsystemBenchmark::transfersUploads));
@@ -79,6 +86,28 @@ public final class GraphicsSubsystemBenchmark {
 			return new Result(name, "ok", System.nanoTime() - started, counts, "");
 		} catch (Throwable throwable) {
 			return new Result(name, "failed", System.nanoTime() - started, WorkloadCounts.EMPTY, throwable.getClass().getSimpleName() + ": " + throwable.getMessage());
+		}
+	}
+
+	private static void precompileVulkanSubsystemPipelines(Minecraft minecraft) {
+		VulkanicAPI.precompileRenderPipeline(RenderPipelines.DEBUG_QUADS, (location, type) -> loadShaderSource(minecraft, location, type));
+		VulkanicAPI.precompileRenderPipeline(RenderPipelines.GUI, (location, type) -> loadShaderSource(minecraft, location, type));
+		VulkanicAPI.precompileRenderPipeline(RenderPipelines.ENTITY_CUTOUT_NO_CULL, (location, type) -> loadShaderSource(minecraft, location, type));
+		VulkanicAPI.precompileRenderPipeline(RenderPipelines.DEBUG_SECTION_QUADS, (location, type) -> loadShaderSource(minecraft, location, type));
+	}
+
+	private static String loadShaderSource(Minecraft minecraft, ResourceLocation location, ShaderType type) {
+		ResourceLocation shaderFile = type.idConverter().idToFile(location);
+		try (Reader reader = minecraft.getResourceManager().getResourceOrThrow(shaderFile).openAsReader()) {
+			StringBuilder source = new StringBuilder(8192);
+			char[] buffer = new char[4096];
+			int read;
+			while ((read = reader.read(buffer)) >= 0) {
+				source.append(buffer, 0, read);
+			}
+			return source.toString();
+		} catch (IOException exception) {
+			return null;
 		}
 	}
 

@@ -60,6 +60,7 @@ import java.util.function.Supplier;
 public class VulkanicAPI {
     public record FramebufferProbeSnapshot(
         byte[] rgba,
+        float[] depth,
         int readFramebuffer,
         int drawFramebuffer,
         int currentProgram,
@@ -70,6 +71,7 @@ public class VulkanicAPI {
     ) {
         public FramebufferProbeSnapshot {
             rgba = java.util.Arrays.copyOf(rgba, rgba.length);
+            depth = java.util.Arrays.copyOf(depth, depth.length);
         }
     }
 
