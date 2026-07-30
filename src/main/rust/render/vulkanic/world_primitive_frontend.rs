@@ -45,6 +45,10 @@ pub const WORLD_STRATUM_BLOCK_BREAKING_CRACK: u32 = 90;
 pub const WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY: u32 = 70;
 pub const WORLD_BORDER_TEXTURE_FORCEFIELD: u32 = 1;
 pub const WORLD_MATERIAL_TEXTURE_STONE: u32 = 1;
+pub const WORLD_MATERIAL_TEXTURE_DIRT: u32 = 2;
+pub const WORLD_MATERIAL_TEXTURE_OAK_LEAVES: u32 = 3;
+pub const WORLD_MATERIAL_TEXTURE_DEEPSLATE: u32 = 4;
+pub const WORLD_MATERIAL_TEXTURE_WHITE_WOOL: u32 = 5;
 pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER: u32 = 100;
 pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00: u32 = 200;
 pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15: u32 =
@@ -76,7 +80,7 @@ const WORLD_BORDER_QUAD_BYTES: usize = 112;
 const WORLD_BORDER_UNIFORM_BYTES: u64 =
     (WORLD_BORDER_HEADER_BYTES + WORLD_MAX_BORDER_QUADS * WORLD_BORDER_QUAD_BYTES) as u64;
 const WORLD_MATERIAL_HEADER_BYTES: usize = 144;
-const WORLD_MATERIAL_QUAD_BYTES: usize = 128;
+const WORLD_MATERIAL_QUAD_BYTES: usize = 112;
 const WORLD_MATERIAL_UNIFORM_BYTES: u64 =
     (WORLD_MATERIAL_HEADER_BYTES + WORLD_MAX_MATERIAL_QUADS * WORLD_MATERIAL_QUAD_BYTES) as u64;
 const WORLD_MATERIAL_INDEX_BYTES: u64 = 6 * 4;
@@ -249,7 +253,6 @@ struct MaterialQuad {
     vec4 uv0_uv1;
     vec4 uv2_uv3;
     vec4 color;
-    vec4 material;
 };
 layout(set = 0, binding = 0, std430) readonly buffer WorldMaterialBatch {
     mat4 view;
@@ -269,7 +272,7 @@ const vec2 corner[4] = vec2[4](
 void main() {
     MaterialQuad quad = quads[gl_InstanceIndex];
     int vertex = gl_VertexIndex;
-    if (quad.material.w > 1.5) {
+    if (quad.p0.w > 1.5) {
         vertex = int[4](0, 3, 2, 1)[vertex];
     }
     vec2 c = corner[vertex];
@@ -281,7 +284,7 @@ void main() {
     gl_Position = projection * view * vec4(position, 1.0);
     v_uv = mix(uv_top, uv_bottom, c.y);
     v_color = quad.color;
-    v_material = vec4(viewport_cutout.z, quad.material.yzw);
+    v_material = vec4(viewport_cutout.z, 0.0, 0.0, 0.0);
 }
 "#;
 
@@ -1131,6 +1134,7 @@ impl WorldPrimitiveFrontend {
         }
         if !material_batches.is_empty() {
             let mut material_slot_indices = BTreeMap::new();
+            let mut material_draws = Vec::with_capacity(material_batches.len());
             for batch in &material_batches {
                 let slot_index = material_slot_indices.entry(batch.key).or_insert(0usize);
                 let resources = self.material_resources.get(&batch.key).ok_or_else(|| {
@@ -1157,33 +1161,44 @@ impl WorldPrimitiveFrontend {
                     TextureUsageState::TransferDst,
                     TextureUsageState::ShaderRead,
                 )));
-                ops.push(CommandOp::BeginPass {
-                    pass,
-                    target: frame_target,
-                    colors: vec![loaded_frame_color_attachment(color_attachment)],
-                    depth_stencil: Some(PassAttachment {
-                        view: depth_view,
-                        load_op: AttachmentLoadOp::Load,
-                        store_op: AttachmentStoreOp::Store,
-                        clear_color: None,
-                    }),
-                });
-                ops.push(CommandOp::BindGraphicsPipeline(resources.pipeline));
+                material_draws.push((
+                    resources.pipeline,
+                    resources.pipeline_layout,
+                    slot.resource_set,
+                    resources.index_buffer,
+                    batch.count() as u32,
+                ));
+            }
+            ops.push(CommandOp::BeginPass {
+                pass,
+                target: frame_target,
+                colors: vec![loaded_frame_color_attachment(color_attachment)],
+                depth_stencil: Some(PassAttachment {
+                    view: depth_view,
+                    load_op: AttachmentLoadOp::Load,
+                    store_op: AttachmentStoreOp::Store,
+                    clear_color: None,
+                }),
+            });
+            for (pipeline, pipeline_layout, resource_set, index_buffer, instance_count) in
+                material_draws
+            {
+                ops.push(CommandOp::BindGraphicsPipeline(pipeline));
                 ops.push(CommandOp::BindResourceSet {
-                    pipeline_layout: resources.pipeline_layout,
+                    pipeline_layout,
                     set_index: 0,
-                    set: slot.resource_set,
+                    set: resource_set,
                 });
                 ops.push(CommandOp::SetIndexBuffer {
-                    buffer: resources.index_buffer,
+                    buffer: index_buffer,
                     offset: 0,
                 });
                 ops.push(CommandOp::DrawIndexed {
                     indices: 6,
-                    instances: batch.count as u32,
+                    instances: instance_count,
                 });
-                ops.push(CommandOp::EndPass);
             }
+            ops.push(CommandOp::EndPass);
         }
         let mut first_batch = false;
         if !border_batches.is_empty() {
@@ -2584,11 +2599,16 @@ struct BorderBatch {
     depth_policy: u32,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct MaterialBatch {
-    start: usize,
-    count: usize,
     key: MaterialResourceKey,
+    indices: Vec<usize>,
+}
+
+impl MaterialBatch {
+    fn count(&self) -> usize {
+        self.indices.len()
+    }
 }
 
 fn line_batches(frame: &WorldPrimitiveFrame) -> Vec<LineBatch> {
@@ -2673,29 +2693,20 @@ fn border_batches(frame: &WorldPrimitiveFrame) -> Vec<BorderBatch> {
 }
 
 fn material_batches(frame: &WorldPrimitiveFrame, color_format: ColorFormat) -> Vec<MaterialBatch> {
-    let mut batches = Vec::new();
-    let Some(first) = frame.material_quads.first() else {
-        return batches;
-    };
-    let mut current = MaterialBatch {
-        start: 0,
-        count: 0,
-        key: material_key(first, color_format),
-    };
+    let mut batches: Vec<MaterialBatch> = Vec::new();
+    let mut key_to_batch = BTreeMap::<MaterialResourceKey, usize>::new();
     for (index, quad) in frame.material_quads.iter().enumerate() {
         let key = material_key(quad, color_format);
-        if current.count > 0 && key != current.key {
-            batches.push(current);
-            current = MaterialBatch {
-                start: index,
-                count: 0,
+        if let Some(batch_index) = key_to_batch.get(&key).copied() {
+            batches[batch_index].indices.push(index);
+        } else {
+            let batch_index = batches.len();
+            key_to_batch.insert(key, batch_index);
+            batches.push(MaterialBatch {
                 key,
-            };
+                indices: vec![index],
+            });
         }
-        current.count += 1;
-    }
-    if current.count > 0 {
-        batches.push(current);
     }
     batches
 }
@@ -2828,7 +2839,10 @@ fn packed_crack_uniforms_for_batch(
         push_f32(&mut out, (stage_x + 0.5) / atlas_width);
         push_f32(&mut out, 0.5 / CRACK_STAGE_SIZE as f32);
         push_f32(&mut out, (CRACK_STAGE_SIZE - 1) as f32 / atlas_width);
-        push_f32(&mut out, (CRACK_STAGE_SIZE - 1) as f32 / CRACK_STAGE_SIZE as f32);
+        push_f32(
+            &mut out,
+            (CRACK_STAGE_SIZE - 1) as f32 / CRACK_STAGE_SIZE as f32,
+        );
         for value in argb_to_rgba(quad.color_argb) {
             push_f32(&mut out, value);
         }
@@ -2894,12 +2908,20 @@ fn packed_material_uniforms_for_batch(
         },
     );
     push_f32(&mut out, 0.0);
-    for quad in &frame.material_quads[batch.start..batch.start + batch.count] {
-        for vertex in quad.vertices {
+    for index in &batch.indices {
+        let quad = &frame.material_quads[*index];
+        for (vertex_index, vertex) in quad.vertices.iter().enumerate() {
             for value in vertex {
-                push_f32(&mut out, value);
+                push_f32(&mut out, *value);
             }
-            push_f32(&mut out, 1.0);
+            push_f32(
+                &mut out,
+                if vertex_index == 0 {
+                    quad.winding as f32
+                } else {
+                    1.0
+                },
+            );
         }
         push_f32(&mut out, quad.uvs[0][0]);
         push_f32(&mut out, quad.uvs[0][1]);
@@ -2912,10 +2934,6 @@ fn packed_material_uniforms_for_batch(
         for value in argb_to_rgba(quad.color_argb) {
             push_f32(&mut out, value);
         }
-        push_f32(&mut out, quad.material_id as f32);
-        push_f32(&mut out, quad.texture_id as f32);
-        push_f32(&mut out, quad.material_mode as f32);
-        push_f32(&mut out, quad.winding as f32);
     }
     Ok(out)
 }
@@ -3071,6 +3089,26 @@ fn bundled_world_material_texture_bytes(texture_id: u32) -> GalResult<(Vec<u8>, 
             include_bytes!("../../../resources/assets/minecraft/textures/block/stone.png")
                 .as_slice(),
             "world material stone texture",
+        ),
+        WORLD_MATERIAL_TEXTURE_DIRT => (
+            include_bytes!("../../../resources/assets/minecraft/textures/block/dirt.png")
+                .as_slice(),
+            "world material dirt texture",
+        ),
+        WORLD_MATERIAL_TEXTURE_OAK_LEAVES => (
+            include_bytes!("../../../resources/assets/minecraft/textures/block/oak_leaves.png")
+                .as_slice(),
+            "world material oak leaves texture",
+        ),
+        WORLD_MATERIAL_TEXTURE_DEEPSLATE => (
+            include_bytes!("../../../resources/assets/minecraft/textures/block/deepslate.png")
+                .as_slice(),
+            "world material deepslate texture",
+        ),
+        WORLD_MATERIAL_TEXTURE_WHITE_WOOL => (
+            include_bytes!("../../../resources/assets/minecraft/textures/block/white_wool.png")
+                .as_slice(),
+            "world material white wool texture",
         ),
         WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER => (
             include_bytes!("../../../resources/assets/minecraft/textures/item/barrier.png")
@@ -3361,6 +3399,11 @@ mod tests {
         }
     }
 
+    fn read_f32(bytes: &[u8], index: usize) -> f32 {
+        let offset = index * std::mem::size_of::<f32>();
+        f32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap())
+    }
+
     fn frame_with_world_work(width: u32, height: u32) -> WorldPrimitiveFrame {
         let mut frame = frame(vec![segment(WORLD_DEPTH_POLICY_TEST_WRITE, 0xff000000)]);
         frame.viewport_width = width;
@@ -3413,20 +3456,96 @@ mod tests {
     }
 
     #[test]
-    fn material_batches_preserve_contiguous_compatible_state() {
+    fn material_batches_group_interleaved_compatible_state_by_key() {
         let mut frame = frame(Vec::new());
+        let opaque = material_quad(WORLD_MATERIAL_MODE_OPAQUE, WORLD_DEPTH_POLICY_TEST_WRITE);
+        let cutout = material_quad(WORLD_MATERIAL_MODE_CUTOUT, WORLD_DEPTH_POLICY_TEST_WRITE);
+        let cutout_no_depth =
+            material_quad(WORLD_MATERIAL_MODE_CUTOUT, WORLD_DEPTH_POLICY_DISABLED);
         frame.material_quads = vec![
-            material_quad(WORLD_MATERIAL_MODE_OPAQUE, WORLD_DEPTH_POLICY_TEST_WRITE),
-            material_quad(WORLD_MATERIAL_MODE_OPAQUE, WORLD_DEPTH_POLICY_TEST_WRITE),
-            material_quad(WORLD_MATERIAL_MODE_CUTOUT, WORLD_DEPTH_POLICY_TEST_WRITE),
-            material_quad(WORLD_MATERIAL_MODE_CUTOUT, WORLD_DEPTH_POLICY_DISABLED),
+            opaque.clone(),
+            cutout.clone(),
+            opaque.clone(),
+            cutout_no_depth,
+            cutout,
+            opaque,
         ];
         let batches = material_batches(&frame, ColorFormat::Bgra8Unorm);
         assert_eq!(3, batches.len());
-        assert_eq!(2, batches[0].count);
+        assert_eq!(3, batches[0].count());
+        assert_eq!(vec![0, 2, 5], batches[0].indices);
         assert_eq!(WORLD_MATERIAL_MODE_OPAQUE, batches[0].key.material_mode);
+        assert_eq!(2, batches[1].count());
+        assert_eq!(vec![1, 4], batches[1].indices);
         assert_eq!(WORLD_MATERIAL_MODE_CUTOUT, batches[1].key.material_mode);
         assert_eq!(WORLD_DEPTH_POLICY_DISABLED, batches[2].key.depth_policy);
+    }
+
+    #[test]
+    fn cutout_material_batches_carry_alpha_discard_threshold() {
+        let mut frame = frame(Vec::new());
+        frame.material_quads = vec![
+            material_quad(WORLD_MATERIAL_MODE_OPAQUE, WORLD_DEPTH_POLICY_TEST_WRITE),
+            material_quad(WORLD_MATERIAL_MODE_CUTOUT, WORLD_DEPTH_POLICY_TEST_WRITE),
+        ];
+        let batches = material_batches(&frame, ColorFormat::Bgra8Unorm);
+        assert_eq!(2, batches.len());
+
+        let opaque_uniforms = packed_material_uniforms_for_batch(&frame, &batches[0]).unwrap();
+        let cutout_uniforms = packed_material_uniforms_for_batch(&frame, &batches[1]).unwrap();
+
+        assert_eq!(0.0, read_f32(&opaque_uniforms, 34));
+        assert_eq!(0.5, read_f32(&cutout_uniforms, 34));
+    }
+
+    #[test]
+    fn packed_material_uniforms_store_only_render_needed_per_quad_data() {
+        let mut frame = frame(Vec::new());
+        let mut quad = material_quad(WORLD_MATERIAL_MODE_OPAQUE, WORLD_DEPTH_POLICY_TEST_WRITE);
+        quad.winding = WORLD_WINDING_CW;
+        frame.material_quads.push(quad);
+        let batches = material_batches(&frame, ColorFormat::Bgra8Unorm);
+
+        let uniforms = packed_material_uniforms_for_batch(&frame, &batches[0]).unwrap();
+
+        assert_eq!(
+            WORLD_MATERIAL_HEADER_BYTES + WORLD_MATERIAL_QUAD_BYTES,
+            uniforms.len()
+        );
+        assert_eq!(WORLD_WINDING_CW as f32, read_f32(&uniforms, 39));
+    }
+
+    #[test]
+    fn interleaved_material_quads_lower_to_one_draw_per_material_key() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        let mut frame = frame(Vec::new());
+        let mut stone = material_quad(WORLD_MATERIAL_MODE_OPAQUE, WORLD_DEPTH_POLICY_TEST_WRITE);
+        stone.texture_id = WORLD_MATERIAL_TEXTURE_STONE;
+        let mut dirt = material_quad(WORLD_MATERIAL_MODE_OPAQUE, WORLD_DEPTH_POLICY_TEST_WRITE);
+        dirt.texture_id = WORLD_MATERIAL_TEXTURE_DIRT;
+        let mut leaves = material_quad(WORLD_MATERIAL_MODE_CUTOUT, WORLD_DEPTH_POLICY_TEST_WRITE);
+        leaves.texture_id = WORLD_MATERIAL_TEXTURE_OAK_LEAVES;
+        frame.material_quads = vec![
+            stone.clone(),
+            dirt.clone(),
+            leaves.clone(),
+            stone.clone(),
+            dirt.clone(),
+            leaves.clone(),
+            stone,
+            dirt,
+            leaves,
+        ];
+
+        let (_ops, stats) = frontend
+            .append_frame_ops(&mut gal, 1, target, frame)
+            .unwrap();
+
+        assert_eq!(9, stats.material_quad_count);
+        assert_eq!(3, stats.material_batch_count);
+        assert_eq!(3, stats.material_draw_count);
     }
 
     #[test]
@@ -3485,6 +3604,40 @@ mod tests {
             .unwrap();
         assert_eq!(1, stats.material_cache_hits);
         assert_eq!(0, stats.material_cache_misses);
+    }
+
+    #[test]
+    fn material_data_slot_reuses_streaming_buffer_across_frames() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        let mut frame = frame(Vec::new());
+        frame.material_quads = vec![
+            material_quad(WORLD_MATERIAL_MODE_OPAQUE, WORLD_DEPTH_POLICY_TEST_WRITE),
+            material_quad(WORLD_MATERIAL_MODE_OPAQUE, WORLD_DEPTH_POLICY_TEST_WRITE),
+        ];
+
+        let (_ops, first_stats) = frontend
+            .append_frame_ops(&mut gal, 1, target, frame.clone())
+            .unwrap();
+        assert_eq!(1, first_stats.material_batch_count);
+        assert_eq!(1, first_stats.material_cache_misses);
+        let key = material_key(&frame.material_quads[0], ColorFormat::Bgra8Unorm);
+        let resources = frontend.material_resources.get(&key).unwrap();
+        assert_eq!(1, resources.data_slots.len());
+        let first_uniform_buffer = resources.data_slots[0].uniform_buffer;
+        let first_resource_set = resources.data_slots[0].resource_set;
+
+        let (_ops, second_stats) = frontend
+            .append_frame_ops(&mut gal, 2, target, frame)
+            .unwrap();
+        assert_eq!(1, second_stats.material_batch_count);
+        assert_eq!(1, second_stats.material_cache_hits);
+        assert_eq!(0, second_stats.material_cache_misses);
+        let resources = frontend.material_resources.get(&key).unwrap();
+        assert_eq!(1, resources.data_slots.len());
+        assert_eq!(first_uniform_buffer, resources.data_slots[0].uniform_buffer);
+        assert_eq!(first_resource_set, resources.data_slots[0].resource_set);
     }
 
     #[test]
@@ -3821,13 +3974,13 @@ mod tests {
                 f32::from_ne_bytes(bytes[uv_offset + 8..uv_offset + 12].try_into().unwrap());
             let height =
                 f32::from_ne_bytes(bytes[uv_offset + 12..uv_offset + 16].try_into().unwrap());
-            assert_eq!(
-                ((stage * CRACK_STAGE_SIZE) as f32 + 0.5) / atlas_width,
-                u
-            );
+            assert_eq!(((stage * CRACK_STAGE_SIZE) as f32 + 0.5) / atlas_width, u);
             assert_eq!(0.5 / CRACK_STAGE_SIZE as f32, v);
             assert_eq!((CRACK_STAGE_SIZE - 1) as f32 / atlas_width, width);
-            assert_eq!((CRACK_STAGE_SIZE - 1) as f32 / CRACK_STAGE_SIZE as f32, height);
+            assert_eq!(
+                (CRACK_STAGE_SIZE - 1) as f32 / CRACK_STAGE_SIZE as f32,
+                height
+            );
         }
     }
 
@@ -3838,12 +3991,7 @@ mod tests {
             let mut rgba = Vec::with_capacity((CRACK_STAGE_SIZE * CRACK_STAGE_SIZE * 4) as usize);
             for y in 0..CRACK_STAGE_SIZE {
                 for x in 0..CRACK_STAGE_SIZE {
-                    rgba.extend_from_slice(&[
-                        stage as u8,
-                        x as u8,
-                        y as u8,
-                        255,
-                    ]);
+                    rgba.extend_from_slice(&[stage as u8, x as u8, y as u8, 255]);
                 }
             }
             overrides.insert(stage, WorldCrackTextureAsset { rgba });

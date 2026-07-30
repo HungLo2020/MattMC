@@ -934,6 +934,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 				net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueWorldBackground(this.minecraft.level, this.mainCamera, f);
 				net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueBlockOutline(this.minecraft, this, this.mainCamera);
 				this.minecraft.particleEngine.enqueueRustGalBlockMarkers(this.mainCamera, f);
+				this.minecraft.particleEngine.enqueueRustGalTerrainParticles(this.mainCamera, f);
 			this.minecraft.levelRenderer.enqueueRustGalBlockBreakingCracks(this.mainCamera);
 			this.minecraft.levelRenderer.enqueueRustGalWorldBorder(this.mainCamera);
 		}

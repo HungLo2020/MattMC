@@ -1753,6 +1753,162 @@ def expected_block_marker_texture_ids(scenario_name: str) -> list[int]:
     return []
 
 
+def expected_terrain_particle_texture_ids(scenario_name: str) -> list[int]:
+    return {
+        "stone": [1],
+        "dirt": [2],
+        "oak-leaves": [3],
+        "deepslate": [4],
+        "white-wool": [5],
+        "mixed-many": [1, 2, 3, 4, 5],
+    }.get(scenario_name, [])
+
+
+def expected_terrain_particle_material_mode(texture_id: int) -> int:
+    return 2 if texture_id == 3 else 1
+
+
+def deterministic_world_material_terrain_particle_pixel_evidence(
+    doc: dict[str, object] | None,
+    scenario: object,
+) -> dict[str, object]:
+    scenario_name = str(scenario or "").strip().lower()
+    evidence: dict[str, object] = {
+        "checked": False,
+        "status": "not_requested",
+        "scenario": scenario_name or None,
+        "screenshot": None,
+        "particles_reported": 0,
+        "expected_texture_ids": [],
+        "validated_texture_ids": [],
+        "crops": [],
+        "matching_pixels": 0,
+        "position_status": "not_checked",
+        "threshold": 24,
+    }
+    if not scenario_name:
+        return evidence
+    particles = doc.get("rustGalWorldTerrainParticles") if isinstance(doc, dict) else None
+    if not isinstance(particles, list):
+        particles = []
+    evidence["particles_reported"] = len(particles)
+    if scenario_name == "hidden":
+        evidence.update(
+            {
+                "checked": True,
+                "status": "absent_expected" if not particles else "unexpected_particle_metadata",
+                "position_status": "absent_expected",
+            }
+        )
+        return evidence
+    expected_texture_ids = expected_terrain_particle_texture_ids(scenario_name)
+    evidence["expected_texture_ids"] = expected_texture_ids
+    if not expected_texture_ids:
+        evidence["status"] = "unknown_scenario"
+        return evidence
+    captures = doc.get("captures") if isinstance(doc, dict) else None
+    if not isinstance(captures, list) or not captures:
+        evidence["status"] = "missing_capture"
+        return evidence
+    first = captures[0]
+    if not isinstance(first, dict) or not first.get("screenshot"):
+        evidence["status"] = "missing_screenshot"
+        return evidence
+    screenshot = Path(str(first["screenshot"]))
+    evidence["screenshot"] = str(screenshot)
+    if not screenshot.is_file():
+        evidence["status"] = "missing_screenshot_file"
+        return evidence
+    capture_frame = parse_number(first.get("renderedFrameIndex"))
+    try:
+        from PIL import Image
+    except Exception as exc:  # pragma: no cover
+        evidence["status"] = f"pillow_unavailable:{exc}"
+        return evidence
+    try:
+        with Image.open(screenshot) as image:
+            rgb = image.convert("RGB")
+            validated: list[int] = []
+            crops: list[dict[str, object]] = []
+            total_matching = 0
+            for texture_id in expected_texture_ids:
+                frame_filtered_particles = particles
+                if capture_frame is not None:
+                    exact_or_near = [
+                        particle for particle in particles
+                        if isinstance(particle, dict)
+                        and particle.get("frameIndex") is not None
+                        and abs(int(particle.get("frameIndex") or -999999) - int(capture_frame)) <= 1
+                    ]
+                    if exact_or_near:
+                        frame_filtered_particles = exact_or_near
+                candidates = [
+                    particle for particle in frame_filtered_particles
+                    if isinstance(particle, dict)
+                    and int(particle.get("textureId") or -1) == texture_id
+                    and particle.get("projected") is True
+                    and isinstance(particle.get("screenBounds"), dict)
+                ]
+                best: dict[str, object] | None = None
+                for particle in candidates:
+                    material_mode = int(parse_number(particle.get("materialMode")) or -1)
+                    expected_material_mode = expected_terrain_particle_material_mode(texture_id)
+                    bounds = particle["screenBounds"]
+                    assert isinstance(bounds, dict)
+                    for mirrored in (False, True):
+                        crop_box = marker_crop_box(bounds, rgb.width, rgb.height, mirrored_y=mirrored)
+                        if crop_box is None:
+                            continue
+                        crop = rgb.crop(crop_box)
+                        stats = terrain_particle_crop_stats(crop, texture_id)
+                        if best is None or int(stats["matching_pixels"]) > int(best["matching_pixels"]):
+                            crop_path = screenshot.with_name(
+                                f"world_material_terrain_particle_crop_{scenario_name}_{texture_id}_{'mirrored' if mirrored else 'projected'}.png"
+                            )
+                            crop.save(crop_path)
+                            best = {
+                                **stats,
+                                "texture_id": texture_id,
+                                "crop": {
+                                    "left": crop_box[0],
+                                    "top": crop_box[1],
+                                    "right": crop_box[2],
+                                    "bottom": crop_box[3],
+                                    "mirrored_y": mirrored,
+                                },
+                                "crop_path": str(crop_path),
+                                "route": particle.get("route"),
+                                "center": particle.get("center"),
+                                "quad_size": particle.get("quadSize"),
+                                "uv": particle.get("uv"),
+                                "sprite_id": particle.get("spriteId"),
+                                "material_mode": material_mode,
+                                "expected_material_mode": expected_material_mode,
+                                "material_mode_matches": material_mode == expected_material_mode,
+                            }
+                if best is None:
+                    crops.append({"texture_id": texture_id, "status": "missing_projected_particle"})
+                    continue
+                crops.append(best)
+                matching = int(best["matching_pixels"])
+                total_matching += matching
+                if matching >= int(evidence["threshold"]) and best.get("material_mode_matches") is True:
+                    validated.append(texture_id)
+            evidence.update(
+                {
+                    "checked": True,
+                    "status": "present" if set(validated) == set(expected_texture_ids) else "absent",
+                    "validated_texture_ids": validated,
+                    "crops": crops,
+                    "matching_pixels": total_matching,
+                    "position_status": "projected_crop_hit" if validated else "missing_projected_crop_hit",
+                }
+            )
+    except Exception as exc:
+        evidence["status"] = f"read_failed:{exc}"
+    return evidence
+
+
 def marker_crop_box(
     bounds: dict[str, object],
     width: int,
@@ -1869,6 +2025,58 @@ def marker_crop_stats(crop: Any, texture_id: int) -> dict[str, object]:
         "pack_b_pixels": pack_b,
         "coverage_ok": coverage_ok,
         "orientation_status": orientation_status,
+    }
+
+
+def terrain_particle_crop_stats(crop: Any, texture_id: int) -> dict[str, object]:
+    width, height = crop.size
+    vanilla_matching = 0
+    pack_a = 0
+    pack_b = 0
+    colored = 0
+    for y in range(height):
+        for x in range(width):
+            red, green, blue = crop.getpixel((x, y))
+            avg = (red + green + blue) / 3.0
+            is_vanilla_match = False
+            if texture_id == 1:  # stone
+                is_vanilla_match = 45 <= avg <= 190 and max(red, green, blue) - min(red, green, blue) <= 55
+            elif texture_id == 2:  # dirt
+                is_vanilla_match = red >= 55 and green >= 35 and blue <= 120 and red >= blue + 12 and green >= blue
+            elif texture_id == 3:  # oak leaves
+                is_vanilla_match = green >= 45 and green >= red and green >= blue
+            elif texture_id == 4:  # deepslate
+                is_vanilla_match = 25 <= avg <= 125 and max(red, green, blue) - min(red, green, blue) <= 65
+            elif texture_id == 5:  # white wool
+                is_vanilla_match = red >= 120 and green >= 120 and blue >= 110 and max(red, green, blue) - min(red, green, blue) <= 85
+            pack_a_pixel = red >= 95 and red >= green + 25 and red >= blue + 20
+            pack_b_pixel = green >= 55 and green >= red + 22 and green >= blue + 12
+            if red > 12 or green > 12 or blue > 12:
+                colored += 1
+            if is_vanilla_match:
+                vanilla_matching += 1
+            if pack_a_pixel:
+                pack_a += 1
+            if pack_b_pixel:
+                pack_b += 1
+    matching = max(vanilla_matching, pack_a, pack_b)
+    if pack_a >= matching and matching > 0:
+        signature = "pack-a"
+    elif pack_b >= matching and matching > 0:
+        signature = "pack-b"
+    elif vanilla_matching > 0:
+        signature = "vanilla-like"
+    else:
+        signature = "unknown"
+    return {
+        "matching_pixels": matching,
+        "vanilla_matching_pixels": vanilla_matching,
+        "pack_a_pixels": pack_a,
+        "pack_b_pixels": pack_b,
+        "texture_signature": signature,
+        "colored_pixels": colored,
+        "crop_width": width,
+        "crop_height": height,
     }
 
 
@@ -3273,6 +3481,28 @@ def normalize_capture_artifact(
     requested_world_material_marker_scenario = parse_java_property(
         combined_logs, "mattmc.dev.rustGalWorldMaterial.blockMarkerScenario"
     )
+    requested_world_material_terrain_particle_scenario = parse_java_property(
+        combined_logs, "mattmc.dev.rustGalWorldMaterial.terrainParticleScenario"
+    )
+    terrain_particle_real_doc = (
+        frame_doc.get("terrainParticleRealGameplay")
+        if isinstance(frame_doc, dict) and isinstance(frame_doc.get("terrainParticleRealGameplay"), dict)
+        else {}
+    )
+    requested_world_material_terrain_particle_real_gameplay = bool(terrain_particle_real_doc.get("enabled")) or (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWorldMaterial.terrainParticleRealGameplay") == "true"
+    )
+    world_material_terrain_particle_control = str(terrain_particle_real_doc.get("routeControl") or "rust")
+    terrain_particle_real_route_counts = (
+        terrain_particle_real_doc.get("routeCounts")
+        if isinstance(terrain_particle_real_doc.get("routeCounts"), dict)
+        else {}
+    )
+    terrain_particle_real_route_nanos = (
+        terrain_particle_real_doc.get("routeNanos")
+        if isinstance(terrain_particle_real_doc.get("routeNanos"), dict)
+        else {}
+    )
     world_outline_pixel_evidence = deterministic_block_outline_pixel_evidence(
         deterministic_doc,
         requested_world_outline_style,
@@ -3289,6 +3519,10 @@ def normalize_capture_artifact(
     world_material_marker_pixel_evidence = deterministic_world_material_marker_pixel_evidence(
         deterministic_doc,
         requested_world_material_marker_scenario,
+    )
+    world_material_terrain_particle_pixel_evidence = deterministic_world_material_terrain_particle_pixel_evidence(
+        deterministic_doc,
+        requested_world_material_terrain_particle_scenario,
     )
     world_crack_framebuffer = world_crack_framebuffer_evidence(combined_logs)
     rust_vulkan_shell_scene_evidence = deterministic_rust_vulkan_shell_scene_evidence(
@@ -3361,6 +3595,12 @@ def normalize_capture_artifact(
     )
     rust_gal_world_material_marker_last_texture_id_for_validation = max_number(
         combined_logs, r"material_marker_last_texture_id[=: ]+(\d+)"
+    )
+    rust_gal_world_material_terrain_particle_quads_for_validation = max_number(
+        combined_logs, r"material_terrain_particle_quads[=: ]+(\d+)"
+    )
+    rust_gal_world_material_terrain_particle_texture_mask_for_validation = max_number(
+        combined_logs, r"material_terrain_particle_texture_mask[=: ]+(\d+)"
     )
     rust_gal_world_background_clears_for_validation = last_number(
         combined_logs, r"rust_gal_world_background_clears_executed[=: ]+(\d+)"
@@ -3760,6 +4000,108 @@ def normalize_capture_artifact(
                     "deterministic BlockMarker projected crop evidence did not prove orientation/coverage "
                     f"(orientation={world_material_marker_pixel_evidence.get('orientation_status')})"
                 )
+    world_material_terrain_particle_workload_complete = True
+    terrain_particle_scenario = (requested_world_material_terrain_particle_scenario or "").strip().lower()
+    if terrain_particle_scenario and rust_outline_mode:
+        if terrain_particle_scenario == "hidden":
+            if int(rust_gal_world_material_quads_for_validation or 0) != 0:
+                world_material_terrain_particle_workload_complete = False
+                validation_messages.append("deterministic hidden TerrainParticle scenario emitted unexpected material quads")
+            if world_material_terrain_particle_pixel_evidence.get("status") != "absent_expected":
+                world_material_terrain_particle_workload_complete = False
+                validation_messages.append(
+                    "deterministic hidden TerrainParticle scenario reported unexpected projected particle evidence "
+                    f"(status={world_material_terrain_particle_pixel_evidence.get('status')})"
+                )
+        else:
+            required_material_counts = {
+                "material quads": rust_gal_world_material_quads_for_validation,
+                "material batches": rust_gal_world_material_batches_for_validation,
+                "material draws": rust_gal_world_material_draws_for_validation,
+            }
+            missing_material_counts = [
+                name for name, value in required_material_counts.items() if int(value or 0) <= 0
+            ]
+            if missing_material_counts:
+                world_material_terrain_particle_workload_complete = False
+                validation_messages.append(
+                    "deterministic Rust-GAL TerrainParticle scenario requested but no non-zero "
+                    + ", ".join(missing_material_counts)
+                    + " evidence was captured"
+                )
+            if world_material_terrain_particle_pixel_evidence.get("status") != "present":
+                world_material_terrain_particle_workload_complete = False
+                validation_messages.append(
+                    "deterministic TerrainParticle scenario did not produce projected particle crop evidence "
+                    f"(status={world_material_terrain_particle_pixel_evidence.get('status')}, "
+                    f"validated={world_material_terrain_particle_pixel_evidence.get('validated_texture_ids')}, "
+                    f"expected={world_material_terrain_particle_pixel_evidence.get('expected_texture_ids')}, "
+                    f"matching_pixels={world_material_terrain_particle_pixel_evidence.get('matching_pixels')})"
+                )
+    if requested_world_material_terrain_particle_real_gameplay and tool_kind == "gameplay":
+        real_drive_calls = parse_number(terrain_particle_real_doc.get("driveCalls"))
+        real_continue_calls = parse_number(terrain_particle_real_doc.get("continueCalls"))
+        real_breaking_effects = parse_number(terrain_particle_real_doc.get("breakingEffects"))
+        real_material_mask = int(parse_number(terrain_particle_real_doc.get("materialMask")) or 0)
+        real_expected_material_mask = int(parse_number(terrain_particle_real_doc.get("expectedMaterialMask")) or 0)
+        real_effects_per_frame = int(parse_number(terrain_particle_real_doc.get("effectsPerFrame")) or 0)
+        real_route_total = sum(
+            int(value or 0)
+            for value in terrain_particle_real_route_counts.values()
+            if isinstance(value, (int, float))
+        )
+        if int(real_drive_calls or 0) <= 0 or int(real_continue_calls or 0) <= 0 or int(real_breaking_effects or 0) <= 0:
+            world_material_terrain_particle_workload_complete = False
+            validation_messages.append(
+                "real gameplay TerrainParticle workload did not prove vanilla block interaction "
+                f"(drive={real_drive_calls}, continue={real_continue_calls}, breakingEffects={real_breaking_effects})"
+            )
+        if real_route_total <= 0:
+            world_material_terrain_particle_workload_complete = False
+            validation_messages.append("real gameplay TerrainParticle workload produced no particle extraction route samples")
+        if real_expected_material_mask and real_material_mask != real_expected_material_mask:
+            world_material_terrain_particle_workload_complete = False
+            validation_messages.append(
+                "real gameplay TerrainParticle workload did not exercise the fixed material set "
+                f"(mask={real_material_mask}, expected={real_expected_material_mask})"
+            )
+        if real_effects_per_frame <= 0:
+            world_material_terrain_particle_workload_complete = False
+            validation_messages.append("real gameplay TerrainParticle workload did not record a bounded effects-per-frame count")
+        java_vulkan_compat_material = mode.expected_attribution == "java-vulkan"
+        if world_material_terrain_particle_control == "rust" and java_vulkan_compat_material:
+            java_route_count = int(terrain_particle_real_route_counts.get("java-compat") or 0)
+            if java_route_count <= 0:
+                world_material_terrain_particle_workload_complete = False
+                validation_messages.append("normal Java Vulkan TerrainParticle control did not use the Java compatibility route")
+            if int(rust_gal_world_material_quads_for_validation or 0) != 0:
+                world_material_terrain_particle_workload_complete = False
+                validation_messages.append("normal Java Vulkan TerrainParticle control emitted unexpected Rust material quads")
+        elif world_material_terrain_particle_control == "rust":
+            rust_route_count = int(terrain_particle_real_route_counts.get("rust") or 0)
+            if rust_route_count <= 0 or int(rust_gal_world_material_quads_for_validation or 0) <= 0:
+                world_material_terrain_particle_workload_complete = False
+                validation_messages.append(
+                    "real gameplay TerrainParticle Rust route did not produce Rust material work "
+                    f"(rustRoute={rust_route_count}, materialQuads={rust_gal_world_material_quads_for_validation})"
+                )
+            if real_material_mask.bit_count() < 3:
+                world_material_terrain_particle_workload_complete = False
+                validation_messages.append(
+                    f"real gameplay TerrainParticle Rust route did not exercise mixed block materials (mask={real_material_mask})"
+                )
+        elif world_material_terrain_particle_control == "disabled":
+            if int(rust_gal_world_material_quads_for_validation or 0) != 0:
+                world_material_terrain_particle_workload_complete = False
+                validation_messages.append("TerrainParticle disabled control emitted unexpected Rust material quads")
+        elif world_material_terrain_particle_control == "legacy":
+            legacy_route_count = int(terrain_particle_real_route_counts.get("java-legacy") or 0)
+            if legacy_route_count <= 0:
+                world_material_terrain_particle_workload_complete = False
+                validation_messages.append("TerrainParticle legacy control did not prove Java legacy particle extraction")
+            if int(rust_gal_world_material_quads_for_validation or 0) != 0:
+                world_material_terrain_particle_workload_complete = False
+                validation_messages.append("TerrainParticle legacy control emitted unexpected Rust material quads")
     background_scenario = (requested_world_background_scenario or "").strip().lower()
     if background_scenario and rust_shell_outline_mode:
         if background_scenario in {"hidden", "invalid"}:
@@ -3923,6 +4265,8 @@ def normalize_capture_artifact(
     rust_gal_world_material_marker_light_level_mask = max_number(combined_logs, r"material_marker_light_level_mask[=: ]+(\d+)")
     rust_gal_world_material_marker_last_light_level = max_number(combined_logs, r"material_marker_last_light_level[=: ]+(-?\d+)")
     rust_gal_world_material_marker_last_texture_id = max_number(combined_logs, r"material_marker_last_texture_id[=: ]+(\d+)")
+    rust_gal_world_material_terrain_particle_quads = max_number(combined_logs, r"material_terrain_particle_quads[=: ]+(\d+)")
+    rust_gal_world_material_terrain_particle_texture_mask = max_number(combined_logs, r"material_terrain_particle_texture_mask[=: ]+(\d+)")
     rust_gal_world_background_clears = last_number(combined_logs, r"rust_gal_world_background_clears_executed[=: ]+(\d+)")
     rust_gal_world_background_fallbacks = last_number(combined_logs, r"rust_gal_world_background_diagnostic_fallbacks[=: ]+(\d+)")
     rust_gal_world_background_sky_type = last_number(combined_logs, r"rust_gal_world_background_sky_type[=: ]+(\d+)")
@@ -4230,6 +4574,17 @@ def normalize_capture_artifact(
                 "world_border_pixel_evidence": world_border_pixel_evidence,
                 "world_background_scenario": requested_world_background_scenario or None,
                 "world_material_marker_pixel_evidence": world_material_marker_pixel_evidence,
+                "world_material_terrain_particle_scenario": requested_world_material_terrain_particle_scenario or None,
+                "world_material_terrain_particle_real_gameplay": requested_world_material_terrain_particle_real_gameplay,
+                "world_material_terrain_particle_control": world_material_terrain_particle_control,
+                "world_material_terrain_particle_real_metrics": terrain_particle_real_doc,
+                "world_material_terrain_particle_pixel_evidence": world_material_terrain_particle_pixel_evidence,
+                "world_material_terrain_particle_quads": (
+                    rust_gal_world_material_terrain_particle_quads
+                    if rust_gal_world_material_terrain_particle_quads is not None
+                    else (rust_gal_world_material_quads if requested_world_material_terrain_particle_real_gameplay else None)
+                ),
+                "world_material_terrain_particle_texture_mask": rust_gal_world_material_terrain_particle_texture_mask,
                 "rust_vulkan_shell_scene_evidence": rust_vulkan_shell_scene_evidence,
                 "cache_hits": last_number(combined_logs, r"rust_gal_cache_hits[=: ]+(\d+)"),
                 "cache_misses": last_number(combined_logs, r"rust_gal_cache_misses[=: ]+(\d+)"),
@@ -5794,6 +6149,20 @@ def build_capture_command(
         java_options.append(
             f"-Dmattmc.dev.rustGalWorldMaterial.blockMarkerScenario={args.world_material_marker_scenario}"
         )
+    if getattr(args, "world_material_terrain_particle_scenario", ""):
+        java_options.append(
+            f"-Dmattmc.dev.rustGalWorldMaterial.terrainParticleScenario={args.world_material_terrain_particle_scenario}"
+        )
+    if getattr(args, "world_material_terrain_particle_real_gameplay", False):
+        java_options.append("-Dmattmc.dev.rustGalWorldMaterial.terrainParticleRealGameplay=true")
+        java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.displayFpsCheckEnabled=false")
+        if not getattr(args, "game_mode", None):
+            java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.gameMode=survival")
+    terrain_particle_control = getattr(args, "world_material_terrain_particle_control", "rust")
+    if terrain_particle_control == "disabled":
+        java_options.append("-Dmattmc.dev.rustGalWorldMaterial.terrainParticle.disabled=true")
+    elif terrain_particle_control == "legacy":
+        java_options.append("-Dmattmc.dev.rustGalWorldMaterial.terrainParticle.legacyControl=true")
     if getattr(args, "world_background_scenario", ""):
         java_options.append(f"-Dmattmc.dev.rustGalWorldBackground.scenario={args.world_background_scenario}")
     rust_gal_gui_control = getattr(args, "rust_gal_gui_control", "rust")
@@ -7008,6 +7377,31 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             ),
             default=os.environ.get("MATTMC_WORLD_MATERIAL_MARKER_SCENARIO", ""),
             help="Spawn deterministic vanilla BLOCK_MARKER particles for BlockMarker material-route validation.",
+        )
+        subparser.add_argument(
+            "--world-material-terrain-particle-scenario",
+            choices=(
+                "hidden",
+                "stone",
+                "dirt",
+                "oak-leaves",
+                "deepslate",
+                "white-wool",
+                "mixed-many",
+            ),
+            default=os.environ.get("MATTMC_WORLD_MATERIAL_TERRAIN_PARTICLE_SCENARIO", ""),
+            help="Spawn deterministic vanilla TerrainParticle block particles for material-route validation.",
+        )
+        subparser.add_argument(
+            "--world-material-terrain-particle-real-gameplay",
+            action="store_true",
+            help="Drive real survival block-hit behavior to create normal TerrainParticle instances for gameplay measurement.",
+        )
+        subparser.add_argument(
+            "--world-material-terrain-particle-control",
+            choices=("rust", "disabled", "legacy"),
+            default=os.environ.get("MATTMC_WORLD_MATERIAL_TERRAIN_PARTICLE_CONTROL", "rust"),
+            help="Select the TerrainParticle route for real gameplay controls.",
         )
         subparser.add_argument(
             "--world-border-scroll-phase",

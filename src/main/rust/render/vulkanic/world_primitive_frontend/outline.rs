@@ -31,7 +31,8 @@ pub(super) fn validate_segment(
             "world primitive line width must be finite and positive",
         ));
     }
-    if segment.viewport_width != frame.viewport_width || segment.viewport_height != frame.viewport_height
+    if segment.viewport_width != frame.viewport_width
+        || segment.viewport_height != frame.viewport_height
     {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,

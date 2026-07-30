@@ -160,8 +160,9 @@ class VulkanicGalBridgeAbiTest {
 			"Rust submission/validation failure must be explicit instead of falling back to Java in the same frame");
 		assertFalse(levelRenderer.contains("java-opengl-retained-after-empty-rust"),
 			"normal OpenGL must not use same-frame Java fallback after selecting the Rust crack route");
-		String borderRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/WorldBorderRenderer.java"));
-		assertTrue(borderRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueWorldBorder"));
+			String borderRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/WorldBorderRenderer.java"));
+			String terrainParticle = Files.readString(Path.of("src/main/java/net/minecraft/client/particle/TerrainParticle.java"));
+			assertTrue(borderRenderer.contains("RustGalWorldPrimitiveRenderer.enqueueWorldBorder"));
 			assertTrue(worldRenderer.contains("enqueueBlockBreakingCracks"));
 			assertTrue(worldRenderer.contains("renderOpenGlBlockBreakingCracks"));
 			assertTrue(worldRenderer.contains("state.blockState.isAir()"),
@@ -206,8 +207,14 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(rustWorldFrontend.contains("apply_world_border_asset_update"));
 		assertTrue(rustWorldFrontend.contains("WorldPrimitiveFrontend"));
 		assertTrue(rustWorldFrontend.contains("submit_whole_frame"));
-		assertTrue(rustWorldFrontend.contains("unsupported_feature"));
-	}
+			assertTrue(rustWorldFrontend.contains("unsupported_feature"));
+			assertTrue(terrainParticle.contains("private boolean alphaTested;"),
+				"TerrainParticle must track alpha-test semantics separately from Iris opaque particle-layer routing");
+			assertTrue(terrainParticle.contains("|| type == net.minecraft.client.renderer.chunk.ChunkSectionLayer.CUTOUT_MIPPED"),
+				"cutout and cutout-mipped block particles must be recognized before Rust material submission");
+			assertTrue(terrainParticle.contains("!this.alphaTested"),
+				"leaf/cutout TerrainParticles must submit Rust cutout material mode so transparent texels discard instead of rendering black");
+		}
 
 	@Test
 	void rustBridgeIsOnlyRoutedFromSubsystemBenchmarkControls() throws Exception {

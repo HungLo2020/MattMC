@@ -15,8 +15,10 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 
 public final class VulkanicGalBridge implements AutoCloseable {
@@ -697,30 +699,63 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 28, quad.viewportWidth());
 			Struct.WORLD_BORDER_QUAD_REQUEST.setInt(item, 29, quad.viewportHeight());
 		}
-		MemorySegment materialArray = Struct.WORLD_MATERIAL_QUAD_REQUEST.array(arena, worldMaterialQuads.size());
+		MemorySegment materialArray = MemorySegment.NULL;
+		LinkedHashMap<WorldMaterialKeyRecord, Integer> materialTable = new LinkedHashMap<>();
+		int[] materialIndexes = new int[worldMaterialQuads.size()];
 		for (int i = 0; i < worldMaterialQuads.size(); i++) {
 			WorldMaterialQuadRecord quad = worldMaterialQuads.get(i);
-			MemorySegment item = Abi.item(materialArray, Struct.WORLD_MATERIAL_QUAD_REQUEST, i);
-			item.set(ValueLayout.JAVA_INT, Struct.WORLD_MATERIAL_QUAD_REQUEST.offset(0), Struct.WORLD_MATERIAL_QUAD_REQUEST.byteSize());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 1, quad.stratum());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 2, quad.materialId());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 3, quad.textureId());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 4, quad.materialMode());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 5, quad.depthPolicy());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 6, quad.cullPolicy());
-				Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 7, quad.topology());
-				Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 8, quad.colorArgb());
-				Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 9, quad.winding());
-			float[] vertices = quad.vertices();
-			for (int field = 0; field < 12; field++) {
-				item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_MATERIAL_QUAD_REQUEST.offset(10 + field), vertices[field]);
+			WorldMaterialKeyRecord key = WorldMaterialKeyRecord.from(quad);
+			Integer index = materialTable.get(key);
+			if (index == null) {
+				index = materialTable.size();
+				materialTable.put(key, index);
 			}
-			float[] uvs = quad.uvs();
-			for (int field = 0; field < 8; field++) {
-				item.set(ValueLayout.JAVA_FLOAT, Struct.WORLD_MATERIAL_QUAD_REQUEST.offset(22 + field), uvs[field]);
-			}
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 30, quad.viewportWidth());
-			Struct.WORLD_MATERIAL_QUAD_REQUEST.setInt(item, 31, quad.viewportHeight());
+			materialIndexes[i] = index;
+		}
+		MemorySegment materialTableArray = Struct.WORLD_MATERIAL_TABLE_RECORD.array(arena, materialTable.size());
+		int materialTableIndex = 0;
+		for (Map.Entry<WorldMaterialKeyRecord, Integer> entry : materialTable.entrySet()) {
+			WorldMaterialKeyRecord key = entry.getKey();
+			MemorySegment item = Abi.item(materialTableArray, Struct.WORLD_MATERIAL_TABLE_RECORD, materialTableIndex++);
+			item.set(ValueLayout.JAVA_INT, Struct.WORLD_MATERIAL_TABLE_RECORD.offset(0), Struct.WORLD_MATERIAL_TABLE_RECORD.byteSize());
+			Struct.WORLD_MATERIAL_TABLE_RECORD.setInt(item, 1, key.stratum());
+			Struct.WORLD_MATERIAL_TABLE_RECORD.setInt(item, 2, key.materialId());
+			Struct.WORLD_MATERIAL_TABLE_RECORD.setInt(item, 3, key.textureId());
+			Struct.WORLD_MATERIAL_TABLE_RECORD.setInt(item, 4, key.materialMode());
+			Struct.WORLD_MATERIAL_TABLE_RECORD.setInt(item, 5, key.depthPolicy());
+			Struct.WORLD_MATERIAL_TABLE_RECORD.setInt(item, 6, key.cullPolicy());
+			Struct.WORLD_MATERIAL_TABLE_RECORD.setInt(item, 7, key.topology());
+			Struct.WORLD_MATERIAL_TABLE_RECORD.setInt(item, 8, key.winding());
+			Struct.WORLD_MATERIAL_TABLE_RECORD.setInt(item, 9, 0);
+		}
+		MemorySegment compactMaterialArray = Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.array(arena, worldMaterialQuads.size());
+		for (int i = 0; i < worldMaterialQuads.size(); i++) {
+			WorldMaterialQuadRecord quad = worldMaterialQuads.get(i);
+			MemorySegment item = Abi.item(compactMaterialArray, Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST, i);
+			item.set(ValueLayout.JAVA_INT, Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.offset(0), Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.byteSize());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setInt(item, 1, materialIndexes[i]);
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setInt(item, 2, quad.colorArgb());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setInt(item, 3, 0);
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 4, quad.p0X());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 5, quad.p0Y());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 6, quad.p0Z());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 7, quad.p1X());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 8, quad.p1Y());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 9, quad.p1Z());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 10, quad.p2X());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 11, quad.p2Y());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 12, quad.p2Z());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 13, quad.p3X());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 14, quad.p3Y());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 15, quad.p3Z());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 16, quad.uv0U());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 17, quad.uv0V());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 18, quad.uv1U());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 19, quad.uv1V());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 20, quad.uv2U());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 21, quad.uv2V());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 22, quad.uv3U());
+			Struct.WORLD_MATERIAL_COMPACT_QUAD_REQUEST.setFloat(item, 23, quad.uv3V());
 		}
 		MemorySegment spriteArray = Struct.GUI_SPRITE_REQUEST.array(arena, guiSprites.size());
 		for (int i = 0; i < guiSprites.size(); i++) {
@@ -771,9 +806,11 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 12, segmentArray, worldSegments.size());
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 13, crackArray, worldCrackQuads.size());
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 14, borderArray, worldBorderQuads.size());
-		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 15, materialArray, worldMaterialQuads.size());
-		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 16, spriteArray, guiSprites.size());
-		Struct.WHOLE_FRAME_SUBMIT.setLong(request, 17, negotiatedFeatures);
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 15, materialArray, 0);
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 16, materialTableArray, materialTable.size());
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 17, compactMaterialArray, worldMaterialQuads.size());
+		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 18, spriteArray, guiSprites.size());
+		Struct.WHOLE_FRAME_SUBMIT.setLong(request, 19, negotiatedFeatures);
 		MemorySegment result = Struct.WHOLE_FRAME_SUBMIT_RESULT.allocate(arena);
 		checkStatus(
 			wholeFrame
@@ -1107,24 +1144,56 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int textureId,
 		int materialMode,
 		int depthPolicy,
-			int cullPolicy,
+		int cullPolicy,
 			int topology,
 			int winding,
 			int colorArgb,
-		float[] vertices,
-		float[] uvs,
+		float p0X,
+		float p0Y,
+		float p0Z,
+		float p1X,
+		float p1Y,
+		float p1Z,
+		float p2X,
+		float p2Y,
+		float p2Z,
+		float p3X,
+		float p3Y,
+		float p3Z,
+		float uv0U,
+		float uv0V,
+		float uv1U,
+		float uv1V,
+		float uv2U,
+		float uv2V,
+		float uv3U,
+		float uv3V,
 		int viewportWidth,
 		int viewportHeight
 	) {
-		public WorldMaterialQuadRecord {
-			Objects.requireNonNull(vertices, "vertices");
-			Objects.requireNonNull(uvs, "uvs");
-			if (vertices.length != 12) {
-				throw new IllegalArgumentException("world material quad requires four xyz vertices");
-			}
-			if (uvs.length != 8) {
-				throw new IllegalArgumentException("world material quad requires four uv pairs");
-			}
+	}
+
+	private record WorldMaterialKeyRecord(
+		int stratum,
+		int materialId,
+		int textureId,
+		int materialMode,
+		int depthPolicy,
+		int cullPolicy,
+		int topology,
+		int winding
+	) {
+		static WorldMaterialKeyRecord from(WorldMaterialQuadRecord quad) {
+			return new WorldMaterialKeyRecord(
+				quad.stratum(),
+				quad.materialId(),
+				quad.textureId(),
+				quad.materialMode(),
+				quad.depthPolicy(),
+				quad.cullPolicy(),
+				quad.topology(),
+				quad.winding()
+			);
 		}
 	}
 
@@ -1499,7 +1568,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				WORLD_CRACK_ASSET_UPDATE(58),
 				WORLD_MATERIAL_QUAD_REQUEST(59),
 				WORLD_MATERIAL_ASSET_PAYLOAD(60),
-				WORLD_MATERIAL_ASSET_UPDATE(61);
+				WORLD_MATERIAL_ASSET_UPDATE(61),
+				WORLD_MATERIAL_TABLE_RECORD(62),
+				WORLD_MATERIAL_COMPACT_QUAD_REQUEST(63);
 
 		private final int id;
 		private final int byteSize;
@@ -1554,6 +1625,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 
 		public int getInt(MemorySegment segment, int field) {
 			return segment.get(ValueLayout.JAVA_INT, offset(field));
+		}
+
+		public void setFloat(MemorySegment segment, int field, float value) {
+			segment.set(ValueLayout.JAVA_FLOAT, offset(field), value);
 		}
 
 		public void setLong(MemorySegment segment, int field, long value) {

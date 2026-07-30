@@ -4,8 +4,13 @@ import net.minecraft.util.profiling.TracyCompat;
 import net.minecraft.util.profiling.TracyCompat.Zone;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import net.vulkanic.gui.RustGalFrameCoordinator;
 
@@ -47,6 +52,8 @@ public final class GraphicsFrameBenchmark {
 	private static final double DISPLAY_FPS_TOLERANCE = Double.parseDouble(System.getProperty("mattmc.dev.graphicsFrameBenchmark.displayFpsTolerance", "0.40"));
 	private static final int DISPLAY_FPS_MIN_FRAMES = Math.max(1, Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.displayFpsMinFrames", 240));
 	private static final long DISPLAY_FPS_MIN_NANOS = Math.max(1L, Long.getLong("mattmc.dev.graphicsFrameBenchmark.displayFpsMinNanos", 2_000_000_000L));
+	private static final boolean DISPLAY_FPS_CHECK_ENABLED =
+		Boolean.parseBoolean(System.getProperty("mattmc.dev.graphicsFrameBenchmark.displayFpsCheckEnabled", "true"));
 	private static final long READINESS_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(Math.max(1L, Long.getLong("mattmc.dev.graphicsFrameBenchmark.readinessTimeoutSeconds", 120L)));
 	private static final boolean STOP_AFTER_COMPLETE = Boolean.parseBoolean(System.getProperty("mattmc.dev.graphicsFrameBenchmark.stopAfterComplete", "true"));
 	private static final int FORCED_ARMOR_VALUE = Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.armorValue", -1);
@@ -68,6 +75,13 @@ public final class GraphicsFrameBenchmark {
 		Float.parseFloat(System.getProperty("mattmc.dev.graphicsFrameBenchmark.mountMaxHealth", "NaN"));
 	private static final int FORCED_MOUNT_HEALTH_ROWS = Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.mountHealthRows", -1);
 	private static final String FORCED_GAME_MODE = System.getProperty("mattmc.dev.graphicsFrameBenchmark.gameMode", "").trim();
+	private static final boolean REAL_TERRAIN_PARTICLE_GAMEPLAY =
+		Boolean.getBoolean("mattmc.dev.rustGalWorldMaterial.terrainParticleRealGameplay");
+	private static final int REAL_TERRAIN_PARTICLE_MATERIAL_COUNT = 5;
+	private static final int REAL_TERRAIN_PARTICLE_RESET_FRAMES =
+		Math.max(12, Integer.getInteger("mattmc.dev.rustGalWorldMaterial.terrainParticleRealGameplayResetFrames", 48));
+	private static final int REAL_TERRAIN_PARTICLE_EFFECTS_PER_FRAME =
+		Math.max(1, Math.min(REAL_TERRAIN_PARTICLE_MATERIAL_COUNT, Integer.getInteger("mattmc.dev.rustGalWorldMaterial.terrainParticleRealGameplayEffectsPerFrame", REAL_TERRAIN_PARTICLE_MATERIAL_COUNT)));
 	private static final Path STATUS_PATH = Path.of(System.getProperty("mattmc.dev.graphicsFrameBenchmark.status", "run/graphics_frame_benchmark.json"));
 	private static final String WORKLOAD_COUNTER_DEFINITION_VERSION = "phase-family-v2";
 
@@ -111,6 +125,22 @@ public final class GraphicsFrameBenchmark {
 	private static GameType originalGameMode;
 	private static GameType originalPreviousGameMode;
 	private static boolean gameModeOverrideApplied;
+	private static BlockPos realTerrainParticleTarget;
+	private static BlockPos[] realTerrainParticleTargets = new BlockPos[0];
+	private static Direction realTerrainParticleDirection = Direction.NORTH;
+	private static int realTerrainParticleMaterialIndex;
+	private static long realTerrainParticleLastResetFrame = Long.MIN_VALUE;
+	private static int realTerrainParticleSetupCount;
+	private static int realTerrainParticleDriveCalls;
+	private static int realTerrainParticleStartCalls;
+	private static int realTerrainParticleContinueCalls;
+	private static int realTerrainParticleBreakingEffects;
+	private static int realTerrainParticleMaterialMask;
+	private static String realTerrainParticleStatus = "inactive";
+	private static String realTerrainParticleTargetText = "unset";
+	private static String realTerrainParticleBlockType = "unset";
+	private static final Map<String, Integer> TERRAIN_PARTICLE_ROUTE_COUNTS = new LinkedHashMap<>();
+	private static final Map<String, Long> TERRAIN_PARTICLE_ROUTE_NANOS = new LinkedHashMap<>();
 
 	private GraphicsFrameBenchmark() {
 	}
@@ -285,12 +315,13 @@ public final class GraphicsFrameBenchmark {
 		initialYaw = CAMERA_YAW;
 		initialPitch = CAMERA_PITCH;
 		player.setPos(initialPosition);
-		player.setYRot(initialYaw);
-		player.setXRot(initialPitch);
-		dimension = minecraft.level.dimension().location().toString();
-		writeStatus(minecraft, "initialized");
-		return true;
-	}
+			player.setYRot(initialYaw);
+			player.setXRot(initialPitch);
+			setupRealTerrainParticleGameplayBlock(minecraft, player);
+			dimension = minecraft.level.dimension().location().toString();
+			writeStatus(minecraft, "initialized");
+			return true;
+		}
 
 	private static void dismissKnownGameplayScreen(Minecraft minecraft) {
 		disableVoxelMapWelcomeScreen();
@@ -385,19 +416,157 @@ public final class GraphicsFrameBenchmark {
 		player.xxa = 0.0F;
 		player.zza = 0.0F;
 		player.setSprinting(false);
-		player.setShiftKeyDown(false);
-		player.setDeltaMovement(Vec3.ZERO);
-		player.setPos(initialPosition);
-		double period = Math.max(1.0, WARMUP_FRAMES + MEASURE_FRAMES);
-		float yaw = initialYaw + (float)Math.sin((frameIndex / period) * Math.PI * 2.0) * YAW_DELTA;
-		player.setYRot(yaw);
-		player.setXRot(initialPitch);
-		player.yRotO = yaw;
-		player.xRotO = initialPitch;
-		player.yHeadRot = yaw;
-		player.yHeadRotO = yaw;
-		player.yBodyRot = yaw;
-		player.yBodyRotO = yaw;
+			player.setShiftKeyDown(false);
+			player.setDeltaMovement(Vec3.ZERO);
+			player.setPos(initialPosition);
+			double period = Math.max(1.0, WARMUP_FRAMES + MEASURE_FRAMES);
+			float yaw = REAL_TERRAIN_PARTICLE_GAMEPLAY
+				? initialYaw
+				: initialYaw + (float)Math.sin((frameIndex / period) * Math.PI * 2.0) * YAW_DELTA;
+			player.setYRot(yaw);
+			player.setXRot(initialPitch);
+			player.yRotO = yaw;
+			player.xRotO = initialPitch;
+			player.yHeadRot = yaw;
+			player.yHeadRotO = yaw;
+			player.yBodyRot = yaw;
+			player.yBodyRotO = yaw;
+			driveRealTerrainParticleGameplay(minecraft, player);
+		}
+
+	private static void setupRealTerrainParticleGameplayBlock(Minecraft minecraft, LocalPlayer player) {
+		if (!REAL_TERRAIN_PARTICLE_GAMEPLAY || minecraft.level == null || player == null) {
+			return;
+		}
+		Vec3 eye = player.getEyePosition(1.0F);
+		Vec3 look = player.getLookAngle();
+		BlockPos center = BlockPos.containing(eye.add(look.scale(2.6)));
+		realTerrainParticleDirection = player.getDirection().getOpposite();
+		Direction rowDirection = player.getDirection().getClockWise();
+		BlockPos[] targets = new BlockPos[terrainParticleBenchmarkMaterialCount()];
+		int middle = terrainParticleBenchmarkMaterialCount() / 2;
+		for (int i = 0; i < targets.length; i++) {
+			targets[i] = center.relative(rowDirection, i - middle);
+			placeRealTerrainParticleBlock(minecraft, targets[i], terrainParticleBenchmarkState(i));
+		}
+		realTerrainParticleTargets = targets;
+		realTerrainParticleTarget = targets[0];
+		realTerrainParticleTargetText = terrainParticleTargetsText();
+		realTerrainParticleStatus = "setup-fixed-material-row";
+	}
+
+	private static void driveRealTerrainParticleGameplay(Minecraft minecraft, LocalPlayer player) {
+		if (!REAL_TERRAIN_PARTICLE_GAMEPLAY || minecraft.level == null || minecraft.gameMode == null || player == null || player.isSpectator()) {
+			realTerrainParticleStatus = REAL_TERRAIN_PARTICLE_GAMEPLAY ? "inactive" : "disabled";
+			return;
+		}
+		if (realTerrainParticleTargets.length != terrainParticleBenchmarkMaterialCount()) {
+			setupRealTerrainParticleGameplayBlock(minecraft, player);
+		}
+		if (realTerrainParticleTargets.length != terrainParticleBenchmarkMaterialCount()) {
+			realTerrainParticleStatus = "missing-target";
+			return;
+		}
+		realTerrainParticleDriveCalls++;
+		if (realTerrainParticleLastResetFrame == Long.MIN_VALUE || frameIndex - realTerrainParticleLastResetFrame >= REAL_TERRAIN_PARTICLE_RESET_FRAMES) {
+			for (int i = 0; i < realTerrainParticleTargets.length; i++) {
+				placeRealTerrainParticleBlock(minecraft, realTerrainParticleTargets[i], terrainParticleBenchmarkState(i));
+			}
+			minecraft.gameMode.stopDestroyBlock();
+			realTerrainParticleLastResetFrame = frameIndex;
+			realTerrainParticleMaterialIndex = (realTerrainParticleMaterialIndex + 1) % terrainParticleBenchmarkMaterialCount();
+			realTerrainParticleTarget = realTerrainParticleTargets[realTerrainParticleMaterialIndex];
+			minecraft.gameMode.startDestroyBlock(realTerrainParticleTarget, realTerrainParticleDirection);
+			realTerrainParticleStartCalls++;
+		}
+		BlockState state = minecraft.level.getBlockState(realTerrainParticleTarget);
+		if (state.isAir()) {
+			placeRealTerrainParticleBlock(minecraft, realTerrainParticleTarget, terrainParticleBenchmarkState(realTerrainParticleMaterialIndex));
+			state = minecraft.level.getBlockState(realTerrainParticleTarget);
+		}
+		realTerrainParticleBlockType = blockName(state);
+		realTerrainParticleTargetText = terrainParticleTargetsText();
+		if (realTerrainParticleStartCalls == 0) {
+			minecraft.gameMode.startDestroyBlock(realTerrainParticleTarget, realTerrainParticleDirection);
+			realTerrainParticleStartCalls++;
+		}
+		minecraft.gameMode.continueDestroyBlock(realTerrainParticleTarget, realTerrainParticleDirection);
+		realTerrainParticleContinueCalls++;
+		for (int i = 0; i < REAL_TERRAIN_PARTICLE_EFFECTS_PER_FRAME; i++) {
+			int materialIndex = (int)Math.floorMod(realTerrainParticleDriveCalls + i, terrainParticleBenchmarkMaterialCount());
+			BlockPos effectTarget = realTerrainParticleTargets[materialIndex];
+			BlockState effectState = minecraft.level.getBlockState(effectTarget);
+			if (effectState.isAir()) {
+				placeRealTerrainParticleBlock(minecraft, effectTarget, terrainParticleBenchmarkState(materialIndex));
+				effectState = minecraft.level.getBlockState(effectTarget);
+			}
+			realTerrainParticleMaterialMask |= 1 << materialIndex;
+			minecraft.level.addBreakingBlockEffect(effectTarget, realTerrainParticleDirection);
+			realTerrainParticleBreakingEffects++;
+		}
+		player.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
+		realTerrainParticleStatus = "fixed-frame-block-hit-effects";
+	}
+
+	private static void placeRealTerrainParticleBlock(Minecraft minecraft, BlockPos target, BlockState state) {
+		if (minecraft.level == null || target == null) {
+			return;
+		}
+		minecraft.level.setBlock(target, state, 3);
+		if (minecraft.getSingleplayerServer() != null) {
+			ServerLevel serverLevel = minecraft.getSingleplayerServer().getLevel(minecraft.level.dimension());
+			if (serverLevel != null) {
+				serverLevel.setBlock(target, state, 3);
+			}
+		}
+		realTerrainParticleSetupCount++;
+		realTerrainParticleLastResetFrame = frameIndex;
+		realTerrainParticleTargetText = target.toShortString();
+		realTerrainParticleBlockType = blockName(state);
+	}
+
+	private static int terrainParticleBenchmarkMaterialCount() {
+		return REAL_TERRAIN_PARTICLE_MATERIAL_COUNT;
+	}
+
+	private static BlockState terrainParticleBenchmarkState(int index) {
+		return switch (Math.floorMod(index, terrainParticleBenchmarkMaterialCount())) {
+			case 1 -> Blocks.DIRT.defaultBlockState();
+			case 2 -> Blocks.OAK_LEAVES.defaultBlockState();
+			case 3 -> Blocks.DEEPSLATE.defaultBlockState();
+			case 4 -> Blocks.WHITE_WOOL.defaultBlockState();
+			default -> Blocks.STONE.defaultBlockState();
+		};
+	}
+
+	private static String terrainParticleTargetsText() {
+		if (realTerrainParticleTargets.length == 0) {
+			return "unset";
+		}
+		StringBuilder text = new StringBuilder();
+		for (int i = 0; i < realTerrainParticleTargets.length; i++) {
+			if (i > 0) {
+				text.append(';');
+			}
+			text.append(i).append('=').append(realTerrainParticleTargets[i].toShortString());
+		}
+		return text.toString();
+	}
+
+	public static void recordTerrainParticleExtraction(String route, BlockState blockState, long nanos) {
+		if (!REAL_TERRAIN_PARTICLE_GAMEPLAY) {
+			return;
+		}
+		String normalizedRoute = route == null || route.isBlank() ? "unknown" : route.trim();
+		TERRAIN_PARTICLE_ROUTE_COUNTS.merge(normalizedRoute, 1, Integer::sum);
+		TERRAIN_PARTICLE_ROUTE_NANOS.merge(normalizedRoute, Math.max(0L, nanos), Long::sum);
+		recordSubmittedWorkIdentity("terrain-particles", normalizedRoute + ":" + blockName(blockState));
+	}
+
+	private static String blockName(BlockState blockState) {
+		return blockState == null
+			? "missing"
+			: blockState.getBlock().builtInRegistryHolder().key().location().toString();
 	}
 
 	private static void fail(Minecraft minecraft, String reason) {
@@ -448,13 +617,15 @@ public final class GraphicsFrameBenchmark {
 		json.append("  \"window\": { \"width\": ").append(minecraft.getWindow().getWidth()).append(", \"height\": ").append(minecraft.getWindow().getHeight()).append(" },\n");
 		writeRuntimeState(json, minecraft);
 		json.append(",\n");
-		json.append("  \"cameraPath\": { \"type\": \"settled-sine-yaw\", \"yawDelta\": ").append(format(YAW_DELTA))
-			.append(", \"initialYaw\": ").append(format(initialYaw))
-			.append(", \"initialPitch\": ").append(format(initialPitch))
-			.append(", \"initialPosition\": { \"x\": ").append(format(initialPosition.x))
-			.append(", \"y\": ").append(format(initialPosition.y))
-			.append(", \"z\": ").append(format(initialPosition.z)).append(" } },\n");
-		writeValidity(json);
+			json.append("  \"cameraPath\": { \"type\": \"settled-sine-yaw\", \"yawDelta\": ").append(format(YAW_DELTA))
+				.append(", \"initialYaw\": ").append(format(initialYaw))
+				.append(", \"initialPitch\": ").append(format(initialPitch))
+				.append(", \"initialPosition\": { \"x\": ").append(format(initialPosition.x))
+				.append(", \"y\": ").append(format(initialPosition.y))
+				.append(", \"z\": ").append(format(initialPosition.z)).append(" } },\n");
+			writeTerrainParticleRealGameplay(json);
+			json.append(",\n");
+			writeValidity(json);
 		json.append(",\n");
 		json.append("  \"java\": {\n");
 		json.append("    \"gcCountDelta\": ").append(delta(gcCountAtStart, gcCountAtEnd)).append(",\n");
@@ -541,7 +712,7 @@ public final class GraphicsFrameBenchmark {
 		double displayedFps = displayedFpsAtMeasurementEnd > 0 ? displayedFpsAtMeasurementEnd : displayedFpsAtMeasurementStart;
 		double displayedRatio = measuredFps > 0.0 && displayedFps > 0.0 ? Math.abs(measuredFps - displayedFps) / measuredFps : -1.0;
 		boolean wallClockOk = wallClockRatio >= 0.0 && wallClockRatio <= WALL_CLOCK_TOLERANCE;
-		boolean displayedRequired = FRAME_NANOS.size() >= DISPLAY_FPS_MIN_FRAMES && wallClock >= DISPLAY_FPS_MIN_NANOS;
+		boolean displayedRequired = DISPLAY_FPS_CHECK_ENABLED && FRAME_NANOS.size() >= DISPLAY_FPS_MIN_FRAMES && wallClock >= DISPLAY_FPS_MIN_NANOS;
 		boolean displayedOk = !displayedRequired || displayedRatio < 0.0 || displayedRatio <= DISPLAY_FPS_TOLERANCE;
 		json.append("  \"validity\": {\n");
 		json.append("    \"sampleSumNanos\": ").append(sampleSum).append(",\n");
@@ -551,6 +722,7 @@ public final class GraphicsFrameBenchmark {
 		json.append("    \"measuredAverageFps\": ").append(format(measuredFps)).append(",\n");
 		json.append("    \"displayedFpsAtMeasurementStart\": ").append(displayedFpsAtMeasurementStart).append(",\n");
 		json.append("    \"displayedFpsAtMeasurementEnd\": ").append(displayedFpsAtMeasurementEnd).append(",\n");
+		json.append("    \"displayedFpsCheckEnabled\": ").append(DISPLAY_FPS_CHECK_ENABLED).append(",\n");
 		json.append("    \"displayedFpsCheckRequired\": ").append(displayedRequired).append(",\n");
 		json.append("    \"displayedFpsRelativeError\": ").append(format(displayedRatio)).append(",\n");
 		json.append("    \"displayedFpsCheckPassed\": ").append(displayedOk).append("\n");
@@ -568,10 +740,44 @@ public final class GraphicsFrameBenchmark {
 		json.append("]");
 	}
 
+	private static void writeTerrainParticleRealGameplay(StringBuilder json) {
+		json.append("  \"terrainParticleRealGameplay\": {\n");
+		json.append("    \"enabled\": ").append(REAL_TERRAIN_PARTICLE_GAMEPLAY).append(",\n");
+		field(json, "routeControl", terrainParticleRouteControl(), 4, true);
+		field(json, "status", realTerrainParticleStatus, 4, true);
+		field(json, "target", realTerrainParticleTargetText, 4, true);
+		field(json, "blockType", realTerrainParticleBlockType, 4, true);
+		json.append("    \"setupCount\": ").append(realTerrainParticleSetupCount).append(",\n");
+		json.append("    \"driveCalls\": ").append(realTerrainParticleDriveCalls).append(",\n");
+		json.append("    \"startCalls\": ").append(realTerrainParticleStartCalls).append(",\n");
+		json.append("    \"continueCalls\": ").append(realTerrainParticleContinueCalls).append(",\n");
+		json.append("    \"breakingEffects\": ").append(realTerrainParticleBreakingEffects).append(",\n");
+		json.append("    \"effectsPerFrame\": ").append(REAL_TERRAIN_PARTICLE_EFFECTS_PER_FRAME).append(",\n");
+		json.append("    \"materialCount\": ").append(terrainParticleBenchmarkMaterialCount()).append(",\n");
+		json.append("    \"expectedMaterialMask\": ").append((1 << terrainParticleBenchmarkMaterialCount()) - 1).append(",\n");
+		json.append("    \"materialMask\": ").append(realTerrainParticleMaterialMask).append(",\n");
+		writeStringIntMap(json, "routeCounts", TERRAIN_PARTICLE_ROUTE_COUNTS);
+		json.append(",\n");
+		writeStringLongMap(json, "routeNanos", TERRAIN_PARTICLE_ROUTE_NANOS);
+		json.append("\n  }");
+	}
+
 	private static void writeStringIntMap(StringBuilder json, String name, Map<String, Integer> values) {
 		json.append("  \"").append(name).append("\": {");
 		int index = 0;
 		for (Map.Entry<String, Integer> entry : values.entrySet()) {
+			if (index++ > 0) {
+				json.append(", ");
+			}
+			json.append('"').append(escape(entry.getKey())).append("\": ").append(entry.getValue());
+		}
+		json.append("}");
+	}
+
+	private static void writeStringLongMap(StringBuilder json, String name, Map<String, Long> values) {
+		json.append("  \"").append(name).append("\": {");
+		int index = 0;
+		for (Map.Entry<String, Long> entry : values.entrySet()) {
 			if (index++ > 0) {
 				json.append(", ");
 			}
@@ -752,6 +958,16 @@ public final class GraphicsFrameBenchmark {
 		}
 		if (Boolean.getBoolean("mattmc.dev.rustGalGui.legacyControl")) {
 			return "all-legacy";
+		}
+		return "rust";
+	}
+
+	private static String terrainParticleRouteControl() {
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldMaterial.terrainParticle.disabled")) {
+			return "disabled";
+		}
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldMaterial.terrainParticle.legacyControl")) {
+			return "legacy";
 		}
 		return "rust";
 	}

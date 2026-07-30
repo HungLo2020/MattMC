@@ -23,6 +23,7 @@ import net.minecraft.Util;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.color.block.BlockTintCache;
+import net.minecraft.client.dev.DeterministicCameraCapture;
 import net.minecraft.client.gui.screens.WinScreen;
 import net.minecraft.client.multiplayer.prediction.BlockStatePredictionHandler;
 import net.minecraft.client.particle.FireworkParticles;
@@ -131,6 +132,7 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 	private static final double FLUID_PARTICLE_SPAWN_OFFSET = 0.05;
 	private static final int NORMAL_LIGHT_UPDATES_PER_FRAME = 10;
 	private static int deterministicBlockMarkerSpawnLogs;
+	private static int deterministicTerrainParticleSpawnLogs;
 	private static final int LIGHT_UPDATE_QUEUE_SIZE_THRESHOLD = 1000;
 	final EntityTickList tickingEntities = new EntityTickList();
 	private final TransientEntitySectionManager<Entity> entityStorage = new TransientEntitySectionManager(Entity.class, new ClientLevel.EntityCallbacks());
@@ -139,6 +141,7 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 	private final LevelEventHandler levelEventHandler;
 	private final ClientLevel.ClientLevelData clientLevelData;
 	private String deterministicBlockMarkerSpawnedScenario = "";
+	private String deterministicTerrainParticleSpawnedScenario = "";
 	private final DimensionSpecialEffects effects;
 	private final TickRateManager tickRateManager;
 	@Nullable
@@ -474,6 +477,7 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 			this.doAnimateTick(i, j, k, 32, randomSource, block, mutableBlockPos);
 		}
 		this.spawnDeterministicBlockMarkerParticles();
+		this.spawnDeterministicTerrainParticles();
 	}
 
 	@Nullable
@@ -586,6 +590,73 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 			"[MattMC graphics audit] BlockMarker deterministic particle"
 				+ " scenario=" + scenario
 				+ " texture_id=" + textureId
+				+ " position=" + x + "," + y + "," + z
+				+ " result=spawned"
+		);
+	}
+
+	private void spawnDeterministicTerrainParticles() {
+		String scenario = System.getProperty("mattmc.dev.rustGalWorldMaterial.terrainParticleScenario", "").trim();
+		if (scenario.isEmpty() || scenario.equals("hidden")) {
+			return;
+		}
+		if (Boolean.getBoolean("mattmc.dev.deterministicCameraCapture") && !DeterministicCameraCapture.isActiveForDiagnostics()) {
+			return;
+		}
+		if (scenario.equals(this.deterministicTerrainParticleSpawnedScenario)) {
+			return;
+		}
+		if (this.minecraft.player == null) {
+			return;
+		}
+		Vec3 eye = this.minecraft.player.getEyePosition();
+		Vec3 look = this.minecraft.player.getLookAngle();
+		double x = eye.x + look.x * 3.0;
+		double y = eye.y + look.y * 3.0;
+		double z = eye.z + look.z * 3.0;
+		if (scenario.equals("mixed-many")) {
+			BlockState[] states = new BlockState[] {
+				Blocks.STONE.defaultBlockState(),
+				Blocks.DIRT.defaultBlockState(),
+				Blocks.OAK_LEAVES.defaultBlockState(),
+				Blocks.DEEPSLATE.defaultBlockState(),
+				Blocks.WHITE_WOOL.defaultBlockState()
+			};
+			for (int index = 0; index < 20; index++) {
+				BlockState state = states[index % states.length];
+				double offsetX = (index % 5 - 2.0) * 0.32;
+				double offsetY = (index / 5 - 1.5) * 0.32;
+				this.addParticle(new BlockParticleOption(ParticleTypes.BLOCK, state), x + offsetX, y + offsetY, z, 0.0, 0.0, 0.0);
+				this.auditDeterministicTerrainParticleSpawn(scenario, state, x + offsetX, y + offsetY, z);
+			}
+			this.deterministicTerrainParticleSpawnedScenario = scenario;
+			return;
+		}
+		BlockState state = switch (scenario) {
+			case "stone" -> Blocks.STONE.defaultBlockState();
+			case "dirt" -> Blocks.DIRT.defaultBlockState();
+			case "oak-leaves" -> Blocks.OAK_LEAVES.defaultBlockState();
+			case "deepslate" -> Blocks.DEEPSLATE.defaultBlockState();
+			case "white-wool" -> Blocks.WHITE_WOOL.defaultBlockState();
+			default -> null;
+		};
+		if (state == null) {
+			return;
+		}
+		this.addParticle(new BlockParticleOption(ParticleTypes.BLOCK, state), x, y, z, 0.0, 0.0, 0.0);
+		this.auditDeterministicTerrainParticleSpawn(scenario, state, x, y, z);
+		this.deterministicTerrainParticleSpawnedScenario = scenario;
+	}
+
+	private void auditDeterministicTerrainParticleSpawn(String scenario, BlockState state, double x, double y, double z) {
+		if (deterministicTerrainParticleSpawnLogs >= 32 || !Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
+			return;
+		}
+		deterministicTerrainParticleSpawnLogs++;
+		System.out.println(
+			"[MattMC graphics audit] TerrainParticle deterministic particle"
+				+ " scenario=" + scenario
+				+ " block=" + state.getBlock().builtInRegistryHolder().key().location()
 				+ " position=" + x + "," + y + "," + z
 				+ " result=spawned"
 		);

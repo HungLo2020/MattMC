@@ -401,6 +401,10 @@ public final class DeterministicCameraCapture {
 		return !ENABLED || !initialized || SETTLED_READY_FRAMES <= 0 || settledReadyGateSatisfied || poseIndex > 0;
 	}
 
+	public static boolean isActiveForDiagnostics() {
+		return ENABLED && initialized && !complete && !failed;
+	}
+
 	public static String currentPoseNameForDiagnostics() {
 		if (!ENABLED || !initialized || poses == null) {
 			return "none";
@@ -1438,6 +1442,8 @@ public final class DeterministicCameraCapture {
 		appendField(json, "rustGalWorldOutlineDepthPolicy", System.getProperty("mattmc.dev.rustGalWorldOutline.depthPolicy", "")).append(",\n");
 		appendField(json, "rustGalWorldMaterialMarkerScenario", System.getProperty("mattmc.dev.rustGalWorldMaterial.blockMarkerScenario", "")).append(",\n");
 		appendBlockMarkerDiagnostics(json).append(",\n");
+		appendField(json, "rustGalWorldTerrainParticleScenario", System.getProperty("mattmc.dev.rustGalWorldMaterial.terrainParticleScenario", "")).append(",\n");
+		appendTerrainParticleDiagnostics(json).append(",\n");
 		json.append("  \"rustGalWorldOutlineDepthProbe\": ").append(Boolean.getBoolean("mattmc.dev.rustGalWorldOutline.depthProbe")).append(",\n");
 		json.append("  \"blockOutlineRealTargetForced\": ").append(FORCE_BLOCK_OUTLINE_TARGET).append(",\n");
 		json.append("  \"blockOutlineRealTargetAimed\": ").append(AIM_BLOCK_OUTLINE_TARGET).append(",\n");
@@ -1672,6 +1678,47 @@ public final class DeterministicCameraCapture {
 				.append(", \"top\": ").append(format(marker.screenTop()))
 				.append(", \"right\": ").append(format(marker.screenRight()))
 				.append(", \"bottom\": ").append(format(marker.screenBottom())).append(" }");
+			json.append(" }");
+		}
+		if (!diagnostics.isEmpty()) {
+			json.append("\n  ");
+		}
+		json.append("]");
+		return json;
+	}
+
+	private static StringBuilder appendTerrainParticleDiagnostics(StringBuilder json) {
+		List<RustGalWorldPrimitiveRenderer.TerrainParticleDiagnostic> diagnostics =
+			RustGalWorldPrimitiveRenderer.terrainParticleDiagnostics();
+		json.append("  \"rustGalWorldTerrainParticles\": [");
+		for (int i = 0; i < diagnostics.size(); i++) {
+			RustGalWorldPrimitiveRenderer.TerrainParticleDiagnostic particle = diagnostics.get(i);
+			if (i > 0) {
+				json.append(",");
+			}
+			json.append("\n    { ");
+			json.append("\"frameIndex\": ").append(particle.frameIndex()).append(", ");
+			appendField(json, "route", particle.route(), 0).append(", ");
+			json.append("\"textureId\": ").append(particle.textureId()).append(", ");
+			appendField(json, "spriteId", particle.spriteId(), 0).append(", ");
+			json.append("\"center\": { \"x\": ").append(format(particle.centerX()))
+				.append(", \"y\": ").append(format(particle.centerY()))
+				.append(", \"z\": ").append(format(particle.centerZ())).append(" }, ");
+			json.append("\"quadSize\": ").append(format(particle.quadSize())).append(", ");
+			json.append("\"colorArgb\": ").append(Integer.toUnsignedLong(particle.colorArgb())).append(", ");
+			json.append("\"packedLight\": ").append(particle.packedLight()).append(", ");
+			json.append("\"materialMode\": ").append(particle.materialMode()).append(", ");
+			json.append("\"uv\": { \"u0\": ").append(format(particle.localU0()))
+				.append(", \"u1\": ").append(format(particle.localU1()))
+				.append(", \"v0\": ").append(format(particle.localV0()))
+				.append(", \"v1\": ").append(format(particle.localV1())).append(" }, ");
+			json.append("\"viewport\": { \"width\": ").append(particle.viewportWidth())
+				.append(", \"height\": ").append(particle.viewportHeight()).append(" }, ");
+			json.append("\"projected\": ").append(particle.projected()).append(", ");
+			json.append("\"screenBounds\": { \"left\": ").append(format(particle.screenLeft()))
+				.append(", \"top\": ").append(format(particle.screenTop()))
+				.append(", \"right\": ").append(format(particle.screenRight()))
+				.append(", \"bottom\": ").append(format(particle.screenBottom())).append(" }");
 			json.append(" }");
 		}
 		if (!diagnostics.isEmpty()) {

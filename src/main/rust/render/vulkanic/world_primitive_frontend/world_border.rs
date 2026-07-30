@@ -34,7 +34,8 @@ pub(super) fn validate_quad(
             format!("unknown world border depth policy {}", quad.depth_policy),
         ));
     }
-    if quad.viewport_width != frame.viewport_width || quad.viewport_height != frame.viewport_height {
+    if quad.viewport_width != frame.viewport_width || quad.viewport_height != frame.viewport_height
+    {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
             "world border viewport metadata must match the frame viewport",

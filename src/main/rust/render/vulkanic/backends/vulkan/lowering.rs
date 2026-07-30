@@ -235,21 +235,17 @@ impl SubmissionLowerer {
                             layer_count: 1,
                         };
                         let to_attachment = vk::ImageMemoryBarrier2::default()
-                            .src_stage_mask(
-                                if old_layout == vk::ImageLayout::PRESENT_SRC_KHR {
-                                    vk::PipelineStageFlags2::BOTTOM_OF_PIPE
-                                } else {
-                                    vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT
-                                },
-                            )
-                            .src_access_mask(
-                                if old_layout == vk::ImageLayout::PRESENT_SRC_KHR {
-                                    vk::AccessFlags2::empty()
-                                } else {
-                                    vk::AccessFlags2::COLOR_ATTACHMENT_READ
-                                        | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE
-                                },
-                            )
+                            .src_stage_mask(if old_layout == vk::ImageLayout::PRESENT_SRC_KHR {
+                                vk::PipelineStageFlags2::BOTTOM_OF_PIPE
+                            } else {
+                                vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT
+                            })
+                            .src_access_mask(if old_layout == vk::ImageLayout::PRESENT_SRC_KHR {
+                                vk::AccessFlags2::empty()
+                            } else {
+                                vk::AccessFlags2::COLOR_ATTACHMENT_READ
+                                    | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE
+                            })
                             .dst_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
                             .dst_access_mask(
                                 vk::AccessFlags2::COLOR_ATTACHMENT_READ

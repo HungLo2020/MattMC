@@ -6,6 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.dev.DeterministicCameraCapture;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.state.BlockOutlineRenderState;
 import net.minecraft.client.renderer.state.WorldBorderRenderState;
 import net.minecraft.client.renderer.state.BlockBreakingRenderState;
@@ -20,6 +21,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LightBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -45,6 +47,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public final class RustGalWorldPrimitiveRenderer {
@@ -60,8 +63,14 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static final int DEPTH_POLICY_TEST_NO_WRITE = 2;
 	public static final int BORDER_TEXTURE_FORCEFIELD = 1;
 	public static final int MATERIAL_TEXTURE_STONE = 1;
+	public static final int MATERIAL_TEXTURE_DIRT = 2;
+	public static final int MATERIAL_TEXTURE_OAK_LEAVES = 3;
+	public static final int MATERIAL_TEXTURE_DEEPSLATE = 4;
+	public static final int MATERIAL_TEXTURE_WHITE_WOOL = 5;
 	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER = 100;
 	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00 = 200;
+	public static final int MATERIAL_ID_OPAQUE_TEXTURED = 1;
+	public static final int MATERIAL_ID_CUTOUT_TEXTURED = 2;
 	public static final int MATERIAL_ID_BLOCK_MARKER_CUTOUT = 100;
 	public static final int MATERIAL_MODE_OPAQUE = 1;
 	public static final int MATERIAL_MODE_CUTOUT = 2;
@@ -89,7 +98,19 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final boolean BLOCK_OUTLINE_DIAGNOSTICS = Boolean.getBoolean("mattmc.dev.blockOutlineDiagnostics");
 	private static final boolean CRACK_DISABLED_CONTROL = Boolean.getBoolean("mattmc.dev.rustGalWorldCrack.disabled");
 	private static final ResourceLocation FORCEFIELD_LOCATION = ResourceLocation.withDefaultNamespace("textures/misc/forcefield.png");
+	private static final ResourceLocation STONE_TEXTURE_LOCATION = ResourceLocation.withDefaultNamespace("textures/block/stone.png");
+	private static final ResourceLocation DIRT_TEXTURE_LOCATION = ResourceLocation.withDefaultNamespace("textures/block/dirt.png");
+	private static final ResourceLocation OAK_LEAVES_TEXTURE_LOCATION = ResourceLocation.withDefaultNamespace("textures/block/oak_leaves.png");
+	private static final ResourceLocation DEEPSLATE_TEXTURE_LOCATION = ResourceLocation.withDefaultNamespace("textures/block/deepslate.png");
+	private static final ResourceLocation WHITE_WOOL_TEXTURE_LOCATION = ResourceLocation.withDefaultNamespace("textures/block/white_wool.png");
 	private static final ResourceLocation BARRIER_MARKER_LOCATION = ResourceLocation.withDefaultNamespace("textures/item/barrier.png");
+	private static final Map<Block, Integer> TERRAIN_PARTICLE_TEXTURE_IDS = Map.of(
+		Blocks.STONE, MATERIAL_TEXTURE_STONE,
+		Blocks.DIRT, MATERIAL_TEXTURE_DIRT,
+		Blocks.OAK_LEAVES, MATERIAL_TEXTURE_OAK_LEAVES,
+		Blocks.DEEPSLATE, MATERIAL_TEXTURE_DEEPSLATE,
+		Blocks.WHITE_WOOL, MATERIAL_TEXTURE_WHITE_WOOL
+	);
 	private static final ResourceLocation[] CRACK_STAGE_LOCATIONS = new ResourceLocation[] {
 		ResourceLocation.withDefaultNamespace("textures/block/destroy_stage_0.png"),
 		ResourceLocation.withDefaultNamespace("textures/block/destroy_stage_1.png"),
@@ -125,7 +146,11 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final List<VulkanicGalBridge.WorldCrackQuadRecord> PENDING_CRACK_QUADS = new ArrayList<>();
 	private static final List<VulkanicGalBridge.WorldBorderQuadRecord> PENDING_BORDER_QUADS = new ArrayList<>();
 	private static final List<VulkanicGalBridge.WorldMaterialQuadRecord> PENDING_MATERIAL_QUADS = new ArrayList<>();
+	private static final float[] MATERIAL_VERTEX_SCRATCH = new float[12];
+	private static final Vector3f MATERIAL_BILLBOARD_VERTEX_SCRATCH = new Vector3f();
+	private static final float[] MATERIAL_BILLBOARD_CORNERS = {1.0F, -1.0F, 1.0F, 1.0F, -1.0F, 1.0F, -1.0F, -1.0F};
 	private static final List<BlockMarkerDiagnostic> BLOCK_MARKER_DIAGNOSTICS = new ArrayList<>();
+	private static final List<TerrainParticleDiagnostic> TERRAIN_PARTICLE_DIAGNOSTICS = new ArrayList<>();
 	private static final float[] PENDING_VIEW = new float[16];
 	private static final float[] PENDING_PROJECTION = new float[16];
 	private static VulkanicGalBridge.WorldBackgroundRecord pendingBackground = VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback();
@@ -164,6 +189,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static int pendingViewportHeight;
 	private static int blockOutlineProjectionDiagnosticLogs;
 	private static int blockMarkerEnqueueDiagnosticLogs;
+	private static int terrainParticleEnqueueDiagnosticLogs;
 
 	private RustGalWorldPrimitiveRenderer() {
 	}
@@ -198,6 +224,12 @@ public final class RustGalWorldPrimitiveRenderer {
 
 	public static boolean shouldUseRustOpenGlMaterial() {
 		return WorldRenderRoutePolicy.currentMaterialRoute().usesRustOpenGl();
+	}
+
+	public static boolean shouldRouteTerrainParticle(BlockState blockState) {
+		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentMaterialRoute();
+		return (route.usesRustOpenGl() || route.usesRustWholeFrameVulkan())
+			&& terrainParticleTextureId(blockState) != 0;
 	}
 
 	public static boolean shouldUseRustOpenGlWorldPrimitives() {
@@ -591,10 +623,15 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	private static WorldMaterialAssetCandidate[] worldMaterialAssetCandidates() {
-		WorldMaterialAssetCandidate[] candidates = new WorldMaterialAssetCandidate[1 + LIGHT_MARKER_LOCATIONS.length];
-		candidates[0] = new WorldMaterialAssetCandidate(MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER, BARRIER_MARKER_LOCATION);
+		WorldMaterialAssetCandidate[] candidates = new WorldMaterialAssetCandidate[6 + LIGHT_MARKER_LOCATIONS.length];
+		candidates[0] = new WorldMaterialAssetCandidate(MATERIAL_TEXTURE_STONE, STONE_TEXTURE_LOCATION);
+		candidates[1] = new WorldMaterialAssetCandidate(MATERIAL_TEXTURE_DIRT, DIRT_TEXTURE_LOCATION);
+		candidates[2] = new WorldMaterialAssetCandidate(MATERIAL_TEXTURE_OAK_LEAVES, OAK_LEAVES_TEXTURE_LOCATION);
+		candidates[3] = new WorldMaterialAssetCandidate(MATERIAL_TEXTURE_DEEPSLATE, DEEPSLATE_TEXTURE_LOCATION);
+		candidates[4] = new WorldMaterialAssetCandidate(MATERIAL_TEXTURE_WHITE_WOOL, WHITE_WOOL_TEXTURE_LOCATION);
+		candidates[5] = new WorldMaterialAssetCandidate(MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER, BARRIER_MARKER_LOCATION);
 		for (int i = 0; i < LIGHT_MARKER_LOCATIONS.length; i++) {
-			candidates[i + 1] = new WorldMaterialAssetCandidate(MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00 + i, LIGHT_MARKER_LOCATIONS[i]);
+			candidates[i + 6] = new WorldMaterialAssetCandidate(MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00 + i, LIGHT_MARKER_LOCATIONS[i]);
 		}
 		return candidates;
 	}
@@ -756,7 +793,8 @@ public final class RustGalWorldPrimitiveRenderer {
 			float centerX = (float)(Mth.lerp(partialTick, xo, x) - cameraPos.x());
 			float centerY = (float)(Mth.lerp(partialTick, yo, y) - cameraPos.y());
 			float centerZ = (float)(Mth.lerp(partialTick, zo, z) - cameraPos.z());
-			float[] vertices = billboardVertices(camera.rotation(), centerX, centerY, centerZ, quadSize);
+			float[] vertices = MATERIAL_VERTEX_SCRATCH;
+			billboardVertices(camera.rotation(), centerX, centerY, centerZ, quadSize, vertices);
 			ProjectedBounds projectedBounds = projectBounds(vertices, viewportWidth, viewportHeight);
 			PENDING_MATERIAL_QUADS.add(new VulkanicGalBridge.WorldMaterialQuadRecord(
 				STRATUM_WORLD_MATERIAL,
@@ -768,8 +806,26 @@ public final class RustGalWorldPrimitiveRenderer {
 				WORLD_TOPOLOGY_TRIANGLES,
 				WORLD_WINDING_CCW,
 				colorArgb,
-				vertices,
-				new float[] {1.0F, 1.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F},
+				vertices[0],
+				vertices[1],
+				vertices[2],
+				vertices[3],
+				vertices[4],
+				vertices[5],
+				vertices[6],
+				vertices[7],
+				vertices[8],
+				vertices[9],
+				vertices[10],
+				vertices[11],
+				1.0F,
+				1.0F,
+				1.0F,
+				0.0F,
+				0.0F,
+				0.0F,
+				0.0F,
+				1.0F,
 				viewportWidth,
 				viewportHeight
 			));
@@ -843,6 +899,178 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
+	public static boolean enqueueTerrainParticle(
+		BlockState blockState,
+		ResourceLocation spriteId,
+		Camera camera,
+		double xo,
+		double x,
+		double yo,
+		double y,
+		double zo,
+		double z,
+		Quaternionf rotation,
+		float partialTick,
+		float quadSize,
+		float localU0,
+		float localU1,
+		float localV0,
+		float localV1,
+		int colorArgb,
+		int packedLight,
+		boolean opaque
+	) {
+		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentMaterialRoute();
+		if (!route.usesRustOpenGl() && !route.usesRustWholeFrameVulkan()) {
+			return false;
+		}
+		int textureId = terrainParticleTextureId(blockState);
+		if (textureId == 0) {
+			return false;
+		}
+		synchronized (LOCK) {
+			int viewportWidth = pendingViewportWidth;
+			int viewportHeight = pendingViewportHeight;
+			if (viewportWidth <= 0 || viewportHeight <= 0) {
+				throw new IllegalStateException("Rust VulkanicGAL TerrainParticle requires a seeded world primitive frame");
+			}
+			Vec3 cameraPos = camera.getPosition();
+			float centerX = (float)(Mth.lerp(partialTick, xo, x) - cameraPos.x());
+			float centerY = (float)(Mth.lerp(partialTick, yo, y) - cameraPos.y());
+			float centerZ = (float)(Mth.lerp(partialTick, zo, z) - cameraPos.z());
+			float[] vertices = MATERIAL_VERTEX_SCRATCH;
+			billboardVertices(rotation, centerX, centerY, centerZ, quadSize, vertices);
+			int materialMode = opaque ? MATERIAL_MODE_OPAQUE : MATERIAL_MODE_CUTOUT;
+			int materialId = opaque ? MATERIAL_ID_OPAQUE_TEXTURED : MATERIAL_ID_CUTOUT_TEXTURED;
+			int litColor = applyPackedLight(colorArgb, packedLight);
+			PENDING_MATERIAL_QUADS.add(new VulkanicGalBridge.WorldMaterialQuadRecord(
+				STRATUM_WORLD_MATERIAL,
+				materialId,
+				textureId,
+				materialMode,
+				DEPTH_POLICY_TEST_WRITE,
+				CULL_NONE,
+				WORLD_TOPOLOGY_TRIANGLES,
+				WORLD_WINDING_CCW,
+				litColor,
+				vertices[0],
+				vertices[1],
+				vertices[2],
+				vertices[3],
+				vertices[4],
+				vertices[5],
+				vertices[6],
+				vertices[7],
+				vertices[8],
+				vertices[9],
+				vertices[10],
+				vertices[11],
+				localU1,
+				localV1,
+				localU1,
+				localV0,
+				localU0,
+				localV0,
+				localU0,
+				localV1,
+				viewportWidth,
+				viewportHeight
+			));
+			ProjectedBounds projectedBounds = projectBounds(vertices, viewportWidth, viewportHeight);
+			recordTerrainParticleDiagnostic(
+				route.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame" : "rust-opengl",
+				textureId,
+				spriteId == null ? "unknown" : spriteId.toString(),
+				centerX,
+				centerY,
+				centerZ,
+				quadSize,
+				litColor,
+				packedLight,
+				materialMode,
+				localU0,
+				localU1,
+				localV0,
+				localV1,
+				viewportWidth,
+				viewportHeight,
+				projectedBounds
+			);
+			if (terrainParticleEnqueueDiagnosticLogs < 24) {
+				terrainParticleEnqueueDiagnosticLogs++;
+				auditMessage("Rust VulkanicGAL TerrainParticle semantic request"
+					+ " route=" + (route.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame" : "rust-opengl")
+					+ " texture_id=" + textureId
+					+ " material_id=" + materialId
+					+ " mode=" + materialMode
+					+ " sprite=" + metricValue(spriteId == null ? "unknown" : spriteId.toString())
+					+ " viewport=" + viewportWidth + "x" + viewportHeight
+					+ " center=" + centerX + "," + centerY + "," + centerZ
+					+ " quad_size=" + quadSize
+					+ " light=" + packedLight
+					+ " result=queued");
+			}
+		}
+		return true;
+	}
+
+	private static void recordTerrainParticleDiagnostic(
+		String route,
+		int textureId,
+		String spriteId,
+		float centerX,
+		float centerY,
+		float centerZ,
+		float quadSize,
+		int colorArgb,
+		int packedLight,
+		int materialMode,
+		float localU0,
+		float localU1,
+		float localV0,
+		float localV1,
+		int viewportWidth,
+		int viewportHeight,
+		ProjectedBounds projectedBounds
+	) {
+		if (!Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
+			return;
+		}
+		if (TERRAIN_PARTICLE_DIAGNOSTICS.size() >= 512) {
+			TERRAIN_PARTICLE_DIAGNOSTICS.remove(0);
+		}
+		TERRAIN_PARTICLE_DIAGNOSTICS.add(new TerrainParticleDiagnostic(
+			DeterministicCameraCapture.currentRenderedFrameIndex(),
+			route,
+			textureId,
+			spriteId,
+			centerX,
+			centerY,
+			centerZ,
+			quadSize,
+			colorArgb,
+			packedLight,
+			materialMode,
+			localU0,
+			localU1,
+			localV0,
+			localV1,
+			viewportWidth,
+			viewportHeight,
+			projectedBounds.valid(),
+			projectedBounds.left(),
+			projectedBounds.top(),
+			projectedBounds.right(),
+			projectedBounds.bottom()
+		));
+	}
+
+	public static List<TerrainParticleDiagnostic> terrainParticleDiagnostics() {
+		synchronized (LOCK) {
+			return List.copyOf(TERRAIN_PARTICLE_DIAGNOSTICS);
+		}
+	}
+
 	public static boolean hasPendingMaterialQuads() {
 		synchronized (LOCK) {
 			return !PENDING_MATERIAL_QUADS.isEmpty();
@@ -888,9 +1116,11 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static String materialMarkerSummary(List<VulkanicGalBridge.WorldMaterialQuadRecord> materialQuads) {
 		int barrier = 0;
 		int light = 0;
+		int terrain = 0;
 		int lastTexture = 0;
 		int lastLightLevel = -1;
 		int lightLevelMask = 0;
+		int terrainTextureMask = 0;
 		for (VulkanicGalBridge.WorldMaterialQuadRecord quad : materialQuads) {
 			int texture = quad.textureId();
 			lastTexture = texture;
@@ -900,13 +1130,22 @@ public final class RustGalWorldPrimitiveRenderer {
 				light++;
 				lastLightLevel = texture - MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00;
 				lightLevelMask |= 1 << lastLightLevel;
+			} else if (isTerrainParticleTextureId(texture)) {
+				terrain++;
+				terrainTextureMask |= 1 << texture;
 			}
 		}
 		return "material_marker_barrier_quads=" + barrier
 			+ " material_marker_light_quads=" + light
+			+ " material_terrain_particle_quads=" + terrain
+			+ " material_terrain_particle_texture_mask=" + terrainTextureMask
 			+ " material_marker_light_level_mask=" + lightLevelMask
 			+ " material_marker_last_light_level=" + lastLightLevel
 			+ " material_marker_last_texture_id=" + lastTexture;
+	}
+
+	private static boolean isTerrainParticleTextureId(int texture) {
+		return TERRAIN_PARTICLE_TEXTURE_IDS.containsValue(texture);
 	}
 
 	public static boolean renderOpenGlBlockBreakingCracks(
@@ -1052,23 +1291,42 @@ public final class RustGalWorldPrimitiveRenderer {
 		return 0;
 	}
 
-	private static float[] billboardVertices(Quaternionf rotation, float centerX, float centerY, float centerZ, float quadSize) {
-		float[][] corners = new float[][] {
-			{1.0F, -1.0F},
-			{1.0F, 1.0F},
-			{-1.0F, 1.0F},
-			{-1.0F, -1.0F}
-		};
-		float[] vertices = new float[12];
-		Quaternionf billboardRotation = new Quaternionf(rotation);
-		for (int i = 0; i < corners.length; i++) {
-			Vector3f vertex = new Vector3f(corners[i][0] * quadSize, corners[i][1] * quadSize, 0.0F);
-			billboardRotation.transform(vertex);
+	private static int terrainParticleTextureId(BlockState blockState) {
+		if (blockState == null) {
+			return 0;
+		}
+		return TERRAIN_PARTICLE_TEXTURE_IDS.getOrDefault(blockState.getBlock(), 0);
+	}
+
+	private static int applyPackedLight(int colorArgb, int packedLight) {
+		int light = Math.max(LightTexture.block(packedLight), LightTexture.sky(packedLight));
+		float brightness = 0.35F + 0.65F * (light / 15.0F);
+		int alpha = ARGB.alpha(colorArgb);
+		int red = Mth.clamp(Math.round(ARGB.red(colorArgb) * brightness), 0, 255);
+		int green = Mth.clamp(Math.round(ARGB.green(colorArgb) * brightness), 0, 255);
+		int blue = Mth.clamp(Math.round(ARGB.blue(colorArgb) * brightness), 0, 255);
+		return ARGB.color(alpha, red, green, blue);
+	}
+
+	private static void billboardVertices(
+		Quaternionf rotation,
+		float centerX,
+		float centerY,
+		float centerZ,
+		float quadSize,
+		float[] vertices
+	) {
+		for (int i = 0; i < 4; i++) {
+			Vector3f vertex = MATERIAL_BILLBOARD_VERTEX_SCRATCH.set(
+				MATERIAL_BILLBOARD_CORNERS[i * 2] * quadSize,
+				MATERIAL_BILLBOARD_CORNERS[i * 2 + 1] * quadSize,
+				0.0F
+			);
+			rotation.transform(vertex);
 			vertices[i * 3] = centerX + vertex.x();
 			vertices[i * 3 + 1] = centerY + vertex.y();
 			vertices[i * 3 + 2] = centerZ + vertex.z();
 		}
-		return vertices;
 	}
 
 	public static boolean enqueueWorldBorder(WorldBorderRenderState state, Vec3 cameraPosition, double renderDistance, double depthFar) {
@@ -1582,6 +1840,32 @@ public final class RustGalWorldPrimitiveRenderer {
 		float centerZ,
 		float quadSize,
 		int colorArgb,
+		int viewportWidth,
+		int viewportHeight,
+		boolean projected,
+		float screenLeft,
+		float screenTop,
+		float screenRight,
+		float screenBottom
+	) {
+	}
+
+	public record TerrainParticleDiagnostic(
+		long frameIndex,
+		String route,
+		int textureId,
+		String spriteId,
+		float centerX,
+		float centerY,
+		float centerZ,
+		float quadSize,
+		int colorArgb,
+		int packedLight,
+		int materialMode,
+		float localU0,
+		float localU1,
+		float localV0,
+		float localV1,
 		int viewportWidth,
 		int viewportHeight,
 		boolean projected,

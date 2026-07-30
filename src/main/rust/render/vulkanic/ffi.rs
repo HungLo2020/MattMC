@@ -42,12 +42,12 @@ use super::world_primitive_frontend::{
     WORLD_CULL_FRONT, WORLD_CULL_NONE, WORLD_DEPTH_POLICY_DISABLED,
     WORLD_DEPTH_POLICY_TEST_NO_WRITE, WORLD_DEPTH_POLICY_TEST_WRITE,
     WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT, WORLD_MATERIAL_ID_CUTOUT_TEXTURED,
-    WORLD_MATERIAL_ID_OPAQUE_TEXTURED,
-    WORLD_MATERIAL_MODE_CUTOUT, WORLD_MATERIAL_MODE_OPAQUE,
+    WORLD_MATERIAL_ID_OPAQUE_TEXTURED, WORLD_MATERIAL_MODE_CUTOUT, WORLD_MATERIAL_MODE_OPAQUE,
     WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER, WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00,
-    WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15, WORLD_MATERIAL_TEXTURE_STONE,
-    WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY, WORLD_TOPOLOGY_TRIANGLES, WORLD_WINDING_CCW,
-    WORLD_WINDING_CW,
+    WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15, WORLD_MATERIAL_TEXTURE_DEEPSLATE,
+    WORLD_MATERIAL_TEXTURE_DIRT, WORLD_MATERIAL_TEXTURE_OAK_LEAVES, WORLD_MATERIAL_TEXTURE_STONE,
+    WORLD_MATERIAL_TEXTURE_WHITE_WOOL, WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY,
+    WORLD_TOPOLOGY_TRIANGLES, WORLD_WINDING_CCW, WORLD_WINDING_CW,
 };
 
 pub const FFI_ABI_V1_VERSION: u32 = 1;
@@ -680,6 +680,50 @@ pub struct FfiWorldMaterialQuadRequest {
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiWorldMaterialTableRecord {
+    pub byte_size: u32,
+    pub stratum: u32,
+    pub material_id: u32,
+    pub texture_id: u32,
+    pub material_mode: u32,
+    pub depth_policy: u32,
+    pub cull_policy: u32,
+    pub topology: u32,
+    pub winding: u32,
+    pub reserved0: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiWorldMaterialCompactQuadRequest {
+    pub byte_size: u32,
+    pub material_index: u32,
+    pub color_argb: u32,
+    pub reserved0: u32,
+    pub p0_x: f32,
+    pub p0_y: f32,
+    pub p0_z: f32,
+    pub p1_x: f32,
+    pub p1_y: f32,
+    pub p1_z: f32,
+    pub p2_x: f32,
+    pub p2_y: f32,
+    pub p2_z: f32,
+    pub p3_x: f32,
+    pub p3_y: f32,
+    pub p3_z: f32,
+    pub uv0_u: f32,
+    pub uv0_v: f32,
+    pub uv1_u: f32,
+    pub uv1_v: f32,
+    pub uv2_u: f32,
+    pub uv2_v: f32,
+    pub uv3_u: f32,
+    pub uv3_v: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FfiWorldBackgroundRequest {
     pub byte_size: u32,
     pub enabled: u32,
@@ -710,6 +754,8 @@ pub struct FfiWholeFrameSubmitRequest {
     pub world_crack_quads: FfiSlice<FfiWorldCrackQuadRequest>,
     pub world_border_quads: FfiSlice<FfiWorldBorderQuadRequest>,
     pub world_material_quads: FfiSlice<FfiWorldMaterialQuadRequest>,
+    pub world_material_table: FfiSlice<FfiWorldMaterialTableRecord>,
+    pub world_material_compact_quads: FfiSlice<FfiWorldMaterialCompactQuadRequest>,
     pub gui_sprites: FfiSlice<FfiGuiSpriteRequest>,
     pub negotiated_feature_bits: u64,
 }
@@ -2703,6 +2749,18 @@ fn input_bytes_for_whole_frame(request: &FfiWholeFrameSubmitRequest) -> u64 {
         )
         .saturating_add(
             request
+                .world_material_table
+                .count
+                .saturating_mul(size_of::<FfiWorldMaterialTableRecord>() as u64),
+        )
+        .saturating_add(
+            request
+                .world_material_compact_quads
+                .count
+                .saturating_mul(size_of::<FfiWorldMaterialCompactQuadRequest>() as u64),
+        )
+        .saturating_add(
+            request
                 .gui_sprites
                 .count
                 .saturating_mul(size_of::<FfiGuiSpriteRequest>() as u64),
@@ -3140,6 +3198,16 @@ unsafe fn decode_whole_frame_submit_with_backend_policy(
         true,
         "world primitive material quads",
     )?;
+    let raw_material_table = read_slice(
+        request.world_material_table,
+        true,
+        "world primitive compact material table",
+    )?;
+    let raw_compact_materials = read_slice(
+        request.world_material_compact_quads,
+        true,
+        "world primitive compact material quads",
+    )?;
     if raw_materials.len() > FFI_MAX_BATCH_ITEMS {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
@@ -3148,6 +3216,46 @@ unsafe fn decode_whole_frame_submit_with_backend_policy(
                 raw_materials.len(),
                 FFI_MAX_BATCH_ITEMS
             ),
+        ));
+    }
+    if raw_material_table.len() > FFI_MAX_BATCH_ITEMS {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "world primitive compact material table count {} exceeds max {}",
+                raw_material_table.len(),
+                FFI_MAX_BATCH_ITEMS
+            ),
+        ));
+    }
+    if raw_compact_materials.len() > FFI_MAX_BATCH_ITEMS {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "world primitive compact material quad count {} exceeds max {}",
+                raw_compact_materials.len(),
+                FFI_MAX_BATCH_ITEMS
+            ),
+        ));
+    }
+    if !raw_materials.is_empty()
+        && (!raw_material_table.is_empty() || !raw_compact_materials.is_empty())
+    {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "world primitive material payload must use either legacy quads or compact material batches, not both",
+        ));
+    }
+    if raw_material_table.is_empty() && !raw_compact_materials.is_empty() {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "compact world material quads require a non-empty material table",
+        ));
+    }
+    if !raw_material_table.is_empty() && raw_compact_materials.is_empty() {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "compact world material table requires compact quad records",
         ));
     }
     let mut material_quads = Vec::with_capacity(raw_materials.len());
@@ -3277,6 +3385,173 @@ unsafe fn decode_whole_frame_submit_with_backend_policy(
             viewport_height,
         });
     }
+    if !raw_compact_materials.is_empty() {
+        let viewport_width_for_materials = u32::try_from(request.viewport_width).map_err(|_| {
+            GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "whole-frame viewport width must be non-negative, got {}",
+                    request.viewport_width
+                ),
+            )
+        })?;
+        let viewport_height_for_materials =
+            u32::try_from(request.viewport_height).map_err(|_| {
+                GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    format!(
+                        "whole-frame viewport height must be non-negative, got {}",
+                        request.viewport_height
+                    ),
+                )
+            })?;
+        let mut table = Vec::with_capacity(raw_material_table.len());
+        for record in raw_material_table {
+            validate_item_size::<FfiWorldMaterialTableRecord>(
+                record.byte_size,
+                "world primitive compact material table record",
+            )?;
+            if record.stratum != WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY {
+                return Err(GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!("unknown compact world material stratum {}", record.stratum),
+                ));
+            }
+            if !is_known_world_material_id(record.material_id) {
+                return Err(GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!("unknown compact world material id {}", record.material_id),
+                ));
+            }
+            if !is_known_world_material_texture_id(record.texture_id) {
+                return Err(GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!(
+                        "unknown compact world material texture id {}",
+                        record.texture_id
+                    ),
+                ));
+            }
+            if record.material_mode != WORLD_MATERIAL_MODE_OPAQUE
+                && record.material_mode != WORLD_MATERIAL_MODE_CUTOUT
+            {
+                return Err(GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!(
+                        "unknown compact world material mode {}",
+                        record.material_mode
+                    ),
+                ));
+            }
+            if (record.material_mode == WORLD_MATERIAL_MODE_OPAQUE
+                && record.material_id != WORLD_MATERIAL_ID_OPAQUE_TEXTURED)
+                || (record.material_mode == WORLD_MATERIAL_MODE_CUTOUT
+                    && !matches!(
+                        record.material_id,
+                        WORLD_MATERIAL_ID_CUTOUT_TEXTURED | WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT
+                    ))
+            {
+                return Err(GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    format!(
+                        "compact world material id {} is incompatible with mode {}",
+                        record.material_id, record.material_mode
+                    ),
+                ));
+            }
+            if record.depth_policy != WORLD_DEPTH_POLICY_DISABLED
+                && record.depth_policy != WORLD_DEPTH_POLICY_TEST_WRITE
+                && record.depth_policy != WORLD_DEPTH_POLICY_TEST_NO_WRITE
+            {
+                return Err(GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!(
+                        "unknown compact world material depth policy {}",
+                        record.depth_policy
+                    ),
+                ));
+            }
+            if record.cull_policy != WORLD_CULL_NONE
+                && record.cull_policy != WORLD_CULL_BACK
+                && record.cull_policy != WORLD_CULL_FRONT
+            {
+                return Err(GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!(
+                        "unknown compact world material cull policy {}",
+                        record.cull_policy
+                    ),
+                ));
+            }
+            if record.topology != WORLD_TOPOLOGY_TRIANGLES {
+                return Err(GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!(
+                        "unknown compact world material topology {}",
+                        record.topology
+                    ),
+                ));
+            }
+            if record.winding != WORLD_WINDING_CCW && record.winding != WORLD_WINDING_CW {
+                return Err(GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!("unknown compact world material winding {}", record.winding),
+                ));
+            }
+            table.push(*record);
+        }
+        material_quads.reserve(raw_compact_materials.len());
+        for quad in raw_compact_materials {
+            validate_item_size::<FfiWorldMaterialCompactQuadRequest>(
+                quad.byte_size,
+                "world primitive compact material quad",
+            )?;
+            let material_index = usize::try_from(quad.material_index).map_err(|_| {
+                GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    format!(
+                        "compact world material index {} overflowed usize",
+                        quad.material_index
+                    ),
+                )
+            })?;
+            let Some(key) = table.get(material_index) else {
+                return Err(GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    format!(
+                        "compact world material quad references table index {} but table has {} entries",
+                        quad.material_index,
+                        table.len()
+                    ),
+                ));
+            };
+            material_quads.push(WorldMaterialQuadRequest {
+                stratum: key.stratum,
+                material_id: key.material_id,
+                texture_id: key.texture_id,
+                material_mode: key.material_mode,
+                depth_policy: key.depth_policy,
+                cull_policy: key.cull_policy,
+                topology: key.topology,
+                winding: key.winding,
+                color_argb: quad.color_argb,
+                vertices: [
+                    [quad.p0_x, quad.p0_y, quad.p0_z],
+                    [quad.p1_x, quad.p1_y, quad.p1_z],
+                    [quad.p2_x, quad.p2_y, quad.p2_z],
+                    [quad.p3_x, quad.p3_y, quad.p3_z],
+                ],
+                uvs: [
+                    [quad.uv0_u, quad.uv0_v],
+                    [quad.uv1_u, quad.uv1_v],
+                    [quad.uv2_u, quad.uv2_v],
+                    [quad.uv3_u, quad.uv3_v],
+                ],
+                viewport_width: viewport_width_for_materials,
+                viewport_height: viewport_height_for_materials,
+            });
+        }
+    }
     let raw_gui = FfiGuiFrameSubmitRequest {
         header: FfiHeader {
             version: request.header.version,
@@ -3339,8 +3614,14 @@ fn is_known_world_material_id(material_id: u32) -> bool {
 }
 
 fn is_known_world_material_texture_id(texture_id: u32) -> bool {
-    texture_id == WORLD_MATERIAL_TEXTURE_STONE
-        || texture_id == WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER
+    matches!(
+        texture_id,
+        WORLD_MATERIAL_TEXTURE_STONE
+            | WORLD_MATERIAL_TEXTURE_DIRT
+            | WORLD_MATERIAL_TEXTURE_OAK_LEAVES
+            | WORLD_MATERIAL_TEXTURE_DEEPSLATE
+            | WORLD_MATERIAL_TEXTURE_WHITE_WOOL
+    ) || texture_id == WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER
         || (WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00
             ..=WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15)
             .contains(&texture_id)
@@ -4418,6 +4699,8 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 world_crack_quads,
                 world_border_quads,
                 world_material_quads,
+                world_material_table,
+                world_material_compact_quads,
                 gui_sprites,
                 negotiated_feature_bits
             ]
@@ -4547,6 +4830,52 @@ fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
             61,
             FfiWorldMaterialAssetUpdateRequest,
             [header, generation, assets, negotiated_feature_bits]
+        ),
+        62 => layout!(
+            62,
+            FfiWorldMaterialTableRecord,
+            [
+                byte_size,
+                stratum,
+                material_id,
+                texture_id,
+                material_mode,
+                depth_policy,
+                cull_policy,
+                topology,
+                winding,
+                reserved0
+            ]
+        ),
+        63 => layout!(
+            63,
+            FfiWorldMaterialCompactQuadRequest,
+            [
+                byte_size,
+                material_index,
+                color_argb,
+                reserved0,
+                p0_x,
+                p0_y,
+                p0_z,
+                p1_x,
+                p1_y,
+                p1_z,
+                p2_x,
+                p2_y,
+                p2_z,
+                p3_x,
+                p3_y,
+                p3_z,
+                uv0_u,
+                uv0_v,
+                uv1_u,
+                uv1_v,
+                uv2_u,
+                uv2_v,
+                uv3_u,
+                uv3_v
+            ]
         ),
         _ => {
             return Err(GalError::ffi(
@@ -7391,6 +7720,50 @@ mod tests {
         }
     }
 
+    fn material_table_record() -> FfiWorldMaterialTableRecord {
+        FfiWorldMaterialTableRecord {
+            byte_size: size_of::<FfiWorldMaterialTableRecord>() as u32,
+            stratum: WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY,
+            material_id: WORLD_MATERIAL_ID_OPAQUE_TEXTURED,
+            texture_id: WORLD_MATERIAL_TEXTURE_STONE,
+            material_mode: WORLD_MATERIAL_MODE_OPAQUE,
+            depth_policy: WORLD_DEPTH_POLICY_TEST_WRITE,
+            cull_policy: WORLD_CULL_BACK,
+            topology: WORLD_TOPOLOGY_TRIANGLES,
+            winding: WORLD_WINDING_CCW,
+            reserved0: 0,
+        }
+    }
+
+    fn compact_material_quad_request() -> FfiWorldMaterialCompactQuadRequest {
+        FfiWorldMaterialCompactQuadRequest {
+            byte_size: size_of::<FfiWorldMaterialCompactQuadRequest>() as u32,
+            material_index: 0,
+            color_argb: 0xffff_ffff,
+            reserved0: 0,
+            p0_x: -1.0,
+            p0_y: -1.0,
+            p0_z: -2.0,
+            p1_x: 1.0,
+            p1_y: -1.0,
+            p1_z: -2.0,
+            p2_x: 1.0,
+            p2_y: 1.0,
+            p2_z: -2.0,
+            p3_x: -1.0,
+            p3_y: 1.0,
+            p3_z: -2.0,
+            uv0_u: 0.0,
+            uv0_v: 0.0,
+            uv1_u: 1.0,
+            uv1_v: 0.0,
+            uv2_u: 1.0,
+            uv2_v: 1.0,
+            uv3_u: 0.0,
+            uv3_v: 1.0,
+        }
+    }
+
     fn whole_frame_request(
         segments: &[FfiWorldLineSegmentRequest],
         sprites: &[FfiGuiSpriteRequest],
@@ -7448,6 +7821,14 @@ mod tests {
                 ptr: std::ptr::null(),
                 count: 0,
             },
+            world_material_table: FfiSlice {
+                ptr: std::ptr::null(),
+                count: 0,
+            },
+            world_material_compact_quads: FfiSlice {
+                ptr: std::ptr::null(),
+                count: 0,
+            },
             gui_sprites: FfiSlice {
                 ptr: sprites.as_ptr(),
                 count: sprites.len() as u64,
@@ -7493,6 +7874,22 @@ mod tests {
     ) -> FfiWholeFrameSubmitRequest {
         let mut request = whole_frame_request(&[], &[]);
         request.world_material_quads = FfiSlice {
+            ptr: materials.as_ptr(),
+            count: materials.len() as u64,
+        };
+        request
+    }
+
+    fn whole_frame_request_with_compact_materials(
+        table: &[FfiWorldMaterialTableRecord],
+        materials: &[FfiWorldMaterialCompactQuadRequest],
+    ) -> FfiWholeFrameSubmitRequest {
+        let mut request = whole_frame_request(&[], &[]);
+        request.world_material_table = FfiSlice {
+            ptr: table.as_ptr(),
+            count: table.len() as u64,
+        };
+        request.world_material_compact_quads = FfiSlice {
             ptr: materials.as_ptr(),
             count: materials.len() as u64,
         };
@@ -7759,6 +8156,74 @@ mod tests {
         let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
             .expect_err("malformed material quad must fail");
         assert_eq!(error.code, StatusCode::InvalidArgument);
+    }
+
+    #[test]
+    fn compact_world_material_ffi_decodes_copies_and_deduplicates_table() {
+        let table = vec![material_table_record()];
+        let mut materials = vec![
+            compact_material_quad_request(),
+            compact_material_quad_request(),
+        ];
+        materials[1].p0_x = -2.0;
+        materials[1].color_argb = 0xff80_4020;
+        let request = whole_frame_request_with_compact_materials(&table, &materials);
+        let (_generation, _target, frame, gui) =
+            unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap() };
+        materials[0].p0_x = 99.0;
+        assert_eq!(2, frame.material_quads.len());
+        assert_eq!(
+            WORLD_MATERIAL_ID_OPAQUE_TEXTURED,
+            frame.material_quads[0].material_id
+        );
+        assert_eq!(
+            WORLD_MATERIAL_TEXTURE_STONE,
+            frame.material_quads[0].texture_id
+        );
+        assert_eq!(-1.0, frame.material_quads[0].vertices[0][0]);
+        assert_eq!(-2.0, frame.material_quads[1].vertices[0][0]);
+        assert_eq!(0xff80_4020, frame.material_quads[1].color_argb);
+        assert_eq!([1.0, 1.0], frame.material_quads[0].uvs[2]);
+        assert!(gui.is_empty());
+    }
+
+    #[test]
+    fn compact_world_material_ffi_rejects_malformed_indexes_and_mixed_legacy_payloads() {
+        let table = vec![material_table_record()];
+        let mut compact = vec![compact_material_quad_request()];
+        compact[0].material_index = 1;
+        let request = whole_frame_request_with_compact_materials(&table, &compact);
+        let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+            .expect_err("out-of-range compact material index must fail");
+        assert_eq!(StatusCode::InvalidArgument, error.code);
+
+        compact[0] = compact_material_quad_request();
+        compact[0].byte_size -= 4;
+        let request = whole_frame_request_with_compact_materials(&table, &compact);
+        let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+            .expect_err("malformed compact material record must fail");
+        assert_eq!(StatusCode::InvalidArgument, error.code);
+
+        let mut bad_table = vec![material_table_record()];
+        bad_table[0].material_mode = 999;
+        let request = whole_frame_request_with_compact_materials(
+            &bad_table,
+            &[compact_material_quad_request()],
+        );
+        let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+            .expect_err("unknown compact material mode must fail");
+        assert_eq!(StatusCode::UnknownEnum, error.code);
+
+        let legacy = vec![material_quad_request()];
+        let mut request =
+            whole_frame_request_with_compact_materials(&table, &[compact_material_quad_request()]);
+        request.world_material_quads = FfiSlice {
+            ptr: legacy.as_ptr(),
+            count: legacy.len() as u64,
+        };
+        let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+            .expect_err("mixed legacy and compact material payloads must fail");
+        assert_eq!(StatusCode::InvalidArgument, error.code);
     }
 
     #[test]

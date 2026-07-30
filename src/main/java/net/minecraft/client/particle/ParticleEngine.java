@@ -141,6 +141,16 @@ public class ParticleEngine {
 		return enqueued;
 	}
 
+	public int enqueueRustGalTerrainParticles(Camera camera, float f) {
+		int enqueued = 0;
+		for (ParticleGroup<?> particleGroup : this.particles.values()) {
+			if (particleGroup instanceof QuadParticleGroup quadParticleGroup) {
+				enqueued += quadParticleGroup.enqueueRustGalTerrainParticles(camera, f);
+			}
+		}
+		return enqueued;
+	}
+
 	public void setLevel(@Nullable ClientLevel clientLevel) {
 		this.level = clientLevel;
 		this.clearParticles();

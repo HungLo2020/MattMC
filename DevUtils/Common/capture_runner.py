@@ -2020,6 +2020,13 @@ WORLD_MATERIAL_BLOCK_MARKER_TEXTURES = (
     "assets/minecraft/textures/item/barrier.png",
     *(f"assets/minecraft/textures/item/light_{level:02d}.png" for level in range(16)),
 )
+WORLD_MATERIAL_TERRAIN_PARTICLE_TEXTURES = (
+    "assets/minecraft/textures/block/stone.png",
+    "assets/minecraft/textures/block/dirt.png",
+    "assets/minecraft/textures/block/oak_leaves.png",
+    "assets/minecraft/textures/block/deepslate.png",
+    "assets/minecraft/textures/block/white_wool.png",
+)
 
 
 GUI_PACK_COLORS = {
@@ -2033,7 +2040,7 @@ def gui_resource_pack_specs(scenario: str) -> list[dict[str, object]]:
         "sprites": GUI_RESOURCE_PACK_SPRITES,
         "world_border_texture": WORLD_BORDER_RESOURCE_PACK_TEXTURE,
         "world_crack_textures": WORLD_CRACK_RESOURCE_PACK_TEXTURES,
-        "world_material_textures": WORLD_MATERIAL_BLOCK_MARKER_TEXTURES,
+        "world_material_textures": WORLD_MATERIAL_BLOCK_MARKER_TEXTURES + WORLD_MATERIAL_TERRAIN_PARTICLE_TEXTURES,
         "malformed": (),
         "wrong_size": (),
     }
@@ -2074,6 +2081,7 @@ def gui_resource_pack_specs(scenario: str) -> list[dict[str, object]]:
                     WORLD_BORDER_RESOURCE_PACK_TEXTURE,
                     "assets/minecraft/textures/block/destroy_stage_4.png",
                     "assets/minecraft/textures/item/barrier.png",
+                    "assets/minecraft/textures/block/stone.png",
                 ),
             }
         ]
@@ -2087,6 +2095,7 @@ def gui_resource_pack_specs(scenario: str) -> list[dict[str, object]]:
                     "assets/minecraft/textures/gui/sprites/hud/armor_full.png",
                     "assets/minecraft/textures/block/destroy_stage_4.png",
                     "assets/minecraft/textures/item/light_15.png",
+                    "assets/minecraft/textures/block/oak_leaves.png",
                 ),
             }
         ]

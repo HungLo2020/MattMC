@@ -48,4 +48,14 @@ public class QuadParticleGroup extends ParticleGroup<SingleQuadParticle> {
 		}
 		return enqueued;
 	}
+
+	public int enqueueRustGalTerrainParticles(Camera camera, float f) {
+		int enqueued = 0;
+		for (SingleQuadParticle singleQuadParticle : this.particles) {
+			if (singleQuadParticle instanceof TerrainParticle terrainParticle && terrainParticle.enqueueRustGal(camera, f)) {
+				enqueued++;
+			}
+		}
+		return enqueued;
+	}
 }

@@ -76,13 +76,19 @@ pub(super) fn validate_quad(
             format!("unknown world material winding {}", quad.winding),
         ));
     }
-    if quad.viewport_width != frame.viewport_width || quad.viewport_height != frame.viewport_height {
+    if quad.viewport_width != frame.viewport_width || quad.viewport_height != frame.viewport_height
+    {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
             "world material viewport metadata must match the frame viewport",
         ));
     }
-    for value in quad.vertices.iter().flatten().chain(quad.uvs.iter().flatten()) {
+    for value in quad
+        .vertices
+        .iter()
+        .flatten()
+        .chain(quad.uvs.iter().flatten())
+    {
         if !value.is_finite() {
             return Err(GalError::ffi(
                 StatusCode::InvalidArgument,
@@ -103,8 +109,14 @@ pub(super) fn is_known_material_id(material_id: u32) -> bool {
 }
 
 pub(super) fn is_known_texture_id(texture_id: u32) -> bool {
-    texture_id == WORLD_MATERIAL_TEXTURE_STONE
-        || texture_id == WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER
+    matches!(
+        texture_id,
+        WORLD_MATERIAL_TEXTURE_STONE
+            | WORLD_MATERIAL_TEXTURE_DIRT
+            | WORLD_MATERIAL_TEXTURE_OAK_LEAVES
+            | WORLD_MATERIAL_TEXTURE_DEEPSLATE
+            | WORLD_MATERIAL_TEXTURE_WHITE_WOOL
+    ) || texture_id == WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER
         || (WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00
             ..=WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15)
             .contains(&texture_id)

@@ -13,7 +13,10 @@ pub(super) fn validate_quad(
     if quad.stage >= CRACK_STAGE_COUNT {
         return Err(GalError::ffi(
             StatusCode::UnknownEnum,
-            format!("unknown block-breaking crack animation stage {}", quad.stage),
+            format!(
+                "unknown block-breaking crack animation stage {}",
+                quad.stage
+            ),
         ));
     }
     if quad.depth_policy > WORLD_DEPTH_POLICY_TEST_WRITE {
@@ -22,7 +25,8 @@ pub(super) fn validate_quad(
             format!("unknown world crack depth policy {}", quad.depth_policy),
         ));
     }
-    if quad.viewport_width != frame.viewport_width || quad.viewport_height != frame.viewport_height {
+    if quad.viewport_width != frame.viewport_width || quad.viewport_height != frame.viewport_height
+    {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
             "world crack viewport metadata must match the frame viewport",

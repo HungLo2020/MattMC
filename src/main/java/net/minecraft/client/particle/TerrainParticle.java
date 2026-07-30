@@ -3,22 +3,30 @@ package net.minecraft.client.particle;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.Camera;
+import net.minecraft.client.dev.GraphicsFrameBenchmark;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.state.QuadParticleRenderState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;
+import net.minecraft.util.ARGB;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Quaternionf;
 
 @Environment(EnvType.CLIENT)
 public class TerrainParticle extends SingleQuadParticle {
 	private final BlockPos pos;
+	private final BlockState blockState;
 	private final float uo;
 	private final float vo;
 	// Iris: Track whether particle is opaque (from MixinTerrainParticle)
 	private boolean isOpaque;
+	private boolean alphaTested;
 
 	public TerrainParticle(ClientLevel clientLevel, double d, double e, double f, double g, double h, double i, BlockState blockState) {
 		this(clientLevel, d, e, f, g, h, i, blockState, BlockPos.containing(d, e, f));
@@ -27,7 +35,16 @@ public class TerrainParticle extends SingleQuadParticle {
 	public TerrainParticle(ClientLevel clientLevel, double d, double e, double f, double g, double h, double i, BlockState blockState, BlockPos blockPos) {
 		super(clientLevel, d, e, f, g, h, i, Minecraft.getInstance().getBlockRenderer().getBlockModelShaper().getParticleIcon(blockState));
 		this.pos = blockPos;
+		this.blockState = blockState;
 		this.gravity = 1.0F;
+		if (!System.getProperty("mattmc.dev.rustGalWorldMaterial.terrainParticleScenario", "").isBlank()) {
+			this.gravity = 0.0F;
+			this.hasPhysics = false;
+			this.xd = 0.0;
+			this.yd = 0.0;
+			this.zd = 0.0;
+			this.lifetime = 20_000;
+		}
 		this.rCol = 0.6F;
 		this.gCol = 0.6F;
 		this.bCol = 0.6F;
@@ -44,10 +61,14 @@ public class TerrainParticle extends SingleQuadParticle {
 		
 		// Iris: Resolve translucency (from MixinTerrainParticle)
 		net.minecraft.client.renderer.chunk.ChunkSectionLayer type = net.minecraft.client.renderer.ItemBlockRenderTypes.getChunkRenderType(blockState);
-		if (type == net.minecraft.client.renderer.chunk.ChunkSectionLayer.SOLID || 
-		    type == net.minecraft.client.renderer.chunk.ChunkSectionLayer.CUTOUT || 
-		    type == net.minecraft.client.renderer.chunk.ChunkSectionLayer.CUTOUT_MIPPED) {
-			isOpaque = true;
+		if (type == net.minecraft.client.renderer.chunk.ChunkSectionLayer.SOLID
+			|| type == net.minecraft.client.renderer.chunk.ChunkSectionLayer.CUTOUT
+			|| type == net.minecraft.client.renderer.chunk.ChunkSectionLayer.CUTOUT_MIPPED) {
+				isOpaque = true;
+			}
+		if (type == net.minecraft.client.renderer.chunk.ChunkSectionLayer.CUTOUT
+			|| type == net.minecraft.client.renderer.chunk.ChunkSectionLayer.CUTOUT_MIPPED) {
+			alphaTested = true;
 		}
 	}
 
@@ -58,6 +79,63 @@ public class TerrainParticle extends SingleQuadParticle {
 			return net.irisshaders.iris.fantastic.IrisParticleRenderTypes.TERRAIN_OPAQUE;
 		}
 		return SingleQuadParticle.Layer.TERRAIN;
+	}
+
+	@Override
+	public void extract(QuadParticleRenderState quadParticleRenderState, Camera camera, float f) {
+		long startNanos = System.nanoTime();
+		GraphicsFrameBenchmark.beginPhase("game.particles.terrain.extract");
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldMaterial.terrainParticle.disabled")) {
+			GraphicsFrameBenchmark.endPhase("game.particles.terrain.extract");
+			GraphicsFrameBenchmark.recordTerrainParticleExtraction("disabled", this.blockState, System.nanoTime() - startNanos);
+			return;
+		}
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldMaterial.terrainParticle.legacyControl")) {
+			super.extract(quadParticleRenderState, camera, f);
+			GraphicsFrameBenchmark.endPhase("game.particles.terrain.extract");
+			GraphicsFrameBenchmark.recordTerrainParticleExtraction("java-legacy", this.blockState, System.nanoTime() - startNanos);
+			return;
+		}
+		if (this.enqueueRustGal(camera, f)) {
+			GraphicsFrameBenchmark.endPhase("game.particles.terrain.extract");
+			GraphicsFrameBenchmark.recordTerrainParticleExtraction("rust", this.blockState, System.nanoTime() - startNanos);
+			return;
+		}
+		super.extract(quadParticleRenderState, camera, f);
+		GraphicsFrameBenchmark.endPhase("game.particles.terrain.extract");
+		GraphicsFrameBenchmark.recordTerrainParticleExtraction("java-compat", this.blockState, System.nanoTime() - startNanos);
+	}
+
+	boolean enqueueRustGal(Camera camera, float f) {
+		if (!RustGalWorldPrimitiveRenderer.shouldRouteTerrainParticle(this.blockState)) {
+			return false;
+		}
+		Quaternionf quaternionf = new Quaternionf();
+		this.getFacingCameraMode().setRotation(quaternionf, camera, f);
+		if (this.roll != 0.0F) {
+			quaternionf.rotateZ(net.minecraft.util.Mth.lerp(f, this.oRoll, this.roll));
+		}
+		return RustGalWorldPrimitiveRenderer.enqueueTerrainParticle(
+			this.blockState,
+			this.sprite.contents().name(),
+			camera,
+			this.xo,
+			this.x,
+			this.yo,
+			this.y,
+			this.zo,
+			this.z,
+			quaternionf,
+			f,
+			this.getQuadSize(f),
+			this.sprite.getUOffset(this.getU0()),
+			this.sprite.getUOffset(this.getU1()),
+			this.sprite.getVOffset(this.getV0()),
+			this.sprite.getVOffset(this.getV1()),
+				ARGB.colorFromFloat(this.alpha, this.rCol, this.gCol, this.bCol),
+				this.getLightColor(f),
+				!this.alphaTested
+			);
 	}
 
 	@Override

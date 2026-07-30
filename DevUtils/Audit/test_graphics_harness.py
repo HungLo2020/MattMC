@@ -170,6 +170,26 @@ def write_block_marker_probe_image(path: Path, *, texture_id: int = 100) -> None
     image.save(path)
 
 
+def write_terrain_particle_probe_image(path: Path, *, texture_id: int = 1) -> None:
+    from PIL import Image
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image = Image.new("RGB", (1280, 720), (36, 48, 60))
+    left, top, right, bottom = 560, 300, 640, 380
+    color = {
+        1: (116, 116, 116),
+        2: (128, 82, 45),
+        3: (74, 128, 52),
+        4: (70, 73, 80),
+        5: (220, 220, 205),
+    }.get(texture_id, (116, 116, 116))
+    for x in range(left, right):
+        for y in range(top, bottom):
+            if 8 <= x - left <= 72 and 8 <= y - top <= 72:
+                image.putpixel((x, y), color)
+    image.save(path)
+
+
 def write_rust_shell_scene_image(path: Path) -> None:
     from PIL import Image
 
@@ -207,7 +227,12 @@ def write_retention_manifest(path: Path, *, success: bool, profile: str = "smoke
     )
 
 
-def write_frame_benchmark(capture_dir: Path, samples: list[int], rust_gal_line: str | None = None) -> None:
+def write_frame_benchmark(
+    capture_dir: Path,
+    samples: list[int],
+    rust_gal_line: str | None = None,
+    terrain_particle_real: dict[str, object] | None = None,
+) -> None:
     (capture_dir / "graphics_frame_benchmark_20260101_000000.json").write_text(
         json.dumps(
             {
@@ -228,6 +253,7 @@ def write_frame_benchmark(capture_dir: Path, samples: list[int], rust_gal_line: 
                     "initialPitch": 10.0,
                     "initialPosition": {"x": 1.0, "y": 80.0, "z": 2.0},
                 },
+                "terrainParticleRealGameplay": terrain_particle_real or {"enabled": False},
                 "runtimeState": {
                     "loadedChunks": 121,
                     "entityCount": 7,
@@ -469,6 +495,269 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             self.assertEqual(counters["world_material_marker_last_texture_id"], 100)
             self.assertEqual("present", counters["world_material_marker_pixel_evidence"]["status"])
             self.assertEqual([100], counters["world_material_marker_pixel_evidence"]["validated_texture_ids"])
+
+    def test_terrain_particle_summary_uses_projected_crop_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = harness.MATRIX_MODES[6]
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            screenshot = capture / "terrain_particle_stone.png"
+            write_terrain_particle_probe_image(screenshot, texture_id=1)
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            doc = json.loads(deterministic.read_text(encoding="utf-8"))
+            doc["captures"][0]["screenshot"] = str(screenshot)
+            doc["rustGalWorldTerrainParticleScenario"] = "stone"
+            doc["rustGalWorldTerrainParticles"] = [
+                {
+                    "frameIndex": doc["captures"][0].get("renderedFrameIndex", 1),
+                    "route": "rust-vulkan-whole-frame",
+                    "textureId": 1,
+                    "spriteId": "minecraft:block/stone",
+                    "center": {"x": 1.5, "y": 80.5, "z": 2.5},
+                    "quadSize": 0.15,
+                    "colorArgb": 0xFFFFFFFF,
+                    "packedLight": 0xF000F0,
+                    "materialMode": 1,
+                    "uv": {"u0": 0.0, "u1": 0.25, "v0": 0.0, "v1": 0.25},
+                    "viewport": {"width": 1280, "height": 720},
+                    "projected": True,
+                    "screenBounds": {"left": 560.0, "top": 300.0, "right": 640.0, "bottom": 380.0},
+                }
+            ]
+            deterministic.write_text(json.dumps(doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "\n".join(
+                    [
+                        "-Dmattmc.dev.rustGalWorldMaterial.terrainParticleScenario=stone",
+                        "Rust VulkanicGAL TerrainParticle semantic request route=rust-vulkan-whole-frame texture_id=1 material_id=1 mode=1 sprite=minecraft:block/stone result=queued",
+                        "gal.frame.target.begin backend=vulkan frame=1 material_terrain_particle_quads=1 material_terrain_particle_texture_mask=2 material_marker_barrier_quads=0 material_marker_light_quads=0 material_marker_light_level_mask=0 material_marker_last_light_level=-1 material_marker_last_texture_id=1",
+                        "rust_gal_world_material_quads_executed=1",
+                        "rust_gal_world_material_batches_executed=1",
+                        "rust_gal_world_material_draws_executed=1",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            artifact = harness.normalize_capture_artifact(
+                target,
+                mode,
+                capture,
+                "correctness",
+                True,
+                ["fake"],
+                0,
+                False,
+            )
+            counters = artifact["metrics"]["rust_gal_slice"]
+            self.assertTrue(artifact["validation"]["complete"])
+            self.assertEqual(1, counters["world_material_terrain_particle_quads"])
+            self.assertEqual("present", counters["world_material_terrain_particle_pixel_evidence"]["status"])
+            self.assertEqual([1], counters["world_material_terrain_particle_pixel_evidence"]["validated_texture_ids"])
+
+    def test_oak_leaf_terrain_particle_requires_cutout_material_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = harness.MATRIX_MODES[6]
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            screenshot = capture / "terrain_particle_oak_leaves.png"
+            write_terrain_particle_probe_image(screenshot, texture_id=3)
+            deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
+            doc = json.loads(deterministic.read_text(encoding="utf-8"))
+            doc["captures"][0]["screenshot"] = str(screenshot)
+            doc["rustGalWorldTerrainParticleScenario"] = "oak-leaves"
+            doc["rustGalWorldTerrainParticles"] = [
+                {
+                    "frameIndex": doc["captures"][0].get("renderedFrameIndex", 1),
+                    "route": "rust-vulkan-whole-frame",
+                    "textureId": 3,
+                    "spriteId": "minecraft:block/oak_leaves",
+                    "center": {"x": 1.5, "y": 80.5, "z": 2.5},
+                    "quadSize": 0.15,
+                    "colorArgb": 0xFFFFFFFF,
+                    "packedLight": 0xF000F0,
+                    "materialMode": 1,
+                    "uv": {"u0": 0.0, "u1": 0.25, "v0": 0.0, "v1": 0.25},
+                    "viewport": {"width": 1280, "height": 720},
+                    "projected": True,
+                    "screenBounds": {"left": 560.0, "top": 300.0, "right": 640.0, "bottom": 380.0},
+                }
+            ]
+            deterministic.write_text(json.dumps(doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "\n".join(
+                    [
+                        "-Dmattmc.dev.rustGalWorldMaterial.terrainParticleScenario=oak-leaves",
+                        "Rust VulkanicGAL TerrainParticle semantic request route=rust-vulkan-whole-frame texture_id=3 material_id=1 mode=1 sprite=minecraft:block/oak_leaves result=queued",
+                        "gal.frame.target.begin backend=vulkan frame=1 material_terrain_particle_quads=1 material_terrain_particle_texture_mask=8 material_marker_barrier_quads=0 material_marker_light_quads=0 material_marker_light_level_mask=0 material_marker_last_light_level=-1 material_marker_last_texture_id=3",
+                        "rust_gal_world_material_quads_executed=1",
+                        "rust_gal_world_material_batches_executed=1",
+                        "rust_gal_world_material_draws_executed=1",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            artifact = harness.normalize_capture_artifact(
+                target,
+                mode,
+                capture,
+                "correctness",
+                True,
+                ["fake"],
+                0,
+                False,
+            )
+            evidence = artifact["metrics"]["rust_gal_slice"]["world_material_terrain_particle_pixel_evidence"]
+            self.assertEqual("absent", evidence["status"])
+            self.assertEqual([], evidence["validated_texture_ids"])
+            self.assertFalse(evidence["crops"][0]["material_mode_matches"])
+
+    def test_real_gameplay_terrain_particle_gate_uses_route_and_material_work(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = harness.MATRIX_MODES[0]
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            write_frame_benchmark(
+                capture,
+                [16_000_000, 17_000_000, 15_500_000],
+                rust_gal_line=(
+                    "Rust OpenGL VulkanicGAL GUI frame executed producer=gui.frame "
+                    "rust_gal_world_material_quads_executed=42 "
+                    "rust_gal_world_material_batches_executed=3 "
+                    "rust_gal_world_material_draws_executed=3 "
+                    "ffi_call_count=9 ffi_bytes=512"
+                ),
+                terrain_particle_real={
+                    "enabled": True,
+                    "routeControl": "rust",
+                    "status": "continue",
+                    "target": "1, 80, 2",
+                    "blockType": "minecraft:stone",
+                    "setupCount": 2,
+                    "driveCalls": 20,
+                    "startCalls": 1,
+                    "continueCalls": 19,
+                    "breakingEffects": 19,
+                    "effectsPerFrame": 5,
+                    "materialCount": 5,
+                    "expectedMaterialMask": 0b11111,
+                    "materialMask": 0b11111,
+                    "routeCounts": {"rust": 42},
+                    "routeNanos": {"rust": 1000},
+                },
+            )
+            artifact = harness.normalize_capture_artifact(
+                target,
+                mode,
+                capture,
+                "gameplay",
+                True,
+                ["fake"],
+                0,
+                False,
+                tool_kind="gameplay",
+            )
+            counters = artifact["metrics"]["rust_gal_slice"]
+            self.assertEqual([], artifact["validation"]["messages"])
+            self.assertEqual(42, counters["world_material_terrain_particle_quads"])
+            self.assertTrue(counters["world_material_terrain_particle_real_gameplay"])
+            self.assertEqual("rust", counters["world_material_terrain_particle_control"])
+
+    def test_real_gameplay_terrain_particle_gate_rejects_missing_production_work(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = harness.MATRIX_MODES[0]
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            write_frame_benchmark(
+                capture,
+                [16_000_000, 17_000_000, 15_500_000],
+                rust_gal_line="Rust OpenGL VulkanicGAL GUI frame executed producer=gui.frame ffi_call_count=3 ffi_bytes=128",
+                terrain_particle_real={
+                    "enabled": True,
+                    "routeControl": "rust",
+                    "status": "continue",
+                    "target": "1, 80, 2",
+                    "blockType": "minecraft:stone",
+                    "setupCount": 1,
+                    "driveCalls": 20,
+                    "startCalls": 1,
+                    "continueCalls": 19,
+                    "breakingEffects": 19,
+                    "effectsPerFrame": 5,
+                    "materialCount": 5,
+                    "expectedMaterialMask": 0b11111,
+                    "materialMask": 0b11111,
+                    "routeCounts": {},
+                    "routeNanos": {},
+                },
+            )
+            artifact = harness.normalize_capture_artifact(
+                target,
+                mode,
+                capture,
+                "gameplay",
+                True,
+                ["fake"],
+                0,
+                False,
+                tool_kind="gameplay",
+            )
+            messages = "\n".join(artifact["validation"]["messages"])
+            self.assertIn("no particle extraction route samples", messages)
+            self.assertIn("did not produce Rust material work", messages)
+
+    def test_real_gameplay_terrain_particle_java_vulkan_uses_compatibility_route(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-java-vulkan-shaders-off")
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            write_frame_benchmark(
+                capture,
+                [16_000_000, 17_000_000, 15_500_000],
+                rust_gal_line="Rust OpenGL VulkanicGAL GUI frame executed producer=gui.frame rust_gal_world_material_quads_executed=0",
+                terrain_particle_real={
+                    "enabled": True,
+                    "routeControl": "rust",
+                    "status": "continue",
+                    "target": "1, 80, 2",
+                    "blockType": "minecraft:stone",
+                    "setupCount": 1,
+                    "driveCalls": 20,
+                    "startCalls": 1,
+                    "continueCalls": 19,
+                    "breakingEffects": 19,
+                    "effectsPerFrame": 5,
+                    "materialCount": 5,
+                    "expectedMaterialMask": 0b11111,
+                    "materialMask": 0b11111,
+                    "routeCounts": {"java-compat": 42},
+                    "routeNanos": {"java-compat": 1000},
+                },
+            )
+            artifact = harness.normalize_capture_artifact(
+                target,
+                mode,
+                capture,
+                "gameplay",
+                True,
+                ["fake"],
+                0,
+                False,
+                tool_kind="gameplay",
+            )
+            self.assertEqual([], artifact["validation"]["messages"])
+            self.assertEqual("java-vulkan", artifact["implementation_attribution"])
 
     def test_required_tool_fingerprint_uses_shaderc_not_glslang(self) -> None:
         fingerprint = harness.tool_fingerprint()
@@ -2762,6 +3051,8 @@ else:
             self.assertIn('resourcePacks:["file/mattmc-rust-gui-pack-a","file/mattmc-rust-gui-pack-b"]', text)
             self.assertTrue((game_dir / "resourcepacks" / "mattmc-rust-gui-pack-b" / "assets/minecraft/textures/gui/sprites/hud/armor_full.png").is_file())
             self.assertTrue((game_dir / "resourcepacks" / "mattmc-rust-gui-pack-b" / "assets/minecraft/textures/misc/forcefield.png").is_file())
+            self.assertTrue((game_dir / "resourcepacks" / "mattmc-rust-gui-pack-b" / "assets/minecraft/textures/block/stone.png").is_file())
+            self.assertTrue((game_dir / "resourcepacks" / "mattmc-rust-gui-pack-b" / "assets/minecraft/textures/block/oak_leaves.png").is_file())
 
     def test_rust_opengl_attribution_is_not_confused_by_vulkanicgal_name(self) -> None:
         mode = harness.ModeSpec("current-opengl-shaders-on", "current", "opengl", "on", "java-opengl", False)
