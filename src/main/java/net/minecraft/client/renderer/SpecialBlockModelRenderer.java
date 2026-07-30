@@ -22,6 +22,10 @@ public class SpecialBlockModelRenderer {
 		return new SpecialBlockModelRenderer(SpecialModelRenderers.createBlockRenderers(bakingContext));
 	}
 
+	public boolean hasRenderer(Block block) {
+		return this.renderers.containsKey(block);
+	}
+
 	public void renderByBlock(
 		Block block, ItemDisplayContext itemDisplayContext, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, int k
 	) {

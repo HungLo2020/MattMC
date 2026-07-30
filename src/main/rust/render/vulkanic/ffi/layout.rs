@@ -619,6 +619,7 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 world_material_quads,
                 world_material_table,
                 world_material_compact_quads,
+                world_mesh_instances,
                 gui_sprites,
                 negotiated_feature_bits
             ]
@@ -644,6 +645,9 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 world_material_quad_count,
                 world_material_batch_count,
                 world_material_draw_count,
+                world_mesh_instance_count,
+                world_mesh_batch_count,
+                world_mesh_draw_count,
                 world_background_clear_count,
                 world_background_diagnostic_fallback_count,
                 world_background_sky_type,
@@ -659,6 +663,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 border_cache_misses,
                 material_cache_hits,
                 material_cache_misses,
+                mesh_cache_hits,
+                mesh_cache_misses,
                 sprite_count,
                 sprite_batch_count,
                 cache_hits,
@@ -793,6 +799,68 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 uv2_v,
                 uv3_u,
                 uv3_v
+            ]
+        ),
+        64 => layout!(
+            64,
+            FfiWorldMeshVertex,
+            [byte_size, color_argb, normal_packed, light, x, y, z, u, v]
+        ),
+        65 => layout!(
+            65,
+            FfiWorldMeshSectionRecord,
+            [
+                byte_size,
+                material_id,
+                texture_id,
+                material_mode,
+                cull_policy,
+                winding,
+                index_offset,
+                index_count
+            ]
+        ),
+        66 => layout!(
+            66,
+            FfiWorldMeshAssetRecord,
+            [
+                byte_size,
+                vertex_layout_version,
+                index_type,
+                reserved0,
+                mesh_key,
+                mesh_generation,
+                vertices,
+                index_bytes,
+                sections
+            ]
+        ),
+        67 => layout!(
+            67,
+            FfiWorldMeshTextureAssetPayload,
+            [byte_size, texture_id, png_bytes]
+        ),
+        68 => layout!(
+            68,
+            FfiWorldMeshAssetUpdateRequest,
+            [header, generation, meshes, textures, negotiated_feature_bits]
+        ),
+        69 => layout!(
+            69,
+            FfiWorldMeshInstanceRecord,
+            [
+                byte_size,
+                stratum,
+                mesh_section_index,
+                depth_policy,
+                cull_policy,
+                winding,
+                color_argb,
+                viewport_width,
+                viewport_height,
+                mesh_key,
+                mesh_generation,
+                transform
             ]
         ),
         _ => {

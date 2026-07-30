@@ -155,7 +155,15 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 	@Override
 	public void submitBlock(PoseStack poseStack, BlockState blockState, int i, int j, int k) {
 		this.wasUsed = true;
-		this.blockSubmits.add(new SubmitNodeStorage.BlockSubmit(poseStack.last().copy(), blockState, i, j, k));
+		this.blockSubmits.add(new SubmitNodeStorage.BlockSubmit(poseStack.last().copy(), blockState, i, j, k, SubmitNodeStorage.BlockSubmitSource.ORDINARY));
+		((SpecialBlockModelRenderer)Minecraft.getInstance().getModelManager().specialBlockModelRenderer().get())
+			.renderByBlock(blockState.getBlock(), ItemDisplayContext.NONE, poseStack, this.submitNodeStorage, i, j, k);
+	}
+
+	@Override
+	public void submitBlockDisplay(PoseStack poseStack, BlockState blockState, int i, int j, int k) {
+		this.wasUsed = true;
+		this.blockSubmits.add(new SubmitNodeStorage.BlockSubmit(poseStack.last().copy(), blockState, i, j, k, SubmitNodeStorage.BlockSubmitSource.BLOCK_DISPLAY));
 		((SpecialBlockModelRenderer)Minecraft.getInstance().getModelManager().specialBlockModelRenderer().get())
 			.renderByBlock(blockState.getBlock(), ItemDisplayContext.NONE, poseStack, this.submitNodeStorage, i, j, k);
 	}

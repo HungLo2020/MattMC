@@ -1002,8 +1002,62 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 					entityRenderState.z - f,
 					poseStack,
 					submitNodeCollector
+			);
+		}
+	}
+
+	public void enqueueRustGalBlockDisplaysForWholeFrame(Camera camera, DeltaTracker deltaTracker, Matrix4f viewMatrix, Matrix4f projectionMatrix) {
+		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentBlockDisplayRoute().usesRustWholeFrameVulkan()) {
+			return;
+		}
+		if (this.level == null) {
+			return;
+		}
+
+		this.entityRenderDispatcher.prepare(camera, this.minecraft.crosshairPickEntity);
+		Vec3 cameraPos = camera.getPosition();
+		double cameraX = cameraPos.x();
+		double cameraY = cameraPos.y();
+		double cameraZ = cameraPos.z();
+		Frustum frustum = this.prepareCullFrustum(viewMatrix, projectionMatrix, cameraPos);
+		TickRateManager tickRateManager = this.minecraft.level.tickRateManager();
+		Entity.setViewScale(Mth.clamp(this.minecraft.options.getEffectiveRenderDistance() / 8.0, 1.0, 2.5) * this.minecraft.options.entityDistanceScaling().get());
+		PoseStack poseStack = new PoseStack();
+
+		for (Entity entity : this.level.entitiesForRendering()) {
+			if (!(entity instanceof net.minecraft.world.entity.Display.BlockDisplay)) {
+				continue;
+			}
+			if (!this.entityRenderDispatcher.shouldRender(entity, frustum, cameraX, cameraY, cameraZ)
+				&& !entity.hasIndirectPassenger(this.minecraft.player)) {
+				continue;
+			}
+
+			if (entity == camera.getEntity() && !camera.isDetached()) {
+				continue;
+			}
+
+			if (entity.tickCount == 0) {
+				entity.xOld = entity.getX();
+				entity.yOld = entity.getY();
+				entity.zOld = entity.getZ();
+			}
+
+			float partialTick = deltaTracker.getGameTimeDeltaPartialTick(!tickRateManager.isEntityFrozen(entity));
+			EntityRenderState entityRenderState = this.extractEntity(entity, partialTick);
+			this.entityRenderDispatcher
+				.submit(
+					entityRenderState,
+					this.levelRenderState.cameraRenderState,
+					entityRenderState.x - cameraX,
+					entityRenderState.y - cameraY,
+					entityRenderState.z - cameraZ,
+					poseStack,
+					this.submitNodeStorage
 				);
 		}
+
+		this.featureRenderDispatcher.renderBlockFeaturesOnly();
 	}
 
 	public void extractVisibleBlockEntities(Camera camera, float f, LevelRenderState levelRenderState) { // Made public for Iris shadow rendering

@@ -121,6 +121,11 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 	}
 
 	@Override
+	public void submitBlockDisplay(PoseStack poseStack, BlockState blockState, int i, int j, int k) {
+		this.order(0).submitBlockDisplay(poseStack, blockState, i, j, k);
+	}
+
+	@Override
 	public void submitMovingBlock(PoseStack poseStack, MovingBlockRenderState movingBlockRenderState) {
 		this.order(0).submitMovingBlock(poseStack, movingBlockRenderState);
 	}
@@ -175,7 +180,13 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 	}
 
 	@Environment(EnvType.CLIENT)
-	public record BlockSubmit(PoseStack.Pose pose, BlockState state, int lightCoords, int overlayCoords, int outlineColor) {
+	public enum BlockSubmitSource {
+		ORDINARY,
+		BLOCK_DISPLAY
+	}
+
+	@Environment(EnvType.CLIENT)
+	public record BlockSubmit(PoseStack.Pose pose, BlockState state, int lightCoords, int overlayCoords, int outlineColor, BlockSubmitSource source) {
 	}
 
 	@Environment(EnvType.CLIENT)

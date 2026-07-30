@@ -105,6 +105,10 @@ public interface OrderedSubmitNodeCollector {
 
 	void submitBlock(PoseStack poseStack, BlockState blockState, int i, int j, int k);
 
+	default void submitBlockDisplay(PoseStack poseStack, BlockState blockState, int i, int j, int k) {
+		this.submitBlock(poseStack, blockState, i, j, k);
+	}
+
 	void submitMovingBlock(PoseStack poseStack, MovingBlockRenderState movingBlockRenderState);
 
 	void submitBlockModel(PoseStack poseStack, RenderType renderType, BlockStateModel blockStateModel, float f, float g, float h, int i, int j, int k);

@@ -11,6 +11,8 @@ pub const FFI_MAX_GUI_ASSET_BYTES: usize = 4 * 1024 * 1024;
 pub const FFI_MAX_WORLD_BORDER_ASSET_BYTES: usize = 2 * 1024 * 1024;
 pub const FFI_MAX_WORLD_CRACK_ASSET_BYTES: usize = 4 * 1024 * 1024;
 pub const FFI_MAX_WORLD_MATERIAL_ASSET_BYTES: usize = 4 * 1024 * 1024;
+pub const FFI_MAX_WORLD_MESH_TEXTURE_ASSET_BYTES: usize = 4 * 1024 * 1024;
+pub const FFI_MAX_WORLD_MESH_INDEX_BYTES: usize = 1024 * 1024;
 pub const FFI_MAX_BATCH_ITEMS: usize = 65_536;
 
 #[repr(u32)]
@@ -673,6 +675,82 @@ pub struct FfiWorldMaterialCompactQuadRequest {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiWorldMeshVertex {
+    pub byte_size: u32,
+    pub color_argb: u32,
+    pub normal_packed: u32,
+    pub light: u32,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub u: f32,
+    pub v: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiWorldMeshSectionRecord {
+    pub byte_size: u32,
+    pub material_id: u32,
+    pub texture_id: u32,
+    pub material_mode: u32,
+    pub cull_policy: u32,
+    pub winding: u32,
+    pub index_offset: u32,
+    pub index_count: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiWorldMeshAssetRecord {
+    pub byte_size: u32,
+    pub vertex_layout_version: u32,
+    pub index_type: u32,
+    pub reserved0: u32,
+    pub mesh_key: u64,
+    pub mesh_generation: u64,
+    pub vertices: FfiSlice<FfiWorldMeshVertex>,
+    pub index_bytes: FfiBytes,
+    pub sections: FfiSlice<FfiWorldMeshSectionRecord>,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiWorldMeshTextureAssetPayload {
+    pub byte_size: u32,
+    pub texture_id: u32,
+    pub png_bytes: FfiBytes,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiWorldMeshAssetUpdateRequest {
+    pub header: FfiHeader,
+    pub generation: u64,
+    pub meshes: FfiSlice<FfiWorldMeshAssetRecord>,
+    pub textures: FfiSlice<FfiWorldMeshTextureAssetPayload>,
+    pub negotiated_feature_bits: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiWorldMeshInstanceRecord {
+    pub byte_size: u32,
+    pub stratum: u32,
+    pub mesh_section_index: u32,
+    pub depth_policy: u32,
+    pub cull_policy: u32,
+    pub winding: u32,
+    pub color_argb: u32,
+    pub viewport_width: i32,
+    pub viewport_height: i32,
+    pub mesh_key: u64,
+    pub mesh_generation: u64,
+    pub transform: [f32; 16],
+}
+
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FfiWorldBackgroundRequest {
     pub byte_size: u32,
@@ -706,6 +784,7 @@ pub struct FfiWholeFrameSubmitRequest {
     pub world_material_quads: FfiSlice<FfiWorldMaterialQuadRequest>,
     pub world_material_table: FfiSlice<FfiWorldMaterialTableRecord>,
     pub world_material_compact_quads: FfiSlice<FfiWorldMaterialCompactQuadRequest>,
+    pub world_mesh_instances: FfiSlice<FfiWorldMeshInstanceRecord>,
     pub gui_sprites: FfiSlice<FfiGuiSpriteRequest>,
     pub negotiated_feature_bits: u64,
 }
@@ -730,6 +809,9 @@ pub struct FfiWholeFrameSubmitResult {
     pub world_material_quad_count: u64,
     pub world_material_batch_count: u64,
     pub world_material_draw_count: u64,
+    pub world_mesh_instance_count: u64,
+    pub world_mesh_batch_count: u64,
+    pub world_mesh_draw_count: u64,
     pub world_background_clear_count: u64,
     pub world_background_diagnostic_fallback_count: u64,
     pub world_background_sky_type: u64,
@@ -745,6 +827,8 @@ pub struct FfiWholeFrameSubmitResult {
     pub border_cache_misses: u64,
     pub material_cache_hits: u64,
     pub material_cache_misses: u64,
+    pub mesh_cache_hits: u64,
+    pub mesh_cache_misses: u64,
     pub sprite_count: u64,
     pub sprite_batch_count: u64,
     pub cache_hits: u64,
@@ -800,6 +884,9 @@ impl Default for FfiWholeFrameSubmitResult {
             world_material_quad_count: 0,
             world_material_batch_count: 0,
             world_material_draw_count: 0,
+            world_mesh_instance_count: 0,
+            world_mesh_batch_count: 0,
+            world_mesh_draw_count: 0,
             world_background_clear_count: 0,
             world_background_diagnostic_fallback_count: 0,
             world_background_sky_type: 0,
@@ -815,6 +902,8 @@ impl Default for FfiWholeFrameSubmitResult {
             border_cache_misses: 0,
             material_cache_hits: 0,
             material_cache_misses: 0,
+            mesh_cache_hits: 0,
+            mesh_cache_misses: 0,
             sprite_count: 0,
             sprite_batch_count: 0,
             cache_hits: 0,

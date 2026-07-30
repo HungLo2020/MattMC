@@ -630,6 +630,89 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             });
         }
     }
+    let raw_mesh_instances = read_slice(
+        request.world_mesh_instances,
+        true,
+        "world primitive mesh instances",
+    )?;
+    if raw_mesh_instances.len() > FFI_MAX_BATCH_ITEMS {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "world primitive mesh instance count {} exceeds max {}",
+                raw_mesh_instances.len(),
+                FFI_MAX_BATCH_ITEMS
+            ),
+        ));
+    }
+    let mut mesh_instances = Vec::with_capacity(raw_mesh_instances.len());
+    for instance in raw_mesh_instances {
+        validate_item_size::<FfiWorldMeshInstanceRecord>(
+            instance.byte_size,
+            "world primitive mesh instance",
+        )?;
+        if instance.stratum != WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown world mesh stratum {}", instance.stratum),
+            ));
+        }
+        if instance.depth_policy != WORLD_DEPTH_POLICY_DISABLED
+            && instance.depth_policy != WORLD_DEPTH_POLICY_TEST_WRITE
+            && instance.depth_policy != WORLD_DEPTH_POLICY_TEST_NO_WRITE
+        {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown world mesh depth policy {}", instance.depth_policy),
+            ));
+        }
+        if instance.cull_policy != WORLD_CULL_NONE
+            && instance.cull_policy != WORLD_CULL_BACK
+            && instance.cull_policy != WORLD_CULL_FRONT
+        {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown world mesh cull policy {}", instance.cull_policy),
+            ));
+        }
+        if instance.winding != WORLD_WINDING_CCW && instance.winding != WORLD_WINDING_CW {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown world mesh winding {}", instance.winding),
+            ));
+        }
+        let viewport_width = u32::try_from(instance.viewport_width).map_err(|_| {
+            GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "world mesh viewport width must be non-negative, got {}",
+                    instance.viewport_width
+                ),
+            )
+        })?;
+        let viewport_height = u32::try_from(instance.viewport_height).map_err(|_| {
+            GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "world mesh viewport height must be non-negative, got {}",
+                    instance.viewport_height
+                ),
+            )
+        })?;
+        mesh_instances.push(WorldMeshInstanceRequest {
+            stratum: instance.stratum,
+            mesh_key: instance.mesh_key,
+            mesh_generation: instance.mesh_generation,
+            mesh_section_index: instance.mesh_section_index,
+            depth_policy: instance.depth_policy,
+            cull_policy: instance.cull_policy,
+            winding: instance.winding,
+            color_argb: instance.color_argb,
+            transform: instance.transform,
+            viewport_width,
+            viewport_height,
+        });
+    }
     let raw_gui = FfiGuiFrameSubmitRequest {
         header: FfiHeader {
             version: request.header.version,
@@ -677,6 +760,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             crack_quads,
             border_quads,
             material_quads,
+            mesh_instances,
         },
         gui_sprites,
     ))

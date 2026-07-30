@@ -230,6 +230,8 @@ fn ffi_abi_does_not_accumulate_producer_specific_schema_names() {
     let forbidden = [
         "BlockMarker",
         "TerrainParticle",
+        "BlockDisplay",
+        "BlockSubmit",
         "Armor",
         "Hunger",
         "Absorption",

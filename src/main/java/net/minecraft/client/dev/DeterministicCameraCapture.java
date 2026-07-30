@@ -19,6 +19,8 @@ import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Display;
 import net.minecraft.world.entity.player.ChatVisiblity;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.level.GameType;
@@ -94,6 +96,8 @@ public final class DeterministicCameraCapture {
 		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.realSurvivalCrack");
 	private static final boolean FORCE_REAL_SURVIVAL_CRACK_SETUP_BLOCK =
 		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.realSurvivalCrackSetupBlock");
+	private static final String BLOCK_DISPLAY_SCENARIO =
+		System.getProperty("mattmc.dev.rustGalWorldMesh.blockDisplayScenario", "").trim().toLowerCase(Locale.ROOT);
 	private static final int FORCED_ARMOR_VALUE =
 		Integer.getInteger("mattmc.dev.deterministicCameraCapture.armorValue", -1);
 	private static final float FORCED_PLAYER_HEALTH =
@@ -529,6 +533,7 @@ public final class DeterministicCameraCapture {
 					applyRuntimeOverrides(minecraft, player);
 					setupDeterministicSupportPlatform(minecraft, player);
 					setupRealSurvivalCrackBlock(minecraft, player);
+					setupBlockDisplayScenario(minecraft, player);
 		initialPose = new Pose("initial", player.getYRot(), player.getXRot());
 		if (forcedBlockOutlineTarget != null) {
 			initialPose = forcedBlockOutlineTarget.pose();
@@ -1192,6 +1197,40 @@ public final class DeterministicCameraCapture {
 		);
 	}
 
+	private static void setupBlockDisplayScenario(Minecraft minecraft, LocalPlayer player) {
+		if (BLOCK_DISPLAY_SCENARIO.isEmpty() || "hidden".equals(BLOCK_DISPLAY_SCENARIO) || minecraft.level == null) {
+			return;
+		}
+		BlockState state = blockDisplayBenchmarkState();
+		Vec3 forward = player.getLookAngle();
+		if (forward.lengthSqr() < 0.0001) {
+			forward = new Vec3(0.0, 0.0, 1.0);
+		}
+		Vec3 position = player.position().add(forward.normalize().scale(4.0)).add(-0.5, -0.5, -0.5);
+		Display.BlockDisplay display = new Display.BlockDisplay(EntityType.BLOCK_DISPLAY, minecraft.level);
+		display.setId(Integer.MIN_VALUE + 4096);
+		display.setPos(position);
+		display.setBlockState(state);
+		display.setViewRange(16.0F);
+		display.setWidth(2.0F);
+		display.setHeight(2.0F);
+		minecraft.level.addEntity(display);
+		LOGGER.info(
+			"Deterministic BlockDisplay setup spawned {} at {} for Rust-GAL mesh capture",
+			state.getBlock().builtInRegistryHolder().key().location(),
+			position
+		);
+	}
+
+	private static BlockState blockDisplayBenchmarkState() {
+		return switch (BLOCK_DISPLAY_SCENARIO) {
+			case "oak-leaves", "cutout", "tinted" -> Blocks.OAK_LEAVES.defaultBlockState();
+			case "asymmetric", "furnace" -> Blocks.FURNACE.defaultBlockState();
+			case "non-full-cube", "stairs" -> Blocks.OAK_STAIRS.defaultBlockState();
+			default -> Blocks.STONE.defaultBlockState();
+		};
+	}
+
 	private static void setupDeterministicSupportPlatform(Minecraft minecraft, LocalPlayer player) {
 		if (!FORCE_REAL_SURVIVAL_CRACK || !FORCE_REAL_SURVIVAL_CRACK_SETUP_BLOCK || minecraft.level == null || !"unset".equals(deterministicSupportBlock)) {
 			return;
@@ -1444,6 +1483,8 @@ public final class DeterministicCameraCapture {
 		appendBlockMarkerDiagnostics(json).append(",\n");
 		appendField(json, "rustGalWorldTerrainParticleScenario", System.getProperty("mattmc.dev.rustGalWorldMaterial.terrainParticleScenario", "")).append(",\n");
 		appendTerrainParticleDiagnostics(json).append(",\n");
+		appendField(json, "rustGalWorldBlockDisplayScenario", System.getProperty("mattmc.dev.rustGalWorldMesh.blockDisplayScenario", "")).append(",\n");
+		appendBlockDisplayDiagnostics(json).append(",\n");
 		json.append("  \"rustGalWorldOutlineDepthProbe\": ").append(Boolean.getBoolean("mattmc.dev.rustGalWorldOutline.depthProbe")).append(",\n");
 		json.append("  \"blockOutlineRealTargetForced\": ").append(FORCE_BLOCK_OUTLINE_TARGET).append(",\n");
 		json.append("  \"blockOutlineRealTargetAimed\": ").append(AIM_BLOCK_OUTLINE_TARGET).append(",\n");
@@ -1719,6 +1760,44 @@ public final class DeterministicCameraCapture {
 				.append(", \"top\": ").append(format(particle.screenTop()))
 				.append(", \"right\": ").append(format(particle.screenRight()))
 				.append(", \"bottom\": ").append(format(particle.screenBottom())).append(" }");
+			json.append(" }");
+		}
+		if (!diagnostics.isEmpty()) {
+			json.append("\n  ");
+		}
+		json.append("]");
+		return json;
+	}
+
+	private static StringBuilder appendBlockDisplayDiagnostics(StringBuilder json) {
+		List<RustGalWorldPrimitiveRenderer.BlockDisplayDiagnostic> diagnostics =
+			RustGalWorldPrimitiveRenderer.blockDisplayDiagnostics();
+		json.append("  \"rustGalWorldBlockDisplays\": [");
+		for (int i = 0; i < diagnostics.size(); i++) {
+			RustGalWorldPrimitiveRenderer.BlockDisplayDiagnostic display = diagnostics.get(i);
+			if (i > 0) {
+				json.append(",");
+			}
+			json.append("\n    { ");
+			json.append("\"frameIndex\": ").append(display.frameIndex()).append(", ");
+			appendField(json, "route", display.route(), 0).append(", ");
+			appendField(json, "blockId", display.blockId(), 0).append(", ");
+			json.append("\"meshKey\": ").append(Long.toUnsignedString(display.meshKey())).append(", ");
+			json.append("\"meshGeneration\": ").append(display.meshGeneration()).append(", ");
+			json.append("\"vertexLayoutVersion\": ").append(display.vertexLayoutVersion()).append(", ");
+			json.append("\"indexType\": ").append(display.indexType()).append(", ");
+			json.append("\"vertexCount\": ").append(display.vertexCount()).append(", ");
+			json.append("\"indexBytes\": ").append(display.indexBytes()).append(", ");
+			json.append("\"sectionCount\": ").append(display.sectionCount()).append(", ");
+			appendField(json, "textureIds", display.textureIds(), 0).append(", ");
+			json.append("\"materialMode\": ").append(display.materialMode()).append(", ");
+			json.append("\"viewport\": { \"width\": ").append(display.viewportWidth())
+				.append(", \"height\": ").append(display.viewportHeight()).append(" }, ");
+			json.append("\"projected\": ").append(display.projected()).append(", ");
+			json.append("\"screenBounds\": { \"left\": ").append(format(display.screenLeft()))
+				.append(", \"top\": ").append(format(display.screenTop()))
+				.append(", \"right\": ").append(format(display.screenRight()))
+				.append(", \"bottom\": ").append(format(display.screenBottom())).append(" }");
 			json.append(" }");
 		}
 		if (!diagnostics.isEmpty()) {

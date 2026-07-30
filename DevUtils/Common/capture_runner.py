@@ -513,18 +513,27 @@ class CaptureRunner:
         gui_scale = os.environ.get("MATTMC_CAPTURE_GUI_SCALE", "3")
         if not gui_scale.isdigit() or int(gui_scale) <= 0:
             raise SystemExit(f"MATTMC_CAPTURE_GUI_SCALE must be a positive integer, got {gui_scale!r}")
+        max_fps = os.environ.get("MATTMC_CAPTURE_MAX_FPS", "120")
+        if not max_fps.isdigit() or int(max_fps) <= 0:
+            raise SystemExit(f"MATTMC_CAPTURE_MAX_FPS must be a positive integer, got {max_fps!r}")
         forced_options = {
             "renderDistance": "10",
             "simulationDistance": "12",
             "guiScale": gui_scale,
             "fullscreen": "false",
             "hideGui": "false",
-            "maxFps": "120",
+            "maxFps": max_fps,
             "enableVsync": "false",
             "tutorialStep": "none",
         }
         for key, value in forced_options.items():
             upsert_option(self.options_file, key, value)
+        dh_file = self.run_dir / "config" / "DistantHorizons.toml"
+        if os.environ.get("MATTMC_CAPTURE_DISABLE_DH_FOR_PERF", "false").lower() == "true":
+            if upsert_toml_value(dh_file, "enableDistantGeneration", "false"):
+                self.append_meta("forced_dh_enableDistantGeneration=false")
+            if upsert_toml_value(dh_file, "rendererMode", '"DISABLED"'):
+                self.append_meta("forced_dh_rendererMode=DISABLED")
         voxelmap_file = self.run_dir / "config" / "voxelmap.properties"
         if voxelmap_file.is_file():
             upsert_option(voxelmap_file, "Welcome Message", "false")
@@ -1990,6 +1999,24 @@ def upsert_option(file_path: Path, key: str, value: str) -> bool:
             break
     if not changed:
         lines.append(f"{key}:{value}")
+    file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return True
+
+
+def upsert_toml_value(file_path: Path, key: str, value: str) -> bool:
+    if not file_path.is_file():
+        return False
+    lines = file_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    changed = False
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith(f"{key} ") or stripped.startswith(f"{key}="):
+            indent = line[: len(line) - len(line.lstrip())]
+            lines[index] = f"{indent}{key} = {value}"
+            changed = True
+            break
+    if not changed:
+        lines.append(f"{key} = {value}")
     file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return True
 

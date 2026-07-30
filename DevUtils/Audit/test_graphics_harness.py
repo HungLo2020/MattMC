@@ -190,6 +190,28 @@ def write_terrain_particle_probe_image(path: Path, *, texture_id: int = harness.
     image.save(path)
 
 
+def write_block_display_probe_image(path: Path, *, scenario: str = "stone") -> None:
+    from PIL import Image
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image = Image.new("RGB", (1280, 720), (36, 48, 60))
+    left, top, right, bottom = 520, 250, 760, 490
+    if scenario in {"oak-leaves", "cutout", "tinted"}:
+        color = (78, 142, 58)
+    elif scenario in {"asymmetric", "furnace"}:
+        color = (118, 118, 118)
+    elif scenario in {"non-full-cube", "stairs"}:
+        color = (136, 82, 38)
+    else:
+        color = (124, 124, 124)
+    for x in range(left, right):
+        for y in range(top, bottom):
+            if scenario in {"oak-leaves", "cutout", "tinted"} and ((x - left) // 16 + (y - top) // 16) % 3 == 0:
+                continue
+            image.putpixel((x, y), color)
+    image.save(path)
+
+
 def write_rust_shell_scene_image(path: Path) -> None:
     from PIL import Image
 
@@ -232,6 +254,8 @@ def write_frame_benchmark(
     samples: list[int],
     rust_gal_line: str | None = None,
     terrain_particle_real: dict[str, object] | None = None,
+    block_display: dict[str, object] | None = None,
+    block_display_work_count: int = 0,
 ) -> None:
     (capture_dir / "graphics_frame_benchmark_20260101_000000.json").write_text(
         json.dumps(
@@ -254,6 +278,14 @@ def write_frame_benchmark(
                     "initialPosition": {"x": 1.0, "y": 80.0, "z": 2.0},
                 },
                 "terrainParticleRealGameplay": terrain_particle_real or {"enabled": False},
+                "blockDisplayScenario": block_display
+                or {
+                    "enabled": False,
+                    "scenario": "",
+                    "workload": "single",
+                    "routeControl": "rust",
+                    "status": "inactive",
+                },
                 "runtimeState": {
                     "loadedChunks": 121,
                     "entityCount": 7,
@@ -281,6 +313,7 @@ def write_frame_benchmark(
                 "submittedWorkCounts": {
                     "sodium-terrain": len(samples) * 30,
                     "distant-horizons": len(samples) * 8,
+                    **({"block-display": block_display_work_count} if block_display_work_count else {}),
                 },
                 "java": {
                     "gcCountDelta": 1,
@@ -764,6 +797,346 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             )
             self.assertEqual([], artifact["validation"]["messages"])
             self.assertEqual("java-vulkan", artifact["implementation_attribution"])
+
+    def test_block_display_mesh_gate_uses_mesh_workload_counters(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = harness.MATRIX_MODES[0]
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            write_frame_benchmark(
+                capture,
+                [16_000_000, 17_000_000, 15_500_000],
+                rust_gal_line=(
+                    "Rust OpenGL VulkanicGAL GUI frame executed producer=gui.frame "
+                    "rust_gal_world_mesh_instances_executed=1 "
+                    "rust_gal_world_mesh_batches_executed=1 "
+                    "rust_gal_world_mesh_draws_executed=1 "
+                    "rust_gal_world_mesh_cache_hits=2 "
+                    "rust_gal_world_mesh_cache_misses=1 "
+                    "rust_gal_ffi_world_mesh_asset_update_calls=1 "
+                    "rust_gal_ffi_world_mesh_asset_update_bytes=4096 "
+                    "ffi_call_count=9 ffi_bytes=512"
+                ),
+            )
+            frame_path = next(capture.glob("graphics_frame_benchmark_*.json"))
+            frame_doc = json.loads(frame_path.read_text(encoding="utf-8"))
+            frame_doc["blockDisplayScenario"] = {
+                "enabled": True,
+                "scenario": "stone",
+                "status": "spawned",
+                "block": "minecraft:stone",
+                "position": {"x": 1.5, "y": 80.0, "z": 2.5},
+            }
+            frame_path.write_text(json.dumps(frame_doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "-Dmattmc.dev.rustGalWorldMesh.blockDisplayScenario=stone\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(
+                target,
+                mode,
+                capture,
+                "gameplay",
+                True,
+                ["fake"],
+                0,
+                False,
+                tool_kind="gameplay",
+            )
+
+            counters = artifact["metrics"]["rust_gal_slice"]
+            self.assertEqual([], artifact["validation"]["messages"])
+            self.assertTrue(artifact["validation"]["complete"])
+            self.assertEqual("stone", counters["world_mesh_block_display_scenario"])
+            self.assertEqual(1, counters["world_mesh_instances_executed"])
+            self.assertEqual(1, counters["world_mesh_batches_executed"])
+            self.assertEqual(1, counters["world_mesh_draws_executed"])
+            self.assertEqual(2, counters["world_mesh_cache_hits"])
+            self.assertEqual(1, counters["ffi_operations"]["world_mesh_asset_update"]["calls"])
+
+    def test_block_display_mesh_gate_rejects_missing_rust_work(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = harness.MATRIX_MODES[0]
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            write_frame_benchmark(
+                capture,
+                [16_000_000, 17_000_000, 15_500_000],
+                rust_gal_line="Rust OpenGL VulkanicGAL GUI frame executed producer=gui.frame ffi_call_count=3 ffi_bytes=128",
+            )
+            frame_path = next(capture.glob("graphics_frame_benchmark_*.json"))
+            frame_doc = json.loads(frame_path.read_text(encoding="utf-8"))
+            frame_doc["blockDisplayScenario"] = {
+                "enabled": True,
+                "scenario": "stone",
+                "status": "spawned",
+            }
+            frame_path.write_text(json.dumps(frame_doc), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "-Dmattmc.dev.rustGalWorldMesh.blockDisplayScenario=stone\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(
+                target,
+                mode,
+                capture,
+                "gameplay",
+                True,
+                ["fake"],
+                0,
+                False,
+                tool_kind="gameplay",
+            )
+
+            self.assertFalse(artifact["validation"]["complete"])
+            self.assertTrue(
+                any("BlockDisplay scenario requested but no non-zero" in message for message in artifact["validation"]["messages"])
+            )
+
+    def test_block_display_performance_gate_requires_multi_mesh_rust_workload(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = harness.MATRIX_MODES[0]
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            write_frame_benchmark(
+                capture,
+                [16_000_000, 17_000_000, 15_500_000],
+                rust_gal_line=(
+                    "Rust OpenGL VulkanicGAL GUI frame executed producer=gui.frame "
+                    "rust_gal_world_mesh_instances_executed=30 "
+                    "rust_gal_world_mesh_batches_executed=5 "
+                    "rust_gal_world_mesh_draws_executed=5 "
+                    "rust_gal_world_mesh_cache_hits=60 "
+                    "rust_gal_world_mesh_cache_misses=5 "
+                    "ffi_call_count=4 ffi_bytes=2048"
+                ),
+                block_display={
+                    "enabled": True,
+                    "scenario": "stone",
+                    "workload": "performance",
+                    "routeControl": "rust",
+                    "status": "spawned",
+                    "block": "minecraft:stone",
+                    "position": "1,2,3",
+                    "entityCount": 30,
+                    "distinctBlockCount": 5,
+                    "workloadFingerprint": "performance|stone|furnace|leaves|stairs|wool",
+                },
+                block_display_work_count=90,
+            )
+            (capture / "runClient_20260101_000000.log").write_text(
+                "-Dmattmc.dev.rustGalWorldMesh.blockDisplayScenario=stone\n"
+                "-Dmattmc.dev.rustGalWorldMesh.blockDisplayWorkload=performance\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(
+                target,
+                mode,
+                capture,
+                "gameplay",
+                True,
+                ["fake"],
+                0,
+                False,
+                tool_kind="gameplay",
+            )
+
+            self.assertTrue(artifact["validation"]["complete"], artifact["validation"]["messages"])
+            counters = artifact["metrics"]["rust_gal_slice"]
+            self.assertEqual("performance", counters["world_mesh_block_display_workload"])
+            self.assertEqual("rust", counters["world_mesh_block_display_control"])
+            self.assertEqual(30, counters["world_mesh_block_display_metrics"]["entityCount"])
+            self.assertEqual(5, counters["world_mesh_block_display_metrics"]["distinctBlockCount"])
+
+    def test_block_display_disabled_and_legacy_controls_expect_no_rust_mesh_work(self) -> None:
+        for control, property_line in (
+            ("disabled", "-Dmattmc.dev.rustGalWorldBlockDisplay.disabled=true\n"),
+            ("legacy", "-Dmattmc.dev.rustGalWorldBlockDisplay.legacyControl=true\n"),
+        ):
+            with self.subTest(control=control):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    temp = Path(temp_dir)
+                    mode = harness.MATRIX_MODES[0]
+                    target = fake_repo(temp, mode.target)
+                    capture = temp / "capture"
+                    write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+                    write_frame_benchmark(
+                        capture,
+                        [16_000_000, 17_000_000, 15_500_000],
+                        rust_gal_line="Rust OpenGL VulkanicGAL GUI frame executed producer=gui.frame ffi_call_count=3 ffi_bytes=128",
+                        block_display={
+                            "enabled": True,
+                            "scenario": "stone",
+                            "workload": "performance",
+                            "routeControl": control,
+                            "status": "spawned",
+                            "block": "minecraft:stone",
+                            "position": "1,2,3",
+                            "entityCount": 30,
+                            "distinctBlockCount": 5,
+                            "workloadFingerprint": "performance|stone|furnace|leaves|stairs|wool",
+                        },
+                        block_display_work_count=90,
+                    )
+                    (capture / "runClient_20260101_000000.log").write_text(
+                        "-Dmattmc.dev.rustGalWorldMesh.blockDisplayScenario=stone\n"
+                        "-Dmattmc.dev.rustGalWorldMesh.blockDisplayWorkload=performance\n"
+                        + property_line,
+                        encoding="utf-8",
+                    )
+
+                    artifact = harness.normalize_capture_artifact(
+                        target,
+                        mode,
+                        capture,
+                        "gameplay",
+                        True,
+                        ["fake"],
+                        0,
+                        False,
+                        tool_kind="gameplay",
+                    )
+
+                    self.assertTrue(artifact["validation"]["complete"], artifact["validation"]["messages"])
+                    counters = artifact["metrics"]["rust_gal_slice"]
+                    self.assertEqual(control, counters["world_mesh_block_display_control"])
+                    self.assertEqual(0, counters["world_mesh_instances_executed"] or 0)
+
+    def test_block_display_capture_requires_projected_crop_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = harness.MATRIX_MODES[0]
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            screenshot = capture / "block_display_stone.png"
+            write_block_display_probe_image(screenshot, scenario="stone")
+            deterministic = {
+                "status": "complete",
+                "dimension": "minecraft:overworld",
+                "initialPosition": {"x": 1.0, "y": 80.0, "z": 2.0},
+                "window": {"width": 1280, "height": 720},
+                "rustGalWorldBlockDisplayScenario": "stone",
+                "captures": [
+                    {
+                        "poseName": "initial",
+                        "requestedYaw": 0.0,
+                        "requestedPitch": 10.0,
+                        "renderedFrameIndex": 8,
+                        "screenshot": str(screenshot),
+                    }
+                ],
+                "rustGalWorldBlockDisplays": [
+                    {
+                        "frameIndex": 8,
+                        "route": "rust-opengl",
+                        "blockId": "minecraft:stone",
+                        "meshKey": "42",
+                        "meshGeneration": 1,
+                        "vertexLayoutVersion": 1,
+                        "indexType": 1,
+                        "vertexCount": 24,
+                        "indexBytes": 72,
+                        "sectionCount": 6,
+                        "textureIds": "568297839",
+                        "materialMode": 1,
+                        "viewport": {"width": 1280, "height": 720},
+                        "projected": True,
+                        "screenBounds": {"left": 520.0, "top": 250.0, "right": 760.0, "bottom": 490.0},
+                    }
+                ],
+            }
+            next(capture.glob("deterministic_camera_capture_*.json")).write_text(json.dumps(deterministic), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "-Dmattmc.dev.rustGalWorldMesh.blockDisplayScenario=stone\n"
+                "Rust OpenGL VulkanicGAL GUI frame executed producer=gui.frame "
+                "rust_gal_world_mesh_instances_executed=1 "
+                "rust_gal_world_mesh_batches_executed=1 "
+                "rust_gal_world_mesh_draws_executed=1 "
+                "rust_gal_world_mesh_cache_hits=2 "
+                "rust_gal_world_mesh_cache_misses=1 "
+                "rust_gal_ffi_world_mesh_asset_update_calls=1 "
+                "rust_gal_ffi_world_mesh_asset_update_bytes=4096 "
+                "ffi_call_count=9 ffi_bytes=512\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(
+                target,
+                mode,
+                capture,
+                "correctness",
+                True,
+                ["fake"],
+                0,
+                False,
+                tool_kind="capture",
+            )
+
+            evidence = artifact["metrics"]["rust_gal_slice"]["world_mesh_block_display_pixel_evidence"]
+            self.assertTrue(artifact["validation"]["complete"], artifact["validation"]["messages"])
+            self.assertEqual("present", evidence["status"])
+            self.assertEqual("passed", evidence["texture_status"])
+            self.assertEqual("passed", evidence["material_status"])
+            self.assertEqual("passed", evidence["orientation_status"])
+
+    def test_block_display_capture_rejects_counter_only_success(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            mode = harness.MATRIX_MODES[0]
+            target = fake_repo(temp, mode.target)
+            capture = temp / "capture"
+            write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
+            deterministic = {
+                "status": "complete",
+                "dimension": "minecraft:overworld",
+                "rustGalWorldBlockDisplayScenario": "stone",
+                "captures": [
+                    {
+                        "poseName": "initial",
+                        "requestedYaw": 0.0,
+                        "requestedPitch": 10.0,
+                        "renderedFrameIndex": 8,
+                    }
+                ],
+                "rustGalWorldBlockDisplays": [],
+            }
+            next(capture.glob("deterministic_camera_capture_*.json")).write_text(json.dumps(deterministic), encoding="utf-8")
+            (capture / "runClient_20260101_000000.log").write_text(
+                "-Dmattmc.dev.rustGalWorldMesh.blockDisplayScenario=stone\n"
+                "Rust OpenGL VulkanicGAL GUI frame executed producer=gui.frame "
+                "rust_gal_world_mesh_instances_executed=1 "
+                "rust_gal_world_mesh_batches_executed=1 "
+                "rust_gal_world_mesh_draws_executed=1 "
+                "ffi_call_count=9 ffi_bytes=512\n",
+                encoding="utf-8",
+            )
+
+            artifact = harness.normalize_capture_artifact(
+                target,
+                mode,
+                capture,
+                "correctness",
+                True,
+                ["fake"],
+                0,
+                False,
+                tool_kind="capture",
+            )
+
+            self.assertFalse(artifact["validation"]["complete"])
+            self.assertTrue(
+                any("projected mesh crop evidence" in message for message in artifact["validation"]["messages"])
+            )
 
     def test_required_tool_fingerprint_uses_shaderc_not_glslang(self) -> None:
         fingerprint = harness.tool_fingerprint()
@@ -1311,6 +1684,7 @@ else:
                 world_outline_depth_policy="test-write",
                 world_outline_depth_probe=True,
                 world_material_marker_scenario="light-15",
+                world_mesh_block_display_scenario="stone",
                 gui_resource_pack_scenario="",
                 world="Origin",
                 max_secs=1,
@@ -1334,6 +1708,19 @@ else:
                 self.assertEqual(env["MATTMC_RENDERDOC_CAPTURE"], "true")
                 self.assertIn("mattmc.dev.renderdocCapture=true", env["JAVA_TOOL_OPTIONS"])
                 self.assertIn("mattmc.dev.rustGalWorldMaterial.blockMarkerScenario=light-15", env["JAVA_TOOL_OPTIONS"])
+                self.assertIn("mattmc.dev.rustGalWorldMesh.blockDisplayScenario=stone", env["JAVA_TOOL_OPTIONS"])
+                _, gameplay_env = harness.build_capture_command(
+                    target,
+                    harness.MATRIX_MODES[0],
+                    root / "gameplay",
+                    "correctness",
+                    args,
+                    "gameplay",
+                )
+                self.assertIn(
+                    "mattmc.dev.rustGalWorldMesh.blockDisplayScenario=stone",
+                    gameplay_env["JAVA_TOOL_OPTIONS"],
+                )
             finally:
                 harness.local_renderdoccmd_path = original  # type: ignore[assignment]
 

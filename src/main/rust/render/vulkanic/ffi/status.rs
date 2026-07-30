@@ -188,6 +188,9 @@ pub(crate) fn whole_frame_result_ok(
         world_material_quad_count: world.material_quad_count,
         world_material_batch_count: world.material_batch_count,
         world_material_draw_count: world.material_draw_count,
+        world_mesh_instance_count: world.mesh_instance_count,
+        world_mesh_batch_count: world.mesh_batch_count,
+        world_mesh_draw_count: world.mesh_draw_count,
         world_background_clear_count: world.background_clear_count,
         world_background_diagnostic_fallback_count: world.background_diagnostic_fallback_count,
         world_background_sky_type: world.background_sky_type,
@@ -203,6 +206,8 @@ pub(crate) fn whole_frame_result_ok(
         border_cache_misses: world.border_cache_misses,
         material_cache_hits: world.material_cache_hits,
         material_cache_misses: world.material_cache_misses,
+        mesh_cache_hits: world.mesh_cache_hits,
+        mesh_cache_misses: world.mesh_cache_misses,
         sprite_count: gui.sprite_count,
         sprite_batch_count: gui.sprite_batch_count,
         cache_hits: world.cache_hits.saturating_add(gui.cache_hits),
@@ -420,6 +425,12 @@ pub(crate) fn input_bytes_for_whole_frame(request: &FfiWholeFrameSubmitRequest) 
         )
         .saturating_add(
             request
+                .world_mesh_instances
+                .count
+                .saturating_mul(size_of::<FfiWorldMeshInstanceRecord>() as u64),
+        )
+        .saturating_add(
+            request
                 .gui_sprites
                 .count
                 .saturating_mul(size_of::<FfiGuiSpriteRequest>() as u64),
@@ -486,6 +497,22 @@ pub(crate) fn input_bytes_for_world_material_asset_update(
     (size_of::<FfiWorldMaterialAssetUpdateRequest>() as u64)
         .saturating_add(payload_headers)
         .saturating_add(payload_bytes)
+}
+
+pub(crate) fn input_bytes_for_world_mesh_asset_update(
+    request: &FfiWorldMeshAssetUpdateRequest,
+) -> u64 {
+    let mesh_headers = request
+        .meshes
+        .count
+        .saturating_mul(size_of::<FfiWorldMeshAssetRecord>() as u64);
+    let texture_headers = request
+        .textures
+        .count
+        .saturating_mul(size_of::<FfiWorldMeshTextureAssetPayload>() as u64);
+    (size_of::<FfiWorldMeshAssetUpdateRequest>() as u64)
+        .saturating_add(mesh_headers)
+        .saturating_add(texture_headers)
 }
 
 pub(crate) fn set_feature(bits: &mut u64, feature: u64, enabled: bool) {

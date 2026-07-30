@@ -29,6 +29,12 @@ pub const WORLD_MAX_LINE_SEGMENTS: usize = 512;
 pub const WORLD_MAX_CRACK_QUADS: usize = 512;
 pub const WORLD_MAX_BORDER_QUADS: usize = 64;
 pub const WORLD_MAX_MATERIAL_QUADS: usize = 512;
+pub const WORLD_MAX_MESH_VERTICES: usize = 65_536;
+pub const WORLD_MAX_MESH_INDEX_BYTES: usize = 393_216;
+pub const WORLD_MAX_MESH_SECTIONS: usize = 256;
+pub const WORLD_MAX_MESH_INSTANCES: usize = 512;
+pub const WORLD_MESH_VERTEX_LAYOUT_V1: u32 = 1;
+pub const WORLD_MESH_SECTION_ALL: u32 = u32::MAX;
 pub const WORLD_DEPTH_POLICY_DISABLED: u32 = 0;
 pub const WORLD_DEPTH_POLICY_TEST_WRITE: u32 = 1;
 pub const WORLD_DEPTH_POLICY_TEST_NO_WRITE: u32 = 2;
@@ -98,6 +104,11 @@ const WORLD_MATERIAL_QUAD_BYTES: usize = 112;
 const WORLD_MATERIAL_UNIFORM_BYTES: u64 =
     (WORLD_MATERIAL_HEADER_BYTES + WORLD_MAX_MATERIAL_QUADS * WORLD_MATERIAL_QUAD_BYTES) as u64;
 const WORLD_MATERIAL_INDEX_BYTES: u64 = 6 * 4;
+const WORLD_MESH_GPU_VERTEX_BYTES: usize = 3 * 4 * 4;
+const WORLD_MESH_BATCH_HEADER_BYTES: usize = 16 * 4 + 16 * 4;
+const WORLD_MESH_INSTANCE_BYTES: usize = 16 * 4 + 4 * 4 + 4 * 4;
+const WORLD_MESH_INSTANCE_BUFFER_BYTES: u64 =
+    (WORLD_MESH_BATCH_HEADER_BYTES + WORLD_MAX_MESH_INSTANCES * WORLD_MESH_INSTANCE_BYTES) as u64;
 const CRACK_STAGE_COUNT: u32 = 10;
 const CRACK_STAGE_SIZE: u32 = 16;
 
@@ -132,6 +143,9 @@ void main() {
     vec2 offset_ndc = normal * (width_px / viewport.xy) * side;
     vec4 clip = endpoint == 0 ? start_clip : end_clip;
     clip.xy += offset_ndc * clip.w;
+#ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
+    clip.z = clip.z * 0.5 + clip.w * 0.5;
+#endif
     gl_Position = clip;
     v_color = segments[segment].color;
 }
@@ -177,7 +191,11 @@ void main() {
     vec3 top = mix(quad.p0.xyz, quad.p1.xyz, c.x);
     vec3 bottom = mix(quad.p3.xyz, quad.p2.xyz, c.x);
     vec3 position = mix(top, bottom, c.y);
-    gl_Position = projection * view * vec4(position, 1.0);
+    vec4 clip = projection * view * vec4(position, 1.0);
+#ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
+    clip.z = clip.z * 0.5 + clip.w * 0.5;
+#endif
+    gl_Position = clip;
     v_uv = vec2(
         quad.uv_region.x + c.x * quad.uv_region.z,
         quad.uv_region.y + c.y * quad.uv_region.w
@@ -234,7 +252,11 @@ void main() {
     vec3 top = mix(quad.p0.xyz, quad.p1.xyz, c.x);
     vec3 bottom = mix(quad.p3.xyz, quad.p2.xyz, c.x);
     vec3 position = mix(top, bottom, c.y);
-    gl_Position = projection * view * vec4(position, 1.0);
+    vec4 clip = projection * view * vec4(position, 1.0);
+#ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
+    clip.z = clip.z * 0.5 + clip.w * 0.5;
+#endif
+    gl_Position = clip;
     v_uv = vec2(
         quad.uv_region.x + c.x * quad.uv_region.z + quad.scroll_border_distance.x,
         quad.uv_region.y + c.y * quad.uv_region.w + quad.scroll_border_distance.y
@@ -295,7 +317,11 @@ void main() {
     vec3 position = mix(top, bottom, c.y);
     vec2 uv_top = mix(quad.uv0_uv1.xy, quad.uv0_uv1.zw, c.x);
     vec2 uv_bottom = mix(quad.uv2_uv3.zw, quad.uv2_uv3.xy, c.x);
-    gl_Position = projection * view * vec4(position, 1.0);
+    vec4 clip = projection * view * vec4(position, 1.0);
+#ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
+    clip.z = clip.z * 0.5 + clip.w * 0.5;
+#endif
+    gl_Position = clip;
     v_uv = mix(uv_top, uv_bottom, c.y);
     v_color = quad.color;
     v_material = vec4(viewport_cutout.z, 0.0, 0.0, 0.0);
@@ -305,6 +331,58 @@ void main() {
 const WORLD_MATERIAL_FRAGMENT_SHADER_VULKAN: &[u8] = br#"#version 450
 layout(set = 0, binding = 1) uniform texture2D Tex0;
 layout(set = 0, binding = 2) uniform sampler Samp0;
+layout(location = 0) in vec2 v_uv;
+layout(location = 1) in vec4 v_color;
+layout(location = 2) flat in vec4 v_material;
+layout(location = 0) out vec4 out_color;
+void main() {
+    vec4 color = texture(sampler2D(Tex0, Samp0), v_uv) * v_color;
+    if (v_material.x > 0.0 && color.a < v_material.x) {
+        discard;
+    }
+    out_color = color;
+}
+"#;
+
+const WORLD_MESH_VERTEX_SHADER_VULKAN: &[u8] = br#"#version 450
+struct MeshVertex {
+    vec4 position_uv;
+    vec4 color_uv;
+    vec4 normal_light;
+};
+layout(set = 0, binding = 0, std430) readonly buffer WorldMeshVertices {
+    MeshVertex vertices[];
+};
+struct MeshInstance {
+    mat4 model;
+    vec4 color;
+    vec4 material;
+};
+layout(set = 0, binding = 1, std430) readonly buffer WorldMeshInstances {
+    mat4 view;
+    mat4 projection;
+    MeshInstance instances[];
+};
+layout(location = 0) out vec2 v_uv;
+layout(location = 1) out vec4 v_color;
+layout(location = 2) flat out vec4 v_material;
+void main() {
+    MeshVertex vertex = vertices[gl_VertexIndex];
+    MeshInstance instance = instances[gl_InstanceIndex];
+    vec4 clip = projection * view * instance.model * vec4(vertex.position_uv.xyz, 1.0);
+#ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
+    clip.z = clip.z * 0.5 + clip.w * 0.5;
+#endif
+    gl_Position = clip;
+    v_uv = vec2(vertex.position_uv.w, vertex.color_uv.w);
+    v_color = vec4(vertex.color_uv.rgb, vertex.normal_light.w) * instance.color;
+    v_material = vec4(instance.material.x, 0.0, 0.0, 0.0);
+}
+"#;
+
+const WORLD_MESH_FRAGMENT_SHADER_VULKAN: &[u8] = br#"#version 450
+layout(set = 0, binding = 2) uniform texture2D Tex0;
+layout(set = 0, binding = 3) uniform sampler Samp0;
 layout(location = 0) in vec2 v_uv;
 layout(location = 1) in vec4 v_color;
 layout(location = 2) flat in vec4 v_material;
@@ -388,6 +466,58 @@ pub struct WorldMaterialAssetPayload {
     pub png_bytes: Vec<u8>,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct WorldMeshVertex {
+    pub position: [f32; 3],
+    pub uv: [f32; 2],
+    pub color_argb: u32,
+    pub normal_packed: u32,
+    pub light: u32,
+}
+
+#[derive(Clone, Debug)]
+pub struct WorldMeshSection {
+    pub material_id: u32,
+    pub texture_id: u32,
+    pub material_mode: u32,
+    pub cull_policy: u32,
+    pub winding: u32,
+    pub index_offset: u32,
+    pub index_count: u32,
+}
+
+#[derive(Clone, Debug)]
+pub struct WorldMeshAsset {
+    pub mesh_key: u64,
+    pub mesh_generation: u64,
+    pub vertex_layout_version: u32,
+    pub index_type: IndexType,
+    pub vertices: Vec<WorldMeshVertex>,
+    pub index_bytes: Vec<u8>,
+    pub sections: Vec<WorldMeshSection>,
+}
+
+#[derive(Clone, Debug)]
+pub struct WorldMeshTextureAssetPayload {
+    pub texture_id: u32,
+    pub png_bytes: Vec<u8>,
+}
+
+#[derive(Clone, Debug)]
+pub struct WorldMeshInstanceRequest {
+    pub stratum: u32,
+    pub mesh_key: u64,
+    pub mesh_generation: u64,
+    pub mesh_section_index: u32,
+    pub depth_policy: u32,
+    pub cull_policy: u32,
+    pub winding: u32,
+    pub color_argb: u32,
+    pub transform: [f32; 16],
+    pub viewport_width: u32,
+    pub viewport_height: u32,
+}
+
 #[derive(Clone, Debug)]
 pub struct WorldCrackAssetPayload {
     pub stage: u32,
@@ -418,6 +548,7 @@ pub struct WorldPrimitiveFrame {
     pub crack_quads: Vec<WorldCrackQuadRequest>,
     pub border_quads: Vec<WorldBorderQuadRequest>,
     pub material_quads: Vec<WorldMaterialQuadRequest>,
+    pub mesh_instances: Vec<WorldMeshInstanceRequest>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -448,10 +579,15 @@ pub struct WorldPrimitiveSubmitStats {
     pub material_quad_count: u64,
     pub material_batch_count: u64,
     pub material_draw_count: u64,
+    pub mesh_instance_count: u64,
+    pub mesh_batch_count: u64,
+    pub mesh_draw_count: u64,
     pub border_cache_hits: u64,
     pub border_cache_misses: u64,
     pub material_cache_hits: u64,
     pub material_cache_misses: u64,
+    pub mesh_cache_hits: u64,
+    pub mesh_cache_misses: u64,
     pub border_asset_generation: u64,
     pub border_asset_payload_bytes: u64,
     pub border_asset_update_failures: u64,
@@ -461,6 +597,9 @@ pub struct WorldPrimitiveSubmitStats {
     pub material_asset_generation: u64,
     pub material_asset_payload_bytes: u64,
     pub material_asset_update_failures: u64,
+    pub mesh_asset_generation: u64,
+    pub mesh_asset_payload_bytes: u64,
+    pub mesh_asset_update_failures: u64,
     pub background_clear_count: u64,
     pub background_diagnostic_fallback_count: u64,
     pub background_sky_type: u64,
@@ -599,6 +738,71 @@ struct MaterialDataSlot {
     resource_set: Handle,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+struct MeshResourceKey {
+    mesh_key: u64,
+    mesh_generation: u64,
+    section_index: u32,
+    material_id: u32,
+    texture_id: u32,
+    material_mode: u32,
+    winding: u32,
+    depth_policy: u32,
+    cull_policy: u32,
+    color_format: ColorFormat,
+}
+
+struct MeshAssetStore {
+    mesh_generation: u64,
+    vertex_bytes: Vec<u8>,
+    index_bytes: Vec<u8>,
+    index_type: IndexType,
+    sections: Vec<WorldMeshSection>,
+}
+
+struct MeshResources {
+    vertex_buffer: Handle,
+    index_buffer: Handle,
+    texture_upload_buffer: Handle,
+    texture: Handle,
+    sampler: Handle,
+    vertex_shader: Handle,
+    fragment_shader: Handle,
+    texture_view: Handle,
+    resource_layout: Handle,
+    pipeline_layout: Handle,
+    pipeline: Handle,
+    data_slots: Vec<MeshDataSlot>,
+}
+
+struct MeshDataSlot {
+    instance_buffer: Handle,
+    resource_set: Handle,
+}
+
+impl MeshResources {
+    fn handles_in_destroy_order(&self) -> Vec<Handle> {
+        let mut handles = vec![
+            self.pipeline,
+            self.pipeline_layout,
+            self.resource_layout,
+            self.texture_view,
+            self.fragment_shader,
+            self.vertex_shader,
+            self.sampler,
+            self.texture,
+            self.texture_upload_buffer,
+            self.index_buffer,
+            self.vertex_buffer,
+        ];
+        for slot in self.data_slots.iter().rev() {
+            handles.push(slot.resource_set);
+            handles.push(slot.instance_buffer);
+        }
+        handles
+    }
+}
+
 impl MaterialResources {
     fn handles_in_destroy_order(&self) -> Vec<Handle> {
         let mut handles = vec![
@@ -650,6 +854,11 @@ pub struct WorldPrimitiveFrontend {
     material_asset_overrides: BTreeMap<u32, WorldMaterialTextureAsset>,
     material_asset_payload_bytes: u64,
     material_asset_update_failures: u64,
+    mesh_asset_generation: u64,
+    mesh_assets: BTreeMap<u64, MeshAssetStore>,
+    mesh_texture_assets: BTreeMap<u32, WorldMaterialTextureAsset>,
+    mesh_asset_payload_bytes: u64,
+    mesh_asset_update_failures: u64,
     resources: Option<WorldLineResources>,
     resource_format: Option<ColorFormat>,
     crack_resources: Option<CrackResources>,
@@ -657,6 +866,7 @@ pub struct WorldPrimitiveFrontend {
     border_resources: Option<BorderResources>,
     border_resource_format: Option<ColorFormat>,
     material_resources: BTreeMap<MaterialResourceKey, MaterialResources>,
+    mesh_resources: BTreeMap<MeshResourceKey, MeshResources>,
     depth_attachment: Option<DepthAttachmentResources>,
     cached_pass: Option<CachedPass>,
     pending_depth_attachment_retires: u64,
@@ -697,6 +907,11 @@ impl WorldPrimitiveFrontend {
         self.material_asset_overrides.clear();
         self.material_asset_payload_bytes = 0;
         self.material_asset_update_failures = 0;
+        self.mesh_asset_generation = 0;
+        self.mesh_assets.clear();
+        self.mesh_texture_assets.clear();
+        self.mesh_asset_payload_bytes = 0;
+        self.mesh_asset_update_failures = 0;
         self.pending_depth_attachment_retires = 0;
     }
 
@@ -915,6 +1130,98 @@ impl WorldPrimitiveFrontend {
         Ok(())
     }
 
+    pub fn apply_world_mesh_asset_update(
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+        meshes: Vec<WorldMeshAsset>,
+        textures: Vec<WorldMeshTextureAssetPayload>,
+    ) -> GalResult<()> {
+        let result = self.apply_world_mesh_asset_update_inner(gal, generation, meshes, textures);
+        if result.is_err() {
+            self.mesh_asset_update_failures = self.mesh_asset_update_failures.saturating_add(1);
+        }
+        result
+    }
+
+    fn apply_world_mesh_asset_update_inner(
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+        meshes: Vec<WorldMeshAsset>,
+        textures: Vec<WorldMeshTextureAssetPayload>,
+    ) -> GalResult<()> {
+        if generation == 0 {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "world mesh asset generation must be non-zero",
+            ));
+        }
+        if generation <= self.mesh_asset_generation {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "stale world mesh asset generation {generation}; current generation is {}",
+                    self.mesh_asset_generation
+                ),
+            ));
+        }
+        let mut texture_assets = BTreeMap::new();
+        let mut payload_bytes = 0u64;
+        for payload in textures {
+            if payload.texture_id == 0 {
+                return Err(GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    "world mesh texture id must be non-zero",
+                ));
+            }
+            if texture_assets.contains_key(&payload.texture_id) {
+                return Err(GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    format!("duplicate world mesh texture {}", payload.texture_id),
+                ));
+            }
+            if payload.png_bytes.is_empty() {
+                continue;
+            }
+            payload_bytes = payload_bytes.saturating_add(payload.png_bytes.len() as u64);
+            let (rgba, width, height) = decode_png_rgba(
+                &payload.png_bytes,
+                &format!("world mesh texture {}", payload.texture_id),
+            )?;
+            texture_assets.insert(payload.texture_id, WorldMaterialTextureAsset { rgba, width, height });
+        }
+        let mut mesh_assets = BTreeMap::new();
+        for mesh in meshes {
+            validate_mesh_asset(&mesh)?;
+            if mesh_assets.contains_key(&mesh.mesh_key) {
+                return Err(GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    format!("duplicate world mesh asset key {}", mesh.mesh_key),
+                ));
+            }
+            payload_bytes = payload_bytes
+                .saturating_add(mesh.vertices.len().saturating_mul(WORLD_MESH_GPU_VERTEX_BYTES) as u64)
+                .saturating_add(mesh.index_bytes.len() as u64);
+            mesh_assets.insert(
+                mesh.mesh_key,
+                MeshAssetStore {
+                    mesh_generation: mesh.mesh_generation,
+                    vertex_bytes: packed_mesh_vertices(&mesh.vertices),
+                    index_bytes: mesh.index_bytes,
+                    index_type: mesh.index_type,
+                    sections: mesh.sections,
+                },
+            );
+        }
+        self.mesh_asset_generation = generation;
+        self.mesh_asset_payload_bytes = payload_bytes;
+        self.mesh_assets = mesh_assets;
+        self.mesh_texture_assets = texture_assets;
+        self.destroy_mesh_resources(gal);
+        Ok(())
+    }
+
     pub fn clear_frame_pass(&mut self, gal: &mut VulkanicGal) {
         if let Some(pass) = self.cached_pass.take() {
             let _ = gal.destroy(pass.pass);
@@ -1000,7 +1307,7 @@ impl WorldPrimitiveFrontend {
             && (clear_background || frame.background.enabled || !frame.border_quads.is_empty())
         {
             return Err(GalError::unsupported_feature(
-                "OpenGL partial world primitive submit supports line and crack primitives only",
+                "OpenGL partial world primitive submit does not own background or world-border presentation",
             ));
         }
         if self.generation == 0 {
@@ -1015,9 +1322,14 @@ impl WorldPrimitiveFrontend {
         let had_border_resources =
             self.border_resources.is_some() && self.border_resource_format == Some(color_format);
         let material_batches = material_batches(&frame, color_format);
+        let mesh_batches = mesh_batches(&frame, self, color_format)?;
         let material_cache_hits = material_batches
             .iter()
             .filter(|batch| self.material_resources.contains_key(&batch.key))
+            .count() as u64;
+        let mesh_cache_hits = mesh_batches
+            .iter()
+            .filter(|batch| self.mesh_resources.contains_key(&batch.key))
             .count() as u64;
         if !frame.segments.is_empty() {
             self.ensure_resources(gal, color_format)?;
@@ -1031,11 +1343,20 @@ impl WorldPrimitiveFrontend {
         for batch in &material_batches {
             self.ensure_material_resources(gal, batch.key)?;
         }
+        for batch in &mesh_batches {
+            self.ensure_mesh_resources(gal, batch.key)?;
+        }
         let mut material_slot_counts = BTreeMap::new();
         for batch in &material_batches {
             let count = material_slot_counts.entry(batch.key).or_insert(0usize);
             *count += 1;
             self.ensure_material_resource_slots(gal, batch.key, *count)?;
+        }
+        let mut mesh_slot_counts = BTreeMap::new();
+        for batch in &mesh_batches {
+            let count = mesh_slot_counts.entry(batch.key).or_insert(0usize);
+            *count += 1;
+            self.ensure_mesh_resource_slots(gal, batch.key, *count)?;
         }
         let (depth_texture, depth_view, created_depth, retired_depth) = self
             .ensure_depth_attachment(
@@ -1056,6 +1377,8 @@ impl WorldPrimitiveFrontend {
             border_batch_count: border_batches(&frame).len() as u64,
             material_quad_count: frame.material_quads.len() as u64,
             material_batch_count: material_batches.len() as u64,
+            mesh_instance_count: frame.mesh_instances.len() as u64,
+            mesh_batch_count: mesh_batches.len() as u64,
             depth_attachment_creates: u64::from(created_depth),
             depth_attachment_reuses: u64::from(!created_depth),
             depth_attachment_retires: retired_depth.saturating_add(pending_depth_retires),
@@ -1068,6 +1391,9 @@ impl WorldPrimitiveFrontend {
             material_asset_generation: self.material_asset_generation,
             material_asset_payload_bytes: self.material_asset_payload_bytes,
             material_asset_update_failures: self.material_asset_update_failures,
+            mesh_asset_generation: self.mesh_asset_generation,
+            mesh_asset_payload_bytes: self.mesh_asset_payload_bytes,
+            mesh_asset_update_failures: self.mesh_asset_update_failures,
             background_clear_count: u64::from(frame.background.enabled),
             background_diagnostic_fallback_count: u64::from(!frame.background.enabled),
             background_sky_type: frame.background.sky_type as u64,
@@ -1109,6 +1435,15 @@ impl WorldPrimitiveFrontend {
                 .resource_creates
                 .saturating_add(stats.material_cache_misses.saturating_mul(13));
         }
+        if !mesh_batches.is_empty() {
+            stats.mesh_cache_hits = mesh_cache_hits;
+            stats.mesh_cache_misses = mesh_batches.len() as u64 - mesh_cache_hits;
+            stats.cache_hits = stats.cache_hits.saturating_add(stats.mesh_cache_hits);
+            stats.cache_misses = stats.cache_misses.saturating_add(stats.mesh_cache_misses);
+            stats.resource_creates = stats
+                .resource_creates
+                .saturating_add(stats.mesh_cache_misses.saturating_mul(12));
+        }
         let background_color = background_clear_color(&frame.background);
         let batches = line_batches(&frame);
         let crack_batches = crack_batches(&frame);
@@ -1117,7 +1452,8 @@ impl WorldPrimitiveFrontend {
             6 + batches.len() * 8
                 + crack_batches.len() * 8
                 + border_batches.len() * 8
-                + material_batches.len() * 9,
+                + material_batches.len() * 9
+                + mesh_batches.len() * 8,
         );
         if clear_background {
             ops.push(CommandOp::Barrier(texture_barrier(
@@ -1207,6 +1543,85 @@ impl WorldPrimitiveFrontend {
                 });
                 ops.push(CommandOp::DrawIndexed {
                     indices: 6,
+                    instances: instance_count,
+                });
+            }
+            ops.push(CommandOp::EndPass);
+        }
+        if !mesh_batches.is_empty() {
+            let mut mesh_slot_indices = BTreeMap::new();
+            let mut mesh_draws = Vec::new();
+            for batch in &mesh_batches {
+                let slot_index = *mesh_slot_indices.entry(batch.key).or_insert(0usize);
+                let resources = self
+                    .mesh_resources
+                    .get(&batch.key)
+                    .ok_or_else(|| GalError::backend("world mesh resources vanished before submit"))?;
+                let asset = self
+                    .mesh_assets
+                    .get(&batch.key.mesh_key)
+                    .ok_or_else(|| GalError::backend("world mesh asset vanished before submit"))?;
+                let section = asset
+                    .sections
+                    .get(batch.key.section_index as usize)
+                    .ok_or_else(|| GalError::backend("world mesh section vanished before submit"))?;
+                let slot = resources
+                    .data_slots
+                    .get(slot_index)
+                    .ok_or_else(|| GalError::backend("world mesh data slot missing"))?;
+                let uniforms = packed_mesh_uniforms_for_batch(&frame, batch)?;
+                ops.push(CommandOp::Barrier(buffer_barrier(
+                    slot.instance_buffer,
+                    TextureUsageState::ShaderRead,
+                    TextureUsageState::TransferDst,
+                )));
+                ops.push(CommandOp::HostWriteBuffer {
+                    buffer: slot.instance_buffer,
+                    offset: 0,
+                    data: uniforms,
+                });
+                ops.push(CommandOp::Barrier(buffer_barrier(
+                    slot.instance_buffer,
+                    TextureUsageState::TransferDst,
+                    TextureUsageState::ShaderRead,
+                )));
+                mesh_draws.push((
+                    resources.pipeline,
+                    resources.pipeline_layout,
+                    slot.resource_set,
+                    resources.index_buffer,
+                    section.index_offset as u64,
+                    asset.index_type,
+                    section.index_count,
+                    batch.count() as u32,
+                ));
+                mesh_slot_indices.insert(batch.key, slot_index + 1);
+            }
+            ops.push(CommandOp::BeginPass {
+                pass,
+                target: frame_target,
+                colors: vec![loaded_frame_color_attachment(color_attachment)],
+                depth_stencil: Some(PassAttachment {
+                    view: depth_view,
+                    load_op: AttachmentLoadOp::Load,
+                    store_op: AttachmentStoreOp::Store,
+                    clear_color: None,
+                }),
+            });
+            for (pipeline, pipeline_layout, resource_set, index_buffer, index_offset, index_type, index_count, instance_count) in mesh_draws {
+                ops.push(CommandOp::BindGraphicsPipeline(pipeline));
+                ops.push(CommandOp::BindResourceSet {
+                    pipeline_layout,
+                    set_index: 0,
+                    set: resource_set,
+                });
+                ops.push(CommandOp::SetIndexBuffer {
+                    buffer: index_buffer,
+                    offset: index_offset,
+                    index_type,
+                });
+                ops.push(CommandOp::DrawIndexed {
+                    indices: index_count,
                     instances: instance_count,
                 });
             }
@@ -1383,6 +1798,13 @@ impl WorldPrimitiveFrontend {
         stats.crack_draw_count = stats.crack_batch_count;
         stats.border_draw_count = stats.border_batch_count;
         stats.material_draw_count = stats.material_batch_count;
+        stats.mesh_draw_count = mesh_batches.len() as u64;
+        stats.world_draws = stats
+            .world_draws
+            .saturating_add(stats.crack_draw_count)
+            .saturating_add(stats.border_draw_count)
+            .saturating_add(stats.material_draw_count)
+            .saturating_add(stats.mesh_draw_count);
         stats.command_ops = ops.len() as u64;
         Ok((ops, stats))
     }
@@ -1414,7 +1836,7 @@ impl WorldPrimitiveFrontend {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
-                code: WORLD_LINE_VERTEX_SHADER_VULKAN.to_vec(),
+                code: world_vertex_shader_code(gal, WORLD_LINE_VERTEX_SHADER_VULKAN),
                 entry_point: "main".to_string(),
             })?;
             created.push(vertex_shader);
@@ -1584,7 +2006,7 @@ impl WorldPrimitiveFrontend {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
-                code: WORLD_CRACK_VERTEX_SHADER_VULKAN.to_vec(),
+                code: world_vertex_shader_code(gal, WORLD_CRACK_VERTEX_SHADER_VULKAN),
                 entry_point: "main".to_string(),
             })?;
             created.push(vertex_shader);
@@ -1842,7 +2264,7 @@ impl WorldPrimitiveFrontend {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
-                code: WORLD_BORDER_VERTEX_SHADER_VULKAN.to_vec(),
+                code: world_vertex_shader_code(gal, WORLD_BORDER_VERTEX_SHADER_VULKAN),
                 entry_point: "main".to_string(),
             })?;
             created.push(vertex_shader);
@@ -2131,7 +2553,7 @@ impl WorldPrimitiveFrontend {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
-                code: WORLD_MATERIAL_VERTEX_SHADER_VULKAN.to_vec(),
+                code: world_vertex_shader_code(gal, WORLD_MATERIAL_VERTEX_SHADER_VULKAN),
                 entry_point: "main".to_string(),
             })?;
             created.push(vertex_shader);
@@ -2389,6 +2811,339 @@ impl WorldPrimitiveFrontend {
         Ok(())
     }
 
+    fn ensure_mesh_resources(
+        &mut self,
+        gal: &mut VulkanicGal,
+        key: MeshResourceKey,
+    ) -> GalResult<()> {
+        if self.mesh_resources.contains_key(&key) {
+            return Ok(());
+        }
+        let asset = self.mesh_assets.get(&key.mesh_key).ok_or_else(|| {
+            GalError::invalid_argument(format!("world mesh asset {} is missing", key.mesh_key))
+        })?;
+        let section = asset
+            .sections
+            .get(key.section_index as usize)
+            .ok_or_else(|| GalError::invalid_argument("world mesh section is missing"))?;
+        let label = format!(
+            "world-mesh-{}-gen{}-section{}-texture{}-mode{}-depth{}-cull{}",
+            key.mesh_key,
+            key.mesh_generation,
+            key.section_index,
+            key.texture_id,
+            key.material_mode,
+            key.depth_policy,
+            key.cull_policy
+        );
+        let vertex_bytes = asset.vertex_bytes.clone();
+        let index_bytes = asset.index_bytes.clone();
+        let index_type = asset.index_type;
+        let index_offset = section.index_offset;
+        let index_count = section.index_count;
+        let (texture_bytes, texture_width, texture_height) =
+            self.world_mesh_texture_bytes(key.texture_id)?;
+        let mut created = Vec::new();
+        let result = (|| -> GalResult<MeshResources> {
+            let vertex_buffer = gal.create_buffer(BufferDesc {
+                label: format!("{label}.vertices"),
+                size: vertex_bytes.len() as u64,
+                memory: MemoryDomain::Upload,
+                usages: vec![BufferUsage::Storage, BufferUsage::HostWrite],
+            })?;
+            created.push(vertex_buffer);
+            let index_buffer = gal.create_buffer(BufferDesc {
+                label: format!("{label}.indices"),
+                size: index_bytes.len() as u64,
+                memory: MemoryDomain::Upload,
+                usages: vec![BufferUsage::Index, BufferUsage::HostWrite],
+            })?;
+            created.push(index_buffer);
+            let texture_upload_buffer = gal.create_buffer(BufferDesc {
+                label: format!("{label}.texture-upload"),
+                size: texture_bytes.len() as u64,
+                memory: MemoryDomain::Upload,
+                usages: vec![
+                    BufferUsage::TransferSrc,
+                    BufferUsage::TransferDst,
+                    BufferUsage::HostWrite,
+                ],
+            })?;
+            created.push(texture_upload_buffer);
+            let texture = gal.create_texture(TextureDesc {
+                label: format!("{label}.texture"),
+                dimension: TextureDimension::D2,
+                format: TextureFormat::Rgba8Unorm,
+                extent: Extent3d {
+                    width: texture_width,
+                    height: texture_height,
+                    depth: 1,
+                },
+                mip_levels: 1,
+                array_layers: 1,
+                usages: vec![TextureUsage::Sampled, TextureUsage::TransferDst],
+            })?;
+            created.push(texture);
+            let sampler = gal.create_sampler(SamplerDesc {
+                label: format!("{label}.sampler"),
+                min_filter: SamplerFilter::Nearest,
+                mag_filter: SamplerFilter::Nearest,
+                mip_filter: SamplerFilter::Nearest,
+                address_u: SamplerAddressMode::ClampToEdge,
+                address_v: SamplerAddressMode::ClampToEdge,
+                address_w: SamplerAddressMode::ClampToEdge,
+            })?;
+            created.push(sampler);
+            let vertex_shader = gal.create_shader_module(ShaderModuleDesc {
+                label: format!("{label}.vertex"),
+                stage: ShaderStage::Vertex,
+                code_format: ShaderCodeFormat::Glsl,
+                code: world_vertex_shader_code(gal, WORLD_MESH_VERTEX_SHADER_VULKAN),
+                entry_point: "main".to_string(),
+            })?;
+            created.push(vertex_shader);
+            let fragment_shader = gal.create_shader_module(ShaderModuleDesc {
+                label: format!("{label}.fragment"),
+                stage: ShaderStage::Fragment,
+                code_format: ShaderCodeFormat::Glsl,
+                code: WORLD_MESH_FRAGMENT_SHADER_VULKAN.to_vec(),
+                entry_point: "main".to_string(),
+            })?;
+            created.push(fragment_shader);
+            let texture_view = gal.create_texture_view(TextureViewDesc {
+                label: format!("{label}.texture-view"),
+                texture,
+                format: TextureFormat::Rgba8Unorm,
+                base_mip: 0,
+                mip_count: 1,
+                base_layer: 0,
+                layer_count: 1,
+            })?;
+            created.push(texture_view);
+            let resource_layout = gal.create_resource_layout(ResourceLayoutDesc {
+                label: format!("{label}.resource-layout"),
+                bindings: vec![
+                    ResourceBindingDesc {
+                        binding: 0,
+                        kind: ResourceBindingKind::StorageBuffer,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                    ResourceBindingDesc {
+                        binding: 1,
+                        kind: ResourceBindingKind::StorageBuffer,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                    ResourceBindingDesc {
+                        binding: 2,
+                        kind: ResourceBindingKind::SampledTexture,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                    ResourceBindingDesc {
+                        binding: 3,
+                        kind: ResourceBindingKind::Sampler,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                ],
+            })?;
+            created.push(resource_layout);
+            let slot = create_mesh_data_slot(
+                gal,
+                &format!("{label}.slot0"),
+                resource_layout,
+                vertex_buffer,
+                texture_view,
+                sampler,
+            )?;
+            created.push(slot.instance_buffer);
+            created.push(slot.resource_set);
+            let pipeline_layout = gal.create_pipeline_layout(PipelineLayoutDesc {
+                label: format!("{label}.pipeline-layout"),
+                resource_layouts: vec![resource_layout],
+            })?;
+            created.push(pipeline_layout);
+            let pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
+                label: format!("{label}.pipeline"),
+                layout: pipeline_layout,
+                vertex_shader,
+                fragment_shader,
+                topology: PrimitiveTopology::Triangles,
+                cull_mode: effective_cull_mode_for_winding(key.cull_policy, key.winding)?,
+                blend: BlendMode::Disabled,
+                depth_compare: match key.depth_policy {
+                    WORLD_DEPTH_POLICY_DISABLED => None,
+                    WORLD_DEPTH_POLICY_TEST_WRITE | WORLD_DEPTH_POLICY_TEST_NO_WRITE => {
+                        Some(CompareOp::LessOrEqual)
+                    }
+                    _ => {
+                        return Err(GalError::ffi(
+                            StatusCode::UnknownEnum,
+                            format!("unknown world mesh depth policy {}", key.depth_policy),
+                        ))
+                    }
+                },
+                depth_write: key.depth_policy == WORLD_DEPTH_POLICY_TEST_WRITE,
+                color_formats: vec![key.color_format],
+                depth_format: Some(TextureFormat::Depth32Float),
+            })?;
+            created.push(pipeline);
+            let resources = MeshResources {
+                vertex_buffer,
+                index_buffer,
+                texture_upload_buffer,
+                texture,
+                sampler,
+                vertex_shader,
+                fragment_shader,
+                texture_view,
+                resource_layout,
+                pipeline_layout,
+                pipeline,
+                data_slots: vec![slot],
+            };
+            self.upload_mesh_resources(
+                gal,
+                &resources,
+                vertex_bytes,
+                index_bytes,
+                texture_bytes,
+                texture_width,
+                texture_height,
+            )?;
+            let _ = (index_offset, index_count, index_type);
+            Ok(resources)
+        })();
+        if result.is_err() {
+            for handle in created.into_iter().rev() {
+                let _ = gal.destroy(handle);
+            }
+        }
+        self.mesh_resources.insert(key, result?);
+        Ok(())
+    }
+
+    fn ensure_mesh_resource_slots(
+        &mut self,
+        gal: &mut VulkanicGal,
+        key: MeshResourceKey,
+        required_slots: usize,
+    ) -> GalResult<()> {
+        let resources = self.mesh_resources.get_mut(&key).ok_or_else(|| {
+            GalError::backend("world mesh resources missing during slot growth")
+        })?;
+        while resources.data_slots.len() < required_slots {
+            let slot_index = resources.data_slots.len();
+            let label = format!(
+                "world-mesh-{}-section{}-slot{}-gen{}",
+                key.mesh_key, key.section_index, slot_index, self.generation
+            );
+            let slot = create_mesh_data_slot(
+                gal,
+                &label,
+                resources.resource_layout,
+                resources.vertex_buffer,
+                resources.texture_view,
+                resources.sampler,
+            )?;
+            resources.data_slots.push(slot);
+        }
+        Ok(())
+    }
+
+    fn world_mesh_texture_bytes(&self, texture_id: u32) -> GalResult<(Vec<u8>, u32, u32)> {
+        if let Some(asset) = self.mesh_texture_assets.get(&texture_id) {
+            return Ok((asset.rgba.clone(), asset.width, asset.height));
+        }
+        self.world_material_texture_bytes(texture_id)
+    }
+
+    fn upload_mesh_resources(
+        &mut self,
+        gal: &mut VulkanicGal,
+        resources: &MeshResources,
+        vertex_bytes: Vec<u8>,
+        index_bytes: Vec<u8>,
+        texture_bytes: Vec<u8>,
+        texture_width: u32,
+        texture_height: u32,
+    ) -> GalResult<()> {
+        gal.submit(SubmissionBatch {
+            label: "world-mesh.upload".to_string(),
+            command_lists: vec![CommandList::from(CommandListDesc {
+                label: "world-mesh.upload.commands".to_string(),
+                operations: vec![
+                    CommandOp::HostWriteBuffer {
+                        buffer: resources.vertex_buffer,
+                        offset: 0,
+                        data: vertex_bytes,
+                    },
+                    CommandOp::Barrier(buffer_barrier(
+                        resources.vertex_buffer,
+                        TextureUsageState::TransferDst,
+                        TextureUsageState::ShaderRead,
+                    )),
+                    CommandOp::HostWriteBuffer {
+                        buffer: resources.index_buffer,
+                        offset: 0,
+                        data: index_bytes,
+                    },
+                    CommandOp::Barrier(buffer_barrier(
+                        resources.index_buffer,
+                        TextureUsageState::TransferDst,
+                        TextureUsageState::IndexRead,
+                    )),
+                    CommandOp::HostWriteBuffer {
+                        buffer: resources.texture_upload_buffer,
+                        offset: 0,
+                        data: texture_bytes,
+                    },
+                    CommandOp::Barrier(buffer_barrier(
+                        resources.texture_upload_buffer,
+                        TextureUsageState::TransferDst,
+                        TextureUsageState::TransferSrc,
+                    )),
+                    CommandOp::Barrier(sampled_texture_barrier(
+                        resources.texture,
+                        TextureUsageState::Undefined,
+                        TextureUsageState::TransferDst,
+                    )),
+                    CommandOp::CopyBufferToTexture(BufferImageCopyRegion {
+                        buffer: resources.texture_upload_buffer,
+                        buffer_offset: 0,
+                        bytes_per_row: texture_width * 4,
+                        rows_per_image: texture_height,
+                        texture: resources.texture,
+                        texture_mip: 0,
+                        texture_layer: 0,
+                        texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+                        extent: Extent3d {
+                            width: texture_width,
+                            height: texture_height,
+                            depth: 1,
+                        },
+                    }),
+                    CommandOp::Barrier(sampled_texture_barrier(
+                        resources.texture,
+                        TextureUsageState::TransferDst,
+                        TextureUsageState::ShaderRead,
+                    )),
+                ],
+            })],
+        })?;
+        Ok(())
+    }
+
     fn ensure_depth_attachment(
         &mut self,
         gal: &mut VulkanicGal,
@@ -2499,6 +3254,7 @@ impl WorldPrimitiveFrontend {
         self.destroy_crack_resources(gal);
         self.destroy_border_resources(gal);
         self.destroy_material_resources(gal);
+        self.destroy_mesh_resources(gal);
         if let Some(depth) = self.depth_attachment.take() {
             for handle in depth.handles_in_destroy_order() {
                 let _ = gal.destroy(handle);
@@ -2535,6 +3291,15 @@ impl WorldPrimitiveFrontend {
             }
         }
     }
+
+    fn destroy_mesh_resources(&mut self, gal: &mut VulkanicGal) {
+        let resources = std::mem::take(&mut self.mesh_resources);
+        for (_, resources) in resources {
+            for handle in resources.handles_in_destroy_order() {
+                let _ = gal.destroy(handle);
+            }
+        }
+    }
 }
 
 fn validate_frame(frame: &WorldPrimitiveFrame) -> GalResult<()> {
@@ -2552,7 +3317,177 @@ fn validate_frame(frame: &WorldPrimitiveFrame) -> GalResult<()> {
     for quad in &frame.material_quads {
         material::validate_quad(quad, frame)?;
     }
+    for instance in &frame.mesh_instances {
+        validate_mesh_instance(instance, frame)?;
+    }
     Ok(())
+}
+
+fn validate_mesh_instance(
+    instance: &WorldMeshInstanceRequest,
+    frame: &WorldPrimitiveFrame,
+) -> GalResult<()> {
+    if instance.stratum != WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY {
+        return Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unsupported world mesh stratum {}", instance.stratum),
+        ));
+    }
+    if instance.depth_policy > WORLD_DEPTH_POLICY_TEST_NO_WRITE {
+        return Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown world mesh depth policy {}", instance.depth_policy),
+        ));
+    }
+    let _ = cull_mode_from_policy(instance.cull_policy)?;
+    if !matches!(instance.winding, WORLD_WINDING_CCW | WORLD_WINDING_CW) {
+        return Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unsupported world mesh winding {}", instance.winding),
+        ));
+    }
+    if instance.viewport_width != frame.viewport_width
+        || instance.viewport_height != frame.viewport_height
+    {
+        return Err(GalError::invalid_argument(
+            "world mesh viewport must match frame viewport",
+        ));
+    }
+    if instance.transform.iter().any(|value| !value.is_finite()) {
+        return Err(GalError::invalid_argument("world mesh transform is not finite"));
+    }
+    Ok(())
+}
+
+fn validate_mesh_asset(mesh: &WorldMeshAsset) -> GalResult<()> {
+    if mesh.mesh_key == 0 || mesh.mesh_generation == 0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "world mesh asset key and generation must be non-zero",
+        ));
+    }
+    if mesh.vertex_layout_version != WORLD_MESH_VERTEX_LAYOUT_V1 {
+        return Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!(
+                "unsupported world mesh vertex layout {}",
+                mesh.vertex_layout_version
+            ),
+        ));
+    }
+    if mesh.vertices.is_empty() || mesh.vertices.len() > WORLD_MAX_MESH_VERTICES {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "world mesh vertex count {} must be 1..={}",
+                mesh.vertices.len(),
+                WORLD_MAX_MESH_VERTICES
+            ),
+        ));
+    }
+    if mesh.index_bytes.is_empty() || mesh.index_bytes.len() > WORLD_MAX_MESH_INDEX_BYTES {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "world mesh index bytes {} must be 1..={}",
+                mesh.index_bytes.len(),
+                WORLD_MAX_MESH_INDEX_BYTES
+            ),
+        ));
+    }
+    let index_size = match mesh.index_type {
+        IndexType::U16 => 2usize,
+        IndexType::U32 => 4usize,
+    };
+    if mesh.index_bytes.len() % index_size != 0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "world mesh index bytes are not aligned to index type",
+        ));
+    }
+    let index_count = mesh.index_bytes.len() / index_size;
+    if mesh.sections.is_empty() || mesh.sections.len() > WORLD_MAX_MESH_SECTIONS {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!(
+                "world mesh section count {} must be 1..={}",
+                mesh.sections.len(),
+                WORLD_MAX_MESH_SECTIONS
+            ),
+        ));
+    }
+    for vertex in &mesh.vertices {
+        if vertex.position.iter().any(|value| !value.is_finite())
+            || vertex.uv.iter().any(|value| !value.is_finite())
+        {
+            return Err(GalError::invalid_argument(
+                "world mesh vertex position and UV values must be finite",
+            ));
+        }
+    }
+    for section in &mesh.sections {
+        if !material_registry::material_matches_mode(section.material_id, section.material_mode) {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!(
+                    "world mesh material {} is incompatible with mode {}",
+                    section.material_id, section.material_mode
+                ),
+            ));
+        }
+        if section.texture_id == 0 {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "world mesh section texture id must be non-zero",
+            ));
+        }
+        let _ = cull_mode_from_policy(section.cull_policy)?;
+        if !matches!(section.winding, WORLD_WINDING_CCW | WORLD_WINDING_CW) {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unsupported world mesh section winding {}", section.winding),
+            ));
+        }
+        let start = (section.index_offset as usize)
+            .checked_div(index_size)
+            .ok_or_else(|| GalError::invalid_argument("invalid world mesh index offset"))?;
+        if section.index_offset as usize % index_size != 0 {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "world mesh section index offset is not aligned",
+            ));
+        }
+        let end = start
+            .checked_add(section.index_count as usize)
+            .ok_or_else(|| GalError::invalid_argument("world mesh section index range overflow"))?;
+        if end > index_count {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "world mesh section index range exceeds index payload",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn packed_mesh_vertices(vertices: &[WorldMeshVertex]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(vertices.len() * WORLD_MESH_GPU_VERTEX_BYTES);
+    for vertex in vertices {
+        push_f32(&mut out, vertex.position[0]);
+        push_f32(&mut out, vertex.position[1]);
+        push_f32(&mut out, vertex.position[2]);
+        push_f32(&mut out, vertex.uv[0]);
+        let color = argb_to_rgba(vertex.color_argb);
+        push_f32(&mut out, color[0]);
+        push_f32(&mut out, color[1]);
+        push_f32(&mut out, color[2]);
+        push_f32(&mut out, vertex.uv[1]);
+        push_f32(&mut out, 0.0);
+        push_f32(&mut out, 0.0);
+        push_f32(&mut out, 0.0);
+        push_f32(&mut out, color[3]);
+    }
+    out
 }
 
 fn cull_mode_from_policy(policy: u32) -> GalResult<CullMode> {
@@ -2625,6 +3560,17 @@ struct MaterialBatch {
 }
 
 impl MaterialBatch {
+    fn count(&self) -> usize {
+        self.indices.len()
+    }
+}
+
+struct MeshBatch {
+    key: MeshResourceKey,
+    indices: Vec<usize>,
+}
+
+impl MeshBatch {
     fn count(&self) -> usize {
         self.indices.len()
     }
@@ -2741,6 +3687,121 @@ fn material_key(quad: &WorldMaterialQuadRequest, color_format: ColorFormat) -> M
     }
 }
 
+fn mesh_batches(
+    frame: &WorldPrimitiveFrame,
+    frontend: &WorldPrimitiveFrontend,
+    color_format: ColorFormat,
+) -> GalResult<Vec<MeshBatch>> {
+    let mut batches: Vec<MeshBatch> = Vec::new();
+    let mut key_to_batch = BTreeMap::<MeshResourceKey, usize>::new();
+    for (index, instance) in frame.mesh_instances.iter().enumerate() {
+        let asset = frontend.mesh_assets.get(&instance.mesh_key).ok_or_else(|| {
+            GalError::invalid_argument(format!(
+                "world mesh instance references unknown mesh key {}",
+                instance.mesh_key
+            ))
+        })?;
+        if instance.mesh_generation != asset_generation_for_key(instance.mesh_key, asset)? {
+            return Err(GalError::invalid_argument(format!(
+                "world mesh instance generation {} does not match mesh {} generation",
+                instance.mesh_generation, instance.mesh_key
+            )));
+        }
+        if instance.mesh_section_index == WORLD_MESH_SECTION_ALL {
+            for (section_index, section) in asset.sections.iter().enumerate() {
+                let key = mesh_key_for_section(
+                    instance,
+                    section,
+                    section_index as u32,
+                    section.cull_policy,
+                    color_format,
+                );
+                push_mesh_batch(&mut batches, &mut key_to_batch, key, index);
+            }
+        } else {
+            let section = asset
+                .sections
+                .get(instance.mesh_section_index as usize)
+                .ok_or_else(|| {
+                    GalError::invalid_argument("world mesh instance references missing section")
+                })?;
+            let key = mesh_key_for_section(
+                instance,
+                section,
+                instance.mesh_section_index,
+                instance.cull_policy,
+                color_format,
+            );
+            push_mesh_batch(&mut batches, &mut key_to_batch, key, index);
+        }
+    }
+    Ok(batches)
+}
+
+fn push_mesh_batch(
+    batches: &mut Vec<MeshBatch>,
+    key_to_batch: &mut BTreeMap<MeshResourceKey, usize>,
+    key: MeshResourceKey,
+    instance_index: usize,
+) {
+    if let Some(batch_index) = key_to_batch.get(&key).copied() {
+        batches[batch_index].indices.push(instance_index);
+    } else {
+        let batch_index = batches.len();
+        key_to_batch.insert(key, batch_index);
+        batches.push(MeshBatch {
+            key,
+            indices: vec![instance_index],
+        });
+    }
+}
+
+fn mesh_key_for_section(
+    instance: &WorldMeshInstanceRequest,
+    section: &WorldMeshSection,
+    section_index: u32,
+    cull_policy: u32,
+    color_format: ColorFormat,
+) -> MeshResourceKey {
+    MeshResourceKey {
+        mesh_key: instance.mesh_key,
+        mesh_generation: instance.mesh_generation,
+        section_index,
+        material_id: section.material_id,
+        texture_id: section.texture_id,
+        material_mode: section.material_mode,
+        winding: section.winding,
+        depth_policy: instance.depth_policy,
+        cull_policy,
+        color_format,
+    }
+}
+
+fn effective_cull_mode_for_winding(policy: u32, winding: u32) -> GalResult<CullMode> {
+    match (policy, winding) {
+        (WORLD_CULL_NONE, WORLD_WINDING_CCW | WORLD_WINDING_CW) => Ok(CullMode::None),
+        (WORLD_CULL_BACK, WORLD_WINDING_CCW) => Ok(CullMode::Back),
+        (WORLD_CULL_FRONT, WORLD_WINDING_CCW) => Ok(CullMode::Front),
+        (WORLD_CULL_BACK, WORLD_WINDING_CW) => Ok(CullMode::Front),
+        (WORLD_CULL_FRONT, WORLD_WINDING_CW) => Ok(CullMode::Back),
+        (_, WORLD_WINDING_CCW | WORLD_WINDING_CW) => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown world mesh cull policy {policy}"),
+        )),
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown world mesh winding {winding}"),
+        )),
+    }
+}
+
+fn asset_generation_for_key(_mesh_key: u64, asset: &MeshAssetStore) -> GalResult<u64> {
+    if asset.sections.is_empty() {
+        return Err(GalError::invalid_argument("world mesh asset has no sections"));
+    }
+    Ok(asset.mesh_generation)
+}
+
 fn create_material_data_slot(
     gal: &mut VulkanicGal,
     label: &str,
@@ -2796,6 +3857,74 @@ fn create_material_data_slot(
     };
     Ok(MaterialDataSlot {
         uniform_buffer,
+        resource_set,
+    })
+}
+
+fn create_mesh_data_slot(
+    gal: &mut VulkanicGal,
+    label: &str,
+    resource_layout: Handle,
+    vertex_buffer: Handle,
+    texture_view: Handle,
+    sampler: Handle,
+) -> GalResult<MeshDataSlot> {
+    let instance_buffer = gal.create_buffer(BufferDesc {
+        label: format!("{label}.instance-data"),
+        size: WORLD_MESH_INSTANCE_BUFFER_BYTES,
+        memory: MemoryDomain::Upload,
+        usages: vec![
+            BufferUsage::Storage,
+            BufferUsage::TransferDst,
+            BufferUsage::HostWrite,
+        ],
+    })?;
+    let resource_set = match gal.create_resource_set(ResourceSetDesc {
+        label: format!("{label}.resource-set"),
+        layout: resource_layout,
+        bindings: vec![
+            ResourceBinding {
+                binding: 0,
+                array_index: 0,
+                resource: vertex_buffer,
+                kind: ResourceBindingKind::StorageBuffer,
+                access: AccessFlags::READ,
+                dynamic_offsets: Vec::new(),
+            },
+            ResourceBinding {
+                binding: 1,
+                array_index: 0,
+                resource: instance_buffer,
+                kind: ResourceBindingKind::StorageBuffer,
+                access: AccessFlags::READ,
+                dynamic_offsets: Vec::new(),
+            },
+            ResourceBinding {
+                binding: 2,
+                array_index: 0,
+                resource: texture_view,
+                kind: ResourceBindingKind::SampledTexture,
+                access: AccessFlags::READ,
+                dynamic_offsets: Vec::new(),
+            },
+            ResourceBinding {
+                binding: 3,
+                array_index: 0,
+                resource: sampler,
+                kind: ResourceBindingKind::Sampler,
+                access: AccessFlags::READ,
+                dynamic_offsets: Vec::new(),
+            },
+        ],
+    }) {
+        Ok(resource_set) => resource_set,
+        Err(error) => {
+            let _ = gal.destroy(instance_buffer);
+            return Err(error);
+        }
+    };
+    Ok(MeshDataSlot {
+        instance_buffer,
         resource_set,
     })
 }
@@ -2953,12 +4082,71 @@ fn packed_material_uniforms_for_batch(
     Ok(out)
 }
 
+fn packed_mesh_uniforms_for_batch(
+    frame: &WorldPrimitiveFrame,
+    batch: &MeshBatch,
+) -> GalResult<Vec<u8>> {
+    let required_bytes = WORLD_MESH_BATCH_HEADER_BYTES
+        .checked_add(batch.count().checked_mul(WORLD_MESH_INSTANCE_BYTES).ok_or_else(|| {
+            GalError::invalid_argument("world mesh batch instance byte count overflow")
+        })?)
+        .ok_or_else(|| GalError::invalid_argument("world mesh batch byte count overflow"))?;
+    if required_bytes as u64 > WORLD_MESH_INSTANCE_BUFFER_BYTES {
+        return Err(GalError::invalid_argument(format!(
+            "world mesh batch has {} instances; maximum is {}",
+            batch.count(),
+            WORLD_MAX_MESH_INSTANCES
+        )));
+    }
+    let mut out = Vec::with_capacity(required_bytes);
+    for value in frame.view_matrix {
+        push_f32(&mut out, value);
+    }
+    for value in frame.projection_matrix {
+        push_f32(&mut out, value);
+    }
+    for instance_index in &batch.indices {
+        let instance = &frame.mesh_instances[*instance_index];
+        for value in instance.transform {
+            push_f32(&mut out, value);
+        }
+        for value in argb_to_rgba(instance.color_argb) {
+            push_f32(&mut out, value);
+        }
+        if batch.key.material_mode == WORLD_MATERIAL_MODE_CUTOUT {
+            push_f32(
+                &mut out,
+                material_registry::cutout_threshold(batch.key.material_id),
+            );
+        } else {
+            push_f32(&mut out, 0.0);
+        }
+        push_f32(&mut out, 0.0);
+        push_f32(&mut out, 0.0);
+        push_f32(&mut out, 0.0);
+    }
+    Ok(out)
+}
+
 fn argb_to_rgba(argb: u32) -> [f32; 4] {
     let a = ((argb >> 24) & 0xff) as f32 / 255.0;
     let r = ((argb >> 16) & 0xff) as f32 / 255.0;
     let g = ((argb >> 8) & 0xff) as f32 / 255.0;
     let b = (argb & 0xff) as f32 / 255.0;
     [r, g, b, a]
+}
+
+fn world_vertex_shader_code(gal: &VulkanicGal, source: &[u8]) -> Vec<u8> {
+    if gal.capabilities().api != BackendApi::Vulkan {
+        return source.to_vec();
+    }
+    let text = String::from_utf8_lossy(source);
+    text.replacen(
+        "#version 450\n",
+        "#version 450\n#define VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH 1\n",
+        1,
+    )
+    .into_bytes()
 }
 
 fn push_f32(out: &mut Vec<u8>, value: f32) {
@@ -3231,6 +4419,7 @@ mod tests {
             crack_quads: Vec::new(),
             border_quads: Vec::new(),
             material_quads: Vec::new(),
+            mesh_instances: Vec::new(),
         }
     }
 
@@ -3296,6 +4485,80 @@ mod tests {
                 [-0.5, 0.5, -1.0],
             ],
             uvs: [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+            viewport_width: 128,
+            viewport_height: 128,
+        }
+    }
+
+    fn mesh_asset(mesh_key: u64, generation: u64, index_type: IndexType) -> WorldMeshAsset {
+        let vertices = vec![
+            WorldMeshVertex {
+                position: [-0.5, -0.5, -1.0],
+                uv: [0.0, 0.0],
+                color_argb: 0xffff_ffff,
+                normal_packed: 0,
+                light: 0,
+            },
+            WorldMeshVertex {
+                position: [0.5, -0.5, -1.0],
+                uv: [1.0, 0.0],
+                color_argb: 0xffff_ffff,
+                normal_packed: 0,
+                light: 0,
+            },
+            WorldMeshVertex {
+                position: [0.5, 0.5, -1.0],
+                uv: [1.0, 1.0],
+                color_argb: 0xffff_ffff,
+                normal_packed: 0,
+                light: 0,
+            },
+            WorldMeshVertex {
+                position: [-0.5, 0.5, -1.0],
+                uv: [0.0, 1.0],
+                color_argb: 0xffff_ffff,
+                normal_packed: 0,
+                light: 0,
+            },
+        ];
+        let index_bytes = match index_type {
+            IndexType::U16 => vec![0, 0, 1, 0, 2, 0, 2, 0, 3, 0, 0, 0],
+            IndexType::U32 => vec![
+                0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0,
+            ],
+        };
+        WorldMeshAsset {
+            mesh_key,
+            mesh_generation: generation,
+            vertex_layout_version: WORLD_MESH_VERTEX_LAYOUT_V1,
+            index_type,
+            vertices,
+            index_bytes,
+            sections: vec![WorldMeshSection {
+                material_id: WORLD_MATERIAL_ID_OPAQUE_TEXTURED,
+                texture_id: WORLD_MATERIAL_TEXTURE_STONE,
+                material_mode: WORLD_MATERIAL_MODE_OPAQUE,
+                cull_policy: WORLD_CULL_BACK,
+                winding: WORLD_WINDING_CCW,
+                index_offset: 0,
+                index_count: 6,
+            }],
+        }
+    }
+
+    fn mesh_instance(mesh_key: u64, generation: u64) -> WorldMeshInstanceRequest {
+        WorldMeshInstanceRequest {
+            stratum: WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY,
+            mesh_key,
+            mesh_generation: generation,
+            mesh_section_index: 0,
+            depth_policy: WORLD_DEPTH_POLICY_TEST_WRITE,
+            cull_policy: WORLD_CULL_BACK,
+            winding: WORLD_WINDING_CCW,
+            color_argb: 0xffff_ffff,
+            transform: [
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+            ],
             viewport_width: 128,
             viewport_height: 128,
         }
@@ -3539,6 +4802,254 @@ mod tests {
             .unwrap();
         assert_eq!(1, stats.material_cache_hits);
         assert_eq!(0, stats.material_cache_misses);
+    }
+
+    #[test]
+    fn world_mesh_assets_lower_to_indexed_draw_and_reuse_cached_resources() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                vec![mesh_asset(81, 1, IndexType::U16)],
+                Vec::new(),
+            )
+            .unwrap();
+        let mut frame = frame(Vec::new());
+        frame.mesh_instances.push(mesh_instance(81, 1));
+
+        let (ops, stats) = frontend
+            .append_frame_ops(&mut gal, 1, target, frame.clone())
+            .unwrap();
+
+        assert_eq!(1, stats.mesh_instance_count);
+        assert_eq!(1, stats.mesh_batch_count);
+        assert_eq!(1, stats.mesh_draw_count);
+        assert_eq!(1, stats.mesh_cache_misses);
+        assert_eq!(0, stats.mesh_cache_hits);
+        assert!(ops.iter().any(|op| matches!(
+            op,
+            CommandOp::SetIndexBuffer {
+                index_type: IndexType::U16,
+                ..
+            }
+        )));
+        assert!(ops.iter().any(|op| matches!(
+            op,
+            CommandOp::DrawIndexed {
+                indices: 6,
+                instances: 1
+            }
+        )));
+
+        let (_ops, stats) = frontend
+            .append_frame_ops(&mut gal, 2, target, frame)
+            .unwrap();
+        assert_eq!(1, stats.mesh_cache_hits);
+        assert_eq!(0, stats.mesh_cache_misses);
+    }
+
+    #[test]
+    fn world_mesh_groups_compatible_instances_into_one_instanced_draw() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                vec![mesh_asset(181, 1, IndexType::U16)],
+                Vec::new(),
+            )
+            .unwrap();
+        let mut frame = frame(Vec::new());
+        for index in 0..32 {
+            let mut instance = mesh_instance(181, 1);
+            instance.transform[12] = index as f32;
+            frame.mesh_instances.push(instance);
+        }
+
+        let (ops, stats) = frontend
+            .append_frame_ops(&mut gal, 1, target, frame)
+            .unwrap();
+
+        assert_eq!(32, stats.mesh_instance_count);
+        assert_eq!(1, stats.mesh_batch_count);
+        assert_eq!(1, stats.mesh_draw_count);
+        assert_eq!(1, frontend.mesh_resources.values().next().unwrap().data_slots.len());
+        assert_eq!(
+            1,
+            ops.iter()
+                .filter(|op| matches!(
+                    op,
+                    CommandOp::DrawIndexed {
+                        indices: 6,
+                        instances: 32
+                    }
+                ))
+                .count()
+        );
+        assert!(ops.iter().any(|op| matches!(
+            op,
+            CommandOp::HostWriteBuffer { data, .. }
+                if data.len() == WORLD_MESH_BATCH_HEADER_BYTES + 32 * WORLD_MESH_INSTANCE_BYTES
+        )));
+    }
+
+    #[test]
+    fn world_mesh_whole_mesh_instances_expand_sections_inside_rust() {
+        let mut asset = mesh_asset(183, 1, IndexType::U16);
+        asset.index_bytes.extend_from_slice(&[0, 0, 2, 0, 3, 0]);
+        asset.sections.push(WorldMeshSection {
+            material_id: WORLD_MATERIAL_ID_OPAQUE_TEXTURED,
+            texture_id: WORLD_MATERIAL_TEXTURE_WHITE_WOOL,
+            material_mode: WORLD_MATERIAL_MODE_OPAQUE,
+            cull_policy: WORLD_CULL_BACK,
+            winding: WORLD_WINDING_CCW,
+            index_offset: 12,
+            index_count: 3,
+        });
+        validate_mesh_asset(&asset).unwrap();
+
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_world_mesh_asset_update(&mut gal, 1, vec![asset], Vec::new())
+            .unwrap();
+        let mut frame = frame(Vec::new());
+        for index in 0..12 {
+            let mut instance = mesh_instance(183, 1);
+            instance.mesh_section_index = WORLD_MESH_SECTION_ALL;
+            instance.transform[12] = index as f32;
+            frame.mesh_instances.push(instance);
+        }
+
+        let (ops, stats) = frontend
+            .append_frame_ops(&mut gal, 1, target, frame)
+            .unwrap();
+
+        assert_eq!(12, stats.mesh_instance_count);
+        assert_eq!(2, stats.mesh_batch_count);
+        assert_eq!(2, stats.mesh_draw_count);
+        assert_eq!(
+            2,
+            ops.iter()
+                .filter(|op| matches!(op, CommandOp::DrawIndexed { instances: 12, .. }))
+                .count()
+        );
+        assert!(ops.iter().any(|op| matches!(
+            op,
+            CommandOp::SetIndexBuffer { offset: 12, .. }
+        )));
+    }
+
+    #[test]
+    fn world_mesh_keeps_incompatible_depth_state_in_separate_draws() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                vec![mesh_asset(182, 1, IndexType::U16)],
+                Vec::new(),
+            )
+            .unwrap();
+        let mut frame = frame(Vec::new());
+        frame.mesh_instances.push(mesh_instance(182, 1));
+        let mut no_write = mesh_instance(182, 1);
+        no_write.depth_policy = WORLD_DEPTH_POLICY_TEST_NO_WRITE;
+        frame.mesh_instances.push(no_write);
+
+        let (ops, stats) = frontend
+            .append_frame_ops(&mut gal, 1, target, frame)
+            .unwrap();
+
+        assert_eq!(2, stats.mesh_instance_count);
+        assert_eq!(2, stats.mesh_batch_count);
+        assert_eq!(2, stats.mesh_draw_count);
+        assert_eq!(
+            2,
+            ops.iter()
+                .filter(|op| matches!(
+                    op,
+                    CommandOp::DrawIndexed {
+                        indices: 6,
+                        instances: 1
+                    }
+                ))
+                .count()
+        );
+    }
+
+    #[test]
+    fn world_mesh_index_type_and_offsets_are_explicit() {
+        let mut asset = mesh_asset(82, 1, IndexType::U32);
+        asset.sections[0].index_offset = 4;
+        asset.sections[0].index_count = 5;
+        validate_mesh_asset(&asset).unwrap();
+
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_world_mesh_asset_update(&mut gal, 1, vec![asset], Vec::new())
+            .unwrap();
+        let mut frame = frame(Vec::new());
+        frame.mesh_instances.push(mesh_instance(82, 1));
+
+        let (ops, _stats) = frontend.append_frame_ops(&mut gal, 1, target, frame).unwrap();
+        assert!(ops.iter().any(|op| matches!(
+            op,
+            CommandOp::SetIndexBuffer {
+                offset: 4,
+                index_type: IndexType::U32,
+                ..
+            }
+        )));
+    }
+
+    #[test]
+    fn world_mesh_validation_rejects_bad_generations_sections_and_ranges() {
+        let mut gal = gal();
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                3,
+                vec![mesh_asset(83, 3, IndexType::U16)],
+                Vec::new(),
+            )
+            .unwrap();
+        let stale = frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                3,
+                vec![mesh_asset(83, 3, IndexType::U16)],
+                Vec::new(),
+            )
+            .unwrap_err();
+        assert_eq!(StatusCode::InvalidArgument, stale.code);
+
+        let mut malformed = mesh_asset(84, 4, IndexType::U16);
+        malformed.sections[0].index_offset = 12;
+        malformed.sections[0].index_count = 1;
+        let bad_range = frontend
+            .apply_world_mesh_asset_update(&mut gal, 4, vec![malformed], Vec::new())
+            .unwrap_err();
+        assert_eq!(StatusCode::InvalidArgument, bad_range.code);
+
+        let mut frame = frame(Vec::new());
+        frame.mesh_instances.push(mesh_instance(83, 2));
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let error = frontend
+            .append_frame_ops(&mut gal, 1, target, frame)
+            .unwrap_err();
+        assert_eq!(StatusCode::InvalidArgument, error.code);
     }
 
     #[test]

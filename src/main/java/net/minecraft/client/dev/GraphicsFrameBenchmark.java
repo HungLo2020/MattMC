@@ -8,6 +8,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Input;
+import net.minecraft.world.entity.Display;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -77,6 +79,12 @@ public final class GraphicsFrameBenchmark {
 	private static final String FORCED_GAME_MODE = System.getProperty("mattmc.dev.graphicsFrameBenchmark.gameMode", "").trim();
 	private static final boolean REAL_TERRAIN_PARTICLE_GAMEPLAY =
 		Boolean.getBoolean("mattmc.dev.rustGalWorldMaterial.terrainParticleRealGameplay");
+	private static final String BLOCK_DISPLAY_SCENARIO =
+		System.getProperty("mattmc.dev.rustGalWorldMesh.blockDisplayScenario", "").trim().toLowerCase(Locale.ROOT);
+	private static final String BLOCK_DISPLAY_WORKLOAD =
+		System.getProperty("mattmc.dev.rustGalWorldMesh.blockDisplayWorkload", "single").trim().toLowerCase(Locale.ROOT);
+	private static final int BLOCK_DISPLAY_INSTANCE_COUNT =
+		Integer.getInteger("mattmc.dev.rustGalWorldMesh.blockDisplayInstanceCount", -1);
 	private static final int REAL_TERRAIN_PARTICLE_MATERIAL_COUNT = 5;
 	private static final int REAL_TERRAIN_PARTICLE_RESET_FRAMES =
 		Math.max(12, Integer.getInteger("mattmc.dev.rustGalWorldMaterial.terrainParticleRealGameplayResetFrames", 48));
@@ -139,6 +147,14 @@ public final class GraphicsFrameBenchmark {
 	private static String realTerrainParticleStatus = "inactive";
 	private static String realTerrainParticleTargetText = "unset";
 	private static String realTerrainParticleBlockType = "unset";
+	private static boolean blockDisplayScenarioSetup;
+	private static int blockDisplayScenarioEntityId = Integer.MIN_VALUE + 2048;
+	private static String blockDisplayScenarioStatus = "inactive";
+	private static String blockDisplayScenarioBlock = "unset";
+	private static String blockDisplayScenarioPosition = "unset";
+	private static int blockDisplayScenarioEntityCount;
+	private static int blockDisplayScenarioDistinctBlockCount;
+	private static String blockDisplayScenarioFingerprint = "unset";
 	private static final Map<String, Integer> TERRAIN_PARTICLE_ROUTE_COUNTS = new LinkedHashMap<>();
 	private static final Map<String, Long> TERRAIN_PARTICLE_ROUTE_NANOS = new LinkedHashMap<>();
 
@@ -318,6 +334,7 @@ public final class GraphicsFrameBenchmark {
 			player.setYRot(initialYaw);
 			player.setXRot(initialPitch);
 			setupRealTerrainParticleGameplayBlock(minecraft, player);
+			setupBlockDisplayScenario(minecraft, player);
 			dimension = minecraft.level.dimension().location().toString();
 			writeStatus(minecraft, "initialized");
 			return true;
@@ -357,8 +374,13 @@ public final class GraphicsFrameBenchmark {
 			return false;
 		}
 		String title = screenTitle(minecraft).toLowerCase(Locale.ROOT);
-		return minecraft.level.getChunkSource().getLoadedChunksCount() > 0
-			&& (title.contains("downloading terrain") || title.contains("loading terrain") || title.contains("joining world"));
+		if (minecraft.level.getChunkSource().getLoadedChunksCount() <= 0) {
+			return false;
+		}
+		if (title.contains("downloading terrain") || title.contains("loading terrain") || title.contains("joining world")) {
+			return true;
+		}
+		return title.contains("saving world") && initializationWaitFrames > 60L;
 	}
 
 	private static void disableVoxelMapWelcomeScreen() {
@@ -453,6 +475,122 @@ public final class GraphicsFrameBenchmark {
 		realTerrainParticleTarget = targets[0];
 		realTerrainParticleTargetText = terrainParticleTargetsText();
 		realTerrainParticleStatus = "setup-fixed-material-row";
+	}
+
+	private static void setupBlockDisplayScenario(Minecraft minecraft, LocalPlayer player) {
+		if (blockDisplayScenarioSetup) {
+			return;
+		}
+		blockDisplayScenarioSetup = true;
+		if (BLOCK_DISPLAY_SCENARIO.isEmpty()) {
+			blockDisplayScenarioStatus = "inactive";
+			return;
+		}
+		if ("hidden".equals(BLOCK_DISPLAY_SCENARIO)) {
+			blockDisplayScenarioStatus = "hidden";
+			return;
+		}
+		if (minecraft.level == null) {
+			blockDisplayScenarioStatus = "missing-client-level";
+			return;
+		}
+		List<BlockState> states = blockDisplayBenchmarkStates();
+		if (states.isEmpty()) {
+			blockDisplayScenarioStatus = "missing-states";
+			return;
+		}
+		Vec3 forward = player.getLookAngle();
+		if (forward.lengthSqr() < 0.0001) {
+			forward = new Vec3(0.0, 0.0, 1.0);
+		}
+		Vec3 normalizedForward = forward.normalize();
+		Vec3 right = new Vec3(-normalizedForward.z, 0.0, normalizedForward.x);
+		if (right.lengthSqr() < 0.0001) {
+			right = new Vec3(1.0, 0.0, 0.0);
+		} else {
+			right = right.normalize();
+		}
+		int entityCount = blockDisplayBenchmarkInstanceCount(states.size());
+		int columns = Math.max(1, (int)Math.ceil(Math.sqrt(entityCount)));
+		int rows = Math.max(1, (int)Math.ceil(entityCount / (double)columns));
+		double spacing = 1.35;
+		Vec3 center = player.position()
+			.add(normalizedForward.scale(4.5))
+			.add(0.0, rows <= 1 ? 0.0 : 0.7, 0.0);
+		Set<String> blockNames = new LinkedHashSet<>();
+		StringBuilder fingerprint = new StringBuilder(BLOCK_DISPLAY_WORKLOAD.isEmpty() ? "single" : BLOCK_DISPLAY_WORKLOAD);
+		for (int i = 0; i < entityCount; i++) {
+			BlockState state = states.get(i % states.size());
+			int column = i % columns;
+			int row = i / columns;
+			double horizontal = (column - (columns - 1) * 0.5) * spacing;
+			double vertical = ((rows - 1) * 0.5 - row) * spacing;
+			Vec3 position = center.add(right.scale(horizontal)).add(0.0, vertical, 0.0).add(-0.5, -0.5, -0.5);
+			Display.BlockDisplay display = new Display.BlockDisplay(EntityType.BLOCK_DISPLAY, minecraft.level);
+			display.setId(blockDisplayScenarioEntityId++);
+			display.setPos(position);
+			display.setBlockState(state);
+			display.setViewRange(32.0F);
+			display.setWidth(2.0F);
+			display.setHeight(2.0F);
+			minecraft.level.addEntity(display);
+			String blockName = blockName(state);
+			blockNames.add(blockName);
+			fingerprint.append('|').append(i).append(':').append(blockName);
+			if (i == 0) {
+				blockDisplayScenarioBlock = blockName;
+				blockDisplayScenarioPosition = String.format(Locale.ROOT, "%.3f,%.3f,%.3f", position.x, position.y, position.z);
+			}
+		}
+		blockDisplayScenarioStatus = "spawned";
+		blockDisplayScenarioEntityCount = entityCount;
+		blockDisplayScenarioDistinctBlockCount = blockNames.size();
+		blockDisplayScenarioFingerprint = fingerprint.toString();
+	}
+
+	private static int blockDisplayBenchmarkInstanceCount(int distinctStateCount) {
+		if (BLOCK_DISPLAY_INSTANCE_COUNT > 0) {
+			return BLOCK_DISPLAY_INSTANCE_COUNT;
+		}
+		return switch (BLOCK_DISPLAY_WORKLOAD) {
+			case "performance" -> 30;
+			case "scale-one-mesh" -> 96;
+			case "scale-mixed-meshes" -> Math.max(96, distinctStateCount * 16);
+			default -> 1;
+		};
+	}
+
+	private static List<BlockState> blockDisplayBenchmarkStates() {
+		return switch (BLOCK_DISPLAY_WORKLOAD) {
+			case "performance", "scale-mixed-meshes" -> List.of(
+				Blocks.STONE.defaultBlockState(),
+				Blocks.FURNACE.defaultBlockState(),
+				Blocks.OAK_LEAVES.defaultBlockState(),
+				Blocks.OAK_STAIRS.defaultBlockState(),
+				Blocks.WHITE_WOOL.defaultBlockState()
+			);
+			case "scale-one-mesh" -> List.of(blockDisplayBenchmarkState());
+			default -> List.of(blockDisplayBenchmarkState());
+		};
+	}
+
+	private static BlockState blockDisplayBenchmarkState() {
+		return switch (BLOCK_DISPLAY_SCENARIO) {
+			case "oak-leaves", "cutout", "tinted" -> Blocks.OAK_LEAVES.defaultBlockState();
+			case "asymmetric", "furnace" -> Blocks.FURNACE.defaultBlockState();
+			case "non-full-cube", "stairs" -> Blocks.OAK_STAIRS.defaultBlockState();
+			default -> Blocks.STONE.defaultBlockState();
+		};
+	}
+
+	private static String blockDisplayRouteControl() {
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldBlockDisplay.disabled")) {
+			return "disabled";
+		}
+		if (Boolean.getBoolean("mattmc.dev.rustGalWorldBlockDisplay.legacyControl")) {
+			return "legacy";
+		}
+		return "rust";
 	}
 
 	private static void driveRealTerrainParticleGameplay(Minecraft minecraft, LocalPlayer player) {
@@ -625,6 +763,8 @@ public final class GraphicsFrameBenchmark {
 				.append(", \"z\": ").append(format(initialPosition.z)).append(" } },\n");
 			writeTerrainParticleRealGameplay(json);
 			json.append(",\n");
+			writeBlockDisplayScenario(json);
+			json.append(",\n");
 			writeValidity(json);
 		json.append(",\n");
 		json.append("  \"java\": {\n");
@@ -760,6 +900,21 @@ public final class GraphicsFrameBenchmark {
 		json.append(",\n");
 		writeStringLongMap(json, "routeNanos", TERRAIN_PARTICLE_ROUTE_NANOS);
 		json.append("\n  }");
+	}
+
+	private static void writeBlockDisplayScenario(StringBuilder json) {
+		json.append("  \"blockDisplayScenario\": {\n");
+		json.append("    \"enabled\": ").append(!BLOCK_DISPLAY_SCENARIO.isEmpty()).append(",\n");
+		field(json, "scenario", BLOCK_DISPLAY_SCENARIO, 4, true);
+		field(json, "workload", BLOCK_DISPLAY_WORKLOAD, 4, true);
+		field(json, "routeControl", blockDisplayRouteControl(), 4, true);
+		field(json, "status", blockDisplayScenarioStatus, 4, true);
+		field(json, "block", blockDisplayScenarioBlock, 4, true);
+		field(json, "position", blockDisplayScenarioPosition, 4, true);
+		json.append("    \"entityCount\": ").append(blockDisplayScenarioEntityCount).append(",\n");
+		json.append("    \"distinctBlockCount\": ").append(blockDisplayScenarioDistinctBlockCount).append(",\n");
+		field(json, "workloadFingerprint", blockDisplayScenarioFingerprint, 4, false);
+		json.append("  }");
 	}
 
 	private static void writeStringIntMap(StringBuilder json, String name, Map<String, Integer> values) {

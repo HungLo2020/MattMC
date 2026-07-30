@@ -4,6 +4,7 @@ import net.blaze3d.vertex.PoseStack;
 import java.util.List;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.minecraft.client.dev.GraphicsFrameBenchmark;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.OutlineBufferSource;
@@ -16,6 +17,8 @@ import net.minecraft.client.renderer.block.model.BlockModelPart;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.state.BlockState;
+import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
+import net.vulkanic.world.WorldRenderRoutePolicy;
 
 @Environment(EnvType.CLIENT)
 public class BlockFeatureRenderer {
@@ -50,14 +53,21 @@ public class BlockFeatureRenderer {
 		for (SubmitNodeStorage.BlockSubmit blockSubmit : submitNodeCollection.getBlockSubmits()) {
 			this.poseStack.pushPose();
 			this.poseStack.last().set(blockSubmit.pose());
-			blockRenderDispatcher.renderSingleBlock(blockSubmit.state(), this.poseStack, bufferSource, blockSubmit.lightCoords(), blockSubmit.overlayCoords());
-			if (blockSubmit.outlineColor() != 0) {
-				outlineBufferSource.setColor(blockSubmit.outlineColor());
-				blockRenderDispatcher.renderSingleBlock(blockSubmit.state(), this.poseStack, outlineBufferSource, blockSubmit.lightCoords(), blockSubmit.overlayCoords());
+			WorldRenderRoutePolicy.Route blockDisplayRoute = WorldRenderRoutePolicy.currentBlockDisplayRoute();
+			if (blockDisplayRoute == WorldRenderRoutePolicy.Route.DISABLED) {
+				GraphicsFrameBenchmark.recordSubmittedWorkIdentity("block-display", "disabled:" + blockSubmit.state().getBlockHolder().getRegisteredName());
+			} else if (!RustGalWorldPrimitiveRenderer.enqueueBlockDisplay(blockRenderDispatcher, blockSubmit)) {
+				GraphicsFrameBenchmark.recordSubmittedWorkIdentity("block-display", "java-legacy:" + blockSubmit.state().getBlockHolder().getRegisteredName());
+				blockRenderDispatcher.renderSingleBlock(blockSubmit.state(), this.poseStack, bufferSource, blockSubmit.lightCoords(), blockSubmit.overlayCoords());
+				if (blockSubmit.outlineColor() != 0) {
+					outlineBufferSource.setColor(blockSubmit.outlineColor());
+					blockRenderDispatcher.renderSingleBlock(blockSubmit.state(), this.poseStack, outlineBufferSource, blockSubmit.lightCoords(), blockSubmit.overlayCoords());
+				}
 			}
 
 			this.poseStack.popPose();
 		}
+		RustGalWorldPrimitiveRenderer.renderOpenGlPendingMeshInstances(net.minecraft.client.Minecraft.getInstance(), "minecraft.entity.block-display");
 
 		for (SubmitNodeStorage.BlockModelSubmit blockModelSubmit : submitNodeCollection.getBlockModelSubmits()) {
 			ModelBlockRenderer.renderModel(

@@ -1942,6 +1942,262 @@ def deterministic_world_material_terrain_particle_pixel_evidence(
     return evidence
 
 
+def expected_block_display_block_id(scenario_name: str) -> str | None:
+    return {
+        "stone": "minecraft:stone",
+        "oak-leaves": "minecraft:oak_leaves",
+        "cutout": "minecraft:oak_leaves",
+        "tinted": "minecraft:oak_leaves",
+        "asymmetric": "minecraft:furnace",
+        "furnace": "minecraft:furnace",
+        "non-full-cube": "minecraft:oak_stairs",
+        "stairs": "minecraft:oak_stairs",
+    }.get(scenario_name)
+
+
+def expected_block_display_material_mode(scenario_name: str) -> int | None:
+    if scenario_name in {"oak-leaves", "cutout", "tinted"}:
+        return 2
+    if expected_block_display_block_id(scenario_name):
+        return 1
+    return None
+
+
+def deterministic_world_mesh_block_display_pixel_evidence(
+    doc: dict[str, object] | None,
+    scenario: object,
+) -> dict[str, object]:
+    scenario_name = str(scenario or "").strip().lower()
+    evidence: dict[str, object] = {
+        "checked": False,
+        "status": "not_requested",
+        "scenario": scenario_name or None,
+        "screenshot": None,
+        "displays_reported": 0,
+        "expected_block_id": None,
+        "validated_mesh_keys": [],
+        "crops": [],
+        "matching_pixels": 0,
+        "texture_status": "not_checked",
+        "material_status": "not_checked",
+        "orientation_status": "not_checked",
+        "position_status": "not_checked",
+        "threshold": 96,
+    }
+    if not scenario_name:
+        return evidence
+    displays = doc.get("rustGalWorldBlockDisplays") if isinstance(doc, dict) else None
+    if not isinstance(displays, list):
+        displays = []
+    evidence["displays_reported"] = len(displays)
+    if scenario_name == "hidden":
+        evidence.update(
+            {
+                "checked": True,
+                "status": "absent_expected" if not displays else "unexpected_mesh_metadata",
+                "texture_status": "absent_expected",
+                "material_status": "absent_expected",
+                "orientation_status": "absent_expected",
+                "position_status": "absent_expected",
+            }
+        )
+        return evidence
+    expected_block = expected_block_display_block_id(scenario_name)
+    expected_material_mode = expected_block_display_material_mode(scenario_name)
+    evidence["expected_block_id"] = expected_block
+    if not expected_block:
+        evidence["status"] = "unknown_scenario"
+        return evidence
+    captures = doc.get("captures") if isinstance(doc, dict) else None
+    if not isinstance(captures, list) or not captures:
+        evidence["status"] = "missing_capture"
+        return evidence
+    first = captures[0]
+    if not isinstance(first, dict) or not first.get("screenshot"):
+        evidence["status"] = "missing_screenshot"
+        return evidence
+    screenshot = Path(str(first["screenshot"]))
+    evidence["screenshot"] = str(screenshot)
+    if not screenshot.is_file():
+        evidence["status"] = "missing_screenshot_file"
+        return evidence
+    capture_frame = parse_number(first.get("renderedFrameIndex"))
+    try:
+        from PIL import Image
+    except Exception as exc:  # pragma: no cover
+        evidence["status"] = f"pillow_unavailable:{exc}"
+        return evidence
+    try:
+        with Image.open(screenshot) as image:
+            rgb = image.convert("RGB")
+            frame_filtered_displays = displays
+            if capture_frame is not None:
+                exact_or_near = [
+                    display for display in displays
+                    if isinstance(display, dict)
+                    and display.get("frameIndex") is not None
+                    and abs(int(display.get("frameIndex") or -999999) - int(capture_frame)) <= 1
+                ]
+                if exact_or_near:
+                    frame_filtered_displays = exact_or_near
+            candidates = [
+                display for display in frame_filtered_displays
+                if isinstance(display, dict)
+                and display.get("blockId") == expected_block
+                and display.get("projected") is True
+                and isinstance(display.get("screenBounds"), dict)
+            ]
+            crops: list[dict[str, object]] = []
+            validated_mesh_keys: list[str] = []
+            total_matching = 0
+            material_ok = True
+            orientation_ok = True
+            for display in candidates[:4]:
+                bounds = display["screenBounds"]
+                assert isinstance(bounds, dict)
+                best: dict[str, object] | None = None
+                for mirrored in (False, True):
+                    crop_box = marker_crop_box(bounds, rgb.width, rgb.height, mirrored_y=mirrored)
+                    if crop_box is None:
+                        continue
+                    crop = rgb.crop(crop_box)
+                    stats = block_display_crop_stats(crop, scenario_name)
+                    if best is None or int(stats["matching_pixels"]) > int(best["matching_pixels"]):
+                        mesh_key = str(display.get("meshKey") or "unknown")
+                        crop_path = screenshot.with_name(
+                            f"world_mesh_block_display_crop_{scenario_name}_{mesh_key}_{'mirrored' if mirrored else 'projected'}.png"
+                        )
+                        crop.save(crop_path)
+                        material_mode = int(parse_number(display.get("materialMode")) or -1)
+                        best = {
+                            **stats,
+                            "mesh_key": mesh_key,
+                            "mesh_generation": display.get("meshGeneration"),
+                            "block_id": display.get("blockId"),
+                            "texture_ids": display.get("textureIds"),
+                            "material_mode": material_mode,
+                            "expected_material_mode": expected_material_mode,
+                            "material_mode_matches": material_mode == expected_material_mode,
+                            "index_type": display.get("indexType"),
+                            "vertex_count": display.get("vertexCount"),
+                            "section_count": display.get("sectionCount"),
+                            "crop": {
+                                "left": crop_box[0],
+                                "top": crop_box[1],
+                                "right": crop_box[2],
+                                "bottom": crop_box[3],
+                                "mirrored_y": mirrored,
+                            },
+                            "crop_path": str(crop_path),
+                        }
+                if best is None:
+                    crops.append({"status": "missing_projected_display_crop", "display": display})
+                    orientation_ok = False
+                    continue
+                crops.append(best)
+                matching = int(best["matching_pixels"])
+                total_matching += matching
+                if matching >= int(evidence["threshold"]) and best.get("material_mode_matches") is True:
+                    validated_mesh_keys.append(str(best["mesh_key"]))
+                if best.get("material_mode_matches") is not True:
+                    material_ok = False
+                if best.get("orientation_status") == "failed":
+                    orientation_ok = False
+            texture_ok = bool(validated_mesh_keys) and all(bool(crop.get("texture_ids")) for crop in crops if isinstance(crop, dict))
+            evidence.update(
+                {
+                    "checked": True,
+                    "status": "present" if validated_mesh_keys and material_ok and orientation_ok else "absent",
+                    "validated_mesh_keys": validated_mesh_keys,
+                    "crops": crops,
+                    "matching_pixels": total_matching,
+                    "texture_status": "passed" if texture_ok else "failed",
+                    "material_status": "passed" if material_ok and validated_mesh_keys else "failed",
+                    "orientation_status": "passed" if orientation_ok and validated_mesh_keys else "failed",
+                    "position_status": "projected_crop_hit" if validated_mesh_keys else "missing_projected_crop_hit",
+                }
+            )
+    except Exception as exc:
+        evidence["status"] = f"read_failed:{exc}"
+    return evidence
+
+
+def block_display_crop_stats(crop: Any, scenario_name: str) -> dict[str, object]:
+    width, height = crop.size
+    grey = 0
+    green = 0
+    brown = 0
+    dark_detail = 0
+    alpha_hole_like = 0
+    colored = 0
+    min_x = width
+    min_y = height
+    max_x = -1
+    max_y = -1
+    for y in range(height):
+        for x in range(width):
+            red, green_value, blue = crop.getpixel((x, y))
+            avg = (red + green_value + blue) / 3.0
+            is_grey = 45 <= avg <= 210 and max(red, green_value, blue) - min(red, green_value, blue) <= 65
+            is_leaf = green_value >= 45 and green_value >= red + 4 and green_value >= blue + 4
+            is_brown = red >= 70 and green_value >= 35 and red >= blue + 20 and green_value >= blue
+            is_dark_detail = red <= 85 and green_value <= 85 and blue <= 95
+            is_visible = is_grey or is_leaf or is_brown or is_dark_detail
+            if is_grey:
+                grey += 1
+            if is_leaf:
+                green += 1
+            if is_brown:
+                brown += 1
+            if is_dark_detail:
+                dark_detail += 1
+            if red <= 25 and green_value <= 25 and blue <= 25:
+                alpha_hole_like += 1
+            if is_visible:
+                colored += 1
+                min_x = min(min_x, x)
+                min_y = min(min_y, y)
+                max_x = max(max_x, x)
+                max_y = max(max_y, y)
+    if scenario_name in {"oak-leaves", "cutout", "tinted"}:
+        matching = green
+        signature = "leaf-cutout"
+        transparency_ok = alpha_hole_like < max(128, int(width * height * 0.75))
+    elif scenario_name in {"asymmetric", "furnace"}:
+        matching = max(grey + dark_detail, brown)
+        signature = "furnace-like"
+        transparency_ok = True
+    elif scenario_name in {"non-full-cube", "stairs"}:
+        matching = max(brown, grey)
+        signature = "stairs-like"
+        transparency_ok = True
+    else:
+        matching = grey
+        signature = "stone-like"
+        transparency_ok = True
+    coverage_ok = (
+        max_x > min_x
+        and max_y > min_y
+        and (max_x - min_x + 1) >= max(8, int(width * 0.25))
+        and (max_y - min_y + 1) >= max(8, int(height * 0.25))
+    )
+    return {
+        "matching_pixels": matching,
+        "texture_signature": signature,
+        "grey_pixels": grey,
+        "green_pixels": green,
+        "brown_pixels": brown,
+        "dark_detail_pixels": dark_detail,
+        "colored_pixels": colored,
+        "alpha_hole_like_pixels": alpha_hole_like,
+        "coverage_ok": coverage_ok,
+        "transparency_status": "passed" if transparency_ok else "failed",
+        "orientation_status": "passed" if coverage_ok and transparency_ok else "failed",
+        "crop_width": width,
+        "crop_height": height,
+    }
+
+
 def marker_crop_box(
     bounds: dict[str, object],
     width: int,
@@ -3517,6 +3773,38 @@ def normalize_capture_artifact(
     requested_world_material_terrain_particle_scenario = parse_java_property(
         combined_logs, "mattmc.dev.rustGalWorldMaterial.terrainParticleScenario"
     )
+    requested_world_mesh_block_display_scenario = parse_java_property(
+        combined_logs, "mattmc.dev.rustGalWorldMesh.blockDisplayScenario"
+    )
+    requested_world_mesh_block_display_workload = parse_java_property(
+        combined_logs, "mattmc.dev.rustGalWorldMesh.blockDisplayWorkload"
+    ) or "single"
+    requested_world_mesh_block_display_disabled = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWorldBlockDisplay.disabled") == "true"
+    )
+    requested_world_mesh_block_display_legacy = (
+        parse_java_property(combined_logs, "mattmc.dev.rustGalWorldBlockDisplay.legacyControl") == "true"
+    )
+    if not requested_world_mesh_block_display_scenario and isinstance(deterministic_doc, dict):
+        requested_world_mesh_block_display_scenario = str(deterministic_doc.get("rustGalWorldBlockDisplayScenario") or "")
+    block_display_doc = (
+        frame_doc.get("blockDisplayScenario")
+        if isinstance(frame_doc, dict) and isinstance(frame_doc.get("blockDisplayScenario"), dict)
+        else {}
+    )
+    submitted_work_counts = (
+        frame_doc.get("submittedWorkCounts")
+        if isinstance(frame_doc, dict) and isinstance(frame_doc.get("submittedWorkCounts"), dict)
+        else {}
+    )
+    block_display_submitted_count = int(parse_number(submitted_work_counts.get("block-display")) or 0)
+    if isinstance(block_display_doc, dict):
+        requested_world_mesh_block_display_workload = str(
+            block_display_doc.get("workload") or requested_world_mesh_block_display_workload or "single"
+        )
+    world_mesh_block_display_control = "disabled" if requested_world_mesh_block_display_disabled else ("legacy" if requested_world_mesh_block_display_legacy else "rust")
+    if isinstance(block_display_doc, dict) and block_display_doc.get("routeControl"):
+        world_mesh_block_display_control = str(block_display_doc.get("routeControl") or world_mesh_block_display_control)
     terrain_particle_real_doc = (
         frame_doc.get("terrainParticleRealGameplay")
         if isinstance(frame_doc, dict) and isinstance(frame_doc.get("terrainParticleRealGameplay"), dict)
@@ -3556,6 +3844,10 @@ def normalize_capture_artifact(
     world_material_terrain_particle_pixel_evidence = deterministic_world_material_terrain_particle_pixel_evidence(
         deterministic_doc,
         requested_world_material_terrain_particle_scenario,
+    )
+    world_mesh_block_display_pixel_evidence = deterministic_world_mesh_block_display_pixel_evidence(
+        deterministic_doc,
+        requested_world_mesh_block_display_scenario,
     )
     world_crack_framebuffer = world_crack_framebuffer_evidence(combined_logs)
     rust_vulkan_shell_scene_evidence = deterministic_rust_vulkan_shell_scene_evidence(
@@ -3635,6 +3927,15 @@ def normalize_capture_artifact(
     rust_gal_world_material_terrain_particle_texture_mask_for_validation = max_number(
         combined_logs, r"material_terrain_particle_texture_mask[=: ]+(\d+)"
     )
+    rust_gal_world_mesh_instances_for_validation = last_number(
+        combined_logs, r"rust_gal_world_mesh_instances_executed[=: ]+(\d+)"
+    )
+    rust_gal_world_mesh_batches_for_validation = last_number(
+        combined_logs, r"rust_gal_world_mesh_batches_executed[=: ]+(\d+)"
+    )
+    rust_gal_world_mesh_draws_for_validation = last_number(
+        combined_logs, r"rust_gal_world_mesh_draws_executed[=: ]+(\d+)"
+    )
     rust_gal_world_background_clears_for_validation = last_number(
         combined_logs, r"rust_gal_world_background_clears_executed[=: ]+(\d+)"
     )
@@ -3645,6 +3946,7 @@ def normalize_capture_artifact(
         combined_logs, r"rust_gal_world_depth_attachment_reuses[=: ]+(\d+)"
     )
     validation_messages: list[str] = []
+    validation_notes: list[str] = []
     if not files["meta"]:
         validation_messages.append("capture metadata is missing")
     if not (success or reused_baseline):
@@ -4135,6 +4437,107 @@ def normalize_capture_artifact(
             if int(rust_gal_world_material_quads_for_validation or 0) != 0:
                 world_material_terrain_particle_workload_complete = False
                 validation_messages.append("TerrainParticle legacy control emitted unexpected Rust material quads")
+    world_mesh_block_display_workload_complete = True
+    block_display_scenario = (requested_world_mesh_block_display_scenario or "").strip().lower()
+    if block_display_scenario and rust_outline_mode:
+        block_display_status = str(block_display_doc.get("status") or "")
+        block_display_entity_count = int(parse_number(block_display_doc.get("entityCount")) or 0)
+        block_display_distinct_count = int(parse_number(block_display_doc.get("distinctBlockCount")) or 0)
+        if block_display_scenario == "hidden":
+            if int(rust_gal_world_mesh_instances_for_validation or 0) != 0:
+                world_mesh_block_display_workload_complete = False
+                validation_messages.append("deterministic hidden BlockDisplay scenario emitted unexpected mesh instances")
+            if block_display_status not in {"hidden", "inactive", ""}:
+                world_mesh_block_display_workload_complete = False
+                validation_messages.append(
+                    f"deterministic hidden BlockDisplay scenario reported unexpected status {block_display_status!r}"
+                )
+            if tool_kind == "capture" and world_mesh_block_display_pixel_evidence.get("status") != "absent_expected":
+                world_mesh_block_display_workload_complete = False
+                validation_messages.append(
+                    "deterministic hidden BlockDisplay scenario reported unexpected projected mesh evidence "
+                    f"(status={world_mesh_block_display_pixel_evidence.get('status')})"
+                )
+        elif world_mesh_block_display_control == "disabled":
+            if block_display_submitted_count <= 0:
+                world_mesh_block_display_workload_complete = False
+                validation_messages.append("BlockDisplay disabled control did not prove production callsite traversal")
+            if int(rust_gal_world_mesh_instances_for_validation or 0) != 0:
+                world_mesh_block_display_workload_complete = False
+                validation_messages.append("BlockDisplay disabled control emitted unexpected Rust mesh instances")
+            if block_display_status and block_display_status != "spawned":
+                world_mesh_block_display_workload_complete = False
+                validation_messages.append(
+                    f"BlockDisplay disabled control did not spawn the matched production entities "
+                    f"(status={block_display_status})"
+                )
+        elif world_mesh_block_display_control == "legacy":
+            if block_display_submitted_count <= 0:
+                world_mesh_block_display_workload_complete = False
+                validation_messages.append("BlockDisplay legacy control did not prove Java legacy draw traversal")
+            if int(rust_gal_world_mesh_instances_for_validation or 0) != 0:
+                world_mesh_block_display_workload_complete = False
+                validation_messages.append("BlockDisplay Java legacy control emitted unexpected Rust mesh instances")
+            if block_display_status and block_display_status != "spawned":
+                world_mesh_block_display_workload_complete = False
+                validation_messages.append(
+                    f"BlockDisplay legacy control did not spawn the matched production entities "
+                    f"(status={block_display_status})"
+                )
+        else:
+            required_mesh_counts = {
+                "mesh instances": rust_gal_world_mesh_instances_for_validation,
+                "mesh batches": rust_gal_world_mesh_batches_for_validation,
+                "mesh draws": rust_gal_world_mesh_draws_for_validation,
+            }
+            missing_mesh_counts = [
+                name for name, value in required_mesh_counts.items() if int(value or 0) <= 0
+            ]
+            if missing_mesh_counts:
+                world_mesh_block_display_workload_complete = False
+                validation_messages.append(
+                    "deterministic Rust-GAL BlockDisplay scenario requested but no non-zero "
+                    + ", ".join(missing_mesh_counts)
+                    + " evidence was captured"
+                )
+            if block_display_status and block_display_status != "spawned":
+                world_mesh_block_display_workload_complete = False
+                validation_messages.append(
+                    f"deterministic BlockDisplay scenario did not spawn a production BlockDisplay entity "
+                    f"(status={block_display_status})"
+                )
+            if requested_world_mesh_block_display_workload in {"performance", "scale-mixed-meshes"}:
+                if block_display_entity_count < 2 or block_display_distinct_count < 3:
+                    world_mesh_block_display_workload_complete = False
+                    validation_messages.append(
+                        "BlockDisplay performance workload did not prove repeated instances across distinct meshes "
+                        f"(entities={block_display_entity_count}, distinctBlocks={block_display_distinct_count})"
+                    )
+            if tool_kind == "capture" and world_mesh_block_display_pixel_evidence.get("status") != "present":
+                world_mesh_block_display_workload_complete = False
+                validation_messages.append(
+                    "deterministic BlockDisplay scenario did not produce projected mesh crop evidence "
+                    f"(status={world_mesh_block_display_pixel_evidence.get('status')}, "
+                    f"validated={world_mesh_block_display_pixel_evidence.get('validated_mesh_keys')}, "
+                    f"expected_block={world_mesh_block_display_pixel_evidence.get('expected_block_id')}, "
+                    f"matching_pixels={world_mesh_block_display_pixel_evidence.get('matching_pixels')})"
+                )
+            elif tool_kind == "capture" and (
+                world_mesh_block_display_pixel_evidence.get("texture_status") != "passed"
+                or world_mesh_block_display_pixel_evidence.get("material_status") != "passed"
+                or world_mesh_block_display_pixel_evidence.get("orientation_status") != "passed"
+            ):
+                world_mesh_block_display_workload_complete = False
+                validation_messages.append(
+                    "deterministic BlockDisplay projected crop evidence did not prove texture/material/orientation "
+                    f"(texture={world_mesh_block_display_pixel_evidence.get('texture_status')}, "
+                    f"material={world_mesh_block_display_pixel_evidence.get('material_status')}, "
+                    f"orientation={world_mesh_block_display_pixel_evidence.get('orientation_status')})"
+                )
+    if block_display_scenario and mode.expected_attribution == "java-vulkan" and not rust_shell_outline_mode:
+        if int(rust_gal_world_mesh_instances_for_validation or 0) != 0:
+            world_mesh_block_display_workload_complete = False
+            validation_messages.append("normal Java Vulkan BlockDisplay control emitted unexpected Rust mesh work")
     background_scenario = (requested_world_background_scenario or "").strip().lower()
     if background_scenario and rust_shell_outline_mode:
         if background_scenario in {"hidden", "invalid"}:
@@ -4146,9 +4549,9 @@ def normalize_capture_artifact(
     run_type = instrumentation.get("run_type") if isinstance(instrumentation, dict) else "clean-performance"
     diagnostic_hooks = bool(instrumentation.get("diagnostic_hooks")) if isinstance(instrumentation, dict) else False
     if run_type in INSTRUMENTED_RUN_TYPES:
-        validation_messages.append(f"{run_type} run is diagnostic-only; performance numbers are not publishable")
+        validation_notes.append(f"{run_type} run is diagnostic-only; performance numbers are not publishable")
     if diagnostic_hooks:
-        validation_messages.append("graphics diagnostic hooks enabled; performance numbers are overhead probes only")
+        validation_notes.append("graphics diagnostic hooks enabled; performance numbers are overhead probes only")
     if isinstance(instrumentation, dict) and instrumentation.get("renderdoc", {}).get("enabled"):
         if renderdoc_summary.get("status") != "complete":
             validation_messages.append("RenderDoc capture/replay did not complete")
@@ -4169,7 +4572,10 @@ def normalize_capture_artifact(
                 if not isinstance(proof, dict) or not proof.get("non_zero_border_workload"):
                     validation_messages.append("RenderDoc capture did not prove non-zero Rust-GAL world-border workload")
             if isinstance(proof, dict) and proof.get("blue_diagnostic_shell_clear_expected"):
-                validation_messages.append("Rust Vulkan shell blue diagnostic clear is expected; this is not full world rendering")
+                validation_notes.append("Rust Vulkan shell blue diagnostic clear is expected; this is not full world rendering")
+        if block_display_scenario and block_display_scenario != "hidden":
+            if not isinstance(proof, dict) or not proof.get("non_zero_mesh_workload"):
+                validation_messages.append("RenderDoc capture did not prove non-zero Rust-GAL BlockDisplay mesh workload")
     if isinstance(instrumentation, dict) and instrumentation.get("tracy", {}).get("enabled"):
         if tracy_summary.get("status") != "complete":
             validation_messages.append("Tracy capture did not complete")
@@ -4192,6 +4598,7 @@ def normalize_capture_artifact(
         and (
             (requested_world_outline_scenario and requested_world_outline_scenario != "no-target")
             or (border_scenario and border_scenario not in {"hidden", "far", "no-target"})
+            or (block_display_scenario and block_display_scenario != "hidden")
         )
     ):
         proof = renderdoc_summary.get("workload_proof") if isinstance(renderdoc_summary, dict) else {}
@@ -4203,6 +4610,8 @@ def normalize_capture_artifact(
             required_workload_keys.extend(["non_zero_outline_workload", "outline_marker_evidence"])
         if border_scenario and border_scenario not in {"hidden", "far", "no-target"}:
             required_workload_keys.extend(["non_zero_border_workload", "border_marker_evidence"])
+        if block_display_scenario and block_display_scenario != "hidden":
+            required_workload_keys.extend(["non_zero_mesh_workload", "mesh_marker_evidence"])
         renderdoc_workload_assertions_complete = isinstance(proof, dict) and all(
             bool(proof.get(key)) for key in required_workload_keys
         )
@@ -4300,6 +4709,11 @@ def normalize_capture_artifact(
     rust_gal_world_material_marker_last_texture_id = max_number(combined_logs, r"material_marker_last_texture_id[=: ]+(\d+)")
     rust_gal_world_material_terrain_particle_quads = max_number(combined_logs, r"material_terrain_particle_quads[=: ]+(\d+)")
     rust_gal_world_material_terrain_particle_texture_mask = max_number(combined_logs, r"material_terrain_particle_texture_mask[=: ]+(\d+)")
+    rust_gal_world_mesh_instances = last_number(combined_logs, r"rust_gal_world_mesh_instances_executed[=: ]+(\d+)")
+    rust_gal_world_mesh_batches = last_number(combined_logs, r"rust_gal_world_mesh_batches_executed[=: ]+(\d+)")
+    rust_gal_world_mesh_draws = last_number(combined_logs, r"rust_gal_world_mesh_draws_executed[=: ]+(\d+)")
+    rust_gal_world_mesh_cache_hits = last_number(combined_logs, r"rust_gal_world_mesh_cache_hits[=: ]+(\d+)")
+    rust_gal_world_mesh_cache_misses = last_number(combined_logs, r"rust_gal_world_mesh_cache_misses[=: ]+(\d+)")
     rust_gal_world_background_clears = last_number(combined_logs, r"rust_gal_world_background_clears_executed[=: ]+(\d+)")
     rust_gal_world_background_fallbacks = last_number(combined_logs, r"rust_gal_world_background_diagnostic_fallbacks[=: ]+(\d+)")
     rust_gal_world_background_sky_type = last_number(combined_logs, r"rust_gal_world_background_sky_type[=: ]+(\d+)")
@@ -4424,6 +4838,10 @@ def normalize_capture_artifact(
             "calls": last_number(combined_logs, r"rust_gal_ffi_world_material_asset_update_calls[=: ]+(\d+)"),
             "bytes": last_number(combined_logs, r"rust_gal_ffi_world_material_asset_update_bytes[=: ]+(\d+)"),
         },
+        "world_mesh_asset_update": {
+            "calls": last_number(combined_logs, r"rust_gal_ffi_world_mesh_asset_update_calls[=: ]+(\d+)"),
+            "bytes": last_number(combined_logs, r"rust_gal_ffi_world_mesh_asset_update_bytes[=: ]+(\d+)"),
+        },
     }
     rust_gal_calls_per_batch = None
     rust_gal_bytes_per_batch = None
@@ -4498,6 +4916,8 @@ def normalize_capture_artifact(
         and world_crack_workload_complete
         and world_border_workload_complete
         and world_material_marker_workload_complete
+        and world_material_terrain_particle_workload_complete
+        and world_mesh_block_display_workload_complete
         and validation_layer_exercised
         and renderdoc_complete
         and renderdoc_workload_assertions_complete
@@ -4618,6 +5038,12 @@ def normalize_capture_artifact(
                     else (rust_gal_world_material_quads if requested_world_material_terrain_particle_real_gameplay else None)
                 ),
                 "world_material_terrain_particle_texture_mask": rust_gal_world_material_terrain_particle_texture_mask,
+                "world_mesh_block_display_scenario": requested_world_mesh_block_display_scenario or None,
+                "world_mesh_block_display_workload": requested_world_mesh_block_display_workload or None,
+                "world_mesh_block_display_control": world_mesh_block_display_control,
+                "world_mesh_block_display_submitted_work": block_display_submitted_count,
+                "world_mesh_block_display_metrics": block_display_doc,
+                "world_mesh_block_display_pixel_evidence": world_mesh_block_display_pixel_evidence,
                 "rust_vulkan_shell_scene_evidence": rust_vulkan_shell_scene_evidence,
                 "cache_hits": last_number(combined_logs, r"rust_gal_cache_hits[=: ]+(\d+)"),
                 "cache_misses": last_number(combined_logs, r"rust_gal_cache_misses[=: ]+(\d+)"),
@@ -4645,6 +5071,9 @@ def normalize_capture_artifact(
                 "world_material_marker_light_level_mask": rust_gal_world_material_marker_light_level_mask,
                 "world_material_marker_last_light_level": rust_gal_world_material_marker_last_light_level,
                 "world_material_marker_last_texture_id": rust_gal_world_material_marker_last_texture_id,
+                "world_mesh_instances_executed": rust_gal_world_mesh_instances,
+                "world_mesh_batches_executed": rust_gal_world_mesh_batches,
+                "world_mesh_draws_executed": rust_gal_world_mesh_draws,
                 "world_background_clears_executed": rust_gal_world_background_clears,
                 "world_background_diagnostic_fallbacks": rust_gal_world_background_fallbacks,
                 "world_background_sky_type": rust_gal_world_background_sky_type,
@@ -4678,6 +5107,13 @@ def normalize_capture_artifact(
                 "world_border_asset_update_failure_events": world_border_asset_update_failure_events,
                 "world_material_cache_hits": rust_gal_world_material_cache_hits,
                 "world_material_cache_misses": rust_gal_world_material_cache_misses,
+                "world_mesh_cache_hits": rust_gal_world_mesh_cache_hits,
+                "world_mesh_cache_misses": rust_gal_world_mesh_cache_misses,
+                "world_mesh_asset_generation": last_number(combined_logs, r"rust_gal_world_mesh_asset_generation[=: ]+(\d+)"),
+                "world_mesh_uploaded_asset_generation": last_number(combined_logs, r"rust_gal_world_mesh_uploaded_asset_generation[=: ]+(\d+)"),
+                "world_mesh_asset_payload_count": last_number(combined_logs, r"rust_gal_world_mesh_asset_payload_count[=: ]+(\d+)"),
+                "world_mesh_asset_payload_bytes": last_number(combined_logs, r"rust_gal_world_mesh_asset_payload_bytes[=: ]+(\d+)"),
+                "world_mesh_asset_update_failures": last_number(combined_logs, r"rust_gal_world_mesh_asset_update_failures[=: ]+(\d+)"),
                 "world_material_asset_generation": last_number(combined_logs, r"rust_gal_world_material_asset_generation[=: ]+(\d+)"),
                 "world_material_uploaded_asset_generation": last_number(combined_logs, r"rust_gal_world_material_uploaded_asset_generation[=: ]+(\d+)"),
                 "world_material_asset_payload_count": last_number(combined_logs, r"rust_gal_world_material_asset_payload_count[=: ]+(\d+)"),
@@ -4766,6 +5202,7 @@ def normalize_capture_artifact(
             "renderdoc_complete": renderdoc_complete,
             "tracy_complete": tracy_complete,
             "messages": validation_messages,
+            "notes": validation_notes,
             "readiness_state": readiness_state,
             "migration_gate_blocking": world_profile_meta["migration_gate_blocking"],
         },
@@ -4997,6 +5434,13 @@ def renderdoc_workload_proof(capture_dir: Path) -> dict[str, object]:
         "border_batches": last_number(log_text, r"rust_gal_world_border_batches_executed[=: ]+(\d+)"),
         "border_draws": last_number(log_text, r"rust_gal_world_border_draws_executed[=: ]+(\d+)"),
     }
+    mesh_counts = {
+        "mesh_instances": last_number(log_text, r"rust_gal_world_mesh_instances_executed[=: ]+(\d+)"),
+        "mesh_batches": last_number(log_text, r"rust_gal_world_mesh_batches_executed[=: ]+(\d+)"),
+        "mesh_draws": last_number(log_text, r"rust_gal_world_mesh_draws_executed[=: ]+(\d+)"),
+        "mesh_cache_hits": last_number(log_text, r"rust_gal_world_mesh_cache_hits[=: ]+(\d+)"),
+        "mesh_cache_misses": last_number(log_text, r"rust_gal_world_mesh_cache_misses[=: ]+(\d+)"),
+    }
     background_counts = {
         "background_clears": last_number(log_text, r"rust_gal_world_background_clears_executed[=: ]+(\d+)"),
         "diagnostic_fallbacks": last_number(log_text, r"rust_gal_world_background_diagnostic_fallbacks[=: ]+(\d+)"),
@@ -5040,7 +5484,7 @@ def renderdoc_workload_proof(capture_dir: Path) -> dict[str, object]:
         }
         for frame, image, width, height, red, green, blue, alpha in re.findall(
             r"gal\.frame\.target\.begin backend=vulkan frame=(\d+) image=(\d+) extent=(\d+)x(\d+) "
-            r"clear=([0-9.\\-]+),([0-9.\\-]+),([0-9.\\-]+),([0-9.\\-]+)",
+            r"[^\n]*?clear=([0-9.\\-]+),([0-9.\\-]+),([0-9.\\-]+),([0-9.\\-]+)",
             log_text,
         )
     )
@@ -5095,6 +5539,7 @@ def renderdoc_workload_proof(capture_dir: Path) -> dict[str, object]:
         "outline": outline_counts,
         "crack": crack_counts,
         "border": border_counts,
+        "mesh": mesh_counts,
         "background": {
             **background_counts,
             "color_argb": background_colors[-1] if background_colors else None,
@@ -5111,6 +5556,10 @@ def renderdoc_workload_proof(capture_dir: Path) -> dict[str, object]:
             int(border_counts[key] or 0) > 0
             for key in ("border_quads", "border_batches", "border_draws")
         ),
+        "non_zero_mesh_workload": all(
+            int(mesh_counts[key] or 0) > 0
+            for key in ("mesh_instances", "mesh_batches", "mesh_draws")
+        ),
         "non_zero_background_workload": int(background_counts["background_clears"] or 0) > 0,
         "depth_attachment_evidence": int(outline_counts["depth_attachment_creates"] or 0) > 0
         or int(outline_counts["depth_attachment_reuses"] or 0) > 0,
@@ -5119,6 +5568,8 @@ def renderdoc_workload_proof(capture_dir: Path) -> dict[str, object]:
         "border_marker_evidence": "minecraft.world-border" in log_text
         or "world-border" in log_text
         or int(border_counts["border_draws"] or 0) > 0,
+        "mesh_marker_evidence": "BlockDisplay mesh request" in log_text
+        or int(mesh_counts["mesh_draws"] or 0) > 0,
         "acquired_images": acquired[-5:],
         "rendered_images": begun[-5:],
         "present_ready_images": present_ready[-5:],
@@ -6097,11 +6548,16 @@ def build_capture_command(
     if getattr(args, "mount_health_rows", None) is not None:
         java_options.append(f"-Dmattmc.dev.graphicsFrameBenchmark.mountHealthRows={args.mount_health_rows}")
         java_options.append(f"-Dmattmc.dev.deterministicCameraCapture.mountHealthRows={args.mount_health_rows}")
-    if (
+    deterministic_capture_requested = (
         tool_kind == "capture"
         and workload_profile in {"correctness", "moving-camera", "settled-static"}
-        and (mode.backend == "rust-vulkan" or kind == "shell")
-    ):
+        and (
+            mode.backend == "rust-vulkan"
+            or kind == "shell"
+            or bool(getattr(args, "world_mesh_block_display_scenario", ""))
+        )
+    )
+    if deterministic_capture_requested:
         deterministic_stamp = timestamp()
         deterministic_metadata = capture_dir / f"deterministic_camera_capture_{deterministic_stamp}.json"
         deterministic_screenshot_dir = capture_dir / f"deterministic_camera_capture_{deterministic_stamp}"
@@ -6186,6 +6642,27 @@ def build_capture_command(
         java_options.append(
             f"-Dmattmc.dev.rustGalWorldMaterial.terrainParticleScenario={args.world_material_terrain_particle_scenario}"
         )
+    if getattr(args, "world_mesh_block_display_scenario", ""):
+        block_display_workload = getattr(args, "world_mesh_block_display_workload", "single")
+        java_options.append(
+            f"-Dmattmc.dev.rustGalWorldMesh.blockDisplayScenario={args.world_mesh_block_display_scenario}"
+        )
+        java_options.append(
+            f"-Dmattmc.dev.rustGalWorldMesh.blockDisplayWorkload={block_display_workload}"
+        )
+        if block_display_workload in {"performance", "scale-one-mesh", "scale-mixed-meshes"}:
+            java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.yawDelta=0.0")
+            env.setdefault("MATTMC_CAPTURE_MAX_FPS", "260")
+            env.setdefault("MATTMC_CAPTURE_DISABLE_DH_FOR_PERF", "true")
+        if getattr(args, "world_mesh_block_display_instance_count", -1) > 0:
+            java_options.append(
+                f"-Dmattmc.dev.rustGalWorldMesh.blockDisplayInstanceCount={args.world_mesh_block_display_instance_count}"
+            )
+        block_display_control = getattr(args, "world_mesh_block_display_control", "rust")
+        if block_display_control == "disabled":
+            java_options.append("-Dmattmc.dev.rustGalWorldBlockDisplay.disabled=true")
+        elif block_display_control == "legacy":
+            java_options.append("-Dmattmc.dev.rustGalWorldBlockDisplay.legacyControl=true")
     if getattr(args, "world_material_terrain_particle_real_gameplay", False):
         java_options.append("-Dmattmc.dev.rustGalWorldMaterial.terrainParticleRealGameplay=true")
         java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.displayFpsCheckEnabled=false")
@@ -7429,6 +7906,40 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             "--world-material-terrain-particle-real-gameplay",
             action="store_true",
             help="Drive real survival block-hit behavior to create normal TerrainParticle instances for gameplay measurement.",
+        )
+        subparser.add_argument(
+            "--world-mesh-block-display-scenario",
+            choices=(
+                "hidden",
+                "stone",
+                "oak-leaves",
+                "cutout",
+                "tinted",
+                "asymmetric",
+                "furnace",
+                "non-full-cube",
+                "stairs",
+            ),
+            default=os.environ.get("MATTMC_WORLD_MESH_BLOCK_DISPLAY_SCENARIO", ""),
+            help="Spawn deterministic vanilla BlockDisplay entities for indexed mesh route validation.",
+        )
+        subparser.add_argument(
+            "--world-mesh-block-display-workload",
+            choices=("single", "performance", "scale-one-mesh", "scale-mixed-meshes"),
+            default=os.environ.get("MATTMC_WORLD_MESH_BLOCK_DISPLAY_WORKLOAD", "single"),
+            help="Select the deterministic BlockDisplay workload shape for gameplay measurement.",
+        )
+        subparser.add_argument(
+            "--world-mesh-block-display-instance-count",
+            type=int,
+            default=int(os.environ.get("MATTMC_WORLD_MESH_BLOCK_DISPLAY_INSTANCE_COUNT", "-1")),
+            help="Override deterministic BlockDisplay instance count for scaling probes.",
+        )
+        subparser.add_argument(
+            "--world-mesh-block-display-control",
+            choices=("rust", "disabled", "legacy"),
+            default=os.environ.get("MATTMC_WORLD_MESH_BLOCK_DISPLAY_CONTROL", "rust"),
+            help="Select the BlockDisplay route for gameplay controls.",
         )
         subparser.add_argument(
             "--world-material-terrain-particle-control",

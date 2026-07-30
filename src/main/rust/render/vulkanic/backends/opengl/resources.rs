@@ -818,6 +818,16 @@ void main() { vec4 color = texture(sampler2D(Tex0, Samp0), vec2(0.5)); }";
         assert!(!normalized.contains("sampler2D(Tex0, Samp0)"));
         assert!(normalized.contains("texture(Tex0, vec2(0.5))"));
     }
+
+    #[test]
+    fn opengl_program_interface_aliases_include_world_mesh_blocks() {
+        assert!(storage_block_names(0)
+            .iter()
+            .any(|name| name == "WorldMeshVertices"));
+        assert!(storage_block_names(1)
+            .iter()
+            .any(|name| name == "WorldMeshInstances"));
+    }
 }
 
 #[allow(dead_code)]
@@ -911,14 +921,19 @@ fn uniform_block_names(binding: u32) -> Vec<String> {
             "DynamicTransforms".to_string(),
             "Projection".to_string(),
         ],
-        1 => vec!["Uniforms1".to_string()],
+        1 => vec!["WorldMeshInstance".to_string(), "Uniforms1".to_string()],
         _ => vec![format!("Uniforms{binding}")],
     }
 }
 
 fn storage_block_names(binding: u32) -> Vec<String> {
     match binding {
-        0 => vec!["WorldMaterialBatch".to_string(), "Storage0".to_string()],
+        0 => vec![
+            "WorldMaterialBatch".to_string(),
+            "WorldMeshVertices".to_string(),
+            "Storage0".to_string(),
+        ],
+        1 => vec!["WorldMeshInstances".to_string(), "Storage1".to_string()],
         _ => vec![format!("Storage{binding}")],
     }
 }

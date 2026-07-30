@@ -340,6 +340,10 @@ fn whole_frame_request(
             ptr: std::ptr::null(),
             count: 0,
         },
+        world_mesh_instances: FfiSlice {
+            ptr: std::ptr::null(),
+            count: 0,
+        },
         gui_sprites: FfiSlice {
             ptr: sprites.as_ptr(),
             count: sprites.len() as u64,
@@ -403,6 +407,17 @@ fn whole_frame_request_with_compact_materials(
     request.world_material_compact_quads = FfiSlice {
         ptr: materials.as_ptr(),
         count: materials.len() as u64,
+    };
+    request
+}
+
+fn whole_frame_request_with_mesh_instances(
+    instances: &[FfiWorldMeshInstanceRecord],
+) -> FfiWholeFrameSubmitRequest {
+    let mut request = whole_frame_request(&[], &[]);
+    request.world_mesh_instances = FfiSlice {
+        ptr: instances.as_ptr(),
+        count: instances.len() as u64,
     };
     request
 }
@@ -498,6 +513,108 @@ fn world_material_asset_update_request(
             | FfiFeatureBits::TEXTURE_SUBRESOURCE_COPIES
             | FfiFeatureBits::HOST_BUFFER_ACCESS
             | FfiFeatureBits::PRESENTATION,
+    }
+}
+
+fn world_mesh_asset_update_request(
+    meshes: &[FfiWorldMeshAssetRecord],
+    textures: &[FfiWorldMeshTextureAssetPayload],
+) -> FfiWorldMeshAssetUpdateRequest {
+    FfiWorldMeshAssetUpdateRequest {
+        header: FfiHeader {
+            version: FFI_ABI_VERSION,
+            byte_size: size_of::<FfiWorldMeshAssetUpdateRequest>() as u32,
+        },
+        generation: 9,
+        meshes: FfiSlice {
+            ptr: meshes.as_ptr(),
+            count: meshes.len() as u64,
+        },
+        textures: FfiSlice {
+            ptr: textures.as_ptr(),
+            count: textures.len() as u64,
+        },
+        negotiated_feature_bits: FfiFeatureBits::GRAPHICS
+            | FfiFeatureBits::DESCRIPTOR_ARRAYS
+            | FfiFeatureBits::OPTIONAL_BINDINGS
+            | FfiFeatureBits::UNIFORM_BUFFERS
+            | FfiFeatureBits::STORAGE_BUFFERS
+            | FfiFeatureBits::TEXTURE_SUBRESOURCE_COPIES
+            | FfiFeatureBits::HOST_BUFFER_ACCESS
+            | FfiFeatureBits::PRESENTATION,
+    }
+}
+
+fn mesh_vertex() -> FfiWorldMeshVertex {
+    FfiWorldMeshVertex {
+        byte_size: size_of::<FfiWorldMeshVertex>() as u32,
+        color_argb: 0xffff_ffff,
+        normal_packed: 0,
+        light: 0xf000_f000,
+        x: 0.0,
+        y: 0.0,
+        z: -1.0,
+        u: 0.0,
+        v: 0.0,
+    }
+}
+
+fn mesh_section(texture_id: u32) -> FfiWorldMeshSectionRecord {
+    FfiWorldMeshSectionRecord {
+        byte_size: size_of::<FfiWorldMeshSectionRecord>() as u32,
+        material_id: WORLD_MATERIAL_ID_OPAQUE_TEXTURED,
+        texture_id,
+        material_mode: WORLD_MATERIAL_MODE_OPAQUE,
+        cull_policy: WORLD_CULL_BACK,
+        winding: WORLD_WINDING_CCW,
+        index_offset: 0,
+        index_count: 3,
+    }
+}
+
+fn mesh_asset<'a>(
+    vertices: &'a [FfiWorldMeshVertex],
+    index_bytes: &'a [u8],
+    sections: &'a [FfiWorldMeshSectionRecord],
+) -> FfiWorldMeshAssetRecord {
+    FfiWorldMeshAssetRecord {
+        byte_size: size_of::<FfiWorldMeshAssetRecord>() as u32,
+        vertex_layout_version: 1,
+        index_type: IndexType::U16 as u32,
+        reserved0: 0,
+        mesh_key: 44,
+        mesh_generation: 9,
+        vertices: FfiSlice {
+            ptr: vertices.as_ptr(),
+            count: vertices.len() as u64,
+        },
+        index_bytes: FfiBytes {
+            ptr: index_bytes.as_ptr(),
+            len: index_bytes.len() as u64,
+        },
+        sections: FfiSlice {
+            ptr: sections.as_ptr(),
+            count: sections.len() as u64,
+        },
+    }
+}
+
+fn mesh_instance() -> FfiWorldMeshInstanceRecord {
+    FfiWorldMeshInstanceRecord {
+        byte_size: size_of::<FfiWorldMeshInstanceRecord>() as u32,
+        stratum: WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY,
+        mesh_section_index: 0,
+        depth_policy: WORLD_DEPTH_POLICY_TEST_WRITE,
+        cull_policy: WORLD_CULL_BACK,
+        winding: WORLD_WINDING_CCW,
+        color_argb: 0xffff_ffff,
+        viewport_width: 854,
+        viewport_height: 480,
+        mesh_key: 44,
+        mesh_generation: 9,
+        transform: [
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ],
     }
 }
 
@@ -941,6 +1058,114 @@ fn world_material_asset_ffi_rejects_duplicates_and_bad_item_size() {
     let malformed = unsafe {
         decode_world_material_asset_update(
             &world_material_asset_update_request(&assets),
+            test_capabilities(),
+        )
+    }
+    .unwrap_err();
+    assert_eq!(StatusCode::InvalidArgument, malformed.code);
+}
+
+#[test]
+fn whole_frame_world_mesh_ffi_copies_and_rejects_malformed_payloads() {
+    let mut instances = vec![mesh_instance()];
+    let request = whole_frame_request_with_mesh_instances(&instances);
+    let (_generation, _target, frame, _gui) =
+        unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap() };
+    instances[0].mesh_key = 99;
+    instances[0].transform[12] = 42.0;
+
+    assert_eq!(1, frame.mesh_instances.len());
+    assert_eq!(44, frame.mesh_instances[0].mesh_key);
+    assert_eq!(9, frame.mesh_instances[0].mesh_generation);
+    assert_eq!(0.0, frame.mesh_instances[0].transform[12]);
+
+    instances[0].stratum = 77;
+    let error = unsafe {
+        decode_whole_frame_submit(
+            &whole_frame_request_with_mesh_instances(&instances),
+            test_vulkan_capabilities(),
+        )
+    }
+    .unwrap_err();
+    assert_eq!(StatusCode::UnknownEnum, error.code);
+
+    instances[0] = mesh_instance();
+    instances[0].byte_size -= 4;
+    let error = unsafe {
+        decode_whole_frame_submit(
+            &whole_frame_request_with_mesh_instances(&instances),
+            test_vulkan_capabilities(),
+        )
+    }
+    .unwrap_err();
+    assert_eq!(StatusCode::InvalidArgument, error.code);
+}
+
+#[test]
+fn world_mesh_asset_ffi_copies_payload_memory() {
+    let mut vertices = vec![mesh_vertex()];
+    let mut index_bytes = vec![0u8, 0, 1, 0, 2, 0];
+    let sections = vec![mesh_section(123)];
+    let meshes = vec![mesh_asset(&vertices, &index_bytes, &sections)];
+    let mut png = vec![41u8, 42, 43, 44];
+    let textures = vec![FfiWorldMeshTextureAssetPayload {
+        byte_size: size_of::<FfiWorldMeshTextureAssetPayload>() as u32,
+        texture_id: 123,
+        png_bytes: FfiBytes {
+            ptr: png.as_ptr(),
+            len: png.len() as u64,
+        },
+    }];
+    let request = world_mesh_asset_update_request(&meshes, &textures);
+    let (generation, owned_meshes, owned_textures) =
+        unsafe { decode_world_mesh_asset_update(&request, test_capabilities()).unwrap() };
+
+    vertices[0].x = 99.0;
+    index_bytes.fill(9);
+    png.fill(0);
+
+    assert_eq!(9, generation);
+    assert_eq!(44, owned_meshes[0].mesh_key);
+    assert_eq!(0.0, owned_meshes[0].vertices[0].position[0]);
+    assert_eq!(vec![0u8, 0, 1, 0, 2, 0], owned_meshes[0].index_bytes);
+    assert_eq!(123, owned_meshes[0].sections[0].texture_id);
+    assert_eq!(vec![41u8, 42, 43, 44], owned_textures[0].png_bytes);
+}
+
+#[test]
+fn world_mesh_asset_ffi_rejects_duplicate_bad_index_and_bad_item_size() {
+    let vertices = vec![mesh_vertex()];
+    let index_bytes = vec![0u8, 0, 1, 0, 2, 0];
+    let sections = vec![mesh_section(123)];
+    let mut meshes = vec![
+        mesh_asset(&vertices, &index_bytes, &sections),
+        mesh_asset(&vertices, &index_bytes, &sections),
+    ];
+    let duplicate = unsafe {
+        decode_world_mesh_asset_update(
+            &world_mesh_asset_update_request(&meshes, &[]),
+            test_capabilities(),
+        )
+    }
+    .unwrap_err();
+    assert_eq!(StatusCode::InvalidArgument, duplicate.code);
+
+    meshes.pop();
+    meshes[0].index_type = 99;
+    let bad_index = unsafe {
+        decode_world_mesh_asset_update(
+            &world_mesh_asset_update_request(&meshes, &[]),
+            test_capabilities(),
+        )
+    }
+    .unwrap_err();
+    assert_eq!(StatusCode::UnknownEnum, bad_index.code);
+
+    meshes[0].index_type = IndexType::U16 as u32;
+    meshes[0].byte_size -= 4;
+    let malformed = unsafe {
+        decode_world_mesh_asset_update(
+            &world_mesh_asset_update_request(&meshes, &[]),
             test_capabilities(),
         )
     }

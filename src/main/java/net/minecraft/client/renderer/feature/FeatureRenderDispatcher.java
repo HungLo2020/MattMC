@@ -69,6 +69,14 @@ public class FeatureRenderDispatcher implements AutoCloseable {
 		this.submitNodeStorage.clear();
 	}
 
+	public void renderBlockFeaturesOnly() {
+		for (SubmitNodeCollection submitNodeCollection : this.submitNodeStorage.getSubmitsPerOrder().values()) {
+			this.blockFeatureRenderer.render(submitNodeCollection, this.bufferSource, this.blockRenderDispatcher, this.outlineBufferSource);
+		}
+
+		this.submitNodeStorage.clear();
+	}
+
 	public void endFrame() {
 		this.particleFeatureRenderer.endFrame();
 	}
