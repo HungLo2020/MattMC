@@ -135,6 +135,134 @@ fn backend_modules_do_not_reference_each_other() {
     );
 }
 
+#[test]
+fn vulkanic_ffi_is_split_into_focused_modules() {
+    let rust_root = Path::new(RUST_ROOT);
+    let ffi_file = rust_root.join("render/vulkanic/ffi.rs");
+    let ffi_dir = rust_root.join("render/vulkanic/ffi");
+    let required = [
+        "mod.rs",
+        "abi.rs",
+        "memory.rs",
+        "status.rs",
+        "layout.rs",
+        "context.rs",
+        "resources.rs",
+        "submission.rs",
+        "frame.rs",
+        "gui.rs",
+        "world.rs",
+        "material.rs",
+        "tests/mod.rs",
+    ];
+
+    assert!(
+        !ffi_file.exists(),
+        "{} must not return as a monolithic FFI file",
+        relative(&ffi_file)
+    );
+    for file in required {
+        let path = ffi_dir.join(file);
+        assert!(
+            path.is_file(),
+            "missing focused FFI module {}",
+            relative(&path)
+        );
+    }
+}
+
+#[test]
+fn semantic_ffi_modules_do_not_construct_rendering_policy() {
+    let rust_root = Path::new(RUST_ROOT);
+    let checked = [
+        rust_root.join("render/vulkanic/ffi/gui.rs"),
+        rust_root.join("render/vulkanic/ffi/world.rs"),
+        rust_root.join("render/vulkanic/ffi/material.rs"),
+    ];
+    let forbidden_tokens = [
+        "CommandOp::",
+        "create_graphics_pipeline",
+        "create_pipeline_layout",
+        "create_resource_set",
+        "create_shader_module",
+        "TextureDesc",
+        "SamplerDesc",
+        "ResourceSetDesc",
+        "GraphicsPipelineDesc",
+        "atlas_for",
+        "build_atlas",
+        "material_batches(",
+        "crack_batches(",
+        "border_batches(",
+        "ensure_material_resources",
+        "ensure_crack_resources",
+        "ensure_border_resources",
+    ];
+    let mut violations = Vec::new();
+
+    for file in checked {
+        let source = read_source(&file);
+        for (line_index, line) in source.lines().enumerate() {
+            for token in forbidden_tokens {
+                if line.contains(token) {
+                    violations.push(format!(
+                        "{}:{}: {}",
+                        relative(&file),
+                        line_index + 1,
+                        line.trim()
+                    ));
+                }
+            }
+        }
+    }
+
+    assert!(
+        violations.is_empty(),
+        "Semantic FFI modules must only decode/copy transport records and call frontends:\n{}",
+        violations.join("\n")
+    );
+}
+
+#[test]
+fn ffi_abi_does_not_accumulate_producer_specific_schema_names() {
+    let rust_root = Path::new(RUST_ROOT);
+    let ffi_dir = rust_root.join("render/vulkanic/ffi");
+    let forbidden = [
+        "BlockMarker",
+        "TerrainParticle",
+        "Armor",
+        "Hunger",
+        "Absorption",
+        "BossBar",
+        "Crosshair",
+        "Hotbar",
+        "ExperienceBar",
+    ];
+    let mut violations = Vec::new();
+
+    for file in rust_files(&ffi_dir) {
+        let source = read_source(&file);
+        for (line_index, line) in source.lines().enumerate() {
+            for token in forbidden {
+                if line.contains(token) {
+                    violations.push(format!(
+                        "{}:{}: {}",
+                        relative(&file),
+                        line_index + 1,
+                        line.trim()
+                    ));
+                }
+            }
+        }
+    }
+
+    assert!(
+        violations.is_empty(),
+        "FFI schemas must extend shared GUI/world/material record families, not named producers:\n{}",
+        violations.join("\n")
+    );
+}
+
 fn assert_no_public_backend_exposure(path: &Path, source: &str) {
     let mut violations = Vec::new();
 

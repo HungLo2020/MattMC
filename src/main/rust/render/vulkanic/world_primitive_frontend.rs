@@ -2,7 +2,8 @@ use std::collections::BTreeMap;
 
 mod background;
 mod crack;
-mod material;
+pub(crate) mod material;
+mod material_registry;
 mod outline;
 mod shared;
 mod world_border;
@@ -15,12 +16,12 @@ use super::error::{GalError, GalResult, StatusCode};
 use super::gal::VulkanicGal;
 use super::handles::Handle;
 use super::resources::{
-    AccessFlags, BlendMode, BufferDesc, BufferUsage, ColorFormat, CompareOp, Extent3d,
-    GraphicsPipelineDesc, MemoryDomain, PipelineLayoutDesc, PipelineStageFlags, PrimitiveTopology,
-    QueueClass, RenderPassDesc, ResourceBinding, ResourceBindingDesc, ResourceBindingKind,
-    ResourceLayoutDesc, ResourceSetDesc, SamplerAddressMode, SamplerDesc, SamplerFilter,
-    ShaderCodeFormat, ShaderModuleDesc, ShaderStage, TextureDesc, TextureDimension, TextureFormat,
-    TextureUsage, TextureViewDesc,
+    AccessFlags, BackendApi, BlendMode, BufferDesc, BufferUsage, ColorFormat, CompareOp, Extent3d,
+    GraphicsPipelineDesc, IndexType, MemoryDomain, PipelineLayoutDesc, PipelineStageFlags,
+    PrimitiveTopology, QueueClass, RenderPassDesc, ResourceBinding, ResourceBindingDesc,
+    ResourceBindingKind, ResourceLayoutDesc, ResourceSetDesc, SamplerAddressMode, SamplerDesc,
+    SamplerFilter, ShaderCodeFormat, ShaderModuleDesc, ShaderStage, TextureDesc, TextureDimension,
+    TextureFormat, TextureUsage, TextureViewDesc,
 };
 use super::{BufferImageCopyRegion, CommandList, CommandListDesc, CullMode};
 
@@ -44,19 +45,32 @@ pub const WORLD_STRATUM_BLOCK_OUTLINE: u32 = 100;
 pub const WORLD_STRATUM_BLOCK_BREAKING_CRACK: u32 = 90;
 pub const WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY: u32 = 70;
 pub const WORLD_BORDER_TEXTURE_FORCEFIELD: u32 = 1;
-pub const WORLD_MATERIAL_TEXTURE_STONE: u32 = 1;
-pub const WORLD_MATERIAL_TEXTURE_DIRT: u32 = 2;
-pub const WORLD_MATERIAL_TEXTURE_OAK_LEAVES: u32 = 3;
-pub const WORLD_MATERIAL_TEXTURE_DEEPSLATE: u32 = 4;
-pub const WORLD_MATERIAL_TEXTURE_WHITE_WOOL: u32 = 5;
-pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER: u32 = 100;
-pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00: u32 = 200;
-pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15: u32 =
-    WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00 + 15;
+pub const WORLD_MATERIAL_TEXTURE_STONE: u32 = 0x21df_896f;
+pub const WORLD_MATERIAL_TEXTURE_DIRT: u32 = 0x0b0b_bd25;
+pub const WORLD_MATERIAL_TEXTURE_OAK_LEAVES: u32 = 0x7232_1ec7;
+pub const WORLD_MATERIAL_TEXTURE_DEEPSLATE: u32 = 0x715d_8d65;
+pub const WORLD_MATERIAL_TEXTURE_WHITE_WOOL: u32 = 0x2253_a2ef;
+pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER: u32 = 0x447d_596a;
+pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00: u32 = 0x665d_a7aa;
+pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_01: u32 = 0x50e8_8e0f;
+pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_02: u32 = 0x079e_2b74;
+pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_03: u32 = 0x4a7c_2b71;
+pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_04: u32 = 0x35e9_0ae6;
+pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_05: u32 = 0x2f21_fecb;
+pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_06: u32 = 0x2a27_abf0;
+pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_07: u32 = 0x0ea4_c92d;
+pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_08: u32 = 0x4473_cce2;
+pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_09: u32 = 0x0ab5_51c7;
+pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_10: u32 = 0x7a25_0241;
+pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_11: u32 = 0x1f43_9384;
+pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_12: u32 = 0x4bab_8f5f;
+pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_13: u32 = 0x4316_88fa;
+pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_14: u32 = 0x0b2b_dbbd;
+pub const WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15: u32 = 0x0194_76c0;
 pub const WORLD_MATERIAL_TEXTURE_DEFAULT: u32 = WORLD_MATERIAL_TEXTURE_STONE;
-pub const WORLD_MATERIAL_ID_OPAQUE_TEXTURED: u32 = 1;
-pub const WORLD_MATERIAL_ID_CUTOUT_TEXTURED: u32 = 2;
-pub const WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT: u32 = 100;
+pub const WORLD_MATERIAL_ID_OPAQUE_TEXTURED: u32 = 0x6a2f_d335;
+pub const WORLD_MATERIAL_ID_CUTOUT_TEXTURED: u32 = 0x129b_1b90;
+pub const WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT: u32 = 0x224a_8659;
 pub const WORLD_MATERIAL_ID_DEFAULT_OPAQUE: u32 = WORLD_MATERIAL_ID_OPAQUE_TEXTURED;
 pub const WORLD_MATERIAL_ID_DEFAULT_CUTOUT: u32 = WORLD_MATERIAL_ID_CUTOUT_TEXTURED;
 pub const WORLD_BORDER_BLEND_OVERLAY: u32 = 1;
@@ -861,18 +875,19 @@ impl WorldPrimitiveFrontend {
         let mut overrides = BTreeMap::new();
         let mut payload_bytes = 0u64;
         for payload in payloads {
-            if !material::is_known_texture_id(payload.texture_id) {
-                return Err(GalError::ffi(
-                    StatusCode::UnknownEnum,
-                    format!("unknown world material texture id {}", payload.texture_id),
-                ));
-            }
-            if overrides.contains_key(&payload.texture_id) {
+            let texture_id =
+                material::canonical_texture_id(payload.texture_id).ok_or_else(|| {
+                    GalError::ffi(
+                        StatusCode::UnknownEnum,
+                        format!("unknown world material texture id {}", payload.texture_id),
+                    )
+                })?;
+            if overrides.contains_key(&texture_id) {
                 return Err(GalError::ffi(
                     StatusCode::InvalidArgument,
                     format!(
                         "duplicate world material asset payload for texture {}",
-                        payload.texture_id
+                        texture_id
                     ),
                 ));
             }
@@ -882,10 +897,10 @@ impl WorldPrimitiveFrontend {
             payload_bytes = payload_bytes.saturating_add(payload.png_bytes.len() as u64);
             let (rgba, width, height) = decode_png_rgba(
                 &payload.png_bytes,
-                &format!("world material texture {} override", payload.texture_id),
+                &format!("world material texture {} override", texture_id),
             )?;
             overrides.insert(
-                payload.texture_id,
+                texture_id,
                 WorldMaterialTextureAsset {
                     rgba,
                     width,
@@ -980,11 +995,7 @@ impl WorldPrimitiveFrontend {
         frame: WorldPrimitiveFrame,
         clear_background: bool,
     ) -> GalResult<(Vec<CommandOp>, WorldPrimitiveSubmitStats)> {
-        let vulkan_backend = gal
-            .capabilities()
-            .name
-            .to_ascii_lowercase()
-            .contains("vulkan");
+        let vulkan_backend = gal.capabilities().api == BackendApi::Vulkan;
         if !vulkan_backend
             && (clear_background || frame.background.enabled || !frame.border_quads.is_empty())
         {
@@ -1192,6 +1203,7 @@ impl WorldPrimitiveFrontend {
                 ops.push(CommandOp::SetIndexBuffer {
                     buffer: index_buffer,
                     offset: 0,
+                    index_type: IndexType::U32,
                 });
                 ops.push(CommandOp::DrawIndexed {
                     indices: 6,
@@ -2049,7 +2061,8 @@ impl WorldPrimitiveFrontend {
             return Ok(());
         }
         let label = format!(
-            "world-material-{}-texture{}-mode{}-depth{}-cull{}-gen{}",
+            "world-material-reg{}-{}-texture{}-mode{}-depth{}-cull{}-gen{}",
+            material_registry::WORLD_MATERIAL_REGISTRY_VERSION,
             key.material_id,
             key.texture_id,
             key.material_mode,
@@ -2275,6 +2288,12 @@ impl WorldPrimitiveFrontend {
     }
 
     fn world_material_texture_bytes(&self, texture_id: u32) -> GalResult<(Vec<u8>, u32, u32)> {
+        let texture_id = material::canonical_texture_id(texture_id).ok_or_else(|| {
+            GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown world material texture id {texture_id}"),
+            )
+        })?;
         if !material::is_known_texture_id(texture_id) {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,
@@ -2901,11 +2920,7 @@ fn packed_material_uniforms_for_batch(
     push_f32(&mut out, frame.viewport_height as f32);
     push_f32(
         &mut out,
-        if batch.key.material_mode == WORLD_MATERIAL_MODE_CUTOUT {
-            0.5
-        } else {
-            0.0
-        },
+        material_registry::cutout_threshold(batch.key.material_id),
     );
     push_f32(&mut out, 0.0);
     for index in &batch.indices {
@@ -2964,8 +2979,6 @@ fn buffer_barrier(
         subresources: None,
         before,
         after,
-        stages: PipelineStageFlags(PipelineStageFlags::DRAW.0 | PipelineStageFlags::TRANSFER.0),
-        access: AccessFlags(AccessFlags::READ.0 | AccessFlags::TRANSFER.0),
         src_queue: QueueClass::Graphics,
         dst_queue: QueueClass::Graphics,
     }
@@ -2981,8 +2994,6 @@ fn texture_barrier(
         subresources: None,
         before,
         after,
-        stages: PipelineStageFlags::DRAW,
-        access: AccessFlags::DEPTH_STENCIL,
         src_queue: QueueClass::Graphics,
         dst_queue: QueueClass::Graphics,
     }
@@ -2998,8 +3009,6 @@ fn sampled_texture_barrier(
         subresources: None,
         before,
         after,
-        stages: PipelineStageFlags(PipelineStageFlags::DRAW.0 | PipelineStageFlags::TRANSFER.0),
-        access: AccessFlags(AccessFlags::READ.0 | AccessFlags::TRANSFER.0),
         src_queue: QueueClass::Graphics,
         dst_queue: QueueClass::Graphics,
     }
@@ -3084,120 +3093,13 @@ fn forcefield_texture_bytes() -> GalResult<(Vec<u8>, u32, u32)> {
 }
 
 fn bundled_world_material_texture_bytes(texture_id: u32) -> GalResult<(Vec<u8>, u32, u32)> {
-    let (bytes, label) = match texture_id {
-        WORLD_MATERIAL_TEXTURE_STONE => (
-            include_bytes!("../../../resources/assets/minecraft/textures/block/stone.png")
-                .as_slice(),
-            "world material stone texture",
-        ),
-        WORLD_MATERIAL_TEXTURE_DIRT => (
-            include_bytes!("../../../resources/assets/minecraft/textures/block/dirt.png")
-                .as_slice(),
-            "world material dirt texture",
-        ),
-        WORLD_MATERIAL_TEXTURE_OAK_LEAVES => (
-            include_bytes!("../../../resources/assets/minecraft/textures/block/oak_leaves.png")
-                .as_slice(),
-            "world material oak leaves texture",
-        ),
-        WORLD_MATERIAL_TEXTURE_DEEPSLATE => (
-            include_bytes!("../../../resources/assets/minecraft/textures/block/deepslate.png")
-                .as_slice(),
-            "world material deepslate texture",
-        ),
-        WORLD_MATERIAL_TEXTURE_WHITE_WOOL => (
-            include_bytes!("../../../resources/assets/minecraft/textures/block/white_wool.png")
-                .as_slice(),
-            "world material white wool texture",
-        ),
-        WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER => (
-            include_bytes!("../../../resources/assets/minecraft/textures/item/barrier.png")
-                .as_slice(),
-            "world material block marker barrier texture",
-        ),
-        WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00 => (
-            include_bytes!("../../../resources/assets/minecraft/textures/item/light_00.png")
-                .as_slice(),
-            "world material block marker light_00 texture",
-        ),
-        201 => (
-            include_bytes!("../../../resources/assets/minecraft/textures/item/light_01.png")
-                .as_slice(),
-            "world material block marker light_01 texture",
-        ),
-        202 => (
-            include_bytes!("../../../resources/assets/minecraft/textures/item/light_02.png")
-                .as_slice(),
-            "world material block marker light_02 texture",
-        ),
-        203 => (
-            include_bytes!("../../../resources/assets/minecraft/textures/item/light_03.png")
-                .as_slice(),
-            "world material block marker light_03 texture",
-        ),
-        204 => (
-            include_bytes!("../../../resources/assets/minecraft/textures/item/light_04.png")
-                .as_slice(),
-            "world material block marker light_04 texture",
-        ),
-        205 => (
-            include_bytes!("../../../resources/assets/minecraft/textures/item/light_05.png")
-                .as_slice(),
-            "world material block marker light_05 texture",
-        ),
-        206 => (
-            include_bytes!("../../../resources/assets/minecraft/textures/item/light_06.png")
-                .as_slice(),
-            "world material block marker light_06 texture",
-        ),
-        207 => (
-            include_bytes!("../../../resources/assets/minecraft/textures/item/light_07.png")
-                .as_slice(),
-            "world material block marker light_07 texture",
-        ),
-        208 => (
-            include_bytes!("../../../resources/assets/minecraft/textures/item/light_08.png")
-                .as_slice(),
-            "world material block marker light_08 texture",
-        ),
-        209 => (
-            include_bytes!("../../../resources/assets/minecraft/textures/item/light_09.png")
-                .as_slice(),
-            "world material block marker light_09 texture",
-        ),
-        210 => (
-            include_bytes!("../../../resources/assets/minecraft/textures/item/light_10.png")
-                .as_slice(),
-            "world material block marker light_10 texture",
-        ),
-        211 => (
-            include_bytes!("../../../resources/assets/minecraft/textures/item/light_11.png")
-                .as_slice(),
-            "world material block marker light_11 texture",
-        ),
-        212 => (
-            include_bytes!("../../../resources/assets/minecraft/textures/item/light_12.png")
-                .as_slice(),
-            "world material block marker light_12 texture",
-        ),
-        213 => (
-            include_bytes!("../../../resources/assets/minecraft/textures/item/light_13.png")
-                .as_slice(),
-            "world material block marker light_13 texture",
-        ),
-        214 => (
-            include_bytes!("../../../resources/assets/minecraft/textures/item/light_14.png")
-                .as_slice(),
-            "world material block marker light_14 texture",
-        ),
-        WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15 => (
-            include_bytes!("../../../resources/assets/minecraft/textures/item/light_15.png")
-                .as_slice(),
-            "world material block marker light_15 texture",
-        ),
-        _ => unreachable!("world material texture id was validated before loading bundled bytes"),
+    let Some(texture) = material_registry::texture(texture_id) else {
+        return Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown world material texture id {texture_id}"),
+        ));
     };
-    decode_png_rgba(bytes, label)
+    decode_png_rgba(texture.default_png, texture.resource_location)
 }
 
 fn decode_crack_stage(bytes: &[u8]) -> GalResult<Vec<u8>> {
@@ -3496,6 +3398,39 @@ mod tests {
 
         assert_eq!(0.0, read_f32(&opaque_uniforms, 34));
         assert_eq!(0.5, read_f32(&cutout_uniforms, 34));
+    }
+
+    #[test]
+    fn semantic_material_registry_canonicalizes_legacy_keys_and_carries_metadata() {
+        assert_eq!(
+            Some(WORLD_MATERIAL_TEXTURE_STONE),
+            material::canonical_texture_id(1)
+        );
+        assert_eq!(
+            Some(WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15),
+            material::canonical_texture_id(215)
+        );
+        assert_eq!(
+            Some(WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT),
+            material::canonical_material_id(100)
+        );
+        assert!(material::material_matches_mode(
+            WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT,
+            WORLD_MATERIAL_MODE_CUTOUT
+        ));
+        assert!(!material::material_matches_mode(
+            WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT,
+            WORLD_MATERIAL_MODE_OPAQUE
+        ));
+        let texture = material_registry::texture(WORLD_MATERIAL_TEXTURE_OAK_LEAVES).unwrap();
+        assert_eq!(
+            "minecraft:textures/block/oak_leaves.png",
+            texture.resource_location
+        );
+        assert_eq!(
+            0.5,
+            material_registry::cutout_threshold(WORLD_MATERIAL_ID_CUTOUT_TEXTURED)
+        );
     }
 
     #[test]

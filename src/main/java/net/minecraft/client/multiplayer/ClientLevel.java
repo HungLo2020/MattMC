@@ -39,6 +39,7 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.resources.sounds.DirectionalSoundInstance;
 import net.minecraft.client.resources.sounds.EntityBoundSoundInstance;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Cursor3D;
 import net.minecraft.core.Direction;
@@ -554,7 +555,7 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 		double z = eye.z + look.z * 3.0;
 		if (scenario.equals("barrier")) {
 			this.addParticle(new BlockParticleOption(ParticleTypes.BLOCK_MARKER, Blocks.BARRIER.defaultBlockState()), x, y, z, 0.0, 0.0, 0.0);
-			this.auditDeterministicBlockMarkerSpawn(scenario, 100, x, y, z);
+				this.auditDeterministicBlockMarkerSpawn(scenario, RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER, x, y, z);
 			this.deterministicBlockMarkerSpawnedScenario = scenario;
 			return;
 		}
@@ -564,7 +565,7 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 				double offsetX = (level % 4 - 1.5) * 0.65;
 				double offsetY = (level / 4 - 1.5) * 0.65;
 				this.addParticle(new BlockParticleOption(ParticleTypes.BLOCK_MARKER, lightState), x + offsetX, y + offsetY, z, 0.0, 0.0, 0.0);
-				this.auditDeterministicBlockMarkerSpawn("light-" + level, 200 + level, x + offsetX, y + offsetY, z);
+					this.auditDeterministicBlockMarkerSpawn("light-" + level, RustGalWorldPrimitiveRenderer.lightMarkerTextureId(level), x + offsetX, y + offsetY, z);
 			}
 			this.deterministicBlockMarkerSpawnedScenario = scenario;
 			return;
@@ -574,7 +575,7 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 				int level = Mth.clamp(Integer.parseInt(scenario.substring("light-".length())), 0, 15);
 				BlockState lightState = Blocks.LIGHT.defaultBlockState().setValue(LightBlock.LEVEL, level);
 				this.addParticle(new BlockParticleOption(ParticleTypes.BLOCK_MARKER, lightState), x, y, z, 0.0, 0.0, 0.0);
-				this.auditDeterministicBlockMarkerSpawn(scenario, 200 + level, x, y, z);
+					this.auditDeterministicBlockMarkerSpawn(scenario, RustGalWorldPrimitiveRenderer.lightMarkerTextureId(level), x, y, z);
 				this.deterministicBlockMarkerSpawnedScenario = scenario;
 			} catch (NumberFormatException ignored) {
 			}

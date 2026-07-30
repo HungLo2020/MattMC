@@ -62,16 +62,31 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static final int DEPTH_POLICY_TEST_WRITE = 1;
 	public static final int DEPTH_POLICY_TEST_NO_WRITE = 2;
 	public static final int BORDER_TEXTURE_FORCEFIELD = 1;
-	public static final int MATERIAL_TEXTURE_STONE = 1;
-	public static final int MATERIAL_TEXTURE_DIRT = 2;
-	public static final int MATERIAL_TEXTURE_OAK_LEAVES = 3;
-	public static final int MATERIAL_TEXTURE_DEEPSLATE = 4;
-	public static final int MATERIAL_TEXTURE_WHITE_WOOL = 5;
-	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER = 100;
-	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00 = 200;
-	public static final int MATERIAL_ID_OPAQUE_TEXTURED = 1;
-	public static final int MATERIAL_ID_CUTOUT_TEXTURED = 2;
-	public static final int MATERIAL_ID_BLOCK_MARKER_CUTOUT = 100;
+	public static final int MATERIAL_TEXTURE_STONE = 0x21DF896F;
+	public static final int MATERIAL_TEXTURE_DIRT = 0x0B0BBD25;
+	public static final int MATERIAL_TEXTURE_OAK_LEAVES = 0x72321EC7;
+	public static final int MATERIAL_TEXTURE_DEEPSLATE = 0x715D8D65;
+	public static final int MATERIAL_TEXTURE_WHITE_WOOL = 0x2253A2EF;
+	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER = 0x447D596A;
+	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00 = 0x665DA7AA;
+	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_01 = 0x50E88E0F;
+	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_02 = 0x079E2B74;
+	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_03 = 0x4A7C2B71;
+	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_04 = 0x35E90AE6;
+	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_05 = 0x2F21FECB;
+	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_06 = 0x2A27ABF0;
+	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_07 = 0x0EA4C92D;
+	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_08 = 0x4473CCE2;
+	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_09 = 0x0AB551C7;
+	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_10 = 0x7A250241;
+	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_11 = 0x1F439384;
+	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_12 = 0x4BAB8F5F;
+	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_13 = 0x431688FA;
+	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_14 = 0x0B2BDBBD;
+	public static final int MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15 = 0x019476C0;
+	public static final int MATERIAL_ID_OPAQUE_TEXTURED = 0x6A2FD335;
+	public static final int MATERIAL_ID_CUTOUT_TEXTURED = 0x129B1B90;
+	public static final int MATERIAL_ID_BLOCK_MARKER_CUTOUT = 0x224A8659;
 	public static final int MATERIAL_MODE_OPAQUE = 1;
 	public static final int MATERIAL_MODE_CUTOUT = 2;
 	public static final int WORLD_TOPOLOGY_TRIANGLES = 1;
@@ -140,6 +155,24 @@ public final class RustGalWorldPrimitiveRenderer {
 		ResourceLocation.withDefaultNamespace("textures/item/light_13.png"),
 		ResourceLocation.withDefaultNamespace("textures/item/light_14.png"),
 		ResourceLocation.withDefaultNamespace("textures/item/light_15.png")
+	};
+	private static final int[] LIGHT_MARKER_TEXTURE_IDS = new int[] {
+		MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00,
+		MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_01,
+		MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_02,
+		MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_03,
+		MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_04,
+		MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_05,
+		MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_06,
+		MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_07,
+		MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_08,
+		MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_09,
+		MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_10,
+		MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_11,
+		MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_12,
+		MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_13,
+		MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_14,
+		MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15
 	};
 	private static final Object LOCK = new Object();
 	private static final List<VulkanicGalBridge.WorldLineSegmentRecord> PENDING_SEGMENTS = new ArrayList<>();
@@ -631,7 +664,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		candidates[4] = new WorldMaterialAssetCandidate(MATERIAL_TEXTURE_WHITE_WOOL, WHITE_WOOL_TEXTURE_LOCATION);
 		candidates[5] = new WorldMaterialAssetCandidate(MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER, BARRIER_MARKER_LOCATION);
 		for (int i = 0; i < LIGHT_MARKER_LOCATIONS.length; i++) {
-			candidates[i + 6] = new WorldMaterialAssetCandidate(MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00 + i, LIGHT_MARKER_LOCATIONS[i]);
+			candidates[i + 6] = new WorldMaterialAssetCandidate(LIGHT_MARKER_TEXTURE_IDS[i], LIGHT_MARKER_LOCATIONS[i]);
 		}
 		return candidates;
 	}
@@ -1126,14 +1159,14 @@ public final class RustGalWorldPrimitiveRenderer {
 			lastTexture = texture;
 			if (texture == MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER) {
 				barrier++;
-			} else if (texture >= MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00 && texture < MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00 + 16) {
+			} else if (lightMarkerLevel(texture) >= 0) {
 				light++;
-				lastLightLevel = texture - MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00;
+				lastLightLevel = lightMarkerLevel(texture);
 				lightLevelMask |= 1 << lastLightLevel;
-			} else if (isTerrainParticleTextureId(texture)) {
-				terrain++;
-				terrainTextureMask |= 1 << texture;
-			}
+				} else if (isTerrainParticleTextureId(texture)) {
+					terrain++;
+					terrainTextureMask |= 1 << terrainParticleTextureOrdinal(texture);
+				}
 		}
 		return "material_marker_barrier_quads=" + barrier
 			+ " material_marker_light_quads=" + light
@@ -1146,6 +1179,38 @@ public final class RustGalWorldPrimitiveRenderer {
 
 	private static boolean isTerrainParticleTextureId(int texture) {
 		return TERRAIN_PARTICLE_TEXTURE_IDS.containsValue(texture);
+	}
+
+	private static int terrainParticleTextureOrdinal(int texture) {
+		if (texture == MATERIAL_TEXTURE_STONE) {
+			return 0;
+		}
+		if (texture == MATERIAL_TEXTURE_DIRT) {
+			return 1;
+		}
+		if (texture == MATERIAL_TEXTURE_OAK_LEAVES) {
+			return 2;
+		}
+		if (texture == MATERIAL_TEXTURE_DEEPSLATE) {
+			return 3;
+		}
+		if (texture == MATERIAL_TEXTURE_WHITE_WOOL) {
+			return 4;
+		}
+		return 31;
+	}
+
+	private static int lightMarkerLevel(int texture) {
+		for (int i = 0; i < LIGHT_MARKER_TEXTURE_IDS.length; i++) {
+			if (LIGHT_MARKER_TEXTURE_IDS[i] == texture) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	public static int lightMarkerTextureId(int level) {
+		return LIGHT_MARKER_TEXTURE_IDS[Mth.clamp(level, 0, 15)];
 	}
 
 	public static boolean renderOpenGlBlockBreakingCracks(
@@ -1286,7 +1351,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			return MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER;
 		}
 		if (blockState.is(Blocks.LIGHT)) {
-			return MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00 + Mth.clamp(blockState.getValue(LightBlock.LEVEL), 0, 15);
+			return LIGHT_MARKER_TEXTURE_IDS[Mth.clamp(blockState.getValue(LightBlock.LEVEL), 0, 15)];
 		}
 		return 0;
 	}

@@ -1,0 +1,1138 @@
+use super::*;
+
+pub fn status_result_from_error(error: &GalError) -> FfiStatusResult {
+    FfiStatusResult {
+        status: error.code as i32,
+        error_domain: error.domain as u32,
+        unsupported_feature: unsupported_feature_from_message(error.message.as_str()),
+        ..FfiStatusResult::default()
+    }
+}
+
+pub fn capability_feature_bits(capabilities: BackendCapabilities) -> u64 {
+    let features = capabilities.features;
+    let mut bits = 0;
+    set_feature(&mut bits, FfiFeatureBits::GRAPHICS, features.graphics);
+    set_feature(&mut bits, FfiFeatureBits::COMPUTE, features.compute);
+    set_feature(
+        &mut bits,
+        FfiFeatureBits::DESCRIPTOR_ARRAYS,
+        features.descriptor_arrays,
+    );
+    set_feature(
+        &mut bits,
+        FfiFeatureBits::OPTIONAL_BINDINGS,
+        features.optional_bindings,
+    );
+    set_feature(
+        &mut bits,
+        FfiFeatureBits::DYNAMIC_BUFFER_OFFSETS,
+        features.dynamic_buffer_offsets,
+    );
+    set_feature(
+        &mut bits,
+        FfiFeatureBits::UNIFORM_BUFFERS,
+        features.uniform_buffers,
+    );
+    set_feature(
+        &mut bits,
+        FfiFeatureBits::STORAGE_BUFFERS,
+        features.storage_buffers,
+    );
+    set_feature(
+        &mut bits,
+        FfiFeatureBits::STORAGE_TEXTURES,
+        features.storage_textures,
+    );
+    set_feature(
+        &mut bits,
+        FfiFeatureBits::INDIRECT_DRAW,
+        features.indirect_draw,
+    );
+    set_feature(
+        &mut bits,
+        FfiFeatureBits::INDIRECT_DISPATCH,
+        features.indirect_dispatch,
+    );
+    set_feature(
+        &mut bits,
+        FfiFeatureBits::MULTIPLE_COLOR_ATTACHMENTS,
+        features.multiple_color_attachments,
+    );
+    set_feature(
+        &mut bits,
+        FfiFeatureBits::DEPTH_ONLY_PASS,
+        features.depth_only_pass,
+    );
+    set_feature(
+        &mut bits,
+        FfiFeatureBits::BLENDED_PASS,
+        features.blended_pass,
+    );
+    set_feature(
+        &mut bits,
+        FfiFeatureBits::TEXTURE_SUBRESOURCE_COPIES,
+        features.texture_subresource_copies,
+    );
+    set_feature(
+        &mut bits,
+        FfiFeatureBits::TEXTURE_MIP_LEVELS,
+        features.texture_mip_levels,
+    );
+    set_feature(
+        &mut bits,
+        FfiFeatureBits::TEXTURE_ARRAY_LAYERS,
+        features.texture_array_layers,
+    );
+    set_feature(
+        &mut bits,
+        FfiFeatureBits::HOST_BUFFER_ACCESS,
+        features.host_buffer_access,
+    );
+    set_feature(
+        &mut bits,
+        FfiFeatureBits::PRESENTATION,
+        features.presentation,
+    );
+    set_feature(
+        &mut bits,
+        FfiFeatureBits::RENDERDOC_CAPTURE,
+        features.renderdoc_capture,
+    );
+    set_feature(&mut bits, FfiFeatureBits::TRACY_ZONES, features.tracy_zones);
+    bits
+}
+
+pub unsafe fn answer_capability_query(
+    request: *const FfiCapabilityQueryRequest,
+    capabilities: BackendCapabilities,
+) -> GalResult<FfiCapabilityResult> {
+    let request = read_struct(request, "capability query")?;
+    validate_header::<FfiCapabilityQueryRequest>(request.header)?;
+    reject_unknown_feature_bits(request.requested_feature_bits)?;
+    let supported = capability_feature_bits(capabilities);
+    if request.requested_feature_bits & !supported != 0 {
+        return Err(GalError::unsupported_feature(format!(
+            "requested unsupported feature bits 0x{:x}",
+            request.requested_feature_bits & !supported
+        )));
+    }
+    Ok(FfiCapabilityResult {
+        header: FfiHeader {
+            version: FFI_ABI_VERSION,
+            byte_size: size_of::<FfiCapabilityResult>() as u32,
+        },
+        status: StatusCode::Ok as i32,
+        error_domain: 0,
+        supported_feature_bits: supported,
+        negotiated_feature_bits: request.requested_feature_bits,
+        limits: FfiBackendLimits::from(capabilities.limits),
+        initial_presentation_supported: u32::from(capabilities.features.presentation),
+    })
+}
+pub(crate) fn context_metrics(context: &BridgeContext) -> FfiMetricsSnapshot {
+    let mut metrics = FfiMetricsSnapshot::from(context.gal.metrics());
+    let backend = context.gal.backend_runtime_metrics();
+    metrics.command_lists = backend.command_lists;
+    metrics.command_ops = backend.command_ops;
+    metrics.backend_submissions = backend.command_batches;
+    metrics.backend_waits = backend.gl_fences_waited;
+    metrics.ffi_calls = context.ffi_calls;
+    metrics.ffi_input_bytes = context.ffi_input_bytes;
+    metrics.ffi_output_bytes = context.ffi_output_bytes;
+    metrics
+}
+
+pub(crate) fn status_ok(context: &BridgeContext) -> FfiStatusResult {
+    FfiStatusResult {
+        metrics: context_metrics(context),
+        ..FfiStatusResult::default()
+    }
+}
+
+pub(crate) fn gui_frame_result_ok(
+    context: &BridgeContext,
+    stats: GuiSubmitStats,
+) -> FfiGuiFrameSubmitResult {
+    FfiGuiFrameSubmitResult {
+        submission_id: stats.submission_id,
+        sprite_count: stats.sprite_count,
+        sprite_batch_count: stats.sprite_batch_count,
+        cache_hits: stats.cache_hits,
+        cache_misses: stats.cache_misses,
+        resource_creates: stats.resource_creates,
+        command_lists: stats.command_lists,
+        command_ops: stats.command_ops,
+        metrics: context_metrics(context),
+        ..FfiGuiFrameSubmitResult::default()
+    }
+}
+
+pub(crate) fn whole_frame_result_ok(
+    context: &BridgeContext,
+    world: WorldPrimitiveSubmitStats,
+    gui: GuiSubmitStats,
+) -> FfiWholeFrameSubmitResult {
+    FfiWholeFrameSubmitResult {
+        submission_id: world.submission_id,
+        world_segment_count: world.segment_count,
+        world_vertex_count: world.vertex_count,
+        world_batch_count: world.primitive_batch_count,
+        world_draw_count: world.world_draws,
+        world_crack_quad_count: world.crack_quad_count,
+        world_crack_batch_count: world.crack_batch_count,
+        world_crack_draw_count: world.crack_draw_count,
+        world_border_quad_count: world.border_quad_count,
+        world_border_batch_count: world.border_batch_count,
+        world_border_draw_count: world.border_draw_count,
+        world_material_quad_count: world.material_quad_count,
+        world_material_batch_count: world.material_batch_count,
+        world_material_draw_count: world.material_draw_count,
+        world_background_clear_count: world.background_clear_count,
+        world_background_diagnostic_fallback_count: world.background_diagnostic_fallback_count,
+        world_background_sky_type: world.background_sky_type,
+        world_background_color_argb: world.background_color_argb,
+        depth_attachment_creates: world.depth_attachment_creates,
+        depth_attachment_reuses: world.depth_attachment_reuses,
+        depth_attachment_retires: world.depth_attachment_retires,
+        outline_cache_hits: world.outline_cache_hits,
+        outline_cache_misses: world.outline_cache_misses,
+        crack_cache_hits: world.crack_cache_hits,
+        crack_cache_misses: world.crack_cache_misses,
+        border_cache_hits: world.border_cache_hits,
+        border_cache_misses: world.border_cache_misses,
+        material_cache_hits: world.material_cache_hits,
+        material_cache_misses: world.material_cache_misses,
+        sprite_count: gui.sprite_count,
+        sprite_batch_count: gui.sprite_batch_count,
+        cache_hits: world.cache_hits.saturating_add(gui.cache_hits),
+        cache_misses: world.cache_misses.saturating_add(gui.cache_misses),
+        resource_creates: world.resource_creates.saturating_add(gui.resource_creates),
+        command_lists: world.command_lists.max(gui.command_lists),
+        command_ops: world.command_ops,
+        metrics: context_metrics(context),
+        ..FfiWholeFrameSubmitResult::default()
+    }
+}
+
+pub(crate) fn status_error(context: Option<&BridgeContext>, error: &GalError) -> FfiStatusResult {
+    let mut status = status_result_from_error(error);
+    if let Some(context) = context {
+        status.metrics = context_metrics(context);
+    }
+    status
+}
+
+pub(crate) fn set_last_error(context: &mut BridgeContext, error: &GalError) {
+    context.last_error = error.to_string();
+}
+
+pub(crate) fn output_bytes_for_resource_results(capacity: u64) -> u64 {
+    capacity.saturating_mul(size_of::<FfiCreateResultEntry>() as u64)
+}
+
+pub(crate) fn input_bytes_for_resource_batch(batch: &FfiResourceBatch) -> u64 {
+    (size_of::<FfiResourceBatch>() as u64)
+        .saturating_add(
+            batch
+                .buffers
+                .count
+                .saturating_mul(size_of::<FfiBufferDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .textures
+                .count
+                .saturating_mul(size_of::<FfiTextureDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .texture_views
+                .count
+                .saturating_mul(size_of::<FfiTextureViewDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .samplers
+                .count
+                .saturating_mul(size_of::<FfiSamplerDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .shaders
+                .count
+                .saturating_mul(size_of::<FfiShaderModuleDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .resource_layouts
+                .count
+                .saturating_mul(size_of::<FfiResourceLayoutDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .resource_layout_bindings
+                .count
+                .saturating_mul(size_of::<FfiResourceBindingDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .resource_sets
+                .count
+                .saturating_mul(size_of::<FfiResourceSetDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .resource_set_bindings
+                .count
+                .saturating_mul(size_of::<FfiResourceBindingAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .pipeline_layouts
+                .count
+                .saturating_mul(size_of::<FfiPipelineLayoutDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .graphics_pipelines
+                .count
+                .saturating_mul(size_of::<FfiGraphicsPipelineDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .compute_pipelines
+                .count
+                .saturating_mul(size_of::<FfiComputePipelineDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .render_targets
+                .count
+                .saturating_mul(size_of::<FfiRenderTargetDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .render_passes
+                .count
+                .saturating_mul(size_of::<FfiRenderPassDescAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .buffer_updates
+                .count
+                .saturating_mul(size_of::<FfiBufferUpdateAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .texture_updates
+                .count
+                .saturating_mul(size_of::<FfiTextureUpdateAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .destroys
+                .count
+                .saturating_mul(size_of::<FfiDestroyDescAbi>() as u64),
+        )
+}
+
+pub(crate) fn input_bytes_for_submission(batch: &FfiSubmissionBatchAbi) -> u64 {
+    (size_of::<FfiSubmissionBatchAbi>() as u64)
+        .saturating_add(
+            batch
+                .command_lists
+                .count
+                .saturating_mul(size_of::<FfiCommandListAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .operations
+                .count
+                .saturating_mul(size_of::<FfiCommandOpAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .pass_attachments
+                .count
+                .saturating_mul(size_of::<FfiPassAttachmentAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .copy_regions
+                .count
+                .saturating_mul(size_of::<FfiBufferImageCopyAbi>() as u64),
+        )
+        .saturating_add(
+            batch
+                .barriers
+                .count
+                .saturating_mul(size_of::<FfiResourceBarrierAbi>() as u64),
+        )
+}
+
+pub(crate) fn input_bytes_for_gui_frame(request: &FfiGuiFrameSubmitRequest) -> u64 {
+    (size_of::<FfiGuiFrameSubmitRequest>() as u64).saturating_add(
+        request
+            .sprites
+            .count
+            .saturating_mul(size_of::<FfiGuiSpriteRequest>() as u64),
+    )
+}
+
+pub(crate) fn input_bytes_for_whole_frame(request: &FfiWholeFrameSubmitRequest) -> u64 {
+    (size_of::<FfiWholeFrameSubmitRequest>() as u64)
+        .saturating_add(
+            request
+                .world_segments
+                .count
+                .saturating_mul(size_of::<FfiWorldLineSegmentRequest>() as u64),
+        )
+        .saturating_add(
+            request
+                .world_crack_quads
+                .count
+                .saturating_mul(size_of::<FfiWorldCrackQuadRequest>() as u64),
+        )
+        .saturating_add(
+            request
+                .world_border_quads
+                .count
+                .saturating_mul(size_of::<FfiWorldBorderQuadRequest>() as u64),
+        )
+        .saturating_add(
+            request
+                .world_material_quads
+                .count
+                .saturating_mul(size_of::<FfiWorldMaterialQuadRequest>() as u64),
+        )
+        .saturating_add(
+            request
+                .world_material_table
+                .count
+                .saturating_mul(size_of::<FfiWorldMaterialTableRecord>() as u64),
+        )
+        .saturating_add(
+            request
+                .world_material_compact_quads
+                .count
+                .saturating_mul(size_of::<FfiWorldMaterialCompactQuadRequest>() as u64),
+        )
+        .saturating_add(
+            request
+                .gui_sprites
+                .count
+                .saturating_mul(size_of::<FfiGuiSpriteRequest>() as u64),
+        )
+}
+
+pub(crate) fn input_bytes_for_gui_asset_update(request: &FfiGuiAssetUpdateRequest) -> u64 {
+    let payload_headers = request
+        .assets
+        .count
+        .saturating_mul(size_of::<FfiGuiAssetPayload>() as u64);
+    let payload_bytes = unsafe { read_slice(request.assets, true, "GUI asset payloads") }
+        .map(|items| {
+            items
+                .iter()
+                .fold(0u64, |sum, item| sum.saturating_add(item.png_bytes.len))
+        })
+        .unwrap_or(0);
+    (size_of::<FfiGuiAssetUpdateRequest>() as u64)
+        .saturating_add(payload_headers)
+        .saturating_add(payload_bytes)
+}
+
+pub(crate) fn input_bytes_for_world_border_asset_update(
+    request: &FfiWorldBorderAssetUpdateRequest,
+) -> u64 {
+    (size_of::<FfiWorldBorderAssetUpdateRequest>() as u64).saturating_add(request.png_bytes.len)
+}
+
+pub(crate) fn input_bytes_for_world_crack_asset_update(
+    request: &FfiWorldCrackAssetUpdateRequest,
+) -> u64 {
+    let payload_headers = request
+        .assets
+        .count
+        .saturating_mul(size_of::<FfiWorldCrackAssetPayload>() as u64);
+    let payload_bytes = unsafe { read_slice(request.assets, true, "world crack asset payloads") }
+        .map(|items| {
+            items
+                .iter()
+                .fold(0u64, |sum, item| sum.saturating_add(item.png_bytes.len))
+        })
+        .unwrap_or(0);
+    (size_of::<FfiWorldCrackAssetUpdateRequest>() as u64)
+        .saturating_add(payload_headers)
+        .saturating_add(payload_bytes)
+}
+
+pub(crate) fn input_bytes_for_world_material_asset_update(
+    request: &FfiWorldMaterialAssetUpdateRequest,
+) -> u64 {
+    let payload_headers = request
+        .assets
+        .count
+        .saturating_mul(size_of::<FfiWorldMaterialAssetPayload>() as u64);
+    let payload_bytes =
+        unsafe { read_slice(request.assets, true, "world material asset payloads") }
+            .map(|items| {
+                items
+                    .iter()
+                    .fold(0u64, |sum, item| sum.saturating_add(item.png_bytes.len))
+            })
+            .unwrap_or(0);
+    (size_of::<FfiWorldMaterialAssetUpdateRequest>() as u64)
+        .saturating_add(payload_headers)
+        .saturating_add(payload_bytes)
+}
+
+pub(crate) fn set_feature(bits: &mut u64, feature: u64, enabled: bool) {
+    if enabled {
+        *bits |= feature;
+    }
+}
+
+pub(crate) fn feature_from_bit(bit: u64) -> Option<BackendFeature> {
+    match bit {
+        FfiFeatureBits::GRAPHICS => Some(BackendFeature::Graphics),
+        FfiFeatureBits::COMPUTE => Some(BackendFeature::Compute),
+        FfiFeatureBits::DESCRIPTOR_ARRAYS => Some(BackendFeature::DescriptorArrays),
+        FfiFeatureBits::OPTIONAL_BINDINGS => Some(BackendFeature::OptionalBindings),
+        FfiFeatureBits::DYNAMIC_BUFFER_OFFSETS => Some(BackendFeature::DynamicBufferOffsets),
+        FfiFeatureBits::UNIFORM_BUFFERS => Some(BackendFeature::UniformBuffers),
+        FfiFeatureBits::STORAGE_BUFFERS => Some(BackendFeature::StorageBuffers),
+        FfiFeatureBits::STORAGE_TEXTURES => Some(BackendFeature::StorageTextures),
+        FfiFeatureBits::INDIRECT_DRAW => Some(BackendFeature::IndirectDraw),
+        FfiFeatureBits::INDIRECT_DISPATCH => Some(BackendFeature::IndirectDispatch),
+        FfiFeatureBits::MULTIPLE_COLOR_ATTACHMENTS => {
+            Some(BackendFeature::MultipleColorAttachments)
+        }
+        FfiFeatureBits::DEPTH_ONLY_PASS => Some(BackendFeature::DepthOnlyPass),
+        FfiFeatureBits::BLENDED_PASS => Some(BackendFeature::BlendedPass),
+        FfiFeatureBits::TEXTURE_SUBRESOURCE_COPIES => {
+            Some(BackendFeature::TextureSubresourceCopies)
+        }
+        FfiFeatureBits::TEXTURE_MIP_LEVELS => Some(BackendFeature::TextureMipLevels),
+        FfiFeatureBits::TEXTURE_ARRAY_LAYERS => Some(BackendFeature::TextureArrayLayers),
+        FfiFeatureBits::HOST_BUFFER_ACCESS => Some(BackendFeature::HostBufferAccess),
+        FfiFeatureBits::PRESENTATION => Some(BackendFeature::Presentation),
+        FfiFeatureBits::RENDERDOC_CAPTURE => Some(BackendFeature::RenderDocCapture),
+        FfiFeatureBits::TRACY_ZONES => Some(BackendFeature::TracyZones),
+        _ => None,
+    }
+}
+
+pub(crate) fn reject_unknown_feature_bits(bits: u64) -> GalResult<()> {
+    if bits & !FfiFeatureBits::ALL_KNOWN != 0 {
+        return Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!(
+                "unknown negotiated feature bits 0x{:x}",
+                bits & !FfiFeatureBits::ALL_KNOWN
+            ),
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn require_negotiated_features(
+    bits: u64,
+    capabilities: BackendCapabilities,
+) -> GalResult<()> {
+    for index in 0..64 {
+        let bit = 1_u64 << index;
+        if bits & bit == 0 {
+            continue;
+        }
+        let Some(feature) = feature_from_bit(bit) else {
+            continue;
+        };
+        if !capabilities.supports(feature) {
+            return Err(GalError::unsupported_feature(format!(
+                "negotiated feature {:?} is unsupported by backend '{}'",
+                feature, capabilities.name
+            )));
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn require_any_handle(handle: FfiHandle, label: &str) -> GalResult<Handle> {
+    let handle = Handle::from(handle);
+    if handle.is_null() || handle.kind().is_none() {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!("{label} is null or has unknown kind"),
+        ));
+    }
+    Ok(handle)
+}
+
+pub(crate) fn require_handle(
+    handle: FfiHandle,
+    kind: HandleKind,
+    label: &str,
+) -> GalResult<Handle> {
+    let handle = Handle::from(handle);
+    if handle.is_null() {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!("{label} handle is null"),
+        ));
+    }
+    handle.require_kind(kind)?;
+    Ok(handle)
+}
+
+pub(crate) fn require_handle_any(
+    handle: FfiHandle,
+    kinds: &[HandleKind],
+    label: &str,
+) -> GalResult<Handle> {
+    let handle = Handle::from(handle);
+    if handle.is_null() {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!("{label} handle is null"),
+        ));
+    }
+    let Some(actual) = handle.kind() else {
+        return Err(GalError::ffi(
+            StatusCode::WrongHandleType,
+            format!("{label} has unknown handle kind"),
+        ));
+    };
+    if !kinds.contains(&actual) {
+        return Err(GalError::ffi(
+            StatusCode::WrongHandleType,
+            format!("{label} has kind {actual:?}, expected one of {kinds:?}"),
+        ));
+    }
+    Ok(handle)
+}
+
+pub(crate) fn optional_handle(
+    handle: FfiHandle,
+    kind: HandleKind,
+    label: &str,
+) -> GalResult<Option<Handle>> {
+    if handle.raw == 0 {
+        return Ok(None);
+    }
+    Ok(Some(require_handle(handle, kind, label)?))
+}
+
+pub(crate) fn handle_kind(raw: u32) -> GalResult<HandleKind> {
+    HandleKind::from_raw(u8::try_from(raw).unwrap_or(0)).ok_or_else(|| {
+        GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown handle kind {raw}"),
+        )
+    })
+}
+
+pub(crate) fn memory_domain(raw: u32) -> GalResult<MemoryDomain> {
+    match raw {
+        1 => Ok(MemoryDomain::DeviceLocal),
+        2 => Ok(MemoryDomain::Upload),
+        3 => Ok(MemoryDomain::Readback),
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown memory domain {raw}"),
+        )),
+    }
+}
+
+pub(crate) fn texture_dimension(raw: u32) -> GalResult<TextureDimension> {
+    match raw {
+        1 => Ok(TextureDimension::D1),
+        2 => Ok(TextureDimension::D2),
+        3 => Ok(TextureDimension::D3),
+        4 => Ok(TextureDimension::Cube),
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown texture dimension {raw}"),
+        )),
+    }
+}
+
+pub(crate) fn texture_format(raw: u32) -> GalResult<TextureFormat> {
+    match raw {
+        1 => Ok(TextureFormat::Rgba8Unorm),
+        2 => Ok(TextureFormat::Bgra8Unorm),
+        3 => Ok(TextureFormat::Rgba16Float),
+        4 => Ok(TextureFormat::Depth24Stencil8),
+        5 => Ok(TextureFormat::Depth32Float),
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown texture format {raw}"),
+        )),
+    }
+}
+
+pub(crate) fn optional_texture_format(raw: u32) -> GalResult<Option<TextureFormat>> {
+    if raw == 0 {
+        Ok(None)
+    } else {
+        texture_format(raw).map(Some)
+    }
+}
+
+pub(crate) fn present_mode(raw: u32) -> GalResult<PresentMode> {
+    match raw {
+        1 => Ok(PresentMode::Immediate),
+        2 => Ok(PresentMode::Mailbox),
+        3 => Ok(PresentMode::Fifo),
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown present mode {raw}"),
+        )),
+    }
+}
+
+pub(crate) fn acquire_status_raw(status: FrameAcquireStatus) -> u32 {
+    status as u32
+}
+
+pub(crate) fn present_status_raw(status: FramePresentStatus) -> u32 {
+    status as u32
+}
+
+pub(crate) fn sampler_filter(raw: u32) -> GalResult<SamplerFilter> {
+    match raw {
+        1 => Ok(SamplerFilter::Nearest),
+        2 => Ok(SamplerFilter::Linear),
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown sampler filter {raw}"),
+        )),
+    }
+}
+
+pub(crate) fn sampler_address(raw: u32) -> GalResult<SamplerAddressMode> {
+    match raw {
+        1 => Ok(SamplerAddressMode::ClampToEdge),
+        2 => Ok(SamplerAddressMode::Repeat),
+        3 => Ok(SamplerAddressMode::MirroredRepeat),
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown sampler address mode {raw}"),
+        )),
+    }
+}
+
+pub(crate) fn shader_stage(raw: u32) -> GalResult<ShaderStage> {
+    match raw {
+        1 => Ok(ShaderStage::Vertex),
+        2 => Ok(ShaderStage::Fragment),
+        3 => Ok(ShaderStage::Compute),
+        4 => Ok(ShaderStage::Geometry),
+        5 => Ok(ShaderStage::TessControl),
+        6 => Ok(ShaderStage::TessEvaluation),
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown shader stage {raw}"),
+        )),
+    }
+}
+
+pub(crate) fn shader_code_format(raw: u32) -> GalResult<ShaderCodeFormat> {
+    match raw {
+        1 => Ok(ShaderCodeFormat::Spirv),
+        2 => Ok(ShaderCodeFormat::BackendPortableIr),
+        3 => Ok(ShaderCodeFormat::Glsl),
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown shader code format {raw}"),
+        )),
+    }
+}
+
+pub(crate) fn resource_binding_kind(raw: u32) -> GalResult<ResourceBindingKind> {
+    match raw {
+        1 => Ok(ResourceBindingKind::UniformBuffer),
+        2 => Ok(ResourceBindingKind::StorageBuffer),
+        3 => Ok(ResourceBindingKind::SampledTexture),
+        4 => Ok(ResourceBindingKind::StorageTexture),
+        5 => Ok(ResourceBindingKind::Sampler),
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown resource binding kind {raw}"),
+        )),
+    }
+}
+
+pub(crate) fn primitive_topology(raw: u32) -> GalResult<PrimitiveTopology> {
+    match raw {
+        1 => Ok(PrimitiveTopology::Points),
+        2 => Ok(PrimitiveTopology::Lines),
+        3 => Ok(PrimitiveTopology::Triangles),
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown primitive topology {raw}"),
+        )),
+    }
+}
+
+pub(crate) fn cull_mode(raw: u32) -> GalResult<CullMode> {
+    match raw {
+        1 => Ok(CullMode::None),
+        2 => Ok(CullMode::Front),
+        3 => Ok(CullMode::Back),
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown cull mode {raw}"),
+        )),
+    }
+}
+
+pub(crate) fn blend_mode(raw: u32) -> GalResult<BlendMode> {
+    match raw {
+        1 => Ok(BlendMode::Disabled),
+        2 => Ok(BlendMode::Alpha),
+        3 => Ok(BlendMode::Additive),
+        4 => Ok(BlendMode::Invert),
+        5 => Ok(BlendMode::Multiply),
+        6 => Ok(BlendMode::Overlay),
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown blend mode {raw}"),
+        )),
+    }
+}
+
+pub(crate) fn compare_op(raw: u32) -> GalResult<CompareOp> {
+    match raw {
+        1 => Ok(CompareOp::Always),
+        2 => Ok(CompareOp::Less),
+        3 => Ok(CompareOp::LessOrEqual),
+        4 => Ok(CompareOp::Equal),
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown compare op {raw}"),
+        )),
+    }
+}
+
+pub(crate) fn optional_compare_op(raw: u32) -> GalResult<Option<CompareOp>> {
+    if raw == 0 {
+        Ok(None)
+    } else {
+        compare_op(raw).map(Some)
+    }
+}
+
+pub(crate) fn load_op(raw: u32) -> GalResult<AttachmentLoadOp> {
+    match raw {
+        1 => Ok(AttachmentLoadOp::Load),
+        2 => Ok(AttachmentLoadOp::Clear),
+        3 => Ok(AttachmentLoadOp::DontCare),
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown attachment load op {raw}"),
+        )),
+    }
+}
+
+pub(crate) fn store_op(raw: u32) -> GalResult<AttachmentStoreOp> {
+    match raw {
+        1 => Ok(AttachmentStoreOp::Store),
+        2 => Ok(AttachmentStoreOp::DontCare),
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown attachment store op {raw}"),
+        )),
+    }
+}
+
+pub(crate) fn texture_usage_state(raw: u32) -> GalResult<TextureUsageState> {
+    match raw {
+        1 => Ok(TextureUsageState::Undefined),
+        2 => Ok(TextureUsageState::ShaderRead),
+        3 => Ok(TextureUsageState::ShaderWrite),
+        4 => Ok(TextureUsageState::ColorAttachment),
+        5 => Ok(TextureUsageState::DepthStencilAttachment),
+        6 => Ok(TextureUsageState::TransferSrc),
+        7 => Ok(TextureUsageState::TransferDst),
+        8 => Ok(TextureUsageState::Present),
+        9 => Ok(TextureUsageState::IndexRead),
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown texture usage state {raw}"),
+        )),
+    }
+}
+
+pub(crate) fn ffi_index_type(raw: u32) -> GalResult<IndexType> {
+    match raw {
+        0 | 2 => Ok(IndexType::U32),
+        1 => Ok(IndexType::U16),
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown index type {raw}"),
+        )),
+    }
+}
+
+pub(crate) fn queue_class(raw: u32) -> GalResult<QueueClass> {
+    match raw {
+        1 => Ok(QueueClass::Graphics),
+        2 => Ok(QueueClass::Compute),
+        3 => Ok(QueueClass::Transfer),
+        4 => Ok(QueueClass::Present),
+        5 => Ok(QueueClass::External),
+        _ => Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown queue class {raw}"),
+        )),
+    }
+}
+
+pub(crate) fn stage_flags(bits: u32) -> GalResult<PipelineStageFlags> {
+    let known = PipelineStageFlags::DRAW.0
+        | PipelineStageFlags::COMPUTE.0
+        | PipelineStageFlags::TRANSFER.0
+        | PipelineStageFlags::PRESENT.0;
+    if bits & !known != 0 {
+        return Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown pipeline stage bits 0x{:x}", bits & !known),
+        ));
+    }
+    Ok(PipelineStageFlags(bits))
+}
+
+pub(crate) fn access_flags(bits: u32) -> GalResult<AccessFlags> {
+    let known = AccessFlags::READ.0
+        | AccessFlags::WRITE.0
+        | AccessFlags::COLOR_ATTACHMENT.0
+        | AccessFlags::DEPTH_STENCIL.0
+        | AccessFlags::TRANSFER.0;
+    if bits & !known != 0 {
+        return Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown access bits 0x{:x}", bits & !known),
+        ));
+    }
+    Ok(AccessFlags(bits))
+}
+
+pub(crate) fn buffer_usage_bits(bits: u64) -> GalResult<Vec<BufferUsage>> {
+    let table = [
+        (1_u64 << 0, BufferUsage::Vertex),
+        (1_u64 << 1, BufferUsage::Index),
+        (1_u64 << 2, BufferUsage::Uniform),
+        (1_u64 << 3, BufferUsage::Storage),
+        (1_u64 << 4, BufferUsage::TransferSrc),
+        (1_u64 << 5, BufferUsage::TransferDst),
+        (1_u64 << 6, BufferUsage::Indirect),
+        (1_u64 << 7, BufferUsage::HostRead),
+        (1_u64 << 8, BufferUsage::HostWrite),
+    ];
+    usage_bits(bits, &table, "buffer usage")
+}
+
+pub(crate) fn texture_usage_bits(bits: u64) -> GalResult<Vec<TextureUsage>> {
+    let table = [
+        (1_u64 << 0, TextureUsage::Sampled),
+        (1_u64 << 1, TextureUsage::Storage),
+        (1_u64 << 2, TextureUsage::ColorAttachment),
+        (1_u64 << 3, TextureUsage::DepthStencilAttachment),
+        (1_u64 << 4, TextureUsage::TransferSrc),
+        (1_u64 << 5, TextureUsage::TransferDst),
+        (1_u64 << 6, TextureUsage::Present),
+        (1_u64 << 7, TextureUsage::HostRead),
+        (1_u64 << 8, TextureUsage::HostWrite),
+    ];
+    usage_bits(bits, &table, "texture usage")
+}
+
+pub(crate) fn usage_bits<T: Copy>(bits: u64, table: &[(u64, T)], label: &str) -> GalResult<Vec<T>> {
+    let known = table.iter().fold(0_u64, |acc, (bit, _)| acc | *bit);
+    if bits == 0 {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!("{label} bits must be non-zero"),
+        ));
+    }
+    if bits & !known != 0 {
+        return Err(GalError::ffi(
+            StatusCode::UnknownEnum,
+            format!("unknown {label} bits 0x{:x}", bits & !known),
+        ));
+    }
+    Ok(table
+        .iter()
+        .filter_map(|(bit, value)| if bits & *bit != 0 { Some(*value) } else { None })
+        .collect())
+}
+
+pub(crate) fn check_buffer_capabilities(
+    desc: &BufferDesc,
+    capabilities: BackendCapabilities,
+) -> GalResult<()> {
+    if desc.size > capabilities.limits.max_buffer_size {
+        return Err(GalError::unsupported_feature(
+            "buffer size exceeds backend limit",
+        ));
+    }
+    if desc.usages.contains(&BufferUsage::Storage) {
+        require_feature(
+            capabilities,
+            BackendFeature::StorageBuffers,
+            "storage buffer",
+        )?;
+    }
+    if desc.usages.contains(&BufferUsage::Indirect) {
+        require_any_feature(
+            capabilities,
+            &[
+                BackendFeature::IndirectDraw,
+                BackendFeature::IndirectDispatch,
+            ],
+            "indirect buffer",
+        )?;
+    }
+    if desc.usages.contains(&BufferUsage::HostRead) || desc.usages.contains(&BufferUsage::HostWrite)
+    {
+        require_feature(
+            capabilities,
+            BackendFeature::HostBufferAccess,
+            "host buffer access",
+        )?;
+    }
+    Ok(())
+}
+
+pub(crate) fn check_texture_capabilities(
+    desc: &TextureDesc,
+    capabilities: BackendCapabilities,
+) -> GalResult<()> {
+    if desc.extent.width > capabilities.limits.max_texture_extent_2d
+        || desc.extent.height > capabilities.limits.max_texture_extent_2d
+    {
+        return Err(GalError::unsupported_feature(
+            "texture extent exceeds backend limit",
+        ));
+    }
+    if desc.mip_levels > capabilities.limits.max_texture_mip_levels {
+        return Err(GalError::unsupported_feature(
+            "texture mip count exceeds backend limit",
+        ));
+    }
+    if desc.array_layers > capabilities.limits.max_texture_array_layers {
+        return Err(GalError::unsupported_feature(
+            "texture layer count exceeds backend limit",
+        ));
+    }
+    if desc.mip_levels > 1 {
+        require_feature(
+            capabilities,
+            BackendFeature::TextureMipLevels,
+            "texture mip levels",
+        )?;
+    }
+    if desc.array_layers > 1 {
+        require_feature(
+            capabilities,
+            BackendFeature::TextureArrayLayers,
+            "texture array layers",
+        )?;
+    }
+    if desc.usages.contains(&TextureUsage::Storage) {
+        require_feature(
+            capabilities,
+            BackendFeature::StorageTextures,
+            "storage texture",
+        )?;
+    }
+    if desc.usages.contains(&TextureUsage::Present) {
+        require_feature(
+            capabilities,
+            BackendFeature::Presentation,
+            "presentation texture",
+        )?;
+        return Err(GalError::unsupported_feature(
+            "presentation texture creation is outside the batch ABI; use ABI v2 frame targets",
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn check_graphics_pipeline_capabilities(
+    desc: &GraphicsPipelineDesc,
+    capabilities: BackendCapabilities,
+) -> GalResult<()> {
+    require_feature(capabilities, BackendFeature::Graphics, "graphics pipeline")?;
+    check_attachment_count(
+        desc.color_formats.len(),
+        desc.depth_format.is_some(),
+        capabilities,
+    )?;
+    if desc.blend != BlendMode::Disabled {
+        require_feature(capabilities, BackendFeature::BlendedPass, "blended pass")?;
+    }
+    Ok(())
+}
+
+pub(crate) fn check_attachment_count(
+    color_count: usize,
+    has_depth: bool,
+    capabilities: BackendCapabilities,
+) -> GalResult<()> {
+    if color_count > capabilities.limits.max_color_attachments as usize {
+        return Err(GalError::unsupported_feature(
+            "color attachment count exceeds backend limit",
+        ));
+    }
+    if color_count > 1 {
+        require_feature(
+            capabilities,
+            BackendFeature::MultipleColorAttachments,
+            "multiple color attachments",
+        )?;
+    }
+    if color_count == 0 && has_depth {
+        require_feature(
+            capabilities,
+            BackendFeature::DepthOnlyPass,
+            "depth-only pass",
+        )?;
+    }
+    Ok(())
+}
+
+pub(crate) fn require_feature(
+    capabilities: BackendCapabilities,
+    feature: BackendFeature,
+    label: &str,
+) -> GalResult<()> {
+    if capabilities.supports(feature) {
+        Ok(())
+    } else {
+        Err(GalError::unsupported_feature(format!(
+            "backend '{}' does not support {label}",
+            capabilities.name
+        )))
+    }
+}
+
+pub(crate) fn require_any_feature(
+    capabilities: BackendCapabilities,
+    features: &[BackendFeature],
+    label: &str,
+) -> GalResult<()> {
+    if features
+        .iter()
+        .any(|feature| capabilities.supports(*feature))
+    {
+        Ok(())
+    } else {
+        Err(GalError::unsupported_feature(format!(
+            "backend '{}' does not support {label}",
+            capabilities.name
+        )))
+    }
+}

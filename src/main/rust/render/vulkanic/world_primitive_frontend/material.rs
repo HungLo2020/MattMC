@@ -31,22 +31,13 @@ pub(super) fn validate_quad(
             format!("unknown world material mode {}", quad.material_mode),
         ));
     }
-    if quad.material_id == WORLD_MATERIAL_ID_OPAQUE_TEXTURED
-        && quad.material_mode != WORLD_MATERIAL_MODE_OPAQUE
-    {
+    if !super::material_registry::material_matches_mode(quad.material_id, quad.material_mode) {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
-            "opaque world material id must use opaque material mode",
-        ));
-    }
-    if matches!(
-        quad.material_id,
-        WORLD_MATERIAL_ID_CUTOUT_TEXTURED | WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT
-    ) && quad.material_mode != WORLD_MATERIAL_MODE_CUTOUT
-    {
-        return Err(GalError::ffi(
-            StatusCode::InvalidArgument,
-            "cutout world material id must use cutout material mode",
+            format!(
+                "world material id {} is incompatible with mode {}",
+                quad.material_id, quad.material_mode
+            ),
         ));
     }
     if quad.depth_policy > WORLD_DEPTH_POLICY_TEST_NO_WRITE {
@@ -99,25 +90,22 @@ pub(super) fn validate_quad(
     Ok(())
 }
 
-pub(super) fn is_known_material_id(material_id: u32) -> bool {
-    matches!(
-        material_id,
-        WORLD_MATERIAL_ID_OPAQUE_TEXTURED
-            | WORLD_MATERIAL_ID_CUTOUT_TEXTURED
-            | WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT
-    )
+pub(crate) fn is_known_material_id(material_id: u32) -> bool {
+    super::material_registry::is_known_material_key(material_id)
 }
 
-pub(super) fn is_known_texture_id(texture_id: u32) -> bool {
-    matches!(
-        texture_id,
-        WORLD_MATERIAL_TEXTURE_STONE
-            | WORLD_MATERIAL_TEXTURE_DIRT
-            | WORLD_MATERIAL_TEXTURE_OAK_LEAVES
-            | WORLD_MATERIAL_TEXTURE_DEEPSLATE
-            | WORLD_MATERIAL_TEXTURE_WHITE_WOOL
-    ) || texture_id == WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER
-        || (WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_00
-            ..=WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15)
-            .contains(&texture_id)
+pub(crate) fn is_known_texture_id(texture_id: u32) -> bool {
+    super::material_registry::is_known_texture_key(texture_id)
+}
+
+pub(crate) fn canonical_material_id(material_id: u32) -> Option<u32> {
+    super::material_registry::canonical_material_key(material_id)
+}
+
+pub(crate) fn canonical_texture_id(texture_id: u32) -> Option<u32> {
+    super::material_registry::canonical_texture_key(texture_id)
+}
+
+pub(crate) fn material_matches_mode(material_id: u32, mode: u32) -> bool {
+    super::material_registry::material_matches_mode(material_id, mode)
 }

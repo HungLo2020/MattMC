@@ -1,7 +1,5 @@
 use super::handles::Handle;
-use super::resources::{
-    AccessFlags, Extent3d, PipelineStageFlags, QueueClass, TextureSubresourceRange,
-};
+use super::resources::{Extent3d, IndexType, QueueClass, TextureSubresourceRange};
 
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -23,8 +21,6 @@ pub struct ResourceBarrier {
     pub subresources: Option<TextureSubresourceRange>,
     pub before: TextureUsageState,
     pub after: TextureUsageState,
-    pub stages: PipelineStageFlags,
-    pub access: AccessFlags,
     pub src_queue: QueueClass,
     pub dst_queue: QueueClass,
 }
@@ -103,6 +99,7 @@ pub enum CommandOp {
     SetIndexBuffer {
         buffer: Handle,
         offset: u64,
+        index_type: IndexType,
     },
     Draw {
         vertices: u32,

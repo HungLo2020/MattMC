@@ -1607,7 +1607,11 @@ impl VulkanicGal {
                         ));
                     }
                 }
-                CommandOp::SetIndexBuffer { buffer, .. } => {
+                CommandOp::SetIndexBuffer {
+                    buffer,
+                    offset,
+                    index_type,
+                } => {
                     let record = self.buffers.get(*buffer)?;
                     if !record.desc.usages.contains(&BufferUsage::Index) {
                         return self.validation_error(GalError::command(
@@ -1615,7 +1619,20 @@ impl VulkanicGal {
                             "index buffer binding requires index buffer usage",
                         ));
                     }
-                    index_buffer = Some(*buffer);
+                    let index_size = index_type_size(*index_type);
+                    if *offset % index_size != 0 {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "index buffer offset must be aligned to index type size",
+                        ));
+                    }
+                    if *offset >= record.desc.size {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "index buffer offset is outside the buffer",
+                        ));
+                    }
+                    index_buffer = Some((*buffer, *offset, *index_type));
                 }
                 CommandOp::Draw {
                     vertices,
@@ -1630,14 +1647,24 @@ impl VulkanicGal {
                     }
                 }
                 CommandOp::DrawIndexed { indices, instances } => {
-                    if !in_pass
-                        || graphics_pipeline.is_none()
-                        || index_buffer.is_none()
-                        || *indices == 0
-                        || *instances == 0
-                    {
+                    if !in_pass || graphics_pipeline.is_none() || *indices == 0 || *instances == 0 {
                         return self.validation_error(GalError::command(StatusCode::InvalidArgument, "indexed draw requires active pass, pipeline, index buffer, and non-zero counts"));
                     }
+                    let Some((buffer, offset, index_type)) = index_buffer else {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "indexed draw requires active index buffer",
+                        ));
+                    };
+                    let bytes = u64::from(*indices)
+                        .checked_mul(index_type_size(index_type))
+                        .ok_or_else(|| {
+                            GalError::command(
+                                StatusCode::InvalidArgument,
+                                "indexed draw byte range overflows",
+                            )
+                        })?;
+                    self.validate_buffer_range(buffer, offset, bytes, BufferUsage::Index)?;
                 }
                 CommandOp::DrawIndirect {
                     buffer,
@@ -1845,13 +1872,10 @@ impl VulkanicGal {
                             }
                         }
                     }
-                    if barrier.access == AccessFlags::NONE
-                        || barrier.stages == PipelineStageFlags::NONE
-                        || barrier.before == barrier.after
-                    {
+                    if barrier.before == barrier.after {
                         return self.validation_error(GalError::command(
                             StatusCode::InvalidArgument,
-                            "barrier must declare access, stages, and a state change",
+                            "barrier must declare a semantic state change",
                         ));
                     }
                     if barrier.src_queue == QueueClass::Present
@@ -2030,7 +2054,7 @@ impl VulkanicGal {
                             },
                         )?;
                     }
-                    CommandOp::SetIndexBuffer { buffer, offset } => {
+                    CommandOp::SetIndexBuffer { buffer, offset, .. } => {
                         let target = self.buffer_access_target(*buffer, *offset, None)?;
                         self.record_access(
                             &mut accesses,
@@ -2779,6 +2803,13 @@ fn is_depth_stencil_format(format: TextureFormat) -> bool {
 impl AccessTarget {
     fn is_zero_sized_sampler_marker(self) -> bool {
         matches!(self, AccessTarget::Buffer { size: 0, .. })
+    }
+}
+
+fn index_type_size(index_type: super::resources::IndexType) -> u64 {
+    match index_type {
+        super::resources::IndexType::U16 => 2,
+        super::resources::IndexType::U32 => 4,
     }
 }
 

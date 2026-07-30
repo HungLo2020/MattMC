@@ -9,11 +9,11 @@ use super::error::{GalError, GalResult, StatusCode};
 use super::gal::VulkanicGal;
 use super::handles::Handle;
 use super::resources::{
-    AccessFlags, BlendMode, BufferDesc, BufferUsage, ColorFormat, Extent3d, GraphicsPipelineDesc,
-    MemoryDomain, PipelineLayoutDesc, PipelineStageFlags, PrimitiveTopology, QueueClass,
-    RenderPassDesc, ResourceBinding, ResourceBindingDesc, ResourceBindingKind, ResourceLayoutDesc,
-    ResourceSetDesc, SamplerAddressMode, SamplerDesc, SamplerFilter, ShaderCodeFormat,
-    ShaderModuleDesc, ShaderStage, TextureDesc, TextureDimension, TextureFormat,
+    AccessFlags, BackendApi, BlendMode, BufferDesc, BufferUsage, ColorFormat, Extent3d,
+    GraphicsPipelineDesc, MemoryDomain, PipelineLayoutDesc, PipelineStageFlags, PrimitiveTopology,
+    QueueClass, RenderPassDesc, ResourceBinding, ResourceBindingDesc, ResourceBindingKind,
+    ResourceLayoutDesc, ResourceSetDesc, SamplerAddressMode, SamplerDesc, SamplerFilter,
+    ShaderCodeFormat, ShaderModuleDesc, ShaderStage, TextureDesc, TextureDimension, TextureFormat,
     TextureSubresourceRange, TextureUsage, TextureViewDesc,
 };
 use super::{BufferImageCopyRegion, CommandListDesc, CullMode};
@@ -485,11 +485,7 @@ impl GuiFrontend {
         }
         stats.sprite_batch_count = batches.len() as u64;
         let mut ops = Vec::new();
-        let whole_frame_vulkan = gal
-            .capabilities()
-            .name
-            .to_ascii_lowercase()
-            .contains("vulkan");
+        let whole_frame_vulkan = gal.capabilities().api == BackendApi::Vulkan;
         if whole_frame_vulkan {
             ops.push(CommandOp::BeginPass {
                 pass: frame_pass,
@@ -543,6 +539,7 @@ impl GuiFrontend {
             ops.push(CommandOp::SetIndexBuffer {
                 buffer: resources.index_buffer,
                 offset: 0,
+                index_type: super::resources::IndexType::U32,
             });
             ops.push(CommandOp::DrawIndexed {
                 indices: 6,
@@ -581,11 +578,7 @@ impl GuiFrontend {
     ) -> GalResult<GuiResources> {
         let label = format!("gui-textured-{}-gen{}", group.label(), self.generation);
         let atlas = self.atlas_for(group)?.clone();
-        let vulkan_shader_syntax = gal
-            .capabilities()
-            .name
-            .to_ascii_lowercase()
-            .contains("vulkan");
+        let vulkan_shader_syntax = gal.capabilities().api == BackendApi::Vulkan;
         let vertex_shader_code = if vulkan_shader_syntax {
             VERTEX_SHADER_VULKAN
         } else {
@@ -927,8 +920,6 @@ fn buffer_barrier(
         subresources: None,
         before,
         after,
-        stages: PipelineStageFlags(PipelineStageFlags::DRAW.0 | PipelineStageFlags::TRANSFER.0),
-        access: AccessFlags::TRANSFER,
         src_queue: QueueClass::Graphics,
         dst_queue: QueueClass::Graphics,
     }
@@ -949,8 +940,6 @@ fn texture_barrier(
         }),
         before,
         after,
-        stages: PipelineStageFlags(PipelineStageFlags::DRAW.0 | PipelineStageFlags::TRANSFER.0),
-        access: AccessFlags::TRANSFER,
         src_queue: QueueClass::Graphics,
         dst_queue: QueueClass::Graphics,
     }

@@ -146,13 +146,13 @@ def write_world_crack_probe_image(path: Path, *, variant: str) -> None:
     image.save(path)
 
 
-def write_block_marker_probe_image(path: Path, *, texture_id: int = 100) -> None:
+def write_block_marker_probe_image(path: Path, *, texture_id: int = harness.WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER) -> None:
     from PIL import Image
 
     path.parent.mkdir(parents=True, exist_ok=True)
     image = Image.new("RGB", (1280, 720), (36, 48, 60))
     left, top, right, bottom = 560, 300, 640, 380
-    if texture_id == 100:
+    if texture_id == harness.WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER:
         for x in range(left, right):
             for y in range(top, bottom):
                 if abs((x - left) - (y - top)) <= 5:
@@ -170,18 +170,18 @@ def write_block_marker_probe_image(path: Path, *, texture_id: int = 100) -> None
     image.save(path)
 
 
-def write_terrain_particle_probe_image(path: Path, *, texture_id: int = 1) -> None:
+def write_terrain_particle_probe_image(path: Path, *, texture_id: int = harness.WORLD_MATERIAL_TEXTURE_STONE) -> None:
     from PIL import Image
 
     path.parent.mkdir(parents=True, exist_ok=True)
     image = Image.new("RGB", (1280, 720), (36, 48, 60))
     left, top, right, bottom = 560, 300, 640, 380
     color = {
-        1: (116, 116, 116),
-        2: (128, 82, 45),
-        3: (74, 128, 52),
-        4: (70, 73, 80),
-        5: (220, 220, 205),
+        harness.WORLD_MATERIAL_TEXTURE_STONE: (116, 116, 116),
+        harness.WORLD_MATERIAL_TEXTURE_DIRT: (128, 82, 45),
+        harness.WORLD_MATERIAL_TEXTURE_OAK_LEAVES: (74, 128, 52),
+        harness.WORLD_MATERIAL_TEXTURE_DEEPSLATE: (70, 73, 80),
+        harness.WORLD_MATERIAL_TEXTURE_WHITE_WOOL: (220, 220, 205),
     }.get(texture_id, (116, 116, 116))
     for x in range(left, right):
         for y in range(top, bottom):
@@ -446,7 +446,9 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             capture = temp / "capture"
             write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
             screenshot = capture / "block_marker_barrier.png"
-            write_block_marker_probe_image(screenshot, texture_id=100)
+            texture_id = harness.WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER
+            material_id = harness.WORLD_MATERIAL_BLOCK_MARKER_CUTOUT
+            write_block_marker_probe_image(screenshot, texture_id=texture_id)
             deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
             doc = json.loads(deterministic.read_text(encoding="utf-8"))
             doc["captures"][0]["screenshot"] = str(screenshot)
@@ -454,7 +456,7 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             doc["rustGalWorldMaterialMarkers"] = [
                 {
                     "route": "rust-vulkan-whole-frame",
-                    "textureId": 100,
+                    "textureId": texture_id,
                     "center": {"x": 1.5, "y": 80.5, "z": 2.5},
                     "quadSize": 0.5,
                     "colorArgb": 0xFFFFFFFF,
@@ -468,8 +470,8 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
                 "\n".join(
                     [
                         "-Dmattmc.dev.rustGalWorldMaterial.blockMarkerScenario=barrier",
-                        "Rust VulkanicGAL BlockMarker semantic request route=rust-vulkan-whole-frame texture_id=100 material_id=100 result=queued",
-                        "gal.frame.target.begin backend=vulkan frame=1 material_marker_barrier_quads=1 material_marker_light_quads=0 material_marker_light_level_mask=0 material_marker_last_light_level=-1 material_marker_last_texture_id=100",
+                        f"Rust VulkanicGAL BlockMarker semantic request route=rust-vulkan-whole-frame texture_id={texture_id} material_id={material_id} result=queued",
+                        f"gal.frame.target.begin backend=vulkan frame=1 material_marker_barrier_quads=1 material_marker_light_quads=0 material_marker_light_level_mask=0 material_marker_last_light_level=-1 material_marker_last_texture_id={texture_id}",
                         "rust_gal_world_material_quads_executed=1",
                         "rust_gal_world_material_batches_executed=1",
                         "rust_gal_world_material_draws_executed=1",
@@ -492,9 +494,9 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             counters = artifact["metrics"]["rust_gal_slice"]
             self.assertTrue(artifact["validation"]["complete"])
             self.assertEqual(counters["world_material_marker_barrier_quads"], 1)
-            self.assertEqual(counters["world_material_marker_last_texture_id"], 100)
+            self.assertEqual(counters["world_material_marker_last_texture_id"], texture_id)
             self.assertEqual("present", counters["world_material_marker_pixel_evidence"]["status"])
-            self.assertEqual([100], counters["world_material_marker_pixel_evidence"]["validated_texture_ids"])
+            self.assertEqual([texture_id], counters["world_material_marker_pixel_evidence"]["validated_texture_ids"])
 
     def test_terrain_particle_summary_uses_projected_crop_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -504,7 +506,9 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             capture = temp / "capture"
             write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
             screenshot = capture / "terrain_particle_stone.png"
-            write_terrain_particle_probe_image(screenshot, texture_id=1)
+            texture_id = harness.WORLD_MATERIAL_TEXTURE_STONE
+            material_id = harness.WORLD_MATERIAL_OPAQUE_TEXTURED
+            write_terrain_particle_probe_image(screenshot, texture_id=texture_id)
             deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
             doc = json.loads(deterministic.read_text(encoding="utf-8"))
             doc["captures"][0]["screenshot"] = str(screenshot)
@@ -513,7 +517,7 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
                 {
                     "frameIndex": doc["captures"][0].get("renderedFrameIndex", 1),
                     "route": "rust-vulkan-whole-frame",
-                    "textureId": 1,
+                    "textureId": texture_id,
                     "spriteId": "minecraft:block/stone",
                     "center": {"x": 1.5, "y": 80.5, "z": 2.5},
                     "quadSize": 0.15,
@@ -531,8 +535,8 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
                 "\n".join(
                     [
                         "-Dmattmc.dev.rustGalWorldMaterial.terrainParticleScenario=stone",
-                        "Rust VulkanicGAL TerrainParticle semantic request route=rust-vulkan-whole-frame texture_id=1 material_id=1 mode=1 sprite=minecraft:block/stone result=queued",
-                        "gal.frame.target.begin backend=vulkan frame=1 material_terrain_particle_quads=1 material_terrain_particle_texture_mask=2 material_marker_barrier_quads=0 material_marker_light_quads=0 material_marker_light_level_mask=0 material_marker_last_light_level=-1 material_marker_last_texture_id=1",
+                        f"Rust VulkanicGAL TerrainParticle semantic request route=rust-vulkan-whole-frame texture_id={texture_id} material_id={material_id} mode=1 sprite=minecraft:block/stone result=queued",
+                        f"gal.frame.target.begin backend=vulkan frame=1 material_terrain_particle_quads=1 material_terrain_particle_texture_mask=2 material_marker_barrier_quads=0 material_marker_light_quads=0 material_marker_light_level_mask=0 material_marker_last_light_level=-1 material_marker_last_texture_id={texture_id}",
                         "rust_gal_world_material_quads_executed=1",
                         "rust_gal_world_material_batches_executed=1",
                         "rust_gal_world_material_draws_executed=1",
@@ -555,7 +559,7 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             self.assertTrue(artifact["validation"]["complete"])
             self.assertEqual(1, counters["world_material_terrain_particle_quads"])
             self.assertEqual("present", counters["world_material_terrain_particle_pixel_evidence"]["status"])
-            self.assertEqual([1], counters["world_material_terrain_particle_pixel_evidence"]["validated_texture_ids"])
+            self.assertEqual([texture_id], counters["world_material_terrain_particle_pixel_evidence"]["validated_texture_ids"])
 
     def test_oak_leaf_terrain_particle_requires_cutout_material_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -565,7 +569,9 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             capture = temp / "capture"
             write_capture(capture, backend=mode.backend, shaders=mode.shaders, world="Origin")
             screenshot = capture / "terrain_particle_oak_leaves.png"
-            write_terrain_particle_probe_image(screenshot, texture_id=3)
+            texture_id = harness.WORLD_MATERIAL_TEXTURE_OAK_LEAVES
+            material_id = harness.WORLD_MATERIAL_OPAQUE_TEXTURED
+            write_terrain_particle_probe_image(screenshot, texture_id=texture_id)
             deterministic = capture / "deterministic_camera_capture_20260101_000000.json"
             doc = json.loads(deterministic.read_text(encoding="utf-8"))
             doc["captures"][0]["screenshot"] = str(screenshot)
@@ -574,7 +580,7 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
                 {
                     "frameIndex": doc["captures"][0].get("renderedFrameIndex", 1),
                     "route": "rust-vulkan-whole-frame",
-                    "textureId": 3,
+                    "textureId": texture_id,
                     "spriteId": "minecraft:block/oak_leaves",
                     "center": {"x": 1.5, "y": 80.5, "z": 2.5},
                     "quadSize": 0.15,
@@ -592,8 +598,8 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
                 "\n".join(
                     [
                         "-Dmattmc.dev.rustGalWorldMaterial.terrainParticleScenario=oak-leaves",
-                        "Rust VulkanicGAL TerrainParticle semantic request route=rust-vulkan-whole-frame texture_id=3 material_id=1 mode=1 sprite=minecraft:block/oak_leaves result=queued",
-                        "gal.frame.target.begin backend=vulkan frame=1 material_terrain_particle_quads=1 material_terrain_particle_texture_mask=8 material_marker_barrier_quads=0 material_marker_light_quads=0 material_marker_light_level_mask=0 material_marker_last_light_level=-1 material_marker_last_texture_id=3",
+                        f"Rust VulkanicGAL TerrainParticle semantic request route=rust-vulkan-whole-frame texture_id={texture_id} material_id={material_id} mode=1 sprite=minecraft:block/oak_leaves result=queued",
+                        f"gal.frame.target.begin backend=vulkan frame=1 material_terrain_particle_quads=1 material_terrain_particle_texture_mask=8 material_marker_barrier_quads=0 material_marker_light_quads=0 material_marker_light_level_mask=0 material_marker_last_light_level=-1 material_marker_last_texture_id={texture_id}",
                         "rust_gal_world_material_quads_executed=1",
                         "rust_gal_world_material_batches_executed=1",
                         "rust_gal_world_material_draws_executed=1",

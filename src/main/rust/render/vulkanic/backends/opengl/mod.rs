@@ -382,9 +382,7 @@ mod tests {
         CommandListDesc, CommandOp, ResourceBarrier, SubmissionBatch, TextureUsageState,
     };
     use crate::render::vulkanic::gal::VulkanicGal;
-    use crate::render::vulkanic::resources::{
-        AccessFlags, BufferDesc, BufferUsage, MemoryDomain, PipelineStageFlags, QueueClass,
-    };
+    use crate::render::vulkanic::resources::{BufferDesc, BufferUsage, MemoryDomain, QueueClass};
 
     #[test]
     fn opengl_backend_can_bootstrap_or_reports_environment_gap() {
@@ -564,8 +562,6 @@ mod tests {
             subresources: None,
             before: TextureUsageState::TransferDst,
             after: TextureUsageState::TransferSrc,
-            stages: PipelineStageFlags::TRANSFER,
-            access: AccessFlags::TRANSFER,
             src_queue: QueueClass::Graphics,
             dst_queue: QueueClass::Graphics,
         })

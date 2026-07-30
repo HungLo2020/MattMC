@@ -376,7 +376,15 @@ pub struct BackendLimits {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BackendApi {
+    Vulkan,
+    OpenGl,
+    Mock,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BackendCapabilities {
+    pub api: BackendApi,
     pub name: &'static str,
     pub features: BackendFeatureFlags,
     pub limits: BackendLimits,

@@ -8,7 +8,8 @@ use super::resources::{
 };
 use super::trace;
 use crate::render::vulkanic::commands::{
-    AttachmentLoadOp, BufferImageCopyRegion, CommandOp, ValidatedSubmissionBatch,
+    AttachmentLoadOp, BufferImageCopyRegion, CommandOp, ResourceBarrier, TextureUsageState,
+    ValidatedSubmissionBatch,
 };
 use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::handles::Handle;
@@ -415,19 +416,23 @@ impl OpenGlLowerer {
                 self.bind_resource_set(objects, set_object)?;
                 Ok(())
             }
-            CommandOp::SetIndexBuffer { buffer, offset } => {
+            CommandOp::SetIndexBuffer {
+                buffer,
+                offset,
+                index_type,
+            } => {
                 let _zone = trace::Zone::new("opengl.lowering.bind-index-buffer");
                 let buffer_object = objects.buffer(*buffer)?;
                 unsafe {
                     self.gl
                         .bind_buffer(glow::ELEMENT_ARRAY_BUFFER, Some(buffer_object.buffer));
                 }
-                state.index_buffer = Some((*buffer, *offset));
+                state.index_buffer = Some((*buffer, *offset, *index_type));
                 Ok(())
             }
             CommandOp::DrawIndexed { indices, instances } => {
                 let _zone = trace::Zone::new("opengl.lowering.draw-indexed");
-                let Some((_, offset)) = state.index_buffer else {
+                let Some((_, offset, index_type)) = state.index_buffer else {
                     return Err(GalError::backend("indexed draw missing index buffer"));
                 };
                 unsafe {
@@ -435,7 +440,7 @@ impl OpenGlLowerer {
                         state.topology,
                         i32::try_from(*indices)
                             .map_err(|_| GalError::backend("index count exceeds i32"))?,
-                        glow::UNSIGNED_INT,
+                        gl_index_type(index_type),
                         i32::try_from(offset)
                             .map_err(|_| GalError::backend("index offset exceeds i32"))?,
                         i32::try_from(*instances)
@@ -461,7 +466,7 @@ impl OpenGlLowerer {
                 }
                 Ok(())
             }
-            CommandOp::Barrier(_) => Ok(()),
+            CommandOp::Barrier(barrier) => self.apply_resource_barrier(barrier),
             CommandOp::BindComputePipeline(_)
             | CommandOp::Dispatch { .. }
             | CommandOp::DispatchIndirect { .. }
@@ -852,6 +857,17 @@ impl OpenGlLowerer {
         }
         Ok(())
     }
+
+    fn apply_resource_barrier(&mut self, barrier: &ResourceBarrier) -> GalResult<()> {
+        let bits = gl_memory_barrier_bits(barrier.before, barrier.after);
+        if bits != 0 {
+            unsafe {
+                self.record_gl_call();
+                self.gl.memory_barrier(bits);
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Default)]
@@ -860,7 +876,7 @@ struct ExecutionState {
     target: Option<Handle>,
     pipeline: Option<Handle>,
     pipeline_layout: Option<Handle>,
-    index_buffer: Option<(Handle, u64)>,
+    index_buffer: Option<(Handle, u64, crate::render::vulkanic::resources::IndexType)>,
     topology: u32,
     bound_sets: BTreeMap<u32, Handle>,
 }
@@ -979,6 +995,39 @@ fn opengl_blend_state(blend: BlendMode) -> OpenGlBlendState {
         color_op: glow::FUNC_ADD,
         alpha_op: glow::FUNC_ADD,
         factors,
+    }
+}
+
+fn gl_index_type(index_type: crate::render::vulkanic::resources::IndexType) -> u32 {
+    match index_type {
+        crate::render::vulkanic::resources::IndexType::U16 => glow::UNSIGNED_SHORT,
+        crate::render::vulkanic::resources::IndexType::U32 => glow::UNSIGNED_INT,
+    }
+}
+
+fn gl_memory_barrier_bits(before: TextureUsageState, after: TextureUsageState) -> u32 {
+    match (before, after) {
+        (TextureUsageState::ShaderWrite, TextureUsageState::ShaderRead) => {
+            glow::SHADER_STORAGE_BARRIER_BIT | glow::TEXTURE_FETCH_BARRIER_BIT
+        }
+        (TextureUsageState::ShaderWrite, TextureUsageState::ShaderWrite) => {
+            glow::SHADER_STORAGE_BARRIER_BIT
+        }
+        (TextureUsageState::TransferDst, TextureUsageState::ShaderRead) => {
+            glow::TEXTURE_FETCH_BARRIER_BIT | glow::SHADER_STORAGE_BARRIER_BIT
+        }
+        (TextureUsageState::TransferDst, TextureUsageState::IndexRead) => {
+            glow::ELEMENT_ARRAY_BARRIER_BIT
+        }
+        (TextureUsageState::TransferDst, TextureUsageState::TransferSrc)
+        | (TextureUsageState::TransferSrc, TextureUsageState::TransferDst) => {
+            glow::BUFFER_UPDATE_BARRIER_BIT | glow::TEXTURE_UPDATE_BARRIER_BIT
+        }
+        (TextureUsageState::ColorAttachment, TextureUsageState::ShaderRead)
+        | (TextureUsageState::DepthStencilAttachment, TextureUsageState::ShaderRead) => {
+            glow::FRAMEBUFFER_BARRIER_BIT | glow::TEXTURE_FETCH_BARRIER_BIT
+        }
+        _ => 0,
     }
 }
 

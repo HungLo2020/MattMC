@@ -482,13 +482,17 @@ impl SubmissionLowerer {
                         &[*offset],
                     );
                 }
-                CommandOp::SetIndexBuffer { buffer, offset } => {
+                CommandOp::SetIndexBuffer {
+                    buffer,
+                    offset,
+                    index_type,
+                } => {
                     let buffer = objects.buffer(*buffer)?;
                     self.context.device.cmd_bind_index_buffer(
                         command_buffer,
                         buffer.buffer,
                         *offset,
-                        vk::IndexType::UINT32,
+                        vk_index_type(*index_type),
                     );
                 }
                 CommandOp::Draw {
@@ -874,6 +878,13 @@ pub(super) fn access_mask(state: TextureUsageState) -> vk::AccessFlags2 {
         TextureUsageState::TransferSrc => vk::AccessFlags2::TRANSFER_READ,
         TextureUsageState::TransferDst => vk::AccessFlags2::TRANSFER_WRITE,
         TextureUsageState::IndexRead => vk::AccessFlags2::INDEX_READ,
+    }
+}
+
+fn vk_index_type(index_type: crate::render::vulkanic::resources::IndexType) -> vk::IndexType {
+    match index_type {
+        crate::render::vulkanic::resources::IndexType::U16 => vk::IndexType::UINT16,
+        crate::render::vulkanic::resources::IndexType::U32 => vk::IndexType::UINT32,
     }
 }
 

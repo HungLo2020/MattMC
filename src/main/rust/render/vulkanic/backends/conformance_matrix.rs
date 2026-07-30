@@ -3,10 +3,10 @@ use crate::render::vulkanic::gal::VulkanicGal;
 use crate::render::vulkanic::handles::Handle;
 use crate::render::vulkanic::resources::*;
 use crate::render::vulkanic::{
-    AccessFlags, AttachmentLoadOp, AttachmentStoreOp, BufferDesc, BufferUsage, ClearColor,
-    CommandListDesc, CommandOp, MemoryDomain, PassAttachment, QueueClass, RenderPassDesc,
-    RenderTargetDesc, ResourceBarrier, SubmissionBatch, TextureDesc, TextureFormat,
-    TextureSubresourceRange, TextureUsage, TextureUsageState, TextureViewDesc,
+    AttachmentLoadOp, AttachmentStoreOp, BufferDesc, BufferUsage, ClearColor, CommandListDesc,
+    CommandOp, MemoryDomain, PassAttachment, QueueClass, RenderPassDesc, RenderTargetDesc,
+    ResourceBarrier, SubmissionBatch, TextureDesc, TextureFormat, TextureSubresourceRange,
+    TextureUsage, TextureUsageState, TextureViewDesc,
 };
 
 const WIDTH: u32 = 96;
@@ -361,8 +361,6 @@ fn texture_barrier(
         }),
         before,
         after,
-        stages: PipelineStageFlags::TRANSFER,
-        access: AccessFlags::TRANSFER,
         src_queue: QueueClass::Graphics,
         dst_queue: QueueClass::Graphics,
     })
@@ -374,8 +372,6 @@ fn buffer_barrier(resource: Handle) -> CommandOp {
         subresources: None,
         before: TextureUsageState::TransferDst,
         after: TextureUsageState::TransferSrc,
-        stages: PipelineStageFlags::TRANSFER,
-        access: AccessFlags::TRANSFER,
         src_queue: QueueClass::Graphics,
         dst_queue: QueueClass::Graphics,
     })

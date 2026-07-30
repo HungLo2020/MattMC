@@ -558,6 +558,7 @@ fn conformance_ops(
         CommandOp::SetIndexBuffer {
             buffer: index,
             offset: 0,
+            index_type: crate::render::vulkanic::resources::IndexType::U32,
         },
         CommandOp::DrawIndexed {
             indices: 6,
@@ -593,8 +594,6 @@ fn buffer_barrier(
         subresources: None,
         before,
         after,
-        stages: PipelineStageFlags::TRANSFER,
-        access: AccessFlags::TRANSFER,
         src_queue: QueueClass::Graphics,
         dst_queue: QueueClass::Graphics,
     })
@@ -615,8 +614,6 @@ fn texture_barrier(
         }),
         before,
         after,
-        stages: PipelineStageFlags::TRANSFER,
-        access: AccessFlags::TRANSFER,
         src_queue: QueueClass::Graphics,
         dst_queue: QueueClass::Graphics,
     })

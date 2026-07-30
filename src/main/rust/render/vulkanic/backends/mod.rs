@@ -17,10 +17,10 @@ use super::frame::{
 };
 use super::handles::{Handle, HandleKind};
 use super::resources::{
-    BackendCapabilities, BackendFeatureFlags, BackendLimits, BufferDesc, ComputePipelineDesc,
-    FrameTargetDesc, GraphicsPipelineDesc, PipelineLayoutDesc, RenderPassDesc, RenderTargetDesc,
-    ResourceLayoutDesc, ResourceSetDesc, SamplerDesc, ShaderModuleDesc, TextureDesc,
-    TextureViewDesc,
+    BackendApi, BackendCapabilities, BackendFeatureFlags, BackendLimits, BufferDesc,
+    ComputePipelineDesc, FrameTargetDesc, GraphicsPipelineDesc, PipelineLayoutDesc, RenderPassDesc,
+    RenderTargetDesc, ResourceLayoutDesc, ResourceSetDesc, SamplerDesc, ShaderModuleDesc,
+    TextureDesc, TextureViewDesc,
 };
 use super::sync::SubmissionId;
 
@@ -162,6 +162,7 @@ pub(super) trait Backend {
 
 pub(super) fn vulkan_capabilities() -> BackendCapabilities {
     BackendCapabilities {
+        api: BackendApi::Vulkan,
         name: "Rust Vulkan",
         features: BackendFeatureFlags {
             graphics: true,
@@ -211,6 +212,7 @@ pub(super) fn presentation_capabilities(
 
 pub(super) fn opengl_capabilities() -> BackendCapabilities {
     BackendCapabilities {
+        api: BackendApi::OpenGl,
         name: "Rust OpenGL",
         features: BackendFeatureFlags {
             graphics: true,

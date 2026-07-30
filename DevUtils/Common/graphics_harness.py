@@ -38,6 +38,33 @@ DEVUTILS_CACHE_ROOT = CURRENT_REPO_ROOT / "DevUtils" / ".cache"
 WORKLOAD_PROFILES = ("correctness", "moving-camera", "settled-static", "gameplay")
 TOOL_KINDS = ("gameplay", "subsystem", "capture", "matrix")
 RUNTIME_PROFILE_NAMES = ("smoke", "standard", "extended")
+WORLD_MATERIAL_TEXTURE_STONE = 0x21DF896F
+WORLD_MATERIAL_TEXTURE_DIRT = 0x0B0BBD25
+WORLD_MATERIAL_TEXTURE_OAK_LEAVES = 0x72321EC7
+WORLD_MATERIAL_TEXTURE_DEEPSLATE = 0x715D8D65
+WORLD_MATERIAL_TEXTURE_WHITE_WOOL = 0x2253A2EF
+WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER = 0x447D596A
+WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_IDS = [
+    0x665DA7AA,
+    0x50E88E0F,
+    0x079E2B74,
+    0x4A7C2B71,
+    0x35E90AE6,
+    0x2F21FECB,
+    0x2A27ABF0,
+    0x0EA4C92D,
+    0x4473CCE2,
+    0x0AB551C7,
+    0x7A250241,
+    0x1F439384,
+    0x4BAB8F5F,
+    0x431688FA,
+    0x0B2BDBBD,
+    0x019476C0,
+]
+WORLD_MATERIAL_OPAQUE_TEXTURED = 0x6A2FD335
+WORLD_MATERIAL_CUTOUT_TEXTURED = 0x129B1B90
+WORLD_MATERIAL_BLOCK_MARKER_CUTOUT = 0x224A8659
 WORLD_PROFILE_NAMES = ("migration-gate", "stress-diagnostic")
 
 
@@ -1740,32 +1767,38 @@ def deterministic_world_material_marker_pixel_evidence(
 
 def expected_block_marker_texture_ids(scenario_name: str) -> list[int]:
     if scenario_name == "barrier":
-        return [100]
+        return [WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER]
     if scenario_name == "lights-all":
-        return list(range(200, 216))
+        return WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_IDS
     if scenario_name.startswith("light-"):
         try:
             level = int(scenario_name.removeprefix("light-"))
         except ValueError:
             return []
         if 0 <= level <= 15:
-            return [200 + level]
+            return [WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_IDS[level]]
     return []
 
 
 def expected_terrain_particle_texture_ids(scenario_name: str) -> list[int]:
     return {
-        "stone": [1],
-        "dirt": [2],
-        "oak-leaves": [3],
-        "deepslate": [4],
-        "white-wool": [5],
-        "mixed-many": [1, 2, 3, 4, 5],
+        "stone": [WORLD_MATERIAL_TEXTURE_STONE],
+        "dirt": [WORLD_MATERIAL_TEXTURE_DIRT],
+        "oak-leaves": [WORLD_MATERIAL_TEXTURE_OAK_LEAVES],
+        "deepslate": [WORLD_MATERIAL_TEXTURE_DEEPSLATE],
+        "white-wool": [WORLD_MATERIAL_TEXTURE_WHITE_WOOL],
+        "mixed-many": [
+            WORLD_MATERIAL_TEXTURE_STONE,
+            WORLD_MATERIAL_TEXTURE_DIRT,
+            WORLD_MATERIAL_TEXTURE_OAK_LEAVES,
+            WORLD_MATERIAL_TEXTURE_DEEPSLATE,
+            WORLD_MATERIAL_TEXTURE_WHITE_WOOL,
+        ],
     }.get(scenario_name, [])
 
 
 def expected_terrain_particle_material_mode(texture_id: int) -> int:
-    return 2 if texture_id == 3 else 1
+    return 2 if texture_id == WORLD_MATERIAL_TEXTURE_OAK_LEAVES else 1
 
 
 def deterministic_world_material_terrain_particle_pixel_evidence(
@@ -1996,7 +2029,7 @@ def marker_crop_stats(crop: Any, texture_id: int) -> dict[str, object]:
                 colored_min_y = min(colored_min_y, y)
                 colored_max_x = max(colored_max_x, x)
                 colored_max_y = max(colored_max_y, y)
-    vanilla_expected = vanilla_barrier if texture_id == 100 else vanilla_light
+    vanilla_expected = vanilla_barrier if texture_id == WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER else vanilla_light
     pack_a_oriented = pack_a if pack_a_top > 0 and pack_a_left > 0 else 0
     pack_b_orientation_seen = (pack_b_top > 0 and pack_b_left > 0) or (pack_b_bottom > 0 and pack_b_right > 0)
     pack_b_oriented = pack_b if pack_b_orientation_seen else 0
@@ -2013,7 +2046,7 @@ def marker_crop_stats(crop: Any, texture_id: int) -> dict[str, object]:
         orientation_status = "passed" if pack_a_top > 0 and pack_a_left > 0 else "failed"
     elif (pack_b_oriented >= matching or pack_b_distinctive >= matching) and matching > 0:
         orientation_status = "passed" if pack_b_orientation_seen else "failed"
-    elif texture_id == 100 and vanilla_barrier > 0:
+    elif texture_id == WORLD_MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER and vanilla_barrier > 0:
         orientation_status = "passed" if red_main_diagonal >= max(4, red_anti_diagonal // 2) else "failed"
     if not coverage_ok:
         orientation_status = "failed"
@@ -2039,15 +2072,15 @@ def terrain_particle_crop_stats(crop: Any, texture_id: int) -> dict[str, object]
             red, green, blue = crop.getpixel((x, y))
             avg = (red + green + blue) / 3.0
             is_vanilla_match = False
-            if texture_id == 1:  # stone
+            if texture_id == WORLD_MATERIAL_TEXTURE_STONE:
                 is_vanilla_match = 45 <= avg <= 190 and max(red, green, blue) - min(red, green, blue) <= 55
-            elif texture_id == 2:  # dirt
+            elif texture_id == WORLD_MATERIAL_TEXTURE_DIRT:
                 is_vanilla_match = red >= 55 and green >= 35 and blue <= 120 and red >= blue + 12 and green >= blue
-            elif texture_id == 3:  # oak leaves
+            elif texture_id == WORLD_MATERIAL_TEXTURE_OAK_LEAVES:
                 is_vanilla_match = green >= 45 and green >= red and green >= blue
-            elif texture_id == 4:  # deepslate
+            elif texture_id == WORLD_MATERIAL_TEXTURE_DEEPSLATE:
                 is_vanilla_match = 25 <= avg <= 125 and max(red, green, blue) - min(red, green, blue) <= 65
-            elif texture_id == 5:  # white wool
+            elif texture_id == WORLD_MATERIAL_TEXTURE_WHITE_WOOL:
                 is_vanilla_match = red >= 120 and green >= 120 and blue >= 110 and max(red, green, blue) - min(red, green, blue) <= 85
             pack_a_pixel = red >= 95 and red >= green + 25 and red >= blue + 20
             pack_b_pixel = green >= 55 and green >= red + 22 and green >= blue + 12

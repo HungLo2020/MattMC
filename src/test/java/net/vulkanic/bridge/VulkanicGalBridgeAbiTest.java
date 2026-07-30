@@ -32,6 +32,20 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class VulkanicGalBridgeAbiTest {
+	private static String readRustFfiModules() throws Exception {
+		Path root = Path.of("src/main/rust/render/vulkanic/ffi");
+		StringBuilder source = new StringBuilder();
+		try (java.util.stream.Stream<Path> paths = Files.walk(root)) {
+			for (Path path : paths
+				.filter(file -> Files.isRegularFile(file) && file.toString().endsWith(".rs"))
+				.sorted()
+				.toList()) {
+				source.append(Files.readString(path)).append('\n');
+			}
+		}
+		return source.toString();
+	}
+
 	@Test
 	void javaLayoutsAreQueriedFromRustAbi() {
 		for (VulkanicGalBridge.Struct struct : VulkanicGalBridge.Struct.values()) {
@@ -122,7 +136,7 @@ class VulkanicGalBridgeAbiTest {
 		String worldRoutePolicy = Files.readString(Path.of("src/main/java/net/vulkanic/world/WorldRenderRoutePolicy.java"));
 		String gameRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
 		String levelRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/LevelRenderer.java"));
-		String rustFfi = Files.readString(Path.of("src/main/rust/render/vulkanic/ffi.rs"));
+		String rustFfi = readRustFfiModules();
 		String rustWorldFrontend = Files.readString(Path.of("src/main/rust/render/vulkanic/world_primitive_frontend.rs"));
 
 		assertTrue(bridge.contains("mattmc_vulkanic_gal_whole_frame_submit"));
@@ -702,7 +716,7 @@ class VulkanicGalBridgeAbiTest {
 		String rustBackends = Files.readString(Path.of("src/main/rust/render/vulkanic/backends/mod.rs"));
 		String rustVulkan = Files.readString(Path.of("src/main/rust/render/vulkanic/backends/vulkan/mod.rs"));
 		String rustGuiFrontend = Files.readString(Path.of("src/main/rust/render/vulkanic/gui_frontend.rs"));
-		String rustFfi = Files.readString(Path.of("src/main/rust/render/vulkanic/ffi.rs"));
+		String rustFfi = readRustFfiModules();
 
 		assertTrue(mode.contains("mattmc.dev.rustGalVulkanWholeFrame"));
 		assertTrue(bridge.contains("mattmc_vulkanic_gal_context_create_windowed_vulkan"));

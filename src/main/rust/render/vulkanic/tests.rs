@@ -647,8 +647,6 @@ fn large_supported_batches_validate_with_backend_limits() {
                         subresources: None,
                         before: TextureUsageState::TransferDst,
                         after: TextureUsageState::ShaderRead,
-                        stages: PipelineStageFlags::TRANSFER,
-                        access: AccessFlags::TRANSFER,
                         src_queue: QueueClass::Graphics,
                         dst_queue: QueueClass::Graphics,
                     }),
@@ -1506,10 +1504,6 @@ fn attachment_and_presentation_hazards_require_semantic_separation() {
                     subresources: Some(full_range),
                     before: TextureUsageState::ColorAttachment,
                     after: TextureUsageState::Present,
-                    stages: PipelineStageFlags(
-                        PipelineStageFlags::DRAW.0 | PipelineStageFlags::PRESENT.0,
-                    ),
-                    access: AccessFlags(AccessFlags::COLOR_ATTACHMENT.0 | AccessFlags::READ.0),
                     src_queue: QueueClass::Graphics,
                     dst_queue: QueueClass::Present,
                 }),
@@ -1595,9 +1589,7 @@ fn malformed_commands_and_usage_declarations_are_rejected() {
                 resource: src,
                 subresources: None,
                 before: TextureUsageState::TransferSrc,
-                after: TextureUsageState::TransferDst,
-                stages: PipelineStageFlags::NONE,
-                access: AccessFlags::TRANSFER,
+                after: TextureUsageState::TransferSrc,
                 src_queue: QueueClass::Transfer,
                 dst_queue: QueueClass::Transfer,
             })],
@@ -1640,10 +1632,59 @@ fn malformed_commands_and_usage_declarations_are_rejected() {
                 CommandOp::SetIndexBuffer {
                     buffer: not_transfer_dst,
                     offset: 0,
+                    index_type: IndexType::U32,
                 },
                 CommandOp::EndPass,
             ],
         }),
+        super::StatusCode::InvalidArgument,
+    );
+}
+
+#[test]
+fn indexed_draws_validate_index_type_alignment_and_range() {
+    let mut gal = gal();
+    let (color_view, target, pass, _layout, pipeline) = simple_graphics_scene(&mut gal);
+    let index = gal
+        .create_buffer(BufferDesc {
+            label: "typed-index".to_owned(),
+            size: 12,
+            memory: MemoryDomain::DeviceLocal,
+            usages: vec![BufferUsage::Index],
+        })
+        .unwrap();
+    let valid = |offset, index_type, indices| CommandListDesc {
+        label: "typed-index-draw".to_owned(),
+        operations: vec![
+            CommandOp::BeginPass {
+                pass,
+                target,
+                colors: vec![color_attachment(color_view)],
+                depth_stencil: None,
+            },
+            CommandOp::BindGraphicsPipeline(pipeline),
+            CommandOp::SetIndexBuffer {
+                buffer: index,
+                offset,
+                index_type,
+            },
+            CommandOp::DrawIndexed {
+                indices,
+                instances: 1,
+            },
+            CommandOp::EndPass,
+        ],
+    };
+    gal.create_command_list(valid(8, IndexType::U16, 2))
+        .unwrap();
+    gal.create_command_list(valid(4, IndexType::U32, 2))
+        .unwrap();
+    assert_code(
+        gal.create_command_list(valid(1, IndexType::U16, 2)),
+        super::StatusCode::InvalidArgument,
+    );
+    assert_code(
+        gal.create_command_list(valid(8, IndexType::U32, 2)),
         super::StatusCode::InvalidArgument,
     );
 }
@@ -1699,8 +1740,6 @@ fn buffer_texture_copy_commands_validate_usage_ranges_and_hazards() {
                 subresources: Some(full_range),
                 before: TextureUsageState::TransferDst,
                 after: TextureUsageState::TransferSrc,
-                stages: PipelineStageFlags::TRANSFER,
-                access: AccessFlags::TRANSFER,
                 src_queue: QueueClass::Transfer,
                 dst_queue: QueueClass::Transfer,
             }),
@@ -3362,7 +3401,18 @@ fn backend_specific_api_tokens_do_not_leak_into_gal_core() {
     for relative in [
         "commands.rs",
         "error.rs",
-        "ffi.rs",
+        "ffi/abi.rs",
+        "ffi/context.rs",
+        "ffi/frame.rs",
+        "ffi/gui.rs",
+        "ffi/layout.rs",
+        "ffi/material.rs",
+        "ffi/memory.rs",
+        "ffi/mod.rs",
+        "ffi/resources.rs",
+        "ffi/status.rs",
+        "ffi/submission.rs",
+        "ffi/world.rs",
         "frame.rs",
         "gal.rs",
         "handles.rs",
